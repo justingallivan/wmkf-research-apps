@@ -2,9 +2,11 @@
 
 Last source comparison: 2026-10-13, main `b3219f4aa`; paused local branch
 `codex/proposal-ranking` at `0d161d60f`. **Source verification only; no new live probe.**
-Current product authority: revision 4 of
+Current product authority: revision 5 of
 `docs/plans/PROPOSAL_RANKING_DESIGN_2026-10-07.md` (agreed October 13).
-The new assessment/reveal workflow is **[PLANNED]**, not implemented by this docs update.
+The new assessment/reveal/reset workflow is **[PLANNED]**, not implemented by this docs update.
+Implementation stages and proposed durable contracts are in
+`docs/plans/PROPOSAL_RANKING_IMPLEMENTATION_PLAN_2026-10-13.md`; they are not provisioned state.
 
 ## Current source and historical deployment boundary
 
@@ -89,19 +91,26 @@ sentiment enrichment, or ranking workbook export (bounded source search in the a
 [VERIFIED via local source at `0d161d60f`] The branch adds a combined **meeting** list
 only after the program meetings are published, a funding-history reader, a local
 rehearsal, a marked dry-run reset, and browser CSV export. It does not collect each
-PD's combined preference or implement revision 4's assessment/readiness model.
+PD's combined preference or implement revision 5's assessment/readiness model.
 Its funding DTO includes qualifying award count, total USD, latest award cycle and
 availability; its card displays dollars and latest award month/year. The agreed
-replacement display is count/year. These features must be adapted, not assumed
+replacement display is count/latest award year across all recorded qualifying regular Research
+awards, with no recency window or quantitative weighting. Zero qualifying awards must not be
+labelled never funded by the Foundation; unavailable/provisional coverage stays explicit. These features must be adapted, not assumed
 ready to merge as the revised workflow. Branch role/delete behavior is not deployed
 by the documentation comparison; no dry-run erase is authorized here.
 
 ## Planned persistence and consumers
 
-[PLANNED] Revision 4 requires durable grades, confidence, separator positions,
-individual combined orders, readiness/reopen versions, one immutable reveal and
-one collective recommendation with funding sections. The schema/version/transition
-mapping is still an engineering prerequisite; none is represented as provisioned.
+[PLANNED] Revision 5 requires durable grades, confidence, separator positions,
+individual combined orders, readiness/reopen versions, immutable reveal revisions and
+one active collective recommendation with funding sections. Resets must be available at every
+stage for the walkthrough: preserve prior reveal records, require everyone ready plus a fresh
+facilitator reveal after reopening private preparation, and make a PD combined-list rebuild
+explicit rather than silently overwrite cross-program edits. Future restrictions on those reset
+controls remain undecided. Initial collective separators enclose only the unanimous-A prefix
+and unanimous-C suffix of the calculated order; the middle is Alternates. Proposed
+schema/version/transition mapping belongs to the implementation plan; none is provisioned.
 The API document preserves the actual main wire contract separately from planned
 changes. New design does not authorize rewriting old round data.
 

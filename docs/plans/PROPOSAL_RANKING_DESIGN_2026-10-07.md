@@ -1,10 +1,11 @@
 # Proposal Ranking — agreed assessment and recommendation workflow
 
-Updated: 2026-10-13. Revision: 4. Owner: Justin.
+Updated: 2026-10-13. Revision: 5. Owner: Justin.
 Status: **[PLANNED] Product workflow agreed; implementation not authorized in this task.**
 The filename is retained for existing links; October 7 is the original design date,
-not the date of this revision. This revision supersedes revision 3's product workflow
-and the October 11 branch's later combined-meeting approach.
+not the date of this revision. This revision incorporates the later October 13
+reset/default decisions and resolves revision 4's open product choices. It supersedes
+revision 3's workflow and the October 11 branch's combined-meeting approach.
 
 Authority: Justin's October 13 decisions in the current conversation, including the
 colleague-reviewed text and the supplied October 11–12 conversation/handoff.
@@ -14,6 +15,7 @@ No runtime, schema, permission, prompt, or live-data change is made by this revi
 Implementation evidence and source comparison:
 `docs/audits/PROPOSAL_RANKING_WORKFLOW_RECONCILIATION_2026-10-13.md`.
 Storage/current-state inventory: `docs/atlas/dataverse-proposal-ranking.md`.
+Implementation sequence: `docs/plans/PROPOSAL_RANKING_IMPLEMENTATION_PLAN_2026-10-13.md`.
 Existing API versus planned contract changes: `docs/plans/PROPOSAL_RANKING_API_CONTRACT.md`.
 
 ## 1. Purpose and end-to-end process
@@ -80,9 +82,13 @@ ascending; use request identity only as a final technical fallback. A known scor
 precedes a missing score; two missing/equal scores use the fallback. These fallback
 rules settle otherwise equal ordering, not substantive preference differences.
 
-Returning to program preparation after a combined list has been edited must not
-silently regenerate or overwrite it. The exact return/rebuild interaction remains
-an implementation design item (§10), not permission to erase a PD's work.
+All preparation is rebuildable. Returning to a program list never silently overwrites
+an edited combined list. Editing either program clears readiness and invalidates
+combined confirmation. The PD explicitly rebuilds from the current program lists,
+reviews the replacement, and reconfirms the combined ranking before marking ready.
+The confirmation explains that combined-only ordering and assessment changes will
+be replaced by the program assessments. Confidence follows each proposal from the
+program preparation used in the rebuild.
 
 ## 4. Ready, privacy, and reveal — agreed
 
@@ -94,7 +100,8 @@ and a confirmed unique position in that PD's complete combined list, with all sa
 confirmed. Before reveal they can reopen preparation; reopening clears readiness.
 They must mark ready again after revising.
 
-Once every PD is ready, the facilitator performs **one reveal action**. Reveal:
+Once every PD is ready, the facilitator performs **one reveal action per preparation
+version**. Reveal:
 
 - Preserves every PD's combined ranking, A/B/C grades, and confidence as immutable
   individual inputs, with the identities and versions that contributed.
@@ -102,9 +109,12 @@ Once every PD is ready, the facilitator performs **one reveal action**. Reveal:
 - Starts one shared collective list. There is no separate generate/publish workflow
   for each program and no facilitator rearrangement of a hidden calculated draft.
 
-After reveal only the collective order/classification changes. Individual inputs
-remain as they were at reveal; no second individual assessment round is required.
-There is no normal bypass for an unready PD. Facilitator status alone adds no vote.
+During normal group work, only the collective order/classification changes. Individual
+inputs remain as they were at that reveal. An explicit facilitator reset may reopen
+preparation for a new version (§10); it never edits the preserved reveal. Everyone
+must mark ready again before another reveal. A second individual assessment round
+is available when needed, not a mandatory step. There is no bypass for an unready PD,
+including in a dry run. Facilitator status alone adds no vote.
 
 ## 5. Calculate the group starting order — agreed
 
@@ -139,8 +149,15 @@ separator changes its collective section, not anyone's preserved individual grad
 Requested amounts and cumulative cost update with the visible order. The group sets
 the funding boundary; the budget does not automatically grade or select proposals.
 Use full requested amounts, one verified currency, and integer minor units. Missing
-amounts remain visibly incomplete rather than zero. Initial placement of collective
-separators must not imply a funding decision; see §10.
+amounts remain visibly incomplete rather than zero.
+
+Initially, place the first separator after the contiguous leading proposals that
+every PD graded A, and the second before the contiguous trailing proposals that
+every PD graded C. Leave the calculated order unchanged; all proposals between
+these bars start as Alternates. Unanimous proposals elsewhere do not jump over
+other proposals. With no unanimous-A prefix, the first boundary is 0; with no
+unanimous-C suffix, the second is the list length. Confidence does not affect
+unanimity. These editable starting recommendations are not funding decisions.
 
 E/W award counts describe the Recommend funding section, with unknown geography
 kept distinct. The general target is **two western awards per eastern award by count,
@@ -151,9 +168,11 @@ bonus, or requirement to recommend a proposal the group cannot support on merit.
 Institutional funding context is **prior award count and most recent award year**.
 Prior funding dollars are not part of the agreed card/export design. Distinguish
 "no recorded awards" from unavailable/incomplete history and retain provisional
-qualifications. Label the scope actually covered by the data; no qualifying Research
-awards is not evidence that the foundation has never funded the institution in any
-category. See the source-scope prerequisite in §10.
+qualifications. Use **qualifying Research awards across all available history**,
+with no arbitrary recent-years window, and label that scope. Show the most recent
+qualifying award year, not its month/cycle. No qualifying Research awards is not
+evidence that the foundation has never funded the institution in any category.
+Neither count nor year affects the quantitative ranking.
 
 ## 7. Earlier discussion sentiment — agreed
 
@@ -207,32 +226,60 @@ and client save serialization and stale-response protection.
 
 The existing eligibility contract (ordinary exact-cycle Phase II Pending SE/MR,
 D26 trial cutoff), configured facilitator, and frozen source pool/roster are not
-changed by this workflow agreement. Do not reinterpret existing rounds as revision 4
+changed by this workflow agreement. Do not reinterpret existing rounds as revision 5
 or relabel their per-program votes as combined votes. Existing trial cleanup,
 facilitator restoration, grants, migrations, and production release need their own
 verified execution plan and authorization. No deletion is authorized here.
 
-## 10. Engineering decisions before implementation
+## 10. Resets and rebuilds at every stage — agreed
 
-The product sequence above is settled. The following are bounded implementation
-questions discovered by comparing it with source, not reasons to reopen that agreement:
+Resets support a complete PD walkthrough, including ready, revealed, collective-editing,
+and exported stages. Keep them available initially; restrictions may be considered
+later. Do not silently restrict them to rounds carrying the old branch's dry-run flag.
+Export does not lock the workflow. Every reset requires a clear scope/impact confirmation.
 
-| Item | Required resolution |
-|---|---|
-| Durable version and transitions | Specify storage for grades, confidence, separators, PD combined order, ready/reopen, immutable reveal inputs, collective order and boundaries. Existing list/status fields do not implement these contracts. Version new rounds; retain safe reading of old rounds. Review additive schema needs without inventing already-provisioned fields. |
-| Reveal transaction | Fence all ready versions plus round/facilitator state. A reopen/save racing reveal must either win and block reveal or lose with the revealed record preserved. No partial exposure, partial participant inclusion, or second reveal resetting group edits. |
-| Program-to-combined revisions | Define how returning to program preparation affects an already edited combined list, with explicit reconfirmation and no silent overwrite. |
-| Separator edge cases | Specify deterministic thirds rounding for 1/2/remainder lists and initial collective separator placement without inventing group funding judgments. Empty sections and moving cards/separators must preserve one total order. |
-| Funding history scope | Branch evidence is qualifying Research history, not necessarily all foundation awards. Confirm category/coverage and year interpretation from the institution-history work before claiming "never funded"; present count/year with honest scope and availability. No arbitrary recent-years window is agreed. |
-| Sentiment access and freshness | Preserve the reader's Meeting Tracker grant check, 50-ID cap, currentness and withdrawal rules; define authorized optional-enrichment behavior and read timing. Do not extend the frozen-at-opening rule to live sentiment eligibility. |
-| Workbook rendering | Define saved-revision consistency, column arrangement and safe cell handling; retain the agreed two sheets. A branch CSV is not a two-sheet workbook. |
+| Reset | Who and when | Result |
+|---|---|---|
+| Reset own program preparation | The PD, during private preparation (reopen own ready state first) | Restore the selected MR or SE reviewer-score seed and initial thirds; clear its confidence answers, readiness and combined confirmation. Other program work stays intact. |
+| Rebuild own combined list | The PD, during private preparation | Replace combined work using current MR/SE grades, pairwise merge and confidence; require review and confirmation again. Do not silently regenerate on a program edit. |
+| Reopen own ready preparation | The PD, before reveal | Clear own readiness; retain saved work for revision or reset. |
+| Reopen individual preparation after reveal | Facilitator | Preserve the previous revealed inputs and group work as history; create a new private preparation version from the latest revealed individual assessments and their source program lists. Clear every PD's readiness; require everyone ready and a new reveal. |
+| Reset collective recommendation | Facilitator, after reveal, including after export | Preserve the replaced group revision; restore that reveal's calculated order and unanimous-A/C initial bars. Keep its individual inputs unchanged. |
+| Restart the complete walkthrough | Facilitator, at any stage | Preserve the previous run as history; start fresh score-seeded MR/SE lists with thirds, unanswered confidence, no combined confirmations and nobody ready. No active collective recommendation until a new reveal. |
 
-## 11. Verification and release boundary
+Implementation uses versioned records and recorded reset outcomes, not deletion of
+prior reveals. Shared resets are facilitator controls; being a facilitator does not
+allow editing another PD's assessments. The old reveal cannot be made unseen, but
+new private edits remain hidden from other PDs until the next reveal. Show historical
+versions clearly as read-only; exclude them from the current ready count/calculation.
+A previously downloaded workbook remains a dated artifact, not a live view.
+
+Resets change ranking work only. They do not edit reviewer scores, source proposals,
+awards/history, or sentiment analyses. The implementation plan specifies a repeatable
+restart from the existing frozen source pool; refreshing source data is a separate
+preview/open operation, not a silent reset side effect.
+
+## 11. Implementation plan and engineering checks
+
+The product decisions are settled. The implementation plan is
+`docs/plans/PROPOSAL_RANKING_IMPLEMENTATION_PLAN_2026-10-13.md`; its storage/action
+names are engineering proposals, not claims of provisioned schema or approved release.
+
+Before enabling new rounds, implement versioned assessments and resets, atomic
+all-PD reveal, consistent two-sheet export and old-round readers. Test deterministic
+thirds for short lists, empty grade sections, program-to-combined invalidation,
+reset/reveal/save races and immutable history. Preserve Research-history availability
+qualifications and sentiment access/currentness. No additional product decision is
+required to begin an authorized build; schema capacity and release readiness still
+require implementation-time verification.
+
+## 12. Verification and release boundary
 
 [PLANNED] Before a later implementation is called ready, cover: initial thirds;
 pair ordering with alternating winners/unequal program lengths/equal or missing
 scores; every proposal exactly once; confidence completeness; strict unique ranks;
-privacy before reveal; ready/reopen/reveal races; immutable revealed inputs;
+privacy before each reveal; ready/reopen/reveal/reset races; immutable revealed inputs;
+every reset before/after ready, reveal, collective edits and export;
 no overwrite by retry/late response; collective separator totals and E/W counts;
 unknown/provisional history; accepted/current/withdrawn/access-denied sentiment;
 and both workbook sheets from confirmed data. Exercise separate identities and

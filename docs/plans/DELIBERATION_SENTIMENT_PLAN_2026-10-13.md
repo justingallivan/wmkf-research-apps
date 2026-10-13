@@ -320,9 +320,12 @@ and infrastructure errors remain distinct from absence. Sentiment never weights 
 orders ranking and is not part of the agreed two-sheet workbook. Do not freeze a
 copy that can survive withdrawal/currentness checks. Access checks are preserved;
 no new grant is implied. Consumer read timing/error handling remains an engineering
-prerequisite. The controlling workflow is revision 4 of
+prerequisite. The controlling workflow is revision 5 of
 `docs/plans/PROPOSAL_RANKING_DESIGN_2026-10-07.md` §7; wire-contract planning is in
-`docs/plans/PROPOSAL_RANKING_API_CONTRACT.md` §6. Wiring is still a separate change.
+`docs/plans/PROPOSAL_RANKING_API_CONTRACT.md` §6; implementation stages are in
+`docs/plans/PROPOSAL_RANKING_IMPLEMENTATION_PLAN_2026-10-13.md`. Reopening private
+preparation hides sentiment again until a fresh reveal; old reveal records do not
+authorize stale or withdrawn sentiment. Wiring is still a separate change.
 
 Known per-request unavailability (transcription disabled, schema not ready, request
 not allowed) reads `none`. If the sentiment prompt is unseeded or duplicated, an

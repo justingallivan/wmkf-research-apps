@@ -1,6 +1,12 @@
 # Proposal Ranking workflow reconciliation — 2026-10-13
 
-Status: source comparison and documentation reconciliation; revision 4 is **PLANNED**.
+Status: **HISTORICAL revision-4 source comparison and documentation reconciliation**
+completed October 13 before the follow-up reset/rebuild decisions. At that checkpoint,
+revision 4 was PLANNED. Current product authority is revision 5 of
+`docs/plans/PROPOSAL_RANKING_DESIGN_2026-10-07.md`; the forward engineering plan is
+`docs/plans/PROPOSAL_RANKING_IMPLEMENTATION_PLAN_2026-10-13.md`.
+The evidence, open questions and verification verdict below retain their revision-4 scope;
+they do not verify or approve the later implementation plan.
 Owner authorized design/docs only. No app, schema, role, grant, live data, branch
 merge, push, or deployment change is part of this task.
 

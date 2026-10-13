@@ -2,7 +2,7 @@
 
 Updated 2026-10-13. Sections 1–5 below describe **[VERIFIED via main source at
 `b3219f4aa`] the existing revision-3 API**, not the agreed replacement workflow.
-Revision 4 product authority is `docs/plans/PROPOSAL_RANKING_DESIGN_2026-10-07.md`.
+Revision 5 product authority is `docs/plans/PROPOSAL_RANKING_DESIGN_2026-10-07.md`.
 The planned changes in §6 are semantic requirements, not callable endpoints or
 provisioned fields. The paused branch `0d161d60f` differs from main (§7).
 Deployment facts are dated receipts in `docs/atlas/dataverse-proposal-ranking.md`;
@@ -214,21 +214,25 @@ ID in the UI's “Resolve opening attempt” control, so retry cannot create a
 replacement for the original round after cancellation.
 
 
-## 6. Planned revision-4 contract — not implemented
+## 6. Planned revision-5 contract — not implemented
 
 Use the agreed design for the product rules. Exact action tokens, versioned DTOs,
-and storage mapping require implementation planning; do not send invented actions
+and storage mapping are proposed in `docs/plans/PROPOSAL_RANKING_IMPLEMENTATION_PLAN_2026-10-13.md`; do not send invented actions
 to the current route. Preserve session-derived actors, server-side app/roster checks,
 private/no-store headers, strict input validation, ETags and operation readback.
 
 | Semantic operation | Required contract |
 |---|---|
 | Save program preparation | Save a complete MR or SE permutation, two A/B/C boundaries, and per-proposal confidence atomically with the relevant version. Default boundaries roughly split the reviewer-score seed into thirds. Grades follow boundaries, not a conflicting second grade store. |
-| Create/review PD combined order | Within A then B then C, pair MR/SE items by the PD's position and order each pair by reviewer mean; finish each pair before the next and append leftovers. Save the reviewed total order, grades/boundaries and confidence. Do not silently rebuild an edited combined list. |
+| Create/review PD combined order | Within A then B then C, pair MR/SE items by the PD's position and order each pair by reviewer mean; finish each pair before the next and append leftovers. Save the reviewed total order, grades/boundaries and confidence. Program edits invalidate combined confirmation and readiness; only an explicit confirmed rebuild replaces combined-only work. |
 | Mark ready / reopen | Require every proposal once, grade and explicit confidence, combined-order confirmation and confirmed saves. Reopening before reveal clears readiness. Readiness belongs to a particular saved version, not an unversioned boolean. |
-| Reveal | Facilitator only; require all captured PDs ready on the same validated versions. Atomically preserve their combined orders/grades/confidence, save equal-weight rank sums and deterministic unique starting positions, and expose one collective list. Repeats/readback must not overwrite group edits. |
+| Reveal | Facilitator only; require all captured PDs ready on the same validated versions. Atomically preserve their combined orders/grades/confidence, save equal-weight rank sums and deterministic unique starting positions, and expose one collective list for this preparation version. Initial bars enclose unanimous-A prefix and unanimous-C suffix, without reordering; everything between is Alternates. Repeats/readback must not overwrite group edits. |
 | Edit collective list | After reveal, persist only collective order and the Recommend funding / Alternates / Do not recommend separators; preserve individual inputs and calculated baseline. ETag/policy checks apply to card and boundary changes together. |
-| Enrich discussion cards | Ranking-authorized server read plus the sentiment reader's own access check. Accepted, current, not-withdrawn sentiment only; no preparation response enrichment. History shows count/year, E/W is informational, neither affects ranking. |
+| Reset own program / rebuild own combined | Owner only in private preparation; reopen own ready state first. Program reset restores seed/thirds, clears its confidence and invalidates combined confirmation/readiness. Combined rebuild uses current program assessments and requires reconfirmation. |
+| Reopen after reveal | Facilitator only; preserve old reveal and group work, start a new private preparation version from saved individual work, clear all readiness. Old revealed inputs stay read-only; new edits are private until all PDs are ready and facilitator reveals again. |
+| Reset collective | Facilitator only; preserve the replaced group revision and restore this reveal's calculated baseline/unanimous initial bars. No individual-input changes. |
+| Restart walkthrough | Facilitator at every stage, including after export; retain prior run, start new seed/thirds/unanswered-confidence preparation. Do not require a dry-run flag. No source-data edits. |
+| Enrich discussion cards | Ranking-authorized server read plus the sentiment reader's own access check. Accepted, current, not-withdrawn sentiment only; no preparation response enrichment. History shows qualifying Research count/latest award year across all available history, E/W is informational, neither affects ranking. |
 | Export workbook | One confirmed collective revision plus its immutable reveal inputs; two sheets from the design. Reject/wait for pending or uncertain edits. No sentiment/transcript quotes in the agreed export. |
 
 Before reveal a response may contain the actor's own preparation and readiness
@@ -242,7 +246,12 @@ combined rankings. Old snapshots lack grades/confidence/readiness/reveal version
 Explicitly version their readers and writes; do not backfill invented assessments.
 Retain old audit/read capability and reject incompatible mutations clearly.
 
-Reveal must serialize against reopening, autosave and facilitator/roster changes.
+All resets bind a server-issued impact confirmation to current state, actor authority,
+round/preparation/reveal versions and operation identity. Record outcomes durably so
+a retry after later edits cannot execute the reset again. Reset is not DELETE.
+Historical versions never contribute to current ready counts or current exports.
+
+Reveal must serialize against resets, reopening, autosave and facilitator/roster changes.
 A response may report confirmed reveal only after the complete durable transaction;
 uncertain transport requires operation-identity readback and the same authorization
 filter as normal reads. No partial roster composite or partial privacy release.
@@ -266,7 +275,10 @@ integration details, not a reason to bypass the existing reader.
 
 At `codex/proposal-ranking` / `0d161d60f`, `combine` creates `meeting:co` from already
 published program meeting orders. There is no `pd:co` preparation workflow. Branch
-`resetDryRun` and `open.dryRun` are rehearsal capabilities, not revision-4 readiness.
+`resetDryRun` and `open.dryRun` are rehearsal capabilities, not revision-5 readiness.
+Its reset physically deletes list rows and is gated by `snapshot.dryRun`; neither
+behavior satisfies the agreed non-destructive, all-stage reset contract. Do not
+carry over its Delete privilege or reset implementation as a default.
 The branch carries `researchFunding` with `status`, `qualifyingGrantCount`,
 `totalUsd`, `lastAwardCycle`; it currently displays dollars/latest cycle and exports
 one saved published meeting order as CSV. This is neither the agreed count/year

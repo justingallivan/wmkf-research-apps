@@ -69,4 +69,8 @@ workflow plans accepted/current sentiment only on group-discussion cards after
 reveal, with no ordering weight or individual-preparation exposure. It is not wired;
 see `docs/plans/PROPOSAL_RANKING_DESIGN_2026-10-07.md` §7 and the API contract §6
 (`docs/plans/PROPOSAL_RANKING_API_CONTRACT.md`). Meeting Tracker access remains
-required; the integration must preserve currentness/withdrawal and the 50-ID cap. The automated integration suite `tests/integration/discussion-sentiments.pg.test.js` targets loopback Postgres (opt-in via `DISCUSSION_SENTIMENT_PG_TEST_URL`; skipped otherwise); unit tests use an in-memory stand-in. These test receipts do not establish a shared-environment integration-suite run. They are distinct from the dated Production migration and application-use receipt in Status above.
+required; the integration must preserve currentness/withdrawal and the 50-ID cap.
+The revision-5 reset workflow hides this context when private preparation is reopened
+and requires a fresh reveal before displaying it again. Retained prior reveals do not
+freeze sentiment or bypass withdrawal. Planned integration stages are in
+`docs/plans/PROPOSAL_RANKING_IMPLEMENTATION_PLAN_2026-10-13.md`. The automated integration suite `tests/integration/discussion-sentiments.pg.test.js` targets loopback Postgres (opt-in via `DISCUSSION_SENTIMENT_PG_TEST_URL`; skipped otherwise); unit tests use an in-memory stand-in. These test receipts do not establish a shared-environment integration-suite run. They are distinct from the dated Production migration and application-use receipt in Status above.

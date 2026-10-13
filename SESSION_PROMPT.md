@@ -8,18 +8,23 @@ within-grade paired MR/SE merging followed by each PD's confirmed combined ranki
 average positions; private preparation until everyone is ready and the facilitator reveals;
 individual assessments preserved at reveal; collective funding/alternate/not-recommended separators;
 group-only accepted/current discussion sentiment and unweighted institutional award count/latest year;
-and an initial two-sheet workbook export. No ties.
+and an initial two-sheet workbook export. No ties. The follow-up agreement adds explicit PD
+combined-list rebuilds, collective separators at the unanimous-A prefix/unanimous-C suffix,
+all-history qualifying regular Research award count/latest year, and resets at every stage
+for the walkthrough. Prior reveals remain preserved; reopening private preparation requires
+everyone ready and a fresh facilitator reveal. Future restrictions on resets are undecided.
 
-The current product authority is [design revision 4](docs/plans/PROPOSAL_RANKING_DESIGN_2026-10-07.md).
+The current product authority is [design revision 5](docs/plans/PROPOSAL_RANKING_DESIGN_2026-10-07.md).
 The [October 13 reconciliation audit](docs/audits/PROPOSAL_RANKING_WORKFLOW_RECONCILIATION_2026-10-13.md)
-compares that target with main and the retained feature branch. The documents now distinguish
-the agreed target from existing source and dated release evidence; verification results are recorded
-in that audit. No app implementation or fresh live-data/deployment verification is claimed.
+records the historical revision-4 source comparison and its verification results. The current
+[implementation plan](docs/plans/PROPOSAL_RANKING_IMPLEMENTATION_PLAN_2026-10-13.md) carries
+revision 5 and the follow-up decisions. Independent read-only review approved the plan; all
+25 scoped documentation gate/self-test checks passed. The plan records the bounded receipt. No app implementation or fresh live-data/deployment verification is claimed.
 
 Implementation remains paused until the owner requests app changes. The current request authorizes
-design consolidation, source comparison, and documentation only. Historical Proposal Ranking handoffs
+implementation planning and documentation only. Historical Proposal Ranking handoffs
 below preserve earlier decisions, branch checkpoints, and dated evidence; their former “current” or
-“next” instructions do not override revision 4 or authorize implementation, promotion, or trial cleanup.
+“next” instructions do not override revision 5 or authorize implementation, promotion, or trial cleanup.
 Unrelated workstream handoffs and carryovers retain their existing scope.
 
 
@@ -1111,7 +1116,7 @@ npm run check:types && npm run check:prompt-injection-tagging && npm run check:r
 ## Session 587 close — Proposal Ranking rehearsal and card refinement (2026-10-08 PT)
 
 **Historical Session 587 ranking handoff; superseded for product direction by the October 13
-current note and design revision 4 above. Earlier ranking sections below are older checkpoints.**
+current note and design revision 5 above. Earlier ranking sections below are older checkpoints.**
 The other workstream handoffs below remain preserved.
 
 [VERIFIED via Git and GitHub] Implementation remains on **codex/proposal-ranking**,
