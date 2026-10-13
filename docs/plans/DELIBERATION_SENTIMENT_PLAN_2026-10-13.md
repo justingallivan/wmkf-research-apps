@@ -378,3 +378,16 @@ prompt make it Tier 1 or above). Codex adversarial review before merging.
   computed before the request lock could withdraw a newer accepted result (monotonic guard in `acceptRun`,
   pg-tested for the v1/v2 interleaving); duplicate or same-speaker evidence could manufacture a
   disagreement (rejected after turn resolution).
+- **Stage 4 built** (Sonnet, branch `claude/discussion-sentiment`, not on `main`): routes
+  `GET|POST /api/meeting-tracker/visits/[requestId]/discussion-sentiment` (read, analyze; `maxDuration` 300; the
+  POST body must be empty so no actor can be supplied) and `.../discussion-sentiment/accept` and `/withdraw`
+  (body `{ runId }`), all `requireAppAccess('meeting-tracker')` + `withDalContext`, actor from the session only;
+  `getDiscussionSentimentStatus` in the service; typed 409 `sentiment_prompt_not_ready` for a missing or duplicated
+  current prompt (read, accept, analyze); the loader's "summarize" copy is reworded to "analyze" with the same
+  codes. Page `/meeting-tracker/discussion-sentiment` (`DiscussionSentimentView`), linked from the Meeting Tracker
+  list. The picker reuses the existing `/api/meeting-tracker/dashboard?projection=schedule&scope=all` visit list
+  (no new list route); status is read only for proposals staff tick, never for every visit. The model-override
+  gate did not need a route change (`loadModelOverrides()` stays inside `analyzeDiscussionSentiment`), and
+  `ROUTE_NAMESPACE_LIFECYCLE` has no `/api/meeting-tracker` entry, so it is unchanged. Sort order (reception,
+  enthusiasm, then fewer disagreements, then fewer uncertainties; no-result rows last) is `sortSentimentRows`;
+  the plan did not fix the direction, so confirm it. Out-of-date results show no comparable values.

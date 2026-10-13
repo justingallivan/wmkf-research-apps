@@ -15,7 +15,7 @@ jest.mock('@vercel/postgres', () => {
 
 import {
   reserveRun, recordFailedRun, completeRun, failRun, acceptRun, withdrawRun, getRun, getLatestRun,
-  getLatestCurrentReadyRun, getAcceptedRun, SENTIMENT_GENERATION_ABANDONED_SECONDS,
+  getLatestCurrentReadyRun, getAcceptedRun, getLatestReadyRun, getProfileName, SENTIMENT_GENERATION_ABANDONED_SECONDS,
 } from '../../lib/services/post-presentation-materials/discussion-sentiment-store.js';
 
 const { Client, Pool } = pg;
@@ -59,8 +59,8 @@ describeIf('staff discussion sentiment store (isolated local Postgres proof)', (
     await admin.query(`CREATE SCHEMA "${schema}"`);
     pool = new Pool({ connectionString: TEST_URL, options: `-c search_path=${schema}` });
     mockPool = pool;
-    await pool.query('CREATE TABLE user_profiles (id SERIAL PRIMARY KEY, name TEXT NOT NULL UNIQUE)');
-    profileA = (await pool.query("INSERT INTO user_profiles(name) VALUES ('a') RETURNING id")).rows[0].id;
+    await pool.query('CREATE TABLE user_profiles (id SERIAL PRIMARY KEY, name TEXT NOT NULL UNIQUE, display_name TEXT)');
+    profileA = (await pool.query("INSERT INTO user_profiles(name, display_name) VALUES ('a', 'Alex Staff') RETURNING id")).rows[0].id;
     profileB = (await pool.query("INSERT INTO user_profiles(name) VALUES ('b') RETURNING id")).rows[0].id;
     await pool.query(fs.readFileSync(path.join(process.cwd(), 'lib/db/migrations/082_staff_discussion_sentiments.sql'), 'utf8'));
   });
@@ -272,5 +272,22 @@ describeIf('staff discussion sentiment store (isolated local Postgres proof)', (
       expect(olderResult?.id === a || olderResult?.conflict?.code === 'sentiment_newer_result_accepted').toBe(true);
       expect((await accepted()).map((r) => r.id)).toEqual([b]);
     }
+  });
+  it('getLatestReadyRun returns the newest ready row of any currentness, never a failed or generating one', async () => {
+    expect(await getLatestReadyRun({ requestId })).toBeNull();
+    const older = await ready({ sourceContentHash: HASH }, 1);
+    const newer = await ready({ sourceContentHash: HASH2 }, 2);
+    await recordFailedRun({ id: uuid(), requestId, sourceArtifactId: artifactId, sourceContentHash: HASH2, promptName: PROMPT, profileId: profileA, failureCode: 'x' });
+    await reserve();
+    const latest = await getLatestReadyRun({ requestId });
+    expect(latest.id).toBe(newer);
+    expect(latest.id).not.toBe(older);
+    expect(await getLatestReadyRun({ requestId: uuid() })).toBeNull();
+  });
+
+  it('getProfileName returns the display name, falls back to the name, and is null for an unknown profile', async () => {
+    expect(await getProfileName({ profileId: profileA })).toBe('Alex Staff');
+    expect(await getProfileName({ profileId: profileB })).toBe('b');
+    expect(await getProfileName({ profileId: 999999 })).toBeNull();
   });
 });
