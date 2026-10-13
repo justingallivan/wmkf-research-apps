@@ -33,7 +33,8 @@ fields are now applied with exact metadata and Beth is the sandbox default facil
 Thirteen retained D98 service-persona checks passed with six fictional proposals and
 four enabled sandbox identities, including all-stage resets, stale writes, replay,
 preserved reveals and two-sheet workbook export. This supersedes the earlier absent
-fields/setting probe. The eligible source pool remains empty. Independent SSO/app-grant
+fields/setting probe. Ordinary eligibility was empty; the later dedicated marked D97
+fixture passes source preview with six rated proposals/four staff (see sandbox audit). Independent SSO/app-grant
 acceptance and live sentiment are not established. A later saved-D98 walkthrough
 in normal Chrome exercised four trusted personas, superseding the earlier port-3136
 browser block. The retained fixture's numeric review
@@ -53,13 +54,14 @@ the actual React component against fictional in-memory workflow state; it is not
 alternative live backend. Keyboard movement across the funding bar, tally changes,
 collective reset, dialog focus return, reopening and a narrow 390px layout were checked.
 Fresh review found StrictMode refresh, restart-tab and numeric-history ordering bugs;
-all three were fixed with regressions. Independent-user acceptance, pointer dragging/smoothness, long-list drag/autoscroll and final release review
+all three were fixed with regressions. Independent-user acceptance, long-list autoscroll and final release review
 remain open. The later saved-D98 browser walkthrough found and fixed private-list
 totals being calculated against an incomplete program subset and SE selection
 resetting to MR after a confidence save; a populated regression was added. A second
 reveal retained the disagreement and unanimous cutoff; final full restart returned
 all four participants to Preparing, with confidence cleared and reveal disabled.
-Keyboard dragging persisted; automated pointer movement did not show a saved drop. Client edits are
+Keyboard dragging persisted; automated pointer movement was inconclusive, but the
+user confirmed basic pointer movement/save (“It moves and saves”). Client edits are
 serialized by disabling movement during saves; failed/uncertain operations retain
 an explicit recovery action rather than replaying a drag automatically.
 

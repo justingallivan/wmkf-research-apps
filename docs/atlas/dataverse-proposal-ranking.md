@@ -144,8 +144,8 @@ service-persona rehearsal passed, followed by a saved-D98 browser walkthrough wi
 four trusted personas in normal Chrome. The earlier port-3136 browser block is historical.
 Final full browser restart returned all four participants to Preparing, with confidence
 cleared and reveal disabled, after a successful second reveal. Independent SSO/app-grant,
-source-eligible opening, live sentiment, pointer smoothness and long-list autoscroll
-remain open. The fresh read-only eligibility probe still returned zero; a separate
+deployed source opening, live sentiment and long-list autoscroll
+remain open. Basic pointer movement/save is user-confirmed. Ordinary eligibility returned zero; dedicated D97 source preview now passes; a separate
 memory-only 100/12 UI fixture passed rendering/navigation/keyboard/reset checks but
 does not prove saved maximum-capacity transactions. Retained D98 reviewer-distribution keys do not support
 reviewer-badge visual proof. Deliberate promotion remains pending. New creation requires literal-on
@@ -153,3 +153,17 @@ reviewer-badge visual proof. Deliberate promotion remains pending. New creation 
 existing readiness. Neither was enabled by this task. Full multi-identity acceptance is not established
 by the historical waiting-state smoke. Only the authorized sandbox schema, default facilitator and retained synthetic ranking
 state changed in this follow-up. No Production change, branch cleanup, merge or deployment occurred.
+
+## Dedicated authenticated test Preview — source-built, deployment pending
+
+[VERIFIED via `lib/services/proposal-ranking/test-policy.js` and the D97 preview probe]
+The explicit `PROPOSAL_RANKING_TEST_ENABLED=on` mode requires the exact dedicated
+project/profile/origin, Preview environment, test Neon database and Dataverse sandbox,
+v2 flag, real authentication, and enforced DAL/target interlocks. Misconfiguration
+does not enable the mode. It scopes test source handling to six marked D97 Requests
+and their fixed test run; synthetic-review inclusion remains false by default outside
+this mode. Justin is the test facilitator without changing Beth's saved default.
+The saved source/review fixture passes preview with six rated proposals and four staff.
+This is working preparation, not deployed Preview, independent SSO or live sentiment
+acceptance. See `docs/audits/PROPOSAL_RANKING_V2_SANDBOX_REHEARSAL_2026-10-13.md`
+for exact fixture IDs, receipts, factory recovery and remaining limits. Production is unchanged.

@@ -336,11 +336,12 @@ remains open. Browser testing found and fixed private-list rendering after reope
 and SE selection after confidence saves. A second reveal retained disagreement and
 the unanimous cutoff; full restart then returned all four to Preparing with confidence
 cleared and reveal disabled. Keyboard dragging persisted, but automated pointer movement
-did not produce an observed saved drop; pointer smoothness remains unaccepted. Retained D98 cards have numeric reviewer-distribution keys
+did not produce an observed saved drop. The user later confirmed basic pointer
+movement/save (“It moves and saves”); long-list autoscroll remains unaccepted. Retained D98 cards have numeric reviewer-distribution keys
 and cannot establish reviewer-badge visual acceptance; future fixture generation
 uses labels without rewriting the retained snapshot. The implementation plan and
 `docs/audits/PROPOSAL_RANKING_V2_SANDBOX_REHEARSAL_2026-10-13.md` record the bounded
-proof and remaining pointer/autoscroll, independent-user and live-sentiment checks.
+proof and remaining long-list autoscroll, independent-user and live-sentiment checks.
 A separate memory-only 100-proposal/12-PD fixture passed rendering, Find 100, keyboard
 100→99 movement, Refresh retention and collective reset; saved maximum-capacity
 transactions remain unverified. DESIGN.md and the suite design system remain unchanged.

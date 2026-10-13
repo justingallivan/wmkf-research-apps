@@ -1,3 +1,8 @@
+jest.mock('../../lib/services/proposal-ranking/test-policy.js', () => ({
+  ...jest.requireActual('../../lib/services/proposal-ranking/test-policy.js'),
+  getRankingTestPolicy: jest.fn(() => ({ requested: false, enabled: false })),
+}));
+import { getRankingTestPolicy, RANKING_TEST_REQUESTS } from '../../lib/services/proposal-ranking/test-policy.js';
 jest.mock('../../lib/dataverse/adapters/proposal-ranking.js', () => ({
   readRound: jest.fn(),
   listRoundRows: jest.fn(),
@@ -544,5 +549,32 @@ describe('Proposal Ranking service access and voting', () => {
         policyRevision: 1, operationId: '78787878-7878-4787-8787-787878787878',
       },
     })).rejects.toMatchObject({ status: 409, code: 'conflict', current: { viewer: { isFacilitator: true } } });
+  });
+});
+
+
+describe('dedicated ranking rehearsal scope', () => {
+  beforeEach(() => { setupRound(); jest.clearAllMocks(); getRankingTestPolicy.mockReturnValue({ requested: true, enabled: true }); });
+  afterEach(() => { getRankingTestPolicy.mockReturnValue({ requested: false, enabled: false }); });
+  test('rejects ordinary cycles before preview or writes', async () => {
+    await expect(handleProposalRankingAction({ action: 'preview', body: { action: 'preview', cycleCode: 'D26' }, profileId: 1 })).rejects.toMatchObject({ status: 403 });
+    expect(buildProposalRankingPreview).not.toHaveBeenCalled();
+    expect(createRoundAndLists).not.toHaveBeenCalled();
+  });
+  test('rejects a real existing ordinary round for reset and reads', async () => {
+    const roundId = round.wmkf_proposalrankingroundid;
+    await expect(handleProposalRankingAction({ action: 'restartWalkthrough', body: { roundId }, profileId: 1 })).rejects.toMatchObject({ status: 403 });
+    await expect(handleProposalRankingGet({ roundId, profileId: 1 })).rejects.toMatchObject({ status: 403 });
+    expect(patchRound).not.toHaveBeenCalled();
+  });
+  test('rejects fixture ID mismatch even under the rehearsal cycle', async () => {
+    round.wmkf_cyclecode = 'D97';
+    round.wmkf_snapshotjson = JSON.stringify({ version: 2, cycleCode: 'D97', proposals: RANKING_TEST_REQUESTS.map((requestId, i) => ({ requestId: i ? requestId : seId })) });
+    await expect(handleProposalRankingGet({ roundId: round.wmkf_proposalrankingroundid, profileId: 1 })).rejects.toMatchObject({ status: 403 });
+  });
+  test('misconfiguration fails before reading any round', async () => {
+    getRankingTestPolicy.mockReturnValue({ requested: true, enabled: false });
+    await expect(handleProposalRankingGet({ roundId: round.wmkf_proposalrankingroundid, profileId: 1 })).rejects.toMatchObject({ status: 503 });
+    expect(readRound).not.toHaveBeenCalled();
   });
 });

@@ -95,7 +95,8 @@ returned to the fresh private round with all four Preparing. Screenshot: `/tmp/p
 
 Keyboard dragging persisted as described above. Automated pointer dragging visibly
 moved the item but did not produce an observed drop/save, including in active Chrome;
-**pointer smoothness and long-list drag/autoscroll acceptance remain pending**.
+automation alone does not prove pointer behavior. The later user confirmation below
+establishes basic movement/save; long-list autoscroll remains pending.
 
 ## Additional bounded checks — 2026-10-13
 
@@ -104,8 +105,7 @@ moved the item but did not produce an observed drop/save, including in active Ch
 card. Find 100 scrolled to the final proposal; keyboard movement changed its position
 from 100 to 99, Refresh retained that in-memory order, and collective reset restored
 position 100. This is UI and in-memory state evidence, not Dataverse persistence or
-maximum-capacity changeset acceptance. Pointer smoothness and long-list autoscroll
-remain unaccepted.
+maximum-capacity changeset acceptance. Long-list autoscroll remains unaccepted.
 
 The fresh read-only `/tmp/ranking-remaining-readiness.json` probe again returned zero
 ordinary eligible proposals. Focused API/workflow-service/sentiment-reader tests passed
@@ -114,17 +114,67 @@ Production state changed in this continuation.
 
 Pointer automation remains inconclusive: native automation dropped back at the original
 position; CDP movement visibly moved the item but produced no observed completed drop.
-This does not establish an app defect or successful pointer acceptance. A human pointer
-check is pending. Independent SSO/app-grant and live sentiment still require usable
-sandbox accounts and accepted analysis; those prerequisites have been requested but
-are not yet supplied. The overall acceptance task is not complete.
+This does not establish an app defect. [USER-VERIFIED via the supplied conversation]
+The user confirmed basic pointer behavior: “It moves and saves.” This is human
+confirmation of basic movement/save, not automated proof or long-list autoscroll
+acceptance. The overall acceptance task is not complete.
+
+## Test access provisioning — partial follow-up
+
+[VERIFIED via `scripts/setup-ranking-test-access.cjs --env-file <private-file> --execute`
+and `/tmp/ranking-test-access-setup.log`] The dedicated test Neon database at
+`ep-aged-dew-b7gtigyy-pooler.c-13.us-east-1.aws.neon.tech` applied 21 pending migrations
+and skipped 61 already applied migrations (82 total). Four real Microsoft-linked
+profiles are configured: Justin's existing profile plus Beth, Rob and Jean. Explicit
+`proposal-ranking` and `meeting-tracker` grants were created in the registered
+Dataverse sandbox `orgd9e66399.crm.dynamics.com`. No Production database, grants or
+deployment changed.
+
+This is provisioning evidence only. The test Preview adaptation is not deployed,
+the D97 source/review fixture is now saved as described below; independent Microsoft sign-ins have not
+been tested, and live accepted-sentiment acceptance has not run. Do not describe the
+test environment as ready or the independent-user acceptance as passed. The earlier zero-source result describes ordinary eligibility, not the dedicated D97 fixture.
+
+## Dedicated D97 source fixture — deployment pending
+
+[VERIFIED via `/private/tmp/ranking-d97-proposal-setup.json`,
+`/private/tmp/ranking-d97-review-setup.json` and `/tmp/ranking-d97-preview-probe.log`]
+Six sandbox Requests with IDs `c31bc841-e260-4a14-9041-8d765ddcc401` through
+`c31bc841-e260-4a14-9041-8d765ddcc406` are saved under test run
+`c31bc841-e260-4a14-9041-8d765ddcc497`. They carry Phase II, MR/SE, four staff and
+USD amounts $100,000–$600,000; per-request email and payment counts were zero at
+readback. One synthetic reviewer (`c31bc841-e260-4a14-9041-8d765ddcc410`) and six
+suggestions (`c31bc841-e260-4a14-9041-8d765ddcc421` through
+`c31bc841-e260-4a14-9041-8d765ddcc426`) supply ratings `[5,4,3,5,2,3]`.
+The dedicated preview probe returned `canOpen: true`, six rated proposals and four
+roster members, with Justin as test facilitator. The actual default remains Beth.
+This proves source preview, not deployed Preview opening or independent SSO.
+
+Fixture creation exposed the factory's `$top=5` activation truncation on the fifth
+Request: creation returned 201 but workflow restoration verification failed. Complete
+Dataverse readback found exactly one active activation among seven; recovery is in
+`/tmp/ranking-workflow-recovery.log`. The helper now removes that limit and refuses
+an incomplete next-link response; 27 factory tests passed. No blind recreation occurred.
+
+Dedicated test policy binds the explicit test flag to the exact project, Preview
+profile/origin, sandbox, test Neon database, required authentication and interlocks,
+and six fixture IDs/run/cycle. Synthetic-review inclusion is test-only; its production
+default remains false. The final scoped ranking/identity/factory run passed 230 tests in 24 suites
+(`/tmp/ranking-final-scoped-tests.log`), as did DAL, reviewer-boundary and API
+gate/self-test pairs. JavaScript lint passed (`/tmp/ranking-final-lint.log`); the CJS
+setup script passed `node --check`, while CJS ESLint hit an existing plugin/config
+mismatch, so no whole-scope lint pass is claimed. Dedicated project Preview flags
+are being configured; their completion and deployment are not yet verified. Build passed before the last small calculation/deduplication
+changes, so those final changes do not inherit a fresh build claim. Preview deployment
+and independent SSO/live-sentiment acceptance remain pending. Production is untouched.
 
 ## Evidence limits and next acceptance
 
 - These are service-persona checks, **not independent Microsoft SSO, app-grant or
   authenticated-route acceptance**. Service actor filtering does not prove those layers.
-- The sandbox source eligibility probe returned an empty pool. Fictional frozen
-  cards test persistence/transitions, not source-preview-to-opening end-to-end behavior.
+- Ordinary sandbox eligibility was empty. The dedicated marked D97 fixture now
+  passes source preview; deployed opening and independent-user end-to-end behavior
+  remain unverified. D98 fictional frozen cards alone do not prove source eligibility.
 - No live sentiment acceptance occurred. The browser harness stubs empty enrichment;
   the stale supplement rejection proves stage fencing, not sentiment access/currentness.
 - The retained D98 fixture originally used numeric review-distribution keys. Future
@@ -132,8 +182,9 @@ are not yet supplied. The overall acceptance task is not complete.
   rewritten. It is unsuitable for reviewer-badge visual proof; persistence, ordering,
   reset and export row-count checks above are unaffected.
 - Saved-browser Dataverse evidence is limited to the six-card/four-persona walkthrough
-  above. The separate 100/12 UI fixture is memory-only. Independent users, pointer
-  dragging/smoothness, long-list autoscroll and live sentiment still need acceptance.
+  above. The separate 100/12 UI fixture is memory-only. Basic pointer movement/save
+  is user-confirmed; independent users, long-list autoscroll and live sentiment
+  still need acceptance.
 - The 100-proposal/12-PD supported-cap fixture has local serialization and bounded
   in-memory UI evidence; six saved proposals/four personas do not prove maximum-capacity
   Dataverse transactions.

@@ -321,3 +321,17 @@ one saved published meeting order as CSV. This is neither the agreed count/year
 presentation nor the two-sheet workbook. Main's types above do not include those
 branch-only additions. See the source comparison audit for exact evidence and
 remaining storage/access prerequisites before implementation.
+
+## Dedicated authenticated test Preview — source-built, deployment pending
+
+[VERIFIED via `lib/services/proposal-ranking/test-policy.js` and the D97 preview probe]
+The explicit `PROPOSAL_RANKING_TEST_ENABLED=on` mode requires the exact dedicated
+project/profile/origin, Preview environment, test Neon database and Dataverse sandbox,
+v2 flag, real authentication, and enforced DAL/target interlocks. Misconfiguration
+does not enable the mode. It scopes test source handling to six marked D97 Requests
+and their fixed test run; synthetic-review inclusion remains false by default outside
+this mode. Justin is the test facilitator without changing Beth's saved default.
+The saved source/review fixture passes preview with six rated proposals and four staff.
+This is working preparation, not deployed Preview, independent SSO or live sentiment
+acceptance. See `docs/audits/PROPOSAL_RANKING_V2_SANDBOX_REHEARSAL_2026-10-13.md`
+for exact fixture IDs, receipts, factory recovery and remaining limits. Production is unchanged.

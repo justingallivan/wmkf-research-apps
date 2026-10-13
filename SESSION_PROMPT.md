@@ -26,12 +26,20 @@ remain open. A later saved-D98 walkthrough in normal Chrome exercised four trust
 personas, replacing the earlier port-3136 browser block; no independent SSO, live
 sentiment or reviewer-badge visual proof is claimed. Final second reveal preserved
 the disagreement/cutoff, then full restart returned all four to Preparing with
-confidence cleared and reveal disabled. Keyboard dragging persisted; pointer
-smoothness and long-list autoscroll remain pending. A separate memory-only 100/12
+confidence cleared and reveal disabled. Keyboard dragging persisted; basic pointer
+movement/save is USER-VERIFIED (“It moves and saves”), while long-list autoscroll
+remains pending. A separate memory-only 100/12
 fixture passed rendering, Find 100, keyboard reorder/Refresh and reset; saved
-maximum-capacity transactions remain unverified. Fresh source eligibility is still zero. See
-`docs/audits/PROPOSAL_RANKING_V2_SANDBOX_REHEARSAL_2026-10-13.md`. Production and
-deployed flags are unchanged. Historical handoffs below do not
+maximum-capacity transactions remain unverified. Ordinary source eligibility remains
+zero; the new dedicated D97 source/review fixture passes preview with six rated proposals
+and four roster members. Justin is test facilitator; the actual default remains Beth.
+The test-access setup applied 21 pending test Neon migrations (61 skipped; 82 total),
+configured four real Microsoft-linked profiles, and created explicit Proposal Ranking
+and Meeting Tracker grants in the Dataverse sandbox. Test Preview adaptation is not
+deployed; six marked D97 Requests and synthetic reviews are saved, while independent sign-ins/live sentiment
+remain untested; this is partial provisioning, not a ready-environment claim. See
+`docs/audits/PROPOSAL_RANKING_V2_SANDBOX_REHEARSAL_2026-10-13.md`. Production is unchanged. Dedicated Preview flags are being configured; configuration
+completion and deployment are not yet verified. Historical handoffs below do not
 override this authorization or authorize production promotion, writes or trial cleanup.
 Unrelated workstream handoffs retain their existing scope.
 

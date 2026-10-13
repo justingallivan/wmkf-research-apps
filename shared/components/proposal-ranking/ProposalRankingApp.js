@@ -320,9 +320,9 @@ function ProgramPanel({ response, program, isFacilitator, localOrders, remoteOrd
   </section>;
 }
 
-export default function ProposalRankingApp() {
-  const options = useMemo(() => cycleOptions(), []);
-  const [cycleCode, setCycleCode] = useState(() => resolveWorkingCycle(conventionalCycles()) || options[0]?.code || '');
+export default function ProposalRankingApp({ rehearsalCycle = null }) {
+  const options = useMemo(() => rehearsalCycle ? [{ code: rehearsalCycle, label: `${rehearsalCycle} · Ranking rehearsal` }] : cycleOptions(), [rehearsalCycle]);
+  const [cycleCode, setCycleCode] = useState(() => rehearsalCycle || resolveWorkingCycle(conventionalCycles()) || options[0]?.code || '');
   const [selectedProgram, setSelectedProgram] = useState('se');
   const [response, setResponse] = useState(null);
   const responseRef = useRef(null);
