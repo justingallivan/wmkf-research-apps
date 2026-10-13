@@ -1,5 +1,5 @@
 /** @jest-environment jsdom */
-import { act, fireEvent, render, screen } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import DiscussionSentimentView from '../../shared/components/meeting-tracker/DiscussionSentimentView';
 import { sortSentimentRows } from '../../shared/utils/discussion-sentiment-order';
 
@@ -182,6 +182,50 @@ test('stale response guard: an analysis that finishes after the page unmounted s
   expect(global.fetch.mock.calls.filter(([u, o]) => String(u) === url(A) && o?.method !== 'POST')).toHaveLength(readsBefore);
   expect(errors).not.toHaveBeenCalled();
   errors.mockRestore();
+});
+
+test('a row whose read failed offers Try again, which reloads it; no action is offered until it is ready', async () => {
+  let calls = 0;
+  handlers[`GET ${url(A)}`] = async () => { calls += 1; return calls === 1 ? json({ error: 'The analysis could not be loaded. Try again.' }, false, 502) : json(status()); };
+  render(<DiscussionSentimentView />);
+  await screen.findByLabelText(/Alpha/); tick('Alpha');
+  expect(await screen.findByRole('alert')).toHaveTextContent('could not be loaded');
+  expect(screen.queryByRole('button', { name: /Analyze|Accept|Withdraw/ })).not.toBeInTheDocument();
+  fireEvent.click(screen.getByRole('button', { name: 'Try again' }));
+  expect(await screen.findByText('Staff were excited.')).toBeInTheDocument();
+  expect(screen.queryByRole('button', { name: 'Try again' })).not.toBeInTheDocument();
+});
+
+test('Accept and Withdraw are not offered while the row is reloading', async () => {
+  const acceptedStatus = status({ accepted: { id: 'a1', acceptedAt: '2026-10-13T18:00:00Z', acceptedByName: 'Alex Staff', current: true } });
+  let calls = 0;
+  const gate = deferred();
+  handlers[`GET ${url(A)}`] = () => { calls += 1; return calls === 1 ? Promise.resolve(json(acceptedStatus)) : gate.promise; };
+  render(<DiscussionSentimentView />);
+  await screen.findByLabelText(/Alpha/); tick('Alpha');
+  expect(await screen.findByRole('button', { name: 'Withdraw' })).toBeInTheDocument();
+  expect(screen.getByRole('button', { name: 'Accept' })).toBeInTheDocument();
+  handlers[`POST ${url(A, '/accept')}`] = async () => json({ run: {} });
+  fireEvent.click(screen.getByRole('button', { name: 'Accept' }));
+  await screen.findByText('Checking…');
+  expect(screen.queryByRole('button', { name: 'Accept' })).not.toBeInTheDocument();
+  expect(screen.queryByRole('button', { name: 'Withdraw' })).not.toBeInTheDocument();
+  await act(async () => { gate.resolve(json(acceptedStatus)); });
+});
+
+test('an accepted result can be withdrawn when the transcript is no longer bound', async () => {
+  handlers[`GET ${url(A)}`] = async () => json({ state: 'no_transcript', run: null, runCurrent: false, lastRunFailed: false,
+    accepted: { id: 'a1', acceptedAt: '2026-10-13T18:00:00Z', acceptedByName: 'Alex Staff', current: false } });
+  handlers[`POST ${url(A, '/withdraw')}`] = async () => json({ run: {} });
+  render(<DiscussionSentimentView />);
+  await screen.findByLabelText(/Alpha/); tick('Alpha');
+  expect(await screen.findByText('No staff discussion transcript')).toBeInTheDocument();
+  expect(screen.getByText(/Accepted by Alex Staff/)).toBeInTheDocument();
+  expect(screen.queryByRole('button', { name: /Analyze/ })).not.toBeInTheDocument();
+  fireEvent.click(screen.getByRole('button', { name: 'Withdraw' }));
+  await waitFor(() => expect(global.fetch.mock.calls.some(([u]) => String(u).endsWith('/withdraw'))).toBe(true));
+  const call = global.fetch.mock.calls.find(([u]) => String(u).endsWith('/withdraw'));
+  expect(JSON.parse(call[1].body)).toEqual({ runId: 'a1' });
 });
 
 test('the date filter narrows the picker by site visit date', async () => {

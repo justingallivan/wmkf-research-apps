@@ -20,6 +20,8 @@ jest.mock('../../lib/services/post-presentation-materials/transcript-summary-ser
 import { sql } from '@vercel/postgres';
 import { listAppKeysForUser } from '../../lib/services/app-access-service.js';
 import * as summaryService from '../../lib/services/post-presentation-materials/transcript-summary-service.js';
+import { requireMeetingTranscriptionEnabled } from '../../lib/services/meeting-tracker-transcription/policy.js';
+import { PROMPT_STORE_ERROR_CODES } from '../../lib/services/prompt-store.js';
 import { ServiceHttpError } from '../../lib/services/service-http-error.js';
 import {
   getDeliberationSentiments, hasMeetingTrackerAccess, DELIBERATION_SENTIMENT_MAX_REQUESTS,
@@ -98,12 +100,53 @@ describe('what a consumer may see', () => {
     expect(result[B].sentiment).toBeNull();
   });
 
-  test('a request the feature is not enabled for is none; a server failure is not swallowed', async () => {
+  test('the REAL transcription-disabled error (a plain Error with code and httpStatus 503) reads as none for that request only', async () => {
+    acceptedRows[A] = accepted(); acceptedRows[B] = accepted();
+    summaryService.assertEnabled.mockImplementation((requestId) => {
+      if (requestId === A) requireMeetingTranscriptionEnabled(requestId, {}); // real policy.js throw: schema flag unset
+    });
+    let thrown;
+    try { requireMeetingTranscriptionEnabled(A, {}); } catch (error) { thrown = error; }
+    expect(thrown).toMatchObject({ code: 'meeting_transcription_disabled', httpStatus: 503 });
+    expect(thrown).not.toBeInstanceOf(ServiceHttpError);
+    const result = await read([A, B]);
+    expect(result[A]).toMatchObject({ status: 'none', sentiment: null });
+    expect(result[B]).toMatchObject({ status: 'current', sentiment: RECORD });
+  });
+
+  test.each([
+    ['post_presentation_not_available', new ServiceHttpError('x', { httpStatus: 404, code: 'post_presentation_not_available' })],
+    ['a 4xx ServiceHttpError', new ServiceHttpError('x', { httpStatus: 409, code: 'whatever' })],
+    ['meeting_transcript_bundle_schema_not_ready', new ServiceHttpError('x', { httpStatus: 503, code: 'meeting_transcript_bundle_schema_not_ready' })],
+  ])('%s reads as none and does not fail the batch', async (_label, error) => {
+    acceptedRows[A] = accepted(); acceptedRows[B] = accepted();
+    summaryService.assertEnabled.mockImplementation((requestId) => { if (requestId === A) throw error; });
+    const result = await read([A, B]);
+    expect(result[A].sentiment).toBeNull();
+    expect(result[B].sentiment).toEqual(RECORD);
+  });
+
+  test('genuine infrastructure failures are not swallowed', async () => {
+    deps.loadBinding.mockRejectedValueOnce(new ServiceHttpError('down', { httpStatus: 503, code: 'upstream_down' }));
+    await expect(read()).rejects.toMatchObject({ httpStatus: 503, code: 'upstream_down' });
+    deps.loadBinding.mockRejectedValueOnce(new Error('socket hang up'));
+    await expect(read()).rejects.toThrow('socket hang up');
+  });
+
+  test.each([
+    ['unseeded', Object.assign(new Error('none'), { code: PROMPT_STORE_ERROR_CODES.NOT_FOUND })],
+    ['duplicate', Object.assign(new Error('two'), { code: PROMPT_STORE_ERROR_CODES.DUPLICATE_CURRENT })],
+  ])('an %s prompt makes nothing current but does not throw for the batch', async (_label, error) => {
+    deps.fetchCurrentPrompt.mockRejectedValue(error);
     acceptedRows[A] = accepted();
-    summaryService.assertEnabled.mockImplementationOnce(() => { throw new ServiceHttpError('off', { httpStatus: 404, code: 'post_presentation_not_available' }); });
-    expect((await read())[A]).toMatchObject({ status: 'none', sentiment: null });
-    deps.loadBinding.mockRejectedValueOnce(new ServiceHttpError('down', { httpStatus: 503, code: 'x' }));
-    await expect(read()).rejects.toMatchObject({ httpStatus: 503 });
+    const result = await read([A, B]);
+    expect(result[A]).toMatchObject({ status: 'out_of_date', sentiment: null, promptVersion: 4 });
+    expect(result[B]).toMatchObject({ status: 'none', sentiment: null });
+  });
+
+  test('an unrelated prompt fetch failure still throws', async () => {
+    deps.fetchCurrentPrompt.mockRejectedValue(Object.assign(new Error('network'), { httpStatus: 502 }));
+    await expect(read()).rejects.toThrow('network');
   });
 });
 

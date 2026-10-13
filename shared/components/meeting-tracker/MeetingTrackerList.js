@@ -260,12 +260,12 @@ export default function MeetingTrackerList() {
           <ScopeSegment scope={scope} onChange={(value) => changeFilters({ scope: value })} allLabel="All program directors" />
         </div>
         <div className="flex flex-wrap items-center gap-3">
-        <Link href="/meeting-tracker/discussion-sentiment" className="inline-flex h-12 items-center rounded-lg border border-gray-300 bg-white px-5 text-sm font-semibold text-gray-800 hover:bg-gray-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-gray-500 focus-visible:ring-offset-2">
-          Discussion sentiment
-        </Link>
-        <Link href={trackerHref('/meeting-tracker/sessions/new', { cycleCode, programId })} className="inline-flex h-12 items-center rounded-lg bg-gray-900 px-5 text-sm font-semibold text-white hover:bg-gray-800 focus:outline-none focus-visible:ring-2 focus-visible:ring-gray-500 focus-visible:ring-offset-2">
-          Create session
-        </Link>
+          <Link href="/meeting-tracker/discussion-sentiment" className="inline-flex h-12 items-center rounded-lg border border-gray-300 bg-white px-5 text-sm font-semibold text-gray-800 hover:bg-gray-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-gray-500 focus-visible:ring-offset-2">
+            Discussion sentiment
+          </Link>
+          <Link href={trackerHref('/meeting-tracker/sessions/new', { cycleCode, programId })} className="inline-flex h-12 items-center rounded-lg bg-gray-900 px-5 text-sm font-semibold text-white hover:bg-gray-800 focus:outline-none focus-visible:ring-2 focus-visible:ring-gray-500 focus-visible:ring-offset-2">
+            Create session
+          </Link>
         </div>
       </div>
 

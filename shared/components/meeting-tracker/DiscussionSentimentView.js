@@ -84,7 +84,7 @@ function SentimentRow({ row, expanded, onToggle, onAnalyze, onRefresh, onAccept,
   const run = data?.run;
   const accepted = data?.accepted;
   const acceptedThisRun = Boolean(accepted && run && accepted.id === run.id);
-  const canAccept = Boolean(record) && !acceptedThisRun && state !== 'no_transcript';
+  const canAccept = phase === 'ready' && Boolean(record) && !acceptedThisRun && state !== 'no_transcript';
   const canAnalyze = phase === 'ready' && state && state !== 'no_transcript';
   const working = Boolean(busy);
   return (
@@ -125,7 +125,8 @@ function SentimentRow({ row, expanded, onToggle, onAnalyze, onRefresh, onAccept,
               </button>
             )}
             {canAccept && <button type="button" className={solidButton} disabled={working} onClick={onAccept}>Accept</button>}
-            {accepted && <button type="button" className={outlineButton} disabled={working} onClick={onWithdraw}>Withdraw</button>}
+            {accepted && phase === 'ready' && <button type="button" className={outlineButton} disabled={working} onClick={onWithdraw}>Withdraw</button>}
+            {phase === 'error' && <button type="button" className={outlineButton} onClick={onRefresh}>Try again</button>}
             {record && (
               <button type="button" className={outlineButton} aria-expanded={expanded} onClick={onToggle}>
                 {expanded ? 'Hide evidence' : 'Show evidence'}
@@ -235,8 +236,8 @@ export default function DiscussionSentimentView() {
   }, []);
 
   const act = async (id, busy, path, body) => {
-    // Remove is disabled while a row works, so the row is still the same selection when this returns
-    // unless staff left the page or the row is gone.
+    // The picker checkbox can still untick a working row, so apply the result only if the row is still
+    // selected and the page is mounted.
     const alive = () => mountedRef.current && selectedRef.current.has(id);
     patchRow(id, { busy, error: null });
     let message = null;

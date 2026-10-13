@@ -3,7 +3,7 @@ title: "Atlas: Staff discussion sentiments (Postgres)"
 domain: postgres
 kind: state-page
 status: source-built
-summary: "staff_discussion_sentiments (migration 082) holds one row per staff discussion sentiment analysis run: a generating row before the provider call, the validated DeliberationSentiment record on ready rows, and Accept/Withdraw columns. Source-built on branch claude/discussion-sentiment only; migration 082 is not applied anywhere, the prompt is not seeded, and no route or page exists yet."
+summary: "staff_discussion_sentiments (migration 082) holds one row per staff discussion sentiment analysis run: a generating row before the provider call, the validated DeliberationSentiment record on ready rows, and Accept/Withdraw columns. Source-built on branch claude/discussion-sentiment only; migration 082 is not applied anywhere, the prompt is not seeded, and the Meeting Tracker routes and page exist in source only."
 canonical: true
 cataloged: 2026-10-13
 owner: product-engineering
@@ -20,7 +20,7 @@ related:
 
 ## Status
 
-**[PLANNED to apply; source-built only (Stages 1 to 3 of `docs/plans/DELIBERATION_SENTIMENT_PLAN_2026-10-13.md`).]** Migration 082 has not been applied to any database, the `meeting-transcript.staff-discussion-sentiment` prompt row is not seeded, and there is no route or page. Nothing reads or writes the table until the owner applies the migration and the routes ship (Stage 4).
+**[PLANNED to apply; source-built only (Stages 1 to 5 of `docs/plans/DELIBERATION_SENTIMENT_PLAN_2026-10-13.md`, branch `claude/discussion-sentiment`, not on `main`).]** Migration 082 has not been applied to any database and the `meeting-transcript.staff-discussion-sentiment` prompt row is not seeded. The routes, page and read service below exist in source only; nothing reads or writes the table until the owner applies the migration, seeds the prompt and the branch ships.
 
 ## Ownership and contract
 
@@ -56,8 +56,11 @@ Currentness is computed in code (`isRunCurrent`): the source artifact id and con
 | Surface | File | Access |
 |---|---|---|
 | Store | `lib/services/post-presentation-materials/discussion-sentiment-store.js` | All SQL. |
-| Service | `lib/services/post-presentation-materials/discussion-sentiment-service.js` | Analyze, accept, withdraw. No route calls it yet. |
+| Service | `lib/services/post-presentation-materials/discussion-sentiment-service.js` | Analyze, accept, withdraw, and `getDiscussionSentimentStatus` (the page's per-request read; "still analyzing" uses the database clock via `live_generating`). |
+| Routes | `pages/api/meeting-tracker/visits/[requestId]/discussion-sentiment.js` (GET read, POST analyze), `.../discussion-sentiment/accept.js`, `.../discussion-sentiment/withdraw.js` | `requireAppAccess('meeting-tracker')`; actor from the session only. Staff-only: no Board or briefing token route imports them (`tests/unit/discussion-sentiment-exposure.test.js`). |
+| Page | `pages/meeting-tracker/discussion-sentiment.js` (`DiscussionSentimentView`) | Meeting Tracker staff. Picker uses the existing schedule dashboard route. |
+| Consumer read service | `lib/services/post-presentation-materials/discussion-sentiment-reader.js` (`getDeliberationSentiments`) | Active profile with the Meeting Tracker grant or superuser, checked live. Returns a sentiment only for the accepted, not withdrawn, current row. No consumer wired. |
 
 ## Not covered
 
-Routes, the comparison page, the consumer read service and Proposal Ranking wiring (Stages 4 to 6). The SQL is exercised against a loopback Postgres by `tests/integration/discussion-sentiments.pg.test.js` (opt-in via `DISCUSSION_SENTIMENT_PG_TEST_URL`; skipped otherwise) and against an in-memory stand-in in the unit tests; it has not run against any shared environment.
+Proposal Ranking wiring (a separate plan) and calibration. The SQL is exercised against a loopback Postgres by `tests/integration/discussion-sentiments.pg.test.js` (opt-in via `DISCUSSION_SENTIMENT_PG_TEST_URL`; skipped otherwise) and against an in-memory stand-in in the unit tests; it has not run against any shared environment.

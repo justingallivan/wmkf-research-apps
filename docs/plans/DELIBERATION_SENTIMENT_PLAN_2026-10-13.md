@@ -282,6 +282,11 @@ must not become a way around the owning app's staff-only access. The read servic
 takes the caller's access context and fails closed when that context does not satisfy the
 Meeting Tracker readership rule.
 
+Per-request failures never fail the batch. A request the feature is not available for (transcription disabled,
+schema not ready, request not allowed) reads `none`. If the sentiment prompt is unseeded or duplicated, no row can be
+current: a request with an accepted row reads `out_of_date`, otherwise `none`, always with `sentiment: null`. Only
+genuine infrastructure failures throw.
+
 ## 5. Owner decisions
 
 All decided 2026-10-13 and recorded in §2. Who may run an analysis: anyone with Meeting Tracker
@@ -398,4 +403,11 @@ prompt make it Tier 1 or above). Codex adversarial review before merging.
   checked live like `requireAppAccess` and `assertReviewPanelAccess` (Postgres `is_active` and superuser read, then
   `listAppKeysForUser`); it does not trust a caller-supplied grant list.
   At most 50 GUID request ids; results are keyed by lowercase GUID. A `sentiment` is returned only for the
-  accepted, not withdrawn, `ready`, current row (re-checked in code as well as in the store query).
+  accepted, not withdrawn, `ready`, current row (re-checked in code as well as in the store query). One request
+  never fails the batch: a request the feature is not available for reads `none`; an unseeded or duplicate prompt
+  makes nothing current (an accepted row reads `out_of_date`, otherwise `none`, always `sentiment: null`); only
+  real infrastructure failures throw.
+- **Stage 4-5 review fixes (Opus, 2026-10-13):** per-request reader failures and an unseeded prompt no longer fail
+  the batch (§4.6); Withdraw stays available when the transcript is unbound or stale (`accepted` is returned in the
+  `no_transcript` branch); an errored page row has Try again and offers no actions until `ready`; "still analyzing"
+  uses the database clock; a token-surface exposure test (§7); supervised-test refusal worded for sentiment.

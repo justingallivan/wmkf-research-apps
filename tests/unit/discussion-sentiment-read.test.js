@@ -66,11 +66,21 @@ beforeEach(() => {
 const status = () => getDiscussionSentimentStatus({ requestId: REQUEST_ID, ownerProfileId: 12 }, deps);
 
 describe('getDiscussionSentimentStatus', () => {
-  test('no bound transcript reads as no_transcript and reads no sentiment rows', async () => {
+  test('no bound transcript reads as no_transcript, reads no ready rows, and still returns the accepted row for withdrawal', async () => {
     bound = { discussion: { reason: 'discussion_missing' } };
-    expect(await status()).toMatchObject({ state: 'no_transcript', run: null, accepted: null });
-    expect(store.getLatestRun).not.toHaveBeenCalled();
+    store.getAcceptedRun.mockResolvedValue(readyRow({ accepted_at: iso(100), accepted_by_profile_id: 9 }));
+    const result = await status();
+    expect(result).toMatchObject({ state: 'no_transcript', run: null, runCurrent: false,
+      accepted: { id: readyRow().id, acceptedByName: 'Alex Staff', current: false } });
+    expect(store.getLatestReadyRun).not.toHaveBeenCalled();
+    expect(store.getLatestCurrentReadyRun).not.toHaveBeenCalled();
     expect(summaryService.assertEnabled).toHaveBeenCalledWith(REQUEST_ID, 12, null, deps, { needsActor: false });
+  });
+
+  test('an unbound transcript with a live run still reads analyzing; with no accepted row accepted is null', async () => {
+    bound = { discussion: { reason: 'discussion_stale' } };
+    store.getLatestRun.mockResolvedValue({ id: 'g', status: 'generating', created_at: iso(5), live_generating: true });
+    expect(await status()).toMatchObject({ state: 'analyzing', accepted: null });
   });
 
   test('no runs is not_analyzed', async () => {
@@ -96,14 +106,23 @@ describe('getDiscussionSentimentStatus', () => {
   });
 
   test('a live generating run is analyzing, an abandoned one is not', async () => {
-    store.getLatestRun.mockResolvedValue({ id: 'g', status: 'generating', created_at: iso(60) });
+    store.getLatestRun.mockResolvedValue({ id: 'g', status: 'generating', created_at: iso(60), live_generating: true });
     expect((await status()).state).toBe('analyzing');
-    store.getLatestRun.mockResolvedValue({ id: 'g', status: 'generating', created_at: iso(400) });
+    store.getLatestRun.mockResolvedValue({ id: 'g', status: 'generating', created_at: iso(400), live_generating: false });
     expect((await status()).state).toBe('not_analyzed');
   });
 
+  test('"still analyzing" comes from the database flag, not the app clock', async () => {
+    // created_at is far in the app clock's past yet the database says live; and the reverse.
+    deps.now = () => new Date('2030-01-01T00:00:00Z');
+    store.getLatestRun.mockResolvedValue({ id: 'g', status: 'generating', created_at: iso(5), live_generating: false });
+    expect((await status()).state).toBe('not_analyzed');
+    store.getLatestRun.mockResolvedValue({ id: 'g', status: 'generating', created_at: iso(99999), live_generating: true });
+    expect((await status()).state).toBe('analyzing');
+  });
+
   test('a re-analysis in progress still shows the current result', async () => {
-    store.getLatestRun.mockResolvedValue({ id: 'g', status: 'generating', created_at: iso(30) });
+    store.getLatestRun.mockResolvedValue({ id: 'g', status: 'generating', created_at: iso(30), live_generating: true });
     store.getLatestCurrentReadyRun.mockResolvedValue(readyRow());
     store.getLatestReadyRun.mockResolvedValue(readyRow());
     expect(await status()).toMatchObject({ state: 'analyzing', runCurrent: true });
@@ -138,6 +157,19 @@ describe('getDiscussionSentimentStatus', () => {
     deps.fetchCurrentPrompt.mockRejectedValue(Object.assign(new Error('network'), { httpStatus: 502 }));
     await expect(status()).rejects.toMatchObject({ httpStatus: 502 });
     await expect(status()).rejects.not.toMatchObject({ code: 'sentiment_prompt_not_ready' });
+  });
+});
+
+describe('supervised-test wording', () => {
+  test.each(['status', 'analyze'])('%s says sentiment, keeps the code and status', async (which) => {
+    summaryService.assertEnabled.mockImplementation(() => {
+      throw new ServiceHttpError('A supervised test cannot write a transcript summary.', { httpStatus: 409,
+        code: 'meeting_transcription_supervised_test_unsupported', body: { error: 'A supervised test cannot write a transcript summary.' } });
+    });
+    const run = which === 'status' ? status() : analyzeDiscussionSentiment({ requestId: REQUEST_ID, ownerProfileId: 12, actingUserSystemId: '77777777-7777-4777-8777-777777777777' }, deps);
+    const error = await run.then(() => null, (thrown) => thrown);
+    expect(error).toMatchObject({ httpStatus: 409, code: 'meeting_transcription_supervised_test_unsupported', message: 'A supervised test cannot run a sentiment analysis.' });
+    expect(error.body.error).toBe(error.message);
   });
 });
 

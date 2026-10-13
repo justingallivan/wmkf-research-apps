@@ -290,4 +290,14 @@ describeIf('staff discussion sentiment store (isolated local Postgres proof)', (
     expect(await getProfileName({ profileId: profileB })).toBe('b');
     expect(await getProfileName({ profileId: 999999 })).toBeNull();
   });
+  it('getLatestRun flags a generating row live or abandoned by the database clock', async () => {
+    const { run } = await reserve();
+    expect((await getLatestRun({ requestId })).live_generating).toBe(true);
+    await pool.query(`UPDATE staff_discussion_sentiments SET created_at = NOW() - ($2::int + 5) * INTERVAL '1 second' WHERE id=$1`, [run.id, SENTIMENT_GENERATION_ABANDONED_SECONDS]);
+    expect((await getLatestRun({ requestId })).live_generating).toBe(false);
+    await pool.query(`UPDATE staff_discussion_sentiments SET created_at = NOW() - ($2::int - 30) * INTERVAL '1 second' WHERE id=$1`, [run.id, SENTIMENT_GENERATION_ABANDONED_SECONDS]);
+    expect((await getLatestRun({ requestId })).live_generating).toBe(true);
+    await completeRun({ id: run.id, record: RECORD, promptName: PROMPT, promptVersion: 1, model: 'm' });
+    expect((await getLatestRun({ requestId })).live_generating).toBe(false);
+  });
 });
