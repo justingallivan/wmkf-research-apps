@@ -112,11 +112,15 @@ type DeliberationSentiment = {
   uncertainties: Array<{ topic: string; evidence: Evidence[] }>;
 };
 type Evidence = {
-  speaker: string | null;  // null when unnamed under the attribution rules
-  quote: string;           // verbatim substring of the transcript, short
-  time: string;            // the transcript's [time] stamp for the line
+  time: string;            // the turn's [time] stamp — model-supplied
+  quote: string;           // verbatim substring of that turn's text — model-supplied
+  speakerLabel: string | null; // server-derived: the turn's label as shown ("Dr. Lee", "Speaker 3", "Unidentified speaker")
+  speaker: string | null;      // server-derived: the label only when it is a real name, else null
 };
 ```
+
+The model supplies only `time` and `quote`. The server finds the matching turn and fills in
+`speakerLabel` and `speaker` (§4.4), so the model cannot attach a quote to the wrong person.
 
 The labels are **categories, not a 1–10 number**. Numeric scores drift from run to run, which
 would undermine re-running. The comparison page sorts by `reception`, then `enthusiasm`, then
@@ -129,9 +133,9 @@ the number of disagreements and uncertainties.
   summary). The rubric (what counts as high enthusiasm, a disagreement, uncertainty) lives in the
   prompt text, so it can be changed in Dataverse/`/admin` without a code change
   (`feedback-mutable-parameters-not-in-code`).
-- Attribution rules are copied verbatim from the discussion summary prompt: use the name exactly
-  as the transcript gives it. Leave the speaker unnamed when they are "Unidentified speaker",
-  "Speaker N", unclear, or a name that looks wrong. Never infer a name.
+- Attribution is done by the server, not the model (§4.4). The prompt asks for each evidence
+  item's turn `[time]` and a short verbatim quote, and tells the model not to name speakers in
+  `topic` or `headline` text. Speaker names reach the record only through the server's turn match.
 - Variable `discussion_transcript`: `untrusted: true`, `dataClass: 'meeting_transcript'`,
   `maxChars: 400000`. Output: `parseMode: 'json'`, target `kind: 'none'`,
   `rawOutputRetention: 'none'`. Use `native-json-schema` if the resolved model supports it.
@@ -145,13 +149,28 @@ the number of disagreements and uncertainties.
 
 ### 4.4 Quote check and storage
 
-**Quote check (server-side, before saving):** every `quote` must be a verbatim substring of the
-transcript text sent to the model (whitespace normalized), found within one speaker-turn paragraph (`[time] Speaker: text`, one per turn) whose `[time]`
-stamp equals `time` and whose speaker equals `speaker`
-[VERIFIED via `lib/services/transcription-pilot/transcript-format.js:229-237`]. A named `speaker` must be a name that appears
-as a speaker in the transcript, and never "Unidentified speaker" or "Speaker N". A record that fails either check is rejected as
-`sentiment_evidence_unverified` and is not saved; staff see "Couldn't verify the analysis. Try
-again." This stops invented quotes and invented names.
+**Schema validation (server-side, before the quote check).** The Executor checks only that
+top-level required keys exist; full validation happens only when a `validationSchema` is
+declared [VERIFIED via `lib/services/execute-prompt.js:935-950`]. The service therefore runs its
+own validator on every result, whether or not native structured output was used: exact
+`schemaVersion`, category enums, bounded string lengths and array sizes, non-empty quotes,
+each disagreement having at least two sides, and at least one evidence item behind any
+`high`/`low` enthusiasm or `positive`/`negative` reception. A failure is
+`sentiment_output_invalid` and nothing is saved.
+
+**Quote check (server-side, before saving).** The server rebuilds the speaker turns from the
+same verified transcript TXT sent to the model. That TXT has one paragraph per turn,
+`[time] Label: text`, with labels from `speakerNameFor` (a mapped name, or `Speaker <id>`) and
+`Unidentified speaker` for excluded attribution
+[VERIFIED via `lib/services/transcription-pilot/transcript-format.js:91-94,205-213,229-237`].
+For each evidence item there must be exactly one turn whose `[time]` equals `time` and whose
+text contains `quote` (whitespace normalized; matched against the TXT, so `safePlainText`
+transforms are already applied). The server then sets `speakerLabel` to that turn's label
+and `speaker` to the label only when it is not `Speaker <id>`, not `Unidentified speaker`, and
+not absent. Older unattributed discussions therefore pass with `speaker: null`. A record
+with any unmatched or ambiguous item is rejected as `sentiment_evidence_unverified` and not
+saved; staff see "Couldn't verify the analysis. Try again." Tests cover named, numbered,
+excluded and label-free turns.
 
 **Storage:** one new Postgres table, `staff_discussion_sentiments` (migration 082, if still free).
 
@@ -167,8 +186,12 @@ again." This stops invented quotes and invented names.
 | `requested_by_profile_id`, `created_at`, `completed_at` | Actor from authenticated context only |
 
 A record is **current** when its `source_artifact_id` and `source_content_hash` match the request's
-currently bound discussion transcript. It is **out of date** after a transcript republish or a
-moved boundary. Re-running adds a new row; reads use the latest `ready` row for the current source.
+currently bound discussion transcript **and** its `prompt_version` equals the currently published
+sentiment prompt's version. It is **out of date** after a transcript republish, a moved boundary,
+or any change to the prompt (rubric). Records analyzed under different rubrics are therefore
+never compared side by side as current. A rubric edit means re-analyzing, and re-accepting,
+before results reach consumers again. Re-running adds a new row; the page shows the most recent
+`ready` row for the current source and prompt (ties broken by `completed_at`, then `id`).
 Concurrent runs: reserve the run in one transaction, following the summary drafts' reserve
 pattern. A live `generating` row for the same request returns `sentiment_analysis_in_progress`.
 A `generating` row older than an abandonment window (the summary store uses 360 s against a
@@ -177,8 +200,28 @@ A `generating` row older than an abandonment window (the summary store uses 360 
 A partial unique index alone cannot express that time rule, so it does not replace the
 transaction.
 
-Additional columns: `accepted_by_profile_id`, `accepted_at` (staff "Accept", §2). Accepting a
-row is a conditional update on a `ready`, current row; an out-of-date row cannot be accepted.
+**Terminal-write fence.** Completing or failing a run is a compare-and-set on the exact run id
+`WHERE status = 'generating'`. Zero rows updated means the run was abandoned and replaced, so the
+late result is discarded as `sentiment_run_superseded`. This matches the summary store
+[VERIFIED via `summary-draft-store.js:115-124`; `transcript-summary-service.js:376`]. Tests: an
+abandoned run finishing after its replacement, and a late failure after a successful completion,
+must not change either row.
+
+Additional columns: `accepted_by_profile_id`, `accepted_at`, `withdrawn_by_profile_id`,
+`withdrawn_at` (staff "Accept" and "Withdraw", §2).
+
+**Accept and withdraw:**
+- Accept is a conditional update on a `ready`, current row; an out-of-date row cannot be
+  accepted.
+- At most one row per request is accepted and not withdrawn (partial unique index). Accepting a
+  new row withdraws the previous accepted row in the same transaction, recording the actor.
+- Withdraw marks the accepted row withdrawn and keeps its acceptance history. Withdrawal never
+  falls back to an older accepted row: the request has no accepted result until someone
+  accepts again.
+- A failed re-analysis leaves the current accepted row unchanged.
+- Consumers read only the single accepted, not-withdrawn row, and only while it is current.
+- Tests: withdrawal; failed re-analysis; concurrent Accept and Withdraw; accept followed by a
+  transcript republish (the row becomes out of date and invisible to consumers).
 
 **Retention:** none (owner decision, §2). No expiry column and no maintenance job. Rows for a
 replaced transcript stay stored but read as out of date and are never returned to consumers.
@@ -202,7 +245,8 @@ row, `docs/SERVICE_AND_UTILITY_CATALOG.md` entry, any route counts in `CANONICAL
   evidence with speaker and time.
 - **Accept:** each current, unaccepted result has **Accept**. Until then it is labelled "AI analysis;
   check the quotes" and is visible only on this page.
-- **Routes (new):** `GET` list/read, `POST` analyze and `POST` accept, under the Meeting Tracker namespace. Each one
+- **Withdraw:** an accepted result has **Withdraw**.
+- **Routes (new):** `GET` list/read, `POST` analyze, `POST` accept and `POST` withdraw, under the Meeting Tracker namespace. Each one
   uses `requireAppAccess`, `withDalContext`, `loadModelOverrides()` before model resolution,
   route → service only (no adapter imports in `pages/api`), and GUID validation of `requestId`.
   Add rows to `docs/API_ROUTE_SECURITY_MATRIX.md` and `ROUTE_NAMESPACE_LIFECYCLE`.
@@ -212,7 +256,7 @@ row, `docs/SERVICE_AND_UTILITY_CATALOG.md` entry, any route counts in `CANONICAL
 ### 4.6 Consumer contract (Proposal Ranking and others)
 
 A read service, `getDeliberationSentiments(requestIds)`, returns, per request, the current
-**accepted** `DeliberationSentiment` (or `null`) plus `{ status: 'current' | 'out_of_date' | 'none',
+**accepted, not withdrawn, current** `DeliberationSentiment` (or `null`) plus `promptVersion` and `{ status: 'current' | 'out_of_date' | 'none',
 analyzedAt }`. Other apps call this service. Proposal Ranking would add an optional
 `deliberationSentiment` field next to `ProposalCard.score`.
 
@@ -243,6 +287,16 @@ access; each run is logged against the actor.
 Branch work per `docs/CAMPAIGN_RELEASE_AND_DATAVERSE_TEST_STRATEGY.md` (new table, route and
 prompt make it Tier 1 or above). Codex adversarial review before merging.
 
+## 8. Review record
+
+- 2026-10-13 `/contract-reconcile` (Claude): preconditions, loader preserved differences,
+  abandoned-run reservation, consumer access, human review folded in.
+- 2026-10-13 Codex adversarial plan review (`gpt-6-astra`, verdict needs-attention, 5 findings,
+  all confirmed against source and folded in): service-owned schema validation (§4.4);
+  server-derived attribution with null for numbered or unidentified speakers (§4.2, §4.4);
+  withdrawal path and single accepted row (§4.4); terminal-write fence (§4.4); prompt version
+  in currentness (§4.4, §4.6).
+
 ## 7. Tests that must have teeth
 
 - A quote that is not a substring of the transcript, and a speaker name not in the transcript,
@@ -250,6 +304,11 @@ prompt make it Tier 1 or above). Codex adversarial review before merging.
 - A record for an older `source_content_hash` must read as out of date.
 - Prompt config: `untrusted: true`, `target.kind: 'none'`, `rawOutputRetention: 'none'`; the
   caller passes both retention flags.
-- The read service returns nothing for an unaccepted or out-of-date row. Mutation: drop the
+- Valid JSON with invalid nested values (bad enum, one-sided disagreement, empty evidence) is
+  rejected before the quote check.
+- The model cannot set `speaker`. A quote from a "Speaker 3" turn is saved with `speaker: null`.
+  A quote whose time matches a different turn is rejected.
+- A prompt version bump makes existing records out of date with the transcript unchanged.
+- The read service returns nothing for an unaccepted, withdrawn or out-of-date row. Mutation: drop the
   accepted filter and the test must fail.
 - Routes refuse requests without app access and never return records to Board or briefing tokens.
