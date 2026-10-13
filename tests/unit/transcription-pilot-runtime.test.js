@@ -1,4 +1,4 @@
-jest.mock('@vercel/blob', () => ({ del: jest.fn(), get: jest.fn(), put: jest.fn() }));
+jest.mock('@vercel/blob', () => ({ del: jest.fn(), get: jest.fn(), head: jest.fn(), put: jest.fn() }));
 jest.mock('@vercel/blob/client', () => ({ generateClientTokenFromReadWriteToken: jest.fn() }));
 jest.mock('../../lib/services/transcription-pilot/crypto', () => ({
   createAssemblyAIWebhookAuth: jest.fn(), openProviderUploadReference: jest.fn(), sealProviderUploadReference: jest.fn(),
@@ -23,11 +23,11 @@ jest.mock('../../lib/services/meeting-tracker-transcription/policy', () => ({
 }));
 
 import { ReadableStream } from 'node:stream/web';
-import { del, get, put } from '@vercel/blob';
+import { del, get, head, put } from '@vercel/blob';
 import { generateClientTokenFromReadWriteToken } from '@vercel/blob/client';
 import * as store from '../../lib/services/transcription-pilot/store';
 import { inspectAudioBuffer } from '../../lib/services/transcription-pilot/media-inspector';
-import { createMeetingTranscriptionUpload, queueMeetingTranscription, createOwnerUpload, deletePrivatePath, projectMeetingTranscriptionJob, readPrivateContentIfPresent, writePrivateContent, __private } from '../../lib/services/transcription-pilot/runtime';
+import { createMeetingTranscriptionUpload, queueMeetingTranscription, createOwnerUpload, confirmPrivatePathAbsent, deletePrivatePath, projectMeetingTranscriptionJob, readPrivateContentIfPresent, writePrivateContent, __private } from '../../lib/services/transcription-pilot/runtime';
 
 const job = {
   id: '11111111-1111-4111-8111-111111111111', owner_profile_id: 42, status: 'uploading', version: 1,
@@ -163,6 +163,18 @@ describe('transcription pilot private Blob runtime', () => {
     del.mockResolvedValue(undefined);
     await deletePrivatePath('transcription-pilot/input/audio.mp3', Date.now() + 1000);
     expect(del.mock.calls[0][1].abortSignal).toBeInstanceOf(AbortSignal);
+  });
+
+  it('confirmPrivatePathAbsent is true only for NotFound', async () => {
+    const path = 'transcription-pilot/input/audio.mp3';
+    head.mockRejectedValueOnce(Object.assign(new Error('missing'), { name: 'BlobNotFoundError' }));
+    await expect(confirmPrivatePathAbsent(path, Date.now() + 1000)).resolves.toBe(true);
+    head.mockResolvedValueOnce({ pathname: path });
+    await expect(confirmPrivatePathAbsent(path, Date.now() + 1000)).resolves.toBe(false);
+    head.mockRejectedValueOnce(new Error('Blob unavailable'));
+    await expect(confirmPrivatePathAbsent(path, Date.now() + 1000)).rejects.toThrow('Blob unavailable');
+    await expect(confirmPrivatePathAbsent('other/path', Date.now() + 1000)).rejects.toMatchObject({ code: 'invalid_cleanup_path' });
+    expect(head.mock.calls[0][1].abortSignal).toBeInstanceOf(AbortSignal);
   });
 
   it('rejects already-expired deadlines before starting a Blob operation', async () => {

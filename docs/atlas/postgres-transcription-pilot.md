@@ -223,11 +223,24 @@ redacts filenames and notes upon cleanup request, expiry, or content purge.
 Receipt expiry also redacts evaluation/model/size/duration metadata at read time.
 `receipt_purged_at` prevents repeated metadata purge writes while retaining
 identifiers required for unresolved cleanup. `upload_valid_until` is reserved
-before token minting; issued-capability input targets remain tracked/reaped
-until a verified remote completion protocol can close them. Token expiry alone
-does not prove late writes impossible. The owner accepts this uncertainty for
-non-sensitive testing; verified closure still gates tombstone removal and
-confidential-use approval.
+before token minting and equals the latest client-token expiry. While it is
+unset-or-future, issued-capability input and Zoom-transcript targets stay
+tracked and are re-reaped. Once it is past by more than a 5-minute skew margin
+(clock differences between the minting server, Blob and the database, not an
+upload grace; database `NOW()`), the worker first asks the store
+(`isTranscriptionUploadWindowClosed`, lease/version fenced) and only then
+`head`s each retained path and
+acknowledges only a Blob NotFound as `verifiedAbsentPaths`; the store then
+clears the path and pointer, and clears `upload_valid_until` when neither path
+remains, so `local_cleanup_completed_at` can be set; `finishLocalCleanup` re-checks the same margin inside its lock. An existing blob or any
+other `head` error keeps today's retention. [VERIFIED via owner-authorized
+test, 2026-10-13, throwaway private store, @vercel/blob 2.8.0: a multipart
+part, `completeMultipartUpload`, or single put issued after token expiry is
+rejected server-side (`client_token_expired`) and the blob is absent.] Owner
+decision 2026-10-13: close the retention when the window has passed and the
+file is confirmed absent, with no extra grace period. Before this change all
+20 production jobs stayed unclosed (`local_cleanup_completed_at` never set)
+and the nightly drain reported incomplete.
 
 Migration 062 source adds a sparse Postgres `speaker_names` JSONB overlay for
 human-authored display labels keyed by detected provider speaker IDs. It does
