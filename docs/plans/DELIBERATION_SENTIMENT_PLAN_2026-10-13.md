@@ -15,7 +15,7 @@ related:
 
 # Staff discussion sentiment meter
 
-Date: 2026-10-13 (Session 601). Status: **PLANNED. Nothing in this document is built.**
+Date: 2026-10-13 (Session 601). Status: **PLANNED; owner decisions recorded (§2). Nothing in this document is built.**
 Owner: Justin.
 
 ## 1. Purpose
@@ -40,6 +40,13 @@ staff members, and writing ranks automatically into Proposal Ranking are out of 
 | Attribution | **Named speakers**, using the transcript's names under the same rules as the discussion summary. |
 | Comparison set | **Staff choose the proposals**, and any proposal can be run again. |
 | Location | **A page of its own**, with the data available to Proposal Ranking and other consumers through a read contract. |
+| Owning app | **A view inside Meeting Tracker.** Readers and runners are staff with Meeting Tracker access. |
+| Names going forward | Some existing discussions are unattributed; staff will use names from now on. Older analyses will mostly have unnamed evidence (`speaker: null`), which is expected. |
+| Retention | **No specific retention policy.** Rows are kept; a newer transcript makes older rows out of date. |
+| AI consent step | **None.** The analysis does not add a consent acknowledgment. |
+| Provider data handling | **Owner accepted** the second model pass over the transcript; the Session 599 provider-confirmation item does not block this feature. |
+| Calibration | **Owner picks 3–5 real discussions** for a read-only calibration run (owner authorizes that production read at the time). |
+| Review before sharing | **Staff "Accept" required** before the read service returns a record to any other app. The Meeting Tracker page shows unaccepted results labelled "AI analysis; check the quotes". |
 
 ## 3. Current state the plan builds on
 
@@ -78,12 +85,8 @@ empty discussion as a failed marker row in `meeting_transcript_summary_drafts` v
 stays in the summary caller. The sentiment caller records its own `failed` row in its own table
 and never writes into the summary drafts table.
 
-**AI-consent acknowledgment.** Summaries require a versioned acknowledgment that the transcript
-may be sent to Anthropic, recorded on the row before the provider call
-[VERIFIED via `shared/config/transcriptSummary.js:17-20`; `transcript-summary-service.js:288`].
-The analysis gets its own acknowledgment (new version string and text naming the sentiment
-analysis), stored on the row before the call. The existing summary acknowledgment does not
-cover this new use.
+**No AI-consent acknowledgment** (owner decision, §2). The summary flow's acknowledgment
+[VERIFIED via `shared/config/transcriptSummary.js:17-20`] is not reused or extended.
 
 A request without a bound discussion transcript shows as "No staff discussion transcript". It
 cannot be run.
@@ -174,13 +177,11 @@ A `generating` row older than an abandonment window (the summary store uses 360 
 A partial unique index alone cannot express that time rule, so it does not replace the
 transaction.
 
-Additional columns: `acknowledgment_version`, `acknowledged_at` (§4.1), and `expires_at`.
+Additional columns: `accepted_by_profile_id`, `accepted_at` (staff "Accept", §2). Accepting a
+row is a conditional update on a `ready`, current row; an out-of-date row cannot be accepted.
 
-**Retention mechanism:** an `expireStaffDiscussionSentiments()` maintenance function clears
-`record` and marks expired rows, in the same way as `expireSummaryDrafts`
-[VERIFIED via `summary-draft-store.js:286-293`]. It is wired into `pages/api/cron/maintenance.js`, which already runs
-that function [VERIFIED via `pages/api/cron/maintenance.js:25,234`]. The retention period is the owner decision in §5.1. A removed or replaced
-discussion transcript must also make its sentiment rows unreadable, not just out of date.
+**Retention:** none (owner decision, §2). No expiry column and no maintenance job. Rows for a
+replaced transcript stay stored but read as out of date and are never returned to consumers.
 
 Required documentation and gate surfaces: `scripts/setup-database.js` shape, manifest entry,
 `docs/atlas/postgres-staff-discussion-sentiments.md` plus its `docs/APPLICATION_STATE_ATLAS.md`
@@ -189,9 +190,8 @@ row, `docs/SERVICE_AND_UTILITY_CATALOG.md` entry, any route counts in `CANONICAL
 
 ### 4.5 Page and routes
 
-- **Location:** a new **"Discussion Sentiment"** page. Which app owns it is an owner decision
-  (§5.4); the recommendation is a new view inside Meeting Tracker, so it reuses that app's access
-  grant and the staff-only posture.
+- **Location:** a new **"Discussion Sentiment"** view inside **Meeting Tracker** (owner decision,
+  §2), using the `meeting-tracker` access grant and the staff-only posture.
 - **Selection:** a picker over requests that have a bound discussion transcript (any cycle,
   filterable by cycle and meeting date). Staff tick proposals; each row shows "Not analyzed",
   "Current", "Out of date" or "Analyzing…" and has **Analyze** / **Re-analyze**. Desktop-first.
@@ -200,7 +200,9 @@ row, `docs/SERVICE_AND_UTILITY_CATALOG.md` entry, any route counts in `CANONICAL
 - **Comparison:** a table, one row per chosen proposal, with columns for reception, enthusiasm,
   headline, and counts of disagreements and uncertainties. Expanding a row shows the quoted
   evidence with speaker and time.
-- **Routes (new):** `GET` list/read and `POST` analyze, under the owning app's namespace. Each one
+- **Accept:** each current, unaccepted result has **Accept**. Until then it is labelled "AI analysis;
+  check the quotes" and is visible only on this page.
+- **Routes (new):** `GET` list/read, `POST` analyze and `POST` accept, under the Meeting Tracker namespace. Each one
   uses `requireAppAccess`, `withDalContext`, `loadModelOverrides()` before model resolution,
   route → service only (no adapter imports in `pages/api`), and GUID validation of `requestId`.
   Add rows to `docs/API_ROUTE_SECURITY_MATRIX.md` and `ROUTE_NAMESPACE_LIFECYCLE`.
@@ -210,7 +212,7 @@ row, `docs/SERVICE_AND_UTILITY_CATALOG.md` entry, any route counts in `CANONICAL
 ### 4.6 Consumer contract (Proposal Ranking and others)
 
 A read service, `getDeliberationSentiments(requestIds)`, returns, per request, the current
-`DeliberationSentiment` (or `null`) plus `{ status: 'current' | 'out_of_date' | 'none',
+**accepted** `DeliberationSentiment` (or `null`) plus `{ status: 'current' | 'out_of_date' | 'none',
 analyzedAt }`. Other apps call this service. Proposal Ranking would add an optional
 `deliberationSentiment` field next to `ProposalCard.score`.
 
@@ -220,38 +222,16 @@ sentiment and how it interacts with ranking privacy (private lists before public
 also needs an access decision: a consumer app's own grant (for example `proposal-ranking`)
 must not become a way around the owning app's staff-only access. The read service therefore
 takes the caller's access context and fails closed when that context does not satisfy the
-§5.1 readership rule.
+Meeting Tracker readership rule.
 
-## 5. Owner decisions needed
+## 5. Owner decisions
 
-1. **Durable named opinions.** This creates a lasting, searchable record of which named colleague
-   was enthusiastic or doubtful about which proposal. Today nothing stores that: discussion
-   summaries are reviewed and neutral, and the run rows are content-free. Decide:
-   - who can read it (recommend: the same staff who can see the Staff Discussion Summary);
-   - how long it is kept (recommend: delete with the discussion transcript and summary under the
-     Stage 5 deletion inventory, and never longer than the cycle);
-   - whether staff can see their own quoted lines before another app shows them.
-2. **Provider data handling.** Session 599 recorded provider confirmation as UNKNOWN and said "no
-   confidential-transcription expansion is approved". This is a second model pass over a
-   transcript already sent to the same provider through the same Executor path. It is not new
-   transcription, but it is a new use of the transcript. Please confirm it is acceptable before
-   build. Evidence: `docs/PROVIDER_DATA_HANDLING_REVIEW_2026-10-12.md`.
-3. **Calibration data.** The rubric cannot be tuned without real discussions. How many real
-   Staff Discussion Transcripts exist is [ASSUMED unknown]: checking needs an owner-authorized
-   production read (`feedback-never-self-authorize-prod-dataverse-reads`). TEST request 1003222
-   has one, but it is feature-test data. Options: the owner picks 3–5 real discussions for a
-   read-only calibration run, or calibration waits for the next cycle.
-4. **Owning app.** Meeting Tracker view (recommended) or a new app registry entry with its own
-   grant.
-5. **Who may run an analysis.** Recommend anyone with access to the owning app; each run is
-   logged with the actor.
-6. **Human review before display.** Discussion summaries are reviewed by staff before they are
-   published [VERIFIED via `transcript-summary-service.js:1-17`]. This plan shows the analysis
-   as soon as it passes the quote check, with no review. Options: show immediately (labelled
-   "AI analysis; check the quotes"), or require a staff "Accept" before other apps can read it.
-   Recommend requiring "Accept" before the read service returns a record to any consumer.
+Decided 2026-10-13; recorded in §2. One minor item remains:
 
-## 6. Build stages (after the owner decides §5)
+1. **Who may run an analysis.** Assumed: anyone with Meeting Tracker access, with each run logged
+   against the actor. Confirm or narrow during build.
+
+## 6. Build stages
 
 1. Shared verified-discussion-transcript loader extracted from the summary service; existing
    summary tests stay green. `/contract-reconcile`.
@@ -272,4 +252,6 @@ prompt make it Tier 1 or above). Codex adversarial review before merging.
 - A record for an older `source_content_hash` must read as out of date.
 - Prompt config: `untrusted: true`, `target.kind: 'none'`, `rawOutputRetention: 'none'`; the
   caller passes both retention flags.
+- The read service returns nothing for an unaccepted or out-of-date row. Mutation: drop the
+  accepted filter and the test must fail.
 - Routes refuse requests without app access and never return records to Board or briefing tokens.
