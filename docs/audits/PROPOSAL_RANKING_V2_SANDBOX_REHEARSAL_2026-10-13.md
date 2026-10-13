@@ -1,6 +1,6 @@
 # Proposal Ranking v2 — bounded sandbox rehearsal receipt
 
-Date: 2026-10-13. Branch source: `codex/proposal-ranking-v2` at `b6676e15e`, with the local sandbox rehearsal scripts. **Saved service-persona rehearsal passed; browser/independent-user acceptance remains open.**
+Date: 2026-10-13. Branch source: `codex/proposal-ranking-v2` at `b6676e15e`, with the local sandbox rehearsal scripts. **Saved service-persona rehearsal and a bounded saved-browser walkthrough passed; independent-user acceptance remains open.**
 
 ## Target and setup
 
@@ -44,11 +44,58 @@ succeeded, but the ordinary eligible proposal pool remained empty. No roles chan
 Search exclusion was explicitly **not verified by entity metadata**; the October 7
 search-exclusion receipt remains dated evidence, not a fresh check.
 
-The final saved readback showed the retained round revealed with all four participants
+The pre-browser saved readback showed the then-current retained round revealed with all four participants
 ready. Local HTTP harness checks loaded that saved revealed view for all four trusted
 personas and rejected foreign Origin, missing rehearsal header, and cross-site POST
 requests with 403. This tests the rehearsal harness boundary, not production SSO or
-app-grant enforcement. The focused local suite rerun passed 19 suites / 134 tests.
+app-grant enforcement. The earlier focused local suite rerun passed 19 suites / 134 tests; after the
+browser fixes, the final rerun passed 135 tests, scoped lint, types and the current
+production build (exit 0).
+
+## Later saved-browser walkthrough — 2026-10-13
+
+[VERIFIED via normal Chrome against saved D98 sandbox state] Four separate browser
+persona tabs exercised the actual assessment UI with persisted Dataverse state.
+The earlier port-3136 `ERR_BLOCKED_BY_CLIENT` observation was resolved by accessing
+the surface in normal Chrome; it is historical, not a remaining browser blocker.
+The persona harness is still not independent Microsoft SSO.
+
+- Keyboard movement across the collective funding separator changed two awards to three
+  ($60,000), survived reload, and collective reset returned two awards/$30,000.
+- Reopening exposed a private-list rendering crash: totals incorrectly used a program
+  subset against the full pool. Totals are now calculated only for the collective list.
+  Saving confidence on SE also used to switch back to MR; the fallback now applies
+  only when an unavailable combined tab is selected. A populated regression was added.
+- A fresh restart cleared confidence and combined preparation. MR and SE resets were
+  each exercised after an actual confidence edit. All six confidence choices were
+  entered in each of four persona tabs. Combined paired order was 1–6; explicit
+  rebuild restored it after an order change. Confirm, ready, own reopen and reready
+  were exercised. Jean reopening disabled facilitator reveal until all four were ready.
+- Justin's different A boundary produced a visible “Grades differ” on proposal 2 and
+  unanimous A of one award/$10,000. Collective movement produced two/$30,000; a stale
+  Justin edit was rejected with recovery controls.
+- Browser workbook download completed; filesystem inspection confirmed two sheets
+  with 9 and 27 rows (including headers). Collective reset after export returned
+  one award/$10,000. Expanded saved history preserved read-only individual inputs.
+  Reopen after export rendered private preparation successfully, with all four Preparing.
+
+The final continuation prepared all four preserved combined lists after the post-export
+reopen and marked everyone Ready again. Justin's stale save was rejected; discard/load
+recovery followed by Ready succeeded. A second reveal retained Justin's B disagreement
+and the unanimous A cutoff of one award/$10,000. Full “Restart walkthrough” from that
+revealed UI then succeeded: private MR showed 0/3 confidence choices, combined creation
+was disabled, the initial grade separators were at 1/2, and Facilitate showed all four
+Preparing with reveal disabled. This reset private state is the final retained browser
+state, not a ready/revealed final state. The final read-only probe
+`/tmp/ranking-sandbox-browser-final-readback.json` confirms round
+`afaccafb-844e-4624-809f-f447796843d8`, stage `private`, and all four not ready.
+“Open previous run” displayed historical round `7b572dca-6fbf-48a6-8ba6-7645716c771f`
+read-only with one award/$10,000 and frozen disagreement; “Open replacement run”
+returned to the fresh private round with all four Preparing. Screenshot: `/tmp/proposal-ranking-sandbox-final-reset.png`.
+
+Keyboard dragging persisted as described above. Automated pointer dragging visibly
+moved the item but did not produce an observed drop/save, including in active Chrome;
+**pointer smoothness and long-list drag/autoscroll acceptance remain pending**.
 
 ## Evidence limits and next acceptance
 
@@ -62,9 +109,9 @@ app-grant enforcement. The focused local suite rerun passed 19 suites / 134 test
   fixture generation now uses rating labels, but frozen D98 was deliberately not
   rewritten. It is unsuitable for reviewer-badge visual proof; persistence, ordering,
   reset and export row-count checks above are unaffected.
-- Chrome blocked the saved-data browser surface on port 3136 with
-  `ERR_BLOCKED_BY_CLIENT`. No saved-browser success is claimed. Independent users,
-  long-list dragging/autoscroll and live sentiment still need acceptance.
+- Saved-browser evidence is limited to the six-card/four-persona walkthrough above.
+  Independent users, pointer dragging/smoothness, long-list dragging/autoscroll and
+  live sentiment still need acceptance.
 - The 100-proposal/12-PD supported-cap fixture remains local serialization evidence;
   six proposals/four personas do not prove maximum-capacity Dataverse transactions.
 - No production schema, flags, grants, source data, deployment or trial cleanup changed.

@@ -6,8 +6,9 @@ Revision 5 product authority is `docs/plans/PROPOSAL_RANKING_DESIGN_2026-10-07.m
 Section 6 describes the branch-built v2 actions and semantics; additive fields are
 provisioned and metadata-verified in the sandbox; deployed v2 creation flags remain unchanged. The paused branch `0d161d60f` differs from main (§7).
 Deployment facts are dated receipts in `docs/atlas/dataverse-proposal-ranking.md`;
-the October 13 saved rehearsal exercised trusted service personas, not independent
-SSO/app-grant or authenticated-route acceptance. See
+the October 13 saved service and browser rehearsals exercised four trusted personas,
+not independent SSO/app-grant or production authenticated-route acceptance. A second
+reveal and full browser restart passed; final state is private preparation for all four. See
 `docs/audits/PROPOSAL_RANKING_V2_SANDBOX_REHEARSAL_2026-10-13.md` for limits.
 
 ## 1. Existing route

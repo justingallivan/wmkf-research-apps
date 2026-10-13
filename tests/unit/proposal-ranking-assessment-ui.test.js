@@ -79,6 +79,34 @@ test('StrictMode refresh resolves and re-enables controls', async () => {
   );
   expect(screen.getByRole('status').textContent).toBe('All changes saved');
 });
+test('private MR and SE lists render their subsets and saving SE keeps it selected', async () => {
+  const initial = view();
+  initial.round.snapshot.proposals = ['mr', 'se'].map((programKey) => ({
+    requestId: programKey,
+    programKey,
+    organization: `${programKey} institution`,
+    amountMinorUnits: 10000,
+    currency: { code: 'USD', precision: 2 },
+  }));
+  for (const program of ['mr', 'se']) {
+    initial.own[program] = { ...list, order: [program], boundaries: [1, 1] };
+  }
+  initial.own.co = null;
+  render(<AssessmentWorkflow initial={initial} cycleOptions={[]} onCycleChange={() => {}} />);
+  expect(screen.getByRole('heading', { name: 'mr institution' })).toBeTruthy();
+  expect(screen.queryByRole('heading', { name: 'se institution' })).toBeNull();
+  fireEvent.click(screen.getByRole('button', { name: 'Science & Engineering' }));
+  expect(screen.getByRole('heading', { name: 'se institution' })).toBeTruthy();
+  expect(screen.queryByRole('heading', { name: 'mr institution' })).toBeNull();
+  sendProposalRankingAction.mockResolvedValue({
+    ...initial,
+    own: { ...initial.own, se: { ...initial.own.se, confidence: { se: 'confident' }, version: 2 } },
+  });
+  fireEvent.click(screen.getByRole('radio', { name: 'Confident' }));
+  await waitFor(() => expect(screen.getByRole('status').textContent).toBe('All changes saved'));
+  expect(screen.getByRole('heading', { name: 'se institution' })).toBeTruthy();
+  expect(screen.queryByRole('heading', { name: 'mr institution' })).toBeNull();
+});
 test('restart while combined is selected returns to source preparation without dereferencing absent combined', async () => {
   const next = view();
   next.roundId = 'new-round';

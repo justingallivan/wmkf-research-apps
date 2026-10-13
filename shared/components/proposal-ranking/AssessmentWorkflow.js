@@ -128,11 +128,10 @@ export function AssessmentList({
   const names = new Map(roster.map((p) => [p.systemUserId, p.name]));
   const items = assessmentItems(assessment);
   const totals = buildCumulativeTotals(assessment.order, proposals);
-  const sectionTotals = calculateSectionTotals(
-    assessment.order,
-    assessment.boundaries,
-    proposals,
-  );
+  // Private program lists contain only part of the full proposal pool.
+  const sectionTotals = collective
+    ? calculateSectionTotals(assessment.order, assessment.boundaries, proposals)
+    : null;
   const move = (from, to) => {
     const next = moveAssessmentItem(assessment, from, to);
     if (next !== assessment) {
@@ -650,7 +649,8 @@ export default function AssessmentWorkflow({
     sentimentGeneration.current += 1;
     setSentiment(null);
     setView(next);
-    if (!next.own?.co) setProgram('mr');
+    if (!next.own?.co)
+      setProgram((selected) => (selected === 'co' ? 'mr' : selected));
     setDraft(null);
     setPending(null);
     pendingRef.current = null;

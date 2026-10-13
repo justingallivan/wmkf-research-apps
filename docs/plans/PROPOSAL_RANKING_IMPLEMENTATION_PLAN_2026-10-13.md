@@ -34,14 +34,15 @@ Thirteen retained D98 service-persona checks passed with six fictional proposals
 four enabled sandbox identities, including all-stage resets, stale writes, replay,
 preserved reveals and two-sheet workbook export. This supersedes the earlier absent
 fields/setting probe. The eligible source pool remains empty. Independent SSO/app-grant
-acceptance, live sentiment and saved-browser acceptance are not established; Chrome
-blocked port 3136 with `ERR_BLOCKED_BY_CLIENT`. The retained fixture's numeric review
+acceptance and live sentiment are not established. A later saved-D98 walkthrough
+in normal Chrome exercised four trusted personas, superseding the earlier port-3136
+browser block. The retained fixture's numeric review
 distribution keys also prevent using it as reviewer-badge visual proof. See the
 [bounded sandbox receipt](../audits/PROPOSAL_RANKING_V2_SANDBOX_REHEARSAL_2026-10-13.md).
 `probe-proposal-ranking-readiness.mjs --workflow-v2` checks additive attributes.
 
-Local verification: 19 ranking suites / 134 tests pass; the production Turbopack build,
-type check and scoped lint pass (the build retains four unrelated document-renderer
+Local verification after the saved-browser fixes: 135 ranking tests, type check and
+scoped lint pass; the current production Turbopack build passed (exit 0) (the build retains four unrelated document-renderer
 tracing warnings). The 100-proposal / 12-PD reveal fits the additive field cap in a
 serialized fixture. Tests cover pure calculations, atomic adapter simulations, stale writes,
 replay after later edits, immutable history, restart, workbook types/provenance, and
@@ -50,8 +51,13 @@ the actual React component against fictional in-memory workflow state; it is not
 alternative live backend. Keyboard movement across the funding bar, tally changes,
 collective reset, dialog focus return, reopening and a narrow 390px layout were checked.
 Fresh review found StrictMode refresh, restart-tab and numeric-history ordering bugs;
-all three were fixed with regressions. Full multi-person saved-data acceptance,
-long-list drag/autoscroll and final release review remain open. Client edits are
+all three were fixed with regressions. Independent-user acceptance, pointer dragging/smoothness, long-list drag/autoscroll and final release review
+remain open. The later saved-D98 browser walkthrough found and fixed private-list
+totals being calculated against an incomplete program subset and SE selection
+resetting to MR after a confidence save; a populated regression was added. A second
+reveal retained the disagreement and unanimous cutoff; final full restart returned
+all four participants to Preparing, with confidence cleared and reveal disabled.
+Keyboard dragging persisted; automated pointer movement did not show a saved drop. Client edits are
 serialized by disabling movement during saves; failed/uncertain operations retain
 an explicit recovery action rather than replaying a drag automatically.
 
