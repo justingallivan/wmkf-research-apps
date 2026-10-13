@@ -1,6 +1,6 @@
 # Proposal Ranking — Impeccable shape brief
 
-Date: 2026-10-13. Status: **DRAFT FOR OWNER CONFIRMATION — no app changes.**
+Date: 2026-10-13. Revision: 2. Status: **DRAFT FOR OWNER CONFIRMATION — no app changes.**
 Controlling product rules: [design revision 5](PROPOSAL_RANKING_DESIGN_2026-10-07.md).
 Build sequence: [implementation plan](PROPOSAL_RANKING_IMPLEMENTATION_PLAN_2026-10-13.md).
 This is phase 0's proposed interaction design, not an implemented or confirmed interface.
@@ -30,6 +30,21 @@ sign-in page; no authentication or live mutations were performed. The large cent
 header and two opening program panels in that rehearsal are evidence, not the proposed
 layout: DESIGN.md now calls for a compact left-aligned staff-page header.
 
+[VERIFIED via retained branch source/history] The October 7–8 work includes institution-first
+cards with linked titles, lead PD, program/geography markers, individual reviewer-grade
+badges and their mean, visible named PD ranks/average, and bottom-aligned requested and
+cumulative amounts. `a2bebba6b` (October 8) adds `@hello-pangea/dnd` 18.0.1; its
+DragDropContext/Draggable/Droppable integration remains in the paused branch. Later
+October 8 commits refine the cards and remove repeated move buttons. Main still uses
+the earlier native dragging; the branch is the reuse reference for smooth sorting.
+
+The owner clarified that these cards captured useful information but their appearance
+was not endorsed. Use them as a content checklist, not a fixed visual template. No
+ranking-specific Impeccable critique/shape record was found in the inspected artifacts
+or handoffs; the earlier app-wide critique is not evidence these cards were reviewed.
+The initial October 13 sketches omitted too much information and are superseded by
+revision 2's sketches below. This is a correction to the draft, not an accepted redesign.
+
 No matching Proposal Ranking surface brief was found by Impeccable context. Its other
 surface briefs concern Meeting Tracker and Workbench. DESIGN.md is the visual authority;
 the tool reported a stale generated design sidecar, which this task does not repair.
@@ -37,7 +52,8 @@ the tool reported a stale generated design sidecar, which this task does not rep
 ## Direction and screen sketches
 
 **One ordered working list, with the next action and saved state always clear.**
-Keep the list full width; use inline expansion for supporting evidence. Do not split
+Keep the list full width. Keep comparison evidence visible; expand longer supporting
+material such as sentiment quotes and reviewer detail. Do not split
 the main group view into three independent columns or introduce a second reordered
 view. A/B/C and collective sections share the same physical separator interaction,
 with different, explicit section names.
@@ -48,6 +64,7 @@ They illustrate hierarchy and states, not pixel specifications or a functional a
 1. [Private preparation sketch](evidence/proposal-ranking-shape/preparation.svg)
 2. [Collective discussion sketch](evidence/proposal-ranking-shape/discussion.svg)
 3. [Rebuild and reset sketch](evidence/proposal-ranking-shape/reset.svg)
+4. [Dragging behavior storyboard](evidence/proposal-ranking-shape/dragging.svg)
 
 ## 1. Navigation and progression
 
@@ -86,17 +103,35 @@ of a long list when useful. One visible saved-state message covers the active li
 
 ## 2. Card anatomy and separator behavior
 
+### Content checklist and hierarchy
+
+| Earlier card content | Revision-2 placement |
+|---|---|
+| Position, institution, linked project title | Stable left rank gutter; institution heading with linked title on its own line below. Never concatenate both into one long heading. |
+| Request number and lead PD | Quiet, visible identity line below the title. |
+| MR/SE and E/W | Two labelled compact markers at top right; distinguish program from geography. Use East/West text to avoid confusion with Excellent's E. |
+| Individual reviewer grades and numeric mean | Visible **Peer reviews** strip, with each grade badge and a clearly labelled mean/scored count. Expanded detail supplements this strip rather than replacing it. |
+| Named PD ranks and average | Group cards always show each PD's combined rank, now with A/B/C and confidence alongside it. Clearly labelled **At reveal**; display starting mean rank separately from current collective position. |
+| Requested amount and cumulative budget | Consistent monetary footer, right-aligned on desktop; cumulative requested cost in group view. Private cards keep requested amount without introducing a personal funding cutoff. |
+| Research history | Group context line: qualifying Research award count/latest year, no dollars; unavailable/provisional qualifications visible. |
+| Smooth dragging | Reuse the retained branch's `@hello-pangea/dnd` integration as the implementation starting point; extend deliberately for dividers. |
+
 Private card, in reading order:
 
-1. Unique position, institution, proposal title/link, request number and MR/SE marker.
-2. Reviewer mean and number of scored reviews; requested amount and E/W as compact
-   metadata. Use the full words East/West in accessible labels, not an ambiguous E.
-3. **Confidence in my assessment:** two radio choices, **Confident / Not sure**.
-   Neither is selected initially. Do not use one checkbox whose unchecked state
-   could mean either unanswered or not sure.
-4. A quiet **Move…** control; reviewer distribution/supporting context starts collapsed.
-   Keep funding history, if shown in private preparation, secondary and unweighted;
-   sentiment is absent. Do not add per-card notes, scores or extra workflow fields.
+1. Institution/title identity block and rank gutter; program/geography markers.
+2. Request number and lead PD, then the visible reviewer-grade strip and mean.
+3. **Confidence in my assessment:** explicit **Confident / Not sure** radio choices,
+   initially unanswered. Keep requested amount aligned in the footer. Program and
+   combined cards use the same anatomy; the surrounding section supplies A/B/C.
+4. A quiet card menu exposes a non-drag movement option. Keep extra controls off the
+   default card face. No sentiment, peer PD assessments, notes or new score fields.
+
+Use reviewer labels that remain distinct from PD A/B/C: the sketches spell out
+Excellent/Very good/Good; compact E/VG/G badges are acceptable only with a clear
+Peer reviews label, visible legend and full accessible names. Do not replace the
+individual review distribution with the mean alone. For unusually many reviewers,
+wrap the badge row; never silently omit reviews. Long names/titles wrap rather than
+push badges, money or controls out of the card.
 
 Show the grade as text derived from its section, not an independently editable grade
 field. A and C are judgments, not green success and red error states. Prefer neutral
@@ -108,13 +143,29 @@ Two full-width movable divider bars sit in the list: **End of A · Fund** and
 **End of Recommend funding** and **End of Alternates**. Section headings show names
 and counts, including empty sections. Top and bottom remain valid destinations.
 
-Drag handles are distinct from links/radios/disclosures. Show the insertion position
-and destination grade while dragging; announce the result with position and section.
-Retain the existing accessible movement alternative: Move… provides up/down and an
-explicit destination position/section. For bars, **Set boundary after position…**
-provides a non-drag alternative. Section moves explicitly choose top or bottom of the
-section so placement is never guessed. Keyboard users can cancel without changes,
-retain focus on the moved item and hear the resulting rank/grade.
+### Smooth movement and accessible alternatives
+
+Keep the branch's smooth sortable-card behavior and `@hello-pangea/dnd` 18.0.1 as the
+reuse baseline, rather than reverting to main's native drag behavior or choosing a
+new animation package. Verify its installed keyboard behavior, interactive-child
+handling and reduced-motion treatment when implementing. This shape pass names the
+existing dependency; it does not claim the new mixed card/divider list already works.
+
+Use one clear drag handle in the rank gutter. Links, radios, menus and disclosures
+remain independently usable. During a move the lifted card retains its width, other
+cards smoothly make space, and the insertion position/target section remain visible.
+Do not animate the list back to an old order when a save returns. Confirm saves quietly;
+a failed/conflicting save keeps its explicit recovery state, not a misleading success.
+Respect reduced-motion preferences with immediate or minimized displacement while
+retaining placement feedback. Motion communicates destination, not decoration.
+
+Retain keyboard dragging and cancellation from the package where verified. Put **Move
+to position…** in the card menu as a discoverable non-drag alternative; do not restore
+always-visible Up/Down buttons on every card. For bars, **Set boundary after position…**
+provides the equivalent control. Section moves explicitly choose top or bottom so
+placement is never guessed. Preserve focus and announce resulting position/section.
+Test auto-scroll and focus with long lists. Card movement and bar movement must share
+a coherent placement model while preserving the different grade-change semantics below.
 
 A card crossing a divider changes its section while other proposals retain their
 sections. Moving a divider reclassifies the proposals it passes. Persist order and
@@ -133,19 +184,34 @@ updates as cards/bars move, marked Saving until confirmed. Missing amounts displ
 form or automatic cutoff is introduced. Show the soft 2W:1E award-count target as
 context, not a quota meter that turns red when the group disagrees with it.
 
-Collapsed group card retains proposal identity, current position/program, requested
-and cumulative amount, reviewer result, a compact A/B/C count and not-sure count,
-and a plainly labelled rank range. Show Research award count/latest year as a quiet
-line with unavailable/provisional qualifiers. Show the current authorized earlier
-sentiment summary briefly; expand its supporting quotes/disagreement/uncertainty.
-Do not make sentiment a colored overall proposal score.
+Every group card shows identity/program/geography, reviewer grades and mean, and an
+**At reveal** comparison row for each PD: name, combined rank, A/B/C and confidence.
+Use a compact aligned grid on desktop that stacks by PD on narrow screens. Named
+comparisons are visible by default, not behind a disclosure. Do not infer confidence
+from a colored rank badge. Text carries each meaning; a restrained amber emphasis may
+call attention to Not sure and an explicit **Grades differ** label.
 
-Expand **PD assessments** inline to show a table: PD name, individual combined rank,
-A/B/C, Confident/Not sure. Those inputs carry the “At reveal” label and no edit controls.
-Highlight differing grades visibly; present rank range directly rather than inventing
-a new divergence threshold in this shape pass. A score distribution disclosure stays
-separate from individual PD assessments. Expanded content pushes following cards down
-without hiding the list in a modal. Avoid automatically opening every detail panel.
+Keep **Starting mean rank** alongside these preserved inputs. The large rank gutter
+always means the current collective position; it may differ after group reordering.
+Use combined-rank values, never reuse the branch's per-program average under a new
+label. No tied badges. Show the rank range as supplementary comparison, not a new
+weighted score or an invented divergence threshold.
+
+A secondary context row shows Research award count/latest year and the current,
+authorized **Earlier discussion sentiment** summary. Expand only the supporting
+quotes, disagreement/uncertainty narrative and longer review detail. Keep context
+visually subordinate to individual assessments, without hiding its useful summary.
+Neither sentiment nor history becomes a colored overall proposal score. Separate
+**Peer reviews**, **PD assessments at reveal**, and **Earlier discussion sentiment**
+with explicit labels so three different sources cannot be mistaken for one verdict.
+
+The monetary footer consistently shows Requested and Cumulative requested. The funding
+bar repeats its section total, so the decision boundary is readable without inspecting
+another card. Allow content-driven card height; do not fit more cards by hiding named
+comparisons or reducing text to unreadable size on a shared screen. Check representative
+24-proposal lists in the built critique; the sketches show selected cards, not a complete
+cycle. Neutral card borders and alignment organize the density without colored boxes
+around every number.
 
 The facilitator shares this same group view; no special presentation mode is required.
 PDs may independently scroll and expand evidence on their laptops. Opening a card,
@@ -232,7 +298,8 @@ in the scheduled critique/audit; sketches do not prove accessibility.
 ## Confirmation and implementation consequence
 
 Proposed decisions to confirm together: single active preparation list, compact stage
-navigation, inline group evidence, same group view for the projector/laptops with
+navigation, visible reviewer grades and named PD comparisons, retained smooth dragging,
+same group view for the projector/laptops with
 independent browsing and explicit refresh, and contextual named reset actions.
 No scoring, merge, reveal, history-scope or reset policy has been changed.
 
@@ -240,3 +307,9 @@ After confirmation, link this brief as phase 0's accepted output and proceed onl
 app implementation is requested. Until then it stays a draft; do not write a direction
 contract, replace DESIGN.md, or change runtime code. Later critique/audit reviews the
 actual built surface once, fixes one batch and confirms once, per the implementation plan.
+
+Revision-2 verification: content checklist checked against retained branch source and
+October 8 commit history. Four static sketches illustrate the revised hierarchy and
+motion requirements; they do not demonstrate working animation. No app, dependency,
+schema or design-system file changed. Owner confirmation of this revised draft remains
+pending; earlier sketches do not carry approval.

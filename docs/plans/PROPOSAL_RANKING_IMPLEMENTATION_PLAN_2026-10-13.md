@@ -192,7 +192,10 @@ merge its incompatible combine/reset/CSV behavior wholesale.
 ### Impeccable review scope and limits
 
 Phase 0 draft: [Proposal Ranking UX brief](PROPOSAL_RANKING_UX_BRIEF_2026-10-13.md),
-with three screen sketches. The owner confirmed shared-screen discussion plus PD
+revision 2, with four sketches including a movement storyboard. The earlier cards
+serve as a content checklist, not a fixed visual design; retain their smooth dragging
+using the branch's existing `@hello-pangea/dnd` integration. Reviewer grades and named
+PD comparisons remain visible by default. The owner confirmed shared-screen discussion plus PD
 laptops; the proposed interaction brief awaits confirmation. No app code changed.
 
 **Before implementation — shape:** use the installed Impeccable skill's context and

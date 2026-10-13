@@ -1,0 +1,38 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="940" viewBox="0 0 1280 940" role="img" aria-label="Keep the smooth dragging"><style>text{font-family:Inter,Arial,sans-serif}</style><rect width="1280" height="940" fill="#f9fafb"/>
+<text x="36" y="32" font-size="13" fill="#6b7280" font-weight="600">PROPOSAL RANKING / SHAPE REVISION 2 / FICTIONAL EXAMPLES</text>
+<text x="36" y="77" font-size="28" fill="#111827" font-weight="600">Keep the smooth dragging</text>
+<text x="36" y="108" font-size="17" fill="#374151" font-weight="400">Motion storyboard · Reuse the retained branch’s @hello-pangea/dnd integration</text>
+<rect x="36" y="153" width="384" height="560" rx="8" fill="#fff" stroke="#d1d5db"/>
+<text x="56" y="194" font-size="21" fill="#111827" font-weight="600">1  Pick up</text>
+<rect x="56" y="225" width="344" height="91" rx="8" fill="#fff" stroke="#d1d5db"/>
+<text x="74" y="260" font-size="18" fill="#111827" font-weight="600">⋮⋮  1   Institution A</text>
+<rect x="56" y="341" width="344" height="91" rx="8" fill="#fff" stroke="#d1d5db"/>
+<text x="74" y="376" font-size="18" fill="#111827" font-weight="600">⋮⋮  2   Institution B</text>
+<rect x="56" y="457" width="344" height="91" rx="8" fill="#fff" stroke="#d1d5db"/>
+<text x="74" y="492" font-size="18" fill="#111827" font-weight="600">⋮⋮  3   Institution C</text>
+<text x="56" y="625" font-size="17" fill="#374151" font-weight="400">Pick up: Institution B</text>
+<rect x="448" y="153" width="384" height="560" rx="8" fill="#fff" stroke="#d1d5db"/>
+<text x="468" y="194" font-size="21" fill="#111827" font-weight="600">2  Make space</text>
+<rect x="468" y="225" width="344" height="91" rx="8" fill="#eaf0f5" stroke="#94a3b8"/>
+<text x="486" y="260" font-size="16" fill="#111827" font-weight="600">Drop at position 1 · A / Fund</text>
+<rect x="468" y="341" width="344" height="91" rx="8" fill="#fff" stroke="#d1d5db"/>
+<text x="486" y="376" font-size="18" fill="#374151" font-weight="400">1   Institution A</text>
+<rect x="468" y="272" width="344" height="91" rx="8" fill="#fff" stroke="#2563eb"/>
+<text x="498" y="307" font-size="17" fill="#111827" font-weight="600">⋮⋮  Institution B · moving</text>
+<rect x="468" y="457" width="344" height="91" rx="8" fill="#fff" stroke="#d1d5db"/>
+<text x="486" y="492" font-size="18" fill="#374151" font-weight="400">3   Institution C</text>
+<text x="468" y="625" font-size="16" fill="#374151" font-weight="400">Card keeps its width; no hidden copy.</text>
+<rect x="860" y="153" width="384" height="560" rx="8" fill="#fff" stroke="#d1d5db"/>
+<text x="880" y="194" font-size="21" fill="#111827" font-weight="600">3  Place and save</text>
+<rect x="880" y="225" width="344" height="91" rx="8" fill="#fff" stroke="#d1d5db"/>
+<text x="898" y="260" font-size="18" fill="#111827" font-weight="600">⋮⋮  1   Institution B</text>
+<rect x="880" y="341" width="344" height="91" rx="8" fill="#fff" stroke="#d1d5db"/>
+<text x="898" y="376" font-size="18" fill="#111827" font-weight="600">⋮⋮  2   Institution A</text>
+<rect x="880" y="457" width="344" height="91" rx="8" fill="#fff" stroke="#d1d5db"/>
+<text x="898" y="492" font-size="18" fill="#111827" font-weight="600">⋮⋮  3   Institution C</text>
+<text x="880" y="625" font-size="17" fill="#374151" font-weight="400">Saving… → All changes saved</text>
+<text x="36" y="762" font-size="19" fill="#374151" font-weight="400">Keyboard: pick up, move, place or cancel; focus stays on the moved card.</text>
+<text x="36" y="801" font-size="19" fill="#374151" font-weight="400">Reduced motion: minimize movement; keep the insertion target and result announcement.</text>
+<text x="36" y="840" font-size="17" fill="#374151" font-weight="400">Dividers use the same placement feedback. Moving a divider changes grades; moving a card changes its own grade.</text>
+<text x="36" y="918" font-size="14" fill="#6b7280" font-weight="400">Draft for confirmation · Static layout sketch, not a working interface. Content and motion requirements are in the brief.</text>
+</svg>
