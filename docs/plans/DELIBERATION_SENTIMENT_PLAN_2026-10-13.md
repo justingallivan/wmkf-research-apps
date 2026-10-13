@@ -40,7 +40,7 @@ staff members, and writing ranks automatically into Proposal Ranking are out of 
 | Attribution | **Named speakers**, using the transcript's names under the same rules as the discussion summary. |
 | Comparison set | **Staff choose the proposals**, and any proposal can be run again. |
 | Location | **A page of its own**, with the data available to Proposal Ranking and other consumers through a read contract. |
-| Owning app | **A view inside Meeting Tracker.** Readers and runners are staff with Meeting Tracker access. |
+| Owning app | **A view inside Meeting Tracker.** Anyone with Meeting Tracker access can read, run and accept; each run and accept is logged against the actor. |
 | Names going forward | Some existing discussions are unattributed; staff will use names from now on. Older analyses will mostly have unnamed evidence (`speaker: null`), which is expected. |
 | Retention | **No specific retention policy.** Rows are kept; a newer transcript makes older rows out of date. |
 | AI consent step | **None.** The analysis does not add a consent acknowledgment. |
@@ -226,10 +226,8 @@ Meeting Tracker readership rule.
 
 ## 5. Owner decisions
 
-Decided 2026-10-13; recorded in §2. One minor item remains:
-
-1. **Who may run an analysis.** Assumed: anyone with Meeting Tracker access, with each run logged
-   against the actor. Confirm or narrow during build.
+All decided 2026-10-13 and recorded in §2. Who may run an analysis: anyone with Meeting Tracker
+access; each run is logged against the actor.
 
 ## 6. Build stages
 
