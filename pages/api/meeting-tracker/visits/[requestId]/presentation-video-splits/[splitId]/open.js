@@ -25,7 +25,7 @@ export default async function handler(req, res) {
   if (Object.keys(req.query || {}).some(key => key !== 'requestId' && key !== 'splitId' && key !== 'attempt')) {
     return res.status(400).json({ error: 'The presentation video request contains unsupported parameters.' });
   }
-  if (req.query?.attempt !== undefined && !/^\d{1,3}$/.test(one(req.query.attempt))) {
+  if (req.query?.attempt !== undefined && !/^\d{1,9}$/.test(one(req.query.attempt))) {
     return res.status(400).json({ error: 'The presentation video request contains unsupported parameters.' });
   }
   const access = await requireAppAccess(req, res, 'meeting-tracker');
