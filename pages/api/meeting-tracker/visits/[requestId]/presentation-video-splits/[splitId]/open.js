@@ -5,7 +5,7 @@ import { ServiceHttpError } from '../../../../../../../lib/services/service-http
 import { resolvePresentationVideoSplitOpen } from '../../../../../../../lib/services/meeting-tracker-recordings/presentation-video-approval-service.js';
 
 // Staff review open for the Stage 4 presentation video: 302 to a fresh download URL for the split's output, which has
-// no Dataverse row until it is approved. The service rechecks the recorded item id and eTag against the live item.
+// no Dataverse row until it is approved. The service rechecks the recorded item id, size, hash and malware flag against the live item.
 export const config = { maxDuration: 30 };
 
 function errorResponse(res, error) {
@@ -21,13 +21,18 @@ export default async function handler(req, res) {
   const requestId = one(req.query.requestId);
   const splitId = one(req.query.splitId);
   if (!isGuid(requestId) || !isGuid(splitId)) return res.status(400).json({ error: 'A valid request id and presentation video id are required.' });
-  if (Object.keys(req.query || {}).some(key => key !== 'requestId' && key !== 'splitId')) {
+  // `attempt` is the player's retry counter (a cache-buster); it carries no meaning for the server.
+  if (Object.keys(req.query || {}).some(key => key !== 'requestId' && key !== 'splitId' && key !== 'attempt')) {
+    return res.status(400).json({ error: 'The presentation video request contains unsupported parameters.' });
+  }
+  if (req.query?.attempt !== undefined && !/^\d{1,9}$/.test(one(req.query.attempt))) {
     return res.status(400).json({ error: 'The presentation video request contains unsupported parameters.' });
   }
   const access = await requireAppAccess(req, res, 'meeting-tracker');
   if (!access) return;
   res.setHeader('Cache-Control', 'private, no-store');
   res.setHeader('Referrer-Policy', 'no-referrer');
+  res.setHeader('X-Content-Type-Options', 'nosniff');
   return withDalContext('meeting-tracker-presentation-video-open', async () => {
     try {
       const media = await resolvePresentationVideoSplitOpen({ requestId, splitId });

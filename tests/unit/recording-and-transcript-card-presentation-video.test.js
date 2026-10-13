@@ -75,15 +75,12 @@ describe('Video line', () => {
     expect(within(el).queryByRole('button')).not.toBeInTheDocument();
   });
 
-  test('review: the name opens the video, approve is inline and re-create is in the menu', async () => {
+  test('review: Watch reveals the player, approve is inline and re-create is in the menu', async () => {
     route({ state: { splits: { available: true, splits: [split()] } } });
     await renderLine();
     const el = await line();
     expect(el).toHaveTextContent('Ready to check');
-    const open = within(el).getByRole('link', { name: 'Presentation video' });
-    expect(open).toHaveAttribute('href', `/api/meeting-tracker/visits/${REQUEST_ID}/presentation-video-splits/${SPLIT_ID}/open`);
-    expect(open).toHaveAttribute('target', '_blank');
-    expect(open).toHaveAttribute('rel', 'noopener noreferrer');
+    expect(within(el).queryByRole('link', { name: 'Presentation video' })).not.toBeInTheDocument();
     expect(within(el).getByRole('button', { name: 'Check the ending and approve' })).toBeInTheDocument();
     expect(within(el).queryByRole('button', { name: 'Create presentation video' })).not.toBeInTheDocument();
     // Staff can replace a video that is waiting for its check (e.g. after fixing the presentation end), behind a confirm.
@@ -103,7 +100,7 @@ describe('Video line', () => {
     await renderLine();
     const el = await line();
     expect(el).toHaveTextContent('Approved');
-    expect(within(el).getByRole('link', { name: 'Presentation video' })).toBeInTheDocument();
+    expect(within(el).getByRole('button', { name: 'Watch' })).toBeInTheDocument();
     expect(within(el).queryByRole('button', { name: 'Create presentation video' })).not.toBeInTheDocument();
     fireEvent.click(within(el).getByRole('button', { name: 'More actions for presentation video' }));
     fireEvent.click(screen.getByRole('menuitem', { name: 'Create presentation video' }));
@@ -167,6 +164,54 @@ describe('Video line', () => {
     expect(container.textContent).not.toContain(SPLIT_ID);
     expect(container.textContent).not.toMatch(/presentation_video_/);
     expect(within(screen.getByTestId('presentation-video-line')).queryByText(GUID)).toBeNull();
+  });
+});
+
+describe('inline player (redesign C3)', () => {
+  const OPEN = `/api/meeting-tracker/visits/${REQUEST_ID}/presentation-video-splits/${SPLIT_ID}/open`;
+  const videoOf = (el) => el.querySelector('video');
+  // jsdom does not implement media loading; the player assigns src, then calls load() and play().
+  beforeEach(() => {
+    jest.spyOn(window.HTMLMediaElement.prototype, 'load').mockImplementation(() => {});
+    jest.spyOn(window.HTMLMediaElement.prototype, 'play').mockImplementation(() => Promise.resolve());
+  });
+  test.each([
+    ['review', [split()]],
+    ['approved', [split({ state: 'approved', boardReady: true })]],
+  ])('%s: hidden by default, Watch reveals it from the open route, clicking again hides it, Download is in the menu', async (_l, splits) => {
+    route({ state: { splits: { available: true, splits } } });
+    await renderLine();
+    const el = await line();
+    expect(videoOf(el)).toBeNull();
+    expect(within(el).queryByRole('button', { name: 'Play the presentation video' })).not.toBeInTheDocument();
+    fireEvent.click(within(el).getByRole('button', { name: 'Watch' }));
+    fireEvent.click(within(el).getByRole('button', { name: /Watch the presentation video/ }));
+    await waitFor(() => expect(videoOf(el).getAttribute('src')).toBe(`${OPEN}?attempt=1`));
+    fireEvent.click(within(el).getByRole('button', { name: 'Hide video' }));
+    expect(videoOf(el)).toBeNull();
+    expect(within(el).queryByRole('button', { name: /Watch the presentation video/ })).not.toBeInTheDocument();
+    fireEvent.click(within(el).getByRole('button', { name: 'More actions for presentation video' }));
+    const download = screen.getByRole('menuitem', { name: 'Download video' });
+    expect(download).toHaveAttribute('href', OPEN);
+  });
+  test.each([['queued'], ['failed'], ['superseded'], ['registering']])('%s: no Watch control and no player', async (s) => {
+    route({ state: { splits: { available: true, splits: [split({ state: s })] } } });
+    await renderLine();
+    const el = await line();
+    expect(within(el).queryByRole('button', { name: 'Watch' })).not.toBeInTheDocument();
+    expect(videoOf(el)).toBeNull();
+  });
+  test('the player closes when a different video becomes the newest', async () => {
+    route({ state: { splits: { available: true, splits: [split()] } } });
+    await renderLine();
+    const el = await line();
+    fireEvent.click(within(el).getByRole('button', { name: 'Watch' }));
+    fireEvent.click(within(el).getByRole('button', { name: /Watch the presentation video/ }));
+    expect(videoOf(el)).not.toBeNull();
+    state.splits = { available: true, splits: [split({ id: OLD_ID, createdAt: '2026-10-11T10:00:00Z' }), split()] };
+    fireEvent.click(screen.getByTestId('card-refresh'));
+    await waitFor(() => expect(videoOf(el)).toBeNull());
+    expect(within(el).getByRole('button', { name: 'Watch' })).toBeInTheDocument();
   });
 });
 
@@ -330,7 +375,7 @@ describe('Board readiness of an approved video', () => {
     expect(el).toHaveTextContent('Out of date');
     expect(el).toHaveTextContent('The transcript or video changed. Create it again.');
     expect(el).not.toHaveTextContent('Approved');
-    expect(within(el).queryByRole('link', { name: 'Presentation video' })).not.toBeInTheDocument();
+    expect(within(el).queryByRole('button', { name: 'Watch' })).not.toBeInTheDocument();
     fireEvent.click(within(el).getByRole('button', { name: 'Create presentation video' }));
     await waitFor(() => expect(state.posts).toEqual([{ action: 'start' }]));
   });

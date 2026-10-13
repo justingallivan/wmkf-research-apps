@@ -28,6 +28,14 @@ test('checks the meeting-tracker grant, redirects 302 to the fresh URL, private 
   expect(res.redirect).toHaveBeenCalledWith(302, 'https://tenant.sharepoint.com/dl');
   expect(res.setHeader).toHaveBeenCalledWith('Cache-Control', 'private, no-store');
   expect(res.setHeader).toHaveBeenCalledWith('Referrer-Policy', 'no-referrer');
+  expect(res.setHeader).toHaveBeenCalledWith('X-Content-Type-Options', 'nosniff');
+});
+test('accepts the player retry counter `attempt` and rejects a non-integer one', async () => {
+  const ok = await get({ requestId, splitId, attempt: '1' });
+  expect(ok.redirect).toHaveBeenCalledWith(302, 'https://tenant.sharepoint.com/dl');
+  expect(resolvePresentationVideoSplitOpen).toHaveBeenCalledWith({ requestId, splitId });
+  for (const attempt of ['abc', '1.5', '-1', '', ['1', '2']]) expect((await get({ requestId, splitId, attempt })).statusCode).toBe(400);
+  expect((await get({ requestId, splitId, attempt: '1', mode: 'x' })).statusCode).toBe(400);
 });
 test('rejects other methods, bad ids and extra query keys before the service; stops when access is refused', async () => {
   expect((await get(undefined, 'POST')).statusCode).toBe(405);
