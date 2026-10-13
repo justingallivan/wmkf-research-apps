@@ -241,14 +241,36 @@ describeIf('staff discussion sentiment store (isolated local Postgres proof)', (
     }
   });
 
-  it('concurrent accepts of two ready rows serialize: one wins, one accepted row remains, no unique violation surfaces', async () => {
-    const a = await ready();
-    const b = await ready();
-    const results = await Promise.all([
-      acceptRun({ id: a, requestId, profileId: profileA, expected: expected() }),
-      acceptRun({ id: b, requestId, profileId: profileB, expected: expected() }),
-    ]);
-    expect(results.every((r) => r && r.accepted_at)).toBe(true);
-    expect(await accepted()).toHaveLength(1);
+  it('accepts of an older and a newer ready row end with the newer row as the only accepted row, in either lock order', async () => {
+    // Deterministic order 1: older first, then newer — both succeed, the older one is withdrawn.
+    let a = await ready();
+    let b = await ready();
+    expect(await acceptRun({ id: a, requestId, profileId: profileA, expected: expected() })).toMatchObject({ id: a });
+    expect(await acceptRun({ id: b, requestId, profileId: profileB, expected: expected() })).toMatchObject({ id: b });
+    expect((await accepted()).map((r) => r.id)).toEqual([b]);
+
+    // Deterministic order 2: newer first, then older — the older one is refused.
+    requestId = uuid(); artifactId = uuid();
+    a = await ready();
+    b = await ready();
+    expect(await acceptRun({ id: b, requestId, profileId: profileB, expected: expected() })).toMatchObject({ id: b });
+    expect(await acceptRun({ id: a, requestId, profileId: profileA, expected: expected() }))
+      .toEqual({ conflict: { code: 'sentiment_newer_result_accepted' } });
+    expect((await accepted()).map((r) => r.id)).toEqual([b]);
+
+    // Concurrent: whichever acquires the lock first, the newer row ends as the only accepted row
+    // and no unique violation surfaces.
+    for (let i = 0; i < 5; i += 1) {
+      requestId = uuid(); artifactId = uuid();
+      a = await ready();
+      b = await ready();
+      const [olderResult, newerResult] = await Promise.all([
+        acceptRun({ id: a, requestId, profileId: profileA, expected: expected() }),
+        acceptRun({ id: b, requestId, profileId: profileB, expected: expected() }),
+      ]);
+      expect(newerResult).toMatchObject({ id: b });
+      expect(olderResult?.id === a || olderResult?.conflict?.code === 'sentiment_newer_result_accepted').toBe(true);
+      expect((await accepted()).map((r) => r.id)).toEqual([b]);
+    }
   });
 });
