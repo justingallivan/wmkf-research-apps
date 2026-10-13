@@ -32,7 +32,7 @@ One row per analysis run over a request's Staff Discussion Transcript. The model
 | `source_artifact_id`, `source_content_hash` | The exact discussion transcript analyzed (request-document id; 64 lowercase hex hash). |
 | `prompt_name`, `prompt_version`, `model` | What produced it. `prompt_version` is set on completion and is required for `ready`. |
 | `status`, `failure_code` | `generating`, `ready`, `failed`. `failure_code` is required exactly when `failed` (format `^[a-z0-9_]{1,80}$`, content-free). |
-| `record` | The validated `DeliberationSentiment` v1 JSON, with `speakerLabel` and `speaker` derived by the server. `ready` rows only. |
+| `record` | The validated `DeliberationSentiment` v1 JSON, with `speakerLabel` and `speaker` derived by the server and each evidence `time`/`quote` taken from the matched turn. When evidence items were dropped as unverifiable, also a content-free `verification: { dropped: { time_not_found, text_not_in_turn, ambiguous, disagreements_dropped, uncertainties_dropped }, total }`; absent on a clean record. `ready` rows only. |
 | `requested_by_profile_id`, `created_at`, `completed_at` | Actor (from authenticated context only) and times. |
 | `accepted_*`, `withdrawn_*` | Staff Accept and Withdraw, each an actor profile id plus a time. Withdrawn requires accepted; accepted requires `ready`. |
 

@@ -133,7 +133,7 @@ import * as summaryService from '../../lib/services/post-presentation-materials/
 import * as store from '../../lib/services/post-presentation-materials/discussion-sentiment-store.js';
 import {
   analyzeDiscussionSentiment, acceptDiscussionSentiment, withdrawDiscussionSentiment, validateSentimentOutput,
-  rebuildTurns, attachSpeakers, isRunCurrent,
+  rebuildTurns, attachSpeakers, isRunCurrent, parseTurnSeconds,
 } from '../../lib/services/post-presentation-materials/discussion-sentiment-service.js';
 import { formatTranscriptText } from '../../lib/services/transcription-pilot/transcript-format.js';
 import { PROMPT_NAME } from '../../shared/config/prompts/meeting-staff-discussion-sentiment.js';
@@ -168,7 +168,7 @@ const goodRecord = (overrides = {}) => ({
   disagreements: [], uncertainties: [], ...overrides,
 });
 
-let nextId; let promptVersion; let deps; let execute; let loaded;
+let nextId; let promptVersion; let deps; let execute; let loaded; let recordEvent;
 const ids = () => `00000000-0000-4000-8000-${String(++nextId).padStart(12, '0')}`;
 const rows = () => pg.__rows;
 const row = (id) => rows().find((r) => r.id === id);
@@ -191,7 +191,9 @@ beforeEach(() => {
     executePrompt: (...args) => execute(...args),
     fetchCurrentPrompt: jest.fn(async () => ({ wmkf_promptversion: promptVersion })),
     sentiments: store,
+    recordEvent: (...args) => recordEvent(...args),
   };
+  recordEvent = jest.fn(async () => {});
 });
 
 const analyze = () => analyzeDiscussionSentiment({ requestId: REQUEST_ID, ownerProfileId: 12, actingUserSystemId: ACTOR }, deps);
@@ -226,24 +228,148 @@ describe('analysis run', () => {
     await expect(analyze()).rejects.toMatchObject({ code: 'sentiment_output_invalid' });
   });
 
-  test('a quote that is not in the transcript is rejected and nothing is saved', async () => {
-    execute.mockResolvedValueOnce({ parsed: goodRecord({ supportPoints: [ev('00:03', 'This team is mediocre')] }), meta: { promptVersion: 1 } });
+  test('a bad support point is dropped and the run still succeeds (was: any bad quote rejected the whole record)', async () => {
+    execute.mockResolvedValueOnce({ parsed: goodRecord({ supportPoints: [ev('00:03', 'This team is excellent'), ev('00:03', 'This team is mediocre')] }), meta: { promptVersion: 1 } });
+    const { run } = await analyze();
+    expect(run.record.supportPoints).toHaveLength(1);
+    expect(run.record.verification).toEqual({ dropped: { time_not_found: 0, text_not_in_turn: 1, ambiguous: 0, disagreements_dropped: 0, uncertainties_dropped: 0 }, total: 3 });
+  });
+
+  test('a clean record has no verification key and emits no event', async () => {
+    const { run } = await analyze();
+    expect(run.record).not.toHaveProperty('verification');
+    expect(recordEvent).not.toHaveBeenCalled();
+  });
+
+  test('a strong rating whose every evidence item is unverifiable fails as unverified and nothing is saved', async () => {
+    execute.mockResolvedValueOnce({ parsed: goodRecord({ enthusiasm: 'high', supportPoints: [ev('00:03', 'This team is mediocre')], concernPoints: [] }), meta: { promptVersion: 1 } });
     await expect(analyze()).rejects.toMatchObject({ httpStatus: 502, code: 'sentiment_evidence_unverified' });
     expect(rows()).toHaveLength(1);
     expect(rows()[0]).toMatchObject({ status: 'failed', failure_code: 'sentiment_evidence_unverified', record: null });
+    expect(recordEvent).toHaveBeenCalledTimes(1);
+    expect(recordEvent.mock.calls[0][0].metadata).toMatchObject({ outcome: 'sentiment_evidence_unverified', total: 1, text_not_in_turn: 1 });
   });
 
-  test('a quote whose time matches a different turn is rejected', async () => {
+  test('a strong rating survives when other evidence verifies (evidence counted across lists)', async () => {
+    execute.mockResolvedValueOnce({ parsed: goodRecord({ reception: 'negative', supportPoints: [ev('00:03', 'This team is mediocre')],
+      concernPoints: [ev('00:10', 'budget is far too large')] }), meta: { promptVersion: 1 } });
+    await expect(analyze()).resolves.toMatchObject({ run: { status: 'ready' } });
+  });
+
+  test('a quote whose time matches a different turn is dropped as text_not_in_turn', async () => {
     execute.mockResolvedValueOnce({ parsed: goodRecord({ supportPoints: [ev('00:10', 'This team is excellent')] }), meta: { promptVersion: 1 } });
-    await expect(analyze()).rejects.toMatchObject({ code: 'sentiment_evidence_unverified' });
-    expect(rows()[0].record).toBeNull();
+    const { run } = await analyze();
+    expect(run.record.supportPoints).toEqual([]);
+    expect(run.record.verification.dropped).toMatchObject({ text_not_in_turn: 1, time_not_found: 0 });
   });
 
-  test('a quote found in two turns that share the time is ambiguous and rejected', async () => {
+  test('a time that matches no turn is dropped as time_not_found', async () => {
+    execute.mockResolvedValueOnce({ parsed: goodRecord({ supportPoints: [ev('00:04', 'This team is excellent')] }), meta: { promptVersion: 1 } });
+    const { run } = await analyze();
+    expect(run.record.supportPoints).toEqual([]);
+    expect(run.record.verification.dropped).toMatchObject({ time_not_found: 1, text_not_in_turn: 0 });
+  });
+
+  test('a quote found in two turns that share the time is ambiguous and dropped', async () => {
     const content = { text: '', utterances: [utt('A', 3000, 'Same words here for both.'), utt('B', 3400, 'Same words here for both.')] };
     loaded = { ...loaded, discussionContent: content, transcriptText: formatTranscriptText(content, SPEAKER_NAMES, { layout: 'turn' }) };
     execute.mockResolvedValueOnce({ parsed: goodRecord({ supportPoints: [ev('00:03', 'Same words here for both')], concernPoints: [] }), meta: { promptVersion: 1 } });
-    await expect(analyze()).rejects.toMatchObject({ code: 'sentiment_evidence_unverified' });
+    const { run } = await analyze();
+    expect(run.record.supportPoints).toEqual([]);
+    expect(run.record.verification.dropped).toMatchObject({ ambiguous: 1 });
+  });
+
+  describe('tolerant time match (turn at 1:02:05)', () => {
+    const Q = 'the review panel will love this';
+    test.each(['01:02:05', '[1:02:05]', ' 1:02:05 ', '[ 01:02:05 ]', '1:02:05'])('model time %j matches and the stored time is the turn\'s', async (time) => {
+      execute.mockResolvedValueOnce({ parsed: goodRecord({ supportPoints: [ev(time, Q)], concernPoints: [] }), meta: { promptVersion: 1 } });
+      const { run } = await analyze();
+      expect(run.record.supportPoints[0]).toMatchObject({ time: '1:02:05', speaker: 'Smith: Jr.' });
+      expect(run.record).not.toHaveProperty('verification');
+    });
+    test('02:15 and 2:15 both match a 02:15 turn; a wrong time does not', async () => {
+      const content = { text: '', utterances: [utt('A', 135000, 'A remark made at two fifteen.')] };
+      loaded = { ...loaded, discussionContent: content, transcriptText: formatTranscriptText(content, SPEAKER_NAMES, { layout: 'turn' }) };
+      for (const time of ['02:15', '2:15']) {
+        execute.mockResolvedValueOnce({ parsed: goodRecord({ supportPoints: [ev(time, 'remark made at two fifteen')], concernPoints: [] }), meta: { promptVersion: 1 } });
+        // eslint-disable-next-line no-await-in-loop
+        const { run } = await analyze();
+        expect(run.record.supportPoints[0]).toMatchObject({ time: '02:15' });
+        rows().length = 0;
+      }
+      execute.mockResolvedValueOnce({ parsed: goodRecord({ supportPoints: [ev('02:16', 'remark made at two fifteen')], concernPoints: [] }), meta: { promptVersion: 1 } });
+      const { run } = await analyze();
+      expect(run.record.supportPoints).toEqual([]);
+      expect(run.record.verification.dropped.time_not_found).toBe(1);
+    });
+  });
+
+  describe('tolerant text match', () => {
+    const withTurn = (text) => {
+      const content = { text: '', utterances: [utt('A', 3000, text)] };
+      loaded = { ...loaded, discussionContent: content, transcriptText: formatTranscriptText(content, SPEAKER_NAMES, { layout: 'turn' }) };
+    };
+    const save = async (quote) => {
+      execute.mockResolvedValueOnce({ parsed: goodRecord({ supportPoints: [ev('00:03', quote)], concernPoints: [] }), meta: { promptVersion: 1 } });
+      return (await analyze()).run.record;
+    };
+    test('curly vs straight apostrophe and quotes; the stored quote is the turn\'s exact slice', async () => {
+      withTurn('We don\u2019t think \u201cthe plan\u201d is ready yet.');
+      const record = await save('we don\'t think "the plan" is ready');
+      expect(record.supportPoints[0].quote).toBe('We don\u2019t think \u201cthe plan\u201d is ready');
+      expect(record).not.toHaveProperty('verification');
+    });
+    test('an em dash vs a hyphen, and the reverse', async () => {
+      withTurn('The cost \u2014 not the team \u2014 is the concern here.');
+      await save('The cost - not the team - is the concern');
+      rows().length = 0;
+      withTurn('The cost - not the team - is the concern here.');
+      expect((await save('The cost \u2014 not the team \u2014 is the concern')).supportPoints[0].quote).toBe('The cost - not the team - is the concern');
+    });
+    test('a case difference and an ellipsis', async () => {
+      withTurn('Well\u2026 THE BUDGET is far too large.');
+      const record = await save('well... the budget IS FAR too large');
+      expect(record.supportPoints[0].quote).toBe('Well\u2026 THE BUDGET is far too large');
+    });
+  });
+
+  test('an unverifiable side leaves a one-sided disagreement, which is dropped', async () => {
+    execute.mockResolvedValueOnce({ parsed: goodRecord({ disagreements: dis([ev('00:10', 'budget is far too large'), ev('00:30', 'would never fund it')]) }), meta: { promptVersion: 1 } });
+    const { run } = await analyze();
+    expect(run.record.disagreements).toEqual([]);
+    expect(run.record.verification.dropped).toMatchObject({ text_not_in_turn: 1, disagreements_dropped: 1 });
+  });
+
+  test('an uncertainty whose only evidence is unverifiable is dropped', async () => {
+    execute.mockResolvedValueOnce({ parsed: goodRecord({ uncertainties: [{ topic: 'Timeline', evidence: [ev('00:20', 'Not sure the schedule works')] }] }), meta: { promptVersion: 1 } });
+    const { run } = await analyze();
+    expect(run.record.uncertainties).toEqual([]);
+    expect(run.record.verification.dropped).toMatchObject({ text_not_in_turn: 1, uncertainties_dropped: 1 });
+  });
+
+  describe('verification event (content-free, best-effort)', () => {
+    const noisy = () => goodRecord({
+      headline: 'HEADLINE-SENTINEL-XYZ',
+      supportPoints: [ev('00:03', 'This team is excellent'), ev('00:03', 'QUOTE-SENTINEL-ONE not real'), ev('09:09', 'QUOTE-SENTINEL-TWO not real')],
+      disagreements: [{ topic: 'TOPIC-SENTINEL-ABC', sides: [ev('00:10', 'budget is far too large'), ev('00:30', 'QUOTE-SENTINEL-THREE absent')] }],
+    });
+    test('carries the counts and none of the content', async () => {
+      execute.mockResolvedValueOnce({ parsed: noisy(), meta: { promptVersion: 1 } });
+      const { run } = await analyze();
+      expect(recordEvent).toHaveBeenCalledTimes(1);
+      const event = recordEvent.mock.calls[0][0];
+      expect(event).toMatchObject({ eventType: 'sentiment_evidence_verification', correlationId: run.id,
+        metadata: { outcome: 'saved', total: 6, time_not_found: 1, text_not_in_turn: 2, ambiguous: 0, disagreements_dropped: 1, uncertainties_dropped: 0 } });
+      const serialized = JSON.stringify(event);
+      ['QUOTE-SENTINEL', 'TOPIC-SENTINEL', 'HEADLINE-SENTINEL', 'excellent', 'budget', 'Dr. Lee', 'Pat Kim'].forEach((text) => expect(serialized).not.toContain(text));
+    });
+    test('a recordEvent that throws or rejects does not fail the run', async () => {
+      execute.mockResolvedValue({ parsed: noisy(), meta: { promptVersion: 1 } });
+      recordEvent = jest.fn(() => { throw new Error('event store down'); });
+      await expect(analyze()).resolves.toMatchObject({ run: { status: 'ready' } });
+      recordEvent = jest.fn(async () => { throw new Error('event store down'); });
+      await expect(analyze()).resolves.toMatchObject({ run: { status: 'ready' } });
+    });
   });
 
   test('two speakers in the same second with different text are each attributed correctly', async () => {
@@ -311,20 +437,29 @@ describe('analysis run', () => {
       return analyze();
     };
     const Q1 = ev('00:10', 'budget is far too large');
+    // Changed contract: a violating disagreement is dropped (the run saves), it no longer fails the run.
+    const dropsDisagreement = async (sides) => {
+      const { run: saved } = await run(sides);
+      expect(saved.record.disagreements).toEqual([]);
+      expect(saved.record.verification.dropped.disagreements_dropped).toBe(1);
+    };
     test('an exact-duplicate quote cannot make two sides', async () => {
-      await expect(run([Q1, { ...Q1 }])).rejects.toMatchObject({ code: 'sentiment_evidence_unverified' });
+      await dropsDisagreement([Q1, { ...Q1 }]);
     });
     test('a whitespace-equivalent duplicate is the same evidence', async () => {
-      await expect(run([Q1, ev('00:10', 'budget  is far\ntoo large')])).rejects.toMatchObject({ code: 'sentiment_evidence_unverified' });
+      await dropsDisagreement([Q1, ev('00:10', 'budget  is far\ntoo large')]);
     });
-    test('duplicate evidence on a speaker-null turn is still rejected (the duplicate rule, not the speaker rule)', async () => {
+    test('a case-only duplicate is the same evidence', async () => {
+      await dropsDisagreement([Q1, ev('00:10', 'BUDGET is far too large')]);
+    });
+    test('duplicate evidence on a speaker-null turn is still dropped (the duplicate rule, not the speaker rule)', async () => {
       const Q = ev('00:40', 'Plain remark without any label');
-      await expect(run([Q, { ...Q }])).rejects.toMatchObject({ code: 'sentiment_evidence_unverified' });
-      await expect(run([Q, ev('00:40', 'Plain   remark without\nany label')])).rejects.toMatchObject({ code: 'sentiment_evidence_unverified' });
+      await dropsDisagreement([Q, { ...Q }]);
+      rows().length = 0;
+      await dropsDisagreement([Q, ev('00:40', 'Plain   remark without\nany label')]);
     });
     test('two different quotes from one named speaker are not a disagreement', async () => {
-      await expect(run([ev('00:10', 'I worry the budget'), ev('00:10', 'too large for the plan')]))
-        .rejects.toMatchObject({ code: 'sentiment_evidence_unverified' });
+      await dropsDisagreement([ev('00:10', 'I worry the budget'), ev('00:10', 'too large for the plan')]);
     });
     test('a named speaker against a speaker-null side is allowed', async () => {
       const { run: saved } = await run([Q1, ev('00:40', 'Plain remark without any label')]);
@@ -597,10 +732,20 @@ describe('pure helpers', () => {
     expect(validateSentimentOutput('nope').ok).toBe(false);
   });
 
-  test('attachSpeakers fails when any item has no unique matching turn', () => {
+  test('attachSpeakers drops items with no unique matching turn instead of failing', () => {
     const record = validateSentimentOutput(goodRecord()).value;
     const turns = rebuildTurns(CONTENT, SPEAKER_NAMES, TRANSCRIPT);
-    expect(attachSpeakers(record, turns).ok).toBe(true);
-    expect(attachSpeakers(record, turns.slice(1)).ok).toBe(false);
+    expect(attachSpeakers(record, turns)).toMatchObject({ ok: true, total: 2 });
+    const partial = attachSpeakers(record, turns.slice(1));
+    expect(partial).toMatchObject({ ok: true, dropped: { time_not_found: 1 } });
+    expect(partial.value.supportPoints).toEqual([]);
+    expect(partial.value.concernPoints).toHaveLength(1);
+  });
+
+  test('parseTurnSeconds accepts padded, bracketed and spaced forms and rejects non-times', () => {
+    ['1:02:15', '01:02:15', '[1:02:15]', ' [ 01:02:15 ] '].forEach((t) => expect(parseTurnSeconds(t)).toBe(3735));
+    expect(parseTurnSeconds('2:15')).toBe(135);
+    expect(parseTurnSeconds('02:15')).toBe(135);
+    ['soon', '1:75', '1:61:00', '', null, '[1:02:15', '12'].forEach((t) => expect(parseTurnSeconds(t)).toBeNull());
   });
 });
