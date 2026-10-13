@@ -88,6 +88,13 @@ export const EXECUTOR_BUDGET_DEFAULTS = Object.freeze({
     maxTokensOverride: 16_000,
     timeoutMsOverride: 240_000,
   }),
+  // The staff discussion sentiment analysis (deliberation sentiment plan §4.3) reads the same
+  // transcript and returns a bounded JSON record, so it uses the same envelope.
+  'meeting-transcript.staff-discussion-sentiment': Object.freeze({
+    kind: 'standing',
+    maxTokensOverride: 16_000,
+    timeoutMsOverride: 240_000,
+  }),
 });
 
 // Safety bounds remain code-owned. Admin publications may tune values only
@@ -142,6 +149,10 @@ export const EXECUTOR_BUDGET_LIMITS = Object.freeze({
     maxTokensOverride: Object.freeze({ min: 4_096, max: 32_000 }),
     timeoutMsOverride: Object.freeze({ min: 60_000, max: 240_000 }),
   }),
+  'meeting-transcript.staff-discussion-sentiment': Object.freeze({
+    maxTokensOverride: Object.freeze({ min: 4_096, max: 32_000 }),
+    timeoutMsOverride: Object.freeze({ min: 60_000, max: 240_000 }),
+  }),
 });
 
 export const EXECUTOR_BUDGET_DESCRIPTIONS = Object.freeze({
@@ -180,6 +191,10 @@ export const EXECUTOR_BUDGET_DESCRIPTIONS = Object.freeze({
   'meeting-transcript.staff-discussion-summary': Object.freeze({
     since: '2026-10-08 (paired summaries plan D5)',
     reason: 'One three-section plain-text summary over the staff discussion transcript, with the presentation summary envelope. Adaptive thinking is counted inside this output budget.',
+  }),
+  'meeting-transcript.staff-discussion-sentiment': Object.freeze({
+    since: '2026-10-13 (deliberation sentiment plan §4.3)',
+    reason: 'One bounded JSON record with quoted evidence over the staff discussion transcript, with the discussion summary envelope. Adaptive thinking is counted inside this output budget.',
   }),
 });
 
