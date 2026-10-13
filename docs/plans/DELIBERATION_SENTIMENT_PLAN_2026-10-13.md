@@ -51,7 +51,10 @@ staff members, and writing ranks automatically into Proposal Ranking are out of 
 | Prompt wording | **Approved as written (2026-10-13).** The seed script may run when the owner seeds each environment (the release-order note in §9 still applies). |
 | Review before sharing | **Staff "Accept" required** before the read service returns a record to any other app. The Meeting Tracker page shows unaccepted results labelled "AI analysis; check the quotes". |
 
-## 3. Current state the plan builds on
+## 3. Historical pre-build baseline (2026-10-13)
+
+This table records the pre-build planning observations. It is not a current inventory;
+the shipped producer is documented in the status above and §9.
 
 | Fact | Evidence |
 |---|---|
@@ -201,7 +204,7 @@ run) with ids, outcome and counts only: `total`, `time_not_found`, `text_not_in_
 saved record that had drops also carries `verification: { dropped: {...same five counts}, total }`; a clean
 record has no `verification` key. Tests cover named, numbered, excluded and label-free turns.
 
-**Storage:** one new Postgres table, `staff_discussion_sentiments` (migration 082, if still free).
+**Storage:** `staff_discussion_sentiments`, migration 082 (implemented; deployment receipt in §9).
 
 | Column | Purpose |
 |---|---|
@@ -301,23 +304,30 @@ row (no `docs/SERVICE_AND_UTILITY_CATALOG.md` entry: the sibling summary service
 
 ### 4.6 Consumer contract (Proposal Ranking and others)
 
-A read service, `getDeliberationSentiments(requestIds)`, returns, per request, the current
-**accepted, not withdrawn, current** `DeliberationSentiment` (or `null`) plus `promptVersion` and `{ status: 'current' | 'out_of_date' | 'none',
-analyzedAt }`. Other apps call this service. Proposal Ranking would add an optional
-`deliberationSentiment` field next to `ProposalCard.score`.
+[VERIFIED via `lib/services/post-presentation-materials/discussion-sentiment-reader.js`]
+`getDeliberationSentiments(requestIds, { profileId })` returns a map keyed by request
+ID, with `status: 'current' | 'out_of_date' | 'none'`, `analyzedAt`, `promptVersion`,
+and `sentiment`. Only the accepted, not withdrawn, current row supplies sentiment.
+The authenticated caller must have live Meeting Tracker access or superuser authority;
+a consumer app grant alone does not suffice. At most 50 GUID request IDs per call,
+inside the caller's trusted DAL context. No consumer app is wired on main.
 
-**Wiring Proposal Ranking is a separate follow-on change.** This plan does not modify Proposal
-Ranking. That needs its own decision about whether a frozen round snapshot captures the
-sentiment and how it interacts with ranking privacy (private lists before publication). It
-also needs an access decision: a consumer app's own grant (for example `proposal-ranking`)
-must not become a way around the owning app's staff-only access. The read service therefore
-takes the caller's access context and fails closed when that context does not satisfy the
-Meeting Tracker readership rule.
+**[PLANNED — owner agreed 2026-10-13]** Proposal Ranking will show **Earlier discussion
+sentiment only on group-discussion cards after reveal**, not on private PD preparation.
+Compact reception/enthusiasm expands to evidence and disagreements/uncertainties.
+Missing, unaccepted, withdrawn, or stale analyses show Not available; authorization
+and infrastructure errors remain distinct from absence. Sentiment never weights or
+orders ranking and is not part of the agreed two-sheet workbook. Do not freeze a
+copy that can survive withdrawal/currentness checks. Access checks are preserved;
+no new grant is implied. Consumer read timing/error handling remains an engineering
+prerequisite. The controlling workflow is revision 4 of
+`docs/plans/PROPOSAL_RANKING_DESIGN_2026-10-07.md` §7; wire-contract planning is in
+`docs/plans/PROPOSAL_RANKING_API_CONTRACT.md` §6. Wiring is still a separate change.
 
-Per-request failures never fail the batch. A request the feature is not available for (transcription disabled,
-schema not ready, request not allowed) reads `none`. If the sentiment prompt is unseeded or duplicated, no row can be
-current: a request with an accepted row reads `out_of_date`, otherwise `none`, always with `sentiment: null`. Only
-genuine infrastructure failures throw.
+Known per-request unavailability (transcription disabled, schema not ready, request
+not allowed) reads `none`. If the sentiment prompt is unseeded or duplicated, an
+accepted row reads `out_of_date`, otherwise `none`, always with `sentiment: null`.
+Genuine infrastructure failures throw; access lookup failure is fail-closed.
 
 ## 5. Owner decisions
 

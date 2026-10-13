@@ -64,4 +64,9 @@ Currentness is computed in code (`isRunCurrent`): the source artifact id and con
 
 ## Not covered
 
-Proposal Ranking wiring (a separate plan) and calibration. The SQL is exercised against a loopback Postgres by `tests/integration/discussion-sentiments.pg.test.js` (opt-in via `DISCUSSION_SENTIMENT_PG_TEST_URL`; skipped otherwise) and against an in-memory stand-in in the unit tests; it has not run against any shared environment.
+Proposal Ranking wiring and calibration. The October 13 owner-approved ranking
+workflow plans accepted/current sentiment only on group-discussion cards after
+reveal, with no ordering weight or individual-preparation exposure. It is not wired;
+see `docs/plans/PROPOSAL_RANKING_DESIGN_2026-10-07.md` §7 and the API contract §6
+(`docs/plans/PROPOSAL_RANKING_API_CONTRACT.md`). Meeting Tracker access remains
+required; the integration must preserve currentness/withdrawal and the 50-ID cap. The automated integration suite `tests/integration/discussion-sentiments.pg.test.js` targets loopback Postgres (opt-in via `DISCUSSION_SENTIMENT_PG_TEST_URL`; skipped otherwise); unit tests use an in-memory stand-in. These test receipts do not establish a shared-environment integration-suite run. They are distinct from the dated Production migration and application-use receipt in Status above.

@@ -1,15 +1,14 @@
-# Proposal Ranking API contract
+# Proposal Ranking API — existing wire contract and planned revision
 
-Status: implementation contract for the first Proposal Ranking release. It is
-derived from revision 3 of `PROPOSAL_RANKING_DESIGN_2026-10-07.md`. Runtime
-activation is now enabled in Production; multi-identity acceptance remains pending. Sandbox and Production schema/application-role setup are verified;
-bounded persistence checks and direct-table denial for the tested sandbox staff
-identity passed. Production facilitator/grants and four-participant direct-table/search
-privacy checks passed. Production activation passed the signed-in participant waiting-state
-smoke; the full browser rehearsal remains open. See
-`docs/atlas/dataverse-proposal-ranking.md` for target-specific status.
+Updated 2026-10-13. Sections 1–5 below describe **[VERIFIED via main source at
+`b3219f4aa`] the existing revision-3 API**, not the agreed replacement workflow.
+Revision 4 product authority is `docs/plans/PROPOSAL_RANKING_DESIGN_2026-10-07.md`.
+The planned changes in §6 are semantic requirements, not callable endpoints or
+provisioned fields. The paused branch `0d161d60f` differs from main (§7).
+Deployment facts are dated receipts in `docs/atlas/dataverse-proposal-ranking.md`;
+no live activation or multi-identity acceptance was reverified in this docs task.
 
-## Route
+## 1. Existing route
 
 `/api/proposal-ranking` accepts authenticated `GET` and `POST` requests. Every
 response is `Cache-Control: private, no-store`. The route requires
@@ -26,7 +25,7 @@ per-request authorization. Missing both selectors returns `400`.
 canonical UUID `operationId`; the server stores it with the affected row(s) and
 uses it to resolve repeat and uncertain outcomes.
 
-## Common response
+## 2. Existing common response
 
 ```ts
 type ProgramKey = 'se' | 'mr';
@@ -141,7 +140,7 @@ receives the shared order and named ranks for that program. Publishing SE does n
 expose MR. A former non-roster facilitator loses participant access after a
 transfer. Canceled rounds are read-only.
 
-## Actions
+## 3. Existing actions
 
 ```ts
 type Action =
@@ -174,7 +173,7 @@ program is `published`. `generate` applies to a meeting list in `collecting`, an
 `publish` applies to a generated list in `composite-draft`. The response's meeting
 `etag` is required for each transition or edit.
 
-## Errors and outcome handling
+## 4. Existing errors and outcome handling
 
 Errors use `{ "error": { "code": string, "message": string, "retryable": boolean, "current": object|null } }`.
 
@@ -196,7 +195,7 @@ repeat terminal action returns its existing result only if the operation ID
 matches the action persisted with that transition. Conflict `current` values are
 always shaped using the same privacy filtering as a successful read.
 
-## Default facilitator setting
+## 5. Existing default facilitator setting
 
 `GET /api/admin/proposal-ranking-facilitator` returns
 `{ systemUserId: string|null, name: string|null, configured: boolean, revision: string|null, eligibleStaff: Array<{ systemUserId: string, name: string }> }`.
@@ -213,3 +212,64 @@ A successful transfer by a facilitator outside the captured roster returns a
 are denied. An uncertain opening retains its original action payload and operation
 ID in the UI's “Resolve opening attempt” control, so retry cannot create a
 replacement for the original round after cancellation.
+
+
+## 6. Planned revision-4 contract — not implemented
+
+Use the agreed design for the product rules. Exact action tokens, versioned DTOs,
+and storage mapping require implementation planning; do not send invented actions
+to the current route. Preserve session-derived actors, server-side app/roster checks,
+private/no-store headers, strict input validation, ETags and operation readback.
+
+| Semantic operation | Required contract |
+|---|---|
+| Save program preparation | Save a complete MR or SE permutation, two A/B/C boundaries, and per-proposal confidence atomically with the relevant version. Default boundaries roughly split the reviewer-score seed into thirds. Grades follow boundaries, not a conflicting second grade store. |
+| Create/review PD combined order | Within A then B then C, pair MR/SE items by the PD's position and order each pair by reviewer mean; finish each pair before the next and append leftovers. Save the reviewed total order, grades/boundaries and confidence. Do not silently rebuild an edited combined list. |
+| Mark ready / reopen | Require every proposal once, grade and explicit confidence, combined-order confirmation and confirmed saves. Reopening before reveal clears readiness. Readiness belongs to a particular saved version, not an unversioned boolean. |
+| Reveal | Facilitator only; require all captured PDs ready on the same validated versions. Atomically preserve their combined orders/grades/confidence, save equal-weight rank sums and deterministic unique starting positions, and expose one collective list. Repeats/readback must not overwrite group edits. |
+| Edit collective list | After reveal, persist only collective order and the Recommend funding / Alternates / Do not recommend separators; preserve individual inputs and calculated baseline. ETag/policy checks apply to card and boundary changes together. |
+| Enrich discussion cards | Ranking-authorized server read plus the sentiment reader's own access check. Accepted, current, not-withdrawn sentiment only; no preparation response enrichment. History shows count/year, E/W is informational, neither affects ranking. |
+| Export workbook | One confirmed collective revision plus its immutable reveal inputs; two sheets from the design. Reject/wait for pending or uncertain edits. No sentiment/transcript quotes in the agreed export. |
+
+Before reveal a response may contain the actor's own preparation and readiness
+progress; only the facilitator may receive other PDs' private preparation. After
+reveal expose the named immutable assessments and mutable collective view to the
+round's authorized participants/facilitator. A nonparticipant superuser does not
+inherit private content merely from that role. Hiding controls is not privacy.
+
+The new API must not silently accept revision-3 or branch `co` data as individual
+combined rankings. Old snapshots lack grades/confidence/readiness/reveal versions.
+Explicitly version their readers and writes; do not backfill invented assessments.
+Retain old audit/read capability and reject incompatible mutations clearly.
+
+Reveal must serialize against reopening, autosave and facilitator/roster changes.
+A response may report confirmed reveal only after the complete durable transaction;
+uncertain transport requires operation-identity readback and the same authorization
+filter as normal reads. No partial roster composite or partial privacy release.
+
+Calculation: compare combined rank sums, then unrounded reviewer mean descending,
+then numeric-aware request number and identity. A missing reviewer score sorts after
+a known one for a tie-break; equal/missing values use the stable fallback. No shared
+positions or `tied` presentation in the revised contract. Confidence and grades
+are descriptive inputs, not weights. Keep missing currency/amount safeguards.
+
+Sentiment service: `getDeliberationSentiments(requestIds, { profileId })`, inside
+trusted DAL context, validates GUIDs and at most 50 IDs, checks active Meeting Tracker
+grant/superuser live, and returns a map of `current` / `out_of_date` / `none` envelopes.
+Only `current` includes sentiment. Known per-request unavailability becomes `none`;
+genuine infrastructure failures throw; access denial must not be mislabeled as
+"no analysis exists". Data must remain absent from unauthorized payloads. Batch sizing,
+read timing, dependency-error display, and withdrawal/currentness refresh are required
+integration details, not a reason to bypass the existing reader.
+
+## 7. Paused branch differences — source inspection only
+
+At `codex/proposal-ranking` / `0d161d60f`, `combine` creates `meeting:co` from already
+published program meeting orders. There is no `pd:co` preparation workflow. Branch
+`resetDryRun` and `open.dryRun` are rehearsal capabilities, not revision-4 readiness.
+The branch carries `researchFunding` with `status`, `qualifyingGrantCount`,
+`totalUsd`, `lastAwardCycle`; it currently displays dollars/latest cycle and exports
+one saved published meeting order as CSV. This is neither the agreed count/year
+presentation nor the two-sheet workbook. Main's types above do not include those
+branch-only additions. See the source comparison audit for exact evidence and
+remaining storage/access prerequisites before implementation.

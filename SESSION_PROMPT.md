@@ -1,5 +1,28 @@
 # Session 602 Prompt: Discussion Sentiment calibration (after uploads); transcription cleanup check; security mitigation Release 1
 
+## Current Proposal Ranking note — 2026-10-13 (Codex; documentation only)
+
+[VERIFIED via owner decisions in the October 13 conversation] The revised workflow is agreed:
+separate reviewer-seeded MR/SE lists with roughly equal A/B/C sections and explicit confidence;
+within-grade paired MR/SE merging followed by each PD's confirmed combined ranking; equal-weight
+average positions; private preparation until everyone is ready and the facilitator reveals;
+individual assessments preserved at reveal; collective funding/alternate/not-recommended separators;
+group-only accepted/current discussion sentiment and unweighted institutional award count/latest year;
+and an initial two-sheet workbook export. No ties.
+
+The current product authority is [design revision 4](docs/plans/PROPOSAL_RANKING_DESIGN_2026-10-07.md).
+The [October 13 reconciliation audit](docs/audits/PROPOSAL_RANKING_WORKFLOW_RECONCILIATION_2026-10-13.md)
+compares that target with main and the retained feature branch. The documents now distinguish
+the agreed target from existing source and dated release evidence; verification results are recorded
+in that audit. No app implementation or fresh live-data/deployment verification is claimed.
+
+Implementation remains paused until the owner requests app changes. The current request authorizes
+design consolidation, source comparison, and documentation only. Historical Proposal Ranking handoffs
+below preserve earlier decisions, branch checkpoints, and dated evidence; their former “current” or
+“next” instructions do not override revision 4 or authorize implementation, promotion, or trial cleanup.
+Unrelated workstream handoffs and carryovers retain their existing scope.
+
+
 ## Session 601 close — Discussion Sentiment meter shipped to Meeting Tracker (Claude Opus orchestrating Sonnet build, Opus/Fable review, Codex adversarial; shared checkout `main`, 2026-10-13 PT)
 
 ### What Was Completed
@@ -25,7 +48,7 @@
 
 1. **Calibration (waiting on the owner):** the owner is uploading more staff-discussion videos first. Then run 3–5 real discussions on the page (#1002852 and #1003038 already done), compare each result with that proposal's AI summary, and decide: keep the transcript version, simplify to summaries only (the owner's original ask), or both. Evidence: plan §6 item 5, §9 last entry.
 2. **Accept results** the owner agrees with (#1002852, #1003038); only accepted results reach other apps.
-3. **Proposal Ranking consumer** for `getDeliberationSentiments` — not wired (follow-on; Proposal Ranking itself is paused, PR #463).
+3. **Proposal Ranking consumer** for `getDeliberationSentiments` — not wired. The October 13 agreed design includes accepted/current sentiment on group-discussion cards only; implementation remains paused until requested. See the current Proposal Ranking note above.
 4. If an analysis drops quotes, Admin → Operational events shows `sentiment_evidence_verification` counts — use them to judge whether matching needs more tuning.
 
 ### Known limits (accepted)
@@ -1087,8 +1110,8 @@ npm run check:types && npm run check:prompt-injection-tagging && npm run check:r
 
 ## Session 587 close — Proposal Ranking rehearsal and card refinement (2026-10-08 PT)
 
-**Current ranking handoff. Earlier ranking sections below are historical checkpoints;
-their card appearance and ordinary-trial reset limitations must not override this section.**
+**Historical Session 587 ranking handoff; superseded for product direction by the October 13
+current note and design revision 4 above. Earlier ranking sections below are older checkpoints.**
 The other workstream handoffs below remain preserved.
 
 [VERIFIED via Git and GitHub] Implementation remains on **codex/proposal-ranking**,
