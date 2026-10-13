@@ -852,7 +852,7 @@ an uploaded transcript gets Open without downloads.
     "Updating…" truthful.
   - **C3 finding (2026-10-12, owner check-in pending on placement):** reuse `shared/components/PresentationVideoPlayer.js`
     (Board page and Workbench already play the same 302-to-Graph route with Range seeking); route change limited to
-    allowing an `attempt` query key and `nosniff`; Vercel proxy streaming and Graph `preview` rejected. **[SHIPPED 2026-10-12, merge `c090c473a`, Codex approve]** C2 (the real reason a presentation video was superseded) is built on that branch.
+    allowing an `attempt` query key and `nosniff`; Vercel proxy streaming and Graph `preview` rejected. **[SHIPPED 2026-10-12, merge `c090c473a`, Codex approve]** C2 (the real reason a presentation video was superseded) is live.
   **[SHIPPED 2026-10-12, merge `309220636`, Codex approve; owner browser check of playback pending]** C3: a Watch button reveals `PresentationVideoPlayer` inline in the Results row (current `review`/`approved` only), Download video moved to the "…" menu, and the open route accepts an integer `attempt` key and sets `nosniff`.
 - **[BUILT 2026-10-12, branch `claude/button-link-variant`; owner desktop check pending]** Text-link
   variant: the shared `Button` gains `variant="link"` (the former `BTN_LINK` look: underlined gray text,
