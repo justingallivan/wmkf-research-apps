@@ -32,7 +32,7 @@ const load = (bound, deps) => loadVerifiedDiscussionTranscript(bound, { siteVisi
 test('returns the verified row, text, boundary, utterance count and names, with no write', async () => {
   const deps = makeDeps();
   const result = await load(boundWith(rowFor()), deps);
-  expect(result).toMatchObject({ transcriptText: TEXT, utteranceCount: 1, speakerNames: { A: 'Dr. Lee' } });
+  expect(result).toMatchObject({ transcriptText: TEXT, utteranceCount: 1, speakerNames: { A: 'Dr. Lee' }, discussionContent: { utterances: [{ end: 5000 }] } });
   expect(result.discussionRow.wmkf_requestdocumentid).toBe('doc-1');
   expect(result.boundary.presentationEnd.endMs).toBe(END_MS);
   expect(deps.drafts.recordEmptySummaryRun).not.toHaveBeenCalled();

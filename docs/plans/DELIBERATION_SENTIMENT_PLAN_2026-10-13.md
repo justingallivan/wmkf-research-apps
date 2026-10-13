@@ -78,8 +78,12 @@ request, transcript-bundle and presentation-materials schema ready, the request 
 a supervised test. Binding uses `bindCurrent(...).discussion` with `reason === 'bound'`
 [VERIFIED via `transcript-summary-service.js:186-197,276`].
 
-**What the extracted loader must not do (preserved differences):** it returns only
-`{ discussionRow, transcriptText, boundary }` and makes no writes. The summary path records an
+**What the extracted loader must not do (preserved differences):** it returns
+`{ discussionRow, boundary, utteranceCount, transcriptText, speakerNames, discussionContent }`
+and makes no writes. `utteranceCount: 0` (with `transcriptText: null`, no TXT read) is how an
+empty discussion is reported. `discussionContent` and `speakerNames` are the verified,
+attribution-resolved content and names the TXT was produced from, so the sentiment service
+rebuilds turns with the formatter's own grouping instead of parsing the TXT (§4.4). The summary path records an
 empty discussion as a failed marker row in `meeting_transcript_summary_drafts` via
 `drafts.recordEmptySummaryRun` [VERIFIED via `transcript-summary-service.js:283-292`]. That write
 stays in the summary caller. The sentiment caller records its own `failed` row in its own table
@@ -160,7 +164,8 @@ each disagreement having at least two sides, and at least one evidence item behi
 `sentiment_output_invalid` and nothing is saved.
 
 **Quote check (server-side, before saving).** The server rebuilds the speaker turns from the
-same verified transcript TXT sent to the model. That TXT has one paragraph per turn,
+verified source content the transcript TXT was produced from (formatter turn grouping), and
+requires the formatted result to equal the verified TXT sent to the model exactly. That TXT has one paragraph per turn,
 `[time] Label: text`, with labels from `speakerNameFor` (a mapped name, or `Speaker <id>`) and
 `Unidentified speaker` for excluded attribution
 [VERIFIED via `lib/services/transcription-pilot/transcript-format.js:91-94,205-213,229-237`].
@@ -229,7 +234,7 @@ replaced transcript stay stored but read as out of date and are never returned t
 
 Required documentation and gate surfaces: `scripts/setup-database.js` shape, manifest entry,
 `docs/atlas/postgres-staff-discussion-sentiments.md` plus its `docs/APPLICATION_STATE_ATLAS.md`
-row, `docs/SERVICE_AND_UTILITY_CATALOG.md` entry, any route counts in `CANONICAL_COUNTS`
+row (no `docs/SERVICE_AND_UTILITY_CATALOG.md` entry: the sibling summary services are not catalogued and no gate checks it), any route counts in `CANONICAL_COUNTS`
 (`check:fact-consistency`), and status/label maps covered by `check:status-enum-parity`.
 
 ### 4.5 Page and routes
@@ -328,3 +333,11 @@ prompt make it Tier 1 or above). Codex adversarial review before merging.
   in that environment. Seed the prompt in Production (owner, after wording approval) **before or
   together with** the merge, and in any Preview environment used for testing.
 - Open for Stage 4: map prompt-store `NOT_FOUND`/`DUPLICATE_CURRENT` in accept/read to typed 409s.
+- **Review fixes (Opus review, 2026-10-13):** prompt text and JSON schema now state every validator
+  bound (`sidesMax`, `uncertaintyEvidenceMax`, one evidence item per uncertainty, `quoteMin` 12);
+  attribution comes from structured turns (formatter grouping over the loader's `discussionContent`,
+  with an exact-equality check against the verified TXT, `sentiment_transcript_mismatch` before any
+  run row or provider call) instead of parsing TXT labels; `assertEnabled` arguments are asserted;
+  `getLatestCurrentReadyRun`/`getAcceptedRun` covered; the 400,000 cap is one shared constant; and a
+  loopback-only Postgres test (`tests/integration/discussion-sentiments.pg.test.js`,
+  `DISCUSSION_SENTIMENT_PG_TEST_URL`) proves reserve, CAS fence, accept/withdraw and the indexes.

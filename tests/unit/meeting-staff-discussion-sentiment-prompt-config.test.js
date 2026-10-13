@@ -12,6 +12,7 @@ import {
   PROMPT_NAME, SYSTEM_PROMPT, USER_PROMPT_TEMPLATE, PROMPT_VARIABLES, PROMPT_OUTPUT_SCHEMA, SENTIMENT_JSON_SCHEMA,
   DISCUSSION_TRANSCRIPT_MAX_CHARS, SENTIMENT_LIMITS,
 } from '../../shared/config/prompts/meeting-staff-discussion-sentiment';
+import { DISCUSSION_TRANSCRIPT_MAX_CHARS as SUMMARY_MAX } from '../../shared/config/prompts/meeting-staff-discussion-summary';
 import { EXECUTOR_BUDGET_DEFAULTS } from '../../shared/config/executorBudgets';
 
 test('prompt name is pinned and has the discussion summary standing budget', () => {
@@ -53,4 +54,24 @@ test('the system prompt carries the untrusted-content rule, the three signals an
   for (const word of ['enthusiasm', 'reception', 'disagreement', 'uncertaint']) expect(SYSTEM_PROMPT).toContain(word);
   expect(SYSTEM_PROMPT).toMatch(/Never name a speaker/);
   expect(SYSTEM_PROMPT).toContain(String(SENTIMENT_LIMITS.quoteMax));
+});
+
+test('the prompt text and JSON schema state every bound the service validator enforces', () => {
+  const L = SENTIMENT_LIMITS;
+  expect(L).toMatchObject({ quoteMin: 12, quoteMax: 400, pointsMax: 8, disagreementsMax: 6, sidesMax: 6, uncertaintiesMax: 6, uncertaintyEvidenceMax: 4 });
+  expect(SYSTEM_PROMPT).toContain(`at least ${L.quoteMin} and at most ${L.quoteMax} characters`);
+  expect(SYSTEM_PROMPT).toContain(`at least two and at most ${L.sidesMax} sides`);
+  expect(SYSTEM_PROMPT).toContain(`at least one and at most ${L.uncertaintyEvidenceMax} quoted evidence items`);
+  expect(SYSTEM_PROMPT).toContain(`no more than ${L.pointsMax} points in each list, ${L.disagreementsMax} disagreements and ${L.uncertaintiesMax} uncertainties`);
+  const props = SENTIMENT_JSON_SCHEMA.properties;
+  expect(props.supportPoints.maxItems).toBe(L.pointsMax);
+  expect(props.concernPoints.maxItems).toBe(L.pointsMax);
+  expect(props.disagreements.maxItems).toBe(L.disagreementsMax);
+  expect(props.disagreements.items.properties.sides).toMatchObject({ minItems: 2, maxItems: L.sidesMax });
+  expect(props.uncertainties.maxItems).toBe(L.uncertaintiesMax);
+  expect(props.uncertainties.items.properties.evidence).toMatchObject({ minItems: 1, maxItems: L.uncertaintyEvidenceMax });
+});
+
+test('the transcript cap is the discussion summary constant, not a copy', () => {
+  expect(DISCUSSION_TRANSCRIPT_MAX_CHARS).toBe(SUMMARY_MAX);
 });
