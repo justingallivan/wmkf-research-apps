@@ -347,6 +347,16 @@ describe('analysis run', () => {
     expect(run.record.verification.dropped).toMatchObject({ text_not_in_turn: 1, uncertainties_dropped: 1 });
   });
 
+  test('two quotes that resolve to the same slice (partial vs full ellipsis match) are one piece of evidence', async () => {
+    const content = { text: '', utterances: [utt(null, 3000, 'This seems promising\u2026 though early.'), utt(null, 10000, 'Another unlabeled remark here.')] };
+    loaded = { ...loaded, discussionContent: content, transcriptText: formatTranscriptText(content, SPEAKER_NAMES, { layout: 'turn' }) };
+    execute.mockResolvedValueOnce({ parsed: goodRecord({ supportPoints: [], concernPoints: [ev('00:10', 'Another unlabeled remark')],
+      disagreements: dis([ev('00:03', 'This seems promising.'), ev('00:03', 'This seems promising...')]) }), meta: { promptVersion: 1 } });
+    const { run } = await analyze();
+    expect(run.record.disagreements).toEqual([]);
+    expect(run.record.verification.dropped.disagreements_dropped).toBe(1);
+  });
+
   describe('verification event (content-free, best-effort)', () => {
     const noisy = () => goodRecord({
       headline: 'HEADLINE-SENTINEL-XYZ',
@@ -362,6 +372,23 @@ describe('analysis run', () => {
         metadata: { outcome: 'saved', total: 6, time_not_found: 1, text_not_in_turn: 2, ambiguous: 0, disagreements_dropped: 1, uncertainties_dropped: 0 } });
       const serialized = JSON.stringify(event);
       ['QUOTE-SENTINEL', 'TOPIC-SENTINEL', 'HEADLINE-SENTINEL', 'excellent', 'budget', 'Dr. Lee', 'Pat Kim'].forEach((text) => expect(serialized).not.toContain(text));
+    });
+    test('a recorder that never resolves cannot stall the run: the terminal write happens first, then a bounded wait', async () => {
+      deps.eventDeadlineMs = 20;
+      const order = [];
+      deps.sentiments = { ...store,
+        completeRun: async (...a) => { const r = await store.completeRun(...a); order.push('complete'); return r; },
+        failRun: async (...a) => { const r = await store.failRun(...a); order.push('fail'); return r; } };
+      recordEvent = jest.fn(() => { order.push('event'); return new Promise(() => {}); });
+      execute.mockResolvedValueOnce({ parsed: noisy(), meta: { promptVersion: 1 } });
+      await expect(analyze()).resolves.toMatchObject({ run: { status: 'ready' } });
+      expect(order).toEqual(['complete', 'event']);
+      // Failure path: failRun commits before the event, and the error is unchanged.
+      order.length = 0;
+      execute.mockResolvedValueOnce({ parsed: goodRecord({ enthusiasm: 'high', supportPoints: [ev('00:03', 'This team is mediocre')], concernPoints: [] }), meta: { promptVersion: 1 } });
+      await expect(analyze()).rejects.toMatchObject({ httpStatus: 502, code: 'sentiment_evidence_unverified' });
+      expect(order).toEqual(['fail', 'event']);
+      expect(rows().at(-1)).toMatchObject({ status: 'failed', failure_code: 'sentiment_evidence_unverified' });
     });
     test('a recordEvent that throws or rejects does not fail the run', async () => {
       execute.mockResolvedValue({ parsed: noisy(), meta: { promptVersion: 1 } });

@@ -472,3 +472,7 @@ prompt make it Tier 1 or above). Codex adversarial review before merging.
   ellipsis, unmatched items are dropped with the surrounding disagreements/uncertainties cleaned up, the run
   fails only when a strong rating loses all evidence, and a content-free `sentiment_evidence_verification`
   event plus `record.verification` carry the counts (§4.4, §7).
+- **Tolerant-match review fixes (Codex, 2026-10-13):** the disagreement duplicate key is now the resolved turn
+  plus the folded canonical slice (a partial and a full ellipsis match are one piece of evidence); the
+  verification event is emitted after the terminal write (`completeRun` / `failRun`) and bounded by a 2 s
+  deadline, so a hung recorder cannot stall or fail a run.
