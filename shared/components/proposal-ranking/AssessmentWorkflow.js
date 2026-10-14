@@ -822,7 +822,6 @@ export default function AssessmentWorkflow({
   const saveStatus = busy ? busyMessage : pending
     ? 'Changes are not confirmed' : 'All changes saved';
   const combinedComplete = view.own?.co?.order.every((id) => view.own.co.confidence[id]);
-  const preparationStep = view.own?.ready ? 'ready' : program === 'co' ? 'combined' : 'programs';
   const unanswered = collective ? [] : assessment?.order.filter((id) => !assessment.confidence?.[id]) || [];
   const findScope = `${view.roundId}:${section}:${program}`;
   const showMissingConfidence = validationScope === findScope && unanswered.length > 0;
@@ -839,7 +838,6 @@ export default function AssessmentWorkflow({
   }
   const preparationAction = unanswered.length > 0 ? (
     <div className="flex flex-wrap items-center gap-3">
-      <p className="font-medium text-amber-900" aria-live="polite">{unanswered.length} {unanswered.length === 1 ? 'proposal needs' : 'proposals need'} a confidence choice</p>
       <Button variant="outline" disabled={busy || Boolean(pending)} onClick={jumpToUnanswered}>Go to next unanswered</Button>
       <Button disabled={busy || Boolean(pending)} onClick={() => { setValidationScope(findScope); jumpToUnanswered(); }}>Continue</Button>
     </div>
@@ -1181,11 +1179,6 @@ export default function AssessmentWorkflow({
         ) : (
           <>
             <h2 className="text-xl font-semibold">My preparation</h2>
-            <ol aria-label="Preparation progress" className="mt-2 flex flex-wrap gap-3 text-sm text-gray-600">
-              {[['programs', '1. Programs'], ['combined', '2. Combined list'], ['ready', '3. Ready']].map(([key, label]) => (
-                <li key={key} aria-current={preparationStep === key ? 'step' : undefined} className={preparationStep === key ? 'font-semibold text-gray-900' : ''}>{label}</li>
-              ))}
-            </ol>
             {view.own.ready ? (
               <div className="my-5">
                 <p className="font-medium">Ready for group discussion</p>
@@ -1199,10 +1192,11 @@ export default function AssessmentWorkflow({
               </div>
             ) : (
               <>
-                <div className="my-3 flex flex-wrap items-center gap-2" aria-label="Assessment lists">
+                <div className="my-4 flex flex-wrap items-center gap-4">
+                  <div className="grid min-w-0 flex-1 basis-full auto-cols-fr grid-flow-col gap-1 sm:max-w-2xl sm:basis-96" aria-label="Assessment lists">
                   {[...programProgress.map((p) => [p.key, p.name]), ...(view.own.co ? [['co', 'Combined list']] : [])].map(([key, label]) => (
                     <button
-                      className={`${buttonClass} ${program === key ? 'bg-gray-100' : ''}`}
+                      className={`min-h-16 min-w-0 rounded-lg px-3 py-2 text-center text-sm font-semibold focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-600 disabled:opacity-50 ${program === key ? 'bg-gray-100 text-gray-900' : 'text-gray-600 hover:bg-gray-50'}`}
                       key={key}
                       aria-label={label}
                       aria-pressed={program === key}
@@ -1211,18 +1205,24 @@ export default function AssessmentWorkflow({
                       onClick={() => { setProgram(key); setDraft(null); }}
                     >
                       {label}
-                      {key !== 'co' && <span id={`preparation-count-${key}`} className="ml-2 font-normal text-gray-600">{programProgress.find((p) => p.key === key).answered === programProgress.find((p) => p.key === key).total ? 'Complete' : programProgress.find((p) => p.key === key).answered === 0 ? 'Not started' : 'In progress'}</span>}
+                      {key === 'co' && <span className="mt-1 block text-xs font-normal text-gray-600">{view.own.co.confirmed ? 'Confirmed' : 'Review order'}</span>}
+                      {key !== 'co' && <span id={`preparation-count-${key}`} className="mt-1 block text-xs font-normal text-gray-600">{programProgress.find((p) => p.key === key).answered === programProgress.find((p) => p.key === key).total ? 'Complete' : programProgress.find((p) => p.key === key).answered === 0 ? 'Not started' : 'In progress'}</span>}
                     </button>
                   ))}
+                  </div>
+                  <div className="flex flex-wrap items-center gap-3">
                   <details className="relative">
                     <summary className={`${buttonClass} cursor-pointer`}>List options</summary>
-                    <div className="mt-1 rounded-lg border bg-white p-2">
+                    <div className="absolute right-0 top-full z-30 mt-1 min-w-56 rounded-lg border bg-white p-2 shadow-sm">
                       {program !== 'co' ? <button disabled={!editable} className={buttonClass} onClick={() => confirm('resetProgram', { programKey: program })}>Reset {program.toUpperCase()} preparation</button>
                         : <button disabled={!allConfident || busy || Boolean(pending) || !active} className={buttonClass} onClick={() => confirm('buildCombined')}>Rebuild combined list</button>}
                     </div>
                   </details>
+                  {preparationAction}
+                  </div>
                 </div>
-                <div className="my-3 flex flex-wrap items-center justify-between gap-3">
+                {(unanswered.length > 0 || program === 'co') && <div className="my-3">
+                  {unanswered.length > 0 && <p className="mb-1 text-sm font-medium text-amber-900" aria-live="polite">{unanswered.length} {unanswered.length === 1 ? 'proposal needs' : 'proposals need'} a confidence choice</p>}
                   <p className="max-w-2xl text-sm text-gray-600">
                     {program === 'co'
                       ? outdated ? 'Rebuild from your latest program assessments before continuing.'
@@ -1231,12 +1231,11 @@ export default function AssessmentWorkflow({
                             : 'Review the merged order and dividers, then confirm your combined order.'
                       : !allConfident ? currentProgramComplete
                         ? `${currentProgram.name} is complete. Continue to ${nextProgram.name}. You can return to adjust either list.`
-                        : `Order the proposals and choose Confident or Not sure for each one. ${currentProgram.answered} of ${currentProgram.total} confidence choices complete.`
+                        : 'Choose Confident or Not sure on the highlighted cards.'
                         : view.own.co ? 'Both programs are complete. Continue to your combined list.'
                           : 'Both programs are complete. Create your combined list to review MR and SE together.'}
                   </p>
-                  {preparationAction}
-                </div>
+                </div>}
               </>
             )}
             {outdated && (
