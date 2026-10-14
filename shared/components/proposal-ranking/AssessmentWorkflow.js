@@ -335,7 +335,7 @@ export function AssessmentList({
                                   <span title={proposal.institutionGeography || 'Geography unavailable'} className={`${tileClass} border border-gray-300 bg-gray-100 text-gray-700`}>{['East', 'West'].includes(proposal.institutionGeography) ? proposal.institutionGeography[0] : '—'}</span>
                                 </div>
                               </div>
-                              <div className="mt-2 flex flex-wrap items-start gap-x-4 gap-y-2 border-t border-gray-100 pt-2 text-xs text-gray-600">
+                              <div className="mt-2 flex flex-wrap items-baseline gap-x-4 gap-y-2 border-t border-gray-100 pt-2 text-xs text-gray-600">
                                 {collective && <>
                                   <details>
                                     <summary className="cursor-pointer py-2 focus-visible:outline focus-visible:outline-2">Initial ranks</summary>
@@ -459,7 +459,7 @@ export function AssessmentList({
                                   </span>
                                 </>}
                                 {editable && (
-                                  <details className="relative shrink-0">
+                                  <details className="relative -my-1.5 shrink-0 self-start">
                                     <summary
                                       className="inline-flex h-11 w-11 cursor-pointer list-none items-center justify-center rounded focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-600 [&::-webkit-details-marker]:hidden"
                                       aria-label={`Actions for proposal ${proposal.requestNumber}`}
