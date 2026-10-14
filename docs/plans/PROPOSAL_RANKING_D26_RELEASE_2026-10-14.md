@@ -1,7 +1,7 @@
 # Proposal Ranking — D26 production release plan
 
 Date: 2026-10-14. Status: **PLANNED; not approved for production mutation or promotion.**
-Owner decisions: launch for D26; Beth Pruitt and Justin Gallivan must have simultaneous facilitator access.
+Owner decisions: launch for D26 with exactly 23 proposals; Beth Pruitt and Justin Gallivan must have simultaneous facilitator access. Requests 1003223 and 1003224 remain excluded test copies (owner confirmed October 14).
 This release plan supplements the October 13 design/implementation plan. Shared facilitation is a new requirement, not a claim about the tested implementation.
 
 ## Scope and evidence boundary
@@ -28,7 +28,7 @@ No production writes, schema apply, settings change, grant change, round cancell
 | Application identity has the named ranking role | Same probe, WhoAmI and role association GET | VERIFIED role assignment only, not exhaustive privilege proof. |
 | Default production facilitator is Justin | Same probe, system setting and enabled user lookup | VERIFIED; Beth is not currently co-facilitator. |
 | Four staff have ranking grants | Same probe | VERIFIED: Beth, Justin, Jean Kim, John Sader. Only Justin has an explicit Meeting Tracker grant among these four; fresh profile mapping and superuser roles were not probed. |
-| D26 has 25 ordinary Phase II Pending Research requests, 23 after the trial cutoff | Same probe; `trial-cutoff.js`, source adapter | VERIFIED: two excluded by number >=1003220; no missing/malformed numbers, leads, amounts or currency references. This is not full review-scale/funding/current-source validation. The probe queries pending requests only; runtime scans all cycle statuses before cutoff validation and unexpected-status diagnostics, so this count does not prove opening will succeed. |
+| D26 has 25 Phase II Pending Research requests passing the ordinary-marker filter, but only 23 belong in the approved pool | Same probe; `trial-cutoff.js`, source adapter | VERIFIED: two excluded by number >=1003220; a follow-up production GET identified 1003223 (ZZTEST-04) and 1003224 (ZZTEST-05), both titled The Secret History of Our Sun, DO NOT PROCESS test copies of 1002963, with W. M. Keck Foundation as applicant. Their test-marker state allows them through the ordinary filter; they are not eligible real proposals; no missing/malformed numbers, leads, amounts or currency references. This is not full review-scale/funding/current-source validation. The probe queries pending requests only; runtime scans all cycle statuses before cutoff validation and unexpected-status diagnostics, so this count does not prove opening will succeed. |
 | v2 creation flags are not configured in production metadata | `vercel env ls production --project wmkf_research_apps --scope justin-gallivans-projects --format json` | VERIFIED absence of `PROPOSAL_RANKING_WORKFLOW_V2` and `PROPOSAL_RANKING_V2_SCHEMA_READY`; existing ranking/isolation/interlock keys present. Values and effective deployed environment NOT VERIFIED. |
 
 Probe usage: `node scripts/probe-ranking-d26-release.js /absolute/path/to/.env.local`.
@@ -37,9 +37,8 @@ The script fixes the registered production hostname and enforces preview-class r
 ## Decisions still pending
 
 1. **Pre-reveal visibility:** current source returns all preparation to the facilitator (`workflow-service.js`, `publicView.facilitatorLists`). The earlier conversational promise that all preparation is private until reveal was inaccurate. Owner was asked whether both facilitators retain that visibility or whether preparation becomes strictly own-only until reveal. Do not silently broaden or remove this access.
-2. **D26 pool:** owner was asked whether to retain the 23-proposal trial cutoff or include all 25 ordinary eligible proposals. Do not remove `trial-cutoff.js` or change its callers until decided; the cutoff is live in the source reader and probes/tests.
-3. **Existing trial retirement:** propose retaining and closing the existing v1 round, then opening a fresh v2 round. One submitted list exists. Before executing, show the exact old round, retained data, new pool/roster and effects to Justin. No destructive erase or automatic conversion of v1 rankings to grades/confidence.
-4. **Sentiment readership:** verify active profiles and superuser status for all four PDs. If they lack access, propose either explicit Meeting Tracker grants (which grant more than sentiment) or a narrowly reviewed ranking-reader authorization change. Do not silently grant another app or bypass its current reader guard.
+2. **Existing trial retirement:** propose retaining and closing the existing v1 round, then opening a fresh v2 round. One submitted list exists. Before executing, show the exact old round, retained data, new pool/roster and effects to Justin. No destructive erase or automatic conversion of v1 rankings to grades/confidence.
+3. **Sentiment readership:** verify active profiles and superuser status for all four PDs. If they lack access, propose either explicit Meeting Tracker grants (which grant more than sentiment) or a narrowly reviewed ranking-reader authorization change. Do not silently grant another app or bypass its current reader guard.
 
 ## Proposed two-facilitator contract
 
@@ -62,7 +61,7 @@ Files: `config.js`, `preview-service.js`, `service.js`, `workflow-service.js`, `
 ### 1. Integrate and settle source contracts
 
 - Preserve the dedicated ranking Preview and existing worktree; prepare a release branch from the tested candidate with current main integrated. Re-run the merge check against the actual current head before merging.
-- Resolve the pending privacy/pool decisions. Validate exact D26 source preview including review scales, ordinary/synthetic markers, identity/profile linkage, currency, funding data and roster. Source reads must remain read-only in production shadow mode.
+- Resolve the pending privacy decision. Retain the current D26 cutoff and verify exactly 23 proposals with requests 1003223 and 1003224 excluded; test-marker repair is separate work, not authorized by this pool decision. Validate exact D26 source preview including review scales, ordinary/synthetic markers, identity/profile linkage, currency, funding data and roster. Source reads must remain read-only in production shadow mode.
 - Implement shared facilitation and version-safe mutation dispatch. Update Admin selection and suite feature descriptions. Reconcile the design, API contract, Atlas, implementation plan, service catalogue and release receipt to the accepted behavior; historical receipts remain dated.
 - Audit the dedicated-test changes in shared identity mapping, app-grant service, source adapter and deployment policy. Prove production excludes fictional identities, synthetic reviews and sample presentation/sentiment. Test malformed test configuration as well as unset/off.
 
@@ -72,7 +71,7 @@ Files: `config.js`, `preview-service.js`, `service.js`, `workflow-service.js`, `
 - Verify chosen pre-reveal privacy at API and UI, not merely hidden controls. Include a populated other-PD assessment in negative tests.
 - Race Beth vs Justin on open, reveal, collective reorder, reset and restart. Race readiness/reopen with reveal and private saves across PDs. Prove no partial commit, duplicate reveal, lost edit or misattributed actor.
 - Exercise definite 409 recovery versus network/timeout ambiguity; old-tab operations after reset/restart; exact operation replay after later edits; malformed memberships; unknown versions; legacy action payloads against v2.
-- Rehearse at the actual D26 size (25 or chosen pool, four PDs), including saved reveal, workbook and retained history. The prior 100/12 memory fixture is not evidence of maximum live transaction support.
+- Rehearse at the actual D26 size (23 proposals, four PDs), including saved reveal, workbook and retained history. The prior 100/12 memory fixture is not evidence of maximum live transaction support.
 - Confirm genuine accepted/current sentiment for an authorized PD; stale/withdrawn/unavailable sentiment must not become sample content or block core ranking. No new AI generation is required by the ranker.
 - Run ranking and cross-cutting identity/policy tests, lint, types, production build and relevant gates with each self-test sequential. Include API-route, Atlas, document/fact consistency, status, DAL/context and schema/privacy boundaries; inspect package scripts for exact current gate names.
 
