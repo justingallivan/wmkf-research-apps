@@ -404,10 +404,28 @@ and expandable total Research funding are included. The release passed 179 ranki
 tests and Justin's Microsoft SSO/updated-interface check. This is sandbox deployment,
 not Production promotion or independent acceptance by the other three PDs.
 
-[PLANNED — owner authorized, not yet live-verified] Enrich the rehearsal to 12
-realistic fictional proposals (six MR, six SE), each with three varied saved synthetic
-reviews, distinct institutions/titles, budgets, geography, award histories and clearly
-labelled sample discussion. Fictional institution/history/discussion projection is
-restricted to the dedicated test policy; it must not fabricate production data or
-claim genuine accepted sentiment. Source preparation, deployment and a fresh opened
-round must be verified separately; resets retain an existing round's frozen pool.
+[VERIFIED via provisioning logs, READY Preview and saved-round readback] The enriched
+rehearsal is deployed from `591c3e98e7f24e699f7f83260a16ab1b1a929167` in Preview
+`dpl_BcJwMnCKWAQp9RueY2F4hDNjdPb6` at
+`https://wmkf-meeting-transcription-test-9qilqb16b.vercel.app`; the stable test alias
+points to this deployment. New round `ea3496d5-c105-4e97-95c0-6b13a2e3f2ef` contains
+12 realistic fictional proposals (six MR, six SE) and 36 saved synthetic reviews,
+three per proposal, with all four PDs in private preparation and nobody ready.
+Fictional institutions, geography, award histories and explicitly labelled sample
+discussions use a strict dedicated-test projection; they are not real awards or
+accepted human discussion analyses. The 182 ranking tests in 20 suites, scoped lint,
+types and DAL/reviewer-boundary/script-writer/API/status gate/self-test pairs passed.
+[VERIFIED via hosted browser] Signed-in Justin saw six proposals in each program,
+distinct institutions/project titles and three review tiles per card, including
+E/E/VG and divergent E/G/F. Both programs remained at 0/6 confidence answers.
+History opened the original run read-only, and Open replacement run returned to
+the enriched round. Anonymous `/api/proposal-ranking` returned 401. No PD assessment
+data changed and no live group reveal occurred in this check; other staff sign-ins
+and a full group walkthrough remain pending.
+
+The atomic operator upgrade preserved old round `f48741f0-4560-471d-b51f-ef93db48c152`,
+its exact frozen snapshot hash and lists, with previous/superseded links. This was a
+fresh source-pool replacement, not a normal UI reset. The commit succeeded once;
+a readback DTO typo was repaired and exact-hash/link verification completed without
+replaying the mutation (`/private/tmp/ranking-rich-round-receipt.json`). Normal resets
+continue to retain the current frozen pool. Production is unchanged.

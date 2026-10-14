@@ -44,12 +44,24 @@ await withDalContext('ranking-test-rich-round-upgrade', async () => {
   const coordinator = await adapter.findCycleCoordinator(RANKING_TEST_CYCLE);
   if (fs.existsSync(RECEIPT)) {
     const saved = JSON.parse(fs.readFileSync(RECEIPT, 'utf8'));
-    assert(saved.complete && saved.target === RANKING_TEST_DATAVERSE && saved.oldRoundId === OLD,
-      'Prior upgrade receipt is incomplete; inspect its exact IDs before retry');
+    assert(saved.target === RANKING_TEST_DATAVERSE && saved.oldRoundId === OLD, 'Receipt target mismatch');
     assert(coordinator.wmkf_activeroundid === saved.newRoundId, 'Active round moved after upgrade');
     const current = await adapter.readAssessmentRound(saved.newRoundId);
     assert(hash(current.wmkf_snapshotjson) === saved.snapshotHash, 'Upgraded snapshot changed');
-    console.log(JSON.stringify({alreadyComplete:true, newRoundId:saved.newRoundId})); return;
+    const preserved = await adapter.readAssessmentRound(OLD);
+    assert(hash(preserved.wmkf_snapshotjson) === saved.oldSnapshotHash
+      && preserved.wmkf_state === 100000001
+      && JSON.parse(preserved.wmkf_workflowjson).supersededBy === saved.newRoundId
+      && JSON.parse(current.wmkf_workflowjson).previousRoundId === OLD, 'History links differ');
+    const view = await readWorkflowRound({roundId:saved.newRoundId,actor:ACTOR});
+    assert(view.round.snapshot.proposals.length === 12 && view.workflow.stage === 'private'
+      && view.progress.every(p => !p.ready), 'Fresh preparation differs');
+    // Readback-only recovery: never replay the database mutation from a receipt.
+    if (!saved.complete) {
+      saved.complete = true; saved.verifiedAt = new Date().toISOString();
+      fs.writeFileSync(RECEIPT,JSON.stringify(saved,null,2),{mode:0o600});
+    }
+    console.log(JSON.stringify({alreadyComplete:true, newRoundId:saved.newRoundId,proposals:12,reviews:36})); return;
   }
   assert(coordinator?.wmkf_activeroundid === OLD, 'The expected six-card rehearsal is no longer active');
   const old = await adapter.readAssessmentRound(OLD);
@@ -86,7 +98,7 @@ await withDalContext('ranking-test-rich-round-upgrade', async () => {
   assert(hash(readback.wmkf_snapshotjson)===receipt.snapshotHash && hash(oldReadback.wmkf_snapshotjson)===receipt.oldSnapshotHash);
   assert((await adapter.findCycleCoordinator(RANKING_TEST_CYCLE)).wmkf_activeroundid===newRoundId);
   const view = await readWorkflowRound({roundId:newRoundId,actor:ACTOR});
-  assert(view.snapshot.proposals.length===12 && view.workflow.stage==='private');
+  assert(view.round.snapshot.proposals.length===12 && view.workflow.stage==='private');
   receipt.complete=true;receipt.verifiedAt=new Date().toISOString();
   fs.writeFileSync(RECEIPT,JSON.stringify(receipt,null,2),{mode:0o600});
   console.log(JSON.stringify({complete:true,newRoundId,proposals:12,reviews:36}));
