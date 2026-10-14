@@ -908,8 +908,11 @@ and offline-tested only on `codex/feature-request`.
   cleanup. Cancel abandons only after confirmed session termination and an absent
   exact path; Retry retains the same intent/path/generation and starts a newly
   confirmed terminal session from byte zero.
-  **[BRANCH-BUILT 2026-10-14; migration 083 not applied and dismissal runtime not
-  deployed.]** Migration `083_presentation_upload_dismissal.sql` adds nullable
+  **[PRODUCTION-LIVE 2026-10-14: PR #480, merge
+  `ccfdb2fb026937ccb5eda41d7037255a1f4bca6b`; migration 083 applied by
+  `codex-pr480-owner-approved-2026-10-14` via the canonical runner (one applied,
+  82 skipped); Ready deployment `dpl_G5aJb9rxRHsCF5xqsZPt7DP19YPQ` serves
+  `applications.wmkeck.org`, verified via Vercel CLI.]** Migration `083_presentation_upload_dismissal.sql` adds nullable
   `staff_dismissed_at` (also in fresh-install schema). If Microsoft rejects Cancel
   with HTTP 401 and repeated authenticated reads find the exact path absent, a
   separate explicit Dismiss action may stamp that field under the actor-bound
@@ -919,8 +922,8 @@ and offline-tested only on `codex/feature-request`.
   reject dismissed attempts. Recording a recovered complete candidate clears the
   dismissal and opens at least three days for staff to Finish saving; cleanup
   does not delete that newly recovered candidate in the same pass. Exact registered
-  candidates can still bind under the owned live lease. Apply and verify migration
-  083 before deploying this runtime; the list reader directly selects the new column. A candidate rejected by MP4 signature
+  candidates can still bind under the owned live lease. Migration 083 was applied
+  before runtime deployment; the list reader directly selects the new column. A candidate rejected by MP4 signature
   or Graph malware validation remains a terminal `failed` intent and is omitted
   from staff's unfinished-upload actions; status and finalize refuse replay.
   Its exact item remains for the existing lease-fenced cleanup review, which
