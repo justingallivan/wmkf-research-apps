@@ -197,6 +197,10 @@ not two editable files.
   misleading direct file link. A handled failure must refresh status once,
   display the durable support reference, and never repeat the generation POST
   automatically.
+  **Superseded 2026-10-14 (owner, Session 604):** these generation-time
+  diagnostics are never re-run against Word edits, so the Staff Deliberations
+  card stops showing them once staff record a version (milestone `actorId`) or
+  reopen the writeup for corrections (`b93025fa2`).
 - Show the Draft→Review handoff as a separate next-stage panel, not as a document
   action. Its confirmation modal must explain same-file reuse, exact-version
   recording, continued Word editing, and the regeneration lock before calling

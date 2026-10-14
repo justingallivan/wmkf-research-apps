@@ -1,4 +1,61 @@
-# Session 604 Prompt: Proposal Ranking v2 sandbox colleague walkthrough; preserve other workstream follow-ups
+# Session 605 Prompt: confirm #1002852 preparation resumes after Finish corrections; ranking v2 colleague walkthrough still open
+
+## Session 604 close — Staff Deliberations preparation-block copy and Meeting Tracker card labels (Claude Opus, worktree `WMKF_Apps-claude-ui` on `claude/ui-changes`; Codex owned the main checkout; 2026-10-14 PT)
+
+### What Was Completed
+
+1. **Diagnosis: #1002852 "Automatic preparation needs attention" banner** `[VERIFIED via owner-authorized read-only prod PG query + source]`.
+   - The only blocked `staff_deliberations_preparations` row in production (19 others `prepared`) is #1002852, `last_error_code='correction_reopen_requires_staff'`, created at the 2026-10-09 18:00Z presentation end, `attempt_count` 1, last swept 2026-10-14 16:15Z.
+   - Cause: the writeup was reopened for corrections (Draft + correction epoch); the worker parks it on purpose (`preparation-worker.js:219`). Retry returns 409 in that state. The sweep re-queues it once corrections finish (`preparation-store.js:33`, `resumeCorrection`).
+   - The page showed only a generic sentence because phase `Corrections in progress` wins before the blocked branch, so no reason line rendered.
+2. **Staff Deliberations UI fix (Production).** `b93025fa2`, merge `98577fe41`, deploy Ready on that sha.
+   - Correction-parked preparation renders as queued: no amber banner, no Retry; the writeup card says "Open for corrections. Choose Finish corrections when your edits are done; the working writeup then updates automatically." (replaces "…The working writeup is not ready yet.").
+   - Other blocked codes show plain-language reasons (`BLOCKED_PREPARATION_REASONS`); Retry hidden for `document_pointer_changed` (stored state is `prepared`, so the retry UPDATE can't match).
+   - "Draft needs a quick edit check" diagnostics are generation-time only; they now hide once staff record a version (milestone `actorId`) or reopen for corrections. Owner chose neutral treatment. Plan note added in `docs/WORKBENCH_WRITEUP_LIFECYCLE_PLAN.md`.
+   - 4 new tests; mutation check (fix disabled) failed 3 of them.
+3. **Meeting Tracker list card (Production).** `f6789f109`, merge `d110e8f56`, deploy Ready on that sha. Institution beside the request number; second line `PD: … · PI: …` (`PD: Not assigned` fallback). Payload already carried `institution` (`lib/services/meeting-tracker/dashboard-service.js:212`).
+4. Startup gates: all 71 gate/self-test runs green in the worktree.
+
+### Commits
+- `b93025fa2` fix: explain Staff Deliberations preparation blocks and drop stale checks (merge `98577fe41`)
+- `f6789f109` feat: show institution beside request number and label PD/PI in Meeting Tracker list (merge `d110e8f56`)
+
+## Next Items
+
+### Verified Open
+
+1. **Confirm #1002852 leaves the blocked state after the owner chooses Finish corrections.** Evidence: prod row above; resume path is source-read only, not observed. Read-only check: `SELECT state, last_error_code, updated_at FROM staff_deliberations_preparations WHERE request_id='e5df0b46-3c43-f111-88b5-000d3a3065b8'` should go `pending` → `prepared` after the next sweep. If it stays `blocked`, inspect `resumeCorrection` (`preparation-worker.js:129-137`) against the artifact's lifecycle/milestone after finish.
+2. **Ranking v2 colleague walkthrough** and current-head release review — carried from Session 603 below; not rechecked this session.
+
+### Verify Before Acting
+
+- Worktree `/Users/gallivan/Code/WMKF_Apps-claude-ui` (branch `claude/ui-changes`, fully merged into main) plus memory symlink `~/.claude/projects/-Users-gallivan-Code-WMKF-Apps-claude-ui/memory`. Remove with the owner's OK when UI work is done. The older `WMKF_Apps-claude-debug` worktree from Session 602 remains too.
+- Session 603/602 carryovers below were not re-audited.
+
+### Gotchas
+
+- The auto-mode classifier blocked a plain local `sed` of `preparation-worker.js` as "[Production Reads]" right after a prod PG probe; the Read tool worked.
+- The Chrome MCP profile is not signed in to `applications.wmkeck.org`; signed-in page reads need the owner to sign in that tab.
+
+**Milestone determination:** no DEVELOPMENT_LOG entry — UI copy/display fixes, no new capability. CLAUDE.md unchanged.
+
+## Key Files Reference
+
+| File | Purpose |
+|------|---------|
+| `shared/components/workbench/StaffDeliberationsTab.js` | Preparation-block reasons, Retry gating, draft-warning gating |
+| `lib/services/pre-site-visit/preparation-worker.js` / `preparation-store.js` | Blocked codes, correction resume, retry SQL |
+| `shared/components/meeting-tracker/MeetingTrackerList.js` | Tracker list card |
+
+## Testing
+
+`npx jest --runInBand tests/unit/staff-deliberations-tab.test.js tests/unit/meeting-tracker-pages.test.js`
+
+---
+
+## Prior handoffs — historical snapshots; apply the current topic-specific handoff first
+
+## Previous Session 604 Prompt: Proposal Ranking v2 sandbox colleague walkthrough; preserve other workstream follow-ups
 
 ## Session 603 close — Proposal Ranking v2 sandbox and preparation UI (Codex, 2026-10-13 PT)
 
@@ -69,8 +126,6 @@ On the feature branch: `npx jest --runInBand --testPathPatterns=proposal-ranking
 For memory-only local rehearsal: `node scripts/rehearse-proposal-ranking-v2.js` (3135; do not collide with an existing server).
 
 ---
-
-## Prior handoffs — historical snapshots; apply the current topic-specific handoff first
 
 ## Previous Session 603 Prompt: confirm the 1003010 Zoom re-import and video cut; Discussion Sentiment calibration; transcription cleanup check
 
