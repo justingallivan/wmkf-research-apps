@@ -75,7 +75,7 @@ function PeerScores({ score }) {
     )),
   );
   return <div>
-    <p className="mb-1 text-xs font-medium text-gray-700">Peer reviews</p>
+    <p className="mb-2 text-xs font-medium text-gray-700">Peer reviews</p>
     <div className="flex flex-wrap gap-1">{tiles.length ? tiles : <span className="text-sm text-gray-600">Not available</span>}</div>
   </div>;
 }
