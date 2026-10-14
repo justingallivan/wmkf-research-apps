@@ -92,7 +92,6 @@ export function AssessmentList({
   showMissingConfidence = false,
 }) {
   const [notice, setNotice] = useState('');
-  const [expanded, setExpanded] = useState(null);
   const [moving, setMoving] = useState(null);
   const [destination, setDestination] = useState('1');
   const [positionError, setPositionError] = useState('');
@@ -371,9 +370,12 @@ export function AssessmentList({
                                       <p>Context only; does not affect ranking.</p>
                                     </div>
                                   </details>
-                                    <div className="min-w-0 basis-full text-xs text-gray-600 sm:flex-1 sm:basis-64">
-                                      <p>
-                                        {sentiment?.sentiments?.[id]?.sample ? 'Sample discussion' : 'Earlier discussion'}:{' '}
+                                    <details className="min-w-0 basis-full text-xs text-gray-600 sm:flex-1 sm:basis-64"
+                                      onToggle={(event) => {
+                                        if (event.currentTarget.open) onSentimentRefresh?.();
+                                      }}>
+                                      <summary className="cursor-pointer py-2 focus-visible:outline focus-visible:outline-2">
+                                        Sentiment:{' '}
                                         {sentiment?.status === 'access-denied'
                                           ? 'Meeting Tracker access required'
                                           : sentiment?.status ===
@@ -385,25 +387,12 @@ export function AssessmentList({
                                               : sentiment?.status === 'loading'
                                                 ? 'Checking current analysis…'
                                                 : 'Not available'}
-                                      </p>
+                                      </summary>
                                       {sentiment?.sentiments?.[id]?.status ===
                                         'current' && (
                                         <>
-                                          <button
-                                            className="min-h-11 cursor-pointer py-2 underline"
-                                            aria-expanded={expanded === id}
-                                            onClick={() => {
-                                              setExpanded(
-                                                expanded === id ? null : id,
-                                              );
-                                              if (expanded !== id)
-                                                onSentimentRefresh?.();
-                                            }}
-                                          >
-                                            Discussion evidence
-                                          </button>
-                                          {expanded === id && (
-                                            <div>
+                                            <div className="pb-2">
+                                              {sentiment.sentiments[id].sample && <p className="mb-2">Sample sentiment and evidence for this rehearsal.</p>}
                                               <p>
                                                 {
                                                   sentiment.sentiments[id]
@@ -475,10 +464,9 @@ export function AssessmentList({
                                                 </div>
                                               ))}
                                             </div>
-                                          )}
                                         </>
                                       )}
-                                    </div>
+                                    </details>
 
                                   <span className={`ml-auto shrink-0 rounded px-2 py-1 font-semibold ${position < assessment.boundaries[0] ? gradeClasses.A : position < assessment.boundaries[1] ? gradeClasses.B : 'bg-gray-100 text-gray-700'}`}>
                                     {position < assessment.boundaries[0] ? 'Recommend funding' : position < assessment.boundaries[1] ? 'Alternate' : 'Not recommended'}
