@@ -14,7 +14,7 @@ jest.mock('../../lib/services/meeting-tracker-recordings/zoom-client.js', () => 
   listHostRecordings: jest.fn(), getMeetingRecordings: jest.fn(), downloadRecordingFile: jest.fn(),
 }));
 jest.mock('../../lib/services/meeting-tracker-recordings/video-copy-store.js', () => ({
-  startZoomVideoCopy: jest.fn(), listFailedZoomVideoCopiesForFile: jest.fn(), findCopiedZoomVideoCopyForFile: jest.fn(),
+  repairCopiedZoomVideoMetadata: jest.fn(), startZoomVideoCopy: jest.fn(), listFailedZoomVideoCopiesForFile: jest.fn(), findCopiedZoomVideoCopyForFile: jest.fn(),
   listZoomVideoCopySnapshotsForRequest: jest.fn(), requestZoomVideoCopyCancel: jest.fn(),
   zoomRecordingTimes: (file) => jest.requireActual('../../lib/services/meeting-tracker-recordings/video-copy-store.js').zoomRecordingTimes(file),
 }));
@@ -23,7 +23,7 @@ jest.mock('../../lib/services/post-presentation-materials/material-service.js', 
   const error = (message, code, httpStatus = 409) => new ServiceHttpError(message, { httpStatus, code, body: { error: message, code } });
   return {
     POST_PRESENTATION_MATERIALS_DEPENDENCIES: {
-      schemaReady: jest.fn(), requestAllowed: jest.fn(), findDocuments: jest.fn(), getSharePointBuckets: jest.fn(), ensureFolderPath: jest.fn(),
+      getFileMetadataById: jest.fn(), schemaReady: jest.fn(), requestAllowed: jest.fn(), findDocuments: jest.fn(), getSharePointBuckets: jest.fn(), ensureFolderPath: jest.fn(),
     },
     activeBucket: jest.fn(buckets => buckets[0] || null),
     loadBoundContext: jest.fn(),
@@ -375,7 +375,7 @@ describe('startZoomVideoCopy: decision 8 confirmation', () => {
   });
   test('a copied-file replay comes before the confirmation check (the Recording winner is never read)', async () => {
     deps.findDocuments.mockResolvedValue({ records: [sharepointWinner()] });
-    store.findCopiedZoomVideoCopyForFile.mockResolvedValue({ id: COPY, state: 'copied' });
+    store.findCopiedZoomVideoCopyForFile.mockResolvedValue({ id: COPY, state: 'copied', recording_start: START, recording_end: START, sharepoint_quickxor_hash: 'hash' });
     expect(await startZoomVideoCopy(args())).toEqual({ status: 200, body: { copy: { id: COPY, state: 'copied' }, replayed: true } });
     expect(store.findCopiedZoomVideoCopyForFile).toHaveBeenCalledWith({ requestId: REQUEST, zoomFileId: 'mp4-id' });
     expect(deps.findDocuments).not.toHaveBeenCalled();
@@ -446,5 +446,46 @@ describe('cancelZoomVideoCopy', () => {
   test.each([['non-GUID', 'nope'], ['padded', ` ${COPY}`], ['missing', undefined]])('%s copyId is 400 before any query', async (_l, copyId) => {
     expect((await rejection(cancelZoomVideoCopy({ requestId: REQUEST, copyId }))).httpStatus).toBe(400);
     expect(store.requestZoomVideoCopyCancel).not.toHaveBeenCalled();
+  });
+});
+
+
+describe('legacy copied video verification', () => {
+  const legacy = () => ({ id: COPY, request_id: REQUEST, state: 'copied', intent_state: 'finalized', intent_origin: 'zoom_copy',
+    request_document_id: WINNER, intent_request_document_id: WINNER, sharepoint_drive_id: 'd', sharepoint_item_id: 'i',
+    candidate_drive_id: 'd', candidate_item_id: 'i', candidate_size: '1000', declared_size: '1000', candidate_version_id: '1.0',
+    zoom_meeting_uuid: UUID, zoom_host_id: HOST_ID, zoom_file_id: 'mp4-id', zoom_recording_type: PLAIN,
+    recording_start: null, recording_end: null, sharepoint_quickxor_hash: null });
+  beforeEach(() => {
+    store.findCopiedZoomVideoCopyForFile.mockResolvedValue(legacy());
+    getMeetingRecordings.mockResolvedValue(meeting([video({ recording_end: START })]));
+    deps.findDocuments.mockResolvedValue({ records: [sharepointWinner()] });
+    deps.getFileMetadataById.mockResolvedValue({ id: 'i', driveId: 'd', size: 1000, versionId: '1.0', quickXorHash: 'hash' });
+    store.repairCopiedZoomVideoMetadata.mockResolvedValue({ id: COPY });
+  });
+  test('verified replay repairs only missing copy metadata, without starting another upload', async () => {
+    expect(await startZoomVideoCopy(args())).toMatchObject({ status: 200, body: { verified: true, replayed: true } });
+    expect(store.repairCopiedZoomVideoMetadata).toHaveBeenCalledWith(expect.objectContaining({ row: legacy(), quickXorHash: 'hash' }));
+    expect(store.startZoomVideoCopy).not.toHaveBeenCalled();
+    expect(deps.ensureFolderPath).not.toHaveBeenCalled();
+  });
+  test('a changed current recording refuses repair before Graph or writes', async () => {
+    deps.findDocuments.mockResolvedValue({ records: [] });
+    expect((await rejection(startZoomVideoCopy(args()))).code).toBe('zoom_video_verification_stale');
+    expect(deps.getFileMetadataById).not.toHaveBeenCalled();
+    expect(store.repairCopiedZoomVideoMetadata).not.toHaveBeenCalled();
+  });
+  test('changed content never gets its hash accepted', async () => {
+    deps.getFileMetadataById.mockResolvedValue({ id: 'i', driveId: 'd', size: 1000, versionId: '2.0', quickXorHash: 'new' });
+    expect((await rejection(startZoomVideoCopy(args()))).code).toBe('zoom_video_verification_failed');
+    expect(store.repairCopiedZoomVideoMetadata).not.toHaveBeenCalled();
+  });
+  test('a concurrent receipt change refuses success', async () => {
+    store.repairCopiedZoomVideoMetadata.mockResolvedValue(null);
+    expect((await rejection(startZoomVideoCopy(args()))).code).toBe('zoom_video_verification_stale');
+  });
+  test('DTO exposes only a verification flag, not its evidence', () => {
+    expect(zoomVideoCopyDto(legacy()).needsVerification).toBe(true);
+    expect(zoomVideoCopyDto({ ...legacy(), recording_start: START, recording_end: START, sharepoint_quickxor_hash: 'hash' }).needsVerification).toBeUndefined();
   });
 });
