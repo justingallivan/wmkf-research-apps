@@ -200,6 +200,19 @@ function FileDetails({ file }) {
   );
 }
 
+// Plain-language reasons for a blocked preparation receipt, keyed by the
+// worker's error code (lib/services/pre-site-visit/preparation-worker.js).
+const SCHEDULE_CHANGED_REASON = 'Automatic preparation stopped because the presentation schedule changed or couldn’t be confirmed. Check the Site Visit in Dynamics, then retry. Your existing document has been preserved.';
+const BLOCKED_PREPARATION_REASONS = {
+  schedule_requires_reconciliation: 'Automatic preparation stopped because more than one presentation is scheduled for this request. Fix the Site Visit in Dynamics so only one remains, then retry. Your existing document has been preserved.',
+  schedule_revision_unavailable: SCHEDULE_CHANGED_REASON,
+  schedule_or_request_changed: SCHEDULE_CHANGED_REASON,
+  schedule_read_incomplete: SCHEDULE_CHANGED_REASON,
+  request_eligibility_changed: 'Automatic preparation stopped because this request’s status changed. Your existing document has been preserved.',
+  correction_epoch_changed: 'Automatic preparation stopped because the writeup was reopened for corrections while it was being prepared. Retry when corrections are finished. Your existing document has been preserved.',
+  document_pointer_changed: 'The writeup file was replaced after automatic preparation, so the prepared version no longer applies. Contact an administrator. Your existing document has been preserved.',
+};
+
 function Warnings({ warnings, label }) {
   if (!warnings.length) return null;
   return (
@@ -1122,7 +1135,18 @@ export default function StaffDeliberationsTab({
   const milestoneComplete = Boolean(artifact?.milestone?.versionId && artifact?.milestone?.contentHash && artifact?.milestone?.createdAt);
   const editingReady = preSiteShared && milestoneComplete && !preparationReadError
     && timing?.availability === 'available';
-  const preparationState = preparationReadError ? 'unavailable' : preparation?.state;
+  // A reopened correction parks preparation on purpose; the sweep re-queues it
+  // after Finish corrections, so it is not a problem to report.
+  const preparationAwaitsCorrections = preparation?.state === 'blocked'
+    && preparation?.errorCode === 'correction_reopen_requires_staff';
+  const preparationState = preparationReadError ? 'unavailable'
+    : preparationAwaitsCorrections ? 'pending' : preparation?.state;
+  // Generation-time checks are never re-run against later Word edits, so they
+  // stop showing once staff record a version or reopen it for corrections.
+  const draftWarnings = artifact?.milestone?.actorId || correctionDraft ? [] : warnings;
+  const blockedReason = BLOCKED_PREPARATION_REASONS[preparation?.errorCode]
+    || 'Automatic preparation stopped before it finished. Your existing document has been preserved.';
+  const canRetryPreparation = preparation?.errorCode !== 'document_pointer_changed';
   // The worker's receipt says it moved this exact file to post-visit editing,
   // and no staff member is recorded as having done so.
   const preparedAutomatically = (preSiteShared || preSiteFinal) && !preparationReadError
@@ -1292,7 +1316,7 @@ export default function StaffDeliberationsTab({
       : preSiteShared ? (finalReview?.phase === 'starting' ? 'Starting group review…' : 'Post-visit drafting')
       : correctionDraft ? 'Corrections in progress'
         : generating || pendingArtifact?.operationStatus === REQUEST_DOCUMENT_OPERATION_STATUS.GENERATING ? 'Preparing…'
-          : (readyFile || writeupHidden) && preSiteDraftReady ? `Draft ready${warnings?.length ? ` · ${warnings.length} ${warnings.length === 1 ? 'thing' : 'things'} to check` : ''}`
+          : (readyFile || writeupHidden) && preSiteDraftReady ? `Draft ready${draftWarnings.length ? ` · ${draftWarnings.length} ${draftWarnings.length === 1 ? 'thing' : 'things'} to check` : ''}`
             : due ? 'Not prepared yet' : 'Optional before the presentation';
   // Post-visit drafting hands off to group review from step 4 (owner 2026-10-06).
   const handOffOpen = preSiteShared && milestoneComplete && !preSiteFinal && !correctionDraft && finalReview?.phase === 'ready';
@@ -1517,7 +1541,7 @@ export default function StaffDeliberationsTab({
             </p>
           )}
           <FileDetails file={readyFile} />
-          <Warnings warnings={warnings} label={preSiteShared || preSiteFinal ? 'Writeup needs a quick edit check' : 'Draft needs a quick edit check'} />
+          <Warnings warnings={draftWarnings} label={preSiteShared || preSiteFinal ? 'Writeup needs a quick edit check' : 'Draft needs a quick edit check'} />
         </div>
       ) : null}
       actions={(
@@ -1586,6 +1610,8 @@ export default function StaffDeliberationsTab({
                 : unchangedRetryBlocked
                   ? 'Automatic preparation is off. Draft preparation needs attention; see the message above before trying again.'
                   : 'Automatic preparation is off. Use Prepare working draft to create the writeup; this does not start review or send email.'
+              : correctionDraft
+                ? 'Open for corrections. Choose Finish corrections when your edits are done; the working writeup then updates automatically.'
               : preparationState === 'due'
                 ? 'Waiting for automatic preparation. No preparation action is needed from you yet; group review starts only when you choose.'
               : preparationState === 'pending'
@@ -1670,10 +1696,10 @@ export default function StaffDeliberationsTab({
             )}
             {preparationReadError && <p role="alert" className="mt-1">{preparationReadError}</p>}
             {preparationState === 'blocked' && <div className="mt-2">
-              <p>Automatic preparation needs attention. Your existing document has been preserved.</p>
-              <button type="button" onClick={retryPreparation} disabled={retryingPreparation} className={`mt-2 ${secondaryClass}`}>
+              <p data-testid="preparation-blocked-reason">{blockedReason}</p>
+              {canRetryPreparation && <button type="button" onClick={retryPreparation} disabled={retryingPreparation} className={`mt-2 ${secondaryClass}`}>
                 {retryingPreparation ? 'Retrying…' : 'Retry preparation'}
-              </button>
+              </button>}
             </div>}
             {briefShared && latestSendFailure && <p className="mt-1 text-red-700" role="alert" data-testid="deliberations-send-failure">The last send failed: {latestSendFailure.message}</p>}
           </div>
