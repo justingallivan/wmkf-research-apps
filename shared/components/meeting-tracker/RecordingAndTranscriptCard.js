@@ -48,6 +48,16 @@ function formatBytes(value) {
   return `${bytes.toLocaleString()} bytes`;
 }
 
+function formatUploadTimestamp(value) {
+  if (!value) return 'Unavailable';
+  const date = new Date(value);
+  if (!Number.isFinite(date.getTime())) return 'Unavailable';
+  return date.toLocaleString(undefined, {
+    year: 'numeric', month: 'short', day: 'numeric',
+    hour: 'numeric', minute: '2-digit', second: '2-digit', timeZoneName: 'short',
+  });
+}
+
 function phaseCopy(state) {
   if (!state) return '';
   if (state.phase === 'pausing') return 'Pausing after the current fragment…';
@@ -3702,7 +3712,13 @@ function RecordingBlock({ m, z }) {
           <ul className="mt-2 divide-y divide-gray-200 border-y border-gray-200">
             {intents.map((intent) => (
               <li key={intent.uploadId} className="flex flex-wrap items-center justify-between gap-3 py-3 text-sm">
-                <div><p className="font-medium text-gray-900">{intent.filename}</p><p className="text-xs text-gray-500">{formatBytes(intent.size)} · {intent.state}</p></div>
+                <div>
+                  <p className="font-medium text-gray-900">{intent.filename}</p>
+                  <p className="text-xs text-gray-500">{formatBytes(intent.size)} · {intent.state}</p>
+                  <p className="mt-1 text-xs text-gray-600">Upload started: {formatUploadTimestamp(intent.createdAt)}</p>
+                  <p className="text-xs text-gray-600">Last status update: {formatUploadTimestamp(intent.updatedAt)}</p>
+                  <p className="text-xs text-gray-500">Status updates may include automatic checks, not a new upload attempt.</p>
+                </div>
                 <div className="flex gap-2">
                   {intent.canResume && <Button type="button" size="sm" variant="outline" disabled={lockedByWork} onClick={() => m.resume(intent)}>Resume</Button>}
                   {intent.canRetry && <Button type="button" size="sm" variant="outline" disabled={lockedByWork} loading={m.recoveryBusyId === intent.uploadId} onClick={() => m.retry(intent)}>Retry upload</Button>}
