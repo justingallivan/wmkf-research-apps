@@ -53,11 +53,20 @@ function safeFileUrl(file) {
   } catch { return null; }
 }
 
-function UploadJobNotice({ jobs, programCoordinator }) {
-  if (!jobs.length) return null;
+function UploadJobNotice({ jobs, programCoordinator, receivedAt, supersededFailures = [] }) {
+  const receivedTime = Date.parse(receivedAt || '');
+  const visibleJobs = jobs.filter((job) => {
+    if (job.status !== 'failed') return true;
+    // Keep the durable history, but stop presenting a replaced failure as current.
+    // Unknown/equal timestamps cannot prove that a receipt supersedes a failure.
+    const failureTime = Date.parse(job.updatedAt || job.createdAt || '');
+    return !supersededFailures.includes(`${job.jobId}:${job.updatedAt || job.createdAt || ''}`)
+      && !(Number.isFinite(receivedTime) && Number.isFinite(failureTime) && receivedTime > failureTime);
+  });
+  if (!visibleJobs.length) return null;
   return (
     <div className="mt-2 space-y-1">
-      {jobs.map((job) => {
+      {visibleJobs.map((job) => {
         if (ACTIVE_UPLOAD_STATUSES.has(job.status)) {
           return <p key={job.jobId} className="text-xs text-blue-800" role="status">Upload received. We’re checking and saving the file.</p>;
         }
@@ -84,6 +93,7 @@ export default function SiteVisitMaterialsCard({ requestId, requestNumber, onSta
   const [loadFailed, setLoadFailed] = useState(false);
   const [copied, setCopied] = useState(false);
   const [composerAction, setComposerAction] = useState(null);
+  const [supersededFailures, setSupersededFailures] = useState({});
   const generationRef = useRef(0);
   const loadGenerationRef = useRef(0);
   const mountedRef = useRef(true);
@@ -128,6 +138,7 @@ export default function SiteVisitMaterialsCard({ requestId, requestNumber, onSta
     setNotice(null);
     setCopied(false);
     setComposerAction(null);
+    setSupersededFailures({});
   }, [requestId]);
 
   useEffect(() => { void load(); }, [load]);
@@ -309,6 +320,11 @@ export default function SiteVisitMaterialsCard({ requestId, requestNumber, onSta
                   disabled={uploadDisabled}
                   showTrigger={!item.received}
                   onBlockedChange={(blocked) => setUploadBlocked(item.key, blocked)}
+                  onUploadStarted={() => {
+                    const failures = jobs.filter((job) => job.status === 'failed')
+                      .map((job) => `${job.jobId}:${job.updatedAt || job.createdAt || ''}`);
+                    setSupersededFailures((current) => ({ ...current, [item.key]: failures }));
+                  }}
                   onUploaded={() => { setNotice(`${item.label} saved.`); void load(); }}
                 />
               );
@@ -322,7 +338,7 @@ export default function SiteVisitMaterialsCard({ requestId, requestNumber, onSta
                     item.received && { key: 'replace', label: 'Upload updated file', disabled: uploadDisabled || Boolean(blockedUploads[item.key]), onSelect: () => uploadRefs.current[item.key]?.open() },
                     canWaive && { key: 'waive', label: item.waived ? 'Require again' : 'Waive', disabled: busy, onSelect: () => act('waive', { key: item.key, waived: !item.waived }) },
                   ]}>
-                  <UploadJobNotice jobs={jobs} programCoordinator={collection.programCoordinator} />
+                  <UploadJobNotice jobs={jobs} programCoordinator={collection.programCoordinator} receivedAt={item.received?.receivedAt} supersededFailures={supersededFailures[item.key]} />
                 </ArtifactRow>
               );
             })}
