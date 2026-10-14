@@ -826,6 +826,17 @@ export default function AssessmentWorkflow({
   const unanswered = collective ? [] : assessment?.order.filter((id) => !assessment.confidence?.[id]) || [];
   const findScope = `${view.roundId}:${section}:${program}`;
   const showMissingConfidence = validationScope === findScope && unanswered.length > 0;
+  const currentFindResult = findResult?.scope === findScope ? findResult : null;
+  function jumpToUnanswered() {
+    const previousPosition = assessment.order.indexOf(currentFindResult?.id);
+    const id = unanswered.find((candidate) => assessment.order.indexOf(candidate) > previousPosition) || unanswered[0];
+    if (!id) return;
+    const proposal = proposals.find((p) => p.requestId === id);
+    setFindResult({ scope: findScope, id, message: `Confidence needed: ${proposal?.organization}. Choose Confident or Not sure.` });
+    const card = document.getElementById(`proposal-${id}`);
+    card?.scrollIntoView({ behavior: 'auto', block: 'center' });
+    card?.querySelector('input[type="radio"]')?.focus({ preventScroll: true });
+  }
   const preparationAction = unanswered.length > 0 ? (
     <div className="flex flex-wrap items-center gap-3">
       <p className="font-medium text-amber-900" aria-live="polite">{unanswered.length} {unanswered.length === 1 ? 'proposal needs' : 'proposals need'} a confidence choice</p>
@@ -851,17 +862,6 @@ export default function AssessmentWorkflow({
   ) : (
     <Button disabled={busy || Boolean(pending) || !active} onClick={() => execute('ready')}>Ready</Button>
   );
-  const currentFindResult = findResult?.scope === findScope ? findResult : null;
-  function jumpToUnanswered() {
-    const previousPosition = assessment.order.indexOf(currentFindResult?.id);
-    const id = unanswered.find((candidate) => assessment.order.indexOf(candidate) > previousPosition) || unanswered[0];
-    if (!id) return;
-    const proposal = proposals.find((p) => p.requestId === id);
-    setFindResult({ scope: findScope, id, message: `Confidence needed: ${proposal?.organization}. Choose Confident or Not sure.` });
-    const card = document.getElementById(`proposal-${id}`);
-    card?.scrollIntoView({ behavior: 'auto', block: 'center' });
-    card?.querySelector('input[type="radio"]')?.focus({ preventScroll: true });
-  }
   const findProposal = (event) => {
     event.preventDefault();
     const query = find.trim().toLowerCase();
