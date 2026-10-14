@@ -288,3 +288,18 @@ test('unanswered navigation follows current order, wraps, and skips saved choice
   expect(document.activeElement.name).toBe('confidence-two');
   expect(Element.prototype.scrollIntoView).toHaveBeenCalledWith({ behavior: 'auto', block: 'center' });
 });
+
+
+test('Continue identifies missing cards without submitting or changing assessments', () => {
+  Element.prototype.scrollIntoView = jest.fn();
+  const initial = populatedView();
+  initial.own.mr.confidence = { one: 'confident' };
+  render(<AssessmentWorkflow initial={initial} cycleOptions={[]} onCycleChange={() => {}} />);
+  fireEvent.click(screen.getByRole('button', { name: 'Continue', exact: true }));
+  expect(screen.getByRole('alert').textContent).toContain('Institution two');
+  expect(screen.getByRole('alert').textContent).not.toContain('Institution one');
+  expect(document.getElementById('proposal-two').className).toContain('ring-red-600');
+  expect(document.getElementById('proposal-one').className).not.toContain('ring-red-600');
+  expect(document.activeElement.name).toBe('confidence-two');
+  expect(sendProposalRankingAction).not.toHaveBeenCalled();
+});

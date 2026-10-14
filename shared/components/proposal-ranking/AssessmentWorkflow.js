@@ -89,6 +89,7 @@ export function AssessmentList({
   sentiment,
   onSentimentRefresh,
   highlightedId,
+  showMissingConfidence = false,
 }) {
   const [notice, setNotice] = useState('');
   const [expanded, setExpanded] = useState(null);
@@ -248,7 +249,7 @@ export function AssessmentList({
                             id={`proposal-${id}`}
                             tabIndex={-1}
                             aria-label={`${proposal.organization}, proposal ${proposal.requestNumber}`}
-                            className="flex scroll-mt-56 items-start gap-2 rounded-xl p-4 focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-600 sm:gap-4"
+                            className={`flex scroll-mt-56 items-start gap-2 rounded-xl p-4 focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-600 sm:gap-4 ${showMissingConfidence && !assessment.confidence?.[id] ? 'ring-2 ring-inset ring-red-600' : ''}`}
                           >
                             <div className="flex shrink-0 self-center">
                               {editable && (
@@ -560,6 +561,7 @@ export default function AssessmentWorkflow({
   const sentimentGeneration = useRef(0);
   const [find, setFind] = useState('');
   const [findResult, setFindResult] = useState(null);
+  const [validationScope, setValidationScope] = useState(null);
   const [refreshed, setRefreshed] = useState(new Date());
   const generation = useRef(0);
   const busyRef = useRef(false);
@@ -822,10 +824,13 @@ export default function AssessmentWorkflow({
   const combinedComplete = view.own?.co?.order.every((id) => view.own.co.confidence[id]);
   const preparationStep = view.own?.ready ? 'ready' : program === 'co' ? 'combined' : 'programs';
   const unanswered = collective ? [] : assessment?.order.filter((id) => !assessment.confidence?.[id]) || [];
+  const findScope = `${view.roundId}:${section}:${program}`;
+  const showMissingConfidence = validationScope === findScope && unanswered.length > 0;
   const preparationAction = unanswered.length > 0 ? (
     <div className="flex flex-wrap items-center gap-3">
       <p className="font-medium text-amber-900" aria-live="polite">{unanswered.length} {unanswered.length === 1 ? 'proposal needs' : 'proposals need'} a confidence choice</p>
-      <Button disabled={busy || Boolean(pending)} onClick={jumpToUnanswered}>Go to next unanswered</Button>
+      <Button variant="outline" disabled={busy || Boolean(pending)} onClick={jumpToUnanswered}>Go to next unanswered</Button>
+      <Button disabled={busy || Boolean(pending)} onClick={() => { setValidationScope(findScope); jumpToUnanswered(); }}>Continue</Button>
     </div>
   ) : !allConfident ? (
     nextProgram && (currentProgramComplete || program === 'co') ? (
@@ -846,7 +851,6 @@ export default function AssessmentWorkflow({
   ) : (
     <Button disabled={busy || Boolean(pending) || !active} onClick={() => execute('ready')}>Ready</Button>
   );
-  const findScope = `${view.roundId}:${section}:${program}`;
   const currentFindResult = findResult?.scope === findScope ? findResult : null;
   function jumpToUnanswered() {
     const previousPosition = assessment.order.indexOf(currentFindResult?.id);
@@ -1113,7 +1117,14 @@ export default function AssessmentWorkflow({
                   : 'Saved group revision'}{' '}
                 · {new Date(entry.at).toLocaleString()}
               </summary>
-              <AssessmentList
+              {section === 'prepare' && showMissingConfidence && (
+            <div role="alert" className="mb-4 rounded-lg border border-red-600 bg-red-50 p-4 text-red-900">
+              <p className="font-semibold">Before continuing, choose Confident or Not sure for these proposals:</p>
+              <ul className="mt-2 list-disc pl-5">{unanswered.map((id) => <li key={id}>{proposals.find((p) => p.requestId === id)?.organization}</li>)}</ul>
+              <p className="mt-2">Their cards are outlined in red. Use Go to next unanswered to reach each one.</p>
+            </div>
+          )}
+          <AssessmentList
                 assessment={entry.collective || entry.baseline}
                 collective={
                   entry.collective || {
@@ -1315,6 +1326,13 @@ export default function AssessmentWorkflow({
             <button className={buttonClass}>Find</button>
           </form>
           <p id="ranking-find-result" aria-live="polite" className="mb-3 text-sm text-gray-600">{currentFindResult?.message}</p>
+          {section === 'prepare' && showMissingConfidence && (
+            <div role="alert" className="mb-4 rounded-lg border border-red-600 bg-red-50 p-4 text-red-900">
+              <p className="font-semibold">Before continuing, choose Confident or Not sure for these proposals:</p>
+              <ul className="mt-2 list-disc pl-5">{unanswered.map((id) => <li key={id}>{proposals.find((p) => p.requestId === id)?.organization}</li>)}</ul>
+              <p className="mt-2">Their cards are outlined in red. Use Go to next unanswered to reach each one.</p>
+            </div>
+          )}
           <AssessmentList
             assessment={assessment}
             proposals={proposals}
@@ -1325,6 +1343,7 @@ export default function AssessmentWorkflow({
             sentiment={sentiment}
             onSentimentRefresh={refreshSentiment}
             highlightedId={currentFindResult?.id}
+            showMissingConfidence={showMissingConfidence}
           />
           {section === 'prepare' && assessment.order.length > 5 && <div className="mt-5 flex justify-end">{preparationAction}</div>}
         </>
