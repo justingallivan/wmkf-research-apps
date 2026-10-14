@@ -2097,7 +2097,6 @@ function useZoomImport(requestId, { onImported, jobsSignature, onVideoCopied }) 
   const [acknowledged, setAcknowledged] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(null);
-  const [showOther, setShowOther] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const lastSignatureRef = useRef(jobsSignature);
   const generationRef = useRef(0);
@@ -2365,7 +2364,7 @@ function useZoomImport(requestId, { onImported, jobsSignature, onVideoCopied }) 
 
   return {
     status, windowDays, meetings, selectedUuid, setSelectedUuid, acknowledged, setAcknowledged, busy, error,
-    showOther, toggleOther: () => setShowOther((value) => !value), openPanel, importSelected, refresh, refreshing,
+    openPanel, importSelected, refresh, refreshing,
     copyAvailable, hasActiveCopy, currentCopy, copyForMeeting, videoStartable, videoBusy, videoMessage, confirm,
     copyVideo, cancelCopy, confirmReplace, declineReplace,
   };
@@ -3074,7 +3073,10 @@ function VideoCopyStatus({ z }) {
 function ZoomImportSection({ z, activeJob, transcriptionBusy, hasTranscript }) {
   if (z.status === 'unavailable') return null;
   if (z.status === 'idle') {
-    return <Button variant="link" type="button" onClick={z.openPanel} className="mt-4">Import from Zoom</Button>;
+    return <div className="mt-4">
+      <Button variant="primary" size="sm" type="button" onClick={z.openPanel}>Import from Zoom</Button>
+      <p className="mt-2 text-sm text-gray-600">Imports the recording and generates a transcript with AssemblyAI.</p>
+    </div>;
   }
   if (z.status === 'loading') return <p className="mt-4 text-sm text-gray-700" aria-live="polite">Loading Zoom recordings…</p>;
   if (z.status === 'failed') {
@@ -3497,7 +3499,7 @@ function TranscriptWorkflow({ m, t, z, requestId, transcriptInputRef, refreshTok
     <Button variant="link" type="button" onClick={() => setUploadInstead((value) => !value)} aria-expanded={uploadInstead} className="mt-3">Upload a finished transcript instead</Button>
     {uploadInstead && <UploadForm m={m} inputRef={transcriptInputRef} />}
   </>;
-  const recordingBlock = <div className="mt-5 border-t border-gray-200 pt-4"><RecordingBlock m={m} z={z} /></div>;
+  const recordingBlock = <div className="mt-5 border-t border-gray-200 pt-4"><RecordingBlock m={m} /></div>;
   const recordingSummary = (
     <p className="min-w-0">
       <span data-testid="current-transcript-line">{line.text}</span>
@@ -3551,21 +3553,18 @@ function TranscriptWorkflow({ m, t, z, requestId, transcriptInputRef, refreshTok
           </div>
         )}
         {step1Expanded && <>
-          {generateReason
-            ? <>
-              <p className="mt-4 text-sm text-gray-700">Transcribing from audio: <span>{generateReason}</span></p>
-              <UploadForm m={m} inputRef={transcriptInputRef} />
-            </>
-            : <>
-              <ZoomImportSection z={z} activeJob={active} transcriptionBusy={Boolean(t.busy)} hasTranscript={Boolean(material)} />
-              {z.status === 'available'
-                ? <div className="mt-4 border-t border-gray-200 pt-3">
-                  <Button variant="link" type="button" onClick={z.toggleOther} aria-expanded={z.showOther}>Upload manually</Button>
-                  {(z.showOther || z.hasActiveCopy) && <>{manualAdd}{recordingBlock}</>}
-                </div>
-                : <>{manualAdd}{recordingBlock}</>}
-            </>}
-          {generateReason && recordingBlock}
+          {!generateReason && <ZoomImportSection z={z} activeJob={active} transcriptionBusy={Boolean(t.busy)} hasTranscript={Boolean(material)} />}
+          <VideoCopyStatus z={z} />
+          <details className="mt-5 border-t border-gray-200 pt-3" open={Boolean(m.data?.uploads?.length)}>
+            <summary className="cursor-pointer py-2 text-sm font-medium text-gray-700 hover:text-gray-950 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2">Import materials manually</summary>
+            {generateReason
+              ? <>
+                <p className="mt-4 text-sm text-gray-700">Transcribing from audio: <span>{generateReason}</span></p>
+                <UploadForm m={m} inputRef={transcriptInputRef} />
+              </>
+              : manualAdd}
+            {recordingBlock}
+          </details>
         </>}
       </Step>
 
@@ -3669,7 +3668,7 @@ function BoardReadiness({ readiness }) {
   );
 }
 
-function RecordingBlock({ m, z }) {
+function RecordingBlock({ m }) {
   const [replaceOpen, setReplaceOpen] = useState(false);
   const recording = (m.data?.materials || []).find((item) => Number(item.artifactType) === REQUEST_DOCUMENT_ARTIFACT_TYPE.RECORDING) || null;
   const intents = m.data?.uploads || [];
@@ -3681,7 +3680,6 @@ function RecordingBlock({ m, z }) {
     <section aria-labelledby="recording-transcript-recording-title">
       <h4 id="recording-transcript-recording-title" className="text-sm font-semibold text-gray-950">Video recording</h4>
       <p className="mt-1 text-xs text-gray-600">Zoom link or MP4, kept for staff. Saving a new one replaces the current one.</p>
-      <VideoCopyStatus z={z} />
       {recording && !showInputs && <Button size="sm" variant="outline" type="button" onClick={() => setReplaceOpen(true)} className="mt-3">Replace recording</Button>}
       {showInputs && <div className="mt-4 grid gap-4 sm:grid-cols-2">
         <div>

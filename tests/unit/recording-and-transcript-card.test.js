@@ -357,7 +357,7 @@ test('an active run shows only the progress line, and the card never shows ids o
   const progress = await screen.findByTestId('transcript-progress');
   expect(progress.textContent).toContain('Transcribing Oregon State recording');
   expect(screen.queryByTestId('transcript-review')).not.toBeInTheDocument();
-  expect(container.textContent).not.toMatch(/AssemblyAI|provider region|reconcil|quarantine|bundle|[0-9a-f]{8}-[0-9a-f]{4}-/i);
+  expect(container.textContent).not.toMatch(/provider region|reconcil|quarantine|bundle|[0-9a-f]{8}-[0-9a-f]{4}-/i);
 });
 
 test('a confirmed boundary with a stale presentation transcript shows no ids or banned words', async () => {
@@ -365,7 +365,7 @@ test('a confirmed boundary with a stale presentation transcript shows no ids or 
   route(state);
   const { container } = render(<RecordingAndTranscriptCard requestId={REQUEST_ID} />);
   expect(await screen.findByText(/Presentation ends at 01:02/)).toBeInTheDocument();
-  expect(container.textContent).not.toMatch(/AssemblyAI|provider region|reconcil|quarantine|bundle|[0-9a-f]{8}-[0-9a-f]{4}-/i);
+  expect(container.textContent).not.toMatch(/provider region|reconcil|quarantine|bundle|[0-9a-f]{8}-[0-9a-f]{4}-/i);
   expect(container.textContent).not.toContain('42');
 });
 
