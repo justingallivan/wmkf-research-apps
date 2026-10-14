@@ -960,6 +960,34 @@ an unspecified/legacy record never claims that a malware signature was found.
 
 Each infected verdict attempts one best-effort warning `operational_events` write,
 `site_visit_material_scan_rejected` at stage `virus_scan`, with request/collection/staging/slot
-references, staging-id deduplication, and only the allowlisted diagnostic in metadata. There is no notification email,
-new column, or migration. The diagnostic and applicant-facing progress/rejection copy are
-Production-deployed via PRs #407 and #410. Exact 500 MB live transfer remains unverified.
+references and staging-id deduplication. The public diagnostic and applicant-facing
+progress/rejection copy are Production-deployed via PRs #407 and #410; the October 14
+read-only incident query for Request 1002835 observed the existing category/flags-only event.
+Exact 500 MB live transfer remains unverified.
+
+**Private diagnostics [BRANCH-BUILT 2026-10-14 on `codex/cloudmersive-diagnostics`; not deployed].**
+The shared scanner preserves a bounded `scanDiagnostics` projection from the original
+response, before synthesizing compatibility findings: submitted extension, detected format,
+native finding count and up to five redacted threat names, optional relevant archive member,
+byte count, elapsed time, attempt count, response validity, HTTP status, and failure kind
+where available. Missing or malformed native findings are unknown, distinct from an explicitly
+empty findings list. Thrown errors carry the projection non-enumerably to avoid accidental
+legacy error serialization. Raw response bodies, headers, URLs, file contents, and full hashes
+are excluded. Flat scalars and string arrays fit the existing event sanitizer; its redaction
+and depth/size limits remain in force.
+
+The common materials finalizer covers synchronous external/staff uploads and background
+processing. It adds this private projection beside `scanRejection` in rejection-event metadata;
+thrown scanner errors or unexpected verdicts instead attempt a
+`site_visit_material_scan_failed` event with a safe `failureCode`. Each event type deduplicates
+by staging id, refreshing the latest metadata and incrementing occurrence count on repeats.
+Logging remains best-effort and cannot change upload outcome or cleanup. The existing
+superuser-only Admin Operational Events API and expanded metadata view consume these fields.
+Staging/job `result_payload`, applicant responses, and ordinary staff upload errors continue to
+carry only their existing public diagnostics. No scan policy, retry profile, additional provider
+call, notification email, new endpoint, column, or migration is introduced.
+
+Detected format is a troubleshooting clue, not proof of the rejection's cause. Cloudmersive's
+optional relevant-member field is not a complete archive report and may be absent; preserving
+it does not reproduce local archive inspection or controlled comparison scans. The new
+telemetry is prospective and does not reconstruct fields omitted from historical events.

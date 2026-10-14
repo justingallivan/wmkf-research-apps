@@ -763,15 +763,29 @@ Cron-driven health checks (7 services), alert log, cron audit trail. `maintenanc
 mirror (auto at error/critical, opt-in via `operationalEvent` at any severity)
 and drain ingestion `lib/services/vercel-log-drain-ingest.js` via
 `/api/webhooks/vercel-log-drain` (HMAC-verified, `vercel:<log id>` dedup).
-**[SOURCE-BUILT, NOT DEPLOYED:]** Applicant materials `scan_infected`
-rejections also write a best-effort warning `site_visit_material_scan_rejected`
-at `virus_scan`, deduplicated by staging id. Entity references contain the
-request, collection, staging, and slot; metadata contains only the allowlisted
-`scanRejection` category and flags. The event does not send email.
+Applicant materials `scan_infected` rejections write a best-effort warning
+`site_visit_material_scan_rejected` at `virus_scan`, deduplicated by staging id.
+Entity references contain the request, collection, staging, and slot.
+**[PRODUCTION-OBSERVED 2026-10-14 via read-only incident query for Request
+1002835:]** the existing event metadata contains the public `scanRejection`
+category and flags.
+**[BRANCH-BUILT 2026-10-14 on `codex/cloudmersive-diagnostics`; not deployed:]**
+the common materials finalizer adds bounded private `scanDiagnostics` to that
+metadata and records thrown scanner failures or unexpected verdicts as
+`site_visit_material_scan_failed`, with a safe `failureCode`. Both event types
+use staging-id deduplication within their event type; a repeated occurrence
+refreshes metadata and increments the count rather than retaining each attempt.
+The diagnostic projection carries submitted/detected formats, native finding
+count and bounded threat names, an optional relevant archive member, byte count,
+elapsed time, attempts, response validity, HTTP status, and failure kind where
+available. Missing/malformed native findings mean unknown, not zero. These
+fields never enter public staging/job results. No scan policy, provider call,
+column, or migration changes; neither event sends email. See applicant-materials
+plan §16.16 for the private/public boundary and diagnostic limits.
 Recovery: `markRecovered`/`markSuperseded` (reviewer-acceptance drain
 completion/withdrawal edges; `AlertService.autoResolve` propagation).
-**Read paths:** `/api/admin/operational-events` → `OperationalEventsSection`
-in `pages/admin.js`.
+**Read paths:** superuser-only `/api/admin/operational-events` →
+`OperationalEventsSection` in `pages/admin.js`; expanded rows render metadata.
 **Privacy boundary:** summaries pass `lib/utils/log-redactor.js`; metadata is
 depth/size/key-capped with a sensitive-key denylist; drain metadata is an
 explicit allowlist (never clientIp/userAgent/referer/JA3/JA4/headers/bodies).
