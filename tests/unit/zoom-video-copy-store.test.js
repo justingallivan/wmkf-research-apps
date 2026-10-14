@@ -260,7 +260,7 @@ test('snapshot reads join the intent, expose no lease token or upload URL, and a
 test('findCopiedZoomVideoCopyForFile reads only the copied row for the request and file', async () => {
   const { store, calls } = harness(() => [{ id: ID, zoom_meeting_uuid: 'm==', state: 'copied' }]);
   expect(await store.findCopiedZoomVideoCopyForFile({ requestId: REQ, zoomFileId: 'f1' })).toEqual({ id: ID, zoom_meeting_uuid: 'm==', state: 'copied' });
-  expect(calls[0].text).toContain("WHERE request_id = $1 AND zoom_file_id = $2 AND state = 'copied'");
+  expect(calls[0].text).toContain("WHERE c.request_id = $1 AND c.zoom_file_id = $2 AND c.state = 'copied'");
   expect(calls[0].params).toEqual([REQ, 'f1']);
   await expect(store.findCopiedZoomVideoCopyForFile({ requestId: 'nope', zoomFileId: 'f1' })).rejects.toThrow(TypeError);
 });
@@ -305,4 +305,18 @@ describe('Stage 4 decision 16: recording times (migration 079)', () => {
     expect(sameZoomRecordingTimes(row, { ...file, recording_end: '2026-10-08T18:43:00Z' })).toBe(false);
     expect(sameZoomRecordingTimes(row, { recording_start: file.recording_start })).toBe(false);
   });
+});
+
+
+test('metadata repair matches both receipt snapshots and refuses overwriting conflicting evidence', async () => {
+  const { store, calls } = harness(() => []);
+  const row = { id: ID, request_id: REQ, updated_key: 'copy-snapshot', intent_updated_key: 'intent-snapshot' };
+  expect(await store.repairCopiedZoomVideoMetadata({ row, recordingStart: '2026-10-09T16:31:01Z', recordingEnd: '2026-10-09T17:25:41Z', quickXorHash: 'hash' })).toBeNull();
+  expect(calls[0].params.slice(0, 4)).toEqual([ID, REQ, 'copy-snapshot', 'intent-snapshot']);
+  for (const predicate of ["c.state = 'copied'", "u.state = 'finalized'", "u.origin = 'zoom_copy'", 'c.updated_at::text = $3',
+    'u.updated_at::text = $4', 'u.request_document_id = c.request_document_id', 'u.candidate_size = c.declared_size',
+    'c.recording_start IS NULL OR c.recording_start = $5::timestamptz', 'c.sharepoint_quickxor_hash = $7']) {
+    expect(calls[0].text).toContain(predicate);
+  }
+  expect(calls[0].text).not.toMatch(/SET state/);
 });

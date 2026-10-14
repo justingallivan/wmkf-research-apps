@@ -2135,6 +2135,7 @@ function useZoomImport(requestId, { onImported, jobsSignature, onVideoCopied }) 
       const next = body?.available === true && Array.isArray(body.copies)
         ? body.copies.filter((copy) => copy && typeof copy.id === 'string' && typeof copy.state === 'string').map((copy) => ({
           id: copy.id, meetingUuid: typeof copy.meetingUuid === 'string' ? copy.meetingUuid : '', state: copy.state,
+          needsVerification: copy.needsVerification === true,
           bytesConfirmed: Number(copy.bytesConfirmed) || 0, declaredSize: Number(copy.declaredSize) || 0,
           failureCode: typeof copy.failureCode === 'string' ? copy.failureCode : null, cancelRequested: copy.cancelRequested === true,
           createdAt: copy.createdAt || null,
@@ -2167,13 +2168,13 @@ function useZoomImport(requestId, { onImported, jobsSignature, onVideoCopied }) 
     if (known) return known;
     const listed = meeting.video?.copy;
     return listed && typeof listed.state === 'string'
-      ? { id: listed.id, meetingUuid: meeting.meetingUuid, state: listed.state, bytesConfirmed: 0, declaredSize: Number(meeting.video.bytes) || 0, failureCode: listed.failureCode || null, cancelRequested: false }
+      ? { id: listed.id, meetingUuid: meeting.meetingUuid, state: listed.state, needsVerification: listed.needsVerification === true, bytesConfirmed: 0, declaredSize: Number(meeting.video.bytes) || 0, failureCode: listed.failureCode || null, cancelRequested: false }
       : null;
   };
   const videoStartable = (meeting) => {
     if (!copyAvailable || hasActiveCopy || !meeting?.video || meeting.video.tooLarge || meeting.video.segmented) return false;
     const copy = copyForMeeting(meeting);
-    return !copy || copy.state === 'failed' || copy.state === 'cancelled';
+    return !copy || copy.state === 'failed' || copy.state === 'cancelled' || (copy.state === 'copied' && copy.needsVerification === true);
   };
 
   // One POST for the video start. Returns { outcome: started | confirm | stale | error | dropped }.
@@ -2188,7 +2189,7 @@ function useZoomImport(requestId, { onImported, jobsSignature, onVideoCopied }) 
         copiesRef.current = [placeholder, ...copiesRef.current.filter((copy) => copy.id !== placeholder.id)];
         setCopies(copiesRef.current);
       }
-      setVideoMessage({ origin, tone: 'info', text: body?.replayed ? 'This video was already copied.' : 'Video copy started. This can take several minutes. You can leave this page.' });
+      setVideoMessage({ origin, tone: 'info', text: body?.verified ? 'Video verified. You can now create the presentation video.' : body?.replayed ? 'This video was already copied.' : 'Video copy started. This can take several minutes. You can leave this page.' });
       void loadCopies();
       return { outcome: 'started' };
     } catch (startError) {
@@ -2994,7 +2995,7 @@ function videoPickerLine(video, copy) {
   if (copy.state === 'queued') return 'Video: waiting to copy';
   if (copy.state === 'copying') return copy.declaredSize > 0 ? `Video: copying ${megabytes(copy.bytesConfirmed)} of ${megabytes(copy.declaredSize)}` : 'Video: copying';
   if (copy.state === 'registering') return 'Video: saving';
-  if (copy.state === 'copied') return 'Video: copied';
+  if (copy.state === 'copied') return copy.needsVerification ? 'Video: copied; verification needed before cutting' : 'Video: copied';
   if (copy.state === 'failed') return 'Video: copy failed';
   if (copy.state === 'cancelled') return 'Video: cancelled';
   return 'Video: not copied';
@@ -3105,7 +3106,7 @@ function ZoomImportSection({ z, activeJob, transcriptionBusy, hasTranscript }) {
                   </label>
                   {ownButton && (
                     <Button size="sm" variant="outline" type="button" onClick={() => void z.copyVideo(meeting.meetingUuid, 'picker')} disabled={z.busy || z.videoBusy}>
-                      {copy?.state === 'failed' ? 'Try again' : 'Copy video'}<span className="sr-only"> from {fmtPacific(meeting.startTime)}</span>
+                      {copy?.state === 'copied' && copy.needsVerification ? 'Verify video' : copy?.state === 'failed' ? 'Try again' : 'Copy video'}<span className="sr-only"> from {fmtPacific(meeting.startTime)}</span>
                     </Button>
                   )}
                 </div>
