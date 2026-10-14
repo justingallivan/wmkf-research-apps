@@ -48,10 +48,11 @@ const pacific = '10:00 AM PT';
 
 afterEach(() => { jest.restoreAllMocks(); });
 
-test('mounting the card makes no Zoom call; Stage 1 step 1 is unchanged and the import entry is offered', async () => {
+test('mounting offers Zoom first with manual methods collapsed and makes no Zoom call', async () => {
   route();
   render(<RecordingAndTranscriptCard requestId={REQUEST_ID} />);
-  expect(await screen.findByTestId('generate-form')).toBeInTheDocument();
+  expect(await screen.findByTestId('generate-form')).not.toBeVisible();
+  expect(screen.getByText('Imports the recording and generates a transcript with AssemblyAI.')).toBeVisible();
   expect(importButton()).toBeInTheDocument();
   expect(zoomCalls()).toEqual([]);
   expect(copyCalls().every(([, options]) => (options?.method || 'GET') === 'GET')).toBe(true);
@@ -85,7 +86,7 @@ test('a failed list shows one quiet line, keeps the manual inputs and can be ret
   expect(await screen.findByTestId('zoom-import')).toBeInTheDocument();
 });
 
-test('available: meetings list by Pacific date and time, the manual inputs collapse and "Other ways" reveals them', async () => {
+test('available: meetings list by Pacific date and time and the manual disclosure preserves its inputs', async () => {
   route({}, { '/zoom-recordings': { respond: () => response(zoomList()) } });
   const panel = await openPanel();
   expect(within(panel).getByText(new RegExp(`Oct 5.*${pacific}`))).toBeInTheDocument();
@@ -93,10 +94,10 @@ test('available: meetings list by Pacific date and time, the manual inputs colla
   expect(within(panel).getByText('45 min · Audio only')).toBeInTheDocument();
   expect(within(panel).getByText('10 min · No audio yet')).toBeInTheDocument();
   expect(within(panel).getByRole('radio', { name: /Oct 3/ })).toBeDisabled();
-  expect(screen.queryByTestId('generate-form')).not.toBeInTheDocument();
-  expect(screen.queryByText('Video recording')).not.toBeInTheDocument();
-  fireEvent.click(screen.getByRole('button', { name: 'Upload manually' }));
-  expect(screen.getByTestId('generate-form')).toBeInTheDocument();
+  expect(screen.getByTestId('generate-form')).not.toBeVisible();
+  expect(screen.getByText('Video recording')).not.toBeVisible();
+  fireEvent.click(screen.getByText('Import materials manually'));
+  expect(screen.getByTestId('generate-form')).toBeVisible();
   expect(screen.getByText('Video recording')).toBeInTheDocument();
   expect(screen.getByRole('button', { name: 'Upload a finished transcript instead' })).toBeInTheDocument();
   expect(zoomCalls().every(([url]) => String(url).endsWith('/zoom-recordings'))).toBe(true);
