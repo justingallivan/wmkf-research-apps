@@ -5,6 +5,7 @@ import { sql } from '@vercel/postgres';
 import {
   bindPresentationMaterialUploadForCleanup,
   cancelPresentationMaterialUploadRecovery,
+  dismissPresentationMaterialUploadRecovery,
   claimPresentationMaterialUploadRecovery,
   claimPresentationMaterialUpload,
   claimPresentationMaterialUploadsForCleanup,
@@ -243,7 +244,7 @@ test('browser reads, claims and unleased writers are isolated to origin browser'
   expect(statement()).toContain(`actor_id = ? AND ${BROWSER_ONLY} AND intent_expires_at > NOW()`);
 
   await claimPresentationMaterialUploadRecovery(INPUT);
-  expect(statement()).toContain(`actor_id = ? AND ${BROWSER_ONLY} AND state IN ('initiated', 'failed')`);
+  expect(statement()).toContain(`actor_id = ? AND ${BROWSER_ONLY} AND staff_dismissed_at IS NULL AND state IN ('initiated', 'failed')`);
 
   await recordPresentationMaterialUploadSession({
     uploadId: INPUT.uploadId, uploadUrlCiphertext: 'sealed', expiresAt: 'x', intentExpiresAt: 'y',
@@ -266,13 +267,13 @@ test('session refresh exempts only a caller holding a lease token from the brows
   });
   expect(statement()).toContain(`AND (?::uuid IS NOT NULL OR ${BROWSER_ONLY})`);
   const params = sql.mock.calls.at(-1).slice(1);
-  expect(params.filter((value) => value === INPUT.leaseToken)).toHaveLength(2);
+  expect(params.filter((value) => value === INPUT.leaseToken)).toHaveLength(3);
 
   await refreshPresentationMaterialUploadSession({
     ...INPUT, leaseToken: undefined, uploadUrlCiphertext: 'sealed', expiresAt: 'x', intentExpiresAt: 'y',
   });
   expect(sql.mock.calls.at(-1).slice(1)).not.toContain(INPUT.leaseToken);
-  expect(sql.mock.calls.at(-1).slice(1).filter((value) => value === null)).toHaveLength(2);
+  expect(sql.mock.calls.at(-1).slice(1).filter((value) => value === null)).toHaveLength(3);
 });
 
 test('the token-keyed candidate writer stays origin-agnostic', async () => {
@@ -316,4 +317,27 @@ test('intent creation writes origin explicitly, browser by default and zoom_copy
   expect(sql.mock.calls.at(-1).at(-1)).toBe('browser');
   await insertPresentationMaterialUpload({ ...row, origin: 'zoom_copy' });
   expect(sql.mock.calls.at(-1).at(-1)).toBe('zoom_copy');
+});
+
+test('dismissal preserves the receipt and fences the actor-authorized recovery lease', async () => {
+  await dismissPresentationMaterialUploadRecovery(INPUT);
+  const text = statement();
+  expect(text).toContain("origin = 'browser'");
+  expect(text).toContain('lease_token = ? AND lease_expires_at > NOW()');
+  expect(text).toContain('candidate_item_id IS NULL AND request_document_id IS NULL');
+  expect(text).toContain('staff_dismissed_at = COALESCE');
+  expect(text).not.toContain('upload_url_ciphertext = NULL');
+  expect(text).not.toContain("state = 'abandoned'");
+});
+test('candidate recovery clears dismissal and opens a fresh review window', async () => {
+  await recordPresentationMaterialUploadCandidate({ ...INPUT, candidate: { siteId: 's', driveId: 'd', itemId: 'i', versionId: '1', eTag: 'e', size: 100 } });
+  expect(statement()).toContain('staff_dismissed_at = NULL');
+  expect(statement()).toContain("NOW() + INTERVAL '3 days'");
+});
+
+test('SQL fences stale resume/retry after dismissal while allowing leased reconciliation', async () => {
+  await claimPresentationMaterialUploadRecovery(INPUT);
+  expect(statement()).toContain('staff_dismissed_at IS NULL');
+  await refreshPresentationMaterialUploadSession({ ...INPUT, leaseToken: null });
+  expect(statement()).toContain('(?::uuid IS NOT NULL OR staff_dismissed_at IS NULL)');
 });

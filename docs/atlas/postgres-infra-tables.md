@@ -907,7 +907,20 @@ and offline-tested only on `codex/feature-request`.
   Staff Cancel and terminal-session Retry share the intent lease with finalize and
   cleanup. Cancel abandons only after confirmed session termination and an absent
   exact path; Retry retains the same intent/path/generation and starts a newly
-  confirmed terminal session from byte zero. A candidate rejected by MP4 signature
+  confirmed terminal session from byte zero.
+  **[BRANCH-BUILT 2026-10-14; migration 083 not applied and dismissal runtime not
+  deployed.]** Migration `083_presentation_upload_dismissal.sql` adds nullable
+  `staff_dismissed_at` (also in fresh-install schema). If Microsoft rejects Cancel
+  with HTTP 401 and repeated authenticated reads find the exact path absent, a
+  separate explicit Dismiss action may stamp that field under the actor-bound
+  browser intent's live recovery lease. Dismissal hides only an empty attempt;
+  it retains lifecycle state, encrypted URL and cleanup eligibility, and does not
+  confirm remote cancellation. Unleased browser resume refresh and recovery claims
+  reject dismissed attempts. Recording a recovered complete candidate clears the
+  dismissal and opens at least three days for staff to Finish saving; cleanup
+  does not delete that newly recovered candidate in the same pass. Exact registered
+  candidates can still bind under the owned live lease. Apply and verify migration
+  083 before deploying this runtime; the list reader directly selects the new column. A candidate rejected by MP4 signature
   or Graph malware validation remains a terminal `failed` intent and is omitted
   from staff's unfinished-upload actions; status and finalize refuse replay.
   Its exact item remains for the existing lease-fenced cleanup review, which

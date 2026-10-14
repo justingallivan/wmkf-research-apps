@@ -1393,3 +1393,28 @@ test('a rejected MP4 refreshes the unfinished list before showing the terminal e
   expect(screen.queryByRole('button', { name: 'Finish saving' })).not.toBeInTheDocument();
   expect(reads).toBeGreaterThanOrEqual(2);
 });
+
+test('failed cancellation offers explicit dismissal and removes the row only after acknowledgement', async () => {
+  let dismissed = false;
+  const intent = { uploadId: UPLOAD_ID, filename: 'stale.mp4', size: 4, state: 'initiated', canCancel: true };
+  global.fetch = jest.fn(async (url, options = {}) => {
+    if (url.endsWith(`/${UPLOAD_ID}/cancel`)) {
+      if (JSON.parse(options.body).dismissUncertain === true) {
+        dismissed = true;
+        return response({ success: true, dismissed: true });
+      }
+      return response({ error: 'Microsoft rejected this upload session.', code: 'post_presentation_upload_dismiss_available' }, 409);
+    }
+    if (url.endsWith('/presentation-link')) return response({ link: null });
+    return response({ status: 'ready', materials: [], uploads: dismissed ? [] : [intent] });
+  });
+  render(<PostPresentationMaterialsCard requestId={REQUEST_A} />);
+  fireEvent.click(await screen.findByRole('button', { name: 'Cancel' }));
+  fireEvent.click(screen.getByRole('button', { name: 'Cancel upload' }));
+  const dismiss = await screen.findByRole('button', { name: 'Dismiss upload attempt' });
+  expect(screen.getByText('stale.mp4')).toBeInTheDocument();
+  fireEvent.click(dismiss);
+  expect(await screen.findByText(/Upload attempt removed from this list/)).toBeInTheDocument();
+  expect(screen.queryByText('stale.mp4')).not.toBeInTheDocument();
+  expect(screen.queryByText('Unfinished upload cancelled.')).not.toBeInTheDocument();
+});

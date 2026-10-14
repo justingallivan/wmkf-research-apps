@@ -212,6 +212,7 @@ function useMaterials(requestId, transcriptInputRef) {
   const [notice, setNotice] = useState(null);
   const [busyUploadId, setBusyUploadId] = useState(null);
   const [recoveryBusyId, setRecoveryBusyId] = useState(null);
+  const [cancelFailure, setCancelFailure] = useState(null);
   const [confirmCancelId, setConfirmCancelId] = useState(null);
   const [transfer, setTransfer] = useState(null);
   const [pauseRequested, setPauseRequested] = useState(false);
@@ -344,6 +345,7 @@ function useMaterials(requestId, transcriptInputRef) {
       setBusyUploadId(null);
       setRecoveryBusyId(null);
       setConfirmCancelId(null);
+      setCancelFailure(null);
       setTransfer(null);
       setPauseRequested(false);
       setUnavailable(false);
@@ -741,7 +743,8 @@ function useMaterials(requestId, transcriptInputRef) {
     }
   };
 
-  const cancel = async (intent) => {
+  const cancel = async (intent, dismissUncertain = false) => {
+    setCancelFailure(null);
     const generation = generationRef.current;
     recoveryBusyRef.current = intent.uploadId;
     setRecoveryBusyId(intent.uploadId);
@@ -753,18 +756,24 @@ function useMaterials(requestId, transcriptInputRef) {
     try {
       const result = await requestJson(
         `/api/meeting-tracker/visits/${encodeURIComponent(requestId)}/presentation-uploads/${encodeURIComponent(intent.uploadId)}/cancel`,
-        { method: 'POST', body: {}, tolerantBody: true },
+        { method: 'POST', body: dismissUncertain ? { dismissUncertain: true } : {}, tolerantBody: true },
       );
       if (!current(generation)) return;
       await load();
       if (!current(generation)) return;
-      setNotice(result.complete
+      setNotice(result.dismissed
+        ? 'Upload attempt removed from this list. Background checks will continue; no saved recording was deleted.'
+        : result.complete
         ? 'The recording is already complete. Choose Finish saving.'
         : result.finalized ? 'This recording was already saved.' : 'Unfinished upload cancelled.');
     } catch (cancelError) {
       if (!current(generation)) return;
       await load();
-      if (current(generation)) setError(uploadFailureMessage(cancelError));
+      if (current(generation)) {
+        const message = uploadFailureMessage(cancelError);
+        setError(message);
+        setCancelFailure({ uploadId: intent.uploadId, message, canDismiss: cancelError?.payload?.code === 'post_presentation_upload_dismiss_available' });
+      }
     } finally {
       if (current(generation)) {
         recoveryBusyRef.current = null;
@@ -893,7 +902,7 @@ function useMaterials(requestId, transcriptInputRef) {
     changeZoomText, chooseTranscriptFile, requestPause,
     data, loading, unavailable, readFailed, file, setFile, zoomText, setZoomText, zoomBusy, zoomError, setZoomError,
     transcriptFile, setTranscriptFile, transcriptBusy, transcriptProgress, transcriptStagedId, setTranscriptStagedId,
-    setTranscriptProgress, transcriptError, setTranscriptError, error, notice, busyUploadId, recoveryBusyId,
+    setTranscriptProgress, transcriptError, setTranscriptError, error, notice, busyUploadId, recoveryBusyId, cancelFailure,
     confirmCancelId, setConfirmCancelId, transfer, setTransfer, pauseRequested, setPauseRequested, link, linkBusy,
     linkError, linkCopied, manualCopy, confirmReissue, setConfirmReissue,
     load, saveZoom, uploadTranscript, begin, resume, finish, cancel, retry, mutateLink, copyLink,
@@ -3725,6 +3734,15 @@ function RecordingBlock({ m, z }) {
                   {intent.canFinalize && <Button type="button" size="sm" disabled={lockedByWork} loading={m.busyUploadId === intent.uploadId} onClick={() => m.finish(intent.uploadId)}>Finish saving</Button>}
                   {intent.canCancel && !intent.canFinalize && <Button type="button" size="sm" variant="outline" disabled={Boolean(m.zoomBusy || m.recoveryBusyId || (m.busyUploadId && m.busyUploadId !== intent.uploadId))} onClick={() => m.setConfirmCancelId(intent.uploadId)}>Cancel</Button>}
                 </div>
+                {m.cancelFailure?.uploadId === intent.uploadId && (
+                  <div role="alert" className="w-full text-sm text-red-700">
+                    <p>Could not cancel this upload. {m.cancelFailure.message}</p>
+                    {m.cancelFailure.canDismiss && <div className="mt-2">
+                      <p className="text-gray-700">Remove this attempt from the list? Background checks will continue. Saved recordings will not be deleted.</p>
+                      <Button type="button" size="sm" variant="outline" disabled={Boolean(m.recoveryBusyId)} onClick={() => m.cancel(intent, true)}>Dismiss upload attempt</Button>
+                    </div>}
+                  </div>
+                )}
                 {m.confirmCancelId === intent.uploadId && (
                   <div className="w-full rounded border border-amber-200 bg-amber-50 p-3 text-amber-950">
                     <p>Cancel this unfinished upload? Unsaved progress will be lost. A completed recording will remain available to finish saving.</p>
