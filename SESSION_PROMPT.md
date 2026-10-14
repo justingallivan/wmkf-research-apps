@@ -1,4 +1,56 @@
-# Session 607 Prompt: resume the D26 Proposal Ranker release plan from the saved ranking branch
+# Session 608 Prompt: Cloudmersive diagnostics deployed; preserve other workstream handoffs
+
+## Session 607 Summary — materials upload diagnosis, stale-warning fix, and private scan diagnostics (Codex, 2026-10-14 PT)
+
+### What Was Completed
+
+1. **Upload incident diagnosed; genuine PowerPoint export accepted.** [VERIFIED via authorized production reads, local archive inspection, six owner-approved Cloudmersive scans, and owner report.] Request #1002835's original `.key` upload was rejected with `invalid_file`; Cloudmersive reported `.pages` and no native malware signature. Three embedded files named `.png` were actually TIFF. Correcting those members alone did not make the `.key` pass; the corrected package named `.pages` passed. The owner exported a real PPTX and confirmed its upload succeeded. These were format-policy findings, not proof of a detected virus or a general renaming workaround.
+2. **Stale upload warnings fixed and accepted.** [VERIFIED via PR #482, production deployment receipt, and owner report.] Starting a replacement hides that slot's prior failed-attempt notices; successful replacement suppresses older notices while preserving current or uncertain failures. Commit `191db1abe`, merge `351a895a0`; production deployment `7079061059` succeeded at **2026-10-14T22:43:53Z**. The owner confirmed the warning is gone.
+3. **Private Cloudmersive diagnostics shipped.** [VERIFIED via source, PR #484, GitHub production deployment receipt, and owner confirmation.] Commit `0ccca22dd`, merge `f826154f8`; production deployment `7079736852` succeeded at **2026-10-14T23:27:01Z**. The shared scanner retains a bounded diagnostic DTO from the existing response. The common materials finalizer enriches `site_visit_material_scan_rejected` and records `site_visit_material_scan_failed` for scanner failures. Diagnostics include submitted/detected format, native finding count/names, relevant archive member when provided, byte count, timing, attempts, and safe failure classification. Existing superuser-only Operational Events displays the metadata. No scan policy, applicant response, schema, or additional scan call changed.
+4. **Verification and release.** [VERIFIED via session test runs, independent source review, and GitHub CI.] Warning fix: **111 tests / 5 suites** passed. Diagnostics: **321 tests / 10 suites**, scoped lint, types, relevant gates and sequential self-tests passed; independent review found no remaining actionable defects; all GitHub CI checks passed before merge. The diagnostics tests exercise actual event sanitization, public-response exclusion, malformed/missing findings, retry counts and logging-failure preservation. These checks do not prove that Cloudmersive populates its optional relevant-member field for this original file.
+5. **Stop on main explicitly authorized.** [VERIFIED via owner instruction and Git.] Main was fast-forwarded to `f826154f8`; unrelated untracked `commit-times-exact.txt` and `commit-times.txt` were preserved. The diagnostic worktree remains at `/Users/gallivan/.codex/worktrees/diagnose-problem/WMKF_Apps`, with its intentional local `CLAUDE.md` symlink; no worktree archive or deletion was authorized. Root `CLAUDE.md` needs no change.
+
+### Commits
+
+- `191db1abe` — suppress stale material-upload notices; PR #482 / merge `351a895a0`.
+- `0ccca22dd` — capture private Cloudmersive diagnostics for materials-upload failures; PR #484 / merge `f826154f8`.
+- This documentation-only main handoff records Session 607 and creates Session 608.
+
+## Next Items
+
+### Optional Observation
+
+- **Inspect the next naturally occurring materials scan failure in Admin → Operational Events.** [VERIFIED via the deployed event path; live optional-field population remains UNKNOWN.] Search by request number and expand metadata. This is optional operational observation, not a release blocker or authorization to manufacture failures. Original events lacked the new metadata; those omitted provider details cannot be reconstructed from the saved events.
+
+### Verify Before Acting
+
+- The **Session 606 close** below preserves the separate D26 ranking release-plan handoff on `codex/ranking-pd-save-conflicts`, plus Workbench/recording follow-ups. That workstream was not re-audited here; consult its branch's current source, plan and owner decisions before resuming. Earlier sessions below are historical snapshots, not a current executable worklist.
+- All **six authorized diagnostic scans were used**. No further paid or synthetic Cloudmersive scan is authorized; obtain new explicit approval naming the product and possible credit use before any additional diagnostic scan.
+- Preserve existing worktrees and unrelated local files. Temporary downloaded files and `/tmp/cloudmersive-diagnosis/` results are local convenience artifacts, not portable prerequisites for the deployed logging feature.
+
+### Do Not Reopen Without New Decision
+
+- Both fixes are merged and deployed, and the owner accepted the upload/warning outcome. Do not repeat the original upload experiments or change scanning policy merely to validate logging.
+- No raw provider responses, secrets, URLs, full hashes or file contents are logged by the new DTO. Keep native malware findings separate from synthesized policy labels; missing/malformed native findings remain unknown rather than zero.
+
+## Key Files Reference
+
+| File | Purpose |
+|------|---------|
+| `lib/services/cloudmersive-scan.js` | Bounded private diagnostics from the original scan response and safe error metadata |
+| `lib/services/site-visit-materials/contributor-service.js` | Common external/staff/background material finalizer and private event projection |
+| `lib/services/operational-event-service.js` | Existing sanitization, JSONB persistence, deduplication and query contract |
+| `shared/components/meeting-tracker/SiteVisitMaterialsCard.js`, `StaffMaterialUpload.js` | Replacement lifecycle and stale-notice suppression |
+| `tests/unit/cloudmersive-scan.test.js`, `tests/unit/site-visit-materials-contributor-service.test.js` | Diagnostic privacy, provider-shape, retry and logging-failure regression coverage |
+| `docs/atlas/postgres-infra-tables.md`, `docs/OPERATIONAL_EVENTS_AND_LOG_DRAIN.md` | Persisted event contract and operator guidance |
+
+**Stop verification:** [VERIFIED via stop commands.] Atlas, doc-currency and fact-consistency gates and their sequential self-tests passed, along with docs-catalog, local and CI agent-invariant checks, and `git diff --check`. `npm run report:claim-evidence-pilot -- --current` could not read local observation state; no observation row was invented. **Milestone determination:** DEVELOPMENT_LOG entry added: “October 2026 — Materials upload incident resolved and scan diagnostics shipped (Session 607)”. Runtime verification above is the release evidence; these documentation checks ran separately at stop.
+
+---
+
+## Prior handoffs — historical snapshots; verify the current topic-specific branch and owner decisions before acting
+
+## Previous Session 607 Prompt: resume the D26 Proposal Ranker release plan from the saved ranking branch
 
 ## Session 606 close — Workbench responsiveness, recording uploads, and ranking release planning (Codex, 2026-10-14 PT)
 

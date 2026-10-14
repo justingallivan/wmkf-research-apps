@@ -769,7 +769,8 @@ Entity references contain the request, collection, staging, and slot.
 **[PRODUCTION-OBSERVED 2026-10-14 via read-only incident query for Request
 1002835:]** the existing event metadata contains the public `scanRejection`
 category and flags.
-**[BRANCH-BUILT 2026-10-14 on `codex/cloudmersive-diagnostics`; not deployed:]**
+**[PRODUCTION-LIVE 2026-10-14 via PR #484, merge `f826154f8`; GitHub Production
+deployment `7079736852` succeeded at `2026-10-14T23:27:01Z`; owner confirmed:]**
 the common materials finalizer adds bounded private `scanDiagnostics` to that
 metadata and records thrown scanner failures or unexpected verdicts as
 `site_visit_material_scan_failed`, with a safe `failureCode`. Both event types

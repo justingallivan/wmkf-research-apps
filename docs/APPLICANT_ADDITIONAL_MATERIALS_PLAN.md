@@ -965,7 +965,10 @@ progress/rejection copy are Production-deployed via PRs #407 and #410; the Octob
 read-only incident query for Request 1002835 observed the existing category/flags-only event.
 Exact 500 MB live transfer remains unverified.
 
-**Private diagnostics [BRANCH-BUILT 2026-10-14 on `codex/cloudmersive-diagnostics`; not deployed].**
+**Private diagnostics [PRODUCTION-LIVE 2026-10-14 via PR #484, merge `f826154f8`].**
+GitHub Production deployment `7079736852` succeeded at `2026-10-14T23:27:01Z`;
+the owner confirmed the release. This confirms deployment, not population of every optional
+provider field on a subsequent failed upload.
 The shared scanner preserves a bounded `scanDiagnostics` projection from the original
 response, before synthesizing compatibility findings: submitted extension, detected format,
 native finding count and up to five redacted threat names, optional relevant archive member,
