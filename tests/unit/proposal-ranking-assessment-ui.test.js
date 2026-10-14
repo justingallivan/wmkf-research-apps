@@ -94,6 +94,8 @@ test('private MR and SE lists render their subsets and saving SE keeps it select
   }
   initial.own.co = null;
   render(<AssessmentWorkflow initial={initial} cycleOptions={[]} onCycleChange={() => {}} />);
+  expect(screen.queryByRole('button', { name: 'Create combined list' })).toBeNull();
+  expect(screen.getByRole('button', { name: 'Medical Research' }).textContent).toContain('Not started');
   expect(screen.getByRole('heading', { name: 'mr institution' })).toBeTruthy();
   expect(screen.queryByRole('heading', { name: 'se institution' })).toBeNull();
   fireEvent.click(screen.getByRole('button', { name: 'Science & Engineering' }));
@@ -107,6 +109,14 @@ test('private MR and SE lists render their subsets and saving SE keeps it select
   await waitFor(() => expect(screen.getByRole('status').textContent).toBe('All changes saved'));
   expect(screen.getByRole('heading', { name: 'se institution' })).toBeTruthy();
   expect(screen.queryByRole('heading', { name: 'mr institution' })).toBeNull();
+  expect(screen.getByRole('button', { name: 'Science & Engineering' }).textContent).toContain('Complete');
+  expect(screen.queryByRole('button', { name: 'Create combined list' })).toBeNull();
+  fireEvent.click(screen.getAllByRole('button', { name: 'Continue to Medical Research →' })[0]);
+  expect(screen.getByRole('heading', { name: 'mr institution' })).toBeTruthy();
+  sendProposalRankingAction.mockResolvedValue({ ...initial, own: { ...initial.own, mr: { ...initial.own.mr, confidence: { mr: 'confident' } }, se: { ...initial.own.se, confidence: { se: 'confident' } } } });
+  fireEvent.click(screen.getByRole('radio', { name: 'Confident' }));
+  await waitFor(() => expect(screen.getAllByRole('button', { name: 'Create combined list' })[0].disabled).toBe(false));
+  expect(screen.queryByRole('button', { name: /Continue to/ })).toBeNull();
 });
 test('restart while combined is selected returns to source preparation without dereferencing absent combined', async () => {
   const next = view();
@@ -131,9 +141,7 @@ test('restart while combined is selected returns to source preparation without d
       screen.getByRole('button', { name: 'Create combined list' }),
     ).toBeTruthy(),
   );
-  expect(screen.getByRole('button', { name: 'Combined list' }).disabled).toBe(
-    true,
-  );
+  expect(screen.queryByRole('button', { name: 'Combined list' })).toBeNull();
 });
 
 const proposals = ['one', 'two', 'three', 'four'].map((id, i) => ({

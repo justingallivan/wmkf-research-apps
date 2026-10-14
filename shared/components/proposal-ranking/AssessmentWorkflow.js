@@ -813,11 +813,20 @@ export default function AssessmentWorkflow({
     answered: view.own?.[key]?.order.filter((id) => view.own[key].confidence[id]).length || 0,
     total: view.own?.[key]?.order.length || 0,
   }));
+  const currentProgram = programProgress.find((p) => p.key === program);
+  const nextProgram = programProgress.find((p) => p.key !== program && p.answered < p.total);
+  const currentProgramComplete = currentProgram && currentProgram.answered === currentProgram.total;
   const saveStatus = busy ? busyMessage : pending
     ? 'Changes are not confirmed' : 'All changes saved';
   const combinedComplete = view.own?.co?.order.every((id) => view.own.co.confidence[id]);
   const preparationStep = view.own?.ready ? 'ready' : program === 'co' ? 'combined' : 'programs';
-  const preparationAction = !view.own?.co ? (
+  const preparationAction = !allConfident ? (
+    nextProgram && (currentProgramComplete || program === 'co') ? (
+      <Button disabled={busy || Boolean(pending)} onClick={() => { setProgram(nextProgram.key); setDraft(null); }}>
+        Continue to {nextProgram.name} →
+      </Button>
+    ) : null
+  ) : !view.own?.co ? (
     <Button disabled={!allConfident || busy || Boolean(pending) || !active} onClick={() => confirm('buildCombined')}>
       Create combined list
     </Button>
@@ -1170,7 +1179,7 @@ export default function AssessmentWorkflow({
             ) : (
               <>
                 <div className="my-3 flex flex-wrap items-center gap-2" aria-label="Assessment lists">
-                  {[...programProgress.map((p) => [p.key, p.name]), ['co', 'Combined list']].map(([key, label]) => (
+                  {[...programProgress.map((p) => [p.key, p.name]), ...(view.own.co ? [['co', 'Combined list']] : [])].map(([key, label]) => (
                     <button
                       className={`${buttonClass} ${program === key ? 'bg-gray-100' : ''}`}
                       key={key}
@@ -1181,7 +1190,7 @@ export default function AssessmentWorkflow({
                       onClick={() => { setProgram(key); setDraft(null); }}
                     >
                       {label}
-                      {key !== 'co' && <span id={`preparation-count-${key}`} className="ml-2 font-normal text-gray-600">{programProgress.find((p) => p.key === key).answered}/{programProgress.find((p) => p.key === key).total} confidence answered</span>}
+                      {key !== 'co' && <span id={`preparation-count-${key}`} className="ml-2 font-normal text-gray-600">{programProgress.find((p) => p.key === key).answered === programProgress.find((p) => p.key === key).total ? 'Complete' : programProgress.find((p) => p.key === key).answered === 0 ? 'Not started' : 'In progress'}</span>}
                     </button>
                   ))}
                   <details className="relative">
@@ -1199,7 +1208,9 @@ export default function AssessmentWorkflow({
                         : !combinedComplete ? 'Answer confidence for every proposal, then confirm the combined order.'
                           : view.own.co.confirmed ? 'Your combined order is confirmed. Mark Ready when you are finished.'
                             : 'Review the merged order and dividers, then confirm your combined order.'
-                      : !allConfident ? 'Choose Confident or Not sure for every proposal in both programs to create the combined list.'
+                      : !allConfident ? currentProgramComplete
+                        ? `${currentProgram.name} is complete. Continue to ${nextProgram.name}. You can return to adjust either list.`
+                        : `Order the proposals and choose Confident or Not sure for each one. ${currentProgram.answered} of ${currentProgram.total} confidence choices complete.`
                         : view.own.co ? 'Both programs are complete. Continue to your combined list.'
                           : 'Both programs are complete. Create your combined list to review MR and SE together.'}
                   </p>
