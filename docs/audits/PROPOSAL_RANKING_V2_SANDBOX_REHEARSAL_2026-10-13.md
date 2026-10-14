@@ -2,6 +2,29 @@
 
 Date: 2026-10-13. Branch source: `codex/proposal-ranking-v2` at `b6676e15e`, with the local sandbox rehearsal scripts. **Saved service-persona rehearsal and a bounded saved-browser walkthrough passed; independent-user acceptance remains open.**
 
+## Current release and next rehearsal
+
+[VERIFIED via deployment receipt and hosted browser] Source `d1b206185` is deployed
+in dedicated READY Preview `dpl_GCjqpVkTNncxSC2kRzByGLbbspyq` at
+`https://wmkf-meeting-transcription-test-h2yh5pkf4.vercel.app`, with stable alias
+`https://wmkf-meeting-transcription-test.vercel.app`. The compact card refinements
+and expandable total Research funding are included. The release passed 179 ranking
+tests and Justin's Microsoft SSO/updated-interface check. This is sandbox deployment,
+not Production promotion or independent acceptance by the other three PDs.
+
+[PLANNED — owner authorized, not yet live-verified] Enrich the rehearsal to 12
+realistic fictional proposals (six MR, six SE), each with three varied saved synthetic
+reviews, distinct institutions/titles, budgets, geography, award histories and clearly
+labelled sample discussion. Fictional institution/history/discussion projection is
+restricted to the dedicated test policy; it must not fabricate production data or
+claim genuine accepted sentiment. Source preparation, deployment and a fresh opened
+round must be verified separately; resets retain an existing round's frozen pool.
+
+## Historical setup and acceptance receipts
+
+The following sections retain their dated pools, deployment IDs and outcomes; the
+current release above supersedes their deployment status, not their evidence limits.
+
 ## Target and setup
 
 [VERIFIED via `apply-dataverse-schema.js --target=sandbox --wave=33-proposal-ranking-assessments --execute` and subsequent readiness metadata readback]

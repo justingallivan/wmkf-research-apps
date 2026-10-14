@@ -43,3 +43,24 @@ test.each([
 ])('dedicated route %s %s allowed=%s', (pathname, method, allowed) => {
   expect(decideMeetingTranscriptionTestRequest({ pathname, method, env: validEnv(), origin: RANKING_TEST_ORIGIN }).allowed).toBe(allowed);
 });
+
+import { RANKING_TEST_REQUESTS, RANKING_TEST_LEGACY_REQUESTS, isRankingRehearsalRound } from '../../lib/services/proposal-ranking/test-policy';
+import { RANKING_REHEARSAL_PROPOSALS, rehearsalPresentation } from '../../lib/services/proposal-ranking/test-fixtures';
+test('only the complete legacy or expanded rehearsal sets are in scope', () => {
+  expect(isRankingRehearsalRound(RANKING_TEST_LEGACY_REQUESTS)).toBe(true);
+  expect(isRankingRehearsalRound(RANKING_TEST_REQUESTS)).toBe(true);
+  expect(isRankingRehearsalRound(RANKING_TEST_REQUESTS.slice(0, 8))).toBe(false);
+  expect(isRankingRehearsalRound([...RANKING_TEST_LEGACY_REQUESTS.slice(1), RANKING_TEST_LEGACY_REQUESTS[1]])).toBe(false);
+  expect(RANKING_TEST_REQUESTS.every(id => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/.test(id))).toBe(true);
+});
+test('sample history and discussion require exact enabled preview policy and owned ID', () => {
+  const id = RANKING_TEST_REQUESTS[0];
+  expect(rehearsalPresentation(id, validEnv()).researchFunding.sample).toBe(true);
+  expect(rehearsalPresentation(id, {})).toBeNull();
+  expect(rehearsalPresentation(id, {...validEnv(), VERCEL_ENV: 'production'})).toBeNull();
+  expect(rehearsalPresentation(id, {...validEnv(), AUTH_REQUIRED: 'false'})).toBeNull();
+  expect(rehearsalPresentation('unrelated', validEnv())).toBeNull();
+  expect(RANKING_REHEARSAL_PROPOSALS.filter(p => p.programKey === 'mr')).toHaveLength(6);
+  expect(RANKING_REHEARSAL_PROPOSALS.filter(p => p.programKey === 'se')).toHaveLength(6);
+  expect(RANKING_REHEARSAL_PROPOSALS.every(p => p.ratings.length === 3)).toBe(true);
+});

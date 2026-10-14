@@ -27,6 +27,6 @@ await withDalContext('ranking-test-preview-probe', async () => {
   console.log(JSON.stringify({ cycleCode: result.cycleCode, canOpen: result.canOpen, warnings: result.warnings,
     roster: result.roster, facilitator: result.facilitator, seedOrders: result.seedOrders,
     scores: result.proposals.map(p => ({ requestId: p.requestId, mean: p.score.mean, received: p.score.receivedCount })) }, null, 2));
-  assert(result.canOpen && result.proposals.length === 6 && result.roster.length === 4);
-  assert(result.proposals.every(p => p.score.receivedCount === 1 && p.score.mean > 0));
+  assert(result.canOpen && result.proposals.length === 12 && result.roster.length === 4);
+  assert(result.proposals.every(p => p.score.receivedCount === 3 && p.score.mean > 0));
 });

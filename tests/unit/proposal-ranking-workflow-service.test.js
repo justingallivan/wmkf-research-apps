@@ -276,8 +276,8 @@ test('history is newest-first across numeric boundaries even when storage sorts 
   expect(result.before).toBe(2);
 });
 
-jest.mock('../../lib/services/post-presentation-materials/discussion-sentiment-reader.js',()=>({getDeliberationSentiments:jest.fn()}));
-import {getDeliberationSentiments} from '../../lib/services/post-presentation-materials/discussion-sentiment-reader';
+jest.mock('../../lib/services/post-presentation-materials/discussion-sentiment-reader.js',()=>({getDeliberationSentiments:jest.fn(),hasMeetingTrackerAccess:jest.fn()}));
+import {getDeliberationSentiments,hasMeetingTrackerAccess} from '../../lib/services/post-presentation-materials/discussion-sentiment-reader';
 import {readWorkflowSupplement} from '../../lib/services/proposal-ranking/workflow-service';
 function installReveal(count=2){
   const proposals=Array.from({length:count},(_,i)=>({requestId:`request-${i}`,programKey:'mr',score:{mean:3}}));
@@ -310,4 +310,26 @@ test('a reset racing sentiment delivery rejects the previously loaded quotes',as
   const body={...installReveal(),action:'sentiment'};
   getDeliberationSentiments.mockImplementationOnce(async()=>{rounds[roundId]['@odata.etag']=etag();return {'request-0':{status:'current',sentiment:{headline:'OLD QUOTE'}}};});
   await expect(readWorkflowSupplement({body,actor:alice,profileId:1})).rejects.toMatchObject({code:'stale_scope'});
+});
+
+
+jest.mock('../../lib/services/proposal-ranking/test-policy.js', () => ({...jest.requireActual('../../lib/services/proposal-ranking/test-policy.js'), getRankingTestPolicy:jest.fn(() => ({enabled:false}))}));
+import { getRankingTestPolicy, RANKING_TEST_REQUESTS } from '../../lib/services/proposal-ranking/test-policy';
+test('sample discussion retains live Meeting Tracker access and stale-response fences', async () => {
+  const body = {...installReveal(), action:'sentiment'};
+  const stored = JSON.parse(rounds[roundId].wmkf_snapshotjson);
+  stored.proposals[0].requestId = RANKING_TEST_REQUESTS[0];
+  rounds[roundId].wmkf_snapshotjson = JSON.stringify(stored);
+  getRankingTestPolicy.mockReturnValue({enabled:true});
+  try {
+    hasMeetingTrackerAccess.mockResolvedValue(false);
+    expect(await readWorkflowSupplement({body,actor:alice,profileId:1})).toEqual({status:'access-denied',sentiments:{}});
+    hasMeetingTrackerAccess.mockResolvedValue(true);
+    const result = await readWorkflowSupplement({body,actor:alice,profileId:1});
+    expect(result.sentiments[RANKING_TEST_REQUESTS[0]]).toMatchObject({sample:true,status:'current'});
+    expect(result.sentiments['request-1']).toBeUndefined();
+    expect(getDeliberationSentiments).not.toHaveBeenCalled();
+    hasMeetingTrackerAccess.mockImplementationOnce(async () => { rounds[roundId]['@odata.etag']=etag(); return true; });
+    await expect(readWorkflowSupplement({body,actor:alice,profileId:1})).rejects.toMatchObject({code:'stale_scope'});
+  } finally { getRankingTestPolicy.mockReturnValue({enabled:false}); }
 });

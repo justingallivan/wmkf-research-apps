@@ -1,7 +1,7 @@
 # Proposal Ranking — agreed assessment and recommendation workflow
 
 Updated: 2026-10-13. Revision: 5. Owner: Justin.
-Status: **Product workflow agreed; revision-3 UX accepted and implementation authorized 2026-10-13. Branch build awaiting sandbox acceptance.**
+Status: **Product workflow agreed; revision-3 UX accepted and implementation authorized 2026-10-13. Dedicated test Preview deployed at `d1b206185`; independent staff acceptance remains open.**
 The filename is retained for existing links; October 7 is the original design date,
 not the date of this revision. This revision incorporates the later October 13
 reset/default decisions and resolves revision 4's open product choices. It supersedes
@@ -146,7 +146,7 @@ One collective MR/SE list has two movable separators:
 
 Moving a separator reclassifies the proposals it passes. Moving a card across a
 separator changes its collective section, not anyone's preserved individual grade.
-Requested amounts and cumulative cost update with the visible order. The group sets
+Requested amounts remain on cards; the Recommended divider shows the total requested amount, recommended count and E/W counts, updating with the visible order. The group sets
 the funding boundary; the budget does not automatically grade or select proposals.
 Use full requested amounts, one verified currency, and integer minor units. Missing
 amounts remain visibly incomplete rather than zero.
@@ -278,6 +278,23 @@ required to begin an authorized build; schema capacity and release readiness sti
 require implementation-time verification.
 
 ## 12. Verification and release boundary
+
+[VERIFIED via deployment receipt and hosted browser] Source `d1b206185` is deployed
+in dedicated READY Preview `dpl_GCjqpVkTNncxSC2kRzByGLbbspyq` at
+`https://wmkf-meeting-transcription-test-h2yh5pkf4.vercel.app`, with stable alias
+`https://wmkf-meeting-transcription-test.vercel.app`. The compact card refinements
+and expandable total Research funding are included. The release passed 179 ranking
+tests and Justin's Microsoft SSO/updated-interface check. This is sandbox deployment,
+not Production promotion or independent acceptance by the other three PDs.
+
+[PLANNED — owner authorized, not yet live-verified] Enrich the rehearsal to 12
+realistic fictional proposals (six MR, six SE), each with three varied saved synthetic
+reviews, distinct institutions/titles, budgets, geography, award histories and clearly
+labelled sample discussion. Fictional institution/history/discussion projection is
+restricted to the dedicated test policy; it must not fabricate production data or
+claim genuine accepted sentiment. Source preparation, deployment and a fresh opened
+round must be verified separately; resets retain an existing round's frozen pool.
+
 
 [PLANNED] Before a later implementation is called ready, cover: initial thirds;
 pair ordering with alternating winners/unequal program lengths/equal or missing

@@ -103,7 +103,7 @@ by the documentation comparison; no dry-run erase is authorized here.
 
 ## Version-2 branch persistence and consumers
 
-[VERIFIED via local branch source, October 13; additive total not deployed]
+[VERIFIED via branch source and dedicated sandbox deployment `d1b206185`; not Production]
 `research-funding.js` returns `researchFunding.totalAmountMinorUnits`, its existing
 safe integer USD-cent sum over the same qualifying awards as the count. The source
 adapter passes the object through `preview-service.js` into the frozen round snapshot;
@@ -166,20 +166,27 @@ state changed in this follow-up. No Production change, branch cleanup or merge o
 
 ## Dedicated authenticated test Preview — deployed to dedicated Preview; partial acceptance
 
-[VERIFIED via `lib/services/proposal-ranking/test-policy.js` and the D97 preview probe]
-The explicit `PROPOSAL_RANKING_TEST_ENABLED=on` mode requires the exact dedicated
-project/profile/origin, Preview environment, test Neon database and Dataverse sandbox,
-v2 flag, real authentication, and enforced DAL/target interlocks. Misconfiguration
-does not enable the mode. It scopes test source handling to six marked D97 Requests
-and their fixed test run; synthetic-review inclusion remains false by default outside
-this mode. Justin is the test facilitator without changing Beth's saved default.
-The saved source/review fixture passes preview with six rated proposals and four staff.
-Dedicated Preview `dpl_6cZM8Dfv6copEpM16gMQWx8b6eFZ` is READY at the stable test
-alias. Justin Microsoft SSO, hosted opening, confidence/reset, combined order
-`1,4,2,3,6,5`, Ready and own reopen passed. Other staff sign-ins and live sentiment
-remain pending. Third Preview `dpl_AKzoUJwZZsdFhu7XVDexuceqQaq2` is READY. The corrected roster is
-Beth, Justin, Jean and John Sader, all Preparing in a newly opened hosted round.
-The first-D97 scripted fictional sentiment fixture returns `current` through the
-real reader; no model generation or full group-browser acceptance is claimed. Four
-new TEST files reside in shared akoyaGO SharePoint, with existing files unchanged. See `docs/audits/PROPOSAL_RANKING_V2_SANDBOX_REHEARSAL_2026-10-13.md`
-for exact fixture IDs, receipts, factory recovery and remaining limits. Production is unchanged.
+[VERIFIED via deployment receipt and hosted browser] Source `d1b206185` is deployed
+in dedicated READY Preview `dpl_GCjqpVkTNncxSC2kRzByGLbbspyq` at
+`https://wmkf-meeting-transcription-test-h2yh5pkf4.vercel.app`, with stable alias
+`https://wmkf-meeting-transcription-test.vercel.app`. The compact card refinements
+and expandable total Research funding are included. The release passed 179 ranking
+tests and Justin's Microsoft SSO/updated-interface check. This is sandbox deployment,
+not Production promotion or independent acceptance by the other three PDs.
+
+[PLANNED — owner authorized, not yet live-verified] Enrich the rehearsal to 12
+realistic fictional proposals (six MR, six SE), each with three varied saved synthetic
+reviews, distinct institutions/titles, budgets, geography, award histories and clearly
+labelled sample discussion. Fictional institution/history/discussion projection is
+restricted to the dedicated test policy; it must not fabricate production data or
+claim genuine accepted sentiment. Source preparation, deployment and a fresh opened
+round must be verified separately; resets retain an existing round's frozen pool.
+
+The dedicated test mode requires the exact project/profile/origin, Preview environment,
+test Neon database, registered Dataverse sandbox, real authentication and enforced
+DAL/target interlocks. Synthetic reviews remain excluded outside that policy.
+The last verified opened pool contained six proposals and the corrected roster
+Beth, Justin, Jean and John Sader, all Preparing. The first-D97 scripted fictional
+sentiment fixture previously returned current through the real reader; that receipt
+does not prove generation or human analysis. Earlier deployment and fixture details,
+including four new TEST files in shared SharePoint, remain in the sandbox audit.

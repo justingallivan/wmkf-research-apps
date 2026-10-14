@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-/** Six marked fictional requests for the dedicated ranking Preview. Read-only
+/** Twelve marked fictional requests for the dedicated ranking Preview. Read-only
  * by default. Exact IDs and receipt prevent adopting or replacing other data.
  * Uses the factory's journaled sandbox-only GoVerify restore guard at creation.
  * Does not create contacts, emails, payments, or provider jobs.
@@ -8,6 +8,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import { createRequire } from 'node:module';
 import { RANKING_TEST_DATAVERSE as TARGET, RANKING_TEST_REQUESTS as IDS, RANKING_TEST_RUN as RUN } from '../lib/services/proposal-ranking/test-policy.js';
+import { RANKING_REHEARSAL_PROPOSALS } from '../lib/services/proposal-ranking/test-fixtures.js';
 import { RESEARCH_PROGRAM_IDS } from '../shared/config/researchPrograms.js';
 import { withDalContext } from '../lib/dataverse/core/context.js';
 import { createRequestWithGoverifyBypass, getRequest, getPayments, getEmails, SOURCE_SELECT } from '../lib/services/test-requests/basic-clone-steps.js';
@@ -80,14 +81,28 @@ await withDalContext('ranking-test-proposal-setup', async () => {
       assert(patch.ok, `Request configuration failed (${patch.status})`);
       receipt.requests[id].configuredAt = new Date().toISOString(); save();
     }
+    const scenario = RANKING_REHEARSAL_PROPOSALS[i];
+    const current = await client.get(`/akoya_requests(${id})?$select=akoya_title,akoya_request,_akoya_programid_value,_wmkf_programdirector_value,wmkf_istestrequest,wmkf_testcreationrunid`);
+    assert(current.ok && current.body.wmkf_istestrequest === true && current.body.wmkf_testcreationrunid === RUN);
+    const title = `TEST: ${scenario.title}`;
+    const program = RESEARCH_PROGRAM_IDS[scenario.programKey === 'se' ? 0 : 1];
+    assert([`TEST: Fictional ranking proposal ${i + 1}`, title].includes(current.body.akoya_title)
+      && [(i + 1) * 100000, scenario.amount].includes(current.body.akoya_request), 'Fixture content was edited; inspect before upgrading');
+    if (current.body.akoya_title !== title || current.body.akoya_request !== scenario.amount || current.body._akoya_programid_value !== program) {
+      receipt.requests[id].enrichmentAttempted = true; save();
+      const enriched = await client.patch(`/akoya_requests(${id})`, { akoya_title: title, akoya_request: scenario.amount,
+        'akoya_programid@odata.bind': `/akoya_programs(${program})` }, { 'If-Match': current.body['@odata.etag'] });
+      assert(enriched.ok, `Scenario update failed (${enriched.status})`);
+    }
     const after = await getRequest(client, id);
     assert(after.akoya_requeststatus === 'Phase II Pending' && after.wmkf_meetingdate.slice(0, 10) === '2097-12-01' && after._wmkf_programdirector_value === STAFF[i % STAFF.length]);
     const inputs = await client.get(`/akoya_requests(${id})?$select=akoya_request,_akoya_programid_value,_transactioncurrencyid_value`);
-    assert(inputs.ok && inputs.body.akoya_request === (i + 1) * 100000
-      && inputs.body._akoya_programid_value === RESEARCH_PROGRAM_IDS[i % 2]
+    assert(inputs.ok && inputs.body.akoya_request === scenario.amount
+      && inputs.body._akoya_programid_value === program
       && inputs.body._transactioncurrencyid_value === CURRENCY, 'Ranking inputs differ');
     assert.equal((await getPayments(client, id)).length, 0, 'Unexpected payment');
     assert.equal((await getEmails(client, id)).length, 0, 'Unexpected email');
+    receipt.requests[id].scenarioVersion = 2;
     receipt.requests[id].verifiedAt = new Date().toISOString(); save();
     console.log(JSON.stringify({ requestId: id, verified: true }));
   }

@@ -359,6 +359,7 @@ export function AssessmentList({
                                         : 'Research history unavailable'}
                                     </summary>
                                     <div className="max-w-sm space-y-1 pb-2">
+                                      {proposal.researchFunding?.sample && <p>Fictional award history for this rehearsal.</p>}
                                       <p>Total Research funding: <strong>{['available', 'provisional'].includes(proposal.researchFunding?.status) && Number.isSafeInteger(proposal.researchFunding.totalAmountMinorUnits) && proposal.researchFunding.totalAmountMinorUnits >= 0
                                         ? formatMoney(proposal.researchFunding.totalAmountMinorUnits, { code: 'USD', precision: 2 })
                                         : 'Not available'}</strong></p>
@@ -370,7 +371,7 @@ export function AssessmentList({
                                   </details>
                                     <div className="min-w-0 basis-full text-xs text-gray-600 sm:flex-1 sm:basis-64">
                                       <p>
-                                        Earlier discussion:{' '}
+                                        {sentiment?.sentiments?.[id]?.sample ? 'Sample discussion' : 'Earlier discussion'}:{' '}
                                         {sentiment?.status === 'access-denied'
                                           ? 'Meeting Tracker access required'
                                           : sentiment?.status ===

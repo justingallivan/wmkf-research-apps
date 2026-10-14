@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-/** Saved synthetic peer scores for the six dedicated ranking rehearsal requests.
+/** Saved synthetic peer scores for the twelve dedicated ranking rehearsal requests.
  * Uses the existing sandbox reviewer seeder. No invitations, contacts, or email.
  * Default is read-only. Receipt ownership and exact readback fence every retry.
  */
@@ -7,6 +7,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import { createRequire } from 'node:module';
 import { RANKING_TEST_DATAVERSE as TARGET, RANKING_TEST_REQUESTS as IDS, RANKING_TEST_RUN as RUN } from '../lib/services/proposal-ranking/test-policy.js';
+import { RANKING_REHEARSAL_PROPOSALS } from '../lib/services/proposal-ranking/test-fixtures.js';
 import { RATING_SCALE } from '../lib/services/proposal-ranking/calculations.js';
 import { withDalContext } from '../lib/dataverse/core/context.js';
 import { createReviewsSandboxDeps } from '../lib/services/test-requests/reviews-sandbox-deps.js';
@@ -29,7 +30,7 @@ await withDalContext('ranking-test-review-setup', async () => {
     const r = await client.get(`/akoya_requests(${id})?$select=wmkf_istestrequest,wmkf_testcreationrunid`);
     assert(r.ok && r.body.wmkf_istestrequest === true && r.body.wmkf_testcreationrunid === RUN);
   }
-  const person = await deps.getPersonById(PERSON);
+  const person = await deps.getPersonById(PERSON, { select: ['wmkf_potentialreviewersid', 'wmkf_issyntheticreviewer'] });
   assert(!person || (receipt?.personAttempted && person.wmkf_issyntheticreviewer === true), 'Reviewer is not receipt-owned');
   console.log(JSON.stringify({ target: TARGET, requests: IDS.length, execute }));
   if (!execute) return;
@@ -40,9 +41,22 @@ await withDalContext('ranking-test-review-setup', async () => {
     await deps.createPerson({ wmkf_potentialreviewersid: PERSON,
       ...syntheticPersonProjection({ person: { wmkf_firstname: 'Ranking', wmkf_lastname: 'Rehearsal' } }, null) });
   }
-  for (let i = 0; i < IDS.length; i++) {
-    const suggestionId = `c31bc841-e260-4a14-9041-8d765ddcc42${i + 1}`;
-    const rating = [5,4,3,5,2,3][i];
+  receipt.extraPeople ||= {};
+  const people = [PERSON, 'c31bc841-e260-4a14-9041-8d765ddcc411', 'c31bc841-e260-4a14-9041-8d765ddcc412'];
+  for (const personId of people.slice(1)) {
+    const existing = await deps.getPersonById(personId, { select: ['wmkf_potentialreviewersid', 'wmkf_issyntheticreviewer'] });
+    assert(!existing || (receipt.extraPeople[personId]?.attempted && existing.wmkf_issyntheticreviewer === true), 'Unowned additional reviewer');
+    if (!existing) {
+      assert(!receipt.extraPeople[personId]?.attempted, 'Resolve ambiguous additional reviewer creation');
+      receipt.extraPeople[personId] = { attempted: true }; save();
+      await deps.createPerson({ wmkf_potentialreviewersid: personId,
+        ...syntheticPersonProjection({ person: { wmkf_firstname: 'Sample', wmkf_lastname: `Reviewer ${people.indexOf(personId) + 1}` } }, null) });
+    }
+  }
+  for (let i = 0; i < IDS.length; i++) for (let reviewerIndex = 0; reviewerIndex < 3; reviewerIndex++) {
+    const suggestionId = i < 6 && reviewerIndex === 0 ? `c31bc841-e260-4a14-9041-8d765ddcc42${i + 1}` : `c31bc841-e260-4a14-9041-8d765ddcc${(0x500 + i * 3 + reviewerIndex).toString(16)}`;
+    const personId = people[reviewerIndex];
+    const rating = RANKING_REHEARSAL_PROPOSALS[i].ratings[reviewerIndex];
     const label = RATING_SCALE.find(x => x.value === rating).label;
     const fixture = { reviewForm: 'received_no_file', suggestion: {
       wmkf_suggestionlabel: 'TEST: Ranking rehearsal', wmkf_selected: false, wmkf_invited: false,
@@ -55,10 +69,10 @@ await withDalContext('ranking-test-review-setup', async () => {
       assert(!receipt.reviews[suggestionId]?.attempted, 'Resolve ambiguous suggestion create before retry');
       receipt.reviews[suggestionId] = { attempted: true }; save();
       await deps.createSuggestion({ wmkf_appreviewersuggestionid: suggestionId,
-        ...buildSuggestionCreateBody(fixture, { destinationRequestId: IDS[i], destinationPersonId: PERSON, grantCycleCode: 'D97' }) });
+        ...buildSuggestionCreateBody(fixture, { destinationRequestId: IDS[i], destinationPersonId: personId, grantCycleCode: 'D97' }) });
       row = await deps.getSuggestionById(suggestionId, { select: ['wmkf_appreviewersuggestionid','_wmkf_request_value','_wmkf_potentialreviewer_value','wmkf_reviewreceivedat'] });
     }
-    assert(receipt.reviews[suggestionId]?.attempted && row._wmkf_request_value === IDS[i] && row._wmkf_potentialreviewer_value === PERSON, 'Suggestion ownership mismatch');
+    assert(receipt.reviews[suggestionId]?.attempted && row._wmkf_request_value === IDS[i] && row._wmkf_potentialreviewer_value === personId, 'Suggestion ownership mismatch');
     if (!row.wmkf_reviewreceivedat) {
       const write = buildCompletionWrite(fixture, { suggestionId, ifMatch: row._etag || row['@odata.etag'] });
       assert(write.operations[0].ifMatch || row._etag || row['@odata.etag'], 'Missing concurrency token');

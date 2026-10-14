@@ -219,7 +219,7 @@ retaining qualifying Research exclusions and provisional/unavailable distinction
 Expose count and most recent qualifying award year in the card summary, with total
 qualifying Research funding in USD under its arrow disclosure (October 13 owner
 refinement). The local helper now returns its existing checked sum as
-`totalAmountMinorUnits`; this additive field is not deployed. Older frozen snapshots
+`totalAmountMinorUnits`; this additive field is deployed in the dedicated test Preview at `d1b206185`, not Production. Older frozen snapshots
 without it show unavailable, not zero; no backfill or source refresh through resets.
 History remains informational and workbook columns are unchanged. Verify
 the year derivation (fiscal-year field, then meeting/decision date fallback) against
@@ -394,10 +394,20 @@ gates; the earlier independent review and 25-check receipt cover the preceding p
 revision, not execution of these reviews. This amendment changes no product rule or
 runtime behavior.
 
-Current dedicated Preview follow-up: Preview 3 is READY. The corrected accepted PD
-roster is Beth, Justin, Jean and John Sader; Justin opened the replacement round through
-real hosted UI, all Preparing. Other staff SSO and group walkthrough remain pending.
-The real sentiment reader returns the first-D97 fictional scripted fixture as current;
-this used four new TEST files in shared akoyaGO SharePoint, no existing-file changes,
-no model call and no human analysis. Generation/full group-browser sentiment acceptance
-remain pending. Exact receipts and operator roster correction are in the sandbox audit.
+## Current dedicated Preview and richer rehearsal
+
+[VERIFIED via deployment receipt and hosted browser] Source `d1b206185` is deployed
+in dedicated READY Preview `dpl_GCjqpVkTNncxSC2kRzByGLbbspyq` at
+`https://wmkf-meeting-transcription-test-h2yh5pkf4.vercel.app`, with stable alias
+`https://wmkf-meeting-transcription-test.vercel.app`. The compact card refinements
+and expandable total Research funding are included. The release passed 179 ranking
+tests and Justin's Microsoft SSO/updated-interface check. This is sandbox deployment,
+not Production promotion or independent acceptance by the other three PDs.
+
+[PLANNED — owner authorized, not yet live-verified] Enrich the rehearsal to 12
+realistic fictional proposals (six MR, six SE), each with three varied saved synthetic
+reviews, distinct institutions/titles, budgets, geography, award histories and clearly
+labelled sample discussion. Fictional institution/history/discussion projection is
+restricted to the dedicated test policy; it must not fabricate production data or
+claim genuine accepted sentiment. Source preparation, deployment and a fresh opened
+round must be verified separately; resets retain an existing round's frozen pool.
