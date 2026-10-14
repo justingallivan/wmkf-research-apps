@@ -266,3 +266,25 @@ test('private grade border follows confidence and leaves unanswered confidence u
   rerender(<AssessmentList {...props} assessment={{ ...assessment, confidence: { one: 'confident' } }} />);
   expect(tile().className).toContain('border-solid');
 });
+
+
+test('unanswered navigation follows current order, wraps, and skips saved choices', async () => {
+  Element.prototype.scrollIntoView = jest.fn();
+  const initial = populatedView();
+  render(<AssessmentWorkflow initial={initial} cycleOptions={[]} onCycleChange={() => {}} />);
+  expect(screen.getByText('2 proposals need a confidence choice')).toBeTruthy();
+  const jump = screen.getByRole('button', { name: 'Go to next unanswered' });
+  fireEvent.click(jump);
+  expect(document.activeElement.name).toBe('confidence-one');
+  fireEvent.click(jump);
+  expect(document.activeElement.name).toBe('confidence-two');
+  fireEvent.click(jump);
+  expect(document.activeElement.name).toBe('confidence-one');
+  sendProposalRankingAction.mockResolvedValue({ ...initial, own: { ...initial.own, mr: { ...initial.own.mr, confidence: { one: 'confident' } } } });
+  fireEvent.click(document.activeElement);
+  await waitFor(() => expect(screen.getByText('1 proposal needs a confidence choice')).toBeTruthy());
+  await waitFor(() => expect(jump.disabled).toBe(false));
+  fireEvent.click(jump);
+  expect(document.activeElement.name).toBe('confidence-two');
+  expect(Element.prototype.scrollIntoView).toHaveBeenCalledWith({ behavior: 'auto', block: 'center' });
+});

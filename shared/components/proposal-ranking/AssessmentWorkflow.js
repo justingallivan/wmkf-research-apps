@@ -298,10 +298,11 @@ export function AssessmentList({
                                 </div> : (
                                   <fieldset
                                     disabled={!editable}
-                                    className="col-span-2 flex flex-wrap items-center gap-4 lg:col-span-1"
+                                    className={`col-span-2 flex flex-wrap items-center gap-4 lg:col-span-1 ${!assessment.confidence[id] ? 'rounded-md border border-amber-400 bg-amber-50 px-3 pb-2' : ''}`}
                                   >
                                     <legend className="mb-1 text-sm text-gray-600">
                                       Confidence in my assessment
+                                      {!assessment.confidence[id] && <span className="ml-2 font-semibold text-amber-900">Choose one</span>}
                                     </legend>
                                     <Grade
                                       confidence={assessment.confidence[id]}
@@ -820,7 +821,13 @@ export default function AssessmentWorkflow({
     ? 'Changes are not confirmed' : 'All changes saved';
   const combinedComplete = view.own?.co?.order.every((id) => view.own.co.confidence[id]);
   const preparationStep = view.own?.ready ? 'ready' : program === 'co' ? 'combined' : 'programs';
-  const preparationAction = !allConfident ? (
+  const unanswered = collective ? [] : assessment?.order.filter((id) => !assessment.confidence?.[id]) || [];
+  const preparationAction = unanswered.length > 0 ? (
+    <div className="flex flex-wrap items-center gap-3">
+      <p className="font-medium text-amber-900" aria-live="polite">{unanswered.length} {unanswered.length === 1 ? 'proposal needs' : 'proposals need'} a confidence choice</p>
+      <Button disabled={busy || Boolean(pending)} onClick={jumpToUnanswered}>Go to next unanswered</Button>
+    </div>
+  ) : !allConfident ? (
     nextProgram && (currentProgramComplete || program === 'co') ? (
       <Button disabled={busy || Boolean(pending)} onClick={() => { setProgram(nextProgram.key); setDraft(null); }}>
         Continue to {nextProgram.name} →
@@ -841,6 +848,16 @@ export default function AssessmentWorkflow({
   );
   const findScope = `${view.roundId}:${section}:${program}`;
   const currentFindResult = findResult?.scope === findScope ? findResult : null;
+  function jumpToUnanswered() {
+    const previousPosition = assessment.order.indexOf(currentFindResult?.id);
+    const id = unanswered.find((candidate) => assessment.order.indexOf(candidate) > previousPosition) || unanswered[0];
+    if (!id) return;
+    const proposal = proposals.find((p) => p.requestId === id);
+    setFindResult({ scope: findScope, id, message: `Confidence needed: ${proposal?.organization}. Choose Confident or Not sure.` });
+    const card = document.getElementById(`proposal-${id}`);
+    card?.scrollIntoView({ behavior: 'auto', block: 'center' });
+    card?.querySelector('input[type="radio"]')?.focus({ preventScroll: true });
+  }
   const findProposal = (event) => {
     event.preventDefault();
     const query = find.trim().toLowerCase();
