@@ -2179,3 +2179,26 @@ test.each(['success', 'failure'])('late attendance %s cannot update a different 
   expect(screen.queryByText('Discussion attendance')).not.toBeInTheDocument();
   expect(screen.queryByText('Late attendance failure')).not.toBeInTheDocument();
 });
+
+test('recording card exposes dismissal beside a failed cancellation and removes only after success', async () => {
+  let dismissed = false;
+  const uploadId = '77777777-7777-4777-8777-777777777777';
+  const intent = { uploadId, filename: 'stale-recording.mp4', size: 100, state: 'initiated', canCancel: true };
+  const state = { collection: collection({ jobs: [] }) };
+  route(state, {
+    '/presentation-materials': { respond: () => response({ materials: [], uploads: dismissed ? [] : [intent] }) },
+    [`/${uploadId}/cancel`]: { method: 'POST', respond: (_path, options) => {
+      if (JSON.parse(options.body).dismissUncertain === true) {
+        dismissed = true;
+        return response({ success: true, dismissed: true });
+      }
+      return response({ error: 'Microsoft rejected this upload session.', code: 'post_presentation_upload_dismiss_available' }, 409);
+    } },
+  });
+  render(<RecordingAndTranscriptCard requestId={REQUEST_ID} />);
+  fireEvent.click(await screen.findByRole('button', { name: 'Cancel' }));
+  fireEvent.click(screen.getByRole('button', { name: 'Cancel upload' }));
+  fireEvent.click(await screen.findByRole('button', { name: 'Dismiss upload attempt' }));
+  expect(await screen.findByText(/Upload attempt removed from this list/)).toBeInTheDocument();
+  expect(screen.queryByText('stale-recording.mp4')).not.toBeInTheDocument();
+});

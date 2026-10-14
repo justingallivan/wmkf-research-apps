@@ -81,6 +81,7 @@
     "079_zoom_video_copy_recording_times.sql",
     "080_presentation_video_splits.sql",
     "081_presentation_transcript_regenerations.sql",
-    "082_staff_discussion_sentiments.sql"
+    "082_staff_discussion_sentiments.sql",
+    "083_presentation_upload_dismissal.sql"
   ]
 }

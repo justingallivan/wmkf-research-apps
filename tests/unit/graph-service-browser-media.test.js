@@ -170,3 +170,8 @@ test('range read never retries a non-transient status or unbounded success', asy
   expect(global.fetch).toHaveBeenCalledTimes(2);
   expect(unbounded.arrayBuffer).not.toHaveBeenCalled();
 });
+
+test('rejected cancellation preserves HTTP status without claiming expiration', async () => {
+  global.fetch.mockResolvedValueOnce(response(401));
+  await expect(GraphService.cancelBrowserUploadSession('https://upload.example/session-secret')).rejects.toMatchObject({ status: 401 });
+});

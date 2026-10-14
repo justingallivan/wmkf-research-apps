@@ -11,7 +11,8 @@ export const config = { api: { bodyParser: { sizeLimit: '16kb' } }, maxDuration:
 
 function emptyBody(body) {
   return body == null || body === ''
-    || (typeof body === 'object' && !Array.isArray(body) && Object.keys(body).length === 0);
+    || (typeof body === 'object' && !Array.isArray(body) && (Object.keys(body).length === 0
+      || (Object.keys(body).length === 1 && body.dismissUncertain === true)));
 }
 
 export default async function handler(req, res) {
@@ -37,6 +38,7 @@ export default async function handler(req, res) {
     try {
       const result = await cancelMp4Upload({
         requestId, uploadId, actingUserSystemId: actorRefFromSession(access.session),
+        ...(req.body?.dismissUncertain === true ? { dismissUncertain: true } : {}),
       });
       return res.status(200).json({ success: true, ...result });
     } catch (error) {
