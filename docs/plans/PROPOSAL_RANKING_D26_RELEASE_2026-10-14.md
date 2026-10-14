@@ -1,7 +1,7 @@
 # Proposal Ranking — D26 production release plan
 
 Date: 2026-10-14. Status: **PLANNED; not approved for production mutation or promotion.**
-Owner decisions: launch for D26 with exactly 23 proposals; Beth Pruitt and Justin Gallivan must have simultaneous facilitator access. Requests 1003223 and 1003224 remain excluded test copies (owner confirmed October 14).
+Owner decisions: launch for D26 with exactly 23 proposals; Beth Pruitt and Justin Gallivan must have simultaneous facilitator access. Before reveal, everyone including both facilitators sees only their own preparation; facilitators may see readiness status, never other PDs’ unrevealed rankings, grades or confidence. Requests 1003223 and 1003224 remain excluded test copies (owner confirmed October 14).
 This release plan supplements the October 13 design/implementation plan. Shared facilitation is a new requirement, not a claim about the tested implementation.
 
 ## Scope and evidence boundary
@@ -14,7 +14,9 @@ Prior findings: shared-round conflicts affected independent PD saves; bounded pr
 
 No production writes, schema apply, settings change, grant change, round cancellation, main merge or production deployment is authorized by this planning pass. Read-only production probes were performed.
 
-## Verified baseline
+## Historical baseline — earlier October 14 planning probe
+
+These are dated observations, not release-day assertions. Candidate and main have advanced; repeat the source, schema, access and round checks before implementation or cutover.
 
 | Claim | Evidence | Status and limitation |
 |---|---|---|
@@ -36,9 +38,14 @@ The script fixes the registered production hostname and enforces preview-class r
 
 ## Decisions still pending
 
-1. **Pre-reveal visibility:** current source returns all preparation to the facilitator (`workflow-service.js`, `publicView.facilitatorLists`). The earlier conversational promise that all preparation is private until reveal was inaccurate. Owner was asked whether both facilitators retain that visibility or whether preparation becomes strictly own-only until reveal. Do not silently broaden or remove this access.
-2. **Existing trial retirement:** propose retaining and closing the existing v1 round, then opening a fresh v2 round. One submitted list exists. Before executing, show the exact old round, retained data, new pool/roster and effects to Justin. No destructive erase or automatic conversion of v1 rankings to grades/confidence.
-3. **Sentiment readership:** verify active profiles and superuser status for all four PDs. If they lack access, propose either explicit Meeting Tracker grants (which grant more than sentiment) or a narrowly reviewed ranking-reader authorization change. Do not silently grant another app or bypass its current reader guard.
+1. **Existing trial retirement:** propose retaining and closing the existing v1 round, then opening a fresh v2 round. One submitted list exists. Before executing, show the exact old round, retained data, new pool/roster and effects to Justin. No destructive erase or automatic conversion of v1 rankings to grades/confidence.
+2. **Sentiment readership:** verify active profiles and superuser status for all four PDs. If they lack access, propose either explicit Meeting Tracker grants (which grant more than sentiment) or a narrowly reviewed ranking-reader authorization change. Do not silently grant another app or bypass its current reader guard.
+
+## Agreed privacy change — planned, not implemented
+
+[OWNER DECISION, 2026-10-14] Only the actor’s own preparation is visible before reveal, including for Beth and Justin. Readiness status is available to facilitators without assessment contents. Enforce filtering in the server response, not only the UI. Audit normal reads, mutation/conflict responses, operation readback, history, exports and alternate readers. New edits after reopening remain private until a new reveal; previously revealed immutable history stays clearly distinguished.
+
+[PLANNED] Remove the v2 facilitator exception that currently supplies other PDs’ preparation. Test with populated other-PD data and both facilitator identities so a missing filter fails. Keep legacy behavior explicitly versioned; do not reinterpret old snapshots as v2 assessments. The precise legacy privacy transition must be reviewed before production release.
 
 ## Proposed two-facilitator contract
 
@@ -61,14 +68,14 @@ Files: `config.js`, `preview-service.js`, `service.js`, `workflow-service.js`, `
 ### 1. Integrate and settle source contracts
 
 - Preserve the dedicated ranking Preview and existing worktree; prepare a release branch from the tested candidate with current main integrated. Re-run the merge check against the actual current head before merging.
-- Resolve the pending privacy decision. Retain the current D26 cutoff and verify exactly 23 proposals with requests 1003223 and 1003224 excluded; test-marker repair is separate work, not authorized by this pool decision. Validate exact D26 source preview including review scales, ordinary/synthetic markers, identity/profile linkage, currency, funding data and roster. Source reads must remain read-only in production shadow mode.
+- Implement the agreed own-only privacy rule across API and UI, including reopened preparation and readback/error paths. Retain the current D26 cutoff and verify exactly 23 proposals with requests 1003223 and 1003224 excluded; test-marker repair is separate work, not authorized by this pool decision. Validate exact D26 source preview including review scales, ordinary/synthetic markers, identity/profile linkage, currency, funding data and roster. Source reads must remain read-only in production shadow mode.
 - Implement shared facilitation and version-safe mutation dispatch. Update Admin selection and suite feature descriptions. Reconcile the design, API contract, Atlas, implementation plan, service catalogue and release receipt to the accepted behavior; historical receipts remain dated.
 - Audit the dedicated-test changes in shared identity mapping, app-grant service, source adapter and deployment policy. Prove production excludes fictional identities, synthetic reviews and sample presentation/sentiment. Test malformed test configuration as well as unset/off.
 
 ### 2. Prove behavior in sandbox and integrated preview
 
 - Both Beth and Justin independently sign in and can perform facilitator actions; Jean/John cannot perform facilitator-only actions; revoked/disabled/unmapped actors fail closed.
-- Verify chosen pre-reveal privacy at API and UI, not merely hidden controls. Include a populated other-PD assessment in negative tests.
+- Verify own-only pre-reveal privacy for every PD and both facilitators at API and UI, not merely hidden controls. Include a populated other-PD assessment in negative tests.
 - Race Beth vs Justin on open, reveal, collective reorder, reset and restart. Race readiness/reopen with reveal and private saves across PDs. Prove no partial commit, duplicate reveal, lost edit or misattributed actor.
 - Exercise definite 409 recovery versus network/timeout ambiguity; old-tab operations after reset/restart; exact operation replay after later edits; malformed memberships; unknown versions; legacy action payloads against v2.
 - Rehearse at the actual D26 size (23 proposals, four PDs), including saved reveal, workbook and retained history. The prior 100/12 memory fixture is not evidence of maximum live transaction support.
@@ -114,6 +121,25 @@ Verdict: **PLAN DRAFT — production promotion blocked by named decisions, imple
 
 A documented `vercel env run` inspection unexpectedly entered the CLI deployment path. The suite deployment attempt failed validation; a second attempt from `/tmp` created an empty `tmp` project and failed before deployment. The accidental project `prj_iTJjzHqGWxdfPltq3mpkmCHlp4Uc` was removed with a confirmed CLI success. A fresh production listing proved the same Ready production URL/SHA. No production flag values were established by these attempts; do not use `env run` for this release's inspection.
 
-## Planning verification
+## Historical planning verification — prior to final privacy decision
 
 A fresh read-only agent review found no blocking errors in the scoped plan/probe, and confirmed the source contracts for scalar authorization, pre-reveal visibility, version dispatch, retained cancellation and rollback. It did not independently repeat the live probe. The inventory limitation about pending-only source counts is recorded above. Document-currency, symbol-reference and fact-consistency gates and their sequential self-tests passed. Syntax checking passed; final probe lint is recorded in the commit verification. This is planning evidence, not runtime release acceptance.
+
+
+## Initial execution plan and home handoff — October 14 close
+
+[VERIFIED via local Git] Ranking candidate before this documentation update is `8ac06821e` on `codex/ranking-pd-save-conflicts`. It contains the PD-save fix, copy changes, list-order guide, release plan, responsive confidence-save work and reduced-motion pointer-drop fix. The owner reported improved behavior on Mac and iPad. Preserve this branch; the older draft PR #463 is not the latest candidate. Prepare one integrated release candidate from this branch plus freshly fetched main; reconcile the older PR only after confirming all useful changes are retained.
+
+[VERIFIED via owner instruction] Plan only: do not execute the implementation, schema changes or ranking production release until the owner resumes and authorizes that work. Pushing the existing candidate and this plan for home continuity is authorized.
+
+Planned milestones and completion checks:
+
+1. **Integrate:** preserve tested work, integrate current main on a release branch, build and rerun ranking regressions; keep the dedicated preview available.
+2. **Privacy:** enforce own-only preparation and readiness-only facilitator visibility on all reads and response paths, with populated negative tests and reopened-version coverage.
+3. **Shared facilitation:** implement Beth/Justin membership, Admin configuration, version-safe actions and real actor attribution; test simultaneous shared actions and non-facilitator denial.
+4. **Readiness:** repeat read-only production checks for schema, roles, profile mapping, accepted sentiment access, 23-proposal source preview and production exclusion of all synthetic fixtures.
+5. **Rehearsal/review:** separate identities, saved confidence, ready/reveal/reopen/reset, collective ordering/bars, workbook, ambiguous retries and Safari/iPad performance. Run relevant gates, build and bounded independent code review. Claude reviews must use subscription OAuth, never project API credits.
+6. **Release approval:** present exact code/checks, additive schema/config changes, old trial summary and retained-history effects, new pool/roster and rollback. Obtain approval before production mutations or trial retirement.
+7. **Cutover/verification:** only after approval, verify schema and compatible deployment, configure facilitators, safely retire the old trial, open fresh D26, then verify separate sign-ins and own-list save/readback. Record deployment, round, settings and rollback receipt. Do not run a real reveal/reset as a smoke test once colleagues enter work.
+
+[ESTIMATE, not commitment] Approximately 6–10 hours of focused implementation/testing plus a separate rollout session. Production schema/access surprises and integration conflicts are the main uncertainties. The privacy decision is resolved; release-time trial retirement and any sentiment permission changes remain explicit approval items.

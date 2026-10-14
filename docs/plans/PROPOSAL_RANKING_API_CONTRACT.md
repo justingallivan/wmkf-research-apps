@@ -1,6 +1,6 @@
 # Proposal Ranking API — existing wire contract and planned revision
 
-Updated 2026-10-13. Sections 1–5 below describe **[VERIFIED via main source at
+Updated 2026-10-14. Sections 1–5 below describe **[VERIFIED via main source at
 `b3219f4aa`] the existing revision-3 API**, not the agreed replacement workflow.
 Revision 5 product authority is `docs/plans/PROPOSAL_RANKING_DESIGN_2026-10-07.md`.
 Section 6 describes the branch-built v2 actions and semantics; additive fields are
@@ -292,8 +292,13 @@ group revision, with the matching individual inputs and no sentiment.
 | Enrich discussion cards | Ranking-authorized server read plus the sentiment reader's own access check. Accepted, current, not-withdrawn sentiment only; no preparation response enrichment. History shows qualifying Research count/latest award year across all available history, with total USD in an expandable card disclosure. History and E/W are informational and never affect ranking. |
 | Export workbook | One confirmed collective revision plus its immutable reveal inputs; two sheets from the design. Reject/wait for pending or uncertain edits. No sentiment/transcript quotes in the agreed export. |
 
-Before reveal a response may contain the actor's own preparation and readiness
-progress; only the facilitator may receive other PDs' private preparation. After
+[CURRENT BRANCH BEHAVIOR, not the D26 target] Before reveal a response may contain
+the actor’s own preparation and readiness progress; the existing facilitator
+exception may return other PDs’ private preparation. [PLANNED — owner decision
+2026-10-14] Remove that exception for the D26 release: both facilitators receive
+only their own preparation plus readiness, including conflict/readback/history
+paths and newly reopened preparation. See the D26 release plan for acceptance.
+After
 reveal expose the named immutable assessments and mutable collective view to the
 round's authorized participants/facilitator. A nonparticipant superuser does not
 inherit private content merely from that role. Hiding controls is not privacy.

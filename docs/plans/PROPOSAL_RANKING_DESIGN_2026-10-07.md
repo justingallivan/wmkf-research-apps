@@ -1,6 +1,6 @@
 # Proposal Ranking — agreed assessment and recommendation workflow
 
-Updated: 2026-10-13. Revision: 5. Owner: Justin.
+Updated: 2026-10-14. Revision: 5 with D26 privacy amendment. Owner: Justin.
 Status: **Product workflow agreed; revision-3 UX accepted and implementation authorized 2026-10-13. Dedicated enriched test Preview deployed at `591c3e98e`; independent staff acceptance remains open.**
 The filename is retained for existing links; October 7 is the original design date,
 not the date of this revision. This revision incorporates the later October 13
@@ -92,8 +92,13 @@ program preparation used in the rebuild.
 
 ## 4. Ready, privacy, and reveal — agreed
 
-Before reveal, preparation is visible only to its PD and the facilitator. Other PDs
-cannot inspect it. The facilitator does not edit someone else's private assessments.
+[OWNER DECISION, 2026-10-14; PLANNED CHANGE] Before reveal, preparation is visible
+only to its own PD, including when that PD is a facilitator. Beth and Justin may
+see readiness status but not another PD’s unrevealed rankings, grades or confidence.
+The server must filter every response path. Facilitators cannot edit another PD’s
+private assessments. This replaces the earlier facilitator-read exception; it is
+not implemented by this documentation change. Shared facilitation and production
+execution are covered by `docs/plans/PROPOSAL_RANKING_D26_RELEASE_2026-10-14.md`.
 
 A PD can mark ready only after every proposal has a grade, a confidence response,
 and a confirmed unique position in that PD's complete combined list, with all saves
