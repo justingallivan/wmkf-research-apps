@@ -1117,14 +1117,7 @@ export default function AssessmentWorkflow({
                   : 'Saved group revision'}{' '}
                 · {new Date(entry.at).toLocaleString()}
               </summary>
-              {section === 'prepare' && showMissingConfidence && (
-            <div role="alert" className="mb-4 rounded-lg border border-red-600 bg-red-50 p-4 text-red-900">
-              <p className="font-semibold">Before continuing, choose Confident or Not sure for these proposals:</p>
-              <ul className="mt-2 list-disc pl-5">{unanswered.map((id) => <li key={id}>{proposals.find((p) => p.requestId === id)?.organization}</li>)}</ul>
-              <p className="mt-2">Their cards are outlined in red. Use Go to next unanswered to reach each one.</p>
-            </div>
-          )}
-          <AssessmentList
+              <AssessmentList
                 assessment={entry.collective || entry.baseline}
                 collective={
                   entry.collective || {
