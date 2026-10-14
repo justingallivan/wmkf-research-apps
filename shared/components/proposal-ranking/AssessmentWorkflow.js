@@ -851,9 +851,7 @@ export default function AssessmentWorkflow({
     <Button disabled={!allConfident || busy || Boolean(pending) || !active} onClick={() => confirm('buildCombined')}>
       Create combined list
     </Button>
-  ) : program !== 'co' ? (
-    <Button disabled={busy || Boolean(pending)} onClick={() => setProgram('co')}>Review combined list</Button>
-  ) : outdated ? (
+  ) : program !== 'co' ? null : outdated ? (
     <Button disabled={!allConfident || busy || Boolean(pending) || !active} onClick={() => confirm('buildCombined')}>Rebuild combined list</Button>
   ) : !view.own.co.confirmed ? (
     <Button disabled={!combinedComplete || busy || Boolean(pending) || !active} onClick={() => execute('confirmCombined')}>Confirm combined order</Button>
