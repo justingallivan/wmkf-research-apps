@@ -250,7 +250,7 @@ export function AssessmentList({
                             aria-label={`${proposal.organization}, proposal ${proposal.requestNumber}`}
                             className="flex scroll-mt-56 items-start gap-2 rounded-xl p-4 focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-600 sm:gap-4"
                           >
-                            <div className="flex shrink-0 flex-col items-center gap-1 sm:flex-row">
+                            <div className="flex shrink-0 self-center">
                               {editable && (
                                 <span
                                   {...drag.dragHandleProps}
@@ -260,12 +260,16 @@ export function AssessmentList({
                                   <GripVertical size={20} />
                                 </span>
                               )}
+
+                            </div>
+                            <div className="min-w-0 flex-1">
+                              <div className="grid grid-cols-[2rem_minmax(0,1fr)] items-baseline gap-x-3 gap-y-2 sm:grid-cols-[2rem_minmax(0,1fr)_auto]">
                               {editable ? (
                                 <button
                                   type="button"
                                   aria-label={`Move ${proposal.organization} to position; current position ${position + 1}`}
                                   title="Move to position"
-                                  className="inline-flex h-11 min-w-6 items-center justify-center rounded text-xl font-bold tabular-nums focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-600"
+                                  className="inline-block min-h-11 min-w-6 -my-2 py-2 text-center rounded text-xl font-bold tabular-nums focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-600"
                                   onClick={() => {
                                     setMoving(id);
                                     setPositionError('');
@@ -273,16 +277,13 @@ export function AssessmentList({
                                   }}
                                 >{position + 1}</button>
                               ) : <span className="min-w-6 text-xl font-bold tabular-nums">{position + 1}</span>}
-                            </div>
-                            <div className="min-w-0 flex-1">
-                              <div className="grid grid-cols-1 items-start gap-2 sm:grid-cols-[minmax(0,1fr)_auto]">
                                 <div className="min-w-0 flex-1">
                                   <h3 className="text-lg font-semibold text-gray-900">{proposal.organization || 'Institution unavailable'}</h3>
                                   <a href={`/workbench/${encodeURIComponent(proposal.requestId)}`} className="break-words text-base text-blue-800 underline underline-offset-2 focus-visible:outline focus-visible:outline-2">{proposal.title || 'Untitled proposal'}</a>
                                 </div>
-                                <p className="text-right tabular-nums"><span className="mr-2 text-xs text-gray-600">Requested</span><strong>{proposal.amountMinorUnits == null ? 'Unavailable' : formatMoney(proposal.amountMinorUnits, proposal.currency)}</strong></p>
+                                <p className="col-start-2 text-right tabular-nums sm:col-start-3"><span className="mr-2 text-xs text-gray-600">Requested</span><strong>{proposal.amountMinorUnits == null ? 'Unavailable' : formatMoney(proposal.amountMinorUnits, proposal.currency)}</strong></p>
                               </div>
-                              <div className="mt-3 grid grid-cols-[minmax(0,1fr)_auto] items-end gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(8rem,.55fr)_auto]">
+                              <div className="ml-11 mt-3 grid grid-cols-[minmax(0,1fr)_auto] items-end gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(8rem,.55fr)_auto]">
                                 {collective ? <div className="col-span-2 grid grid-cols-[repeat(auto-fill,minmax(4.5rem,1fr))] items-end gap-x-2 gap-y-3 lg:col-span-1">
                                   {individuals.map((pd) => {
                                     const lead = pd.systemUserId === proposal.leadSystemUserId;
@@ -344,7 +345,7 @@ export function AssessmentList({
                                   <span title={proposal.institutionGeography || 'Geography unavailable'} className={`${tileClass} border border-gray-300 bg-gray-100 text-gray-700`}>{['East', 'West'].includes(proposal.institutionGeography) ? proposal.institutionGeography[0] : '—'}</span>
                                 </div>
                               </div>
-                              <div className="mt-2 flex flex-wrap items-baseline gap-x-4 gap-y-2 border-t border-gray-100 pt-2 text-xs text-gray-600">
+                              <div className="ml-11 mt-2 flex flex-wrap items-baseline gap-x-4 gap-y-2 border-t border-gray-100 pt-2 text-xs text-gray-600">
                                 {collective && <>
                                   <details>
                                     <summary className="cursor-pointer py-2 focus-visible:outline focus-visible:outline-2">Initial ranks</summary>
