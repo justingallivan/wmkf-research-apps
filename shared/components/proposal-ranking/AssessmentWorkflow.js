@@ -2,9 +2,6 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { DragDropContext, Draggable, Droppable } from '@hello-pangea/dnd';
 import {
   GripVertical,
-  Check,
-  HelpCircle,
-  ArrowLeftRight,
   MoreHorizontal,
 } from 'lucide-react';
 import { Button } from '../Layout';
@@ -13,7 +10,7 @@ import {
   loadProposalRanking,
   sendProposalRankingAction,
 } from './client';
-import { buildCumulativeTotals, formatMoney, formatScore } from './model';
+import { formatMoney } from './model';
 import {
   assessmentItems,
   moveAssessmentItem,
@@ -51,55 +48,36 @@ function RankingDialog({ label, children, onClose }) {
   );
 }
 const gradeClasses = {
-  A: 'bg-green-100 text-green-800',
-  B: 'bg-amber-100 text-amber-800',
-  C: 'bg-slate-200 text-slate-700',
+  A: 'bg-[#d5edda] text-[#205632]',
+  B: 'bg-[#ffeb9c] text-[#654c00]',
+  C: 'bg-[#f8d6d4] text-[#8a2825]',
 };
+const tileClass = 'inline-flex h-8 w-8 shrink-0 items-center justify-center rounded font-semibold text-[15px] leading-none';
 const buttonClass =
   'min-h-11 rounded-md px-3 py-2 text-sm font-medium hover:bg-gray-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600 disabled:opacity-50';
-function Grade({ value }) {
-  return (
-    <span
-      className={`inline-flex h-8 w-8 items-center justify-center rounded-md font-semibold ${gradeClasses[value]}`}
-    >
-      {value}
-    </span>
-  );
-}
-function Confidence({ value }) {
-  return value === 'confident' ? (
-    <Check size={18} aria-label="Confident" />
-  ) : value === 'not-sure' ? (
-    <HelpCircle size={18} aria-label="Not sure" />
-  ) : (
-    <span>Unanswered</span>
-  );
+function Grade({ value, confidence }) {
+  return <span className={`${tileClass} border-2 ${confidence === 'not-sure' ? 'border-dashed border-current' : confidence === 'confident' ? 'border-solid border-current' : 'border-transparent'} ${gradeClasses[value] || 'bg-gray-100 text-gray-700'}`}>
+    {value || '—'}
+  </span>;
 }
 function PeerScores({ score }) {
-  const labels = {
-    Excellent: 'E',
-    'Very Good': 'VG',
-    Good: 'G',
-    Fair: 'F',
-    Poor: 'P',
-  };
-  return (
-    <p className="flex flex-wrap items-center gap-1 text-sm text-gray-600">
-      <span className="mr-1">Peer reviews:</span>
-      {Object.entries(labels).flatMap(([label, short]) =>
-        Array.from({ length: score?.distribution?.[label] || 0 }, (_, i) => (
-          <span
-            key={`${label}-${i}`}
-            title={label}
-            className="rounded bg-gray-100 px-1.5 py-0.5"
-          >
-            {short}
-          </span>
-        )),
-      )}
-      <span className="ml-1">{formatScore(score)}</span>
-    </p>
+  const ratings = [
+    ['Excellent', 'E', gradeClasses.A],
+    ['Very Good', 'VG', 'bg-[#e4edb2] text-[#475716]'],
+    ['Good', 'G', gradeClasses.B],
+    ['Fair', 'F', 'bg-[#f9d6aa] text-[#75410f]'],
+    ['Poor', 'P', gradeClasses.C],
+  ];
+  const tiles = ratings.flatMap(([label, short, color]) =>
+    Array.from({ length: score?.distribution?.[label] || 0 }, (_, i) => (
+      <span key={`${label}-${i}`} title={label} aria-label={label}
+        className={`${tileClass} border border-current ${color}`}>{short}</span>
+    )),
   );
+  return <div>
+    <p className="mb-1 text-xs font-medium text-gray-700">Peer reviews</p>
+    <div className="flex flex-wrap gap-1">{tiles.length ? tiles : <span className="text-sm text-gray-600">Not available</span>}</div>
+  </div>;
 }
 
 export function AssessmentList({
@@ -127,9 +105,7 @@ export function AssessmentList({
     return () => media.removeEventListener('change', sync);
   }, []);
   const byId = new Map(proposals.map((p) => [p.requestId, p]));
-  const names = new Map(roster.map((p) => [p.systemUserId, p.name]));
   const items = assessmentItems(assessment);
-  const totals = buildCumulativeTotals(assessment.order, proposals);
   // Private program lists contain only part of the full proposal pool.
   const sectionTotals = collective
     ? calculateSectionTotals(assessment.order, assessment.boundaries, proposals)
@@ -188,11 +164,11 @@ export function AssessmentList({
                 const isBar = id === FIRST_BOUNDARY || id === SECOND_BOUNDARY;
                 const position = assessment.order.indexOf(id);
                 const proposal = byId.get(id);
-                const individualGrades =
-                  collective?.individuals.map((pd) =>
-                    gradeAt(pd.order.indexOf(id), pd.boundaries),
-                  ) || [];
-                const disagreement = new Set(individualGrades).size > 1;
+                const individuals = [...(collective?.individuals || [])].sort((a, b) => {
+                  const leadA = a.systemUserId === proposal?.leadSystemUserId;
+                  const leadB = b.systemUserId === proposal?.leadSystemUserId;
+                  return Number(leadB) - Number(leadA) || (a.name || '').localeCompare(b.name || '');
+                });
                 return (
                   <Draggable
                     key={id}
@@ -211,11 +187,11 @@ export function AssessmentList({
                         className={
                           isBar
                             ? 'py-2'
-                            : `rounded-xl border bg-white ${highlightedId === id ? 'border-blue-700' : disagreement ? 'border-amber-300' : 'border-gray-200'} ${dragState.isDragging ? 'shadow-lg' : ''}`
+                            : `rounded-xl border bg-white ${highlightedId === id ? 'border-blue-700' : 'border-gray-200'} ${dragState.isDragging ? 'shadow-lg' : ''}`
                         }
                       >
                         {isBar ? (
-                          <div className="flex flex-wrap items-center gap-2 border-y border-gray-200 py-3 text-sm font-semibold">
+                          <div className={`flex flex-wrap items-center gap-3 py-3 text-sm font-semibold ${collective && id === FIRST_BOUNDARY ? 'rounded-lg border border-green-300 bg-green-50 px-3 text-green-900' : 'border-y border-gray-200'}`}>
                             {editable && (
                               <span
                                 {...drag.dragHandleProps}
@@ -228,13 +204,13 @@ export function AssessmentList({
                             <span>
                               {collective
                                 ? id === FIRST_BOUNDARY
-                                  ? 'End of Recommend funding'
+                                  ? 'Recommended'
                                   : 'End of Alternates'
                                 : id === FIRST_BOUNDARY
                                   ? 'End of A · Fund'
                                   : 'End of B · Maybe fund'}
                             </span>
-                            <span className="ml-auto text-gray-600">
+                            <span className={collective && id === FIRST_BOUNDARY ? 'sr-only' : 'ml-auto text-gray-600'}>
                               After position{' '}
                               {
                                 assessment.boundaries[
@@ -243,18 +219,11 @@ export function AssessmentList({
                               }
                             </span>
                             {collective && id === FIRST_BOUNDARY && (
-                              <span className="text-gray-700">
-                                {sectionTotals[0].count}{' '}
-                                {sectionTotals[0].count === 1
-                                  ? 'award'
-                                  : 'awards'}{' '}
-                                ·{' '}
-                                {formatMoney(
-                                  sectionTotals[0].amountMinorUnits,
-                                  proposals[0]?.currency,
-                                  { incomplete: !sectionTotals[0].complete },
-                                )}
-                              </span>
+                              <>
+                                <span className="text-2xl tabular-nums">{formatMoney(sectionTotals[0].amountMinorUnits, proposals[0]?.currency, { incomplete: !sectionTotals[0].complete })}</span>
+                                <span>{sectionTotals[0].count} {sectionTotals[0].count === 1 ? 'proposal' : 'proposals'}</span>
+                                <span className="ml-auto">East {sectionTotals[0].geography.East} · West {sectionTotals[0].geography.West}{sectionTotals[0].geography.Unknown > 0 && ` · Unknown ${sectionTotals[0].geography.Unknown}`}</span>
+                              </>
                             )}
                             {editable && (
                               <button
@@ -296,73 +265,87 @@ export function AssessmentList({
                                 {position + 1}
                               </span>
                             </div>
-                            <div className="min-w-0 flex-1 lg:grid lg:grid-cols-[1fr_12rem] lg:gap-6">
-                              <div className="min-w-0">
-                                <div className="flex items-start justify-between gap-3">
-                                  <h3 className="text-lg font-semibold text-gray-900">
-                                    {proposal.organization ||
-                                      'Institution unavailable'}
-                                  </h3>
-                                  <span className="shrink-0 text-sm font-semibold text-gray-600">
-                                    {proposal.programKey?.toUpperCase()} /{' '}
-                                    {proposal.institutionGeography?.[0] ||
-                                      'Unknown'}
-                                  </span>
+                            <div className="min-w-0 flex-1">
+                              <div className="grid grid-cols-1 items-start gap-2 sm:grid-cols-[minmax(0,1fr)_auto]">
+                                <div className="min-w-0 flex-1">
+                                  <h3 className="text-lg font-semibold text-gray-900">{proposal.organization || 'Institution unavailable'}</h3>
+                                  <a href={`/workbench/${encodeURIComponent(proposal.requestId)}`} className="break-words text-base text-blue-800 underline underline-offset-2 focus-visible:outline focus-visible:outline-2">{proposal.title || 'Untitled proposal'}</a>
                                 </div>
-                                <p className="mt-1 break-words text-base">
-                                  <a
-                                    href={`/workbench/${encodeURIComponent(proposal.requestId)}`}
-                                    className="text-blue-800 underline underline-offset-2 focus-visible:outline focus-visible:outline-2"
+                                <p className="text-right tabular-nums"><span className="mr-2 text-xs text-gray-600">Requested</span><strong>{proposal.amountMinorUnits == null ? 'Unavailable' : formatMoney(proposal.amountMinorUnits, proposal.currency)}</strong></p>
+                              </div>
+                              <div className="mt-3 grid grid-cols-[minmax(0,1fr)_auto] items-end gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(8rem,.55fr)_auto]">
+                                {collective ? <div className="col-span-2 flex flex-wrap items-end gap-x-6 gap-y-3 lg:col-span-1">
+                                  {individuals.map((pd) => {
+                                    const lead = pd.systemUserId === proposal.leadSystemUserId;
+                                    const grade = gradeAt(pd.order.indexOf(id), pd.boundaries);
+                                    const firstName = pd.name?.trim().split(/\s+/)[0] || 'Unknown PD';
+                                    const duplicateFirstName = individuals.some((other) => other.systemUserId !== pd.systemUserId && other.name?.trim().split(/\s+/)[0] === firstName);
+                                    return <div key={pd.systemUserId} aria-label={`${pd.name}${lead ? ', lead PD' : ''}: grade ${grade}, ${pd.confidence[id] === 'confident' ? 'confident' : pd.confidence[id] === 'not-sure' ? 'not sure' : 'confidence unavailable'}`}>
+                                      <p title={`${pd.name}${lead ? ' · Lead PD' : ''}`} className={`mb-1 text-xs font-medium text-gray-700 ${lead ? 'underline decoration-2 underline-offset-4' : ''}`}>{duplicateFirstName ? pd.name : firstName}</p>
+                                      <Grade value={grade} confidence={pd.confidence[id]} />
+                                    </div>;
+                                  })}
+                                </div> : (
+                                  <fieldset
+                                    disabled={!editable}
+                                    className="col-span-2 flex flex-wrap items-center gap-4 lg:col-span-1"
                                   >
-                                    {proposal.title || 'Untitled proposal'}
-                                  </a>
-                                </p>
-                                <p className="my-2 text-xs text-gray-600">
-                                  #{proposal.requestNumber} · Lead:{' '}
-                                  {proposal.leadName ||
-                                    names.get(proposal.leadSystemUserId) ||
-                                    'Unavailable'}
-                                </p>
+                                    <legend className="mb-1 text-sm text-gray-600">
+                                      Confidence in my assessment
+                                    </legend>
+                                    <Grade
+                                      confidence={assessment.confidence[id]}
+                                      value={gradeAt(
+                                        position,
+                                        assessment.boundaries,
+                                      )}
+                                    />
+                                    {[
+                                      ['confident', 'Confident'],
+                                      ['not-sure', 'Not sure'],
+                                    ].map(([value, label]) => (
+                                      <label
+                                        key={value}
+                                        className="flex min-h-11 cursor-pointer items-center gap-2 text-sm"
+                                      >
+                                        <input
+                                          type="radio"
+                                          name={`confidence-${id}`}
+                                          checked={
+                                            assessment.confidence[id] === value
+                                          }
+                                          onChange={() =>
+                                            onChange({
+                                              ...assessment,
+                                              confidence: {
+                                                ...assessment.confidence,
+                                                [id]: value,
+                                              },
+                                            })
+                                          }
+                                        />
+                                        {label}
+                                      </label>
+                                    ))}
+                                  </fieldset>
+                                )}
                                 <PeerScores score={proposal.score} />
-                                {collective ? (
-                                  <>
-                                    <p className="mt-2 text-sm font-medium">
-                                      Group recommendation: {position < assessment.boundaries[0]
-                                        ? 'Recommend funding' : position < assessment.boundaries[1]
-                                          ? 'Alternate' : 'Not recommended'}
-                                    </p>
-                                    <p className="mt-4 text-xs font-medium text-gray-600">
-                                      PD assessments at reveal
-                                    </p>
-                                    <div className="mt-1 grid grid-cols-1 gap-x-5 gap-y-2 sm:grid-cols-2 xl:grid-cols-4">
-                                      {collective.individuals.map((pd, i) => (
-                                        <div
-                                          key={pd.systemUserId}
-                                          className="grid min-w-0 grid-cols-[minmax(0,1fr)_2rem_1.25rem_2.25rem] items-center gap-2 text-sm"
-                                          aria-label={`${pd.name}: grade ${individualGrades[i]}, ${pd.confidence[id]}, individual rank ${pd.order.indexOf(id) + 1}`}
-                                        >
-                                          <span className="break-words">{pd.name}</span>
-                                          <Grade value={individualGrades[i]} />
-                                          <Confidence
-                                            value={pd.confidence[id]}
-                                          />
-                                          <span className="tabular-nums">
-                                            #{pd.order.indexOf(id) + 1}
-                                          </span>
-                                        </div>
-                                      ))}
-                                    </div>
-                                    <div className="mt-3 flex flex-wrap gap-x-5 gap-y-1 text-sm text-gray-600">
-                                      <span>
-                                        Research:{' '}
-                                        {['available', 'provisional'].includes(
-                                          proposal.researchFunding?.status,
-                                        )
-                                          ? `${proposal.researchFunding.status === 'provisional' ? 'Provisional: ' : ''}${proposal.researchFunding.qualifyingGrantCount} recorded ${proposal.researchFunding.qualifyingGrantCount === 1 ? 'award' : 'awards'}${proposal.researchFunding.latestAwardYear ? ` · latest ${proposal.researchFunding.latestAwardYear}` : ''}`
-                                          : 'History unavailable'}
-                                      </span>
-                                    </div>
-                                    <div className="mt-2 text-sm text-gray-600">
+                                <div className="flex justify-end gap-1.5">
+                                  <span title={proposal.programKey?.toUpperCase() || 'Program unavailable'} className={`${tileClass} border border-gray-300 bg-gray-100 text-gray-700`}>{proposal.programKey?.toUpperCase() || '—'}</span>
+                                  <span title={proposal.institutionGeography || 'Geography unavailable'} className={`${tileClass} border border-gray-300 bg-gray-100 text-gray-700`}>{['East', 'West'].includes(proposal.institutionGeography) ? proposal.institutionGeography[0] : '—'}</span>
+                                </div>
+                              </div>
+                              <div className="mt-2 flex flex-wrap items-start gap-x-4 gap-y-2 border-t border-gray-100 pt-2 text-xs text-gray-600">
+                                {collective && <>
+                                  <details>
+                                    <summary className="cursor-pointer py-2 focus-visible:outline focus-visible:outline-2">Initial ranks</summary>
+                                    <ul>{individuals.map((pd) => <li key={pd.systemUserId}>{pd.name}: #{pd.order.indexOf(id) + 1}</li>)}</ul>
+                                    <p>Starting mean rank {collective.baseline.scores[id]?.averageRank?.toFixed(2) || 'Unavailable'}</p>
+                                  </details>
+                                  <span className="py-2">{['available', 'provisional'].includes(proposal.researchFunding?.status)
+                                    ? `${proposal.researchFunding.status === 'provisional' ? 'Provisional: ' : ''}${proposal.researchFunding.qualifyingGrantCount} prior Research ${proposal.researchFunding.qualifyingGrantCount === 1 ? 'award' : 'awards'}${proposal.researchFunding.latestAwardYear ? ` · latest ${proposal.researchFunding.latestAwardYear}` : ''}`
+                                    : 'Research history unavailable'}</span>
+                                    <div className="min-w-0 basis-full text-xs text-gray-600 sm:flex-1 sm:basis-64">
                                       <p>
                                         Earlier discussion:{' '}
                                         {sentiment?.status === 'access-denied'
@@ -470,100 +453,13 @@ export function AssessmentList({
                                         </>
                                       )}
                                     </div>
-                                    <div className="mt-2 flex flex-wrap justify-between gap-2 text-xs text-gray-600">
-                                      {disagreement ? (
-                                        <span className="flex items-center gap-1 font-semibold text-amber-800">
-                                          <ArrowLeftRight size={14} /> Grades
-                                          differ
-                                        </span>
-                                      ) : (
-                                        <span>Same grade across PDs</span>
-                                      )}
-                                      <span>
-                                        Starting mean rank{' '}
-                                        {collective.baseline.scores[
-                                          id
-                                        ].averageRank.toFixed(2)}
-                                      </span>
-                                    </div>
-                                  </>
-                                ) : (
-                                  <fieldset
-                                    disabled={!editable}
-                                    className="mt-4 flex flex-wrap items-center gap-4"
-                                  >
-                                    <legend className="mb-1 text-sm text-gray-600">
-                                      Confidence in my assessment
-                                    </legend>
-                                    <Grade
-                                      value={gradeAt(
-                                        position,
-                                        assessment.boundaries,
-                                      )}
-                                    />
-                                    {[
-                                      ['confident', 'Confident'],
-                                      ['not-sure', 'Not sure'],
-                                    ].map(([value, label]) => (
-                                      <label
-                                        key={value}
-                                        className="flex min-h-11 cursor-pointer items-center gap-2 text-sm"
-                                      >
-                                        <input
-                                          type="radio"
-                                          name={`confidence-${id}`}
-                                          checked={
-                                            assessment.confidence[id] === value
-                                          }
-                                          onChange={() =>
-                                            onChange({
-                                              ...assessment,
-                                              confidence: {
-                                                ...assessment.confidence,
-                                                [id]: value,
-                                              },
-                                            })
-                                          }
-                                        />
-                                        {label}
-                                      </label>
-                                    ))}
-                                  </fieldset>
-                                )}
-                              </div>
-                              <div className="mt-4 flex flex-wrap gap-5 border-t border-gray-100 pt-3 lg:mt-0 lg:block lg:border-l lg:border-t-0 lg:pl-6 lg:pt-0">
-                                <div>
-                                  <p className="text-xs text-gray-600">
-                                    Requested
-                                  </p>
-                                  <p className="mt-1 text-xl font-semibold tabular-nums">
-                                    {proposal.amountMinorUnits == null
-                                      ? 'Unavailable'
-                                      : formatMoney(
-                                          proposal.amountMinorUnits,
-                                          proposal.currency,
-                                        )}
-                                  </p>
-                                </div>
-                                {collective && (
-                                  <div className="lg:mt-5">
-                                    <p className="text-xs text-gray-600">
-                                      Cumulative requested
-                                    </p>
-                                    <p className="mt-1 text-lg font-semibold tabular-nums text-gray-700">
-                                      {formatMoney(
-                                        totals[position]?.cumulativeMinorUnits,
-                                        proposal.currency,
-                                        {
-                                          incomplete:
-                                            !totals[position]?.complete,
-                                        },
-                                      )}
-                                    </p>
-                                  </div>
-                                )}
+
+                                  <span className={`ml-auto shrink-0 rounded px-2 py-1 font-semibold ${position < assessment.boundaries[0] ? gradeClasses.A : position < assessment.boundaries[1] ? gradeClasses.B : 'bg-gray-100 text-gray-700'}`}>
+                                    {position < assessment.boundaries[0] ? 'Recommend funding' : position < assessment.boundaries[1] ? 'Alternate' : 'Not recommended'}
+                                  </span>
+                                </>}
                                 {editable && (
-                                  <details className="lg:mt-4">
+                                  <details className="relative shrink-0">
                                     <summary
                                       className="inline-flex h-11 w-11 cursor-pointer list-none items-center justify-center rounded focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-600 [&::-webkit-details-marker]:hidden"
                                       aria-label={`Actions for proposal ${proposal.requestNumber}`}
@@ -571,7 +467,7 @@ export function AssessmentList({
                                       <MoreHorizontal size={20} />
                                     </summary>
                                     <button
-                                      className={buttonClass}
+                                      className={`${buttonClass} absolute right-0 top-full z-10 w-44 border border-gray-200 bg-white text-left`}
                                       onClick={() => {
                                         setMoving(id);
                                         setPositionError('');
@@ -947,14 +843,7 @@ export default function AssessmentWorkflow({
     card?.scrollIntoView({ behavior: 'auto', block: 'center' });
     card?.focus({ preventScroll: true });
   };
-  const totals =
-    collective && assessment
-      ? calculateSectionTotals(
-          assessment.order,
-          assessment.boundaries,
-          proposals,
-        )
-      : null;
+
   const loadHistory = async (before) => {
     const id = ++generation.current;
     busyRef.current = true;
@@ -1339,13 +1228,7 @@ export default function AssessmentWorkflow({
             <Button variant="outline" disabled={busy || Boolean(pending) || !active} onClick={exportWorkbook}>Export workbook</Button>
           </div>
           <section aria-label="Current group recommendation" className="sticky top-0 z-20 mb-4 flex flex-wrap items-center justify-between gap-x-6 gap-y-2 border-y border-gray-200 bg-gray-50 px-2 py-3">
-            <div>
-              <p className="font-semibold tabular-nums">
-                Recommend funding: {totals[0].count} {totals[0].count === 1 ? 'award' : 'awards'} ·{' '}
-                {formatMoney(totals[0].amountMinorUnits, proposals[0]?.currency, { incomplete: !totals[0].complete })}
-              </p>
-              <p className="mt-1 text-sm text-gray-600">West {totals[0].geography.West} / East {totals[0].geography.East} / Unknown {totals[0].geography.Unknown} · Target: 2 West to 1 East by award count</p>
-            </div>
+            <p className="font-semibold">Collective order</p>
             <div className="flex items-center gap-3">
               <div className="text-sm text-gray-600">
                 <p role="status">{saveStatus}</p>
@@ -1374,10 +1257,10 @@ export default function AssessmentWorkflow({
               <Grade value="C" /> Don’t fund
             </span>
             <span className="flex items-center gap-1">
-              <Check size={16} /> Confident
+              <span aria-hidden="true" className="h-6 w-6 rounded border-2 border-solid border-gray-600" /> Confident
             </span>
             <span className="flex items-center gap-1">
-              <HelpCircle size={16} /> Not sure
+              <span aria-hidden="true" className="h-6 w-6 rounded border-2 border-dashed border-gray-600" /> Not sure
             </span>
           </div>
           <p className="mb-3 text-xs text-gray-600">

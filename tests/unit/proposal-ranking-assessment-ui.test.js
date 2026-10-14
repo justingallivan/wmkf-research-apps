@@ -218,3 +218,38 @@ test('unconfirmed saves explain recovery and retry the same operation rather tha
   expect(sendProposalRankingAction.mock.calls[1][0]).toEqual(original);
   expect(createOperationId).toHaveBeenCalledTimes(1);
 });
+
+test('group cards keep assessments attached to each PD when lead-first display order changes', () => {
+  const proposal = { requestId: 'p', requestNumber: '2026-041', organization: 'Example University', title: 'Example research', leadSystemUserId: 'morgan', programKey: 'mr', institutionGeography: 'West', amountMinorUnits: 120000, currency: { code: 'USD', precision: 2 }, score: { distribution: { Excellent: 1, Fair: 1 }, average: 3 }, researchFunding: { status: 'available', qualifyingGrantCount: 2, latestAwardYear: 2023 } };
+  const individuals = [
+    { systemUserId: 'dana', name: 'Dana Smith', order: ['p'], boundaries: [0, 0], confidence: { p: 'confident' } },
+    { systemUserId: 'alex', name: 'Alex Jones', order: ['p'], boundaries: [1, 1], confidence: { p: 'confident' } },
+    { systemUserId: 'morgan', name: 'Morgan Brown', order: ['p'], boundaries: [0, 1], confidence: { p: 'not-sure' } },
+  ];
+  const assessment = { order: ['p'], boundaries: [1, 1], confidence: {} };
+  const { container } = render(<AssessmentList assessment={assessment} proposals={[proposal]} roster={[]} collective={{ individuals, baseline: { scores: { p: { averageRank: 1 } } } }} editable={false} onChange={jest.fn()} />);
+  const judgments = [...container.querySelectorAll('[aria-label*="grade "]')];
+  expect(judgments.map((node) => node.getAttribute('aria-label'))).toEqual([
+    'Morgan Brown, lead PD: grade B, not sure', 'Alex Jones: grade A, confident', 'Dana Smith: grade C, confident',
+  ]);
+  expect(judgments[0].querySelector('span').className).toContain('border-dashed');
+  expect(judgments[1].querySelector('span').className).toContain('border-solid');
+  expect(screen.getByText('Morgan').className).toContain('underline');
+  expect(screen.queryByText(/Cumulative requested|Grades differ|Lead:/)).toBeNull();
+  expect(screen.getByText('Morgan Brown: #1').closest('details').open).toBe(false);
+  expect(screen.getByText('Recommended')).toBeTruthy();
+  expect(screen.getByText('East 0 · West 1')).toBeTruthy();
+  expect(screen.getAllByText('$1,200.00')).toHaveLength(2); // Requested and cutoff only.
+});
+
+test('private grade border follows confidence and leaves unanswered confidence unmarked', () => {
+  const assessment = { ...list, order: ['one'], boundaries: [1, 1], confidence: {} };
+  const props = { proposals: [proposals[0]], roster: [], editable: true, onChange: jest.fn() };
+  const { container, rerender } = render(<AssessmentList {...props} assessment={assessment} />);
+  const tile = () => container.querySelector('fieldset > span');
+  expect(tile().className).toContain('border-transparent');
+  rerender(<AssessmentList {...props} assessment={{ ...assessment, confidence: { one: 'not-sure' } }} />);
+  expect(tile().className).toContain('border-dashed');
+  rerender(<AssessmentList {...props} assessment={{ ...assessment, confidence: { one: 'confident' } }} />);
+  expect(tile().className).toContain('border-solid');
+});
