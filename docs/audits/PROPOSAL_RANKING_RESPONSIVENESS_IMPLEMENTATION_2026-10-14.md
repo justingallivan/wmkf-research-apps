@@ -50,3 +50,7 @@ Published-alias read-only smoke checks through Vercel protection: ranking page H
 ## Scoped documentation reconciliation
 
 Sweep Mode A: claim changed from planned to implemented client queue. Source/consumer proof is the implementation and tests above. Search terms `PROPOSAL_RANKING_RESPONSIVENESS`, `private-save queue`, and `responsiveness plan` found the accepted plan and dated Opus plan-review record; unrelated performance documents are excluded. The accepted plan's status/evidence is updated; its design remains the accepted specification. The Opus plan review remains explicitly historical review of revision 1. Live performance and multi-user acceptance are UNKNOWN, not asserted complete.
+
+## Reduced-motion follow-up
+
+The earlier browser timing experiment used the position dialog and programmatic radio click, not pointer dragging. A later Safari report exposed a reduced-motion drop-completion issue. See [the follow-up verification and Opus review](PROPOSAL_RANKING_REDUCED_MOTION_2026-10-14.md). Its measurements and native Safari limitations are separate from the historical queue experiment above.

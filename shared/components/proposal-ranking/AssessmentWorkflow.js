@@ -197,7 +197,11 @@ export function AssessmentList({
                         {...drag.draggableProps}
                         style={{
                           ...drag.draggableProps.style,
-                          ...(reduced ? { transition: 'none' } : {}),
+                          // The drag library completes a drop on transform transitionend.
+                          // `none` (or 0s) leaves reduced-motion users stuck dropping.
+                          ...(reduced ? dragState.isDropAnimating
+                            ? { transitionDuration: '0.001s' }
+                            : { transition: 'none' } : {}),
                         }}
                         className={
                           isBar
