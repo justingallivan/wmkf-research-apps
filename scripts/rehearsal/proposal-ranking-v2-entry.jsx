@@ -7,6 +7,7 @@ import {
   chooseFixture,
   seed,
   snapshot,
+  setSaveDelay,
 } from './proposal-ranking-v2-client';
 function Rehearsal() {
   const [view, setView] = useState(currentView());
@@ -25,6 +26,10 @@ function Rehearsal() {
         <button className="ml-4 underline" onClick={() => change(chooseFixture(false))}>
           Load four-card examples
         </button>
+        <button className="ml-4 underline" onClick={() => change(chooseFixture('cycle'))}>
+          Load 23 proposals / 4 PDs
+        </button>
+        <label className="ml-4"><input type="checkbox" onChange={e => setSaveDelay(e.target.checked)} /> Delay saves by 2 seconds</label>
         <label className="ml-4">
           Viewing as{' '}
           <select

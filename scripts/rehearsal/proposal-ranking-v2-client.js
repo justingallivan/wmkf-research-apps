@@ -84,10 +84,11 @@ const smallSnapshot = structuredClone(snapshot);
 export function chooseFixture(large = false) {
   Object.assign(snapshot, structuredClone(smallSnapshot));
   if (large) {
-    snapshot.roster = Array.from({ length: 12 }, (_, i) => ({
+    const count = large === 'cycle' ? 23 : 100;
+    snapshot.roster = Array.from({ length: large === 'cycle' ? 4 : 12 }, (_, i) => ({
       name: `Example PD ${i + 1}`, systemUserId: `pd-${i}`,
     }));
-    snapshot.proposals = Array.from({ length: 100 }, (_, i) => ({
+    snapshot.proposals = Array.from({ length: count }, (_, i) => ({
       ...structuredClone(smallSnapshot.proposals[i % 4]),
       requestId: `example-${i + 1}`,
       requestNumber: `Example ${i + 1}`,
@@ -182,7 +183,7 @@ export function seed(group = false) {
         order: i === 2 ? [...ids.slice(0, 2), ids[3], ids[2], ...ids.slice(4)] : ids,
         boundaries:
           ids.length > 4
-            ? [i === 0 ? 34 : 33, 67]
+            ? [Math.floor(ids.length / 3) + (i === 0 ? 1 : 0), Math.ceil(ids.length * 2 / 3)]
             : i === 0 ? [3, 3] : i === 1 ? [2, 3] : i === 2 ? [2, 2] : [1, 3],
         confidence: Object.fromEntries(
           ids.map((id) => [
@@ -220,7 +221,10 @@ export function createOperationId() {
 export async function loadProposalRanking() {
   return currentView();
 }
+let saveDelay = 0;
+export function setSaveDelay(enabled) { saveDelay = enabled ? 2000 : 0; }
 export async function sendProposalRankingAction(body) {
+  if (body.action === 'saveAssessment' && saveDelay) await new Promise(resolve => setTimeout(resolve, saveDelay));
   if (body.action === 'history')
     return { entries: archives.slice().reverse(), before: null };
   if (body.action === 'sentiment')
@@ -245,5 +249,5 @@ export async function sendProposalRankingAction(body) {
   archives.push(...result.archives);
   revision += 1;
   if (result.restart) roundId = `fictional-round-${revision}`;
-  return currentView();
+  return { ...currentView(), operation: { operationId: body.operationId, status: 'confirmed' } };
 }

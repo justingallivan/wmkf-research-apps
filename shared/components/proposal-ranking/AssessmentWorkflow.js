@@ -1,4 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import Router from 'next/router';
+import { createPrivateSaveQueue, EMPTY_PRIVATE_SAVE, projectedPrivateOwn } from './private-save-queue';
 import { DragDropContext, Draggable, Droppable } from '@hello-pangea/dnd';
 import {
   GripVertical,
@@ -90,6 +92,7 @@ export function AssessmentList({
   onSentimentRefresh,
   highlightedId,
   showMissingConfidence = false,
+  onPrivateChange,
 }) {
   const [notice, setNotice] = useState('');
   const [moving, setMoving] = useState(null);
@@ -103,6 +106,8 @@ export function AssessmentList({
     media.addEventListener('change', sync);
     return () => media.removeEventListener('change', sync);
   }, []);
+  const dragAssessment = useRef(null);
+  const update = (fn) => onPrivateChange ? onPrivateChange(fn) : onChange(fn(assessment));
   const byId = new Map(proposals.map((p) => [p.requestId, p]));
   const items = assessmentItems(assessment);
   // Private program lists contain only part of the full proposal pool.
@@ -112,7 +117,11 @@ export function AssessmentList({
   const move = (from, to) => {
     const next = moveAssessmentItem(assessment, from, to);
     if (next !== assessment) {
-      onChange(next);
+      const movingId = items[from], targetId = items[to];
+      update(current => {
+        const currentItems = assessmentItems(current);
+        return moveAssessmentItem(current, currentItems.indexOf(movingId), currentItems.indexOf(targetId));
+      });
       setNotice('Position and section updated. Saving changes.');
     } else setNotice('The dividers cannot cross.');
   };
@@ -131,9 +140,10 @@ export function AssessmentList({
     }
     if (moving === FIRST_BOUNDARY || moving === SECOND_BOUNDARY) {
       const bar = moving === FIRST_BOUNDARY ? 0 : 1;
-      const boundaries = [...assessment.boundaries];
-      boundaries[bar] = value;
-      onChange({ ...assessment, boundaries });
+      update(current => {
+        const next = [...current.boundaries]; next[bar] = value;
+        return next[0] <= next[1] && next[1] <= current.order.length ? { ...current, boundaries: next } : current;
+      });
     } else {
       const position = value - 1;
       const target = assessment.order[position];
@@ -148,8 +158,10 @@ export function AssessmentList({
         {notice}
       </p>
       <DragDropContext
+        onDragStart={() => { dragAssessment.current = assessment; }}
         onDragEnd={({ source, destination: target }) => {
-          if (target) move(source.index, target.index);
+          if (editable && dragAssessment.current === assessment && target) move(source.index, target.index);
+          dragAssessment.current = null;
         }}
       >
         <Droppable droppableId="ranking-assessments">
@@ -326,13 +338,13 @@ export function AssessmentList({
                                             assessment.confidence[id] === value
                                           }
                                           onChange={() =>
-                                            onChange({
-                                              ...assessment,
+                                            update(current => ({
+                                              ...current,
                                               confidence: {
-                                                ...assessment.confidence,
+                                                ...current.confidence,
                                                 [id]: value,
                                               },
-                                            })
+                                            }))
                                           }
                                         />
                                         {label}
@@ -538,7 +550,8 @@ export default function AssessmentWorkflow({
     initial.workflow.stage === 'revealed' ? 'group' : 'prepare',
   );
   const [program, setProgram] = useState('mr');
-  const [busy, setBusy] = useState(false);
+  const [exclusiveBusy, setBusy] = useState(false);
+  const [privateSave, setPrivateSave] = useState(EMPTY_PRIVATE_SAVE);
   const [busyMessage, setBusyMessage] = useState('Saving changes…');
   const [error, setError] = useState('');
   const [pending, setPending] = useState(null);
@@ -555,6 +568,41 @@ export default function AssessmentWorkflow({
   const busyRef = useRef(false);
   const pendingRef = useRef(null);
   const alive = useRef(true);
+  const recoveryRef = useRef(null);
+  const [queue] = useState(() => createPrivateSaveQueue({
+    onChange: setPrivateSave,
+    onView: next => {
+      setView(next); setRefreshed(new Date());
+      if (next.workflow.stage === 'revealed') setSection('group');
+      if (!next.own?.co) setProgram(selected => selected === 'co' ? 'mr' : selected);
+    },
+    onAuthLost: () => { setView(null); setDraft(null); setPending(null); },
+  }));
+  const busy = exclusiveBusy || privateSave.saving || Boolean(privateSave.blocked);
+  useEffect(() => {
+    queue.activate();
+    const beforeUnload = event => {
+      if (queue.isDirty()) { event.preventDefault(); event.returnValue = ''; }
+    };
+    const beforeRoute = (url, options) => {
+      if (!queue.isDirty()) return;
+      setError('Finish saving or resolve your unsaved preparation before leaving this page.');
+      const canceled = Object.assign(new Error('Unsaved ranking preparation'), { canceled: true, cancelled: true });
+      Router.events.emit('routeChangeError', canceled, url, options);
+      throw canceled;
+    };
+    window.addEventListener('beforeunload', beforeUnload);
+    Router.events.on('routeChangeStart', beforeRoute);
+    return () => {
+      queue.dispose();
+      window.removeEventListener('beforeunload', beforeUnload);
+      Router.events.off('routeChangeStart', beforeRoute);
+    };
+  }, [queue]);
+  useEffect(() => {
+    if (privateSave.blocked) recoveryRef.current?.focus();
+  }, [privateSave.blocked]);
+
   useEffect(() => {
     alive.current = true;
     return () => {
@@ -567,6 +615,7 @@ export default function AssessmentWorkflow({
   const accept = (next) => {
     sentimentGeneration.current += 1;
     setSentiment(null);
+    if (queue.isDirty()) return;
     setView(next);
     if (!next.own?.co)
       setProgram((selected) => (selected === 'co' ? 'mr' : selected));
@@ -579,7 +628,7 @@ export default function AssessmentWorkflow({
     else if (view.workflow.stage === 'revealed') setSection('prepare');
   };
   const refresh = async () => {
-    if (busyRef.current || pendingRef.current) return;
+    if (queue.isDirty() || busyRef.current || pendingRef.current) return;
     const id = ++generation.current;
     busyRef.current = true;
     setBusyMessage('Refreshing saved work…');
@@ -600,7 +649,7 @@ export default function AssessmentWorkflow({
     }
   };
   const execute = async (action, extra = {}, reuse = null) => {
-    if (busyRef.current || (!reuse && pendingRef.current)) return;
+    if (queue.isDirty() || busyRef.current || (!reuse && pendingRef.current)) return;
     const body = reuse || {
       action,
       roundId: view.roundId,
@@ -648,7 +697,7 @@ export default function AssessmentWorkflow({
   useEffect(() => {
     const onVisible = () => {
       if (
-        document.visibilityState === 'visible' &&
+        document.visibilityState === 'visible' && !queue.isDirty() &&
         !busyRef.current &&
         !pendingRef.current
       )
@@ -700,7 +749,7 @@ export default function AssessmentWorkflow({
     };
   }, [refreshSentiment]);
   const exportWorkbook = async () => {
-    if (busyRef.current || pendingRef.current) return;
+    if (queue.isDirty() || busyRef.current || pendingRef.current) return;
     const id = ++generation.current;
     busyRef.current = true;
     setBusyMessage('Preparing workbook…');
@@ -744,17 +793,20 @@ export default function AssessmentWorkflow({
       </p>
     );
   const collective = section === 'group' ? view.collective : null;
+  const own = projectedPrivateOwn(view.own, privateSave.program, privateSave.draft);
   const saved = collective || view.own?.[program];
-  const assessment = draft || saved;
+  const assessment = (!collective && privateSave.draft) || draft || saved;
   const active = view.round.state === 'active';
   const outdated =
     program === 'co' &&
-    view.own?.co &&
-    (view.own.co.sourceVersions.se !== view.own.se.version ||
-      view.own.co.sourceVersions.mr !== view.own.mr.version);
+    own?.co &&
+    (own.co.sourceVersions.se !== own.se.version ||
+      own.co.sourceVersions.mr !== own.mr.version);
   const editable =
     active &&
-    !busy &&
+    !exclusiveBusy &&
+    !privateSave.blocked &&
+    !confirmation &&
     !pending &&
     (collective
       ? view.workflow.stage === 'revealed'
@@ -762,6 +814,7 @@ export default function AssessmentWorkflow({
   const proposals = view.round.snapshot.proposals;
   const roster = view.round.snapshot.roster;
   const confirm = (action, extra = {}) => {
+    if (queue.isDirty() || busyRef.current || pendingRef.current) return;
     const key =
       action === 'resetProgram' ? `${action}:${extra.programKey}` : action;
     const item = view.confirmations[key];
@@ -773,43 +826,34 @@ export default function AssessmentWorkflow({
       });
   };
   const change = (next) => {
+    if (!collective) {
+      if (!busyRef.current && !pendingRef.current && !confirmation) queue.edit(view, program, next);
+      return;
+    }
     setDraft(next);
-    void execute(
-      collective ? 'editCollective' : 'saveAssessment',
-      collective
-        ? {
-            order: next.order,
-            boundaries: next.boundaries,
-            listVersion: saved.version,
-          }
-        : {
-            programKey: program,
-            listVersion: saved.version,
-            assessment: {
-              order: next.order,
-              boundaries: next.boundaries,
-              confidence: next.confidence,
-            },
-          },
-    );
+    void execute('editCollective', {
+      order: next.order,
+      boundaries: next.boundaries,
+      listVersion: saved.version,
+    });
   };
   const allConfident = ['se', 'mr'].every(
     (key) =>
-      view.own?.[key] &&
-      view.own[key].order.every((id) => view.own[key].confidence[id]),
+      own?.[key] &&
+      own[key].order.every((id) => own[key].confidence[id]),
   );
   const programProgress = ['mr', 'se'].map((key) => ({
     key,
     name: key === 'mr' ? 'Medical Research' : 'Science & Engineering',
-    answered: view.own?.[key]?.order.filter((id) => view.own[key].confidence[id]).length || 0,
-    total: view.own?.[key]?.order.length || 0,
+    answered: own?.[key]?.order.filter((id) => own[key].confidence[id]).length || 0,
+    total: own?.[key]?.order.length || 0,
   }));
   const currentProgram = programProgress.find((p) => p.key === program);
   const nextProgram = programProgress.find((p) => p.key !== program && p.answered < p.total);
   const currentProgramComplete = currentProgram && currentProgram.answered === currentProgram.total;
-  const saveStatus = busy ? busyMessage : pending
+  const saveStatus = privateSave.blocked ? 'Latest changes are not confirmed' : privateSave.saving ? 'Saving changes…' : busy ? busyMessage : pending
     ? 'Changes are not confirmed' : 'All changes saved';
-  const combinedComplete = view.own?.co?.order.every((id) => view.own.co.confidence[id]);
+  const combinedComplete = own?.co?.order.every((id) => own.co.confidence[id]);
   const unanswered = collective ? [] : assessment?.order.filter((id) => !assessment.confidence?.[id]) || [];
   const findScope = `${view.roundId}:${section}:${program}`;
   const showMissingConfidence = validationScope === findScope && unanswered.length > 0;
@@ -826,22 +870,22 @@ export default function AssessmentWorkflow({
   }
   const preparationAction = unanswered.length > 0 ? (
     <div className="flex flex-wrap items-center gap-3">
-      <Button variant="outline" disabled={busy || Boolean(pending)} onClick={jumpToUnanswered}>Go to next unanswered</Button>
-      <Button disabled={busy || Boolean(pending)} onClick={() => { setValidationScope(findScope); jumpToUnanswered(); }}>Continue</Button>
+      <Button variant="outline" disabled={exclusiveBusy || Boolean(pending) || Boolean(privateSave.blocked)} onClick={jumpToUnanswered}>Go to next unanswered</Button>
+      <Button disabled={exclusiveBusy || Boolean(pending) || Boolean(privateSave.blocked)} onClick={() => { setValidationScope(findScope); jumpToUnanswered(); }}>Continue</Button>
     </div>
   ) : !allConfident ? (
     nextProgram && (currentProgramComplete || program === 'co') ? (
-      <Button disabled={busy || Boolean(pending)} onClick={() => { setProgram(nextProgram.key); setDraft(null); }}>
+      <Button disabled={busy || Boolean(pending)} onClick={() => { if (queue.isDirty() || busyRef.current || pendingRef.current) return; setProgram(nextProgram.key); setDraft(null); }}>
         Continue to {nextProgram.name} →
       </Button>
     ) : null
-  ) : !view.own?.co ? (
+  ) : !own?.co ? (
     <Button disabled={!allConfident || busy || Boolean(pending) || !active} onClick={() => confirm('buildCombined')}>
       Create combined list
     </Button>
   ) : program !== 'co' ? null : outdated ? (
     <Button disabled={!allConfident || busy || Boolean(pending) || !active} onClick={() => confirm('buildCombined')}>Rebuild combined list</Button>
-  ) : !view.own.co.confirmed ? (
+  ) : !own.co.confirmed ? (
     <Button disabled={!combinedComplete || busy || Boolean(pending) || !active} onClick={() => execute('confirmCombined')}>Confirm combined order</Button>
   ) : (
     <Button disabled={busy || Boolean(pending) || !active} onClick={() => execute('ready')}>Ready</Button>
@@ -863,7 +907,30 @@ export default function AssessmentWorkflow({
     card?.focus({ preventScroll: true });
   };
 
+  const openRound = async (roundId, showHistory = false) => {
+    if (queue.isDirty() || busyRef.current || pendingRef.current) return;
+    const id = ++generation.current;
+    busyRef.current = true;
+    setBusy(true);
+    setBusyMessage('Loading saved run…');
+    try {
+      const next = await loadProposalRanking({ roundId });
+      if (valid(id)) {
+        accept(next);
+        if (showHistory) { setHistory(null); setSection('group'); }
+      }
+    } catch (err) {
+      if (valid(id)) {
+        setError(err.message);
+        if ([401, 403].includes(err.status)) setView(null);
+      }
+    } finally {
+      if (valid(id)) { busyRef.current = false; setBusy(false); }
+    }
+  };
+
   const loadHistory = async (before) => {
+    if (queue.isDirty() || busyRef.current || pendingRef.current) return;
     const id = ++generation.current;
     busyRef.current = true;
     setBusyMessage('Loading history…');
@@ -911,7 +978,7 @@ export default function AssessmentWorkflow({
             className="rounded-md border p-2 text-sm"
             disabled={busy || Boolean(pending)}
             value={view.cycleCode}
-            onChange={(e) => onCycleChange(e.target.value)}
+            onChange={(e) => { if (!queue.isDirty() && !busyRef.current && !pendingRef.current) onCycleChange(e.target.value); }}
           >
             {cycleOptions.map((option) => (
               <option key={option.code} value={option.code}>
@@ -950,6 +1017,7 @@ export default function AssessmentWorkflow({
             aria-current={section === key ? 'page' : undefined}
             className={`${buttonClass} ${section === key ? 'bg-gray-900 text-white hover:bg-gray-800' : ''}`}
             onClick={() => {
+              if (queue.isDirty() || busyRef.current || pendingRef.current) return;
               setSection(key);
               setDraft(null);
             }}
@@ -967,6 +1035,18 @@ export default function AssessmentWorkflow({
         </button>
       </nav>
       {!(section === 'group' && collective) && <p role="status" className="mb-3 text-sm text-gray-600">{saveStatus}</p>}
+      {privateSave.blocked && <div ref={recoveryRef} role="alert" tabIndex={-1} className="mb-4 rounded-lg border border-amber-300 bg-amber-50 p-4">
+        <p>{privateSave.blocked.message}</p>
+        <p className="mt-2 text-sm">Your local change is kept here. Earlier confirmed changes remain saved; the latest changes need recovery before you continue.</p>
+        <div className="mt-3 flex flex-wrap gap-2">
+          {['uncertain', 'rejected'].includes(privateSave.blocked.kind) && <Button disabled={privateSave.saving} onClick={() => queue.retry()}>
+            {privateSave.blocked.kind === 'uncertain' ? 'Check and retry change' : 'Try saving again'}
+          </Button>}
+          {['changed', 'rejected'].includes(privateSave.blocked.kind) && <Button disabled={privateSave.saving} variant="outline" onClick={() => {
+            if (window.confirm('Discard unsaved local edits and load the current saved preparation? Previously saved edits will remain.')) queue.discard();
+          }}>Discard local changes and load saved work</Button>}
+        </div>
+      </div>}
       {error && (
         <div
           role="alert"
@@ -1004,20 +1084,7 @@ export default function AssessmentWorkflow({
           {view.workflow.supersededBy && (
             <button
               className={buttonClass}
-              onClick={async () => {
-                const id = ++generation.current;
-                try {
-                  const next = await loadProposalRanking({
-                    roundId: view.workflow.supersededBy,
-                  });
-                  if (valid(id)) accept(next);
-                } catch (err) {
-                  if (valid(id)) {
-                    setError(err.message);
-                    if ([401, 403].includes(err.status)) setView(null);
-                  }
-                }
-              }}
+              onClick={() => openRound(view.workflow.supersededBy)}
             >
               Open replacement run
             </button>
@@ -1127,24 +1194,7 @@ export default function AssessmentWorkflow({
           {history?.previousRoundId && (
             <button
               className={buttonClass}
-              onClick={async () => {
-                const id = ++generation.current;
-                try {
-                  const next = await loadProposalRanking({
-                    roundId: history.previousRoundId,
-                  });
-                  if (valid(id)) {
-                    accept(next);
-                    setHistory(null);
-                    setSection('group');
-                  }
-                } catch (err) {
-                  if (valid(id)) {
-                    setError(err.message);
-                    if ([401, 403].includes(err.status)) setView(null);
-                  }
-                }
-              }}
+              onClick={() => openRound(history.previousRoundId, true)}
             >
               Open previous run
             </button>
@@ -1152,7 +1202,7 @@ export default function AssessmentWorkflow({
         </>
       )}
       {section === 'prepare' &&
-        (!view.own ? (
+        (!own ? (
           <p>
             You are facilitating this round and do not have an individual
             assessment.
@@ -1165,7 +1215,7 @@ export default function AssessmentWorkflow({
         ) : (
           <>
             <h2 className="text-xl font-semibold">My preparation</h2>
-            {view.own.ready ? (
+            {own.ready ? (
               <div className="my-5">
                 <p className="font-medium">Ready for group discussion</p>
                 <Button
@@ -1180,18 +1230,18 @@ export default function AssessmentWorkflow({
               <>
                 <div className="my-4 flex flex-wrap items-center gap-4">
                   <div className="grid min-w-0 flex-1 basis-full auto-cols-fr grid-flow-col gap-1 sm:max-w-2xl sm:basis-96" aria-label="Assessment lists">
-                  {[...programProgress.map((p) => [p.key, p.name]), ...(view.own.co ? [['co', 'Combined list']] : [])].map(([key, label]) => (
+                  {[...programProgress.map((p) => [p.key, p.name]), ...(own.co ? [['co', 'Combined list']] : [])].map(([key, label]) => (
                     <button
                       className={`min-h-16 min-w-0 rounded-lg px-3 py-2 text-center text-sm font-semibold focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-600 disabled:opacity-50 ${program === key ? 'bg-gray-100 text-gray-900' : 'text-gray-600 hover:bg-gray-50'}`}
                       key={key}
                       aria-label={label}
                       aria-pressed={program === key}
                       aria-describedby={key !== 'co' ? `preparation-count-${key}` : undefined}
-                      disabled={busy || Boolean(pending) || (key === 'co' && !view.own.co)}
-                      onClick={() => { setProgram(key); setDraft(null); }}
+                      disabled={busy || Boolean(pending) || (key === 'co' && !own.co)}
+                      onClick={() => { if (queue.isDirty() || busyRef.current || pendingRef.current) return; setProgram(key); setDraft(null); }}
                     >
                       {label}
-                      {key === 'co' && <span className="mt-1 block text-xs font-normal text-gray-600">{view.own.co.confirmed ? 'Confirmed' : 'Review order'}</span>}
+                      {key === 'co' && <span className="mt-1 block text-xs font-normal text-gray-600">{own.co.confirmed ? 'Confirmed' : 'Review order'}</span>}
                       {key !== 'co' && <span id={`preparation-count-${key}`} className="mt-1 block text-xs font-normal text-gray-600">{programProgress.find((p) => p.key === key).answered === programProgress.find((p) => p.key === key).total ? 'Complete' : programProgress.find((p) => p.key === key).answered === 0 ? 'Not started' : 'In progress'}</span>}
                     </button>
                   ))}
@@ -1200,7 +1250,7 @@ export default function AssessmentWorkflow({
                   <details className="relative">
                     <summary className={`${buttonClass} cursor-pointer`}>List options</summary>
                     <div className="absolute right-0 top-full z-30 mt-1 min-w-56 rounded-lg border bg-white p-2 shadow-sm">
-                      {program !== 'co' ? <button disabled={!editable} className={buttonClass} onClick={() => confirm('resetProgram', { programKey: program })}>Reset {program.toUpperCase()} preparation</button>
+                      {program !== 'co' ? <button disabled={!editable || busy} className={buttonClass} onClick={() => confirm('resetProgram', { programKey: program })}>Reset {program.toUpperCase()} preparation</button>
                         : <button disabled={!allConfident || busy || Boolean(pending) || !active} className={buttonClass} onClick={() => confirm('buildCombined')}>Rebuild combined list</button>}
                     </div>
                   </details>
@@ -1213,12 +1263,12 @@ export default function AssessmentWorkflow({
                     {program === 'co'
                       ? outdated ? 'Rebuild from your latest program assessments before continuing.'
                         : !combinedComplete ? 'Answer confidence for every proposal, then confirm the combined order.'
-                          : view.own.co.confirmed ? 'Your combined order is confirmed. Mark Ready when you are finished.'
+                          : own.co.confirmed ? 'Your combined order is confirmed. Mark Ready when you are finished.'
                             : 'Review the merged order and dividers, then confirm your combined order.'
                       : !allConfident ? currentProgramComplete
                         ? `${currentProgram.name} is complete. Continue to ${nextProgram.name}. You can return to adjust either list.`
                         : 'Choose Confident or Not sure on the highlighted cards.'
-                        : view.own.co ? 'Both programs are complete. Continue to your combined list.'
+                        : own.co ? 'Both programs are complete. Continue to your combined list.'
                           : 'Both programs are complete. Create your combined list to review MR and SE together.'}
                   </p>
                 </div>}
@@ -1263,8 +1313,8 @@ export default function AssessmentWorkflow({
       )}
       {((section === 'prepare' &&
         assessment &&
-        view.own &&
-        !view.own.ready &&
+        own &&
+        !own.ready &&
         view.workflow.stage === 'private') ||
         (section === 'group' && collective)) && (
         <>
@@ -1318,6 +1368,7 @@ export default function AssessmentWorkflow({
             collective={collective}
             editable={editable}
             onChange={change}
+                    onPrivateChange={!collective ? change : undefined}
             sentiment={sentiment}
             onSentimentRefresh={refreshSentiment}
             highlightedId={currentFindResult?.id}

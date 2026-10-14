@@ -1,6 +1,7 @@
 /** @jest-environment jsdom */
+import Router from 'next/router';
 import React, { StrictMode } from 'react';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
 import AssessmentWorkflow, { AssessmentList } from '../../shared/components/proposal-ranking/AssessmentWorkflow';
 import {
   createOperationId,
@@ -12,6 +13,7 @@ jest.mock('../../shared/components/proposal-ranking/client', () => ({
   loadProposalRanking: jest.fn(),
   sendProposalRankingAction: jest.fn(),
 }));
+jest.mock('next/router', () => ({ __esModule: true, default: { events: { on: jest.fn(), off: jest.fn(), emit: jest.fn() } } }));
 jest.mock('../../shared/components/Layout', () => ({
   Button: ({ children, variant, size, ...props }) => (
     <button {...props}>{children}</button>
@@ -46,8 +48,16 @@ const view = () => ({
     restartWalkthrough: { fingerprint: 'fp', message: 'Start again?' },
   },
 });
+function saved(base, body) {
+  const next = JSON.parse(JSON.stringify(base));
+  next.own[body.programKey] = { ...next.own[body.programKey], ...body.assessment, version: body.listVersion + 1 };
+  if (next.own.co) next.own.co.confirmed = false;
+  next.operation = { status: 'confirmed', operationId: body.operationId };
+  return next;
+}
 beforeEach(() => {
-  jest.clearAllMocks();
+  jest.resetAllMocks();
+  createOperationId.mockReturnValue("operation");
   window.matchMedia = () => ({
     matches: false,
     addEventListener: () => {},
@@ -101,10 +111,8 @@ test('private MR and SE lists render their subsets and saving SE keeps it select
   fireEvent.click(screen.getByRole('button', { name: 'Science & Engineering' }));
   expect(screen.getByRole('heading', { name: 'se institution' })).toBeTruthy();
   expect(screen.queryByRole('heading', { name: 'mr institution' })).toBeNull();
-  sendProposalRankingAction.mockResolvedValue({
-    ...initial,
-    own: { ...initial.own, se: { ...initial.own.se, confidence: { se: 'confident' }, version: 2 } },
-  });
+  let current = initial;
+  sendProposalRankingAction.mockImplementation(async body => (current = saved(current, body)));
   fireEvent.click(screen.getByRole('radio', { name: 'Confident' }));
   await waitFor(() => expect(screen.getByRole('status').textContent).toBe('All changes saved'));
   expect(screen.getByRole('heading', { name: 'se institution' })).toBeTruthy();
@@ -113,7 +121,6 @@ test('private MR and SE lists render their subsets and saving SE keeps it select
   expect(screen.queryByRole('button', { name: 'Create combined list' })).toBeNull();
   fireEvent.click(screen.getAllByRole('button', { name: 'Continue to Medical Research →' })[0]);
   expect(screen.getByRole('heading', { name: 'mr institution' })).toBeTruthy();
-  sendProposalRankingAction.mockResolvedValue({ ...initial, own: { ...initial.own, mr: { ...initial.own.mr, confidence: { mr: 'confident' } }, se: { ...initial.own.se, confidence: { se: 'confident' } } } });
   fireEvent.click(screen.getByRole('radio', { name: 'Confident' }));
   await waitFor(() => expect(screen.getAllByRole('button', { name: 'Create combined list' })[0].disabled).toBe(false));
   expect(screen.queryByRole('button', { name: /Continue to/ })).toBeNull();
@@ -220,7 +227,7 @@ test('unconfirmed saves explain recovery and retry the same operation rather tha
   expect(screen.getByText(/Your local change is kept here/)).toBeTruthy();
   expect(screen.getByRole('button', { name: 'Refresh' }).disabled).toBe(true);
   const original = sendProposalRankingAction.mock.calls[0][0];
-  sendProposalRankingAction.mockResolvedValueOnce({ ...initial, own: { ...initial.own, mr: { ...initial.own.mr, confidence: { one: 'not-sure' } } } });
+  sendProposalRankingAction.mockImplementationOnce(async body => saved(initial, body));
   fireEvent.click(screen.getByRole('button', { name: 'Check and retry change' }));
   await waitFor(() => expect(screen.getByRole('status').textContent).toBe('All changes saved'));
   expect(sendProposalRankingAction.mock.calls[1][0]).toEqual(original);
@@ -280,7 +287,7 @@ test('unanswered navigation follows current order, wraps, and skips saved choice
   expect(document.activeElement.name).toBe('confidence-two');
   fireEvent.click(jump);
   expect(document.activeElement.name).toBe('confidence-one');
-  sendProposalRankingAction.mockResolvedValue({ ...initial, own: { ...initial.own, mr: { ...initial.own.mr, confidence: { one: 'confident' } } } });
+  sendProposalRankingAction.mockImplementation(async body => saved(initial, body));
   fireEvent.click(document.activeElement);
   await waitFor(() => expect(screen.getByText('1 proposal needs a confidence choice')).toBeTruthy());
   await waitFor(() => expect(jump.disabled).toBe(false));
@@ -316,8 +323,77 @@ test('uncertain rebased save retries the exact final operation supplied by the c
   render(<AssessmentWorkflow initial={initial} cycleOptions={[]} onCycleChange={() => {}} />);
   fireEvent.click(screen.getAllByRole('radio', { name: 'Not sure' })[0]);
   await screen.findByRole('button', { name: 'Check and retry change' });
-  sendProposalRankingAction.mockResolvedValueOnce(initial);
+  sendProposalRankingAction.mockImplementationOnce(async body => saved(initial, body));
   fireEvent.click(screen.getByRole('button', { name: 'Check and retry change' }));
   await waitFor(() => expect(screen.getByRole('status').textContent).toBe('All changes saved'));
   expect(sendProposalRankingAction.mock.calls[1][0]).toEqual(rebased);
+});
+
+test('confidence stays interactive while a move saves, coalesces later choices and guards leaving', async () => {
+  const initial = populatedView();
+  const pending = [];
+  sendProposalRankingAction.mockImplementation(body => new Promise(resolve => pending.push({ body, resolve })));
+  render(<StrictMode><AssessmentWorkflow initial={initial} cycleOptions={[]} onCycleChange={() => {}} /></StrictMode>);
+  fireEvent.click(screen.getAllByRole('button', { name: 'Set boundary…' })[0]);
+  fireEvent.change(screen.getByRole('spinbutton'), { target: { value: '0' } });
+  fireEvent.click(screen.getByRole('button', { name: 'Move', exact: true }));
+  expect(pending).toHaveLength(1);
+  const started = performance.now();
+  fireEvent.click(screen.getAllByRole('radio', { name: 'Confident' })[0]);
+  fireEvent.click(screen.getAllByRole('radio', { name: 'Not sure' })[1]);
+  expect(performance.now() - started).toBeLessThan(200);
+  expect(screen.getAllByRole('radio', { name: 'Confident' })[0].checked).toBe(true);
+  expect(screen.getAllByRole('radio', { name: 'Not sure' })[1].checked).toBe(true);
+  expect(pending).toHaveLength(1);
+  expect(screen.getByRole('button', { name: 'Refresh' }).disabled).toBe(true);
+  expect(screen.getByRole('button', { name: 'Science & Engineering' }).disabled).toBe(true);
+  const event = new Event('beforeunload', { cancelable: true });
+  window.dispatchEvent(event);
+  expect(event.defaultPrevented).toBe(true);
+  const guard = Router.events.on.mock.calls.filter(([name]) => name === 'routeChangeStart').at(-1)[1];
+  expect(() => guard('/apps', {})).toThrow('Unsaved ranking preparation');
+  const first = saved(initial, pending[0].body);
+  await act(async () => pending[0].resolve(first));
+  expect(pending).toHaveLength(2);
+  expect(pending[1].body.assessment).toEqual({ order: ['one', 'two'], boundaries: [0, 2], confidence: { one: 'confident', two: 'not-sure' } });
+  expect(pending[1].body.listVersion).toBe(2);
+  await act(async () => pending[1].resolve(saved(first, pending[1].body)));
+  expect(screen.getByRole('status').textContent).toBe('All changes saved');
+  expect(() => guard('/apps', {})).not.toThrow();
+});
+
+test('keyboard drop keeps its drag handle and confidence usable while saving', async () => {
+  const initial = populatedView();
+  sendProposalRankingAction.mockImplementation(() => new Promise(() => {}));
+  render(<AssessmentWorkflow initial={initial} cycleOptions={[]} onCycleChange={() => {}} />);
+  const handle = screen.getByRole('button', { name: 'Move Institution one, position 1' });
+  handle.focus();
+  fireEvent.keyDown(handle, { key: ' ', code: 'Space', keyCode: 32 });
+  await act(async () => { await new Promise(resolve => requestAnimationFrame(resolve)); });
+  fireEvent.keyDown(handle, { key: 'ArrowDown', code: 'ArrowDown', keyCode: 40 });
+  fireEvent.keyDown(handle, { key: ' ', code: 'Space', keyCode: 32 });
+  await waitFor(() => expect(sendProposalRankingAction).toHaveBeenCalledTimes(1));
+  expect(document.activeElement).toBe(handle);
+  expect(handle.isConnected).toBe(true);
+  const confidence = screen.getAllByRole('radio', { name: 'Confident' })[0];
+  confidence.focus();
+  fireEvent.click(confidence);
+  expect(confidence.checked).toBe(true);
+  expect(document.activeElement).toBe(confidence);
+  expect(sendProposalRankingAction).toHaveBeenCalledTimes(1);
+});
+
+test('loading a previous run locks preparation until its response arrives', async () => {
+  const initial = populatedView();
+  sendProposalRankingAction.mockResolvedValueOnce({ entries: [], before: null, previousRoundId: 'previous' });
+  let resolve;
+  loadProposalRanking.mockImplementationOnce(() => new Promise(r => { resolve = r; }));
+  render(<AssessmentWorkflow initial={initial} cycleOptions={[]} onCycleChange={() => {}} />);
+  fireEvent.click(screen.getByRole('button', { name: 'History' }));
+  const open = await screen.findByRole('button', { name: 'Open previous run' });
+  fireEvent.click(open);
+  expect(screen.getByRole('button', { name: 'My preparation' }).disabled).toBe(true);
+  const previous = { ...initial, roundId: 'previous', round: { ...initial.round, state: 'closed' } };
+  await act(async () => resolve(previous));
+  expect(screen.getByText(/Read-only historical run/)).toBeTruthy();
 });

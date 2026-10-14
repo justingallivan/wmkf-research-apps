@@ -30,7 +30,7 @@ const config = {
       use: path.join(root, 'scripts/rehearsal/jsx-loader.js')
     }]
   },
-  plugins: [new webpack.NormalModuleReplacementPlugin(/^\.\.\/Layout$/, path.join(output, 'layout.jsx')), new webpack.NormalModuleReplacementPlugin(/^\.\/client$/, resource => {
+  plugins: [new webpack.NormalModuleReplacementPlugin(/^next\/router$/, path.join(root, 'scripts/rehearsal/router.js')),new webpack.NormalModuleReplacementPlugin(/^\.\.\/Layout$/, path.join(output, 'layout.jsx')), new webpack.NormalModuleReplacementPlugin(/^\.\/client$/, resource => {
     if (resource.context === path.join(root, 'shared/components/proposal-ranking')) resource.request = path.join(root, 'scripts/rehearsal/proposal-ranking-sandbox-client.js');
   })]
 };

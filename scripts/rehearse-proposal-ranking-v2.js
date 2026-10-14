@@ -29,7 +29,7 @@ const config = {
       },
     ],
   },
-  plugins: [
+  plugins: [new webpack.NormalModuleReplacementPlugin(/^next\/router$/, path.join(root, 'scripts/rehearsal/router.js')),
     new webpack.NormalModuleReplacementPlugin(
       /^\.\.\/Layout$/,
       path.join(output, 'layout.jsx'),
