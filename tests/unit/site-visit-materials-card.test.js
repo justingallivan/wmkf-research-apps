@@ -1,5 +1,5 @@
 /** @jest-environment jsdom */
-import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { StrictMode } from 'react';
 import SiteVisitMaterialsCard from '../../shared/components/meeting-tracker/SiteVisitMaterialsCard';
 
@@ -239,10 +239,70 @@ test('pending replacement opens only the previous receipt and never the unfinish
   expect(screen.getByText(/Previously received/)).toBeInTheDocument();
 });
 
+const failedSourceJob = (overrides = {}) => ({
+  jobId: 'old-failure', slot: 'presentation_source', status: 'failed', errorCode: 'infected',
+  createdAt: '2026-10-14T20:00:00Z', updatedAt: '2026-10-14T20:01:00Z',
+  scanRejection: { category: 'invalid_or_protected_file', flags: ['invalid_file'] },
+  ...overrides,
+});
+const oldFailureCopy = /The new upload could not be saved/;
+
+test.each([
+  ['new receipt', '2026-10-14T22:00:00Z', {}, false],
+  ['older receipt', '2026-10-14T19:00:00Z', {}, true],
+  ['equal timestamp', '2026-10-14T20:01:00Z', {}, true],
+  ['unknown failure time', '2026-10-14T22:00:00Z', { createdAt: null, updatedAt: null }, true],
+  ['invalid receipt time', 'unknown', {}, true],
+])('failed notice on a fresh load: %s', async (_label, receivedAt, jobOverrides, visible) => {
+  const data = collection({ uploadJobs: [failedSourceJob(jobOverrides)] });
+  data.checklist[1].received = { artifactId: 'replacement', filename: 'replacement.pptx', receivedAt };
+  global.fetch = jest.fn(async () => response({ success: true, collection: data }));
+  render(<SiteVisitMaterialsCard requestId={REQUEST_ID} />);
+  await screen.findByTestId('materials-row-presentation_source');
+  expect(Boolean(within(rowOf('presentation_source')).queryByText(oldFailureCopy))).toBe(visible);
+});
+
+test('a newer receipt never hides an upload needing reconciliation or another slot failure', async () => {
+  const data = collection({ uploadJobs: [failedSourceJob({ status: 'needs_attention' }), failedSourceJob({ jobId: 'bios-failure', slot: 'participant_bios' })] });
+  data.checklist[1].received = { artifactId: 'replacement', filename: 'replacement.pptx', receivedAt: '2026-10-14T22:00:00Z' };
+  global.fetch = jest.fn(async () => response({ success: true, collection: data }));
+  render(<SiteVisitMaterialsCard requestId={REQUEST_ID} />);
+  expect(await screen.findByText(/Needs coordinator attention/)).toBeInTheDocument();
+  expect(within(rowOf('participant_bios')).getByText(oldFailureCopy)).toBeInTheDocument();
+});
+
 describe('staff replacement upload (staff replacement plan §3.4)', () => {
   const mockPut = jest.fn(async () => ({}));
   beforeAll(() => { jest.doMock('@vercel/blob/client', () => ({ put: (...args) => mockPut(...args) })); });
   beforeEach(() => mockPut.mockClear());
+
+  test.each([true, false])('replacement supersedes the old warning from start through success=%s', async (succeeds) => {
+    let finish;
+    const finalizing = new Promise((resolve) => { finish = resolve; });
+    const data = collection({ uploadJobs: [failedSourceJob(), failedSourceJob({ jobId: 'bios-failure', slot: 'participant_bios' })] });
+    global.fetch = jest.fn(async (url) => {
+      if (url.endsWith('/staff-upload-token')) return response({ ok: true, stagingId: 'stage-new', pathname: 'p', clientToken: 'ct', contentType: 'application/octet-stream' });
+      if (url.endsWith('/staff-finalize')) return finalizing;
+      return response({ success: true, collection: data });
+    });
+    const view = render(<SiteVisitMaterialsCard requestId={REQUEST_ID} />);
+    await screen.findByTestId('materials-row-presentation_source');
+    expect(within(rowOf('presentation_source')).getByText(oldFailureCopy)).toBeInTheDocument();
+    fireEvent.change(screen.getByTestId('staff-upload-input-presentation_source'), { target: { files: [new File(['ppt'], 'new.pptx')] } });
+    expect(within(rowOf('presentation_source')).queryByText(oldFailureCopy)).toBeNull();
+    expect(within(rowOf('participant_bios')).getByText(oldFailureCopy)).toBeInTheDocument();
+    await screen.findByText(/Checking and saving the file/);
+    expect(within(rowOf('presentation_source')).queryByText(oldFailureCopy)).toBeNull();
+    await act(async () => finish(succeeds
+      ? response({ ok: true, slot: 'presentation_source', filename: 'new.pptx', receivedAt: '2026-10-14T22:00:00Z' })
+      : response({ ok: false, reason: 'scan_infected', scanRejection: { category: 'blocked_content', flags: ['embedded_macro'] } }, 422)));
+    if (succeeds) await screen.findByText(/Presentation source .* saved/);
+    else expect(await within(rowOf('presentation_source')).findByRole('alert')).toHaveTextContent('embedded macro');
+    // Even a stale collection response must not bring the superseded warning back.
+    expect(within(rowOf('presentation_source')).queryByText(oldFailureCopy)).toBeNull();
+    view.rerender(<SiteVisitMaterialsCard requestId="33333333-3333-4333-8333-333333333333" />);
+    await waitFor(() => expect(within(rowOf('presentation_source')).getByText(oldFailureCopy)).toBeInTheDocument());
+  });
 
   test('a closed collection still offers upload on every row; a waived row with a staff file is not struck through', async () => {
     const closed = collection({
