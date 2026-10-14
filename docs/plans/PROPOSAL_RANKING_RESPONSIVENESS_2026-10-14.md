@@ -1,6 +1,6 @@
 # Proposal Ranking responsiveness plan
 
-Date: October 14, 2026. Status: revised after Claude Opus review; implementation not started.
+Date: October 14, 2026. Status: client queue implemented, verified, reviewed by Opus and deployed to the isolated preview; live multi-user acceptance remains.
 Scope: revised ranker's private preparation, especially moving a card and immediately answering confidence. This is separate from the D26 shared-facilitator/schema release work.
 
 ## Outcome and current evidence
@@ -11,7 +11,7 @@ Let a PD move a card, set confidence and keep editing without waiting for each s
 
 [VERIFIED source] `client.js` permits at most three peer-only conflict rebases after definite 409 rejection, requiring unchanged own state, actor, workflow and policy. It preserves the final request as `pendingAction` on failure. `workflow-service.js` loads the round and active assessments, checks an operation receipt, validates scope (the reducer checks list version), writes one ETag-fenced changeset, then reloads the round for the response. This is real work on every private edit; no live latency breakdown has yet been measured.
 
-[PLANNED] First improve interaction latency without removing server authorization, readback, round fencing or durable receipt checks. Server-read reductions are conditional follow-up work, not part of the first patch.
+[VERIFIED via `85d07a3bf` and the implementation receipt] The client queue improves interaction availability without removing server authorization, readback, round fencing or durable receipt checks. Server-read reductions are conditional follow-up work, not part of the first patch.
 
 ## Contract and invariants
 
@@ -31,7 +31,9 @@ Persistence: unchanged Dataverse assessment rows, round fence and operation rece
 | Scope/access changes never replay old work | Bind queue to actor, round, preparation version, program and workflow stage; validate on every response and retry. |
 | Shared discussion semantics stay unchanged | Only private `saveAssessment` gets optimistic queuing; shared actions remain serialized and explicitly confirmed where required. |
 
-## Proposed client design
+## Accepted client design
+
+Implementation evidence and remaining limits are in the linked implementation receipt. The design below is the accepted specification; future live measurements remain explicitly planned.
 
 Use one small dedicated private-save controller/hook with testable state transitions, not a general synchronization framework. Keep the existing execute path for lifecycle and shared operations.
 
@@ -119,6 +121,6 @@ Rollback: redeploy the prior v2-capable preview/runtime if necessary. There is n
 
 Whole flow and stale-state audits apply to every client transition above. Partial success remains one atomic assessment transaction; queued edits are not reported saved until individually acknowledged. Helper extraction is limited to private-save state and cannot absorb lifecycle/shared semantics. Durable-surface audit: no new table/field; client behavior documentation and tests need updates; the API wire contract stays unchanged. Symbol fan-out: audit every `busy`, `editable`, `pending`, `draft`, `accept`, `generation`, navigation and refresh consumer. Documentation reconciliation is limited to this proposed behavior and eventual implementation receipts; this document makes no deployed-performance claim.
 
-Recommendation evidence: the UI busy lock and unconditional draft clearing are source-verified; the queue improvement is PLANNED and untested. Disconfirming test: keep a move response unresolved and confirm confidence updates immediately, then ensure the response cannot remove that choice. Backend bottleneck attribution is UNKNOWN until measured.
+Recommendation evidence: the former UI busy lock is verified at the baseline commit. The implemented queue passes deferred-response tests and a local browser comparison with two-second synthetic saves. The disconfirming test keeps a move unresolved, selects confidence, then proves the earlier response cannot remove that choice. Backend bottleneck attribution and live multi-user timing remain UNKNOWN. Implementation, verification, limitations and rollout: `docs/audits/PROPOSAL_RANKING_RESPONSIVENESS_IMPLEMENTATION_2026-10-14.md`.
 
 Claude Opus review: completed through the Claude CLI OAuth/subscription session. Verdict on revision 1: READY WITH NAMED CHANGES. The review reported claude-opus-5-5 (CLI metadata also lists claude-fable-5-1), no permission denials and success. No API-key authentication or Ultrareview was used. Full review and disposition: `docs/audits/PROPOSAL_RANKING_RESPONSIVENESS_OPUS_2026-10-14.md`. This revision incorporates the named changes; that is author reconciliation, not a claim of a second Opus approval.
