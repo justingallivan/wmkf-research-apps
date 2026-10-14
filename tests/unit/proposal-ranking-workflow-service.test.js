@@ -333,3 +333,33 @@ test('sample discussion retains live Meeting Tracker access and stale-response f
     await expect(readWorkflowSupplement({body,actor:alice,profileId:1})).rejects.toMatchObject({code:'stale_scope'});
   } finally { getRankingTestPolicy.mockReturnValue({enabled:false}); }
 });
+
+jest.mock('../../shared/utils/api-request', () => ({ requestEnvelope: jest.fn() }));
+import { requestEnvelope } from '../../shared/utils/api-request';
+import { sendProposalRankingAction } from '../../shared/components/proposal-ranking/client';
+test('two PDs saving from the same loaded round retain distinct private assessments through client recovery', async () => {
+  const bobView = await readWorkflowRound({ roundId, actor: bob });
+  await send('saveAssessment', alice, { programKey: 'mr', listVersion: 1,
+    assessment: { ...bobView.own.mr, confidence: { m: 'confident' } } });
+  requestEnvelope.mockImplementation(async (_url, options) => {
+    try {
+      const data = options.body
+        ? await mutateWorkflow({ body: options.body, actor: bob })
+        : await readWorkflowRound({ roundId, actor: bob });
+      return { ok: true, status: 200, data };
+    } catch (error) {
+      return { ok: false, status: error.status, data: { error: { code: error.code, message: error.message } } };
+    }
+  });
+  const response = await sendProposalRankingAction({
+    action: 'saveAssessment', roundId, operationId: 'bob-save', roundEtag: bobView.round.etag,
+    policyRevision: 1, preparationVersion: 1, revealId: null, programKey: 'mr', listVersion: 1,
+    assessment: { ...bobView.own.mr, confidence: { m: 'not-sure' } },
+  }, { baseView: bobView });
+  expect(response.own.mr.confidence).toEqual({ m: 'not-sure' });
+  expect((await readWorkflowRound({ roundId, actor: alice })).own.mr.confidence).toEqual({ m: 'confident' });
+  const lastCommit = commitAssessmentChanges.mock.calls.at(-1)[0];
+  expect(lastCommit.updates).toHaveLength(1);
+  expect(lastCommit.updates[0].row.wmkf_participantsystemuserid).toBe(bob);
+  expect(requestEnvelope).toHaveBeenCalledTimes(3);
+});

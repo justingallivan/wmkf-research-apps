@@ -631,7 +631,7 @@ export default function AssessmentWorkflow({
     setBusy(true);
     setError('');
     try {
-      const next = await sendProposalRankingAction(body);
+      const next = await sendProposalRankingAction(body, { baseView: view });
       if (valid(id)) {
         accept(next);
         if (action === 'buildCombined') setProgram('co');
@@ -646,8 +646,8 @@ export default function AssessmentWorkflow({
           setPending(null);
           pendingRef.current = null;
         } else {
-          setPending(body);
-          pendingRef.current = body;
+          setPending(err.pendingAction || body);
+          pendingRef.current = err.pendingAction || body;
         }
       }
     } finally {

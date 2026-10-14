@@ -303,3 +303,21 @@ test('Continue identifies missing cards without submitting or changing assessmen
   expect(document.activeElement.name).toBe('confidence-two');
   expect(sendProposalRankingAction).not.toHaveBeenCalled();
 });
+
+
+test('uncertain rebased save retries the exact final operation supplied by the client', async () => {
+  const initial = populatedView();
+  let rebased;
+  sendProposalRankingAction.mockImplementationOnce(async (body, options) => {
+    expect(options.baseView).toBe(initial);
+    rebased = { ...body, operationId: 'rebased-operation', roundEtag: 'new-round' };
+    throw Object.assign(new Error('Outcome uncertain'), { pendingAction: rebased });
+  });
+  render(<AssessmentWorkflow initial={initial} cycleOptions={[]} onCycleChange={() => {}} />);
+  fireEvent.click(screen.getAllByRole('radio', { name: 'Not sure' })[0]);
+  await screen.findByRole('button', { name: 'Check and retry change' });
+  sendProposalRankingAction.mockResolvedValueOnce(initial);
+  fireEvent.click(screen.getByRole('button', { name: 'Check and retry change' }));
+  await waitFor(() => expect(screen.getByRole('status').textContent).toBe('All changes saved'));
+  expect(sendProposalRankingAction.mock.calls[1][0]).toEqual(rebased);
+});

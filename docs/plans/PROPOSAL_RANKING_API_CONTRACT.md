@@ -262,6 +262,17 @@ An operation UUID reused with different input conflicts. Serialized storage limi
 are enforced before the atomic changeset; historical receipts are not loaded into
 ordinary views. Version-1 operation readback remains as described in §4.
 
+[VERIFIED via branch tests, 2026-10-14; deployment pending] Private preparation
+clients recover from definite `409 stale_scope`, `conflict`, or
+`confirmation_stale` responses with up to three automatic retries. Each rereads
+the round and requires the same actor, active round, policy, full workflow and
+complete own preparation before rebasing the round ETag/confirmation. A fresh
+operation UUID accompanies the changed request hash. Shared actions, changed own
+work and uncertain outcomes never take this automatic path. If a rebased attempt
+has an uncertain outcome, the UI retains that exact last payload/UUID for receipt
+recovery. See `docs/audits/PROPOSAL_RANKING_PD_SAVE_CONFLICT_2026-10-14.md`.
+
+
 Sentiment returns optional current envelopes or an explicit access/dependency status;
 any failed batch clears the entire enrichment. A round change during the read rejects
 the response. Workbook export returns `{filename, base64}` for one saved
