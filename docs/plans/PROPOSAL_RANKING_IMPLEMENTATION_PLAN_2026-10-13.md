@@ -99,7 +99,7 @@ Existing seams to extend, subject to implementation tests:
 | Authenticated entry | `pages/api/proposal-ranking.js` | Versioned allowlisted actions and payloads, same session-derived actors/app grant/private no-store/DAL context. |
 | Workflow and response privacy | `lib/services/proposal-ranking/service.js` | Version-aware reads, new preparation/reveal/reset transitions, atomicity, durable operation readback, filtered history. |
 | Deterministic calculations | `lib/services/proposal-ranking/calculations.js` | Thirds, pair merge, exact combined rank sums, unanimous outer blocks, section totals; no score weighting from grades/confidence/history/sentiment. |
-| Source snapshot | `lib/services/proposal-ranking/preview-service.js`, `lib/dataverse/adapters/proposal-ranking-source.js` | Preserve eligibility/roster/scale/currency; adapt qualified Research count/latest year. |
+| Source snapshot | `lib/services/proposal-ranking/preview-service.js`, `lib/dataverse/adapters/proposal-ranking-source.js` | Preserve eligibility/roster/scale/currency; carry qualifying Research count/latest year and total USD in integer cents. |
 | Persistence | `lib/dataverse/adapters/proposal-ranking.js`, `lib/dataverse/schema/wave32-proposal-ranking/` | Additive versioned fields/keys and conditional multi-row transitions; retain old records. |
 | Sentiment | `lib/services/post-presentation-materials/discussion-sentiment-reader.js` | Optional live authorized enrichment of active group cards only, never frozen private data. |
 | Export | New ranking workbook helper using an inspected supported workbook dependency | Two sheets from one saved group revision and its matching revealed inputs. Branch CSV is only a formatting/security reference. |
@@ -216,7 +216,12 @@ not change unanimity. All-A/all-C/empty middle/no consensus cases must remain va
 
 Research history: adapt the branch classifier and complete all-history source read,
 retaining qualifying Research exclusions and provisional/unavailable distinctions.
-Expose count and most recent qualifying award year, omitting funding dollars. Verify
+Expose count and most recent qualifying award year in the card summary, with total
+qualifying Research funding in USD under its arrow disclosure (October 13 owner
+refinement). The local helper now returns its existing checked sum as
+`totalAmountMinorUnits`; this additive field is not deployed. Older frozen snapshots
+without it show unavailable, not zero; no backfill or source refresh through resets.
+History remains informational and workbook columns are unchanged. Verify
 the year derivation (fiscal-year field, then meeting/decision date fallback) against
 source before settling the display; label any uncertain year rather than inventing it.
 Capture history with opening source provenance; resets do not refresh or alter it.
@@ -253,7 +258,7 @@ merge its incompatible combine/reset/CSV behavior wholesale.
 | 3. Additive persistence and private preparation | New schema/readers/writers, own program/combined edits, explicit rebuild, readiness/reopen and own reset. | Actor isolation, combined invalidation, transactional order/bars/confidence saves, cap tests, replay and stale-write cases. Probe schema after approved application. |
 | 4. Reveal and shared resets | Atomic all-ready reveal, collective edits, reopen after reveal, collective reset, full restart, read-only history. | Two-identity concurrent saves/reveal/reset; all-or-nothing failure injection; retry after later edits; coordinator conflict; no deleted reveals or cross-version votes. |
 | 5. Complete interaction | Private MR/SE and combined views, draggable/keyboard bars/cards, ready progress, reveal, group comparisons/totals and clear reset confirmations. | Browser walkthrough with separate PD/facilitator identities, focus/keyboard accessibility, pending-save and stale-response behavior, private payload inspection. |
-| 6. Context and workbook | Research count/year, optional authorized sentiment, two-sheet saved-revision XLSX. | Missing/provisional history, present-but-unauthorized sentiment, withdrawal/currentness, >50 IDs, dependency failure, workbook cell types/provenance and reset/export race. |
+| 6. Context and workbook | Research count/year with expandable total USD, optional authorized sentiment, two-sheet saved-revision XLSX. | Missing/provisional history, present-but-unauthorized sentiment, withdrawal/currentness, >50 IDs, dependency failure, workbook cell types/provenance and reset/export race. |
 | 6a. Impeccable critique and audit — working interface | Review the complete built flow, including context-rich cards and reset/export states, for usability, visual hierarchy, accessibility and responsive behavior. | Record prioritized findings, fix the agreed batch, and verify once more. No unresolved blocking usability/accessibility defects before rehearsal/release review. |
 | 7. Rehearsal and release review | Repeatable local/sandbox walkthrough at every stage, source/Atlas/API/catalogue updates and scoped gates. | Complete acceptance matrix below, independent whole-flow review, sandbox receipt and deliberate promotion/rollback plan. No production changes inferred from test success. |
 

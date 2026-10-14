@@ -74,6 +74,7 @@ export const snapshot = {
       researchFunding: {
         status: 'available',
         qualifyingGrantCount: i % 3,
+        totalAmountMinorUnits: (i % 3) * 100000000,
         latestAwardYear: i % 3 ? 2021 : null,
       },
     }),

@@ -94,13 +94,23 @@ rehearsal, a marked dry-run reset, and browser CSV export. It does not collect e
 PD's combined preference or implement revision 5's assessment/readiness model.
 Its funding DTO includes qualifying award count, total USD, latest award cycle and
 availability; its card displays dollars and latest award month/year. The agreed
-replacement display is count/latest award year across all recorded qualifying regular Research
-awards, with no recency window or quantitative weighting. Zero qualifying awards must not be
+replacement display is count/latest award year with total USD in an arrow disclosure,
+across all recorded qualifying regular Research awards, with no recency window or
+quantitative weighting. Zero qualifying awards must not be
 labelled never funded by the Foundation; unavailable/provisional coverage stays explicit. These features must be adapted, not assumed
 ready to merge as the revised workflow. Branch role/delete behavior is not deployed
 by the documentation comparison; no dry-run erase is authorized here.
 
 ## Version-2 branch persistence and consumers
+
+[VERIFIED via local branch source, October 13; additive total not deployed]
+`research-funding.js` returns `researchFunding.totalAmountMinorUnits`, its existing
+safe integer USD-cent sum over the same qualifying awards as the count. The source
+adapter passes the object through `preview-service.js` into the frozen round snapshot;
+`AssessmentWorkflow.js` displays it inside the prior-awards disclosure. Unavailable
+history returns null; old snapshots without the field display **Not available**.
+Provisional history remains labelled. Scoring, workbook columns, and reset semantics
+are unchanged; resets retain the original history and do not backfill this total.
 
 [VERIFIED via branch source] Revision 5 implements grades, confidence, separator positions,
 individual combined orders, readiness/reopen versions, immutable reveal revisions and

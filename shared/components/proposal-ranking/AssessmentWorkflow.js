@@ -352,9 +352,22 @@ export function AssessmentList({
                                     <ul>{individuals.map((pd) => <li key={pd.systemUserId}>{pd.name}: #{pd.order.indexOf(id) + 1}</li>)}</ul>
                                     <p>Starting mean rank {collective.baseline.scores[id]?.averageRank?.toFixed(2) || 'Unavailable'}</p>
                                   </details>
-                                  <span className="py-2">{['available', 'provisional'].includes(proposal.researchFunding?.status)
-                                    ? `${proposal.researchFunding.status === 'provisional' ? 'Provisional: ' : ''}${proposal.researchFunding.qualifyingGrantCount} prior Research ${proposal.researchFunding.qualifyingGrantCount === 1 ? 'award' : 'awards'}${proposal.researchFunding.latestAwardYear ? ` · latest ${proposal.researchFunding.latestAwardYear}` : ''}`
-                                    : 'Research history unavailable'}</span>
+                                  <details>
+                                    <summary className="cursor-pointer py-2 focus-visible:outline focus-visible:outline-2">
+                                      {['available', 'provisional'].includes(proposal.researchFunding?.status)
+                                        ? `${proposal.researchFunding.status === 'provisional' ? 'Provisional: ' : ''}${proposal.researchFunding.qualifyingGrantCount} prior Research ${proposal.researchFunding.qualifyingGrantCount === 1 ? 'award' : 'awards'}${proposal.researchFunding.latestAwardYear ? ` · latest ${proposal.researchFunding.latestAwardYear}` : ''}`
+                                        : 'Research history unavailable'}
+                                    </summary>
+                                    <div className="max-w-sm space-y-1 pb-2">
+                                      <p>Total Research funding: <strong>{['available', 'provisional'].includes(proposal.researchFunding?.status) && Number.isSafeInteger(proposal.researchFunding.totalAmountMinorUnits) && proposal.researchFunding.totalAmountMinorUnits >= 0
+                                        ? formatMoney(proposal.researchFunding.totalAmountMinorUnits, { code: 'USD', precision: 2 })
+                                        : 'Not available'}</strong></p>
+                                      <p>Most recent award: {proposal.researchFunding?.latestAwardYear || (proposal.researchFunding?.qualifyingGrantCount === 0 ? 'None recorded' : 'Not available')}</p>
+                                      <p>Qualifying regular Research awards to this institution across recorded history. Excludes directed, capital, endowment, teaching, Special, and Young Scholars awards.</p>
+                                      {proposal.researchFunding?.status === 'provisional' && <p>Provisional: some historical award classifications still need review.</p>}
+                                      <p>Context only; does not affect ranking.</p>
+                                    </div>
+                                  </details>
                                     <div className="min-w-0 basis-full text-xs text-gray-600 sm:flex-1 sm:basis-64">
                                       <p>
                                         Earlier discussion:{' '}

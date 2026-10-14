@@ -220,14 +220,14 @@ test('unconfirmed saves explain recovery and retry the same operation rather tha
 });
 
 test('group cards keep assessments attached to each PD when lead-first display order changes', () => {
-  const proposal = { requestId: 'p', requestNumber: '2026-041', organization: 'Example University', title: 'Example research', leadSystemUserId: 'morgan', programKey: 'mr', institutionGeography: 'West', amountMinorUnits: 120000, currency: { code: 'USD', precision: 2 }, score: { distribution: { Excellent: 1, Fair: 1 }, average: 3 }, researchFunding: { status: 'available', qualifyingGrantCount: 2, latestAwardYear: 2023 } };
+  const proposal = { requestId: 'p', requestNumber: '2026-041', organization: 'Example University', title: 'Example research', leadSystemUserId: 'morgan', programKey: 'mr', institutionGeography: 'West', amountMinorUnits: 120000, currency: { code: 'USD', precision: 2 }, score: { distribution: { Excellent: 1, Fair: 1 }, average: 3 }, researchFunding: { status: 'available', qualifyingGrantCount: 2, latestAwardYear: 2023, totalAmountMinorUnits: 250000000 } };
   const individuals = [
     { systemUserId: 'dana', name: 'Dana Smith', order: ['p'], boundaries: [0, 0], confidence: { p: 'confident' } },
     { systemUserId: 'alex', name: 'Alex Jones', order: ['p'], boundaries: [1, 1], confidence: { p: 'confident' } },
     { systemUserId: 'morgan', name: 'Morgan Brown', order: ['p'], boundaries: [0, 1], confidence: { p: 'not-sure' } },
   ];
   const assessment = { order: ['p'], boundaries: [1, 1], confidence: {} };
-  const { container } = render(<AssessmentList assessment={assessment} proposals={[proposal]} roster={[]} collective={{ individuals, baseline: { scores: { p: { averageRank: 1 } } } }} editable={false} onChange={jest.fn()} />);
+  const { container, rerender } = render(<AssessmentList assessment={assessment} proposals={[proposal]} roster={[]} collective={{ individuals, baseline: { scores: { p: { averageRank: 1 } } } }} editable={false} onChange={jest.fn()} />);
   const judgments = [...container.querySelectorAll('[aria-label*="grade "]')];
   expect(judgments.map((node) => node.getAttribute('aria-label'))).toEqual([
     'Morgan Brown, lead PD: grade B, not sure', 'Alex Jones: grade A, confident', 'Dana Smith: grade C, confident',
@@ -237,9 +237,14 @@ test('group cards keep assessments attached to each PD when lead-first display o
   expect(screen.getByText('Morgan').className).toContain('underline');
   expect(screen.queryByText(/Cumulative requested|Grades differ|Lead:/)).toBeNull();
   expect(screen.getByText('Morgan Brown: #1').closest('details').open).toBe(false);
+  expect(screen.getByText('$2,500,000.00').closest('details').open).toBe(false);
   expect(screen.getByText('Recommended')).toBeTruthy();
   expect(screen.getByText('East 0 · West 1')).toBeTruthy();
   expect(screen.getAllByText('$1,200.00')).toHaveLength(2); // Requested and cutoff only.
+  delete proposal.researchFunding.totalAmountMinorUnits;
+  rerender(<AssessmentList assessment={assessment} proposals={[proposal]} roster={[]} collective={{ individuals, baseline: { scores: { p: { averageRank: 1 } } } }} editable={false} onChange={jest.fn()} />);
+  expect(screen.queryByText('$2,500,000.00')).toBeNull();
+  expect(screen.getByText(/Total Research funding:/).textContent).toBe('Total Research funding: Not available');
 });
 
 test('private grade border follows confidence and leaves unanswered confidence unmarked', () => {

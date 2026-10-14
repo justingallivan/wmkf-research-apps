@@ -115,7 +115,7 @@ of a long list when useful. One visible saved-state message covers the active li
 | Individual reviewer grades and numeric mean | Visible **Peer reviews** strip, with each grade badge and a clearly labelled mean/scored count. Expanded detail supplements this strip rather than replacing it. |
 | Named PD ranks and average | Group cards always show each PD's combined rank, now with A/B/C and confidence alongside it. Clearly labelled **At reveal**; display starting mean rank separately from current collective position. |
 | Requested amount and cumulative budget | Dedicated aligned amount column on desktop; cumulative requested cost in group view. Private cards keep requested amount without introducing a personal funding cutoff. |
-| Research history | Group context line: qualifying Research award count/latest year, no dollars; unavailable/provisional qualifications visible. |
+| Research history | Group disclosure summary: qualifying Research award count/latest year. Expand for total qualifying Research funding in USD and scope; unavailable/provisional qualifications stay visible. |
 | Smooth dragging | Reuse the retained branch's `@hello-pangea/dnd` integration as the implementation starting point; extend deliberately for dividers. |
 
 Private card, in reading order:
@@ -221,8 +221,11 @@ label. No tied badges. Show the rank range as supplementary comparison, not a ne
 weighted score or an invented divergence threshold.
 
 A secondary context row shows Research award count/latest year and the current,
-authorized **Earlier discussion sentiment** summary. Expand only the supporting
-quotes, disagreement/uncertainty narrative and longer review detail. Keep context
+authorized **Earlier discussion sentiment** summary. The Research-history arrow
+expands to total qualifying Research funding in USD, latest year and scope. A missing
+total in an old snapshot is unavailable, not zero. This owner-directed October 13
+addition is informational only; the local implementation is not deployed. Also expand
+the supporting quotes, disagreement/uncertainty narrative and longer review detail. Keep context
 visually subordinate to individual assessments, without hiding its useful summary.
 Neither sentiment nor history becomes a colored overall proposal score. Separate
 **Peer reviews**, **PD assessments at reveal**, and **Earlier discussion sentiment**

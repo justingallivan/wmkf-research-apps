@@ -165,14 +165,18 @@ not dollars**, not a hard per-cycle constraint. Merit may justify deviation. Giv
 preference to previously unfunded institutions without a points system, automatic
 bonus, or requirement to recommend a proposal the group cannot support on merit.
 
-Institutional funding context is **prior award count and most recent award year**.
-Prior funding dollars are not part of the agreed card/export design. Distinguish
+Institutional funding context is **prior award count, most recent award year, and
+total qualifying Research funding in USD** (owner card refinement, October 13).
+Keep count/year in the card summary; an arrow disclosure exposes the total and scope.
+This adds card detail only; the agreed workbook columns remain unchanged. Distinguish
 "no recorded awards" from unavailable/incomplete history and retain provisional
 qualifications. Use **qualifying Research awards across all available history**,
 with no arbitrary recent-years window, and label that scope. Show the most recent
 qualifying award year, not its month/cycle. No qualifying Research awards is not
 evidence that the foundation has never funded the institution in any category.
-Neither count nor year affects the quantitative ranking.
+Count, year, and total are informational only and never affect quantitative ranking.
+A missing total in an older frozen snapshot means unavailable, not zero. Resets retain
+the frozen history; they do not backfill or refresh it.
 
 ## 7. Earlier discussion sentiment — agreed
 

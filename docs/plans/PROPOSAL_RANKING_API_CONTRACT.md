@@ -245,6 +245,16 @@ confidence is keyed by proposal (`confident` / `not-sure`, absent until answered
 `confirmations` is keyed by action (program reset uses `resetProgram:<program>`).
 Canceled/replaced runs are read-only and carry the successor pointer.
 
+[VERIFIED via local branch source, October 13; this addition is not deployed]
+V2 source cards carry `researchFunding: { status, qualifyingGrantCount,
+latestAwardYear, totalAmountMinorUnits }`. The additive total is a safe integer in
+USD cents for `available`/`provisional` history, and null when unavailable. It sums
+the same qualifying regular Research awards as the count, retaining all existing
+exclusions and provisional classification. The object is frozen with the opening
+snapshot; older snapshots may omit the total and render **Not available**, never
+an invented zero. No migration/backfill or reset refresh is implied. The card
+disclosure consumes this field; scoring and workbook columns are unchanged.
+
 The service stores immutable operation receipts containing request hashes. To resolve
 an ambiguous write, resubmit the identical payload/operation UUID; the stored outcome
 is returned alongside the current authorized view, without executing it again.
@@ -268,7 +278,7 @@ group revision, with the matching individual inputs and no sentiment.
 | Reopen after reveal | Facilitator only; preserve old reveal and group work, start a new private preparation version from saved individual work, clear all readiness. Old revealed inputs stay read-only; new edits are private until all PDs are ready and facilitator reveals again. |
 | Reset collective | Facilitator only; preserve the replaced group revision and restore this reveal's calculated baseline/unanimous initial bars. No individual-input changes. |
 | Restart walkthrough | Facilitator at every stage, including after export; retain prior run, start new seed/thirds/unanswered-confidence preparation. Do not require a dry-run flag. No source-data edits. |
-| Enrich discussion cards | Ranking-authorized server read plus the sentiment reader's own access check. Accepted, current, not-withdrawn sentiment only; no preparation response enrichment. History shows qualifying Research count/latest award year across all available history, E/W is informational, neither affects ranking. |
+| Enrich discussion cards | Ranking-authorized server read plus the sentiment reader's own access check. Accepted, current, not-withdrawn sentiment only; no preparation response enrichment. History shows qualifying Research count/latest award year across all available history, with total USD in an expandable card disclosure. History and E/W are informational and never affect ranking. |
 | Export workbook | One confirmed collective revision plus its immutable reveal inputs; two sheets from the design. Reject/wait for pending or uncertain edits. No sentiment/transcript quotes in the agreed export. |
 
 Before reveal a response may contain the actor's own preparation and readiness
@@ -317,8 +327,8 @@ behavior satisfies the agreed non-destructive, all-stage reset contract. Do not
 carry over its Delete privilege or reset implementation as a default.
 The branch carries `researchFunding` with `status`, `qualifyingGrantCount`,
 `totalUsd`, `lastAwardCycle`; it currently displays dollars/latest cycle and exports
-one saved published meeting order as CSV. This is neither the agreed count/year
-presentation nor the two-sheet workbook. Main's types above do not include those
+one saved published meeting order as CSV. This differs from the current expandable count/year/total-USD
+card presentation and the two-sheet workbook. Main's types above do not include those
 branch-only additions. See the source comparison audit for exact evidence and
 remaining storage/access prerequisites before implementation.
 
