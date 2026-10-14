@@ -2,7 +2,6 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { DragDropContext, Draggable, Droppable } from '@hello-pangea/dnd';
 import {
   GripVertical,
-  MoreHorizontal,
 } from 'lucide-react';
 import { Button } from '../Layout';
 import {
@@ -261,9 +260,19 @@ export function AssessmentList({
                                   <GripVertical size={20} />
                                 </span>
                               )}
-                              <span className="min-w-6 text-xl font-bold tabular-nums">
-                                {position + 1}
-                              </span>
+                              {editable ? (
+                                <button
+                                  type="button"
+                                  aria-label={`Move ${proposal.organization} to position; current position ${position + 1}`}
+                                  title="Move to position"
+                                  className="inline-flex h-11 min-w-6 items-center justify-center rounded text-xl font-bold tabular-nums focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-600"
+                                  onClick={() => {
+                                    setMoving(id);
+                                    setPositionError('');
+                                    setDestination(String(position + 1));
+                                  }}
+                                >{position + 1}</button>
+                              ) : <span className="min-w-6 text-xl font-bold tabular-nums">{position + 1}</span>}
                             </div>
                             <div className="min-w-0 flex-1">
                               <div className="grid grid-cols-1 items-start gap-2 sm:grid-cols-[minmax(0,1fr)_auto]">
@@ -458,26 +467,7 @@ export function AssessmentList({
                                     {position < assessment.boundaries[0] ? 'Recommend funding' : position < assessment.boundaries[1] ? 'Alternate' : 'Not recommended'}
                                   </span>
                                 </>}
-                                {editable && (
-                                  <details className="relative -my-1.5 shrink-0 self-start">
-                                    <summary
-                                      className="inline-flex h-11 w-11 cursor-pointer list-none items-center justify-center rounded focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-600 [&::-webkit-details-marker]:hidden"
-                                      aria-label={`Actions for proposal ${proposal.requestNumber}`}
-                                    >
-                                      <MoreHorizontal size={20} />
-                                    </summary>
-                                    <button
-                                      className={`${buttonClass} absolute right-0 top-full z-10 w-44 border border-gray-200 bg-white text-left`}
-                                      onClick={() => {
-                                        setMoving(id);
-                                        setPositionError('');
-                                        setDestination(String(position + 1));
-                                      }}
-                                    >
-                                      Move to position…
-                                    </button>
-                                  </details>
-                                )}
+
                               </div>
                             </div>
                           </div>
