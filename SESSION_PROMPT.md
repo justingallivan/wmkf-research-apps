@@ -1,4 +1,58 @@
-# Session 606 Prompt: confirm Duncan's video cut and sentiment picker in use; preserve other workstream follow-ups
+# Session 607 Prompt: resume the D26 Proposal Ranker release plan from the saved ranking branch
+
+## Session 606 close — Workbench responsiveness, recording uploads, and ranking release planning (Codex, 2026-10-14 PT)
+
+### What Was Completed
+
+1. **Workbench and recording changes merged.** [VERIFIED via GitHub merge records and fetched main.] PR #478 `c24b5a268` reduces Staff Deliberations reads and overlaps independent lookups; #479 `9975fb9d1` adds unfinished-upload timestamps; #480 `ccfdb2fb0` adds safe explicit dismissal when Microsoft rejects cancellation; #481 `26b97f4c4` records the production receipt; #483 `dc0aa0019` makes Zoom import prominent and groups manual options beneath **Import materials manually**. Zoom still starts AssemblyAI transcription automatically.
+2. **Production upload incident outcome.** [VERIFIED during the authorized release; retained receipt in `docs/atlas/postgres-infra-tables.md` and the route matrix.] Migration 083 was applied through the canonical runner before #480 deployed; Ready deployment `dpl_G5aJb9rxRHsCF5xqsZPt7DP19YPQ`. Dismissal hides an uncertain empty attempt without deleting saved recordings or stopping reconciliation. The owner saw the Dismiss action for #1002912, but has not confirmed clicking it successfully cleared the old attempt.
+3. **Recording layout accepted.** [VERIFIED via release check and owner report.] #483 deployed Ready as `dpl_FEVU79qcmg6uKMtwR2btVL84qvmG`; the owner said it looks good. The release ran 259 focused tests and desktop/mobile layout checks. These are the earlier release checks, not a new test run at stop.
+4. **Ranking work preserved separately; production release remains PLANNED.** The continuation branch is **`codex/ranking-pd-save-conflicts`**, plan/privacy handoff commit **`886e194ac`**, containing the PD-save isolation and responsiveness fixes tested by the owner on Mac and iPad. Its release plan is **`docs/plans/PROPOSAL_RANKING_D26_RELEASE_2026-10-14.md` on that branch**, not main. [VERIFIED via remote/local ref comparison] The branch is pushed at `886e194ac`, including its nine previously unpushed commits. Do not merge it merely to make it available at home.
+5. **Owner privacy decision settled.** [VERIFIED via explicit owner instruction.] Before reveal everyone, including Beth and Justin, sees only their own preparation; facilitators may see readiness. Beth and Justin as simultaneous facilitators is **PLANNED, not built**. D26 must contain exactly **23 proposals**, excluding test copies **1003223 and 1003224**; re-probe the pool before opening the round. No ranking release, trial retirement, new round, schema or configuration change was executed as part of this initial plan or stop.
+
+### Resume at home
+
+1. Fetch origin and inspect the home checkout for unrelated changes.
+2. Resume `origin/codex/ranking-pd-save-conflicts` in its existing checkout or a separate tracking worktree. Do not rebuild from main or use the older ranking branches as the current candidate.
+3. Read that branch's D26 release plan, ranking Atlas and current branch handoff. Preserve main's unrelated handoffs when integrating later.
+4. Use the home machine's own credentials. Local servers, screenshots, temporary reports and environment files do not travel through Git.
+
+## Next Items
+
+### Verified Open
+
+- **D26 release implementation, pending a new instruction to execute.** The user asked for an initial plan and explicitly said not to execute it. Scope: integrate with current main; enforce own-only preparation at API and UI boundaries; support simultaneous facilitators; recheck schema/access/pool; rehearse separate identities and concurrent edits; present the concrete production cutover for approval. Evidence: owner's decision and the branch-only plan above. Production migration/promotion and retiring the existing trial remain separate approved steps.
+- **Upload dismissal acceptance remains unconfirmed.** If the owner reports it still fails, inspect the current exact upload state before taking action. Do not dismiss or delete anything based solely on the earlier screenshot.
+
+### Verify Before Acting
+
+- Prior handoffs below are **historical snapshots**, not a current executable worklist. #1002852 video/preparation follow-ups, sentiment calibration, #1003010, security work, cleanup and other sessions' follow-ups were not re-audited by this stop.
+- Main was fast-forwarded through `351a895a0`, preserving concurrent #482 material-upload notices. That other session's change was not retested here.
+- Keep existing worktrees; no deletion or archiving was performed. Unrelated local `commit-times.txt` is untracked and deliberately excluded.
+
+### Do Not Reopen Without New Decision
+
+- The five merged PRs above are complete; the recording layout has owner acceptance.
+- Do not substitute facilitator-wide pre-reveal access for the owner's own-only requirement.
+- No colleague messages, paid analyses, ranking-data resets or production ranking promotion are authorized by this handoff.
+
+## Key Files Reference
+
+| File | Purpose |
+|------|---------|
+| `docs/plans/PROPOSAL_RANKING_D26_RELEASE_2026-10-14.md` (on `codex/ranking-pd-save-conflicts`) | Initial release plan and privacy decision; not an implementation receipt |
+| `docs/atlas/dataverse-proposal-ranking.md` (ranking branch) | Ranking persistence and release evidence |
+| `shared/components/meeting-tracker/RecordingAndTranscriptCard.js` | Zoom-first layout and unfinished-upload actions |
+| `docs/atlas/postgres-infra-tables.md` | Migration 083 and upload-dismissal production receipt |
+| `docs/API_ROUTE_SECURITY_MATRIX.md` | Actor-bound cancel/dismiss contract |
+
+**Stop verification:** doc-currency and fact-consistency gates and their sequential self-tests passed; `git diff --check` passed. The claim-evidence pilot report could not read local observation state; no observation row was invented. CLAUDE.md needs no change. **Milestone determination:** DEVELOPMENT_LOG entry added for the safe upload-dismissal production incident outcome and accepted Zoom-first layout.
+
+---
+
+## Prior handoffs — historical snapshots; apply the current topic-specific handoff first
+
+## Previous Session 606 Prompt: confirm Duncan's video cut and sentiment picker in use; preserve other workstream follow-ups
 
 ## Session 605 close — Zoom video recovery and Discussion Sentiment picker status (Codex, 2026-10-14 PT)
 

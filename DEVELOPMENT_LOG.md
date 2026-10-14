@@ -10,6 +10,19 @@ The chronological archive after the `Legacy chronological session log` divider c
 
 ---
 
+## October 2026 — Recover from rejected upload cancellation and prioritize Zoom import (Session 606)
+
+**Milestone:** staff can dismiss an uncertain empty upload attempt after Microsoft rejects cancellation, while preserving reconciliation and saved recordings.
+**Sessions:** 606 (Codex; owner-approved production migration and merges).
+**Ship state:**
+- PR #479 `9975fb9d1` shows upload-start and last-status timestamps; #480 `ccfdb2fb0` adds explicit dismissal with actor/lease fences and recovery safeguards.
+- Migration 083 applied through the canonical runner; Ready production deployment `dpl_G5aJb9rxRHsCF5xqsZPt7DP19YPQ`; receipt docs #481 `26b97f4c4`. Owner confirmation of dismissing #1002912 remains unreceived.
+- PR #483 `dc0aa0019` prioritizes Zoom import, explains AssemblyAI transcription and collapses manual inputs; 259 focused tests and desktop/mobile checks passed, deployment Ready, owner accepted layout.
+**Why it matters:** an expired upload session no longer traps staff in an unexplained cancellation loop, and the preferred recording-import path is clear.
+**Pointers:** `docs/atlas/postgres-infra-tables.md`; `docs/API_ROUTE_SECURITY_MATRIX.md`; `shared/components/meeting-tracker/RecordingAndTranscriptCard.js`.
+
+---
+
 ## October 2026 — Recover copied Zoom videos and find completed sentiment analyses (Session 605)
 
 **Milestone:** staff can verify legacy copied Zoom videos without replacing the transcript, and identify previously analyzed proposals directly in the Discussion Sentiment picker.
