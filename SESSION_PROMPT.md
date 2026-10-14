@@ -1,4 +1,63 @@
-# Session 605 Prompt: confirm #1002852 preparation resumes after Finish corrections; ranking v2 colleague walkthrough still open
+# Session 606 Prompt: confirm Duncan's video cut and sentiment picker in use; preserve other workstream follow-ups
+
+## Session 605 close — Zoom video recovery and Discussion Sentiment picker status (Codex, 2026-10-14 PT)
+
+### What Was Completed
+
+1. **Legacy copied Zoom video recovery shipped.** [VERIFIED via source, PR #476 merge `42f4770b7`, and GitHub Production deployment `7074045431` success at 2026-10-14 18:38:49 UTC.] Copied videos missing recording timestamps/hash can now use **Verify video**. Recovery checks exact Zoom identity, the finalized SharePoint receipt, original content version/size/hash, and optimistic row fences before filling only missing metadata. Healthy copies retain their existing behavior. Repair script: `scripts/repair-zoom-video-copy-metadata.mjs` (dry-run default).
+2. **#1002852 targeted repair completed.** [VERIFIED via the authorized production repair and readback during this session.] JHU / Anthony Leung request `e5df0b46-3c43-f111-88b5-000d3a3065b8`, copy `555e3fff-a7b2-4e7f-a031-f021a882a48c`: restored recording times 2026-10-09 16:31:01–17:25:41 UTC and verified hash. The second dry run returned `repairNeeded:false`. No transcript, speaker assignments, SharePoint file contents or Dataverse rows were changed. No actual presentation video cut was run. The summaries' Out of date label is based on transcript freshness, not the missing video metadata; summaries were not regenerated.
+3. **Discussion Sentiment picker badges and filters shipped.** [VERIFIED via source, PR #477 merge `6697bb6d8`, and GitHub Production deployment `7076811714` success at 2026-10-14 20:45:25 UTC.] Meeting Tracker → Discussion sentiment → Choose proposals shows Current / Out of date / Not analyzed / Analyzing / Status unavailable before selection. Accepted and Last attempt failed remain separate. Analysis status filters include Previously analyzed; Refresh statuses preserves selected comparison rows. One metadata-only Postgres batch and one prompt-version lookup reuse existing freshness rules; no schema change or model execution on list load. Busy rows remain selected through the action and its status refresh.
+4. **Review and verification.** [VERIFIED via local commands and GitHub CI.] Video regression: 24 suites / 856 tests passed locally (DB-dependent suite skipped locally; CI PostgreSQL integration passed). Sentiment: 9 suites / 292 tests passed, including isolated loopback PostgreSQL integration; scoped ESLint clean, production build passed, scoped gates/self-tests passed sequentially. Independent review findings were fixed and rechecked. PR #477's Python CodeQL job had all steps including Complete job successful and downloadable completed logs, while its check indicator remained pending at merge; aggregate CodeQL, full Jest, other security checks and Vercel preview passed. No authenticated production UI acceptance was performed.
+5. **Stop handoff on main explicitly authorized.** [VERIFIED via user instruction and clean checkout.] Main was fast-forwarded to `9975fb9d1`, preserving other sessions' #478 Workbench optimization and #479 unfinished-upload timestamp work. This session did not build or reverify those changes. Claim-evidence pilot report could not read local observation state; no observation row was invented. CLAUDE.md needs no change: existing feature/route contracts are documented in their plan, Atlas and route matrix.
+
+### Commits
+
+- `8b816c504` — recover missing metadata on copied Zoom videos; PR #476 / merge `42f4770b7`.
+- `c90a0bff9` — show sentiment analysis status in proposal picker; PR #477 / merge `6697bb6d8`.
+- This documentation-only main commit records Session 605 and creates the Session 606 handoff.
+
+## Next Items
+
+### Verified Open
+
+1. **Confirm the user-facing outcomes when staff next use them.** Evidence: deployed source and successful deployment receipts above; this session did not cut the presentation video or inspect a signed-in production picker. Duncan can refresh #1002852 and retry the cut. Check badges/filter/refresh on real candidate requests without starting paid analyses solely for validation.
+
+### Verify Before Acting
+
+- Prior handoffs below are historical snapshots. Recheck #1002852's separate Staff Deliberations correction/preparation state before treating it as still blocked; video metadata recovery did not alter that workflow.
+- Ranking acceptance/release, sentiment calibration, #1003010 follow-up, and older cleanup/security items were not re-audited. Consult their current branch/source and owner decisions before acting. No ranking runtime promotion, dedicated preview repointing, colleague messages or cleanup is authorized by this handoff.
+- Local worktrees remain in place. Do not reset, delete or archive another session's checkout based on this handoff.
+
+### Do Not Reopen Without New Decision
+
+- Both recovery and picker features are merged and deployed; do not recreate the branches or repeat the metadata repair blindly. Use the repair script's default dry run if new evidence warrants investigation.
+- Summaries were not regenerated. An Out of date summary needs its own transcript-freshness assessment; it is not evidence that the copied video repair failed.
+
+## Key Files Reference
+
+| File | Purpose |
+|------|---------|
+| `lib/services/meeting-tracker-recordings/video-copy-verification.js` | Exact identity and original-content verification |
+| `scripts/repair-zoom-video-copy-metadata.mjs` | Guarded dry-run/apply metadata repair |
+| `shared/components/meeting-tracker/RecordingAndTranscriptCard.js` | Verify video action |
+| `shared/components/meeting-tracker/DiscussionSentimentView.js` | Picker badges, filters and refresh |
+| `lib/services/post-presentation-materials/discussion-sentiment-candidates.js` | Authorized candidates and batch statuses |
+| `lib/services/post-presentation-materials/discussion-sentiment-store.js` | Compact Postgres run summaries |
+
+## Testing
+
+- `npx jest --runInBand --testPathPatterns='zoom-video|zoom-import|presentation-video-split|recording-and-transcript-card'`
+- `npx jest --runInBand --testPathPatterns='discussion-sentiment'`
+- The sentiment integration suite requires `DISCUSSION_SENTIMENT_PG_TEST_URL` pointed only at an isolated loopback database. The temporary Docker test database from this session was stopped.
+- Runtime builds passed with unrelated existing filesystem-tracing warnings. Logs under `/tmp/sentiment-*` and `/tmp/wmkf-video-*` are local convenience artifacts, not durable evidence for another machine.
+
+**Milestone determination:** DEVELOPMENT_LOG entry added for the production video recovery and sentiment picker capabilities.
+
+---
+
+## Prior handoffs — historical snapshots; apply the current topic-specific handoff first
+
+## Previous Session 605 Prompt: confirm #1002852 preparation resumes after Finish corrections; ranking v2 colleague walkthrough still open
 
 ## Session 604 close — Staff Deliberations preparation-block copy and Meeting Tracker card labels (Claude Opus, worktree `WMKF_Apps-claude-ui` on `claude/ui-changes`; Codex owned the main checkout; 2026-10-14 PT)
 

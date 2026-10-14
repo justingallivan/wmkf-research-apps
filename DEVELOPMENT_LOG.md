@@ -10,6 +10,19 @@ The chronological archive after the `Legacy chronological session log` divider c
 
 ---
 
+## October 2026 — Recover copied Zoom videos and find completed sentiment analyses (Session 605)
+
+**Milestone:** staff can verify legacy copied Zoom videos without replacing the transcript, and identify previously analyzed proposals directly in the Discussion Sentiment picker.
+**Sessions:** 605 (Codex; independent review, owner-authorized production repair and merges).
+**Ship state:**
+- Video verification and guarded repair shipped in PR #476, merge `42f4770b7`; Production deployment `7074045431` succeeded 2026-10-14. #1002852's missing timestamps/hash repaired with readback; transcript and speaker assignments preserved.
+- Sentiment badges, filters and Refresh statuses shipped in PR #477, merge `6697bb6d8`; Production deployment `7076811714` succeeded 2026-10-14. Metadata-only batch reads; no schema migration or model execution on list load.
+- Video regression and CI passed; sentiment 292 tests including loopback PostgreSQL integration passed. Signed-in staff acceptance remains separate from deployment verification.
+**Why it matters:** removes the copied-video retry dead end and lets staff find completed sentiment work before selecting proposals.
+**Pointers:** `docs/atlas/postgres-zoom-video-copies.md`; `docs/atlas/postgres-staff-discussion-sentiments.md`; `docs/plans/DELIBERATION_SENTIMENT_PLAN_2026-10-13.md`; `scripts/repair-zoom-video-copy-metadata.mjs`.
+
+---
+
 ## October 2026 — Discussion Sentiment meter in Meeting Tracker (Session 601)
 
 **Milestone:** staff can compare how proposals were received in the staff discussions — enthusiasm, reception, disagreement and uncertainty — each backed by named, quoted, server-verified evidence, on a new Meeting Tracker page.

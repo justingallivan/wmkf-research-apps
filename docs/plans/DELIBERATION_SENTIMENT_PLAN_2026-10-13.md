@@ -3,7 +3,7 @@ title: Staff discussion sentiment meter
 domain: transcription
 kind: plan
 status: shipped
-summary: "Shipped 2026-10-13 (Meeting Tracker). Reads each proposal's Staff Discussion Transcript, records enthusiasm, reception, disagreement and uncertainty with named, quoted evidence, and compares chosen proposals. Picker badges/filter are source-built on codex/sentiment-picker-status (2026-10-14), not deployed."
+summary: "Shipped 2026-10-13 (Meeting Tracker). Reads each proposal's Staff Discussion Transcript, records enthusiasm, reception, disagreement and uncertainty with named, quoted evidence, and compares chosen proposals. Picker badges/filter are live in Production since 2026-10-14 (PR #477, merge 6697bb6d8; deployment 7076811714 succeeded)."
 owner: product-engineering
 related:
   - docs/plans/PAIRED_SUMMARIES_PLAN_2026-10-08.md
@@ -16,7 +16,7 @@ related:
 # Staff discussion sentiment meter
 
 Date: 2026-10-13 (Session 601). Status: **SHIPPED 2026-10-13** (merge `62963a352`, quote-match fix `1bb83c3a2`; migration 082 applied and prompt v1 seeded in Production by the owner). Calibration (§6 item 5) and Proposal Ranking wiring remain open; see §9.
-**Picker extension:** source-built 2026-10-14 on `codex/sentiment-picker-status`, not deployed; see §4.5.
+**Picker extension:** Production-deployed 2026-10-14 via PR #477, merge `6697bb6d8`; GitHub Production deployment `7076811714` succeeded. See §4.5.
 Owner: Justin.
 
 ## 1. Purpose
@@ -300,7 +300,7 @@ row (no `docs/SERVICE_AND_UTILITY_CATALOG.md` entry: the sibling summary service
   the transcript went stale in between. `ROUTE_NAMESPACE_LIFECYCLE` has no `/api/meeting-tracker` entry, so it is
   unchanged.
 
-**Picker status extension [SOURCE-BUILT 2026-10-14 on `codex/sentiment-picker-status`; not deployed]:**
+**Picker status extension [PRODUCTION-DEPLOYED 2026-10-14, PR #477; merge `6697bb6d8`, successful deployment `7076811714`]:**
 
 - Before selection, each candidate shows Current, Out of date, Not analyzed, Analyzing… or Status unavailable.
   Accepted (including stale acceptance) and Last attempt failed are separate indicators; a failed re-analysis
@@ -321,7 +321,7 @@ row (no `docs/SERVICE_AND_UTILITY_CATALOG.md` entry: the sibling summary service
   incomplete-list warning remains.
 - Verification covers candidate batch statuses and failures, list filtering/selection preservation, busy-row
   completion and slow-batch/action ordering in unit tests, plus the compact SQL snapshot in the loopback
-  Postgres integration suite. Tests require execution before promotion; this note asserts source behavior only.
+  Postgres integration suite. Production deployment is recorded above; live calibration remains separately scoped.
 
 ### 4.6 Consumer contract (Proposal Ranking and others)
 
