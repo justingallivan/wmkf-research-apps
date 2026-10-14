@@ -1,13 +1,14 @@
 /** @jest-environment jsdom */
 import React, { StrictMode } from 'react';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
-import AssessmentWorkflow from '../../shared/components/proposal-ranking/AssessmentWorkflow';
+import AssessmentWorkflow, { AssessmentList } from '../../shared/components/proposal-ranking/AssessmentWorkflow';
 import {
+  createOperationId,
   loadProposalRanking,
   sendProposalRankingAction,
 } from '../../shared/components/proposal-ranking/client';
 jest.mock('../../shared/components/proposal-ranking/client', () => ({
-  createOperationId: () => 'operation',
+  createOperationId: jest.fn(() => 'operation'),
   loadProposalRanking: jest.fn(),
   sendProposalRankingAction: jest.fn(),
 }));
@@ -133,4 +134,87 @@ test('restart while combined is selected returns to source preparation without d
   expect(screen.getByRole('button', { name: 'Combined list' }).disabled).toBe(
     true,
   );
+});
+
+const proposals = ['one', 'two', 'three', 'four'].map((id, i) => ({
+  requestId: id, requestNumber: i + 1, organization: `Institution ${id}`,
+  title: `Proposal ${id}`, programKey: i < 2 ? 'mr' : 'se',
+  amountMinorUnits: 10000, currency: { code: 'USD', precision: 2 },
+}));
+function populatedView() {
+  const initial = view();
+  initial.round.snapshot.proposals = proposals;
+  initial.own.mr = { ...list, order: ['one', 'two'], boundaries: [1, 2] };
+  initial.own.se = { ...list, order: ['three', 'four'], boundaries: [1, 2] };
+  initial.own.co = null;
+  return initial;
+}
+
+test('divider validation rejects crossing, empty and fractional values with a recoverable error', () => {
+  const onChange = jest.fn();
+  render(<AssessmentList assessment={{ ...list, order: proposals.map((p) => p.requestId), boundaries: [1, 3] }} proposals={proposals} roster={[]} editable onChange={onChange} />);
+  fireEvent.click(screen.getAllByRole('button', { name: 'Set boundary…' })[0]);
+  const input = screen.getByRole('spinbutton');
+  expect(input.max).toBe('3');
+  for (const value of ['4', '', '1.5']) {
+    fireEvent.change(input, { target: { value } });
+    fireEvent.click(screen.getByRole('button', { name: 'Move', exact: true }));
+    expect(onChange).not.toHaveBeenCalled();
+    expect(input.getAttribute('aria-invalid')).toBe('true');
+    expect(screen.getByRole('alert').textContent).toMatch(/whole number from 0 to 3/);
+  }
+  fireEvent.change(input, { target: { value: '0' } });
+  fireEvent.click(screen.getByRole('button', { name: 'Move', exact: true }));
+  expect(onChange).toHaveBeenCalledWith(expect.objectContaining({ boundaries: [0, 3] }));
+});
+
+test('second divider advertises the first divider as minimum and permits an empty middle section', () => {
+  const onChange = jest.fn();
+  render(<AssessmentList assessment={{ ...list, order: proposals.map((p) => p.requestId), boundaries: [1, 3] }} proposals={proposals} roster={[]} editable onChange={onChange} />);
+  fireEvent.click(screen.getAllByRole('button', { name: 'Set boundary…' })[1]);
+  const input = screen.getByRole('spinbutton');
+  expect(input.min).toBe('1');
+  fireEvent.change(input, { target: { value: '0' } });
+  fireEvent.click(screen.getByRole('button', { name: 'Move', exact: true }));
+  expect(onChange).not.toHaveBeenCalled();
+  fireEvent.change(input, { target: { value: '1' } });
+  fireEvent.click(screen.getByRole('button', { name: 'Move', exact: true }));
+  expect(onChange).toHaveBeenCalledWith(expect.objectContaining({ boundaries: [1, 1] }));
+});
+
+test('Find stays in the active program, announces missing results and cycles matching cards with focus', () => {
+  Element.prototype.scrollIntoView = jest.fn();
+  render(<AssessmentWorkflow initial={populatedView()} cycleOptions={[]} onCycleChange={() => {}} />);
+  const find = screen.getByRole('textbox', { name: 'Find proposal' });
+  fireEvent.change(find, { target: { value: 'three' } });
+  fireEvent.click(screen.getByRole('button', { name: 'Find', exact: true }));
+  expect(screen.getByText(/No matching proposal in this list/)).toBeTruthy();
+  expect(Element.prototype.scrollIntoView).not.toHaveBeenCalled();
+  fireEvent.change(find, { target: { value: 'Institution' } });
+  fireEvent.click(screen.getByRole('button', { name: 'Find', exact: true }));
+  expect(document.activeElement.id).toBe('proposal-one');
+  expect(screen.getByText(/Match 1 of 2/)).toBeTruthy();
+  fireEvent.click(screen.getByRole('button', { name: 'Find', exact: true }));
+  expect(document.activeElement.id).toBe('proposal-two');
+  fireEvent.click(screen.getByRole('button', { name: 'Science & Engineering' }));
+  expect(screen.queryByText(/Match 2 of 2/)).toBeNull();
+  expect(screen.getByRole('button', { name: 'Science & Engineering' }).getAttribute('aria-pressed')).toBe('true');
+  expect(screen.getByRole('button', { name: 'Medical Research' }).getAttribute('aria-pressed')).toBe('false');
+});
+
+test('unconfirmed saves explain recovery and retry the same operation rather than a new edit', async () => {
+  const initial = populatedView();
+  createOperationId.mockReturnValueOnce('first-operation').mockReturnValue('new-operation');
+  sendProposalRankingAction.mockRejectedValueOnce(new Error('Connection interrupted'));
+  render(<AssessmentWorkflow initial={initial} cycleOptions={[]} onCycleChange={() => {}} />);
+  fireEvent.click(screen.getAllByRole('radio', { name: 'Not sure' })[0]);
+  await screen.findByRole('button', { name: 'Check and retry change' });
+  expect(screen.getByText(/Your local change is kept here/)).toBeTruthy();
+  expect(screen.getByRole('button', { name: 'Refresh' }).disabled).toBe(true);
+  const original = sendProposalRankingAction.mock.calls[0][0];
+  sendProposalRankingAction.mockResolvedValueOnce({ ...initial, own: { ...initial.own, mr: { ...initial.own.mr, confidence: { one: 'not-sure' } } } });
+  fireEvent.click(screen.getByRole('button', { name: 'Check and retry change' }));
+  await waitFor(() => expect(screen.getByRole('status').textContent).toBe('All changes saved'));
+  expect(sendProposalRankingAction.mock.calls[1][0]).toEqual(original);
+  expect(createOperationId).toHaveBeenCalledTimes(1);
 });

@@ -56,7 +56,7 @@ const gradeClasses = {
   C: 'bg-slate-200 text-slate-700',
 };
 const buttonClass =
-  'rounded-md px-3 py-2 text-sm font-medium hover:bg-gray-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600 disabled:opacity-50';
+  'min-h-11 rounded-md px-3 py-2 text-sm font-medium hover:bg-gray-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600 disabled:opacity-50';
 function Grade({ value }) {
   return (
     <span
@@ -111,11 +111,13 @@ export function AssessmentList({
   onChange,
   sentiment,
   onSentimentRefresh,
+  highlightedId,
 }) {
   const [notice, setNotice] = useState('');
   const [expanded, setExpanded] = useState(null);
   const [moving, setMoving] = useState(null);
   const [destination, setDestination] = useState('1');
+  const [positionError, setPositionError] = useState('');
   const [reduced, setReduced] = useState(false);
   useEffect(() => {
     const media = window.matchMedia('(prefers-reduced-motion: reduce)');
@@ -139,23 +141,26 @@ export function AssessmentList({
       setNotice('Position and section updated. Saving changes.');
     } else setNotice('The dividers cannot cross.');
   };
-  const setPosition = () => {
+  const minimumPosition = moving === FIRST_BOUNDARY ? 0
+    : moving === SECOND_BOUNDARY ? assessment.boundaries[0] : 1;
+  const maximumPosition = moving === FIRST_BOUNDARY
+    ? assessment.boundaries[1] : assessment.order.length;
+  const setPosition = (event) => {
+    event.preventDefault();
+    if (!editable) return;
+    const value = Number(destination);
+    if (!destination.trim() || !Number.isInteger(value) ||
+        value < minimumPosition || value > maximumPosition) {
+      setPositionError(`Enter a whole number from ${minimumPosition} to ${maximumPosition}.${moving === FIRST_BOUNDARY || moving === SECOND_BOUNDARY ? ' The section dividers cannot cross.' : ''}`);
+      return;
+    }
     if (moving === FIRST_BOUNDARY || moving === SECOND_BOUNDARY) {
       const bar = moving === FIRST_BOUNDARY ? 0 : 1;
-      const value = Number(destination);
-      if (
-        !Number.isInteger(value) ||
-        value < 0 ||
-        value > assessment.order.length ||
-        (bar === 0 && value > assessment.boundaries[1]) ||
-        (bar === 1 && value < assessment.boundaries[0])
-      )
-        return;
       const boundaries = [...assessment.boundaries];
       boundaries[bar] = value;
       onChange({ ...assessment, boundaries });
     } else {
-      const position = Number(destination) - 1;
+      const position = value - 1;
       const target = assessment.order[position];
       if (!target) return;
       move(items.indexOf(moving), items.indexOf(target));
@@ -206,7 +211,7 @@ export function AssessmentList({
                         className={
                           isBar
                             ? 'py-2'
-                            : `rounded-xl border bg-white ${disagreement ? 'border-amber-300' : 'border-gray-200'} ${dragState.isDragging ? 'shadow-lg' : ''}`
+                            : `rounded-xl border bg-white ${highlightedId === id ? 'border-blue-700' : disagreement ? 'border-amber-300' : 'border-gray-200'} ${dragState.isDragging ? 'shadow-lg' : ''}`
                         }
                       >
                         {isBar ? (
@@ -215,7 +220,7 @@ export function AssessmentList({
                               <span
                                 {...drag.dragHandleProps}
                                 aria-label="Move section divider"
-                                className="cursor-grab p-2"
+                                className="inline-flex h-11 w-11 shrink-0 cursor-grab items-center justify-center rounded focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-600"
                               >
                                 <GripVertical size={18} />
                               </span>
@@ -256,6 +261,7 @@ export function AssessmentList({
                                 className={buttonClass}
                                 onClick={() => {
                                   setMoving(id);
+                                  setPositionError('');
                                   setDestination(
                                     String(
                                       assessment.boundaries[
@@ -272,14 +278,16 @@ export function AssessmentList({
                         ) : (
                           <div
                             id={`proposal-${id}`}
-                            className="flex items-start gap-2 p-4 sm:gap-4"
+                            tabIndex={-1}
+                            aria-label={`${proposal.organization}, proposal ${proposal.requestNumber}`}
+                            className="flex scroll-mt-56 items-start gap-2 rounded-xl p-4 focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-600 sm:gap-4"
                           >
-                            <div className="flex shrink-0 items-center gap-1">
+                            <div className="flex shrink-0 flex-col items-center gap-1 sm:flex-row">
                               {editable && (
                                 <span
                                   {...drag.dragHandleProps}
                                   aria-label={`Move ${proposal.organization}, position ${position + 1}`}
-                                  className="cursor-grab rounded p-1 text-gray-500 focus-visible:outline focus-visible:outline-2"
+                                  className="inline-flex h-11 w-11 shrink-0 cursor-grab items-center justify-center rounded text-gray-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-600"
                                 >
                                   <GripVertical size={20} />
                                 </span>
@@ -318,17 +326,22 @@ export function AssessmentList({
                                 <PeerScores score={proposal.score} />
                                 {collective ? (
                                   <>
+                                    <p className="mt-2 text-sm font-medium">
+                                      Group recommendation: {position < assessment.boundaries[0]
+                                        ? 'Recommend funding' : position < assessment.boundaries[1]
+                                          ? 'Alternate' : 'Not recommended'}
+                                    </p>
                                     <p className="mt-4 text-xs font-medium text-gray-600">
                                       PD assessments at reveal
                                     </p>
-                                    <div className="mt-1 flex flex-wrap gap-x-5 gap-y-2">
+                                    <div className="mt-1 grid grid-cols-1 gap-x-5 gap-y-2 sm:grid-cols-2 xl:grid-cols-4">
                                       {collective.individuals.map((pd, i) => (
                                         <div
                                           key={pd.systemUserId}
-                                          className="flex items-center gap-2 text-sm"
+                                          className="grid min-w-0 grid-cols-[minmax(0,1fr)_2rem_1.25rem_2.25rem] items-center gap-2 text-sm"
                                           aria-label={`${pd.name}: grade ${individualGrades[i]}, ${pd.confidence[id]}, individual rank ${pd.order.indexOf(id) + 1}`}
                                         >
-                                          <span>{pd.name}</span>
+                                          <span className="break-words">{pd.name}</span>
                                           <Grade value={individualGrades[i]} />
                                           <Confidence
                                             value={pd.confidence[id]}
@@ -368,7 +381,7 @@ export function AssessmentList({
                                         'current' && (
                                         <>
                                           <button
-                                            className="cursor-pointer py-1 underline"
+                                            className="min-h-11 cursor-pointer py-2 underline"
                                             aria-expanded={expanded === id}
                                             onClick={() => {
                                               setExpanded(
@@ -494,7 +507,7 @@ export function AssessmentList({
                                     ].map(([value, label]) => (
                                       <label
                                         key={value}
-                                        className="flex items-center gap-2 text-sm"
+                                        className="flex min-h-11 cursor-pointer items-center gap-2 text-sm"
                                       >
                                         <input
                                           type="radio"
@@ -552,7 +565,7 @@ export function AssessmentList({
                                 {editable && (
                                   <details className="lg:mt-4">
                                     <summary
-                                      className="cursor-pointer list-none p-1 [&::-webkit-details-marker]:hidden"
+                                      className="inline-flex h-11 w-11 cursor-pointer list-none items-center justify-center rounded focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-600 [&::-webkit-details-marker]:hidden"
                                       aria-label={`Actions for proposal ${proposal.requestNumber}`}
                                     >
                                       <MoreHorizontal size={20} />
@@ -561,6 +574,7 @@ export function AssessmentList({
                                       className={buttonClass}
                                       onClick={() => {
                                         setMoving(id);
+                                        setPositionError('');
                                         setDestination(String(position + 1));
                                       }}
                                     >
@@ -584,6 +598,7 @@ export function AssessmentList({
       </DragDropContext>
       {moving && (
         <RankingDialog label="Change position" onClose={() => setMoving(null)}>
+          <form noValidate onSubmit={setPosition}>
           <label className="block">
             {moving === FIRST_BOUNDARY || moving === SECOND_BOUNDARY
               ? 'Set boundary after position'
@@ -591,21 +606,31 @@ export function AssessmentList({
             <input
               autoFocus
               type="number"
-              min={
-                moving === FIRST_BOUNDARY || moving === SECOND_BOUNDARY ? 0 : 1
-              }
-              max={assessment.order.length}
+              min={minimumPosition}
+              max={maximumPosition}
+              step={1}
+              aria-invalid={Boolean(positionError)}
+              aria-describedby="ranking-position-help ranking-position-error"
               value={destination}
-              onChange={(e) => setDestination(e.target.value)}
+              onChange={(e) => {
+                setDestination(e.target.value);
+                setPositionError('');
+              }}
               className="mt-2 w-full rounded border p-2"
             />
           </label>
+          <p id="ranking-position-help" className="mt-2 text-sm text-gray-600">
+            Enter a whole number from {minimumPosition} to {maximumPosition}.
+            {(moving === FIRST_BOUNDARY || moving === SECOND_BOUNDARY) && ' Dividers cannot cross; empty sections are allowed.'}
+          </p>
+          <p id="ranking-position-error" role="alert" className="mt-2 text-sm text-red-700">{positionError}</p>
           <div className="mt-4 flex gap-3">
-            <Button onClick={setPosition}>Move</Button>
-            <Button variant="outline" onClick={() => setMoving(null)}>
+            <Button type="submit" disabled={!editable}>Move</Button>
+            <Button type="button" variant="outline" onClick={() => setMoving(null)}>
               Cancel
             </Button>
           </div>
+          </form>
         </RankingDialog>
       )}
     </>
@@ -623,6 +648,7 @@ export default function AssessmentWorkflow({
   );
   const [program, setProgram] = useState('mr');
   const [busy, setBusy] = useState(false);
+  const [busyMessage, setBusyMessage] = useState('Saving changes…');
   const [error, setError] = useState('');
   const [pending, setPending] = useState(null);
   const [draft, setDraft] = useState(null);
@@ -631,6 +657,7 @@ export default function AssessmentWorkflow({
   const [sentiment, setSentiment] = useState(null);
   const sentimentGeneration = useRef(0);
   const [find, setFind] = useState('');
+  const [findResult, setFindResult] = useState(null);
   const [refreshed, setRefreshed] = useState(new Date());
   const generation = useRef(0);
   const busyRef = useRef(false);
@@ -663,6 +690,7 @@ export default function AssessmentWorkflow({
     if (busyRef.current || pendingRef.current) return;
     const id = ++generation.current;
     busyRef.current = true;
+    setBusyMessage('Refreshing saved work…');
     setBusy(true);
     try {
       const next = await loadProposalRanking({ roundId: view.roundId });
@@ -695,6 +723,7 @@ export default function AssessmentWorkflow({
     sentimentGeneration.current += 1;
     setSentiment(null);
     busyRef.current = true;
+    setBusyMessage(reuse ? 'Checking and retrying your change…' : 'Saving changes…');
     setBusy(true);
     setError('');
     try {
@@ -782,6 +811,7 @@ export default function AssessmentWorkflow({
     if (busyRef.current || pendingRef.current) return;
     const id = ++generation.current;
     busyRef.current = true;
+    setBusyMessage('Preparing workbook…');
     setBusy(true);
     try {
       const result = await sendProposalRankingAction(
@@ -876,6 +906,47 @@ export default function AssessmentWorkflow({
       view.own?.[key] &&
       view.own[key].order.every((id) => view.own[key].confidence[id]),
   );
+  const programProgress = ['mr', 'se'].map((key) => ({
+    key,
+    name: key === 'mr' ? 'Medical Research' : 'Science & Engineering',
+    answered: view.own?.[key]?.order.filter((id) => view.own[key].confidence[id]).length || 0,
+    total: view.own?.[key]?.order.length || 0,
+  }));
+  const saveStatus = busy ? busyMessage : pending
+    ? 'Changes are not confirmed' : 'All changes saved';
+  const combinedComplete = view.own?.co?.order.every((id) => view.own.co.confidence[id]);
+  const preparationStep = view.own?.ready ? 'ready' : program === 'co' ? 'combined' : 'programs';
+  const preparationAction = !view.own?.co ? (
+    <Button disabled={!allConfident || busy || Boolean(pending) || !active} onClick={() => confirm('buildCombined')}>
+      Create combined list
+    </Button>
+  ) : program !== 'co' ? (
+    <Button disabled={busy || Boolean(pending)} onClick={() => setProgram('co')}>Review combined list</Button>
+  ) : outdated ? (
+    <Button disabled={!allConfident || busy || Boolean(pending) || !active} onClick={() => confirm('buildCombined')}>Rebuild combined list</Button>
+  ) : !view.own.co.confirmed ? (
+    <Button disabled={!combinedComplete || busy || Boolean(pending) || !active} onClick={() => execute('confirmCombined')}>Confirm combined order</Button>
+  ) : (
+    <Button disabled={busy || Boolean(pending) || !active} onClick={() => execute('ready')}>Ready</Button>
+  );
+  const findScope = `${view.roundId}:${section}:${program}`;
+  const currentFindResult = findResult?.scope === findScope ? findResult : null;
+  const findProposal = (event) => {
+    event.preventDefault();
+    const query = find.trim().toLowerCase();
+    const matches = query ? assessment.order.map((id) => proposals.find((p) => p.requestId === id))
+      .filter((p) => p && `${p.requestNumber} ${p.organization} ${p.title}`.toLowerCase().includes(query)) : [];
+    if (!matches.length) {
+      setFindResult({ scope: findScope, message: query ? 'No matching proposal in this list. Try another name, title or proposal number.' : 'Enter a name, title or proposal number.', id: null });
+      return;
+    }
+    const index = currentFindResult?.query === query ? (matches.findIndex((p) => p.requestId === currentFindResult.id) + 1) % matches.length : 0;
+    const match = matches[index];
+    setFindResult({ scope: findScope, query, id: match.requestId, message: `Match ${index + 1} of ${matches.length}: ${match.organization}, ${match.title || match.requestNumber}.${matches.length > 1 ? ' Select Find again for the next match.' : ''}` });
+    const card = document.getElementById(`proposal-${match.requestId}`);
+    card?.scrollIntoView({ behavior: 'auto', block: 'center' });
+    card?.focus({ preventScroll: true });
+  };
   const totals =
     collective && assessment
       ? calculateSectionTotals(
@@ -887,6 +958,7 @@ export default function AssessmentWorkflow({
   const loadHistory = async (before) => {
     const id = ++generation.current;
     busyRef.current = true;
+    setBusyMessage('Loading history…');
     setBusy(true);
     try {
       const next = await sendProposalRankingAction({
@@ -939,25 +1011,25 @@ export default function AssessmentWorkflow({
               </option>
             ))}
           </select>
-          <Button
+          {!(section === 'group' && collective) && <Button
             variant="outline"
             disabled={busy || Boolean(pending)}
             onClick={refresh}
           >
             Refresh
-          </Button>
-          <span className="text-xs text-gray-600">
+          </Button>}
+          {!(section === 'group' && collective) && <span className="text-xs text-gray-600">
             Last refreshed{' '}
             {refreshed.toLocaleTimeString([], {
               hour: '2-digit',
               minute: '2-digit',
             })}
-          </span>
+          </span>}
         </div>
       </header>
       <nav
         aria-label="Ranking workspace"
-        className="my-6 flex flex-wrap gap-2 border-b pb-3"
+        className="my-4 flex flex-wrap gap-2 border-b pb-2"
       >
         {[
           ['prepare', 'My preparation'],
@@ -979,32 +1051,28 @@ export default function AssessmentWorkflow({
         ))}
         <button
           disabled={busy || Boolean(pending)}
+          aria-current={section === 'history' ? 'page' : undefined}
           className={buttonClass}
           onClick={() => loadHistory()}
         >
           History
         </button>
       </nav>
-      <p role="status" className="mb-3 text-sm text-gray-600">
-        {busy
-          ? 'Saving or refreshing…'
-          : pending
-            ? 'Changes are not confirmed'
-            : 'All changes saved'}
-      </p>
+      {!(section === 'group' && collective) && <p role="status" className="mb-3 text-sm text-gray-600">{saveStatus}</p>}
       {error && (
         <div
           role="alert"
           className="mb-4 rounded-lg border border-amber-300 bg-amber-50 p-4"
         >
           <p>{error}</p>
+          {pending && <p className="mt-2 text-sm">Your local change is kept here, but its save is not confirmed. Retry to check the result and safely finish the same change, or load the saved version below.</p>}
           {pending && (
             <div className="mt-3 flex flex-wrap gap-2">
               <Button
                 disabled={busy}
                 onClick={() => execute(pending.action, {}, pending)}
               >
-                Resolve saved operation
+                Check and retry change
               </Button>
               <Button
                 variant="outline"
@@ -1189,9 +1257,11 @@ export default function AssessmentWorkflow({
         ) : (
           <>
             <h2 className="text-xl font-semibold">My preparation</h2>
-            <p className="mt-2 text-sm text-gray-600">
-              Programs → Combined list → Ready
-            </p>
+            <ol aria-label="Preparation progress" className="mt-2 flex flex-wrap gap-3 text-sm text-gray-600">
+              {[['programs', '1. Programs'], ['combined', '2. Combined list'], ['ready', '3. Ready']].map(([key, label]) => (
+                <li key={key} aria-current={preparationStep === key ? 'step' : undefined} className={preparationStep === key ? 'font-semibold text-gray-900' : ''}>{label}</li>
+              ))}
+            </ol>
             {view.own.ready ? (
               <div className="my-5">
                 <p className="font-medium">Ready for group discussion</p>
@@ -1204,88 +1274,49 @@ export default function AssessmentWorkflow({
                 </Button>
               </div>
             ) : (
-              <div className="my-4 flex flex-wrap items-center gap-2">
-                {[
-                  ['mr', 'Medical Research'],
-                  ['se', 'Science & Engineering'],
-                  ['co', 'Combined list'],
-                ].map(([key, label]) => (
-                  <button
-                    className={`${buttonClass} ${program === key ? 'bg-gray-100' : ''}`}
-                    key={key}
-                    disabled={
-                      busy || Boolean(pending) || (key === 'co' && !view.own.co)
-                    }
-                    onClick={() => {
-                      setProgram(key);
-                      setDraft(null);
-                    }}
-                  >
-                    {label}
-                  </button>
-                ))}
-                <Button
-                  disabled={
-                    !allConfident || busy || Boolean(pending) || !active
-                  }
-                  onClick={() => confirm('buildCombined')}
-                >
-                  {view.own.co
-                    ? 'Rebuild combined list'
-                    : 'Create combined list'}
-                </Button>
-                {program === 'co' && (
-                  <>
-                    <Button
-                      disabled={
-                        outdated ||
-                        busy ||
-                        Boolean(pending) ||
-                        !active ||
-                        !view.own.co?.order.every(
-                          (id) => view.own.co.confidence[id],
-                        )
-                      }
-                      onClick={() => execute('confirmCombined')}
+              <>
+                <div className="my-3 flex flex-wrap items-center gap-2" aria-label="Assessment lists">
+                  {[...programProgress.map((p) => [p.key, p.name]), ['co', 'Combined list']].map(([key, label]) => (
+                    <button
+                      className={`${buttonClass} ${program === key ? 'bg-gray-100' : ''}`}
+                      key={key}
+                      aria-label={label}
+                      aria-pressed={program === key}
+                      aria-describedby={key !== 'co' ? `preparation-count-${key}` : undefined}
+                      disabled={busy || Boolean(pending) || (key === 'co' && !view.own.co)}
+                      onClick={() => { setProgram(key); setDraft(null); }}
                     >
-                      Confirm combined order
-                    </Button>
-                    <Button
-                      disabled={
-                        !view.own.co?.confirmed ||
-                        outdated ||
-                        busy ||
-                        Boolean(pending) ||
-                        !active
-                      }
-                      onClick={() => execute('ready')}
-                    >
-                      Ready
-                    </Button>
-                  </>
-                )}
-              </div>
+                      {label}
+                      {key !== 'co' && <span id={`preparation-count-${key}`} className="ml-2 font-normal text-gray-600">{programProgress.find((p) => p.key === key).answered}/{programProgress.find((p) => p.key === key).total} confidence answered</span>}
+                    </button>
+                  ))}
+                  <details className="relative">
+                    <summary className={`${buttonClass} cursor-pointer`}>List options</summary>
+                    <div className="mt-1 rounded-lg border bg-white p-2">
+                      {program !== 'co' ? <button disabled={!editable} className={buttonClass} onClick={() => confirm('resetProgram', { programKey: program })}>Reset {program.toUpperCase()} preparation</button>
+                        : <button disabled={!allConfident || busy || Boolean(pending) || !active} className={buttonClass} onClick={() => confirm('buildCombined')}>Rebuild combined list</button>}
+                    </div>
+                  </details>
+                </div>
+                <div className="my-3 flex flex-wrap items-center justify-between gap-3">
+                  <p className="max-w-2xl text-sm text-gray-600">
+                    {program === 'co'
+                      ? outdated ? 'Rebuild from your latest program assessments before continuing.'
+                        : !combinedComplete ? 'Answer confidence for every proposal, then confirm the combined order.'
+                          : view.own.co.confirmed ? 'Your combined order is confirmed. Mark Ready when you are finished.'
+                            : 'Review the merged order and dividers, then confirm your combined order.'
+                      : !allConfident ? 'Choose Confident or Not sure for every proposal in both programs to create the combined list.'
+                        : view.own.co ? 'Both programs are complete. Continue to your combined list.'
+                          : 'Both programs are complete. Create your combined list to review MR and SE together.'}
+                  </p>
+                  {preparationAction}
+                </div>
+              </>
             )}
             {outdated && (
               <p className="my-3 text-amber-800">
                 Your combined list was built before your latest program changes.
                 Rebuild it to continue; combined-only changes will be replaced.
-              </p>
-            )}
-            {!view.own.ready && program !== 'co' && (
-              <button
-                disabled={!editable}
-                className={buttonClass}
-                onClick={() => confirm('resetProgram', { programKey: program })}
-              >
-                Reset {program.toUpperCase()} preparation
-              </button>
-            )}
-            {assessment && (
-              <p className="my-3 text-sm text-gray-600">
-                Confidence answered {Object.keys(assessment.confidence).length}{' '}
-                of {assessment.order.length}. Move proposals and dividers to
-                make your assessment.
               </p>
             )}
           </>
@@ -1302,29 +1333,28 @@ export default function AssessmentWorkflow({
         </>
       )}
       {section === 'group' && collective && (
-        <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
-          <div>
+        <>
+          <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
             <h2 className="text-xl font-semibold">Group discussion</h2>
-            <p className="mt-2">
-              Recommend funding: {totals[0].count}{' '}
-              {totals[0].count === 1 ? 'award' : 'awards'} ·{' '}
-              {formatMoney(totals[0].amountMinorUnits, proposals[0]?.currency, {
-                incomplete: !totals[0].complete,
-              })}
-            </p>
-            <p className="mt-1 text-sm text-gray-600">
-              West {totals[0].geography.West} / East {totals[0].geography.East}{' '}
-              / Unknown {totals[0].geography.Unknown} · General target: 2 West
-              to 1 East by award count
-            </p>
+            <Button variant="outline" disabled={busy || Boolean(pending) || !active} onClick={exportWorkbook}>Export workbook</Button>
           </div>
-          <Button
-            disabled={busy || Boolean(pending) || !active}
-            onClick={exportWorkbook}
-          >
-            Export workbook
-          </Button>
-        </div>
+          <section aria-label="Current group recommendation" className="sticky top-0 z-20 mb-4 flex flex-wrap items-center justify-between gap-x-6 gap-y-2 border-y border-gray-200 bg-gray-50 px-2 py-3">
+            <div>
+              <p className="font-semibold tabular-nums">
+                Recommend funding: {totals[0].count} {totals[0].count === 1 ? 'award' : 'awards'} ·{' '}
+                {formatMoney(totals[0].amountMinorUnits, proposals[0]?.currency, { incomplete: !totals[0].complete })}
+              </p>
+              <p className="mt-1 text-sm text-gray-600">West {totals[0].geography.West} / East {totals[0].geography.East} / Unknown {totals[0].geography.Unknown} · Target: 2 West to 1 East by award count</p>
+            </div>
+            <div className="flex items-center gap-3">
+              <div className="text-sm text-gray-600">
+                <p role="status">{saveStatus}</p>
+                <p className="text-xs">Last refreshed {refreshed.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</p>
+              </div>
+              <Button variant="outline" disabled={busy || Boolean(pending)} onClick={refresh}>Refresh</Button>
+            </div>
+          </section>
+        </>
       )}
       {((section === 'prepare' &&
         assessment &&
@@ -1354,21 +1384,7 @@ export default function AssessmentWorkflow({
             Peer grades: E Excellent · VG Very good · G Good · F Fair · P Poor.
             MR/SE program · E/W geography.
           </p>
-          <form
-            className="mb-4 flex gap-2"
-            onSubmit={(e) => {
-              e.preventDefault();
-              const match = proposals.find((p) =>
-                `${p.requestNumber} ${p.organization} ${p.title}`
-                  .toLowerCase()
-                  .includes(find.toLowerCase()),
-              );
-              if (match)
-                document
-                  .getElementById(`proposal-${match.requestId}`)
-                  ?.scrollIntoView({ behavior: 'auto', block: 'center' });
-            }}
-          >
+          <form className="mb-2 flex gap-2" onSubmit={findProposal}>
             <label className="sr-only" htmlFor="ranking-find">
               Find proposal
             </label>
@@ -1377,10 +1393,12 @@ export default function AssessmentWorkflow({
               value={find}
               onChange={(e) => setFind(e.target.value)}
               placeholder="Find proposal"
+              aria-describedby="ranking-find-result"
               className="w-full max-w-sm rounded-md border p-2 text-sm"
             />
             <button className={buttonClass}>Find</button>
           </form>
+          <p id="ranking-find-result" aria-live="polite" className="mb-3 text-sm text-gray-600">{currentFindResult?.message}</p>
           <AssessmentList
             assessment={assessment}
             proposals={proposals}
@@ -1390,7 +1408,9 @@ export default function AssessmentWorkflow({
             onChange={change}
             sentiment={sentiment}
             onSentimentRefresh={refreshSentiment}
+            highlightedId={currentFindResult?.id}
           />
+          {section === 'prepare' && assessment.order.length > 5 && <div className="mt-5 flex justify-end">{preparationAction}</div>}
         </>
       )}
       {view.viewer.isFacilitator && active && (
@@ -1451,7 +1471,7 @@ export default function AssessmentWorkflow({
               }
             >
               {pending
-                ? 'Resolve saved operation'
+                ? 'Check and retry change'
                 : {
                     resetProgram: 'Reset program preparation',
                     buildCombined: 'Build combined list',
