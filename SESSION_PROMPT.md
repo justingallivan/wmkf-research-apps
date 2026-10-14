@@ -1,4 +1,78 @@
-# Session 603 Prompt: confirm the 1003010 Zoom re-import and video cut; Discussion Sentiment calibration; transcription cleanup check
+# Session 604 Prompt: Proposal Ranking v2 sandbox colleague walkthrough; preserve other workstream follow-ups
+
+## Session 603 close — Proposal Ranking v2 sandbox and preparation UI (Codex, 2026-10-13 PT)
+
+### What Was Completed
+
+- [VERIFIED via feature source and dedicated Vercel Preview] Ranking v2 lives on `codex/proposal-ranking-v2`, runtime tip `6e121170a`. The owner requested this documentation-only handoff on main. No ranking runtime merge or production promotion is authorized.
+- [VERIFIED via sandbox setup/readback earlier this session] Dedicated test app: https://wmkf-meeting-transcription-test.vercel.app. D97 has 12 realistic fictional proposals (six MR, six SE), three synthetic reviews each, varied budgets, institution/history context and clearly labeled sample discussion sentiment. Exact test-profile scope remains isolated from ordinary production reads. Accepted roster: Justin, Beth, Jean and John Sader; Justin facilitates the test round. Do not seed again or reset colleagues' work for screenshots.
+- [VERIFIED via source/tests] Approved v2 workflow: reviewer-seeded separate MR/SE A/B/C lists with explicit confidence; paired, within-grade MR/SE merge ordered within each pair by reviewer score; PD combined-list review; private until all ready and facilitator reveal; preserved individual assessments; collective order and funding separators; resets at every stage. Smooth dragging remains. Discussion sentiment and institutional history are group context, not ranking weights.
+- [VERIFIED via source/browser] Cards use matching letter tiles, solid/dashed PD confidence borders, lead PD first, neutral backgrounds, aligned metadata, expandable initial ranks and prior Research funding totals. Funding total/count/E-W counts appear at the Recommended separator; no E/W target, per-card cumulative total or peer-score mean.
+- [VERIFIED via source/tests/local browser] Preparation now offers next-program navigation, missing-confidence counts and direct navigation, Continue validation with named missing institutions and red card outlines. Header uses equal-width tabs with secondary status text; redundant numbered steps and completion instructions removed. Final change removes Review combined list; the Combined list tab remains. Create combined list, Confirm combined order and Ready retain their stage-specific roles.
+- [VERIFIED via signed-in sandbox browser, 2026-10-13 21:15 PT] Justin was Ready for group discussion. This is a point-in-time observation, not a claim about the other PDs or full multi-user acceptance. Saved assessments were left intact during final layout checks.
+
+### Commits
+
+- `591c3e98e`, `1e1a648ad`: realistic sandbox cohort, isolated fixtures, retained round replacement and evidence.
+- `d1b206185`: prior Research award funding totals (earlier card commits remain in branch history).
+- `735e7f59f`: clear next-program transition.
+- `9b8a9c32b`, `f9705e88d`, `0cdb3e3e5`, `b8de72f7b`: missing-choice navigation, validation and cleanup.
+- `94829e66e`: simplified preparation toolbar.
+- `6e121170a`: remove duplicate Review combined list action.
+
+### Deployment and verification
+
+- [VERIFIED via Vercel CLI] Final dedicated Preview: https://wmkf-meeting-transcription-test-ic0634b8w.vercel.app, serving the stable test alias, built from the tracked archive at `6e121170a`. No `--prod` or production promotion performed.
+- [VERIFIED via local checks] Full ranking regression: 20 suites / 184 tests passed before the final button-only removal; final UI regression: 11 tests passed, scoped ESLint clean. Types passed on the preceding toolbar build. Dedicated Preview build passed after the final removal.
+- [VERIFIED via local browser] Missing-choice Continue displays the institution list and red cards; Go to next unanswered scrolls and focuses the next confidence radio. Tests cover wrapping and skipping saved choices. Local synthetic rehearsal is not independent-user hosted acceptance.
+- Claim-evidence pilot report was attempted; local observation state could not be read. No observation row invented.
+- Milestone determination: no new production capability shipped in this session; no DEVELOPMENT_LOG entry required. CLAUDE.md requires no change for these UI updates.
+
+## Next Items
+
+### Verified Open
+
+1. **Colleague sandbox walkthrough / acceptance.** Evidence: feature-branch rehearsal audit records the remaining independent Microsoft sign-ins; this session observed only Justin's signed-in state. Beth, Jean and John should complete their own preparation, then the facilitator can reveal and exercise group ordering, sentiment display, export and resets as agreed. Do not manufacture staff votes or infer acceptance from unit tests.
+2. **Current-head release review before any eventual production decision.** Evidence: runtime remains on the feature branch and deployed only to the dedicated test app. Fetch current main, inspect merge conflicts and CI before proposing promotion; this handoff does not authorize it.
+
+### Owner Decision Needed
+
+- Production release only after sandbox acceptance and explicit owner approval. Keep the existing production app untouched.
+
+### Verify Before Acting
+
+- Other workstream carryovers below (Zoom re-import, sentiment calibration, transcription cleanup, security releases) were not re-audited here. They remain historical pointers requiring current source/live-state checks, not an automatically authorized worklist.
+- Shared checkout `/Users/gallivan/Code/WMKF_Apps` remains on the v2 branch. Its local main diverges from remote main (six ranking-design commits versus two remote commits at preflight); do not force-reset or push it blindly. This handoff was prepared in an isolated clone from remote main.
+- Existing untracked `output/` artifacts and `.impeccable/critique/2026-10-13T23-47-04Z__ts-proposal-ranking-assessmentworkflow-js-99d8f072.md` remain local and were not swept into commits. Temporary servers, screenshots and credentials do not travel between Macs.
+- The repo-root Vercel binding targets the production project. Sandbox deployment must use the dedicated test binding and `vercel.meeting-transcription-test.json` in a tracked-file archive; do not deploy the shared root or use `--prod`.
+
+### Do Not Reopen Without New Decision
+
+- Earlier ranking pause, six-proposal rehearsal, old card layout and old reset limitations below are historical, superseded for v2 by this handoff and the feature-branch design. Do not rebuild v2 from main or use the old `codex/proposal-ranking` branch as its current source.
+- No colleague messages, production data operations or resets of current work are authorized merely by this handoff.
+
+## Key Files Reference (on codex/proposal-ranking-v2)
+
+| File | Purpose |
+|------|---------|
+| `shared/components/proposal-ranking/AssessmentWorkflow.js` | Current preparation/group UI |
+| `tests/unit/proposal-ranking-assessment-ui.test.js` | Navigation, confidence validation and UI regression |
+| `docs/atlas/dataverse-proposal-ranking.md` | Ranking ownership and deployed-state contracts |
+| `docs/plans/PROPOSAL_RANKING_DESIGN_2026-10-07.md` | Revised approved workflow |
+| `docs/plans/PROPOSAL_RANKING_API_CONTRACT.md` | Cross-layer API contract |
+| `docs/plans/PROPOSAL_RANKING_IMPLEMENTATION_PLAN_2026-10-13.md` | Implementation and acceptance scope |
+| `docs/audits/PROPOSAL_RANKING_V2_SANDBOX_REHEARSAL_2026-10-13.md` | Bounded sandbox receipts; latest UI release supersedes its earlier deployment URL |
+
+## Testing
+
+On the feature branch: `npx jest --runInBand --testPathPatterns=proposal-ranking` and `npm run check:types`.
+For memory-only local rehearsal: `node scripts/rehearse-proposal-ranking-v2.js` (3135; do not collide with an existing server).
+
+---
+
+## Prior handoffs — historical snapshots; apply the current topic-specific handoff first
+
+## Previous Session 603 Prompt: confirm the 1003010 Zoom re-import and video cut; Discussion Sentiment calibration; transcription cleanup check
 
 ## Session 602 close — Zoom imports from before provenance capture blocked attendance and the video cut (Claude Opus, worktree `WMKF_Apps-claude-debug` on `claude/debugging`; Codex owned the main checkout; 2026-10-13 PT)
 
