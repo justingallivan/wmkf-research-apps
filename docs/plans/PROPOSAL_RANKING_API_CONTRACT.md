@@ -262,7 +262,7 @@ An operation UUID reused with different input conflicts. Serialized storage limi
 are enforced before the atomic changeset; historical receipts are not loaded into
 ordinary views. Version-1 operation readback remains as described in §4.
 
-[VERIFIED via branch tests, 2026-10-14; deployment pending] Private preparation
+[VERIFIED via branch tests and dedicated Preview d59e4dc33, 2026-10-14] Private preparation
 clients recover from definite `409 stale_scope`, `conflict`, or
 `confirmation_stale` responses with up to three automatic retries. Each rereads
 the round and requires the same actor, active round, policy, full workflow and

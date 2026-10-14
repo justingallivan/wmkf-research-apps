@@ -53,7 +53,7 @@ N/A; the recovery allowlist uses existing action/error tokens only.
 
 ## Validation and limits
 
-- Full ranking regression, including real client-to-service logic with an
+- Full ranking regression: 21 suites / 210 tests passed, including real client-to-service logic with an
   in-memory ETag-enforcing adapter, preserves different answers from two PDs
   loaded at the same initial round revision.
 - Client tests reject changed own work, actor, round, policy, stage, preparation
@@ -61,8 +61,19 @@ N/A; the recovery allowlist uses existing action/error tokens only.
 - UI regression retains the rebased pending request after an uncertain result.
 - Type check and scoped ESLint passed. Fresh-agent read-only review found no
   actionable issue; the reviewer did not independently run live account tests.
-- Deployment is pending: Vercel CLI authentication became unavailable after the
-  initial read-only inspections. The owner was asked to complete `vercel login`.
+- [VERIFIED via Vercel deployment metadata and alias inspection] Runtime commit
+  `d59e4dc33` is READY in dedicated Preview `dpl_ZQAZoAWvd5dg8iKA7CzuCeMMgY4m`,
+  URL `https://wmkf-meeting-transcription-test-rmq780a2r.vercel.app`. The stable
+  `https://wmkf-meeting-transcription-test.vercel.app` alias points to it.
+  Deployment used a tracked-file archive and the dedicated test configuration;
+  no production promotion occurred. The temporary CLI authentication block was
+  resolved by the owner logging in.
+- [VERIFIED via Chrome reload after alias update] Justin's signed-in D97 private
+  preparation displayed saved MR/SE completion and existing entries. No assessment
+  control was changed. Anonymous ranking API requests returned 401.
+- Doc-currency, status-enum-parity, secret-scan, doc-symbol-refs and scaffolding
+  gates/self-tests passed. Initial fixture-writing sandbox permission failures
+  were resolved by rerunning the same checks with worktree write access.
 - Independent hosted multi-account acceptance after deployment remains required.
   No restoration or reset of colleagues' work is authorized or performed.
 
