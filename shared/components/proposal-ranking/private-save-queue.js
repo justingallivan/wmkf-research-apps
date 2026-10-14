@@ -35,7 +35,7 @@ function editable(view, program) {
     && (program !== 'co' || (view.own.co.sourceVersions.mr === view.own.mr.version
       && view.own.co.sourceVersions.se === view.own.se.version));
 }
-const REJECTED = new Set(['stale_scope', 'conflict', 'confirmation_stale', 'stale_list', 'invalid_assessment', 'invalid_transition', 'round_closed']);
+const REJECTED = new Set(['stale_scope', 'conflict', 'confirmation_stale', 'stale_list', 'invalid_assessment', 'invalid_transition', 'round_closed', 'invalid_request']);
 function failureKind(error) {
   if ([401, 403].includes(error.status)) return 'auth';
   if (error.code === 'operation_id_reused') return 'integrity';
@@ -79,7 +79,7 @@ export function createPrivateSaveQueue({ onChange, onView, onAuthLost, send = se
     try {
       const next = await timed(signal => send(job.request, {
         signal, ...(replay ? {} : { baseView: job.base }),
-        onAttempt: request => { job.request = copy(request); },
+        onAttempt: request => { if (active && epoch === scopeEpoch) job.request = copy(request); },
       }));
       if (!active || epoch !== scopeEpoch) return;
       if (next?.operation?.status !== 'confirmed' || next.operation.operationId !== job.request.operationId) {
@@ -136,7 +136,7 @@ export function createPrivateSaveQueue({ onChange, onView, onAuthLost, send = se
       if (discard) {
         base = next; state = { ...EMPTY_PRIVATE_SAVE }; onView(next); emit();
       } else if (sameScope(blocked.job.base, next) && equal(ownShape(blocked.job.base.own), ownShape(next.own))) {
-        base = next; state = { ...state, saving: false, blocked: null }; drain();
+        base = next; onView(next); state = { ...state, saving: false, blocked: null }; drain();
       } else block('changed', new Error('Your saved preparation or round has changed. Automatic retry would replace newer work.'), blocked.job);
     } catch (error) {
       if (!active || scopeEpoch !== epoch) return;
@@ -147,12 +147,21 @@ export function createPrivateSaveQueue({ onChange, onView, onAuthLost, send = se
   }
   return {
     isDirty: dirty,
-    activate() { active = true; },
-    dispose() { active = false; epoch++; },
+    activate() { active = true; emit(); },
+    dispose() {
+      active = false; epoch++;
+      const interrupted = flight || state.blocked?.job;
+      if (state.saving && interrupted) state = { ...state, saving: false,
+        blocked: { kind: 'uncertain', message: 'Saving was interrupted. Check the result before continuing.', job: interrupted } };
+      flight = null;
+    },
     edit(view, program, update) {
       if (!active || state.blocked || !editable(view, program)) return;
       if (dirty() && (state.program !== program || !sameScope(base, view))) return;
-      if (!dirty()) base = view;
+      // A click can precede React rendering the acknowledgement. Never replace a
+      // newer acknowledged list with that older render; fresh external views still win.
+      if (!dirty() && !(base && sameScope(base, view)
+        && base.own?.[program]?.version > view.own[program].version)) base = view;
       const current = state.draft || base.own[program];
       const next = typeof update === 'function' ? update(current) : update;
       if (equal(content(current), content(next))) return;
@@ -162,7 +171,7 @@ export function createPrivateSaveQueue({ onChange, onView, onAuthLost, send = se
     },
     retry() {
       if (!active || state.saving || flight || !state.blocked) return;
-      if (state.blocked.kind === 'uncertain') void dispatch(state.blocked.job, true);
+      if (state.blocked.kind === 'uncertain') void dispatch({ ...state.blocked.job, request: copy(state.blocked.job.request) }, true);
       else if (state.blocked.kind === 'rejected') void reload(false);
     },
     discard() { // Caller must confirm. Uncertain operations must be resolved first.

@@ -152,3 +152,57 @@ test('operation identifier reuse blocks retry and discard', async () => {
   expect(h.state().blocked.kind).toBe('integrity'); h.queue.retry(); h.queue.discard(); await tick();
   expect(send).toHaveBeenCalledTimes(1); expect(h.queue.isDirty()).toBe(true);
 });
+
+test('a click before React receives the acknowledgement uses the newer queue base', async () => {
+  const initial = base(); let current = initial;
+  const send = jest.fn(async body => (current = success(current, body)));
+  const h = setup({ send });
+  h.queue.edit(initial, 'mr', choose('confident')); await tick();
+  h.queue.edit(initial, 'mr', choose('not-sure')); await tick();
+  expect(send.mock.calls[1][0].listVersion).toBe(2);
+  expect(h.queue.isDirty()).toBe(false);
+});
+
+test('reactivation retains an interrupted operation for exact retry and ignores its late response', async () => {
+  let resolve;
+  const send = jest.fn().mockImplementationOnce(() => new Promise(r => { resolve = r; }))
+    .mockImplementationOnce(async body => success(base(), body));
+  const h = setup({ send }); h.queue.edit(base(), 'mr', choose('confident'));
+  h.queue.dispose(); h.queue.activate();
+  expect(h.state().blocked.kind).toBe('uncertain');
+  h.queue.retry(); await tick();
+  expect(send.mock.calls[1][0]).toEqual(send.mock.calls[0][0]);
+  resolve(success(base(), send.mock.calls[0][0])); await tick();
+  expect(h.onView).toHaveBeenCalledTimes(1); expect(h.queue.isDirty()).toBe(false);
+});
+
+test('confirmed replay containing a newer same-program edit never drains the queued draft', async () => {
+  const send = jest.fn().mockRejectedValueOnce(new Error('lost response'))
+    .mockImplementationOnce(async body => {
+      const newer = success(base(), body); newer.own.mr.version++; newer.own.mr.confidence.a = 'not-sure'; return newer;
+    });
+  const h = setup({ send }); h.queue.edit(base(), 'mr', choose('confident'));
+  h.queue.edit(base(), 'mr', current => ({ ...current, boundaries: [0, 1] })); await tick();
+  h.queue.retry(); await tick();
+  expect(h.state().blocked.kind).toBe('changed');
+  expect(h.state().draft.boundaries).toEqual([0, 1]); expect(send).toHaveBeenCalledTimes(2);
+});
+
+test('rejected retry publishes fresh view even when queued draft returns to saved content', async () => {
+  const initial = base(), refreshed = base(); refreshed.round.etag = '9';
+  const send = jest.fn().mockRejectedValue(Object.assign(new Error('conflict'), { status: 409, code: 'conflict', requestMethod: 'POST' }));
+  const h = setup({ send, load: async () => refreshed });
+  h.queue.edit(initial, 'mr', choose('confident'));
+  h.queue.edit(initial, 'mr', () => initial.own.mr); await tick();
+  h.queue.retry(); await tick();
+  expect(h.onView).toHaveBeenCalledWith(refreshed); expect(h.queue.isDirty()).toBe(false); expect(send).toHaveBeenCalledTimes(1);
+});
+
+test.each(['invalid_request', 'stale_list', 'invalid_transition'])('%s rejection remains recoverable after a failed reload', async code => {
+  const send = jest.fn().mockRejectedValue(Object.assign(new Error(code), { status: 400, code, requestMethod: 'POST' }));
+  const load = jest.fn().mockRejectedValueOnce(new Error('Read failed')).mockResolvedValueOnce(base());
+  const h = setup({ send, load }); h.queue.edit(base(), 'mr', choose('confident')); await tick();
+  expect(h.state().blocked.kind).toBe('rejected'); h.queue.retry(); await tick();
+  expect(h.state().blocked.kind).toBe('rejected'); expect(h.state().draft.confidence.a).toBe('confident');
+  h.queue.discard(); await tick(); expect(h.queue.isDirty()).toBe(false); expect(send).toHaveBeenCalledTimes(1);
+});

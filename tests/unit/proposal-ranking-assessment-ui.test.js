@@ -13,7 +13,7 @@ jest.mock('../../shared/components/proposal-ranking/client', () => ({
   loadProposalRanking: jest.fn(),
   sendProposalRankingAction: jest.fn(),
 }));
-jest.mock('next/router', () => ({ __esModule: true, default: { events: { on: jest.fn(), off: jest.fn(), emit: jest.fn() } } }));
+jest.mock('next/router', () => ({ __esModule: true, default: { router: null, asPath: '/ranking', beforePopState: jest.fn(), events: { on: jest.fn(), off: jest.fn(), emit: jest.fn() } } }));
 jest.mock('../../shared/components/Layout', () => ({
   Button: ({ children, variant, size, ...props }) => (
     <button {...props}>{children}</button>
@@ -57,6 +57,8 @@ function saved(base, body) {
 }
 beforeEach(() => {
   jest.resetAllMocks();
+  Router.router = null;
+  window.history.replaceState(null, "", "/");
   createOperationId.mockReturnValue("operation");
   window.matchMedia = () => ({
     matches: false,
@@ -396,4 +398,42 @@ test('loading a previous run locks preparation until its response arrives', asyn
   const previous = { ...initial, roundId: 'previous', round: { ...initial.round, state: 'closed' } };
   await act(async () => resolve(previous));
   expect(screen.getByText(/Read-only historical run/)).toBeTruthy();
+});
+
+test('a normal save acknowledgement during a keyboard drag does not cancel the drop', async () => {
+  const initial = populatedView();
+  const pending = [];
+  sendProposalRankingAction.mockImplementation(body => new Promise(resolve => pending.push({ body, resolve })));
+  render(<AssessmentWorkflow initial={initial} cycleOptions={[]} onCycleChange={() => {}} />);
+  fireEvent.click(screen.getAllByRole('radio', { name: 'Confident' })[0]);
+  const handle = screen.getByRole('button', { name: 'Move Institution one, position 1' });
+  handle.focus();
+  fireEvent.keyDown(handle, { key: ' ', code: 'Space', keyCode: 32 });
+  await act(async () => { await new Promise(resolve => requestAnimationFrame(resolve)); });
+  await act(async () => pending[0].resolve(saved(initial, pending[0].body)));
+  fireEvent.keyDown(handle, { key: 'ArrowDown', code: 'ArrowDown', keyCode: 40 });
+  fireEvent.keyDown(handle, { key: ' ', code: 'Space', keyCode: 32 });
+  await waitFor(() => expect(pending).toHaveLength(2));
+  expect(pending[1].body.listVersion).toBe(2);
+  expect(pending[1].body.assessment.confidence.one).toBe('confident');
+  expect(pending[1].body.assessment.boundaries).not.toEqual(initial.own.mr.boundaries);
+});
+
+test('dirty history restores Next metadata and suite links wait until the queue drains', async () => {
+  Router.router = {};
+  const metadata = { __N: true, url: '/ranking', as: '/ranking', key: 'ranking-key', options: {} };
+  window.history.replaceState(metadata, '', '/ranking');
+  let resolve, body;
+  sendProposalRankingAction.mockImplementation(request => { body = request; return new Promise(r => { resolve = r; }); });
+  const initial = populatedView();
+  render(<><a href="/other">Suite destination</a><AssessmentWorkflow initial={initial} cycleOptions={[]} onCycleChange={() => {}} /></>);
+  fireEvent.click(screen.getAllByRole('radio', { name: 'Confident' })[0]);
+  expect(fireEvent.click(screen.getByRole('link', { name: 'Suite destination' }))).toBe(false);
+  const pop = Router.beforePopState.mock.calls[0][0];
+  window.history.replaceState({ __N: true, url: '/other' }, '', '/other');
+  act(() => expect(pop()).toBe(false));
+  expect(window.location.pathname).toBe('/ranking'); expect(window.history.state).toEqual(metadata);
+  await act(async () => resolve(saved(initial, body)));
+  expect(pop()).toBe(true);
+  expect(screen.queryByText(/Finish saving or resolve/)).toBeNull();
 });

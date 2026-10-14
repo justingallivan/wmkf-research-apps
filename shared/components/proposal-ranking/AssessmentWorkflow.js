@@ -93,6 +93,7 @@ export function AssessmentList({
   highlightedId,
   showMissingConfidence = false,
   onPrivateChange,
+  scopeKey,
 }) {
   const [notice, setNotice] = useState('');
   const [moving, setMoving] = useState(null);
@@ -120,7 +121,8 @@ export function AssessmentList({
       const movingId = items[from], targetId = items[to];
       update(current => {
         const currentItems = assessmentItems(current);
-        return moveAssessmentItem(current, currentItems.indexOf(movingId), currentItems.indexOf(targetId));
+        const sourceIndex = currentItems.indexOf(movingId), targetIndex = currentItems.indexOf(targetId);
+        return sourceIndex < 0 || targetIndex < 0 ? current : moveAssessmentItem(current, sourceIndex, targetIndex);
       });
       setNotice('Position and section updated. Saving changes.');
     } else setNotice('The dividers cannot cross.');
@@ -158,9 +160,11 @@ export function AssessmentList({
         {notice}
       </p>
       <DragDropContext
-        onDragStart={() => { dragAssessment.current = assessment; }}
+        onDragStart={() => { dragAssessment.current = { scopeKey, items }; }}
         onDragEnd={({ source, destination: target }) => {
-          if (editable && dragAssessment.current === assessment && target) move(source.index, target.index);
+          const started = dragAssessment.current;
+          if (editable && target && started?.scopeKey === scopeKey && started?.items.length === items.length
+            && started.items.every((id, index) => id === items[index])) move(source.index, target.index);
           dragAssessment.current = null;
         }}
       >
@@ -570,7 +574,10 @@ export default function AssessmentWorkflow({
   const alive = useRef(true);
   const recoveryRef = useRef(null);
   const [queue] = useState(() => createPrivateSaveQueue({
-    onChange: setPrivateSave,
+    onChange: next => {
+      setPrivateSave(next);
+      if (!next.draft && !next.saving && !next.blocked) setError(current => current.startsWith('Finish saving or resolve') ? '' : current);
+    },
     onView: next => {
       setView(next); setRefreshed(new Date());
       if (next.workflow.stage === 'revealed') setSection('group');
@@ -591,10 +598,31 @@ export default function AssessmentWorkflow({
       Router.events.emit('routeChangeError', canceled, url, options);
       throw canceled;
     };
+    const beforeLink = event => {
+      if (!queue.isDirty() || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+      const link = event.target.closest?.('a[href]');
+      if (!link || link.hasAttribute('download') || (link.target && link.target !== '_self')) return;
+      const destination = new URL(link.href, window.location.href);
+      if (destination.origin !== window.location.origin
+        || (destination.pathname === window.location.pathname && destination.search === window.location.search)) return;
+      event.preventDefault(); // Next Link sees defaultPrevented, avoiding a rejected router.push.
+      setError('Finish saving or resolve your unsaved preparation before leaving this page.');
+    };
+    const currentHistoryState = window.history.state;
+    if (Router.router) Router.beforePopState(() => {
+      if (!queue.isDirty()) return true;
+      // Popstate already changed the URL. Restore this entry with its Next metadata.
+      window.history.pushState(currentHistoryState, '', Router.asPath);
+      setError('Finish saving or resolve your unsaved preparation before leaving this page.');
+      return false;
+    });
+    document.addEventListener('click', beforeLink, true);
     window.addEventListener('beforeunload', beforeUnload);
     Router.events.on('routeChangeStart', beforeRoute);
     return () => {
       queue.dispose();
+      if (Router.router) Router.beforePopState(() => true);
+      document.removeEventListener('click', beforeLink, true);
       window.removeEventListener('beforeunload', beforeUnload);
       Router.events.off('routeChangeStart', beforeRoute);
     };
@@ -1037,6 +1065,7 @@ export default function AssessmentWorkflow({
       {!(section === 'group' && collective) && <p role="status" className="mb-3 text-sm text-gray-600">{saveStatus}</p>}
       {privateSave.blocked && <div ref={recoveryRef} role="alert" tabIndex={-1} className="mb-4 rounded-lg border border-amber-300 bg-amber-50 p-4">
         <p>{privateSave.blocked.message}</p>
+        {privateSave.blocked.kind === 'integrity' && <p className="mt-2 text-sm">This operation cannot be retried safely. Reload the page to continue; unsaved local edits will be lost.</p>}
         <p className="mt-2 text-sm">Your local change is kept here. Earlier confirmed changes remain saved; the latest changes need recovery before you continue.</p>
         <div className="mt-3 flex flex-wrap gap-2">
           {['uncertain', 'rejected'].includes(privateSave.blocked.kind) && <Button disabled={privateSave.saving} onClick={() => queue.retry()}>
@@ -1369,6 +1398,7 @@ export default function AssessmentWorkflow({
             editable={editable}
             onChange={change}
                     onPrivateChange={!collective ? change : undefined}
+            scopeKey={`${view.roundId}:${view.viewer.systemUserId}:${view.workflow.preparationVersion}:${section}:${program}`}
             sentiment={sentiment}
             onSentimentRefresh={refreshSentiment}
             highlightedId={currentFindResult?.id}
