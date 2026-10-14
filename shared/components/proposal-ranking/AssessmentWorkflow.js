@@ -274,14 +274,14 @@ export function AssessmentList({
                                 <p className="text-right tabular-nums"><span className="mr-2 text-xs text-gray-600">Requested</span><strong>{proposal.amountMinorUnits == null ? 'Unavailable' : formatMoney(proposal.amountMinorUnits, proposal.currency)}</strong></p>
                               </div>
                               <div className="mt-3 grid grid-cols-[minmax(0,1fr)_auto] items-end gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(8rem,.55fr)_auto]">
-                                {collective ? <div className="col-span-2 flex flex-wrap items-end gap-x-6 gap-y-3 lg:col-span-1">
+                                {collective ? <div className="col-span-2 grid grid-cols-[repeat(auto-fill,minmax(4.5rem,1fr))] items-end gap-x-2 gap-y-3 lg:col-span-1">
                                   {individuals.map((pd) => {
                                     const lead = pd.systemUserId === proposal.leadSystemUserId;
                                     const grade = gradeAt(pd.order.indexOf(id), pd.boundaries);
                                     const firstName = pd.name?.trim().split(/\s+/)[0] || 'Unknown PD';
                                     const duplicateFirstName = individuals.some((other) => other.systemUserId !== pd.systemUserId && other.name?.trim().split(/\s+/)[0] === firstName);
-                                    return <div key={pd.systemUserId} aria-label={`${pd.name}${lead ? ', lead PD' : ''}: grade ${grade}, ${pd.confidence[id] === 'confident' ? 'confident' : pd.confidence[id] === 'not-sure' ? 'not sure' : 'confidence unavailable'}`}>
-                                      <p title={`${pd.name}${lead ? ' · Lead PD' : ''}`} className={`mb-1 text-xs font-medium text-gray-700 ${lead ? 'underline decoration-2 underline-offset-4' : ''}`}>{duplicateFirstName ? pd.name : firstName}</p>
+                                    return <div key={pd.systemUserId} className="flex min-w-0 flex-col items-center text-center" aria-label={`${pd.name}${lead ? ', lead PD' : ''}: grade ${grade}, ${pd.confidence[id] === 'confident' ? 'confident' : pd.confidence[id] === 'not-sure' ? 'not sure' : 'confidence unavailable'}`}>
+                                      <p title={`${pd.name}${lead ? ' · Lead PD' : ''}`} className={`mb-2 max-w-full break-words text-xs font-medium text-gray-700 ${lead ? 'font-bold text-gray-900 underline decoration-[3px] decoration-gray-900 underline-offset-4' : ''}`}>{duplicateFirstName ? pd.name : firstName}</p>
                                       <Grade value={grade} confidence={pd.confidence[id]} />
                                     </div>;
                                   })}
