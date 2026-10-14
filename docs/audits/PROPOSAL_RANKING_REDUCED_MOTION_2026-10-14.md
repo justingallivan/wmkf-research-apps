@@ -28,3 +28,9 @@ Claude Opus reviewed the component change, installed drag-library completion pat
 ## Scoped reconciliation
 
 This is a bounded follow-up to the responsiveness implementation receipt. Earlier Chrome timing results used the position dialog and a programmatic radio click; they did not establish pointer-drag or Safari performance. The historical plan and reviews remain historical. Native Safari user acceptance remains open.
+
+## Preview rollout
+
+[VERIFIED via Vercel CLI] Runtime commit `56305b159` is Ready as Preview deployment `dpl_9eqKrmPDQDbY4mXHQFhFQdEKfRBN`. The shared `https://wmkf-meeting-transcription-test.vercel.app` alias points to `https://wmkf-meeting-transcription-test-89zquohkj.vercel.app`. Read-only smoke checks: `/proposal-ranking` 307, `/api/proposal-ranking` 401, `/auth/signin` 200. Production was not promoted. Immediate rollback candidate is the prior preview `dpl_34BbqkNXbayt1QjGHH3DMejjDRAm`.
+
+Doc-currency and doc-symbol-reference gates and their self-tests pass; self-tests ran on the host to permit temporary worktree fixtures. The earlier responsiveness receipt's deployment paragraph is the historical queue rollout; this paragraph records its superseding preview deployment.
