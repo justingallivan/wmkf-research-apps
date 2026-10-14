@@ -3,7 +3,7 @@ title: Staff discussion sentiment meter
 domain: transcription
 kind: plan
 status: shipped
-summary: "Shipped 2026-10-13 (Meeting Tracker). Reads each proposal's Staff Discussion Transcript, records enthusiasm, reception, disagreement and uncertainty with named, quoted evidence, and compares chosen proposals."
+summary: "Shipped 2026-10-13 (Meeting Tracker). Reads each proposal's Staff Discussion Transcript, records enthusiasm, reception, disagreement and uncertainty with named, quoted evidence, and compares chosen proposals. Picker badges/filter are source-built on codex/sentiment-picker-status (2026-10-14), not deployed."
 owner: product-engineering
 related:
   - docs/plans/PAIRED_SUMMARIES_PLAN_2026-10-08.md
@@ -16,6 +16,7 @@ related:
 # Staff discussion sentiment meter
 
 Date: 2026-10-13 (Session 601). Status: **SHIPPED 2026-10-13** (merge `62963a352`, quote-match fix `1bb83c3a2`; migration 082 applied and prompt v1 seeded in Production by the owner). Calibration (§6 item 5) and Proposal Ranking wiring remain open; see §9.
+**Picker extension:** source-built 2026-10-14 on `codex/sentiment-picker-status`, not deployed; see §4.5.
 Owner: Justin.
 
 ## 1. Purpose
@@ -299,6 +300,29 @@ row (no `docs/SERVICE_AND_UTILITY_CATALOG.md` entry: the sibling summary service
   the transcript went stale in between. `ROUTE_NAMESPACE_LIFECYCLE` has no `/api/meeting-tracker` entry, so it is
   unchanged.
 
+**Picker status extension [SOURCE-BUILT 2026-10-14 on `codex/sentiment-picker-status`; not deployed]:**
+
+- Before selection, each candidate shows Current, Out of date, Not analyzed, Analyzing… or Status unavailable.
+  Accepted (including stale acceptance) and Last attempt failed are separate indicators; a failed re-analysis
+  does not hide a completed result. Abandoned generation is treated as a failed last attempt, using the same
+  database-clock rule as the comparison row.
+- Analysis status defaults to All, with Previously analyzed, Not analyzed, Out of date, Analyzing and
+  Status unavailable filters. Previously analyzed means any completed result exists, including while a newer
+  analysis runs; Not analyzed means no completed result exists. Unavailable never counts as Not analyzed.
+  Filters do not remove selected comparison rows.
+- The existing candidates response adds `statuses` keyed by request id. One metadata-only Postgres query
+  (`getCandidateRunSummaries`) reads latest/current-ready/latest-ready/accepted run summaries for the
+  server-scoped candidates; one current prompt-version read supplies freshness. Shared `summarizeSentimentRuns`
+  rules also serve the selected-row read. No full result records, analysis calls, writes or migration are added.
+- Analyze, Re-analyze, Accept and Withdraw refresh the picker badge through the selected-row status read.
+  Busy rows cannot be deselected. Refresh statuses reloads candidates for other staff changes while preserving
+  selections. Program/cycle generation guards reject stale batch responses, and per-request status generations
+  preserve newer action results over an older batch. Lookup failures show Status unavailable; the existing
+  incomplete-list warning remains.
+- Verification covers candidate batch statuses and failures, list filtering/selection preservation, busy-row
+  completion and slow-batch/action ordering in unit tests, plus the compact SQL snapshot in the loopback
+  Postgres integration suite. Tests require execution before promotion; this note asserts source behavior only.
+
 ### 4.6 Consumer contract (Proposal Ranking and others)
 
 A read service, `getDeliberationSentiments(requestIds)`, returns, per request, the current
@@ -369,7 +393,7 @@ prompt make it Tier 1 or above). Codex adversarial review before merging.
   accepted filter and the test must fail.
 - Routes refuse requests without app access and never return records to Board or briefing tokens.
 
-## 9. Stage log
+## 9. Historical stage log
 
 - **Stages 1–3 built** (Sonnet) on `claude/discussion-sentiment`: `4e75f1b79` loader extraction,
   `57be45ccc` prompt source/seed/config test/A7 `inv: 35`, `35a7f3247` migration 082, store,

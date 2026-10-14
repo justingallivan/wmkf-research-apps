@@ -112,7 +112,7 @@ test('a slow candidates response for a previous cycle is ignored after the cycle
   const slow = deferred();
   let slowAsked = false;
   handlers.candidates = (path) => {
-    if (path.includes('cycleCode=D26')) return Promise.resolve(json({ requestIds: [A], capped: false }));
+    if (path.includes('cycleCode=D26')) return Promise.resolve(json({ requestIds: [A], statuses: { [A]: { state: 'current', hasCompletedAnalysis: true } }, capped: false }));
     slowAsked = true;
     return slow.promise;
   };
@@ -123,10 +123,12 @@ test('a slow candidates response for a previous cycle is ignored after the cycle
   await waitFor(() => expect(slowAsked).toBe(true)); // the J27 load is now waiting on its candidates
   fireEvent.change(cycleSelect, { target: { value: 'D26' } });
   expect(await screen.findByLabelText(/Alpha/)).toBeInTheDocument();
-  await act(async () => { slow.resolve(json({ requestIds: [B], capped: true })); });
+  await act(async () => { slow.resolve(json({ requestIds: [B], statuses: { [A]: { state: 'out_of_date', hasCompletedAnalysis: true } }, capped: true })); });
   expect(screen.queryByLabelText(/Beta/)).not.toBeInTheDocument();
   expect(screen.getByLabelText(/Alpha/)).toBeInTheDocument();
   expect(screen.queryByText(/may be incomplete/)).not.toBeInTheDocument();
+  expect(picker().getByText('Current')).toBeInTheDocument();
+  expect(picker().queryByText('Out of date')).not.toBeInTheDocument();
 });
 
 test('choosing a proposal reads only that proposal, and shows each status label', async () => {
@@ -143,7 +145,7 @@ test('choosing a proposal reads only that proposal, and shows each status label'
     await screen.findByLabelText(/Alpha tissue repair/);
     expect(global.fetch.mock.calls.some(([u]) => String(u).includes('/visits/'))).toBe(false);
     tick('Alpha');
-    expect(await screen.findByText(text)).toBeInTheDocument();
+    expect(await within(screen.getByRole('table')).findByText(text)).toBeInTheDocument();
     expect(global.fetch.mock.calls.filter(([u]) => String(u).includes('/visits/'))).toHaveLength(1);
     unmount();
     global.fetch.mockClear();
@@ -254,7 +256,7 @@ test('stale response guard: an analysis that finishes after the page unmounted s
   errors.mockRestore();
 });
 
-test('stale response guard: an analysis that fails after the proposal was unticked and re-ticked writes nothing to the new row', async () => {
+test('a working request cannot be unticked; completion updates its picker badge', async () => {
   handlers[`GET ${url(A)}`] = async () => json({ state: 'not_analyzed', run: null, runCurrent: false });
   const gate = deferred();
   handlers[`POST ${url(A)}`] = () => gate.promise;
@@ -262,14 +264,21 @@ test('stale response guard: an analysis that fails after the proposal was untick
   await screen.findByLabelText(/Alpha/); tick('Alpha');
   fireEvent.click(await screen.findByRole('button', { name: 'Analyze' }));
   await screen.findByText(/Keep this page open/);
-  tick('Alpha'); // unticked while the analysis is running
-  tick('Alpha'); // re-ticked: a fresh row with its own read
-  expect(await screen.findByRole('button', { name: 'Analyze' })).toBeEnabled();
-  const readsBefore = global.fetch.mock.calls.filter(([u, o]) => String(u) === url(A) && o?.method !== 'POST').length;
-  await act(async () => { gate.resolve(json({ error: 'STALE ANALYSIS ERROR', code: 'sentiment_generation_failed' }, false, 502)); });
-  expect(screen.queryByText('STALE ANALYSIS ERROR')).not.toBeInTheDocument();
-  expect(global.fetch.mock.calls.filter(([u, o]) => String(u) === url(A) && o?.method !== 'POST')).toHaveLength(readsBefore);
-  expect(screen.getByRole('button', { name: 'Analyze' })).toBeEnabled();
+  expect(screen.getByLabelText(/Alpha/)).toBeDisabled();
+  tick('Alpha');
+  expect(screen.getByLabelText(/Alpha/)).toBeChecked();
+  expect(picker().getByText('Analyzing…')).toBeInTheDocument();
+  const readGate = deferred();
+  handlers[`GET ${url(A)}`] = () => readGate.promise;
+  await act(async () => { gate.resolve(json({ run: {} })); });
+  await screen.findByText('Checking…');
+  expect(screen.getByLabelText(/Alpha/)).toBeDisabled();
+  tick('Alpha');
+  expect(screen.getByLabelText(/Alpha/)).toBeChecked();
+  await act(async () => { readGate.resolve(json(status())); });
+  await screen.findByText('Staff were excited.');
+  expect(screen.getByLabelText(/Alpha/)).toBeEnabled();
+  expect(picker().getByText('Current')).toBeInTheDocument();
 });
 
 test('a row whose read failed offers Try again, which reloads it; no action is offered until it is ready', async () => {
@@ -307,7 +316,7 @@ test('an accepted result can be withdrawn when the transcript is no longer bound
   handlers[`POST ${url(A, '/withdraw')}`] = async () => json({ run: {} });
   render(<DiscussionSentimentView />);
   await screen.findByLabelText(/Alpha/); tick('Alpha');
-  expect(await screen.findByText('No staff discussion transcript')).toBeInTheDocument();
+  expect(await within(screen.getByRole('table')).findByText('No staff discussion transcript')).toBeInTheDocument();
   expect(screen.getByText(/Accepted by Alex Staff/)).toBeInTheDocument();
   expect(screen.queryByRole('button', { name: /Analyze/ })).not.toBeInTheDocument();
   fireEvent.click(screen.getByRole('button', { name: 'Withdraw' }));
@@ -353,4 +362,91 @@ describe('sortSentimentRows', () => {
     expect(sortSentimentRows(rows).map((x) => x.id)).toEqual(['a', 'b']);
     expect(rows).toEqual(copy);
   });
+});
+
+const picker = () => within(screen.getByRole('region', { name: 'Choose proposals' }));
+const candidateStatus = (over = {}) => ({ state: 'current', hasCompletedAnalysis: true, accepted: null, lastRunFailed: false, ...over });
+const filterStatus = (value) => fireEvent.change(screen.getByLabelText('Analysis status'), { target: { value } });
+
+test('picker shows saved statuses before selection without detailed reads or analysis; filters preserve selected rows', async () => {
+  handlers.candidates = async () => json({ requestIds: [A, B], statuses: {
+    [A]: candidateStatus({ accepted: { current: false }, lastRunFailed: true }),
+    [B]: candidateStatus({ state: 'not_analyzed', hasCompletedAnalysis: false }),
+  } });
+  handlers[`GET ${url(A)}`] = async () => json(status());
+  render(<DiscussionSentimentView />);
+  await screen.findByLabelText(/Alpha/);
+  expect(picker().getByText('Current')).toBeInTheDocument();
+  expect(picker().getByText('Accepted (out of date)')).toBeInTheDocument();
+  expect(picker().getByText('Last attempt failed')).toBeInTheDocument();
+  expect(global.fetch.mock.calls.some(([u]) => String(u).includes('/visits/'))).toBe(false);
+  tick('Alpha');
+  await screen.findByText('Staff were excited.');
+  filterStatus('not_analyzed');
+  expect(screen.queryByLabelText(/Alpha/)).not.toBeInTheDocument();
+  expect(screen.getByLabelText(/Beta/)).toBeInTheDocument();
+  expect(screen.getByText('Staff were excited.')).toBeInTheDocument();
+  filterStatus('previously_analyzed');
+  expect(screen.getByLabelText(/Alpha/)).toBeChecked();
+  expect(screen.queryByLabelText(/Beta/)).not.toBeInTheDocument();
+  expect(global.fetch.mock.calls.every(([, options]) => !options?.method || options.method === 'GET')).toBe(true);
+});
+
+test('analyzing an existing result remains previously analyzed; unavailable rows never count as not analyzed', async () => {
+  handlers.candidates = async () => json({ requestIds: [A, B], statuses: {
+    [A]: candidateStatus({ state: 'analyzing' }), [B]: { state: 'unavailable' },
+  } });
+  render(<DiscussionSentimentView />); await screen.findByLabelText(/Alpha/);
+  filterStatus('previously_analyzed'); expect(screen.getByLabelText(/Alpha/)).toBeInTheDocument();
+  filterStatus('analyzing'); expect(screen.getByLabelText(/Alpha/)).toBeInTheDocument();
+  filterStatus('not_analyzed'); expect(screen.queryByLabelText(/Alpha|Beta/)).not.toBeInTheDocument();
+  filterStatus('unavailable'); expect(screen.getByLabelText(/Beta/)).toBeInTheDocument();
+});
+
+test('Refresh statuses reads other staff changes and keeps selections; a later row result wins over a slow batch', async () => {
+  handlers.candidates = async () => json({ requestIds: [A, B], statuses: { [A]: candidateStatus(), [B]: candidateStatus() } });
+  handlers[`GET ${url(A)}`] = async () => json(status());
+  render(<DiscussionSentimentView />); await screen.findByLabelText(/Alpha/); tick('Alpha');
+  await screen.findByText('Staff were excited.');
+  const slow = deferred(); let asked = false;
+  handlers.candidates = () => { asked = true; return slow.promise; };
+  fireEvent.click(screen.getByRole('button', { name: 'Refresh statuses' }));
+  await waitFor(() => expect(asked).toBe(true));
+  handlers[`POST ${url(A, '/accept')}`] = async () => json({});
+  handlers[`GET ${url(A)}`] = async () => json(status({ accepted: { id: status().run.id, current: true, acceptedByName: 'Alex', acceptedAt: '2026-10-14' } }));
+  fireEvent.click(screen.getByRole('button', { name: 'Accept' }));
+  await screen.findByText(/Accepted by Alex/);
+  await act(async () => slow.resolve(json({ requestIds: [A, B], statuses: {
+    [A]: candidateStatus(), [B]: candidateStatus({ state: 'out_of_date' }),
+  } })));
+  expect(screen.getByLabelText(/Alpha/)).toBeChecked();
+  expect(picker().getByText('Accepted')).toBeInTheDocument();
+  expect(picker().getByText('Out of date')).toBeInTheDocument();
+  filterStatus('out_of_date');
+  expect(screen.getByLabelText(/Beta/)).toBeInTheDocument();
+  expect(screen.queryByLabelText(/Alpha/)).not.toBeInTheDocument();
+});
+
+test('failed detailed reads replace an old picker badge with unavailable', async () => {
+  handlers.candidates = async () => json({ requestIds: [A], statuses: { [A]: candidateStatus() } });
+  handlers[`GET ${url(A)}`] = async () => json({ error: 'Unavailable' }, false, 503);
+  render(<DiscussionSentimentView />); await screen.findByLabelText(/Alpha/); tick('Alpha');
+  await screen.findByRole('alert');
+  expect(picker().getByText('Status unavailable')).toBeInTheDocument();
+  expect(picker().queryByText('Current')).not.toBeInTheDocument();
+});
+
+test('a failed post-action status read retains its error and marks the picker unavailable', async () => {
+  handlers.candidates = async () => json({ requestIds: [A], statuses: { [A]: candidateStatus({ state: 'not_analyzed', hasCompletedAnalysis: false }) } });
+  handlers[`GET ${url(A)}`] = async () => json({ state: 'not_analyzed', run: null });
+  handlers[`POST ${url(A)}`] = async () => {
+    handlers[`GET ${url(A)}`] = async () => json({ error: 'Status read failed.' }, false, 503);
+    return json({});
+  };
+  render(<DiscussionSentimentView />); await screen.findByLabelText(/Alpha/); tick('Alpha');
+  fireEvent.click(await screen.findByRole('button', { name: 'Analyze' }));
+  expect(await screen.findByRole('alert')).toHaveTextContent('Status read failed.');
+  expect(screen.getByLabelText(/Alpha/)).toBeEnabled();
+  expect(picker().getByText('Status unavailable')).toBeInTheDocument();
+  expect(screen.getByRole('button', { name: 'Try again' })).toBeInTheDocument();
 });
