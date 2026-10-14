@@ -47,6 +47,7 @@ it('guards with the reviewers app and returns the service body for a valid cycle
     writeupViewer: expect.objectContaining({ isSuperuser: false }),
   });
   expect(res.statusCode).toBe(200);
+  expect(res.headers['Server-Timing']).toMatch(/^service_total;dur=/);
   expect(res.body).toEqual({ success: true, cycleCode: 'D26', programId: PROGRAM, scope: 'my', stageLabels: {}, counts: {}, artifacts: [] });
 });
 

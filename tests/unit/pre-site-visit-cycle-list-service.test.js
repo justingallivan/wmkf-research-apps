@@ -1,5 +1,7 @@
 /** @jest-environment node */
 
+jest.mock('../../lib/services/dynamics-service.js', () => ({ DynamicsService: { queryAllRecords: jest.fn() } }));
+jest.mock('../../lib/utils/final-writeup-readiness.js', () => ({ isFinalWriteupSchemaReady: () => true }));
 jest.mock('../../lib/dataverse/adapters/request-document.js', () => ({ findByRequests: jest.fn() }));
 jest.mock('../../lib/dataverse/adapters/grant-request.js', () => ({ queryAllRequests: jest.fn() }));
 jest.mock('../../lib/dataverse/adapters/site-visit.js', () => ({ findSummariesByRequests: jest.fn() }));
@@ -374,4 +376,78 @@ describe('draft writeup visibility per row', () => {
     const [row] = (await list({ writeupViewer: null })).artifacts;
     expect(row.writeup.file?.webUrl).toBe('https://sharepoint.test/writeup-1.docx');
   });
+});
+
+it('starts independent reads while documents are pending, but waits for complete documents', async () => {
+  let releaseDocuments;
+  const documents = new Promise((resolve) => { releaseDocuments = resolve; });
+  requestDocumentAdapter.findByRequests.mockReturnValue(documents);
+  let completed = false;
+  const pending = list().then((value) => { completed = true; return value; });
+  await new Promise(setImmediate);
+  expect(siteVisitAdapter.findSummariesByRequests).toHaveBeenCalled();
+  expect(getDeliberationScheduleByRequestsWithAvailability).toHaveBeenCalled();
+  expect(getMaterialsSummaryByRequestsWithAvailability).toHaveBeenCalled();
+  expect(completed).toBe(false);
+  releaseDocuments({ records: [], capped: true });
+  await expect(pending).rejects.toMatchObject({ code: 'staff_deliberations_documents_capped' });
+});
+
+
+it.each([L.DRAFT, L.REVIEW, L.FINAL])('list projection matches full document reads at lifecycle %s', async (lifecycle) => {
+  jest.useFakeTimers().setSystemTime(new Date('2026-10-14T00:00:00Z'));
+  const { DynamicsService } = jest.requireMock('../../lib/services/dynamics-service.js');
+  const actual = jest.requireActual('../../lib/dataverse/adapters/request-document.js');
+  const source = doc('writeup-1', R1, {
+    wmkf_lifecyclestate: lifecycle, wmkf_sharepointdriveid: 'drive',
+    wmkf_reopencycleid: 'correction', wmkf_milestoneversionid: 'v1',
+    wmkf_milestonecontenthash: 'hash', wmkf_milestonecreatedat: '2026-09-01',
+    wmkf_sharepointversionid: 'v1', wmkf_presiteproposalcorejson: 'large-unused-body',
+  });
+  const brief = doc('brief-1', R1, { wmkf_artifacttype: REQUEST_DOCUMENT_ARTIFACT_TYPE.PRE_RESEARCH_PRESENTATION_BRIEF,
+    wmkf_contenttype: PRE_RP_BRIEF_CONTRACT.contentType, wmkf_sharepointversionid: 'b1' });
+  const final = doc('final-1', R1, { wmkf_artifacttype: REQUEST_DOCUMENT_ARTIFACT_TYPE.FINAL_WRITEUP,
+    wmkf_lifecyclestate: L.FINAL, _wmkf_sourcedocument_value: 'writeup-1',
+    wmkf_sharepointdriveid: 'drive', wmkf_sharepointitemid: source.wmkf_sharepointitemid,
+    wmkf_groupreviewstartedat: '2026-09-02', _wmkf_groupreviewstartedby_value: PD_A,
+    wmkf_leadershipreviewstartedat: '2026-09-03', _wmkf_leadershipreviewstartedby_value: PD_B });
+  const snapshot = doc('snapshot', R1, { wmkf_producer: 'request-workbench-distribution-docx', createdon: '2026-10-01' });
+  grantRequestAdapter.queryAllRequests.mockResolvedValue({ records: [req(R1, {
+    _wmkf_currentpresitevisit_value: 'writeup-1', _wmkf_currentprerpbrief_value: 'brief-1',
+    _wmkf_currentfinalwriteup_value: 'final-1',
+  }), req(R2)], capped: false });
+  DynamicsService.queryAllRecords.mockImplementation(async (_entity, { select, filter }) => ({
+    records: [source, brief, final, snapshot].filter((row) => filter.includes(`wmkf_artifacttype eq ${row.wmkf_artifacttype}`))
+      .map((row) => Object.fromEntries(Object.entries(row).filter(([key]) => select.split(',').includes(key)))),
+    capped: false,
+  }));
+  requestDocumentAdapter.findByRequests.mockImplementation((ids, options) => actual.findByRequests(ids, { ...options, listFactsOnly: false }));
+  const baseline = await list({ writeupViewer: { actingUserSystemId: PD_B, isSuperuser: false } });
+  requestDocumentAdapter.findByRequests.mockImplementation(actual.findByRequests);
+  const candidate = await list({ writeupViewer: { actingUserSystemId: PD_B, isSuperuser: false } });
+  expect(candidate).toEqual(baseline);
+  expect(candidate.artifacts).toHaveLength(2);
+  if (lifecycle === L.FINAL) expect(candidate.artifacts[0].finalReview.phase).toBe('leadership-review');
+  else expect(candidate.artifacts[0].writeup.fileHidden).toBe(true);
+});
+
+
+it('preserves document-cap precedence when an independent visit read also fails', async () => {
+  requestDocumentAdapter.findByRequests.mockResolvedValue({ records: [], capped: true });
+  siteVisitAdapter.findSummariesByRequests.mockRejectedValue(new Error('visit transport failure'));
+  await expect(list()).rejects.toMatchObject({ code: 'staff_deliberations_documents_capped' });
+});
+
+it('joins pending reads before reporting a document rejection over a visit rejection', async () => {
+  const documentFailure = new Error('document read failed');
+  let releaseMaterial;
+  getMaterialsSummaryByRequestsWithAvailability.mockReturnValue(new Promise((resolve) => { releaseMaterial = resolve; }));
+  requestDocumentAdapter.findByRequests.mockRejectedValue(documentFailure);
+  siteVisitAdapter.findSummariesByRequests.mockRejectedValue(new Error('visit read failed'));
+  let finished = false;
+  const result = list().then(() => { finished = true; }, (error) => { finished = true; return error; });
+  await new Promise(setImmediate);
+  expect(finished).toBe(false);
+  releaseMaterial({ summaries: new Map(), availability: new Map() });
+  expect(await result).toBe(documentFailure);
 });

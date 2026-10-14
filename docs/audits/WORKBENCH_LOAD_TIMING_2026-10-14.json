@@ -1,0 +1,408 @@
+{
+  "baseline-aligned": {
+    "targetHost": "wmkf.crm.dynamics.com",
+    "runs": [
+      {
+        "dashboard": {
+          "milliseconds": 394,
+          "steps": [
+            {
+              "name": "pd_resolution",
+              "milliseconds": 0
+            },
+            {
+              "name": "role",
+              "milliseconds": 32
+            },
+            {
+              "name": "program_catalog",
+              "milliseconds": 64
+            },
+            {
+              "name": "program_assignments",
+              "milliseconds": 83
+            },
+            {
+              "name": "program_scope",
+              "milliseconds": 148
+            },
+            {
+              "name": "cycle_list",
+              "milliseconds": 212
+            }
+          ],
+          "digest": "6c0839fdeb96f4a9a9b4a67c8e79f077f47dc03b5514a220922d72341d90f514"
+        },
+        "deliberations": {
+          "milliseconds": 1002,
+          "steps": [
+            {
+              "name": "labels",
+              "milliseconds": 1
+            },
+            {
+              "name": "program_catalog",
+              "milliseconds": 47
+            },
+            {
+              "name": "program_assignments",
+              "milliseconds": 53
+            },
+            {
+              "name": "program_scope",
+              "milliseconds": 100
+            },
+            {
+              "name": "requests",
+              "milliseconds": 86
+            },
+            {
+              "name": "brief_documents",
+              "milliseconds": 338
+            },
+            {
+              "name": "final_documents",
+              "milliseconds": 378
+            },
+            {
+              "name": "presite_documents",
+              "milliseconds": 411
+            },
+            {
+              "name": "sent_sources",
+              "milliseconds": 32
+            },
+            {
+              "name": "sent_versions",
+              "milliseconds": 38
+            },
+            {
+              "name": "site_visits",
+              "milliseconds": 86
+            },
+            {
+              "name": "materials",
+              "milliseconds": 153
+            },
+            {
+              "name": "schedules",
+              "milliseconds": 246
+            },
+            {
+              "name": "preparations",
+              "milliseconds": 151
+            }
+          ],
+          "digest": "84624481f821b7aca08228f862c01c4fc994c7ca0c295d3bb9b0d7e9ed281260",
+          "requestCounts": {
+            "total": 13,
+            "ordinary": 7,
+            "test": 6
+          }
+        }
+      },
+      {
+        "dashboard": {
+          "milliseconds": 400,
+          "steps": [
+            {
+              "name": "pd_resolution",
+              "milliseconds": 0
+            },
+            {
+              "name": "role",
+              "milliseconds": 32
+            },
+            {
+              "name": "program_catalog",
+              "milliseconds": 145
+            },
+            {
+              "name": "program_assignments",
+              "milliseconds": 58
+            },
+            {
+              "name": "program_scope",
+              "milliseconds": 203
+            },
+            {
+              "name": "cycle_list",
+              "milliseconds": 164
+            }
+          ],
+          "digest": "6c0839fdeb96f4a9a9b4a67c8e79f077f47dc03b5514a220922d72341d90f514"
+        },
+        "deliberations": {
+          "milliseconds": 1056,
+          "steps": [
+            {
+              "name": "labels",
+              "milliseconds": 0
+            },
+            {
+              "name": "program_catalog",
+              "milliseconds": 54
+            },
+            {
+              "name": "program_assignments",
+              "milliseconds": 62
+            },
+            {
+              "name": "program_scope",
+              "milliseconds": 116
+            },
+            {
+              "name": "requests",
+              "milliseconds": 134
+            },
+            {
+              "name": "final_documents",
+              "milliseconds": 369
+            },
+            {
+              "name": "brief_documents",
+              "milliseconds": 414
+            },
+            {
+              "name": "presite_documents",
+              "milliseconds": 555
+            },
+            {
+              "name": "sent_sources",
+              "milliseconds": 31
+            },
+            {
+              "name": "sent_versions",
+              "milliseconds": 64
+            },
+            {
+              "name": "site_visits",
+              "milliseconds": 72
+            },
+            {
+              "name": "materials",
+              "milliseconds": 194
+            },
+            {
+              "name": "schedules",
+              "milliseconds": 217
+            },
+            {
+              "name": "preparations",
+              "milliseconds": 32
+            }
+          ],
+          "digest": "84624481f821b7aca08228f862c01c4fc994c7ca0c295d3bb9b0d7e9ed281260",
+          "requestCounts": {
+            "total": 13,
+            "ordinary": 7,
+            "test": 6
+          }
+        }
+      }
+    ]
+  },
+  "final": {
+    "targetHost": "wmkf.crm.dynamics.com",
+    "runs": [
+      {
+        "dashboard": {
+          "milliseconds": 512,
+          "steps": [
+            {
+              "name": "pd_resolution",
+              "milliseconds": 0
+            },
+            {
+              "name": "role",
+              "milliseconds": 35
+            },
+            {
+              "name": "program_catalog",
+              "milliseconds": 118
+            },
+            {
+              "name": "program_assignments",
+              "milliseconds": 47
+            },
+            {
+              "name": "program_scope",
+              "milliseconds": 165
+            },
+            {
+              "name": "cycle_list",
+              "milliseconds": 309
+            }
+          ],
+          "digest": "6c0839fdeb96f4a9a9b4a67c8e79f077f47dc03b5514a220922d72341d90f514"
+        },
+        "deliberations": {
+          "milliseconds": 731,
+          "steps": [
+            {
+              "name": "labels",
+              "milliseconds": 1
+            },
+            {
+              "name": "program_catalog",
+              "milliseconds": 60
+            },
+            {
+              "name": "program_assignments",
+              "milliseconds": 70
+            },
+            {
+              "name": "program_scope",
+              "milliseconds": 130
+            },
+            {
+              "name": "requests",
+              "milliseconds": 79
+            },
+            {
+              "name": "site_visits",
+              "milliseconds": 62
+            },
+            {
+              "name": "materials",
+              "milliseconds": 188
+            },
+            {
+              "name": "presite_documents",
+              "milliseconds": 229
+            },
+            {
+              "name": "schedules",
+              "milliseconds": 290
+            },
+            {
+              "name": "brief_documents",
+              "milliseconds": 299
+            },
+            {
+              "name": "final_documents",
+              "milliseconds": 310
+            },
+            {
+              "name": "sent_sources",
+              "milliseconds": 33
+            },
+            {
+              "name": "sent_versions",
+              "milliseconds": 33
+            },
+            {
+              "name": "preparations",
+              "milliseconds": 170
+            }
+          ],
+          "digest": "84624481f821b7aca08228f862c01c4fc994c7ca0c295d3bb9b0d7e9ed281260",
+          "requestCounts": {
+            "total": 13,
+            "ordinary": 7,
+            "test": 6
+          }
+        }
+      },
+      {
+        "dashboard": {
+          "milliseconds": 308,
+          "steps": [
+            {
+              "name": "pd_resolution",
+              "milliseconds": 0
+            },
+            {
+              "name": "role",
+              "milliseconds": 31
+            },
+            {
+              "name": "program_catalog",
+              "milliseconds": 59
+            },
+            {
+              "name": "program_assignments",
+              "milliseconds": 64
+            },
+            {
+              "name": "program_scope",
+              "milliseconds": 123
+            },
+            {
+              "name": "cycle_list",
+              "milliseconds": 153
+            }
+          ],
+          "digest": "6c0839fdeb96f4a9a9b4a67c8e79f077f47dc03b5514a220922d72341d90f514"
+        },
+        "deliberations": {
+          "milliseconds": 747,
+          "steps": [
+            {
+              "name": "labels",
+              "milliseconds": 0
+            },
+            {
+              "name": "program_catalog",
+              "milliseconds": 49
+            },
+            {
+              "name": "program_assignments",
+              "milliseconds": 65
+            },
+            {
+              "name": "program_scope",
+              "milliseconds": 115
+            },
+            {
+              "name": "requests",
+              "milliseconds": 80
+            },
+            {
+              "name": "site_visits",
+              "milliseconds": 83
+            },
+            {
+              "name": "final_documents",
+              "milliseconds": 141
+            },
+            {
+              "name": "brief_documents",
+              "milliseconds": 171
+            },
+            {
+              "name": "materials",
+              "milliseconds": 240
+            },
+            {
+              "name": "schedules",
+              "milliseconds": 248
+            },
+            {
+              "name": "presite_documents",
+              "milliseconds": 479
+            },
+            {
+              "name": "sent_versions",
+              "milliseconds": 32
+            },
+            {
+              "name": "sent_sources",
+              "milliseconds": 32
+            },
+            {
+              "name": "preparations",
+              "milliseconds": 39
+            }
+          ],
+          "digest": "84624481f821b7aca08228f862c01c4fc994c7ca0c295d3bb9b0d7e9ed281260",
+          "requestCounts": {
+            "total": 13,
+            "ordinary": 7,
+            "test": 6
+          }
+        }
+      }
+    ]
+  }
+}
