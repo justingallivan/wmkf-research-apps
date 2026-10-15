@@ -114,7 +114,10 @@ function setupRound() {
     makeList(`pd:mr:${participantId}`, 'mr', participantId, 100000000, [mrId]),
     makeList('meeting:mr', 'mr', null, 100000002, [mrId]),
   ];
-  readRound.mockImplementation(async () => ({ ...round }));
+  readRound.mockImplementation(async () => {
+    const { wmkf_workflowjson: _workflow, ...legacyProjection } = round;
+    return legacyProjection;
+  });
   readAssessmentRound.mockImplementation(async () => ({ ...round }));
   readAssessmentRows.mockImplementation(async (_roundId, keys) => rows.filter((row) => keys.includes(row.wmkf_listkey)).map((row) => ({ ...row })));
   listRoundRows.mockImplementation(async () => rows.map((row) => ({ ...row })));

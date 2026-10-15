@@ -213,6 +213,11 @@ test('captured second facilitator gets facilitator actions without anyone elseâ€
   expect(view.workflow).not.toHaveProperty('privateMarker');
   expect(view.round.snapshot).not.toHaveProperty('privateMarker');
 
+  const facilitatorAdmin = await readWorkflowRound({ roundId, actor: charlie, isSuperuser: true });
+  expect(facilitatorAdmin.round.snapshot.proposals).toHaveLength(snapshot.proposals.length);
+  expect(facilitatorAdmin.own).toBeNull();
+  expect(facilitatorAdmin.confirmations.reveal).toBeDefined();
+
   const facilitatorPd = await readWorkflowRound({ roundId, actor: alice });
   expect(facilitatorPd.own).not.toBeNull();
   expect(facilitatorPd.facilitatorLists).toBeNull();
@@ -260,6 +265,15 @@ test('reveal, reset, replay after later edits, history, reopen and restart retai
   expect(retry.operation.result).toEqual(reset.result.operation.result);
   const history = await readWorkflowHistory({ roundId, actor: bob });
   expect(history.entries).toHaveLength(2);
+  const revealHistory = rows.find((row) => row.wmkf_listkey === 'h:1');
+  const storedReveal = JSON.parse(revealHistory.wmkf_assessmentjson);
+  storedReveal.individuals[0].ready = { operationId: 'private-ready-sentinel' };
+  storedReveal.individuals[0].privateAssessment = 'private-extra-sentinel';
+  revealHistory.wmkf_assessmentjson = JSON.stringify(storedReveal);
+  const safeHistory = await readWorkflowHistory({ roundId, actor: bob });
+  expect(safeHistory.entries.find((entry) => entry.kind === 'reveal').individuals).toHaveLength(2);
+  expect(JSON.stringify(safeHistory)).not.toContain('private-ready-sentinel');
+  expect(JSON.stringify(safeHistory)).not.toContain('private-extra-sentinel');
   const immutable = copy(rows.find((row) => row.wmkf_listkey.startsWith('r:')));
   await send('reopenPreparation');
   const privateView = await readWorkflowRound({ roundId, actor: bob });
