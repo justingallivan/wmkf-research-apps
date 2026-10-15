@@ -21,7 +21,8 @@ export default function DefaultFacilitatorSettings() {
 
   useEffect(() => {
     let active = true;
-    requestEnvelope('/api/app-access?all=true')
+    // The plain app-access read reports isSuperuser; the ?all=true admin snapshot does not.
+    requestEnvelope('/api/app-access')
       .then(({ ok, data }) => {
         if (!active) return;
         setIsSuperuser(ok && data?.isSuperuser === true);

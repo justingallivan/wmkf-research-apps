@@ -71,7 +71,7 @@ const EXPECTED_FETCHES = {
     '/api/admin/review-questions',
   ],
   'workflows:proposal-ranking': [
-    '/api/app-access?all=true',
+    '/api/app-access',
   ],
   'workflows:final-writeups': [
     '/api/admin/final-writeup-matrix-audiences',
