@@ -663,7 +663,7 @@ export default function AssessmentWorkflow({
     pendingRef.current = null;
     setError('');
     setRefreshed(new Date());
-    if (next.workflow.stage === 'revealed') setSection('group');
+    if (next.workflow.stage === 'revealed' || next.viewer.isObserver) setSection('group');
     else if (view.workflow.stage === 'revealed') setSection('prepare');
   };
   const refresh = async () => {

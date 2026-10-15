@@ -598,3 +598,16 @@ test('before reveal an observer sees who is ready and no preparation workspace',
   expect(screen.queryByRole('button', { name: 'My preparation' })).toBeNull();
   expect(screen.queryByRole('button', { name: 'History' })).toBeNull();
 });
+
+test('an observer stays on readiness when a refresh finds preparation reopened', async () => {
+  const reopened = revealedView({ systemUserId: 'allison', isObserver: true });
+  reopened.workflow = { stage: 'private', preparationVersion: 2, revealId: null };
+  reopened.collective = null;
+  reopened.progress = reopened.progress.map((p) => ({ ...p, ready: false }));
+  loadProposalRanking.mockResolvedValue(reopened);
+  render(<AssessmentWorkflow initial={revealedView({ systemUserId: 'allison', isObserver: true })} cycleOptions={[]} onCycleChange={() => {}} />);
+  fireEvent.click(screen.getByRole('button', { name: 'Refresh' }));
+  expect(await screen.findByRole('heading', { name: 'Waiting for the group reveal' })).toBeTruthy();
+  expect(screen.getByText('Alice — Preparing')).toBeTruthy();
+  expect(screen.queryByText(/You are facilitating/)).toBeNull();
+});
