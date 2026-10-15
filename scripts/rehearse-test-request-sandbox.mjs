@@ -104,6 +104,10 @@ import {
 } from '../lib/services/test-requests/basic-clone-steps.js';
 import { advanceRun, recipeLeaseSeconds, RECIPE_STEP_ORDER } from '../lib/services/test-requests/run-runner.js';
 import { recheckFoundationTransition } from '../lib/services/test-requests/foundation-transition.js';
+import {
+  captureSandboxFoundationBaseline,
+  verifySandboxFoundationTransition,
+} from '../lib/services/test-requests/sandbox-foundation-verification.js';
 import { requireLedgerUrl, ledgerSchemaCheck } from '../lib/db/ledger-guard.js';
 import { fieldFor, recheckStatusChange, runStatusChange } from '../lib/services/test-requests/status-change-runner.js';
 import { CAST_DEFAULT_NAMES, CAST_ROLE_ORDER, planCastAddresses, readCast, runCastCreate } from '../lib/services/test-requests/cast-runner.js';
@@ -653,7 +657,7 @@ async function executeManifest(client, manifest, receiptPath, { bypassGoverify =
 
   const journalCreate = async (patch) => {
     if (patch.goverifyBypass) receipt.goverifyBypass = patch.goverifyBypass;
-    for (const key of ['createAttempted', 'createAttemptedAt', 'createResponseStatus', 'createResponseReceivedAt', 'postCreateStepsSkipped', 'postCreateStepsSkippedReason']) {
+    for (const key of ['sandboxFoundationBaseline', 'createAttempted', 'createAttemptedAt', 'createResponseStatus', 'createResponseReceivedAt', 'postCreateStepsSkipped', 'postCreateStepsSkippedReason']) {
       if (key in patch) receipt[key] = patch[key];
     }
     updateRehearsalReceipt(receiptPath, receipt);
@@ -690,6 +694,16 @@ async function executeManifest(client, manifest, receiptPath, { bypassGoverify =
 
     await createRequestWithGoverifyBypass({
       client, manifest, preflightBefore, bypassGoverify, journal: journalCreate,
+      beforeCreate: targetEnvironmentOf(manifest) === 'sandbox'
+        ? async () => {
+          const baseline = await captureSandboxFoundationBaseline(client, {
+            foundationId: preflightBefore.foundation.accountid,
+            applicantId: manifest.expectedOrganization.accountid,
+            reservedRequestId: manifest.values.requestId,
+          });
+          await journalCreate({ sandboxFoundationBaseline: baseline });
+        }
+        : undefined,
     });
 
     const createdRequest = await readRequestForCorrection(client, manifest.values.requestId);
@@ -713,6 +727,16 @@ async function executeManifest(client, manifest, receiptPath, { bypassGoverify =
       getFoundationSnapshot(client),
       getContactSnapshot(client, manifest.expectedOrganization.accountid),
     ]);
+    let sandboxFoundation = null;
+    if (targetEnvironmentOf(manifest) === 'sandbox') {
+      if (!receipt.sandboxFoundationBaseline) throw new Error('Sandbox Foundation baseline was not durably journaled before create.');
+      sandboxFoundation = await verifySandboxFoundationTransition(client, receipt.sandboxFoundationBaseline, {
+        startedAt: receipt.sandboxFoundationBaseline.capturedAt,
+        verifiedAt: new Date().toISOString(),
+      });
+      receipt.sandboxFoundationVerification = sandboxFoundation;
+      updateRehearsalReceipt(receiptPath, receipt);
+    }
     const verification = verifyClone(
       manifest,
       preflightBefore,
@@ -721,6 +745,7 @@ async function executeManifest(client, manifest, receiptPath, { bypassGoverify =
       foundationAfter,
       contactsAfter,
       isBundleManifest(manifest) ? receipt.fileCopies || [] : null,
+      sandboxFoundation,
     );
     try {
       await fenceSource(client, manifest, preflightBefore.grantOption.value);

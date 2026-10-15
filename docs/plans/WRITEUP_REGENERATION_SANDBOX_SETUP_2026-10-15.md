@@ -1,13 +1,12 @@
 # Writeup-regeneration sandbox rehearsal setup
 
-Status: **fixture setup paused after Factory verification failed**. This is a
-service-integration rehearsal plan for the registered Dataverse sandbox and
-the shared akoyaGO SharePoint site. It does not establish hosted API
-authentication or production behavior. The Factory created a marked Sandbox
-Request and its unique location/folder, but its required Foundation-account
-invariance check failed; dependent fixture writes and all model calls remain
-stopped. The failure is unresolved, so it is not treated as a successful
-Factory receipt.
+Status: **fresh fixture created; count rollup not yet caught up**. The targeted
+Sandbox verifier repair is implemented and reviewed. The fresh Request 1000366
+has a durable pre-create baseline, but its active-Request census is 29 while the
+rollup remains 28. The original 1000365 failure remains preserved. No dependent
+fixture completion or model call has run. This is a service-integration rehearsal
+for the registered Dataverse Sandbox and shared akoyaGO SharePoint site; it does
+not establish hosted API authentication or production behavior.
 
 ## Execution status and retained evidence
 
@@ -31,7 +30,7 @@ remained `2026-05-19T18:33:57Z`; the bounded read-only Foundation audit query
 returned zero rows. The create body contained only Request fields and did
 not issue an account or Contact write. Current readback confirms the marked
 Request, its sole expected location/folder, zero payment rows, zero regarding
-emails, and no child Contact changes. Because the Factory does not persist the
+emails, and no child Contact changes. Because that earlier Factory version did not persist the
 runtime before-version in its receipt, the version delta cannot be attributed
 conclusively to a Request-triggered rollup versus an unrelated concurrent
 change. Do not weaken or edit the Factory baseline guard to continue. Retain
@@ -46,8 +45,8 @@ refused at that guard before any Dataverse or Graph request.
 **Verified:** `compareSnapshots` compares `String(versionnumber)` and the
 `modifiedon` value; the observed version number is far below JavaScript's
 exact-integer limit, so a type/precision artifact does not explain the
-failure. The Factory receipt records that the account version differed, but
-it does not persist either runtime version number or the pre-create full-row
+failure. The earlier Factory receipt records that the account version differed, but
+it did not persist either runtime version number or the pre-create full-row
 snapshot. That evidence cannot be reconstructed from the manifest.
 
 **Verified in Sandbox:** a read-only account attribute-metadata query found
@@ -77,20 +76,47 @@ for `SourceType=2` formulas containing `akoya_request`, reading the new
 Request's async-operation rows with formatted status, and counting current
 Foundation-applicant Request rows.
 
-**Safest next guarded design:** do not retroactively bless this receipt or
-remove the version guard. Before any separately authorized future Sandbox
-Factory run, persist a pre-create Foundation baseline in the private receipt:
-the version and modified time, a digest of all non-rollup account columns except `versionnumber`,
-the eight rollup values plus each `_date`/`_state`, and the Foundation Contact
-version digest. After quiescence, permit the account version to advance only when the
-remaining checks pass; require every other non-rollup field (including
-`modifiedon`) and Contact version to match; allow only date/state companion changes on the eight
-metadata-confirmed Request rollups when every present state remains
-Calculated. Keep the eight rollup values protected until the Sandbox formula
-predicate and expected count transition are characterized from captured
-before/after data; do not import the Production `+1` rule by assumption. Report
-the changed version and changed fields in the receipt. This is a future
-reviewed verifier change, not authorization to resume the present fixture.
+**Implemented guarded verification:** the owner approved the targeted repair.
+The standalone Sandbox Factory runner now journals a versioned baseline before
+its sole create POST, then rechecks source freshness and interruption state.
+The baseline retains digests of every protected account field, all rollup
+values/companions, the Contact census, and the exact expected active Request
+set. All 15 live rollup formulas are hash-pinned. The count formula was verified
+to count only active Requests: 28 active plus 5 inactive explains the earlier
+33-row total. The after-set must equal the before-set plus precisely the reserved
+Request, and the rollup count must equal that complete set. Other rollup values,
+non-rollup account fields (including modified time), and Contacts stay protected.
+Only reviewed rollup dates within the operation window may move, with healthy
+Calculated states; unexplained version-only drift fails. Missing/unknown schema,
+fields, unhealthy states, unexpected membership, or changed formulas fail closed.
+The existing version comparison remains the default for other Factory callers.
+
+Luna implemented, Sol reviewed, and parent checked the composition. Two focused
+suites / 39 tests passed, as did scoped lint and sequential data-access/writer
+gates and self-tests. The GET-only live probe captured a valid baseline and
+failed only the expected reserved-Request absence check without any create.
+The reproducible probe is `scripts/probe-writeup-sandbox-rollups.mjs`. A fresh
+manifest/receipt is required; this does not convert the failed 1000365 receipt
+into a success. No production contract or schema was changed.
+
+## Fresh baseline-backed attempt
+
+[VERIFIED via the private baseline manifest/receipt and read-only recheck.]
+A fresh v3 manifest created Request **1000366** once; POST returned 201 and
+GoVerify restoration was verified. The initial final check and later read-only
+check at `2026-10-15T23:17:50.885Z` used the original baseline captured at
+`23:14:55.012Z`. Both found exactly the expected active Request set (29), but the
+account's count rollup was still 28, with no rollup or version movement. The sole
+failure was count/census parity. Fresh Request, location/parent, empty folder,
+zero payment/email, unchanged Contact, and active GoVerify checks passed.
+
+Private evidence is retained as
+`/private/tmp/writeup-regen-foundation-baseline-receipt-2026-10-15.json` and
+`/private/tmp/writeup-regen-foundation-baseline-recheck-2026-10-15.json`.
+The original failed receipt was not edited. A future read-only recheck may use
+this same original baseline; it must not capture a new baseline after creation
+or retry creation. Fixture completion remains stopped pending a fully passing
+check, and provider attempts remain **0 of 3**.
 
 ## Read-only evidence
 

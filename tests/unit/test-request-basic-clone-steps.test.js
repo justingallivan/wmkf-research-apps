@@ -247,6 +247,41 @@ describe('createRequestWithGoverifyBypass', () => {
     expect(dispatchIndex).toBeLessThan(responseIndex);
   });
 
+  test('runs and journals a pre-create baseline between source fences before the sole POST', async () => {
+    const calls = [];
+    const client = {
+      get: jest.fn(async () => { calls.push('source-fence'); return ok(sourceRow()); }),
+      postWithOptions: jest.fn(async () => { calls.push('dispatch'); return ok({ akoya_requestnum: '9000002' }, 201); }),
+    };
+    await createRequestWithGoverifyBypass({
+      client,
+      manifest: baseManifest(),
+      preflightBefore: preflightBefore(),
+      journal: async (patch) => { calls.push(Object.keys(patch)[0]); },
+      beforeCreate: async () => { calls.push('capture-baseline'); },
+    });
+    expect(calls).toEqual([
+      'source-fence', 'capture-baseline', 'source-fence', 'createAttempted', 'dispatch', 'createResponseStatus',
+    ]);
+  });
+
+  test('a failed baseline hook prevents createAttempted and the Request POST', async () => {
+    const client = {
+      get: jest.fn(async () => ok(sourceRow())),
+      postWithOptions: jest.fn(),
+    };
+    const journal = jest.fn();
+    await expect(createRequestWithGoverifyBypass({
+      client,
+      manifest: baseManifest(),
+      preflightBefore: preflightBefore(),
+      journal,
+      beforeCreate: async () => { throw new Error('rollup baseline mismatch'); },
+    })).rejects.toThrow('rollup baseline mismatch');
+    expect(client.postWithOptions).not.toHaveBeenCalled();
+    expect(journal).not.toHaveBeenCalledWith(expect.objectContaining({ createAttempted: true }));
+  });
+
   test('a GoVerify deactivation PATCH that never confirms deactivation is a manual-recheck dead end, never auto-resolved', async () => {
     const manifest = baseManifest();
     const workflowRow = {

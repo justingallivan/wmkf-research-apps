@@ -3,7 +3,7 @@ title: Post-presentation writeup regeneration rehearsal
 kind: audit
 domain: workbench
 status: hosted-proof-blocked
-summary: Sandbox rollups recalculated during the failed Factory check; missing pre-create evidence prevents validating the run. No application model calls occurred.
+summary: Sandbox verifier repaired with durable baselines; fresh Request verification awaits count-rollup parity. No application model calls occurred.
 owner: product-engineering
 last_verified: 2026-10-15
 related:
@@ -147,12 +147,28 @@ DAL, reviewer-engagement, and Request Document writer gates plus their sequentia
 self-tests passed. The fixture helper requires a successful Factory verification
 and verified restoration before any dependent write. See the
 [setup record](../plans/WRITEUP_REGENERATION_SANDBOX_SETUP_2026-10-15.md) for scope.
-The PR stays draft. The failed receipt cannot be promoted by taking a new
-baseline after creation. The next proposed tooling change is to persist a full
-pre-create account/Contacts baseline and evaluate a reviewed, narrow Sandbox
-rollup transition alongside all existing checks. The current rollup count is 28
-versus 33 total Foundation-applicant Requests; its filter must be understood
-before proposing a count allowance. Do not import production GoVerify exemptions
-or rerun either create merely to evade the failed guard. This investigation made
-no external writes or provider calls; implementing and exercising that revised
-verification remains outstanding.
+The PR stays draft. The failed 1000365 receipt cannot be promoted by taking a
+new baseline after creation. Following owner approval, Luna implemented the
+narrow Sandbox verifier, Sol reviewed it, and parent checked the composition.
+All 15 observed formula hashes are pinned. The baseline is durably saved before
+POST and protects account fields, Contact versions, and exact Request membership;
+active-Request count must match the complete census. The active-only formula
+explains the earlier 28-versus-33 discrepancy (five Requests are inactive).
+Production GoVerify exemptions are not imported. Two focused suites / 39 tests,
+scoped lint, and sequential data-access/writer gates plus self-tests passed.
+The GET-only live preflight passed every check except the intentionally absent
+reserved Request.
+
+A fresh baseline-backed create returned 201 for Request **1000366**, with
+verified GoVerify restoration and the expected unique folder/location. The
+original baseline was captured at `2026-10-15T23:14:55.012Z`. Final verification
+and a read-only recheck at `23:17:50.885Z` found exactly 29 active Requests but a
+still-stale count rollup of 28; no rollup field or account version changed.
+That count/census mismatch was the sole failure. Other Request/Graph/Contacts,
+zero-payment/email, and workflow checks passed. The original failed receipt
+remains unmodified, and the separate recheck uses its original baseline.
+No dependent fixture completion or model-bearing operation has run. The
+[setup record](../plans/WRITEUP_REGENERATION_SANDBOX_SETUP_2026-10-15.md) retains
+the precise evidence paths and subsequent status. The rollup schedule and
+read-only recheck remain the next operational check; no additional create or
+forced recalculation is authorized by this receipt.
