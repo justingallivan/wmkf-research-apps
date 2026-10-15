@@ -2499,3 +2499,16 @@ describe('finalizeClaimedMp4Upload server-copy seams', () => {
     expect(beforeCreate).not.toHaveBeenCalled();
   });
 });
+
+test('dismissal hides only the empty attempt and preserves recovered Finish saving', async () => {
+  const d = deps({ listUploadIntents: jest.fn(async () => [
+    mp4Intent({ state: 'initiated', staff_dismissed_at: '2026-09-25T00:00:00Z', candidate_item_id: null }),
+    mp4Intent({ id: '99999999-9999-4999-8999-999999999999', state: 'uploaded', staff_dismissed_at: null, candidate_item_id: 'item', lease_token: null }),
+  ]) });
+  const result = await getPresentationMaterials({ requestId: REQUEST_ID, actingUserSystemId: ACTOR_ID }, d);
+  expect(result.uploads).toEqual([expect.objectContaining({ uploadId: '99999999-9999-4999-8999-999999999999', canFinalize: true })]);
+});
+test('resume refuses a dismissed empty attempt before issuing an upload URL', async () => {
+  const d = deps({ getUploadIntent: jest.fn(async () => mp4Intent({ state: 'initiated', staff_dismissed_at: '2026-09-25T00:00:00Z', candidate_item_id: null })) });
+  await expect(getMp4UploadStatus({ requestId: REQUEST_ID, uploadId: OPERATION_ID, actingUserSystemId: ACTOR_ID, resumeFingerprint: 'a'.repeat(64) }, d)).rejects.toMatchObject({ code: 'post_presentation_upload_dismissed' });
+});

@@ -40,3 +40,19 @@ test('batch-read rejects malformed or over-broad identity sets before transport'
   ))).rejects.toThrow(/at most/);
   expect(DynamicsService.queryAllRecords).not.toHaveBeenCalled();
 });
+
+test('list facts preserve provenance and schema gates while dropping document bodies', async () => {
+  const { findByRequests } = jest.requireActual('../../lib/dataverse/adapters/request-document.js');
+  const { isFinalWriteupSchemaReady } = jest.requireMock('../../lib/utils/final-writeup-readiness.js');
+  await findByRequests([DOCUMENT_ID], { listFactsOnly: true, includeGuardedReopen: true });
+  let fields = DynamicsService.queryAllRecords.mock.calls.at(-1)[1].select.split(',');
+  expect(fields).toEqual(expect.arrayContaining(['wmkf_producer', 'wmkf_milestonecontenthash', '_wmkf_sourcedocument_value', 'wmkf_reopencycleid']));
+  expect(fields).not.toContain('wmkf_presiteproposalcorejson');
+  expect(fields).not.toContain('wmkf_groupreviewstartedat');
+  isFinalWriteupSchemaReady.mockReturnValueOnce(true);
+  await findByRequests([DOCUMENT_ID], { listFactsOnly: true });
+  fields = DynamicsService.queryAllRecords.mock.calls.at(-1)[1].select.split(',');
+  expect(fields).toContain('wmkf_groupreviewstartedat');
+  await findByRequests([DOCUMENT_ID]);
+  expect(DynamicsService.queryAllRecords.mock.calls.at(-1)[1].select).toContain('wmkf_presiteproposalcorejson');
+});

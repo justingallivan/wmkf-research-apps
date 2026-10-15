@@ -35,7 +35,7 @@ function isTerminalFinalize(status) {
 
 // `showTrigger={false}` hides the button so a row menu can start the upload through the ref's `open()` (Site Visit
 // redesign §3.2); progress, errors and Retry still show here either way.
-function StaffMaterialUpload({ requestId, slot, label, disabled = false, onUploaded, showTrigger = true, onBlockedChange }, ref) {
+function StaffMaterialUpload({ requestId, slot, label, disabled = false, onUploaded, onUploadStarted, showTrigger = true, onBlockedChange }, ref) {
   const [phase, setPhase] = useState(null);
   const [percent, setPercent] = useState(null);
   const [error, setError] = useState(null);
@@ -101,6 +101,7 @@ function StaffMaterialUpload({ requestId, slot, label, disabled = false, onUploa
   const upload = async (file) => {
     if (!file || pending) return;
     const generation = ++generationRef.current;
+    onUploadStarted?.();
     setError(null);
     setPercent(null);
     setPhase('Preparing…');

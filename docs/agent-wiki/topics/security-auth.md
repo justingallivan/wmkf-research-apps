@@ -1,7 +1,7 @@
 ---
 agent_wiki: topic
 status: active
-last_verified: 2026-08-15
+last_verified: 2026-10-14
 stale_after_days: 60
 owner: platform-security
 source_files:
@@ -10,6 +10,13 @@ source_files:
   - lib/utils/tracked-secrets.js
   - lib/utils/intake-blob.js
   - lib/utils/guid.js
+  - proxy.js
+  - next.config.js
+  - shared/components/RequireAuth.js
+  - shared/utils/auth-enabled.js
+  - pages/api/auth/link-profile.js
+  - pages/api/webhooks/bill.js
+  - pages/api/webhooks/vercel-log-drain.js
   - scripts/check-trust-boundary-guid.js
   - pages/api/auth/[...nextauth].js
   - pages/api/cron/drain-submissions.js
@@ -86,9 +93,10 @@ not a current authority.
   "auth disabled" (Codex adversarial finding, S398: a cached transient 503
   disabled the client auth gate for the page lifetime). Regression tests:
   `tests/unit/require-auth-render-race.test.js`.
-- **Disabled-account revocation is enforced at sign-in, session/JWT, and every
-  route guard; the proxy edge inherits it via JWT invalidation (2026-08-15
-  revocation hardening, branch `codex/claude-revocation-hardening`):** the
+- **Staff account revocation is checked by sign-in, session/JWT and the shared
+  authenticated route guards:** the proxy checks token claims and idle age,
+  not a live `is_active` read. JWT refresh invalidates a disabled staff token;
+  protected API guards perform their own live checks. In the normal staff flow, the
   NextAuth `signIn` callback looks up the caller's `azure_id` WITHOUT an
   `is_active` filter and denies sign-in for a disabled row before any
   provisioning/notification/reconcile side effect; the `jwt` callback returns
@@ -118,7 +126,12 @@ not a current authority.
   over-fetch / IDOR / filter-injection vector. Server-derived ids (read off a row
   already fetched, or a token-bound row) are trusted.
 
-## Branded Staff-Domain Migration Backlog
+## Branded Staff-Domain Routing and Historical Cutover
+
+The June 2026 deployment observations below are historical receipts, not a fresh
+Session 608 production verification. Current source still defines the legacy
+page redirect and configured-origin checks. Re-probe runtime configuration and
+Entra redirect registration before any domain change.
 
 - Current external magic-link state (2026-06-23): reviewer links use
   `REVIEWER_PORTAL_BASE_URL=https://reviews.wmkeck.org`; grantee links use
@@ -185,3 +198,13 @@ not a current authority.
 ```bash
 rg -n "getServerSession|requireAuth|authorization|trackedSecrets|INTAKE_BLOB_RW_TOKEN|BLOB" pages/api lib docs
 ```
+
+## Verification Scope
+
+Session 608 traced the shared route guards, staff sign-in/JWT revocation,
+transactional profile linking, client auth rendering, strict drain bearer check,
+and raw-body webhook signature boundaries. Existing mocked regression tests
+passed; these do not prove current production environment values, Entra app
+registration, external magic-link delivery or an authenticated production write.
+The API-route and GUID gates cover their registered checks, not every security
+property. Evidence: `docs/audits/AGENT_WIKI_REVERIFICATION_2026-10-14.md`.

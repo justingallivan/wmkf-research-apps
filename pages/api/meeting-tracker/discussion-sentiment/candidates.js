@@ -10,7 +10,7 @@ import {
 
 export const config = { maxDuration: 60 };
 
-// The cycle's requests are listed server-side exactly as the schedule dashboard lists them (optionally for one program); requests in it whose Staff Discussion Transcript is bound; ids only, plus `capped` when the list may be incomplete.
+// The cycle's requests are listed server-side exactly as the schedule dashboard lists them (optionally for one program); requests in it whose Staff Discussion Transcript is bound; ids and compact analysis statuses, plus `capped` when the list may be incomplete.
 export default async function handler(req, res) {
   if (req.method !== 'GET') { res.setHeader('Allow', 'GET'); return res.status(405).json({ error: 'Method not allowed' }); }
   const access = await requireAppAccess(req, res, 'meeting-tracker');

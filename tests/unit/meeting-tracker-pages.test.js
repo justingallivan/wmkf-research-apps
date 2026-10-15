@@ -54,6 +54,15 @@ test('list row links to the tracker\'s visit editor with the request number and 
     .toHaveAttribute('data-full-page-navigation', 'true');
 });
 
+test('list row puts the institution beside the request number and labels the PD and PI', () => {
+  const { rerender } = render(<MeetingTrackerRequestRow proposal={proposal({ institution: 'Caltech' })} cycleCode="D26" programId="p1" />);
+  expect(screen.getByRole('heading', { name: '#1002003' }).nextElementSibling).toHaveTextContent('Caltech');
+  expect(screen.getByText('PD: Alex Staff · PI: Jordan Investigator')).toBeInTheDocument();
+  rerender(<MeetingTrackerRequestRow proposal={proposal({ institution: null, programDirector: null, projectLeader: null })} cycleCode="D26" programId="p1" />);
+  expect(screen.getByText('PD: Not assigned')).toBeInTheDocument();
+  expect(screen.queryByText('Caltech')).not.toBeInTheDocument();
+});
+
 test('a saved visit is labeled as the workspace entry, while a missing visit only offers scheduling', () => {
   const { rerender } = render(<MeetingTrackerRequestRow proposal={proposal({ siteVisit: { activityId: 'visit-1' } })} cycleCode="D26" programId="p1" />);
   expect(screen.getByRole('link', { name: 'Open visit' })).toHaveAttribute('href', expect.stringContaining('/meeting-tracker/visits/'));

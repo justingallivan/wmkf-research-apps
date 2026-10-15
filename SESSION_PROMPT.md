@@ -1,4 +1,345 @@
-# Session 602 Prompt: Discussion Sentiment calibration (after uploads); transcription cleanup check; security mitigation Release 1
+# Session 608 Prompt: Cloudmersive diagnostics deployed; preserve other workstream handoffs
+
+## Session 607 Summary — materials upload diagnosis, stale-warning fix, and private scan diagnostics (Codex, 2026-10-14 PT)
+
+### What Was Completed
+
+1. **Upload incident diagnosed; genuine PowerPoint export accepted.** [VERIFIED via authorized production reads, local archive inspection, six owner-approved Cloudmersive scans, and owner report.] Request #1002835's original `.key` upload was rejected with `invalid_file`; Cloudmersive reported `.pages` and no native malware signature. Three embedded files named `.png` were actually TIFF. Correcting those members alone did not make the `.key` pass; the corrected package named `.pages` passed. The owner exported a real PPTX and confirmed its upload succeeded. These were format-policy findings, not proof of a detected virus or a general renaming workaround.
+2. **Stale upload warnings fixed and accepted.** [VERIFIED via PR #482, production deployment receipt, and owner report.] Starting a replacement hides that slot's prior failed-attempt notices; successful replacement suppresses older notices while preserving current or uncertain failures. Commit `191db1abe`, merge `351a895a0`; production deployment `7079061059` succeeded at **2026-10-14T22:43:53Z**. The owner confirmed the warning is gone.
+3. **Private Cloudmersive diagnostics shipped.** [VERIFIED via source, PR #484, GitHub production deployment receipt, and owner confirmation.] Commit `0ccca22dd`, merge `f826154f8`; production deployment `7079736852` succeeded at **2026-10-14T23:27:01Z**. The shared scanner retains a bounded diagnostic DTO from the existing response. The common materials finalizer enriches `site_visit_material_scan_rejected` and records `site_visit_material_scan_failed` for scanner failures. Diagnostics include submitted/detected format, native finding count/names, relevant archive member when provided, byte count, timing, attempts, and safe failure classification. Existing superuser-only Operational Events displays the metadata. No scan policy, applicant response, schema, or additional scan call changed.
+4. **Verification and release.** [VERIFIED via session test runs, independent source review, and GitHub CI.] Warning fix: **111 tests / 5 suites** passed. Diagnostics: **321 tests / 10 suites**, scoped lint, types, relevant gates and sequential self-tests passed; independent review found no remaining actionable defects; all GitHub CI checks passed before merge. The diagnostics tests exercise actual event sanitization, public-response exclusion, malformed/missing findings, retry counts and logging-failure preservation. These checks do not prove that Cloudmersive populates its optional relevant-member field for this original file.
+5. **Stop on main explicitly authorized.** [VERIFIED via owner instruction and Git.] Main was fast-forwarded to `f826154f8`; unrelated untracked `commit-times-exact.txt` and `commit-times.txt` were preserved. The diagnostic worktree remains at `/Users/gallivan/.codex/worktrees/diagnose-problem/WMKF_Apps`, with its intentional local `CLAUDE.md` symlink; no worktree archive or deletion was authorized. Root `CLAUDE.md` needs no change.
+
+### Commits
+
+- `191db1abe` — suppress stale material-upload notices; PR #482 / merge `351a895a0`.
+- `0ccca22dd` — capture private Cloudmersive diagnostics for materials-upload failures; PR #484 / merge `f826154f8`.
+- This documentation-only main handoff records Session 607 and creates Session 608.
+
+## Next Items
+
+### Optional Observation
+
+- **Inspect the next naturally occurring materials scan failure in Admin → Operational Events.** [VERIFIED via the deployed event path; live optional-field population remains UNKNOWN.] Search by request number and expand metadata. This is optional operational observation, not a release blocker or authorization to manufacture failures. Original events lacked the new metadata; those omitted provider details cannot be reconstructed from the saved events.
+
+### Verify Before Acting
+
+- The **Session 606 close** below preserves the separate D26 ranking release-plan handoff on `codex/ranking-pd-save-conflicts`, plus Workbench/recording follow-ups. That workstream was not re-audited here; consult its branch's current source, plan and owner decisions before resuming. Earlier sessions below are historical snapshots, not a current executable worklist.
+- All **six authorized diagnostic scans were used**. No further paid or synthetic Cloudmersive scan is authorized; obtain new explicit approval naming the product and possible credit use before any additional diagnostic scan.
+- Preserve existing worktrees and unrelated local files. Temporary downloaded files and `/tmp/cloudmersive-diagnosis/` results are local convenience artifacts, not portable prerequisites for the deployed logging feature.
+
+### Do Not Reopen Without New Decision
+
+- Both fixes are merged and deployed, and the owner accepted the upload/warning outcome. Do not repeat the original upload experiments or change scanning policy merely to validate logging.
+- No raw provider responses, secrets, URLs, full hashes or file contents are logged by the new DTO. Keep native malware findings separate from synthesized policy labels; missing/malformed native findings remain unknown rather than zero.
+
+## Key Files Reference
+
+| File | Purpose |
+|------|---------|
+| `lib/services/cloudmersive-scan.js` | Bounded private diagnostics from the original scan response and safe error metadata |
+| `lib/services/site-visit-materials/contributor-service.js` | Common external/staff/background material finalizer and private event projection |
+| `lib/services/operational-event-service.js` | Existing sanitization, JSONB persistence, deduplication and query contract |
+| `shared/components/meeting-tracker/SiteVisitMaterialsCard.js`, `StaffMaterialUpload.js` | Replacement lifecycle and stale-notice suppression |
+| `tests/unit/cloudmersive-scan.test.js`, `tests/unit/site-visit-materials-contributor-service.test.js` | Diagnostic privacy, provider-shape, retry and logging-failure regression coverage |
+| `docs/atlas/postgres-infra-tables.md`, `docs/OPERATIONAL_EVENTS_AND_LOG_DRAIN.md` | Persisted event contract and operator guidance |
+
+**Stop verification:** [VERIFIED via stop commands.] Atlas, doc-currency and fact-consistency gates and their sequential self-tests passed, along with docs-catalog, local and CI agent-invariant checks, and `git diff --check`. `npm run report:claim-evidence-pilot -- --current` could not read local observation state; no observation row was invented. **Milestone determination:** DEVELOPMENT_LOG entry added: “October 2026 — Materials upload incident resolved and scan diagnostics shipped (Session 607)”. Runtime verification above is the release evidence; these documentation checks ran separately at stop.
+
+---
+
+## Prior handoffs — historical snapshots; verify the current topic-specific branch and owner decisions before acting
+
+## Previous Session 607 Prompt: resume the D26 Proposal Ranker release plan from the saved ranking branch
+
+## Session 606 close — Workbench responsiveness, recording uploads, and ranking release planning (Codex, 2026-10-14 PT)
+
+### What Was Completed
+
+1. **Workbench and recording changes merged.** [VERIFIED via GitHub merge records and fetched main.] PR #478 `c24b5a268` reduces Staff Deliberations reads and overlaps independent lookups; #479 `9975fb9d1` adds unfinished-upload timestamps; #480 `ccfdb2fb0` adds safe explicit dismissal when Microsoft rejects cancellation; #481 `26b97f4c4` records the production receipt; #483 `dc0aa0019` makes Zoom import prominent and groups manual options beneath **Import materials manually**. Zoom still starts AssemblyAI transcription automatically.
+2. **Production upload incident outcome.** [VERIFIED during the authorized release; retained receipt in `docs/atlas/postgres-infra-tables.md` and the route matrix.] Migration 083 was applied through the canonical runner before #480 deployed; Ready deployment `dpl_G5aJb9rxRHsCF5xqsZPt7DP19YPQ`. Dismissal hides an uncertain empty attempt without deleting saved recordings or stopping reconciliation. The owner saw the Dismiss action for #1002912, but has not confirmed clicking it successfully cleared the old attempt.
+3. **Recording layout accepted.** [VERIFIED via release check and owner report.] #483 deployed Ready as `dpl_FEVU79qcmg6uKMtwR2btVL84qvmG`; the owner said it looks good. The release ran 259 focused tests and desktop/mobile layout checks. These are the earlier release checks, not a new test run at stop.
+4. **Ranking work preserved separately; production release remains PLANNED.** The continuation branch is **`codex/ranking-pd-save-conflicts`**, plan/privacy handoff commit **`886e194ac`**, containing the PD-save isolation and responsiveness fixes tested by the owner on Mac and iPad. Its release plan is **`docs/plans/PROPOSAL_RANKING_D26_RELEASE_2026-10-14.md` on that branch**, not main. [VERIFIED via remote/local ref comparison] The branch is pushed at `886e194ac`, including its nine previously unpushed commits. Do not merge it merely to make it available at home.
+5. **Owner privacy decision settled.** [VERIFIED via explicit owner instruction.] Before reveal everyone, including Beth and Justin, sees only their own preparation; facilitators may see readiness. Beth and Justin as simultaneous facilitators is **PLANNED, not built**. D26 must contain exactly **23 proposals**, excluding test copies **1003223 and 1003224**; re-probe the pool before opening the round. No ranking release, trial retirement, new round, schema or configuration change was executed as part of this initial plan or stop.
+
+### Resume at home
+
+1. Fetch origin and inspect the home checkout for unrelated changes.
+2. Resume `origin/codex/ranking-pd-save-conflicts` in its existing checkout or a separate tracking worktree. Do not rebuild from main or use the older ranking branches as the current candidate.
+3. Read that branch's D26 release plan, ranking Atlas and current branch handoff. Preserve main's unrelated handoffs when integrating later.
+4. Use the home machine's own credentials. Local servers, screenshots, temporary reports and environment files do not travel through Git.
+
+## Next Items
+
+### Verified Open
+
+- **D26 release implementation, pending a new instruction to execute.** The user asked for an initial plan and explicitly said not to execute it. Scope: integrate with current main; enforce own-only preparation at API and UI boundaries; support simultaneous facilitators; recheck schema/access/pool; rehearse separate identities and concurrent edits; present the concrete production cutover for approval. Evidence: owner's decision and the branch-only plan above. Production migration/promotion and retiring the existing trial remain separate approved steps.
+- **Upload dismissal acceptance remains unconfirmed.** If the owner reports it still fails, inspect the current exact upload state before taking action. Do not dismiss or delete anything based solely on the earlier screenshot.
+
+### Verify Before Acting
+
+- Prior handoffs below are **historical snapshots**, not a current executable worklist. #1002852 video/preparation follow-ups, sentiment calibration, #1003010, security work, cleanup and other sessions' follow-ups were not re-audited by this stop.
+- Main was fast-forwarded through `351a895a0`, preserving concurrent #482 material-upload notices. That other session's change was not retested here.
+- Keep existing worktrees; no deletion or archiving was performed. Unrelated local `commit-times.txt` is untracked and deliberately excluded.
+
+### Do Not Reopen Without New Decision
+
+- The five merged PRs above are complete; the recording layout has owner acceptance.
+- Do not substitute facilitator-wide pre-reveal access for the owner's own-only requirement.
+- No colleague messages, paid analyses, ranking-data resets or production ranking promotion are authorized by this handoff.
+
+## Key Files Reference
+
+| File | Purpose |
+|------|---------|
+| `docs/plans/PROPOSAL_RANKING_D26_RELEASE_2026-10-14.md` (on `codex/ranking-pd-save-conflicts`) | Initial release plan and privacy decision; not an implementation receipt |
+| `docs/atlas/dataverse-proposal-ranking.md` (ranking branch) | Ranking persistence and release evidence |
+| `shared/components/meeting-tracker/RecordingAndTranscriptCard.js` | Zoom-first layout and unfinished-upload actions |
+| `docs/atlas/postgres-infra-tables.md` | Migration 083 and upload-dismissal production receipt |
+| `docs/API_ROUTE_SECURITY_MATRIX.md` | Actor-bound cancel/dismiss contract |
+
+**Stop verification:** doc-currency and fact-consistency gates and their sequential self-tests passed; `git diff --check` passed. The claim-evidence pilot report could not read local observation state; no observation row was invented. CLAUDE.md needs no change. **Milestone determination:** DEVELOPMENT_LOG entry added for the safe upload-dismissal production incident outcome and accepted Zoom-first layout.
+
+---
+
+## Prior handoffs — historical snapshots; apply the current topic-specific handoff first
+
+## Previous Session 606 Prompt: confirm Duncan's video cut and sentiment picker in use; preserve other workstream follow-ups
+
+## Session 605 close — Zoom video recovery and Discussion Sentiment picker status (Codex, 2026-10-14 PT)
+
+### What Was Completed
+
+1. **Legacy copied Zoom video recovery shipped.** [VERIFIED via source, PR #476 merge `42f4770b7`, and GitHub Production deployment `7074045431` success at 2026-10-14 18:38:49 UTC.] Copied videos missing recording timestamps/hash can now use **Verify video**. Recovery checks exact Zoom identity, the finalized SharePoint receipt, original content version/size/hash, and optimistic row fences before filling only missing metadata. Healthy copies retain their existing behavior. Repair script: `scripts/repair-zoom-video-copy-metadata.mjs` (dry-run default).
+2. **#1002852 targeted repair completed.** [VERIFIED via the authorized production repair and readback during this session.] JHU / Anthony Leung request `e5df0b46-3c43-f111-88b5-000d3a3065b8`, copy `555e3fff-a7b2-4e7f-a031-f021a882a48c`: restored recording times 2026-10-09 16:31:01–17:25:41 UTC and verified hash. The second dry run returned `repairNeeded:false`. No transcript, speaker assignments, SharePoint file contents or Dataverse rows were changed. No actual presentation video cut was run. The summaries' Out of date label is based on transcript freshness, not the missing video metadata; summaries were not regenerated.
+3. **Discussion Sentiment picker badges and filters shipped.** [VERIFIED via source, PR #477 merge `6697bb6d8`, and GitHub Production deployment `7076811714` success at 2026-10-14 20:45:25 UTC.] Meeting Tracker → Discussion sentiment → Choose proposals shows Current / Out of date / Not analyzed / Analyzing / Status unavailable before selection. Accepted and Last attempt failed remain separate. Analysis status filters include Previously analyzed; Refresh statuses preserves selected comparison rows. One metadata-only Postgres batch and one prompt-version lookup reuse existing freshness rules; no schema change or model execution on list load. Busy rows remain selected through the action and its status refresh.
+4. **Review and verification.** [VERIFIED via local commands and GitHub CI.] Video regression: 24 suites / 856 tests passed locally (DB-dependent suite skipped locally; CI PostgreSQL integration passed). Sentiment: 9 suites / 292 tests passed, including isolated loopback PostgreSQL integration; scoped ESLint clean, production build passed, scoped gates/self-tests passed sequentially. Independent review findings were fixed and rechecked. PR #477's Python CodeQL job had all steps including Complete job successful and downloadable completed logs, while its check indicator remained pending at merge; aggregate CodeQL, full Jest, other security checks and Vercel preview passed. No authenticated production UI acceptance was performed.
+5. **Stop handoff on main explicitly authorized.** [VERIFIED via user instruction and clean checkout.] Main was fast-forwarded to `9975fb9d1`, preserving other sessions' #478 Workbench optimization and #479 unfinished-upload timestamp work. This session did not build or reverify those changes. Claim-evidence pilot report could not read local observation state; no observation row was invented. CLAUDE.md needs no change: existing feature/route contracts are documented in their plan, Atlas and route matrix.
+
+### Commits
+
+- `8b816c504` — recover missing metadata on copied Zoom videos; PR #476 / merge `42f4770b7`.
+- `c90a0bff9` — show sentiment analysis status in proposal picker; PR #477 / merge `6697bb6d8`.
+- This documentation-only main commit records Session 605 and creates the Session 606 handoff.
+
+## Next Items
+
+### Verified Open
+
+1. **Confirm the user-facing outcomes when staff next use them.** Evidence: deployed source and successful deployment receipts above; this session did not cut the presentation video or inspect a signed-in production picker. Duncan can refresh #1002852 and retry the cut. Check badges/filter/refresh on real candidate requests without starting paid analyses solely for validation.
+
+### Verify Before Acting
+
+- Prior handoffs below are historical snapshots. Recheck #1002852's separate Staff Deliberations correction/preparation state before treating it as still blocked; video metadata recovery did not alter that workflow.
+- Ranking acceptance/release, sentiment calibration, #1003010 follow-up, and older cleanup/security items were not re-audited. Consult their current branch/source and owner decisions before acting. No ranking runtime promotion, dedicated preview repointing, colleague messages or cleanup is authorized by this handoff.
+- Local worktrees remain in place. Do not reset, delete or archive another session's checkout based on this handoff.
+
+### Do Not Reopen Without New Decision
+
+- Both recovery and picker features are merged and deployed; do not recreate the branches or repeat the metadata repair blindly. Use the repair script's default dry run if new evidence warrants investigation.
+- Summaries were not regenerated. An Out of date summary needs its own transcript-freshness assessment; it is not evidence that the copied video repair failed.
+
+## Key Files Reference
+
+| File | Purpose |
+|------|---------|
+| `lib/services/meeting-tracker-recordings/video-copy-verification.js` | Exact identity and original-content verification |
+| `scripts/repair-zoom-video-copy-metadata.mjs` | Guarded dry-run/apply metadata repair |
+| `shared/components/meeting-tracker/RecordingAndTranscriptCard.js` | Verify video action |
+| `shared/components/meeting-tracker/DiscussionSentimentView.js` | Picker badges, filters and refresh |
+| `lib/services/post-presentation-materials/discussion-sentiment-candidates.js` | Authorized candidates and batch statuses |
+| `lib/services/post-presentation-materials/discussion-sentiment-store.js` | Compact Postgres run summaries |
+
+## Testing
+
+- `npx jest --runInBand --testPathPatterns='zoom-video|zoom-import|presentation-video-split|recording-and-transcript-card'`
+- `npx jest --runInBand --testPathPatterns='discussion-sentiment'`
+- The sentiment integration suite requires `DISCUSSION_SENTIMENT_PG_TEST_URL` pointed only at an isolated loopback database. The temporary Docker test database from this session was stopped.
+- Runtime builds passed with unrelated existing filesystem-tracing warnings. Logs under `/tmp/sentiment-*` and `/tmp/wmkf-video-*` are local convenience artifacts, not durable evidence for another machine.
+
+**Milestone determination:** DEVELOPMENT_LOG entry added for the production video recovery and sentiment picker capabilities.
+
+---
+
+## Prior handoffs — historical snapshots; apply the current topic-specific handoff first
+
+## Previous Session 605 Prompt: confirm #1002852 preparation resumes after Finish corrections; ranking v2 colleague walkthrough still open
+
+## Session 604 close — Staff Deliberations preparation-block copy and Meeting Tracker card labels (Claude Opus, worktree `WMKF_Apps-claude-ui` on `claude/ui-changes`; Codex owned the main checkout; 2026-10-14 PT)
+
+### What Was Completed
+
+1. **Diagnosis: #1002852 "Automatic preparation needs attention" banner** `[VERIFIED via owner-authorized read-only prod PG query + source]`.
+   - The only blocked `staff_deliberations_preparations` row in production (19 others `prepared`) is #1002852, `last_error_code='correction_reopen_requires_staff'`, created at the 2026-10-09 18:00Z presentation end, `attempt_count` 1, last swept 2026-10-14 16:15Z.
+   - Cause: the writeup was reopened for corrections (Draft + correction epoch); the worker parks it on purpose (`preparation-worker.js:219`). Retry returns 409 in that state. The sweep re-queues it once corrections finish (`preparation-store.js:33`, `resumeCorrection`).
+   - The page showed only a generic sentence because phase `Corrections in progress` wins before the blocked branch, so no reason line rendered.
+2. **Staff Deliberations UI fix (Production).** `b93025fa2`, merge `98577fe41`, deploy Ready on that sha.
+   - Correction-parked preparation renders as queued: no amber banner, no Retry; the writeup card says "Open for corrections. Choose Finish corrections when your edits are done; the working writeup then updates automatically." (replaces "…The working writeup is not ready yet.").
+   - Other blocked codes show plain-language reasons (`BLOCKED_PREPARATION_REASONS`); Retry hidden for `document_pointer_changed` (stored state is `prepared`, so the retry UPDATE can't match).
+   - "Draft needs a quick edit check" diagnostics are generation-time only; they now hide once staff record a version (milestone `actorId`) or reopen for corrections. Owner chose neutral treatment. Plan note added in `docs/WORKBENCH_WRITEUP_LIFECYCLE_PLAN.md`.
+   - 4 new tests; mutation check (fix disabled) failed 3 of them.
+3. **Meeting Tracker list card (Production).** `f6789f109`, merge `d110e8f56`, deploy Ready on that sha. Institution beside the request number; second line `PD: … · PI: …` (`PD: Not assigned` fallback). Payload already carried `institution` (`lib/services/meeting-tracker/dashboard-service.js:212`).
+4. Startup gates: all 71 gate/self-test runs green in the worktree.
+
+### Commits
+- `b93025fa2` fix: explain Staff Deliberations preparation blocks and drop stale checks (merge `98577fe41`)
+- `f6789f109` feat: show institution beside request number and label PD/PI in Meeting Tracker list (merge `d110e8f56`)
+
+## Next Items
+
+### Verified Open
+
+1. **Confirm #1002852 leaves the blocked state after the owner chooses Finish corrections.** Evidence: prod row above; resume path is source-read only, not observed. Read-only check: `SELECT state, last_error_code, updated_at FROM staff_deliberations_preparations WHERE request_id='e5df0b46-3c43-f111-88b5-000d3a3065b8'` should go `pending` → `prepared` after the next sweep. If it stays `blocked`, inspect `resumeCorrection` (`preparation-worker.js:129-137`) against the artifact's lifecycle/milestone after finish.
+2. **Ranking v2 colleague walkthrough** and current-head release review — carried from Session 603 below; not rechecked this session.
+
+### Verify Before Acting
+
+- Worktree `/Users/gallivan/Code/WMKF_Apps-claude-ui` (branch `claude/ui-changes`, fully merged into main) plus memory symlink `~/.claude/projects/-Users-gallivan-Code-WMKF-Apps-claude-ui/memory`. Remove with the owner's OK when UI work is done. The older `WMKF_Apps-claude-debug` worktree from Session 602 remains too.
+- Session 603/602 carryovers below were not re-audited.
+
+### Gotchas
+
+- The auto-mode classifier blocked a plain local `sed` of `preparation-worker.js` as "[Production Reads]" right after a prod PG probe; the Read tool worked.
+- The Chrome MCP profile is not signed in to `applications.wmkeck.org`; signed-in page reads need the owner to sign in that tab.
+
+**Milestone determination:** no DEVELOPMENT_LOG entry — UI copy/display fixes, no new capability. CLAUDE.md unchanged.
+
+## Key Files Reference
+
+| File | Purpose |
+|------|---------|
+| `shared/components/workbench/StaffDeliberationsTab.js` | Preparation-block reasons, Retry gating, draft-warning gating |
+| `lib/services/pre-site-visit/preparation-worker.js` / `preparation-store.js` | Blocked codes, correction resume, retry SQL |
+| `shared/components/meeting-tracker/MeetingTrackerList.js` | Tracker list card |
+
+## Testing
+
+`npx jest --runInBand tests/unit/staff-deliberations-tab.test.js tests/unit/meeting-tracker-pages.test.js`
+
+---
+
+## Prior handoffs — historical snapshots; apply the current topic-specific handoff first
+
+## Previous Session 604 Prompt: Proposal Ranking v2 sandbox colleague walkthrough; preserve other workstream follow-ups
+
+## Session 603 close — Proposal Ranking v2 sandbox and preparation UI (Codex, 2026-10-13 PT)
+
+### What Was Completed
+
+- [VERIFIED via feature source and dedicated Vercel Preview] Ranking v2 lives on `codex/proposal-ranking-v2`, runtime tip `6e121170a`. The owner requested this documentation-only handoff on main. No ranking runtime merge or production promotion is authorized.
+- [VERIFIED via sandbox setup/readback earlier this session] Dedicated test app: https://wmkf-meeting-transcription-test.vercel.app. D97 has 12 realistic fictional proposals (six MR, six SE), three synthetic reviews each, varied budgets, institution/history context and clearly labeled sample discussion sentiment. Exact test-profile scope remains isolated from ordinary production reads. Accepted roster: Justin, Beth, Jean and John Sader; Justin facilitates the test round. Do not seed again or reset colleagues' work for screenshots.
+- [VERIFIED via source/tests] Approved v2 workflow: reviewer-seeded separate MR/SE A/B/C lists with explicit confidence; paired, within-grade MR/SE merge ordered within each pair by reviewer score; PD combined-list review; private until all ready and facilitator reveal; preserved individual assessments; collective order and funding separators; resets at every stage. Smooth dragging remains. Discussion sentiment and institutional history are group context, not ranking weights.
+- [VERIFIED via source/browser] Cards use matching letter tiles, solid/dashed PD confidence borders, lead PD first, neutral backgrounds, aligned metadata, expandable initial ranks and prior Research funding totals. Funding total/count/E-W counts appear at the Recommended separator; no E/W target, per-card cumulative total or peer-score mean.
+- [VERIFIED via source/tests/local browser] Preparation now offers next-program navigation, missing-confidence counts and direct navigation, Continue validation with named missing institutions and red card outlines. Header uses equal-width tabs with secondary status text; redundant numbered steps and completion instructions removed. Final change removes Review combined list; the Combined list tab remains. Create combined list, Confirm combined order and Ready retain their stage-specific roles.
+- [VERIFIED via signed-in sandbox browser, 2026-10-13 21:15 PT] Justin was Ready for group discussion. This is a point-in-time observation, not a claim about the other PDs or full multi-user acceptance. Saved assessments were left intact during final layout checks.
+
+### Commits
+
+- `591c3e98e`, `1e1a648ad`: realistic sandbox cohort, isolated fixtures, retained round replacement and evidence.
+- `d1b206185`: prior Research award funding totals (earlier card commits remain in branch history).
+- `735e7f59f`: clear next-program transition.
+- `9b8a9c32b`, `f9705e88d`, `0cdb3e3e5`, `b8de72f7b`: missing-choice navigation, validation and cleanup.
+- `94829e66e`: simplified preparation toolbar.
+- `6e121170a`: remove duplicate Review combined list action.
+
+### Deployment and verification
+
+- [VERIFIED via Vercel CLI] Final dedicated Preview: https://wmkf-meeting-transcription-test-ic0634b8w.vercel.app, serving the stable test alias, built from the tracked archive at `6e121170a`. No `--prod` or production promotion performed.
+- [VERIFIED via local checks] Full ranking regression: 20 suites / 184 tests passed before the final button-only removal; final UI regression: 11 tests passed, scoped ESLint clean. Types passed on the preceding toolbar build. Dedicated Preview build passed after the final removal.
+- [VERIFIED via local browser] Missing-choice Continue displays the institution list and red cards; Go to next unanswered scrolls and focuses the next confidence radio. Tests cover wrapping and skipping saved choices. Local synthetic rehearsal is not independent-user hosted acceptance.
+- Claim-evidence pilot report was attempted; local observation state could not be read. No observation row invented.
+- Milestone determination: no new production capability shipped in this session; no DEVELOPMENT_LOG entry required. CLAUDE.md requires no change for these UI updates.
+
+## Next Items
+
+### Verified Open
+
+1. **Colleague sandbox walkthrough / acceptance.** Evidence: feature-branch rehearsal audit records the remaining independent Microsoft sign-ins; this session observed only Justin's signed-in state. Beth, Jean and John should complete their own preparation, then the facilitator can reveal and exercise group ordering, sentiment display, export and resets as agreed. Do not manufacture staff votes or infer acceptance from unit tests.
+2. **Current-head release review before any eventual production decision.** Evidence: runtime remains on the feature branch and deployed only to the dedicated test app. Fetch current main, inspect merge conflicts and CI before proposing promotion; this handoff does not authorize it.
+
+### Owner Decision Needed
+
+- Production release only after sandbox acceptance and explicit owner approval. Keep the existing production app untouched.
+
+### Verify Before Acting
+
+- Other workstream carryovers below (Zoom re-import, sentiment calibration, transcription cleanup, security releases) were not re-audited here. They remain historical pointers requiring current source/live-state checks, not an automatically authorized worklist.
+- Shared checkout `/Users/gallivan/Code/WMKF_Apps` remains on the v2 branch. Its local main diverges from remote main (six ranking-design commits versus two remote commits at preflight); do not force-reset or push it blindly. This handoff was prepared in an isolated clone from remote main.
+- Existing untracked `output/` artifacts and `.impeccable/critique/2026-10-13T23-47-04Z__ts-proposal-ranking-assessmentworkflow-js-99d8f072.md` remain local and were not swept into commits. Temporary servers, screenshots and credentials do not travel between Macs.
+- The repo-root Vercel binding targets the production project. Sandbox deployment must use the dedicated test binding and `vercel.meeting-transcription-test.json` in a tracked-file archive; do not deploy the shared root or use `--prod`.
+
+### Do Not Reopen Without New Decision
+
+- Earlier ranking pause, six-proposal rehearsal, old card layout and old reset limitations below are historical, superseded for v2 by this handoff and the feature-branch design. Do not rebuild v2 from main or use the old `codex/proposal-ranking` branch as its current source.
+- No colleague messages, production data operations or resets of current work are authorized merely by this handoff.
+
+## Key Files Reference (on codex/proposal-ranking-v2)
+
+| File | Purpose |
+|------|---------|
+| `shared/components/proposal-ranking/AssessmentWorkflow.js` | Current preparation/group UI |
+| `tests/unit/proposal-ranking-assessment-ui.test.js` | Navigation, confidence validation and UI regression |
+| `docs/atlas/dataverse-proposal-ranking.md` | Ranking ownership and deployed-state contracts |
+| `docs/plans/PROPOSAL_RANKING_DESIGN_2026-10-07.md` | Revised approved workflow |
+| `docs/plans/PROPOSAL_RANKING_API_CONTRACT.md` | Cross-layer API contract |
+| `docs/plans/PROPOSAL_RANKING_IMPLEMENTATION_PLAN_2026-10-13.md` | Implementation and acceptance scope |
+| `docs/audits/PROPOSAL_RANKING_V2_SANDBOX_REHEARSAL_2026-10-13.md` | Bounded sandbox receipts; latest UI release supersedes its earlier deployment URL |
+
+## Testing
+
+On the feature branch: `npx jest --runInBand --testPathPatterns=proposal-ranking` and `npm run check:types`.
+For memory-only local rehearsal: `node scripts/rehearse-proposal-ranking-v2.js` (3135; do not collide with an existing server).
+
+---
+
+## Previous Session 603 Prompt: confirm the 1003010 Zoom re-import and video cut; Discussion Sentiment calibration; transcription cleanup check
+
+## Session 602 close — Zoom imports from before provenance capture blocked attendance and the video cut (Claude Opus, worktree `WMKF_Apps-claude-debug` on `claude/debugging`; Codex owned the main checkout; 2026-10-13 PT)
+
+### What Was Completed
+
+1. **Diagnosis: Duncan's report on #1003010 (UC Riverside)** `[VERIFIED via owner-run read-only prod probes]`.
+   - **The import came before provenance capture.** Import `7abbcf18` was made 2026-10-08 12:32 PT. Provenance capture (merge `f3cc08540`) shipped 2026-10-09 20:25 PT. So `selected_recording_files` was NULL.
+   - **No source on publish.** `provenanceFromJob` returns null for such an import. The publication's `frozen_source_provenance` was therefore null, and the resolver returned `legacy_unknown`.
+   - **Effects.** Attendance was never fetched ("Attendance is unavailable or incomplete"; every speaker under "Other voices"). The cut was refused with `presentation_video_source_not_zoom`.
+   - **"Copy from Zoom" greyed out.** The import was still `started` and its job `ready`: one import per meeting.
+   - **Manual re-upload refused by design.** The audio + Zoom transcript publication is `kind: upload`.
+   - **Attendance itself works.** All 11 published Zoom-sourced transcripts with an attendance decision have attendance `complete` (no Zoom-sourced row had another status), with 115 attendee rows that all carry leave times.
+2. **Production repairs (owner ran each with `!`; dry run first, then `--apply`).** Each set one `zoom_recording_imports` row to `state='failed'`, `failure_code='zoom_import_superseded_pre_provenance'`. This mirrors `releaseStartedImportWithEndedJob` (`import-store.js:100`). The guards required the exact id and request, `started`, no recorded files, and a `ready` job.
+   - #1003010: import `7abbcf18…` (job `1c7a713e…`), committed 21:25:52 UTC.
+   - #1002852 (Poly ADP-Ribose, request `e5df0b46…`, imported by profile 17): import `054c348e…` (job `77c7a6cc…`), committed 21:39:40 UTC.
+   - No transcripts, jobs, publications, video copies, sentiment rows or Dataverse rows were touched. The third pre-provenance import (`e43ae6ea…`) had already been re-imported and has a video.
+   - The probe and repair scripts live only in the session scratchpad; they are not tracked.
+3. **Clearer refusal text (Production).**
+   - `presentation-video-split-service.js` now picks the message by resolver status. An uploaded transcript points to publishing the Zoom run (Earlier runs). An unrecorded or mismatched source points to re-importing from Zoom, with an administrator fallback.
+   - The code and status are unchanged. Three new tests fail against the old wording.
+   - Owner chose the copy. Merge `1ed6e33bf` (Tier 0, pushed by the owner); the production deploy was Ready on that sha.
+
+### Commits
+- `1ed6e33bf` fix: name the next step when a presentation video can't use the transcript
+
+## Next Items (Session 602)
+
+### Verified Open
+
+1. **Confirm #1003010 after Duncan re-imports.**
+   - Expected: the new import has `selected_recording_files`, `audioOnlyFileCount` = 1, and audio recording start/end equal to copy `36157ba4` (21:01:31–22:05:52 UTC). Durations already match: 3,861,867 ms vs 64:21.
+   - Attendance should come back `complete`, and the cut should start without `presentation_video_source_mismatch`.
+   - Owner sent (or will send) Duncan the re-import steps.
+2. **#1002852 re-import is optional** (only if a presentation video is needed). Re-publishing may mark its accepted Discussion Sentiment result out of date. Unchecked: confirm before advising re-runs.
+3. Session 601 items below (sentiment calibration, accept results, transcription cleanup check after 2026-10-14 03:00 UTC) were not rechecked this session.
+
+### Verify Before Acting
+- Worktree `/Users/gallivan/Code/WMKF_Apps-claude-debug` (branch `claude/debugging`, no unique commits) plus its memory symlink `~/.claude/projects/-Users-gallivan-Code-WMKF-Apps-claude-debug/memory`. Remove with the owner's OK once item 1 is confirmed.
+
+### Gotchas
+- Auto mode blocked Production reads/writes, `node --check` on a script reading production, and pushes to `main`. The owner ran them with `!`.
+- `attendance_review` is cleared at publish. To judge whether attendance worked, read `frozen_discussion_attribution.attendance.status` instead.
+- `operational_events` has no `created_at`; use `recorded_at` or `last_occurred_at`.
+
+**Milestone determination:** no DEVELOPMENT_LOG entry. This was a support fix: two data repairs and a copy change, with no new capability.
+
+---
 
 ## Current Proposal Ranking note — 2026-10-13 (Codex; owner-authorized v2 branch implementation)
 

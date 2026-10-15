@@ -294,3 +294,26 @@ test('unknown or invalid access remains inspect-only', async () => {
   expect(result.retained).toBe(1);
   expect(d.deleteByEtag).not.toHaveBeenCalled();
 });
+
+test('a recovered dismissed candidate is retained for staff even with destructive cleanup enabled', async () => {
+  const d = deps({
+    claim: jest.fn(async () => ({ leaseToken: 'lease', rows: [{ ...ROW, staff_dismissed_at: '2026-10-14T00:00:00Z' }] })),
+    access: () => ({ mode: 'on', valid: true }), destructiveCleanupEnabled: () => true,
+  });
+  const result = await cleanupPresentationMaterialUploads({}, d);
+  expect(result.retained).toBe(1);
+  expect(d.recordCandidate).toHaveBeenCalled();
+  expect(d.deleteByEtag).not.toHaveBeenCalled();
+  expect(d.abandon).not.toHaveBeenCalled();
+  expect(d.release).toHaveBeenCalledWith(expect.objectContaining({ lastError: 'dismissed_candidate_recovered' }));
+});
+
+test('a dismissed candidate already registered binds under its live lease after review extension', async () => {
+  const d = deps({
+    claim: jest.fn(async () => ({ leaseToken: 'lease', rows: [{ ...ROW, staff_dismissed_at: '2026-10-14T00:00:00Z' }] })),
+    findByGenerationKey: jest.fn(async () => ({ records: [REGISTERED] })),
+  });
+  await cleanupPresentationMaterialUploads({}, d);
+  expect(d.bind).toHaveBeenCalled();
+  expect(d.deleteByEtag).not.toHaveBeenCalled();
+});

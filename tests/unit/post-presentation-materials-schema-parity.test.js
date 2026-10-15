@@ -129,3 +129,10 @@ test('migration 055 is tracked by the generated manifest', () => {
   const manifest = fs.readFileSync(path.join(ROOT, 'lib/db/migrations-manifest.json'), 'utf8');
   expect(manifest).toContain('055_post_presentation_materials.sql');
 });
+
+test('dismissal migration and fresh schema preserve independent nullable evidence', () => {
+  const dismissal = fs.readFileSync(path.join(ROOT, 'lib/db/migrations/083_presentation_upload_dismissal.sql'), 'utf8');
+  expect(dismissal).toContain('ADD COLUMN IF NOT EXISTS staff_dismissed_at TIMESTAMPTZ');
+  expect(setup).toContain('staff_dismissed_at TIMESTAMPTZ');
+  expect(readMigrationManifest()).toContain('083_presentation_upload_dismissal.sql');
+});

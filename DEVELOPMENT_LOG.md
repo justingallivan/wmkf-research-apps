@@ -10,6 +10,47 @@ The chronological archive after the `Legacy chronological session log` divider c
 
 ---
 
+## October 2026 — Materials upload incident resolved and scan diagnostics shipped (Session 607)
+
+**Milestone:** a rejected Keynote upload was resolved through a genuine PPTX export, stale replacement warnings were fixed, and materials scan failures now retain private diagnostics.
+**Sessions:** 607 (Codex investigation, six owner-authorized comparison scans, independent review, production releases and owner confirmation).
+**Ship state:**
+
+- Request 1002835's `.key` was flagged `invalid_file`, reported as `.pages`, with no native malware signature; local inspection found three TIFF members named `.png`. Correcting those members alone did not pass `.key`; the corrected package named `.pages` passed. The owner-confirmed PPTX upload succeeded; no general rename workaround or malware-free guarantee follows.
+- PR #482 (`191db1abe`, merge `351a895a0`) clears obsolete warnings during/after replacement; Production deployment `7079061059` succeeded at 2026-10-14T22:43:53Z, and the owner confirmed the warning was gone.
+- PR #484 (`0ccca22dd`, merge `f826154f8`) adds bounded diagnostics to superuser-only Operational Events for rejected scans and scanner failures; Production deployment `7079736852` succeeded at 2026-10-14T23:27:01Z, owner confirmed. Public results, scan policy and provider call counts are unchanged; no migration.
+
+**Why it matters:** future failures retain format, native findings, timing and safe failure evidence from the original scan; optional archive-member details remain provider-dependent and do not replace archive inspection.
+**Pointers:** `docs/APPLICANT_ADDITIONAL_MATERIALS_PLAN.md` §16.16; `docs/atlas/postgres-infra-tables.md`; PRs #482 and #484.
+
+---
+
+## October 2026 — Recover from rejected upload cancellation and prioritize Zoom import (Session 606)
+
+**Milestone:** staff can dismiss an uncertain empty upload attempt after Microsoft rejects cancellation, while preserving reconciliation and saved recordings.
+**Sessions:** 606 (Codex; owner-approved production migration and merges).
+**Ship state:**
+- PR #479 `9975fb9d1` shows upload-start and last-status timestamps; #480 `ccfdb2fb0` adds explicit dismissal with actor/lease fences and recovery safeguards.
+- Migration 083 applied through the canonical runner; Ready production deployment `dpl_G5aJb9rxRHsCF5xqsZPt7DP19YPQ`; receipt docs #481 `26b97f4c4`. Owner confirmation of dismissing #1002912 remains unreceived.
+- PR #483 `dc0aa0019` prioritizes Zoom import, explains AssemblyAI transcription and collapses manual inputs; 259 focused tests and desktop/mobile checks passed, deployment Ready, owner accepted layout.
+**Why it matters:** an expired upload session no longer traps staff in an unexplained cancellation loop, and the preferred recording-import path is clear.
+**Pointers:** `docs/atlas/postgres-infra-tables.md`; `docs/API_ROUTE_SECURITY_MATRIX.md`; `shared/components/meeting-tracker/RecordingAndTranscriptCard.js`.
+
+---
+
+## October 2026 — Recover copied Zoom videos and find completed sentiment analyses (Session 605)
+
+**Milestone:** staff can verify legacy copied Zoom videos without replacing the transcript, and identify previously analyzed proposals directly in the Discussion Sentiment picker.
+**Sessions:** 605 (Codex; independent review, owner-authorized production repair and merges).
+**Ship state:**
+- Video verification and guarded repair shipped in PR #476, merge `42f4770b7`; Production deployment `7074045431` succeeded 2026-10-14. #1002852's missing timestamps/hash repaired with readback; transcript and speaker assignments preserved.
+- Sentiment badges, filters and Refresh statuses shipped in PR #477, merge `6697bb6d8`; Production deployment `7076811714` succeeded 2026-10-14. Metadata-only batch reads; no schema migration or model execution on list load.
+- Video regression and CI passed; sentiment 292 tests including loopback PostgreSQL integration passed. Signed-in staff acceptance remains separate from deployment verification.
+**Why it matters:** removes the copied-video retry dead end and lets staff find completed sentiment work before selecting proposals.
+**Pointers:** `docs/atlas/postgres-zoom-video-copies.md`; `docs/atlas/postgres-staff-discussion-sentiments.md`; `docs/plans/DELIBERATION_SENTIMENT_PLAN_2026-10-13.md`; `scripts/repair-zoom-video-copy-metadata.mjs`.
+
+---
+
 ## October 2026 — Discussion Sentiment meter in Meeting Tracker (Session 601)
 
 **Milestone:** staff can compare how proposals were received in the staff discussions — enthusiasm, reception, disagreement and uncertainty — each backed by named, quoted, server-verified evidence, on a new Meeting Tracker page.

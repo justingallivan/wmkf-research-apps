@@ -32,7 +32,7 @@ S193 verified the virus-scan reject + system_alerts row + email path end-to-end 
 
 **Why:** Both paths share `lib/services/cloudmersive-scan.js`'s `scanBytes()`. So the ONLY residual is the live deployed-env integration: real Entra-authed applicant session + three-call upload dance + real Blob + real `/advanced` scan, all wired together. That's an integration-confidence check, not a logic check — but it must still be run before real applicants.
 
-**How to apply (the irreducible manual gate):** When intake portal work resumes (the next cycle's Phase I intake; the June 2026 Phase II Research pilot is superseded — see [[project-system-model]]), before going live to real applicants, on a deployed env with `VIRUS_SCAN_ENABLED=true` + `CLOUDMERSIVE_API_KEY`:
+**How to apply (the irreducible manual gate):** Only when the owner revives the parked portal for a future pilot, before going live to real applicants, on a deployed env with `VIRUS_SCAN_ENABLED=true` + `CLOUDMERSIVE_API_KEY`. This is not a J27/GOApply prerequisite. Obtain explicit authorization naming Cloudmersive and possible credit use before running the diagnostic scan:
 - `python3 scripts/build-intake-eicar-fixture.py` to stage the fixture.
 - Sign in via Entra External as a fake applicant (or a test contact already in the External ID tenant).
 - Create a draft, get to the file-upload step, upload `/tmp/eicar-test-exe.docx`.

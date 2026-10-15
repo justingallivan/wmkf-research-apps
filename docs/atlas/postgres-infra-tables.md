@@ -763,15 +763,30 @@ Cron-driven health checks (7 services), alert log, cron audit trail. `maintenanc
 mirror (auto at error/critical, opt-in via `operationalEvent` at any severity)
 and drain ingestion `lib/services/vercel-log-drain-ingest.js` via
 `/api/webhooks/vercel-log-drain` (HMAC-verified, `vercel:<log id>` dedup).
-**[SOURCE-BUILT, NOT DEPLOYED:]** Applicant materials `scan_infected`
-rejections also write a best-effort warning `site_visit_material_scan_rejected`
-at `virus_scan`, deduplicated by staging id. Entity references contain the
-request, collection, staging, and slot; metadata contains only the allowlisted
-`scanRejection` category and flags. The event does not send email.
+Applicant materials `scan_infected` rejections write a best-effort warning
+`site_visit_material_scan_rejected` at `virus_scan`, deduplicated by staging id.
+Entity references contain the request, collection, staging, and slot.
+**[PRODUCTION-OBSERVED 2026-10-14 via read-only incident query for Request
+1002835:]** the existing event metadata contains the public `scanRejection`
+category and flags.
+**[PRODUCTION-LIVE 2026-10-14 via PR #484, merge `f826154f8`; GitHub Production
+deployment `7079736852` succeeded at `2026-10-14T23:27:01Z`; owner confirmed:]**
+the common materials finalizer adds bounded private `scanDiagnostics` to that
+metadata and records thrown scanner failures or unexpected verdicts as
+`site_visit_material_scan_failed`, with a safe `failureCode`. Both event types
+use staging-id deduplication within their event type; a repeated occurrence
+refreshes metadata and increments the count rather than retaining each attempt.
+The diagnostic projection carries submitted/detected formats, native finding
+count and bounded threat names, an optional relevant archive member, byte count,
+elapsed time, attempts, response validity, HTTP status, and failure kind where
+available. Missing/malformed native findings mean unknown, not zero. These
+fields never enter public staging/job results. No scan policy, provider call,
+column, or migration changes; neither event sends email. See applicant-materials
+plan §16.16 for the private/public boundary and diagnostic limits.
 Recovery: `markRecovered`/`markSuperseded` (reviewer-acceptance drain
 completion/withdrawal edges; `AlertService.autoResolve` propagation).
-**Read paths:** `/api/admin/operational-events` → `OperationalEventsSection`
-in `pages/admin.js`.
+**Read paths:** superuser-only `/api/admin/operational-events` →
+`OperationalEventsSection` in `pages/admin.js`; expanded rows render metadata.
 **Privacy boundary:** summaries pass `lib/utils/log-redactor.js`; metadata is
 depth/size/key-capped with a sensitive-key denylist; drain metadata is an
 explicit allowlist (never clientIp/userAgent/referer/JA3/JA4/headers/bodies).
@@ -907,7 +922,23 @@ and offline-tested only on `codex/feature-request`.
   Staff Cancel and terminal-session Retry share the intent lease with finalize and
   cleanup. Cancel abandons only after confirmed session termination and an absent
   exact path; Retry retains the same intent/path/generation and starts a newly
-  confirmed terminal session from byte zero. A candidate rejected by MP4 signature
+  confirmed terminal session from byte zero.
+  **[PRODUCTION-LIVE 2026-10-14: PR #480, merge
+  `ccfdb2fb026937ccb5eda41d7037255a1f4bca6b`; migration 083 applied by
+  `codex-pr480-owner-approved-2026-10-14` via the canonical runner (one applied,
+  82 skipped); Ready deployment `dpl_G5aJb9rxRHsCF5xqsZPt7DP19YPQ` serves
+  `applications.wmkeck.org`, verified via Vercel CLI.]** Migration `083_presentation_upload_dismissal.sql` adds nullable
+  `staff_dismissed_at` (also in fresh-install schema). If Microsoft rejects Cancel
+  with HTTP 401 and repeated authenticated reads find the exact path absent, a
+  separate explicit Dismiss action may stamp that field under the actor-bound
+  browser intent's live recovery lease. Dismissal hides only an empty attempt;
+  it retains lifecycle state, encrypted URL and cleanup eligibility, and does not
+  confirm remote cancellation. Unleased browser resume refresh and recovery claims
+  reject dismissed attempts. Recording a recovered complete candidate clears the
+  dismissal and opens at least three days for staff to Finish saving; cleanup
+  does not delete that newly recovered candidate in the same pass. Exact registered
+  candidates can still bind under the owned live lease. Migration 083 was applied
+  before runtime deployment; the list reader directly selects the new column. A candidate rejected by MP4 signature
   or Graph malware validation remains a terminal `failed` intent and is omitted
   from staff's unfinished-upload actions; status and finalize refuse replay.
   Its exact item remains for the existing lease-fenced cleanup review, which

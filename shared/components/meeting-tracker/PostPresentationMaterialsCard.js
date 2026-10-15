@@ -39,6 +39,16 @@ function formatBytes(value) {
   return `${bytes.toLocaleString()} bytes`;
 }
 
+function formatUploadTimestamp(value) {
+  if (!value) return 'Unavailable';
+  const date = new Date(value);
+  if (!Number.isFinite(date.getTime())) return 'Unavailable';
+  return date.toLocaleString(undefined, {
+    year: 'numeric', month: 'short', day: 'numeric',
+    hour: 'numeric', minute: '2-digit', second: '2-digit', timeZoneName: 'short',
+  });
+}
+
 function phaseCopy(state) {
   if (!state) return '';
   if (state.phase === 'pausing') return 'Pausing after the current fragment…';
@@ -185,6 +195,7 @@ export default function PostPresentationMaterialsCard({ requestId }) {
   const [notice, setNotice] = useState(null);
   const [busyUploadId, setBusyUploadId] = useState(null);
   const [recoveryBusyId, setRecoveryBusyId] = useState(null);
+  const [cancelFailure, setCancelFailure] = useState(null);
   const [confirmCancelId, setConfirmCancelId] = useState(null);
   const [transfer, setTransfer] = useState(null);
   const [pauseRequested, setPauseRequested] = useState(false);
@@ -316,6 +327,7 @@ export default function PostPresentationMaterialsCard({ requestId }) {
       setBusyUploadId(null);
       setRecoveryBusyId(null);
       setConfirmCancelId(null);
+      setCancelFailure(null);
       setTransfer(null);
       setPauseRequested(false);
       setUnavailable(false);
@@ -712,7 +724,8 @@ export default function PostPresentationMaterialsCard({ requestId }) {
     }
   };
 
-  const cancel = async (intent) => {
+  const cancel = async (intent, dismissUncertain = false) => {
+    setCancelFailure(null);
     const generation = generationRef.current;
     recoveryBusyRef.current = intent.uploadId;
     setRecoveryBusyId(intent.uploadId);
@@ -724,18 +737,24 @@ export default function PostPresentationMaterialsCard({ requestId }) {
     try {
       const result = await requestJson(
         `/api/meeting-tracker/visits/${encodeURIComponent(requestId)}/presentation-uploads/${encodeURIComponent(intent.uploadId)}/cancel`,
-        { method: 'POST', body: {}, tolerantBody: true },
+        { method: 'POST', body: dismissUncertain ? { dismissUncertain: true } : {}, tolerantBody: true },
       );
       if (!current(generation)) return;
       await load();
       if (!current(generation)) return;
-      setNotice(result.complete
+      setNotice(result.dismissed
+        ? 'Upload attempt removed from this list. Background checks will continue; no saved recording was deleted.'
+        : result.complete
         ? 'The recording is already complete. Choose Finish saving.'
         : result.finalized ? 'This recording was already saved.' : 'Unfinished upload cancelled.');
     } catch (cancelError) {
       if (!current(generation)) return;
       await load();
-      if (current(generation)) setError(uploadFailureMessage(cancelError));
+      if (current(generation)) {
+        const message = uploadFailureMessage(cancelError);
+        setError(message);
+        setCancelFailure({ uploadId: intent.uploadId, message, canDismiss: cancelError?.payload?.code === 'post_presentation_upload_dismiss_available' });
+      }
     } finally {
       if (current(generation)) {
         recoveryBusyRef.current = null;
@@ -948,13 +967,28 @@ export default function PostPresentationMaterialsCard({ requestId }) {
               <ul className="mt-2 divide-y divide-gray-100 rounded-lg border border-gray-200">
                 {intents.map((intent) => (
                   <li key={intent.uploadId} className="flex flex-wrap items-center justify-between gap-3 px-4 py-3 text-sm">
-                    <div><p className="font-medium text-gray-900">{intent.filename}</p><p className="text-xs text-gray-500">{formatBytes(intent.size)} · {intent.state}</p></div>
+                    <div>
+                      <p className="font-medium text-gray-900">{intent.filename}</p>
+                      <p className="text-xs text-gray-500">{formatBytes(intent.size)} · {intent.state}</p>
+                      <p className="mt-1 text-xs text-gray-600">Upload started: {formatUploadTimestamp(intent.createdAt)}</p>
+                      <p className="text-xs text-gray-600">Last status update: {formatUploadTimestamp(intent.updatedAt)}</p>
+                      <p className="text-xs text-gray-500">Status updates may include automatic checks, not a new upload attempt.</p>
+                    </div>
                     <div className="flex gap-2">
                       {intent.canResume && <Button type="button" size="sm" variant="outline" disabled={Boolean(busyUploadId || recoveryBusyId || zoomBusy)} onClick={() => resume(intent)}>Resume</Button>}
                       {intent.canRetry && <Button type="button" size="sm" variant="outline" disabled={Boolean(busyUploadId || recoveryBusyId || zoomBusy)} loading={recoveryBusyId === intent.uploadId} onClick={() => retry(intent)}>Retry upload</Button>}
                       {intent.canFinalize && <Button type="button" size="sm" disabled={Boolean(busyUploadId || recoveryBusyId || zoomBusy)} loading={busyUploadId === intent.uploadId} onClick={() => finish(intent.uploadId)}>Finish saving</Button>}
                       {intent.canCancel && !intent.canFinalize && <Button type="button" size="sm" variant="outline" disabled={Boolean(zoomBusy || recoveryBusyId || (busyUploadId && busyUploadId !== intent.uploadId))} onClick={() => setConfirmCancelId(intent.uploadId)}>Cancel</Button>}
                     </div>
+                    {cancelFailure?.uploadId === intent.uploadId && (
+                      <div role="alert" className="w-full text-sm text-red-700">
+                    <p>Could not cancel this upload. {cancelFailure.message}</p>
+                    {cancelFailure.canDismiss && <div className="mt-2">
+                      <p className="text-gray-700">Remove this attempt from the list? Background checks will continue. Saved recordings will not be deleted.</p>
+                      <Button type="button" size="sm" variant="outline" disabled={Boolean(recoveryBusyId)} onClick={() => cancel(intent, true)}>Dismiss upload attempt</Button>
+                    </div>}
+                  </div>
+                    )}
                     {confirmCancelId === intent.uploadId && (
                       <div className="w-full rounded border border-amber-200 bg-amber-50 p-3 text-amber-950">
                         <p>Cancel this unfinished upload? Unsaved progress will be lost. A completed recording will remain available to finish saving.</p>

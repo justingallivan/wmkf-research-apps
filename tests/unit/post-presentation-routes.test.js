@@ -492,3 +492,14 @@ test('temporarily invisible conflict-path candidate releases for retry', async (
   expect(rejectPortalUpload).not.toHaveBeenCalled();
   expect(res.statusCode).toBe(503);
 });
+
+test('dismissal accepts only the explicit boolean and retains session actor authority', async () => {
+  cancelMp4Upload.mockResolvedValue({ uploadId: UPLOAD_ID, dismissed: true });
+  const res = response();
+  await presentationUploadCancelHandler({ method: 'POST', query: { requestId: REQUEST_ID, uploadId: UPLOAD_ID }, body: { dismissUncertain: true } }, res);
+  expect(cancelMp4Upload).toHaveBeenCalledWith({ requestId: REQUEST_ID, uploadId: UPLOAD_ID, actingUserSystemId: ACTOR_ID, dismissUncertain: true });
+  expect(res.body).toMatchObject({ dismissed: true });
+  const bad = response();
+  await presentationUploadCancelHandler({ method: 'POST', query: { requestId: REQUEST_ID, uploadId: UPLOAD_ID }, body: { dismissUncertain: 'true' } }, bad);
+  expect(bad.statusCode).toBe(400);
+});

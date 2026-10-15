@@ -2,8 +2,8 @@
 title: Stage 4 build plan — presentation video cut
 kind: plan
 domain: transcription
-status: draft
-summary: "Build plan for Stage 4 (presentation-only video cut from the copied Zoom MP4 at the confirmed presentation end). Slice 0 probe passed; slice 1 (migration 079, recording times) merged and live; slices 2-5 (migration 080, start route, Sandbox worker and cut recipe, approval and Board/briefing playback, card) built on branch claude/stage4-build and each approved by Codex adversarial review (Session 592). Not merged: owner applies 080, adds Dataverse value 100000011, uploads the FFmpeg tarball, then merge with the flag off."
+status: source-built
+summary: "Stage 4 presentation-video implementation and build history. Recording-time capture, split start/worker/approval and card are present on main; the historical rollout record below documents October 10-11 release. Missing copied-video metadata recovery is live in Production since 2026-10-14 (PR #476, merge 42f4770b7; deployment 7074045431 succeeded); an authorized one-row CLI repair on 1002852 succeeded October 14."
 owner: product-engineering
 related:
   - docs/plans/STAGE4_VIDEO_SPLIT_PLAN_2026-10-09.md
@@ -16,7 +16,9 @@ related:
 
 # Stage 4 build plan — presentation video cut
 
-**[DRAFT, Session 592, 2026-10-10.]** Nothing here is built. The design and owner decisions 1-17 live in `STAGE4_VIDEO_SPLIT_PLAN_2026-10-09.md`; this plan does not reopen them. It turns that design into ordered slices. Source facts below come from Session 592 source reads, either direct or by read-only research agents with file:line citations. The one unmeasured fact (how the Sandbox SDK authenticates) is labelled where it appears. Next step: `/contract-reconcile` Mode A on this plan, then owner approval.
+**[SOURCE-BUILT, checked 2026-10-14]** The recording-time capture and split service/store/worker/approval/card are present on main. The October 10-11 build and rollout evidence is retained below; its original slice instructions and review requests describe the historical implementation sequence, not pending work. Source and the relevant Atlas pages govern current runtime behavior.
+
+**Missing metadata recovery [PRODUCTION-DEPLOYED 2026-10-14]:** PR #476 (merge `42f4770b7`; GitHub Production deployment `7074045431` succeeded) adds **Verify video** for copied rows missing times/hash. The verifier requires a finalized receipt, matching Zoom identity/size/times, and matching SharePoint item/size plus original version or eTag. The SQL fills only missing evidence under copy/intent update-key fences. The dry-run-default `scripts/repair-zoom-video-copy-metadata.mjs` applied one authorized repair to 1002852; state stayed `copied`, timestamps are `2026-10-09T16:31:01Z`–`2026-10-09T17:25:41Z`, hash is present, and transcript, speakers and file bytes were untouched. Full operational evidence and identities: `docs/atlas/postgres-zoom-video-copies.md`, “Missing metadata recovery”.
 
 **v1 scope (fixed):** presentation video only; started on request; identity mapping (cut at `endMs` on the MP4 timeline); Vercel Sandbox venue; no discussion video, no anchor mapper, no automatic trigger. Anything outside this goes to a follow-up, not into these slices.
 
@@ -75,7 +77,7 @@ Each slice is a branch merge under Tier 1-3 release rules (`docs/CAMPAIGN_RELEAS
 
 - Migration 079: `zoom_video_copies.recording_start` and `recording_end` (`TIMESTAMPTZ NULL`, both null or both set). Manifest entry and Atlas updates.
 - Write the times at copy start: `video-copy-service.js:127-133` already holds the Zoom file from `pickVideoFile`, whose `recording_start` / `recording_end` are available there; pass them into `store.startZoomVideoCopy` (insert at `video-copy-store.js:205`, after slice 1). The worker's `listAndValidate` (`video-copy-worker.js:464-481`) gains the same comparison, only for rows that have times, so a changed Zoom file fails the copy. A copy already in flight when slice 1 deploys has null times and must not fail on the new check.
-- Rows copied before this slice keep null times and are ineligible for a cut (decision 16). Landable alone.
+- Rows copied before this slice retain null times and are ineligible until the evidence is recovered (decision 16). The October 14 recovery release (PR #476) adds a verified metadata fill; a blanket re-copy or transcript reset is not required. This slice originally landed independently.
 
 ### Slice 2 — Split store, start route and same-source check
 

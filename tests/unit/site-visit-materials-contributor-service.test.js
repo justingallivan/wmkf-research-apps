@@ -253,7 +253,7 @@ test('finalize refuses: waived slot, oversize, wrong bytes, infected scan, no ac
     eventType: 'site_visit_material_scan_rejected',
     severity: 'warning',
     entityRefs: expect.objectContaining({ stagingId: STAGING_ID, slot: 'presentation_pdf' }),
-    metadata: { scanRejection: { category: 'blocked_content', flags: ['embedded_macro'] } },
+    metadata: expect.objectContaining({ scanRejection: { category: 'blocked_content', flags: ['embedded_macro'] } }),
     dedupeKey: `site_visit_material_scan_rejected:${STAGING_ID}`,
   }));
   expect(JSON.stringify(infected.recordEvent.mock.calls)).not.toMatch(/provider secret|provider-format-secret|virusName|https:\/\//i);
@@ -618,4 +618,50 @@ describe('staff replacement upload (staff replacement plan §3.2)', () => {
       .rejects.toMatchObject({ code: 'uploader_invalid' });
     expect(d.getRequest).not.toHaveBeenCalled();
   });
+});
+
+
+test('private scan diagnostics survive event sanitization but never enter the public failure body', async () => {
+  const { sanitizeMetadata } = require('../../lib/services/operational-event-service');
+  const recordEvent = jest.fn();
+  const diagnostic = { submittedExtension: '.pdf', detectedFormat: '.pages', nativeFindingCount: 0,
+    nativeThreatNames: [], relevantSubfile: 'Data/image.png', byteCount: PDF.length, elapsedMs: 45, attempts: 1,
+    responseValid: true, httpStatus: 200, rawBody: 'must-not-persist', token: 'must-not-persist' };
+  const d = deps({ recordEvent, scanBytes: async () => ({ scan_result: 'infected', contentFlags: ['invalid_file'], scanDiagnostics: diagnostic }) });
+  const error = await finalizeMaterialUpload(finalizeArgs(), d).catch((e) => e);
+  expect(error.body).toEqual({ ok: false, reason: 'scan_infected', error: expect.any(String), scanRejection: { category: 'invalid_or_protected_file', flags: ['invalid_file'] } });
+  const metadata = recordEvent.mock.calls[0][0].metadata;
+  expect(sanitizeMetadata(metadata)).toEqual(metadata);
+  expect(metadata.scanDiagnostics).toMatchObject({ detectedFormat: '.pages', nativeFindingCount: 0, relevantSubfile: 'Data/image.png', attempts: 1 });
+  expect(JSON.stringify(metadata)).not.toContain('must-not-persist');
+  expect(d.uploadFile).not.toHaveBeenCalled();
+});
+
+test.each([
+  [401, false, null, 'scan_misconfigured'],
+  [429, true, null, 'scan_busy'],
+  [503, true, null, 'scan_unavailable'],
+  [null, true, 'abort', 'scan_timeout'],
+])('scanner failure %s creates a private event without leaking provider error bodies', async (status, isTransient, causeKind, code) => {
+  const recordEvent = jest.fn();
+  const failure = Object.assign(new Error('provider-body-secret'), { serviceName: 'cloudmersive', status, isTransient, causeKind,
+    scanDiagnostics: { attempts: 2, httpStatus: status, failureKind: causeKind || 'http', submittedExtension: '.pdf', rawBody: 'provider-body-secret' } });
+  const d = deps({ recordEvent, scanBytes: async () => { throw failure; } });
+  const error = await finalizeMaterialUpload(finalizeArgs(), d).catch((e) => e);
+  expect(error.code).toBe(code);
+  expect(recordEvent).toHaveBeenCalledWith(expect.objectContaining({
+    eventType: 'site_visit_material_scan_failed', dedupeKey: `site_visit_material_scan_failed:${STAGING_ID}`,
+    metadata: expect.objectContaining({ failureCode: code, scanDiagnostics: expect.objectContaining({ attempts: 2, httpStatus: status }) }),
+  }));
+  expect(JSON.stringify(recordEvent.mock.calls)).not.toContain('provider-body-secret');
+  expect(JSON.stringify(error)).not.toMatch(/scanDiagnostics|provider-body-secret/);
+  expect(d.uploadFile).not.toHaveBeenCalled();
+});
+
+test.each(['infected', 'error', 'throw'])('event-store failure preserves scan outcome: %s', async (verdict) => {
+  const d = deps({ recordEvent: jest.fn(async () => { throw new Error('database unavailable'); }),
+    scanBytes: async () => { if (verdict === 'throw') throw new Error('scanner unavailable'); return { scan_result: verdict }; } });
+  await expect(finalizeMaterialUpload(finalizeArgs(), d)).rejects.toMatchObject({ code: verdict === 'infected' ? 'scan_infected' : 'scan_unavailable' });
+  expect(d.recordEvent).toHaveBeenCalledTimes(1);
+  expect(d.uploadFile).not.toHaveBeenCalled();
 });

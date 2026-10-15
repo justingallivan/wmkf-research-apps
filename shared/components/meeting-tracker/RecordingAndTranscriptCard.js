@@ -48,6 +48,16 @@ function formatBytes(value) {
   return `${bytes.toLocaleString()} bytes`;
 }
 
+function formatUploadTimestamp(value) {
+  if (!value) return 'Unavailable';
+  const date = new Date(value);
+  if (!Number.isFinite(date.getTime())) return 'Unavailable';
+  return date.toLocaleString(undefined, {
+    year: 'numeric', month: 'short', day: 'numeric',
+    hour: 'numeric', minute: '2-digit', second: '2-digit', timeZoneName: 'short',
+  });
+}
+
 function phaseCopy(state) {
   if (!state) return '';
   if (state.phase === 'pausing') return 'Pausing after the current fragment…';
@@ -202,6 +212,7 @@ function useMaterials(requestId, transcriptInputRef) {
   const [notice, setNotice] = useState(null);
   const [busyUploadId, setBusyUploadId] = useState(null);
   const [recoveryBusyId, setRecoveryBusyId] = useState(null);
+  const [cancelFailure, setCancelFailure] = useState(null);
   const [confirmCancelId, setConfirmCancelId] = useState(null);
   const [transfer, setTransfer] = useState(null);
   const [pauseRequested, setPauseRequested] = useState(false);
@@ -334,6 +345,7 @@ function useMaterials(requestId, transcriptInputRef) {
       setBusyUploadId(null);
       setRecoveryBusyId(null);
       setConfirmCancelId(null);
+      setCancelFailure(null);
       setTransfer(null);
       setPauseRequested(false);
       setUnavailable(false);
@@ -731,7 +743,8 @@ function useMaterials(requestId, transcriptInputRef) {
     }
   };
 
-  const cancel = async (intent) => {
+  const cancel = async (intent, dismissUncertain = false) => {
+    setCancelFailure(null);
     const generation = generationRef.current;
     recoveryBusyRef.current = intent.uploadId;
     setRecoveryBusyId(intent.uploadId);
@@ -743,18 +756,24 @@ function useMaterials(requestId, transcriptInputRef) {
     try {
       const result = await requestJson(
         `/api/meeting-tracker/visits/${encodeURIComponent(requestId)}/presentation-uploads/${encodeURIComponent(intent.uploadId)}/cancel`,
-        { method: 'POST', body: {}, tolerantBody: true },
+        { method: 'POST', body: dismissUncertain ? { dismissUncertain: true } : {}, tolerantBody: true },
       );
       if (!current(generation)) return;
       await load();
       if (!current(generation)) return;
-      setNotice(result.complete
+      setNotice(result.dismissed
+        ? 'Upload attempt removed from this list. Background checks will continue; no saved recording was deleted.'
+        : result.complete
         ? 'The recording is already complete. Choose Finish saving.'
         : result.finalized ? 'This recording was already saved.' : 'Unfinished upload cancelled.');
     } catch (cancelError) {
       if (!current(generation)) return;
       await load();
-      if (current(generation)) setError(uploadFailureMessage(cancelError));
+      if (current(generation)) {
+        const message = uploadFailureMessage(cancelError);
+        setError(message);
+        setCancelFailure({ uploadId: intent.uploadId, message, canDismiss: cancelError?.payload?.code === 'post_presentation_upload_dismiss_available' });
+      }
     } finally {
       if (current(generation)) {
         recoveryBusyRef.current = null;
@@ -883,7 +902,7 @@ function useMaterials(requestId, transcriptInputRef) {
     changeZoomText, chooseTranscriptFile, requestPause,
     data, loading, unavailable, readFailed, file, setFile, zoomText, setZoomText, zoomBusy, zoomError, setZoomError,
     transcriptFile, setTranscriptFile, transcriptBusy, transcriptProgress, transcriptStagedId, setTranscriptStagedId,
-    setTranscriptProgress, transcriptError, setTranscriptError, error, notice, busyUploadId, recoveryBusyId,
+    setTranscriptProgress, transcriptError, setTranscriptError, error, notice, busyUploadId, recoveryBusyId, cancelFailure,
     confirmCancelId, setConfirmCancelId, transfer, setTransfer, pauseRequested, setPauseRequested, link, linkBusy,
     linkError, linkCopied, manualCopy, confirmReissue, setConfirmReissue,
     load, saveZoom, uploadTranscript, begin, resume, finish, cancel, retry, mutateLink, copyLink,
@@ -2078,7 +2097,6 @@ function useZoomImport(requestId, { onImported, jobsSignature, onVideoCopied }) 
   const [acknowledged, setAcknowledged] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(null);
-  const [showOther, setShowOther] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const lastSignatureRef = useRef(jobsSignature);
   const generationRef = useRef(0);
@@ -2135,6 +2153,7 @@ function useZoomImport(requestId, { onImported, jobsSignature, onVideoCopied }) 
       const next = body?.available === true && Array.isArray(body.copies)
         ? body.copies.filter((copy) => copy && typeof copy.id === 'string' && typeof copy.state === 'string').map((copy) => ({
           id: copy.id, meetingUuid: typeof copy.meetingUuid === 'string' ? copy.meetingUuid : '', state: copy.state,
+          needsVerification: copy.needsVerification === true,
           bytesConfirmed: Number(copy.bytesConfirmed) || 0, declaredSize: Number(copy.declaredSize) || 0,
           failureCode: typeof copy.failureCode === 'string' ? copy.failureCode : null, cancelRequested: copy.cancelRequested === true,
           createdAt: copy.createdAt || null,
@@ -2167,13 +2186,13 @@ function useZoomImport(requestId, { onImported, jobsSignature, onVideoCopied }) 
     if (known) return known;
     const listed = meeting.video?.copy;
     return listed && typeof listed.state === 'string'
-      ? { id: listed.id, meetingUuid: meeting.meetingUuid, state: listed.state, bytesConfirmed: 0, declaredSize: Number(meeting.video.bytes) || 0, failureCode: listed.failureCode || null, cancelRequested: false }
+      ? { id: listed.id, meetingUuid: meeting.meetingUuid, state: listed.state, needsVerification: listed.needsVerification === true, bytesConfirmed: 0, declaredSize: Number(meeting.video.bytes) || 0, failureCode: listed.failureCode || null, cancelRequested: false }
       : null;
   };
   const videoStartable = (meeting) => {
     if (!copyAvailable || hasActiveCopy || !meeting?.video || meeting.video.tooLarge || meeting.video.segmented) return false;
     const copy = copyForMeeting(meeting);
-    return !copy || copy.state === 'failed' || copy.state === 'cancelled';
+    return !copy || copy.state === 'failed' || copy.state === 'cancelled' || (copy.state === 'copied' && copy.needsVerification === true);
   };
 
   // One POST for the video start. Returns { outcome: started | confirm | stale | error | dropped }.
@@ -2188,7 +2207,7 @@ function useZoomImport(requestId, { onImported, jobsSignature, onVideoCopied }) 
         copiesRef.current = [placeholder, ...copiesRef.current.filter((copy) => copy.id !== placeholder.id)];
         setCopies(copiesRef.current);
       }
-      setVideoMessage({ origin, tone: 'info', text: body?.replayed ? 'This video was already copied.' : 'Video copy started. This can take several minutes. You can leave this page.' });
+      setVideoMessage({ origin, tone: 'info', text: body?.verified ? 'Video verified. You can now create the presentation video.' : body?.replayed ? 'This video was already copied.' : 'Video copy started. This can take several minutes. You can leave this page.' });
       void loadCopies();
       return { outcome: 'started' };
     } catch (startError) {
@@ -2345,7 +2364,7 @@ function useZoomImport(requestId, { onImported, jobsSignature, onVideoCopied }) 
 
   return {
     status, windowDays, meetings, selectedUuid, setSelectedUuid, acknowledged, setAcknowledged, busy, error,
-    showOther, toggleOther: () => setShowOther((value) => !value), openPanel, importSelected, refresh, refreshing,
+    openPanel, importSelected, refresh, refreshing,
     copyAvailable, hasActiveCopy, currentCopy, copyForMeeting, videoStartable, videoBusy, videoMessage, confirm,
     copyVideo, cancelCopy, confirmReplace, declineReplace,
   };
@@ -2994,7 +3013,7 @@ function videoPickerLine(video, copy) {
   if (copy.state === 'queued') return 'Video: waiting to copy';
   if (copy.state === 'copying') return copy.declaredSize > 0 ? `Video: copying ${megabytes(copy.bytesConfirmed)} of ${megabytes(copy.declaredSize)}` : 'Video: copying';
   if (copy.state === 'registering') return 'Video: saving';
-  if (copy.state === 'copied') return 'Video: copied';
+  if (copy.state === 'copied') return copy.needsVerification ? 'Video: copied; verification needed before cutting' : 'Video: copied';
   if (copy.state === 'failed') return 'Video: copy failed';
   if (copy.state === 'cancelled') return 'Video: cancelled';
   return 'Video: not copied';
@@ -3054,7 +3073,10 @@ function VideoCopyStatus({ z }) {
 function ZoomImportSection({ z, activeJob, transcriptionBusy, hasTranscript }) {
   if (z.status === 'unavailable') return null;
   if (z.status === 'idle') {
-    return <Button variant="link" type="button" onClick={z.openPanel} className="mt-4">Import from Zoom</Button>;
+    return <div className="mt-4">
+      <Button variant="primary" size="sm" type="button" onClick={z.openPanel}>Import from Zoom</Button>
+      <p className="mt-2 text-sm text-gray-600">Imports the recording and generates a transcript with AssemblyAI.</p>
+    </div>;
   }
   if (z.status === 'loading') return <p className="mt-4 text-sm text-gray-700" aria-live="polite">Loading Zoom recordings…</p>;
   if (z.status === 'failed') {
@@ -3105,7 +3127,7 @@ function ZoomImportSection({ z, activeJob, transcriptionBusy, hasTranscript }) {
                   </label>
                   {ownButton && (
                     <Button size="sm" variant="outline" type="button" onClick={() => void z.copyVideo(meeting.meetingUuid, 'picker')} disabled={z.busy || z.videoBusy}>
-                      {copy?.state === 'failed' ? 'Try again' : 'Copy video'}<span className="sr-only"> from {fmtPacific(meeting.startTime)}</span>
+                      {copy?.state === 'copied' && copy.needsVerification ? 'Verify video' : copy?.state === 'failed' ? 'Try again' : 'Copy video'}<span className="sr-only"> from {fmtPacific(meeting.startTime)}</span>
                     </Button>
                   )}
                 </div>
@@ -3477,7 +3499,7 @@ function TranscriptWorkflow({ m, t, z, requestId, transcriptInputRef, refreshTok
     <Button variant="link" type="button" onClick={() => setUploadInstead((value) => !value)} aria-expanded={uploadInstead} className="mt-3">Upload a finished transcript instead</Button>
     {uploadInstead && <UploadForm m={m} inputRef={transcriptInputRef} />}
   </>;
-  const recordingBlock = <div className="mt-5 border-t border-gray-200 pt-4"><RecordingBlock m={m} z={z} /></div>;
+  const recordingBlock = <div className="mt-5 border-t border-gray-200 pt-4"><RecordingBlock m={m} /></div>;
   const recordingSummary = (
     <p className="min-w-0">
       <span data-testid="current-transcript-line">{line.text}</span>
@@ -3531,21 +3553,18 @@ function TranscriptWorkflow({ m, t, z, requestId, transcriptInputRef, refreshTok
           </div>
         )}
         {step1Expanded && <>
-          {generateReason
-            ? <>
-              <p className="mt-4 text-sm text-gray-700">Transcribing from audio: <span>{generateReason}</span></p>
-              <UploadForm m={m} inputRef={transcriptInputRef} />
-            </>
-            : <>
-              <ZoomImportSection z={z} activeJob={active} transcriptionBusy={Boolean(t.busy)} hasTranscript={Boolean(material)} />
-              {z.status === 'available'
-                ? <div className="mt-4 border-t border-gray-200 pt-3">
-                  <Button variant="link" type="button" onClick={z.toggleOther} aria-expanded={z.showOther}>Upload manually</Button>
-                  {(z.showOther || z.hasActiveCopy) && <>{manualAdd}{recordingBlock}</>}
-                </div>
-                : <>{manualAdd}{recordingBlock}</>}
-            </>}
-          {generateReason && recordingBlock}
+          {!generateReason && <ZoomImportSection z={z} activeJob={active} transcriptionBusy={Boolean(t.busy)} hasTranscript={Boolean(material)} />}
+          <VideoCopyStatus z={z} />
+          <details className="mt-5 border-t border-gray-200 pt-3" open={Boolean(m.data?.uploads?.length)}>
+            <summary className="cursor-pointer py-2 text-sm font-medium text-gray-700 hover:text-gray-950 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2">Import materials manually</summary>
+            {generateReason
+              ? <>
+                <p className="mt-4 text-sm text-gray-700">Transcribing from audio: <span>{generateReason}</span></p>
+                <UploadForm m={m} inputRef={transcriptInputRef} />
+              </>
+              : manualAdd}
+            {recordingBlock}
+          </details>
         </>}
       </Step>
 
@@ -3649,7 +3668,7 @@ function BoardReadiness({ readiness }) {
   );
 }
 
-function RecordingBlock({ m, z }) {
+function RecordingBlock({ m }) {
   const [replaceOpen, setReplaceOpen] = useState(false);
   const recording = (m.data?.materials || []).find((item) => Number(item.artifactType) === REQUEST_DOCUMENT_ARTIFACT_TYPE.RECORDING) || null;
   const intents = m.data?.uploads || [];
@@ -3661,7 +3680,6 @@ function RecordingBlock({ m, z }) {
     <section aria-labelledby="recording-transcript-recording-title">
       <h4 id="recording-transcript-recording-title" className="text-sm font-semibold text-gray-950">Video recording</h4>
       <p className="mt-1 text-xs text-gray-600">Zoom link or MP4, kept for staff. Saving a new one replaces the current one.</p>
-      <VideoCopyStatus z={z} />
       {recording && !showInputs && <Button size="sm" variant="outline" type="button" onClick={() => setReplaceOpen(true)} className="mt-3">Replace recording</Button>}
       {showInputs && <div className="mt-4 grid gap-4 sm:grid-cols-2">
         <div>
@@ -3701,13 +3719,28 @@ function RecordingBlock({ m, z }) {
           <ul className="mt-2 divide-y divide-gray-200 border-y border-gray-200">
             {intents.map((intent) => (
               <li key={intent.uploadId} className="flex flex-wrap items-center justify-between gap-3 py-3 text-sm">
-                <div><p className="font-medium text-gray-900">{intent.filename}</p><p className="text-xs text-gray-500">{formatBytes(intent.size)} · {intent.state}</p></div>
+                <div>
+                  <p className="font-medium text-gray-900">{intent.filename}</p>
+                  <p className="text-xs text-gray-500">{formatBytes(intent.size)} · {intent.state}</p>
+                  <p className="mt-1 text-xs text-gray-600">Upload started: {formatUploadTimestamp(intent.createdAt)}</p>
+                  <p className="text-xs text-gray-600">Last status update: {formatUploadTimestamp(intent.updatedAt)}</p>
+                  <p className="text-xs text-gray-500">Status updates may include automatic checks, not a new upload attempt.</p>
+                </div>
                 <div className="flex gap-2">
                   {intent.canResume && <Button type="button" size="sm" variant="outline" disabled={lockedByWork} onClick={() => m.resume(intent)}>Resume</Button>}
                   {intent.canRetry && <Button type="button" size="sm" variant="outline" disabled={lockedByWork} loading={m.recoveryBusyId === intent.uploadId} onClick={() => m.retry(intent)}>Retry upload</Button>}
                   {intent.canFinalize && <Button type="button" size="sm" disabled={lockedByWork} loading={m.busyUploadId === intent.uploadId} onClick={() => m.finish(intent.uploadId)}>Finish saving</Button>}
                   {intent.canCancel && !intent.canFinalize && <Button type="button" size="sm" variant="outline" disabled={Boolean(m.zoomBusy || m.recoveryBusyId || (m.busyUploadId && m.busyUploadId !== intent.uploadId))} onClick={() => m.setConfirmCancelId(intent.uploadId)}>Cancel</Button>}
                 </div>
+                {m.cancelFailure?.uploadId === intent.uploadId && (
+                  <div role="alert" className="w-full text-sm text-red-700">
+                    <p>Could not cancel this upload. {m.cancelFailure.message}</p>
+                    {m.cancelFailure.canDismiss && <div className="mt-2">
+                      <p className="text-gray-700">Remove this attempt from the list? Background checks will continue. Saved recordings will not be deleted.</p>
+                      <Button type="button" size="sm" variant="outline" disabled={Boolean(m.recoveryBusyId)} onClick={() => m.cancel(intent, true)}>Dismiss upload attempt</Button>
+                    </div>}
+                  </div>
+                )}
                 {m.confirmCancelId === intent.uploadId && (
                   <div className="w-full rounded border border-amber-200 bg-amber-50 p-3 text-amber-950">
                     <p>Cancel this unfinished upload? Unsaved progress will be lost. A completed recording will remain available to finish saving.</p>
