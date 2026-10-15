@@ -1,4 +1,41 @@
-# Session 609 Prompt: finish D26 ranking Preview acceptance; keep production separate
+# Session 610 Prompt: Research SharePoint access for Sarah’s Board writeups
+
+## Session 609 Summary — isolated SharePoint access investigation (2026-10-15 PT)
+
+### Completed and evidence
+
+- **[OWNER DECISION]** Sarah makes final Board-facing edits after leadership review. Immediate preference: one legibly named folder in the **Research** SharePoint site with legibly named writeup documents for Sarah to edit and transfer to Diligent. Working documents currently linked from the app may keep their existing filenames. Example supplied by owner: `1002912 Pre-Site Visit b821e35b-bde95555`.
+- **[OWNER REQUIREMENTS; NOT IMPLEMENTED THIS SESSION]** Sarah’s eventual final versions must also be retained with consistent filenames in request folders and remain accessible to PDs in the app after the cycle ends. Exact cycle, source-stage eligibility, destination library/folder, filename convention, publication/replacement behavior and any reapproval requirement still need confirmation. Examples suggested in chat were proposals, not approved specifications.
+- **[VERIFIED via live Microsoft Graph probes in this session]** Local configured `DYNAMICS_CLIENT_ID` is `d2e73696-537a-483b-bb63-4a4de6aa5d45`. Authentication succeeded; token application role was `Sites.Selected`. The same credentials read AkoyaGo at `/sites/akoyaGO` with HTTP 200. Research’s supplied folder-sharing link and direct `/sites/Research` lookup returned HTTP 403 `accessDenied`. The WMKF sharing link and a root-site candidate lookup also returned 403; the underlying WMKF site identity was not resolved. No test files were created: folder resolution failed before upload. Write access therefore remains **unverified**, not an independently tested write denial. These are local-credential observations, not a deployed Vercel identity audit.
+- **[OWNER DECISION]** Request additional access only to `https://appriver3651007194.sharepoint.com/sites/Research` and its contents; preserve existing AkoyaGo access. WMKF root-site access is out of scope. Owner sent IT the request for a site-specific `write` grant under existing Microsoft Graph `Sites.Selected`; **IT has not replied as of this handoff**. No tenant-wide permission was requested. Reference: https://learn.microsoft.com/en-us/graph/permissions-selected-overview .
+- **[VERIFIED via source]** `lib/services/graph/auth.js` uses the Dynamics app identity for Graph client-credentials authentication. This is separate from staff SSO. `lib/services/sharepoint-target-registry.js` currently registers AkoyaGo only; Microsoft authorization alone does not implement Research as an application destination. No runtime registry, credentials, permissions, documents or schema were changed.
+- **[VERIFIED via Git]** Reproducible operator probe: `scripts/probe-sharepoint-folder-access.mjs`, commit `37b094a01` (rebased from original local `769ffd11a`). Work isolated on `codex/problem-discussion`; other agents’ checkouts and WIP were not edited. Probe syntax and authentication/denied-read paths were exercised. Its successful write/readback/cleanup path has not yet been live-proved.
+
+### Next items
+
+1. **Blocked on IT:** after confirmation, rerun the probe against the Research folder link provided in this chat (or obtain a fresh link). Start without `--write`; then use `--write` for the authorized uniquely named temporary-file create/read/delete check. No broad cleanup or real-writeup copying is authorized by the probe. If a write outcome is uncertain or cleanup fails, inspect the exact reported test filename/item before retrying.
+2. **Owner decisions needed:** confirm cycle, eligible source writeups and exact Research destination, then prepare the smallest folder/copy workflow. Preserve linked AkoyaGo working files. Decide how Sarah’s edited versions return to request folders and PD historical access before claiming that end-to-end workflow complete.
+3. **Parked:** WMKF root-site access; direct Diligent API integration; a larger Board-ready lifecycle implementation. Do not substitute these for the requested shared Research folder.
+4. **Concurrent work:** prior ranking and other handoffs below are historical snapshots. Main has advanced through PR #489 (`d34ad7a0e`) at this stop; prior claims that ranking is unmerged are historical, not current release guidance. Consult current source, workstream owner and release receipts before acting on unrelated carryover.
+
+### Resume command
+
+```bash
+node scripts/probe-sharepoint-folder-access.mjs --env /absolute/path/to/.env.local 'RESEARCH_FOLDER_SHARING_URL'
+# After read succeeds, add --write to create/read/delete only the unique probe file.
+```
+
+Credentials are read locally and never printed. The probe is an explicit operator diagnostic, not a new runtime authorization path. Do not change the global SharePoint target to redirect existing AkoyaGo workflows.
+
+### Stop scope
+
+Documentation and an operator probe only; no new production capability shipped, so no DEVELOPMENT_LOG.md milestone entry is required. CLAUDE.md remains unchanged because mutable script inventories do not belong there. The claim-evidence pilot report returned “local state could not be read”; no observation row was invented. This handoff is to land on main at the owner’s explicit request, preserving previous handoff text below. No IT completion or later access result is assumed.
+
+---
+
+## Prior handoff — historical snapshot, retained for concurrent workstream continuity
+
+## Previous Session 609 Prompt: finish D26 ranking Preview acceptance; keep production separate
 
 ## Session 608 Summary — D26 ranking candidate and dedicated test Preview (Codex, 2026-10-14/15 PT)
 
