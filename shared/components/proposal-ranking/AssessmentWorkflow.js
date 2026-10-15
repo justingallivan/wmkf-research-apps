@@ -61,7 +61,7 @@ function Grade({ value, confidence }) {
     {value || '—'}
   </span>;
 }
-function PeerScores({ score }) {
+function PeerScores({ score, alignment = 'group' }) {
   const ratings = [
     ['Excellent', 'E', gradeClasses.A],
     ['Very Good', 'VG', 'bg-[#e4edb2] text-[#475716]'],
@@ -71,14 +71,15 @@ function PeerScores({ score }) {
   ];
   const tiles = ratings.flatMap(([label, short, color]) =>
     Array.from({ length: score?.distribution?.[label] || 0 }, (_, i) => (
-      <span key={`${label}-${i}`} title={label} aria-label={label}
+      <span key={`${label}-${i}`} role="img" title={label} aria-label={label}
         className={`${tileClass} border border-current ${color}`}>{short}</span>
     )),
   );
-  return <div>
+  // Match the 44px confidence controls around the 32px grade; unanswered adds 8px bottom padding.
+  const alignmentClass = alignment === 'unanswered' ? 'lg:pb-3.5' : alignment === 'answered' ? 'lg:pb-1.5' : '';
+  return <div className={alignmentClass}>
     <p className="mb-2 text-xs font-medium text-gray-700">Peer reviews</p>
     <div className="flex flex-wrap gap-1">{tiles.length ? tiles : <span className="text-sm text-gray-600">Not available</span>}</div>
-    <p aria-hidden="true" className="mt-1 text-xs text-gray-600">E Excellent · VG Very good · G Good · F Fair · P Poor</p>
   </div>;
 }
 
@@ -361,7 +362,10 @@ export function AssessmentList({
                                     ))}
                                   </fieldset>
                                 )}
-                                <PeerScores score={proposal.score} />
+                                <PeerScores
+                                  score={proposal.score}
+                                  alignment={collective ? 'group' : assessment.confidence[id] ? 'answered' : 'unanswered'}
+                                />
                                 <div className="flex justify-end gap-1.5">
                                   <span title={proposal.programKey?.toUpperCase() || 'Program unavailable'} className={`${tileClass} border border-gray-300 bg-gray-100 text-gray-700`}>{proposal.programKey?.toUpperCase() || '—'}</span>
                                   <span title={proposal.institutionGeography || 'Geography unavailable'} className={`${tileClass} border border-gray-300 bg-gray-100 text-gray-700`}>{['East', 'West'].includes(proposal.institutionGeography) ? proposal.institutionGeography[0] : '—'}</span>
@@ -1310,7 +1314,6 @@ export default function AssessmentWorkflow({
         view.workflow.stage === 'private') ||
         (section === 'group' && collective)) && (
         <>
-          <p className="sr-only">Peer review grades: E Excellent, VG Very good, G Good, F Fair, P Poor.</p>
           <div className="mb-3 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm">
             <span className="flex items-center gap-2">
               <Grade value="A" /> Fund
