@@ -1,12 +1,13 @@
 # Writeup-regeneration sandbox rehearsal setup
 
-Status: **fresh fixture created; count rollup not yet caught up**. The targeted
-Sandbox verifier repair is implemented and reviewed. The fresh Request 1000366
-has a durable pre-create baseline, but its active-Request census is 29 while the
-rollup remains 28. The original 1000365 failure remains preserved. No dependent
-fixture completion or model call has run. This is a service-integration rehearsal
-for the registered Dataverse Sandbox and shared akoyaGO SharePoint site; it does
-not establish hosted API authentication or production behavior.
+Status: **parked by owner at session close**. The owner stopped sandbox expansion
+after the test setup displaced the feature goal. The feature remains on draft
+PR #486; actual Dataverse/SharePoint regeneration was not reached. Request 1000366
+has a durable pre-create baseline but failed count/census parity at the last
+read-only check. No later pass is claimed. Do not resume Factory repairs, create
+another Request, force recalculation, or run models without a fresh scope decision.
+The next session should review the feature-only diff and choose a small acceptance
+test in a suitable venue. This service rehearsal does not prove hosted API auth.
 
 ## Execution status and retained evidence
 
@@ -113,7 +114,7 @@ zero payment/email, unchanged Contact, and active GoVerify checks passed.
 Private evidence is retained as
 `/private/tmp/writeup-regen-foundation-baseline-receipt-2026-10-15.json` and
 `/private/tmp/writeup-regen-foundation-baseline-recheck-2026-10-15.json`.
-The original failed receipt was not edited. A future read-only recheck may use
+The original failed receipt was not edited. If the owner reopens this parked work, a read-only recheck may use
 this same original baseline; it must not capture a new baseline after creation
 or retry creation. Fixture completion remains stopped pending a fully passing
 check, and provider attempts remain **0 of 3**.
@@ -340,3 +341,26 @@ migration, or production fallback to work around a failed precondition.
 - [`final-writeup-handoff-email.pg.test.js`](../../tests/integration/final-writeup-handoff-email.pg.test.js)
   demonstrates the isolated local SQL transport binding and migration-072
   proof without changing production storage code.
+
+## Session-close limits
+
+The last 12 completed account-rollup jobs showed an hourly pattern, latest start
+`2026-10-15T22:30:46Z`; no explicit next schedule was exposed. A roughly 23:30
+refresh was only inferred and was not awaited or verified after the owner stopped.
+The separate baseline-bound recovery acceptance path was designed but not built.
+The [Opus source review](../audits/WRITEUP_SANDBOX_OPUS_REVIEW_2026-10-15.md)
+requires that path, fixture-bound provider budget/checkpoint identity, and a
+post-read timestamp bound before further live use of the harness. These are
+parked findings, not permission to grow the Factory work.
+
+At commit `cc2651b1f`, Gitleaks CI flagged `sumologic-access-token` at lines 62,
+64 and 65 of `sandbox-foundation-verification.js`, locations containing pinned
+rollup formula hashes. The local secret scanner passed; the CI finding remains
+unresolved. Do not describe this latest candidate as fully green. Earlier feature
+candidate `8f6bdd6fc` had all reported CI checks passing.
+
+Private original manifests, receipts, baseline digests and local database
+credentials remain outside Git on this Mac. This document preserves the outcomes
+for another machine; it is not a substitute for those original recovery inputs.
+Do not fabricate or recapture a pre-create baseline to resume elsewhere. No
+milestone shipped to production and no automatic cleanup is authorized.

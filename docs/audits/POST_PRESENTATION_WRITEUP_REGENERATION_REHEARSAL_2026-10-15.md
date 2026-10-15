@@ -2,8 +2,8 @@
 title: Post-presentation writeup regeneration rehearsal
 kind: audit
 domain: workbench
-status: hosted-proof-blocked
-summary: Sandbox verifier repaired with durable baselines; fresh Request verification awaits count-rollup parity. No application model calls occurred.
+status: parked-by-owner
+summary: Feature remains draft; sandbox expansion parked by owner, with no live regeneration or application model calls. Latest tooling review and CI findings remain open.
 owner: product-engineering
 last_verified: 2026-10-15
 related:
@@ -169,6 +169,9 @@ zero-payment/email, and workflow checks passed. The original failed receipt
 remains unmodified, and the separate recheck uses its original baseline.
 No dependent fixture completion or model-bearing operation has run. The
 [setup record](../plans/WRITEUP_REGENERATION_SANDBOX_SETUP_2026-10-15.md) retains
-the precise evidence paths and subsequent status. The rollup schedule and
-read-only recheck remain the next operational check; no additional create or
-forced recalculation is authorized by this receipt.
+the precise evidence paths and subsequent status. The owner subsequently parked sandbox expansion and requested a feature-focused
+reset. No later rollup pass is claimed. Recovery tooling is not implemented;
+[Opus findings](WRITEUP_SANDBOX_OPUS_REVIEW_2026-10-15.md) remain parked. Latest
+`cc2651b1f` CI has a Gitleaks failure at formula-hash literal locations; earlier
+CI success must not be presented as a pass of that tooling commit. No additional
+create, forced recalculation, or model run is an active next step.
