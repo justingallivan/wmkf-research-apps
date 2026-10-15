@@ -1,0 +1,6 @@
+{
+  "name": "wmkf_proposalrankinground-assessments",
+  "kind": "extensions-on-existing",
+  "entityLogicalName": "wmkf_proposalrankinground",
+  "attributes": [{ "type": "Memo", "schemaName": "wmkf_WorkflowJson", "displayName": "Ranking Workflow", "description": "Version-2 active preparation and reveal pointers. Never contains individual assessments.", "maxLength": 65536 }]
+}

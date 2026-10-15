@@ -311,10 +311,11 @@ describe('createRequestWithGoverifyBypass', () => {
       get: jest.fn(async (requestPath) => {
         if (requestPath.startsWith('/workflows(')) return ok(workflowRow);
         if (requestPath.startsWith('/workflows?')) {
-          return ok({ value: [{
-            workflowid: 'activation-1', name: workflowRow.name, type: 2, primaryentity: 'akoya_request',
-            statecode: 1, statuscode: 2, _parentworkflowid_value: workflowRow.workflowid,
-          }] });
+          expect(requestPath).not.toContain('$top=5');
+          return ok({ value: Array.from({ length: 7 }, (_, index) => ({
+            workflowid: `activation-${index}`, name: workflowRow.name, type: 2, primaryentity: 'akoya_request',
+            statecode: index === 6 ? 1 : 0, statuscode: index === 6 ? 2 : 1, _parentworkflowid_value: workflowRow.workflowid,
+          })) });
         }
         return ok(sourceRow());
       }),

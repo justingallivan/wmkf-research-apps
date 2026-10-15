@@ -1,9 +1,9 @@
 # Proposal Ranking — Impeccable shape brief
 
-Date: 2026-10-13. Revision: 3. Status: **DRAFT FOR OWNER CONFIRMATION — no app changes.**
+Date: 2026-10-13. Revision: 3. Status: **ACCEPTED — implementation authorized 2026-10-13.**
 Controlling product rules: [design revision 5](PROPOSAL_RANKING_DESIGN_2026-10-07.md).
 Build sequence: [implementation plan](PROPOSAL_RANKING_IMPLEMENTATION_PLAN_2026-10-13.md).
-This is phase 0's proposed interaction design, not an implemented or confirmed interface.
+Phase 0 was accepted by the owner: “This is better. Let's use this direction and start implementing the updated workflow, including the smooth dragging and resets at every stage.” Branch implementation and remaining acceptance work are tracked in the implementation plan.
 
 ## Job, audience and visual authority
 
@@ -17,8 +17,8 @@ Mode: **Operate**. Page type: **Workspace / Tool** containing an ordered working
 Inherit PRODUCT.md and DESIGN.md: desktop first, neutral surfaces, Inter/system type,
 left-aligned compact header, dark primary actions, restrained semantic color, shared
 buttons and visible keyboard focus. The owner requested a surface-specific use of
-green/amber/slate A/B/C badges and confidence symbols after finding revision 2 busy
-and bland. This extends the ranking visual treatment without changing the suite design system.
+semantic grade colors after finding revision 2 busy
+and bland; later owner refinements below replace separate confidence symbols with borders. This extends the ranking visual treatment without changing the suite design system.
 This is a focused extension of the existing ranking surface: the agreed single-list,
 movable-separator workflow fixes the structure; no unrelated layout tournament is needed.
 
@@ -45,7 +45,7 @@ was not endorsed. Use them as a content checklist, not a fixed visual template. 
 ranking-specific Impeccable critique/shape record was found in the inspected artifacts
 or handoffs; the earlier app-wide critique is not evidence these cards were reviewed.
 The initial October 13 sketches omitted too much information and are superseded by
-revision 3's sketches below. This is a correction to the draft, not an accepted redesign.
+revision 3's sketches below. Revision 3 is the owner-accepted direction. Earlier revisions remain superseded.
 
 No matching Proposal Ranking surface brief was found by Impeccable context. Its other
 surface briefs concern Meeting Tracker and Workbench. DESIGN.md is the visual authority;
@@ -92,8 +92,10 @@ of duplicated lists or a separate submission action for each program.
 - Combined shows one MR/SE list. A short expandable “How this list was started”
   explanation describes grade-by-grade pairs and the within-pair reviewer comparison.
   Do not leave the two source lists beside the combined list.
-- **Confirm combined order** follows review. Later combined edits clear confirmation.
-  Ready requires that confirmation, complete confidence and confirmed saves.
+- After reviewing the combined order, the PD selects **Ready for group discussion**
+  once. That action confirms the current combined order and marks the PD ready in
+  the same saved transition. It requires complete confidence and confirmed saves;
+  later edits require reopening preparation and marking ready again.
 - Ready collapses preparation to “Ready for group discussion” with a timestamp and
   **Reopen preparation** in its menu. It does not mean the facilitator has revealed.
 - Group discussion before reveal shows only readiness progress/waiting guidance;
@@ -105,67 +107,34 @@ of a long list when useful. One visible saved-state message covers the active li
 
 ## 2. Card anatomy and separator behavior
 
-### Content checklist and hierarchy
+### Current card anatomy — owner refinements after the build
 
-| Earlier card content | Revision-3 placement |
-|---|---|
-| Position, institution, linked project title | Stable left rank gutter; institution heading with linked title on its own line below. Never concatenate both into one long heading. |
-| Request number and lead PD | Quiet, visible identity line below the title. |
-| MR/SE and E/W | Compact SE/MR and E/W markers in a stable location, with a visible legend and full accessible names; never leave an isolated ambiguous E. |
-| Individual reviewer grades and numeric mean | Visible **Peer reviews** strip, with each grade badge and a clearly labelled mean/scored count. Expanded detail supplements this strip rather than replacing it. |
-| Named PD ranks and average | Group cards always show each PD's combined rank, now with A/B/C and confidence alongside it. Clearly labelled **At reveal**; display starting mean rank separately from current collective position. |
-| Requested amount and cumulative budget | Dedicated aligned amount column on desktop; cumulative requested cost in group view. Private cards keep requested amount without introducing a personal funding cutoff. |
-| Research history | Group context line: qualifying Research award count/latest year, no dollars; unavailable/provisional qualifications visible. |
-| Smooth dragging | Reuse the retained branch's `@hello-pangea/dnd` integration as the implementation starting point; extend deliberately for dividers. |
+The owner refined the accepted direction in the October 13 built-interface review.
+These specifications supersede the earlier sketches where they differ:
 
-Private card, in reading order:
+- Neutral cards; vertically centered drag handle, with rank, institution and requested
+  amount aligned on the top-row baseline. Linked project title sits below institution.
+- Click the understated rank number for Move to position; no separate ellipsis menu.
+- PD names centered over equally spaced 32 px grade tiles. Lead PD is first with a
+  prominent underline; remaining PDs are alphabetical by first name. No Lead PD line.
+- Solid tile borders mean confident; dashed borders mean uncertain. Remove check/question
+  marks and move initial individual ranks and starting mean into Initial ranks details.
+- Peer reviews occupy the center, with their label matching PD-name type and top edge.
+  Reviewer and PD tiles have equal outer dimensions and share one aligned tile row.
+- PD A/B/C tiles use green/yellow/red. Reviewer E/G/P use corresponding colors, with
+  VG/F interpolated. Letters and accessible names retain meaning without color.
+- Neutral MR/SE and E/W tiles occupy the right of that same row.
+- No request numbers, peer-review mean/scored count, PD Grades/At reveal label, Grades
+  differ badge, amber card background/border or per-card cumulative funding.
+- Footer items share a baseline: Initial ranks disclosure, prior Research awards
+  disclosure, earlier discussion and the recommendation badge at lower right.
+- Research history summarizes count/latest year; expand for total qualifying Research
+  funding in USD and scope. Missing/provisional coverage remains explicit.
 
-1. Institution/title identity block and rank gutter; program/geography markers.
-2. Request number and lead PD, then the visible reviewer-grade strip and mean.
-3. **Confidence in my assessment:** explicit **Confident / Not sure** radio choices,
-   initially unanswered. Keep requested amount aligned in the right-hand amount column. Program and
-   combined cards use the same anatomy; the surrounding section supplies A/B/C.
-4. A quiet card menu exposes a non-drag movement option. Keep extra controls off the
-   default card face. No sentiment, peer PD assessments, notes or new score fields.
-
-Use reviewer labels that remain distinct from PD A/B/C: the sketches spell out
-Excellent/Very good/Good; compact E/VG/G badges are acceptable only with a clear
-Peer reviews label, visible legend and full accessible names. Do not replace the
-individual review distribution with the mean alone. For unusually many reviewers,
-wrap the badge row; never silently omit reviews. Long names/titles wrap rather than
-push badges, money or controls out of the card.
-
-### Color, symbols and scan hierarchy — owner-directed revision 3
-
-Grade badges use restrained **green A**, **amber B**, and **slate C**, with the letter
-always visible. This is a local assessment vocabulary, not a claim that an A is an
-approved award or a C is an error. Keep grade colors off reviewer scores and sentiment.
-Use **✓ Confident** and **? Not sure** in a persistent legend. In group comparison
-strips show each PD's name, grade, confidence symbol and `#` individual combined rank.
-Use full accessible names such as “Casey: grade B, not sure, individual rank 3.”
-Private confidence controls retain both text labels, radio semantics and explicit
-unanswered state; a missing answer never becomes a question mark by default.
-
-A thin amber edge and **↔ Grades differ** identify cards with different PD grades.
-Consensus cards stay visually quiet, with no extra colored consensus banner. This
-uses exact grade differences, not a newly invented numerical disagreement threshold.
-Symbols are reinforced by labels/legend and accessible names; color is redundant.
-
-Institution/title leads; the compact PD strip is the principal comparison surface;
-aligned requested/cumulative amounts form a separate right-hand column. Reviewer
-grades stay visible as neutral E/VG/G/F/P marks plus mean, under a visible legend.
-History and earlier sentiment are short secondary lines. Remove repeated box outlines
-and source headings from every subsection; keep enough labels to distinguish reviewer
-results, preserved individual judgments, and the current collective order.
-
-The grade follows its section, not a second editable control. Dividers retain the
-full A/B/C or collective section names. Narrow layouts stack the amount column and
-wrap the comparison strip without dropping people or their assessments.
-
-Two full-width movable divider bars sit in the list: **End of A · Fund** and
-**End of B · Maybe fund**. The C section follows. Group bars instead read
-**End of Recommend funding** and **End of Alternates**. Section headings show names
-and counts, including empty sections. Top and bottom remain valid destinations.
+Private preparation keeps explicit Confident / Not sure controls with an unanswered
+state. Group confidence comes from the preserved reveal. Long names/titles and review
+rows wrap rather than silently dropping information. Color and borders have accessible
+text equivalents. The surrounding section owns grade; no second editable grade store.
 
 ### Smooth movement and accessible alternatives
 
@@ -183,8 +152,8 @@ a failed/conflicting save keeps its explicit recovery state, not a misleading su
 Respect reduced-motion preferences with immediate or minimized displacement while
 retaining placement feedback. Motion communicates destination, not decoration.
 
-Retain keyboard dragging and cancellation from the package where verified. Put **Move
-to position…** in the card menu as a discoverable non-drag alternative; do not restore
+Retain keyboard dragging and cancellation from the package where verified. Expose **Move
+to position…** by clicking the rank number as a discoverable non-drag alternative; do not restore
 always-visible Up/Down buttons on every card. For bars, **Set boundary after position…**
 provides the equivalent control. Section moves explicitly choose top or bottom so
 placement is never guessed. Preserve focus and announce resulting position/section.
@@ -200,41 +169,23 @@ hiding proposals and making the boundary ambiguous.
 
 ## 3. Shared-screen discussion and laptop behavior
 
-After reveal, open **Group discussion** with one collective order and a compact
-persistent summary: **Recommend funding: count · requested total · West/East/Unknown**.
-Place cumulative requested cost at each card and at the funding boundary. The tally
-updates as cards/bars move, marked Saving until confirmed. Missing amounts display
-**Total incomplete**, never an apparently exact slate total. No new budget-setting
-form or automatic cutoff is introduced. Show the soft 2W:1E award-count target as
-context, not a quota meter that turns red when the group disagrees with it.
+After reveal, open **Group discussion** with one collective order. The movable
+**Recommended** divider prominently shows the requested total, recommendation count
+and E/W counts. Missing amounts display **Total incomplete**. Do not repeat cumulative
+funding on cards or display an E/W target anywhere on the page.
 
-Every group card shows identity/program/geography, reviewer grades and mean, and an
-**At reveal** comparison row for each PD: name, combined rank, A/B/C and confidence.
-Use a compact aligned grid on desktop that stacks by PD on narrow screens. Named
-comparisons are visible by default, not behind a disclosure. Confidence has its own ✓ / ? symbol beside the grade, reinforced by the legend and
-accessible names. Color never substitutes for a confidence answer.
+Group cards show the neutral compact anatomy above. Named PD grades remain visible;
+solid/dashed borders carry confidence, and Initial ranks expands the preserved combined
+positions and starting mean. The large rank means the current collective position.
 
-Keep **Starting mean rank** alongside these preserved inputs. The large rank gutter
-always means the current collective position; it may differ after group reordering.
-Use combined-rank values, never reuse the branch's per-program average under a new
-label. No tied badges. Show the rank range as supplementary comparison, not a new
-weighted score or an invented divergence threshold.
-
-A secondary context row shows Research award count/latest year and the current,
-authorized **Earlier discussion sentiment** summary. Expand only the supporting
-quotes, disagreement/uncertainty narrative and longer review detail. Keep context
-visually subordinate to individual assessments, without hiding its useful summary.
-Neither sentiment nor history becomes a colored overall proposal score. Separate
-**Peer reviews**, **PD assessments at reveal**, and **Earlier discussion sentiment**
-with explicit labels so three different sources cannot be mistaken for one verdict.
-
-The aligned right-hand amount column consistently shows Requested and Cumulative requested. The funding
-bar repeats its section total, so the decision boundary is readable without inspecting
-another card. Allow content-driven card height; do not fit more cards by hiding named
-comparisons or reducing text to unreadable size on a shared screen. Check representative
-24-proposal lists in the built critique; the revised group sketch shows four fictional
-proposals together: unanimous A, mostly A, A/B/C disagreement, and unanimous C. Neutral card borders and alignment organize the density without colored boxes
-around every number.
+The footer's Research disclosure exposes count/year/total and qualifying scope; the
+optional authorized Earlier discussion summary expands supporting discussion evidence.
+Neither history nor sentiment affects numerical ranking. The Research total is deployed
+in the dedicated test Preview at `d1b206185`, not Production; old snapshots lacking the
+field remain unavailable. Allow content-driven height and verify long-list shared-screen
+readability. The owner has now authorized 12 realistic fictional sandbox proposals to
+make that rehearsal more representative; provisioning and saved-round readback passed,
+with Justin’s hosted two-program display and retained-history navigation verified.
 
 The facilitator shares this same group view; no special presentation mode is required.
 PDs may independently scroll and expand evidence on their laptops. Opening a card,
@@ -318,21 +269,66 @@ announcements, sensible heading order, contrast verification and usable zoom. Th
 brief does not invent a suite-wide conformance certification. Measure the built UI
 in the scheduled critique/audit; sketches do not prove accessibility.
 
-## Confirmation and implementation consequence
+## Acceptance and implementation consequence
 
-Proposed decisions to confirm together: single active preparation list, compact stage
-navigation, visible reviewer grades and named PD comparisons, retained smooth dragging,
-same group view for the projector/laptops with
-independent browsing and explicit refresh, and contextual named reset actions.
-No scoring, merge, reveal, history-scope or reset policy has been changed.
+The owner accepted revision 3 and explicitly requested app implementation, smooth
+dragging and resets at every stage on October 13. No ranking, merge, privacy or
+reset policy changed. The four sketches remain the visual/interaction reference.
 
-After confirmation, link this brief as phase 0's accepted output and proceed only when
-app implementation is requested. Until then it stays a draft; do not write a direction
-contract, replace DESIGN.md, or change runtime code. Later critique/audit reviews the
-actual built surface once, fixes one batch and confirms once, per the implementation plan.
+[VERIFIED via branch source and local browser] `codex/proposal-ranking-v2` now
+implements the mixed card/divider list with `@hello-pangea/dnd`, grade/confidence
+tiles, visible named comparisons and contextual resets. A local four-proposal
+rehearsal exercised keyboard movement, collective reset, reopened preparation and
+390px layout. This is synthetic UI evidence, not saved Dataverse acceptance.
+The later saved sandbox rehearsal passed 13 service-persona checks, followed by
+a saved-D98 browser walkthrough with four trusted personas in normal Chrome.
+That supersedes the earlier port-3136 browser block; independent-SSO acceptance
+remains open. Browser testing found and fixed private-list rendering after reopen
+and SE selection after confidence saves. A second reveal retained disagreement and
+the unanimous cutoff; full restart then returned all four to Preparing with confidence
+cleared and reveal disabled. Keyboard dragging persisted, but automated pointer movement
+did not produce an observed saved drop. The user later confirmed basic pointer
+movement/save (“It moves and saves”); 100-card pointer autoscroll/drop is now user-confirmed in the memory-only fixture. Retained D98 cards have numeric reviewer-distribution keys
+and cannot establish reviewer-badge visual acceptance; future fixture generation
+uses labels without rewriting the retained snapshot. The implementation plan and
+`docs/audits/PROPOSAL_RANKING_V2_SANDBOX_REHEARSAL_2026-10-13.md` record the bounded
+proof and remaining other-staff sign-in and live-sentiment checks. Justin real SSO and hosted opening passed.
+A separate memory-only 100-proposal/12-PD fixture passed rendering, Find 100, keyboard
+100→99 movement, Refresh retention and collective reset; saved maximum-capacity
+transactions remain unverified. DESIGN.md and the suite design system remain unchanged.
 
-Revision-3 verification: content checklist checked against retained branch source and
-October 8 commit history. The preparation and discussion sketches now use color/symbols and a compact
-comparison strip. Reset and movement sketches retain the prior interaction specification; they do not demonstrate working animation. No app, dependency,
-schema or design-system file changed. Owner confirmation of this revised draft remains
-pending; earlier sketches do not carry approval.
+## Current dedicated Preview and richer rehearsal
+
+[VERIFIED via deployment receipt and hosted browser] Source `d1b206185` is deployed
+in dedicated READY Preview `dpl_GCjqpVkTNncxSC2kRzByGLbbspyq` at
+`https://wmkf-meeting-transcription-test-h2yh5pkf4.vercel.app`, with stable alias
+`https://wmkf-meeting-transcription-test.vercel.app`. The compact card refinements
+and expandable total Research funding are included. The release passed 179 ranking
+tests and Justin's Microsoft SSO/updated-interface check. This is sandbox deployment,
+not Production promotion or independent acceptance by the other three PDs.
+
+[VERIFIED via provisioning logs, READY Preview and saved-round readback] The enriched
+rehearsal is deployed from `591c3e98e7f24e699f7f83260a16ab1b1a929167` in Preview
+`dpl_BcJwMnCKWAQp9RueY2F4hDNjdPb6` at
+`https://wmkf-meeting-transcription-test-9qilqb16b.vercel.app`; the stable test alias
+points to this deployment. New round `ea3496d5-c105-4e97-95c0-6b13a2e3f2ef` contains
+12 realistic fictional proposals (six MR, six SE) and 36 saved synthetic reviews,
+three per proposal, with all four PDs in private preparation and nobody ready.
+Fictional institutions, geography, award histories and explicitly labelled sample
+discussions use a strict dedicated-test projection; they are not real awards or
+accepted human discussion analyses. The 182 ranking tests in 20 suites, scoped lint,
+types and DAL/reviewer-boundary/script-writer/API/status gate/self-test pairs passed.
+[VERIFIED via hosted browser] Signed-in Justin saw six proposals in each program,
+distinct institutions/project titles and three review tiles per card, including
+E/E/VG and divergent E/G/F. Both programs remained at 0/6 confidence answers.
+History opened the original run read-only, and Open replacement run returned to
+the enriched round. Anonymous `/api/proposal-ranking` returned 401. No PD assessment
+data changed and no live group reveal occurred in this check; other staff sign-ins
+and a full group walkthrough remain pending.
+
+The atomic operator upgrade preserved old round `f48741f0-4560-471d-b51f-ef93db48c152`,
+its exact frozen snapshot hash and lists, with previous/superseded links. This was a
+fresh source-pool replacement, not a normal UI reset. The commit succeeded once;
+a readback DTO typo was repaired and exact-hash/link verification completed without
+replaying the mutation (`/private/tmp/ranking-rich-round-receipt.json`). Normal resets
+continue to retain the current frozen pool. Production is unchanged.

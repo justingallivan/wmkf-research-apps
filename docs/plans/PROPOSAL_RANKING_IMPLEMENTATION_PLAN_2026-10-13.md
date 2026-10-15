@@ -1,9 +1,104 @@
 # Proposal Ranking — implementation plan
 
-Date: 2026-10-13. Status: **[PLANNED] Documentation only; no implementation or release authorized.**
+Date: 2026-10-13. Status at that date: **Implementation in progress on `codex/proposal-ranking-v2`; UX accepted and app work authorized. Dedicated test Preview deployed; Production unchanged.** The Session 608 D26 release status below supersedes this for current implementation branch and acceptance state.
 Product authority: revision 5 of `docs/plans/PROPOSAL_RANKING_DESIGN_2026-10-07.md`.
 API boundary: `docs/plans/PROPOSAL_RANKING_API_CONTRACT.md` §§1–5 are existing;
 §6 is the replacement contract. Storage inventory: `docs/atlas/dataverse-proposal-ranking.md`.
+
+## Session 608 D26 release status — 2026-10-15
+
+This October 13 plan records the assessment/reveal implementation and its earlier
+dedicated-Preview acceptance. The D26 release extends that source on
+`codex/d26-ranking-release`; the current code candidate is `9fe92f0ed`. The
+versioned one/two-facilitator setting, captured workflow membership, participant
+privacy projections, safe version dispatch, and legacy own-only transition are
+implemented and passed Sol's source review. The additive schema already described
+here is reused; this release adds no table or Dataverse attribute.
+
+The final candidate `9fe92f0ed` passed 25 suites / 269 tests, types, scoped lint,
+and production build. The scoped API-route, status-enum, DAL, OData, context,
+route-lifecycle, route-service, and trust-boundary-GUID gates with their
+self-tests. A synthetic D96 sandbox rehearsal passed six persisted checks including
+two-facilitator races and a 23-proposal / 92-assessment workbook. It did not use D26
+source requests, change shared defaults, or test independent SSO/profile/grant
+authorization. A read-only host Chrome smoke with trusted sandbox personas rendered
+the 23-card view/readiness/controls, navigated history and downloaded the workbook;
+it does not establish independent SSO or WebKit/iPad acceptance. D96's retained synthetic rounds and receipt are recorded in the
+[D26 addendum](PROPOSAL_RANKING_D26_IMPLEMENTATION_ADDENDUM_2026-10-14.md).
+
+Opus's final review is satisfied. Independent staff SSO/profile/grant and
+WebKit/iPad acceptance remain pending.
+This is a release candidate, not a Production approval: no Production flag,
+setting, schema, round, or deployment changed. Re-probe the actual D26 pool and
+retained trial immediately before a separately approved cutover.
+
+## Current implementation receipt — 2026-10-13
+
+The owner accepted UX brief revision 3 and requested implementation including smooth
+dragging and all-stage resets. [VERIFIED via branch source] The build adds private
+MR/SE assessment, explicit per-grade paired combined merge, confidence/confirmation,
+ready/reopen, immutable all-ready reveal, collective edits, non-destructive resets,
+paged history, authorized group sentiment and a saved-revision two-sheet workbook.
+The original version-1 path remains separate. No Production writes occurred; dedicated Preview deployment is recorded in the sandbox audit;
+owner-authorized sandbox setup and retained synthetic writes are recorded below.
+
+Selected persistence: additive wave33 `wmkf_workflowjson` (65,536) and
+`wmkf_assessmentjson` (524,288), using existing round/list entities. Current read keys
+are bounded to active preparation/reveal; history pages contain at most ten entries.
+Immutable operation receipts use `o:<UUID>` list keys and bind the original request.
+A supported opening is capped at 100 proposals and 12 distinct PDs; serialized field
+limits are checked before changeset dispatch. The supported maximum still needs live capacity rehearsal; the six-proposal/four-persona
+sandbox run below proves only its bounded Dataverse changesets. Resets retain old rounds/reveals and never DELETE.
+
+New creation requires both `PROPOSAL_RANKING_WORKFLOW_V2=on` and
+`PROPOSAL_RANKING_V2_SCHEMA_READY=on`, in addition to existing ranking readiness.
+Unset/other values do not enable v2 creation. Both flags are enabled in the dedicated Preview; Production is unchanged.
+Once v2 data exists, keep a v2-aware reader as the rollback floor.
+
+[VERIFIED via sandbox setup/readback and saved rehearsal, October 13] Both wave33
+fields are now applied with exact metadata and Beth is the sandbox default facilitator.
+Thirteen retained D98 service-persona checks passed with six fictional proposals and
+four enabled sandbox identities, including all-stage resets, stale writes, replay,
+preserved reveals and two-sheet workbook export. This supersedes the earlier absent
+fields/setting probe. Ordinary eligibility was empty; the later dedicated marked D97
+fixture passes source preview with six rated proposals/four staff (see sandbox audit). Justin real Microsoft SSO and hosted opening passed; other staff sign-ins
+and live sentiment remain pending. A later saved-D98 walkthrough
+in normal Chrome exercised four trusted personas, superseding the earlier port-3136
+browser block. The retained fixture's numeric review
+distribution keys also prevent using it as reviewer-badge visual proof. See the
+[bounded sandbox receipt](../audits/PROPOSAL_RANKING_V2_SANDBOX_REHEARSAL_2026-10-13.md).
+`probe-proposal-ranking-readiness.mjs --workflow-v2` checks additive attributes.
+
+Local verification after the saved-browser fixes: 135 ranking tests, type check and
+scoped lint pass; the current production Turbopack build passed (exit 0) (the build retains four unrelated document-renderer
+tracing warnings). The 100-proposal / 12-PD reveal fits the additive field cap in a
+serialized fixture. A memory-only 100/12 browser check also passed rendering, Find 100,
+keyboard position 100→99, Refresh retention and collective reset to 100; this does not
+prove saved maximum-capacity transactions. The user later confirmed smooth pointer
+autoscroll/drop in that memory-only fixture. Tests cover pure calculations, atomic adapter simulations, stale writes,
+replay after later edits, immutable history, restart, workbook types/provenance, and
+sentiment batching/access loss/reveal races. The isolated browser rehearsal renders
+the actual React component against fictional in-memory workflow state; it is not an
+alternative live backend. Keyboard movement across the funding bar, tally changes,
+collective reset, dialog focus return, reopening and a narrow 390px layout were checked.
+Fresh review found StrictMode refresh, restart-tab and numeric-history ordering bugs;
+all three were fixed with regressions. Other staff sign-ins, live sentiment and final release review
+remain open. The later saved-D98 browser walkthrough found and fixed private-list
+totals being calculated against an incomplete program subset and SE selection
+resetting to MR after a confidence save; a populated regression was added. A second
+reveal retained the disagreement and unanimous cutoff; final full restart returned
+all four participants to Preparing, with confidence cleared and reveal disabled.
+Keyboard dragging persisted; automated pointer movement was inconclusive, but the
+user confirmed basic pointer movement/save (“It moves and saves”). Client edits are
+serialized by disabling movement during saves; failed/uncertain operations retain
+an explicit recovery action rather than replaying a drag automatically.
+
+Documentation updates cover current Ranking status in the design, brief, API/Atlas,
+service catalogue, route matrix, sentiment plan/Atlas and session routing. This is a
+bounded changed-surface update, not an exhaustive audit of unrelated session history.
+
+The numbered build sequence below remains the acceptance checklist. Historical
+pre-build documentation receipts at the end describe their dated scope only.
 
 ## 1. Outcome and evidence
 
@@ -19,8 +114,9 @@ trace is retained in the explicitly historical revision-4 reconciliation report,
 `docs/audits/PROPOSAL_RANKING_WORKFLOW_RECONCILIATION_2026-10-13.md`.
 The paused local branch at `0d161d60f` adds group-program interleaving, Research funding
 context, CSV and a destructive dry-run reset; it does not implement individual
-combined preparation. No fresh remote PR, deployment, live schema or grant probe
-was performed for this plan. Those states remain **UNKNOWN** until preflight.
+combined preparation. The original planning comparison did not probe remote PR/deployment/schema/grants.
+The later sandbox setup and bounded saved rehearsal are recorded above; Production
+and independent participant access remain outside that proof.
 
 Existing seams to extend, subject to implementation tests:
 
@@ -30,7 +126,7 @@ Existing seams to extend, subject to implementation tests:
 | Authenticated entry | `pages/api/proposal-ranking.js` | Versioned allowlisted actions and payloads, same session-derived actors/app grant/private no-store/DAL context. |
 | Workflow and response privacy | `lib/services/proposal-ranking/service.js` | Version-aware reads, new preparation/reveal/reset transitions, atomicity, durable operation readback, filtered history. |
 | Deterministic calculations | `lib/services/proposal-ranking/calculations.js` | Thirds, pair merge, exact combined rank sums, unanimous outer blocks, section totals; no score weighting from grades/confidence/history/sentiment. |
-| Source snapshot | `lib/services/proposal-ranking/preview-service.js`, `lib/dataverse/adapters/proposal-ranking-source.js` | Preserve eligibility/roster/scale/currency; adapt qualified Research count/latest year. |
+| Source snapshot | `lib/services/proposal-ranking/preview-service.js`, `lib/dataverse/adapters/proposal-ranking-source.js` | Preserve eligibility/roster/scale/currency; carry qualifying Research count/latest year and total USD in integer cents. |
 | Persistence | `lib/dataverse/adapters/proposal-ranking.js`, `lib/dataverse/schema/wave32-proposal-ranking/` | Additive versioned fields/keys and conditional multi-row transitions; retain old records. |
 | Sentiment | `lib/services/post-presentation-materials/discussion-sentiment-reader.js` | Optional live authorized enrichment of active group cards only, never frozen private data. |
 | Export | New ranking workbook helper using an inspected supported workbook dependency | Two sheets from one saved group revision and its matching revealed inputs. Branch CSV is only a formatting/security reference. |
@@ -48,9 +144,8 @@ changeset capacity before implementing this mapping.
 - Add a round workflow JSON field for active preparation version, active reveal
   identity and stage. Add a list assessment JSON field for two boundary positions,
   confidence by request ID, combined source versions/confirmation and ready receipt.
-  Suggested names are `wmkf_workflowjson` and `wmkf_assessmentjson`; neither exists
-  merely because it is named here. Select the next available additive schema wave
-  during implementation; do not rewrite historical wave32 as if already deployed.
+  Selected names are `wmkf_workflowjson` and `wmkf_assessmentjson` in additive
+  `wave33-proposal-ranking-assessments`. They are now provisioned and metadata-verified in the sandbox; Production was not changed.
 - Keep order in the existing order field. Derive grades from order plus boundaries;
   do not keep a second writable grade map. Validate `0 <= first <= second <= N`,
   integer positions, exact proposal membership and confidence keys/allowed values.
@@ -148,7 +243,12 @@ not change unanimity. All-A/all-C/empty middle/no consensus cases must remain va
 
 Research history: adapt the branch classifier and complete all-history source read,
 retaining qualifying Research exclusions and provisional/unavailable distinctions.
-Expose count and most recent qualifying award year, omitting funding dollars. Verify
+Expose count and most recent qualifying award year in the card summary, with total
+qualifying Research funding in USD under its arrow disclosure (October 13 owner
+refinement). The local helper now returns its existing checked sum as
+`totalAmountMinorUnits`; this additive field is deployed in the dedicated test Preview at `d1b206185`, not Production. Older frozen snapshots
+without it show unavailable, not zero; no backfill or source refresh through resets.
+History remains informational and workbook columns are unchanged. Verify
 the year derivation (fiscal-year field, then meeting/decision date fallback) against
 source before settling the display; label any uncertain year rather than inventing it.
 Capture history with opening source provenance; resets do not refresh or alter it.
@@ -168,7 +268,7 @@ identifiable after resets. Use numeric cells for amounts/ranks and safe text cel
 for untrusted titles/names; prevent formula injection. Export fails clearly on a
 stale requested revision or unavailable source, never mixes two revisions. No new
 finalization lock and no sentiment. Inspect the installed workbook dependency before
-choosing reuse or adding one; do not add a library during this documentation task.
+choosing reuse or adding one. The branch reuses the existing ExcelJS dependency.
 
 ## 5. Build sequence and acceptance gates
 
@@ -185,7 +285,7 @@ merge its incompatible combine/reset/CSV behavior wholesale.
 | 3. Additive persistence and private preparation | New schema/readers/writers, own program/combined edits, explicit rebuild, readiness/reopen and own reset. | Actor isolation, combined invalidation, transactional order/bars/confidence saves, cap tests, replay and stale-write cases. Probe schema after approved application. |
 | 4. Reveal and shared resets | Atomic all-ready reveal, collective edits, reopen after reveal, collective reset, full restart, read-only history. | Two-identity concurrent saves/reveal/reset; all-or-nothing failure injection; retry after later edits; coordinator conflict; no deleted reveals or cross-version votes. |
 | 5. Complete interaction | Private MR/SE and combined views, draggable/keyboard bars/cards, ready progress, reveal, group comparisons/totals and clear reset confirmations. | Browser walkthrough with separate PD/facilitator identities, focus/keyboard accessibility, pending-save and stale-response behavior, private payload inspection. |
-| 6. Context and workbook | Research count/year, optional authorized sentiment, two-sheet saved-revision XLSX. | Missing/provisional history, present-but-unauthorized sentiment, withdrawal/currentness, >50 IDs, dependency failure, workbook cell types/provenance and reset/export race. |
+| 6. Context and workbook | Research count/year with expandable total USD, optional authorized sentiment, two-sheet saved-revision XLSX. | Missing/provisional history, present-but-unauthorized sentiment, withdrawal/currentness, >50 IDs, dependency failure, workbook cell types/provenance and reset/export race. |
 | 6a. Impeccable critique and audit — working interface | Review the complete built flow, including context-rich cards and reset/export states, for usability, visual hierarchy, accessibility and responsive behavior. | Record prioritized findings, fix the agreed batch, and verify once more. No unresolved blocking usability/accessibility defects before rehearsal/release review. |
 | 7. Rehearsal and release review | Repeatable local/sandbox walkthrough at every stage, source/Atlas/API/catalogue updates and scoped gates. | Complete acceptance matrix below, independent whole-flow review, sandbox receipt and deliberate promotion/rollback plan. No production changes inferred from test success. |
 
@@ -197,7 +297,7 @@ serve as a content checklist, not a fixed visual design; retain their smooth dra
 using the branch's existing `@hello-pangea/dnd` integration. Reviewer grades and named
 PD comparisons remain visible by default, with restrained grade colors, confidence
 symbols and an aligned amount column. The owner confirmed shared-screen discussion plus PD
-laptops; the proposed interaction brief awaits confirmation. No app code changed.
+laptops and accepted revision 3; app implementation is now authorized. See the current receipt above.
 
 **Before implementation — shape:** use the installed Impeccable skill's context and
 shape workflow, in Operate mode. Read the existing product/design context and inspect
@@ -229,8 +329,8 @@ Check desktop and narrow-screen layouts together. Produce one prioritized findin
 list, fix in one batch, then perform at most one confirmation pass. Record any deferred
 nonblocking issues explicitly; do not expand into open-ended visual polishing.
 The UX review complements, and does not replace, transaction/privacy tests or the
-multi-person acceptance walkthrough. These Impeccable passes are scheduled work;
-neither has been executed by this plan update.
+multi-person acceptance walkthrough. Phase 0 is complete and accepted. The current implementation receipt records the
+bounded local UI checks and remaining phase-6a/7 acceptance work.
 
 Do not split phase 4's durable reveal/reset safety across releases where an incomplete
 transition becomes callable. UI can follow durable service tests, but new public
@@ -266,7 +366,7 @@ parser after creating version-2 active rounds. If rollout fails, stop new writes
 retain rounds/receipts for diagnosis; never erase data or silently restore an old
 coordinator pointer. Owner-approved legacy-trial cleanup is a separate operation.
 
-## 7. Contract review and documentation receipt
+## 7. Historical pre-build contract review and documentation receipt
 
 Contract-reconcile Mode A: whole-flow and durable surfaces are mapped in §§1–6;
 partial success and stale async state in §3; helper semantics in §4; status/projection
@@ -320,3 +420,39 @@ critique/audit against the working interface. Phase 0 and phase 6a above are new
 gates; the earlier independent review and 25-check receipt cover the preceding plan
 revision, not execution of these reviews. This amendment changes no product rule or
 runtime behavior.
+
+## Current dedicated Preview and richer rehearsal
+
+[VERIFIED via deployment receipt and hosted browser] Source `d1b206185` is deployed
+in dedicated READY Preview `dpl_GCjqpVkTNncxSC2kRzByGLbbspyq` at
+`https://wmkf-meeting-transcription-test-h2yh5pkf4.vercel.app`, with stable alias
+`https://wmkf-meeting-transcription-test.vercel.app`. The compact card refinements
+and expandable total Research funding are included. The release passed 179 ranking
+tests and Justin's Microsoft SSO/updated-interface check. This is sandbox deployment,
+not Production promotion or independent acceptance by the other three PDs.
+
+[VERIFIED via provisioning logs, READY Preview and saved-round readback] The enriched
+rehearsal is deployed from `591c3e98e7f24e699f7f83260a16ab1b1a929167` in Preview
+`dpl_BcJwMnCKWAQp9RueY2F4hDNjdPb6` at
+`https://wmkf-meeting-transcription-test-9qilqb16b.vercel.app`; the stable test alias
+points to this deployment. New round `ea3496d5-c105-4e97-95c0-6b13a2e3f2ef` contains
+12 realistic fictional proposals (six MR, six SE) and 36 saved synthetic reviews,
+three per proposal, with all four PDs in private preparation and nobody ready.
+Fictional institutions, geography, award histories and explicitly labelled sample
+discussions use a strict dedicated-test projection; they are not real awards or
+accepted human discussion analyses. The 182 ranking tests in 20 suites, scoped lint,
+types and DAL/reviewer-boundary/script-writer/API/status gate/self-test pairs passed.
+[VERIFIED via hosted browser] Signed-in Justin saw six proposals in each program,
+distinct institutions/project titles and three review tiles per card, including
+E/E/VG and divergent E/G/F. Both programs remained at 0/6 confidence answers.
+History opened the original run read-only, and Open replacement run returned to
+the enriched round. Anonymous `/api/proposal-ranking` returned 401. No PD assessment
+data changed and no live group reveal occurred in this check; other staff sign-ins
+and a full group walkthrough remain pending.
+
+The atomic operator upgrade preserved old round `f48741f0-4560-471d-b51f-ef93db48c152`,
+its exact frozen snapshot hash and lists, with previous/superseded links. This was a
+fresh source-pool replacement, not a normal UI reset. The commit succeeded once;
+a readback DTO typo was repaired and exact-hash/link verification completed without
+replaying the mutation (`/private/tmp/ranking-rich-round-receipt.json`). Normal resets
+continue to retain the current frozen pool. Production is unchanged.

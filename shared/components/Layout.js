@@ -21,7 +21,7 @@ const MAIN_WIDTH_CLASSES = {
 };
 
 // Apps shown as top-level nav items; every other accessible app goes in Tools.
-const PRIMARY_APP_KEYS = ['reviewers', 'meeting-tracker'];
+const PRIMARY_APP_KEYS = ['reviewers', 'meeting-tracker', 'proposal-ranking'];
 
 function isCurrentPath(pathname, href) {
   if (href === '/') return pathname === '/';

@@ -16,7 +16,56 @@ export async function loadProposalRanking({ cycleCode, roundId, signal }) {
   return data;
 }
 
-export async function sendProposalRankingAction(action, { signal } = {}) {
+const PRIVATE_ACTIONS = new Set([
+  'saveAssessment', 'buildCombined', 'confirmCombined', 'ready', 'reopenOwn', 'resetProgram',
+]);
+const DEFINITE_CONFLICTS = new Set(['stale_scope', 'conflict', 'confirmation_stale']);
+
+// A peer save advances the shared round ETag without changing this PD's work.
+// Rebase only proven rejections, only over identical private state, and retain
+// the exact final request if its outcome becomes uncertain.
+async function sendWithPrivateConflictRecovery(action, baseView, signal, onAttempt) {
+  let pendingAction = action;
+  for (let attempt = 0; ; attempt += 1) {
+    try {
+      return await sendProposalRankingAction(pendingAction, { signal, onAttempt });
+    } catch (error) {
+      error.pendingAction = pendingAction;
+      if (attempt >= 3 || error.status !== 409 || !DEFINITE_CONFLICTS.has(error.code)) throw error;
+      let current;
+      try {
+        current = await loadProposalRanking({ roundId: action.roundId, signal });
+      } catch (readError) {
+        readError.pendingAction = pendingAction;
+        throw readError;
+      }
+      const sameScope = current.roundId === baseView.roundId
+        && current.viewer?.systemUserId === baseView.viewer?.systemUserId
+        && current.round?.state === 'active'
+        && current.round.policyRevision === baseView.round.policyRevision
+        && current.workflow?.stage === 'private'
+        && JSON.stringify(current.workflow) === JSON.stringify(baseView.workflow)
+        && current.own && JSON.stringify(current.own) === JSON.stringify(baseView.own);
+      if (!sameScope) throw error;
+      const key = action.action === 'resetProgram' ? `resetProgram:${action.programKey}` : action.action;
+      const confirmation = current.confirmations?.[key];
+      if (action.confirmationFingerprint && !confirmation?.fingerprint) throw error;
+      pendingAction = {
+        ...pendingAction,
+        operationId: createOperationId(),
+        roundEtag: current.round.etag,
+        ...(action.confirmationFingerprint ? { confirmationFingerprint: confirmation.fingerprint } : {}),
+      };
+    }
+  }
+}
+
+export async function sendProposalRankingAction(action, { signal, baseView, onAttempt } = {}) {
+  if (baseView?.own && baseView.workflow?.stage === 'private' && PRIVATE_ACTIONS.has(action.action)) {
+    return sendWithPrivateConflictRecovery(action, baseView, signal, onAttempt);
+  }
+  signal?.throwIfAborted();
+  onAttempt?.(action);
   const { ok, status, data } = await requestEnvelope(PROPOSAL_RANKING_API, {
     method: 'POST',
     body: action,
@@ -24,6 +73,7 @@ export async function sendProposalRankingAction(action, { signal } = {}) {
   });
   if (!ok) {
     const error = requestFailure(data, status);
+    error.requestMethod = 'POST';
     error.current = data?.error?.current || null;
     error.code = data?.error?.code || null;
     error.retryable = data?.error?.retryable === true;
