@@ -1,24 +1,36 @@
 # D26 ranking — implementation addendum
 
-Session 608, 2026-10-14. **PLANNED engineering contract; no implementation or production release executed.**
-**Independent review:** Claude Opus 5.5 reviewed through subscription OAuth and
-returned READY WITH NAMED CHANGES. Its follow-up confirmed the original findings
-resolved and named two final additions (safe legacy meeting control handle and
-pre-publication edit refusal). Both are incorporated below. The final additions
-were source-checked by the author, not reviewed in a third Opus pass. Receipt:
+Session 608, 2026-10-14. **The D26 code candidate and isolated D96 sandbox rehearsal are built on `codex/d26-ranking-release`; no production release or production ranking write has been executed.**
+**Earlier plan review (not implementation code review):** Claude Opus 5.5 reviewed
+the plan through subscription OAuth and returned READY WITH NAMED CHANGES. Its
+follow-up confirmed the original plan findings resolved and named two final
+requirements (safe legacy meeting control handle and pre-publication edit refusal).
+Both are incorporated below. The initial code review found no high/medium defects
+and recommended three low corrections; commit `69578a397` implements them, and
+Sol's narrow review found no actionable defect. Opus's final follow-up confirmed
+SATISFIED with no blocker. Final source, test, type, lint and build checks passed.
+The review record is
+`docs/audits/PROPOSAL_RANKING_D26_IMPLEMENTATION_REVIEW_2026-10-14.md`. Plan receipt:
 `docs/audits/PROPOSAL_RANKING_D26_OPUS_PLAN_REVIEW_2026-10-14.md`.
 This supplements `PROPOSAL_RANKING_D26_RELEASE_2026-10-14.md` on
 `origin/codex/ranking-pd-save-conflicts`, inspected at
-`886e194ac1b8fb6707a47c59828a3d3d14edc179`. That candidate, not the older ranking
-branches or local main, is the starting point. Integrate current main only when
-implementation starts. This file lives on main so the continuation is discoverable.
+`886e194ac1b8fb6707a47c59828a3d3d14edc179`. The implementation branch started
+from that candidate and integrated local main in merge commit `74040eba5`.
+This file lives on main so the continuation is discoverable.
 
 Owner requirements: exactly 23 D26 proposals, excluding 1003223/1003224; Beth and
 Justin both facilitate; everybody sees only their own preparation before reveal;
 facilitators may see readiness. These decisions are settled. The contracts below
-are proposed implementation details for review, not claims of existing behavior.
+preserve the requirements and the original pre-build plan. Section 6 and §8 are the
+current implementation/evidence record; do not read the pre-build requirements or
+observations below as proof of current source or live behavior.
 
-## 1. Source baseline and scope
+## 1. Pre-build source baseline and scope — historical inspection before D26 implementation
+
+The observations in this subsection describe the candidate before the Session 608
+implementation. Section 8 records the implemented D26 contract and supersedes
+pre-build statements about scalar-only facilitation and facilitator access to
+private lists.
 
 [VERIFIED via candidate source] `config.js` reads a scalar default setting;
 `preview-service.js` validates that one facilitator. `service.js` owns preview,
@@ -266,7 +278,64 @@ aborted or late responses cannot overwrite a newly selected round.
    sequential self-tests; use the actual package scripts. Bounded independent
    code review precedes the production release proposal.
 
-## 6. Release boundary and review obligations
+## 6. Implementation checkpoint and remaining acceptance
+
+**[VERIFIED via local branch source, focused Jest, and final Opus/Sol review]** Candidate
+`9fe92f0ed` on `codex/d26-ranking-release` implements the configuration,
+preview/open capture, persisted two-member v2 authorization, version dispatch,
+response privacy, legacy own-list/meeting-control behavior, and Admin/UI changes
+described above. The rehearsal setting resolves the two approved test personas
+from enabled Dataverse staff records under the existing fail-closed test policy;
+the D96 harness used explicit synthetic membership provenance and did not exercise
+preview/open setting capture. This source contract is distinct from service persona
+tests or real authenticated route authorization.
+
+**[VERIFIED via current corrected commit `9fe92f0ed`]** 25 suites / 269 tests,
+type check, scoped lint and production build passed. API-route, status-enum, DAL,
+OData, Dynamics-context, route-lifecycle, route-service and trust-boundary-GUID
+gates passed with their sequential self-tests on the previously checked source
+slice. Atlas, doc-currency, fact-consistency, doc-symbol and docs-catalog gates and
+their self-tests passed; `git diff --check` is clean. The build reports existing
+broad dynamic-filesystem tracing warnings in unrelated renderers. Sol found no
+actionable defects; Opus's final follow-up is SATISFIED. See the implementation
+review record.
+
+**[VERIFIED via isolated sandbox run, 2026-10-15 UTC]** The bounded rehearsal
+created a new synthetic D96 cycle in the registered Dataverse sandbox after
+read-only preflight confirmed that D96 and its receipt were absent. It retained
+both created rounds (`a2f2e623-2718-4f45-bac4-5e443927cf85`, then successor
+`cbd337f2-1cc5-4352-b1ee-a16b221c43f1`) and performed no deletes. Six persisted
+checks passed: four distinct private preparations remained actor-only; the two
+facilitators raced on reveal and collective edit with one writer each; preparation
+reopen and restart races had one winner; captured membership survived restart;
+and the revealed workbook contained 23 synthetic proposals and 92 assessments.
+Receipt: `/private/tmp/proposal-ranking-d26-d96-sandbox-receipt.json` (local,
+not versioned). The receipt records four enabled sandbox Dataverse users (Beth,
+Justin, Rob, Jean); Rob is the rehearsal surrogate for production John. The
+membership provenance is an explicitly synthetic fixture. This verifies direct
+persisted service behavior, not preview/open setting-revision capture, active
+profile mapping, app grants, route authorization, independent Microsoft SSO, or
+signed-in Safari/iPad browser behavior. D97 and D98 and shared defaults were left
+untouched.
+
+**[VERIFIED via one bounded host Chrome smoke, 2026-10-15]** The browser loaded the
+23-card sandbox view, readiness and shared controls for the Beth and Justin service
+personas, navigated history, and downloaded the workbook without page runtime
+errors. The D96 receipt was unchanged. This was a read-only UI smoke, not independent
+SSO acceptance, WebKit/iPad testing, or validation of D26 live data.
+
+The corrected implementation and its source review are complete for this local
+candidate. The remaining release acceptance is:
+
+- Complete independent staff SSO/profile/grant acceptance and WebKit/iPad
+  interaction; the host Chrome smoke used trusted sandbox service personas.
+- Re-probe the live D26 proposal pool and retained trial at release time; D96 used
+  synthetic proposals, not D26 source records.
+
+This is a local branch checkpoint, not production acceptance. No environment
+flags, setting, schema, existing trial, or round were changed.
+
+## 7. Release boundary and review obligations
 
 Implementation acceptance is separate from production approval. Repeat read-only
 schema/access/source checks at release time. Present exact additive wave33 changes,
@@ -287,8 +356,10 @@ must survive every workflow write and restart. Search raw
 `round.facilitator`, `facilitatorLists`, `state.participants` and all action
 names across the integrated candidate before implementation sign-off.
 
-Author-side disconfirming review: inspected current `publicView` (privacy exception
+**Historical author-side pre-build review:** inspected the then-current
+`publicView` (privacy exception
 exists), `handleProposalRankingAction` (legacy dispatch needs explicit v2 denial),
 `preview-service` fingerprint (single identity, no new-key revision), restart
 (scalar copied), and client retry (private-only unchanged-state guard exists).
-No prerequisite is claimed implemented merely because this addendum specifies it.
+Those findings drove the requirements in this addendum; they were resolved in the
+candidate described in §8. They are not statements of current source behavior.

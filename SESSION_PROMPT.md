@@ -1,4 +1,30 @@
-# Session 608 Prompt: Cloudmersive diagnostics deployed; preserve other workstream handoffs
+# Session 609 Prompt: finish D26 ranking candidate acceptance; preserve other workstream handoffs
+
+## Session 608 Summary — D26 ranking implementation and isolated sandbox rehearsal (Codex, 2026-10-14/15 PT)
+
+### What Was Completed
+
+1. **D26 release candidate built on its own branch.** [VERIFIED via local Git and source review.] Branch `codex/d26-ranking-release` integrates current main at merge `74040eba5`; implementation commits are `26cc92dd5`, `789fc8ea4`, `26cb148a1`, `a5f4a83d8`, `69578a397`, and `9fe92f0ed` (current source). The candidate supports one/two versioned facilitators, captures membership in v2 workflow state, protects unrevealed assessments in v2 and v1 responses, uses safe v1 meeting controls, and dispatches reads/actions by stored version. Sol reviewed the corrections; Opus's final review is satisfied with no blocker. No production deployment or production write occurred.
+2. **Local verification passed.** [VERIFIED via final checks on `9fe92f0ed`.] 25 ranking/identity-map suites / 269 tests, type check, scoped lint and production build passed. Scoped runtime gates and their sequential self-tests passed on the preceding reviewed source slice. Documentation gates/self-tests passed for Atlas, doc currency, fact consistency, symbol references and docs catalogue. The earlier build showed existing broad dynamic-filesystem tracing warnings in unrelated renderers. Review record: `docs/audits/PROPOSAL_RANKING_D26_IMPLEMENTATION_REVIEW_2026-10-14.md`.
+3. **Persisted synthetic sandbox rehearsal passed in a new cycle.** [VERIFIED via direct service harness and retained receipt.] Read-only preflight found D96 unused and its receipt absent. Six checks passed in synthetic D96 rounds: four actor-only private preparations; one-winner reveal and collective-edit races; one-winner reopen and restart races; captured membership through restart; retained history; and a workbook containing 23 synthetic proposals / 92 assessments. Receipt: `/private/tmp/proposal-ranking-d26-d96-sandbox-receipt.json`. D96 data remains; no deletion occurred. D97/D98 and shared defaults were untouched. Four enabled sandbox Dataverse users were used; Rob is a rehearsal surrogate for John.
+
+### Still Open
+
+- Claude Opus's final OAuth follow-up is satisfied; there are no review blockers.
+- A bounded host Chrome smoke with trusted sandbox personas rendered the 23-card view/readiness/controls, navigated history and downloaded the workbook. It is not independent Microsoft SSO. Separate sign-ins, active profile mappings/app grants, WebKit/iPad acceptance, and actual D26 live-pool confirmation remain unverified.
+- Re-probe the exact 23-proposal D26 pool, current retained v1 trial, effective flags, grants, and schema at release time. D96 is synthetic, not D26 source data.
+- Production configuration, schema, cancellation/retirement, round opening, promotion, and deployment are separate owner-approved actions. Do not perform them from this handoff.
+
+### Resume at Home
+
+1. Use `codex/d26-ranking-release`; do not switch branches, push, or deploy without an explicit new instruction. Preserve retained D96 rounds and the local receipt; never reuse D97 or D98.
+2. Read `docs/plans/PROPOSAL_RANKING_D26_IMPLEMENTATION_ADDENDUM_2026-10-14.md`, the D26 release plan, current API §8, and `docs/audits/PROPOSAL_RANKING_D26_OPUS_PLAN_REVIEW_2026-10-14.md`. Treat the latter as plan review, not runtime review.
+3. Keep production status PLANNED. Prepare a concrete cutover proposal only after final review and authenticated staff acceptance; ask for the production decision at that point.
+4. Preserve unrelated `.impeccable/critique/...` and `output/` files.
+
+---
+
+## Previous Session 608 Prompt: Cloudmersive diagnostics deployed; preserve other workstream handoffs
 
 ## Session 607 Summary — materials upload diagnosis, stale-warning fix, and private scan diagnostics (Codex, 2026-10-14 PT)
 

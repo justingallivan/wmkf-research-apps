@@ -1,9 +1,36 @@
 # Proposal Ranking — implementation plan
 
-Date: 2026-10-13. Status: **IMPLEMENTATION IN PROGRESS on `codex/proposal-ranking-v2`; UX accepted and app work authorized. Dedicated test Preview deployed; Production unchanged.**
+Date: 2026-10-13. Status at that date: **Implementation in progress on `codex/proposal-ranking-v2`; UX accepted and app work authorized. Dedicated test Preview deployed; Production unchanged.** The Session 608 D26 release status below supersedes this for current implementation branch and acceptance state.
 Product authority: revision 5 of `docs/plans/PROPOSAL_RANKING_DESIGN_2026-10-07.md`.
 API boundary: `docs/plans/PROPOSAL_RANKING_API_CONTRACT.md` §§1–5 are existing;
 §6 is the replacement contract. Storage inventory: `docs/atlas/dataverse-proposal-ranking.md`.
+
+## Session 608 D26 release status — 2026-10-15
+
+This October 13 plan records the assessment/reveal implementation and its earlier
+dedicated-Preview acceptance. The D26 release extends that source on
+`codex/d26-ranking-release`; the current code candidate is `9fe92f0ed`. The
+versioned one/two-facilitator setting, captured workflow membership, participant
+privacy projections, safe version dispatch, and legacy own-only transition are
+implemented and passed Sol's source review. The additive schema already described
+here is reused; this release adds no table or Dataverse attribute.
+
+The final candidate `9fe92f0ed` passed 25 suites / 269 tests, types, scoped lint,
+and production build. The scoped API-route, status-enum, DAL, OData, context,
+route-lifecycle, route-service, and trust-boundary-GUID gates with their
+self-tests. A synthetic D96 sandbox rehearsal passed six persisted checks including
+two-facilitator races and a 23-proposal / 92-assessment workbook. It did not use D26
+source requests, change shared defaults, or test independent SSO/profile/grant
+authorization. A read-only host Chrome smoke with trusted sandbox personas rendered
+the 23-card view/readiness/controls, navigated history and downloaded the workbook;
+it does not establish independent SSO or WebKit/iPad acceptance. D96's retained synthetic rounds and receipt are recorded in the
+[D26 addendum](PROPOSAL_RANKING_D26_IMPLEMENTATION_ADDENDUM_2026-10-14.md).
+
+Opus's final review is satisfied. Independent staff SSO/profile/grant and
+WebKit/iPad acceptance remain pending.
+This is a release candidate, not a Production approval: no Production flag,
+setting, schema, round, or deployment changed. Re-probe the actual D26 pool and
+retained trial immediately before a separately approved cutover.
 
 ## Current implementation receipt — 2026-10-13
 

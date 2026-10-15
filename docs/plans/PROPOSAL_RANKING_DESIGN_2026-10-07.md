@@ -1,7 +1,7 @@
 # Proposal Ranking — agreed assessment and recommendation workflow
 
 Updated: 2026-10-14. Revision: 5 with D26 privacy amendment. Owner: Justin.
-Status: **Product workflow agreed; revision-3 UX accepted and implementation authorized 2026-10-13. Dedicated enriched test Preview deployed at `591c3e98e`; independent staff acceptance remains open.**
+Status: **Product workflow agreed. D26 privacy and dual-facilitator implementation candidate is built on `codex/d26-ranking-release` at `9fe92f0ed`; isolated synthetic D96 rehearsal and a bounded host Chrome smoke with sandbox personas passed. Opus's final review is satisfied; independent SSO/profile/grant and WebKit/iPad acceptance remain open. No Production promotion is approved.**
 The filename is retained for existing links; October 7 is the original design date,
 not the date of this revision. This revision incorporates the later October 13
 reset/default decisions and resolves revision 4's open product choices. It supersedes
@@ -10,7 +10,7 @@ revision 3's workflow and the October 11 branch's combined-meeting approach.
 Authority: Justin's October 13 decisions in the current conversation, including the
 colleague-reviewed text and the supplied October 11–12 conversation/handoff.
 That handoff's Word proposal is prior context, not authority over these newer decisions.
-Implementation now proceeds on `codex/proposal-ranking-v2`; this design does not authorize production promotion or legacy-data cleanup.
+The earlier assessment/reveal workflow was built on `codex/proposal-ranking-v2`; D26 release work now proceeds on `codex/d26-ranking-release`. This design does not authorize Production promotion or legacy-data cleanup.
 
 Implementation evidence and source comparison:
 `docs/audits/PROPOSAL_RANKING_WORKFLOW_RECONCILIATION_2026-10-13.md`.
@@ -92,13 +92,14 @@ program preparation used in the rebuild.
 
 ## 4. Ready, privacy, and reveal — agreed
 
-[OWNER DECISION, 2026-10-14; PLANNED CHANGE] Before reveal, preparation is visible
-only to its own PD, including when that PD is a facilitator. Beth and Justin may
-see readiness status but not another PD’s unrevealed rankings, grades or confidence.
-The server must filter every response path. Facilitators cannot edit another PD’s
-private assessments. This replaces the earlier facilitator-read exception; it is
-not implemented by this documentation change. Shared facilitation and production
-execution are covered by `docs/plans/PROPOSAL_RANKING_D26_RELEASE_2026-10-14.md`.
+[OWNER DECISION, 2026-10-14; SOURCE IMPLEMENTED on the D26 branch, not Production]
+Before reveal, preparation is visible only to its own PD, including when that PD
+is a facilitator. Beth and Justin may see readiness status but not another PD’s
+unrevealed rankings, grades or confidence. The service filters each response path;
+facilitators cannot edit another PD’s private assessments. This replaces the earlier
+facilitator-read exception. Current source and acceptance evidence are in
+`docs/plans/PROPOSAL_RANKING_D26_IMPLEMENTATION_ADDENDUM_2026-10-14.md` and the
+`D26` section of `docs/plans/PROPOSAL_RANKING_API_CONTRACT.md`.
 
 A PD can mark ready only after every proposal has a grade, a confidence response,
 and a confirmed unique position in that PD's complete combined list, with all saves
@@ -271,8 +272,10 @@ preview/open operation, not a silent reset side effect.
 ## 11. Implementation plan and engineering checks
 
 The product decisions are settled. The implementation plan is
-`docs/plans/PROPOSAL_RANKING_IMPLEMENTATION_PLAN_2026-10-13.md`; its storage/action
-names are engineering proposals, not claims of provisioned schema or approved release.
+`docs/plans/PROPOSAL_RANKING_IMPLEMENTATION_PLAN_2026-10-13.md`; use its Session 608
+status addendum and the D26 release addendum for current branch/source evidence.
+The plan's October 13 storage/action proposal remains historical; it is not an
+approved Production release.
 
 Before enabling new rounds, implement versioned assessments and resets, atomic
 all-PD reveal, consistent two-sheet export and old-round readers. Test deterministic
@@ -319,7 +322,8 @@ replaying the mutation (`/private/tmp/ranking-rich-round-receipt.json`). Normal 
 continue to retain the current frozen pool. Production is unchanged.
 
 
-[PLANNED] Before a later implementation is called ready, cover: initial thirds;
+[PLANNED historical checklist; see current D26 evidence below] Before implementation
+acceptance, cover: initial thirds;
 pair ordering with alternating winners/unequal program lengths/equal or missing
 scores; every proposal exactly once; confidence completeness; strict unique ranks;
 privacy before each reveal; ready/reopen/reveal/reset races; immutable revealed inputs;
@@ -329,8 +333,8 @@ unknown/provisional history; accepted/current/withdrawn/access-denied sentiment;
 and both workbook sheets from confirmed data. Exercise separate identities and
 conflicting browser sessions. Run relevant gates with their self-tests sequentially.
 
-Current source tests and old production receipts validate their dated implementations,
-not this new workflow. The owner has authorized app implementation on the accepted
-UX direction. Branch merge, deployment, source-data changes and legacy-round cleanup
-remain separate release work. Current branch evidence and outstanding checks are in
-the implementation plan.
+Current source tests and old Production receipts validate their dated implementations.
+The owner authorized the D26 branch implementation on the accepted UX direction;
+the isolated synthetic rehearsal and remaining sign-in/release checks are recorded
+in the D26 implementation addendum. Production configuration, source-data changes,
+legacy-round retirement, and deployment remain separate release decisions.

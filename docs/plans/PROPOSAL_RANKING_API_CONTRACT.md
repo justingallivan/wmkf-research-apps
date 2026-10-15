@@ -1,17 +1,20 @@
-# Proposal Ranking API — existing wire contract and planned revision
+# Proposal Ranking API — current D26 candidate and historical contracts
 
-Updated 2026-10-14. Sections 1–5 below describe **[VERIFIED via main source at
-`b3219f4aa`] the existing revision-3 API**, not the agreed replacement workflow.
-Revision 5 product authority is `docs/plans/PROPOSAL_RANKING_DESIGN_2026-10-07.md`.
-Section 6 describes the branch-built v2 actions and semantics; additive fields are
-provisioned and metadata-verified in the sandbox; deployed v2 creation flags remain unchanged. The paused branch `0d161d60f` differs from main (§7).
+Updated 2026-10-15. **The current local D26 candidate API is §8**, source-verified
+at `9fe92f0ed` on `codex/d26-ranking-release`; it is not a production deployment.
+Sections 1–5 preserve the **historical revision-3 API** verified on main at
+`b3219f4aa` before D26 integration. Section 6 preserves the earlier Preview v2
+contract. Do not use either historical section as the current D26 privacy or
+facilitation contract. Revision 5 product authority is
+`docs/plans/PROPOSAL_RANKING_DESIGN_2026-10-07.md`. The paused branch `0d161d60f`
+differs from the October 13 main baseline (§7).
 Deployment facts are dated receipts in `docs/atlas/dataverse-proposal-ranking.md`;
 the October 13 saved service and browser rehearsals exercised four trusted personas,
 not independent SSO/app-grant or production authenticated-route acceptance. A second
 reveal and full browser restart passed; final state is private preparation for all four. See
 `docs/audits/PROPOSAL_RANKING_V2_SANDBOX_REHEARSAL_2026-10-13.md` for limits.
 
-## 1. Existing route
+## 1. Historical revision-3 route — October 13 main baseline
 
 `/api/proposal-ranking` accepts authenticated `GET` and `POST` requests. Every
 response is `Cache-Control: private, no-store`. The route requires
@@ -28,7 +31,7 @@ per-request authorization. Missing both selectors returns `400`.
 canonical UUID `operationId`; the server stores it with the affected row(s) and
 uses it to resolve repeat and uncertain outcomes.
 
-## 2. Existing common response
+## 2. Historical revision-3 common response — October 13 main baseline
 
 ```ts
 type ProgramKey = 'se' | 'mr';
@@ -134,7 +137,8 @@ participates in the preview fingerprint. Unknown or missing values become null;
 older snapshots may omit the field. Only known values render an E/W marker.
 Geography does not affect ranking calculations or eligibility.
 
-Privacy rules shape the response, not the client. Before a program is published,
+These privacy rules describe the dated revision-3 main baseline, not the current
+D26 candidate. Privacy rules shape the response, not the client. Before a program is published,
 a roster participant receives only their own individual list and that program's
 submission progress. The facilitator receives all private lists and the draft
 composite. A superuser outside the roster receives administration metadata only;
@@ -143,7 +147,7 @@ receives the shared order and named ranks for that program. Publishing SE does n
 expose MR. A former non-roster facilitator loses participant access after a
 transfer. Canceled rounds are read-only.
 
-## 3. Existing actions
+## 3. Historical revision-3 actions — October 13 main baseline
 
 ```ts
 type Action =
@@ -176,7 +180,7 @@ program is `published`. `generate` applies to a meeting list in `collecting`, an
 `publish` applies to a generated list in `composite-draft`. The response's meeting
 `etag` is required for each transition or edit.
 
-## 4. Existing errors and outcome handling
+## 4. Historical revision-3 errors and outcome handling — October 13 main baseline
 
 Errors use `{ "error": { "code": string, "message": string, "retryable": boolean, "current": object|null } }`.
 
@@ -198,7 +202,7 @@ repeat terminal action returns its existing result only if the operation ID
 matches the action persisted with that transition. Conflict `current` values are
 always shaped using the same privacy filtering as a successful read.
 
-## 5. Existing default facilitator setting
+## 5. Historical scalar facilitator setting — October 13 main baseline
 
 `GET /api/admin/proposal-ranking-facilitator` returns
 `{ systemUserId: string|null, name: string|null, configured: boolean, revision: string|null, eligibleStaff: Array<{ systemUserId: string, name: string }> }`.
@@ -217,7 +221,13 @@ ID in the UI's “Resolve opening attempt” control, so retry cannot create a
 replacement for the original round after cancellation.
 
 
-## 6. Version-2 contract — enabled in dedicated test Preview; not Production
+## 6. Historical version-2 Preview contract — October 13/14 (superseded by D26)
+
+Snapshot: candidate source and hosted Preview as recorded in the October 13/14
+receipts. This section preserves that dated wire contract; it does not describe the
+current D26 branch's pre-reveal visibility or dual-facilitator rules. Section 8 is
+the current branch contract and explicitly identifies its remaining acceptance
+limits.
 
 Use the agreed design for product rules. `service.js` dispatches snapshot version 2
 to `workflow-service.js`; legacy actions/readers remain a separate version-1 path.
@@ -392,3 +402,72 @@ Beth, Justin, Jean and John Sader, all Preparing. The first-D97 scripted fiction
 sentiment fixture previously returned current through the real reader; that receipt
 does not prove generation or human analysis. Earlier deployment and fixture details,
 including four new TEST files in shared SharePoint, remain in the sandbox audit.
+
+## 8. D26 implementation candidate — local branch, not deployed
+
+[VERIFIED via local source, focused Jest, and final Opus/Sol review,
+`codex/d26-ranking-release` commit `9fe92f0ed`, 2026-10-15] This section supersedes conflicting §2/§5/§6 privacy
+claims for the D26 branch candidate only. Sections 1–7 retain their dated main,
+branch, and dedicated-Preview history; they are not evidence of the D26 behavior.
+The candidate has not been deployed. Persisted sandbox testing is limited to the
+new synthetic D96 rehearsal described below; no D26 source proposal data was used.
+
+Admin `PUT /api/admin/proposal-ranking-facilitator` accepts exactly
+`{ facilitatorSystemUserIds: string[], revision: string|null }`. The array must
+contain one or two unique canonical system-user GUIDs. Each identity must resolve
+to enabled staff, an active mapped profile, and an explicit Proposal Ranking app
+grant. The save uses the expected setting revision and writes only
+`proposal_ranking.default_facilitators_v1`, encoded as
+`{version:1,systemUserIds:[...]}`. GET returns the eligible staff list, selected
+IDs/names, new-key revision and a missing-key marker. A present malformed new
+setting blocks fallback; only absence allows a singleton legacy scalar.
+
+New v2 opens store the sorted captured membership and provenance in
+`workflow.facilitation`; the older round scalar stores the first sorted member for
+compatibility only. Either captured member may preview/open and authorize shared
+facilitator actions. Existing v2 workflow JSON without membership uses that
+round's own scalar as a singleton. Restart carries forward the captured set or
+materializes that singleton with `source: "legacy-round"`; it never reads current
+defaults. A present malformed persisted set fails closed. A new dual setting with
+v2 creation disabled refuses v1 preview/open with `409 configuration_requires_v2`.
+
+For v2 responses, `facilitatorLists` is always null. `own` contains only the
+authenticated actor's private preparation; `progress` contains readiness only;
+collective content is present only after reveal. History, supplements, operation
+replay, and error `current` use explicit privacy projections; nonparticipant
+superusers get metadata and readiness, not assessments. For v1, every participant
+including a facilitator-as-PD receives their own list. Before publication, even
+facilitators receive no individual lists or meeting draft; they get only a safe
+`meetingControl: {listKey,status,etag,version}` handle for Generate/Publish.
+Unpublished composite-draft edits return `409 invalid_transition` without writing.
+After publication, existing edit rules continue.
+
+The service validates stored round version before selecting legacy or v2
+read/action/history/supplement consumers. V2 requests on v1 rounds, legacy actions
+on v2 rounds, and unknown stored versions return `409 unsupported_version` before
+mutation. Private preparation retries remain bounded to three definite conflict
+rebases after the initial attempt and require unchanged actor, own state, and
+workflow/policy scope; shared writes continue to use ETags, operation IDs, and the
+existing atomic changeset.
+
+**Local verification on `9fe92f0ed`:** 25 suites / 269 tests, types, scoped lint and
+production build passed. The scoped API-route, status-enum, DAL, OData,
+Dynamics-context, route-lifecycle, route-service and trust-boundary-GUID gates with
+sequential self-tests passed on the previous reviewed source slice. Documentation
+gates and self-tests pass for the current docs. Opus's final follow-up is satisfied
+and Sol found no actionable defects. The host Chrome smoke with trusted sandbox
+personas rendered cards/readiness/controls, navigated history and downloaded the
+workbook; it does not establish independent SSO or WebKit/iPad acceptance. See the
+[implementation review record](../audits/PROPOSAL_RANKING_D26_IMPLEMENTATION_REVIEW_2026-10-14.md).
+The implementation review is tracked in
+`docs/audits/PROPOSAL_RANKING_D26_IMPLEMENTATION_REVIEW_2026-10-14.md`.
+**[VERIFIED via isolated sandbox run, 2026-10-15 UTC]** New synthetic
+D96 rounds persisted actor-only private preparation, one-winner two-facilitator
+reveal/collective-edit/reopen/restart races, retained captured membership and
+history, and a workbook with 23 synthetic proposals / 92 assessments. The durable
+local receipt is `/private/tmp/proposal-ranking-d26-d96-sandbox-receipt.json`.
+Four trusted direct service personas were used; the run did not test preview/open
+configuration revision capture, active profile mappings, app grants, route auth,
+independent OAuth/SSO sessions, or signed-in Safari/iPad acceptance. It does not
+prove the live D26 pool. See the [D26 addendum](PROPOSAL_RANKING_D26_IMPLEMENTATION_ADDENDUM_2026-10-14.md)
+for the acceptance boundary.

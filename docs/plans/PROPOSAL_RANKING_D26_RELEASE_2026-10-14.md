@@ -2,7 +2,7 @@
 
 Date: 2026-10-14. Status: **PLANNED; not approved for production mutation or promotion.**
 Owner decisions: launch for D26 with exactly 23 proposals; Beth Pruitt and Justin Gallivan must have simultaneous facilitator access. Before reveal, everyone including both facilitators sees only their own preparation; facilitators may see readiness status, never other PDs’ unrevealed rankings, grades or confidence. Requests 1003223 and 1003224 remain excluded test copies (owner confirmed October 14).
-This release plan supplements the October 13 design/implementation plan. Shared facilitation is a new requirement, not a claim about the tested implementation.
+This release plan supplements the October 13 design/implementation plan. Shared facilitation was a new requirement; the current implementation candidate is `9fe92f0ed` on `codex/d26-ranking-release`, detailed in `PROPOSAL_RANKING_D26_IMPLEMENTATION_ADDENDUM_2026-10-14.md` and reviewed in `../audits/PROPOSAL_RANKING_D26_IMPLEMENTATION_REVIEW_2026-10-14.md`. Its 25 suites / 269 tests, types, scoped lint and build passed. A new synthetic D96 sandbox rehearsal exercised persisted dual-facilitator races and workbook export. A host Chrome smoke with trusted sandbox personas rendered the candidate and downloaded its workbook. These checks did not exercise D26 source data, independent SSO, WebKit/iPad, or production. Opus's final follow-up is satisfied; Production status remains planned, with no approval for mutation or promotion.
 
 ## Scope and evidence boundary
 

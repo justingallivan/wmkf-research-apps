@@ -1,14 +1,43 @@
-# Proposal Ranking — storage, implementation, and planned workflow
+# Proposal Ranking — current D26 candidate and storage history
 
-Last source comparison: 2026-10-13, main `b3219f4aa`; paused local branch
-`codex/proposal-ranking` at `0d161d60f`. **Incumbent source baseline; later sandbox-only v2 evidence is below.**
-Current product authority: revision 5 of
+Current local candidate: `codex/d26-ranking-release` at `9fe92f0ed`; no production
+promotion or D26 live ranking write. See the first section for candidate storage,
+facilitation and verification. The remaining sections preserve dated source and live
+state history. The October 13 main comparison below is historical, not current branch
+behavior. Current product authority: revision 5 of
 `docs/plans/PROPOSAL_RANKING_DESIGN_2026-10-07.md` (agreed October 13).
-The assessment/reveal/reset workflow is **deployed to the dedicated test Preview from `codex/proposal-ranking-v2`; not Production**. The owner accepted UX revision 3 and authorized implementation.
+The assessment/reveal/reset workflow was **deployed to the dedicated test Preview from `codex/proposal-ranking-v2`; not Production**. This dated deployment statement does not establish the D26 candidate's deployment.
 Implementation stages and proposed durable contracts are in
 `docs/plans/PROPOSAL_RANKING_IMPLEMENTATION_PLAN_2026-10-13.md`; sandbox provisioning is recorded below; Production provisioning is not claimed.
 
-## Incumbent version-1 source and historical deployment boundary
+## D26 release candidate — local branch source, not deployed
+
+[VERIFIED via local branch source, `codex/d26-ranking-release` at `9fe92f0ed`,
+2026-10-15] The compatible D26 candidate adds no table or Dataverse attribute for
+dual facilitation. It stores the default member set in the existing
+`wmkf_appsystemsetting` under `proposal_ranking.default_facilitators_v1` as JSON
+`{version:1,systemUserIds:[...]}` with revision-conditional writes. A missing new
+setting can read the legacy scalar as a singleton; a present malformed setting
+fails closed. New v2 workflow JSON captures the exact sorted set and source
+revision. Existing v2 rounds without that property retain their own scalar as a
+legacy singleton during authorization and restart. Existing v1 rounds remain
+scalar-authorized. This describes source only; no live setting or production round
+was changed by the implementation checkpoint. A separate authorized harness
+created and retained two synthetic D96 sandbox rounds; it did not change shared
+defaults or D97/D98. See the [D26 release addendum](../plans/PROPOSAL_RANKING_D26_IMPLEMENTATION_ADDENDUM_2026-10-14.md).
+
+The corrected candidate passed 25 suites / 269 tests, type checking, scoped lint
+and production build on `9fe92f0ed`. Scoped runtime gates passed on
+`a5f4a83d8`; Opus's final review is satisfied with no blocker. A read-only host
+Chrome smoke with sandbox personas rendered the 23-card view, readiness/shared
+controls, history navigation and workbook download; it does not establish
+independent SSO, WebKit/iPad behavior or live D26 eligibility. The D96 receipt records persisted private
+order isolation, two-facilitator races, captured membership through restart, and a
+23-proposal / 92-assessment workbook. The proposals were synthetic, not the D26
+source pool. Independent profile/grant/SSO authorization and WebKit/iPad acceptance
+remain open. Prior D97/D98 rehearsal receipts remain unchanged.
+
+## Historical version-1 source and deployment boundary — October 13 main
 
 [VERIFIED via main source] The existing app still stores separate individual SE/MR
 orders, locks each on submission, and generates/publishes separate program composites.
@@ -23,7 +52,7 @@ acceptance. Do not repeat earlier "Production untouched" or "activation pending"
 checkpoints as current state. Detailed dated setup history is preserved in
 `docs/audits/PROPOSAL_RANKING_ATLAS_HISTORY_2026-10-07.md`.
 
-## Producer → persistence → consumer on main
+## Historical producer → persistence → consumer on main — October 13
 
 [VERIFIED via source] `pages/proposal-ranking.js` renders
 `shared/components/proposal-ranking/ProposalRankingApp.js`; `client.js` calls
@@ -52,7 +81,7 @@ probe reads the Dataverse `searchstatus` platform endpoint (HTTP `/searchstatus`
 to inspect search-index exclusion; it is not a ranking storage table. Historical
 search-exclusion receipts are in the dated Atlas history, not a fresh probe here.
 
-## Inputs and calculations on main
+## Historical inputs and calculations on main — October 13
 
 [VERIFIED via source] `proposal-ranking-source.js` completely paginates ordinary
 exact-cycle SE/MR requests at `Phase II Pending`; `trial-cutoff.js` excludes D26
@@ -73,10 +102,12 @@ positions within each program, stabilizes equal sums by seed order, and calculat
 integer-minor-unit cumulative totals. Existing responses/cards mark equal composites
 as tied. That presentation differs from the new no-ties decision.
 
-## Privacy and client behavior on main
+## Historical privacy and client behavior on main — October 13; superseded for D26 candidate
 
-Before publication, each PD sees their own orders; the facilitator sees all. Each
-program publishes independently. A nonparticipant superuser gets administration
+In the October 13 main baseline, before publication each PD sees their own orders
+and the single facilitator sees all. The D26 candidate's current own-only privacy
+contract supersedes this behavior; its two captured facilitators see readiness but
+not other participants' unrevealed orders. Each program publishes independently. A nonparticipant superuser gets administration
 metadata only. Main still permits exceptional excusal before generation and retains
 excluded submissions; the new all-PDs-ready design does not carry that bypass forward.
 
