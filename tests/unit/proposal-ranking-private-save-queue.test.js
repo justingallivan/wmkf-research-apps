@@ -25,6 +25,9 @@ function setup(options = {}) {
   return { queue, onView, onAuthLost, state: () => state };
 }
 beforeEach(() => jest.resetAllMocks());
+afterEach(() => jest.useRealTimers());
+// The real transport pauses up to 300 ms before its first peer-conflict rebase.
+const pastFirstRebasePause = () => jest.advanceTimersByTimeAsync(400);
 
 test('real transport rebases peer conflict, uncertain replay uses final ID, then drains newest draft', async () => {
   const initial = base(), peer = base(); peer.round.etag = '2';
@@ -32,10 +35,11 @@ test('real transport rebases peer conflict, uncertain replay uses final ID, then
   requestEnvelope.mockResolvedValueOnce({ ok: false, status: 409, data: { error: { code: 'conflict' } } })
     .mockResolvedValueOnce({ ok: true, data: peer })
     .mockImplementationOnce(async (_, { body }) => { finalBody = clone(body); throw new Error('lost response'); });
+  jest.useFakeTimers();
   const h = setup();
   h.queue.edit(initial, 'mr', choose('confident'));
   h.queue.edit(initial, 'mr', choose('not-sure'));
-  await tick();
+  await pastFirstRebasePause();
   expect(h.state().blocked.kind).toBe('uncertain');
   const acknowledged = success(peer, finalBody);
   requestEnvelope.mockResolvedValueOnce({ ok: true, data: acknowledged })
@@ -109,7 +113,8 @@ test('disposed queue ignores response callbacks', async () => {
 test('recovery GET failure stays uncertain and does not permit a new operation', async () => {
   requestEnvelope.mockResolvedValueOnce({ ok: false, status: 409, data: { error: { code: 'conflict' } } })
     .mockResolvedValueOnce({ ok: false, status: 503, data: { error: { code: 'dependency_unavailable' } } });
-  const h = setup(); h.queue.edit(base(), 'mr', choose('confident')); await tick();
+  jest.useFakeTimers();
+  const h = setup(); h.queue.edit(base(), 'mr', choose('confident')); await pastFirstRebasePause();
   expect(h.state().blocked.kind).toBe('uncertain');
   h.queue.discard(); await tick(); expect(h.queue.isDirty()).toBe(true);
   const original = requestEnvelope.mock.calls[0][1].body;
