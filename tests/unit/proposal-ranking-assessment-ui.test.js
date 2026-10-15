@@ -596,4 +596,5 @@ test('before reveal an observer sees who is ready and no preparation workspace',
   expect(screen.getByText('Alice — Ready')).toBeTruthy();
   expect(screen.getByText('Bob — Preparing')).toBeTruthy();
   expect(screen.queryByRole('button', { name: 'My preparation' })).toBeNull();
+  expect(screen.queryByRole('button', { name: 'History' })).toBeNull();
 });

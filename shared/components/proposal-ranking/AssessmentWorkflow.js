@@ -1100,14 +1100,14 @@ export default function AssessmentWorkflow({
             {label}
           </button>
         ))}
-        <button
+        {!(view.viewer.isObserver && view.workflow.stage !== 'revealed') && <button
           disabled={busy || Boolean(pending)}
           aria-current={section === 'history' ? 'page' : undefined}
           className={buttonClass}
           onClick={() => loadHistory()}
         >
           History
-        </button>
+        </button>}
       </nav>
       {!(section === 'group' && collective) && !(section === 'prepare' && own && view.workflow.stage === 'private') && <p role="status" className="mb-3 text-sm text-gray-600">{saveStatus}</p>}
       {privateSave.blocked && <div ref={recoveryRef} role="alert" tabIndex={-1} className="mb-4 rounded-lg border border-amber-300 bg-amber-50 p-4">

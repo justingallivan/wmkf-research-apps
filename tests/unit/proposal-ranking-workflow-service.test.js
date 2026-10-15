@@ -235,8 +235,10 @@ test('an observer sees readiness before reveal, the revealed group afterwards, a
   expect(reopened.workflow.stage).toBe('private');
   expect(reopened.collective).toBeNull();
   expect(reopened.totals).toBeNull();
-  // Reopening archives the already-revealed group revision; history stays readable.
-  expect((await readWorkflowHistory({ roundId, actor: dana })).entries.map((e) => e.kind)).toEqual(['collective', 'reveal']);
+  // The archived reveal holds named assessments; observers lose it while preparing again.
+  const participantHistory = await readWorkflowHistory({ roundId, actor: bob });
+  expect(participantHistory.entries.find((e) => e.kind === 'reveal').individuals).toHaveLength(2);
+  await expect(readWorkflowHistory({ roundId, actor: dana })).rejects.toMatchObject({ code: 'access_denied', status: 403 });
 });
 
 test('a nonfacilitator participant can reset their own program preparation', async () => {

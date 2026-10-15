@@ -279,14 +279,15 @@ describe('Proposal Ranking service access and voting', () => {
       },
     })).rejects.toMatchObject({ code: 'unsupported_version', status: 409 });
 
-    // A granted observer passes the version gate for v2 reads only.
+    // A granted observer passes the version gate for v2 reads only; during
+    // private preparation the workflow then refuses observer history.
     const observerId = 'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee';
     resolveProfileToSystemUser.mockResolvedValue({ systemuserid: observerId });
     await expect(handleProposalRankingAction({
       action: 'history',
       profileId: 'profile-observer',
       body: { action: 'history', roundId: round.wmkf_proposalrankingroundid },
-    })).resolves.toMatchObject({ entries: [], before: null });
+    })).rejects.toThrow('History is available to observers while the group is revealed.');
     await expect(handleProposalRankingAction({
       action: 'exportWorkbook',
       profileId: 'profile-observer',

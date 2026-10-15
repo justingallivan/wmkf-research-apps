@@ -140,7 +140,7 @@ previousRoundId, supersededBy, facilitation); participant state never belongs th
 | `own` | Actor's SE/MR/combined preparation only, or null if not a participant | Actor's own preparation, read-only |
 | `progress` | Existing names/readiness booleans; no ranks, boundaries, grades, confidence, timestamps or list versions | Same readiness-only projection |
 | `collective` and totals | null | Saved collective and immutable named combined assessments from that reveal |
-| History | Prior revealed records only, explicitly labelled prior versions | Prior revealed records only |
+| History | Prior revealed records only, explicitly labelled prior versions; observers refused (403) | Prior revealed records only |
 | Workbook/sentiment | Denied by stage guard | Existing revealed-round supplement rules and sentiment authorization |
 | Observer (grant holder outside roster and facilitation, including a nonparticipant superuser; owner decision 2026-10-15) | Source snapshot and readiness-only `progress`; no own, collective or confirmations | Same revealed collective, named assessments, history and supplements as participants; no own or confirmations; every mutation refused |
 
