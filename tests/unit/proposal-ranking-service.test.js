@@ -509,6 +509,32 @@ describe('Proposal Ranking service access and voting', () => {
     expect(retry.operation).toMatchObject({ operationId, status: 'confirmed', result: 'round-canceled' });
   });
 
+  test('former non-roster facilitator can retry an exact v1 transfer receipt but cannot read the round', async () => {
+    round.wmkf_snapshotjson = JSON.stringify({
+      ...JSON.parse(round.wmkf_snapshotjson),
+      roster: [{ systemUserId: participantId, name: 'Participant', excluded: false }],
+    });
+    const operationId = 'dede0000-dede-4000-8000-dede00000000';
+    const body = {
+      action: 'transfer',
+      roundId: round.wmkf_proposalrankingroundid,
+      successorSystemUserId: participantId,
+      policyRevision: 1,
+      operationId,
+    };
+
+    const first = await handleProposalRankingAction({ action: 'transfer', profileId: 'profile-facilitator', body });
+    const retry = await handleProposalRankingAction({ action: 'transfer', profileId: 'profile-facilitator', body });
+
+    expect(patchRound).toHaveBeenCalledTimes(1);
+    expect(round.wmkf_facilitatorsystemuserid).toBe(participantId);
+    expect(first).toMatchObject({ mode: 'waiting', roundId: round.wmkf_proposalrankingroundid });
+    expect(retry).toMatchObject({ mode: 'waiting', roundId: round.wmkf_proposalrankingroundid });
+    expect(retry.viewer.systemUserId).toBe(facilitatorId);
+    await expect(handleProposalRankingGet({ roundId: round.wmkf_proposalrankingroundid, profileId: 'profile-facilitator' }))
+      .rejects.toMatchObject({ status: 403, code: 'access_denied' });
+  });
+
   test('superuser outside the roster receives lifecycle metadata without proposal or private-list contents', async () => {
     resolveProfileToSystemUser.mockResolvedValue({ systemuserid: '99999999-9999-4999-8999-999999999999' });
     const response = await handleProposalRankingGet({
@@ -548,6 +574,21 @@ describe('Proposal Ranking service access and voting', () => {
         operationId: 'aaaaaaaa-1111-4111-8111-aaaaaaaaaaaa',
       },
     })).rejects.toMatchObject({ status: 403, code: 'access_denied', current: null });
+  });
+
+  test('denied preview checks configured membership before building proposal data', async () => {
+    resolveProfileToSystemUser.mockResolvedValue({ systemuserid: participantId });
+    readDefaultFacilitators.mockResolvedValue({
+      systemUserIds: [facilitatorId], source: 'set', settingRevision: 'r1', revision: 'r1',
+      configured: true, configurationError: false, newSettingPresent: true, newSettingMissing: false,
+    });
+
+    await expect(handleProposalRankingAction({
+      action: 'preview',
+      profileId: 'profile-participant',
+      body: { action: 'preview', cycleCode: 'J27' },
+    })).rejects.toMatchObject({ status: 403, code: 'access_denied' });
+    expect(buildProposalRankingPreview).not.toHaveBeenCalled();
   });
 
   test('losing concurrent first-open reloads the winner instead of reading a nonexistent local round ID', async () => {

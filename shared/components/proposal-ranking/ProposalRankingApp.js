@@ -942,7 +942,7 @@ export default function ProposalRankingApp({ rehearsalCycle = null }) {
             </label>
             <label className="flex items-start gap-2 text-sm text-gray-700">
               <input type="checkbox" checked={transferConfirmed} onChange={(event) => setTransferConfirmed(event.target.checked)} disabled={actionBusy || hasUnresolvedSave || !transferSelection} className="mt-0.5 rounded border-gray-300" />
-              I understand the new facilitator gains facilitator visibility and my later access follows my captured roster status.
+              I understand the new facilitator gains round controls and readiness access. My later access follows my captured roster status.
             </label>
             <Button type="button" size="sm" disabled={actionBusy || hasUnresolvedSave || !transferSelection || !transferConfirmed} onClick={transferFacilitator}>Transfer facilitation</Button>
           </div>}
