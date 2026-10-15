@@ -10,6 +10,16 @@ The chronological archive after the `Legacy chronological session log` divider c
 
 ---
 
+## October 2026 — D26 Proposal Ranking released to production (Session 609)
+
+**Milestone:** the version-2 Ranker (private preparation, two facilitators, read-only observers, top-nav entry) went live and the D26 round opened in production.
+**Sessions:** 609 (Claude orchestrator; three Codex adversarial passes on the observer change; owner approved and performed each production write).
+**Ship state:** wave33 applied and read back; PR #485 `34db290a2` released; v2 flags on; retained v1 test round canceled; D26 v2 round `49279ac7-3ab9-41d8-b2d6-5aaf4085e642` open (23 proposals, four PDs, Beth and Justin facilitating). Two post-release production fixes: PR #488 (facilitator Admin panel empty since October 7) and PR #489 (a busy PD starved another PD's private saves; found when Jean Kim discovered the nav link within minutes). Owner and Jean then raced re-ranking cleanly.
+**Why it matters:** D26 ranking runs on the agreed privacy model with shared facilitation and leadership visibility; rollback floor is `dpl_A9KMAx1YJGBce9gB1TXyqN4pYSZt`, not pre-release main.
+**Pointers:** release receipt in `docs/plans/PROPOSAL_RANKING_D26_RELEASE_2026-10-14.md`; `docs/plans/PROPOSAL_RANKING_API_CONTRACT.md` §8; `docs/atlas/dataverse-proposal-ranking.md`.
+
+---
+
 ## October 2026 — D26 ranking dual-facilitator candidate and sandbox rehearsal (Session 608)
 
 **Milestone:** a reviewed release-branch candidate captures two facilitators, enforces own-only preparation across workflow versions, and passes a persisted synthetic two-facilitator rehearsal.

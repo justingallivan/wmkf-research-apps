@@ -1,4 +1,61 @@
-# Session 609 Prompt: finish D26 ranking Preview acceptance; keep production separate
+# Session 610 Prompt: D26 ranking is live; observe real use, keep production steps separate
+
+## Session 609 Summary — D26 Proposal Ranking released to production (Claude, 2026-10-15 PT)
+
+### What Was Completed
+
+1. **J27 register gate repaired.** [VERIFIED via `check:j27-register` and self-test.] J27-055 dropped the two sites reworded in S608 (`f8dbaea63`).
+2. **Read-only observers built, reviewed and released.** [VERIFIED via tests and three Codex adversarial passes.] Any Proposal Ranking grant holder outside the roster and facilitation sees readiness before reveal and the revealed group view, history, workbook and sentiment after it; every mutation is refused. Codex findings fixed: observer history after reopen (`78171af7d`), mid-read reopen race fenced by a round ETag check (`9c9b7af70`), observers kept on readiness after reopen (`3c0645d61`). Proposal Ranking added to the top nav (`3c6274440`).
+3. **D26 production cutover executed with per-step owner approval.** [VERIFIED via the release receipt in `docs/plans/PROPOSAL_RANKING_D26_RELEASE_2026-10-14.md`.] wave33 applied and read back; PR #485 merged `34db290a2` (also fixed a CI lint config abort on the first `.cjs` scripts and a stale admin heading test); v2 flags on; retained v1 round canceled; D26 v2 round `49279ac7-3ab9-41d8-b2d6-5aaf4085e642` open with Beth Pruitt and Justin Gallivan captured as facilitators.
+4. **Two production fixes after release.** [VERIFIED via PR CI and owner checks.] PR #488 `e49485558`: facilitator Admin panel rendered empty since October 7. PR #489 `d34ad7a0e`: a busy PD starved another PD's private saves (Jean Kim found the nav link within minutes; read-only actor probe showed her 46 saves); owner and Jean then raced re-ranking cleanly, Jean saw no Facilitate tab, and she reset her lists.
+5. **Codex writeup-regeneration worktree prepared.** `/Users/gallivan/Code/WMKF_Apps-writeup-regen` on `codex/writeup-regenerate`, with the starting brief given in session. Owner decisions: regenerate replaces the file while keeping the prior version; offered during post-visit drafting and group review.
+
+### Commits
+
+- `f8dbaea63` J27-055 register fix (main).
+- Ranking branch then release: `579f2abe5`, `3c6274440`, `024df17e3`, `78171af7d`, `9c9b7af70`, `3c0645d61`; release merge `70cc0db24`, `4cab7c13b`, `bbe16cba4`; PR #485 `34db290a2`.
+- PR #488 `57fb0f29a` / `e49485558`; PR #489 `9c975cb64` / `d34ad7a0e`.
+
+## Next Items
+
+### Verified Open
+
+1. **Observe first real two-facilitator and observer use.** Evidence: release receipt "Not yet observed". Beth's facilitator view, an observer session (Allison Keller), reveal, group discussion and export have not run with real accounts. Owner plans to facilitate this cycle; Beth still sees Facilitate because facilitators are captured at opening.
+2. **Facilitator picker design.** Evidence: owner feedback in session; `shared/components/proposal-ranking/DefaultFacilitatorSettings.js` uses a Cmd-click multi-select not used elsewhere in the app. Replace with an existing app pattern; not a release blocker.
+
+### Owner Decision Needed
+
+1. **Codex writeup-regeneration session location.** Evidence: Codex rollout logs show the session working in the main checkout rather than the prepared worktree. Point it at `WMKF_Apps-writeup-regen` before it edits files.
+
+### Verify Before Acting
+
+1. Rollback for ranking is `dpl_A9KMAx1YJGBce9gB1TXyqN4pYSZt`, never pre-release main, now that a v2 round exists; code rollback does not undo saved assessments.
+2. D26 scores were frozen at opening with 50 external reviews outstanding. Do not reopen or restart the live round to refresh scores without an owner decision; Restart clears every PD's preparation.
+3. Production Dataverse reads by agents are blocked by the auto-mode classifier; owner-run `!` commands worked (probe, schema dry run, actor probe). `/tmp/d26cut` (owner-created checkout with a one-off read-only actor script) can be removed with `git worktree remove --force /tmp/d26cut`.
+4. Older sections below are historical snapshots; the S609 prompt's "not merged / no production" statements are superseded by this release.
+
+### Do Not Reopen Without New Decision
+
+1. The retained v1 test round's rankings were throwaway (owner decision 2026-10-15); it is canceled and kept.
+2. Observer access rule: any Proposal Ranking grant holder outside roster and facilitation (owner decision 2026-10-15).
+
+## Key Files Reference
+
+| File | Purpose |
+|------|---------|
+| `docs/plans/PROPOSAL_RANKING_D26_RELEASE_2026-10-14.md` | Release plan and production receipt |
+| `lib/services/proposal-ranking/workflow-service.js` | v2 roles, privacy projection, observer fence |
+| `shared/components/proposal-ranking/client.js` | Private-save conflict recovery (jittered retries) |
+| `shared/components/proposal-ranking/AssessmentWorkflow.js` | Observer UI, readiness, refresh |
+| `shared/components/proposal-ranking/DefaultFacilitatorSettings.js` | Admin facilitator setting |
+
+**Stop verification:** see the stop commit; milestone entry added: "October 2026 — D26 Proposal Ranking released to production (Session 609)". Claim-evidence pilot: no eligible plan/design edit recorded, so no observation row.
+
+---
+
+## Prior handoffs — historical snapshots; verify current source, live state and owner decisions before acting
+
+## Previous Session 609 Prompt: finish D26 ranking Preview acceptance; keep production separate
 
 ## Session 608 Summary — D26 ranking candidate and dedicated test Preview (Codex, 2026-10-14/15 PT)
 
