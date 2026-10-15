@@ -13,6 +13,9 @@ import nextVitals from 'eslint-config-next/core-web-vitals'
 const eslintConfig = defineConfig([
   ...nextVitals,
   {
+    // Same extensions eslint-config-next registers its react/react-hooks plugins
+    // for; without this scope the overrides reach .cjs files and ESLint aborts.
+    files: ['**/*.{js,jsx,mjs,ts,tsx,mts,cts}'],
     rules: {
       // Stylistic only (literal ' and " in JSX text). Not a correctness issue;
       // Next's own docs use this as the canonical "rule to disable" example.
