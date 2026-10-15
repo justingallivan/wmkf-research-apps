@@ -1249,12 +1249,9 @@ export default function AssessmentWorkflow({
                   ))}
                   </div>
                   <div className="flex flex-wrap items-center gap-3">
-                  {program !== 'co' && <details className="relative">
-                    <summary className={`${buttonClass} cursor-pointer`}>List options</summary>
-                    <div className="absolute right-0 top-full z-30 mt-1 min-w-56 rounded-lg border bg-white p-2 shadow-sm">
-                      <button disabled={!editable || busy} className={buttonClass} onClick={() => confirm('resetProgram', { programKey: program })}>Reset {program.toUpperCase()} preparation</button>
-                    </div>
-                  </details>}
+                  {program !== 'co' && <Button variant="outline" disabled={!editable || busy} onClick={() => confirm('resetProgram', { programKey: program })}>
+                    Reset {program.toUpperCase()} preparation
+                  </Button>}
                   {preparationAction}
                   </div>
                 </div>
