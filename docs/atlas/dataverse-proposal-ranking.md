@@ -107,8 +107,8 @@ as tied. That presentation differs from the new no-ties decision.
 In the October 13 main baseline, before publication each PD sees their own orders
 and the single facilitator sees all. The D26 candidate's current own-only privacy
 contract supersedes this behavior; its two captured facilitators see readiness but
-not other participants' unrevealed orders. Each program publishes independently. A nonparticipant superuser gets administration
-metadata only. Main still permits exceptional excusal before generation and retains
+not other participants' unrevealed orders. Each program publishes independently. In v1 a nonparticipant superuser gets administration
+metadata only. In the D26 v2 candidate, Proposal Ranking grant holders who are neither roster participants nor captured facilitators are read-only observers (owner decision 2026-10-15): before reveal they see the source snapshot and readiness only; after reveal they see the named assessments and collective view, history, workbook and sentiment (sentiment still needs Meeting Tracker readership); every mutation is refused. Main still permits exceptional excusal before generation and retains
 excluded submissions; the new all-PDs-ready design does not carry that bypass forward.
 
 The UI serializes saves, keeps the latest queued order and visible unsaved/conflict

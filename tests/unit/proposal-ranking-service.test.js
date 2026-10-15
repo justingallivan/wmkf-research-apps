@@ -278,6 +278,42 @@ describe('Proposal Ranking service access and voting', () => {
         operationId: 'dddddddd-dddd-4ddd-8ddd-dddddddddddd',
       },
     })).rejects.toMatchObject({ code: 'unsupported_version', status: 409 });
+
+    // A granted observer passes the version gate for v2 reads only.
+    const observerId = 'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee';
+    resolveProfileToSystemUser.mockResolvedValue({ systemuserid: observerId });
+    await expect(handleProposalRankingAction({
+      action: 'history',
+      profileId: 'profile-observer',
+      body: { action: 'history', roundId: round.wmkf_proposalrankingroundid },
+    })).resolves.toMatchObject({ entries: [], before: null });
+    await expect(handleProposalRankingAction({
+      action: 'exportWorkbook',
+      profileId: 'profile-observer',
+      body: {
+        action: 'exportWorkbook', roundId: round.wmkf_proposalrankingroundid,
+        roundEtag: round['@odata.etag'], preparationVersion: 1,
+        revealId: null, listVersion: 1,
+      },
+    })).rejects.toMatchObject({ code: 'invalid_transition', status: 409 });
+    await expect(handleProposalRankingAction({
+      action: 'reveal',
+      profileId: 'profile-observer',
+      body: {
+        action: 'reveal', roundId: round.wmkf_proposalrankingroundid,
+        operationId: 'ffffffff-ffff-4fff-8fff-ffffffffffff', roundEtag: round['@odata.etag'], policyRevision: 1,
+        preparationVersion: 1, revealId: null, confirmationFingerprint: 'x',
+      },
+    })).rejects.toMatchObject({ code: 'access_denied', status: 403 });
+    await expect(handleProposalRankingAction({
+      action: 'save',
+      profileId: 'profile-observer',
+      body: {
+        action: 'save', roundId: round.wmkf_proposalrankingroundid,
+        programKey: 'se', order: [seId], etag: 'W/"list"', policyRevision: 1,
+        operationId: 'abababab-abab-4bab-8bab-abababababab',
+      },
+    })).rejects.toMatchObject({ code: 'access_denied', status: 403 });
   });
 
   test('accepts real Dataverse GUID formats throughout round reads', async () => {

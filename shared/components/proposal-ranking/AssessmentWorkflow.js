@@ -48,6 +48,7 @@ function RankingDialog({ label, children, onClose }) {
     </dialog>
   );
 }
+const OBSERVER_REFRESH_MS = 20000;
 const gradeClasses = {
   A: 'bg-[#d5edda] text-[#205632]',
   B: 'bg-[#ffeb9c] text-[#654c00]',
@@ -560,7 +561,7 @@ export default function AssessmentWorkflow({
 }) {
   const [view, setView] = useState(initial);
   const [section, setSection] = useState(
-    initial.workflow.stage === 'revealed' ? 'group' : 'prepare',
+    initial.workflow.stage === 'revealed' || initial.viewer.isObserver ? 'group' : 'prepare',
   );
   const [program, setProgram] = useState('mr');
   const [exclusiveBusy, setBusy] = useState(false);
@@ -749,6 +750,16 @@ export default function AssessmentWorkflow({
     document.addEventListener('visibilitychange', onVisible);
     return () => document.removeEventListener('visibilitychange', onVisible);
   });
+  // Observers never edit, so they follow the group with a quiet periodic refresh.
+  const isObserver = view?.viewer?.isObserver === true;
+  useEffect(() => {
+    if (!isObserver) return undefined;
+    const timer = setInterval(() => {
+      if (document.visibilityState === 'visible' && !busyRef.current && !pendingRef.current)
+        void refresh();
+    }, OBSERVER_REFRESH_MS);
+    return () => clearInterval(timer);
+  });
   const supplementBody = useCallback(
     (action) => ({
       action,
@@ -846,6 +857,7 @@ export default function AssessmentWorkflow({
   const outdated = program === 'co' && combinedOutdated;
   const editable =
     active &&
+    !view.viewer.isObserver &&
     !exclusiveBusy &&
     !privateSave.blocked &&
     !confirmation &&
@@ -1060,12 +1072,17 @@ export default function AssessmentWorkflow({
           </span>}
         </div>
       </header>
+      {isObserver && (
+        <p role="note" className="mt-3 rounded-lg border border-gray-200 bg-gray-50 p-3 text-sm text-gray-700">
+          You are following this round. Assessments and the group order are read-only, and this page updates on its own.
+        </p>
+      )}
       <nav
         aria-label="Ranking workspace"
         className="my-4 flex flex-wrap gap-2 border-b pb-2"
       >
         {[
-          ['prepare', 'My preparation'],
+          ...(view.viewer.isObserver ? [] : [['prepare', 'My preparation']]),
           ['group', 'Group discussion'],
           ...(view.viewer.isFacilitator ? [['facilitate', 'Facilitate']] : []),
         ].map(([key, label]) => (
@@ -1287,6 +1304,21 @@ export default function AssessmentWorkflow({
             {view.progress.filter((p) => p.ready).length} of{' '}
             {view.progress.length} Program Directors ready.
           </p>
+          {view.viewer.isObserver && (
+            <>
+              <ul className="my-4 space-y-2">
+                {view.progress.map((p) => (
+                  <li key={p.systemUserId}>
+                    {p.name} — {p.ready ? 'Ready' : 'Preparing'}
+                  </li>
+                ))}
+              </ul>
+              <p className="text-sm text-gray-600">
+                Each Program Director’s assessment appears here when the
+                facilitator reveals the group starting order.
+              </p>
+            </>
+          )}
         </>
       )}
       {section === 'group' && collective && (

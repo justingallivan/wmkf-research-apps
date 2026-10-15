@@ -142,7 +142,7 @@ previousRoundId, supersededBy, facilitation); participant state never belongs th
 | `collective` and totals | null | Saved collective and immutable named combined assessments from that reveal |
 | History | Prior revealed records only, explicitly labelled prior versions | Prior revealed records only |
 | Workbook/sentiment | Denied by stage guard | Existing revealed-round supplement rules and sentiment authorization |
-| Nonparticipant superuser | Administration metadata and readiness-only `progress`; no own or collective content | Same |
+| Observer (grant holder outside roster and facilitation, including a nonparticipant superuser; owner decision 2026-10-15) | Source snapshot and readiness-only `progress`; no own, collective or confirmations | Same revealed collective, named assessments, history and supplements as participants; no own or confirmations; every mutation refused |
 
 Readiness remains visible to the existing participant audience as well as the
 facilitators; no new readiness restriction is introduced. Facilitation alone grants
@@ -208,9 +208,9 @@ actor); its internal checks remain authoritative even if UI controls are absent.
 | editCollective | Either facilitator or captured participant | Revealed; exact collective version |
 | resetCollective/reopenPreparation | Either facilitator | Revealed; fresh confirmation |
 | restartWalkthrough | Either facilitator | Active round; fresh confirmation; preserve source pool and facilitator set |
-| read/history | Participant or facilitator; superuser metadata-only | Current route identity/grant; privacy projection above |
-| exportWorkbook/sentiment | Participant or facilitator | Revealed; exact round/reveal/list scope; existing sentiment reader guard |
-| legacy save/submit/generate/edit/publish/transfer/excuse/cancel | Nobody | 409 `unsupported_version` before any legacy mutation or legacy replay |
+| read/history | Any grant holder (participant, facilitator or observer) | Current route identity/grant; privacy projection above |
+| exportWorkbook/sentiment | Participant, facilitator or observer | Revealed; exact round/reveal/list scope; existing sentiment reader guard |
+| legacy save/submit/generate/edit/publish/transfer/excuse/cancel | Nobody | 409 `unsupported_version` before any legacy mutation or legacy replay; observers are refused earlier with 403 `access_denied` |
 
 Existing v1 actions remain versioned, including retained cancellation and its
 published-round refusal, with the explicit pre-publication edit refusal above.

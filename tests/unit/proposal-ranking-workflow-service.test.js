@@ -15,6 +15,7 @@ import {
   readWorkflowRound,
   mutateWorkflow,
   readWorkflowHistory,
+  WORKFLOW_ACTIONS,
 } from '../../lib/services/proposal-ranking/workflow-service';
 
 const alice = '11111111-1111-4111-8111-111111111111';
@@ -172,7 +173,7 @@ test('ready writes combined confirmation, readiness, and its receipt in one comm
   expect(view.progress.find((person) => person.systemUserId === alice).ready).toBe(true);
 });
 
-test('private response excludes actual peer assessments; superuser gets no content', async () => {
+test('private response excludes actual peer assessments; a nonparticipant superuser is an observer', async () => {
   await prepare(alice);
   const view = await readWorkflowRound({ roundId, actor: bob });
   expect(view.facilitatorLists).toBeNull();
@@ -183,7 +184,10 @@ test('private response excludes actual peer assessments; superuser gets no conte
     actor: 'outsider',
     isSuperuser: true,
   });
-  expect(admin.round.snapshot.proposals).toEqual([]);
+  expect(admin.viewer.isObserver).toBe(true);
+  expect(admin.round.snapshot.proposals).toHaveLength(snapshot.proposals.length);
+  expect(admin.collective).toBeNull();
+  expect(admin.confirmations).toEqual({});
   expect(admin.own).toBeNull();
   expect(admin.facilitatorLists).toBeNull();
   expect(admin.progress).toHaveLength(snapshot.roster.length);
@@ -193,6 +197,46 @@ test('private response excludes actual peer assessments; superuser gets no conte
   expect(participantSuperuser.own).not.toBeNull();
   expect(participantSuperuser.own.co).not.toBeNull();
   expect(participantSuperuser.facilitatorLists).toBeNull();
+});
+
+test('an observer sees readiness before reveal, the revealed group afterwards, and can never act', async () => {
+  const dana = '55555555-5555-4555-8555-555555555555';
+  await prepare(alice);
+  await prepare(bob);
+  const before = await readWorkflowRound({ roundId, actor: dana });
+  expect(before.viewer).toMatchObject({ isObserver: true, isFacilitator: false, isRosterParticipant: false });
+  expect(before.round.snapshot.proposals).toHaveLength(snapshot.proposals.length);
+  expect(before.progress.map((p) => p.ready)).toEqual([true, true]);
+  expect(before.own).toBeNull();
+  expect(before.collective).toBeNull();
+  expect(before.totals).toBeNull();
+  expect(before.confirmations).toEqual({});
+  expect(JSON.stringify(before)).not.toContain('confident');
+  for (const action of WORKFLOW_ACTIONS)
+    await expect(
+      mutateWorkflow({ body: { action, roundId, operationId: `observer-${action}` }, actor: dana }),
+    ).rejects.toMatchObject({ code: 'access_denied', status: 403 });
+
+  await send('reveal');
+  const after = await readWorkflowRound({ roundId, actor: dana });
+  expect(after.collective.individuals.map((i) => i.name)).toEqual(['Alice', 'Bob']);
+  expect(after.totals).not.toBeNull();
+  expect(after.own).toBeNull();
+  expect(after.confirmations).toEqual({});
+  expect((await readWorkflowHistory({ roundId, actor: dana })).entries.map((e) => e.kind)).toEqual(['reveal']);
+  const view = await readWorkflowRound({ roundId, actor: dana });
+  await expect(mutateWorkflow({
+    body: { action: 'editCollective', roundId, operationId: 'observer-edit', roundEtag: view.round.etag, policyRevision: view.round.policyRevision, preparationVersion: view.workflow.preparationVersion, revealId: view.workflow.revealId, listVersion: view.collective.version, order: view.collective.order, boundaries: view.collective.boundaries },
+    actor: dana,
+  })).rejects.toMatchObject({ code: 'access_denied' });
+
+  await send('reopenPreparation');
+  const reopened = await readWorkflowRound({ roundId, actor: dana });
+  expect(reopened.workflow.stage).toBe('private');
+  expect(reopened.collective).toBeNull();
+  expect(reopened.totals).toBeNull();
+  // Reopening archives the already-revealed group revision; history stays readable.
+  expect((await readWorkflowHistory({ roundId, actor: dana })).entries.map((e) => e.kind)).toEqual(['collective', 'reveal']);
 });
 
 test('a nonfacilitator participant can reset their own program preparation', async () => {
@@ -424,11 +468,13 @@ test('sentiment batches over 50 and discards already-loaded quotes when later au
   expect(response).toEqual({status:'access-denied',sentiments:{}});
   expect(JSON.stringify(response)).not.toContain('PRIVATE QUOTE');
 });
-test('sentiment is absent before reveal and for nonparticipant superusers',async()=>{
-  await expect(readWorkflowSupplement({body:{action:'sentiment',roundId},actor:alice,profileId:1})).rejects.toMatchObject({code:'invalid_transition'});
-  const body={...installReveal(),action:'sentiment'};
-  await expect(readWorkflowSupplement({body,actor:'outsider',isSuperuser:true,profileId:1})).rejects.toMatchObject({code:'access_denied'});
+test('sentiment is absent before reveal; after reveal observers read it under their own Meeting Tracker access',async()=>{
+  await expect(readWorkflowSupplement({body:{action:'sentiment',roundId},actor:'outsider',profileId:9})).rejects.toMatchObject({code:'invalid_transition'});
   expect(getDeliberationSentiments).not.toHaveBeenCalled();
+  const body={...installReveal(),action:'sentiment'};
+  getDeliberationSentiments.mockRejectedValueOnce(Object.assign(new Error('denied'),{code:'sentiment_read_forbidden'}));
+  expect(await readWorkflowSupplement({body,actor:'outsider',profileId:9})).toEqual({status:'access-denied',sentiments:{}});
+  expect(getDeliberationSentiments).toHaveBeenCalledWith(expect.any(Array),{profileId:9});
 });
 test('a reset racing sentiment delivery rejects the previously loaded quotes',async()=>{
   const body={...installReveal(),action:'sentiment'};

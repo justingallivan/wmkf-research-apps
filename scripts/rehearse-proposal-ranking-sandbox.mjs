@@ -292,17 +292,15 @@ await withDalContext('proposal-ranking-v2-sandbox-rehearsal', async () => {
   const privateView = await read(roster[1].systemUserId);
   assert.equal(privateView.facilitatorLists, null);
   assert.equal(privateView.collective, null);
+  // The route admits only grant holders; at the service, anyone outside roster
+  // and facilitation is a read-only observer with no private content.
   const outsider = randomUUID();
-  await assert.rejects(() => read(outsider), e => e.status === 403);
-  const admin = await workflow.readWorkflowRound({
-    roundId: receipt.roundId,
-    actor: outsider,
-    isSuperuser: true
-  });
-  assert.equal(admin.own, null);
-  assert.equal(admin.collective, null);
-  assert.deepEqual(admin.round.snapshot.proposals, []);
-  check('private owner/facilitator filtering and outsider denial');
+  const observer = await read(outsider);
+  assert.equal(observer.viewer.isObserver, true);
+  assert.equal(observer.own, null);
+  assert.equal(observer.collective, null);
+  assert.deepEqual(observer.confirmations, {});
+  check('private owner/facilitator filtering and observer projection');
   await send('reopenOwn', roster[1].systemUserId);
   await assert.rejects(() => send('reveal'), /Every Program Director/);
   receipt.pending = null;

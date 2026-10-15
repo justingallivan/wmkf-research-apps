@@ -555,3 +555,45 @@ test('dirty history restores Next metadata and suite links wait until the queue 
   expect(pop()).toBe(true);
   expect(screen.queryByText(/Finish saving or resolve/)).toBeNull();
 });
+
+function revealedView(viewer) {
+  const initial = view();
+  const order = proposals.map((p) => p.requestId);
+  initial.viewer = viewer;
+  initial.round.snapshot.proposals = proposals;
+  initial.round.snapshot.roster = [{ systemUserId: 'alice', name: 'Alice' }, { systemUserId: 'bob', name: 'Bob' }];
+  initial.workflow = { stage: 'revealed', preparationVersion: 1, revealId: 'reveal' };
+  initial.own = null;
+  initial.confirmations = {};
+  initial.progress = [{ systemUserId: 'alice', name: 'Alice', ready: true }, { systemUserId: 'bob', name: 'Bob', ready: true }];
+  initial.collective = {
+    order, boundaries: [1, 3], version: 1,
+    baseline: { order, boundaries: [1, 3], scores: {} },
+    individuals: initial.round.snapshot.roster.map((p) => ({ ...p, order, boundaries: [1, 3], confidence: {} })),
+  };
+  return initial;
+}
+
+test('a participant can move group cards but an observer sees the same group read-only', () => {
+  const { unmount } = render(<AssessmentWorkflow initial={revealedView({ systemUserId: 'bob', isRosterParticipant: true })} cycleOptions={[]} onCycleChange={() => {}} />);
+  expect(screen.queryAllByLabelText(/^Move /).length).toBeGreaterThan(0);
+  unmount();
+  render(<AssessmentWorkflow initial={revealedView({ systemUserId: 'allison', isObserver: true })} cycleOptions={[]} onCycleChange={() => {}} />);
+  expect(screen.queryAllByLabelText(/^Move /)).toHaveLength(0);
+  expect(screen.getByRole('heading', { name: 'Group discussion' })).toBeTruthy();
+  expect(screen.queryByRole('button', { name: 'My preparation' })).toBeNull();
+  expect(screen.getByRole('note').textContent).toMatch(/following this round/);
+  expect(screen.getByRole('button', { name: 'Export workbook' })).toBeTruthy();
+});
+
+test('before reveal an observer sees who is ready and no preparation workspace', () => {
+  const initial = revealedView({ systemUserId: 'allison', isObserver: true });
+  initial.workflow = { stage: 'private', preparationVersion: 1, revealId: null };
+  initial.collective = null;
+  initial.progress[1].ready = false;
+  render(<AssessmentWorkflow initial={initial} cycleOptions={[]} onCycleChange={() => {}} />);
+  expect(screen.getByRole('heading', { name: 'Waiting for the group reveal' })).toBeTruthy();
+  expect(screen.getByText('Alice — Ready')).toBeTruthy();
+  expect(screen.getByText('Bob — Preparing')).toBeTruthy();
+  expect(screen.queryByRole('button', { name: 'My preparation' })).toBeNull();
+});

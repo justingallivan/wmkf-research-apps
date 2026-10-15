@@ -48,6 +48,7 @@ type Response = {
     isFacilitator: boolean;
     isSuperuser: boolean;
     isRosterParticipant: boolean;
+    isObserver?: boolean; // v2 only: grant holder outside roster and facilitation
     capabilities: {
       preview: boolean;
       open: boolean;
@@ -312,8 +313,9 @@ only their own preparation plus readiness, including conflict/readback/history
 paths and newly reopened preparation. See the D26 release plan for acceptance.
 After
 reveal expose the named immutable assessments and mutable collective view to the
-round's authorized participants/facilitator. A nonparticipant superuser does not
-inherit private content merely from that role. Hiding controls is not privacy.
+round's authorized participants/facilitator and to observers. A superuser role adds
+nothing: a nonparticipant superuser with the grant is an observer like anyone else.
+Proposal Ranking grant holders who are neither roster participants nor captured facilitators are read-only observers (owner decision 2026-10-15): before reveal they see the source snapshot and readiness only; after reveal they see the named assessments and collective view, history, workbook and sentiment (sentiment still needs Meeting Tracker readership); every mutation is refused. Hiding controls is not privacy.
 
 The new API must not silently accept revision-3 or branch `co` data as individual
 combined rankings. Old snapshots lack grades/confidence/readiness/reveal versions.
@@ -452,8 +454,9 @@ v2 creation disabled refuses v1 preview/open with `409 configuration_requires_v2
 For v2 responses, `facilitatorLists` is always null. `own` contains only the
 authenticated actor's private preparation; `progress` contains readiness only;
 collective content is present only after reveal. History, supplements, operation
-replay, and error `current` use explicit privacy projections; nonparticipant
-superusers get metadata and readiness, not assessments. For v1, every participant
+replay, and error `current` use explicit privacy projections; observers
+(including nonparticipant superusers) get the snapshot and readiness before reveal and
+the revealed group view after it, never `own` or confirmations. For v1, every participant
 including a facilitator-as-PD receives their own list. Before publication, even
 facilitators receive no individual lists or meeting draft; they get only a safe
 `meetingControl: {listKey,status,etag,version}` handle for Generate/Publish.
