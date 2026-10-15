@@ -1,4 +1,6 @@
-# Proposal Ranking API — current D26 candidate and historical contracts
+# Proposal Ranking API — D26 production contract and historical contracts
+
+**Released to production 2026-10-15 (Session 609)**: D26 v2 round `49279ac7-3ab9-41d8-b2d6-5aaf4085e642` is open; see the receipt in `PROPOSAL_RANKING_D26_RELEASE_2026-10-14.md`. Candidate and branch statements below are dated pre-release history. §8 plus the observer and concurrent-save changes merged in PRs #485 and #489 are the production contract.
 
 Updated 2026-10-15. **The D26 branch API is §8**. Its reviewed baseline was
 source-verified at `9fe92f0ed` on `codex/d26-ranking-release`; a later baseline

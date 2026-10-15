@@ -1,5 +1,7 @@
 # D26 ranking — implementation addendum
 
+**Released to production 2026-10-15 (Session 609)**: D26 v2 round `49279ac7-3ab9-41d8-b2d6-5aaf4085e642` is open; see the receipt in `PROPOSAL_RANKING_D26_RELEASE_2026-10-14.md`. Candidate and branch statements below are dated pre-release history.
+
 Session 608, 2026-10-14. **The D26 code candidate and isolated D96 sandbox rehearsal are built on `codex/d26-ranking-release`; no production release or production ranking write has been executed.**
 **Earlier plan review (not implementation code review):** Claude Opus 5.5 reviewed
 the plan through subscription OAuth and returned READY WITH NAMED CHANGES. Its

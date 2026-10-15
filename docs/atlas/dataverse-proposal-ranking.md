@@ -1,4 +1,6 @@
-# Proposal Ranking — current D26 candidate and storage history
+# Proposal Ranking — D26 production release and storage history
+
+**Released to production 2026-10-15 (Session 609)**: D26 v2 round `49279ac7-3ab9-41d8-b2d6-5aaf4085e642` is open; see the receipt in `../plans/PROPOSAL_RANKING_D26_RELEASE_2026-10-14.md`. Candidate and branch statements below are dated pre-release history. Production wave33 fields `wmkf_workflowjson` (65,536) and `wmkf_assessmentjson` (524,288) were applied and read back 2026-10-15.
 
 Current local candidate: `codex/d26-ranking-release` at `9fe92f0ed`; no production
 promotion or D26 live ranking write. See the first section for candidate storage,

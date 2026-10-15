@@ -1,8 +1,24 @@
 # Proposal Ranking — D26 production release plan
 
-Date: 2026-10-14. Status: **PLANNED; not approved for production mutation or promotion.**
+Date: 2026-10-14. Status: **RELEASED to production 2026-10-15 (Session 609); D26 v2 round open.** See the release receipt below. The planning text that follows is the dated pre-release plan.
 Owner decisions: launch for D26 with exactly 23 proposals; Beth Pruitt and Justin Gallivan must have simultaneous facilitator access. Before reveal, everyone including both facilitators sees only their own preparation; facilitators may see readiness status, never other PDs’ unrevealed rankings, grades or confidence. Requests 1003223 and 1003224 remain excluded test copies (owner confirmed October 14).
 This release plan supplements the October 13 design/implementation plan. Shared facilitation was a new requirement; the current implementation candidate is `9fe92f0ed` on `codex/d26-ranking-release`, detailed in `PROPOSAL_RANKING_D26_IMPLEMENTATION_ADDENDUM_2026-10-14.md` and reviewed in `../audits/PROPOSAL_RANKING_D26_IMPLEMENTATION_REVIEW_2026-10-14.md`. Its 25 suites / 269 tests, types, scoped lint and build passed. A new synthetic D96 sandbox rehearsal exercised persisted dual-facilitator races and workbook export. A host Chrome smoke with trusted sandbox personas rendered the candidate and downloaded its workbook. These checks did not exercise D26 source data, independent SSO, WebKit/iPad, or production. Opus's final follow-up is satisfied; Production status remains planned, with no approval for mutation or promotion.
+
+## Production release receipt — 2026-10-15 (Session 609)
+
+Each production write was separately owner-approved in session. [VERIFIED via the commands and readbacks named.]
+
+| Step | Result | Evidence |
+|---|---|---|
+| Pre-check | Retained v1 round `83a45de0-8fcc-4e34-8b23-10af7636bf8d` unpublished; 23-proposal pool; four PD grants; v2 fields absent | `probe-ranking-d26-release.js`, 21:08:57 UTC |
+| Schema | wave33 applied: `wmkf_workflowjson` 65,536 and `wmkf_assessmentjson` 524,288, read back exact | `apply-dataverse-schema.js --target=prod --wave=33-proposal-ranking-assessments` dry run then `--execute` (dated `DATAVERSE_PROD_WRITE_ACK`); probe 21:11:46 UTC |
+| Code | PR #485 merged `34db290a2` (release, incl. read-only observers and top-nav link); deploy `dpl_AijRWfowGETAxaq7rtB4V973rKDE`; owner saw the retained v1 round and the nav link | GitHub CI green; Vercel inspect |
+| Admin fix | PR #488 `e49485558`: facilitator panel had rendered empty since October 7 (read `isSuperuser` from `/api/app-access?all=true`, which never returns it); deploy `dpl_A9KMAx1YJGBce9gB1TXyqN4pYSZt` is the v2-compatible rollback floor (built before the v2 flags) | PR tests; owner saved Beth Pruitt and Justin Gallivan as default facilitators |
+| Flags | `PROPOSAL_RANKING_WORKFLOW_V2=on`, `PROPOSAL_RANKING_V2_SCHEMA_READY=on` (Config type); `PROPOSAL_RANKING_TEST_ENABLED` absent; redeploy `dpl_4Zw4KrjHk2dqx1fkH2D1d3HEXdo1` | `vercel env add`, values read back via scratch `env pull` (deleted) |
+| Cutover | Owner canceled the retained v1 round (data kept), then opened D26 v2 round `49279ac7-3ab9-41d8-b2d6-5aaf4085e642` (23 proposals, four PDs, both facilitators captured) about 22:09 UTC | UI receipts; preview loaded only with v2 creation on |
+| Incident | Jean Kim found the nav link minutes after opening; her rapid saves starved the owner's private saves (four immediate rebases lost, 409 banner). PR #489 `d34ad7a0e` adds jittered growing pauses and six rebases; deploy `dpl_CxWZE5G6hqfJBbLhfNCrXcZxEXpM` | Vercel request logs; read-only actor probe (46 saves by Jean, no content read); owner and Jean then raced re-ranking without failure; Jean saw no Facilitate tab; Jean reset her lists |
+
+Not yet observed with real accounts: Beth's facilitator view, an observer (Allison Keller) session, reveal, group discussion and export. Opening froze review scores while 50 external reviews were outstanding; later reviews do not change the round. Rollback: do not return to pre-release main now that a v2 round exists; promote `dpl_A9KMAx1YJGBce9gB1TXyqN4pYSZt` (v2 reads still dispatch by stored version) and reconcile any saved assessments by hand.
 
 ## Scope and evidence boundary
 
@@ -44,7 +60,7 @@ The script fixes the registered production hostname and enforces preview-class r
    [OWNER DECISION, 2026-10-15] Resolved: the owner granted Meeting Tracker access to all PDs so the ranker's sentiment reader admits them. Active-profile status was not re-probed; first sign-ins confirm it.
 3. **Read-only observers and navigation:** [OWNER DECISION, 2026-10-15] Any Proposal Ranking grant holder outside the roster and facilitation (for example the President) follows the round read-only: readiness before reveal, then the same revealed group view, history, workbook and sentiment as participants, with no edits. Proposal Ranking also appears in the top navigation for grant holders. Built on this branch; see API contract §8 and the addendum visibility table.
 
-## Agreed privacy change — planned, not implemented
+## Agreed privacy change — implemented and released (see receipt)
 
 [OWNER DECISION, 2026-10-14] Only the actor’s own preparation is visible before reveal, including for Beth and Justin. Readiness status is available to facilitators without assessment contents. Enforce filtering in the server response, not only the UI. Audit normal reads, mutation/conflict responses, operation readback, history, exports and alternate readers. New edits after reopening remain private until a new reveal; previously revealed immutable history stays clearly distinguished.
 
