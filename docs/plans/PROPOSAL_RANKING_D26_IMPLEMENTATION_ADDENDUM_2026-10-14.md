@@ -214,6 +214,13 @@ actor); its internal checks remain authoritative even if UI controls are absent.
 
 Existing v1 actions remain versioned, including retained cancellation and its
 published-round refusal, with the explicit pre-publication edit refusal above.
+The owner-approved preparation simplification presents one **Ready for group
+discussion** action after combined-list review. The `ready` reducer transition
+validates current source versions and complete confidence, then persists combined
+confirmation and version-bound readiness together. Keep `confirmCombined` as an
+accepted v2 action for older clients; it is no longer a separate UI step. Pending
+or uncertain private saves still block Ready, and an outdated combined list still
+requires explicit rebuild.
 A v2 restart is the supported reset; do not add a v2 cancel
 or membership-transfer feature. No superuser-only bypass of facilitator actions.
 

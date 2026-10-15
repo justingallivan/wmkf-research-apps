@@ -20,7 +20,7 @@ Within each grade:
 
 For example, if the A lists are **MR1, MR2** and **SE1, SE2, SE3**, the merge orders the MR1/SE1 pair, then the MR2/SE2 pair, then SE3. It does not re-sort all five by reviewer score. Equal scores use request number; an unrated proposal follows a rated one within its pair.
 
-The first bar goes after all the A proposals; the second goes after all the B proposals. **The merged list is not divided into thirds again.** Confidence answers carry over. The PD can then adjust the combined order and bars before confirming readiness. Rebuilding the combined list repeats these rules and replaces edits made directly in that list.
+The first bar goes after all the A proposals; the second goes after all the B proposals. **The merged list is not divided into thirds again.** Confidence answers carry over. The PD can then adjust the combined order and bars before selecting **Ready for group discussion**, which confirms that order and marks the PD ready together. Rebuilding the combined list repeats these rules and replaces edits made directly in that list.
 
 ## The group list at reveal
 

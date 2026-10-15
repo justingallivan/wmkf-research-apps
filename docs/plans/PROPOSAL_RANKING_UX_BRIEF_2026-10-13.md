@@ -92,8 +92,10 @@ of duplicated lists or a separate submission action for each program.
 - Combined shows one MR/SE list. A short expandable “How this list was started”
   explanation describes grade-by-grade pairs and the within-pair reviewer comparison.
   Do not leave the two source lists beside the combined list.
-- **Confirm combined order** follows review. Later combined edits clear confirmation.
-  Ready requires that confirmation, complete confidence and confirmed saves.
+- After reviewing the combined order, the PD selects **Ready for group discussion**
+  once. That action confirms the current combined order and marks the PD ready in
+  the same saved transition. It requires complete confidence and confirmed saves;
+  later edits require reopening preparation and marking ready again.
 - Ready collapses preparation to “Ready for group discussion” with a timestamp and
   **Reopen preparation** in its menu. It does not mean the facilitator has revealed.
 - Group discussion before reveal shows only readiness progress/waiting guidance;

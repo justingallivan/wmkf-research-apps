@@ -127,7 +127,8 @@ test('private MR and SE lists render their subsets and saving SE keeps it select
   fireEvent.click(screen.getByRole('radio', { name: 'Confident' }));
   await waitFor(() => expect(screen.getAllByRole('button', { name: 'Create combined list' })[0].disabled).toBe(false));
   expect(screen.queryByRole('button', { name: /Continue to/ })).toBeNull();
-  expect(screen.getByText('You can keep editing, or create your combined list. Only Ready marks your preparation finished.')).toBeTruthy();
+  expect(screen.queryByText(/Only Ready marks your preparation finished/)).toBeNull();
+  expect(screen.getByRole('heading', { name: 'My preparation' }).className).toBe('sr-only');
 });
 test('fresh preparation leaves every MR and SE confidence choice unselected', () => {
   const initial = view();
@@ -227,7 +228,11 @@ test('a changed completed source list routes back to rebuilding and confirming t
     } else if (body.action === 'confirmCombined') {
       current.own.co.confirmed = true;
       current.operation = { status: 'confirmed', operationId: body.operationId };
+    } else if (body.action === 'reopenOwn') {
+      current.own.ready = null;
+      current.operation = { status: 'confirmed', operationId: body.operationId };
     } else if (body.action === 'ready') {
+      current.own.co.confirmed = true;
       current.own.ready = { combinedVersion: current.own.co.version, operationId: body.operationId };
       current.operation = { status: 'confirmed', operationId: body.operationId };
     }
@@ -239,10 +244,10 @@ test('a changed completed source list routes back to rebuilding and confirming t
   expect(screen.getByRole('button', { name: 'Medical Research' }).textContent).toContain('In combined list');
   expect(screen.getByRole('button', { name: 'Science & Engineering' }).textContent).toContain('In combined list');
   expect(screen.queryByText(/rebuild it from your latest assessments/i)).toBeNull();
-  expect(screen.getByRole('button', { name: 'Reset SE preparation' })).toBeTruthy();
+  expect(screen.getByRole('button', { name: 'Reset this list' })).toBeTruthy();
   fireEvent.click(screen.getAllByRole('button', { name: 'Review combined list →' })[0]);
-  expect(screen.getByRole('button', { name: 'Ready' })).toBeTruthy();
-  expect(screen.queryByRole('button', { name: 'Reset SE preparation' })).toBeNull();
+  expect(screen.getByRole('button', { name: 'Ready for group discussion' })).toBeTruthy();
+  expect(screen.queryByRole('button', { name: 'Reset this list' })).toBeNull();
   expect(sendProposalRankingAction).not.toHaveBeenCalled();
   fireEvent.click(screen.getByRole('button', { name: 'Science & Engineering' }));
   fireEvent.click(screen.getAllByRole('button', { name: 'Set boundary…' })[0]);
@@ -252,23 +257,26 @@ test('a changed completed source list routes back to rebuilding and confirming t
 
   expect(screen.getByRole('button', { name: 'Medical Research' }).textContent).toContain('In combined list');
   expect(screen.getByRole('button', { name: 'Science & Engineering' }).textContent).toContain('Ready to combine');
-  expect(screen.getByText(/rebuild the combined list from your latest assessments/i)).toBeTruthy();
+  expect(screen.getByText(/rebuild to include your latest program changes/i)).toBeTruthy();
   expect(screen.getByRole('button', { name: 'Combined list' }).textContent).toContain('Needs rebuild');
   expect(screen.queryByRole('button', { name: 'Review combined list →' })).toBeNull();
-  expect(screen.getByRole('button', { name: 'Reset SE preparation' })).toBeTruthy();
+  expect(screen.getByRole('button', { name: 'Reset this list' })).toBeTruthy();
   fireEvent.click(screen.getAllByRole('button', { name: 'Rebuild combined list' })[0]);
   expect(sendProposalRankingAction).not.toHaveBeenCalledWith(expect.objectContaining({ action: 'buildCombined' }), expect.anything());
   expect(screen.getByText('Replace the combined order?')).toBeTruthy();
   fireEvent.click(screen.getByRole('button', { name: 'Build combined list' }));
   expect(sendProposalRankingAction).toHaveBeenCalledWith(expect.objectContaining({ action: 'buildCombined', confirmationFingerprint: 'build-fp' }), expect.anything());
-  await waitFor(() => expect(screen.getByRole('button', { name: 'Confirm combined order' })).toBeTruthy());
+  await waitFor(() => expect(screen.getByRole('button', { name: 'Ready for group discussion' })).toBeTruthy());
   expect(screen.getByRole('button', { name: 'Medical Research' }).textContent).toContain('In combined list');
   expect(screen.getByRole('button', { name: 'Science & Engineering' }).textContent).toContain('In combined list');
-  expect(screen.queryByRole('button', { name: 'Reset SE preparation' })).toBeNull();
-  fireEvent.click(screen.getByRole('button', { name: 'Confirm combined order' }));
-  await waitFor(() => expect(screen.getByRole('button', { name: 'Ready' })).toBeTruthy());
-  fireEvent.click(screen.getByRole('button', { name: 'Ready' }));
-  await waitFor(() => expect(screen.getByText('Ready for group discussion')).toBeTruthy());
+  expect(screen.queryByRole('button', { name: 'Reset this list' })).toBeNull();
+  expect(screen.getByText(/Review and adjust your combined order/)).toBeTruthy();
+  fireEvent.click(screen.getByRole('button', { name: 'Ready for group discussion' }));
+  expect(sendProposalRankingAction).toHaveBeenLastCalledWith(expect.objectContaining({ action: 'ready' }), expect.anything());
+  expect(sendProposalRankingAction).not.toHaveBeenCalledWith(expect.objectContaining({ action: 'confirmCombined' }), expect.anything());
+  await waitFor(() => expect(document.activeElement).toBe(screen.getByRole('heading', { name: 'Ready for group discussion' })));
+  fireEvent.click(screen.getByRole('button', { name: 'Reopen preparation' }));
+  await waitFor(() => expect(document.activeElement).toBe(screen.getByRole('heading', { name: 'My preparation' })));
 });
 
 test('divider validation rejects crossing, empty and fractional values with a recoverable error', () => {
@@ -385,17 +393,19 @@ test('unanswered navigation follows current order, wraps, and skips saved choice
   Element.prototype.scrollIntoView = jest.fn();
   const initial = populatedView();
   render(<AssessmentWorkflow initial={initial} cycleOptions={[]} onCycleChange={() => {}} />);
-  expect(screen.getByText('2 proposals need a confidence choice')).toBeTruthy();
-  const jump = screen.getByRole('button', { name: 'Go to next unanswered' });
+  expect(screen.getByText(/2 proposals need a confidence choice/)).toBeTruthy();
+  const jump = screen.getByRole('button', { name: 'Continue' });
   fireEvent.click(jump);
   expect(document.activeElement.name).toBe('confidence-one');
+  expect(screen.queryByRole('alert')).toBeNull();
+  expect(document.getElementById('proposal-one').className).not.toContain('ring-red-600');
   fireEvent.click(jump);
   expect(document.activeElement.name).toBe('confidence-two');
   fireEvent.click(jump);
   expect(document.activeElement.name).toBe('confidence-one');
   sendProposalRankingAction.mockImplementation(async body => saved(initial, body));
   fireEvent.click(document.activeElement);
-  await waitFor(() => expect(screen.getByText('1 proposal needs a confidence choice')).toBeTruthy());
+  await waitFor(() => expect(screen.getByText(/1 proposal needs a confidence choice/)).toBeTruthy());
   await waitFor(() => expect(jump.disabled).toBe(false));
   fireEvent.click(jump);
   expect(document.activeElement.name).toBe('confidence-two');
@@ -413,8 +423,8 @@ test.each(['confident', 'not-sure'])('Continue preserves saved %s and identifies
   const freshChoices = document.getElementById('proposal-two').querySelectorAll('input[type=radio]');
   expect(Array.from(freshChoices, choice => choice.checked)).toEqual([false, false]);
   fireEvent.click(screen.getByRole('button', { name: 'Continue', exact: true }));
-  expect(screen.getByRole('alert').textContent).toContain('Institution two');
-  expect(screen.getByRole('alert').textContent).not.toContain('Institution one');
+  expect(screen.queryByRole('alert')).toBeNull();
+  expect(screen.getByText(/Choose Confident or Not sure on the outlined cards/)).toBeTruthy();
   expect(document.getElementById('proposal-two').className).toContain('ring-red-600');
   expect(document.getElementById('proposal-one').className).not.toContain('ring-red-600');
   expect(document.activeElement.name).toBe('confidence-two');

@@ -1,7 +1,9 @@
 # Proposal Ranking API — current D26 candidate and historical contracts
 
-Updated 2026-10-15. **The current local D26 candidate API is §8**, source-verified
-at `9fe92f0ed` on `codex/d26-ranking-release`; it is not a production deployment.
+Updated 2026-10-15. **The D26 branch API is §8**. Its reviewed baseline was
+source-verified at `9fe92f0ed` on `codex/d26-ranking-release`; a later baseline
+at `e091dd82f` reached dedicated test Preview. The single-Ready simplification
+described there is subsequent branch work. Production has not received this D26 release.
 Sections 1–5 preserve the **historical revision-3 API** verified on main at
 `b3219f4aa` before D26 integration. Section 6 preserves the earlier Preview v2
 contract. Do not use either historical section as the current D26 privacy or
@@ -403,14 +405,30 @@ sentiment fixture previously returned current through the real reader; that rece
 does not prove generation or human analysis. Earlier deployment and fixture details,
 including four new TEST files in shared SharePoint, remain in the sandbox audit.
 
-## 8. D26 implementation candidate — local branch, not deployed
+## 8. D26 implementation candidate — dedicated Preview baseline and branch simplification
 
 [VERIFIED via local source, focused Jest, and final Opus/Sol review,
 `codex/d26-ranking-release` commit `9fe92f0ed`, 2026-10-15] This section supersedes conflicting §2/§5/§6 privacy
 claims for the D26 branch candidate only. Sections 1–7 retain their dated main,
 branch, and dedicated-Preview history; they are not evidence of the D26 behavior.
-The candidate has not been deployed. Persisted sandbox testing is limited to the
-new synthetic D96 rehearsal described below; no D26 source proposal data was used.
+The `e091dd82f` baseline was deployed to dedicated test Preview at
+`https://wmkf-meeting-transcription-test-8zuz51qab.vercel.app`. The single-Ready
+simplification below is later branch work; this document does not record a deployment
+of that change. Production remains unchanged. Persisted sandbox testing described
+below used synthetic D96 data, not the live D26 proposal pool.
+
+[VERIFIED 2026-10-14 via `workflow.js` Git blob
+`141d5861df403c32ad01aef0e03869aa0cd2575e`, current
+`AssessmentWorkflow.js`, and focused
+`proposal-ranking-workflow.test.js`, `proposal-ranking-workflow-service.test.js`,
+and `proposal-ranking-assessment-ui.test.js`] The approved
+preparation simplification gives the PD one **Ready for group discussion** action
+after reviewing the combined list. `ready` validates current program source
+versions and complete confidence, then sets `co.confirmed = true` and the
+version-bound readiness receipt within the same reducer transition and atomic
+save. The separate `confirmCombined` token remains accepted for older clients,
+but the current UI does not require or present it as a preceding step. Outstanding
+private saves, uncertain outcomes, and an outdated combined list still block Ready.
 
 Admin `PUT /api/admin/proposal-ranking-facilitator` accepts exactly
 `{ facilitatorSystemUserIds: string[], revision: string|null }`. The array must

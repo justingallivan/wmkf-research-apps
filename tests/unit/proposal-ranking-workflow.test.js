@@ -49,7 +49,6 @@ function prepare(actorId) {
     });
   }
   act('buildCombined', actorId);
-  act('confirmCombined', actorId);
   act('ready', actorId);
 }
 beforeEach(() => {
@@ -109,9 +108,48 @@ test('source edit invalidates combined confirmation without overwriting the comb
   expect(state.participants.alice.co.order).toEqual(before);
   expect(state.participants.alice.co.confirmed).toBe(false);
   expect(() => act('confirmCombined')).toThrow(/Rebuild/);
-  expect(() => act('ready')).toThrow(/Confirm/);
+  expect(() => act('ready')).toThrow(/Rebuild/);
   act('buildCombined');
   expect(state.participants.alice.co.order).toEqual(['s', 'm']);
+});
+
+test('ready confirms a complete combined order and marks it ready in one transition', () => {
+  for (const programKey of ['mr', 'se']) {
+    const current = state.participants.alice[programKey];
+    act('saveAssessment', 'alice', {
+      programKey,
+      listVersion: current.version,
+      assessment: { ...current, confidence: { [current.order[0]]: 'confident' } },
+    });
+  }
+  act('buildCombined');
+  expect(state.participants.alice.co.confirmed).toBe(false);
+
+  act('ready');
+
+  expect(state.participants.alice.co.confirmed).toBe(true);
+  expect(state.participants.alice.ready).toMatchObject({
+    combinedVersion: state.participants.alice.co.version,
+    operationId: 'op-4',
+  });
+  expect(participantIsReady(state.participants.alice)).toBe(true);
+});
+
+test('ready rejects incomplete confidence without changing the combined order', () => {
+  for (const programKey of ['mr', 'se']) {
+    const current = state.participants.alice[programKey];
+    act('saveAssessment', 'alice', {
+      programKey,
+      listVersion: current.version,
+      assessment: { ...current, confidence: { [current.order[0]]: 'confident' } },
+    });
+  }
+  act('buildCombined');
+  state.participants.alice.co.confidence.m = undefined;
+  const before = JSON.stringify(state);
+
+  expect(() => act('ready')).toThrow(/Answer confidence/);
+  expect(JSON.stringify(state)).toBe(before);
 });
 
 test('ready locks own edits; reveal locks all private edits and stale scopes fail', () => {

@@ -85,7 +85,8 @@ rules settle otherwise equal ordering, not substantive preference differences.
 All preparation is rebuildable. Returning to a program list never silently overwrites
 an edited combined list. Editing either program clears readiness and invalidates
 combined confirmation. The PD explicitly rebuilds from the current program lists,
-reviews the replacement, and reconfirms the combined ranking before marking ready.
+reviews the replacement, then uses one **Ready for group discussion** action to
+confirm that ranking and mark ready together.
 The confirmation explains that combined-only ordering and assessment changes will
 be replaced by the program assessments. Confidence follows each proposal from the
 program preparation used in the rebuild.
@@ -102,8 +103,9 @@ facilitator-read exception. Current source and acceptance evidence are in
 `D26` section of `docs/plans/PROPOSAL_RANKING_API_CONTRACT.md`.
 
 A PD can mark ready only after every proposal has a grade, a confidence response,
-and a confirmed unique position in that PD's complete combined list, with all saves
-confirmed. Before reveal they can reopen preparation; reopening clears readiness.
+and a unique position in that PD's complete combined list, with all saves confirmed.
+The single Ready action durably confirms the combined order and records readiness
+together. Before reveal they can reopen preparation; reopening clears readiness.
 They must mark ready again after revising.
 
 Once every PD is ready, the facilitator performs **one reveal action per preparation
@@ -251,7 +253,7 @@ Export does not lock the workflow. Every reset requires a clear scope/impact con
 | Reset | Who and when | Result |
 |---|---|---|
 | Reset own program preparation | The PD, during private preparation (reopen own ready state first) | Restore the selected MR or SE reviewer-score seed and initial thirds; clear its confidence answers, readiness and combined confirmation. Other program work stays intact. |
-| Rebuild own combined list | The PD, during private preparation | Replace combined work using current MR/SE grades, pairwise merge and confidence; require review and confirmation again. Do not silently regenerate on a program edit. |
+| Rebuild own combined list | The PD, during private preparation | Replace combined work using current MR/SE grades, pairwise merge and confidence; require review, then the single Ready action again. Do not silently regenerate on a program edit. |
 | Reopen own ready preparation | The PD, before reveal | Clear own readiness; retain saved work for revision or reset. |
 | Reopen individual preparation after reveal | Facilitator | Preserve the previous revealed inputs and group work as history; create a new private preparation version from the latest revealed individual assessments and their source program lists. Clear every PD's readiness; require everyone ready and a new reveal. |
 | Reset collective recommendation | Facilitator, after reveal, including after export | Preserve the replaced group revision; restore that reveal's calculated order and unanimous-A/C initial bars. Keep its individual inputs unchanged. |

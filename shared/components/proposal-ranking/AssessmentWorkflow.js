@@ -53,7 +53,7 @@ const gradeClasses = {
   B: 'bg-[#ffeb9c] text-[#654c00]',
   C: 'bg-[#f8d6d4] text-[#8a2825]',
 };
-const tileClass = 'inline-flex h-8 w-8 shrink-0 items-center justify-center rounded font-semibold text-[15px] leading-none';
+const tileClass = 'inline-flex h-8 w-8 shrink-0 items-center justify-center rounded font-semibold text-sm leading-none';
 const buttonClass =
   'min-h-11 rounded-md px-3 py-2 text-sm font-medium hover:bg-gray-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600 disabled:opacity-50';
 function Grade({ value, confidence }) {
@@ -78,6 +78,7 @@ function PeerScores({ score }) {
   return <div>
     <p className="mb-2 text-xs font-medium text-gray-700">Peer reviews</p>
     <div className="flex flex-wrap gap-1">{tiles.length ? tiles : <span className="text-sm text-gray-600">Not available</span>}</div>
+    <p aria-hidden="true" className="mt-1 text-xs text-gray-600">E Excellent · VG Very good · G Good · F Fair · P Poor</p>
   </div>;
 }
 
@@ -577,6 +578,7 @@ export default function AssessmentWorkflow({
   const pendingRef = useRef(null);
   const alive = useRef(true);
   const recoveryRef = useRef(null);
+  const preparationHeadingRef = useRef(null);
   const [queue] = useState(() => createPrivateSaveQueue({
     onChange: next => {
       setPrivateSave(next);
@@ -704,6 +706,11 @@ export default function AssessmentWorkflow({
       if (valid(id)) {
         accept(next);
         if (action === 'buildCombined') setProgram('co');
+        if (action === 'ready' || action === 'reopenOwn') {
+          requestAnimationFrame(() => {
+            if (valid(id)) preparationHeadingRef.current?.focus();
+          });
+        }
         setConfirmation(null);
       }
     } catch (err) {
@@ -892,6 +899,13 @@ export default function AssessmentWorkflow({
     ? 'Changes are not confirmed' : 'All changes saved';
   const combinedComplete = own?.co?.order.every((id) => own.co.confidence[id]);
   const unanswered = collective ? [] : assessment?.order.filter((id) => !assessment.confidence?.[id]) || [];
+  const preparationHint = unanswered.length > 0
+    ? `${unanswered.length} ${unanswered.length === 1 ? 'proposal needs' : 'proposals need'} a confidence choice.`
+    : combinedOutdated
+      ? 'Rebuild to include your latest program changes.'
+      : program === 'co' && combinedComplete && !own.co.confirmed
+        ? 'Review and adjust your combined order, then select Ready for group discussion.'
+        : '';
   const findScope = `${view.roundId}:${section}:${program}`;
   const showMissingConfidence = validationScope === findScope && unanswered.length > 0;
   const currentFindResult = findResult?.scope === findScope ? findResult : null;
@@ -906,10 +920,7 @@ export default function AssessmentWorkflow({
     card?.querySelector('input[type="radio"]')?.focus({ preventScroll: true });
   }
   const preparationAction = unanswered.length > 0 ? (
-    <div className="flex flex-wrap items-center gap-3">
-      <Button variant="outline" disabled={exclusiveBusy || Boolean(pending) || Boolean(privateSave.blocked)} onClick={jumpToUnanswered}>Go to next unanswered</Button>
-      <Button disabled={exclusiveBusy || Boolean(pending) || Boolean(privateSave.blocked)} onClick={() => { setValidationScope(findScope); jumpToUnanswered(); }}>Continue</Button>
-    </div>
+    <Button disabled={exclusiveBusy || Boolean(pending) || Boolean(privateSave.blocked)} onClick={() => { if (unanswered.length < assessment.order.length) setValidationScope(findScope); jumpToUnanswered(); }}>Continue</Button>
   ) : !allConfident ? (
     nextProgram && (currentProgramComplete || program === 'co') ? (
       <Button disabled={busy || Boolean(pending)} onClick={() => { if (queue.isDirty() || busyRef.current || pendingRef.current) return; setProgram(nextProgram.key); setDraft(null); }}>
@@ -930,10 +941,8 @@ export default function AssessmentWorkflow({
       </Button>
   ) : outdated ? (
     <Button disabled={!allConfident || busy || Boolean(pending) || !active} onClick={() => confirm('buildCombined')}>Rebuild combined list</Button>
-  ) : !own.co.confirmed ? (
-    <Button disabled={!combinedComplete || busy || Boolean(pending) || !active} onClick={() => execute('confirmCombined')}>Confirm combined order</Button>
   ) : (
-    <Button disabled={busy || Boolean(pending) || !active} onClick={() => execute('ready')}>Ready</Button>
+    <Button disabled={!combinedComplete || busy || Boolean(pending) || !active} onClick={() => execute('ready')}>Ready for group discussion</Button>
   );
   const findProposal = (event) => {
     event.preventDefault();
@@ -1032,7 +1041,7 @@ export default function AssessmentWorkflow({
             ))}
           </select>
           {!(section === 'group' && collective) && <Button
-            variant="outline"
+            variant="link"
             disabled={busy || Boolean(pending)}
             onClick={refresh}
           >
@@ -1079,7 +1088,7 @@ export default function AssessmentWorkflow({
           History
         </button>
       </nav>
-      {!(section === 'group' && collective) && <p role="status" className="mb-3 text-sm text-gray-600">{saveStatus}</p>}
+      {!(section === 'group' && collective) && !(section === 'prepare' && own && view.workflow.stage === 'private') && <p role="status" className="mb-3 text-sm text-gray-600">{saveStatus}</p>}
       {privateSave.blocked && <div ref={recoveryRef} role="alert" tabIndex={-1} className="mb-4 rounded-lg border border-amber-300 bg-amber-50 p-4">
         <p>{privateSave.blocked.message}</p>
         {privateSave.blocked.kind === 'integrity' && <p className="mt-2 text-sm">This operation cannot be retried safely. Reload the page to continue; unsaved local edits will be lost.</p>}
@@ -1222,10 +1231,11 @@ export default function AssessmentWorkflow({
           </p>
         ) : (
           <>
-            <h2 className="text-xl font-semibold">My preparation</h2>
+            <h2 ref={preparationHeadingRef} tabIndex={-1} className="sr-only">{own.ready ? 'Ready for group discussion' : 'My preparation'}</h2>
             {own.ready ? (
               <div className="my-5">
                 <p className="font-medium">Ready for group discussion</p>
+                <p role="status" className="my-2 text-sm text-gray-600">{saveStatus}</p>
                 <Button
                   variant="outline"
                   disabled={busy || Boolean(pending) || !active}
@@ -1236,54 +1246,31 @@ export default function AssessmentWorkflow({
               </div>
             ) : (
               <>
-                <div className="my-4 flex flex-wrap items-center gap-4">
-                  <div className="grid min-w-0 flex-1 basis-full auto-cols-fr grid-flow-col gap-1 sm:max-w-2xl sm:basis-96" aria-label="Assessment lists">
+                <div className="my-3 flex flex-wrap items-center gap-x-4 gap-y-2 border-y border-gray-200 py-2">
+                  <div role="group" className="flex min-w-0 flex-1 basis-full flex-wrap items-center gap-x-4 gap-y-1 sm:basis-0" aria-label="Assessment lists">
                   {[...programProgress.map((p) => [p.key, p.name]), ...(own.co ? [['co', 'Combined list']] : [])].map(([key, label]) => (
                     <button
-                      className={`min-h-16 min-w-0 rounded-lg px-3 py-2 text-center text-sm font-semibold focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-600 disabled:opacity-50 ${program === key ? 'bg-gray-100 text-gray-900' : 'text-gray-600 hover:bg-gray-50'}`}
+                      className={`min-h-11 border-b-2 px-1 py-1 text-left text-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-600 disabled:opacity-50 ${program === key ? 'border-gray-900 font-semibold text-gray-900' : 'border-transparent text-gray-600 hover:text-gray-900'}`}
                       key={key}
                       aria-label={label}
                       aria-pressed={program === key}
-                      aria-describedby={key !== 'co' ? `preparation-count-${key}` : undefined}
+                      aria-describedby={key !== 'co' ? `preparation-count-${key}` : combinedOutdated ? 'combined-list-status' : undefined}
                       disabled={busy || Boolean(pending) || (key === 'co' && !own.co)}
                       onClick={() => { if (queue.isDirty() || busyRef.current || pendingRef.current) return; setProgram(key); setDraft(null); }}
                     >
                       {label}
-                      {key === 'co' && <span className="mt-1 block text-xs font-normal text-gray-600">{combinedOutdated ? 'Needs rebuild' : own.co.confirmed ? 'Confirmed' : 'Review order'}</span>}
-                      {key !== 'co' && <span id={`preparation-count-${key}`} className="mt-1 block text-xs font-normal text-gray-600">{programProgress.find((p) => p.key === key).status}</span>}
+                      {key === 'co' && combinedOutdated && <span id="combined-list-status" className="ml-2 text-xs font-normal text-amber-800">Needs rebuild</span>}
+                      {key !== 'co' && <span id={`preparation-count-${key}`} className="ml-2 text-xs font-normal text-gray-600">{programProgress.find((p) => p.key === key).status}</span>}
                     </button>
                   ))}
                   </div>
-                  <div className="flex flex-wrap items-center gap-3">
-                  {program !== 'co' && <Button variant="outline" disabled={!editable || busy} onClick={() => confirm('resetProgram', { programKey: program })}>
-                    Reset {program.toUpperCase()} preparation
-                  </Button>}
+                  <div className="flex w-full flex-wrap items-center justify-between gap-x-3 gap-y-1 text-sm text-gray-600 sm:w-auto sm:justify-start">
+                    <span role="status">{saveStatus}</span>
                   {preparationAction}
                   </div>
                 </div>
-                {(unanswered.length > 0 || program === 'co' || allConfident) && <div className="my-3">
-                  {unanswered.length > 0 && <p className="mb-1 text-sm font-medium text-amber-900" aria-live="polite">{unanswered.length} {unanswered.length === 1 ? 'proposal needs' : 'proposals need'} a confidence choice</p>}
-                  <p className="max-w-2xl text-sm text-gray-600">
-                    {program === 'co'
-                      ? outdated ? 'Rebuild the combined list from your latest assessments before marking Ready.'
-                        : !combinedComplete ? 'Answer confidence for every proposal, then confirm the combined order.'
-                          : own.co.confirmed ? 'Your combined order is confirmed. You can keep editing; select Ready when you are finished.'
-                            : 'Review and adjust the merged order and dividers, then confirm the combined order. Only Ready marks your preparation finished.'
-                      : !allConfident ? currentProgramComplete
-                        ? `All confidence choices in ${currentProgram.name} are answered. Continue to ${nextProgram.name}; you can return to edit either list.`
-                        : 'Choose Confident or Not sure on the highlighted cards.'
-                        : own.co ? combinedOutdated ? 'You can keep editing, or rebuild the combined list from your latest assessments before marking Ready.'
-                          : 'You can keep editing, or review your combined list. Only Ready marks your preparation finished.'
-                          : 'You can keep editing, or create your combined list. Only Ready marks your preparation finished.'}
-                  </p>
-                </div>}
+                {preparationHint && <p className={`mb-3 text-sm ${unanswered.length || outdated ? 'text-amber-900' : 'text-gray-600'}`} aria-live="polite">{preparationHint}</p>}
               </>
-            )}
-            {outdated && (
-              <p className="my-3 text-amber-800">
-                Your combined list is from before your latest program changes.
-                Rebuilding it uses your current program assessments and replaces changes made only to the combined list.
-              </p>
             )}
           </>
         ))}
@@ -1323,7 +1310,8 @@ export default function AssessmentWorkflow({
         view.workflow.stage === 'private') ||
         (section === 'group' && collective)) && (
         <>
-          <div className="mb-4 flex flex-wrap items-center gap-x-5 gap-y-2 text-sm">
+          <p className="sr-only">Peer review grades: E Excellent, VG Very good, G Good, F Fair, P Poor.</p>
+          <div className="mb-3 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm">
             <span className="flex items-center gap-2">
               <Grade value="A" /> Fund
             </span>
@@ -1340,11 +1328,7 @@ export default function AssessmentWorkflow({
               <span aria-hidden="true" className="h-6 w-6 rounded border-2 border-dashed border-gray-600" /> Not sure
             </span>
           </div>
-          <p className="mb-3 text-xs text-gray-600">
-            Peer grades: E Excellent · VG Very good · G Good · F Fair · P Poor.
-            MR/SE program · E/W geography.
-          </p>
-          <form className="mb-2 flex gap-2" onSubmit={findProposal}>
+          <form className="mb-2 flex flex-wrap items-center gap-2" onSubmit={findProposal}>
             <label className="sr-only" htmlFor="ranking-find">
               Find proposal
             </label>
@@ -1354,16 +1338,15 @@ export default function AssessmentWorkflow({
               onChange={(e) => setFind(e.target.value)}
               placeholder="Find proposal"
               aria-describedby="ranking-find-result"
-              className="w-full max-w-sm rounded-md border p-2 text-sm"
+              className="min-w-0 max-w-sm flex-1 rounded-md border p-2 text-sm"
             />
             <button className={buttonClass}>Find</button>
+            <span className="basis-full self-center text-xs text-gray-600 sm:basis-auto">MR/SE program · E/W geography</span>
           </form>
           <p id="ranking-find-result" aria-live="polite" className="mb-3 text-sm text-gray-600">{currentFindResult?.message}</p>
           {section === 'prepare' && showMissingConfidence && (
-            <div role="alert" className="mb-4 rounded-lg border border-red-600 bg-red-50 p-4 text-red-900">
-              <p className="font-semibold">Before continuing, choose Confident or Not sure for these proposals:</p>
-              <ul className="mt-2 list-disc pl-5">{unanswered.map((id) => <li key={id}>{proposals.find((p) => p.requestId === id)?.organization}</li>)}</ul>
-              <p className="mt-2">Their cards are outlined in red. Use Go to next unanswered to reach each one.</p>
+            <div className="mb-4 rounded-lg border border-red-600 bg-red-50 p-4 text-red-900">
+              <p>Choose Confident or Not sure on the outlined cards. Use Continue to reach each one.</p>
             </div>
           )}
           <AssessmentList
@@ -1381,6 +1364,9 @@ export default function AssessmentWorkflow({
             showMissingConfidence={showMissingConfidence}
           />
           {section === 'prepare' && assessment.order.length > 5 && <div className="mt-5 flex justify-end">{preparationAction}</div>}
+          {section === 'prepare' && program !== 'co' && <div className="mt-5 flex justify-end border-t border-gray-200 pt-3">
+            <Button variant="link" disabled={!editable || busy} onClick={() => confirm('resetProgram', { programKey: program })}>Reset this list</Button>
+          </div>}
         </>
       )}
       {view.viewer.isFacilitator && active && (

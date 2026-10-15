@@ -68,7 +68,6 @@ async function prepare(actor) {
     });
   }
   await send('buildCombined', actor);
-  await send('confirmCombined', actor);
   await send('ready', actor);
 }
 beforeEach(() => {
@@ -152,6 +151,25 @@ beforeEach(() => {
         };
     },
   );
+});
+
+test('ready writes combined confirmation, readiness, and its receipt in one commit', async () => {
+  await prepare(alice);
+
+  const commit = commitAssessmentChanges.mock.calls.at(-1)[0];
+  const combinedUpdate = commit.updates.find(({ patch }) => {
+    const value = JSON.parse(patch.wmkf_assessmentjson);
+    return Boolean(value.ready);
+  });
+  const combined = JSON.parse(combinedUpdate.patch.wmkf_assessmentjson);
+  expect(combined.confirmed).toBe(true);
+  expect(combined.ready.combinedVersion).toBe(combined.version);
+  expect(commit.creates.some((row) => row.wmkf_listkey.startsWith('o:')
+    && JSON.parse(row.wmkf_assessmentjson).outcome.action === 'ready')).toBe(true);
+
+  const view = await readWorkflowRound({ roundId, actor: alice });
+  expect(view.own.co.confirmed).toBe(true);
+  expect(view.progress.find((person) => person.systemUserId === alice).ready).toBe(true);
 });
 
 test('private response excludes actual peer assessments; superuser gets no content', async () => {
