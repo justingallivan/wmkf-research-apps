@@ -5,6 +5,9 @@ jest.mock('../../lib/services/proposal-ranking/test-policy.js', () => ({
 import { getRankingTestPolicy, RANKING_TEST_REQUESTS } from '../../lib/services/proposal-ranking/test-policy.js';
 jest.mock('../../lib/dataverse/adapters/proposal-ranking.js', () => ({
   readRound: jest.fn(),
+  readAssessmentRound: jest.fn(),
+  readAssessmentRows: jest.fn(),
+  commitAssessmentChanges: jest.fn(),
   listRoundRows: jest.fn(),
   patchRound: jest.fn(),
   patchRoundAndList: jest.fn(),
@@ -35,7 +38,7 @@ jest.mock('../../lib/services/proposal-ranking/preview-service.js', () => ({
 }));
 
 import {
-  readRound, listRoundRows, patchRound, patchRoundAndList, findCycleCoordinator,
+  readRound, readAssessmentRound, readAssessmentRows, commitAssessmentChanges, listRoundRows, patchRound, patchRoundAndList, findCycleCoordinator,
   findRoundByCreationOperation, makeOpenOperations, createRoundAndLists,
   cancelRoundChangeset,
 } from '../../lib/dataverse/adapters/proposal-ranking.js';
@@ -46,9 +49,11 @@ import { listAllGrantsForAdmin } from '../../lib/services/app-access-service.js'
 import { readDefaultFacilitator, readDefaultFacilitators, saveDefaultFacilitator, saveDefaultFacilitators } from '../../lib/services/proposal-ranking/config.js';
 import { handleProposalRankingAction, handleProposalRankingGet } from '../../lib/services/proposal-ranking/service.js';
 import { handleProposalRankingAdminSettings } from '../../lib/services/proposal-ranking/service.js';
+import { makeInitialWorkflowRecords, readWorkflowRound } from '../../lib/services/proposal-ranking/workflow-service.js';
 
 const facilitatorId = '11111111-1111-4111-8111-111111111111';
 const participantId = '22222222-2222-4222-8222-222222222222';
+const secondaryFacilitatorId = '44444444-4444-4444-8444-444444444444';
 const seId = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
 const mrId = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb';
 const dynamicsStaffId = 'f1111111-1111-1111-1111-111111111111';
@@ -110,6 +115,8 @@ function setupRound() {
     makeList('meeting:mr', 'mr', null, 100000002, [mrId]),
   ];
   readRound.mockImplementation(async () => ({ ...round }));
+  readAssessmentRound.mockImplementation(async () => ({ ...round }));
+  readAssessmentRows.mockImplementation(async (_roundId, keys) => rows.filter((row) => keys.includes(row.wmkf_listkey)).map((row) => ({ ...row })));
   listRoundRows.mockImplementation(async () => rows.map((row) => ({ ...row })));
   patchRoundAndList.mockImplementation(async (_round, list, roundPatch, listPatch) => {
     Object.assign(round, roundPatch, { '@odata.etag': 'W/"round-v2"' });
@@ -205,6 +212,69 @@ describe('Proposal Ranking service access and voting', () => {
       action: 'saveAssessment', profileId: 'profile-facilitator',
       body: { action: 'saveAssessment', roundId: round.wmkf_proposalrankingroundid },
     })).rejects.toMatchObject({ status: 409, code: 'unsupported_version' });
+  });
+
+  test('top-level dispatch authorizes a nonparticipant secondary facilitator for v2 action, history, and supplements', async () => {
+    const snapshot = { ...JSON.parse(round.wmkf_snapshotjson), version: 2 };
+    const initial = makeInitialWorkflowRecords(
+      snapshot,
+      round.wmkf_proposalrankingroundid,
+      facilitatorId,
+      'open',
+      '2026-10-14T00:00:00.000Z',
+      { version: 1, systemUserIds: [facilitatorId, secondaryFacilitatorId], source: 'set', settingRevision: 'setting-r1' },
+    );
+    round.wmkf_snapshotjson = JSON.stringify(snapshot);
+    round.wmkf_workflowjson = JSON.stringify(initial.workflow);
+    rows = initial.lists.map((row) => ({ ...row, '@odata.etag': `W/"${row.wmkf_listkey}"` }));
+    readAssessmentRound.mockImplementation(async () => ({ ...round }));
+    readAssessmentRows.mockImplementation(async (_roundId, keys) => rows.filter((row) => keys.includes(row.wmkf_listkey)).map((row) => ({ ...row })));
+    resolveProfileToSystemUser.mockResolvedValue({ systemuserid: secondaryFacilitatorId });
+
+    const view = await readWorkflowRound({
+      roundId: round.wmkf_proposalrankingroundid,
+      actor: secondaryFacilitatorId,
+    });
+    expect(view.viewer.isFacilitator).toBe(true);
+    expect(view.viewer.isRosterParticipant).toBe(false);
+
+    const operationId = 'cccccccc-cccc-4ccc-8ccc-cccccccccccc';
+    await expect(handleProposalRankingAction({
+      action: 'reveal',
+      profileId: 'profile-secondary-facilitator',
+      body: {
+        action: 'reveal', roundId: round.wmkf_proposalrankingroundid,
+        operationId, roundEtag: round['@odata.etag'], policyRevision: 1,
+        preparationVersion: 1, revealId: null,
+        confirmationFingerprint: view.confirmations.reveal.fingerprint,
+      },
+    })).rejects.toMatchObject({ code: 'incomplete_readiness', status: 409 });
+
+    await expect(handleProposalRankingAction({
+      action: 'history',
+      profileId: 'profile-secondary-facilitator',
+      body: { action: 'history', roundId: round.wmkf_proposalrankingroundid },
+    })).resolves.toMatchObject({ entries: [], before: null });
+
+    await expect(handleProposalRankingAction({
+      action: 'exportWorkbook',
+      profileId: 'profile-secondary-facilitator',
+      body: {
+        action: 'exportWorkbook', roundId: round.wmkf_proposalrankingroundid,
+        roundEtag: round['@odata.etag'], preparationVersion: 1,
+        revealId: null, listVersion: 1,
+      },
+    })).rejects.toMatchObject({ code: 'invalid_transition', status: 409 });
+
+    await expect(handleProposalRankingAction({
+      action: 'save',
+      profileId: 'profile-secondary-facilitator',
+      body: {
+        action: 'save', roundId: round.wmkf_proposalrankingroundid,
+        programKey: 'se', order: [seId], etag: 'W/"list"', policyRevision: 1,
+        operationId: 'dddddddd-dddd-4ddd-8ddd-dddddddddddd',
+      },
+    })).rejects.toMatchObject({ code: 'unsupported_version', status: 409 });
   });
 
   test('accepts real Dataverse GUID formats throughout round reads', async () => {

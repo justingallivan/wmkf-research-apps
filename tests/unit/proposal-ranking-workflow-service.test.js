@@ -168,6 +168,28 @@ test('private response excludes actual peer assessments; superuser gets no conte
   expect(admin.round.snapshot.proposals).toEqual([]);
   expect(admin.own).toBeNull();
   expect(admin.facilitatorLists).toBeNull();
+  expect(admin.progress).toHaveLength(snapshot.roster.length);
+
+  const participantSuperuser = await readWorkflowRound({ roundId, actor: alice, isSuperuser: true });
+  expect(participantSuperuser.round.snapshot.proposals).toHaveLength(snapshot.proposals.length);
+  expect(participantSuperuser.own).not.toBeNull();
+  expect(participantSuperuser.own.co).not.toBeNull();
+  expect(participantSuperuser.facilitatorLists).toBeNull();
+});
+
+test('a nonfacilitator participant can reset their own program preparation', async () => {
+  const before = await readWorkflowRound({ roundId, actor: bob });
+  await send('saveAssessment', bob, {
+    programKey: 'mr',
+    listVersion: before.own.mr.version,
+    assessment: { ...before.own.mr, confidence: { m: 'confident' } },
+  });
+  const reset = await send('resetProgram', bob, { programKey: 'mr' });
+  expect(reset.result.operation).toMatchObject({ status: 'confirmed', result: { action: 'resetProgram' } });
+  const after = await readWorkflowRound({ roundId, actor: bob });
+  expect(after.own.mr.order).toEqual(['m']);
+  expect(after.own.mr.confidence).toEqual({});
+  expect(after.facilitatorLists).toBeNull();
 });
 
 test('captured second facilitator gets facilitator actions without anyone else’s private assessments', async () => {
@@ -311,7 +333,11 @@ test('history is newest-first across numeric boundaries even when storage sorts 
         at: `time-${i}`,
         collective: {
           order: ['s', 'm'], boundaries: [1, 1], version: i,
-          individuals: [{ systemUserId: alice, name: 'Alice', order: ['s', 'm'], boundaries: [1, 1], ready: 'private-marker' }],
+          individuals: [{
+            systemUserId: alice, name: 'Alice', order: ['s', 'm'], boundaries: [1, 1],
+            confidence: { s: 'confident' }, version: i, sourceVersions: { mr: i }, confirmed: true,
+            ready: { operationId: 'private-ready-operation' }, privateAssessment: 'must-not-leak',
+          }],
           privateOperationId: 'must-not-leak',
         },
         privateRequestHash: 'must-not-leak',
@@ -334,6 +360,11 @@ test('history is newest-first across numeric boundaries even when storage sorts 
   expect(result.entries[0]).not.toHaveProperty('privateRequestHash');
   expect(result.entries[0].collective).not.toHaveProperty('privateOperationId');
   expect(result.entries[0].collective.individuals[0]).not.toHaveProperty('ready');
+  expect(result.entries[0].collective.individuals[0]).not.toHaveProperty('privateAssessment');
+  expect(result.entries[0].collective.individuals[0]).not.toHaveProperty('ready');
+  expect(result.entries[0].collective.individuals[0]).toMatchObject({
+    systemUserId: alice, name: 'Alice', order: ['s', 'm'], version: 12, confirmed: true,
+  });
   expect(result.before).toBe(2);
 });
 
