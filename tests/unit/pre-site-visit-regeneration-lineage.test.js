@@ -115,6 +115,16 @@ test('group-review replacement atomically supersedes and rebinds both document p
   });
 });
 
+test('group-review replacement has a default clock when dependencies do not inject one', async () => {
+  const h = harness();
+  delete h.deps.now;
+  await expect(commitGroupReviewRegeneration(args(), h.deps)).resolves.toMatchObject({
+    wmkf_requestdocumentid: NEW_PRE,
+    wmkf_lifecyclestate: LIFE.FINAL,
+  });
+  expect(Number.isFinite(Date.parse(h.finalRows[1].wmkf_groupreviewstartedat))).toBe(true);
+});
+
 test('lost commit response is recovered only when both successor pointers and old states read back', async () => {
   const h = harness({ commitError: new Error('response lost') });
   h.deps.commitChangeset.mockImplementationOnce(async (operations) => {

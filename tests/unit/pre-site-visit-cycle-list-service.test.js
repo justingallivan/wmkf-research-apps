@@ -208,6 +208,33 @@ it('keeps the preparation receipt when its source is in the current document lin
   });
 });
 
+it('recognizes a preparation receipt beyond the ten displayed predecessor versions', async () => {
+  jest.useFakeTimers().setSystemTime(new Date('2026-12-02T00:00:00Z'));
+  grantRequestAdapter.queryAllRequests.mockResolvedValue({
+    records: [req(R1, { _wmkf_currentpresitevisit_value: 'writeup-current' })], capped: false,
+  });
+  const ancestors = Array.from({ length: 12 }, (_, index) => doc(`writeup-old-${index}`, R1, {
+    wmkf_lifecyclestate: L.SUPERSEDED,
+    ...(index > 0 ? { _wmkf_sourcedocument_value: `writeup-old-${index - 1}` } : {}),
+  }));
+  requestDocumentAdapter.findByRequests.mockResolvedValue({ records: [
+    ...ancestors,
+    doc('writeup-current', R1, { _wmkf_sourcedocument_value: 'writeup-old-11' }),
+  ], capped: false });
+  siteVisitAdapter.findSummariesByRequests.mockResolvedValue({ records: [{
+    _regardingobjectid_value: R1, activityid: 'visit-current', statecode: 1, statuscode: 2,
+    scheduledend: '2026-12-01T18:00:00Z',
+  }], capped: false });
+  listPreparationsForSchedules.mockResolvedValue(new Map([[R1, {
+    state: 'prepared', siteVisitId: 'visit-current', scheduledEndIso: '2026-12-01T18:00:00Z',
+    documentId: 'writeup-old-0', errorCode: null,
+  }]]));
+  const result = await list();
+  expect(result.artifacts[0].preparation).toMatchObject({
+    state: 'prepared', documentId: 'writeup-old-0', errorCode: null,
+  });
+});
+
 it('fails closed on an unclassified Site Visit state/status pair', async () => {
   delete process.env.STAFF_DELIBERATIONS_SITE_VISIT_STATE_STATUS_PAIRS;
   siteVisitAdapter.findSummariesByRequests.mockResolvedValue({ records: [

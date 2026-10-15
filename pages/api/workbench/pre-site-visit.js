@@ -24,7 +24,7 @@ import { getPreparationForRequest } from '../../../lib/services/pre-site-visit/p
 import { getFinalWriteupStatus } from '../../../lib/services/final-writeup/transition-service';
 import { readBriefFact } from '../../../lib/services/pre-site-visit/status-facts';
 import {
-  canChangeDraftWriteup, redactDraftWriteup, resolveWriteupViewer,
+  canChangeDraftWriteup, canSeeDraftWriteup, redactDraftWriteup, resolveWriteupViewer,
 } from '../../../lib/services/pre-site-visit/writeup-visibility';
 
 function sameId(left, right) {
@@ -102,7 +102,7 @@ export default async function handler(req, res) {
         try {
           const finalStatus = await getFinalWriteupStatus({
             requestId, isSuperuser: role === 'superuser', actingUserSystemId,
-            canSeeDraft: (leadId) => canChangeDraftWriteup(viewer, leadId),
+            writeupViewer: viewer,
           });
           finalReview = {
             ...finalStatus,
@@ -132,7 +132,7 @@ export default async function handler(req, res) {
           currentArtifact: redactDraftWriteup(status.currentArtifact, viewer, leadProgramDirectorId),
           pendingArtifact: redactDraftWriteup(status.pendingArtifact, viewer, leadProgramDirectorId),
           previousVersions: (status.previousVersions || []).map((version) => (
-            version.stage === 'group-review' || canChangeDraftWriteup(viewer, leadProgramDirectorId)
+            version.stage === 'group-review' || canSeeDraftWriteup(viewer, leadProgramDirectorId)
               ? version : { ...version, file: null, fileHidden: true }
           )),
         };

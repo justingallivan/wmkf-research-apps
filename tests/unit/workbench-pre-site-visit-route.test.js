@@ -44,6 +44,7 @@ import {
   getPreSiteVisitArtifactStatus,
 } from '../../lib/services/pre-site-visit/artifact-service';
 import { readDeliberationStageLabels } from '../../lib/services/deliberation-stage-labels';
+import { resolveFinalWriteupPersonas } from '../../lib/services/final-writeup/persona-service';
 import handler from '../../pages/api/workbench/pre-site-visit';
 import { REQUEST_DOCUMENT_OPERATION_STATUS } from '../../shared/config/requestDocument';
 
@@ -486,6 +487,28 @@ test('GET keeps previous-version files visible only to the lead or group-review 
   ]);
   expect(JSON.stringify(res.body)).not.toContain('private-old.docx');
   expect(JSON.stringify(res.body)).toContain('shared-old.docx');
+});
+
+test('GET lets Program Coordinators access previous post-visit writeup files', async () => {
+  const coordinatorId = '99999999-9999-4999-8999-999999999999';
+  getUserRole.mockResolvedValueOnce('staff');
+  requireAppAccess.mockResolvedValueOnce({ profileId: PROFILE_ID,
+    session: { user: { dynamicsSystemuserId: coordinatorId } } });
+  resolveFinalWriteupPersonas.mockResolvedValueOnce({ enabled: true, personas: ['program-coordinator'] });
+  getPreSiteVisitArtifactStatus.mockResolvedValueOnce({
+    leadProgramDirectorId: '22222222-2222-4222-8222-222222222222',
+    currentArtifact: { artifactId: 'current', lifecycleState: 100000001 },
+    previousVersions: [{ artifactId: 'old-draft', stage: 'post-visit-drafting', file: { webUrl: 'https://sharepoint.test/private-old.docx' } }],
+  });
+  const res = mockRes();
+  await handler(get(), res);
+  expect(res.statusCode).toBe(200);
+  expect(res.body.previousVersions).toEqual([
+    { artifactId: 'old-draft', stage: 'post-visit-drafting', file: { webUrl: 'https://sharepoint.test/private-old.docx' } },
+  ]);
+  expect(getFinalWriteupStatus).toHaveBeenCalledWith(expect.objectContaining({
+    writeupViewer: expect.objectContaining({ isCoordinator: true, actingUserSystemId: coordinatorId }),
+  }));
 });
 
 test('a draft published between the status read and the preparation read stays hidden', async () => {

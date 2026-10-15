@@ -1141,7 +1141,13 @@ export default function StaffDeliberationsTab({
               <p>Regeneration creates a new Word document from the current governed data. Edits in the current file will not carry over; it will remain under Previous versions.</p>
             )}
             {confirmDialog.stage === 'group-review' && (
-              <p>Colleagues may be editing the current file. Ask them to stop before continuing. They will receive a replacement notice and need to open the new file and sign off again. Later edits to the old file stay only in that previous version.</p>
+              <p>
+                Colleagues may be editing the current file. Ask them to stop before continuing.{' '}
+                {finalReview?.handoffEmailEnabled === true
+                  ? 'They will receive a replacement notice. '
+                  : 'Email notifications are off for this program; let colleagues know about the replacement. '}
+                They need to open the new file and sign off again. Later edits to the old file stay only in that previous version.
+              </p>
             )}
           </div>
         ),

@@ -393,6 +393,23 @@ test('group-review regeneration warns about replacement and submits the confirme
   expect(body.clientOperationId).toMatch(/^[0-9a-f-]{36}$/i);
 });
 
+test.each([
+  [true, /will receive a replacement notice/i, /Email notifications are off/],
+  [false, /Email notifications are off for this program/i, /They will receive a replacement notice/],
+])('group-review regeneration confirmation matches handoffEmailEnabled=%s', async (emailEnabled, shown, absent) => {
+  queueRoute('presiteGet', statusResponse({
+    currentArtifact: preSiteArtifact(FINAL),
+    finalReview: { phase: 'group-review', artifact: { artifactId: '55555555-5555-4555-8555-555555555555', sourceArtifactId: PRESITE_ARTIFACT_ID }, handoffEmailEnabled: emailEnabled },
+    writeupAccess: { canChange: true, identityLinked: true, canRegenerate: true },
+  }));
+  render(<StaffDeliberationsTab requestId={REQUEST_ID} />);
+  fireEvent.click(await screen.findByRole('button', { name: 'More writeup actions' }));
+  fireEvent.click(screen.getByRole('menuitem', { name: 'Regenerate Word Draft' }));
+  const dialog = screen.getByRole('dialog', { name: 'Regenerate this writeup?' });
+  expect(dialog).toHaveTextContent(shown);
+  expect(dialog).not.toHaveTextContent(absent);
+});
+
 test('previous writeup versions render their preserved file links', async () => {
   queueRoute('presiteGet', statusResponse({
     currentArtifact: preSiteArtifact(REVIEW),

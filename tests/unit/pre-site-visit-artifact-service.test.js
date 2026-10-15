@@ -1046,6 +1046,40 @@ test('read-only status returns the current Ready artifact without generation sid
   expect(harness.dependencies.downloadFile).toHaveBeenCalledTimes(sideEffectCounts.download);
 });
 
+test('status limits displayed history to ten while retaining complete predecessor ancestry for receipts', async () => {
+  const ancestors = Array.from({ length: 12 }, (_, index) => ({
+    wmkf_requestdocumentid: `old-${index}`,
+    _wmkf_request_value: REQUEST_ID,
+    wmkf_artifacttype: REQUEST_DOCUMENT_ARTIFACT_TYPE.PRE_SITE_VISIT,
+    wmkf_contenttype: PRE_SITE_VISIT_CONTRACT.contentType,
+    wmkf_operationstatus: REQUEST_DOCUMENT_OPERATION_STATUS.READY,
+    wmkf_lifecyclestate: REQUEST_DOCUMENT_LIFECYCLE_STATE.SUPERSEDED,
+    ...(index > 0 ? { _wmkf_sourcedocument_value: `old-${index - 1}` } : {}),
+    wmkf_sharepointweburl: `https://sharepoint.test/old-${index}.docx`,
+    createdon: `2026-08-${String(index + 1).padStart(2, '0')}T00:00:00Z`,
+  }));
+  const current = {
+    wmkf_requestdocumentid: ARTIFACT_ID,
+    _wmkf_request_value: REQUEST_ID,
+    wmkf_artifacttype: REQUEST_DOCUMENT_ARTIFACT_TYPE.PRE_SITE_VISIT,
+    wmkf_contenttype: PRE_SITE_VISIT_CONTRACT.contentType,
+    wmkf_operationstatus: REQUEST_DOCUMENT_OPERATION_STATUS.READY,
+    wmkf_lifecyclestate: REQUEST_DOCUMENT_LIFECYCLE_STATE.REVIEW,
+    _wmkf_sourcedocument_value: 'old-11',
+    wmkf_sharepointweburl: 'https://sharepoint.test/current.docx',
+    wmkf_sharepointversionid: '1.0',
+    wmkf_milestoneversionid: '1.0',
+    wmkf_milestonecontenthash: 'gdc1:current',
+    wmkf_milestonecreatedat: '2026-09-01T00:00:00Z',
+    createdon: '2026-09-01T00:00:00Z',
+  };
+  const harness = createHarness({ currentPointerRow: current, additionalRows: ancestors });
+  const status = await getPreSiteVisitArtifactStatus({ requestId: REQUEST_ID }, harness.dependencies);
+  expect(status.previousVersions).toHaveLength(10);
+  expect(status.previousVersionArtifactIds).toHaveLength(12);
+  expect(status.previousVersionArtifactIds).toContain('old-0');
+});
+
 test('read-only status projects current Ready plus milestone and newer pending rows while ignoring frozen and superseded rows', async () => {
   const harness = createHarness();
   await generatePreSiteVisitArtifact({ requestId: REQUEST_ID }, harness.dependencies);
