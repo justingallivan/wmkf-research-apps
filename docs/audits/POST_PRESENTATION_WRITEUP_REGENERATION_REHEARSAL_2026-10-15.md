@@ -3,7 +3,7 @@ title: Post-presentation writeup regeneration rehearsal
 kind: audit
 domain: workbench
 status: hosted-proof-blocked
-summary: Isolated browser rehearsal and read-only sandbox schema checks; hosted write-path proof remains blocked on a complete isolated fixture.
+summary: Browser checks passed; authorized sandbox setup stopped at an unexplained Factory account-version guard. No application model calls occurred.
 owner: product-engineering
 last_verified: 2026-10-15
 related:
@@ -16,7 +16,7 @@ related:
 Draft PR [486](https://github.com/justingallivan/wmkf-research-apps/pull/486),
 `codex/writeup-regenerate`. No production data operations, schema changes, merge or
 production promotion. The earlier Opus receipt remains source-review evidence.
-This receipt adds Mode A browser evidence and read-only sandbox metadata evidence;
+This receipt records Mode A browser evidence, sandbox metadata, and partial authorized sandbox setup;
 it does not establish hosted Dataverse/SharePoint replacement correctness.
 
 ## Isolated browser rehearsal
@@ -58,8 +58,8 @@ model generation is a throwing sentinel, and the cloned Request lacks a real lin
 project-leader Contact. Its injected seed identity cannot satisfy the actual route's
 regeneration inputs. The staff-deliberations Factory runner is production-only and
 was not run. The registered akoyaGO SharePoint site is shared, so sandbox Dataverse
-alone does not isolate file operations. No dedicated email ledger/delivery capture
-was verified.
+alone does not isolate file operations. The initial preflight had no dedicated email
+ledger; the later setup below provisioned one locally, without exercising delivery.
 
 Before Mode C hosted rehearsal: establish a dedicated sandbox Request with linked
 PI, complete inputs/narrative/reviews, authorized linked staff actor, exact current
@@ -86,5 +86,57 @@ passed 1,379 suites and found four contract failures. Follow-up changes:
 
 Luna implemented; Sol and parent reviewed. Five affected suites / 161 tests pass;
 scoped lint has zero errors (one existing unused-disable warning). DAL and Request
-Document writer gates and their self-tests passed sequentially. Full CI reruns on
-push; this receipt does not claim a pending run passed.
+Document writer gates and their self-tests passed sequentially. Full CI subsequently
+passed at `270269f625710c54047d28423d0dafee23fed9fd`: 1,383 suites / 23,822 tests,
+plus 10 Postgres integration suites / 130 tests. That result predates the sandbox
+harness additions below and is not a claim about their next CI run.
+
+
+## Authorized sandbox setup and stop condition
+
+[VERIFIED via private execution receipts and readbacks, 2026-10-15.] The owner
+selected Justin Gallivan as lead Program Director and John Sader as reviewing
+colleague, authorized sandbox role/audience setup, and allowed at most three
+application provider attempts. No second human login was needed for the planned
+service-level rehearsal. Agent reviews remain OAuth-only.
+
+The existing `wave23-final-writeup-reviewer` role specification was applied to
+those two enabled sandbox identities, with its six privileges verified. Missing
+Research-program matrix and canonical handoff subject/body settings were seeded
+and read back. These sandbox configuration changes remain in place. A separate
+local Postgres 16 container, `wmkf-writeup-regen-pg`, on loopback port 55439 holds
+the dedicated rehearsal database and local actor profile; existing application
+and Factory databases were not used. No schema changes were made to Dataverse.
+
+The first Factory create failed with the documented GoVerify remote-500 error;
+readback confirmed no Request, folder, location, or email. A fresh manifest then
+used the existing sandbox-only guarded GoVerify create-and-restore procedure.
+The sole Request POST returned 201, and Request **1000365**, its unique empty
+SharePoint folder, and its exact document location were created. The receipt
+verified GoVerify restored and active. No payment or email rows were created.
+
+The Factory nevertheless exited unsuccessfully: its final verification detected
+a Foundation account version-number change, with an unchanged modification
+timestamp and unchanged child Contacts. The Factory payload contains no account
+or contact write. A bounded read-only audit query returned no account audit rows
+in the window. A platform rollup is plausible but **unproven**; concurrent change
+cannot be excluded. The guard was not relaxed or rebased. Fixture completion and
+all model-bearing service operations stopped. Request 1000365 and its empty
+folder remain for inspection; no cleanup deletion occurred.
+
+**Application provider attempts: 0 of 3.** No generated Word document, synthetic
+PI/reviewer/schedule completion, group-review handoff, sign-off, or real email send
+occurred in this service rehearsal. The prepared runner captures notices and
+notifications, fences writes to the isolated fixture, records provider attempts
+before dispatch, and refuses automatic replay after an interrupted run. These
+are reviewed safeguards, not evidence that the live scenario passed.
+
+Luna built the helpers and runner; Sol reviewed them, and parent reviewed the
+final guards. The opt-in test was verified skipped by default; scoped lint and
+DAL, reviewer-engagement, and Request Document writer gates plus their sequential
+self-tests passed. The fixture helper requires a successful Factory verification
+and verified restoration before any dependent write. See the
+[setup record](../plans/WRITEUP_REGENERATION_SANDBOX_SETUP_2026-10-15.md) for scope.
+The PR stays draft. Resuming requires resolving the Factory verification failure
+with evidence; do not rerun either create or spend the unused model budget merely
+to work around this prerequisite.
