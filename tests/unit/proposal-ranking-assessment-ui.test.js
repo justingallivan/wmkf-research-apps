@@ -120,13 +120,14 @@ test('private MR and SE lists render their subsets and saving SE keeps it select
   await waitFor(() => expect(screen.getByRole('status').textContent).toBe('All changes saved'));
   expect(screen.getByRole('heading', { name: 'se institution' })).toBeTruthy();
   expect(screen.queryByRole('heading', { name: 'mr institution' })).toBeNull();
-  expect(screen.getByRole('button', { name: 'Science & Engineering' }).textContent).toContain('Complete');
+  expect(screen.getByRole('button', { name: 'Science & Engineering' }).textContent).toContain('All confidence choices answered');
   expect(screen.queryByRole('button', { name: 'Create combined list' })).toBeNull();
   fireEvent.click(screen.getAllByRole('button', { name: 'Continue to Medical Research →' })[0]);
   expect(screen.getByRole('heading', { name: 'mr institution' })).toBeTruthy();
   fireEvent.click(screen.getByRole('radio', { name: 'Confident' }));
   await waitFor(() => expect(screen.getAllByRole('button', { name: 'Create combined list' })[0].disabled).toBe(false));
   expect(screen.queryByRole('button', { name: /Continue to/ })).toBeNull();
+  expect(screen.getByText('You can keep editing, or create your combined list. Only Ready marks your preparation finished.')).toBeTruthy();
 });
 test('fresh preparation leaves every MR and SE confidence choice unselected', () => {
   const initial = view();
@@ -248,7 +249,7 @@ test('a changed completed source list routes back to rebuilding and confirming t
   expect(screen.getByText(/rebuild it from your latest assessments/i)).toBeTruthy();
   expect(screen.getByRole('button', { name: 'Combined list' }).textContent).toContain('Needs rebuild');
   fireEvent.click(screen.getAllByRole('button', { name: 'Review combined list →' })[0]);
-  expect(screen.getByText(/Rebuild from your latest program assessments/i)).toBeTruthy();
+  expect(screen.getByText(/Rebuild the combined list from your latest assessments/i)).toBeTruthy();
   fireEvent.click(screen.getAllByRole('button', { name: 'Rebuild combined list' })[0]);
   expect(sendProposalRankingAction).not.toHaveBeenCalledWith(expect.objectContaining({ action: 'buildCombined' }), expect.anything());
   fireEvent.click(screen.getByRole('button', { name: 'Build combined list' }));

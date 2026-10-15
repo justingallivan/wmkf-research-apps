@@ -1240,7 +1240,7 @@ export default function AssessmentWorkflow({
                     >
                       {label}
                       {key === 'co' && <span className="mt-1 block text-xs font-normal text-gray-600">{combinedOutdated ? 'Needs rebuild' : own.co.confirmed ? 'Confirmed' : 'Review order'}</span>}
-                      {key !== 'co' && <span id={`preparation-count-${key}`} className="mt-1 block text-xs font-normal text-gray-600">{programProgress.find((p) => p.key === key).answered === programProgress.find((p) => p.key === key).total ? 'Complete' : programProgress.find((p) => p.key === key).answered === 0 ? 'Not started' : 'In progress'}</span>}
+                      {key !== 'co' && <span id={`preparation-count-${key}`} className="mt-1 block text-xs font-normal text-gray-600">{programProgress.find((p) => p.key === key).answered === programProgress.find((p) => p.key === key).total ? 'All confidence choices answered' : programProgress.find((p) => p.key === key).answered === 0 ? 'Not started' : 'In progress'}</span>}
                     </button>
                   ))}
                   </div>
@@ -1255,28 +1255,28 @@ export default function AssessmentWorkflow({
                   {preparationAction}
                   </div>
                 </div>
-                {(unanswered.length > 0 || program === 'co' || (allConfident && own?.co)) && <div className="my-3">
+                {(unanswered.length > 0 || program === 'co' || allConfident) && <div className="my-3">
                   {unanswered.length > 0 && <p className="mb-1 text-sm font-medium text-amber-900" aria-live="polite">{unanswered.length} {unanswered.length === 1 ? 'proposal needs' : 'proposals need'} a confidence choice</p>}
                   <p className="max-w-2xl text-sm text-gray-600">
                     {program === 'co'
-                      ? outdated ? 'Rebuild from your latest program assessments before continuing.'
+                      ? outdated ? 'Rebuild the combined list from your latest assessments before marking Ready.'
                         : !combinedComplete ? 'Answer confidence for every proposal, then confirm the combined order.'
-                          : own.co.confirmed ? 'Your combined order is confirmed. Mark Ready when you are finished.'
-                            : 'Review the merged order and dividers, then confirm your combined order.'
+                          : own.co.confirmed ? 'Your combined order is confirmed. You can keep editing; select Ready when you are finished.'
+                            : 'Review and adjust the merged order and dividers, then confirm the combined order. Only Ready marks your preparation finished.'
                       : !allConfident ? currentProgramComplete
-                        ? `${currentProgram.name} is complete. Continue to ${nextProgram.name}. You can return to adjust either list.`
+                        ? `All confidence choices in ${currentProgram.name} are answered. Continue to ${nextProgram.name}; you can return to edit either list.`
                         : 'Choose Confident or Not sure on the highlighted cards.'
-                        : own.co ? combinedOutdated ? 'Both programs are complete. Review the combined list and rebuild it from your latest assessments.'
-                          : 'Both programs are complete. Continue to your combined list.'
-                          : 'Both programs are complete. Create your combined list to review MR and SE together.'}
+                        : own.co ? combinedOutdated ? 'You can keep editing, or review your combined list. Rebuild it from your latest assessments before marking Ready.'
+                          : 'You can keep editing, or review your combined list. Only Ready marks your preparation finished.'
+                          : 'You can keep editing, or create your combined list. Only Ready marks your preparation finished.'}
                   </p>
                 </div>}
               </>
             )}
             {outdated && (
               <p className="my-3 text-amber-800">
-                Your combined list was built before your latest program changes.
-                Rebuild it to continue; combined-only changes will be replaced.
+                Your combined list is from before your latest program changes.
+                Rebuilding it uses your current program assessments and replaces changes made only to the combined list.
               </p>
             )}
           </>
