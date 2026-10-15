@@ -152,7 +152,7 @@ const EXPECTED_HEADINGS = {
     'External review form',
   ],
   'workflows:proposal-ranking': [
-    'Proposal Ranking facilitator',
+    'Proposal Ranking facilitators',
   ],
   'workflows:final-writeups': [
     'Final Writeup staffing',
