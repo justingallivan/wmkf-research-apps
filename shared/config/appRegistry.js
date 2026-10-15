@@ -70,9 +70,9 @@ export const APP_REGISTRY = [
     name: 'Proposal Ranking',
     href: '/proposal-ranking',
     icon: '↕️',
-    description: 'Prepare private Program Director rankings and facilitate a shared proposal order by funding cycle',
+    description: 'Prepare private proposal assessments, reveal the group starting order, and build a shared recommendation by funding cycle',
     categories: ['phase-ii'],
-    features: ['Private PD Rankings', 'SE and MR Lists', 'Facilitated Composite', 'Meeting Order'],
+    features: ['Private Preparation', 'Combined Assessments', 'Group Discussion', 'Shared Facilitation'],
   },
   {
     key: 'peer-review-summarizer',

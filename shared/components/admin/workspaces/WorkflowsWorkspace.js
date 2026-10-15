@@ -121,8 +121,8 @@ export function WorkflowsWorkspace({ view }) {
       return (
         <AdminEditorPanel
           id="proposal-ranking-default-facilitator"
-          title="Proposal Ranking facilitator"
-          description="Choose the active staff member who can preview and open each cycle. Participants still need separate Proposal Ranking app access."
+          title="Proposal Ranking facilitators"
+          description="Choose one or two active staff members who can preview and open future ranking rounds. Changing these defaults does not change an active round. Participants still need separate Proposal Ranking app access."
           scope="Global setting"
         >
           <DefaultFacilitatorSettings />
