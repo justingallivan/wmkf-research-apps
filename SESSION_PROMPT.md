@@ -1,4 +1,52 @@
-# Session 608 Prompt: Cloudmersive diagnostics deployed; preserve other workstream handoffs
+# Session 609 Prompt: finish D26 ranking Preview acceptance; keep production separate
+
+## Session 608 Summary — D26 ranking candidate and dedicated test Preview (Codex, 2026-10-14/15 PT)
+
+### What Was Completed
+
+1. **The D26 release contract and implementation were reconciled.** [VERIFIED via main Git and the ranking branch.] Main documentation commits `a9aed5b87` (startup wiki blocker), `9e51152a7` (D26 privacy/facilitation contract and addendum), and `053bbcd6e` (Opus plan-review reconciliation) are present. The runtime candidate is on pushed branch **`codex/d26-ranking-release` at `c412d87cb`**; it has **not been merged into main**. Earlier implementation commits `26cc92dd5` through `9fe92f0ed` established captured membership, one or two facilitators, versioned workflow dispatch, private preparation, and guarded legacy controls. Source/contract detail and review receipts live on that branch in the D26 release plan, implementation addendum, API contract §8, ranking Atlas and implementation-review audit.
+2. **The preparation UI was simplified after the first candidate.** [VERIFIED via branch commits `68c5105b2` and `c412d87cb`, source and review.] Ready for group discussion is now one save-and-transition action; the separate confirm-then-Ready sequence is gone. The toolbar is compact; save status and preparation counts remain visible; refresh is quiet and reset is a direct, confirmed action at the bottom. Stale combined lists offer explicit rebuild confirmation and direct navigation. The letter-grade legend was removed, and peer-review tiles align with the PD's own grade. The in-progress, ready-to-combine and combined-list distinctions remain. Privacy, stale-save and rebuild guards remain in service code.
+3. **The dedicated test Preview is Ready for owner testing.** [VERIFIED via deployment receipt.] Candidate `c412d87cb` is deployed as `dpl_DFjfUyLxAGv2fa1Avoy1BZFKMgCV` at [the immutable Preview](https://wmkf-meeting-transcription-test-gdf9ez1ue.vercel.app); the stable test address is [the D97 ranking page](https://wmkf-meeting-transcription-test.vercel.app/proposal-ranking). The owner is testing **D97** there. **D96** remains a separate, retained synthetic service rehearsal; its six persisted checks are evidence for races, privacy, restart and export, not independent staff acceptance. No ranking runtime was promoted to production and no production ranking reset was performed in this session.
+4. **Verification is bounded and passed.** [VERIFIED via test/review receipts.] The earlier implementation at `9fe92f0ed` passed 25 suites / 269 tests, types, scoped lint and build. The `68c5105b2` simplification passed 48 focused tests, 72 overlapping regression tests, types, relevant documentation checks and build. The final `c412d87cb` tile change passed 20 UI tests and scoped lint; independent source/accessibility review found no remaining actionable issue. Local fictional-persona Chromium checks exercised the candidate, but were **not** independent Microsoft SSO, Safari or iPad acceptance. Opus review used subscription OAuth only; no API credits or separate metered review product was used.
+
+### Commits
+
+- **D26 service, rehearsal and review:** `26cc92dd5`, `789fc8ea4`, `26cb148a1`, `a5f4a83d8`, `69578a397`, `9fe92f0ed`, `d960893f8`, `492c408b5`.
+- **Preparation flow and UI:** `2badd6bd0`, `85be99e2a`, `d4e71bc43`, `a9e7374ec`, `c82444965`, `f53f8f05e`, `0c0f6d21a`, `e091dd82f`, `68c5105b2`, `c412d87cb`.
+- **Main documentation already present:** `a9aed5b87`, `9e51152a7`, `053bbcd6e`. The 18 branch commits above remain on `codex/d26-ranking-release`, outside main.
+
+### Next Items
+
+#### Verified Open
+
+- **Finish owner acceptance in the dedicated D97 Preview.** Exercise separate real staff sign-ins, private own-only preparation before reveal (including both facilitators), facilitator readiness-only visibility, the combined-list and group flow, and the final layout on the owner's devices. Current source/tests/fictional-browser checks do not stand in for those observations. Do not open or control the owner's Safari unless explicitly asked.
+- **Re-probe release-time state before any production cutover.** Check the exact 23 eligible D26 proposals and exclusions, current retained v1 trial, schema, flags, grants, active profiles, and branch/main integration. Read the branch's D26 release plan and current Atlas before proposing steps. The Preview deployment does not establish production readiness.
+
+#### Owner Decision Needed
+
+- **Production promotion and any live ranking reset or trial retirement remain separate decisions.** The owner repeatedly authorized the dedicated test Preview and D97 testing; that authorization does not promote the candidate or authorize a production data operation. Present current acceptance evidence and a concrete guarded cutover before requesting a production decision.
+
+#### Verify Before Acting
+
+- Preserve D96's retained synthetic data, D97 colleague work, unrelated untracked `output/` and `.impeccable/critique/` files, and existing worktrees. Local scratch receipts and fictional Chromium state are not portable evidence. Do not manufacture staff rankings or assume historical facilitator and round state still holds.
+- The prior Session 608 handoff and all older sections below are **historical snapshots**. In particular, their ranking branch names, “implementation paused,” and “no Preview deployment authorized” statements reflected their dates; use this entry, the current branch source and fresh owner decisions for active work. Other workstream follow-ups were not re-audited here.
+
+### References and stop verification
+
+| Source | Purpose |
+|---|---|
+| `codex/d26-ranking-release` at `c412d87cb` | Pushed D26 runtime candidate; `68c5105b2` and `c412d87cb` are the final preparation UI changes |
+| `docs/plans/PROPOSAL_RANKING_D26_RELEASE_2026-10-14.md` and `docs/plans/PROPOSAL_RANKING_D26_IMPLEMENTATION_ADDENDUM_2026-10-14.md` | Release sequence, privacy, dual facilitation and acceptance scope |
+| `docs/plans/PROPOSAL_RANKING_API_CONTRACT.md` §8 and `docs/atlas/dataverse-proposal-ranking.md` | Versioned behavior and persisted-state ownership |
+| `docs/audits/PROPOSAL_RANKING_D26_IMPLEMENTATION_REVIEW_2026-10-14.md` | Bounded implementation and review receipts |
+
+**Stop scope:** Main is at `053bbcd6e` before this handoff and contains documentation-only D26 commits; its ranking runtime remains unchanged. The current handoff is a documentation-only stop, and no new production milestone was shipped, so no `DEVELOPMENT_LOG.md` entry is needed. The claim-evidence pilot report returned “Claim-evidence observation report unavailable: local state could not be read”; no observation row was invented. The older main handoff and its unrelated Cloudmersive context are retained below.
+
+---
+
+## Prior handoffs — historical snapshots; verify current source, live state and owner decisions before acting
+
+## Previous Session 608 Prompt: Cloudmersive diagnostics deployed; preserve other workstream handoffs
 
 ## Session 607 Summary — materials upload diagnosis, stale-warning fix, and private scan diagnostics (Codex, 2026-10-14 PT)
 
