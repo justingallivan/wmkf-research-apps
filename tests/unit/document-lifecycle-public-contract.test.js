@@ -106,6 +106,9 @@ describe('governed document lifecycle public boundaries (Stage 0)', () => {
       'advanceToLeadershipReview',
       'buildFinalWriteupGenerationKey',
       'getFinalWriteupStatus',
+      // Approved Stage 1 composition seam: guarded/idempotent creation of a
+      // replacement Final successor from the Pre-Site producer.
+      'prepareRegeneratedFinalSuccessor',
       'projectFinalWriteupArtifact',
       'startFinalWriteup',
     ]);

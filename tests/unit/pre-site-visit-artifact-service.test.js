@@ -1,13 +1,13 @@
 import {
   buildPreSiteVisitIdentity,
   buildPreSiteVisitInputSnapshot,
-  buildPreSiteVisitRegenerationKey,
   generatePreSiteVisitArtifact,
   getPreSiteVisitArtifactStatus,
   projectPreSiteVisitArtifact,
   projectReopenHistory,
   SECTION_FIELDS,
 } from '../../lib/services/pre-site-visit/artifact-service.js';
+import { buildPreSiteVisitRegenerationKey } from '../../lib/services/pre-site-visit/artifact-model.js';
 import {
   PRE_SITE_DISTRIBUTION_CONTRACT,
   PRE_SITE_VISIT_CONTRACT,

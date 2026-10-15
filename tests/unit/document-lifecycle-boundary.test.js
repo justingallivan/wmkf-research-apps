@@ -1,7 +1,7 @@
 /** Permanent Stage8 architecture checks and negative fixtures run by npm test. */
 const path = require('path');
 const {
-  analyzeSources, loadSources, FACADES, HASH, AGENDA, COMPOSITION, WRITERS, BINDINGS, HASH_CONSUMERS,
+  analyzeSources, loadSources, FACADES, HASH, AGENDA, COMPOSITION, WRITERS, BINDINGS, HASH_CONSUMERS, COMPOSITION_IMPORTS,
 } = require('../helpers/document-lifecycle-boundary');
 
 const INTERNAL = 'lib/services/pre-site-visit/artifact-model.js';
@@ -35,6 +35,19 @@ test('live lifecycle imports, six scoped writer seams, and six adapter bindings 
   expect(result.bindingCounts).toEqual(Object.fromEntries(BINDINGS.map((file) => [file, 1])));
 });
 test('minimal complete fixture is accepted', () => expect(errorsFor(fixture())).toEqual([]));
+test('the regeneration composition permits only its two declared Final-service edges', () => {
+  const sources = fixture();
+  const artifactDeps = 'lib/services/pre-site-visit/artifact-dependencies.js';
+  const finalTransition = 'lib/services/final-writeup/transition-service.js';
+  const handoffEmail = 'lib/services/final-writeup/handoff-email-service.js';
+  sources.set(finalTransition, 'export function getFinalWriteupStatus() {}\nfunction save(dependencies) { dependencies.createDocument({}); }');
+  sources.set(handoffEmail, 'export function stageGroupReviewHandoff() {}');
+  sources.set(artifactDeps, `${sources.get(artifactDeps)}\nimport { getFinalWriteupStatus } from '../final-writeup/transition-service.js';\nimport { stageGroupReviewHandoff } from '../final-writeup/handoff-email-service.js';`);
+  expect(COMPOSITION_IMPORTS.size).toBe(2);
+  expect(errorsFor(sources)).toEqual([]);
+  sources.set(INTERNAL, "import '../final-writeup/transition-service.js';");
+  expectError(sources, 'internal facade dependency');
+});
 
 test.each([
   ['static', (spec) => `import '${spec}';`],
