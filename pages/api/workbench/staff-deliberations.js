@@ -9,6 +9,7 @@
  * Same `reviewers` app gate as the sibling initial-assessment route.
  */
 
+import { collectWorkbenchLoadTimings, workbenchServerTiming } from '../../../lib/services/workbench/load-timing';
 import { getUserRole, requireAppAccess } from '../../../lib/utils/auth';
 import { isGuid } from '../../../lib/utils/guid';
 import { actorRefFromSession } from '../../../lib/utils/actor-ref';
@@ -49,9 +50,11 @@ export default async function handler(req, res) {
         isSuperuser: role === 'superuser',
         actingUserSystemId: access.session?.user?.dynamicsSystemuserId || null,
       });
-      return res.status(200).json(await listPreSiteVisitDrafts({
+      const timing = await collectWorkbenchLoadTimings(() => listPreSiteVisitDrafts({
         cycleCode, programId, scope, callerSystemId, writeupViewer,
       }));
+      res.setHeader('Server-Timing', workbenchServerTiming(timing));
+      return res.status(200).json(timing.value);
     } catch (error) {
       if (error instanceof ServiceHttpError) {
         return res.status(error.httpStatus).json(error.body ?? { error: error.message });

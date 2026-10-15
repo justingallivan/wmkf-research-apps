@@ -7,8 +7,8 @@ import {
   getZoomVideoCopies, startZoomVideoCopy, cancelZoomVideoCopy,
 } from '../../../../../lib/services/meeting-tracker-recordings/video-copy-service.js';
 
-// Lists, starts and cancels the Zoom meeting video copy into SharePoint (Stage 3b plan). Start only queues the copy
-// (the every-minute cron moves the bytes), so this route is short.
+// Lists, starts and cancels the Zoom meeting video copy into SharePoint. Start queues new copies (the cron moves
+// bytes) or verifies missing metadata on an existing copy against Zoom and SharePoint without moving bytes.
 export const config = { api: { bodyParser: { sizeLimit: '8kb' } }, maxDuration: 60 };
 const START_KEYS = ['action', 'meetingUuid', 'replaces'];
 const CANCEL_KEYS = ['action', 'copyId'];

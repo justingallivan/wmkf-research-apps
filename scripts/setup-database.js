@@ -1633,6 +1633,7 @@ const v56Statements = [
     candidate_size BIGINT,
     request_document_id UUID,
     finalized_at TIMESTAMPTZ,
+    staff_dismissed_at TIMESTAMPTZ,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     CONSTRAINT presentation_material_uploads_artifact_type_check CHECK (

@@ -41,6 +41,7 @@ function dependencies(row = intent(), overrides = {}) {
     releaseUploadRecovery: jest.fn(async () => row),
     markUploadRecoveryTerminal: jest.fn(async () => row),
     markUploadRecoveryUncertain: jest.fn(async () => row),
+    dismissUploadRecovery: jest.fn(async () => ({ ...row, staff_dismissed_at: new Date() })),
     cancelUploadRecovery: jest.fn(async () => ({ ...row, state: 'abandoned' })),
     recordUploadRecoverySession: jest.fn(async () => ({ ...row, state: 'initiated' })),
     recordUploadCandidate: jest.fn(async () => ({ ...row, state: 'uploaded' })),
@@ -278,4 +279,48 @@ test('Retry retains an uncertain database commit instead of cancelling a possibl
   expect(d.recordEvent).toHaveBeenCalledWith(expect.objectContaining({
     eventType: 'post_presentation_upload_retry_persistence_uncertain',
   }));
+});
+
+const unauthorized = () => Object.assign(new Error('session rejected'), { status: 401 });
+test('401 offers explicit dismissal without treating the session as expired', async () => {
+  const d = dependencies(intent(), { cancelBrowserUploadSession: jest.fn(async () => { throw unauthorized(); }) });
+  await expect(cancelMp4Upload(cancelArgs, d)).rejects.toMatchObject({ code: 'post_presentation_upload_dismiss_available' });
+  expect(d.getFileMetadataByPath).toHaveBeenCalledTimes(4);
+  expect(d.dismissUploadRecovery).not.toHaveBeenCalled();
+  expect(d.cancelUploadRecovery).not.toHaveBeenCalled();
+});
+test('explicit dismissal preserves uncertain receipt after repeated absent reads', async () => {
+  const d = dependencies(intent(), { cancelBrowserUploadSession: jest.fn(async () => { throw unauthorized(); }) });
+  await expect(cancelMp4Upload({ ...cancelArgs, dismissUncertain: true }, d)).resolves.toEqual({ uploadId: UPLOAD_ID, dismissed: true });
+  expect(d.dismissUploadRecovery).toHaveBeenCalledWith({ uploadId: UPLOAD_ID, leaseToken: LEASE });
+  expect(d.cancelUploadRecovery).not.toHaveBeenCalled();
+  expect(d.releaseUploadRecovery).toHaveBeenCalled();
+});
+test('dismissal preserves a completed file discovered after the rejected cancellation', async () => {
+  const item = { siteId: 'site', driveId: 'drive', id: 'item', name: FILENAME, size: 100, eTag: 'etag', versionId: '1.0' };
+  const d = dependencies(intent(), {
+    cancelBrowserUploadSession: jest.fn(async () => { throw unauthorized(); }),
+    getFileMetadataByPath: jest.fn().mockResolvedValueOnce(null).mockResolvedValue(item),
+    getFileMetadataById: jest.fn(async () => item),
+  });
+  await expect(cancelMp4Upload({ ...cancelArgs, dismissUncertain: true }, d)).resolves.toMatchObject({ complete: true, canFinalize: true });
+  expect(d.dismissUploadRecovery).not.toHaveBeenCalled();
+  expect(d.recordUploadCandidate).toHaveBeenCalled();
+});
+test('dismissal refuses a partial file and does not broaden other errors', async () => {
+  const d = dependencies(intent(), {
+    cancelBrowserUploadSession: jest.fn(async () => { throw unauthorized(); }),
+    getFileMetadataByPath: jest.fn(async () => ({ siteId: 'site', driveId: 'drive', id: 'item', name: FILENAME, size: 20 })),
+  });
+  await expect(cancelMp4Upload({ ...cancelArgs, dismissUncertain: true }, d)).rejects.toMatchObject({ code: 'post_presentation_upload_reconciliation_pending' });
+  expect(d.dismissUploadRecovery).not.toHaveBeenCalled();
+  const e = dependencies(intent(), { cancelBrowserUploadSession: jest.fn(async () => { throw Object.assign(new Error('outage'), { status: 503 }); }) });
+  await expect(cancelMp4Upload({ ...cancelArgs, dismissUncertain: true }, e)).rejects.toMatchObject({ status: 503 });
+  expect(e.dismissUploadRecovery).not.toHaveBeenCalled();
+});
+test('dismissal replay is idempotent and retry cannot resurrect a dismissed attempt', async () => {
+  const d = dependencies(intent({ staff_dismissed_at: '2026-09-28T00:00:00Z' }));
+  await expect(cancelMp4Upload(cancelArgs, d)).resolves.toEqual({ uploadId: UPLOAD_ID, dismissed: true });
+  await expect(retryMp4Upload(retryArgs, d)).rejects.toMatchObject({ code: 'post_presentation_upload_dismissed' });
+  expect(d.claimUploadRecovery).not.toHaveBeenCalled();
 });

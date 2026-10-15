@@ -1463,7 +1463,7 @@ test.each([
 test('an incomplete checkpoint cannot offer review readiness', async () => {
   queueRoute('presiteGet', statusResponse({ currentArtifact: { ...preSiteArtifact(REVIEW), milestone: null }, preparation: { due: true, state: 'blocked' } }));
   render(<StaffDeliberationsTab requestId={REQUEST_ID} onSelectTab={jest.fn()} />);
-  await screen.findByText('Automatic preparation needs attention. Your existing document has been preserved.');
+  await screen.findByText('Automatic preparation stopped before it finished. Your existing document has been preserved.');
   expect(screen.queryByRole('button', { name: 'Open group-review details' })).not.toBeInTheDocument();
 });
 
@@ -1493,6 +1493,45 @@ test('staff can finish corrections without receiving restricted correction audit
   expect(screen.getByTestId('deliberations-stage-sentence')).toHaveTextContent('Corrections in progress');
 });
 
+
+test('a correction-parked preparation is not reported as a problem and offers no Retry', async () => {
+  queueRoute('presiteGet', statusResponse({
+    currentArtifact: { ...preSiteArtifact(DRAFT), warnings: [{ code: 'section_over_target', message: 'Executive Summary is longer than suggested and may need editing.' }] },
+    correctionInProgress: true,
+    preparation: { due: true, state: 'blocked', errorCode: 'correction_reopen_requires_staff' },
+    timing: { availability: 'available', endIso: '2026-09-28T18:00:00Z' },
+  }));
+  render(<StaffDeliberationsTab requestId={REQUEST_ID} />);
+  expect(await screen.findByRole('button', { name: 'Finish corrections' })).toBeInTheDocument();
+  expect(screen.getByTestId('final-writeup-prerequisite')).toHaveTextContent('Open for corrections. Choose Finish corrections when your edits are done');
+  expect(screen.queryByTestId('preparation-blocked-reason')).not.toBeInTheDocument();
+  expect(screen.queryByRole('button', { name: 'Retry preparation' })).not.toBeInTheDocument();
+  expect(screen.queryByText(/working writeup is not ready yet/)).not.toBeInTheDocument();
+  expect(screen.queryByRole('heading', { name: 'Draft needs a quick edit check' })).not.toBeInTheDocument();
+});
+
+test('generation checks stop showing once staff record a version', async () => {
+  queueRoute('presiteGet', statusResponse({
+    currentArtifact: {
+      ...preSiteArtifact(REVIEW),
+      milestone: { ...preSiteArtifact(REVIEW).milestone, actorId: 'staff-1' },
+      warnings: [{ code: 'section_over_target', message: 'Executive Summary is longer than suggested and may need editing.' }],
+    },
+  }));
+  render(<StaffDeliberationsTab requestId={REQUEST_ID} />);
+  expect(await screen.findByText(/Findings from the presentation/)).toBeInTheDocument();
+  expect(screen.queryByText(/longer than suggested/)).not.toBeInTheDocument();
+});
+
+test.each([
+  ['schedule_requires_reconciliation', /more than one presentation is scheduled/, true],
+  ['document_pointer_changed', /writeup file was replaced/, false],
+])('a blocked preparation (%s) names its reason and offers Retry only when it can work', async (errorCode, reason, retry) => {
+  queueRoute('presiteGet', statusResponse({ currentArtifact: preSiteArtifact(DRAFT), preparation: { due: true, state: 'blocked', errorCode } }));
+  render(<StaffDeliberationsTab requestId={REQUEST_ID} />);
+  expect(await screen.findByTestId('preparation-blocked-reason')).toHaveTextContent(reason);
+  expect(Boolean(screen.queryByRole('button', { name: 'Retry preparation' }))).toBe(retry);
+});
 
 test('paused preparation retains manual foundation generation after the presentation', async () => {
   queueRoute('presiteGet', statusResponse({ preparation: { due: true, state: 'disabled' }, timing: { availability: 'available', endIso: '2026-09-28T18:00:00Z' } }));

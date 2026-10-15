@@ -399,3 +399,21 @@ test('no GUID appears anywhere in the rendered card with copies, a winner and th
   await within(panel).findByText(/This will replace/);
   expect(screen.getByTestId('recording-and-transcript-card').textContent).not.toMatch(GUID);
 });
+
+
+test.each(['snapshot', 'listing'])('legacy copy offers Verify video from %s without reimporting audio', async source => {
+  const legacy = copy({ state: 'copied', meetingUuid: UUID_B, needsVerification: true });
+  route({ state: { copies: { available: true, copies: source === 'snapshot' ? [legacy] : [] },
+    list: list({ b: { video: video({ copy: { id: COPY_ID, state: 'copied', needsVerification: true } }) } }) },
+  videoPost: () => {
+    state.copies = { available: true, copies: [{ ...legacy, needsVerification: false }] };
+    return response({ copy: { id: COPY_ID, state: 'copied' }, replayed: true, verified: true });
+  } });
+  const panel = await openPanel();
+  expect(within(panel).getByRole('radio', { name: /Oct 4/ })).toBeDisabled();
+  fireEvent.click(await within(panel).findByRole('button', { name: /^Verify video/ }));
+  await screen.findByText('Video verified. You can now create the presentation video.');
+  expect(posts('video')[0].body).toEqual({ action: 'start', meetingUuid: UUID_B, replaces: null });
+  expect(posts('audio')).toHaveLength(0);
+  await waitFor(() => expect(within(panel).queryByRole('button', { name: /^Verify video/ })).not.toBeInTheDocument());
+});

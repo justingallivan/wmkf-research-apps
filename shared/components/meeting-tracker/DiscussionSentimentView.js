@@ -1,7 +1,7 @@
 /**
  * Discussion Sentiment: compare how staff discussed the proposals staff choose (plan §4.5).
  * Staff tick proposals from a cycle's site visits, then analyze each one; the comparison table is built
- * from the stored per-proposal results. Nothing is read for a proposal until staff choose it.
+ * from the stored per-proposal results. The picker reads batched metadata; full results load on selection.
  * Every response is applied only while its row is still selected, still the latest request for that
  * row, and the page is mounted.
  */
@@ -21,6 +21,7 @@ const fmt = (formatter, value) => {
 const label = (value) => (value ? value.charAt(0).toUpperCase() + value.slice(1) : '');
 
 const STATUS = {
+  unavailable: { text: 'Status unavailable', tone: 'text-gray-600' },
   no_transcript: { text: 'No staff discussion transcript', tone: 'text-gray-600' },
   not_analyzed: { text: 'Not analyzed', tone: 'text-gray-700' },
   analyzing: { text: 'Analyzing…', tone: 'text-blue-800' },
@@ -155,6 +156,9 @@ export default function DiscussionSentimentView() {
   const [proposals, setProposals] = useState([]);
   // Lowercase ids of the cycle's proposals whose staff discussion transcript is bound, and whether that list may be incomplete.
   const [candidateIds, setCandidateIds] = useState(() => new Set());
+  const [statuses, setStatuses] = useState({});
+  const [statusFilter, setStatusFilter] = useState('all');
+  const statusSeq = useRef({});
   const [capped, setCapped] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -177,10 +181,12 @@ export default function DiscussionSentimentView() {
 
   const load = useCallback(async (nextProgramId, nextCycleCode) => {
     const token = ++loadToken.current;
+    const statusVersions = { ...statusSeq.current };
     setLoading(true);
     setError(null);
     setProposals([]);
     setCandidateIds(new Set());
+    setStatuses({});
     setCapped(false);
     const fetchDashboard = async (programKey, cycleKey) => {
       const query = new URLSearchParams({ projection: 'schedule', scope: 'all' });
@@ -223,6 +229,11 @@ export default function DiscussionSentimentView() {
       if (!mountedRef.current || token !== loadToken.current) return;
       setProposals(visits);
       setCandidateIds(new Set((candidates?.requestIds || []).map((id) => String(id).toLowerCase())));
+      setStatuses((previous) => Object.fromEntries((candidates?.requestIds || []).map((requestId) => {
+        const id = String(requestId).toLowerCase();
+        return [id, statusSeq.current[id] !== statusVersions[id] && previous[id]
+          ? previous[id] : candidates?.statuses?.[id] || { state: 'unavailable' }];
+      })));
       setCapped(candidates?.capped === true);
       setLoading(false);
     } catch (loadError) {
@@ -250,6 +261,7 @@ export default function DiscussionSentimentView() {
   // carryError keeps an action's failure message visible while the row reloads.
   const refresh = useCallback(async (id, carryError = null) => {
     const isLive = beginRequest(id);
+    const context = loadToken.current;
     patchRow(id, { phase: 'loading', error: carryError });
     let envelope = null;
     try {
@@ -260,11 +272,18 @@ export default function DiscussionSentimentView() {
     if (!isLive()) return;
     if (envelope?.ok) patchRow(id, { phase: 'ready', data: envelope.data, error: carryError });
     else patchRow(id, { phase: 'error', error: carryError || envelope?.data?.error || 'The analysis could not be loaded. Try again.' });
+    if (context === loadToken.current) {
+      const key = id.toLowerCase();
+      statusSeq.current[key] = (statusSeq.current[key] || 0) + 1;
+      const data = envelope?.ok ? envelope.data : null;
+      setStatuses((current) => ({ ...current, [key]: data ? {
+        state: data.state, hasCompletedAnalysis: Boolean(data.run), accepted: data.accepted, lastRunFailed: data.lastRunFailed,
+      } : { state: 'unavailable' } }));
+    }
   }, []);
 
   const act = async (id, busy, path, body) => {
-    // The picker checkbox can still untick a working row, so apply the result only if the row is still
-    // selected (and not unticked and re-ticked since) and the page is mounted.
+    // Keep action responses scoped to the same selected row and mounted page.
     const pick = pickSeq.current[id];
     const alive = () => mountedRef.current && selectedRef.current.has(id) && pickSeq.current[id] === pick;
     patchRow(id, { busy, error: null });
@@ -276,12 +295,13 @@ export default function DiscussionSentimentView() {
       message = 'That did not work. Check your connection and try again.';
     }
     if (!alive()) return;
-    patchRow(id, { busy: null, error: message });
     await refresh(id, message);
+    if (alive()) patchRow(id, { busy: null });
   };
 
   const toggle = (proposal) => {
     const id = proposal.requestId;
+    if (rows[id]?.busy) return;
     if (selectedRef.current.has(id)) {
       selectedRef.current.delete(id);
       setRows((current) => { const next = { ...current }; delete next[id]; return next; });
@@ -302,7 +322,18 @@ export default function DiscussionSentimentView() {
     const day = start.slice(0, 10);
     return (!from || day >= from) && (!to || day <= to);
   };
-  const visible = proposals.filter((proposal) => candidateIds.has(String(proposal.requestId).toLowerCase()) && inRange(proposal));
+  const pickerStatus = (proposal) => {
+    const status = statuses[String(proposal.requestId).toLowerCase()] || { state: 'unavailable' };
+    return rows[proposal.requestId]?.busy === 'analyzing' ? { ...status, state: 'analyzing' } : status;
+  };
+  const visible = proposals.filter((proposal) => {
+    if (!candidateIds.has(String(proposal.requestId).toLowerCase()) || !inRange(proposal)) return false;
+    const status = pickerStatus(proposal);
+    if (statusFilter === 'all') return true;
+    if (statusFilter === 'previously_analyzed') return status.hasCompletedAnalysis === true;
+    if (statusFilter === 'not_analyzed') return status.hasCompletedAnalysis === false;
+    return status.state === statusFilter;
+  });
 
   const selectedRows = sortSentimentRows(order.map((id) => ({ ...rows[id], id, record: rows[id]?.data?.runCurrent ? rows[id].data.run?.record : null })));
 
@@ -323,6 +354,16 @@ export default function DiscussionSentimentView() {
           onChange={(event) => { setCycleCode(event.target.value); void load(programId, event.target.value); }}>
           {cycles.map((cycle) => <option key={cycle.code} value={cycle.code}>{cycle.label || cycle.code}</option>)}
         </ToolbarSelect>
+        <ToolbarSelect id="sentiment-status" label="Analysis status" value={statusFilter}
+          onChange={(event) => setStatusFilter(event.target.value)}>
+          <option value="all">All</option>
+          <option value="previously_analyzed">Previously analyzed</option>
+          <option value="not_analyzed">Not analyzed</option>
+          <option value="out_of_date">Out of date</option>
+          <option value="analyzing">Analyzing</option>
+          <option value="unavailable">Status unavailable</option>
+        </ToolbarSelect>
+        <button type="button" className={outlineButton} disabled={loading || !cycleCode} onClick={() => load(programId, cycleCode)}>Refresh statuses</button>
         <label className="text-sm font-medium text-gray-700">Visit on or after
           <input type="date" value={from} onChange={(event) => setFrom(event.target.value)} className="mt-1 block h-12 rounded-xl border border-gray-300 px-3 text-base" />
         </label>
@@ -345,16 +386,23 @@ export default function DiscussionSentimentView() {
           <ul className="divide-y divide-gray-200 rounded-xl border border-gray-200 bg-white">
             {visible.map((proposal) => (
               <li key={proposal.requestId} className="flex items-center gap-3 px-4 py-3">
-                <input id={`pick-${proposal.requestId}`} type="checkbox" className="h-5 w-5" checked={Boolean(rows[proposal.requestId])} onChange={() => toggle(proposal)} />
+                <input id={`pick-${proposal.requestId}`} type="checkbox" className="h-5 w-5" checked={Boolean(rows[proposal.requestId])} disabled={Boolean(rows[proposal.requestId]?.busy)} onChange={() => toggle(proposal)} />
                 <label htmlFor={`pick-${proposal.requestId}`} className="min-w-0 flex-1 text-sm text-gray-900">
                   <span className="font-semibold">#{proposal.requestNumber}</span> {proposal.title || 'Untitled request'}
                   <span className="ml-2 text-gray-500">{fmt(DAY, proposal.siteVisit?.scheduledStartIso)}</span>
                 </label>
+                <div className="text-right text-xs" aria-live="polite">
+                  <span className={`inline-block rounded-full bg-gray-100 px-2 py-1 font-semibold ${(STATUS[pickerStatus(proposal).state] || STATUS.unavailable).tone}`}>
+                    {(STATUS[pickerStatus(proposal).state] || STATUS.unavailable).text}
+                  </span>
+                  {pickerStatus(proposal).accepted && <p className="mt-1 text-gray-600">Accepted{pickerStatus(proposal).accepted.current ? '' : ' (out of date)'}</p>}
+                  {pickerStatus(proposal).lastRunFailed && pickerStatus(proposal).state !== 'analyzing' && <p className="mt-1 text-amber-800">Last attempt failed</p>}
+                </div>
               </li>
             ))}
           </ul>
         ) : (
-          !error && <div className="rounded-xl border border-gray-200 bg-white p-6 text-sm text-gray-600">No proposals with a staff discussion transcript match. Choose another cycle or dates.</div>
+          !error && <div className="rounded-xl border border-gray-200 bg-white p-6 text-sm text-gray-600">No proposals with a staff discussion transcript match. Try another cycle, date range, or analysis status filter.</div>
         )}
         {!loading && !error && <p className="mt-2 text-xs text-gray-500">Showing proposals with a staff discussion transcript.</p>}
         {!loading && !error && capped && <p role="status" className="mt-1 text-sm text-amber-900">This list may be incomplete: the cycle has more documents than can be read at once. Ask an administrator if a proposal is missing.</p>}

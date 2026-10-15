@@ -611,3 +611,68 @@ describe('scanBytes — config / input guards', () => {
     expect(global.fetch).not.toHaveBeenCalled();
   });
 });
+
+
+describe('private scan diagnostics', () => {
+  test('preserves original format and member clues, without synthesized malware findings', async () => {
+    mockFetchSequence([() => ({ status: 200, body: { CleanResult: false, FoundViruses: [], ContainsInvalidFile: true,
+      VerifiedFileFormat: '.pages', ContentInformation: { RelevantSubfileName: 'Data/image.png', Hash_SHA1: 'sensitive-hash' }, raw: 'not-logged' } })]);
+    const { scanBytes } = await loadService();
+    const result = await scanBytes(Buffer.from('x'), 'deck.key');
+    expect(result.foundViruses[0].virusName).toBe('malformed file');
+    expect(result.scanDiagnostics).toMatchObject({ submittedExtension: '.key', detectedFormat: '.pages', nativeFindingCount: 0,
+      nativeThreatNames: [], relevantSubfile: 'Data/image.png', byteCount: 1, attempts: 1, responseValid: true, httpStatus: 200 });
+    const { sanitizeMetadata } = require('../../lib/services/operational-event-service');
+    expect(sanitizeMetadata({ scanDiagnostics: result.scanDiagnostics })).toEqual({ scanDiagnostics: result.scanDiagnostics });
+    expect(JSON.stringify(result.scanDiagnostics)).not.toMatch(/sensitive-hash|not-logged|malformed file/);
+    expect(fetchCalls).toHaveLength(1);
+  });
+
+  test.each([undefined, null, {}, [null], [{ VirusName: '' }]])('missing or malformed native findings remain unknown: %j', async (FoundViruses) => {
+    mockFetchSequence([() => ({ status: 200, body: { CleanResult: false, FoundViruses } })]);
+    const { scanBytes } = await loadService();
+    expect((await scanBytes(Buffer.from('x'), 'a.pdf')).scanDiagnostics.nativeFindingCount).toBeNull();
+  });
+
+  test('bounds and redacts native fields and rejects unknown fields', async () => {
+    const { sanitizeScanDiagnostics } = await loadService();
+    const result = sanitizeScanDiagnostics({ nativeFindingCount: 12, nativeThreatNames: ['EICAR-Test-Signature', 'secret=hidden', 'https://private.example/secret', 'z'.repeat(200), 'five', 'six'],
+      detectedFormat: 'https://private.example/secret', relevantSubfile: 'https://private.example/secret', elapsedMs: -1, attempts: Infinity, raw: 'secret', password: 'hidden' });
+    expect(result.nativeThreatNames).toEqual(['EICAR-Test-Signature', 'secret=[REDACTED]', '[REDACTED:long-token]', 'five']);
+    expect(result.detectedFormat).toBeNull();
+    expect(result.relevantSubfile).toBeNull();
+    expect(result.elapsedMs).toBeNull();
+    expect(result.attempts).toBeNull();
+    expect(result).not.toHaveProperty('password');
+    expect(result).not.toHaveProperty('raw');
+  });
+
+  test('native findings count and names precede legacy synthesis', async () => {
+    mockFetchSequence([() => ({ status: 200, body: { CleanResult: false, FoundViruses: [{ VirusName: 'EICAR-Test-Signature' }], ContainsMacros: true } })]);
+    const { scanBytes } = await loadService();
+    expect((await scanBytes(Buffer.from('x'), 'a.pdf')).scanDiagnostics).toMatchObject({ nativeFindingCount: 1, nativeThreatNames: ['EICAR-Test-Signature'] });
+  });
+
+  test('malformed JSON captures safe failure classification without changing retries', async () => {
+    global.fetch = jest.fn(async () => ({ ok: true, json: async () => { throw new SyntaxError('private response content'); } }));
+    const { scanBytes } = await loadService();
+    const error = await scanBytes(Buffer.from('x'), 'a.pdf').catch((e) => e);
+    expect(error).toBeInstanceOf(SyntaxError);
+    expect(error.scanDiagnostics).toMatchObject({ attempts: 1, failureKind: 'invalid_response' });
+    expect(JSON.stringify(error)).not.toContain('scanDiagnostics');
+    expect(JSON.stringify(error.scanDiagnostics)).not.toContain('private response content');
+    expect(global.fetch).toHaveBeenCalledTimes(1);
+  });
+
+  test('missing key records zero attempts; retries-exhausted records actual attempts', async () => {
+    const { scanBytes } = await loadService();
+    delete process.env.CLOUDMERSIVE_API_KEY;
+    const missing = await scanBytes(Buffer.from('x'), 'a.pdf').catch((e) => e);
+    expect(missing.scanDiagnostics).toMatchObject({ attempts: 0, failureKind: 'configuration' });
+    process.env.CLOUDMERSIVE_API_KEY = 'test-key-not-real';
+    mockFetchSequence([() => ({ status: 503 }), () => ({ status: 503 })]);
+    const failed = await scanBytes(Buffer.from('x'), 'a.pdf', { maxAttempts: 2 }).catch((e) => e);
+    expect(failed.scanDiagnostics).toMatchObject({ attempts: 2, failureKind: 'http', httpStatus: 503 });
+    expect(fetchCalls).toHaveLength(2);
+  });
+});

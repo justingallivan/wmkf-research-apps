@@ -40,7 +40,7 @@ const discussion = (requestId, { revision = REVISION, endMs = 70_000, id, cycle 
   wmkf_requestdocumentid: id || `d-${requestId}`, _wmkf_request_value: requestId, wmkf_artifacttype: STAFF_DISCUSSION_TRANSCRIPT, wmkf_producer: PRODUCER,
   wmkf_operationstatus: REQUEST_DOCUMENT_OPERATION_STATUS.READY, wmkf_sharepointdriveid: 'drive', wmkf_sharepointitemid: `d-item-${requestId}`,
   wmkf_generationkey: staffDiscussionTranscriptGenerationKey({ requestId, sourceRevisionId: revision, presentationEndMs: endMs }),
-  wmkf_cyclecode: cycle, createdon: '2026-10-06T00:00:00Z' });
+  wmkf_contenthash: SHA, wmkf_cyclecode: cycle, createdon: '2026-10-06T00:00:00Z' });
 
 let pages; let deps; let cycleMembers;
 const CALLER = { azureEmail: 'staff@example.org', profileId: 12, callerSystemId: '77777777-7777-4777-8777-777777777777', programId: undefined };
@@ -48,6 +48,8 @@ beforeEach(() => {
   pages = { [TRANSCRIPT]: { records: [], capped: false, hasMore: false }, [STAFF_DISCUSSION_TRANSCRIPT]: { records: [], capped: false, hasMore: false } };
   cycleMembers = {};
   deps = {
+    fetchCurrentPrompt: jest.fn(async () => ({ wmkf_promptversion: 3 })),
+    sentiments: { getCandidateRunSummaries: jest.fn(async ({ sources }) => sources.map(({ requestId }) => ({ request_id: requestId }))) },
     loadCycleRequests: jest.fn(async ({ cycleCode }) => ({ proposals: (cycleMembers[cycleCode] || []).map((requestId) => ({ requestId })) })),
     // Any cycle stamp; and deliberately returns every fixture row, so a row for an unlisted request must be ignored by the service.
     findDocumentsByRequests: jest.fn(async (_ids, type) => pages[type]),
@@ -68,7 +70,7 @@ test('only requests whose discussion TXT is bound are candidates; the cycle is q
   pages[TRANSCRIPT].records = [transcript(bound), transcript(stale), transcript(missing), transcript(noBoundary, { presentationEnd: null })];
   pages[STAFF_DISCUSSION_TRANSCRIPT].records = [discussion(bound), discussion(stale, { endMs: 65_000 }), discussion(noBoundary), discussion(orphan)];
   const result = await list();
-  expect(result).toEqual({ requestIds: [bound], capped: false });
+  expect(result).toMatchObject({ requestIds: [bound], capped: false, statuses: { [bound]: { state: 'not_analyzed', hasCompletedAnalysis: false } } });
   expect(deps.findDocumentsByRequests).toHaveBeenCalledTimes(2);
   expect(deps.findDocumentsByRequests).toHaveBeenCalledWith(cycleMembers.D26, TRANSCRIPT);
   expect(deps.findDocumentsByRequests).toHaveBeenCalledWith(cycleMembers.D26, STAFF_DISCUSSION_TRANSCRIPT);
@@ -157,7 +159,7 @@ test('request ids come only from the server-side listing, which receives the ses
 });
 
 test('an empty cycle makes no document query', async () => {
-  expect(await list()).toEqual({ requestIds: [], capped: false });
+  expect(await list()).toEqual({ requestIds: [], statuses: {}, capped: false });
   expect(deps.findDocumentsByRequests).not.toHaveBeenCalled();
 });
 
@@ -171,4 +173,46 @@ test('a request the feature is not available for is excluded; a global refusal i
   expect(result.requestIds).toEqual([b]);
   await expect(listDiscussionSentimentCandidates({ cycleCode: 'D26', ownerProfileId: 12, caller: CALLER },
     { ...deps, schemaReady: () => false, requestAllowed: () => true })).rejects.toMatchObject({ code: 'post_presentation_schema_not_ready' });
+});
+
+const seedCandidates = (...ids) => {
+  cycleMembers.D26 = ids;
+  pages[TRANSCRIPT].records = ids.map((id) => transcript(id));
+  pages[STAFF_DISCUSSION_TRANSCRIPT].records = ids.map((id) => discussion(id));
+};
+
+test('batch statuses use the already bound sources and one prompt read; no result content is returned', async () => {
+  const [a, b] = [rid(40), rid(41)];
+  seedCandidates(a, b);
+  deps.sentiments.getCandidateRunSummaries.mockResolvedValue([
+    { request_id: a, latest_ready: { completed_at: '2026-10-14T10:00:00Z' }, current_ready: { completed_at: '2026-10-14T10:00:00Z' },
+      latest: { status: 'generating', live_generating: true },
+      accepted_row: { source_artifact_id: `d-${a}`, source_content_hash: SHA, prompt_version: 3, record: { secret: 'not exposed' } } },
+    { request_id: b, latest_ready: { completed_at: '2026-10-13T10:00:00Z' },
+      latest: { status: 'generating', live_generating: false, created_at: '2026-10-14T10:00:00Z' } },
+  ]);
+  const result = await list();
+  expect(result.statuses[a]).toEqual({ state: 'analyzing', hasCompletedAnalysis: true, accepted: { current: true }, lastRunFailed: false });
+  expect(result.statuses[b]).toEqual({ state: 'out_of_date', hasCompletedAnalysis: true, accepted: null, lastRunFailed: true });
+  expect(deps.fetchCurrentPrompt).toHaveBeenCalledTimes(1);
+  expect(deps.sentiments.getCandidateRunSummaries).toHaveBeenCalledTimes(1);
+  expect(deps.sentiments.getCandidateRunSummaries).toHaveBeenCalledWith({ sources: [a, b].map((id) => ({
+    requestId: id, sourceArtifactId: `d-${id}`, sourceContentHash: SHA, promptVersion: 3,
+  })) });
+  expect(JSON.stringify(result)).not.toContain('not exposed');
+});
+
+test.each(['database', 'prompt', 'missing-row'])('unavailable %s metadata never reports not analyzed', async (failure) => {
+  const a = rid(40); seedCandidates(a);
+  if (failure === 'database') deps.sentiments.getCandidateRunSummaries.mockRejectedValue(new Error('private database error'));
+  if (failure === 'prompt') deps.fetchCurrentPrompt.mockRejectedValue(new Error('private prompt error'));
+  if (failure === 'missing-row') deps.sentiments.getCandidateRunSummaries.mockResolvedValue([]);
+  expect((await list()).statuses).toEqual({ [a]: { state: 'unavailable' } });
+});
+
+test('a failed first attempt has no completed analysis; acceptance can be stale independently', async () => {
+  const a = rid(40); seedCandidates(a);
+  deps.sentiments.getCandidateRunSummaries.mockResolvedValue([{ request_id: a,
+    latest: { status: 'failed', created_at: '2026-10-14T10:00:00Z' } }]);
+  expect((await list()).statuses[a]).toEqual({ state: 'not_analyzed', hasCompletedAnalysis: false, accepted: null, lastRunFailed: true });
 });

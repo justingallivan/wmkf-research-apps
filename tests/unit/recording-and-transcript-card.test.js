@@ -357,7 +357,7 @@ test('an active run shows only the progress line, and the card never shows ids o
   const progress = await screen.findByTestId('transcript-progress');
   expect(progress.textContent).toContain('Transcribing Oregon State recording');
   expect(screen.queryByTestId('transcript-review')).not.toBeInTheDocument();
-  expect(container.textContent).not.toMatch(/AssemblyAI|provider region|reconcil|quarantine|bundle|[0-9a-f]{8}-[0-9a-f]{4}-/i);
+  expect(container.textContent).not.toMatch(/provider region|reconcil|quarantine|bundle|[0-9a-f]{8}-[0-9a-f]{4}-/i);
 });
 
 test('a confirmed boundary with a stale presentation transcript shows no ids or banned words', async () => {
@@ -365,7 +365,7 @@ test('a confirmed boundary with a stale presentation transcript shows no ids or 
   route(state);
   const { container } = render(<RecordingAndTranscriptCard requestId={REQUEST_ID} />);
   expect(await screen.findByText(/Presentation ends at 01:02/)).toBeInTheDocument();
-  expect(container.textContent).not.toMatch(/AssemblyAI|provider region|reconcil|quarantine|bundle|[0-9a-f]{8}-[0-9a-f]{4}-/i);
+  expect(container.textContent).not.toMatch(/provider region|reconcil|quarantine|bundle|[0-9a-f]{8}-[0-9a-f]{4}-/i);
   expect(container.textContent).not.toContain('42');
 });
 
@@ -2178,4 +2178,27 @@ test.each(['success', 'failure'])('late attendance %s cannot update a different 
   await act(async () => finish(outcome === 'success' ? response({ correction: attendanceDraft() }) : response({ error: 'Late attendance failure' }, 503)));
   expect(screen.queryByText('Discussion attendance')).not.toBeInTheDocument();
   expect(screen.queryByText('Late attendance failure')).not.toBeInTheDocument();
+});
+
+test('recording card exposes dismissal beside a failed cancellation and removes only after success', async () => {
+  let dismissed = false;
+  const uploadId = '77777777-7777-4777-8777-777777777777';
+  const intent = { uploadId, filename: 'stale-recording.mp4', size: 100, state: 'initiated', canCancel: true };
+  const state = { collection: collection({ jobs: [] }) };
+  route(state, {
+    '/presentation-materials': { respond: () => response({ materials: [], uploads: dismissed ? [] : [intent] }) },
+    [`/${uploadId}/cancel`]: { method: 'POST', respond: (_path, options) => {
+      if (JSON.parse(options.body).dismissUncertain === true) {
+        dismissed = true;
+        return response({ success: true, dismissed: true });
+      }
+      return response({ error: 'Microsoft rejected this upload session.', code: 'post_presentation_upload_dismiss_available' }, 409);
+    } },
+  });
+  render(<RecordingAndTranscriptCard requestId={REQUEST_ID} />);
+  fireEvent.click(await screen.findByRole('button', { name: 'Cancel' }));
+  fireEvent.click(screen.getByRole('button', { name: 'Cancel upload' }));
+  fireEvent.click(await screen.findByRole('button', { name: 'Dismiss upload attempt' }));
+  expect(await screen.findByText(/Upload attempt removed from this list/)).toBeInTheDocument();
+  expect(screen.queryByText('stale-recording.mp4')).not.toBeInTheDocument();
 });

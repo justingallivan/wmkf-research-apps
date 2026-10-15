@@ -22,6 +22,7 @@
  * lib/services/workbench/dashboard-service.js.
  */
 
+import { collectWorkbenchLoadTimings, workbenchServerTiming } from '../../../lib/services/workbench/load-timing';
 import { requireAppAccess } from '../../../lib/utils/auth';
 import { actorRefFromSession } from '../../../lib/utils/actor-ref';
 import { withDalContext } from '../../../lib/dataverse/core/context';
@@ -52,7 +53,7 @@ export default async function handler(req, res) {
 
   return withDalContext('workbench-dashboard', async () => {
     try {
-      const body = await loadDashboard({
+      const timing = await collectWorkbenchLoadTimings(() => loadDashboard({
         azureEmail,
         profileId: access.profileId,
         callerSystemId: actorRefFromSession(access.session),
@@ -60,8 +61,9 @@ export default async function handler(req, res) {
         scope,
         includeSetAside,
         programId,
-      });
-      return res.status(200).json(body);
+      }));
+      res.setHeader('Server-Timing', workbenchServerTiming(timing));
+      return res.status(200).json(timing.value);
     } catch (err) {
       if (err instanceof ServiceHttpError) {
         return res.status(err.httpStatus).json(err.body ?? { error: err.message });

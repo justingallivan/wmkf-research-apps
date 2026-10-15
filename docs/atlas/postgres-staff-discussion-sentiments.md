@@ -3,7 +3,7 @@ title: "Atlas: Staff discussion sentiments (Postgres)"
 domain: postgres
 kind: state-page
 status: live
-summary: "staff_discussion_sentiments (migration 082) holds one row per staff discussion sentiment analysis run: a generating row before the provider call, the validated DeliberationSentiment record on ready rows, and Accept/Withdraw columns. Live since 2026-10-13: merge 62963a352; migration 082 applied in Production by the owner and the prompt seeded."
+summary: "staff_discussion_sentiments (migration 082) holds one row per staff discussion sentiment analysis run: a generating row before the provider call, the validated DeliberationSentiment record on ready rows, and Accept/Withdraw columns. Live since 2026-10-13: merge 62963a352; migration 082 applied in Production by the owner and the prompt seeded. Picker status badges/filter are live in Production since 2026-10-14 (PR #477, merge 6697bb6d8; deployment 7076811714 succeeded)."
 canonical: true
 cataloged: 2026-10-13
 owner: product-engineering
@@ -21,6 +21,8 @@ related:
 ## Status
 
 **[Shipped 2026-10-13 (merge `62963a352`; tolerant quote-match fix `1bb83c3a2`). Migration 082 was applied to Production by the owner (`applied_by` `owner-sentiment-2026-10-13`) and the `meeting-transcript.staff-discussion-sentiment` prompt v1 is seeded.]** The Meeting Tracker routes, the Discussion Sentiment page and the read service below are live; no consumer app calls the read service yet.
+
+**[PRODUCTION-DEPLOYED 2026-10-14: PR #477, merge `6697bb6d8`; GitHub Production deployment `7076811714` succeeded.]** The picker extension reads compact run metadata in one batch and shows status badges, acceptance/failure indicators, an Analysis status filter and Refresh statuses. It adds no schema or writes. Full analysis records still load only for selected requests.
 
 ## Ownership and contract
 
@@ -58,8 +60,8 @@ Currentness is computed in code (`isRunCurrent`): the source artifact id and con
 | Store | `lib/services/post-presentation-materials/discussion-sentiment-store.js` | All SQL. |
 | Service | `lib/services/post-presentation-materials/discussion-sentiment-service.js` | Analyze, accept, withdraw, and `getDiscussionSentimentStatus` (the page's per-request read; "still analyzing" uses the database clock via `live_generating`). |
 | Routes | `pages/api/meeting-tracker/visits/[requestId]/discussion-sentiment.js` (GET read, POST analyze), `.../discussion-sentiment/accept.js`, `.../discussion-sentiment/withdraw.js` | `requireAppAccess('meeting-tracker')`; actor from the session only. Staff-only: no Board or briefing token route imports them (`tests/unit/discussion-sentiment-exposure.test.js`). |
-| Picker candidates | `lib/services/post-presentation-materials/discussion-sentiment-candidates.js` behind `pages/api/meeting-tracker/discussion-sentiment/candidates.js` | `requireAppAccess('meeting-tracker')`. Lists the cycle's requests server-side (the schedule dashboard's own `loadMeetingTrackerSelection`), loads their TRANSCRIPT and STAFF_DISCUSSION_TRANSCRIPT documents by request id across all document cycles (`findByRequests`, with the bundle manifest) and returns the request ids whose discussion transcript is bound, via the analysis's own `bindCurrent`; `capped` when a document query hit the export cap. No write; no Postgres. |
-| Page | `pages/meeting-tracker/discussion-sentiment.js` (`DiscussionSentimentView`) | Meeting Tracker staff. Picker lists the cycle's dashboard proposals (existing schedule route) intersected with the candidates route (transcript-only). |
+| Picker candidates | `lib/services/post-presentation-materials/discussion-sentiment-candidates.js` behind `pages/api/meeting-tracker/discussion-sentiment/candidates.js` | `requireAppAccess('meeting-tracker')`. Lists the cycle's requests server-side (the schedule dashboard's own `loadMeetingTrackerSelection`), loads their TRANSCRIPT and STAFF_DISCUSSION_TRANSCRIPT documents by request id across all document cycles (`findByRequests`, with the bundle manifest) and returns the request ids whose discussion transcript is bound, via the analysis's own `bindCurrent`; `capped` when a document query hit the export cap. **[Production-deployed 2026-10-14, PR #477]** also returns `statuses` keyed by request id from one `getCandidateRunSummaries` Postgres read and one current prompt-version read. No analysis records or writes; status lookup failures become `unavailable`, never `not_analyzed`. |
+| Page | `pages/meeting-tracker/discussion-sentiment.js` (`DiscussionSentimentView`) | Meeting Tracker staff. Picker lists the cycle's dashboard proposals (existing schedule route) intersected with the candidates route (transcript-only). **[Production-deployed 2026-10-14, PR #477]** status badges and filters identify completed/current/stale/running analyses before selection; acceptance and last-failure indicators remain separate. Refresh statuses preserves selections; successful action reads update badges. Busy rows cannot be deselected. |
 | Consumer read service | `lib/services/post-presentation-materials/discussion-sentiment-reader.js` (`getDeliberationSentiments`) | Active profile with the Meeting Tracker grant or superuser, checked live. Returns a sentiment only for the accepted, not withdrawn, current row. No consumer wired. |
 
 ## Not covered

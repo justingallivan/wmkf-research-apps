@@ -2,8 +2,8 @@
 title: Meeting video split at the presentation end (Stage 4)
 kind: plan
 domain: transcription
-status: draft
-summary: "Design outline for cutting the copied Zoom meeting MP4 at the staff-confirmed presentation end into a Board-eligible presentation video only (no discussion video; owner 2026-10-09), approved by staff before Board release, with same-source proof, a frozen source identity, a durable split job and a processor contract. Venue research and local benchmarks by Codex are merged to main (228a97b5b). Session 591: coordinated with the Codex transcript-provenance contract; same-source check is metadata plus staff listen (hard gate 1 relaxed). Draft: nothing built."
+status: historical
+summary: "Historical Stage 4 design and owner decisions from October 9-10. Implementation and rollout are recorded in STAGE4_BUILD_PLAN_2026-10-10.md; source and Atlas govern current behavior. Missing copied-video metadata has a verified recovery path live in Production since 2026-10-14 (PR #476, merge 42f4770b7; deployment 7074045431 succeeded), with one authorized CLI repair on 1002852 completed October 14."
 owner: product-engineering
 related:
   - docs/plans/MEETING_RECORDING_WORKFLOW_PLAN_2026-10-07.md
@@ -15,7 +15,9 @@ related:
 
 # Meeting video split at the presentation end (Stage 4)
 
-**[DRAFT OUTLINE, Session 590, 2026-10-09.]** Nothing here is built or approved. This outline turns Stage 4 of `MEETING_RECORDING_WORKFLOW_PLAN_2026-10-07.md` (`:104-112`) into a design. The processing venue (where the cut runs) was researched by Codex (merged to `main` in `228a97b5b`; deliverable `docs/plans/STAGE4_VIDEO_PROCESSING_OPTIONS_2026-10-09.md`). This document defines what any venue must receive and return.
+**Historical design record, Sessions 590-592 (2026-10-09–10).** The original outline and planning sequence below are retained as design history, not current build or release instructions. The implemented split service is `lib/services/meeting-tracker-recordings/presentation-video-split-service.js`; implementation/rollout history is in `STAGE4_BUILD_PLAN_2026-10-10.md`. Current copy metadata ownership and recovery are documented in `docs/atlas/postgres-zoom-video-copies.md`.
+
+**Recovery update [PRODUCTION-DEPLOYED 2026-10-14]:** PR #476 (merge `42f4770b7`; GitHub Production deployment `7074045431` succeeded) adds verification of the original Zoom/SharePoint receipt and a fenced fill of missing times/hash, preserving transcript and speakers. The authorized CLI repair on 1002852 succeeded and a second dry run reported `repairNeeded: false`; the recovery UI/service deployment is independently verified above.
 
 **[Session 591, 2026-10-09] Coordination with the Codex speaker-label plan is agreed (owner approved).** Response and contract: `/tmp/zoom-attribution-stage4-response.md` against Codex's `/tmp/zoom-attribution-shared-contract.md` (both outside the repo; the decisions are recorded below). Stage 4 is unpaused for the Sandbox pilot only (done, see `STAGE4_SANDBOX_PILOT_RESULTS_2026-10-09.md`); Codex's provenance slice has since merged (`f3cc08540`, migration 077), so the Stage 4 build plan can proceed (decisions 15-17).
 
@@ -35,7 +37,7 @@ related:
 - **14. Ownership and order.** Codex first ships transcript provenance (Zoom file identity captured at import, `audioSha256`, frozen per publication and carried through corrections) with the import file-ID binding fix, then the discussion-exclusion policy and attendance checklist. Claude owns Stage 4 (mapping, processing, verification, split jobs, approval, Board eligibility) and runs the Sandbox pilot meanwhile. Shared files have one editor at a time: `bundle.js`, `import-service.js` and `zoom_recording_imports` are Codex's until the provenance slice merges; `presentation-transcript-binding.js` and `RecordingAndTranscriptCard.js` until the policy slice merges. Codex's migration precedes the split-job migration; numbers are claimed at build time.
 **Decided (owner, Session 591), coordinating with Codex's attendance slice (`/tmp/zoom-stage4-attendance-coordination.md`):**
 - **15. Fewest sessions and clicks; minimum regeneration** is the guiding principle. Duncan confirms the presentation end and the attendance list in one correction, published once, so derived outputs (transcripts, summaries, video) are generated once. Decision 11 stands: later edits are rare.
-- **16. Record the MP4's recording times.** Stage 4 adds `recording_start`/`recording_end` to `zoom_video_copies`, written at copy time; the same-source check requires them to equal the audio file's. Copy rows from before the change (1003222's included) block until re-copied.
+- **16. Record the MP4's recording times.** Stage 4 adds `recording_start`/`recording_end` to `zoom_video_copies`, written at copy time; the same-source check requires them to equal the audio file's. Missing times block a cut. The original plan proposed re-copying; the October 14 recovery release (PR #476) instead permits a verified fill of missing metadata without replacing the file or transcript (see the Atlas recovery contract).
 - **17. Migrations:** 078 is Codex's attendance/policy slice; **079 is Stage 4** (split-job table plus the decision 16 columns). Codex's provenance slice merged as 077 (`f3cc08540`). **Revised Session 592:** 079 holds only the decision 16 columns, so the owner can apply it early; the split-job table is 080 (`STAGE4_BUILD_PLAN_2026-10-10.md`).
 - **6 (venue), status.** Azure availability is pending an IT ticket (Dragonfly) with no quick answer expected. The first benchmark therefore targets Vercel Sandbox, per the research doc's fallback.
 

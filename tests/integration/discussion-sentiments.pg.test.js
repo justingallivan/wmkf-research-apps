@@ -15,7 +15,7 @@ jest.mock('@vercel/postgres', () => {
 
 import {
   reserveRun, recordFailedRun, completeRun, failRun, acceptRun, withdrawRun, getRun, getLatestRun,
-  getLatestCurrentReadyRun, getAcceptedRun, getLatestReadyRun, getProfileName, SENTIMENT_GENERATION_ABANDONED_SECONDS,
+  getCandidateRunSummaries, getLatestCurrentReadyRun, getAcceptedRun, getLatestReadyRun, getProfileName, SENTIMENT_GENERATION_ABANDONED_SECONDS,
 } from '../../lib/services/post-presentation-materials/discussion-sentiment-store.js';
 
 const { Client, Pool } = pg;
@@ -69,6 +69,40 @@ describeIf('staff discussion sentiment store (isolated local Postgres proof)', (
     if (pool) await pool.end();
     if (schema) await admin.query(`DROP SCHEMA "${schema}" CASCADE`);
     if (admin) await admin.end();
+  });
+
+  it('batch metadata agrees with individual reads, keeps earlier current results, and isolates requests', async () => {
+    const first = await ready();
+    await acceptRun({ id: first, requestId, profileId: profileA, expected: expected() });
+    // A newer ready run for a different prompt must not hide the current one.
+    const newer = await ready({}, 2);
+    await pool.query("UPDATE staff_discussion_sentiments SET completed_at=NOW() + INTERVAL '1 second' WHERE id=$1", [newer]);
+    const other = uuid(); const empty = uuid();
+    const failed = await reserve({ requestId: other });
+    await failRun({ id: failed.run.id, failureCode: 'test_failure' });
+    const sources = [requestId, other, empty].map((id) => ({ requestId: id, ...expected() }));
+    const snapshots = await getCandidateRunSummaries({ sources });
+    expect(snapshots).toHaveLength(3);
+    const own = snapshots.find((r) => r.request_id === requestId);
+    expect(new Date(own.current_ready.completed_at).toISOString()).toBe((await getLatestCurrentReadyRun({ requestId, ...expected() })).completed_at.toISOString());
+    expect(new Date(own.latest_ready.completed_at).toISOString()).toBe((await getLatestReadyRun({ requestId })).completed_at.toISOString());
+    expect(own.accepted_row).toEqual({ source_artifact_id: artifactId, source_content_hash: HASH, prompt_version: 1 });
+    expect(snapshots.find((r) => r.request_id === other)).toMatchObject({ latest: { status: 'failed' }, current_ready: null, latest_ready: null, accepted_row: null });
+    expect(snapshots.find((r) => r.request_id === empty)).toEqual({ request_id: empty, latest: null, current_ready: null, latest_ready: null, accepted_row: null });
+    expect(JSON.stringify(snapshots)).not.toContain('reception');
+    await withdrawRun({ id: first, requestId, profileId: profileA });
+    expect((await getCandidateRunSummaries({ sources })).find((r) => r.request_id === requestId).accepted_row).toBeNull();
+    expect(await getCandidateRunSummaries({ sources: [] })).toEqual([]);
+  });
+
+  it('batch live-generating classification uses the database clock and preserves a completed result', async () => {
+    await ready();
+    const { run } = await reserve();
+    const sources = [{ requestId, ...expected() }];
+    expect((await getCandidateRunSummaries({ sources }))[0]).toMatchObject({ latest: { status: 'generating', live_generating: true }, current_ready: { completed_at: expect.any(String) } });
+    await pool.query("UPDATE staff_discussion_sentiments SET created_at=NOW() - INTERVAL '1 hour' WHERE request_id=$1 AND status='ready'", [requestId]);
+    await pool.query("UPDATE staff_discussion_sentiments SET created_at=NOW() - INTERVAL '10 minutes' WHERE id=$1", [run.id]);
+    expect((await getCandidateRunSummaries({ sources }))[0].latest).toMatchObject({ status: 'generating', live_generating: false });
   });
 
   it('reserve inserts a generating row; a live one blocks with in_progress', async () => {
