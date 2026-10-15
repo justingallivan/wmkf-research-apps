@@ -535,6 +535,16 @@ describe('Proposal Ranking service access and voting', () => {
       .rejects.toMatchObject({ status: 403, code: 'access_denied' });
   });
 
+  test.each(['edit', 'generate'])('nonmember legacy %s is denied before state-dependent validation', async (action) => {
+    resolveProfileToSystemUser.mockResolvedValue({ systemuserid: secondaryFacilitatorId });
+    await expect(handleProposalRankingAction({
+      action, profileId: 'profile-outsider',
+      body: { action, roundId: round.wmkf_proposalrankingroundid, programKey: 'se',
+        policyRevision: 999, etag: 'stale', operationId: 'dddddddd-dddd-4ddd-8ddd-dddddddddddd' },
+    })).rejects.toMatchObject({ status: 403, code: 'access_denied' });
+    expect(patchRoundAndList).not.toHaveBeenCalled();
+  });
+
   test('superuser outside the roster receives lifecycle metadata without proposal or private-list contents', async () => {
     resolveProfileToSystemUser.mockResolvedValue({ systemuserid: '99999999-9999-4999-8999-999999999999' });
     const response = await handleProposalRankingGet({
