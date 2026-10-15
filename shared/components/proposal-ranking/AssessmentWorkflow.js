@@ -915,9 +915,13 @@ export default function AssessmentWorkflow({
       Create combined list
     </Button>
   ) : program !== 'co' ? (
-    own?.co && <Button disabled={busy || Boolean(pending)} onClick={() => { if (queue.isDirty() || busyRef.current || pendingRef.current) return; setProgram('co'); setDraft(null); }}>
-      Review combined list →
-    </Button>
+    combinedOutdated
+      ? <Button disabled={!allConfident || busy || Boolean(pending) || !active} onClick={() => confirm('buildCombined')}>
+        Rebuild combined list
+      </Button>
+      : <Button disabled={busy || Boolean(pending)} onClick={() => { if (queue.isDirty() || busyRef.current || pendingRef.current) return; setProgram('co'); setDraft(null); }}>
+        Review combined list →
+      </Button>
   ) : outdated ? (
     <Button disabled={!allConfident || busy || Boolean(pending) || !active} onClick={() => confirm('buildCombined')}>Rebuild combined list</Button>
   ) : !own.co.confirmed ? (
@@ -1266,7 +1270,7 @@ export default function AssessmentWorkflow({
                       : !allConfident ? currentProgramComplete
                         ? `All confidence choices in ${currentProgram.name} are answered. Continue to ${nextProgram.name}; you can return to edit either list.`
                         : 'Choose Confident or Not sure on the highlighted cards.'
-                        : own.co ? combinedOutdated ? 'You can keep editing, or review your combined list. Rebuild it from your latest assessments before marking Ready.'
+                        : own.co ? combinedOutdated ? 'You can keep editing, or rebuild the combined list from your latest assessments before marking Ready.'
                           : 'You can keep editing, or review your combined list. Only Ready marks your preparation finished.'
                           : 'You can keep editing, or create your combined list. Only Ready marks your preparation finished.'}
                   </p>

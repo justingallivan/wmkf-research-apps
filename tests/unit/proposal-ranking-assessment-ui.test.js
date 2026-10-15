@@ -246,12 +246,12 @@ test('a changed completed source list routes back to rebuilding and confirming t
   fireEvent.click(screen.getByRole('button', { name: 'Move', exact: true }));
   await waitFor(() => expect(screen.getByRole('status').textContent).toBe('All changes saved'));
 
-  expect(screen.getByText(/rebuild it from your latest assessments/i)).toBeTruthy();
+  expect(screen.getByText(/rebuild the combined list from your latest assessments/i)).toBeTruthy();
   expect(screen.getByRole('button', { name: 'Combined list' }).textContent).toContain('Needs rebuild');
-  fireEvent.click(screen.getAllByRole('button', { name: 'Review combined list →' })[0]);
-  expect(screen.getByText(/Rebuild the combined list from your latest assessments/i)).toBeTruthy();
+  expect(screen.queryByRole('button', { name: 'Review combined list →' })).toBeNull();
   fireEvent.click(screen.getAllByRole('button', { name: 'Rebuild combined list' })[0]);
   expect(sendProposalRankingAction).not.toHaveBeenCalledWith(expect.objectContaining({ action: 'buildCombined' }), expect.anything());
+  expect(screen.getByText('Replace the combined order?')).toBeTruthy();
   fireEvent.click(screen.getByRole('button', { name: 'Build combined list' }));
   expect(sendProposalRankingAction).toHaveBeenCalledWith(expect.objectContaining({ action: 'buildCombined', confirmationFingerprint: 'build-fp' }), expect.anything());
   await waitFor(() => expect(screen.getByRole('button', { name: 'Confirm combined order' })).toBeTruthy());
