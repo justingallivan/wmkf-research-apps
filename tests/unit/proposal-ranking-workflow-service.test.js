@@ -241,6 +241,45 @@ test('an observer sees readiness before reveal, the revealed group afterwards, a
   await expect(readWorkflowHistory({ roundId, actor: dana })).rejects.toMatchObject({ code: 'access_denied', status: 403 });
 });
 
+test('a reopen committed during an observer read never returns revealed work', async () => {
+  const dana = '55555555-5555-4555-8555-555555555555';
+  await prepare(alice);
+  await prepare(bob);
+  await send('reveal');
+  const base = readAssessmentRows.getMockImplementation();
+  async function reopenDuring(matches) {
+    const view = await readWorkflowRound({ roundId, actor: alice });
+    const body = {
+      action: 'reopenPreparation', roundId, operationId: `operation-${++serial}`,
+      roundEtag: view.round.etag, policyRevision: view.round.policyRevision,
+      preparationVersion: view.workflow.preparationVersion, revealId: view.workflow.revealId,
+      confirmationFingerprint: view.confirmations.reopenPreparation.fingerprint,
+    };
+    let pending = true;
+    readAssessmentRows.mockImplementation(async (id, keys) => {
+      const result = await base(id, keys);
+      if (pending && matches(keys)) {
+        pending = false;
+        await mutateWorkflow({ body, actor: alice });
+      }
+      return result;
+    });
+  }
+
+  await reopenDuring((keys) => keys.some((key) => key.startsWith('h:')));
+  await expect(readWorkflowHistory({ roundId, actor: dana })).rejects.toMatchObject({ code: 'access_denied' });
+
+  readAssessmentRows.mockImplementation(base);
+  await send('ready', alice);
+  await send('ready', bob);
+  await send('reveal');
+  await reopenDuring((keys) => keys.some((key) => key.startsWith('r:')));
+  const view = await readWorkflowRound({ roundId, actor: dana });
+  expect(view.workflow.stage).toBe('private');
+  expect(view.collective).toBeNull();
+  expect(JSON.stringify(view)).not.toContain('confident');
+});
+
 test('a nonfacilitator participant can reset their own program preparation', async () => {
   const before = await readWorkflowRound({ roundId, actor: bob });
   await send('saveAssessment', bob, {

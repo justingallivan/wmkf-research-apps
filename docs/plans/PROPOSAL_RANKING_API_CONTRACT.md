@@ -456,7 +456,9 @@ authenticated actor's private preparation; `progress` contains readiness only;
 collective content is present only after reveal. History, supplements, operation
 replay, and error `current` use explicit privacy projections; observers
 (including nonparticipant superusers) get the snapshot and readiness before reveal and
-the revealed group view after it, never `own` or confirmations. For v1, every participant
+the revealed group view after it, never `own` or confirmations. Observer round and history reads end
+with a round ETag check and rebuild from the current round (bounded retries, then
+`stale_scope`), so a reopen committed mid-read cannot return revealed work. For v1, every participant
 including a facilitator-as-PD receives their own list. Before publication, even
 facilitators receive no individual lists or meeting draft; they get only a safe
 `meetingControl: {listKey,status,etag,version}` handle for Generate/Publish.
