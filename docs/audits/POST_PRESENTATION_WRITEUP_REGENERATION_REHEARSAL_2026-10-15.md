@@ -3,7 +3,7 @@ title: Post-presentation writeup regeneration rehearsal
 kind: audit
 domain: workbench
 status: hosted-proof-blocked
-summary: Browser checks passed; authorized sandbox setup stopped at an unexplained Factory account-version guard. No application model calls occurred.
+summary: Sandbox rollups recalculated during the failed Factory check; missing pre-create evidence prevents validating the run. No application model calls occurred.
 owner: product-engineering
 last_verified: 2026-10-15
 related:
@@ -89,7 +89,9 @@ scoped lint has zero errors (one existing unused-disable warning). DAL and Reque
 Document writer gates and their self-tests passed sequentially. Full CI subsequently
 passed at `270269f625710c54047d28423d0dafee23fed9fd`: 1,383 suites / 23,822 tests,
 plus 10 Postgres integration suites / 130 tests. That result predates the sandbox
-harness additions below and is not a claim about their next CI run.
+harness additions below. A later `gh pr checks 486` read confirmed every reported
+check passed at `8f6bdd6fc`, including Jest, Postgres integration, security scans
+and Preview deployment; this does not establish live service correctness.
 
 
 ## Authorized sandbox setup and stop condition
@@ -119,8 +121,16 @@ The Factory nevertheless exited unsuccessfully: its final verification detected
 a Foundation account version-number change, with an unchanged modification
 timestamp and unchanged child Contacts. The Factory payload contains no account
 or contact write. A bounded read-only audit query returned no account audit rows
-in the window. A platform rollup is plausible but **unproven**; concurrent change
-cannot be excluded. The guard was not relaxed or rebased. Fixture completion and
+in the window. Follow-up read-only Sandbox metadata/readback found eight
+`SourceType=2` account rollups referencing `akoya_request`, all with recalculation
+timestamps `2026-10-15T22:30:48Z` and healthy Calculated states. That is inside the
+Factory observation window (`22:30:07.512Z`–`22:31:08.158Z`), after the Request
+create and date-correction writes. Recalculation during verification is
+**verified**; its being the only cause of the version change remains **unproven**.
+No full pre-create account snapshot or digest was retained, so unrelated changes
+cannot be excluded retrospectively. Sol reviewed this distinction against the
+Sandbox comparison and the existing production transition contract. The guard
+was not relaxed or rebased. Fixture completion and
 all model-bearing service operations stopped. Request 1000365 and its empty
 folder remain for inspection; no cleanup deletion occurred.
 
@@ -137,6 +147,12 @@ DAL, reviewer-engagement, and Request Document writer gates plus their sequentia
 self-tests passed. The fixture helper requires a successful Factory verification
 and verified restoration before any dependent write. See the
 [setup record](../plans/WRITEUP_REGENERATION_SANDBOX_SETUP_2026-10-15.md) for scope.
-The PR stays draft. Resuming requires resolving the Factory verification failure
-with evidence; do not rerun either create or spend the unused model budget merely
-to work around this prerequisite.
+The PR stays draft. The failed receipt cannot be promoted by taking a new
+baseline after creation. The next proposed tooling change is to persist a full
+pre-create account/Contacts baseline and evaluate a reviewed, narrow Sandbox
+rollup transition alongside all existing checks. The current rollup count is 28
+versus 33 total Foundation-applicant Requests; its filter must be understood
+before proposing a count allowance. Do not import production GoVerify exemptions
+or rerun either create merely to evade the failed guard. This investigation made
+no external writes or provider calls; implementing and exercising that revised
+verification remains outstanding.

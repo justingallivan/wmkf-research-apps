@@ -27,8 +27,8 @@ Sandbox-only GoVerify bypass. It returned HTTP 201 for Request **1000365** and
 created the expected unique Dynamics location and empty SharePoint folder.
 The receipt records GoVerify restored and verified. It also records a failed
 verification: Foundation-account `versionnumber` changed while `modifiedon`
-remained `2026-05-19T18:33:57Z`; no Foundation audit rows were readable in the
-bounded create window. The create body contained only Request fields and did
+remained `2026-05-19T18:33:57Z`; the bounded read-only Foundation audit query
+returned zero rows. The create body contained only Request fields and did
 not issue an account or Contact write. Current readback confirms the marked
 Request, its sole expected location/folder, zero payment rows, zero regarding
 emails, and no child Contact changes. Because the Factory does not persist the
@@ -40,6 +40,57 @@ The fixture helper requires `receipt.verification.ok === true` and a verified
 GoVerify restoration. Invoking it with the retained failed receipt using the
 repository's `node --import ./scripts/lib/use-extensionless.mjs` runtime
 refused at that guard before any Dataverse or Graph request.
+
+## Foundation version-change diagnosis
+
+**Verified:** `compareSnapshots` compares `String(versionnumber)` and the
+`modifiedon` value; the observed version number is far below JavaScript's
+exact-integer limit, so a type/precision artifact does not explain the
+failure. The Factory receipt records that the account version differed, but
+it does not persist either runtime version number or the pre-create full-row
+snapshot. That evidence cannot be reconstructed from the manifest.
+
+**Verified in Sandbox:** a read-only account attribute-metadata query found
+eight `SourceType=2` rollups whose `FormulaDefinition` references
+`akoya_request`. On current readback, all eight `_date` companions equal
+`2026-10-15T22:30:48Z` and all eight `_state` companions equal `1` (Calculated).
+That timestamp falls inside Factory observation (`22:30:07.512Z` to
+`22:31:08.158Z`), after its Request create response (`22:29:59.270Z`) and
+meeting-date correction PATCH (`22:30:05.087Z` to `22:30:06.096Z`). The eight
+rollup values currently read as request count 28, awards/grant totals 0, and
+most-recent-grant date null. The Foundation applicant has 33 Request rows in
+the current list, so that list count does not establish the rollup's inclusion
+predicate or an expected `+1`; no count delta is assumed. The six current
+Request-related asynchronous workflow jobs are all Canceled, including
+`WMKF_Update CA FTB Status on Org`.
+
+**Inference, not proof of exclusive cause:** the fresh rollup timestamps are
+direct evidence that the platform recalculated the Request aggregate rollups
+during the verification window. That likely explains a genuine
+`versionnumber` bump without a `modifiedon` change. The absent before-version,
+zero Foundation audit rows, and lack of a version-bearing intermediate read
+mean an unrelated concurrent update cannot be excluded. The private
+read-only probe summary is retained at
+`/private/tmp/writeup-factory-foundation-readonly-2026-10-15.json`; it was
+collected by reading the Sandbox account, querying Account attribute metadata
+for `SourceType=2` formulas containing `akoya_request`, reading the new
+Request's async-operation rows with formatted status, and counting current
+Foundation-applicant Request rows.
+
+**Safest next guarded design:** do not retroactively bless this receipt or
+remove the version guard. Before any separately authorized future Sandbox
+Factory run, persist a pre-create Foundation baseline in the private receipt:
+the version and modified time, a digest of all non-rollup account columns except `versionnumber`,
+the eight rollup values plus each `_date`/`_state`, and the Foundation Contact
+version digest. After quiescence, permit the account version to advance only when the
+remaining checks pass; require every other non-rollup field (including
+`modifiedon`) and Contact version to match; allow only date/state companion changes on the eight
+metadata-confirmed Request rollups when every present state remains
+Calculated. Keep the eight rollup values protected until the Sandbox formula
+predicate and expected count transition are characterized from captured
+before/after data; do not import the Production `+1` rule by assumption. Report
+the changed version and changed fields in the receipt. This is a future
+reviewed verifier change, not authorization to resume the present fixture.
 
 ## Read-only evidence
 
