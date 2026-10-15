@@ -52,6 +52,7 @@ const STAGE_LABELS = { draft: 'AI draft ready', shared: 'Shared', visit: 'Visit'
 
 const REQUEST_ID = '11111111-1111-1111-1111-111111111111';
 const PROFILE_ID = '44444444-4444-4444-8444-444444444444';
+const priorActorSchemaReady = process.env.REQUEST_DOCUMENT_EXPLICIT_ACTOR_SCHEMA_READY;
 
 function mockRes() {
   const res = { statusCode: 200, headers: {}, body: null };
@@ -72,6 +73,7 @@ function get(requestId = REQUEST_ID) {
 
 beforeEach(() => {
   jest.clearAllMocks();
+  process.env.REQUEST_DOCUMENT_EXPLICIT_ACTOR_SCHEMA_READY = 'on';
   getById.mockResolvedValue({ akoya_requestid: REQUEST_ID });
   findByIds.mockResolvedValue({ records: [] });
   getPreparationForRequest.mockResolvedValue({ timing: { availability: 'missing' }, preparation: { state: 'none', due: false }, writeup: { availability: 'missing' } });
@@ -101,6 +103,11 @@ beforeEach(() => {
     reopenHistory: [],
   });
   readDeliberationStageLabels.mockResolvedValue(STAGE_LABELS);
+});
+
+afterEach(() => {
+  if (priorActorSchemaReady === undefined) delete process.env.REQUEST_DOCUMENT_EXPLICIT_ACTOR_SCHEMA_READY;
+  else process.env.REQUEST_DOCUMENT_EXPLICIT_ACTOR_SCHEMA_READY = priorActorSchemaReady;
 });
 test('rejects methods other than GET/POST before authentication', async () => {
   const res = mockRes();
@@ -150,6 +157,26 @@ test('the GET payload carries the applicant-materials summary (counts and window
   expect(getMaterialsSummaryForRequest).toHaveBeenCalledWith({ requestId: REQUEST_ID });
   expect(res.body.materials).toEqual(summary);
   expect(JSON.stringify(res.body)).not.toMatch(/contributorUrl|contacts/);
+});
+
+test('GET hides regeneration eligibility when explicit-actor schema readiness is off', async () => {
+  process.env.REQUEST_DOCUMENT_EXPLICIT_ACTOR_SCHEMA_READY = 'off';
+  getPreSiteVisitArtifactStatus.mockResolvedValueOnce({
+    leadProgramDirectorId: '22222222-2222-4222-8222-222222222222',
+    currentArtifact: {
+      artifactId: '33333333-3333-4333-8333-333333333333',
+      operationStatus: REQUEST_DOCUMENT_OPERATION_STATUS.READY,
+      lifecycleState: 100000001,
+    },
+    pendingArtifact: null,
+    reopenHistory: [],
+  });
+  getFinalWriteupStatus.mockResolvedValueOnce({ available: true, phase: 'ready', artifact: null });
+
+  const res = mockRes();
+  await handler(get(), res);
+
+  expect(res.body.writeupAccess).toMatchObject({ canRegenerate: false, regenerationBlockedReason: 'schema_not_ready' });
 });
 
 test('the GET payload carries the tracker session line through the briefing seam, reduced to the card shape (fail-open null on error)', async () => {
@@ -341,6 +368,30 @@ test('accepts a confirmed regeneration identity and delegates pair validation to
     },
   });
   expect(res.statusCode).toBe(200);
+});
+
+test('regeneration route refuses schema-off and unlinked superuser identities before invoking the writer', async () => {
+  const body = {
+    requestId: REQUEST_ID, mode: 'regenerate',
+    expectedArtifactId: '33333333-3333-4333-8333-333333333333',
+    expectedFinalArtifactId: null,
+    clientOperationId: '55555555-5555-4555-8555-555555555555',
+  };
+
+  process.env.REQUEST_DOCUMENT_EXPLICIT_ACTOR_SCHEMA_READY = 'off';
+  const unavailable = mockRes();
+  await handler(post(body), unavailable);
+  expect(unavailable.statusCode).toBe(503);
+  expect(unavailable.body.code).toBe('final_writeup_schema_not_ready');
+  expect(generatePreSiteVisitArtifact).not.toHaveBeenCalled();
+
+  process.env.REQUEST_DOCUMENT_EXPLICIT_ACTOR_SCHEMA_READY = 'on';
+  requireAppAccess.mockResolvedValueOnce({ profileId: PROFILE_ID, session: { user: {} } });
+  const unlinked = mockRes();
+  await handler(post(body), unlinked);
+  expect(unlinked.statusCode).toBe(403);
+  expect(unlinked.body.code).toBe('final_writeup_actor_required');
+  expect(generatePreSiteVisitArtifact).not.toHaveBeenCalled();
 });
 
 test('returns 202 when another owned generation is still active', async () => {

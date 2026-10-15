@@ -370,6 +370,19 @@ test('a live regeneration observed from another tab disables a second regenerati
   expect(calls('presitePost')).toHaveLength(0);
 });
 
+test('a live regeneration disables the group-review handoff action', async () => {
+  queueRoute('presiteGet', statusResponse({
+    ...POST_VISIT_STATUS,
+    pendingArtifact: { artifactId: '66666666-6666-4666-8666-666666666666', operationStatus: GENERATING, leaseActive: true },
+    finalReview: readyFinalReview(),
+  }));
+  render(<StaffDeliberationsTab requestId={REQUEST_ID} />);
+
+  await screen.findByRole('link', { name: 'Edit writeup in Word' });
+  expect(screen.queryByRole('button', { name: 'Ready for group review' })).not.toBeInTheDocument();
+  expect(calls('finalStart')).toHaveLength(0);
+});
+
 test('group-review regeneration warns about replacement and submits the confirmed old pair', async () => {
   const finalArtifactId = '55555555-5555-4555-8555-555555555555';
   queueRoute('presiteGet', statusResponse({

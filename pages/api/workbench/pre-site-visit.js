@@ -9,6 +9,7 @@
 import { getUserRole, requireAppAccess } from '../../../lib/utils/auth';
 import { withDalContext } from '../../../lib/dataverse/core/context';
 import { isGuid } from '../../../lib/utils/guid';
+import { isRequestDocumentExplicitActorSchemaReady } from '../../../lib/utils/request-document-explicit-actor-readiness';
 import { ServiceHttpError } from '../../../lib/services/service-http-error';
 import {
   generatePreSiteVisitArtifact,
@@ -169,10 +170,14 @@ export default async function handler(req, res) {
           writeupAccess: {
             canChange: canChangeDraftWriteup(viewer, leadProgramDirectorId),
             identityLinked: Boolean(viewer.actingUserSystemId) || viewer.isSuperuser,
-            canRegenerate: canChangeDraftWriteup(viewer, leadProgramDirectorId)
+            canRegenerate: isRequestDocumentExplicitActorSchemaReady()
+              && isGuid(viewer.actingUserSystemId)
+              && canChangeDraftWriteup(viewer, leadProgramDirectorId)
               && Boolean(status.currentArtifact)
               && regenerationStageEligible,
             regenerationBlockedReason: !status.currentArtifact ? 'writeup_missing'
+                : !isRequestDocumentExplicitActorSchemaReady() ? 'schema_not_ready'
+                  : !isGuid(viewer.actingUserSystemId) ? 'actor_required'
                 : !regenerationStageEligible ? 'leadership_or_state_unavailable'
                   : !canChangeDraftWriteup(viewer, leadProgramDirectorId) ? 'lead_only' : null,
           },
@@ -215,6 +220,16 @@ export default async function handler(req, res) {
           || (req.body.expectedFinalArtifactId != null && !isGuid(req.body.expectedFinalArtifactId))) {
           throw new ServiceHttpError('A confirmed writeup pair and operation id are required.', {
             httpStatus: 400, code: 'pre_site_visit_regeneration_identity_invalid',
+          });
+        }
+        if (!isRequestDocumentExplicitActorSchemaReady()) {
+          throw new ServiceHttpError('Final Writeup is unavailable until its Dataverse schema is verified.', {
+            httpStatus: 503, code: 'final_writeup_schema_not_ready',
+          });
+        }
+        if (!isGuid(actingUserSystemId)) {
+          throw new ServiceHttpError('A resolved staff identity is required to regenerate this writeup.', {
+            httpStatus: 403, code: 'final_writeup_actor_required',
           });
         }
       }

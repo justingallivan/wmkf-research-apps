@@ -1383,7 +1383,8 @@ export default function StaffDeliberationsTab({
   // Post-visit drafting hands off to group review from step 4 (owner 2026-10-06).
   const handOffOpen = preSiteShared && milestoneComplete && !preSiteFinal && !correctionDraft && finalReview?.phase === 'ready';
   const canHandOff = handOffOpen && finalReview.canStart === true
-    && sameArtifactId(finalReview.sourceArtifactId, artifact?.artifactId);
+    && sameArtifactId(finalReview.sourceArtifactId, artifact?.artifactId)
+    && !regenerationPending;
   const handOffNote = !handOffOpen ? null
     : canHandOff ? 'When the draft is ready for colleagues, choose Ready for group review. They’ll edit this same file.'
       : finalReview.startBlockedReason === 'final_writeup_site_visit_not_ended'
