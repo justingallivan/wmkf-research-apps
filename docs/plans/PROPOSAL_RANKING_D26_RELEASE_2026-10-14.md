@@ -39,6 +39,7 @@ The script fixes the registered production hostname and enforces preview-class r
 ## Decisions still pending
 
 1. **Existing trial retirement:** propose retaining and closing the existing v1 round, then opening a fresh v2 round. One submitted list exists. Before executing, show the exact old round, retained data, new pool/roster and effects to Justin. No destructive erase or automatic conversion of v1 rankings to grades/confidence.
+   [OWNER DECISION, 2026-10-15] The existing production v1 round is a test round from the prior week; its PD and meeting rankings (including the submitted list) are throwaway test entries with no content to preserve or carry forward. The underlying D26 proposal/request data is real and out of scope. This removes the content-preservation concern only: closing still uses the supported cancel operation and its published-round guard, and the cutover still requires the release approval in step 6.
 2. **Sentiment readership:** verify active profiles and superuser status for all four PDs. If they lack access, propose either explicit Meeting Tracker grants (which grant more than sentiment) or a narrowly reviewed ranking-reader authorization change. Do not silently grant another app or bypass its current reader guard.
 
 ## Agreed privacy change — planned, not implemented
