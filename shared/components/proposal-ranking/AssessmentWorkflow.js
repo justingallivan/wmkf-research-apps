@@ -873,12 +873,18 @@ export default function AssessmentWorkflow({
       own?.[key] &&
       own[key].order.every((id) => own[key].confidence[id]),
   );
-  const programProgress = ['mr', 'se'].map((key) => ({
-    key,
-    name: key === 'mr' ? 'Medical Research' : 'Science & Engineering',
-    answered: own?.[key]?.order.filter((id) => own[key].confidence[id]).length || 0,
-    total: own?.[key]?.order.length || 0,
-  }));
+  const programProgress = ['mr', 'se'].map((key) => {
+    const answered = own?.[key]?.order.filter((id) => own[key].confidence[id]).length || 0;
+    const total = own?.[key]?.order.length || 0;
+    const inCombined = Boolean(own?.[key] && own.co && own.co.sourceVersions?.[key] === own[key].version);
+    return {
+      key,
+      name: key === 'mr' ? 'Medical Research' : 'Science & Engineering',
+      answered,
+      total,
+      status: answered < total ? 'In progress' : inCombined ? 'In combined list' : 'Ready to combine',
+    };
+  });
   const currentProgram = programProgress.find((p) => p.key === program);
   const nextProgram = programProgress.find((p) => p.key !== program && p.answered < p.total);
   const currentProgramComplete = currentProgram && currentProgram.answered === currentProgram.total;
@@ -1244,7 +1250,7 @@ export default function AssessmentWorkflow({
                     >
                       {label}
                       {key === 'co' && <span className="mt-1 block text-xs font-normal text-gray-600">{combinedOutdated ? 'Needs rebuild' : own.co.confirmed ? 'Confirmed' : 'Review order'}</span>}
-                      {key !== 'co' && <span id={`preparation-count-${key}`} className="mt-1 block text-xs font-normal text-gray-600">{programProgress.find((p) => p.key === key).answered === programProgress.find((p) => p.key === key).total ? 'All confidence choices answered' : programProgress.find((p) => p.key === key).answered === 0 ? 'Not started' : 'In progress'}</span>}
+                      {key !== 'co' && <span id={`preparation-count-${key}`} className="mt-1 block text-xs font-normal text-gray-600">{programProgress.find((p) => p.key === key).status}</span>}
                     </button>
                   ))}
                   </div>

@@ -108,7 +108,7 @@ test('private MR and SE lists render their subsets and saving SE keeps it select
   initial.own.co = null;
   render(<AssessmentWorkflow initial={initial} cycleOptions={[]} onCycleChange={() => {}} />);
   expect(screen.queryByRole('button', { name: 'Create combined list' })).toBeNull();
-  expect(screen.getByRole('button', { name: 'Medical Research' }).textContent).toContain('Not started');
+  expect(screen.getByRole('button', { name: 'Medical Research' }).textContent).toContain('In progress');
   expect(screen.getByRole('heading', { name: 'mr institution' })).toBeTruthy();
   expect(screen.queryByRole('heading', { name: 'se institution' })).toBeNull();
   fireEvent.click(screen.getByRole('button', { name: 'Science & Engineering' }));
@@ -120,7 +120,7 @@ test('private MR and SE lists render their subsets and saving SE keeps it select
   await waitFor(() => expect(screen.getByRole('status').textContent).toBe('All changes saved'));
   expect(screen.getByRole('heading', { name: 'se institution' })).toBeTruthy();
   expect(screen.queryByRole('heading', { name: 'mr institution' })).toBeNull();
-  expect(screen.getByRole('button', { name: 'Science & Engineering' }).textContent).toContain('All confidence choices answered');
+  expect(screen.getByRole('button', { name: 'Science & Engineering' }).textContent).toContain('Ready to combine');
   expect(screen.queryByRole('button', { name: 'Create combined list' })).toBeNull();
   fireEvent.click(screen.getAllByRole('button', { name: 'Continue to Medical Research →' })[0]);
   expect(screen.getByRole('heading', { name: 'mr institution' })).toBeTruthy();
@@ -236,6 +236,8 @@ test('a changed completed source list routes back to rebuilding and confirming t
 
   render(<AssessmentWorkflow initial={initial} cycleOptions={[]} onCycleChange={() => {}} />);
   fireEvent.click(screen.getByRole('button', { name: 'Science & Engineering' }));
+  expect(screen.getByRole('button', { name: 'Medical Research' }).textContent).toContain('In combined list');
+  expect(screen.getByRole('button', { name: 'Science & Engineering' }).textContent).toContain('In combined list');
   expect(screen.queryByText(/rebuild it from your latest assessments/i)).toBeNull();
   expect(screen.getByRole('button', { name: 'Reset SE preparation' })).toBeTruthy();
   fireEvent.click(screen.getAllByRole('button', { name: 'Review combined list →' })[0]);
@@ -248,6 +250,8 @@ test('a changed completed source list routes back to rebuilding and confirming t
   fireEvent.click(screen.getByRole('button', { name: 'Move', exact: true }));
   await waitFor(() => expect(screen.getByRole('status').textContent).toBe('All changes saved'));
 
+  expect(screen.getByRole('button', { name: 'Medical Research' }).textContent).toContain('In combined list');
+  expect(screen.getByRole('button', { name: 'Science & Engineering' }).textContent).toContain('Ready to combine');
   expect(screen.getByText(/rebuild the combined list from your latest assessments/i)).toBeTruthy();
   expect(screen.getByRole('button', { name: 'Combined list' }).textContent).toContain('Needs rebuild');
   expect(screen.queryByRole('button', { name: 'Review combined list →' })).toBeNull();
@@ -258,6 +262,8 @@ test('a changed completed source list routes back to rebuilding and confirming t
   fireEvent.click(screen.getByRole('button', { name: 'Build combined list' }));
   expect(sendProposalRankingAction).toHaveBeenCalledWith(expect.objectContaining({ action: 'buildCombined', confirmationFingerprint: 'build-fp' }), expect.anything());
   await waitFor(() => expect(screen.getByRole('button', { name: 'Confirm combined order' })).toBeTruthy());
+  expect(screen.getByRole('button', { name: 'Medical Research' }).textContent).toContain('In combined list');
+  expect(screen.getByRole('button', { name: 'Science & Engineering' }).textContent).toContain('In combined list');
   expect(screen.queryByRole('button', { name: 'Reset SE preparation' })).toBeNull();
   fireEvent.click(screen.getByRole('button', { name: 'Confirm combined order' }));
   await waitFor(() => expect(screen.getByRole('button', { name: 'Ready' })).toBeTruthy());
