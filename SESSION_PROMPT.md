@@ -1,3 +1,54 @@
+# Session 612 Prompt: refocus writeup regeneration; sandbox expansion parked
+
+## Session 611 Summary — writeup regeneration and scope reset (Codex, 2026-10-15 PT)
+
+### Owner direction at close
+
+The owner said the session had lost the plot after feature verification grew into
+sandbox Factory work. **Stop expanding that work.** Review the feature-only diff,
+separate test-tooling concerns from feature acceptance, and agree on one short
+test in a suitable venue before further live work. This handoff is not permission
+to resume the Factory repair/recovery loop. The owner explicitly requested this
+documentation-only handoff on main for work from another machine tomorrow.
+
+### Completed and current state
+
+- **[VERIFIED via Git/source]** Draft [PR #486](https://github.com/justingallivan/wmkf-research-apps/pull/486), branch **`codex/writeup-regenerate`**, pushed through **`caa797971`**. Checkout: `/Users/gallivan/Code/WMKF_Apps-writeup-regen`. No feature merge, production promotion or production data operation occurred. Preserve other agents' checkouts; stay on the feature branch when resuming implementation.
+- **[SOURCE-BUILT, NOT LIVE-PROVED]** Regeneration is offered during post-visit drafting and group review, preserves the prior Word document as a superseded version, warns that edits are not carried forward, and stays in the same stage. Final/leadership review is ineligible. Group regeneration replaces the paired artifacts atomically and requires fresh sign-offs; UUID/lease/ETag guards protect retries and competing transitions. Existing route/writer boundaries are used; no application schema migration was added.
+- **[VERIFIED via reviews/tests]** Luna built, Sol and parent reviewed, and Opus reviewed the core feature through subscription OAuth. Focused feature/adjacent tests and isolated real-component browser checks passed. All reported CI at `8f6bdd6fc` passed. These checks do **not** prove actual Dataverse/SharePoint regeneration, which was never reached.
+- **[PARTIAL SANDBOX SETUP]** Justin Gallivan is the intended lead PD, John Sader the reviewing colleague. The existing Sandbox reviewer role was assigned to both; missing Research staffing and canonical notice-copy settings were seeded. A separate local PostgreSQL container `wmkf-writeup-regen-pg`, database `writeup_regeneration_rehearsal`, loopback port 55439, was initialized. It is local to this Mac, not portable Git state. Existing Factory/application databases were not used.
+- **[RETAINED FACTORY EVIDENCE]** These standalone CLI attempts used private JSON journals, **no Factory ledger**. First create failed before a Request existed. Request **1000365** was then created with an empty unique SharePoint folder/location; its verifier flagged an account-version change without a sufficient before snapshot. The supported Sandbox GoVerify bypass was restored and verified. Do not retrospectively mark that receipt successful.
+- **[VERIFIED TOOLING REPAIR; LIVE CHECK FAILED]** `cc2651b1f` adds a durable pre-create account/Contact baseline and pins all 15 observed rollup formula hashes. Two focused suites / 39 tests, lint and scoped gates passed. Request **1000366** was created once with that baseline and restored GoVerify. Last read-only recheck at **2026-10-15 16:17:50 PDT** found exactly 29 active Requests but a stale count rollup of 28; other Request/Graph/Contact/payment/email/workflow checks passed. No later pass is claimed. Hourly rollup-job history suggested a later refresh but exposed no definite next run. No separate recovery-acceptance path was built.
+- **[BUDGET / RETENTION]** Application model calls used: **0 of 3 authorized attempts**. No generated Word file, completed PI/narrative/review/Site Visit fixture, handoff, sign-off, or real email occurred. Retain sandbox records, files, roles/settings and local database; no cleanup deletion was authorized. Agent sessions used OAuth, not provider API keys.
+
+### Open findings — record them, do not restart the detour
+
+1. **Latest tooling CI is not all green.** Gitleaks at `cc2651b1f` flagged `sumologic-access-token` at formula-hash literal locations in `sandbox-foundation-verification.js` (lines 62, 64, 65). Local secret-scan passed, but CI triage is unresolved. Recheck current PR CI; don't transfer the earlier green result to later commits. Final documentation commit may have a new pending run.
+2. **Final sandbox-tooling Opus review: CHANGES REQUIRED.** The completed OAuth review identifies missing safe recovery after delayed rollup refresh; provider budget/checkpoint paths aren't bound firmly to a fixture; and verification end-time should follow reads. Parent agrees these are harness follow-ups if that work is reopened. Core feature review is separate. Full portable reviewer output is on the feature branch in `docs/audits/WRITEUP_SANDBOX_OPUS_REVIEW_2026-10-15.md`.
+3. **Private receipts are not portable.** Raw manifests, original baseline/recheck receipts, credentials and detailed probe dumps remain outside Git on this Mac. Their outcomes and reviewed source are committed. Do not fabricate or recapture a pre-create baseline on another machine; the next feature review does not need those private inputs. Any resumed live recovery needs the originals via a suitable private transfer or a newly agreed test plan.
+
+### Next session — scope first
+
+- **Verified open:** inspect feature changes through `270269f62` separately from later rehearsal-tooling commits; use the PR and feature-branch plan/audits. Decide the smallest remaining acceptance test. No production test, promotion or merge is authorized by this handoff.
+- **Parked:** further Factory redesign, automatic rollup recovery, more test Requests, forced recalculation, model calls, and cleanup. Reopen only after owner agrees the verification venue and scope.
+- **Preserve unrelated work:** Research SharePoint access remains pending IT confirmation per the prior handoff; D26 ranking is already live per its separate release handoff. Neither workstream was advanced or re-audited here. The older claim that writeup work was in the main checkout is historical; all this session's feature edits were in the dedicated writeup worktree.
+
+### Feature-branch references and commits
+
+- Core: `02f054c6d`, `bad799414`, `e2848e94a`, `0922265ff`; CI/contracts/browser: `ba02b414e`, `270269f62`.
+- Sandbox tooling/evidence: `7a085db9a`, `8f6bdd6fc`, `d3e4d0cb4`, `cc2651b1f`; parked close/review: `caa797971`.
+- On `codex/writeup-regenerate`: `docs/plans/POST_PRESENTATION_WRITEUP_REGENERATION_PLAN_2026-10-15.md`, `docs/audits/POST_PRESENTATION_WRITEUP_REGENERATION_IMPLEMENTATION_REVIEW_2026-10-15.md`, `docs/audits/POST_PRESENTATION_WRITEUP_REGENERATION_REHEARSAL_2026-10-15.md`, `docs/plans/WRITEUP_REGENERATION_SANDBOX_SETUP_2026-10-15.md`, and the final Opus review above. These files are not being merged to main with this handoff.
+
+**Stop verification:** no production milestone shipped; no DEVELOPMENT_LOG.md entry
+is required. CLAUDE.md remains unchanged. Claim-evidence pilot report could not
+read local state; no observation row was invented. Feature work is committed and
+pushed. This main commit changes only SESSION_PROMPT.md, with all prior handoff
+bytes preserved below. No other checkout is switched or modified.
+
+---
+
+## Prior concurrent handoffs — preserved from main at 5928a7a0a; verify live state before acting
+
 # Session 611 Prompt: Research SharePoint access pending; preserve ranking handoff
 
 ## Session 610 Summary — isolated SharePoint access investigation (2026-10-15 PT)
