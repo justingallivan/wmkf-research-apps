@@ -19,6 +19,7 @@ import {
 
 const alice = '11111111-1111-4111-8111-111111111111';
 const bob = '22222222-2222-4222-8222-222222222222';
+const charlie = '44444444-4444-4444-8444-444444444444';
 const roundId = '33333333-3333-4333-8333-333333333333';
 const snapshot = {
   version: 2,
@@ -169,6 +170,51 @@ test('private response excludes actual peer assessments; superuser gets no conte
   expect(admin.facilitatorLists).toBeNull();
 });
 
+test('captured second facilitator gets facilitator actions without anyone else’s private assessments', async () => {
+  const workflow = JSON.parse(rounds[roundId].wmkf_workflowjson);
+  workflow.facilitation = {
+    version: 1,
+    systemUserIds: [alice, charlie],
+    source: 'set',
+    settingRevision: 'setting-r1',
+  };
+  workflow.privateMarker = 'must-not-leak';
+  rounds[roundId].wmkf_workflowjson = JSON.stringify(workflow);
+  const storedSnapshot = JSON.parse(rounds[roundId].wmkf_snapshotjson);
+  storedSnapshot.privateMarker = 'must-not-leak';
+  rounds[roundId].wmkf_snapshotjson = JSON.stringify(storedSnapshot);
+
+  const view = await readWorkflowRound({ roundId, actor: charlie });
+  expect(view.viewer.isFacilitator).toBe(true);
+  expect(view.facilitatorLists).toBeNull();
+  expect(view.own).toBeNull();
+  expect(view.workflow).not.toHaveProperty('privateMarker');
+  expect(view.round.snapshot).not.toHaveProperty('privateMarker');
+
+  const facilitatorPd = await readWorkflowRound({ roundId, actor: alice });
+  expect(facilitatorPd.own).not.toBeNull();
+  expect(facilitatorPd.facilitatorLists).toBeNull();
+
+  await expect(send('reveal', charlie)).rejects.toMatchObject({
+    code: 'incomplete_readiness', status: 409,
+  });
+  await expect(send('reveal', bob)).rejects.toMatchObject({
+    code: 'access_denied', status: 403,
+  });
+
+  await send('restartWalkthrough', charlie);
+  const created = commitAssessmentChanges.mock.calls.at(-1)[0].newRound;
+  expect(created.wmkf_facilitatorsystemuserid).toBe(alice);
+  const successor = await readWorkflowRound({
+    roundId: created.wmkf_proposalrankingroundid,
+    actor: charlie,
+  });
+  expect(successor.workflow.facilitation).toEqual({
+    version: 1, systemUserIds: [alice, charlie], source: 'set', settingRevision: 'setting-r1',
+  });
+  expect(successor.facilitatorLists).toBeNull();
+});
+
 test('reveal, reset, replay after later edits, history, reopen and restart retain records', async () => {
   await prepare(alice);
   await prepare(bob);
@@ -258,7 +304,18 @@ test('history is newest-first across numeric boundaries even when storage sorts 
     rows.push({
       wmkf_roundid: roundId,
       wmkf_listkey: `h:${i}`,
-      wmkf_assessmentjson: JSON.stringify({ sequence: i }),
+      wmkf_assessmentjson: JSON.stringify({
+        kind: 'collective',
+        revealId: `reveal-${i}`,
+        preparationVersion: 1,
+        at: `time-${i}`,
+        collective: {
+          order: ['s', 'm'], boundaries: [1, 1], version: i,
+          individuals: [{ systemUserId: alice, name: 'Alice', order: ['s', 'm'], boundaries: [1, 1], ready: 'private-marker' }],
+          privateOperationId: 'must-not-leak',
+        },
+        privateRequestHash: 'must-not-leak',
+      }),
     });
   readAssessmentRows.mockImplementation(async (id, keys) =>
     copy(
@@ -270,9 +327,13 @@ test('history is newest-first across numeric boundaries even when storage sorts 
     ),
   );
   const result = await readWorkflowHistory({ roundId, actor: bob });
-  expect(result.entries.map((row) => row.sequence)).toEqual([
-    12, 11, 10, 9, 8, 7, 6, 5, 4, 3,
+  expect(result.entries.map((row) => row.revealId)).toEqual([
+    'reveal-12', 'reveal-11', 'reveal-10', 'reveal-9', 'reveal-8',
+    'reveal-7', 'reveal-6', 'reveal-5', 'reveal-4', 'reveal-3',
   ]);
+  expect(result.entries[0]).not.toHaveProperty('privateRequestHash');
+  expect(result.entries[0].collective).not.toHaveProperty('privateOperationId');
+  expect(result.entries[0].collective.individuals[0]).not.toHaveProperty('ready');
   expect(result.before).toBe(2);
 });
 

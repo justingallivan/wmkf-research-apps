@@ -29,6 +29,7 @@ const {
 } = await import('../lib/dataverse/core/context.js');
 const adapter = await import('../lib/dataverse/adapters/proposal-ranking.js');
 const workflow = await import('../lib/services/proposal-ranking/workflow-service.js');
+const { RANKING_TEST_FACILITATOR_NAMES } = await import('../lib/services/proposal-ranking/test-policy.js');
 const {
   readDefaultFacilitator,
   saveDefaultFacilitator
@@ -42,7 +43,7 @@ const client = createClient({
 });
 const CYCLE = 'D98';
 const RECEIPT = '/private/tmp/proposal-ranking-v2-sandbox-receipt.json';
-const names = ['Beth Pruitt', 'Justin Gallivan', 'Rob Harrison', 'Jean Kim'];
+const names = [...RANKING_TEST_FACILITATOR_NAMES, 'Rob Harrison', 'Jean Kim'];
 const execute = process.argv.includes('--execute');
 const resume = process.argv.includes('--resume');
 const readOnly = process.argv.includes('--readback');

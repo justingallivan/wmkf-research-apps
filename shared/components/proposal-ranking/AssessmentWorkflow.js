@@ -1147,44 +1147,6 @@ export default function AssessmentWorkflow({
               Reveal group starting order
             </Button>
           )}
-          <details className="mt-5">
-            <summary className="cursor-pointer font-medium">
-              Inspect private preparation
-            </summary>
-            <p className="my-3 text-sm text-amber-800">
-              Private preparation — visible to you and each PD. Do not share
-              this view before reveal.
-            </p>
-            {Object.entries(view.facilitatorLists || {}).map(([id, person]) => (
-              <details key={id} className="py-2">
-                <summary>
-                  {roster.find((p) => p.systemUserId === id)?.name}
-                </summary>
-                {['mr', 'se', 'co'].map(
-                  (key) =>
-                    person[key] && (
-                      <div key={key} className="mt-3">
-                        <h3 className="font-semibold">{key.toUpperCase()}</h3>
-                        <ol>
-                          {person[key].order.map((requestId, i) => (
-                            <li key={requestId} className="py-1">
-                              {i + 1}.{' '}
-                              {
-                                proposals.find((p) => p.requestId === requestId)
-                                  ?.organization
-                              }{' '}
-                              · {gradeAt(i, person[key].boundaries)} ·{' '}
-                              {person[key].confidence[requestId] ||
-                                'Confidence unanswered'}
-                            </li>
-                          ))}
-                        </ol>
-                      </div>
-                    ),
-                )}
-              </details>
-            ))}
-          </details>
         </>
       )}
       {section === 'history' && (
