@@ -1,7 +1,7 @@
 ---
 agent_wiki: topic
 status: active
-last_verified: 2026-08-15
+last_verified: 2026-10-14
 stale_after_days: 60
 owner: intake-portal
 source_files:
@@ -86,13 +86,31 @@ intake-to-Dataverse mapping.
 
 ## Operating Notes
 
-- Source trace refreshed 2026-08-13: applicant identity comes from the server
+- Source trace refreshed 2026-10-14 (Session 608): applicant identity comes from the server
   session, the contact bridge resolves its Dataverse contact, membership guards
   authorize the selected account, Postgres holds drafts/jobs/audit, the private
   intake Blob store holds uploads, and the configured drain consumes queued jobs.
-- Virus-scan E2E was deferred and must run before the next cycle.
-- Budget/roster drain reconciliation deactivates obsolete child rows (`statecode`), never hard-deletes removed lines; recompute over active children only. Current pointers: `docs/INTAKE_PORTAL_BUDGET_ROSTER_RECONCILE_STATUS.md` and `lib/dataverse/schema/wave4/wmkf_proposalbudgetline.json`.
+- Virus-scan E2E remains a prerequisite for a future owner-approved portal pilot,
+  not the next GOApply cycle. Any Cloudmersive diagnostic scan requires separate
+  explicit authorization acknowledging possible credit use.
+- Budget/roster reconciliation design requires deactivating obsolete child rows
+  (`statecode`), never hard-deleting removed lines, and recomputing over active
+  children only. This is a requirement, not a completed-flow claim: the current
+  drain creates budget lines and parks jobs containing persons; it does not
+  establish full roster/recompute readiness. Design pointers:
+  `docs/INTAKE_PORTAL_BUDGET_ROSTER_RECONCILE_STATUS.md` and
+  `lib/dataverse/schema/wave4/wmkf_proposalbudgetline.json`.
 - Pilot decisions and UI TODOs should be read before re-deciding settled questions.
+
+## Verification Scope
+
+Session 608 checked the source path from applicant session through contact bridge,
+membership, draft/attachment persistence and frozen submission payload to the
+drain. Local mocked regression tests cover draft capture, upload tokens,
+attachment handling and submit race guards. The arbitrary `dataverseFields`
+spread remains present in `handleScanning`; the revival hazard above is unresolved.
+No applicant launch, live schema, deployed scan, or production configuration was
+revalidated. Evidence: `docs/audits/AGENT_WIKI_REVERIFICATION_2026-10-14.md`.
 
 ## Standard Probe
 
