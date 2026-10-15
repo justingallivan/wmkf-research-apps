@@ -1,28 +1,50 @@
-# Session 609 Prompt: finish D26 ranking candidate acceptance; preserve other workstream handoffs
+# Session 609 Prompt: finish D26 ranking Preview acceptance; keep production separate
 
-## Session 608 Summary — D26 ranking implementation and isolated sandbox rehearsal (Codex, 2026-10-14/15 PT)
+## Session 608 Summary — D26 ranking candidate and dedicated test Preview (Codex, 2026-10-14/15 PT)
 
 ### What Was Completed
 
-1. **D26 release candidate built on its own branch.** [VERIFIED via local Git and source review.] Branch `codex/d26-ranking-release` integrates current main at merge `74040eba5`; implementation commits are `26cc92dd5`, `789fc8ea4`, `26cb148a1`, `a5f4a83d8`, `69578a397`, and `9fe92f0ed` (current source). The candidate supports one/two versioned facilitators, captures membership in v2 workflow state, protects unrevealed assessments in v2 and v1 responses, uses safe v1 meeting controls, and dispatches reads/actions by stored version. Sol reviewed the corrections; Opus's final review is satisfied with no blocker. No production deployment or production write occurred.
-2. **Local verification passed.** [VERIFIED via final checks on `9fe92f0ed`.] 25 ranking/identity-map suites / 269 tests, type check, scoped lint and production build passed. Scoped runtime gates and their sequential self-tests passed on the preceding reviewed source slice. Documentation gates/self-tests passed for Atlas, doc currency, fact consistency, symbol references and docs catalogue. The earlier build showed existing broad dynamic-filesystem tracing warnings in unrelated renderers. Review record: `docs/audits/PROPOSAL_RANKING_D26_IMPLEMENTATION_REVIEW_2026-10-14.md`.
-3. **Persisted synthetic sandbox rehearsal passed in a new cycle.** [VERIFIED via direct service harness and retained receipt.] Read-only preflight found D96 unused and its receipt absent. Six checks passed in synthetic D96 rounds: four actor-only private preparations; one-winner reveal and collective-edit races; one-winner reopen and restart races; captured membership through restart; retained history; and a workbook containing 23 synthetic proposals / 92 assessments. Receipt: `/private/tmp/proposal-ranking-d26-d96-sandbox-receipt.json`. D96 data remains; no deletion occurred. D97/D98 and shared defaults were untouched. Four enabled sandbox Dataverse users were used; Rob is a rehearsal surrogate for John.
+1. **The D26 release contract and implementation were reconciled.** [VERIFIED via main Git and the ranking branch.] Main documentation commits `a9aed5b87` (startup wiki blocker), `9e51152a7` (D26 privacy/facilitation contract and addendum), and `053bbcd6e` (Opus plan-review reconciliation) are present. The runtime candidate is on pushed branch **`codex/d26-ranking-release` at `c412d87cb`**; it has **not been merged into main**. Earlier implementation commits `26cc92dd5` through `9fe92f0ed` established captured membership, one or two facilitators, versioned workflow dispatch, private preparation, and guarded legacy controls. Source/contract detail and review receipts live on that branch in the D26 release plan, implementation addendum, API contract §8, ranking Atlas and implementation-review audit.
+2. **The preparation UI was simplified after the first candidate.** [VERIFIED via branch commits `68c5105b2` and `c412d87cb`, source and review.] Ready for group discussion is now one save-and-transition action; the separate confirm-then-Ready sequence is gone. The toolbar is compact; save status and preparation counts remain visible; refresh is quiet and reset is a direct, confirmed action at the bottom. Stale combined lists offer explicit rebuild confirmation and direct navigation. The letter-grade legend was removed, and peer-review tiles align with the PD's own grade. The in-progress, ready-to-combine and combined-list distinctions remain. Privacy, stale-save and rebuild guards remain in service code.
+3. **The dedicated test Preview is Ready for owner testing.** [VERIFIED via deployment receipt.] Candidate `c412d87cb` is deployed as `dpl_DFjfUyLxAGv2fa1Avoy1BZFKMgCV` at [the immutable Preview](https://wmkf-meeting-transcription-test-gdf9ez1ue.vercel.app); the stable test address is [the D97 ranking page](https://wmkf-meeting-transcription-test.vercel.app/proposal-ranking). The owner is testing **D97** there. **D96** remains a separate, retained synthetic service rehearsal; its six persisted checks are evidence for races, privacy, restart and export, not independent staff acceptance. No ranking runtime was promoted to production and no production ranking reset was performed in this session.
+4. **Verification is bounded and passed.** [VERIFIED via test/review receipts.] The earlier implementation at `9fe92f0ed` passed 25 suites / 269 tests, types, scoped lint and build. The `68c5105b2` simplification passed 48 focused tests, 72 overlapping regression tests, types, relevant documentation checks and build. The final `c412d87cb` tile change passed 20 UI tests and scoped lint; independent source/accessibility review found no remaining actionable issue. Local fictional-persona Chromium checks exercised the candidate, but were **not** independent Microsoft SSO, Safari or iPad acceptance. Opus review used subscription OAuth only; no API credits or separate metered review product was used.
 
-### Still Open
+### Commits
 
-- Claude Opus's final OAuth follow-up is satisfied; there are no review blockers.
-- A bounded host Chrome smoke with trusted sandbox personas rendered the 23-card view/readiness/controls, navigated history and downloaded the workbook. It is not independent Microsoft SSO. Separate sign-ins, active profile mappings/app grants, WebKit/iPad acceptance, and actual D26 live-pool confirmation remain unverified.
-- Re-probe the exact 23-proposal D26 pool, current retained v1 trial, effective flags, grants, and schema at release time. D96 is synthetic, not D26 source data.
-- Production configuration, schema, cancellation/retirement, round opening, promotion, and deployment are separate owner-approved actions. Do not perform them from this handoff.
+- **D26 service, rehearsal and review:** `26cc92dd5`, `789fc8ea4`, `26cb148a1`, `a5f4a83d8`, `69578a397`, `9fe92f0ed`, `d960893f8`, `492c408b5`.
+- **Preparation flow and UI:** `2badd6bd0`, `85be99e2a`, `d4e71bc43`, `a9e7374ec`, `c82444965`, `f53f8f05e`, `0c0f6d21a`, `e091dd82f`, `68c5105b2`, `c412d87cb`.
+- **Main documentation already present:** `a9aed5b87`, `9e51152a7`, `053bbcd6e`. The 18 branch commits above remain on `codex/d26-ranking-release`, outside main.
 
-### Resume at Home
+### Next Items
 
-1. Use `codex/d26-ranking-release`; do not switch branches, push, or deploy without an explicit new instruction. Preserve retained D96 rounds and the local receipt; never reuse D97 or D98.
-2. Read `docs/plans/PROPOSAL_RANKING_D26_IMPLEMENTATION_ADDENDUM_2026-10-14.md`, the D26 release plan, current API §8, and `docs/audits/PROPOSAL_RANKING_D26_OPUS_PLAN_REVIEW_2026-10-14.md`. Treat the latter as plan review, not runtime review.
-3. Keep production status PLANNED. Prepare a concrete cutover proposal only after final review and authenticated staff acceptance; ask for the production decision at that point.
-4. Preserve unrelated `.impeccable/critique/...` and `output/` files.
+#### Verified Open
+
+- **Finish owner acceptance in the dedicated D97 Preview.** Exercise separate real staff sign-ins, private own-only preparation before reveal (including both facilitators), facilitator readiness-only visibility, the combined-list and group flow, and the final layout on the owner's devices. Current source/tests/fictional-browser checks do not stand in for those observations. Do not open or control the owner's Safari unless explicitly asked.
+- **Re-probe release-time state before any production cutover.** Check the exact 23 eligible D26 proposals and exclusions, current retained v1 trial, schema, flags, grants, active profiles, and branch/main integration. Read the branch's D26 release plan and current Atlas before proposing steps. The Preview deployment does not establish production readiness.
+
+#### Owner Decision Needed
+
+- **Production promotion and any live ranking reset or trial retirement remain separate decisions.** The owner repeatedly authorized the dedicated test Preview and D97 testing; that authorization does not promote the candidate or authorize a production data operation. Present current acceptance evidence and a concrete guarded cutover before requesting a production decision.
+
+#### Verify Before Acting
+
+- Preserve D96's retained synthetic data, D97 colleague work, unrelated untracked `output/` and `.impeccable/critique/` files, and existing worktrees. Local scratch receipts and fictional Chromium state are not portable evidence. Do not manufacture staff rankings or assume historical facilitator and round state still holds.
+- The prior Session 608 handoff and all older sections below are **historical snapshots**. In particular, their ranking branch names, “implementation paused,” and “no Preview deployment authorized” statements reflected their dates; use this entry, the current branch source and fresh owner decisions for active work. Other workstream follow-ups were not re-audited here.
+
+### References and stop verification
+
+| Source | Purpose |
+|---|---|
+| `codex/d26-ranking-release` at `c412d87cb` | Pushed D26 runtime candidate; `68c5105b2` and `c412d87cb` are the final preparation UI changes |
+| `docs/plans/PROPOSAL_RANKING_D26_RELEASE_2026-10-14.md` and `docs/plans/PROPOSAL_RANKING_D26_IMPLEMENTATION_ADDENDUM_2026-10-14.md` | Release sequence, privacy, dual facilitation and acceptance scope |
+| `docs/plans/PROPOSAL_RANKING_API_CONTRACT.md` §8 and `docs/atlas/dataverse-proposal-ranking.md` | Versioned behavior and persisted-state ownership |
+| `docs/audits/PROPOSAL_RANKING_D26_IMPLEMENTATION_REVIEW_2026-10-14.md` | Bounded implementation and review receipts |
+
+**Stop scope:** Main is at `053bbcd6e` before this handoff and contains documentation-only D26 commits; its ranking runtime remains unchanged. The current handoff is a documentation-only stop, and no new production milestone was shipped, so no `DEVELOPMENT_LOG.md` entry is needed. The claim-evidence pilot report returned “Claim-evidence observation report unavailable: local state could not be read”; no observation row was invented. The older main handoff and its unrelated Cloudmersive context are retained below.
 
 ---
+
+## Prior handoffs — historical snapshots; verify current source, live state and owner decisions before acting
 
 ## Previous Session 608 Prompt: Cloudmersive diagnostics deployed; preserve other workstream handoffs
 
@@ -367,7 +389,7 @@ For memory-only local rehearsal: `node scripts/rehearse-proposal-ranking-v2.js` 
 
 ---
 
-## Current Proposal Ranking note — 2026-10-13 (Codex; owner-authorized v2 branch implementation)
+## Current Proposal Ranking note — 2026-10-13 (Codex; documentation only)
 
 [VERIFIED via owner decisions in the October 13 conversation] The revised workflow is agreed:
 separate reviewer-seeded MR/SE lists with roughly equal A/B/C sections and explicit confidence;
@@ -381,32 +403,18 @@ all-history qualifying regular Research award count/latest year, and resets at e
 for the walkthrough. Prior reveals remain preserved; reopening private preparation requires
 everyone ready and a fresh facilitator reveal. Future restrictions on resets are undecided.
 
-The current product authority is [design revision 5](docs/plans/PROPOSAL_RANKING_DESIGN_2026-10-07.md)
-and the owner-accepted revision-3 UX direction. The owner authorized implementation,
-smooth dragging and resets at every stage. Source is built on `codex/proposal-ranking-v2`;
-the [implementation plan](docs/plans/PROPOSAL_RANKING_IMPLEMENTATION_PLAN_2026-10-13.md)
-records local verification and remaining acceptance. Source commit `27e6fdc7c` is
-on READY dedicated Preview `dpl_6cZM8Dfv6copEpM16gMQWx8b6eFZ` at the stable test
-alias; Production is unchanged. Justin real Microsoft SSO, hosted six-proposal/four-PD
-source, opening, MR confidence/reset, combined order `1,4,2,3,6,5`, Ready and own
-reopen passed; reopening left all four Preparing and Reveal disabled. Other accepted staff sign-ins remain pending. Justin is test facilitator; Beth's actual
-default is unchanged. The accepted roster is Justin, Beth, Jean and John Sader (canonical identity verified).
-Rob's two setup-created grants were removed, John's profile/grants and third-Request
-lead were corrected, and the earlier round was canceled/retained by an atomic operator
-correction, not UI Restart. Justin opened the corrected round through hosted UI;
-all four are Preparing with Reveal disabled. Other staff SSO/group walkthrough remain
-pending. Test Neon has zero pending migrations. Preview 3
-`dpl_AKzoUJwZZsdFhu7XVDexuceqQaq2` is READY on the stable test alias.
-The user confirmed smooth 100-card pointer/autoscroll/drop in the memory-only fixture;
-saved maximum-capacity transactions remain unverified. The first-D97 fictional
-sentiment fixture now returns `current` through the real consumer. Four new marked
-TEST files were created in shared akoyaGO SharePoint; no existing files changed.
-This was scripted acceptance with no model call or human analysis, not generation
-or full group-browser proof. Production is unchanged. See
-`docs/audits/PROPOSAL_RANKING_V2_SANDBOX_REHEARSAL_2026-10-13.md`.
-Historical handoffs below do not
-override this authorization or authorize production promotion, writes or trial cleanup.
-Unrelated workstream handoffs retain their existing scope.
+The current product authority is [design revision 5](docs/plans/PROPOSAL_RANKING_DESIGN_2026-10-07.md).
+The [October 13 reconciliation audit](docs/audits/PROPOSAL_RANKING_WORKFLOW_RECONCILIATION_2026-10-13.md)
+records the historical revision-4 source comparison and its verification results. The current
+[implementation plan](docs/plans/PROPOSAL_RANKING_IMPLEMENTATION_PLAN_2026-10-13.md) carries
+revision 5 and the follow-up decisions. Independent read-only review approved the plan; all
+25 scoped documentation gate/self-test checks passed. The plan records the bounded receipt. No app implementation or fresh live-data/deployment verification is claimed.
+
+Implementation remains paused until the owner requests app changes. The current request authorizes
+implementation planning and documentation only. Historical Proposal Ranking handoffs
+below preserve earlier decisions, branch checkpoints, and dated evidence; their former “current” or
+“next” instructions do not override revision 5 or authorize implementation, promotion, or trial cleanup.
+Unrelated workstream handoffs and carryovers retain their existing scope.
 
 
 ## Session 601 close — Discussion Sentiment meter shipped to Meeting Tracker (Claude Opus orchestrating Sonnet build, Opus/Fable review, Codex adversarial; shared checkout `main`, 2026-10-13 PT)
@@ -434,7 +442,7 @@ Unrelated workstream handoffs retain their existing scope.
 
 1. **Calibration (waiting on the owner):** the owner is uploading more staff-discussion videos first. Then run 3–5 real discussions on the page (#1002852 and #1003038 already done), compare each result with that proposal's AI summary, and decide: keep the transcript version, simplify to summaries only (the owner's original ask), or both. Evidence: plan §6 item 5, §9 last entry.
 2. **Accept results** the owner agrees with (#1002852, #1003038); only accepted results reach other apps.
-3. **Proposal Ranking consumer:** accepted/current group-only sentiment is source-built on `codex/proposal-ranking-v2`, not merged or deployed. Bounded sandbox persistence rehearsal passed; independent-user and live sentiment acceptance remain outstanding; see the current note above.
+3. **Proposal Ranking consumer** for `getDeliberationSentiments` — not wired. The October 13 agreed design includes accepted/current sentiment on group-discussion cards only; implementation remains paused until requested. See the current Proposal Ranking note above.
 4. If an analysis drops quotes, Admin → Operational events shows `sentiment_evidence_verification` counts — use them to judge whether matching needs more tuning.
 
 ### Known limits (accepted)
