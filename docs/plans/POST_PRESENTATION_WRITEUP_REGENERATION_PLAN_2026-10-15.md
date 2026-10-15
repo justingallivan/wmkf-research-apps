@@ -2,8 +2,8 @@
 title: Post-presentation writeup regeneration
 domain: workbench
 kind: plan
-status: proposed
-summary: Owner-review proposal for preserving prior Word files while regenerating during post-visit drafting and group review.
+status: in-review
+summary: Source-built guarded replacement flow preserving prior Word files during post-visit drafting and group review; not deployed.
 owner: product-engineering
 last_verified: 2026-10-15
 related:
@@ -14,15 +14,37 @@ related:
 
 # Post-presentation writeup regeneration
 
-**[PLANNED — owner review required; no implementation authorized yet.]** Scope: Workbench → Staff Deliberations → step 4. Generate a fresh Word document from current governed inputs, including reviews submitted since the preceding generation. Preserve the preceding document as a separate superseded version; do not transfer its staff edits. Stay in `/Users/gallivan/Code/WMKF_Apps-writeup-regen`, branch `codex/writeup-regenerate`; no main push or production operations.
+**[OWNER APPROVED — source-built on `codex/writeup-regenerate`, 2026-10-15; review and scoped gates remain.]** Scope: Workbench → Staff Deliberations → step 4. Generate a fresh Word document from current governed inputs, including reviews submitted since the preceding generation. Preserve the preceding document as a separate superseded version; do not transfer its staff edits. This is not deployed and no production operations were performed.
 
 ## Owner review
 
-1. **Confirm the cutoff:** allow post-visit drafting and **group review**, but refuse once the **Final Writeup row** reaches `FINAL` / leadership review. The Pre-Site row already reaches `FINAL` at the start of group review; that flag alone must not prohibit regeneration.
-2. **Proposed stage preservation:** post-visit drafting stays post-visit drafting; group review stays group review. A regenerated group-review document starts with fresh sign-offs; sign-offs on the preserved document remain historical and do not approve the replacement.
-3. **Proposed colleague notice:** during group review, send a fresh handoff notice pointing colleagues to the replacement using the existing durable email mechanism and existing program/recipient rules. Preserve previous sent receipts; safely retire pending notices for the replaced source. Approval of this plan must settle this behavior before implementation; no messages are sent during planning.
+1. **Approved cutoff:** allow post-visit drafting and **group review**, but refuse once the **Final Writeup row** reaches `FINAL` / leadership review. The Pre-Site row already reaches `FINAL` at the start of group review; that flag alone does not prohibit regeneration.
+2. **Approved stage preservation:** post-visit drafting stays post-visit drafting; group review stays group review. A regenerated group-review document starts with fresh sign-offs; sign-offs on the preserved document remain historical and do not approve the replacement.
+3. **Approved colleague notice:** during group review, send a fresh handoff notice pointing colleagues to the replacement using the existing durable email mechanism and existing program/recipient rules. Preserve previous sent receipts; safely retire pending notices for the replaced source. Reuse the current group-review email copy and settings; the email opens the Final tab, which resolves the current document.
 
-The file replacement/preservation and availability during both stages are owner decisions from 2026-10-15. Items 1–3 make the boundary and its consequences explicit for approval. No schema/migration or new route is proposed. If existing fields cannot express the audited operation without changing their meaning, return with a named schema proposal before building that part.
+The file replacement/preservation and availability during both stages are owner decisions from 2026-10-15. No schema/migration or new route is proposed. Existing `wmkf_producer` and generation-key fields identify this operation; `wmkf_reopencycleid` remains reserved for reopen/correction history.
+
+## Opus review reconciliation and owner choices
+
+The read-only Opus review at `docs/audits/POST_PRESENTATION_WRITEUP_REGENERATION_OPUS_REVIEW_2026-10-15.md` identified implementation gaps. Owner approved the stage cutoff, stage preservation, fresh group-review signoffs and colleague notice on 2026-10-15. The gaps are closed here before code changes:
+
+1. **Preparation history:** keep preparation receipts immutable. Both request-detail and cycle-list projections treat a receipt tied to a superseded predecessor in the current source lineage as historical; it must not become `document_pointer_changed` or `Needs attention`. A group-review successor receives its own group-review checkpoint/milestone; the prior checkpoint remains on the old Final row.
+2. **Operation identity/retry:** key a regeneration as a canonical hash of `{operation:'post-presentation-writeup-regeneration-v1', requestId, expectedPreSiteArtifactId, expectedFinalArtifactId|null, clientOperationId}`. Store a distinct producer (`request-workbench-regenerate`) on the successor; leave `wmkf_reopencycleid` empty. The input fingerprint remains the frozen input snapshot's fingerprint and is not part of this operation key. At initial claim, persist the rendering snapshot before model execution. A same-operation retry with a persisted proposal core resumes that frozen output even if live reviews changed. If a process failed before persisting a complete model output/run, same-ID recovery fails closed and requires a deliberate new UUID; it never repeats a potentially paid model call. The snapshot does not contain enough proposal narrative text to reconstruct that model input, so this is the chosen safe boundary.
+3. **Email recovery:** replacement email intent is staged before activation against the expected old pair and successor operation. When delivery sees the old pair still current and the successor is generating/ready but not current, it releases the lease and waits; this wait expires through the existing `transition_not_committed` terminal state, which the store can reopen. If the source row is superseded or the operation is proven abandoned, terminalize the intent with that same reopenable reason. Once the replacement pair is current, the activation path calls the existing `deliverGroupReviewHandoff` hook. Reuse current group-review copy/settings; prior sent receipts remain history. A concurrently accepted old notice cannot be recalled and its Final-tab link resolves to current state.
+4. **Old-file edits:** regeneration never consumes the old file bytes, so the SharePoint version observed at user confirmation is provenance only. Edits after confirmation are allowed and remain on the preserved old item. Refresh/reconfirmation keeps the same operation ID and frozen output, avoiding a second model call. UI text asks group reviewers to stop editing and explains that later edits remain on the previous version.
+5. **Writer and route constraints:** extend the existing Pre-Site POST allowlist for an explicit `mode:'regenerate'` and the expected row IDs/client UUID; ordinary `{requestId}` remains unchanged and unknown keys fail closed. Update its exact-body test. Keep one registered `createDocument` call in `transition-service.js`; extract/share the create helper for ordinary Final claims and regeneration's prepared successor, and express actor policy as a three-way policy at that one call. Update the writer-gate fixture and require explicit REQUIRED actor resolution for regeneration.
+6. **History and timestamps:** history derives the old stage from a linked Final row's group-review checkpoint when present; otherwise it is post-visit drafting. A new group-review Final row gets a fresh `wmkf_groupreviewstartedat`, which is also the displayed start for the replacement review.
+7. **Citation fixes:** the ordinary Draft-only guard is in `artifact-service.js` around lines 91–104; the leadership transition is in `transition-service.js` around lines 191 and 298–326 in the reviewed baseline.
+
+The distinct producer, key shape, fail-closed pre-model retry behavior and preparation-lineage rule are application contracts defined by this implementation; they are not Dataverse option values or schema additions.
+
+## Source-built implementation contract
+
+The existing `POST /api/workbench/pre-site-visit` route accepts only `{requestId}` for ordinary generation or the exact regeneration body `{requestId, mode:'regenerate', expectedArtifactId, expectedFinalArtifactId?, clientOperationId}`. It rechecks the lead-PD/superuser authority and exact current pair at activation. A regeneration key includes the client UUID and both expected rows; an active competing UUID returns the active pending row (HTTP 202) without loading inputs or starting another model call. A same-UUID active claim returns pending; a completed same-UUID replay returns its committed successor. Failed or expired work without a persisted core/upload fails closed and tells the user to explicitly confirm a new operation. Work with a persisted core or verified upload resumes from the frozen snapshot and does not consult live narrative or prompt state.
+
+Post-visit drafting replaces only the Pre-Site pointer; group review creates a new Pre-Site/Final pair and changes both pointers in one ETag-fenced changeset. Existing SharePoint files, snapshots, sign-offs, sent notices, and distribution history remain attached to their old rows. New group-review notices use the existing durable email ledger and explicit replacement/fresh-signoff copy. GET projects independently refreshed Pre-Site and Final state plus bounded previous-version links; pre-group-review file access remains lead-PD/PC/superuser scoped. The cycle-list lineage includes superseded predecessors only for matching immutable preparation receipts. No schema, migration, or API route was added. The source-built files are the implementations cited by the route, Atlas, and service catalog; hosted Dataverse/SharePoint race behavior remains unverified until an isolated authorized rehearsal.
+
+Candidate verification passed on 2026-10-15: 8 focused suites / 395 tests, then `check:request-document-writers` and `check:request-document-writers:self-test` sequentially. Parent-owned route/type/lint/build gates and independent parent, Sol, and Claude OAuth reviews remain pending. No model/provider calls, production data operations, or hosted race rehearsal were performed.
 
 ## Current contract traced
 

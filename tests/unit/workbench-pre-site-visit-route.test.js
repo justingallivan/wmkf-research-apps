@@ -325,6 +325,23 @@ test('generates through the durable service and returns the governed artifact id
   });
 });
 
+test('accepts a confirmed regeneration identity and delegates pair validation to the writer service', async () => {
+  const expectedArtifactId = '33333333-3333-4333-8333-333333333333';
+  const clientOperationId = '55555555-5555-4555-8555-555555555555';
+  const res = mockRes();
+  await handler(post({ requestId: REQUEST_ID, mode: 'regenerate', expectedArtifactId,
+    expectedFinalArtifactId: null, clientOperationId }), res);
+  expect(generatePreSiteVisitArtifact).toHaveBeenCalledWith({
+    requestId: REQUEST_ID,
+    actingUserSystemId: '22222222-2222-4222-8222-222222222222',
+    generationMode: 'regenerate',
+    regeneration: {
+      expectedArtifactId, expectedFinalArtifactId: null, clientOperationId, isSuperuser: true,
+    },
+  });
+  expect(res.statusCode).toBe(200);
+});
+
 test('returns 202 when another owned generation is still active', async () => {
   generatePreSiteVisitArtifact.mockResolvedValueOnce({
     artifact: { operationStatus: REQUEST_DOCUMENT_OPERATION_STATUS.GENERATING },
@@ -390,8 +407,9 @@ test('a not-yet-started Final carries the start permission and source for step 4
   const res = mockRes();
   await handler(get(), res);
   expect(res.body.finalReview).toEqual({
-    availability: 'missing', phase: 'ready', artifactId: null, file: null,
+    available: true, availability: 'missing', phase: 'ready', artifact: null, artifactId: null, file: null,
     canStart: true, startBlockedReason: null, sourceArtifactId: 'source-1', handoffEmailEnabled: true,
+    canAdvance: false, pendingArtifact: null,
   });
   expect(getFinalWriteupStatus).toHaveBeenCalledWith(expect.objectContaining({ actingUserSystemId: expect.anything() }));
 });
@@ -424,7 +442,8 @@ describe('draft writeup visibility before group review', () => {
     await handler(get(), res);
     expect(res.statusCode).toBe(200);
     expect(res.body).not.toHaveProperty('leadProgramDirectorId');
-    expect(res.body.writeupAccess).toEqual({ canChange, identityLinked: true });
+    expect(res.body.writeupAccess).toMatchObject({ canChange, identityLinked: true });
+    expect(res.body.writeupAccess.canRegenerate).toBe(canChange);
     if (visible) {
       expect(res.body.currentArtifact.file.webUrl).toBe('https://sharepoint.test/w.docx');
       expect(res.body.writeup.file.webUrl).toBe('https://sharepoint.test/w.docx');
@@ -443,6 +462,30 @@ describe('draft writeup visibility before group review', () => {
     expect(res.body.code).toBe('pre_site_writeup_lead_only');
     expect(generatePreSiteVisitArtifact).not.toHaveBeenCalled();
   });
+});
+
+test('GET keeps previous-version files visible only to the lead or group-review audience', async () => {
+  getUserRole.mockResolvedValueOnce('staff');
+  requireAppAccess.mockResolvedValueOnce({ profileId: PROFILE_ID,
+    session: { user: { dynamicsSystemuserId: '99999999-9999-4999-8999-999999999999' } } });
+  getPreSiteVisitArtifactStatus.mockResolvedValueOnce({
+    leadProgramDirectorId: '22222222-2222-4222-8222-222222222222',
+    currentArtifact: { artifactId: 'current', lifecycleState: 100000001 },
+    previousVersions: [
+      { artifactId: 'old-draft', stage: 'post-visit-drafting', file: { webUrl: 'https://sharepoint.test/private-old.docx' } },
+      { artifactId: 'old-review', stage: 'group-review', file: { webUrl: 'https://sharepoint.test/shared-old.docx' } },
+    ],
+  });
+  getFinalWriteupStatus.mockResolvedValueOnce({ available: true, phase: 'ready', artifact: null });
+  const res = mockRes();
+  await handler(get(), res);
+  expect(res.statusCode).toBe(200);
+  expect(res.body.previousVersions).toEqual([
+    { artifactId: 'old-draft', stage: 'post-visit-drafting', file: null, fileHidden: true },
+    { artifactId: 'old-review', stage: 'group-review', file: { webUrl: 'https://sharepoint.test/shared-old.docx' } },
+  ]);
+  expect(JSON.stringify(res.body)).not.toContain('private-old.docx');
+  expect(JSON.stringify(res.body)).toContain('shared-old.docx');
 });
 
 test('a draft published between the status read and the preparation read stays hidden', async () => {

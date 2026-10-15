@@ -21,6 +21,7 @@ import { requestJson, requestEnvelope } from '../../utils/api-request';
 import {
   PRE_SITE_REOPEN_CONTRACT,
   PRE_SITE_REOPEN_REASON_LABEL,
+  PRE_SITE_VISIT_REGENERATION_CONTRACT,
   REQUEST_DOCUMENT_LIFECYCLE_STATE,
   REQUEST_DOCUMENT_OPERATION_STATUS,
 } from '../../config/requestDocument';
@@ -243,6 +244,8 @@ export default function StaffDeliberationsTab({
   const [artifact, setArtifact] = useState(null);
   const [pendingArtifact, setPendingArtifact] = useState(null);
   const [reopenHistory, setReopenHistory] = useState(EMPTY_LIST);
+  const [previousVersions, setPreviousVersions] = useState(EMPTY_LIST);
+  const [regenerationRetry, setRegenerationRetry] = useState(null);
   const [, setStageLabels] = useState(EMPTY_STAGE_LABELS);
   const [preparation, setPreparation] = useState(null);
   const [correctionInProgress, setCorrectionInProgress] = useState(false);
@@ -331,6 +334,7 @@ export default function StaffDeliberationsTab({
           setArtifact(status.currentArtifact || null);
           setPendingArtifact(status.pendingArtifact || null);
           setReopenHistory(status.reopenHistory || EMPTY_LIST);
+          setPreviousVersions(status.previousVersions || EMPTY_LIST);
           if (status.stageLabels) setStageLabels(status.stageLabels);
           setSession(status.session || null);
           setSessionAttendees(Array.isArray(status.sessionAttendees) ? status.sessionAttendees : EMPTY_LIST);
@@ -364,6 +368,8 @@ export default function StaffDeliberationsTab({
   }, [requestId]);
 
   useEffect(() => {
+    setPreviousVersions(EMPTY_LIST);
+    setRegenerationRetry(null);
     if (!requestId) return undefined;
     let disposed = false;
     let timer;
@@ -485,6 +491,12 @@ export default function StaffDeliberationsTab({
       const pending = status.pendingArtifact || null;
       if (current) setArtifact(current);
       setPendingArtifact(pending);
+      setPreviousVersions(status.previousVersions || EMPTY_LIST);
+      if (status.finalReview) setFinalReview(status.finalReview);
+      if (status.writeupAccess) setWriteupAccess(status.writeupAccess);
+      setPreparation(status.preparation || null);
+      setTiming(status.timing || null);
+      setCorrectionInProgress(status.correctionInProgress === true);
       if (status.stageLabels) setStageLabels(status.stageLabels);
       if (status.session !== undefined) setSession(status.session || null);
       if (status.sessionAttendees !== undefined) setSessionAttendees(Array.isArray(status.sessionAttendees) ? status.sessionAttendees : EMPTY_LIST);
@@ -506,7 +518,7 @@ export default function StaffDeliberationsTab({
     );
   };
 
-  const generate = async () => {
+  const generate = async (regeneration = null) => {
     if (!requestId || generating) return;
     const id = requestId;
     const baselineArtifactId = artifact?.artifactId || null;
@@ -529,7 +541,13 @@ export default function StaffDeliberationsTab({
       // per-site rule).
       const envelope = await requestEnvelope('/api/workbench/pre-site-visit', {
         method: 'POST',
-        body: { requestId: id },
+        body: regeneration ? {
+          requestId: id,
+          mode: 'regenerate',
+          expectedArtifactId: regeneration.expectedArtifactId,
+          ...(regeneration.expectedFinalArtifactId ? { expectedFinalArtifactId: regeneration.expectedFinalArtifactId } : {}),
+          clientOperationId: regeneration.clientOperationId,
+        } : { requestId: id },
         signal: controller.signal,
         tolerantBody: true,
       });
@@ -570,6 +588,17 @@ export default function StaffDeliberationsTab({
       } else {
         setArtifact(body.artifact);
       }
+      if (regeneration) {
+        const refreshed = await readStatus(id, controller.signal);
+        if (generationSequence.current !== sequence || id !== requestId) return;
+        setArtifact(refreshed.currentArtifact || body.artifact || null);
+        setPendingArtifact(refreshed.pendingArtifact || null);
+        setFinalReview(refreshed.finalReview || null);
+        setWriteupAccess(refreshed.writeupAccess || null);
+        setPreparation(refreshed.preparation || null);
+        setPreviousVersions(refreshed.previousVersions || EMPTY_LIST);
+        setRegenerationRetry(null);
+      }
     } catch (generationError) {
       if (generationError?.name !== 'AbortError'
         && generationSequence.current === sequence
@@ -589,9 +618,15 @@ export default function StaffDeliberationsTab({
             setArtifact(ready);
             setPendingArtifact(null);
           } catch (recoveryError) {
-            if (recoveryError?.name !== 'AbortError') setError(recoveryError.message);
+            if (recoveryError?.name !== 'AbortError'
+              && generationSequence.current === sequence
+              && id === requestId) {
+              if (regeneration) setRegenerationRetry(regeneration);
+              setError(recoveryError.message);
+            }
           }
         } else {
+          if (regeneration) setRegenerationRetry(regeneration);
           setError(generationError.message);
         }
       }
@@ -686,6 +721,9 @@ export default function StaffDeliberationsTab({
   const unchangedRetryBlocked = pendingArtifact?.operationStatus
     === REQUEST_DOCUMENT_OPERATION_STATUS.FAILED
     && pendingArtifact.retryable === false;
+  const regenerationPending = pendingArtifact?.operationStatus
+    === REQUEST_DOCUMENT_OPERATION_STATUS.GENERATING
+    && pendingArtifact.leaseActive !== false;
   const preSiteShared = artifact?.lifecycleState === REQUEST_DOCUMENT_LIFECYCLE_STATE.REVIEW;
   const preSiteDraftReady = artifact?.lifecycleState === REQUEST_DOCUMENT_LIFECYCLE_STATE.DRAFT;
   const preSiteFinal = artifact?.lifecycleState === REQUEST_DOCUMENT_LIFECYCLE_STATE.FINAL;
@@ -1084,19 +1122,28 @@ export default function StaffDeliberationsTab({
     }
     : confirmDialog?.kind === 'presite'
       ? {
-        title: 'Regenerate this draft?',
+        title: 'Regenerate this writeup?',
         confirmLabel: generating ? 'Regenerating…' : 'Regenerate',
         busy: generating,
-        onConfirm: () => {
-          setConfirmDialog(null);
-          generate();
+          onConfirm: () => {
+            setConfirmDialog(null);
+            if (confirmDialog.stage === 'draft') generate();
+            else {
+              setRegenerationRetry(confirmDialog);
+              generate(confirmDialog);
+            }
         },
         body: (
-          <p>
-            Regenerating starts a new Claude call and creates new AI-generated content from
-            the latest proposal source and Dataverse data. Edits in the current Word file
-            will not be carried into the new draft.
-          </p>
+          <div className="space-y-2">
+            {confirmDialog.stage === 'draft' ? (
+              <p>Regeneration creates a new Word draft from the latest proposal source and Dataverse data. Edits in the current Word file will not carry over.</p>
+            ) : (
+              <p>Regeneration creates a new Word document from the current governed data. Edits in the current file will not carry over; it will remain under Previous versions.</p>
+            )}
+            {confirmDialog.stage === 'group-review' && (
+              <p>Colleagues may be editing the current file. Ask them to stop before continuing. They will receive a replacement notice and need to open the new file and sign off again. Later edits to the old file stay only in that previous version.</p>
+            )}
+          </div>
         ),
       }
       : confirmDialog?.kind === 'group-review'
@@ -1143,7 +1190,9 @@ export default function StaffDeliberationsTab({
     : preparationAwaitsCorrections ? 'pending' : preparation?.state;
   // Generation-time checks are never re-run against later Word edits, so they
   // stop showing once staff record a version or reopen it for corrections.
-  const draftWarnings = artifact?.milestone?.actorId || correctionDraft ? [] : warnings;
+  const isRegenerationProducer = artifact?.provenance?.producer
+    === PRE_SITE_VISIT_REGENERATION_CONTRACT.producer;
+  const draftWarnings = (artifact?.milestone?.actorId && !isRegenerationProducer) || correctionDraft ? [] : warnings;
   const blockedReason = BLOCKED_PREPARATION_REASONS[preparation?.errorCode]
     || 'Automatic preparation stopped before it finished. Your existing document has been preserved.';
   const canRetryPreparation = preparation?.errorCode !== 'document_pointer_changed';
@@ -1272,8 +1321,15 @@ export default function StaffDeliberationsTab({
     readyFile && !preSiteFinal && {
       key: 'download', label: 'Download', href: downloadUrl, download: readyFile.name || true, title: readyFile.name || undefined,
     },
-    readyFile && preSiteDraftReady && canChangeWriteup && {
-      key: 'regenerate', label: 'Regenerate Word Draft', onSelect: () => setConfirmDialog({ kind: 'presite' }), disabled: generating || unchangedRetryBlocked,
+      readyFile && ((preSiteDraftReady && canChangeWriteup) || writeupAccess?.canRegenerate === true) && {
+      key: 'regenerate', label: 'Regenerate Word Draft', onSelect: () => setConfirmDialog({
+        kind: 'presite',
+        expectedArtifactId: artifact.artifactId,
+        expectedFinalArtifactId: finalReview?.phase === 'group-review' ? finalReview.artifact?.artifactId : null,
+        stage: preSiteDraftReady ? 'draft'
+          : finalReview?.phase === 'group-review' ? 'group-review' : 'post-visit-drafting',
+        ...(preSiteDraftReady ? {} : { clientOperationId: newClientOperationId() }),
+      }), disabled: generating || unchangedRetryBlocked || regenerationPending,
     },
   ].filter(Boolean);
 
@@ -1542,6 +1598,21 @@ export default function StaffDeliberationsTab({
           )}
           <FileDetails file={readyFile} />
           <Warnings warnings={draftWarnings} label={preSiteShared || preSiteFinal ? 'Writeup needs a quick edit check' : 'Draft needs a quick edit check'} />
+          {previousVersions.length > 0 && (
+            <section className="mt-3" aria-label="Previous writeup versions">
+              <h4 className="font-medium text-gray-800">Previous versions</h4>
+              <ul className="mt-1 space-y-1">
+                {previousVersions.filter((version) => version.file?.webUrl).map((version, index) => (
+                  <li key={`${version.createdAt || 'version'}-${index}`}>
+                    <a href={version.file.webUrl} target="_blank" rel="noopener noreferrer" className="underline">
+                      {version.stage === 'group-review' ? 'Previous group-review writeup' : 'Previous post-visit draft'}
+                      {version.createdAt ? ` · ${new Date(version.createdAt).toLocaleDateString()}` : ''}
+                    </a>
+                  </li>
+                ))}
+              </ul>
+            </section>
+          )}
         </div>
       ) : null}
       actions={(
@@ -1549,7 +1620,7 @@ export default function StaffDeliberationsTab({
           {(!due || ['disabled', 'blocked', 'none'].includes(preparationState)) && !readyFile && !writeupHidden && canChangeWriteup && !preSiteShared && !preSiteFinal && (
             <button
               type="button"
-              onClick={generate}
+              onClick={() => generate()}
               disabled={generating || !requestId || unchangedRetryBlocked}
               className={due ? primaryClass : secondaryClass}
             >
@@ -1585,6 +1656,23 @@ export default function StaffDeliberationsTab({
     >
       {error && (
         <p className="mt-2 text-sm text-red-800" role="alert">{error}</p>
+      )}
+      {regenerationRetry && (
+        <div className="mt-2 flex flex-wrap gap-2 text-sm">
+          <button type="button" onClick={() => generate(regenerationRetry)} disabled={generating} className="underline">
+            Retry this regeneration
+          </button>
+          <button type="button" onClick={() => {
+            setError(null);
+            setRegenerationRetry(null);
+            setConfirmDialog({
+              ...regenerationRetry,
+              clientOperationId: newClientOperationId(),
+            });
+          }} disabled={generating} className="underline">
+            Start a new regeneration
+          </button>
+        </div>
       )}
       <div aria-live="polite">
         {checkingStatus && !artifact && !pendingArtifact && (

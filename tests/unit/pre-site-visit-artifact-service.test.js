@@ -1,6 +1,7 @@
 import {
   buildPreSiteVisitIdentity,
   buildPreSiteVisitInputSnapshot,
+  buildPreSiteVisitRegenerationKey,
   generatePreSiteVisitArtifact,
   getPreSiteVisitArtifactStatus,
   projectPreSiteVisitArtifact,
@@ -179,6 +180,20 @@ test('a guarded reopen cycle prevents later generation from rediscovering the pr
   expect(reopened.generationKey).not.toBe(original.generationKey);
 });
 
+test('regeneration operation identity is stable for one confirmed source pair and UUID', () => {
+  const base = {
+    requestId: REQUEST_ID,
+    expectedPreSiteArtifactId: ARTIFACT_ID,
+    expectedFinalArtifactId: null,
+    clientOperationId: '66666666-6666-4666-8666-666666666666',
+  };
+  expect(buildPreSiteVisitRegenerationKey(base)).toBe(buildPreSiteVisitRegenerationKey(base));
+  expect(buildPreSiteVisitRegenerationKey({ ...base, clientOperationId: '77777777-7777-4777-8777-777777777777' }))
+    .not.toBe(buildPreSiteVisitRegenerationKey(base));
+  expect(buildPreSiteVisitRegenerationKey({ ...base, expectedPreSiteArtifactId: '88888888-8888-4888-8888-888888888888' }))
+    .not.toBe(buildPreSiteVisitRegenerationKey(base));
+});
+
 test('reopen history projects durable actor, reason, source, and milestone evidence', () => {
   const source = {
     wmkf_requestdocumentid: ARTIFACT_ID,
@@ -275,17 +290,20 @@ function createHarness({
   mutatePersistedDraft = false,
   currentPointerRow = null,
   additionalRows = [],
+  initialOperationRow = null,
+  initialUploadedFile = null,
 } = {}) {
-  let row = null;
   const prior = currentPointerRow ? { ...currentPointerRow } : null;
+  let row = initialOperationRow ? { ...initialOperationRow } : null;
   const extraRows = additionalRows.map((candidate) => ({ ...candidate }));
   const request = {
     akoya_requestid: REQUEST_ID,
     _wmkf_currentpresitevisit_value: prior?.wmkf_requestdocumentid || null,
+    _wmkf_currentfinalwriteup_value: null,
     _etag: 'request-1',
   };
   let etag = 1;
-  let uploaded = null;
+  let uploaded = initialUploadedFile;
 
   function applyDocumentPatch(target, patch) {
     for (const [key, value] of Object.entries(patch)) {
@@ -349,6 +367,8 @@ function createHarness({
       };
       delete row['wmkf_Request@odata.bind'];
       delete row['wmkf_AIPrompt@odata.bind'];
+      row._wmkf_sourcedocument_value = payload['wmkf_SourceDocument@odata.bind']?.match(/\(([^)]+)\)/)?.[1] || null;
+      delete row['wmkf_SourceDocument@odata.bind'];
       return ARTIFACT_ID;
     }),
     updateDocument: jest.fn().mockImplementation(async (id, patch, options) => {
@@ -371,6 +391,9 @@ function createHarness({
           request._wmkf_currentpresitevisit_value = operation.body[
             'wmkf_CurrentPreSiteVisit@odata.bind'
           ].match(/\(([^)]+)\)/)?.[1];
+          if (operation.body['wmkf_CurrentFinalWriteup@odata.bind']) {
+            request._wmkf_currentfinalwriteup_value = operation.body['wmkf_CurrentFinalWriteup@odata.bind'].match(/\(([^)]+)\)/)?.[1];
+          }
           request._etag = 'request-2';
         }
       }
@@ -391,10 +414,17 @@ function createHarness({
       return uploaded;
     }),
     getFileMetadataByPath: jest.fn().mockImplementation(async () => uploaded),
+    getFileMetadataById: jest.fn().mockImplementation(async (driveId, itemId) => (
+      itemId === 'uploaded-item' ? uploaded : {
+        siteId: 'site-id', driveId, id: itemId, versionId: 'old-version', eTag: 'old-etag',
+        size: 1234, lastModified: '2026-08-17T11:00:00Z',
+      }
+    )),
     downloadFile: jest.fn().mockResolvedValue({ buffer: Buffer.from('normalized-docx') }),
     deleteFile: jest.fn().mockResolvedValue(undefined),
     newClaimToken: jest.fn().mockReturnValue(CLAIM_ID),
     isGuardedReopenSchemaReady: jest.fn().mockReturnValue(true),
+    readFinalWriteupStatus: jest.fn().mockResolvedValue({ phase: 'ready' }),
   };
 
   return {
@@ -609,6 +639,242 @@ test('persists eight sections and snapshots, renders the Dataverse read-back, th
     'request', 'commit', 'generation-read',
     'request', 'request-documents',
   ]);
+});
+
+test('post-visit regeneration freezes inputs at claim and atomically preserves the old file', async () => {
+  const oldArtifactId = '66666666-6666-4666-8666-666666666666';
+  const clientOperationId = '77777777-7777-4777-8777-777777777777';
+  const old = {
+    wmkf_requestdocumentid: oldArtifactId,
+    _wmkf_request_value: REQUEST_ID,
+    wmkf_artifacttype: REQUEST_DOCUMENT_ARTIFACT_TYPE.PRE_SITE_VISIT,
+    wmkf_contenttype: PRE_SITE_VISIT_CONTRACT.contentType,
+    wmkf_operationstatus: REQUEST_DOCUMENT_OPERATION_STATUS.READY,
+    wmkf_lifecyclestate: REQUEST_DOCUMENT_LIFECYCLE_STATE.REVIEW,
+    wmkf_sharepointsiteid: 'site-id',
+    wmkf_sharepointdriveid: 'drive-id',
+    wmkf_sharepointitemid: 'old-item',
+    wmkf_sharepointweburl: 'https://sharepoint.test/old.docx',
+    wmkf_sharepointversionid: 'old-version',
+    wmkf_sharepointetag: 'old-etag',
+    wmkf_sharepointlastmodified: '2026-08-17T11:00:00Z',
+    wmkf_filesize: 1200,
+    wmkf_contenthash: 'gdc1:old-content',
+    _etag: 'old-row-etag',
+  };
+  const harness = createHarness({ currentPointerRow: old });
+  const expectedSnapshot = buildPreSiteVisitInputSnapshot(inputFixture());
+  const result = await generatePreSiteVisitArtifact({
+    requestId: REQUEST_ID,
+    actingUserSystemId: '88888888-8888-4888-8888-888888888888',
+    generationMode: 'regenerate',
+    regeneration: { expectedArtifactId: oldArtifactId, clientOperationId, expectedFinalArtifactId: null, isSuperuser: true },
+  }, harness.dependencies);
+
+  expect(result.artifact).toMatchObject({
+    operationStatus: REQUEST_DOCUMENT_OPERATION_STATUS.READY,
+    lifecycleState: REQUEST_DOCUMENT_LIFECYCLE_STATE.REVIEW,
+    file: { itemId: 'uploaded-item' },
+  });
+  expect(harness.dependencies.createDocument).toHaveBeenCalledWith(expect.objectContaining({
+    wmkf_producer: 'request-workbench-regenerate',
+    wmkf_presiteinputsnapshotjson: JSON.stringify(expectedSnapshot),
+    'wmkf_SourceDocument@odata.bind': `/wmkf_requestdocuments(${oldArtifactId})`,
+  }), expect.objectContaining({ actorPolicy: 'required' }));
+  expect(harness.dependencies.createDocument.mock.calls[0][0]).not.toHaveProperty('wmkf_reopencycleid');
+  expect(harness.currentPointerRow.wmkf_lifecyclestate).toBe(REQUEST_DOCUMENT_LIFECYCLE_STATE.SUPERSEDED);
+  expect(harness.currentPointerRow.wmkf_sharepointitemid).toBe('old-item');
+  expect(harness.request._wmkf_currentpresitevisit_value).toBe(ARTIFACT_ID);
+  expect(harness.row.wmkf_milestoneversionid).toBe('1.0');
+  expect(harness.dependencies.deleteFile).not.toHaveBeenCalled();
+
+  const generatedCoreCalls = harness.dependencies.runProposalCore.mock.calls.length;
+  const uploads = harness.dependencies.uploadFile.mock.calls.length;
+  const replay = await generatePreSiteVisitArtifact({
+    requestId: REQUEST_ID,
+    actingUserSystemId: '88888888-8888-4888-8888-888888888888',
+    generationMode: 'regenerate',
+    regeneration: { expectedArtifactId: oldArtifactId, clientOperationId, expectedFinalArtifactId: null, isSuperuser: true },
+  }, harness.dependencies);
+  expect(replay).toMatchObject({ reused: true, artifact: { artifactId: ARTIFACT_ID } });
+  expect(harness.dependencies.runProposalCore).toHaveBeenCalledTimes(generatedCoreCalls);
+  expect(harness.dependencies.uploadFile).toHaveBeenCalledTimes(uploads);
+});
+
+test('an active regeneration claim without saved core remains pending on the same operation', async () => {
+  const oldArtifactId = '66666666-6666-4666-8666-666666666666';
+  const clientOperationId = '77777777-7777-4777-8777-777777777777';
+  const old = {
+    wmkf_requestdocumentid: oldArtifactId, _wmkf_request_value: REQUEST_ID,
+    wmkf_artifacttype: REQUEST_DOCUMENT_ARTIFACT_TYPE.PRE_SITE_VISIT,
+    wmkf_contenttype: PRE_SITE_VISIT_CONTRACT.contentType,
+    wmkf_operationstatus: REQUEST_DOCUMENT_OPERATION_STATUS.READY,
+    wmkf_lifecyclestate: REQUEST_DOCUMENT_LIFECYCLE_STATE.REVIEW,
+    wmkf_sharepointdriveid: 'drive-id', wmkf_sharepointitemid: 'old-item',
+    wmkf_sharepointversionid: 'old-version', wmkf_contenthash: 'old-hash',
+    _etag: 'old-etag', createdon: '2026-10-10T00:00:00Z',
+  };
+  const generationKey = buildPreSiteVisitRegenerationKey({
+    requestId: REQUEST_ID, expectedPreSiteArtifactId: oldArtifactId,
+    expectedFinalArtifactId: null, clientOperationId,
+  });
+  const operation = {
+    wmkf_requestdocumentid: ARTIFACT_ID, _wmkf_request_value: REQUEST_ID,
+    wmkf_artifacttype: REQUEST_DOCUMENT_ARTIFACT_TYPE.PRE_SITE_VISIT,
+    wmkf_contenttype: PRE_SITE_VISIT_CONTRACT.contentType,
+    wmkf_operationstatus: REQUEST_DOCUMENT_OPERATION_STATUS.GENERATING,
+    wmkf_lifecyclestate: REQUEST_DOCUMENT_LIFECYCLE_STATE.DRAFT,
+    wmkf_generationkey: generationKey, wmkf_claimtoken: CLAIM_ID,
+    wmkf_producer: 'request-workbench-regenerate',
+    wmkf_presiteinputsnapshotjson: JSON.stringify(buildPreSiteVisitInputSnapshot(inputFixture())),
+    _wmkf_sourcedocument_value: oldArtifactId,
+    _etag: 'operation-etag', createdon: '2026-10-15T00:00:00Z', modifiedon: new Date().toISOString(),
+  };
+  const harness = createHarness({ currentPointerRow: old, initialOperationRow: operation });
+  const result = await generatePreSiteVisitArtifact({
+    requestId: REQUEST_ID, generationMode: 'regenerate',
+    regeneration: { expectedArtifactId: oldArtifactId, clientOperationId, expectedFinalArtifactId: null },
+  }, harness.dependencies);
+  expect(result.artifact.operationStatus).toBe(REQUEST_DOCUMENT_OPERATION_STATUS.GENERATING);
+  expect(harness.dependencies.runProposalCore).not.toHaveBeenCalled();
+  expect(harness.dependencies.uploadFile).not.toHaveBeenCalled();
+});
+
+test('an expired pre-model claim with no generated core fails closed and requires a new operation id', async () => {
+  const oldArtifactId = '66666666-6666-4666-8666-666666666666';
+  const clientOperationId = '77777777-7777-4777-8777-777777777777';
+  const old = {
+    wmkf_requestdocumentid: oldArtifactId, _wmkf_request_value: REQUEST_ID,
+    wmkf_artifacttype: REQUEST_DOCUMENT_ARTIFACT_TYPE.PRE_SITE_VISIT,
+    wmkf_contenttype: PRE_SITE_VISIT_CONTRACT.contentType,
+    wmkf_operationstatus: REQUEST_DOCUMENT_OPERATION_STATUS.READY,
+    wmkf_lifecyclestate: REQUEST_DOCUMENT_LIFECYCLE_STATE.REVIEW,
+    wmkf_sharepointdriveid: 'drive-id', wmkf_sharepointitemid: 'old-item',
+    wmkf_sharepointversionid: 'old-version', wmkf_contenthash: 'old-hash',
+    _etag: 'old-etag', createdon: '2026-10-10T00:00:00Z',
+  };
+  const generationKey = buildPreSiteVisitRegenerationKey({
+    requestId: REQUEST_ID, expectedPreSiteArtifactId: oldArtifactId,
+    expectedFinalArtifactId: null, clientOperationId,
+  });
+  const operation = {
+    wmkf_requestdocumentid: ARTIFACT_ID, _wmkf_request_value: REQUEST_ID,
+    wmkf_artifacttype: REQUEST_DOCUMENT_ARTIFACT_TYPE.PRE_SITE_VISIT,
+    wmkf_contenttype: PRE_SITE_VISIT_CONTRACT.contentType,
+    wmkf_operationstatus: REQUEST_DOCUMENT_OPERATION_STATUS.FAILED,
+    wmkf_lifecyclestate: REQUEST_DOCUMENT_LIFECYCLE_STATE.DRAFT,
+    wmkf_generationkey: generationKey, wmkf_claimtoken: CLAIM_ID,
+    wmkf_producer: 'request-workbench-regenerate',
+    wmkf_presiteinputsnapshotjson: JSON.stringify(buildPreSiteVisitInputSnapshot(inputFixture())),
+    wmkf_lasterrorcode: 'worker_interrupted', _wmkf_sourcedocument_value: oldArtifactId,
+    _etag: 'operation-etag', createdon: '2026-10-15T00:00:00Z', modifiedon: '2026-10-15T00:00:00Z',
+  };
+  const harness = createHarness({ currentPointerRow: old, initialOperationRow: operation });
+  await expect(generatePreSiteVisitArtifact({
+    requestId: REQUEST_ID, generationMode: 'regenerate',
+    regeneration: { expectedArtifactId: oldArtifactId, clientOperationId, expectedFinalArtifactId: null },
+  }, harness.dependencies)).rejects.toMatchObject({ code: 'pre_site_visit_regeneration_output_incomplete', httpStatus: 409 });
+  expect(harness.dependencies.runProposalCore).not.toHaveBeenCalled();
+  expect(harness.dependencies.uploadFile).not.toHaveBeenCalled();
+});
+
+test('same operation resumes a verified uploaded file through post-visit activation without re-uploading', async () => {
+  const oldArtifactId = '66666666-6666-4666-8666-666666666666';
+  const clientOperationId = '77777777-7777-4777-8777-777777777777';
+  const old = {
+    wmkf_requestdocumentid: oldArtifactId, _wmkf_request_value: REQUEST_ID,
+    wmkf_artifacttype: REQUEST_DOCUMENT_ARTIFACT_TYPE.PRE_SITE_VISIT,
+    wmkf_contenttype: PRE_SITE_VISIT_CONTRACT.contentType,
+    wmkf_operationstatus: REQUEST_DOCUMENT_OPERATION_STATUS.READY,
+    wmkf_lifecyclestate: REQUEST_DOCUMENT_LIFECYCLE_STATE.REVIEW,
+    wmkf_sharepointsiteid: 'site-id', wmkf_sharepointdriveid: 'drive-id',
+    wmkf_sharepointitemid: 'old-item', wmkf_sharepointversionid: 'old-version',
+    wmkf_sharepointetag: 'old-etag', wmkf_sharepointlastmodified: '2026-08-17T11:00:00Z',
+    wmkf_filesize: 1200, _etag: 'old-row-etag', createdon: '2026-10-10T00:00:00Z',
+  };
+  const generationKey = buildPreSiteVisitRegenerationKey({
+    requestId: REQUEST_ID, expectedPreSiteArtifactId: oldArtifactId,
+    expectedFinalArtifactId: null, clientOperationId,
+  });
+  const operation = {
+    wmkf_requestdocumentid: ARTIFACT_ID, _wmkf_request_value: REQUEST_ID,
+    wmkf_artifacttype: REQUEST_DOCUMENT_ARTIFACT_TYPE.PRE_SITE_VISIT,
+    wmkf_contenttype: PRE_SITE_VISIT_CONTRACT.contentType,
+    wmkf_operationstatus: REQUEST_DOCUMENT_OPERATION_STATUS.FAILED,
+    wmkf_lifecyclestate: REQUEST_DOCUMENT_LIFECYCLE_STATE.DRAFT,
+    wmkf_generationkey: generationKey, wmkf_claimtoken: CLAIM_ID,
+    wmkf_producer: 'request-workbench-regenerate',
+    wmkf_contenthash: 'gdc1:governed-hash',
+    wmkf_presiteinputsnapshotjson: JSON.stringify(buildPreSiteVisitInputSnapshot(inputFixture())),
+    wmkf_sharepointfolderpath: 'Requests/1002379/Pre-Site Visit',
+    wmkf_filename: '1002379 regenerated.docx',
+    _wmkf_sourcedocument_value: oldArtifactId,
+    _etag: 'operation-etag', createdon: '2026-10-15T00:00:00Z', modifiedon: '2026-10-15T00:00:00Z',
+  };
+  const uploaded = {
+    siteId: 'site-id', driveId: 'drive-id', id: 'uploaded-item',
+    webUrl: 'https://sharepoint.test/recovered.docx', versionId: '1.0',
+    eTag: 'file-etag', size: 1234, lastModified: '2026-10-15T00:00:00Z',
+  };
+  const harness = createHarness({ currentPointerRow: old, initialOperationRow: operation, initialUploadedFile: uploaded });
+  harness.dependencies.loadInputs.mockRejectedValue(new Error('live narrative is unavailable'));
+  harness.dependencies.getCurrentPrompt.mockRejectedValue(new Error('current prompt is unpublished'));
+  const result = await generatePreSiteVisitArtifact({
+    requestId: REQUEST_ID, actingUserSystemId: '88888888-8888-4888-8888-888888888888',
+    generationMode: 'regenerate',
+    regeneration: { expectedArtifactId: oldArtifactId, clientOperationId, expectedFinalArtifactId: null, isSuperuser: true },
+  }, harness.dependencies);
+  expect(result).toMatchObject({
+    recovered: true,
+    artifact: { artifactId: ARTIFACT_ID, operationStatus: REQUEST_DOCUMENT_OPERATION_STATUS.READY,
+      lifecycleState: REQUEST_DOCUMENT_LIFECYCLE_STATE.REVIEW, file: { itemId: 'uploaded-item' } },
+  });
+  expect(harness.dependencies.uploadFile).not.toHaveBeenCalled();
+  expect(harness.dependencies.runProposalCore).not.toHaveBeenCalled();
+  expect(harness.dependencies.loadInputs).not.toHaveBeenCalled();
+  expect(harness.dependencies.getCurrentPrompt).not.toHaveBeenCalled();
+  expect(harness.dependencies.commitChangeset).toHaveBeenCalledTimes(1);
+});
+
+test('a second UUID waits on the live regeneration claim without loading inputs or calling the model', async () => {
+  const oldArtifactId = '66666666-6666-4666-8666-666666666666';
+  const old = {
+    wmkf_requestdocumentid: oldArtifactId, _wmkf_request_value: REQUEST_ID,
+    wmkf_artifacttype: REQUEST_DOCUMENT_ARTIFACT_TYPE.PRE_SITE_VISIT,
+    wmkf_contenttype: PRE_SITE_VISIT_CONTRACT.contentType,
+    wmkf_operationstatus: REQUEST_DOCUMENT_OPERATION_STATUS.READY,
+    wmkf_lifecyclestate: REQUEST_DOCUMENT_LIFECYCLE_STATE.REVIEW,
+    wmkf_sharepointsiteid: 'site-id', wmkf_sharepointdriveid: 'drive-id',
+    wmkf_sharepointitemid: 'old-item', wmkf_sharepointversionid: 'old-version',
+    _etag: 'old-row-etag', createdon: '2026-10-10T00:00:00Z',
+  };
+  const competitor = {
+    wmkf_requestdocumentid: ARTIFACT_ID, _wmkf_request_value: REQUEST_ID,
+    wmkf_artifacttype: REQUEST_DOCUMENT_ARTIFACT_TYPE.PRE_SITE_VISIT,
+    wmkf_contenttype: PRE_SITE_VISIT_CONTRACT.contentType,
+    wmkf_operationstatus: REQUEST_DOCUMENT_OPERATION_STATUS.GENERATING,
+    wmkf_lifecyclestate: REQUEST_DOCUMENT_LIFECYCLE_STATE.DRAFT,
+    wmkf_generationkey: 'a-different-operation-key',
+    wmkf_claimtoken: CLAIM_ID, wmkf_producer: 'request-workbench-regenerate',
+    _wmkf_sourcedocument_value: oldArtifactId,
+    _etag: 'operation-etag', createdon: new Date().toISOString(), modifiedon: new Date().toISOString(),
+  };
+  const harness = createHarness({ currentPointerRow: old, initialOperationRow: competitor });
+  const result = await generatePreSiteVisitArtifact({
+    requestId: REQUEST_ID, generationMode: 'regenerate',
+    regeneration: {
+      expectedArtifactId: oldArtifactId,
+      clientOperationId: '77777777-7777-4777-8777-777777777777',
+      expectedFinalArtifactId: null,
+    },
+  }, harness.dependencies);
+  expect(result.artifact).toMatchObject({
+    artifactId: ARTIFACT_ID,
+    operationStatus: REQUEST_DOCUMENT_OPERATION_STATUS.GENERATING,
+  });
+  expect(harness.dependencies.loadInputs).not.toHaveBeenCalled();
+  expect(harness.dependencies.runProposalCore).not.toHaveBeenCalled();
+  expect(harness.dependencies.createDocument).not.toHaveBeenCalled();
 });
 
 test('fails closed when named fields diverge from the audited proposal-core envelope', async () => {
@@ -840,6 +1106,7 @@ test('read-only status projects current Ready plus milestone and newer pending r
     { code: 'referee_section_manual', message: 'The Reviews paragraph wasn\'t filled in automatically (no reviews had been submitted when this version was generated, or it was generated before reviews were added automatically). Check that it is complete in Word; this note stays until the document is regenerated.' },
   ];
   const provenance = {
+    producer: 'request-workbench',
     inputFingerprint: 'input-fingerprint', renderInputFingerprint: 'render-fingerprint',
     promptName: PRE_SITE_VISIT_CONTRACT.promptName, promptVersion: 4, promptId: PROMPT_ID,
     runId: RUN_ID, templateId: 'phase-ii-pre-site-visit', templateVersion: '9',
@@ -867,7 +1134,7 @@ test('read-only status projects current Ready plus milestone and newer pending r
     },
     pendingArtifact: {
       ...common, artifactId: pending.wmkf_requestdocumentid,
-      operationStatus: REQUEST_DOCUMENT_OPERATION_STATUS.GENERATING, file: null, milestone,
+      operationStatus: REQUEST_DOCUMENT_OPERATION_STATUS.GENERATING, file: null, milestone, leaseActive: true,
     },
     reopenHistory: [],
   });
@@ -1000,6 +1267,7 @@ test.each([2, 3, 4])('matching persisted core and input snapshot schema v%s reta
         size: 1234, lastModified: '2026-08-17T12:00:00Z',
       },
       provenance: {
+        producer: 'request-workbench',
         inputFingerprint: 'input-fingerprint', renderInputFingerprint: 'render-fingerprint',
         promptName: PRE_SITE_VISIT_CONTRACT.promptName, promptVersion: 4, promptId: PROMPT_ID,
         runId: RUN_ID, templateId: 'phase-ii-pre-site-visit', templateVersion: '9',

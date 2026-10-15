@@ -21,10 +21,15 @@ import { getMaterialsSummaryForRequest } from '../../../lib/services/site-visit-
 import { REQUEST_DOCUMENT_OPERATION_STATUS } from '../../../shared/config/requestDocument';
 import { REQUEST_DOCUMENT_LIFECYCLE_STATE } from '../../../shared/config/requestDocument';
 import { getPreparationForRequest } from '../../../lib/services/pre-site-visit/preparation-worker';
-import { readBriefFact, readFinalFact } from '../../../lib/services/pre-site-visit/status-facts';
+import { getFinalWriteupStatus } from '../../../lib/services/final-writeup/transition-service';
+import { readBriefFact } from '../../../lib/services/pre-site-visit/status-facts';
 import {
   canChangeDraftWriteup, redactDraftWriteup, resolveWriteupViewer,
 } from '../../../lib/services/pre-site-visit/writeup-visibility';
+
+function sameId(left, right) {
+  return Boolean(left && right) && String(left).toLowerCase() === String(right).toLowerCase();
+}
 
 export const config = {
   api: {
@@ -93,10 +98,43 @@ export default async function handler(req, res) {
           resolveWriteupViewer({ isSuperuser: role === 'superuser', actingUserSystemId }),
         ]);
         const { leadProgramDirectorId, ...statusWithoutLead } = status;
+        let finalReview;
+        try {
+          const finalStatus = await getFinalWriteupStatus({
+            requestId, isSuperuser: role === 'superuser', actingUserSystemId,
+            canSeeDraft: (leadId) => canChangeDraftWriteup(viewer, leadId),
+          });
+          finalReview = {
+            ...finalStatus,
+            availability: finalStatus.available
+              ? (finalStatus.phase === 'ready' && !finalStatus.artifact ? 'missing' : 'available')
+              : 'unavailable',
+            artifactId: finalStatus.artifact?.artifactId || null,
+            file: finalStatus.artifact?.file || null,
+          };
+        } catch (error) {
+          const expectedAbsentFinal = (status.currentArtifact?.lifecycleState === REQUEST_DOCUMENT_LIFECYCLE_STATE.DRAFT
+            && error?.code === 'final_writeup_source_ineligible')
+            || (!status.currentArtifact && error?.code === 'final_writeup_source_missing');
+          finalReview = expectedAbsentFinal
+            ? { availability: 'missing', phase: 'none', artifactId: null, file: null }
+            : { availability: 'unavailable', phase: 'unavailable', artifactId: null, file: null };
+        }
+        const regenerationStageEligible = (
+          status.currentArtifact?.lifecycleState === REQUEST_DOCUMENT_LIFECYCLE_STATE.REVIEW
+          && finalReview.phase === 'ready'
+        ) || (
+          status.currentArtifact?.lifecycleState === REQUEST_DOCUMENT_LIFECYCLE_STATE.FINAL
+          && finalReview.phase === 'group-review'
+        );
         const visibleStatus = {
           ...statusWithoutLead,
           currentArtifact: redactDraftWriteup(status.currentArtifact, viewer, leadProgramDirectorId),
           pendingArtifact: redactDraftWriteup(status.pendingArtifact, viewer, leadProgramDirectorId),
+          previousVersions: (status.previousVersions || []).map((version) => (
+            version.stage === 'group-review' || canChangeDraftWriteup(viewer, leadProgramDirectorId)
+              ? version : { ...version, file: null, fileHidden: true }
+          )),
         };
         const payload = includeCorrectionAudit ? visibleStatus : staffSafePayload(visibleStatus);
         // Session line (tracker §5.4 via the briefing seam): fail-open null
@@ -104,7 +142,7 @@ export default async function handler(req, res) {
         // Applicant materials summary (plan §16.3, PR 3): counts and window
         // only, never the contributor link or contacts; null when off and an
         // unavailable sentinel when a runtime read fails.
-        const [stageLabels, session, materials, preparation, brief, final] = await Promise.all([
+        const [stageLabels, session, materials, preparation, brief] = await Promise.all([
           readDeliberationStageLabels(),
           getDeliberationSessionForRequest(requestId).catch(() => null),
           getMaterialsSummaryForRequest({ requestId }),
@@ -114,14 +152,12 @@ export default async function handler(req, res) {
             writeup: { availability: 'unavailable', artifactId: null, file: null, milestone: null },
           })),
           readBriefFact(requestId).catch(() => ({ availability: 'unavailable', artifactId: null, lifecycleState: null, file: null, milestone: null })),
-          readFinalFact({ requestId, currentArtifact: payload.currentArtifact, role, actingUserSystemId }),
         ]);
         // Tracker §5.6: the session's attendees are the Share email's default
         // recipients, so the tab gets their addresses alongside the card shape.
         const sessionAttendees = Array.isArray(session?.attendees)
           ? session.attendees.map((person) => ({ name: person?.name || '', email: String(person?.email || '').trim().toLowerCase() })).filter((person) => person.email)
           : [];
-        const finalReview = final;
         return res.status(200).json({ success: true, ...payload, stageLabels,
           timing: preparation.timing, preparation: preparation.preparation,
           // A separate read: redacted on its own lifecycle so a draft
@@ -133,6 +169,12 @@ export default async function handler(req, res) {
           writeupAccess: {
             canChange: canChangeDraftWriteup(viewer, leadProgramDirectorId),
             identityLinked: Boolean(viewer.actingUserSystemId) || viewer.isSuperuser,
+            canRegenerate: canChangeDraftWriteup(viewer, leadProgramDirectorId)
+              && Boolean(status.currentArtifact)
+              && regenerationStageEligible,
+            regenerationBlockedReason: !status.currentArtifact ? 'writeup_missing'
+                : !regenerationStageEligible ? 'leadership_or_state_unavailable'
+                  : !canChangeDraftWriteup(viewer, leadProgramDirectorId) ? 'lead_only' : null,
           },
           correctionInProgress: status.currentArtifact?.lifecycleState === REQUEST_DOCUMENT_LIFECYCLE_STATE.DRAFT
             && Boolean(status.currentArtifact?.correction?.cycleId),
@@ -141,9 +183,16 @@ export default async function handler(req, res) {
 
       if (!req.body
         || typeof req.body !== 'object'
-        || Array.isArray(req.body)
-        || Object.keys(req.body).some((key) => key !== 'requestId')) {
-        return res.status(400).json({ error: 'POST body must contain only requestId' });
+        || Array.isArray(req.body)) {
+        return res.status(400).json({ error: 'POST body must be an object' });
+      }
+      const regenerating = req.body.mode === 'regenerate';
+      const allowedKeys = regenerating
+        ? new Set(['requestId', 'mode', 'expectedArtifactId', 'expectedFinalArtifactId', 'clientOperationId'])
+        : new Set(['requestId']);
+      if (Object.keys(req.body).some((key) => !allowedKeys.has(key))
+        || (!regenerating && req.body.mode !== undefined)) {
+        return res.status(400).json({ error: 'POST body contains unsupported fields' });
       }
       const requestId = String(req.body.requestId || '').trim();
       if (!isGuid(requestId)) {
@@ -161,7 +210,26 @@ export default async function handler(req, res) {
           code: 'pre_site_writeup_lead_only',
         });
       }
-      const result = await generatePreSiteVisitArtifact({ requestId, actingUserSystemId });
+      if (regenerating) {
+        if (!isGuid(req.body.expectedArtifactId) || !isGuid(req.body.clientOperationId)
+          || (req.body.expectedFinalArtifactId != null && !isGuid(req.body.expectedFinalArtifactId))) {
+          throw new ServiceHttpError('A confirmed writeup pair and operation id are required.', {
+            httpStatus: 400, code: 'pre_site_visit_regeneration_identity_invalid',
+          });
+        }
+      }
+      const result = await generatePreSiteVisitArtifact({
+        requestId, actingUserSystemId,
+        ...(regenerating ? {
+          generationMode: 'regenerate',
+          regeneration: {
+            expectedArtifactId: req.body.expectedArtifactId,
+            expectedFinalArtifactId: req.body.expectedFinalArtifactId || null,
+            clientOperationId: req.body.clientOperationId,
+            isSuperuser: role === 'superuser',
+          },
+        } : {}),
+      });
       const generating = result.artifact.operationStatus
         === REQUEST_DOCUMENT_OPERATION_STATUS.GENERATING;
       const payload = includeCorrectionAudit ? result : staffSafePayload(result);

@@ -185,6 +185,29 @@ it('does not show a prepared receipt as current when its document no longer matc
   });
 });
 
+it('keeps the preparation receipt when its source is in the current document lineage', async () => {
+  jest.useFakeTimers().setSystemTime(new Date('2026-12-02T00:00:00Z'));
+  grantRequestAdapter.queryAllRequests.mockResolvedValue({
+    records: [req(R1, { _wmkf_currentpresitevisit_value: 'writeup-current' })], capped: false,
+  });
+  requestDocumentAdapter.findByRequests.mockResolvedValue({ records: [
+    doc('writeup-old', R1, { wmkf_lifecyclestate: L.SUPERSEDED }),
+    doc('writeup-current', R1, { _wmkf_sourcedocument_value: 'writeup-old' }),
+  ], capped: false });
+  siteVisitAdapter.findSummariesByRequests.mockResolvedValue({ records: [{
+    _regardingobjectid_value: R1, activityid: 'visit-current', statecode: 1, statuscode: 2,
+    scheduledend: '2026-12-01T18:00:00Z',
+  }], capped: false });
+  listPreparationsForSchedules.mockResolvedValue(new Map([[R1, {
+    state: 'prepared', siteVisitId: 'visit-current', scheduledEndIso: '2026-12-01T18:00:00Z',
+    documentId: 'writeup-old', errorCode: null,
+  }]]));
+  const result = await list();
+  expect(result.artifacts[0].preparation).toMatchObject({
+    state: 'prepared', documentId: 'writeup-old', errorCode: null,
+  });
+});
+
 it('fails closed on an unclassified Site Visit state/status pair', async () => {
   delete process.env.STAFF_DELIBERATIONS_SITE_VISIT_STATE_STATUS_PAIRS;
   siteVisitAdapter.findSummariesByRequests.mockResolvedValue({ records: [
