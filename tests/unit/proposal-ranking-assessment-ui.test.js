@@ -3,6 +3,7 @@ import Router from 'next/router';
 import React, { StrictMode } from 'react';
 import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
 import AssessmentWorkflow, { AssessmentList } from '../../shared/components/proposal-ranking/AssessmentWorkflow';
+import { initialPreparation } from '../../lib/services/proposal-ranking/workflow';
 import {
   createOperationId,
   loadProposalRanking,
@@ -126,6 +127,36 @@ test('private MR and SE lists render their subsets and saving SE keeps it select
   fireEvent.click(screen.getByRole('radio', { name: 'Confident' }));
   await waitFor(() => expect(screen.getAllByRole('button', { name: 'Create combined list' })[0].disabled).toBe(false));
   expect(screen.queryByRole('button', { name: /Continue to/ })).toBeNull();
+});
+test('fresh preparation leaves every MR and SE confidence choice unselected', () => {
+  const initial = view();
+  initial.round.snapshot.version = 2;
+  initial.round.snapshot.proposals = [
+    { requestId: 'mr-1', programKey: 'mr', organization: 'MR institution', amountMinorUnits: 10000, currency: { code: 'USD', precision: 2 } },
+    { requestId: 'se-1', programKey: 'se', organization: 'SE institution', amountMinorUnits: 10000, currency: { code: 'USD', precision: 2 } },
+  ];
+  initial.round.snapshot.seedOrders = { mr: ['mr-1'], se: ['se-1'] };
+  initial.own = initialPreparation(initial.round.snapshot).participants.alice;
+
+  render(<AssessmentWorkflow initial={initial} cycleOptions={[]} onCycleChange={() => {}} />);
+
+  const expectCurrentConfidenceUnselected = () => {
+    const confidenceChoices = screen.getAllByRole('radio');
+    expect(confidenceChoices).toHaveLength(2);
+    expect(confidenceChoices.every(choice => !choice.checked)).toBe(true);
+  };
+  expect(screen.getByRole('heading', { name: 'MR institution' })).toBeTruthy();
+  expectCurrentConfidenceUnselected();
+
+  fireEvent.click(screen.getByRole('button', { name: 'Science & Engineering' }));
+  expect(screen.getByRole('heading', { name: 'SE institution' })).toBeTruthy();
+  expectCurrentConfidenceUnselected();
+
+  fireEvent.click(screen.getByRole('button', { name: 'Medical Research' }));
+  expect(screen.getByRole('heading', { name: 'MR institution' })).toBeTruthy();
+  expectCurrentConfidenceUnselected();
+  expect(sendProposalRankingAction).not.toHaveBeenCalled();
+  expect(screen.getByText('Choose one')).toBeTruthy();
 });
 test('restart while combined is selected returns to source preparation without dereferencing absent combined', async () => {
   const next = view();
@@ -299,11 +330,15 @@ test('unanswered navigation follows current order, wraps, and skips saved choice
 });
 
 
-test('Continue identifies missing cards without submitting or changing assessments', () => {
+test.each(['confident', 'not-sure'])('Continue preserves saved %s and identifies missing cards without submitting', confidence => {
   Element.prototype.scrollIntoView = jest.fn();
   const initial = populatedView();
-  initial.own.mr.confidence = { one: 'confident' };
+  initial.own.mr.confidence = { one: confidence };
   render(<AssessmentWorkflow initial={initial} cycleOptions={[]} onCycleChange={() => {}} />);
+  const savedChoices = document.getElementById('proposal-one').querySelectorAll('input[type=radio]');
+  expect(Array.from(savedChoices, choice => choice.checked)).toEqual([confidence === 'confident', confidence === 'not-sure']);
+  const freshChoices = document.getElementById('proposal-two').querySelectorAll('input[type=radio]');
+  expect(Array.from(freshChoices, choice => choice.checked)).toEqual([false, false]);
   fireEvent.click(screen.getByRole('button', { name: 'Continue', exact: true }));
   expect(screen.getByRole('alert').textContent).toContain('Institution two');
   expect(screen.getByRole('alert').textContent).not.toContain('Institution one');
