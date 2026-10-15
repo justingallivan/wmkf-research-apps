@@ -198,6 +198,68 @@ function populatedView() {
   return initial;
 }
 
+test('a changed completed source list routes back to rebuilding and confirming the combined list', async () => {
+  const initial = populatedView();
+  for (const key of ['mr', 'se']) {
+    initial.own[key] = { ...initial.own[key], confidence: Object.fromEntries(initial.own[key].order.map(id => [id, 'confident'])) };
+  }
+  initial.own.co = {
+    ...list,
+    order: proposals.map(({ requestId }) => requestId),
+    boundaries: [1, 3],
+    confidence: Object.fromEntries(proposals.map(({ requestId }) => [requestId, 'confident'])),
+    sourceVersions: { mr: initial.own.mr.version, se: initial.own.se.version },
+    confirmed: true,
+  };
+  initial.confirmations.buildCombined = { fingerprint: 'build-fp', message: 'Replace the combined order?' };
+
+  let current = initial;
+  sendProposalRankingAction.mockImplementation(async body => {
+    current = JSON.parse(JSON.stringify(current));
+    if (body.action === 'saveAssessment') {
+      current = saved(current, body);
+    } else if (body.action === 'buildCombined') {
+      current.own.co.sourceVersions = { mr: current.own.mr.version, se: current.own.se.version };
+      current.own.co.version++;
+      current.own.co.confirmed = false;
+      current.operation = { status: 'confirmed', operationId: body.operationId };
+    } else if (body.action === 'confirmCombined') {
+      current.own.co.confirmed = true;
+      current.operation = { status: 'confirmed', operationId: body.operationId };
+    } else if (body.action === 'ready') {
+      current.own.ready = { combinedVersion: current.own.co.version, operationId: body.operationId };
+      current.operation = { status: 'confirmed', operationId: body.operationId };
+    }
+    return current;
+  });
+
+  render(<AssessmentWorkflow initial={initial} cycleOptions={[]} onCycleChange={() => {}} />);
+  fireEvent.click(screen.getByRole('button', { name: 'Science & Engineering' }));
+  expect(screen.queryByText(/rebuild it from your latest assessments/i)).toBeNull();
+  fireEvent.click(screen.getAllByRole('button', { name: 'Review combined list →' })[0]);
+  expect(screen.getByRole('button', { name: 'Ready' })).toBeTruthy();
+  expect(sendProposalRankingAction).not.toHaveBeenCalled();
+  fireEvent.click(screen.getByRole('button', { name: 'Science & Engineering' }));
+  fireEvent.click(screen.getAllByRole('button', { name: 'Set boundary…' })[0]);
+  fireEvent.change(screen.getByRole('spinbutton'), { target: { value: '0' } });
+  fireEvent.click(screen.getByRole('button', { name: 'Move', exact: true }));
+  await waitFor(() => expect(screen.getByRole('status').textContent).toBe('All changes saved'));
+
+  expect(screen.getByText(/rebuild it from your latest assessments/i)).toBeTruthy();
+  expect(screen.getByRole('button', { name: 'Combined list' }).textContent).toContain('Needs rebuild');
+  fireEvent.click(screen.getAllByRole('button', { name: 'Review combined list →' })[0]);
+  expect(screen.getByText(/Rebuild from your latest program assessments/i)).toBeTruthy();
+  fireEvent.click(screen.getAllByRole('button', { name: 'Rebuild combined list' })[0]);
+  expect(sendProposalRankingAction).not.toHaveBeenCalledWith(expect.objectContaining({ action: 'buildCombined' }), expect.anything());
+  fireEvent.click(screen.getByRole('button', { name: 'Build combined list' }));
+  expect(sendProposalRankingAction).toHaveBeenCalledWith(expect.objectContaining({ action: 'buildCombined', confirmationFingerprint: 'build-fp' }), expect.anything());
+  await waitFor(() => expect(screen.getByRole('button', { name: 'Confirm combined order' })).toBeTruthy());
+  fireEvent.click(screen.getByRole('button', { name: 'Confirm combined order' }));
+  await waitFor(() => expect(screen.getByRole('button', { name: 'Ready' })).toBeTruthy());
+  fireEvent.click(screen.getByRole('button', { name: 'Ready' }));
+  await waitFor(() => expect(screen.getByText('Ready for group discussion')).toBeTruthy());
+});
+
 test('divider validation rejects crossing, empty and fractional values with a recoverable error', () => {
   const onChange = jest.fn();
   render(<AssessmentList assessment={{ ...list, order: proposals.map((p) => p.requestId), boundaries: [1, 3] }} proposals={proposals} roster={[]} editable onChange={onChange} />);

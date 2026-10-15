@@ -829,11 +829,10 @@ export default function AssessmentWorkflow({
   const saved = collective || view.own?.[program];
   const assessment = (!collective && privateSave.draft) || draft || saved;
   const active = view.round.state === 'active';
-  const outdated =
-    program === 'co' &&
-    own?.co &&
-    (own.co.sourceVersions.se !== own.se.version ||
-      own.co.sourceVersions.mr !== own.mr.version);
+  const combinedOutdated = own?.co &&
+    (own.co.sourceVersions?.se !== own.se.version ||
+      own.co.sourceVersions?.mr !== own.mr.version);
+  const outdated = program === 'co' && combinedOutdated;
   const editable =
     active &&
     !exclusiveBusy &&
@@ -915,7 +914,11 @@ export default function AssessmentWorkflow({
     <Button disabled={!allConfident || busy || Boolean(pending) || !active} onClick={() => confirm('buildCombined')}>
       Create combined list
     </Button>
-  ) : program !== 'co' ? null : outdated ? (
+  ) : program !== 'co' ? (
+    own?.co && <Button disabled={busy || Boolean(pending)} onClick={() => { if (queue.isDirty() || busyRef.current || pendingRef.current) return; setProgram('co'); setDraft(null); }}>
+      Review combined list →
+    </Button>
+  ) : outdated ? (
     <Button disabled={!allConfident || busy || Boolean(pending) || !active} onClick={() => confirm('buildCombined')}>Rebuild combined list</Button>
   ) : !own.co.confirmed ? (
     <Button disabled={!combinedComplete || busy || Boolean(pending) || !active} onClick={() => execute('confirmCombined')}>Confirm combined order</Button>
@@ -1236,7 +1239,7 @@ export default function AssessmentWorkflow({
                       onClick={() => { if (queue.isDirty() || busyRef.current || pendingRef.current) return; setProgram(key); setDraft(null); }}
                     >
                       {label}
-                      {key === 'co' && <span className="mt-1 block text-xs font-normal text-gray-600">{own.co.confirmed ? 'Confirmed' : 'Review order'}</span>}
+                      {key === 'co' && <span className="mt-1 block text-xs font-normal text-gray-600">{combinedOutdated ? 'Needs rebuild' : own.co.confirmed ? 'Confirmed' : 'Review order'}</span>}
                       {key !== 'co' && <span id={`preparation-count-${key}`} className="mt-1 block text-xs font-normal text-gray-600">{programProgress.find((p) => p.key === key).answered === programProgress.find((p) => p.key === key).total ? 'Complete' : programProgress.find((p) => p.key === key).answered === 0 ? 'Not started' : 'In progress'}</span>}
                     </button>
                   ))}
@@ -1252,7 +1255,7 @@ export default function AssessmentWorkflow({
                   {preparationAction}
                   </div>
                 </div>
-                {(unanswered.length > 0 || program === 'co') && <div className="my-3">
+                {(unanswered.length > 0 || program === 'co' || (allConfident && own?.co)) && <div className="my-3">
                   {unanswered.length > 0 && <p className="mb-1 text-sm font-medium text-amber-900" aria-live="polite">{unanswered.length} {unanswered.length === 1 ? 'proposal needs' : 'proposals need'} a confidence choice</p>}
                   <p className="max-w-2xl text-sm text-gray-600">
                     {program === 'co'
@@ -1263,7 +1266,8 @@ export default function AssessmentWorkflow({
                       : !allConfident ? currentProgramComplete
                         ? `${currentProgram.name} is complete. Continue to ${nextProgram.name}. You can return to adjust either list.`
                         : 'Choose Confident or Not sure on the highlighted cards.'
-                        : own.co ? 'Both programs are complete. Continue to your combined list.'
+                        : own.co ? combinedOutdated ? 'Both programs are complete. Review the combined list and rebuild it from your latest assessments.'
+                          : 'Both programs are complete. Continue to your combined list.'
                           : 'Both programs are complete. Create your combined list to review MR and SE together.'}
                   </p>
                 </div>}
