@@ -1,9 +1,12 @@
 # D26 ranking — implementation addendum
 
 Session 608, 2026-10-14. **PLANNED engineering contract; no implementation or production release executed.**
-**Independent review pending:** Claude subscription OAuth was confirmed, but
-automatic approval review blocked the requested Opus launch pending explicit
-acknowledgment of usage consumption. No Opus verdict has been obtained.
+**Independent review:** Claude Opus 5.5 reviewed through subscription OAuth and
+returned READY WITH NAMED CHANGES. Its follow-up confirmed the original findings
+resolved and named two final additions (safe legacy meeting control handle and
+pre-publication edit refusal). Both are incorporated below. The final additions
+were source-checked by the author, not reviewed in a third Opus pass. Receipt:
+`docs/audits/PROPOSAL_RANKING_D26_OPUS_PLAN_REVIEW_2026-10-14.md`.
 This supplements `PROPOSAL_RANKING_D26_RELEASE_2026-10-14.md` on
 `origin/codex/ranking-pd-save-conflicts`, inspected at
 `886e194ac1b8fb6707a47c59828a3d3d14edc179`. That candidate, not the older ranking
@@ -55,20 +58,29 @@ invalid members. D26 release configuration must resolve exactly Beth and Justin.
 - Missing new key: read the old scalar as a singleton. Present malformed new key:
   configuration error (503), never scalar fallback. Missing both: unconfigured,
   preview cannot open. Admin must still be able to read eligible staff and repair
-  invalid configuration; expose a bounded configuration error, not raw stored data.
+  invalid configuration, including malformed legacy fallback; expose a bounded
+  configuration error, not raw stored data. Always return the new-key revision
+  (null plus an explicit missing-key marker if absent), even on invalid fallback.
 - Admin GET adds `facilitatorSystemUserIds`, eligible names and new-key `revision`.
   PUT accepts only `{ facilitatorSystemUserIds, revision }`; reject old scalar
   payloads with 400 so an old tab cannot silently replace two selections with one.
   Validate each enabled Dataverse user, active mapped profile and explicit ranking
   grant before revision-conditional save. Do not dual-write the old key.
 - For new v2 rounds, store
-  `workflow.facilitation = { version: 1, systemUserIds: [...] }` inside existing
+  `workflow.facilitation = { version: 1, systemUserIds: [...], source, settingRevision }`
+  inside existing
   `wmkf_workflowjson`. Preserve the exact set during all transitions and restart.
   The legacy scalar is the lexically first member, for compatibility/display only;
   actual actor stamps always identify the person who acted. No membership in
-  `snapshot.roster` is added merely because somebody facilitates.
+  `snapshot.roster` is added merely because somebody facilitates. Omit the obsolete
+  `snapshot.facilitatorSystemUserId` on new v2 snapshots; the helper never reads it.
+  `source` is `set`, `legacy-scalar` or `legacy-round`; `settingRevision` is the
+  revision of the setting actually read, or null for a legacy round fallback.
+  Validate these provenance fields along with the set; never use them as authority.
 - For existing v2 rounds, missing `facilitation` falls back to that round's scalar,
-  not today's defaults. Present malformed `facilitation` fails closed with 503;
+  not today's defaults. Restart of such a round writes an explicit singleton
+  `facilitation` with source `legacy-round` and null settingRevision to its successor.
+  Present malformed `facilitation` fails closed with 503;
   never reinterpret it as legacy. Existing v1 rounds retain their scalar authority.
 - Active-round facilitator changes are out of this release's scope. Admin defaults
   affect future opens only. Restart preserves captured membership, even after
@@ -83,8 +95,24 @@ Preview returns the resolved set and names and includes set, setting revision,
 readiness results, pool and roster in its fingerprint. Either configured
 facilitator can preview/open; open recalculates and requires the same fingerprint.
 A changed setting, membership eligibility or source pool invalidates confirmation.
-One-winner cycle-coordinator behavior remains atomic. A v1 creation path continues
-using the legacy default; the new setting is used only when v2 creation is enabled.
+Every member must be enabled, map to an active profile and have an explicit ranking
+grant at preview/open; any failed check is a named blocking problem. Never silently
+drop a member or capture an ineligible set. Restart retains its captured set;
+revoked actors remain denied, and no default membership repair happens on restart.
+
+One-winner cycle-coordinator behavior remains atomic. Configuration is captured as
+of open's fresh configuration read; a concurrent Admin save after that read applies
+to later opens, not this one. No cross-record settings transaction is claimed.
+Fingerprint and persisted provenance include the revision of the actual source key,
+including legacy fallback. Test both Admin-save-before-read (stale preview rejects)
+and Admin-save-after-read (captured configuration wins) orderings.
+
+If the new key is present and v2 creation is disabled, refuse v1 preview/open with
+409 `configuration_requires_v2`; do not show two selected people while silently
+opening with one. If the present key is malformed, use the configuration error
+instead. V1 creation uses the legacy scalar only while the new key is absent.
+Existing v1 round reads, own saves and retained cancellation remain available.
+Configure the new key only at the reviewed v2 cutover, after the compatible rollout.
 
 ## 3. Response visibility contract
 
@@ -102,7 +130,7 @@ previousRoundId, supersededBy, facilitation); participant state never belongs th
 | `collective` and totals | null | Saved collective and immutable named combined assessments from that reveal |
 | History | Prior revealed records only, explicitly labelled prior versions | Prior revealed records only |
 | Workbook/sentiment | Denied by stage guard | Existing revealed-round supplement rules and sentiment authorization |
-| Nonparticipant superuser | Administration metadata only; no own or collective content | Administration metadata only |
+| Nonparticipant superuser | Administration metadata and readiness-only `progress`; no own or collective content | Same |
 
 Readiness remains visible to the existing participant audience as well as the
 facilitators; no new readiness restriction is introduced. Facilitation alone grants
@@ -116,20 +144,47 @@ clearly labelled with its reveal/version. Restart keeps the old round readable
 under this same privacy policy, including a never-revealed old round. History
 serialization allowlists reveal/collective records and rejects unknown kinds;
 operation receipts expose status/outcome only to their authenticated owner, never
-raw request hashes or assessment payloads.
+raw request hashes or assessment payloads. Strip `individuals[].ready` from all
+revealed and historical projections: another actor’s operation ID is not public
+assessment content. Retain only explicitly required assessment/version fields.
 
 **Legacy transition:** do not convert or rewrite v1 lists. In the compatible release,
 unpublished v1 individual lists become own-only too (`facilitatorLists: null`);
-submitted is not published. Existing program publication controls when its named
-submitted orders may be shown. Preserve v1 generation inputs on the server and its
-published-history contract. Test the incumbent UI still supports readiness and
-generation without the private facilitator list. This closes the privacy gap while
-the retained v1 trial awaits separately approved cancellation.
+submitted is not published. Before publication, `meeting` is null even for the
+facilitator: no draft order, `composite.ranks[].participants`, source-submission IDs
+or other draft composite detail is exposed. Generation remains server-side;
+publication is the v1 reveal point. Keep safe meeting status/readiness/confirmation
+metadata so Generate/Publish can operate without rendering a draft composite.
+After publication preserve the existing published composite contract.
+
+Before publication, expose `meetingControl: { listKey, status, etag, version }`
+only to the facilitator, alongside the safe confirmation metadata. Allowlist these
+four fields: no order, totals, composite, owner or timestamps. The handle's ETag
+is the meeting-list ETag required by the existing generate/publish payloads, not
+the round ETag. `onGenerate`/`onPublish` use this handle and do not require `meeting`.
+Refresh it through the same privacy-filtered conflict/readback response.
+
+Refuse legacy `edit` on a v1 `composite-draft` with 409 `invalid_transition`, before
+any write. `editMeetingOrder` is false until a program is published; mixed program
+states also need a per-program UI check and server enforcement on the target list.
+Post-publication edits retain the existing facilitator/participant authorization.
+
+The v1 UI shows `ownList` to every roster participant, facilitator included, with
+save/submit/readback available under the existing lifecycle rules. Its facilitator
+panel shows readiness, not private lists. Drive Generate/Publish buttons from
+server capabilities/confirmations and meetingStatus, not the presence of meeting
+content. Update transfer copy to describe authority without promising private-list
+visibility. Test collecting, submitted, composite-draft and published combinations,
+including Justin as both facilitator and participant. This closes the privacy gap
+while the retained v1 trial awaits separately approved cancellation.
 
 ## 4. Actions, versions and conflicts
 
 Resolve the actor from authenticated identity; load the stored snapshot version
-before selecting a mutator. Unknown version → 409 `unsupported_version`, no write.
+before selecting a mutator. Unknown version → 409 `unsupported_version` on read
+and write, no mutation. V2 action/history/workbook/sentiment against a v1 round
+also returns 409 `unsupported_version` before the v2 loader or any write; it must
+not surface as an unrelated capacity/storage error.
 The v2 reducer receives the resolved set (not a client set or substituted primary
 actor); its internal checks remain authoritative even if UI controls are absent.
 
@@ -146,7 +201,8 @@ actor); its internal checks remain authoritative even if UI controls are absent.
 | legacy save/submit/generate/edit/publish/transfer/excuse/cancel | Nobody | 409 `unsupported_version` before any legacy mutation or legacy replay |
 
 Existing v1 actions remain versioned, including retained cancellation and its
-published-round refusal. A v2 restart is the supported reset; do not add a v2 cancel
+published-round refusal, with the explicit pre-publication edit refusal above.
+A v2 restart is the supported reset; do not add a v2 cancel
 or membership-transfer feature. No superuser-only bypass of facilitator actions.
 
 Keep round, affected list and coordinator ETag checks plus the existing atomic
@@ -181,14 +237,24 @@ aborted or late responses cannot overwrite a newly selected round.
    version, disabled/unmapped/ungranted users, stale Admin revision, defaults
    changing after open, and restart preserving the set. Rehearsal config must
    remain isolated; no fictional identity or sample material in production.
+   Replace test mode’s single-facilitator fixture with two approved mapped sandbox
+   personas under the existing exact test-policy guard; never read production
+   facilitator settings or provision identities for this test. Resolve persona IDs
+   from the existing rehearsal mapping, not invented GUIDs. Malformed test
+   configuration fails closed; unset/off production paths cannot use this fixture.
 3. Wire preview/open, reducer, restart and stored-version dispatch. Parameterize
    actor tests for Beth/Justin versus Jean/John and nonparticipant superuser. Assert
    original actor on every persisted operation; no writes on denied legacy action.
 4. Replace public projections and UI consumers. Seed distinct sentinel orders,
    grades and confidence for another PD. Assert absence in full serialized GET,
    POST, conflict, retry, history, restart/old-round and supplement responses for
-   both facilitators. Assert prior reveal remains available but new preparation
+   both facilitators. Include other actors’ ready/operation metadata and v1 draft
+   composite details as negative sentinels. Prove facilitator-as-PD own save, submit
+   and readback still work with null facilitatorLists. Assert prior reveal remains available but new preparation
    does not leak. Cover v1 unpublished/submitted/published program combinations.
+   Prove Generate then Publish succeed using `meetingControl` while `meeting` is
+   null; apply the sentinel check to the control handle too. Prove draft `edit`
+   writes nothing and returns 409, while published edits retain their contract.
 5. Run persisted two-actor races and 23-proposal/four-PD rehearsal in sandbox;
    service mocks alone do not establish atomicity. Repeat separate authenticated
    sign-ins, saved readback, Safari/iPad interaction, workbook and history.
@@ -217,7 +283,8 @@ response → UI/history/export is covered above. Partial-success must be prevent
 by one changeset; async retries distinguish rejection from unknown outcome; helper
 semantics preserve absent/malformed and v1/v2 differences; persisted membership
 must survive every workflow write and restart. Search raw
-`wmkf_facilitatorsystemuserid`, `facilitatorLists`, `state.participants` and all action
+`wmkf_facilitatorsystemuserid`, `facilitatorSystemUserId`, `readDefaultFacilitator`,
+`round.facilitator`, `facilitatorLists`, `state.participants` and all action
 names across the integrated candidate before implementation sign-off.
 
 Author-side disconfirming review: inspected current `publicView` (privacy exception
