@@ -3,7 +3,7 @@ title: Post-presentation writeup regeneration rehearsal
 kind: audit
 domain: workbench
 status: parked-by-owner
-summary: Feature remains draft; sandbox expansion parked by owner, with no live regeneration or application model calls. Latest tooling review and CI findings remain open.
+summary: Feature remains draft; sandbox expansion parked by owner, with no live regeneration or application model calls. Tooling review findings remain parked; the reproduced Gitleaks false positive has an exact scoped exception.
 owner: product-engineering
 last_verified: 2026-10-15
 related:
@@ -171,7 +171,9 @@ No dependent fixture completion or model-bearing operation has run. The
 [setup record](../plans/WRITEUP_REGENERATION_SANDBOX_SETUP_2026-10-15.md) retains
 the precise evidence paths and subsequent status. The owner subsequently parked sandbox expansion and requested a feature-focused
 reset. No later rollup pass is claimed. Recovery tooling is not implemented;
-[Opus findings](WRITEUP_SANDBOX_OPUS_REVIEW_2026-10-15.md) remain parked. Latest
-`cc2651b1f` CI has a Gitleaks failure at formula-hash literal locations; earlier
-CI success must not be presented as a pass of that tooling commit. No additional
+[Opus findings](WRITEUP_SANDBOX_OPUS_REVIEW_2026-10-15.md) remain parked. The historical
+`cc2651b1f` Gitleaks failure identified three formula-hash literals. An owner-requested
+exception now matches only those exact field/hash pairs, file, and detector rule.
+Gitleaks 8.24.3 passes the feature-history scan; changed-hash and other-file
+negative controls still trigger. Hosted CI is rechecked after push. No additional
 create, forced recalculation, or model run is an active next step.

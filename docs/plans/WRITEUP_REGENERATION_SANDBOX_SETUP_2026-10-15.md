@@ -355,9 +355,14 @@ parked findings, not permission to grow the Factory work.
 
 At commit `cc2651b1f`, Gitleaks CI flagged `sumologic-access-token` at lines 62,
 64 and 65 of `sandbox-foundation-verification.js`, locations containing pinned
-rollup formula hashes. The local secret scanner passed; the CI finding remains
-unresolved. Do not describe this latest candidate as fully green. Earlier feature
-candidate `8f6bdd6fc` had all reported CI checks passing.
+rollup formula hashes. At the owner's request, `.gitleaks.toml` now exempts only
+those three exact field/hash lines, in that exact file, for that one rule. The
+CI-matching Gitleaks 8.24.3 reproduced the original failure and passed the feature
+history with the exception. Temporary regression fixtures confirmed changed
+hashes and other paths remain detected. The local scanner and self-test passed.
+This resolves the reproduced scanner false positive; hosted CI reruns on push.
+Earlier feature candidate `8f6bdd6fc` had all reported CI checks passing. Sandbox
+work remains parked.
 
 Private original manifests, receipts, baseline digests and local database
 credentials remain outside Git on this Mac. This document preserves the outcomes

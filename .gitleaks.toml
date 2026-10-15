@@ -40,3 +40,17 @@ regexes = ['''const SECRET = '[a-z0-9-]*test-secret-[a-z0-9-]*';''']
 paths = [
   '''^tests/unit/verify-briefing-token\.test\.js$''',
 ]
+
+[[rules]]
+id = "sumologic-access-token"
+
+[[rules.allowlists]]
+description = "Three verified Sandbox rollup FormulaDefinition SHA-256 pins; these exact field/hash pairs are schema fingerprints, not Sumo Logic credentials."
+condition = "AND"
+regexTarget = "line"
+paths = ['''^lib/services/test-requests/sandbox-foundation-verification\.js$''']
+regexes = [
+  '''^\s*wmkf_sumofdiscretionarygrants: '33a5c1b7aae70d16d0f3fc4343efe463b586d7f30896bf9587af884c72fff080',\s*$''',
+  '''^\s*wmkf_sumofprogramgrants: 'e1c725b8fb804568d65daacc223d39bd665ef789cd34b17f81a18c1f873255f7',\s*$''',
+  '''^\s*wmkf_sumofprogramgrants_base: '12ae32cb1ec02d01eda3581b127c1fee3b0dc53572ed6baf239721a03d82e126',\s*$''',
+]
