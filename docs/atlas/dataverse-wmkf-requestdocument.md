@@ -519,11 +519,11 @@ Production Request Document row was created by this release smoke.
   no automatic Word-to-Dataverse section synchronization is claimed.
 - The Site Visit tab reuses that stable Word item for staff observations while
   registering supporting files separately. The built handoff changes Draft to
-  Review, records the exact current version/hash/time, and locks Pre-Site
-  regeneration before any AI or write side effects. The owner-approved Final
+  Review, records the exact current version/hash/time, and locks ordinary Pre-Site
+  generation before any AI or write side effects. The owner-approved Final
   handoff creates/reuses a Final lineage row over that same item, pins the exact
   Pre-Site row/version/hash, retains the Pre-Site pointer, and sets the separate
-  current-Final pointer. This contract is Production-proved on Request `1002788`. This source-built addition (2026-10-15, not deployed) permits a distinct `request-workbench-regenerate` successor while the current Pre-Site row is Review and its paired Final row is in group review; leadership review remains locked. The operation key binds the request, both expected source rows, and client UUID. Post-visit activation changes the Pre-Site pointer; group-review activation creates a fresh Pre-Site/Final pair and changes both pointers atomically under ETags. Old Word items, sign-offs, distribution snapshots/history, and sent notices remain attached to predecessors. `wmkf_reopencycleid` is not used. Active duplicate operations return 202; frozen-core/upload retry does not depend on live narrative/prompt state. Previous-version UI links retain the existing lead-PD/PC/superuser privacy boundary. No schema or migration is added.
+  current-Final pointer. This contract is Production-proved on Request `1002788`. This source-built addition (2026-10-15, not deployed) permits a distinct `request-workbench-regenerate` successor during post-visit drafting (Pre-Site Review, no current Final) or group review (Pre-Site Final paired with Final Writeup Review); leadership review remains locked. The operation key binds the request, both expected source rows, and client UUID. Post-visit activation changes the Pre-Site pointer; group-review activation creates a fresh Pre-Site/Final pair and changes both pointers atomically under ETags. Old Word items, sign-offs, distribution snapshots/history, and sent notices remain attached to predecessors. `wmkf_reopencycleid` is not used. Active duplicate operations return 202; frozen-core/upload retry does not depend on live narrative/prompt state. Previous-version UI links retain the existing lead-PD/PC/superuser privacy boundary. No schema or migration is added.
 - **Slice 4 (Reviews Tab Phase II; Production-live 2026-09-15 UTC via PR #296
   merge `b9ad64eb` and Ready deployment `wmkfresearchapps-adp2hh965`,
   docs/plans/REVIEWS_TAB_WRITEUP_PARAGRAPHS_PLAN_2026-09-14.md §4.5):**

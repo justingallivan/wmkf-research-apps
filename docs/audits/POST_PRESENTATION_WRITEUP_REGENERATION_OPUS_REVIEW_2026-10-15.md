@@ -3,7 +3,7 @@ title: Opus review of post-presentation writeup regeneration plan
 domain: workbench
 kind: audit
 status: review-complete
-summary: Independent read-only Claude Opus review; named plan changes remain open before implementation.
+summary: Historical read-only Opus plan review; accepted findings reconciled in the implementation plan after owner approval.
 owner: product-engineering
 last_verified: 2026-10-15
 related:
@@ -21,8 +21,9 @@ The CLI completed successfully. Its model usage names `claude-opus-5-5` and also
 not claim an exclusively Opus execution. The reviewer reported no delegation.
 
 The report below is the reviewer's source-based assessment, not implementation or runtime
-proof. No plan or runtime changes were made in response yet. Findings remain open for
-reconciliation before implementation; owner decisions remain pending.
+proof. This is the historical pre-implementation report. On 2026-10-15 the owner approved
+the three decisions and the accepted findings were reconciled in the linked plan;
+implementation review is a separate receipt. The original report below is retained verbatim.
 
 ---
 
