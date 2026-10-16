@@ -10,6 +10,26 @@ The chronological archive after the `Legacy chronological session log` divider c
 
 ---
 
+## October 2026 — D26 Proposal Ranking released to production (Session 609)
+
+**Milestone:** the version-2 Ranker (private preparation, two facilitators, read-only observers, top-nav entry) went live and the D26 round opened in production.
+**Sessions:** 609 (Claude orchestrator; three Codex adversarial passes on the observer change; owner approved and performed each production write).
+**Ship state:** wave33 applied and read back; PR #485 `34db290a2` released; v2 flags on; retained v1 test round canceled; D26 v2 round `49279ac7-3ab9-41d8-b2d6-5aaf4085e642` open (23 proposals, four PDs, Beth and Justin facilitating). Two post-release production fixes: PR #488 (facilitator Admin panel empty since October 7) and PR #489 (a busy PD starved another PD's private saves; found when Jean Kim discovered the nav link within minutes). Owner and Jean then raced re-ranking cleanly.
+**Why it matters:** D26 ranking runs on the agreed privacy model with shared facilitation and leadership visibility; rollback floor is `dpl_A9KMAx1YJGBce9gB1TXyqN4pYSZt`, not pre-release main.
+**Pointers:** release receipt in `docs/plans/PROPOSAL_RANKING_D26_RELEASE_2026-10-14.md`; `docs/plans/PROPOSAL_RANKING_API_CONTRACT.md` §8; `docs/atlas/dataverse-proposal-ranking.md`.
+
+---
+
+## October 2026 — D26 ranking dual-facilitator candidate and sandbox rehearsal (Session 608)
+
+**Milestone:** a reviewed release-branch candidate captures two facilitators, enforces own-only preparation across workflow versions, and passes a persisted synthetic two-facilitator rehearsal.
+**Sessions:** 608 (Codex builder, Sol source review, orchestrator final fixes and checks; Opus OAuth review found no high/medium defects and its three low corrections are resolved; final follow-up is satisfied).
+**Ship state:** `codex/d26-ranking-release` at `9fe92f0ed`; 25 ranking/identity-map suites / 269 tests, types, scoped lint and production build passed. Scoped runtime gates passed on the preceding reviewed source slice. A bounded host Chrome smoke with trusted sandbox personas rendered the 23-card view/readiness/controls, navigated history and downloaded the workbook. Synthetic D96 retained two rounds after six persisted privacy, race, restart, history and 23-proposal / 92-assessment workbook checks. D96 was not the D26 source pool; Rob was the rehearsal surrogate for John. No production deployment/configuration/write occurred. Independent SSO/profile/grant, WebKit/iPad, and live D26 pool acceptance remain open.
+**Why it matters:** the candidate has service-level evidence for captured dual authority, private preparation and one-winner shared updates while keeping the live D26 cutover separate.
+**Pointers:** `docs/plans/PROPOSAL_RANKING_D26_IMPLEMENTATION_ADDENDUM_2026-10-14.md`; `docs/plans/PROPOSAL_RANKING_D26_RELEASE_2026-10-14.md`; local receipt `/private/tmp/proposal-ranking-d26-d96-sandbox-receipt.json`.
+
+---
+
 ## October 2026 — Materials upload incident resolved and scan diagnostics shipped (Session 607)
 
 **Milestone:** a rejected Keynote upload was resolved through a genuine PPTX export, stale replacement warnings were fixed, and materials scan failures now retain private diagnostics.

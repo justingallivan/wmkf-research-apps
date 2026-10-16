@@ -37,7 +37,7 @@ function list({ listKey, owner, order = INITIAL_ORDER, etag = 'list-v1', status 
   };
 }
 
-function roundResponse({ facilitator = false, published = false, order = INITIAL_ORDER, etag = 'list-v1', secretLists = true } = {}) {
+function roundResponse({ facilitator = false, facilitatorParticipant = false, published = false, order = INITIAL_ORDER, etag = 'list-v1', secretLists = true } = {}) {
   const own = list({ listKey: 'se-pd-self', owner: { systemUserId: 'pd-self', name: 'Current PD' }, order, etag, status: 'draft' });
   const other = list({ listKey: 'se-pd-other', owner: { systemUserId: 'pd-other', name: 'Private Other PD' }, order: [...INITIAL_ORDER].reverse() });
   const meeting = {
@@ -52,8 +52,8 @@ function roundResponse({ facilitator = false, published = false, order = INITIAL
   const capabilities = {
     preview: facilitator,
     open: false,
-    saveOwnList: !facilitator && !published,
-    submitOwnList: !facilitator && !published,
+    saveOwnList: (!facilitator || facilitatorParticipant) && !published,
+    submitOwnList: (!facilitator || facilitatorParticipant) && !published,
     generate: facilitator && !published,
     editMeetingOrder: published,
     publish: facilitator && !published,
@@ -69,7 +69,7 @@ function roundResponse({ facilitator = false, published = false, order = INITIAL
       systemUserId: facilitator ? 'facilitator' : 'pd-self',
       isFacilitator: facilitator,
       isSuperuser: false,
-      isRosterParticipant: !facilitator,
+      isRosterParticipant: !facilitator || facilitatorParticipant,
       capabilities,
     },
     round: {
@@ -97,10 +97,11 @@ function roundResponse({ facilitator = false, published = false, order = INITIAL
       se: {
         proposalIds: INITIAL_ORDER,
         progress: { required: 2, submitted: 1, outstandingNames: ['Other PD'] },
-        ownList: facilitator ? null : own,
-        facilitatorLists: facilitator ? [own, other] : secretLists ? [other] : null,
+        ownList: (!facilitator || facilitatorParticipant) ? own : null,
+        facilitatorLists: null,
         meetingStatus: published ? 'published' : 'collecting',
-        meeting: facilitator || published ? meeting : null,
+        meetingControl: facilitator ? { listKey: 'se-meeting', status: published ? 'published' : 'collecting', etag: 'meeting-v1', version: 1 } : null,
+        meeting: published ? meeting : null,
       },
       mr: { proposalIds: [], progress: { required: 0, submitted: 0, outstandingNames: [] }, ownList: null, facilitatorLists: facilitator ? [] : null, meetingStatus: null, meeting: null },
     },
@@ -121,7 +122,7 @@ beforeEach(() => {
 });
 
 describe('Proposal Ranking page', () => {
-  test('a PD sees only their private list while the facilitator can inspect every PD list', async () => {
+  test('a PD and a facilitator who is also a PD see only their own private list', async () => {
     mockLoad.mockResolvedValue(roundResponse({ secretLists: true }));
     const { unmount } = render(<ProposalRankingApp />);
 
@@ -130,11 +131,23 @@ describe('Proposal Ranking page', () => {
     expect(screen.queryByText('Private Other PD')).not.toBeInTheDocument();
     unmount();
 
-    mockLoad.mockResolvedValue(roundResponse({ facilitator: true }));
+    const facilitatedResponse = roundResponse({ facilitator: true, facilitatorParticipant: true });
+    facilitatedResponse.viewer.systemUserId = 'pd-self';
+    mockLoad.mockResolvedValue(facilitatedResponse);
+    mockSend.mockImplementation((action) => {
+      const next = JSON.parse(JSON.stringify(facilitatedResponse));
+      next.programs.se.ownList.order = action.order;
+      next.programs.se.ownList.etag = 'list-v2';
+      return Promise.resolve(next);
+    });
     render(<ProposalRankingApp />);
-    expect(await screen.findByText('Individual PD rankings')).toBeInTheDocument();
-    expect(screen.getByRole('heading', { name: 'Private Other PD' })).toBeInTheDocument();
+    const own = await screen.findByRole('region', { name: 'Current PD SE ranking' });
+    expect(screen.queryByText('Private Other PD')).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Generate SE draft' })).toBeInTheDocument();
+    fireEvent.click(within(own).getByRole('button', { name: 'Move proposal 1001 down' }));
+    await screen.findByText('Order saved.');
+    fireEvent.click(within(own).getByRole('button', { name: 'Submit and lock list' }));
+    await waitFor(() => expect(mockSend).toHaveBeenLastCalledWith(expect.objectContaining({ action: 'submit', etag: 'list-v2' })));
   });
 
   test('serializes saves and keeps the latest queued drag order visible', async () => {
@@ -247,28 +260,17 @@ describe('Proposal Ranking page', () => {
     expect(unscored[0]).toHaveStyle({ backgroundColor: '#9ca3af' });
   });
 
-  test('a facilitator who is a PD can save and submit only their own list', async () => {
-    const response = roundResponse({ facilitator: true });
-    response.viewer.systemUserId = 'pd-self';
-    response.viewer.isRosterParticipant = true;
-    response.viewer.capabilities.saveOwnList = true;
-    response.viewer.capabilities.submitOwnList = true;
-    mockLoad.mockResolvedValue(response);
-    mockSend.mockImplementation((action) => {
-      const next = JSON.parse(JSON.stringify(response));
-      next.programs.se.facilitatorLists[0].order = action.order;
-      next.programs.se.facilitatorLists[0].etag = 'list-v2';
-      return Promise.resolve(next);
-    });
+  test('a non-participant facilitator gets safe controls without private list content', async () => {
+    mockLoad.mockResolvedValue(roundResponse({ facilitator: true }));
+    mockSend.mockResolvedValue(roundResponse({ facilitator: true }));
     render(<ProposalRankingApp />);
-    const own = await screen.findByRole('region', { name: 'Current PD SE ranking' });
-    const other = screen.getByRole('region', { name: 'Private Other PD SE ranking' });
-    expect(within(other).queryByRole('button', { name: /Move proposal/ })).not.toBeInTheDocument();
-    expect(within(other).queryByRole('button', { name: 'Submit and lock list' })).not.toBeInTheDocument();
-    fireEvent.click(within(own).getByRole('button', { name: 'Move proposal 1001 down' }));
-    await screen.findByText('Order saved.');
-    fireEvent.click(within(own).getByRole('button', { name: 'Submit and lock list' }));
-    await waitFor(() => expect(mockSend).toHaveBeenLastCalledWith(expect.objectContaining({ action: 'submit', etag: 'list-v2' })));
+    fireEvent.click(await screen.findByRole('button', { name: 'Generate SE draft' }));
+    fireEvent.click(await screen.findByRole('button', { name: /Confirm generate/ }));
+    await waitFor(() => expect(mockSend).toHaveBeenCalledWith(expect.objectContaining({
+      action: 'generate', etag: 'meeting-v1', confirmationFingerprint: 'generate-se',
+    })));
+    expect(screen.queryByRole('region', { name: 'Current PD SE ranking' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('region', { name: 'Private Other PD SE ranking' })).not.toBeInTheDocument();
   });
 
   test('opening preview shows the roster, lead assignments and review completeness', async () => {
@@ -352,7 +354,7 @@ describe('Proposal Ranking page', () => {
     render(<ProposalRankingApp />);
 
     expect(await screen.findByText('Shared meeting order')).toBeInTheDocument();
-    expect(screen.queryByText('Your private ranking')).not.toBeInTheDocument();
+    expect(screen.getByText('Your private ranking')).toBeInTheDocument();
     expect(screen.getByText('Disagreement')).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Move proposal 1001 down' }));
     await waitFor(() => expect(mockSend).toHaveBeenCalledWith(expect.objectContaining({ action: 'edit', programKey: 'se', etag: 'meeting-v1' })));

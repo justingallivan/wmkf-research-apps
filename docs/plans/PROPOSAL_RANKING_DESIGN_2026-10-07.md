@@ -1,7 +1,7 @@
 # Proposal Ranking — agreed assessment and recommendation workflow
 
-Updated: 2026-10-13. Revision: 5. Owner: Justin.
-Status: **[PLANNED] Product workflow agreed; implementation not authorized in this task.**
+Updated: 2026-10-14. Revision: 5 with D26 privacy amendment. Owner: Justin.
+Status: **Product workflow agreed. D26 privacy and dual-facilitator implementation candidate is built on `codex/d26-ranking-release` at `9fe92f0ed`; isolated synthetic D96 rehearsal and a bounded host Chrome smoke with sandbox personas passed. Opus's final review is satisfied; independent SSO/profile/grant and WebKit/iPad acceptance remain open. No Production promotion is approved.**
 The filename is retained for existing links; October 7 is the original design date,
 not the date of this revision. This revision incorporates the later October 13
 reset/default decisions and resolves revision 4's open product choices. It supersedes
@@ -10,7 +10,7 @@ revision 3's workflow and the October 11 branch's combined-meeting approach.
 Authority: Justin's October 13 decisions in the current conversation, including the
 colleague-reviewed text and the supplied October 11–12 conversation/handoff.
 That handoff's Word proposal is prior context, not authority over these newer decisions.
-No runtime, schema, permission, prompt, or live-data change is made by this revision.
+The earlier assessment/reveal workflow was built on `codex/proposal-ranking-v2`; D26 release work now proceeds on `codex/d26-ranking-release`. This design does not authorize Production promotion or legacy-data cleanup.
 
 Implementation evidence and source comparison:
 `docs/audits/PROPOSAL_RANKING_WORKFLOW_RECONCILIATION_2026-10-13.md`.
@@ -85,19 +85,27 @@ rules settle otherwise equal ordering, not substantive preference differences.
 All preparation is rebuildable. Returning to a program list never silently overwrites
 an edited combined list. Editing either program clears readiness and invalidates
 combined confirmation. The PD explicitly rebuilds from the current program lists,
-reviews the replacement, and reconfirms the combined ranking before marking ready.
+reviews the replacement, then uses one **Ready for group discussion** action to
+confirm that ranking and mark ready together.
 The confirmation explains that combined-only ordering and assessment changes will
 be replaced by the program assessments. Confidence follows each proposal from the
 program preparation used in the rebuild.
 
 ## 4. Ready, privacy, and reveal — agreed
 
-Before reveal, preparation is visible only to its PD and the facilitator. Other PDs
-cannot inspect it. The facilitator does not edit someone else's private assessments.
+[OWNER DECISION, 2026-10-14; SOURCE IMPLEMENTED on the D26 branch, not Production]
+Before reveal, preparation is visible only to its own PD, including when that PD
+is a facilitator. Beth and Justin may see readiness status but not another PD’s
+unrevealed rankings, grades or confidence. The service filters each response path;
+facilitators cannot edit another PD’s private assessments. This replaces the earlier
+facilitator-read exception. Current source and acceptance evidence are in
+`docs/plans/PROPOSAL_RANKING_D26_IMPLEMENTATION_ADDENDUM_2026-10-14.md` and the
+`D26` section of `docs/plans/PROPOSAL_RANKING_API_CONTRACT.md`.
 
 A PD can mark ready only after every proposal has a grade, a confidence response,
-and a confirmed unique position in that PD's complete combined list, with all saves
-confirmed. Before reveal they can reopen preparation; reopening clears readiness.
+and a unique position in that PD's complete combined list, with all saves confirmed.
+The single Ready action durably confirms the combined order and records readiness
+together. Before reveal they can reopen preparation; reopening clears readiness.
 They must mark ready again after revising.
 
 Once every PD is ready, the facilitator performs **one reveal action per preparation
@@ -146,7 +154,7 @@ One collective MR/SE list has two movable separators:
 
 Moving a separator reclassifies the proposals it passes. Moving a card across a
 separator changes its collective section, not anyone's preserved individual grade.
-Requested amounts and cumulative cost update with the visible order. The group sets
+Requested amounts remain on cards; the Recommended divider shows the total requested amount, recommended count and E/W counts, updating with the visible order. The group sets
 the funding boundary; the budget does not automatically grade or select proposals.
 Use full requested amounts, one verified currency, and integer minor units. Missing
 amounts remain visibly incomplete rather than zero.
@@ -165,14 +173,18 @@ not dollars**, not a hard per-cycle constraint. Merit may justify deviation. Giv
 preference to previously unfunded institutions without a points system, automatic
 bonus, or requirement to recommend a proposal the group cannot support on merit.
 
-Institutional funding context is **prior award count and most recent award year**.
-Prior funding dollars are not part of the agreed card/export design. Distinguish
+Institutional funding context is **prior award count, most recent award year, and
+total qualifying Research funding in USD** (owner card refinement, October 13).
+Keep count/year in the card summary; an arrow disclosure exposes the total and scope.
+This adds card detail only; the agreed workbook columns remain unchanged. Distinguish
 "no recorded awards" from unavailable/incomplete history and retain provisional
 qualifications. Use **qualifying Research awards across all available history**,
 with no arbitrary recent-years window, and label that scope. Show the most recent
 qualifying award year, not its month/cycle. No qualifying Research awards is not
 evidence that the foundation has never funded the institution in any category.
-Neither count nor year affects the quantitative ranking.
+Count, year, and total are informational only and never affect quantitative ranking.
+A missing total in an older frozen snapshot means unavailable, not zero. Resets retain
+the frozen history; they do not backfill or refresh it.
 
 ## 7. Earlier discussion sentiment — agreed
 
@@ -194,7 +206,7 @@ and caps each call at 50 request IDs. It requires live Meeting Tracker access (o
 superuser authority), not merely Proposal Ranking access, and runs under trusted
 DAL context. Infrastructure failures throw; they are not empty-history results.
 
-[PLANNED] Ranking must consume this service through its authenticated server layer,
+[VERIFIED via branch source] Ranking consumes this service through `workflow-service.js` in its authenticated server layer. The contract remains:
 respect its additional authorization, and omit data from private-preparation
 responses. Handle absent data, access denial, and dependency errors distinctly;
 never copy previously seen sentiment into an unauthorized response. No new grant
@@ -241,7 +253,7 @@ Export does not lock the workflow. Every reset requires a clear scope/impact con
 | Reset | Who and when | Result |
 |---|---|---|
 | Reset own program preparation | The PD, during private preparation (reopen own ready state first) | Restore the selected MR or SE reviewer-score seed and initial thirds; clear its confidence answers, readiness and combined confirmation. Other program work stays intact. |
-| Rebuild own combined list | The PD, during private preparation | Replace combined work using current MR/SE grades, pairwise merge and confidence; require review and confirmation again. Do not silently regenerate on a program edit. |
+| Rebuild own combined list | The PD, during private preparation | Replace combined work using current MR/SE grades, pairwise merge and confidence; require review, then the single Ready action again. Do not silently regenerate on a program edit. |
 | Reopen own ready preparation | The PD, before reveal | Clear own readiness; retain saved work for revision or reset. |
 | Reopen individual preparation after reveal | Facilitator | Preserve the previous revealed inputs and group work as history; create a new private preparation version from the latest revealed individual assessments and their source program lists. Clear every PD's readiness; require everyone ready and a new reveal. |
 | Reset collective recommendation | Facilitator, after reveal, including after export | Preserve the replaced group revision; restore that reveal's calculated order and unanimous-A/C initial bars. Keep its individual inputs unchanged. |
@@ -262,8 +274,10 @@ preview/open operation, not a silent reset side effect.
 ## 11. Implementation plan and engineering checks
 
 The product decisions are settled. The implementation plan is
-`docs/plans/PROPOSAL_RANKING_IMPLEMENTATION_PLAN_2026-10-13.md`; its storage/action
-names are engineering proposals, not claims of provisioned schema or approved release.
+`docs/plans/PROPOSAL_RANKING_IMPLEMENTATION_PLAN_2026-10-13.md`; use its Session 608
+status addendum and the D26 release addendum for current branch/source evidence.
+The plan's October 13 storage/action proposal remains historical; it is not an
+approved Production release.
 
 Before enabling new rounds, implement versioned assessments and resets, atomic
 all-PD reveal, consistent two-sheet export and old-round readers. Test deterministic
@@ -275,7 +289,43 @@ require implementation-time verification.
 
 ## 12. Verification and release boundary
 
-[PLANNED] Before a later implementation is called ready, cover: initial thirds;
+[VERIFIED via deployment receipt and hosted browser] Source `d1b206185` is deployed
+in dedicated READY Preview `dpl_GCjqpVkTNncxSC2kRzByGLbbspyq` at
+`https://wmkf-meeting-transcription-test-h2yh5pkf4.vercel.app`, with stable alias
+`https://wmkf-meeting-transcription-test.vercel.app`. The compact card refinements
+and expandable total Research funding are included. The release passed 179 ranking
+tests and Justin's Microsoft SSO/updated-interface check. This is sandbox deployment,
+not Production promotion or independent acceptance by the other three PDs.
+
+[VERIFIED via provisioning logs, READY Preview and saved-round readback] The enriched
+rehearsal is deployed from `591c3e98e7f24e699f7f83260a16ab1b1a929167` in Preview
+`dpl_BcJwMnCKWAQp9RueY2F4hDNjdPb6` at
+`https://wmkf-meeting-transcription-test-9qilqb16b.vercel.app`; the stable test alias
+points to this deployment. New round `ea3496d5-c105-4e97-95c0-6b13a2e3f2ef` contains
+12 realistic fictional proposals (six MR, six SE) and 36 saved synthetic reviews,
+three per proposal, with all four PDs in private preparation and nobody ready.
+Fictional institutions, geography, award histories and explicitly labelled sample
+discussions use a strict dedicated-test projection; they are not real awards or
+accepted human discussion analyses. The 182 ranking tests in 20 suites, scoped lint,
+types and DAL/reviewer-boundary/script-writer/API/status gate/self-test pairs passed.
+[VERIFIED via hosted browser] Signed-in Justin saw six proposals in each program,
+distinct institutions/project titles and three review tiles per card, including
+E/E/VG and divergent E/G/F. Both programs remained at 0/6 confidence answers.
+History opened the original run read-only, and Open replacement run returned to
+the enriched round. Anonymous `/api/proposal-ranking` returned 401. No PD assessment
+data changed and no live group reveal occurred in this check; other staff sign-ins
+and a full group walkthrough remain pending.
+
+The atomic operator upgrade preserved old round `f48741f0-4560-471d-b51f-ef93db48c152`,
+its exact frozen snapshot hash and lists, with previous/superseded links. This was a
+fresh source-pool replacement, not a normal UI reset. The commit succeeded once;
+a readback DTO typo was repaired and exact-hash/link verification completed without
+replaying the mutation (`/private/tmp/ranking-rich-round-receipt.json`). Normal resets
+continue to retain the current frozen pool. Production is unchanged.
+
+
+[PLANNED historical checklist; see current D26 evidence below] Before implementation
+acceptance, cover: initial thirds;
 pair ordering with alternating winners/unequal program lengths/equal or missing
 scores; every proposal exactly once; confidence completeness; strict unique ranks;
 privacy before each reveal; ready/reopen/reveal/reset races; immutable revealed inputs;
@@ -285,6 +335,8 @@ unknown/provisional history; accepted/current/withdrawn/access-denied sentiment;
 and both workbook sheets from confirmed data. Exercise separate identities and
 conflicting browser sessions. Run relevant gates with their self-tests sequentially.
 
-Current source tests and old production receipts validate their dated implementations,
-not this new workflow. This task updates documents only. No app implementation,
-branch merge, deployment, source-data change, or legacy-round cleanup is authorized.
+Current source tests and old Production receipts validate their dated implementations.
+The owner authorized the D26 branch implementation on the accepted UX direction;
+the isolated synthetic rehearsal and remaining sign-in/release checks are recorded
+in the D26 implementation addendum. Production configuration, source-data changes,
+legacy-round retirement, and deployment remain separate release decisions.

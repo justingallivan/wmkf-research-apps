@@ -71,7 +71,7 @@ const EXPECTED_FETCHES = {
     '/api/admin/review-questions',
   ],
   'workflows:proposal-ranking': [
-    '/api/app-access?all=true',
+    '/api/app-access',
   ],
   'workflows:final-writeups': [
     '/api/admin/final-writeup-matrix-audiences',
@@ -152,7 +152,7 @@ const EXPECTED_HEADINGS = {
     'External review form',
   ],
   'workflows:proposal-ranking': [
-    'Proposal Ranking facilitator',
+    'Proposal Ranking facilitators',
   ],
   'workflows:final-writeups': [
     'Final Writeup staffing',

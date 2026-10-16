@@ -121,3 +121,9 @@ describe('Proposal Ranking calculations', () => {
     expect(calculateComposite([{ order: ids }], ids).ranges[ids[0]].disagreement).toBe(false);
   });
 });
+
+test('synthetic saved scores require the explicit rehearsal opt-in', () => {
+  const reviews = [{ received: true, synthetic: true, answer: { answerValue: 4, answerText: 'Very Good', questionOptions: savedScale } }];
+  expect(summarizeProposalReviews(reviews).ratedCount).toBe(0);
+  expect(summarizeProposalReviews(reviews, { includeSynthetic: true })).toMatchObject({ ratedCount: 1, receivedCount: 1, mean: 4 });
+});

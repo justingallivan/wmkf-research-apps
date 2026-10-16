@@ -16,7 +16,70 @@ export async function loadProposalRanking({ cycleCode, roundId, signal }) {
   return data;
 }
 
-export async function sendProposalRankingAction(action, { signal } = {}) {
+const PRIVATE_ACTIONS = new Set([
+  'saveAssessment', 'buildCombined', 'confirmCombined', 'ready', 'reopenOwn', 'resetProgram',
+]);
+const DEFINITE_CONFLICTS = new Set(['stale_scope', 'conflict', 'confirmation_stale']);
+// Every write advances the shared round ETag, so a PD saving every few seconds
+// can win each immediate retry. Jittered, growing pauses break that lockstep;
+// the worst case stays inside the private save queue's 30 s timeout.
+const PRIVATE_CONFLICT_RETRIES = 6;
+const privateConflictPause = (attempt) => Math.min(1500, 200 * 2 ** attempt) * (0.5 + Math.random());
+function pause(ms, signal) {
+  return new Promise((resolve, reject) => {
+    if (signal?.aborted) { reject(signal.reason); return; }
+    const timer = setTimeout(() => { signal?.removeEventListener('abort', onAbort); resolve(); }, ms);
+    function onAbort() { clearTimeout(timer); reject(signal.reason); }
+    signal?.addEventListener('abort', onAbort, { once: true });
+  });
+}
+
+// A peer save advances the shared round ETag without changing this PD's work.
+// Rebase only proven rejections, only over identical private state, and retain
+// the exact final request if its outcome becomes uncertain.
+async function sendWithPrivateConflictRecovery(action, baseView, signal, onAttempt, wait = pause) {
+  let pendingAction = action;
+  for (let attempt = 0; ; attempt += 1) {
+    try {
+      return await sendProposalRankingAction(pendingAction, { signal, onAttempt });
+    } catch (error) {
+      error.pendingAction = pendingAction;
+      if (attempt >= PRIVATE_CONFLICT_RETRIES || error.status !== 409 || !DEFINITE_CONFLICTS.has(error.code)) throw error;
+      let current;
+      try {
+        await wait(privateConflictPause(attempt), signal);
+        current = await loadProposalRanking({ roundId: action.roundId, signal });
+      } catch (readError) {
+        readError.pendingAction = pendingAction;
+        throw readError;
+      }
+      const sameScope = current.roundId === baseView.roundId
+        && current.viewer?.systemUserId === baseView.viewer?.systemUserId
+        && current.round?.state === 'active'
+        && current.round.policyRevision === baseView.round.policyRevision
+        && current.workflow?.stage === 'private'
+        && JSON.stringify(current.workflow) === JSON.stringify(baseView.workflow)
+        && current.own && JSON.stringify(current.own) === JSON.stringify(baseView.own);
+      if (!sameScope) throw error;
+      const key = action.action === 'resetProgram' ? `resetProgram:${action.programKey}` : action.action;
+      const confirmation = current.confirmations?.[key];
+      if (action.confirmationFingerprint && !confirmation?.fingerprint) throw error;
+      pendingAction = {
+        ...pendingAction,
+        operationId: createOperationId(),
+        roundEtag: current.round.etag,
+        ...(action.confirmationFingerprint ? { confirmationFingerprint: confirmation.fingerprint } : {}),
+      };
+    }
+  }
+}
+
+export async function sendProposalRankingAction(action, { signal, baseView, onAttempt, wait } = {}) {
+  if (baseView?.own && baseView.workflow?.stage === 'private' && PRIVATE_ACTIONS.has(action.action)) {
+    return sendWithPrivateConflictRecovery(action, baseView, signal, onAttempt, wait);
+  }
+  signal?.throwIfAborted();
+  onAttempt?.(action);
   const { ok, status, data } = await requestEnvelope(PROPOSAL_RANKING_API, {
     method: 'POST',
     body: action,
@@ -24,6 +87,7 @@ export async function sendProposalRankingAction(action, { signal } = {}) {
   });
   if (!ok) {
     const error = requestFailure(data, status);
+    error.requestMethod = 'POST';
     error.current = data?.error?.current || null;
     error.code = data?.error?.code || null;
     error.retryable = data?.error?.retryable === true;

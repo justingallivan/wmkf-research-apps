@@ -1,0 +1,6 @@
+{
+  "name": "wmkf_proposalrankinglist-assessments",
+  "kind": "extensions-on-existing",
+  "entityLogicalName": "wmkf_proposalrankinglist",
+  "attributes": [{ "type": "Memo", "schemaName": "wmkf_AssessmentJson", "displayName": "Ranking Assessment", "description": "Version-2 assessment, immutable reveal, collective revision or operation receipt, discriminated by server-owned list key.", "maxLength": 524288 }]
+}

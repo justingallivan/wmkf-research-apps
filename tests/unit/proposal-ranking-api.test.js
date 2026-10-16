@@ -144,7 +144,7 @@ describe('Proposal Ranking API route authorization and envelopes', () => {
     expectPrivateHeaders(getRes);
 
     handleProposalRankingAdminSettings.mockClear();
-    const body = { systemUserId: 'staff-guid', revision: 'rev-1' };
+    const body = { facilitatorSystemUserIds: ['11111111-1111-4111-8111-111111111111'], revision: 'rev-1' };
     const putRes = responseRecorder();
     await proposalRankingAdminSettingsHandler(request('PUT', { body }), putRes);
     expect(putRes.statusCode).toBe(200);
@@ -165,7 +165,7 @@ describe('Proposal Ranking API route authorization and envelopes', () => {
     const res = responseRecorder();
 
     await proposalRankingAdminSettingsHandler(request('PUT', {
-      body: { systemUserId: 'staff-guid', revision: 'rev-2' },
+      body: { facilitatorSystemUserIds: ['11111111-1111-4111-8111-111111111111'], revision: 'rev-2' },
     }), res);
 
     expect(res.statusCode).toBe(409);
@@ -196,7 +196,7 @@ describe('Proposal Ranking API route authorization and envelopes', () => {
       getUserRole.mockResolvedValue('superuser');
       handleProposalRankingAdminSettings.mockRejectedValue(failure);
       await proposalRankingAdminSettingsHandler(request('PUT', {
-        body: { systemUserId: 'staff-guid', revision: 'rev-1' },
+        body: { facilitatorSystemUserIds: ['11111111-1111-4111-8111-111111111111'], revision: 'rev-1' },
       }), res);
       expect(res.body.error.message).toBe('Proposal Ranking settings could not complete this request. Please retry or contact an administrator.');
     }

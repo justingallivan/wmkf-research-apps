@@ -30,7 +30,7 @@
 - Multi-session features / MVP drift: feedback-anchor-multisession-features-to-the-original-ask.md; changing the owner's named input source: feedback-keep-the-owners-named-input-source.md
 - Git / releases: ../docs/CAMPAIGN_RELEASE_AND_DATAVERSE_TEST_STRATEGY.md; feedback-verify-branch-before-git-action.md; feedback-scope-git-stash-in-shared-worktrees.md; feedback-feature-branch-handoff-lands-on-main.md; feedback-merge-to-main-from-temp-worktree.md
 - Migration numbers / schema_migrations / branch-applied migrations: project-migration-numbers-claimed-off-main.md
-- Action affordances / UI gating: feedback-ui-gates-must-mirror-server-guards.md
+- Action affordances / UI gating: feedback-ui-gates-must-mirror-server-guards.md; feedback-match-existing-ui-patterns.md
 - Tunables / mutable parameters: feedback-mutable-parameters-not-in-code.md
 - Cycle-scoped settings / per-cycle allowlists / cycle literals: feedback-minimize-per-cycle-configuration.md
 - Test Request Factory safety vs fidelity / rehearsal venue: feedback-factory-safe-not-full-fidelity.md; feedback-question-the-rehearsal-venue.md

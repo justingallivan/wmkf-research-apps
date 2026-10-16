@@ -29,6 +29,7 @@ jest.mock('../../shared/config/appRegistry', () => ({
     { key: 'reviewers', name: 'Workbench', href: '/workbench' },
     { key: 'meeting-tracker', name: 'Meeting Tracker', href: '/meeting-tracker' },
     { key: 'grant-reporting', name: 'Grant Reporting', href: '/grant-reporting' },
+    { key: 'proposal-ranking', name: 'Proposal Ranking', href: '/proposal-ranking' },
   ],
 }));
 jest.mock('next/link', () => function LinkStub({ href, children, ...rest }) {
@@ -44,12 +45,12 @@ beforeEach(() => {
   mockAccess = { isSuperuser: false, hasAccess: () => true };
 });
 
-test('top level is Home, Workbench, Meeting Tracker, Tools, Guide; other apps only inside Tools', async () => {
+test('top level is Home, Workbench, Meeting Tracker, Proposal Ranking, Tools, Guide; other apps only inside Tools', async () => {
   render(<Layout>content</Layout>);
   await screen.findByText('content');
   const nav = mainNav();
   const topLevel = within(nav).getAllByRole('link').map(link => link.textContent);
-  expect(topLevel).toEqual(['Home', 'Workbench', 'Meeting Tracker', 'Guide']);
+  expect(topLevel).toEqual(['Home', 'Workbench', 'Meeting Tracker', 'Proposal Ranking', 'Guide']);
   expect(within(nav).queryByText('Review Panel')).not.toBeInTheDocument();
 
   fireEvent.click(within(nav).getByRole('button', { name: 'Tools' }));
@@ -58,10 +59,11 @@ test('top level is Home, Workbench, Meeting Tracker, Tools, Guide; other apps on
 });
 
 test('Tools lists only apps the user can access; Cycle Dossier and Admin are superuser-only', async () => {
-  mockAccess = { isSuperuser: false, hasAccess: key => key !== 'grant-reporting' && key !== 'meeting-tracker' };
+  mockAccess = { isSuperuser: false, hasAccess: key => !['grant-reporting', 'meeting-tracker', 'proposal-ranking'].includes(key) };
   const { unmount } = render(<Layout>content</Layout>);
   await screen.findByText('content');
   expect(within(mainNav()).queryByText('Meeting Tracker')).not.toBeInTheDocument();
+  expect(within(mainNav()).queryByText('Proposal Ranking')).not.toBeInTheDocument();
   expect(within(mainNav()).queryByText('Admin')).not.toBeInTheDocument();
   fireEvent.click(within(mainNav()).getByRole('button', { name: 'Tools' }));
   expect(within(screen.getByRole('menu')).getAllByRole('menuitem').map(item => item.textContent)).toEqual(['Review Panel']);

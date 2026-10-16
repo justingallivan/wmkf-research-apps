@@ -1,3 +1,4 @@
+import AssessmentWorkflow from './AssessmentWorkflow';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Button, Card, PageHeader } from '../Layout';
 import { conventionalCycles, cycleCodeToLabel, resolveWorkingCycle } from '../../../lib/utils/cycle-code';
@@ -182,11 +183,9 @@ function ProposalOrder({ list, proposals, order, editable, saveState, composite,
   );
 }
 
-function SubmissionLists({ response, program, proposals, isFacilitator, onSubmit, submitting, saveStates, localOrders, remoteOrders, onMove, onRetry }) {
+function SubmissionLists({ response, program, proposals, onSubmit, submitting, saveStates, localOrders, remoteOrders, onMove, onRetry }) {
   const data = response.programs?.[program.key];
-  const lists = isFacilitator
-    ? (data?.facilitatorLists || [])
-    : response.viewer.isRosterParticipant && data?.ownList ? [data.ownList] : [];
+  const lists = response.viewer.isRosterParticipant && data?.ownList ? [data.ownList] : [];
   if (!lists.length) {
     return <p className="rounded-lg bg-gray-50 p-4 text-sm text-gray-600">No individual list is available to this viewer.</p>;
   }
@@ -238,6 +237,7 @@ function ProgramPanel({ response, program, isFacilitator, localOrders, remoteOrd
   const proposalById = new Map((response.round?.snapshot.proposals || []).map((proposal) => [proposal.requestId, proposal]));
   const proposals = (programData.proposalIds || []).map((id) => proposalById.get(id)).filter(Boolean);
   const meeting = programData.meeting;
+  const meetingControl = programData.meetingControl;
   const meetingStatus = programData.meetingStatus || meeting?.status || null;
   const generated = meetingStatus === 'composite-draft' || meetingStatus === 'published';
   const published = meetingStatus === 'published';
@@ -245,7 +245,7 @@ function ProgramPanel({ response, program, isFacilitator, localOrders, remoteOrd
   const activeConfirmation = pendingConfirmation?.programKey === program.key ? pendingConfirmation : null;
   const currentConfirmations = confirmations || response.confirmations;
   const meetingCanEdit = Boolean(response.round.state === 'active' && response.viewer.capabilities.editMeetingOrder && (meetingStatus === 'composite-draft' || published));
-  const listKey = meeting?.listKey;
+  const listKey = meeting?.listKey || meetingControl?.listKey;
   return <section aria-labelledby={`program-heading-${program.key}`} className="mt-5">
     <div className="flex flex-wrap items-start justify-between gap-3">
       <div>
@@ -261,29 +261,12 @@ function ProgramPanel({ response, program, isFacilitator, localOrders, remoteOrd
       {programData.progress && <div className="mt-3 flex flex-wrap gap-2 text-xs">
         <span className={`rounded-full px-2.5 py-1 font-semibold ${published ? 'bg-green-100 text-green-900' : 'bg-gray-100 text-gray-700'}`}>{published ? 'Published meeting order' : meetingStatus === 'composite-draft' ? 'Facilitator draft' : 'Collecting submissions'}</span>
       </div>}
-      {isFacilitator && <div className="mt-5">
-        <h3 className="mb-3 text-base font-semibold text-gray-900">Individual PD rankings</h3>
-        <SubmissionLists
-          response={response}
-          program={program}
-          proposals={proposals}
-          isFacilitator
-          onSubmit={onSubmit}
-          submitting={submitting}
-          saveStates={saveStates}
-          localOrders={localOrders}
-          remoteOrders={remoteOrders}
-          onMove={onMove}
-          onRetry={onRetry}
-        />
-      </div>}
-      {!isFacilitator && response.viewer.isRosterParticipant && !published && <div className="mt-5">
+      {response.viewer.isRosterParticipant && <div className="mt-5">
         <h3 className="mb-3 text-base font-semibold text-gray-900">Your private ranking</h3>
         <SubmissionLists
           response={response}
           program={program}
           proposals={proposals}
-          isFacilitator={false}
           onSubmit={onSubmit}
           submitting={submitting}
           saveStates={saveStates}
@@ -319,9 +302,9 @@ function ProgramPanel({ response, program, isFacilitator, localOrders, remoteOrd
   </section>;
 }
 
-export default function ProposalRankingApp() {
-  const options = useMemo(() => cycleOptions(), []);
-  const [cycleCode, setCycleCode] = useState(() => resolveWorkingCycle(conventionalCycles()) || options[0]?.code || '');
+export default function ProposalRankingApp({ rehearsalCycle = null }) {
+  const options = useMemo(() => rehearsalCycle ? [{ code: rehearsalCycle, label: `${rehearsalCycle} · Ranking rehearsal` }] : cycleOptions(), [rehearsalCycle]);
+  const [cycleCode, setCycleCode] = useState(() => rehearsalCycle || resolveWorkingCycle(conventionalCycles()) || options[0]?.code || '');
   const [selectedProgram, setSelectedProgram] = useState('se');
   const [response, setResponse] = useState(null);
   const responseRef = useRef(null);
@@ -758,7 +741,7 @@ export default function ProposalRankingApp() {
   const generateProgram = (programKey) => {
     const current = responseRef.current;
     const token = current?.confirmations?.generate?.[programKey];
-    const meeting = current?.programs?.[programKey]?.meeting;
+    const meeting = current?.programs?.[programKey]?.meetingControl || current?.programs?.[programKey]?.meeting;
     if (!current?.roundId || !token || !meeting) return;
     setPendingConfirmation(null);
     void runAction({ action: 'generate', roundId: current.roundId, programKey, etag: meeting.etag, policyRevision: current.round.policyRevision, confirmationFingerprint: token.fingerprint, operationId: createOperationId() });
@@ -767,7 +750,7 @@ export default function ProposalRankingApp() {
   const publishProgram = (programKey) => {
     const current = responseRef.current;
     const token = current?.confirmations?.publish?.[programKey];
-    const meeting = current?.programs?.[programKey]?.meeting;
+    const meeting = current?.programs?.[programKey]?.meetingControl || current?.programs?.[programKey]?.meeting;
     if (!current?.roundId || !token || !meeting) return;
     setPendingConfirmation(null);
     void runAction({ action: 'publish', roundId: current.roundId, programKey, etag: meeting.etag, policyRevision: current.round.policyRevision, confirmationFingerprint: token.fingerprint, operationId: createOperationId() });
@@ -799,6 +782,8 @@ export default function ProposalRankingApp() {
   const currentProposalData = activeResponse?.mode === 'preview' ? activeResponse.preview : activeResponse?.mode === 'round' ? activeResponse.round?.snapshot : null;
   const currentProposalById = new Map((currentProposalData?.proposals || []).map((proposal) => [proposal.requestId, proposal]));
   const preview = activeResponse?.preview;
+
+  if (activeResponse?.workflowVersion === 2) return <AssessmentWorkflow key={`${activeResponse.roundId}:${activeResponse.viewer.systemUserId}`} initial={activeResponse} cycleOptions={options} onCycleChange={changeCycle}/>;
 
   return <div className="mx-auto max-w-7xl px-4 pb-10">
     <PageHeader title="Proposal Ranking" subtitle="Prepare private PD rankings and facilitate the funding-cycle discussion." icon="▤">
@@ -875,7 +860,7 @@ export default function ProposalRankingApp() {
             </div>
           </div>
         </Card>
-        {activeResponse.viewer.isRosterParticipant && !isFacilitator && <StatusBanner>Before publication, only your own ranking is shown. Published program orders include named PD ranks.</StatusBanner>}
+        {activeResponse.viewer.isRosterParticipant && <StatusBanner>Before publication, only your own ranking is shown. Published program orders include named PD ranks.</StatusBanner>}
         <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_20rem]">
           <Card hover={false}>
             <ProgramPanel
@@ -957,7 +942,7 @@ export default function ProposalRankingApp() {
             </label>
             <label className="flex items-start gap-2 text-sm text-gray-700">
               <input type="checkbox" checked={transferConfirmed} onChange={(event) => setTransferConfirmed(event.target.checked)} disabled={actionBusy || hasUnresolvedSave || !transferSelection} className="mt-0.5 rounded border-gray-300" />
-              I understand the new facilitator gains facilitator visibility and my later access follows my captured roster status.
+              I understand the new facilitator gains round controls and readiness access. My later access follows my captured roster status.
             </label>
             <Button type="button" size="sm" disabled={actionBusy || hasUnresolvedSave || !transferSelection || !transferConfirmed} onClick={transferFacilitator}>Transfer facilitation</Button>
           </div>}

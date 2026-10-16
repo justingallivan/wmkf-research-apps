@@ -21,7 +21,7 @@ export default async function handler(req, res) {
       if (!apps.includes('proposal-ranking')) {
         return res.status(403).json({ error: { code: 'access_denied', message: 'Proposal Ranking app access is required.', retryable: false, current: null } });
       }
-      const allowedFields = new Set(['systemUserId', 'revision']);
+      const allowedFields = new Set(['facilitatorSystemUserIds', 'revision']);
       if (req.method === 'PUT' && (!req.body || typeof req.body !== 'object' || Array.isArray(req.body)
         || !Object.keys(req.body).every((key) => allowedFields.has(key)))) {
         return res.status(400).json({ error: { code: 'invalid_request', message: 'The settings request contains unsupported fields.', retryable: false, current: null } });
