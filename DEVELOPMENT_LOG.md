@@ -10,6 +10,16 @@ The chronological archive after the `Legacy chronological session log` divider c
 
 ---
 
+## October 2026 — Post-presentation writeup regeneration released (Session 612)
+
+**Milestone:** lead PDs and superusers can regenerate the Pre-Site writeup from current data during post-visit drafting and group review, keeping the prior Word file under Previous versions.
+**Sessions:** 610–611 (Codex build, Sol/Opus reviews; sandbox rehearsal parked), 612 (Claude: feature-only split, bounded Opus review with no blockers, superuser-gated release, owner production run, opened to lead PDs).
+**Ship state:** PR #491 `88d7badba` released behind a superuser-only gate; owner regenerated one real request and confirmed updated sections on the current template; PR #492 `8fd4ef702` opened it to lead PDs; PR #493 `ce756d695` retires a regenerated writeup's generation checks once group review starts (owner-reported undismissable warning). Group-review races and the replacement colleague email are unit-proved only.
+**Why it matters:** writeups can pick up reviews that arrive after generation without hand-copying; the venue switch from sandbox fixtures to a gated production run ended a two-session rehearsal loop.
+**Pointers:** `docs/plans/POST_PRESENTATION_WRITEUP_REGENERATION_PLAN_2026-10-15.md`; `docs/atlas/dataverse-wmkf-requestdocument.md`; parked tooling on branch `codex/writeup-regenerate` (closed PR #486).
+
+---
+
 ## October 2026 — D26 Proposal Ranking released to production (Session 609)
 
 **Milestone:** the version-2 Ranker (private preparation, two facilitators, read-only observers, top-nav entry) went live and the D26 round opened in production.

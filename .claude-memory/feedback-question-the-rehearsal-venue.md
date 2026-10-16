@@ -33,3 +33,5 @@ Administrator where production's has none.
 **How to apply:** see `docs/plans/TEST_REQUEST_FACTORY_PRODUCTION_PLAN_2026-09-27.md`
 and the agent-wiki Dataverse note on sandbox background processing. Related:
 [[feedback-factory-safe-not-full-fidelity]], [[project-preview-rehearsal-venue-limits]].
+
+S612 (2026-10-15) applied this: writeup regeneration's sandbox tooling (3,023 lines) outgrew the feature (2,569) without one real run. Splitting it off and shipping behind a superuser-only gate for one owner-run production regeneration proved the feature in a single session.

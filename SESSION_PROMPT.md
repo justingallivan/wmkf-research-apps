@@ -1,3 +1,59 @@
+# Session 613 Prompt: writeup regeneration live; observe real use
+
+## Session 612 Summary — writeup regeneration released (Claude, 2026-10-15 PT)
+
+### What Was Completed
+
+1. **Main's Tests workflow repaired.** [VERIFIED via local test + PR CI.] `scripts/probe-sharepoint-folder-access.mjs` imported Graph internals, which `tests/unit/graph-service-boundary.test.js` rejects; it now uses `GraphService.getAccessToken()` (`5c2ed60ff`).
+2. **Regeneration split from sandbox tooling.** Force-push was refused by the classifier, so history was not rewritten: `codex/writeup-regenerate` keeps the parked Factory/sandbox tooling unchanged (PR #486 closed with a pointer). The feature continued on `claude/writeup-regenerate` from `270269f62`.
+3. **Bounded Opus review** of route allowlist, atomic pointer replacement and handoff-email staging: no blockers. Four low findings recorded in PR #491's body, not fixed (see Verified Open).
+4. **Released and owner-proved.** [VERIFIED via GitHub production deployment statuses.] PR #491 `88d7badba` shipped behind a superuser-only gate; the owner regenerated one real request and reported sections updated with new information on the current template. PR #492 `8fd4ef702` removed the gate (lead PDs and superusers). The stage of the owner's test request (post-visit vs group review) was not recorded.
+5. **Undismissable warnings fixed.** Owner chose option 3: a regenerated writeup's generation-time checks show through post-visit drafting and stop at group review; a group-review regeneration shows none (PR #493 `ce756d695`, discriminating test mutation-checked). Owner declined a durable Mark-as-checked control for now.
+
+### Commits
+- `5c2ed60ff` probe via Graph facade (main)
+- `4a77f1e1c` superuser gate; PR #491 merge `88d7badba`
+- `f42d302f7` open to lead PDs; PR #492 merge `8fd4ef702`
+- `48e48aa67` retire regenerated checks at group review; PR #493 merge `ce756d695`
+
+## Next Items
+
+### Verified Open
+
+1. **Observe first lead-PD regeneration and first group-review regeneration.** Evidence: only one owner-run production regeneration exists. Group-review pair replacement, fresh sign-offs and the replacement colleague email are unit-proved only.
+2. **Low review findings (optional cleanup).** Evidence: PR #491 body. Uploaded file orphaned when activation is refused under a new operation id; prepared Final left GENERATING after a failed group commit; group path lacks the source-id parity check; two different-UUID operations can each spend a model call (accepted by design).
+
+### Owner Decision Needed
+
+1. **Reviewer-expertise warning wording past drafting.** The `referee_expertise_missing` message says "…and regenerate" (`lib/services/pre-site-visit/artifact-model.js` `projectWarnings`). With option 3 it no longer shows in group review, so this is low priority; raised to owner, unanswered.
+2. **Untracked files in the main checkout:** `.impeccable/critique/2026-10-13T23-47-04Z__ts-proposal-ranking-assessmentworkflow-js-99d8f072.md` and `output/` (ranking mockups) predate this session; owner has not said commit, ignore or leave.
+
+### Parked
+
+1. **Sandbox rehearsal tooling** on `codex/writeup-regenerate` (Factory baselines, rollup verification, sandbox fixtures; Requests 1000365/1000366 retained; private receipts on the other Mac). Re-open only if the owner wants that tooling for another workstream.
+
+### Verify Before Acting
+
+1. Research SharePoint access (Session 610 handoff below) — still waiting on IT as of that handoff; not touched this session.
+2. D26 ranking carryover items in the preserved handoffs below were not re-audited this session.
+3. Writeup worktree: `/Users/gallivan/Code/WMKF_Apps-writeup-regen` on this Mac (local branches merged); safe to remove with `git worktree remove` after checking `git status` there.
+
+## Key Files Reference
+
+| File | Purpose |
+|------|---------|
+| `pages/api/workbench/pre-site-visit.js` | Regenerate POST allowlist and GET `canRegenerate` |
+| `lib/services/pre-site-visit/artifact-lineage.js` | Atomic post-visit / group-review replacement |
+| `lib/services/final-writeup/handoff-email-service.js` | Replacement colleague notice staging/delivery |
+| `shared/components/workbench/StaffDeliberationsTab.js` | Step 4 Regenerate, Previous versions, warning retirement |
+| `docs/plans/POST_PRESENTATION_WRITEUP_REGENERATION_PLAN_2026-10-15.md` | Contract and rollout record |
+
+**Stop verification:** milestone entry added to DEVELOPMENT_LOG.md. CLAUDE.md unchanged. Claim-evidence pilot: no eligible plan/design edit recorded, no row added. Prior handoff bytes preserved below.
+
+---
+
+## Prior handoffs — preserved from main at ce756d695; verify live state before acting
+
 # Session 612 Prompt: refocus writeup regeneration; sandbox expansion parked
 
 ## Session 611 Summary — writeup regeneration and scope reset (Codex, 2026-10-15 PT)
