@@ -2,8 +2,8 @@
 title: Post-presentation writeup regeneration
 domain: workbench
 kind: plan
-status: source-built-not-deployed
-summary: Source-built guarded replacement flow preserving prior Word files during post-visit drafting and group review; not deployed.
+status: shipped
+summary: Source-built guarded replacement flow preserving prior Word files during post-visit drafting and group review; in production for lead PDs and superusers.
 owner: product-engineering
 last_verified: 2026-10-15
 related:
@@ -22,7 +22,7 @@ related:
 2. **Approved stage preservation:** post-visit drafting stays post-visit drafting; group review stays group review. A regenerated group-review document starts with fresh sign-offs; sign-offs on the preserved document remain historical and do not approve the replacement.
 3. **Approved colleague notice:** during group review, send a fresh handoff notice pointing colleagues to the replacement using the existing durable email mechanism and existing program/recipient rules. Preserve previous sent receipts; safely retire pending notices for the replaced source. Reuse the current group-review email copy and settings; the email opens the Final tab, which resolves the current document.
 
-4. **Rollout gate (owner, 2026-10-15):** first production release offers regeneration to superusers only (route `isRegenerationRolloutViewer`); the owner runs it once on a real request, then a second release opens it to lead PDs. The sandbox rehearsal tooling is parked on `codex/writeup-regenerate`; the feature continues on `claude/writeup-regenerate` from `270269f62`.
+4. **Rollout (owner, 2026-10-15):** PR #491 (`88d7badba`) released regeneration to production behind a superuser-only gate. The owner regenerated one real request in production and confirmed sections updated with new information on the current template. The follow-up release removed the gate, so lead PDs and superusers can regenerate. The sandbox rehearsal tooling is parked on `codex/writeup-regenerate`; the feature continues on `claude/writeup-regenerate` from `270269f62`.
 
 The file replacement/preservation and availability during both stages are owner decisions from 2026-10-15. No schema/migration or new route is proposed. Existing `wmkf_producer` and generation-key fields identify this operation; `wmkf_reopencycleid` remains reserved for reopen/correction history.
 
@@ -132,4 +132,4 @@ Audits: whole-flow traced above; partial success uses atomic activation and expl
 
 Startup: all package `check:*` scripts and available self-tests ran sequentially and exited 0 on the unchanged baseline (2026-10-15); factory-ledger inspected two configured ledgers with zero refused/unreachable/skipped. No production data mutation was performed. Baseline lifecycle/UI tests: 8 suites / 315 tests passed (`npx --no-install jest --runInBand` over the artifact, both reopen, Final/group and leadership transition, visibility, Pre-Site route and StaffDeliberationsTab suites). These prove existing behavior only. Independent read-only contract review confirmed the paired successor requirement, historical sign-offs, email-staging incompatibility and staff-history gap; those findings are incorporated above.
 
-**Verdict: source-built, reviewed and locally verified; not deployed.** This plan does not authorize a schema change, production operation, merge, main push or release.
+**Verdict: shipped.** Released by PR #491 behind a superuser-only gate. After one owner-run production regeneration, the gate was removed for lead PDs. Group-review concurrency and colleague-email behavior are proved by unit tests, not by a live race.

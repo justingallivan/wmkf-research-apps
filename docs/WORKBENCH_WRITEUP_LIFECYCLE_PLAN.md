@@ -23,7 +23,7 @@ related:
 
 ## Decision and current status
 
-**[SOURCE-BUILT 2026-10-15 on `codex/writeup-regenerate`; NOT DEPLOYED.]**
+**[SHIPPED 2026-10-15, PR #491; available to the lead PD and superusers.]**
 The explicit guarded regeneration mode now permits replacement during post-visit
 drafting and group review, preserving the prior Word item and the same lifecycle
 stage. A replacement group-review pair starts with fresh sign-offs and the existing
