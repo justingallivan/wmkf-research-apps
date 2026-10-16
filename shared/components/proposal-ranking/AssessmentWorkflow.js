@@ -49,6 +49,7 @@ function RankingDialog({ label, children, onClose }) {
   );
 }
 const OBSERVER_REFRESH_MS = 20000;
+const RECOMMENDED_DIVIDER_ID = 'ranking-recommended-divider';
 const gradeClasses = {
   A: 'bg-[#d5edda] text-[#205632]',
   B: 'bg-[#ffeb9c] text-[#654c00]',
@@ -213,7 +214,7 @@ export function AssessmentList({
                         }
                       >
                         {isBar ? (
-                          <div className={`flex flex-wrap items-center gap-3 py-3 text-sm font-semibold ${collective && id === FIRST_BOUNDARY ? 'rounded-lg border border-green-300 bg-green-50 px-3 text-green-900' : 'border-y border-gray-200'}`}>
+                          <div id={collective && id === FIRST_BOUNDARY ? RECOMMENDED_DIVIDER_ID : undefined} className={`flex flex-wrap items-center gap-3 py-3 text-sm font-semibold ${collective && id === FIRST_BOUNDARY ? 'rounded-lg border border-green-300 bg-green-50 px-3 text-green-900' : 'border-y border-gray-200'}`}>
                             {editable && (
                               <span
                                 {...drag.dragHandleProps}
@@ -292,7 +293,7 @@ export function AssessmentList({
                                   type="button"
                                   aria-label={`Move ${proposal.organization} to position; current position ${position + 1}`}
                                   title="Move to position"
-                                  className="inline-block min-h-11 min-w-6 -my-2 py-2 text-center rounded text-xl font-bold tabular-nums focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-600"
+                                  className="inline-block min-h-11 min-w-6 -mx-1.5 -my-2 px-1.5 py-2 text-center rounded text-xl font-bold tabular-nums focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-600"
                                   onClick={() => {
                                     setMoving(id);
                                     setPositionError('');
@@ -839,6 +840,35 @@ export default function AssessmentWorkflow({
       }
     }
   };
+  // The pinned group bar repeats the Recommended total only while the cutoff
+  // line itself is out of view, so the figures never show twice at once. The
+  // check reads the bar's current height because the bar grows when it wraps.
+  const groupBarRef = useRef(null);
+  const [cutoffInView, setCutoffInView] = useState(false);
+  const revealedCollective = section === 'group' ? view?.collective : null;
+  const hasRevealedCollective = Boolean(revealedCollective);
+  const liveRecommendedBoundary = (draft || revealedCollective)?.boundaries?.[0];
+  useEffect(() => {
+    if (!hasRevealedCollective) return undefined;
+    let frame = 0;
+    const check = () => {
+      frame = 0;
+      const divider = document.getElementById(RECOMMENDED_DIVIDER_ID);
+      const bar = groupBarRef.current;
+      if (!divider || !bar) return;
+      const line = divider.getBoundingClientRect();
+      setCutoffInView(line.bottom > bar.getBoundingClientRect().bottom && line.top < window.innerHeight);
+    };
+    const schedule = () => { if (!frame) frame = window.requestAnimationFrame(check); };
+    schedule();
+    document.addEventListener('scroll', schedule, { capture: true, passive: true });
+    window.addEventListener('resize', schedule);
+    return () => {
+      if (frame) window.cancelAnimationFrame(frame);
+      document.removeEventListener('scroll', schedule, { capture: true });
+      window.removeEventListener('resize', schedule);
+    };
+  }, [hasRevealedCollective, liveRecommendedBoundary]);
   if (!view)
     return (
       <p role="alert" className="p-8">
@@ -867,6 +897,9 @@ export default function AssessmentWorkflow({
       : view.workflow.stage === 'private' && !view.own?.ready && !outdated);
   const proposals = view.round.snapshot.proposals;
   const roster = view.round.snapshot.roster;
+  const recommendedTotals = collective
+    ? calculateSectionTotals(assessment.order, assessment.boundaries, proposals)[0]
+    : null;
   const confirm = (action, extra = {}) => {
     if (queue.isDirty() || busyRef.current || pendingRef.current) return;
     const key =
@@ -1058,6 +1091,7 @@ export default function AssessmentWorkflow({
           </select>
           {!(section === 'group' && collective) && <Button
             variant="link"
+            className="-mx-2 -my-3 px-2 py-3"
             disabled={busy || Boolean(pending)}
             onClick={refresh}
           >
@@ -1267,7 +1301,7 @@ export default function AssessmentWorkflow({
               </div>
             ) : (
               <>
-                <div className="my-3 flex flex-wrap items-center gap-x-4 gap-y-2 border-y border-gray-200 py-2">
+                <div className="sticky top-0 z-20 my-3 flex flex-wrap items-center gap-x-4 gap-y-2 border-y border-gray-200 bg-gray-50 py-2">
                   <div role="group" className="flex min-w-0 flex-1 basis-full flex-wrap items-center gap-x-4 gap-y-1 sm:basis-0" aria-label="Assessment lists">
                   {[...programProgress.map((p) => [p.key, p.name]), ...(own.co ? [['co', 'Combined list']] : [])].map(([key, label]) => (
                     <button
@@ -1327,8 +1361,13 @@ export default function AssessmentWorkflow({
             <h2 className="text-xl font-semibold">Group discussion</h2>
             <Button variant="outline" disabled={busy || Boolean(pending) || !active} onClick={exportWorkbook}>Export workbook</Button>
           </div>
-          <section aria-label="Current group recommendation" className="sticky top-0 z-20 mb-4 flex flex-wrap items-center justify-between gap-x-6 gap-y-2 border-y border-gray-200 bg-gray-50 px-2 py-3">
+          <section ref={groupBarRef} aria-label="Current group recommendation" className="sticky top-0 z-20 mb-4 flex flex-wrap items-center justify-between gap-x-6 gap-y-2 border-y border-gray-200 bg-gray-50 px-2 py-3">
             <p className="font-semibold">Collective order</p>
+            {!cutoffInView && recommendedTotals && (
+              <p data-testid="pinned-recommended-total" className="rounded-lg border border-green-300 bg-green-50 px-3 py-1.5 text-sm font-semibold tabular-nums text-green-900">
+                Recommended {formatMoney(recommendedTotals.amountMinorUnits, proposals[0]?.currency, { incomplete: !recommendedTotals.complete })} · {recommendedTotals.count} {recommendedTotals.count === 1 ? 'proposal' : 'proposals'} · East {recommendedTotals.geography.East} · West {recommendedTotals.geography.West}{recommendedTotals.geography.Unknown > 0 && ` · Unknown ${recommendedTotals.geography.Unknown}`}
+              </p>
+            )}
             <div className="flex items-center gap-3">
               <div className="text-sm text-gray-600">
                 <p role="status">{saveStatus}</p>
