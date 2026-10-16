@@ -24,12 +24,13 @@
 ### Verified Open
 
 1. **Observe first lead-PD regeneration and first group-review regeneration.** Evidence: only one owner-run production regeneration exists. Group-review pair replacement, fresh sign-offs and the replacement colleague email are unit-proved only.
-2. **Low review findings (optional cleanup).** Evidence: PR #491 body. Uploaded file orphaned when activation is refused under a new operation id; prepared Final left GENERATING after a failed group commit; group path lacks the source-id parity check; two different-UUID operations can each spend a model call (accepted by design).
+2. **Check the ranking group total at full desktop width in the first real group discussion.** Evidence: PR #494 was verified only on the local fictional rehearsal at 500px; the hosted group view needs every PD ready.
+3. **Low review findings (optional cleanup).** Evidence: PR #491 body. Uploaded file orphaned when activation is refused under a new operation id; prepared Final left GENERATING after a failed group commit; group path lacks the source-id parity check; two different-UUID operations can each spend a model call (accepted by design).
 
 ### Owner Decision Needed
 
 1. **Reviewer-expertise warning wording past drafting.** The `referee_expertise_missing` message says "…and regenerate" (`lib/services/pre-site-visit/artifact-model.js` `projectWarnings`). With option 3 it no longer shows in group review, so this is low priority; raised to owner, unanswered.
-2. **Untracked files in the main checkout:** `.impeccable/critique/2026-10-13T23-47-04Z__ts-proposal-ranking-assessmentworkflow-js-99d8f072.md` and `output/` (ranking mockups) predate this session; owner has not said commit, ignore or leave.
+2. **`output/` (ranking mockup images) is still untracked** in the main checkout; owner chose to leave it. The Oct 13 critique was committed (`62c73f736`).
 
 ### Parked
 
