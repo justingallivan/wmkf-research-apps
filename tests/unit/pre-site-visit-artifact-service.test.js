@@ -1584,7 +1584,7 @@ test('composer-time referee_expertise_missing diagnostics survive persistence an
     expect.objectContaining({
       code: 'referee_expertise_missing',
       name: 'Applicant Pick',
-      message: expect.stringContaining('Applicant Pick has no recorded expertise'),
+      message: 'Applicant Pick has no recorded expertise, so the Reviews paragraph expertise sentence omits them. Add keywords or an area of expertise to their reviewer record and regenerate, or add their expertise to the Reviews paragraph directly.',
     }),
   ]));
 });
