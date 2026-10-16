@@ -36,7 +36,6 @@
 
 1. Research SharePoint access (Session 610 handoff below) — still waiting on IT as of that handoff; not touched this session.
 2. D26 ranking carryover items in the preserved handoffs below were not re-audited this session.
-3. Writeup worktree: `/Users/gallivan/Code/WMKF_Apps-writeup-regen` on this Mac (local branches merged); safe to remove with `git worktree remove` after checking `git status` there.
 
 ## Key Files Reference
 
