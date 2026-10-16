@@ -74,6 +74,21 @@ describe('createPresiteSandboxDeps (I9: complete against artifact-dependencies.j
     await expect(deps.getBuckets('req', 'num')).rejects.toThrow(/must never be reached/);
   });
 
+  it('regeneration-only dependencies stay local or fail closed for this copy-only recipe', async () => {
+    expect(deps.now()).toBeInstanceOf(Date);
+    expect(deps.isExplicitActorSchemaReady()).toBe(false);
+    for (const key of [
+      'getFileMetadataById',
+      'resolveRequestDocumentActor',
+      'readFinalWriteupStatus',
+      'prepareFinalSuccessor',
+      'stageGroupReviewHandoff',
+      'deliverGroupReviewHandoff',
+    ]) {
+      await expect(deps[key]()).rejects.toThrow(/must never be reached/);
+    }
+  });
+
   it('refuses a non-sandbox Dataverse host', () => {
     expect(() => createPresiteSandboxDeps({
       resourceUrl: 'https://wmkf.crm.dynamics.com',

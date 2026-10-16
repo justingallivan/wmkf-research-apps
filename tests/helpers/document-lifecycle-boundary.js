@@ -15,6 +15,13 @@ const FACADES = [
   'lib/services/pre-site-visit/distribution-service.js',
   'lib/services/final-writeup/transition-service.js',
 ];
+// The Pre-Site dependency bundle is the single orchestration composition
+// point for paired group-review regeneration. Keep these two edges exact;
+// lifecycle leaves and every other dependency module remain domain-fenced.
+const COMPOSITION_IMPORTS = new Set([
+  'lib/services/pre-site-visit/artifact-dependencies.js->lib/services/final-writeup/transition-service.js',
+  'lib/services/pre-site-visit/artifact-dependencies.js->lib/services/final-writeup/handoff-email-service.js',
+]);
 const HASH = 'lib/services/documents/governed-docx-hash.js';
 const DISTRIBUTION_SHARED_LEAVES = new Set([
   'lib/services/pre-site-visit/review-bundle-service.js',
@@ -131,7 +138,8 @@ function analyzeSources(sources) {
     for (const edge of edges) {
       if (roots.includes(file) && edge.spec == null) errors.push(`nonliteral dependency: ${file}`);
       if (edge.spec?.startsWith('.') && !edge.target) errors.push(`unresolved dependency: ${file} -> ${edge.spec}`);
-      if (isInternal(file) && FACADES.includes(edge.target)) errors.push(`internal facade dependency: ${file} -> ${edge.target}`);
+      const compositionImport = COMPOSITION_IMPORTS.has(`${file}->${edge.target}`);
+      if (isInternal(file) && FACADES.includes(edge.target) && !compositionImport) errors.push(`internal facade dependency: ${file} -> ${edge.target}`);
       // Internal lifecycle modules may share neutral leaves, but cannot reach
       // another lifecycle domain's implementation service. Keep this broader
       // than the extracted-module list so an unclassified sibling cannot become
@@ -139,7 +147,7 @@ function analyzeSources(sources) {
       const sharedDistributionLeaf = domainOf(file) === 'distribution'
         && DISTRIBUTION_SHARED_LEAVES.has(edge.target);
       if (isInternal(file) && isScoped(edge.target || '') && edge.target !== HASH
-        && !sharedDistributionLeaf
+        && !sharedDistributionLeaf && !compositionImport
         && domainOf(file) !== domainOf(edge.target)) {
         errors.push(`cross-domain internal dependency: ${file} -> ${edge.target}`);
       }
@@ -262,4 +270,4 @@ function analyzeSources(sources) {
   }
   return { errors, writerCounts: Object.fromEntries(writerCounts), bindingCounts: Object.fromEntries(bindingCounts), modules: roots.length };
 }
-module.exports = { analyzeSources, loadSources, FACADES, HASH, AGENDA, COMPOSITION, WRITERS, BINDINGS, HASH_CONSUMERS };
+module.exports = { analyzeSources, loadSources, FACADES, HASH, AGENDA, COMPOSITION, WRITERS, BINDINGS, HASH_CONSUMERS, COMPOSITION_IMPORTS };

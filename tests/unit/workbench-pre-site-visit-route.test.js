@@ -44,6 +44,7 @@ import {
   getPreSiteVisitArtifactStatus,
 } from '../../lib/services/pre-site-visit/artifact-service';
 import { readDeliberationStageLabels } from '../../lib/services/deliberation-stage-labels';
+import { resolveFinalWriteupPersonas } from '../../lib/services/final-writeup/persona-service';
 import handler from '../../pages/api/workbench/pre-site-visit';
 import { REQUEST_DOCUMENT_OPERATION_STATUS } from '../../shared/config/requestDocument';
 
@@ -51,6 +52,7 @@ const STAGE_LABELS = { draft: 'AI draft ready', shared: 'Shared', visit: 'Visit'
 
 const REQUEST_ID = '11111111-1111-1111-1111-111111111111';
 const PROFILE_ID = '44444444-4444-4444-8444-444444444444';
+const priorActorSchemaReady = process.env.REQUEST_DOCUMENT_EXPLICIT_ACTOR_SCHEMA_READY;
 
 function mockRes() {
   const res = { statusCode: 200, headers: {}, body: null };
@@ -71,6 +73,7 @@ function get(requestId = REQUEST_ID) {
 
 beforeEach(() => {
   jest.clearAllMocks();
+  process.env.REQUEST_DOCUMENT_EXPLICIT_ACTOR_SCHEMA_READY = 'on';
   getById.mockResolvedValue({ akoya_requestid: REQUEST_ID });
   findByIds.mockResolvedValue({ records: [] });
   getPreparationForRequest.mockResolvedValue({ timing: { availability: 'missing' }, preparation: { state: 'none', due: false }, writeup: { availability: 'missing' } });
@@ -100,6 +103,11 @@ beforeEach(() => {
     reopenHistory: [],
   });
   readDeliberationStageLabels.mockResolvedValue(STAGE_LABELS);
+});
+
+afterEach(() => {
+  if (priorActorSchemaReady === undefined) delete process.env.REQUEST_DOCUMENT_EXPLICIT_ACTOR_SCHEMA_READY;
+  else process.env.REQUEST_DOCUMENT_EXPLICIT_ACTOR_SCHEMA_READY = priorActorSchemaReady;
 });
 test('rejects methods other than GET/POST before authentication', async () => {
   const res = mockRes();
@@ -149,6 +157,26 @@ test('the GET payload carries the applicant-materials summary (counts and window
   expect(getMaterialsSummaryForRequest).toHaveBeenCalledWith({ requestId: REQUEST_ID });
   expect(res.body.materials).toEqual(summary);
   expect(JSON.stringify(res.body)).not.toMatch(/contributorUrl|contacts/);
+});
+
+test('GET hides regeneration eligibility when explicit-actor schema readiness is off', async () => {
+  process.env.REQUEST_DOCUMENT_EXPLICIT_ACTOR_SCHEMA_READY = 'off';
+  getPreSiteVisitArtifactStatus.mockResolvedValueOnce({
+    leadProgramDirectorId: '22222222-2222-4222-8222-222222222222',
+    currentArtifact: {
+      artifactId: '33333333-3333-4333-8333-333333333333',
+      operationStatus: REQUEST_DOCUMENT_OPERATION_STATUS.READY,
+      lifecycleState: 100000001,
+    },
+    pendingArtifact: null,
+    reopenHistory: [],
+  });
+  getFinalWriteupStatus.mockResolvedValueOnce({ available: true, phase: 'ready', artifact: null });
+
+  const res = mockRes();
+  await handler(get(), res);
+
+  expect(res.body.writeupAccess).toMatchObject({ canRegenerate: false, regenerationBlockedReason: 'schema_not_ready' });
 });
 
 test('the GET payload carries the tracker session line through the briefing seam, reduced to the card shape (fail-open null on error)', async () => {
@@ -325,6 +353,47 @@ test('generates through the durable service and returns the governed artifact id
   });
 });
 
+test('accepts a confirmed regeneration identity and delegates pair validation to the writer service', async () => {
+  const expectedArtifactId = '33333333-3333-4333-8333-333333333333';
+  const clientOperationId = '55555555-5555-4555-8555-555555555555';
+  const res = mockRes();
+  await handler(post({ requestId: REQUEST_ID, mode: 'regenerate', expectedArtifactId,
+    expectedFinalArtifactId: null, clientOperationId }), res);
+  expect(generatePreSiteVisitArtifact).toHaveBeenCalledWith({
+    requestId: REQUEST_ID,
+    actingUserSystemId: '22222222-2222-4222-8222-222222222222',
+    generationMode: 'regenerate',
+    regeneration: {
+      expectedArtifactId, expectedFinalArtifactId: null, clientOperationId, isSuperuser: true,
+    },
+  });
+  expect(res.statusCode).toBe(200);
+});
+
+test('regeneration route refuses schema-off and unlinked superuser identities before invoking the writer', async () => {
+  const body = {
+    requestId: REQUEST_ID, mode: 'regenerate',
+    expectedArtifactId: '33333333-3333-4333-8333-333333333333',
+    expectedFinalArtifactId: null,
+    clientOperationId: '55555555-5555-4555-8555-555555555555',
+  };
+
+  process.env.REQUEST_DOCUMENT_EXPLICIT_ACTOR_SCHEMA_READY = 'off';
+  const unavailable = mockRes();
+  await handler(post(body), unavailable);
+  expect(unavailable.statusCode).toBe(503);
+  expect(unavailable.body.code).toBe('final_writeup_schema_not_ready');
+  expect(generatePreSiteVisitArtifact).not.toHaveBeenCalled();
+
+  process.env.REQUEST_DOCUMENT_EXPLICIT_ACTOR_SCHEMA_READY = 'on';
+  requireAppAccess.mockResolvedValueOnce({ profileId: PROFILE_ID, session: { user: {} } });
+  const unlinked = mockRes();
+  await handler(post(body), unlinked);
+  expect(unlinked.statusCode).toBe(403);
+  expect(unlinked.body.code).toBe('final_writeup_actor_required');
+  expect(generatePreSiteVisitArtifact).not.toHaveBeenCalled();
+});
+
 test('returns 202 when another owned generation is still active', async () => {
   generatePreSiteVisitArtifact.mockResolvedValueOnce({
     artifact: { operationStatus: REQUEST_DOCUMENT_OPERATION_STATUS.GENERATING },
@@ -390,8 +459,9 @@ test('a not-yet-started Final carries the start permission and source for step 4
   const res = mockRes();
   await handler(get(), res);
   expect(res.body.finalReview).toEqual({
-    availability: 'missing', phase: 'ready', artifactId: null, file: null,
+    available: true, availability: 'missing', phase: 'ready', artifact: null, artifactId: null, file: null,
     canStart: true, startBlockedReason: null, sourceArtifactId: 'source-1', handoffEmailEnabled: true,
+    canAdvance: false, pendingArtifact: null,
   });
   expect(getFinalWriteupStatus).toHaveBeenCalledWith(expect.objectContaining({ actingUserSystemId: expect.anything() }));
 });
@@ -424,7 +494,10 @@ describe('draft writeup visibility before group review', () => {
     await handler(get(), res);
     expect(res.statusCode).toBe(200);
     expect(res.body).not.toHaveProperty('leadProgramDirectorId');
-    expect(res.body.writeupAccess).toEqual({ canChange, identityLinked: true });
+    expect(res.body.writeupAccess).toMatchObject({ canChange, identityLinked: true });
+    // Regeneration is superuser-only during rollout, even for the lead PD.
+    expect(res.body.writeupAccess.canRegenerate).toBe(false);
+    expect(res.body.writeupAccess.regenerationBlockedReason).toBe(canChange ? 'superuser_only' : 'lead_only');
     if (visible) {
       expect(res.body.currentArtifact.file.webUrl).toBe('https://sharepoint.test/w.docx');
       expect(res.body.writeup.file.webUrl).toBe('https://sharepoint.test/w.docx');
@@ -435,6 +508,20 @@ describe('draft writeup visibility before group review', () => {
     }
   });
 
+  test('regeneration POST from the lead PD is refused while rollout is superuser-only', async () => {
+    asStaff('22222222-2222-4222-8222-222222222222');
+    const res = mockRes();
+    await handler(post({
+      requestId: REQUEST_ID, mode: 'regenerate',
+      expectedArtifactId: '33333333-3333-4333-8333-333333333333',
+      expectedFinalArtifactId: null,
+      clientOperationId: '55555555-5555-4555-8555-555555555555',
+    }), res);
+    expect(res.statusCode).toBe(403);
+    expect(res.body.code).toBe('pre_site_visit_regeneration_superuser_only');
+    expect(generatePreSiteVisitArtifact).not.toHaveBeenCalled();
+  });
+
   test('POST from someone other than the lead PD is refused before generation', async () => {
     asStaff(OTHER_ID);
     const res = mockRes();
@@ -443,6 +530,52 @@ describe('draft writeup visibility before group review', () => {
     expect(res.body.code).toBe('pre_site_writeup_lead_only');
     expect(generatePreSiteVisitArtifact).not.toHaveBeenCalled();
   });
+});
+
+test('GET keeps previous-version files visible only to the lead or group-review audience', async () => {
+  getUserRole.mockResolvedValueOnce('staff');
+  requireAppAccess.mockResolvedValueOnce({ profileId: PROFILE_ID,
+    session: { user: { dynamicsSystemuserId: '99999999-9999-4999-8999-999999999999' } } });
+  getPreSiteVisitArtifactStatus.mockResolvedValueOnce({
+    leadProgramDirectorId: '22222222-2222-4222-8222-222222222222',
+    currentArtifact: { artifactId: 'current', lifecycleState: 100000001 },
+    previousVersions: [
+      { artifactId: 'old-draft', stage: 'post-visit-drafting', file: { webUrl: 'https://sharepoint.test/private-old.docx' } },
+      { artifactId: 'old-review', stage: 'group-review', file: { webUrl: 'https://sharepoint.test/shared-old.docx' } },
+    ],
+  });
+  getFinalWriteupStatus.mockResolvedValueOnce({ available: true, phase: 'ready', artifact: null });
+  const res = mockRes();
+  await handler(get(), res);
+  expect(res.statusCode).toBe(200);
+  expect(res.body.previousVersions).toEqual([
+    { artifactId: 'old-draft', stage: 'post-visit-drafting', file: null, fileHidden: true },
+    { artifactId: 'old-review', stage: 'group-review', file: { webUrl: 'https://sharepoint.test/shared-old.docx' } },
+  ]);
+  expect(JSON.stringify(res.body)).not.toContain('private-old.docx');
+  expect(JSON.stringify(res.body)).toContain('shared-old.docx');
+});
+
+test('GET lets Program Coordinators access previous post-visit writeup files', async () => {
+  const coordinatorId = '99999999-9999-4999-8999-999999999999';
+  getUserRole.mockResolvedValueOnce('staff');
+  requireAppAccess.mockResolvedValueOnce({ profileId: PROFILE_ID,
+    session: { user: { dynamicsSystemuserId: coordinatorId } } });
+  resolveFinalWriteupPersonas.mockResolvedValueOnce({ enabled: true, personas: ['program-coordinator'] });
+  getPreSiteVisitArtifactStatus.mockResolvedValueOnce({
+    leadProgramDirectorId: '22222222-2222-4222-8222-222222222222',
+    currentArtifact: { artifactId: 'current', lifecycleState: 100000001 },
+    previousVersions: [{ artifactId: 'old-draft', stage: 'post-visit-drafting', file: { webUrl: 'https://sharepoint.test/private-old.docx' } }],
+  });
+  const res = mockRes();
+  await handler(get(), res);
+  expect(res.statusCode).toBe(200);
+  expect(res.body.previousVersions).toEqual([
+    { artifactId: 'old-draft', stage: 'post-visit-drafting', file: { webUrl: 'https://sharepoint.test/private-old.docx' } },
+  ]);
+  expect(getFinalWriteupStatus).toHaveBeenCalledWith(expect.objectContaining({
+    writeupViewer: expect.objectContaining({ isCoordinator: true, actingUserSystemId: coordinatorId }),
+  }));
 });
 
 test('a draft published between the status read and the preparation read stays hidden', async () => {

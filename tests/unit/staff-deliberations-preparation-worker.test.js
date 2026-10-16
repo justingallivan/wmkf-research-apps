@@ -762,6 +762,22 @@ describe('existing receipts for requests automation no longer covers', () => {
       .toMatchObject({ state: 'blocked', errorCode: 'document_pointer_changed' });
   });
 
+  it('recognizes a preparation receipt from the proven predecessor of the current writeup', async () => {
+    const { dependencies } = harness();
+    dependencies.readArtifactStatus.mockResolvedValue({
+      currentArtifact: { artifactId: DOC, lifecycleState: L.REVIEW },
+      previousVersionArtifactIds: ['dddddddd-0000-4000-8000-000000000099'],
+    });
+    dependencies.listScheduleReceipts = jest.fn().mockResolvedValue(receiptMap('prepared', {
+      documentId: 'dddddddd-0000-4000-8000-000000000099',
+      preparedByAutomation: true,
+    }));
+    expect((await getPreparationForRequest(REQUEST, dependencies)).preparation).toMatchObject({
+      state: 'prepared', documentId: 'dddddddd-0000-4000-8000-000000000099',
+      preparedByAutomation: true,
+    });
+  });
+
   it('keeps a pending receipt when the request read fails', async () => {
     const { dependencies } = harness();
     dependencies.getRequest.mockRejectedValue(new Error('dataverse down'));

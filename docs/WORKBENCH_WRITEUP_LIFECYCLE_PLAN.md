@@ -23,6 +23,16 @@ related:
 
 ## Decision and current status
 
+**[SOURCE-BUILT 2026-10-15 on `codex/writeup-regenerate`; NOT DEPLOYED.]**
+The explicit guarded regeneration mode now permits replacement during post-visit
+drafting and group review, preserving the prior Word item and the same lifecycle
+stage. A replacement group-review pair starts with fresh sign-offs and the existing
+program-gated colleague notice. Leadership review remains locked. This supersedes
+the first-release prohibition below only for that explicit mode; ordinary generation
+remains Draft-only. Historical deployment evidence below is unchanged. See
+`docs/plans/POST_PRESENTATION_WRITEUP_REGENERATION_PLAN_2026-10-15.md` for the
+source-built contract, privacy-scoped previous versions, retry rules and proof limits.
+
 **UI merge (S466, 2026-08-28):** the former Pre Site Visit Writeup and Site
 Visit tabs are now ONE Workbench tab, **Staff Deliberations**
 (`shared/components/workbench/StaffDeliberationsTab.js`), with a stage rail

@@ -106,6 +106,13 @@ export const PRE_SITE_VISIT_CONTRACT = Object.freeze({
   contentType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
 });
 
+// Explicitly user-confirmed replacement of a post-presentation writeup.
+// Distinct from reopen/correction, which has separate reason and cycle readers.
+export const PRE_SITE_VISIT_REGENERATION_CONTRACT = Object.freeze({
+  producer: 'request-workbench-regenerate',
+  operation: 'post-presentation-writeup-regeneration-v1',
+});
+
 export const PRE_SITE_DISTRIBUTION_CONTRACT = Object.freeze({
   producerPrefix: 'request-workbench-distribution',
   templateVersion: 'pre-site-frozen-distribution-v1',

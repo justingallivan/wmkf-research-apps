@@ -22,6 +22,7 @@ import {
   readHandoffEmailProgramIds,
 } from '../../lib/services/final-writeup/handoff-email-config.js';
 import { REQUEST_DOCUMENT_LIFECYCLE_STATE } from '../../shared/config/requestDocument.js';
+import { PRE_SITE_VISIT_REGENERATION_CONTRACT, REQUEST_DOCUMENT_OPERATION_STATUS } from '../../shared/config/requestDocument.js';
 
 const REQUEST_ID = '11111111-1111-4111-8111-111111111111';
 const SOURCE_ID = '22222222-2222-4222-8222-222222222221';
@@ -109,7 +110,10 @@ function harness({
   const activities = new Map();
   const deps = {
     getRequest: jest.fn(async () => state.requestRow),
-    getDocument: jest.fn(async () => state.documentRow),
+    getDocument: jest.fn(async (id) => id === SOURCE_ID ? {
+      wmkf_requestdocumentid: SOURCE_ID,
+      wmkf_producer: 'request-workbench',
+    } : state.documentRow),
     getSystemUser: jest.fn(async (id) => {
       const user = users[id];
       if (user instanceof Error) throw user;
@@ -291,6 +295,56 @@ describe('stageGroupReviewHandoff', () => {
     const { deps } = harness({ requestRow: request({ _wmkf_currentfinalwriteup_value: null }) });
     expect(await stageGroupReviewHandoff(stage({ actingUserSystemId: BEA_ID, isSuperuser: true }), deps))
       .toEqual({ status: 'staged' });
+  });
+
+  test('replacement notice is staged only against the still-current old pair', async () => {
+    const replacementId = '22222222-2222-4222-8222-222222222223';
+    const replacement = {
+      requestId: REQUEST_ID,
+      sourceDocumentId: replacementId,
+      expectedCurrentSourceDocumentId: SOURCE_ID,
+      expectedFinalArtifactId: FINAL_ID,
+      replacement: true,
+      actingUserSystemId: LEAD_ID,
+    };
+    const { deps } = harness();
+    expect(await stageGroupReviewHandoff(replacement, deps)).toEqual({ status: 'staged' });
+    expect(deps.insertIntent).toHaveBeenCalledWith(expect.objectContaining({ sourceDocumentId: replacementId }));
+
+    const changed = harness({ requestRow: request({
+      _wmkf_currentpresitevisit_value: replacementId,
+    }) });
+    expect(await stageGroupReviewHandoff(replacement, changed.deps)).toEqual({ status: 'replacement_pair_changed' });
+    expect(changed.deps.insertIntent).not.toHaveBeenCalled();
+  });
+
+  test('replacement intent waits for its paired activation and can then deliver', async () => {
+    const replacementId = '22222222-2222-4222-8222-222222222223';
+    const replacementFinalId = '22222222-2222-4222-8222-222222222224';
+    const { deps, state } = harness({ existingRow: pendingRow({ source_document_id: replacementId }) });
+    deps.getDocument.mockImplementation(async (id) => {
+      if (id === replacementId) return {
+        wmkf_requestdocumentid: replacementId,
+        wmkf_producer: PRE_SITE_VISIT_REGENERATION_CONTRACT.producer,
+        wmkf_operationstatus: REQUEST_DOCUMENT_OPERATION_STATUS.GENERATING,
+        wmkf_lifecyclestate: REQUEST_DOCUMENT_LIFECYCLE_STATE.DRAFT,
+      };
+      return finalDocument();
+    });
+    expect(await deliverHandoffEmail(replacementId, deps)).toEqual({ status: 'awaiting_transition' });
+    expect(deps.release).toHaveBeenCalledWith(replacementId, expect.any(String));
+    state.requestRow = request({ _wmkf_currentpresitevisit_value: replacementId,
+      _wmkf_currentfinalwriteup_value: replacementFinalId });
+    deps.getDocument.mockImplementation(async (id) => id === replacementId ? {
+      wmkf_requestdocumentid: replacementId,
+      wmkf_producer: PRE_SITE_VISIT_REGENERATION_CONTRACT.producer,
+    } : {
+      wmkf_requestdocumentid: id,
+      _wmkf_sourcedocument_value: replacementId,
+      wmkf_lifecyclestate: REQUEST_DOCUMENT_LIFECYCLE_STATE.REVIEW,
+    });
+    expect(await deliverHandoffEmail(replacementId, deps)).toEqual({ status: 'sent' });
+    expect(deps.createEmailActivity.mock.calls[0][0].body).toContain('Earlier sign-offs do not carry over');
   });
 
   test('someone who is neither the lead nor a superuser cannot stage', async () => {

@@ -1,8 +1,11 @@
 import {
   buildFinalWriteupGenerationKey,
   getFinalWriteupStatus,
+  prepareRegeneratedFinalSuccessor,
   startFinalWriteup,
 } from '../../lib/services/final-writeup/transition-service.js';
+import { readFile } from 'node:fs/promises';
+import { hashGovernedDocxContent } from '../../lib/services/documents/governed-docx-hash.js';
 import {
   PRE_SITE_VISIT_CONTRACT,
   REQUEST_DOCUMENT_ARTIFACT_TYPE,
@@ -16,6 +19,23 @@ const FINAL_ID = '33333333-3333-4333-8333-333333333333';
 const COMPETING_ID = '66666666-6666-4666-8666-666666666666';
 const LEAD_PD_ID = '44444444-4444-4444-8444-444444444444';
 const OTHER_USER_ID = '55555555-5555-4555-8555-555555555555';
+
+test('replacement Final claim accepts the actual governed DOCX hash contract', async () => {
+  const harness = createHarness();
+  const sourceBytes = await readFile('shared/templates/pre-site-visit/phase-ii-pre-site-visit-v8.docx');
+  const contentHash = await hashGovernedDocxContent(sourceBytes);
+  expect(contentHash).toMatch(/^gdc1:[A-Za-z0-9_-]{43}$/);
+  const result = await prepareRegeneratedFinalSuccessor({
+    requestId: REQUEST_ID,
+    source: harness.source,
+    metadata: harness.metadata,
+    contentHash,
+    actingUserSystemId: LEAD_PD_ID,
+    operationId: '77777777-7777-4777-8777-777777777777',
+  }, harness.dependencies);
+  expect(result.wmkf_sourcecontenthash).toBe(contentHash);
+  expect(harness.dependencies.createDocument).toHaveBeenCalledTimes(1);
+});
 
 function createHarness({ actorId = LEAD_PD_ID, schemaReady = true } = {}) {
   const request = {

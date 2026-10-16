@@ -163,12 +163,14 @@ function statusResponse({
   timing = null,
   correctionInProgress = false,
   finalReview = null,
-  writeupAccess = { canChange: true, identityLinked: true },
+  previousVersions = [],
+  writeupAccess = { canChange: true, identityLinked: true, canRegenerate: true },
 } = {}) {
   return response({
     success: true,
     currentArtifact,
     pendingArtifact,
+    previousVersions,
     reopenHistory,
     preparation, timing, correctionInProgress,
     ...(stageLabels ? { stageLabels } : {}),
@@ -339,8 +341,8 @@ test('Pre-Site card: regenerate opens a confirmation dialog scoped to the writeu
 
   fireEvent.click(await screen.findByRole('button', { name: 'More writeup actions' }));
   fireEvent.click(screen.getByRole('menuitem', { name: 'Regenerate Word Draft' }));
-  const dialog = screen.getByRole('dialog', { name: 'Regenerate this draft?' });
-  expect(dialog).toHaveTextContent('will not be carried into the new draft');
+  const dialog = screen.getByRole('dialog', { name: 'Regenerate this writeup?' });
+  expect(dialog).toHaveTextContent('will not carry over');
   fireEvent.click(within(dialog).getByRole('button', { name: 'Cancel' }));
   expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
   expect(calls('presitePost')).toHaveLength(0);
@@ -349,6 +351,120 @@ test('Pre-Site card: regenerate opens a confirmation dialog scoped to the writeu
   fireEvent.click(screen.getByRole('menuitem', { name: 'Regenerate Word Draft' }));
   fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Regenerate' }));
   await waitFor(() => expect(calls('presitePost')).toHaveLength(1));
+});
+
+test('a live regeneration observed from another tab disables a second regeneration', async () => {
+  queueRoute('presiteGet', statusResponse({
+    currentArtifact: preSiteArtifact(REVIEW),
+    pendingArtifact: {
+      artifactId: '66666666-6666-4666-8666-666666666666',
+      operationStatus: GENERATING,
+      leaseActive: true,
+    },
+    finalReview: { phase: 'ready' },
+    writeupAccess: { canChange: true, identityLinked: true, canRegenerate: true },
+  }));
+  render(<StaffDeliberationsTab requestId={REQUEST_ID} />);
+  fireEvent.click(await screen.findByRole('button', { name: 'More writeup actions' }));
+  expect(screen.getByRole('menuitem', { name: 'Regenerate Word Draft' })).toBeDisabled();
+  expect(calls('presitePost')).toHaveLength(0);
+});
+
+test('a live regeneration disables the group-review handoff action', async () => {
+  queueRoute('presiteGet', statusResponse({
+    ...POST_VISIT_STATUS,
+    pendingArtifact: { artifactId: '66666666-6666-4666-8666-666666666666', operationStatus: GENERATING, leaseActive: true },
+    finalReview: readyFinalReview(),
+  }));
+  render(<StaffDeliberationsTab requestId={REQUEST_ID} />);
+
+  await screen.findByRole('link', { name: 'Edit writeup in Word' });
+  expect(screen.queryByRole('button', { name: 'Ready for group review' })).not.toBeInTheDocument();
+  expect(calls('finalStart')).toHaveLength(0);
+});
+
+test('group-review regeneration warns about replacement and submits the confirmed old pair', async () => {
+  const finalArtifactId = '55555555-5555-4555-8555-555555555555';
+  queueRoute('presiteGet', statusResponse({
+    currentArtifact: preSiteArtifact(FINAL),
+    finalReview: { phase: 'group-review', artifact: { artifactId: finalArtifactId, sourceArtifactId: PRESITE_ARTIFACT_ID } },
+    writeupAccess: { canChange: true, identityLinked: true, canRegenerate: true },
+  }));
+  render(<StaffDeliberationsTab requestId={REQUEST_ID} />);
+  fireEvent.click(await screen.findByRole('button', { name: 'More writeup actions' }));
+  fireEvent.click(screen.getByRole('menuitem', { name: 'Regenerate Word Draft' }));
+  const dialog = screen.getByRole('dialog', { name: 'Regenerate this writeup?' });
+  expect(dialog).toHaveTextContent('Colleagues may be editing the current file');
+  expect(dialog).toHaveTextContent('need to open the new file and sign off again');
+  fireEvent.click(within(dialog).getByRole('button', { name: 'Regenerate' }));
+  await waitFor(() => expect(calls('presitePost')).toHaveLength(1));
+  const body = JSON.parse(calls('presitePost')[0][1].body);
+  expect(body).toMatchObject({
+    requestId: REQUEST_ID, mode: 'regenerate', expectedArtifactId: PRESITE_ARTIFACT_ID,
+    expectedFinalArtifactId: finalArtifactId,
+  });
+  expect(body.clientOperationId).toMatch(/^[0-9a-f-]{36}$/i);
+});
+
+test.each([
+  [true, /will receive a replacement notice/i, /Email notifications are off/],
+  [false, /Email notifications are off for this program/i, /They will receive a replacement notice/],
+])('group-review regeneration confirmation matches handoffEmailEnabled=%s', async (emailEnabled, shown, absent) => {
+  queueRoute('presiteGet', statusResponse({
+    currentArtifact: preSiteArtifact(FINAL),
+    finalReview: { phase: 'group-review', artifact: { artifactId: '55555555-5555-4555-8555-555555555555', sourceArtifactId: PRESITE_ARTIFACT_ID }, handoffEmailEnabled: emailEnabled },
+    writeupAccess: { canChange: true, identityLinked: true, canRegenerate: true },
+  }));
+  render(<StaffDeliberationsTab requestId={REQUEST_ID} />);
+  fireEvent.click(await screen.findByRole('button', { name: 'More writeup actions' }));
+  fireEvent.click(screen.getByRole('menuitem', { name: 'Regenerate Word Draft' }));
+  const dialog = screen.getByRole('dialog', { name: 'Regenerate this writeup?' });
+  expect(dialog).toHaveTextContent(shown);
+  expect(dialog).not.toHaveTextContent(absent);
+});
+
+test('previous writeup versions render their preserved file links', async () => {
+  queueRoute('presiteGet', statusResponse({
+    currentArtifact: preSiteArtifact(REVIEW),
+    previousVersions: [{
+      artifactId: 'old-version', stage: 'post-visit-drafting', createdAt: '2026-09-10T00:00:00Z',
+      file: { webUrl: 'https://sharepoint.test/old-version.docx' },
+    }],
+  }));
+  render(<StaffDeliberationsTab requestId={REQUEST_ID} />);
+  expect(await screen.findByRole('link', { name: /Previous post-visit draft/ }))
+    .toHaveAttribute('href', 'https://sharepoint.test/old-version.docx');
+});
+
+test('failed regeneration keeps its operation id for retry and requires confirmation for a new id', async () => {
+  const status = () => statusResponse({
+    currentArtifact: preSiteArtifact(REVIEW),
+    finalReview: { phase: 'ready', artifact: null },
+    writeupAccess: { canChange: true, identityLinked: true, canRegenerate: true },
+  });
+  queueRoute('presiteGet', status());
+  queueRoute('presiteGet', status());
+  queueRoute('presitePost', response({
+    error: 'This regeneration stopped before its generated content was saved.',
+    code: 'pre_site_visit_regeneration_output_incomplete',
+  }, 409));
+  queueRoute('presitePost', response({ success: true, artifact: preSiteArtifact(REVIEW) }));
+  render(<StaffDeliberationsTab requestId={REQUEST_ID} />);
+
+  fireEvent.click(await screen.findByRole('button', { name: 'More writeup actions' }));
+  fireEvent.click(screen.getByRole('menuitem', { name: 'Regenerate Word Draft' }));
+  fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Regenerate' }));
+  await screen.findByRole('alert');
+  const first = JSON.parse(calls('presitePost')[0][1].body);
+  expect(screen.getByRole('button', { name: 'Retry this regeneration' })).toBeInTheDocument();
+
+  fireEvent.click(screen.getByRole('button', { name: 'Start a new regeneration' }));
+  const newOperationDialog = screen.getByRole('dialog', { name: 'Regenerate this writeup?' });
+  fireEvent.click(within(newOperationDialog).getByRole('button', { name: 'Regenerate' }));
+  await waitFor(() => expect(calls('presitePost')).toHaveLength(2));
+  const second = JSON.parse(calls('presitePost')[1][1].body);
+  expect(second.clientOperationId).not.toBe(first.clientOperationId);
+  expect(second.expectedArtifactId).toBe(first.expectedArtifactId);
 });
 
 test('Pre-Site card: a server error on generate shows an alert without creating a Word link', async () => {
@@ -483,6 +599,18 @@ test('Pre-Site card: shows durable Ready warnings beside the Word link', async (
 
   expect(await screen.findByRole('heading', { name: 'Draft needs a quick edit check' })).toBeInTheDocument();
   expect(screen.getByText(/longer than suggested/i)).toBeInTheDocument();
+});
+
+test('regenerated Pre-Site warnings remain visible when the successor has a milestone actor', async () => {
+  const current = {
+    ...preSiteArtifact(REVIEW),
+    provenance: { producer: 'request-workbench-regenerate' },
+    milestone: { versionId: '3.0', contentHash: 'gdc1:next', createdAt: '2026-10-15T00:00:00Z', actorId: '88888888-8888-4888-8888-888888888888' },
+    warnings: [{ code: 'referee_section_manual', message: 'Check the Reviews paragraph in this regenerated file.' }],
+  };
+  queueRoute('presiteGet', statusResponse({ currentArtifact: current }));
+  render(<StaffDeliberationsTab requestId={REQUEST_ID} />);
+  expect(await screen.findByText('Check the Reviews paragraph in this regenerated file.')).toBeInTheDocument();
 });
 
 // ── Pre-Research Presentation Brief card ─────────────────────────────────
@@ -920,7 +1048,8 @@ test('a late lock response cannot publish workspace state after the request chan
 
 test('M2: a Final document offers one action, Open review details, and no More menu', async () => {
   const onSelectTab = jest.fn();
-  queueRoute('presiteGet', statusResponse({ currentArtifact: preSiteArtifact(FINAL) }));
+  queueRoute('presiteGet', statusResponse({ currentArtifact: preSiteArtifact(FINAL),
+    writeupAccess: { canChange: true, identityLinked: true, canRegenerate: false } }));
   render(<StaffDeliberationsTab requestId={REQUEST_ID} onSelectTab={onSelectTab} />);
 
   await waitFor(() => expect(screen.getByTestId('deliberations-stage-sentence')).toHaveTextContent('In review'));

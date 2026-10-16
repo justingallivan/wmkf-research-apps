@@ -25,9 +25,9 @@ const WRITERS = Object.freeze([
   // change the text this gate scans and does not need a second WRITERS row.
   ['lib/services/initial-assessment/controls-service.js', 'dependencies.createDocument(', 'REQUIRED'],
   ['lib/services/pre-site-visit/artifact-service.js', 'dependencies.createDocument(', {
-    expression: 'actorPolicy: missingOnly ? REQUEST_DOCUMENT_ACTOR_POLICY.SCHEDULED_AUTOMATION : REQUEST_DOCUMENT_ACTOR_POLICY.ALLOW_UNATTRIBUTED,',
-    fixtureExpression: 'missingOnly ? REQUEST_DOCUMENT_ACTOR_POLICY.SCHEDULED_AUTOMATION : REQUEST_DOCUMENT_ACTOR_POLICY.ALLOW_UNATTRIBUTED',
-    description: 'SCHEDULED_AUTOMATION for missing-only work and ALLOW_UNATTRIBUTED for ordinary manual generation',
+    expression: 'actorPolicy: missingOnly ? REQUEST_DOCUMENT_ACTOR_POLICY.SCHEDULED_AUTOMATION : regenerating ? REQUEST_DOCUMENT_ACTOR_POLICY.REQUIRED : REQUEST_DOCUMENT_ACTOR_POLICY.ALLOW_UNATTRIBUTED,',
+    fixtureExpression: 'missingOnly ? REQUEST_DOCUMENT_ACTOR_POLICY.SCHEDULED_AUTOMATION : regenerating ? REQUEST_DOCUMENT_ACTOR_POLICY.REQUIRED : REQUEST_DOCUMENT_ACTOR_POLICY.ALLOW_UNATTRIBUTED',
+    description: 'SCHEDULED_AUTOMATION for missing-only, REQUIRED for regeneration, and ALLOW_UNATTRIBUTED for ordinary manual generation',
   }],
   ['lib/services/pre-site-visit/reopen-service.js', 'dependencies.createDocument(', 'REQUIRED'],
   ['lib/services/pre-site-visit/distribution/retained-snapshot.js', 'dependencies.createDocument(', 'REQUIRED'],

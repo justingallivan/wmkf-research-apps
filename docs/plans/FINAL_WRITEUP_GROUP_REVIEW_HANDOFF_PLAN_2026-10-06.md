@@ -11,6 +11,13 @@ related:
 
 # Final Writeup group-review handoff
 
+**[SOURCE-BUILT 2026-10-15; NOT DEPLOYED.]** The owner-approved regeneration
+flow preserves the current stage, creates a fresh group-review Pre-Site/Final pair,
+and retains the old Word file and old sign-offs as history. New sign-offs are required
+for the replacement; the existing program-gated email ledger sends explicit replacement
+copy. This is distinct from edits to the same file described below. Leadership review
+remains ineligible. See `docs/plans/POST_PRESENTATION_WRITEUP_REGENERATION_PLAN_2026-10-15.md`.
+
 ## 1. Owner intent (2026-10-06, Session 580)
 
 1. **Step 4 is the lead PD drafting alone.** Other staff do not see the writeup in the apps

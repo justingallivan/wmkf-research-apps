@@ -60,6 +60,7 @@ const RECORDED_SENDERS = {
 // the transport, with where their test-request refusal lives.
 const RECORDED_INDIRECT = {
   'lib/services/cron/grantee-deliverable-reminders-service.js': 'processRow skips test requests before recipient reads or ledger writes; deliverScheduledEmail checks before claim',
+  'lib/services/pre-site-visit/artifact-service.js': 'group-review regeneration stages only a durable intent before activation; deliverGroupReviewHandoff creates a regarding-Request email and the shared Dynamics transport test-request check plus dispatch recheck refuse delivery',
   'lib/services/reviewer-manual-reminder.js': 'sendOneReminder sends with the request as regarding; delivery seam and dispatch recheck',
   'lib/services/site-visit-materials/reminder-sweep.js': 'per-row check before read, preparation or claim; sendReminderEmail uses shared Dynamics Request recheck after claim',
 };
