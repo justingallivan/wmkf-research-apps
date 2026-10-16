@@ -611,3 +611,46 @@ test('an observer stays on readiness when a refresh finds preparation reopened',
   expect(screen.getByText('Alice — Preparing')).toBeTruthy();
   expect(screen.queryByText(/You are facilitating/)).toBeNull();
 });
+
+test('pinned group bar repeats the Recommended total only while the cutoff line is out of view', async () => {
+  const proposal = { requestId: 'p', requestNumber: '2026-041', organization: 'Example University', title: 'Example research', leadSystemUserId: 'alice', programKey: 'mr', institutionGeography: 'West', amountMinorUnits: 120000, currency: { code: 'USD', precision: 2 }, score: { distribution: { Excellent: 1 }, average: 4 } };
+  const revealed = view();
+  revealed.round.snapshot.proposals = [proposal];
+  revealed.workflow = { stage: 'revealed', preparationVersion: 1, revealId: 'reveal' };
+  revealed.collective = {
+    order: ['p'], boundaries: [1, 1], confidence: {}, version: 1,
+    individuals: [{ systemUserId: 'alice', name: 'Alice', order: ['p'], boundaries: [1, 1], confidence: { p: 'confident' } }],
+    baseline: { scores: { p: { averageRank: 1 } } },
+  };
+  // The bar covers the top 120px; the line moves between hidden, covered and visible.
+  let lineTop = 2000;
+  const rect = (top, height) => ({ top, bottom: top + height, left: 0, right: 0, width: 0, height, x: 0, y: top });
+  const original = Element.prototype.getBoundingClientRect;
+  Element.prototype.getBoundingClientRect = function () {
+    if (this.id === 'ranking-recommended-divider') return rect(lineTop, 50);
+    if (this.getAttribute('aria-label') === 'Current group recommendation') return rect(0, 120);
+    return original.call(this);
+  };
+  try {
+    render(<AssessmentWorkflow initial={revealed} cycleOptions={[{ code: 'J27', label: 'J27' }]} onCycleChange={() => {}} />);
+    const pinned = () => screen.queryByTestId('pinned-recommended-total');
+    await waitFor(() => expect(pinned()?.textContent).toBe('Recommended $1,200.00 · 1 proposal · East 0 · West 1'));
+    expect(pinned().closest('section').getAttribute('aria-label')).toBe('Current group recommendation');
+    lineTop = 300;
+    fireEvent.scroll(document);
+    await waitFor(() => expect(pinned()).toBeNull());
+    lineTop = 60; // Under the pinned bar counts as out of view.
+    fireEvent.scroll(document);
+    await waitFor(() => expect(pinned()).not.toBeNull());
+  } finally {
+    Element.prototype.getBoundingClientRect = original;
+  }
+});
+
+test('preparation toolbar stays pinned while the list scrolls', () => {
+  render(<AssessmentWorkflow initial={view()} cycleOptions={[{ code: 'J27', label: 'J27' }]} onCycleChange={() => {}} />);
+  const toolbar = screen.getByRole('group', { name: 'Assessment lists' }).parentElement;
+  expect(toolbar.className).toMatch(/\bsticky\b/);
+  expect(toolbar.className).toMatch(/\btop-0\b/);
+  expect(toolbar.className).toMatch(/\bbg-gray-50\b/);
+});
