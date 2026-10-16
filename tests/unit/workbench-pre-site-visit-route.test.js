@@ -495,7 +495,9 @@ describe('draft writeup visibility before group review', () => {
     expect(res.statusCode).toBe(200);
     expect(res.body).not.toHaveProperty('leadProgramDirectorId');
     expect(res.body.writeupAccess).toMatchObject({ canChange, identityLinked: true });
-    expect(res.body.writeupAccess.canRegenerate).toBe(canChange);
+    // Regeneration is superuser-only during rollout, even for the lead PD.
+    expect(res.body.writeupAccess.canRegenerate).toBe(false);
+    expect(res.body.writeupAccess.regenerationBlockedReason).toBe(canChange ? 'superuser_only' : 'lead_only');
     if (visible) {
       expect(res.body.currentArtifact.file.webUrl).toBe('https://sharepoint.test/w.docx');
       expect(res.body.writeup.file.webUrl).toBe('https://sharepoint.test/w.docx');
@@ -504,6 +506,20 @@ describe('draft writeup visibility before group review', () => {
       expect(res.body.writeup).toMatchObject({ file: null, fileHidden: true });
       expect(JSON.stringify(res.body)).not.toContain('sharepoint.test/w.docx');
     }
+  });
+
+  test('regeneration POST from the lead PD is refused while rollout is superuser-only', async () => {
+    asStaff('22222222-2222-4222-8222-222222222222');
+    const res = mockRes();
+    await handler(post({
+      requestId: REQUEST_ID, mode: 'regenerate',
+      expectedArtifactId: '33333333-3333-4333-8333-333333333333',
+      expectedFinalArtifactId: null,
+      clientOperationId: '55555555-5555-4555-8555-555555555555',
+    }), res);
+    expect(res.statusCode).toBe(403);
+    expect(res.body.code).toBe('pre_site_visit_regeneration_superuser_only');
+    expect(generatePreSiteVisitArtifact).not.toHaveBeenCalled();
   });
 
   test('POST from someone other than the lead PD is refused before generation', async () => {

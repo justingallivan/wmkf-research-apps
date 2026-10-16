@@ -28,6 +28,12 @@ import {
   canChangeDraftWriteup, canSeeDraftWriteup, redactDraftWriteup, resolveWriteupViewer,
 } from '../../../lib/services/pre-site-visit/writeup-visibility';
 
+// Rollout gate: regeneration stays superuser-only until the owner's first
+// production run is observed; widening it to lead PDs removes this check.
+function isRegenerationRolloutViewer(role) {
+  return role === 'superuser';
+}
+
 function sameId(left, right) {
   return Boolean(left && right) && String(left).toLowerCase() === String(right).toLowerCase();
 }
@@ -173,13 +179,15 @@ export default async function handler(req, res) {
             canRegenerate: isRequestDocumentExplicitActorSchemaReady()
               && isGuid(viewer.actingUserSystemId)
               && canChangeDraftWriteup(viewer, leadProgramDirectorId)
+              && isRegenerationRolloutViewer(role)
               && Boolean(status.currentArtifact)
               && regenerationStageEligible,
             regenerationBlockedReason: !status.currentArtifact ? 'writeup_missing'
                 : !isRequestDocumentExplicitActorSchemaReady() ? 'schema_not_ready'
                   : !isGuid(viewer.actingUserSystemId) ? 'actor_required'
                 : !regenerationStageEligible ? 'leadership_or_state_unavailable'
-                  : !canChangeDraftWriteup(viewer, leadProgramDirectorId) ? 'lead_only' : null,
+                  : !canChangeDraftWriteup(viewer, leadProgramDirectorId) ? 'lead_only'
+                    : !isRegenerationRolloutViewer(role) ? 'superuser_only' : null,
           },
           correctionInProgress: status.currentArtifact?.lifecycleState === REQUEST_DOCUMENT_LIFECYCLE_STATE.DRAFT
             && Boolean(status.currentArtifact?.correction?.cycleId),
@@ -216,6 +224,11 @@ export default async function handler(req, res) {
         });
       }
       if (regenerating) {
+        if (!isRegenerationRolloutViewer(role)) {
+          throw new ServiceHttpError('Writeup regeneration is currently limited to superusers.', {
+            httpStatus: 403, code: 'pre_site_visit_regeneration_superuser_only',
+          });
+        }
         if (!isGuid(req.body.expectedArtifactId) || !isGuid(req.body.clientOperationId)
           || (req.body.expectedFinalArtifactId != null && !isGuid(req.body.expectedFinalArtifactId))) {
           throw new ServiceHttpError('A confirmed writeup pair and operation id are required.', {

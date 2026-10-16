@@ -22,6 +22,8 @@ related:
 2. **Approved stage preservation:** post-visit drafting stays post-visit drafting; group review stays group review. A regenerated group-review document starts with fresh sign-offs; sign-offs on the preserved document remain historical and do not approve the replacement.
 3. **Approved colleague notice:** during group review, send a fresh handoff notice pointing colleagues to the replacement using the existing durable email mechanism and existing program/recipient rules. Preserve previous sent receipts; safely retire pending notices for the replaced source. Reuse the current group-review email copy and settings; the email opens the Final tab, which resolves the current document.
 
+4. **Rollout gate (owner, 2026-10-15):** first production release offers regeneration to superusers only (route `isRegenerationRolloutViewer`); the owner runs it once on a real request, then a second release opens it to lead PDs. The sandbox rehearsal tooling is parked on `codex/writeup-regenerate`; the feature continues on `claude/writeup-regenerate` from `270269f62`.
+
 The file replacement/preservation and availability during both stages are owner decisions from 2026-10-15. No schema/migration or new route is proposed. Existing `wmkf_producer` and generation-key fields identify this operation; `wmkf_reopencycleid` remains reserved for reopen/correction history.
 
 ## Opus review reconciliation and owner choices
