@@ -613,6 +613,22 @@ test('regenerated Pre-Site warnings remain visible when the successor has a mile
   expect(await screen.findByText('Check the Reviews paragraph in this regenerated file.')).toBeInTheDocument();
 });
 
+test('regenerated Pre-Site warnings stop showing once the writeup reaches group review', async () => {
+  const current = {
+    ...preSiteArtifact(FINAL),
+    provenance: { producer: 'request-workbench-regenerate' },
+    milestone: { versionId: '3.0', contentHash: 'gdc1:next', createdAt: '2026-10-15T00:00:00Z', actorId: '88888888-8888-4888-8888-888888888888' },
+    warnings: [{ code: 'referee_section_manual', message: 'Check the Reviews paragraph in this regenerated file.' }],
+  };
+  queueRoute('presiteGet', statusResponse({
+    currentArtifact: current,
+    finalReview: { phase: 'group-review', artifact: { artifactId: '55555555-5555-4555-8555-555555555555', sourceArtifactId: PRESITE_ARTIFACT_ID } },
+  }));
+  render(<StaffDeliberationsTab requestId={REQUEST_ID} />);
+  expect(await screen.findByRole('link', { name: /Word/i })).toBeInTheDocument();
+  expect(screen.queryByText('Check the Reviews paragraph in this regenerated file.')).not.toBeInTheDocument();
+});
+
 // ── Pre-Research Presentation Brief card ─────────────────────────────────
 
 test('Brief card: Generate, then Edit in Word plus Share…; Download/Regenerate under More', async () => {

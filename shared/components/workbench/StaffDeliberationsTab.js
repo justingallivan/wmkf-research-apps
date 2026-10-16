@@ -1196,9 +1196,12 @@ export default function StaffDeliberationsTab({
     : preparationAwaitsCorrections ? 'pending' : preparation?.state;
   // Generation-time checks are never re-run against later Word edits, so they
   // stop showing once staff record a version or reopen it for corrections.
+  // A regenerated file carries a milestone at birth, so its checks stay visible
+  // through post-visit drafting and stop once it reaches group review.
   const isRegenerationProducer = artifact?.provenance?.producer
     === PRE_SITE_VISIT_REGENERATION_CONTRACT.producer;
-  const draftWarnings = (artifact?.milestone?.actorId && !isRegenerationProducer) || correctionDraft ? [] : warnings;
+  const warningsRetired = isRegenerationProducer ? preSiteFinal : Boolean(artifact?.milestone?.actorId);
+  const draftWarnings = warningsRetired || correctionDraft ? [] : warnings;
   const blockedReason = BLOCKED_PREPARATION_REASONS[preparation?.errorCode]
     || 'Automatic preparation stopped before it finished. Your existing document has been preserved.';
   const canRetryPreparation = preparation?.errorCode !== 'document_pointer_changed';
