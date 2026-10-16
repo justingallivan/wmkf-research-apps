@@ -7,7 +7,6 @@
 import { readFileSync } from 'node:fs';
 import { parseEnv } from 'node:util';
 import { randomUUID } from 'node:crypto';
-import { getAccessToken } from '../lib/services/graph/auth.js';
 const args = process.argv.slice(2);
 const envIndex = args.indexOf('--env');
 if (envIndex < 0 || !args[envIndex + 1]) throw new Error('--env is required');
@@ -23,7 +22,8 @@ for (const value of urls) {
   const url = new URL(value);
   if (url.protocol !== 'https:' || url.hostname !== 'appriver3651007194.sharepoint.com') throw new Error('Unexpected site host');
 }
-const token = await getAccessToken();
+const { GraphService } = await import('../lib/services/graph-service.js');
+const token = await GraphService.getAccessToken();
 async function call(path, options = {}) {
   const response = await fetch(`https://graph.microsoft.com/v1.0${path}`, {
     ...options, headers: { Authorization: `Bearer ${token}`, ...options.headers },
