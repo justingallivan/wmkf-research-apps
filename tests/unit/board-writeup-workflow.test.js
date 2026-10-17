@@ -235,3 +235,32 @@ test('an authorized archive exclusion completes a held entry only before any cop
   other.state.archives[ID] = { state: 'held', source, uploadStartedAt: d.now(), destination: null };
   await expect(recover('D26', actor, { operation: 'archive', action: 'exclude', requestId: ID, reason: 'Uncertain upload cannot be ignored' }, other.d)).rejects.toThrow();
 });
+
+
+test('a definite archive refusal permits audited exclusion', async () => {
+  const { state, d } = fixture(); state.archiveStartedAt = d.now(); state.archiveManifest = [{ requestId: ID }];
+  state.archives[ID] = { state: 'held', source, uploadStartedAt: d.now(), destination: null, uploadRefusal: { status: 409, at: d.now() } };
+  await recover('D26', actor, { operation: 'archive', action: 'exclude', requestId: ID, reason: 'Confirmed withdrawal after refused copy' }, d);
+  expect(state.archiveCompletedAt).toBe(d.now());
+  expect(state.archives[ID].excluded.reason).toContain('withdrawal');
+  expect(state.events.at(-1).details.priorUpload.uploadRefusal.status).toBe(409);
+});
+
+test('completion notice sends with unavailable removed-roster details redacted', async () => {
+  const { state, d } = fixture(); const removed = '22222222-2222-4222-8222-222222222222';
+  state.archiveCompletedAt = d.now(); state.configHistory = [{ value: { rosterConfirmed: true, requestIds: [ID, removed] } }];
+  const previousOrigin = process.env.NEXTAUTH_URL, previousFrom = process.env.NOTIFICATION_EMAIL_FROM;
+  process.env.NEXTAUTH_URL = 'https://tools.wmkeck.org'; process.env.NOTIFICATION_EMAIL_FROM = 'test@wmkeck.org';
+  const create = jest.fn(async () => 'email-id'), send = jest.fn();
+  try {
+    await deliverNotice('D26', { key: `complete:${d.now()}`, kind: 'complete' }, { ...d,
+      getRequest: async id => { if (id === removed) throw new Error('not found'); return { _wmkf_grantprogram_value: PROGRAM_ID, wmkf_meetingdate: '2026-12-01', wmkf_istestrequest: false, wmkf_testcreationrunid: null }; },
+      getRole: async () => ({ value: { systemUserId: ID } }), eligibleStaff: async () => ({ email: 'test@wmkeck.org' }), create, send,
+      get: async () => ({ activityid: 'email-id', statuscode: 1 }), alert: jest.fn() });
+    expect(send).toHaveBeenCalledTimes(1); expect(create.mock.calls[0][0].body).toContain('Proposal details unavailable');
+    expect(state.emails[`complete:${d.now()}`].acceptedAt).toBe(d.now());
+  } finally {
+    if (previousOrigin === undefined) delete process.env.NEXTAUTH_URL; else process.env.NEXTAUTH_URL = previousOrigin;
+    if (previousFrom === undefined) delete process.env.NOTIFICATION_EMAIL_FROM; else process.env.NOTIFICATION_EMAIL_FROM = previousFrom;
+  }
+});
