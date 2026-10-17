@@ -1,3 +1,70 @@
+# Session 614 Prompt: resume reviewed Research Board workflow rollout
+
+## Session 613 Summary — Research Board workflow built, not deployed (Codex, 2026-10-16 PT)
+
+Owner requested the final handoff on **main**. Runtime work stays on **`codex/research-board-workflow`**, tip `4e1923595`, based on `94dbed5e9`. Resume that branch on either Mac; do not rebuild from main or merge the superseded `codex/sarah-board-writeups` branch. Main receives only this handoff.
+
+### What Was Completed
+
+1. **[VERIFIED via feature source/tests] Revised workflow implemented:** configured CSO release dashboard, early-draft warning, create-only SharePoint delivery, expected/released counts, daily reminders, scoped Grants Manager role, confirmed Board archival and separate historical Dataverse references. No required Allison approval and no PD-stage release prerequisite. Existing staff edits are protected.
+2. **[VERIFIED via saved OAuth review receipts] Claude Opus build review passed with named activation gates** through runtime commit `423dbb9c6`; blockers and selected low follow-ups fixed. Final receipt is on the feature branch at `docs/audits/research-board-build-opus-final-2026-10-16.md`.
+3. **[VERIFIED via local commands]** 228 scoped tests, 4 actual PostgreSQL tests, webpack production build, lint/type and relevant route/data/security/document gates passed. The temporary isolated test database was stopped. No production schema, file or email writes and no runtime merge/activation occurred.
+4. **Documentation:** approved plan, Board-run Atlas and three build-review records are committed on the feature branch. CLAUDE.md remains unchanged: it routes mutable feature details to those sources. No production milestone shipped; **no DEVELOPMENT_LOG.md entry required**. Claim-evidence pilot report was unavailable because local state could not be read; no observation row invented.
+
+### Commits (feature branch)
+- `c7e56882b` — carry reviewed plan onto clean main base.
+- `2cc02a95e` — CSO release, reminders and archival implementation.
+- `f98ecf16e` — configuration reconciliation and recovery fixes.
+- `423dbb9c6` — completion-email edge case and recovery follow-ups.
+- `4e1923595` — final Opus verdict and activation requirements.
+
+## Next Items
+
+### Verified Open
+
+1. **Bounded live acceptance before activation.** Evidence: feature Atlas and final review. A registered synthetic test destination and real DOCX outgoing/archive round-trip remain unproved, along with hosted staff rehearsal, Graph conflict timing and lock-file behavior. Source rejects nonproduction file writes; do not bypass that guard or silently expand into the parked Factory project. Agree the smallest suitable rehearsal first.
+2. **Deployment prerequisites, after fresh preflight.** Evidence: read-only checks this session found migration 085 and Board option 100000014 absent; approved Research Board Materials root resolved, D26 child absent. Before deliberate release, verify schema/migration, role assignments, roster, credentials, old-digest drain and recipients. Build review is not production approval.
+3. **Owner date reminder — OPEN until Justin explicitly reports done:** enter D26 **materials deadline for Allison** and **Board meeting end date** in Admin when controls are available. Neither date was supplied; completing the build or deploying controls does not close this reminder.
+
+### Owner Decision Needed
+
+1. **Confirm the 23 D26 expected proposal identities.** Evidence: user approved count23; source discovery returned369 ordinary D26 candidates, not an approved roster. Do not infer the list from discovery.
+2. **Deliberate runtime promotion/activation after acceptance.** The owner authorized implementation and Opus review, then stopping/pushing; no runtime merge or activation is authorized by this handoff.
+
+### Parked
+
+1. Outlook calendar integration and future single-phase expected-roster rules. Evidence: owner deferred both in the approved plan. Keep the per-cycle staff-confirmed roster until a new decision.
+2. Unrelated Factory expansion, ranking and regeneration follow-ups below remain historical carryover; not re-audited by this build.
+
+### Verify Before Acting
+
+1. Fetch and inspect current branch/CI before resuming. Local worktree was `/Users/gallivan/.codex/worktrees/research-board-workflow/WMKF_Apps`; use the other Mac's credentials and checkout. Temporary local probe inputs/logs are not portable; sanitized outcomes are in the Atlas.
+2. Recipients preflight found Allison and Beth only, but recheck the deployed allowlist before cutover. Leave PD group-review mail intact. Unknown upload/settings/email outcomes require the documented operator investigation, never blind replay.
+3. Historical notes below are not a current task list. The old reviewer-expertise wording item was addressed by main `94dbed5e9`; SharePoint root access was read-proved this session, while upload round-trip remains open. Preserve unrelated `output/` in the original checkout.
+
+### Do Not Reopen Without New Decision
+
+1. The superseded automatic two-signoff copy design is rejected. CSO chooses releases; Allison edits in SharePoint. Future access is through archived Board references.
+2. Never overwrite staff-edited Board copies or silently recreate removed files. Initial uncertain settings saves and uncertain email sends remain documented operator exceptions.
+
+## Key Files Reference (on the feature branch)
+
+| File | Purpose |
+|------|---------|
+| `docs/plans/RESEARCH_WRITEUP_RELEASE_AND_BOARD_ARCHIVE_PLAN_2026-10-16.md` | Approved workflow and owner decisions |
+| `docs/atlas/postgres-board-writeup-runs.md` | State ownership, guards, rollout and recovery procedures |
+| `docs/audits/research-board-build-opus-final-2026-10-16.md` | Final independent verdict and verification limits |
+| `lib/services/board-writeups/` | Release, archival, roles and reminders |
+| `shared/components/board-writeups/BoardWriteups.js` | Staff dashboard and setup controls |
+
+## Testing
+
+On the feature branch, scoped workflow/UI tests are `tests/unit/board-writeup-workflow.test.js` and `tests/unit/board-writeup-ui.test.js`. PostgreSQL tests require an isolated localhost database and `BOARD_TEST_DATABASE_URL`; do not point them at application data. Use `npx next build --webpack` with the current external dependency symlink; Turbopack rejects that symlink. Full verification inventory is in the final review receipt.
+
+---
+
+## Historical main handoffs — preserved; verify before acting
+
 # Session 613 Prompt: writeup regeneration live; observe real use
 
 ## Session 612 Summary — writeup regeneration released (Claude, 2026-10-15 PT)
