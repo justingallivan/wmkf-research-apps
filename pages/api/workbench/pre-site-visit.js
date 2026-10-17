@@ -130,10 +130,10 @@ export default async function handler(req, res) {
         );
         const visibleStatus = {
           ...statusWithoutLead,
-          currentArtifact: redactDraftWriteup(status.currentArtifact, viewer, leadProgramDirectorId),
-          pendingArtifact: redactDraftWriteup(status.pendingArtifact, viewer, leadProgramDirectorId),
+          currentArtifact: redactDraftWriteup(status.currentArtifact, viewer, leadProgramDirectorId, status.grantProgramId),
+          pendingArtifact: redactDraftWriteup(status.pendingArtifact, viewer, leadProgramDirectorId, status.grantProgramId),
           previousVersions: (status.previousVersions || []).map((version) => (
-            version.stage === 'group-review' || canSeeDraftWriteup(viewer, leadProgramDirectorId)
+            version.stage === 'group-review' || canSeeDraftWriteup(viewer, leadProgramDirectorId, status.grantProgramId)
               ? version : { ...version, file: null, fileHidden: true }
           )),
         };
@@ -163,23 +163,23 @@ export default async function handler(req, res) {
           timing: preparation.timing, preparation: preparation.preparation,
           // A separate read: redacted on its own lifecycle so a draft
           // published between the two reads is never returned.
-          writeup: redactDraftWriteup(preparation.writeup, viewer, leadProgramDirectorId),
+          writeup: redactDraftWriteup(preparation.writeup, viewer, leadProgramDirectorId, status.grantProgramId),
           brief, finalReview, finalPhase: finalReview.phase,
           // Mirrors the POST and start-site-visit guards so the page offers
           // only the actions the server will accept.
           writeupAccess: {
-            canChange: canChangeDraftWriteup(viewer, leadProgramDirectorId),
+            canChange: canChangeDraftWriteup(viewer, leadProgramDirectorId, status.grantProgramId),
             identityLinked: Boolean(viewer.actingUserSystemId) || viewer.isSuperuser,
             canRegenerate: isRequestDocumentExplicitActorSchemaReady()
               && isGuid(viewer.actingUserSystemId)
-              && canChangeDraftWriteup(viewer, leadProgramDirectorId)
+              && canChangeDraftWriteup(viewer, leadProgramDirectorId, status.grantProgramId)
               && Boolean(status.currentArtifact)
               && regenerationStageEligible,
             regenerationBlockedReason: !status.currentArtifact ? 'writeup_missing'
                 : !isRequestDocumentExplicitActorSchemaReady() ? 'schema_not_ready'
                   : !isGuid(viewer.actingUserSystemId) ? 'actor_required'
                 : !regenerationStageEligible ? 'leadership_or_state_unavailable'
-                  : !canChangeDraftWriteup(viewer, leadProgramDirectorId) ? 'lead_only' : null,
+                  : !canChangeDraftWriteup(viewer, leadProgramDirectorId, status.grantProgramId) ? 'lead_only' : null,
           },
           correctionInProgress: status.currentArtifact?.lifecycleState === REQUEST_DOCUMENT_LIFECYCLE_STATE.DRAFT
             && Boolean(status.currentArtifact?.correction?.cycleId),
@@ -209,7 +209,7 @@ export default async function handler(req, res) {
         getPreSiteVisitArtifactStatus({ requestId }),
         resolveWriteupViewer({ isSuperuser: role === 'superuser', actingUserSystemId }),
       ]);
-      if (!canChangeDraftWriteup(viewer, leadProgramDirectorId)) {
+      if (!canChangeDraftWriteup(viewer, leadProgramDirectorId, status.grantProgramId)) {
         throw new ServiceHttpError('Only the lead Program Director or a superuser can prepare this writeup.', {
           httpStatus: 403,
           code: 'pre_site_writeup_lead_only',

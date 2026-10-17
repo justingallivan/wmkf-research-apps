@@ -94,3 +94,12 @@ test.each([
   const source = fs.readFileSync(path.join(process.cwd(), file), 'utf8');
   for (const symbol of symbols) expect(source).toContain(symbol);
 });
+
+// CSO is an extra Research read privilege, never an editing privilege.
+test('configured CSO sees early Research drafts without acquiring generation/edit authority', () => {
+  const viewer = { isResearchCso: true, actingUserSystemId: OTHER, isCoordinator: false, isSuperuser: false };
+  expect(canSeeDraftWriteup(viewer, LEAD, 'c247b11a-a7cb-ee11-9078-000d3a341e8f')).toBe(true);
+  expect(canSeeDraftWriteup(viewer, LEAD, '11111111-1111-4111-8111-111111111111')).toBe(false);
+  expect(canSeeDraftWriteup(viewer, LEAD)).toBe(false);
+  expect(canChangeDraftWriteup(viewer, LEAD)).toBe(false);
+});

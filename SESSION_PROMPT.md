@@ -1,3 +1,15 @@
+# Active implementation handoff — Research Board workflow (2026-10-16)
+
+Owner authorized implementation of the revised plan and requires Claude Opus build review before deployment. Worktree: `/Users/gallivan/.codex/worktrees/research-board-workflow/WMKF_Apps`, branch `codex/research-board-workflow`, clean-main base `94dbed5e9`. Do not merge superseded `codex/sarah-board-writeups`. Runtime work is source-built and under review, not deployed; no external schema/file/email writes performed.
+
+**OPEN until Justin explicitly reports done:** remind Justin to set D26 **materials deadline for Allison** and **Board meeting end date** in Admin. Implementation, review, deployment or an inferred date does not close this reminder. Staff must also confirm the 23 request identities. Future single-phase selection rules remain open.
+
+Plan: `docs/plans/RESEARCH_WRITEUP_RELEASE_AND_BOARD_ARCHIVE_PLAN_2026-10-16.md`. Build ownership/contracts/verification limits: `docs/atlas/postgres-board-writeup-runs.md`. Initial Opus findings/disposition: `docs/audits/research-board-build-opus-initial-2026-10-16.md`. Final independent review and remaining acceptance are pending at this checkpoint. Do not enable flags or deploy before resolving them and obtaining deliberate promotion approval.
+
+Local checks: workflow/privacy/UI tests, isolated actual Postgres overlap/rollback tests, webpack production build, relevant security/data/route/Atlas/count/type gates. Turbopack cannot use the worktree's external node_modules symlink. Live read-only checks: migration 084/085 absent; Board option 100000014 absent; approved root resolves, D26 child absent; leadership recipients Allison and Beth only; 369 candidate records (not the confirmed roster); request 1002988 valid versioned source and one archive bucket. Actual synthetic outgoing/archive DOCX round-trip and staff rehearsal remain pending. No test target is currently registered; production Graph gate rejects local/preview writes.
+
+---
+
 # Session 613 Prompt: writeup regeneration live; observe real use
 
 ## Session 612 Summary — writeup regeneration released (Claude, 2026-10-15 PT)

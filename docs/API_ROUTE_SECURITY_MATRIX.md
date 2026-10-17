@@ -463,6 +463,14 @@ separate server-owned promotion contract. No branch writes Dataverse or accepts 
 | `/api/review-panel/download` | GET | App / `requireAppAccess(req, res, 'review-panel')` + service-level `assertReviewPanelAccess` | `entryId` plus `docx`/`pdf`; service reauthorizes and validates the entry's persisted SHA-256/size/path refs (D11 dedicated private Blob store) before streaming. `Cache-Control: private, no-store`, `nosniff`; PDF adds `X-Frame-Options: SAMEORIGIN` and is served inline for in-page preview, DOCX as an attachment. |
 | `/api/cron/drain-review-panels` | GET, POST | Cron / strict platform `CRON_SECRET` bearer (no development bypass, `verifyReviewPanelCronSecret`) | No client body authority. Feature flag `REVIEW_PANEL_ENABLED=true` is required after secret verification; the durable `review_panel_control.stop_requested` stop is enforced inside the worker (claim-time and before every paid call via `assertReviewPanelWorkerOpen`). Worker claims one global run lease; per-seat/chair Postgres attempt-ledger checkpoints only — never `api_usage_log`. No public response data. |
 
+### Research Board workflow (branch implementation, not deployed)
+
+| Route | Methods | Intended Class | Current Guard | Data Scope | Persistence | Risk | Notes |
+|---|---|---|---|---|---|---|---|
+| `/api/workbench/board-writeups` | GET, POST | App + scoped Board role | `requireAppAccess('reviewers')`; enabled identity binding; configured CSO for release | Confirmed Research cycle; server-selected sources/targets | Dataverse settings read; `board_writeup_runs` approval receipts (PG) | High | No client actor or destination; per-request outcomes; non-CSO payload omits draft links. |
+| `/api/admin/board-writeup-cycles` | GET, POST, PUT | App + superuser or Grants Manager | `requireAppAccess('reviewers')`; `boardActor`; settings/roles additionally require superuser | Research cycle reconciliation, archival and recovery | Version-fenced settings (DV), cycle journal (PG); Graph verification | High | Grants Manager cannot release or change assignments. Explicit source/version and revision fences; recovery never replays unknown uploads. |
+| `/api/cron/board-writeups` | GET, POST | Cron | `verifyCronSecret`; production target and literal feature mode | Configured active Research cycles | PG receipts, create-only SharePoint copies, Board Request Document references and email activities (DV) | High | Bounded worker; CSO/archive actor revalidation; daily Pacific receipts; no automatic overwrites. See Board-run Atlas for rollout prerequisites. |
+
 ## Regular Maintenance Process
 
 ### On every PR that touches `pages/api`

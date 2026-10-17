@@ -82,6 +82,7 @@
     "080_presentation_video_splits.sql",
     "081_presentation_transcript_regenerations.sql",
     "082_staff_discussion_sentiments.sql",
-    "083_presentation_upload_dismissal.sql"
+    "083_presentation_upload_dismissal.sql",
+    "085_board_writeup_runs.sql"
   ]
 }
