@@ -1,6 +1,6 @@
 # Research writeup release and Board archive — revised workflow
 
-Date: 2026-10-16. Status: **IMPLEMENTATION IN PROGRESS — owner authorized implementation in conversation; deployment remains unapproved.** Owner: Justin Gallivan. Review: Claude Opus returned **READY WITH NAMED CHANGES**; initial technical revisions incorporated; owner decisions below confirmed in conversation. Second Opus review returned **READY WITH NAMED CHANGES**; named plan changes incorporated, runtime verification still pending. This plan supersedes the unshipped two-leader automatic-copy design in branch `codex/sarah-board-writeups` (build `2a38dba86`, recovery fixes `b7c0e2074`). Do not enable or publish that build as the new workflow.
+Date: 2026-10-16. Status: **BUILD IMPLEMENTED AND OPUS-REVIEWED — deployment remains unapproved; named activation gates pending.** Owner: Justin Gallivan. Review: Claude Opus returned **READY WITH NAMED CHANGES**; initial technical revisions incorporated; owner decisions below confirmed in conversation. Second Opus review returned **READY WITH NAMED CHANGES**; named plan changes incorporated. Runtime review passed with named activation gates through `423dbb9c6`; see `docs/audits/research-board-build-opus-final-2026-10-16.md` for tests and unverified live rollout steps. This plan supersedes the unshipped two-leader automatic-copy design in branch `codex/sarah-board-writeups` (build `2a38dba86`, recovery fixes `b7c0e2074`). Do not enable or publish that build as the new workflow.
 
 ## 1. Owner decisions
 
