@@ -168,18 +168,18 @@ export default async function handler(req, res) {
           // Mirrors the POST and start-site-visit guards so the page offers
           // only the actions the server will accept.
           writeupAccess: {
-            canChange: canChangeDraftWriteup(viewer, leadProgramDirectorId, status.grantProgramId),
+            canChange: canChangeDraftWriteup(viewer, leadProgramDirectorId),
             identityLinked: Boolean(viewer.actingUserSystemId) || viewer.isSuperuser,
             canRegenerate: isRequestDocumentExplicitActorSchemaReady()
               && isGuid(viewer.actingUserSystemId)
-              && canChangeDraftWriteup(viewer, leadProgramDirectorId, status.grantProgramId)
+              && canChangeDraftWriteup(viewer, leadProgramDirectorId)
               && Boolean(status.currentArtifact)
               && regenerationStageEligible,
             regenerationBlockedReason: !status.currentArtifact ? 'writeup_missing'
                 : !isRequestDocumentExplicitActorSchemaReady() ? 'schema_not_ready'
                   : !isGuid(viewer.actingUserSystemId) ? 'actor_required'
                 : !regenerationStageEligible ? 'leadership_or_state_unavailable'
-                  : !canChangeDraftWriteup(viewer, leadProgramDirectorId, status.grantProgramId) ? 'lead_only' : null,
+                  : !canChangeDraftWriteup(viewer, leadProgramDirectorId) ? 'lead_only' : null,
           },
           correctionInProgress: status.currentArtifact?.lifecycleState === REQUEST_DOCUMENT_LIFECYCLE_STATE.DRAFT
             && Boolean(status.currentArtifact?.correction?.cycleId),
@@ -209,7 +209,7 @@ export default async function handler(req, res) {
         getPreSiteVisitArtifactStatus({ requestId }),
         resolveWriteupViewer({ isSuperuser: role === 'superuser', actingUserSystemId }),
       ]);
-      if (!canChangeDraftWriteup(viewer, leadProgramDirectorId, status.grantProgramId)) {
+      if (!canChangeDraftWriteup(viewer, leadProgramDirectorId)) {
         throw new ServiceHttpError('Only the lead Program Director or a superuser can prepare this writeup.', {
           httpStatus: 403,
           code: 'pre_site_writeup_lead_only',

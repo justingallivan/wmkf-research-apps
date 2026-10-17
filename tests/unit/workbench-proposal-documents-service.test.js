@@ -44,6 +44,7 @@ test('derives scope from the resolved record (id/number/cycle) and spreads the r
   expect(listProposalDocuments).toHaveBeenCalledWith(REQ, '1002794', 'J26');
   expect(body).toEqual({
     success: true,
+    boardWriteups: [],
     slots: [],
     reviewerMaterials: [],
     aiMaterials: [],

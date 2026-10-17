@@ -1,9 +1,14 @@
 /** @jest-environment node */
+import { sourceFor } from '../../lib/services/board-writeups/source';
+import { boardReferences } from '../../lib/services/board-writeups/reader';
+import { assertBoardWriteEnvironment } from '../../lib/services/graph/board-writeups';
+import { REQUEST_DOCUMENT_ARTIFACT_TYPE as TYPE, REQUEST_DOCUMENT_OPERATION_STATUS as OP, REQUEST_DOCUMENT_LIFECYCLE_STATE as LIFE, FINAL_WRITEUP_CONTRACT } from '../../shared/config/requestDocument';
 import { PROGRAM_ID, validateCycle, filename, pacificTime, progress } from '../../lib/services/board-writeups/model';
 import { emptyState } from '../../lib/services/board-writeups/store';
 import { noticeIntents, deliverNotice, reconcileNotices } from '../../lib/services/board-writeups/notifications';
 import { queueRelease, deliverRelease, dashboard } from '../../lib/services/board-writeups/service';
-import { startArchive } from '../../lib/services/board-writeups/archive';
+import { startArchive, archiveOne } from '../../lib/services/board-writeups/archive';
+import { saveCycle, resumeConfig } from '../../lib/services/board-writeups/config';
 import { boardMode, boardWorkEnabled } from '../../lib/services/board-writeups/mode';
 import { recover } from '../../lib/services/board-writeups/recovery';
 const ID = '11111111-1111-4111-8111-111111111111';
@@ -129,4 +134,104 @@ test('uncertain email send never blindly resends and later acceptance reconciles
     if (previousOrigin === undefined) delete process.env.NEXTAUTH_URL; else process.env.NEXTAUTH_URL = previousOrigin;
     if (previousFrom === undefined) delete process.env.NOTIFICATION_EMAIL_FROM; else process.env.NOTIFICATION_EMAIL_FROM = previousFrom;
   }
+});
+
+test('archive registry failure resumes the known copy without another upload', async () => {
+  const { state, d } = fixture();
+  state.archiveStartedAt = d.now(); state.archiveActor = actor;
+  state.archiveManifest = [{ requestId: ID }];
+  state.releases[ID] = { requestId: ID, source, hash: 'working-hash', releasedAt: d.now(), destination: { itemId: 'board-item', driveId: 'board-drive' } };
+  state.archives[ID] = { state: 'queued', source: { ...source, driveId: 'board-drive', itemId: 'board-item' }, uploadStartedAt: null, lease: null };
+  let registry = null, refuse = true;
+  const deps = { ...d, getRequest: async () => ({ akoya_requestid: ID, akoya_requestnum: '123', _wmkf_grantprogram_value: PROGRAM_ID, wmkf_meetingdate: '2026-12-01', wmkf_istestrequest: false, wmkf_testcreationrunid: null }),
+    buckets: async () => [{ source: 'dynamics', library: 'akoya_request', folder: 'request-folder' }], site: async () => 'site', drive: async () => 'archive-drive', ensureFolder: async () => ({ id: 'folder' }),
+    findDocument: async () => ({ records: registry ? [registry] : [] }),
+    createDocument: jest.fn(async payload => { if (refuse) throw new Error('registry unavailable'); registry = { wmkf_requestdocumentid: 'registry-id', _wmkf_request_value: ID, wmkf_artifacttype: payload.wmkf_artifacttype, wmkf_operationstatus: payload.wmkf_operationstatus, wmkf_sharepointitemid: payload.wmkf_sharepointitemid, wmkf_sharepointdriveid: payload.wmkf_sharepointdriveid }; }) };
+  await archiveOne('D26', ID, deps);
+  expect(state.archives[ID].state).toBe('held');
+  expect(state.archives[ID].destination.itemId).toBe('board-item');
+  expect(state.archiveCompletedAt).toBeNull();
+  refuse = false;
+  await recover('D26', actor, { operation: 'archive', action: 'retry', requestId: ID, reason: 'Registry is available again' }, deps);
+  await archiveOne('D26', ID, deps);
+  expect(deps.put).toHaveBeenCalledTimes(1);
+  expect(state.archives[ID].state).toBe('archived');
+  expect(state.archiveCompletedAt).toBe(d.now());
+  expect(deps.createDocument.mock.calls[1][0].wmkf_sourceversionid).toBe(source.versionId);
+  expect(deps.createDocument.mock.calls[1][0].wmkf_sourcecontenthash).toBe('working-hash');
+});
+
+test('definite settings refusal clears intent; uncertain conditional write remains recoverable', async () => {
+  const { state, d } = fixture();
+  let current = value, revision = 'etag';
+  const deps = { ...d, getUser: async () => ({ isdisabled: false, internalemailaddress: 'admin@wmkeck.org', fullname: 'Admin' }), resolveSystemUserToProfile: async () => actor.profileId, profile: async () => ({ is_active: true, superuser: true }),
+    getSettingStrict: async () => ({ found: true, value: JSON.stringify(current), revision }),
+    setSettingIfUnchanged: jest.fn(async () => { throw Object.assign(new Error('conflict'), { status: 409 }); }) };
+  await expect(saveCycle(actor, { ...value, active: false }, 'etag', '', deps)).rejects.toThrow('conflict');
+  expect(state.configIntent).toBeNull();
+  deps.setSettingIfUnchanged.mockImplementation(async () => { throw new Error('network timeout'); });
+  await expect(saveCycle(actor, { ...value, active: false }, 'etag', '', deps)).rejects.toThrow('network timeout');
+  expect(state.configIntent).not.toBeNull();
+  deps.setSettingIfUnchanged.mockImplementation(async (_key, serialized, expected) => { expect(expected).toBe('etag'); current = JSON.parse(serialized); revision = 'next-etag'; });
+  await resumeConfig('D26', actor, deps);
+  expect(state.configIntent).toBeNull();
+  expect(state.configHistory).toHaveLength(1);
+});
+
+test('unknown source lifecycle is refused without falling back to another document', async () => {
+  const getDocuments = jest.fn(async () => ({ records: [{ wmkf_requestdocumentid: ID, _wmkf_request_value: ID, wmkf_artifacttype: TYPE.FINAL_WRITEUP, wmkf_cyclecode: 'D26', wmkf_operationstatus: OP.READY, wmkf_lifecyclestate: 999, wmkf_contenttype: FINAL_WRITEUP_CONTRACT.contentType, wmkf_sharepointdriveid: 'drive', wmkf_sharepointitemid: 'file' }] }));
+  await expect(sourceFor('D26', ID, { getDocuments, getRequest: async () => ({ akoya_requestid: ID, _wmkf_grantprogram_value: PROGRAM_ID, wmkf_meetingdate: '2026-12-01', wmkf_istestrequest: false, wmkf_testcreationrunid: null, _wmkf_currentfinalwriteup_value: ID, _wmkf_currentpresitevisit_value: '22222222-2222-4222-8222-222222222222' }) })).rejects.toThrow();
+  expect(getDocuments).toHaveBeenCalledTimes(1); expect(getDocuments).toHaveBeenCalledWith([ID]);
+});
+test('historical Board reader excludes working, foreign-request and unsafe-link rows', async () => {
+  const record = { _wmkf_request_value: ID, wmkf_requestdocumentid: 'registry', wmkf_artifacttype: TYPE.BOARD_WRITEUP, wmkf_operationstatus: OP.READY, wmkf_lifecyclestate: LIFE.BOARD_READY, wmkf_sharepointweburl: 'https://appriver3651007194.sharepoint.com/sites/akoyaGO/Board.docx' };
+  const find = jest.fn(async () => ({ records: [record, { ...record, wmkf_artifacttype: TYPE.FINAL_WRITEUP }, { ...record, _wmkf_request_value: 'other' }, { ...record, wmkf_sharepointweburl: 'https://untrusted.example/Board.docx' }] }));
+  expect(await boardReferences(ID, { find, ready: () => true })).toHaveLength(1);
+  find.mockClear(); expect(await boardReferences(ID, { find, ready: () => false })).toEqual([]); expect(find).not.toHaveBeenCalled();
+});
+test('Graph write boundary rejects local, preview, unknown targets and disabled modes', () => {
+  const env = { VERCEL_ENV: 'production', BOARD_WRITEUPS_ENABLED: 'on', RESEARCH_LEADERSHIP_DIGEST_MODE: 'board-release', DYNAMICS_URL: 'https://wmkf.crm.dynamics.com' };
+  expect(() => assertBoardWriteEnvironment(env)).not.toThrow();
+  for (const patch of [{ VERCEL_ENV: 'preview' }, { VERCEL_ENV: '' }, { DYNAMICS_URL: 'https://unknown.crm.dynamics.com' }, { BOARD_WRITEUPS_ENABLED: 'off' }, { RESEARCH_LEADERSHIP_DIGEST_MODE: 'legacy' }]) expect(() => assertBoardWriteEnvironment({ ...env, ...patch })).toThrow();
+});
+
+test('definite single-PUT refusal permits audited cancellation and a fresh CSO selection', async () => {
+  const { state, d } = fixture(); d.put.mockRejectedValue(Object.assign(new Error('name conflict'), { status: 409, code: 'nameAlreadyExists' }));
+  await queueRelease('D26', actor, [selection], d); await deliverRelease('D26', ID, d);
+  expect(state.releases[ID].state).toBe('held'); expect(state.releases[ID].uploadRefusal.status).toBe(409);
+  await recover('D26', actor, { operation: 'release', action: 'cancel', requestId: ID, reason: 'Confirmed Graph refused the conflicting name' }, d);
+  expect(state.releases[ID].uploadStartedAt).toBeNull();
+  expect(state.events.at(-1).details.priorUpload.uploadRefusal.status).toBe(409);
+  expect((await queueRelease('D26', actor, [selection], d)).results[0].status).toBe('queued');
+  expect(d.put).toHaveBeenCalledTimes(1);
+});
+test.each([404, 410, 429, 500, 503])('HTTP %s never establishes no-upload proof', async status => {
+  const { state, d } = fixture(); d.put.mockRejectedValue(Object.assign(new Error('unknown outcome'), { status }));
+  await queueRelease('D26', actor, [selection], d); await deliverRelease('D26', ID, d);
+  expect(state.releases[ID].uploadRefusal).toBeUndefined();
+  await expect(recover('D26', actor, { operation: 'release', action: 'cancel', requestId: ID, reason: 'Missing file is not proof of refusal' }, d)).rejects.toThrow();
+  expect(d.put).toHaveBeenCalledTimes(1);
+});
+test('archive records a definite refusal and can retry the same confirmed source', async () => {
+  const { state, d } = fixture();
+  state.archiveStartedAt = d.now(); state.archiveActor = actor; state.archiveManifest = [{ requestId: ID }];
+  state.releases[ID] = { source, releasedAt: d.now() };
+  state.archives[ID] = { state: 'queued', source, uploadStartedAt: null };
+  d.put.mockRejectedValue(Object.assign(new Error('conflict'), { status: 409 }));
+  const deps = { ...d, getRequest: async () => ({ _wmkf_grantprogram_value: PROGRAM_ID, wmkf_meetingdate: '2026-12-01', wmkf_istestrequest: false, wmkf_testcreationrunid: null }), buckets: async () => [{ source: 'dynamics', library: 'akoya_request', folder: 'request' }], site: async () => 'site', drive: async () => 'drive', ensureFolder: async () => ({ id: 'folder' }) };
+  await archiveOne('D26', ID, deps);
+  expect(state.archives[ID].uploadRefusal.status).toBe(409);
+  await recover('D26', actor, { operation: 'archive', action: 'retry', requestId: ID, reason: 'The conflicting unrelated file has been resolved' }, deps);
+  expect(state.archives[ID].uploadStartedAt).toBeNull(); expect(state.archives[ID].state).toBe('queued'); expect(state.archives[ID].source).toEqual(source);
+});
+
+test('an authorized archive exclusion completes a held entry only before any copy committed', async () => {
+  const { state, d } = fixture();
+  state.archiveStartedAt = d.now(); state.archiveManifest = [{ requestId: ID }];
+  state.archives[ID] = { state: 'held', source, uploadStartedAt: null, error: 'board_archive_request_changed' };
+  await recover('D26', actor, { operation: 'archive', action: 'exclude', requestId: ID, reason: 'Confirmed withdrawn after the Board meeting' }, d);
+  expect(state.archives[ID].excluded.reason).toContain('withdrawn'); expect(state.archiveCompletedAt).toBe(d.now());
+  const other = fixture(); other.state.archiveStartedAt = d.now(); other.state.archiveManifest = [{ requestId: ID }];
+  other.state.archives[ID] = { state: 'held', source, uploadStartedAt: d.now(), destination: null };
+  await expect(recover('D26', actor, { operation: 'archive', action: 'exclude', requestId: ID, reason: 'Uncertain upload cannot be ignored' }, other.d)).rejects.toThrow();
 });
