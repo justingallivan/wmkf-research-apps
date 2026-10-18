@@ -1,4 +1,5 @@
 /** Scoped workflow operations; role/settings mutations remain superuser-only in service. */
+import { boardWorkEnabled } from '../../../lib/services/board-writeups/mode';
 import { requireAppAccess } from '../../../lib/utils/auth';
 import { withDalContext } from '../../../lib/dataverse/core/context';
 import { boardActor, getRole, getCycle, saveCycle, saveRole, resumeConfig, staffDirectory } from '../../../lib/services/board-writeups/config';
@@ -12,6 +13,7 @@ export default async function handler(req, res) {
   if (!['GET', 'POST', 'PUT'].includes(req.method)) return res.status(405).json({ error: 'Method not allowed' });
   const gate = await requireAppAccess(req, res, 'reviewers');
   if (!gate) return;
+  if (!boardWorkEnabled()) return res.status(404).json({ error: 'Board writeups are disabled.', code: 'board_disabled' });
   const actor = { profileId: gate.profileId, systemUserId: gate.session?.user?.dynamicsSystemuserId };
   return withDalContext('board-writeup-admin', async () => {
     try {

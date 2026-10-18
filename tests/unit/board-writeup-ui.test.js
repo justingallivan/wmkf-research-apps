@@ -38,3 +38,12 @@ test('a late response from the previous cycle cannot replace the new cycle', asy
   expect(screen.queryByText('1002988')).toBeNull();
   expect(screen.getByText('NEW123')).toBeTruthy();
 });
+
+test('disabled response shows no release or setup controls and makes no further requests', async () => {
+  global.fetch = jest.fn(async () => ({ ok: false, status: 404, json: async () => ({ error: 'Board writeups are disabled.', code: 'board_disabled' }) }));
+  render(<BoardWriteups />);
+  expect(await screen.findByText('Board writeups are disabled.')).toBeTruthy();
+  expect(screen.queryByText('Release selected to Allison')).toBeNull();
+  expect(screen.queryByText('Admin: cycle setup and roles')).toBeNull();
+  expect(global.fetch).toHaveBeenCalledTimes(1);
+});
