@@ -53,6 +53,7 @@ test('one email per Pacific day to admin only, no catch-up burst or proposal rea
   await deliverNotice('D26', intent, d);
   expect(d.create).toHaveBeenCalledTimes(1); expect(d.send).toHaveBeenCalledTimes(1);
   expect(d.create).toHaveBeenCalledWith(expect.objectContaining({ to: ['admin@wmkeck.org'], cc: [], subject: 'D26: Staff-discussion cleanup reminder' }));
+  expect(d.create.mock.calls[0][0].body).toContain('The D26 Board meeting ended on 2026-12-01; the one-week grace period ended on 2026-12-08.');
   expect(d.create.mock.calls[0][0].body).toContain('Mark cleanup complete');
   expect(d.create.mock.calls[0][0].body).toContain('does not delete');
   expect(d.getRequest).not.toHaveBeenCalled(); expect(d.getRole).not.toHaveBeenCalled();
