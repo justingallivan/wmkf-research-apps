@@ -3,11 +3,12 @@ import workbench from '../../pages/api/workbench/board-writeups';
 import admin from '../../pages/api/admin/board-writeup-cycles';
 import { requireAppAccess } from '../../lib/utils/auth';
 import { withDalContext } from '../../lib/dataverse/core/context';
+import { completeCleanup } from '../../lib/services/board-writeups/service';
 import { boardActor, listCycles } from '../../lib/services/board-writeups/config';
 jest.mock('../../lib/utils/auth', () => ({ requireAppAccess: jest.fn() }));
 jest.mock('../../lib/dataverse/core/context', () => ({ withDalContext: jest.fn((_name, fn) => fn()) }));
 jest.mock('../../lib/services/board-writeups/config', () => ({ boardActor: jest.fn(), listCycles: jest.fn() }));
-jest.mock('../../lib/services/board-writeups/service', () => ({}));
+jest.mock('../../lib/services/board-writeups/service', () => ({ completeCleanup: jest.fn() }));
 jest.mock('../../lib/services/board-writeups/source', () => ({}));
 jest.mock('../../lib/services/board-writeups/archive', () => ({}));
 jest.mock('../../lib/services/board-writeups/recovery', () => ({}));
@@ -30,7 +31,7 @@ test.each([
   for (const [handler, method, query, body] of [
     [workbench, 'GET', {}, {}], [workbench, 'GET', { cycle: 'D26' }, {}],
     [workbench, 'POST', {}, { cycle: 'D26', selections: [{}] }],
-    ...['role', 'save', 'reconcileConfig', 'archive', 'recover', 'resolve'].flatMap(action => ['POST', 'PUT'].map(method => [admin, method, {}, { action, cycle: 'D26' }])),
+    ...['role', 'save', 'reconcileConfig', 'archive', 'recover', 'resolve', 'completeCleanup'].flatMap(action => ['POST', 'PUT'].map(method => [admin, method, {}, { action, cycle: 'D26' }])),
     ...[undefined, 'reconcile', 'inspectRecovery'].map(action => [admin, 'GET', { cycle: 'D26', action }, {}]),
   ]) {
     const res = response();
@@ -56,4 +57,18 @@ test.each([workbench, admin])('authentication still precedes the feature guard',
   expect(requireAppAccess).toHaveBeenCalled();
   expect(res.json).not.toHaveBeenCalled();
   expect(withDalContext).not.toHaveBeenCalled();
+});
+
+test('cleanup completion uses authenticated actor and rejects client-supplied identity', async () => {
+  process.env.RESEARCH_LEADERSHIP_DIGEST_MODE = 'board-release';
+  process.env.BOARD_WRITEUPS_ENABLED = 'on';
+  completeCleanup.mockResolvedValue({ completedAt: '2026-12-08T17:00:00Z' });
+  const res = response();
+  await admin({ method: 'POST', body: { action: 'completeCleanup', cycle: 'D26' } }, res);
+  expect(completeCleanup).toHaveBeenCalledWith('D26', { profileId: 'admin', systemUserId: 'staff' });
+  completeCleanup.mockClear();
+  const denied = response();
+  await admin({ method: 'POST', body: { action: 'completeCleanup', cycle: 'D26', value: { actorId: 'forged' } } }, denied);
+  expect(denied.status).toHaveBeenCalledWith(400);
+  expect(completeCleanup).not.toHaveBeenCalled();
 });

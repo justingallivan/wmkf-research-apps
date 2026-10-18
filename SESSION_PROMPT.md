@@ -24,7 +24,7 @@
 ### Owner Decision Needed
 
 - **Board activation remains separate.** The earlier disabled release is not activation permission. Recheck the current Board Atlas, roster, dates, recipient configuration and hosted acceptance before any activation.
-- **Board-date reminder:** retain the owner's request for a one-week grace period after the Board meeting and a reminder, rather than automatic deletion, for staff-discussion cleanup. This is a product decision, not a shipped cleanup feature.
+- **Board cleanup reminder built, not deployed:** `codex/board-cleanup-reminder` implements the owner's daily-email-until-complete decision. At 9 a.m. Pacific, starting seven calendar days after the saved Board end date, the configured cycle admin receives reminders until an administrator chooses **Mark cleanup complete**. No automatic deletion. Deliberate promotion/Board activation and verification of dates/admin recipient remain pending; see `docs/atlas/postgres-board-writeup-runs.md`.
 - **Cross-visit sentiment/ranking study stays parked.** The confirmed corrections and accepted current analyses close the earlier data-quality prerequisite; the study still requires owner authorization and an agreed read-only scope. See the existing study memory for historical design context; do not treat its earlier cleanup blocker as a new repair task.
 
 ### Parked

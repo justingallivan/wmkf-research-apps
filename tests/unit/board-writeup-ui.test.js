@@ -47,3 +47,48 @@ test('disabled response shows no release or setup controls and makes no further 
   expect(screen.queryByText('Admin: cycle setup and roles')).toBeNull();
   expect(global.fetch).toHaveBeenCalledTimes(1);
 });
+
+test('admin can mark cleanup complete and sees the saved completion state', async () => {
+  let complete = false;
+  const posts = [];
+  const board = () => ({ ...data, isSuperuser: true, cleanup: { dueDate: '2026-12-08', canComplete: !complete, completedAt: complete ? '2026-12-08T17:00:00Z' : null, completedBy: complete ? 'Admin' : null } });
+  global.fetch = jest.fn(async (url, options) => {
+    if (options.method === 'POST') { posts.push(JSON.parse(options.body)); complete = true; return response({ completedAt: '2026-12-08T17:00:00Z' }); }
+    if (url.startsWith('/api/admin/')) return response({ cycle: { value: null }, roles: { cso: { value: null }, grantsManager: { value: null } }, staff: [], candidates: [] });
+    return response(url.includes('?') ? board() : { canRelease: true, canArchive: false, isSuperuser: true });
+  });
+  jest.spyOn(window, 'confirm').mockReturnValue(true);
+  render(<BoardWriteups />);
+  fireEvent.click(await screen.findByText('Mark cleanup complete'));
+  await waitFor(() => expect(posts).toEqual([{ action: 'completeCleanup', cycle: 'D26' }]));
+  expect(await screen.findByText(/Cleanup marked complete by Admin/)).toBeTruthy();
+  expect(screen.queryByText('Mark cleanup complete')).toBeNull();
+});
+
+test('non-admin cannot see cleanup completion control even when cleanup is due', async () => {
+  global.fetch = jest.fn(async url => response(url.includes('?')
+    ? { ...data, cleanup: { dueDate: '2026-12-08', canComplete: false } }
+    : { canRelease: true, canArchive: false, isSuperuser: false }));
+  render(<BoardWriteups />);
+  await screen.findByText('1002988');
+  expect(screen.queryByText('Mark cleanup complete')).toBeNull();
+});
+
+test('late cleanup completion response does not update a newly selected cycle', async () => {
+  let finish;
+  const pending = new Promise(resolve => { finish = resolve; });
+  global.fetch = jest.fn(async (url, options) => {
+    if (options.method === 'POST') return pending;
+    if (url.startsWith('/api/admin/')) return response({ cycle: { value: null }, roles: { cso: { value: null }, grantsManager: { value: null } }, staff: [], candidates: [] });
+    if (!url.includes('?')) return response({ canRelease: true, isSuperuser: true });
+    return response({ ...data, isSuperuser: true, cleanup: { dueDate: url.includes('J27') ? '2027-06-08' : '2026-12-08', canComplete: !url.includes('J27') } });
+  });
+  jest.spyOn(window, 'confirm').mockReturnValue(true);
+  render(<BoardWriteups />);
+  fireEvent.click(await screen.findByText('Mark cleanup complete'));
+  fireEvent.change(screen.getByLabelText('Cycle'), { target: { value: 'J27' } });
+  await screen.findByText(/2027-06-08/);
+  await act(async () => { finish(response({ completedAt: '2026-12-08T17:00:00Z' })); });
+  expect(screen.queryByText(/Cleanup marked complete/)).toBeNull();
+  expect(screen.getByText(/2027-06-08/)).toBeTruthy();
+});

@@ -15,6 +15,7 @@ Date: 2026-10-16. Status: **BUILD IMPLEMENTED AND OPUS-REVIEWED — deployment r
 - Materials-due-to-Allison and Board meeting dates are entered by staff in Admin for now. Outlook integration is deferred until after this cycle.
 - After the Board meeting, email the configured admin (Justin initially), cc the configured Grants Manager (Sarah initially), daily until archival starts. Any authorized admin or the Grants Manager can reconcile and confirm/start archival. Send failure alerts and a completion confirmation to the same role-based distribution. Preserve edited copies in request document folders with Dataverse references available in the app.
 - Before archival, reconcile every successfully released file by identity. Missing files trigger an admin email identifying requests/institutions/original names. Do not silently restore them. Rare withdrawals are handled by staff in SharePoint and investigated at archival.
+- **Staff-discussion cleanup (owner decision 2026-10-18):** after a one-week grace period, email the configured cycle admin daily until an administrator marks cleanup complete. This is separate from Board-writeup archival; no automatic deletion is authorized.
 
 ## 2. Confirmed decisions from owner walkthrough
 
@@ -90,6 +91,8 @@ Future readers see **Board writeup — D26** in the request, with archive date a
 7. Preserve copied files and receipts after moves/deletion. No source regeneration, withdrawal, re-release or edit automatically overwrites/recreates Allison's copy. Staff restoration and authorized admin/Grants Manager reconnection follow section 2.7; replacement does not authorize an automatic source recopy.
 
 ## 7. Daily reminders and existing-email cutover
+
+**Staff-discussion cleanup extension — branch-built, not deployed (2026-10-18).** Starting seven calendar days after `boardEnds`, send the configured admin one daily cleanup reminder at 9 a.m. Pacific, with no cc. Reuse the active-cycle/Board feature gates and existing email journal with `cleanup:<Pacific date>` keys. Archive completion does not close this task. The administrator-only **Mark cleanup complete** action persists original actor/time in the cycle journal and suppresses future cleanup intents; retries preserve the first completion. It records a human decision and performs no deletion. The Board page shows its due date and completion status; provider-accepted/in-flight messages cannot be recalled. See the Board-run Atlas for the state contract and isolated test evidence. Current production dates, recipient setup, activation and live email acceptance remain separate rollout checks.
 
 Use an hourly scheduler with a fixed 9 a.m. America/Los_Angeles local-hour gate and local-date receipt; do not expose arbitrary time/zone settings. Vercel cron schedules are UTC ([official documentation](https://vercel.com/docs/cron-jobs)). Overlapping invocations share the same claim; missed dates do not cause catch-up email bursts.
 
