@@ -46,18 +46,20 @@ test('generic PATCH remains refused with the ordinary factory create option enab
   expect(fetch).not.toHaveBeenCalled();
 });
 
-test('specific maintenance method resolves by allowlisted number and ETag-patches only the marker', async () => {
+test.each(['1003220', '1002788'])('specific maintenance of %s ETag-patches only the marker and preserves factory provenance', async (requestNumber) => {
+  const row = (marker) => ({ ...requestRow(marker), akoya_requestnum: requestNumber,
+    wmkf_testcreationrunid: requestNumber === '1002788' ? null : RUN_ID });
   fetch.mockImplementation(async (url, options) => {
     if (options.method === 'PATCH') return response(204);
     if (String(url).includes('?$select=akoya_requestnum')) {
-      return response(200, { ...requestRow(true) });
+      return response(200, row(true));
     }
-    return response(200, { value: [requestRow(false)] });
+    return response(200, { value: [row(false)] });
   });
   const client = createClient({ resourceUrl: 'https://wmkf.crm.dynamics.com', token: 'test' });
 
-  await expect(client.maintainD26TrialTestMarker('1003220', { apply: true })).resolves.toMatchObject({
-    requestNumber: '1003220', state: 'verified-marked', runIdPresent: true, applied: true, patchResponseOk: true,
+  await expect(client.maintainD26TrialTestMarker(requestNumber, { apply: true })).resolves.toMatchObject({
+    requestNumber, state: 'verified-marked', runIdPresent: requestNumber !== '1002788', applied: true, patchResponseOk: true,
   });
 
   const patchCall = fetch.mock.calls.find(([, options]) => options.method === 'PATCH');
