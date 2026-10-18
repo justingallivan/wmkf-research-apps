@@ -306,20 +306,20 @@ test('a PD acknowledging a leadership-stage writeup is warned, not locked; Leade
   global.fetch.mockResolvedValueOnce(response(dashboard({ viewer: pdViewer, selected: movedOn, navigation: null })));
   const { unmount } = render(<FinalWriteupFocusedView requestId={REQUEST_ID} />);
   expect(await screen.findByText(warningCopy)).toBeInTheDocument();
-  expect(screen.getByRole('button', { name: 'Sign off' })).toBeEnabled();
+  expect(screen.getByRole('button', { name: 'Mark reviewed' })).toBeEnabled();
   unmount();
 
   global.fetch.mockResolvedValueOnce(response(dashboard({
     viewer: { ...pdViewer, personas: ['leadership'] }, selected: movedOn, navigation: null,
   })));
   const leadership = render(<FinalWriteupFocusedView requestId={REQUEST_ID} />);
-  expect(await screen.findByRole('button', { name: 'Sign off' })).toBeEnabled();
+  expect(await screen.findByRole('button', { name: 'Mark reviewed' })).toBeEnabled();
   expect(screen.queryByText(warningCopy)).not.toBeInTheDocument();
   leadership.unmount();
 
   global.fetch.mockResolvedValueOnce(response(dashboard({ viewer: pdViewer, selected: writeup(), navigation: null })));
   render(<FinalWriteupFocusedView requestId={REQUEST_ID} />);
-  expect(await screen.findByRole('button', { name: 'Sign off' })).toBeInTheDocument();
+  expect(await screen.findByRole('button', { name: 'Mark reviewed' })).toBeInTheDocument();
   expect(screen.queryByText(warningCopy)).not.toBeInTheDocument();
 });
 
@@ -387,7 +387,7 @@ test('superuser dashboard renders a complete neutral coordinator matrix with dir
   expect(await screen.findByRole('heading', { name: 'Coordinator matrix' })).toBeInTheDocument();
   expect(screen.getByRole('heading', { name: 'Research' })).toBeInTheDocument();
   expect(screen.getByText(/not approval or compliance tracking/i)).toBeInTheDocument();
-  expect(screen.getByLabelText('Ada Reviewer: Updated for request 1002788')).toBeInTheDocument();
+  expect(screen.getByLabelText('Ada Reviewer: Reviewed for request 1002788')).toBeInTheDocument();
   expect(screen.getByLabelText('Program Director A: Responsible PD for request 1002788')).toBeInTheDocument();
   expect(screen.getByRole('link', { name: 'Open in Word' })).toHaveAttribute('href', row.document.url);
 });
@@ -404,8 +404,8 @@ test('reviewer initials expose current and earlier-version meaning without color
   })));
   renderPanel();
 
-  expect(await screen.findByText('1 current · 1 earlier version')).toBeInTheDocument();
-  expect(screen.getByLabelText('Review activity: 1 current · 1 earlier version')).toBeInTheDocument();
+  expect(await screen.findByText('2 reviewed')).toBeInTheDocument();
+  expect(screen.getByLabelText('Review activity: 2 reviewed')).toBeInTheDocument();
 });
 
 test('review activity pluralizes earlier versions', async () => {
@@ -420,7 +420,7 @@ test('review activity pluralizes earlier versions', async () => {
     queues: { open: [several], history: [], stewardship: [] },
   })));
   renderPanel();
-  expect(await screen.findByText('3 earlier versions')).toBeInTheDocument();
+  expect(await screen.findByText('3 reviewed')).toBeInTheDocument();
 });
 
 test('focused review keeps Word external, exposes collapsed context, and records exact-current review', async () => {
@@ -454,7 +454,7 @@ test('focused review keeps Word external, exposes collapsed context, and records
   expect(screen.getByText('Supporting materials')).toBeInTheDocument();
   expect(screen.queryByRole('navigation', { name: 'Request sections' })).not.toBeInTheDocument();
 
-  fireEvent.click(screen.getByRole('button', { name: 'Sign off' }));
+  fireEvent.click(screen.getByRole('button', { name: 'Mark reviewed' }));
   await waitFor(() => expect(global.fetch).toHaveBeenNthCalledWith(
     2,
     '/api/workbench/final-writeup/acknowledgement',
@@ -466,8 +466,8 @@ test('focused review keeps Word external, exposes collapsed context, and records
       }),
     }),
   ));
-  expect(await screen.findByRole('heading', { name: 'You reviewed this version' })).toBeInTheDocument();
-  expect(screen.queryByRole('button', { name: 'Sign off' })).not.toBeInTheDocument();
+  expect(await screen.findByRole('heading', { name: 'Your review is complete' })).toBeInTheDocument();
+  expect(screen.queryByRole('button', { name: 'Mark reviewed' })).not.toBeInTheDocument();
 });
 
 test('focused review ignores a late response after its request changes', async () => {
@@ -499,7 +499,7 @@ test('responsible PD focused view offers editing but never self-acknowledgement'
   global.fetch.mockResolvedValueOnce(response(dashboard({ selected: owner, navigation: null })));
   render(<FinalWriteupFocusedView requestId={REQUEST_ID} />);
   expect(await screen.findByRole('link', { name: 'Edit in Word' })).toHaveAttribute('target', '_blank');
-  expect(screen.queryByRole('button', { name: /^Sign off/ })).not.toBeInTheDocument();
+  expect(screen.queryByRole('button', { name: /^Mark reviewed/ })).not.toBeInTheDocument();
 });
 
 describe('views, Program director filter, and version context (Slices 6B/6C)', () => {
@@ -606,7 +606,7 @@ describe('views, Program director filter, and version context (Slices 6B/6C)', (
     fireEvent.click(screen.getByRole('button', { name: /Reviewed by me/ }));
     expect(screen.getByRole('heading', { name: 'Reviewed by me' })).toBeInTheDocument();
     expect(screen.getByText('A second proposal')).toBeInTheDocument();
-    expect(screen.getByText('Updated since review')).toBeInTheDocument();
+    expect(screen.getByText('Reviewed')).toHaveClass('bg-green-50');
     expect(screen.queryByText('Cellular repair after tissue injury')).not.toBeInTheDocument();
     expect(panelState().writeupsView).toBe('reviewed');
 
@@ -792,4 +792,24 @@ describe('views, Program director filter, and version context (Slices 6B/6C)', (
     render(<FinalWriteupFocusedView requestId={REQUEST_ID} />);
     expect(await screen.findByText(/^You reviewed version 2\.0 on .+\.$/)).toBeInTheDocument();
   });
+});
+
+test.each(['program-director', 'leadership'])('%s keeps an edited review complete with its original version and date', async persona => {
+  const row = writeup({
+    personalState: 'updated', bucket: 'history',
+    acknowledgedAt: '2026-08-30T12:00:00.000Z',
+    acknowledgedPublicationVersionId: '1.0',
+    document: { url: 'https://example.sharepoint.com/writeup', publicationVersionId: '2.0' },
+    stage: { key: persona === 'leadership' ? 'leadership-review' : 'group-review' },
+  });
+  global.fetch.mockResolvedValueOnce(response(dashboard({
+    selected: row, viewer: { personas: [persona] },
+    queues: { open: [], history: [row], stewardship: [] }, navigation: null,
+  })));
+  render(<FinalWriteupFocusedView requestId={REQUEST_ID} />);
+  expect(await screen.findByText('Your review is complete')).toBeInTheDocument();
+  expect(screen.getByText('Reviewed')).toHaveClass('bg-green-50');
+  expect(screen.getByText(/^You reviewed version 1\.0 on .+\. The current version is 2\.0\.$/)).toBeInTheDocument();
+  expect(screen.queryByRole('button', { name: /Mark reviewed|Sign off/ })).not.toBeInTheDocument();
+  expect(global.fetch).toHaveBeenCalledTimes(1);
 });

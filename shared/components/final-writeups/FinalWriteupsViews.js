@@ -10,7 +10,7 @@
  *   state live in the shell URL (`writeups`, `pd`, `q`, `uncycled`) and are never sent to the
  *   API; the cycle always comes from the shell, so the API's default-cycle walk-back is unused here.
  * FORM: an editorial task list; each row names the publication version acknowledgements key to
- *   (Slice 6C) so "Updated since review" is explainable without opening Word.
+ *   (Slice 6C) as neutral history; completed reviews remain green after edits.
  */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -65,13 +65,13 @@ function StateChip({ state }) {
   const copy = {
     unreviewed: 'Needs review',
     reviewed: 'Reviewed',
-    updated: 'Updated since review',
+    updated: 'Reviewed',
     'not-applicable': 'Your writeup',
   }[state] || 'Review status unavailable';
   const classes = {
     unreviewed: 'bg-blue-50 text-blue-800 border-blue-200',
     reviewed: 'bg-green-50 text-green-800 border-green-200',
-    updated: 'bg-amber-50 text-amber-900 border-amber-200',
+    updated: 'bg-green-50 text-green-800 border-green-200',
     'not-applicable': 'bg-gray-100 text-gray-700 border-gray-200',
   }[state] || 'bg-gray-100 text-gray-700 border-gray-200';
   return (
@@ -83,12 +83,7 @@ function StateChip({ state }) {
 
 function ReviewerInitials({ reviewers = [] }) {
   if (!reviewers.length) return <span className="text-xs text-gray-500">No reviews recorded</span>;
-  const currentCount = reviewers.filter((reviewer) => reviewer.state !== 'updated').length;
-  const earlierCount = reviewers.length - currentCount;
-  const reviewSummary = [
-    currentCount ? `${currentCount} current` : null,
-    earlierCount ? `${earlierCount} earlier version${earlierCount === 1 ? '' : 's'}` : null,
-  ].filter(Boolean).join(' · ');
+  const reviewSummary = `${reviewers.length} reviewed`;
   return (
     <div className="flex flex-wrap items-center gap-2" aria-label={`Review activity: ${reviewSummary}`}>
       <span className="text-xs text-gray-500">{reviewSummary}</span>
@@ -98,11 +93,7 @@ function ReviewerInitials({ reviewers = [] }) {
             key={reviewer.reviewerId}
             title={`${reviewer.name || 'Reviewer'} — ${reviewer.state === 'updated' ? 'document changed since review' : 'reviewed'}`}
             aria-label={`${reviewer.name || 'Reviewer'} — ${reviewer.state === 'updated' ? 'document changed since this review' : 'Reviewed'}`}
-            className={`flex h-8 w-8 items-center justify-center rounded-full border-2 border-white text-xs font-bold ${
-              reviewer.state === 'updated'
-                ? 'bg-amber-100 text-amber-900'
-                : 'bg-gray-900 text-white'
-            }`}
+            className="flex h-8 w-8 items-center justify-center rounded-full border-2 border-white bg-green-50 text-green-800 text-xs font-bold"
           >
             {reviewer.initials || '•'}
           </span>
@@ -122,7 +113,7 @@ function VersionContext({ currentVersion, acknowledgedVersion, personalState }) 
     <span className="text-xs text-gray-500">
       Version {currentVersion}
       {personalState === 'updated' && acknowledgedVersion && (
-        <span className="text-amber-900"> · You reviewed version {acknowledgedVersion}</span>
+        <span> · You reviewed version {acknowledgedVersion}</span>
       )}
     </span>
   );
@@ -238,13 +229,13 @@ function QueueSection({ title, description, rows, emptyCopy, secondary = false }
 function MatrixState({ state, reviewerName, requestNumber }) {
   const copy = {
     reviewed: 'Reviewed',
-    updated: 'Updated',
+    updated: 'Reviewed',
     unreviewed: 'Not reviewed',
     'not-applicable': 'Responsible PD',
   }[state] || 'Unavailable';
   const classes = {
     reviewed: 'border-green-200 bg-green-50 text-green-800',
-    updated: 'border-amber-200 bg-amber-50 text-amber-900',
+    updated: 'border-green-200 bg-green-50 text-green-800',
     unreviewed: 'border-gray-200 bg-white text-gray-600',
     'not-applicable': 'border-gray-200 bg-gray-100 text-gray-600',
   }[state] || 'border-red-200 bg-red-50 text-red-800';
@@ -955,22 +946,19 @@ function acknowledgementVersionCopy(writeup) {
 
 function AcknowledgementPanel({ writeup, viewer, saving, error, onAcknowledge }) {
   if (!writeup.mayAcknowledge) return null;
-  const reviewed = writeup.personalState === 'reviewed';
-  const updated = writeup.personalState === 'updated';
+  const reviewed = ['reviewed', 'updated'].includes(writeup.personalState);
   const warning = stageMovedOnWarning(writeup, viewer);
   return (
     <section aria-labelledby="review-state-heading" className="rounded-xl border border-gray-200 bg-white p-5 sm:p-6">
       <div className="flex flex-col gap-5 sm:flex-row sm:items-start sm:justify-between">
         <div className="max-w-2xl">
           <h2 id="review-state-heading" className="text-lg font-semibold text-gray-900">
-            {reviewed ? 'You reviewed this version' : updated ? 'The writeup changed after your review' : 'Record your review'}
+            {reviewed ? 'Your review is complete' : 'Record your review'}
           </h2>
           <p className="mt-1 text-sm leading-6 text-gray-600">
             {reviewed
-              ? 'Your acknowledgement is recorded. It does not approve the writeup or prevent later edits.'
-              : updated
-                ? 'Your earlier acknowledgement remains in history. Record the latest version after you have reviewed the changes.'
-                : 'After reading the current version, sign off. This is personal tracking, not an approval.'}
+              ? 'Your review remains complete after edits. The lead Program Director is responsible for addressing feedback.'
+              : 'After reading and leaving any feedback in Word, mark reviewed. The lead Program Director will address corrections and comments.'}
           </p>
           {writeup.acknowledgedAt && (
             <p className="mt-2 text-xs text-gray-500">
@@ -991,7 +979,7 @@ function AcknowledgementPanel({ writeup, viewer, saving, error, onAcknowledge })
             disabled={saving}
             className="inline-flex min-h-11 shrink-0 items-center justify-center rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-sm font-semibold text-gray-900 hover:border-gray-400 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2 disabled:cursor-wait disabled:opacity-60"
           >
-            {saving ? 'Signing off…' : updated ? 'Sign off latest version' : 'Sign off'}
+            {saving ? 'Recording review…' : 'Mark reviewed'}
           </button>
         )}
       </div>
