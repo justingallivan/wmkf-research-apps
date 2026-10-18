@@ -30,6 +30,9 @@ const SENDER_PATTERN = /\.createAndSendEmail\(|\.createEmailActivity\(|DynamicsS
 // records or sending (senders the delivery seam cannot see, or that act before
 // it).
 const RECORDED_SENDERS = {
+  // Cycle-level notices: release notices reject nonordinary roster rows before
+  // journal/email writes; historical notices expose only revalidated labels.
+  'lib/services/board-writeups/notifications.js': { audience: 'staff', early: [] },
   'lib/services/admin/test-email-service.js': { audience: 'staff', early: [] },
   // Group-review handoff (Stage 4): regarding the request, so the delivery seam refuses test requests.
   'lib/services/final-writeup/handoff-email-service.js': { audience: 'staff', early: [] },
@@ -59,6 +62,7 @@ const RECORDED_SENDERS = {
 // lib/ files that reach a sender through its exported send helpers rather than
 // the transport, with where their test-request refusal lives.
 const RECORDED_INDIRECT = {
+  'lib/services/board-writeups/worker.js': 'deliverNotice refuses nonordinary release requests before journal/email writes and revalidates historical labels; the worker requires explicit Board activation',
   'lib/services/cron/grantee-deliverable-reminders-service.js': 'processRow skips test requests before recipient reads or ledger writes; deliverScheduledEmail checks before claim',
   'lib/services/pre-site-visit/artifact-service.js': 'group-review regeneration stages only a durable intent before activation; deliverGroupReviewHandoff creates a regarding-Request email and the shared Dynamics transport test-request check plus dispatch recheck refuse delivery',
   'lib/services/reviewer-manual-reminder.js': 'sendOneReminder sends with the request as regarding; delivery seam and dispatch recheck',

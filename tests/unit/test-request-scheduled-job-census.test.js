@@ -23,6 +23,7 @@ const GUARD = /createRequestTestStateLookup\(|resolveRequestTestState|resolveTes
 //   operational — global monitoring, pricing, retention or reference data; no per-request action
 //   n/a         — cannot reach a test request
 const RECORDED_CRONS = {
+  'board-writeups': { scheduled: true, class: 'guarded', guardFiles: ['lib/services/board-writeups/source.js'], note: 'ordinary Research roster only; release and archive paths revalidate request eligibility, and release notices refuse nonordinary requests before journal or email writes' },
   'auth-bypass-check': { scheduled: true, class: 'operational' },
   'drain-materials-uploads': { scheduled: true, class: 'allowed', note: 'continues an explicitly submitted token-authorized applicant upload; no request selection or email; materials background plan records this decision' },
   'drain-zoom-video-copies': { scheduled: true, class: 'allowed', note: 'every minute; continues a recording-video copy staff started on a chosen request (Stage 3b ruling 14); the worker rechecks ZOOM_VIDEO_COPY_ACCESS and request access before every claim and write, and receipt repair is local Postgres only' },
@@ -69,14 +70,14 @@ test('every cron route is recorded', () => {
     .filter((name) => name.endsWith('.js'))
     .map((name) => name.replace(/\.js$/, ''))
     .sort();
-  expect(routes).toHaveLength(31);
+  expect(routes).toHaveLength(32);
   expect(routes).toEqual(Object.keys(RECORDED_CRONS).sort());
 });
 
 test('the recorded schedule matches vercel.json', () => {
   const crons = JSON.parse(fs.readFileSync(path.join(ROOT, 'vercel.json'), 'utf8')).crons;
-  expect(crons).toHaveLength(30);
-  expect(new Set(crons.map(({ path: cronPath }) => cronPath.split('?')[0])).size).toBe(29);
+  expect(crons).toHaveLength(31);
+  expect(new Set(crons.map(({ path: cronPath }) => cronPath.split('?')[0])).size).toBe(30);
   const transcriptionCrons = crons.filter((cron) =>
     typeof cron.path === 'string' && cron.path.split('?')[0] === '/api/cron/drain-transcriptions'
   ).map(({ path: cronPath, schedule }) => ({ path: cronPath, schedule })).sort((a, b) => a.path.localeCompare(b.path));

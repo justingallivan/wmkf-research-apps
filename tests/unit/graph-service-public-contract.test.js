@@ -5,6 +5,10 @@ import { GraphService, SHAREPOINT_CANONICAL_SITE_URL } from '../../lib/services/
 
 const originalFetch = global.fetch;
 const METHODS = {
+  assertBoardWriteEnvironment: [0, false],
+  boardFolder: [2, false],
+  boardChildren: [1, false],
+  boardUploadSession: [2, false],
   getAccessToken: [0, true],
   buildHeaders: [1, false],
   getSiteId: [0, true],
@@ -58,7 +62,7 @@ beforeEach(() => {
 test('keeps the named export, canonical URL, own static surface, arity, and sync/async split', () => {
   expect(SHAREPOINT_CANONICAL_SITE_URL).toBe('https://appriver3651007194.sharepoint.com/sites/akoyaGO');
   expect(Object.keys(graphServiceModule).sort()).toEqual(['GraphService', 'SHAREPOINT_CANONICAL_SITE_URL']);
-  expect(Object.keys(METHODS)).toHaveLength(28);
+  expect(Object.keys(METHODS)).toHaveLength(32);
   expect(Object.getOwnPropertyNames(GraphService)
     .filter(name => !['length', 'name', 'prototype'].includes(name)).sort())
     .toEqual(Object.keys(METHODS).sort());

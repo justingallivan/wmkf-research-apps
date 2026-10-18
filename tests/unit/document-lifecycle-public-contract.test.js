@@ -125,6 +125,7 @@ describe('governed document lifecycle public boundaries (Stage 0)', () => {
 
     expect(result).toEqual({
       leadProgramDirectorId: null,
+      grantProgramId: null,
       currentArtifact: null,
       pendingArtifact: null,
       reopenHistory: [],
