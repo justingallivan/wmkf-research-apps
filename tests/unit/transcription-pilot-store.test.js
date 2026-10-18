@@ -675,6 +675,18 @@ describe('Zoom transcript and speaker alignment persistence', () => {
       speakerNames: {}, alignment: { status: 'applied', blob: 'x'.repeat(70000) } })).rejects.toMatchObject({ code: 'transcription_invalid_value' });
   });
 
+  it('fragment warnings persist only inside the same fenced alignment record', async () => {
+    const db = fakeDatabase();
+    const store = createTranscriptionPilotStore(db);
+    const fragmentReview = { status: 'complete', limited: false, warnings: [{ index: 1, speakerId: 'A', reason: 'Continuous clause.' }] };
+    await store.completeAlignment({ jobId: JOB, leaseToken: TOKEN, expectedVersion: 4,
+      speakerNames: { A: 'Alex' }, alignment: { status: 'applied', fragmentReview } });
+    const [query, params] = db.query.mock.calls[0];
+    expect(JSON.parse(params[4]).fragmentReview).toEqual(fragmentReview);
+    expect(query).toMatch(/lease_token = \$2 AND lease_expires_at > NOW\(\) AND version = \$3/);
+    expect(query).toMatch(/cleanup_requested_at IS NULL/);
+  });
+
   it('failAlignment is fenced, caps at three attempts, and validates its code', async () => {
     const db = fakeDatabase();
     const store = createTranscriptionPilotStore(db);

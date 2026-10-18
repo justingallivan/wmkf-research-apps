@@ -100,7 +100,7 @@ describe('seed script composition', () => {
   });
   test('uses the sonnet tier alias, 16384 max tokens, create-only seedPromptRow with --force', () => {
     expect(seed).toContain("wmkf_ai_model: 'sonnet'");
-    expect(seed).toContain('wmkf_ai_maxtokens: 16384');
+    expect(seed).toContain("wmkf_ai_maxtokens: process.argv.includes('--fragment-review') ? 2048 : 16384");
     expect(seed).toContain("process.argv.includes('--force')");
     expect(seed).toContain('seedPromptRow({ promptName: PROMPT_NAME, recordData, force: FORCE })');
   });

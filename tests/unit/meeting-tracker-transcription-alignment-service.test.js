@@ -517,3 +517,26 @@ test('automatic generation discovers a late participant inside an earlier audio 
   expect(split.utterances.slice(-3).map(u => speakerNames[u.speaker])).toEqual(['Late Person', 'Late Person', 'Late Person']);
   expect(split.utterances.slice(0, 6).map(u => speakerNames[u.speaker])).toEqual([NAME_A, NAME_B, NAME_A, NAME_B, NAME_A, NAME_B]);
 });
+
+test.each([false, true])('fragment review travels through the final fenced alignment write (failure=%s)', async fails => {
+  const f = fixture(); const parsed = JSON.parse(f.content);
+  const index = parsed.utterances.length + 1;
+  parsed.utterances.push(
+    { speaker: 'A', start: 50000, end: 50500, text: 'I' },
+    { speaker: 'B', start: 50500, end: 50800, text: 'was' },
+    { speaker: 'A', start: 50800, end: 53000, text: 'ready to test the prototype.' },
+  );
+  arrange({ ...f, content: JSON.stringify(parsed) });
+  executePrompt.mockImplementation(async ({ promptName }) => {
+    if (promptName === 'meeting-transcript.speaker-alignment') return { parsed: goodVerdict };
+    if (fails) throw new Error('private provider failure');
+    return { parsed: { [index]: { classification: 'sentence_fragment', reason: 'Continuous clause.' } } };
+  });
+  await alignMeetingTranscriptionSpeakers({ jobId });
+  expect(executePrompt).toHaveBeenCalledTimes(2);
+  const { alignment } = store.completeTranscriptionAlignment.mock.calls[0][0];
+  expect(alignment.fragmentReview.status).toBe(fails ? 'unavailable' : 'complete');
+  expect(alignment.reassigned?.[index]).toBeUndefined();
+  expect(store.failTranscriptionAlignment).not.toHaveBeenCalled();
+  expectNoLeak('private provider failure');
+});

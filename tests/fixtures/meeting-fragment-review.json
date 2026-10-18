@@ -1,0 +1,8 @@
+[
+  { "id": "continuous-clause", "before": "I", "middle": "was", "after": "ready to test the prototype after lunch.", "expected": "sentence_fragment", "basis": "Synthetic continuous clause with an isolated verb." },
+  { "id": "yes-answer", "before": "Do you agree?", "middle": "Yes.", "after": "Thank you. Let us move on.", "expected": "interjection", "basis": "Independent answer to a direct question." },
+  { "id": "no-answer", "before": "Have we received the report?", "middle": "No.", "after": "Then we will wait.", "expected": "interjection", "basis": "Independent answer to a direct question." },
+  { "id": "embedded-yes", "before": "I would cast a", "middle": "yes", "after": "vote on this proposal.", "expected": "sentence_fragment", "basis": "Yes modifies vote within a continuous clause." },
+  { "id": "embedded-no", "before": "I would cast a", "middle": "no", "after": "vote on this proposal.", "expected": "sentence_fragment", "basis": "No modifies vote within a continuous clause." },
+  { "id": "ambiguous", "before": "It could work.", "middle": "Right.", "after": "We should discuss the cost.", "expected": "uncertain-or-interjection", "basis": "Do not flag a plausible independent acknowledgment." }
+]
