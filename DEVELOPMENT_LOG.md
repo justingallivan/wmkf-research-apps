@@ -10,6 +10,20 @@ The chronological archive after the `Legacy chronological session log` divider c
 
 ---
 
+## October 2026 — Discussion attribution safeguards and fragment review (Session 617)
+
+**Milestone:** conservative attendance review and bounded AI sentence-fragment warnings released for transcript review.
+**Sessions:** 617 (Codex; owner-confirmed corrections, bounded evaluation and deliberate production release).
+**Ship state:**
+- PR #497, sanitized implementation `f669ab40c`; merge `aaf95e1828eb3c801865e5a969f358fdc3fc782f`, Ready production `dpl_DrBHYVUB6whmYZmtyk1qJ2VBRHka` at that exact SHA.
+- Uncertain identities and supported departure conflicts receive conservative review defaults; earlier decisions are preserved.
+- One-word sentence-fragment warnings use one bounded optional call and never rewrite speaker assignments, words or timing; prompt v1 is published.
+- 404 targeted tests passed; six live evaluation cases passed through both client and Executor; all PR CI checks passed.
+**Why it matters:** staff can spot suspicious attribution before publishing without treating grammatical continuity as proof of identity.
+**Pointers:** `lib/services/meeting-tracker-transcription/fragment-review.js`; `shared/config/prompts/meeting-fragment-review.js`; PR #497; Session 617 handoff.
+
+---
+
 ## October 2026 — Final Writeups review tracking corrected (Session 616)
 
 **Milestone:** Final Writeups excludes test proposals; completed PD and leadership reviews stay green after edits while retaining reviewed-version history.
