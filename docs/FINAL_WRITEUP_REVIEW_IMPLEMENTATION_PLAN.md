@@ -3,10 +3,10 @@ title: Final Writeup Review — Implementation Plan
 domain: workbench
 kind: plan
 status: active
-summary: "Final runtime, staffing, lenses, and dashboard Slices 6A–6C are Production-live; the leadership-review transition (Slice 4) is Production-live since 2026-09-07."
+summary: "Final runtime, staffing, lenses, and dashboard Slices 6A–6C are live; completed reviews stay green after edits with original review version/date."
 canonical: false
 cataloged: 2026-08-28
-last_verified: 2026-09-07
+last_verified: 2026-10-18
 owner: product-engineering
 related:
   - docs/audits/final-writeup-review-fable-review-2026-08-28.md
@@ -149,8 +149,9 @@ audience for that request's broad Grant Program. The dashboard
 must include a full coordinator matrix showing who has reviewed each writeup,
 subject to the same caveats as individual acknowledgements: it is tracking, not
 approval; blanks are not failures; there is no required count, due date, or
-leadership sequence; and a later Word version yields **Updated since review**
-rather than erasing the acknowledgement. The responsible PD does not
+leadership sequence. Since PR #496 (2026-10-18), ordinary edits preserve
+completed green reviews and their original acknowledged version/date without
+requesting another review. The responsible PD does not
 self-acknowledge their own writeup. In Production, the complete matrix is
 available to freshly identified superusers and explicitly configured Program
 Coordinators. PD, Leadership, and overlapping queue visibility is derived from
@@ -267,12 +268,12 @@ The frozen distribution snapshot already preserves what colleagues received. Sha
 | Every stage transition records the actual initiating staff member | Final row transition fields and services | Explicit actor lookup and timestamp are written from session-derived identity; `modifiedby` and impersonation fallback are not authoritative |
 | “Ready for leadership review” records an exact checkpoint but does not create another file | Stage-transition service | Final lifecycle moves from `REVIEW` to `FINAL`; stable version/hash/time and explicit actor are recorded; stable file identity is unchanged |
 | Acknowledgement belongs to the signed-in reviewer and the exact current Final document version | Acknowledgement route/service/entity | Reviewer identity absent from request body; server resolves current pointer and Graph version; responsible-PD self-review rejected |
-| Later content versions retain the acknowledgement and yield “Updated since your review” | Dashboard/read model | Stored acknowledged publication version differs from current publication version; last-modified is secondary; eTag alone never marks stale; acknowledgement row remains |
-| A reviewed document does not return to the President’s open queue after an ordinary edit | Dashboard service | Queue membership uses acknowledgement existence; freshness affects its label only |
+| Later content versions retain the completed green review and original acknowledgement | Dashboard/read model | The acknowledgement row, reviewed publication version, and date remain stored; a version difference is shown as context, with no repeat-review action |
+| A reviewed document does not return to the President’s open queue after an ordinary edit | Dashboard service | Queue membership uses acknowledgement existence; a version difference does not change the green Reviewed label or request another review |
 | A materially new Final successor has no inherited acknowledgement | Final successor + acknowledgement read model | Acknowledgements key to Final artifact identity; new current artifact begins without rows |
 | Other reviewers cannot advance stages | Final transition route/service | Hard server-side owner/approved-PC gate; UI hiding is not treated as authorization |
 | Supporting materials are read-only and do not expose reviewer-management controls | Focused review page and supporting-material service | Purpose-built projection; route tests prove only allowlisted request/document data is returned |
-| The coordinator matrix is complete without becoming a compliance scorecard | Dashboard service and PC/superuser lens | Every in-scope writeup × intended reviewer cell is present; blank, Reviewed, and Updated since review are neutral states; no denominator, overdue flag, required count, or enforced order |
+| The coordinator matrix is complete without becoming a compliance scorecard | Dashboard service and PC/superuser lens | Every in-scope writeup × intended reviewer cell is present; blank and Reviewed are neutral states; ordinary edits keep a completed review green and preserve its date; no denominator, overdue flag, required count, or enforced order |
 | Editing remains in Microsoft Word, outside the Workbench | Final tab, dashboard, focused page | Actions open the canonical SharePoint link in a separate browser window/tab; no iframe, embedded editor, or app-native document editor is introduced |
 | Action labels distinguish the queue step from the external editor | Workbench panels, dashboard, focused page | Dashboard non-owner: **Open review**; focused document: **Open in Word**; responsible PD: **Edit in Word** |
 | Program taxonomy does not control access or primary grouping | Dashboard/persona service | No grant-program/program-area branch in authorization or default lists |
@@ -357,7 +358,7 @@ A separate service owns mark/read behavior. The write body contains the Request 
 4. upserts the caller’s acknowledgement under the alternate key for that observed publication version, using `If-Match` when replacing a prior acknowledgement;
 5. returns the derived personal state and updated positive-initial list.
 
-An edit that lands after the observation is simply a later edit: the next read derives **Updated since your review** by comparing publication version first and last-modified time only as a secondary signal. eTag is retained as diagnostic metadata but never marks a review stale by itself. AutoSave or co-authoring activity between the read and upsert does not prevent the acknowledgement. The service must not report a failed acknowledgement after it has already persisted one.
+An edit that lands after the observation is simply a later edit: the next read can show that the current publication version differs from the acknowledged version, comparing publication version first and last-modified time only as a secondary signal. Since PR #496 (2026-10-18), that version context does not change the completed green Reviewed state, clear the original acknowledgement date, or request another review. eTag is retained as diagnostic metadata but never marks a review stale by itself. AutoSave or co-authoring activity between the read and upsert does not prevent the acknowledgement. The service must not report a failed acknowledgement after it has already persisted one.
 
 ### 3. Cross-request dashboard
 
@@ -389,7 +390,7 @@ The service, not the client, derives queue membership. Leadership and PC cycle s
   Slice 6A: nothing disappears from a PD view unless they filter it out by choice);
 - PC lens: all active writeups, with review as the primary row action and stewardship controls secondary;
 - leadership lens: leadership-stage writeups only, with open and reviewed lists;
-- President behavior: an acknowledged row stays in reviewed history after later edits and displays **Updated since your review** there.
+- President behavior: an acknowledged row stays in Reviewed history after later edits. It remains green **Reviewed**, keeps its original reviewed version/date, and may show the current version as separate context; no repeat review is requested.
 
 ### 4. Supporting materials
 
@@ -463,7 +464,7 @@ Leadership review.
 - During group review, show **Ready for leadership review** to the responsible PD.
 - Show any PC backup action only when the server positively returns that permission; render it as secondary/exceptional.
 - Do not add board-package controls yet.
-- Do not add a backward-stage control in the first release. If the PD advances early, the same document remains editable and ordinary freshness states reflect later changes.
+- Do not add a backward-stage control in the first release. If the PD advances early, the same document remains editable and completed reviews remain green through ordinary edits.
 
 ### Final Writeups dashboard
 
@@ -480,7 +481,9 @@ Leadership review.
   identified PCs only after persona rollout. It shows every in-scope writeup
   against the intended reviewer set for that request's configured broad Grant
   Program
-  with neutral blank / Reviewed / Updated since review states. It is a tracking
+  with neutral blank / Reviewed states. A newer document version may be shown
+  beside the original reviewed version/date without changing the completed state.
+  It is a tracking
   view, not an approval, completion, or performance report.
 
 ### Focused reviewer page
@@ -697,7 +700,8 @@ read model's scope, cap, and fail-closed behavior change):
   `dpl_2UrsDnydRqudu95wJyLCK7A6FUFR`, owner-run signed-in smoke passed 2026-09-07; per
   `docs/FINAL_WRITEUPS_DASHBOARD_VIEWS_AND_VERSION_PLAN.md`, three Codex plan passes).** The page
   opens on "Needs my review" for every role (`bucket open`), with "Reviewed by me" (`bucket history`,
-  including Updated-since-review rows) and "All writeups" (every visible row, merged and sorted by
+  including rows whose current publication version is newer than their acknowledged version)
+  and "All writeups" (every visible row, merged and sorted by
   request number) as the only alternatives, plus a Program director dropdown derived from the loaded
   rows. The stage filter was dropped (two stages only; the label is already on each row) and the
   four-state control was not built. Both controls persist in the page URL (`view`, `pd`), are
@@ -707,8 +711,11 @@ read model's scope, cap, and fail-closed behavior change):
   program-taxonomy grouping or authorization branch. The header thesis comment in
   `FinalWriteupsViews.js` carries the amended direction.
 - **6C — current-version context (PRODUCTION-LIVE 2026-09-07, same merge).** Preview is retired; each row
-  shows "Version {publicationVersionId}" (verbatim Graph string) and, when Updated since review,
-  "You reviewed version {acknowledgedPublicationVersionId}". The shared projection and the POST
+  shows "Version {publicationVersionId}" (verbatim Graph string) and, when the acknowledged and
+  current versions differ, "You reviewed version {acknowledgedPublicationVersionId}". The review
+  version comparison is shown as **Updated since your review** in this 2026-09-07 release snapshot.
+  Current presentation (PR #496, 2026-10-18) keeps a completed review green and complete; this is
+  version context, not a re-review request. The shared projection and the POST
   acknowledgement response both carry `acknowledgedPublicationVersionId` (null for the responsible
   PD). The focused page names the reviewed and current versions. No embedded editor, no iframe.
 - **6D — "has edits" secondary hint. CLOSED by owner decision 2026-09-06; do not build.**

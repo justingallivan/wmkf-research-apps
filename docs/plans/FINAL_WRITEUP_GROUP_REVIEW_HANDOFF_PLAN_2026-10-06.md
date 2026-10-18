@@ -57,8 +57,9 @@ Checked in source on 2026-10-06:
   link before handoff. The Pre-Site projection always returns `webUrl`
   (`lib/services/pre-site-visit/artifact-model.js:411`).
 - **Sign-off.** "Mark reviewed" acknowledgements exist (`acknowledgement-service.js`). Each one is
-  keyed to the SharePoint publication version, and any later file change shows it as "Updated
-  since your review" (`:311`).
+  keyed to the SharePoint publication version. An ordinary edit to the same Final keeps the stored
+  review version and date and leaves the review complete and green; the current version may be
+  shown separately as context. No repeat sign-off is requested (PR #496, `3b54a3727`, 2026-10-18).
 - **Who can see sign-off status.** The full expected-reviewer matrix is visible only to
   superusers and PCs (`dashboard-service.js:676-678`). The lead PD sees only "Reviewed by"
   (people who acknowledged).
@@ -75,9 +76,11 @@ Checked in source on 2026-10-06:
 ## 3. Owner decisions (resolved 2026-10-06: A yes, B as recommended, C defaults accepted)
 
 **A. Edits made after a sign-off.** In group editing, almost every sign-off will be followed by
-someone's edit. Recommendation (simplest): keep the stored model unchanged, and change only how
-it is displayed and counted. A sign-off on an earlier version still counts, with an "edited
-since" note. **Decided: yes.**
+someone's edit. The stored acknowledgement remains keyed to the publication version that person
+reviewed. **Shipped behavior (PR #496, `3b54a3727`, 2026-10-18):** a sign-off on an earlier version
+still counts as complete and renders green **Reviewed**; its original version and date are
+preserved, with any newer current version shown as separate context. Ordinary edits do not ask for
+another sign-off.
 
 **B. How "Research only for now" is realized.** **Decided as recommended:** no new allowlist (per the
 minimal per-cycle configuration rule).
@@ -217,12 +220,15 @@ directly, so it is not guarded (Codex re-review finding, 2026-10-06).
 - Roster statuses separate "no list for this program" and "staffing not published" from an
   empty list, so a request outside a configured program never reads as fully signed off.
 - "Mark reviewed" became "Sign off" on the Workbench tab and on the Final writeups action
-  button. The Final writeups view names ("Needs my review", "Reviewed by me") and matrix labels
-  are unchanged and remain an open wording question.
-- Rename "Mark reviewed" → "Sign off".
+  button. The Final writeups view names ("Needs my review", "Reviewed by me") remain unchanged.
+  This records the Stage 3 label change from the 2026-10-07 implementation snapshot. The current
+  open-state action label is **Mark reviewed**; PR #496 (2026-10-18) closed the review-state
+  wording question: completed acknowledgements stay green **Reviewed** after ordinary edits, and
+  the original reviewed version/date are retained.
 - Per-request projection visible to the lead PD and superusers:
   - expected PDs = program audience ∩ PD persona, minus the lead;
-  - each person: signed off / signed off (edited since) / not yet;
+  - a signed or signed-on-an-earlier-version state renders green **Reviewed**; unsigned people
+    remain **Not yet**. The version comparison is context only and does not reopen sign-off;
   - names only, no internal IDs.
 - PC and other staff sign-offs stay allowed and are listed, but are not counted against the PD
   total.

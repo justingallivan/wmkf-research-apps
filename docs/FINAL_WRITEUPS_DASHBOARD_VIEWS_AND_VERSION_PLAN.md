@@ -3,10 +3,10 @@ title: Final Writeups Dashboard — Slices 6B and 6C Views, PD Filter, and Versi
 domain: workbench
 kind: plan
 status: active
-summary: "Opens the Final writeups dashboard on Needs my review with two alternative views and a PD filter, URL-persisted; renders the acknowledged publication version."
+summary: "Final Writeups opens on Needs my review with two alternate views and a PD filter; completed reviews stay green after edits."
 canonical: false
 cataloged: 2026-09-06
-last_verified: 2026-09-07
+last_verified: 2026-10-18
 owner: product-engineering
 related:
   - docs/FINAL_WRITEUPS_DASHBOARD_CYCLE_SCOPING_PLAN.md
@@ -24,12 +24,13 @@ closed by owner decision and are not part of this plan. Every state claim below 
 
 ## 1. Why now
 
-D26 Final writeups do not exist yet. The dashboard is Production-live with Slice 6A cycle scoping
+D26 Final writeups do not exist yet. Current review-state presentation, verified
+2026-10-18 via PR #496, keeps completed reviews green after ordinary edits. The dashboard is Production-live with Slice 6A cycle scoping
 (`842c9f13`) and opens on three fixed queues: Awaiting your review, Reviewed history, Your writeups
 `[VERIFIED via shared/components/final-writeups/FinalWriteupsViews.js:602-616]`. The owner wants the
 page to open on the writeups that need the viewer's review, with two alternative views and a Program
 Director filter, all bookmarkable, and wants the publication version that acknowledgements key to
-visible per row so "Updated since review" is explainable without opening Word. Building before the
+visible per row so the version context is clear without opening Word. Building before the
 first D26 Final exists means the first real reviewers meet the intended shape.
 
 ## 2. Surface (contract-reconcile Step 0)
@@ -70,6 +71,10 @@ first D26 Final exists means the first real reviewers meet the intended shape.
   `not-applicable` for the responsible PD, else `reviewed` when the stored publication version
   equals the observed one, else `updated`; no row means `unreviewed`
   `[VERIFIED via lib/services/final-writeup/acknowledgement-service.js:317-320,360-362]`.
+- `updated` is version context, not an incomplete review: the dashboard keeps the row in
+  Reviewed by me and renders the completed state as green **Reviewed**. The stored reviewed
+  version and date remain available beside the current version; ordinary edits do not ask for
+  another review `[VERIFIED via FinalWriteupsViews.js:64-75,110-118 and PR #496 / 3b54a3727]`.
 - "Needs my review" therefore equals `bucket === 'open'` (eligible and not yet acknowledged);
   "Reviewed by me" equals `bucket === 'history'`; "All writeups" is every persona-visible row.
 - Rows carry `responsibleProgramDirector: { id, name }`, `stage`, `cycleCode`, `cycleLabel`,
@@ -125,9 +130,11 @@ concatenation of three pre-sorted queues.
 - Counts beside the options are navigation counts, never denominators (contract row "coordinator
   matrix is complete without becoming a compliance scorecard" holds). They reflect the current PD
   filter and search so the numbers match what switching would show.
-- `personalState: 'updated'` rows stay in **Reviewed by me** with the amber "Updated since review"
-  chip. This is the existing product decision, already in live copy: "A later edit is shown as an
-  update, not a new requirement" `[VERIFIED via FinalWriteupsViews.js:610]`. Owner default; see §10.
+- `personalState: 'updated'` rows stay in **Reviewed by me** with the green **Reviewed** chip.
+  The row shows both the current publication version and, when they differ, the version the
+  reviewer acknowledged. The completion and original acknowledgement date remain intact; an
+  ordinary edit does not create a new review requirement `[VERIFIED via
+  FinalWriteupsViews.js:64-75,110-118 and PR #496 / 3b54a3727]`.
 - Stewardship rows (the viewer's own writeups, `mayAcknowledge: false`) never appear in Needs my
   review or Reviewed by me main lists. Under those two views the existing collapsed "Your writeups"
   section remains below the main list; under All writeups the section is omitted because its rows
@@ -330,8 +337,9 @@ a matrix present) so a deleted guard turns the test red.
 
 **Non-blocking; defaults stated. The build proceeds on the defaults unless the owner objects.**
 
-1. **Updated-since-review rows stay in Reviewed by me** (amber chip), per the live copy "an update,
-   not a new requirement". Alternative: move them to Needs my review. Default: stay.
+1. **Edited writeups stay in Reviewed by me with a green Reviewed state.** The acknowledged
+   version and original date remain visible as version context; an ordinary edit does not require
+   another review. This presentation shipped in PR #496 (`3b54a3727`, 2026-10-18).
 2. **Your writeups** remains a collapsed section under Needs my review and Reviewed by me, and is
    folded into the list under All writeups. Alternative: a fourth view "My writeups". Default: as
    stated (the owner dropped the stage filter to keep controls minimal; a fourth view cuts the other

@@ -34,7 +34,6 @@
 
 ### Verify Before Acting
 
-- **Prior session's Final Writeups wording debt:** older amber/updated-review descriptions remain in planning documents. Runtime keeps completed reviews green with original reviewed-version history. Reconcile only if separately scoped; do not restore old behavior from stale prose. Pointers: `docs/FINAL_WRITEUPS_DASHBOARD_VIEWS_AND_VERSION_PLAN.md`, `docs/FINAL_WRITEUP_REVIEW_IMPLEMENTATION_PLAN.md`, `docs/STRATEGY.md`.
 - Earlier unrelated tasks were not re-audited. Historical handoffs remain available at `6d6fb0740:SESSION_PROMPT.md`; consult source, current owner decisions and live state before turning any carryover into work.
 
 ### Do Not Reopen Without New Decision

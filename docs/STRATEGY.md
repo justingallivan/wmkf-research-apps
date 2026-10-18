@@ -246,8 +246,9 @@ The reviewer set shown for a request is separately configurable by its broad
 Grant Program. The full
 coordinator matrix is included as neutral tracking: blank does not mean failure,
 there is no required count, due date, compliance score, or leadership order,
-and later edits produce **Updated since review** without erasing the recorded
-acknowledgement. The neutral acknowledgement-role rollout is complete for the
+and later edits leave completed reviews green and in history, preserving the
+original acknowledged version and date without asking for another review. The
+current publication version may be shown as separate context. The neutral acknowledgement-role rollout is complete for the
 confirmed 11-person audience. **[PRODUCTION-LIVE + SIGNED-IN READ SMOKE PASSED
 2026-08-31]** commit `52575761` and Ready deployment
 `dpl_Frc6fAonyFFYwiWyFJCzzE3UNune` ship the superuser Final Writeups index with
@@ -257,6 +258,9 @@ with zero browser-console errors. It provides direct review/Word links and
 neutral Responsible PD / Not reviewed / Reviewed / Updated states.
 **[PRODUCTION-LIVE + SIGNED-IN READ/WRITE PROVED 2026-08-31]** Commit
 `5573bca3` is live in Ready deployment `dpl_5DNuc2BV76RihwuWu8ZFYBgxBXE7`.
+**Current review presentation (PR #496, 2026-10-18):** ordinary edits to the same Final keep a
+completed review green and in history. The original acknowledged version and date remain available,
+and a newer current version is shown as context without requesting another review.
 The program-audience Admin editor stores stable broad Grant Program GUID →
 reviewer GUID configuration. The published Research audience contains nine
 current reviewer-role members and excludes owner-confirmed Southern California
