@@ -1,3 +1,4 @@
+import FragmentReviewWarnings from './FragmentReviewWarnings';
 import { resolveDiscussionAttribution } from '../../../lib/services/meeting-tracker-transcription/presentation-boundary';
 /** Site Visit "Recording and transcript" card: recording, transcript upload/generation, speaker names, board link. */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -2550,6 +2551,8 @@ function PresentationEndEditor({ t, readOnly }) {
           {t.attendanceDecision.rows.map((row, index) => row.kind === kind && <label key={index} className="flex items-start gap-2 text-sm">
             <input type="checkbox" checked={t.attendanceKept[index]} onChange={event => t.setAttendanceKept(index, event.target.checked)} />
             <span>{row.displayName}{row.lastLeaveAt && <span className="ml-2 text-xs text-gray-600">Left {new Date(row.lastLeaveAt).toLocaleString('en-US', { timeZone: t.attendanceReview.timeZone || 'UTC', hour: 'numeric', minute: '2-digit', timeZoneName: 'short' })}</span>}
+              {t.attendanceReview.identityUncertain?.[index] && <span className="block text-xs text-gray-600">Identity uncertain. Leave unchecked to display “Unidentified speaker”.</span>}
+              {t.attendanceReview.spokeAfterDeparture?.[index] && <span className="block text-xs text-gray-600">Discussion speech is assigned to this person after their Zoom departure. Confirm the identity before checking.</span>}
               {t.attendanceReview.leftBeforeEnd[index] && <span className="block text-xs text-gray-600">Left before the presentation ended</span>}</span>
           </label>)}
         </div>)}
@@ -2632,6 +2635,7 @@ function ReviewBlock({ t }) {
         {alignmentShown && ALIGNMENT_REASONS[alignmentStatus] && <p className="mt-3 text-sm leading-5 text-gray-700">{ALIGNMENT_REASONS[alignmentStatus]}</p>}
         <SpeakerEditor t={{ ...t, collection }} alignment={alignment} readOnly={matchingActive || (correction && correction.state !== 'draft')} />
         {correction && <PresentationEndEditor t={t} readOnly={correction.state !== 'draft'} />}
+        {alignmentShown && !matchingActive && <FragmentReviewWarnings review={alignment?.fragmentReview} content={t.content} names={t.names} presentationEndMs={t.presentationEndMs} />}
         <TranscriptPreview content={resolveDiscussionAttribution(t.content, t.presentationEndMs, t.previewDecision)} names={t.names} />
         <div className="mt-3 flex flex-wrap items-center gap-2">
           <span className="mr-auto text-xs text-gray-600" aria-live="polite">{correction ? (dirty ? 'Unsaved changes' : 'Saved') : (dirty ? 'Unsaved name changes' : 'Names saved')}</span>

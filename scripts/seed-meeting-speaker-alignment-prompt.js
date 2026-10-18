@@ -25,6 +25,9 @@
  *   node scripts/seed-meeting-speaker-alignment-prompt.js --execute            # bootstrap (refuses if exists)
  *   node scripts/seed-meeting-speaker-alignment-prompt.js --execute --force    # publish a recovery version
  *
+ * Add --fragment-review to seed the separate review-only sentence-fragment prompt instead.
+ * This does not change the speaker-alignment prompt. Neither seed runs during deployment.
+ *
  * Target (prod Dynamics — via .env.local): entity wmkf_ai_prompts,
  *   wmkf_ai_promptname = 'meeting-transcript.speaker-alignment'.
  * Prompt text source of truth: shared/config/prompts/meeting-speaker-alignment.js.
@@ -51,7 +54,9 @@ for (const envFile of ['.env', '.env.local']) {
 const { enterDynamicsBypassForScript } = await import('../lib/services/dynamics-context.js');
 const { seedPromptRow, planSeed, SeedRefused } = await import('../lib/services/prompt-seed.js');
 const { PROMPT_NAME, SYSTEM_PROMPT, USER_PROMPT_TEMPLATE, PROMPT_VARIABLES, PROMPT_OUTPUT_SCHEMA } = await import(
-  '../shared/config/prompts/meeting-speaker-alignment.js'
+  process.argv.includes('--fragment-review')
+    ? '../shared/config/prompts/meeting-fragment-review.js'
+    : '../shared/config/prompts/meeting-speaker-alignment.js'
 );
 enterDynamicsBypassForScript('seed-meeting-speaker-alignment-prompt');
 
@@ -86,11 +91,13 @@ const recordData = {
   // reviewed temperature-less models.
   wmkf_ai_model: 'sonnet',
   wmkf_ai_temperature: 0,
-  wmkf_ai_maxtokens: 16384,
+  wmkf_ai_maxtokens: process.argv.includes('--fragment-review') ? 2048 : 16384,
   wmkf_ai_promptstatus: PROMPTSTATUS_PUBLISHED,
   // wmkf_ai_iscurrent / wmkf_promptversion / wmkf_ai_publisheddatetime are set by
   // seedPromptRow (create-only + version-preserving force) — not here.
-  wmkf_ai_notes:
+  wmkf_ai_notes: process.argv.includes('--fragment-review')
+    ? 'Review-only one-word fragment check. Untrusted passages; no output persistence; content-free audit. Source: shared/config/prompts/meeting-fragment-review.js.'
+    :
     'Zoom VTT speaker-alignment verifier. All-override; speaker_samples/zoom_names/prior untrusted ' +
     '(dataClass meeting_transcript); parseMode json keyed by speaker ID; output verdict target kind:none; ' +
     'rawOutputRetention none. Caller passes requireNoPersistence + auditRetention content-free. Source: ' +

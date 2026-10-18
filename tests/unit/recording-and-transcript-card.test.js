@@ -2121,6 +2121,10 @@ describe('cancelling a queued transcription', () => {
 test('attendance shares the boundary step, previews exclusion, and confirms once before publishing', async () => {
   const artifact = boundaryArtifact();
   let draft = attendanceDraft({ discussionAttribution: null });
+  draft.attendanceReview.identityUncertain = [false, true];
+  draft.attendanceReview.spokeAfterDeparture = [false, true];
+  draft.attendanceReview.decision.rows[1].kept = false;
+  draft.attendanceReview.decision.excludedSpeakerIds = ['B'];
   let confirmations = 0, publications = 0;
   route({ materials: [transcriptRow()], collection: collection({ jobs: [], currentArtifact: artifact }), detail: detailFor({}) }, {
     [`/corrections/${CORRECTION_ID}/publish`]: { method: 'POST', respond: () => { publications += 1; return response({ publication: { state: 'published' }, currentArtifact: artifact }); } },
@@ -2136,10 +2140,12 @@ test('attendance shares the boundary step, previews exclusion, and confirms once
   await stepAction('Edit speaker names');
   const editor = await screen.findByTestId('presentation-end-editor');
   const silent = within(editor).getByRole('checkbox', { name: /Silent attendee/ });
-  const voice = within(editor).getByRole('checkbox', { name: 'Speaker B' });
-  expect(silent).toBeChecked(); expect(voice).toBeChecked();
+  const voice = within(editor).getByRole('checkbox', { name: /Speaker B/ });
+  expect(silent).toBeChecked(); expect(voice).not.toBeChecked();
+  expect(within(editor).getByText(/Identity uncertain. Leave unchecked/)).toBeInTheDocument();
+  expect(within(editor).getByText(/Discussion speech is assigned to this person after their Zoom departure/)).toBeInTheDocument();
   expect(within(editor).getByText('1 stayed in the waiting room.')).toBeInTheDocument();
-  fireEvent.click(silent); fireEvent.click(voice);
+  fireEvent.click(silent);
   expect(within(screen.getByTestId('transcript-preview')).getByText('Unidentified speaker:')).toBeInTheDocument();
   fireEvent.click(screen.getByRole('button', { name: 'Publish transcript' }));
   await waitFor(() => expect(publications).toBe(1));
@@ -2201,4 +2207,21 @@ test('recording card exposes dismissal beside a failed cancellation and removes 
   fireEvent.click(await screen.findByRole('button', { name: 'Dismiss upload attempt' }));
   expect(await screen.findByText(/Upload attempt removed from this list/)).toBeInTheDocument();
   expect(screen.queryByText('stale-recording.mp4')).not.toBeInTheDocument();
+});
+
+test('ready draft exposes review-only fragment warnings without changing names', async () => {
+  const body = job({ speaker_names: { A: 'Alex Example', B: 'Casey Example' }, zoomTranscriptAttached: true,
+    speaker_alignment: { status: 'applied', fragmentReview: { status: 'complete', warnings: [
+      { index: 1, speakerId: 'A', reason: 'The word completes the clause.' },
+    ] } } });
+  const passage = { utterances: [
+    { speaker: 'A', start: 1000, end: 1500, text: 'I' },
+    { speaker: 'B', start: 1500, end: 1800, text: 'was' },
+    { speaker: 'A', start: 1800, end: 4000, text: 'ready to test the prototype.' },
+  ] };
+  route({ collection: collection({ jobs: [body] }), detail: () => ({ job: body, content: passage, candidates: [] }) });
+  render(<RecordingAndTranscriptCard requestId={REQUEST_ID} />);
+  expect(await screen.findByLabelText('Sentence-fragment review')).toHaveTextContent('Possible speaker for “was”: Alex Example');
+  expect(screen.getByLabelText('Name for Speaker B')).toHaveValue('Casey Example');
+  expect(global.fetch.mock.calls.some(([, options]) => options?.method === 'PATCH')).toBe(false);
 });

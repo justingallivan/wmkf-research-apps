@@ -1,3 +1,8 @@
+import * as attendanceService from '../../lib/services/meeting-tracker-transcription/attendance-service';
+jest.mock('../../lib/services/meeting-tracker-transcription/attendance-service', () => {
+  const actual = jest.requireActual('../../lib/services/meeting-tracker-transcription/attendance-service');
+  return { ...actual, buildAttendanceReview: jest.fn(actual.buildAttendanceReview) };
+});
 /** @jest-environment node */
 import crypto from 'node:crypto';
 jest.mock('../../lib/services/meeting-tracker-recordings/zoom-client', () => ({ getMeetingAttendance: jest.fn(async () => ({ status: 'unavailable', participants: [] })) }));
@@ -551,12 +556,13 @@ test('Stage 4 resolver requires an authenticated actor and a matching published 
 });
 
 
-function editableAttendanceFixture() {
-  const row = bindCurrentFixture(null);
+function editableAttendanceFixture(sourceProvenance = null) {
+  attendanceService.buildAttendanceReview.mockImplementation(jest.requireActual('../../lib/services/meeting-tracker-transcription/attendance-service').buildAttendanceReview);
+  const row = bindCurrentFixture(sourceProvenance);
   const receipt = confirmedDraft({ operation_id: originalActor, request_id: requestId, site_visit_activity_id: visitId,
     state: 'draft', version: 4, expires_at: new Date(Date.now() + 60000), source_artifact_id: predecessor,
     source_revision_id: operationId, expected_current_artifact_id: predecessor,
-    expected_current_fingerprint: row.wmkf_inputfingerprint, speaker_names: { A: 'Synthetic Chair' }, frozen_source_provenance: null });
+    expected_current_fingerprint: row.wmkf_inputfingerprint, speaker_names: { A: 'Synthetic Chair' }, frozen_source_provenance: sourceProvenance });
   receipt.attendance_review = null; receipt.discussion_attribution = null;
   store.getMeetingTranscriptPublication.mockResolvedValue(receipt);
   const manifest = JSON.parse(row.wmkf_transcriptbundlejson);
@@ -605,4 +611,19 @@ test('recovery rejects a receipt policy mismatch before publication', async () =
   receipt.frozen_discussion_attribution = { version: 1, rows: [], excludedSpeakerIds: [], attendance: { status: 'complete', fetchedAt: '2026-10-09T18:00:00.000Z' } };
   await expect(reconcileMeetingTranscriptPublication({ requestId, operationId, actorProfileId: 12, actingUserSystemId: currentActor })).rejects.toThrow('invalid_transcript_bundle');
   expect(publisher.publishMeetingTranscriptBundle).not.toHaveBeenCalled();
+});
+
+test('attendance reads alignment only from the frozen source job scoped to this request and visit', async () => {
+  const sourceProvenance = { version: 1, sourceId: predecessor, kind: 'zoom', audioSha256: 'a'.repeat(64), audioBytes: 5, audioDurationMs: 1000,
+    zoom: { importId: originalActor, meetingUuid: 'exact-occurrence==', hostId: 'host', audioOnlyFileCount: 1, transcriptFile: null,
+      audioFile: { fileId: 'audio', recordingType: 'audio_only', bytes: 5, sha256: 'a'.repeat(64), recordingStart: '2026-10-09T00:00:00Z', recordingEnd: '2026-10-09T00:00:01Z' } } };
+  editableAttendanceFixture(sourceProvenance);
+  const alignment = { reasons: { A: 'mixed_speakers' } };
+  store.getMeetingTranscriptionJob.mockResolvedValue({ speaker_alignment: alignment });
+  const build = attendanceService.buildAttendanceReview.mockResolvedValueOnce({ decision: { rows: [], excludedSpeakerIds: [] }, identityUncertain: [] });
+  {
+    await prepareMeetingAttendance({ requestId, operationId: originalActor, ownerProfileId: 12, expectedVersion: 4 });
+    expect(store.getMeetingTranscriptionJob).toHaveBeenCalledWith({ jobId: predecessor, requestId, siteVisitActivityId: visitId });
+    expect(build).toHaveBeenCalledWith(expect.objectContaining({ speakerAlignment: alignment, sourceProvenance: expect.objectContaining({ sourceId: predecessor }) }));
+  }
 });

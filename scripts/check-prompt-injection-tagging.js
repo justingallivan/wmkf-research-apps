@@ -457,7 +457,7 @@ const SURFACES = [
     id: 'meeting-speaker-alignment',
     inv: 32,
     status: 'migrated',
-    promptFiles: ['shared/config/prompts/meeting-speaker-alignment.js'],
+    promptFiles: ['shared/config/prompts/meeting-speaker-alignment.js', 'shared/config/prompts/meeting-fragment-review.js'],
     callSiteFiles: ['lib/services/execute-prompt.js'],
   },
   {
