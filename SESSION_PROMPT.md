@@ -18,6 +18,10 @@ Owner requested the final handoff on **main**. Runtime work stays on **`codex/re
 - `423dbb9c6` — completion-email edge case and recovery follow-ups.
 - `4e1923595` — final Opus verdict and activation requirements.
 
+### Concurrent Claude Session 613 (2026-10-16 PT, worktree `WMKF_Apps-claude-session`)
+
+- **[VERIFIED via CI + GitHub Production deployment status]** Owner chose option 2 for the `referee_expertise_missing` warning: it now also offers adding the expertise to the Reviews paragraph directly, since regenerating drops PD edits. Fast-forwarded to main as `94dbed5e9`; all six CI runs passed and Production deployment succeeded. The Reviews-tab variant in `shared/utils/review-writeup-paragraphs.js` never mentioned regenerating and is unchanged. No other work; no milestone entry required; no claim-evidence row (no eligible edit). The open queue items reviewed with the owner (presentation-video vCPUs, Zoom participants in speaker picker, Recording card redesign, streaming transcription, cycle rollover, transcript eTag) remain in `docs/CURRENT_WORK_QUEUE.md`, not re-verified.
+
 ## Next Items
 
 ### Verified Open
