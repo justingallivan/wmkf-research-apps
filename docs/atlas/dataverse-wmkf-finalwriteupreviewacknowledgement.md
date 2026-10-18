@@ -2,7 +2,7 @@
 
 **Last verified:** schema 2026-08-31 via
 `scripts/preflight-final-writeup-review-acknowledgement-schema.mjs --target=prod`;
-persona consumer and live-data projection 2026-09-03 PT.
+persona consumer and live-data projection 2026-09-03 PT; completed-review presentation and test exclusion 2026-10-18 PT (PRs #495/#496, signed-in production checks).
 **Live row count:** 1, verified by an exact Production entity-set count and
 complete-row readback on 2026-08-31.
 **Entity set:** `wmkf_finalwriteupreviewacknowledgements`
@@ -116,7 +116,7 @@ one lightweight scan discovers the cycles that hold current Finals, the queue
 read is scoped to the selected cycle's meeting-date window, and the 100-row
 bound applies per cycle), derive ordinary staff open/history/stewardship
 queues plus an optional focused row, and keep a reviewed row in history after
-a later Word edit while labeling its freshness Updated. Since Slice 6C
+a later Word edit while retaining the original reviewed version/date. Both `reviewed` and `updated` render green Reviewed for every persona; edits do not prompt another review (PR #496, `3b54a3727`). Since Slice 6C
 (Production-live 2026-09-07, PR #175 merge `44bdd240`) the shared
 projection and the POST mark response also expose the stored
 `wmkf_publicationversionid` as `acknowledgedPublicationVersionId` (null for the
@@ -131,8 +131,10 @@ Signed-in Production DOM proof showed the exact 11-person roster and Request
 other cell Not reviewed, both direct actions, and zero browser-console errors.
 Its expected-reviewer axis is the exact enabled
 membership of `WMKF Final Writeup Reviewer`, capped at 50; each cell is
-Reviewed, Updated, Not reviewed, or Responsible PD. Persona teams do not
+Reviewed (including later edits), Not reviewed, or Responsible PD. The action is Mark reviewed. Persona teams do not
 control this matrix.
+
+Ordinary dashboard queries and projections exclude test requests (PR #495). On 2026-10-18, owner-confirmed legacy test 1002788 was marked true in Production; its documents/acknowledgements remain, but it no longer appears in the ordinary dashboard. Signed-in D26 count after correction: 20. Earlier 1002788 observations in this Atlas are historical verification evidence.
 
 ## Write Paths
 

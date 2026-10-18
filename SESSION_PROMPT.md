@@ -1,3 +1,59 @@
+# Session 617 Prompt: Final Writeups fixes live; legacy test corrected
+
+## Session 616 Summary — Final Writeups production corrections (Codex, 2026-10-18 PT)
+
+Owner directed session documentation to **main**. This handoff supersedes the historical handoffs below for this session's scope; unrelated older items require a fresh preflight.
+
+### What Was Completed
+
+1. **[VERIFIED via PR #495 and signed-in production dashboard] Test requests excluded from Final Writeups and every dashboard count.** Query and defensive projection filtering shipped in `778533e93`. Reconciled pre-existing Board workflow test expectations without weakening checks (`e4b636ae9`). Owner confirmed the test writeups disappeared.
+2. **[VERIFIED via PR #496, CI, production DOM and owner acceptance] Completed reviews stay green after edits for PD and leadership.** “Mark reviewed” replaces “Sign off”; earlier reviewed version/date remain visible, with no repeat-review prompt. Persistence and version comparison are unchanged. Live request 1002964 retained version 5.0 / October 13 review against current version 7.0; formerly yellow cells on leadership-stage 1002788 became green. Leadership personal-view behavior is regression-test proved; no separate leadership login was used.
+3. **[VERIFIED via Production Dataverse PATCH/readback and signed-in dashboard] Legacy test 1002788 classified as test at owner request.** Only `wmkf_istestrequest` changed to true; null factory run ID retained. Documents/review records were not modified. Dashboard now shows **20** writeups; 1002788, 1003220, 1003222 and 1003312 are absent. This was direct request metadata maintenance, not a Factory ledger run. Guarded maintenance allowlist and regression test are committed/pushed separately as `e563c5f3b` on `codex/legacy-test-request-1002788`; **not merged to main**. The production correction is already complete and does not require that branch to deploy.
+4. **Release receipt:** PR #496 merged `3b54a3727`; Ready production deployment `dpl_CzJcpC48cZNETAeYgxignkMewxqp` served applications.wmkeck.org. Zero error records in bounded post-release query. Rollback target `dpl_DQnvJLXTunqdNtiSMoqzosg3MU2V`. Docs-only pushes may subsequently move the alias. Full receipts are in PRs #495/#496.
+5. **Milestone:** DEVELOPMENT_LOG entry added for the production review-tracking corrections. CLAUDE.md unchanged (no new apps, routes, schemas, scripts or conventions). Claim-evidence report returned “local state could not be read”; no observation row fabricated.
+
+### Commits
+- `c172783fe` — exclude test requests from Final Writeups.
+- `e4b636ae9` — reconcile Board workflow public-contract tests/censuses.
+- `778533e93` — PR #495 release merge.
+- `3fb9c932c` / `3b54a3727` — persistent green reviews, PR #496 release.
+- `e563c5f3b` — exact legacy-marker maintenance authorization, remote feature branch only.
+
+## Next Items
+
+### Verified Open
+
+1. **Optional maintenance-branch integration:** `codex/legacy-test-request-1002788` is pushed, not merged. Evidence: remote branch and commit above. No further production data change needed; retain the tested maintenance record, review/merge only if desired.
+2. **Documentation wording debt:** bounded search found older “Updated since review”/amber descriptions in Final Writeup plans and strategy documents. Runtime and Atlas now describe green completed reviews. A whole-document reconciliation was not completed in this stop pass; audit is incomplete for those older restatements. Do not use old wording to restore yellow status. Evidence: `docs/FINAL_WRITEUPS_DASHBOARD_VIEWS_AND_VERSION_PLAN.md`, `docs/FINAL_WRITEUP_REVIEW_IMPLEMENTATION_PLAN.md`, `docs/STRATEGY.md`.
+
+### Verify Before Acting
+
+- Unrelated Board activation, discussion attribution and cross-visit study items in prior handoffs were not re-audited here. Consult current source, branch state and owner decisions before treating them as work.
+- Preserve unrelated work/output in `/Users/gallivan/Code/WMKF_Apps`; this session used the isolated `9d01` worktree.
+
+### Do Not Reopen Without New Decision
+
+- PD and leadership reviews remain complete through ordinary edits; lead PD handles feedback. Keep the original reviewed version/date.
+- 1002788 is an owner-confirmed test proposal; do not unmark it or reintroduce it in ordinary dashboard counts.
+
+## Key Files Reference
+
+| File | Purpose |
+|------|---------|
+| `lib/services/final-writeup/dashboard-service.js` | Test exclusion, queue and matrix projections |
+| `shared/components/final-writeups/FinalWriteupsViews.js` | Dashboard/focused green state and version history |
+| `shared/components/workbench/FinalWriteupTab.js` | Request-tab review wording and state |
+| `lib/dataverse/client.js` | Guarded local-only legacy marker maintenance (new allowlist entry on feature branch) |
+| `tests/unit/d26-trial-marker-maintenance.test.js` | Exact-row marker/provenance regression coverage |
+
+## Testing
+
+[VERIFIED via PR #496 CI] 1,400 suites / 24,077 tests passed; 18 suites / 241 tests skipped. PostgreSQL integration: 10 suites / 130 tests passed. Build, lint, repository gates, security scans, review and preview passed. Legacy maintenance: 56 targeted tests passed; scoped lint, status parity and GUID boundary checks passed. No production documents were edited to test the UI.
+
+---
+
+## Historical handoffs — dated evidence only; verify before acting
+
 # Session 614 Prompt: resume reviewed Research Board workflow rollout
 
 ## Session 613 Summary — Research Board workflow built, not deployed (Codex, 2026-10-16 PT)

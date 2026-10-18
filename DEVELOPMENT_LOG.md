@@ -10,6 +10,20 @@ The chronological archive after the `Legacy chronological session log` divider c
 
 ---
 
+## October 2026 — Final Writeups review tracking corrected (Session 616)
+
+**Milestone:** Final Writeups excludes test proposals; completed PD and leadership reviews stay green after edits while retaining reviewed-version history.
+**Sessions:** 616 (Codex, owner-authorized production releases and legacy-test correction).
+**Ship state:**
+- PR #495 `778533e93` shipped test exclusion and repaired pre-existing Board contract tests.
+- PR #496 `3b54a3727` shipped “Mark reviewed” and persistent green review states; full CI passed (24,077 tests plus 130 PostgreSQL tests).
+- Signed-in production verification preserved version 5.0 review/date against current version 7.0; leadership-stage cells green. Leadership personal view is test-proved, not separately signed-in proved.
+- Owner-confirmed legacy test 1002788 marked in Dataverse; dashboard count verified at 20, documents/reviews retained. Maintenance commit `e563c5f3b` is saved on its remote branch, not main.
+**Why it matters:** normal lead-PD corrections no longer make completed colleague reviews appear unfinished, and test proposals no longer inflate the work queue.
+**Pointers:** PRs #495/#496; `docs/atlas/dataverse-wmkf-finalwriteupreviewacknowledgement.md`; Session 616 handoff in `SESSION_PROMPT.md`.
+
+---
+
 ## October 2026 — Post-presentation writeup regeneration released (Session 612)
 
 **Milestone:** lead PDs and superusers can regenerate the Pre-Site writeup from current data during post-visit drafting and group review, keeping the prior Word file under Previous versions.
