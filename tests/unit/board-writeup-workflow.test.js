@@ -264,3 +264,20 @@ test('completion notice sends with unavailable removed-roster details redacted',
     if (previousFrom === undefined) delete process.env.NOTIFICATION_EMAIL_FROM; else process.env.NOTIFICATION_EMAIL_FROM = previousFrom;
   }
 });
+
+test.each([
+  { wmkf_istestrequest: true, wmkf_testcreationrunid: ID },
+  { wmkf_istestrequest: false, wmkf_testcreationrunid: ID },
+  { wmkf_istestrequest: undefined, wmkf_testcreationrunid: null },
+])('release notice refuses nonordinary requests before journal or email writes: %j', async markers => {
+  const { state, d } = fixture();
+  state.firstEventAt = '2026-10-15T16:00:00Z';
+  const mutateCycle = jest.fn(), create = jest.fn(), send = jest.fn();
+  await expect(deliverNotice('D26', { key: 'release:2026-10-16', kind: 'release' }, {
+    ...d, mutateCycle, create, send,
+    getRequest: async () => ({ akoya_requestid: ID, _wmkf_grantprogram_value: PROGRAM_ID, wmkf_meetingdate: '2026-12-01', ...markers }),
+  })).rejects.toMatchObject({ code: 'board_notice_request_ineligible' });
+  expect(mutateCycle).not.toHaveBeenCalled();
+  expect(create).not.toHaveBeenCalled();
+  expect(send).not.toHaveBeenCalled();
+});

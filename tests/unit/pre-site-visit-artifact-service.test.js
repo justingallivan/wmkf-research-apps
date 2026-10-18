@@ -1291,6 +1291,7 @@ test('read-only status projects current Ready plus milestone and newer pending r
   };
   expect(status).toEqual({
     leadProgramDirectorId: null,
+    grantProgramId: null,
     currentArtifact: {
       ...common, artifactId: ARTIFACT_ID,
       operationStatus: REQUEST_DOCUMENT_OPERATION_STATUS.READY, file: currentFile, milestone,
@@ -1415,6 +1416,7 @@ test.each([2, 3, 4])('matching persisted core and input snapshot schema v%s reta
   const refereeWarnings = schemaVersion === 4 ? [] : [{ code: 'referee_section_manual', message: 'The Reviews paragraph wasn\'t filled in automatically (no reviews had been submitted when this version was generated, or it was generated before reviews were added automatically). Check that it is complete in Word; this note stays until the document is regenerated.' }];
   expect(status).toEqual({
     leadProgramDirectorId: null,
+    grantProgramId: null,
     pendingArtifact: null,
     currentArtifact: {
       artifactId: ARTIFACT_ID,

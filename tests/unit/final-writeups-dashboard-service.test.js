@@ -907,3 +907,107 @@ describe('leadership checkpoint (shared with the transition and acknowledgement 
     ]).toContain(error.code);
   });
 });
+
+describe('test requests are excluded from every Final Writeups surface', () => {
+  let previousIsolation;
+  beforeEach(() => {
+    previousIsolation = process.env.TEST_REQUEST_ISOLATION;
+    process.env.TEST_REQUEST_ISOLATION = 'on';
+  });
+  afterEach(() => {
+    if (previousIsolation === undefined) delete process.env.TEST_REQUEST_ISOLATION;
+    else process.env.TEST_REQUEST_ISOLATION = previousIsolation;
+  });
+
+  function isolatedHarness() {
+    const fixture = harness();
+    for (const request of fixture.requests) {
+      request.wmkf_istestrequest = false;
+      request.wmkf_testcreationrunid = null;
+    }
+    // Deliberately return tests too: verify the service boundary independently
+    // of Dataverse filtering, and assert the database predicates separately.
+    fixture.dependencies.queryAllRequests.mockImplementation(async () => ({
+      records: fixture.requests, capped: false,
+    }));
+    fixture.dependencies.queryRequests.mockImplementation(async ({ filter }) => {
+      const baseFilter = filter.replace(/^\((.*)\) and \(\(wmkf_istestrequest.*$/, '$1');
+      const records = fixture.requests.filter((row) => matchesFilter(row, baseFilter));
+      return { records, totalCount: records.length, hasMore: false };
+    });
+    return fixture;
+  }
+
+  function markTest(request) {
+    request.wmkf_istestrequest = true;
+    request.wmkf_testcreationrunid = REQUEST_C_ID;
+  }
+
+  test.each([
+    ['ordinary reviewer', false, null],
+    ['program director', false, 'program-director'],
+    ['coordinator', false, 'program-coordinator'],
+    ['leadership', false, 'leadership'],
+    ['superuser', true, null],
+  ])('%s receives only real proposals in queues, counts and matrix', async (_label, isSuperuser, persona) => {
+    const { requests, documents, dependencies } = isolatedHarness();
+    // Keep a real leadership writeup; exclude a group-review test and a
+    // leadership-stage test belonging to the viewer (stewardship).
+    markTest(requests[0]);
+    markTest(requests[2]);
+    Object.assign(documents[2], {
+      wmkf_lifecyclestate: REQUEST_DOCUMENT_LIFECYCLE_STATE.FINAL,
+      ...leadershipCheckpoint(),
+    });
+    if (persona) dependencies.resolvePersonas.mockResolvedValue({ enabled: true, personas: [persona] });
+    const result = await loadFinalWriteupsDashboard({ actingUserSystemId: ACTOR_ID, isSuperuser }, dependencies);
+    expect(Object.values(result.queues).flat().map((row) => row.requestId)).toEqual([REQUEST_B_ID]);
+    expect(result.counts).toEqual({ total: 1, open: 0, history: 1, stewardship: 0 });
+    if (result.coordinatorMatrix) {
+      expect(result.coordinatorMatrix.groups.flatMap((group) => group.rows).map((row) => row.requestId)).toEqual([REQUEST_B_ID]);
+      expect(result.coordinatorMatrix.unconfiguredRows).toEqual([]);
+    }
+    expect(dependencies.findDocumentsByIds).toHaveBeenCalledWith([FINAL_B_ID]);
+    expect(dependencies.getFileMetadataById).toHaveBeenCalledTimes(1);
+    for (const mock of [dependencies.queryAllRequests, dependencies.queryRequests]) {
+      for (const [options] of mock.mock.calls) {
+        expect(options.filter).toContain('wmkf_istestrequest eq false or wmkf_istestrequest eq null');
+        expect(options.filter).toContain('wmkf_testcreationrunid eq null');
+      }
+    }
+  });
+
+  test('test-only newer cycles and undated tests do not affect cycle discovery or default selection', async () => {
+    const { requests, dependencies } = isolatedHarness();
+    markTest(requests[0]);
+    markTest(requests[2]);
+    requests[2].wmkf_meetingdate = null;
+    requests[1].wmkf_meetingdate = J26;
+    const result = await loadFinalWriteupsDashboard({ actingUserSystemId: ACTOR_ID }, dependencies);
+    expect(result.cycles.selected).toBe('J26');
+    expect(result.cycles.available.map((cycle) => cycle.code)).toEqual(['J26']);
+    expect(result.cycles.hasUncycled).toBe(false);
+    const empty = await loadFinalWriteupsDashboard({ actingUserSystemId: ACTOR_ID, cycleCode: 'D26', isSuperuser: true }, dependencies);
+    expect(empty.counts).toEqual({ total: 0, open: 0, history: 0, stewardship: 0 });
+    expect(Object.values(empty.queues).flat()).toEqual([]);
+    expect(empty.coordinatorMatrix.groups.flatMap((group) => group.rows)).toEqual([]);
+  });
+
+  test('a focused test request returns not found without loading its documents', async () => {
+    const { requests, dependencies } = isolatedHarness();
+    markTest(requests[0]);
+    await expect(loadFinalWriteupsDashboard({ actingUserSystemId: ACTOR_ID, selectedRequestId: REQUEST_A_ID, isSuperuser: true }, dependencies))
+      .rejects.toMatchObject({ httpStatus: 404 });
+    expect(dependencies.findDocumentsByIds).not.toHaveBeenCalled();
+  });
+
+  test('null legacy markers remain ordinary; malformed or missing classification is excluded', async () => {
+    const { requests, dependencies } = isolatedHarness();
+    requests[0].wmkf_istestrequest = null;
+    requests[1].wmkf_testcreationrunid = REQUEST_C_ID;
+    delete requests[2].wmkf_istestrequest;
+    const result = await loadFinalWriteupsDashboard({ actingUserSystemId: ACTOR_ID }, dependencies);
+    expect(result.counts.total).toBe(1);
+    expect(result.queues.open.map((row) => row.requestId)).toEqual([REQUEST_A_ID]);
+  });
+});

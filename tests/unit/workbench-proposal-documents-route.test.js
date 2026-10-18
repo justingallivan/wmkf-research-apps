@@ -87,6 +87,7 @@ test('golden path: resolves scope from the record, not the raw query param', asy
     success: true,
     slots: [{ found: true, library: 'Documents', folder: 'x', name: 'proposal.pdf' }],
     aiMaterials: [],
+    boardWriteups: [],
     otherDocuments: [],
     libraries: ['Documents'],
     errors: [],
