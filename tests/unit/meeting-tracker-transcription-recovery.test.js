@@ -1,4 +1,9 @@
 import * as attendanceService from '../../lib/services/meeting-tracker-transcription/attendance-service';
+import * as repairs from '../../lib/services/meeting-tracker-transcription/confirmed-discussion-repairs';
+jest.mock('../../lib/services/meeting-tracker-transcription/confirmed-discussion-repairs', () => {
+  const actual = jest.requireActual('../../lib/services/meeting-tracker-transcription/confirmed-discussion-repairs');
+  return { ...actual, applyConfirmedDiscussionRepair: jest.fn(actual.applyConfirmedDiscussionRepair) };
+});
 jest.mock('../../lib/services/meeting-tracker-transcription/attendance-service', () => {
   const actual = jest.requireActual('../../lib/services/meeting-tracker-transcription/attendance-service');
   return { ...actual, buildAttendanceReview: jest.fn(actual.buildAttendanceReview) };
@@ -55,6 +60,7 @@ const oldEnv = { access: process.env.MEETING_TRACKER_TRANSCRIPTION_ACCESS,
   bundle: process.env.MEETING_TRACKER_TRANSCRIPT_BUNDLE_SCHEMA_READY };
 beforeEach(() => {
   jest.resetAllMocks();
+  repairs.applyConfirmedDiscussionRepair.mockImplementation(jest.requireActual('../../lib/services/meeting-tracker-transcription/confirmed-discussion-repairs').applyConfirmedDiscussionRepair);
   store.listMeetingTranscriptionJobs.mockResolvedValue([]);
   store.listMeetingTranscriptPublications.mockResolvedValue([]);
   process.env.MEETING_TRACKER_TRANSCRIPTION_ACCESS = 'on';
@@ -626,4 +632,41 @@ test('attendance reads alignment only from the frozen source job scoped to this 
     expect(store.getMeetingTranscriptionJob).toHaveBeenCalledWith({ jobId: predecessor, requestId, siteVisitActivityId: visitId });
     expect(build).toHaveBeenCalledWith(expect.objectContaining({ speakerAlignment: alignment, sourceProvenance: expect.objectContaining({ sourceId: predecessor }) }));
   }
+});
+
+test('confirmed repairs invalidate old attendance, flow into the review and published bundle, and pin unknown names/boundary', async () => {
+  const receipt = editableAttendanceFixture();
+  const args = { requestId, operationId: originalActor, ownerProfileId: 12 };
+  await prepareMeetingAttendance({ ...args, expectedVersion: 4 });
+  receipt.discussion_attribution = receipt.attendance_review.decision;
+  repairs.applyConfirmedDiscussionRepair.mockImplementation(({ source }) => ({
+    content: { ...source.content, utterances: [...source.content.utterances,
+      { speaker: 'repair_unknown_1', start: 1001, end: 1100, text: 'Uncertain discussion.' }] },
+    repairId: 'synthetic-confirmed-repair', unknownSpeakerNames: { repair_unknown_1: 'Unidentified speaker' },
+    confirmedSpeakerNames: { A: 'Synthetic Chair' },
+  }));
+  await expect(publishMeetingCorrection({ ...args, actingUserSystemId: currentActor, body: { expectedVersion: 5 } }))
+    .rejects.toMatchObject({ code: 'meeting_attendance_confirmation_required' });
+  const names = { ...receipt.speaker_names, repair_unknown_1: 'Unidentified speaker' };
+  await expect(updateMeetingCorrection({ ...args, body: { expectedVersion: 5, speakerNames: receipt.speaker_names } }))
+    .rejects.toMatchObject({ code: 'transcription_invalid_value' });
+  await expect(updateMeetingCorrection({ ...args, body: { expectedVersion: 5, speakerNames: { ...names, A: 'Wrong person' } } }))
+    .rejects.toMatchObject({ code: 'transcription_invalid_value' });
+  await expect(updateMeetingCorrection({ ...args, body: { expectedVersion: 5, speakerNames: names, presentationEndMs: null } }))
+    .rejects.toMatchObject({ code: 'meeting_discussion_repair_source_changed' });
+  await prepareMeetingAttendance({ ...args, expectedVersion: 5 });
+  expect(attendanceService.buildAttendanceReview).toHaveBeenLastCalledWith(expect.objectContaining({
+    content: expect.objectContaining({ utterances: expect.arrayContaining([expect.objectContaining({ speaker: 'repair_unknown_1' })]) }),
+    speakerNames: names,
+  }));
+  await updateMeetingCorrection({ ...args, body: { expectedVersion: 6, speakerNames: names,
+    attendanceConfirmation: { reviewId: receipt.attendance_review.id, kept: receipt.attendance_review.decision.rows.map(() => false) } } });
+  publisher.prepareMeetingTranscriptBundlePublication.mockResolvedValue({ candidatePaths: {} });
+  store.freezeMeetingTranscriptCorrectionDraft.mockResolvedValue({ leaseToken: originalActor });
+  store.transitionMeetingTranscriptPublication.mockResolvedValue({ state: 'published' });
+  await publishMeetingCorrection({ ...args, actingUserSystemId: currentActor, body: { expectedVersion: 7 } });
+  const published = publisher.publishMeetingTranscriptBundle.mock.calls[0][0];
+  expect(published.files.txt.bytes.toString()).toContain('Unidentified speaker: Uncertain discussion.');
+  expect(JSON.parse(published.files.source.bytes).utterances.at(-1).speakerId).toBe('repair_unknown_1');
+  expect(published.identity.sourceRevisionId).toBe(operationId);
 });
