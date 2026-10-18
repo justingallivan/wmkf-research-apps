@@ -214,9 +214,9 @@ test('shows positive reviewer initials without a personal action for the respons
   render(<FinalWriteupTab requestId={REQUEST_ID} />);
 
   expect(await screen.findByRole('heading', { name: 'Group review is in progress' })).toBeInTheDocument();
-  expect(await screen.findByLabelText(/Ada Reviewer.*Signed off/i)).toHaveTextContent('AR');
-  expect(screen.getByText('Signed off by')).toBeInTheDocument();
-  expect(screen.queryByRole('button', { name: /^Sign off$/ })).not.toBeInTheDocument();
+  expect(await screen.findByLabelText(/Ada Reviewer.*Reviewed/i)).toHaveTextContent('AR');
+  expect(screen.getByText('Reviewed by')).toBeInTheDocument();
+  expect(screen.queryByRole('button', { name: /^Mark reviewed$/ })).not.toBeInTheDocument();
   expect(screen.getByRole('link', { name: 'Edit working writeup in Word' })).toHaveAttribute('target', '_blank');
 });
 
@@ -237,7 +237,7 @@ test('lets a non-owner record review with only request and current-Final fences'
     })));
   render(<FinalWriteupTab requestId={REQUEST_ID} />);
 
-  fireEvent.click(await screen.findByRole('button', { name: 'Sign off' }));
+  fireEvent.click(await screen.findByRole('button', { name: 'Mark reviewed' }));
 
   await waitFor(() => expect(global.fetch).toHaveBeenCalledWith(
     '/api/workbench/final-writeup/acknowledgement',
@@ -250,16 +250,17 @@ test('lets a non-owner record review with only request and current-Final fences'
       signal: expect.any(AbortSignal),
     }),
   ));
-  expect(await screen.findByText('Signed off')).toBeInTheDocument();
-  expect(screen.getByText(/You signed off on the current version/i)).toBeInTheDocument();
-  expect(screen.queryByRole('button', { name: 'Sign off' })).not.toBeInTheDocument();
+  expect(await screen.findByText('Reviewed')).toBeInTheDocument();
+  expect(screen.getByText(/Your review remains complete after edits/i)).toBeInTheDocument();
+  expect(screen.queryByRole('button', { name: 'Mark reviewed' })).not.toBeInTheDocument();
 });
 
-test('offers an explicit latest-version action when the writeup changed after review', async () => {
+test('keeps an edited writeup reviewed and retains its reviewed version without a repeat action', async () => {
   global.fetch
     .mockResolvedValueOnce(response(groupReviewStatus()))
     .mockResolvedValueOnce(response(acknowledgementState({
       personalState: 'updated',
+      acknowledgedPublicationVersionId: '1.0',
       acknowledgedAt: '2026-08-30T12:05:00.000Z',
       reviewers: [{
         reviewerId: '44444444-4444-4444-8444-444444444444',
@@ -271,9 +272,11 @@ test('offers an explicit latest-version action when the writeup changed after re
     })));
   render(<FinalWriteupTab requestId={REQUEST_ID} />);
 
-  expect(await screen.findByText('Edited since your sign-off')).toBeInTheDocument();
-  expect(screen.getByRole('button', { name: 'Sign off latest version' })).toBeEnabled();
-  expect(screen.getByLabelText(/Ada Reviewer.*edited since this sign-off/i)).toBeInTheDocument();
+  expect(await screen.findByText('Reviewed')).toHaveClass('text-green-800');
+  expect(screen.queryByRole('button', { name: 'Mark reviewed' })).not.toBeInTheDocument();
+  expect(screen.getByText(/You reviewed version 1.0/)).toBeInTheDocument();
+  expect(screen.getByLabelText(/Ada Reviewer.*edited since this review/i)).toBeInTheDocument();
+  expect(global.fetch).toHaveBeenCalledTimes(2);
 });
 
 test('keeps the Word action available when acknowledgement schema is off', async () => {
@@ -287,7 +290,7 @@ test('keeps the Word action available when acknowledgement schema is off', async
 
   expect(await screen.findByRole('link', { name: 'Edit working writeup in Word' })).toBeInTheDocument();
   await waitFor(() => expect(global.fetch).toHaveBeenCalledTimes(2));
-  expect(screen.queryByText('Signed off by')).not.toBeInTheDocument();
+  expect(screen.queryByText('Reviewed by')).not.toBeInTheDocument();
   expect(screen.queryByRole('alert')).not.toBeInTheDocument();
 });
 
@@ -298,10 +301,10 @@ test('isolates acknowledgement errors and provides a bounded retry', async () =>
     .mockResolvedValueOnce(response(acknowledgementState()));
   render(<FinalWriteupTab requestId={REQUEST_ID} />);
 
-  expect(await screen.findByText(/Sign-offs could not be loaded/i)).toBeInTheDocument();
+  expect(await screen.findByText(/Reviews could not be loaded/i)).toBeInTheDocument();
   expect(screen.getByRole('link', { name: 'Edit working writeup in Word' })).toBeInTheDocument();
-  fireEvent.click(screen.getByRole('button', { name: 'Try loading sign-offs again' }));
-  expect(await screen.findByText('Not signed off yet')).toBeInTheDocument();
+  fireEvent.click(screen.getByRole('button', { name: 'Try loading reviews again' }));
+  expect(await screen.findByText('Not reviewed yet')).toBeInTheDocument();
   expect(global.fetch).toHaveBeenCalledTimes(3);
 });
 
@@ -366,9 +369,9 @@ describe('leadership review stage', () => {
     // The acknowledgement GET fires for the leadership phase, not only group review.
     await waitFor(() => expect(global.fetch).toHaveBeenCalledTimes(2));
     expect(global.fetch.mock.calls[1][0]).toContain('/api/workbench/final-writeup/acknowledgement?requestId=');
-    expect(await screen.findByText('Signed off by')).toBeInTheDocument();
+    expect(await screen.findByText('Reviewed by')).toBeInTheDocument();
     expect(screen.getByLabelText(/Allison Keller/)).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Sign off' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Mark reviewed' })).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Send to leadership' })).not.toBeInTheDocument();
   });
 
@@ -473,7 +476,7 @@ test('T2 fetchAcknowledgementState: network rejection is isolated to the review-
     .mockResolvedValueOnce(response(groupReviewStatus()))
     .mockRejectedValueOnce(new Error('network down'));
   render(<FinalWriteupTab requestId={REQUEST_ID} />);
-  expect(await screen.findByText(/Sign-offs could not be loaded/i)).toBeInTheDocument();
+  expect(await screen.findByText(/Reviews could not be loaded/i)).toBeInTheDocument();
   expect(screen.getByText('network down')).toBeInTheDocument();
   expect(screen.getByRole('link', { name: 'Edit working writeup in Word' })).toBeInTheDocument();
 });
@@ -483,7 +486,7 @@ test('T2 fetchAcknowledgementState: malformed 2xx body reads as a stale-Final mi
     .mockResolvedValueOnce(response(groupReviewStatus()))
     .mockResolvedValueOnce(malformed());
   render(<FinalWriteupTab requestId={REQUEST_ID} />);
-  expect(await screen.findByText(/Sign-offs could not be loaded/i)).toBeInTheDocument();
+  expect(await screen.findByText(/Reviews could not be loaded/i)).toBeInTheDocument();
   expect(screen.getByText(/current Final Writeup changed/i)).toBeInTheDocument();
 });
 
@@ -559,7 +562,7 @@ test('T2 markReviewed(): network rejection is isolated to the review-tracking pa
     .mockResolvedValueOnce(response(acknowledgementState()))
     .mockRejectedValueOnce(new Error('network down'));
   render(<FinalWriteupTab requestId={REQUEST_ID} />);
-  fireEvent.click(await screen.findByRole('button', { name: 'Sign off' }));
+  fireEvent.click(await screen.findByRole('button', { name: 'Mark reviewed' }));
   await waitFor(() => expect(screen.getByText('network down')).toBeInTheDocument());
   expect(screen.getByRole('link', { name: 'Edit working writeup in Word' })).toBeInTheDocument();
 });
@@ -570,7 +573,7 @@ test('T2 markReviewed(): malformed 2xx body reads as a stale-Final mismatch', as
     .mockResolvedValueOnce(response(acknowledgementState()))
     .mockResolvedValueOnce(malformed());
   render(<FinalWriteupTab requestId={REQUEST_ID} />);
-  fireEvent.click(await screen.findByRole('button', { name: 'Sign off' }));
+  fireEvent.click(await screen.findByRole('button', { name: 'Mark reviewed' }));
   await waitFor(() => expect(screen.getByText(/current Final Writeup changed/i)).toBeInTheDocument());
 });
 
@@ -616,36 +619,36 @@ describe('lead PD sign-off roster (group-review Stage 3)', () => {
   }
 
   async function openLeadershipDialog() {
-    await screen.findByLabelText('Sign-offs');
+    await screen.findByLabelText('Reviews');
     fireEvent.click(screen.getByRole('button', { name: 'Send to leadership' }));
     return screen.getByRole('dialog', { name: 'Send to leadership?' });
   }
 
-  test('counts signed and edited-since sign-offs and lists other signers separately', async () => {
+  test('counts signed and edited-since reviews and lists other signers separately', async () => {
     renderLead(roster());
-    const panel = await screen.findByLabelText('Sign-offs');
-    expect(panel).toHaveTextContent('2 of 3 Program Directors signed off.');
-    expect(within(panel).getByText('Cy Director').closest('li')).toHaveTextContent('Signed off, edited since');
+    const panel = await screen.findByLabelText('Reviews');
+    expect(panel).toHaveTextContent('2 of 3 Program Directors reviewed.');
+    expect(within(panel).getByText('Cy Director').closest('li')).toHaveTextContent('Reviewed');
     expect(within(panel).getByText('Dee Director').closest('li')).toHaveTextContent('Not yet');
-    expect(within(panel).getByText('Also signed off')).toBeInTheDocument();
+    expect(within(panel).getByText('Also reviewed')).toBeInTheDocument();
     expect(within(panel).getByText('Ada Coordinator')).toBeInTheDocument();
-    expect(screen.queryByText('Signed off by')).not.toBeInTheDocument();
+    expect(screen.queryByText('Reviewed by')).not.toBeInTheDocument();
   });
 
-  test('Send to leadership names only the Program Directors who have not signed off', async () => {
+  test('Send to leadership names only the Program Directors who have not reviewed', async () => {
     renderLead(roster());
     const dialog = await openLeadershipDialog();
-    expect(dialog).toHaveTextContent('1 Program Director hasn’t signed off: Dee Director. You can send anyway.');
+    expect(dialog).toHaveTextContent('1 Program Director hasn’t reviewed: Dee Director. You can send anyway.');
     expect(dialog).not.toHaveTextContent('Cy Director');
     expect(within(dialog).getByRole('button', { name: 'Send to leadership' })).toBeEnabled();
   });
 
-  test('Send to leadership says when every Program Director has signed off', async () => {
+  test('Send to leadership says when every Program Director has reviewed', async () => {
     renderLead(roster({
       expected: [{ name: 'Bea Director', state: 'signed-edited-since', signedAt: '2026-08-31T11:05:00.000Z' }],
     }));
     const dialog = await openLeadershipDialog();
-    expect(dialog).toHaveTextContent('All Program Directors have signed off.');
+    expect(dialog).toHaveTextContent('All Program Directors have reviewed.');
   });
 
   test.each([
@@ -654,18 +657,18 @@ describe('lead PD sign-off roster (group-review Stage 3)', () => {
     ['unavailable', /could not be loaded/],
   ])('%s shows its own note and the dialog makes no sign-off claim', async (status, note) => {
     renderLead(roster({ status, expected: [] }));
-    const panel = await screen.findByLabelText('Sign-offs');
+    const panel = await screen.findByLabelText('Reviews');
     expect(panel).toHaveTextContent(note);
-    expect(panel).not.toHaveTextContent(/signed off\.$/);
+    expect(panel).not.toHaveTextContent(/reviewed\.$/);
     expect(panel).not.toHaveTextContent(/\d+ of \d+/);
     const dialog = await openLeadershipDialog();
     expect(dialog).not.toHaveTextContent(/All Program Directors/);
-    expect(dialog).not.toHaveTextContent(/hasn’t signed off|haven’t signed off/);
+    expect(dialog).not.toHaveTextContent(/hasn’t reviewed|haven’t reviewed/);
   });
 
   test('a configured program with no other Program Directors says so instead of claiming everyone signed', async () => {
     renderLead(roster({ expected: [] }));
-    const panel = await screen.findByLabelText('Sign-offs');
+    const panel = await screen.findByLabelText('Reviews');
     expect(panel).toHaveTextContent('No other Program Directors are listed for this grant program.');
     const dialog = await openLeadershipDialog();
     expect(dialog).not.toHaveTextContent(/All Program Directors/);
