@@ -20,7 +20,7 @@ background-processing mode, identity/role parity) instead of assuming parity.
 Do not: keep hardening a venue by default because it was the plan's starting
 point.
 
-**Why:** Session 545 (2026-09-27). Recipe 5 hit a missing program director in
+**Historical example (Session 545, 2026-09-27):** Recipe 5 hit a missing program director in
 the sandbox, the latest of several sandbox-only gaps (stub AI run, seeded
 prompt, GoVerify bypass). The owner asked: "what are we even accomplishing by
 building in a sandbox… 90% of your effort is going to patch/harden an

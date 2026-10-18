@@ -28,7 +28,7 @@ an invariant (`expectedSharePointFiles: 2` over `documents: []`) that the real
 builder could never produce; wrap every test in `bypassDynamicsRestrictions` and
 call the context contract proven.
 
-**Why:** S539, Factory slice 6b: (1) sandbox reads returned raw bodies with no
+**Historical example (S539, Factory slice 6b):** (1) sandbox reads returned raw bodies with no
 `_etag`, so `commitReadyLineage` would throw on every live run; the fake deps
 already returned `_etag`. (2) The destination-request read skipped annotations so
 the institution was always empty; the fake carried the processed key. (3) The

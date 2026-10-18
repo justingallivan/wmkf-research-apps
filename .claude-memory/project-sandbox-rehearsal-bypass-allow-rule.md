@@ -1,47 +1,37 @@
 ---
 name: project-sandbox-rehearsal-bypass-allow-rule
-description: "Per-machine Claude Code allow rule so the sandbox rehearsal script (execute, reserve, advance with --bypass-goverify) is not blocked by the auto-mode classifier; verified working 2026-09-24; must be re-added on each machine"
+description: "A narrowly scoped, machine-local Claude Code allow rule was owner-authorized for the sandbox rehearsal CLI; verify the local entry before use."
 metadata:
   node_type: memory
   type: project
   status: active
-  last_verified: 2026-10-05 via the allow rule present in .claude/settings.local.json and --bypass-goverify parsing plus its production refusal in scripts/rehearse-test-request-sandbox.mjs
+  last_verified: historical check 2026-10-05; recheck the local setting before relying on it
   originSessionId: 5fb56b4d-c45a-4872-8a32-38a75b670ef3
   modified: 2026-09-24T05:02:25.866Z
 ---
 
 ## Recall Rule
-Read when the auto-mode classifier blocks `scripts/rehearse-test-request-sandbox.mjs --execute ... --bypass-goverify`, or when setting up the Test Request Factory on a new machine.
+Read when the auto-mode classifier blocks `scripts/rehearse-test-request-sandbox.mjs --execute ... --bypass-goverify`, or when setting up the Test Request Factory on another machine.
 
-Do: add the exact allow rule below to the gitignored `.claude/settings.local.json` under `permissions.allow`, adjusting only the `--env-file` path; run from the repo root so `scripts/` resolves.
-Do not: widen the rule beyond this script or drop the pinned sandbox URL; expect it to travel with git.
-Ground truth: `.claude/settings.local.json` on the machine (present on the owner's Mac, checked 2026-10-05); `scripts/rehearse-test-request-sandbox.mjs`.
-
-On 2026-09-24 (Session 537) the owner authorized a machine-local Claude Code
-permission rule so the Test Request Factory sandbox rehearsal can run
-`--execute ... --bypass-goverify` without the auto-mode classifier stopping it
-(it flagged the bypass flag as a "Safety Bypass Flag"). The rule lives in the
-gitignored `.claude/settings.local.json` at the repo root, under
-`permissions.allow`, and does NOT travel with git:
+The owner authorized a machine-local Claude Code rule on 2026-09-24 (S537).
+It lives in the gitignored `.claude/settings.local.json` and does not travel with
+Git. The exact previously authorized template is:
 
 `"Bash(DYNAMICS_SANDBOX_URL=https://orgd9e66399.crm.dynamics.com node --env-file=/Users/gallivan/Code/WMKF_Apps/.env.local scripts/rehearse-test-request-sandbox.mjs:*)"`
 
-The prefix pins the sandbox URL and the env file, so it cannot match a
-production target. Adjust the `--env-file` path if the repo lives elsewhere on
-another machine. Verified 2026-09-24 (later in Session 537): under this rule the
-ledger-driven `--reserve`, `--advance` and `--advance --bypass-goverify` calls
-ran without a prompt (Request 1000341). Extra leading environment assignments
-such as `TEST_REQUEST_LEDGER_URL=...` before `DYNAMICS_SANDBOX_URL=...` also
-passed, and the command must run with the repository root as the working
-directory so the relative `scripts/` path resolves (the Factory has since
-merged to `main`; a separate Factory worktree is no longer needed).
+When configuring another machine, adjust only the `--env-file` path. Keep the
+sandbox hostname pinned, the command limited to this script, and run it from the
+repository root so the relative `scripts/` path resolves. Never widen the rule.
+Inspect the local permissions entry before relying on it; last checked on the
+owner's Mac on 2026-10-05, so current presence is UNKNOWN. This permission is a
+Claude Code prompt rule, not an application safety control.
 
-**Why:** every live sandbox create needs the bypass (GoVerify rejects the POST
-otherwise; the script deactivates and restores it around the single POST, and
-that path is proven on Requests 1000338, 1000339, 1000340). Without the rule the
-owner must run each execute by hand.
-
-**How to apply:** on a new machine, add the rule to
-`.claude/settings.local.json` (create the file if missing; it is gitignored).
-Never widen it beyond this script. See [[project-test-request-factory]] and
+The CLI rejects `--bypass-goverify` for production and allows it only with
+`--execute` or `--advance` [verified in source:
+`scripts/rehearse-test-request-sandbox.mjs`]. In S537 the owner verified the rule with the sandbox ledger-driven
+`--reserve`, `--advance`, and `--advance --bypass-goverify` path (Request 1000341).
+The GoVerify deactivation, create, and restoration path was separately proven on
+Requests 1000338–1000340. These are historical rehearsal records, not current
+system state. Production permissions and target interlocks remain governed by
+`CLAUDE.md`. See [[project-test-request-factory]] and
 `docs/plans/TEST_REQUEST_FACTORY_DESIGN_2026-09-19.md`.

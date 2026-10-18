@@ -11,7 +11,7 @@ metadata:
 ## Recall Rule
 Read before delegating any build or dispatching any review round on the Test Request Factory or comparable multi-stage work.
 
-## The feedback (owner, 2026-09-25, Session 543)
+## Historical owner feedback (2026-09-25, Session 543)
 "The cadence is only needed when the designer and builder make mistakes, which your evidence says happens a lot." Across the four 6c builds that day Opus round 1 found P1s in three of them (v2 bundle digest regression; DOCX census that could never pass; a claimed magic-byte check that did not exist) and Codex found more in every slice. Fifteen plan rounds and eight build rounds on one slice.
 
 **Why:** the reviews were doing first contact with defects the orchestrator could have caught in a ten-minute diff read, briefs listed contracts instead of invariants with required tests, and Opus-grade code (verifiers, comparators, identity) was given to Sonnet.

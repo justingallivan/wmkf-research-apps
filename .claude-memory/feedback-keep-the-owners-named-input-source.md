@@ -13,6 +13,6 @@ Do: build on the source the owner named by default; if a different source looks 
 Do not: mark the switch "(Recommended)" on quality grounds alone, or treat the owner picking it from a list as proof they wanted the larger build.
 Ground truth: the owner's request wording; `docs/plans/DELIBERATION_SENTIMENT_PLAN_2026-10-13.md` §2.
 
-**Why:** the ask was "a sentiment meter that reads the AI-generated summaries of the staff discussions and compares them". I argued the summaries were too neutral and recommended transcripts with quoted evidence; the owner chose it from my options. That added transcript integrity checks, structured attribution, quote verification and a sentiment table — PR #475, ~3,900 lines across two build rounds and five reviews. The owner accepted it as a starting point but had expected summary-only.
+**Historical example (S601):** the ask was "a sentiment meter that reads the AI-generated summaries of the staff discussions and compares them". I argued the summaries were too neutral and recommended transcripts with quoted evidence; the owner chose it from my options. That added transcript integrity checks, structured attribution, quote verification and a sentiment table — PR #475, ~3,900 lines across two build rounds and five reviews. The owner accepted it as a starting point but had expected summary-only.
 
 **How to apply:** same discipline as [[feedback-anchor-multisession-features-to-the-original-ask]] — restate the original ask before recommending; size each alternative in effort, not just quality.
