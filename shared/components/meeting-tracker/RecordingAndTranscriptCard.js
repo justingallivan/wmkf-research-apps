@@ -2551,6 +2551,7 @@ function PresentationEndEditor({ t, readOnly }) {
             <input type="checkbox" checked={t.attendanceKept[index]} onChange={event => t.setAttendanceKept(index, event.target.checked)} />
             <span>{row.displayName}{row.lastLeaveAt && <span className="ml-2 text-xs text-gray-600">Left {new Date(row.lastLeaveAt).toLocaleString('en-US', { timeZone: t.attendanceReview.timeZone || 'UTC', hour: 'numeric', minute: '2-digit', timeZoneName: 'short' })}</span>}
               {t.attendanceReview.identityUncertain?.[index] && <span className="block text-xs text-gray-600">Identity uncertain. Leave unchecked to display “Unidentified speaker”.</span>}
+              {t.attendanceReview.spokeAfterDeparture?.[index] && <span className="block text-xs text-gray-600">Discussion speech is assigned to this person after their Zoom departure. Confirm the identity before checking.</span>}
               {t.attendanceReview.leftBeforeEnd[index] && <span className="block text-xs text-gray-600">Left before the presentation ended</span>}</span>
           </label>)}
         </div>)}

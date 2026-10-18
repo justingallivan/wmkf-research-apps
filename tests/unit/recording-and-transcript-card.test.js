@@ -2122,6 +2122,7 @@ test('attendance shares the boundary step, previews exclusion, and confirms once
   const artifact = boundaryArtifact();
   let draft = attendanceDraft({ discussionAttribution: null });
   draft.attendanceReview.identityUncertain = [false, true];
+  draft.attendanceReview.spokeAfterDeparture = [false, true];
   draft.attendanceReview.decision.rows[1].kept = false;
   draft.attendanceReview.decision.excludedSpeakerIds = ['B'];
   let confirmations = 0, publications = 0;
@@ -2142,6 +2143,7 @@ test('attendance shares the boundary step, previews exclusion, and confirms once
   const voice = within(editor).getByRole('checkbox', { name: /Speaker B/ });
   expect(silent).toBeChecked(); expect(voice).not.toBeChecked();
   expect(within(editor).getByText(/Identity uncertain. Leave unchecked/)).toBeInTheDocument();
+  expect(within(editor).getByText(/Discussion speech is assigned to this person after their Zoom departure/)).toBeInTheDocument();
   expect(within(editor).getByText('1 stayed in the waiting room.')).toBeInTheDocument();
   fireEvent.click(silent);
   expect(within(screen.getByTestId('transcript-preview')).getByText('Unidentified speaker:')).toBeInTheDocument();

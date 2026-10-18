@@ -67,10 +67,11 @@ it.each([
   expect((await buildAttendanceReview({ ...args, sourceProvenance }, report([row('Alex Example')]))).leftBeforeEnd).toEqual([false, false]);
 });
 
-it('preserves the ten-second departure margin for a matched, unflagged voice', async () => {
+it('keeps the boundary hint separate from evidence of speech after departure', async () => {
   const review = await buildAttendanceReview(args, report([row('Alex Example', 'in_meeting', '2026-10-09T16:00:20Z')]));
   expect(review.leftBeforeEnd[0]).toBe(false);
-  expect(review.decision.rows.map(r => r.kept)).toEqual([true, false]);
+  expect(review.spokeAfterDeparture[0]).toBe(true);
+  expect(review.decision.rows.map(r => r.kept)).toEqual([false, false]);
 });
 
 it('excludes discussion only, preserves separate IDs, names, boundaries, words and all output consumers', async () => {
@@ -159,4 +160,43 @@ it.each([{ reasons: { A: 'mixed_speakers' } }, null])('requires confirmation for
   expect(review.decision.excludedSpeakerIds).toContain('A');
   const confirmed = confirmDiscussionAttribution(review, { reviewId: 'review', kept: [true, false] });
   expect(confirmed.excludedSpeakerIds).toEqual(['B']);
+});
+
+function departureArgs(starts, overrides = {}) {
+  return { ...args, sourceProvenance: { ...provenance, audioDurationMs: 120000,
+    zoom: { ...provenance.zoom, audioFile: { ...provenance.zoom.audioFile, recordingEnd: '2026-10-09T16:02:00Z' } } },
+    endMs: 30000, content: { text: '', utterances: [
+    { speaker: 'A', start: 0, end: 30000, text: 'Presentation.' },
+    ...starts.map(start => ({ speaker: 'A', start, end: start + 1000, text: 'Discussion.' })),
+  ] }, ...overrides };
+}
+it('flags the jingli shape: departure two seconds after boundary, speech 43 seconds later', async () => {
+  const review = await buildAttendanceReview(departureArgs([73000]), report([row('Alex Example', 'in_meeting', '2026-10-09T16:00:32Z')]));
+  expect(review.leftBeforeEnd).toEqual([false]);
+  expect(review.identityUncertain).toEqual([false]);
+  expect(review.spokeAfterDeparture).toEqual([true]);
+  expect(review.decision.excludedSpeakerIds).toEqual(['A']);
+});
+it('keeps the Kim Kruse shape: four discussion turns all before departure', async () => {
+  // Relative to a 17:20:06 recording start: boundary 17:20:36,
+  // turns 17:20:50–17:21:33, departure 17:21:36.
+  const review = await buildAttendanceReview(departureArgs([44000, 55000, 70000, 87000], {
+    speakerNames: { A: 'Kim Kruse, UF CFR' },
+  }), report([row('Kim Kruse, UF CFR', 'in_meeting', '2026-10-09T16:01:30Z')]));
+  expect(review.spokeAfterDeparture).toEqual([false]);
+  expect(review.decision.rows[0].kept).toBe(true);
+  expect(review.decision.excludedSpeakerIds).toEqual([]);
+});
+it.each([[32000, false], [34000, false], [34001, true]])('departure tolerance at turn start %i: suspicious=%s', async (start, suspicious) => {
+  const review = await buildAttendanceReview(departureArgs([start]), report([row('Alex Example', 'in_meeting', '2026-10-09T16:00:32Z')]));
+  expect(review.spokeAfterDeparture).toEqual([suspicious]);
+  expect(review.decision.rows[0].kept).toBe(!suspicious);
+});
+it.each([
+  { ...provenance, audioDurationMs: 57000 },
+  { ...provenance, zoom: { ...provenance.zoom, audioOnlyFileCount: 2 } },
+])('does not infer post-departure speech without aligned recording evidence', async sourceProvenance => {
+  const review = await buildAttendanceReview(departureArgs([73000], { sourceProvenance }), report([row('Alex Example', 'in_meeting', '2026-10-09T16:00:32Z')]));
+  expect(review.spokeAfterDeparture).toEqual([false]);
+  expect(review.decision.rows[0].kept).toBe(true);
 });
