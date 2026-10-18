@@ -34,7 +34,8 @@
         { "value": 100000010, "label": "Staff Discussion Summary" },
         { "value": 100000011, "label": "Presentation Video" },
         { "value": 100000012, "label": "Presentation Transcript" },
-        { "value": 100000013, "label": "Staff Discussion Transcript" }
+        { "value": 100000013, "label": "Staff Discussion Transcript" },
+        { "value": 100000014, "label": "Board Writeup" }
       ]
     },
     {

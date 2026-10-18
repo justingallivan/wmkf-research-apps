@@ -68,6 +68,7 @@ export default function Layout({
   const pathname = router?.pathname || '';
   const [authEnabled, setAuthEnabled] = useState(false);
   const [alertCount, setAlertCount] = useState(0);
+  const [boardAccess, setBoardAccess] = useState(false);
   const { data: session, status } = useSession();
   const { currentProfile } = useProfile();
   const { hasAccess, isSuperuser } = useAppAccess();
@@ -87,6 +88,17 @@ export default function Layout({
       })
       .catch(() => {});
   }, [isSuperuser]);
+
+  useEffect(() => {
+    let active = true;
+    setBoardAccess(false);
+    if (hasAccess('reviewers')) {
+      requestEnvelope('/api/workbench/board-writeups').then(({ ok, data }) => {
+        if (active && ok) setBoardAccess(Boolean(data.canRelease || data.canArchive));
+      }).catch(() => {});
+    }
+    return () => { active = false; };
+  }, [hasAccess, currentProfile?.id]);
 
   // Escape closes any open dropdown.
   useEffect(() => {
@@ -110,6 +122,7 @@ export default function Layout({
       .filter(app => !PRIMARY_APP_KEYS.includes(app.key))
       .map(app => ({ name: app.name, href: app.href }));
     if (isSuperuser) tools.push({ name: 'Cycle Dossier', href: '/cycle-dossier' });
+    if (boardAccess) tools.push({ name: 'Board writeups', href: '/board-writeups' });
 
     const trailing = [{ name: 'Guide', href: '/guide' }];
     if (isSuperuser) {
@@ -117,7 +130,7 @@ export default function Layout({
     }
 
     return { primaryItems: primary, toolItems: tools, trailingItems: trailing };
-  }, [hasAccess, isSuperuser, alertCount]);
+  }, [hasAccess, isSuperuser, alertCount, boardAccess]);
 
   const toolsCurrent = toolItems.some(item => isCurrentPath(pathname, item.href));
   const mainWidthClass = MAIN_WIDTH_CLASSES[maxWidth] || SHELL_WIDTH_CLASS;

@@ -1,0 +1,85 @@
+{
+  "name": "WMKF-Board-Rehearsal-20261017-ecaf2700",
+  "preparedAt": "2026-10-18T01:39:12.826Z",
+  "parents": {
+    "board": {
+      "siteId": "appriver3651007194.sharepoint.com,b054330a-50fa-47ff-bbb5-3334931bba64,f715fd9e-9976-48d6-bb48-83796982874e",
+      "driveId": "b!CjNUsPpQ_0e7tTM0kxu6ZJ79Ffd2mdZIu0iDeWmCh07Jfe3QPWzBQK4bHaey0TsY",
+      "folderId": "016CN7LDORXOJUYVKPFNE3P4DP5UIMWIVJ",
+      "webUrl": "https://appriver3651007194.sharepoint.com/sites/Research/Shared%20Documents/Board%20Materials"
+    },
+    "archive": {
+      "siteId": "appriver3651007194.sharepoint.com,48930e19-ba2f-46e7-9dc1-e0f7f8ade852,270ae82a-6903-42ec-99d1-4079863f002d",
+      "driveId": "b!GQ6TSC-650adweD3-K3oUiroCicDaexCmdFAeYY_AC0LfwP99I31QY_tw5hNNRkY",
+      "folderId": "01G4GVMS56Y2GOVW7725BZO354PWSELRRZ",
+      "webUrl": "https://appriver3651007194.sharepoint.com/sites/akoyaGO/akoya_request"
+    }
+  },
+  "uploadStarted": "2026-10-18T01:39:38.116Z",
+  "board": {
+    "siteId": "appriver3651007194.sharepoint.com,b054330a-50fa-47ff-bbb5-3334931bba64,f715fd9e-9976-48d6-bb48-83796982874e",
+    "driveId": "b!CjNUsPpQ_0e7tTM0kxu6ZJ79Ffd2mdZIu0iDeWmCh07Jfe3QPWzBQK4bHaey0TsY",
+    "folderId": "016CN7LDM5FEQJY4LKANG2Q75YUPZ6ZHQR",
+    "webUrl": "https://appriver3651007194.sharepoint.com/sites/Research/Shared%20Documents/Board%20Materials/WMKF-Board-Rehearsal-20261017-ecaf2700",
+    "path": "Board Materials/WMKF-Board-Rehearsal-20261017-ecaf2700"
+  },
+  "archive": {
+    "siteId": "appriver3651007194.sharepoint.com,48930e19-ba2f-46e7-9dc1-e0f7f8ade852,270ae82a-6903-42ec-99d1-4079863f002d",
+    "driveId": "b!GQ6TSC-650adweD3-K3oUiroCicDaexCmdFAeYY_AC0LfwP99I31QY_tw5hNNRkY",
+    "folderId": "01G4GVMS6IEVC57HEJ6FFZUFZVSOI64LFR",
+    "webUrl": "https://appriver3651007194.sharepoint.com/sites/akoyaGO/akoya_request/WMKF-Board-Rehearsal-20261017-ecaf2700",
+    "path": "WMKF-Board-Rehearsal-20261017-ecaf2700"
+  },
+  "sourceHash": "gdc1:J_Ekik2AyTYjgYbIisB0eSjNdqDgCQOkgbxpqS4znx0",
+  "boardItem": {
+    "id": "016CN7LDMNP6WYPVLGCBHIO77PPIVSOIFJ",
+    "name": "000000 - Fictional Rehearsal - Writeup.docx",
+    "webUrl": "https://appriver3651007194.sharepoint.com/sites/Research/_layouts/15/Doc.aspx?sourcedoc=%7B87AD7F8D-66D5-4E10-877F-EF7A2B2720A9%7D&file=000000%20-%20Fictional%20Rehearsal%20-%20Writeup.docx&action=default&mobileredirect=true",
+    "eTag": "\"{87AD7F8D-66D5-4E10-877F-EF7A2B2720A9},2\""
+  },
+  "boardReadback": {
+    "hash": "gdc1:J_Ekik2AyTYjgYbIisB0eSjNdqDgCQOkgbxpqS4znx0",
+    "eTag": "\"{87AD7F8D-66D5-4E10-877F-EF7A2B2720A9},2\"",
+    "versionId": "1.0"
+  },
+  "boardConflict": {
+    "status": 409,
+    "hash": "gdc1:J_Ekik2AyTYjgYbIisB0eSjNdqDgCQOkgbxpqS4znx0",
+    "eTag": "\"{87AD7F8D-66D5-4E10-877F-EF7A2B2720A9},2\""
+  },
+  "childrenWhileWordOpen": [
+    {
+      "id": "016CN7LDMNP6WYPVLGCBHIO77PPIVSOIFJ",
+      "name": "000000 - Fictional Rehearsal - Writeup.docx"
+    }
+  ],
+  "edited": {
+    "hash": "gdc1:slkFS5g-kd7yCLtr0aldCj29XPhtG42iKyghdYtifT0",
+    "eTag": "\"{87AD7F8D-66D5-4E10-877F-EF7A2B2720A9},6\"",
+    "versionId": "2.0"
+  },
+  "boardChildren": [
+    {
+      "id": "016CN7LDMNP6WYPVLGCBHIO77PPIVSOIFJ",
+      "name": "000000 - Fictional Rehearsal - Writeup.docx"
+    }
+  ],
+  "archiveStarted": "2026-10-18T01:40:38.828Z",
+  "archiveItem": {
+    "id": "01G4GVMS2W3QEF2766YVGKGD7QEA2YJMF5",
+    "name": "000000 - Fictional Rehearsal - Writeup.docx",
+    "webUrl": "https://appriver3651007194.sharepoint.com/sites/akoyaGO/_layouts/15/Doc.aspx?sourcedoc=%7B5D08DC56-DE7F-4CC5-A30F-F0203584B0BD%7D&file=000000%20-%20Fictional%20Rehearsal%20-%20Writeup.docx&action=default&mobileredirect=true",
+    "eTag": "\"{5D08DC56-DE7F-4CC5-A30F-F0203584B0BD},2\""
+  },
+  "archiveReadback": {
+    "hash": "gdc1:slkFS5g-kd7yCLtr0aldCj29XPhtG42iKyghdYtifT0",
+    "eTag": "\"{5D08DC56-DE7F-4CC5-A30F-F0203584B0BD},2\"",
+    "versionId": "1.0"
+  },
+  "archiveConflict": {
+    "status": 409,
+    "hash": "gdc1:slkFS5g-kd7yCLtr0aldCj29XPhtG42iKyghdYtifT0",
+    "eTag": "\"{5D08DC56-DE7F-4CC5-A30F-F0203584B0BD},2\""
+  },
+  "completedAt": "2026-10-18T01:40:42.779Z"
+}

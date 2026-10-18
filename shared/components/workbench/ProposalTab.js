@@ -406,6 +406,7 @@ function DocumentsSection({ requestId, docs, error }) {
   const others = Array.isArray(docs.otherDocuments) ? docs.otherDocuments : [];
   return (
     <div className="space-y-4">
+      {docs.boardWriteups?.length > 0 && <div><p className="text-xs uppercase tracking-wide text-gray-400 mb-1">Final Board writeups</p><ul>{docs.boardWriteups.map(document => <li key={document.documentId} className="py-2"><a className="text-blue-700 underline" href={document.webUrl} target="_blank" rel="noreferrer">{document.cycle} — {document.filename}</a>{document.archivedAt && <span className="ml-2 text-xs text-gray-500">Archived {new Date(document.archivedAt).toLocaleDateString()}</span>}</li>)}</ul></div>}
       <div>
         <p className="text-xs uppercase tracking-wide text-gray-400 mb-1">Reviewer Materials</p>
         {reviewerMaterials.length > 0 ? (

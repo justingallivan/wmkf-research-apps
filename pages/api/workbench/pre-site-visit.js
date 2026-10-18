@@ -130,10 +130,10 @@ export default async function handler(req, res) {
         );
         const visibleStatus = {
           ...statusWithoutLead,
-          currentArtifact: redactDraftWriteup(status.currentArtifact, viewer, leadProgramDirectorId),
-          pendingArtifact: redactDraftWriteup(status.pendingArtifact, viewer, leadProgramDirectorId),
+          currentArtifact: redactDraftWriteup(status.currentArtifact, viewer, leadProgramDirectorId, status.grantProgramId),
+          pendingArtifact: redactDraftWriteup(status.pendingArtifact, viewer, leadProgramDirectorId, status.grantProgramId),
           previousVersions: (status.previousVersions || []).map((version) => (
-            version.stage === 'group-review' || canSeeDraftWriteup(viewer, leadProgramDirectorId)
+            version.stage === 'group-review' || canSeeDraftWriteup(viewer, leadProgramDirectorId, status.grantProgramId)
               ? version : { ...version, file: null, fileHidden: true }
           )),
         };
@@ -163,7 +163,7 @@ export default async function handler(req, res) {
           timing: preparation.timing, preparation: preparation.preparation,
           // A separate read: redacted on its own lifecycle so a draft
           // published between the two reads is never returned.
-          writeup: redactDraftWriteup(preparation.writeup, viewer, leadProgramDirectorId),
+          writeup: redactDraftWriteup(preparation.writeup, viewer, leadProgramDirectorId, status.grantProgramId),
           brief, finalReview, finalPhase: finalReview.phase,
           // Mirrors the POST and start-site-visit guards so the page offers
           // only the actions the server will accept.
