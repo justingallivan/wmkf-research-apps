@@ -34,12 +34,12 @@
 
 ### Verify Before Acting
 
-- **Prior session's optional maintenance integration:** the previous handoff records a separately pushed, unmerged maintenance branch. Its production correction was already complete. Recheck its current status before considering integration; no repeat data change is authorized.
 - **Prior session's Final Writeups wording debt:** older amber/updated-review descriptions remain in planning documents. Runtime keeps completed reviews green with original reviewed-version history. Reconcile only if separately scoped; do not restore old behavior from stale prose. Pointers: `docs/FINAL_WRITEUPS_DASHBOARD_VIEWS_AND_VERSION_PLAN.md`, `docs/FINAL_WRITEUP_REVIEW_IMPLEMENTATION_PLAN.md`, `docs/STRATEGY.md`.
 - Earlier unrelated tasks were not re-audited. Historical handoffs remain available at `6d6fb0740:SESSION_PROMPT.md`; consult source, current owner decisions and live state before turning any carryover into work.
 
 ### Do Not Reopen Without New Decision
 
+- **Maintenance integration closed — [VERIFIED via owner decision, 2026-10-18].** Keep `codex/legacy-test-request-1002788` (commit `e563c5f3b`) unmerged as a historical record. Integration is no longer an open to-do. The production correction was already completed; no repeat data change is authorized.
 - Grammar-based warnings are review-only; they do not establish speaker identity.
 - Completed Final Writeup reviews remain complete through ordinary edits; retain original review dates and versions.
 - Do not push unpublished sensitive development history or repeat completed transcript/analysis corrections.
