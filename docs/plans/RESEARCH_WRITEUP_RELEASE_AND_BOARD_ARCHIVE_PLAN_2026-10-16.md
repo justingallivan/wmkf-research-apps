@@ -157,3 +157,7 @@ Proposed route families: Beth dashboard/read and release under `/api/workbench/b
 The seven contract audits in section 9 are implementation acceptance checks, not completed runtime evidence. External production state and future UI/worker behavior remain untested. Source baseline in section 3 describes the inspected branch, not the revised design as deployed behavior.
 
 Implementation evidence and remaining rollout prerequisites: [Board-run Atlas](../atlas/postgres-board-writeup-runs.md). The physical Postgres design uses one bounded cycle journal and row lock for the logically separate release/archive/email receipts; this makes their cross-operation fences atomic. No production deployment or activation is claimed.
+
+## Bounded transport evidence — 2026-10-17
+
+One fictional DOCX passed live outgoing/edit/archive content validation and duplicate-name refusal in isolated SharePoint folders. See `docs/audits/research-board-docx-rehearsal-2026-10-17.md`. No production activation, staff workflow acceptance, Dataverse reference write, or email test occurred; those gates remain open.
