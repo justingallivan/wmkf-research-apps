@@ -2121,6 +2121,9 @@ describe('cancelling a queued transcription', () => {
 test('attendance shares the boundary step, previews exclusion, and confirms once before publishing', async () => {
   const artifact = boundaryArtifact();
   let draft = attendanceDraft({ discussionAttribution: null });
+  draft.attendanceReview.identityUncertain = [false, true];
+  draft.attendanceReview.decision.rows[1].kept = false;
+  draft.attendanceReview.decision.excludedSpeakerIds = ['B'];
   let confirmations = 0, publications = 0;
   route({ materials: [transcriptRow()], collection: collection({ jobs: [], currentArtifact: artifact }), detail: detailFor({}) }, {
     [`/corrections/${CORRECTION_ID}/publish`]: { method: 'POST', respond: () => { publications += 1; return response({ publication: { state: 'published' }, currentArtifact: artifact }); } },
@@ -2136,10 +2139,11 @@ test('attendance shares the boundary step, previews exclusion, and confirms once
   await stepAction('Edit speaker names');
   const editor = await screen.findByTestId('presentation-end-editor');
   const silent = within(editor).getByRole('checkbox', { name: /Silent attendee/ });
-  const voice = within(editor).getByRole('checkbox', { name: 'Speaker B' });
-  expect(silent).toBeChecked(); expect(voice).toBeChecked();
+  const voice = within(editor).getByRole('checkbox', { name: /Speaker B/ });
+  expect(silent).toBeChecked(); expect(voice).not.toBeChecked();
+  expect(within(editor).getByText(/Identity uncertain. Leave unchecked/)).toBeInTheDocument();
   expect(within(editor).getByText('1 stayed in the waiting room.')).toBeInTheDocument();
-  fireEvent.click(silent); fireEvent.click(voice);
+  fireEvent.click(silent);
   expect(within(screen.getByTestId('transcript-preview')).getByText('Unidentified speaker:')).toBeInTheDocument();
   fireEvent.click(screen.getByRole('button', { name: 'Publish transcript' }));
   await waitFor(() => expect(publications).toBe(1));

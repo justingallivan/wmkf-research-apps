@@ -17,7 +17,7 @@ const content = { text: '', utterances: [
 ] };
 const names = { A: 'Alex Example', B: 'Speaker B' };
 const row = (name, status = 'in_meeting', leave = '2026-10-09T16:00:15Z') => ({ name, status, join_time: '2026-10-09T15:45:16Z', leave_time: leave, duration: 899 });
-const args = { sourceProvenance: provenance, content, speakerNames: names, endMs: 30000 };
+const args = { sourceProvenance: provenance, content, speakerNames: names, endMs: 30000, speakerAlignment: { reasons: {} } };
 const report = participants => jest.fn(async () => ({ status: 'complete', participants }));
 const identity = { requestId: guid, siteVisitActivityId: guid, revisionId: guid, operationId: guid,
   presentationEnd: { endMs: 30000, confirmedBy: 1, confirmedAt: '2026-10-09T17:00:00Z' } };
@@ -27,12 +27,12 @@ it('groups exact names across waiting/admitted rows, hides waiting-only, links d
   const review = await buildAttendanceReview(args, fetch);
   expect(fetch).toHaveBeenCalledWith(provenance.zoom.meetingUuid);
   expect(review.decision.rows).toEqual([
-    // D2 revised (owner, 2026-10-10): hinted leavers start unchecked; other voices stay checked.
+    // Hinted leavers and unmatched voices both start unchecked.
     { displayName: 'Alex Example', kept: false, speakerIds: ['A'], lastLeaveAt: '2026-10-09T16:00:18Z', kind: 'attendee' },
     { displayName: 'Silent', kept: false, speakerIds: [], lastLeaveAt: '2026-10-09T16:00:15Z', kind: 'attendee' },
-    { displayName: 'Speaker B', kept: true, speakerIds: ['B'], lastLeaveAt: null, kind: 'voice' },
+    { displayName: 'Speaker B', kept: false, speakerIds: ['B'], lastLeaveAt: null, kind: 'voice' },
   ]);
-  expect(review.decision.excludedSpeakerIds).toEqual(['A']);
+  expect(review.decision.excludedSpeakerIds).toEqual(['A', 'B']);
   expect(review.waitingRoomOnlyCount).toBe(1);
   expect(review.leftBeforeEnd).toEqual([true, true, false]);
 });
@@ -52,10 +52,10 @@ it.each([null, { invalid: true }, { ...provenance, kind: 'upload', zoom: null }]
   expect(review.decision.rows.map(r => r.speakerIds)).toEqual([['A'], ['B']]);
 });
 
-it('partial/error reports use checked manual voices, never a partial roster', async () => {
+it('partial/error reports use unchecked manual voices, never a partial roster', async () => {
   for (const fetch of [jest.fn(async () => ({ status: 'partial', participants: [row('Alex Example')] })), jest.fn(async () => { throw Error('report not ready'); })]) {
     const review = await buildAttendanceReview(args, fetch);
-    expect(review.decision.rows.every(r => r.kind === 'voice' && r.kept)).toBe(true);
+    expect(review.decision.rows.every(r => r.kind === 'voice' && !r.kept)).toBe(true);
     expect(review.decision.rows).toHaveLength(2);
   }
 });
@@ -67,10 +67,10 @@ it.each([
   expect((await buildAttendanceReview({ ...args, sourceProvenance }, report([row('Alex Example')]))).leftBeforeEnd).toEqual([false, false]);
 });
 
-it('uses recording start and a strict ten-second margin, never auto-unchecks', async () => {
+it('preserves the ten-second departure margin for a matched, unflagged voice', async () => {
   const review = await buildAttendanceReview(args, report([row('Alex Example', 'in_meeting', '2026-10-09T16:00:20Z')]));
   expect(review.leftBeforeEnd[0]).toBe(false);
-  expect(review.decision.rows.every(r => r.kept)).toBe(true);
+  expect(review.decision.rows.map(r => r.kept)).toEqual([true, false]);
 });
 
 it('excludes discussion only, preserves separate IDs, names, boundaries, words and all output consumers', async () => {
@@ -135,4 +135,28 @@ it.each([[[]], [['A']]])('rejects confirmation carrying sharedSpeakerIds %j', as
 it('never claims waiting-only attendance from incomplete pages', async () => {
   const review = await buildAttendanceReview(args, async () => ({ status: 'partial', participants: [row('Waiting', 'in_waiting_room')] }));
   expect(review.waitingRoomOnlyCount).toBe(0);
+});
+
+it('leaves a presenter label unmatched to Zoom unchecked without changing words or presentation attribution', async () => {
+  const review = await buildAttendanceReview({ ...args, speakerNames: { ...names, A: 'Presenter and Team' } }, report([
+    row('Presenter, Director', 'in_meeting', '2026-10-09T16:01:00Z'),
+    row('Speaker B', 'in_meeting', '2026-10-09T16:01:00Z'),
+  ]));
+  const voice = review.decision.rows.find(r => r.displayName === 'Presenter and Team');
+  expect(voice.kept).toBe(false);
+  expect(review.decision.excludedSpeakerIds).toEqual(['A']);
+  const resolved = resolveDiscussionAttribution(content, args.endMs, review.decision);
+  expect(resolved.utterances[0]).toEqual(content.utterances[0]);
+  expect(resolved.utterances[1]).toEqual({ ...content.utterances[1], unidentifiedSpeaker: true });
+});
+it.each([{ reasons: { A: 'mixed_speakers' } }, null])('requires confirmation for a matched voice with mixed or missing alignment evidence: %j', async speakerAlignment => {
+  const review = { id: 'review', ...await buildAttendanceReview({ ...args, speakerAlignment }, report([
+    row('Alex Example', 'in_meeting', '2026-10-09T16:01:00Z'),
+  ])) };
+  expect(review.leftBeforeEnd[0]).toBe(false);
+  expect(review.identityUncertain[0]).toBe(true);
+  expect(review.decision.rows[0].kept).toBe(false);
+  expect(review.decision.excludedSpeakerIds).toContain('A');
+  const confirmed = confirmDiscussionAttribution(review, { reviewId: 'review', kept: [true, false] });
+  expect(confirmed.excludedSpeakerIds).toEqual(['B']);
 });
