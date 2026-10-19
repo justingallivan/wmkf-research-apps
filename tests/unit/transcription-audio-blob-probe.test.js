@@ -9,7 +9,7 @@ import { get } from '@vercel/blob';
 import * as runtime from '../../lib/services/transcription-pilot/runtime';
 import { audioBlobProbeEnabled, runSyntheticAudioBlobProbe } from '../../lib/services/transcription-pilot/audio-blob-probe';
 
-const safe={VERCEL_ENV:'preview',TRANSCRIPTION_AUDIO_BLOB_PROBE_ENABLED:'on',TRANSCRIPTION_PILOT_ENABLED:'false',TRANSCRIPTION_SUBMISSIONS_ENABLED:'false',TRANSCRIPTION_AUDIO_BLOB_PROBE_STORE_ID:'1234567890abcdef',UPLOADS_BLOB_RW_TOKEN:'vercel_blob_rw_1234567890abcdef_synthetic'};
+const safe={VERCEL_ENV:'preview',TRANSCRIPTION_AUDIO_BLOB_PROBE_ENABLED:'on',TRANSCRIPTION_PILOT_ENABLED:'false',TRANSCRIPTION_SUBMISSIONS_ENABLED:'false',TRANSCRIPTION_AUDIO_BLOB_PROBE_STORE_ID:'1234567890abcdef',UPLOADS_BLOB_RW_TOKEN:['vercel_blob_rw','1234567890abcdef','synthetic'].join('_')};
 let saved;
 beforeEach(()=>{
  saved={...process.env}; Object.assign(process.env,safe);delete process.env.ASSEMBLYAI_API_KEY;jest.resetAllMocks();
@@ -61,4 +61,9 @@ test('a failed deletion retains the exact opaque recovery target and cannot repo
   await expect(runSyntheticAudioBlobProbe('small')).rejects.toThrow('delete failed');
   expect(log).toHaveBeenCalledWith('[audio-blob-probe] unconfirmed cleanup:',runtime.writePrivateContent.mock.calls[0][0]);
  }finally{log.mockRestore();}
+});
+test('an existing path is never overwritten or deleted by the probe',async()=>{
+ runtime.confirmPrivatePathAbsent.mockResolvedValue(false);
+ await expect(runSyntheticAudioBlobProbe('small')).rejects.toMatchObject({code:'probe_path_exists'});
+ expect(runtime.writePrivateContent).not.toHaveBeenCalled();expect(runtime.deletePrivatePath).not.toHaveBeenCalled();
 });
