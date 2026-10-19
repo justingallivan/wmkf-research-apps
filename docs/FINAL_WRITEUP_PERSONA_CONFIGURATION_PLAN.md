@@ -42,7 +42,7 @@ the earlier failed team-create attempt made zero Dataverse writes.
 
 - **Change surface:** global Final Writeup PD, PC, and Leadership persona
   assignment and the existing program-specific matrix audiences.
-- **Entry points:** **People & Access → Staffing** in Admin (central staffing branch-built, not deployed), with the existing Final Writeup editor; the former **Workflows → Final Writeups** entry links there,
+- **Entry points:** **People & Access → Staffing** in Admin (central staffing deployed via PR #507, `e4cb89ada`), with the existing Final Writeup editor; the former **Workflows → Final Writeups** entry links there,
   its existing superuser GET/PUT route, the Final Writeups dashboard service,
   and the focused Final Writeup page.
 - **Persistence:** the existing `final_writeup.matrix_audiences` value in
@@ -92,7 +92,7 @@ the earlier failed team-create attempt made zero Dataverse writes.
 
 ## Product and administration decision
 
-Keep one Final Writeup configuration editor. [VERIFIED via central-staffing branch source, not deployed] Its placement is now Admin → People & Access → Staffing alongside independently saved shared Board roles. The Grants Manager’s limited `/staffing` page does not expose Final Writeup configuration; that editor and its API remain superuser-only. The original persona consolidation below changes neither shared-role storage nor authority:
+Keep one Final Writeup configuration editor. [VERIFIED via parent session production deployment and signed-in Admin readback for PR #507 (`e4cb89ada`), 2026-10-19] Its placement is now Admin → People & Access → Staffing alongside independently saved shared Board roles. The Grants Manager’s limited `/staffing` page does not expose Final Writeup configuration; that editor and its API remain superuser-only. The original persona consolidation below changes neither shared-role storage nor authority:
 
 
 1. Rename the current panel from **Final Writeup review matrix** to

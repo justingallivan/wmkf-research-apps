@@ -4,7 +4,7 @@ import { useAppAccess } from '../../shared/context/AppAccessContext';
 jest.mock('../../shared/context/AppAccessContext', () => ({ useAppAccess: jest.fn(() => ({ isSuperuser: false })) }));
 import StaffingPanel from '../../shared/components/staffing/StaffingPanel';
 jest.mock('../../shared/components/admin/FinalWriteupMatrixAudiencesSection', () => function MockFinalWriteupEditor() { return <div>Existing publication editor</div>; });
-const snapshot = { isSuperuser: false, staff: [{ systemUserId: 'one', name: 'First Person' }, { systemUserId: 'two', name: 'Second Person' }], roles: Object.fromEntries(['president', 'cso', 'grantsManager'].map(role => [role, { value: { version: 1, systemUserId: 'one' }, revision: `${role}-old` }])) };
+const snapshot = { isSuperuser: false, staff: [{ systemUserId: 'one', name: 'First Person', canUseWorkbench: true }, { systemUserId: 'two', name: 'Second Person', canUseWorkbench: true }], roles: Object.fromEntries(['president', 'cso', 'grantsManager'].map(role => [role, { value: { version: 1, systemUserId: 'one' }, revision: `${role}-old` }])) };
 const response = (body, status = 200) => ({ ok: status < 400, status, json: async () => body });
 beforeEach(() => useAppAccess.mockReturnValue({ isSuperuser: false }));
 afterEach(() => jest.restoreAllMocks());
@@ -83,4 +83,12 @@ test('direct Admin staffing URL does not render Admin editors for a Grants Manag
   await screen.findByLabelText('President');
   expect(screen.queryByText('Existing publication editor')).toBeNull();
   expect(screen.queryByText('Related assignments')).toBeNull();
+});
+
+test('staff without Workbench access appear only in the President selector', async () => {
+  global.fetch = jest.fn(async () => response({ ...snapshot, staff: [...snapshot.staff, { systemUserId: 'president-only', name: 'Anneli Example', canUseWorkbench: false }] }));
+  render(<StaffingPanel />);
+  const president = await screen.findByLabelText('President');
+  expect([...president.options].map(x => x.text)).toContain('Anneli Example');
+  for (const label of ['CSO', 'Grants Manager']) expect([...screen.getByLabelText(label).options].map(x => x.text)).not.toContain('Anneli Example');
 });
