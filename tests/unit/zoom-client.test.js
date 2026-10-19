@@ -397,3 +397,27 @@ describe('attendance report pagination', () => {
     expect((await getMeetingAttendance('occurrence')).status).toBe('partial');
   });
 });
+
+
+test('picker attendance deadline includes token acquisition and aborts a slow request', async () => {
+  const aborts = [];
+  fetchMock.mockImplementation((_url, { signal }) => new Promise((_resolve, reject) => {
+    signal.addEventListener('abort', () => { aborts.push(true); reject(new Error('aborted')); }, { once: true });
+  }));
+  // Real short deadline exercises the AbortSignal, not just a mocked timeout result.
+  const result = await getMeetingAttendance('occurrence', { timeoutMs: 20 });
+  expect(result).toEqual({ status: 'unavailable', participants: [] });
+  expect(aborts).toEqual([true]);
+  expect(fetchMock).toHaveBeenCalledTimes(1);
+});
+
+test('picker attendance pages share the same total deadline after authentication', async () => {
+  jest.useFakeTimers();
+  jest.setSystemTime(new Date('2026-10-19T00:00:00Z'));
+  const timeout = jest.spyOn(AbortSignal, 'timeout');
+  fetchMock.mockImplementationOnce(async () => { jest.setSystemTime(Date.now() + 3000); return tokenRes(); })
+    .mockResolvedValueOnce(jsonRes({ participants: [], total_records: 0, next_page_token: '' }));
+  expect((await getMeetingAttendance('occurrence', { timeoutMs: 5000 })).status).toBe('complete');
+  expect(timeout.mock.calls.map(call => call[0])).toEqual([5000, 2000]);
+  timeout.mockRestore();
+});

@@ -2225,3 +2225,32 @@ test('ready draft exposes review-only fragment warnings without changing names',
   expect(screen.getByLabelText('Name for Speaker B')).toHaveValue('Casey Example');
   expect(global.fetch.mock.calls.some(([, options]) => options?.method === 'PATCH')).toBe(false);
 });
+
+
+test('speaker picker offers Zoom participants first without applying a name or saving automatically', async () => {
+  route({ collection: collection({ candidates: [{ id: 'pi:one', source: 'pi', displayName: 'Request Person' }] }),
+    detail: () => ({ ...detailFor({})(), candidates: [{ id: 'pi:one', source: 'pi', displayName: 'Request Person' }], zoomCandidateStatus: 'complete', zoomCandidates: [
+      { id: 'zoom:0', source: 'zoom_participant', displayName: 'Call Person' },
+    ] }) });
+  render(<RecordingAndTranscriptCard requestId={REQUEST_ID} />);
+  const pickers = await screen.findAllByRole('combobox', { name: /^People on the call or request/ });
+  expect([...pickers[0].querySelectorAll('optgroup')].map(group => group.label)).toEqual(['Zoom participants', 'PI']);
+  expect(screen.getByLabelText('Name for Speaker A')).toHaveValue('');
+  fireEvent.change(pickers[0], { target: { value: 'zoom:0' } });
+  expect(screen.getByLabelText('Name for Speaker A')).toHaveValue('Call Person');
+  expect(global.fetch.mock.calls.some(([, options]) => options?.method === 'PATCH')).toBe(false);
+  fireEvent.change(pickers[0], { target: { value: 'pi:one' } });
+  expect(screen.getByLabelText('Name for Speaker A')).toHaveValue('Request Person');
+});
+
+test('incomplete Zoom lookup retains request contacts and manual entry', async () => {
+  route({ collection: collection({ candidates: [{ id: 'pi:one', source: 'pi', displayName: 'Request Person' }] }),
+    detail: () => ({ ...detailFor({})(), candidates: [{ id: 'pi:one', source: 'pi', displayName: 'Request Person' }], zoomCandidateStatus: 'partial', zoomCandidates: [] }) });
+  render(<RecordingAndTranscriptCard requestId={REQUEST_ID} />);
+  expect(await screen.findByText('Zoom participants are unavailable. Choose a request contact or type a name.')).toBeInTheDocument();
+  const picker = screen.getAllByRole('combobox', { name: /^People on this request/ })[0];
+  fireEvent.change(picker, { target: { value: 'pi:one' } });
+  expect(screen.getByLabelText('Name for Speaker A')).toHaveValue('Request Person');
+  fireEvent.change(screen.getByLabelText('Name for Speaker A'), { target: { value: 'Typed Name' } });
+  expect(screen.getByLabelText('Name for Speaker A')).toHaveValue('Typed Name');
+});

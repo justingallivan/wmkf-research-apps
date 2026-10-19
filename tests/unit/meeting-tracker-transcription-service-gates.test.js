@@ -1,3 +1,5 @@
+jest.mock('../../lib/services/meeting-tracker-recordings/import-store', () => ({ getZoomImportForJob: jest.fn() }));
+jest.mock('../../lib/services/meeting-tracker-recordings/zoom-client', () => ({ getMeetingAttendance: jest.fn() }));
 jest.mock('../../lib/dataverse/adapters/request-document.js', () => ({ findByRequest: jest.fn(), findByGenerationKey: jest.fn() }));
 jest.mock('../../lib/services/post-presentation-materials/material-service.js', () => ({
   prepareMeetingTranscriptBundlePublication: jest.fn(), publishMeetingTranscriptBundle: jest.fn(),
@@ -152,4 +154,28 @@ test('publication accepts a mapped Dataverse actor GUID with non-RFC version/var
     if (previous.bundle === undefined) delete process.env.MEETING_TRACKER_TRANSCRIPT_BUNDLE_SCHEMA_READY;
     else process.env.MEETING_TRACKER_TRANSCRIPT_BUNDLE_SCHEMA_READY = previous.bundle;
   }
+});
+
+
+test('job editor reads Zoom suggestions only from its server-bound occurrence and survives optional lookup failure', async () => {
+  const { readMeetingTranscriptionJob } = require('../../lib/services/meeting-tracker-transcription/service.js');
+  const { getMeetingTranscriptionJobContent } = require('../../lib/services/transcription-pilot/runtime.js');
+  const { getZoomImportForJob } = require('../../lib/services/meeting-tracker-recordings/import-store');
+  const { getMeetingAttendance } = require('../../lib/services/meeting-tracker-recordings/zoom-client');
+  process.env.MEETING_TRACKER_TRANSCRIPTION_ACCESS = 'on';
+  process.env.MEETING_TRACKER_TRANSCRIPTION_SCHEMA_READY = 'on';
+  const visitId = '33333333-3333-4333-8333-333333333333';
+  binding.loadMeetingTranscriptionBinding.mockResolvedValue({ requestId, siteVisitActivityId: visitId });
+  getMeetingTranscriptionJobContent.mockResolvedValue({ job: { id: jobId }, content: { text: 'Verified content' } });
+  store.getMeetingTranscriptionJob.mockResolvedValue({ id: jobId, audio_sha256: 'a'.repeat(64), verified_bytes: 10, audio_duration_ms: 60000 });
+  getZoomImportForJob.mockResolvedValue({ id: jobId, zoom_meeting_uuid: 'exact-occurrence==', zoom_host_id: 'host',
+    selected_recording_files: { version: 1, audioOnlyFileCount: 1, transcriptFile: null,
+      audioFile: { fileId: 'audio', recordingType: 'audio_only', bytes: 10, sha256: 'a'.repeat(64), recordingStart: '2026-10-09T16:00:00Z', recordingEnd: '2026-10-09T16:01:00Z' } } });
+  getMeetingAttendance.mockResolvedValue({ status: 'complete', participants: [{ name: 'Call Person', status: 'in_meeting', join_time: '2026-10-09T16:00:00Z', leave_time: '2026-10-09T16:01:00Z', duration: 60 }] });
+  const result = await readMeetingTranscriptionJob({ requestId, jobId });
+  expect(getZoomImportForJob).toHaveBeenCalledWith({ requestId, siteVisitActivityId: visitId, jobId });
+  expect(getMeetingAttendance).toHaveBeenCalledWith('exact-occurrence==', { timeoutMs: 5_000 });
+  expect(result.zoomCandidates).toEqual([{ id: 'zoom:0', source: 'zoom_participant', displayName: 'Call Person' }]);
+  getZoomImportForJob.mockRejectedValueOnce(new Error('lookup unavailable'));
+  expect(await readMeetingTranscriptionJob({ requestId, jobId })).toMatchObject({ content: { text: 'Verified content' }, zoomCandidates: [], zoomCandidateStatus: 'unavailable' });
 });
