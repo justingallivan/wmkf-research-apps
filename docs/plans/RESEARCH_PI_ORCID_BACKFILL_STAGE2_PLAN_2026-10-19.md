@@ -73,6 +73,6 @@ Only rows whose `result` is `write` are eligible; `present_unattributed`, `noop`
 
 ## 6. Before any apply
 
-1. Codex adversarial review of this plan and of the stage-1 fixes.
-2. Owner approves the batch (CSV `approve` column) and the `requireEtag` decision.
+1. Two Codex adversarial reviews (2026-10-19) are addressed in this revision.
+2. Owner approves the batch (CSV `approve` column).
 3. The resolve summary is reviewed. Apply runs first on a small batch (about 10 rows), then `--verify`, then the remainder.
