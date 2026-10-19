@@ -104,6 +104,7 @@ test('failed setup save shows an error beside Save setup and preserves entered d
   });
   render(<BoardWriteups />);
   const save = await screen.findByText('Save setup');
+  expect(save.closest('details').open).toBe(true);
   fireEvent.change(screen.getByLabelText('Board meeting end date'), { target: { value: '2026-12-10' } });
   fireEvent.click(save);
   const alert = await screen.findByRole('alert');
