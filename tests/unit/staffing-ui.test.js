@@ -3,7 +3,7 @@ import { render, screen, fireEvent, waitFor, act } from '@testing-library/react'
 import { useAppAccess } from '../../shared/context/AppAccessContext';
 jest.mock('../../shared/context/AppAccessContext', () => ({ useAppAccess: jest.fn(() => ({ isSuperuser: false })) }));
 import StaffingPanel from '../../shared/components/staffing/StaffingPanel';
-jest.mock('../../shared/components/admin/FinalWriteupMatrixAudiencesSection', () => () => <div>Existing publication editor</div>);
+jest.mock('../../shared/components/admin/FinalWriteupMatrixAudiencesSection', () => function MockFinalWriteupEditor() { return <div>Existing publication editor</div>; });
 const snapshot = { isSuperuser: false, staff: [{ systemUserId: 'one', name: 'First Person' }, { systemUserId: 'two', name: 'Second Person' }], roles: Object.fromEntries(['president', 'cso', 'grantsManager'].map(role => [role, { value: { version: 1, systemUserId: 'one' }, revision: `${role}-old` }])) };
 const response = (body, status = 200) => ({ ok: status < 400, status, json: async () => body });
 beforeEach(() => useAppAccess.mockReturnValue({ isSuperuser: false }));
