@@ -1,4 +1,4 @@
-/** Scoped workflow operations; role/settings mutations remain superuser-only in service. */
+/** Scoped workflow operations; setup mutations require a system administrator or assigned Grants Manager in service. */
 import { boardWorkEnabled } from '../../../lib/services/board-writeups/mode';
 import { requireAppAccess } from '../../../lib/utils/auth';
 import { withDalContext } from '../../../lib/dataverse/core/context';
@@ -24,7 +24,6 @@ export default async function handler(req, res) {
         const cycle = cycleCode(req.query.cycle);
         if (req.query.action === 'inspectRecovery') return res.json(await inspectRecovery(cycle, actor, req.query.requestId, req.query.operation));
         if (req.query.action === 'reconcile') return res.json(await reconcile(cycle, actor));
-        if (!staff.isSuperuser) fail('board_settings_denied', 'Only administrators edit setup.', 403);
         return res.json({ staff: await staffDirectory(), cycle: await getCycle(cycle), candidates: await candidates(cycle), roles: { president: await getRole('president'), cso: await getRole('cso'), grantsManager: await getRole('grantsManager') } });
       }
       const input = req.body;
@@ -42,7 +41,7 @@ export default async function handler(req, res) {
         if (!input.value?.requestIds?.every(id => choices.has(id) || existing.value?.requestIds.includes(id))) fail('board_roster_candidate_mismatch', 'Refresh the proposal list; one or more requests changed.');
         return res.json(await saveCycle(actor, input.value, input.expectedRevision, input.reason));
       }
-      if (input.action === 'reconcileConfig' && staff.isSuperuser) return res.json(await resumeConfig(cycle, actor));
+      if (input.action === 'reconcileConfig') return res.json(await resumeConfig(cycle, actor));
       if (input.action === 'archive') return res.json(await startArchive(cycle, actor, input.expectedRevision));
       if (input.action === 'recover') return res.json(await recover(cycle, actor, input.resolution));
       if (input.action === 'resolve') return res.json(await resolveDiscrepancy(cycle, actor, input.resolution));
