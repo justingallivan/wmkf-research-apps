@@ -8,10 +8,12 @@
  * Grades (a human reviews every row before any write):
  *   high   — PI only: one reviewer-record ORCID whose profile name matches; or
  *            exactly one name-matching ORCID record whose email equals the
- *            contact email; or exactly one name-matching record listing the
- *            award's applicant institution.
+ *            contact email; or exactly one record with the same first given
+ *            name listing the award's applicant institution.
  *   review — some name-matching record with an institution or email signal,
- *            but not unambiguous; every co-PI candidate lands here at best.
+ *            but not unambiguous (incl. first-initial-only matches such as
+ *            nicknames); a sole full-name match whose record lists no
+ *            affiliations; every co-PI candidate lands here at best.
  *   none   — no name-matching record with any corroborating signal.
  * `institution-name` in expanded search lists every affiliation on the record
  * (any period), so an institution match is not proof of award-time employment.
@@ -53,21 +55,39 @@ async function search(opts) {
 }
 
 const norm = (s) => String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase()
-  .replace(/&/g, ' and ').replace(/[^a-z0-9 ]+/g, ' ').replace(/\b(the|inc|of)\b/g, ' ').replace(/\s+/g, ' ').trim();
+  .replace(/&/g, ' and ').replace(/[^a-z0-9 ]+/g, ' ').replace(/\s+/g, ' ').trim();
+
+// Institutions: compare the distinctive words after dropping legal boilerplate
+// ("Regents of", "Board of Trustees of", ...) and generic words (university,
+// research, center, ...). Sets must be equal, or the smaller (>= 3 words) may
+// miss at most one word of the larger — so "University of Washington" never
+// matches "Washington State University", "University of San Diego" never
+// matches UC San Diego, nor a UC system name a UC campus.
+const BOILERPLATE = new Set('the of at and in for a an inc corporation regents board trustees president fellows leland junior campus'.split(' '));
+const GENERIC = new Set('university univ college institute institutes school center centre research medical medicine hospital foundation laboratory laboratories health sciences science department faculty'.split(' '));
+const instWords = (s) => new Set(norm(s).split(' ').filter((w) => w && !BOILERPLATE.has(w) && !GENERIC.has(w)));
 const instMatch = (a, b) => {
-  const x = norm(a); const y = norm(b);
-  if (!x || !y) return false;
-  return x === y || (Math.min(x.length, y.length) >= 8 && (x.includes(y) || y.includes(x)));
+  const x = instWords(a); const y = instWords(b);
+  const [small, large] = x.size <= y.size ? [x, y] : [y, x];
+  if (!small.size || ![...small].every((w) => large.has(w))) return false;
+  return small.size === large.size || (small.size >= 3 && large.size - small.size <= 1);
 };
+// The Foundation itself is not an institution signal for a grantee.
+const usableInst = (s) => s && !/keck foundation/i.test(s);
+
+// Name match level: 'full' (same first given name) | 'initial' (same first
+// initial — nicknames like Terry/Terrence) | null. Family names match on any
+// shared hyphen/space component (Podlaha-Murphy ~ Podlaha).
 const firstToken = (s) => norm(s).split(' ')[0] || '';
-function nameMatches(person, rec) {
-  const family = norm(person.lastname);
+function nameMatch(person, rec) {
+  const fam = norm(person.lastname).split(' ').filter((w) => w.length > 1);
+  const recFam = norm(rec.familyName).split(' ').filter((w) => w.length > 1);
+  if (!fam.length || !recFam.some((w) => fam.includes(w))) return null;
   const given = firstToken(person.firstname);
-  const recFamily = norm(rec.familyName);
-  if (!family || !recFamily || !(recFamily === family || recFamily.split(' ').includes(family) || family.split(' ').includes(recFamily))) return false;
   const recGiven = firstToken(rec.givenNames);
-  if (!given || !recGiven) return false;
-  return recGiven === given || (given.length === 1 && recGiven.startsWith(given)) || (recGiven.length === 1 && given.startsWith(recGiven));
+  if (!given || !recGiven || given[0] !== recGiven[0]) return null;
+  if (recGiven === given || given.length === 1 || recGiven.length === 1) return 'full';
+  return 'initial';
 }
 
 const { people } = JSON.parse(fs.readFileSync(IN, 'utf8'));
@@ -77,40 +97,51 @@ for (const person of people) {
   i += 1;
   const name = `${person.firstname} ${person.lastname}`.trim() || person.fullname;
   const isPi = person.roles.includes('PI');
-  const applicants = person.institutions.filter((x) => x.source === 'award-applicant').map((x) => x.name);
-  const allInst = person.institutions.map((x) => x.name);
+  const applicants = person.institutions.filter((x) => x.source === 'award-applicant' && usableInst(x.name)).map((x) => x.name);
+  const allInst = [...new Set(person.institutions.map((x) => x.name).filter(usableInst))];
+  const familyParts = norm(person.lastname).split(' ').filter((w) => w.length > 1);
 
-  // Name-only search plus one search per distinct institution (max 2).
+  // Searches: full name; full name + institution; family name + institution
+  // (catches nicknames); first family-name component for compound surnames.
   const records = new Map();
   let error = '';
   try {
-    for (const rec of await search({ name, maxResults: 25 })) records.set(rec.orcidId, rec);
-    for (const inst of [...new Set(allInst)].slice(0, 2)) {
-      for (const rec of await search({ name, affiliation: inst, maxResults: 10 })) records.set(rec.orcidId, rec);
+    const add = (recs) => { for (const rec of recs) records.set(rec.orcidId, rec); };
+    add(await search({ name, maxResults: 25 }));
+    for (const inst of allInst.slice(0, 2)) {
+      add(await search({ name, affiliation: inst, maxResults: 10 }));
+      add(await search({ name: person.lastname.replace(/\s+/g, '-'), affiliation: inst, maxResults: 10 }));
     }
+    if (familyParts.length > 1) add(await search({ name: `${person.firstname} ${familyParts[0]}`, maxResults: 10 }));
   } catch (err) { error = String(err.message || err).slice(0, 200); }
 
-  const candidates = [...records.values()].filter((rec) => nameMatches(person, rec)).map((rec) => ({
-    ...rec,
-    applicantMatch: applicants.some((a) => rec.institutions.some((ri) => instMatch(a, ri))),
-    instMatch: allInst.some((a) => rec.institutions.some((ri) => instMatch(a, ri))),
-    emailMatch: Boolean(person.email) && rec.emails.some((e) => e.toLowerCase() === person.email.toLowerCase()),
-    reviewerMatch: person.reviewerOrcids.includes(rec.orcidId),
-  }));
+  const candidates = [...records.values()].map((rec) => ({ ...rec, nameLevel: nameMatch(person, rec) }))
+    .filter((rec) => rec.nameLevel).map((rec) => ({
+      ...rec,
+      applicantMatch: applicants.some((a) => rec.institutions.some((ri) => instMatch(a, ri))),
+      instMatch: allInst.some((a) => rec.institutions.some((ri) => instMatch(a, ri))),
+      emailMatch: Boolean(person.email) && rec.emails.some((e) => e.toLowerCase() === person.email.toLowerCase()),
+      reviewerMatch: person.reviewerOrcids.includes(rec.orcidId),
+    }));
   candidates.sort((a, b) => (b.reviewerMatch - a.reviewerMatch) || (b.emailMatch - a.emailMatch)
-    || (b.applicantMatch - a.applicantMatch) || (b.instMatch - a.instMatch));
+    || (b.applicantMatch - a.applicantMatch) || (b.instMatch - a.instMatch) || ((a.nameLevel === 'full' ? 0 : 1) - (b.nameLevel === 'full' ? 0 : 1)));
 
+  const full = (c) => c.nameLevel === 'full';
   const reviewerHits = candidates.filter((c) => c.reviewerMatch);
   const emailHits = candidates.filter((c) => c.emailMatch);
   const applicantHits = candidates.filter((c) => c.applicantMatch);
   const signalled = candidates.filter((c) => c.reviewerMatch || c.emailMatch || c.instMatch);
+  const fullNoInst = candidates.filter((c) => full(c) && !c.institutions.length);
   let grade = 'none';
   let reason = error ? `search error: ${error}` : candidates.length ? `${candidates.length} name match(es), no institution/email signal` : 'no name match';
   if (isPi && person.reviewerOrcids.length === 1 && reviewerHits.length === 1) { grade = 'high'; reason = 'linked reviewer-record ORCID; profile name matches'; }
   else if (isPi && emailHits.length === 1) { grade = 'high'; reason = 'one name match with matching email'; }
-  else if (isPi && applicantHits.length === 1) { grade = 'high'; reason = 'one name match listing the award institution'; }
-  else if (signalled.length) { grade = 'review'; reason = `${signalled.length} name match(es) with a signal${isPi ? '' : ' (co-PI: always reviewed)'}`; }
-  else if (person.reviewerOrcids.length) { grade = 'review'; reason = 'linked reviewer-record ORCID not found by name search'; }
+  else if (isPi && applicantHits.length === 1 && full(applicantHits[0])) { grade = 'high'; reason = 'one name match listing the award institution'; }
+  else if (signalled.length) {
+    grade = 'review';
+    reason = `${signalled.length} name match(es) with a signal${signalled.some(full) ? '' : ' (first initial only)'}${isPi ? '' : ' (co-PI: always reviewed)'}`;
+  } else if (person.reviewerOrcids.length) { grade = 'review'; reason = 'linked reviewer-record ORCID not found by name search'; }
+  else if (candidates.filter(full).length === 1 && fullNoInst.length === 1) { grade = 'review'; reason = 'only full-name match; record lists no affiliations'; }
 
   results.push({ person, grade, reason, candidates });
   if (i % 25 === 0) console.log(`  ${i}/${people.length}`);
@@ -127,7 +158,8 @@ for (const { person, grade, reason, candidates } of results.sort((a, b) => order
     [...new Set(person.awards.map((a) => (a.meetingDate || '').slice(0, 4)))].join(' '),
     person.reviewerOrcids.join(' '), candidates.length];
   for (const c of candidates.slice(0, 3).concat([{}, {}, {}]).slice(0, 3)) {
-    const signals = c.orcidId ? ['reviewerMatch', 'emailMatch', 'applicantMatch', 'instMatch'].filter((k) => c[k]).map((k) => k.replace('Match', '')).join(' ') : '';
+    const signals = c.orcidId ? ['reviewerMatch', 'emailMatch', 'applicantMatch', 'instMatch'].filter((k) => c[k]).map((k) => k.replace('Match', ''))
+      .concat(c.nameLevel === 'initial' ? ['first-initial-only'] : []).join(' ') : '';
     cells.push(c.orcidId, c.orcidUrl, c.orcidId ? `${c.givenNames || ''} ${c.familyName || ''}`.trim() : '', signals, (c.institutions || []).slice(0, 6).join('; '));
   }
   lines.push(cells.map(esc).join(','));
