@@ -194,15 +194,14 @@ sequence.
   open). Fix if needed: compare size + `publication.versionId`, which Graph's
   default item response omits, so `resolveMediaDownloadUrl` must request it
   explicitly. Detail: `docs/plans/STAGE4_BUILD_PLAN_2026-10-10.md` "Board link fix".
-- **Speaker-name picker should offer the Zoom call's participants
-  (2026-10-10).** [OPEN — owner request] "People on this request" in the
-  speaker-name editor (`RecordingAndTranscriptCard.js`, option groups PI,
-  Co-PI, Saved staff, Saved attendee) is built from the request and its
-  invitation. That was defensible before Zoom import; for a transcript with
-  verified Zoom provenance it should default to the people on the call, from
-  the same Zoom participants report the attendance attribution already
-  fetches (`attendance-service.js`). Keep the request people as a secondary
-  group or fallback for uploads and when attendance is unavailable.
+- **Zoom participants in the speaker-name picker.** [IMPLEMENTED ON BRANCH —
+  NOT DEPLOYED, 2026-10-19] `codex/zoom-speaker-picker` adds a first Zoom
+  participants group from the transcript's verified occurrence, preserving request
+  contacts and manual entry. Picker suggestions remain separate from boundary
+  classification and attendance decisions. Incomplete/failed reports fall back;
+  the optional lookup has a five-second total budget including authentication.
+  Source contract, tests, review and release limits:
+  `docs/plans/ZOOM_SPEAKER_PICKER_2026-10-19.md`.
 
 ## Audit follow-ups — verified open, not silently prioritized
 - **Hard-coded late-2026 `expiresAt` dates in unit-test fixtures (2026-09-27, S546).** **[CLOSED

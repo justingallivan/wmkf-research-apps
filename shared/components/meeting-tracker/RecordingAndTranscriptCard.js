@@ -940,7 +940,7 @@ const ALIGNMENT_REASONS = {
   superseded: 'Names were edited before matching finished.',
 };
 const SOURCE_LABELS = {
-  pi: 'PI', co_pi: 'Co-PI', coPIs: 'Co-PI', saved_staff: 'Saved staff', saved_attendee: 'Saved attendee', savedAttendees: 'Saved attendee',
+  zoom_participant: 'Zoom participants', pi: 'PI', co_pi: 'Co-PI', coPIs: 'Co-PI', saved_staff: 'Saved staff', saved_attendee: 'Saved attendee', savedAttendees: 'Saved attendee',
 };
 const RUN_STATE_LABELS = {
   uploading: 'Uploading', queued: 'Waiting', submitting: 'Transcribing', processing: 'Transcribing', saving: 'Saving',
@@ -2379,11 +2379,14 @@ function SpeakerEditor({ t, alignment, readOnly }) {
   const { content, names, setNames, suggestionPicks, setSuggestionPicks, speakerIds, correctionDetail, collection, busy } = t;
   const candidates = useMemo(() => {
     const result = new Map();
-    for (const candidate of correctionDetail?.candidates || t.detail?.candidates || collection?.candidates || []) {
+    const detail = correctionDetail || t.detail;
+    const zoom = detail?.zoomCandidates || [];
+    const requestPeople = correctionDetail?.candidates || t.detail?.candidates || collection?.candidates || [];
+    for (const candidate of [...zoom, ...requestPeople]) {
       if (candidate?.id && candidate?.displayName) result.set(candidate.id, candidate);
     }
     return [...result.values()];
-  }, [correctionDetail?.candidates, t.detail?.candidates, collection?.candidates]);
+  }, [correctionDetail, t.detail, collection?.candidates]);
   const grouped = useMemo(() => {
     const sources = new Map();
     for (const candidate of candidates) {
@@ -2409,6 +2412,7 @@ function SpeakerEditor({ t, alignment, readOnly }) {
         <h4 className="text-sm font-semibold text-gray-950">Speakers ({speakerIds.length})</h4>
         <p className="text-xs text-gray-600">Pick a suggestion or type a name. Suggestions only fill the field.</p>
       </div>
+      {['partial', 'unavailable'].includes((correctionDetail || t.detail)?.zoomCandidateStatus) && <p className="mt-2 text-xs text-amber-900">Zoom participants are unavailable. Choose a request contact or type a name.</p>}
       {unavailable.length > 0 && <p className="mt-2 text-xs text-amber-900">Some name suggestions are unavailable ({unavailable.map(([source]) => SOURCE_LABELS[source] || source).join(', ')}). You can still type names.</p>}
       <div className="mt-2 divide-y divide-gray-200 border-y border-gray-200">
         {speakerIds.map((speaker, index) => {
@@ -2444,7 +2448,7 @@ function SpeakerEditor({ t, alignment, readOnly }) {
                   ))}
                 </div>}
                 {candidates.length > 0 && <label htmlFor={`${controlId}-pick`} className="block text-xs font-medium text-gray-700">
-                  People on this request
+                  {candidates.some(candidate => candidate.source === 'zoom_participant') ? 'People on the call or request' : 'People on this request'}
                   <select
                     id={`${controlId}-pick`}
                     disabled={disabled}

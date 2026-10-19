@@ -1,6 +1,6 @@
 /** @jest-environment node */
 import baseline from '../fixtures/zoom-attendance-legacy-baseline.json';
-import { buildAttendanceReview } from '../../lib/services/meeting-tracker-transcription/attendance-service';
+import { buildAttendanceReview, getZoomSpeakerCandidates } from '../../lib/services/meeting-tracker-transcription/attendance-service';
 import { normalizeDiscussionAttribution, confirmDiscussionAttribution } from '../../lib/services/meeting-tracker-transcription/discussion-attribution';
 import { resolveDiscussionAttribution, proposePresentationEnd, buildStaffDiscussionTranscriptText } from '../../lib/services/meeting-tracker-transcription/presentation-boundary';
 import { buildMeetingTranscriptFiles, parseVerifiedMeetingTranscriptSource } from '../../lib/services/meeting-tracker-transcription/bundle';
@@ -199,4 +199,30 @@ it.each([
   const review = await buildAttendanceReview(departureArgs([73000], { sourceProvenance }), report([row('Alex Example', 'in_meeting', '2026-10-09T16:00:32Z')]));
   expect(review.spokeAfterDeparture).toEqual([false]);
   expect(review.decision.rows[0].kept).toBe(true);
+});
+
+
+it('offers only exact in-meeting Zoom display names, with rejoins deduped and collisions retained', async () => {
+  const fetch = report([row('Lee, Alex'), row('Lee, Alex'), row('Alex Lee'), row('Waiting', 'in_waiting_room'),
+    row('person@example.org'), row('Bad\nName'), row('x'.repeat(81))]);
+  const result = await getZoomSpeakerCandidates(provenance, fetch);
+  expect(fetch).toHaveBeenCalledWith(provenance.zoom.meetingUuid);
+  expect(result).toEqual({ zoomCandidateStatus: 'complete', zoomCandidates: [
+    { id: 'zoom:0', source: 'zoom_participant', displayName: 'Alex Lee' },
+    { id: 'zoom:1', source: 'zoom_participant', displayName: 'Lee, Alex' },
+  ] });
+});
+
+it.each([null, { ...provenance, kind: 'upload', zoom: null }, { ...provenance, zoom: { meetingUuid: 'unverified' } }])(
+  'never queries Zoom for absent, uploaded, or invalid provenance', async source => {
+    const fetch = jest.fn();
+    expect(await getZoomSpeakerCandidates(source, fetch)).toEqual({ zoomCandidates: [], zoomCandidateStatus: 'not_applicable' });
+    expect(fetch).not.toHaveBeenCalled();
+  });
+
+it.each(['partial', 'unavailable', 'throw'])('uses fallback for %s reports even when participant names exist', async status => {
+  const fetch = jest.fn(async () => { if (status === 'throw') throw new Error('unavailable'); return { status, participants: [row('Present Name')] }; });
+  const result = await getZoomSpeakerCandidates(provenance, fetch);
+  expect(result.zoomCandidates).toEqual([]);
+  expect(result.zoomCandidateStatus).toBe(status === 'partial' ? 'partial' : 'unavailable');
 });
