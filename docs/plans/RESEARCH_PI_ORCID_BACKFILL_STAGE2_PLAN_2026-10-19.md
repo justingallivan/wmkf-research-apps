@@ -16,6 +16,7 @@ A wrong contact ORCID is worse than a missing one. `contact.wmkf_orcid` feeds PI
 1. Staff review the stage-1 CSV and add two columns: `approve` (`yes` only) and `approved_by`. Only rows with `approve=yes`, a `selected_orcid`, and a non-empty `approved_by` are eligible. An approver may change `selected_orcid` to another candidate they verified; the row then records `selection_overridden=yes`.
 2. The script hashes (SHA-256) the approved CSV and the stage-1 pool JSON, and records them with the Dataverse host and run id in every checkpoint line. Apply refuses to run if the approved CSV hash, pool hash or host differs from the resolve checkpoint.
 3. Grade is advisory. `review` rows may be approved; `none` rows cannot.
+4. Approval is tied to the CSV it was given on. A regenerated stage-1 CSV needs fresh approval; the script refuses an approved file whose pool hash does not match.
 
 ## 3. Phases (one owner-run script, modeled on `backfill-contact-orcid.js`)
 
@@ -30,9 +31,10 @@ Per row, in order; the first failure sets the action:
 1. **Shape:** `normalizeOrcid(selected_orcid)` is `valid` → else `malformed`.
 2. **Batch uniqueness:** the same ORCID approved for two contacts, or two ORCIDs approved for one contact → every involved row becomes `batch_conflict`.
 3. **Contact state:** re-read the contact by id. Missing or inactive → `nocontact`. Current `wmkf_orcid` equals the ORCID → `noop`. Non-empty and different → `conflict`. Name differs from the pool snapshot (first/last) → `changed_since_export`.
-4. **Cross-store uniqueness:** no other contact and no potential-reviewer row may already hold this ORCID in any form. `contact.findByOrcidCandidates` and `potentialReviewer.findByOrcidCandidates` match only the canonical `0000-0000-0000-0000` string. [VERIFIED via `lib/dataverse/adapters/contact.js:187-210`, `lib/dataverse/adapters/potential-reviewer.js:209`] So the script adds `contains(wmkf_orcid, '<id>')` and `contains(wmkf_orcid, '<16 digits>')` queries, normalizes each hit, and compares. A hit on another contact → `held_by_other_contact`. A reviewer row linked to a different contact, or unlinked → `held_by_reviewer`. A reviewer row linked to this contact with a different valid ORCID → `reviewer_disagrees`.
-5. **Registry re-check:** `ORCIDService.getProfile(orcid)` still resolves, and `forenamesContradict(contactName, profileName)` is false, with the surname matching → else `registry_mismatch`.
-6. Otherwise → `write`.
+4. **Cross-store uniqueness:** no other contact and no potential-reviewer row may already hold this ORCID in any form. `contact.findByOrcidCandidates` and `potentialReviewer.findByOrcidCandidates` match only the canonical `0000-0000-0000-0000` string [VERIFIED via `lib/dataverse/adapters/contact.js:187-210`, `lib/dataverse/adapters/potential-reviewer.js:209`], and stored values also appear as URLs, compact or space-separated forms. So resolve reads **every** contact and potential-reviewer row with a non-null `wmkf_orcid` once (paginated, failing closed if a read is capped or incomplete), normalizes each with `normalizeOrcid`, and indexes them. A hit on another contact → `held_by_other_contact`. A reviewer row linked to a different contact, or unlinked → `held_by_reviewer`.
+5. **Linked reviewers:** from the same index, every reviewer row linked to this contact (`_wmkf_contact_value`) must hold either no valid ORCID or this one → else `reviewer_disagrees`.
+6. **Registry re-check:** `ORCIDService.getProfile(orcid)` still resolves, and `forenamesContradict(contactName, profileName)` is false, with the surname matching → else `registry_mismatch`.
+7. Otherwise → `write`.
 
 The resolve checkpoint (`scripts/.research-pi-orcid-resolve.jsonl`, gitignored) stores per row: contact id, ORCID, action, the contact's current value, approver, grade, reason, signals, override flag, hashes, host and run id.
 
@@ -41,13 +43,13 @@ The resolve checkpoint (`scripts/.research-pi-orcid-resolve.jsonl`, gitignored) 
 For each `write` row:
 
 1. Append an `intent` line to `scripts/.research-pi-orcid-applied.jsonl` (contact id, ORCID, before-value `null`, approver, evidence, hashes, run id, timestamp).
-2. Repeat the contact-state and cross-store checks from 3.1 (state can change between resolve and apply).
-3. Call `contactAdapter.setOrcidIfAbsent(contactId, orcid)`: fill-only, `noop` for the same value, `conflict` for a different one, conditional on the record's ETag with up to two 412 retries. [VERIFIED via `lib/dataverse/adapters/contact.js:357-403`]
-4. Append a `result` line (`write | noop | conflict | malformed | failed` plus error text).
+2. Repeat the contact-state check and the per-ORCID and per-contact lookups from 3.1 (state can change between resolve and apply).
+3. Call `contactAdapter.setOrcidIfAbsent(contactId, orcid, { requireEtag: true })`: fill-only, `noop` for the same value, `conflict` for a different one, conditional on the record's ETag with up to two 412 retries. [VERIFIED via `lib/dataverse/adapters/contact.js:357-403`]
+4. Re-read the contact and append a `result` line (`write | noop | conflict | malformed | failed`, error text, and the post-write ETag).
 
-**Crash recovery:** on restart, an `intent` with no `result` is re-read. If the contact now holds the intended ORCID, the script records `result=write (recovered)`. If the contact is still empty, it re-runs the row. Anything else is recorded as `conflict`, with no write.
+**Crash recovery:** on restart, an `intent` with no `result` is re-read. If the contact now holds the intended ORCID, the script records `result=present_unattributed`: it cannot prove this run wrote it, so rollback never touches it. If the contact is still empty, it re-runs the row. Anything else is recorded as `conflict`, with no write.
 
-**Gap — ETag fail-closed:** `setOrcidIfAbsent` falls back to an unconditional PATCH when the re-read returns no ETag [VERIFIED via `lib/dataverse/adapters/contact.js:380-382`]. Proposed additive option `{ requireEtag: true }` that returns `failed` instead of falling back. It is a shared-adapter change, so it needs its own test and review.
+**Required adapter change:** `setOrcidIfAbsent` falls back to an unconditional PATCH when the re-read returns no ETag [VERIFIED via `lib/dataverse/adapters/contact.js:380-382`]. Add an opt-in `{ requireEtag: true }` that returns `failed` instead, applied to the first attempt and every 412 retry, with a unit test. Existing callers are unchanged.
 
 ### 3.3 Verify
 
@@ -55,7 +57,7 @@ Re-read every contact with a `write` result. Report counts where `normalizeOrcid
 
 ### 3.4 Rollback (conditional, owner-run)
 
-For listed contact ids from the applied log: re-read the contact. Clear `wmkf_orcid` only if its normalized value still equals the ORCID this run wrote, using a conditional PATCH with that read's ETag. Any other value, or a 412, is reported and left alone, so a later legitimate edit is never erased. Each rollback appends a `rollback` line with before and after values.
+Only rows whose `result` is `write` are eligible; `present_unattributed`, `noop` and `conflict` rows never are. For each, re-read the contact and clear `wmkf_orcid` only when its current ETag still equals the post-write ETag recorded at apply, meaning the contact has not changed at all since this run's write. Use a conditional PATCH with that ETag. Anything else, including a 412, is reported and left alone, so a later edit is never erased. Each rollback appends a `rollback` line with before and after values.
 
 ## 4. Provenance and attribution
 

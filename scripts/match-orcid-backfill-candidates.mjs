@@ -20,19 +20,21 @@
  *     A profile's employments decide; search-result names count only when the
  *     profile lists none. "University of X" never matches "X University";
  *   - award-time, per PI award: a dated employment at that award's institution
- *     covering that award's meeting year (±1) → yes | no | undated | unfetched;
- *   - works: an ORCID work title sharing >= 2 distinct words with an award title.
+ *     covering that award's meeting year (±1) → yes | undated | no | none |
+ *     unfetched;
+ *   - works (advisory, never grading): the ORCID work title sharing the most
+ *     (>= 2) distinct words with an award title, shown for the reviewer.
  *
  * Grades (a human reviews every row before any write). Every graded row names
  * the exact selected ORCID; the reason and signals describe that ORCID.
- *   high   — PI only, the selected profile fetched, no reviewer/email conflict,
- *            and one of: one linked reviewer ORCID (resolver status
- *            confirmed/probable, filtered in the export) with no forename
- *            contradiction; exactly one candidate whose email equals the
- *            contact email, no forename contradiction; exactly one candidate at
- *            the award institution, forename fully agreeing, institution search
- *            not truncated, and employment covering an award year — or undated
- *            employment plus a works match.
+ *   high   — PI only; the selected profile fetched; no forename contradiction;
+ *            if the contact has eligible linked reviewer ORCIDs (resolver status
+ *            confirmed/probable, filtered in the export), the selected ORCID is
+ *            one of them; and one of: the one linked reviewer ORCID; exactly
+ *            one candidate whose email equals the contact email; exactly one
+ *            candidate at the award institution, forename fully agreeing, every
+ *            award institution searched without a full results page, and dated
+ *            employment there covering an award year.
  *   review — any other candidate with an institution, email-domain or email
  *            signal; a sole full-name match whose record lists no affiliations;
  *            every co-PI candidate lands here at best.
@@ -225,19 +227,21 @@ for (const person of people) {
 
   // Searches: full name; family name alone and family name + institution
   // (catch nicknames such as Terry/Terrence); full name + institution; first
-  // family-name component for compound surnames. A full-name + institution
-  // search that fills its page may have dropped a namesake: flag it.
+  // family-name component for compound surnames. Every award institution is
+  // searched; a full-name + institution search that fills its page may have
+  // dropped a namesake, so that institution is flagged.
   const records = new Map();
   let error = '';
-  let truncated = false;
+  const truncatedInsts = new Set();
   try {
     const add = (recs) => { for (const rec of recs) records.set(rec.orcidId, rec); return recs; };
     add(await search({ name, maxResults: 25 }));
     add(await search({ name: person.lastname.replace(/\s+/g, '-'), maxResults: 25 }));
-    const searchInsts = [...new Set(insts.filter((x) => x.source !== 'email-domain').map((x) => x.name))].slice(0, 2);
+    const others = insts.filter((x) => x.source !== 'award-applicant' && x.source !== 'email-domain' && !applicants.some((a) => orgAgrees(a, x)));
+    const searchInsts = [...new Set([...applicants, ...others.slice(0, 1)].map((x) => x.name))];
     if (domain && !insts.some((x) => x.source !== 'email-domain' && x.ror === domain.ror)) searchInsts.push(domain.names[0]);
     for (const inst of searchInsts) {
-      if (add(await search({ name, affiliation: inst, maxResults: INST_PAGE })).length >= INST_PAGE) truncated = true;
+      if (add(await search({ name, affiliation: inst, maxResults: INST_PAGE })).length >= INST_PAGE) truncatedInsts.add(inst);
       add(await search({ name: person.lastname.replace(/\s+/g, '-'), affiliation: inst, maxResults: INST_PAGE }));
     }
     if (familyParts.length > 1) add(await search({ name: `${person.firstname} ${familyParts[0]}`, maxResults: 10 }));
@@ -273,42 +277,55 @@ for (const person of people) {
     // cannot be overridden by a search-result name).
     const orgs = employments.length ? employments : rec.institutions.map((n) => ({ name: n, ror: null }));
     const hits = (set) => orgs.some((o) => set.some((x) => orgAgrees(x, o)));
-    const datedAt = (inst) => employments.filter((e) => e.start && orgAgrees(inst, e));
-    const covered = piAwards.some((a) => datedAt(a.inst).some((e) => e.start <= a.year + 1 && (!e.end || e.end >= a.year - 1)));
-    const anyDated = piAwards.some((a) => datedAt(a.inst).length);
+    // Per PI award, employments at that award's institution: 'yes' when one
+    // with a known start covers the award year (±1); 'undated' when one has no
+    // start year and its known end does not rule the year out; 'no' when the
+    // known bounds rule out every award; 'none' when there is no such
+    // employment (a search-result name alone is not employment evidence).
+    const fits = (e, y) => (!e.start || e.start <= y + 1) && (!e.end || e.end >= y - 1);
+    const atInst = piAwards.map((a) => ({ year: a.year, emps: employments.filter((e) => orgAgrees(a.inst, e)) }));
+    const covered = atInst.some(({ year, emps }) => emps.some((e) => e.start && fits(e, year)));
+    const undated = atInst.some(({ year, emps }) => emps.some((e) => !e.start && fits(e, year)));
+    const anyEmployment = atInst.some(({ emps }) => emps.length);
     candidates.push({
       ...rec,
       employments,
       profiled,
       applicantMatch: hits(applicants),
-      atAward: !profiled ? 'unfetched' : covered ? 'yes' : anyDated ? 'no' : 'undated',
+      atAward: !profiled ? 'unfetched' : covered ? 'yes' : undated ? 'undated' : anyEmployment ? 'no' : 'none',
       instMatch: hits(insts.filter((x) => x.source !== 'email-domain')),
       domainMatch: hits(insts.filter((x) => x.source === 'email-domain')),
       emailMatch: Boolean(person.email) && rec.emails.some((e) => e.toLowerCase() === person.email.toLowerCase()),
       reviewerMatch: reviewerOrcids.includes(rec.orcidId),
-      worksMatch: false,
+      works: null,
     });
   }
-  // Works check (ORCID self-asserted works vs the award titles) for the
-  // candidates that could be selected: >= 2 distinct shared title words, the
-  // threshold the identity work-grounding rescue uses.
+  // Works overlap (ORCID self-asserted work titles vs the award titles) for the
+  // candidates that could be selected. ADVISORY ONLY: shared title words show
+  // topic similarity, not identity, so this never decides a grade; the best
+  // overlap is shown to the reviewer.
   for (const c of candidates.filter((x) => x.profiled && (x.applicantMatch || x.emailMatch) && titles.length)) {
     try {
       const works = await withRetry(() => ORCIDService.getWorks(c.orcidId, creds.clientId, creds.clientSecret, { limit: 100 }), 150);
-      const titleTokens = titles.map((t) => new Set(tokenize(t)));
-      c.worksMatch = works.some((w) => {
-        const wt = new Set(tokenize(w));
-        return titleTokens.some((tt) => [...tt].filter((tok) => wt.has(tok)).length >= 2);
-      });
+      for (const t of titles) {
+        const tt = new Set(tokenize(t));
+        for (const w of works) {
+          const shared = [...new Set(tokenize(w))].filter((tok) => tt.has(tok));
+          if (shared.length >= 2 && shared.length > (c.works?.shared.length || 0)) c.works = { award: t, work: w, shared };
+        }
+      }
     } catch (err) { error = `works: ${String(err.message || err).slice(0, 150)}`; }
   }
   const levelRank = { full: 0, initial: 1, differs: 2 };
   candidates.sort((a, b) => (b.reviewerMatch - a.reviewerMatch) || (b.emailMatch - a.emailMatch)
     || (b.applicantMatch - a.applicantMatch) || (b.instMatch - a.instMatch) || (b.domainMatch - a.domainMatch)
-    || (b.worksMatch - a.worksMatch) || (levelRank[a.nameLevel] - levelRank[b.nameLevel]));
+    || (Boolean(b.works) - Boolean(a.works)) || (levelRank[a.nameLevel] - levelRank[b.nameLevel]));
 
   // Grade, naming the exact ORCID the grade is about.
-  const eligible = (c) => c && c.profiled && c.nameLevel !== 'differs';
+  // Any eligible linked reviewer ORCID must be the selected one, whether or not
+  // the search surfaced it.
+  const eligible = (c) => c && c.profiled && c.nameLevel !== 'differs'
+    && (!reviewerOrcids.length || reviewerOrcids.includes(c.orcidId));
   const reviewerHits = candidates.filter((c) => c.reviewerMatch);
   const emailHits = candidates.filter((c) => c.emailMatch);
   const applicantHits = candidates.filter((c) => c.applicantMatch);
@@ -316,6 +333,7 @@ for (const person of people) {
   const signalled = candidates.filter((c) => c.reviewerMatch || c.emailMatch || c.instMatch || c.domainMatch);
   const noAffiliations = candidates.filter((c) => c.nameLevel === 'full' && !c.institutions.length && !c.employments.length);
   const inst = applicantHits.length === 1 ? applicantHits[0] : null;
+  const truncated = applicants.some((x) => truncatedInsts.has(x.name));
   let grade = 'none';
   let selected = null;
   let reason = candidates.length ? `${candidates.length} name match(es), no institution/email signal` : 'no name match';
@@ -324,20 +342,16 @@ for (const person of people) {
     grade = 'high'; selected = reviewerHits[0]; reason = 'linked eligible reviewer-record ORCID; profile fetched, forename consistent';
   } else if (isPi && !conflicting && emailHits.length === 1 && eligible(emailHits[0])) {
     grade = 'high'; selected = emailHits[0]; reason = 'one name match with matching email; profile fetched';
-  } else if (isPi && !conflicting && inst && inst.nameLevel === 'full' && inst.profiled && !truncated
-    && (inst.atAward === 'yes' || (inst.worksMatch && inst.atAward !== 'no'))) {
-    grade = 'high'; selected = inst;
-    reason = inst.atAward === 'yes'
-      ? `only match at the award institution, employed there in the award years${inst.worksMatch ? '; works match award title' : ''}`
-      : 'only match at the award institution (undated); works match award title';
+  } else if (isPi && !conflicting && inst && inst.nameLevel === 'full' && eligible(inst) && !truncated && inst.atAward === 'yes') {
+    grade = 'high'; selected = inst; reason = 'only match at the award institution, employed there in the award years';
   } else if (signalled.length) {
     grade = 'review'; selected = signalled[0];
     const notes = [];
-    if (conflicting) notes.push('reviewer/email point to different ORCIDs');
+    if (conflicting || (reviewerOrcids.length && !reviewerOrcids.includes(selected.orcidId))) notes.push('linked reviewer ORCID differs or not found');
     if (applicantHits.length > 1) notes.push(`${applicantHits.length} accounts at the award institution`);
     if (truncated) notes.push('institution search page full');
     if (inst?.atAward === 'no') notes.push('award-institution employment outside award years');
-    if (inst && ['undated', 'unfetched'].includes(inst.atAward) && !inst.worksMatch) notes.push(`employment ${inst.atAward}, no works match`);
+    if (inst && ['undated', 'unfetched', 'none'].includes(inst.atAward)) notes.push(`award-institution employment ${inst.atAward}`);
     if (selected.nameLevel !== 'full') notes.push(`forename ${selected.nameLevel}`);
     if (!isPi) notes.push('co-PI: always reviewed');
     reason = `${signalled.length} name match(es) with a signal${notes.length ? ` (${notes.join('; ')})` : ''}`;
@@ -367,15 +381,15 @@ if (validation.length) {
   for (const v of highWrong) console.log(`    WRONG: ${v.person.contactId} known ${v.person.knownOrcid} vs selected ${v.selected?.orcidId} (${v.reason})`);
 }
 
-const signalsOf = (c) => ['reviewerMatch', 'emailMatch', 'applicantMatch', 'instMatch', 'domainMatch', 'worksMatch']
-  .filter((k) => c[k]).map((k) => k.replace('Match', ''))
+const signalsOf = (c) => ['reviewerMatch', 'emailMatch', 'applicantMatch', 'instMatch', 'domainMatch', 'works']
+  .filter((k) => c[k]).map((k) => k.replace('Match', '').replace('works', 'works-overlap'))
   .concat(c.applicantMatch ? [`at-award:${c.atAward}`] : [], c.nameLevel !== 'full' ? [`forename:${c.nameLevel}`] : [], c.profiled ? [] : ['profile:unfetched'])
   .join(' ');
 const employmentOf = (c) => (c.employments.length
   ? c.employments.map((e) => `${e.name}${e.ror ? ` ror:${e.ror}` : ''} (${e.start || '?'}–${e.end || 'now'})`)
   : (c.institutions || []).map((n) => `${n} (search result, undated)`)).slice(0, 6).join('; ');
 const esc = (v) => `"${String(v ?? '').replace(/"/g, '""')}"`;
-const header = ['grade', 'reason', 'selected_orcid', 'selected_url', 'selected_name', 'selected_signals', 'selected_employment',
+const header = ['grade', 'reason', 'selected_orcid', 'selected_url', 'selected_name', 'selected_signals', 'selected_employment', 'selected_works_overlap',
   'role', 'contactid', 'name', 'email', 'institutions', 'pi_awards', 'reviewer_orcids', 'name_matches', 'institution_search_full'];
 for (let n = 1; n <= 3; n++) header.push(`cand${n}_orcid`, `cand${n}_name`, `cand${n}_signals`);
 const lines = [header.join(',')];
@@ -383,6 +397,7 @@ const order = { high: 0, review: 1, none: 2 };
 for (const r of results.sort((a, b) => order[a.grade] - order[b.grade])) {
   const { person, selected: s } = r;
   const cells = [r.grade, r.reason, s?.orcidId, s?.orcidUrl, s ? `${s.givenNames || ''} ${s.familyName || ''}`.trim() : '', s ? signalsOf(s) : '', s ? employmentOf(s) : '',
+    s?.works ? `${s.works.shared.join(' ')} | award: ${s.works.award} | work: ${s.works.work}` : '',
     person.roles.join('+'), person.contactId, person.fullname || `${person.firstname} ${person.lastname}`, person.email,
     r.insts.map((x) => `${x.name} [${x.source}${x.ror ? ` ror:${x.ror}` : ''}]`).join('; '),
     r.piAwards.map((a) => `${a.inst.name} ${a.year}`).join('; '),
