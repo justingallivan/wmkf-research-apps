@@ -27,6 +27,13 @@ live probes, and current tests own what the system does. `docs/DOCS_CATALOG.md` 
 documents; an `active` catalog status means the document remains useful, not that every task in
 it is approved backlog.
 
+## Verification scope — 2026-10-19
+
+The bounded code/Git audit in `docs/audits/work-queue-drift-2026-10-19.md`
+corrects the named Site Visit, Workbench, J27, Cycle Dossier and personal-email
+status claims. Other entries retain their earlier evidence dates; this is not a
+whole-backlog or live-environment verification. Priority order is unchanged.
+
 ## Current sequence
 
 Work these items in order unless an operational incident or explicit owner decision changes the
@@ -41,10 +48,10 @@ sequence.
 | 5 | Final writeups dashboard completion: cycle scoping, filters, and residuals (Editor Dashboard contract) | **[OWNER-DIRECTED 2026-09-06; 6A PRODUCTION-LIVE AND SMOKED; 6B/6C PRODUCTION-LIVE AND OWNER-SMOKED 2026-09-07 (TWO CODEX DIFF PASSES, FINAL APPROVE; PR #175 MERGED `44bdd240`, DEPLOYMENT `dpl_2UrsDnydRqudu95wJyLCK7A6FUFR`; SIGNED-IN SMOKE PASSED ON VIEWS, EMPTY STATE, BOOKMARKED AND INVALID URLS, VERSION LABEL, PD FILTER); 6D/6E CLOSED; PRIORITIZED ABOVE ITEM 6.]** The owner reviewed the Editor Dashboard contract against the Production-live Final writeups dashboard and decided: keep and build the contract filters (cycle, program/PD, artifact stage, editing/review state) as navigation-only controls; retire inline preview (Word opens outside the Workbench); keep the residuals. Boundary [VERIFIED S491 via source]: the dashboard lists every current Final across all cycles under one hard 100-row cap that fails the whole page (503) when exceeded, renders no cycle or publication version, and has no filter controls or "has edits" hint. Build order and contracts are Slice 6 of `docs/FINAL_WRITEUP_REVIEW_IMPLEMENTATION_PLAN.md`: 6A server-side cycle scoping (dated: before D26 Final writeups exist; **built S491 on branch `claude/final-writeups-cycle-scoping` per `docs/FINAL_WRITEUPS_DASHBOARD_CYCLE_SCOPING_PLAN.md` after three Codex plan passes and the owner's 2026-09-06 decision that lenses focus rather than conceal (PD lens now retains leadership-stage rows); two Codex diff passes, merged `842c9f13`, owner-run signed-in smoke passed 2026-09-06; the PD lens now retains leadership-stage rows with a warn-not-lock notice**), 6B views and Program director filter persisted in the URL (**owner-shaped 2026-09-06; built 2026-09-07 per `docs/FINAL_WRITEUPS_DASHBOARD_VIEWS_AND_VERSION_PLAN.md` after three Codex plan passes:** the page opens on "Needs my review" for every role, with "Reviewed by me" and "All writeups" as alternatives and a Program director dropdown that also filters every coordinator-matrix row; the stage filter is dropped because the dashboard has only two stages and the label is already on each row; `view`/`pd` are page-URL state sanitized on mount and never sent to the API), 6C current-version context in place of preview (**built 2026-09-07, same branch:** rows and the focused page show the verbatim publication version and, when Updated since review, the version the viewer acknowledged; `acknowledgedPublicationVersionId` is additive on the dashboard row and both acknowledgement responses, null for the responsible PD), 6D "has edits" hint and 6E other-stage lists (**owner 2026-09-06: closed as unnecessary for D26; do not build**). No approval gates, denominators, program-taxonomy grouping, or authorization changes. | **Met when:** a signed-in user opens the dashboard on the writeups that need their review, can switch to reviewed-by-me or all, can narrow by PD, and the view is bookmarkable; the publication version acknowledgements key to is visible per row; two cycles of Finals load without the scope-exceeded error. 6D/6E closed by owner decision 2026-09-06. |
 | 6 | Automated materials-on-acceptance email (reviewer lifecycle) | **[OWNER-DIRECTED 2026-09-06; NOT STARTED; PLAN-FIRST; J27 ITEM.]** Owner correction 2026-09-06: this is a **J27** (June 2027 cycle) flow, not D26. D26 invitations and acceptances have already happened; J27 proposals arrive in early December 2026 and J27 reviewer invitations follow in 2027. Desired J27 flow: every review material the reviewer needs is in hand at the time of the request to review, and upon acceptance **and** onboarding the system automatically emails the reviewer a link to the review materials (the proposal) with no PD action. Nothing does this today [VERIFIED S490: the acceptance job/drain handles honorarium onboarding and bookkeeping only; materials go out solely through the PD-driven `ReleaseMaterialsModal` → send-emails `materials` template]. Build when the current campaigns settle; the plan must exist before J27 reviewer invitations go out (2027; exact window depends on the J27 calendar in `docs/J27_TRANSITION_REGISTER.md`). Plan-first triggers (`/contract-reconcile`): new background/durable work in the acceptance drain, a live email send, idempotency across drain retries (never two materials emails), the "materials in hand" precondition the drain can verify, accept-before-materials-attached handling, the PD's visibility/override, and how the manual modal becomes the fallback. No preview step, so the 6D draft fingerprint does not apply; render and send are one server step. | Production-live automated send observed on the first real J27 acceptance, recorded in the Stage 6B3 receipt; the manual modal documented as the exception path. |
 | 7 | Per-reminder audit trail for reviewer follow-up (Activity history) | **[SURFACED 2026-09-06 BY THE CODEX POLISH HANDOFF; NOT STARTED; PLAN-FIRST WITH `/contract-reconcile`; J27 ITEM (owner 2026-09-06: "can wait till J27"). Reminders stay manual for D26.]** The reviewer record stores only cumulative `reminderCount` and the latest `reminderSentAt`, so the Activity history drawer (reachable since the 2026-09-06 polish from status, token, and reminder pills) shows one dated reminder event plus "N reminders recorded in total". Build a durable per-reminder record and extend the reviewer activity API/DTO so each reminder is its own dated event. Do not read `reminderCount` as evidence of individual timestamps. Handoff: `docs/plans/REVIEWER_FOLLOW_UP_POLISH_HANDOFF_2026-09-06.md`. | **Met when:** each reminder sent appears as its own dated event in the drawer, backed by durable rows, with the existing count preserved for older reviewers. |
-| 8 | J27 single-phase transition inventory (register of what retires, persists, changes, or must be built) | **[OWNER-DIRECTED 2026-09-06; SWEEP RUN; REGISTER BUILT; GATE GREEN ON BRANCH `claude/j27-gate-tighten` AFTER RECONCILIATION, MATRIX REVIEW, A CODEX ADVERSARIAL REVIEW, AND THE OWNER'S J27-023 RULING.]** The owner asked to collect every J27-sensitive site in one place and plan the June 2027 build and change work. `docs/J27_TRANSITION_REGISTER.md` holds the sweep output across Retire / Persist / Change / Build / Scale, seven recorded contradictions, and owner questions. The `J27:` marker convention and advisory check script `scripts/check-j27-register.js` were built 2026-09-07 and merged to `main` (PR #180/#181). **2026-09-08 (branch `claude/j27-gate-tighten`):** the owner decided to keep the strict per-site excerpt rule and reconcile the register with subagents rather than weaken the gate. A site-to-fragment binding schema (`` `path` → `fragment` ``) was added so a reconciled row cannot pass on a coincidental match, refined through an Opus review (four schema gaps fixed) and the owner's STRICT UNBOUND decision ("we don't need drift": an unbound file in a multi-site row is itself a failure, not an info flag). Applying the fully-fixed gate to the real register initially found 12 ok / 47 stale / 6 unverifiable / 11 closed / 47 unbound rows. Four parallel Sonnet subagents reconciled every stale row to the binding syntax per `docs/plans/J27_REGISTER_PER_SITE_RECONCILIATION_PLAN_2026-09-08.md` Phase 1; two exhaustive Opus matrix reviews then returned CONDITIONS on all four slices, applied in a follow-up commit, reaching 59 ok / 0 stale. A Codex adversarial review of that state (`65eb4bfe`) then found: (1) the row-detection regex silently skipped valid non-canonically-spaced Markdown rows instead of checking them — fixed, now whitespace-tolerant and fails closed (exit 2) on a malformed id; (2) J27-023 was bound to a verbatim-but-not-the-row's-fact fragment — fixed by removing that binding, which honestly makes the row STALE pending an owner ruling (self-test's `KNOWN_OWNER_PENDING` documents the exception); (3) two remaining plan-doc passages still described unbound multi-site files as informational — rewritten to STRICT UNBOUND; (4) two doc restatements of the already-fixed `REVIEWER_ENGAGEMENT_SPEC.md`/`finance-honoraria.md` stale lines were marked resolved. The owner ruled 2026-09-08 (option 1): the shortcode-domain audit is not a J27 site, so its citation was dropped from J27-023 and `Ev` restored to SV. Current baseline: `check:j27-register` reports 59 ok, 0 stale, 6 unverifiable, 11 closed, 0 unbound, 0 disposition-vocabulary warnings; self-test fully green (80/80, `KNOWN_OWNER_PENDING` empty). Not yet merged to `main`. **Next action is the J27 build plan once Q5 lands** — the separate J27 build plan still waits on Connor's file-location decision (parked, he is out). | **Met when:** every register row is labelled and verified, the owner questions are answered or queued, the gate is green on `main` (0 stale, 0 unbound, 0 vocabulary warnings), and the marker check script is referenced from `docs/CI_GATES_REFERENCE.md`. |
+| 8 | J27 single-phase transition inventory | **[VERIFIED via Git ancestry and `check:j27-register`, 2026-10-19.]** The register and tightened per-site binding gate are on `main`; the reviewed `65eb4bfee` history is included. Current gate: 79 rows, 61 ok, 0 stale, 6 unverifiable, 12 closed. The register remains the detailed source for owner questions and the separate J27 build plan. | Gate implementation and merge are complete. Six unverifiable rows and unresolved owner inputs remain explicit; a green gate does not resolve them or establish runtime readiness. |
 | 9 | PC Meeting Tracker: deliberation sessions and site visits as the schedule of record, read by the Staff Deliberations rail and cycle view | **[PRODUCTION-LIVE; REVERIFIED 2026-09-15.]** Slices 0–3 and 2b are merged and deployed; Production Wave 28 readback is 22 exact / 0 absent / 0 divergent and `MEETING_TRACKER_SCHEMA_READY` is exact-on. The app owns session/slot scheduling and Site Visit editing; the rail, cycle view, Share flow, and briefing seam consume its schedule reader. PR #294 now disables attendee choices that lack an email and returns a named, actionable save error. Migration 041 is applied for the deployed agenda ledger, but the agenda transport itself is not independently production-smoked. | **Met for runtime/schema promotion.** Remaining work is operational observation and the separately listed future-cycle/email-consistency follow-up, not activation of the tracker. |
 | 10 | Email send feedback and consistency audit (system-wide) | **[PRODUCTION-LIVE 2026-09-15; COMMITS `2c9497ce` + `d6cfcfeb`; READY DEPLOYMENT `dpl_CxCtZ7F8AnniXRCsPyctjmz22LcW`; PLAYWRIGHT FOLLOW-UP `472b1ad8` GREEN.]** `docs/EMAIL_SEND_FEEDBACK_AUDIT_2026-09-15.md` records the complete send-path inventory and the implemented contract. Human-triggered surfaces now share accessible confirmed/failed/uncertain/partial/draft feedback; a clean confirmed result renders only **Sent for delivery.** and never exposes the Dynamics activity id, sender, or recipient. `sent` still means Dynamics accepted for delivery, never inbox delivery. Pre-dispatch errors are definite failures, send-stage errors retain the activity id internally and stay uncertain unless a ledger reconciles them, batch outcomes retain recipient identities, and refresh failures cannot relabel accepted sends. Background at-most-once jobs now count failed versus unconfirmed separately. No migration or new retry loop was introduced. The full 939-suite / 13,667-test repository run and production build passed; the corrected 25-test Playwright suite passed locally and in GitHub Actions. **[OWNER-REPORTED]** An ordinary Admin Email Test send succeeded in Production and exposed the former over-detailed receipt, proving the ordinary `createAndSendEmail` path. | **[CLOSED 2026-09-16]** Owner-driven Production smoke of a ledger-backed Meeting Tracker agenda send (smoke session, To = owner only) rendered exactly **Sent for delivery.** with no technical detail; the owner also received the email. Inbox delivery remains an external mail-system fact and is not claimed. Residue cleaned: smoke session set Cancelled; its one `deliberation_agenda_sends` row deleted after owner confirmation. |
-| 11 | Cycle Dossier superuser pilot (D26): land, smoke, then pilot-mode hardening | **[SMOKE SUCCEEDED 2026-09-12 (S508): run completed, item ready, edition 7b656b74 assembled 11:14 PDT, PDF reviewed by the owner; DOCX+PDF in the request's `AI Artifacts/Cycle Dossier/D26/<revision>/` folder. Four production fixes landed on the way: #260 destinationHash (JSONB key order), #261 structural DOCX verification, #262 customXml relationships + differing-part logging, #264 `[trash]` slots; #263 api_usage_log per paid stage. Total spend $0.135 (research + entry once; every retry was free).]** Prior state: `claude/cycle-dossier-merge-main` = the S499 reconcile branch merged onto main with migration renumbered to 045, all gates and 888 jest suites green, `/contract-reconcile` READY FOR SMOKE, Codex adversarial review fixed on-branch (roster-resolved smoke selection, resume cap floor, Applicant-lookup institution, 60 s checkpoint window). Production env set: smoke mode, operator profile 2, allowlist 1002852, enabled=false. Owner sequence in the PR body (migration 045 → seed prompts → preflight → enable → launch). PR #179 to be closed with a pointer. **Before pilot mode (more than one request/operator):** stop re-read inside LLMClient retries and between folder POSTs; preview/Blob retention job (owner decision open since S494); UI retry affordance and dead `pausing`/`cancelling` strings; `Content-Disposition` filename escaping; round the page's USD estimate to two decimals (smoke 2026-09-12 showed `$2.87775–$14.38875`; owner wants `$2.88–$14.39`); rename the "Retry failed" button (reads as a status; owner 2026-09-12) to "Retry failed entries"; move or duplicate the error banner next to the launch control (it renders above the fold and the owner missed the 409 message); the Progress tab should be the default view when the latest run is not settled; SharePoint copies must not be opened in Word Online before the item is ready (Word Online autosaves a re-serialised package that fails verification; recovered by restoring version 1.0), so the page should say so or the verification should run before any human can touch the file. **2026-09-12 (S509):** pilot-mode hardening built on `claude/dossier-pilot-hardening` (Sonnet agents, Fable review): Content-Disposition escaping; two-decimal USD; "Retry failed entries"; inline error beside Launch and the run controls; Progress tab default while a run is unsettled; dead `pausing`/`cancelling` removed; Word Online warning; operator stop re-read inside in-flight LLM calls and `ensureFolderPath` (Executor `signal` argument). **2026-09-16 ops:** the drain cadence is decided and configured at every five minutes; because each invocation claims one run and advances at most three queued entries, the slower cadence lengthens wall-clock completion as well as pickup. Still open: preview/Blob retention (owner). **2026-09-12 (S508):** `CYCLE_DOSSIER_REQUEST_ALLOWLIST` had never been saved in Vercel (preflight reads the shell env, so it did not prove Vercel state); owner added it as a readable config var and redeployed; smoke preview then returned a known estimate. | Owner smoke on 1002852 succeeds end to end (entry DOCX/PDF in the request's AI Artifacts folder); then a pilot-hardening slice is scoped from the accepted-for-smoke list. |
+| 11 | Cycle Dossier pilot: remaining retention decision | **[VERIFIED via Git ancestry, 2026-10-19.]** The recorded owner smoke on Request 1002852 succeeded on 2026-09-12; it is not a pending task. Pilot hardening merged in PR #265 (`1accfbcab`), followed by #274–278 for entry timeout, edition clarity, retry budget, run-item links and request revision. The former accepted-for-smoke hardening list must not be offered as unbuilt work. The recorded five-minute drain cadence and smoke receipts are historical operational evidence, not a fresh environment probe. | Preview/Blob retention remains an owner decision requiring a focused current-state check before implementation. Current production configuration and broader pilot acceptance were not re-probed in this documentation pass. |
 | 12 | Pre-Research Presentation Brief: fourth governed artifact replacing the Pre-Site writeup as the Board distribution source | **[SHIPPED 2026-09-17 — PR #307 merged `f1cf8fe3`, hotfix PR #308 `9ab5fe71`, CI repair PR #309 `de349928`; migration 052 applied and read back.]** Owner decisions B1–B14 and Codex rounds in `docs/plans/PRE_RESEARCH_PRESENTATION_BRIEF_PLAN_2026-09-16.md`. Follow-ups built S516 and **merged 2026-09-17**: PR #310 `0eba7358` (items 2–10), PR #311 `248233c7` (guarded regeneration of a sent brief), PR #312 `7f776e36` (review bundle PDF; migration 053 applied and read back exact). | ZZTEST-03 smoke run 2026-09-17 (plan §12): generate, lock, share with bundle, briefing page, drift detection, guarded regeneration pass. Email link confirmed by the owner. Finding A (snapshot hash mismatch) fixed in PR #313 `b5af962b`, deployed and smoked on ZZTEST-03 2026-09-17: Staff Brief download and same-version re-preview pass. **Met.** |
 | 13 | Client request layer: fix unguarded response handling (D1) after each file migrates onto `shared/utils/api-request.js` | **[RELEASED 2026-09-20; merge `8623c2f7b`, production `dpl_9rNyDMfuEMHPHo6ndSNh3di9d9eQ`.]** The roles, providers, scheduled-email posture GETs, and remaining D9 `ErrorAlert` props are implemented with focused tests. [VERIFIED via Git, Vercel API and signed-in smoke] Release evidence: `docs/plans/AGENDA_D1_RELEASE_2026-09-20.md`. Source plan and execution details remain in `docs/plans/CLIENT_REQUEST_LAYER_D1_UNGUARDED_RESPONSES_2026-09-20.md` and `docs/plans/CLIENT_REQUEST_LAYER_EXECUTION_2026-09-19.md`; Luna built, Sol reviewed, root accepted, and the owner authorized promotion. | Every confirmed unguarded site shows the server error on non-2xx, each with a test; execution log carries a "D1 fixes" section; campaign-critical rows released under Tier 2. |
 
@@ -58,9 +65,10 @@ sequence.
   request-assigned Program Coordinator; the shared four-key Admin readback matched
   tracked seeds exactly after runtime promotion. Implementation and evidence are
   recorded in `docs/plans/MATERIALS_EMAIL_PERSONALIZATION_PLAN_2026-09-20.md`.
-  Suite-wide adoption remains a separate to-do:
-  inventory support and gaps for every app-authorized user, then extend existing
-  mechanisms in bounded changes. Requirements and remaining follow-ups:
+  The suite-wide inventory is complete; grantee invitation and reviewer-reminder
+  slices merged in PRs #330 and #332. Broader adoption remains a separate to-do:
+  extend the remaining email families in bounded changes. This merge-status
+  correction does not establish live delivery. Requirements and remaining follow-ups:
   `docs/plans/PERSONAL_EMAIL_DEFAULTS_TODO_2026-09-20.md`.
 
 - **Settle the deliberations vocabulary suite-wide (2026-10-06).** [OPEN —
@@ -135,76 +143,19 @@ sequence.
   cap can track the four-hour duration cap instead of memory. Verify the
   200 MiB cap first with a real two-to-three-hour recording in production.
 
-- **Redesign the Recording and transcript card (2026-10-10).** [OPEN — owner
-  request, scheduled after the first real Stage 4 cut] The Meeting Tracker
-  card (`shared/components/meeting-tracker/RecordingAndTranscriptCard.js`) grew
-  stage by stage and now reads as a mess for an ordinary Zoom import. Do one
-  design pass over the whole card, not piecemeal patches. **Proposal (Session
-  593, scope widened to the whole Site Visit page by the owner):**
-  `docs/plans/SITE_VISIT_PAGE_REDESIGN_PLAN_2026-10-10.md`. **[SHIPPED: built on
-  `claude/site-visit-redesign` in Session 593 and merged to `main` 2026-10-11 (`c574e9e7d`) and deployed to Production.]** Built:
-  result rows in four staff-first cards (Recording setup, Presentation, Staff discussion,
-  Board materials with a readiness list; no full-recording row; owner decisions 7-12, plan §8.2), collapsed steps, Upload manually, Copy video in its row with an in-row
-  replace confirmation, one card Refresh, quiet own-write staleness, old-transcript edits
-  gated, hinted leavers unchecked. Still open: auto-generate after publish, the real
-  cancel reason, streaming the review video (plan §6 C1-C3), and the header status chip
-  (plan §10). Owner observations
-  and screenshots from Session 592:
-  - **"Copy video" is ambiguous.** In the "Import from Zoom" list each link sits
-    outside and below its recording's box, so it reads as belonging to the next
-    row as easily as the previous one. The list also mixes two selections: the
-    radio button (which recording to import) and the per-row video copy. Put
-    the action inside its recording's row and name the recording in it.
-  - **The replace confirmation is off screen.** When the request already has a
-    recording, "Copy video" asks for a replace confirmation that renders after
-    the whole list (`ReplaceConfirm` below the fieldset), so the click appears
-    to do nothing. Show it in the clicked row, or scroll to it and move focus.
-  - **Stacked banners for one action.** After an import plus a replace
-    confirmation the card showed a red "This transcription changed…" and a
-    yellow "Another session changed this. Refresh…" banner at once, though
-    nothing had failed: the card had only gone stale from its own actions.
-    Refresh after the card's own writes, and reserve warnings for real
-    conflicts.
-  - **Three refresh controls** (the banner's Refresh, the transcription line's
-    Refresh, and "Refresh list"). Collapse them to one.
-  - **Hide the manual upload paths unless needed.** Zoom is now the preferred
-    source. Show the manual MP4 upload ("Upload MP4") and the manual transcript
-    upload ("Upload a finished transcript instead") only behind a secondary
-    "Upload manually" disclosure, or when Zoom is unavailable for the request.
-  - **Order the steps** so the path reads import from Zoom, then transcript,
-    then confirm the presentation end, then the presentation video.
-  - **Old-transcript edit buttons look current.** While a newer Zoom
-    transcription is pending, "Edit presentation end" still opens the older
-    published transcript (`beginEditNames` edits `collection.currentArtifact`),
-    so staff land in a different recording's transcript. De-emphasise or hide
-    the published transcript's edit actions while a newer one is pending.
-  - **Start hinted leavers unchecked in "Discussion attendance".** [SHIPPED with the Site Visit
-    redesign, commit 4; merged 2026-10-11] Reverses
-    owner decision D2 of `docs/plans/ZOOM_ATTENDANCE_ATTRIBUTION_PLAN_2026-10-09.md`
-    ("everyone starts checked"), by owner request after the first live use
-    (1003222, 2026-10-10): people flagged "Left before the presentation ended"
-    were still checked. Rows whose `leftBeforeEnd` hint is true should start
-    `kept: false` (`attendance-service.js` builds every row `kept: true`);
-    everyone else and every "other voice" row stays checked. The hint already
-    requires aligned recording times, so a misaligned transcript is unaffected.
-    Update D2 in the plan in the same change.
-  - **Generate the split transcripts automatically after publish.** After
-    publishing a transcript, step 3 shows "Presentation transcript is out of
-    date. Generate it again in step 2." and the same for the staff discussion,
-    with a separate "Generate presentation and discussion transcripts" button
-    in step 2. Staff could not tell what that meant (owner, 1003222,
-    2026-10-10). Publishing with a confirmed presentation end should start that
-    generation itself, and step 3 should say what is happening in plain words
-    rather than "out of date".
-  - **Say why a presentation video was cancelled.** A superseded cut shows
-    "Video: Out of date. The transcript or video changed. Create it again." even
-    when the worker cancelled it for its own reasons (first live cut, 1003222,
-    2026-10-10: a SharePoint metadata-only eTag bump). Show the actual reason,
-    and never suggest "again" when a retry cannot succeed.
-  - **Play the presentation video for review instead of downloading it.** The
-    staff open link (`resolvePresentationVideoSplitOpen`) redirects to Graph's
-    download URL, so the browser downloads 450 MB (first live cut, 2026-10-10).
-    Stream it instead: the SharePoint web view, or the Board link's watch mode.
+- **Site Visit page redesign and follow-ups — implemented.**
+  [VERIFIED via source and Git ancestry, 2026-10-19] The redesign merged as
+  `c574e9e7d`. Correction publication queues automatic split-transcript
+  regeneration when a confirmed presentation end is available; first publication
+  without that boundary does not queue it. Summaries remain manual. The card
+  displays specific video supersession reasons and offers inline Watch playback;
+  `SiteVisitEditor` renders the shared readiness status chip. C1–C3 and the chip
+  are implementation history, not remaining builds. Source and limits:
+  `lib/services/meeting-tracker-transcription/service.js`,
+  `shared/components/meeting-tracker/RecordingAndTranscriptCard.js`,
+  `shared/components/meeting-tracker/SiteVisitEditor.js`, and
+  `docs/plans/SITE_VISIT_PAGE_REDESIGN_PLAN_2026-10-10.md` §10.
+  This code/Git check does not establish new production playback acceptance.
 - **Card stays busy after a successful transcript publish (2026-10-10).**
   [FIXED 2026-10-10 — branch `claude/card-publish-busy`, Codex approve round 3; owner-token busy claims for publish, save and attendance] In `RecordingAndTranscriptCard.js`
   the publish handler closes the editor on success (`setCorrectionDetail(null)`,
@@ -832,17 +783,13 @@ These are valid directions but are not current app-team delivery commitments:
   after `git fetch origin`; works from any machine with the remote). Codex's PC/Ops discussion
   deck is on the same branch since `e0166296` (`docs/plans/site-visit-materials/`, pushed
   2026-09-08), so plan, brief, and deck all travel together.
-- **Request Workbench top-matter reconciliation — owner chose Codex's recommendation 2026-09-08;
-  built overnight 2026-09-08, awaiting the owner's merge.** The recommendation travels as
-  `docs/plans/CODEX_WORKBENCH_TOP_MATTER_RECOMMENDATION_2026-09-08.md` (amendment notes added at
-  build). PR #210 (`claude/workbench-top-matter`, Slices A+B: cycle count, subtitle, view intros,
-  shared Scope control and live filter, Final writeups count behaviour, pluralization) and
-  PR #211 (`claude/workbench-locator-disclosure`, Slice C: locator as a shell-level disclosure,
-  stacked on #210). Merge #210 first; then confirm #211's base is `main` (`gh pr view 211 --json
-  baseRefName`; retarget with `gh pr edit 211 --base main` if it still points at the merged
-  branch) before merging #211. One deviation from the amendment, recorded in the #210 body for
-  the owner: the Program select on Final writeups and Awardees stays live with a note, because
-  disabling it also froze the shell's per-program cycle list.
+- **Request Workbench top-matter reconciliation — merged.**
+  [VERIFIED via Git ancestry, 2026-10-19] PR #210 (merge `0fb2e47ba`)
+  and PR #211 (merge `7c647b524`) are both on `main`. The cycle count,
+  subtitle, view introductions, Scope controls and locator disclosure are no
+  longer awaiting merge. The original recommendation remains in
+  `docs/plans/CODEX_WORKBENCH_TOP_MATTER_RECOMMENDATION_2026-09-08.md`.
+  This merge check does not independently establish deployment acceptance.
 
 ## Parked — do not resurface without a new decision
 

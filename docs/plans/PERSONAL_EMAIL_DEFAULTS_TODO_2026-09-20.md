@@ -3,7 +3,7 @@ title: Personal email defaults and editable previews
 domain: platform
 kind: plan
 status: active
-summary: Owner-requested personal email defaults across the suite, with editable applicant-materials invitation and reminder previews as the immediate use case.
+summary: Owner-requested personal email defaults across the suite. Meeting Tracker slice #320 is Production-verified; grantee invitation #330 and reviewer reminders #332 are merged and verified through source and test inspection, while broader adoption remains open and live delivery for those merged slices is unverified.
 owner: product-engineering
 related:
   - docs/CURRENT_WORK_QUEUE.md
@@ -41,7 +41,7 @@ Preserve server-controlled recipients, upload links, current required/missing
 items, authorization and truthful send outcomes. Required content must remain
 correct when the surrounding wording is personalized. Reuse the suite's existing
 preference and preview mechanisms after tracing their contracts. The Meeting
-Tracker branch selects its own route and existing preference store; this note
+Tracker implementation selects its own route and existing preference store; this note
 does not select an API or generalized editor for suite-wide use.
 
 ## Current evidence and next work
@@ -71,9 +71,35 @@ the tracked seeds. No email was sent.
   Save action is still required to change that override; see the feature
   execution plan's residuals.
 - [x] Inventory suite-wide email flows and record each gap against this requirement.
-  See `docs/plans/PERSONAL_EMAIL_DEFAULTS_INVENTORY_2026-09-24.md` (source-only
-  inventory; follow-up slices remain proposed).
+  See `docs/plans/PERSONAL_EMAIL_DEFAULTS_INVENTORY_2026-09-24.md` (the Sep 24
+  counts and case table are a historical source baseline; slices #330 and #332
+  are now merged, and remaining suite-wide follow-ups remain open).
 - [ ] Extend the capability consistently in bounded, reviewed follow-ups.
+
+## Current implementation update — 2026-10-19
+
+[VERIFIED via current Git ancestry, source, and focused test inspection; implementation status only]
+
+- **Grantee abstract invitation, slice 4:** PR #330 is merged on `main` as
+  `185c9f35f`. `shared/components/workbench/AwardeeTab.js` applies the sender's
+  saved subject/body preferences over Admin defaults while retaining editable
+  compose. Relevant focused tests include
+  `tests/unit/profile-settings-email-signature.test.js` and
+  `tests/unit/grantee-send-invite-workbench-service.test.js`.
+- **Reviewer reminders, slice 1:** PR #332 is merged on `main` as
+  `bab0d3989`. Manual respond/review-due previews use per-kind personal defaults
+  via `shared/components/reviewers/RespondReminderModal.js` and
+  `lib/services/reviewer-manual-reminder.js`. Automatic `respond` and
+  `reviewdue` sweeps load the sending PD's default in
+  `lib/services/reviewer-reminder-sweep.js`. Focused tests include
+  `tests/unit/reviewer-reminder-personalization.test.js`,
+  `tests/unit/reviewer-manual-reminder.test.js`, and
+  `tests/unit/reviewer-reminder-sweep.test.js`.
+
+These checks do not establish Production deployment or live email delivery for
+#330/#332. The Sep 24 inventory counts have not been recalculated. Other email
+families remain in the inventory's follow-up table, so the suite-wide initiative
+is still open.
 
 The separate Test Request Factory platform status is tracked in
 `docs/plans/CONNOR_TEST_REQUEST_FACTORY_HANDOFF_2026-09-19.md`; it does not
