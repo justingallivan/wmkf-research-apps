@@ -45,7 +45,7 @@ For each `write` row:
 1. Append an `intent` line to `scripts/.research-pi-orcid-applied.jsonl` (contact id, ORCID, before-value `null`, approver, evidence, hashes, run id, timestamp).
 2. Repeat the contact-state check and the per-ORCID and per-contact lookups from 3.1 (state can change between resolve and apply).
 3. Call `contactAdapter.setOrcidIfAbsent(contactId, orcid, { requireEtag: true })`: fill-only, `noop` for the same value, `conflict` for a different one, conditional on the record's ETag with up to two 412 retries. [VERIFIED via `lib/dataverse/adapters/contact.js:357-403`]
-4. Re-read the contact and append a `result` line (`write | noop | conflict | malformed | failed`, error text, and the post-write ETag).
+4. Re-read the contact and append a `result` line (`write | write_then_changed | noop | conflict | malformed | failed`, error text, the post-write ETag, and normalized `wmkf_orcid`). A `write` row is rollback-eligible only if the re-read value equals the intended ORCID. Otherwise record `result=write_then_changed`; it is not rollback-eligible.
 
 **Crash recovery:** on restart, an `intent` with no `result` is re-read. If the contact now holds the intended ORCID, the script records `result=present_unattributed`: it cannot prove this run wrote it, so rollback never touches it. If the contact is still empty, it re-runs the row. Anything else is recorded as `conflict`, with no write.
 
@@ -57,7 +57,7 @@ Re-read every contact with a `write` result. Report counts where `normalizeOrcid
 
 ### 3.4 Rollback (conditional, owner-run)
 
-Only rows whose `result` is `write` are eligible; `present_unattributed`, `noop` and `conflict` rows never are. For each, re-read the contact and clear `wmkf_orcid` only when its current ETag still equals the post-write ETag recorded at apply, meaning the contact has not changed at all since this run's write. Use a conditional PATCH with that ETag. Anything else, including a 412, is reported and left alone, so a later edit is never erased. Each rollback appends a `rollback` line with before and after values.
+Only rollback-eligible `write` rows are eligible; `write_then_changed`, `present_unattributed`, `noop` and `conflict` rows never are. For each, re-read the contact and clear `wmkf_orcid` only when its current ETag equals the recorded post-write ETag AND its current normalized `wmkf_orcid` equals the intended ORCID. Use a conditional PATCH with that ETag. Anything else, including a 412, is reported and left alone. This cannot erase a different value written by someone else. The only residual case is someone re-entering the same ORCID; clearing then returns the contact to the pre-backfill state. Each rollback appends a `rollback` line with before and after values.
 
 ## 4. Provenance and attribution
 
