@@ -226,3 +226,30 @@ test('refresh and cycle switching require confirmation before discarding unsaved
   await waitFor(() => expect(global.fetch).toHaveBeenCalledTimes(6));
   expect((await screen.findByLabelText('Board meeting end date')).value).toBe('');
 });
+
+test('Select all proposals includes search-hidden candidates, preserves prior selections, and leaves confirmation and activation unchanged', async () => {
+  const second = '22222222-2222-4222-8222-222222222222';
+  const previous = '33333333-3333-4333-8333-333333333333';
+  const posts = [];
+  const value = { version: 1, cycle: 'D26', programId: 'c247b11a-a7cb-ee11-9078-000d3a341e8f', requestIds: [ID, previous], rosterConfirmed: false, active: false, materialsDue: null, boardEnds: null, adminId: null };
+  global.fetch = jest.fn(async (url, options) => {
+    if (options.method === 'POST') { const body = JSON.parse(options.body); posts.push(body); return response({ value: body.value, revision: 'saved' }); }
+    if (url.startsWith('/api/admin/')) return response({ cycle: { value, revision: 'one' }, roles: { president: {}, cso: {}, grantsManager: {} }, staff: [], candidates: [{ requestId: ID, number: '1002988', institution: 'Institute' }, { requestId: second, number: '1003000', institution: 'Other Institute' }] });
+    return response(url.includes('?') ? data : { canArchive: true, isSuperuser: true });
+  });
+  render(<BoardWriteups mode="setup" />);
+  const selectAll = await screen.findByRole('button', { name: 'Select all proposals' });
+  fireEvent.change(screen.getByLabelText('Find proposal'), { target: { value: '1002988' } });
+  expect(screen.queryByLabelText('1003000 — Other Institute')).toBeNull();
+  fireEvent.click(selectAll);
+  expect(selectAll.disabled).toBe(true);
+  expect(screen.getByText('Expected proposals — 3 selected of 23')).toBeTruthy();
+  expect(screen.getByLabelText('Staff has confirmed this expected proposal list').checked).toBe(false);
+  expect(screen.getByLabelText('Activate this cycle').checked).toBe(false);
+  expect(posts).toHaveLength(0);
+  fireEvent.change(screen.getByLabelText('Find proposal'), { target: { value: '' } });
+  expect(screen.getByLabelText('1003000 — Other Institute').checked).toBe(true);
+  fireEvent.click(screen.getByRole('button', { name: 'Save setup' }));
+  await waitFor(() => expect(posts).toHaveLength(1));
+  expect(posts[0].value.requestIds).toEqual([ID, previous, second]);
+});
