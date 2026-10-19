@@ -23,8 +23,9 @@ Recommendation: revise the design around **preallocation, releasing the Zoom
 import reference before start, and streaming the verified upload** first. Treat
 worker transfer as a separately justified ownership change, and do not adopt a
 scratch admission/reaper subsystem on the evidence collected so far. That is a
-design recommendation, not implementation approval. The revised plan still needs
-Opus review and deployment-specific validation.
+design recommendation. The revised specification subsequently received
+[Opus approval](ZOOM_AUDIO_REVIEW_DISPOSITION_2026-10-19.md); implementation and
+deployment-specific validation remain pending.
 
 The recommendation does not hide the counterexample: the preallocation Zoom
 candidate had one **741.1 MiB** trial, versus a 544.4 MiB median. Buffer reference
@@ -189,9 +190,9 @@ adoption question. Existing byte/duration limits are unchanged.
 
 Simpler candidates win on **local measured memory versus existing code**. Their
 production compatibility, safe interface, ownership, cancellation and bounded
-failure behavior still need a revised design and Opus review. Keep provider
-submission and cleanup semantics unchanged in that future design. Do not expand
-this benchmark task into a deployment or application implementation.
+failure behavior are specified in the subsequently reviewed
+[plan](../ZOOM_AUDIO_STREAMING_PLAN_2026-10-19.md), with implementation validation
+still pending. The benchmark itself did not deploy or implement application changes.
 
 ## Recommendation evidence and disconfirming checks
 

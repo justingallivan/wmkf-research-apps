@@ -3,94 +3,74 @@ title: Zoom audio adversarial review disposition
 domain: meeting-tracker
 kind: decision
 status: active
-summary: "Implementation held after Opus review. Local comparisons favor copy reduction; revised contracts and target-environment validation remain required."
+summary: "Opus approved the revised preallocation and verified-buffer streaming specification, including Zoom import. Runtime implementation and release validation remain pending."
 owner: product-engineering
 ---
 
 # Review disposition
 
-The [original Opus 5.5 review](ZOOM_AUDIO_OPUS_REVIEW_2026-10-19.md) returned
-**NEEDS REWORK**. The [plan](../ZOOM_AUDIO_STREAMING_PLAN_2026-10-19.md) is a
-blocked draft. No runtime code, production state, environment, database or
-provider request changed. Planning/review is now supplemented by a
-[local synthetic benchmark](ZOOM_AUDIO_BENCHMARK_2026-10-19.md); no application
-implementation or hosted/provider experiment has occurred.
+[VERIFIED via the recorded Claude Opus review] The revised
+[plan](../ZOOM_AUDIO_STREAMING_PLAN_2026-10-19.md) received **READY TO IMPLEMENT**
+after two rounds of corrections and a final exact-revision check. The complete
+[preallocation review receipt](ZOOM_AUDIO_PREALLOCATION_OPUS_REVIEW_2026-10-19.md)
+preserves each verdict. The approved plan SHA-256 is
+`6671cf8165542753d2352660999b503d588c036a8f86b353e2a17f5be6f87a5b`.
+This is specification approval, not proof of runtime or production readiness.
+No application code, production state, environment or database was changed, and
+no real provider upload was performed in this planning/review task.
 
-## Findings accepted as implementation blockers
+## Selected design and premise
 
-- **Premise and scope:** whole-file copies are verified in source, but no
-  production OOM has been established. Local copy-reduction benefit is now
-  measured in the linked report; hosted benefit remains unknown. The Zoom importer
-  retains its own audio Buffer while calling queue validation. A worker-only
-  memory result cannot stand in for the entire Zoom import route. Measurement
-  must be able to stop the project or choose a narrower change.
-- **Failure contract:** `worker.js` `submitQueuedJob` catches a pre-intent failure
-  and writes `failed` plus `cleanup_requested_at`. A new scratch admission or
-  ENOSPC error would follow that path. Calling it retryable in prose supplies no
-  retry mechanism. Define and test bounded backoff, lease release, retention and
-  exhaustion behavior before introducing local resource failures. Do not broaden
-  retry handling across ambiguous submission intent.
-- **Parser parity:** installed music-metadata `parseFile` consults the extension
-  before content sniffing; today's `parseBuffer(bytes, undefined)` does not get
-  that hint. Use a deliberately sniffed path/tokenizer strategy and test parity
-  on accepted, mismatched and malicious bytes. Prove the Node worker build in
-  deployment. A dot in an ancestor directory is not by itself proof of a wrong
-  parser; verify the extension lookup result rather than blindly banning dots.
-- **Capacity and lifecycle:** choose concrete admission, reservation, stale-owner
-  recovery, cleanup-error and hard-kill behavior. The global provider slot does
-  not serialize starts/imports. Neither a filesystem lock nor a module counter is
-  yet a proven sufficient or necessary design for this deployment.
-- **Deadlines:** Meeting Tracker start declares 60 s, owner-pilot start 120 s,
-  Zoom import 300 s; the worker budget is 240 s. Explicit end-to-end budgets with
-  cleanup reserves must fit each caller. Existing stage caps do not add up to an
-  enforced total deadline.
-- **Streaming mechanics:** prove actual body framing, byte count, timeout, early
-  response and close behavior through the chosen fetch seam. Local wire tests
-  cannot prove the actual provider integration; an authorized provider check is
-  a separate release gate. Preserve saved-reference reuse and submission fences.
-- **Consumer coverage:** enumerate error projection/retry consequences at both
-  queue modes and Zoom import. Extend parser tracing/probe coverage to every
-  execution route that uses the changed inspector.
+[PLANNED] Preallocate one exact-size audio Buffer when trusted response metadata
+permits it, retaining bounded accumulation otherwise. Verify full length and
+SHA-256 before provider upload, keep the copying container inspector, and upload
+bounded Buffer views through an owned stream with explicit Content-Length.
+Include the Zoom audio download and release its audio reference before start;
+retain Blob staging and queue reread. Keep the existing 200 MiB/four-hour limits.
+Do not add disk scratch, worker-buffer transfer, prefix-only inspection or new
+retry policy in this change.
 
-## Qualifications to the original review
+[VERIFIED via local benchmark] The
+[synthetic comparison](ZOOM_AUDIO_BENCHMARK_2026-10-19.md) supports reducing
+copies: near-cap submission median peak RSS was 1,104.9 MiB for baseline versus
+534.6 MiB for preallocation plus streaming. Zoom preallocation/reference release
+had a 544.4 MiB median and a 741.1 MiB outlier. These are local process samples;
+production OOM, hosted memory accounting and concurrency benefit remain unknown.
+The project is a measured optimization proposal, not a confirmed production
+incident repair.
 
-The receipt preserves Opus's words; its hypotheses are not promoted wholesale
-to verified facts:
+## Review findings resolved in the specification
 
-- File random access is proposed relative to a prefix-only design; buffers
-  already support late metadata. The design has no new format-support advantage
-  over today's buffer parser.
-- A streaming fetch body does not automatically establish that the request
-  must use chunked framing when an explicit content length is provided. Opus did
-  not run the wire test. The subsequent local wire test now demonstrates explicit
-  content length without chunked framing on Node 26.6.0 for both Buffer and
-  stream bodies. Actual AssemblyAI/deployed-runtime integration remains untested.
-- Dropping the Zoom Buffer reference and transferring a single Buffer through
-  the inspector have now been compared locally. The report preserves the
-  preallocation Zoom outlier and limits claims to measured samples. File-backed
-  Blob bodies remain untested; this benchmark used file streams for disk upload.
-- `/tmp` backing and hosted memory accounting are unmeasured. A tmpfs result or
-  charged file cache would challenge the benefit; compare full measured peaks
-  rather than infer all memory savings from a filesystem label alone.
-- There are no new stale audio scratch files today: this code does not yet use
-  that scratch lifecycle. Platform termination would create that risk after
-  adopting the proposal; the review's existing deadline mismatch is real source
-  evidence, not evidence that scratch leakage has already occurred.
-- The Blob SDK's returned pathname is not independent proof of object identity.
-  Keep persisted-path scoping as an authorization boundary, while actual full
-  length and SHA-256 establish byte integrity. A final-byte mutation test must
-  prove that no provider bytes are sent before verification completes.
+- Preserve per-caller error/status contracts and avoid leaking internal helper
+  errors; cancel rejected bodies even before acquiring their reader.
+- Propagate absolute caller deadlines through physical reads, Zoom listing and
+  downloads, Blob writes, queue/start and workflow dispatch. Preserve stage caps
+  and reserve time for Zoom capture/start, including the VTT download.
+- Define bounded upload chunks, pushed-byte accounting, an empty Readable buffer
+  before accepting success, bounded close and primary-error preservation.
+  Do not wait for a final iterator pull that can race a valid response.
+- Recheck the latest lease, cleanup, switches and saved upload reference before
+  upload; preserve existing submission/reference/intent fences afterward.
+- State the existing post-intent uncertainty behavior explicitly: an exhausted
+  deadline after intent may yield uncertainty even with zero provider POSTs.
+  The settling reserve does not promise that all database work fits.
+- Require target-runtime source-buffer integrity, framing, early-response,
+  cancellation, slow-VTT and end-to-end caller tests before release.
 
-## Next gate and limits
+## Historical review and remaining gates
 
-The bounded provider-free local experiment is complete: owner start, Meeting
-Tracker start, Zoom import and submission byte paths were compared in fresh
-processes. Revise the design using that evidence and obtain a fresh Opus review
-before runtime implementation. Any hosted experiment still needs an explicit
-synthetic-only target and resource budget; it must not touch real recordings or
-invoke paid transcription incidentally. Hosted memory accounting remains unknown.
+The [original disk-plan review](ZOOM_AUDIO_OPUS_REVIEW_2026-10-19.md) remains a
+historical **NEEDS REWORK** receipt. Its scratch admission/reaper and parseFile
+objections concern an alternative that is no longer selected. Its source-backed
+warnings about the Zoom caller, deadlines, failure contracts and unsupported
+production claims informed this revision. Local explicit-length wire results
+qualified its unconditional chunked-framing prediction; actual deployed/provider
+compatibility remains unverified.
 
-Documentation currency, catalog, symbol-reference and build-claim checks passed
-for the planning work; runtime tests were not run because runtime code is
-unchanged. The initial review fingerprint remains an audit record, not approval
-of subsequent plan edits.
+[PLANNED] Implement and run the plan's verification items 1–8, relevant runtime
+and documentation gates, actual-code memory comparisons and target-Node wire
+checks. A bounded synthetic Preview test must assess memory and concurrent
+starts. A real provider acceptance check requires separate authorization.
+Hard termination, non-abortable database/auth work and orphaned remote uploads
+remain explicit residuals; streaming does not eliminate them. No byte-cap
+increase or deployment is authorized by this design review.
