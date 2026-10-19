@@ -25,7 +25,7 @@ export default async function handler(req, res) {
         if (req.query.action === 'inspectRecovery') return res.json(await inspectRecovery(cycle, actor, req.query.requestId, req.query.operation));
         if (req.query.action === 'reconcile') return res.json(await reconcile(cycle, actor));
         if (!staff.isSuperuser) fail('board_settings_denied', 'Only administrators edit setup.', 403);
-        return res.json({ staff: await staffDirectory(), cycle: await getCycle(cycle), candidates: await candidates(cycle), roles: { cso: await getRole('cso'), grantsManager: await getRole('grantsManager') } });
+        return res.json({ staff: await staffDirectory(), cycle: await getCycle(cycle), candidates: await candidates(cycle), roles: { president: await getRole('president'), cso: await getRole('cso'), grantsManager: await getRole('grantsManager') } });
       }
       const input = req.body;
       exact(input, ['action', 'cycle', 'value', 'expectedRevision', 'reason', 'role', 'resolution']);

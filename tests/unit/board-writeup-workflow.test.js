@@ -8,7 +8,7 @@ import { emptyState } from '../../lib/services/board-writeups/store';
 import { noticeIntents, deliverNotice, reconcileNotices } from '../../lib/services/board-writeups/notifications';
 import { queueRelease, deliverRelease, dashboard } from '../../lib/services/board-writeups/service';
 import { startArchive, archiveOne } from '../../lib/services/board-writeups/archive';
-import { saveCycle, resumeConfig } from '../../lib/services/board-writeups/config';
+import { saveCycle, resumeConfig, saveRole, boardActor } from '../../lib/services/board-writeups/config';
 import { boardMode, boardWorkEnabled } from '../../lib/services/board-writeups/mode';
 import { recover } from '../../lib/services/board-writeups/recovery';
 const ID = '11111111-1111-4111-8111-111111111111';
@@ -280,4 +280,37 @@ test.each([
   expect(mutateCycle).not.toHaveBeenCalled();
   expect(create).not.toHaveBeenCalled();
   expect(send).not.toHaveBeenCalled();
+});
+
+
+test('President assignment persists with revision fencing and grants no workflow privileges', async () => {
+  const settings = {};
+  const deps = {
+    getUser: async () => ({ isdisabled: false, internalemailaddress: 'staff@wmkeck.org', fullname: 'Staff' }),
+    resolveSystemUserToProfile: async () => actor.profileId,
+    profile: async () => ({ is_active: true, superuser: true }),
+    getSettingStrict: async key => settings[key] || { found: false },
+    setSettingIfUnchanged: jest.fn(async (key, serialized) => { settings[key] = { found: true, value: serialized, revision: 'next' }; })
+  };
+  expect(await saveRole(actor, 'president', { version: 1, systemUserId: ID }, null, deps)).toEqual({ value: { version: 1, systemUserId: ID }, revision: 'next' });
+  expect(deps.setSettingIfUnchanged).toHaveBeenCalledWith('board_writeups.president', JSON.stringify({ version: 1, systemUserId: ID }), null, actor.profileId);
+  expect(await boardActor(actor, { ...deps, profile: async () => ({ is_active: true, superuser: false }), listAppKeysForUser: async () => ['reviewers'] })).toMatchObject({ canRelease: false, canArchive: false });
+});
+
+test('active cycle save requires President and succeeds after assignment', async () => {
+  const { d } = fixture();
+  let president = false, current = value;
+  const deps = { ...d,
+    getUser: async () => ({ isdisabled: false, internalemailaddress: 'admin@wmkeck.org', fullname: 'Admin' }),
+    resolveSystemUserToProfile: async () => actor.profileId, profile: async () => ({ is_active: true, superuser: true }),
+    getSettingStrict: async key => key.includes('.cycle.')
+      ? { found: true, value: JSON.stringify(current), revision: 'etag' }
+      : key === 'board_writeups.president' && !president ? { found: false }
+        : { found: true, value: JSON.stringify({ version: 1, systemUserId: ID }), revision: 'role' },
+    setSettingIfUnchanged: jest.fn(async (_key, serialized) => { current = JSON.parse(serialized); })
+  };
+  await expect(saveCycle(actor, value, 'etag', '', deps)).rejects.toThrow('Assign the President');
+  expect(deps.setSettingIfUnchanged).not.toHaveBeenCalled();
+  president = true;
+  await expect(saveCycle(actor, value, 'etag', '', deps)).resolves.toMatchObject({ value });
 });
