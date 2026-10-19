@@ -1,10 +1,12 @@
 #!/usr/bin/env node
 /**
  * Synthetic, local-only comparison. No .env loading, credentials, real provider,
- * database, deployment or runtime edits. Baseline calls current runtime/import
+ * database or deployment. Historical baseline loads d90886f73 runtime/import
  * functions with storage/policy/store edges replaced. Candidate source rewrites
  * exist only in the child module loader; they are experiments, not fixes.
  * Usage: node scripts/benchmarks/zoom-audio-memory.mjs [--quick] [--repeats 2]
+ * With --implemented, compare reviewed runtime code against --baseline-ref (default d90886f73),
+ * including HTTP Buffer Blob-write modeling, fallback reads and concurrent starts.
  * Output: JSON at --output PATH (default /tmp/zoom-audio-memory-results.json).
  */
 import assert from 'node:assert/strict';
@@ -109,6 +111,11 @@ async function fixture(dir, format, mib) {
 }
 
 function installEdges(c) {
+  const baselineSources = new Map();
+  if (c.baselineRef || !c.implementationComparison) for (const rel of [
+    'lib/services/transcription-pilot/runtime.js', 'lib/services/transcription-pilot/provider.js',
+    'lib/services/meeting-tracker-recordings/import-service.js', 'lib/services/meeting-tracker-recordings/zoom-client.js',
+  ]) baselineSources.set(pathToFileURL(path.join(ROOT, rel)).href, execFileSync('git', ['show', `${c.baselineRef || 'd90886f73'}:${rel}`], { cwd: ROOT, encoding: 'utf8' }));
   const stubs = new Map();
   const runtimeFile = path.join(ROOT, 'lib/services/transcription-pilot/runtime.js');
   const importFile = path.join(ROOT, 'lib/services/meeting-tracker-recordings/import-service.js');
@@ -137,7 +144,7 @@ function installEdges(c) {
     load(url, context, next) {
       if (stubs.has(url)) return { format: 'module', source: stubs.get(url), shortCircuit: true };
       if (url === pathToFileURL(runtimeFile).href && ['prealloc', 'stream', 'transfer'].includes(c.mode)) {
-        let source = readFileSync(runtimeFile, 'utf8');
+        let source = baselineSources.get(url) || readFileSync(runtimeFile, 'utf8');
         for (const [name, prefix] of [['readPrivateBlob', 'async function'], ['readPrivateContentIfPresent', 'export async function']]) {
           const start = source.indexOf(`${prefix} ${name}(`);
           const end = source.indexOf('\nexport async function', start + 1);
@@ -154,16 +161,17 @@ function installEdges(c) {
         return { source, format: 'module', shortCircuit: true };
       }
       if (url === pathToFileURL(importFile).href && ['drop', 'prealloc', 'transfer'].includes(c.mode)) {
-        let source = readFileSync(importFile, 'utf8').replace('const audioBytes = await', 'let audioBytes = await');
+        let source = (baselineSources.get(url) || readFileSync(importFile, 'utf8')).replace('const audioBytes = await', 'let audioBytes = await');
         source = source.replace('started = await startMeetingTranscription(', 'audioBytes = null;\n    started = await startMeetingTranscription(');
         return { source, format: 'module', shortCircuit: true };
       }
       if (url.endsWith('/meeting-tracker-recordings/zoom-client.js') && ['prealloc', 'transfer'].includes(c.mode)) {
-        let source = readFileSync(fileURLToPath(url), 'utf8');
+        let source = baselineSources.get(url) || readFileSync(fileURLToPath(url), 'utf8');
         const start = source.indexOf('async function readBounded('), end = source.indexOf('\n/**', start);
         source = source.slice(0, start) + 'async function readBounded(res,maxBytes){return globalThis.__audioBench.preallocate(res.body,globalThis.__audioBench.size,maxBytes);}\n' + source.slice(end);
         return { source, format: 'module', shortCircuit: true };
       }
+      if (baselineSources.has(url)) return { format: 'module', source: baselineSources.get(url), shortCircuit: true };
       return next(url, context);
     },
   });
@@ -186,8 +194,16 @@ async function scenario(config) {
       declared_content_type: 'audio/mp4', verified_bytes: c.size, audio_sha256: c.sha256,
       audio_etag: 'synthetic-etag', expires_at: new Date(Date.now() + 3600000), options_snapshot: {} };
     const blob = pathname => ({ pathname, contentType: 'audio/mp4', etag: 'synthetic-etag' });
-    c.api.get = async pathname => ({ statusCode: 200, stream: Readable.toWeb(Readable.from(source(c))), blob: blob(pathname) });
-    c.api.put = async (pathname, body) => { assert.equal(hash(body), c.sha256); return blob(pathname); };
+    c.api.get = async pathname => ({ statusCode: 200, stream: Readable.toWeb(Readable.from(source(c))), headers: new Headers(c.unknownLength ? {} : { 'content-length': String(c.size) }), blob: blob(pathname) });
+    c.api.put = async (pathname, body) => {
+      assert.equal(hash(body), c.sha256);
+      if (c.implementationComparison) {
+        const res = await nativeFetch(`${c.sinkUrl}/blob`, { method: 'PUT', body, headers: { 'content-length': String(body.length) } });
+        const receipt = await res.json(); assert.equal(receipt.sha256, c.sha256); assert.equal(receipt.receivedBytes, c.size);
+        c.blobWriteBytes = (c.blobWriteBytes || 0) + receipt.receivedBytes;
+      }
+      return blob(pathname);
+    };
     c.api.generateClientTokenFromReadWriteToken = async () => 'synthetic-token';
     c.api.projectOwnerTranscriptionJob = r => r;
     c.api.getOwnerTranscriptionJob = c.api.getMeetingTranscriptionJob = async () => row;
@@ -218,7 +234,8 @@ async function scenario(config) {
       stdio: ['ignore', 'ignore', 'inherit', 'ipc'], execArgv: ['--no-warnings'],
     });
     const port = await new Promise((resolve, reject) => { sink.once('message', m => resolve(m.port)); sink.once('error', reject); sink.once('exit', code => reject(Error(`sink_exit_${code}`))); });
-    const sinkUrl = `http://127.0.0.1:${port}/upload`;
+    c.sinkUrl = `http://127.0.0.1:${port}`;
+    const sinkUrl = `${c.sinkUrl}/upload`;
     async function send(init) {
       c.uploadRequests = (c.uploadRequests || 0) + 1;
       const res = await nativeFetch(sinkUrl, init);
@@ -232,7 +249,7 @@ async function scenario(config) {
       if (u.hostname === 'api.assemblyai.com') return send(init);
       if (u.hostname === 'zoom.us') return Response.json({ access_token: 'synthetic', expires_in: 3600 });
       if (u.hostname === 'api.zoom.us') return Response.json(u.pathname.includes('/users/') ? { meetings: [meeting], next_page_token: '' } : meeting);
-      if (u.hostname === 'synthetic.zoom.us') return new Response(Readable.toWeb(Readable.from(chunks(c.filename, c.slowSource))), { headers: { 'content-type': 'audio/mp4', 'content-length': String(c.size) } });
+      if (u.hostname === 'synthetic.zoom.us') return new Response(Readable.toWeb(Readable.from(chunks(c.filename, c.slowSource))), { headers: { 'content-type': 'audio/mp4', ...(c.unknownLength ? {} : { 'content-length': String(c.size) }) } });
       throw Error('external_network_blocked');
     };
     async function spoolQueue() {
@@ -256,6 +273,7 @@ async function scenario(config) {
     global.gc?.(); c.before = process.memoryUsage(); sample(c); const start = performance.now();
     const timer = setInterval(() => sample(c), 5);
     try {
+      const run = async () => {
       if (c.flow === 'zoom') {
         await importer.importZoomRecording({ requestId: ID, ownerProfileId: OWNER, actingUserSystemId: ID, meetingUuid: meeting.uuid, acknowledged: true });
       } else if (c.mode === 'spool') {
@@ -274,11 +292,14 @@ async function scenario(config) {
         } else await provider.uploadAssemblyAIAudio({ region: 'us', audio: result.buffer, contentType: 'audio/mp4' });
       } else if (c.flow === 'owner') await runtime.validateAndQueueOwnerJob({ ownerProfileId: OWNER, jobId: ID, expectedVersion: 1, acknowledged: true });
       else await runtime.queueMeetingTranscription(meetingArgs);
+      };
+      await Promise.all(Array.from({ length: c.concurrency || 1 }, run));
     } finally { sample(c); clearInterval(timer); }
-    assert.equal(c.bytesSent, c.flow === 'submit' ? c.size : 0);
+    assert.equal(c.bytesSent, c.flow === 'submit' ? c.size * (c.concurrency || 1) : 0);
     const result = { mode: c.mode, flow: c.flow, format: c.format, mib: c.mib, bytes: c.size, repeat: c.repeat,
       elapsedMs: performance.now() - start, before: c.before, sampledPeak: c.peak, processMaxRSS: c.maxRSS,
       bytesSent: c.bytesSent, wire: c.wire, scratchBytes: c.scratchBytes || 0, slowSource: !!c.slowSource, slowSink: !!c.slowSink,
+      unknownLength: !!c.unknownLength, concurrency: c.concurrency || 1, baselineRef: c.baselineRef || null, blobWriteBytes: c.blobWriteBytes || 0,
       integrity: 'passed', durationMs: c.durationMs, runtime: process.version };
     process.send?.(result);
   } catch (error) {
@@ -330,24 +351,46 @@ if (process.argv.includes('--sink')) {
   assert(Number.isInteger(repeats) && repeats >= 1 && repeats <= 5);
   try {
     const quick = process.argv.includes('--quick');
+    const implemented = process.argv.includes('--implemented');
+    const baselineRef = arg('--baseline-ref', 'd90886f73');
+    const measured = async config => {
+      const r = await child(config); results.push(r);
+      console.log(`${config.format} ${config.mib}MiB ${config.flow}/${config.mode} header=${!config.unknownLength} concurrent=${config.concurrency || 1}: peak ${(r.processMaxRSS / MIB).toFixed(1)} MiB`);
+    };
     for (const mib of quick ? [4] : [40, 199]) for (const format of ['mp3', 'm4a-late']) {
       const f = await fixture(dir, format, mib);
       for (let repeat = 1; repeat <= repeats; repeat++) for (const flow of ['owner', 'meeting', 'zoom', 'submit']) {
+        if (implemented) {
+          for (const mode of ['baseline', 'implemented']) await measured({ ...f, flow, mode, repeat, implementationComparison: true, ...(mode === 'baseline' ? { baselineRef } : {}) });
+          continue;
+        }
         for (const mode of ['baseline', ...(flow === 'zoom' ? ['drop'] : []), 'prealloc', ...(flow === 'submit' ? ['stream'] : []), 'transfer', 'spool']) {
           const r = await child({ ...f, flow, mode, repeat }); results.push(r);
           console.log(`${format} ${mib}MiB ${flow}/${mode} #${repeat}: peak ${(r.processMaxRSS / MIB).toFixed(1)} MiB, ${(r.elapsedMs / 1000).toFixed(2)} s`);
         }
       }
     }
-    if (!quick) {
+    if (implemented) {
+      for (const mib of quick ? [4] : [40, 199]) {
+        const extraDir = await mkdtemp(path.join(dir, 'fallback-'));
+        const f = await fixture(extraDir, 'm4a-late', mib);
+        for (const mode of ['baseline', 'implemented']) {
+          const config = { ...f, mode, repeat: 1, implementationComparison: true, ...(mode === 'baseline' ? { baselineRef } : {}) };
+          for (const flow of ['owner', 'meeting', 'zoom', 'submit']) await measured({ ...config, flow, unknownLength: true });
+          // Two simultaneous callers in one process, no forced in-operation collection.
+          for (const flow of ['meeting', 'zoom']) await measured({ ...config, flow, concurrency: 2 });
+        }
+      }
+    }
+    if (!quick && !implemented) {
       const f = await fixture(dir, 'mp3', 8);
       for (const mode of ['baseline', 'transfer', 'spool']) results.push(await child({ ...f, flow: 'submit', mode, repeat: 1, slowSource: true, slowSink: true }));
     }
     const controls = [];
     const controlFixture = await fixture(dir, 'mp3', 2);
-    for (const mode of ['baseline', 'prealloc', 'stream', 'transfer', 'spool']) {
-      const r = await child({ ...controlFixture, flow: 'submit', mode, repeat: 1, corruptLastByte: true });
-      assert.equal(r.rejected, true); controls.push(r);
+    for (const mode of implemented ? ['implemented'] : ['baseline', 'prealloc', 'stream', 'transfer', 'spool']) {
+      const r = await child({ ...controlFixture, flow: 'submit', mode, repeat: 1, corruptLastByte: true, ...(implemented ? { implementationComparison: true } : {}) });
+      assert.equal(r.rejected, true); assert.equal(r.error, 'audio_integrity_mismatch'); controls.push(r);
     }
     await assert.rejects(preallocate(Readable.from([Buffer.alloc(3)]), 2), /length_overflow/);
     await assert.rejects(preallocate(Readable.from([Buffer.alloc(1)]), 2), /length_underflow/);
@@ -355,7 +398,8 @@ if (process.argv.includes('--sink')) {
       measuredAt: new Date().toISOString(), platform: `${os.platform()}/${os.arch()}`, runtime: process.version,
       fetchUndici: process.versions.undici,
       receiverIsolation: 'separate child process; receiver RSS excluded',
-      tmpFilesystem: await statfs(os.tmpdir()), scope: 'Local synthetic source/storage mocks and loopback upload; no hosted/cloud/provider measurement.', results, controls };
+      tmpFilesystem: await statfs(os.tmpdir()), scope: 'Local synthetic source/storage mocks and loopback upload; no hosted/cloud/provider measurement. Implemented comparison models SDK Buffer Blob writes via physical HTTP but does not run real Blob storage.',
+      implementationComparison: implemented, sourceHashes: Object.fromEntries(['lib/services/transcription-pilot/audio-read.js', 'lib/services/transcription-pilot/runtime.js', 'lib/services/transcription-pilot/provider.js', 'lib/services/meeting-tracker-recordings/zoom-client.js', 'lib/services/meeting-tracker-recordings/import-service.js'].map(rel => [rel, hash(readFileSync(path.join(ROOT, rel)))])), results, controls };
     await writeFile(arg('--output', '/tmp/zoom-audio-memory-results.json'), JSON.stringify(output, null, 2) + '\n');
   } finally { await rm(dir, { recursive: true, force: true }); }
 }

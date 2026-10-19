@@ -235,7 +235,7 @@ describe('import: validation and provenance', () => {
     uploadMeetingTranscription.mockResolvedValue({ job: { id: JOB, status: 'uploading', version: 7 }, upload: {} });
     await importZoomRecording(args());
     expect(startMeetingTranscription).toHaveBeenCalledWith({ requestId: REQUEST, ownerProfileId: 9, actingUserSystemId: ACTOR, jobId: JOB,
-      body: { expectedVersion: 7, nonSensitiveAcknowledged: true } });
+      body: { expectedVersion: 7, nonSensitiveAcknowledged: true }, deadlineMs: expect.any(Number) });
   });
 });
 
@@ -292,8 +292,8 @@ describe('import: bytes and Blob writes', () => {
   test("bytes are written to the job's cleanup pathnames with the declared sizes enforced by the download", async () => {
     await importZoomRecording(args());
     expect(getMeetingTranscriptionJob).toHaveBeenCalledWith({ jobId: JOB, requestId: REQUEST, siteVisitActivityId: VISIT });
-    expect(downloadRecordingFile).toHaveBeenNthCalledWith(1, AUDIO_URL, { maxBytes: 200 * 1024 * 1024, expectedBytes: 5 });
-    expect(downloadRecordingFile).toHaveBeenNthCalledWith(2, VTT_URL, { maxBytes: 4_000_000, expectedBytes: 3 });
+    expect(downloadRecordingFile).toHaveBeenNthCalledWith(1, AUDIO_URL, { maxBytes: 200 * 1024 * 1024, expectedBytes: 5, preallocateAudio: true, deadlineMs: expect.any(Number) });
+    expect(downloadRecordingFile).toHaveBeenNthCalledWith(2, VTT_URL, { maxBytes: 4_000_000, expectedBytes: 3, deadlineMs: expect.any(Number) });
     expect(writePrivateContent.mock.calls.map(([path, type, body]) => [path, type, body.length])).toEqual([
       [rawJob.input_cleanup_pathname, 'audio/mp4', 5], [rawJob.zoom_transcript_cleanup_pathname, 'text/vtt', 3]]);
   });
@@ -797,5 +797,31 @@ describe('listing: Stage 3b video fields', () => {
     process.env.ZOOM_VIDEO_COPY_ACCESS = 'test:99999999-9999-4999-8999-999999999999';
     expect(await listZoomRecordingsForVisit({ requestId: REQUEST })).not.toHaveProperty('videoCopyAvailable');
     expect(videoStore.listZoomVideoCopySnapshotsForRequest).not.toHaveBeenCalled();
+  });
+});
+
+describe('absolute import budgets', () => {
+  test('listing/detail/audio/start share the parent deadline, while VTT/write retain the shared start reserve', async () => {
+    const deadlineMs = Date.now() + 270_000;
+    await importZoomRecording(args({ deadlineMs }));
+    expect(listHostRecordings).toHaveBeenCalledWith(expect.any(String), expect.objectContaining({ deadlineMs }));
+    expect(getMeetingRecordings).toHaveBeenCalledWith(UUID, { deadlineMs });
+    expect(downloadRecordingFile.mock.calls[0][1]).toMatchObject({ preallocateAudio: true, deadlineMs });
+    expect(downloadRecordingFile.mock.calls[1][1].deadlineMs).toBe(deadlineMs - 70_000);
+    expect(downloadRecordingFile.mock.calls[1][1].preallocateAudio).toBeUndefined();
+    for (const call of writePrivateContent.mock.calls) expect(call[3]).toBeLessThanOrEqual(deadlineMs - 70_000);
+    expect(startMeetingTranscription).toHaveBeenCalledWith(expect.objectContaining({ deadlineMs }));
+  });
+  test('a real stalled VTT download aborts before start reserve, retires the uploading job and records sanitized failure', async () => {
+    const real = jest.requireActual('../../lib/services/meeting-tracker-recordings/zoom-client.js'); real.resetZoomTokenCache();
+    const cancel = jest.fn();
+    global.fetch.mockResolvedValueOnce({ ok: true, json: async () => ({ access_token: 'synthetic', expires_in: 3600 }) })
+      .mockResolvedValueOnce({ ok: true, headers: { get: () => null }, body: { getReader: () => ({ read: () => new Promise(() => {}), cancel, releaseLock: jest.fn() }) } });
+    downloadRecordingFile.mockImplementation(async (url, options) => url === AUDIO_URL ? Buffer.alloc(5) : real.downloadRecordingFile(url, options));
+    const error = await rejection(importZoomRecording(args({ deadlineMs: Date.now() + 70_050 })));
+    expect(error.code).toBe('zoom_unavailable'); expect(cancel).toHaveBeenCalled();
+    expect(retireMeetingTranscriptionUploadingJob).toHaveBeenCalled();
+    expect(startMeetingTranscription).not.toHaveBeenCalled();
+    expect(onlyRow()).toMatchObject({ state: 'failed', failure_code: 'zoom_unavailable' });
   });
 });

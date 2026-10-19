@@ -6,6 +6,7 @@ import { projectReadableOwnerJob, requireSubmissionsEnabled, TranscriptionPilotE
 export const config = { api: { bodyParser: { sizeLimit: '8kb' } }, maxDuration: 120 };
 
 export default async function handler(req, res) {
+  const deadlineMs = Date.now() + 105_000;
   if (req.method !== 'POST') { res.setHeader('Allow', 'POST'); return res.status(405).json({ error: 'Method not allowed' }); }
   const gate = await requireSuperuser(req, res);
   if (!gate) return;
@@ -19,7 +20,7 @@ export default async function handler(req, res) {
     let manual = false;
     if (existing.status === 'uploading') {
       job = await validateAndQueueOwnerJob({ ownerProfileId: gate.profileId, jobId: req.query.id,
-        expectedVersion: req.body?.expectedVersion, acknowledged: req.body?.acknowledgeNonSensitive });
+        expectedVersion: req.body?.expectedVersion, acknowledged: req.body?.acknowledgeNonSensitive, deadlineMs });
     } else if (existing.status === 'queued' && existing.version === req.body?.expectedVersion
       && req.body?.acknowledgeNonSensitive === true && existing.non_sensitive_acknowledged_at) {
       job = projectReadableOwnerJob(existing);
@@ -30,7 +31,7 @@ export default async function handler(req, res) {
       throw new TranscriptionPilotError('job_changed', 409);
     }
     try {
-      await dispatchQueuedTranscriptionWorkflow({ jobId: req.query.id, ownerProfileId: gate.profileId, manual });
+      await dispatchQueuedTranscriptionWorkflow({ jobId: req.query.id, ownerProfileId: gate.profileId, manual, deadline: Math.min(deadlineMs, Date.now() + 15_000) });
     } catch (error) {
       if (error instanceof TranscriptionWorkflowDispatchError) {
         return res.status(error.status).json({ error: error.message, code: error.code, retryable: true, job });

@@ -131,20 +131,17 @@ sequence.
   Owner priority 2026-10-07: a to-do, not the highest priority.
 
 - **Reduce transcription audio copies and stream verified uploads (2026-10-19).**
-  [OPEN — plan reviewed, not implemented] Source still buffers private Blob
-  audio, copies it into the inspector worker and uploads it to AssemblyAI.
-  The [revised plan](plans/ZOOM_AUDIO_STREAMING_PLAN_2026-10-19.md) selects
-  exact-size preallocation with a bounded fallback, full-file integrity checks,
-  and bounded streaming of verified Buffer views. It includes Zoom import
-  preallocation and release of its audio reference before queue validation.
-  The [Opus disposition](plans/evidence/ZOOM_AUDIO_REVIEW_DISPOSITION_2026-10-19.md)
-  records READY TO IMPLEMENT for the exact specification. Local near-cap
-  submission median RSS fell from 1,104.9 to 534.6 MiB in synthetic comparisons;
-  hosted memory/concurrency and provider compatibility remain unverified.
-  Keep the 200 MiB/four-hour limits and current copying inspector. Next:
-  implementation, caller/failure tests and target-runtime/Preview validation;
-  separately authorize real provider acceptance. No prefix-only inspection,
-  scratch subsystem or cap increase is selected.
+  [BUILT ON `codex/zoom-audio-streaming` — not merged/deployed] The reviewed
+  [plan](plans/ZOOM_AUDIO_STREAMING_PLAN_2026-10-19.md) is implemented: metadata-gated
+  preallocation with bounded fallback, full-file integrity checks, bounded upload
+  streams, caller deadlines and pre-upload lease/switch checks. Zoom import opts
+  audio into preallocation and releases its Buffer after provenance capture,
+  before queue validation; the Blob reread and copying inspector remain.
+  [Implementation evidence](plans/evidence/ZOOM_AUDIO_IMPLEMENTATION_2026-10-19.md)
+  records local tests and memory results, including outliers and concurrent starts.
+  Keep the 200 MiB/four-hour limits. Remaining: CI, synthetic hosted validation,
+  separately authorized real-provider acceptance and deliberate promotion.
+  Local memory reductions do not establish a safe hosted concurrency bound.
 
 - **Site Visit page redesign and follow-ups — implemented.**
   [VERIFIED via source and Git ancestry, 2026-10-19] The redesign merged as

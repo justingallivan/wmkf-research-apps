@@ -22,6 +22,7 @@ function exactBody(body) {
 }
 
 export default async function handler(req, res) {
+  const deadlineMs = Date.now() + 270_000;
   if (req.method !== 'POST') { res.setHeader('Allow', 'POST'); return res.status(405).json({ error: 'Method not allowed' }); }
   const requestId = Array.isArray(req.query.requestId) ? '' : String(req.query.requestId || '').trim();
   if (!isGuid(requestId)) return res.status(400).json({ error: 'A valid request id is required.' });
@@ -34,7 +35,7 @@ export default async function handler(req, res) {
     try {
       return res.status(200).json(await importZoomRecording({
         requestId, ownerProfileId: access.profileId, actingUserSystemId: actorRefFromSession(access.session),
-        meetingUuid: req.body.meetingUuid, acknowledged: req.body.nonSensitiveAcknowledged,
+        meetingUuid: req.body.meetingUuid, acknowledged: req.body.nonSensitiveAcknowledged, deadlineMs,
       }));
     } catch (error) { return errorResponse(res, error); }
   });

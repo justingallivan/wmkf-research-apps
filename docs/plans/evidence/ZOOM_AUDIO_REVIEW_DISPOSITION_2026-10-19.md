@@ -3,7 +3,7 @@ title: Zoom audio adversarial review disposition
 domain: meeting-tracker
 kind: decision
 status: active
-summary: "Opus approved the revised preallocation and verified-buffer streaming specification, including Zoom import. Runtime implementation and release validation remain pending."
+summary: "Opus approved the preallocation/upload design including Zoom. Branch implementation is locally tested; hosted/provider validation and promotion remain pending."
 owner: product-engineering
 ---
 
@@ -16,12 +16,14 @@ after two rounds of corrections and a final exact-revision check. The complete
 preserves each verdict. The approved plan SHA-256 is
 `6671cf8165542753d2352660999b503d588c036a8f86b353e2a17f5be6f87a5b`.
 This is specification approval, not proof of runtime or production readiness.
-No application code, production state, environment or database was changed, and
-no real provider upload was performed in this planning/review task.
+The planning/review task changed no application code or external state. The
+subsequent owner-authorized [branch implementation](ZOOM_AUDIO_IMPLEMENTATION_2026-10-19.md)
+is locally tested and remains unmerged/undeployed. No real provider acceptance
+or production change is claimed.
 
 ## Selected design and premise
 
-[PLANNED] Preallocate one exact-size audio Buffer when trusted response metadata
+[VERIFIED via linked branch implementation; not deployed] Preallocate one exact-size audio Buffer when trusted response metadata
 permits it, retaining bounded accumulation otherwise. Verify full length and
 SHA-256 before provider upload, keep the copying container inspector, and upload
 bounded Buffer views through an owned stream with explicit Content-Length.
@@ -67,10 +69,10 @@ production claims informed this revision. Local explicit-length wire results
 qualified its unconditional chunked-framing prediction; actual deployed/provider
 compatibility remains unverified.
 
-[PLANNED] Implement and run the plan's verification items 1–8, relevant runtime
-and documentation gates, actual-code memory comparisons and target-Node wire
-checks. A bounded synthetic Preview test must assess memory and concurrent
-starts. A real provider acceptance check requires separate authorization.
+The linked implementation receipt records local tests, gates, actual-code
+comparisons and Node 22/24 wire checks. A bounded synthetic Preview test must
+still assess the actual configured deployment runtime, SDK/store behavior, memory
+and concurrent starts. A real provider acceptance check requires separate authorization.
 Hard termination, non-abortable database/auth work and orphaned remote uploads
 remain explicit residuals; streaming does not eliminate them. No byte-cap
 increase or deployment is authorized by this design review.

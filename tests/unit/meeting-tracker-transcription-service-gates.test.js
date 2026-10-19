@@ -112,13 +112,16 @@ test('Start dispatches queued work immediately and reports a truthful pending st
     const started = await startMeetingTranscription({ requestId, ownerProfileId: 8,
       actingUserSystemId: '29b0de0d-4ff7-ee11-a1fd-000d3a3621c7', jobId,
       body: { expectedVersion: 5, nonSensitiveAcknowledged: true } });
-    expect(dispatchQueuedTranscriptionWorkflow).toHaveBeenCalledWith({ jobId });
+    expect(dispatchQueuedTranscriptionWorkflow).toHaveBeenCalledWith({ jobId, deadline: expect.any(Number) });
     expect(started).toEqual({ job: { id: jobId, status: 'queued', version: 6 }, dispatchPending: false });
 
     dispatchQueuedTranscriptionWorkflow.mockRejectedValueOnce(new Error('outbox unavailable'));
+    const deadlineMs = Date.now() + 8_000;
     const retry = await startMeetingTranscription({ requestId, ownerProfileId: 8,
       actingUserSystemId: '29b0de0d-4ff7-ee11-a1fd-000d3a3621c7', jobId,
-      body: { expectedVersion: 5, nonSensitiveAcknowledged: true } });
+      body: { expectedVersion: 5, nonSensitiveAcknowledged: true }, deadlineMs });
+    expect(queueMeetingTranscription).toHaveBeenLastCalledWith(expect.objectContaining({ deadlineMs }));
+    expect(dispatchQueuedTranscriptionWorkflow).toHaveBeenLastCalledWith({ jobId, deadline: deadlineMs });
     expect(retry).toMatchObject({ job: { id: jobId, status: 'queued' }, dispatchPending: true });
   } finally {
     if (oldAccess === undefined) delete process.env.MEETING_TRACKER_TRANSCRIPTION_ACCESS;

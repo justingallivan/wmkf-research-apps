@@ -362,3 +362,67 @@ describe('getMeetingTranscriptionJobContent applies recorded short-utterance rea
     expect(JSON.parse(raw).utterances[1].speaker).toBe('A');
   });
 });
+
+describe('audio-only readers preserve per-caller integrity and metadata contracts', () => {
+  const bytes = Buffer.from('abcd');
+  const sha256 = require('node:crypto').createHash('sha256').update(bytes).digest('hex');
+  const row = { ...job, declared_bytes: 4, declared_content_type: 'audio/mpeg',
+    audio_pathname: job.input_cleanup_pathname, verified_bytes: 4, audio_etag: 'etag', audio_sha256: sha256 };
+  const runtime = require('../../lib/services/transcription-pilot/runtime');
+  function result(over = {}) {
+    return { statusCode: 200, blob: { pathname: row.audio_pathname, contentType: 'audio/mpeg', etag: 'etag' },
+      headers: { get: n => n === 'content-length' ? '4' : null }, stream: readable(bytes), ...over };
+  }
+  beforeEach(() => {
+    jest.resetAllMocks();
+    process.env.TRANSCRIPTION_PILOT_ENABLED = 'true'; process.env.TRANSCRIPTION_SUBMISSIONS_ENABLED = 'true';
+    process.env.UPLOADS_BLOB_RW_TOKEN = 'synthetic-private-token';
+    store.getOwnerTranscriptionJob.mockResolvedValue(row); store.getMeetingTranscriptionJob.mockResolvedValue(row);
+    store.queueTranscriptionJob.mockResolvedValue({ ...row, status: 'queued' });
+    store.queueMeetingTranscriptionJob.mockResolvedValue({ ...row, status: 'queued' });
+    inspectAudioBuffer.mockResolvedValue({ container: 'MPEG', durationSeconds: 1 });
+  });
+  const calls = () => [
+    [() => runtime.validateAndQueueOwnerJob({ ownerProfileId: 42, jobId: row.id, expectedVersion: 1, acknowledged: true }), 'uploaded_size_mismatch', 422, 'audio_not_found', 409, 'audio_too_large'],
+    [() => queueMeetingTranscription({ ownerProfileId: 42, jobId: row.id, expectedVersion: 1, acknowledged: true }), 'uploaded_metadata_mismatch', 422, 'transcription_upload_missing', 410, 'content_too_large'],
+    [() => runtime.inspectOwnerInput(row), 'audio_integrity_mismatch', 409, 'audio_not_found', 409, 'audio_too_large'],
+  ];
+  it('uses the header-gated reader for both queues and worker, preserving full hashes', async () => {
+    for (const [call] of calls()) { get.mockResolvedValueOnce(result()); await call(); }
+    expect(store.queueTranscriptionJob.mock.calls[0][0].sha256).toBe(sha256);
+    expect(store.queueMeetingTranscriptionJob.mock.calls[0][0].sha256).toBe(sha256);
+    expect(get.mock.calls.every(([, o]) => o.useCache === false && o.token === 'synthetic-private-token')).toBe(true);
+  });
+  it('maps missing/short/over-cap audio independently for every caller before inspection/queue', async () => {
+    for (const [call, mismatch, status, missing, missingStatus, tooLarge] of calls()) {
+      get.mockResolvedValueOnce(null);
+      await expect(call()).rejects.toMatchObject({ code: missing, status: missingStatus });
+      get.mockResolvedValueOnce(result({ stream: readable(Buffer.from('abc')) }));
+      await expect(call()).rejects.toMatchObject({ code: mismatch, status });
+      get.mockResolvedValueOnce(result({ headers: { get: n => n === 'content-length' ? String(200 * 1024 * 1024 + 1) : null } }));
+      await expect(call()).rejects.toMatchObject({ code: tooLarge, status: 413 });
+    }
+    expect(inspectAudioBuffer).not.toHaveBeenCalled(); expect(store.queueTranscriptionJob).not.toHaveBeenCalled();
+    expect(store.queueMeetingTranscriptionJob).not.toHaveBeenCalled();
+  });
+  it('rejects final-byte corruption before worker inspection and keeps legacy optional ETag rows valid', async () => {
+    get.mockResolvedValueOnce(result({ stream: readable(Buffer.from('abce')) }));
+    await expect(runtime.inspectOwnerInput(row)).rejects.toMatchObject({ code: 'audio_integrity_mismatch', status: 409 });
+    expect(inspectAudioBuffer).not.toHaveBeenCalled();
+    get.mockResolvedValueOnce(result());
+    await expect(runtime.inspectOwnerInput({ ...row, audio_etag: null })).resolves.toHaveProperty('buffer', bytes);
+  });
+  it('cancels MIME/ETag conflicts before acquiring a reader or allocating', async () => {
+    for (const blob of [{ pathname: row.audio_pathname, contentType: 'text/html', etag: 'etag' },
+      { pathname: row.audio_pathname, contentType: 'audio/mpeg', etag: 'changed' }]) {
+      const stream = { cancel: jest.fn(), getReader: jest.fn() };
+      get.mockResolvedValueOnce(result({ stream, blob }));
+      await expect(runtime.inspectOwnerInput(row)).rejects.toMatchObject({ code: 'audio_integrity_mismatch' });
+      expect(stream.cancel).toHaveBeenCalled(); expect(stream.getReader).not.toHaveBeenCalled();
+    }
+  });
+  it('expires audio read before the inspection/store reserve and never begins after deadline', async () => {
+    await expect(runtime.inspectOwnerInput(row, Date.now() + 14_000)).rejects.toMatchObject({ code: 'blob_deadline_exhausted', status: 504 });
+    expect(get).not.toHaveBeenCalled();
+  });
+});

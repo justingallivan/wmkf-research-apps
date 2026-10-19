@@ -35,6 +35,19 @@ Migration `077_zoom_transcript_provenance.sql` is reserved for this extension;
 application remains pending and no Production change is claimed. See the
 [provenance plan](../plans/ZOOM_TRANSCRIPT_PROVENANCE_PLAN_2026-10-09.md).
 
+## Audio memory follow-up — branch source
+
+[VERIFIED via `import-service.js`, `zoom-client.js` and local tests, 2026-10-19]
+`codex/zoom-audio-streaming` opts only audio downloads into metadata-gated
+preallocation, retaining a bounded fallback. It writes the Buffer to the same
+private Blob, captures scalar provenance, then clears the audio reference before
+start rereads/validates Blob. Listing/detail/download/write/start share the
+server-authored import deadline; the VTT download and each Blob write preserve
+the start reserve. Existing retirement, lease recovery and queued partial-success
+behavior are unchanged. This follow-up is not merged or deployed. No table,
+column, retention or import-state change is introduced. Local memory is still
+variable; see the [implementation evidence](../plans/evidence/ZOOM_AUDIO_IMPLEMENTATION_2026-10-19.md).
+
 ## Ownership and contract
 
 `zoom_recording_imports` holds one row per import attempt for a request's Site Visit meeting. It stores identifiers, lifecycle state and (in the undeployed provenance slice above) bounded recording-file evidence: no recording content, download URLs, tokens, topics or names. `request_id` and `site_visit_activity_id` are Dataverse identities, not foreign keys; `actor_profile_id` references `user_profiles.id`; `transcription_job_id` references `transcription_jobs.id` (`ON DELETE SET NULL`; jobs are expired, never deleted).
