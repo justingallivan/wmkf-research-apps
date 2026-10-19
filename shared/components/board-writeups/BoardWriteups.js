@@ -110,13 +110,15 @@ export default function BoardWriteups({ initialCycle = 'D26', mode = 'dashboard'
     generation.current += 1; setLoadFailed(false); setLoading(true); setBusy(false); setData(null); setCaps(null); setRecovery(null); setSettings(null); setForm(null); setReport(null); setSelected([]); setMessage(''); setRowFilter('all'); setCandidateSearch(''); setCycleInput(next); setCycle(next);
   }
   return <div className="space-y-6 py-6 text-gray-900">
-    <header className="flex flex-wrap items-start justify-between gap-4">
-      <div><h1 className="text-2xl font-semibold">{isSetup ? 'Board cycle setup' : 'Board writeups'}</h1><p className="mt-1 max-w-2xl text-gray-600">{isSetup ? 'Prepare the cycle for the CSO and manage the final copies after the meeting.' : 'Review writeups and send approved copies to the Board folder.'}</p></div>
-      <form onSubmit={switchCycle} className="flex items-end gap-2"><label className="text-sm font-medium">Cycle<input aria-label="Cycle" className={`${field} ml-2 w-24`} value={cycleInput} maxLength={3} onChange={e => setCycleInput(e.target.value.toUpperCase())} /></label><Button type="submit" variant="outline" size="sm">Open cycle</Button></form>
+    <header className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+      <div className="min-w-0 flex-1"><h1 className="text-2xl font-semibold">{isSetup ? 'Board cycle setup' : 'Board writeups'}</h1><p className="mt-1 max-w-2xl text-gray-600">{isSetup ? 'Prepare the cycle for the CSO and manage the final copies after the meeting.' : 'Review writeups and send approved copies to the Board folder.'}</p></div>
+      <div className="flex shrink-0 flex-wrap items-center gap-x-4 gap-y-2" aria-label="Cycle controls" role="group">
+        <form onSubmit={switchCycle} className="flex items-center gap-2"><label className="flex items-center gap-2 text-sm font-medium">Cycle<input aria-label="Cycle" className={`${field} h-11 w-24`} value={cycleInput} maxLength={3} onChange={e => setCycleInput(e.target.value.toUpperCase())} /></label><Button className="h-11" type="submit" variant="outline" size="sm">Open cycle</Button></form>
+      <Button className="min-h-11" variant="link" disabled={busy || loading} onClick={() => { if (!discardChanges()) return; setLoading(true); setLoadFailed(false); setMessage(''); setReload(n => n + 1); }}>Refresh status</Button>
+      </div>
     </header>
-    <nav aria-label="Board workflow" className="flex flex-wrap items-center justify-between gap-3 border-b border-gray-200 pb-3">
+    <nav aria-label="Board workflow" className="border-b border-gray-200 pb-3">
       <div className="flex flex-wrap gap-5"><Link className={!isSetup ? 'font-semibold underline underline-offset-8' : 'text-gray-600 underline underline-offset-4'} onClick={event => { if (busy) event.preventDefault(); }} aria-current={!isSetup ? 'page' : undefined} href={`/board-writeups?cycle=${cycle}`}>CSO dashboard</Link>{caps?.canArchive && <Link className={isSetup ? 'font-semibold underline underline-offset-8' : 'text-gray-600 underline underline-offset-4'} onClick={event => { if (busy) event.preventDefault(); }} aria-current={isSetup ? 'page' : undefined} href={`/board-cycle-setup?cycle=${cycle}`}>Cycle setup &amp; maintenance</Link>}</div>
-      <Button variant="link" disabled={busy || loading} onClick={() => { if (!discardChanges()) return; setLoading(true); setLoadFailed(false); setMessage(''); setReload(n => n + 1); }}>Refresh status</Button>
     </nav>
     {messageScope === 'page' && feedback}
     {loading && <p role="status" className="rounded-lg bg-gray-100 p-6">Loading {cycle} {isSetup ? 'cycle setup' : 'writeups'}…</p>}
