@@ -41,6 +41,7 @@ if (!Number.isInteger(YEARS) || YEARS < 1) { console.error('--years must be a po
 const { DynamicsService } = await import('../lib/services/dynamics-service.js');
 const { enterDynamicsBypassForScript } = await import('../lib/services/dynamics-context.js');
 enterDynamicsBypassForScript('export-research-orcid-backfill-pool');
+const { mayPersistIdentity } = await import('../lib/services/reviewer-identity-resolver.js');
 
 const AWARDED = ['Approved', 'Active', 'Closed'];
 const ROLE_COPI = 100000001;
@@ -70,7 +71,7 @@ const research = programs.filter((p) => /research/i.test(programName(p)) && !/re
 const programFilter = research.map((p) => `_akoya_programid_value eq ${p.akoya_programid}`).join(' or ');
 const statusFilter = AWARDED.map((s) => `akoya_requeststatus eq '${s}'`).join(' or ');
 const requests = await readAll('akoya_requests', {
-  select: ['akoya_requestid', 'akoya_requestnum', 'wmkf_meetingdate', '_akoya_applicantid_value', '_wmkf_projectleader_value', ...SLOTS].join(','),
+  select: ['akoya_requestid', 'akoya_requestnum', 'akoya_title', 'wmkf_meetingdate', '_akoya_applicantid_value', '_wmkf_projectleader_value', ...SLOTS].join(','),
   filter: `(${programFilter}) and (${statusFilter}) and wmkf_meetingdate ge ${cutoffDate}`,
 });
 const byId = new Map(requests.map((r) => [lc(r.akoya_requestid), r]));
@@ -102,9 +103,12 @@ const contacts = new Map((await inBatches(contactIds, 50, (ids) => readAll('cont
 }))).map((c) => [lc(c.contactid), c]));
 const reviewerOrcids = new Map();
 for (const rv of await inBatches(contactIds, 50, (ids) => readAll('wmkf_potentialreviewerses', {
-  select: 'wmkf_orcid,_wmkf_contact_value',
+  select: 'wmkf_orcid,wmkf_identitystatus,_wmkf_contact_value',
   filter: ids.map((id) => `_wmkf_contact_value eq ${id}`).join(' or '),
 }))) {
+  // Same gate as scripts/backfill-contact-orcid.js: only resolver-eligible
+  // (confirmed/probable) reviewer identities count as evidence.
+  if (!mayPersistIdentity(rv.wmkf_identitystatus ?? null)) continue;
   const n = normalizeOrcid(rv.wmkf_orcid);
   if (n.state !== 'valid') continue;
   const id = lc(rv._wmkf_contact_value);
@@ -133,7 +137,7 @@ for (const a of assignments) {
     reviewerOrcids: [...(reviewerOrcids.get(a.contact) || [])],
   };
   if (!p.roles.includes(a.role)) p.roles.push(a.role);
-  p.awards.push({ requestNum: r.akoya_requestnum, meetingDate: r.wmkf_meetingdate, role: a.role, applicant: r._akoya_applicantid_value_formatted || '' });
+  p.awards.push({ requestNum: r.akoya_requestnum, meetingDate: r.wmkf_meetingdate, title: r.akoya_title || '', role: a.role, applicant: r._akoya_applicantid_value_formatted || '' });
   const addInst = (name, source) => {
     if (name && !p.institutions.some((i) => i.name === name && i.source === source)) p.institutions.push({ name, source });
   };

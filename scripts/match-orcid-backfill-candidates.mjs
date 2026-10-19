@@ -17,19 +17,27 @@
  *     institutions by ROR id when both sides have one, else by name
  *     (`instMatch` below, which understands grantee legal names, or
  *     `DeduplicationService.institutionDirectMatch`);
- *   - award-time: whether a dated employment at the award institution covers
- *     an award year (±1).
+ *     A profile's employments decide; search-result names count only when the
+ *     profile lists none. "University of X" never matches "X University";
+ *   - award-time, per PI award: a dated employment at that award's institution
+ *     covering that award's meeting year (±1) → yes | no | undated | unfetched;
+ *   - works: an ORCID work title sharing >= 2 distinct words with an award title.
  *
- * Grades (a human reviews every row before any write):
- *   high   — PI only, and one of: one reviewer-record ORCID whose profile name
- *            matches; exactly one candidate whose email equals the contact
- *            email; exactly one candidate at the award institution, with a
- *            fully agreeing forename and not contradicted by dated employment.
- *   review — some candidate with an institution, email-domain or email signal
- *            that is not unambiguous; first-initial or differing forenames
- *            (nicknames); a sole full-name match whose record lists no
- *            affiliations; every co-PI candidate lands here at best.
- *   none   — no name-matching record with any corroborating signal.
+ * Grades (a human reviews every row before any write). Every graded row names
+ * the exact selected ORCID; the reason and signals describe that ORCID.
+ *   high   — PI only, the selected profile fetched, no reviewer/email conflict,
+ *            and one of: one linked reviewer ORCID (resolver status
+ *            confirmed/probable, filtered in the export) with no forename
+ *            contradiction; exactly one candidate whose email equals the
+ *            contact email, no forename contradiction; exactly one candidate at
+ *            the award institution, forename fully agreeing, institution search
+ *            not truncated, and employment covering an award year — or undated
+ *            employment plus a works match.
+ *   review — any other candidate with an institution, email-domain or email
+ *            signal; a sole full-name match whose record lists no affiliations;
+ *            every co-PI candidate lands here at best.
+ *   none   — no name-matching record with any corroborating signal, or a
+ *            lookup error.
  *
  *   node scripts/match-orcid-backfill-candidates.mjs --in=<pool.json> --out=<review.csv>
  */
@@ -52,10 +60,13 @@ try {
 if (!env.ORCID_CLIENT_ID || !env.ORCID_CLIENT_SECRET) { console.error('ORCID client credentials missing from .env.local'); process.exit(2); }
 
 const { ORCIDService } = await import('../lib/services/orcid-service.js');
-const { forenameFullyAgrees, forenamesContradict } = await import('../lib/services/reviewer-identity-evidence.js');
+const { forenameFullyAgrees, forenamesContradict, ReviewerIdentityEvidence } = await import('../lib/services/reviewer-identity-evidence.js');
+const { tokenize } = ReviewerIdentityEvidence._internals;
 const { DeduplicationService } = await import('../lib/services/deduplication-service.js');
 const creds = { clientId: env.ORCID_CLIENT_ID, clientSecret: env.ORCID_CLIENT_SECRET };
-const PROFILES_PER_PERSON = 4;
+const PROFILES_PER_PERSON = 4; // profiles fetched for unsignalled candidates
+const MAX_PROFILES = 8; // per-person ceiling, signalled candidates first
+const INST_PAGE = 10; // full-name + institution search page size
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 async function withRetry(fn, pauseMs) {
@@ -94,13 +105,25 @@ const norm = (s) => String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toL
 const BOILERPLATE = new Set('the of at and in for a an inc corporation regents board trustees president fellows leland junior campus'.split(' '));
 const GENERIC = new Set('university univ college institute institutes school center centre research medical medicine hospital foundation laboratory laboratories health sciences science department faculty'.split(' '));
 const instWords = (s) => new Set(norm(s).split(' ').filter((w) => w && !BOILERPLATE.has(w) && !GENERIC.has(w)));
+const stripLegal = (s) => String(s || '')
+  .replace(/^(the\s+)?(board of trustees of|trustees of|regents of|board of regents of|president and fellows of|arizona board of regents,?)\s+(the\s+)?/i, '');
+// "University of Miami" vs "Miami University" are different institutions with
+// the same distinctive words; word order decides. Also consults the shared
+// helper's guard (DeduplicationService.isInverseUniversityName).
+const inverseUniversity = (a, b) => {
+  const x = norm(stripLegal(a)).replace(/^the /, ''); const y = norm(stripLegal(b)).replace(/^the /, '');
+  const flip = (p, q) => { const m = p.match(/^university of (.+)$/); return Boolean(m) && q === `${m[1]} university`; };
+  return flip(x, y) || flip(y, x) || DeduplicationService.isInverseUniversityName(
+    DeduplicationService.normalizeInstitution(a), DeduplicationService.normalizeInstitution(b));
+};
 const instMatch = (a, b) => {
+  if (inverseUniversity(a, b)) return false;
   const x = instWords(a); const y = instWords(b);
   const [small, large] = x.size <= y.size ? [x, y] : [y, x];
   if (!small.size || ![...small].every((w) => large.has(w))) return false;
   return small.size === large.size || (small.size >= 3 && large.size - small.size <= 1);
 };
-const namesAgree = (a, b) => instMatch(a, b) || DeduplicationService.institutionDirectMatch(a, b);
+const namesAgree = (a, b) => !inverseUniversity(a, b) && (instMatch(a, b) || DeduplicationService.institutionDirectMatch(a, b));
 // Both sides { name, ror? }: ROR ids decide when both exist; otherwise names.
 const orgAgrees = (a, b) => (a.ror && b.ror ? a.ror === b.ror : namesAgree(a.name, b.name));
 // The Foundation itself is not an institution signal for a grantee.
@@ -117,9 +140,7 @@ const rorNames = (org) => (org.names || []).filter((n) => !n.types.includes('acr
 const affiliationCache = new Map();
 async function rorForAffiliation(name) {
   if (affiliationCache.has(name)) return affiliationCache.get(name);
-  const cleaned = name
-    .replace(/^(the\s+)?(board of trustees of|trustees of|regents of|board of regents of|president and fellows of|arizona board of regents,?)\s+(the\s+)?/i, '')
-    .replace(/\s+at\s+/gi, ', ');
+  const cleaned = stripLegal(name).replace(/\s+at\s+/gi, ', ');
   let result = null;
   try {
     const chosen = (await ror(`affiliation=${encodeURIComponent(cleaned)}`)).filter((it) => it.chosen).map((it) => it.organization);
@@ -180,7 +201,10 @@ for (const person of people) {
   i += 1;
   const name = `${person.firstname} ${person.lastname}`.trim() || person.fullname;
   const isPi = person.roles.includes('PI');
-  const awardYears = person.awards.map((a) => Number((a.meetingDate || '').slice(0, 4))).filter(Boolean);
+  // Validation rows hide linked reviewer ORCIDs: many known contact ORCIDs came
+  // from an earlier reviewer back-propagation and would otherwise grade
+  // themselves.
+  const reviewerOrcids = person.knownOrcid ? [] : person.reviewerOrcids;
 
   // The person's institutions, each with a ROR id when one resolves safely.
   const insts = [];
@@ -191,37 +215,51 @@ for (const person of people) {
   const domain = await rorForDomain((person.email.split('@')[1] || '').toLowerCase());
   if (domain && !insts.some((x) => x.ror === domain.ror)) insts.push({ name: domain.names[0], source: 'email-domain', ror: domain.ror });
   const applicants = insts.filter((x) => x.source === 'award-applicant');
+  // Each PI award as its own (institution, meeting year) tuple.
+  const piAwards = person.awards.filter((a) => a.role === 'PI' && usableInst(a.applicant)).map((a) => ({
+    inst: applicants.find((x) => x.name === a.applicant),
+    year: Number((a.meetingDate || '').slice(0, 4)),
+  })).filter((a) => a.inst && a.year);
+  const titles = person.awards.map((a) => a.title).filter(Boolean);
   const familyParts = norm(person.lastname).split(' ').filter((w) => w.length > 1);
 
   // Searches: full name; family name alone and family name + institution
   // (catch nicknames such as Terry/Terrence); full name + institution; first
-  // family-name component for compound surnames.
+  // family-name component for compound surnames. A full-name + institution
+  // search that fills its page may have dropped a namesake: flag it.
   const records = new Map();
   let error = '';
+  let truncated = false;
   try {
-    const add = (recs) => { for (const rec of recs) records.set(rec.orcidId, rec); };
+    const add = (recs) => { for (const rec of recs) records.set(rec.orcidId, rec); return recs; };
     add(await search({ name, maxResults: 25 }));
     add(await search({ name: person.lastname.replace(/\s+/g, '-'), maxResults: 25 }));
     const searchInsts = [...new Set(insts.filter((x) => x.source !== 'email-domain').map((x) => x.name))].slice(0, 2);
     if (domain && !insts.some((x) => x.source !== 'email-domain' && x.ror === domain.ror)) searchInsts.push(domain.names[0]);
     for (const inst of searchInsts) {
-      add(await search({ name, affiliation: inst, maxResults: 10 }));
-      add(await search({ name: person.lastname.replace(/\s+/g, '-'), affiliation: inst, maxResults: 10 }));
+      if (add(await search({ name, affiliation: inst, maxResults: INST_PAGE })).length >= INST_PAGE) truncated = true;
+      add(await search({ name: person.lastname.replace(/\s+/g, '-'), affiliation: inst, maxResults: INST_PAGE }));
     }
     if (familyParts.length > 1) add(await search({ name: `${person.firstname} ${familyParts[0]}`, maxResults: 10 }));
   } catch (err) { error = String(err.message || err).slice(0, 200); }
 
   const named = [...records.values()].map((rec) => ({ ...rec, nameLevel: nameLevel(person, rec) })).filter((rec) => rec.nameLevel);
-  // Pre-rank by search-result institution names, then fetch dated
-  // employments for the leading candidates.
-  named.sort((a, b) => insts.some((x) => b.institutions.some((ri) => namesAgree(x.name, ri)))
-    - insts.some((x) => a.institutions.some((ri) => namesAgree(x.name, ri))));
+  // Every candidate with a search-level signal gets its profile fetched (so
+  // any selectable candidate has dated employments), plus the leading others.
+  const preSignal = (rec) => reviewerOrcids.includes(rec.orcidId)
+    || (person.email && rec.emails.some((e) => e.toLowerCase() === person.email.toLowerCase()))
+    || insts.some((x) => rec.institutions.some((ri) => namesAgree(x.name, ri)));
+  named.sort((a, b) => preSignal(b) - preSignal(a));
   const candidates = [];
+  let fetched = 0;
   for (const [k, rec] of named.entries()) {
     let employments = [];
-    if (k < PROFILES_PER_PERSON && !error) {
+    let profiled = false;
+    if (!error && fetched < MAX_PROFILES && (k < PROFILES_PER_PERSON || preSignal(rec))) {
+      fetched += 1;
       try {
         const p = await profile(rec.orcidId);
+        profiled = Boolean(p);
         employments = (p?.affiliations || []).map((a) => ({
           name: a.organization,
           ror: a.disambiguationSource === 'ROR' ? rorId(a.disambiguatedOrganizationId) : null,
@@ -230,86 +268,127 @@ for (const person of people) {
         }));
       } catch (err) { error = `profile: ${String(err.message || err).slice(0, 150)}`; }
     }
-    const orgs = [...employments, ...rec.institutions.map((n) => ({ name: n, ror: null }))];
+    // A profile's employments decide; undated search-result names are used
+    // only when the profile lists no employment (so a conflicting profile ROR
+    // cannot be overridden by a search-result name).
+    const orgs = employments.length ? employments : rec.institutions.map((n) => ({ name: n, ror: null }));
     const hits = (set) => orgs.some((o) => set.some((x) => orgAgrees(x, o)));
-    const atApplicant = employments.filter((e) => applicants.some((x) => orgAgrees(x, e)));
-    const dated = atApplicant.filter((e) => e.start);
-    const covers = dated.some((e) => awardYears.some((y) => e.start <= y + 1 && (!e.end || e.end >= y - 1)));
+    const datedAt = (inst) => employments.filter((e) => e.start && orgAgrees(inst, e));
+    const covered = piAwards.some((a) => datedAt(a.inst).some((e) => e.start <= a.year + 1 && (!e.end || e.end >= a.year - 1)));
+    const anyDated = piAwards.some((a) => datedAt(a.inst).length);
     candidates.push({
       ...rec,
       employments,
+      profiled,
       applicantMatch: hits(applicants),
-      atAward: covers ? 'yes' : dated.length ? 'no' : 'unknown',
+      atAward: !profiled ? 'unfetched' : covered ? 'yes' : anyDated ? 'no' : 'undated',
       instMatch: hits(insts.filter((x) => x.source !== 'email-domain')),
       domainMatch: hits(insts.filter((x) => x.source === 'email-domain')),
-      emailMatch: Boolean(person.email) && [...rec.emails].some((e) => e.toLowerCase() === person.email.toLowerCase()),
-      reviewerMatch: person.reviewerOrcids.includes(rec.orcidId),
+      emailMatch: Boolean(person.email) && rec.emails.some((e) => e.toLowerCase() === person.email.toLowerCase()),
+      reviewerMatch: reviewerOrcids.includes(rec.orcidId),
+      worksMatch: false,
     });
+  }
+  // Works check (ORCID self-asserted works vs the award titles) for the
+  // candidates that could be selected: >= 2 distinct shared title words, the
+  // threshold the identity work-grounding rescue uses.
+  for (const c of candidates.filter((x) => x.profiled && (x.applicantMatch || x.emailMatch) && titles.length)) {
+    try {
+      const works = await withRetry(() => ORCIDService.getWorks(c.orcidId, creds.clientId, creds.clientSecret, { limit: 100 }), 150);
+      const titleTokens = titles.map((t) => new Set(tokenize(t)));
+      c.worksMatch = works.some((w) => {
+        const wt = new Set(tokenize(w));
+        return titleTokens.some((tt) => [...tt].filter((tok) => wt.has(tok)).length >= 2);
+      });
+    } catch (err) { error = `works: ${String(err.message || err).slice(0, 150)}`; }
   }
   const levelRank = { full: 0, initial: 1, differs: 2 };
   candidates.sort((a, b) => (b.reviewerMatch - a.reviewerMatch) || (b.emailMatch - a.emailMatch)
     || (b.applicantMatch - a.applicantMatch) || (b.instMatch - a.instMatch) || (b.domainMatch - a.domainMatch)
-    || (levelRank[a.nameLevel] - levelRank[b.nameLevel]));
+    || (b.worksMatch - a.worksMatch) || (levelRank[a.nameLevel] - levelRank[b.nameLevel]));
 
-  const full = (c) => c.nameLevel === 'full';
+  // Grade, naming the exact ORCID the grade is about.
+  const eligible = (c) => c && c.profiled && c.nameLevel !== 'differs';
   const reviewerHits = candidates.filter((c) => c.reviewerMatch);
   const emailHits = candidates.filter((c) => c.emailMatch);
   const applicantHits = candidates.filter((c) => c.applicantMatch);
+  const conflicting = new Set([...reviewerHits, ...emailHits].map((c) => c.orcidId)).size > 1;
   const signalled = candidates.filter((c) => c.reviewerMatch || c.emailMatch || c.instMatch || c.domainMatch);
-  const noAffiliations = candidates.filter((c) => full(c) && !c.institutions.length && !c.employments.length);
+  const noAffiliations = candidates.filter((c) => c.nameLevel === 'full' && !c.institutions.length && !c.employments.length);
+  const inst = applicantHits.length === 1 ? applicantHits[0] : null;
   let grade = 'none';
-  let reason = error ? `lookup error: ${error}` : candidates.length ? `${candidates.length} name match(es), no institution/email signal` : 'no name match';
-  if (isPi && person.reviewerOrcids.length === 1 && reviewerHits.length === 1 && !error) { grade = 'high'; reason = 'linked reviewer-record ORCID; profile name matches'; }
-  else if (isPi && emailHits.length === 1 && !error) { grade = 'high'; reason = 'one name match with matching email'; }
-  else if (isPi && applicantHits.length === 1 && full(applicantHits[0]) && applicantHits[0].atAward !== 'no' && !error) {
-    grade = 'high';
-    reason = applicantHits[0].atAward === 'yes' ? 'one name match employed at the award institution in the award years' : 'one name match listing the award institution';
+  let selected = null;
+  let reason = candidates.length ? `${candidates.length} name match(es), no institution/email signal` : 'no name match';
+  if (error) { reason = `lookup error: ${error}`; }
+  else if (isPi && !conflicting && reviewerOrcids.length === 1 && reviewerHits.length === 1 && eligible(reviewerHits[0])) {
+    grade = 'high'; selected = reviewerHits[0]; reason = 'linked eligible reviewer-record ORCID; profile fetched, forename consistent';
+  } else if (isPi && !conflicting && emailHits.length === 1 && eligible(emailHits[0])) {
+    grade = 'high'; selected = emailHits[0]; reason = 'one name match with matching email; profile fetched';
+  } else if (isPi && !conflicting && inst && inst.nameLevel === 'full' && inst.profiled && !truncated
+    && (inst.atAward === 'yes' || (inst.worksMatch && inst.atAward !== 'no'))) {
+    grade = 'high'; selected = inst;
+    reason = inst.atAward === 'yes'
+      ? `only match at the award institution, employed there in the award years${inst.worksMatch ? '; works match award title' : ''}`
+      : 'only match at the award institution (undated); works match award title';
   } else if (signalled.length) {
-    grade = 'review';
+    grade = 'review'; selected = signalled[0];
     const notes = [];
-    if (!signalled.some(full)) notes.push('forename not fully agreeing');
-    if (applicantHits.length === 1 && applicantHits[0].atAward === 'no') notes.push('award-institution employment outside award years');
+    if (conflicting) notes.push('reviewer/email point to different ORCIDs');
+    if (applicantHits.length > 1) notes.push(`${applicantHits.length} accounts at the award institution`);
+    if (truncated) notes.push('institution search page full');
+    if (inst?.atAward === 'no') notes.push('award-institution employment outside award years');
+    if (inst && ['undated', 'unfetched'].includes(inst.atAward) && !inst.worksMatch) notes.push(`employment ${inst.atAward}, no works match`);
+    if (selected.nameLevel !== 'full') notes.push(`forename ${selected.nameLevel}`);
     if (!isPi) notes.push('co-PI: always reviewed');
     reason = `${signalled.length} name match(es) with a signal${notes.length ? ` (${notes.join('; ')})` : ''}`;
-  } else if (person.reviewerOrcids.length) { grade = 'review'; reason = 'linked reviewer-record ORCID not found by name search'; }
-  else if (candidates.filter(full).length === 1 && noAffiliations.length === 1) { grade = 'review'; reason = 'only full-name match; record lists no affiliations'; }
+  } else if (reviewerOrcids.length) { grade = 'review'; reason = 'linked reviewer-record ORCID not found by name search'; }
+  else if (candidates.filter((c) => c.nameLevel === 'full').length === 1 && noAffiliations.length === 1) {
+    grade = 'review'; selected = noAffiliations[0]; reason = 'only full-name match; record lists no affiliations';
+  }
 
-  (person.knownOrcid ? validation : results).push({ person, grade, reason, candidates, insts });
+  (person.knownOrcid ? validation : results).push({ person, grade, reason, selected, candidates, insts, piAwards, truncated });
   if (i % 25 === 0) console.log(`  ${i}/${people.length}`);
 }
 
 // Blind scoring against contacts that already carry a valid ORCID (export
-// --include-known). knownOrcid is never read by the grading above.
+// --include-known). knownOrcid is never read by the grading above, and their
+// linked reviewer ORCIDs are masked.
 if (validation.length) {
-  const top = (v) => v.candidates[0]?.orcidId === v.person.knownOrcid;
-  const listed = (v) => v.candidates.slice(0, 3).some((c) => c.orcidId === v.person.knownOrcid);
-  const highWrong = validation.filter((v) => v.grade === 'high' && !top(v));
-  console.log(`\nValidation against ${validation.length} known ORCIDs:`);
-  console.log(`  high, correct:            ${validation.filter((v) => v.grade === 'high' && top(v)).length}`);
+  const right = (v) => v.selected?.orcidId === v.person.knownOrcid;
+  const listed = (v) => right(v) || v.candidates.slice(0, 3).some((c) => c.orcidId === v.person.knownOrcid);
+  const highWrong = validation.filter((v) => v.grade === 'high' && !right(v));
+  console.log(`\nValidation against ${validation.length} known ORCIDs (reviewer ORCIDs masked):`);
+  console.log(`  high, correct:            ${validation.filter((v) => v.grade === 'high' && right(v)).length}`);
   console.log(`  high, WRONG:              ${highWrong.length}`);
-  console.log(`  review, correct in top 3: ${validation.filter((v) => v.grade === 'review' && listed(v)).length}`);
+  console.log(`  review, selected correct: ${validation.filter((v) => v.grade === 'review' && right(v)).length}`);
+  console.log(`  review, correct in top 3: ${validation.filter((v) => v.grade === 'review' && !right(v) && listed(v)).length}`);
   console.log(`  review, correct missing:  ${validation.filter((v) => v.grade === 'review' && !listed(v)).length}`);
   console.log(`  none:                     ${validation.filter((v) => v.grade === 'none').length}`);
-  for (const v of highWrong) console.log(`    WRONG: ${v.person.contactId} known ${v.person.knownOrcid} vs matched ${v.candidates[0]?.orcidId} (${v.reason})`);
+  for (const v of highWrong) console.log(`    WRONG: ${v.person.contactId} known ${v.person.knownOrcid} vs selected ${v.selected?.orcidId} (${v.reason})`);
 }
 
+const signalsOf = (c) => ['reviewerMatch', 'emailMatch', 'applicantMatch', 'instMatch', 'domainMatch', 'worksMatch']
+  .filter((k) => c[k]).map((k) => k.replace('Match', ''))
+  .concat(c.applicantMatch ? [`at-award:${c.atAward}`] : [], c.nameLevel !== 'full' ? [`forename:${c.nameLevel}`] : [], c.profiled ? [] : ['profile:unfetched'])
+  .join(' ');
+const employmentOf = (c) => (c.employments.length
+  ? c.employments.map((e) => `${e.name}${e.ror ? ` ror:${e.ror}` : ''} (${e.start || '?'}–${e.end || 'now'})`)
+  : (c.institutions || []).map((n) => `${n} (search result, undated)`)).slice(0, 6).join('; ');
 const esc = (v) => `"${String(v ?? '').replace(/"/g, '""')}"`;
-const header = ['grade', 'reason', 'role', 'contactid', 'name', 'email', 'institutions', 'award_years', 'reviewer_orcids', 'name_matches'];
-for (let n = 1; n <= 3; n++) header.push(`cand${n}_orcid`, `cand${n}_url`, `cand${n}_name`, `cand${n}_signals`, `cand${n}_employment`);
+const header = ['grade', 'reason', 'selected_orcid', 'selected_url', 'selected_name', 'selected_signals', 'selected_employment',
+  'role', 'contactid', 'name', 'email', 'institutions', 'pi_awards', 'reviewer_orcids', 'name_matches', 'institution_search_full'];
+for (let n = 1; n <= 3; n++) header.push(`cand${n}_orcid`, `cand${n}_name`, `cand${n}_signals`);
 const lines = [header.join(',')];
 const order = { high: 0, review: 1, none: 2 };
-for (const { person, grade, reason, candidates, insts } of results.sort((a, b) => order[a.grade] - order[b.grade])) {
-  const cells = [grade, reason, person.roles.join('+'), person.contactId, person.fullname || `${person.firstname} ${person.lastname}`, person.email,
-    insts.map((x) => `${x.name} [${x.source}${x.ror ? ` ror:${x.ror}` : ''}]`).join('; '),
-    [...new Set(person.awards.map((a) => (a.meetingDate || '').slice(0, 4)))].join(' '),
-    person.reviewerOrcids.join(' '), candidates.length];
-  for (const c of candidates.slice(0, 3).concat([{}, {}, {}]).slice(0, 3)) {
-    const signals = c.orcidId ? ['reviewerMatch', 'emailMatch', 'applicantMatch', 'instMatch', 'domainMatch'].filter((k) => c[k]).map((k) => k.replace('Match', ''))
-      .concat(c.applicantMatch ? [`at-award:${c.atAward}`] : [], c.nameLevel !== 'full' ? [`forename:${c.nameLevel}`] : []).join(' ') : '';
-    const employment = c.orcidId
-      ? (c.employments.length ? c.employments.map((e) => `${e.name} (${e.start || '?'}–${e.end || 'now'})`) : (c.institutions || []).map((n) => `${n} (undated)`)).slice(0, 6).join('; ')
-      : '';
-    cells.push(c.orcidId, c.orcidUrl, c.orcidId ? `${c.givenNames || ''} ${c.familyName || ''}`.trim() : '', signals, employment);
+for (const r of results.sort((a, b) => order[a.grade] - order[b.grade])) {
+  const { person, selected: s } = r;
+  const cells = [r.grade, r.reason, s?.orcidId, s?.orcidUrl, s ? `${s.givenNames || ''} ${s.familyName || ''}`.trim() : '', s ? signalsOf(s) : '', s ? employmentOf(s) : '',
+    person.roles.join('+'), person.contactId, person.fullname || `${person.firstname} ${person.lastname}`, person.email,
+    r.insts.map((x) => `${x.name} [${x.source}${x.ror ? ` ror:${x.ror}` : ''}]`).join('; '),
+    r.piAwards.map((a) => `${a.inst.name} ${a.year}`).join('; '),
+    person.reviewerOrcids.join(' '), r.candidates.length, r.truncated ? 'yes' : ''];
+  for (const c of r.candidates.slice(0, 3).concat([null, null, null]).slice(0, 3)) {
+    cells.push(c?.orcidId, c ? `${c.givenNames || ''} ${c.familyName || ''}`.trim() : '', c ? signalsOf(c) : '');
   }
   lines.push(cells.map(esc).join(','));
 }
