@@ -40,6 +40,14 @@ async function reportIncomplete(autoResolveKey, title, message, stage) {
 export default async function handler(req, res) {
   if (!['GET', 'POST'].includes(req.method)) { res.setHeader('Allow', 'GET, POST'); return res.status(405).json({ error: 'Method not allowed' }); }
   if (!verifyTranscriptionCronSecret(req, res)) return;
+  if (Object.hasOwn(req.query || {}, 'audio_blob_probe')) {
+    if (req.method !== 'POST' || Object.keys(req.query).length !== 1) return res.status(400).json({ error: 'Invalid audio Blob probe request' });
+    const { audioBlobProbeEnabled, runSyntheticAudioBlobProbe } = await import('../../../lib/services/transcription-pilot/audio-blob-probe');
+    if (!audioBlobProbeEnabled()) return res.status(404).json({ error: 'Not found' });
+    if (!['small', 'large', 'concurrent', 'corrupt'].includes(req.query.audio_blob_probe)) return res.status(400).json({ error: 'Invalid audio Blob probe request' });
+    try { return res.status(200).json(await runSyntheticAudioBlobProbe(req.query.audio_blob_probe)); }
+    catch { return res.status(502).json({ ok: false, code: 'audio_blob_probe_failed' }); }
+  }
   const hasPreflightParameter = req.query && Object.prototype.hasOwnProperty.call(req.query, 'preflight');
   const hasWorkflowProbeParameter = req.query && Object.prototype.hasOwnProperty.call(req.query, 'workflow_probe');
   const hasRecoveryParameter = req.query && Object.prototype.hasOwnProperty.call(req.query, 'recovery');

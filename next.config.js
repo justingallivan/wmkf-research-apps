@@ -108,6 +108,7 @@ const nextConfig = {
       './node_modules/win-guid/**/*',
     ],
     '/api/cron/drain-transcriptions': [
+      './tests/fixtures/transcription/synthetic-aac.m4a',
       './lib/services/transcription-pilot/audio-inspector-worker.js',
       './node_modules/music-metadata/**/*',
       './node_modules/@borewit/text-codec/**/*',
