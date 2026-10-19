@@ -46,18 +46,18 @@ test('generic PATCH remains refused with the ordinary factory create option enab
   expect(fetch).not.toHaveBeenCalled();
 });
 
-test('specific maintenance method resolves by allowlisted number and ETag-patches only the marker', async () => {
+test.each(['1003220', '1003223', '1003224'])('specific maintenance method ETag-patches only the marker for %s', async requestNumber => {
   fetch.mockImplementation(async (url, options) => {
     if (options.method === 'PATCH') return response(204);
     if (String(url).includes('?$select=akoya_requestnum')) {
-      return response(200, { ...requestRow(true) });
+      return response(200, { ...requestRow(true), akoya_requestnum: requestNumber });
     }
-    return response(200, { value: [requestRow(false)] });
+    return response(200, { value: [{ ...requestRow(false), akoya_requestnum: requestNumber }] });
   });
   const client = createClient({ resourceUrl: 'https://wmkf.crm.dynamics.com', token: 'test' });
 
-  await expect(client.maintainD26TrialTestMarker('1003220', { apply: true })).resolves.toMatchObject({
-    requestNumber: '1003220', state: 'verified-marked', runIdPresent: true, applied: true, patchResponseOk: true,
+  await expect(client.maintainD26TrialTestMarker(requestNumber, { apply: true })).resolves.toMatchObject({
+    requestNumber, state: 'verified-marked', runIdPresent: true, applied: true, patchResponseOk: true,
   });
 
   const patchCall = fetch.mock.calls.find(([, options]) => options.method === 'PATCH');
@@ -73,7 +73,7 @@ test('dry run reads the exact row but does not PATCH; unlisted numbers fail befo
   const client = createClient({ resourceUrl: 'https://wmkf.crm.dynamics.com', token: 'test' });
 
   await expect(client.maintainD26TrialTestMarker('1003220')).resolves.toMatchObject({ state: 'would-mark', applied: false });
-  await expect(client.maintainD26TrialTestMarker('1003223', { apply: true })).rejects.toThrow('fixed D26 marker-maintenance allowlist');
+  await expect(client.maintainD26TrialTestMarker('1003225', { apply: true })).rejects.toThrow('fixed D26 marker-maintenance allowlist');
   expect(fetch.mock.calls.filter(([, options]) => options.method === 'PATCH')).toHaveLength(0);
   expect(fetch.mock.calls.filter(([, options]) => options.method === 'GET')).toHaveLength(1);
 });
