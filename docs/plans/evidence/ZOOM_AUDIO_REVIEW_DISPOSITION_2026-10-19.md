@@ -3,7 +3,7 @@ title: Zoom audio adversarial review disposition
 domain: meeting-tracker
 kind: decision
 status: active
-summary: "Implementation held after Opus review. Premise measurements and concrete failure, capacity, deadline and upload contracts remain required."
+summary: "Implementation held after Opus review. Local comparisons favor copy reduction; revised contracts and target-environment validation remain required."
 owner: product-engineering
 ---
 
@@ -12,12 +12,15 @@ owner: product-engineering
 The [original Opus 5.5 review](ZOOM_AUDIO_OPUS_REVIEW_2026-10-19.md) returned
 **NEEDS REWORK**. The [plan](../ZOOM_AUDIO_STREAMING_PLAN_2026-10-19.md) is a
 blocked draft. No runtime code, production state, environment, database or
-provider request changed. The completed work is planning and review only.
+provider request changed. Planning/review is now supplemented by a
+[local synthetic benchmark](ZOOM_AUDIO_BENCHMARK_2026-10-19.md); no application
+implementation or hosted/provider experiment has occurred.
 
 ## Findings accepted as implementation blockers
 
 - **Premise and scope:** whole-file copies are verified in source, but no
-  production OOM or measured benefit has been established. The Zoom importer
+  production OOM has been established. Local copy-reduction benefit is now
+  measured in the linked report; hosted benefit remains unknown. The Zoom importer
   retains its own audio Buffer while calling queue validation. A worker-only
   memory result cannot stand in for the entire Zoom import route. Measurement
   must be able to stop the project or choose a narrower change.
@@ -59,11 +62,13 @@ to verified facts:
   over today's buffer parser.
 - A streaming fetch body does not automatically establish that the request
   must use chunked framing when an explicit content length is provided. Opus did
-  not run the wire test. Keep this as an untested integration requirement rather
-  than treating the claimed framing behavior as proved.
-- Dropping the Zoom Buffer reference, transferring a single Buffer through the
-  inspector, or using a file-backed Blob are untested comparison candidates.
-  Their benefit and correctness have not been established by this review.
+  not run the wire test. The subsequent local wire test now demonstrates explicit
+  content length without chunked framing on Node 26.6.0 for both Buffer and
+  stream bodies. Actual AssemblyAI/deployed-runtime integration remains untested.
+- Dropping the Zoom Buffer reference and transferring a single Buffer through
+  the inspector have now been compared locally. The report preserves the
+  preallocation Zoom outlier and limits claims to measured samples. File-backed
+  Blob bodies remain untested; this benchmark used file streams for disk upload.
 - `/tmp` backing and hosted memory accounting are unmeasured. A tmpfs result or
   charged file cache would challenge the benefit; compare full measured peaks
   rather than infer all memory savings from a filesystem label alone.
@@ -78,13 +83,12 @@ to verified facts:
 
 ## Next gate and limits
 
-Prepare a bounded, provider-free measurement experiment covering owner start,
-Meeting Tracker start and Zoom import. Any hosted experiment needs an explicit
+The bounded provider-free local experiment is complete: owner start, Meeting
+Tracker start, Zoom import and submission byte paths were compared in fresh
+processes. Revise the design using that evidence and obtain a fresh Opus review
+before runtime implementation. Any hosted experiment still needs an explicit
 synthetic-only target and resource budget; it must not touch real recordings or
-invoke paid transcription incidentally. Measure baseline versus candidates in
-fresh processes, and process versus hosted memory accounting where available.
-Revise the design using that evidence and obtain a fresh Opus review before
-runtime implementation. This planning task does not itself execute that experiment.
+invoke paid transcription incidentally. Hosted memory accounting remains unknown.
 
 Documentation currency, catalog, symbol-reference and build-claim checks passed
 for the planning work; runtime tests were not run because runtime code is

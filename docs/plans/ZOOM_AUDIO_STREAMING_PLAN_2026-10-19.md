@@ -3,7 +3,7 @@ title: Zoom audio memory reduction plan
 domain: meeting-tracker
 kind: plan
 status: draft
-summary: "Opus reviewed the proposed audio spool design: NEEDS REWORK. Measure the premise and resolve failure handling before runtime implementation."
+summary: "Local benchmarks favor simpler buffer-copy reductions. Runtime implementation remains blocked on revised design, Opus review and hosted validation."
 owner: product-engineering
 related:
   - docs/CURRENT_WORK_QUEUE.md
@@ -24,14 +24,22 @@ of the initial review, not approval of this amended draft. The candidate design
 below remains provisional. A new Opus review is required before an implementation
 approval claim.
 
-The next bounded work is **measurement and design correction**, not the spool
-helper. Baseline all three entry paths and determine hosted scratch/memory
-behavior. Compare the disk candidate against narrower copy-reduction changes;
-neither alternative has been tested here. The measurement gate can end the work.
-Resolve the specific worker failure outcomes, route budgets, media-parser parity,
-admission and cleanup lifecycle, import scope and wire-level upload mechanics
-before promoting any candidate to an implementation plan. No tests/probes in
-that proposed experiment have yet been executed.
+[VERIFIED via the
+local benchmark](evidence/ZOOM_AUDIO_BENCHMARK_2026-10-19.md): 147 fresh-process
+synthetic cases and five last-byte rejection controls compared current byte paths
+with narrower copy reductions and disk spooling. Preallocation plus a verified
+buffer streaming upload reduced local near-cap submission median RSS from
+1,104.9 to 534.6 MiB; hosted memory accounting and production compatibility remain
+unknown. The recommendation is to revise the design around simpler copy
+reductions first, not to implement the scratch helper as written below.
+
+The next bounded work is **design correction and target-environment validation**.
+The candidate disk sections below describe the reviewed draft, not an accepted
+implementation prescription. Resolve worker failure outcomes, route budgets,
+parser parity, import scope, ownership/cancellation and upload mechanics. If disk
+remains a candidate, its admission/reaping and hosted memory gates still apply.
+The local result does not satisfy those outstanding gates, and the measurement
+gate can still end or narrow the work.
 
 [PLANNED, 2026-10-19] No implementation yet. Branch:
 `codex/zoom-audio-streaming`, based on `bb7b5e04c` (merged speaker picker).
@@ -51,11 +59,12 @@ submission or real recording probe is authorized by this planning task.
 | The current ceiling is 200 MiB and accepted duration is at most four hours | `limits.js`; `media-inspector.js`: `validateParsedAudio` | VERIFIED via source; no change proposed |
 | Production is currently failing or nearing OOM | No incident, peak-memory trace or failed job has been collected in this task | UNKNOWN; do not describe this as an observed outage |
 | Moving audio to disk materially lowers hosted memory accounting and improves reliability | Not measured; filesystem cache/tmp backing may affect process versus instance accounting | ASSUMED; must be falsified or measured before rollout |
+| Narrower copy reductions substantially reduce local process memory | 147-case synthetic comparison and five digest-rejection controls in the linked benchmark; near-cap submission median 1,104.9 → 534.6 MiB for preallocation + streaming | VERIFIED locally; hosted adoption not established |
 | Prefix-only inspection supports every accepted M4A/MP3 | Not established; MP4 parser walks atoms and metadata need not precede media | UNKNOWN; prefix-only parsing is not this design |
 | The byte cap must increase to support four-hour Zoom audio | Existing observed-rate estimate already puts four hours under 200 MiB; codec rates vary | NOT ESTABLISHED; cap increase excluded |
 
 This is a proposed memory-efficiency improvement, not a demonstrated production
-incident fix. First compare the baseline and proposed path using the same files.
+incident fix. The local comparison favors revising scope toward copy reduction.
 If improvement is negligible or disk failure risk dominates, stop or narrow the
 work instead of adding a storage subsystem to satisfy a queue sentence.
 
@@ -73,23 +82,29 @@ storage. Scratch files are invocation-local working data, never persisted in a
 job, returned in a DTO, logged, or passed across Workflow steps. No schema,
 status enum, route, UI, auth, provider, model or retention change is proposed.
 
-Proposed first slice: eliminate whole-audio buffers from **both queue validation
-and worker submission**, shared by Meeting Tracker and the owner pilot. Retain
-bounded Buffer reads for small VTT/JSON outputs and existing consumers. Keep the
-buffer inspector API where other callers still require it; add a file-based path
-without silently changing those callers.
+The original disk proposal would eliminate whole-audio buffers from **both queue
+validation and worker submission**, shared by Meeting Tracker and the owner pilot.
+That scope is not adopted. The locally favored simpler candidate intentionally
+retains one capped audio Buffer, fills it without concatenation, and streams its
+verified bytes for upload; it also addresses the Zoom import reader/reference.
+Small VTT/JSON content remains buffered in either candidate. A revised design
+must specify exact interfaces and ownership before either candidate is built.
 
 Zoom → Blob import buffering is a separately identified residual. The first
 slice must not be called end-to-end Zoom streaming: `audioBytes` may still be
 retained by `importZoomRecording` while queue validation runs. Measure that route
-as well as the worker. If import remains the controlling peak, a follow-on must
-stream Zoom audio into the same bounded scratch lifecycle, stream that file to
-Blob, and capture provenance from the streamed digest/length. Preserve the Zoom
+as well as the worker. The local disk-split comparison leaves that stage at about
+493 MiB median. A fully streamed importer is an untested possible follow-on, not a
+required consequence of that result: the simpler candidate reaches about 544 MiB
+median without scratch handling, with a 741 MiB outlier. Preserve Zoom's
 host/redirect/bearer rules and leave the small VTT Buffer interface unchanged.
-Opus must challenge whether this split delivers enough benefit to justify a
-separate first slice, or whether import must be included before rollout.
+The revised scope must account for import before claiming whole-flow improvement.
 
-## Invariants
+## Reviewed disk candidate invariants — not adopted
+
+The no-full-buffer and scratch constraints below apply to the reviewed disk
+candidate. They are not requirements imposed on the simpler measured candidate;
+that candidate needs its own bounded-buffer ownership and cancellation contract.
 
 | Invariant | Proposed surface | Verification |
 |---|---|---|
@@ -102,7 +117,7 @@ separate first slice, or whether import must be included before rollout.
 | Temporary capacity is bounded across concurrent calls | scratch admission and cleanup design below | same-instance concurrent starts, competing helpers, ENOSPC, stale file cases |
 | No storage paths or source contents escape | helper/provider errors and DTOs | sanitized errors and unchanged projections |
 
-## Proposed design
+## Reviewed disk candidate design — not adopted
 
 ### 1. Establish the baseline before changing runtime code
 
@@ -225,15 +240,19 @@ the existing before/after-submission-intent distinction.
 
 ## Alternatives Opus must try to make preferable
 
-1. Keep the current path and improve measurement only: no observed production
+1. Preallocate, release the import reference, and stream verified Buffer views:
+   locally compared, with substantial copy reduction and no scratch subsystem.
+   Worker transfer is a separately measured ownership variant. Hosted/deployed
+   compatibility and failure contracts remain untested.
+2. Keep the current path and improve measurement only: no observed production
    failure has established urgency; the current cap may be adequate.
-2. Two Blob reads, validate/hash first, stream a second read to provider: avoids
+3. Two Blob reads, validate/hash first, stream a second read to provider: avoids
    scratch, but requires exact version binding and revalidation of the bytes sent;
    chunked I/O does not itself solve media inspection or mutation races.
-3. Blob ranged/tokenizer inspection plus streaming: potentially avoids disk;
+4. Blob ranged/tokenizer inspection plus streaming: potentially avoids disk;
    requires correct bounded MP3 scanning, late-MP4 metadata, stable version access
    and hashing of actual full audio. No prefix-only safety claim is established.
-4. Direct stream with hash checked after upload: lower buffering but relaxes the
+5. Direct stream with hash checked after upload: lower buffering but relaxes the
    chosen verify-before-provider property. Reject unless Justin reopens that
    requirement after review.
 
