@@ -19,12 +19,14 @@
 
 ### Verified Open
 
+- **Central staffing panel — planned, not implemented (owner request 2026-10-18).** Build a one-stop staffing panel in Admin to update shared staff roles and serve assignments to workflows such as Board writeups. The President, CSO and Grants Manager selectors remain Board-local for now; centralization and migration of those assignments are future work.
+
 - No further implementation is authorized for the fragment check. Observe ordinary use before expanding its scope; the six live evaluation cases are bounded acceptance evidence.
 
 ### Owner Decision Needed
 
 - **Board activation remains separate.** The earlier disabled release is not activation permission. Recheck the current Board Atlas, roster, dates, recipient configuration and hosted acceptance before any activation.
-- **Board cleanup reminder built, not deployed:** `codex/board-cleanup-reminder` implements the owner's daily-email-until-complete decision. At 9 a.m. Pacific, starting seven calendar days after the saved Board end date, the configured cycle admin receives reminders until an administrator chooses **Mark cleanup complete**. No automatic deletion. Deliberate promotion/Board activation and verification of dates/admin recipient remain pending; see `docs/atlas/postgres-board-writeup-runs.md`.
+- **Board cleanup reminder deployed:** PR #498 (merge `0e39ad951`) implements the owner's daily-email-until-complete decision. At 9 a.m. Pacific, starting seven calendar days after the saved Board end date, the configured cycle admin receives reminders until an administrator chooses **Mark cleanup complete**. No automatic deletion. Board cycle activation remains pending; see `docs/atlas/postgres-board-writeup-runs.md`.
 - **Cross-visit sentiment/ranking study stays parked.** The confirmed corrections and accepted current analyses close the earlier data-quality prerequisite; the study still requires owner authorization and an agreed read-only scope. See the existing study memory for historical design context; do not treat its earlier cleanup blocker as a new repair task.
 
 ### Parked

@@ -15,12 +15,12 @@ test('early draft release requires warning and submits the version shown, with q
   jest.spyOn(window, 'confirm').mockReturnValue(true);
   render(<BoardWriteups />);
   fireEvent.click(await screen.findByLabelText('Select 1002988'));
-  fireEvent.click(screen.getByText('Release selected to Allison'));
+  fireEvent.click(screen.getByText('Release selected to the President'));
   await waitFor(() => expect(calls).toHaveLength(1));
-  expect(window.confirm).toHaveBeenCalledWith('This writeup is still in drafting. Release the current version to Allison?');
+  expect(window.confirm).toHaveBeenCalledWith('This writeup is still in drafting. Release the current version to the President?');
   expect(calls[0].selections[0]).toMatchObject({ requestId: ID, eTag: 'one', versionId: '1', draftConfirmed: true });
   expect(await screen.findByText(/1002988: queued/)).toBeTruthy();
-  expect(screen.getByText('0 of 23 released to Allison')).toBeTruthy();
+  expect(screen.getByText('0 of 23 released to the President')).toBeTruthy();
 });
 test('a late response from the previous cycle cannot replace the new cycle', async () => {
   let resolveOld;
@@ -43,7 +43,7 @@ test('disabled response shows no release or setup controls and makes no further 
   global.fetch = jest.fn(async () => ({ ok: false, status: 404, json: async () => ({ error: 'Board writeups are disabled.', code: 'board_disabled' }) }));
   render(<BoardWriteups />);
   expect(await screen.findByText('Board writeups are disabled.')).toBeTruthy();
-  expect(screen.queryByText('Release selected to Allison')).toBeNull();
+  expect(screen.queryByText('Release selected to the President')).toBeNull();
   expect(screen.queryByText('Admin: cycle setup and roles')).toBeNull();
   expect(global.fetch).toHaveBeenCalledTimes(1);
 });
@@ -54,7 +54,7 @@ test('admin can mark cleanup complete and sees the saved completion state', asyn
   const board = () => ({ ...data, isSuperuser: true, cleanup: { dueDate: '2026-12-08', canComplete: !complete, completedAt: complete ? '2026-12-08T17:00:00Z' : null, completedBy: complete ? 'Admin' : null } });
   global.fetch = jest.fn(async (url, options) => {
     if (options.method === 'POST') { posts.push(JSON.parse(options.body)); complete = true; return response({ completedAt: '2026-12-08T17:00:00Z' }); }
-    if (url.startsWith('/api/admin/')) return response({ cycle: { value: null }, roles: { cso: { value: null }, grantsManager: { value: null } }, staff: [], candidates: [] });
+    if (url.startsWith('/api/admin/')) return response({ cycle: { value: null }, roles: { president: { value: null, revision: null }, cso: { value: null }, grantsManager: { value: null } }, staff: [], candidates: [] });
     return response(url.includes('?') ? board() : { canRelease: true, canArchive: false, isSuperuser: true });
   });
   jest.spyOn(window, 'confirm').mockReturnValue(true);
@@ -79,7 +79,7 @@ test('late cleanup completion response does not update a newly selected cycle', 
   const pending = new Promise(resolve => { finish = resolve; });
   global.fetch = jest.fn(async (url, options) => {
     if (options.method === 'POST') return pending;
-    if (url.startsWith('/api/admin/')) return response({ cycle: { value: null }, roles: { cso: { value: null }, grantsManager: { value: null } }, staff: [], candidates: [] });
+    if (url.startsWith('/api/admin/')) return response({ cycle: { value: null }, roles: { president: { value: null, revision: null }, cso: { value: null }, grantsManager: { value: null } }, staff: [], candidates: [] });
     if (!url.includes('?')) return response({ canRelease: true, isSuperuser: true });
     return response({ ...data, isSuperuser: true, cleanup: { dueDate: url.includes('J27') ? '2027-06-08' : '2026-12-08', canComplete: !url.includes('J27') } });
   });
@@ -99,7 +99,7 @@ test('failed setup save shows an error beside Save setup and preserves entered d
     if (options.method === 'POST') return refuse
       ? { ok: false, status: 500, json: async () => ({ error: 'Board operation failed.' }) }
       : response({ value: JSON.parse(options.body).value, revision: 'saved' });
-    if (url.startsWith('/api/admin/')) return response({ cycle: { value: null, revision: null }, roles: { cso: { value: null }, grantsManager: { value: null } }, staff: [], candidates: [] });
+    if (url.startsWith('/api/admin/')) return response({ cycle: { value: null, revision: null }, roles: { president: { value: null, revision: null }, cso: { value: null }, grantsManager: { value: null } }, staff: [], candidates: [] });
     return response(url.includes('?') ? data : { canRelease: true, isSuperuser: true });
   });
   render(<BoardWriteups />);
@@ -119,4 +119,19 @@ test('failed setup save shows an error beside Save setup and preserves entered d
   await screen.findByText('Cycle setup saved.');
   expect(screen.queryByRole('alert')).toBeNull();
   expect(save.nextElementSibling.getAttribute('role')).toBe('status');
+});
+
+
+test('administrator can assign President through the existing role settings', async () => {
+  const posts = [];
+  global.fetch = jest.fn(async (url, options) => {
+    if (options.method === 'POST') { const body = JSON.parse(options.body); posts.push(body); return response({ value: body.value, revision: 'saved' }); }
+    if (url.startsWith('/api/admin/')) return response({ cycle: { value: null }, roles: { president: { value: null, revision: null }, cso: { value: null }, grantsManager: { value: null } }, staff: [{ systemUserId: ID, name: 'Example Staff' }], candidates: [] });
+    return response(url.includes('?') ? data : { isSuperuser: true, canArchive: true });
+  });
+  render(<BoardWriteups />);
+  fireEvent.change(await screen.findByLabelText('President'), { target: { value: ID } });
+  await screen.findByText('Role saved.');
+  expect(posts).toEqual([{ action: 'role', role: 'president', value: { version: 1, systemUserId: ID }, expectedRevision: null }]);
+  expect(screen.getByLabelText('President').value).toBe(ID);
 });
