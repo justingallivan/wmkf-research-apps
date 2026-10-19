@@ -13,6 +13,14 @@ export default function BoardWriteups({ initialCycle = 'D26' }) {
   const [candidateSearch, setCandidateSearch] = useState(''), [rowFilter, setRowFilter] = useState('all');
   const [recovery, setRecovery] = useState(null);
   const [selected, setSelected] = useState([]), [busy, setBusy] = useState(false), [message, setMessage] = useState('');
+  const [messageType, setMessageType] = useState('success'), [messageScope, setMessageScope] = useState('page');
+  const feedbackRef = useRef(null);
+  useEffect(() => {
+    if (message && messageScope === 'setup') {
+      feedbackRef.current?.focus({ preventScroll: true });
+      feedbackRef.current?.scrollIntoView?.({ block: 'nearest' });
+    }
+  }, [message, messageScope]);
   const generation = useRef(0), mounted = useRef(true);
   useEffect(() => { mounted.current = true; return () => { mounted.current = false; generation.current += 1; }; }, []);
   useEffect(() => {
@@ -29,19 +37,21 @@ export default function BoardWriteups({ initialCycle = 'D26' }) {
         if (seq !== generation.current) return;
         setSettings(setup); setForm(setup.cycle.value || { version: 1, cycle, programId: PROGRAM, active: false, rosterConfirmed: false, requestIds: [], materialsDue: null, boardEnds: null, adminId: null });
       }
-    }).catch(e => { if (seq === generation.current && !controller.signal.aborted) setMessage(e.message); });
+    }).catch(e => { if (seq === generation.current && !controller.signal.aborted) { setMessageType('error'); setMessageScope('page'); setMessage(e.message); } });
     return () => controller.abort();
   }, [cycle]);
-  async function act(fn) {
+  async function act(fn, scope = 'page') {
     const seq = generation.current;
-    setBusy(true); setMessage('');
+    let actionSucceeded = false;
+    setBusy(true); setMessage(''); setMessageScope(scope); setMessageType('success');
     try {
       const result = await fn(() => mounted.current && generation.current === seq);
       if (!mounted.current || generation.current !== seq) return;
+      actionSucceeded = true;
       setMessage(result?.message || 'Saved.');
       const current = await api(`/api/workbench/board-writeups?cycle=${cycle}`).catch(e => { if (caps?.isSuperuser && !data) return null; throw e; });
       if (generation.current === seq) { setData(current); setSelected([]); }
-    } catch (e) { if (mounted.current && generation.current === seq) setMessage(e.message); }
+    } catch (e) { if (mounted.current && generation.current === seq) { setMessageType(actionSucceeded ? 'refresh-error' : 'error'); setMessage(e.message); } }
     finally { if (mounted.current && generation.current === seq) setBusy(false); }
   }
   async function release() {
@@ -77,11 +87,12 @@ export default function BoardWriteups({ initialCycle = 'D26' }) {
       return { message: result.status === 'excluded' ? 'Exclusion recorded in the archive history.' : result.status === 'cancelled' ? 'Uncommitted release cancelled. The CSO can select it again after resolving the issue.' : 'Recovery queued. Existing files will be verified before proceeding.' };
     });
   }
+  const feedback = message && <div ref={feedbackRef} tabIndex={-1} role={messageType !== 'success' ? 'alert' : 'status'} className={`rounded border p-3 ${messageType !== 'success' ? 'border-red-300 bg-red-50 text-red-900' : 'border-green-300 bg-green-50 text-green-900'}`}><p className="font-semibold">{messageType === 'refresh-error' ? 'Saved, but status could not refresh' : messageType === 'error' ? (messageScope === 'setup' ? 'Setup could not be saved' : 'Action could not be completed') : 'Success'}</p><p>{message}</p>{messageType === 'error' && messageScope === 'setup' && <p className="mt-1">Your entries are still here. Resolve the issue and try Save setup again.</p>}</div>;
   const change = patch => setForm(current => ({ ...current, ...patch }));
   return <div className="space-y-6 py-6">
     <div className="flex items-center justify-between"><div><h1 className="text-2xl font-semibold">Board writeups</h1><p className="text-gray-600">Release to Allison, then preserve the final Board versions.</p></div><label>Cycle <input aria-label="Cycle" className="ml-2 w-20 rounded border p-2" value={cycle} maxLength={3} onChange={e => { generation.current += 1; setBusy(false); setData(null); setRecovery(null); setSettings(null); setForm(null); setReport(null); setSelected([]); setMessage(''); setCycle(e.target.value.toUpperCase()); }} /></label></div>
     <button className={button} disabled={busy} onClick={() => act(async () => ({ message: 'Refreshed.' }))}>Refresh status</button>
-    {message && <p role="status" className="rounded border bg-gray-50 p-3">{message}</p>}
+    {messageScope === 'page' && feedback}
     {data && <><div className="rounded border p-4"><strong className="text-xl">{data.progress.released} of {data.progress.expected} released to Allison</strong><p>Materials deadline: {data.config.materialsDue || 'Not set'}</p><p>{data.archiveCompletedAt ? 'Archival complete' : data.archiveStartedAt ? 'Archival started — releases closed' : data.firstEventAt ? 'Daily reminders active until all writeups are released' : 'Reminder window not started'}</p></div>
       <label>Show <select value={rowFilter} onChange={e => setRowFilter(e.target.value)} className="ml-2 rounded border p-2"><option value="all">All writeups</option><option value="outstanding">Outstanding</option><option value="released">Released</option></select></label>
       <div className="overflow-x-auto"><table className="w-full text-left"><thead><tr>{['Select', 'Request', 'Institution', 'Lead PD', 'Stage', 'Delivery', 'Documents'].map(x => <th key={x} className="border-b p-2">{x}</th>)}</tr></thead><tbody>{data.rows.filter(row => rowFilter === 'all' || (rowFilter === 'released' ? Boolean(row.receipt?.releasedAt) : row.expected !== false && !row.receipt?.releasedAt)).map(row => <tr key={row.requestId}>
@@ -111,13 +122,14 @@ export default function BoardWriteups({ initialCycle = 'D26' }) {
       <details><summary>Approval history</summary><ul>{data.events.filter(x => ['release_approved', 'released', 'archived'].includes(x.action)).map((x, i) => <li key={i}>{new Date(x.at).toLocaleString()} — {x.details?.actorName || data.rows.find(row => row.requestId === x.details.requestId)?.receipt?.actorName || 'Recorded staff member'} — {x.action.replaceAll('_', ' ')} — {data.rows.find(row => row.requestId === x.details.requestId)?.receipt?.source.number || 'Writeup'}{x.details?.source?.versionId && ` — version ${x.details.source.versionId}`}</li>)}</ul></details>
     </>}
     {data?.configPending && caps?.isSuperuser && <button className={button} disabled={busy} onClick={() => act(() => api('/api/admin/board-writeup-cycles', { action: 'reconcileConfig', cycle }))}>Reconcile interrupted setup save</button>}
-    {caps?.isSuperuser && settings && form && <details open={!data}><summary className="cursor-pointer text-lg font-semibold">Admin: cycle setup and roles</summary><div className="mt-4 space-y-4 rounded border p-4">
+    {caps?.isSuperuser && settings && form && <details open={!data || !data.config.active}><summary className="cursor-pointer text-lg font-semibold">Admin: cycle setup and roles</summary><div className="mt-4 space-y-4 rounded border p-4">
       {['cso', 'grantsManager'].map(role => <label key={role} className="block">{role === 'cso' ? 'CSO' : 'Grants Manager'} <select className="ml-3 rounded border p-2" value={settings.roles[role].value?.systemUserId || ''} disabled={busy} onChange={e => { const value = e.target.value || null; act(async isCurrent => { const saved = await api('/api/admin/board-writeup-cycles', { action: 'role', role, value: { version: 1, systemUserId: value }, expectedRevision: settings.roles[role].revision }); if (isCurrent()) setSettings(old => ({ ...old, roles: { ...old.roles, [role]: saved } })); return { message: 'Role saved.' }; }); }}><option value="">Not assigned</option>{settings.staff.map(person => <option key={person.systemUserId} value={person.systemUserId}>{person.name}</option>)}</select></label>)}
       <label className="block">Admin email recipient <select className="ml-3 rounded border p-2" value={form.adminId || ''} onChange={e => change({ adminId: e.target.value || null })}><option value="">Not assigned</option>{settings.staff.filter(x => x.isSuperuser).map(x => <option key={x.systemUserId} value={x.systemUserId}>{x.name}</option>)}</select></label>
       <label className="block">Materials deadline for Allison <input className="ml-3 rounded border p-2" type="date" value={form.materialsDue || ''} onChange={e => change({ materialsDue: e.target.value || null })} /></label><label className="block">Board meeting end date <input className="ml-3 rounded border p-2" type="date" value={form.boardEnds || ''} onChange={e => change({ boardEnds: e.target.value || null })} /></label>
       <fieldset>{form.requestIds.filter(id => !settings.candidates.some(x => x.requestId === id)).map(id => <label className="block text-amber-800" key={id}><input type="checkbox" checked onChange={() => change({ requestIds: form.requestIds.filter(x => x !== id) })} /> {data?.rows.find(x => x.requestId === id)?.number || 'Previously selected proposal'} — no longer in the candidate list; review before removing.</label>)}<legend className="font-semibold">Expected proposals — {form.requestIds.length} selected{cycle === 'D26' ? ' of 23' : ''}</legend><label className="block py-2">Find proposal <input className="ml-2 rounded border p-2" value={candidateSearch} onChange={e => setCandidateSearch(e.target.value)} placeholder="Request number or institution" /></label>{settings.candidates.filter(x => `${x.number} ${x.institution}`.toLowerCase().includes(candidateSearch.toLowerCase())).map(x => <label className="block" key={x.requestId}><input type="checkbox" checked={form.requestIds.includes(x.requestId)} onChange={e => change({ requestIds: e.target.checked ? [...form.requestIds, x.requestId] : form.requestIds.filter(id => id !== x.requestId) })} /> {x.number} — {x.institution}</label>)}</fieldset>
       <label className="block"><input type="checkbox" checked={form.rosterConfirmed} onChange={e => change({ rosterConfirmed: e.target.checked })} /> Staff has confirmed this expected proposal list</label><label className="block"><input type="checkbox" checked={form.active} onChange={e => change({ active: e.target.checked })} /> Activate this cycle</label>
-      <button className={button} disabled={busy} onClick={() => { const reason = settings.cycle.value?.rosterConfirmed ? window.prompt('Explain any change to the confirmed proposal list (or leave blank if unchanged).') : ''; act(async isCurrent => { const saved = await api('/api/admin/board-writeup-cycles', { action: 'save', cycle, value: form, expectedRevision: settings.cycle.revision, reason }); if (isCurrent()) setSettings(old => ({ ...old, cycle: saved })); return { message: 'Cycle setup saved.' }; }); }}>Save setup</button>
+      <button className={button} disabled={busy} onClick={() => { const reason = settings.cycle.value?.rosterConfirmed ? window.prompt('Explain any change to the confirmed proposal list (or leave blank if unchanged).') : ''; act(async isCurrent => { const saved = await api('/api/admin/board-writeup-cycles', { action: 'save', cycle, value: form, expectedRevision: settings.cycle.revision, reason }); if (isCurrent()) setSettings(old => ({ ...old, cycle: saved })); return { message: 'Cycle setup saved.' }; }, 'setup'); }}>{busy && messageScope === 'setup' ? 'Saving setup…' : 'Save setup'}</button>
+      {messageScope === 'setup' && feedback}
     </div></details>}
   </div>;
 }

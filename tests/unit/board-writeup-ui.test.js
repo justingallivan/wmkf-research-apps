@@ -92,3 +92,31 @@ test('late cleanup completion response does not update a newly selected cycle', 
   expect(screen.queryByText(/Cleanup marked complete/)).toBeNull();
   expect(screen.getByText(/2027-06-08/)).toBeTruthy();
 });
+
+test('failed setup save shows an error beside Save setup and preserves entered dates', async () => {
+  let refuse = true;
+  global.fetch = jest.fn(async (url, options) => {
+    if (options.method === 'POST') return refuse
+      ? { ok: false, status: 500, json: async () => ({ error: 'Board operation failed.' }) }
+      : response({ value: JSON.parse(options.body).value, revision: 'saved' });
+    if (url.startsWith('/api/admin/')) return response({ cycle: { value: null, revision: null }, roles: { cso: { value: null }, grantsManager: { value: null } }, staff: [], candidates: [] });
+    return response(url.includes('?') ? data : { canRelease: true, isSuperuser: true });
+  });
+  render(<BoardWriteups />);
+  const save = await screen.findByText('Save setup');
+  expect(save.closest('details').open).toBe(true);
+  fireEvent.change(screen.getByLabelText('Board meeting end date'), { target: { value: '2026-12-10' } });
+  fireEvent.click(save);
+  const alert = await screen.findByRole('alert');
+  expect(alert.textContent).toContain('Setup could not be saved');
+  expect(alert.textContent).toContain('Your entries are still here');
+  expect(alert.className).toContain('bg-red-50');
+  expect(save.nextElementSibling).toBe(alert);
+  expect(document.activeElement).toBe(alert);
+  expect(screen.getByLabelText('Board meeting end date').value).toBe('2026-12-10');
+  refuse = false;
+  fireEvent.click(save);
+  await screen.findByText('Cycle setup saved.');
+  expect(screen.queryByRole('alert')).toBeNull();
+  expect(save.nextElementSibling.getAttribute('role')).toBe('status');
+});
