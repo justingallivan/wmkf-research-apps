@@ -1,7 +1,7 @@
 import DefaultFacilitatorSettings from '../../proposal-ranking/DefaultFacilitatorSettings';
 import { AdminEditorPanel } from '../AdminWorkspaceNavigation';
 import ReviewQuestionsSection from '../ReviewQuestionsSection';
-import FinalWriteupMatrixAudiencesSection from '../FinalWriteupMatrixAudiencesSection';
+import Link from 'next/link';
 import SiteVisitRecipientsSection from '../SiteVisitRecipientsSection';
 import MeetingTrackerDefaultsSection from '../MeetingTrackerDefaultsSection';
 import SiteVisitMaterialsDefaultsSection from '../SiteVisitMaterialsDefaultsSection';
@@ -41,14 +41,6 @@ const SITE_VISIT_RECIPIENT_DATAVERSE_FIELDS = [
     'Curated recipient identity references',
     'site_visit.distribution_recipient_directory',
     'Stores only active staff profile IDs and Dataverse Contact GUIDs; names and emails are resolved live.',
-  ),
-];
-
-const FINAL_WRITEUP_MATRIX_AUDIENCE_DATAVERSE_FIELDS = [
-  appSystemSettingField(
-    'Program-specific matrix audiences',
-    'final_writeup.matrix_audiences',
-    'Stores stable broad Grant Program GUIDs and enabled Final Writeup reviewer systemuser GUIDs; names resolve live.',
   ),
 ];
 
@@ -141,17 +133,7 @@ export function WorkflowsWorkspace({ view }) {
         </AdminEditorPanel>
       );
     case 'final-writeups':
-      return (
-        <AdminEditorPanel
-          id="final-writeup-matrix-audiences"
-          title="Final Writeup staffing"
-          description="Assign staff responsibilities and choose the reviewers expected for each Dataverse Grant Program."
-          scope="Global staff · Per Grant Program"
-          dataverseFields={FINAL_WRITEUP_MATRIX_AUDIENCE_DATAVERSE_FIELDS}
-        >
-          <FinalWriteupMatrixAudiencesSection />
-        </AdminEditorPanel>
-      );
+      return <section><h2 className="text-lg font-semibold">Final Writeup staffing</h2><p className="mt-2 text-gray-600">Staff responsibilities and program review audiences are now managed in People &amp; Access.</p><Link className="mt-4 inline-flex min-h-11 items-center font-semibold underline" href="/admin?workspace=people&view=staffing">Open Staffing</Link></section>;
     case 'site-visits':
       return (
         <div className="space-y-6">

@@ -1,5 +1,5 @@
 /** @jest-environment node */
-import { saveRole, saveCycle, resumeConfig } from '../../lib/services/board-writeups/config';
+import { saveRole, saveCycle, resumeConfig, loadStaffing, staffingCapabilities } from '../../lib/services/board-writeups/config';
 import { emptyState } from '../../lib/services/board-writeups/store';
 import { PROGRAM_ID } from '../../lib/services/board-writeups/model';
 const ID = '11111111-1111-4111-8111-111111111111';
@@ -41,4 +41,22 @@ test('forged profile binding and stale revisions cannot save cycle setup', async
   await expect(saveRole({ ...actor, profileId: 'someone-else' }, 'cso', { version: 1, systemUserId: ID }, 'role', d)).rejects.toMatchObject({ code: 'board_actor_mismatch' });
   await expect(saveCycle(actor, cycle, 'stale', '', d)).rejects.toMatchObject({ code: 'board_settings_changed' });
   expect(d.setSettingIfUnchanged).not.toHaveBeenCalled();
+});
+
+test.each([['admin', { admin: true }], ['Grants Manager', {}]])('%s can load shared staffing without loading a cycle', async (_label, options) => {
+  const { d } = setup(options);
+  d.staffDirectory = jest.fn(async () => [{ systemUserId: ID, name: 'Staff' }]);
+  d.readCycle = jest.fn(() => { throw new Error('Must not read cycle'); });
+  const value = await loadStaffing(actor, d);
+  expect(value.canManageSharedRoles).toBe(true);
+  expect(Object.keys(value.roles)).toEqual(['president', 'cso', 'grantsManager']);
+  expect(value.staff).toHaveLength(1);
+  expect(d.readCycle).not.toHaveBeenCalled();
+});
+test.each([{ manager: OTHER }, { active: false }, { app: false }])('unauthorized staffing reads are rejected: %j', async options => {
+  const { d } = setup(options);
+  d.staffDirectory = jest.fn();
+  await expect(loadStaffing(actor, d)).rejects.toBeTruthy();
+  await expect(staffingCapabilities(actor, d)).rejects.toBeTruthy();
+  expect(d.staffDirectory).not.toHaveBeenCalled();
 });

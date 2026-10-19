@@ -126,22 +126,14 @@ test('failed setup save shows an error beside Save setup and preserves entered d
 });
 
 
-test('administrator can assign President through the existing role settings', async () => {
-  const posts = [];
-  global.fetch = jest.fn(async (url, options) => {
-    if (options.method === 'POST') { const body = JSON.parse(options.body); posts.push(body); return response({ value: body.value, revision: 'saved' }); }
-    if (url.startsWith('/api/admin/')) return response({ cycle: { value: null }, roles: { president: { value: null, revision: null }, cso: { value: null }, grantsManager: { value: null } }, staff: [{ systemUserId: ID, name: 'Example Staff' }], candidates: [] });
-    return response(url.includes('?') ? data : { isSuperuser: true, canArchive: true });
-  });
+test('cycle setup shows shared assignments and links to the central editor', async () => {
+  global.fetch = jest.fn(async url => response(url.startsWith('/api/admin/')
+    ? { cycle: { value: null }, roles: { president: { value: { systemUserId: ID } }, cso: {}, grantsManager: {} }, staff: [{ systemUserId: ID, name: 'Example Staff' }], candidates: [] }
+    : url.includes('?') ? { ...data, isSuperuser: true, canArchive: true } : { isSuperuser: true, canManageSetup: true, canArchive: true }));
   render(<BoardWriteups mode="setup" />);
-  const president = await screen.findByLabelText('President');
-  president.focus();
-  fireEvent.change(president, { target: { value: ID } });
-  const savedNotice = await screen.findByText('Role saved.');
-  expect(document.activeElement).toBe(president);
-  expect(president.closest('div').contains(savedNotice)).toBe(true);
-  expect(posts).toEqual([{ action: 'role', role: 'president', value: { version: 1, systemUserId: ID }, expectedRevision: null }]);
-  expect(screen.getByLabelText('President').value).toBe(ID);
+  expect(await screen.findByText('Example Staff')).toBeTruthy();
+  expect(screen.queryByLabelText('President')).toBeNull();
+  expect(screen.getByText('Manage shared roles in Staffing').getAttribute('href')).toBe('/admin?workspace=people&view=staffing');
 });
 
 test.each([
@@ -190,7 +182,7 @@ test('Grants Manager can open setup before a cycle exists; dashboard remains sep
   });
   render(<BoardWriteups mode="setup" />);
   await screen.findByText('Save setup');
-  expect(screen.getByLabelText('President')).toBeTruthy();
+  expect(screen.getByText('Manage shared roles in Staffing').getAttribute('href')).toBe('/staffing');
   expect(screen.queryByRole('table')).toBeNull();
   expect(screen.queryByText('Release selected to the President')).toBeNull();
 });

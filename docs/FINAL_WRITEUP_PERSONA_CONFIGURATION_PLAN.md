@@ -42,7 +42,7 @@ the earlier failed team-create attempt made zero Dataverse writes.
 
 - **Change surface:** global Final Writeup PD, PC, and Leadership persona
   assignment and the existing program-specific matrix audiences.
-- **Entry points:** the existing **Workflows → Final Writeups** Admin editor,
+- **Entry points:** **People & Access → Staffing** in Admin (central staffing branch-built, not deployed), with the existing Final Writeup editor; the former **Workflows → Final Writeups** entry links there,
   its existing superuser GET/PUT route, the Final Writeups dashboard service,
   and the focused Final Writeup page.
 - **Persistence:** the existing `final_writeup.matrix_audiences` value in
@@ -92,7 +92,8 @@ the earlier failed team-create attempt made zero Dataverse writes.
 
 ## Product and administration decision
 
-Use one existing operational surface, not another panel:
+Keep one Final Writeup configuration editor. [VERIFIED via central-staffing branch source, not deployed] Its placement is now Admin → People & Access → Staffing alongside independently saved shared Board roles. The Grants Manager’s limited `/staffing` page does not expose Final Writeup configuration; that editor and its API remain superuser-only. The original persona consolidation below changes neither shared-role storage nor authority:
+
 
 1. Rename the current panel from **Final Writeup review matrix** to
    **Final Writeup staffing**.
@@ -104,8 +105,8 @@ Use one existing operational surface, not another panel:
    lens** state for people whose role is limited to acknowledgement duties.
 4. Keep the existing per-Grant-Program reviewer checkboxes below it.
 5. Publish both sections with the existing single sticky publication action and
-   one Dataverse ETag. Do not add another navigation item, card, modal, page,
-   route, or save button.
+   one Dataverse ETag. The central Staffing placement does not add a second
+   Final Writeup editor, configuration route or publication action.
 
 Names and initials resolve live from Dataverse. Only stable GUIDs persist.
 Assignment remains explicit and multi-valued: Beth Pruitt can be both Program
@@ -345,7 +346,7 @@ existing Admin Overview, not as another configuration panel.
 
 | Invariant | Likely surfaces | Required proof |
 |---|---|---|
-| No new Admin layer | `pages/admin.js`, existing Final Writeup component | One Workflows navigation entry, one editor panel, one Publish action |
+| One Final Writeup configuration owner | `pages/admin.js`, existing Final Writeup component | People & Access → Staffing hosts one editor and one Publish action; legacy Workflows entry links there; Grants Manager shared-role access does not grant publication |
 | Both live program audiences survive migration | configuration service and migration path | Exact reviewer-GUID sets before/after plus signed-in Research matrix read |
 | New reviewer-role users appear automatically | Admin GET and component | Add roster fixture absent from stored personas; it renders unassigned and selectable |
 | Unassigned users do not broaden access | persona resolver and dashboard | Positive row fixture exists but unassigned viewer receives zero persona rows |

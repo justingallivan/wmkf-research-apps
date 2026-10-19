@@ -41,7 +41,7 @@ test('unknown workspace and view values fall back to safe defaults', () => {
 
 test('legacy anchors resolve to their new workspace locations', () => {
   expect(adminLocationForHash('#system-alerts')).toEqual({ workspace: 'operations', view: 'incidents' });
-  expect(adminLocationForHash('#final-writeup-matrix-audiences')).toEqual({ workspace: 'workflows', view: 'final-writeups' });
+  expect(adminLocationForHash('#final-writeup-matrix-audiences')).toEqual({ workspace: 'people', view: 'staffing' });
   expect(adminLocationForHash('#unknown')).toBeNull();
 });
 
