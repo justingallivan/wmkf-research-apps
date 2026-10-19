@@ -54,6 +54,9 @@ async function installApiFixtures(context) {
     const fulfill = (body, status = 200) => route.fulfill({ status, contentType: 'application/json', body: JSON.stringify(body) });
     if (pathname === '/api/auth/status') return fulfill({ enabled: false });
     if (pathname === '/api/auth/session') return fulfill({ user: { name: 'Program Director', email: 'pd@example.org', azureId: 'integrity-e2e-azure-id', userType: 'staff', profileId: 1, dynamicsSystemuserId: '22222222-2222-4222-8222-222222222222' }, expires: new Date(Date.now() + 3600000).toISOString() });
+    // Shared navigation probes capabilities; this ordinary PD has no Board or staffing role.
+    if (request.method() === 'GET' && pathname === '/api/workbench/board-writeups' && !url.search) return fulfill({ canRelease: false, canArchive: false, isSuperuser: false, cycles: [] });
+    if (request.method() === 'GET' && pathname === '/api/workbench/staffing' && url.search === '?capabilities=true') return fulfill({ error: 'A system administrator or the assigned Grants Manager is required.', code: 'board_settings_denied' }, 403);
     if (pathname === '/api/app-access') return fulfill({ apps: ['reviewers', 'integrity-screener'], isSuperuser: false });
     if (pathname === '/api/user-profiles') return fulfill({ profiles: [{ id: 1, name: 'Program Director', displayName: 'Program Director', isDefault: true, avatarColor: '#111827' }] });
     if (pathname === '/api/user-preferences') return fulfill({ preferences: {} });

@@ -118,6 +118,9 @@ async function installApiFixture(page, {
         dynamicsSystemuserId: '77777777-7777-4777-8777-777777777777',
       }, expires: new Date(Date.now() + 3600000).toISOString() });
     }
+    // Shared navigation probes capabilities; this ordinary PD has no Board or staffing role.
+    if (request.method() === 'GET' && path === '/api/workbench/board-writeups' && !url.search) return fulfill({ canRelease: false, canArchive: false, isSuperuser: false, cycles: [] });
+    if (request.method() === 'GET' && path === '/api/workbench/staffing' && url.search === '?capabilities=true') return fulfill({ error: 'A system administrator or the assigned Grants Manager is required.', code: 'board_settings_denied' }, 403);
     if (path === '/api/app-access') return fulfill({ apps: ['reviewers'], isSuperuser: false });
     if (path === '/api/user-profiles') {
       return fulfill({ profiles: [{ id: 1, name: 'Program Director', displayName: 'Program Director', isDefault: true, avatarColor: '#111827' }] });
