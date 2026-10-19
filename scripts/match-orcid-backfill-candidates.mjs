@@ -3,7 +3,8 @@
  * backfill. Reads the pool JSON written by
  * export-research-orcid-backfill-pool.mjs, searches the public ORCID registry,
  * and writes a review CSV. No Dataverse access and no Dataverse writes; the
- * only network calls are ORCID's token and expanded-search endpoints.
+ * only network calls are ORCID's token and expanded-search endpoints and ROR's
+ * organization search (email domains only, to infer a current institution).
  *
  * Grades (a human reviews every row before any write):
  *   high   — PI only: one reviewer-record ORCID whose profile name matches; or
@@ -93,13 +94,47 @@ function nameMatch(person, rec) {
 const { people } = JSON.parse(fs.readFileSync(IN, 'utf8'));
 const results = [];
 const validation = [];
+
+// Email domain → institution via ROR v2 (only the domain is sent). Keep ROR
+// records listing the exact domain; prefer the one with sub-units (a campus
+// over its labs); otherwise accept a sole exact record. Subdomains fall back
+// to their parent domain (mednet.ucla.edu → ucla.edu). The result reflects the
+// person's CURRENT institution, so it can lift a match to review, never high.
+const FREEMAIL = /^(gmail|googlemail|yahoo|hotmail|outlook|live|icloud|me|mac|aol|protonmail|comcast|msn)\./;
+const domainInstitution = new Map();
+async function rorForDomain(domain) {
+  await sleep(100);
+  const res = await fetch(`https://api.ror.org/v2/organizations?query.advanced=${encodeURIComponent(`domains:${domain}`)}`);
+  if (!res.ok) throw new Error(`ROR ${res.status}`);
+  const exact = ((await res.json()).items || []).filter((it) => (it.domains || []).includes(domain));
+  const parents = exact.filter((it) => (it.relationships || []).some((r) => r.type === 'child'));
+  const pick = parents.length === 1 ? parents[0] : exact.length === 1 ? exact[0] : null;
+  // Display name first: it is the one shown in the review CSV.
+  return pick ? (pick.names || []).filter((n) => !n.types.includes('acronym'))
+    .sort((a, b) => b.types.includes('ror_display') - a.types.includes('ror_display')).map((n) => n.value) : null;
+}
+for (const domain of new Set(people.map((p) => (p.email.split('@')[1] || '').toLowerCase()).filter(Boolean))) {
+  if (FREEMAIL.test(domain)) continue;
+  const labels = domain.split('.');
+  for (let k = 0; k <= labels.length - 2 && !domainInstitution.has(domain); k++) {
+    try {
+      const names = await rorForDomain(labels.slice(k).join('.'));
+      if (names?.length) domainInstitution.set(domain, names);
+    } catch { break; }
+  }
+}
+console.log(`Email domains resolved to an institution: ${domainInstitution.size}`);
+
 let i = 0;
 for (const person of people) {
   i += 1;
   const name = `${person.firstname} ${person.lastname}`.trim() || person.fullname;
   const isPi = person.roles.includes('PI');
   const applicants = person.institutions.filter((x) => x.source === 'award-applicant' && usableInst(x.name)).map((x) => x.name);
-  const allInst = [...new Set(person.institutions.map((x) => x.name).filter(usableInst))];
+  const domainInst = domainInstitution.get((person.email.split('@')[1] || '').toLowerCase()) || [];
+  const recordInst = [...new Set(person.institutions.map((x) => x.name).filter(usableInst))];
+  const allInst = [...new Set([...recordInst, ...domainInst])];
+  const searchInst = [...recordInst.slice(0, 2), ...(domainInst.length && !recordInst.some((r) => instMatch(r, domainInst[0])) ? [domainInst[0]] : [])];
   const familyParts = norm(person.lastname).split(' ').filter((w) => w.length > 1);
 
   // Searches: full name; full name + institution; family name + institution
@@ -109,7 +144,7 @@ for (const person of people) {
   try {
     const add = (recs) => { for (const rec of recs) records.set(rec.orcidId, rec); };
     add(await search({ name, maxResults: 25 }));
-    for (const inst of allInst.slice(0, 2)) {
+    for (const inst of searchInst) {
       add(await search({ name, affiliation: inst, maxResults: 10 }));
       add(await search({ name: person.lastname.replace(/\s+/g, '-'), affiliation: inst, maxResults: 10 }));
     }
@@ -121,6 +156,7 @@ for (const person of people) {
       ...rec,
       applicantMatch: applicants.some((a) => rec.institutions.some((ri) => instMatch(a, ri))),
       instMatch: allInst.some((a) => rec.institutions.some((ri) => instMatch(a, ri))),
+      domainMatch: domainInst.some((a) => rec.institutions.some((ri) => instMatch(a, ri))),
       emailMatch: Boolean(person.email) && rec.emails.some((e) => e.toLowerCase() === person.email.toLowerCase()),
       reviewerMatch: person.reviewerOrcids.includes(rec.orcidId),
     }));
@@ -144,7 +180,7 @@ for (const person of people) {
   } else if (person.reviewerOrcids.length) { grade = 'review'; reason = 'linked reviewer-record ORCID not found by name search'; }
   else if (candidates.filter(full).length === 1 && fullNoInst.length === 1) { grade = 'review'; reason = 'only full-name match; record lists no affiliations'; }
 
-  (person.knownOrcid ? validation : results).push({ person, grade, reason, candidates });
+  (person.knownOrcid ? validation : results).push({ person, grade, reason, candidates, domainInst });
   if (i % 25 === 0) console.log(`  ${i}/${people.length}`);
 }
 
@@ -168,13 +204,13 @@ const header = ['grade', 'reason', 'role', 'contactid', 'name', 'email', 'instit
 for (let n = 1; n <= 3; n++) header.push(`cand${n}_orcid`, `cand${n}_url`, `cand${n}_name`, `cand${n}_signals`, `cand${n}_institutions`);
 const lines = [header.join(',')];
 const order = { high: 0, review: 1, none: 2 };
-for (const { person, grade, reason, candidates } of results.sort((a, b) => order[a.grade] - order[b.grade])) {
+for (const { person, grade, reason, candidates, domainInst } of results.sort((a, b) => order[a.grade] - order[b.grade])) {
   const cells = [grade, reason, person.roles.join('+'), person.contactId, person.fullname || `${person.firstname} ${person.lastname}`, person.email,
-    person.institutions.map((x) => `${x.name} [${x.source}]`).join('; '),
+    person.institutions.map((x) => `${x.name} [${x.source}]`).concat(domainInst.length ? [`${domainInst[0]} [email-domain]`] : []).join('; '),
     [...new Set(person.awards.map((a) => (a.meetingDate || '').slice(0, 4)))].join(' '),
     person.reviewerOrcids.join(' '), candidates.length];
   for (const c of candidates.slice(0, 3).concat([{}, {}, {}]).slice(0, 3)) {
-    const signals = c.orcidId ? ['reviewerMatch', 'emailMatch', 'applicantMatch', 'instMatch'].filter((k) => c[k]).map((k) => k.replace('Match', ''))
+    const signals = c.orcidId ? ['reviewerMatch', 'emailMatch', 'applicantMatch', 'instMatch', 'domainMatch'].filter((k) => c[k]).map((k) => k.replace('Match', ''))
       .concat(c.nameLevel === 'initial' ? ['first-initial-only'] : []).join(' ') : '';
     cells.push(c.orcidId, c.orcidUrl, c.orcidId ? `${c.givenNames || ''} ${c.familyName || ''}`.trim() : '', signals, (c.institutions || []).slice(0, 6).join('; '));
   }
