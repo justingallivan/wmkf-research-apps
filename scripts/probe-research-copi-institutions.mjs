@@ -125,7 +125,7 @@ row(copiIds.length, 'distinct co-PI contacts');
 const piIds = [...new Set(requests.map((r) => lc(r._wmkf_projectleader_value)).filter(Boolean))];
 const contactIds = [...new Set([...piIds, ...copiIds])];
 const contacts = new Map((await inBatches(contactIds, 50, (ids) => readAll('contacts', {
-  select: 'contactid,_parentcustomerid_value,adx_organizationname,wmkf_orcid',
+  select: 'contactid,_parentcustomerid_value,adx_organizationname,wmkf_copiorganizationname,wmkf_orcid',
   filter: ids.map((id) => `contactid eq ${id}`).join(' or '),
 }))).map((c) => [lc(c.contactid), c]));
 
@@ -152,6 +152,23 @@ const report = (label, assignments) => {
 };
 report('PIs', requests.filter((r) => r._wmkf_projectleader_value).map((r) => ({ request: lc(r.akoya_requestid), contact: lc(r._wmkf_projectleader_value) })));
 report('Co-PIs', pairs);
+
+// Free-text institution fields on co-PI contacts (contact-level, not per award).
+const has = (id, f) => Boolean(contacts.get(id)?.[f]?.trim());
+console.log('\nCo-PI free-text institution fields on contact:');
+row(copiIds.filter((id) => has(id, 'wmkf_copiorganizationname')).length, 'wmkf_copiorganizationname populated', copiIds.length);
+row(copiIds.filter((id) => has(id, 'adx_organizationname')).length, 'adx_organizationname populated', copiIds.length);
+row(copiIds.filter((id) => has(id, 'wmkf_copiorganizationname') && has(id, 'adx_organizationname')
+  && contacts.get(id).wmkf_copiorganizationname.trim().toLowerCase() !== contacts.get(id).adx_organizationname.trim().toLowerCase()).length,
+'  both populated but different text', copiIds.length);
+row(copiIds.filter((id) => contacts.get(id)?._parentcustomerid_value || has(id, 'wmkf_copiorganizationname') || has(id, 'adx_organizationname')).length,
+  'any institution signal (account or either text field)', copiIds.length);
+const copiRequests = [...new Set(pairs.map((p) => p.request))];
+const collab = await inBatches(copiRequests, 50, (ids) => readAll('akoya_requests', {
+  select: 'akoya_requestid,akoya_collaboration',
+  filter: `(${ids.map((id) => `akoya_requestid eq ${id}`).join(' or ')}) and akoya_collaboration ne null`,
+}));
+row(collab.length, 'co-PI requests with akoya_collaboration text', copiRequests.length);
 
 console.log('\nCo-PI ORCID on contact:');
 row(copiIds.filter((id) => normalizeOrcid(contacts.get(id)?.wmkf_orcid).state === 'valid').length, 'distinct co-PI contacts with a valid ORCID', copiIds.length);
