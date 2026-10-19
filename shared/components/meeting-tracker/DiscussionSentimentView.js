@@ -342,6 +342,7 @@ export default function DiscussionSentimentView() {
       <PageHeader title="Discussion Sentiment" subtitle="Compare how staff received the proposals you choose, with quotes from the staff discussion." />
       <p className="mb-4 text-sm text-gray-600">
         <Link href="/meeting-tracker" className="font-semibold text-blue-700 underline underline-offset-4">Back to Meeting Tracker</Link>
+        <Link href="/meeting-tracker/program-briefing" className="ml-5 font-semibold text-blue-700 underline underline-offset-4">Program briefing</Link>
       </p>
 
       <div className="mb-6 flex flex-wrap items-end gap-4">
