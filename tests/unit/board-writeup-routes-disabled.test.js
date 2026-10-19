@@ -3,13 +3,14 @@ import workbench from '../../pages/api/workbench/board-writeups';
 import admin from '../../pages/api/admin/board-writeup-cycles';
 import { requireAppAccess } from '../../lib/utils/auth';
 import { withDalContext } from '../../lib/dataverse/core/context';
+import { candidates } from '../../lib/services/board-writeups/source';
 import { completeCleanup } from '../../lib/services/board-writeups/service';
-import { boardActor, listCycles } from '../../lib/services/board-writeups/config';
+import { boardActor, listCycles, getRole, getCycle, staffDirectory, saveRole } from '../../lib/services/board-writeups/config';
 jest.mock('../../lib/utils/auth', () => ({ requireAppAccess: jest.fn() }));
 jest.mock('../../lib/dataverse/core/context', () => ({ withDalContext: jest.fn((_name, fn) => fn()) }));
-jest.mock('../../lib/services/board-writeups/config', () => ({ boardActor: jest.fn(), listCycles: jest.fn() }));
+jest.mock('../../lib/services/board-writeups/config', () => ({ boardActor: jest.fn(), listCycles: jest.fn(), getRole: jest.fn(), getCycle: jest.fn(), staffDirectory: jest.fn(), saveRole: jest.fn() }));
 jest.mock('../../lib/services/board-writeups/service', () => ({ completeCleanup: jest.fn() }));
-jest.mock('../../lib/services/board-writeups/source', () => ({}));
+jest.mock('../../lib/services/board-writeups/source', () => ({ candidates: jest.fn() }));
 jest.mock('../../lib/services/board-writeups/archive', () => ({}));
 jest.mock('../../lib/services/board-writeups/recovery', () => ({}));
 const original = { ...process.env };
@@ -71,4 +72,19 @@ test('cleanup completion uses authenticated actor and rejects client-supplied id
   await admin({ method: 'POST', body: { action: 'completeCleanup', cycle: 'D26', value: { actorId: 'forged' } } }, denied);
   expect(denied.status).toHaveBeenCalledWith(400);
   expect(completeCleanup).not.toHaveBeenCalled();
+});
+
+ test('assigned Grants Manager can read setup and dispatch role save; other staff are denied', async () => {
+  process.env.RESEARCH_LEADERSHIP_DIGEST_MODE = 'board-release'; process.env.BOARD_WRITEUPS_ENABLED = 'on';
+  boardActor.mockResolvedValue({ canArchive: true, isSuperuser: false });
+  getCycle.mockResolvedValue({ value: null }); getRole.mockResolvedValue({ value: null }); staffDirectory.mockResolvedValue([]); candidates.mockResolvedValue([]);
+  const res = response();
+  await admin({ method: 'GET', query: { cycle: 'D26' } }, res);
+  expect(res.json).toHaveBeenCalledWith(expect.objectContaining({ staff: [], candidates: [], cycle: { value: null } }));
+  await admin({ method: 'POST', body: { action: 'role', role: 'president', value: { version: 1, systemUserId: null }, expectedRevision: null } }, response());
+  expect(saveRole).toHaveBeenCalledWith({ profileId: 'admin', systemUserId: 'staff' }, 'president', { version: 1, systemUserId: null }, null);
+  jest.clearAllMocks(); boardActor.mockResolvedValue({ canArchive: false, canRelease: true });
+  const denied = response();
+  await admin({ method: 'GET', query: { cycle: 'D26' } }, denied);
+  expect(denied.status).toHaveBeenCalledWith(403); expect(staffDirectory).not.toHaveBeenCalled();
 });

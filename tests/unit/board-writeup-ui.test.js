@@ -3,7 +3,7 @@ import { render, screen, fireEvent, waitFor, act } from '@testing-library/react'
 import BoardWriteups from '../../shared/components/board-writeups/BoardWriteups';
 const ID = '11111111-1111-4111-8111-111111111111';
 const row = { requestId: ID, source: { number: '1002988', institution: 'Institute', documentId: ID, eTag: 'one', versionId: '1', earlyDraft: true, stage: 'Drafting' } };
-const data = { config: { materialsDue: '2026-11-01' }, progress: { released: 0, expected: 23 }, rows: [row], events: [], canRelease: true, canArchive: false };
+const data = { config: { active: true, rosterConfirmed: true, materialsDue: '2026-11-01' }, progress: { released: 0, expected: 23 }, rows: [row], events: [], canRelease: true, canArchive: false };
 const response = body => ({ ok: true, status: 200, json: async () => body });
 afterEach(() => jest.restoreAllMocks());
 test('early draft release requires warning and submits the version shown, with queued result', async () => {
@@ -33,6 +33,7 @@ test('a late response from the previous cycle cannot replace the new cycle', asy
   render(<BoardWriteups />);
   await waitFor(() => expect(global.fetch).toHaveBeenCalledWith(expect.stringContaining('cycle=D26'), expect.anything()));
   fireEvent.change(screen.getByLabelText('Cycle'), { target: { value: 'J27' } });
+  fireEvent.click(screen.getByText('Open cycle'));
   expect(await screen.findByText('NEW123')).toBeTruthy();
   await act(async () => { resolveOld(response(data)); });
   expect(screen.queryByText('1002988')).toBeNull();
@@ -55,10 +56,10 @@ test('admin can mark cleanup complete and sees the saved completion state', asyn
   global.fetch = jest.fn(async (url, options) => {
     if (options.method === 'POST') { posts.push(JSON.parse(options.body)); complete = true; return response({ completedAt: '2026-12-08T17:00:00Z' }); }
     if (url.startsWith('/api/admin/')) return response({ cycle: { value: null }, roles: { president: { value: null, revision: null }, cso: { value: null }, grantsManager: { value: null } }, staff: [], candidates: [] });
-    return response(url.includes('?') ? board() : { canRelease: true, canArchive: false, isSuperuser: true });
+    return response(url.includes('?') ? board() : { canRelease: true, canArchive: true, isSuperuser: true });
   });
   jest.spyOn(window, 'confirm').mockReturnValue(true);
-  render(<BoardWriteups />);
+  render(<BoardWriteups mode="setup" />);
   fireEvent.click(await screen.findByText('Mark cleanup complete'));
   await waitFor(() => expect(posts).toEqual([{ action: 'completeCleanup', cycle: 'D26' }]));
   expect(await screen.findByText(/Cleanup marked complete by Admin/)).toBeTruthy();
@@ -80,17 +81,18 @@ test('late cleanup completion response does not update a newly selected cycle', 
   global.fetch = jest.fn(async (url, options) => {
     if (options.method === 'POST') return pending;
     if (url.startsWith('/api/admin/')) return response({ cycle: { value: null }, roles: { president: { value: null, revision: null }, cso: { value: null }, grantsManager: { value: null } }, staff: [], candidates: [] });
-    if (!url.includes('?')) return response({ canRelease: true, isSuperuser: true });
+    if (!url.includes('?')) return response({ canRelease: true, canArchive: true, isSuperuser: true });
     return response({ ...data, isSuperuser: true, cleanup: { dueDate: url.includes('J27') ? '2027-06-08' : '2026-12-08', canComplete: !url.includes('J27') } });
   });
   jest.spyOn(window, 'confirm').mockReturnValue(true);
-  render(<BoardWriteups />);
+  render(<BoardWriteups mode="setup" />);
   fireEvent.click(await screen.findByText('Mark cleanup complete'));
   fireEvent.change(screen.getByLabelText('Cycle'), { target: { value: 'J27' } });
-  await screen.findByText(/2027-06-08/);
+  fireEvent.click(screen.getByText('Open cycle'));
+  await screen.findByText(/June 8, 2027/);
   await act(async () => { finish(response({ completedAt: '2026-12-08T17:00:00Z' })); });
   expect(screen.queryByText(/Cleanup marked complete/)).toBeNull();
-  expect(screen.getByText(/2027-06-08/)).toBeTruthy();
+  expect(screen.getByText(/June 8, 2027/)).toBeTruthy();
 });
 
 test('failed setup save shows an error beside Save setup and preserves entered dates', async () => {
@@ -100,11 +102,11 @@ test('failed setup save shows an error beside Save setup and preserves entered d
       ? { ok: false, status: 500, json: async () => ({ error: 'Board operation failed.' }) }
       : response({ value: JSON.parse(options.body).value, revision: 'saved' });
     if (url.startsWith('/api/admin/')) return response({ cycle: { value: null, revision: null }, roles: { president: { value: null, revision: null }, cso: { value: null }, grantsManager: { value: null } }, staff: [], candidates: [] });
-    return response(url.includes('?') ? data : { canRelease: true, isSuperuser: true });
+    return response(url.includes('?') ? data : { canRelease: true, canArchive: true, isSuperuser: true });
   });
-  render(<BoardWriteups />);
+  render(<BoardWriteups mode="setup" />);
   const save = await screen.findByText('Save setup');
-  expect(save.closest('details').open).toBe(true);
+  expect(screen.getByRole('region', { name: 'Cycle setup' })).toBeTruthy();
   fireEvent.change(screen.getByLabelText('Board meeting end date'), { target: { value: '2026-12-10' } });
   fireEvent.click(save);
   const alert = await screen.findByRole('alert');
@@ -114,9 +116,11 @@ test('failed setup save shows an error beside Save setup and preserves entered d
   expect(save.nextElementSibling).toBe(alert);
   expect(document.activeElement).toBe(alert);
   expect(screen.getByLabelText('Board meeting end date').value).toBe('2026-12-10');
+  expect(screen.getByText('Unsaved cycle changes')).toBeTruthy();
   refuse = false;
   fireEvent.click(save);
   await screen.findByText('Cycle setup saved.');
+  expect(screen.getByText('No unsaved cycle changes')).toBeTruthy();
   expect(screen.queryByRole('alert')).toBeNull();
   expect(save.nextElementSibling.getAttribute('role')).toBe('status');
 });
@@ -129,9 +133,104 @@ test('administrator can assign President through the existing role settings', as
     if (url.startsWith('/api/admin/')) return response({ cycle: { value: null }, roles: { president: { value: null, revision: null }, cso: { value: null }, grantsManager: { value: null } }, staff: [{ systemUserId: ID, name: 'Example Staff' }], candidates: [] });
     return response(url.includes('?') ? data : { isSuperuser: true, canArchive: true });
   });
-  render(<BoardWriteups />);
-  fireEvent.change(await screen.findByLabelText('President'), { target: { value: ID } });
-  await screen.findByText('Role saved.');
+  render(<BoardWriteups mode="setup" />);
+  const president = await screen.findByLabelText('President');
+  president.focus();
+  fireEvent.change(president, { target: { value: ID } });
+  const savedNotice = await screen.findByText('Role saved.');
+  expect(document.activeElement).toBe(president);
+  expect(president.closest('div').contains(savedNotice)).toBe(true);
   expect(posts).toEqual([{ action: 'role', role: 'president', value: { version: 1, systemUserId: ID }, expectedRevision: null }]);
   expect(screen.getByLabelText('President').value).toBe(ID);
+});
+
+test.each([
+  ['system administrator', { isSuperuser: true, canArchive: true, canRelease: false }],
+  ['Grants Manager', { isSuperuser: false, canArchive: true, canRelease: false }],
+])('%s can view dashboard without setup requests or release/maintenance controls', async (_role, permissions) => {
+  const urls = [];
+  global.fetch = jest.fn(async url => { urls.push(url); return response(url.includes('?') ? { ...data, ...permissions, cleanup: { canComplete: true } } : permissions); });
+  render(<BoardWriteups />);
+  await screen.findByText('1002988');
+  expect(screen.getByText('Cycle setup & maintenance').getAttribute('href')).toBe('/board-cycle-setup?cycle=D26');
+  expect(screen.queryByText('Release selected to the President')).toBeNull();
+  expect(screen.queryByText('Save setup')).toBeNull();
+  expect(screen.queryByText('Staff-discussion cleanup')).toBeNull();
+  expect(screen.queryByText('Check Board writeups')).toBeNull();
+  expect(urls.some(url => url.startsWith('/api/admin/'))).toBe(false);
+});
+
+test('empty inactive cycle explains setup without zero denominator or empty headers', async () => {
+  global.fetch = jest.fn(async url => response(url.includes('?') ? { ...data, config: { active: false }, progress: { expected: 0, released: 0 }, rows: [] } : { canRelease: true }));
+  render(<BoardWriteups />);
+  await screen.findByText('This cycle isn’t ready for release yet');
+  expect(screen.queryByRole('table')).toBeNull();
+  expect(screen.queryByText(/0 of 0/)).toBeNull();
+  expect(screen.queryByText('Release selected to the President')).toBeNull();
+  expect(screen.getByText(/No proposals have been selected/)).toBeTruthy();
+});
+
+test('only missing cycle is treated as setup needed; real read errors remain errors', async () => {
+  let code = 'board_cycle_unconfigured';
+  global.fetch = jest.fn(async url => url.includes('?') ? { ok: false, status: 404, json: async () => ({ code, error: 'Read failed' }) } : response({ canArchive: true }));
+  render(<BoardWriteups />);
+  await screen.findByText('Complete cycle setup');
+  code = 'board_settings_corrupt';
+  fireEvent.click(screen.getByText('Refresh status'));
+  await screen.findByRole('alert');
+  expect(screen.queryByText('Complete cycle setup')).toBeNull();
+  expect(screen.getByText('Try again')).toBeTruthy();
+});
+
+test('Grants Manager can open setup before a cycle exists; dashboard remains separate', async () => {
+  global.fetch = jest.fn(async url => {
+    if (url.startsWith('/api/admin/')) return response({ cycle: { value: null, revision: null }, roles: { president: {}, cso: {}, grantsManager: {} }, staff: [], candidates: [] });
+    if (url.includes('?')) return { ok: false, status: 404, json: async () => ({ code: 'board_cycle_unconfigured' }) };
+    return response({ canArchive: true, canRelease: false, isSuperuser: false });
+  });
+  render(<BoardWriteups mode="setup" />);
+  await screen.findByText('Save setup');
+  expect(screen.getByLabelText('President')).toBeTruthy();
+  expect(screen.queryByRole('table')).toBeNull();
+  expect(screen.queryByText('Release selected to the President')).toBeNull();
+});
+
+test('CSO without setup authority cannot load settings on setup page', async () => {
+  global.fetch = jest.fn(async () => response({ canRelease: true, canArchive: false }));
+  render(<BoardWriteups mode="setup" />);
+  await screen.findByRole('alert');
+  expect(global.fetch).toHaveBeenCalledTimes(1);
+  expect(screen.queryByText('Save setup')).toBeNull();
+});
+
+test('cycle input waits for valid submission and retains loaded data while typing', async () => {
+  global.fetch = jest.fn(async url => response(url.includes('?') ? data : { canRelease: true }));
+  render(<BoardWriteups />);
+  await screen.findByText('1002988');
+  fireEvent.change(screen.getByLabelText('Cycle'), { target: { value: 'J' } });
+  expect(screen.getByText('1002988')).toBeTruthy();
+  fireEvent.click(screen.getByText('Open cycle'));
+  await screen.findByText('Enter a cycle such as D26 or J27.');
+  expect(global.fetch).toHaveBeenCalledTimes(2);
+});
+
+test('refresh and cycle switching require confirmation before discarding unsaved setup', async () => {
+  global.fetch = jest.fn(async url => url.startsWith('/api/admin/')
+    ? response({ cycle: { value: null, revision: null }, roles: { president: {}, cso: {}, grantsManager: {} }, staff: [], candidates: [] })
+    : response(url.includes('?') ? data : { canArchive: true, isSuperuser: true }));
+  jest.spyOn(window, 'confirm').mockReturnValue(false);
+  render(<BoardWriteups mode="setup" />);
+  fireEvent.change(await screen.findByLabelText('Board meeting end date'), { target: { value: '2026-12-10' } });
+  fireEvent.click(screen.getByText('Refresh status'));
+  expect(window.confirm).toHaveBeenCalledWith('Discard your unsaved cycle setup changes?');
+  expect(screen.getByLabelText('Board meeting end date').value).toBe('2026-12-10');
+  expect(global.fetch).toHaveBeenCalledTimes(3);
+  fireEvent.change(screen.getByLabelText('Cycle'), { target: { value: 'J27' } });
+  fireEvent.click(screen.getByText('Open cycle'));
+  expect(global.fetch).toHaveBeenCalledTimes(3);
+  expect(screen.getByLabelText('Board meeting end date').value).toBe('2026-12-10');
+  window.confirm.mockReturnValue(true);
+  fireEvent.click(screen.getByText('Refresh status'));
+  await waitFor(() => expect(global.fetch).toHaveBeenCalledTimes(6));
+  expect((await screen.findByLabelText('Board meeting end date')).value).toBe('');
 });
