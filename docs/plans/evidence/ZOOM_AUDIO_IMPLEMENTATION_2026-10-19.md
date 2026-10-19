@@ -3,7 +3,7 @@ title: Zoom audio preallocation implementation evidence
 domain: meeting-tracker
 kind: audit
 status: active
-summary: "Branch code passes local tests and Node 22/24 wire/media checks. Memory outliers are recorded; hosted/provider acceptance and promotion remain pending."
+summary: "Branch code passes local tests and bounded real-Blob Preview checks. Memory outliers are recorded; provider acceptance and Production promotion remain pending."
 owner: product-engineering
 ---
 
@@ -12,7 +12,9 @@ owner: product-engineering
 [VERIFIED via source and local commands, 2026-10-19] Implemented on
 `codex/zoom-audio-streaming` against the fingerprinted
 [Opus-reviewed specification](../ZOOM_AUDIO_STREAMING_PLAN_2026-10-19.md).
-This receipt records branch source, not a deployed change. No migration,
+This receipt records branch source and local checks. Subsequent
+[bounded Preview acceptance](ZOOM_AUDIO_PREVIEW_VALIDATION_2026-10-19.md) passed;
+no Production deployment is claimed. No migration,
 environment update, live Zoom call, real recording or AssemblyAI request was
 made. The existing 200 MiB/four-hour caps, private-store selection, parser worker,
 job schema and uncertain-submission policy remain unchanged.
@@ -58,8 +60,8 @@ Opus specification approval and is not a hosted acceptance claim.
 - Node **22.23.3** and **24.22.0**: **40 tests each** for the real reader,
   production-provider/safeFetch wire seam and media inspection. Tests use the
   installed Undici transport for loopback; the memory comparison uses each
-  process's native fetch. Actual configured deployment behavior is still a
-  Preview gate, not inferred from a local runtime version.
+  process's native fetch. The subsequent Preview receipt records the actual Node 22.23.2 runtime;
+  local runtime parity alone was not treated as hosted proof.
 - Scoped ESLint, `npm run check:types` and the standard Next production build
   passed. The build compiled workflows and traced the unchanged inspector worker
   plus music-metadata for owner start, Meeting start and Zoom import. The emitted
@@ -137,10 +139,11 @@ The fingerprinted specification and original reviews remain immutable dated
 records. Other feature/provenance/attendance history is outside this audio change.
 No current audio statement is intended to claim deployed optimization.
 
-Still required before promotion: CI, synthetic Preview with actual configured
-runtime, real Blob SDK/store and bundled parser, abort/slow-source checks and
-concurrent memory/timing, then separately authorized real-provider acceptance and
-owner promotion. Non-abortable auth/database work, hard termination, transient
+The linked Preview receipt now verifies the real Blob SDK/store, configured
+runtime, bundled parser, corrupt-byte rejection and bounded concurrent memory/
+timing. Remaining before promotion: final-head CI, separately authorized real-
+provider acceptance and owner promotion. Hosted slow-source/disconnect, live Zoom
+and sustained independent concurrency remain untested. Non-abortable auth/database work, hard termination, transient
 pre-intent failures becoming failed/cleanup, post-intent zero-POST uncertainty and
 orphan remote uploads remain explicit residuals. No production OOM or universal
 memory ceiling is established.

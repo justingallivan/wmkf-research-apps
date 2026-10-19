@@ -131,7 +131,7 @@ sequence.
   Owner priority 2026-10-07: a to-do, not the highest priority.
 
 - **Reduce transcription audio copies and stream verified uploads (2026-10-19).**
-  [BUILT ON `codex/zoom-audio-streaming` — not merged/deployed] The reviewed
+  [BUILT ON `codex/zoom-audio-streaming` — PR #513; Preview tested, not merged] The reviewed
   [plan](plans/ZOOM_AUDIO_STREAMING_PLAN_2026-10-19.md) is implemented: metadata-gated
   preallocation with bounded fallback, full-file integrity checks, bounded upload
   streams, caller deadlines and pre-upload lease/switch checks. Zoom import opts
@@ -139,9 +139,13 @@ sequence.
   before queue validation; the Blob reread and copying inspector remain.
   [Implementation evidence](plans/evidence/ZOOM_AUDIO_IMPLEMENTATION_2026-10-19.md)
   records local tests and memory results, including outliers and concurrent starts.
-  Keep the 200 MiB/four-hour limits. Remaining: CI, synthetic hosted validation,
-  separately authorized real-provider acceptance and deliberate promotion.
-  Local memory reductions do not establish a safe hosted concurrency bound.
+  [Real private Blob Preview validation](plans/evidence/ZOOM_AUDIO_PREVIEW_VALIDATION_2026-10-19.md)
+  passed small, 199 MiB, two concurrent near-cap operations and corrupt-byte
+  rejection with verified cleanup. The concurrent process peak was 1,898 MiB;
+  this does not establish a safe sustained concurrency bound. Keep the 200 MiB/
+  four-hour limits. Remaining: final-head CI, separately authorized real-provider
+  acceptance and deliberate promotion; live Zoom and hosted slow-source/abort
+  acceptance remain untested.
 
 - **Site Visit page redesign and follow-ups — implemented.**
   [VERIFIED via source and Git ancestry, 2026-10-19] The redesign merged as

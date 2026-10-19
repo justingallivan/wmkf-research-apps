@@ -3,7 +3,7 @@ title: Zoom audio adversarial review disposition
 domain: meeting-tracker
 kind: decision
 status: active
-summary: "Opus approved the preallocation/upload design including Zoom. Branch implementation is locally tested; hosted/provider validation and promotion remain pending."
+summary: "Opus approved the audio design. Branch code passes local and bounded real-Blob Preview tests; provider acceptance and Production promotion remain pending."
 owner: product-engineering
 ---
 
@@ -18,7 +18,8 @@ preserves each verdict. The approved plan SHA-256 is
 This is specification approval, not proof of runtime or production readiness.
 The planning/review task changed no application code or external state. The
 subsequent owner-authorized [branch implementation](ZOOM_AUDIO_IMPLEMENTATION_2026-10-19.md)
-is locally tested and remains unmerged/undeployed. No real provider acceptance
+is locally tested and [Preview-verified](ZOOM_AUDIO_PREVIEW_VALIDATION_2026-10-19.md),
+and remains unmerged without a Production deployment. No real provider acceptance
 or production change is claimed.
 
 ## Selected design and premise
@@ -70,9 +71,10 @@ qualified its unconditional chunked-framing prediction; actual deployed/provider
 compatibility remains unverified.
 
 The linked implementation receipt records local tests, gates, actual-code
-comparisons and Node 22/24 wire checks. A bounded synthetic Preview test must
-still assess the actual configured deployment runtime, SDK/store behavior, memory
-and concurrent starts. A real provider acceptance check requires separate authorization.
+comparisons and Node 22/24 wire checks. A [bounded synthetic Preview test](ZOOM_AUDIO_PREVIEW_VALIDATION_2026-10-19.md)
+has now exercised the configured runtime, real SDK/store, integrity/parser and
+concurrent byte operations. It does not prove sustained independent concurrency,
+missing-header fallback or hosted slow-source/disconnect behavior. A real provider acceptance check requires separate authorization.
 Hard termination, non-abortable database/auth work and orphaned remote uploads
 remain explicit residuals; streaming does not eliminate them. No byte-cap
 increase or deployment is authorized by this design review.

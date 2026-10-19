@@ -1,0 +1,169 @@
+{
+  "projectId": "prj_56SJKzNer1aV38kKVoP8tl3X0lf3",
+  "deploymentId": "dpl_BoK3vfgYgNtgEevSPJ3yM4h7dP7S",
+  "url": "https://wmkfresearchapps-ou7vrcc7c-justin-gallivans-projects.vercel.app",
+  "commit": "5b534b8ecb5752640c6478c80e077d5ba0b4f584",
+  "nodeVersion": "22.x",
+  "region": "iad1",
+  "fluid": true,
+  "memoryType": "standard",
+  "observedAt": "2026-10-19T21:47:12.517Z",
+  "scenarios": {
+    "small": {
+      "ok": true,
+      "scenario": "small",
+      "runtime": "v22.23.2",
+      "region": "iad1",
+      "sourceCommit": "5b534b8ecb5752640c6478c80e077d5ba0b4f584",
+      "elapsedMs": 1085,
+      "samples": [
+        {
+          "bytes": 1048576,
+          "headerMatched": true,
+          "sha256": "04bf66e262c96ec56fec1ee89a3e78ffccd3200f64c3e25a7bfa4853bd0e3c53",
+          "container": "M4A/mp42/isom",
+          "durationSeconds": 3.0650340136054424,
+          "integrityRejected": false
+        }
+      ],
+      "cleanupVerified": true,
+      "before": {
+        "rss": 96030720,
+        "heapTotal": 29687808,
+        "heapUsed": 23178984,
+        "external": 4028291,
+        "arrayBuffers": 142552
+      },
+      "sampledPeak": {
+        "rss": 128954368,
+        "external": 10389887,
+        "arrayBuffers": 7541776
+      },
+      "processMaxRssBytes": 128954368,
+      "providerCalls": 0,
+      "jobsCreated": 0
+    },
+    "large": {
+      "ok": true,
+      "scenario": "large",
+      "runtime": "v22.23.2",
+      "region": "iad1",
+      "sourceCommit": "5b534b8ecb5752640c6478c80e077d5ba0b4f584",
+      "elapsedMs": 10684,
+      "samples": [
+        {
+          "bytes": 208666624,
+          "headerMatched": true,
+          "sha256": "92546491489c659a64f0de23df4a6d139cf7aa77d20475e45ea732ccbae49e84",
+          "container": "M4A/mp42/isom",
+          "durationSeconds": 3.0650340136054424,
+          "integrityRejected": false
+        }
+      ],
+      "cleanupVerified": true,
+      "before": {
+        "rss": 111992832,
+        "heapTotal": 42426368,
+        "heapUsed": 24173112,
+        "external": 5111794,
+        "arrayBuffers": 1226050
+      },
+      "sampledPeak": {
+        "rss": 947052544,
+        "external": 841621774,
+        "arrayBuffers": 835123524
+      },
+      "processMaxRssBytes": 1155756032,
+      "providerCalls": 0,
+      "jobsCreated": 0
+    },
+    "concurrent": {
+      "ok": true,
+      "scenario": "concurrent",
+      "runtime": "v22.23.2",
+      "region": "iad1",
+      "sourceCommit": "5b534b8ecb5752640c6478c80e077d5ba0b4f584",
+      "elapsedMs": 16893,
+      "samples": [
+        {
+          "bytes": 208666624,
+          "headerMatched": true,
+          "sha256": "92546491489c659a64f0de23df4a6d139cf7aa77d20475e45ea732ccbae49e84",
+          "container": "M4A/mp42/isom",
+          "durationSeconds": 3.0650340136054424,
+          "integrityRejected": false
+        },
+        {
+          "bytes": 208666624,
+          "headerMatched": true,
+          "sha256": "92546491489c659a64f0de23df4a6d139cf7aa77d20475e45ea732ccbae49e84",
+          "container": "M4A/mp42/isom",
+          "durationSeconds": 3.0650340136054424,
+          "integrityRejected": false
+        }
+      ],
+      "cleanupVerified": true,
+      "before": {
+        "rss": 320307200,
+        "heapTotal": 30105600,
+        "heapUsed": 22391472,
+        "external": 212740200,
+        "arrayBuffers": 208857126
+      },
+      "sampledPeak": {
+        "rss": 1781760000,
+        "external": 1464736684,
+        "arrayBuffers": 1252223161
+      },
+      "processMaxRssBytes": 1990234112,
+      "providerCalls": 0,
+      "jobsCreated": 0
+    },
+    "corrupt": {
+      "ok": true,
+      "scenario": "corrupt",
+      "runtime": "v22.23.2",
+      "region": "iad1",
+      "sourceCommit": "5b534b8ecb5752640c6478c80e077d5ba0b4f584",
+      "elapsedMs": 467,
+      "samples": [
+        {
+          "bytes": 1048576,
+          "headerMatched": true,
+          "integrityRejected": true
+        }
+      ],
+      "cleanupVerified": true,
+      "before": {
+        "rss": 537350144,
+        "heapTotal": 34824192,
+        "heapUsed": 23060872,
+        "external": 215221896,
+        "arrayBuffers": 211344270
+      },
+      "sampledPeak": {
+        "rss": 538431488,
+        "external": 221575354,
+        "arrayBuffers": 217692249
+      },
+      "processMaxRssBytes": 1990234112,
+      "providerCalls": 0,
+      "jobsCreated": 0
+    }
+  },
+  "cleanup": {
+    "storeId": "store_8bc1I10beREdykxv",
+    "observedAt": "2026-10-19T21:45:53.350Z",
+    "blobCount": 0,
+    "hasMore": false,
+    "storeDeletedReadback404": true,
+    "probeDisabledForFutureDeployments": true,
+    "sharedEnvironmentConnectionRemoved": true
+  },
+  "unauthorized": {
+    "status": 401,
+    "body": {
+      "error": "Unauthorized"
+    }
+  }
+}

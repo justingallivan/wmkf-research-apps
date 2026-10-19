@@ -44,8 +44,9 @@ private Blob, captures scalar provenance, then clears the audio reference before
 start rereads/validates Blob. Listing/detail/download/write/start share the
 server-authored import deadline; the VTT download and each Blob write preserve
 the start reserve. Existing retirement, lease recovery and queued partial-success
-behavior are unchanged. This follow-up is not merged or deployed. No table,
-column, retention or import-state change is introduced. Local memory is still
+behavior are unchanged. This follow-up is Preview-tested and not merged or deployed to Production. Bounded real-Blob proof:
+[Preview receipt](../plans/evidence/ZOOM_AUDIO_PREVIEW_VALIDATION_2026-10-19.md).
+No table, column, retention or import-state change is introduced. Local memory is still
 variable; see the [implementation evidence](../plans/evidence/ZOOM_AUDIO_IMPLEMENTATION_2026-10-19.md).
 
 ## Ownership and contract

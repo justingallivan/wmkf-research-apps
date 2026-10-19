@@ -24,7 +24,7 @@ related:
 
 ## Current status
 
-**[BRANCH SOURCE, 2026-10-19; NOT MERGED/DEPLOYED.]**
+**[BRANCH SOURCE, 2026-10-19; PREVIEW TESTED, NOT MERGED/PRODUCTION.]**
 `codex/zoom-audio-streaming` adds metadata-gated exact-size audio reads with bounded
 fallback and streams only fully verified Buffer views to AssemblyAI. It retains
 full-file SHA-256, the copying inspector, 200 MiB/four-hour limits, private Blob
