@@ -116,9 +116,11 @@ test('failed setup save shows an error beside Save setup and preserves entered d
   expect(save.nextElementSibling).toBe(alert);
   expect(document.activeElement).toBe(alert);
   expect(screen.getByLabelText('Board meeting end date').value).toBe('2026-12-10');
+  expect(screen.getByText('Unsaved cycle changes')).toBeTruthy();
   refuse = false;
   fireEvent.click(save);
   await screen.findByText('Cycle setup saved.');
+  expect(screen.getByText('No unsaved cycle changes')).toBeTruthy();
   expect(screen.queryByRole('alert')).toBeNull();
   expect(save.nextElementSibling.getAttribute('role')).toBe('status');
 });
@@ -132,8 +134,12 @@ test('administrator can assign President through the existing role settings', as
     return response(url.includes('?') ? data : { isSuperuser: true, canArchive: true });
   });
   render(<BoardWriteups mode="setup" />);
-  fireEvent.change(await screen.findByLabelText('President'), { target: { value: ID } });
-  await screen.findByText('Role saved.');
+  const president = await screen.findByLabelText('President');
+  president.focus();
+  fireEvent.change(president, { target: { value: ID } });
+  const savedNotice = await screen.findByText('Role saved.');
+  expect(document.activeElement).toBe(president);
+  expect(president.closest('div').contains(savedNotice)).toBe(true);
   expect(posts).toEqual([{ action: 'role', role: 'president', value: { version: 1, systemUserId: ID }, expectedRevision: null }]);
   expect(screen.getByLabelText('President').value).toBe(ID);
 });
