@@ -6,6 +6,7 @@ import { boardActor, getRole, getCycle, saveCycle, saveRole, resumeConfig, staff
 import { candidates } from '../../../lib/services/board-writeups/source';
 import { reconcile, startArchive, resolveDiscrepancy } from '../../../lib/services/board-writeups/archive';
 import { recover, inspectRecovery } from '../../../lib/services/board-writeups/recovery';
+import { completeCleanup } from '../../../lib/services/board-writeups/service';
 import { cycleCode, exact, fail } from '../../../lib/services/board-writeups/model';
 export const config = { api: { bodyParser: { sizeLimit: '96kb' } }, maxDuration: 300 };
 export default async function handler(req, res) {
@@ -30,6 +31,10 @@ export default async function handler(req, res) {
       exact(input, ['action', 'cycle', 'value', 'expectedRevision', 'reason', 'role', 'resolution']);
       if (input.action === 'role') return res.json(await saveRole(actor, input.role, input.value, input.expectedRevision));
       const cycle = cycleCode(input.cycle);
+      if (input.action === 'completeCleanup') {
+        exact(input, ['action', 'cycle']);
+        return res.json(await completeCleanup(cycle, actor));
+      }
       if (input.action === 'save') {
         if (input.value?.cycle !== cycle) fail('board_cycle_identity_mismatch');
         const choices = new Set((await candidates(cycle)).map(x => x.requestId));

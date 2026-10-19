@@ -6,7 +6,7 @@ status: canonical
 summary: "Canonical Workbench sequence; current cross-request lifecycle navigation and reviewer follow-up work are tracked here."
 canonical: true
 cataloged: 2026-07-26
-last_verified: 2026-09-08
+last_verified: 2026-10-18
 owner: product-engineering
 related:
   - docs/audits/AUDIT_REQUEST_WORKBENCH_TRUTH_2026-07-26.md
@@ -256,8 +256,9 @@ audience is all PDs, PCs, the CSO, and the President. Its minimum contract is:
 - personal review state and reviewed history; and
 - a full coordinator matrix for positively identified PCs and superusers,
   showing every in-scope writeup × intended reviewer for that request's
-  configured broad Grant Program with neutral blank,
-  Reviewed, and Updated since review states.
+  configured broad Grant Program with neutral blank and green Reviewed states.
+  A newer current version is context; it does not make a completed review
+  incomplete (PR #496, `3b54a3727`, 2026-10-18).
 
 “Reviewed” is a progress signal, not an approval gate, denominator, due-date,
 or compliance score. SharePoint revisions or
@@ -268,7 +269,10 @@ staff and should not appear in the Research matrix. Exact per-request matrix
 assignment is configured from the request's broad Grant Program;
 exact app/file authorization still must be enforced rather than inferred from
 employment. Acknowledgements key to the Final artifact and observed publication
-version; later edits show Updated since review without erasing the row. The
+version. Since PR #496 (`3b54a3727`, 2026-10-18), an ordinary edit to the same
+Final keeps a completed review green and in history, retaining its original
+reviewed version and date; any newer current version is context, not a repeat
+review requirement. The
 responsible PD does not self-acknowledge. App visibility and SharePoint file
 permission are separate controls and both must be enforced. Edit/review actions
 open Word outside the Workbench in a separate browser window/tab; no embedded

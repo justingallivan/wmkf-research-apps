@@ -6,7 +6,7 @@ status: active
 summary: "File storage and linking in AkoyaGO/Dynamics, including governed staff writeups and Site Visit artifacts."
 canonical: true
 cataloged: 2026-07-02
-last_verified: 2026-09-10
+last_verified: 2026-10-18
 owner: product-engineering
 related:
   - scripts/probe-sharepoint-write.js
@@ -118,10 +118,10 @@ hood.
   same typed registry across a cycle so approved
   collaborators can find and open the canonical Word files without visiting
   every request separately. This narrow cycle list does not implement the
-  Editor Dashboard filters, version context, or Reviewed progress contract
-  below; for Final artifacts those live on the Final writeups dashboard
-  (Reviewed progress live; cycle scoping in Production since 2026-09-06 (merge `842c9f13`, deployment `dpl_2xuEv64c5NQVXEhA3rSXZRQQaWPa`, owner-run signed-in smoke passed); filters and version context
-  planned as Slice 6 of `docs/FINAL_WRITEUP_REVIEW_IMPLEMENTATION_PLAN.md`).
+  Editor Dashboard contract below; for Final artifacts, Reviewed progress,
+  cycle scoping, filters, and current-version context are live on the Final
+  writeups dashboard. PR #496 (`3b54a3727`, 2026-10-18) shipped its current
+  review-state presentation, which keeps completed reviews green after edits.
 - **Current metadata readback (deployed and live-verified 2026-07-30 local /
   2026-07-31 UTC):** native
   Word editing preserves stable item identity, while Dataverse intentionally
@@ -841,9 +841,11 @@ a secondary hint because no edits can mean either “reviewed; no changes” or
 The Reviewed marker requires durable per-editor state in a child row keyed to
 the reviewer and Final artifact, with the observed SharePoint publication
 version. The approved dashboard includes a full coordinator matrix for
-positively identified PCs and superusers. It shows neutral blank, Reviewed, and
-Updated since review states and is not an approval, required count, due-date,
-or compliance surface. The v2 access/persona contract and representative Word
+positively identified PCs and superusers. It shows neutral blank and Reviewed
+states. A newer current publication version remains available as context; an
+existing acknowledgement stays green and complete after an ordinary edit
+(PR #496, `3b54a3727`, 2026-10-18). The matrix is not an approval, required
+count, due-date, or compliance surface. The v2 access/persona contract and representative Word
 access are now proved, and commit `213f6c34` enables the dashboard lenses in
 Ready Production deployment `dpl_HGrbWUNPJMJunVevYLVEmtn7He6a`. PC backup is closed by owner
 decision (2026-09-06); the Leadership-stage transition is Production-live 2026-09-07 (merge `25dc8645`, owner-smoked on Request `1002788`;
