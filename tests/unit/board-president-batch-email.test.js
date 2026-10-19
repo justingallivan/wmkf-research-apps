@@ -6,6 +6,7 @@ import { recover } from '../../lib/services/board-writeups/recovery';
 import { emptyState } from '../../lib/services/board-writeups/store';
 import { runBoardWorkflow } from '../../lib/services/board-writeups/worker';
 import AlertService from '../../lib/services/alert-service';
+import { eligibleStaff } from '../../lib/services/board-writeups/config';
 import { PROGRAM_ID } from '../../lib/services/board-writeups/model';
 import { RESEARCH_BOARD_MATERIALS_TARGET as TARGET } from '../../lib/services/sharepoint-target-registry';
 const A = '11111111-1111-4111-8111-111111111111', B = '22222222-2222-4222-8222-222222222222';
@@ -184,4 +185,18 @@ test('one blocked batch does not starve later valid batches in the worker', asyn
     expect(dispatch.mock.calls.map(([, intent]) => intent.batchId)).toEqual(Object.keys(f.state.releaseBatches));
     expect(result.results).toContainEqual({ cycle: 'D26', status: 'notice_failed', code: 'board_batch_cso_changed' });
   } finally { alert.mockRestore(); }
+});
+
+test('President without Workbench receives the batch email with live eligibility rechecked before send', async () => {
+  const f = fixture(), intent = await release(f);
+  const grants = jest.fn(async profileId => profileId === actor.profileId ? ['reviewers'] : []);
+  f.d.eligibleStaff = jest.fn((id, options) => eligibleStaff(id, options, {
+    getUser: async userId => ({ isdisabled: false, internalemailaddress: userId === CSO ? 'cso@wmkeck.org' : 'president@wmkeck.org', fullname: 'Staff' }),
+    resolveSystemUserToProfile: async userId => userId === CSO ? actor.profileId : 'president-profile',
+    profile: async () => ({ is_active: true, superuser: false }), listAppKeysForUser: grants,
+  }));
+  await deliverNotice('D26', intent, f.d);
+  expect(f.d.send).toHaveBeenCalledTimes(1);
+  expect(f.d.eligibleStaff.mock.calls.filter(([id]) => id === PRESIDENT)).toEqual([[PRESIDENT, { app: false }], [PRESIDENT, { app: false }]]);
+  expect(grants.mock.calls.every(([id]) => id === actor.profileId)).toBe(true);
 });

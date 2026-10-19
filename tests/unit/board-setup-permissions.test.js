@@ -1,5 +1,5 @@
 /** @jest-environment node */
-import { saveRole, saveCycle, resumeConfig, loadStaffing, staffingCapabilities } from '../../lib/services/board-writeups/config';
+import { saveRole, saveCycle, resumeConfig, loadStaffing, staffingCapabilities, staffDirectory, boardActor } from '../../lib/services/board-writeups/config';
 import { emptyState } from '../../lib/services/board-writeups/store';
 import { PROGRAM_ID } from '../../lib/services/board-writeups/model';
 const ID = '11111111-1111-4111-8111-111111111111';
@@ -59,4 +59,47 @@ test.each([{ manager: OTHER }, { active: false }, { app: false }])('unauthorized
   await expect(loadStaffing(actor, d)).rejects.toBeTruthy();
   await expect(staffingCapabilities(actor, d)).rejects.toBeTruthy();
   expect(d.staffDirectory).not.toHaveBeenCalled();
+});
+
+function presidentWithoutWorkbench() {
+  const f = setup({ admin: true });
+  f.d.resolveSystemUserToProfile = async id => id === ID ? 'staff' : 'president';
+  f.d.profile = async id => ({ is_active: true, superuser: id === 'staff' });
+  f.d.listAppKeysForUser = jest.fn(async () => []);
+  return f;
+}
+test('President can be saved without Workbench; CSO and Grants Manager cannot', async () => {
+  const { d } = presidentWithoutWorkbench();
+  await saveRole(actor, 'president', { version: 1, systemUserId: OTHER }, 'role', d);
+  expect(d.setSettingIfUnchanged).toHaveBeenCalledTimes(1);
+  for (const role of ['cso', 'grantsManager']) await expect(saveRole(actor, role, { version: 1, systemUserId: OTHER }, 'role', d)).rejects.toMatchObject({ code: 'board_staff_app_access' });
+  expect(d.setSettingIfUnchanged).toHaveBeenCalledTimes(1);
+  await expect(boardActor({ systemUserId: OTHER, profileId: 'president' }, d)).rejects.toMatchObject({ code: 'board_staff_app_access' });
+});
+test.each(['disabled', 'inactive', 'unlinked', 'external'])('President still rejects %s staff', async problem => {
+  const { d } = presidentWithoutWorkbench();
+  d.getUser = async id => ({ isdisabled: id === OTHER && problem === 'disabled', internalemailaddress: id === OTHER && problem === 'external' ? 'staff@example.org' : 'staff@wmkeck.org' });
+  if (problem === 'inactive') d.profile = async id => ({ is_active: id !== 'president', superuser: id === 'staff' });
+  if (problem === 'unlinked') d.resolveSystemUserToProfile = async id => id === ID ? 'staff' : null;
+  await expect(saveRole(actor, 'president', { version: 1, systemUserId: OTHER }, 'role', d)).rejects.toMatchObject({ code: 'board_staff_unavailable' });
+  expect(d.setSettingIfUnchanged).not.toHaveBeenCalled();
+});
+test.each(['president', 'cso', 'grantsManager'])('activation validates Workbench according to the %s assignment', async role => {
+  const { d, cycle } = presidentWithoutWorkbench();
+  cycle.cycle = 'J27';
+  const getSetting = d.getSettingStrict;
+  d.getSettingStrict = async key => key.includes('.cycle.') ? getSetting(key) : ({ found: true, revision: 'role', value: JSON.stringify({ version: 1, systemUserId: key === { president: 'board_writeups.president', cso: 'board_writeups.cso', grantsManager: 'board_writeups.grants_manager' }[role] ? OTHER : ID }) });
+  const save = saveCycle(actor, { ...cycle, active: true, rosterConfirmed: true, requestIds: [OTHER], materialsDue: '2027-06-01', boardEnds: '2027-06-10', adminId: ID }, 'old', '', d);
+  if (role === 'president') await expect(save).resolves.toMatchObject({ value: { active: true } });
+  else { await expect(save).rejects.toMatchObject({ code: 'board_staff_app_access' }); expect(d.setSettingIfUnchanged).not.toHaveBeenCalled(); }
+});
+test('directory includes President-only staff and marks operational eligibility', async () => {
+  const { d } = presidentWithoutWorkbench();
+  d.listActiveProfiles = async () => [{ id: 'staff' }, { id: 'president' }, { id: 'missing' }];
+  d.resolveProfileToSystemUser = async id => id === 'missing' ? null : { systemuserid: id === 'staff' ? ID : OTHER };
+  d.getUser = async id => ({ isdisabled: false, internalemailaddress: 'staff@wmkeck.org', fullname: id === ID ? 'Admin' : 'President Only' });
+  expect(await staffDirectory(d)).toEqual([
+    expect.objectContaining({ systemUserId: ID, canUseWorkbench: true }),
+    expect.objectContaining({ systemUserId: OTHER, canUseWorkbench: false }),
+  ]);
 });
