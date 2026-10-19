@@ -92,6 +92,7 @@ function nameMatch(person, rec) {
 
 const { people } = JSON.parse(fs.readFileSync(IN, 'utf8'));
 const results = [];
+const validation = [];
 let i = 0;
 for (const person of people) {
   i += 1;
@@ -143,8 +144,23 @@ for (const person of people) {
   } else if (person.reviewerOrcids.length) { grade = 'review'; reason = 'linked reviewer-record ORCID not found by name search'; }
   else if (candidates.filter(full).length === 1 && fullNoInst.length === 1) { grade = 'review'; reason = 'only full-name match; record lists no affiliations'; }
 
-  results.push({ person, grade, reason, candidates });
+  (person.knownOrcid ? validation : results).push({ person, grade, reason, candidates });
   if (i % 25 === 0) console.log(`  ${i}/${people.length}`);
+}
+
+// Blind scoring against contacts that already carry a valid ORCID (export
+// --include-known). knownOrcid is never read by the grading above.
+if (validation.length) {
+  const top = (v) => v.candidates[0]?.orcidId === v.person.knownOrcid;
+  const listed = (v) => v.candidates.slice(0, 3).some((c) => c.orcidId === v.person.knownOrcid);
+  const highWrong = validation.filter((v) => v.grade === 'high' && !top(v));
+  console.log(`\nValidation against ${validation.length} known ORCIDs:`);
+  console.log(`  high, correct:            ${validation.filter((v) => v.grade === 'high' && top(v)).length}`);
+  console.log(`  high, WRONG:              ${highWrong.length}`);
+  console.log(`  review, correct in top 3: ${validation.filter((v) => v.grade === 'review' && listed(v)).length}`);
+  console.log(`  review, correct missing:  ${validation.filter((v) => v.grade === 'review' && !listed(v)).length}`);
+  console.log(`  none:                     ${validation.filter((v) => v.grade === 'none').length}`);
+  for (const v of highWrong) console.log(`    WRONG: ${v.person.contactId} known ${v.person.knownOrcid} vs matched ${v.candidates[0]?.orcidId} (${v.reason})`);
 }
 
 const esc = (v) => `"${String(v ?? '').replace(/"/g, '""')}"`;

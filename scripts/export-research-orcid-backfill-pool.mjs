@@ -14,7 +14,7 @@
  * legacy `wmkf_copi1..5` slots.
  *
  * No writes to Dataverse. Acts against whatever .env.local points at.
- *   node scripts/export-research-orcid-backfill-pool.mjs --out=<path> [--years=10]
+ *   node scripts/export-research-orcid-backfill-pool.mjs --out=<path> [--years=10] [--include-known]
  * The output contains names and emails: keep it out of the repo.
  */
 
@@ -32,6 +32,9 @@ try {
 const arg = (name) => process.argv.find((a) => a.startsWith(`--${name}=`))?.split('=').slice(1).join('=');
 const YEARS = Number(arg('years') || 10);
 const OUT = arg('out');
+// Also emit contacts that already have a valid ORCID (as `knownOrcid`) so the
+// matcher can be scored blind against a known answer.
+const INCLUDE_KNOWN = process.argv.includes('--include-known');
 if (!OUT) { console.error('--out=<path> is required'); process.exit(2); }
 if (!Number.isInteger(YEARS) || YEARS < 1) { console.error('--years must be a positive integer'); process.exit(2); }
 
@@ -113,7 +116,8 @@ const people = new Map();
 for (const a of assignments) {
   const c = contacts.get(a.contact);
   if (!c) continue;
-  if (normalizeOrcid(c.wmkf_orcid).state === 'valid') continue;
+  const known = normalizeOrcid(c.wmkf_orcid);
+  if (known.state === 'valid' && !INCLUDE_KNOWN) continue;
   const r = byId.get(a.request);
   const p = people.get(a.contact) || {
     contactId: a.contact,
@@ -122,6 +126,7 @@ for (const a of assignments) {
     fullname: c.fullname || '',
     email: c.emailaddress1 || '',
     existingOrcidRaw: c.wmkf_orcid || '',
+    ...(known.state === 'valid' ? { knownOrcid: known.id } : {}),
     roles: [],
     awards: [],
     institutions: [],
@@ -143,7 +148,9 @@ const alreadyHave = contactIds.filter((id) => normalizeOrcid(contacts.get(id)?.w
 fs.writeFileSync(OUT, `${JSON.stringify({ generatedAt: new Date().toISOString(), cutoffDate, people: pool }, null, 2)}\n`);
 console.log(`\nAwarded Research requests since ${cutoffDate}: ${requests.length}`);
 console.log(`Distinct PI/co-PI contacts: ${contactIds.length} (${alreadyHave} already have a valid ORCID)`);
-console.log(`Backfill pool: ${pool.length} — ${pool.filter((p) => p.roles.includes('PI')).length} PI, ${pool.filter((p) => !p.roles.includes('PI')).length} co-PI only`);
+const backfill = pool.filter((p) => !p.knownOrcid);
+console.log(`Backfill pool: ${backfill.length} — ${backfill.filter((p) => p.roles.includes('PI')).length} PI, ${backfill.filter((p) => !p.roles.includes('PI')).length} co-PI only`);
+if (INCLUDE_KNOWN) console.log(`Known-ORCID validation set included: ${pool.length - backfill.length}`);
 console.log(`  with an institution signal: ${pool.filter((p) => p.institutions.length).length}`);
 console.log(`  with a linked reviewer ORCID: ${pool.filter((p) => p.reviewerOrcids.length).length}`);
 console.log(`Wrote ${OUT}\n`);
