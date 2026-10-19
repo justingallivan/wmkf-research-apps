@@ -3,7 +3,7 @@ title: "Atlas: Research Board writeup runs"
 domain: postgres
 kind: state-page
 status: source-built
-summary: "Board workflow deployed; cycle setup remains owner-controlled. Phase II candidate filter is a pending follow-up."
+summary: "Board workflow deployed; cycle setup remains owner-controlled. Phase II candidate filter is deployed; the production journal migration is applied."
 canonical: true
 cataloged: 2026-10-16
 owner: product-engineering
@@ -18,7 +18,7 @@ related:
 
 # Research Board writeup runs
 
-[VERIFIED via source and isolated PostgreSQL tests] Migration 085 creates `board_writeup_runs`, keyed by Research program GUID and meeting-date cycle code. The row contains a monotonic revision and version-1 JSON journal. Settings and human identities remain in Dataverse; SharePoint owns file bytes; `wmkf_requestdocument` owns archived references. Runtime deployed at merge `0e39ad951`; production redeployment `dpl_3AHPWmAYw5B1aMeUzvuPS4Ce44kM` was Ready on 2026-10-18 PT. Historical read-only preflight on 2026-10-16 found neither migration 084 nor 085 in the configured database and Board Writeup option 100000014 absent.
+[VERIFIED via source and isolated PostgreSQL tests] Migration 085 creates `board_writeup_runs`, keyed by Research program GUID and meeting-date cycle code. The row contains a monotonic revision and version-1 JSON journal. Settings and human identities remain in Dataverse; SharePoint owns file bytes; `wmkf_requestdocument` owns archived references. Runtime deployed at merge `0e39ad951`; production redeployment `dpl_3AHPWmAYw5B1aMeUzvuPS4Ce44kM` was Ready on 2026-10-18 PT. The missing journal caused the initial production cycle-save failure. [VERIFIED via production schema probe and `scripts/apply-migrations.js`, 2026-10-18 PT] Migration 085 was the only pending migration and is now applied (1 applied, 83 skipped). Tracker readback and an insert/row-lock transaction followed by rollback verified the journal. No cycle settings were changed by the repair. Historical preflight on 2026-10-16 also found Board Writeup option 100000014 absent; this Postgres repair does not establish Dataverse archival schema readiness.
 
 The bounded journal is an implementation refinement of the plan's logical release/archive/email ledgers: one row lock serializes all those receipts with archive-start and configuration intent. Request IDs and email notice keys are unique object keys within that cycle. `mutateCycle` requires a synchronous callback, holds `SELECT FOR UPDATE`, commits before external calls, and rolls back exceptions. Limits: 100 expected requests, 2 MB journal, 5,000 audit events. There is no automatic deletion; operational capacity alerts require administrator attention and historical receipts must be retained.
 
@@ -55,7 +55,7 @@ Tests: `tests/unit/board-writeup-workflow.test.js`, CSO cases in `tests/unit/pre
 
 **OPEN owner setup:** Justin must enter D26 Allison materials deadline and Board meeting end date, and staff must confirm all 23 request identities. Keep the date reminder in handoffs until Justin explicitly reports completion. Future single-phase selection rules remain undecided.
 
-Read-only source preflight: request 1002988 resolved its current group-review source, a present Graph version, a 961,267-byte valid DOCX semantic hash, and exactly one resolved Dynamics request-document bucket. This proves reads and source selection, not upload round-trip or archival writes. The original candidate query lacked a pipeline-status filter. The follow-up on `codex/board-phase-ii-roster` restricts new candidates to ordinary Research requests in the selected cycle with `akoya_requeststatus=Phase II Pending`, at both query and row-filter boundaries; deployment is pending. Existing saved selections remain visible for explicit owner review/removal. [VERIFIED via `scripts/probe-board-cycle-candidates.js`, 2026-10-18 PT] Owner-approved, ETag-fenced corrections marked legacy test requests 1003223 and 1003224 as tests, preserving their null run IDs. Readback found exactly 23 ordinary Phase II Pending D26 candidates. The roster still requires staff confirmation; no cycle selection or activation was changed.
+Read-only source preflight: request 1002988 resolved its current group-review source, a present Graph version, a 961,267-byte valid DOCX semantic hash, and exactly one resolved Dynamics request-document bucket. This proves reads and source selection, not upload round-trip or archival writes. The original candidate query lacked a pipeline-status filter. PR #499 (merge `a4cf97239`) restricts new candidates to ordinary Research requests in the selected cycle with `akoya_requeststatus=Phase II Pending`, at both query and row-filter boundaries; production deployment `dpl_ADXz1nWhMaH2gHnMhcqVAbCNr2kp` is Ready and signed-in UI verification showed exactly 23 candidates. Existing saved selections remain visible for explicit owner review/removal. [VERIFIED via `scripts/probe-board-cycle-candidates.js`, 2026-10-18 PT] Owner-approved, ETag-fenced corrections marked legacy test requests 1003223 and 1003224 as tests, preserving their null run IDs. Readback found exactly 23 ordinary Phase II Pending D26 candidates. The roster still requires staff confirmation; no cycle selection or activation was changed.
 
 ## Operator exceptions (required before activation)
 
