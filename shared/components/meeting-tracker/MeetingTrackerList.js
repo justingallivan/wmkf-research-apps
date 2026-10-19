@@ -261,6 +261,9 @@ export default function MeetingTrackerList() {
           <ScopeSegment scope={scope} onChange={(value) => changeFilters({ scope: value })} allLabel="All program directors" />
         </div>
         <div className="flex flex-wrap items-center gap-3">
+          <Link href="/meeting-tracker/program-briefing" className="inline-flex h-12 items-center rounded-lg border border-gray-300 bg-white px-5 text-sm font-semibold text-gray-800 hover:bg-gray-50 focus-visible:outline focus-visible:outline-2">
+            Program briefing
+          </Link>
           <Link href="/meeting-tracker/discussion-sentiment" className="inline-flex h-12 items-center rounded-lg border border-gray-300 bg-white px-5 text-sm font-semibold text-gray-800 hover:bg-gray-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-gray-500 focus-visible:ring-offset-2">
             Discussion sentiment
           </Link>
