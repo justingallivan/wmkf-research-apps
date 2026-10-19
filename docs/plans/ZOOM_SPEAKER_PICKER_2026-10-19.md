@@ -51,9 +51,23 @@ job and frozen-correction occurrence selection, duplicates/collisions, fallback,
 group ordering and no implicit save. Existing publication, attendance and
 presentation-boundary regressions are included in the focused run.
 
-Validation passed: 300 tests across six focused suites. Relevant route/context/status/GUID gates and paired self-tests, type checking,
+Validation passed: 303 tests across six focused suites. Relevant route/context/status/GUID gates and paired self-tests, type checking,
 changed-file ESLint, design detection and documentation drift checks passed for
 this change. Existing ESLint warnings outside edited lines remain unchanged.
 No live Zoom report, production mutation, hosted browser rehearsal or deployment
 was performed. Runtime behavior still needs hosted staff acceptance after an
 explicit release decision.
+
+
+## Claude Opus review follow-up
+
+Claude Opus 5.5 approved the initial implementation with one low-severity label
+mismatch: formatting only eligible picker names could disagree with attendance
+formatting when a collision involved a waiting-room-only or long name. Both now
+use the same validated full report name set before picker eligibility filtering;
+raw whitespace is retained for exact attendance matching. The shared row
+predicate preserves the existing attendance validation contract. Three added
+regressions verify waiting-room collisions, long-name collisions and whitespace
+by feeding the selected label into attendance review and checking its speaker
+link. The six-suite rerun passed 303 tests; scoped ESLint and types passed.
+Deployment and live acceptance remain unverified.

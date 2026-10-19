@@ -171,7 +171,7 @@ test('job editor reads Zoom suggestions only from its server-bound occurrence an
   getZoomImportForJob.mockResolvedValue({ id: jobId, zoom_meeting_uuid: 'exact-occurrence==', zoom_host_id: 'host',
     selected_recording_files: { version: 1, audioOnlyFileCount: 1, transcriptFile: null,
       audioFile: { fileId: 'audio', recordingType: 'audio_only', bytes: 10, sha256: 'a'.repeat(64), recordingStart: '2026-10-09T16:00:00Z', recordingEnd: '2026-10-09T16:01:00Z' } } });
-  getMeetingAttendance.mockResolvedValue({ status: 'complete', participants: [{ name: 'Call Person', status: 'in_meeting' }] });
+  getMeetingAttendance.mockResolvedValue({ status: 'complete', participants: [{ name: 'Call Person', status: 'in_meeting', join_time: '2026-10-09T16:00:00Z', leave_time: '2026-10-09T16:01:00Z', duration: 60 }] });
   const result = await readMeetingTranscriptionJob({ requestId, jobId });
   expect(getZoomImportForJob).toHaveBeenCalledWith({ requestId, siteVisitActivityId: visitId, jobId });
   expect(getMeetingAttendance).toHaveBeenCalledWith('exact-occurrence==', { timeoutMs: 5_000 });

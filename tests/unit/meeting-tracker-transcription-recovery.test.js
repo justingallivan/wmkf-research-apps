@@ -524,7 +524,7 @@ test('Zoom provenance survives real service publish, names correction and recove
     receipts.set(args.operationId, receipt); return receipt;
   });
   const { getMeetingAttendance } = require('../../lib/services/meeting-tracker-recordings/zoom-client');
-  getMeetingAttendance.mockResolvedValueOnce({ status: 'complete', participants: [{ name: 'Frozen Call Person', status: 'in_meeting' }] });
+  getMeetingAttendance.mockResolvedValueOnce({ status: 'complete', participants: [{ name: 'Frozen Call Person', status: 'in_meeting', join_time: '2026-10-09T16:00:00Z', leave_time: '2026-10-09T16:01:00Z', duration: 60 }] });
   const draft = await createMeetingCorrection({ requestId, ownerProfileId: 12, artifactId: first.currentArtifact.id });
   expect(getMeetingAttendance).toHaveBeenCalledWith('exact-occurrence==', { timeoutMs: 5000 });
   expect(draft.zoomCandidates).toEqual([{ id: 'zoom:0', source: 'zoom_participant', displayName: 'Frozen Call Person' }]);

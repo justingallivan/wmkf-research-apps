@@ -226,3 +226,19 @@ it.each(['partial', 'unavailable', 'throw'])('uses fallback for %s reports even 
   expect(result.zoomCandidates).toEqual([]);
   expect(result.zoomCandidateStatus).toBe(status === 'partial' ? 'partial' : 'unavailable');
 });
+
+
+it.each([
+  ['waiting-room collision', [row('Example, Alex'), row('Alex Example', 'in_waiting_room')], 'Example, Alex'],
+  ['long-label collision', [row('Example, Alex'), row('Example,' + ' '.repeat(80) + 'Alex')], 'Example, Alex'],
+  ['whitespace preserved', [row(' Alex Example ')], ' Alex Example '],
+])('picker labels match attendance labels: %s', async (_case, participants, expectedLabel) => {
+  const fetch = report(participants);
+  const picker = await getZoomSpeakerCandidates(provenance, fetch);
+  expect(picker.zoomCandidates).toHaveLength(1);
+  expect(picker.zoomCandidates[0].displayName).toBe(expectedLabel);
+  const review = await buildAttendanceReview({ ...args, speakerNames: { A: expectedLabel } }, fetch);
+  const attendee = review.decision.rows.find(person => person.kind === 'attendee' && person.speakerIds.includes('A'));
+  expect(attendee).toMatchObject({ displayName: expectedLabel, speakerIds: ['A'] });
+  expect(review.decision.rows.some(person => person.kind === 'voice' && person.speakerIds.includes('A'))).toBe(false);
+});
