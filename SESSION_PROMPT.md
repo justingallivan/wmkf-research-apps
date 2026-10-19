@@ -1,65 +1,57 @@
-# Session 618 Prompt: discussion attribution safeguards released; preserve bounded scope
+# Session 619 Prompt: Board workflow and central staffing released
 
-## Session 617 Summary — Discussion attribution review and correction (Codex, 2026-10-18 PT)
+## Session 618 Summary — Board workflow and shared staffing (Codex, 2026-10-18–19 PT)
 
 ### What Was Completed
 
-1. **[VERIFIED via source and targeted tests] Conservative attendance defaults.** Uncertain identities and speech after a supported departure cue are flagged for review instead of silently including the speaker. These defaults do not rewrite earlier attendance decisions.
-2. **[VERIFIED via source and targeted tests] Review-only sentence-fragment check.** A bounded optional second AI call examines one-word A–B–A passages, with at most ten candidates and a twenty-second model-call budget. The review display shows warnings; words, timing, speaker assignments and transcript boundaries remain unchanged. Failures leave the existing alignment usable.
-3. **[VERIFIED via live model evaluation] Prompt validation.** Six live evaluation cases passed through both the model client and normal Executor; prompt v1 is published. Mocked automated tests establish contracts, not general linguistic accuracy.
-4. **[VERIFIED via production readback] Owner-confirmed transcript corrections and regenerated derived artifacts.** Both affected requests have accepted current sentiment analyses. Their summaries are published and current, including the final confirmed continuation correction. Record identifiers, speaker names, transcript text and operational repair details are deliberately omitted from public documentation.
-5. **[VERIFIED via merged PR, CI and Vercel metadata] Release.** PR #497 merged as `aaf95e1828eb3c801865e5a969f358fdc3fc782f`; production deployment `dpl_DrBHYVUB6whmYZmtyk1qJ2VBRHka` is Ready at that exact SHA and serves `applications.wmkeck.org`. The bounded HTTP check returned the expected authentication redirect; this does not claim a signed-in UI smoke. The release carries only general safeguards and synthetic public examples from `f669ab40c`. Production switches were not changed.
-6. **Public-history boundary.** Unpublished sensitive development history is retained locally and must not be pushed. Continue from the sanitized release/main history; never merge the private development history merely to synchronize commits. Unrelated `output/` remains untouched.
+1. **Board workflow refinements released.** [VERIFIED via merged Git history] PRs #498–#505 delivered daily cleanup reminders, the 23 non-test Phase II candidate filter, save feedback and inactive-cycle recovery, a configurable President, clearer workflow wording, CSO batch email to the President, separate setup/dashboard pages, and aligned desktop/mobile headers. Production migration 085 and bounded production observations are recorded in the Board-run Atlas. No first real release/email/archive acceptance is claimed.
+2. **Central staffing released.** [VERIFIED via PR #507, Ready deployment and signed-in Admin readback] Admin → People & Access → Staffing combines shared President/CSO/Grants Manager assignments with the separate superuser-only Final Writeup editor. The assigned Grants Manager keeps shared-role editing through `/staffing` without general Admin access. Board setup retains cycle-specific settings. No migration or new role store.
+3. **President eligibility released.** [VERIFIED via PR #508, all CI checks, Vercel metadata and signed-in production dropdowns] Any enabled, active, linked WMKF staff member may be President. CSO/Grants Manager retain Workbench or superuser eligibility. Assignment, cycle validation and batch-email recipient checks agree. Anneli Stone and Saskia Pallais appear under President and neither appears under CSO/Grants Manager. Existing selections remained unchanged; no assignments or grants were changed by verification.
+4. **Production receipt.** PR #508 merged as `fbfb7e83bccbc83b2a60c219a1956c9f04d9e3e5`. Vercel did not automatically start the production build during observation, so the exact merged tree was deployed through the CLI. Deployment `dpl_4bF6rurMekk5gnF26jNdXWiQJNMQ` is Ready, built in 59 seconds, and serves `applications.wmkeck.org`. Bounded post-deploy error scan returned zero records. No environment changes were needed.
 
 ### Commits
-- `f669ab40c` — conservative discussion attribution and review-only fragment warnings.
-- Release merge: `aaf95e1828eb3c801865e5a969f358fdc3fc782f` (PR #497).
+- `0e39ad951` (#498), `a4cf97239` (#499), `62d46ebd7` (#500), `0b0b4e94c` (#501): reminders, candidate filtering, save recovery and President role.
+- `df3d4c699` (#502), `ae4c980b1` (#503), `50bc843b0` (#504), `25b17b32e` (#505): wording, batch email, page separation and header refinement.
+- `e4cb89ada` (#507): central staffing; includes Jest characterization fixes.
+- `fbfb7e83b` (#508), source `b56deb15c`: President eligibility.
 
 ## Next Items
 
-### Verified Open
-
-- **Central staffing first release — deployed in PR #507 (`e4cb89ada`).** [VERIFIED via parent session production deployment and signed-in Admin readback, 2026-10-19] Admin → People & Access → Staffing brings President, CSO and Grants Manager assignments together with the existing superuser-only Final Writeup staffing editor and links to other assignment settings. The assigned Grants Manager retains shared-role editing through `/staffing` without general Admin access. Board cycle setup shows the assignments and links to Staffing; dates, admin recipient, roster and activation stay cycle-specific. Existing Dataverse keys, separate role revisions and Final Writeup publication remain unchanged; no data migration. Shared-role configuration is available while Board execution is disabled, without enabling execution. Production Admin readback verified the panel; no production assignments were changed.
-
-- **President eligibility refinement — branch-built on `codex/president-staff-eligibility`, not deployed.** Owner authorized choosing any enabled, active, identity-linked `@wmkeck.org` staff member as President without a Workbench grant. CSO/Grants Manager retain Workbench (or superuser) eligibility. [VERIFIED via branch source] The same rule applies at assignment, active-cycle validation and batch-email dispatch; no migration, new environment variable or live assignment write.
-
-- No further implementation is authorized for the fragment check. Observe ordinary use before expanding its scope; the six live evaluation cases are bounded acceptance evidence.
-
 ### Owner Decision Needed
 
-- **Board activation remains separate.** The earlier disabled release is not activation permission. Recheck the current Board Atlas, roster, dates, recipient configuration and hosted acceptance before any activation.
-- **Board cleanup reminder deployed:** PR #498 (merge `0e39ad951`) implements the owner's daily-email-until-complete decision. At 9 a.m. Pacific, starting seven calendar days after the saved Board end date, the configured cycle admin receives reminders until an administrator chooses **Mark cleanup complete**. No automatic deletion. Board cycle activation remains pending; see `docs/atlas/postgres-board-writeup-runs.md`.
-- **Cross-visit sentiment/ranking study stays parked.** The confirmed corrections and accepted current analyses close the earlier data-quality prerequisite; the study still requires owner authorization and an agreed read-only scope. See the existing study memory for historical design context; do not treat its earlier cleanup blocker as a new repair task.
+- **Board cycle operational setup and activation remain separate.** [VERIFIED via Board-run Atlas and owner scope] Before activation, recheck current dates, the 23 request identities, recipient configuration, target/schema readiness and hosted acceptance. The Atlas records the Board end date as saved and the materials deadline/roster incomplete at the earlier probe; do not infer current cycle state from staffing verification. Preserve the owner date-entry reminder until explicit completion. Shared roles are already assigned; do not carry President selection as an open task.
+- **First real Board release/email/archive acceptance remains unproved.** Source tests and transport rehearsal are bounded evidence; no production mail or file operation was performed for the staffing release.
 
 ### Parked
 
-- Automatic speaker reassignment, general per-turn editing, longer-fragment checks and historical batch reprocessing require a separate decision.
-- Outlook integration, broader Factory work and other unrelated queue items remain parked or require fresh preflight; this release does not reopen them.
+- Broader staffing consolidation beyond this first release requires a new scope decision. Existing related settings keep their owning editors.
+- Cross-visit sentiment/ranking study, Outlook integration and other unrelated work remain outside this session. Recheck their source/memory before acting.
 
 ### Verify Before Acting
 
-- Earlier unrelated tasks were not re-audited. Historical handoffs remain available at `6d6fb0740:SESSION_PROMPT.md`; consult source, current owner decisions and live state before turning any carryover into work.
+- Older Board design prose still mixes historical build/deployment statements with current guidance outside this staffing status update. Use current source and the Atlas receipts; a whole Board documentation audit was not part of this stop pass.
+- Unrelated handoff items were not re-audited. Earlier Session 617 history remains in Git. Never push unpublished sensitive development history or repeat completed transcript corrections.
 
 ### Do Not Reopen Without New Decision
 
-- **Maintenance integration closed — [VERIFIED via owner decision, 2026-10-18].** Keep `codex/legacy-test-request-1002788` (commit `e563c5f3b`) unmerged as a historical record. Integration is no longer an open to-do. The production correction was already completed; no repeat data change is authorized.
-- Grammar-based warnings are review-only; they do not establish speaker identity.
-- Completed Final Writeup reviews remain complete through ordinary edits; retain original review dates and versions.
-- Do not push unpublished sensitive development history or repeat completed transcript/analysis corrections.
+- Keep `codex/legacy-test-request-1002788` (`e563c5f3b`) unmerged as a historical record, per owner decision. Maintenance integration is not a to-do.
+- Completed Final Writeup reviews remain complete through ordinary edits, retaining original review dates and versions.
+- Do not broaden CSO/Grants Manager eligibility or infer application permissions from President assignment.
 
 ## Key Files Reference
 
 | File | Purpose |
 |------|---------|
-| `lib/services/meeting-tracker-transcription/attendance-service.js` | Conservative attendance review defaults |
-| `lib/services/meeting-tracker-transcription/fragment-review.js` | Bounded optional review call |
-| `shared/utils/transcript-fragment-review.js` | Candidate selection and review validation |
-| `shared/components/meeting-tracker/FragmentReviewWarnings.js` | Review-only display |
-| `shared/config/prompts/meeting-fragment-review.js` | Prompt seed |
-| `tests/fixtures/meeting-fragment-review.json` | Synthetic evaluation examples |
+| `shared/components/staffing/StaffingPanel.js` | Shared roles and separate Final Writeup staffing UI |
+| `pages/api/workbench/staffing.js` | Scoped staffing read/write endpoint |
+| `lib/services/board-writeups/config.js` | Identity eligibility, role/cycle validation and directory capabilities |
+| `lib/services/board-writeups/notifications.js` | Recipient revalidation and durable notification handling |
+| `docs/atlas/postgres-board-writeup-runs.md` | State ownership, release receipts and operational limits |
 
-## Testing and documentation
+## Verification and handoff
 
-[VERIFIED via local targeted run] 404 tests passed on the sanitized release branch. Six live evaluation cases passed through the client and Executor (approximately 3.4 and 4.1 seconds). Hosted preview and all PR CI checks passed; the exact release SHA is Ready in production. No new table or route. CLAUDE.md needs no change. Claim-evidence report local state was unavailable; no observation row was invented.
+[VERIFIED via local tests and CI] President refinement: 165 tests in nine focused suites, scoped lint/types, relevant runtime/document gates and independent review passed. All PR #508 checks passed before merge. PR #507 also passed full CI after updating Admin characterization expectations. Production verification was read-only.
 
-Milestone determination: DEVELOPMENT_LOG.md includes the verified production attribution-safeguards milestone. Documentation reconciliation covers this handoff, the milestone, and the directly related attribution brief and study-memory status; older unrelated wording debt remains explicitly open.
+`/stop` ran on `main`. Claim-evidence report could not read local observation state; no row was invented. No CLAUDE.md change was needed. Milestone determination: new production capabilities warrant the Board workflow/central staffing entry in DEVELOPMENT_LOG.md.
+
+Unrelated untracked `output/` artifacts and `.impeccable/critique/2026-10-19T02-04-42Z__shared-components-board-writeups-boardwriteups-js.md` are preserved locally and excluded from the documentation commit.

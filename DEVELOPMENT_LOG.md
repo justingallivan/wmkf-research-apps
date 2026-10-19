@@ -10,6 +10,20 @@ The chronological archive after the `Legacy chronological session log` divider c
 
 ---
 
+## October 2026 — Board workflow and central staffing released (Session 618)
+
+**Milestone:** Board cycle setup and the CSO dashboard are separate, with shared staffing managed centrally.
+**Sessions:** 618 (Codex; owner-authorized implementation, reviews, CI repairs and production releases).
+**Ship state:**
+- PRs #498–#505 delivered cleanup reminders, Phase II/test filtering, save recovery, President assignment/batch email and clearer Board pages.
+- PR #507 `e4cb89ada` centralized shared roles while preserving scoped Grants Manager editing and separate Final Writeup publication.
+- PR #508 `fbfb7e83b` permits active linked WMKF staff as President; CSO/Grants Manager retain Workbench eligibility. All PR checks passed before merge.
+- Ready production `dpl_4bF6rurMekk5gnF26jNdXWiQJNMQ`; signed-in readback confirmed Anneli and Saskia only in President choices. No assignments changed; live Board release/mail/archive acceptance remains separate.
+**Why it matters:** staffing changes have a clear home without granting broad Admin access or excluding eligible President recipients.
+**Pointers:** `docs/atlas/postgres-board-writeup-runs.md`; `shared/components/staffing/StaffingPanel.js`; PRs #507/#508; Session 618 handoff.
+
+---
+
 ## October 2026 — Discussion attribution safeguards and fragment review (Session 617)
 
 **Milestone:** conservative attendance review and bounded AI sentence-fragment warnings released for transcript review.
