@@ -60,7 +60,7 @@ export default function BoardWriteups({ initialCycle = 'D26' }) {
     if (!window.confirm(`Release ${rows.length} writeup(s) to the President? Existing Board copies will not be replaced.`)) return;
     await act(async () => {
       const result = await api('/api/workbench/board-writeups', { cycle, selections: rows.map(row => ({ requestId: row.requestId, documentId: row.source.documentId, eTag: row.source.eTag, versionId: row.source.versionId, draftConfirmed: row.source.earlyDraft })) });
-      return { message: result.results.map(x => `${rows.find(r => r.requestId === x.requestId)?.source.number}: ${x.status}${x.message ? ` — ${x.message}` : ''}`).join('; ') + (result.results.some(x => x.status === 'queued') ? '. Copies are queued; refresh to check progress.' : '') };
+      return { message: result.results.map(x => `${rows.find(r => r.requestId === x.requestId)?.source.number}: ${x.status}${x.message ? ` — ${x.message}` : ''}`).join('; ') + (result.results.some(x => x.status === 'queued') ? '. Copies are queued; refresh to check progress. The President will receive one email from the CSO after the batch finishes.' : '') };
     });
   }
   async function checkFiles() {
