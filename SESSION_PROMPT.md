@@ -1,19 +1,16 @@
-# Session 619 Prompt: Board workflow and central staffing released
+# Session 620 Prompt: Board activation explanation merged
 
-## Session 618 Summary — Board workflow and shared staffing (Codex, 2026-10-18–19 PT)
+## Session 619 Summary — Clarify cycle activation (Codex, 2026-10-19 PT)
 
 ### What Was Completed
 
-1. **Board workflow refinements released.** [VERIFIED via merged Git history] PRs #498–#505 delivered daily cleanup reminders, the 23 non-test Phase II candidate filter, save feedback and inactive-cycle recovery, a configurable President, clearer workflow wording, CSO batch email to the President, separate setup/dashboard pages, and aligned desktop/mobile headers. Production migration 085 and bounded production observations are recorded in the Board-run Atlas. No first real release/email/archive acceptance is claimed.
-2. **Central staffing released.** [VERIFIED via PR #507, Ready deployment and signed-in Admin readback] Admin → People & Access → Staffing combines shared President/CSO/Grants Manager assignments with the separate superuser-only Final Writeup editor. The assigned Grants Manager keeps shared-role editing through `/staffing` without general Admin access. Board setup retains cycle-specific settings. No migration or new role store.
-3. **President eligibility released.** [VERIFIED via PR #508, all CI checks, Vercel metadata and signed-in production dropdowns] Any enabled, active, linked WMKF staff member may be President. CSO/Grants Manager retain Workbench or superuser eligibility. Assignment, cycle validation and batch-email recipient checks agree. Anneli Stone and Saskia Pallais appear under President and neither appears under CSO/Grants Manager. Existing selections remained unchanged; no assignments or grants were changed by verification.
-4. **Production receipt.** PR #508 merged as `fbfb7e83bccbc83b2a60c219a1956c9f04d9e3e5`. Vercel did not automatically start the production build during observation, so the exact merged tree was deployed through the CLI. Deployment `dpl_4bF6rurMekk5gnF26jNdXWiQJNMQ` is Ready, built in 59 seconds, and serves `applications.wmkeck.org`. Bounded post-deploy error scan returned zero records. No environment changes were needed.
+1. **Activation explanation.** [VERIFIED via source] Added helper text directly beneath **Activate this cycle**: saving an active cycle saves the proposal list and enables scheduled reminders; files are copied to the Board folder only when the CSO releases them from the dashboard. The checkbox references the explanation with `aria-describedby`. No workflow behavior changed.
+2. **Validation and merge.** [VERIFIED via local checks and GitHub] All 16 existing Board UI tests, scoped ESLint, the Impeccable detector and diff checks passed. Owner requested merge; PR #509 merged as `097bfc2e30bdcd11b27fc05f32c1b2e4d0b3fe6a`. Preview and review checks passed; full Jest and JavaScript CodeQL were still running at the pre-merge check. No full-CI-pass or production-deployment claim is made for this copy-only merge.
+3. **Prior release remains recorded.** Central staffing and President eligibility were production-verified in Session 618; its milestone and receipts remain in DEVELOPMENT_LOG.md and the Board-run Atlas. This session made no live role, cycle, file or email changes.
 
 ### Commits
-- `0e39ad951` (#498), `a4cf97239` (#499), `62d46ebd7` (#500), `0b0b4e94c` (#501): reminders, candidate filtering, save recovery and President role.
-- `df3d4c699` (#502), `ae4c980b1` (#503), `50bc843b0` (#504), `25b17b32e` (#505): wording, batch email, page separation and header refinement.
-- `e4cb89ada` (#507): central staffing; includes Jest characterization fixes.
-- `fbfb7e83b` (#508), source `b56deb15c`: President eligibility.
+- `6529d2a43` — clarify Board activation helper text.
+- `097bfc2e3` — PR #509 squash merge.
 
 ## Next Items
 
@@ -42,16 +39,13 @@
 
 | File | Purpose |
 |------|---------|
-| `shared/components/staffing/StaffingPanel.js` | Shared roles and separate Final Writeup staffing UI |
-| `pages/api/workbench/staffing.js` | Scoped staffing read/write endpoint |
-| `lib/services/board-writeups/config.js` | Identity eligibility, role/cycle validation and directory capabilities |
-| `lib/services/board-writeups/notifications.js` | Recipient revalidation and durable notification handling |
-| `docs/atlas/postgres-board-writeup-runs.md` | State ownership, release receipts and operational limits |
+| `shared/components/board-writeups/BoardWriteups.js` | Activation helper text and accessible checkbox description |
+| `lib/services/board-writeups/config.js` | Save cycle settings without copying files |
+| `lib/services/board-writeups/service.js` | Explicit CSO release queues file copying |
+| `docs/atlas/postgres-board-writeup-runs.md` | Operational state, prior release receipts and limits |
 
 ## Verification and handoff
 
-[VERIFIED via local tests and CI] President refinement: 165 tests in nine focused suites, scoped lint/types, relevant runtime/document gates and independent review passed. All PR #508 checks passed before merge. PR #507 also passed full CI after updating Admin characterization expectations. Production verification was read-only.
+`/stop` ran on `main`. Claim-evidence report could not read local observation state; no row was invented. CLAUDE.md needs no change. **Milestone determination: no new milestone entry required** for this copy-only clarification; the Session 618 capability milestone already exists.
 
-`/stop` ran on `main`. Claim-evidence report could not read local observation state; no row was invented. No CLAUDE.md change was needed. Milestone determination: new production capabilities warrant the Board workflow/central staffing entry in DEVELOPMENT_LOG.md.
-
-Unrelated untracked `output/` artifacts and `.impeccable/critique/2026-10-19T02-04-42Z__shared-components-board-writeups-boardwriteups-js.md` are preserved locally and excluded from the documentation commit.
+Unrelated untracked `output/` artifacts and `.impeccable/critique/2026-10-19T02-04-42Z__shared-components-board-writeups-boardwriteups-js.md` are preserved locally and excluded from this commit. Older carryovers above retain their owner-decision/parked/preflight classifications; this copy change does not authorize activation or reopen them.
