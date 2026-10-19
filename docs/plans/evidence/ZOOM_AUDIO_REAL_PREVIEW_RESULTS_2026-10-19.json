@@ -1,0 +1,305 @@
+{
+  "testedSource": "1dc8f3d1b75e8dc517f7cb42db65abddb430d362",
+  "deploymentId": "dpl_2bcyRsH3JmSUPHPcapoaCV6VNqgr",
+  "listing": {
+    "mode": "list",
+    "httpStatus": "200",
+    "elapsedMs": 4146,
+    "clientExitCode": 0,
+    "responseBytes": 4742,
+    "available": true,
+    "meetings": [
+      {
+        "meetingUuid": "W2F2ANe/Rua0wZ5D4ykdbA==",
+        "startTime": "2026-10-05T17:46:15Z",
+        "durationMinutes": 85,
+        "hostEmail": "wmk-library@wmkeck.org",
+        "audio": {
+          "bytes": 56283857
+        },
+        "transcript": {
+          "bytes": 112697
+        },
+        "import": null
+      }
+    ]
+  },
+  "import": {
+    "mode": "import",
+    "httpStatus": "200",
+    "elapsedMs": 10686,
+    "clientExitCode": 0,
+    "responseBytes": 753,
+    "import": {
+      "id": "c53578ee-17db-4da9-833e-9353c288059c",
+      "state": "started",
+      "failureCode": null
+    },
+    "job": {
+      "id": "934ccb8c-604a-4391-9f93-c1845d2e9a11",
+      "status": "queued",
+      "version": 3,
+      "declared_bytes": "56283857",
+      "verified_bytes": "56283857",
+      "audio_duration_ms": "5134677",
+      "ready_at": null,
+      "expires_at": "2026-10-26T22:35:39.015Z",
+      "zoomTranscriptAttached": true,
+      "cleanupPending": false,
+      "contentAccessAllowed": false
+    }
+  },
+  "processing": {
+    "database": "audio_pr513_acceptance_20261019",
+    "jobs": [
+      {
+        "id": "934ccb8c-604a-4391-9f93-c1845d2e9a11",
+        "status": "processing",
+        "version": 12,
+        "declared_bytes": "56283857",
+        "verified_bytes": "56283857",
+        "audio_duration_ms": "5134677",
+        "sanitized_error_code": null,
+        "provider_transcript_id": "c735b2c4-1d31-4995-8750-a7e26188d6d7",
+        "provider_cleanup_completed_at": null,
+        "audio_deleted_at": null,
+        "audio_sha256": "34a1d8360eb4ceefa0a5843ae6157aa461f4dde448138d260fd8952c55044171",
+        "requested_model": "universal-3-5-pro",
+        "returned_model": null,
+        "output_sha256": null,
+        "ready_at": null,
+        "cleanup_requested_at": null
+      }
+    ],
+    "imports": [
+      {
+        "id": "c53578ee-17db-4da9-833e-9353c288059c",
+        "state": "started",
+        "transcription_job_id": "934ccb8c-604a-4391-9f93-c1845d2e9a11",
+        "failure_code": null,
+        "selected_recording_files": {
+          "version": 1,
+          "audioFile": {
+            "bytes": 56283857,
+            "fileId": "2a426384-d749-49c7-8607-3298d0a4cd3d",
+            "sha256": "34a1d8360eb4ceefa0a5843ae6157aa461f4dde448138d260fd8952c55044171",
+            "recordingEnd": "2026-10-05T19:26:34.000Z",
+            "recordingType": "audio_only",
+            "recordingStart": "2026-10-05T18:00:59.000Z"
+          },
+          "transcriptFile": {
+            "bytes": 112697,
+            "fileId": "7b602e19-bcae-4e4f-ac91-51002647eab4",
+            "sha256": "a340e50557a4498674b9db33cc8c98d1a25b27fbfad6aaffc0599b67e48b2896",
+            "recordingEnd": "2026-10-05T19:26:34.000Z",
+            "recordingType": "audio_transcript",
+            "recordingStart": "2026-10-05T18:00:59.000Z"
+          },
+          "audioOnlyFileCount": 1
+        }
+      }
+    ],
+    "dispatches": [
+      {
+        "job_id": "934ccb8c-604a-4391-9f93-c1845d2e9a11",
+        "state": "running",
+        "attempt_no": 1,
+        "last_error_code": null
+      }
+    ]
+  },
+  "ready": {
+    "database": "audio_pr513_acceptance_20261019",
+    "jobs": [
+      {
+        "id": "934ccb8c-604a-4391-9f93-c1845d2e9a11",
+        "status": "ready",
+        "version": 23,
+        "created_at": "2026-10-19T22:35:33.737Z",
+        "submission_intent_at": "2026-10-19T22:35:45.716Z",
+        "declared_bytes": "56283857",
+        "verified_bytes": "56283857",
+        "audio_duration_ms": "5134677",
+        "sanitized_error_code": null,
+        "provider_transcript_id": null,
+        "provider_cleanup_completed_at": "2026-10-19T22:36:41.798Z",
+        "audio_deleted_at": "2026-10-19T22:36:41.909Z",
+        "audio_sha256": "34a1d8360eb4ceefa0a5843ae6157aa461f4dde448138d260fd8952c55044171",
+        "requested_model": "universal-3-5-pro",
+        "returned_model": "universal-3-5-pro",
+        "output_sha256": "13dfb88ab8545a20ca3c9b1687d19589220842ff337c3ae71643f9d0f4d863ac",
+        "ready_at": "2026-10-19T22:36:38.380Z",
+        "cleanup_requested_at": null
+      }
+    ],
+    "imports": [
+      {
+        "id": "c53578ee-17db-4da9-833e-9353c288059c",
+        "state": "started",
+        "transcription_job_id": "934ccb8c-604a-4391-9f93-c1845d2e9a11",
+        "failure_code": null,
+        "selected_recording_files": {
+          "version": 1,
+          "audioFile": {
+            "bytes": 56283857,
+            "fileId": "2a426384-d749-49c7-8607-3298d0a4cd3d",
+            "sha256": "34a1d8360eb4ceefa0a5843ae6157aa461f4dde448138d260fd8952c55044171",
+            "recordingEnd": "2026-10-05T19:26:34.000Z",
+            "recordingType": "audio_only",
+            "recordingStart": "2026-10-05T18:00:59.000Z"
+          },
+          "transcriptFile": {
+            "bytes": 112697,
+            "fileId": "7b602e19-bcae-4e4f-ac91-51002647eab4",
+            "sha256": "a340e50557a4498674b9db33cc8c98d1a25b27fbfad6aaffc0599b67e48b2896",
+            "recordingEnd": "2026-10-05T19:26:34.000Z",
+            "recordingType": "audio_transcript",
+            "recordingStart": "2026-10-05T18:00:59.000Z"
+          },
+          "audioOnlyFileCount": 1
+        }
+      }
+    ],
+    "dispatches": [
+      {
+        "job_id": "934ccb8c-604a-4391-9f93-c1845d2e9a11",
+        "state": "completed",
+        "attempt_no": 1,
+        "last_error_code": null
+      }
+    ]
+  },
+  "content": {
+    "mode": "job",
+    "httpStatus": "200",
+    "elapsedMs": 3621,
+    "clientExitCode": 0,
+    "responseBytes": 727901,
+    "keys": [
+      "job",
+      "content",
+      "zoomCandidateStatus",
+      "zoomCandidates"
+    ],
+    "job": {
+      "id": "934ccb8c-604a-4391-9f93-c1845d2e9a11",
+      "status": "ready",
+      "version": 23,
+      "declared_bytes": "56283857",
+      "verified_bytes": "56283857",
+      "audio_duration_ms": "5134677",
+      "ready_at": "2026-10-19T22:36:38.380Z",
+      "expires_at": "2026-10-26T22:36:38.380Z",
+      "zoomTranscriptAttached": true,
+      "cleanupPending": false,
+      "contentAccessAllowed": true
+    },
+    "transcript": {
+      "utterances": 306,
+      "speakers": 8,
+      "textCharacters": 68101,
+      "firstStartMs": 7694,
+      "lastEndMs": 5133104
+    }
+  },
+  "download": {
+    "mode": "download",
+    "httpStatus": "200",
+    "elapsedMs": 4341,
+    "clientExitCode": 0,
+    "responseBytes": 75184,
+    "sha256": "ed35f78f007e685fbd17ae3d201917ec95e8995e99f01c10c5c45480d1f1ec4a",
+    "lines": 612
+  },
+  "assertions": {
+    "ready": true,
+    "fullDuration": true,
+    "utterancesPresent": true,
+    "timestampsValid": true,
+    "lastSpeechNearEnd": true,
+    "matchingSourceHash": true,
+    "singleJob": true,
+    "singleImport": true,
+    "singleDispatchAttempt": true,
+    "providerCleanupRecorded": true,
+    "audioDeleted": true
+  },
+  "cleanupRequest": {
+    "mode": "cleanup",
+    "httpStatus": "200",
+    "elapsedMs": 2082,
+    "clientExitCode": 0,
+    "responseBytes": 652,
+    "body": {
+      "job": {
+        "id": "934ccb8c-604a-4391-9f93-c1845d2e9a11",
+        "status": "ready",
+        "version": 24,
+        "declared_bytes": "56283857",
+        "verified_bytes": "56283857",
+        "audio_duration_ms": "5134677",
+        "ready_at": "2026-10-19T22:36:38.380Z",
+        "expires_at": "2026-10-26T22:36:38.380Z",
+        "zoomTranscriptAttached": true,
+        "cleanupPending": true,
+        "contentAccessAllowed": false
+      }
+    }
+  },
+  "cleanupDrain": {
+    "mode": "cron",
+    "httpStatus": "200",
+    "elapsedMs": 18665,
+    "clientExitCode": 0,
+    "responseBytes": 234,
+    "body": {
+      "ok": true,
+      "summary": {
+        "recoveredPreIntent": 0,
+        "markedUncertain": 0,
+        "cleanup": {
+          "expiredContent": 0,
+          "cleanup": 1,
+          "incomplete": true
+        },
+        "workflowDispatch": {
+          "checked": 0,
+          "recovered": 0,
+          "started": 0,
+          "failed": 0,
+          "incomplete": false
+        },
+        "incomplete": true
+      }
+    }
+  },
+  "providerAndStorage": {
+    "provider": {
+      "status": "completed",
+      "contentAbsent": true,
+      "textCharacters": 16,
+      "utterances": 0,
+      "words": 0,
+      "deletionMarker": true
+    },
+    "blobCount": 0,
+    "hasMore": false
+  },
+  "databaseDeletion": {
+    "deletedDatabase": "audio_pr513_acceptance_20261019",
+    "absenceVerified": true
+  },
+  "cleanup": {
+    "deploymentDeleted": true,
+    "storeDeleted": true,
+    "temporaryBranchOverridesRemoved": true,
+    "disabledBaselineRestored": true,
+    "localCredentialsAndContentRemoved": true
+  },
+  "notification": {
+    "acceptedForDeliveryAt": "2026-10-19T22:38:25.146Z",
+    "recipient": "owner only",
+    "subject": "[WARNING] Daily transcription cleanup or lease recovery is incomplete",
+    "inboxDeliveryVerified": false
+  }
+}

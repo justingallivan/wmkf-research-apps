@@ -3,7 +3,7 @@ title: Zoom audio adversarial review disposition
 domain: meeting-tracker
 kind: decision
 status: active
-summary: "Opus approved the audio design. Branch code passes local and bounded real-Blob Preview tests; provider acceptance and Production promotion remain pending."
+summary: "Opus approved the audio design. Branch code passes local, synthetic Blob and real Zoom/AssemblyAI Preview tests; Production promotion remains pending."
 owner: product-engineering
 ---
 
@@ -19,8 +19,9 @@ This is specification approval, not proof of runtime or production readiness.
 The planning/review task changed no application code or external state. The
 subsequent owner-authorized [branch implementation](ZOOM_AUDIO_IMPLEMENTATION_2026-10-19.md)
 is locally tested and [Preview-verified](ZOOM_AUDIO_PREVIEW_VALIDATION_2026-10-19.md),
-and remains unmerged without a Production deployment. No real provider acceptance
-or production change is claimed.
+including [one owner-approved real Zoom/AssemblyAI run](ZOOM_AUDIO_REAL_PREVIEW_2026-10-19.md),
+and remains unmerged without a Production deployment. The real-run receipt
+records isolated setup, output verification, cleanup and its automatic warning email.
 
 ## Selected design and premise
 
@@ -67,14 +68,14 @@ historical **NEEDS REWORK** receipt. Its scratch admission/reaper and parseFile
 objections concern an alternative that is no longer selected. Its source-backed
 warnings about the Zoom caller, deadlines, failure contracts and unsupported
 production claims informed this revision. Local explicit-length wire results
-qualified its unconditional chunked-framing prediction; actual deployed/provider
-compatibility remains unverified.
+qualified its unconditional chunked-framing prediction; the later real-recording receipt now establishes bounded deployed/provider
+compatibility for one approved recording.
 
 The linked implementation receipt records local tests, gates, actual-code
 comparisons and Node 22/24 wire checks. A [bounded synthetic Preview test](ZOOM_AUDIO_PREVIEW_VALIDATION_2026-10-19.md)
 has now exercised the configured runtime, real SDK/store, integrity/parser and
 concurrent byte operations. It does not prove sustained independent concurrency,
-missing-header fallback or hosted slow-source/disconnect behavior. A real provider acceptance check requires separate authorization.
+missing-header fallback or hosted slow-source/disconnect behavior. The owner subsequently authorized the linked real-recording acceptance, which passed.
 Hard termination, non-abortable database/auth work and orphaned remote uploads
 remain explicit residuals; streaming does not eliminate them. No byte-cap
 increase or deployment is authorized by this design review.

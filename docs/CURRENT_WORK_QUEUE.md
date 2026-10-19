@@ -143,9 +143,12 @@ sequence.
   passed small, 199 MiB, two concurrent near-cap operations and corrupt-byte
   rejection with verified cleanup. The concurrent process peak was 1,898 MiB;
   this does not establish a safe sustained concurrency bound. Keep the 200 MiB/
-  four-hour limits. Remaining: final-head CI, separately authorized real-provider
-  acceptance and deliberate promotion; live Zoom and hosted slow-source/abort
-  acceptance remain untested.
+  four-hour limits. [Real Zoom/AssemblyAI Preview acceptance](plans/evidence/ZOOM_AUDIO_REAL_PREVIEW_2026-10-19.md)
+  also passed on the approved 85-minute recording: full import, one provider job,
+  saved transcript and TXT download; disposable resources were removed. The
+  receipt records one automatic cleanup warning email to the owner. Remaining:
+  final-head CI and deliberate promotion. Hosted slow-source/abort, callback
+  delivery and sustained concurrency remain unverified.
 
 - **Site Visit page redesign and follow-ups — implemented.**
   [VERIFIED via source and Git ancestry, 2026-10-19] The redesign merged as

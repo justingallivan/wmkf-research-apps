@@ -3,7 +3,7 @@ title: Zoom audio preallocation implementation evidence
 domain: meeting-tracker
 kind: audit
 status: active
-summary: "Branch code passes local tests and bounded real-Blob Preview checks. Memory outliers are recorded; provider acceptance and Production promotion remain pending."
+summary: "Branch code passes local tests and bounded real-Blob Preview checks. Real Zoom/AssemblyAI Preview acceptance also passed; memory outliers and release limits remain explicit. Production promotion is pending."
 owner: product-engineering
 ---
 
@@ -14,9 +14,10 @@ owner: product-engineering
 [Opus-reviewed specification](../ZOOM_AUDIO_STREAMING_PLAN_2026-10-19.md).
 This receipt records branch source and local checks. Subsequent
 [bounded Preview acceptance](ZOOM_AUDIO_PREVIEW_VALIDATION_2026-10-19.md) passed;
-no Production deployment is claimed. No migration,
-environment update, live Zoom call, real recording or AssemblyAI request was
-made. The existing 200 MiB/four-hour caps, private-store selection, parser worker,
+the later [owner-approved real Zoom/AssemblyAI acceptance](ZOOM_AUDIO_REAL_PREVIEW_2026-10-19.md)
+also passed. No Production deployment is claimed. The local implementation
+phase itself made no migration, environment update, live Zoom call, real recording
+or AssemblyAI request; the linked hosted receipts describe subsequent external work. The existing 200 MiB/four-hour caps, private-store selection, parser worker,
 job schema and uncertain-submission policy remain unchanged.
 
 ## Invariants and tests
@@ -141,9 +142,11 @@ No current audio statement is intended to claim deployed optimization.
 
 The linked Preview receipt now verifies the real Blob SDK/store, configured
 runtime, bundled parser, corrupt-byte rejection and bounded concurrent memory/
-timing. Remaining before promotion: final-head CI, separately authorized real-
-provider acceptance and owner promotion. Hosted slow-source/disconnect, live Zoom
-and sustained independent concurrency remain untested. Non-abortable auth/database work, hard termination, transient
+timing. The later real-recording receipt verifies Zoom download/import, one AssemblyAI
+transcription, saved content and TXT download with cleanup and the automatic
+notification side effect recorded. Remaining before promotion: final-head CI and
+owner promotion. Hosted slow-source/disconnect, callback delivery and sustained
+independent concurrency remain untested. Non-abortable auth/database work, hard termination, transient
 pre-intent failures becoming failed/cleanup, post-intent zero-POST uncertainty and
 orphan remote uploads remain explicit residuals. No production OOM or universal
 memory ceiling is established.
