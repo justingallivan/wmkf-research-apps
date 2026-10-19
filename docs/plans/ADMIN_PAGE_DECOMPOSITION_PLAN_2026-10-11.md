@@ -360,3 +360,9 @@ before trying it (`admin-view-coverage` covers first render only).
   stage, so there is no unilateral call to flag before merge. Campaign status: **Stages 0–5 complete on
   `claude/admin-decomposition`; Stage 6 omitted; awaiting owner merge.**
 
+- 2026-10-19: **Authorized central staffing feature (PR #507), characterization update.**
+  Final Writeup staffing moved to People & Access → Staffing alongside shared Board roles.
+  The Workflows entry now renders a compatibility link and performs no editor fetch.
+  Coverage now supplies the application access context, a minimal shared-role response,
+  and pins both editor fetches and all headings at `people:staffing`. This is an intentional
+  feature change after the decomposition, not a relaxation of its pure-move acceptance.

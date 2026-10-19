@@ -1,3 +1,4 @@
+import StaffingPanel from '../../staffing/StaffingPanel';
 import { AdminEditorPanel } from '../AdminWorkspaceNavigation';
 import AppAccessSection from '../AppAccessSection';
 import DynamicsIdentitySection from '../DynamicsIdentitySection';
@@ -5,6 +6,8 @@ import RoleManagementSection from '../RoleManagementSection';
 
 export function PeopleWorkspace({ view }) {
   switch (view) {
+    case 'staffing':
+      return <StaffingPanel includeFinalWriteups />;
     case 'app-access':
       return (
         <AdminEditorPanel

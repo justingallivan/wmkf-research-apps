@@ -19,7 +19,7 @@
 
 ### Verified Open
 
-- **Central staffing panel — planned, not implemented (owner request 2026-10-18).** Build a one-stop staffing panel in Admin to update shared staff roles and serve assignments to workflows such as Board writeups. The President, CSO and Grants Manager selectors remain Board-local for now; centralization and migration of those assignments are future work.
+- **Central staffing first release — branch-built, not deployed (`codex/central-staffing-panel`).** [VERIFIED via branch source] Admin → People & Access → Staffing brings President, CSO and Grants Manager assignments together with the existing superuser-only Final Writeup staffing editor and links to other assignment settings. The assigned Grants Manager retains shared-role editing through `/staffing` without general Admin access. Board cycle setup shows the assignments and links to Staffing; dates, admin recipient, roster and activation stay cycle-specific. Existing Dataverse keys, separate role revisions and Final Writeup publication remain unchanged; no data migration. Shared-role configuration is available while Board execution is disabled, without enabling execution. Merge, deployment and hosted acceptance remain pending; no production assignments were changed.
 
 - No further implementation is authorized for the fragment check. Observe ordinary use before expanding its scope; the six live evaluation cases are bounded acceptance evidence.
 

@@ -9,12 +9,13 @@
  *
  * Every URL resolves 200 with `{}`; full URLs (query strings included) are compared, and
  * duplicates are kept so a doubled request fails.
- * Two views cannot render under a bare `{}` (they dereference arrays), so those
+ * Some views cannot render under a bare `{}` (they dereference arrays), so those
  * URLs return the minimal shape the existing workspace tests use:
  *   /api/admin/maintenance (MaintenanceSection, operations:jobs) -> { jobs: [] }
  *   /api/admin/models (ModelConfigSection, ai:models) -> { apps: [] }
  * Views are rendered one at a time (AdminDashboard is not rendered here).
  */
+import AppAccessContext from '../../shared/context/AppAccessContext';
 import { act, render, screen } from '@testing-library/react';
 import { WorkspaceContent } from '../../pages/admin';
 import { ADMIN_WORKSPACES } from '../../shared/components/admin/AdminWorkspaceNavigation';
@@ -28,6 +29,7 @@ const jsonResponse = (status, body) => ({
 const MINIMAL_BODIES = {
   '/api/admin/maintenance': { jobs: [] },
   '/api/admin/models': { apps: [] },
+  '/api/workbench/staffing': { staff: [], roles: { president: {}, cso: {}, grantsManager: {} } },
 };
 
 const EXPECTED_FETCHES = {
@@ -73,9 +75,8 @@ const EXPECTED_FETCHES = {
   'workflows:proposal-ranking': [
     '/api/app-access',
   ],
-  'workflows:final-writeups': [
-    '/api/admin/final-writeup-matrix-audiences',
-  ],
+  'workflows:final-writeups': [],
+  'people:staffing': ['/api/admin/final-writeup-matrix-audiences', '/api/workbench/staffing'],
   'workflows:site-visits': [
     '/api/admin/meeting-tracker-defaults',
     '/api/admin/site-visit-materials-defaults',
@@ -154,11 +155,8 @@ const EXPECTED_HEADINGS = {
   'workflows:proposal-ranking': [
     'Proposal Ranking facilitators',
   ],
-  'workflows:final-writeups': [
-    'Final Writeup staffing',
-    'Program review audiences',
-    'Staff responsibilities',
-  ],
+  'workflows:final-writeups': ['Final Writeup staffing'],
+  'people:staffing': ['Final Writeup staffing', 'Program review audiences', 'Related assignments', 'Shared roles', 'Staff responsibilities'],
   'workflows:site-visits': [
     'Consultants and Board',
     'Materials defaults',
@@ -218,7 +216,7 @@ describe('admin view coverage', () => {
           return Promise.resolve(jsonResponse(200, MINIMAL_BODIES[String(url).split('?')[0]] || {}));
         });
         await act(async () => {
-          render(<WorkspaceContent workspace={ws.key} view={view.key} />);
+          render(<AppAccessContext.Provider value={{ isSuperuser: true }}><WorkspaceContent workspace={ws.key} view={view.key} /></AppAccessContext.Provider>);
         });
         await settle();
         const fetched = urls.slice().sort(); // full URLs, duplicates kept: a doubled fetch must fail

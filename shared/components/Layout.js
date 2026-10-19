@@ -70,6 +70,7 @@ export default function Layout({
   const [alertCount, setAlertCount] = useState(0);
   const [boardAccess, setBoardAccess] = useState(false);
   const [boardSetupAccess, setBoardSetupAccess] = useState(false);
+  const [staffingAccess, setStaffingAccess] = useState(false);
   const { data: session, status } = useSession();
   const { currentProfile } = useProfile();
   const { hasAccess, isSuperuser } = useAppAccess();
@@ -94,7 +95,11 @@ export default function Layout({
     let active = true;
     setBoardAccess(false);
     setBoardSetupAccess(false);
+    setStaffingAccess(false);
     if (hasAccess('reviewers')) {
+      requestEnvelope('/api/workbench/staffing?capabilities=true').then(({ ok, data }) => {
+        if (active && ok) setStaffingAccess(Boolean(data.canManageSharedRoles));
+      }).catch(() => {});
       requestEnvelope('/api/workbench/board-writeups').then(({ ok, data }) => {
         if (active && ok) { setBoardAccess(Boolean(data.canRelease || data.canArchive)); setBoardSetupAccess(Boolean(data.canArchive)); }
       }).catch(() => {});
@@ -125,6 +130,7 @@ export default function Layout({
       .map(app => ({ name: app.name, href: app.href }));
     if (isSuperuser) tools.push({ name: 'Cycle Dossier', href: '/cycle-dossier' });
     if (boardAccess) tools.push({ name: 'Board writeups', href: '/board-writeups' });
+    if (staffingAccess) tools.push({ name: 'Staffing', href: isSuperuser ? '/admin?workspace=people&view=staffing' : '/staffing' });
     if (boardSetupAccess) tools.push({ name: 'Board cycle setup', href: '/board-cycle-setup' });
 
     const trailing = [{ name: 'Guide', href: '/guide' }];
@@ -133,7 +139,7 @@ export default function Layout({
     }
 
     return { primaryItems: primary, toolItems: tools, trailingItems: trailing };
-  }, [hasAccess, isSuperuser, alertCount, boardAccess, boardSetupAccess]);
+  }, [hasAccess, isSuperuser, alertCount, boardAccess, boardSetupAccess, staffingAccess]);
 
   const toolsCurrent = toolItems.some(item => isCurrentPath(pathname, item.href));
   const mainWidthClass = MAIN_WIDTH_CLASSES[maxWidth] || SHELL_WIDTH_CLASS;

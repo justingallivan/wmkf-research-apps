@@ -70,6 +70,7 @@ export const ADMIN_WORKSPACES = Object.freeze([
     description: 'Internal roles, application access, account lifecycle, and Dataverse identity linkage.',
     defaultView: 'roles',
     views: [
+      { key: 'staffing', label: 'Staffing' },
       { key: 'roles', label: 'Users & roles' },
       { key: 'app-access', label: 'App access' },
       { key: 'identity', label: 'Identity linkage' },
@@ -81,7 +82,7 @@ const WORKSPACE_BY_KEY = new Map(ADMIN_WORKSPACES.map((workspace) => [workspace.
 
 export const LEGACY_ADMIN_HASH_LOCATIONS = Object.freeze({
   '#system-alerts': { workspace: 'operations', view: 'incidents' },
-  '#final-writeup-matrix-audiences': { workspace: 'workflows', view: 'final-writeups' },
+  '#final-writeup-matrix-audiences': { workspace: 'people', view: 'staffing' },
 });
 
 export function resolveAdminLocation(rawWorkspace, rawView) {
