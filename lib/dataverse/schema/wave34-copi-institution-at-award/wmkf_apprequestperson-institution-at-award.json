@@ -1,0 +1,17 @@
+{
+  "name": "wmkf_apprequestperson-institution-at-award",
+  "kind": "extensions-on-existing",
+  "entityLogicalName": "wmkf_apprequestperson",
+  "_comment": "Owner + Connor decision 2026-10-20: per-award institution snapshot on the PI/co-PI junction, as a lookup to account. The contact's own account link stays the person's CURRENT institution; this column keeps where they were when this request was made/awarded, so a later move changes only the contact. GoApply's submission flow (Connor) fills it for new co-PIs; the 2017-2023 Research co-PI recovery backfill fills existing rows. Nullable; additive only. Default cascade (Delete: Restrict) matches the wave4 wmkf_portalmembership account lookup and keeps award history from being silently unlinked by an account delete.",
+  "relationships": [
+    {
+      "kind": "N:1",
+      "schemaName": "wmkf_apprequestperson_institutionataward",
+      "referencedEntity": "account",
+      "lookupSchemaName": "wmkf_InstitutionAtAward",
+      "lookupDisplayName": "Institution at Award",
+      "lookupDescription": "The person's institution (account) for this request at the time of submission/award. Does not change if the person later moves; the contact's account holds their current institution.",
+      "required": "None"
+    }
+  ]
+}

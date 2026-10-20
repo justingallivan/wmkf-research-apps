@@ -30,7 +30,7 @@ Worked in worktree `WMKF_Apps-claude-session` on `claude/session-2026-10-19`; me
 
 ### Owner Decision Needed
 
-1. **Co-PI data structure (Connor).** [AWAITING CONNOR] Note on the junction vs. a new "Institution at award" lookup column on `wmkf_apprequestperson` (recommended), and whether GoApply fills it. The owner has asked Connor. Gates the co-PI write stage below.
+1. **Co-PI data structure — decided 2026-10-20.** Connor agreed in writing (relayed by the owner) to a lookup column on `wmkf_apprequestperson`, which the GoApply submission flow will fill. The owner assumes Connor's flow also links the co-PI contact to an account, and is alerting Connor. Spec `lib/dataverse/schema/wave34-copi-institution-at-award/` (`wmkf_InstitutionAtAward` → `account`) [PLANNED; not applied]. Owner runs `node scripts/apply-dataverse-schema.js --target=sandbox --wave=34-copi-institution-at-award` (dry run, then `--execute`), then the same with `--target=prod`.
 2. **Colleague vocabulary review.** [VERIFIED via owner request and saved review artifact] Review `docs/plans/review/PROPOSAL_WORKFLOW_VOCABULARY_2026-10-19.md` and the linked owner-edited deck. Await feedback and explicit implementation scope. Do not treat the October 8 options as the newest proposed names.
 3. **Meeting Tracker redesign direction.** [VERIFIED via audit and unchanged implementation] Choose the primary landing task and whether to separate task views / compact rows. Investigation and mockups did not authorize a redesign build.
 
