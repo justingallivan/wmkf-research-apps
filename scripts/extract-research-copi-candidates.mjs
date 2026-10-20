@@ -103,12 +103,13 @@ const SYSTEM = (nonces) => [
   '',
   'You extract the research team from grant proposal documents for the W. M. Keck Foundation.',
   'Return ONLY a JSON object, no prose, with this shape:',
-  '{"people":[{"name":"","title":"","department":"","email":"","is_pi":false,"faculty_level":false,"named_coinvestigator":false,"evidence":""}],"documents_name_coinvestigators":false}',
+  '{"people":[{"name":"","title":"","department":"","email":"","institution":"","is_pi":false,"faculty_level":false,"named_coinvestigator":false,"evidence":""}],"documents_name_coinvestigators":false}',
   'Rules:',
   '- Include every person who has a biosketch, CV or bio in the documents, once each.',
   '- name: the person\'s full name as written. title: their current position title. email: as written, or "".',
+  '- institution: the person\'s institution as stated in their biosketch header or current appointment, or "".',
   '- is_pi: true only for the principal investigator (lead PI) of this proposal.',
-  '- faculty_level: true for independent investigators (professor of any rank, investigator, staff/research scientist leading work, center or lab director); false for postdocs, students, technicians, research associates, managers and administrators.',
+  '- faculty_level: true for independent investigators (professor of any rank, investigator, staff/research scientist leading work, center or lab director); false for postdocs, students and doctoral researchers, technicians, research associates, managers and administrators.',
   '- named_coinvestigator: true only if the narrative, application or a biosketch heading explicitly calls this person a co-PI, co-principal investigator or co-investigator of THIS proposal.',
   '- documents_name_coinvestigators: true if the documents explicitly identify any co-PI/co-investigator by name.',
   '- evidence: up to 15 words quoted from the documents supporting named_coinvestigator, else "".',
@@ -149,7 +150,9 @@ for (const r of inv) {
     for (const b of buckets) {
       try { for (const f of await GraphService.listFiles(b.library, b.folder, { recursive: true })) files.push({ ...f, library: b.library }); } catch { /* speculative archive bucket */ }
     }
-    const wanted = new Set([...(r.biosketch_files ? r.biosketch_files.split(' | ') : []), ...(r.biosketch_files ? [] : r.proposal_files.split(' | ').slice(0, 1))]);
+    // A compiled proposal (2016–2017) contains the biosketches; separate
+    // biosketch-like files in those years are often stray student CVs.
+    const wanted = new Set([...(r.proposal_files ? r.proposal_files.split(' | ').slice(0, 1) : []), ...(r.biosketch_files ? r.biosketch_files.split(' | ') : [])]);
     const narrative = files.filter((f) => /narrative|application|phase\s*(i{1,2}|1|2)\b/i.test(f.name) && !/report/i.test(f.name) && /\.(pdf|docx?)$/i.test(f.name))
       .sort((a, b) => (b.size || 0) - (a.size || 0)).slice(0, 1);
     const docs = [...files.filter((f) => wanted.has(f.name)).slice(0, 3), ...narrative.filter((f) => !wanted.has(f.name))];
@@ -181,11 +184,16 @@ for (const r of inv) {
     const named = Boolean(parsed.documents_name_coinvestigators);
     for (const p of parsed.people) {
       const email = String(p.email || '').trim().toLowerCase();
+      // Institution: email domain via ROR, else as stated in the documents,
+      // else the grant's own institution (an assumption, labelled as such).
       const inst = await rorForDomain(email.split('@')[1] || '');
+      const stated = String(p.institution || '').trim();
+      const institution = inst?.name || stated || base.applicant || '';
+      const institutionSource = inst ? 'email domain' : stated ? 'stated' : base.applicant ? 'assumed: grant institution' : '';
       const isCoPI = !p.is_pi && (named ? Boolean(p.named_coinvestigator) : Boolean(p.faculty_level));
       out.push({
         ...base, name: p.name, title: p.title, department: p.department, email,
-        institution: inst?.name || '', ror: inst?.ror || '',
+        institution, institutionSource, ror: inst?.ror || '',
         isPI: Boolean(p.is_pi), facultyLevel: Boolean(p.faculty_level), namedCoInvestigator: Boolean(p.named_coinvestigator),
         decision: p.is_pi ? 'PI' : isCoPI ? 'co-PI' : 'other',
         rule: p.is_pi ? '' : named ? 'c: named in documents' : 'a: faculty-level',
@@ -201,9 +209,9 @@ for (const r of inv) {
 }
 
 const esc = (v) => `"${String(v ?? '').replace(/"/g, '""')}"`;
-const cols = ['year', 'requestNum', 'applicant', 'piOnRecord', 'name', 'title', 'department', 'email', 'institution', 'ror', 'isPI', 'facultyLevel', 'namedCoInvestigator', 'decision', 'rule', 'evidence', 'sources'];
+const cols = ['year', 'requestNum', 'applicant', 'piOnRecord', 'name', 'title', 'department', 'email', 'institution', 'institutionSource', 'ror', 'isPI', 'facultyLevel', 'namedCoInvestigator', 'decision', 'rule', 'evidence', 'sources'];
 fs.writeFileSync(OUT, `${[cols.join(','), ...out.map((o) => cols.map((c) => esc(o[c])).join(','))].join('\n')}\n`);
 const coPIs = out.filter((o) => o.decision === 'co-PI');
-console.log(`\nGrants processed: ${done}. People: ${out.filter((o) => o.name).length}. Co-PIs: ${coPIs.length} (with institution from email: ${coPIs.filter((o) => o.institution).length}). Errors: ${out.filter((o) => o.decision === 'error').length}.`);
+console.log(`\nGrants processed: ${done}. People: ${out.filter((o) => o.name).length}. Co-PIs: ${coPIs.length} (institution from email: ${coPIs.filter((o) => o.institutionSource === 'email domain').length}, stated: ${coPIs.filter((o) => o.institutionSource === 'stated').length}, assumed: ${coPIs.filter((o) => o.institutionSource?.startsWith('assumed')).length}). Errors: ${out.filter((o) => o.decision === 'error').length}.`);
 console.log(`Model usage: ${tokensIn} input + ${tokensOut} output tokens ≈ $${cost().toFixed(3)} (${MODEL}).`);
 console.log(`Wrote ${OUT}\n`);
