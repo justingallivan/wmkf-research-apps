@@ -24,6 +24,7 @@ related:
 - [Desktop screenshot, 1440px wide](meeting-tracker-2026-10-20/desktop.png).
 - [Narrow-screen screenshot, 390px wide](meeting-tracker-2026-10-20/narrow.png).
 - [Sessions HTML mockup](meeting-tracker-2026-10-20/sessions.html), [desktop screenshot](meeting-tracker-2026-10-20/sessions-desktop.png), and [narrow-screen screenshot](meeting-tracker-2026-10-20/sessions-narrow.png).
+- [Session detail HTML mockup](meeting-tracker-2026-10-20/session-detail.html), [desktop screenshot](meeting-tracker-2026-10-20/session-detail-desktop.png), and [narrow-screen screenshot](meeting-tracker-2026-10-20/session-detail-narrow.png).
 - [Original audit](../../../.impeccable/critique/2026-10-19T22-21-01Z__nts-meeting-tracker-meetingtrackerlist-js-ef43d395.md) — dated source and production inspection, not a fresh runtime assessment.
 - [Vocabulary review](PROPOSAL_WORKFLOW_VOCABULARY_2026-10-19.md) — proposed names and owner-edited deck, awaiting colleague feedback.
 
@@ -56,9 +57,23 @@ Scope is explicitly independent of the cycle schedule’s program and request fi
 
 [PLANNED — mockup only] Date-range/status filtering, search including agenda requests, and the list-level selected agenda preview are proposed interactions. Agenda content exists on the session detail surface; integrating it into a list preview requires a separately reviewed data-loading design. No API extension, session name field, cycle-membership mapping or persistence change is approved here. The existing status words are provisional display copy for this mockup, not a decision to alter persisted statuses.
 
-The screenshots use four illustrative sessions, including two on the same day, and a three-request agenda. Both widths were rendered without horizontal document overflow. Controls are static except local navigation/preview anchors; screenshots are visual evidence, not proof of working filters or switching previews. Session details, agenda editing/sending, creation forms, empty/loading/error states and long-list behavior are outside this mockup.
+The screenshots use four illustrative sessions, including two on the same day, and a three-request agenda. Both widths were rendered without horizontal document overflow. Controls are static except local navigation/preview anchors; screenshots are visual evidence, not proof of working filters or switching previews. Session detail now has its own proposed read-view mockup below. Agenda editing/sending, creation forms, empty/loading/error states and long-list behavior remain outside the Sessions-tab mockup.
 
 The standalone HTML files link between Cycle schedule and Sessions. No app code, vocabulary decision, session handoff, or design-system files were changed. Further layout work may proceed before vocabulary approval; app implementation still needs explicit scope.
+
+## Session detail — proposed read view, 2026-10-20
+
+[VERIFIED via owner instruction] Create and save desktop and narrow-screen session detail mockups with provisional labels; do not change the app. This screen’s layout remains a proposal for owner review.
+
+The proposed read view leads with date, start/end time and time zone, status and Join meeting. A compact summary contains location, duration, attendee count and Edit session details. Proposal order is the main working area, with calculated start times, allocated minutes, request identity and request/briefing actions. The missing-briefing case uses Check briefing, not direct creation. Attendees, notes and agenda sharing sit in a desktop sidebar and follow the agenda on narrow screens. Edit proposal order remains separate from the read view.
+
+[VERIFIED via source inspection] `shared/components/meeting-tracker/SessionEditor.js` provides session summary/editing, attendee editing, proposal order editing and briefing links. `shared/components/meeting-tracker/SessionAgendaPanel.js` provides agenda recipient/message review and preview before sending. These sources ground the capabilities; the proposed composition, derived per-item times and provisional labels are design decisions rather than claims of current UI behavior. Open request and Check briefing destinations require implementation review. Attendee editing would retain the existing session-details save contract unless explicitly changed later.
+
+Prepare agenda is a static entry point to a future reviewed composer layout. No live meeting joins, recipients, emails, records or send receipts are used. The illustrative example has six attendees and three 30-minute proposals in a 90-minute session. Both saved widths rendered without horizontal document overflow. Independent visual review returned ship for mockup review; a final copy correction changed Create briefing to Check briefing.
+
+Edit forms, reordering/moving/removing proposals, cancellation, conflict/over-capacity warnings, missing links, unavailable briefings, attendee issues, agenda-send uncertainty, loading/errors/empty states and long agendas are not designed or runtime-verified here. Preserve those existing behaviors when a separately authorized implementation is scoped. This mockup is not acceptance of keyboard accessibility, interaction behavior, data loading or sending.
+
+Only the selected illustrative session and its preview link to this detail; the detail links back to Sessions. All names and related labels remain provisional. No app, API, persistence, design-system or vocabulary decision changes are included.
 
 ## Before implementation, after vocabulary is settled
 
