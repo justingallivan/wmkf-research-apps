@@ -103,6 +103,7 @@ describe('transcription worker submission safety', () => {
   });
 
   it('records uncertain acceptance after an ambiguous POST and never automatically resubmits it', async () => {
+    store.getLeasedTranscriptionJob.mockResolvedValueOnce({ ...queued });
     await drainTranscriptionPilot({ maxJobs: 2 });
     await drainTranscriptionPilot({ maxJobs: 2 });
     expect(store.claimNextTranscriptionJob).toHaveBeenCalled();
@@ -113,6 +114,66 @@ describe('transcription worker submission safety', () => {
     expect(store.mutateLeasedTranscriptionJob).toHaveBeenCalledWith(expect.objectContaining({
       fields: expect.objectContaining({ status: 'submission_uncertain' }), expectedStatuses: ['submitting'],
     }));
+  });
+
+  it.each([null, { ...queued, status: 'queued' }, { ...queued, cleanup_requested_at: new Date() }])('fences changed lease/state/cleanup before upload (%p)', async latest => {
+    store.getLeasedTranscriptionJob.mockReset().mockResolvedValue(latest);
+    store.claimNextDueTranscriptionJob.mockReset().mockResolvedValue(null);
+    await drainTranscriptionPilot({ maxJobs: 1 });
+    expect(runtime.inspectOwnerInput).toHaveBeenCalled();
+    expect(uploadAssemblyAIAudio).not.toHaveBeenCalled();
+    expect(store.beginTranscriptionProviderSubmission).not.toHaveBeenCalled();
+    expect(store.mutateLeasedTranscriptionJob).not.toHaveBeenCalled();
+  });
+
+  it('rechecks submission switches on the latest row and releases the queued lease', async () => {
+    store.claimNextDueTranscriptionJob.mockReset().mockResolvedValue(null);
+    runtime.inspectOwnerInput.mockImplementation(async () => {
+      process.env.TRANSCRIPTION_SUBMISSIONS_ENABLED = 'false';
+      return { buffer: Buffer.from('audio'), blob: { pathname: queued.audio_pathname } };
+    });
+    store.getLeasedTranscriptionJob.mockReset().mockResolvedValue({ ...queued, version: 7 });
+    store.mutateLeasedTranscriptionJob.mockResolvedValue({ ...queued, status: 'queued', version: 8 });
+    await drainTranscriptionPilot({ maxJobs: 1 });
+    expect(uploadAssemblyAIAudio).not.toHaveBeenCalled();
+    expect(store.mutateLeasedTranscriptionJob).toHaveBeenCalledWith(expect.objectContaining({ expectedVersion: 7, fields: { status: 'queued' } }));
+    expect(store.releaseTranscriptionLease).toHaveBeenCalledWith(expect.objectContaining({ expectedVersion: 8, expectedStatuses: ['queued'] }));
+  });
+
+  it('reuses a reference discovered after inspection and never uploads again', async () => {
+    store.claimNextDueTranscriptionJob.mockReset().mockResolvedValue(null);
+    store.getLeasedTranscriptionJob.mockResolvedValueOnce({ ...queued, version: 2, provider_upload_ref_ciphertext: 'late-saved-ref' });
+    await drainTranscriptionPilot({ maxJobs: 1 });
+    expect(runtime.inspectOwnerInput).toHaveBeenCalled();
+    expect(runtime.providerReference).toHaveBeenCalledWith('late-saved-ref');
+    expect(uploadAssemblyAIAudio).not.toHaveBeenCalled();
+    expect(submitAssemblyAITranscription).toHaveBeenCalledTimes(1);
+  });
+
+  it('integrity failure before intent never uploads and preserves failed plus cleanup behavior', async () => {
+    store.claimNextDueTranscriptionJob.mockReset().mockResolvedValue(null);
+    runtime.inspectOwnerInput.mockRejectedValue(Object.assign(new Error('audio_integrity_mismatch'), { code: 'audio_integrity_mismatch' }));
+    store.getLeasedTranscriptionJob.mockReset().mockResolvedValue(queued);
+    await drainTranscriptionPilot({ maxJobs: 1 });
+    expect(uploadAssemblyAIAudio).not.toHaveBeenCalled();
+    expect(store.beginTranscriptionProviderSubmission).not.toHaveBeenCalled();
+    expect(store.mutateLeasedTranscriptionJob).toHaveBeenCalledWith(expect.objectContaining({ fields: expect.objectContaining({ status: 'failed', cleanup_requested_at: expect.any(Date) }) }));
+  });
+
+  it('retains zero-POST uncertainty when the deadline expires after intent', async () => {
+    store.claimNextDueTranscriptionJob.mockReset().mockResolvedValue(null);
+    store.getLeasedTranscriptionJob.mockResolvedValueOnce(queued);
+    const now = Date.now(); const clock = jest.spyOn(Date, 'now').mockReturnValue(now);
+    store.beginTranscriptionProviderSubmission.mockImplementation(async () => {
+      clock.mockReturnValue(now + 240_001);
+      return { ...queued, submission_intent_at: new Date(), attempt_correlation_id: '33333333-3333-4333-8333-333333333333' };
+    });
+    try {
+      await drainTranscriptionPilot({ maxJobs: 1 });
+      expect(uploadAssemblyAIAudio).toHaveBeenCalledTimes(1);
+      expect(submitAssemblyAITranscription).not.toHaveBeenCalled();
+      expect(store.mutateLeasedTranscriptionJob).toHaveBeenCalledWith(expect.objectContaining({ fields: expect.objectContaining({ status: 'submission_uncertain' }) }));
+    } finally { clock.mockRestore(); }
   });
 
   it('keeps recovery/cleanup worker entry active but does not claim queued work when switches are off', async () => {

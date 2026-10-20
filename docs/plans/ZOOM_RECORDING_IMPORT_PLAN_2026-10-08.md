@@ -27,6 +27,16 @@ the extension; application remains pending. Consult the provenance plan for deta
 
 Implementation notes that refine this plan:
 
+- **[BRANCH SOURCE 2026-10-19; Preview tested, not merged/Production]** The reviewed audio-memory
+  follow-up adds internal `deadlineMs` options to import/listing/detail/download/start,
+  and `preallocateAudio:true` only to the import's audio download. VTT remains
+  bounded without preallocation. Audio and VTT writes and the VTT download reserve
+  time for capture/start; audio references are released after scalar provenance
+  capture and before start. Buffer-based Blob staging, queue reread, integrity
+  checks and the existing recovery/partial-success contract remain. See
+  [implementation evidence](evidence/ZOOM_AUDIO_IMPLEMENTATION_2026-10-19.md) and
+  [real-Blob Preview receipt](evidence/ZOOM_AUDIO_PREVIEW_VALIDATION_2026-10-19.md).
+
 - The cleanup pathnames are read from the raw job row (`getMeetingTranscriptionJob` in `lib/services/transcription-pilot/store.js`); the job DTO from `projectMeetingTranscriptionJob` exposes only `zoomTranscriptAttached`.
 - The import re-lists with the same default 30-day window the picker uses; the POST body has no `days`.
 - A Zoom transcript over the 4,000,000-byte cap is treated as absent (audio imports alone); audio over the 200 MiB cap is `zoom_audio_too_large` (422) before any claim.

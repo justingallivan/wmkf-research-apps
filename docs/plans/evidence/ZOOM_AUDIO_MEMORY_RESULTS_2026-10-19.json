@@ -1,0 +1,4861 @@
+{
+  "sourceCommit": "ca318defa2a27c8c4f1fc7767217aae598b13136",
+  "measuredAt": "2026-10-19T20:56:53.531Z",
+  "platform": "darwin/arm64",
+  "runtime": "v26.6.0",
+  "fetchUndici": "8.9.0",
+  "receiverIsolation": "separate child process; receiver RSS excluded",
+  "tmpFilesystem": {
+    "type": 26,
+    "bsize": 4096,
+    "frsize": 4096,
+    "blocks": 120699413,
+    "bfree": 23800000,
+    "bavail": 23800000,
+    "files": 957275610,
+    "ffree": 953685520
+  },
+  "scope": "Local synthetic source/storage mocks and loopback upload; no hosted/cloud/provider measurement.",
+  "results": [
+    {
+      "mode": "baseline",
+      "flow": "owner",
+      "format": "mp3",
+      "mib": 40,
+      "bytes": 41942694,
+      "repeat": 1,
+      "elapsedMs": 133.045791,
+      "before": {
+        "rss": 70991872,
+        "heapTotal": 12468224,
+        "heapUsed": 7707480,
+        "external": 4355350,
+        "arrayBuffers": 212117
+      },
+      "sampledPeak": {
+        "rss": 226230272,
+        "heapUsed": 9599640,
+        "external": 52671961,
+        "arrayBuffers": 84097490
+      },
+      "processMaxRSS": 226508800,
+      "bytesSent": 0,
+      "wire": [],
+      "scratchBytes": 0,
+      "slowSource": false,
+      "slowSink": false,
+      "integrity": "passed",
+      "durationMs": 2627448,
+      "runtime": "v26.6.0"
+    },
+    {
+      "mode": "prealloc",
+      "flow": "owner",
+      "format": "mp3",
+      "mib": 40,
+      "bytes": 41942694,
+      "repeat": 1,
+      "elapsedMs": 154.56691600000005,
+      "before": {
+        "rss": 66043904,
+        "heapTotal": 12730368,
+        "heapUsed": 7704712,
+        "external": 4289814,
+        "arrayBuffers": 260891
+      },
+      "sampledPeak": {
+        "rss": 196722688,
+        "heapUsed": 9552856,
+        "external": 68924543,
+        "arrayBuffers": 101726328
+      },
+      "processMaxRSS": 196968448,
+      "bytesSent": 0,
+      "wire": [],
+      "scratchBytes": 0,
+      "slowSource": false,
+      "slowSink": false,
+      "integrity": "passed",
+      "durationMs": 2627448,
+      "runtime": "v26.6.0"
+    },
+    {
+      "mode": "transfer",
+      "flow": "owner",
+      "format": "mp3",
+      "mib": 40,
+      "bytes": 41942694,
+      "repeat": 1,
+      "elapsedMs": 108.39266700000002,
+      "before": {
+        "rss": 70926336,
+        "heapTotal": 11943936,
+        "heapUsed": 7706136,
+        "external": 4289814,
+        "arrayBuffers": 212117
+      },
+      "sampledPeak": {
+        "rss": 149733376,
+        "heapUsed": 8819944,
+        "external": 59094143,
+        "arrayBuffers": 55065388
+      },
+      "processMaxRSS": 149962752,
+      "bytesSent": 0,
+      "wire": [],
+      "scratchBytes": 0,
+      "slowSource": false,
+      "slowSink": false,
+      "integrity": "passed",
+      "durationMs": 2627448,
+      "runtime": "v26.6.0"
+    },
+    {
+      "mode": "spool",
+      "flow": "owner",
+      "format": "mp3",
+      "mib": 40,
+      "bytes": 41942694,
+      "repeat": 1,
+      "elapsedMs": 123.579792,
+      "before": {
+        "rss": 70975488,
+        "heapTotal": 12468224,
+        "heapUsed": 7707000,
+        "external": 4355350,
+        "arrayBuffers": 212117
+      },
+      "sampledPeak": {
+        "rss": 109019136,
+        "heapUsed": 10539096,
+        "external": 19515576,
+        "arrayBuffers": 15481644
+      },
+      "processMaxRSS": 109264896,
+      "bytesSent": 0,
+      "wire": [],
+      "scratchBytes": 41942694,
+      "slowSource": false,
+      "slowSink": false,
+      "integrity": "passed",
+      "durationMs": 2627448,
+      "runtime": "v26.6.0"
+    },
+    {
+      "mode": "baseline",
+      "flow": "meeting",
+      "format": "mp3",
+      "mib": 40,
+      "bytes": 41942694,
+      "repeat": 1,
+      "elapsedMs": 138.15875,
+      "before": {
+        "rss": 71057408,
+        "heapTotal": 12730368,
+        "heapUsed": 7706928,
+        "external": 4355350,
+        "arrayBuffers": 212117
+      },
+      "sampledPeak": {
+        "rss": 228261888,
+        "heapUsed": 9314744,
+        "external": 88978968,
+        "arrayBuffers": 84097490
+      },
+      "processMaxRSS": 228507648,
+      "bytesSent": 0,
+      "wire": [],
+      "scratchBytes": 0,
+      "slowSource": false,
+      "slowSink": false,
+      "integrity": "passed",
+      "durationMs": 2627448,
+      "runtime": "v26.6.0"
+    },
+    {
+      "mode": "prealloc",
+      "flow": "meeting",
+      "format": "mp3",
+      "mib": 40,
+      "bytes": 41942694,
+      "repeat": 1,
+      "elapsedMs": 100.29520899999999,
+      "before": {
+        "rss": 70991872,
+        "heapTotal": 12468224,
+        "heapUsed": 7704544,
+        "external": 4289814,
+        "arrayBuffers": 212117
+      },
+      "sampledPeak": {
+        "rss": 195592192,
+        "heapUsed": 9608680,
+        "external": 62960767,
+        "arrayBuffers": 92747896
+      },
+      "processMaxRSS": 195887104,
+      "bytesSent": 0,
+      "wire": [],
+      "scratchBytes": 0,
+      "slowSource": false,
+      "slowSink": false,
+      "integrity": "passed",
+      "durationMs": 2627448,
+      "runtime": "v26.6.0"
+    },
+    {
+      "mode": "transfer",
+      "flow": "meeting",
+      "format": "mp3",
+      "mib": 40,
+      "bytes": 41942694,
+      "repeat": 1,
+      "elapsedMs": 102.456916,
+      "before": {
+        "rss": 71254016,
+        "heapTotal": 11943936,
+        "heapUsed": 7704680,
+        "external": 4289814,
+        "arrayBuffers": 212117
+      },
+      "sampledPeak": {
+        "rss": 153894912,
+        "heapUsed": 9128520,
+        "external": 62633087,
+        "arrayBuffers": 58604332
+      },
+      "processMaxRSS": 154173440,
+      "bytesSent": 0,
+      "wire": [],
+      "scratchBytes": 0,
+      "slowSource": false,
+      "slowSink": false,
+      "integrity": "passed",
+      "durationMs": 2627448,
+      "runtime": "v26.6.0"
+    },
+    {
+      "mode": "spool",
+      "flow": "meeting",
+      "format": "mp3",
+      "mib": 40,
+      "bytes": 41942694,
+      "repeat": 1,
+      "elapsedMs": 116.65937499999998,
+      "before": {
+        "rss": 70975488,
+        "heapTotal": 12468224,
+        "heapUsed": 7707464,
+        "external": 4355350,
+        "arrayBuffers": 212117
+      },
+      "sampledPeak": {
+        "rss": 103874560,
+        "heapUsed": 9475408,
+        "external": 12891624,
+        "arrayBuffers": 8862869
+      },
+      "processMaxRSS": 104595456,
+      "bytesSent": 0,
+      "wire": [],
+      "scratchBytes": 41942694,
+      "slowSource": false,
+      "slowSink": false,
+      "integrity": "passed",
+      "durationMs": 2627448,
+      "runtime": "v26.6.0"
+    },
+    {
+      "mode": "baseline",
+      "flow": "zoom",
+      "format": "mp3",
+      "mib": 40,
+      "bytes": 41942694,
+      "repeat": 1,
+      "elapsedMs": 181.33262499999998,
+      "before": {
+        "rss": 71188480,
+        "heapTotal": 12730368,
+        "heapUsed": 7707392,
+        "external": 4355350,
+        "arrayBuffers": 212117
+      },
+      "sampledPeak": {
+        "rss": 289341440,
+        "heapUsed": 9662000,
+        "external": 155494400,
+        "arrayBuffers": 126040184
+      },
+      "processMaxRSS": 289406976,
+      "bytesSent": 0,
+      "wire": [],
+      "scratchBytes": 0,
+      "slowSource": false,
+      "slowSink": false,
+      "integrity": "passed",
+      "durationMs": 2627448,
+      "runtime": "v26.6.0"
+    },
+    {
+      "mode": "drop",
+      "flow": "zoom",
+      "format": "mp3",
+      "mib": 40,
+      "bytes": 41942694,
+      "repeat": 1,
+      "elapsedMs": 162.78433299999998,
+      "before": {
+        "rss": 71106560,
+        "heapTotal": 12468224,
+        "heapUsed": 7708304,
+        "external": 4289814,
+        "arrayBuffers": 212117
+      },
+      "sampledPeak": {
+        "rss": 246398976,
+        "heapUsed": 9674976,
+        "external": 113224026,
+        "arrayBuffers": 84228562
+      },
+      "processMaxRSS": 246710272,
+      "bytesSent": 0,
+      "wire": [],
+      "scratchBytes": 0,
+      "slowSource": false,
+      "slowSink": false,
+      "integrity": "passed",
+      "durationMs": 2627448,
+      "runtime": "v26.6.0"
+    },
+    {
+      "mode": "prealloc",
+      "flow": "zoom",
+      "format": "mp3",
+      "mib": 40,
+      "bytes": 41942694,
+      "repeat": 1,
+      "elapsedMs": 150.783208,
+      "before": {
+        "rss": 70844416,
+        "heapTotal": 12468224,
+        "heapUsed": 7706104,
+        "external": 4289814,
+        "arrayBuffers": 212117
+      },
+      "sampledPeak": {
+        "rss": 207863808,
+        "heapUsed": 9357336,
+        "external": 89242059,
+        "arrayBuffers": 112015480
+      },
+      "processMaxRSS": 208027648,
+      "bytesSent": 0,
+      "wire": [],
+      "scratchBytes": 0,
+      "slowSource": false,
+      "slowSink": false,
+      "integrity": "passed",
+      "durationMs": 2627448,
+      "runtime": "v26.6.0"
+    },
+    {
+      "mode": "transfer",
+      "flow": "zoom",
+      "format": "mp3",
+      "mib": 40,
+      "bytes": 41942694,
+      "repeat": 1,
+      "elapsedMs": 147.15170799999999,
+      "before": {
+        "rss": 70926336,
+        "heapTotal": 12206080,
+        "heapUsed": 7705664,
+        "external": 4289814,
+        "arrayBuffers": 212117
+      },
+      "sampledPeak": {
+        "rss": 205193216,
+        "heapUsed": 9917120,
+        "external": 112376613,
+        "arrayBuffers": 108345810
+      },
+      "processMaxRSS": 205553664,
+      "bytesSent": 0,
+      "wire": [],
+      "scratchBytes": 0,
+      "slowSource": false,
+      "slowSink": false,
+      "integrity": "passed",
+      "durationMs": 2627448,
+      "runtime": "v26.6.0"
+    },
+    {
+      "mode": "spool",
+      "flow": "zoom",
+      "format": "mp3",
+      "mib": 40,
+      "bytes": 41942694,
+      "repeat": 1,
+      "elapsedMs": 173.05362499999998,
+      "before": {
+        "rss": 70926336,
+        "heapTotal": 12206080,
+        "heapUsed": 7707016,
+        "external": 4355350,
+        "arrayBuffers": 212117
+      },
+      "sampledPeak": {
+        "rss": 180518912,
+        "heapUsed": 10828232,
+        "external": 88259365,
+        "arrayBuffers": 60111314
+      },
+      "processMaxRSS": 180846592,
+      "bytesSent": 0,
+      "wire": [],
+      "scratchBytes": 41942694,
+      "slowSource": false,
+      "slowSink": false,
+      "integrity": "passed",
+      "durationMs": 2627448,
+      "runtime": "v26.6.0"
+    },
+    {
+      "mode": "baseline",
+      "flow": "submit",
+      "format": "mp3",
+      "mib": 40,
+      "bytes": 41942694,
+      "repeat": 1,
+      "elapsedMs": 168.200292,
+      "before": {
+        "rss": 71286784,
+        "heapTotal": 12468224,
+        "heapUsed": 7707616,
+        "external": 4355350,
+        "arrayBuffers": 212117
+      },
+      "sampledPeak": {
+        "rss": 312508416,
+        "heapUsed": 9713624,
+        "external": 172929892,
+        "arrayBuffers": 168037364
+      },
+      "processMaxRSS": 312508416,
+      "bytesSent": 41942694,
+      "wire": [
+        {
+          "contentLength": "41942694",
+          "transferEncoding": null
+        }
+      ],
+      "scratchBytes": 0,
+      "slowSource": false,
+      "slowSink": false,
+      "integrity": "passed",
+      "durationMs": 2627448,
+      "runtime": "v26.6.0"
+    },
+    {
+      "mode": "prealloc",
+      "flow": "submit",
+      "format": "mp3",
+      "mib": 40,
+      "bytes": 41942694,
+      "repeat": 1,
+      "elapsedMs": 150.21666699999997,
+      "before": {
+        "rss": 71008256,
+        "heapTotal": 12468224,
+        "heapUsed": 7704536,
+        "external": 4289814,
+        "arrayBuffers": 212117
+      },
+      "sampledPeak": {
+        "rss": 278970368,
+        "heapUsed": 9425592,
+        "external": 172067759,
+        "arrayBuffers": 168037903
+      },
+      "processMaxRSS": 278970368,
+      "bytesSent": 41942694,
+      "wire": [
+        {
+          "contentLength": "41942694",
+          "transferEncoding": null
+        }
+      ],
+      "scratchBytes": 0,
+      "slowSource": false,
+      "slowSink": false,
+      "integrity": "passed",
+      "durationMs": 2627448,
+      "runtime": "v26.6.0"
+    },
+    {
+      "mode": "stream",
+      "flow": "submit",
+      "format": "mp3",
+      "mib": 40,
+      "bytes": 41942694,
+      "repeat": 1,
+      "elapsedMs": 138.40612500000003,
+      "before": {
+        "rss": 70959104,
+        "heapTotal": 12468224,
+        "heapUsed": 7705544,
+        "external": 4289814,
+        "arrayBuffers": 212117
+      },
+      "sampledPeak": {
+        "rss": 198868992,
+        "heapUsed": 10192664,
+        "external": 63736970,
+        "arrayBuffers": 99235960
+      },
+      "processMaxRSS": 198868992,
+      "bytesSent": 41942694,
+      "wire": [
+        {
+          "contentLength": "41942694",
+          "transferEncoding": null
+        }
+      ],
+      "scratchBytes": 0,
+      "slowSource": false,
+      "slowSink": false,
+      "integrity": "passed",
+      "durationMs": 2627448,
+      "runtime": "v26.6.0"
+    },
+    {
+      "mode": "transfer",
+      "flow": "submit",
+      "format": "mp3",
+      "mib": 40,
+      "bytes": 41942694,
+      "repeat": 1,
+      "elapsedMs": 145.462459,
+      "before": {
+        "rss": 70844416,
+        "heapTotal": 12468224,
+        "heapUsed": 7704784,
+        "external": 4289814,
+        "arrayBuffers": 212117
+      },
+      "sampledPeak": {
+        "rss": 165625856,
+        "heapUsed": 10184160,
+        "external": 74550883,
+        "arrayBuffers": 70521027
+      },
+      "processMaxRSS": 165625856,
+      "bytesSent": 41942694,
+      "wire": [
+        {
+          "contentLength": "41942694",
+          "transferEncoding": null
+        }
+      ],
+      "scratchBytes": 0,
+      "slowSource": false,
+      "slowSink": false,
+      "integrity": "passed",
+      "durationMs": 2627448,
+      "runtime": "v26.6.0"
+    },
+    {
+      "mode": "spool",
+      "flow": "submit",
+      "format": "mp3",
+      "mib": 40,
+      "bytes": 41942694,
+      "repeat": 1,
+      "elapsedMs": 149.603458,
+      "before": {
+        "rss": 70762496,
+        "heapTotal": 12468224,
+        "heapUsed": 7707464,
+        "external": 4355350,
+        "arrayBuffers": 212117
+      },
+      "sampledPeak": {
+        "rss": 154042368,
+        "heapUsed": 10132616,
+        "external": 50761188,
+        "arrayBuffers": 46731332
+      },
+      "processMaxRSS": 154042368,
+      "bytesSent": 41942694,
+      "wire": [
+        {
+          "contentLength": "41942694",
+          "transferEncoding": null
+        }
+      ],
+      "scratchBytes": 41942694,
+      "slowSource": false,
+      "slowSink": false,
+      "integrity": "passed",
+      "durationMs": 2627448,
+      "runtime": "v26.6.0"
+    },
+    {
+      "mode": "baseline",
+      "flow": "owner",
+      "format": "mp3",
+      "mib": 40,
+      "bytes": 41942694,
+      "repeat": 2,
+      "elapsedMs": 107.99104200000002,
+      "before": {
+        "rss": 71122944,
+        "heapTotal": 12468224,
+        "heapUsed": 7706896,
+        "external": 4355350,
+        "arrayBuffers": 212117
+      },
+      "sampledPeak": {
+        "rss": 229474304,
+        "heapUsed": 8929560,
+        "external": 88192882,
+        "arrayBuffers": 126105720
+      },
+      "processMaxRSS": 229752832,
+      "bytesSent": 0,
+      "wire": [],
+      "scratchBytes": 0,
+      "slowSource": false,
+      "slowSink": false,
+      "integrity": "passed",
+      "durationMs": 2627448,
+      "runtime": "v26.6.0"
+    },
+    {
+      "mode": "prealloc",
+      "flow": "owner",
+      "format": "mp3",
+      "mib": 40,
+      "bytes": 41942694,
+      "repeat": 2,
+      "elapsedMs": 109.68725,
+      "before": {
+        "rss": 70844416,
+        "heapTotal": 12730368,
+        "heapUsed": 7696280,
+        "external": 4289814,
+        "arrayBuffers": 212117
+      },
+      "sampledPeak": {
+        "rss": 199950336,
+        "heapUsed": 10102440,
+        "external": 67220607,
+        "arrayBuffers": 92682360
+      },
+      "processMaxRSS": 200146944,
+      "bytesSent": 0,
+      "wire": [],
+      "scratchBytes": 0,
+      "slowSource": false,
+      "slowSink": false,
+      "integrity": "passed",
+      "durationMs": 2627448,
+      "runtime": "v26.6.0"
+    },
+    {
+      "mode": "transfer",
+      "flow": "owner",
+      "format": "mp3",
+      "mib": 40,
+      "bytes": 41942694,
+      "repeat": 2,
+      "elapsedMs": 106.789417,
+      "before": {
+        "rss": 71024640,
+        "heapTotal": 12468224,
+        "heapUsed": 7704904,
+        "external": 4289814,
+        "arrayBuffers": 212117
+      },
+      "sampledPeak": {
+        "rss": 154681344,
+        "heapUsed": 9008792,
+        "external": 61715583,
+        "arrayBuffers": 57686828
+      },
+      "processMaxRSS": 154992640,
+      "bytesSent": 0,
+      "wire": [],
+      "scratchBytes": 0,
+      "slowSource": false,
+      "slowSink": false,
+      "integrity": "passed",
+      "durationMs": 2627448,
+      "runtime": "v26.6.0"
+    },
+    {
+      "mode": "spool",
+      "flow": "owner",
+      "format": "mp3",
+      "mib": 40,
+      "bytes": 41942694,
+      "repeat": 2,
+      "elapsedMs": 108.763125,
+      "before": {
+        "rss": 71237632,
+        "heapTotal": 12730368,
+        "heapUsed": 7706976,
+        "external": 4355350,
+        "arrayBuffers": 212117
+      },
+      "sampledPeak": {
+        "rss": 107315200,
+        "heapUsed": 9937440,
+        "external": 15971801,
+        "arrayBuffers": 11943046
+      },
+      "processMaxRSS": 107544576,
+      "bytesSent": 0,
+      "wire": [],
+      "scratchBytes": 41942694,
+      "slowSource": false,
+      "slowSink": false,
+      "integrity": "passed",
+      "durationMs": 2627448,
+      "runtime": "v26.6.0"
+    },
+    {
+      "mode": "baseline",
+      "flow": "meeting",
+      "format": "mp3",
+      "mib": 40,
+      "bytes": 41942694,
+      "repeat": 2,
+      "elapsedMs": 110.831458,
+      "before": {
+        "rss": 71155712,
+        "heapTotal": 12730368,
+        "heapUsed": 7707584,
+        "external": 4355350,
+        "arrayBuffers": 212117
+      },
+      "sampledPeak": {
+        "rss": 229244928,
+        "heapUsed": 8910368,
+        "external": 89110040,
+        "arrayBuffers": 127022878
+      },
+      "processMaxRSS": 229507072,
+      "bytesSent": 0,
+      "wire": [],
+      "scratchBytes": 0,
+      "slowSource": false,
+      "slowSink": false,
+      "integrity": "passed",
+      "durationMs": 2627448,
+      "runtime": "v26.6.0"
+    },
+    {
+      "mode": "prealloc",
+      "flow": "meeting",
+      "format": "mp3",
+      "mib": 40,
+      "bytes": 41942694,
+      "repeat": 2,
+      "elapsedMs": 101.57487499999999,
+      "before": {
+        "rss": 71041024,
+        "heapTotal": 12468224,
+        "heapUsed": 7705112,
+        "external": 4289814,
+        "arrayBuffers": 212117
+      },
+      "sampledPeak": {
+        "rss": 195690496,
+        "heapUsed": 9324080,
+        "external": 64140415,
+        "arrayBuffers": 92747896
+      },
+      "processMaxRSS": 195805184,
+      "bytesSent": 0,
+      "wire": [],
+      "scratchBytes": 0,
+      "slowSource": false,
+      "slowSink": false,
+      "integrity": "passed",
+      "durationMs": 2627448,
+      "runtime": "v26.6.0"
+    },
+    {
+      "mode": "transfer",
+      "flow": "meeting",
+      "format": "mp3",
+      "mib": 40,
+      "bytes": 41942694,
+      "repeat": 2,
+      "elapsedMs": 104.117833,
+      "before": {
+        "rss": 71041024,
+        "heapTotal": 12730368,
+        "heapUsed": 7705368,
+        "external": 4289814,
+        "arrayBuffers": 212117
+      },
+      "sampledPeak": {
+        "rss": 153583616,
+        "heapUsed": 9046488,
+        "external": 62698623,
+        "arrayBuffers": 51460908
+      },
+      "processMaxRSS": 153583616,
+      "bytesSent": 0,
+      "wire": [],
+      "scratchBytes": 0,
+      "slowSource": false,
+      "slowSink": false,
+      "integrity": "passed",
+      "durationMs": 2627448,
+      "runtime": "v26.6.0"
+    },
+    {
+      "mode": "spool",
+      "flow": "meeting",
+      "format": "mp3",
+      "mib": 40,
+      "bytes": 41942694,
+      "repeat": 2,
+      "elapsedMs": 193.041792,
+      "before": {
+        "rss": 71090176,
+        "heapTotal": 12730368,
+        "heapUsed": 7706856,
+        "external": 4355350,
+        "arrayBuffers": 212117
+      },
+      "sampledPeak": {
+        "rss": 107184128,
+        "heapUsed": 9761472,
+        "external": 14857689,
+        "arrayBuffers": 10828934
+      },
+      "processMaxRSS": 107233280,
+      "bytesSent": 0,
+      "wire": [],
+      "scratchBytes": 41942694,
+      "slowSource": false,
+      "slowSink": false,
+      "integrity": "passed",
+      "durationMs": 2627448,
+      "runtime": "v26.6.0"
+    },
+    {
+      "mode": "baseline",
+      "flow": "zoom",
+      "format": "mp3",
+      "mib": 40,
+      "bytes": 41942694,
+      "repeat": 2,
+      "elapsedMs": 190.20799999999997,
+      "before": {
+        "rss": 71073792,
+        "heapTotal": 12730368,
+        "heapUsed": 7706896,
+        "external": 4355350,
+        "arrayBuffers": 212117
+      },
+      "sampledPeak": {
+        "rss": 297451520,
+        "heapUsed": 9437512,
+        "external": 161982464,
+        "arrayBuffers": 126040184
+      },
+      "processMaxRSS": 297746432,
+      "bytesSent": 0,
+      "wire": [],
+      "scratchBytes": 0,
+      "slowSource": false,
+      "slowSink": false,
+      "integrity": "passed",
+      "durationMs": 2627448,
+      "runtime": "v26.6.0"
+    },
+    {
+      "mode": "drop",
+      "flow": "zoom",
+      "format": "mp3",
+      "mib": 40,
+      "bytes": 41942694,
+      "repeat": 2,
+      "elapsedMs": 158.90091700000002,
+      "before": {
+        "rss": 71090176,
+        "heapTotal": 12730368,
+        "heapUsed": 7708720,
+        "external": 4289814,
+        "arrayBuffers": 212117
+      },
+      "sampledPeak": {
+        "rss": 245907456,
+        "heapUsed": 9889792,
+        "external": 113360408,
+        "arrayBuffers": 151271198
+      },
+      "processMaxRSS": 246169600,
+      "bytesSent": 0,
+      "wire": [],
+      "scratchBytes": 0,
+      "slowSource": false,
+      "slowSink": false,
+      "integrity": "passed",
+      "durationMs": 2627448,
+      "runtime": "v26.6.0"
+    },
+    {
+      "mode": "prealloc",
+      "flow": "zoom",
+      "format": "mp3",
+      "mib": 40,
+      "bytes": 41942694,
+      "repeat": 2,
+      "elapsedMs": 161.90791700000003,
+      "before": {
+        "rss": 70828032,
+        "heapTotal": 12468224,
+        "heapUsed": 7704632,
+        "external": 4289814,
+        "arrayBuffers": 212117
+      },
+      "sampledPeak": {
+        "rss": 205733888,
+        "heapUsed": 9179464,
+        "external": 97302987,
+        "arrayBuffers": 93272184
+      },
+      "processMaxRSS": 205848576,
+      "bytesSent": 0,
+      "wire": [],
+      "scratchBytes": 0,
+      "slowSource": false,
+      "slowSink": false,
+      "integrity": "passed",
+      "durationMs": 2627448,
+      "runtime": "v26.6.0"
+    },
+    {
+      "mode": "transfer",
+      "flow": "zoom",
+      "format": "mp3",
+      "mib": 40,
+      "bytes": 41942694,
+      "repeat": 2,
+      "elapsedMs": 160.138291,
+      "before": {
+        "rss": 70975488,
+        "heapTotal": 12206080,
+        "heapUsed": 7704776,
+        "external": 4289814,
+        "arrayBuffers": 260891
+      },
+      "sampledPeak": {
+        "rss": 206569472,
+        "heapUsed": 9723464,
+        "external": 97302987,
+        "arrayBuffers": 93272184
+      },
+      "processMaxRSS": 206831616,
+      "bytesSent": 0,
+      "wire": [],
+      "scratchBytes": 0,
+      "slowSource": false,
+      "slowSink": false,
+      "integrity": "passed",
+      "durationMs": 2627448,
+      "runtime": "v26.6.0"
+    },
+    {
+      "mode": "spool",
+      "flow": "zoom",
+      "format": "mp3",
+      "mib": 40,
+      "bytes": 41942694,
+      "repeat": 2,
+      "elapsedMs": 160.010375,
+      "before": {
+        "rss": 70942720,
+        "heapTotal": 12468224,
+        "heapUsed": 7706872,
+        "external": 4355350,
+        "arrayBuffers": 212117
+      },
+      "sampledPeak": {
+        "rss": 180224000,
+        "heapUsed": 10338272,
+        "external": 88259365,
+        "arrayBuffers": 63060780
+      },
+      "processMaxRSS": 180600832,
+      "bytesSent": 0,
+      "wire": [],
+      "scratchBytes": 41942694,
+      "slowSource": false,
+      "slowSink": false,
+      "integrity": "passed",
+      "durationMs": 2627448,
+      "runtime": "v26.6.0"
+    },
+    {
+      "mode": "baseline",
+      "flow": "submit",
+      "format": "mp3",
+      "mib": 40,
+      "bytes": 41942694,
+      "repeat": 2,
+      "elapsedMs": 168.822167,
+      "before": {
+        "rss": 71008256,
+        "heapTotal": 12468224,
+        "heapUsed": 7707456,
+        "external": 4355350,
+        "arrayBuffers": 212117
+      },
+      "sampledPeak": {
+        "rss": 310689792,
+        "heapUsed": 9581632,
+        "external": 172061630,
+        "arrayBuffers": 168037364
+      },
+      "processMaxRSS": 310689792,
+      "bytesSent": 41942694,
+      "wire": [
+        {
+          "contentLength": "41942694",
+          "transferEncoding": null
+        }
+      ],
+      "scratchBytes": 0,
+      "slowSource": false,
+      "slowSink": false,
+      "integrity": "passed",
+      "durationMs": 2627448,
+      "runtime": "v26.6.0"
+    },
+    {
+      "mode": "prealloc",
+      "flow": "submit",
+      "format": "mp3",
+      "mib": 40,
+      "bytes": 41942694,
+      "repeat": 2,
+      "elapsedMs": 146.49720900000003,
+      "before": {
+        "rss": 70975488,
+        "heapTotal": 12206080,
+        "heapUsed": 7705960,
+        "external": 4289814,
+        "arrayBuffers": 212117
+      },
+      "sampledPeak": {
+        "rss": 283000832,
+        "heapUsed": 9371624,
+        "external": 172067759,
+        "arrayBuffers": 168037903
+      },
+      "processMaxRSS": 283000832,
+      "bytesSent": 41942694,
+      "wire": [
+        {
+          "contentLength": "41942694",
+          "transferEncoding": null
+        }
+      ],
+      "scratchBytes": 0,
+      "slowSource": false,
+      "slowSink": false,
+      "integrity": "passed",
+      "durationMs": 2627448,
+      "runtime": "v26.6.0"
+    },
+    {
+      "mode": "stream",
+      "flow": "submit",
+      "format": "mp3",
+      "mib": 40,
+      "bytes": 41942694,
+      "repeat": 2,
+      "elapsedMs": 139.27554200000003,
+      "before": {
+        "rss": 71057408,
+        "heapTotal": 12468224,
+        "heapUsed": 7705096,
+        "external": 4289814,
+        "arrayBuffers": 212117
+      },
+      "sampledPeak": {
+        "rss": 198049792,
+        "heapUsed": 9582056,
+        "external": 63222911,
+        "arrayBuffers": 99235960
+      },
+      "processMaxRSS": 198049792,
+      "bytesSent": 41942694,
+      "wire": [
+        {
+          "contentLength": "41942694",
+          "transferEncoding": null
+        }
+      ],
+      "scratchBytes": 0,
+      "slowSource": false,
+      "slowSink": false,
+      "integrity": "passed",
+      "durationMs": 2627448,
+      "runtime": "v26.6.0"
+    },
+    {
+      "mode": "transfer",
+      "flow": "submit",
+      "format": "mp3",
+      "mib": 40,
+      "bytes": 41942694,
+      "repeat": 2,
+      "elapsedMs": 138.36224999999996,
+      "before": {
+        "rss": 70959104,
+        "heapTotal": 12730368,
+        "heapUsed": 7704392,
+        "external": 4289814,
+        "arrayBuffers": 212117
+      },
+      "sampledPeak": {
+        "rss": 166723584,
+        "heapUsed": 9589872,
+        "external": 62164106,
+        "arrayBuffers": 56376108
+      },
+      "processMaxRSS": 166723584,
+      "bytesSent": 41942694,
+      "wire": [
+        {
+          "contentLength": "41942694",
+          "transferEncoding": null
+        }
+      ],
+      "scratchBytes": 0,
+      "slowSource": false,
+      "slowSink": false,
+      "integrity": "passed",
+      "durationMs": 2627448,
+      "runtime": "v26.6.0"
+    },
+    {
+      "mode": "spool",
+      "flow": "submit",
+      "format": "mp3",
+      "mib": 40,
+      "bytes": 41942694,
+      "repeat": 2,
+      "elapsedMs": 142.926041,
+      "before": {
+        "rss": 71204864,
+        "heapTotal": 12468224,
+        "heapUsed": 7707648,
+        "external": 4355350,
+        "arrayBuffers": 212117
+      },
+      "sampledPeak": {
+        "rss": 144080896,
+        "heapUsed": 9775576,
+        "external": 44994020,
+        "arrayBuffers": 40964164
+      },
+      "processMaxRSS": 144080896,
+      "bytesSent": 41942694,
+      "wire": [
+        {
+          "contentLength": "41942694",
+          "transferEncoding": null
+        }
+      ],
+      "scratchBytes": 41942694,
+      "slowSource": false,
+      "slowSink": false,
+      "integrity": "passed",
+      "durationMs": 2627448,
+      "runtime": "v26.6.0"
+    },
+    {
+      "mode": "baseline",
+      "flow": "owner",
+      "format": "m4a-late",
+      "mib": 40,
+      "bytes": 41943040,
+      "repeat": 1,
+      "elapsedMs": 106.589917,
+      "before": {
+        "rss": 71352320,
+        "heapTotal": 12730368,
+        "heapUsed": 7707568,
+        "external": 4355350,
+        "arrayBuffers": 212117
+      },
+      "sampledPeak": {
+        "rss": 228114432,
+        "heapUsed": 8897744,
+        "external": 52147673,
+        "arrayBuffers": 84098182
+      },
+      "processMaxRSS": 228786176,
+      "bytesSent": 0,
+      "wire": [],
+      "scratchBytes": 0,
+      "slowSource": false,
+      "slowSink": false,
+      "integrity": "passed",
+      "durationMs": 3065,
+      "runtime": "v26.6.0"
+    },
+    {
+      "mode": "prealloc",
+      "flow": "owner",
+      "format": "m4a-late",
+      "mib": 40,
+      "bytes": 41943040,
+      "repeat": 1,
+      "elapsedMs": 97.12099999999998,
+      "before": {
+        "rss": 70713344,
+        "heapTotal": 12468224,
+        "heapUsed": 7705768,
+        "external": 4289814,
+        "arrayBuffers": 212117
+      },
+      "sampledPeak": {
+        "rss": 194920448,
+        "heapUsed": 9088648,
+        "external": 61978073,
+        "arrayBuffers": 99236998
+      },
+      "processMaxRSS": 195641344,
+      "bytesSent": 0,
+      "wire": [],
+      "scratchBytes": 0,
+      "slowSource": false,
+      "slowSink": false,
+      "integrity": "passed",
+      "durationMs": 3065,
+      "runtime": "v26.6.0"
+    },
+    {
+      "mode": "transfer",
+      "flow": "owner",
+      "format": "m4a-late",
+      "mib": 40,
+      "bytes": 41943040,
+      "repeat": 1,
+      "elapsedMs": 98.806625,
+      "before": {
+        "rss": 71139328,
+        "heapTotal": 11943936,
+        "heapUsed": 7704888,
+        "external": 4289814,
+        "arrayBuffers": 212117
+      },
+      "sampledPeak": {
+        "rss": 154419200,
+        "heapUsed": 9846152,
+        "external": 64271833,
+        "arrayBuffers": 60243078
+      },
+      "processMaxRSS": 154861568,
+      "bytesSent": 0,
+      "wire": [],
+      "scratchBytes": 0,
+      "slowSource": false,
+      "slowSink": false,
+      "integrity": "passed",
+      "durationMs": 3065,
+      "runtime": "v26.6.0"
+    },
+    {
+      "mode": "spool",
+      "flow": "owner",
+      "format": "m4a-late",
+      "mib": 40,
+      "bytes": 41943040,
+      "repeat": 1,
+      "elapsedMs": 97.514625,
+      "before": {
+        "rss": 71024640,
+        "heapTotal": 12468224,
+        "heapUsed": 7707016,
+        "external": 4355350,
+        "arrayBuffers": 212117
+      },
+      "sampledPeak": {
+        "rss": 111345664,
+        "heapUsed": 9911368,
+        "external": 20564498,
+        "arrayBuffers": 11811974
+      },
+      "processMaxRSS": 111443968,
+      "bytesSent": 0,
+      "wire": [],
+      "scratchBytes": 41943040,
+      "slowSource": false,
+      "slowSink": false,
+      "integrity": "passed",
+      "durationMs": 3065,
+      "runtime": "v26.6.0"
+    },
+    {
+      "mode": "baseline",
+      "flow": "meeting",
+      "format": "m4a-late",
+      "mib": 40,
+      "bytes": 41943040,
+      "repeat": 1,
+      "elapsedMs": 106.11570800000001,
+      "before": {
+        "rss": 71008256,
+        "heapTotal": 12468224,
+        "heapUsed": 7706848,
+        "external": 4355350,
+        "arrayBuffers": 212117
+      },
+      "sampledPeak": {
+        "rss": 227442688,
+        "heapUsed": 8942104,
+        "external": 53327321,
+        "arrayBuffers": 84098182
+      },
+      "processMaxRSS": 227999744,
+      "bytesSent": 0,
+      "wire": [],
+      "scratchBytes": 0,
+      "slowSource": false,
+      "slowSink": false,
+      "integrity": "passed",
+      "durationMs": 3065,
+      "runtime": "v26.6.0"
+    },
+    {
+      "mode": "prealloc",
+      "flow": "meeting",
+      "format": "m4a-late",
+      "mib": 40,
+      "bytes": 41943040,
+      "repeat": 1,
+      "elapsedMs": 103.97958400000002,
+      "before": {
+        "rss": 71090176,
+        "heapTotal": 12730368,
+        "heapUsed": 7704560,
+        "external": 4289814,
+        "arrayBuffers": 212117
+      },
+      "sampledPeak": {
+        "rss": 196083712,
+        "heapUsed": 9098392,
+        "external": 61323814,
+        "arrayBuffers": 99236998
+      },
+      "processMaxRSS": 196689920,
+      "bytesSent": 0,
+      "wire": [],
+      "scratchBytes": 0,
+      "slowSource": false,
+      "slowSink": false,
+      "integrity": "passed",
+      "durationMs": 3065,
+      "runtime": "v26.6.0"
+    },
+    {
+      "mode": "transfer",
+      "flow": "meeting",
+      "format": "m4a-late",
+      "mib": 40,
+      "bytes": 41943040,
+      "repeat": 1,
+      "elapsedMs": 93.844834,
+      "before": {
+        "rss": 70762496,
+        "heapTotal": 11943936,
+        "heapUsed": 7706552,
+        "external": 4289814,
+        "arrayBuffers": 212117
+      },
+      "sampledPeak": {
+        "rss": 153468928,
+        "heapUsed": 9422576,
+        "external": 62961113,
+        "arrayBuffers": 58932358
+      },
+      "processMaxRSS": 153960448,
+      "bytesSent": 0,
+      "wire": [],
+      "scratchBytes": 0,
+      "slowSource": false,
+      "slowSink": false,
+      "integrity": "passed",
+      "durationMs": 3065,
+      "runtime": "v26.6.0"
+    },
+    {
+      "mode": "spool",
+      "flow": "meeting",
+      "format": "m4a-late",
+      "mib": 40,
+      "bytes": 41943040,
+      "repeat": 1,
+      "elapsedMs": 104.12100000000001,
+      "before": {
+        "rss": 71139328,
+        "heapTotal": 12468224,
+        "heapUsed": 7707008,
+        "external": 4355350,
+        "arrayBuffers": 212117
+      },
+      "sampledPeak": {
+        "rss": 109723648,
+        "heapUsed": 10514752,
+        "external": 19450386,
+        "arrayBuffers": 15416454
+      },
+      "processMaxRSS": 110247936,
+      "bytesSent": 0,
+      "wire": [],
+      "scratchBytes": 41943040,
+      "slowSource": false,
+      "slowSink": false,
+      "integrity": "passed",
+      "durationMs": 3065,
+      "runtime": "v26.6.0"
+    },
+    {
+      "mode": "baseline",
+      "flow": "zoom",
+      "format": "m4a-late",
+      "mib": 40,
+      "bytes": 41943040,
+      "repeat": 1,
+      "elapsedMs": 167.15937499999998,
+      "before": {
+        "rss": 71090176,
+        "heapTotal": 12468224,
+        "heapUsed": 7707496,
+        "external": 4355350,
+        "arrayBuffers": 212117
+      },
+      "sampledPeak": {
+        "rss": 284786688,
+        "heapUsed": 9504960,
+        "external": 150908264,
+        "arrayBuffers": 126041222
+      },
+      "processMaxRSS": 285376512,
+      "bytesSent": 0,
+      "wire": [],
+      "scratchBytes": 0,
+      "slowSource": false,
+      "slowSink": false,
+      "integrity": "passed",
+      "durationMs": 3065,
+      "runtime": "v26.6.0"
+    },
+    {
+      "mode": "drop",
+      "flow": "zoom",
+      "format": "m4a-late",
+      "mib": 40,
+      "bytes": 41943040,
+      "repeat": 1,
+      "elapsedMs": 157.868333,
+      "before": {
+        "rss": 71385088,
+        "heapTotal": 12730368,
+        "heapUsed": 7707960,
+        "external": 4289814,
+        "arrayBuffers": 212117
+      },
+      "sampledPeak": {
+        "rss": 242679808,
+        "heapUsed": 9656576,
+        "external": 109882728,
+        "arrayBuffers": 84163718
+      },
+      "processMaxRSS": 243105792,
+      "bytesSent": 0,
+      "wire": [],
+      "scratchBytes": 0,
+      "slowSource": false,
+      "slowSink": false,
+      "integrity": "passed",
+      "durationMs": 3065,
+      "runtime": "v26.6.0"
+    },
+    {
+      "mode": "prealloc",
+      "flow": "zoom",
+      "format": "m4a-late",
+      "mib": 40,
+      "bytes": 41943040,
+      "repeat": 1,
+      "elapsedMs": 146.79112499999997,
+      "before": {
+        "rss": 70729728,
+        "heapTotal": 12730368,
+        "heapUsed": 7705568,
+        "external": 4289814,
+        "arrayBuffers": 212117
+      },
+      "sampledPeak": {
+        "rss": 221954048,
+        "heapUsed": 11214400,
+        "external": 89177561,
+        "arrayBuffers": 126106758
+      },
+      "processMaxRSS": 222199808,
+      "bytesSent": 0,
+      "wire": [],
+      "scratchBytes": 0,
+      "slowSource": false,
+      "slowSink": false,
+      "integrity": "passed",
+      "durationMs": 3065,
+      "runtime": "v26.6.0"
+    },
+    {
+      "mode": "transfer",
+      "flow": "zoom",
+      "format": "m4a-late",
+      "mib": 40,
+      "bytes": 41943040,
+      "repeat": 1,
+      "elapsedMs": 163.699417,
+      "before": {
+        "rss": 70778880,
+        "heapTotal": 12206080,
+        "heapUsed": 7706336,
+        "external": 4289814,
+        "arrayBuffers": 212117
+      },
+      "sampledPeak": {
+        "rss": 206733312,
+        "heapUsed": 9095128,
+        "external": 96714201,
+        "arrayBuffers": 92683398
+      },
+      "processMaxRSS": 206962688,
+      "bytesSent": 0,
+      "wire": [],
+      "scratchBytes": 0,
+      "slowSource": false,
+      "slowSink": false,
+      "integrity": "passed",
+      "durationMs": 3065,
+      "runtime": "v26.6.0"
+    },
+    {
+      "mode": "spool",
+      "flow": "zoom",
+      "format": "m4a-late",
+      "mib": 40,
+      "bytes": 41943040,
+      "repeat": 1,
+      "elapsedMs": 164.53270899999998,
+      "before": {
+        "rss": 71237632,
+        "heapTotal": 12468224,
+        "heapUsed": 7707448,
+        "external": 4355350,
+        "arrayBuffers": 212117
+      },
+      "sampledPeak": {
+        "rss": 180830208,
+        "heapUsed": 10088440,
+        "external": 88194521,
+        "arrayBuffers": 69287046
+      },
+      "processMaxRSS": 180928512,
+      "bytesSent": 0,
+      "wire": [],
+      "scratchBytes": 41943040,
+      "slowSource": false,
+      "slowSink": false,
+      "integrity": "passed",
+      "durationMs": 3065,
+      "runtime": "v26.6.0"
+    },
+    {
+      "mode": "baseline",
+      "flow": "submit",
+      "format": "m4a-late",
+      "mib": 40,
+      "bytes": 41943040,
+      "repeat": 1,
+      "elapsedMs": 167.76849999999996,
+      "before": {
+        "rss": 71073792,
+        "heapTotal": 12730368,
+        "heapUsed": 7706864,
+        "external": 4355350,
+        "arrayBuffers": 212117
+      },
+      "sampledPeak": {
+        "rss": 312737792,
+        "heapUsed": 9276160,
+        "external": 172068324,
+        "arrayBuffers": 168038748
+      },
+      "processMaxRSS": 312737792,
+      "bytesSent": 41943040,
+      "wire": [
+        {
+          "contentLength": "41943040",
+          "transferEncoding": null
+        }
+      ],
+      "scratchBytes": 0,
+      "slowSource": false,
+      "slowSink": false,
+      "integrity": "passed",
+      "durationMs": 3065,
+      "runtime": "v26.6.0"
+    },
+    {
+      "mode": "prealloc",
+      "flow": "submit",
+      "format": "m4a-late",
+      "mib": 40,
+      "bytes": 41943040,
+      "repeat": 1,
+      "elapsedMs": 151.675666,
+      "before": {
+        "rss": 70778880,
+        "heapTotal": 12206080,
+        "heapUsed": 7706192,
+        "external": 4289814,
+        "arrayBuffers": 212117
+      },
+      "sampledPeak": {
+        "rss": 282509312,
+        "heapUsed": 9271568,
+        "external": 172069143,
+        "arrayBuffers": 168039287
+      },
+      "processMaxRSS": 282509312,
+      "bytesSent": 41943040,
+      "wire": [
+        {
+          "contentLength": "41943040",
+          "transferEncoding": null
+        }
+      ],
+      "scratchBytes": 0,
+      "slowSource": false,
+      "slowSink": false,
+      "integrity": "passed",
+      "durationMs": 3065,
+      "runtime": "v26.6.0"
+    },
+    {
+      "mode": "stream",
+      "flow": "submit",
+      "format": "m4a-late",
+      "mib": 40,
+      "bytes": 41943040,
+      "repeat": 1,
+      "elapsedMs": 143.0085,
+      "before": {
+        "rss": 71090176,
+        "heapTotal": 12468224,
+        "heapUsed": 7705512,
+        "external": 4289814,
+        "arrayBuffers": 212117
+      },
+      "sampledPeak": {
+        "rss": 204259328,
+        "heapUsed": 9601232,
+        "external": 68793817,
+        "arrayBuffers": 92683398
+      },
+      "processMaxRSS": 204259328,
+      "bytesSent": 41943040,
+      "wire": [
+        {
+          "contentLength": "41943040",
+          "transferEncoding": null
+        }
+      ],
+      "scratchBytes": 0,
+      "slowSource": false,
+      "slowSink": false,
+      "integrity": "passed",
+      "durationMs": 3065,
+      "runtime": "v26.6.0"
+    },
+    {
+      "mode": "transfer",
+      "flow": "submit",
+      "format": "m4a-late",
+      "mib": 40,
+      "bytes": 41943040,
+      "repeat": 1,
+      "elapsedMs": 142.04295900000002,
+      "before": {
+        "rss": 70828032,
+        "heapTotal": 12206080,
+        "heapUsed": 7705376,
+        "external": 4289814,
+        "arrayBuffers": 212117
+      },
+      "sampledPeak": {
+        "rss": 161038336,
+        "heapUsed": 9462816,
+        "external": 65244644,
+        "arrayBuffers": 61214788
+      },
+      "processMaxRSS": 161038336,
+      "bytesSent": 41943040,
+      "wire": [
+        {
+          "contentLength": "41943040",
+          "transferEncoding": null
+        }
+      ],
+      "scratchBytes": 0,
+      "slowSource": false,
+      "slowSink": false,
+      "integrity": "passed",
+      "durationMs": 3065,
+      "runtime": "v26.6.0"
+    },
+    {
+      "mode": "spool",
+      "flow": "submit",
+      "format": "m4a-late",
+      "mib": 40,
+      "bytes": 41943040,
+      "repeat": 1,
+      "elapsedMs": 148.906334,
+      "before": {
+        "rss": 71041024,
+        "heapTotal": 12468224,
+        "heapUsed": 7708096,
+        "external": 4355350,
+        "arrayBuffers": 212117
+      },
+      "sampledPeak": {
+        "rss": 132284416,
+        "heapUsed": 10506784,
+        "external": 39614758,
+        "arrayBuffers": 23662660
+      },
+      "processMaxRSS": 132284416,
+      "bytesSent": 41943040,
+      "wire": [
+        {
+          "contentLength": "41943040",
+          "transferEncoding": null
+        }
+      ],
+      "scratchBytes": 41943040,
+      "slowSource": false,
+      "slowSink": false,
+      "integrity": "passed",
+      "durationMs": 3065,
+      "runtime": "v26.6.0"
+    },
+    {
+      "mode": "baseline",
+      "flow": "owner",
+      "format": "m4a-late",
+      "mib": 40,
+      "bytes": 41943040,
+      "repeat": 2,
+      "elapsedMs": 110.337583,
+      "before": {
+        "rss": 70729728,
+        "heapTotal": 12206080,
+        "heapUsed": 7707824,
+        "external": 4355350,
+        "arrayBuffers": 212117
+      },
+      "sampledPeak": {
+        "rss": 228261888,
+        "heapUsed": 8706880,
+        "external": 88259110,
+        "arrayBuffers": 126172294
+      },
+      "processMaxRSS": 228392960,
+      "bytesSent": 0,
+      "wire": [],
+      "scratchBytes": 0,
+      "slowSource": false,
+      "slowSink": false,
+      "integrity": "passed",
+      "durationMs": 3065,
+      "runtime": "v26.6.0"
+    },
+    {
+      "mode": "prealloc",
+      "flow": "owner",
+      "format": "m4a-late",
+      "mib": 40,
+      "bytes": 41943040,
+      "repeat": 2,
+      "elapsedMs": 154.94416599999997,
+      "before": {
+        "rss": 70828032,
+        "heapTotal": 12206080,
+        "heapUsed": 7705768,
+        "external": 4289814,
+        "arrayBuffers": 212117
+      },
+      "sampledPeak": {
+        "rss": 194068480,
+        "heapUsed": 8996640,
+        "external": 62109145,
+        "arrayBuffers": 92224646
+      },
+      "processMaxRSS": 194166784,
+      "bytesSent": 0,
+      "wire": [],
+      "scratchBytes": 0,
+      "slowSource": false,
+      "slowSink": false,
+      "integrity": "passed",
+      "durationMs": 3065,
+      "runtime": "v26.6.0"
+    },
+    {
+      "mode": "transfer",
+      "flow": "owner",
+      "format": "m4a-late",
+      "mib": 40,
+      "bytes": 41943040,
+      "repeat": 2,
+      "elapsedMs": 95.57491700000001,
+      "before": {
+        "rss": 71073792,
+        "heapTotal": 11943936,
+        "heapUsed": 7704760,
+        "external": 4289814,
+        "arrayBuffers": 212117
+      },
+      "sampledPeak": {
+        "rss": 154370048,
+        "heapUsed": 9354128,
+        "external": 60601817,
+        "arrayBuffers": 58145926
+      },
+      "processMaxRSS": 154370048,
+      "bytesSent": 0,
+      "wire": [],
+      "scratchBytes": 0,
+      "slowSource": false,
+      "slowSink": false,
+      "integrity": "passed",
+      "durationMs": 3065,
+      "runtime": "v26.6.0"
+    },
+    {
+      "mode": "spool",
+      "flow": "owner",
+      "format": "m4a-late",
+      "mib": 40,
+      "bytes": 41943040,
+      "repeat": 2,
+      "elapsedMs": 126.65108400000003,
+      "before": {
+        "rss": 71204864,
+        "heapTotal": 12730368,
+        "heapUsed": 7707304,
+        "external": 4355350,
+        "arrayBuffers": 212117
+      },
+      "sampledPeak": {
+        "rss": 109920256,
+        "heapUsed": 10458440,
+        "external": 19450386,
+        "arrayBuffers": 15416454
+      },
+      "processMaxRSS": 110542848,
+      "bytesSent": 0,
+      "wire": [],
+      "scratchBytes": 41943040,
+      "slowSource": false,
+      "slowSink": false,
+      "integrity": "passed",
+      "durationMs": 3065,
+      "runtime": "v26.6.0"
+    },
+    {
+      "mode": "baseline",
+      "flow": "meeting",
+      "format": "m4a-late",
+      "mib": 40,
+      "bytes": 41943040,
+      "repeat": 2,
+      "elapsedMs": 112.964708,
+      "before": {
+        "rss": 71303168,
+        "heapTotal": 12468224,
+        "heapUsed": 7707520,
+        "external": 4355350,
+        "arrayBuffers": 212117
+      },
+      "sampledPeak": {
+        "rss": 228786176,
+        "heapUsed": 8980448,
+        "external": 88193574,
+        "arrayBuffers": 126106758
+      },
+      "processMaxRSS": 229277696,
+      "bytesSent": 0,
+      "wire": [],
+      "scratchBytes": 0,
+      "slowSource": false,
+      "slowSink": false,
+      "integrity": "passed",
+      "durationMs": 3065,
+      "runtime": "v26.6.0"
+    },
+    {
+      "mode": "prealloc",
+      "flow": "meeting",
+      "format": "m4a-late",
+      "mib": 40,
+      "bytes": 41943040,
+      "repeat": 2,
+      "elapsedMs": 130.715917,
+      "before": {
+        "rss": 71057408,
+        "heapTotal": 12468224,
+        "heapUsed": 7704568,
+        "external": 4289814,
+        "arrayBuffers": 212117
+      },
+      "sampledPeak": {
+        "rss": 195428352,
+        "heapUsed": 9613424,
+        "external": 62110246,
+        "arrayBuffers": 100023430
+      },
+      "processMaxRSS": 196050944,
+      "bytesSent": 0,
+      "wire": [],
+      "scratchBytes": 0,
+      "slowSource": false,
+      "slowSink": false,
+      "integrity": "passed",
+      "durationMs": 3065,
+      "runtime": "v26.6.0"
+    },
+    {
+      "mode": "transfer",
+      "flow": "meeting",
+      "format": "m4a-late",
+      "mib": 40,
+      "bytes": 41943040,
+      "repeat": 2,
+      "elapsedMs": 104.160459,
+      "before": {
+        "rss": 71106560,
+        "heapTotal": 11943936,
+        "heapUsed": 7705968,
+        "external": 4289814,
+        "arrayBuffers": 212117
+      },
+      "sampledPeak": {
+        "rss": 155025408,
+        "heapUsed": 9028920,
+        "external": 62043609,
+        "arrayBuffers": 58014854
+      },
+      "processMaxRSS": 155287552,
+      "bytesSent": 0,
+      "wire": [],
+      "scratchBytes": 0,
+      "slowSource": false,
+      "slowSink": false,
+      "integrity": "passed",
+      "durationMs": 3065,
+      "runtime": "v26.6.0"
+    },
+    {
+      "mode": "spool",
+      "flow": "meeting",
+      "format": "m4a-late",
+      "mib": 40,
+      "bytes": 41943040,
+      "repeat": 2,
+      "elapsedMs": 98.375958,
+      "before": {
+        "rss": 71286784,
+        "heapTotal": 12730368,
+        "heapUsed": 7707512,
+        "external": 4355350,
+        "arrayBuffers": 212117
+      },
+      "sampledPeak": {
+        "rss": 110886912,
+        "heapUsed": 9794152,
+        "external": 20564498,
+        "arrayBuffers": 11418758
+      },
+      "processMaxRSS": 111001600,
+      "bytesSent": 0,
+      "wire": [],
+      "scratchBytes": 41943040,
+      "slowSource": false,
+      "slowSink": false,
+      "integrity": "passed",
+      "durationMs": 3065,
+      "runtime": "v26.6.0"
+    },
+    {
+      "mode": "baseline",
+      "flow": "zoom",
+      "format": "m4a-late",
+      "mib": 40,
+      "bytes": 41943040,
+      "repeat": 2,
+      "elapsedMs": 185.248834,
+      "before": {
+        "rss": 71106560,
+        "heapTotal": 12730368,
+        "heapUsed": 7706952,
+        "external": 4355350,
+        "arrayBuffers": 212117
+      },
+      "sampledPeak": {
+        "rss": 285048832,
+        "heapUsed": 9964656,
+        "external": 152218984,
+        "arrayBuffers": 126041222
+      },
+      "processMaxRSS": 285392896,
+      "bytesSent": 0,
+      "wire": [],
+      "scratchBytes": 0,
+      "slowSource": false,
+      "slowSink": false,
+      "integrity": "passed",
+      "durationMs": 3065,
+      "runtime": "v26.6.0"
+    },
+    {
+      "mode": "drop",
+      "flow": "zoom",
+      "format": "m4a-late",
+      "mib": 40,
+      "bytes": 41943040,
+      "repeat": 2,
+      "elapsedMs": 154.892542,
+      "before": {
+        "rss": 70926336,
+        "heapTotal": 12468224,
+        "heapUsed": 7708800,
+        "external": 4289814,
+        "arrayBuffers": 212117
+      },
+      "sampledPeak": {
+        "rss": 241631232,
+        "heapUsed": 9459616,
+        "external": 108178792,
+        "arrayBuffers": 84163718
+      },
+      "processMaxRSS": 241680384,
+      "bytesSent": 0,
+      "wire": [],
+      "scratchBytes": 0,
+      "slowSource": false,
+      "slowSink": false,
+      "integrity": "passed",
+      "durationMs": 3065,
+      "runtime": "v26.6.0"
+    },
+    {
+      "mode": "prealloc",
+      "flow": "zoom",
+      "format": "m4a-late",
+      "mib": 40,
+      "bytes": 41943040,
+      "repeat": 2,
+      "elapsedMs": 150.017708,
+      "before": {
+        "rss": 70909952,
+        "heapTotal": 12468224,
+        "heapUsed": 7704560,
+        "external": 4289814,
+        "arrayBuffers": 212117
+      },
+      "sampledPeak": {
+        "rss": 221151232,
+        "heapUsed": 9850688,
+        "external": 89046489,
+        "arrayBuffers": 126106758
+      },
+      "processMaxRSS": 221200384,
+      "bytesSent": 0,
+      "wire": [],
+      "scratchBytes": 0,
+      "slowSource": false,
+      "slowSink": false,
+      "integrity": "passed",
+      "durationMs": 3065,
+      "runtime": "v26.6.0"
+    },
+    {
+      "mode": "transfer",
+      "flow": "zoom",
+      "format": "m4a-late",
+      "mib": 40,
+      "bytes": 41943040,
+      "repeat": 2,
+      "elapsedMs": 147.696958,
+      "before": {
+        "rss": 71155712,
+        "heapTotal": 12730368,
+        "heapUsed": 7705016,
+        "external": 4289814,
+        "arrayBuffers": 212117
+      },
+      "sampledPeak": {
+        "rss": 221954048,
+        "heapUsed": 10762136,
+        "external": 96714201,
+        "arrayBuffers": 92683398
+      },
+      "processMaxRSS": 222035968,
+      "bytesSent": 0,
+      "wire": [],
+      "scratchBytes": 0,
+      "slowSource": false,
+      "slowSink": false,
+      "integrity": "passed",
+      "durationMs": 3065,
+      "runtime": "v26.6.0"
+    },
+    {
+      "mode": "spool",
+      "flow": "zoom",
+      "format": "m4a-late",
+      "mib": 40,
+      "bytes": 41943040,
+      "repeat": 2,
+      "elapsedMs": 159.29283399999997,
+      "before": {
+        "rss": 71041024,
+        "heapTotal": 12468224,
+        "heapUsed": 7708248,
+        "external": 4355350,
+        "arrayBuffers": 212117
+      },
+      "sampledPeak": {
+        "rss": 180518912,
+        "heapUsed": 10076920,
+        "external": 88194521,
+        "arrayBuffers": 59980934
+      },
+      "processMaxRSS": 180584448,
+      "bytesSent": 0,
+      "wire": [],
+      "scratchBytes": 41943040,
+      "slowSource": false,
+      "slowSink": false,
+      "integrity": "passed",
+      "durationMs": 3065,
+      "runtime": "v26.6.0"
+    },
+    {
+      "mode": "baseline",
+      "flow": "submit",
+      "format": "m4a-late",
+      "mib": 40,
+      "bytes": 41943040,
+      "repeat": 2,
+      "elapsedMs": 159.982708,
+      "before": {
+        "rss": 70893568,
+        "heapTotal": 12468224,
+        "heapUsed": 7707336,
+        "external": 4355350,
+        "arrayBuffers": 212117
+      },
+      "sampledPeak": {
+        "rss": 311181312,
+        "heapUsed": 9119848,
+        "external": 172063014,
+        "arrayBuffers": 168038748
+      },
+      "processMaxRSS": 311181312,
+      "bytesSent": 41943040,
+      "wire": [
+        {
+          "contentLength": "41943040",
+          "transferEncoding": null
+        }
+      ],
+      "scratchBytes": 0,
+      "slowSource": false,
+      "slowSink": false,
+      "integrity": "passed",
+      "durationMs": 3065,
+      "runtime": "v26.6.0"
+    },
+    {
+      "mode": "prealloc",
+      "flow": "submit",
+      "format": "m4a-late",
+      "mib": 40,
+      "bytes": 41943040,
+      "repeat": 2,
+      "elapsedMs": 146.56674999999998,
+      "before": {
+        "rss": 70778880,
+        "heapTotal": 11943936,
+        "heapUsed": 7705976,
+        "external": 4289814,
+        "arrayBuffers": 212117
+      },
+      "sampledPeak": {
+        "rss": 278937600,
+        "heapUsed": 9205584,
+        "external": 172069143,
+        "arrayBuffers": 168039287
+      },
+      "processMaxRSS": 278937600,
+      "bytesSent": 41943040,
+      "wire": [
+        {
+          "contentLength": "41943040",
+          "transferEncoding": null
+        }
+      ],
+      "scratchBytes": 0,
+      "slowSource": false,
+      "slowSink": false,
+      "integrity": "passed",
+      "durationMs": 3065,
+      "runtime": "v26.6.0"
+    },
+    {
+      "mode": "stream",
+      "flow": "submit",
+      "format": "m4a-late",
+      "mib": 40,
+      "bytes": 41943040,
+      "repeat": 2,
+      "elapsedMs": 137.02758400000005,
+      "before": {
+        "rss": 70828032,
+        "heapTotal": 12468224,
+        "heapUsed": 7705728,
+        "external": 4289814,
+        "arrayBuffers": 212117
+      },
+      "sampledPeak": {
+        "rss": 198770688,
+        "heapUsed": 10055016,
+        "external": 64206312,
+        "arrayBuffers": 92486790
+      },
+      "processMaxRSS": 198770688,
+      "bytesSent": 41943040,
+      "wire": [
+        {
+          "contentLength": "41943040",
+          "transferEncoding": null
+        }
+      ],
+      "scratchBytes": 0,
+      "slowSource": false,
+      "slowSink": false,
+      "integrity": "passed",
+      "durationMs": 3065,
+      "runtime": "v26.6.0"
+    },
+    {
+      "mode": "transfer",
+      "flow": "submit",
+      "format": "m4a-late",
+      "mib": 40,
+      "bytes": 41943040,
+      "repeat": 2,
+      "elapsedMs": 141.263166,
+      "before": {
+        "rss": 70975488,
+        "heapTotal": 12468224,
+        "heapUsed": 7704864,
+        "external": 4289814,
+        "arrayBuffers": 212117
+      },
+      "sampledPeak": {
+        "rss": 165986304,
+        "heapUsed": 9797448,
+        "external": 74617111,
+        "arrayBuffers": 70587255
+      },
+      "processMaxRSS": 165986304,
+      "bytesSent": 41943040,
+      "wire": [
+        {
+          "contentLength": "41943040",
+          "transferEncoding": null
+        }
+      ],
+      "scratchBytes": 0,
+      "slowSource": false,
+      "slowSink": false,
+      "integrity": "passed",
+      "durationMs": 3065,
+      "runtime": "v26.6.0"
+    },
+    {
+      "mode": "spool",
+      "flow": "submit",
+      "format": "m4a-late",
+      "mib": 40,
+      "bytes": 41943040,
+      "repeat": 2,
+      "elapsedMs": 156.14116600000003,
+      "before": {
+        "rss": 71122944,
+        "heapTotal": 12468224,
+        "heapUsed": 7707176,
+        "external": 4355350,
+        "arrayBuffers": 212117
+      },
+      "sampledPeak": {
+        "rss": 120848384,
+        "heapUsed": 9827824,
+        "external": 29204739,
+        "arrayBuffers": 25170807
+      },
+      "processMaxRSS": 120848384,
+      "bytesSent": 41943040,
+      "wire": [
+        {
+          "contentLength": "41943040",
+          "transferEncoding": null
+        }
+      ],
+      "scratchBytes": 41943040,
+      "slowSource": false,
+      "slowSink": false,
+      "integrity": "passed",
+      "durationMs": 3065,
+      "runtime": "v26.6.0"
+    },
+    {
+      "mode": "baseline",
+      "flow": "owner",
+      "format": "mp3",
+      "mib": 199,
+      "bytes": 208666383,
+      "repeat": 1,
+      "elapsedMs": 346.81279200000006,
+      "before": {
+        "rss": 71008256,
+        "heapTotal": 12468224,
+        "heapUsed": 7706296,
+        "external": 4355350,
+        "arrayBuffers": 212117
+      },
+      "sampledPeak": {
+        "rss": 742981632,
+        "heapUsed": 10152296,
+        "external": 444637845,
+        "arrayBuffers": 417544868
+      },
+      "processMaxRSS": 743718912,
+      "bytesSent": 0,
+      "wire": [],
+      "scratchBytes": 0,
+      "slowSource": false,
+      "slowSink": false,
+      "integrity": "passed",
+      "durationMs": 13071647,
+      "runtime": "v26.6.0"
+    },
+    {
+      "mode": "prealloc",
+      "flow": "owner",
+      "format": "mp3",
+      "mib": 199,
+      "bytes": 208666383,
+      "repeat": 1,
+      "elapsedMs": 238.24770900000001,
+      "before": {
+        "rss": 70877184,
+        "heapTotal": 12468224,
+        "heapUsed": 7705496,
+        "external": 4289814,
+        "arrayBuffers": 212117
+      },
+      "sampledPeak": {
+        "rss": 536772608,
+        "heapUsed": 9606648,
+        "external": 236958952,
+        "arrayBuffers": 437467571
+      },
+      "processMaxRSS": 538214400,
+      "bytesSent": 0,
+      "wire": [],
+      "scratchBytes": 0,
+      "slowSource": false,
+      "slowSink": false,
+      "integrity": "passed",
+      "durationMs": 13071647,
+      "runtime": "v26.6.0"
+    },
+    {
+      "mode": "transfer",
+      "flow": "owner",
+      "format": "mp3",
+      "mib": 199,
+      "bytes": 208666383,
+      "repeat": 1,
+      "elapsedMs": 272.218167,
+      "before": {
+        "rss": 70778880,
+        "heapTotal": 12206080,
+        "heapUsed": 7706344,
+        "external": 4289814,
+        "arrayBuffers": 212117
+      },
+      "sampledPeak": {
+        "rss": 329236480,
+        "heapUsed": 9704864,
+        "external": 238138600,
+        "arrayBuffers": 234109845
+      },
+      "processMaxRSS": 329924608,
+      "bytesSent": 0,
+      "wire": [],
+      "scratchBytes": 0,
+      "slowSource": false,
+      "slowSink": false,
+      "integrity": "passed",
+      "durationMs": 13071647,
+      "runtime": "v26.6.0"
+    },
+    {
+      "mode": "spool",
+      "flow": "owner",
+      "format": "mp3",
+      "mib": 199,
+      "bytes": 208666383,
+      "repeat": 1,
+      "elapsedMs": 254.25075000000004,
+      "before": {
+        "rss": 71352320,
+        "heapTotal": 12730368,
+        "heapUsed": 7706856,
+        "external": 4355350,
+        "arrayBuffers": 212117
+      },
+      "sampledPeak": {
+        "rss": 134103040,
+        "heapUsed": 11588896,
+        "external": 39564761,
+        "arrayBuffers": 29244550
+      },
+      "processMaxRSS": 134299648,
+      "bytesSent": 0,
+      "wire": [],
+      "scratchBytes": 208666383,
+      "slowSource": false,
+      "slowSink": false,
+      "integrity": "passed",
+      "durationMs": 13071647,
+      "runtime": "v26.6.0"
+    },
+    {
+      "mode": "baseline",
+      "flow": "meeting",
+      "format": "mp3",
+      "mib": 199,
+      "bytes": 208666383,
+      "repeat": 1,
+      "elapsedMs": 338.219833,
+      "before": {
+        "rss": 71090176,
+        "heapTotal": 12468224,
+        "heapUsed": 7707008,
+        "external": 4355350,
+        "arrayBuffers": 212117
+      },
+      "sampledPeak": {
+        "rss": 744407040,
+        "heapUsed": 10064232,
+        "external": 442475157,
+        "arrayBuffers": 603601572
+      },
+      "processMaxRSS": 745357312,
+      "bytesSent": 0,
+      "wire": [],
+      "scratchBytes": 0,
+      "slowSource": false,
+      "slowSink": false,
+      "integrity": "passed",
+      "durationMs": 13071647,
+      "runtime": "v26.6.0"
+    },
+    {
+      "mode": "prealloc",
+      "flow": "meeting",
+      "format": "mp3",
+      "mib": 199,
+      "bytes": 208666383,
+      "repeat": 1,
+      "elapsedMs": 233.517333,
+      "before": {
+        "rss": 70991872,
+        "heapTotal": 12206080,
+        "heapUsed": 7704552,
+        "external": 4289814,
+        "arrayBuffers": 212117
+      },
+      "sampledPeak": {
+        "rss": 536264704,
+        "heapUsed": 9593616,
+        "external": 237286632,
+        "arrayBuffers": 429144499
+      },
+      "processMaxRSS": 538148864,
+      "bytesSent": 0,
+      "wire": [],
+      "scratchBytes": 0,
+      "slowSource": false,
+      "slowSink": false,
+      "integrity": "passed",
+      "durationMs": 13071647,
+      "runtime": "v26.6.0"
+    },
+    {
+      "mode": "transfer",
+      "flow": "meeting",
+      "format": "mp3",
+      "mib": 199,
+      "bytes": 208666383,
+      "repeat": 1,
+      "elapsedMs": 225.59379199999998,
+      "before": {
+        "rss": 70975488,
+        "heapTotal": 12730368,
+        "heapUsed": 7704720,
+        "external": 4289814,
+        "arrayBuffers": 212117
+      },
+      "sampledPeak": {
+        "rss": 329400320,
+        "heapUsed": 9650520,
+        "external": 238138600,
+        "arrayBuffers": 234109845
+      },
+      "processMaxRSS": 330416128,
+      "bytesSent": 0,
+      "wire": [],
+      "scratchBytes": 0,
+      "slowSource": false,
+      "slowSink": false,
+      "integrity": "passed",
+      "durationMs": 13071647,
+      "runtime": "v26.6.0"
+    },
+    {
+      "mode": "spool",
+      "flow": "meeting",
+      "format": "mp3",
+      "mib": 199,
+      "bytes": 208666383,
+      "repeat": 1,
+      "elapsedMs": 230.814583,
+      "before": {
+        "rss": 71221248,
+        "heapTotal": 12730368,
+        "heapUsed": 7706800,
+        "external": 4355350,
+        "arrayBuffers": 212117
+      },
+      "sampledPeak": {
+        "rss": 133152768,
+        "heapUsed": 11613608,
+        "external": 36943321,
+        "arrayBuffers": 32914566
+      },
+      "processMaxRSS": 133545984,
+      "bytesSent": 0,
+      "wire": [],
+      "scratchBytes": 208666383,
+      "slowSource": false,
+      "slowSink": false,
+      "integrity": "passed",
+      "durationMs": 13071647,
+      "runtime": "v26.6.0"
+    },
+    {
+      "mode": "baseline",
+      "flow": "zoom",
+      "format": "mp3",
+      "mib": 199,
+      "bytes": 208666383,
+      "repeat": 1,
+      "elapsedMs": 583.4819170000001,
+      "before": {
+        "rss": 71352320,
+        "heapTotal": 12730368,
+        "heapUsed": 7707464,
+        "external": 4355350,
+        "arrayBuffers": 212117
+      },
+      "sampledPeak": {
+        "rss": 944340992,
+        "heapUsed": 10508328,
+        "external": 633514404,
+        "arrayBuffers": 812005811
+      },
+      "processMaxRSS": 947093504,
+      "bytesSent": 0,
+      "wire": [],
+      "scratchBytes": 0,
+      "slowSource": false,
+      "slowSink": false,
+      "integrity": "passed",
+      "durationMs": 13071647,
+      "runtime": "v26.6.0"
+    },
+    {
+      "mode": "drop",
+      "flow": "zoom",
+      "format": "mp3",
+      "mib": 199,
+      "bytes": 208666383,
+      "repeat": 1,
+      "elapsedMs": 491.88595799999996,
+      "before": {
+        "rss": 70844416,
+        "heapTotal": 12468224,
+        "heapUsed": 7707728,
+        "external": 4289814,
+        "arrayBuffers": 212117
+      },
+      "sampledPeak": {
+        "rss": 747143168,
+        "heapUsed": 10171720,
+        "external": 442280597,
+        "arrayBuffers": 525351588
+      },
+      "processMaxRSS": 747765760,
+      "bytesSent": 0,
+      "wire": [],
+      "scratchBytes": 0,
+      "slowSource": false,
+      "slowSink": false,
+      "integrity": "passed",
+      "durationMs": 13071647,
+      "runtime": "v26.6.0"
+    },
+    {
+      "mode": "prealloc",
+      "flow": "zoom",
+      "format": "mp3",
+      "mib": 199,
+      "bytes": 208666383,
+      "repeat": 1,
+      "elapsedMs": 467.570333,
+      "before": {
+        "rss": 70860800,
+        "heapTotal": 12468224,
+        "heapUsed": 7704688,
+        "external": 4289814,
+        "arrayBuffers": 212117
+      },
+      "sampledPeak": {
+        "rss": 775438336,
+        "heapUsed": 11350648,
+        "external": 470727671,
+        "arrayBuffers": 633223362
+      },
+      "processMaxRSS": 777093120,
+      "bytesSent": 0,
+      "wire": [],
+      "scratchBytes": 0,
+      "slowSource": false,
+      "slowSink": false,
+      "integrity": "passed",
+      "durationMs": 13071647,
+      "runtime": "v26.6.0"
+    },
+    {
+      "mode": "transfer",
+      "flow": "zoom",
+      "format": "mp3",
+      "mib": 199,
+      "bytes": 208666383,
+      "repeat": 1,
+      "elapsedMs": 462.608833,
+      "before": {
+        "rss": 70762496,
+        "heapTotal": 12206080,
+        "heapUsed": 7705664,
+        "external": 4289814,
+        "arrayBuffers": 212117
+      },
+      "sampledPeak": {
+        "rss": 567787520,
+        "heapUsed": 10214672,
+        "external": 436321030,
+        "arrayBuffers": 432290227
+      },
+      "processMaxRSS": 569229312,
+      "bytesSent": 0,
+      "wire": [],
+      "scratchBytes": 0,
+      "slowSource": false,
+      "slowSink": false,
+      "integrity": "passed",
+      "durationMs": 13071647,
+      "runtime": "v26.6.0"
+    },
+    {
+      "mode": "spool",
+      "flow": "zoom",
+      "format": "mp3",
+      "mib": 199,
+      "bytes": 208666383,
+      "repeat": 1,
+      "elapsedMs": 474.09120799999994,
+      "before": {
+        "rss": 70942720,
+        "heapTotal": 12206080,
+        "heapUsed": 7707016,
+        "external": 4355350,
+        "arrayBuffers": 212117
+      },
+      "sampledPeak": {
+        "rss": 516472832,
+        "heapUsed": 10238208,
+        "external": 421701433,
+        "arrayBuffers": 317406101
+      },
+      "processMaxRSS": 516505600,
+      "bytesSent": 0,
+      "wire": [],
+      "scratchBytes": 208666383,
+      "slowSource": false,
+      "slowSink": false,
+      "integrity": "passed",
+      "durationMs": 13071647,
+      "runtime": "v26.6.0"
+    },
+    {
+      "mode": "baseline",
+      "flow": "submit",
+      "format": "mp3",
+      "mib": 199,
+      "bytes": 208666383,
+      "repeat": 1,
+      "elapsedMs": 488.769,
+      "before": {
+        "rss": 71172096,
+        "heapTotal": 12468224,
+        "heapUsed": 7707008,
+        "external": 4355350,
+        "arrayBuffers": 212117
+      },
+      "sampledPeak": {
+        "rss": 1157742592,
+        "heapUsed": 10324784,
+        "external": 838957211,
+        "arrayBuffers": 834932665
+      },
+      "processMaxRSS": 1157742592,
+      "bytesSent": 208666383,
+      "wire": [
+        {
+          "contentLength": "208666383",
+          "transferEncoding": null
+        }
+      ],
+      "scratchBytes": 0,
+      "slowSource": false,
+      "slowSink": false,
+      "integrity": "passed",
+      "durationMs": 13071647,
+      "runtime": "v26.6.0"
+    },
+    {
+      "mode": "prealloc",
+      "flow": "submit",
+      "format": "mp3",
+      "mib": 199,
+      "bytes": 208666383,
+      "repeat": 1,
+      "elapsedMs": 408.57283399999994,
+      "before": {
+        "rss": 70631424,
+        "heapTotal": 12468224,
+        "heapUsed": 7704560,
+        "external": 4289814,
+        "arrayBuffers": 212117
+      },
+      "sampledPeak": {
+        "rss": 954597376,
+        "heapUsed": 9705696,
+        "external": 838962521,
+        "arrayBuffers": 834932665
+      },
+      "processMaxRSS": 954597376,
+      "bytesSent": 208666383,
+      "wire": [
+        {
+          "contentLength": "208666383",
+          "transferEncoding": null
+        }
+      ],
+      "scratchBytes": 0,
+      "slowSource": false,
+      "slowSink": false,
+      "integrity": "passed",
+      "durationMs": 13071647,
+      "runtime": "v26.6.0"
+    },
+    {
+      "mode": "stream",
+      "flow": "submit",
+      "format": "mp3",
+      "mib": 199,
+      "bytes": 208666383,
+      "repeat": 1,
+      "elapsedMs": 364.157791,
+      "before": {
+        "rss": 70860800,
+        "heapTotal": 12468224,
+        "heapUsed": 7705464,
+        "external": 4289814,
+        "arrayBuffers": 212117
+      },
+      "sampledPeak": {
+        "rss": 562036736,
+        "heapUsed": 10695320,
+        "external": 256800821,
+        "arrayBuffers": 426719667
+      },
+      "processMaxRSS": 562036736,
+      "bytesSent": 208666383,
+      "wire": [
+        {
+          "contentLength": "208666383",
+          "transferEncoding": null
+        }
+      ],
+      "scratchBytes": 0,
+      "slowSource": false,
+      "slowSink": false,
+      "integrity": "passed",
+      "durationMs": 13071647,
+      "runtime": "v26.6.0"
+    },
+    {
+      "mode": "transfer",
+      "flow": "submit",
+      "format": "mp3",
+      "mib": 199,
+      "bytes": 208666383,
+      "repeat": 1,
+      "elapsedMs": 353.93254099999996,
+      "before": {
+        "rss": 71073792,
+        "heapTotal": 12206080,
+        "heapUsed": 7704912,
+        "external": 4289814,
+        "arrayBuffers": 212117
+      },
+      "sampledPeak": {
+        "rss": 351043584,
+        "heapUsed": 10788120,
+        "external": 255555637,
+        "arrayBuffers": 251531091
+      },
+      "processMaxRSS": 351043584,
+      "bytesSent": 208666383,
+      "wire": [
+        {
+          "contentLength": "208666383",
+          "transferEncoding": null
+        }
+      ],
+      "scratchBytes": 0,
+      "slowSource": false,
+      "slowSink": false,
+      "integrity": "passed",
+      "durationMs": 13071647,
+      "runtime": "v26.6.0"
+    },
+    {
+      "mode": "spool",
+      "flow": "submit",
+      "format": "mp3",
+      "mib": 199,
+      "bytes": 208666383,
+      "repeat": 1,
+      "elapsedMs": 340.201875,
+      "before": {
+        "rss": 71188480,
+        "heapTotal": 12730368,
+        "heapUsed": 7706976,
+        "external": 4355350,
+        "arrayBuffers": 212117
+      },
+      "sampledPeak": {
+        "rss": 165675008,
+        "heapUsed": 11596528,
+        "external": 67139878,
+        "arrayBuffers": 63115332
+      },
+      "processMaxRSS": 165675008,
+      "bytesSent": 208666383,
+      "wire": [
+        {
+          "contentLength": "208666383",
+          "transferEncoding": null
+        }
+      ],
+      "scratchBytes": 208666383,
+      "slowSource": false,
+      "slowSink": false,
+      "integrity": "passed",
+      "durationMs": 13071647,
+      "runtime": "v26.6.0"
+    },
+    {
+      "mode": "baseline",
+      "flow": "owner",
+      "format": "mp3",
+      "mib": 199,
+      "bytes": 208666383,
+      "repeat": 2,
+      "elapsedMs": 259.92195899999996,
+      "before": {
+        "rss": 71155712,
+        "heapTotal": 12730368,
+        "heapUsed": 7706856,
+        "external": 4355350,
+        "arrayBuffers": 212117
+      },
+      "sampledPeak": {
+        "rss": 745291776,
+        "heapUsed": 10229720,
+        "external": 443392661,
+        "arrayBuffers": 596196004
+      },
+      "processMaxRSS": 746373120,
+      "bytesSent": 0,
+      "wire": [],
+      "scratchBytes": 0,
+      "slowSource": false,
+      "slowSink": false,
+      "integrity": "passed",
+      "durationMs": 13071647,
+      "runtime": "v26.6.0"
+    },
+    {
+      "mode": "prealloc",
+      "flow": "owner",
+      "format": "mp3",
+      "mib": 199,
+      "bytes": 208666383,
+      "repeat": 2,
+      "elapsedMs": 226.543,
+      "before": {
+        "rss": 70959104,
+        "heapTotal": 12468224,
+        "heapUsed": 7704552,
+        "external": 4289814,
+        "arrayBuffers": 212117
+      },
+      "sampledPeak": {
+        "rss": 536150016,
+        "heapUsed": 9707200,
+        "external": 238138600,
+        "arrayBuffers": 422066611
+      },
+      "processMaxRSS": 538296320,
+      "bytesSent": 0,
+      "wire": [],
+      "scratchBytes": 0,
+      "slowSource": false,
+      "slowSink": false,
+      "integrity": "passed",
+      "durationMs": 13071647,
+      "runtime": "v26.6.0"
+    },
+    {
+      "mode": "transfer",
+      "flow": "owner",
+      "format": "mp3",
+      "mib": 199,
+      "bytes": 208666383,
+      "repeat": 2,
+      "elapsedMs": 216.65175,
+      "before": {
+        "rss": 70860800,
+        "heapTotal": 11943936,
+        "heapUsed": 7705552,
+        "external": 4289814,
+        "arrayBuffers": 212117
+      },
+      "sampledPeak": {
+        "rss": 327811072,
+        "heapUsed": 9661936,
+        "external": 236762344,
+        "arrayBuffers": 232733589
+      },
+      "processMaxRSS": 329367552,
+      "bytesSent": 0,
+      "wire": [],
+      "scratchBytes": 0,
+      "slowSource": false,
+      "slowSink": false,
+      "integrity": "passed",
+      "durationMs": 13071647,
+      "runtime": "v26.6.0"
+    },
+    {
+      "mode": "spool",
+      "flow": "owner",
+      "format": "mp3",
+      "mib": 199,
+      "bytes": 208666383,
+      "repeat": 2,
+      "elapsedMs": 211.46054099999998,
+      "before": {
+        "rss": 71106560,
+        "heapTotal": 12468224,
+        "heapUsed": 7707480,
+        "external": 4355350,
+        "arrayBuffers": 212117
+      },
+      "sampledPeak": {
+        "rss": 133611520,
+        "heapUsed": 11499896,
+        "external": 35829209,
+        "arrayBuffers": 31800454
+      },
+      "processMaxRSS": 133660672,
+      "bytesSent": 0,
+      "wire": [],
+      "scratchBytes": 208666383,
+      "slowSource": false,
+      "slowSink": false,
+      "integrity": "passed",
+      "durationMs": 13071647,
+      "runtime": "v26.6.0"
+    },
+    {
+      "mode": "baseline",
+      "flow": "meeting",
+      "format": "mp3",
+      "mib": 199,
+      "bytes": 208666383,
+      "repeat": 2,
+      "elapsedMs": 255.14416699999998,
+      "before": {
+        "rss": 71057408,
+        "heapTotal": 12468224,
+        "heapUsed": 7707008,
+        "external": 4355350,
+        "arrayBuffers": 212117
+      },
+      "sampledPeak": {
+        "rss": 744374272,
+        "heapUsed": 10314232,
+        "external": 443130517,
+        "arrayBuffers": 569784996
+      },
+      "processMaxRSS": 745111552,
+      "bytesSent": 0,
+      "wire": [],
+      "scratchBytes": 0,
+      "slowSource": false,
+      "slowSink": false,
+      "integrity": "passed",
+      "durationMs": 13071647,
+      "runtime": "v26.6.0"
+    },
+    {
+      "mode": "prealloc",
+      "flow": "meeting",
+      "format": "mp3",
+      "mib": 199,
+      "bytes": 208666383,
+      "repeat": 2,
+      "elapsedMs": 233.06929200000002,
+      "before": {
+        "rss": 70844416,
+        "heapTotal": 12730368,
+        "heapUsed": 7704576,
+        "external": 4289814,
+        "arrayBuffers": 212117
+      },
+      "sampledPeak": {
+        "rss": 537378816,
+        "heapUsed": 9617208,
+        "external": 235844840,
+        "arrayBuffers": 427768243
+      },
+      "processMaxRSS": 538345472,
+      "bytesSent": 0,
+      "wire": [],
+      "scratchBytes": 0,
+      "slowSource": false,
+      "slowSink": false,
+      "integrity": "passed",
+      "durationMs": 13071647,
+      "runtime": "v26.6.0"
+    },
+    {
+      "mode": "transfer",
+      "flow": "meeting",
+      "format": "mp3",
+      "mib": 199,
+      "bytes": 208666383,
+      "repeat": 2,
+      "elapsedMs": 215.47233400000005,
+      "before": {
+        "rss": 70844416,
+        "heapTotal": 12206080,
+        "heapUsed": 7705720,
+        "external": 4289814,
+        "arrayBuffers": 212117
+      },
+      "sampledPeak": {
+        "rss": 329940992,
+        "heapUsed": 9684112,
+        "external": 238400744,
+        "arrayBuffers": 233913237
+      },
+      "processMaxRSS": 330104832,
+      "bytesSent": 0,
+      "wire": [],
+      "scratchBytes": 0,
+      "slowSource": false,
+      "slowSink": false,
+      "integrity": "passed",
+      "durationMs": 13071647,
+      "runtime": "v26.6.0"
+    },
+    {
+      "mode": "spool",
+      "flow": "meeting",
+      "format": "mp3",
+      "mib": 199,
+      "bytes": 208666383,
+      "repeat": 2,
+      "elapsedMs": 211.65525000000002,
+      "before": {
+        "rss": 70926336,
+        "heapTotal": 12468224,
+        "heapUsed": 7707608,
+        "external": 4355350,
+        "arrayBuffers": 212117
+      },
+      "sampledPeak": {
+        "rss": 133234688,
+        "heapUsed": 11606528,
+        "external": 33273305,
+        "arrayBuffers": 29244550
+      },
+      "processMaxRSS": 133660672,
+      "bytesSent": 0,
+      "wire": [],
+      "scratchBytes": 208666383,
+      "slowSource": false,
+      "slowSink": false,
+      "integrity": "passed",
+      "durationMs": 13071647,
+      "runtime": "v26.6.0"
+    },
+    {
+      "mode": "baseline",
+      "flow": "zoom",
+      "format": "mp3",
+      "mib": 199,
+      "bytes": 208666383,
+      "repeat": 2,
+      "elapsedMs": 523.2329579999999,
+      "before": {
+        "rss": 71155712,
+        "heapTotal": 12730368,
+        "heapUsed": 7706928,
+        "external": 4355350,
+        "arrayBuffers": 326427
+      },
+      "sampledPeak": {
+        "rss": 955547648,
+        "heapUsed": 10178736,
+        "external": 643803556,
+        "arrayBuffers": 757479859
+      },
+      "processMaxRSS": 956563456,
+      "bytesSent": 0,
+      "wire": [],
+      "scratchBytes": 0,
+      "slowSource": false,
+      "slowSink": false,
+      "integrity": "passed",
+      "durationMs": 13071647,
+      "runtime": "v26.6.0"
+    },
+    {
+      "mode": "drop",
+      "flow": "zoom",
+      "format": "mp3",
+      "mib": 199,
+      "bytes": 208666383,
+      "repeat": 2,
+      "elapsedMs": 492.05404200000004,
+      "before": {
+        "rss": 71090176,
+        "heapTotal": 12468224,
+        "heapUsed": 7707656,
+        "external": 4289814,
+        "arrayBuffers": 212117
+      },
+      "sampledPeak": {
+        "rss": 755679232,
+        "heapUsed": 10340256,
+        "external": 425175701,
+        "arrayBuffers": 567163556
+      },
+      "processMaxRSS": 757628928,
+      "bytesSent": 0,
+      "wire": [],
+      "scratchBytes": 0,
+      "slowSource": false,
+      "slowSink": false,
+      "integrity": "passed",
+      "durationMs": 13071647,
+      "runtime": "v26.6.0"
+    },
+    {
+      "mode": "prealloc",
+      "flow": "zoom",
+      "format": "mp3",
+      "mib": 199,
+      "bytes": 208666383,
+      "repeat": 2,
+      "elapsedMs": 478.901209,
+      "before": {
+        "rss": 71024640,
+        "heapTotal": 12468224,
+        "heapUsed": 7704360,
+        "external": 4289814,
+        "arrayBuffers": 212117
+      },
+      "sampledPeak": {
+        "rss": 569147392,
+        "heapUsed": 10655680,
+        "external": 459520774,
+        "arrayBuffers": 455489971
+      },
+      "processMaxRSS": 569884672,
+      "bytesSent": 0,
+      "wire": [],
+      "scratchBytes": 0,
+      "slowSource": false,
+      "slowSink": false,
+      "integrity": "passed",
+      "durationMs": 13071647,
+      "runtime": "v26.6.0"
+    },
+    {
+      "mode": "transfer",
+      "flow": "zoom",
+      "format": "mp3",
+      "mib": 199,
+      "bytes": 208666383,
+      "repeat": 2,
+      "elapsedMs": 448.572209,
+      "before": {
+        "rss": 71155712,
+        "heapTotal": 12468224,
+        "heapUsed": 7705640,
+        "external": 4289814,
+        "arrayBuffers": 212117
+      },
+      "sampledPeak": {
+        "rss": 570654720,
+        "heapUsed": 10042344,
+        "external": 422296326,
+        "arrayBuffers": 418265523
+      },
+      "processMaxRSS": 571686912,
+      "bytesSent": 0,
+      "wire": [],
+      "scratchBytes": 0,
+      "slowSource": false,
+      "slowSink": false,
+      "integrity": "passed",
+      "durationMs": 13071647,
+      "runtime": "v26.6.0"
+    },
+    {
+      "mode": "spool",
+      "flow": "zoom",
+      "format": "mp3",
+      "mib": 199,
+      "bytes": 208666383,
+      "repeat": 2,
+      "elapsedMs": 461.156583,
+      "before": {
+        "rss": 70877184,
+        "heapTotal": 12468224,
+        "heapUsed": 7707576,
+        "external": 4355350,
+        "arrayBuffers": 212117
+      },
+      "sampledPeak": {
+        "rss": 517193728,
+        "heapUsed": 10585992,
+        "external": 421701433,
+        "arrayBuffers": 379140772
+      },
+      "processMaxRSS": 517455872,
+      "bytesSent": 0,
+      "wire": [],
+      "scratchBytes": 208666383,
+      "slowSource": false,
+      "slowSink": false,
+      "integrity": "passed",
+      "durationMs": 13071647,
+      "runtime": "v26.6.0"
+    },
+    {
+      "mode": "baseline",
+      "flow": "submit",
+      "format": "mp3",
+      "mib": 199,
+      "bytes": 208666383,
+      "repeat": 2,
+      "elapsedMs": 493.01099999999997,
+      "before": {
+        "rss": 71303168,
+        "heapTotal": 12730368,
+        "heapUsed": 7707656,
+        "external": 4355350,
+        "arrayBuffers": 212117
+      },
+      "sampledPeak": {
+        "rss": 1163476992,
+        "heapUsed": 9810488,
+        "external": 838957211,
+        "arrayBuffers": 834932665
+      },
+      "processMaxRSS": 1163575296,
+      "bytesSent": 208666383,
+      "wire": [
+        {
+          "contentLength": "208666383",
+          "transferEncoding": null
+        }
+      ],
+      "scratchBytes": 0,
+      "slowSource": false,
+      "slowSink": false,
+      "integrity": "passed",
+      "durationMs": 13071647,
+      "runtime": "v26.6.0"
+    },
+    {
+      "mode": "prealloc",
+      "flow": "submit",
+      "format": "mp3",
+      "mib": 199,
+      "bytes": 208666383,
+      "repeat": 2,
+      "elapsedMs": 413.21858299999997,
+      "before": {
+        "rss": 70647808,
+        "heapTotal": 12206080,
+        "heapUsed": 7705504,
+        "external": 4289814,
+        "arrayBuffers": 212117
+      },
+      "sampledPeak": {
+        "rss": 954204160,
+        "heapUsed": 9993392,
+        "external": 838961696,
+        "arrayBuffers": 834932665
+      },
+      "processMaxRSS": 954204160,
+      "bytesSent": 208666383,
+      "wire": [
+        {
+          "contentLength": "208666383",
+          "transferEncoding": null
+        }
+      ],
+      "scratchBytes": 0,
+      "slowSource": false,
+      "slowSink": false,
+      "integrity": "passed",
+      "durationMs": 13071647,
+      "runtime": "v26.6.0"
+    },
+    {
+      "mode": "stream",
+      "flow": "submit",
+      "format": "mp3",
+      "mib": 199,
+      "bytes": 208666383,
+      "repeat": 2,
+      "elapsedMs": 363.49816599999997,
+      "before": {
+        "rss": 70926336,
+        "heapTotal": 12468224,
+        "heapUsed": 7704872,
+        "external": 4289814,
+        "arrayBuffers": 212117
+      },
+      "sampledPeak": {
+        "rss": 559185920,
+        "heapUsed": 10861192,
+        "external": 256473141,
+        "arrayBuffers": 429668787
+      },
+      "processMaxRSS": 559185920,
+      "bytesSent": 208666383,
+      "wire": [
+        {
+          "contentLength": "208666383",
+          "transferEncoding": null
+        }
+      ],
+      "scratchBytes": 0,
+      "slowSource": false,
+      "slowSink": false,
+      "integrity": "passed",
+      "durationMs": 13071647,
+      "runtime": "v26.6.0"
+    },
+    {
+      "mode": "transfer",
+      "flow": "submit",
+      "format": "mp3",
+      "mib": 199,
+      "bytes": 208666383,
+      "repeat": 2,
+      "elapsedMs": 357.51870800000006,
+      "before": {
+        "rss": 70877184,
+        "heapTotal": 12206080,
+        "heapUsed": 7704776,
+        "external": 4289814,
+        "arrayBuffers": 212117
+      },
+      "sampledPeak": {
+        "rss": 349437952,
+        "heapUsed": 10545088,
+        "external": 254310453,
+        "arrayBuffers": 250285907
+      },
+      "processMaxRSS": 349437952,
+      "bytesSent": 208666383,
+      "wire": [
+        {
+          "contentLength": "208666383",
+          "transferEncoding": null
+        }
+      ],
+      "scratchBytes": 0,
+      "slowSource": false,
+      "slowSink": false,
+      "integrity": "passed",
+      "durationMs": 13071647,
+      "runtime": "v26.6.0"
+    },
+    {
+      "mode": "spool",
+      "flow": "submit",
+      "format": "mp3",
+      "mib": 199,
+      "bytes": 208666383,
+      "repeat": 2,
+      "elapsedMs": 343.369792,
+      "before": {
+        "rss": 70729728,
+        "heapTotal": 12206080,
+        "heapUsed": 7707808,
+        "external": 4355350,
+        "arrayBuffers": 212117
+      },
+      "sampledPeak": {
+        "rss": 170901504,
+        "heapUsed": 11671608,
+        "external": 70880740,
+        "arrayBuffers": 63115332
+      },
+      "processMaxRSS": 170901504,
+      "bytesSent": 208666383,
+      "wire": [
+        {
+          "contentLength": "208666383",
+          "transferEncoding": null
+        }
+      ],
+      "scratchBytes": 208666383,
+      "slowSource": false,
+      "slowSink": false,
+      "integrity": "passed",
+      "durationMs": 13071647,
+      "runtime": "v26.6.0"
+    },
+    {
+      "mode": "baseline",
+      "flow": "owner",
+      "format": "m4a-late",
+      "mib": 199,
+      "bytes": 208666624,
+      "repeat": 1,
+      "elapsedMs": 259.50987499999997,
+      "before": {
+        "rss": 70959104,
+        "heapTotal": 12206080,
+        "heapUsed": 7707832,
+        "external": 4355350,
+        "arrayBuffers": 212117
+      },
+      "sampledPeak": {
+        "rss": 743538688,
+        "heapUsed": 9741408,
+        "external": 442738024,
+        "arrayBuffers": 429931654
+      },
+      "processMaxRSS": 744783872,
+      "bytesSent": 0,
+      "wire": [],
+      "scratchBytes": 0,
+      "slowSource": false,
+      "slowSink": false,
+      "integrity": "passed",
+      "durationMs": 3065,
+      "runtime": "v26.6.0"
+    },
+    {
+      "mode": "prealloc",
+      "flow": "owner",
+      "format": "m4a-late",
+      "mib": 199,
+      "bytes": 208666624,
+      "repeat": 1,
+      "elapsedMs": 228.445583,
+      "before": {
+        "rss": 70909952,
+        "heapTotal": 12730368,
+        "heapUsed": 7704608,
+        "external": 4289814,
+        "arrayBuffers": 212117
+      },
+      "sampledPeak": {
+        "rss": 536313856,
+        "heapUsed": 9589336,
+        "external": 238400985,
+        "arrayBuffers": 430718086
+      },
+      "processMaxRSS": 537903104,
+      "bytesSent": 0,
+      "wire": [],
+      "scratchBytes": 0,
+      "slowSource": false,
+      "slowSink": false,
+      "integrity": "passed",
+      "durationMs": 3065,
+      "runtime": "v26.6.0"
+    },
+    {
+      "mode": "transfer",
+      "flow": "owner",
+      "format": "m4a-late",
+      "mib": 199,
+      "bytes": 208666624,
+      "repeat": 1,
+      "elapsedMs": 214.312958,
+      "before": {
+        "rss": 71106560,
+        "heapTotal": 12730368,
+        "heapUsed": 7704760,
+        "external": 4289814,
+        "arrayBuffers": 212117
+      },
+      "sampledPeak": {
+        "rss": 327417856,
+        "heapUsed": 9720640,
+        "external": 238728665,
+        "arrayBuffers": 234699910
+      },
+      "processMaxRSS": 329170944,
+      "bytesSent": 0,
+      "wire": [],
+      "scratchBytes": 0,
+      "slowSource": false,
+      "slowSink": false,
+      "integrity": "passed",
+      "durationMs": 3065,
+      "runtime": "v26.6.0"
+    },
+    {
+      "mode": "spool",
+      "flow": "owner",
+      "format": "m4a-late",
+      "mib": 199,
+      "bytes": 208666624,
+      "repeat": 1,
+      "elapsedMs": 214.50875000000002,
+      "before": {
+        "rss": 71024640,
+        "heapTotal": 12468224,
+        "heapUsed": 7707016,
+        "external": 4355350,
+        "arrayBuffers": 212117
+      },
+      "sampledPeak": {
+        "rss": 134201344,
+        "heapUsed": 11541968,
+        "external": 35768850,
+        "arrayBuffers": 31014022
+      },
+      "processMaxRSS": 134250496,
+      "bytesSent": 0,
+      "wire": [],
+      "scratchBytes": 208666624,
+      "slowSource": false,
+      "slowSink": false,
+      "integrity": "passed",
+      "durationMs": 3065,
+      "runtime": "v26.6.0"
+    },
+    {
+      "mode": "baseline",
+      "flow": "meeting",
+      "format": "m4a-late",
+      "mib": 199,
+      "bytes": 208666624,
+      "repeat": 1,
+      "elapsedMs": 252.305791,
+      "before": {
+        "rss": 70844416,
+        "heapTotal": 12468224,
+        "heapUsed": 7706920,
+        "external": 4355350,
+        "arrayBuffers": 212117
+      },
+      "sampledPeak": {
+        "rss": 744292352,
+        "heapUsed": 10022368,
+        "external": 443131240,
+        "arrayBuffers": 540228742
+      },
+      "processMaxRSS": 745127936,
+      "bytesSent": 0,
+      "wire": [],
+      "scratchBytes": 0,
+      "slowSource": false,
+      "slowSink": false,
+      "integrity": "passed",
+      "durationMs": 3065,
+      "runtime": "v26.6.0"
+    },
+    {
+      "mode": "prealloc",
+      "flow": "meeting",
+      "format": "m4a-late",
+      "mib": 199,
+      "bytes": 208666624,
+      "repeat": 1,
+      "elapsedMs": 225.808458,
+      "before": {
+        "rss": 70909952,
+        "heapTotal": 12468224,
+        "heapUsed": 7705216,
+        "external": 4289814,
+        "arrayBuffers": 212117
+      },
+      "sampledPeak": {
+        "rss": 535642112,
+        "heapUsed": 9719000,
+        "external": 237221337,
+        "arrayBuffers": 423902342
+      },
+      "processMaxRSS": 537657344,
+      "bytesSent": 0,
+      "wire": [],
+      "scratchBytes": 0,
+      "slowSource": false,
+      "slowSink": false,
+      "integrity": "passed",
+      "durationMs": 3065,
+      "runtime": "v26.6.0"
+    },
+    {
+      "mode": "transfer",
+      "flow": "meeting",
+      "format": "m4a-late",
+      "mib": 199,
+      "bytes": 208666624,
+      "repeat": 1,
+      "elapsedMs": 219.13616599999997,
+      "before": {
+        "rss": 70959104,
+        "heapTotal": 12468224,
+        "heapUsed": 7704944,
+        "external": 4289814,
+        "arrayBuffers": 212117
+      },
+      "sampledPeak": {
+        "rss": 333053952,
+        "heapUsed": 10113008,
+        "external": 243512793,
+        "arrayBuffers": 239484038
+      },
+      "processMaxRSS": 334413824,
+      "bytesSent": 0,
+      "wire": [],
+      "scratchBytes": 0,
+      "slowSource": false,
+      "slowSink": false,
+      "integrity": "passed",
+      "durationMs": 3065,
+      "runtime": "v26.6.0"
+    },
+    {
+      "mode": "spool",
+      "flow": "meeting",
+      "format": "m4a-late",
+      "mib": 199,
+      "bytes": 208666624,
+      "repeat": 1,
+      "elapsedMs": 212.89525,
+      "before": {
+        "rss": 70795264,
+        "heapTotal": 12468224,
+        "heapUsed": 7707648,
+        "external": 4355350,
+        "arrayBuffers": 212117
+      },
+      "sampledPeak": {
+        "rss": 133136384,
+        "heapUsed": 11409624,
+        "external": 36943321,
+        "arrayBuffers": 32914566
+      },
+      "processMaxRSS": 133709824,
+      "bytesSent": 0,
+      "wire": [],
+      "scratchBytes": 208666624,
+      "slowSource": false,
+      "slowSink": false,
+      "integrity": "passed",
+      "durationMs": 3065,
+      "runtime": "v26.6.0"
+    },
+    {
+      "mode": "baseline",
+      "flow": "zoom",
+      "format": "m4a-late",
+      "mib": 199,
+      "bytes": 208666624,
+      "repeat": 1,
+      "elapsedMs": 526.9920840000001,
+      "before": {
+        "rss": 71041024,
+        "heapTotal": 12468224,
+        "heapUsed": 7707464,
+        "external": 4355350,
+        "arrayBuffers": 212117
+      },
+      "sampledPeak": {
+        "rss": 962560000,
+        "heapUsed": 10090952,
+        "external": 657829224,
+        "arrayBuffers": 789593222
+      },
+      "processMaxRSS": 963461120,
+      "bytesSent": 0,
+      "wire": [],
+      "scratchBytes": 0,
+      "slowSource": false,
+      "slowSink": false,
+      "integrity": "passed",
+      "durationMs": 3065,
+      "runtime": "v26.6.0"
+    },
+    {
+      "mode": "drop",
+      "flow": "zoom",
+      "format": "m4a-late",
+      "mib": 199,
+      "bytes": 208666624,
+      "repeat": 1,
+      "elapsedMs": 494.35141699999997,
+      "before": {
+        "rss": 70909952,
+        "heapTotal": 12468224,
+        "heapUsed": 7707872,
+        "external": 4289814,
+        "arrayBuffers": 212117
+      },
+      "sampledPeak": {
+        "rss": 747388928,
+        "heapUsed": 10369280,
+        "external": 442936680,
+        "arrayBuffers": 571161734
+      },
+      "processMaxRSS": 748011520,
+      "bytesSent": 0,
+      "wire": [],
+      "scratchBytes": 0,
+      "slowSource": false,
+      "slowSink": false,
+      "integrity": "passed",
+      "durationMs": 3065,
+      "runtime": "v26.6.0"
+    },
+    {
+      "mode": "prealloc",
+      "flow": "zoom",
+      "format": "m4a-late",
+      "mib": 199,
+      "bytes": 208666624,
+      "repeat": 1,
+      "elapsedMs": 458.825,
+      "before": {
+        "rss": 70713344,
+        "heapTotal": 12206080,
+        "heapUsed": 7697232,
+        "external": 4289814,
+        "arrayBuffers": 212117
+      },
+      "sampledPeak": {
+        "rss": 567902208,
+        "heapUsed": 10206176,
+        "external": 437829081,
+        "arrayBuffers": 433798278
+      },
+      "processMaxRSS": 568770560,
+      "bytesSent": 0,
+      "wire": [],
+      "scratchBytes": 0,
+      "slowSource": false,
+      "slowSink": false,
+      "integrity": "passed",
+      "durationMs": 3065,
+      "runtime": "v26.6.0"
+    },
+    {
+      "mode": "transfer",
+      "flow": "zoom",
+      "format": "m4a-late",
+      "mib": 199,
+      "bytes": 208666624,
+      "repeat": 1,
+      "elapsedMs": 460.73716600000006,
+      "before": {
+        "rss": 70893568,
+        "heapTotal": 11943936,
+        "heapUsed": 7705736,
+        "external": 4289814,
+        "arrayBuffers": 212117
+      },
+      "sampledPeak": {
+        "rss": 566968320,
+        "heapUsed": 10225840,
+        "external": 459390425,
+        "arrayBuffers": 455359622
+      },
+      "processMaxRSS": 568508416,
+      "bytesSent": 0,
+      "wire": [],
+      "scratchBytes": 0,
+      "slowSource": false,
+      "slowSink": false,
+      "integrity": "passed",
+      "durationMs": 3065,
+      "runtime": "v26.6.0"
+    },
+    {
+      "mode": "spool",
+      "flow": "zoom",
+      "format": "m4a-late",
+      "mib": 199,
+      "bytes": 208666624,
+      "repeat": 1,
+      "elapsedMs": 495.66429200000005,
+      "before": {
+        "rss": 70893568,
+        "heapTotal": 12468224,
+        "heapUsed": 7706888,
+        "external": 4355350,
+        "arrayBuffers": 212117
+      },
+      "sampledPeak": {
+        "rss": 516833280,
+        "heapUsed": 10102552,
+        "external": 421636379,
+        "arrayBuffers": 387529862
+      },
+      "processMaxRSS": 516947968,
+      "bytesSent": 0,
+      "wire": [],
+      "scratchBytes": 208666624,
+      "slowSource": false,
+      "slowSink": false,
+      "integrity": "passed",
+      "durationMs": 3065,
+      "runtime": "v26.6.0"
+    },
+    {
+      "mode": "baseline",
+      "flow": "submit",
+      "format": "m4a-late",
+      "mib": 199,
+      "bytes": 208666624,
+      "repeat": 1,
+      "elapsedMs": 498.45737499999996,
+      "before": {
+        "rss": 71172096,
+        "heapTotal": 12730368,
+        "heapUsed": 7708224,
+        "external": 4355350,
+        "arrayBuffers": 212117
+      },
+      "sampledPeak": {
+        "rss": 1156333568,
+        "heapUsed": 10261536,
+        "external": 838958175,
+        "arrayBuffers": 834933629
+      },
+      "processMaxRSS": 1157283840,
+      "bytesSent": 208666624,
+      "wire": [
+        {
+          "contentLength": "208666624",
+          "transferEncoding": null
+        }
+      ],
+      "scratchBytes": 0,
+      "slowSource": false,
+      "slowSink": false,
+      "integrity": "passed",
+      "durationMs": 3065,
+      "runtime": "v26.6.0"
+    },
+    {
+      "mode": "prealloc",
+      "flow": "submit",
+      "format": "m4a-late",
+      "mib": 199,
+      "bytes": 208666624,
+      "repeat": 1,
+      "elapsedMs": 401.11687500000005,
+      "before": {
+        "rss": 71057408,
+        "heapTotal": 12206080,
+        "heapUsed": 7704560,
+        "external": 4289814,
+        "arrayBuffers": 212117
+      },
+      "sampledPeak": {
+        "rss": 954220544,
+        "heapUsed": 9881320,
+        "external": 838958175,
+        "arrayBuffers": 834933629
+      },
+      "processMaxRSS": 954220544,
+      "bytesSent": 208666624,
+      "wire": [
+        {
+          "contentLength": "208666624",
+          "transferEncoding": null
+        }
+      ],
+      "scratchBytes": 0,
+      "slowSource": false,
+      "slowSink": false,
+      "integrity": "passed",
+      "durationMs": 3065,
+      "runtime": "v26.6.0"
+    },
+    {
+      "mode": "stream",
+      "flow": "submit",
+      "format": "m4a-late",
+      "mib": 199,
+      "bytes": 208666624,
+      "repeat": 1,
+      "elapsedMs": 353.68487500000003,
+      "before": {
+        "rss": 71090176,
+        "heapTotal": 12730368,
+        "heapUsed": 7705472,
+        "external": 4289814,
+        "arrayBuffers": 212117
+      },
+      "sampledPeak": {
+        "rss": 562479104,
+        "heapUsed": 10894184,
+        "external": 257854948,
+        "arrayBuffers": 437599366
+      },
+      "processMaxRSS": 562479104,
+      "bytesSent": 208666624,
+      "wire": [
+        {
+          "contentLength": "208666624",
+          "transferEncoding": null
+        }
+      ],
+      "scratchBytes": 0,
+      "slowSource": false,
+      "slowSink": false,
+      "integrity": "passed",
+      "durationMs": 3065,
+      "runtime": "v26.6.0"
+    },
+    {
+      "mode": "transfer",
+      "flow": "submit",
+      "format": "m4a-late",
+      "mib": 199,
+      "bytes": 208666624,
+      "repeat": 1,
+      "elapsedMs": 343.33720800000003,
+      "before": {
+        "rss": 71057408,
+        "heapTotal": 12730368,
+        "heapUsed": 7704776,
+        "external": 4289814,
+        "arrayBuffers": 212117
+      },
+      "sampledPeak": {
+        "rss": 348700672,
+        "heapUsed": 10875808,
+        "external": 255883558,
+        "arrayBuffers": 251859012
+      },
+      "processMaxRSS": 348700672,
+      "bytesSent": 208666624,
+      "wire": [
+        {
+          "contentLength": "208666624",
+          "transferEncoding": null
+        }
+      ],
+      "scratchBytes": 0,
+      "slowSource": false,
+      "slowSink": false,
+      "integrity": "passed",
+      "durationMs": 3065,
+      "runtime": "v26.6.0"
+    },
+    {
+      "mode": "spool",
+      "flow": "submit",
+      "format": "m4a-late",
+      "mib": 199,
+      "bytes": 208666624,
+      "repeat": 1,
+      "elapsedMs": 353.64191700000003,
+      "before": {
+        "rss": 70942720,
+        "heapTotal": 12468224,
+        "heapUsed": 7706872,
+        "external": 4355350,
+        "arrayBuffers": 212117
+      },
+      "sampledPeak": {
+        "rss": 170147840,
+        "heapUsed": 11706136,
+        "external": 71137574,
+        "arrayBuffers": 60559428
+      },
+      "processMaxRSS": 170147840,
+      "bytesSent": 208666624,
+      "wire": [
+        {
+          "contentLength": "208666624",
+          "transferEncoding": null
+        }
+      ],
+      "scratchBytes": 208666624,
+      "slowSource": false,
+      "slowSink": false,
+      "integrity": "passed",
+      "durationMs": 3065,
+      "runtime": "v26.6.0"
+    },
+    {
+      "mode": "baseline",
+      "flow": "owner",
+      "format": "m4a-late",
+      "mib": 199,
+      "bytes": 208666624,
+      "repeat": 2,
+      "elapsedMs": 254.53841599999998,
+      "before": {
+        "rss": 71041024,
+        "heapTotal": 12468224,
+        "heapUsed": 7707040,
+        "external": 4355350,
+        "arrayBuffers": 212117
+      },
+      "sampledPeak": {
+        "rss": 744947712,
+        "heapUsed": 9822888,
+        "external": 443524456,
+        "arrayBuffers": 483146886
+      },
+      "processMaxRSS": 745799680,
+      "bytesSent": 0,
+      "wire": [],
+      "scratchBytes": 0,
+      "slowSource": false,
+      "slowSink": false,
+      "integrity": "passed",
+      "durationMs": 3065,
+      "runtime": "v26.6.0"
+    },
+    {
+      "mode": "prealloc",
+      "flow": "owner",
+      "format": "m4a-late",
+      "mib": 199,
+      "bytes": 208666624,
+      "repeat": 2,
+      "elapsedMs": 225.16475000000003,
+      "before": {
+        "rss": 70647808,
+        "heapTotal": 12206080,
+        "heapUsed": 7705520,
+        "external": 4289814,
+        "arrayBuffers": 212117
+      },
+      "sampledPeak": {
+        "rss": 535773184,
+        "heapUsed": 9664352,
+        "external": 238138841,
+        "arrayBuffers": 425409670
+      },
+      "processMaxRSS": 537837568,
+      "bytesSent": 0,
+      "wire": [],
+      "scratchBytes": 0,
+      "slowSource": false,
+      "slowSink": false,
+      "integrity": "passed",
+      "durationMs": 3065,
+      "runtime": "v26.6.0"
+    },
+    {
+      "mode": "transfer",
+      "flow": "owner",
+      "format": "m4a-late",
+      "mib": 199,
+      "bytes": 208666624,
+      "repeat": 2,
+      "elapsedMs": 214.85812500000003,
+      "before": {
+        "rss": 70942720,
+        "heapTotal": 12468224,
+        "heapUsed": 7704880,
+        "external": 4289814,
+        "arrayBuffers": 212117
+      },
+      "sampledPeak": {
+        "rss": 329793536,
+        "heapUsed": 9812336,
+        "external": 238007769,
+        "arrayBuffers": 233979014
+      },
+      "processMaxRSS": 329891840,
+      "bytesSent": 0,
+      "wire": [],
+      "scratchBytes": 0,
+      "slowSource": false,
+      "slowSink": false,
+      "integrity": "passed",
+      "durationMs": 3065,
+      "runtime": "v26.6.0"
+    },
+    {
+      "mode": "spool",
+      "flow": "owner",
+      "format": "m4a-late",
+      "mib": 199,
+      "bytes": 208666624,
+      "repeat": 2,
+      "elapsedMs": 213.20870799999997,
+      "before": {
+        "rss": 71122944,
+        "heapTotal": 12730368,
+        "heapUsed": 7707448,
+        "external": 4355350,
+        "arrayBuffers": 326427
+      },
+      "sampledPeak": {
+        "rss": 133971968,
+        "heapUsed": 11472528,
+        "external": 35304921,
+        "arrayBuffers": 31276166
+      },
+      "processMaxRSS": 134332416,
+      "bytesSent": 0,
+      "wire": [],
+      "scratchBytes": 208666624,
+      "slowSource": false,
+      "slowSink": false,
+      "integrity": "passed",
+      "durationMs": 3065,
+      "runtime": "v26.6.0"
+    },
+    {
+      "mode": "baseline",
+      "flow": "meeting",
+      "format": "m4a-late",
+      "mib": 199,
+      "bytes": 208666624,
+      "repeat": 2,
+      "elapsedMs": 259.60083299999997,
+      "before": {
+        "rss": 70860800,
+        "heapTotal": 12468224,
+        "heapUsed": 7707040,
+        "external": 4355350,
+        "arrayBuffers": 212117
+      },
+      "sampledPeak": {
+        "rss": 755007488,
+        "heapUsed": 10277384,
+        "external": 453158248,
+        "arrayBuffers": 553532550
+      },
+      "processMaxRSS": 757071872,
+      "bytesSent": 0,
+      "wire": [],
+      "scratchBytes": 0,
+      "slowSource": false,
+      "slowSink": false,
+      "integrity": "passed",
+      "durationMs": 3065,
+      "runtime": "v26.6.0"
+    },
+    {
+      "mode": "prealloc",
+      "flow": "meeting",
+      "format": "m4a-late",
+      "mib": 199,
+      "bytes": 208666624,
+      "repeat": 2,
+      "elapsedMs": 228.653375,
+      "before": {
+        "rss": 70877184,
+        "heapTotal": 12206080,
+        "heapUsed": 7704576,
+        "external": 4289814,
+        "arrayBuffers": 212117
+      },
+      "sampledPeak": {
+        "rss": 536903680,
+        "heapUsed": 9625192,
+        "external": 237745625,
+        "arrayBuffers": 436747398
+      },
+      "processMaxRSS": 537690112,
+      "bytesSent": 0,
+      "wire": [],
+      "scratchBytes": 0,
+      "slowSource": false,
+      "slowSink": false,
+      "integrity": "passed",
+      "durationMs": 3065,
+      "runtime": "v26.6.0"
+    },
+    {
+      "mode": "transfer",
+      "flow": "meeting",
+      "format": "m4a-late",
+      "mib": 199,
+      "bytes": 208666624,
+      "repeat": 2,
+      "elapsedMs": 215.312,
+      "before": {
+        "rss": 70795264,
+        "heapTotal": 11681792,
+        "heapUsed": 7705712,
+        "external": 4289814,
+        "arrayBuffers": 212117
+      },
+      "sampledPeak": {
+        "rss": 328433664,
+        "heapUsed": 9739048,
+        "external": 238663129,
+        "arrayBuffers": 234634374
+      },
+      "processMaxRSS": 329318400,
+      "bytesSent": 0,
+      "wire": [],
+      "scratchBytes": 0,
+      "slowSource": false,
+      "slowSink": false,
+      "integrity": "passed",
+      "durationMs": 3065,
+      "runtime": "v26.6.0"
+    },
+    {
+      "mode": "spool",
+      "flow": "meeting",
+      "format": "m4a-late",
+      "mib": 199,
+      "bytes": 208666624,
+      "repeat": 2,
+      "elapsedMs": 220.11629200000002,
+      "before": {
+        "rss": 70942720,
+        "heapTotal": 12730368,
+        "heapUsed": 7706880,
+        "external": 4355350,
+        "arrayBuffers": 212117
+      },
+      "sampledPeak": {
+        "rss": 132546560,
+        "heapUsed": 11306720,
+        "external": 38128146,
+        "arrayBuffers": 33569926
+      },
+      "processMaxRSS": 133382144,
+      "bytesSent": 0,
+      "wire": [],
+      "scratchBytes": 208666624,
+      "slowSource": false,
+      "slowSink": false,
+      "integrity": "passed",
+      "durationMs": 3065,
+      "runtime": "v26.6.0"
+    },
+    {
+      "mode": "baseline",
+      "flow": "zoom",
+      "format": "m4a-late",
+      "mib": 199,
+      "bytes": 208666624,
+      "repeat": 2,
+      "elapsedMs": 527.4071250000001,
+      "before": {
+        "rss": 70991872,
+        "heapTotal": 12730368,
+        "heapUsed": 7706856,
+        "external": 4355350,
+        "arrayBuffers": 212117
+      },
+      "sampledPeak": {
+        "rss": 955875328,
+        "heapUsed": 10266144,
+        "external": 651668840,
+        "arrayBuffers": 833305734
+      },
+      "processMaxRSS": 957693952,
+      "bytesSent": 0,
+      "wire": [],
+      "scratchBytes": 0,
+      "slowSource": false,
+      "slowSink": false,
+      "integrity": "passed",
+      "durationMs": 3065,
+      "runtime": "v26.6.0"
+    },
+    {
+      "mode": "drop",
+      "flow": "zoom",
+      "format": "m4a-late",
+      "mib": 199,
+      "bytes": 208666624,
+      "repeat": 2,
+      "elapsedMs": 495.37325,
+      "before": {
+        "rss": 71008256,
+        "heapTotal": 12468224,
+        "heapUsed": 7708304,
+        "external": 4289814,
+        "arrayBuffers": 260891
+      },
+      "sampledPeak": {
+        "rss": 746504192,
+        "heapUsed": 10247088,
+        "external": 434417000,
+        "arrayBuffers": 544357510
+      },
+      "processMaxRSS": 747503616,
+      "bytesSent": 0,
+      "wire": [],
+      "scratchBytes": 0,
+      "slowSource": false,
+      "slowSink": false,
+      "integrity": "passed",
+      "durationMs": 3065,
+      "runtime": "v26.6.0"
+    },
+    {
+      "mode": "prealloc",
+      "flow": "zoom",
+      "format": "m4a-late",
+      "mib": 199,
+      "bytes": 208666624,
+      "repeat": 2,
+      "elapsedMs": 455.274458,
+      "before": {
+        "rss": 70811648,
+        "heapTotal": 12206080,
+        "heapUsed": 7706128,
+        "external": 4289814,
+        "arrayBuffers": 212117
+      },
+      "sampledPeak": {
+        "rss": 571015168,
+        "heapUsed": 11551832,
+        "external": 460570073,
+        "arrayBuffers": 463879302
+      },
+      "processMaxRSS": 571817984,
+      "bytesSent": 0,
+      "wire": [],
+      "scratchBytes": 0,
+      "slowSource": false,
+      "slowSink": false,
+      "integrity": "passed",
+      "durationMs": 3065,
+      "runtime": "v26.6.0"
+    },
+    {
+      "mode": "transfer",
+      "flow": "zoom",
+      "format": "m4a-late",
+      "mib": 199,
+      "bytes": 208666624,
+      "repeat": 2,
+      "elapsedMs": 447.817041,
+      "before": {
+        "rss": 71139328,
+        "heapTotal": 11943936,
+        "heapUsed": 7704704,
+        "external": 4289814,
+        "arrayBuffers": 212117
+      },
+      "sampledPeak": {
+        "rss": 570523648,
+        "heapUsed": 10239632,
+        "external": 435797465,
+        "arrayBuffers": 431766662
+      },
+      "processMaxRSS": 572030976,
+      "bytesSent": 0,
+      "wire": [],
+      "scratchBytes": 0,
+      "slowSource": false,
+      "slowSink": false,
+      "integrity": "passed",
+      "durationMs": 3065,
+      "runtime": "v26.6.0"
+    },
+    {
+      "mode": "spool",
+      "flow": "zoom",
+      "format": "m4a-late",
+      "mib": 199,
+      "bytes": 208666624,
+      "repeat": 2,
+      "elapsedMs": 454.61175000000003,
+      "before": {
+        "rss": 71041024,
+        "heapTotal": 12730368,
+        "heapUsed": 7707544,
+        "external": 4355350,
+        "arrayBuffers": 212117
+      },
+      "sampledPeak": {
+        "rss": 516931584,
+        "heapUsed": 10528752,
+        "external": 421636379,
+        "arrayBuffers": 384777350
+      },
+      "processMaxRSS": 516997120,
+      "bytesSent": 0,
+      "wire": [],
+      "scratchBytes": 208666624,
+      "slowSource": false,
+      "slowSink": false,
+      "integrity": "passed",
+      "durationMs": 3065,
+      "runtime": "v26.6.0"
+    },
+    {
+      "mode": "baseline",
+      "flow": "submit",
+      "format": "m4a-late",
+      "mib": 199,
+      "bytes": 208666624,
+      "repeat": 2,
+      "elapsedMs": 447.24345800000003,
+      "before": {
+        "rss": 71221248,
+        "heapTotal": 12468224,
+        "heapUsed": 7707016,
+        "external": 4355350,
+        "arrayBuffers": 212117
+      },
+      "sampledPeak": {
+        "rss": 1159495680,
+        "heapUsed": 9721336,
+        "external": 838958175,
+        "arrayBuffers": 834933629
+      },
+      "processMaxRSS": 1159495680,
+      "bytesSent": 208666624,
+      "wire": [
+        {
+          "contentLength": "208666624",
+          "transferEncoding": null
+        }
+      ],
+      "scratchBytes": 0,
+      "slowSource": false,
+      "slowSink": false,
+      "integrity": "passed",
+      "durationMs": 3065,
+      "runtime": "v26.6.0"
+    },
+    {
+      "mode": "prealloc",
+      "flow": "submit",
+      "format": "m4a-late",
+      "mib": 199,
+      "bytes": 208666624,
+      "repeat": 2,
+      "elapsedMs": 391.19554099999993,
+      "before": {
+        "rss": 70893568,
+        "heapTotal": 12468224,
+        "heapUsed": 7705176,
+        "external": 4289814,
+        "arrayBuffers": 212117
+      },
+      "sampledPeak": {
+        "rss": 953647104,
+        "heapUsed": 9941192,
+        "external": 838958175,
+        "arrayBuffers": 834933629
+      },
+      "processMaxRSS": 953647104,
+      "bytesSent": 208666624,
+      "wire": [
+        {
+          "contentLength": "208666624",
+          "transferEncoding": null
+        }
+      ],
+      "scratchBytes": 0,
+      "slowSource": false,
+      "slowSink": false,
+      "integrity": "passed",
+      "durationMs": 3065,
+      "runtime": "v26.6.0"
+    },
+    {
+      "mode": "stream",
+      "flow": "submit",
+      "format": "m4a-late",
+      "mib": 199,
+      "bytes": 208666624,
+      "repeat": 2,
+      "elapsedMs": 357.58112500000004,
+      "before": {
+        "rss": 70729728,
+        "heapTotal": 12206080,
+        "heapUsed": 7705848,
+        "external": 4289814,
+        "arrayBuffers": 212117
+      },
+      "sampledPeak": {
+        "rss": 558235648,
+        "heapUsed": 10850648,
+        "external": 254441766,
+        "arrayBuffers": 441465990
+      },
+      "processMaxRSS": 558235648,
+      "bytesSent": 208666624,
+      "wire": [
+        {
+          "contentLength": "208666624",
+          "transferEncoding": null
+        }
+      ],
+      "scratchBytes": 0,
+      "slowSource": false,
+      "slowSink": false,
+      "integrity": "passed",
+      "durationMs": 3065,
+      "runtime": "v26.6.0"
+    },
+    {
+      "mode": "transfer",
+      "flow": "submit",
+      "format": "m4a-late",
+      "mib": 199,
+      "bytes": 208666624,
+      "repeat": 2,
+      "elapsedMs": 340.866916,
+      "before": {
+        "rss": 71450624,
+        "heapTotal": 11943936,
+        "heapUsed": 7705376,
+        "external": 4289814,
+        "arrayBuffers": 212117
+      },
+      "sampledPeak": {
+        "rss": 349732864,
+        "heapUsed": 10535720,
+        "external": 254376230,
+        "arrayBuffers": 250351684
+      },
+      "processMaxRSS": 349732864,
+      "bytesSent": 208666624,
+      "wire": [
+        {
+          "contentLength": "208666624",
+          "transferEncoding": null
+        }
+      ],
+      "scratchBytes": 0,
+      "slowSource": false,
+      "slowSink": false,
+      "integrity": "passed",
+      "durationMs": 3065,
+      "runtime": "v26.6.0"
+    },
+    {
+      "mode": "spool",
+      "flow": "submit",
+      "format": "m4a-late",
+      "mib": 199,
+      "bytes": 208666624,
+      "repeat": 2,
+      "elapsedMs": 339.99145799999997,
+      "before": {
+        "rss": 70811648,
+        "heapTotal": 12730368,
+        "heapUsed": 7707128,
+        "external": 4355350,
+        "arrayBuffers": 212117
+      },
+      "sampledPeak": {
+        "rss": 169590784,
+        "heapUsed": 11499632,
+        "external": 68324836,
+        "arrayBuffers": 64294980
+      },
+      "processMaxRSS": 169590784,
+      "bytesSent": 208666624,
+      "wire": [
+        {
+          "contentLength": "208666624",
+          "transferEncoding": null
+        }
+      ],
+      "scratchBytes": 208666624,
+      "slowSource": false,
+      "slowSink": false,
+      "integrity": "passed",
+      "durationMs": 3065,
+      "runtime": "v26.6.0"
+    },
+    {
+      "mode": "baseline",
+      "flow": "submit",
+      "format": "mp3",
+      "mib": 8,
+      "bytes": 8388372,
+      "repeat": 1,
+      "elapsedMs": 380.235458,
+      "before": {
+        "rss": 71270400,
+        "heapTotal": 12730368,
+        "heapUsed": 7707232,
+        "external": 4355350,
+        "arrayBuffers": 212117
+      },
+      "sampledPeak": {
+        "rss": 140263424,
+        "heapUsed": 9035344,
+        "external": 37849652,
+        "arrayBuffers": 33820075
+      },
+      "processMaxRSS": 140263424,
+      "bytesSent": 8388372,
+      "wire": [
+        {
+          "contentLength": "8388372",
+          "transferEncoding": null
+        }
+      ],
+      "scratchBytes": 0,
+      "slowSource": true,
+      "slowSink": true,
+      "integrity": "passed",
+      "durationMs": 525479,
+      "runtime": "v26.6.0"
+    },
+    {
+      "mode": "transfer",
+      "flow": "submit",
+      "format": "mp3",
+      "mib": 8,
+      "bytes": 8388372,
+      "repeat": 1,
+      "elapsedMs": 375.402125,
+      "before": {
+        "rss": 71008256,
+        "heapTotal": 12206080,
+        "heapUsed": 7705088,
+        "external": 4289814,
+        "arrayBuffers": 212117
+      },
+      "sampledPeak": {
+        "rss": 109379584,
+        "heapUsed": 9311088,
+        "external": 22055948,
+        "arrayBuffers": 17119918
+      },
+      "processMaxRSS": 109445120,
+      "bytesSent": 8388372,
+      "wire": [
+        {
+          "contentLength": "8388372",
+          "transferEncoding": null
+        }
+      ],
+      "scratchBytes": 0,
+      "slowSource": true,
+      "slowSink": true,
+      "integrity": "passed",
+      "durationMs": 525479,
+      "runtime": "v26.6.0"
+    },
+    {
+      "mode": "spool",
+      "flow": "submit",
+      "format": "mp3",
+      "mib": 8,
+      "bytes": 8388372,
+      "repeat": 1,
+      "elapsedMs": 379.692416,
+      "before": {
+        "rss": 70909952,
+        "heapTotal": 12468224,
+        "heapUsed": 7708808,
+        "external": 4355350,
+        "arrayBuffers": 212117
+      },
+      "sampledPeak": {
+        "rss": 101941248,
+        "heapUsed": 9488184,
+        "external": 13929956,
+        "arrayBuffers": 9900100
+      },
+      "processMaxRSS": 101941248,
+      "bytesSent": 8388372,
+      "wire": [
+        {
+          "contentLength": "8388372",
+          "transferEncoding": null
+        }
+      ],
+      "scratchBytes": 8388372,
+      "slowSource": true,
+      "slowSink": true,
+      "integrity": "passed",
+      "durationMs": 525479,
+      "runtime": "v26.6.0"
+    }
+  ],
+  "controls": [
+    {
+      "mode": "baseline",
+      "flow": "submit",
+      "control": "last_byte_mutation",
+      "rejected": true,
+      "error": "audio_integrity_mismatch",
+      "bytesReceived": 0,
+      "uploadRequests": 0
+    },
+    {
+      "mode": "prealloc",
+      "flow": "submit",
+      "control": "last_byte_mutation",
+      "rejected": true,
+      "error": "audio_integrity_mismatch",
+      "bytesReceived": 0,
+      "uploadRequests": 0
+    },
+    {
+      "mode": "stream",
+      "flow": "submit",
+      "control": "last_byte_mutation",
+      "rejected": true,
+      "error": "audio_integrity_mismatch",
+      "bytesReceived": 0,
+      "uploadRequests": 0
+    },
+    {
+      "mode": "transfer",
+      "flow": "submit",
+      "control": "last_byte_mutation",
+      "rejected": true,
+      "error": "audio_integrity_mismatch",
+      "bytesReceived": 0,
+      "uploadRequests": 0
+    },
+    {
+      "mode": "spool",
+      "flow": "submit",
+      "control": "last_byte_mutation",
+      "rejected": true,
+      "error": "ERR_ASSERTION",
+      "bytesReceived": 0,
+      "uploadRequests": 0
+    }
+  ],
+  "benchmarkSourceSha256": {
+    "scripts/benchmarks/zoom-audio-memory.mjs": "032ee111b21256debe6e5e2b80172a2174b4894ab79b7653e296cfc6a04f78ac",
+    "scripts/benchmarks/zoom-audio-inspector-worker.cjs": "3147d5168c750f04c8089564e2570086cae84f9c0f0d9763adc859aa567d586b"
+  },
+  "productionSourceSha256": {
+    "lib/services/transcription-pilot/runtime.js": "1a80ded234b44af02006a630e1e72002b58b046bd8f0a20381cf81ac28211fd5",
+    "lib/services/transcription-pilot/media-inspector.js": "902c1ddc6c770239a8a06d45d432c01773cfaad084a896d1f10d338594a1722f",
+    "lib/services/transcription-pilot/audio-inspector-worker.js": "50dce38fec90ccb95618ac2d5608a59bcd5b3e19e9e9e4c3a8d5fa5f251a1f86",
+    "lib/services/transcription-pilot/provider.js": "cdc1e5e23bf4ec159b16075f14d67a58d6ccbd7c1a58980d1f3a01a6ca7cc78e",
+    "lib/services/meeting-tracker-recordings/import-service.js": "9eb5d5d81a686732eae48f3bec70dd679fd51e1f09b46e35d264955389cc4d55",
+    "lib/services/meeting-tracker-recordings/zoom-client.js": "8a2aaf446c26a75c9aba6eadb188cdae84ff1ec08898e9c4367ee07e322e48c2"
+  },
+  "validation": {
+    "matrixCases": 144,
+    "slowCases": 3,
+    "lastByteControls": 5,
+    "allCasesSucceeded": true,
+    "allWireLengthsAndHashesMatched": true,
+    "mutationControlsNoRequests": true,
+    "preallocationUnderflowOverflowRejected": true
+  }
+}

@@ -421,3 +421,33 @@ test('picker attendance pages share the same total deadline after authentication
   expect(timeout.mock.calls.map(call => call[0])).toEqual([5000, 2000]);
   timeout.mockRestore();
 });
+
+describe('preallocated audio downloads and absolute import budgets', () => {
+  test.each([null, '5', '5x'])('audio supports trusted and fallback headers (%s)', async length => {
+    fetchMock.mockResolvedValueOnce(tokenRes()).mockResolvedValueOnce(streamRes(['he', 'llo'], { extra: { 'content-length': length } }));
+    expect((await downloadRecordingFile('https://ssrweb.zoom.us/audio', { maxBytes: 10, expectedBytes: 5, preallocateAudio: true, deadlineMs: Date.now() + 1000 })).toString()).toBe('hello');
+  });
+  test.each(['text/html', 'audio/mp4'])('metadata rejection cancels a live body before reader acquisition (%s)', async type => {
+    const body = { cancel: jest.fn(), getReader: jest.fn() };
+    fetchMock.mockResolvedValueOnce(tokenRes()).mockResolvedValueOnce({ ok: true, status: 200, body,
+      headers: headers({ 'content-type': type, 'content-length': '6' }) });
+    const error = await rejection(downloadRecordingFile('https://ssrweb.zoom.us/audio', { maxBytes: 10, expectedBytes: 5, preallocateAudio: true }));
+    expect(error.code).toBe('zoom_download_invalid'); expect(body.cancel).toHaveBeenCalled(); expect(body.getReader).not.toHaveBeenCalled();
+    expectNoLeak(error);
+  });
+  test('redirects retain the absolute deadline, and stalled VTT body is aborted/canceled before the start reserve', async () => {
+    const cancel = jest.fn(); const releaseLock = jest.fn();
+    fetchMock.mockResolvedValueOnce(tokenRes()).mockResolvedValueOnce(redirect('https://ssrweb.zoom.us/final'))
+      .mockResolvedValueOnce({ ok: true, headers: headers(), body: { getReader: () => ({ read: () => new Promise(() => {}), cancel, releaseLock }) } });
+    const error = await rejection(downloadRecordingFile('https://ssrweb.zoom.us/vtt', { maxBytes: 10, expectedBytes: 5, deadlineMs: Date.now() + 40 }));
+    expect(error.code).toBe('zoom_unavailable');
+    expect(fetchMock.mock.calls[2][1].signal.aborted).toBe(true);
+    expect(cancel).toHaveBeenCalled(); expect(releaseLock).toHaveBeenCalled();
+  });
+  test('expired import listing and detail budgets cannot issue a request even with a cached token', async () => {
+    fetchMock.mockResolvedValueOnce(tokenRes()); await getAccessToken(); fetchMock.mockClear();
+    await expect(getMeetingRecordings('abc', { deadlineMs: Date.now() - 1 })).rejects.toMatchObject({ code: 'zoom_unavailable' });
+    await expect(listHostRecordings('host@example.org', { from: new Date(), to: new Date(), deadlineMs: Date.now() - 1 })).rejects.toMatchObject({ code: 'zoom_unavailable' });
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+});

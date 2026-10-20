@@ -130,18 +130,25 @@ sequence.
   with a placeholder meeting date and other ops-maintained dates; see the plan §2a.
   Owner priority 2026-10-07: a to-do, not the highest priority.
 
-- **Stream transcription audio instead of buffering it (2026-10-04).** [OPEN —
-  owner decision, not yet built] The transcription worker reads the whole
-  recording from private Blob into Function memory, copies it into a worker
-  thread for container inspection, then uploads the bytes to AssemblyAI. The
-  byte cap was raised from 50 MiB to 200 MiB the same day (`limits.js`,
-  migration 066) because a 62-minute Zoom M4A measured 40.8 MB, so 50 MiB
-  covered about 76 minutes. 200 MiB keeps roughly three capped copies inside
-  a default Function, but the ceiling is still memory-bound. Follow-up: pipe
-  the Blob download straight into the provider upload, inspect the container
-  from a bounded prefix read, and re-measure peak RSS, after which the byte
-  cap can track the four-hour duration cap instead of memory. Verify the
-  200 MiB cap first with a real two-to-three-hour recording in production.
+- **Reduce transcription audio copies and stream verified uploads (2026-10-19).**
+  [BUILT ON `codex/zoom-audio-streaming` — PR #513; Preview tested, not merged] The reviewed
+  [plan](plans/ZOOM_AUDIO_STREAMING_PLAN_2026-10-19.md) is implemented: metadata-gated
+  preallocation with bounded fallback, full-file integrity checks, bounded upload
+  streams, caller deadlines and pre-upload lease/switch checks. Zoom import opts
+  audio into preallocation and releases its Buffer after provenance capture,
+  before queue validation; the Blob reread and copying inspector remain.
+  [Implementation evidence](plans/evidence/ZOOM_AUDIO_IMPLEMENTATION_2026-10-19.md)
+  records local tests and memory results, including outliers and concurrent starts.
+  [Real private Blob Preview validation](plans/evidence/ZOOM_AUDIO_PREVIEW_VALIDATION_2026-10-19.md)
+  passed small, 199 MiB, two concurrent near-cap operations and corrupt-byte
+  rejection with verified cleanup. The concurrent process peak was 1,898 MiB;
+  this does not establish a safe sustained concurrency bound. Keep the 200 MiB/
+  four-hour limits. [Real Zoom/AssemblyAI Preview acceptance](plans/evidence/ZOOM_AUDIO_REAL_PREVIEW_2026-10-19.md)
+  also passed on the approved 85-minute recording: full import, one provider job,
+  saved transcript and TXT download; disposable resources were removed. The
+  receipt records one automatic cleanup warning email to the owner. Remaining:
+  final-head CI and deliberate promotion. Hosted slow-source/abort, callback
+  delivery and sustained concurrency remain unverified.
 
 - **Site Visit page redesign and follow-ups — implemented.**
   [VERIFIED via source and Git ancestry, 2026-10-19] The redesign merged as

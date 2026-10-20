@@ -8,6 +8,7 @@ import { startMeetingTranscription } from '../../../../../../../lib/services/mee
 
 export const config = { api: { bodyParser: { sizeLimit: '4kb' } }, maxDuration: 60 };
 export default async function handler(req, res) {
+  const deadlineMs = Date.now() + 50_000;
   if (req.method !== 'POST') { res.setHeader('Allow','POST'); return res.status(405).json({ error: 'Method not allowed' }); }
   const requestId = Array.isArray(req.query.requestId) ? '' : String(req.query.requestId || '').trim();
   const jobId = Array.isArray(req.query.jobId) ? '' : String(req.query.jobId || '').trim();
@@ -21,7 +22,7 @@ export default async function handler(req, res) {
   res.setHeader('Cache-Control','private, no-store');
   return withDalContext('meeting-tracker-transcription-start', async () => {
     try { return res.status(200).json(await startMeetingTranscription({ requestId, ownerProfileId: access.profileId,
-      actingUserSystemId: actorRefFromSession(access.session), jobId, body })); }
+      actingUserSystemId: actorRefFromSession(access.session), jobId, body, deadlineMs })); }
     catch (error) {
       const status = error instanceof ServiceHttpError ? error.httpStatus : error instanceof TranscriptionPilotError ? error.status : Number(error?.httpStatus) || 500;
       const code = error?.code || 'meeting_transcription_failed';

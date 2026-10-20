@@ -20,12 +20,15 @@ describe('AssemblyAI transcription provider boundary', () => {
   });
 
   it('uploads bounded raw audio and accepts only the documented CDN reference', async () => {
-    safeFetch.mockResolvedValueOnce(jsonResponse({ upload_url: 'https://cdn.assemblyai.com/upload/opaque-ref' }));
+    safeFetch.mockImplementationOnce(async (_url, { body }) => {
+      for await (const chunk of body) expect(chunk.length).toBeLessThanOrEqual(64 * 1024);
+      return jsonResponse({ upload_url: 'https://cdn.assemblyai.com/upload/opaque-ref' });
+    });
     const ref = await uploadAssemblyAIAudio({ region: 'us', audio: Buffer.from('audio'), contentType: 'audio/mpeg' });
     expect(ref).toBe('https://cdn.assemblyai.com/upload/opaque-ref');
     expect(safeFetch).toHaveBeenCalledWith('https://api.assemblyai.com/v2/upload', expect.objectContaining({
       method: 'POST', headers: expect.objectContaining({ authorization: 'test-server-only-key' }),
-      body: Buffer.from('audio'), failOnRedirect: true,
+      body: expect.anything(), duplex: 'half', failOnRedirect: true,
     }));
   });
 

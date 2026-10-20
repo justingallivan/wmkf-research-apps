@@ -66,7 +66,7 @@ describe('POST zoom-imports', () => {
     const res = response();
     await importRoute({ method: 'POST', query: { requestId }, body: body() }, res);
     expect(actorRefFromSession).toHaveBeenCalled();
-    expect(importZoomRecording).toHaveBeenCalledWith({ requestId, ownerProfileId: 9, actingUserSystemId: ACTOR, meetingUuid: 'abc==', acknowledged: true });
+    expect(importZoomRecording).toHaveBeenCalledWith({ requestId, ownerProfileId: 9, actingUserSystemId: ACTOR, meetingUuid: 'abc==', acknowledged: true, deadlineMs: expect.any(Number) });
     expect(res.setHeader).toHaveBeenCalledWith('Cache-Control', 'private, no-store');
     expect(res.statusCode).toBe(200);
     expect(res.body.import.state).toBe('started');
