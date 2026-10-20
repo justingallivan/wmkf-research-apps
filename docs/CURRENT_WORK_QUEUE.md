@@ -131,7 +131,7 @@ sequence.
   Owner priority 2026-10-07: a to-do, not the highest priority.
 
 - **Reduce transcription audio copies and stream verified uploads (2026-10-19).**
-  [BUILT ON `codex/zoom-audio-streaming` — PR #513; Preview tested, not merged] The reviewed
+  [PRODUCTION-LIVE — PR #513, merge `413c5f048`, Ready deployment `dpl_Dh9KeHbpPbqoYEzvjuiKgymJR6hG`; all 12 CI checks passed] The reviewed
   [plan](plans/ZOOM_AUDIO_STREAMING_PLAN_2026-10-19.md) is implemented: metadata-gated
   preallocation with bounded fallback, full-file integrity checks, bounded upload
   streams, caller deadlines and pre-upload lease/switch checks. Zoom import opts
@@ -146,8 +146,9 @@ sequence.
   four-hour limits. [Real Zoom/AssemblyAI Preview acceptance](plans/evidence/ZOOM_AUDIO_REAL_PREVIEW_2026-10-19.md)
   also passed on the approved 85-minute recording: full import, one provider job,
   saved transcript and TXT download; disposable resources were removed. The
-  receipt records one automatic cleanup warning email to the owner. Remaining:
-  final-head CI and deliberate promotion. Hosted slow-source/abort, callback
+  receipt records one automatic cleanup warning email to the owner. The release uses
+  Performance allocation (4 GB / 2 vCPUs), verified in deployment configuration;
+  the earlier memory measurements used 2 GB, and no 4 GB stress rerun is claimed. Hosted slow-source/abort, callback
   delivery and sustained concurrency remain unverified.
 
 - **Site Visit page redesign and follow-ups — implemented.**

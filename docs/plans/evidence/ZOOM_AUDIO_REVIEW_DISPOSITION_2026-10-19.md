@@ -3,7 +3,7 @@ title: Zoom audio adversarial review disposition
 domain: meeting-tracker
 kind: decision
 status: active
-summary: "Opus approved the audio design. Branch code passes local, synthetic Blob and real Zoom/AssemblyAI Preview tests; Production promotion remains pending."
+summary: "Opus approved the audio design. Branch code passes local, synthetic Blob and real Zoom/AssemblyAI Preview tests; Production release and 4 GB allocation are verified in the implementation receipt."
 owner: product-engineering
 ---
 
@@ -20,12 +20,12 @@ The planning/review task changed no application code or external state. The
 subsequent owner-authorized [branch implementation](ZOOM_AUDIO_IMPLEMENTATION_2026-10-19.md)
 is locally tested and [Preview-verified](ZOOM_AUDIO_PREVIEW_VALIDATION_2026-10-19.md),
 including [one owner-approved real Zoom/AssemblyAI run](ZOOM_AUDIO_REAL_PREVIEW_2026-10-19.md),
-and remains unmerged without a Production deployment. The real-run receipt
+and subsequently shipped in PR #513 (`413c5f048`), Ready Production `dpl_Dh9KeHbpPbqoYEzvjuiKgymJR6hG`, with 4 GB / 2 vCPUs. The real-run receipt
 records isolated setup, output verification, cleanup and its automatic warning email.
 
 ## Selected design and premise
 
-[VERIFIED via linked branch implementation; not deployed] Preallocate one exact-size audio Buffer when trusted response metadata
+[VERIFIED via linked implementation and Production release] Preallocate one exact-size audio Buffer when trusted response metadata
 permits it, retaining bounded accumulation otherwise. Verify full length and
 SHA-256 before provider upload, keep the copying container inspector, and upload
 bounded Buffer views through an owned stream with explicit Content-Length.

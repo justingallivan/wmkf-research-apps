@@ -35,7 +35,7 @@ Migration `077_zoom_transcript_provenance.sql` is reserved for this extension;
 application remains pending and no Production change is claimed. See the
 [provenance plan](../plans/ZOOM_TRANSCRIPT_PROVENANCE_PLAN_2026-10-09.md).
 
-## Audio memory follow-up — branch source
+## Audio memory follow-up — Production released
 
 [VERIFIED via `import-service.js`, `zoom-client.js` and local tests, 2026-10-19]
 `codex/zoom-audio-streaming` opts only audio downloads into metadata-gated
@@ -44,7 +44,9 @@ private Blob, captures scalar provenance, then clears the audio reference before
 start rereads/validates Blob. Listing/detail/download/write/start share the
 server-authored import deadline; the VTT download and each Blob write preserve
 the start reserve. Existing retirement, lease recovery and queued partial-success
-behavior are unchanged. This follow-up is Preview-tested and not merged or deployed to Production. Bounded real-Blob proof:
+behavior are unchanged. PR #513 merged as `413c5f048`; Ready Production
+`dpl_Dh9KeHbpPbqoYEzvjuiKgymJR6hG` uses Performance (4 GB / 2 vCPUs).
+All 12 PR checks passed; no fresh Production import or 4 GB stress test is claimed. Bounded real-Blob proof:
 [Preview receipt](../plans/evidence/ZOOM_AUDIO_PREVIEW_VALIDATION_2026-10-19.md).
 No table, column, retention or import-state change is introduced. Local memory is still
 variable; see the [implementation evidence](../plans/evidence/ZOOM_AUDIO_IMPLEMENTATION_2026-10-19.md).

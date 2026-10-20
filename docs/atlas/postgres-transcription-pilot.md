@@ -24,7 +24,7 @@ related:
 
 ## Current status
 
-**[BRANCH SOURCE, 2026-10-19; PREVIEW TESTED, NOT MERGED/PRODUCTION.]**
+**[PRODUCTION-LIVE, 2026-10-19 PT; PR #513 `413c5f048`, all 12 checks passed.]**
 `codex/zoom-audio-streaming` adds metadata-gated exact-size audio reads with bounded
 fallback and streams only fully verified Buffer views to AssemblyAI. It retains
 full-file SHA-256, the copying inspector, 200 MiB/four-hour limits, private Blob
@@ -33,8 +33,11 @@ server-only absolute deadlines before auth; the worker refreshes its lease and
 submission switches after inspection, before upload. No schema change or new
 status is introduced. See the
 [implementation evidence](../plans/evidence/ZOOM_AUDIO_IMPLEMENTATION_2026-10-19.md)
-for local tests, memory outliers and remaining hosted/provider gates. Earlier
-hosted checkpoints below are unchanged by this branch implementation.
+for local tests, memory outliers, real Preview acceptance and release evidence.
+Ready deployment `dpl_Dh9KeHbpPbqoYEzvjuiKgymJR6hG` uses Performance
+(4 GB / 2 vCPUs). Earlier memory measurements used 2 GB; no fresh Production
+transcription or 4 GB stress rerun is claimed. Earlier hosted checkpoints retain
+their original test conditions.
 
 **[BUILT ON BRANCH `feature/zoom-vtt-speaker-mapping`, 2026-10-04; NOT APPLIED TO ANY DATABASE; NOT DEPLOYED.]**
 Migration `065_transcription_zoom_transcript.sql` adds four nullable columns to

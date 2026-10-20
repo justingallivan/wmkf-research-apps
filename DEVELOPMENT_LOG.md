@@ -10,6 +10,20 @@ The chronological archive after the `Legacy chronological session log` divider c
 
 ---
 
+## October 2026 — Verified audio upload optimization released (Session 620)
+
+**Milestone:** Zoom imports and transcription uploads reduce whole-file memory copies while preserving full-file validation.
+**Sessions:** 620 (Codex; benchmarked alternatives, Opus design review, owner-approved real Preview acceptance and release).
+**Ship state:**
+- PR #513 `413c5f048` merged after all 12 checks passed; Ready Production `dpl_Dh9KeHbpPbqoYEzvjuiKgymJR6hG` serves the production alias.
+- Metadata-gated preallocation, bounded verified-buffer streaming, Zoom reference release and deadline/lease fences retain the 200 MiB/four-hour limits.
+- Approved 85-minute real Zoom/AssemblyAI Preview import, saved transcript and TXT download passed; disposable DB/store/deployments removed. Cleanup queued one disclosed warning email to the owner.
+- Production allocation is Performance: 4 GB / 2 vCPUs. Prior 2 GB concurrent synthetic peak was 1,898 MiB; no 4 GB stress rerun or Production OOM recovery proof is claimed.
+**Why it matters:** fewer large buffer copies and greater instance headroom support long recordings without weakening integrity checks.
+**Pointers:** `docs/plans/evidence/ZOOM_AUDIO_IMPLEMENTATION_2026-10-19.md`; real Preview receipt beside it; PR #513.
+
+---
+
 ## October 2026 — Board workflow and central staffing released (Session 618)
 
 **Milestone:** Board cycle setup and the CSO dashboard are separate, with shared staffing managed centrally.

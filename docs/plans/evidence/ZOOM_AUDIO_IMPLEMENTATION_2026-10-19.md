@@ -3,7 +3,7 @@ title: Zoom audio preallocation implementation evidence
 domain: meeting-tracker
 kind: audit
 status: active
-summary: "Branch code passes local tests and bounded real-Blob Preview checks. Real Zoom/AssemblyAI Preview acceptance also passed; memory outliers and release limits remain explicit. Production promotion is pending."
+summary: "Branch code passes local tests and bounded real-Blob Preview checks. Real Zoom/AssemblyAI Preview acceptance also passed; memory outliers and release limits remain explicit. Production release and 4 GB allocation are verified below."
 owner: product-engineering
 ---
 
@@ -15,7 +15,7 @@ owner: product-engineering
 This receipt records branch source and local checks. Subsequent
 [bounded Preview acceptance](ZOOM_AUDIO_PREVIEW_VALIDATION_2026-10-19.md) passed;
 the later [owner-approved real Zoom/AssemblyAI acceptance](ZOOM_AUDIO_REAL_PREVIEW_2026-10-19.md)
-also passed. No Production deployment is claimed. The local implementation
+also passed. Production release is recorded below. The local implementation
 phase itself made no migration, environment update, live Zoom call, real recording
 or AssemblyAI request; the linked hosted receipts describe subsequent external work. The existing 200 MiB/four-hour caps, private-store selection, parser worker,
 job schema and uncertain-submission policy remain unchanged.
@@ -138,15 +138,20 @@ review disposition, benchmark current-status prose, transcription and Zoom Atlas
 pages and the Zoom import plan distinguish branch source from deployed history.
 The fingerprinted specification and original reviews remain immutable dated
 records. Other feature/provenance/attendance history is outside this audio change.
-No current audio statement is intended to claim deployed optimization.
+The runtime optimization is now deployed; the fingerprinted design and original test measurements retain their dated conditions.
 
 The linked Preview receipt now verifies the real Blob SDK/store, configured
 runtime, bundled parser, corrupt-byte rejection and bounded concurrent memory/
 timing. The later real-recording receipt verifies Zoom download/import, one AssemblyAI
 transcription, saved content and TXT download with cleanup and the automatic
-notification side effect recorded. Remaining before promotion: final-head CI and
-owner promotion. Hosted slow-source/disconnect, callback delivery and sustained
+notification side effect recorded. Final-head CI and owner-authorized promotion are complete. Hosted slow-source/disconnect, callback delivery and sustained
 independent concurrency remain untested. Non-abortable auth/database work, hard termination, transient
 pre-intent failures becoming failed/cleanup, post-intent zero-POST uncertainty and
 orphan remote uploads remain explicit residuals. No production OOM or universal
 memory ceiling is established.
+
+## Production release — 2026-10-19 PT
+
+[VERIFIED via GitHub and Vercel, 2026-10-19 PT] PR #513 merged as `413c5f04854adccf023ec03d8e0836b579e9a5ef` after all 12 checks passed. Production deployment `dpl_Dh9KeHbpPbqoYEzvjuiKgymJR6hG` is Ready and serves the production alias with `functionMemoryType=performance` (4 GB / 2 vCPUs). Initial production HTTP returned the normal 302 redirect; the initial error/fatal log query returned zero records. This is release/configuration proof, not a fresh Production transcription or 4 GB stress test.
+
+The owner reports $6.21 total AssemblyAI spend for all work to date; this supersedes the conversational list-price estimate and is not an independently fetched invoice. Existing audio limits remain unchanged.
