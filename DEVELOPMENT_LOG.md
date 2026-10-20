@@ -10,6 +10,20 @@ The chronological archive after the `Legacy chronological session log` divider c
 
 ---
 
+## October 2026 — Institution at Award column and Research PI backfill (Session 622)
+
+**Milestone:** New `wmkf_apprequestperson.wmkf_InstitutionAtAward` lookup (→ `account`) in production, and 230 Research PI rows filled from each award's applicant institution.
+**Sessions:** 622 (owner-run schema apply and production writes; three Codex adversarial reviews).
+**Ship state:**
+- Schema wave 34 applied to sandbox and production; Connor agreed to fill it from GoApply for new submissions.
+- Awarded Research requests with meeting dates from 2017: 231 written and 39 empty PI contact accounts linked, `--verify` 270/270; test request 1002807 then rolled back (230 stand).
+- Co-PI list for 2017–2023 decided (136, evidence-checked from proposal documents and budgets; owner-reviewed); writes not built yet.
+- Found: the akoyaGO integration creates PI contacts without an account and sometimes duplicates them; special grants (incl. UCLA Keck Court Biomedical Initiative) sit inside Research cohorts.
+**Why it matters:** each award keeps where its PI was at award time even after they move, enabling the 10-year institution analysis.
+**Pointers:** `docs/plans/RESEARCH_INSTITUTION_AT_AWARD_BACKFILL_PLAN_2026-10-20.md`; `scripts/backfill-research-pi-institution-at-award.mjs`; `scripts/verify-research-copi-roles.mjs`; `lib/dataverse/schema/wave34-copi-institution-at-award/`; commits `cefd15420`..`1432a5946`.
+
+---
+
 ## October 2026 — Research PI/co-PI ORCID backfill (concurrent Claude session, Session 621 window)
 
 **Milestone:** 176 owner-approved ORCIDs written to production `contact.wmkf_orcid` for awarded Research PIs and co-PIs (meeting dates 2016-10..2026-10).
