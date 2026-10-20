@@ -36,7 +36,7 @@ Worked in worktree `WMKF_Apps-claude-session` on `claude/session-2026-10-19`; me
 
 ### Verified Open (owner-paced)
 
-1. **Co-PI write stage for 2017–2023.** [PLANNED; not built] Match the 308 extracted people to existing contacts (email, then name + institution), create missing contacts and Co-PI junction rows, set current institution, then institution-at-award per Connor. Follow the ORCID-backfill pattern (resolve/apply/verify, owner-run, Codex review). A staff member will handle the manual list: 4 unreadable 2017 grants (989734, 989935, 989982, 990613), one model failure (995777; a re-run usually fixes it), the 5 Dec 2016 scanned grants, and the ~18 2018–2023 grants with no biosketch file.
+1. **Institution at Award backfill** (PI + co-PI, awarded Research, meeting date 2017 on; owner scope 2026-10-20). [PLANNED; not built] Plan: `docs/plans/RESEARCH_INSTITUTION_AT_AWARD_BACKFILL_PLAN_2026-10-20.md`. Stage A covers PIs from the applicant account. Stage B matches the 308 extracted co-PIs to contacts (email, then name + institution), creates missing contacts and junction rows only with owner approval, and fills a contact's current institution only when it is empty. Follow the ORCID-backfill pattern (resolve/apply/verify, owner-run, Codex review). A staff member will handle the manual list: 4 unreadable 2017 grants (989734, 989935, 989982, 990613), one model failure (995777; a re-run usually fixes it), the 5 Dec 2016 scanned grants, and the ~18 2018–2023 grants with no biosketch file.
 2. **Duplicate contacts** for the 4 held-back ORCID rows need cleanup in Dynamics before their ORCIDs can be written.
 
 ### Parked / Verification Limits
