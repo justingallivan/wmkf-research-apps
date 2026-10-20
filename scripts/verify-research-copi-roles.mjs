@@ -28,7 +28,7 @@
 import fs from 'fs';
 import path from 'path';
 import ExcelJS from 'exceljs';
-import { normalizeForQuote, isBudgetFile, decideRole } from './lib/research-copi-roles.mjs';
+import { normalizeForQuote, isBudgetFile, decideRole, matchPeople } from './lib/research-copi-roles.mjs';
 
 try {
   const env = fs.readFileSync('.env.local', 'utf8');
@@ -100,7 +100,8 @@ const SYSTEM = (nonces) => [
   '  "pi": the documents call this person a PI, principal investigator, project PI or project leader of this proposal or one of its projects, although they are not the lead PI listed above.',
   '  "co-pi" covers co-PI, co-principal investigator and multiple-PI; "co-investigator" covers co-I and co-investigator.',
   '  Use "none" unless a document explicitly states the role for this proposal (e.g. "Role: Co-Investigator", "Dr. X (co-PI)").',
-  '- role_quote: 6 to 25 words copied EXACTLY from the document that states the role, else "". role_source: that document\'s label exactly as given in its header, else "".',
+  '- role_quote: 6 to 25 words copied EXACTLY from the document that states the role and names this person, else "". role_source: that document\'s label exactly as given in its header, else "".',
+  '  A sentence about "the PIs" or "the team" that does not name the person is not evidence of their role.',
   '- in_budget: true only if a budget, budget justification or personnel document lists this person.',
   '- budget_effort: their stated effort, months or percent (e.g. "1 summer month", "10%"), else "".',
   '- budget_quote / budget_source: 6 to 25 words copied EXACTLY from that budget document and its label, else "".',
@@ -172,10 +173,12 @@ for (const g of ruleAGrants) {
       try { parsed = parseJson(res.text || ''); } catch { parsed = null; }
     }
     if (!parsed?.people) throw new Error('model did not return parseable JSON');
-    const byName = new Map(parsed.people.map((p) => [String(p.name || '').trim().toLowerCase(), p]));
+    const matched = matchPeople(people.map((c) => c.name), parsed.people);
     for (const c of people) {
-      const p = byName.get(c.name.trim().toLowerCase()) || {};
-      const { decision, basis } = decideRole(p, c.facultyLevel === 'true', docTexts);
+      const p = matched.get(c.name);
+      const { decision, basis } = p
+        ? decideRole(p, c.facultyLevel === 'true', docTexts, c.name)
+        : { decision: 'unassessed', basis: 'model returned no entry matching this name' };
       out.push({
         ...base(c), decision, basis,
         roleStated: p.role_stated || '', roleQuote: p.role_quote || '', roleSource: p.role_source || '',
@@ -196,6 +199,6 @@ const cols = ['year', 'requestNum', 'name', 'email', 'title', 'institution', 'in
   'roleStated', 'roleQuote', 'roleSource', 'inBudget', 'budgetEffort', 'budgetQuote', 'budgetSource', 'documents'];
 fs.writeFileSync(OUT, `${[cols.join(','), ...out.map((o) => cols.map((c) => esc(o[c])).join(','))].join('\n')}\n`);
 const n = (d) => out.filter((o) => o.decision === d).length;
-console.log(`\nPeople re-checked: ${out.length} on ${done} grants. co-PI ${n('co-PI')}, budget-only ${n('budget-only')}, not co-PI ${n('not co-PI')}, error ${n('error')}.`);
+console.log(`\nPeople re-checked: ${out.length} on ${done} grants. co-PI ${n('co-PI')}, budget-only ${n('budget-only')}, not co-PI ${n('not co-PI')}, unassessed ${n('unassessed')}, error ${n('error')}.`);
 console.log(`Tokens in ${tokensIn}, out ${tokensOut}; estimated cost $${cost().toFixed(3)}.`);
 console.log(`Wrote ${OUT}`);

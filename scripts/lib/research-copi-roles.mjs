@@ -46,23 +46,70 @@ export const isBudgetFile = (name) => /budget|justification|personnel/i.test(nam
   && !POST_AWARD.test(name || '')
   && /\.(pdf|docx?|xlsx?)$/i.test(name || '');
 
+const HONORIFIC = /^(dr|prof|professor|mr|mrs|ms|mx)$/;
+const SUFFIX = /^(phd|md|mph|msc|ms|ma|mba|dphil|dvm|pharmd|jr|sr|ii|iii|iv|facs|frcp)$/;
+
+/** Name tokens without honorifics, degrees and punctuation. */
+export function nameTokens(name) {
+  return String(name || '').normalize('NFKD').replace(/[\u0300-\u036f]/g, '').toLowerCase()
+    .replace(/\./g, '') // "Ph.D." → "phd", "Q." → "q"
+    .replace(/[^a-z\s-]/g, ' ').split(/\s+/).filter(Boolean)
+    .filter((t) => !HONORIFIC.test(t) && !SUFFIX.test(t));
+}
+
+/** Last name: final token after honorifics and degrees are removed. */
+export const lastName = (name) => nameTokens(name).at(-1) || '';
+
+/**
+ * Match the model's entries to the listed people: exact token match first,
+ * then last name + first initial when exactly one entry fits.
+ * @returns {Map<string, object>} listed name → model entry
+ */
+export function matchPeople(listedNames, entries) {
+  const out = new Map();
+  const key = (n) => nameTokens(n).join(' ');
+  const byKey = new Map(entries.map((e) => [key(e.name), e]));
+  for (const name of listedNames) {
+    const exact = byKey.get(key(name));
+    if (exact) { out.set(name, exact); continue; }
+    const t = nameTokens(name);
+    const hits = entries.filter((e) => { const u = nameTokens(e.name); return u.at(-1) === t.at(-1) && u[0]?.[0] === t[0]?.[0]; });
+    if (hits.length === 1) out.set(name, hits[0]);
+  }
+  return out;
+}
+
+/**
+ * True when evidence is about this person: the quote contains their last name,
+ * or the cited file is theirs alone (its name contains their last name).
+ */
+export function quoteNamesPerson(quote, source, personName) {
+  const ln = lastName(personName);
+  if (ln.length < 2) return false;
+  const words = (s) => ` ${String(s || '').normalize('NFKD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z]+/g, ' ')} `;
+  return words(quote).includes(` ${ln} `) || words(source).includes(` ${ln} `);
+}
+
 /**
  * Decide one person's status from the model's report.
  * @param {{role_stated?: string, role_quote?: string, role_source?: string,
  *          in_budget?: boolean, budget_effort?: string, budget_quote?: string, budget_source?: string}} p
  * @param {boolean} facultyLevel from the first extraction
  * @param {Map<string, string>} docTexts
+ * @param {string} personName the listed name; role and budget quotes must name this person
  * @returns {{decision: 'co-PI'|'budget-only'|'not co-PI', basis: string}}
  */
-export function decideRole(p, facultyLevel, docTexts) {
+export function decideRole(p, facultyLevel, docTexts, personName) {
   const role = String(p.role_stated || '').trim().toLowerCase();
   const roleOk = quoteVerified(p.role_quote, p.role_source, docTexts);
   if (CO_PI_ROLES.has(role)) {
-    if (roleOk) return { decision: 'co-PI', basis: `stated role: ${role}` };
-    return { decision: 'not co-PI', basis: `stated role ${role}, quote not found in documents` };
+    if (!roleOk) return { decision: 'not co-PI', basis: `stated role ${role}, quote not found in documents` };
+    if (!quoteNamesPerson(p.role_quote, p.role_source, personName)) return { decision: 'not co-PI', basis: `stated role ${role}, quote does not name this person` };
+    return { decision: 'co-PI', basis: `stated role: ${role}` };
   }
   if (role && role !== 'none' && roleOk) return { decision: 'not co-PI', basis: `stated role: ${role}` };
-  const budgetOk = Boolean(p.in_budget) && quoteVerified(p.budget_quote, p.budget_source, docTexts);
+  const budgetOk = Boolean(p.in_budget) && quoteVerified(p.budget_quote, p.budget_source, docTexts)
+    && quoteNamesPerson(p.budget_quote, p.budget_source, personName);
   if (budgetOk && facultyLevel && String(p.budget_effort || '').trim()) {
     return { decision: 'budget-only', basis: `budgeted effort ${String(p.budget_effort).trim()}, no stated role` };
   }
