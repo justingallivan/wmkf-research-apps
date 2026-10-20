@@ -1,6 +1,6 @@
 # Research PI/co-PI Institution at Award backfill — plan
 
-Date: 2026-10-20. Status: **DRAFT — not built, no production writes.** Owner: Justin Gallivan.
+Date: 2026-10-20. Status: **Stage A (PIs) applied to production 2026-10-20; Stage B (co-PIs) not built.** Owner: Justin Gallivan.
 
 ## 1. Goal and decisions
 
@@ -53,6 +53,8 @@ For each in-scope award: read `_wmkf_projectleader_value`, `_akoya_applicantid_v
 - Not measured: how many of the 183 `same` contacts were created by the integration and linked to an account afterwards by staff. That rate would need a further read.
 
 Proposed handling [PROPOSED; owner to approve]: write Institution at Award for all 231. As a separately approved group, set the contact's account to the applicant only for the 39 with no duplicate, and only while empty. Leave the 6 duplicates for staff to merge in Dynamics, then confirm each award's PI junction row follows the surviving contact.
+
+**Stage A applied, 2026-10-20** [VERIFIED via owner-run apply and `--verify`, resolve hash `7e5cdcf7`, approver Justin Gallivan; logs kept outside the repo]: a first batch of 5 (`--first=5`, verify 5/5), then the rest with `--contact-accounts`. 231 Institution at Award values and 39 contact accounts written, 0 skipped or failed, every write rollback-eligible with its ETag from the PATCH response; `--verify` 270/270. Not written, still open: 1000954 (`pi-mismatch`), the 6 awards with no PI recorded, the 3 `elsewhere` contacts (left as they are), and the 6 duplicate contacts (for staff to merge).
 
 ### 3.2 Stage B resolve — co-PIs, read-only
 
