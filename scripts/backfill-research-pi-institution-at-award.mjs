@@ -26,10 +26,11 @@
  *       counts and the 8-char resolve hash. Options: --since=YYYY-MM-DD.
  *   --apply --confirm=<resolve hash> --approver="<name>" [--contact-accounts] [--first=N]
  *       Per target: re-reads the request and its PI rows and skips any drift
- *       from the resolve snapshot (contacts also re-run the duplicate search),
- *       re-reads the target, writes only an empty value with If-Match, then
- *       re-reads it. A write is rollback-eligible only if the post-write read
- *       shows this script's own Dataverse user (WhoAmI) as `modifiedby`.
+ *       from the resolve snapshot, including the meeting date. Contact targets
+ *       also re-collect the contact's in-scope awards and re-run the
+ *       latest-award selection and the duplicate search. Then re-reads the
+ *       target and writes only an empty value with If-Match, taking the
+ *       rollback ETag from the PATCH response itself (return=representation).
  *       Intent/result lines go to research-pi-iaa-applied.jsonl; reruns skip
  *       targets with a non-failed result.
  *   --verify READ-ONLY. Re-reads every written value not confirmed cleared.
@@ -48,7 +49,7 @@ import fs from 'fs';
 import path from 'path';
 import crypto from 'crypto';
 import {
-  AWARDED, lc, classifyAward, pickContactAccounts, sourceDrift, planTargets,
+  AWARDED, lc, classifyAward, pickContactAccounts, sourceDrift, inScope, contactSelectionDrift, planTargets,
   foldLedger, applyDone, rollbackEligible, verifyTarget,
 } from './lib/research-iaa-backfill.mjs';
 
@@ -85,7 +86,7 @@ if ((MODE === 'apply' || MODE === 'rollback') && !process.env.DATAVERSE_PROD_WRI
 
 const { DynamicsService } = await import('../lib/services/dynamics-service.js');
 const { bypassDynamicsRestrictions } = await import('../lib/services/dynamics-context.js');
-const { fetchWithTimeout } = await import('../lib/services/dynamics/http.js');
+const { fetchWithTimeout, buildHeaders } = await import('../lib/services/dynamics/http.js');
 const { escape } = await import('../lib/dataverse/core/odata.js');
 
 const ROLE_PI = 100000000;
@@ -120,13 +121,13 @@ const readPiRows = (requestId) => readAll(JUNCTION, { select: PI_ROW_SELECT, fil
 const TARGETS = {
   iaa: {
     entitySet: JUNCTION,
-    select: '_wmkf_institutionataward_value,_modifiedby_value',
+    select: '_wmkf_institutionataward_value',
     value: (rec) => lc(rec?._wmkf_institutionataward_value),
     bind: (accountId) => ({ 'wmkf_InstitutionAtAward@odata.bind': accountId ? `/accounts(${accountId})` : null }),
   },
   contact: {
     entitySet: 'contacts',
-    select: '_parentcustomerid_value,statecode,_modifiedby_value',
+    select: '_parentcustomerid_value,statecode',
     value: (rec) => lc(rec?._parentcustomerid_value),
     bind: (accountId) => ({ 'parentcustomerid_account@odata.bind': accountId ? `/accounts(${accountId})` : null }),
   },
@@ -216,6 +217,7 @@ async function runResolve() {
         requestId: lc(r.akoya_requestid),
         requestNum: r.akoya_requestnum,
         programId: lc(r._akoya_programid_value),
+        since: SINCE,
         meetingDate: (r.wmkf_meetingdate || '').slice(0, 10),
         junctionRowId: row ? lc(row.wmkf_apprequestpersonid) : null,
         contactId,
@@ -270,15 +272,38 @@ async function runResolve() {
 }
 
 // ── Apply ──
-async function whoAmI() {
+// PATCH with Prefer: return=representation, so the ETag recorded for rollback
+// is the version this PATCH produced — no separate read that another writer
+// (even one using the same app credentials) could slip in front of. Goes
+// through the interlocked fetchWithTimeout seam like every Dataverse call.
+async function patchReturning(kind, id, body, ifMatch) {
   const token = await DynamicsService.getAccessToken();
-  const res = await fetchWithTimeout(`${process.env.DYNAMICS_URL}/api/data/v9.2/WhoAmI`, {
-    headers: { Authorization: `Bearer ${token}`, Accept: 'application/json', 'OData-Version': '4.0' },
-  }, 60000);
-  if (!res.ok) throw new Error(`WhoAmI failed (${res.status})`);
-  const id = lc((await res.json()).UserId);
-  if (!id) throw new Error('WhoAmI returned no UserId');
-  return id;
+  const headers = { ...buildHeaders(token), Prefer: 'return=representation,odata.include-annotations="*"', 'If-Match': ifMatch };
+  const url = `${process.env.DYNAMICS_URL}/api/data/v9.2/${TARGETS[kind].entitySet}(${id})?$select=${TARGETS[kind].select}`;
+  const res = await fetchWithTimeout(url, { method: 'PATCH', headers, body: JSON.stringify(body) }, 60000);
+  if (!res.ok) {
+    const err = new Error(`PATCH failed (${res.status}): ${(await res.text()).slice(0, 200)}`);
+    err.status = res.status;
+    throw err;
+  }
+  return DynamicsService.processAnnotations(await res.json());
+}
+
+// A contact's current in-scope PI awards, for re-running the latest-award selection.
+async function contactEvidence(contactId, scope) {
+  const rows = await readAll(JUNCTION, { select: PI_ROW_SELECT, filter: `_wmkf_contact_value eq ${contactId} and wmkf_role eq ${ROLE_PI}` });
+  const evidence = [];
+  // The target re-read already requires this contact's account to be empty.
+  const contactsMap = new Map([[contactId, {}]]);
+  for (const requestId of new Set(rows.map((j) => lc(j._wmkf_request_value)))) {
+    const r = await getOrNull('akoya_requests', requestId, REQUEST_SELECT);
+    if (!r || !inScope(r, scope)) continue;
+    const c = classifyAward(r, await readPiRows(requestId), contactsMap);
+    if ((c.cls === 'write' || c.cls === 'already-set') && c.contactAccount === 'empty') {
+      evidence.push({ contactId, meetingDate: (r.wmkf_meetingdate || '').slice(0, 10), applicantAccountId: lc(r._akoya_applicantid_value), requestId });
+    }
+  }
+  return evidence;
 }
 
 async function runApply() {
@@ -289,7 +314,8 @@ async function runApply() {
   const approver = arg('approver');
   if (!approver) { console.error('--approver="<name>" is required'); process.exit(2); }
   const resolved = readJsonl(RESOLVE_LOG);
-  if (resolved.some((x) => x.host !== host || !('programId' in x))) { console.error('Resolve file is from another host or an older script version. Re-run --resolve.'); process.exit(2); }
+  if (resolved.some((x) => x.host !== host || !('programId' in x) || !x.since)) { console.error('Resolve file is from another host or an older script version. Re-run --resolve.'); process.exit(2); }
+  const scope = { programIds: new Set(resolved.map((x) => x.programId)), since: resolved[0].since };
   const plan = planTargets(resolved, flag('contact-accounts'));
   const first = Number(arg('first')) || Infinity;
   const ledger = foldLedger(readJsonl(APPLIED_LOG));
@@ -297,7 +323,6 @@ async function runApply() {
   let done = 0; const counts = {};
 
   await bypassDynamicsRestrictions('research-pi-iaa-apply', async () => {
-    const me = await whoAmI();
     for (const t of plan) {
       const key = `${t.kind}|${t.id}`;
       const state = ledger.get(key);
@@ -306,16 +331,17 @@ async function runApply() {
       done += 1;
       const base = { runId, resolveHash: hash, approver, host, kind: t.kind, id: t.id, value: t.value, requestNum: t.requestNum };
       append(APPLIED_LOG, { ...base, phase: 'intent', at: now() });
-      let result; let detail = ''; let etag = null; let after = null; let attributed = false;
+      let result; let detail = ''; let etag = null; let after = null;
       try {
         // The resolve hash authenticates the snapshot, not current eligibility: re-read the source.
-        const drift = sourceDrift(t.source, {
+        let drift = sourceDrift(t.source, {
           request: await getOrNull('akoya_requests', t.source.requestId, REQUEST_SELECT),
           piRows: await readPiRows(t.source.requestId),
         });
         let dupNow = 0;
         if (!drift && t.kind === 'contact') {
-          const c = await getOrNull('contacts', t.id, CONTACT_SELECT);
+          drift = contactSelectionDrift(t.source, await contactEvidence(t.id, scope));
+          const c = drift ? null : await getOrNull('contacts', t.id, CONTACT_SELECT);
           dupNow = c ? await otherContactCount(c) : 0;
         }
         const cur = drift || dupNow ? null : await readTarget(t.kind, t.id);
@@ -331,21 +357,17 @@ async function runApply() {
         else if (!cur._etag) { result = 'skipped'; detail = 'no ETag on re-read'; }
         else {
           try {
-            await DynamicsService.updateRecord(TARGETS[t.kind].entitySet, t.id, TARGETS[t.kind].bind(t.value), { ifMatch: cur._etag });
-            const post = await readTarget(t.kind, t.id);
+            const post = await patchReturning(t.kind, t.id, TARGETS[t.kind].bind(t.value), cur._etag);
             etag = post?._etag || null;
             after = TARGETS[t.kind].value(post);
-            // A different modifier means another write landed between our PATCH
-            // and this read; its ETag is not ours to roll back.
-            attributed = lc(post?._modifiedby_value) === me;
-            result = after === t.value && etag ? 'write' : 'write_then_changed';
-            if (result === 'write' && !attributed) detail = 'modifiedby is not this script; rollback disabled';
+            result = after === t.value ? 'write' : 'write_then_changed';
+            if (result === 'write' && !etag) detail = 'no ETag in write response; rollback disabled';
           } catch (err) {
             if (err?.status === 412) { result = 'changed_since_resolve'; detail = '412 on write'; } else throw err;
           }
         }
       } catch (err) { result = 'failed'; detail = String(err.message || err).slice(0, 200); }
-      const rec = { ...base, phase: 'result', result, detail, postWriteEtag: etag, postWriteValue: after, rollbackEligible: result === 'write' && attributed, at: now() };
+      const rec = { ...base, phase: 'result', result, detail, postWriteEtag: etag, postWriteValue: after, rollbackEligible: result === 'write' && Boolean(etag), at: now() };
       append(APPLIED_LOG, rec);
       ledger.set(key, { receipt: rec, cleared: false, rollbacks: [], interrupted: false });
       counts[`${t.kind}:${result}`] = (counts[`${t.kind}:${result}`] || 0) + 1;

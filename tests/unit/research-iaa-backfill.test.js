@@ -2,13 +2,13 @@
  * @jest-environment node
  */
 import {
-  classifyAward, pickContactAccounts, sourceDrift, planTargets,
+  classifyAward, pickContactAccounts, sourceDrift, inScope, contactSelectionDrift, planTargets,
   foldLedger, applyDone, rollbackEligible, verifyTarget,
 } from '../../scripts/lib/research-iaa-backfill.mjs';
 
 const A = 'acc-a'; const B = 'acc-b'; const P = 'c-p'; const Q = 'c-q';
 const req = (o = {}) => ({
-  akoya_requestid: 'R1', akoya_requeststatus: 'Active', _akoya_programid_value: 'prog',
+  akoya_requestid: 'R1', akoya_requeststatus: 'Active', _akoya_programid_value: 'prog', wmkf_meetingdate: '2025-06-01T00:00:00Z',
   _wmkf_projectleader_value: P, _akoya_applicantid_value: A, _akoya_applicantid_value_entity: 'account', ...o,
 });
 const row = (o = {}) => ({ wmkf_apprequestpersonid: 'J1', _wmkf_contact_value: P, _wmkf_institutionataward_value: null, ...o });
@@ -62,7 +62,7 @@ describe('pickContactAccounts (Codex finding 3)', () => {
 });
 
 describe('sourceDrift (Codex finding 1)', () => {
-  const snap = { requestId: 'r1', programId: 'prog', contactId: P, junctionRowId: 'j1', applicantAccountId: A };
+  const snap = { requestId: 'r1', programId: 'prog', meetingDate: '2025-06-01', contactId: P, junctionRowId: 'j1', applicantAccountId: A };
   const fresh = (o = {}, piRows = [row()]) => ({ request: req(o), piRows });
   test('unchanged source passes', () => {
     expect(sourceDrift(snap, fresh())).toBeNull();
@@ -71,6 +71,7 @@ describe('sourceDrift (Codex finding 1)', () => {
     ['request gone', { request: null, piRows: [] }, 'request not found'],
     ['status left the awarded set', fresh({ akoya_requeststatus: 'Withdrawn' }), 'status now Withdrawn'],
     ['program changed', fresh({ _akoya_programid_value: 'other' }), 'program changed'],
+    ['meeting date moved out of scope', fresh({ wmkf_meetingdate: '2010-06-01T00:00:00Z' }), 'meeting date changed'],
     ['applicant corrected', fresh({ _akoya_applicantid_value: B }), 'applicant changed'],
     ['project leader changed', fresh({ _wmkf_projectleader_value: Q }), 'project leader changed'],
     ['second PI row added', fresh({}, [row(), row({ wmkf_apprequestpersonid: 'j2', _wmkf_contact_value: Q })]), '2 PI rows now'],
@@ -78,6 +79,38 @@ describe('sourceDrift (Codex finding 1)', () => {
     ['PI row contact changed', fresh({}, [row({ _wmkf_contact_value: Q })]), 'PI row contact changed'],
   ])('%s', (_name, cur, reason) => {
     expect(sourceDrift(snap, cur)).toBe(reason);
+  });
+});
+
+describe('inScope', () => {
+  const scope = { programIds: new Set(['prog']), since: '2017-01-01' };
+  test('awarded, in program, on or after the floor', () => {
+    expect(inScope(req(), scope)).toBe(true);
+    expect(inScope(req({ wmkf_meetingdate: '2017-01-01T00:00:00Z' }), scope)).toBe(true);
+  });
+  test.each([
+    ['before the floor', { wmkf_meetingdate: '2016-12-31T00:00:00Z' }],
+    ['other program', { _akoya_programid_value: 'other' }],
+    ['not awarded', { akoya_requeststatus: 'Declined' }],
+  ])('%s is out of scope', (_name, o) => {
+    expect(inScope(req(o), scope)).toBe(false);
+  });
+});
+
+describe('contactSelectionDrift (Codex re-review finding 2)', () => {
+  const snap = { contactId: P, requestId: 'r1', applicantAccountId: A };
+  const ev = (requestId, meetingDate, applicantAccountId) => ({ contactId: P, requestId, meetingDate, applicantAccountId });
+  test('selection unchanged', () => {
+    expect(contactSelectionDrift(snap, [ev('r0', '2019-06-01', B), ev('r1', '2025-06-01', A)])).toBeNull();
+  });
+  test('a newer award now exists', () => {
+    expect(contactSelectionDrift(snap, [ev('r1', '2025-06-01', A), ev('r2', '2026-06-01', B)])).toBe('a different award is now latest');
+  });
+  test('a same-date tie has appeared', () => {
+    expect(contactSelectionDrift(snap, [ev('r1', '2025-06-01', A), ev('r2', '2025-06-01', B)])).toBe('latest awards now tie');
+  });
+  test('the selected award no longer qualifies', () => {
+    expect(contactSelectionDrift(snap, [])).toBe('no in-scope award evidence');
   });
 });
 

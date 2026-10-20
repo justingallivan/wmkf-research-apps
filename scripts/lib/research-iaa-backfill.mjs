@@ -73,12 +73,38 @@ export function sourceDrift(snap, cur) {
   if (!r) return 'request not found';
   if (!AWARDED.includes(r.akoya_requeststatus)) return `status now ${r.akoya_requeststatus}`;
   if (lc(r._akoya_programid_value) !== snap.programId) return 'program changed';
+  if ((r.wmkf_meetingdate || '').slice(0, 10) !== snap.meetingDate) return 'meeting date changed';
   if (lc(r._wmkf_projectleader_value) !== snap.contactId) return 'project leader changed';
   if (lc(r._akoya_applicantid_value) !== snap.applicantAccountId) return 'applicant changed';
   if (r._akoya_applicantid_value_entity && r._akoya_applicantid_value_entity !== 'account') return 'applicant is not an account';
   if (cur.piRows.length !== 1) return `${cur.piRows.length} PI rows now`;
   if (lc(cur.piRows[0].wmkf_apprequestpersonid) !== snap.junctionRowId) return 'PI row replaced';
   if (lc(cur.piRows[0]._wmkf_contact_value) !== snap.contactId) return 'PI row contact changed';
+  return null;
+}
+
+/**
+ * Whether a request is inside the resolved scope.
+ * @param {object} r akoya_request row.
+ * @param {{programIds: Set<string>, since: string}} scope
+ */
+export function inScope(r, scope) {
+  return AWARDED.includes(r.akoya_requeststatus)
+    && scope.programIds.has(lc(r._akoya_programid_value))
+    && (r.wmkf_meetingdate || '').slice(0, 10) >= scope.since;
+}
+
+/**
+ * Re-run the latest-award selection for a contact write against fresh
+ * evidence (the contact's current in-scope PI awards).
+ * @returns {string|null} why the approved selection no longer holds, or null.
+ */
+export function contactSelectionDrift(snap, evidence) {
+  const pick = pickContactAccounts(evidence).get(snap.contactId);
+  if (!pick) return 'no in-scope award evidence';
+  if (pick.status === 'tie') return 'latest awards now tie';
+  if (pick.requestId !== snap.requestId) return 'a different award is now latest';
+  if (pick.accountId !== snap.applicantAccountId) return 'latest award applicant changed';
   return null;
 }
 
