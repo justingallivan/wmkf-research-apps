@@ -42,7 +42,7 @@ enterDynamicsBypassForScript('probe-research-proposal-file-inventory');
 const AWARDED = ['Approved', 'Active', 'Closed'];
 const CATEGORIES = [
   ['report', /report|fullreport|progress|interim|final narrative/i],
-  ['biosketch', /bio\s*-?\s*sketch|biographical|\bbios?\b|\bcv\b|curriculum\s*vitae|resume/i],
+  ['biosketch', /bio\s*-?\s*sketch|biographical|curriculum\s*vitae|(^|[^a-z])(bios?|cv|resume)([^a-z]|$)/i],
   ['proposal', /_proposal\.(pdf|docx?)$|\bproposal\b.*\.(pdf)$/i],
   ['narrative', /narrative|project\s*description|research\s*plan/i],
   ['application', /application|phase\s*(i{1,2}|1|2)\b|cover|face\s*page|summary\s*page/i],
