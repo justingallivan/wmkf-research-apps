@@ -20,7 +20,8 @@
  *
  * Common: --approvals=<xlsx> (required), --pool=<json> (default: research-pi-orcid-pool.json
  * next to the workbook), --dir=<checkpoint dir> (default: the workbook's folder),
- * --approver="<name>" (required for --resolve).
+ * --approver="<name>" (required for --resolve), --accept-name-diff=<id,id> (resolve:
+ * contacts whose differing ORCID first name the owner has checked, e.g. nicknames).
  * Write modes need DATAVERSE_PROD_WRITE_ACK="<purpose> <YYYY-MM-DD>" (the
  * Dataverse interlock's local→production write exception).
  * Checkpoints hold contact ids and ORCIDs only (no names).
@@ -159,6 +160,7 @@ async function runResolve() {
   const pool = new Map(JSON.parse(poolText).people.map((p) => [p.contactId.toLowerCase(), p]));
   const meta = { runId: crypto.randomUUID(), approver, approvalsContentHash: approvals.contentHash, approvalsFileHash: approvals.fileHash, poolHash: sha(poolText), host };
   const orcidCreds = [process.env.ORCID_CLIENT_ID, process.env.ORCID_CLIENT_SECRET];
+  const acceptNameDiff = new Set((arg('accept-name-diff') || '').split(',').map((s) => s.trim().toLowerCase()).filter(Boolean));
 
   const byOrcid = new Map(); const byContact = new Map();
   for (const r of approvals.rows) {
@@ -191,8 +193,12 @@ async function runResolve() {
           const pFam = norm(p?.familyName).split(' ').filter((w) => w.length > 1);
           const contactName = `${c.firstname || ''} ${c.lastname || ''}`;
           if (!p) { action = 'registry_mismatch'; detail = 'ORCID record not found'; }
-          else if (!pFam.some((w) => fam.includes(w)) || forenamesContradict(contactName, `${p.givenNames} ${p.familyName}`)) {
-            action = 'registry_mismatch'; detail = 'registry name differs';
+          else if (!pFam.some((w) => fam.includes(w))) { action = 'registry_mismatch'; detail = 'registry surname differs'; }
+          else if (forenamesContradict(contactName, `${p.givenNames} ${p.familyName}`)) {
+            // Nicknames (Katie/Katherine) trip the production forename gate; the
+            // owner can accept specific contacts after checking them.
+            if (acceptNameDiff.has(r.contactid)) detail = 'first name differs; owner-accepted';
+            else { action = 'registry_mismatch'; detail = 'registry first name differs'; }
           }
         }
       }
