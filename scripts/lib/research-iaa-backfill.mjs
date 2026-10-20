@@ -95,6 +95,20 @@ export function inScope(r, scope) {
 }
 
 /**
+ * Scope for apply-time checks, from the full program list resolve selected
+ * (every line carries it, so the resolve hash covers it) — not from the
+ * programs that happened to have awards, which would drop an empty program.
+ * @returns {{programIds: Set<string>, since: string}|null} null when lines disagree or lack scope.
+ */
+export function scopeFromResolve(resolved) {
+  const first = resolved[0];
+  if (!first?.since || !Array.isArray(first.scopeProgramIds) || !first.scopeProgramIds.length) return null;
+  const key = JSON.stringify([first.since, first.scopeProgramIds]);
+  if (resolved.some((x) => JSON.stringify([x.since, x.scopeProgramIds]) !== key)) return null;
+  return { programIds: new Set(first.scopeProgramIds), since: first.since };
+}
+
+/**
  * Re-run the latest-award selection for a contact write against fresh
  * evidence (the contact's current in-scope PI awards).
  * @returns {string|null} why the approved selection no longer holds, or null.

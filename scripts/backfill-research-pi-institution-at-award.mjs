@@ -49,7 +49,7 @@ import fs from 'fs';
 import path from 'path';
 import crypto from 'crypto';
 import {
-  AWARDED, lc, classifyAward, pickContactAccounts, sourceDrift, inScope, contactSelectionDrift, planTargets,
+  AWARDED, lc, classifyAward, pickContactAccounts, sourceDrift, inScope, scopeFromResolve, contactSelectionDrift, planTargets,
   foldLedger, applyDone, rollbackEligible, verifyTarget,
 } from './lib/research-iaa-backfill.mjs';
 
@@ -154,6 +154,7 @@ async function runResolve() {
   const research = programs.filter((p) => /research/i.test(programName(p)) && !/reviewer/i.test(programName(p)));
   if (!research.length) { console.error('No Research programs matched.'); process.exit(1); }
   console.log(`Programs in scope: ${research.map(programName).join('; ')}`);
+  const scopeProgramIds = research.map((p) => lc(p.akoya_programid)).sort();
   const programFilter = research.map((p) => `_akoya_programid_value eq ${p.akoya_programid}`).join(' or ');
   const statusFilter = AWARDED.map((s) => `akoya_requeststatus eq '${s}'`).join(' or ');
   const requests = await readAll('akoya_requests', {
@@ -218,6 +219,7 @@ async function runResolve() {
         requestNum: r.akoya_requestnum,
         programId: lc(r._akoya_programid_value),
         since: SINCE,
+        scopeProgramIds,
         meetingDate: (r.wmkf_meetingdate || '').slice(0, 10),
         junctionRowId: row ? lc(row.wmkf_apprequestpersonid) : null,
         contactId,
@@ -314,8 +316,8 @@ async function runApply() {
   const approver = arg('approver');
   if (!approver) { console.error('--approver="<name>" is required'); process.exit(2); }
   const resolved = readJsonl(RESOLVE_LOG);
-  if (resolved.some((x) => x.host !== host || !('programId' in x) || !x.since)) { console.error('Resolve file is from another host or an older script version. Re-run --resolve.'); process.exit(2); }
-  const scope = { programIds: new Set(resolved.map((x) => x.programId)), since: resolved[0].since };
+  const scope = scopeFromResolve(resolved);
+  if (!scope || resolved.some((x) => x.host !== host || !('programId' in x))) { console.error('Resolve file is from another host or an older script version. Re-run --resolve.'); process.exit(2); }
   const plan = planTargets(resolved, flag('contact-accounts'));
   const first = Number(arg('first')) || Infinity;
   const ledger = foldLedger(readJsonl(APPLIED_LOG));

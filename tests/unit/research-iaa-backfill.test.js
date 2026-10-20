@@ -2,7 +2,7 @@
  * @jest-environment node
  */
 import {
-  classifyAward, pickContactAccounts, sourceDrift, inScope, contactSelectionDrift, planTargets,
+  classifyAward, pickContactAccounts, sourceDrift, inScope, scopeFromResolve, contactSelectionDrift, planTargets,
   foldLedger, applyDone, rollbackEligible, verifyTarget,
 } from '../../scripts/lib/research-iaa-backfill.mjs';
 
@@ -94,6 +94,20 @@ describe('inScope', () => {
     ['not awarded', { akoya_requeststatus: 'Declined' }],
   ])('%s is out of scope', (_name, o) => {
     expect(inScope(req(o), scope)).toBe(false);
+  });
+});
+
+describe('scopeFromResolve (Codex third review)', () => {
+  const line = (programId, o = {}) => ({ programId, since: '2017-01-01', scopeProgramIds: ['medical', 'science'], ...o });
+  test('keeps a selected program that had no awards at resolve time', () => {
+    // Every resolved award is Medical; a Science award appearing before apply must still count.
+    const scope = scopeFromResolve([line('medical'), line('medical')]);
+    expect(inScope(req({ _akoya_programid_value: 'science' }), scope)).toBe(true);
+  });
+  test('refuses files without scope or with disagreeing lines', () => {
+    expect(scopeFromResolve([{ programId: 'medical', since: '2017-01-01' }])).toBeNull();
+    expect(scopeFromResolve([line('medical'), line('medical', { scopeProgramIds: ['medical'] })])).toBeNull();
+    expect(scopeFromResolve([])).toBeNull();
   });
 });
 
