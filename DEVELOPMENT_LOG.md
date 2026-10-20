@@ -10,6 +10,20 @@ The chronological archive after the `Legacy chronological session log` divider c
 
 ---
 
+## October 2026 — Research PI/co-PI ORCID backfill (concurrent Claude session, Session 621 window)
+
+**Milestone:** 176 owner-approved ORCIDs written to production `contact.wmkf_orcid` for awarded Research PIs and co-PIs (meeting dates 2016-10..2026-10).
+**Sessions:** concurrent Claude session 2026-10-19/20 (owner-run production reads and writes; three Codex adversarial reviews).
+**Ship state:**
+- Coverage on that cohort rose from 29 to 205 of 285 contacts; `--verify` read back 176/176 after apply.
+- Writes went through `contact.setOrcidIfAbsent` with the new opt-in `requireEtag`, under `DATAVERSE_PROD_WRITE_ACK`; 4 rows held back as duplicate-contact cases, 6 owner-Unsure, 70 had no candidate.
+- Audit trail (approval workbook, pool snapshot, resolve and apply logs) is owner-held in SharePoint, outside git.
+- Follow-on: Haiku extraction found 308 co-PIs on 2017–2023 awards from biosketches (CSV only, nothing written).
+**Why it matters:** PI/co-PI identity for publication tracking; contact ORCID also feeds PI exclusion/COI and honorarium matching.
+**Pointers:** `docs/plans/RESEARCH_PI_ORCID_BACKFILL_STAGE2_PLAN_2026-10-19.md`; `scripts/apply-research-pi-orcid-backfill.mjs`; `scripts/match-orcid-backfill-candidates.mjs`; `scripts/extract-research-copi-candidates.mjs`; merge of `claude/session-2026-10-19`.
+
+---
+
 ## October 2026 — Printable proposal and discussion briefings released (Session 621)
 
 **Milestone:** Meeting Tracker provides a printable cycle briefing grouped by SE and MR.

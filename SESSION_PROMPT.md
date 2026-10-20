@@ -16,12 +16,28 @@
 - `a6d7c6a04` — Meeting Tracker UX/technical audit (branch original `6dfe59e74`).
 - Stop documentation commit follows these; use Git history for its identity.
 
+## Concurrent Claude Session — Research PI/co-PI ORCID backfill and co-PI recovery (2026-10-19/20 PT)
+
+Worked in worktree `WMKF_Apps-claude-session` on `claude/session-2026-10-19`; merged to main at owner request. All production reads/writes were owner-run.
+
+1. **ORCID backfill, done.** [VERIFIED via owner-run `--verify`: 176/176] Awarded Research PIs and co-PIs (meeting dates 2016-10..2026-10, `akoya_programid` Medical / Science & Engineering Research, status Approved/Active/Closed): contact ORCID coverage 29 → 205 of 285. Matcher graded candidates from ORCID search, dated ORCID employments, ROR institution ids and email-domain institutions; blind validation on 29 known ORCIDs had 0 wrong high grades. Owner approved 180 in a workbook; resolve held back 4 duplicate-contact cases (Weizhe Hong, Peter Reiners, Kristy Townsend, Vincenzo Vitelli) and 4 nickname cases were owner-accepted. Three Codex adversarial reviews shaped the rules; the last finding was fixed by Codex and reviewed.
+2. **`contact.setOrcidIfAbsent` gained opt-in `requireEtag`** [VERIFIED via `tests/unit/contact-set-orcid-require-etag.test.js`]: fails closed when the re-read has no ETag, including on 412 retries. Existing callers unchanged.
+3. **Co-PI data facts.** [VERIFIED via owner-run probes] On those awards Dataverse records co-PIs only from 2024 on (52 co-PIs/27 awards, all contacts, 51 junction-linked); `contact.wmkf_copiorganizationname` and `akoya_collaboration` are unused. Connor confirmed GoApply will collect co-PI details, with institution on the contact and the link through `wmkf_apprequestperson` [PLANNED; recorded on the Atlas page].
+4. **Older co-PI recovery (Project 2).** [VERIFIED via owner-run probes] SharePoint `RequestArchive3` holds proposals for every year; Dec 2016 proposals are mostly scans, June 2017 on are text; 2018–2023 have biosketch files for 130/148 grants. Owner-approved Haiku 5.5 extraction ($0.55) found 308 co-PIs on 154 grants (institution from email 242, stated 64, assumed 2); rule: co-PIs named in the documents, else faculty-level non-PIs. Output is a CSV only; nothing written.
+5. **PII handling.** Workbooks, logs and CSVs were moved by the owner to a restricted SharePoint folder; the repo is public, so none of them belong in git.
+
 ## Next Items
 
 ### Owner Decision Needed
 
-1. **Colleague vocabulary review.** [VERIFIED via owner request and saved review artifact] Review `docs/plans/review/PROPOSAL_WORKFLOW_VOCABULARY_2026-10-19.md` and the linked owner-edited deck. Await feedback and explicit implementation scope. Do not treat the October 8 options as the newest proposed names.
-2. **Meeting Tracker redesign direction.** [VERIFIED via audit and unchanged implementation] Choose the primary landing task and whether to separate task views / compact rows. Investigation and mockups did not authorize a redesign build.
+1. **Co-PI data structure (Connor).** [AWAITING CONNOR] Note on the junction vs. a new "Institution at award" lookup column on `wmkf_apprequestperson` (recommended), and whether GoApply fills it. The owner has asked Connor. Gates the co-PI write stage below.
+2. **Colleague vocabulary review.** [VERIFIED via owner request and saved review artifact] Review `docs/plans/review/PROPOSAL_WORKFLOW_VOCABULARY_2026-10-19.md` and the linked owner-edited deck. Await feedback and explicit implementation scope. Do not treat the October 8 options as the newest proposed names.
+3. **Meeting Tracker redesign direction.** [VERIFIED via audit and unchanged implementation] Choose the primary landing task and whether to separate task views / compact rows. Investigation and mockups did not authorize a redesign build.
+
+### Verified Open (owner-paced)
+
+1. **Co-PI write stage for 2017–2023.** [PLANNED; not built] Match the 308 extracted people to existing contacts (email, then name + institution), create missing contacts and Co-PI junction rows, set current institution, then institution-at-award per Connor. Follow the ORCID-backfill pattern (resolve/apply/verify, owner-run, Codex review). A staff member will handle the manual list: 4 unreadable 2017 grants (989734, 989935, 989982, 990613), one model failure (995777; a re-run usually fixes it), the 5 Dec 2016 scanned grants, and the ~18 2018–2023 grants with no biosketch file.
+2. **Duplicate contacts** for the 4 held-back ORCID rows need cleanup in Dynamics before their ORCIDs can be written.
 
 ### Parked / Verification Limits
 
@@ -46,6 +62,10 @@
 | `docs/CURRENT_WORK_QUEUE.md` | Priority routing; latest review artifact linked |
 | `shared/components/meeting-tracker/ProgramBriefingView.js` | Released printable briefing UI |
 | `docs/plans/evidence/ZOOM_AUDIO_IMPLEMENTATION_2026-10-19.md` | Concurrent Session 620 audio release evidence |
+| `docs/plans/RESEARCH_PI_ORCID_BACKFILL_STAGE2_PLAN_2026-10-19.md` | ORCID backfill write plan (as built) |
+| `scripts/apply-research-pi-orcid-backfill.mjs` | Owner-run resolve/apply/verify/rollback for approved ORCIDs |
+| `scripts/match-orcid-backfill-candidates.mjs` | ORCID candidate matcher and blind validation |
+| `scripts/extract-research-copi-candidates.mjs` | Haiku co-PI extraction from proposal documents (paid; needs owner approval) |
 
 ## Verification and handoff
 
