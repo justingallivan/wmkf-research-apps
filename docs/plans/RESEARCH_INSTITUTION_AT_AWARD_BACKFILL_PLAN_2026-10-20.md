@@ -79,3 +79,16 @@ No overwriting a contact's existing current account, no new contacts/accounts/ju
 ## 6. Extending to earlier years
 
 Change the meeting-date floor in resolve. PIs extend cheaply (applicant account exists on migrated requests). Co-PIs need a new document inventory and extraction for the added years (`scripts/probe-research-proposal-file-inventory.mjs`, then the extraction script, which is paid and needs owner approval); expect scanned documents before mid-2017 and more missing biosketches.
+
+## 7. Held note to Connor (unsent)
+
+Status: **drafted 2026-10-20, held by the owner** until an unrelated thread with Connor resolves; send as one message, not several in quick succession. Counts are from §3.1.
+
+> Thanks for agreeing to the lookup. The column is live in production and the sandbox: **"Institution at Award"** (`wmkf_InstitutionAtAward`) on `wmkf_apprequestperson`, a lookup to Account. For new submissions, please set it to the applicant's Account on every PI and co-PI row. I'll fill in Research awards from 2017 on myself.
+>
+> While preparing that backfill, I looked at how PI contacts are being created, and found two patterns in the akoyaGO integration that are worth fixing before GoApply starts sending co-PIs:
+>
+> 1. **New contacts aren't linked to an Account.** Of the 238 Research awards since 2017, 45 have PI contacts with no Account, though the applicant institution is on the request. 39 of those contacts were created by the "# BCO akoyaGO Integration" user, 35 of them after the migration, in batches that match each proposal cycle. When the flow creates a contact, could it set the contact's Account to the applicant institution?
+> 2. **It sometimes creates a duplicate of an existing person.** In 4 cases it created a new contact in 2025 even though the person was already in the system, with the right Account. In 3 of those the email address was exactly the same. Could the flow look for an existing contact by email before creating one?
+>
+> These matter more for co-PIs. Many won't be in our system yet, and some will be under a different email, so unlinked contacts and duplicates would pile up quickly. The order I'd suggest is: find the contact by email, create one only if there's no match, link it to its Account, then write the PI or co-PI row with Institution at Award.
