@@ -40,7 +40,9 @@ For each in-scope award: read `_wmkf_projectleader_value`, `_akoya_applicantid_v
 - `no-applicant` — no applicant account. Review.
 - `multiple-pi-rows` — more than one PI junction row on the request (the alternate key allows it when the contacts differ). Review.
 - `other` — any state the classes above miss; never written.
-- `contact-elsewhere` — the PI contact's current parent account differs from the applicant. Still `write` (the applicant is the award-time institution), but listed so the owner can see who moved or is mislinked.
+- On `write` rows, `contact_account` compares the PI contact's current parent account with the applicant: `same`, `elsewhere`, `empty` or `not-account`. `elsewhere` rows are still written (the applicant is the award-time institution) but listed so the owner can see who moved or is mislinked.
+
+**Built 2026-10-20:** `scripts/backfill-research-pi-institution-at-award.mjs` (resolve only; apply/verify/rollback refuse to run until built after owner review). A sandbox run on 2026-10-20 executed every query, including the new column. The sandbox has no PI junction rows for these awards (147 `no-junction-row`, 7 `other`: no project leader and no PI row), so the `write` path was checked with fixture cases only, not live data.
 
 ### 3.2 Stage B resolve — co-PIs, read-only
 
