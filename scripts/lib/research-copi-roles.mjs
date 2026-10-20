@@ -37,8 +37,8 @@ export function quoteVerified(quote, source, docTexts) {
   return Boolean(text && text.includes(q));
 }
 
-// Post-award paperwork (reallocations, no-cost extensions, supplements, reports)
-// does not describe the proposed team.
+// Post-award paperwork (reallocations, no-cost extensions = "NCE", supplements,
+// reports, revised-budget approvals) does not describe the proposed team.
 // `(?:^|[^a-z])nce(?:[^a-z]|$)` rather than \bnce\b: "WMKF_NCE Request" has an underscore, a word character.
 const POST_AWARD = /realloc|(?:^|[^a-z])nce(?:[^a-z]|$)|no[\s-]*cost|extension|supplement|spending\s*plan|report|amendment|rebudget|revised|approval/i;
 
