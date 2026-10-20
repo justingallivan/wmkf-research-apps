@@ -13,8 +13,8 @@ A wrong contact ORCID is worse than a missing one. `contact.wmkf_orcid` feeds PI
 
 ## 2. Inputs and approval
 
-1. Staff review the stage-1 CSV and add two columns: `approve` (`yes` only) and `approved_by`. Only rows with `approve=yes`, a `selected_orcid`, and a non-empty `approved_by` are eligible. An approver may change `selected_orcid` to another candidate they verified; the row then records `selection_overridden=yes`.
-2. The script hashes (SHA-256) the approved CSV and the stage-1 pool JSON, and records them with the Dataverse host and run id in every checkpoint line. Apply refuses to run if the approved CSV hash, pool hash or host differs from the resolve checkpoint.
+1. As built, the owner reviews a workbook generated from the stage-1 CSV (one row per person, a `Confirm?` Yes/No/Unsure column, the proposed ORCID, and a hidden contact id). Only `Yes` rows are eligible; the approver's name is passed as `--approver`. The 2026-10-19 review approved 180 rows and left 6 `Unsure`.
+2. The script hashes the approval decisions (sorted contact id and ORCID pairs; Excel rewrites file bytes on any save, so the file hash is recorded for audit only) and the stage-1 pool JSON, and records them with the Dataverse host and run id in every checkpoint line. Apply refuses to run if the decision hash, pool hash or host differs from the resolve checkpoint.
 3. Grade is advisory. `review` rows may be approved; `none` rows cannot.
 4. Approval is tied to the CSV it was given on. A regenerated stage-1 CSV needs fresh approval; the script refuses an approved file whose pool hash does not match.
 
