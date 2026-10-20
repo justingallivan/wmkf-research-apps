@@ -1,6 +1,6 @@
 # Atlas: `wmkf_apprequestperson` (Dataverse, WMKF junction entity)
 
-**Last verified:** 2026-05-15 (S155) — live `wmkf_role` data re-probed (`scripts/probe-apprequestperson-role-data.js`); base entity 2026-05-08 via S139 deploy (`c8cbfe1`) + backfill (`8b9b287`)
+**Last verified:** 2026-10-20 — `wmkf_institutionataward` lookup metadata read back in sandbox after wave 34 (production applied by owner run; row counts below not re-probed); previously 2026-05-15 (S155) — live `wmkf_role` data re-probed (`scripts/probe-apprequestperson-role-data.js`); base entity 2026-05-08 via S139 deploy (`c8cbfe1`) + backfill (`8b9b287`)
 **Live row count:** 5,561 (4,488 PI + 1,073 Co-PI; re-confirmed 2026-05-15 — zero rows in `100000002`–`100000004`)
 **Entity set:** `wmkf_apprequestpersons`
 **Schema spec:** `lib/dataverse/schema/wave2/wmkf_app_request_person.json`; slice-0 roster-field additions `lib/dataverse/schema/wave4-existing/wmkf_apprequestperson-roster-fields.json`; institution-at-award lookup `lib/dataverse/schema/wave34-copi-institution-at-award/wmkf_apprequestperson-institution-at-award.json`; `wmkf_role` enum expansion `scripts/extend-apprequestperson-role-picklist.mjs` (NOT a wave spec — apply-dataverse-schema.js is creation-only, see `[[project_slice0_role_probe]]`)

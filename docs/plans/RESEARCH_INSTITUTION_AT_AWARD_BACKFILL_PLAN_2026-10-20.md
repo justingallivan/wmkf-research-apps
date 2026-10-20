@@ -10,6 +10,8 @@ Decisions (owner, 2026-10-20):
 
 - **Column, not a Note.** Connor agreed in writing to a lookup on the junction, and the GoApply submission flow will fill it for new submissions. The owner expects that flow to link each co-PI contact to an account [ASSUMED; Connor to confirm].
 - **Scope:** awarded (`Approved`/`Active`/`Closed`) Research requests — the Medical Research and Science & Engineering programs, chosen as in `scripts/export-research-orcid-backfill-pool.mjs` (program name contains "research", not "reviewer") — with `wmkf_meetingdate` on or after 2017-01-01. Both PI and co-PI rows. This is the same set of awards as the co-PI extraction and the ORCID backfill, except Dec 2016.
+- **Scale:** roughly 200 PI rows and 360 co-PI rows (308 extracted for 2017–2023 plus 52 recorded from 2024). [ASSUMED from the 2026-10-19 extraction and probe counts; resolve reports exact numbers.]
+- **Meaning of the value:** the institution named on the request when it was decided. For PIs that is `akoya_applicantid`. GoApply writes it at submission; if the applicant institution changes before the decision, the flow (or a later check) should bring it into line. [PROPOSED to Connor 2026-10-20.]
 - **Earlier years are deferred, not ruled out.** Extend only if this cohort turns out to be useful. Earlier work is likely harder: Dec 2016 proposals are mostly scans and pre-2016 documents were not inventoried. §6 records what to change.
 - **2024 onward is in scope here,** using the best available evidence, so that Connor's flow only handles new submissions. [PROPOSED to Connor 2026-10-20; confirm so both do not write the same rows.]
 
@@ -36,6 +38,8 @@ For each in-scope award: read `_wmkf_projectleader_value`, `_akoya_applicantid_v
 - `no-junction-row` — the project leader has no PI junction row. The junction backfill (`scripts/backfill-request-person-junction.js`) predates later requests, and Connor's dual-write flows have not shipped (Atlas), so these are expected for newer awards. Creating the row is a separate owner decision; report the count.
 - `pi-mismatch` — junction PI contact differs from the project leader. Review.
 - `no-applicant` — no applicant account. Review.
+- `multiple-pi-rows` — more than one PI junction row on the request (the alternate key allows it when the contacts differ). Review.
+- `other` — any state the classes above miss; never written.
 - `contact-elsewhere` — the PI contact's current parent account differs from the applicant. Still `write` (the applicant is the award-time institution), but listed so the owner can see who moved or is mislinked.
 
 ### 3.2 Stage B resolve — co-PIs, read-only
