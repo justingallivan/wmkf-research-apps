@@ -31,6 +31,7 @@ describe('isBudgetFile', () => {
     ['Budget Reallocation Supplement 1 (5-19-2020).pdf', false],
     ['NCE 2020 - Keck2017 NCE Justification and Itemized Spending Plan.pdf', false],
     ['No-Cost Extension Budget.pdf', false], ['Final Report Budget.xlsx', false],
+    ['2018_DEC_UCLA_992037_Revised Budget Approval.pdf', false], ['UCLA BUDGET PAGE - Edited.xlsx', true],
   ])('%s → %s', (name, expected) => expect(isBudgetFile(name)).toBe(expected));
 });
 

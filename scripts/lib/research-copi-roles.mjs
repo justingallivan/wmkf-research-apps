@@ -39,7 +39,7 @@ export function quoteVerified(quote, source, docTexts) {
 
 // Post-award paperwork (reallocations, no-cost extensions, supplements, reports)
 // does not describe the proposed team.
-const POST_AWARD = /realloc|\bnce\b|no[\s-]*cost|extension|supplement|spending\s*plan|report|amendment|rebudget/i;
+const POST_AWARD = /realloc|\bnce\b|no[\s-]*cost|extension|supplement|spending\s*plan|report|amendment|rebudget|revised|approval/i;
 
 /** Proposal-stage budget, budget-justification and personnel files, by name. */
 export const isBudgetFile = (name) => /budget|justification|personnel/i.test(name || '')
