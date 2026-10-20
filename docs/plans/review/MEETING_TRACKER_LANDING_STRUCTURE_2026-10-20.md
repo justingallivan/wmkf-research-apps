@@ -25,6 +25,7 @@ related:
 - [Narrow-screen screenshot, 390px wide](meeting-tracker-2026-10-20/narrow.png).
 - [Sessions HTML mockup](meeting-tracker-2026-10-20/sessions.html), [desktop screenshot](meeting-tracker-2026-10-20/sessions-desktop.png), and [narrow-screen screenshot](meeting-tracker-2026-10-20/sessions-narrow.png).
 - [Session detail HTML mockup](meeting-tracker-2026-10-20/session-detail.html), [desktop screenshot](meeting-tracker-2026-10-20/session-detail-desktop.png), and [narrow-screen screenshot](meeting-tracker-2026-10-20/session-detail-narrow.png).
+- [Visit detail HTML mockup](meeting-tracker-2026-10-20/visit-detail.html), [desktop screenshot](meeting-tracker-2026-10-20/visit-detail-desktop.png), and [narrow-screen screenshot](meeting-tracker-2026-10-20/visit-detail-narrow.png).
 - [Original audit](../../../.impeccable/critique/2026-10-19T22-21-01Z__nts-meeting-tracker-meetingtrackerlist-js-ef43d395.md) — dated source and production inspection, not a fresh runtime assessment.
 - [Vocabulary review](PROPOSAL_WORKFLOW_VOCABULARY_2026-10-19.md) — proposed names and owner-edited deck, awaiting colleague feedback.
 
@@ -63,7 +64,7 @@ The standalone HTML files link between Cycle schedule and Sessions. No app code,
 
 ## Session detail — proposed read view, 2026-10-20
 
-[VERIFIED via owner instruction] Create and save desktop and narrow-screen session detail mockups with provisional labels; do not change the app. This screen’s layout remains a proposal for owner review.
+[VERIFIED via owner instruction] Create and save desktop and narrow-screen session detail mockups with provisional labels; do not change the app. This screen’s layout remains a proposal for owner review. The owner subsequently found it busy and is willing to iterate later; it is a working draft, not an approved final layout.
 
 The proposed read view leads with date, start/end time and time zone, status and Join meeting. A compact summary contains location, duration, attendee count and Edit session details. Proposal order is the main working area, with calculated start times, allocated minutes, request identity and request/briefing actions. The missing-briefing case uses Check briefing, not direct creation. Attendees, notes and agenda sharing sit in a desktop sidebar and follow the agenda on narrow screens. Edit proposal order remains separate from the read view.
 
@@ -74,6 +75,22 @@ Prepare agenda is a static entry point to a future reviewed composer layout. No 
 Edit forms, reordering/moving/removing proposals, cancellation, conflict/over-capacity warnings, missing links, unavailable briefings, attendee issues, agenda-send uncertainty, loading/errors/empty states and long agendas are not designed or runtime-verified here. Preserve those existing behaviors when a separately authorized implementation is scoped. This mockup is not acceptance of keyboard accessibility, interaction behavior, data loading or sending.
 
 Only the selected illustrative session and its preview link to this detail; the detail links back to Sessions. All names and related labels remain provisional. No app, API, persistence, design-system or vocabulary decision changes are included.
+
+## Visit detail — quieter proposed read view, 2026-10-20
+
+[VERIFIED via owner instruction] Create and save desktop and narrow-screen visit detail mockups with provisional labels and no application changes. The composition is proposed for owner review; it is not implementation approval.
+
+The proposal responds to the owner’s feedback that session detail still looks busy. Request identity, visit time/time zone, virtual location/organizer and Join meeting remain visible. Attendees and notes collapse under one disclosure. Applicant materials is expanded in this illustrative pre-visit state. Recording setup, Presentation, Staff discussion and Board materials follow in the existing work order as collapsed sections, each with a visible summary and provisional status. Disclosure sections open locally in the HTML; uploads, sends and joins are inert.
+
+[VERIFIED via source inspection] `shared/components/meeting-tracker/SiteVisitEditor.js` provides visit logistics, organizer, required/optional attendees and notes, followed by applicant-materials and recording/result components. The existing Site Visit surface brief (`.impeccable/surfaces/onents-meeting-tracker-sitevisiteditor-js-e5657c91.md`) specifies Recording setup → Presentation → Staff discussion → Board materials. `SiteVisitMaterialsCard.js` provides checklist receipt states, due/invitation metadata, uploads and reminder actions. `RecordingAndTranscriptCard.js` provides the separate follow-up sections. These capabilities ground the mockup; the new collapsed composition and section-level rollups are proposed, not current runtime behavior.
+
+The synthetic example has one received file and one missing file, before its due date, six attendees, no recording outputs and no Board link. Checklist item names are illustrative and do not redefine actual required materials. Waiting, Not started, Not ready and No link are scoped display examples, not new persisted states or a universal readiness algorithm. Join meeting is not a confirmation of calendar invitations or attendance.
+
+Before implementation, define section summaries against the existing per-artifact states. Attention, failed upload/transcription, unavailable state, privacy/publication readiness, partial success and unresolved sends must remain visible even when a section is collapsed. Do not let quiet styling hide actionable failures. Do not infer a publishable Board bundle from aggregate readiness. Reminder/invitation actions retain their review steps; no messages are sent by these artifacts.
+
+Detailed upload/transcription/speaker-review/output/Board-link flows, edit forms, in-person and unscheduled states, loading/errors and long content remain outside this first layout. Opening a collapsed mock section reveals explanatory content rather than a completed functional design. Both default screenshots and expanded Board-section checks rendered without horizontal overflow at the two captured widths. This does not establish full accessibility or runtime acceptance.
+
+The first illustrative Open visit action in Cycle schedule links to this example; other request links remain static. Labels remain provisional. No application, API, schema, design-system or vocabulary changes are included.
 
 ## Before implementation, after vocabulary is settled
 
