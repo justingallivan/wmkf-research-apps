@@ -6,7 +6,9 @@
  * Tested by tests/unit/research-copi-roles.test.js.
  */
 
-export const CO_PI_ROLES = new Set(['co-pi', 'co-investigator']);
+// 'pi' = the documents call this person a PI or project leader on THIS proposal
+// although they are not the lead PI (multi-PI and multi-project proposals).
+export const CO_PI_ROLES = new Set(['pi', 'co-pi', 'co-investigator']);
 
 /** Normalize text for quote matching: case, whitespace, punctuation and ligature noise from PDF extraction. */
 export function normalizeForQuote(s) {
@@ -35,8 +37,14 @@ export function quoteVerified(quote, source, docTexts) {
   return Boolean(text && text.includes(q));
 }
 
-/** Budget, budget-justification and personnel files, by name. */
-export const isBudgetFile = (name) => /budget|justification|personnel|key\s*personnel/i.test(name || '') && /\.(pdf|docx?|xlsx?)$/i.test(name || '');
+// Post-award paperwork (reallocations, no-cost extensions, supplements, reports)
+// does not describe the proposed team.
+const POST_AWARD = /realloc|\bnce\b|no[\s-]*cost|extension|supplement|spending\s*plan|report|amendment|rebudget/i;
+
+/** Proposal-stage budget, budget-justification and personnel files, by name. */
+export const isBudgetFile = (name) => /budget|justification|personnel/i.test(name || '')
+  && !POST_AWARD.test(name || '')
+  && /\.(pdf|docx?|xlsx?)$/i.test(name || '');
 
 /**
  * Decide one person's status from the model's report.

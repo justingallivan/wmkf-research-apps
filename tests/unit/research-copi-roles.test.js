@@ -28,12 +28,20 @@ describe('isBudgetFile', () => {
   test.each([
     ['Budget Justification.pdf', true], ['BUDGET.xlsx', true], ['Key Personnel.docx', true],
     ['Narrative.pdf', false], ['budget-notes.txt', false],
+    ['Budget Reallocation Supplement 1 (5-19-2020).pdf', false],
+    ['NCE 2020 - Keck2017 NCE Justification and Itemized Spending Plan.pdf', false],
+    ['No-Cost Extension Budget.pdf', false], ['Final Report Budget.xlsx', false],
   ])('%s → %s', (name, expected) => expect(isBudgetFile(name)).toBe(expected));
 });
 
 describe('decideRole', () => {
   test('stated co-investigator role with a verified quote is a co-PI', () => {
     const out = decideRole({ role_stated: 'Co-Investigator', role_quote: 'Role: Co-Investigator on the proposed Keck project', role_source: 'bio.pdf' }, true, docs);
+    expect(out.decision).toBe('co-PI');
+  });
+  test('a non-lead PI on a multi-PI proposal counts as a co-PI', () => {
+    const multi = new Map([['p.pdf', normalizeForQuote('PI Alec Davidson would fill this knowledge gap by identifying the SCN neurons')]]);
+    const out = decideRole({ role_stated: 'pi', role_quote: 'PI Alec Davidson would fill this knowledge gap', role_source: 'p.pdf' }, true, multi);
     expect(out.decision).toBe('co-PI');
   });
   test('a stated co-PI role whose quote is not in the documents is rejected', () => {
