@@ -161,8 +161,11 @@ for (const r of inv) {
     for (const f of docs) {
       if ((f.size || 0) > MAX_BYTES) continue;
       if (!driveIds.has(f.library)) driveIds.set(f.library, await GraphService.getDriveId(f.library));
-      const { buffer } = await GraphService.downloadFile(driveIds.get(f.library), f.id, { maxBytes: MAX_BYTES });
-      const text = await extractTextFromBuffer(buffer, f.name, f.mimeType);
+      let text = '';
+      try {
+        const { buffer } = await GraphService.downloadFile(driveIds.get(f.library), f.id, { maxBytes: MAX_BYTES });
+        text = await extractTextFromBuffer(buffer, f.name, f.mimeType);
+      } catch { continue; } // e.g. a ".docx" that is not a Word file: use the other documents
       if (text.trim().length < 200) continue;
       wrapped.push(wrapUntrustedContent({ text, source: 'extract-research-copi-candidates', dataClass: DATA_CLASSES.PROPOSAL_TEXT, maxChars: MAX_DOC_CHARS, label: f.name }));
     }
@@ -173,7 +176,7 @@ for (const r of inv) {
       const res = await llm.complete({
         system: SYSTEM(wrapped.map((w) => w.nonce)),
         messages: [{ role: 'user', content: `Proposal ${r.request_num}. Applicant institution on record: ${base.applicant || 'unknown'}.\n\n${wrapped.map((w) => w.text).join('\n\n')}` }],
-        maxTokens: 3000,
+        maxTokens: 8000, // large teams overflowed 3000 and truncated the JSON
         temperature: 0,
       });
       tokensIn += res.usage?.inputTokens || 0;
