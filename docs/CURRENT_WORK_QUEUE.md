@@ -81,7 +81,10 @@ sequence.
   per concept with colleagues after D26; the change then lands across the suite
   in one pass. Inventory, workflow order, code-identifier contracts and the
   decision list: `docs/NOMENCLATURE_GLOSSARY.md` → "Deliberations workflow
-  vocabulary".
+  vocabulary". Latest owner-edited colleague-review deck and proposed table:
+  `docs/plans/review/PROPOSAL_WORKFLOW_VOCABULARY_2026-10-19.md`.
+  [OWNER DIRECTION 2026-10-19] Review with colleagues before app changes;
+  Staff Deliberations stays and the collection is proposed as Discussion summaries.
 
 - **Staff Deliberations: group-review handoff from the writeup step
   (2026-10-06).** [STAGE 1 LIVE — PR #452, merge `40b70a145`, Production 2026-10-06]
@@ -110,10 +113,12 @@ sequence.
   (b) the two writeup "check in Word" warnings no longer say "the Dataverse fill"
   (`lib/services/pre-site-visit/artifact-model.js`). Owner approved both wordings.
 
-- **Deliberations vocabulary: owner to pick up November 1, 2026 (owner request, 2026-10-07).**
-  The options sheet is ready: `docs/plans/DELIBERATIONS_VOCABULARY_OPTIONS_2026-10-08.md`
-  (eight concepts, current counts, a suggested name for each). The group decides after D26;
-  then one suite-wide rename on a branch. Nothing to do before then.
+- **Deliberations vocabulary: colleague review pending (owner, 2026-10-19).**
+  The owner has now reviewed the terminology and edited the presentation:
+  `docs/plans/review/PROPOSAL_WORKFLOW_VOCABULARY_2026-10-19.md` links the exact deck
+  and proposed names. The October 8 options sheet is an earlier historical proposal.
+  The earlier November 1 reminder does not block preparation already completed.
+  Await colleague feedback and explicit implementation scope before a suite-wide rename.
 
 - **Cycle rollover with minimal configuration (2026-10-06).** [OPEN —
   investigation designed, not started] Owner principle: very few parameters may

@@ -3,7 +3,7 @@ title: Deliberations Vocabulary — Options Sheet for the Group Decision
 domain: product
 kind: plan
 status: proposed
-summary: "One-page options sheet for the owner's after-D26 group decision on Staff Deliberations wording: the eight concepts, the variants in use with current counts, a suggested name for each, and the code names that stay unless the group chooses to migrate them. Resurface on November 1, 2026."
+summary: "Historical October 8 vocabulary options and dated counts; superseded as the latest proposal by the October 19 owner-edited colleague-review deck and table. No application rename is authorized."
 canonical: false
 owner: product-engineering
 related:
@@ -11,6 +11,11 @@ related:
 ---
 
 # Deliberations vocabulary: options sheet
+
+**Historical proposal:** the October 19 owner-edited colleague-review deck and table
+in `docs/plans/review/PROPOSAL_WORKFLOW_VOCABULARY_2026-10-19.md` supersede this
+sheet as the latest proposed names. Preserve the dated counts and suggestions below
+as history. Neither proposal authorizes application renames.
 
 **Prepared 2026-10-08 (Session 584) for the owner. Resurface on November 1, 2026** (owner request), ahead
 of the group discussion after the D26 cycle. Nothing here is decided. The decision, and the record

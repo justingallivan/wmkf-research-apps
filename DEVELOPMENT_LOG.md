@@ -10,6 +10,19 @@ The chronological archive after the `Legacy chronological session log` divider c
 
 ---
 
+## October 2026 — Printable proposal and discussion briefings released (Session 621)
+
+**Milestone:** Meeting Tracker provides a printable cycle briefing grouped by SE and MR.
+**Sessions:** 621 (Codex; owner-directed implementation, review, merge and production verification).
+**Ship state:**
+- PR #512 merged as `1120f95ec` after passing checks; the release was production-smoked earlier in this session.
+- `/meeting-tracker/program-briefing` combines proposal and post-presentation discussion summaries with accepted sentiment highlights and print support.
+- Navigation links from Meeting Tracker and Discussion Sentiment expose the page. Proposed label Discussion summaries remains pending colleague review.
+**Why it matters:** staff can read a compact account of each proposal and its discussion outside the sentiment analysis screen.
+**Pointers:** `shared/components/meeting-tracker/ProgramBriefingView.js`; `lib/services/meeting-tracker/program-briefing-service.js`; PR #512; `docs/plans/review/PROPOSAL_WORKFLOW_VOCABULARY_2026-10-19.md`.
+
+---
+
 ## October 2026 — Verified audio upload optimization released (Session 620)
 
 **Milestone:** Zoom imports and transcription uploads reduce whole-file memory copies while preserving full-file validation.
