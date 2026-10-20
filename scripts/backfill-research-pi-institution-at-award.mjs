@@ -2,7 +2,8 @@
  * backfill-research-pi-institution-at-award.mjs — Stage A of the Research
  * Institution at Award backfill: PI rows on awarded Research requests.
  * Plan: docs/plans/RESEARCH_INSTITUTION_AT_AWARD_BACKFILL_PLAN_2026-10-20.md §3.1.
- * Owner-run only. Write/log shape follows apply-research-pi-orcid-backfill.mjs.
+ * Owner-run only. Write/log shape follows apply-research-pi-orcid-backfill.mjs;
+ * decision rules live in scripts/lib/research-iaa-backfill.mjs (unit-tested).
  *
  * Scope (owner, 2026-10-20): akoya_requeststatus Approved/Active/Closed,
  * program name contains "research" but not "reviewer" (same as
@@ -12,10 +13,11 @@
  * Two write groups, each applied only when asked:
  *   iaa      Set wmkf_apprequestperson.wmkf_InstitutionAtAward to the
  *            request's applicant account on the PI junction row.
- *   contact  (--contact-accounts) Set contact.parentcustomerid to that
- *            applicant account, only for PI contacts with no account and no
- *            other contact sharing an email or first + last name. One write
- *            per contact, from its most recent in-scope award.
+ *   contact  (--contact-accounts) Set contact.parentcustomerid to an applicant
+ *            account, only for PI contacts with no account and no other contact
+ *            sharing an email or first + last name. The account comes from the
+ *            contact's latest in-scope award (IAA already set or not); a tie
+ *            between different applicants on that date is not written.
  *
  * Modes (all take --out-dir=<dir outside the repo>):
  *   --resolve (default) READ-ONLY. Classifies every in-scope award and writes
@@ -23,20 +25,20 @@
  *       research-pi-iaa-review.csv (names, for owner review), then prints
  *       counts and the 8-char resolve hash. Options: --since=YYYY-MM-DD.
  *   --apply --confirm=<resolve hash> --approver="<name>" [--contact-accounts] [--first=N]
- *       Re-reads each target, writes with If-Match, re-reads the result, and
- *       appends intent/result lines to research-pi-iaa-applied.jsonl.
- *       Rerunnable: rows with a non-failed result are skipped.
- *   --verify READ-ONLY. Re-reads every target whose latest result is `write`.
+ *       Per target: re-reads the request and its PI rows and skips any drift
+ *       from the resolve snapshot (contacts also re-run the duplicate search),
+ *       re-reads the target, writes only an empty value with If-Match, then
+ *       re-reads it. A write is rollback-eligible only if the post-write read
+ *       shows this script's own Dataverse user (WhoAmI) as `modifiedby`.
+ *       Intent/result lines go to research-pi-iaa-applied.jsonl; reruns skip
+ *       targets with a non-failed result.
+ *   --verify READ-ONLY. Re-reads every written value not confirmed cleared.
  *   --rollback --ids=<file of target ids | all>
- *       Clears a value only where this script's `write` still stands
- *       (unchanged ETag since the post-write read and the same value).
+ *       Clears a value only where this script's attributed write still stands
+ *       (unchanged ETag since the post-write read and the same value). Failed
+ *       attempts can be retried; cleared targets are never re-applied.
  * Write modes need DATAVERSE_PROD_WRITE_ACK="<purpose> <YYYY-MM-DD>" (the
  * Dataverse interlock's local→production write exception).
- *
- * Resolve classes: write, already-set, no-junction-row, multiple-pi-rows,
- * pi-mismatch, no-applicant, other. `write` rows carry contactAccount =
- * same | elsewhere | empty | not-account, and for `empty` contactLink =
- * eligible | duplicate.
  *
  * Acts against whatever .env.local points at. The review CSV holds PI names:
  * keep it out of the repo. The JSONL logs hold ids only.
@@ -45,6 +47,10 @@
 import fs from 'fs';
 import path from 'path';
 import crypto from 'crypto';
+import {
+  AWARDED, lc, classifyAward, pickContactAccounts, sourceDrift, planTargets,
+  foldLedger, applyDone, rollbackEligible, verifyTarget,
+} from './lib/research-iaa-backfill.mjs';
 
 try {
   const env = fs.readFileSync('.env.local', 'utf8');
@@ -79,12 +85,13 @@ if ((MODE === 'apply' || MODE === 'rollback') && !process.env.DATAVERSE_PROD_WRI
 
 const { DynamicsService } = await import('../lib/services/dynamics-service.js');
 const { bypassDynamicsRestrictions } = await import('../lib/services/dynamics-context.js');
+const { fetchWithTimeout } = await import('../lib/services/dynamics/http.js');
 const { escape } = await import('../lib/dataverse/core/odata.js');
 
-const AWARDED = ['Approved', 'Active', 'Closed'];
 const ROLE_PI = 100000000;
 const JUNCTION = 'wmkf_apprequestpersons';
-const lc = (v) => (v ? String(v).toLowerCase() : null);
+const REQUEST_SELECT = 'akoya_requestid,akoya_requestnum,wmkf_meetingdate,akoya_requeststatus,_akoya_programid_value,_akoya_applicantid_value,_wmkf_projectleader_value';
+const PI_ROW_SELECT = 'wmkf_apprequestpersonid,wmkf_assignmentkey,_wmkf_request_value,_wmkf_contact_value,_wmkf_institutionataward_value';
 const lcTrim = (v) => (v ? String(v).trim().toLowerCase() : null);
 const sha = (s) => crypto.createHash('sha256').update(s).digest('hex');
 const now = () => new Date().toISOString();
@@ -103,28 +110,32 @@ async function inBatches(ids, size, fn) {
   for (let i = 0; i < ids.length; i += size) out.push(...(await fn(ids.slice(i, i + size))));
   return out;
 }
+async function getOrNull(entitySet, id, select) {
+  try { return await DynamicsService.getRecord(entitySet, id, { select }); }
+  catch (err) { if (err?.status === 404) return null; throw err; }
+}
+const readPiRows = (requestId) => readAll(JUNCTION, { select: PI_ROW_SELECT, filter: `_wmkf_request_value eq ${requestId} and wmkf_role eq ${ROLE_PI}` });
 
-// ── Write targets. Each target is one field on one record. ──
+// ── Write targets. Each target is one lookup on one record. ──
 const TARGETS = {
   iaa: {
     entitySet: JUNCTION,
-    select: '_wmkf_institutionataward_value,_wmkf_contact_value,_wmkf_request_value',
+    select: '_wmkf_institutionataward_value,_modifiedby_value',
     value: (rec) => lc(rec?._wmkf_institutionataward_value),
     bind: (accountId) => ({ 'wmkf_InstitutionAtAward@odata.bind': accountId ? `/accounts(${accountId})` : null }),
   },
   contact: {
     entitySet: 'contacts',
-    select: '_parentcustomerid_value,statecode',
+    select: '_parentcustomerid_value,statecode,_modifiedby_value',
     value: (rec) => lc(rec?._parentcustomerid_value),
     bind: (accountId) => ({ 'parentcustomerid_account@odata.bind': accountId ? `/accounts(${accountId})` : null }),
   },
 };
-const readTarget = (kind, id) => DynamicsService.getRecord(TARGETS[kind].entitySet, id, { select: TARGETS[kind].select });
+const readTarget = (kind, id) => getOrNull(TARGETS[kind].entitySet, id, TARGETS[kind].select);
 
-// ── Resolve ──
+// ── Duplicate-contact search ──
 const CONTACT_SELECT = 'contactid,fullname,firstname,lastname,emailaddress1,emailaddress2,emailaddress3,_parentcustomerid_value';
 const emailsOf = (c) => [c.emailaddress1, c.emailaddress2, c.emailaddress3].map(lcTrim).filter(Boolean);
-
 // Other contacts sharing any email (either direction) or the same first + last name.
 async function otherContactCount(c) {
   const clauses = [];
@@ -134,6 +145,7 @@ async function otherContactCount(c) {
   return (await readAll('contacts', { select: 'contactid', filter: `(${clauses.join(' or ')}) and contactid ne ${c.contactid}` })).length;
 }
 
+// ── Resolve ──
 async function runResolve() {
   const programs = await readAll('akoya_programs', { filter: 'akoya_programid ne null' });
   const programName = (p) => p.akoya_name ?? p.akoya_programname ?? p.akoya_program
@@ -144,14 +156,14 @@ async function runResolve() {
   const programFilter = research.map((p) => `_akoya_programid_value eq ${p.akoya_programid}`).join(' or ');
   const statusFilter = AWARDED.map((s) => `akoya_requeststatus eq '${s}'`).join(' or ');
   const requests = await readAll('akoya_requests', {
-    select: 'akoya_requestid,akoya_requestnum,wmkf_meetingdate,akoya_requeststatus,_akoya_programid_value,_akoya_applicantid_value,_wmkf_projectleader_value',
+    select: REQUEST_SELECT,
     filter: `(${programFilter}) and (${statusFilter}) and wmkf_meetingdate ge ${SINCE}`,
     orderby: 'wmkf_meetingdate asc',
   });
   const requestIds = requests.map((r) => lc(r.akoya_requestid));
 
   const piRows = await inBatches(requestIds, 50, (ids) => readAll(JUNCTION, {
-    select: 'wmkf_apprequestpersonid,wmkf_assignmentkey,_wmkf_request_value,_wmkf_contact_value,_wmkf_institutionataward_value',
+    select: PI_ROW_SELECT,
     filter: `(${ids.map((id) => `_wmkf_request_value eq ${id}`).join(' or ')}) and wmkf_role eq ${ROLE_PI}`,
   }));
   const rowsByRequest = new Map();
@@ -169,60 +181,56 @@ async function runResolve() {
     filter: ids.map((id) => `contactid eq ${id}`).join(' or '),
   }))).map((c) => [lc(c.contactid), c]));
 
-  function classify(r) {
-    const rows = rowsByRequest.get(lc(r.akoya_requestid)) || [];
-    const leader = lc(r._wmkf_projectleader_value);
-    const applicant = lc(r._akoya_applicantid_value);
-    if (rows.length === 0) return leader ? { cls: 'no-junction-row' } : { cls: 'other', reason: 'no project leader and no PI row' };
-    if (rows.length > 1) return { cls: 'multiple-pi-rows' };
-    const row = rows[0];
-    const contact = lc(row._wmkf_contact_value);
-    if (!leader) return { cls: 'other', row, reason: 'PI row but no project leader' };
-    if (contact !== leader) return { cls: 'pi-mismatch', row };
-    if (row._wmkf_institutionataward_value) return { cls: 'already-set', row };
-    if (!applicant) return { cls: 'no-applicant', row };
-    if (r._akoya_applicantid_value_entity && r._akoya_applicantid_value_entity !== 'account') {
-      return { cls: 'other', row, reason: `applicant is a ${r._akoya_applicantid_value_entity}` };
-    }
-    const c = contacts.get(contact);
-    const parent = lc(c?._parentcustomerid_value);
-    const contactAccount = !parent ? 'empty'
-      : c._parentcustomerid_value_entity !== 'account' ? 'not-account'
-        : parent === applicant ? 'same' : 'elsewhere';
-    return { cls: 'write', row, contactAccount };
-  }
+  const classified = requests.map((r) => ({ r, ...classifyAward(r, rowsByRequest.get(lc(r.akoya_requestid)) || [], contacts) }));
 
-  const classified = requests.map((r) => ({ r, ...classify(r) }));
-  // Duplicate check only for contacts that would receive an account.
-  const linkStatus = new Map();
-  for (const x of classified.filter((y) => y.cls === 'write' && y.contactAccount === 'empty')) {
+  // Contact accounts: duplicate check on every empty-account PI contact, then
+  // pick each eligible contact's latest award among write and already-set rows.
+  const emptyRows = classified.filter((x) => (x.cls === 'write' || x.cls === 'already-set') && x.contactAccount === 'empty');
+  const dupStatus = new Map();
+  for (const x of emptyRows) {
     const id = lc(x.row._wmkf_contact_value);
-    if (!linkStatus.has(id)) linkStatus.set(id, (await otherContactCount(contacts.get(id))) ? 'duplicate' : 'eligible');
+    if (!dupStatus.has(id)) dupStatus.set(id, (await otherContactCount(contacts.get(id))) ? 'duplicate' : 'eligible');
   }
+  const picks = pickContactAccounts(emptyRows
+    .filter((x) => dupStatus.get(lc(x.row._wmkf_contact_value)) === 'eligible')
+    .map((x) => ({
+      contactId: lc(x.row._wmkf_contact_value),
+      meetingDate: (x.r.wmkf_meetingdate || '').slice(0, 10),
+      applicantAccountId: lc(x.r._akoya_applicantid_value),
+      requestId: lc(x.r.akoya_requestid),
+    })));
 
   const results = classified.map(({ r, cls, row, reason, contactAccount }) => {
     const leader = contacts.get(lc(r._wmkf_projectleader_value));
     const rowContact = row ? contacts.get(lc(row._wmkf_contact_value)) : null;
-    const contactLink = contactAccount === 'empty' ? linkStatus.get(lc(row._wmkf_contact_value)) : null;
+    const contactId = row ? lc(row._wmkf_contact_value) : lc(r._wmkf_projectleader_value);
+    const pick = picks.get(contactId);
+    const contactLink = contactAccount !== 'empty' || !row ? null
+      : dupStatus.get(contactId) === 'duplicate' ? 'duplicate'
+        : pick?.status === 'tie' ? 'tie' : 'eligible';
+    const contactLinkSelected = contactLink === 'eligible' && pick?.status === 'selected' && pick.requestId === lc(r.akoya_requestid);
     return {
       ids: {
         class: cls,
         host,
         requestId: lc(r.akoya_requestid),
         requestNum: r.akoya_requestnum,
+        programId: lc(r._akoya_programid_value),
         meetingDate: (r.wmkf_meetingdate || '').slice(0, 10),
         junctionRowId: row ? lc(row.wmkf_apprequestpersonid) : null,
-        contactId: row ? lc(row._wmkf_contact_value) : lc(r._wmkf_projectleader_value),
+        contactId,
         applicantAccountId: lc(r._akoya_applicantid_value),
         existingInstitutionAtAward: row ? lc(row._wmkf_institutionataward_value) : null,
         contactAccount: contactAccount || null,
-        contactLink: contactLink || null,
+        contactLink,
+        contactLinkSelected,
         reason: reason || null,
       },
       review: {
         class: cls,
         contact_account: contactAccount || '',
         contact_link: contactLink || '',
+        contact_link_write: contactLinkSelected ? 'yes' : '',
         reason: reason || '',
         request_num: r.akoya_requestnum || '',
         meeting_date: (r.wmkf_meetingdate || '').slice(0, 10),
@@ -250,7 +258,9 @@ async function runResolve() {
   for (const k of classes) console.log(`  ${k.padEnd(17)} ${count((x) => x.ids.class === k)}`);
   console.log('  write rows by contact_account:');
   for (const k of ['same', 'elsewhere', 'empty', 'not-account']) console.log(`    ${k.padEnd(12)} ${count((x) => x.ids.class === 'write' && x.ids.contactAccount === k)}`);
-  console.log(`  empty-account contacts: ${[...linkStatus.values()].filter((v) => v === 'eligible').length} eligible for an account link, ${[...linkStatus.values()].filter((v) => v === 'duplicate').length} with a possible duplicate`);
+  const dupVals = [...dupStatus.values()];
+  console.log(`  empty-account PI contacts: ${dupStatus.size} — ${dupVals.filter((v) => v === 'duplicate').length} possible duplicate, `
+    + `${[...picks.values()].filter((p) => p.status === 'tie').length} tie, ${count((x) => x.ids.contactLinkSelected)} contact account writes planned`);
   const years = [...new Set(results.map((x) => x.review.meeting_date.slice(0, 4)))].sort();
   console.log('  by meeting year (total / write):');
   for (const y of years) console.log(`    ${y}  ${count((x) => x.review.meeting_date.startsWith(y))} / ${count((x) => x.review.meeting_date.startsWith(y) && x.ids.class === 'write')}`);
@@ -259,29 +269,17 @@ async function runResolve() {
   console.log(`Resolve hash (pass to --apply --confirm=): ${sha(jsonl).slice(0, 8)}`);
 }
 
-// ── Plan: the write targets implied by a resolve file. ──
-function planTargets(resolved, includeContacts) {
-  const writes = resolved.filter((x) => x.class === 'write');
-  const plan = writes.map((x) => ({
-    kind: 'iaa', id: x.junctionRowId, value: x.applicantAccountId,
-    expect: { contact: x.contactId, request: x.requestId }, requestNum: x.requestNum,
-  }));
-  if (includeContacts) {
-    const latestByContact = new Map();
-    for (const x of writes.filter((y) => y.contactLink === 'eligible')) {
-      const prev = latestByContact.get(x.contactId);
-      if (!prev || x.meetingDate > prev.meetingDate) latestByContact.set(x.contactId, x);
-    }
-    for (const x of latestByContact.values()) plan.push({ kind: 'contact', id: x.contactId, value: x.applicantAccountId, requestNum: x.requestNum });
-  }
-  return plan;
+// ── Apply ──
+async function whoAmI() {
+  const token = await DynamicsService.getAccessToken();
+  const res = await fetchWithTimeout(`${process.env.DYNAMICS_URL}/api/data/v9.2/WhoAmI`, {
+    headers: { Authorization: `Bearer ${token}`, Accept: 'application/json', 'OData-Version': '4.0' },
+  }, 60000);
+  if (!res.ok) throw new Error(`WhoAmI failed (${res.status})`);
+  const id = lc((await res.json()).UserId);
+  if (!id) throw new Error('WhoAmI returned no UserId');
+  return id;
 }
-
-const latestByTarget = () => {
-  const m = new Map();
-  for (const l of readJsonl(APPLIED_LOG)) m.set(`${l.kind}|${l.id}`, l);
-  return m;
-};
 
 async function runApply() {
   if (!fs.existsSync(RESOLVE_LOG)) { console.error('No resolve file; run --resolve first.'); process.exit(2); }
@@ -291,35 +289,44 @@ async function runApply() {
   const approver = arg('approver');
   if (!approver) { console.error('--approver="<name>" is required'); process.exit(2); }
   const resolved = readJsonl(RESOLVE_LOG);
-  if (resolved.some((x) => x.host !== host)) { console.error('Resolve was run against a different Dataverse host. Re-run --resolve.'); process.exit(2); }
+  if (resolved.some((x) => x.host !== host || !('programId' in x))) { console.error('Resolve file is from another host or an older script version. Re-run --resolve.'); process.exit(2); }
   const plan = planTargets(resolved, flag('contact-accounts'));
   const first = Number(arg('first')) || Infinity;
-  const latest = latestByTarget();
+  const ledger = foldLedger(readJsonl(APPLIED_LOG));
   const runId = `${now()}-${crypto.randomBytes(3).toString('hex')}`;
   let done = 0; const counts = {};
 
   await bypassDynamicsRestrictions('research-pi-iaa-apply', async () => {
+    const me = await whoAmI();
     for (const t of plan) {
       const key = `${t.kind}|${t.id}`;
-      const prev = latest.get(key);
-      if (prev?.phase === 'result' && prev.result !== 'failed') continue;
-      if (prev?.phase === 'rollback') continue;
+      const state = ledger.get(key);
+      if (applyDone(state)) continue;
       if (done >= first) break;
       done += 1;
       const base = { runId, resolveHash: hash, approver, host, kind: t.kind, id: t.id, value: t.value, requestNum: t.requestNum };
       append(APPLIED_LOG, { ...base, phase: 'intent', at: now() });
-      let result; let detail = ''; let etag = null; let after = null;
+      let result; let detail = ''; let etag = null; let after = null; let attributed = false;
       try {
-        // State can change between resolve and apply (or across an interrupted run): re-read first.
-        const cur = await readTarget(t.kind, t.id);
+        // The resolve hash authenticates the snapshot, not current eligibility: re-read the source.
+        const drift = sourceDrift(t.source, {
+          request: await getOrNull('akoya_requests', t.source.requestId, REQUEST_SELECT),
+          piRows: await readPiRows(t.source.requestId),
+        });
+        let dupNow = 0;
+        if (!drift && t.kind === 'contact') {
+          const c = await getOrNull('contacts', t.id, CONTACT_SELECT);
+          dupNow = c ? await otherContactCount(c) : 0;
+        }
+        const cur = drift || dupNow ? null : await readTarget(t.kind, t.id);
         const curValue = TARGETS[t.kind].value(cur);
-        if (!cur) { result = 'missing'; }
-        else if (t.kind === 'iaa' && (lc(cur._wmkf_contact_value) !== t.expect.contact || lc(cur._wmkf_request_value) !== t.expect.request)) {
-          result = 'changed_since_resolve'; detail = 'junction row now points elsewhere';
-        } else if (t.kind === 'contact' && cur.statecode !== 0) { result = 'skipped'; detail = 'contact inactive'; }
+        if (drift) { result = 'changed_since_resolve'; detail = drift; }
+        else if (dupNow) { result = 'skipped'; detail = 'possible duplicate contact now exists'; }
+        else if (!cur) { result = 'missing'; }
+        else if (t.kind === 'contact' && cur.statecode !== 0) { result = 'skipped'; detail = 'contact inactive'; }
         else if (curValue === t.value) {
           // Our own interrupted write, or someone else's identical one: not ours to roll back.
-          result = prev?.phase === 'intent' ? 'present_unattributed' : 'already_set';
+          result = state?.interrupted ? 'present_unattributed' : 'already_set';
         } else if (curValue) { result = 'conflict'; detail = `already holds ${curValue}`; }
         else if (!cur._etag) { result = 'skipped'; detail = 'no ETag on re-read'; }
         else {
@@ -328,28 +335,33 @@ async function runApply() {
             const post = await readTarget(t.kind, t.id);
             etag = post?._etag || null;
             after = TARGETS[t.kind].value(post);
+            // A different modifier means another write landed between our PATCH
+            // and this read; its ETag is not ours to roll back.
+            attributed = lc(post?._modifiedby_value) === me;
             result = after === t.value && etag ? 'write' : 'write_then_changed';
+            if (result === 'write' && !attributed) detail = 'modifiedby is not this script; rollback disabled';
           } catch (err) {
             if (err?.status === 412) { result = 'changed_since_resolve'; detail = '412 on write'; } else throw err;
           }
         }
       } catch (err) { result = 'failed'; detail = String(err.message || err).slice(0, 200); }
-      const rec = { ...base, phase: 'result', result, detail, postWriteEtag: etag, postWriteValue: after, at: now() };
-      append(APPLIED_LOG, rec); latest.set(key, rec);
+      const rec = { ...base, phase: 'result', result, detail, postWriteEtag: etag, postWriteValue: after, rollbackEligible: result === 'write' && attributed, at: now() };
+      append(APPLIED_LOG, rec);
+      ledger.set(key, { receipt: rec, cleared: false, rollbacks: [], interrupted: false });
       counts[`${t.kind}:${result}`] = (counts[`${t.kind}:${result}`] || 0) + 1;
-      if (result !== 'write' && result !== 'already_set') console.log(`  ${t.kind} ${t.requestNum} ${result}${detail ? ` (${detail})` : ''}`);
+      if (result !== 'already_set' && (result !== 'write' || detail)) console.log(`  ${t.kind} ${t.requestNum} ${result}${detail ? ` (${detail})` : ''}`);
     }
   });
   console.log(`Apply this run: ${JSON.stringify(counts)}. Log: ${APPLIED_LOG}`);
-  const rolledBack = plan.filter((t) => latest.get(`${t.kind}|${t.id}`)?.phase === 'rollback').length;
-  const pending = plan.filter((t) => { const l = latest.get(`${t.kind}|${t.id}`); return !(l?.phase === 'rollback' || (l?.phase === 'result' && l.result !== 'failed')); }).length;
-  console.log(`Targets not yet applied: ${pending} of ${plan.length}; rolled back (never re-applied): ${rolledBack}${flag('contact-accounts') ? '' : ' (contact accounts not included; pass --contact-accounts)'}`);
+  const pending = plan.filter((t) => !applyDone(ledger.get(`${t.kind}|${t.id}`))).length;
+  const cleared = plan.filter((t) => ledger.get(`${t.kind}|${t.id}`)?.cleared).length;
+  console.log(`Targets not yet applied: ${pending} of ${plan.length}; rolled back (never re-applied): ${cleared}${flag('contact-accounts') ? '' : ' (contact accounts not included; pass --contact-accounts)'}`);
 }
 
 async function runVerify() {
-  const all = [...latestByTarget().values()];
-  const written = all.filter((l) => l.phase === 'result' && l.result === 'write');
-  console.log(`Rolled back (not verified): ${all.filter((l) => l.phase === 'rollback' && l.outcome === 'cleared').length}`);
+  const ledger = foldLedger(readJsonl(APPLIED_LOG));
+  const states = [...ledger.values()];
+  const written = states.filter(verifyTarget).map((s) => s.receipt);
   let ok = 0; const bad = [];
   await bypassDynamicsRestrictions('research-pi-iaa-verify', async () => {
     for (const l of written) {
@@ -359,23 +371,26 @@ async function runVerify() {
   });
   const byKind = (k) => written.filter((l) => l.kind === k).length;
   console.log(`Verify: ${ok}/${written.length} written values still hold (iaa ${byKind('iaa')}, contact ${byKind('contact')}).`);
+  console.log(`Confirmed rolled back: ${states.filter((s) => s.cleared).length}; writes not rollback-eligible: ${written.filter((l) => !l.rollbackEligible).length}`);
   for (const b of bad) console.log(`  MISMATCH ${b}`);
 }
 
 async function runRollback() {
   const ids = arg('ids');
   if (!ids) { console.error('--ids=<file of target ids | all> is required'); process.exit(2); }
-  const latest = latestByTarget();
+  const ledger = foldLedger(readJsonl(APPLIED_LOG));
   const wanted = ids === 'all'
-    ? [...latest.keys()]
+    ? [...ledger.keys()]
     : fs.readFileSync(ids, 'utf8').split(/\s+/).filter(Boolean).map((s) => s.toLowerCase())
-      .flatMap((id) => ['iaa', 'contact'].map((k) => `${k}|${id}`).filter((k) => latest.has(k)));
+      .flatMap((id) => ['iaa', 'contact'].map((k) => `${k}|${id}`).filter((k) => ledger.has(k)));
   const counts = {};
   await bypassDynamicsRestrictions('research-pi-iaa-rollback', async () => {
     for (const key of wanted) {
-      const l = latest.get(key);
+      const s = ledger.get(key);
+      if (s?.cleared) { counts.already_cleared = (counts.already_cleared || 0) + 1; continue; }
+      const l = s?.receipt;
       let outcome;
-      if (!l || l.phase !== 'result' || l.result !== 'write' || !l.postWriteEtag) outcome = 'not_eligible';
+      if (!rollbackEligible(s)) outcome = 'not_eligible';
       else {
         const cur = await readTarget(l.kind, l.id);
         if (cur?._etag !== l.postWriteEtag || TARGETS[l.kind].value(cur) !== l.value) outcome = 'changed_since_write';
@@ -391,4 +406,9 @@ async function runRollback() {
   console.log(`Rollback: ${JSON.stringify(counts)}`);
 }
 
-await { resolve: () => bypassDynamicsRestrictions('research-pi-iaa-resolve', runResolve), apply: runApply, verify: runVerify, rollback: runRollback }[MODE]();
+await {
+  resolve: () => bypassDynamicsRestrictions('research-pi-iaa-resolve', runResolve),
+  apply: runApply,
+  verify: runVerify,
+  rollback: runRollback,
+}[MODE]();
