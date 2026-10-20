@@ -16,13 +16,14 @@ related:
 
 [VERIFIED via owner decisions in the Codex chat, 2026-10-20] The owner agreed to a cycle schedule landing page whose primary job is to scan the cycle’s requests and open the next task. Sessions have a separate task view within Meeting Tracker. Both session and visit actions remain visible for every request, including on narrow screens.
 
-[VERIFIED via owner instruction, 2026-10-20] Save the structure and mockups for resumption after meeting names are settled. Meeting names and related labels are provisional. This is approval of the structure for design continuation, not authorization to change the application. No application code is changed by this handoff.
+[VERIFIED via owner instruction, 2026-10-20] Save the structure and mockups. Further layout design can continue with provisional labels; final terminology and app implementation remain pending. Meeting names and related labels are provisional. This is approval of the structure for design continuation, not authorization to change the application. No application code is changed by this handoff.
 
 ## Saved artifacts
 
 - [Standalone responsive HTML mockup](meeting-tracker-2026-10-20/index.html) — open locally in a browser; controls are static.
 - [Desktop screenshot, 1440px wide](meeting-tracker-2026-10-20/desktop.png).
 - [Narrow-screen screenshot, 390px wide](meeting-tracker-2026-10-20/narrow.png).
+- [Sessions HTML mockup](meeting-tracker-2026-10-20/sessions.html), [desktop screenshot](meeting-tracker-2026-10-20/sessions-desktop.png), and [narrow-screen screenshot](meeting-tracker-2026-10-20/sessions-narrow.png).
 - [Original audit](../../../.impeccable/critique/2026-10-19T22-21-01Z__nts-meeting-tracker-meetingtrackerlist-js-ef43d395.md) — dated source and production inspection, not a fresh runtime assessment.
 - [Vocabulary review](PROPOSAL_WORKFLOW_VOCABULARY_2026-10-19.md) — proposed names and owner-edited deck, awaiting colleague feedback.
 
@@ -30,7 +31,7 @@ All records, institutions, proposal titles and dates in the mockups are illustra
 
 ## Agreed structure
 
-1. **Cycle schedule is the default view; Sessions is a separate view.** Keep the main page focused on request lookup and scheduling visibility. The Sessions view will carry session creation and session navigation; its detailed design remains pending.
+1. **Cycle schedule is the default view; Sessions is a separate view.** Keep the main page focused on request lookup and scheduling visibility. The Sessions view will carry session creation and session navigation; its initial proposed layout is saved below for owner review.
 2. **Compact request rows.** Show request number, institution and proposal title; separate session and visit columns show the relevant date and explicit Open/Schedule action. Preserve test-request distinctions when eventually implementing against real records.
 3. **One scope toolbar.** Program, cycle, My/All scope and request search sit above the list. Keep result counts and one materials-status filter near the list. Do not put summary cards ahead of the requests.
 4. **Materials support the task.** Show the precise materials status without implying that one completed artifact means the request is complete. The proposed menu keeps existing status meanings and counts; zero-result choices should be disabled.
@@ -45,11 +46,25 @@ This is visual composition evidence only. Live interactions, authorization, resu
 
 Desktop rows are approximately 80px, compared with the design system’s approximately 64px target; the first record also starts below its preferred queue position. Resolve density and header height before implementation rather than changing DESIGN.md to match the mockup.
 
-## Resume after vocabulary is settled
+## Sessions tab — proposed layout, 2026-10-20
+
+[VERIFIED via owner instruction] Continue designing the other tabs and screens now, using provisional labels; do not change the app. The owner requested the Sessions mockups and repository save, but has not yet approved this tab’s composition.
+
+The proposed desktop layout has a session list and a selected agenda preview beside it. The narrow version stacks the preview after the list; the preview link targets that region. Each session shows date, start/end time and time zone, location, Planned/Held status and an Open session action. Same-day sessions remain distinguishable by time and location. Create session is the primary action. Upcoming sessions precede held sessions in the illustrative list.
+
+Scope is explicitly independent of the cycle schedule’s program and request filters. [VERIFIED via source inspection] `pages/api/meeting-tracker/sessions/index.js` GET calls `listDeliberationSessions`; that service returns projected sessions without cycle/program membership filtering, while the adapter excludes cancelled sessions by default. This inspection establishes the current list contract only; no live session reads were performed.
+
+[PLANNED — mockup only] Date-range/status filtering, search including agenda requests, and the list-level selected agenda preview are proposed interactions. Agenda content exists on the session detail surface; integrating it into a list preview requires a separately reviewed data-loading design. No API extension, session name field, cycle-membership mapping or persistence change is approved here. The existing status words are provisional display copy for this mockup, not a decision to alter persisted statuses.
+
+The screenshots use four illustrative sessions, including two on the same day, and a three-request agenda. Both widths were rendered without horizontal document overflow. Controls are static except local navigation/preview anchors; screenshots are visual evidence, not proof of working filters or switching previews. Session details, agenda editing/sending, creation forms, empty/loading/error states and long-list behavior are outside this mockup.
+
+The standalone HTML files link between Cycle schedule and Sessions. No app code, vocabulary decision, session handoff, or design-system files were changed. Further layout work may proceed before vocabulary approval; app implementation still needs explicit scope.
+
+## Before implementation, after vocabulary is settled
 
 1. Obtain the owner-approved meeting names from the vocabulary decision; do not assume the proposed table is final.
 2. Update mockup tabs, column headings and action labels consistently, and review wrapping at both saved widths.
-3. Resolve desktop density, Sessions-view composition, request-detail affordances and session identity/scope. Verify actual session membership before showing a session list as cycle-filtered.
+3. Resolve desktop density, owner review of the Sessions layout, request-detail affordances and session identity/scope. Verify actual session membership before showing a session list as cycle-filtered.
 4. Include loading, empty, error and filter-result announcements in an implementation brief. Preserve workflow status meanings and existing authorization boundaries.
 5. Obtain explicit implementation scope before changing the app. Naming approval alone does not authorize route, API, database or internal identifier migrations.
 
