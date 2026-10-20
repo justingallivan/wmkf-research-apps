@@ -181,15 +181,17 @@ for (const g of ruleAGrants) {
         : { decision: 'unassessed', basis: 'model returned no entry matching this name' };
       out.push({
         ...base(c), decision, basis,
-        roleStated: p.role_stated || '', roleQuote: p.role_quote || '', roleSource: p.role_source || '',
-        inBudget: Boolean(p.in_budget), budgetEffort: p.budget_effort || '', budgetQuote: p.budget_quote || '', budgetSource: p.budget_source || '',
+        roleStated: p?.role_stated || '', roleQuote: p?.role_quote || '', roleSource: p?.role_source || '',
+        inBudget: Boolean(p?.in_budget), budgetEffort: p?.budget_effort || '', budgetQuote: p?.budget_quote || '', budgetSource: p?.budget_source || '',
         documents: docs.map((f) => f.name).join(' | '),
       });
     }
     const mine = out.filter((o) => o.requestNum === g);
     console.log(`  ${g}: ${people.length} people — ${mine.filter((o) => o.decision === 'co-PI').length} co-PI, ${mine.filter((o) => o.decision === 'budget-only').length} budget-only (${budget.length} budget files) — $${cost().toFixed(3)} so far`);
   } catch (err) {
-    for (const c of people) out.push({ ...base(c), decision: 'error', basis: String(err.message || err).slice(0, 150) });
+    // Rows already recorded for this grant stay; only the rest are marked as errors.
+    const recorded = new Set(out.filter((o) => o.requestNum === g).map((o) => o.name));
+    for (const c of people) if (!recorded.has(c.name)) out.push({ ...base(c), decision: 'error', basis: String(err.message || err).slice(0, 150) });
     console.log(`  ${g}: ERROR ${String(err.message || err).slice(0, 120)}`);
   }
 }
