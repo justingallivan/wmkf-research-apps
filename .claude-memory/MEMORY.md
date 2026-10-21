@@ -43,6 +43,7 @@
 - Search / schema language: feedback-grep-general-codebase-terms.md; feedback-human-legibility-schema-principle.md; feedback-staff-ui-never-shows-internal-ids.md; feedback-staff-ui-desktop-first.md
 
 ## Task Routing
+- Outdated apps: project-grant-reporting-rework.md; project-literature-analyzer-rework.md
 - Reviewer search post-refactor limitations / separate Impeccable exceptions: ../docs/plans/REVIEWER_SEARCH_FOLLOW_UPS_2026-09-18.md
 - Reviewer origination / retrieval / excluded-reviewer intake: ../docs/agent-wiki/topics/reviewer-origination.md; ../docs/EXCLUDED_REVIEWERS_STRUCTURED_INTAKE_PLAN.md
 - Reviewer identity / finding / contact / COI / verify-fail safety: ../docs/agent-wiki/topics/reviewer-identity.md; ../docs/REVIEWER_IDENTITY_CONTACT_PLAN.md
