@@ -450,6 +450,10 @@ await bypassDynamicsRestrictions('resolve-research-copi-institution-at-award', a
   const tally = (f, subset = results) => { const t = {}; for (const x of subset) { const k = f(x); t[k] = (t[k] || 0) + 1; } return t; };
   for (const cohort of ['extracted', 'recorded', 'contact']) {
     const sub = results.filter((x) => x.ids.cohort === cohort);
+    if (cohort === 'contact') {
+      console.log(`\ncontact: ${sub.length} empty-account contacts — ${JSON.stringify(tally((x) => x.ids.class, sub))}`);
+      continue;
+    }
     console.log(`\n${cohort}: ${sub.length} rows on ${new Set(sub.map((x) => x.ids.requestNum)).size} requests`);
     console.log(`  class: ${JSON.stringify(tally((x) => x.ids.class, sub))}`);
     console.log(`  contact match: ${JSON.stringify(tally((x) => x.ids.contactMatch, sub))}`);
