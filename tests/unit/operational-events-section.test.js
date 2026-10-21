@@ -12,7 +12,7 @@
  * component against a mocked fetch and exercises both batch actions.
  */
 
-import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import OperationalEventsSection from '../../shared/components/admin/OperationalEventsSection';
 
 jest.mock('../../shared/components/Layout', () => ({
@@ -286,4 +286,74 @@ test('(d) resolveBatch: a malformed 2xx body (bare .json()) shows "Bulk resolve 
   await screen.findByText('×3');
   fireEvent.click(screen.getByRole('button', { name: 'Resolve all 4 shown' }));
   expect(await screen.findByText('Bulk resolve failed')).toBeInTheDocument();
+});
+
+test.each(['resolved', 'recovered', 'superseded'])('%s can be reopened with full freshness and only its action disabled while pending', async (status) => {
+  const event = { ...prefs, status, occurrence_count: status === 'recovered' ? 2 : 7 };
+  if (status === 'superseded') delete event.status_changed_at;
+  const other = { ...prefs, id: 51, summary: 'Another distinct incident', status: 'open' };
+  let finish;
+  global.fetch = jest.fn((url, init) => init?.method === 'PATCH'
+    ? new Promise(resolve => { finish = () => resolve(response({})); })
+    : Promise.resolve(response({ events: [event, other], summary: [] })));
+  render(<OperationalEventsSection />);
+  const card = (await screen.findByText(event.summary)).closest('div.rounded-lg');
+  const otherCard = screen.getByText(other.summary).closest('div.rounded-lg');
+  expect(within(card).queryByRole('button', { name: 'Resolve' })).not.toBeInTheDocument();
+  fireEvent.click(within(card).getByRole('button', { name: 'Reopen' }));
+  await waitFor(() => expect(finish).toBeDefined());
+  expect(within(card).getByRole('button', { name: 'Reopen' })).toBeDisabled();
+  expect(within(card).getByTitle('Expand')).toBeEnabled();
+  expect(within(otherCard).getByRole('button', { name: 'Resolve' })).toBeEnabled();
+  const patches = global.fetch.mock.calls.filter(([, init]) => init?.method === 'PATCH');
+  expect(patches).toHaveLength(1);
+  expect(JSON.parse(patches[0][1].body)).toEqual({
+    action: 'reopen', id: event.id, expectedStatus: status,
+    expectedLastOccurredAt: event.last_occurred_at,
+    expectedStatusChangedAt: event.status_changed_at ?? null,
+    expectedOccurrenceCount: event.occurrence_count,
+  });
+  await act(async () => { finish(); });
+  await waitFor(() => expect(global.fetch.mock.calls.filter(([, init]) => init?.method !== 'PATCH')).toHaveLength(2));
+  await waitFor(() => expect(within(screen.getByText(event.summary).closest('div.rounded-lg')).getByRole('button', { name: 'Reopen' })).toBeEnabled());
+});
+
+test.each(['info', 'unexpected-status'])('%s stays visible and offers neither resolve nor reopen', async (status) => {
+  global.fetch = jest.fn(async () => response({ events: [{ ...prefs, status, severity: status === 'info' ? 'error' : 'unknown-severity' }], summary: [] }));
+  render(<OperationalEventsSection />);
+  const card = (await screen.findByText(prefs.summary)).closest('div.rounded-lg');
+  const badge = within(card).getByText(status);
+  expect(badge).toBeVisible();
+  expect(card).toHaveClass(...(status === 'info' ? ['bg-red-50', 'text-red-700', 'border-red-200'] : ['bg-blue-50', 'text-blue-700', 'border-blue-200']));
+  if (status !== 'info') expect(card.querySelector('span.bg-gray-400')).not.toBeNull();
+  expect(badge).toHaveClass(status === 'info' ? 'bg-blue-100' : 'bg-gray-100');
+  expect(within(card).queryByRole('button', { name: 'Resolve' })).not.toBeInTheDocument();
+  expect(within(card).queryByRole('button', { name: 'Reopen' })).not.toBeInTheDocument();
+});
+
+test('individual expansion is shared across standalone and grouped cards and details stay escaped', async () => {
+  const events = listBody.events.map(e => ({ ...e, correlation_id: `correlation-${e.id}`, resolution_note: 'Resolution detail', entity_refs: { request: 'request-ref' }, metadata: { note: '<img src=x onerror=alert(1)>' } }));
+  global.fetch = jest.fn(async () => response({ ...listBody, events }));
+  render(<OperationalEventsSection />);
+  const single = (await screen.findByText(prefs.summary)).closest('div.rounded-lg');
+  fireEvent.click(within(single).getByTitle('Expand'));
+  expect(screen.getByText('Correlation: correlation-50')).toBeVisible();
+  expect(within(single).getByText('Note: Resolution detail')).toBeVisible();
+  expect(within(single).getByText(/request-ref/)).toBeVisible();
+  const metadata = within(single).getByText(/<img src=x/);
+  expect(metadata.tagName).toBe('PRE');
+  expect(single.querySelector('img')).toBeNull();
+  fireEvent.click(screen.getByTitle(/Show 3 rows/));
+  const member = screen.getByText(/TraceId f472ae7f/).closest('div.rounded-lg');
+  fireEvent.click(within(member).getByTitle('Expand'));
+  expect(screen.queryByText('Correlation: correlation-50')).not.toBeInTheDocument();
+  expect(screen.getByText('Correlation: correlation-2')).toBeVisible();
+  fireEvent.click(screen.getByTitle('Collapse group'));
+  expect(screen.queryByText('Correlation: correlation-2')).not.toBeInTheDocument();
+  fireEvent.click(screen.getByTitle(/Show 3 rows/));
+  expect(screen.getByText('Correlation: correlation-2')).toBeVisible();
+  const reopened = screen.getByText(/TraceId f472ae7f/).closest('div.rounded-lg');
+  fireEvent.click(within(reopened).getByTitle('Collapse'));
+  expect(screen.queryByText('Correlation: correlation-2')).not.toBeInTheDocument();
+  expect(global.fetch).toHaveBeenCalledTimes(1);
 });
