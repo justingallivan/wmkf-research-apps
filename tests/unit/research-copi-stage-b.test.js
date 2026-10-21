@@ -3,7 +3,7 @@
  */
 import {
   selectApprovedCopis, domainOf, institutionalDomain, domainsRelated, domainCandidates, domainWinner,
-  sameName, matchContact, pickLatestAccount, groupNewContacts, resolveExtractedIaa, resolveRecordedIaa, classifyWebEvidence, isNonInstitutionHost,
+  sameName, matchContact, pickLatestAccount, groupNewContacts, contactWebQuery, contactAccountCheck, approvalBucket, resolveExtractedIaa, resolveRecordedIaa, classifyWebEvidence, isNonInstitutionHost,
   webQuery, classifyRow,
 } from '../../scripts/lib/research-copi-stage-b.mjs';
 
@@ -142,6 +142,20 @@ describe('pickLatestAccount', () => {
   });
 });
 
+describe('existing contact current account', () => {
+  test('query is first + last only', () => {
+    expect(contactWebQuery({ firstname: 'Simon J L', lastname: 'Billinge', fullname: 'Simon J L Billinge' })).toBe('"Simon Billinge"');
+    expect(contactWebQuery({ fullname: 'Jane Q. Doe' })).toBe('"Jane Doe"');
+    expect(contactWebQuery({ fullname: 'Cher' })).toBe('');
+  });
+  test('web elsewhere → review; agreement or silence → ready', () => {
+    expect(contactAccountCheck('A', { status: 'suggested-account', accountId: 'B' })).toEqual({ cls: 'contact-account-web-disagrees', webAccountId: 'b' });
+    expect(contactAccountCheck('A', { status: 'suggested-account', accountId: 'a' })).toEqual({ cls: 'ready', webAccountId: 'a' });
+    expect(contactAccountCheck('A', { status: 'no-evidence' }).cls).toBe('ready');
+    expect(contactAccountCheck('A', { status: 'ambiguous' }).cls).toBe('contact-account-web-ambiguous');
+  });
+});
+
 describe('groupNewContacts', () => {
   const p = (idx, name, email) => ({ idx, ref: `r${idx}`, name, email });
   test('same email on two awards is one proposed contact', () => {
@@ -252,6 +266,7 @@ describe('classifyRow', () => {
     ['possible existing', { contact: { status: 'possible-existing-contact' }, contactId: null }, 'possible-existing-contact'],
     ['contact is the PI', { contactId: 'pl' }, 'is-pi'],
     ['contact has a PI row', { piRowForContact: true }, 'is-pi'],
+    ['contact is the liaison', { liaisonIds: ['c1'] }, 'is-liaison'],
     ['already set', { existingIaa: 'x', junctionRowId: 'j' }, 'already-set'],
     ['no account', { iaa: { status: 'no-account-match' } }, 'no-account-match'],
     ['duplicate contact needing a new row', { duplicateContact: true }, 'duplicate-contact'],
@@ -280,3 +295,21 @@ describe('classifyRow', () => {
       .toEqual(['create-contact', 'create-junction-row', 'set-iaa']);
   });
 });
+
+describe('approvalBucket', () => {
+  const L = (o) => ({ class: 'ready', cohort: 'extracted', actions: ['create-junction-row', 'set-iaa'], iaaVia: 'pi-email-domain+account-name', ...o });
+  test.each([
+    ['strong existing contact', L(), { group: 'existing-strong', checks: [] }],
+    ['strong new contact', L({ actions: ['create-contact', 'create-junction-row', 'set-iaa'] }), { group: 'new-strong', checks: [] }],
+    ['new contact with a web suggestion', L({ actions: ['create-contact', 'suggest-contact-account', 'create-junction-row', 'set-iaa'] }), { group: 'new-strong', checks: ['web-suggestion'] }],
+    ['linked new contact', L({ actions: ['link-proposed-contact', 'create-junction-row', 'set-iaa'] }), { group: 'new-strong', checks: [] }],
+    ['single signal', L({ iaaVia: 'account-name' }), { checks: ['single-signal'] }],
+    ['recorded', L({ cohort: 'recorded', iaaVia: 'domain-map', actions: ['set-iaa'] }), { group: 'recorded', checks: [] }],
+    ['contact, web agrees', { class: 'ready', cohort: 'contact', actions: ['set-contact-account'], webAccountId: 'a' }, { group: 'contact-web-agrees', checks: [] }],
+    ['contact, web silent', { class: 'ready', cohort: 'contact', actions: ['set-contact-account'], webAccountId: null }, { group: 'contact-web-silent', checks: [] }],
+    ['contact, web elsewhere', { class: 'contact-account-web-disagrees', cohort: 'contact', actions: [] }, { checks: ['contact-account-web'] }],
+    ['possible duplicate', { class: 'possible-existing-contact', cohort: 'extracted', actions: [] }, { checks: ['possible-duplicate'] }],
+    ['not written', { class: 'is-liaison', cohort: 'recorded', actions: [] }, { checks: [] }],
+  ])('%s', (_, line, want) => expect(approvalBucket(line)).toEqual(want));
+});
+

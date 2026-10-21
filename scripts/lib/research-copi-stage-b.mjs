@@ -302,6 +302,34 @@ export function webQuery(p) {
   return n.last ? `${quoted} ${p.department || p.institution || ''}`.trim() : '';
 }
 
+/**
+ * Search query for an existing contact's current page: first + last name only.
+ * Middle initials and the award institution are left out, so the search is not
+ * steered back to where the person used to be.
+ */
+export function contactWebQuery(contact) {
+  const raw = (v) => String(v || '').replace(/["()]/g, '').replace(/\s+/g, ' ').trim();
+  const first = raw(contact?.firstname).split(' ')[0];
+  const last = raw(contact?.lastname);
+  if (first && last) return `"${first} ${last}"`;
+  const parts = raw(contact?.fullname).split(' ').filter(Boolean);
+  return parts.length > 1 ? `"${parts[0]} ${parts.at(-1)}"` : '';
+}
+
+/**
+ * Check a latest-award contact account against the web: agreement or silence
+ * keeps the proposal; a web page at another institution sends it to review
+ * (the person may have moved since that award).
+ * @returns {{cls: string, webAccountId: string|null}}
+ */
+export function contactAccountCheck(pickAccountId, web) {
+  if (web?.status === 'suggested-account' && lc(web.accountId) !== lc(pickAccountId)) {
+    return { cls: 'contact-account-web-disagrees', webAccountId: lc(web.accountId) };
+  }
+  if (web?.status === 'ambiguous') return { cls: 'contact-account-web-ambiguous', webAccountId: null };
+  return { cls: 'ready', webAccountId: web?.status === 'suggested-account' ? lc(web.accountId) : null };
+}
+
 // ── New contacts across the batch ──
 
 /**
@@ -369,6 +397,8 @@ export function classifyRow(x) {
   if (x.contact.status === 'name-unparseable') return block('name-unparseable');
   if (x.contactId && x.contactId === x.projectLeaderId) return block('is-pi');
   if (x.piRowForContact) return block('is-pi');
+  // The request's or the applicant's primary contact is the liaison, not a co-PI.
+  if (x.contactId && (x.liaisonIds || []).includes(x.contactId)) return block('is-liaison');
   if (x.contactInactive) return block('inactive-contact');
   if (x.existingIaa) return block('already-set');
   if (x.iaa.status !== 'resolved') return block(x.iaa.status);
@@ -391,3 +421,34 @@ export function classifyRow(x) {
   // An existing contact's empty account is a separate contact-level row (see the script).
   return { cls: 'ready', actions };
 }
+
+// ── Approval workbook buckets ──
+
+export const APPROVAL_GROUPS = {
+  'recorded': '2024-on co-PIs already recorded: set Institution at Award',
+  'existing-strong': '2017–2023 co-PIs with an existing contact, two or more signals agree: add as co-PI and set Institution at Award',
+  'new-strong': '2017–2023 co-PIs needing a new contact, two or more signals agree: create contact, add as co-PI, set Institution at Award',
+  'contact-web-agrees': 'Empty contact accounts: latest award institution, and the web agrees',
+  'contact-web-silent': 'Empty contact accounts: latest award institution, the web found nothing',
+};
+
+/**
+ * Where one resolve line goes in the approval workbook: an approval group
+ * (one decision covers it), an individual check, or nowhere (not written).
+ * A single Institution at Award signal, a web suggestion for a new contact,
+ * a web disagreement and a possible duplicate are individual checks.
+ * @returns {{group?: string, checks: string[]}}
+ */
+export function approvalBucket(line) {
+  const checks = [];
+  if (line.class === 'possible-existing-contact') return { checks: ['possible-duplicate'] };
+  if (line.class === 'contact-account-web-disagrees' || line.class === 'contact-account-web-ambiguous') return { checks: ['contact-account-web'] };
+  if (line.class !== 'ready') return { checks };
+  if (line.cohort === 'contact') return { group: line.webAccountId ? 'contact-web-agrees' : 'contact-web-silent', checks };
+  if (line.actions.includes('suggest-contact-account')) checks.push('web-suggestion');
+  if (line.cohort === 'recorded') return { group: 'recorded', checks };
+  const signals = (line.iaaVia || '').split('+').filter(Boolean).length;
+  if (signals < 2) return { checks: ['single-signal', ...checks] };
+  return { group: line.actions.includes('create-contact') || line.actions.includes('link-proposed-contact') ? 'new-strong' : 'existing-strong', checks };
+}
+

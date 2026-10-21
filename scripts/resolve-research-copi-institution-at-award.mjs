@@ -44,7 +44,7 @@ import crypto from 'crypto';
 import ExcelJS from 'exceljs';
 import { AWARDED } from './lib/research-iaa-backfill.mjs';
 import {
-  lc, nameParts, pickLatestAccount, groupNewContacts, selectApprovedCopis, institutionalDomain, domainCandidates, domainWinner, contactEmails,
+  lc, nameParts, pickLatestAccount, groupNewContacts, contactWebQuery, contactAccountCheck, selectApprovedCopis, institutionalDomain, domainCandidates, domainWinner, contactEmails,
   matchContact, resolveExtractedIaa, resolveRecordedIaa, classifyWebEvidence, webQuery, classifyRow,
 } from './lib/research-copi-stage-b.mjs';
 
@@ -142,7 +142,7 @@ await bypassDynamicsRestrictions('resolve-research-copi-institution-at-award', a
   if (!research.length) { console.error('No Research programs matched.'); process.exit(1); }
   const scopeProgramIds = research.map((p) => lc(p.akoya_programid)).sort();
   const requests = await readAll('akoya_requests', {
-    select: ['akoya_requestid', 'akoya_requestnum', 'wmkf_meetingdate', 'akoya_requeststatus', 'statecode', '_akoya_programid_value', '_akoya_applicantid_value', '_wmkf_projectleader_value', ...SLOTS].join(','),
+    select: ['akoya_requestid', 'akoya_requestnum', 'wmkf_meetingdate', 'akoya_requeststatus', 'statecode', '_akoya_programid_value', '_akoya_applicantid_value', '_wmkf_projectleader_value', '_akoya_primarycontactid_value', ...SLOTS].join(','),
     filter: `(${research.map((p) => `_akoya_programid_value eq ${p.akoya_programid}`).join(' or ')}) and (${AWARDED.map((s) => `akoya_requeststatus eq '${s}'`).join(' or ')}) and wmkf_meetingdate ge ${SINCE} and statecode eq 0`,
   });
   const byNum = new Map(requests.map((r) => [String(r.akoya_requestnum), r]));
@@ -154,8 +154,9 @@ await bypassDynamicsRestrictions('resolve-research-copi-institution-at-award', a
   }));
   const rowFor = (requestId, contactId, role) => junction.filter((j) => lc(j._wmkf_request_value) === requestId && lc(j._wmkf_contact_value) === contactId && j.wmkf_role === role);
 
-  const accounts = await readAll('accounts', { select: 'accountid,name,akoya_aka,wmkf_legalname,wmkf_dc_aka,statecode', filter: 'statecode eq 0' });
+  const accounts = await readAll('accounts', { select: 'accountid,name,akoya_aka,wmkf_legalname,wmkf_dc_aka,statecode,_primarycontactid_value', filter: 'statecode eq 0' });
   const accountName = new Map(accounts.map((a) => [lc(a.accountid), a.name || '']));
+  const accountPrimary = new Map(accounts.map((a) => [lc(a.accountid), lc(a._primarycontactid_value)]));
   const keckAccounts = new Set(accounts.filter((a) => KECK.test(a.name || '')).map((a) => lc(a.accountid)));
   const nameableAccounts = accounts.filter((a) => !keckAccounts.has(lc(a.accountid)));
 
@@ -219,6 +220,8 @@ await bypassDynamicsRestrictions('resolve-research-copi-institution-at-award', a
     keckApplicant: Boolean(r && (KECK.test(r._akoya_applicantid_value_formatted || '') || keckAccounts.has(lc(r._akoya_applicantid_value)))),
     applicantEntity: r?._akoya_applicantid_value_entity || null,
     projectLeaderId: r ? lc(r._wmkf_projectleader_value) : null,
+    // Liaison of record: the request's primary contact and the applicant account's primary contact.
+    liaisonIds: r ? [lc(r._akoya_primarycontactid_value), accountPrimary.get(lc(r._akoya_applicantid_value))].filter(Boolean) : [],
   });
   const contactFacts = async (r, contactId) => {
     const c = contacts.get(contactId);
@@ -309,25 +312,20 @@ await bypassDynamicsRestrictions('resolve-research-copi-institution-at-award', a
     .filter(({ x, i }) => x.contact.status === 'new-contact' && prelim[i].cls === 'ready')
     .map(({ x, i }) => ({ idx: i, ref: x.person.ref, name: x.person.name, email: x.person.email, accountId: x.iaa.accountId })));
 
-  // ── Web search for new contacts (current account only) ──
+  // ── Web search (current account evidence only), one cap and cache for every use ──
   const cache = fs.existsSync(WEB_CACHE) ? JSON.parse(fs.readFileSync(WEB_CACHE, 'utf8')) : {};
   let searches = 0;
   const hostAccountCache = new Map();
-  for (const [i, x] of rows.entries()) {
-    // Search once per proposed contact (the group's first row).
-    if (x.contact.status !== 'new-contact' || prelim[i].cls !== 'ready' || groups.get(i)?.primary === false || groups.get(i)?.status === 'uncertain') continue;
-    const q = webQuery(x.person);
-    x.webQuery = q;
-    if (!WEB || !q) { x.web = { status: WEB ? 'no-query' : 'web-off', hits: [] }; continue; }
+  const webEvidence = async (name, q) => {
+    if (!WEB || !q) return { status: WEB ? 'no-query' : 'web-off', hits: [] };
     if (!cache[q]) {
-      if (searches >= MAX_SEARCHES) { x.web = { status: 'search-cap-reached', hits: [] }; continue; }
+      if (searches >= MAX_SEARCHES) return { status: 'search-cap-reached', hits: [] };
       searches++;
       try {
         cache[q] = await SerpContactService.searchOrganicResults(q, process.env.SERP_API_KEY, { limit: 10 });
       } catch (err) {
-        x.web = { status: 'search-error', hits: [] };
         console.error(`Web search failed: ${String(err.message).slice(0, 120)}`);
-        continue;
+        return { status: 'search-error', hits: [] };
       }
       fs.writeFileSync(WEB_CACHE, JSON.stringify(cache));
     }
@@ -338,7 +336,13 @@ await bypassDynamicsRestrictions('resolve-research-copi-institution-at-award', a
       for (const d of domainCandidates(h)) { const w = await domainMapAsync(d); if (w.status === 'winner') { id = w.accountId; break; } }
       hostAccountCache.set(h, id);
     }
-    x.web = classifyWebEvidence(x.person.name, cache[q], (h) => hostAccountCache.get(h) || null);
+    return classifyWebEvidence(name, cache[q], (h) => hostAccountCache.get(h) || null);
+  };
+  for (const [i, x] of rows.entries()) {
+    // New contacts: search once per proposed contact (the group's first row).
+    if (x.contact.status !== 'new-contact' || prelim[i].cls !== 'ready' || groups.get(i)?.primary === false || groups.get(i)?.status === 'uncertain') continue;
+    x.webQuery = webQuery(x.person);
+    x.web = await webEvidence(x.person.name, x.webQuery);
   }
 
   // ── Final classification ──
@@ -392,16 +396,20 @@ await bypassDynamicsRestrictions('resolve-research-copi-institution-at-award', a
   });
 
   // ── Contact-level rows: fill an existing contact's empty account from their latest award ──
+  // Checked against the web (first + last name), since the person may have moved since that award.
   for (const [contactId, pick] of picks) {
     const c = contacts.get(contactId);
     const r = pick.requestId ? byId.get(pick.requestId) : null;
-    const cls = pick.status === 'selected' ? 'ready' : `contact-account-${pick.status}`;
-    const actions = pick.status === 'selected' ? ['set-contact-account'] : [];
+    const web = pick.status === 'selected' ? await webEvidence(c?.fullname || '', contactWebQuery(c)) : null;
+    const check = pick.status === 'selected' ? contactAccountCheck(pick.accountId, web) : { cls: `contact-account-${pick.status}`, webAccountId: null };
+    const cls = check.cls;
+    const actions = cls === 'ready' ? ['set-contact-account'] : [];
     results.push({
       ids: {
         key: `con|${contactId}`, cohort: 'contact', class: cls, actions, host, since: SINCE, scopeProgramIds,
         contactId, contactAccountTarget: pick.accountId || null, evidenceRequestId: pick.requestId || null,
         evidenceMeetingDate: r ? (r.wmkf_meetingdate || '').slice(0, 10) : null,
+        webStatus: web?.status || null, webAccountId: check.webAccountId,
       },
       review: {
         cls, actions: actions.join(', '), year: r ? (r.wmkf_meetingdate || '').slice(0, 4) : '', request: r?.akoya_requestnum || '',
@@ -409,6 +417,8 @@ await bypassDynamicsRestrictions('resolve-research-copi-institution-at-award', a
         contact: c ? `${c.fullname} <${contactEmails(c).join(', ') || 'no email'}>` : '',
         proposedContactAccount: accountName.get(pick.accountId) || '',
         contactAccountEvidence: pick.status === 'selected' ? `latest award ${r?.akoya_requestnum || ''}` : pick.status,
+        suggestedContactAccount: accountName.get(check.webAccountId) || '',
+        web: (web?.hits || []).slice(0, 3).map((h) => `${h.title} — ${h.link}`).join('\n') || (web ? web.status : ''),
         key: `con|${contactId}`,
       },
     });
