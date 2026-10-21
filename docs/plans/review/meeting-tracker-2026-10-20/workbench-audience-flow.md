@@ -25,7 +25,7 @@ flowchart TB
         W1 --> W2 --> W3 --> W4
     end
 
-    subgraph PREP["Duncan and superusers · Preparation workspace"]
+    subgraph PREP["Duncan and superusers · Meeting coordination"]
         direction LR
         D1["Set up meeting<br/>Time, attendees and agenda"]
         D2["Review and send invitations<br/>Collect materials and follow up"]
@@ -53,7 +53,7 @@ flowchart TB
 | Audience | Main entry | Primary work |
 |---|---|---|
 | Program Directors | Request in Workbench | Find meeting time, open the full agenda and materials, join, then return for video/transcript/summary links |
-| Duncan | Preparation workspace, proposed within Meeting Tracker | Schedule, manage attendees/agenda, review invitations, collect missing materials, prepare recordings/transcripts and assign speakers |
+| Duncan | Meeting coordination workspace, proposed within Meeting Tracker | Schedule, manage attendees/agenda, review invitations, collect missing materials, prepare recordings/transcripts and assign speakers |
 | Superusers | Same preparation capabilities | Perform or support the same preparation and transcript-assignment work |
 
 ## PD Workbench hierarchy — owner correction
@@ -75,4 +75,6 @@ flowchart TB
 
 The earlier cycle, session and visit layouts are exploration artifacts, not approved final screens. The owner found session detail busy and later identified mixed audiences as a broader cause. This map is the newer organizing direction: Workbench for PD consumption; preparation tasks for Duncan/superusers. Revisit the earlier screen compositions against it before implementing them. Their labels remain provisional.
 
-The [revised writeup-first PD Workbench](workbench-pd-writeup.html), [desktop](workbench-writeup-desktop.png) and [narrow-screen](workbench-writeup-narrow.png) captures now explore the owner-directed hierarchy. The earlier [materials-first mockup](workbench-pd-materials.html) is superseded because it buried writeup/review. The revision is a proposed composition, not approved implementation. A first [Duncan/superuser preparation workspace](preparation-workspace.html) is now saved with task views for setup, invitations, collection and transcript checking. Both compositions remain proposals for owner review. Resolve exact placement, lifecycle/role variants and artifact availability before an implementation brief. No routes, API, database, role configuration or live records changed.
+The [revised writeup-first PD Workbench](workbench-pd-writeup.html), [desktop](workbench-writeup-desktop.png) and [narrow-screen](workbench-writeup-narrow.png) captures now explore the owner-directed hierarchy. The earlier [materials-first mockup](workbench-pd-materials.html) is superseded because it buried writeup/review. The revision is a proposed composition, not approved implementation. A first [Duncan/superuser Meeting coordination workspace](preparation-workspace.html) is now saved with task views for setup, invitations, collection and transcript checking. Both compositions remain proposals for owner review. Resolve exact placement, lifecycle/role variants and artifact availability before an implementation brief. No routes, API, database, role configuration or live records changed.
+
+Provisional workspace title: **Meeting coordination**, with **Before the meeting** and **After the meeting** task groups (owner agreed at session end). This is a display proposal, not a route or identifier rename.

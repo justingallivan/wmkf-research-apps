@@ -1,4 +1,58 @@
-# Session 624 Prompt: Re-scope the co-PI (Stage B) Institution at Award backfill
+# Session 625 Prompt: Review Workbench and Meeting coordination designs
+
+## Session 624 Summary — Design exploration and audience split (Codex, 2026-10-20 PT)
+
+### What Was Completed
+
+1. **Design artifacts saved and merged to main.** [VERIFIED via git and saved files] Cycle schedule, Sessions, session detail, visit detail, PD Workbench and Duncan/superuser coordination layouts have standalone HTML and desktop/narrow captures under `docs/plans/review/meeting-tracker-2026-10-20/`. These are synthetic mockups, not application changes or production screenshots.
+2. **Audience split.** [VERIFIED via owner decisions] PDs primarily consume meeting information and outputs in the Workbench. Duncan and superusers handle logistics, materials and transcript preparation/assignments. The saved flow map records the handoffs; exact runtime permissions and artifact visibility still need source/security review before implementation.
+3. **Writeup first.** [VERIFIED via owner correction and “looks better” response] Staff Deliberations leads with working writeup/review, supporting video/transcript/summary links follow, meeting logistics are behind a compact link. `workbench-pd-writeup.html` is the current direction for further design. The materials-first mockup is superseded, retained as history. This is not implementation approval.
+4. **Meeting coordination.** [VERIFIED via owner agreement] Provisional workspace title replaces Meeting preparation, with Before the meeting (setup, invitations, collection) and After the meeting (transcript preparation) groups. Four task views switch locally; other actions are inert. No sending, paid processing, uploads or production writes occurred.
+5. **Terminology and build remain pending.** Do not implement app changes or infer final vocabulary from these mockups. Session detail still felt busy to the owner; its composition remains an exploration. The earlier assistant assurance about retaining slot sliders is design intent only: inspected SessionEditor currently uses a numeric minutes input, so verify the owner’s intended slider behavior before designing that edit state.
+
+### Commits
+
+- `bc184b4e1` cycle-schedule mockups and design handoff.
+- `9fde7d84b` Sessions; `ec8445407` session detail; `833baf6a0` visit detail.
+- `f490bc419` Workbench-first audience flow.
+- `363b83684` materials-first Workbench (superseded); `4c6d1f0ef` writeup-first revision.
+- `11be069e6` four-task coordination workspace; `9847ef6e4` provisional coordination title and before/after grouping.
+- Merge and stop documentation commits follow; inspect Git history for identities.
+
+## Next Items
+
+### Verified Open — design only, owner-paced
+
+1. Review the Meeting coordination workspace and refine the four task views. Evidence: saved HTML/captures and owner request. Calendar invitations versus agenda emails, recording intake/transcription generation and full output creation still need design; do not assume delivery or publication contracts.
+2. Continue the writeup-first Workbench direction. Evidence: owner feedback and `workbench-pd-writeup.html`. Resolve lifecycle/role variants, unavailable/failed artifacts, active-meeting Join behavior and summary editorial responsibility before an implementation brief.
+
+### Owner Decision Needed
+
+1. Final meeting vocabulary remains pending colleague feedback. Evidence: `docs/plans/review/PROPOSAL_WORKFLOW_VOCABULARY_2026-10-19.md` and owner instruction this session.
+2. App implementation scope is not authorized. Naming/layout discussion does not authorize route, identifier, schema or role changes.
+
+### Verify Before Acting — separate Claude data work
+
+Claude’s Session 623 handoff below is retained to avoid losing concurrent work. Its Stage B scope warning is owner-directed and remains important; Codex did not re-probe its production results or re-verify every carried item. Before any data work, read its plan/memory and re-scope with the owner. Do not treat the historical next-step list as a newly verified or authorized worklist. Stage B apply must not proceed without the scope decision. No data work was performed in this design session.
+
+## Key Files Reference
+
+| File | Purpose |
+|---|---|
+| `docs/plans/review/MEETING_TRACKER_LANDING_STRUCTURE_2026-10-20.md` | Design index, decisions, historical/superseded mockups and limitations |
+| `docs/plans/review/meeting-tracker-2026-10-20/workbench-audience-flow.md` | Audience flow and writeup-first hierarchy |
+| `docs/plans/review/meeting-tracker-2026-10-20/workbench-pd-writeup.html` | Current PD Workbench direction |
+| `docs/plans/review/meeting-tracker-2026-10-20/preparation-workspace.html` | Meeting coordination prototype (filename unchanged) |
+
+## Verification and handoff
+
+Startup: 70 checks/self-tests returned success; live factory-ledger check skipped without configured test URL. Mockups were rendered at 1440px and 390px with bounded independent visual review; no horizontal document overflow observed. Task switching and compact meeting disclosure were exercised. This is not runtime accessibility, authorization, delivery or publication verification. Relevant documentation gates ran before each save; final stop gates are reported in the closing message.
+
+No DEVELOPMENT_LOG.md milestone entry required: design exploration only, no capability shipped. CLAUDE.md unchanged. Claim-evidence report returned local state unavailable; no observation row invented. Owner authorized landing/pushing these design docs on main after Claude left. Existing untracked `output/` and the October 19 board-writeups critique were preserved, not included. The isolated worktree is retained.
+
+---
+
+# Prior Claude handoff — historical snapshot, not re-verified by Codex
 
 ## Raise First (owner request, end of Session 623, 2026-10-20)
 

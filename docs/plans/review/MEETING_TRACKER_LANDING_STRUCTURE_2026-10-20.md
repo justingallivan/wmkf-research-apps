@@ -130,9 +130,11 @@ The earlier materials-first artifacts are preserved as superseded history. Reque
 
 Both screenshot widths rendered without horizontal document overflow; the compact meeting link was exercised and opened the logistics disclosure at both widths. No application source, runtime routes, permissions or live data changed.
 
-## Duncan and superusers — preparation workspace proposal, 2026-10-20
+## Duncan and superusers — Meeting coordination workspace proposal, 2026-10-20
 
 [VERIFIED via owner direction] Create and save a preparation workspace covering setup, invitations, materials collection and transcript preparation. No application changes. The layout remains a proposal, with provisional labels and synthetic examples.
+
+[VERIFIED via owner naming correction] The provisional workspace title is Meeting coordination, since transcript work happens after the meeting. Navigation groups setup, invitations and collection under Before the meeting, and transcript preparation under After the meeting. This provisional label does not settle the broader meeting vocabulary.
 
 The standalone workspace separates four tasks; one task is open at a time. Desktop uses a left task selector, while narrow screens put four compact selectors above the selected task. Each task has one illustrative work item and a focused detail panel. Queue counts are synthetic navigation examples, not an implemented aggregation contract or exhaustive list.
 
@@ -163,4 +165,4 @@ Task switching was exercised at 1440px and 390px, with no horizontal document ov
 
 Owner: Codex for these new design artifacts. Claude retains the Research Institution at Award workstream and shared session handoff documentation. No edits to SESSION_PROMPT.md, the vocabulary review, the original audit, DESIGN.md or application source are part of this save.
 
-Changed-fact sweep scope: owner-selected landing structure and the existence of these saved mockups. Authoritative evidence is the owner’s chat decisions and the rendered standalone artifacts; runtime persistence/consumer hops are not applicable to this design-only decision. The original audit remains historical evidence. The older SESSION_PROMPT.md asks the owner to choose a landing task; that prompt is now superseded on this decision by this document, but is deliberately left to Claude’s current handoff ownership. Whole-repository reconciliation is therefore not claimed. At the next coordinated handoff, link this document and replace that older open design question. Other search matches concerning Workbench rows are unrelated.
+Changed-fact sweep scope: owner-selected landing structure and the existence of these saved mockups. Authoritative evidence is the owner’s chat decisions and the rendered standalone artifacts; runtime persistence/consumer hops are not applicable to this design-only decision. The original audit remains historical evidence. The original handoff asked the owner to choose a landing task. At owner-authorized stop, the current SESSION_PROMPT.md links this design record and preserves Claude’s newer data work as a separate historical carryover. Whole-repository reconciliation is not claimed. Other search matches concerning Workbench rows are unrelated.
