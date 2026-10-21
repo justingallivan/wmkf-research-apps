@@ -11,6 +11,7 @@
  * evidence only for the current account of a contact that must be created.
  */
 
+import crypto from 'crypto';
 import { nameTokens } from './research-copi-roles.mjs';
 import { classifyReviewerAffiliationAccount } from '../../lib/utils/reviewer-institution-account-match.js';
 
@@ -24,7 +25,8 @@ export const lc = (v) => (v ? String(v).trim().toLowerCase() : '');
  * owner names — `budget-only` rows and the single `unassessed` re-check row.
  * @param {{candidates: object[], roles: object[], recheck: object[]}} csv parsed CSV rows
  * @param {{budgetOnly: string[], unassessed: string[]}} approve request numbers
- * @returns {{people: object[], duplicates: number}}
+ * @returns {{people: object[], duplicates: number}} each person carries `ref`, a
+ *   hash of request number + normalized name, so logs can name the row without the name.
  */
 export function selectApprovedCopis({ candidates, roles, recheck }, approve) {
   const picked = [];
@@ -50,7 +52,7 @@ export function selectApprovedCopis({ candidates, roles, recheck }, approve) {
     const key = `${p.requestNum}|${nameTokens(p.name).join(' ')}`;
     if (seen.has(key)) continue;
     seen.add(key);
-    people.push({ ...p, key });
+    people.push({ ...p, ref: crypto.createHash('sha256').update(key).digest('hex').slice(0, 16) });
   }
   return { people, duplicates: picked.length - people.length };
 }
@@ -117,14 +119,17 @@ export function domainWinner(linked, rule) {
 
 // ── Names ──
 
+// Last name compared on its final word and final hyphen segment, so
+// "Jane Smith Jones", "Jane Smith-Jones" and a contact "Smith-Jones" all compare on "jones".
+const lastKey = (t) => (t || '').split('-').filter(Boolean).at(-1) || '';
 /** {first, last} tokens of a person's name, honorifics and degrees removed. */
 export function nameParts(name) {
   const t = nameTokens(name);
-  return { first: t[0] || '', last: t.at(-1) || '' };
+  return { first: t[0] || '', last: t.length > 1 ? lastKey(t.at(-1)) : '' };
 }
 function contactParts(c) {
   const first = nameTokens(c.firstname)[0];
-  const last = nameTokens(c.lastname).at(-1);
+  const last = lastKey(nameTokens(c.lastname).at(-1));
   return first && last ? { first, last } : nameParts(c.fullname);
 }
 /** Same last name, and the same first name (or matching initial when either is an initial). */
@@ -147,12 +152,13 @@ export const contactEmails = (c) => [c.emailaddress1, c.emailaddress2, c.emailad
  * @param {string|null} awardAccountId the resolved Institution at Award, if any
  * @returns {{status: string, contactId?: string, candidateIds?: string[]}}
  *   status: email | name-domain | ambiguous-email | ambiguous-name-domain |
- *   possible-existing-contact | new-contact
+ *   name-unparseable | possible-existing-contact | new-contact
  */
 export function matchContact(person, emailHits, lastNameHits, awardAccountId) {
   const byEmail = [...new Set(emailHits.map((c) => lc(c.contactid)))];
   if (byEmail.length === 1) return { status: 'email', contactId: byEmail[0] };
   if (byEmail.length > 1) return { status: 'ambiguous-email', candidateIds: byEmail };
+  if (!nameParts(person.name).last || !nameParts(person.name).first) return { status: 'name-unparseable' };
   const domain = institutionalDomain(person.email);
   const named = lastNameHits.filter((c) => sameName(person.name, c));
   const byNameDomain = domain ? named.filter((c) => contactEmails(c).some((e) => domainsRelated(institutionalDomain(e), domain))) : [];
@@ -183,7 +189,7 @@ export function matchContact(person, emailHits, lastNameHits, awardAccountId) {
 export function resolveExtractedIaa(p, ctx) {
   const signals = [];
   const domain = institutionalDomain(p.email);
-  if (domain && ctx.piDomains.some((d) => domainsRelated(d, domain))) signals.push({ via: 'pi-email-domain', accountId: lc(ctx.applicantId) });
+  if (ctx.applicantId && domain && ctx.piDomains.some((d) => domainsRelated(d, domain))) signals.push({ via: 'pi-email-domain', accountId: lc(ctx.applicantId) });
   if (domain) {
     const w = ctx.domainMap(domain);
     if (w?.status === 'winner') signals.push({ via: 'domain-map', accountId: lc(w.accountId) });
@@ -210,7 +216,7 @@ export function resolveRecordedIaa(contact, ctx) {
   const parent = lc(contact?._parentcustomerid_value);
   if (parent && contact._parentcustomerid_value_entity === 'account') return { status: 'resolved', accountId: parent, via: 'contact-account' };
   const domains = contactEmails(contact || {}).map(institutionalDomain).filter(Boolean);
-  if (domains.some((d) => ctx.piDomains.some((pd) => domainsRelated(pd, d)))) return { status: 'resolved', accountId: lc(ctx.applicantId), via: 'pi-email-domain' };
+  if (ctx.applicantId && domains.some((d) => ctx.piDomains.some((pd) => domainsRelated(pd, d)))) return { status: 'resolved', accountId: lc(ctx.applicantId), via: 'pi-email-domain' };
   const winners = [...new Set(domains.map((d) => ctx.domainMap(d)).filter((w) => w?.status === 'winner').map((w) => lc(w.accountId)))];
   if (winners.length === 1) return { status: 'resolved', accountId: winners[0], via: 'domain-map' };
   return { status: 'no-account-match' };
@@ -246,7 +252,7 @@ export function classifyWebEvidence(name, results, hostAccount) {
     let host = '';
     try { host = new URL(r.link).hostname; } catch { continue; }
     if (!host || isNonInstitutionHost(host)) continue;
-    const t = nameTokens(r.title);
+    const t = nameTokens(r.title).flatMap((x) => [x, ...x.split('-')]);
     const named = t.includes(p.last) && t.some((x) => x === p.first || (p.first.length > 0 && x.length === 1 && x === p.first[0]));
     if (!named) continue;
     const accountId = hostAccount(host);
@@ -280,11 +286,13 @@ export function classifyRow(x) {
   if (x.applicantEntity && x.applicantEntity !== 'account') return block('applicant-not-account');
   if (x.contact.status === 'ambiguous-email' || x.contact.status === 'ambiguous-name-domain') return block('ambiguous-contact');
   if (x.contact.status === 'possible-existing-contact') return block('possible-existing-contact');
+  if (x.contact.status === 'name-unparseable') return block('name-unparseable');
   if (x.contactId && x.contactId === x.projectLeaderId) return block('is-pi');
   if (x.piRowForContact) return block('is-pi');
   if (x.contactInactive) return block('inactive-contact');
   if (x.existingIaa) return block('already-set');
   if (x.iaa.status !== 'resolved') return block(x.iaa.status);
+  if (!x.iaa.accountId) return block('no-account-match');
   const actions = [];
   if (x.contact.status === 'new-contact') {
     actions.push('create-contact');

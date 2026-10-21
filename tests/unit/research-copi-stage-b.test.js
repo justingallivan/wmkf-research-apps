@@ -45,6 +45,15 @@ describe('selectApprovedCopis', () => {
     expect(() => selectApprovedCopis(csv, { budgetOnly: [], unassessed: ['99'] })).toThrow(/found 0/);
   });
 
+  test('people carry a name-free ref, stable across honorifics', () => {
+    const a = selectApprovedCopis(csv, { budgetOnly: [], unassessed: [] }).people[0];
+    const b = selectApprovedCopis({ ...csv, candidates: [cand({ name: 'Dr. Ann Lee' })] }, { budgetOnly: [], unassessed: [] }).people[0];
+    expect(a.ref).toMatch(/^[0-9a-f]{16}$/);
+    expect(a.ref).toBe(b.ref);
+    expect(JSON.stringify(a.ref)).not.toMatch(/ann|lee/i);
+    expect(a).not.toHaveProperty('key');
+  });
+
   test('collapses the same person on the same grant across sources', () => {
     const dup = { ...csv, recheck: [role({ name: 'Dr. Bo Kim, PhD', requestNum: '2' })] };
     const { people, duplicates } = selectApprovedCopis(dup, { budgetOnly: [], unassessed: [] });
@@ -86,6 +95,8 @@ describe('names and contact match', () => {
     ['Jane Doe', c('1', 'John', 'Doe'), false],
     ['Dr. José Núñez, MD', c('1', 'Jose', 'Nunez'), true],
     ['Maria de la Cruz', c('1', 'Maria', 'de la Cruz'), true],
+    ['Jane Smith Jones', c('1', 'Jane', 'Smith-Jones'), true],
+    ['Jane Smith-Jones', c('1', 'Jane', 'Smith-Jones'), true],
   ])('sameName(%s)', (name, contact, want) => expect(sameName(name, contact)).toBe(want));
 
   const p = { name: 'Jane Doe', email: 'jdoe@med.x.edu' };
@@ -108,6 +119,10 @@ describe('names and contact match', () => {
     const gm = { name: 'Jane Doe', email: 'jane@gmail.com' };
     expect(matchContact(gm, [], [c('B', 'Jane', 'Doe', { emailaddress1: 'other@gmail.com' })], null).status).toBe('possible-existing-contact');
   });
+  test('a name without first and last parts is never a new contact', () => {
+    expect(matchContact({ name: 'Smith', email: '' }, [], [], null).status).toBe('name-unparseable');
+    expect(matchContact({ name: 'Smith', email: 'jdoe@med.x.edu' }, [c('A', 'J', 'Smith')], [], null).status).toBe('email');
+  });
   test('new contact only when no one shares the name or last name at the place', () => {
     expect(matchContact(p, [], [c('B', 'Rob', 'Doe', { emailaddress1: 'r@y.edu' })], null)).toEqual({ status: 'new-contact' });
   });
@@ -117,6 +132,10 @@ describe('Institution at Award', () => {
   const ctx = (o = {}) => ({ piDomains: ['x.edu'], applicantId: 'APP', domainMap: () => null, accounts: [], ...o });
   test('applicant when the proposal email matches the PI domain', () => {
     expect(resolveExtractedIaa({ email: 'a@med.x.edu' }, ctx())).toMatchObject({ status: 'resolved', accountId: 'app' });
+  });
+  test('no applicant gives no PI-domain signal', () => {
+    expect(resolveExtractedIaa({ email: 'a@x.edu' }, ctx({ applicantId: null })).status).toBe('no-account-match');
+    expect(resolveRecordedIaa({ emailaddress1: 'a@x.edu' }, ctx({ applicantId: null })).status).toBe('no-account-match');
   });
   test('free mail is not a PI-domain match', () => {
     expect(resolveExtractedIaa({ email: 'a@gmail.com' }, ctx({ piDomains: ['gmail.com'] })).status).toBe('no-account-match');
@@ -163,6 +182,9 @@ describe('web evidence', () => {
     expect(isNonInstitutionHost('www.nimh.nih.gov')).toBe(false);
     expect(isNonInstitutionHost('notlinkedin.com')).toBe(false);
   });
+  test('a hyphenated surname in the title still names the person', () => {
+    expect(classifyWebEvidence('Jane Jones', [r('Jane Smith-Jones Lab', 'https://y.edu/a')], hostAccount).status).toBe('current-account');
+  });
   test('query quotes the name and adds the department', () => {
     expect(webQuery({ name: 'Jane "J" Doe', department: 'Chemistry' })).toBe('"Jane J Doe" Chemistry');
   });
@@ -185,6 +207,8 @@ describe('classifyRow', () => {
     ['already set', { existingIaa: 'x', junctionRowId: 'j' }, 'already-set'],
     ['no account', { iaa: { status: 'no-account-match' } }, 'no-account-match'],
     ['duplicate contact needing a new row', { duplicateContact: true }, 'duplicate-contact'],
+    ['unparseable name', { contact: { status: 'name-unparseable' }, contactId: null }, 'name-unparseable'],
+    ['resolved without an account id', { iaa: { status: 'resolved', accountId: '' } }, 'no-account-match'],
   ])('%s', (_, o, cls) => expect(classifyRow(base(o)).cls).toBe(cls));
 
   test('existing contact without a row: create row, set IAA, link empty account', () => {

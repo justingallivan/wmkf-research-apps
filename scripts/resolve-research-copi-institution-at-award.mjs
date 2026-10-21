@@ -29,7 +29,10 @@
  * Writes research-copi-iaa-resolve.jsonl (ids only; a meta line first with
  * input file hashes) and research-copi-iaa-review.xlsx (names; the owner marks
  * Confirm? = Yes/No/Unsure), plus research-copi-web-cache.json so a rerun does
- * not repeat searches. Prints counts and the 8-char resolve hash. Writes
+ * not repeat searches (the cache holds query strings, which contain names; keep
+ * it with the workbook). Extracted rows are keyed by a hash of request number +
+ * normalized name, recomputable from the CSVs whose hashes the meta line
+ * records. Prints counts and the 8-char resolve hash. Writes
  * nothing to Dataverse; an apply step is a separate, reviewed build.
  *
  * Acts against whatever .env.local points at.
@@ -327,7 +330,7 @@ await bypassDynamicsRestrictions('resolve-research-copi-institution-at-award', a
     const contactAccountTarget = actions.includes('set-contact-account') ? (newContactAccount || x.iaa.accountId) : null;
     const c = x.contactId ? contacts.get(x.contactId) : null;
     const r = x.r;
-    const key = x.cohort === 'extracted' ? `ext|${x.person.key}` : `rec|${lc(r.akoya_requestid)}|${x.contactId}`;
+    const key = x.cohort === 'extracted' ? `ext|${x.person.ref}` : `rec|${lc(r.akoya_requestid)}|${x.contactId}`;
     return {
       ids: {
         key, cohort: x.cohort, class: cls, actions, host, since: SINCE, scopeProgramIds,
