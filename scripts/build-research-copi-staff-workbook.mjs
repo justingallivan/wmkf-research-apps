@@ -125,6 +125,7 @@ const p1 = sheet('1. Existing contact', [...ANSWER, ...CONTEXT, ['Why flagged', 
 // Rows the owner has already answered; staff can skip them.
 const OWNER_ANSWERS = {
   'p1|ext|2bca4627a9d206f8': ['Not a co-PI', 'Owner, 2026-10-21: he is the current PI. Smith was PI at award, left UF, and the PI was changed to Mehrad. No change needed.'],
+  'p1|ext|e69301fc2aab7096': ['Not a co-PI', 'He is the PI in AkoyaGO. The proposal has two PIs (Biyu He and Eric Oermann); AkoyaGO records Oermann. No change needed.'],
 };
 for (const it of parts.p1) {
   const [d, note] = OWNER_ANSWERS[`p1|${it.x.key}`] || [];
