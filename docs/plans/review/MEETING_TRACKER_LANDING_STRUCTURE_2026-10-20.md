@@ -16,6 +16,8 @@ related:
 
 [VERIFIED via owner direction, 2026-10-20] The newer [audience flow map](meeting-tracker-2026-10-20/workbench-audience-flow.md) makes the Workbench the PDs’ main entry for meeting information, agendas, materials and post-meeting video/transcript/summary links. Duncan and superusers handle preparation, including transcript assignments. This supersedes the mixed-audience organization implicit in the earlier mockups; it does not approve implementation or settle terminology. Earlier screen layouts remain design explorations to revisit against this flow.
 
+The owner’s later hierarchy correction is controlling for the PD Workbench: **working writeup and review first, supporting materials second, meeting logistics behind a compact link**. The [revised mockup](meeting-tracker-2026-10-20/workbench-pd-writeup.html) explores that direction; the earlier materials-first Workbench mockup is superseded and retained only as history.
+
 ## Earlier layout decisions and boundary
 
 [VERIFIED via owner decisions in the Codex chat, 2026-10-20] The owner agreed to a cycle schedule landing page whose primary job is to scan the cycle’s requests and open the next task. Sessions have a separate task view within Meeting Tracker. Both session and visit actions remain visible for every request, including on narrow screens.
@@ -32,7 +34,8 @@ related:
 - [Sessions HTML mockup](meeting-tracker-2026-10-20/sessions.html), [desktop screenshot](meeting-tracker-2026-10-20/sessions-desktop.png), and [narrow-screen screenshot](meeting-tracker-2026-10-20/sessions-narrow.png).
 - [Session detail HTML mockup](meeting-tracker-2026-10-20/session-detail.html), [desktop screenshot](meeting-tracker-2026-10-20/session-detail-desktop.png), and [narrow-screen screenshot](meeting-tracker-2026-10-20/session-detail-narrow.png).
 - [Visit detail HTML mockup](meeting-tracker-2026-10-20/visit-detail.html), [desktop screenshot](meeting-tracker-2026-10-20/visit-detail-desktop.png), and [narrow-screen screenshot](meeting-tracker-2026-10-20/visit-detail-narrow.png).
-- [PD Workbench HTML mockup](meeting-tracker-2026-10-20/workbench-pd-materials.html), [desktop screenshot](meeting-tracker-2026-10-20/workbench-pd-desktop.png), and [narrow-screen screenshot](meeting-tracker-2026-10-20/workbench-pd-narrow.png).
+- [Revised writeup-first PD Workbench](meeting-tracker-2026-10-20/workbench-pd-writeup.html), [desktop screenshot](meeting-tracker-2026-10-20/workbench-writeup-desktop.png), and [narrow-screen screenshot](meeting-tracker-2026-10-20/workbench-writeup-narrow.png) — current PD layout proposal.
+- [Superseded materials-first PD Workbench HTML mockup](meeting-tracker-2026-10-20/workbench-pd-materials.html), [desktop screenshot](meeting-tracker-2026-10-20/workbench-pd-desktop.png), and [narrow-screen screenshot](meeting-tracker-2026-10-20/workbench-pd-narrow.png).
 - [Original audit](../../../.impeccable/critique/2026-10-19T22-21-01Z__nts-meeting-tracker-meetingtrackerlist-js-ef43d395.md) — dated source and production inspection, not a fresh runtime assessment.
 - [Vocabulary review](PROPOSAL_WORKFLOW_VOCABULARY_2026-10-19.md) — proposed names and owner-edited deck, awaiting colleague feedback.
 
@@ -99,11 +102,11 @@ Detailed upload/transcription/speaker-review/output/Board-link flows, edit forms
 
 The first illustrative Open visit action in Cycle schedule links to this example; other request links remain static. Labels remain provisional. No application, API, schema, design-system or vocabulary changes are included.
 
-## PD Workbench meeting/materials area — proposed, 2026-10-20
+## Historical PD Workbench materials-first exploration — superseded, 2026-10-20
 
 [VERIFIED via owner instruction] Mock up the PD-facing meeting/materials area in the Workbench with easily found video, transcript and summary links; save alongside the earlier designs without changing the app.
 
-[PLANNED — composition for review] This first draft places Meetings and materials within Staff Deliberations, keeping that existing tab name. Placement and the surrounding illustrative navigation are not final. Two compact meeting entries show session time, the request’s slot within a multi-request agenda, and the presentation time. Presentation video, transcript and summary links are directly visible, separate from internal staff-discussion transcript/summary links. A pending discussion summary has plain availability text rather than a dead link or generation button. Preparation controls for Duncan/superusers are omitted.
+[HISTORICAL — rejected hierarchy] The owner found that this draft buried the working writeup/review, the product of staff deliberations. It is not the basis for implementation. This first draft places Meetings and materials within Staff Deliberations, keeping that existing tab name. Placement and the surrounding illustrative navigation are not final. Two compact meeting entries show session time, the request’s slot within a multi-request agenda, and the presentation time. Presentation video, transcript and summary links are directly visible, separate from internal staff-discussion transcript/summary links. A pending discussion summary has plain availability text rather than a dead link or generation button. Preparation controls for Duncan/superusers are omitted.
 
 The screenshots depict a synthetic post-meeting state, not live records or output readiness. No Join action is shown for ended meetings; before-meeting/active-meeting, unscheduled, failed and unavailable states still need design. All names, dates, agenda membership and availability are illustrative. Available means usable in this example, not formally approved or shared with the Board. Internal is an audience cue, not a new security mechanism.
 
@@ -112,6 +115,18 @@ Meeting documents are disclosed below the direct output links. Working writeup a
 Local agenda navigation points to the earlier session-detail exploration for context only; that screen still contains preparation controls and is not the final PD-only agenda destination. Full agenda access must retain request restrictions when designed for a multi-request session. Artifact links are inert. Nothing is uploaded, generated, joined or sent. A future implementation must reuse authorized artifacts and enforce presentation/internal discussion boundaries, rather than copy documents or treat display state as access permission.
 
 Desktop uses side-by-side presentation and staff-discussion groups; narrow screens stack them. Both rendered without horizontal document overflow, with the active request tab fully visible. The intended consumption path is Workbench request → meeting/agenda/materials → direct outputs, without a required trip through Meeting Tracker processing controls. Future review must resolve placement, surrounding tabs, active-meeting Join behavior, actual artifact eligibility/availability and preservation of the existing writeup/review flow.
+
+## Revised PD Workbench — writeup first, 2026-10-20
+
+[VERIFIED via owner direction] Put working writeup and review first, supporting materials second, and meeting logistics behind a compact link. Save the revision without changing the app. The hierarchy is owner-directed; the resulting composition still needs owner review.
+
+The revised standalone mockup uses a synthetic lead-PD drafting state. The first visible work area contains the working writeup, an Edit writeup in Word action, a Ready for group review confirmation entry point and a plain drafting → group review → leadership review progression. Supporting presentation video/transcript/summary and internal staff-discussion links follow. Pending output remains non-linked. Meeting time and agenda is one compact link that opens and scrolls to a logistics disclosure below the supporting material area.
+
+[VERIFIED via source inspection] `shared/components/workbench/StaffDeliberationsTab.js` has Word editing, Ready for group review confirmation, and group/leadership review states. This is a layout proposal, not a complete verified transition or permission contract. Do not offer lead-PD drafting actions to every PD or assume all documents are visible before review. The mockup preserves the distinction that group review starts only through an explicit confirmed action. Actual active group/leadership work continues to use its existing Final Writeup contract; the progression is informational, not new navigation or a replacement workflow.
+
+The earlier materials-first artifacts are preserved as superseded history. Request shell/tab placement, naming and surrounding navigation remain provisional. Editing, review confirmation, actual document/media links, all lifecycle variants, failure states, accessibility and authorization are outside this static mockup. The same direct artifact/audience boundaries described above continue to apply.
+
+Both screenshot widths rendered without horizontal document overflow; the compact meeting link was exercised and opened the logistics disclosure at both widths. No application source, runtime routes, permissions or live data changed.
 
 ## Before implementation, after vocabulary is settled
 

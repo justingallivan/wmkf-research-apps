@@ -21,7 +21,7 @@ flowchart TB
         W1["Open request in Workbench"]
         W2["Meeting information<br/>Time, agenda and material links"]
         W3["Join meeting<br/>Read and discuss"]
-        W4["Return to the same request<br/>Video, transcript and summaries"]
+        W4["Return to the same request<br/>Draft/review writeup with supporting outputs"]
         W1 --> W2 --> W3 --> W4
     end
 
@@ -56,6 +56,10 @@ flowchart TB
 | Duncan | Preparation workspace, proposed within Meeting Tracker | Schedule, manage attendees/agenda, review invitations, collect missing materials, prepare recordings/transcripts and assign speakers |
 | Superusers | Same preparation capabilities | Perform or support the same preparation and transcript-assignment work |
 
+## PD Workbench hierarchy — owner correction
+
+[VERIFIED via owner direction] Staff Deliberations centers on producing and reviewing the working writeup. Working writeup/review comes first; supporting materials (including video, transcripts and summaries) come second; meeting logistics sit behind a compact link. The Workbench remains the PD entry point. This hierarchy prevents the consumer-materials area from displacing the purpose of deliberations.
+
 ## Handoffs and boundaries
 
 - The Workbench request should expose direct, clearly labeled artifact links and individual availability states. PDs should not have to navigate through processing controls to find outputs. The exact Workbench tab, section title and composition remain open.
@@ -71,4 +75,4 @@ flowchart TB
 
 The earlier cycle, session and visit layouts are exploration artifacts, not approved final screens. The owner found session detail busy and later identified mixed audiences as a broader cause. This map is the newer organizing direction: Workbench for PD consumption; preparation tasks for Duncan/superusers. Revisit the earlier screen compositions against it before implementing them. Their labels remain provisional.
 
-A first [PD Workbench meeting/materials mockup](workbench-pd-materials.html) is saved with [desktop](workbench-pd-desktop.png) and [narrow-screen](workbench-pd-narrow.png) captures. It is proposed, not an approved placement or implementation. Next design step: review this composition, then sketch the preparation workspace. Resolve placement, summary review responsibility and artifact availability rules before an implementation brief. No routes, API, database, role configuration or live records changed.
+The [revised writeup-first PD Workbench](workbench-pd-writeup.html), [desktop](workbench-writeup-desktop.png) and [narrow-screen](workbench-writeup-narrow.png) captures now explore the owner-directed hierarchy. The earlier [materials-first mockup](workbench-pd-materials.html) is superseded because it buried writeup/review. The revision is a proposed composition, not approved implementation. Next: review it and sketch the preparation workspace. Resolve exact placement, lifecycle/role variants and artifact availability before an implementation brief. No routes, API, database, role configuration or live records changed.
