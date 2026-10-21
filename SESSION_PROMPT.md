@@ -1,5 +1,13 @@
 # Session 623 Prompt: Build the co-PI (Stage B) resolve for Institution at Award
 
+## Raise First in Session 624 (owner request, end of Session 623, 2026-10-20)
+
+**The co-PI Institution at Award backfill (Stage B) is mushrooming. Re-scope with the owner before building anything else.** Owner: "this seems to be mushrooming. We're now verifying 58 people by hand which is a larger task than what we've done thus far." Memory: `feedback-owner-review-burden-must-shrink`.
+
+State at handoff [VERIFIED via owner-run resolve `05b61fa0` and pushed commits `5eeba6f8d`..`b5a7da11f`]: read-only resolve (`scripts/resolve-research-copi-institution-at-award.mjs`, three Codex rounds, all findings fixed) and approval-workbook builder (`scripts/build-research-copi-confirm-workbook.mjs`) are built. Nothing is written to Dataverse; no apply script exists. The owner's workbook `~/Downloads/Research Co-PI Searches/stage-b/research-copi-confirm-v2.xlsx` has 5 group decisions and 58 individual checks, unanswered except the 47 recorded rows carried from the owner's row-by-row review. Details, counts and owner decisions (liaison check, Billinge, parked confirmation campaign): plan `docs/plans/RESEARCH_INSTITUTION_AT_AWARD_BACKFILL_PLAN_2026-10-20.md` §3.2.
+
+Open owner decisions: how to cut scope (one option: write only the strong groups and leave all individual-check rows unwritten for staff or the parked campaign); what email new contacts carry; Billinge's current institution (UCSB) needs an override path if contact accounts are written. Item 1 under Next Items below is superseded by this note.
+
 ## Session 622 Summary — Institution at Award column, PI backfill, co-PI evidence (Claude, 2026-10-20 PT)
 
 All production reads and writes were owner-run or owner-authorized. Plan of record: `docs/plans/RESEARCH_INSTITUTION_AT_AWARD_BACKFILL_PLAN_2026-10-20.md`.
