@@ -3,7 +3,7 @@ title: Meeting Tracker Landing Structure and Mockups
 domain: product
 kind: plan
 status: proposed
-summary: Owner-agreed landing structure with desktop and narrow-screen mockups; terminology is provisional and app implementation remains pending.
+summary: Meeting layout explorations and newer Workbench-first audience flow; terminology is provisional and app implementation remains pending.
 canonical: false
 owner: product-engineering
 related:
@@ -12,13 +12,19 @@ related:
 
 # Meeting Tracker landing structure and mockups
 
-## Decision and boundary
+## Current organizing direction
+
+[VERIFIED via owner direction, 2026-10-20] The newer [audience flow map](meeting-tracker-2026-10-20/workbench-audience-flow.md) makes the Workbench the PDs’ main entry for meeting information, agendas, materials and post-meeting video/transcript/summary links. Duncan and superusers handle preparation, including transcript assignments. This supersedes the mixed-audience organization implicit in the earlier mockups; it does not approve implementation or settle terminology. Earlier screen layouts remain design explorations to revisit against this flow.
+
+## Earlier layout decisions and boundary
 
 [VERIFIED via owner decisions in the Codex chat, 2026-10-20] The owner agreed to a cycle schedule landing page whose primary job is to scan the cycle’s requests and open the next task. Sessions have a separate task view within Meeting Tracker. Both session and visit actions remain visible for every request, including on narrow screens.
 
 [VERIFIED via owner instruction, 2026-10-20] Save the structure and mockups. Further layout design can continue with provisional labels; final terminology and app implementation remain pending. Meeting names and related labels are provisional. This is approval of the structure for design continuation, not authorization to change the application. No application code is changed by this handoff.
 
 ## Saved artifacts
+
+- [Workbench-first audience flow map](meeting-tracker-2026-10-20/workbench-audience-flow.md) — current organizing direction, design only.
 
 - [Standalone responsive HTML mockup](meeting-tracker-2026-10-20/index.html) — open locally in a browser; controls are static.
 - [Desktop screenshot, 1440px wide](meeting-tracker-2026-10-20/desktop.png).
@@ -31,7 +37,7 @@ related:
 
 All records, institutions, proposal titles and dates in the mockups are illustrative. The screenshots show the proposed composition, not production. There are no remote assets, live reads or write actions in the HTML.
 
-## Agreed structure
+## Earlier agreed landing structure — subject to audience-flow revision
 
 1. **Cycle schedule is the default view; Sessions is a separate view.** Keep the main page focused on request lookup and scheduling visibility. The Sessions view will carry session creation and session navigation; its initial proposed layout is saved below for owner review.
 2. **Compact request rows.** Show request number, institution and proposal title; separate session and visit columns show the relevant date and explicit Open/Schedule action. Preserve test-request distinctions when eventually implementing against real records.
@@ -96,7 +102,7 @@ The first illustrative Open visit action in Cycle schedule links to this example
 
 1. Obtain the owner-approved meeting names from the vocabulary decision; do not assume the proposed table is final.
 2. Update mockup tabs, column headings and action labels consistently, and review wrapping at both saved widths.
-3. Resolve desktop density, owner review of the Sessions layout, request-detail affordances and session identity/scope. Verify actual session membership before showing a session list as cycle-filtered.
+3. Revisit screen compositions against the Workbench-first audience flow. Resolve desktop density, owner review of the Sessions layout, request-detail affordances and session identity/scope. Verify actual session membership before showing a session list as cycle-filtered.
 4. Include loading, empty, error and filter-result announcements in an implementation brief. Preserve workflow status meanings and existing authorization boundaries.
 5. Obtain explicit implementation scope before changing the app. Naming approval alone does not authorize route, API, database or internal identifier migrations.
 
