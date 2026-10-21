@@ -9,7 +9,8 @@
  * Two cohorts:
  *   extracted  The owner-approved 2017–2023 co-PIs from the CSVs (rule-c
  *              co-PIs, role-check co-PIs, re-check co-PIs, plus the grants named
- *              in --approve-budget-only / --approve-unassessed). Institution at
+ *              in --approve-budget-only / --approve-unassessed, and the second
+ *              PI on the two-PI grants in --approve-extracted-pi). Institution at
  *              Award comes from the proposal: PI email domain → applicant,
  *              domain → account map, or exact Account name. Matched to a
  *              contact by email (any of three fields), then name + email domain.
@@ -24,6 +25,7 @@
  *   node scripts/resolve-research-copi-institution-at-award.mjs \
  *     --inputs-dir=<folder with the CSVs> --out-dir=<dir outside the repo> \
  *     --approve-budget-only=992950 --approve-unassessed=991649,994865 \
+ *     --approve-extracted-pi=992853,994359,995123,995677,995764 \
  *     [--since=2017-01-01] [--map-min=3] [--map-share=0.9] [--max-searches=400] [--no-web]
  *
  * Writes research-copi-iaa-resolve.jsonl (ids only; a meta line first with
@@ -65,7 +67,7 @@ const SINCE = arg('since') || '2017-01-01';
 const MAP_RULE = { min: Number(arg('map-min') || 3), share: Number(arg('map-share') || 0.9) };
 const MAX_SEARCHES = Number(arg('max-searches') || 400);
 const WEB = !flag('no-web');
-const APPROVE = { budgetOnly: list(arg('approve-budget-only')), unassessed: list(arg('approve-unassessed')) };
+const APPROVE = { budgetOnly: list(arg('approve-budget-only')), unassessed: list(arg('approve-unassessed')), extractedPi: list(arg('approve-extracted-pi')) };
 if (!OUT_DIR || !INPUTS) { console.error('--out-dir=<dir outside the repo> and --inputs-dir=<folder with the CSVs> are required'); process.exit(2); }
 if (!/^\d{4}-\d{2}-\d{2}$/.test(SINCE)) { console.error('--since must be YYYY-MM-DD'); process.exit(2); }
 if (!(MAP_RULE.min >= 1) || !(MAP_RULE.share > 0.5 && MAP_RULE.share <= 1)) { console.error('--map-min must be >= 1 and --map-share in (0.5, 1]'); process.exit(2); }

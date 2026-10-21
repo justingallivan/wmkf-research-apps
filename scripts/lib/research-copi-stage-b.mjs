@@ -22,9 +22,11 @@ export const lc = (v) => (v ? String(v).trim().toLowerCase() : '');
 /**
  * The approved 2017–2023 co-PIs: rule-c co-PIs from the extraction, `co-PI`
  * rows from the role check and its re-check, and — only on the grants the
- * owner names — `budget-only` rows and the single `unassessed` re-check row.
+ * owner names — `budget-only` rows, the single `unassessed` re-check row, and
+ * the single extracted PI (a second PI on a two-PI grant whose Dynamics PI is
+ * the other person, owner 2026-10-21).
  * @param {{candidates: object[], roles: object[], recheck: object[]}} csv parsed CSV rows
- * @param {{budgetOnly: string[], unassessed: string[]}} approve request numbers
+ * @param {{budgetOnly: string[], unassessed: string[], extractedPi?: string[]}} approve request numbers
  * @returns {{people: object[], duplicates: number}} each person carries `ref`, a
  *   hash of request number + normalized name, so logs can name the row without the name.
  */
@@ -45,6 +47,11 @@ export function selectApprovedCopis({ candidates, roles, recheck }, approve) {
     const rows = recheck.filter((x) => String(x.requestNum) === num && x.decision === 'unassessed');
     if (rows.length !== 1) throw new Error(`--approve-unassessed=${num}: expected exactly one unassessed re-check row, found ${rows.length}`);
     add(rows[0], 'owner-approved');
+  }
+  for (const num of approve.extractedPi || []) {
+    const rows = candidates.filter((x) => String(x.requestNum) === num && x.decision === 'PI');
+    if (rows.length !== 1) throw new Error(`--approve-extracted-pi=${num}: expected exactly one extracted PI, found ${rows.length}`);
+    add(rows[0], 'second-pi-owner-approved');
   }
   const seen = new Set();
   const people = [];
