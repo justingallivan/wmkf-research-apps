@@ -3,7 +3,7 @@
  */
 import {
   selectApprovedCopis, domainOf, institutionalDomain, domainsRelated, domainCandidates, domainWinner,
-  sameName, matchContact, pickLatestAccount, resolveExtractedIaa, resolveRecordedIaa, classifyWebEvidence, isNonInstitutionHost,
+  sameName, matchContact, pickLatestAccount, groupNewContacts, resolveExtractedIaa, resolveRecordedIaa, classifyWebEvidence, isNonInstitutionHost,
   webQuery, classifyRow,
 } from '../../scripts/lib/research-copi-stage-b.mjs';
 
@@ -142,6 +142,24 @@ describe('pickLatestAccount', () => {
   });
 });
 
+describe('groupNewContacts', () => {
+  const p = (idx, name, email) => ({ idx, ref: `r${idx}`, name, email });
+  test('same email on two awards is one proposed contact', () => {
+    const g = groupNewContacts([p(0, 'Jane Doe', 'jd@x.edu'), p(1, 'Jane Doe', 'jd@x.edu'), p(2, 'Rob Roe', 'rr@y.edu')]);
+    expect(g.get(0)).toEqual({ status: 'shared', groupRef: 'r0', primary: true });
+    expect(g.get(1)).toEqual({ status: 'shared', groupRef: 'r0', primary: false });
+    expect(g.get(2)).toEqual({ status: 'single', groupRef: 'r2', primary: true });
+  });
+  test('same name without a shared email is uncertain for every group it touches', () => {
+    const g = groupNewContacts([p(0, 'Jane Doe', 'jd@x.edu'), p(1, 'J. Doe', ''), p(2, 'Jane Doe', 'jd@x.edu')]);
+    expect([0, 1, 2].map((i) => g.get(i).status)).toEqual(['uncertain', 'uncertain', 'uncertain']);
+  });
+  test('different people stay single', () => {
+    const g = groupNewContacts([p(0, 'Jane Doe', ''), p(1, 'John Doe', '')]);
+    expect([g.get(0).status, g.get(1).status]).toEqual(['single', 'single']);
+  });
+});
+
 describe('Institution at Award', () => {
   const ctx = (o = {}) => ({ piDomains: ['x.edu'], applicantId: 'APP', domainMap: () => null, accounts: [], ...o });
   test('applicant when the proposal email matches the PI domain', () => {
@@ -215,7 +233,7 @@ describe('classifyRow', () => {
     inScope: true, keckApplicant: false, applicantEntity: 'account', contact: { status: 'email' }, contactId: 'c1',
     projectLeaderId: 'pl', piRowForContact: false, contactInactive: false, existingIaa: null,
     iaa: { status: 'resolved', accountId: 'a' }, junctionRowId: null, duplicateContact: false,
-    contactAccountEmpty: false, contactAccountSelected: false, newContactAccount: null, ...o,
+    newContactAccount: null, newContactGroup: null, ...o,
   });
   test.each([
     ['out of scope', { inScope: false }, 'out-of-scope'],
@@ -231,13 +249,19 @@ describe('classifyRow', () => {
     ['resolved without an account id', { iaa: { status: 'resolved', accountId: '' } }, 'no-account-match'],
   ])('%s', (_, o, cls) => expect(classifyRow(base(o)).cls).toBe(cls));
 
-  test('existing contact without a row: create row, set IAA, link empty account', () => {
-    expect(classifyRow(base({ contactAccountEmpty: true, contactAccountSelected: true })).actions)
-      .toEqual(['create-junction-row', 'set-iaa', 'set-contact-account']);
+  test('existing contact without a row: create row, set IAA (contact account is a separate row)', () => {
+    expect(classifyRow(base()).actions).toEqual(['create-junction-row', 'set-iaa']);
   });
   test('existing junction row only needs IAA, even for a duplicate contact', () => {
-    expect(classifyRow(base({ junctionRowId: 'j', duplicateContact: true, contactAccountEmpty: true, contactAccountSelected: true })))
-      .toEqual({ cls: 'ready', actions: ['set-iaa'] });
+    expect(classifyRow(base({ junctionRowId: 'j', duplicateContact: true }))).toEqual({ cls: 'ready', actions: ['set-iaa'] });
+  });
+  test('one new person on two awards: the first creates, the other links', () => {
+    const nc = { contact: { status: 'new-contact' }, contactId: null };
+    expect(classifyRow(base({ ...nc, newContactGroup: { status: 'shared', primary: true }, newContactAccount: 'y' })).actions)
+      .toEqual(['create-contact', 'suggest-contact-account', 'create-junction-row', 'set-iaa']);
+    expect(classifyRow(base({ ...nc, newContactGroup: { status: 'shared', primary: false }, newContactAccount: 'y' })).actions)
+      .toEqual(['link-proposed-contact', 'create-junction-row', 'set-iaa']);
+    expect(classifyRow(base({ ...nc, newContactGroup: { status: 'uncertain', primary: true } })).cls).toBe('possible-same-new-person');
   });
   test('new contact: create contact (+ a suggested account to confirm separately), row, IAA', () => {
     expect(classifyRow(base({ contact: { status: 'new-contact' }, contactId: null, newContactAccount: 'y' })).actions)

@@ -302,6 +302,44 @@ export function webQuery(p) {
   return n.last ? `${quoted} ${p.department || p.institution || ''}`.trim() : '';
 }
 
+// ── New contacts across the batch ──
+
+/**
+ * Group the people who would each get a new contact, so one person on two
+ * awards gets one contact. The same email (exact) joins a group. People with
+ * the same name (first or initial + last) who share no email are uncertain:
+ * every group they touch goes to review.
+ * @param {{idx: number, ref: string, name: string, email: string}[]} people in row order
+ * @returns {Map<number, {status: 'single'|'shared'|'uncertain', groupRef: string, primary: boolean}>}
+ */
+export function groupNewContacts(people) {
+  const parent = people.map((_, i) => i);
+  const find = (i) => (parent[i] === i ? i : (parent[i] = find(parent[i])));
+  const union = (a, b) => { parent[find(b)] = find(a); };
+  for (let i = 0; i < people.length; i++) {
+    for (let j = i + 1; j < people.length; j++) if (people[i].email && people[i].email === people[j].email) union(i, j);
+  }
+  const uncertain = new Set();
+  const sameNameParts = (a, b) => {
+    const x = nameParts(a); const y = nameParts(b);
+    if (!x.last || x.last !== y.last || !x.first || !y.first) return false;
+    return x.first === y.first || ((x.first.length === 1 || y.first.length === 1) && x.first[0] === y.first[0]);
+  };
+  for (let i = 0; i < people.length; i++) {
+    for (let j = i + 1; j < people.length; j++) {
+      if (find(i) !== find(j) && sameNameParts(people[i].name, people[j].name)) { uncertain.add(find(i)); uncertain.add(find(j)); }
+    }
+  }
+  const members = new Map();
+  people.forEach((_, i) => members.set(find(i), [...(members.get(find(i)) || []), i]));
+  const out = new Map();
+  for (const [root, list] of members) {
+    const status = uncertain.has(root) ? 'uncertain' : list.length > 1 ? 'shared' : 'single';
+    for (const i of list) out.set(people[i].idx, { status, groupRef: people[list[0]].ref, primary: i === list[0] });
+  }
+  return out;
+}
+
 // ── Row classification ──
 
 /**
@@ -326,14 +364,19 @@ export function classifyRow(x) {
   if (!x.iaa.accountId) return block('no-account-match');
   const actions = [];
   if (x.contact.status === 'new-contact') {
-    actions.push('create-contact');
-    // Web evidence only suggests; the workbook asks for its own confirmation.
-    if (x.newContactAccount) actions.push('suggest-contact-account');
+    const g = x.newContactGroup;
+    if (g?.status === 'uncertain') return block('possible-same-new-person');
+    if (g && !g.primary) actions.push('link-proposed-contact');
+    else {
+      actions.push('create-contact');
+      // Web evidence only suggests; the workbook asks for its own confirmation.
+      if (x.newContactAccount) actions.push('suggest-contact-account');
+    }
   } else if (x.duplicateContact && !x.junctionRowId) {
     return block('duplicate-contact');
   }
   if (!x.junctionRowId) actions.push('create-junction-row');
   actions.push('set-iaa');
-  if (x.contact.status !== 'new-contact' && x.contactAccountEmpty && x.contactAccountSelected && !x.duplicateContact) actions.push('set-contact-account');
+  // An existing contact's empty account is a separate contact-level row (see the script).
   return { cls: 'ready', actions };
 }

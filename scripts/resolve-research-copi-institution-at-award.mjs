@@ -44,7 +44,7 @@ import crypto from 'crypto';
 import ExcelJS from 'exceljs';
 import { AWARDED } from './lib/research-iaa-backfill.mjs';
 import {
-  lc, nameParts, pickLatestAccount, selectApprovedCopis, institutionalDomain, domainCandidates, domainWinner, contactEmails,
+  lc, nameParts, pickLatestAccount, groupNewContacts, selectApprovedCopis, institutionalDomain, domainCandidates, domainWinner, contactEmails,
   matchContact, resolveExtractedIaa, resolveRecordedIaa, classifyWebEvidence, webQuery, classifyRow,
 } from './lib/research-copi-stage-b.mjs';
 
@@ -288,9 +288,9 @@ await bypassDynamicsRestrictions('resolve-research-copi-institution-at-award', a
   // Evidence spans every award the contact is on: this resolve's co-PI rows
   // (ready → its resolved account, already-set → the stored value, otherwise
   // unresolved) and the contact's PI rows on in-scope awards.
-  const fill = (x, extra = {}) => ({ ...x, contactAccountSelected: false, newContactAccount: null, ...extra });
+  const fill = (x, extra = {}) => ({ ...x, newContactAccount: null, newContactGroup: null, ...extra });
   const prelim = rows.map((x) => classifyRow(fill(x)));
-  const wanted = new Set(rows.filter((x) => x.contactId && x.contactAccountEmpty && !x.duplicateContact).map((x) => x.contactId));
+  const wanted = new Set(rows.filter((x) => x.contactId && x.contactAccountEmpty && !x.duplicateContact && !x.contactInactive).map((x) => x.contactId));
   const evidence = [];
   rows.forEach((x, i) => {
     if (!wanted.has(x.contactId) || !x.r || x.keckApplicant) return;
@@ -299,16 +299,23 @@ await bypassDynamicsRestrictions('resolve-research-copi-institution-at-award', a
   });
   for (const j of junction.filter((y) => y.wmkf_role === ROLE_PI && wanted.has(lc(y._wmkf_contact_value)))) {
     const r = byId.get(lc(j._wmkf_request_value));
+    if (requestFacts(r).keckApplicant) continue;
     evidence.push({ contactId: lc(j._wmkf_contact_value), meetingDate: (r.wmkf_meetingdate || '').slice(0, 10), accountId: lc(j._wmkf_institutionataward_value) || null, requestId: lc(r.akoya_requestid) });
   }
   const picks = pickLatestAccount(evidence);
+
+  // ── One proposed contact per new person across the batch ──
+  const groups = groupNewContacts(rows.map((x, i) => ({ x, i }))
+    .filter(({ x, i }) => x.contact.status === 'new-contact' && prelim[i].cls === 'ready')
+    .map(({ x, i }) => ({ idx: i, ref: x.person.ref, name: x.person.name, email: x.person.email })));
 
   // ── Web search for new contacts (current account only) ──
   const cache = fs.existsSync(WEB_CACHE) ? JSON.parse(fs.readFileSync(WEB_CACHE, 'utf8')) : {};
   let searches = 0;
   const hostAccountCache = new Map();
   for (const [i, x] of rows.entries()) {
-    if (x.contact.status !== 'new-contact' || prelim[i].cls !== 'ready') continue;
+    // Search once per proposed contact (the group's first row).
+    if (x.contact.status !== 'new-contact' || prelim[i].cls !== 'ready' || groups.get(i)?.primary === false || groups.get(i)?.status === 'uncertain') continue;
     const q = webQuery(x.person);
     x.webQuery = q;
     if (!WEB || !q) { x.web = { status: WEB ? 'no-query' : 'web-off', hits: [] }; continue; }
@@ -336,12 +343,10 @@ await bypassDynamicsRestrictions('resolve-research-copi-institution-at-award', a
 
   // ── Final classification ──
   const results = rows.map((x, i) => {
-    const pick = x.contactId ? picks.get(x.contactId) : null;
     const c = x.contactId ? contacts.get(x.contactId) : null;
-    const selected = Boolean(pick?.status === 'selected' && pick.requestId === lc(x.r?.akoya_requestid));
     const newContactAccount = x.web?.status === 'suggested-account' ? x.web.accountId : null;
-    const { cls, actions } = classifyRow(fill(x, { contactAccountSelected: selected, newContactAccount }));
-    const contactAccountTarget = actions.includes('set-contact-account') ? pick.accountId : null;
+    const group = groups.get(i) || null;
+    const { cls, actions } = classifyRow(fill(x, { newContactAccount, newContactGroup: group }));
     const suggestedContactAccount = actions.includes('suggest-contact-account') ? newContactAccount : null;
     const domains = x.cohort === 'extracted' ? [institutionalDomain(x.person.email)] : contactEmails(c || {}).map(institutionalDomain);
     const domainEvidence = [...new Set(domains.filter(Boolean))].map((d) => ({ domain: d, ...(mapCache.get(d) || { status: 'not-looked-up' }) }));
@@ -357,7 +362,7 @@ await bypassDynamicsRestrictions('resolve-research-copi-institution-at-award', a
         contactMatch: x.contact.status, contactId: x.contactId || null, junctionRowId: x.junctionRowId || null, inSlot: Boolean(x.inSlot),
         existingIaa: x.existingIaa || null, iaaAccountId: x.iaa.accountId || null,
         iaaVia: x.iaa.via || (x.iaa.signals || []).map((s) => s.via).join('+') || null,
-        contactAccountTarget, contactAccountVia: contactAccountTarget ? 'latest-award' : null, suggestedContactAccount,
+        proposedContactRef: group ? group.groupRef : null, suggestedContactAccount,
         domainEvidence: domainEvidence.map(({ domain, status, accountId, n, top }) => ({ domain, status, accountId: accountId || null, n: n ?? null, top: top ?? null })),
         duplicateContact: Boolean(x.duplicateContact),
       },
@@ -376,8 +381,8 @@ await bypassDynamicsRestrictions('resolve-research-copi-institution-at-award', a
         contactMatch: x.contact.status,
         contact: c ? `${c.fullname} <${contactEmails(c).join(', ') || 'no email'}>` : '',
         contactCurrentAccount: c?._parentcustomerid_value_formatted || '',
-        proposedContactAccount: accountName.get(contactAccountTarget) || '',
-        contactAccountEvidence: contactAccountTarget ? 'latest award' : '',
+        proposedContactAccount: '',
+        contactAccountEvidence: group && group.status === 'shared' ? `new contact shared with ${group.primary ? 'later rows' : 'an earlier row'}` : '',
         suggestedContactAccount: accountName.get(suggestedContactAccount) || '',
         web: (x.web?.hits || []).slice(0, 3).map((h) => `${h.title} — ${h.link}`).join('\n') || (x.web ? x.web.status : ''),
         candidates: (x.candidateNames || []).join('\n'),
@@ -385,6 +390,29 @@ await bypassDynamicsRestrictions('resolve-research-copi-institution-at-award', a
       },
     };
   });
+
+  // ── Contact-level rows: fill an existing contact's empty account from their latest award ──
+  for (const [contactId, pick] of picks) {
+    const c = contacts.get(contactId);
+    const r = pick.requestId ? byId.get(pick.requestId) : null;
+    const cls = pick.status === 'selected' ? 'ready' : `contact-account-${pick.status}`;
+    const actions = pick.status === 'selected' ? ['set-contact-account'] : [];
+    results.push({
+      ids: {
+        key: `con|${contactId}`, cohort: 'contact', class: cls, actions, host, since: SINCE, scopeProgramIds,
+        contactId, contactAccountTarget: pick.accountId || null, evidenceRequestId: pick.requestId || null,
+        evidenceMeetingDate: r ? (r.wmkf_meetingdate || '').slice(0, 10) : null,
+      },
+      review: {
+        cls, actions: actions.join(', '), year: r ? (r.wmkf_meetingdate || '').slice(0, 4) : '', request: r?.akoya_requestnum || '',
+        person: c?.fullname || '', source: 'contact account (latest award)',
+        contact: c ? `${c.fullname} <${contactEmails(c).join(', ') || 'no email'}>` : '',
+        proposedContactAccount: accountName.get(pick.accountId) || '',
+        contactAccountEvidence: pick.status === 'selected' ? `latest award ${r?.akoya_requestnum || ''}` : pick.status,
+        key: `con|${contactId}`,
+      },
+    });
+  }
 
   // ── Write outputs ──
   const meta = { meta: true, host, since: SINCE, scopeProgramIds, inputHashes, approve: APPROVE, mapRule: MAP_RULE, web: WEB };
@@ -420,7 +448,7 @@ await bypassDynamicsRestrictions('resolve-research-copi-institution-at-award', a
 
   // ── Counts (no names) ──
   const tally = (f, subset = results) => { const t = {}; for (const x of subset) { const k = f(x); t[k] = (t[k] || 0) + 1; } return t; };
-  for (const cohort of ['extracted', 'recorded']) {
+  for (const cohort of ['extracted', 'recorded', 'contact']) {
     const sub = results.filter((x) => x.ids.cohort === cohort);
     console.log(`\n${cohort}: ${sub.length} rows on ${new Set(sub.map((x) => x.ids.requestNum)).size} requests`);
     console.log(`  class: ${JSON.stringify(tally((x) => x.ids.class, sub))}`);
