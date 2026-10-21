@@ -1,86 +1,75 @@
-# Session 623 Prompt: Build the co-PI (Stage B) resolve for Institution at Award
+# Session 624 Prompt: Re-scope the co-PI (Stage B) Institution at Award backfill
 
-## Raise First in Session 624 (owner request, end of Session 623, 2026-10-20)
+## Raise First (owner request, end of Session 623, 2026-10-20)
 
-**The co-PI Institution at Award backfill (Stage B) is mushrooming. Re-scope with the owner before building anything else.** Owner: "this seems to be mushrooming. We're now verifying 58 people by hand which is a larger task than what we've done thus far." Memory: `feedback-owner-review-burden-must-shrink`.
+**Stage B is mushrooming. Re-scope with the owner before building anything else.** Owner: "I can't deal with this anymore … this seems to be mushrooming. We're now verifying 58 people by hand which is a larger task than what we've done thus far." Memory: `feedback-owner-review-burden-must-shrink`. Original ask (Session 622 handoff): build the Stage B resolve (read-only) and an approval workbook for the 136 approved 2017–2023 co-PIs and the 52 recorded 2024-on co-PIs. Owner-usable today: the resolve output and workbooks; nothing written to Dataverse.
 
-State at handoff [VERIFIED via owner-run resolve `05b61fa0` and pushed commits `5eeba6f8d`..`b5a7da11f`]: read-only resolve (`scripts/resolve-research-copi-institution-at-award.mjs`, three Codex rounds, all findings fixed) and approval-workbook builder (`scripts/build-research-copi-confirm-workbook.mjs`) are built. Nothing is written to Dataverse; no apply script exists. The owner's workbook `~/Downloads/Research Co-PI Searches/stage-b/research-copi-confirm-v2.xlsx` has 5 group decisions and 58 individual checks, unanswered except the 47 recorded rows carried from the owner's row-by-row review. Details, counts and owner decisions (liaison check, Billinge, parked confirmation campaign): plan `docs/plans/RESEARCH_INSTITUTION_AT_AWARD_BACKFILL_PLAN_2026-10-20.md` §3.2.
+Suggested cut to put to the owner: write only the strong-evidence groups, and leave every individual-check row unwritten (for staff or the parked confirmation campaign).
 
-Open owner decisions: how to cut scope (one option: write only the strong groups and leave all individual-check rows unwritten for staff or the parked campaign); what email new contacts carry; Billinge's current institution (UCSB) needs an override path if contact accounts are written. Item 1 under Next Items below is superseded by this note.
+## Session 623 Summary — Stage B resolve built and run (Claude, 2026-10-20 PT)
 
-## Session 622 Summary — Institution at Award column, PI backfill, co-PI evidence (Claude, 2026-10-20 PT)
-
-All production reads and writes were owner-run or owner-authorized. Plan of record: `docs/plans/RESEARCH_INSTITUTION_AT_AWARD_BACKFILL_PLAN_2026-10-20.md`.
+All production reads were owner-run. Plan of record: `docs/plans/RESEARCH_INSTITUTION_AT_AWARD_BACKFILL_PLAN_2026-10-20.md` §3.2 (full rules, counts, owner decisions).
 
 ### What Was Completed
 
-1. **New column.** [VERIFIED via sandbox metadata readback; production via owner-run `--execute` output] Connor agreed in writing to a lookup on the PI/co-PI junction. Schema wave 34 added `wmkf_apprequestperson.wmkf_InstitutionAtAward` (→ `account`, Delete: Restrict, Merge: Cascade) to sandbox and production. GoApply will fill it for new submissions.
-2. **Stage A, PIs, applied.** [VERIFIED via owner-run `--verify` 270/270, then `--rollback` `{"cleared":1}`] Scope (owner): awarded (Approved/Active/Closed) Medical and Science & Engineering Research requests with meeting dates from 2017, special grants included. 231 PI rows set to the applicant account and 39 empty PI contact accounts linked. Test request 1002807 (W. M. Keck Foundation applicant) was then rolled back: 230 stand. The script went through three Codex adversarial reviews (findings fixed with tests: source re-validation, PATCH-response ETag for rollback, latest-award selection, retryable rollback, full program scope).
-3. **Findings recorded.**
-   - PI contacts without an account: 39 of 45 were created by the akoyaGO integration without one (35 after the migration), and 6 are duplicates whose other contact holds the applicant account. A note to Connor is drafted and held unsent (plan §7).
-   - Special grants: 30 of the 238 awards are not `wmkf_type = Program`; 19 of the 24 with a PI are the UCLA Keck Court Biomedical Initiative. Atlas `dataverse-akoya-request.md` gotchas and memory `project-research-special-grants-in-cohorts`.
-   - Trashed requests keep `akoya_requeststatus` (filter `statecode eq 0`); the test marker `wmkf_istestrequest` is unset on all awarded requests, so a Keck Foundation applicant is the better test signal. "NCE" = no-cost extension (post-award paperwork). Atlas gotchas.
-4. **Co-PI list decided for 2017–2023 (136).** [OWNER DECISIONS, plan §3.2] The first extraction's "rule a" (faculty with a biosketch) was a guess. `scripts/verify-research-copi-roles.mjs` (paid, Haiku 5.5, about $1.00 across all runs) re-read the 78 rule-a grants including budgets, accepting only quotes found in the cited file that name the person. Approved: 110 rule-c co-PIs + 19 stated roles + 4 budgeted faculty on 992950 + Dill (991649), Ji (994865), Nelson (995161). 996163's people are collaborators (owner hand check). Everyone else stays in the CSVs, not written.
-5. **2024-on co-PIs probed.** [VERIFIED via owner-run `scripts/probe-research-copi-accounts.mjs`] 52 co-PIs on 27 awards, none before 2024; 37 contacts lack an account; 25 share the PI's email domain; 1 is slot-only (needs a junction row).
+1. **Read-only Stage B resolve.** [VERIFIED via sandbox runs and two owner-run production resolves] `scripts/resolve-research-copi-institution-at-award.mjs` with rules in `scripts/lib/research-copi-stage-b.mjs` (80 tests). Owner rules: Institution at Award only from our data (PI email domain → applicant, domain → account map, exact Account name); SerpAPI only for current-account evidence (owner authorized up to 400 searches; 118 used). Checks for duplicates (email, name + domain, nicknames, batch-level grouping), `is-pi`, `is-liaison`, Keck Foundation applicants, trashed requests. Three Codex adversarial rounds (gpt-6-astra): 4, 2, 1 findings, all fixed with tests.
+2. **Production resolve `05b61fa0`** (owner-run, at `c2d154fe5`): extracted 98 ready / 20 no account / 15 possible existing contact / 2 is-pi / 1 conflict; recorded 47 ready / 1 is-liaison (1001012, Aaron Diaz) / 2 is-pi (1000954) / 2 no account; 31 contact accounts ready, 6 web conflicts, 2 unresolved. Output in `~/Downloads/Research Co-PI Searches/stage-b/` (restricted, not in git).
+3. **Approval workbook** `research-copi-confirm-v2.xlsx` from `scripts/build-research-copi-confirm-workbook.mjs`: 5 group decisions + 58 individual checks. The owner's earlier row-by-row answers (47 recorded rows) carry over by key; Billinge's contact row is pre-excluded.
+4. **Owner findings recorded in the plan:** the 2017–2023 total is 136 (the old "133" line was stale); Billinge was at Columbia at the 1001565 award and is now at UCSB (Institution at Award right, latest-award contact account stale); the web check found nothing usable for 28 of 37 contacts; the confirmation email campaign is parked.
 
 ### Commits
 
-`cefd15420`..`1432a5946` on `main` (29 commits, all pushed). Key ones: `cefd15420` wave 34 spec; `78ff873d5`/`f873e9f49`/`bbf720d6a`/`361f63797`/`9de903b3b` Stage A script and Codex fixes; `96eba3ce3`..`72c6de1b9` co-PI role check; `e4fb9e8d7` special grants; `1432a5946` rollback record. This handoff commit follows.
+`5eeba6f8d`..`980478a77` on `main` (11 commits, all pushed). Key ones: `5eeba6f8d` resolve; `12c0f9fe1`/`474ec8b5e`/`158bfefb2` Codex fixes; `c2d154fe5` liaison check, contact web check, workbook builder; `b5a7da11f` re-run record; `980478a77` scope note and memory. This handoff commit follows.
 
 ## Next Items
 
-### Verified Open
-
-1. **Build the Stage B resolve (read-only) and approval workbook.**
-   Evidence: plan §3.2; owner CSVs in `~/Downloads/Research Co-PI Searches/` (`research-copi-candidates.csv`, `research-copi-roles-v3.csv`, `research-copi-roles-recheck.csv`, `research-copi-accounts-probe.csv`; restricted PII, never in git).
-   Inputs: the 136 approved 2017–2023 co-PIs and the 52 recorded 2024-on co-PIs. Rules agreed: exclude W. M. Keck Foundation applicants and `statecode ≠ 0`; contact match by any email (all three fields, all contacts), then name + email domain, else review; account from the contact's account if set, else the applicant when the email domain (incl. subdomains) matches the PI's, else a clear-winner domain→account map from contacts staff already linked, else review; never create accounts without per-row approval; create contacts/junction rows only with approval; check legacy `wmkf_copi1..5` slots and the junction alternate key. Created records need delete-based rollback with their own ledger kinds. Put rules in `scripts/lib/` with Jest tests; expect Codex review rounds. Approval in the ORCID-style workbook.
-2. **Data fixes for staff in Dynamics.**
-   Evidence: plan §3.1. Merge the 6 duplicate PI contacts (992966, 994465, 1001530, 1001618, 1002341, 1002353); check 1000954 (PI junction row names a different contact than the project leader); the 4 held-back ORCID duplicate cases.
-
 ### Owner Decision Needed
 
-1. **Send the held note to Connor** (intake contact account linking and email dedupe). Evidence: plan §7. Owner is waiting on another thread with him first.
-2. **Colleague vocabulary review.** Evidence: `docs/plans/review/PROPOSAL_WORKFLOW_VOCABULARY_2026-10-19.md`. Await feedback and explicit scope.
-3. **Meeting Tracker redesign direction.** Evidence: `.impeccable/critique/2026-10-19T22-21-01Z__nts-meeting-tracker-meetingtrackerlist-js-ef43d395.md`. No build authorized.
+1. **Stage B scope cut** (see Raise First). Evidence: plan §3.2; `research-copi-confirm-v2.xlsx`. Do not build the apply step until decided.
+2. **Email for new contacts** (81 proposed): proposal-era address, none, or kept in a secondary field marked unverified. Evidence: plan §3.2 "Still open". The parked campaign would need a working address.
+3. **Billinge's current institution (UCSB)** needs an override path if contact accounts are written. Evidence: plan §3.2 owner findings.
+4. **Send the held note to Connor.** Evidence: plan §7. Owner is waiting on another thread with him.
+5. **Colleague vocabulary review.** Evidence: `docs/plans/review/PROPOSAL_WORKFLOW_VOCABULARY_2026-10-19.md`.
+6. **Meeting Tracker redesign direction.** Codex was working on it in its own worktree this session. Evidence: `.impeccable/critique/2026-10-19T22-21-01Z__nts-meeting-tracker-meetingtrackerlist-js-ef43d395.md`.
+
+### Verified Open
+
+1. **Data fixes for staff in Dynamics.** Evidence: plan §3.1, §3.2. Merge the 6 duplicate PI contacts (992966, 994465, 1001530, 1001618, 1002341, 1002353); 1000954 (PI row names another contact; its slot co-PI is the PI); 1001012 (liaison recorded as co-PI); the 4 held-back ORCID duplicate cases.
 
 ### Parked
 
-1. **Earlier years (before 2017).** Evidence: plan §6. Re-open if the 2017-on analysis is useful; PIs extend cheaply, co-PIs need a new inventory and paid extraction.
-2. **994464** (PI name spelled "Zhange"; other issues). Owner is handling it personally.
-3. **1001976** is a trashed Keck Foundation test grant (Inactive/Trash); outside scope. Three duplicate "W. M. Keck Foundation" accounts exist.
+1. **PI/co-PI confirmation email campaign** (owner, 2026-10-20). Evidence: plan §3.2. Re-open when the owner schedules it.
+2. **Earlier years (before 2017).** Evidence: plan §6.
+3. **994464** ("Zhange"; owner handling). **1001976** trashed Keck Foundation test grant; three duplicate "W. M. Keck Foundation" accounts exist.
 
 ### Verify Before Acting
 
-1. Session 620 limits carried: audio PR #513 released (`413c5f048`); no fresh Production transcription or 4 GB rerun proved; Board real release/email/archive acceptance unproved. Evidence limits, not tasks.
+1. Accent-insensitive Dataverse name search is `[ASSUMED]`, not probed (plan §3.2).
+2. Session 620 limits carried: audio PR #513 released (`413c5f048`); no fresh Production transcription or 4 GB rerun proved; Board real release/email/archive acceptance unproved.
 
 ### Do Not Reopen Without New Decision
 
-1. PRs #506, #511, #512, #513 merged; printable briefing needs no rebuild.
-2. Keep `codex/legacy-test-request-1002788` (`e563c5f3b`) unmerged.
-3. Do not re-run Stage A writes; its resolve hash `7e5cdcf7` and logs are owner-held. Do not re-run the co-PI role check; decisions are recorded in plan §3.2.
-4. Proposed naming does not imply route, database, API or identifier migration.
+1. Do not re-run Stage A writes (hash `7e5cdcf7`) or the paid co-PI role check.
+2. PRs #506, #511, #512, #513 merged; keep `codex/legacy-test-request-1002788` (`e563c5f3b`) unmerged.
+3. Proposed naming does not imply route, database, API or identifier migration.
 
 ## Key Files Reference
 
 | File | Purpose |
 |---|---|
-| `docs/plans/RESEARCH_INSTITUTION_AT_AWARD_BACKFILL_PLAN_2026-10-20.md` | Plan, results, owner decisions, held Connor note (§7) |
-| `scripts/backfill-research-pi-institution-at-award.mjs` | Stage A resolve/apply/verify/rollback (applied) |
-| `scripts/lib/research-iaa-backfill.mjs` | Stage A decision rules (`tests/unit/research-iaa-backfill.test.js`) |
-| `scripts/verify-research-copi-roles.mjs` | Paid evidence-only co-PI role check |
-| `scripts/lib/research-copi-roles.mjs` | Role rules, quote verification, name matching (`tests/unit/research-copi-roles.test.js`) |
-| `scripts/probe-research-copi-accounts.mjs` | Read-only probe of recorded co-PIs' accounts |
-| `scripts/probe-research-pi-contacts-without-account.mjs` | Read-only duplicate/creator probe for PI contacts |
-| `lib/dataverse/schema/wave34-copi-institution-at-award/` | Column spec (applied) |
-| `docs/atlas/dataverse-wmkf-apprequestperson.md` | Junction Atlas incl. the new column and backfill state |
-| `docs/atlas/dataverse-akoya-request.md` | Gotchas: special grants, NCE, trashed/test requests |
+| `docs/plans/RESEARCH_INSTITUTION_AT_AWARD_BACKFILL_PLAN_2026-10-20.md` | Plan, Stage A/B results, owner decisions |
+| `scripts/resolve-research-copi-institution-at-award.mjs` | Stage B read-only resolve (owner-run) |
+| `scripts/lib/research-copi-stage-b.mjs` | Stage B rules (`tests/unit/research-copi-stage-b.test.js`) |
+| `scripts/build-research-copi-confirm-workbook.mjs` | Group-approval workbook from a resolve run (local files only) |
+| `scripts/backfill-research-pi-institution-at-award.mjs` | Stage A (applied) |
+| `docs/atlas/dataverse-wmkf-apprequestperson.md` | Junction Atlas incl. backfill state |
 
 ## Testing
 
 ```bash
-npx jest tests/unit/research-iaa-backfill.test.js tests/unit/research-copi-roles.test.js
+npx jest tests/unit/research-copi-stage-b.test.js tests/unit/research-iaa-backfill.test.js tests/unit/research-copi-roles.test.js
 ```
 
 ## Handoff notes
 
-Milestone: DEVELOPMENT_LOG.md entry added, **Institution at Award column and Research PI backfill**. CLAUDE.md needs no change. Claim-evidence report: 1 advisory event (2 universal claims) on the plan; one row added to `docs/AGENT_ADJACENT_VERIFICATION_PILOT_DIRECTIVE.md`. Sandbox runs need `DYNAMICS_SANDBOX_URL` passed on the command line, never in `.env.local`. Unrelated untracked files in the shared checkout (`output/`, `.impeccable/critique/2026-10-19T02-04-42Z__shared-components-board-writeups-boardwriteups-js.md`) belong to another session and were left alone.
+No DEVELOPMENT_LOG.md milestone: nothing was written to production and no capability shipped. CLAUDE.md needs no change. Claim-evidence report: no eligible event, no row. Sandbox runs: set `DYNAMICS_URL=https://orgd9e66399.crm.dynamics.com` on the command line. Codex worked in its own worktrees; the untracked `output/` and `.impeccable/critique/2026-10-19T02-04-42Z__…` in the shared checkout belong to another session and were left alone. Sandbox resolve output (names) was deleted from the session scratchpad at handoff.
