@@ -312,4 +312,3 @@ function BudgetNumberField({ label, value, limits, onChange }) {
     </label>
   );
 }
-
