@@ -76,3 +76,11 @@ Semantic Scholar (free `citationCount` + paper search + `hIndex`) is also the gr
 the planned staff one-page field review (key-papers + metrics), so this migration and
 `docs/REVIEWER_FINDER_PROMPT_DECOMPOSITION_DESIGN.md` reinforce each other — the one-pager can be
 grounded on free APIs, not paid Scholar.
+
+## Idle credit use (owner, 2026-10-20)
+The prepaid plan's credits go largely unused outside reviewer-search months, so the owner wants
+them used where SerpAPI gives better information than OpenAlex (which has caused identity trouble,
+see [[project-reviewer-contact-enrichment-anchoring]]). First approved use: up to 400 searches,
+owner-run, for current-institution evidence on co-PIs who need a NEW contact in the Research
+Institution at Award Stage B backfill (`docs/plans/RESEARCH_INSTITUTION_AT_AWARD_BACKFILL_PLAN_2026-10-20.md`).
+Approval is per named use and cap (CLAUDE.md rule 12); this note does not authorize other spending.
