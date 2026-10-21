@@ -45,6 +45,16 @@ describe('selectApprovedCopis', () => {
     expect(() => selectApprovedCopis(csv, { budgetOnly: [], unassessed: ['99'] })).toThrow(/found 0/);
   });
 
+  test('adds the extracted PI only on the named two-PI grants, and needs exactly one', () => {
+    const num = csv.candidates.find((x) => x.name === 'Ed Poe').requestNum;
+    const { people } = selectApprovedCopis(csv, { budgetOnly: [], unassessed: [], extractedPi: [num] });
+    expect(people.filter((p) => p.source === 'second-pi-owner-approved').map((p) => p.name)).toEqual(['Ed Poe']);
+    expect(selectApprovedCopis(csv, { budgetOnly: [], unassessed: [] }).people.some((p) => p.name === 'Ed Poe')).toBe(false);
+    expect(() => selectApprovedCopis(csv, { budgetOnly: [], unassessed: [], extractedPi: ['99'] })).toThrow(/found 0/);
+    const twoPis = { ...csv, candidates: [...csv.candidates, cand({ name: 'Flo Ito', decision: 'PI', rule: '' })] };
+    expect(() => selectApprovedCopis(twoPis, { budgetOnly: [], unassessed: [], extractedPi: [num] })).toThrow(/found 2/);
+  });
+
   test('people carry a name-free ref, stable across honorifics', () => {
     const a = selectApprovedCopis(csv, { budgetOnly: [], unassessed: [] }).people[0];
     const b = selectApprovedCopis({ ...csv, candidates: [cand({ name: 'Dr. Ann Lee' })] }, { budgetOnly: [], unassessed: [] }).people[0];

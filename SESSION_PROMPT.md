@@ -1,3 +1,74 @@
+# Session 626 Prompt: Choose an active user workflow before further performance work
+
+## Session 625 Summary — Bounded refactoring and user-facing latency audit (Codex, 2026-10-21)
+
+### What Was Completed
+
+1. **Isolated refactoring branch.** [VERIFIED via Git] Runtime work is on `codex/refactor-inspection`, through `e2ee81769`, based on `fea84c9c0`. Worktree: `/Users/gallivan/.codex/worktrees/refactor-inspection/WMKF_Apps`. It is not merged into main. Owner chose main for stop-time documentation only. Do not infer runtime release from this handoff.
+2. **Behavior-preserving extractions.** Executor budget editor; immutable Dossier/Review Panel file transport; PromptPublishForm; PolicyPublishForm/PolicyDiffBlock; ReviewQuestionRowEditor; model-override mapping helpers; OperationalEventCard; HealthHistoryCheckRow. A separate policy publication conflict-details fix forwards the comparison details. Scoped characterization/regression tests passed for each slice. The initial Executor extraction used independent Codex review; subsequent requested plan/build reviews used Claude Opus through host OAuth, with no API keys or Ultrareview.
+3. **Read-only user-facing latency audit.** Traced Grant Reporting, Literature Analyzer, Expense Reporter and Expertise Finder. Serial processing and waits were source-verified; production latency and organic usage were not measured. The optional literature comparison is not requested by its current page, so parallelizing that branch is not a current UI speedup. Other sessions' Meeting/Workbench and research data work remained outside implementation scope.
+4. **Owner direction on dormant apps.** Grant Reporting is out of date and should be reworked to integrate useful features elsewhere; destination/timing undecided. Literature Analyzer is substantially outdated; possible capability reuse elsewhere is an unverified owner recollection. These decisions are in the two linked project memory notes and deprioritize standalone optimization.
+5. **Expense Reporter bounded concurrency.** [VERIFIED via branch source/tests] Two receipt pipelines overlap downloads and model calls; PDF parsing remains serial per request. Indexed results preserve equal/missing-date order; per-file errors and final response shape remain. Unexpected worker errors stop new work and drain in-flight work before ending the response. Opus plan review required this drain guard; amended plan and final implementation review were READY. Owner subsequently said the app is dormant and to leave it as it is: keep the completed commit, do no further work without a new decision.
+
+### Commits (feature branch; not merged to main)
+
+- `f62ac3218` — refactor(admin): extract Executor budget editor
+- `e10acc54b` — refactor(storage): share immutable artifact byte transport
+- `8aed7d863` — refactor(admin): extract prompt publication form
+- `a20797137` — test(admin): pin policy publication outcome and retry behavior
+- `9264b72eb` — refactor(admin): extract policy publication form
+- `25b6dcc8c` — fix(admin): expose policy label-conflict comparison details
+- `33095b7be` — test(admin): verify question conflict retry and type transitions
+- `09785faa3` — refactor(admin): extract review question row editor
+- `b6e52952d` — test(admin): pin model override mapping and ordered save behavior
+- `810dd1cd5` — refactor(admin): share model override mapping helpers
+- `e5728d703` — test(admin): pin operational event card controls and expansion
+- `0bfe62b84` — refactor(admin): extract operational event card
+- `d445f4f1b` — test: characterize health history row behavior
+- `4c87e1e16` — refactor: extract HealthHistoryCheckRow
+- `b69e1b40d` — docs: record future Grant Reporting rework
+- `f3e269a88` — docs: record outdated Literature Analyzer and reassessment need
+- `e2ee81769` — perf: process expense receipts with two bounded workers
+
+## Next Items
+
+### Owner Decision Needed
+
+1. **Choose a currently used workflow for any further performance audit.** Evidence: owner shifted focus to user-facing latency, then identified Grant Reporting, Literature Analyzer and Expense Reporter as outdated/dormant. No next implementation target was selected. Expertise Finder concurrency is only an unmeasured candidate, not approved work.
+2. **Disposition of the refactoring branch.** Evidence: Git branch and commits above. Publishing the branch for handoff does not authorize merging or deploying runtime changes. Reconcile against current main and review/test the intended release slice before any later promotion.
+
+### Parked
+
+1. **Grant Reporting rework/integration.** Evidence: `.claude-memory/project-grant-reporting-rework.md`. Reopen when owner chooses destination and scope.
+2. **Literature Analyzer reassessment.** Evidence: `.claude-memory/project-literature-analyzer-rework.md`. Trace any reused capabilities before deciding the standalone app's future; no retirement authorized.
+3. **Expense Reporter further work.** Evidence: owner's final instruction, “Let's leave it as it is.” The completed `e2ee81769` stays on the feature branch. No further optimization or stream-parser cleanup requested.
+
+### Verify Before Acting
+
+1. **Concurrent design/data work:** prior handoffs below are historical, not a fresh worklist. Main advanced independently during this session, including Stage B changes through `07c0899ee` at the stop preflight. Read the latest owner decisions and owning session before taking those surfaces; this session did not re-verify their data or authorization.
+2. **Existing Expense Reporter limitations:** Opus observed a preexisting client parser that does not retain split stream chunks and processing that continues after disconnect. Neither was changed. Synthetic PDF parser probes were inconclusive even serially; no real parallel-PDF or production speedup claim is made.
+
+## Key Files Reference
+
+| Surface | Location / purpose |
+|---|---|
+| Runtime changes | `codex/refactor-inspection`, commits above; admin component extractions and storage transport |
+| Expense Reporter | `pages/api/process-expenses.js` on the feature branch; two bounded pipelines |
+| Grant Reporting direction | `.claude-memory/project-grant-reporting-rework.md` |
+| Literature Analyzer direction | `.claude-memory/project-literature-analyzer-rework.md` |
+
+## Verification and handoff
+
+Each implementation slice passed its relevant tests; counts are per slice, not additive unique totals: Executor 36; file transport 182; PromptPublishForm 43; PolicyPublishForm 107; conflict details 108; review-question editor 154; model mappings 58; event card 83; health row 66. Expense Reporter passed 85 tests across seven suites, scoped lint, prompt-injection and API-route gates plus sequential self-tests. Concurrency regressions failed against the original serial implementation before passing after the change. No full production build or live performance acceptance is claimed for the final slice.
+
+Claim-evidence report: local state unavailable; no observation row invented. No DEVELOPMENT_LOG milestone entry required: unreleased bounded refactoring/performance work and future-work notes, not a shipped architecture or capability. CLAUDE.md unchanged. Main's preexisting untracked `commit-times-exact.txt` and `commit-times.txt` were left untouched. The isolated worktree is retained. Stop-time doc gates and remote synchronization are reported in the closing response.
+
+---
+
+# Prior concurrent handoffs — historical snapshots, not re-verified worklists
+
+The following text is preserved verbatim for the owning sessions. Newer main commits and owner decisions may supersede it; do not execute its next items without re-verifying scope.
+
 # Session 625 Prompt: Review Workbench and Meeting coordination designs
 
 ## Session 624 Summary — Design exploration and audience split (Codex, 2026-10-20 PT)
