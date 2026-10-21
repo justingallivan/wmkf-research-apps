@@ -301,4 +301,62 @@ describe('PoliciesSection — unique-label guidance', () => {
     expect(postCall[1].headers).toEqual({ 'Content-Type': 'application/json' });
     expect(JSON.parse(postCall[1].body)).toMatchObject({ slotCode: 'grantee-waiver', title: 'New title', versionLabel: TODAY, parentEtag: 'W/"1"' });
   });
+  test.each(['completed', 'already_published'])('%s closes the editor, reloads, and retains the outcome', async (status) => {
+    const state = makeState({ versions: [version('v1', { isActive: true })] });
+    const fetchSpy = mockGet(state);
+    render(<PoliciesSection />);
+    await openForm();
+    fireEvent.change(screen.getByLabelText(/^title$/i), { target: { value: '  Draft title  ' } });
+    fetchSpy.mockImplementation((url, opts) => Promise.resolve({
+      ok: true, status: 200,
+      json: async () => opts?.method === 'POST' ? { status } : makeState({ versions: [version('v2', { isActive: true })] }),
+    }));
+    fireEvent.click(screen.getByRole('button', { name: /^publish$/i }));
+    fireEvent.click(screen.getByRole('button', { name: /^publish$/i }));
+    await screen.findByText(/v2/);
+    expect(screen.queryByLabelText(/version label/i)).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /^edit policy$/i })).toBeInTheDocument();
+    expect(screen.getByText(status === 'completed' ? 'Published.' : 'No change — that exact version is already active.')).toBeInTheDocument();
+    expect(fetchSpy.mock.calls.filter(([, opts]) => opts?.method !== 'POST')).toHaveLength(2);
+  });
+
+  test.each(['partial', 'concurrency_conflict'])('%s retains the draft without reloading and retries the identical payload', async (status) => {
+    const state = makeState({ versions: [version('v1', { isActive: true })] });
+    const fetchSpy = mockGet(state);
+    render(<PoliciesSection />);
+    await openForm();
+    fireEvent.change(screen.getByLabelText(/^title$/i), { target: { value: '  Draft title  ' } });
+    fireEvent.change(screen.getByLabelText(/body \(markdown\)/i), { target: { value: 'Draft body '.repeat(8) } });
+    fireEvent.change(screen.getByLabelText(/effective date/i), { target: { value: '2026-10-01' } });
+    fetchSpy.mockImplementation((url, opts) => Promise.resolve({
+      ok: status === 'partial', status: status === 'partial' ? 200 : 409,
+      json: async () => opts?.method === 'POST'
+        ? { status, warnings: status === 'partial' ? ['audit_finalize_failed'] : [], freshState: { ...state.slots[0], parentEtag: 'W/"fresh"' } }
+        : state,
+    }));
+    for (let attempt = 0; attempt < 2; attempt++) {
+      fireEvent.click(screen.getByRole('button', { name: /^publish$/i }));
+      fireEvent.click(screen.getByRole('button', { name: /^publish$/i }));
+      await waitFor(() => expect(screen.getByLabelText(/^title$/i)).toHaveValue('  Draft title  '));
+      expect(screen.getByLabelText(/body \(markdown\)/i)).toHaveValue('Draft body '.repeat(8));
+      expect(screen.getByLabelText(/effective date/i)).toHaveValue('2026-10-01');
+      expect(screen.queryByText(/published versions cannot be edited later/i)).not.toBeInTheDocument();
+      if (status === 'partial') {
+        expect(screen.getByText('audit_finalize_failed')).toBeInTheDocument();
+        expect(screen.getByText('Published with warnings — see details below.')).toBeInTheDocument();
+      } else {
+        expect(screen.getByText(/another admin published while you were editing/i)).toBeInTheDocument();
+      }
+      expect(screen.getByRole('button', { name: /^publish$/i })).toBeEnabled();
+    }
+    const posts = fetchSpy.mock.calls.filter(([, opts]) => opts?.method === 'POST');
+    expect(posts).toHaveLength(2);
+    expect(JSON.parse(posts[0][1].body)).toEqual({
+      slotCode: 'grantee-waiver', versionLabel: TODAY, title: '  Draft title  ',
+      body: 'Draft body '.repeat(8), effectiveDate: '2026-10-01', parentEtag: 'W/"1"',
+    });
+    expect(posts[1][1].body).toBe(posts[0][1].body);
+    expect(fetchSpy.mock.calls.filter(([, opts]) => opts?.method !== 'POST')).toHaveLength(1);
+  });
+
 });
