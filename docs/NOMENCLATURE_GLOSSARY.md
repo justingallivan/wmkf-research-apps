@@ -113,15 +113,19 @@ legacy-live | deprecated | ambiguous | direct-url-test`. `migrationDecision` ∈
 - **notes:** Included to disambiguate from "candidate"/"potential reviewer" and to correct the easy "applicant-suggested" misread of the `app` prefix. Data-model term, not an app.
 - **lastVerified:** 2026-06-26
 
-## Deliberations workflow vocabulary — OPEN, decide suite-wide after D26
+## Deliberations workflow vocabulary — approved names
 
-**Owner direction (2026-10-06):** do not rename these panel by panel. The owner
-will settle the vocabulary with colleagues as a group after the D26 cycle; the
-chosen names then change across the whole suite (Workbench, Meeting Tracker,
-Board-facing pages, email, Admin, docs) in one pass. Until then, new copy reuses
-the wording already on the surface it touches and avoids introducing a further
-variant. Inventory taken 2026-10-06 on `feature/workbench-ux`; counts are
-user-facing `.js` in `shared/components` + `pages` (excluding `pages/api`).
+[VERIFIED via owner decision, 2026-10-21] Colleague review approved the names in
+[the terminology table](plans/review/PROPOSAL_WORKFLOW_VOCABULARY_2026-10-19.md),
+with **Draft writeup** replacing the proposed **Post-presentation writeup**.
+The deck and mockups use these names. Runtime wording migration is pending and
+is not authorized by this artifact-editing task. Routes, storage names and
+identifiers remain unchanged.
+
+### Historical source inventory — October 6–7, 2026
+
+The following workflow and variants describe the earlier runtime inventory,
+not the approved design labels.
 
 **The workflow as the owner describes it (2026-10-05/06):**
 
@@ -166,16 +170,10 @@ anchors `#deliberations-status|briefing|writeup`; SharePoint file names such as
 "… Site Visit Presentation.pdf". Treat these as LEAVE+DOCUMENT unless the group
 explicitly chooses a migration.
 
-**Decisions for the group:** one name each for (1) the PD's document, (2) the
-applicant event, (3) the pre-visit meeting, (4) the staff working document,
-(5) applicant slides/bios, (6) recording/transcripts, and (7) a second word for
-"presentation end" in the transcript sense. Then record each as a
-`canonicalName` entry above, with the variants as `legacyAliases`.
-
-- **status:** ambiguous
+- **status:** canonical (approved display vocabulary); runtime migration pending
 - **ownerAppKey:** `reviewers` (Workbench), `meeting-tracker`
-- **migrationDecision:** — (open; colleague review pending, owner 2026-10-19). Latest owner-edited deck and proposed table: `docs/plans/review/PROPOSAL_WORKFLOW_VOCABULARY_2026-10-19.md`. Staff Deliberations stays as the request tab; Discussion summaries is the proposed collection name. No app rename is authorized. The October 8 options sheet and November 1 reminder are earlier planning context, not the latest proposed names.
-- **lastVerified:** 2026-10-06
+- **migrationDecision:** RENAME display copy when separately implemented; LEAVE+DOCUMENT internal identifiers.
+- **lastVerified:** 2026-10-21 via owner approval and terminology deck inspection
 
 ## Concept Evaluator
 

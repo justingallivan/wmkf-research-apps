@@ -12,7 +12,7 @@ owner: product-engineering
 
 [VERIFIED via owner direction, 2026-10-20] Program Directors primarily work in the Workbench. They need an easy-to-find place on the request for meeting time, agenda, materials, videos, transcripts and summaries. Duncan handles meeting preparation and transcript assignments/preparation; superusers should also be able to perform that work.
 
-[PLANNED — design intent] The map below describes the proposed experience. It does not assert that the layout, permissions, publication rules or handoffs are implemented. Meeting names and related labels remain provisional. No app change is authorized by this document.
+[PLANNED — design intent] The map below describes the proposed experience. It does not assert that the layout, permissions, publication rules or handoffs are implemented. Meeting names follow the owner-approved terminology table (2026-10-21). No app change is authorized by this document.
 
 ```mermaid
 flowchart TB
@@ -58,7 +58,7 @@ flowchart TB
 
 ## PD Workbench hierarchy — owner correction
 
-[VERIFIED via owner direction] Staff Deliberations centers on producing and reviewing the working writeup. Working writeup/review comes first; supporting materials (including video, transcripts and summaries) come second; meeting logistics sit behind a compact link. The Workbench remains the PD entry point. This hierarchy prevents the consumer-materials area from displacing the purpose of deliberations.
+[VERIFIED via owner direction] Staff Deliberations centers on producing and reviewing the draft writeup. Draft writeup/review comes first; supporting materials (including video, transcripts and summaries) come second; meeting logistics sit behind a compact link. The Workbench remains the PD entry point. This hierarchy prevents the consumer-materials area from displacing the purpose of deliberations.
 
 ## Handoffs and boundaries
 
@@ -73,7 +73,7 @@ flowchart TB
 
 ## Effect on the saved mockups
 
-The earlier cycle, session and visit layouts are exploration artifacts, not approved final screens. The owner found session detail busy and later identified mixed audiences as a broader cause. This map is the newer organizing direction: Workbench for PD consumption; preparation tasks for Duncan/superusers. Revisit the earlier screen compositions against it before implementing them. Their labels remain provisional.
+The earlier cycle, session and visit layouts are exploration artifacts, not approved final screens. The owner found session detail busy and later identified mixed audiences as a broader cause. This map is the newer organizing direction: Workbench for PD consumption; preparation tasks for Duncan/superusers. Revisit the earlier screen compositions against it before implementing them. Their labels now follow the approved terminology.
 
 The [revised writeup-first PD Workbench](workbench-pd-writeup.html), [desktop](workbench-writeup-desktop.png) and [narrow-screen](workbench-writeup-narrow.png) captures now explore the owner-directed hierarchy. The earlier [materials-first mockup](workbench-pd-materials.html) is superseded because it buried writeup/review. The revision is a proposed composition, not approved implementation. A first [Duncan/superuser Meeting coordination workspace](preparation-workspace.html) is now saved with task views for setup, invitations, collection and transcript checking. Both compositions remain proposals for owner review. Resolve exact placement, lifecycle/role variants and artifact availability before an implementation brief. No routes, API, database, role configuration or live records changed.
 

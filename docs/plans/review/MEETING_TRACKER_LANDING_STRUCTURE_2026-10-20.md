@@ -3,7 +3,7 @@ title: Meeting Tracker Landing Structure and Mockups
 domain: product
 kind: plan
 status: proposed
-summary: Meeting layout explorations and newer Workbench-first audience flow; terminology is provisional and app implementation remains pending.
+summary: Meeting layout explorations and newer Workbench-first audience flow; terminology is approved as of 2026-10-21 and app implementation remains pending.
 canonical: false
 owner: product-engineering
 related:
@@ -22,7 +22,7 @@ The owner’s later hierarchy correction is controlling for the PD Workbench: **
 
 [VERIFIED via owner decisions in the Codex chat, 2026-10-20] The owner agreed to a cycle schedule landing page whose primary job is to scan the cycle’s requests and open the next task. Sessions have a separate task view within Meeting Tracker. Both session and visit actions remain visible for every request, including on narrow screens.
 
-[VERIFIED via owner instruction, 2026-10-20] Save the structure and mockups. Further layout design can continue with provisional labels; final terminology and app implementation remain pending. Meeting names and related labels are provisional. This is approval of the structure for design continuation, not authorization to change the application. No application code is changed by this handoff.
+[VERIFIED via owner instruction, 2026-10-20] Save the structure and mockups. Layout design continues with the owner-approved terminology of 2026-10-21, including Draft writeup. App implementation remains pending. This is approval of the structure for design continuation, not authorization to change the application. No application code is changed by this handoff.
 
 ## Saved artifacts
 
@@ -39,7 +39,7 @@ The owner’s later hierarchy correction is controlling for the PD Workbench: **
 - [Revised writeup-first PD Workbench](meeting-tracker-2026-10-20/workbench-pd-writeup.html), [desktop screenshot](meeting-tracker-2026-10-20/workbench-writeup-desktop.png), and [narrow-screen screenshot](meeting-tracker-2026-10-20/workbench-writeup-narrow.png) — current PD layout proposal.
 - [Superseded materials-first PD Workbench HTML mockup](meeting-tracker-2026-10-20/workbench-pd-materials.html), [desktop screenshot](meeting-tracker-2026-10-20/workbench-pd-desktop.png), and [narrow-screen screenshot](meeting-tracker-2026-10-20/workbench-pd-narrow.png).
 - [Original audit](../../../.impeccable/critique/2026-10-19T22-21-01Z__nts-meeting-tracker-meetingtrackerlist-js-ef43d395.md) — dated source and production inspection, not a fresh runtime assessment.
-- [Vocabulary review](PROPOSAL_WORKFLOW_VOCABULARY_2026-10-19.md) — proposed names and owner-edited deck, awaiting colleague feedback.
+- [Vocabulary review](PROPOSAL_WORKFLOW_VOCABULARY_2026-10-19.md) — approved names and updated owner-edited deck, including Draft writeup.
 
 All records, institutions, proposal titles and dates in the mockups are illustrative. The screenshots show the proposed composition, not production. There are no remote assets, live reads or write actions in the HTML.
 
@@ -62,7 +62,7 @@ Desktop rows are approximately 80px, compared with the design system’s approxi
 
 ## Sessions tab — proposed layout, 2026-10-20
 
-[VERIFIED via owner instruction] Continue designing the other tabs and screens now, using provisional labels; do not change the app. The owner requested the Sessions mockups and repository save, but has not yet approved this tab’s composition.
+[VERIFIED via owner instruction] Continue designing the other tabs and screens now, using approved labels; do not change the app. The owner requested the Sessions mockups and repository save, but has not yet approved this tab’s composition.
 
 The proposed desktop layout has a session list and a selected agenda preview beside it. The narrow version stacks the preview after the list; the preview link targets that region. Each session shows date, start/end time and time zone, location, Planned/Held status and an Open session action. Same-day sessions remain distinguishable by time and location. Create session is the primary action. Upcoming sessions precede held sessions in the illustrative list.
 
@@ -76,7 +76,7 @@ The standalone HTML files link between Cycle schedule and Sessions. No app code,
 
 ## Session detail — proposed read view, 2026-10-20
 
-[VERIFIED via owner instruction] Create and save desktop and narrow-screen session detail mockups with provisional labels; do not change the app. This screen’s layout remains a proposal for owner review. The owner subsequently found it busy and is willing to iterate later; it is a working draft, not an approved final layout.
+[VERIFIED via owner instruction] Create and save desktop and narrow-screen session detail mockups with approved labels; do not change the app. This screen’s layout remains a proposal for owner review. The owner subsequently found it busy and is willing to iterate later; it is a working draft, not an approved final layout.
 
 The proposed read view leads with date, start/end time and time zone, status and Join meeting. A compact summary contains location, duration, attendee count and Edit session details. Proposal order is the main working area, with calculated start times, allocated minutes, request identity and request/briefing actions. The missing-briefing case uses Check briefing, not direct creation. Attendees, notes and agenda sharing sit in a desktop sidebar and follow the agenda on narrow screens. Edit proposal order remains separate from the read view.
 
@@ -86,11 +86,11 @@ Prepare agenda is a static entry point to a future reviewed composer layout. No 
 
 Edit forms, reordering/moving/removing proposals, cancellation, conflict/over-capacity warnings, missing links, unavailable briefings, attendee issues, agenda-send uncertainty, loading/errors/empty states and long agendas are not designed or runtime-verified here. Preserve those existing behaviors when a separately authorized implementation is scoped. This mockup is not acceptance of keyboard accessibility, interaction behavior, data loading or sending.
 
-Only the selected illustrative session and its preview link to this detail; the detail links back to Sessions. All names and related labels remain provisional. No app, API, persistence, design-system or vocabulary decision changes are included.
+Only the selected illustrative session and its preview link to this detail; the detail links back to Sessions. Names now follow the approved terminology table. No app, API, persistence or design-system implementation changes are included.
 
 ## Visit detail — quieter proposed read view, 2026-10-20
 
-[VERIFIED via owner instruction] Create and save desktop and narrow-screen visit detail mockups with provisional labels and no application changes. The composition is proposed for owner review; it is not implementation approval.
+[VERIFIED via owner instruction] Create and save desktop and narrow-screen visit detail mockups with approved labels and no application changes. The composition is proposed for owner review; it is not implementation approval.
 
 The proposal responds to the owner’s feedback that session detail still looks busy. Request identity, visit time/time zone, virtual location/organizer and Join meeting remain visible. Attendees and notes collapse under one disclosure. Applicant materials is expanded in this illustrative pre-visit state. Recording setup, Presentation, Staff discussion and Board materials follow in the existing work order as collapsed sections, each with a visible summary and provisional status. Disclosure sections open locally in the HTML; uploads, sends and joins are inert.
 
@@ -102,7 +102,7 @@ Before implementation, define section summaries against the existing per-artifac
 
 Detailed upload/transcription/speaker-review/output/Board-link flows, edit forms, in-person and unscheduled states, loading/errors and long content remain outside this first layout. Opening a collapsed mock section reveals explanatory content rather than a completed functional design. Both default screenshots and expanded Board-section checks rendered without horizontal overflow at the two captured widths. This does not establish full accessibility or runtime acceptance.
 
-The first illustrative Open visit action in Cycle schedule links to this example; other request links remain static. Labels remain provisional. No application, API, schema, design-system or vocabulary changes are included.
+The first illustrative Open visit action in Cycle schedule links to this example; other request links remain static. Labels now follow the approved terminology table. No application, API, schema or design-system implementation changes are included.
 
 ## Historical PD Workbench materials-first exploration — superseded, 2026-10-20
 
@@ -126,15 +126,15 @@ The revised standalone mockup uses a synthetic lead-PD drafting state. The first
 
 [VERIFIED via source inspection] `shared/components/workbench/StaffDeliberationsTab.js` has Word editing, Ready for group review confirmation, and group/leadership review states. This is a layout proposal, not a complete verified transition or permission contract. Do not offer lead-PD drafting actions to every PD or assume all documents are visible before review. The mockup preserves the distinction that group review starts only through an explicit confirmed action. Actual active group/leadership work continues to use its existing Final Writeup contract; the progression is informational, not new navigation or a replacement workflow.
 
-The earlier materials-first artifacts are preserved as superseded history. Request shell/tab placement, naming and surrounding navigation remain provisional. Editing, review confirmation, actual document/media links, all lifecycle variants, failure states, accessibility and authorization are outside this static mockup. The same direct artifact/audience boundaries described above continue to apply.
+The earlier materials-first artifacts are preserved as superseded history. Request shell/tab placement and surrounding navigation remain proposed; display names follow the approved terminology. Editing, review confirmation, actual document/media links, all lifecycle variants, failure states, accessibility and authorization are outside this static mockup. The same direct artifact/audience boundaries described above continue to apply.
 
 Both screenshot widths rendered without horizontal document overflow; the compact meeting link was exercised and opened the logistics disclosure at both widths. No application source, runtime routes, permissions or live data changed.
 
 ## Duncan and superusers — Meeting coordination workspace proposal, 2026-10-20
 
-[VERIFIED via owner direction] Create and save a preparation workspace covering setup, invitations, materials collection and transcript preparation. No application changes. The layout remains a proposal, with provisional labels and synthetic examples.
+[VERIFIED via owner direction] Create and save a preparation workspace covering setup, invitations, materials collection and transcript preparation. No application changes. The layout remains a proposal, with approved labels and synthetic examples.
 
-[VERIFIED via owner naming correction] The provisional workspace title is Meeting coordination, since transcript work happens after the meeting. Navigation groups setup, invitations and collection under Before the meeting, and transcript preparation under After the meeting. This provisional label does not settle the broader meeting vocabulary.
+[VERIFIED via owner naming correction] The provisional workspace title is Meeting coordination, since transcript work happens after the meeting. Navigation groups setup, invitations and collection under Before the meeting, and transcript preparation under After the meeting. The broader meeting vocabulary was approved after colleague review on 2026-10-21.
 
 The standalone workspace separates four tasks; one task is open at a time. Desktop uses a left task selector, while narrow screens put four compact selectors above the selected task. Each task has one illustrative work item and a focused detail panel. Queue counts are synthetic navigation examples, not an implemented aggregation contract or exhaustive list.
 
