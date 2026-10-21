@@ -173,7 +173,7 @@ describe('PoliciesSection — unique-label guidance', () => {
   // T3 matrix (Stage 3, group A) ahead of migrating both fetch sites onto
   // shared/utils/api-request.js. fetchState (GET) branches on status before
   // reading the body (403 -> exact pinned message, plan §2.3); PublishForm's
-  // submit (POST, PoliciesSection.js:363) is D1 PRESERVE — no ok check, reads
+  // submit (POST, PolicyPublishForm.js) is D1 PRESERVE — no ok check, reads
   // data.status regardless of HTTP status.
   test('(b) GET 403 shows "Admin access required" verbatim', async () => {
     jest.spyOn(global, 'fetch').mockResolvedValueOnce({ ok: false, status: 403, json: async () => ({ error: 'ignored' }) });
