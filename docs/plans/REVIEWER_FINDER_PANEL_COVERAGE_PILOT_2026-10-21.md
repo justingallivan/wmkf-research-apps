@@ -1,6 +1,6 @@
 # Reviewer Finder panel coverage pilot specification
 
-Pilot principles accepted in principle by Justin — 21 October 2026. **PLANNED: no pilot has run and no application implementation is authorized by this document.** Justin is willing to pilot the approach; selection of a practice case is deferred at his request. Resource limits and operational arrangements remain to be settled before execution.
+**PARKED by Justin — 21 October 2026.** The panel-coverage gap and a potential solution are recorded; other work for the new single-phase submission takes priority. Reopen only when Justin chooses to return to this workstream. Principles are accepted in principle, but no pilot has run and no application implementation is authorized. Resource limits and operational arrangements remain unsettled.
 
 The pilot asks whether organizing reviewer discovery around the judgments a panel must make produces better coverage than a list of individually plausible reviewers. It separately tests whether deliberate use of the bibliography adds value. The first deliverables are reports, not a production UI or database design.
 
@@ -41,6 +41,14 @@ Apply the selection priorities in order:
 4. Fill remaining supporting gaps.
 
 Overlap must bring a meaningfully different method, body of evidence, or interpretation. Similar publication profiles do not by themselves establish independent scrutiny. If a fixed-size panel cannot meet the priorities, expose the tradeoff and consider a bridging candidate or panel-size change rather than hiding the gap in an aggregate score. In the scored comparison, any panel-size change must apply to all arms and be declared before selection.
+
+## Smallest useful version when resumed
+
+Begin with a staff-assisted report: read the narrative and bibliography, draft a small coverage map, have staff correct it, search for the missing contributions, and record candidate evidence and uncertainty. Measure whether one consequential gap can be filled by a defensible candidate with modest staff correction. This practice case is not an adoption test or a substitute for the later comparison below.
+
+If the pilot supports a product change, the smallest proposed slice is an editable judgment list, a candidate annotation explaining which judgment the person could help assess with evidence and uncertainty, and a staff-triggered search for one gap. These are design options, not authorized implementation. Defer automatic panel selection, exhaustive citation expansion, global expertise profiles, and searches automatically triggered by engagement changes. Keep dated proposal and panel snapshots until a live update contract is justified.
+
+The hard questions to test first are whether judgments are proposal-specific, whether evidence establishes a person's contribution, whether the search adds complementary people, and whether staff correction/review costs are acceptable. Do not turn the practice case into a large verification workbook or an automation project.
 
 ## Three search arms
 

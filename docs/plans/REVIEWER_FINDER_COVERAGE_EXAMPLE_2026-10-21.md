@@ -2,7 +2,7 @@
 
 **Fictional demonstration — no real proposal, reviewer, publication, verification, search result, or measured pilot outcome appears below.** The identifiers and evidence descriptions illustrate the report format. Do not use them for outreach or infer that the strategy has been tested.
 
-This example follows the [draft pilot specification](REVIEWER_FINDER_PANEL_COVERAGE_PILOT_2026-10-21.md). It shows a panel tradeoff rather than an automatically selected winner.
+The pilot is parked at Justin's request while other single-phase submission work takes priority. This example follows the [draft pilot specification](REVIEWER_FINDER_PANEL_COVERAGE_PILOT_2026-10-21.md). It shows a panel tradeoff rather than an automatically selected winner.
 
 ## Application and review decision
 
