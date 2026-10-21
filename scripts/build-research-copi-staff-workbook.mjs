@@ -157,7 +157,7 @@ const KIND4 = {
   'web-suggestion': 'New contact: the web suggests this current institution',
   'contact-account-web-disagrees': 'Web shows a different current institution than their latest award',
   'contact-account-web-ambiguous': 'Web shows several institutions',
-  'contact-account-unresolved': 'Latest award institution unknown',
+  'contact-account-unresolved': 'Latest award institution unknown (if this person is also in Part 3, start from that answer)',
 };
 const p4 = sheet('4. Current institution', [...ANSWER, ['Request', 'req', 10], ['Year', 'y', 6], ['Person', 'p', 24], ['Contact in AkoyaGO', 'c', 34], ['Why flagged', 'w', 30], ['Proposed (latest award)', 'i', 30], ['Web suggestion', 's', 28], ['Web results', 'links', 60], ['key', 'key', 8]]);
 for (const it of parts.p4) {
@@ -189,6 +189,32 @@ const FIXES = [
   ['1001565', 'One co-PI (Simon Billinge) has moved from Columbia to UC Santa Barbara since this award. His contact has no current institution.', 'Set his contact\'s institution (account) to UC Santa Barbara only if it is still empty. Do not change anything on the request.'],
 ];
 for (const [req, prob, todo] of FIXES) p5.addRow({ req, prob, todo, key: `p5|${req}` });
+
+// PI contacts held back from the ORCID backfill (research-pi-orcid-resolve.jsonl
+// action held_by_*), named from research-pi-orcid-review.xlsx by contactid.
+const ORCID_TODO = 'Search the person\'s last name for a second contact (one may have been created when they reviewed for us). If two contacts are clearly the same person, merge them as above, keeping the one linked to the award. If there is only one, write that in "What you found".';
+const orcidActions = new Map(fs.readFileSync(path.join(DIR, '..', 'research-pi-orcid-resolve.jsonl'), 'utf8').trim().split('\n')
+  .map((l) => JSON.parse(l)).filter((x) => /^held_by_/.test(x.action)).map((x) => [x.contactid, x.action]));
+const orcidWb = new ExcelJS.Workbook();
+await orcidWb.xlsx.readFile(path.join(DIR, '..', 'research-pi-orcid-review.xlsx'));
+{
+  const ws = orcidWb.worksheets[0];
+  const head = ws.getRow(1).values;
+  ws.eachRow((r, i) => {
+    if (i === 1) return;
+    const row = {};
+    head.forEach((h, k) => { if (h) row[h] = String(text(r.getCell(k).value)); });
+    const action = orcidActions.get(row.contactid);
+    if (!action) return;
+    const where = action === 'held_by_other_contact' ? 'another contact' : 'a reviewer record linked to a different contact';
+    p5.addRow({
+      req: '(search by name)',
+      prob: `PI ${row.Person}, ${row['Grant institution (award years)']}: their ORCID (${row['Proposed ORCID (click to open)']}) is already on ${where}, so the person probably has two contacts.`,
+      todo: ORCID_TODO,
+      key: `p5|orcid|${row.contactid}`,
+    });
+  });
+}
 p5.eachRow((row, i) => {
   if (i === 1) return;
   row.alignment = { vertical: 'top', wrapText: true };
@@ -197,5 +223,5 @@ p5.eachRow((row, i) => {
 });
 
 await wb.xlsx.writeFile(OUT);
-console.log(`Part 1 ${parts.p1.length}, Part 2 ${parts.p2.length}, Part 3 ${parts.p3.length}, Part 4 ${parts.p4.length}, Part 5 ${FIXES.length}`);
+console.log(`Part 1 ${parts.p1.length}, Part 2 ${parts.p2.length}, Part 3 ${parts.p3.length}, Part 4 ${parts.p4.length}, Part 5 ${p5.rowCount - 1}`);
 console.log(`Wrote ${OUT}`);
