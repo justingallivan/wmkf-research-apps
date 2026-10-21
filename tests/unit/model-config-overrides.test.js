@@ -42,6 +42,7 @@ test('clearing an override sends null and reloads after success', async () => {
   expect(JSON.parse(puts()[0][1].body)).toEqual({ appKey: 'sample:app', modelType: 'model', modelId: null });
   expect(gets()).toHaveLength(2);
   expect((await screen.findAllByRole('combobox'))[0]).toHaveValue('');
+  expect(screen.getByRole('button', { name: 'No Changes' })).toBeDisabled();
 });
 
 test('save follows server-key order, waits per request, and stops after a partial failure', async () => {
