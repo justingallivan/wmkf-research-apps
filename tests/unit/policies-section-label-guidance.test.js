@@ -173,7 +173,7 @@ describe('PoliciesSection — unique-label guidance', () => {
   // T3 matrix (Stage 3, group A) ahead of migrating both fetch sites onto
   // shared/utils/api-request.js. fetchState (GET) branches on status before
   // reading the body (403 -> exact pinned message, plan §2.3); PublishForm's
-  // submit (POST, PoliciesSection.js:363) is D1 PRESERVE — no ok check, reads
+  // submit (POST, PolicyPublishForm.js) is D1 PRESERVE — no ok check, reads
   // data.status regardless of HTTP status.
   test('(b) GET 403 shows "Admin access required" verbatim', async () => {
     jest.spyOn(global, 'fetch').mockResolvedValueOnce({ ok: false, status: 403, json: async () => ({ error: 'ignored' }) });
@@ -301,4 +301,101 @@ describe('PoliciesSection — unique-label guidance', () => {
     expect(postCall[1].headers).toEqual({ 'Content-Type': 'application/json' });
     expect(JSON.parse(postCall[1].body)).toMatchObject({ slotCode: 'grantee-waiver', title: 'New title', versionLabel: TODAY, parentEtag: 'W/"1"' });
   });
+  test.each(['completed', 'already_published'])('%s closes the editor, reloads, and retains the outcome', async (status) => {
+    const state = makeState({ versions: [version('v1', { isActive: true })] });
+    const fetchSpy = mockGet(state);
+    render(<PoliciesSection />);
+    await openForm();
+    fireEvent.change(screen.getByLabelText(/^title$/i), { target: { value: '  Draft title  ' } });
+    fetchSpy.mockImplementation((url, opts) => Promise.resolve({
+      ok: true, status: 200,
+      json: async () => opts?.method === 'POST' ? { status } : makeState({ versions: [version('v2', { isActive: true })] }),
+    }));
+    fireEvent.click(screen.getByRole('button', { name: /^publish$/i }));
+    fireEvent.click(screen.getByRole('button', { name: /^publish$/i }));
+    await screen.findByText(/v2/);
+    expect(screen.queryByLabelText(/version label/i)).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /^edit policy$/i })).toBeInTheDocument();
+    expect(screen.getByText(status === 'completed' ? 'Published.' : 'No change — that exact version is already active.')).toBeInTheDocument();
+    expect(fetchSpy.mock.calls.filter(([, opts]) => opts?.method !== 'POST')).toHaveLength(2);
+  });
+
+  test.each(['partial', 'concurrency_conflict'])('%s retains the draft without reloading and retries the identical payload', async (status) => {
+    const state = makeState({ versions: [version('v1', { isActive: true })] });
+    const fetchSpy = mockGet(state);
+    render(<PoliciesSection />);
+    await openForm();
+    fireEvent.change(screen.getByLabelText(/^title$/i), { target: { value: '  Draft title  ' } });
+    fireEvent.change(screen.getByLabelText(/body \(markdown\)/i), { target: { value: 'Draft body '.repeat(8) } });
+    fireEvent.change(screen.getByLabelText(/effective date/i), { target: { value: '2026-10-01' } });
+    fetchSpy.mockImplementation((url, opts) => Promise.resolve({
+      ok: status === 'partial', status: status === 'partial' ? 200 : 409,
+      json: async () => opts?.method === 'POST'
+        ? { status, warnings: status === 'partial' ? ['audit_finalize_failed'] : [], freshState: { ...state.slots[0], parentEtag: 'W/"fresh"' } }
+        : state,
+    }));
+    for (let attempt = 0; attempt < 2; attempt++) {
+      fireEvent.click(screen.getByRole('button', { name: /^publish$/i }));
+      fireEvent.click(screen.getByRole('button', { name: /^publish$/i }));
+      await waitFor(() => expect(screen.getByLabelText(/^title$/i)).toHaveValue('  Draft title  '));
+      expect(screen.getByLabelText(/body \(markdown\)/i)).toHaveValue('Draft body '.repeat(8));
+      expect(screen.getByLabelText(/effective date/i)).toHaveValue('2026-10-01');
+      expect(screen.queryByText(/published versions cannot be edited later/i)).not.toBeInTheDocument();
+      if (status === 'partial') {
+        expect(screen.getByText('audit_finalize_failed')).toBeInTheDocument();
+        expect(screen.getByText('Published with warnings — see details below.')).toBeInTheDocument();
+      } else {
+        expect(screen.getByText(/another admin published while you were editing/i)).toBeInTheDocument();
+      }
+      expect(screen.getByRole('button', { name: /^publish$/i })).toBeEnabled();
+    }
+    const posts = fetchSpy.mock.calls.filter(([, opts]) => opts?.method === 'POST');
+    expect(posts).toHaveLength(2);
+    expect(JSON.parse(posts[0][1].body)).toEqual({
+      slotCode: 'grantee-waiver', versionLabel: TODAY, title: '  Draft title  ',
+      body: 'Draft body '.repeat(8), effectiveDate: '2026-10-01', parentEtag: 'W/"1"',
+    });
+    expect(posts[1][1].body).toBe(posts[0][1].body);
+    expect(fetchSpy.mock.calls.filter(([, opts]) => opts?.method !== 'POST')).toHaveLength(1);
+  });
+
+  test('label conflict renders the server comparison after confirmation closes and preserves the draft', async () => {
+    const state = makeState({ versions: [version('v1', { isActive: true, title: 'Current active title' })] });
+    const fetchSpy = mockGet(state);
+    render(<PoliciesSection />);
+    await openForm();
+    fireEvent.change(screen.getByLabelText(/^title$/i), { target: { value: 'Draft title' } });
+    fireEvent.change(screen.getByLabelText(/version label/i), { target: { value: 'conflicting-v2' } });
+    fireEvent.change(screen.getByLabelText(/body \(markdown\)/i), { target: { value: 'Edited body '.repeat(8) } });
+    fireEvent.change(screen.getByLabelText(/effective date/i), { target: { value: '2026-10-01' } });
+    const details = {
+      fieldsMatch: { title: false, body: false, effectiveDate: true },
+      existing: { versionLabel: 'conflicting-v2', title: 'Server conflicting title', effectiveDate: '2026-10-01', bodyLength: 250, bodyExcerpt: '<b>Existing text</b>' },
+      submitted: { versionLabel: 'conflicting-v2', title: 'Draft title', effectiveDate: '2026-10-01', bodyLength: 96, bodyExcerpt: 'Edited body '.repeat(8) },
+    };
+    fetchSpy.mockImplementation((url, opts) => Promise.resolve({
+      ok: opts?.method !== 'POST', status: opts?.method === 'POST' ? 409 : 200,
+      json: async () => opts?.method === 'POST' ? { status: 'label_conflict', warnings: [], details } : state,
+    }));
+    fireEvent.click(screen.getByRole('button', { name: /^publish$/i }));
+    fireEvent.click(screen.getByRole('button', { name: /^publish$/i }));
+    await waitFor(() => expect(screen.getByLabelText(/^title$/i)).toHaveValue('Draft title'));
+    expect(screen.queryByText(/published versions cannot be edited later/i)).not.toBeInTheDocument();
+    expect(screen.getAllByText('Existing')).toHaveLength(1);
+    expect(screen.getByText('Submitted')).toBeInTheDocument();
+    expect(screen.getByText('Title ✗ differs: Server conflicting title')).toBeInTheDocument();
+    expect(screen.getByText('Title ✗ differs: Draft title')).toBeInTheDocument();
+    expect(screen.getAllByText('Effective ✓: 2026-10-01')).toHaveLength(2);
+    expect(screen.getByText('Body ✗ differs (250 chars):')).toBeInTheDocument();
+    const excerpt = screen.getByText('<b>Existing text</b>');
+    expect(excerpt.querySelector('b')).toBeNull();
+    expect(screen.getByText('Edited body '.repeat(8).trim(), { selector: 'div' })).toBeInTheDocument();
+    expect(screen.getByText(/pick a new label/i)).toBeInTheDocument();
+    expect(screen.getByLabelText(/version label/i)).toHaveValue('conflicting-v2');
+    expect(screen.getByLabelText(/body \(markdown\)/i)).toHaveValue('Edited body '.repeat(8));
+    expect(screen.getByLabelText(/effective date/i)).toHaveValue('2026-10-01');
+    expect(screen.getByRole('button', { name: /^publish$/i })).toBeEnabled();
+    expect(fetchSpy.mock.calls.filter(([, opts]) => opts?.method !== 'POST')).toHaveLength(1);
+  });
+
 });

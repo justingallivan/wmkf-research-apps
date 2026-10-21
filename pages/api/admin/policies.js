@@ -71,6 +71,9 @@ async function handlePost(req, res, profileId) {
     orphan: outcome.orphan || null,
     freshState: outcome.freshState || null,
   };
+  if (outcome.status === 'label_conflict' && outcome.details != null) {
+    responseBody.details = outcome.details;
+  }
   if (!auditWritten) {
     responseBody.warnings.push('audit_finalize_failed');
     if (responseBody.status === 'completed') responseBody.status = 'partial';

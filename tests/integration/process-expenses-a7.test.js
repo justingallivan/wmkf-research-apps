@@ -194,7 +194,8 @@ describe('/api/process-expenses prompt resolution (convergence Stage 3)', () => 
       ['m-expense-reporter.extract-image', 'expense-reporter'],
     ]);
     const byType = completeArgs.map((a) => [typeof a.messages[0].content === 'string' ? 'doc' : 'img', a.maxTokens, a.temperature]);
-    expect(byType).toEqual([['doc', 1005, 0.2], ['img', 1011, 0.2]]);
+    expect(byType).toHaveLength(2);
+    expect(byType).toEqual(expect.arrayContaining([['doc', 1005, 0.2], ['img', 1011, 0.2]]));
   });
 
   test('a non-empty resolved system prompt is sent as system', async () => {

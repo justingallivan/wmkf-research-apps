@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { requestJson, requestEnvelope } from '../../utils/api-request';
+import { buildModelOverrideMap, diffModelOverrides } from './model-override-utils';
 
 // --- Section B2: Model Configuration ---
 const MODEL_TYPE_LABELS = {
@@ -91,15 +92,7 @@ export default function ModelConfigSection() {
       .then(data => {
         setServerState(data);
         // Initialize local overrides from server DB overrides
-        const overrides = {};
-        (data.apps || []).forEach(app => {
-          Object.entries(app.models).forEach(([type, info]) => {
-            if (info.dbOverride) {
-              overrides[`${app.appKey}:${type}`] = info.dbOverride;
-            }
-          });
-        });
-        setLocalOverrides(overrides);
+        setLocalOverrides(buildModelOverrideMap(data.apps || []));
       })
       .catch(err => setError(err.message))
       .finally(() => { setLoading(false); setRefreshing(false); });
@@ -121,14 +114,7 @@ export default function ModelConfigSection() {
   const reviewPanel = apps.find(app => app.appKey === 'review-panel');
 
   // Build server-side DB override map for diff calculation
-  const serverDbOverrides = {};
-  apps.forEach(app => {
-    Object.entries(app.models).forEach(([type, info]) => {
-      if (info.dbOverride) {
-        serverDbOverrides[`${app.appKey}:${type}`] = info.dbOverride;
-      }
-    });
-  });
+  const serverDbOverrides = buildModelOverrideMap(apps);
 
   // Handle dropdown change
   const handleChange = (appKey, modelType, value) => {
@@ -146,21 +132,7 @@ export default function ModelConfigSection() {
   };
 
   // Compute diff between server DB overrides and local state
-  const computeDiff = () => {
-    const changes = [];
-    const allKeys = new Set([...Object.keys(serverDbOverrides), ...Object.keys(localOverrides)]);
-    for (const key of allKeys) {
-      const serverVal = serverDbOverrides[key] || null;
-      const localVal = localOverrides[key] || null;
-      if (serverVal !== localVal) {
-        const [appKey, modelType] = [key.substring(0, key.lastIndexOf(':')), key.substring(key.lastIndexOf(':') + 1)];
-        changes.push({ appKey, modelType, modelId: localVal });
-      }
-    }
-    return changes;
-  };
-
-  const diff = computeDiff();
+  const diff = diffModelOverrides(serverDbOverrides, localOverrides);
   const hasChanges = diff.length > 0;
 
   const saveAll = async () => {
@@ -185,15 +157,7 @@ export default function ModelConfigSection() {
   };
 
   const discardChanges = () => {
-    const overrides = {};
-    apps.forEach(app => {
-      Object.entries(app.models).forEach(([type, info]) => {
-        if (info.dbOverride) {
-          overrides[`${app.appKey}:${type}`] = info.dbOverride;
-        }
-      });
-    });
-    setLocalOverrides(overrides);
+    setLocalOverrides(buildModelOverrideMap(apps));
     setMessage(null);
   };
 

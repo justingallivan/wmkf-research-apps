@@ -561,6 +561,34 @@ describe('prompt publish (PublishForm, D1 fix)', () => {
     fireEvent.change(screen.getByDisplayValue('body'), { target: { value: 'body edited' } });
   }
 
+  test('prompt retries reuse request identity until the draft payload changes', async () => {
+    await openPublishForm();
+    const payloads = [];
+    global.fetch.mockImplementation(async (url, options = {}) => {
+      if (options.method === 'PUT') {
+        payloads.push(JSON.parse(options.body));
+        return response({ status: 'concurrency_conflict' }, false, 409);
+      }
+      throw new Error(`Unexpected fetch ${url}`);
+    });
+    const publish = async (count) => {
+      fireEvent.click(screen.getByRole('button', { name: 'Publish v6' }));
+      await waitFor(() => {
+        expect(payloads).toHaveLength(count);
+        expect(screen.getByRole('button', { name: 'Publish v6' })).toBeEnabled();
+      });
+    };
+    await publish(1);
+    expect(payloads[0].requestId).toMatch(/^[0-9a-f-]{36}$/);
+    await publish(2);
+    expect(payloads[1]).toEqual(payloads[0]);
+    fireEvent.change(screen.getByDisplayValue('body edited'), { target: { value: 'body edited again' } });
+    await publish(3);
+    expect(payloads[2].body).toBe('body edited again');
+    expect(payloads[2].requestId).toMatch(/^[0-9a-f-]{36}$/);
+    expect(payloads[2].requestId).not.toBe(payloads[0].requestId);
+  });
+
   test('(a) 2xx {status:"completed"} calls onSuccess, closes the form', async () => {
     await openPublishForm();
     global.fetch.mockImplementation(async (url, options = {}) => {

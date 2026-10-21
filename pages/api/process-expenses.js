@@ -131,13 +131,13 @@ export default async function handler(req, res) {
     const imageClient = clientFor(imageRow);
     const fileProcessor = createFileProcessor();
 
-    const expenses = [];
-    let processedCount = 0;
+    const inputFiles = [...files];
+    const expenses = new Array(inputFiles.length);
+    // Keep PDF parsing serial; downloads and model calls may overlap.
+    let parseTail = Promise.resolve();
 
-    // Process each file
-    for (const file of files) {
-      processedCount++;
-      const progressMessage = `Processing file ${processedCount}/${files.length}: ${file.filename}`;
+    const processReceipt = async (file, index) => {
+      const progressMessage = `Processing file ${index + 1}/${files.length}: ${file.filename}`;
       sendProgress(progressMessage);
 
       try {
@@ -208,14 +208,14 @@ export default async function handler(req, res) {
               console.warn('Expense data failed schema validation:', validated.errors.join('; '));
             }
             const expenseData = validated.ok ? validated.value : parsed;
-            expenses.push({
+            expenses[index] = {
               ...expenseData,
               sourceFile: file.filename
-            });
+            };
           } catch (parseError) {
             console.error('Failed to parse expense data:', parseError);
             console.error('Raw response:', response);
-            expenses.push({
+            expenses[index] = {
               date: null,
               vendor: 'Parse Error',
               description: `Failed to extract data from ${file.filename}`,
@@ -224,7 +224,7 @@ export default async function handler(req, res) {
               sourceFile: file.filename,
               confidence: 'low',
               notes: `Parse error: ${parseError.message}`
-            });
+            };
           }
 
         } else {
@@ -232,10 +232,12 @@ export default async function handler(req, res) {
           sendProgress(`Extracting text from PDF: ${file.filename}`);
 
           const fileBuffer = await readUploadedBlobBuffer(file);
-          const { text } = await fileProcessor.processFile(fileBuffer, file.filename);
+          const parsing = parseTail.then(() => fileProcessor.processFile(fileBuffer, file.filename));
+          parseTail = parsing.catch(() => {});
+          const { text } = await parsing;
 
           if (!text || text.trim().length < 5) {
-            expenses.push({
+            expenses[index] = {
               date: null,
               vendor: 'Extraction Error',
               description: `No text found in ${file.filename}`,
@@ -244,8 +246,8 @@ export default async function handler(req, res) {
               sourceFile: file.filename,
               confidence: 'low',
               notes: 'Could not extract text from PDF'
-            });
-            continue;
+            };
+            return;
           }
 
           // Send to Claude for analysis
@@ -293,14 +295,14 @@ export default async function handler(req, res) {
               console.warn('Expense data failed schema validation:', validated.errors.join('; '));
             }
             const expenseData = validated.ok ? validated.value : parsed;
-            expenses.push({
+            expenses[index] = {
               ...expenseData,
               sourceFile: file.filename
-            });
+            };
           } catch (parseError) {
             console.error('Failed to parse expense data:', parseError);
             console.error('Raw response:', response);
-            expenses.push({
+            expenses[index] = {
               date: null,
               vendor: 'Parse Error',
               description: `Failed to extract structured data from ${file.filename}`,
@@ -309,13 +311,13 @@ export default async function handler(req, res) {
               sourceFile: file.filename,
               confidence: 'low',
               notes: `Parse error: ${parseError.message}`
-            });
+            };
           }
         }
 
       } catch (fileError) {
         console.error(`Error processing file ${file.filename}:`, fileError);
-        expenses.push({
+        expenses[index] = {
           date: null,
           vendor: 'Processing Error',
           description: `Error processing ${file.filename}`,
@@ -324,9 +326,28 @@ export default async function handler(req, res) {
           sourceFile: file.filename,
           confidence: 'low',
           notes: fileError.message
-        });
+        };
       }
-    }
+    };
+
+    let nextIndex = 0;
+    let stopped = false;
+    const worker = async () => {
+      while (!stopped && nextIndex < inputFiles.length) {
+        const index = nextIndex++;
+        try {
+          await processReceipt(inputFiles[index], index);
+        } catch (error) {
+          stopped = true;
+          throw error;
+        }
+      }
+    };
+    // Exactly two receipt pipelines. Drain both before ending the stream,
+    // including unexpected failures outside the per-file error handling.
+    const outcomes = await Promise.allSettled([worker(), worker()]);
+    const failed = outcomes.find(outcome => outcome.status === 'rejected');
+    if (failed) throw failed.reason;
 
     // Sort expenses by date
     expenses.sort((a, b) => {
