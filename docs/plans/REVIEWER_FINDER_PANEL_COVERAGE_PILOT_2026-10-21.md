@@ -1,6 +1,6 @@
 # Reviewer Finder panel coverage pilot specification
 
-Draft for Justin's review — 21 October 2026. **PLANNED: no pilot has run and no application implementation is authorized by this document.** Numerical limits below are proposed pilot settings, not established performance requirements.
+Pilot principles accepted in principle by Justin — 21 October 2026. **PLANNED: no pilot has run and no application implementation is authorized by this document.** Justin is willing to pilot the approach; selection of a practice case is deferred at his request. Resource limits and operational arrangements remain to be settled before execution.
 
 The pilot asks whether organizing reviewer discovery around the judgments a panel must make produces better coverage than a list of individually plausible reviewers. It separately tests whether deliberate use of the bibliography adds value. The first deliverables are reports, not a production UI or database design.
 
@@ -16,16 +16,31 @@ The application instructions supplied by Justin specify a narrative of up to six
 
 Use six owner-selected applications with both a substantive narrative and its bibliography. Include variation in interdisciplinarity, methodological risk, sparse or ambiguous citations, access to paper full text, and biomedical versus other fields where the actual application pool permits. Record the sampling rationale. Do not select only cases known to work well. This is a diagnostic pilot, not a statistically representative estimate.
 
-Prefer actual new-format submissions when available. If earlier full proposals are used, label them format proxies and reserve at least two actual new-format applications for confirmation before a production decision. A short Phase I proposal alone is not a valid substitute. Use one separate practice case to settle the rubric; freeze the protocol before the six scored cases.
+Prefer actual new-format submissions when available. If earlier full proposals are used, label them format proxies and reserve at least two actual new-format applications for confirmation before a production decision. A short Phase I proposal alone is not a valid substitute. Start with one separate practice case before committing to the six-case comparison: draft its judgments, have staff review their usefulness, and then examine candidate fit with a report. Record difficulties and staff effort; do not build an automated workflow to get through the practice case. Freeze the resulting protocol before the six scored cases. Practice-case selection is currently deferred at Justin's request.
 
 For each application, staff must approve before search:
 
-- Three or four scientific judgments, each anchored to a narrative page, section, aim, or figure. Mark at most two as critical and explain why.
+- A small set of scientific judgments, each anchored to a narrative page, section, aim, or figure. Start with two or three critical judgments, but do not impose an artificial maximum. For each, explain how getting it wrong or leaving it unexamined could materially change the funding decision.
 - A provisional panel size of three. If actual practice requires a different size, set it before all arms run for that case.
 - Existing panel members, if any, and relevant exclusions. Primary comparison starts with an empty panel; an existing-panel replacement exercise is secondary and uses the same members in all arms.
 - The exact input bundle and source versions. Optional scientific-question, risk, enabling-advance, and peer-group answers may be included only if their authoritative mappings are verified and all arms receive the same fields.
 
 Staff can rewrite or reject an automatically drafted coverage map. Record the time needed and the changes made. The approved map is the common evaluation rubric; it is deliberately withheld from baseline generation.
+
+## Agreed principles for judgments and panel selection
+
+A judgment is critical when it concerns the significance of the proposed advance, whether the results could distinguish the claimed explanation from a consequential alternative, or an essential dependency needed for interpretable results. These are prompts, not mandatory categories. For high-risk research, critical does not mean already demonstrated: assess whether the uncertainty is scientifically worthwhile and whether success or failure would be informative.
+
+For a provisional three-person panel, seek assessment of the central scientific claim, scrutiny of the most consequential methodological or interpretive dependency, and coverage of the largest remaining gap or a valuable independent perspective. These are contributions, not fixed discipline seats; one person may cover several.
+
+Apply the selection priorities in order:
+
+1. Cover every critical judgment with at least one supported reviewer.
+2. Avoid having all critical judgments depend on one person.
+3. Add a second perspective where disagreement could materially affect the decision.
+4. Fill remaining supporting gaps.
+
+Overlap must bring a meaningfully different method, body of evidence, or interpretation. Similar publication profiles do not by themselves establish independent scrutiny. If a fixed-size panel cannot meet the priorities, expose the tradeoff and consider a bridging candidate or panel-size change rather than hiding the gap in an aggregate score. In the scored comparison, any panel-size change must apply to all arms and be declared before selection.
 
 ## Three search arms
 
@@ -45,7 +60,7 @@ B and C follow up only when an important judgment lacks a supported, eligible, c
 
 Common proposed evidence-retrieval ceiling: 60 distinct work records and ten full-text retrieval attempts per arm per application, counting origin and verification work together. C spends part of this allowance on citation discovery. A work reused within an arm counts once, but every request/retry and its time or cost is logged. Stop at the ceiling and mark unfinished verification unknown. If the practice case shows the cap is unrealistic, revise it for every arm before scoring begins. Do not silently change it mid-pilot.
 
-Track actual model calls, tokens, scholarly requests, wall time, and staff minutes; equal candidate ceilings do not imply equal cost. Before execution, name the permitted model/services, their charging terms, and a total monetary/credit ceiling for Justin's explicit approval. **This draft authorizes no metered calls or pilot execution.**
+Track actual model calls, tokens, scholarly requests, wall time, and staff minutes; equal candidate ceilings do not imply equal cost. Before execution, name the permitted model/services, their charging terms, and a total monetary/credit ceiling for Justin's explicit approval. **Willingness to pilot does not authorize named metered services or application changes. No searches will run while practice-case selection is deferred.**
 
 ## Evidence and eligibility
 
@@ -71,7 +86,7 @@ Two staff assessors independently score the critical judgments and suggested pan
 
 Construct a staff-selected panel of the predeclared size from each arm's eligible, contactable pool, without revealing the arm label during selection. A person found by multiple arms can appear in each corresponding panel, subject to that arm's own evidence and eligibility. If fewer than the prescribed number qualify, retain the qualifying survivors, leave seats vacant, score coverage normally, and report the shortfall; do not drop the case or borrow another arm's candidates. Compare these panels using:
 
-- **Primary:** critical judgments with at least one score-2 reviewer, reported as a count and denominator. A high aggregate cannot conceal a critical gap.
+- **First-priority outcome:** critical judgments with at least one score-2 reviewer, reported as a count and denominator. Then assess useful independent overlap and consequential supporting gaps in the decision order below. A high aggregate cannot conceal a critical gap.
 - **Secondary breadth:** weighted coverage = sum of judgment weight times the highest eligible panel-member fit score, divided by twice the sum of weights. Critical judgments weigh 2; others weigh 1. This is a rubric score, not a probability of successful review.
 - **Useful overlap:** critical judgments with two independently supported reviewers. Report separately; do not award unlimited points for similar candidates or assume two people are independent merely because their names differ.
 - **Practical yield:** unique eligible/contactable prospects, reasons for losses, plausible-only or unknown fits, alternative candidates for critical judgments, and marginal contribution of the second discovery lane.
@@ -79,13 +94,21 @@ Construct a staff-selected panel of the predeclared size from each arm's eligibl
 
 Later, if staff independently choose to invite people through the normal workflow, distinguish invited, accepted, declined, and received-review status. Ask staff whether received reviews actually addressed the judgments. Invitations and receipt alone cannot establish delivered coverage; this pilot does not send invitations to measure acceptance.
 
-## Decision rules proposed for approval before execution
+## Meaningful improvement and adoption decision
 
-Advance a coverage-directed workflow to a bounded product design only if it improves the primary count over A on at least three of six cases, worsens it on no more than one case, and does not conceal any unresolved critical gap. If A already covers all critical judgments on most cases, treat the primary comparison as ceiling-limited and revise the next experiment; do not change the endpoint after seeing results to manufacture a win.
+Judge meaningful improvement in this order:
+
+1. A previously uncovered critical judgment gains supported, eligible, contactable expertise.
+2. A critical judgment becomes less dependent on one reviewer through a useful independent perspective.
+3. A consequential supporting gap is filled without weakening critical coverage.
+
+For each case, report gains and losses separately, including losses of useful overlap. Staff must explain why the resulting panel is better after that tradeoff; a higher weighted percentage alone does not qualify. Each claimed improvement names the judgment, the added contribution, and evidence obtained within that arm's budget. This ordering is fixed before the scored runs, including cases where A already covers all critical judgments.
+
+Advance a coverage-directed workflow to bounded product design when staff identify a concrete improvement of one of these kinds over A in at least three of six cases, with no unexplained loss of critical coverage and within the agreed effort budget. Any loss of critical coverage remains a named adoption issue requiring staff resolution; do not hide it in the number of winning cases. This is a practical small-pilot decision threshold, not proof of general superiority.
 
 For effort, propose a median ongoing staff-time increase (preparation, search, ordinary evidence review, and panel selection) of no more than 20% over A. Report minutes as well as ratios; a near-zero baseline makes a percentage unhelpful. Only additional experimental assessment overhead is excluded from this threshold and reported separately. These thresholds guide a small design decision, not a statistical claim.
 
-Adopt the dedicated citation lane only if C adds at least one independently supported, eligible/contactable candidate filling a critical gap left by B on at least two cases, within the approved usage budget. Report whether those candidates actually improve the selected panel. If it mainly duplicates B, returns conflicted people, or consumes the budget on uncertain author matches, retain it as a targeted follow-up option or omit it.
+For the dedicated citation lane, propose adoption only if C adds supported, eligible/contactable candidates that produce a meaningful panel improvement over B under the same ordered criteria on at least two cases, within the approved usage budget. Name the resulting improvement in the selected panel; more candidates alone do not qualify. If it mainly duplicates B, returns conflicted people, or consumes the budget on uncertain author matches, retain it as a targeted follow-up option or omit it.
 
 Mixed results lead to a narrow revision and a new, predeclared comparison on additional cases. Unsupported fit claims, identity mistakes, and concealed failures trigger a review of the affected results before any adoption decision.
 
@@ -101,4 +124,4 @@ Before execution, confirm the real input locations and permissions, source-versi
 
 ## Review boundary
 
-[PLANNED] All search, persistence, scoring, and decision behavior above is a pilot design. No improvement has been measured. The falsifying cases are explicit: no increase in critical coverage, unacceptable staff effort, or citation discovery that adds no usable gap-filling candidates. Live availability of the new-format files and structured answers is UNKNOWN until the execution preflight. This document establishes no claim that production has changed.
+[PLANNED] All search, persistence, scoring, and decision behavior above is a pilot design. No improvement has been measured. The falsifying cases are explicit: no meaningful improvement under the ordered panel criteria, unacceptable staff effort, or citation discovery that adds no usable panel contribution. Live availability of the new-format files and structured answers is UNKNOWN until the execution preflight. This document establishes no claim that production has changed.

@@ -10,7 +10,7 @@ Illustrative application: Can patterned mechanical pulses create persistent cell
 
 The hypothetical proposal argues that a mechanical perturbation produces lasting cellular memory. It proposes a custom stimulation device, live-cell imaging, and longitudinal molecular measurements. The panel must judge whether persistence is real, whether the device isolates the intended perturbation, and whether the analysis distinguishes a causal change from selection of pre-existing cells.
 
-Illustrative input manifest: narrative revision N1, six pages; bibliography revision B1, 24 references; coverage map revision M1. In a real report, replace these labels with actual file identity/version, content hash, extraction status, and retrieval time. Here, none exists.
+Illustrative input manifest: narrative revision N1, six pages; bibliography revision B1, 24 references; coverage map revision M2. In a real report, replace these labels with actual file identity/version, content hash, extraction status, and retrieval time. Here, none exists.
 
 Panel budget: three people. Starting panel: empty. Search arm: C, coverage plus citation discovery. Search and evidence counters: not run. Applicant exclusions, author identity, and conflicts below are simulated.
 
@@ -20,10 +20,10 @@ Panel budget: three people. Starting panel: empty. Search arm: C, coverage plus 
 |---|---|---|---|
 | J1 | Would the claimed persistence support cellular memory rather than a transient response? | Critical, weight 2 | Narrative p. 2, field/gap; p. 4, Aim 2 |
 | J2 | Can the device isolate the intended mechanical exposure from heating or fluid-flow effects? | Critical, weight 2 | Narrative p. 3, Aim 1; Figure 1 |
-| J3 | Could the experiments and analysis distinguish induced change from selection or measurement artifacts? | Supporting, weight 1 | Narrative p. 4, Aim 2; p. 5, analysis |
+| J3 | Could the experiments and analysis distinguish induced change from selection or measurement artifacts? | Critical, weight 2 | Narrative p. 4, Aim 2; p. 5, analysis |
 | J4 | Can the proposed live-cell measurements sustain the required resolution and duration? | Supporting, weight 1 | Narrative p. 6, feasibility |
 
-Staff note: J3 is supporting in this invented case because a narrow validation experiment addresses the principal confound. If the actual scientific claim depends critically on that distinction, staff should mark J3 critical before search and re-evaluate the panel accordingly. Importance must follow the proposal, not a fixed discipline template.
+Staff note: J3 is critical because failure to distinguish induced change from selection would undermine the central interpretation. J4 remains supporting here, but would become critical if measurement limitations made the results uninterpretable. These designations follow the scientific consequences rather than a quota of critical judgments. They do not require the high-risk project to have already demonstrated success.
 
 ## Candidate evidence and eligibility
 
@@ -66,12 +66,12 @@ A real evidence record includes DOI/PMID or another stable identifier where avai
 
 | Panel | Members | Critical judgments supported | Weighted breadth | Important tradeoff |
 |---|---|---|---|---|
-| A | R1, R2, R3 | 2 of 2 | 10/12 = 83% | Two supported perspectives on J1, but no supported J4 reviewer |
-| B | R1, R3, R4 | 2 of 2 | 12/12 = 100% | J4 gains coverage; J1 now depends on one supported reviewer |
+| A | R1, R2, R3 | 3 of 3 | 12/14 = 86% | Two supported perspectives on J1, but no supported J4 reviewer |
+| B | R1, R3, R4 | 3 of 3 | 14/14 = 100% | J4 gains coverage; J1 now depends on one supported reviewer |
 
-For Panel A, the best fit scores are 2, 2, 2, 0. With weights 2, 2, 1, 1, the numerator is 4 + 4 + 2 + 0 = 10 and the maximum is 12. Panel B scores 2 on all four judgments. These percentages summarize a fictional rubric; they do not estimate review quality or certainty.
+For Panel A, the best fit scores are 2, 2, 2, 0. With weights 2, 2, 2, 1, the numerator is 4 + 4 + 4 + 0 = 12 and the maximum is 14. Panel B scores 2 on all four judgments. These percentages summarize a fictional rubric; they do not estimate review quality or certainty.
 
-**Illustrative staff decision:** provisionally favor Panel B if the imaging feasibility question needs specialist scrutiny. Keep R2 as an alternative when independent assessment of the central mechanism matters more, or as a replacement for R1. Confirm that J1's single-reviewer dependence is acceptable. The report does not silently resolve that tradeoff using the aggregate score.
+**Illustrative staff decision:** provisionally favor Panel B if the imaging feasibility question needs specialist scrutiny. Keep R2 as an alternative when independent assessment of the central mechanism matters more, or as a replacement for R1. Confirm that J1's single-reviewer dependence is acceptable. Both panels cover all three critical judgments; Panel B does not improve that count. It may qualify as a meaningful improvement because it fills a consequential supporting gap and adds supported overlap on J3, but it loses overlap on J1. Staff must explain why that tradeoff is preferable; the aggregate score does not decide it. R2's independence also needs confirmation before its overlap can be counted as useful independent scrutiny.
 
 The useful follow-up was specific: find expertise in sustained imaging and its failure modes. Another general memory expert would not have repaired the J4 gap. If R4 could not be verified or contacted within the budget, the correct result would remain “J4 unresolved.”
 
