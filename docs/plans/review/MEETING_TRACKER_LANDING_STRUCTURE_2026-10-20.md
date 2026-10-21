@@ -32,6 +32,7 @@ related:
 - [Sessions HTML mockup](meeting-tracker-2026-10-20/sessions.html), [desktop screenshot](meeting-tracker-2026-10-20/sessions-desktop.png), and [narrow-screen screenshot](meeting-tracker-2026-10-20/sessions-narrow.png).
 - [Session detail HTML mockup](meeting-tracker-2026-10-20/session-detail.html), [desktop screenshot](meeting-tracker-2026-10-20/session-detail-desktop.png), and [narrow-screen screenshot](meeting-tracker-2026-10-20/session-detail-narrow.png).
 - [Visit detail HTML mockup](meeting-tracker-2026-10-20/visit-detail.html), [desktop screenshot](meeting-tracker-2026-10-20/visit-detail-desktop.png), and [narrow-screen screenshot](meeting-tracker-2026-10-20/visit-detail-narrow.png).
+- [PD Workbench HTML mockup](meeting-tracker-2026-10-20/workbench-pd-materials.html), [desktop screenshot](meeting-tracker-2026-10-20/workbench-pd-desktop.png), and [narrow-screen screenshot](meeting-tracker-2026-10-20/workbench-pd-narrow.png).
 - [Original audit](../../../.impeccable/critique/2026-10-19T22-21-01Z__nts-meeting-tracker-meetingtrackerlist-js-ef43d395.md) — dated source and production inspection, not a fresh runtime assessment.
 - [Vocabulary review](PROPOSAL_WORKFLOW_VOCABULARY_2026-10-19.md) — proposed names and owner-edited deck, awaiting colleague feedback.
 
@@ -97,6 +98,20 @@ Before implementation, define section summaries against the existing per-artifac
 Detailed upload/transcription/speaker-review/output/Board-link flows, edit forms, in-person and unscheduled states, loading/errors and long content remain outside this first layout. Opening a collapsed mock section reveals explanatory content rather than a completed functional design. Both default screenshots and expanded Board-section checks rendered without horizontal overflow at the two captured widths. This does not establish full accessibility or runtime acceptance.
 
 The first illustrative Open visit action in Cycle schedule links to this example; other request links remain static. Labels remain provisional. No application, API, schema, design-system or vocabulary changes are included.
+
+## PD Workbench meeting/materials area — proposed, 2026-10-20
+
+[VERIFIED via owner instruction] Mock up the PD-facing meeting/materials area in the Workbench with easily found video, transcript and summary links; save alongside the earlier designs without changing the app.
+
+[PLANNED — composition for review] This first draft places Meetings and materials within Staff Deliberations, keeping that existing tab name. Placement and the surrounding illustrative navigation are not final. Two compact meeting entries show session time, the request’s slot within a multi-request agenda, and the presentation time. Presentation video, transcript and summary links are directly visible, separate from internal staff-discussion transcript/summary links. A pending discussion summary has plain availability text rather than a dead link or generation button. Preparation controls for Duncan/superusers are omitted.
+
+The screenshots depict a synthetic post-meeting state, not live records or output readiness. No Join action is shown for ended meetings; before-meeting/active-meeting, unscheduled, failed and unavailable states still need design. All names, dates, agenda membership and availability are illustrative. Available means usable in this example, not formally approved or shared with the Board. Internal is an audience cue, not a new security mechanism.
+
+Meeting documents are disclosed below the direct output links. Working writeup and review is represented as a separate out-of-scope disclosure, not a proposed removal, relocation approval or replacement of existing review workflow. [VERIFIED via source inspection] `shared/components/workbench/StaffDeliberationsTab.js` already coordinates meeting context, briefing/writeup lifecycle and follow-up components; the proposed artifact layout has not been implemented or checked against a complete data/security contract.
+
+Local agenda navigation points to the earlier session-detail exploration for context only; that screen still contains preparation controls and is not the final PD-only agenda destination. Full agenda access must retain request restrictions when designed for a multi-request session. Artifact links are inert. Nothing is uploaded, generated, joined or sent. A future implementation must reuse authorized artifacts and enforce presentation/internal discussion boundaries, rather than copy documents or treat display state as access permission.
+
+Desktop uses side-by-side presentation and staff-discussion groups; narrow screens stack them. Both rendered without horizontal document overflow, with the active request tab fully visible. The intended consumption path is Workbench request → meeting/agenda/materials → direct outputs, without a required trip through Meeting Tracker processing controls. Future review must resolve placement, surrounding tabs, active-meeting Join behavior, actual artifact eligibility/availability and preservation of the existing writeup/review flow.
 
 ## Before implementation, after vocabulary is settled
 
