@@ -359,4 +359,43 @@ describe('PoliciesSection — unique-label guidance', () => {
     expect(fetchSpy.mock.calls.filter(([, opts]) => opts?.method !== 'POST')).toHaveLength(1);
   });
 
+  test('label conflict renders the server comparison after confirmation closes and preserves the draft', async () => {
+    const state = makeState({ versions: [version('v1', { isActive: true, title: 'Current active title' })] });
+    const fetchSpy = mockGet(state);
+    render(<PoliciesSection />);
+    await openForm();
+    fireEvent.change(screen.getByLabelText(/^title$/i), { target: { value: 'Draft title' } });
+    fireEvent.change(screen.getByLabelText(/version label/i), { target: { value: 'conflicting-v2' } });
+    fireEvent.change(screen.getByLabelText(/body \(markdown\)/i), { target: { value: 'Edited body '.repeat(8) } });
+    fireEvent.change(screen.getByLabelText(/effective date/i), { target: { value: '2026-10-01' } });
+    const details = {
+      fieldsMatch: { title: false, body: false, effectiveDate: true },
+      existing: { versionLabel: 'conflicting-v2', title: 'Server conflicting title', effectiveDate: '2026-10-01', bodyLength: 250, bodyExcerpt: '<b>Existing text</b>' },
+      submitted: { versionLabel: 'conflicting-v2', title: 'Draft title', effectiveDate: '2026-10-01', bodyLength: 96, bodyExcerpt: 'Edited body '.repeat(8) },
+    };
+    fetchSpy.mockImplementation((url, opts) => Promise.resolve({
+      ok: opts?.method !== 'POST', status: opts?.method === 'POST' ? 409 : 200,
+      json: async () => opts?.method === 'POST' ? { status: 'label_conflict', warnings: [], details } : state,
+    }));
+    fireEvent.click(screen.getByRole('button', { name: /^publish$/i }));
+    fireEvent.click(screen.getByRole('button', { name: /^publish$/i }));
+    await waitFor(() => expect(screen.getByLabelText(/^title$/i)).toHaveValue('Draft title'));
+    expect(screen.queryByText(/published versions cannot be edited later/i)).not.toBeInTheDocument();
+    expect(screen.getAllByText('Existing')).toHaveLength(1);
+    expect(screen.getByText('Submitted')).toBeInTheDocument();
+    expect(screen.getByText('Title ✗ differs: Server conflicting title')).toBeInTheDocument();
+    expect(screen.getByText('Title ✗ differs: Draft title')).toBeInTheDocument();
+    expect(screen.getAllByText('Effective ✓: 2026-10-01')).toHaveLength(2);
+    expect(screen.getByText('Body ✗ differs (250 chars):')).toBeInTheDocument();
+    const excerpt = screen.getByText('<b>Existing text</b>');
+    expect(excerpt.querySelector('b')).toBeNull();
+    expect(screen.getByText('Edited body '.repeat(8).trim(), { selector: 'div' })).toBeInTheDocument();
+    expect(screen.getByText(/pick a new label/i)).toBeInTheDocument();
+    expect(screen.getByLabelText(/version label/i)).toHaveValue('conflicting-v2');
+    expect(screen.getByLabelText(/body \(markdown\)/i)).toHaveValue('Edited body '.repeat(8));
+    expect(screen.getByLabelText(/effective date/i)).toHaveValue('2026-10-01');
+    expect(screen.getByRole('button', { name: /^publish$/i })).toBeEnabled();
+    expect(fetchSpy.mock.calls.filter(([, opts]) => opts?.method !== 'POST')).toHaveLength(1);
+  });
+
 });

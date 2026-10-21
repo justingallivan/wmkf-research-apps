@@ -200,20 +200,43 @@ describe('POST publish', () => {
     await handler(post(validBody()), res);
     expect(res.statusCode).toBe(500);
     expect(res.body.status).toBe('slot_not_provisioned');
+    expect(res.body).not.toHaveProperty('details');
   });
 
-  it('409 label_conflict when the label exists with different fields', async () => {
+  it('409 label_conflict exposes only the bounded comparison details without mutations', async () => {
+    const conflictingId = 'dddddddd-dddd-dddd-dddd-dddddddddddd';
     DynamicsService.queryRecords
       .mockResolvedValueOnce({ records: [parentRecord('reviewer-coi')] })
       .mockResolvedValueOnce({ records: [versionRecord()] })
-      .mockResolvedValueOnce({ records: [versionRecord({ wmkf_versionlabel: 'v2', wmkf_policytitle: 'Different title' })] });
+      .mockResolvedValueOnce({ records: [versionRecord({
+        wmkf_policyversionid: conflictingId, wmkf_versionlabel: 'v2',
+        wmkf_policytitle: 'New title', wmkf_policybody: 'X'.repeat(250),
+        wmkf_effectivedate: '2026-07-04T00:00:00Z',
+      })] });
     DynamicsService.getRecord.mockResolvedValue({ ...parentRecord('reviewer-coi'), _etag: 'W/"1"' });
 
     const res = mockRes();
-    await handler(post(validBody()), res);
+    await handler(post(validBody({ versionLabel: ' v2 ', title: ' New title ', body: 'B'.repeat(260) })), res);
     expect(res.statusCode).toBe(409);
-    expect(res.body.status).toBe('label_conflict');
+    expect(res.body).toEqual({
+      status: 'label_conflict',
+      child: { id: conflictingId, created: false, reused: false },
+      parent: { flipped: false }, priorRetired: false, auditWritten: true,
+      warnings: [], orphan: null, freshState: null,
+      details: {
+        fieldsMatch: { title: true, body: false, effectiveDate: true },
+        existing: {
+          versionLabel: 'v2', title: 'New title', effectiveDate: '2026-07-04',
+          bodyLength: 250, bodyExcerpt: 'X'.repeat(200) + '…',
+        },
+        submitted: {
+          versionLabel: 'v2', title: 'New title', effectiveDate: '2026-07-04',
+          bodyLength: 260, bodyExcerpt: 'B'.repeat(200) + '…',
+        },
+      },
+    });
     expect(DynamicsService.createRecord).not.toHaveBeenCalled();
+    expect(DynamicsService.updateRecord).not.toHaveBeenCalled();
   });
 
   it('409 concurrency_conflict when the parent flip PATCH 412s (orphaned child)', async () => {
