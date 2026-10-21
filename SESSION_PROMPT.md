@@ -1,3 +1,60 @@
+# Session 627 Prompt: Reviewer panel coverage parked pending single-phase priorities
+
+## Session 626 Summary — Reviewer Finder strategy and pilot design (Codex, 2026-10-21 PT)
+
+### What Was Completed
+
+1. **Gap identified; potential solution drafted.** [VERIFIED via owner discussion and saved documents] Reviewer search should help staff assemble complementary expertise for consequential scientific judgments, not merely return individually plausible people. The forthcoming single-phase narrative and bibliography create richer inputs; this session did not verify their live availability.
+2. **Pilot specification and fictional example.** [PLANNED, not executed] Three search approaches share input and resource budgets. Staff assess proposal-specific judgments, evidence-supported candidate contributions, critical coverage, useful overlap, and effort. The example contains no real reviewers, publications, or measured outcomes.
+3. **Principles accepted in principle.** [VERIFIED via owner discussion] Criticality follows consequences for the scientific/funding decision, without requiring high-risk work to be already demonstrated. Secure critical coverage, avoid all critical judgments depending on one person, then add useful independent perspectives and supporting breadth. A concrete improvement must explain the gain and any loss; weighted coverage alone is insufficient.
+4. **Smallest useful starting point.** [PLANNED] One staff-assisted practice report, with an editable coverage map and explicit candidate evidence/uncertainty, before automation or a scored comparison. A later product slice could add judgment annotations and staff-triggered gap searches. No implementation is authorized.
+5. **Parked by owner.** [VERIFIED via final instruction] Other single-phase submission work takes priority. No practice application was selected. Do not run the pilot, expand the plan, or build functionality until Justin explicitly reopens this workstream.
+
+### Commits
+
+Planning branch `codex/reviewer-strategy`:
+- `c2e5d9c64` — draft pilot specification and fictional coverage report.
+- `6e0bfc4ab` — align drafts with agreed judgment, overlap, and improvement principles.
+- `d689eb9eb` — park the pilot and record the smallest useful future scope.
+
+The owner explicitly chose main for this session's handoff. The two planning documents are included with this handoff so future sessions can find them without switching branches. No runtime changes from this session are included.
+
+## Next Items
+
+### Parked
+
+1. **Reviewer Finder complementary panel coverage.** Evidence: owner's 2026-10-21 instruction to set it aside while other single-phase submission work takes priority; linked pilot specification. Reopen only at Justin's direction. The gap and potential solution are recorded; the six-case comparison is not an immediate worklist.
+
+### Verify Before Acting — only after reopening
+
+1. Choose one substantive narrative plus bibliography for a practice case; an older full proposal may be a labeled format proxy. Confirm input identity/version, field availability, and staff participation before analysis.
+2. Confirm resource limits, permitted model/services, report destination, and any reused route's audit-write behavior before execution. Prior willingness to pilot does not authorize named metered calls or production writes.
+3. Re-read current source before implementation: this was strategy work, and parallel sessions may change the document readers, search pipeline, or UI. Do not infer deployment or live-input readiness from the design.
+
+### Concurrent work
+
+The previous handoffs below are preserved as historical snapshots, not current action lists. [VERIFIED via Git] Remote main already contains refactoring merge `73c5fb36f`; the older handoff's statements that that branch was unmerged are historical. This session does not assert production deployment or reauthorize any of its next steps. The shared checkout's preexisting untracked `commit-times.txt` and `commit-times-exact.txt` were preserved.
+
+## Key Files Reference
+
+| File | Purpose |
+|---|---|
+| `docs/plans/REVIEWER_FINDER_PANEL_COVERAGE_PILOT_2026-10-21.md` | Parked strategy, practice-case scope, proposed experiment and decision criteria |
+| `docs/plans/REVIEWER_FINDER_COVERAGE_EXAMPLE_2026-10-21.md` | Fictional evidence and panel tradeoff report |
+| `.claude-memory/project-reviewer-panel-coverage-pilot.md` | Compact parked-workstream recall note |
+
+## Verification and handoff
+
+Planning branch startup checks and bounded reviewer tests were recorded earlier in this chat; none measures the proposed strategy's effectiveness. Documentation gates and sequential self-tests passed during drafting; final handoff checks are reported in the closing response. No pilot search, candidate outreach, paid model run, application change, or production data write occurred in this workstream.
+
+No DEVELOPMENT_LOG.md milestone entry required: design exploration and a parked potential solution, with no capability shipped. CLAUDE.md is unchanged. Claim-evidence observation report returned local state unavailable; no observation row was invented. The reviewer-strategy worktree is retained. Owner: Codex; next action: wait for Justin to reopen the topic.
+
+---
+
+# Prior concurrent handoff snapshots — historical, not re-verified worklists
+
+Preserved for continuity. Their dated branch/release statements may be superseded; use current Git, source, and owning-session decisions before acting.
+
 # Session 626 Prompt: Choose an active user workflow before further performance work
 
 ## Session 625 Summary — Bounded refactoring and user-facing latency audit (Codex, 2026-10-21)
