@@ -75,7 +75,7 @@ test('every budget fits inside the default model\'s reviewed output ceiling', ()
 });
 
 test('the panel\'s hand-copied row default matches BASE_CONFIG', () => {
-  // shared/components/admin/PromptTemplatesSection.js mirrors this as
+  // shared/components/admin/prompt-editor-utils.js mirrors this as
   // ROW_DEFAULT_MAX_TOKENS (kept out of the client bundle); a change here must
   // be carried there.
   expect(BASE_CONFIG.MODEL_PARAMS.DEFAULT_MAX_TOKENS).toBe(16384);

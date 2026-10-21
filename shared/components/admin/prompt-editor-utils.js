@@ -22,3 +22,4 @@ export function fmtTs(ts) {
 
 export const fmtInt = (n) => (Number.isFinite(Number(n)) ? Number(n).toLocaleString('en-US') : '—');
 
+export const ROW_DEFAULT_MAX_TOKENS = 16384; // BASE_CONFIG.MODEL_PARAMS.DEFAULT_MAX_TOKENS, applied by execute-prompt.js
