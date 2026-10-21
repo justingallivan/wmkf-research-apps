@@ -1,3 +1,64 @@
+# Session 630 Prompt: Choose the next active workflow; refactoring release is complete
+
+## Session 629 Summary — Refactoring release verification and production merge (Codex, 2026-10-21 PT)
+
+### What Was Completed
+
+1. **Released the refactoring branch.** [VERIFIED via Git and GitHub deployment status] `codex/refactor-inspection` was reconciled with main, reviewed, merged and pushed with explicit owner approval. Merge `73c5fb36f` has the same file tree as reviewed release `fa17c8f03`. This supersedes the older Session 625 snapshot's unmerged status and pending branch-disposition item.
+2. **Release verification passed.** [VERIFIED via local command results] All 43 CI lint/type/static checks passed; isolated lockfile dependency installation and production build passed. Full Jest: 1,425 suites, 24,565 tests and five snapshots passed; 241 tests skipped. The separate required PostgreSQL job passed all ten suites / 130 tests against a disposable PostgreSQL 16 container, then the container was removed. Lint: zero errors, 162 warnings. Initial runner-origin/dependency and browser-harness issues were resolved in setup; complete reruns passed without product changes to mask failures.
+3. **Browser smoke and independent review passed.** [VERIFIED via browser output and review receipt] Six real-component checks with synthetic responses covered health expansion, model discard, review-question save, budget publication, prompt cancel/reset and policy conflict details with a retained retryable draft. No page errors. Claude Opus (`claude-opus-5-5`) reviewed the final combined diff through host OAuth/subscription, with API-key variables removed: final verdict READY, no introduced defects or remaining blockers. Review session `d40a9f8f-d267-4707-b2a4-fc4d7c6c4359`; durable verification/rollback record is the `fa17c8f03` commit body.
+4. **Production deployment verified.** [VERIFIED via GitHub Production deployment 7238690219] Merge SHA `73c5fb36f7e0c6b3c0b83046e9e091606053ff10` deployed successfully to `https://wmkfresearchapps-hqyj6b1v6-justin-gallivans-projects.vercel.app`. The canonical `https://applications.wmkeck.org/auth/signin` and its JavaScript asset returned HTTP 200; protected routes redirected unauthenticated requests to sign-in. This is not authenticated integration health, live publication/storage acceptance, or measured production latency. Vercel CLI runtime-log access was unavailable; no runtime error-scan claim.
+5. **Hosted CI passed for the merge.** [VERIFIED via GitHub Actions] Tests `39685680990`, Playwright `39685681688`, Secret Scanning `39685681073`, Dependency Scan `39685681165`, Security Scan `39685681009`, and additional CodeQL workflow `39685677609` all completed successfully. CodeQL was pending in the deployment response and was rechecked successfully during this stop.
+
+### Commits
+
+- `70e256fc8` — merge current main into the refactoring branch for release checks.
+- `fa17c8f03` — release verification record and trailing-blank-line cleanup.
+- `73c5fb36f` — authorized refactoring merge to main; production deployment succeeded.
+- This handoff commit follows on main; concurrent documentation commits are preserved.
+
+## Next Items
+
+### Done
+
+1. **Refactoring release and branch disposition.** Evidence: merge/deployment/CI above. Do not repeat the merge or treat the older unmerged snapshot as current.
+
+### Owner Decision Needed
+
+1. **Select a currently used workflow before further performance work.** Evidence: this chat's user-facing latency direction and dormant-app decisions; no next implementation was selected here. Expertise Finder remains only an unmeasured candidate, not approved work.
+
+### Parked
+
+1. **Grant Reporting integration/rework.** Evidence: `.claude-memory/project-grant-reporting-rework.md`; destination and timing undecided.
+2. **Literature Analyzer reassessment.** Evidence: `.claude-memory/project-literature-analyzer-rework.md`; possible reuse elsewhere remains unverified. No retirement authorized.
+3. **Further Expense Reporter work.** Evidence: owner's “leave it as it is” instruction. The completed two-worker change is now released; no further optimization or stream-parser cleanup authorized.
+
+### Verify Before Acting
+
+1. **Concurrent design and Stage B work belongs to its owning sessions.** Their latest handoffs are preserved below, not reauthorized or independently verified by this release session. Re-read current decisions/source before continuing those workstreams.
+2. **Known limits remain.** Two concurrent receipts can increase memory use; no production benchmark was taken. Existing split-chunk expense stream parsing and partial-save UI behavior were outside scope. No new cleanup task is implied.
+3. **Rollback reference is historical.** The successful pre-release deployment was `https://wmkfresearchapps-p90b0zkzv-justin-gallivans-projects.vercel.app` at `1b4f5ebb3`. Main has since received concurrent documentation. Reassess current production and intervening changes before any rollback; code rollback does not undo business writes.
+
+## Key Files Reference
+
+| Surface | Location / purpose |
+|---|---|
+| Admin extractions | `shared/components/admin/` — budget, prompt, policy, question, model, event and health editors |
+| Shared byte transport | `lib/services/immutable-artifact-bytes.js` with separate Dossier/Review Panel wrapper checks |
+| Conflict response fix | `pages/api/admin/policies.js` — bounded comparison details for label conflicts |
+| Expense concurrency | `pages/api/process-expenses.js` — two workers, serial PDF parsing, terminal drain |
+| Release evidence | `git show -s --format=full fa17c8f03`; GitHub Actions/deployment IDs above |
+
+## Handoff
+
+Owner: Codex. Runtime release complete; next product action requires an owner-selected workflow. The feature worktree is retained and clean. Main's unrelated modified `docs/plans/review/PROPOSAL_WORKFLOW_VOCABULARY_2026-10-19.pptx` and untracked `commit-times-exact.txt` / `commit-times.txt` belong to other work and are excluded from this commit. No changes to CLAUDE.md were needed. No DEVELOPMENT_LOG milestone entry required: this shipped bounded refactoring, a conflict-display fix and a small latency improvement, not a new capability, architecture or production-system cutover. Claim-evidence report returned local state unavailable; no observation row was invented. Stop-time documentation gates and push result are reported in the closing response.
+
+---
+
+# Preserved concurrent handoffs — owning-session context
+
+The snapshots below are preserved unchanged. Their release statements may be historical; the verified release summary above controls this workstream. Their task lists are not a newly verified or authorized worklist for this session.
+
 # Session 629 Prompt: Resume Meeting coordination layout review
 
 ## Meeting coordination handoff — Codex, 2026-10-21 PT
