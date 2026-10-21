@@ -26,6 +26,8 @@ The owner’s later hierarchy correction is controlling for the PD Workbench: **
 
 ## Saved artifacts
 
+- [Duncan/superuser preparation workspace](meeting-tracker-2026-10-20/preparation-workspace.html) — four locally selectable task views; see captures below.
+
 - [Workbench-first audience flow map](meeting-tracker-2026-10-20/workbench-audience-flow.md) — current organizing direction, design only.
 
 - [Standalone responsive HTML mockup](meeting-tracker-2026-10-20/index.html) — open locally in a browser; controls are static.
@@ -127,6 +129,27 @@ The revised standalone mockup uses a synthetic lead-PD drafting state. The first
 The earlier materials-first artifacts are preserved as superseded history. Request shell/tab placement, naming and surrounding navigation remain provisional. Editing, review confirmation, actual document/media links, all lifecycle variants, failure states, accessibility and authorization are outside this static mockup. The same direct artifact/audience boundaries described above continue to apply.
 
 Both screenshot widths rendered without horizontal document overflow; the compact meeting link was exercised and opened the logistics disclosure at both widths. No application source, runtime routes, permissions or live data changed.
+
+## Duncan and superusers — preparation workspace proposal, 2026-10-20
+
+[VERIFIED via owner direction] Create and save a preparation workspace covering setup, invitations, materials collection and transcript preparation. No application changes. The layout remains a proposal, with provisional labels and synthetic examples.
+
+The standalone workspace separates four tasks; one task is open at a time. Desktop uses a left task selector, while narrow screens put four compact selectors above the selected task. Each task has one illustrative work item and a focused detail panel. Queue counts are synthetic navigation examples, not an implemented aggregation contract or exhaustive list.
+
+| Task | Desktop | Narrow |
+|---|---|---|
+| Meeting setup | [Preview](meeting-tracker-2026-10-20/prep-setup-desktop.png) | [Preview](meeting-tracker-2026-10-20/prep-setup-narrow.png) |
+| Invitations | [Preview](meeting-tracker-2026-10-20/prep-invitations-desktop.png) | [Preview](meeting-tracker-2026-10-20/prep-invitations-narrow.png) |
+| Materials collection | [Preview](meeting-tracker-2026-10-20/prep-materials-desktop.png) | [Preview](meeting-tracker-2026-10-20/prep-materials-narrow.png) |
+| Transcript preparation | [Preview](meeting-tracker-2026-10-20/prep-transcripts-desktop.png) | [Preview](meeting-tracker-2026-10-20/prep-transcripts-narrow.png) |
+
+Setup shows time/duration/location, attendees and agenda checking. Invitations demonstrates an agenda email with recipient/message review before sending; calendar invitation delivery remains a separate unresolved contract, never inferred from saving logistics. Materials shows received/missing items and reminder preparation with message review. Transcript preparation shows a generated transcript’s speaker assignments and presentation end, with review before changes. Different task views use different illustrative meetings; changing task does not imply the same request changes lifecycle state.
+
+[VERIFIED via prior source inspection] Existing SessionEditor/SessionAgendaPanel, SiteVisitMaterialsCard and RecordingAndTranscriptCard ground the capabilities. The task queue, combined workspace and review controls shown are proposals, not built state. Transcript example uses a generated transcript: do not infer that uploaded transcript files support speaker reassignment/splitting. Recording intake, transcription generation, source selection, approval and output creation flows still need fuller design. No paid processing was run.
+
+Duncan and superusers are the intended preparation audience, but runtime authorization is not changed or verified by this mockup. Preserve existing access restrictions, upload recovery, uncertain-send handling, draft/speaker editing, presentation/internal discussion boundaries and separate Board sharing. PDs receive authorized output links in the writeup-first Workbench view; readiness here does not itself publish anything. Summary editorial responsibility remains open.
+
+Task switching was exercised at 1440px and 390px, with no horizontal document overflow in all four task views. All eight captures received independent visual review, ship for mockup review. The source is standalone; only task switching, selects and local links/disclosures respond. Save, review, send, upload, processing and publication actions are inert. Full keyboard/assistive-technology behavior and end-to-end contracts are unverified. DESIGN.md and application files remain unchanged.
 
 ## Before implementation, after vocabulary is settled
 
