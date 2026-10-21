@@ -111,25 +111,44 @@ test('a 409 set_changed preserves the operator edits instead of discarding them'
   expect(screen.getByRole('button', { name: /discard my edits/i })).toBeInTheDocument();
 });
 
-test('a 409 resync re-fetches the live set so the retry saves against a current version', async () => {
-  global.fetch = mockFetch({ postResponse: { ok: false, status: 409, json: async () => ({ status: 'set_changed', error: 'stale' }) } });
+test('a 409 resync retains the draft and retries with the new server version', async () => {
+  let gets = 0;
+  let posts = 0;
+  global.fetch = jest.fn(async (url, opts = {}) => {
+    if (opts.method === 'POST') {
+      posts++;
+      if (posts > 2) throw new Error('Unexpected extra POST');
+      return posts === 1
+        ? { ok: false, status: 409, json: async () => ({ status: 'set_changed' }) }
+        : { ok: true, status: 200, json: async () => ({ status: 'completed', summary: { updated: 1 }, version: 'v3' }) };
+    }
+    gets++;
+    if (gets > 3) throw new Error('Unexpected extra GET');
+    const state = gets === 1 ? GET_BODY : {
+      ...GET_BODY, version: gets === 2 ? 'v2' : 'v3',
+      questions: GET_BODY.questions.map(q => q.id === 'id-2' ? { ...q, label: gets === 2 ? 'Concurrent wording' : 'My retained wording' } : q),
+    };
+    return { ok: true, status: 200, json: async () => state };
+  });
   render(<ReviewQuestionsSection />);
   await waitFor(() => expect(screen.getAllByTestId('rq-row')).toHaveLength(2));
-  fireEvent.change(within(screen.getAllByTestId('rq-row')[1]).getByLabelText('Question text'), { target: { value: 'x' } });
+  fireEvent.change(within(screen.getAllByTestId('rq-row')[1]).getByLabelText('Question text'), { target: { value: 'My retained wording' } });
   fireEvent.click(screen.getByRole('button', { name: /save changes/i }));
-
-  await waitFor(() => expect(screen.getByTestId('rq-message-conflict')).toBeInTheDocument());
-  // The resync issued its own GET — without it the retry would 409 forever.
-  await waitFor(() => {
-    const gets = global.fetch.mock.calls.filter(([, o]) => !o?.method || o.method === 'GET');
-    expect(gets.length).toBeGreaterThanOrEqual(2);
-  });
-  // The explicit discard path still reloads from the server.
-  fireEvent.click(screen.getByRole('button', { name: /discard my edits/i }));
-  await waitFor(() => {
-    const gets = global.fetch.mock.calls.filter(([, o]) => !o?.method || o.method === 'GET');
-    expect(gets.length).toBeGreaterThanOrEqual(3);
-  });
+  await screen.findByTestId('rq-message-conflict');
+  expect(within(screen.getAllByTestId('rq-row')[1]).getByTestId('rq-row-conflict')).toBeInTheDocument();
+  expect(within(screen.getAllByTestId('rq-row')[1]).getByLabelText('Question text')).toHaveValue('My retained wording');
+  await waitFor(() => expect(screen.getByRole('button', { name: /save changes/i })).toBeEnabled());
+  fireEvent.click(screen.getByRole('button', { name: /save changes/i }));
+  await screen.findByRole('button', { name: /^no changes$/i });
+  expect(gets).toBe(3);
+  expect(posts).toBe(2);
+  expect(screen.queryByTestId('rq-row-conflict')).not.toBeInTheDocument();
+  expect(within(screen.getAllByTestId('rq-row')[1]).getByLabelText('Question text')).toHaveValue('My retained wording');
+  const bodies = global.fetch.mock.calls.filter(([, o]) => o?.method === 'POST').map(([, o]) => JSON.parse(o.body));
+  expect(bodies).toHaveLength(2);
+  expect(bodies[0].baseVersion).toBe('v1');
+  expect(bodies[1]).toEqual({ questions: bodies[0].questions, baseVersion: 'v2' });
+  expect(bodies[1].questions[1].label).toBe('My retained wording');
 });
 
 test('a no-op save is reported neutrally, not as a success', async () => {
@@ -254,4 +273,40 @@ test('(save, 2xx empty body) a 2xx save with an empty/unparseable body falls bac
   fireEvent.change(within(screen.getAllByTestId('rq-row')[1]).getByLabelText('Question text'), { target: { value: 'edited' } });
   fireEvent.click(screen.getByRole('button', { name: /save changes/i }));
   expect(await screen.findByTestId('rq-message-error')).toHaveTextContent('Save failed.');
+});
+
+test('discard after a conflict explicitly replaces the retained draft', async () => {
+  global.fetch = mockFetch({ postResponse: { ok: false, status: 409, json: async () => ({ status: 'set_changed' }) } });
+  render(<ReviewQuestionsSection />);
+  await waitFor(() => expect(screen.getAllByTestId('rq-row')).toHaveLength(2));
+  fireEvent.change(within(screen.getAllByTestId('rq-row')[1]).getByLabelText('Question text'), { target: { value: 'Discard this edit' } });
+  fireEvent.click(screen.getByRole('button', { name: /save changes/i }));
+  await screen.findByTestId('rq-message-conflict');
+  fireEvent.click(screen.getByRole('button', { name: /discard my edits/i }));
+  await waitFor(() => expect(screen.getAllByTestId('rq-row')).toHaveLength(2));
+  expect(within(screen.getAllByTestId('rq-row')[1]).getByLabelText('Question text')).toHaveValue('Q2 narrative');
+  expect(screen.queryByTestId('rq-message-conflict')).not.toBeInTheDocument();
+});
+
+test('type switches clear incompatible fields and retain options between option types', async () => {
+  render(<ReviewQuestionsSection />);
+  await waitFor(() => expect(screen.getAllByTestId('rq-row')).toHaveLength(2));
+  const first = within(screen.getAllByTestId('rq-row')[0]);
+  fireEvent.change(first.getByLabelText('Question type'), { target: { value: 'richtext' } });
+  fireEvent.change(first.getByLabelText('Question type'), { target: { value: 'picklist' } });
+  expect(first.queryByLabelText('Option 1 label')).not.toBeInTheDocument();
+  const second = within(screen.getAllByTestId('rq-row')[1]);
+  fireEvent.change(second.getByLabelText('Max length'), { target: { value: '500' } });
+  fireEvent.change(second.getByLabelText('Question type'), { target: { value: 'multiselect' } });
+  expect(second.queryByLabelText('Max length')).not.toBeInTheDocument();
+  fireEvent.click(second.getByRole('button', { name: /add option/i }));
+  fireEvent.change(second.getByLabelText('Option 1 label'), { target: { value: 'Retained option' } });
+  fireEvent.change(second.getByLabelText('Question type'), { target: { value: 'picklist' } });
+  expect(second.getByLabelText('Option 1 label')).toHaveValue('Retained option');
+  fireEvent.click(screen.getByRole('button', { name: /save changes/i }));
+  await waitFor(() => expect(global.fetch.mock.calls.some(([, o]) => o?.method === 'POST')).toBe(true));
+  const post = global.fetch.mock.calls.find(([, o]) => o?.method === 'POST');
+  const questions = JSON.parse(post[1].body).questions;
+  expect(questions[0].options).toEqual([]);
+  expect(questions[1]).toEqual({ id: 'id-2', key: 'q2', label: 'Q2 narrative', type: 'picklist', required: true, options: [{ value: 1, label: 'Retained option' }] });
 });
