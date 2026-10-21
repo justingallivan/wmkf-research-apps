@@ -306,10 +306,12 @@ export function webQuery(p) {
 
 /**
  * Group the people who would each get a new contact, so one person on two
- * awards gets one contact. The same email (exact) joins a group. People with
- * the same name (first or initial + last) who share no email are uncertain:
- * every group they touch goes to review.
- * @param {{idx: number, ref: string, name: string, email: string}[]} people in row order
+ * awards gets one contact. The same email (exact) joins a group. People who
+ * share no email but have the same name (first or initial + last), or the same
+ * last name at a related institutional email domain or the same resolved
+ * account (nicknames: "Bill" vs "William"), are uncertain: every group they
+ * touch goes to review. Mirrors matchContact's guard for existing contacts.
+ * @param {{idx: number, ref: string, name: string, email: string, accountId?: string}[]} people in row order
  * @returns {Map<number, {status: 'single'|'shared'|'uncertain', groupRef: string, primary: boolean}>}
  */
 export function groupNewContacts(people) {
@@ -325,9 +327,18 @@ export function groupNewContacts(people) {
     if (!x.last || x.last !== y.last || !x.first || !y.first) return false;
     return x.first === y.first || ((x.first.length === 1 || y.first.length === 1) && x.first[0] === y.first[0]);
   };
+  const samePlace = (a, b) => {
+    const da = institutionalDomain(a.email); const db = institutionalDomain(b.email);
+    return domainsRelated(da, db) || Boolean(a.accountId && lc(a.accountId) === lc(b.accountId));
+  };
   for (let i = 0; i < people.length; i++) {
     for (let j = i + 1; j < people.length; j++) {
-      if (find(i) !== find(j) && sameNameParts(people[i].name, people[j].name)) { uncertain.add(find(i)); uncertain.add(find(j)); }
+      if (find(i) === find(j)) continue;
+      const a = people[i]; const b = people[j];
+      const lastA = nameParts(a.name).last;
+      if (sameNameParts(a.name, b.name) || (lastA && lastA === nameParts(b.name).last && samePlace(a, b))) {
+        uncertain.add(find(i)); uncertain.add(find(j));
+      }
     }
   }
   const members = new Map();

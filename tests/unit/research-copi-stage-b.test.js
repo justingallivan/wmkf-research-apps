@@ -154,6 +154,16 @@ describe('groupNewContacts', () => {
     const g = groupNewContacts([p(0, 'Jane Doe', 'jd@x.edu'), p(1, 'J. Doe', ''), p(2, 'Jane Doe', 'jd@x.edu')]);
     expect([0, 1, 2].map((i) => g.get(i).status)).toEqual(['uncertain', 'uncertain', 'uncertain']);
   });
+  test('nicknames at the same institution are uncertain (domain or account)', () => {
+    const byDomain = groupNewContacts([p(0, 'William Smith', 'wsmith@x.edu'), p(1, 'Bill Smith', 'bill@med.x.edu')]);
+    expect([byDomain.get(0).status, byDomain.get(1).status]).toEqual(['uncertain', 'uncertain']);
+    const byAccount = groupNewContacts([{ ...p(0, 'William Smith', ''), accountId: 'A' }, { ...p(1, 'Bill Smith', ''), accountId: 'a' }]);
+    expect([byAccount.get(0).status, byAccount.get(1).status]).toEqual(['uncertain', 'uncertain']);
+  });
+  test('same last name at different places stays single', () => {
+    const g = groupNewContacts([{ ...p(0, 'William Smith', 'ws@x.edu'), accountId: 'A' }, { ...p(1, 'Bill Smith', 'bs@y.edu'), accountId: 'B' }]);
+    expect([g.get(0).status, g.get(1).status]).toEqual(['single', 'single']);
+  });
   test('different people stay single', () => {
     const g = groupNewContacts([p(0, 'Jane Doe', ''), p(1, 'John Doe', '')]);
     expect([g.get(0).status, g.get(1).status]).toEqual(['single', 'single']);

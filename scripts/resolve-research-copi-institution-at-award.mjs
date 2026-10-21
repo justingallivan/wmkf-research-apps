@@ -307,7 +307,7 @@ await bypassDynamicsRestrictions('resolve-research-copi-institution-at-award', a
   // ── One proposed contact per new person across the batch ──
   const groups = groupNewContacts(rows.map((x, i) => ({ x, i }))
     .filter(({ x, i }) => x.contact.status === 'new-contact' && prelim[i].cls === 'ready')
-    .map(({ x, i }) => ({ idx: i, ref: x.person.ref, name: x.person.name, email: x.person.email })));
+    .map(({ x, i }) => ({ idx: i, ref: x.person.ref, name: x.person.name, email: x.person.email, accountId: x.iaa.accountId })));
 
   // ── Web search for new contacts (current account only) ──
   const cache = fs.existsSync(WEB_CACHE) ? JSON.parse(fs.readFileSync(WEB_CACHE, 'utf8')) : {};
