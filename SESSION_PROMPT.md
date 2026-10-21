@@ -1,3 +1,51 @@
+# Session 629 Prompt: Resume Meeting coordination layout review
+
+## Meeting coordination handoff — Codex, 2026-10-21 PT
+
+Owner: Codex with Justin/Duncan. Status: design review paused for tonight; no application implementation authorized. This handoff supersedes the older Meeting coordination snapshot below. Other workstreams are preserved verbatim and were not re-verified here.
+
+### Completed and saved
+
+- [VERIFIED via branch files and local browser checks] Four linked standalone views: Meeting setup, Invitations, Materials collection, Transcript preparation. HTML and desktop/narrow captures live under `docs/plans/review/meeting-tracker-2026-10-20/` on **`codex/meeting-coordination-designs-2026-10-21`**. Local checkout: `/Users/gallivan/.codex/worktrees/coordinated-session/WMKF_Apps`. Start at `meeting-setup.html`. These are synthetic previews, not deployed application screens.
+- [VERIFIED via owner decisions and mockups] Setup has **Proposal discussion session** and **Research presentation** tabs; the selected meeting carries into Invitations and back. Both meetings may include staff, board and consultants; both invitations include materials and a magic link. Applicants get meeting details through Calendly.
+- [VERIFIED via owner decisions] Terminology deck approved with one correction: **Draft writeup**, replacing proposed Post-presentation writeup. All other proposed names approved. Deck, glossary, memory and mockups updated in `3192ac6ac`; runtime labels/identifiers have not been migrated. Approved mapping is in `docs/plans/review/PROPOSAL_WORKFLOW_VOCABULARY_2026-10-19.md` on the branch, with the sibling PPTX.
+- [VERIFIED via owner decisions] Materials: bios, PowerPoint/Keynote source and PDF slides; request 14 days before, reminders 7 and 2 days before unless all required items are submitted; deadline 3 business days before at 4:30 PM Pacific. Rescheduling moves the deadline and unsent reminders. PI and liaison receive requests/reminders and completion confirmation; Duncan receives completion and overdue alerts by email and in app. Holiday calendar source is still owed by owner.
+- [VERIFIED via source review during session] Existing collection/portal infrastructure can be reused, but the agreed timed automation is not fully built. Existing reminder cron is absent from vercel.json; exact schedule, holiday/time cutoff, rescheduling and completion/alert behaviors need implementation work only after scope approval. Six focused mocked suites passed (135 tests); no live email/cron proof claimed.
+- [VERIFIED via source review and mockup] Transcript preparation follows existing Zoom recording import: approved host and recent recording picker, audio/optional VTT import, separate video copy, speaker assignments and presentation/discussion boundary. No Zoom calls or paid transcription were made.
+
+### Commits on the design branch
+
+- `9611dcef5` materials collection states
+- `36c3a704d` meeting setup and editable details
+- `e5cae53ac` invitations with materials
+- `6e942840e` magic links and consultants for both meetings
+- `06095ecd5` Zoom import and transcript preparation
+- `c0fa6df1d` linked four-view flow
+- `1ccfc17c8` both meeting types and invitation context
+- `3192ac6ac` approved terminology in deck and mockups
+
+### Next items
+
+**Verified open — layout work only:** Add the existing agenda editing controls to the Proposal discussion session setup mockup. Evidence: `shared/components/meeting-tracker/SessionEditor.js` already supports adding requests, drag/position ordering, numeric allotted minutes, removal, moving to another session and totals/overrun. Changes auto-save with Done; do not scope a new backend or invent a Save agenda workflow. The current `meeting-setup.html` agenda remains display-only.
+
+**Owner decision needed:** Continue reviewing the layouts and choose an implementation slice later. User explicitly prefers the bare minimum scoping needed for page layouts. Do not expand this into a full automation project now.
+
+**Parked:** Launching Calendly inside the app; materials automation implementation; runtime terminology migration. Reopen at owner's direction. Holiday calendar source is needed before deadline automation implementation.
+
+**Do not reopen without new decision:** Approved vocabulary, including Draft writeup. Older snapshots below that call vocabulary pending are historical.
+
+### Verification and continuation
+
+[VERIFIED via local checks in session] All four views exercised at desktop/narrow widths, selected meeting preserved across navigation, local edit/preview interactions checked. Deck retains seven slides with both repeated terminology tables updated and validated. Relevant documentation gates and self-tests passed during edits. These checks do not establish live authorization, delivery, persistence or production behavior.
+
+No DEVELOPMENT_LOG milestone entry required: design artifacts only, no capability shipped. CLAUDE.md unchanged. Claim-evidence report returned local state unavailable; no observation row invented. Main receives this handoff only; latest mockups, deck and glossary remain on the pushed design branch. Keep its worktree for tonight. Do not use another agent's checkout or overwrite its changes. Before resuming elsewhere, fetch and check out `origin/codex/meeting-coordination-designs-2026-10-21` in a separate worktree.
+
+---
+
+# Preserved concurrent handoffs
+
+The latest Claude handoff and older concurrent snapshots follow unchanged. Their own scope and owner decisions remain separate from Meeting coordination.
+
 # Session 628 Prompt: Stage B co-PI backfill — read back staff answers, re-run resolve
 
 ## Concurrent Claude session summary — Stage B re-scope and staff review (Claude, 2026-10-21 PT)
