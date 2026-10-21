@@ -3,7 +3,7 @@
  */
 import {
   selectApprovedCopis, domainOf, institutionalDomain, domainsRelated, domainCandidates, domainWinner,
-  sameName, matchContact, resolveExtractedIaa, resolveRecordedIaa, classifyWebEvidence, isNonInstitutionHost,
+  sameName, matchContact, pickLatestAccount, resolveExtractedIaa, resolveRecordedIaa, classifyWebEvidence, isNonInstitutionHost,
   webQuery, classifyRow,
 } from '../../scripts/lib/research-copi-stage-b.mjs';
 
@@ -82,8 +82,8 @@ describe('domains', () => {
     expect(domainWinner({ accountIds: ['A', 'a', 'A'], capped: false }, rule)).toMatchObject({ status: 'winner', accountId: 'a' });
     expect(domainWinner({ accountIds: ['a', 'a'], capped: false }, rule).status).toBe('too-few');
     expect(domainWinner({ accountIds: Array(9).fill('a').concat(['b', 'b']), capped: false }, rule).status).toBe('split');
-    expect(domainWinner({ accountIds: Array(10).fill('a'), capped: true }, rule)).toMatchObject({ status: 'winner', sampled: true });
-    expect(domainWinner({ accountIds: Array(5).fill('a').concat(Array(5).fill('b')), capped: true }, rule).status).toBe('split');
+    // A capped read is a prefix, not a sample: never a winner.
+    expect(domainWinner({ accountIds: Array(10).fill('a'), capped: true }, rule)).toMatchObject({ status: 'capped', n: 10, top: 10 });
   });
 });
 
@@ -125,6 +125,20 @@ describe('names and contact match', () => {
   });
   test('new contact only when no one shares the name or last name at the place', () => {
     expect(matchContact(p, [], [c('B', 'Rob', 'Doe', { emailaddress1: 'r@y.edu' })], null)).toEqual({ status: 'new-contact' });
+  });
+});
+
+describe('pickLatestAccount', () => {
+  const e = (meetingDate, accountId, requestId) => ({ contactId: 'c', meetingDate, accountId, requestId });
+  test('a newer award with Institution at Award already set wins over an older ready one', () => {
+    expect(pickLatestAccount([e('2019-06-01', 'A', 'r1'), e('2022-06-01', 'B', 'r2')]).get('c')).toEqual({ status: 'selected', requestId: 'r2', accountId: 'b' });
+  });
+  test('an unresolved latest award selects nothing', () => {
+    expect(pickLatestAccount([e('2019-06-01', 'A', 'r1'), e('2022-06-01', null, 'r2')]).get('c').status).toBe('unresolved');
+  });
+  test('same-date awards at different accounts tie; at the same account select', () => {
+    expect(pickLatestAccount([e('2022-06-01', 'A', 'r1'), e('2022-06-01', 'B', 'r2')]).get('c').status).toBe('tie');
+    expect(pickLatestAccount([e('2022-06-01', 'A', 'r1'), e('2022-06-01', 'a', 'r2')]).get('c')).toMatchObject({ status: 'selected', accountId: 'a' });
   });
 });
 
@@ -170,7 +184,7 @@ describe('web evidence', () => {
       r('Lab of John Smith', 'https://z.edu/smith'),
       r('J. Doe Lab', 'https://www.y.edu/doe'),
     ], hostAccount);
-    expect(out).toMatchObject({ status: 'current-account', accountId: 'y1' });
+    expect(out).toMatchObject({ status: 'suggested-account', accountId: 'y1' });
     expect(out.hits).toHaveLength(2);
   });
   test('two institutions → ambiguous; nothing → no evidence', () => {
@@ -183,7 +197,13 @@ describe('web evidence', () => {
     expect(isNonInstitutionHost('notlinkedin.com')).toBe(false);
   });
   test('a hyphenated surname in the title still names the person', () => {
-    expect(classifyWebEvidence('Jane Jones', [r('Jane Smith-Jones Lab', 'https://y.edu/a')], hostAccount).status).toBe('current-account');
+    expect(classifyWebEvidence('Jane Jones', [r('Jane Smith-Jones Lab', 'https://y.edu/a')], hostAccount).status).toBe('suggested-account');
+  });
+  test.each([
+    'Visiting speaker Jane Doe (X University)', 'Seminar: Jane Doe', 'Jane Doe, Professor Emerita', 'Former faculty: Jane Doe',
+    'News: Jane Doe wins award',
+  ])('event, news and former-role titles are not employment evidence: %s', (title) => {
+    expect(classifyWebEvidence('Jane Doe', [r(title, 'https://y.edu/a')], hostAccount).status).toBe('no-evidence');
   });
   test('query quotes the name and adds the department', () => {
     expect(webQuery({ name: 'Jane "J" Doe', department: 'Chemistry' })).toBe('"Jane J Doe" Chemistry');
@@ -219,9 +239,9 @@ describe('classifyRow', () => {
     expect(classifyRow(base({ junctionRowId: 'j', duplicateContact: true, contactAccountEmpty: true, contactAccountSelected: true })))
       .toEqual({ cls: 'ready', actions: ['set-iaa'] });
   });
-  test('new contact: create contact (+ current account when found), row, IAA', () => {
+  test('new contact: create contact (+ a suggested account to confirm separately), row, IAA', () => {
     expect(classifyRow(base({ contact: { status: 'new-contact' }, contactId: null, newContactAccount: 'y' })).actions)
-      .toEqual(['create-contact', 'set-contact-account', 'create-junction-row', 'set-iaa']);
+      .toEqual(['create-contact', 'suggest-contact-account', 'create-junction-row', 'set-iaa']);
     expect(classifyRow(base({ contact: { status: 'new-contact' }, contactId: null })).actions)
       .toEqual(['create-contact', 'create-junction-row', 'set-iaa']);
   });

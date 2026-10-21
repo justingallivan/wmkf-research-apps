@@ -42,9 +42,9 @@ import fs from 'fs';
 import path from 'path';
 import crypto from 'crypto';
 import ExcelJS from 'exceljs';
-import { AWARDED, pickContactAccounts } from './lib/research-iaa-backfill.mjs';
+import { AWARDED } from './lib/research-iaa-backfill.mjs';
 import {
-  lc, nameParts, selectApprovedCopis, institutionalDomain, domainCandidates, domainWinner, contactEmails,
+  lc, nameParts, pickLatestAccount, selectApprovedCopis, institutionalDomain, domainCandidates, domainWinner, contactEmails,
   matchContact, resolveExtractedIaa, resolveRecordedIaa, classifyWebEvidence, webQuery, classifyRow,
 } from './lib/research-copi-stage-b.mjs';
 
@@ -190,13 +190,14 @@ await bypassDynamicsRestrictions('resolve-research-copi-institution-at-award', a
     const e = escape(email);
     return readAll('contacts', { select: CONTACT_SELECT, filter: `emailaddress1 eq '${e}' or emailaddress2 eq '${e}' or emailaddress3 eq '${e}'` });
   };
-  // Last name equal, or the final word of a compound one ("de la Cruz", "Smith-Jones").
+  // Any stored last name ending in the compared surname, so "de la Cruz",
+  // "Smith-Jones", "O'Connor" and "O’Connor" are all fetched; sameName filters.
   // A capped search returns null: the person goes to review, never to a new contact.
   const lastNameHitsOf = async (name) => {
     const last = escape(nameParts(name).last);
     if (!last) return [];
     const res = await DynamicsService.queryAllRecords('contacts', {
-      select: CONTACT_SELECT, filter: `lastname eq '${last}' or endswith(lastname,' ${last}') or endswith(lastname,'-${last}')`,
+      select: CONTACT_SELECT, filter: `endswith(lastname,'${last}')`,
     });
     return res.capped ? null : res.records;
   };
@@ -284,11 +285,23 @@ await bypassDynamicsRestrictions('resolve-research-copi-institution-at-award', a
   }
 
   // ── Contact accounts for existing empty-account contacts: latest award evidence ──
+  // Evidence spans every award the contact is on: this resolve's co-PI rows
+  // (ready → its resolved account, already-set → the stored value, otherwise
+  // unresolved) and the contact's PI rows on in-scope awards.
   const fill = (x, extra = {}) => ({ ...x, contactAccountSelected: false, newContactAccount: null, ...extra });
   const prelim = rows.map((x) => classifyRow(fill(x)));
-  const picks = pickContactAccounts(rows
-    .filter((x, i) => prelim[i].cls === 'ready' && x.contactId && x.contactAccountEmpty && !x.duplicateContact)
-    .map((x) => ({ contactId: x.contactId, meetingDate: (x.r.wmkf_meetingdate || '').slice(0, 10), applicantAccountId: x.iaa.accountId, requestId: lc(x.r.akoya_requestid) })));
+  const wanted = new Set(rows.filter((x) => x.contactId && x.contactAccountEmpty && !x.duplicateContact).map((x) => x.contactId));
+  const evidence = [];
+  rows.forEach((x, i) => {
+    if (!wanted.has(x.contactId) || !x.r || x.keckApplicant) return;
+    const accountId = prelim[i].cls === 'ready' ? x.iaa.accountId : prelim[i].cls === 'already-set' ? x.existingIaa : null;
+    evidence.push({ contactId: x.contactId, meetingDate: (x.r.wmkf_meetingdate || '').slice(0, 10), accountId: accountId || null, requestId: lc(x.r.akoya_requestid) });
+  });
+  for (const j of junction.filter((y) => y.wmkf_role === ROLE_PI && wanted.has(lc(y._wmkf_contact_value)))) {
+    const r = byId.get(lc(j._wmkf_request_value));
+    evidence.push({ contactId: lc(j._wmkf_contact_value), meetingDate: (r.wmkf_meetingdate || '').slice(0, 10), accountId: lc(j._wmkf_institutionataward_value) || null, requestId: lc(r.akoya_requestid) });
+  }
+  const picks = pickLatestAccount(evidence);
 
   // ── Web search for new contacts (current account only) ──
   const cache = fs.existsSync(WEB_CACHE) ? JSON.parse(fs.readFileSync(WEB_CACHE, 'utf8')) : {};
@@ -324,11 +337,14 @@ await bypassDynamicsRestrictions('resolve-research-copi-institution-at-award', a
   // ── Final classification ──
   const results = rows.map((x, i) => {
     const pick = x.contactId ? picks.get(x.contactId) : null;
-    const selected = Boolean(pick?.status === 'selected' && pick.requestId === lc(x.r?.akoya_requestid));
-    const newContactAccount = x.web?.status === 'current-account' ? x.web.accountId : null;
-    const { cls, actions } = classifyRow(fill(x, { contactAccountSelected: selected, newContactAccount }));
-    const contactAccountTarget = actions.includes('set-contact-account') ? (newContactAccount || x.iaa.accountId) : null;
     const c = x.contactId ? contacts.get(x.contactId) : null;
+    const selected = Boolean(pick?.status === 'selected' && pick.requestId === lc(x.r?.akoya_requestid));
+    const newContactAccount = x.web?.status === 'suggested-account' ? x.web.accountId : null;
+    const { cls, actions } = classifyRow(fill(x, { contactAccountSelected: selected, newContactAccount }));
+    const contactAccountTarget = actions.includes('set-contact-account') ? pick.accountId : null;
+    const suggestedContactAccount = actions.includes('suggest-contact-account') ? newContactAccount : null;
+    const domains = x.cohort === 'extracted' ? [institutionalDomain(x.person.email)] : contactEmails(c || {}).map(institutionalDomain);
+    const domainEvidence = [...new Set(domains.filter(Boolean))].map((d) => ({ domain: d, ...(mapCache.get(d) || { status: 'not-looked-up' }) }));
     const r = x.r;
     const key = x.cohort === 'extracted' ? `ext|${x.person.ref}` : `rec|${lc(r.akoya_requestid)}|${x.contactId}`;
     return {
@@ -341,7 +357,8 @@ await bypassDynamicsRestrictions('resolve-research-copi-institution-at-award', a
         contactMatch: x.contact.status, contactId: x.contactId || null, junctionRowId: x.junctionRowId || null, inSlot: Boolean(x.inSlot),
         existingIaa: x.existingIaa || null, iaaAccountId: x.iaa.accountId || null,
         iaaVia: x.iaa.via || (x.iaa.signals || []).map((s) => s.via).join('+') || null,
-        contactAccountTarget, contactAccountVia: contactAccountTarget ? (newContactAccount ? 'web-search' : 'latest-award') : null,
+        contactAccountTarget, contactAccountVia: contactAccountTarget ? 'latest-award' : null, suggestedContactAccount,
+        domainEvidence: domainEvidence.map(({ domain, status, accountId, n, top }) => ({ domain, status, accountId: accountId || null, n: n ?? null, top: top ?? null })),
         duplicateContact: Boolean(x.duplicateContact),
       },
       review: {
@@ -354,12 +371,14 @@ await bypassDynamicsRestrictions('resolve-research-copi-institution-at-award', a
         statedInstitution: x.person ? `${x.person.institution}${x.person.institutionSource ? ` (${x.person.institutionSource})` : ''}` : '',
         applicant: r?._akoya_applicantid_value_formatted || '',
         iaa: accountName.get(x.iaa.accountId) || '',
-        iaaEvidence: x.iaa.via || (x.iaa.signals || []).map((s) => `${s.via}: ${accountName.get(s.accountId) || s.accountId}`).join('; ') || x.iaa.status,
+        iaaEvidence: [x.iaa.via || (x.iaa.signals || []).map((s) => `${s.via}: ${accountName.get(s.accountId) || s.accountId}`).join('; ') || x.iaa.status,
+          ...domainEvidence.map((d) => `domain ${d.domain}: ${d.status}${d.n != null ? ` (${d.top}/${d.n}${d.accountId ? ` ${accountName.get(d.accountId) || ''}` : ''})` : ''}`)].join('\n'),
         contactMatch: x.contact.status,
         contact: c ? `${c.fullname} <${contactEmails(c).join(', ') || 'no email'}>` : '',
         contactCurrentAccount: c?._parentcustomerid_value_formatted || '',
         proposedContactAccount: accountName.get(contactAccountTarget) || '',
-        contactAccountEvidence: contactAccountTarget ? (newContactAccount ? 'web search' : 'latest award') : '',
+        contactAccountEvidence: contactAccountTarget ? 'latest award' : '',
+        suggestedContactAccount: accountName.get(suggestedContactAccount) || '',
         web: (x.web?.hits || []).slice(0, 3).map((h) => `${h.title} — ${h.link}`).join('\n') || (x.web ? x.web.status : ''),
         candidates: (x.candidateNames || []).join('\n'),
         key,
@@ -379,17 +398,22 @@ await bypassDynamicsRestrictions('resolve-research-copi-institution-at-award', a
     ['Person', 'person', 24], ['Source', 'source', 20], ['Proposal email', 'proposalEmail', 28], ['Stated institution', 'statedInstitution', 30],
     ['Applicant', 'applicant', 30], ['Proposed Institution at Award', 'iaa', 30], ['Why', 'iaaEvidence', 34], ['Contact match', 'contactMatch', 18],
     ['Contact', 'contact', 34], ['Contact current account', 'contactCurrentAccount', 30], ['Proposed contact account', 'proposedContactAccount', 30],
-    ['Contact account from', 'contactAccountEvidence', 14], ['Web results (current page)', 'web', 50], ['Possible existing contacts', 'candidates', 40],
+    ['Contact account from', 'contactAccountEvidence', 14], ['Suggested account for new contact (web)', 'suggestedContactAccount', 30],
+    ['Use suggested account?', 'confirmSuggested', 12], ['Web results (current page)', 'web', 50], ['Possible existing contacts', 'candidates', 40],
     ['Notes', 'notes', 30], ['key', 'key', 10],
   ];
   ws.columns = cols.map(([header, k, width]) => ({ header, key: k, width }));
-  for (const x of results) ws.addRow({ ...x.review, confirm: '' });
+  for (const x of results) ws.addRow({ ...x.review, confirm: '', confirmSuggested: '' });
   ws.getRow(1).font = { bold: true };
   ws.views = [{ state: 'frozen', xSplit: 3, ySplit: 1 }];
   ws.autoFilter = { from: 'A1', to: `${String.fromCharCode(64 + cols.length - 1)}1` };
   ws.getColumn(cols.length).hidden = true;
   for (let i = 2; i <= results.length + 1; i++) {
-    ws.getCell(`A${i}`).dataValidation = { type: 'list', allowBlank: true, formulae: ['"Yes,No,Unsure"'], showErrorMessage: true, errorTitle: 'Choose one', error: 'Pick Yes, No or Unsure.' };
+    const yesNo = { type: 'list', allowBlank: true, formulae: ['"Yes,No,Unsure"'], showErrorMessage: true, errorTitle: 'Choose one', error: 'Pick Yes, No or Unsure.' };
+    ws.getCell(`A${i}`).dataValidation = yesNo;
+    if (ws.getRow(i).getCell(cols.findIndex(([, k]) => k === 'suggestedContactAccount') + 1).value) {
+      ws.getRow(i).getCell(cols.findIndex(([, k]) => k === 'confirmSuggested') + 1).dataValidation = yesNo;
+    }
     ws.getRow(i).alignment = { vertical: 'top', wrapText: true };
   }
   await wb.xlsx.writeFile(REVIEW_XLSX);

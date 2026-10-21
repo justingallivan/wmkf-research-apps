@@ -100,21 +100,21 @@ export function domainCandidates(host) {
 
 /**
  * Clear winner among the accounts of contacts whose primary email has this domain.
- * A large institution can exceed the 5,000-row read cap; the share rule is then
- * judged on that 5,000-row sample and the result is marked `sampled`.
+ * A read over the 5,000-row cap is the first 5,000 rows, not a sample, so it
+ * never yields a winner (`capped`, review only).
  * @param {{accountIds: string[], capped: boolean}} linked accounts of linked contacts
  * @param {{min: number, share: number}} rule
- * @returns {{status: 'winner'|'too-few'|'split', accountId?: string, n: number, top: number, sampled: boolean}}
+ * @returns {{status: 'winner'|'too-few'|'split'|'capped', accountId?: string, n: number, top: number}}
  */
 export function domainWinner(linked, rule) {
-  const sampled = Boolean(linked.capped);
   const counts = new Map();
   for (const id of linked.accountIds.map(lc)) counts.set(id, (counts.get(id) || 0) + 1);
   const n = linked.accountIds.length;
   const [accountId, top] = [...counts.entries()].sort((a, b) => b[1] - a[1])[0] || [null, 0];
-  if (n < rule.min) return { status: 'too-few', n, top, sampled };
-  if (top / n < rule.share) return { status: 'split', n, top, sampled };
-  return { status: 'winner', accountId, n, top, sampled };
+  if (linked.capped) return { status: 'capped', n, top };
+  if (n < rule.min) return { status: 'too-few', n, top };
+  if (top / n < rule.share) return { status: 'split', n, top };
+  return { status: 'winner', accountId, n, top };
 }
 
 // ── Names ──
@@ -173,6 +173,32 @@ export function matchContact(person, emailHits, lastNameHits, awardAccountId) {
   const possible = ids([...named, ...sameLastSamePlace]);
   if (possible.length) return { status: 'possible-existing-contact', candidateIds: possible };
   return { status: 'new-contact' };
+}
+
+// ── Current account for an existing empty-account contact ──
+
+/**
+ * The account of each contact's latest in-scope award, across every award the
+ * contact is on (co-PI rows whether or not their Institution at Award needs
+ * writing, and PI rows). `accountId` is null when that award's institution is
+ * unresolved; a latest award with no account, or latest awards on one date
+ * with different accounts, selects nothing.
+ * @param {{contactId: string, meetingDate: string, accountId: string|null, requestId: string}[]} evidence
+ * @returns {Map<string, {status: 'selected'|'tie'|'unresolved', requestId?: string, accountId?: string}>}
+ */
+export function pickLatestAccount(evidence) {
+  const byContact = new Map();
+  for (const e of evidence) byContact.set(e.contactId, [...(byContact.get(e.contactId) || []), e]);
+  const out = new Map();
+  for (const [contactId, items] of byContact) {
+    const latest = items.reduce((m, e) => (e.meetingDate > m ? e.meetingDate : m), '');
+    const top = items.filter((e) => e.meetingDate === latest);
+    const accounts = new Set(top.map((e) => e.accountId && lc(e.accountId)));
+    if (accounts.has(null) || accounts.has('')) out.set(contactId, { status: 'unresolved' });
+    else if (accounts.size > 1) out.set(contactId, { status: 'tie' });
+    else out.set(contactId, { status: 'selected', requestId: top[0].requestId, accountId: lc(top[0].accountId) });
+  }
+  return out;
 }
 
 // ── Institution at Award ──
@@ -235,15 +261,20 @@ export const NON_INSTITUTION_HOSTS = [
 ];
 export const isNonInstitutionHost = (host) => NON_INSTITUTION_HOSTS.some((h) => lc(host) === h || lc(host).endsWith(`.${h}`));
 
+// Titles that mention a person without showing where they work now.
+const NOT_EMPLOYMENT = /\b(visiting|visit|seminar|seminars|speaker|speakers|lecture|lectures|talk|talks|colloquium|symposium|workshop|webinar|keynote|conference|former|emeritus|emerita|alumni|alumnus|alumna|news|award|awards|prize|obituary|memoriam|interview|podcast|event|events)\b/;
+
 /**
- * Current institution from web search results for a person who needs a new
- * contact. A result counts only when its title names the person (first + last,
- * or initial + last) and its host maps to an account; all counted results must
- * agree.
+ * Suggested current institution from web search results for a person who
+ * needs a new contact. A result counts only when its title names the person
+ * (first + last, or initial + last), does not read as an event, news item or
+ * former role, and its host maps to an account; all counted results must
+ * agree. This is a suggestion the owner confirms separately, never proof of
+ * employment (Codex review 2026-10-20).
  * @param {string} name
  * @param {{title: string, link: string}[]} results
  * @param {(host: string) => string|null} hostAccount account id for a host, or null
- * @returns {{status: 'current-account'|'ambiguous'|'no-evidence', accountId?: string, hits: object[]}}
+ * @returns {{status: 'suggested-account'|'ambiguous'|'no-evidence', accountId?: string, hits: object[]}}
  */
 export function classifyWebEvidence(name, results, hostAccount) {
   const p = nameParts(name);
@@ -254,12 +285,12 @@ export function classifyWebEvidence(name, results, hostAccount) {
     if (!host || isNonInstitutionHost(host)) continue;
     const t = nameTokens(r.title).flatMap((x) => [x, ...x.split('-')]);
     const named = t.includes(p.last) && t.some((x) => x === p.first || (p.first.length > 0 && x.length === 1 && x === p.first[0]));
-    if (!named) continue;
+    if (!named || NOT_EMPLOYMENT.test(nameTokens(r.title).join(' '))) continue;
     const accountId = hostAccount(host);
     hits.push({ host, link: r.link, title: r.title, accountId: accountId ? lc(accountId) : null });
   }
   const accounts = [...new Set(hits.map((h) => h.accountId).filter(Boolean))];
-  if (accounts.length === 1) return { status: 'current-account', accountId: accounts[0], hits };
+  if (accounts.length === 1) return { status: 'suggested-account', accountId: accounts[0], hits };
   if (accounts.length > 1) return { status: 'ambiguous', hits };
   return { status: 'no-evidence', hits };
 }
@@ -296,7 +327,8 @@ export function classifyRow(x) {
   const actions = [];
   if (x.contact.status === 'new-contact') {
     actions.push('create-contact');
-    if (x.newContactAccount) actions.push('set-contact-account');
+    // Web evidence only suggests; the workbook asks for its own confirmation.
+    if (x.newContactAccount) actions.push('suggest-contact-account');
   } else if (x.duplicateContact && !x.junctionRowId) {
     return block('duplicate-contact');
   }
