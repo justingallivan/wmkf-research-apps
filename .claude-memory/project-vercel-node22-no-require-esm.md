@@ -35,8 +35,7 @@ was not sufficient evidence to override it.
 **Resolution (2026-09-02, PR #144, merged `39413e3d`):** `transpilePackages` in
 `next.config.js` lists sanitize-html + htmlparser2/domhandler/domutils/
 dom-serializer/domelementtype/entities, so both bundlers inline them into the
-server chunks and no runtime require(esm) occurs. The webpack builder (used by
-Playwright e2e via `next build --webpack`) additionally needs
+server chunks and no runtime require(esm) occurs. The optional webpack fallback builder additionally needs
 `experimental.esmExternals: 'loose'`, which Turbopack panics on, so it is
 spread in only when `process.env.TURBOPACK` is unset. sanitize-html is now
 2.17.7. Production probe after deploy: draft route 401 with app JSON.

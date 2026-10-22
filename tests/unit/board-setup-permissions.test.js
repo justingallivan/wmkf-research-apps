@@ -49,7 +49,7 @@ test.each([['admin', { admin: true }], ['Grants Manager', {}]])('%s can load sha
   d.readCycle = jest.fn(() => { throw new Error('Must not read cycle'); });
   const value = await loadStaffing(actor, d);
   expect(value.canManageSharedRoles).toBe(true);
-  expect(Object.keys(value.roles)).toEqual(['president', 'cso', 'grantsManager']);
+  expect(Object.keys(value.roles)).toEqual(['president', 'cso', 'grantsManager', 'programCoordinator', 'systemsSpecialist']);
   expect(value.staff).toHaveLength(1);
   expect(d.readCycle).not.toHaveBeenCalled();
 });
@@ -68,12 +68,16 @@ function presidentWithoutWorkbench() {
   f.d.listAppKeysForUser = jest.fn(async () => []);
   return f;
 }
-test('President can be saved without Workbench; CSO and Grants Manager cannot', async () => {
+test('President, Program Coordinator and Systems Specialist can be saved without Workbench; CSO and Grants Manager cannot', async () => {
   const { d } = presidentWithoutWorkbench();
   await saveRole(actor, 'president', { version: 1, systemUserId: OTHER }, 'role', d);
-  expect(d.setSettingIfUnchanged).toHaveBeenCalledTimes(1);
+  await saveRole(actor, 'programCoordinator', { version: 1, systemUserId: OTHER }, 'role', d);
+  expect(d.setSettingIfUnchanged).toHaveBeenLastCalledWith('board_writeups.program_coordinator', JSON.stringify({ version: 1, systemUserId: OTHER }), 'role', 'staff');
+  await saveRole(actor, 'systemsSpecialist', { version: 1, systemUserId: OTHER }, 'role', d);
+  expect(d.setSettingIfUnchanged).toHaveBeenLastCalledWith('board_writeups.systems_specialist', JSON.stringify({ version: 1, systemUserId: OTHER }), 'role', 'staff');
+  expect(d.setSettingIfUnchanged).toHaveBeenCalledTimes(3);
   for (const role of ['cso', 'grantsManager']) await expect(saveRole(actor, role, { version: 1, systemUserId: OTHER }, 'role', d)).rejects.toMatchObject({ code: 'board_staff_app_access' });
-  expect(d.setSettingIfUnchanged).toHaveBeenCalledTimes(1);
+  expect(d.setSettingIfUnchanged).toHaveBeenCalledTimes(3);
   await expect(boardActor({ systemUserId: OTHER, profileId: 'president' }, d)).rejects.toMatchObject({ code: 'board_staff_app_access' });
 });
 test.each(['disabled', 'inactive', 'unlinked', 'external'])('President still rejects %s staff', async problem => {
@@ -92,6 +96,21 @@ test.each(['president', 'cso', 'grantsManager'])('activation validates Workbench
   const save = saveCycle(actor, { ...cycle, active: true, rosterConfirmed: true, requestIds: [OTHER], materialsDue: '2027-06-01', boardEnds: '2027-06-10', adminId: ID }, 'old', '', d);
   if (role === 'president') await expect(save).resolves.toMatchObject({ value: { active: true } });
   else { await expect(save).rejects.toMatchObject({ code: 'board_staff_app_access' }); expect(d.setSettingIfUnchanged).not.toHaveBeenCalled(); }
+});
+test('first Program Coordinator assignment saves against an absent setting', async () => {
+  const { d } = presidentWithoutWorkbench();
+  const getSetting = d.getSettingStrict;
+  d.getSettingStrict = async key => key === 'board_writeups.program_coordinator' ? { found: false } : getSetting(key);
+  await expect(saveRole(actor, 'programCoordinator', { version: 1, systemUserId: OTHER }, null, d)).resolves.toEqual({ value: null, revision: null });
+  expect(d.setSettingIfUnchanged).toHaveBeenCalledWith('board_writeups.program_coordinator', JSON.stringify({ version: 1, systemUserId: OTHER }), null, 'staff');
+});
+test('unassigned Program Coordinator and Systems Specialist do not block activation', async () => {
+  const { d, cycle } = presidentWithoutWorkbench();
+  cycle.cycle = 'J27';
+  d.listAppKeysForUser = jest.fn(async () => ['reviewers']);
+  const getSetting = d.getSettingStrict;
+  d.getSettingStrict = async key => ['board_writeups.program_coordinator', 'board_writeups.systems_specialist'].includes(key) ? { found: false } : getSetting(key);
+  await expect(saveCycle(actor, { ...cycle, active: true, rosterConfirmed: true, requestIds: [OTHER], materialsDue: '2027-06-01', boardEnds: '2027-06-10', adminId: ID }, 'old', '', d)).resolves.toMatchObject({ value: { active: true } });
 });
 test('directory includes President-only staff and marks operational eligibility', async () => {
   const { d } = presidentWithoutWorkbench();

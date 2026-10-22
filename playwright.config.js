@@ -10,9 +10,8 @@
 // browser/UX layer jsdom can't (scroll-gated policy modals, accept-gating,
 // opt-out card hiding, inline error rendering).
 //
-// NB: this worktree's node_modules is a cross-root symlink to WMKF_Apps, which
-// Turbopack rejects — so the dev server runs with `--webpack`. In the WMKF_Apps
-// checkout (real node_modules) plain `next dev` also works.
+// Use a real lockfile installation in this checkout. Production CSP coverage
+// must exercise Turbopack, the deployed bundler, rather than a webpack build.
 
 const { defineConfig, devices } = require('@playwright/test');
 
@@ -45,15 +44,10 @@ module.exports = defineConfig({
     { name: 'chromium', use: { ...devices['Desktop Chrome'] } },
   ],
   webServer: {
-    // Use the PRODUCTION server, not `next dev`. Under `next dev --webpack`,
-    // instrumentation.js's node-only import chain (→ dynamics-service → crypto)
-    // fails to resolve in the edge compile; `next build` compiles it correctly,
-    // so `next start` serves a clean app. (`next build`/`next dev` default to
-    // Turbopack in Next 16, which rejects this worktree's cross-root node_modules
-    // symlink — hence the explicit `--webpack`.) For fast local iteration, start
-    // the server once manually (`next build --webpack && next start -p 3100`) and
-    // Playwright reuses it.
-    command: `NEXTAUTH_SECRET=e2e-throwaway-nextauth-secret-32-chars NEXTAUTH_URL=${BASE_URL} npx next build --webpack && NEXTAUTH_SECRET=e2e-throwaway-nextauth-secret-32-chars NEXTAUTH_URL=${BASE_URL} npx next start -p ${PORT}`,
+    // Production mode is essential: development allows inline scripts and
+    // webpack does not emit the same inline startup as deployed Turbopack.
+    // Install dependencies in this checkout; cross-root symlinks are unsupported.
+    command: `NEXTAUTH_SECRET=e2e-throwaway-nextauth-secret-32-chars NEXTAUTH_URL=${BASE_URL} npx next build && NEXTAUTH_SECRET=e2e-throwaway-nextauth-secret-32-chars NEXTAUTH_URL=${BASE_URL} npx next start -p ${PORT}`,
     // Readiness check hits a PUBLIC route — `/` redirects to the auth-gated
     // signin page; the external review portal is token-public (allowlisted in
     // proxy), so it returns 200.

@@ -1,11 +1,11 @@
 ---
 name: project-e2e-playwright-harness
-description: Playwright browser-E2E harness for the external reviewer portal lives in tests/e2e/ (run `npm run test:e2e`). Mocks the Dataverse data layer at the browser; runs against `next build --webpack && next start` (NOT next dev). CI-gated via .github/workflows/e2e.yml (path-filtered to the reviewer flow). Shipped 2026-06-11.
+description: Playwright browser-E2E harness for the external reviewer portal lives in tests/e2e/ (run `npm run test:e2e`). Mocks the Dataverse data layer at the browser; runs against `next build && next start` (NOT next dev). CI-gated via .github/workflows/e2e.yml (path-filtered to the reviewer flow and shared startup files). Shipped 2026-06-11.
 metadata:
   type: project
   status: active
   scope: testing
-  last_verified: 2026-06-11 — harness + CI added (7 specs green locally)
+  last_verified: 2026-10-21 — Turbopack production CSP regression coverage
 ---
 
 ## Recall Rule
@@ -18,8 +18,8 @@ Do:
 - Cover the browser/UX layer jsdom can't (scroll-gated policy modals, accept-button gating, opt-out card hiding, inline 422 render). The server-side 422 guard itself is unit-tested (`tests/unit/respond-required-address.test.js`).
 
 Do not:
-- Use `next dev` for the webServer. Under `next dev --webpack`, `instrumentation.js`'s node-only chain (→ dynamics-service → `crypto`) fails the edge compile; the config runs `next build --webpack && next start` instead, which compiles cleanly.
-- Drop the `--webpack` flag: `next dev`/`next build` default to Turbopack in Next 16, which rejects the `WMKF_onboarding` worktree's cross-root `node_modules` symlink. (In a real-node_modules checkout, plain `next dev` would also work — webpack is just the portable choice.)
+- Use `next dev` for the webServer. Under `next dev --webpack`, `instrumentation.js`'s node-only chain (→ dynamics-service → `crypto`) fails the edge compile; the config runs `next build && next start` instead, which compiles cleanly.
+- Substitute webpack for the deployed Turbopack bundler: it misses Turbopack’s inline-startup CSP failure. Install locked dependencies in the checkout with `npm ci`; cross-root dependency symlinks are unsupported. `tests/e2e/csp-nonce.spec.js` covers fresh-page hydration and matching per-request Admin nonces.
 
 Ground truth: `playwright.config.js`, `tests/e2e/` (+ `tests/e2e/README.md`), `.github/workflows/e2e.yml`. Related: [[project-reviewer-accept-prod-automation]], [[project-bill-honorarium-integration]].
 

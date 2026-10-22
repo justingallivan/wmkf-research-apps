@@ -23,7 +23,7 @@ The config (`playwright.config.js`) starts the app itself (`webServer`), so you 
 will reuse it:
 
 ```bash
-npx next build --webpack && npx next start -p 3100
+npx next build && npx next start -p 3100
 ```
 
 ## How it works (and why)
@@ -40,10 +40,12 @@ npx next build --webpack && npx next start -p 3100
 
 - **Production server, not `next dev`.** Under `next dev --webpack`, `instrumentation.js`'s
   node-only import chain (→ `dynamics-service` → `crypto`) fails to resolve in the edge
-  compile; `next build` compiles it fine, so the config uses `next build --webpack && next start`.
-- **`--webpack` everywhere.** `next dev`/`next build` default to Turbopack in Next 16,
-  which rejects a cross-root `node_modules` symlink (used by the `WMKF_onboarding`
-  worktree). In a normal checkout with a real `node_modules`, plain `next dev` also works.
+  compile; `next build` compiles it fine, so the config uses `next build && next start`.
+- **Use the deployed Turbopack bundler.** Run `npm ci` inside the checkout instead
+  of using a cross-root `node_modules` symlink. Webpack does not reproduce
+  Turbopack's inline startup script, so it can miss a production CSP failure.
+  `csp-nonce.spec.js` checks fresh-page hydration and authenticated Admin HTML
+  with per-request nonces; its only session credential is a local synthetic JWT.
 - **Readiness check hits the token-public portal route**, because `/` redirects to the
   auth-gated signin page (which 500s without a session).
 - `tests/e2e/` is excluded from jest (`jest.config.js` `testPathIgnorePatterns`); jest
@@ -52,7 +54,7 @@ npx next build --webpack && npx next start -p 3100
 ## CI
 
 [`.github/workflows/e2e.yml`](../../.github/workflows/e2e.yml) runs this suite on PRs
-that touch the reviewer/external flow or the harness (path-filtered to avoid running on
+that touch the reviewer/external flow, shared App/Document/proxy startup, or the harness (path-filtered to avoid running on
 docs-only PRs). The HTML report is uploaded as a build artifact on every run.
 
 ## Applicant materials scan UX

@@ -29,7 +29,7 @@ const jsonResponse = (status, body) => ({
 const MINIMAL_BODIES = {
   '/api/admin/maintenance': { jobs: [] },
   '/api/admin/models': { apps: [] },
-  '/api/workbench/staffing': { staff: [], roles: { president: {}, cso: {}, grantsManager: {} } },
+  '/api/workbench/staffing': { staff: [], roles: { president: {}, cso: {}, grantsManager: {}, programCoordinator: {}, systemsSpecialist: {} } },
 };
 
 const EXPECTED_FETCHES = {
