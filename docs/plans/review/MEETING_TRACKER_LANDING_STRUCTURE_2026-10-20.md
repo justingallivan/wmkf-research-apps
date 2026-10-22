@@ -3,7 +3,7 @@ title: Meeting Tracker Landing Structure and Mockups
 domain: product
 kind: plan
 status: proposed
-summary: Meeting layout explorations and newer Workbench-first audience flow; terminology is provisional and app implementation remains pending.
+summary: Meeting layout explorations and newer Workbench-first audience flow; terminology is approved as of 2026-10-21 and app implementation remains pending.
 canonical: false
 owner: product-engineering
 related:
@@ -18,11 +18,75 @@ related:
 
 The owner’s later hierarchy correction is controlling for the PD Workbench: **working writeup and review first, supporting materials second, meeting logistics behind a compact link**. The [revised mockup](meeting-tracker-2026-10-20/workbench-pd-writeup.html) explores that direction; the earlier materials-first Workbench mockup is superseded and retained only as history.
 
+## Review paused — next session, 2026-10-21
+
+[VERIFIED via owner instruction] Pause here and revisit these cases in a future session: **no video available** (audio-only approval), **changes after approval** (names/boundary/summary revisions and existing Board materials), and **returning later** (draft persistence, ongoing preparation and partial-failure recovery). These are parked design/contract decisions, not authorized runtime work. The implementation acceptance requirements below identify their unresolved safeguards; do not treat the simplified preview as a settled persistence or publication contract.
+
+[VERIFIED via owner direction] Materials collection belongs to the assigned **Program Coordinator** in Admin; requests, reminders and confirmations should come from that person (Duncan currently, per owner). Resolve the role at runtime rather than hardcoding Duncan or inferring ownership from a Meeting Tracker permission. The shared Program Coordinator role was added by the concurrent role workstream; consumer wiring remains unbuilt and requires source/role verification when implementation resumes.
+
+## Transcript preparation — simplified preparation and approval build change, 2026-10-21
+
+[VERIFIED via owner direction] Replace the separate save/publish/generate sequence in the new layout with **Save and prepare materials** after speaker and presentation-end review. Collapse the saved review into a checked summary with an Edit action. Show two result sections: **Presentation** and **Staff discussion · Internal only**. This is an approved design/build requirement; application implementation remains pending.
+
+[PLANNED — coordinated behavior change] The action saves the checked names and presentation end, then prepares both derived transcripts, drafts both summaries, and creates the presentation video. Preparation does not itself authorize Board access. Review/edit the presentation summary and check the video ending before a separate **Approve for Board** action and explicit final confirmation. Internal transcript and summary remain staff only; the internal summary retains its review/edit/save action.
+
+[VERIFIED via inspected current UI handlers] `RecordingAndTranscriptCard.js` currently separates saved edits (`saveNames`), transcript publication (`publishJob` / `publishCorrection`), derivative generation (`generatePresentationTranscript`), summary draft/publication and presentation-video approval. The proposed combined action changes that contract, rather than merely relabeling a button. Current Board-readiness logic can recognize a bound presentation transcript or published summary individually; implementation must prevent preparation from making those new outputs Board-visible before the new approval step.
+
+[VERIFIED via owner direction] Provide a separate **Save draft** action for the presentation summary, so edits can be saved without Board approval. Retain the video-ending and summary-review checkboxes for now; revisit their burden after use rather than removing them in this build. [PLANNED] Runtime draft saving must persist edits without granting Board access; the mockup only acknowledges a local simulated save.
+
+[PLANNED — implementation acceptance requirements]
+
+- Trace save → transcript publication/version → derived transcripts → summary drafts/video → Board consumer before implementation; use the existing authorized services and explicit presentation/internal boundaries. Resolve the approval/persistence contract through the architecture/data review, including whether approval covers the whole presentation bundle and how edits revoke readiness. No schema or route design is settled by the mockup.
+- Coordinate preparation durably against the saved transcript/boundary version. Show per-item progress and failures, preserve successful outputs, and retry only unfinished/failed work. Reloads and repeat clicks must not create duplicate processing or charges. A changed source/boundary must invalidate stale derivatives and approvals; never approve a mixed-version bundle.
+- Missing video, preparation failures, uncertain paid submissions and partial publication must retain visible recovery paths. Do not infer completion or retry safety from a successful save alone. Define the no-video approval case explicitly before runtime implementation.
+- Test both import paths, resumed preparation, partial failure/retry, duplicate clicks, stale edits, approval/revocation and Board access. Verify that preparation exposes neither new unapproved presentation artifacts nor internal discussion through the Board page. Preserve unrelated access, recovery and review safeguards.
+
+[VERIFIED via mockup source] The standalone [transcript mockup](meeting-tracker-2026-10-20/transcript-preparation.html) demonstrates the combined action, collapsed review receipt, two result groups, editable summaries, simulated Preparing/Ready/Failure states, retry and separate simulated Board approval. Preview state buttons advance examples without real jobs, paid calls, persistence or sharing. The video is the synthetic source excerpt, not a generated trimmed output. Earlier screenshots and workspace descriptions are dated explorations, not this flow's implementation evidence.
+
+Changed-fact sweep scope: this owner-approved future flow and its standalone preview. Authority: owner instruction and inspected UI handlers; persistence/route changes and runtime verification remain pending. Existing application descriptions remain evidence of current behavior until the build changes it.
+
+## Transcript preparation — playback review, 2026-10-21
+
+[VERIFIED via owner direction] Put video playback beside the speaker/transcript review on desktop and above it on narrow screens. Provide **Use current playback time as presentation end** and retain audio as a fallback when video is unavailable. Applying a playback time must update the editable presentation-end value and clear the prior review confirmation, just like editing the time directly.
+
+[VERIFIED via mockup source] The [review-stage mockup](meeting-tracker-2026-10-20/transcript-preparation.html) includes a local synthetic, silent 38-second video excerpt representing recording times 00:41:52–00:42:30. Applicant tiles disappear at 00:42:18. Video and audio fallback share the recording-time offset; switching pauses the previous player and transfers position. These media files demonstrate controls only, without meeting footage, voices or external access. Application playback integration, real media availability/error handling and authorized media delivery remain pending. Earlier screenshots predate these playback controls.
+
+## Transcript preparation — acknowledgement removal build requirement, 2026-10-21
+
+[VERIFIED via owner direction] The new layout omits the non-sensitive/provider/paid-credits acknowledgement checkbox. Keep manual import available through the subdued, initially collapsed **Import manually** disclosure below Import from Zoom, as shown in the [transcript preparation mockup](meeting-tracker-2026-10-20/transcript-preparation.html).
+
+[PLANNED — application implementation pending] Remove the checkbox dependencies together when building this layout; hiding the control alone would block imports. Treat this as one coordinated change covering both Zoom import and manual audio transcription:
+
+- Remove acknowledgement state, disabled-button conditions and action-handler guards in `shared/components/meeting-tracker/RecordingAndTranscriptCard.js`.
+- Update the `nonSensitiveAcknowledged` request contract and matching validation in the Zoom-import and transcription-start API routes, the Zoom import service, and the Meeting Tracker transcription queue path. Trace internal Zoom-to-transcription calls as well as browser requests so no downstream caller still requires the removed value.
+- Reconcile writes to `transcription_jobs.non_sensitive_acknowledged_at`: do not fabricate an acknowledgement timestamp after the checkbox is removed. Decide the treatment of new jobs while preserving existing historical records; any schema change requires separate implementation review. Shared transcription-pilot code also serves the admin pilot, so do not remove that separate workflow's acknowledgement implicitly.
+- Update tests for both entry paths to prove import/transcription can start without the checkbox or acknowledgement payload, and that normal access, upload validation, recovery and processing safeguards still apply. Keep the separate speaker/presentation-end review confirmation and unrelated acknowledgements intact.
+
+[VERIFIED via source inspection, 2026-10-21] Current application dependencies exist in `RecordingAndTranscriptCard.js` (`uploadAndStart` and `importSelected`), `pages/api/meeting-tracker/visits/[requestId]/zoom-imports.js`, `pages/api/meeting-tracker/visits/[requestId]/transcriptions/[jobId]/start.js`, `lib/services/meeting-tracker-recordings/import-service.js`, `lib/services/meeting-tracker-transcription/service.js`, and `lib/services/transcription-pilot/runtime.js` / `store.js`. The mockup removes its local checkbox and button dependency only; production contracts remain unchanged.
+
+Changed-fact sweep scope: this owner-directed future build requirement, recorded in this layout plan. Existing implementation references describe current behavior and remain valid until the coordinated application change lands. No runtime, schema or historical-data change is authorized by this documentation update.
+
+## Invitations — layout review, 2026-10-21
+
+[VERIFIED via owner feedback] The owner finds the overall Invitations layout good. For both Proposal discussion session and Research presentation, carry the selected staff, board members and consultants from Meeting setup into Invitations. The recipient list, count and email review must reflect the same selection; an empty group must not silently restore default recipients.
+
+[VERIFIED via mockup source] The linked standalone setup and Invitations previews share illustrative attendee selections through browser-tab session storage. Direct Invitations entry without saved selections uses illustrative defaults for both meeting types. Returning to setup retains attendee choices in that tab. This demonstrates local layout continuity only; the application build and actual email delivery remain pending.
+
+Changed-fact sweep scope: Invitations layout feedback and attendee continuity. Authority: current owner instruction and the two mockup sources. Earlier static workspace descriptions below remain dated explorations. No application persistence, authorization or delivery change is claimed.
+
+## Agenda ordering — build decision, 2026-10-21
+
+[VERIFIED via owner direction] Use `@hello-pangea/dnd` for agenda drag ordering when the Meeting coordination build is authorized. Follow Proposal Ranking’s existing integration in `shared/components/proposal-ranking/AssessmentWorkflow.js`: dedicated handles, keyboard support, preservation of the library’s drag styles, its reduced-motion drop-transition handling, and protection against applying a drop to a changed list. The existing dependency is declared in `package.json`; no new drag package is needed.
+
+[PLANNED — application implementation pending] Retain numeric allotted minutes, Change position, move-to-session, removal and allocated-time/overrun feedback. Agenda changes retain the existing save-as-you-go contract; Done leaves editing. The owner explicitly does not require demonstrating the package in a mockup. The [setup mockup](meeting-tracker-2026-10-20/meeting-setup.html) remains a local layout/controls preview using basic browser dragging, not acceptance of the eventual drag interaction or application persistence.
+
+Changed-fact sweep scope: this package choice only. Authority: owner instruction and inspected Proposal Ranking source/package declaration. Producer: owner decision; persistence: this design record; consumer: future Meeting coordination implementation. No runtime change or external-state probe applies. Repository searches found no competing agenda package decision; broader design history remains outside this decision’s scope.
+
 ## Earlier layout decisions and boundary
 
 [VERIFIED via owner decisions in the Codex chat, 2026-10-20] The owner agreed to a cycle schedule landing page whose primary job is to scan the cycle’s requests and open the next task. Sessions have a separate task view within Meeting Tracker. Both session and visit actions remain visible for every request, including on narrow screens.
 
-[VERIFIED via owner instruction, 2026-10-20] Save the structure and mockups. Further layout design can continue with provisional labels; final terminology and app implementation remain pending. Meeting names and related labels are provisional. This is approval of the structure for design continuation, not authorization to change the application. No application code is changed by this handoff.
+[VERIFIED via owner instruction, 2026-10-20] Save the structure and mockups. Layout design continues with the owner-approved terminology of 2026-10-21, including Draft writeup. App implementation remains pending. This is approval of the structure for design continuation, not authorization to change the application. No application code is changed by this handoff.
 
 ## Saved artifacts
 
@@ -39,7 +103,7 @@ The owner’s later hierarchy correction is controlling for the PD Workbench: **
 - [Revised writeup-first PD Workbench](meeting-tracker-2026-10-20/workbench-pd-writeup.html), [desktop screenshot](meeting-tracker-2026-10-20/workbench-writeup-desktop.png), and [narrow-screen screenshot](meeting-tracker-2026-10-20/workbench-writeup-narrow.png) — current PD layout proposal.
 - [Superseded materials-first PD Workbench HTML mockup](meeting-tracker-2026-10-20/workbench-pd-materials.html), [desktop screenshot](meeting-tracker-2026-10-20/workbench-pd-desktop.png), and [narrow-screen screenshot](meeting-tracker-2026-10-20/workbench-pd-narrow.png).
 - [Original audit](../../../.impeccable/critique/2026-10-19T22-21-01Z__nts-meeting-tracker-meetingtrackerlist-js-ef43d395.md) — dated source and production inspection, not a fresh runtime assessment.
-- [Vocabulary review](PROPOSAL_WORKFLOW_VOCABULARY_2026-10-19.md) — proposed names and owner-edited deck, awaiting colleague feedback.
+- [Vocabulary review](PROPOSAL_WORKFLOW_VOCABULARY_2026-10-19.md) — approved names and updated owner-edited deck, including Draft writeup.
 
 All records, institutions, proposal titles and dates in the mockups are illustrative. The screenshots show the proposed composition, not production. There are no remote assets, live reads or write actions in the HTML.
 
@@ -62,7 +126,7 @@ Desktop rows are approximately 80px, compared with the design system’s approxi
 
 ## Sessions tab — proposed layout, 2026-10-20
 
-[VERIFIED via owner instruction] Continue designing the other tabs and screens now, using provisional labels; do not change the app. The owner requested the Sessions mockups and repository save, but has not yet approved this tab’s composition.
+[VERIFIED via owner instruction] Continue designing the other tabs and screens now, using approved labels; do not change the app. The owner requested the Sessions mockups and repository save, but has not yet approved this tab’s composition.
 
 The proposed desktop layout has a session list and a selected agenda preview beside it. The narrow version stacks the preview after the list; the preview link targets that region. Each session shows date, start/end time and time zone, location, Planned/Held status and an Open session action. Same-day sessions remain distinguishable by time and location. Create session is the primary action. Upcoming sessions precede held sessions in the illustrative list.
 
@@ -76,7 +140,7 @@ The standalone HTML files link between Cycle schedule and Sessions. No app code,
 
 ## Session detail — proposed read view, 2026-10-20
 
-[VERIFIED via owner instruction] Create and save desktop and narrow-screen session detail mockups with provisional labels; do not change the app. This screen’s layout remains a proposal for owner review. The owner subsequently found it busy and is willing to iterate later; it is a working draft, not an approved final layout.
+[VERIFIED via owner instruction] Create and save desktop and narrow-screen session detail mockups with approved labels; do not change the app. This screen’s layout remains a proposal for owner review. The owner subsequently found it busy and is willing to iterate later; it is a working draft, not an approved final layout.
 
 The proposed read view leads with date, start/end time and time zone, status and Join meeting. A compact summary contains location, duration, attendee count and Edit session details. Proposal order is the main working area, with calculated start times, allocated minutes, request identity and request/briefing actions. The missing-briefing case uses Check briefing, not direct creation. Attendees, notes and agenda sharing sit in a desktop sidebar and follow the agenda on narrow screens. Edit proposal order remains separate from the read view.
 
@@ -86,11 +150,11 @@ Prepare agenda is a static entry point to a future reviewed composer layout. No 
 
 Edit forms, reordering/moving/removing proposals, cancellation, conflict/over-capacity warnings, missing links, unavailable briefings, attendee issues, agenda-send uncertainty, loading/errors/empty states and long agendas are not designed or runtime-verified here. Preserve those existing behaviors when a separately authorized implementation is scoped. This mockup is not acceptance of keyboard accessibility, interaction behavior, data loading or sending.
 
-Only the selected illustrative session and its preview link to this detail; the detail links back to Sessions. All names and related labels remain provisional. No app, API, persistence, design-system or vocabulary decision changes are included.
+Only the selected illustrative session and its preview link to this detail; the detail links back to Sessions. Names now follow the approved terminology table. No app, API, persistence or design-system implementation changes are included.
 
 ## Visit detail — quieter proposed read view, 2026-10-20
 
-[VERIFIED via owner instruction] Create and save desktop and narrow-screen visit detail mockups with provisional labels and no application changes. The composition is proposed for owner review; it is not implementation approval.
+[VERIFIED via owner instruction] Create and save desktop and narrow-screen visit detail mockups with approved labels and no application changes. The composition is proposed for owner review; it is not implementation approval.
 
 The proposal responds to the owner’s feedback that session detail still looks busy. Request identity, visit time/time zone, virtual location/organizer and Join meeting remain visible. Attendees and notes collapse under one disclosure. Applicant materials is expanded in this illustrative pre-visit state. Recording setup, Presentation, Staff discussion and Board materials follow in the existing work order as collapsed sections, each with a visible summary and provisional status. Disclosure sections open locally in the HTML; uploads, sends and joins are inert.
 
@@ -102,7 +166,7 @@ Before implementation, define section summaries against the existing per-artifac
 
 Detailed upload/transcription/speaker-review/output/Board-link flows, edit forms, in-person and unscheduled states, loading/errors and long content remain outside this first layout. Opening a collapsed mock section reveals explanatory content rather than a completed functional design. Both default screenshots and expanded Board-section checks rendered without horizontal overflow at the two captured widths. This does not establish full accessibility or runtime acceptance.
 
-The first illustrative Open visit action in Cycle schedule links to this example; other request links remain static. Labels remain provisional. No application, API, schema, design-system or vocabulary changes are included.
+The first illustrative Open visit action in Cycle schedule links to this example; other request links remain static. Labels now follow the approved terminology table. No application, API, schema or design-system implementation changes are included.
 
 ## Historical PD Workbench materials-first exploration — superseded, 2026-10-20
 
@@ -126,15 +190,15 @@ The revised standalone mockup uses a synthetic lead-PD drafting state. The first
 
 [VERIFIED via source inspection] `shared/components/workbench/StaffDeliberationsTab.js` has Word editing, Ready for group review confirmation, and group/leadership review states. This is a layout proposal, not a complete verified transition or permission contract. Do not offer lead-PD drafting actions to every PD or assume all documents are visible before review. The mockup preserves the distinction that group review starts only through an explicit confirmed action. Actual active group/leadership work continues to use its existing Final Writeup contract; the progression is informational, not new navigation or a replacement workflow.
 
-The earlier materials-first artifacts are preserved as superseded history. Request shell/tab placement, naming and surrounding navigation remain provisional. Editing, review confirmation, actual document/media links, all lifecycle variants, failure states, accessibility and authorization are outside this static mockup. The same direct artifact/audience boundaries described above continue to apply.
+The earlier materials-first artifacts are preserved as superseded history. Request shell/tab placement and surrounding navigation remain proposed; display names follow the approved terminology. Editing, review confirmation, actual document/media links, all lifecycle variants, failure states, accessibility and authorization are outside this static mockup. The same direct artifact/audience boundaries described above continue to apply.
 
 Both screenshot widths rendered without horizontal document overflow; the compact meeting link was exercised and opened the logistics disclosure at both widths. No application source, runtime routes, permissions or live data changed.
 
 ## Duncan and superusers — Meeting coordination workspace proposal, 2026-10-20
 
-[VERIFIED via owner direction] Create and save a preparation workspace covering setup, invitations, materials collection and transcript preparation. No application changes. The layout remains a proposal, with provisional labels and synthetic examples.
+[VERIFIED via owner direction] Create and save a preparation workspace covering setup, invitations, materials collection and transcript preparation. No application changes. The layout remains a proposal, with approved labels and synthetic examples.
 
-[VERIFIED via owner naming correction] The provisional workspace title is Meeting coordination, since transcript work happens after the meeting. Navigation groups setup, invitations and collection under Before the meeting, and transcript preparation under After the meeting. This provisional label does not settle the broader meeting vocabulary.
+[VERIFIED via owner naming correction] The provisional workspace title is Meeting coordination, since transcript work happens after the meeting. Navigation groups setup, invitations and collection under Before the meeting, and transcript preparation under After the meeting. The broader meeting vocabulary was approved after colleague review on 2026-10-21.
 
 The standalone workspace separates four tasks; one task is open at a time. Desktop uses a left task selector, while narrow screens put four compact selectors above the selected task. Each task has one illustrative work item and a focused detail panel. Queue counts are synthetic navigation examples, not an implemented aggregation contract or exhaustive list.
 

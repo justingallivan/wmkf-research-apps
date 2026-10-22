@@ -10,6 +10,19 @@ The chronological archive after the `Legacy chronological session log` divider c
 
 ---
 
+## October 2026 — Admin startup restored under request-specific CSP (Session 632)
+
+**Milestone:** Resolved the Admin panel remaining on Loading after the Next.js 16.4.2 upgrade exposed statically rendered startup code with an empty nonce.
+**Sessions:** Meeting coordination review / Session 632 handoff, including owner-authorized incident release.
+**Ship state:**
+- PR #514 merged as `6d6fefdd2`; Production deployment `7242027781` succeeded after hosted checks.
+- Pages startup now renders per request via NextApp.getInitialProps; CSP and authentication protections remain intact.
+- Turbopack nonce regression coverage added; fresh authenticated Admin and Staffing loaded after deployment.
+**Why it matters:** restores fresh-page access to Admin while retaining nonce-based script enforcement; Pages routes give up automatic static optimization.
+**Pointers:** `docs/plans/ADMIN_CSP_STARTUP_FIX_2026-10-21.md`; `pages/_app.js`; PR #514 / `6d6fefdd2`.
+
+---
+
 ## October 2026 — Institution at Award column and Research PI backfill (Session 622)
 
 **Milestone:** New `wmkf_apprequestperson.wmkf_InstitutionAtAward` lookup (→ `account`) in production, and 230 Research PI rows filled from each award's applicant institution.

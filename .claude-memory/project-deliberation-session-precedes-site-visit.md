@@ -21,7 +21,7 @@ briefing and shares it with staff and select Board members → deliberation sess
 where the briefing and proposal are discussed → site visit (research presentation)
 → working writeup → group review → leadership review.
 
-Vocabulary is unsettled across the suite; the owner will fix it as a group decision after D26 and rename everywhere in one pass, not panel by panel. Inventory and open decisions: `docs/NOMENCLATURE_GLOSSARY.md` → "Deliberations workflow vocabulary". Reuse the wording already on a surface until then.
+Vocabulary was approved after colleague review on 2026-10-21, with Draft writeup replacing the proposed Post-presentation writeup. See `docs/NOMENCLATURE_GLOSSARY.md` and the approved table at `docs/plans/review/PROPOSAL_WORKFLOW_VOCABULARY_2026-10-19.md`. The deck and mockups are updated; runtime migration remains pending.
 
 **Why:** I misread a session dated weeks before the presentation as test residue and placed the session line under the Group review step of the Staff Deliberations stepper; both were wrong.
 

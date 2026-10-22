@@ -1,9 +1,9 @@
 ---
-title: Proposal Workflow Vocabulary — Colleague Review
+title: Proposal Workflow Vocabulary — Approved Names
 domain: product
 kind: plan
-status: proposed
-summary: Proposed vocabulary and owner-edited PowerPoint for colleague review; no application wording changes are approved by this review artifact.
+status: active
+summary: Owner-approved vocabulary following colleague review on 2026-10-21; deck and design mockups updated, runtime wording migration pending.
 canonical: false
 owner: product-engineering
 related:
@@ -11,15 +11,15 @@ related:
   - docs/plans/DELIBERATIONS_VOCABULARY_OPTIONS_2026-10-08.md
 ---
 
-# Proposal workflow vocabulary: colleague review
+# Proposal workflow vocabulary: approved names
 
-**Status:** Proposal for discussion with colleagues. This records proposed names, not an implementation decision or a statement that the app already uses them. Staff Deliberations remains the Workbench request tab name.
+**Status:** [VERIFIED via owner decision, 2026-10-21] Colleague review is complete. All proposed names are approved, with **Draft writeup** replacing **Post-presentation writeup**. The owner authorized updating the deck and mockups; runtime application changes remain separately scoped. Staff Deliberations remains the Workbench request tab name.
 
-[Review presentation](PROPOSAL_WORKFLOW_VOCABULARY_2026-10-19.pptx)
+[Approved terminology presentation](PROPOSAL_WORKFLOW_VOCABULARY_2026-10-19.pptx)
 
-The presentation is the owner's edited copy, preserved without modification. Its before-and-after mockups illustrate wording with fictional proposal details; they are not production screenshots. The table below transcribes the proposed names in that deck. The existing glossary remains the canonical record of terminology decisions.
+The owner's edited deck retains its layout and before/after examples. The approved-name column uses Draft writeup. Illustrative screens are not production screenshots. The table below records the approved names; the glossary points here for the decision.
 
-| Type | Current wording / examples | Proposed name |
+| Type | Current wording / examples | Approved name |
 |---|---|---|
 | Workspace | Staff Deliberations | Staff Deliberations (keep) |
 | Meeting | Deliberation session / Pre-discussion | Proposal discussion session |
@@ -30,7 +30,7 @@ The presentation is the owner's edited copy, preserved without modification. Its
 | Agenda | Deliberation session agenda | Discussion session agenda |
 | Materials | Site visit materials | Presentation materials |
 | Recording | Post-presentation materials | Recording and transcripts |
-| Document | Working writeup / Word Draft | Post-presentation writeup |
+| Document | Working writeup / Word Draft | Draft writeup |
 | Document | Final Writeup | Final writeup |
 | Summary | Presentation summary | Presentation summary |
 | Summary | Staff discussion summary | Post-presentation discussion summary |
@@ -40,4 +40,4 @@ The presentation is the owner's edited copy, preserved without modification. Its
 
 The proposal discussion session covers multiple proposals and their reviews, gathers initial sentiments, and prepares questions for applicants before their research presentations. The proposal discussion brief is the authored document; the proposal review packet is the shared page containing the brief and supporting materials. Discussion summaries collect individual proposal and post-presentation discussion summaries, grouped by SE and MR.
 
-No route, storage, API, or internal identifier migration is specified here. Review and approval of terminology precede any app changes.
+No route, storage, API, or internal identifier migration is specified here. Terminology is approved; runtime copy changes remain pending.

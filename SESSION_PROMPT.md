@@ -1,3 +1,62 @@
+# Session 633 Prompt: Resume Meeting coordination edge-case review when requested
+
+## Session 632 Summary — Meeting coordination layouts and Admin startup incident (Codex, 2026-10-21 PT)
+
+### What Was Completed
+
+1. **Meeting coordination previews saved.** [VERIFIED via design commits and local browser checks] Setup now includes existing agenda controls; use existing `@hello-pangea/dnd` in the future build, not as a required mockup demonstration. Selected staff/Board/consultants carry from setup to Invitations for both meeting types; invitation materials labels distinguish discussion-session and research-presentation packets. Materials collection is owner-approved and belongs to the Admin-assigned Program Coordinator (Duncan currently, per owner).
+2. **Transcript review and simplified materials flow.** [VERIFIED via owner decisions and standalone HTML] Collapsed Import manually below Zoom; provider/non-sensitive/credit acknowledgement removed from mockup. Video playback with current-time boundary action and audio fallback uses local synthetic silent media. Save and prepare materials leads to Presentation and Staff discussion/Internal only, editable summaries, separate presentation Save draft, per-item processing/failure examples and simulated Board approval. Keep review checkboxes for now. [PLANNED] Runtime orchestration and coordinated checkbox dependency removal are documented, not implemented.
+3. **Admin loading incident fixed and released.** [VERIFIED via PR #514 and fresh authenticated browser acceptance] Next 16.4.2 exposed a static startup/CSP nonce mismatch. `_app.getInitialProps` delegates to NextApp so startup renders with the request nonce. User approved merge/deploy after checks; merge `6d6fefdd2`, Production deployment `7242027781` succeeded, and fresh Admin/Staffing populated. CSP/auth protections were preserved. Details and regression coverage: `docs/plans/ADMIN_CSP_STARTUP_FIX_2026-10-21.md`.
+4. **Main handoff requested.** [OWNER-CONFIRMED] Land this handoff and saved designs on main. Concurrent cycle-planning/role/refactoring handoffs below are preserved as owning-session context, not a new actionable worklist.
+
+### Commits
+
+- `a8f8bd49f`, `0ab61fc58` — agenda controls and drag-package decision.
+- `f0035df6d`, `2e09dfc60` — attendee continuity and distinct invitation packets.
+- `8bc29ef84`, `cee25cedd` — manual import preview and coordinated acknowledgement-removal requirement.
+- `c685bedac` — video/audio review playback.
+- `3604cea20`, `d3fa98d25` — simplified preparation/approval and presentation draft save.
+- `6d6fefdd2` — released Admin startup fix (PR #514).
+- Main design merge and handoff commit follows; earlier design branch history is included in that merge.
+
+## Next Items
+
+### Parked — resume only when owner requests
+
+1. **No-video approval, revisions after approval, and returning later.** Evidence: owner’s final instruction and design plan's Review paused section. Resolve audio-only approval, stale/revoked Board materials, durable drafts, resumed jobs and partial-failure recovery before implementation. No extra mockups or runtime build requested now.
+2. **Meeting coordination application build.** Evidence: plan labels and owner scope. Design approval does not authorize runtime routes, schema, jobs, paid processing or sharing changes. The proposed single preparation action changes existing save/publish/generate behavior; source-to-Board-consumer reconciliation is required.
+
+### Verify Before Acting
+
+1. **Use the latest standalone HTML, not old captures.** Evidence: transcript mockup and design plan. Earlier screenshots predate playback/materials controls. Preview saves/approvals are simulated and not persisted across reloads. Synthetic video is an excerpt, not a trimmed presentation output.
+2. **Program Coordinator is a shared role.** Evidence: concurrent role handoff below and current design decision. Read current assignment via its existing config contract before wiring collection ownership/sender; do not hardcode the name or confuse responsibilities with access permissions.
+3. **Removed checkbox has live runtime dependencies.** Evidence: documented UI guards, Zoom/start routes, import/queue services and acknowledgement timestamp. Remove these together only within an authorized build, preserving historical data and the separate admin-pilot workflow.
+
+### Done / Do Not Reopen Without New Evidence
+
+1. **Admin startup incident.** Released and accepted as above. Reinvestigate only for a new failure; do not reapply the old fix.
+2. **Review checkboxes retained.** Owner chose to leave them for now and revisit only if burdensome.
+
+## Key Files Reference
+
+| File | Purpose |
+|---|---|
+| `docs/plans/review/MEETING_TRACKER_LANDING_STRUCTURE_2026-10-20.md` | Current decisions, build requirements and parked edge cases |
+| `docs/plans/review/meeting-tracker-2026-10-20/transcript-preparation.html` | Review/playback/materials preview |
+| `docs/plans/review/meeting-tracker-2026-10-20/meeting-setup.html` | Agenda/attendee preview |
+| `docs/plans/review/meeting-tracker-2026-10-20/invitations.html` | Attendee continuity and distinct materials |
+| `docs/plans/ADMIN_CSP_STARTUP_FIX_2026-10-21.md` | Released incident evidence and verification |
+
+## Verification and Handoff
+
+Owner: Codex → future owner-paced design session. Designs retained in `/Users/gallivan/.codex/worktrees/meeting-agenda-layout/WMKF_Apps` on `codex/meeting-agenda-layout`; static preview server uses port 8768. Source previews are under the same relative docs path on main after this merge. Design checks included local stage transitions, timestamp update, manual disclosure, draft save and separate approval confirmation; detector found no primary anti-patterns. These are not runtime accessibility, persistence, authorization or processing acceptance. Admin incident had 43 focused unit and 36 browser tests, production build and hosted checks, plus authenticated production acceptance, recorded in its incident doc. Stop-time documentation gates/push reported at close.
+
+Milestone determination: Admin startup incident outcome merits a DEVELOPMENT_LOG entry; design work alone does not. CLAUDE.md unchanged. Claim-evidence report returned local state unavailable; no observation row invented. Main's preexisting untracked critique and `output/` remain untouched. No instruction or skill edits.
+
+---
+
+# Preserved concurrent handoffs — historical owning-session context
+
 # Session 632 Prompt: Resolve calendar ownership and choose an overlapping-cycle implementation slice
 
 ## Session 631 Summary — J27 overlapping-cycle planning and foundational checks (Codex, 2026-10-21 PT)
