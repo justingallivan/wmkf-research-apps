@@ -1,6 +1,6 @@
 ---
 name: project-jsdom-serverless-esm-incompat
-description: "jsdom can't load in the Vercel/Turbopack serverless runtime (ESM-require); for server-side HTML sanitization use a DOM-free sanitizer (sanitize-html), never DOMPurify+jsdom. All 3 markdown utils fixed S284."
+description: "Historical S284 jsdom tracing/ESM failure; preserve the DOM-free server sanitizer pattern and verify current consumers and function traces before changing it."
 metadata: 
   node_type: memory
   type: project
@@ -20,25 +20,30 @@ Do:
 
 Do not:
 - Use DOMPurify plus `jsdom` on a server route.
-- Rewrite the remaining client-only `app-markdown.js` branch unless it gains an
-  SSR/API consumer.
+- Rewrite `app-markdown.js` solely from this incident. First check its current
+  consumers and preserve its sanitization allowlist and hook behavior.
 
 Ground truth: `shared/utils/policy-markdown-server.js`,
 `shared/utils/grantee-markdown.js`, and the S284 production incident retained
 below.
 
+## Historical S284 evidence
+
+The runtime and consumer details below describe that incident, not today's hosted
+Node version or a fresh caller census. Check current source before relying on them.
+
 **Symptom (S284):** `POST /api/admin/policies` 500'd in prod with `Cannot find
 module 'jsdom'` → after forcing it into the trace, `ERR_REQUIRE_ESM` on
 `@exodus/bytes` (via `html-encoding-sniffer@6`). Local `next dev`/`next build`
-do NOT reproduce it — the dev box runs Node 26 (which supports `require(esm)`);
-Vercel's function runtime is older and can't.
+did not reproduce it on that session's Node 26 machine; the deployed runtime
+failed the corresponding module load.
 
 **Root cause:** `shared/utils/*-markdown.js` loaded jsdom server-side via
 `eval('require')('jsdom')` so DOMPurify has a DOM. The eval hid jsdom from the
 build tracer (so it kept jsdom out of the CLIENT bundle), but it also meant
 jsdom was never bundled into the lambda. jsdom@29's transitive tree is full of
 ESM-only pkgs (`@exodus/bytes`, `entities`, `parse5`, `tough-cookie`,
-`@asamuzakjp/css-color`); Vercel's runtime can't `require()` any of them.
+`@asamuzakjp/css-color`); that deployed configuration failed their require chain.
 `serverExternalPackages:['jsdom']`, force-tracing via `import 'jsdom'`, pinning
 `html-encoding-sniffer`, and swapping to `linkedom` ALL failed (linkedom is
 also ESM-laden). The fix that worked: **don't externalize a DOM lib at all.**
@@ -59,11 +64,11 @@ website-html / cycle-export / abstract / external context) so it was converted
 wholesale to `sanitize-html` (no client split needed). Verified: build trace
 shows jsdom:0 + sanitize-html in those route bundles.
 
-**Remaining (LOW risk, NOT actually broken):** `shared/utils/app-markdown.js:141`
-still uses `eval('require')('jsdom')`, BUT its only consumer is `Phase2QAModal`
+**Remaining at S284 (historical consumer census):** `shared/utils/app-markdown.js`
+used `eval('require')('jsdom')`, and its identified consumer was `Phase2QAModal`
 (client component, `if (!isOpen) return null`, client-fetched messages) — so the
-jsdom branch is dead code in prod, never hit. Convert to the client/server split
-only if it ever gains a server-side (SSR or API) caller. Its sanitization is
+jsdom branch was not exercised in that flow. Check current consumers before
+relying on that exclusion or considering a client/server split. Its sanitization was
 intricate (DOMPurify hooks: Tailwind class-value allowlist + href scheme), so
 don't rush a sanitize-html rewrite for zero current benefit.
 See [[feedback-codex-build-gate-turbopack-sandbox]].

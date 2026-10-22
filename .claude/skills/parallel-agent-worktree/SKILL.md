@@ -115,9 +115,13 @@ git -C ../<repo>-codex diff --stat main...codex/<task-slug>      # files changed
 
 ```bash
 cd ../<repo>-codex && npm run lint        # 0 errors (pre-existing warnings ok)
-cd ../<repo>-codex && npm run build       # clean; a Turbopack sandbox panic is an
-                                          # ENV failure, not the app's — escalate, don't delete .next
+cd ../<repo>-codex && npm run build       # canonical build; investigate any failure
 ```
+
+For the specific historical `Operation not permitted` worker/process signature,
+follow `feedback-codex-build-gate-turbopack-sandbox`: treat it as environment-suspect
+and verify through an approved rerun. Do not classify every Turbopack panic as an
+environment failure or delete `.next` to force a pass.
 
 **Merge + deploy** (from the main checkout, on the owner's go — `main` deploys):
 

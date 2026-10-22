@@ -75,8 +75,8 @@ else
   warn ".env.local is MISSING — it holds secrets and is NOT created by this script."
   warn "Provision it (see docs/CREDENTIALS_RUNBOOK.md):"
   warn "  - securely copy .env.local from your other machine (most reliable), OR"
-  warn "  - 'vercel env pull .env.local'  (NOTE: Sensitive vars pull back EMPTY and"
-  warn "    must be filled in by hand)."
+  warn "  - an authorized env pull to a separate gitignored scratch file, then review selected keys."
+  warn "    Empty pulled values are ambiguous; provision unavailable secrets through the runbook."
 fi
 
 # 5. Verify the symlink invariants.

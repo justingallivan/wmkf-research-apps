@@ -187,9 +187,12 @@ checklist:
 
 ```bash
 cd ../WMKF_Apps-codex && npm run lint          # expect 0 errors (pre-existing warnings ok)
-cd ../WMKF_Apps-codex && npm run build         # expect clean; a Turbopack sandbox panic
-                                               # is an ENV failure, not the app's — escalate
+cd ../WMKF_Apps-codex && npm run build         # canonical build; investigate any failure
 ```
+For the specific historical `Operation not permitted` worker/process signature,
+follow `.claude-memory/feedback-codex-build-gate-turbopack-sandbox.md`: the initial
+result is environment-suspect and needs an approved rerun. Other panics are not
+automatically environment failures. Do not delete build artifacts to force a pass.
 (Optional: visual check — needs the dev server + the page's auth, e.g. superuser for
 `/admin`.)
 

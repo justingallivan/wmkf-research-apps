@@ -38,9 +38,9 @@ missing local-dev auth plumbing that a stale memory claimed was already there
    `NEXTAUTH_URL=http://localhost:3000` + `NEXTAUTH_SECRET`** — without these,
    NextAuth's Azure provider can't complete a real sign-in.
 2. **`AUTH_REQUIRED=true`** — this is the one that actually produced the
-   confusing symptom. `lib/utils/auth.js`/`auth-policy.js` treat
-   `AUTH_REQUIRED` as a **kill switch that fails OPEN**: unless it's the
-   literal string `'true'`, the app skips Azure AD entirely and
+   confusing symptom. In non-production-mode dev/test, `lib/utils/auth-policy.js`
+   requires both literal `AUTH_REQUIRED=true` and Azure credentials to enforce auth.
+   Without them, auth is disabled and
    `shared/components/ProfileSelector.js` (dev-mode only, `AUTH_REQUIRED=false`
    gate per its own header comment) lets you silently pick any existing
    Postgres `user_profiles` row — including a real staffer's profile. This
@@ -48,7 +48,10 @@ missing local-dev auth plumbing that a stale memory claimed was already there
    sign-out button," and neither an app-level sign-out nor an Incognito window
    fixes it, because no real session was ever established. Restarting Chrome,
    clearing cookies, or hunting for a Microsoft SSO conflict are all dead
-   ends — check `AUTH_REQUIRED` first.
+   ends for that historical configuration — check the current policy first.
+   Production-mode processes, including `next start`, enforce auth unless the
+   explicit emergency-bypass condition applies; missing `AUTH_REQUIRED` alone
+   does not disable their auth. [VERIFIED via `lib/utils/auth-policy.js`, 2026-10-22]
 3. **`EXTERNAL_LINK_SECRET`** (32+ chars) — needed to mint the reviewer
    accept/decline token. It's a purely internal HMAC key (sign+verify both
    happen in the same process, per `lib/services/external-token.js` header;
@@ -59,10 +62,12 @@ missing local-dev auth plumbing that a stale memory claimed was already there
    [[external-reviewer-portal]] topic page) rather than shipping a broken link.
 
 **How to apply:** before debugging an auth-shaped symptom on `localhost:3000`
-(wrong user, redirect loop, a send skipped for a "missing link"), grep
-`.env.local` for all of the above rather than assuming a browser/cookie/SSO
+(wrong user, redirect loop, a send skipped for a "missing link"), check the
+non-secret settings and secret-key presence above without printing credentials,
+rather than assuming a browser/cookie/SSO
 problem. Editing `.env.local` while `next dev` is already running does NOT
-reach the running process for server-only vars like these — kill and restart
-the dev server after any change.
+reach an existing process for these server-only settings — after an authorized
+change, coordinate restarting the specific server with its owner; do not kill
+another session's process.
 
 Related: [[project-vercel-cli-deploy-preview-auth]], [[reviewer-invite-capture-mode-not-full-sandbox]].

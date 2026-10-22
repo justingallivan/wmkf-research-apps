@@ -1,6 +1,6 @@
 ---
 name: project-vercel-sensitive-env-pull-empty
-description: "Vercel \"Sensitive\" env vars pull back EMPTY via `vercel env pull` — paste secret values by hand"
+description: Historical S215 empty Sensitive-variable pulls; preserve local overrides, treat empty values as ambiguous, and provision missing secrets through the credentials runbook.
 metadata: 
   node_type: memory
   type: project
@@ -15,8 +15,9 @@ metadata:
 Read this when: syncing env vars from Vercel to local via `vercel env pull` or setting up `.env.local`.
 
 Do:
-- Paste freshly-added "Sensitive" secret values into `.env.local` by hand (they pull back empty).
-- Keep using the CLI-override dev run command for `AUTH_REQUIRED`/`NEXTAUTH_*`.
+- Treat an empty pull as ambiguous; [[reference-vercel-sensitive-env-unreadable]] owns that evidence boundary. Follow `docs/CREDENTIALS_RUNBOOK.md` for authorized provisioning of missing credentials.
+- Preserve existing local configuration. If an env pull is authorized, use a separate gitignored destination and review selected keys before merging; do not overwrite `.env.local` or copy Production callback/auth settings blindly.
+- Keep the repo's local auth settings in gitignored `.env.local` as described by [[project-dev-environment]]; intentional shell overrides are process-specific.
 
 Do not:
 - Copy Vercel-injected system/build vars (`VERCEL*`, `TURBO_*`, `NX_DAEMON`) into `.env.local` — `VERCEL_ENV=production` triggers prod-fail-closed branches locally.
@@ -24,10 +25,24 @@ Do not:
 
 Ground truth: historical-only (lesson, not live state). Related: [[project-dev-environment]].
 
-`vercel env pull <file>` returns recently-added secrets with an **empty value** because Vercel now defaults new secrets to **"Sensitive"** (write-only — the value can't be read back, including via pull). Older non-Sensitive vars (`CLAUDE_API_KEY`, `AZURE_AD_CLIENT_SECRET`, `NEXTAUTH_SECRET`) pull populated; newer ones (`ORCID_*`, `NCBI_API_KEY`, `EXTERNAL_LINK_SECRET`, `DVX_BLOB_RW_TOKEN`, `ANTHROPIC_ADMIN_API_KEY`) come back blank.
+## Historical observation — S215
 
-**Implication:** you cannot sync a freshly-added secret from Vercel → local via pull. Paste the value into `.env.local` by hand.
+In S215, `vercel env pull <file>` returned newer Sensitive entries empty. Older
+non-Sensitive entries (`CLAUDE_API_KEY`, `AZURE_AD_CLIENT_SECRET`, `NEXTAUTH_SECRET`)
+were populated; newer `ORCID_*`, `NCBI_API_KEY`, `EXTERNAL_LINK_SECRET`,
+`DVX_BLOB_RW_TOKEN`, and `ANTHROPIC_ADMIN_API_KEY` entries were blank. That inventory
+and the then-observed defaults are historical, not current per-key classifications.
 
-**Merge hygiene (S215):** `vercel env pull` also writes ~22 Vercel-injected system/build vars (`VERCEL`, `VERCEL_ENV`, `VERCEL_URL`, `VERCEL_OIDC_TOKEN`, `VERCEL_GIT_*`, `TURBO_*`, `NX_DAEMON`) — never copy these into `.env.local` (`VERCEL_ENV=production` would make local code take prod-fail-closed branches). And `AUTH_REQUIRED`/`NEXTAUTH_*` come with prod values — keep using the CLI-override dev run command, don't put them in the file. `.gitignore` now covers `.env`, `.env.*`, `.env*.bak` (S215) so a pulled `.env.vercel` (real prod secrets) can't be committed.
+**Response then:** the owner supplied unavailable values separately. The enduring
+lesson is to provision through an approved source, not infer a missing hosted
+value or change its sensitivity merely to make a pull readable.
+
+**Merge hygiene observed in S215:** the pull included about 22 injected
+system/build entries (`VERCEL`, `VERCEL_ENV`, `VERCEL_URL`, `VERCEL_OIDC_TOKEN`,
+`VERCEL_GIT_*`, `TURBO_*`, `NX_DAEMON`) and Production auth/callback values.
+The session used CLI overrides to avoid importing those values. That workaround
+does not prohibit intentionally configured localhost values in `.env.local`.
+The current repository `.gitignore` covers `.env`, `.env.*`, and `.env*.bak`;
+verify ignore coverage for any new scratch destination and never force-add secrets.
 
 Related: [[project-dev-environment]].

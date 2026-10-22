@@ -57,7 +57,7 @@ Claude config sync, and environment-specific operating notes.
 - Decision log: `decision-module-typeless-warning-accept`.
 - Vercel env and deploy verification (routed here from the memory router 2026-09-17): `feedback-verify-vercel-env-with-env-ls`, `feedback-deployment-monitoring-use-inspect`, `feedback-verify-deploy-is-the-merge-build`, `feedback-no-vercel-cli-update-reminders`, `reference-vercel-sensitive-env-unreadable`, `reference-vercel-logs-filtering`.
 - Delegated Codex work (routed here from the memory router 2026-09-17; contract in `docs/AGENT_COLLABORATION_PLAN.md`): `feedback-codex-worktree-owner-runs-it`, `feedback-codex-delegation-review-vs-rescue-routing`, `reference-codex-review-needs-a-committed-diff`, `feedback-codex-model-gpt56-sol`.
-- Vercel Node 22 runtime cannot `require(esm)`; sanitize-html/jsdom pins: `project-vercel-node22-no-require-esm`, `project-jsdom-serverless-esm-incompat`.
+- Historical deployed module-load failures and retained sanitizer/bundling safeguards: `project-vercel-node22-no-require-esm`, `project-jsdom-serverless-esm-incompat`. Inspect current build/runtime evidence before inferring compatibility from the incident's Node version.
 - Delegated builds and review cadence (routed here from the memory router 2026-10-05): `feedback-orchestrator-checks-builds-before-review`, `feedback-cap-subagent-load-in-reproduction-briefs`, `project-agent-worktree-base-is-main` (also kept on the router as a live hazard).
 - Local containers, ledger Postgres, sandbox rehearsal, and owner-run durable state (routed here from the memory router 2026-10-05): `project-local-docker-is-colima`, `feedback-postgres-url-handling-hazards`, `project-sandbox-rehearsal-bypass-allow-rule`, `project-preview-rehearsal-venue-limits`, `feedback-operational-state-must-be-reachable-from-every-workstation` (plan `docs/plans/TEST_REQUEST_LEDGER_PORTABILITY_PLAN_2026-09-30.md`).
 - Handoff commits run `check:harness-framing` first: `feedback-run-harness-framing-before-handoff-commit`.
@@ -149,17 +149,18 @@ Claude config sync, and environment-specific operating notes.
   No `akoya_request` teardown — in capture-only mode there is none; in the
   no-BILL creation posture, any minted honorarium request needs separate cleanup.
 
-- **A "wrong user logged in, no sign-out button" symptom on `localhost:3000` is
-  usually `AUTH_REQUIRED` missing/not `'true'` in `.env.local`, not a browser or
-  Microsoft-SSO problem (S346).** `AUTH_REQUIRED` fails OPEN — unless it is the
-  literal string `'true'`, Azure AD is skipped entirely and the dev-only
-  `ProfileSelector` lets you silently pick any existing Postgres `user_profiles`
-  row. Full local-auth checklist (Azure AD vars, `AUTH_REQUIRED=true`,
+- **The "wrong user logged in, no sign-out button" symptom on `localhost:3000`
+  was traced to missing local-dev auth configuration in S346.** Check current
+  `lib/utils/auth-policy.js`: non-production-mode dev/test enforces auth only with
+  literal `AUTH_REQUIRED=true` and Azure credentials; production-mode processes
+  enforce auth unless the explicit emergency-bypass condition applies. Do not
+  generalize the dev-only profile-selection symptom to `next start` or hosted
+  deployments. Full local-auth checklist (Azure AD vars, `AUTH_REQUIRED=true`,
   `EXTERNAL_LINK_SECRET`): `project-local-dev-auth-setup`. Editing `.env.local`
   does not reach an already-running `next dev` process — restart it after any
   change.
-- **A local Workbench run hits the target interlock before it hits anything else
-  (2026-08-13).** `.env.local` points `DYNAMICS_URL` at `wmkf.crm.dynamics.com`,
+- **Historical local Workbench interlock incident (2026-08-13).** That machine's
+  `.env.local` pointed `DYNAMICS_URL` at `wmkf.crm.dynamics.com`,
   which `lib/dataverse/core/target-registry.js:28` classifies as **production**,
   so every read fails closed with `[dataverse-interlock] denied:
   deployment=local target=production ... DATAVERSE_ALLOW_PROD_READS not set to
@@ -167,7 +168,7 @@ Claude config sync, and environment-specific operating notes.
   dashboard", "Failed to list awardees" — which reads like a broken feature or a
   credentials problem; the interlock line is only in the `next dev` console, so
   check there first. Only the literal `'yes'` lifts it
-  (`interlock.js:327`), and it gates **reads only** — a local→production write
+  (see `lib/dataverse/core/interlock.js`), and it gates **reads only** — a local→production write
   still needs the separate `resolveProdWriteAck` exception. A denied write also
   surfaces as generic route copy ("Failed to close reviewer engagement" from the
   closeout route's 500 catch-all, 2026-09-08): the interlock throw is not a
@@ -177,6 +178,8 @@ Claude config sync, and environment-specific operating notes.
   and wait. It is a standing permission once set, so it belongs out of
   `.env.local` again when the session's testing is done. Restart `next dev`
   after the edit — see the `AUTH_REQUIRED` note above for why.
+  The dated target is not evidence of the current machine's configuration or
+  authorization. Check both before any live access.
 - **Azure CLI is installed locally** (`/opt/homebrew/bin/az`, homebrew 2.89.0)
   and, after the owner runs `az login` themselves (browser/MFA; auth is
   per-user and expires), it can READ the Entra app registration

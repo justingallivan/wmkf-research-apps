@@ -12,15 +12,18 @@ metadata:
 
 ## Recall Rule
 
-After a push or explicit deployment, identify the deployment URL once and inspect
-that deployment directly. Do not base readiness on a listing-row grep.
+After a push or explicit deployment, establish the intended commit's immutable
+deployment identity using [[feedback-verify-deploy-is-the-merge-build]], then
+inspect that deployment directly. That note owns deployment identification;
+this note owns waiting and the historical reasons to avoid parser loops.
 
 **Recurrence S597 (2026-10-12):** two more home-rolled loops. (1) Polling GitHub commit statuses for a
 Vercel context: for these `main` pushes GitHub recorded **no** Production deployment or status at all,
 so the loop could never finish. (2) A `vercel ls | grep Production` loop the owner interrupted
 ("what are you waiting for?"). A single `vercel ls --prod` showed the deploy Ready within a minute.
-Do one direct check (newest `--prod` row created after the push), and if it is still building, use
-`vercel inspect <that deployment url> --wait` in the background; tell the owner what is being waited on.
+That session used a newest-row lookup. S598 subsequently showed why recency was
+insufficient; current identification must follow the commit-specific procedure
+above before waiting on the immutable deployment.
 
 [VERIFIED historically via S267 and S311 CLI observations.] In those sessions,
 `vercel inspect <deployment-url>` exposed a direct status while `vercel ls` row
@@ -44,14 +47,15 @@ external state:
 1. Use the tool's own wait primitive: `gh pr checks <n> --watch --fail-fast` (exits
    when checks finish), `vercel inspect <url> --wait` (blocks until the deploy
    completes), `gh run watch <id>`.
-2. Run it with `run_in_background: true` so the session gets a completion
-   notification and the owner is never blocked behind the wait.
+2. Use the current runtime's supported background/task mechanism and bounded waits,
+   keeping the owner informed. `run_in_background: true` was the Claude tool syntax
+   in S509, not a universal parameter for other runtimes.
 3. Merge / redeploy / verify in a SEPARATE step after the notification, never in
    the same command as the wait.
 
 **How to apply:**
-- Prefer a direct deployment inspection for a one-shot status check; obtain the URL
-  from the current deployment output or a single listing lookup.
+- For a one-shot status check, inspect the immutable deployment whose commit,
+  target, and project were established through the identity note above.
 - If waiting is necessary, use the current inspection output rather than assuming
   the S267 status format or timing. Treat empty/unparseable output as unknown.
 - Do NOT build a poll loop around `grep "<deployment-hash>"` of `vercel ls` — that's the fragile
