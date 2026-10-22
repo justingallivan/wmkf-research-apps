@@ -62,11 +62,10 @@ const sharedAuthProxy = withAuth(
     // Build CSP directives
     // Dev: Turbopack injects inline scripts without nonces, needs unsafe-inline + unsafe-eval.
     //      localhost is HTTP, so upgrade-insecure-requests would break all resource loads.
-    // Prod: 'self' allows same-origin script chunks, nonce covers any inline scripts on
-    //      SSR pages. No unsafe-inline or unsafe-eval — blocks injected scripts and eval.
-    //      Note: 'strict-dynamic' is NOT used because SSG pages are pre-rendered at build
-    //      time without nonces on script tags, so strict-dynamic would override 'self' and
-    //      block all same-origin scripts.
+    // Prod: 'self' allows same-origin script chunks; the nonce authorizes inline
+    // startup. pages/_app.js disables automatic static optimization so Document
+    // receives this request's x-nonce instead of freezing an empty build-time value.
+    // No unsafe-inline or unsafe-eval; keep the existing origin-based loading policy.
     const scriptSrc = isDev
       ? `'self' 'unsafe-inline' 'unsafe-eval' https://va.vercel-scripts.com`
       : `'self' 'nonce-${nonce}' https://va.vercel-scripts.com`;
