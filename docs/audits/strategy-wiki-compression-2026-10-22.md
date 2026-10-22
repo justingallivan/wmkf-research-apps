@@ -68,4 +68,4 @@ would require a separately scoped preservation pass.
 
 The archive payload was byte-compared with the captured pre-edit body and its
 hash was independently checked after writing. Targeted routing/reference searches
-were run. No tests, gates, live probes, or environment reads were run; The parent independently compared the archive body against the committed pre-edit wiki, confirmed the 13,302-byte SHA-256 match above, and verified the later implementation-history body is unchanged. Repository documentation checks are recorded in the companion audit index.
+were run. The editing agent ran no gates or live probes. The parent independently compared the archive body against the committed pre-edit wiki, confirmed the 13,302-byte SHA-256 match above, and verified the later implementation-history body is unchanged. Repository documentation checks are recorded in the companion audit index.

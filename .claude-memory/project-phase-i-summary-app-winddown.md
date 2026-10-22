@@ -1,12 +1,14 @@
 ---
 name: Phase I summary app winddown
-description: Strategic shift — user-facing Phase I summary app deprioritized; backend automation owns the future of this workflow
+description: Historical Phase I summary investment decision; retained app remains available as reference, while future Grant Reporting direction is undecided
 type: project
 originSessionId: e2e4c03f-8046-4d90-a1fd-93c1bb8256d1
 status: active
 scope: strategy
-last_verified: 2026-07-27 via current page/routes/scripts and owner strategic direction
+last_verified: 2026-10-22
 ---
+
+**Verification scope:** the 2026-10-21 Grant Reporting owner direction and current app registry/extract route were checked on 2026-10-22. This does not establish current usage or authorize retirement.
 
 ## Recall Rule
 
@@ -15,16 +17,14 @@ Read this when: deciding where to invest on `/phase-i-dynamics`, or weighing use
 Do:
 - Treat the winddown as strategic priority/UI-investment, not proof that the
   retained `/phase-i-dynamics` source is deleted.
-- Put forward investment into current Dynamics-tied surfaces such as the
-  Workbench, Expertise Finder, and Grant Reporting; verify `appRegistry` before
-  naming an app current.
+- Prefer investment in Workbench and Expertise Finder where their current value supports it. For Grant Reporting, revisit product direction before proposing investment in the standalone workflow: the destination, scope, and timing are undecided. Verify `appRegistry` before naming an app current.
 - Author future intake prompts (compliance, fit-assessment, keywords) backend-first as PA-triggered Executor calls.
 
 Do not:
 - Over-invest in `/phase-i-dynamics` UI features (forms, polish, dashboards) — it's a direct-URL prompt-dev surface, hidden from nav by design.
 - Read "winddown" as a general retreat from user-facing apps — it's specific to Phase-I-summary-as-a-user-task.
 
-Ground truth: `/phase-i-dynamics` page + `/api/phase-i-dynamics/summarize{,-v2}`, `scripts/compare-phase-i-v1-v2.js`, `scripts/ab-phase-i-prompts.js`, `scripts/audit-system-prompt-sizes.js`; Justin framing 2026-04-25, audit 2026-05-03.
+Ground truth: `/phase-i-dynamics` page + `/api/phase-i-dynamics/summarize{,-v2}`, `scripts/compare-phase-i-v1-v2.js`, `scripts/ab-phase-i-prompts.js`, `scripts/audit-system-prompt-sizes.js`; current Grant Reporting owner direction in `.claude-memory/project-grant-reporting-rework.md`; app registry `shared/config/appRegistry.js:131-139` and extraction route `pages/api/grant-reporting/extract.js:43-45`.
 
 The user-facing `/phase-i-dynamics` summary app was originally a quick way to produce template-conforming summaries when the workflow was human-driven. Post-May-2026 cycle:
 
@@ -35,15 +35,17 @@ The user-facing `/phase-i-dynamics` summary app was originally a quick way to pr
 
 **Why:** Justin's framing 2026-04-25 — backend-driven prompt automation will produce most summaries; UI app demand collapses for high-volume early-cycle work. Reviewer finder + Phase II tools remain because they're expert-driven late-cycle work.
 
-**Source boundary verified 2026-07-27:** `/phase-i-dynamics`,
+**Source boundary checked 2026-07-27:** `/phase-i-dynamics`,
 `summarize{,-v2}`, Executor wiring, and A/B scripts remain in the repository,
 while `appRegistry` does not present the page as an active app. That proves a
 retained prompt-development/reference surface, not current usage or active
 iteration.
 
+The Grant Reporting app remains registered in `shared/config/appRegistry.js` and its extract route remains present. The later 2026-10-21 owner decision concerns the future home of its capabilities; it does not retire the app, disable its route, or decide where backend automation will run.
+
 **How to apply:**
 - Don't over-invest in `/phase-i-dynamics` UI features (forms, polish, dashboards). It works for May 2026; details of its prompt may change but driven by backend needs not user request.
-- Backend automation owns volume; `/phase-i-dynamics` is the human-in-the-loop prompt-tuning surface.
+- Backend automation owns Phase I volume; `/phase-i-dynamics` is the human-in-the-loop prompt-tuning surface.
 - Future intake prompts (compliance, fit-assessment, keywords) are **backend-first** — author them as PA-triggered Executor calls, not as new user-facing routes.
 - When weighing where to spend effort, prefer reviewer finder + Phase II apps + Executor/prompt-row infrastructure over new Phase I user routes.
 - "Production ready by next cycle" includes the backend automation, not user-app polish.

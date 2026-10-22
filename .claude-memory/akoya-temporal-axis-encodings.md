@@ -1,30 +1,46 @@
 ---
 name: akoya-temporal-axis-encodings
-description: akoya_request has ONE canonical temporal field (wmkf_meetingdate); fiscal year + grant cycle derive from it; Jxx/Dxx cycle is a June/Dec CONVENTION not an invariant — off-month meetings silently drop today (fail-loud required)
+description: akoya_request board-cycle date and derived cycle conventions, with current Workbench cycle propagation
 metadata: 
   node_type: memory
   type: reference
   originSessionId: 8050fbb7-13c6-444b-b802-c9bc7a61a3ce
   status: active
   scope: dataverse
-  last_verified: 2026-09-08 via lib/utils/cycle-code.js; population figures remain dated 2026-05-18 probe snapshots
+  last_verified: 2026-10-22
 ---
+
+**Verification scope:** source and checked-in dated evidence were checked on 2026-10-22. Population figures below remain 2026-05-18 probe snapshots; no live Dataverse query was run.
 
 ## Recall Rule
 
 Read this when: building any cohorting/cycle-filter or temporal-axis UI over `akoya_request` (e.g. Dataverse Bulk Export, Reviewer Finder cycle filters).
 
 Do:
-- Treat `wmkf_meetingdate` as the single canonical temporal handle (raw range = fail-safe ground truth); compile cycle filters to a `wmkf_meetingdate` range via `cycleCodeToOdataFilter`.
-- Surface an off-month / null-cycle meeting LOUDLY (`UNCLASSIFIED cycle` sentinel) — never coerce to nearest cycle, never silently drop.
+- Treat `wmkf_meetingdate` as the canonical board-cycle date; compile Jxx/Dxx filters to a meeting-date range via `cycleCodeToOdataFilter` where the convention fits, and preserve a raw-date path for off-month meetings.
+- Treat Jxx/Dxx as the twice-yearly June/December convention, not a schema invariant. `meetingDateToCycleCode` returns `null` outside those months; never coerce or silently drop an off-month/null-cycle row. Surface it explicitly where the consumer supports that path, and verify the specific consumer before claiming an `UNCLASSIFIED` sentinel is implemented.
+- In Workbench, use the shell-supplied cycle for Final Writeups and Initial Assessments. Final Writeups has an explicit selector and a manual newest-cycle fallback when no usable rows are available; that fallback does not automatically select a cycle. Awardees shares the shell cycle and offers last-decided as an alternative (`shared/components/workbench/WorkbenchShell.js:77-147,297-329`; `shared/components/workbench/InitialAssessmentsPanel.js:21-56`; `shared/components/final-writeups/FinalWriteupsViews.js:552-578,633-694,805-814`).
 - Verify callers (e.g. `my-proposals.js`, `reviewer-suggestion.js findByPD`) before relying on existing cycle filters.
 
 Do not:
 - Expose `akoya_fiscalyear` as a separate filter axis (it's just month+year of `wmkf_meetingdate`). The last two runtime readers that did — Expertise Finder's proposals query and request search's unknown-label fallback — were moved onto `cycleCodeToOdataFilter` / a 400 on 2026-09-08 (S499). The one write path that stored a client-supplied cycle code on suggestion rows (`save-candidates`) now derives it from the request's meeting date (same day).
-- Treat `Jxx`/`Dxx` as a schema invariant — it's a June/Dec convention; non-June/Dec months return null and vanish from cycle-grouped views.
+- Treat `Jxx`/`Dxx` as a schema invariant: it is a June/December convention and other months return null. Whether a view drops or separately exposes those rows depends on that consumer; check it.
 - Conflate `wmkf_meetingdate` (board-cycle) with `akoya_decisiondate` (approval-stamp/business-history axis).
 
 Ground truth: `lib/utils/cycle-code.js`; `scripts/probe-akoya-meetingdate-by-type.js` + evidence `docs/atlas/evidence/akoya-meetingdate-by-type-2026-05-18.txt`; build-plan §9. Related: [[dataverse-export-floor-scoping]].
+
+**Default cycle and Workbench propagation (owner decision 2026-09-08, S499; source checked 2026-10-22).** The historical owner rule chose a program's working cycle by default, with a last-decided alternative where appropriate, independently of the caller's assignments. The dashboard cycle-list response supplies `defaultCycleCode` and `lastDecidedCycleCode`; WorkbenchShell loads it, uses an explicit URL cycle when present, otherwise applies `defaultCycleCode` and records the resolved cycle in the URL. It passes the selected shell cycle into Final Writeups, Initial Assessments, and Awardees. Awardees offers last-decided as a user-selectable alternative; do not describe it as automatically receiving the last-decided cycle.
+
+Initial Assessments consumes the shell cycle. Final Writeups has an explicit cycle selector and a manual newest-cycle fallback for its empty/no-row state; it does not automatically walk cycles to choose one. Do not reuse earlier implementation notes that Final Writeups or Initial Assessments independently select an artifact-row cycle.
+
+The older PR #183/203 rollout notes, program-scoped consistency rule, cycle-list endpoint details, and retired local-time/upcoming helpers are retained as historical design context. Check the current endpoint before changing cycle-source behavior. `conventionalCycles(today)` remains an explicit fallback for callers that have no existence-aware cycle list.
+
+**Dated population snapshot (S162, 2026-05-18):** `wmkf_meetingdate` was populated on 99.5% of all rows and about 100% of named process rows, including Discretionary (1/5,345 missing; migrated Discretionary 0/4,749). The missing tail concentrated in untyped/in-flight Pending rows. These figures are from `docs/atlas/evidence/akoya-meetingdate-by-type-2026-05-18.txt`, not current population claims.
+Related: [[dataverse-export-floor-scoping]]
+
+## Historical implementation snapshot — superseded design notes (source state reviewed through S499)
+
+The following body is preserved verbatim from the prior memory. Its rollout assumptions and consumer predictions are historical; use the Recall Rule and current Workbench propagation above for current guidance.
 
 On `akoya_request`, `wmkf_meetingdate` is the single canonical temporal field for board-cycle work. There are not multiple independent time dimensions for cohorting — there is one, with three encodings:
 

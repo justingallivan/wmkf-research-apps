@@ -1,27 +1,31 @@
 ---
-name: Dynamics Explorer schema discovery — prefer the diff tool
-description: How to find Dataverse fields missing from Dynamics Explorer's inline annotations; which script to use and which to avoid for that purpose
+name: Dynamics Explorer schema discovery and curated annotations
+description: Distinguish live Dataverse field discovery from hand-curated field descriptions in Dynamics Explorer
 type: project
 originSessionId: 176c13fa-41ec-4cad-a5ac-c3ad9b64cdac
 status: active
 scope: dynamics
-last_verified: 2026-07-12 — diff-tool how-to is durable; scripts/dynamics-schema-diff.js + scripts/dynamics-schema-map.js present. The 2026-05-05 example gap (wmkf_ai_summary) has since been curated into TABLE_ANNOTATIONS (now present in shared/config/prompts/dynamics-explorer.js), which illustrates rather than changes the guidance
+last_verified: 2026-10-22
 ---
+
+**Verification scope:** source and repository history were checked on 2026-10-22. No live Dataverse metadata probe was run; current tenant schema remains unverified here.
 
 ## Recall Rule
 
 Read this when: a user reports Dynamics Explorer "doesn't know about field X," or you need to find Dataverse fields missing from Explorer's `TABLE_ANNOTATIONS`.
 
 Do:
-- Run `scripts/dynamics-schema-diff.js [table ...]` (definition-based, full attribute metadata regardless of population) to enumerate the gap, then curate descriptions by hand.
-- Focus curation on custom `wmkf_*`/`akoya_*` fields the foundation uses; ignore the large raw "missing" count (mostly system boilerplate).
+- For a field the model cannot find, call Dynamics Explorer `describe_table` for the table. The tool returns curated annotations plus readable live Dataverse attributes; use `full: true` for the complete additional-live-field list (`lib/services/dynamics-explorer/tools/describe-table.js:24-34,52-79,120-136`).
+- Treat `TABLE_ANNOTATIONS` as curated descriptions and rules, not an exhaustive schema registry. The runtime adds live attributes not already curated; a field can therefore be discoverable without having a hand-written semantic description (`shared/config/prompts/dynamics-explorer.js:22-25`).
+- When preparing a code-side curation pass, `scripts/dynamics-schema-diff.js [table ...]` remains useful to enumerate definition metadata against annotation keys, independent of record population. Review likely custom `wmkf_*`/`akoya_*` candidates and curate descriptions by hand.
 
 Do not:
-- Use `scripts/dynamics-schema-map.js` for gap-finding — it's sample-based (25 records, <20% population dropped) and silently misses sparsely-populated new fields like `wmkf_ai_summary`.
+- Assume a newly discovered live attribute already has a curated description, or that a curated field list proves the live tenant schema is complete.
+- Use `scripts/dynamics-schema-map.js` to enumerate all schema gaps. It is sample/population based and answers what appears in sampled data, not what the table defines.
 
-Ground truth: `scripts/dynamics-schema-diff.js` (+ gitignored `.json`), `shared/config/prompts/dynamics-explorer.js`. Schema gaps are live — re-run the diff tool rather than trusting any field list in this memory.
+Ground truth: runtime discovery is `lib/services/dynamics-explorer/tools/describe-table.js`; curated semantics are in `shared/config/prompts/dynamics-explorer.js`; offline code-side comparison is `scripts/dynamics-schema-diff.js` (its JSON output is gitignored). Re-query live metadata when a tenant-specific claim matters.
 
-When fields are added to Dataverse, Dynamics Explorer's `TABLE_ANNOTATIONS` (`shared/config/prompts/dynamics-explorer.js`) does NOT update automatically. The model only "knows" about hand-curated fields. Use the right tool to find the gap.
+When fields are added to Dataverse, `TABLE_ANNOTATIONS` does not update automatically. However, the runtime `describe_table` tool fetches live readable attributes and can expose additional fields; hand-curated descriptions and live discoverability are separate contracts. The system prompt also directs the model to discover missing fields with the tool (`shared/config/prompts/dynamics-explorer.js:579-580`).
 
 **Use:** `scripts/dynamics-schema-diff.js` (added 2026-05-05, commit `25d91e4`).
 - Definition-based: queries `EntityDefinitions(LogicalName='X')/Attributes` for full attribute metadata, regardless of population.
@@ -30,11 +34,8 @@ When fields are added to Dataverse, Dynamics Explorer's `TABLE_ANNOTATIONS` (`sh
 - Output: console report grouped by attribute type + structured `scripts/dynamics-schema-diff.json` (gitignored).
 - Run: `node scripts/dynamics-schema-diff.js [tableName ...]`. No args = all annotated tables.
 
-**Don't use for gap-finding:** `scripts/dynamics-schema-map.js`.
-- Sample-based (25 records). Filters fields populated <20% of samples.
-- Sparsely-populated new fields (e.g. `wmkf_ai_summary` rolled out across 2026, used on a small subset of records) get silently dropped.
-- Still useful for "what's actually in active use" — different question, different tool.
+**Different question:** `scripts/dynamics-schema-map.js` samples records to show fields observed in use; it is not a definition-based completeness check. Its population thresholds can omit sparse fields.
 
-**Why:** `wmkf_ai_summary` was missing from inline annotations as of 2026-05-05 even though it was added to Dataverse weeks earlier. The sample mapper had been re-run since the field was added but didn't surface it. The diff tool catches this class of miss.
+**Historical example:** On 2026-05-05, `wmkf_ai_summary` was missing from inline annotations and sample mapping did not surface the sparsely populated field. It was later curated into `TABLE_ANNOTATIONS`. This records why the definition-based diff was added; it does not mean the current runtime can only see annotated fields.
 
-**How to apply:** When the user reports the model "doesn't know about field X" or asks for a schema refresh, run the diff tool first to enumerate the actual gap, then curate descriptions by hand. The 1200+ raw "missing" count across all six annotated tables is misleading — most is Dataverse system boilerplate (`address1_*`, `yomi*`) and unused Akoya-platform fields (scholarship/dedication-notification). Real curation candidates are the custom-only `wmkf_*` and `akoya_*` fields the foundation actually uses.
+**How to apply:** For an interactive missing-field question, use `describe_table` and request `full: true` if the sample is incomplete. For a repository curation task, compare definitions with annotations using the diff script, then select meaningful fields and write descriptions deliberately. The old 1,200+ count was a dated raw count across six tables; much of it was system metadata or unused platform fields, so do not treat it as a current backlog.
