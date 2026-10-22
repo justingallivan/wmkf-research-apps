@@ -40,12 +40,11 @@ Do not:
 
 ## Current contract
 
-- The registry currently defines
-  [12](../docs/CANONICAL_COUNTS.md#app-definition-count) apps. New users get
-  only `dynamics-explorer` by default.
-- API enforcement currently covers
-  [104](../docs/CANONICAL_COUNTS.md#requireappaccess-endpoint-count)
-  app-specific endpoints.
+- Use the [canonical app-definition count](../docs/CANONICAL_COUNTS.md#app-definition-count)
+  when reporting registry size. New users get only `dynamics-explorer` by default.
+- Use the [canonical route-file count](../docs/CANONICAL_COUNTS.md#requireappaccess-endpoint-count)
+  when reporting the `requireAppAccess` scan. Its denominator is route files matched by
+  the guard scan, not endpoint functions or the whole API surface.
 - `requireAppAccess` checks active status and superuser role fresh on every
   request. It caches ordinary app grants for two minutes.
 - Grant lookup failures fail closed without poisoning that cache:

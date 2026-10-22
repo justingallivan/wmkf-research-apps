@@ -13,15 +13,15 @@ metadata:
 Read this when: a closed, shipped, or point-in-time subject resurfaces and you need to find the detailed topic file or design doc it was consolidated into.
 
 Do:
-- Use this as the consolidated pointer to closed-work topic files that no longer hold an always-loaded MEMORY.md slot.
+- Use this as a historical routing index to closed-work topic files that no longer hold an always-loaded MEMORY.md slot.
 - Pull the named topic file (or its design doc) when the subject actually comes up.
-- Treat listed shipped features as authoritative-by-design-doc — don't rebuild them.
+- Preserve the don't-rebuild guardrail for listed shipped work, while checking source, the Atlas, and authorized read-only probes before making current-state claims or taking follow-up action.
 
 Do not:
 - Expand this index into route/implementation detail — it's a pointer, not a spec.
-- Assume a point-in-time snapshot here is current; live state lives in SESSION_PROMPT handoffs / the named topic files.
+- Assume archive entries or linked plans prove current implementation state. They preserve historical evidence; verify present behavior from source and Atlas, using an authorized probe when the claim depends on live external state.
 
-Ground truth: the linked topic files + design docs named per entry (e.g. `docs/POSTGRES_TO_DATAVERSE_MIGRATION.md`); historical-only consolidation.
+Ground truth for current claims: source, Atlas, and authorized probes as applicable. The linked topic files and design docs (e.g. `docs/POSTGRES_TO_DATAVERSE_MIGRATION.md`) are historical routing evidence and consolidation records.
 
 These items are **done, closed, or point-in-time** and no longer earn a slot in the always-loaded MEMORY.md index. Their detailed topic files still exist on disk and are recall-able by `description` — this file is the consolidated pointer so nothing is lost. Pull the named topic file (or design doc) when the subject actually comes up.
 

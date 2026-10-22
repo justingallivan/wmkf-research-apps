@@ -174,10 +174,12 @@ exists. The fallback preserves the
 S466/S467 values (32 768 tokens / 240 seconds; 16 000–32 000 retry range) but is
 not the normal mutable source of truth. Runtime routes accept no budget fields.
 
-The owner-viewed Production Admin panel reported **No published revision · using
-reviewed code fallback**, which verifies the deployed read/fallback presentation
-without claiming a Production write. Publishing revision 1 remains an explicit
-administrator action.
+Before the first publication, the owner-viewed Production Admin panel reported
+**No published revision · using reviewed code fallback**. That dated observation
+verified the read/fallback presentation at the time; it was superseded by the
+owner-directed publication of revision 1 on 2026-09-07 described above. Runtime
+reads now resolve the highest valid published revision, using the reviewed code
+fallback only when settings are absent or unavailable or no valid revision exists.
 
 **Deferred (Phase 1+):** `overridePromptBody: { system?: string, body?: string }` — body-level override for per-session prompt editing (PROMPT_STORAGE_DESIGN §17). Not needed for May 1.
 

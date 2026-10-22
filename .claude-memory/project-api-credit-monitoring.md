@@ -15,7 +15,9 @@ Read this when: working on credit-spend observability, the `/admin` spend tile, 
 Do:
 - Keep pricing source of truth in code (`lib/utils/model-pricing.js`); cron alerts surface drift, humans edit.
 - When adding a streaming Claude caller, verify the SSE parser captures BOTH `cache_creation_input_tokens` and `cache_read_input_tokens` from `message_start.message.usage` (silent zeros = the dynamics-explorer bug).
-- Use Anthropic console Billing → Usage for authoritative org-wide spend; auto-reload is ON.
+- Use Anthropic console Billing → Usage for authoritative org-wide spend. Recheck account
+  settings when relying on auto-reload or spend-limit status; the S181 account observations
+  below are historical, not current settings.
 
 Do not:
 - Rebuild the removed low-balance estimator/anchor machinery — Anthropic-native auto-reload + spend limits replaced it (S181).
@@ -31,7 +33,7 @@ User ran out of Anthropic API credits during a batch expertise matching run (Apr
 
 **Account moved to work org.** Justin's WMKF Anthropic account replaces the personal account that motivated the original work. Production `CLAUDE_API_KEY` confirmed pointing at the work org (last-used timestamp comparison, S181).
 
-**Anthropic-native features now cover the failure modes the local code was guarding:**
+**Historical S181 account observation only — not a statement of current Anthropic settings:**
 - **Auto-reload ON** — when balance drops below threshold, Anthropic charges the saved card and tops up automatically. Eliminates "credits run out mid-batch."
 - **$500/mo spend limit + Anthropic's own email notifications** — covers "approaching budget" without our code.
 - **Anthropic console Usage/Cost pages** — authoritative org-wide spend, one click away.

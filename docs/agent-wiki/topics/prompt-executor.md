@@ -134,9 +134,10 @@ reviewer-finder prompt migration.
   Conflicting Admin drafts are retained but cannot publish until explicitly
   field-level reapplied or reset. Admin reads fail closed on backend failure;
   runtime reads use the highest valid revision, or the bounded fallback when
-  settings are absent/unavailable or no valid revision remains. The owner
-  verified the Production Admin read surface in that safe no-revision/fallback
-  state; publishing revision 1 remains an explicit later action.
+  settings are absent/unavailable or no valid revision remains. The owner's
+  Production Admin view showing no published revision and the fallback was a
+  pre-publication observation; revision 1 was published on 2026-09-07 as recorded
+  in `docs/EXECUTOR_CONTRACT.md`.
 
 ## Hazard: thinking-default models spend `max_tokens` on reasoning
 

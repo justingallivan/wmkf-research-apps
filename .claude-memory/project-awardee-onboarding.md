@@ -1,11 +1,11 @@
 ---
 name: project-awardee-onboarding
-description: The Awardee tab and grantee-facing deliverables portal are live end to end; GAL/status-triggered automation and any additional abstract-generation automation remain separate, unverified scope.
+description: The Awardee tab and grantee-facing deliverables portal are built end to end; GAL/status-triggered automation remains separate, unverified scope.
 metadata:
   type: project
   status: active
   scope: reviewer
-  last_verified: 2026-07-26 via source and Workbench truth audit
+  last_verified: 2026-10-22 via AwardeeTab, generate route/service, and grantee-abstract-service source for the staff-triggered rewrite; GAL/status automation not probed
 ---
 
 ## Recall Rule
@@ -30,7 +30,8 @@ Do not:
 - describe Awardee as a placeholder, future tab, or unbuilt external portal;
 - rebuild it by generalizing the reviewer-specific `lib/external` implementation;
 - infer that the shipped manual/staff-triggered workflow includes GAL/status automation;
-- assume an LLM-written abstract is in scope without an owner decision.
+- assume additional or GAL/status-triggered AI abstract generation beyond the shipped
+  staff-triggered rewrite is in scope without an owner decision.
 
 ## Source-backed state
 
@@ -40,12 +41,20 @@ built. The external route is `/external/grantee/[token]`; persistence uses the
 flow covers invitation/token handling, abstract approve/edit, artwork/caption upload,
 waiver agreement, staff tracking, and cycle output.
 
+The Awardee tab also has a staff-triggered house-style rewrite/edit flow for the
+applicant's abstract. `AwardeeTab.js` calls the grantee-deliverables generate route;
+`grantee-deliverables/generate-service.js` reads the applicant abstract and call text,
+uses the `grantee-abstract.generate` Executor prompt, and persists the result with an
+ETag. Regeneration is rejected after the grantee submits. This is a staff editorial
+action within the grantee-approval workflow; it does not establish automatic generation
+or invitation from a GAL/status event.
+
 **UNKNOWN / separate scope:**
 
 1. the exact Dataverse field/value or event that proves a Grant Award Letter was sent;
 2. whether that event should automatically send the grantee invitation;
-3. whether an LLM should draft the foundation abstract and what prompt/approval contract
-   would govern it;
+3. whether GAL/status automation should trigger any additional abstract work beyond the
+   existing staff-triggered rewrite, and what approval contract would govern it;
 4. whether additional post-award artifacts are required beyond the shipped deliverables.
 
 ## Historical rationale
@@ -54,7 +63,9 @@ The original May 2026 concept correctly identified that the request lifecycle ex
 past the board decision and that awardees need to approve an abstract, provide artwork,
 and agree to a release. It incorrectly remained in memory as if the external surface and
 schema were still future work after those pieces shipped. Preserve only the remaining
-GAL-trigger questions as future design.
+GAL/status-trigger questions as future design. Preserve the May rationale for grantee
+approval and artwork/release collection; do not treat that rationale as evidence that
+future automation has been decided.
 
 Related: `docs/GRANTEE_PORTAL_SPEC.md`, `docs/GRANTEE_PORTAL_BUILD_PLAN.md`,
 `docs/audits/AUDIT_REQUEST_WORKBENCH_TRUTH_2026-07-26.md`,

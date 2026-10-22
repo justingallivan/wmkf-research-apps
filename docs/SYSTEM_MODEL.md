@@ -173,9 +173,9 @@ hangs off events and state transitions:
      caller, esp. PA) **or when the owner wants staff to edit it (and its model) without a redeploy**
      — owner decision 2026-10-12, recorded in
      `docs/plans/AI_TOOL_APPS_EXECUTOR_CONVERGENCE_PLAN_2026-10-11.md` §8. Editability alone does not
-     require the Executor; it may use the prompt-resolver seam. The live application-definition count is
-     [12](CANONICAL_COUNTS.md#app-definition-count); do not copy that scalar into prose without the
-     canonical pointer.
+     require the Executor; it may use the prompt-resolver seam. For the live application-definition
+     count, use the [canonical count](CANONICAL_COUNTS.md#app-definition-count) rather than copying a
+     scalar into this model.
 2. **Identity & access scoping** — who sees what (per-app grants, active-user checks, superuser;
    dual-provider auth for staff vs. applicants). **Applies to documents too** (see resolution).
 
