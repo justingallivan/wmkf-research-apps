@@ -1,20 +1,22 @@
 # Scheduled email: engine hardening, then queued-reminder re-addressing
 
-Status: **Part A MERGED (PR #373, 2026-09-30; migration 059 applied to Production). Part B MERGED (PR #384, `3b5002d95`, 2026-10-01; Production deployment Ready). It passed Codex adversarial review in two rounds (one medium, fixed; then approve) and an owner-authorized browser rehearsal against a Neon branch. No migration.** Plan text: revision 5 (2026-09-29, S551, after Codex round 3 on r4; owner decisions A-1, A-2, B-1, B-2 and B-3 and the r4 simplification remain settled). Narrowed by the owner in S551 after the measurement below: Part A, engine hardening for every program, now leads, and Part B, Liaison re-addressing, is a smaller follow-on. Revision 0 (S549) was split out of `docs/plans/LIAISON_FROM_INSTITUTION_PLAN_2026-09-29.md` after Codex round 3 on that plan. Revision 5 keeps one new column (`recipient_generation`), with no backoff schedule, reconciliation/forbidden counters, `next_reconcile_at` or digest rotation. Ready to build (owner, S551): plan review closed after Codex round 3; remaining risk is covered by the live-Postgres tests and the implementation review. **Part A: MERGED to `main` 2026-09-30 (S553; PR #373, merge `9d0119d4d`, after `main` was merged in over B4 #369). Migration 059 was applied to shared Production the same day by an owner-run one-off script (tracker row `applied_by` `claude-part-a-2026-09-30`), before the merge, because `apply-migrations.js` has no per-file filter and would also have applied 058. Built on branch `claude/scheduled-email-part-a` as migration 059 / block V58, with `tests/integration/scheduled-email-engine.pg.test.js` passing on a scratch Postgres; not merged, migration 059 not applied to the shared database, implementation review pending.** Part B: nothing built.**
+Status: **Implementation history checked against source on 2026-10-22: Parts A and B are merged.** Part A merged to `main` 2026-09-30 (S553; PR #373, merge `9d0119d4d`); migration 059 was applied to shared Production the same day. Part B merged in PR #384 (`3b5002d95`) on 2026-10-01, when its Production deployment was reported Ready; no current deployment check is claimed here. This file preserves the revision-5 design and its owner decisions as an implementation-history record, not as a current hazard inventory. Current source uses generation-qualified correlation keys and rechecks transport-pristine rows before delivery; see the current-source correction below.
 
-## Why
+**Historical plan checkpoint (revision 5, 2026-09-29 / S551):** the plan followed Codex round 3 on r4 and retained owner decisions A-1, A-2, B-1, B-2 and B-3 plus the r4 simplification. In S551, the owner narrowed the sequence so Part A engine hardening led and Part B Liaison re-addressing followed. Revision 0 (S549) was split out of `docs/plans/LIAISON_FROM_INSTITUTION_PLAN_2026-09-29.md` after Codex round 3 on that plan. Revision 5 kept one new column (`recipient_generation`), with no backoff schedule, reconciliation/forbidden counters, `next_reconcile_at` or digest rotation. At that checkpoint the owner had closed plan review and implementation review remained. The initial branch checkpoint reported Part A as unmerged and Part B as unbuilt; the merged status at the top supersedes that dated checkpoint.
 
-The scheduled-email engine sends the grantee materials reminder (`grantee_abstract_reminder`, the only workflow the status table allows [VERIFIED via `lib/db/migrations/036_scheduled_email_messages.sql:56-57`, mirrored at `scripts/setup-database.js:891-892`; no later migration alters it]) for every program. It has hazards that do not depend on the Liaison change: it can send the same email twice once a send has been requested, it can adopt a stale draft, and it can drop a PD's edit (*Current engine facts*). Part A fixes these.
+## Why (revision-5 planning context, 2026-09-29)
 
-The Research Liaison switch gives **new** reminders the current Liaison. A row already queued keeps the recipients it was created with (liaison plan, owner answer 9). The point-in-time measurement found no queued rows, so the remaining prospective case is a Liaison change while a row waits to send. Part B covers it, reusing Part A's recipient generation.
+At the revision-5 planning checkpoint, the scheduled-email engine sent the grantee materials reminder (`grantee_abstract_reminder`, the only workflow the status table allowed [VERIFIED via `lib/db/migrations/036_scheduled_email_messages.sql:56-57`, mirrored at `scripts/setup-database.js:891-892`; no later migration alters it]) for every program. The pre-hardening baseline had hazards independent of the Liaison change: it could send the same email twice after send intent, adopt a stale draft, and drop a PD's edit (see *Historical engine baseline*). Part A was designed to address those hazards.
+
+The Research Liaison switch was designed to give **new** reminders the current Liaison. In revision 5, a row already queued kept the recipients it was created with (liaison plan, owner answer 9). The point-in-time measurement found no queued rows, so the remaining prospective case at that checkpoint was a Liaison change while a row waited to send. Part B was designed to cover it, reusing Part A's recipient generation.
 
 ## Measurement (S551)
 
 **Result (owner-run, production, 2026-09-29, read-only) [DERIVED-FROM: the S551 session run of scratch probe `probe-queued-reminder-liaison-drift.js`; its output is not committed]:** the production ledger had **0** `grantee_abstract_reminder` rows in any status, so 0 were unsent at that point in time. The owner confirmed the probe read the production Postgres host. The owner also said no grantee materials requests were outstanding, which is consistent: the cron creates a row only for an Invited deliverable with an invited date [VERIFIED via `lib/services/cron/grantee-deliverable-reminders-service.js:151-153`]. The owner's statement is an owner report, not a probe result. The zero is not a bound on rows created later or on any future activity-without-send-intent crash window.
 
-The measurement found no queued reminder carrying a Liaison from before the switch. Every row the cron creates gets the Liaison current at creation [VERIFIED via `grantee-deliverable-reminders-service.js:300-318,365`]. The remaining re-address exposure is an institution changing its Liaison while a row waits to send. The engine hazards under *Current engine facts* do not depend on this point-in-time count.
+The measurement found no queued reminder carrying a Liaison from before the switch. Every row the cron created got the Liaison current at creation [VERIFIED via `grantee-deliverable-reminders-service.js:300-318,365`]. The remaining re-address exposure at that checkpoint was an institution changing its Liaison while a row waited to send. The pre-hardening hazards documented below did not depend on this point-in-time count.
 
-## Current engine facts
+## Historical engine baseline at `ed04b6c17` (2026-09-29; superseded by Parts A and B)
 
 All line numbers are as of `ed04b6c17`.
 
@@ -27,6 +29,22 @@ All line numbers are as of `ed04b6c17`.
 - `cancelScheduledEmailForSource` checks only id and status (`scheduled`/`failed`/`sending`) and clears any lease, including another worker's [VERIFIED via `scheduled-email-store.js:173-188`].
 - The due query is one oldest-first list capped at 100 by default, so expired reconciliation rows share the same capacity as ordinary sends [VERIFIED via `lib/services/scheduled-email-store.js:81-92`]. The digest query is one PD-sorted list capped at 500 by default [VERIFIED via `lib/services/scheduled-email-store.js:305-313`]. It groups `scheduled`/`failed` rows into approval-pending or upcoming and unreceipted `sent` rows into FYI [VERIFIED via `scheduled-email-service.js:414-437`]. Approval-pending rows repeat in every digest until actioned and need no receipt; only FYI ids are frozen into a digest run [VERIFIED via `scheduled-email-service.js:455-466`].
 - Send-now passes `expectedVersion` and returns 409 when the claim is lost [VERIFIED via `pages/api/scheduled-emails/[id].js:82-91`].
+
+## Current source correction (checked 2026-10-22)
+
+The stale findings above describe the pre-hardening baseline at `ed04b6c17`.
+Current `scheduled-email-service.js` uses generation-qualified correlation
+keys for rebuilt recipient generations. Before ordinary delivery, it
+reconciles current Liaison recipients and approval posture for rows with no
+persisted activity and no send intent. Send-now may proceed through a
+posture-only tightening because the PD explicitly requested it, while
+recipient drift still holds for review. A saved activity without send intent
+is detected and remains bound to its original recipients/content until
+resolved; it is not silently replaced or re-addressed. Once send intent is
+persisted, recovery reconciles the saved activity without sending again.
+See `lib/services/scheduled-email-service.js` around lines 493–521 and
+616–630, plus `lib/services/scheduled-email-store.js` around lines 104–119 and
+295–302, for the current generation and recovery behavior.
 
 ## Part A: engine hardening (every program)
 

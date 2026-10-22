@@ -1,11 +1,11 @@
 ---
 name: project-grantee-deliverable-email-voice
-description: Current grantee invite/reminder email voice and live reminder template; both send from the named Program Director.
+description: Owner-approved grantee invite/reminder email voice and current source contract for the scheduled reminder; sent as the named Program Director.
 metadata:
   type: project
   status: active
   scope: global
-  last_verified: 2026-07-27 via source trace, production settings probe, and owner-authorized body update
+  last_verified: 2026-10-22 via source trace; live settings were last probed 2026-07-27
 ---
 
 ## Recall Rule
@@ -58,22 +58,43 @@ the publish-image waiver wording.
   portal interface now collects the image, caption+credit, and the publish
   permission (the waiver checkbox IS the release form).
 
-## Current shipped reminder (verified 2026-07-27)
+## Current shipped reminder source contract (source checked 2026-10-22)
 
-The automatic reminder is built and deployed. It runs daily, selects packages
-still `Invited` at day 12, and uses invite-date + 14 days as the COB deadline.
-It sends from the assigned PD to the PI and Cc's the liaison.
+The daily cron queries all deliverable rows still `Invited` with an invite date
+and can queue their ledger rows before the reminder is due. A new reminder's
+`scheduled_send_at` is set to invite date plus 12 days; the Postgres store
+enforces send time and approval before delivery. The cron does not directly
+send a reminder or move a row out of `Invited` before transport. Ledger rows
+carry the current review-all/VIP approval posture, and a recipient whose
+posture requires approval waits for PD action. Before an ordinary send, the service
+re-reads the current Liaison and posture for a transport-pristine row; recipient
+drift may re-address it and require fresh approval. A saved Dynamics activity is
+not re-addressed and remains tied to its original content/recipient snapshot
+until resolved. Dataverse reminder status is finalized only after the ledger
+records successful delivery; sent-but-unfinalized rows can be finalized without
+resending.
 
-The live `email.grantee_reminder.subject/body` rows match
-`lib/seed/email-defaults/grantee-reminder.js`. Current wording uses
-`Dear Professor {{granteeName}},` (comma), a concise follow-up, the secure link,
-the day-14 deadline/implied-concurrence sentence, the no-action-needed sentence,
-the contact invitation, and `Thank you,` before `{{signature}}`. The owner
-authorized restoring `Thank you,` on 2026-07-27. Do not copy the longer invite
-sequence into the reminder unless the owner requests a reminder-copy change.
+The assigned PD remains the sender and the reminder uses `noFallback:true`; if
+the sender cannot be resolved, it skips rather than sending as the service
+principal. No Liaison (`none`) means PI-only. A Liaison/contact read failure or
+a found Liaison without email skips the row. The invite-date + 14 days COB
+deadline, PI recipient and Liaison copy remain the reminder's intended
+recipient/deadline contract.
 
-At verification time, all three production package rows were `Drafted`; the
-probe found zero eligible rows and no evidence of successful live delivery.
+### Historical copy and production observation (owner-approved, 2026-07-27)
+
+The live `email.grantee_reminder.subject/body` rows matched
+`lib/seed/email-defaults/grantee-reminder.js` at the last settings probe on
+2026-07-27. The approved wording uses `Dear Professor {{granteeName}},`
+(comma), a concise follow-up, the secure link, the day-14 deadline/implied-
+concurrence sentence, the no-action-needed sentence, the contact invitation,
+and `Thank you,` before `{{signature}}`. The owner authorized restoring
+`Thank you,` on that date. Preserve these copy and signature decisions; do not
+copy the longer invite sequence into the reminder unless the owner requests a
+copy change.
+
+At that verification time, all three production package rows were `Drafted`;
+the probe found zero eligible rows and no evidence of successful live delivery.
 
 **Why:** stakeholder/grantee emails in the Foundation's real voice are personal,
 PD-signed, and deadline-driven; a generic Foundation sign-off and portal mechanics

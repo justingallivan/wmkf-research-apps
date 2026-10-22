@@ -3,7 +3,7 @@ title: "Scheduled email: VIP review and digest design"
 domain: email
 kind: plan
 status: active
-summary: "Owner-settled scheduled-email redesign: automatic labeled sends, per-PD VIP recipient flags, digest as single interface, explicit rollout onboarding."
+summary: "Historical owner-settled design and current source boundaries for scheduled-email posture, per-PD VIP flags, digest, and parked reviewer-reminder work."
 canonical: false
 cataloged: 2026-08-26
 owner: product-engineering
@@ -14,6 +14,25 @@ related:
 ---
 
 # Scheduled email: VIP review and digest design
+
+## Current source status (checked 2026-10-22)
+
+The grantee abstract reminder workflow is shipped. Before an ordinary send,
+`scheduled-email-service.js` re-reads the current Liaison and the assigned PD's
+review-all/VIP posture for a transport-pristine row. Recipient drift can
+re-address the row and recomputes posture for the new recipients in either
+direction; posture-only drift re-holds when approval becomes required, while a
+posture-only relaxation leaves the stored posture alone. Send-now approves a
+posture-only tightening, while recipient drift still returns the row to
+approval-pending for review. Rows with a persisted
+Dynamics activity are not re-addressed; their accepted historical content
+remains attached to that activity until resolved.
+
+The per-email-type preference matrix below remains **[PLANNED]** and has not
+been built. Reviewer reminder ledger integration remains **parked**; its
+promotion dependencies in the section below are still outstanding. The August
+2026 decisions and branch notes remain as dated design history rather than a
+description of today's complete runtime contract.
 
 ## Status
 
@@ -150,16 +169,18 @@ confirmed findings; the fixes are source-built on the branch:
    re-enters the new PD's posture, which may be automatic. Reassignment
    mid-run (after the drift check, before that run's send) and rows deferred
    by a capped scan self-heal next run.
-   **Transport-state residual (re-review 2026-08-26, fixed via Codex
-   rescue):** a row whose Dynamics activity already exists (created, send
-   failed) is NOT rebuilt — the deliver path prefers the retained activity
-   and the correlation backstop is generation-blind, so a rebuild would send
-   the former PD's frozen content under the new PD's name. Such a row
-   deliberately stays under the former PD until its retry resolves (honest
-   attribution; same mail as a handoff one day later), and the cron reports
-   `pd handoff deferred` in the summary failures list. The full
-   cancel-and-regenerate path (generation-keyed correlation + a Dynamics
-   cancel op the adapter does not have) is deliberately not built.
+   **Transport-state residual (historical branch checkpoint, 2026-08-26):**
+   at that point, a row whose Dynamics activity already existed (created,
+   send failed) was not rebuilt because the correlation backstop was
+   generation-blind. The accepted attribution rule remains: persisted
+   activity content stays with the original PD until that activity is
+   resolved; the workflow does not replace or re-address a saved activity.
+   Current source uses generation-qualified correlation keys for a rebuilt
+   recipient generation (`scheduled-email-service.js` and
+   `scheduled-email-store.js`). A later re-address design chose to retain and
+   detect an activity that was persisted without send intent, rather than
+   re-address it; see the current-status note at the top and
+   `docs/plans/SCHEDULED_EMAIL_READDRESS_PLAN_2026-09-29.md`.
    [RECHECKED after lib/services/scheduled-email-store.js change: reassignScheduledEmail SQL guard — different PD + unsent + no transport state + unleased only]
 3. **Digest creation was not concurrency-safe** (medium). Fixed by the same
    run ledger: the (PD, day) primary key plus lease is claimed before any
@@ -345,7 +366,7 @@ A parity test must hold the three lists together: the shared type list in
 dispatch in `scheduled-email-service.js` (`check:status-enum-parity` is the
 existing gate family for exactly this producer↔consumer drift).
 
-### Consultation sites and the freeze-at-creation carry-over
+### Historical consultation proposal and freeze-at-creation assumption (2026-08-27; superseded for the shipped grantee workflow)
 
 Both `approval_required` computation sites replace their coarse check with a
 shared helper `effectiveReviewAll(preference, workflowType)` exported from
@@ -359,10 +380,15 @@ shared helper `effectiveReviewAll(preference, workflowType)` exported from
   `reviewer-reminder-workflows.js` never reads posture — its send-time
   recompute covers timing/config, not approval]
 
-Freeze-at-creation semantics carry over unchanged: the matrix is consulted
-ONCE at ledger-row creation; editing the preference affects future rows
-only, and revive/reassign remain the only recompute paths. Posture reads
-stay fail-closed (read failure skips the row, never weakens posture).
+The 2026-08-27 proposal assumed freeze-at-creation semantics: consult the
+matrix once at ledger-row creation, with preference edits affecting only
+future rows and revive/reassign as the recompute paths. That assumption is not
+the current grantee send contract. The shipped grantee workflow re-reads
+current recipients and posture before ordinary delivery, as described above.
+The proposed shared helper, its two-caller count, the reviewer-reminder caller
+on the parked branch, and the freeze-at-creation behavior remain historical
+implementation planning details; they do not establish that the matrix or
+reviewer ledger workflow is built.
 
 ### Hard ordering invariant (do not ship mid-park)
 

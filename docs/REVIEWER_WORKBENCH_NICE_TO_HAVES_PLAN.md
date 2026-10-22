@@ -308,13 +308,19 @@ S-M for free tags; L for controlled taxonomy or multi-select reporting.
 - [VERIFIED via `pages/api/reviewer-finder/my-candidates.js:199-246`] Saved candidate rows do not include aggregate review counts or last completed/submitted review date.
 - [VERIFIED via `pages/api/review-manager/reviewers.js:208-245`] Track reviewer rows do not include cross-request aggregate history.
 - [ASSUMED] "Completed a review" needs a business definition: reviewer submitted a review (`wmkf_reviewreceivedat`) versus PD closed it out (`wmkf_completedat` / `reviewStatus=complete`).
-- [VERIFIED via production source/tests 2026-08-11] Wave 18 provides a nullable
-  per-engagement `wmkf_reviewduedateoverride`; review-due reminders and other
-  operational consumers use it first and fall back to request-level
+- [VERIFIED via production source/tests 2026-08-11; current preflight contract
+  checked 2026-10-22] Wave 18 provides a nullable per-engagement
+  `wmkf_reviewduedateoverride`; review-due reminders and other operational
+  consumers use it first and fall back to request-level
   `wmkf_reviewduedate`. The dedicated Track Reviewers extension writer permits
   non-null dates only when current/future in the Foundation-Pacific calendar
-  and strictly after the request default, with no maximum; save/restore also
-  triggers the reviewer email/calendar update. [VERIFIED via production create,
+  and strictly after the request default; there is no fixed calendar maximum.
+  Before a non-null save, a present stored token hash must pass expiry and
+  revocation preflight. A missing hash skips preflight, and null restore skips
+  it as well; a revoked hash or expiry earlier than the proposed cover date
+  fails as `token_recovery_required` before the date write. This does not
+  rotate a token. Save/restore also triggers the reviewer email/calendar
+  update. [VERIFIED via production create,
   entity-scoped publish, typed metadata, and runtime `$select` on 2026-08-11 /
   2026-08-12 UTC] the new field is live and EXACT in production. [VERIFIED via
   the non-clobbering admin-body seed, main `8647af33`, Vercel

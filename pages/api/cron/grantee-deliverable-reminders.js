@@ -1,16 +1,19 @@
 /**
- * Cron: automatic grantee deliverable day-12 reminders.
+ * Cron: queue newly invited grantee reminders for day 12 and process the due ledger.
  *
- * Selects package rows still Invited at least 12 days after first invite. Each
- * row is claimed before email send by moving it out of Invited, so a post-send
- * failure cannot double-send on the next run.
+ * Each run reads Invited deliverables with invite dates and creates or repairs
+ * `scheduled_email_messages` ledger rows. New reminders are scheduled for
+ * invite date + 12 days; Postgres enforces send time, leases, and approval.
+ * The cron does not move the Dataverse row before sending.
+ * Successful delivery is finalized back to Dataverse after the ledger records
+ * the send. Sent-but-unfinalized rows can be repaired without another send.
  *
  * Thin route shell (Route→Service Consolidation Plan, Stage 5): method
  * dispatch → verifyCronSecret (byte-untouched) → withDalContext (historical
  * label kept, same scope — the email-defaults read ran inside the historical
  * bypass and still runs inside this context via the service) → one service
- * call → result/error→HTTP mapping. Batch orchestration (claim-before-send
- * idempotency, per-row fail-soft, recipient/PD resolution) lives in
+ * call → result/error→HTTP mapping. Queue creation, per-row fail-soft,
+ * recipient/PD resolution, and scheduled-email dispatch/finalization live in
  * lib/services/cron/grantee-deliverable-reminders-service.js.
  */
 
