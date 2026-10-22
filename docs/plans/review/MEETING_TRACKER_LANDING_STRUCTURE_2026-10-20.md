@@ -18,6 +18,21 @@ related:
 
 The owner’s later hierarchy correction is controlling for the PD Workbench: **working writeup and review first, supporting materials second, meeting logistics behind a compact link**. The [revised mockup](meeting-tracker-2026-10-20/workbench-pd-writeup.html) explores that direction; the earlier materials-first Workbench mockup is superseded and retained only as history.
 
+## Transcript preparation — acknowledgement removal build requirement, 2026-10-21
+
+[VERIFIED via owner direction] The new layout omits the non-sensitive/provider/paid-credits acknowledgement checkbox. Keep manual import available through the subdued, initially collapsed **Import manually** disclosure below Import from Zoom, as shown in the [transcript preparation mockup](meeting-tracker-2026-10-20/transcript-preparation.html).
+
+[PLANNED — application implementation pending] Remove the checkbox dependencies together when building this layout; hiding the control alone would block imports. Treat this as one coordinated change covering both Zoom import and manual audio transcription:
+
+- Remove acknowledgement state, disabled-button conditions and action-handler guards in `shared/components/meeting-tracker/RecordingAndTranscriptCard.js`.
+- Update the `nonSensitiveAcknowledged` request contract and matching validation in the Zoom-import and transcription-start API routes, the Zoom import service, and the Meeting Tracker transcription queue path. Trace internal Zoom-to-transcription calls as well as browser requests so no downstream caller still requires the removed value.
+- Reconcile writes to `transcription_jobs.non_sensitive_acknowledged_at`: do not fabricate an acknowledgement timestamp after the checkbox is removed. Decide the treatment of new jobs while preserving existing historical records; any schema change requires separate implementation review. Shared transcription-pilot code also serves the admin pilot, so do not remove that separate workflow's acknowledgement implicitly.
+- Update tests for both entry paths to prove import/transcription can start without the checkbox or acknowledgement payload, and that normal access, upload validation, recovery and processing safeguards still apply. Keep the separate speaker/presentation-end review confirmation and unrelated acknowledgements intact.
+
+[VERIFIED via source inspection, 2026-10-21] Current application dependencies exist in `RecordingAndTranscriptCard.js` (`uploadAndStart` and `importSelected`), `pages/api/meeting-tracker/visits/[requestId]/zoom-imports.js`, `pages/api/meeting-tracker/visits/[requestId]/transcriptions/[jobId]/start.js`, `lib/services/meeting-tracker-recordings/import-service.js`, `lib/services/meeting-tracker-transcription/service.js`, and `lib/services/transcription-pilot/runtime.js` / `store.js`. The mockup removes its local checkbox and button dependency only; production contracts remain unchanged.
+
+Changed-fact sweep scope: this owner-directed future build requirement, recorded in this layout plan. Existing implementation references describe current behavior and remain valid until the coordinated application change lands. No runtime, schema or historical-data change is authorized by this documentation update.
+
 ## Invitations — layout review, 2026-10-21
 
 [VERIFIED via owner feedback] The owner finds the overall Invitations layout good. For both Proposal discussion session and Research presentation, carry the selected staff, board members and consultants from Meeting setup into Invitations. The recipient list, count and email review must reflect the same selection; an empty group must not silently restore default recipients.
