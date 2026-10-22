@@ -19,8 +19,8 @@ test('fresh page bootstraps under its request-specific CSP', async ({ page }) =>
   expect(policy.match(/(?:^|;\s*)script-src ([^;]+)/)?.[1]).not.toContain("'unsafe-inline'");
   expect(policy.match(/(?:^|;\s*)script-src ([^;]+)/)?.[1]).not.toContain("'unsafe-eval'");
   const html = await response.text();
-  const scripts = [...html.matchAll(/<script\b([^>]*)>([\s\S]*?)<\/script>/g)]
-    .filter(([, attributes, body]) => body.trim() && !/type="application\/(json|ld\+json)"/.test(attributes));
+  const scripts = [...html.matchAll(/<script\b([^>]*)>([\s\S]*?)<\/script>/gi)]
+    .filter(([, attributes, body]) => body.trim() && !/type="application\/(json|ld\+json)"/i.test(attributes));
   expect(scripts.length).toBeGreaterThan(0);
   // Turbopack emits an inline module bootstrap; it must not be frozen with an
   // empty build-time nonce. External framework scripts must also carry it.
@@ -48,8 +48,8 @@ test('fresh authenticated Admin HTML has the matching per-request nonce', async 
     expect(nonce).toBeTruthy();
     const html = await response.text();
     expect(html).toContain('People &amp; Access');
-    const startup = [...html.matchAll(/<script\b([^>]*)>([\s\S]*?)<\/script>/g)]
-      .filter(([, attributes, body]) => body.trim() && !/type="application\/(json|ld\+json)"/.test(attributes));
+    const startup = [...html.matchAll(/<script\b([^>]*)>([\s\S]*?)<\/script>/gi)]
+      .filter(([, attributes, body]) => body.trim() && !/type="application\/(json|ld\+json)"/i.test(attributes));
     expect(startup.length).toBeGreaterThan(0);
     for (const [, attributes] of startup) expect(attributes).toContain(`nonce="${nonce}"`);
     nonces.push(nonce);

@@ -3,7 +3,7 @@ title: Admin CSP Startup Failure and Fix
 domain: security
 kind: decision
 status: active
-summary: Request-time rendering supplies matching CSP nonces after Next 16.4.2 introduced inline startup for static Pages routes; production promotion remains pending.
+summary: Request-time rendering supplies matching CSP nonces after Next 16.4.2 introduced inline startup for static Pages routes.
 canonical: false
 owner: product-engineering
 ---
@@ -34,7 +34,7 @@ Playwright now builds with deployed Turbopack rather than webpack. Its new CSP r
 - Full browser suite against fixed Turbopack production server: 36 passed. An initial local full-suite attempt used a different throwaway server secret from the existing staff fixtures; that setup was corrected before the successful full run.
 - Scoped lint and relevant type, architecture, API-security, prompt-tagging and secret gates passed. Documentation gates and final recheck are recorded in the commit/PR evidence.
 
-[PLANNED] Production promotion requires the owner's explicit merge/push decision under Tier 2 of `docs/CAMPAIGN_RELEASE_AND_DATAVERSE_TEST_STRATEGY.md`. Before promotion, use the PR's integrated local evidence and review its final diff. After promotion, verify a fresh authenticated Admin load, People & Access roles, and absence of startup CSP errors. Last observed Production deployment before this fix: GitHub deployment 7239988158 at `301eaedc8`; it exhibits the incident and is not a claimed working rollback. The immediately preceding refactoring release was `73c5fb36f`, deployment 7238690219. No safe pre-upgrade production deployment has been re-verified. Code rollback to either retains the defect; no business writes are introduced by this fix.
+[VERIFIED via owner instruction] The owner approved merge and deployment after hosted checks pass, satisfying the explicit merge/push decision under Tier 2 of `docs/CAMPAIGN_RELEASE_AND_DATAVERSE_TEST_STRATEGY.md`. Before promotion, use the PR's integrated local evidence and review its final diff. After promotion, verify a fresh authenticated Admin load, People & Access roles, and absence of startup CSP errors. Last observed Production deployment before this fix: GitHub deployment 7239988158 at `301eaedc8`; it exhibits the incident and is not a claimed working rollback. The immediately preceding refactoring release was `73c5fb36f`, deployment 7238690219. No safe pre-upgrade production deployment has been re-verified. Code rollback to either retains the defect; no business writes are introduced by this fix.
 
 ## Bounded changed-fact reconciliation
 
