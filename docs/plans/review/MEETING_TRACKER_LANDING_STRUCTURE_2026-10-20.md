@@ -18,6 +18,25 @@ related:
 
 The owner’s later hierarchy correction is controlling for the PD Workbench: **working writeup and review first, supporting materials second, meeting logistics behind a compact link**. The [revised mockup](meeting-tracker-2026-10-20/workbench-pd-writeup.html) explores that direction; the earlier materials-first Workbench mockup is superseded and retained only as history.
 
+## Transcript preparation — simplified preparation and approval build change, 2026-10-21
+
+[VERIFIED via owner direction] Replace the separate save/publish/generate sequence in the new layout with **Save and prepare materials** after speaker and presentation-end review. Collapse the saved review into a checked summary with an Edit action. Show two result sections: **Presentation** and **Staff discussion · Internal only**. This is an approved design/build requirement; application implementation remains pending.
+
+[PLANNED — coordinated behavior change] The action saves the checked names and presentation end, then prepares both derived transcripts, drafts both summaries, and creates the presentation video. Preparation does not itself authorize Board access. Review/edit the presentation summary and check the video ending before a separate **Approve for Board** action and explicit final confirmation. Internal transcript and summary remain staff only; the internal summary retains its review/edit/save action.
+
+[VERIFIED via inspected current UI handlers] `RecordingAndTranscriptCard.js` currently separates saved edits (`saveNames`), transcript publication (`publishJob` / `publishCorrection`), derivative generation (`generatePresentationTranscript`), summary draft/publication and presentation-video approval. The proposed combined action changes that contract, rather than merely relabeling a button. Current Board-readiness logic can recognize a bound presentation transcript or published summary individually; implementation must prevent preparation from making those new outputs Board-visible before the new approval step.
+
+[PLANNED — implementation acceptance requirements]
+
+- Trace save → transcript publication/version → derived transcripts → summary drafts/video → Board consumer before implementation; use the existing authorized services and explicit presentation/internal boundaries. Resolve the approval/persistence contract through the architecture/data review, including whether approval covers the whole presentation bundle and how edits revoke readiness. No schema or route design is settled by the mockup.
+- Coordinate preparation durably against the saved transcript/boundary version. Show per-item progress and failures, preserve successful outputs, and retry only unfinished/failed work. Reloads and repeat clicks must not create duplicate processing or charges. A changed source/boundary must invalidate stale derivatives and approvals; never approve a mixed-version bundle.
+- Missing video, preparation failures, uncertain paid submissions and partial publication must retain visible recovery paths. Do not infer completion or retry safety from a successful save alone. Define the no-video approval case explicitly before runtime implementation.
+- Test both import paths, resumed preparation, partial failure/retry, duplicate clicks, stale edits, approval/revocation and Board access. Verify that preparation exposes neither new unapproved presentation artifacts nor internal discussion through the Board page. Preserve unrelated access, recovery and review safeguards.
+
+[VERIFIED via mockup source] The standalone [transcript mockup](meeting-tracker-2026-10-20/transcript-preparation.html) demonstrates the combined action, collapsed review receipt, two result groups, editable summaries, simulated Preparing/Ready/Failure states, retry and separate simulated Board approval. Preview state buttons advance examples without real jobs, paid calls, persistence or sharing. The video is the synthetic source excerpt, not a generated trimmed output. Earlier screenshots and workspace descriptions are dated explorations, not this flow's implementation evidence.
+
+Changed-fact sweep scope: this owner-approved future flow and its standalone preview. Authority: owner instruction and inspected UI handlers; persistence/route changes and runtime verification remain pending. Existing application descriptions remain evidence of current behavior until the build changes it.
+
 ## Transcript preparation — playback review, 2026-10-21
 
 [VERIFIED via owner direction] Put video playback beside the speaker/transcript review on desktop and above it on narrow screens. Provide **Use current playback time as presentation end** and retain audio as a fallback when video is unavailable. Applying a playback time must update the editable presentation-end value and clear the prior review confirmation, just like editing the time directly.
