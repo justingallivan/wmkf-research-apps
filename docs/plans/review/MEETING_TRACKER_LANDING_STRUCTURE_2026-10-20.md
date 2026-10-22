@@ -18,6 +18,14 @@ related:
 
 The owner’s later hierarchy correction is controlling for the PD Workbench: **working writeup and review first, supporting materials second, meeting logistics behind a compact link**. The [revised mockup](meeting-tracker-2026-10-20/workbench-pd-writeup.html) explores that direction; the earlier materials-first Workbench mockup is superseded and retained only as history.
 
+## Invitations — layout review, 2026-10-21
+
+[VERIFIED via owner feedback] The owner finds the overall Invitations layout good. For both Proposal discussion session and Research presentation, carry the selected staff, board members and consultants from Meeting setup into Invitations. The recipient list, count and email review must reflect the same selection; an empty group must not silently restore default recipients.
+
+[VERIFIED via mockup source] The linked standalone setup and Invitations previews share illustrative attendee selections through browser-tab session storage. Direct Invitations entry without saved selections uses illustrative defaults for both meeting types. Returning to setup retains attendee choices in that tab. This demonstrates local layout continuity only; the application build and actual email delivery remain pending.
+
+Changed-fact sweep scope: Invitations layout feedback and attendee continuity. Authority: current owner instruction and the two mockup sources. Earlier static workspace descriptions below remain dated explorations. No application persistence, authorization or delivery change is claimed.
+
 ## Agenda ordering — build decision, 2026-10-21
 
 [VERIFIED via owner direction] Use `@hello-pangea/dnd` for agenda drag ordering when the Meeting coordination build is authorized. Follow Proposal Ranking’s existing integration in `shared/components/proposal-ranking/AssessmentWorkflow.js`: dedicated handles, keyboard support, preservation of the library’s drag styles, its reduced-motion drop-transition handling, and protection against applying a drop to a changed list. The existing dependency is declared in `package.json`; no new drag package is needed.
