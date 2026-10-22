@@ -1,3 +1,58 @@
+# Session 631 Prompt: Choose the next active workflow; shared roles added
+
+## Session 630 Summary — Program Coordinator and Systems Specialist shared roles (Claude, 2026-10-21 PT)
+
+Ran in its own worktree (`/Users/gallivan/Code/WMKF_Apps-claude-2026-10-21`, branch `claude/session-2026-10-21`, now fully merged) while Codex sessions held other worktrees. Startup: all 71 gate/self-test runs green.
+
+### What Was Completed
+
+1. **Two new shared roles in Admin → People → Staffing.** [VERIFIED via source and tests] `programCoordinator` (`board_writeups.program_coordinator`) and `systemsSpecialist` (`board_writeups.systems_specialist`) added to `ROLE_KEYS`. Owner intent: a central record other app surfaces read via `getRole(...)`; they grant no permission. Any active staff member may hold them (`ANY_STAFF_ROLES`, same rule as President). Board cycle activation still requires only President, CSO and Grants Manager (`BOARD_ACTIVATION_ROLES`). The staffing POST route now requires a string `role` in `ROLE_KEYS`.
+2. **Released.** [VERIFIED via GitHub] PR #516 passed all 12 checks (Jest, Postgres, CodeQL, Semgrep, Gitleaks, Trivy, Vercel, claude-review with no findings), merged as `4822bb267`; Production deployment `7242543871` succeeded. Last-known-good before merge: `6d6fefdd2`.
+3. **Assigned by the owner.** [VERIFIED via owner statement, not read back by the agent] The owner set Program Coordinator = Duncan Spore and Systems Specialist = Connor Noda in the UI.
+4. **Local permission.** `Bash(gh pr merge:*)` added to the owner's gitignored `.claude/settings.local.json` (main checkout) at the owner's request.
+
+### Commits
+
+- `a6cb70c31` Program Coordinator role; `c9ee5c925` first-save test and string role guard; `2c6a048c2` Systems Specialist role.
+- `4822bb267` merge of PR #516 to main.
+- This handoff commit follows on main.
+
+## Next Items
+
+### Owner Decision Needed
+
+1. **Select a currently used workflow before further performance work.** Evidence: Session 629 handoff below; unchanged this session.
+
+### Verify Before Acting
+
+1. **Consumers of the new roles do not exist yet.** Evidence: `rg "getRole\('(programCoordinator|systemsSpecialist)'"` finds only tests. Wiring Duncan into meeting-materials alerts (Meeting coordination handoff below) or anything else is unbuilt; read the role at runtime rather than hardcoding names.
+2. **Settings keys carry the `board_writeups.` prefix** for storage consistency with the existing roles, though the new roles are not Board-specific. Evidence: `lib/services/board-writeups/model.js`; Atlas `docs/atlas/postgres-board-writeup-runs.md`.
+
+## Key Files Reference
+
+| File | Purpose |
+|---|---|
+| `lib/services/board-writeups/model.js` | `ROLE_KEYS`, `BOARD_ACTIVATION_ROLES`, `ANY_STAFF_ROLES` |
+| `lib/services/board-writeups/config.js` | `getRole`, `saveRole`, activation check |
+| `pages/api/workbench/staffing.js` | Shared staffing GET/POST |
+| `shared/components/staffing/StaffingPanel.js` | Shared roles UI |
+
+## Testing
+
+```bash
+npx jest tests/unit/board-setup-permissions.test.js tests/unit/staffing-ui.test.js tests/unit/admin-view-coverage.test.js
+```
+
+## Handoff
+
+Owner: Claude → next session. Worktree `/Users/gallivan/Code/WMKF_Apps-claude-2026-10-21` is clean and detached at main; safe to remove (`git worktree remove`) along with its merged branch. No DEVELOPMENT_LOG milestone entry required: a small admin configuration addition, not a new capability, architecture or cutover. CLAUDE.md unchanged. Claim-evidence report: no eligible plan/design edit, no observation row. Main checkout's untracked `.impeccable/critique/…boardwriteups-js.md` and `output/` belong to other work and were left alone.
+
+---
+
+# Preserved concurrent handoffs — owning-session context
+
+The snapshots below are preserved unchanged; their task lists are not re-verified by Session 630.
+
 # Session 630 Prompt: Choose the next active workflow; refactoring release is complete
 
 ## Session 629 Summary — Refactoring release verification and production merge (Codex, 2026-10-21 PT)
