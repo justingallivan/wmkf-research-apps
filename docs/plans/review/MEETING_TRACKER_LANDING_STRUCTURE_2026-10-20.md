@@ -18,6 +18,14 @@ related:
 
 The owner’s later hierarchy correction is controlling for the PD Workbench: **working writeup and review first, supporting materials second, meeting logistics behind a compact link**. The [revised mockup](meeting-tracker-2026-10-20/workbench-pd-writeup.html) explores that direction; the earlier materials-first Workbench mockup is superseded and retained only as history.
 
+## Agenda ordering — build decision, 2026-10-21
+
+[VERIFIED via owner direction] Use `@hello-pangea/dnd` for agenda drag ordering when the Meeting coordination build is authorized. Follow Proposal Ranking’s existing integration in `shared/components/proposal-ranking/AssessmentWorkflow.js`: dedicated handles, keyboard support, preservation of the library’s drag styles, its reduced-motion drop-transition handling, and protection against applying a drop to a changed list. The existing dependency is declared in `package.json`; no new drag package is needed.
+
+[PLANNED — application implementation pending] Retain numeric allotted minutes, Change position, move-to-session, removal and allocated-time/overrun feedback. Agenda changes retain the existing save-as-you-go contract; Done leaves editing. The owner explicitly does not require demonstrating the package in a mockup. The [setup mockup](meeting-tracker-2026-10-20/meeting-setup.html) remains a local layout/controls preview using basic browser dragging, not acceptance of the eventual drag interaction or application persistence.
+
+Changed-fact sweep scope: this package choice only. Authority: owner instruction and inspected Proposal Ranking source/package declaration. Producer: owner decision; persistence: this design record; consumer: future Meeting coordination implementation. No runtime change or external-state probe applies. Repository searches found no competing agenda package decision; broader design history remains outside this decision’s scope.
+
 ## Earlier layout decisions and boundary
 
 [VERIFIED via owner decisions in the Codex chat, 2026-10-20] The owner agreed to a cycle schedule landing page whose primary job is to scan the cycle’s requests and open the next task. Sessions have a separate task view within Meeting Tracker. Both session and visit actions remain visible for every request, including on narrow screens.
