@@ -4,8 +4,15 @@ description: Tier-1 system prompts (Dataverse wmkf_ai_prompts, versioned, create
 type: project
 status: active
 scope: prompts
-last_verified: 2026-08-18 — Pre-Site prompt v4 is sole-current and exact-readback matched to the Production resilience deployment; controlled signed-in generation smoke remains open
+last_verified: 2026-08-18 publication/deployment snapshot; current live prompt version and generation-smoke status are unknown
 ---
+
+**Dated live-state snapshot:** The publication and deployment observations below were
+verified on 2026-08-18. They do not establish the current live prompt version, prompt
+body/schema, or smoke status. Establish a named, authorized read-only evidence
+plan before re-reading live rows or deployment state; this memory does not
+authorize a production probe. The owner-confirmed create-only/versioning governance below
+remains the durable policy.
 
 ## Recall Rule
 
@@ -44,12 +51,12 @@ Read this before adding a new prompt, writing/editing a seed script, or touching
   system prompt, variables, model, temperature, and token settings. Legacy upsert seeds (`phase-ii`, `reviewer-finder`,
   `peer-review-summarizer`, `phase-i-summary`) remain a separate audited sweep.
 
-**Pre-Site resilience boundary (Production-live 2026-08-18; signed-in generation smoke open):** runtime checks
-the governed body, variables, full schema, and assertions before side effects;
-force publication verifies full readback. Sole-current v4 exactly matches the
-tracked schema; any future mixed state blocks generation.
+**Pre-Site resilience boundary recorded 2026-08-18:** that review reported
+pre-side-effect validation of body, variables, schema and assertions, full
+publication readback, and sole-current v4 matching the then-tracked schema.
+Current prompt contents, version, and smoke status remain UNKNOWN.
 
-**Admin model/schema publication (Production-live 2026-08-18):** the Prompt Templates editor
+**Admin model/schema publication (observed 2026-08-18; current live status unknown):** the Prompt Templates editor
 can select `wmkf_ai_model` and edit the validated output-schema JSON; either
 change publishes a new immutable
 version. The PUT requires the editor's expected version, binds request-id
@@ -58,7 +65,8 @@ fields, and records prior/new model values in audit JSON. Native structured
 output refuses blank/tier models and accepts only a reviewed compatible
 concrete id within its max-output-token capability. Commit `f10dff3f` is an
 ancestor of Production deployment commit `abfe5529`; the Admin publish route
-has not yet received a separate post-deploy runtime smoke.
+had not received a separate post-deploy runtime smoke in that August record;
+current smoke status is UNKNOWN.
 
 **Provenance / timestamps:** Dataverse auto-stamps every version row — `createdon` (version created),
 `modifiedon` (last touch — a version-flip rewrites it, so NOT authorship for history rows),
@@ -66,10 +74,6 @@ has not yet received a separate post-deploy runtime smoke.
 admin publish both set `wmkf_ai_publisheddatetime` (domain publish time). The `/admin` panel surfaces
 these (S269).
 
-⚠️ **Open hazard (separate from this work):** the admin `PUT` can edit a prompt's `variables`, and
-neither the file config-pin test nor the A7 gate validates the LIVE row's untrusted declarations — so a
-superuser edit could weaken the A7 boundary on most live paths undetected.
-Tracked as a follow-up; the source-built Pre-Site producer is now an explicit
-exception because it performs the exact preflight described above.
+⚠️ **Hazard recorded 2026-08-18 (current status unknown):** the review then identified that admin `PUT` could edit a prompt's `variables`, while the file config-pin test and A7 gate did not validate the LIVE row's declarations. Do not present this as a confirmed current vulnerability without checking the current writer, consumers, and gates. The recorded source-built Pre-Site producer was an exception because it performed its own preflight; whether that version remains current is unknown.
 
 Related: [[project-dynamics-as-prompt-ground-truth]], [[project-phaseistatus-decision-lifecycle]].

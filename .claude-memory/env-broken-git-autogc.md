@@ -1,13 +1,13 @@
 ---
 name: env-broken-git-autogc
-description: git traversal commands (gc/fsck/repack/prune) hang in mmap — CONFIRMED cause is cloud File Provider dataless placeholders on .git loose objects; fix = move repo off cloud-synced path
+description: Historical S175 cloud File Provider diagnosis and July 2026 resolved-repo snapshot; lock/process recovery instructions require current repo-specific ownership verification and explicit repair authorization
 metadata: 
   node_type: memory
   type: project
   originSessionId: 8821677f-2a33-4a32-b5ca-e3fb038b41a1
   status: active
   scope: dev-env
-  last_verified: 2026-07-12 via pwd, git config --get gc.auto, git count-objects -v, git rev-list --all --count, and .git/objects flag scan
+  last_verified: 2026-07-12 (historical environment snapshot; not a current repo-state check)
 ---
 
 ## Recall Rule
@@ -15,8 +15,8 @@ metadata:
 Read this when: git traversal commands (`gc`/`fsck`/`repack`/`prune`/`rev-list --all`) hang, or a commit fails with `cannot lock ref 'HEAD'`.
 
 Do:
-- For the lock case: `pkill -f 'git-core/git (gc|repack|prune|pack-objects|maintenance)'`; if `.git/refs/heads/main` is missing but `main.lock` exists, the lock file content IS the correct ref — `mv` it onto `main`, verify with `git rev-parse HEAD`.
-- Keep the repo off any cloud-synced path (it now lives at `/Users/gallivan/Code/WMKF_Apps`).
+- Treat the incident and July snapshot below as dated evidence, not current process/ref/path state. If traversal or a lock failure recurs, inspect the exact repository, process ownership, lock contents, refs, and reflog; preserve evidence and obtain explicit authorization for any process termination or ref repair. Use a reviewed, repo-specific recovery plan; never assume a lock file contains the right ref or replace a ref from it automatically.
+- Keep repositories outside cloud-synced paths when establishing or moving a checkout, but verify the actual path and ownership before any move.
 
 Do not:
 - Put `.git` back under a cloud File Provider (OneDrive/Google Drive/iCloud) — dataless placeholders on loose objects cause `mmap()` page-fault hangs.
@@ -24,7 +24,7 @@ Do not:
 
 Ground truth: historical-only (resolved S209; recovery runbook + do-not-relitigate guard). Root cause confirmed S175 via `ls -lO` showing `dataless` flag.
 
-> **RESOLVED. [VERIFIED 2026-07-12 via `pwd`, `git config --get gc.auto`, `git count-objects -v`, `git rev-list --all --count`, and a `.git/objects` flag scan.]** The recommended fix was executed: the repo now lives at **`/Users/gallivan/Code/WMKF_Apps`** (off any cloud-synced path), `gc.auto` is **unset**, there are **no dataless objects**, loose-object growth is visible through `git count-objects -v` without freezing a naturally changing count here, and full-walk traversal completes without hanging. Kept as the **recovery runbook** for the `cannot lock ref 'HEAD'` lock-file case and as a do-not-relitigate guard (never put `.git` back under a cloud File Provider).
+> **Resolved at the time of the 2026-07-12 snapshot (historical; not a current environment assertion).** The recorded checks then found this repo at `/Users/gallivan/Code/WMKF_Apps`, `gc.auto` unset, no dataless objects, and full-walk traversal completing. Keep this as dated evidence and a reminder to avoid cloud-synced repository storage; it does not establish the current checkout path or state.
 
 **Symptom (S174–S175):** every git command that walks ALL loose objects in
 `.git/objects/` — `gc`, `repack`, `prune`, `fsck` — hangs. Targeted commands
@@ -50,21 +50,17 @@ via the File Provider API and offloads cold files to `dataless`. The repo had
 eviction targets. So the "iCloud" guess was wrong only on the *specific
 provider*; the dataless-placeholder *mechanism* is real and confirmed.
 
-**Fix (recommended): fresh clone outside any cloud-synced path.** Repo is fully
-pushed to origin/main and only ~51M. `git clone` into e.g. `~/dev/WMKF_Apps`
-gives a clean fully-packed repo, zero dataless objects, zero loose bloat. Then
-copy untracked/ignored files the clone lacks (`.env*`, `.claude/settings.local.json`,
-`docs/INTAKE_PORTAL_ITEM_6_CONNOR_EMAIL.md`, local config), verify, delete old
-copy. Do NOT plain-`mv` the repo without first materializing all dataless
-objects — moving online-only files out of the provider domain can orphan their
-content.
+**Historical recovery recommendation:** establish a clean checkout outside any cloud-synced
+path only after reviewing current Git state and preserving owner-owned or untracked work.
+The old clone/copy/delete recipe was not a general authorization to copy secrets or
+remove an old checkout. Do not move an online-only tree without first establishing that all
+objects and owner-owned files are preserved.
 
-**Recovery if a commit fails with `cannot lock ref 'HEAD'`:** a hung gc died
-mid-ref-pack and left a stale lock. `pkill -f 'git-core/git (gc|repack|prune|pack-objects|maintenance)'`,
-then if `.git/refs/heads/main` is missing but `main.lock` exists, the lock
-file content IS the correct ref value — `mv` it onto `main`. Verify with
-`git rev-parse HEAD`.
+**Historical S175 lock observation:** a hung gc had died mid-ref-pack and left a lock.
+Do not use the old broad `pkill`/`mv main.lock` recipe. For a current lock failure,
+identify the exact repository and lock/ref ownership, preserve refs and reflog evidence,
+and use an explicitly authorized repair scoped to the confirmed failure.
 
-**Config note:** `gc.auto` is currently unset on this repo. If the lock-file failure
-recurs, `git config gc.auto 0` can be used as an interim workaround, but once
-the repo is on a non-synced path, leave auto-gc enabled.
+**Historical config note:** `gc.auto` was observed unset on this repo in the 2026-07-12
+snapshot. Recheck current configuration before drawing conclusions; do not change it as
+a generic workaround.

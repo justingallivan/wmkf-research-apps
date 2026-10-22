@@ -1,273 +1,273 @@
-memory_leaf,whole_read_sample,source_verification_scope
-akoya-payment-field-semantics.md,outside-named-whole-read-samples,not reviewed in these named samples
-akoya-request-honorarium-nomenclature.md,outside-named-whole-read-samples,not reviewed in these named samples
-akoya-temporal-axis-encodings.md,initial-38,"selective; see audit evidence, not every claim"
-claude-config-git-sync.md,outside-named-whole-read-samples,not reviewed in these named samples
-dataverse-export-floor-scoping.md,initial-38,"selective; see audit evidence, not every claim"
-decision-module-typeless-warning-accept.md,outside-named-whole-read-samples,not reviewed in these named samples
-env-broken-git-autogc.md,outside-named-whole-read-samples,not reviewed in these named samples
-feedback-affordance-consistency-beats-deduplication.md,outside-named-whole-read-samples,not reviewed in these named samples
-feedback-anchor-multisession-features-to-the-original-ask.md,outside-named-whole-read-samples,not reviewed in these named samples
-feedback-apply-measurement-artifacts-in-both-directions.md,outside-named-whole-read-samples,not reviewed in these named samples
-feedback-apply-reconcile-to-fix-work.md,continuation-59,"selective; see audit evidence, not every claim"
-feedback-author-adversarial-pass-first.md,continuation-59,"selective; see audit evidence, not every claim"
-feedback-behavior-claims-cite-the-producer.md,continuation-59,"selective; see audit evidence, not every claim"
-feedback-behavior-freeze-passthrough-no-default.md,outside-named-whole-read-samples,not reviewed in these named samples
-feedback-briefs-are-snapshots-not-ship-state.md,outside-named-whole-read-samples,not reviewed in these named samples
-feedback-cap-subagent-load-in-reproduction-briefs.md,continuation-59,"selective; see audit evidence, not every claim"
-feedback-check-memory-before-asking-user.md,outside-named-whole-read-samples,not reviewed in these named samples
-feedback-cite-ground-truth.md,continuation-59,"selective; see audit evidence, not every claim"
-feedback-clear-jest-cache-in-shared-worktrees.md,outside-named-whole-read-samples,not reviewed in these named samples
-feedback-codex-build-gate-turbopack-sandbox.md,outside-named-whole-read-samples,not reviewed in these named samples
-feedback-codex-delegation-review-vs-rescue-routing.md,continuation-59,"selective; see audit evidence, not every claim"
-feedback-codex-model-gpt56-sol.md,outside-named-whole-read-samples,not reviewed in these named samples
-feedback-codex-worktree-owner-runs-it.md,outside-named-whole-read-samples,not reviewed in these named samples
-feedback-commit-before-delegating-to-worktree-agent.md,continuation-59,"selective; see audit evidence, not every claim"
-feedback-completeness-by-scanner-not-enumeration.md,continuation-59,"selective; see audit evidence, not every claim"
-feedback-concepts-vs-phase-i.md,outside-named-whole-read-samples,not reviewed in these named samples
-feedback-consistency-over-preview-rationale.md,outside-named-whole-read-samples,not reviewed in these named samples
-feedback-corrections-decay-unless-mechanized.md,continuation-59,"selective; see audit evidence, not every claim"
-feedback-cycle-vs-executor-scope.md,outside-named-whole-read-samples,not reviewed in these named samples
-feedback-deployment-monitoring-use-inspect.md,outside-named-whole-read-samples,not reviewed in these named samples
-feedback-dont-resurface-parked-items.md,outside-named-whole-read-samples,not reviewed in these named samples
-feedback-dont-self-certify-convergence.md,outside-named-whole-read-samples,not reviewed in these named samples
-feedback-dont-tune-against-hook-source.md,continuation-59,"selective; see audit evidence, not every claim"
-feedback-drive-to-completion.md,continuation-59,"selective; see audit evidence, not every claim"
-feedback-enforcement-hierarchy.md,continuation-59,"selective; see audit evidence, not every claim"
-feedback-escalate-aggregate-scope-not-step-size.md,outside-named-whole-read-samples,not reviewed in these named samples
-feedback-factory-safe-not-full-fidelity.md,outside-named-whole-read-samples,not reviewed in these named samples
-feedback-falsify-not-confirm.md,continuation-59,"selective; see audit evidence, not every claim"
-feedback-feature-branch-handoff-lands-on-main.md,outside-named-whole-read-samples,not reviewed in these named samples
-feedback-first-time-correctness-over-rework.md,outside-named-whole-read-samples,not reviewed in these named samples
-feedback-fixtures-return-raw-transport-shape.md,outside-named-whole-read-samples,not reviewed in these named samples
-feedback-green-requires-full-test-suite.md,outside-named-whole-read-samples,not reviewed in these named samples
-feedback-grep-general-codebase-terms.md,outside-named-whole-read-samples,not reviewed in these named samples
-feedback-human-legibility-schema-principle.md,outside-named-whole-read-samples,not reviewed in these named samples
-feedback-idempotency-name-the-mechanism.md,continuation-59,"selective; see audit evidence, not every claim"
-feedback-keep-the-owners-named-input-source.md,outside-named-whole-read-samples,not reviewed in these named samples
-feedback-latency-plan-scope-accretion-postmortem.md,outside-named-whole-read-samples,not reviewed in these named samples
-feedback-list-and-confirm-before-bulk-deletes.md,continuation-59,"selective; see audit evidence, not every claim"
-feedback-manual-affiliation-edit-no-coi-recheck.md,outside-named-whole-read-samples,not reviewed in these named samples
-feedback-match-existing-ui-patterns.md,outside-named-whole-read-samples,not reviewed in these named samples
-feedback-merge-to-main-from-temp-worktree.md,outside-named-whole-read-samples,not reviewed in these named samples
-feedback-minimize-per-cycle-configuration.md,outside-named-whole-read-samples,not reviewed in these named samples
-feedback-mocked-sql-hides-parameter-typing.md,outside-named-whole-read-samples,not reviewed in these named samples
-feedback-multi-model-review-pipeline.md,outside-named-whole-read-samples,not reviewed in these named samples
-feedback-mutable-parameters-not-in-code.md,outside-named-whole-read-samples,not reviewed in these named samples
-feedback-mutation-test-with-the-discriminating-fixture.md,outside-named-whole-read-samples,not reviewed in these named samples
-feedback-never-self-authorize-prod-dataverse-reads.md,continuation-59,"selective; see audit evidence, not every claim"
-feedback-new-gate-fixtures-trip-scanner-gates.md,outside-named-whole-read-samples,not reviewed in these named samples
-feedback-no-fabricated-placeholder-values.md,outside-named-whole-read-samples,not reviewed in these named samples
-feedback-no-performative-contrition.md,outside-named-whole-read-samples,not reviewed in these named samples
-feedback-no-time-pressure-commentary.md,outside-named-whole-read-samples,not reviewed in these named samples
-feedback-no-vercel-cli-update-reminders.md,outside-named-whole-read-samples,not reviewed in these named samples
-feedback-one-session-runs-gates-per-worktree.md,outside-named-whole-read-samples,not reviewed in these named samples
-feedback-operational-state-must-be-reachable-from-every-workstation.md,outside-named-whole-read-samples,not reviewed in these named samples
-feedback-orchestrator-checks-builds-before-review.md,outside-named-whole-read-samples,not reviewed in these named samples
-feedback-owner-review-burden-must-shrink.md,outside-named-whole-read-samples,not reviewed in these named samples
-feedback-pause-for-codex-on-high-stakes.md,continuation-59,"selective; see audit evidence, not every claim"
-feedback-plan-contracts-read-the-extremes.md,continuation-59,"selective; see audit evidence, not every claim"
-feedback-postgres-url-handling-hazards.md,outside-named-whole-read-samples,not reviewed in these named samples
-feedback-prioritize-contact-recall-over-identity-precision.md,outside-named-whole-read-samples,not reviewed in these named samples
-feedback-profile-context-runtime-bugs.md,outside-named-whole-read-samples,not reviewed in these named samples
-feedback-question-the-rehearsal-venue.md,outside-named-whole-read-samples,not reviewed in these named samples
-feedback-read-the-implementation-not-the-callers-docblock.md,continuation-59,"selective; see audit evidence, not every claim"
-feedback-real-fix-not-design-note.md,outside-named-whole-read-samples,not reviewed in these named samples
-feedback-reconcile-dont-append-docs.md,continuation-59,"selective; see audit evidence, not every claim"
-feedback-red-gates-are-p0.md,outside-named-whole-read-samples,not reviewed in these named samples
-feedback-rename-code-not-just-docs.md,outside-named-whole-read-samples,not reviewed in these named samples
-feedback-returning-machine-sync-before-install.md,continuation-59,"selective; see audit evidence, not every claim"
-feedback-review-panel-tone.md,outside-named-whole-read-samples,not reviewed in these named samples
-feedback-reviewer-differs-from-author.md,continuation-59,"selective; see audit evidence, not every claim"
-feedback-run-harness-framing-before-handoff-commit.md,outside-named-whole-read-samples,not reviewed in these named samples
-feedback-scope-git-stash-in-shared-worktrees.md,continuation-59,"selective; see audit evidence, not every claim"
-feedback-scrutinize-exemptions-and-fallthrough.md,continuation-59,"selective; see audit evidence, not every claim"
-feedback-self-review-before-delegating-review.md,continuation-59,"selective; see audit evidence, not every claim"
-feedback-share-codex-verbatim.md,continuation-59,"selective; see audit evidence, not every claim"
-feedback-skip-legacy-fixes-that-the-target-state-removes.md,outside-named-whole-read-samples,not reviewed in these named samples
-feedback-staff-ui-desktop-first.md,outside-named-whole-read-samples,not reviewed in these named samples
-feedback-staff-ui-never-shows-internal-ids.md,outside-named-whole-read-samples,not reviewed in these named samples
-feedback-stakeholder-email-tone.md,outside-named-whole-read-samples,not reviewed in these named samples
-feedback-surface-full-review-findings.md,continuation-59,"selective; see audit evidence, not every claim"
-feedback-symbol-consumer-fanout.md,continuation-59,"selective; see audit evidence, not every claim"
-feedback-thoroughness-default.md,continuation-59,"selective; see audit evidence, not every claim"
-feedback-timebox-metawork.md,continuation-59,"selective; see audit evidence, not every claim"
-feedback-truncation-is-breakage-not-completion.md,outside-named-whole-read-samples,not reviewed in these named samples
-feedback-ui-gates-must-mirror-server-guards.md,outside-named-whole-read-samples,not reviewed in these named samples
-feedback-user-facing-error-copy-voice.md,outside-named-whole-read-samples,not reviewed in these named samples
-feedback-vacuous-clean-results-print-the-denominator.md,continuation-59,"selective; see audit evidence, not every claim"
-feedback-verify-additive-carryover-not-just-destructive.md,outside-named-whole-read-samples,not reviewed in these named samples
-feedback-verify-before-destructive-carryover.md,outside-named-whole-read-samples,not reviewed in these named samples
-feedback-verify-branch-before-git-action.md,continuation-59,"selective; see audit evidence, not every claim"
-feedback-verify-deploy-is-the-merge-build.md,outside-named-whole-read-samples,not reviewed in these named samples
-feedback-verify-external-platform-claims.md,continuation-59,"selective; see audit evidence, not every claim"
-feedback-verify-vercel-env-with-env-ls.md,outside-named-whole-read-samples,not reviewed in these named samples
-feedback-verify-write-paths-against-live-service.md,continuation-59,"selective; see audit evidence, not every claim"
-feedback-weigh-the-risks-you-name.md,outside-named-whole-read-samples,not reviewed in these named samples
-local-jest-build-environment.md,outside-named-whole-read-samples,not reviewed in these named samples
-memory-store-propagation.md,outside-named-whole-read-samples,not reviewed in these named samples
-project-a7-prompt-injection-hardening.md,initial-38,"selective; see audit evidence, not every claim"
-project-accepted-awaiting-materials-is-transient.md,outside-named-whole-read-samples,not reviewed in these named samples
-project-admin-dashboard.md,initial-38,"selective; see audit evidence, not every claim"
-project-agent-worktree-base-is-main.md,continuation-59,"selective; see audit evidence, not every claim"
-project-akoya-request-pd-fields.md,outside-named-whole-read-samples,not reviewed in these named samples
-project-api-credit-monitoring.md,outside-named-whole-read-samples,not reviewed in these named samples
-project-app-access-control.md,initial-38,"selective; see audit evidence, not every claim"
-project-applicant-exclusion-policy-pending.md,outside-named-whole-read-samples,not reviewed in these named samples
-project-appresearcher-collapse-post-pilot.md,initial-38,"selective; see audit evidence, not every claim"
-project-awardee-onboarding.md,outside-named-whole-read-samples,not reviewed in these named samples
-project-backend-automation.md,outside-named-whole-read-samples,not reviewed in these named samples
-project-bill-honorarium-integration.md,continuation-59,"selective; see audit evidence, not every claim"
-project-branded-domains.md,outside-named-whole-read-samples,not reviewed in these named samples
-project-cache-hit-rate-review.md,initial-38,"selective; see audit evidence, not every claim"
-project-campaign-settings-ux-revisit.md,outside-named-whole-read-samples,not reviewed in these named samples
-project-ci-npm10-lockfile-parity.md,outside-named-whole-read-samples,not reviewed in these named samples
-project-claude-instruction-architecture.md,outside-named-whole-read-samples,not reviewed in these named samples
-project-cloudmersive-advanced-endpoint.md,continuation-59,"selective; see audit evidence, not every claim"
-project-codex-design-pre-impl-iteration.md,outside-named-whole-read-samples,not reviewed in these named samples
-project-codex-recurring-review.md,outside-named-whole-read-samples,not reviewed in these named samples
-project-commit-directly-to-main.md,outside-named-whole-read-samples,not reviewed in these named samples
-project-contact-promotion-permission.md,continuation-59,"selective; see audit evidence, not every claim"
-project-d26-cross-visit-sentiment-ranking-study.md,outside-named-whole-read-samples,not reviewed in these named samples
-project-dataverse-batch-changeset-available.md,initial-38,"selective; see audit evidence, not every claim"
-project-dataverse-creator-privileges.md,initial-38,"selective; see audit evidence, not every claim"
-project-dataverse-odata-null-filter.md,initial-38,"selective; see audit evidence, not every claim"
-project-dataverse-power-tools.md,initial-38,"selective; see audit evidence, not every claim"
-project-dataverse-schema-deploy-gotchas.md,continuation-59,"selective; see audit evidence, not every claim"
-project-dataverse-settings-audit-enablement.md,initial-38,"selective; see audit evidence, not every claim"
-project-deferred-code-cleanup.md,initial-38,"selective; see audit evidence, not every claim"
-project-deliberation-session-precedes-site-visit.md,outside-named-whole-read-samples,not reviewed in these named samples
-project-dev-environment.md,outside-named-whole-read-samples,not reviewed in these named samples
-project-download-proxy-parked.md,initial-38,"selective; see audit evidence, not every claim"
-project-dynamics-ai-writeback.md,initial-38,"selective; see audit evidence, not every claim"
-project-dynamics-as-prompt-ground-truth.md,outside-named-whole-read-samples,not reviewed in these named samples
-project-dynamics-crm-limitations.md,initial-38,"selective; see audit evidence, not every claim"
-project-dynamics-crm-users.md,initial-38,"selective; see audit evidence, not every claim"
-project-dynamics-email.md,initial-38,"selective; see audit evidence, not every claim"
-project-dynamics-explorer-details.md,initial-38,"selective; see audit evidence, not every claim"
-project-dynamics-explorer-reuse-power-tools.md,initial-38,"selective; see audit evidence, not every claim"
-project-dynamics-explorer-schema-diff.md,initial-38,"selective; see audit evidence, not every claim"
-project-dynamics-explorer-socal-campaign.md,initial-38,"selective; see audit evidence, not every claim"
-project-dynamics-feedback-admin-shipped.md,outside-named-whole-read-samples,not reviewed in these named samples
-project-dynamics-identity-reconciliation.md,initial-38,"selective; see audit evidence, not every claim"
-project-dynamics-sandbox-state.md,initial-38,"selective; see audit evidence, not every claim"
-project-e2e-playwright-harness.md,outside-named-whole-read-samples,not reviewed in these named samples
-project-email-template-token-syntax.md,outside-named-whole-read-samples,not reviewed in these named samples
-project-excluded-reviewers-often-in-pool.md,outside-named-whole-read-samples,not reviewed in these named samples
-project-executor-thinking-budget-truncation.md,outside-named-whole-read-samples,not reviewed in these named samples
-project-external-reviewer-file-access.md,outside-named-whole-read-samples,not reviewed in these named samples
-project-grant-lifecycle-states-confirmed.md,initial-38,"selective; see audit evidence, not every claim"
-project-grant-phasing-evolution.md,initial-38,"selective; see audit evidence, not every claim"
-project-grant-reporting-rework.md,initial-38,"selective; see audit evidence, not every claim"
-project-grantee-deliverable-email-voice.md,outside-named-whole-read-samples,not reviewed in these named samples
-project-grantee-waiver-versioning.md,initial-38,"selective; see audit evidence, not every claim"
-project-honorarium-payment-landscape.md,outside-named-whole-read-samples,not reviewed in these named samples
-project-institution-foundation-liaison.md,outside-named-whole-read-samples,not reviewed in these named samples
-project-institution-identity-cost-calibration.md,outside-named-whole-read-samples,not reviewed in these named samples
-project-intake-portal-external-id-foundation.md,continuation-59,"selective; see audit evidence, not every claim"
-project-intake-portal-institution-match.md,outside-named-whole-read-samples,not reviewed in these named samples
-project-intake-portal-parked.md,initial-38,"selective; see audit evidence, not every claim"
-project-intake-portal-reviewer-capture.md,outside-named-whole-read-samples,not reviewed in these named samples
-project-intake-portal-skinny-scope.md,initial-38,"selective; see audit evidence, not every claim"
-project-intake-portal-ui-todo.md,initial-38,"selective; see audit evidence, not every claim"
-project-intake-portal-virus-scan-e2e-deferred.md,continuation-59,"selective; see audit evidence, not every claim"
-project-interim-report-automation.md,initial-38,"selective; see audit evidence, not every claim"
-project-invitation-link-strictness-open-decision.md,outside-named-whole-read-samples,not reviewed in these named samples
-project-irs-exempt-verification.md,initial-38,"selective; see audit evidence, not every claim"
-project-j27-doc-capture-evolution.md,outside-named-whole-read-samples,not reviewed in these named samples
-project-jsdom-serverless-esm-incompat.md,outside-named-whole-read-samples,not reviewed in these named samples
-project-literature-analyzer-rework.md,outside-named-whole-read-samples,not reviewed in these named samples
-project-living-taxonomy-principle.md,initial-38,"selective; see audit evidence, not every claim"
-project-local-dev-auth-setup.md,continuation-59,"selective; see audit evidence, not every claim"
-project-local-docker-is-colima.md,outside-named-whole-read-samples,not reviewed in these named samples
-project-machine-legible-form-capture.md,outside-named-whole-read-samples,not reviewed in these named samples
-project-memory-router-trap-prevention.md,outside-named-whole-read-samples,not reviewed in these named samples
-project-migration-numbers-claimed-off-main.md,continuation-59,"selective; see audit evidence, not every claim"
-project-new-ai-capabilities.md,outside-named-whole-read-samples,not reviewed in these named samples
-project-no-banking-pii-in-dataverse.md,continuation-59,"selective; see audit evidence, not every claim"
-project-openalex-merge-use-orcid-works.md,outside-named-whole-read-samples,not reviewed in these named samples
-project-pdf-processing-tiers.md,outside-named-whole-read-samples,not reviewed in these named samples
-project-peer-review-executor-migration.md,continuation-59,"selective; see audit evidence, not every claim"
-project-phase-i-summary-app-winddown.md,initial-38,"selective; see audit evidence, not every claim"
-project-phaseistatus-decision-lifecycle.md,initial-38,"selective; see audit evidence, not every claim"
-project-preview-rehearsal-venue-limits.md,continuation-59,"selective; see audit evidence, not every claim"
-project-private-repo-ci-visibility.md,outside-named-whole-read-samples,not reviewed in these named samples
-project-prompt-governance.md,outside-named-whole-read-samples,not reviewed in these named samples
-project-prompt-storage-strategy.md,outside-named-whole-read-samples,not reviewed in these named samples
-project-proposal-context-extraction.md,outside-named-whole-read-samples,not reviewed in these named samples
-project-research-special-grants-in-cohorts.md,initial-38,"selective; see audit evidence, not every claim"
-project-review-form-checkbox-questions.md,outside-named-whole-read-samples,not reviewed in these named samples
-project-review-output-formatting.md,outside-named-whole-read-samples,not reviewed in these named samples
-project-reviewer-accept-decline-links.md,outside-named-whole-read-samples,not reviewed in these named samples
-project-reviewer-accept-prod-automation.md,continuation-59,"selective; see audit evidence, not every claim"
-project-reviewer-ack-provenance-parity-followup.md,outside-named-whole-read-samples,not reviewed in these named samples
-project-reviewer-address-collection-provisional.md,outside-named-whole-read-samples,not reviewed in these named samples
-project-reviewer-affiliation-institution-linking.md,outside-named-whole-read-samples,not reviewed in these named samples
-project-reviewer-apps-redesign-direction.md,outside-named-whole-read-samples,not reviewed in these named samples
-project-reviewer-card-simplification-direction.md,outside-named-whole-read-samples,not reviewed in these named samples
-project-reviewer-closeout-payability.md,continuation-59,"selective; see audit evidence, not every claim"
-project-reviewer-coi-concern-surfacing.md,outside-named-whole-read-samples,not reviewed in these named samples
-project-reviewer-coi-rely-on-self-disclosure.md,outside-named-whole-read-samples,not reviewed in these named samples
-project-reviewer-contact-enrichment-anchoring.md,outside-named-whole-read-samples,not reviewed in these named samples
-project-reviewer-count-invariant.md,outside-named-whole-read-samples,not reviewed in these named samples
-project-reviewer-duplicate-merge.md,continuation-59,"selective; see audit evidence, not every claim"
-project-reviewer-field-aware-verification.md,outside-named-whole-read-samples,not reviewed in these named samples
-project-reviewer-find-roster.md,outside-named-whole-read-samples,not reviewed in these named samples
-project-reviewer-find-usage-cadence-blocks-observation-windows.md,outside-named-whole-read-samples,not reviewed in these named samples
-project-reviewer-finder-dataverse-entry-path.md,outside-named-whole-read-samples,not reviewed in these named samples
-project-reviewer-finder-next-topics.md,outside-named-whole-read-samples,not reviewed in these named samples
-project-reviewer-finder-proposal-doc-context.md,outside-named-whole-read-samples,not reviewed in these named samples
-project-reviewer-history-data-quality.md,outside-named-whole-read-samples,not reviewed in these named samples
-project-reviewer-hold-step-decouple.md,outside-named-whole-read-samples,not reviewed in these named samples
-project-reviewer-holistic-redesign-parallel-build.md,outside-named-whole-read-samples,not reviewed in these named samples
-project-reviewer-identity-resolution-phase1.md,outside-named-whole-read-samples,not reviewed in these named samples
-project-reviewer-institution-match.md,outside-named-whole-read-samples,not reviewed in these named samples
-project-reviewer-org-open-access-by-design.md,outside-named-whole-read-samples,not reviewed in these named samples
-project-reviewer-origination-experiment-result.md,outside-named-whole-read-samples,not reviewed in these named samples
-project-reviewer-origination-multilane.md,outside-named-whole-read-samples,not reviewed in these named samples
-project-reviewer-panel-coverage-pilot.md,outside-named-whole-read-samples,not reviewed in these named samples
-project-reviewer-pi-identity-structured.md,outside-named-whole-read-samples,not reviewed in these named samples
-project-reviewer-ranking-recency-over-citations.md,outside-named-whole-read-samples,not reviewed in these named samples
-project-reviewer-recall-over-precision.md,outside-named-whole-read-samples,not reviewed in these named samples
-project-reviewer-referral-capture.md,outside-named-whole-read-samples,not reviewed in these named samples
-project-reviewer-reliability-data.md,outside-named-whole-read-samples,not reviewed in these named samples
-project-reviewer-self-report-orcid-sticky-confirmed.md,outside-named-whole-read-samples,not reviewed in these named samples
-project-reviewer-sourcing-constraints.md,outside-named-whole-read-samples,not reviewed in these named samples
-project-reviewer-upload-dormant-not-deleted.md,outside-named-whole-read-samples,not reviewed in these named samples
-project-reviewer-verify-fail-dangerous.md,outside-named-whole-read-samples,not reviewed in these named samples
-project-reviewer-web-discovery-abandoned.md,outside-named-whole-read-samples,not reviewed in these named samples
-project-reviewer-workbench-invite-workflow.md,outside-named-whole-read-samples,not reviewed in these named samples
-project-rtk-grep-output-corruption.md,outside-named-whole-read-samples,not reviewed in these named samples
-project-sandbox-rehearsal-bypass-allow-rule.md,continuation-59,"selective; see audit evidence, not every claim"
-project-serpapi-budget-latency.md,outside-named-whole-read-samples,not reviewed in these named samples
-project-serpapi-capability-erosion.md,outside-named-whole-read-samples,not reviewed in these named samples
-project-sharepoint-integration.md,continuation-59,"selective; see audit evidence, not every claim"
-project-sharepoint-property-promotion-rewrites-docx.md,continuation-59,"selective; see audit evidence, not every claim"
-project-site-visit-materials-planning-handoff.md,outside-named-whole-read-samples,not reviewed in these named samples
-project-socal-writeup-workflow-parked.md,outside-named-whole-read-samples,not reviewed in these named samples
-project-staff-review-rescue-tool.md,outside-named-whole-read-samples,not reviewed in these named samples
-project-staged-review-pipeline.md,outside-named-whole-read-samples,not reviewed in these named samples
-project-strategy-direction.md,outside-named-whole-read-samples,not reviewed in these named samples
-project-system-model.md,outside-named-whole-read-samples,not reviewed in these named samples
-project-test-residue-cleanup-is-for-data-mining.md,continuation-59,"selective; see audit evidence, not every claim"
-project-vercel-cli-deploy-preview-auth.md,outside-named-whole-read-samples,not reviewed in these named samples
-project-vercel-node22-no-require-esm.md,outside-named-whole-read-samples,not reviewed in these named samples
-project-vercel-plugin-disabled-restore.md,outside-named-whole-read-samples,not reviewed in these named samples
-project-vercel-sensitive-env-pull-empty.md,outside-named-whole-read-samples,not reviewed in these named samples
-project-vercel-workflow-runs-pinned-to-deployment.md,outside-named-whole-read-samples,not reviewed in these named samples
-project-virus-scanning-it-context.md,continuation-59,"selective; see audit evidence, not every claim"
-project-wave1-closeout-role-tail.md,continuation-59,"selective; see audit evidence, not every claim"
-project-wave1-onboarding.md,continuation-59,"selective; see audit evidence, not every claim"
-project-workbench-consolidation-rollout.md,outside-named-whole-read-samples,not reviewed in these named samples
-reference-codex-detached-exec-protocol.md,continuation-59,"selective; see audit evidence, not every claim"
-reference-codex-rescue-pkill-overstep.md,continuation-59,"selective; see audit evidence, not every claim"
-reference-codex-rescue-plan-task-runs-readonly.md,continuation-59,"selective; see audit evidence, not every claim"
-reference-codex-review-needs-a-committed-diff.md,outside-named-whole-read-samples,not reviewed in these named samples
-reference-dataverse-altkey-lookup-upsert-url.md,outside-named-whole-read-samples,not reviewed in these named samples
-reference-dataverse-audit-trail-actor-detection.md,outside-named-whole-read-samples,not reviewed in these named samples
-reference-staleness-ack-markers-single-line.md,outside-named-whole-read-samples,not reviewed in these named samples
-reference-staleness-ack-single-line.md,outside-named-whole-read-samples,not reviewed in these named samples
-reference-vercel-logs-filtering.md,outside-named-whole-read-samples,not reviewed in these named samples
-reference-vercel-sensitive-env-unreadable.md,outside-named-whole-read-samples,not reviewed in these named samples
-reviewer-identity-fragmentation.md,outside-named-whole-read-samples,not reviewed in these named samples
-reviewer-invite-capture-mode-not-full-sandbox.md,outside-named-whole-read-samples,not reviewed in these named samples
+memory_leaf,whole_read_sample,source_verification_scope,bounded_disposition,evidence_report
+akoya-payment-field-semantics.md,remainder-55,selective; see remainder audit; not every claim or live state,owner/history/prior repair retained; remaining behavior claims not fully verified,active-memory-remainder-audit-2026-10-22.md
+akoya-request-honorarium-nomenclature.md,remainder-55,selective; see remainder audit; not every claim or live state,selected source guard/path agrees; other claims unverified,active-memory-remainder-audit-2026-10-22.md
+akoya-temporal-axis-encodings.md,initial-38,"selective; see audit evidence, not every claim",earlier whole-read sample only; selective evidence in initial audit,dynamics-identity-temporal-memory-repair-2026-10-22.md
+claude-config-git-sync.md,remainder-75,selective; see remainder audit; not every claim or live state,confirmed guidance/pointer/history repair; parent-reviewed,active-memory-remainder-audit-2026-10-22.md
+dataverse-export-floor-scoping.md,initial-38,"selective; see audit evidence, not every claim",earlier whole-read sample only; selective evidence in initial audit,dynamics-identity-temporal-memory-repair-2026-10-22.md
+decision-module-typeless-warning-accept.md,remainder-75,selective; see remainder audit; not every claim or live state,owner policy retained; incidental implementation/external claims not fully verified,active-memory-remainder-audit-2026-10-22.md
+env-broken-git-autogc.md,remainder-75,selective; see remainder audit; not every claim or live state,confirmed guidance/pointer/history repair; parent-reviewed,active-memory-remainder-audit-2026-10-22.md
+feedback-affordance-consistency-beats-deduplication.md,remainder-75,selective; see remainder audit; not every claim or live state,owner policy retained; incidental implementation/external claims not fully verified,active-memory-remainder-audit-2026-10-22.md
+feedback-anchor-multisession-features-to-the-original-ask.md,remainder-75,selective; see remainder audit; not every claim or live state,owner policy retained; incidental implementation/external claims not fully verified,active-memory-remainder-audit-2026-10-22.md
+feedback-apply-measurement-artifacts-in-both-directions.md,remainder-75,selective; see remainder audit; not every claim or live state,owner policy retained; incidental implementation/external claims not fully verified,active-memory-remainder-audit-2026-10-22.md
+feedback-apply-reconcile-to-fix-work.md,continuation-59,"selective; see audit evidence, not every claim",see per-leaf safety/write/operating tables in continuation audit,active-memory-safety-write-audit-2026-10-22.md
+feedback-author-adversarial-pass-first.md,continuation-59,"selective; see audit evidence, not every claim",see per-leaf safety/write/operating tables in continuation audit,active-memory-safety-write-audit-2026-10-22.md
+feedback-behavior-claims-cite-the-producer.md,continuation-59,"selective; see audit evidence, not every claim",see per-leaf safety/write/operating tables in continuation audit,active-memory-safety-write-audit-2026-10-22.md
+feedback-behavior-freeze-passthrough-no-default.md,remainder-75,selective; see remainder audit; not every claim or live state,owner policy retained; incidental implementation/external claims not fully verified,active-memory-remainder-audit-2026-10-22.md
+feedback-briefs-are-snapshots-not-ship-state.md,remainder-75,selective; see remainder audit; not every claim or live state,owner policy retained; incidental implementation/external claims not fully verified,active-memory-remainder-audit-2026-10-22.md
+feedback-cap-subagent-load-in-reproduction-briefs.md,continuation-59,"selective; see audit evidence, not every claim",see per-leaf safety/write/operating tables in continuation audit,active-memory-safety-write-audit-2026-10-22.md
+feedback-check-memory-before-asking-user.md,remainder-75,selective; see remainder audit; not every claim or live state,owner policy retained; incidental implementation/external claims not fully verified,active-memory-remainder-audit-2026-10-22.md
+feedback-cite-ground-truth.md,continuation-59,"selective; see audit evidence, not every claim",see per-leaf safety/write/operating tables in continuation audit,active-memory-safety-write-audit-2026-10-22.md
+feedback-clear-jest-cache-in-shared-worktrees.md,remainder-75,selective; see remainder audit; not every claim or live state,confirmed guidance/pointer/history repair; parent-reviewed,active-memory-remainder-audit-2026-10-22.md
+feedback-codex-build-gate-turbopack-sandbox.md,remainder-75,selective; see remainder audit; not every claim or live state,dated incident/tool evidence retained; current external behavior unknown,active-memory-remainder-audit-2026-10-22.md
+feedback-codex-delegation-review-vs-rescue-routing.md,continuation-59,"selective; see audit evidence, not every claim",see per-leaf safety/write/operating tables in continuation audit,active-memory-safety-write-audit-2026-10-22.md
+feedback-codex-model-gpt56-sol.md,remainder-75,selective; see remainder audit; not every claim or live state,owner policy retained; incidental implementation/external claims not fully verified,active-memory-remainder-audit-2026-10-22.md
+feedback-codex-worktree-owner-runs-it.md,remainder-75,selective; see remainder audit; not every claim or live state,owner policy retained; incidental implementation/external claims not fully verified,active-memory-remainder-audit-2026-10-22.md
+feedback-commit-before-delegating-to-worktree-agent.md,continuation-59,"selective; see audit evidence, not every claim",see per-leaf safety/write/operating tables in continuation audit,active-memory-safety-write-audit-2026-10-22.md
+feedback-completeness-by-scanner-not-enumeration.md,continuation-59,"selective; see audit evidence, not every claim",see per-leaf safety/write/operating tables in continuation audit,active-memory-safety-write-audit-2026-10-22.md
+feedback-concepts-vs-phase-i.md,remainder-75,selective; see remainder audit; not every claim or live state,dated incident/tool evidence retained; current external behavior unknown,active-memory-remainder-audit-2026-10-22.md
+feedback-consistency-over-preview-rationale.md,remainder-75,selective; see remainder audit; not every claim or live state,owner policy retained; incidental implementation/external claims not fully verified,active-memory-remainder-audit-2026-10-22.md
+feedback-corrections-decay-unless-mechanized.md,continuation-59,"selective; see audit evidence, not every claim",see per-leaf safety/write/operating tables in continuation audit,active-memory-safety-write-audit-2026-10-22.md
+feedback-cycle-vs-executor-scope.md,remainder-75,selective; see remainder audit; not every claim or live state,owner policy retained; incidental implementation/external claims not fully verified,active-memory-remainder-audit-2026-10-22.md
+feedback-deployment-monitoring-use-inspect.md,remainder-75,selective; see remainder audit; not every claim or live state,owner policy retained; incidental implementation/external claims not fully verified,active-memory-remainder-audit-2026-10-22.md
+feedback-dont-resurface-parked-items.md,remainder-75,selective; see remainder audit; not every claim or live state,owner policy retained; incidental implementation/external claims not fully verified,active-memory-remainder-audit-2026-10-22.md
+feedback-dont-self-certify-convergence.md,remainder-75,selective; see remainder audit; not every claim or live state,owner policy retained; incidental implementation/external claims not fully verified,active-memory-remainder-audit-2026-10-22.md
+feedback-dont-tune-against-hook-source.md,continuation-59,"selective; see audit evidence, not every claim",see per-leaf safety/write/operating tables in continuation audit,active-memory-safety-write-audit-2026-10-22.md
+feedback-drive-to-completion.md,continuation-59,"selective; see audit evidence, not every claim",see per-leaf safety/write/operating tables in continuation audit,active-memory-safety-write-audit-2026-10-22.md
+feedback-enforcement-hierarchy.md,continuation-59,"selective; see audit evidence, not every claim",see per-leaf safety/write/operating tables in continuation audit,active-memory-safety-write-audit-2026-10-22.md
+feedback-escalate-aggregate-scope-not-step-size.md,remainder-75,selective; see remainder audit; not every claim or live state,owner policy retained; incidental implementation/external claims not fully verified,active-memory-remainder-audit-2026-10-22.md
+feedback-factory-safe-not-full-fidelity.md,remainder-75,selective; see remainder audit; not every claim or live state,owner policy retained; incidental implementation/external claims not fully verified,active-memory-remainder-audit-2026-10-22.md
+feedback-falsify-not-confirm.md,continuation-59,"selective; see audit evidence, not every claim",see per-leaf safety/write/operating tables in continuation audit,active-memory-safety-write-audit-2026-10-22.md
+feedback-feature-branch-handoff-lands-on-main.md,remainder-75,selective; see remainder audit; not every claim or live state,owner policy retained; incidental implementation/external claims not fully verified,active-memory-remainder-audit-2026-10-22.md
+feedback-first-time-correctness-over-rework.md,remainder-75,selective; see remainder audit; not every claim or live state,owner policy retained; incidental implementation/external claims not fully verified,active-memory-remainder-audit-2026-10-22.md
+feedback-fixtures-return-raw-transport-shape.md,remainder-75,selective; see remainder audit; not every claim or live state,owner policy retained; incidental implementation/external claims not fully verified,active-memory-remainder-audit-2026-10-22.md
+feedback-green-requires-full-test-suite.md,remainder-75,selective; see remainder audit; not every claim or live state,owner policy retained; incidental implementation/external claims not fully verified,active-memory-remainder-audit-2026-10-22.md
+feedback-grep-general-codebase-terms.md,remainder-75,selective; see remainder audit; not every claim or live state,owner policy retained; incidental implementation/external claims not fully verified,active-memory-remainder-audit-2026-10-22.md
+feedback-human-legibility-schema-principle.md,remainder-75,selective; see remainder audit; not every claim or live state,owner policy retained; incidental implementation/external claims not fully verified,active-memory-remainder-audit-2026-10-22.md
+feedback-idempotency-name-the-mechanism.md,continuation-59,"selective; see audit evidence, not every claim",see per-leaf safety/write/operating tables in continuation audit,active-memory-safety-write-audit-2026-10-22.md
+feedback-keep-the-owners-named-input-source.md,remainder-75,selective; see remainder audit; not every claim or live state,owner policy retained; incidental implementation/external claims not fully verified,active-memory-remainder-audit-2026-10-22.md
+feedback-latency-plan-scope-accretion-postmortem.md,remainder-75,selective; see remainder audit; not every claim or live state,owner policy retained; incidental implementation/external claims not fully verified,active-memory-remainder-audit-2026-10-22.md
+feedback-list-and-confirm-before-bulk-deletes.md,continuation-59,"selective; see audit evidence, not every claim",see per-leaf safety/write/operating tables in continuation audit,active-memory-safety-write-audit-2026-10-22.md
+feedback-manual-affiliation-edit-no-coi-recheck.md,remainder-75,selective; see remainder audit; not every claim or live state,owner policy retained; incidental implementation/external claims not fully verified,active-memory-remainder-audit-2026-10-22.md
+feedback-match-existing-ui-patterns.md,remainder-75,selective; see remainder audit; not every claim or live state,owner policy retained; incidental implementation/external claims not fully verified,active-memory-remainder-audit-2026-10-22.md
+feedback-merge-to-main-from-temp-worktree.md,remainder-75,selective; see remainder audit; not every claim or live state,owner policy retained; incidental implementation/external claims not fully verified,active-memory-remainder-audit-2026-10-22.md
+feedback-minimize-per-cycle-configuration.md,remainder-75,selective; see remainder audit; not every claim or live state,owner policy retained; incidental implementation/external claims not fully verified,active-memory-remainder-audit-2026-10-22.md
+feedback-mocked-sql-hides-parameter-typing.md,remainder-75,selective; see remainder audit; not every claim or live state,owner policy retained; incidental implementation/external claims not fully verified,active-memory-remainder-audit-2026-10-22.md
+feedback-multi-model-review-pipeline.md,remainder-75,selective; see remainder audit; not every claim or live state,owner policy retained; incidental implementation/external claims not fully verified,active-memory-remainder-audit-2026-10-22.md
+feedback-mutable-parameters-not-in-code.md,remainder-75,selective; see remainder audit; not every claim or live state,owner policy retained; incidental implementation/external claims not fully verified,active-memory-remainder-audit-2026-10-22.md
+feedback-mutation-test-with-the-discriminating-fixture.md,remainder-75,selective; see remainder audit; not every claim or live state,owner policy retained; incidental implementation/external claims not fully verified,active-memory-remainder-audit-2026-10-22.md
+feedback-never-self-authorize-prod-dataverse-reads.md,continuation-59,"selective; see audit evidence, not every claim",see per-leaf safety/write/operating tables in continuation audit,active-memory-safety-write-audit-2026-10-22.md
+feedback-new-gate-fixtures-trip-scanner-gates.md,remainder-75,selective; see remainder audit; not every claim or live state,owner policy retained; incidental implementation/external claims not fully verified,active-memory-remainder-audit-2026-10-22.md
+feedback-no-fabricated-placeholder-values.md,remainder-75,selective; see remainder audit; not every claim or live state,owner policy retained; incidental implementation/external claims not fully verified,active-memory-remainder-audit-2026-10-22.md
+feedback-no-performative-contrition.md,remainder-75,selective; see remainder audit; not every claim or live state,owner policy retained; incidental implementation/external claims not fully verified,active-memory-remainder-audit-2026-10-22.md
+feedback-no-time-pressure-commentary.md,remainder-75,selective; see remainder audit; not every claim or live state,owner policy retained; incidental implementation/external claims not fully verified,active-memory-remainder-audit-2026-10-22.md
+feedback-no-vercel-cli-update-reminders.md,remainder-75,selective; see remainder audit; not every claim or live state,owner policy retained; incidental implementation/external claims not fully verified,active-memory-remainder-audit-2026-10-22.md
+feedback-one-session-runs-gates-per-worktree.md,remainder-75,selective; see remainder audit; not every claim or live state,owner policy retained; incidental implementation/external claims not fully verified,active-memory-remainder-audit-2026-10-22.md
+feedback-operational-state-must-be-reachable-from-every-workstation.md,remainder-75,selective; see remainder audit; not every claim or live state,owner policy retained; incidental implementation/external claims not fully verified,active-memory-remainder-audit-2026-10-22.md
+feedback-orchestrator-checks-builds-before-review.md,remainder-75,selective; see remainder audit; not every claim or live state,owner policy retained; incidental implementation/external claims not fully verified,active-memory-remainder-audit-2026-10-22.md
+feedback-owner-review-burden-must-shrink.md,remainder-75,selective; see remainder audit; not every claim or live state,owner policy retained; incidental implementation/external claims not fully verified,active-memory-remainder-audit-2026-10-22.md
+feedback-pause-for-codex-on-high-stakes.md,continuation-59,"selective; see audit evidence, not every claim",see per-leaf safety/write/operating tables in continuation audit,active-memory-safety-write-audit-2026-10-22.md
+feedback-plan-contracts-read-the-extremes.md,continuation-59,"selective; see audit evidence, not every claim",see per-leaf safety/write/operating tables in continuation audit,active-memory-safety-write-audit-2026-10-22.md
+feedback-postgres-url-handling-hazards.md,remainder-75,selective; see remainder audit; not every claim or live state,owner policy retained; incidental implementation/external claims not fully verified,active-memory-remainder-audit-2026-10-22.md
+feedback-prioritize-contact-recall-over-identity-precision.md,remainder-75,selective; see remainder audit; not every claim or live state,owner policy retained; incidental implementation/external claims not fully verified,active-memory-remainder-audit-2026-10-22.md
+feedback-profile-context-runtime-bugs.md,remainder-75,selective; see remainder audit; not every claim or live state,confirmed guidance/pointer/history repair; parent-reviewed,active-memory-remainder-audit-2026-10-22.md
+feedback-question-the-rehearsal-venue.md,remainder-75,selective; see remainder audit; not every claim or live state,owner policy retained; incidental implementation/external claims not fully verified,active-memory-remainder-audit-2026-10-22.md
+feedback-read-the-implementation-not-the-callers-docblock.md,continuation-59,"selective; see audit evidence, not every claim",see per-leaf safety/write/operating tables in continuation audit,active-memory-safety-write-audit-2026-10-22.md
+feedback-real-fix-not-design-note.md,remainder-75,selective; see remainder audit; not every claim or live state,owner policy retained; incidental implementation/external claims not fully verified,active-memory-remainder-audit-2026-10-22.md
+feedback-reconcile-dont-append-docs.md,continuation-59,"selective; see audit evidence, not every claim",see per-leaf safety/write/operating tables in continuation audit,active-memory-safety-write-audit-2026-10-22.md
+feedback-red-gates-are-p0.md,remainder-75,selective; see remainder audit; not every claim or live state,owner policy retained; incidental implementation/external claims not fully verified,active-memory-remainder-audit-2026-10-22.md
+feedback-rename-code-not-just-docs.md,remainder-75,selective; see remainder audit; not every claim or live state,owner policy retained; incidental implementation/external claims not fully verified,active-memory-remainder-audit-2026-10-22.md
+feedback-returning-machine-sync-before-install.md,continuation-59,"selective; see audit evidence, not every claim",see per-leaf safety/write/operating tables in continuation audit,active-memory-safety-write-audit-2026-10-22.md
+feedback-review-panel-tone.md,remainder-75,selective; see remainder audit; not every claim or live state,owner policy retained; incidental implementation/external claims not fully verified,active-memory-remainder-audit-2026-10-22.md
+feedback-reviewer-differs-from-author.md,continuation-59,"selective; see audit evidence, not every claim",see per-leaf safety/write/operating tables in continuation audit,active-memory-safety-write-audit-2026-10-22.md
+feedback-run-harness-framing-before-handoff-commit.md,remainder-75,selective; see remainder audit; not every claim or live state,owner policy retained; incidental implementation/external claims not fully verified,active-memory-remainder-audit-2026-10-22.md
+feedback-scope-git-stash-in-shared-worktrees.md,continuation-59,"selective; see audit evidence, not every claim",see per-leaf safety/write/operating tables in continuation audit,active-memory-safety-write-audit-2026-10-22.md
+feedback-scrutinize-exemptions-and-fallthrough.md,continuation-59,"selective; see audit evidence, not every claim",see per-leaf safety/write/operating tables in continuation audit,active-memory-safety-write-audit-2026-10-22.md
+feedback-self-review-before-delegating-review.md,continuation-59,"selective; see audit evidence, not every claim",see per-leaf safety/write/operating tables in continuation audit,active-memory-safety-write-audit-2026-10-22.md
+feedback-share-codex-verbatim.md,continuation-59,"selective; see audit evidence, not every claim",see per-leaf safety/write/operating tables in continuation audit,active-memory-safety-write-audit-2026-10-22.md
+feedback-skip-legacy-fixes-that-the-target-state-removes.md,remainder-75,selective; see remainder audit; not every claim or live state,owner policy retained; incidental implementation/external claims not fully verified,active-memory-remainder-audit-2026-10-22.md
+feedback-staff-ui-desktop-first.md,remainder-75,selective; see remainder audit; not every claim or live state,owner policy retained; incidental implementation/external claims not fully verified,active-memory-remainder-audit-2026-10-22.md
+feedback-staff-ui-never-shows-internal-ids.md,remainder-75,selective; see remainder audit; not every claim or live state,owner policy retained; incidental implementation/external claims not fully verified,active-memory-remainder-audit-2026-10-22.md
+feedback-stakeholder-email-tone.md,remainder-75,selective; see remainder audit; not every claim or live state,owner policy retained; incidental implementation/external claims not fully verified,active-memory-remainder-audit-2026-10-22.md
+feedback-surface-full-review-findings.md,continuation-59,"selective; see audit evidence, not every claim",see per-leaf safety/write/operating tables in continuation audit,active-memory-safety-write-audit-2026-10-22.md
+feedback-symbol-consumer-fanout.md,continuation-59,"selective; see audit evidence, not every claim",see per-leaf safety/write/operating tables in continuation audit,active-memory-safety-write-audit-2026-10-22.md
+feedback-thoroughness-default.md,continuation-59,"selective; see audit evidence, not every claim",see per-leaf safety/write/operating tables in continuation audit,active-memory-safety-write-audit-2026-10-22.md
+feedback-timebox-metawork.md,continuation-59,"selective; see audit evidence, not every claim",see per-leaf safety/write/operating tables in continuation audit,active-memory-safety-write-audit-2026-10-22.md
+feedback-truncation-is-breakage-not-completion.md,remainder-75,selective; see remainder audit; not every claim or live state,owner policy retained; incidental implementation/external claims not fully verified,active-memory-remainder-audit-2026-10-22.md
+feedback-ui-gates-must-mirror-server-guards.md,remainder-75,selective; see remainder audit; not every claim or live state,owner policy retained; incidental implementation/external claims not fully verified,active-memory-remainder-audit-2026-10-22.md
+feedback-user-facing-error-copy-voice.md,remainder-75,selective; see remainder audit; not every claim or live state,owner policy retained; incidental implementation/external claims not fully verified,active-memory-remainder-audit-2026-10-22.md
+feedback-vacuous-clean-results-print-the-denominator.md,continuation-59,"selective; see audit evidence, not every claim",see per-leaf safety/write/operating tables in continuation audit,active-memory-safety-write-audit-2026-10-22.md
+feedback-verify-additive-carryover-not-just-destructive.md,remainder-75,selective; see remainder audit; not every claim or live state,owner policy retained; incidental implementation/external claims not fully verified,active-memory-remainder-audit-2026-10-22.md
+feedback-verify-before-destructive-carryover.md,remainder-75,selective; see remainder audit; not every claim or live state,owner policy retained; incidental implementation/external claims not fully verified,active-memory-remainder-audit-2026-10-22.md
+feedback-verify-branch-before-git-action.md,continuation-59,"selective; see audit evidence, not every claim",see per-leaf safety/write/operating tables in continuation audit,active-memory-safety-write-audit-2026-10-22.md
+feedback-verify-deploy-is-the-merge-build.md,remainder-75,selective; see remainder audit; not every claim or live state,owner policy retained; incidental implementation/external claims not fully verified,active-memory-remainder-audit-2026-10-22.md
+feedback-verify-external-platform-claims.md,continuation-59,"selective; see audit evidence, not every claim",see per-leaf safety/write/operating tables in continuation audit,active-memory-safety-write-audit-2026-10-22.md
+feedback-verify-vercel-env-with-env-ls.md,remainder-75,selective; see remainder audit; not every claim or live state,owner policy retained; incidental implementation/external claims not fully verified,active-memory-remainder-audit-2026-10-22.md
+feedback-verify-write-paths-against-live-service.md,continuation-59,"selective; see audit evidence, not every claim",see per-leaf safety/write/operating tables in continuation audit,active-memory-safety-write-audit-2026-10-22.md
+feedback-weigh-the-risks-you-name.md,remainder-75,selective; see remainder audit; not every claim or live state,owner policy retained; incidental implementation/external claims not fully verified,active-memory-remainder-audit-2026-10-22.md
+local-jest-build-environment.md,remainder-75,selective; see remainder audit; not every claim or live state,dated incident/tool evidence retained; current external behavior unknown,active-memory-remainder-audit-2026-10-22.md
+memory-store-propagation.md,remainder-46,selective; see remainder audit; not every claim or live state,bounded plan/history/source disposition; see remainder report and backlog,active-memory-remainder-audit-2026-10-22.md
+project-a7-prompt-injection-hardening.md,initial-38,"selective; see audit evidence, not every claim",earlier whole-read sample only; selective evidence in initial audit,dynamics-identity-temporal-memory-repair-2026-10-22.md
+project-accepted-awaiting-materials-is-transient.md,remainder-46,selective; see remainder audit; not every claim or live state,bounded plan/history/source disposition; see remainder report and backlog,active-memory-remainder-audit-2026-10-22.md
+project-admin-dashboard.md,initial-38,"selective; see audit evidence, not every claim",earlier whole-read sample only; selective evidence in initial audit,dynamics-identity-temporal-memory-repair-2026-10-22.md
+project-agent-worktree-base-is-main.md,continuation-59,"selective; see audit evidence, not every claim",see per-leaf safety/write/operating tables in continuation audit,active-memory-safety-write-audit-2026-10-22.md
+project-akoya-request-pd-fields.md,remainder-46,selective; see remainder audit; not every claim or live state,bounded plan/history/source disposition; see remainder report and backlog,active-memory-remainder-audit-2026-10-22.md
+project-api-credit-monitoring.md,remainder-46,selective; see remainder audit; not every claim or live state,bounded plan/history/source disposition; see remainder report and backlog,active-memory-remainder-audit-2026-10-22.md
+project-app-access-control.md,initial-38,"selective; see audit evidence, not every claim",earlier whole-read sample only; selective evidence in initial audit,dynamics-identity-temporal-memory-repair-2026-10-22.md
+project-applicant-exclusion-policy-pending.md,remainder-46,selective; see remainder audit; not every claim or live state,bounded plan/history/source disposition; see remainder report and backlog,active-memory-remainder-audit-2026-10-22.md
+project-appresearcher-collapse-post-pilot.md,initial-38,"selective; see audit evidence, not every claim",earlier whole-read sample only; selective evidence in initial audit,dynamics-identity-temporal-memory-repair-2026-10-22.md
+project-awardee-onboarding.md,remainder-46,selective; see remainder audit; not every claim or live state,bounded plan/history/source disposition; see remainder report and backlog,active-memory-remainder-audit-2026-10-22.md
+project-backend-automation.md,remainder-46,selective; see remainder audit; not every claim or live state,confirmed guidance/pointer/history repair; parent-reviewed,active-memory-remainder-audit-2026-10-22.md
+project-bill-honorarium-integration.md,continuation-59,"selective; see audit evidence, not every claim",see per-leaf safety/write/operating tables in continuation audit,active-memory-safety-write-audit-2026-10-22.md
+project-branded-domains.md,remainder-46,selective; see remainder audit; not every claim or live state,bounded plan/history/source disposition; see remainder report and backlog,active-memory-remainder-audit-2026-10-22.md
+project-cache-hit-rate-review.md,initial-38,"selective; see audit evidence, not every claim",earlier whole-read sample only; selective evidence in initial audit,dynamics-identity-temporal-memory-repair-2026-10-22.md
+project-campaign-settings-ux-revisit.md,remainder-46,selective; see remainder audit; not every claim or live state,bounded plan/history/source disposition; see remainder report and backlog,active-memory-remainder-audit-2026-10-22.md
+project-ci-npm10-lockfile-parity.md,remainder-46,selective; see remainder audit; not every claim or live state,bounded plan/history/source disposition; see remainder report and backlog,active-memory-remainder-audit-2026-10-22.md
+project-claude-instruction-architecture.md,remainder-46,selective; see remainder audit; not every claim or live state,confirmed guidance/pointer/history repair; parent-reviewed,active-memory-remainder-audit-2026-10-22.md
+project-cloudmersive-advanced-endpoint.md,continuation-59,"selective; see audit evidence, not every claim",see per-leaf safety/write/operating tables in continuation audit,active-memory-safety-write-audit-2026-10-22.md
+project-codex-design-pre-impl-iteration.md,remainder-46,selective; see remainder audit; not every claim or live state,bounded plan/history/source disposition; see remainder report and backlog,active-memory-remainder-audit-2026-10-22.md
+project-codex-recurring-review.md,remainder-46,selective; see remainder audit; not every claim or live state,bounded plan/history/source disposition; see remainder report and backlog,active-memory-remainder-audit-2026-10-22.md
+project-commit-directly-to-main.md,remainder-46,selective; see remainder audit; not every claim or live state,bounded plan/history/source disposition; see remainder report and backlog,active-memory-remainder-audit-2026-10-22.md
+project-contact-promotion-permission.md,continuation-59,"selective; see audit evidence, not every claim",see per-leaf safety/write/operating tables in continuation audit,active-memory-safety-write-audit-2026-10-22.md
+project-d26-cross-visit-sentiment-ranking-study.md,remainder-46,selective; see remainder audit; not every claim or live state,bounded plan/history/source disposition; see remainder report and backlog,active-memory-remainder-audit-2026-10-22.md
+project-dataverse-batch-changeset-available.md,initial-38,"selective; see audit evidence, not every claim",earlier whole-read sample only; selective evidence in initial audit,dynamics-identity-temporal-memory-repair-2026-10-22.md
+project-dataverse-creator-privileges.md,initial-38,"selective; see audit evidence, not every claim",earlier whole-read sample only; selective evidence in initial audit,dynamics-identity-temporal-memory-repair-2026-10-22.md
+project-dataverse-odata-null-filter.md,initial-38,"selective; see audit evidence, not every claim",earlier whole-read sample only; selective evidence in initial audit,dynamics-identity-temporal-memory-repair-2026-10-22.md
+project-dataverse-power-tools.md,initial-38,"selective; see audit evidence, not every claim",earlier whole-read sample only; selective evidence in initial audit,dynamics-identity-temporal-memory-repair-2026-10-22.md
+project-dataverse-schema-deploy-gotchas.md,continuation-59,"selective; see audit evidence, not every claim",see per-leaf safety/write/operating tables in continuation audit,active-memory-safety-write-audit-2026-10-22.md
+project-dataverse-settings-audit-enablement.md,initial-38,"selective; see audit evidence, not every claim",earlier whole-read sample only; selective evidence in initial audit,dynamics-identity-temporal-memory-repair-2026-10-22.md
+project-deferred-code-cleanup.md,initial-38,"selective; see audit evidence, not every claim",earlier whole-read sample only; selective evidence in initial audit,dynamics-identity-temporal-memory-repair-2026-10-22.md
+project-deliberation-session-precedes-site-visit.md,remainder-46,selective; see remainder audit; not every claim or live state,bounded plan/history/source disposition; see remainder report and backlog,active-memory-remainder-audit-2026-10-22.md
+project-dev-environment.md,remainder-46,selective; see remainder audit; not every claim or live state,bounded plan/history/source disposition; see remainder report and backlog,active-memory-remainder-audit-2026-10-22.md
+project-download-proxy-parked.md,initial-38,"selective; see audit evidence, not every claim",earlier whole-read sample only; selective evidence in initial audit,dynamics-identity-temporal-memory-repair-2026-10-22.md
+project-dynamics-ai-writeback.md,initial-38,"selective; see audit evidence, not every claim",earlier whole-read sample only; selective evidence in initial audit,dynamics-identity-temporal-memory-repair-2026-10-22.md
+project-dynamics-as-prompt-ground-truth.md,remainder-46,selective; see remainder audit; not every claim or live state,bounded plan/history/source disposition; see remainder report and backlog,active-memory-remainder-audit-2026-10-22.md
+project-dynamics-crm-limitations.md,initial-38,"selective; see audit evidence, not every claim",earlier whole-read sample only; selective evidence in initial audit,dynamics-identity-temporal-memory-repair-2026-10-22.md
+project-dynamics-crm-users.md,initial-38,"selective; see audit evidence, not every claim",earlier whole-read sample only; selective evidence in initial audit,dynamics-identity-temporal-memory-repair-2026-10-22.md
+project-dynamics-email.md,initial-38,"selective; see audit evidence, not every claim",earlier whole-read sample only; selective evidence in initial audit,dynamics-identity-temporal-memory-repair-2026-10-22.md
+project-dynamics-explorer-details.md,initial-38,"selective; see audit evidence, not every claim",earlier whole-read sample only; selective evidence in initial audit,dynamics-identity-temporal-memory-repair-2026-10-22.md
+project-dynamics-explorer-reuse-power-tools.md,initial-38,"selective; see audit evidence, not every claim",earlier whole-read sample only; selective evidence in initial audit,dynamics-identity-temporal-memory-repair-2026-10-22.md
+project-dynamics-explorer-schema-diff.md,initial-38,"selective; see audit evidence, not every claim",earlier whole-read sample only; selective evidence in initial audit,dynamics-identity-temporal-memory-repair-2026-10-22.md
+project-dynamics-explorer-socal-campaign.md,initial-38,"selective; see audit evidence, not every claim",earlier whole-read sample only; selective evidence in initial audit,dynamics-identity-temporal-memory-repair-2026-10-22.md
+project-dynamics-feedback-admin-shipped.md,remainder-46,selective; see remainder audit; not every claim or live state,bounded plan/history/source disposition; see remainder report and backlog,active-memory-remainder-audit-2026-10-22.md
+project-dynamics-identity-reconciliation.md,initial-38,"selective; see audit evidence, not every claim",earlier whole-read sample only; selective evidence in initial audit,dynamics-identity-temporal-memory-repair-2026-10-22.md
+project-dynamics-sandbox-state.md,initial-38,"selective; see audit evidence, not every claim",earlier whole-read sample only; selective evidence in initial audit,dynamics-identity-temporal-memory-repair-2026-10-22.md
+project-e2e-playwright-harness.md,remainder-46,selective; see remainder audit; not every claim or live state,bounded plan/history/source disposition; see remainder report and backlog,active-memory-remainder-audit-2026-10-22.md
+project-email-template-token-syntax.md,remainder-46,selective; see remainder audit; not every claim or live state,bounded plan/history/source disposition; see remainder report and backlog,active-memory-remainder-audit-2026-10-22.md
+project-excluded-reviewers-often-in-pool.md,remainder-55,selective; see remainder audit; not every claim or live state,owner/history/prior repair retained; remaining behavior claims not fully verified,active-memory-remainder-audit-2026-10-22.md
+project-executor-thinking-budget-truncation.md,remainder-46,selective; see remainder audit; not every claim or live state,bounded plan/history/source disposition; see remainder report and backlog,active-memory-remainder-audit-2026-10-22.md
+project-external-reviewer-file-access.md,remainder-55,selective; see remainder audit; not every claim or live state,owner/history/prior repair retained; remaining behavior claims not fully verified,active-memory-remainder-audit-2026-10-22.md
+project-grant-lifecycle-states-confirmed.md,initial-38,"selective; see audit evidence, not every claim",earlier whole-read sample only; selective evidence in initial audit,dynamics-identity-temporal-memory-repair-2026-10-22.md
+project-grant-phasing-evolution.md,initial-38,"selective; see audit evidence, not every claim",earlier whole-read sample only; selective evidence in initial audit,dynamics-identity-temporal-memory-repair-2026-10-22.md
+project-grant-reporting-rework.md,initial-38,"selective; see audit evidence, not every claim",earlier whole-read sample only; selective evidence in initial audit,dynamics-identity-temporal-memory-repair-2026-10-22.md
+project-grantee-deliverable-email-voice.md,remainder-46,selective; see remainder audit; not every claim or live state,bounded plan/history/source disposition; see remainder report and backlog,active-memory-remainder-audit-2026-10-22.md
+project-grantee-waiver-versioning.md,initial-38,"selective; see audit evidence, not every claim",earlier whole-read sample only; selective evidence in initial audit,dynamics-identity-temporal-memory-repair-2026-10-22.md
+project-honorarium-payment-landscape.md,remainder-55,selective; see remainder audit; not every claim or live state,selected source guard/path agrees; other claims unverified,active-memory-remainder-audit-2026-10-22.md
+project-institution-foundation-liaison.md,remainder-55,selective; see remainder audit; not every claim or live state,owner/history/prior repair retained; remaining behavior claims not fully verified,active-memory-remainder-audit-2026-10-22.md
+project-institution-identity-cost-calibration.md,remainder-55,selective; see remainder audit; not every claim or live state,owner/history/prior repair retained; remaining behavior claims not fully verified,active-memory-remainder-audit-2026-10-22.md
+project-intake-portal-external-id-foundation.md,continuation-59,"selective; see audit evidence, not every claim",see per-leaf safety/write/operating tables in continuation audit,active-memory-safety-write-audit-2026-10-22.md
+project-intake-portal-institution-match.md,remainder-55,selective; see remainder audit; not every claim or live state,owner/history/prior repair retained; remaining behavior claims not fully verified,active-memory-remainder-audit-2026-10-22.md
+project-intake-portal-parked.md,initial-38,"selective; see audit evidence, not every claim",earlier whole-read sample only; selective evidence in initial audit,dynamics-identity-temporal-memory-repair-2026-10-22.md
+project-intake-portal-reviewer-capture.md,remainder-55,selective; see remainder audit; not every claim or live state,owner/history/prior repair retained; remaining behavior claims not fully verified,active-memory-remainder-audit-2026-10-22.md
+project-intake-portal-skinny-scope.md,initial-38,"selective; see audit evidence, not every claim",earlier whole-read sample only; selective evidence in initial audit,dynamics-identity-temporal-memory-repair-2026-10-22.md
+project-intake-portal-ui-todo.md,initial-38,"selective; see audit evidence, not every claim",earlier whole-read sample only; selective evidence in initial audit,dynamics-identity-temporal-memory-repair-2026-10-22.md
+project-intake-portal-virus-scan-e2e-deferred.md,continuation-59,"selective; see audit evidence, not every claim",see per-leaf safety/write/operating tables in continuation audit,active-memory-safety-write-audit-2026-10-22.md
+project-interim-report-automation.md,initial-38,"selective; see audit evidence, not every claim",earlier whole-read sample only; selective evidence in initial audit,dynamics-identity-temporal-memory-repair-2026-10-22.md
+project-invitation-link-strictness-open-decision.md,remainder-46,selective; see remainder audit; not every claim or live state,bounded plan/history/source disposition; see remainder report and backlog,active-memory-remainder-audit-2026-10-22.md
+project-irs-exempt-verification.md,initial-38,"selective; see audit evidence, not every claim",earlier whole-read sample only; selective evidence in initial audit,dynamics-identity-temporal-memory-repair-2026-10-22.md
+project-j27-doc-capture-evolution.md,remainder-46,selective; see remainder audit; not every claim or live state,bounded plan/history/source disposition; see remainder report and backlog,active-memory-remainder-audit-2026-10-22.md
+project-jsdom-serverless-esm-incompat.md,remainder-46,selective; see remainder audit; not every claim or live state,bounded plan/history/source disposition; see remainder report and backlog,active-memory-remainder-audit-2026-10-22.md
+project-literature-analyzer-rework.md,remainder-46,selective; see remainder audit; not every claim or live state,bounded plan/history/source disposition; see remainder report and backlog,active-memory-remainder-audit-2026-10-22.md
+project-living-taxonomy-principle.md,initial-38,"selective; see audit evidence, not every claim",earlier whole-read sample only; selective evidence in initial audit,dynamics-identity-temporal-memory-repair-2026-10-22.md
+project-local-dev-auth-setup.md,continuation-59,"selective; see audit evidence, not every claim",see per-leaf safety/write/operating tables in continuation audit,active-memory-safety-write-audit-2026-10-22.md
+project-local-docker-is-colima.md,remainder-46,selective; see remainder audit; not every claim or live state,confirmed guidance/pointer/history repair; parent-reviewed,active-memory-remainder-audit-2026-10-22.md
+project-machine-legible-form-capture.md,remainder-46,selective; see remainder audit; not every claim or live state,bounded plan/history/source disposition; see remainder report and backlog,active-memory-remainder-audit-2026-10-22.md
+project-memory-router-trap-prevention.md,remainder-46,selective; see remainder audit; not every claim or live state,bounded plan/history/source disposition; see remainder report and backlog,active-memory-remainder-audit-2026-10-22.md
+project-migration-numbers-claimed-off-main.md,continuation-59,"selective; see audit evidence, not every claim",see per-leaf safety/write/operating tables in continuation audit,active-memory-safety-write-audit-2026-10-22.md
+project-new-ai-capabilities.md,remainder-46,selective; see remainder audit; not every claim or live state,confirmed guidance/pointer/history repair; parent-reviewed,active-memory-remainder-audit-2026-10-22.md
+project-no-banking-pii-in-dataverse.md,continuation-59,"selective; see audit evidence, not every claim",see per-leaf safety/write/operating tables in continuation audit,active-memory-safety-write-audit-2026-10-22.md
+project-openalex-merge-use-orcid-works.md,remainder-55,selective; see remainder audit; not every claim or live state,owner/history/prior repair retained; remaining behavior claims not fully verified,active-memory-remainder-audit-2026-10-22.md
+project-pdf-processing-tiers.md,remainder-46,selective; see remainder audit; not every claim or live state,bounded plan/history/source disposition; see remainder report and backlog,active-memory-remainder-audit-2026-10-22.md
+project-peer-review-executor-migration.md,continuation-59,"selective; see audit evidence, not every claim",see per-leaf safety/write/operating tables in continuation audit,active-memory-safety-write-audit-2026-10-22.md
+project-phase-i-summary-app-winddown.md,initial-38,"selective; see audit evidence, not every claim",earlier whole-read sample only; selective evidence in initial audit,dynamics-identity-temporal-memory-repair-2026-10-22.md
+project-phaseistatus-decision-lifecycle.md,initial-38,"selective; see audit evidence, not every claim",earlier whole-read sample only; selective evidence in initial audit,dynamics-identity-temporal-memory-repair-2026-10-22.md
+project-preview-rehearsal-venue-limits.md,continuation-59,"selective; see audit evidence, not every claim",see per-leaf safety/write/operating tables in continuation audit,active-memory-safety-write-audit-2026-10-22.md
+project-private-repo-ci-visibility.md,remainder-46,selective; see remainder audit; not every claim or live state,confirmed guidance/pointer/history repair; parent-reviewed,active-memory-remainder-audit-2026-10-22.md
+project-prompt-governance.md,remainder-46,selective; see remainder audit; not every claim or live state,confirmed guidance/pointer/history repair; parent-reviewed,active-memory-remainder-audit-2026-10-22.md
+project-prompt-storage-strategy.md,remainder-46,selective; see remainder audit; not every claim or live state,bounded plan/history/source disposition; see remainder report and backlog,active-memory-remainder-audit-2026-10-22.md
+project-proposal-context-extraction.md,remainder-46,selective; see remainder audit; not every claim or live state,bounded plan/history/source disposition; see remainder report and backlog,active-memory-remainder-audit-2026-10-22.md
+project-research-special-grants-in-cohorts.md,initial-38,"selective; see audit evidence, not every claim",earlier whole-read sample only; selective evidence in initial audit,dynamics-identity-temporal-memory-repair-2026-10-22.md
+project-review-form-checkbox-questions.md,remainder-55,selective; see remainder audit; not every claim or live state,owner/history/prior repair retained; remaining behavior claims not fully verified,active-memory-remainder-audit-2026-10-22.md
+project-review-output-formatting.md,remainder-55,selective; see remainder audit; not every claim or live state,owner/history/prior repair retained; remaining behavior claims not fully verified,active-memory-remainder-audit-2026-10-22.md
+project-reviewer-accept-decline-links.md,remainder-55,selective; see remainder audit; not every claim or live state,owner/history/prior repair retained; remaining behavior claims not fully verified,active-memory-remainder-audit-2026-10-22.md
+project-reviewer-accept-prod-automation.md,continuation-59,"selective; see audit evidence, not every claim",see per-leaf safety/write/operating tables in continuation audit,active-memory-safety-write-audit-2026-10-22.md
+project-reviewer-ack-provenance-parity-followup.md,remainder-55,selective; see remainder audit; not every claim or live state,owner/history/prior repair retained; remaining behavior claims not fully verified,active-memory-remainder-audit-2026-10-22.md
+project-reviewer-address-collection-provisional.md,remainder-55,selective; see remainder audit; not every claim or live state,confirmed guidance/pointer/history repair; parent-reviewed,active-memory-remainder-audit-2026-10-22.md
+project-reviewer-affiliation-institution-linking.md,remainder-55,selective; see remainder audit; not every claim or live state,selected source guard/path agrees; other claims unverified,active-memory-remainder-audit-2026-10-22.md
+project-reviewer-apps-redesign-direction.md,remainder-55,selective; see remainder audit; not every claim or live state,owner/history/prior repair retained; remaining behavior claims not fully verified,active-memory-remainder-audit-2026-10-22.md
+project-reviewer-card-simplification-direction.md,remainder-55,selective; see remainder audit; not every claim or live state,owner/history/prior repair retained; remaining behavior claims not fully verified,active-memory-remainder-audit-2026-10-22.md
+project-reviewer-closeout-payability.md,continuation-59,"selective; see audit evidence, not every claim",see per-leaf safety/write/operating tables in continuation audit,active-memory-safety-write-audit-2026-10-22.md
+project-reviewer-coi-concern-surfacing.md,remainder-55,selective; see remainder audit; not every claim or live state,owner/history/prior repair retained; remaining behavior claims not fully verified,active-memory-remainder-audit-2026-10-22.md
+project-reviewer-coi-rely-on-self-disclosure.md,remainder-55,selective; see remainder audit; not every claim or live state,owner/history/prior repair retained; remaining behavior claims not fully verified,active-memory-remainder-audit-2026-10-22.md
+project-reviewer-contact-enrichment-anchoring.md,remainder-55,selective; see remainder audit; not every claim or live state,owner/history/prior repair retained; remaining behavior claims not fully verified,active-memory-remainder-audit-2026-10-22.md
+project-reviewer-count-invariant.md,remainder-55,selective; see remainder audit; not every claim or live state,owner/history/prior repair retained; remaining behavior claims not fully verified,active-memory-remainder-audit-2026-10-22.md
+project-reviewer-duplicate-merge.md,continuation-59,"selective; see audit evidence, not every claim",see per-leaf safety/write/operating tables in continuation audit,active-memory-safety-write-audit-2026-10-22.md
+project-reviewer-field-aware-verification.md,remainder-55,selective; see remainder audit; not every claim or live state,owner/history/prior repair retained; remaining behavior claims not fully verified,active-memory-remainder-audit-2026-10-22.md
+project-reviewer-find-roster.md,remainder-55,selective; see remainder audit; not every claim or live state,selected source guard/path agrees; other claims unverified,active-memory-remainder-audit-2026-10-22.md
+project-reviewer-find-usage-cadence-blocks-observation-windows.md,remainder-55,selective; see remainder audit; not every claim or live state,owner/history/prior repair retained; remaining behavior claims not fully verified,active-memory-remainder-audit-2026-10-22.md
+project-reviewer-finder-dataverse-entry-path.md,remainder-55,selective; see remainder audit; not every claim or live state,owner/history/prior repair retained; remaining behavior claims not fully verified,active-memory-remainder-audit-2026-10-22.md
+project-reviewer-finder-next-topics.md,remainder-55,selective; see remainder audit; not every claim or live state,owner/history/prior repair retained; remaining behavior claims not fully verified,active-memory-remainder-audit-2026-10-22.md
+project-reviewer-finder-proposal-doc-context.md,remainder-55,selective; see remainder audit; not every claim or live state,owner/history/prior repair retained; remaining behavior claims not fully verified,active-memory-remainder-audit-2026-10-22.md
+project-reviewer-history-data-quality.md,remainder-55,selective; see remainder audit; not every claim or live state,owner/history/prior repair retained; remaining behavior claims not fully verified,active-memory-remainder-audit-2026-10-22.md
+project-reviewer-hold-step-decouple.md,remainder-55,selective; see remainder audit; not every claim or live state,owner/history/prior repair retained; remaining behavior claims not fully verified,active-memory-remainder-audit-2026-10-22.md
+project-reviewer-holistic-redesign-parallel-build.md,remainder-55,selective; see remainder audit; not every claim or live state,selected source guard/path agrees; other claims unverified,active-memory-remainder-audit-2026-10-22.md
+project-reviewer-identity-resolution-phase1.md,remainder-55,selective; see remainder audit; not every claim or live state,selected source guard/path agrees; other claims unverified,active-memory-remainder-audit-2026-10-22.md
+project-reviewer-institution-match.md,remainder-55,selective; see remainder audit; not every claim or live state,selected source guard/path agrees; other claims unverified,active-memory-remainder-audit-2026-10-22.md
+project-reviewer-org-open-access-by-design.md,remainder-55,selective; see remainder audit; not every claim or live state,selected source guard/path agrees; other claims unverified,active-memory-remainder-audit-2026-10-22.md
+project-reviewer-origination-experiment-result.md,remainder-55,selective; see remainder audit; not every claim or live state,owner/history/prior repair retained; remaining behavior claims not fully verified,active-memory-remainder-audit-2026-10-22.md
+project-reviewer-origination-multilane.md,remainder-55,selective; see remainder audit; not every claim or live state,owner/history/prior repair retained; remaining behavior claims not fully verified,active-memory-remainder-audit-2026-10-22.md
+project-reviewer-panel-coverage-pilot.md,remainder-55,selective; see remainder audit; not every claim or live state,owner/history/prior repair retained; remaining behavior claims not fully verified,active-memory-remainder-audit-2026-10-22.md
+project-reviewer-pi-identity-structured.md,remainder-55,selective; see remainder audit; not every claim or live state,selected source guard/path agrees; other claims unverified,active-memory-remainder-audit-2026-10-22.md
+project-reviewer-ranking-recency-over-citations.md,remainder-55,selective; see remainder audit; not every claim or live state,owner/history/prior repair retained; remaining behavior claims not fully verified,active-memory-remainder-audit-2026-10-22.md
+project-reviewer-recall-over-precision.md,remainder-55,selective; see remainder audit; not every claim or live state,owner/history/prior repair retained; remaining behavior claims not fully verified,active-memory-remainder-audit-2026-10-22.md
+project-reviewer-referral-capture.md,remainder-55,selective; see remainder audit; not every claim or live state,owner/history/prior repair retained; remaining behavior claims not fully verified,active-memory-remainder-audit-2026-10-22.md
+project-reviewer-reliability-data.md,remainder-55,selective; see remainder audit; not every claim or live state,owner/history/prior repair retained; remaining behavior claims not fully verified,active-memory-remainder-audit-2026-10-22.md
+project-reviewer-self-report-orcid-sticky-confirmed.md,remainder-55,selective; see remainder audit; not every claim or live state,selected source guard/path agrees; other claims unverified,active-memory-remainder-audit-2026-10-22.md
+project-reviewer-sourcing-constraints.md,remainder-55,selective; see remainder audit; not every claim or live state,owner/history/prior repair retained; remaining behavior claims not fully verified,active-memory-remainder-audit-2026-10-22.md
+project-reviewer-upload-dormant-not-deleted.md,remainder-55,selective; see remainder audit; not every claim or live state,selected source guard/path agrees; other claims unverified,active-memory-remainder-audit-2026-10-22.md
+project-reviewer-verify-fail-dangerous.md,remainder-55,selective; see remainder audit; not every claim or live state,selected source guard/path agrees; other claims unverified,active-memory-remainder-audit-2026-10-22.md
+project-reviewer-web-discovery-abandoned.md,remainder-55,selective; see remainder audit; not every claim or live state,owner/history/prior repair retained; remaining behavior claims not fully verified,active-memory-remainder-audit-2026-10-22.md
+project-reviewer-workbench-invite-workflow.md,remainder-55,selective; see remainder audit; not every claim or live state,confirmed guidance/pointer/history repair; parent-reviewed,active-memory-remainder-audit-2026-10-22.md
+project-rtk-grep-output-corruption.md,remainder-46,selective; see remainder audit; not every claim or live state,bounded plan/history/source disposition; see remainder report and backlog,active-memory-remainder-audit-2026-10-22.md
+project-sandbox-rehearsal-bypass-allow-rule.md,continuation-59,"selective; see audit evidence, not every claim",see per-leaf safety/write/operating tables in continuation audit,active-memory-safety-write-audit-2026-10-22.md
+project-serpapi-budget-latency.md,remainder-55,selective; see remainder audit; not every claim or live state,owner/history/prior repair retained; remaining behavior claims not fully verified,active-memory-remainder-audit-2026-10-22.md
+project-serpapi-capability-erosion.md,remainder-55,selective; see remainder audit; not every claim or live state,owner/history/prior repair retained; remaining behavior claims not fully verified,active-memory-remainder-audit-2026-10-22.md
+project-sharepoint-integration.md,continuation-59,"selective; see audit evidence, not every claim",see per-leaf safety/write/operating tables in continuation audit,active-memory-safety-write-audit-2026-10-22.md
+project-sharepoint-property-promotion-rewrites-docx.md,continuation-59,"selective; see audit evidence, not every claim",see per-leaf safety/write/operating tables in continuation audit,active-memory-safety-write-audit-2026-10-22.md
+project-site-visit-materials-planning-handoff.md,remainder-46,selective; see remainder audit; not every claim or live state,bounded plan/history/source disposition; see remainder report and backlog,active-memory-remainder-audit-2026-10-22.md
+project-socal-writeup-workflow-parked.md,remainder-46,selective; see remainder audit; not every claim or live state,bounded plan/history/source disposition; see remainder report and backlog,active-memory-remainder-audit-2026-10-22.md
+project-staff-review-rescue-tool.md,remainder-55,selective; see remainder audit; not every claim or live state,owner/history/prior repair retained; remaining behavior claims not fully verified,active-memory-remainder-audit-2026-10-22.md
+project-staged-review-pipeline.md,remainder-55,selective; see remainder audit; not every claim or live state,owner/history/prior repair retained; remaining behavior claims not fully verified,active-memory-remainder-audit-2026-10-22.md
+project-strategy-direction.md,remainder-46,selective; see remainder audit; not every claim or live state,confirmed guidance/pointer/history repair; parent-reviewed,active-memory-remainder-audit-2026-10-22.md
+project-system-model.md,remainder-46,selective; see remainder audit; not every claim or live state,confirmed guidance/pointer/history repair; parent-reviewed,active-memory-remainder-audit-2026-10-22.md
+project-test-residue-cleanup-is-for-data-mining.md,continuation-59,"selective; see audit evidence, not every claim",see per-leaf safety/write/operating tables in continuation audit,active-memory-safety-write-audit-2026-10-22.md
+project-vercel-cli-deploy-preview-auth.md,remainder-55,selective; see remainder audit; not every claim or live state,owner/history/prior repair retained; remaining behavior claims not fully verified,active-memory-remainder-audit-2026-10-22.md
+project-vercel-node22-no-require-esm.md,remainder-46,selective; see remainder audit; not every claim or live state,bounded plan/history/source disposition; see remainder report and backlog,active-memory-remainder-audit-2026-10-22.md
+project-vercel-plugin-disabled-restore.md,remainder-46,selective; see remainder audit; not every claim or live state,bounded plan/history/source disposition; see remainder report and backlog,active-memory-remainder-audit-2026-10-22.md
+project-vercel-sensitive-env-pull-empty.md,remainder-46,selective; see remainder audit; not every claim or live state,bounded plan/history/source disposition; see remainder report and backlog,active-memory-remainder-audit-2026-10-22.md
+project-vercel-workflow-runs-pinned-to-deployment.md,remainder-46,selective; see remainder audit; not every claim or live state,confirmed guidance/pointer/history repair; parent-reviewed,active-memory-remainder-audit-2026-10-22.md
+project-virus-scanning-it-context.md,continuation-59,"selective; see audit evidence, not every claim",see per-leaf safety/write/operating tables in continuation audit,active-memory-safety-write-audit-2026-10-22.md
+project-wave1-closeout-role-tail.md,continuation-59,"selective; see audit evidence, not every claim",see per-leaf safety/write/operating tables in continuation audit,active-memory-safety-write-audit-2026-10-22.md
+project-wave1-onboarding.md,continuation-59,"selective; see audit evidence, not every claim",see per-leaf safety/write/operating tables in continuation audit,active-memory-safety-write-audit-2026-10-22.md
+project-workbench-consolidation-rollout.md,remainder-46,selective; see remainder audit; not every claim or live state,confirmed guidance/pointer/history repair; parent-reviewed,active-memory-remainder-audit-2026-10-22.md
+reference-codex-detached-exec-protocol.md,continuation-59,"selective; see audit evidence, not every claim",see per-leaf safety/write/operating tables in continuation audit,active-memory-safety-write-audit-2026-10-22.md
+reference-codex-rescue-pkill-overstep.md,continuation-59,"selective; see audit evidence, not every claim",see per-leaf safety/write/operating tables in continuation audit,active-memory-safety-write-audit-2026-10-22.md
+reference-codex-rescue-plan-task-runs-readonly.md,continuation-59,"selective; see audit evidence, not every claim",see per-leaf safety/write/operating tables in continuation audit,active-memory-safety-write-audit-2026-10-22.md
+reference-codex-review-needs-a-committed-diff.md,remainder-75,selective; see remainder audit; not every claim or live state,owner policy retained; incidental implementation/external claims not fully verified,active-memory-remainder-audit-2026-10-22.md
+reference-dataverse-altkey-lookup-upsert-url.md,remainder-75,selective; see remainder audit; not every claim or live state,confirmed guidance/pointer/history repair; parent-reviewed,active-memory-remainder-audit-2026-10-22.md
+reference-dataverse-audit-trail-actor-detection.md,remainder-75,selective; see remainder audit; not every claim or live state,dated incident/tool evidence retained; current external behavior unknown,active-memory-remainder-audit-2026-10-22.md
+reference-staleness-ack-markers-single-line.md,remainder-75,selective; see remainder audit; not every claim or live state,owner policy retained; incidental implementation/external claims not fully verified,active-memory-remainder-audit-2026-10-22.md
+reference-staleness-ack-single-line.md,remainder-75,selective; see remainder audit; not every claim or live state,confirmed guidance/pointer/history repair; parent-reviewed,active-memory-remainder-audit-2026-10-22.md
+reference-vercel-logs-filtering.md,remainder-75,selective; see remainder audit; not every claim or live state,dated incident/tool evidence retained; current external behavior unknown,active-memory-remainder-audit-2026-10-22.md
+reference-vercel-sensitive-env-unreadable.md,remainder-75,selective; see remainder audit; not every claim or live state,dated incident/tool evidence retained; current external behavior unknown,active-memory-remainder-audit-2026-10-22.md
+reviewer-identity-fragmentation.md,remainder-55,selective; see remainder audit; not every claim or live state,confirmed guidance/pointer/history repair; parent-reviewed,active-memory-remainder-audit-2026-10-22.md
+reviewer-invite-capture-mode-not-full-sandbox.md,remainder-55,selective; see remainder audit; not every claim or live state,owner/history/prior repair retained; remaining behavior claims not fully verified,active-memory-remainder-audit-2026-10-22.md

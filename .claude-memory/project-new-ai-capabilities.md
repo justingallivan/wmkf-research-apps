@@ -1,10 +1,10 @@
 ---
 name: New AI Capabilities (Compliance + Matching)
-description: Two new capabilities planned — compliance screening against Foundation criteria, and three-tier staff/consultant/board proposal matching
+description: Expertise Finder shipped the staff/consultant/board matching capability; Compliance Screening is a planned capability whose current implementation status has not been freshly checked.
 type: project
 status: active
 scope: strategy
-last_verified: 2026-10-12 via Expertise Finder route/resolver source and expertise-finder-dynamics.js (prompt now a Dataverse row); compliance-screening absence last checked 2026-07-27
+last_verified: 2026-10-12 for Expertise Finder source; Compliance Screening absence was last checked 2026-07-27 only and current absence is unknown
 ---
 
 ## Recall Rule
@@ -17,11 +17,11 @@ Do:
   `expertise-finder.js`; production prompt rules in the Dataverse
   `expertise-finder.match` row, seeded from
   `shared/config/prompts/expertise-finder-dynamics.js`).
-- Build Compliance Screening (still unbuilt) via batch eval against historical Phase I proposals → iterate prompts → deploy as PA triggers; full PDFs but text-only extraction for cost at scale.
+- Compliance Screening was a proposed capability, and code absence was checked only on 2026-07-27. Its current implementation/status is unknown; confirm owner priority and current architecture before planning or building it. The batch-evaluation, full-PDF/text-only, and PowerAutomate sequence below is historical proposal, not a current build instruction.
 
 Do not:
 - Rebuild matching or assume it has "no UI" — that original framing was overtaken (S209).
-- Apply the "no-UI, batch-only, PA-deploy" framing to matching; it applies only to the still-unbuilt compliance piece.
+- Apply the old "no-UI, batch-only, PA-deploy" proposal to matching or treat it as an approved current compliance implementation plan.
 - Treat `modules/expertise_matching` as the production implementation; it is an
   isolated reference/demo with no production caller.
 
@@ -29,9 +29,10 @@ Ground truth: `pages/api/expertise-finder/*.js`, `expertise-finder.js`, and
 `shared/config/prompts/expertise-finder-dynamics.js` (row definition; live text
 is edited in Admin → Prompt Templates); production-call-path search found
 no caller from the app/API into `modules/expertise_matching`. Compliance-screen
-code was confirmed absent by the S209 source search.
+code was not found in the S209 source search (2026-07-27); that dated search does not
+establish current absence.
 
-Two new AI capabilities to develop via batch evaluation → production deployment:
+Historical capability framing (S209): two areas were discussed for development; the current state differs, with Expertise Finder shipped and Compliance Screening status unknown:
 
 **1. Compliance Screening**
 - Foundation has written criteria for what research they support/exclude
@@ -52,8 +53,8 @@ staff/consultant/board tiers are all covered.
 - **Board member expertise:** Identify board members with relevant knowledge
 - A colleague has made a first attempt at matching rules — starting point for prompts
 
-**Development approach:** Batch evaluation against historical Phase I proposals in Dynamics. Compare AI decisions against actual outcomes + staff judgment. Iterate on prompts until accuracy is acceptable, then deploy as automatic PowerAutomate triggers for new proposals.
+**Historical proposed development approach (not current authorization):** batch evaluation against historical Phase I proposals in Dynamics, compare with outcomes and staff judgment, then consider PowerAutomate triggers. Confirm current owner priority, data contract, and architecture before adopting this sequence.
 
-**Why:** (Original framing, partly overtaken — S209.) Matching has since shipped *with* a UI as Expertise Finder (see section 2); **Compliance Screening is still unbuilt** (no compliance-screen code exists — `git grep`/`find` return nothing). The original "build via batch scripts, no UI, deploy to PowerAutomate" framing applies to the still-unbuilt compliance piece; it was NOT how matching actually shipped.
+**Why:** The original framing is partly overtaken — matching shipped with a UI as Expertise Finder (see section 2). Compliance Screening absence was checked only in a 2026-07-27 source search; present status is unknown. The original batch/no-UI/PowerAutomate wording records a proposal, not evidence that the capability remains unbuilt or that this is its current delivery plan.
 
-**How to apply:** These share infrastructure with the service processing endpoints (Phase 2). Same auth, same prompt system, same Dynamics/SharePoint data access. The batch evaluation endpoint is the key new piece.
+**How to apply:** Treat the shipped Expertise Finder path and the proposed Compliance Screening capability separately. Any new compliance endpoint or batch workflow needs its own current contract, caller/auth review, and owner priority; the old proposal does not establish shared endpoint architecture or a required batch-evaluation endpoint.

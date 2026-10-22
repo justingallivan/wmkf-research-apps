@@ -1,6 +1,6 @@
 ---
 name: feedback-clear-jest-cache-in-shared-worktrees
-description: In shared multi-agent worktrees, clear the Jest cache before citable verification runs when intermittent false reds appear; cache involvement may be suspected but is not proven by this incident.
+description: For intermittent Jest failures after concurrent edits, preserve evidence and bound any diagnostic rerun; the S438 cache-cause hypothesis remains unproven.
 status: active
 metadata:
   type: feedback
@@ -8,17 +8,21 @@ metadata:
 
 ## Recall Rule
 
-Read this when multi-agent edits are followed by intermittent Jest failures
-that committed source cannot produce.
+Read this when concurrent edits are followed by an intermittent Jest failure
+that appears inconsistent with the exact source under test.
 
-Do: prove the failure is impossible from HEAD, clear Jest's cache, and require
-repeated green verification. Treat any post-clear recurrence as real.
+Do: preserve the failing output and identify the exact source/commit and run mode.
+If the failure is provably impossible from that source, perform at most a
+task-appropriate, bounded diagnostic rerun within the agreed verification ceiling.
+Clear cache only when there is a specific reason to test that hypothesis; the S438
+incident did not prove cache causation.
 
 Do not: label an ordinary red test as cache-related or claim cache causation
 without separate evidence.
 
-Ground truth: committed source, the failing test, and Jest's post-clear rerun;
-this memory records an incident lesson, not a guaranteed diagnosis.
+Ground truth: the exact source, failing test/output, and any bounded rerun. The
+cache cause in the S438 incident remains unknown; this memory does not prescribe
+repeated parallel runs or guarantee that clearing cache explains a failure.
 
 During the Stage 2 read-coalescing build (S438, branch
 `codex/claude-workbench-read-coalescing-stage2`), parallel cold-cache jest runs in a worktree
@@ -33,9 +37,9 @@ signature stayed unexplained.
 doubt a correct diff; conversely trusting "it flaked" without proving the failure is impossible
 from HEAD would hide real bugs.
 
-**How to apply:** after multiple agents have edited services in one worktree, run
-`npx jest --clearCache` before any verification run you intend to cite, then require N
-consecutive green parallel runs. If a failure recurs post-clear, treat it as real. Distinguish
-carefully: only call a red a false red when the assertion is provably unsatisfiable from committed
-source, and do not attribute its cause to cache without separate evidence. Related:
+**How to apply:** after concurrent edits, keep the task-appropriate run mode and verification
+budget explicit. Only call a red impossible when the assertion is provably unsatisfiable from
+the exact source being tested. A rerun or cache-clear is a bounded diagnostic, not a required
+ritual; recurrence warrants investigation but a single post-clear result does not establish
+cause. The S438 cache explanation remains unconfirmed. Related:
 [[feedback-scope-git-stash-in-shared-worktrees]].

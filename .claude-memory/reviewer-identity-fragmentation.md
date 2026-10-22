@@ -18,7 +18,7 @@ Do:
 - Treat de-fragmentation as a FLOW problem — propagate ORCID forward (intake, applicant-suggested capture) rather than a one-shot collapse; reuse the shipped resolver/backprop machinery.
 
 Do not:
-- Store remittance/banking PII in Dataverse — onboard reviewers at bill.com, keep only status + the join pointer.
+- Store bank-account, routing, or remittance details in Dataverse. The owner tabled the BILL API integration on 2026-07-12; do not re-enable it without a new owner decision. Stage 2a's existing mailing-address and phone fields support the owner's address-based onboarding plan through existing Foundation systems; that does not authorize storing banking details. Keep any BILL onboarding status and join pointer as a separate contract if BILL is authorized later.
 - Join applicants on `akoya_primarycontactid` (the Request's Liaison copy); the PI is `wmkf_projectleader`.
 - Run `--execute` table-drops autonomously — always grep live callers + back up first (as the W6 drop did: migration 018, 2026-06-04, with JSONL+Blob backup).
 
@@ -33,9 +33,11 @@ as live build work.** Per `docs/atlas/postgres-researchers.md` (W6 update
 surfaces carry zero reviewer-domain Postgres SQL — fully on `lib/dataverse/adapters/{reviewer-suggestion,potential-reviewer,contact,researcher}`
 + `grant-cycles-dataverse` (excluding the shared auth/profile tables and later operational roster state). Postgres `researchers` / `reviewer_suggestions` were drained and then **DROPPED 2026-06-04** via migration 018; `grant_cycles` is the separate Dataverse-primary drain concern. External-reviewer token
 hash/issue/expire/revoke live on the Dataverse `wmkf_appreviewersuggestion` row,
-not Postgres. The only Postgres touch in the request path is the shared
-cross-app auth gate (`requireAppAccess` → `user_profiles` + `dynamics_user_roles`),
-deliberately excluded from Wave 1 by design. If a future session is told to "do
+not Postgres. The shared cross-app auth gate (`requireAppAccess` → `user_profiles`
++ `dynamics_user_roles`) remains outside Wave 1 by design. The separate
+operational `reviewer_find_roster` table stores per-request Workbench Find
+state; it is not canonical reviewer identity storage and does not undo the
+migration or dropped tables. If a future session is told to "do
 the Reviewer Manager→Dataverse migration," stop — it landed W5/W6.
 
 **The fragmentation finding (sample-based forward-design FLAG, not a census).**
@@ -72,9 +74,14 @@ populated — a real collection gap; (C) identity linkage 100%; (D) amount $250.
 reviewer entity = likely `contact`, but it needs de-dupe + curation, not
 creation (the 87 already link via `akoya_primarycontactid`); (b) reuse existing
 identity machinery ([[project-dynamics-identity-reconciliation]]), not a new
-bridge; (c) **payment: do NOT store remittance/banking PII in Dataverse** (see
-[[project-no-banking-pii-in-dataverse]]) — onboard reviewers at bill.com, store
-only onboarding-confirmed status + the `wmkf_paymentnetworkidpni` join pointer.
+bridge; (c) **payment: do NOT store bank-account, routing, or remittance details
+in Dataverse** (see [[project-no-banking-pii-in-dataverse]]). The owner tabled
+the BILL API integration on 2026-07-12 and plans address-based onboarding via
+existing Foundation systems; Stage 2a's existing mailing-address and phone
+fields support that plan. Do not re-enable BILL without a new owner decision.
+If it is authorized later, keep its onboarding status and
+`wmkf_paymentnetworkidpni` join pointer separate from the prohibited payment
+details.
 What remains: an explicitly-deferred 5/87→census upgrade. (The gated `DROP TABLE`
 was executed 2026-06-04 via migration 018 — backed up + verified, not autonomous.)
 Do not re-derive the finding from scratch — cite this memory.

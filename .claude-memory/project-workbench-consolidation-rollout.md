@@ -1,6 +1,6 @@
 ---
 name: project-workbench-consolidation-rollout
-description: The Workbench is being rolled out to non-tech-savvy PD coworkers. Surfacing dead-end / now-automated manual UI (the old Reviewer Manager manual tracking steps) is actively harmful to that rollout — removing obsolete affordances is a priority, not cosmetic.
+description: Owner stated in S280 (2026-06-23) that the Workbench rollout serves non-technical PD coworkers and dead-end manual controls harm adoption. Treat this as dated rollout context; current route connectivity is unknown.
 metadata:
   type: project
   status: active
@@ -14,7 +14,7 @@ Read this when: planning workbench Reviewers-tab UI changes, deciding whether to
 keep/remove a manual affordance, or scoping the reviewer-finder/review-manager
 sunset.
 
-## The facts (owner, S280)
+## Dated owner context (S280, 2026-06-23)
 
 - **Goal:** ONE Workbench (`appRegistry` key `reviewers`) covering what the legacy
   Reviewer Finder + Reviewer Manager apps did. Admin access to grant the two legacy
@@ -27,7 +27,7 @@ sunset.
   these obsolete, no-op affordances confuses non-technical users and undermines the
   rollout. Removing them is a priority.
 
-## Reviewers sub-tab restructure + proposal-release trigger (owner, S280)
+## Dated Reviewers sub-tab restructure + proposal-release trigger (owner, S280)
 
 - **Sub-tabs collapse. [SHIPPED — commit `4d45b4c8`, the S280-planned collapse.]** The
   Reviewers tab now has **3 sub-tabs** (`Find · Invite Reviewers · Track Reviewers`,
@@ -56,14 +56,13 @@ sunset.
 duplicates an automated step) reads as "the app is broken / I did it wrong," not "an
 old affordance." That erodes trust in the tool the owner is trying to land.
 
-**How to apply:** the dead-end-UI audit and the code carve-out are ONE exercise. Walk
-the Reviewers tab affordance-by-affordance (`shared/components/reviewers/*`:
-`ReviewersTab`, `ReviewerManagePanel`, `ReviewerInvitePanel`) and classify each control
-keep vs now-automated-dead-end. Removing a dead-end affordance also lets its backing
-route/component be deleted — which SHRINKS the surface that then needs renaming. Do
-the UI dead-end removal first (rollout-blocking + reduces scope), then renomenclature
-the smaller live surface. Pairs with SESSION_PROMPT next-step 0b and
-`docs/agent-wiki/topics/reviewer-workbench-lifecycle.md`. The connectivity map (which
-legacy routes are live-via-Workbench vs orphaned) was traced in S280. Related:
+**How to apply:** treat the UI audit and any route/component retirement as separate
+evidence-backed decisions. For each proposed removal, inspect current UI callers, API
+callers, background consumers, and owner-approved scope first; hiding a control does not
+show that its route or component is unused. The S280 connectivity map is historical;
+current route connectivity is UNKNOWN until those callers and consumers are checked.
+Preserve the owner’s audience/rationale, manual Release decision for this cycle, and
+future status-trigger direction. Do not use old SESSION_PROMPT next-step 0b as authority
+for automatic retirement. Related:
 [[feedback-rename-code-not-just-docs]], [[project-deferred-code-cleanup]],
 [[feedback-verify-before-destructive-carryover]].

@@ -1,19 +1,20 @@
 ---
 name: reference-dataverse-altkey-lookup-upsert-url
-description: Dataverse alternate-key upsert URL whose key includes a LOOKUP must address the lookup by `_<lookup>_value=<guid>` (the value attribute), NOT the bare logical name or nav property — else 400 0x80060888. Verified in prod S302.
+description: Historical S302 evidence and current source pointer for the reviewer-answer alternate-key URL; lookup component uses `_<lookup>_value=<guid>`, with no current production re-probe implied
 metadata:
   type: reference
   status: active
   scope: dataverse
-  last_verified: S302 (2026-06-28) via scripts/probe-altkey-upsert-changeset.mjs --execute against prod
+  last_verified: 2026-10-22 via current source-pointer review; S302 production probe remains historical evidence
 ---
 
 ## Recall Rule
 
-Read before building any Dataverse upsert/PATCH/DELETE addressed by an **alternate
-key that includes a lookup column**. The intuitive URL forms fail; only one works.
+Read before changing or using the `wmkf_appreviewanswer` alternate key described
+below. The S302 probe tested this specific key and URL form; do not generalize its
+result to other Dataverse keys without evidence.
 
-## The fact (verified S302, 2026-06-28)
+## Historical probe evidence (S302, 2026-06-28)
 
 For the `wmkf_appreviewanswer` alt key `wmkf_appreviewanswer_suggestion_question_key`
 on `(wmkf_appreviewersuggestion, wmkf_questionkey)` — where `wmkf_appreviewersuggestion`
@@ -39,11 +40,14 @@ the body needed.
   and `field='<value>'` for scalar string components. No leading slash (it's a path
   relative to the v9.2 data root, as [[project-dataverse-batch-changeset-available]]'s
   `executeChangeset` expects).
-- Live use: the reviewer `/submit` route (`pages/api/external/review/[token]/submit.js`,
-  `ANSWER_KEY_LOOKUP_ATTR`) upserts the answer-snapshot child rows this way inside one
-  atomic changeset; `0x80060888` from a changeset means the key URL form is wrong, not
-  that `$batch`/the key is broken.
-- The probe `scripts/probe-altkey-upsert-changeset.mjs` re-validates the form (and
-  `executeChangeset` end-to-end) in prod; it self-cleans its `__probe_uk*` rows.
+- Current source pointer: `ANSWER_KEY_LOOKUP_ATTR` and URL builders are in
+  `lib/dataverse/adapters/review-answer.js:58,262-279` and
+  `lib/external/review-answer-snapshot.js:70,79-84`. The external `/submit` route
+  (`pages/api/external/review/[token]/submit.js`) delegates to `submitReview`; it is
+  not the URL-builder location. This pointer update does not change the wire contract
+  or assert current production metadata/state.
+- `scripts/probe-altkey-upsert-changeset.mjs` records the historical S302 production
+  probe only; do not treat this note as authorization or an instruction to re-probe
+  production.
 
 Related: [[project-dataverse-batch-changeset-available]], [[feedback-verify-external-platform-claims]].

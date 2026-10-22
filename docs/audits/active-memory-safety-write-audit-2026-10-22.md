@@ -1,6 +1,9 @@
 # Active memory safety and write-instruction audit — 2026-10-22
 
-**Status: AUDIT INCOMPLETE.** This continuation checks a named sample of active
+**Status: checkpoint `cb18820d0`; all-claim audit INCOMPLETE.** The later
+[remaining-memory audit](active-memory-remainder-audit-2026-10-22.md) closes the
+active whole-read inventory and supersedes this report’s remaining-read queue.
+ This continuation checks a named sample of active
 memories against repository source and current owner decisions. It does not
 certify all active memories or current external configuration. Sol investigated;
 Luna edits confirmed defects; the parent reviews and runs local checks. Final
@@ -179,7 +182,7 @@ source-checked at `tests/unit/email-source-pairing-invariant.test.js:39,49-101`.
 Path-scoped rule delivery is not proof a whole-file read happened. No checker,
 hook, or test behavior was changed to alter those limits.
 
-## Coverage and next queue
+## Historical read-inventory checkpoint and then-next queue
 
 The companion CSV enumerates all 272 active leaves present in this census. It
 separates the 37 active leaves in the earlier 38-leaf sample (one was closed),

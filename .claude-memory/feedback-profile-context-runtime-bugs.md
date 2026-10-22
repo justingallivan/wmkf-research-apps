@@ -5,7 +5,7 @@ metadata:
   type: feedback
   status: active
   scope: auth
-  last_verified: 2026-07-27 via shared/context/ProfileContext.js guards; incident and smoke evidence remain historical S203-S204
+  last_verified: 2026-10-22 via ProfileContext/auth-guard source review; incident and smoke evidence remain historical S203-S204
 ---
 
 ## Recall Rule
@@ -15,7 +15,7 @@ Read this when: doing load-bearing async/effect React work (contexts, mount effe
 Do:
 - Check `response.ok` before any irreversible action (delete/purge/overwrite) — `fetch()` does not throw on HTTP errors.
 - Use a `useRef` to read changing state inside a callback that is itself an effect dependency, so deps stay stable.
-- Manually smoke-test (mount, switch profile, simulate a failing save) before calling such a refactor done; lint+tests+build green is not sufficient.
+- Verify mount/profile-switch/failure behavior with the current authentication policy in an approved isolated test environment; lint+tests+build green may not expose every runtime-only effect issue.
 
 Do not:
 - Assume CI (lint + jest + build) catches runtime-only effect loops or fetch-error data-loss paths — both S203 bugs passed CI clean.
@@ -31,6 +31,12 @@ The S203 atomic-state-machine refactor of `shared/context/ProfileContext.js` —
 
 **Why:** Two reusable root causes. (a) `fetch()` doesn't reject on HTTP error status — any `await fetch` that gates an irreversible/destructive action (delete, purge, overwrite) MUST check `response.ok` first. (b) A callback that depends on state it also causes to change, when that callback is itself an effect dependency, is a self-retriggering loop — use a `useRef` to *read* the changing state inside the callback without taking it as a dependency.
 
-**How to apply:** For load-bearing async/effect code, "lint + tests + build green" is NOT sufficient evidence of correctness — both bugs were runtime-only and invisible to CI. Manually smoke-test (mount the app, switch a profile, simulate a failing save) before calling such a refactor done. Related: [[feedback-real-fix-not-design-note]], [[feedback-apply-reconcile-to-fix-work]]. Design doc: `docs/PROFILE_CONTEXT_REFACTOR_SUMMARY.md`.
+**How to apply:** For load-bearing async/effect code, "lint + tests + build green" may not be sufficient evidence of correctness — both historical bugs were runtime-only and invisible to CI. Verify mount/profile-switch/failure behavior with the current auth policy in an approved isolated test environment. Do not use `AUTH_REQUIRED=false` as a substitute for authenticated testing or as a live-access recipe: `requireAppAccess` returns an auth-bypassed context before its Origin/CSRF and session checks. The S204 bypassed local smoke is retained below only as historical evidence. Related: [[feedback-real-fix-not-design-note]], [[feedback-apply-reconcile-to-fix-work]]. Design doc: `docs/PROFILE_CONTEXT_REFACTOR_SUMMARY.md`.
 
-**CLOSED S204 (2026-05-30).** The mandatory smoke test was done and the refactor verified three ways: (1) 5 regression tests added — `tests/unit/profile-context.test.js`, commit `62b0640` — pinning both bugs (each confirmed to go RED when the bug is reintroduced) plus the stale-flash and out-of-order-request guards; (2) server-log analysis under a local `npm run dev` (auth bypassed via temporary `AUTH_REQUIRED=false` + dev `NEXTAUTH_SECRET` in `.env.local`, reverted after): bounded request pattern, fresh `GET /api/user-preferences?profileId=<new>` on every switch, no loop, no cross-profile bleed; (3) Justin's browser pass: correct per-profile settings + persistence, no leak. The file previously had ZERO tests — that gap is now closed, so a reintroduction is CI-caught. Local-dev auth note: full Azure login can't run on localhost (no `localhost:3000` redirect URI), so `AUTH_REQUIRED=false`+dev secret is the way to smoke-test gated UI locally; the fire-and-forget `PATCH /api/user-profiles` 401s harmlessly under that bypass.
+**Historical S204 closeout (2026-05-30; preserved incident evidence, not current execution or procedure).** The mandatory smoke test was done and the refactor verified three ways: (1) 5 regression tests added — `tests/unit/profile-context.test.js`, commit `62b0640` — pinning both bugs (each confirmed to go RED when the bug is reintroduced) plus the stale-flash and out-of-order-request guards; (2) server-log analysis under a local `npm run dev` (auth bypassed via temporary `AUTH_REQUIRED=false` + dev `NEXTAUTH_SECRET` in `.env.local`, reverted after): bounded request pattern, fresh `GET /api/user-preferences?profileId=<new>` on every switch, no loop, no cross-profile bleed; (3) Justin's browser pass: correct per-profile settings + persistence, no leak. The file previously had ZERO tests — that gap is now closed, so a reintroduction is CI-caught.
+
+The old follow-on claim that full Azure login cannot run on localhost and that an
+auth bypass is the current smoke recipe is withdrawn. `docs/AUTHENTICATION_SETUP.md`
+documents a localhost callback and authenticated local setup; actual tenant redirect
+registration is UNKNOWN in this audit. The recorded bypass did not exercise current
+CSRF/session/profile authorization and does not authorize a new bypass or live access.

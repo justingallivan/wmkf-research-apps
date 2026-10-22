@@ -1,8 +1,8 @@
 ---
 name: project-local-docker-is-colima
-description: "On the owner's Mac, Docker runs through Colima (no Docker Desktop app): start it with `colima start`. The Test Request Factory's throwaway ledger Postgres is the container wmkf-ledger-pg (postgres:16, 127.0.0.1:5433, password ledger, db ledger)."
+description: "Dated local setup: Test Request Factory ledger suites can use a throwaway Postgres container through Colima. Current Colima/container presence is unknown; verify locally before use."
 status: active
-last_verified: 2026-10-05 via colima/docker on PATH, docker context colima, and docker inspect of wmkf-ledger-pg (127.0.0.1:5433, db and password ledger)
+last_verified: 2026-10-05 dated local Colima/container observation; current presence unknown
 metadata:
   type: project
 ---
@@ -22,6 +22,12 @@ application named 'Docker'"); `/opt/homebrew/bin/colima` and `docker` exist.
 Then `TEST_REQUEST_LEDGER_TEST_URL=postgres://postgres:ledger@127.0.0.1:5433/ledger`
 and run the two `.pg.test.js` suites with `--runInBand` (running them in
 parallel on a fresh database races on schema creation and fails spuriously).
-[VERIFIED 2026-10-05] The running `wmkf-ledger-pg` uses `postgres:16-alpine`, not
-`postgres:16`; either image works for these suites. When migration 054 changes, drop `test_request_run_resources`,
-`test_request_runs` and `test_request_receipt_ok(jsonb)` first.
+[OBSERVED 2026-10-05] The then-running `wmkf-ledger-pg` used `postgres:16-alpine`;
+that observation does not establish current container presence. The ledger proof at
+`tests/integration/test-request-run-ledger.pg.test.js` requires an explicit scratch/local
+`TEST_REQUEST_LEDGER_TEST_URL` and refuses Neon or the shared `POSTGRES_URL`. Its
+fixtures create a random isolated schema and clean up only the rows/schema they create.
+
+Migration 054 is tracked by the durable migration ledger. Applied migration files are
+checksum-immutable: schema changes must use a new numbered forward migration. Do not
+drop ledger tables or replay the migration as a generic response to a migration change.
