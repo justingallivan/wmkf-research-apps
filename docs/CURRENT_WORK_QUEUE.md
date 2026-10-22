@@ -121,7 +121,7 @@ sequence.
   Await colleague feedback and explicit implementation scope before a suite-wide rename.
 
 - **Overlapping cycles with minimal configuration (2026-10-21).**
-  [SOURCE INVESTIGATION COMPLETE; DELIVERY PLAN PROPOSED; NOT IMPLEMENTED]
+  [SOURCE INVESTIGATION AND BOUNDED LIVE CENSUS COMPLETE; DELIVERY PLAN PROPOSED; NOT IMPLEMENTED]
   Owner requested a cross-app plan after three read-only agents inventoried
   cycle selection, settings, jobs and schema. Proposed delivery: verify the
   operations calendar contract, isolate reviewer dates per cycle, make app
@@ -129,9 +129,12 @@ sequence.
   surface only actionable rollover exceptions in one readiness view.
   `docs/plans/CYCLE_ROLLOVER_MINIMAL_CONFIGURATION_PLAN_2026-10-06.md`
   now contains the evidence, migration order and acceptance scenarios.
-  No live state was re-probed, runtime change authorized or queue priority changed.
-  The production-derived schema snapshot defines operations `wmkf_grantcycle`
-  and a request lookup; current population and date propagation remain unknown.
+  Foundational read-only Production checks now verify shared roles/assignments,
+  cycle rows, selected settings and request/GOApply linkage. Evidence and remaining
+  owner/Connor questions: `docs/audits/cycle-foundations-2026-10-21.md`. J27
+  exists in operations; D27 does not yet. Calendar-role selection, intended
+  Research opportunity/publication and date propagation remain unresolved.
+  No runtime/live write or queue-priority change was made.
   Historical interim safeguard: owner-reported Production preparation list
   `["D26","J27"]`, redeployed 2026-10-07 (J27-084), not read back this session.
   Coordinate implementation with J27 row 8; routine future rollover should need
