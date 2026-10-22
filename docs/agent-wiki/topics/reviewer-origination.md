@@ -121,9 +121,11 @@ sparse-tail toolkit, not a mandate to replace Claude.
   not on name.** The issue was unanchored keyword→author mechanism, not keywords per se.
   Canonical: `docs/REVIEWER_FINDER_SPARSE_PROPOSAL_ANCHOR_STRATEGY.md` §12; memory
   `project-reviewer-origination-multilane`.
-- **Retrieval-redesign framing (S231):** demote the Claude generator to a
-  field-routed retrieval/fan-out over an OpenAlex+ORCID spine, reusing the existing
-  resolver + ranker. Canonical: `docs/REVIEWER_FINDER_RETRIEVAL_REDESIGN_PLAN.md`;
+- **Historical retrieval-redesign framing (S231; primary-engine cutover deferred
+  by S246):** proposed demoting the Claude generator to field-routed retrieval/
+  fan-out over an OpenAlex+ORCID spine. Retain Claude-assisted origination under
+  the current posture above; this proposal supplies sparse-tail experiment rationale,
+  not a current replacement instruction. Historical design: `docs/REVIEWER_FINDER_RETRIEVAL_REDESIGN_PLAN.md`;
   memory `project-reviewer-finder-retrieval-redesign`.
 - **Recall-over-precision reframe (S238):** review is a floor/gate, not a ranker.
   Optimize coverage/spread, surface-don't-silently-drop, grade COI rather than hard
@@ -147,9 +149,11 @@ sparse-tail toolkit, not a mandate to replace Claude.
 ## Track B — Archived Dormant Code
 
 **Status: OFF, archived in code (S248).** `DiscoveryService.TRACK_B_ENABLED = false`
-(`lib/services/discovery-service.js`) gates the four Track-B DB-search blocks. The code
-is **intact and dormant**, kept for future repurposing — flip the one constant to
-re-enable. This is a code-level switch by design, **NOT** an admin/user toggle and **NOT**
+(facade in `lib/services/discovery-service.js`, value owned by
+`lib/services/discovery/constants.js`) gates the four Track-B DB-search blocks. The
+code is **intact and dormant**, kept for future repurposing. Changing the constant
+alone cannot restore the lane: query generation must also be restored and validated
+(see the reactivation requirements below). This is a code-level switch, **NOT** an admin/user toggle and **NOT**
 `searchPubmed` (that flag also routes Track-A verification via `suggestionVerifierRouting`,
 so flipping it would change Track A through coupled behavior).
 
@@ -188,13 +192,15 @@ bare keyword→author lane is what underperformed.
 
 ## Operating Notes
 
-- **Route→Service layout (Stage 7, 2026-07-05): the reviewer-finder routes are
-  thin shells; origination business logic lives in `lib/services/reviewer-finder/`
-  (plus the flat discovery/dedup services).** Routes may not import
-  `lib/dataverse/adapters/*` or `lib/services/dynamics-service` — enforced by
-  `check:route-service-boundary` (law mode) `[VERIFIED via the gate run at
-  census 0, 2026-07-05; docs/ROUTE_SERVICE_CONSOLIDATION_PLAN.md]`. Edit the
-  service, not the route, when changing lane/ranking behavior.
+- **Route/service ownership (source checked 2026-10-22):** extracted operations
+  live in `lib/services/reviewer-finder/` and the discovery/dedup services, but
+  `pages/api/reviewer-finder/discover.js` retains orchestration, exclusion and
+  author/institution filtering, referral integration, and the final rank invocation.
+  Trace the relevant route and service together before changing lane/ranking behavior.
+  Routes may not import `lib/dataverse/adapters/*` or
+  `lib/services/dynamics-service`; that import boundary remains enforced by
+  `check:route-service-boundary`. The July Stage-7 extraction record does not mean
+  every reviewer-finder route is now a thin shell.
 - **Web-discovery via an ungrounded LLM was EVALUATED and ABANDONED (S230).**
   The Perplexity reviewer-agent produced ungrounded reviewers and affiliations.
   Keep reviewer web discovery grounded before using it. Memory
@@ -238,9 +244,12 @@ bare keyword→author lane is what underperformed.
   labeled attribution on the Invite card (`ReviewerInvitePanel.js` `CandidateRationale`)
   does not repeat it in the "Why" prose. Rows written before S424 are genuinely
   ambiguous and keep the lossy legacy parse.
-- **Results list has a Rank⇄A–Z sort toggle (S318, shipped).** Default is
-  confidence/relevance rank; A–Z sorts by name *within* each provenance group (grouping
-  preserved). `ReviewerSearchSection.js` `sortMode`.
+- **Results list has a Rank⇄A–Z sort toggle (introduced S318).** The current
+  `useReviewerSearchProjection.js` groups actionable results by **Ready to add to
+  Invite** / **Needs review**. Default preserves server confidence/relevance order;
+  A–Z sorts names within each readiness section. Provenance remains available in
+  card Details and supporting counters, rather than determining the primary groups.
+  The original S318 provenance-group layout is historical.
 - **Analyze request metadata now comes from Dataverse; `requestId` is required (S319).**
   Title/PI/Co-PIs/institution/abstract are authoritative on `akoya_request`, so the analyze
   route loads them via `reviewer-request-context.js`, the prompt is slimmed to scientific

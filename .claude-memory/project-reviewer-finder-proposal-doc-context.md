@@ -5,7 +5,7 @@ metadata:
   type: project
   status: active
   scope: reviewer
-  last_verified: 2026-08-17 via owner direction, integration source/tests, prompt source, and prior live current-cycle probe
+  last_verified: 2026-10-22 via load-proposal-service, ReviewerFindPanel, and implementation-commit ancestry; August request-file probe remains historical
 ---
 
 ## Recall Rule
@@ -36,16 +36,22 @@ ambiguous fallback returns the server-listed picker before download/Blob write.
 An explicit authenticated `fileKey` remains available only for deliberate
 historical/ad-hoc staff analysis.
 
-**Current branch status (2026-08-01; not deployed):**
-`codex/reviewer-proposal-binding-refresh` persists a deliberate authenticated
+**Repository implementation (source and Git ancestry checked 2026-10-22):**
+The implementation is on `main` (commits `fe30d3b8b` and `810e497ac` are
+ancestors of HEAD). It persists a deliberate authenticated
 dropdown choice in validated `?proposalFile=` navigation state. Refresh replays
 the exact file key, the server re-lists the request's files before accepting it,
 and the existing cache contract prevents a new random Blob URL for the same key
 from rerunning applicant enrichment. A stale or cross-request key fails closed
-and returns to the picker. The same branch now implements the automatic exact
-fallback while preserving canonical-first precedence. Request `1003010` has no
-canonical package and does have that exact Phase I file, so the patched resolver
-selects it without staff input. [VERIFIED via source + focused tests; request
+and returns to the picker. The loader implements the automatic exact
+fallback while preserving canonical-first precedence. This is repository evidence,
+not a fresh hosted-deployment check.
+
+**Historical branch/probe record (2026-08-01):**
+`codex/reviewer-proposal-binding-refresh` was then recorded as not deployed.
+At that probe, request `1003010` had no
+canonical package and did have that exact Phase I file, so the patched resolver
+selected it without staff input. [VERIFIED via source + focused tests; request
 file availability verified 2026-08-01 via owner correction + read-only
 Dataverse/SharePoint probe]
 
@@ -77,6 +83,9 @@ Reviewer-finder quality is gated by the proposal context it sees. Phase I's thin
   `Phase I/ProjectDescription.pdf` rule above; other files remain deliberate,
   server-validated dropdown choices. `Project Narrative.pdf` was an owner-
   corrected naming mistake and is not the current-cycle fallback.
-- Consider surfacing Claude-origin (and the greyed "needs identity review" Claude names) in the Workbench Find tab the way the standalone does, so the PD can see what Claude found.
+- Use the current Workbench readiness sections and card Details for source/provenance
+  behavior (`useReviewerSearchProjection.js`); the June standalone-parity suggestion
+  was historical UX exploration, not a current requirement to restore that layout.
+  Keep exact document selection separate from display grouping.
 
 Related: [[project-grant-phasing-evolution]], [[project-reviewer-finder-retrieval-redesign]], [[project-reviewer-finder-next-topics]].

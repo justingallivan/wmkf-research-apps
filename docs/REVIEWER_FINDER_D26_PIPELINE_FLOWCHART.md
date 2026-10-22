@@ -119,7 +119,9 @@ off / abandoned / deferred (don't wire in).
   inversion.
 - **Track B — OFF, archived in code (S248).** `DiscoveryService.TRACK_B_ENABLED = false`
   gates the four DB-search blocks; the Track-B code is left **intact and dormant** for future
-  repurposing (flip the one constant to re-enable). It contributed ~0 to the saved set last
+  repurposing. The original flip-only shortcut is superseded: S253 removed analyze
+  query generation, so reactivation also requires restoring and validating that
+  contract (see the wiki's "To re-enable / repurpose" requirements). It contributed ~0 to the saved set last
   cycle (origination plan §1: `scholarly-only-saved ≈ 0`, by construction — pre-resolution
   dedup + identity budget + save-gate) and Claude alone supplies enough even at count=12. The
   switch is deliberately code-level (NOT `searchPubmed`, which also routes Track-A

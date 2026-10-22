@@ -16,6 +16,25 @@ related:
 
 # Reviewer Finder — Prompt Decomposition & Grounded Field-Review Design
 
+## Current routing and historical scope
+
+The body below preserves the S244 design of 2026-06-11 and its later explicitly
+dated updates. Its "today," "now," and D26 build instructions describe that design
+baseline, not current implementation requirements. S246 subsequently retained
+Claude-assisted origination and staff curation as the primary engine; the
+retrieval-first query-planner/synthesizer proposal remains deferred as an engine
+replacement. It may inform a separately scoped sparse-tail experiment.
+
+Track B was archived off in S248, and S253 removed analyze query generation. The
+historical ~92–98% Track-B ratio is a probe observation, not a current contribution
+measurement. Do not treat §7's Track-B one-pager work as authorized current work
+or infer that existing shared recency ranking is missing. Current source behavior,
+reactivation prerequisites, and open owner policy decisions live in
+`docs/agent-wiki/topics/reviewer-origination.md`; this boundary does not classify
+every proposed component below as absent from the repository.
+
+## Historical design record
+
 > **Status:** DESIGN, pre-implementation (2026-06-11, Session 244). For Codex
 > pre-impl review before any code. Captures the Justin↔Claude design session that
 > decomposes the monolithic `reviewer-finder.analyze` prompt into a chain of

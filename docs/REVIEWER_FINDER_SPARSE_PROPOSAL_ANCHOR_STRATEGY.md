@@ -16,6 +16,26 @@ related:
 
 # Reviewer Finder - Sparse Proposal Anchor Strategy
 
+## Current routing and historical scope
+
+The design and probe findings below record the S239 discussion of 2026-06-10;
+their references to "current" behavior and missing controls describe that baseline,
+not today's implementation inventory. S246 subsequently retained Claude-assisted
+origination and staff curation as the primary engine. The ORCID-works-anchored
+multilane design remains a targeted sparse-tail experiment, not an approved engine
+replacement. Track B was archived off in S248, and S253 removed analyze query
+generation; neither this design nor its probes authorizes reactivation.
+
+Shared recency ranking is already implemented. Revalidate the historical §12.7
+recency item for the proposed lane/probe evidence; it does not justify rebuilding
+the shared ranker.
+Revalidate the remaining historical integration and COI checklist against source
+before any separately scoped build. For current source behavior, reactivation
+prerequisites, and open owner policy decisions, use
+`docs/agent-wiki/topics/reviewer-origination.md`.
+
+## Historical design and probe record
+
 Status: **Strategy / validated direction** (not yet built). This document captures the
 2026-06-10 strategy discussion for the current grant cycle, where proposals do not
 reliably contain formal bibliographies. **§12 records what three S239 read-only probes
