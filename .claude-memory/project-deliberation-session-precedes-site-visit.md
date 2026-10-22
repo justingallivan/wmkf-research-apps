@@ -5,6 +5,7 @@ metadata:
   node_type: memory
   type: project
   status: active
+  last_verified: 2026-10-21 via owner-approved workflow vocabulary; runtime wording migration remains pending
   originSessionId: 42ef6bd1-176f-4e4c-8aac-52e98856079b
   modified: 2026-10-06T20:45:32.159Z
 ---
@@ -14,12 +15,12 @@ Read when reviewing Meeting Tracker session chronology or placing deliberation
 events in a timeline. A deliberation session is the internal staff briefing held
 before the research presentation; use the workflow plan for terminology and sequence.
 
-Owner decision, 2026-10-06: a Meeting Tracker deliberation session is an internal
+[VERIFIED — owner decision, 2026-10-06] A Meeting Tracker deliberation session is an internal
 staff briefing held **before** the site visit (research presentation) to agree
 what staff should address there. Lifecycle order: a PD prepares the pre-site
 briefing and shares it with staff and select Board members → deliberation session,
 where the briefing and proposal are discussed → site visit (research presentation)
-→ working writeup → group review → leadership review.
+→ Draft writeup → group review → leadership review.
 
 Vocabulary was approved after colleague review on 2026-10-21, with Draft writeup replacing the proposed Post-presentation writeup. See `docs/NOMENCLATURE_GLOSSARY.md` and the approved table at `docs/plans/review/PROPOSAL_WORKFLOW_VOCABULARY_2026-10-19.md`. The deck and mockups are updated; runtime migration remains pending.
 

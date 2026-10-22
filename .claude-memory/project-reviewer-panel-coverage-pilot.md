@@ -8,7 +8,7 @@ metadata:
   last_verified: 2026-10-21 via owner decisions and saved planning documents
 ---
 
-## Recall rule
+## Recall Rule
 
 Read when considering Reviewer Finder changes for the single-phase submission or panel complementarity. **PARKED by Justin on 2026-10-21:** other single-phase submission work takes priority. A gap and potential solution are recorded; this is not an active build or pilot task.
 

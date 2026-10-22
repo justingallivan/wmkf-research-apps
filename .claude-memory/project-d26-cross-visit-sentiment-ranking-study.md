@@ -4,6 +4,7 @@ description: Parked owner-requested study comparing cycle staff discussion senti
 metadata:
   type: project
 status: active
+last_verified: 2026-10-18 via Session 617 production readback recorded in the discussion attribution correction brief; historical verification, not a fresh probe
 ---
 
 ## Recall Rule
@@ -15,7 +16,7 @@ Do not: self-authorize production reads, treat completion of the correction as a
 
 ## Current prerequisites — 2026-10-18
 
-**[VERIFIED via production readback in Session 617]** The two scoped attribution corrections and their accepted current sentiment analyses are complete. This closes the earlier cleanup prerequisite; do not repeat the repair. Summary regeneration/review/publication is also complete.
+**[VERIFIED via production readback in Session 617, 2026-10-18]** The two scoped attribution corrections and their accepted current sentiment analyses are complete. This closes the earlier cleanup prerequisite; do not repeat the repair. Summary regeneration/review/publication is also complete. Historical verification is recorded in `docs/plans/DISCUSSION_MISATTRIBUTION_BRIEF_2026-10-17.md` under Current disposition; this note does not assert a fresh production readback.
 
 **Parked / owner decision needed:** confirm read-only authorization and scope for ranking records, accepted sentiment rows, transcripts and attendance; confirm the ranking round is final (otherwise use a dated snapshot); reconfirm the memo audience before extraction. Earlier tooling/permission limitations must be checked afresh rather than assumed to still apply.
 
