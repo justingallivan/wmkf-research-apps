@@ -10,7 +10,12 @@ and cleanup paths have since shipped.
 
 ## Source of truth
 
-**Postgres-primary, but SCRATCHPAD only.** This table holds the in-progress autosave state for the external reviewer in-browser review form — one row per review, keyed by `suggestion_id` (the `wmkf_appreviewersuggestion` GUID). It is NOT the system of record for a submitted review: on final submit, the route maps the draft into Dataverse `wmkf_appreviewanswer` snapshot child rows, patches the parent affiliation/finality fields, then deletes the draft. A reviewer's authoritative, point-in-time answers live in Dataverse (see [dataverse-wmkf-appreviewanswer.md](dataverse-wmkf-appreviewanswer.md)).
+**Postgres-primary, but SCRATCHPAD only.** This table holds the in-progress autosave state for the external reviewer in-browser review form — one row per review, keyed by `suggestion_id` (the `wmkf_appreviewersuggestion` GUID). It is NOT the system of record for a submitted review: on final submit, the service sanitizes and validates the request's `answers` payload, commits Dataverse `wmkf_appreviewanswer` snapshot rows and parent affiliation/receipt state atomically, then attempts draft deletion best-effort. It does not re-read this table as final-submit authority, and a preceding successful autosave is not required. A reviewer's authoritative, point-in-time answers live in Dataverse (see [dataverse-wmkf-appreviewanswer.md](dataverse-wmkf-appreviewanswer.md)).
+
+The editor may rehydrate from a draft before editing, but submission sends its
+current in-memory values. A failed post-commit draft deletion does not undo the
+review or turn success into failure. The [review-record authority map](dataverse-wmkf-appreviewanswer.md#review-record-authority)
+separates scratch drafts, submitted answers, receipts and file pointers.
 
 Same reasoning as `intake_drafts`: autosave fires many times per session, and Dataverse is the wrong store for high-frequency partial writes.
 
@@ -35,5 +40,5 @@ Same reasoning as `intake_drafts`: autosave fires many times per session, and Da
 ## Lifecycle / gotchas
 
 - **Finality is enforced in the ROUTE, not this layer.** The "refuse once submitted" check reads `wmkf_reviewreceivedat` from Dataverse; `ReviewDraftService` is pure Postgres and has no finality awareness.
-- **Draft survives benign email resends and explicit token regeneration; it dies on submit, explicit revoke, or 90-day GC.** Drafts key on `suggestion_id`, stable across token regeneration. Regeneration is the replacement-link recovery action and preserves in-progress work. If compromise response must discard possibly tampered draft state, staff revoke first; revocation deletes the draft best-effort before any deliberate replacement token is issued.
+- **Draft survives benign email resends and explicit token regeneration; submit and explicit revoke attempt cleanup best-effort, with 90-day GC as later cleanup.** Drafts key on `suggestion_id`, stable across token regeneration. Regeneration is the replacement-link recovery action and preserves in-progress work. If compromise response must discard possibly tampered draft state, staff revoke first; revocation deletes the draft best-effort before any deliberate replacement token is issued.
 - **Two-tab autosave is last-write-wins** — a single reviewer is the only writer and there is no async drain to corrupt, so no idempotency key.

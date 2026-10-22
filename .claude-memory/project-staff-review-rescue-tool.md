@@ -58,15 +58,23 @@ boundaries in [[project-review-form-checkbox-questions]].
 deployment `dpl_BjkM3tjopMpRWPMwn3NRgtB4CHSU` reported Ready and holds the live aliases.
 
 - `ReviewsTab` offers **Enter review manually** only on accepted, outstanding rows.
-- `ManualReviewEntryForm` GETs the authoritative live question set/version and current
-  affiliation, then reuses `ReviewQuestionFields` from `ReviewAuthoringForm`, including
-  the rich-text editor. It has no autosave and clearly labels submission as final.
-- POST re-reads acceptance/receipt state and the parent ETag, rejects stale question
-  versions, sanitizes rich text, runs the full external validator and canonical
+- `ManualReviewEntryForm` GETs the rendered question set/version through cached
+  `getActiveQuestionSet`, plus current affiliation, then reuses
+  `ReviewQuestionFields` from `ReviewAuthoringForm`, including the rich-text editor.
+  It has no autosave and clearly labels submission as final. The July implementation
+  description called this GET authoritative/live; freshness authority is at POST, below.
+- POST re-reads acceptance/receipt state and the parent ETag, resolves the uncached
+  `getAuthoritativeQuestionSet`, requires the submitted version to match, sanitizes
+  rich text, runs the full external validator and canonical
   `buildReviewSubmission()`, then commits parent + every answer row atomically.
 - The parent is marked `wmkf_reviewuploadedbystaff=true`; any stale portal draft is
   deleted best-effort only after the Dataverse commit. A received review is locked
   against retry overwrite, and a concurrent parent change returns a retryable conflict.
+
+The [review-record authority map](../docs/atlas/dataverse-wmkf-appreviewanswer.md#review-record-authority)
+distinguishes this full-form snapshot from legacy partial receipt/file paths.
+The cached GET/fresh POST distinction was checked against source on 2026-10-22;
+this is not a new question publication or a fresh deployment check.
 
 ## Why not just keep the panel buttons
 

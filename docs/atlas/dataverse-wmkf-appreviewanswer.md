@@ -8,9 +8,45 @@
 
 ## Source of Truth
 
-Point-in-time **answer snapshot** for an external reviewer's submitted review. One row per submitted question, each storing the question text exactly as asked beside the answer, so a submitted review reconstructs losslessly even after the question set changes. It is the **sole system of record for the structured ratings** as well as narrative and categorical answers. Production's active question contract has two core ratings (`riskLevel`, `overallAssessment`) and one categorical multiselect (`impactAreas`) as of the audited 2026-07-26 target publication. The former parent rating columns were retired and dropped in S305. Adding questions later = more rows, never new columns.
+Point-in-time **answer snapshot** for a structured review submitted through the reviewer portal or dedicated staff rescue. One row per submitted question, each storing the question text exactly as asked beside the answer, so a submitted review reconstructs losslessly even after the question set changes. It is the **sole system of record for the structured ratings** as well as narrative and categorical answers. Production's active question contract has two core ratings (`riskLevel`, `overallAssessment`) and one categorical multiselect (`impactAreas`) as of the audited 2026-07-26 target publication. The former parent rating columns were retired and dropped in S305. Adding questions later = more rows, never new columns.
 
 Full design: `docs/REVIEWER_REVIEW_FORM_AUTHORING_BUILD_PLAN.md` §3a.
+
+## Review-record authority
+
+[VERIFIED via repository producer and reader source, 2026-10-22; no live probes]
+These records have different meanings. Retained partial paths are intentional;
+this map documents them without authorizing new writes, cleanup or stricter gates.
+
+| Record / input | Authority | What it does not establish |
+|---|---|---|
+| Postgres `review_drafts.draft_json` | Recoverable, sanitized work in progress; the editor can rehydrate it. | A submitted review, a receipt, or the final-submit payload. |
+| Submit request `answers` | Input sanitized/validated against the write-time question set before the canonical atomic snapshot/receipt commit. | Durable submission before that commit; it is not replaced by a server re-read of the autosave draft. |
+| Dataverse `wmkf_appreviewanswer` rows | Stored structured-answer content, question text and available categorical option snapshots. | A complete modern form merely because some rows exist; legacy writers intentionally produce partial or absent snapshots. |
+| Suggestion `wmkf_reviewreceivedat` | Lifecycle receipt, used by finality and downstream participation/readiness logic. | Full structured-answer completeness, PD closeout approval, or final payment authority. |
+| `wmkf_reviewsharepointfolder` + `wmkf_reviewfilename` | Associated download location: legacy upload or generated review DOCX. | Genuine submission provenance or content completeness from the pointer/download alone. Generated documents are derived from snapshots. |
+
+Reader contracts deliberately differ:
+
+- `review-manager/reviewers-service.js` loads child answers for received rows;
+  absent rows become `answers:[]` and absent canonical ratings remain null.
+- `review-manager/synthesize-reviews-service.js` requires at least one received
+  suggestion and builds its digest from stored answers, not uploaded file bytes.
+  Receipt resolution in `review-synthesis-readiness.js` is lifecycle readiness,
+  not a separate full-form completeness check; legacy received rows can have no answers.
+- The combined Word export (`review-manager/export-reviews-service.js`) rereads
+  server-authoritative request/reviewer/snapshot inputs. Browser comparisons and
+  copy presentation do not supply its report data.
+- Individual DOCX retention (`review-documents/individual-file-service.js`)
+  additionally requires a persisted rich-text row and validates stored identity,
+  order, type and categorical shapes. It does not apply today's question set as
+  a historical completeness template.
+- `review-manager/download-review-service.js` follows the stored pointer pair;
+  it does not reconstruct or validate the answer snapshot during download.
+
+Preserve null/malformed historical option distinctions and owner boundaries.
+Neither a missing generated file nor a legacy test-artifact classification grants
+permission to delete, restore, infer answers, or reset a received review.
 
 ## Fields
 

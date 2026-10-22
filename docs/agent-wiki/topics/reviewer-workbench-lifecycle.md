@@ -1353,7 +1353,14 @@ rating keys, `riskLevel` and `overallAssessment`; categorical multiselect
 answers remain separate from numeric ratings).
 Submitted reviewers still render as a read-only per-reviewer card list
 (ratings decoded via the static schema, richtext narrative answers, SharePoint
-download). Panel-prep roll-up/export now exists client-side (Phase 3, below).
+download). Comparison and Writeup-paragraph clipboard composition run in the
+browser; the combined Word export uses the server-authoritative
+`/api/review-manager/export-reviews` read/compose/render path (Phase 3, below).
+Earlier client-side roll-up/export work is retained as implementation history,
+not the current export authority. For draft, answer-snapshot, receipt, and file
+pointer boundaries and reader-specific acceptance rules, see the **Review-record
+authority** section in
+`docs/atlas/dataverse-wmkf-appreviewanswer.md`.
 
 **Writeup paragraphs (Reviews Tab Phase II Slice 1, 2026-09-14,
 `docs/plans/REVIEWS_TAB_WRITEUP_PARAGRAPHS_PLAN_2026-09-14.md`):** a

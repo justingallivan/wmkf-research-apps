@@ -48,6 +48,10 @@ When legacy review files surface:
   not deletion authority;
 - expect more dormant PDF-era baggage elsewhere until positively reconciled.
 
+For the current meanings and reader-specific limits of drafts, snapshots, receipt
+stamps and file pointers, use the [review-record authority map](../docs/atlas/dataverse-wmkf-appreviewanswer.md#review-record-authority).
+Retained partial paths do not imply a complete modern structured review.
+
 ## Staff-side surfaces ALSO removed from the Track Reviewers panel (S347)
 
 The staff-side counterparts on `ReviewerManagePanel` (Track Reviewers ⋮ menu) — the
