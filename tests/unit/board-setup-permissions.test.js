@@ -49,7 +49,7 @@ test.each([['admin', { admin: true }], ['Grants Manager', {}]])('%s can load sha
   d.readCycle = jest.fn(() => { throw new Error('Must not read cycle'); });
   const value = await loadStaffing(actor, d);
   expect(value.canManageSharedRoles).toBe(true);
-  expect(Object.keys(value.roles)).toEqual(['president', 'cso', 'grantsManager']);
+  expect(Object.keys(value.roles)).toEqual(['president', 'cso', 'grantsManager', 'programCoordinator']);
   expect(value.staff).toHaveLength(1);
   expect(d.readCycle).not.toHaveBeenCalled();
 });
@@ -68,12 +68,14 @@ function presidentWithoutWorkbench() {
   f.d.listAppKeysForUser = jest.fn(async () => []);
   return f;
 }
-test('President can be saved without Workbench; CSO and Grants Manager cannot', async () => {
+test('President and Program Coordinator can be saved without Workbench; CSO and Grants Manager cannot', async () => {
   const { d } = presidentWithoutWorkbench();
   await saveRole(actor, 'president', { version: 1, systemUserId: OTHER }, 'role', d);
-  expect(d.setSettingIfUnchanged).toHaveBeenCalledTimes(1);
+  await saveRole(actor, 'programCoordinator', { version: 1, systemUserId: OTHER }, 'role', d);
+  expect(d.setSettingIfUnchanged).toHaveBeenCalledTimes(2);
+  expect(d.setSettingIfUnchanged).toHaveBeenLastCalledWith('board_writeups.program_coordinator', JSON.stringify({ version: 1, systemUserId: OTHER }), 'role', 'staff');
   for (const role of ['cso', 'grantsManager']) await expect(saveRole(actor, role, { version: 1, systemUserId: OTHER }, 'role', d)).rejects.toMatchObject({ code: 'board_staff_app_access' });
-  expect(d.setSettingIfUnchanged).toHaveBeenCalledTimes(1);
+  expect(d.setSettingIfUnchanged).toHaveBeenCalledTimes(2);
   await expect(boardActor({ systemUserId: OTHER, profileId: 'president' }, d)).rejects.toMatchObject({ code: 'board_staff_app_access' });
 });
 test.each(['disabled', 'inactive', 'unlinked', 'external'])('President still rejects %s staff', async problem => {
@@ -92,6 +94,14 @@ test.each(['president', 'cso', 'grantsManager'])('activation validates Workbench
   const save = saveCycle(actor, { ...cycle, active: true, rosterConfirmed: true, requestIds: [OTHER], materialsDue: '2027-06-01', boardEnds: '2027-06-10', adminId: ID }, 'old', '', d);
   if (role === 'president') await expect(save).resolves.toMatchObject({ value: { active: true } });
   else { await expect(save).rejects.toMatchObject({ code: 'board_staff_app_access' }); expect(d.setSettingIfUnchanged).not.toHaveBeenCalled(); }
+});
+test('an unassigned Program Coordinator does not block activation', async () => {
+  const { d, cycle } = presidentWithoutWorkbench();
+  cycle.cycle = 'J27';
+  d.listAppKeysForUser = jest.fn(async () => ['reviewers']);
+  const getSetting = d.getSettingStrict;
+  d.getSettingStrict = async key => key === 'board_writeups.program_coordinator' ? { found: false } : getSetting(key);
+  await expect(saveCycle(actor, { ...cycle, active: true, rosterConfirmed: true, requestIds: [OTHER], materialsDue: '2027-06-01', boardEnds: '2027-06-10', adminId: ID }, 'old', '', d)).resolves.toMatchObject({ value: { active: true } });
 });
 test('directory includes President-only staff and marks operational eligibility', async () => {
   const { d } = presidentWithoutWorkbench();
