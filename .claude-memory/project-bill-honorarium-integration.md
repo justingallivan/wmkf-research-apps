@@ -1,11 +1,11 @@
 ---
 name: Reviewer honorarium onboarding (portal-integrated)
-description: Reviewer portal accept-action can create the honorarium akoya_request and can trigger BILL.com onboarding inline. OWNER DECISION 2026-07-12 - the BILL API integration is TABLED for several months, possibly permanently (onboarding via address + existing foundation systems instead); do not build on the BILL pipeline without a new decision. Live posture: request creation ON (`HONORARIUM_ONBOARDING_DEFERRED` unset + discriminator GUIDs set) with BILL OFF (`BILL_ONBOARDING_DEFERRED=true`, `BILL_ENABLED` unset everywhere) - the deferred flag's VALUE was wrong from go-live until S414 (2026-08-11), so verify env values, not just presence. Capture-only remains the safety/off mode when the honorarium flag is true or GUIDs are missing.
+description: Portal-integrated reviewer honorarium follow-up runs through durable acceptance jobs, not inline in the response handler. OWNER DECISION 2026-07-12 — BILL API work is tabled; request creation and BILL deferral remain separate gates. Historical production configuration and rollout evidence below require a fresh probe before reuse as live state.
 metadata:
   type: project
   status: active
   scope: bill
-  last_verified: 2026-07-27 against source and GET-only production honorarium-link census
+  last_verified: 2026-10-22 via respond-service, acceptance drain, and orchestrator source for queue boundary; production-link census remains dated 2026-07-27
 ---
 
 ## Recall Rule
@@ -13,7 +13,7 @@ metadata:
 Read this when: touching reviewer honorarium onboarding, the BILL.com integration, the Stage 2a accept path, or honorarium `akoya_request` creation. For current no-BILL-cycle request creation, read `docs/HONORARIUM_PORTAL_CREATION_STRATEGY.md` first.
 
 Do:
-- Treat the architecture as portal-integrated (Stage 2a accept extension), not PA-triggered.
+- Treat the architecture as portal-integrated, not PA-triggered. The response service stages `reviewer_acceptance_jobs` before a fresh Dataverse accept PATCH and returns after the accept; the acceptance drain performs the slow honorarium/contact follow-up. A successful accept response does not prove that follow-up completed.
 - Read engagement provenance from the `wmkf_appreviewersuggestion` junction:
   `wmkf_HonorariumRequest` points to the honorarium (read
   `_wmkf_honorariumrequest_value`) while `wmkf_Request` points to the proposal.
@@ -27,11 +27,14 @@ Do not:
 - Rebuild shipped chunks (lib/bill primitives, chunk-4 orchestrator, chunk-5 address UI, webhook scaffold/dedupe/logging). Chunk 5 (address UI) SHIPPED (commits `96baeb2` + `b4c91f0`); webhook event-dispatch + Dataverse PATCH remain pending 7b. Remaining BILL gaps are 7b plus e2e against the BILL sandbox (chunk 8, blocked on Steph) — moot for the no-BILL creation cycle.
 - **Do not re-enable BILL at all without a new owner decision.** Originally deferred to next cycle (leadership, 2026-06-09); superseded 2026-07-12 by the owner TABLING the BILL API integration for several months, possibly permanently — onboarding will use reviewer address + existing foundation systems instead (see [[Reviewer honorarium onboarding/payment reality (current-state, reverse-engineered)]]). Request creation remains a separate lever: honorarium GUIDs set + `HONORARIUM_ONBOARDING_DEFERRED` unset, `BILL_ONBOARDING_DEFERRED=true` stays.
 
-**Current no-BILL-cycle status (2026-07-01 decision; live since 2026-07-02):
-automated BILL onboarding DEFERRED, honorarium request creation ON.** Implemented
+## Current source contract and dated rollout
+
+**Owner target and recorded July 2 rollout: automated BILL onboarding deferred,
+honorarium request creation enabled.** Those configuration observations are historical,
+not a fresh environment check. The source implements this posture
 as reversible gates, NOT a teardown — no BILL code removed:
 - `lib/bill/honorarium-onboard-orchestrator.js` still short-circuits to capture-only before honorarium request creation when `HONORARIUM_ONBOARDING_DEFERRED=true` or required discriminator GUIDs are missing; mailing-address PATCH still runs. This is the safety/off state.
-- The target config for the no-BILL creation cycle is to set `HONORARIUM_PROGRAM_ID`, `HONORARIUM_GRANTPROGRAM_ID`, `HONORARIUM_TYPE_ID`, unset `HONORARIUM_ONBOARDING_DEFERRED`, set `honorarium.default_amount`, keep `BILL_ONBOARDING_DEFERRED=true`, then deploy/restart so module-load env constants take effect. Then `ensureHonorariumOnboarding()` mints the honorarium request at Stage 2a accept while `onboardReviewer()` returns `status: 'deferred'` (no BILL call, no alert).
+- The target config for the no-BILL creation cycle is to set `HONORARIUM_PROGRAM_ID`, `HONORARIUM_GRANTPROGRAM_ID`, `HONORARIUM_TYPE_ID`, unset `HONORARIUM_ONBOARDING_DEFERRED`, set `honorarium.default_amount`, keep `BILL_ONBOARDING_DEFERRED=true`, then deploy/restart so module-load env constants take effect. Then `ensureHonorariumOnboarding()` mints the honorarium request in the acceptance drain after the Stage 2a accept while `onboardReviewer()` returns `status: 'deferred'` (no BILL call, no alert).
 - Historical capture-only backfill hardening is LANDED (S316): `scripts/backfill-honorarium-capture-only.mjs` now enforces the same required-address completeness AND validity checks as fresh accept — shared `missingRequiredAddressFields` + `validateAddress` in `lib/external/required-address.js` (validity mirrors the fresh-accept 400: country must be ISO2, field-length caps) — and includes `akoya_title` in `REQUEST_SELECT`, so stale partial/unnormalized contact addresses (e.g. a full-name country) or generic proposal titles can no longer leak into minted backfill rows.
 - **Phone now required + collected** in the Stage 2a payment-address card (`shared/components/external/Stage2aView.js`), validated server-side (`respond.js` `ADDRESS_MAX.phone`), persisted to `contact.address1_telephone1` (orchestrator `patchContactAddress`), and would ride as `reviewerPhone` on the BILL payload if BILL were ever re-enabled (orchestrator reads `body.address.phone`).
 - **The gate was configured but broken from go-live to 2026-08-11 (S414).** `BILL_ONBOARDING_DEFERRED` was *present* in Production/Preview yet its value wasn't the literal `'true'` the strict `===` requires, so 61 `bill_manual_onboarding` alerts accumulated instead of the designed silence. `docs/HONORARIUM_PORTAL_CREATION_STRATEGY.md:78-79` had warned about exactly this branch and it happened anyway — **a flag appearing in `vercel env ls` is not evidence the gate is active; only its value is.** It was Sensitive (unreadable), which hid the drift; it is now stored non-sensitive. Mechanism, evidence, and the `system_alerts` timestamp trap: `docs/agent-wiki/topics/finance-honoraria.md`.
@@ -42,7 +45,25 @@ as reversible gates, NOT a teardown — no BILL code removed:
   all 40 proposal identities agree. Re-run
   `scripts/probe-honorarium-link-population.js` before quoting a later count.
 
+- The drain re-reads accepted/declined/released state, uses leased durable jobs,
+  and rechecks after honorarium creation. Racing reviewer withdrawal deletes the
+  exact late-linked request; foundation release uses the distinct retain-and-withdraw
+  compensation. Transient failures can retry; deterministic failures can be terminal.
+  Do not equate a queued job or accepted response with completed contact, honorarium,
+  or email work.
+- Opt-out skips honorarium creation and BILL, but accepted-contact follow-up still
+  runs. Request creation is separate from final authorization to remit; the app
+  does not set that Finance-controlled flag.
+
 Ground truth: `docs/HONORARIUM_PORTAL_CREATION_STRATEGY.md`, `docs/BILL_HONORARIUM_INTEGRATION_DESIGN.md`, `docs/BILL_CHUNK_4_DESIGN.md`, `docs/BILL_LIB_DESIGN.md`; `lib/bill/*`. Related: [[akoya-payment-field-semantics]], [[akoya-request-honorarium-nomenclature]], [[project-external-reviewer-file-access]].
+
+## Historical S188–S316 design and implementation
+
+This section preserves the original inline design, tentative dates/questions, and
+shipped chunk record. The direct endpoint call proposed below was already replaced
+by an in-process service call in chunk 4; the later durable acceptance drain owns
+that work now. This history is not a current build queue or authorization to resume
+BILL. The July 12 owner decision above remains controlling.
 
 **Status (S188, 2026-05-25):** Design doc at `docs/BILL_HONORARIUM_INTEGRATION_DESIGN.md`. **Architecture pivoted from PA-triggered backend-only to portal-integrated** after discovering Stage 2a accept endpoint is already shipped (since 2026-05-09) and only needs extension. No GOapply replacement work needed.
 
@@ -93,7 +114,7 @@ Sequencing between is flexible and depends on Connor's Q5 schema add + Steph's B
 
 **Why:** Ops team meeting 2026-05-23 approved BILL integration. Pre-existing BILL integration (AkoyaGO for institutional grantee payouts) means legal/policy posture is already established — no new financial connector, no new data category. Skipping GOapply entirely (not just for honoraria onboarding, but for the whole reviewer-payment-info flow) removes a UX hop AND a dependency we don't control.
 
-**How to apply:**
+## Applying the current contract
 - Don't reintroduce PA-trigger framing in design conversations — that path is closed.
 - The `wmkf_appreviewersuggestion` row carries engagement provenance:
   `wmkf_Request` identifies the proposal and `wmkf_HonorariumRequest` identifies
@@ -101,5 +122,5 @@ Sequencing between is flexible and depends on Connor's Q5 schema add + Steph's B
   `akoya_request` as `wmkf_ReviewedProposal` / `_wmkf_reviewedproposal_value`.
   Do not use `wmkf_honorariumforrequest` (a dead variant). `[verified source +
   production census 2026-07-27]`
-- Existing Stage 2a primitives (token verify, state machine, optimistic locking, audit, rate limit, policy ack) handle all the auth/safety concerns — extension is purely additive.
+- Preserve Stage 2a validation/optimistic locking and the durable acceptance-job boundary. Test both the response service and drain; handler-only tests do not establish honorarium completion or downstream automation safety.
 - Related: [[akoya-request-honorarium-nomenclature]], [[akoya-payment-field-semantics]], [[project-external-reviewer-file-access]] (Stage 2a primitives), [[project-reviewer-lifecycle]].

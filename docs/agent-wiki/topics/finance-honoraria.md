@@ -7,6 +7,8 @@ owner: finance-ops
 source_files:
   - pages/api/review-manager/send-emails.js
   - pages/api/external/review/[token]/respond.js
+  - lib/services/external-review/respond-service.js
+  - lib/services/reviewer-acceptance-drain.js
   - lib/bill/honorarium-onboard-orchestrator.js
   - lib/services/reviewer-engagement/terminal-transition.js
   - lib/dataverse/adapters/reviewer-suggestion.js
@@ -123,8 +125,10 @@ posture, not a plan; a real honorarium `akoya_request` was created
 - keep payment offline by check until the person-payee/BILL tail is separately
   approved and verified.
 
-If an accepted reviewer withdraws before review receipt, either the reviewer
-can use portal self-service or a PD can record **Withdrew** in Track Reviewers.
+Reviewer portal self-withdrawal is available only before materials release and
+before any review receipt; after that the response endpoint locks changes and
+routes the reviewer to the PD. Before review receipt, a PD can separately record
+**Withdrew** in Track Reviewers, subject to the staff transition guards.
 Both remove that engagement's exact linked honorarium `akoya_request`
 automatically in the same Dataverse changeset that flips the suggestion to
 declined and revokes portal access. The reviewer/contact and suggestion history
@@ -151,12 +155,24 @@ The 2026-06-22 production lock was capture-only:
 that as the safety/off state before the config flip, not the target operating
 state for the no-BILL creation cycle.
 
-Two independent deferral gates sit on the post-accept honorarium pipeline:
+### Acceptance response versus follow-up (source checked 2026-10-22)
+
+`respond-service.js` stages a durable `reviewer_acceptance_jobs` row before a
+fresh Dataverse accept PATCH, then returns after the accept. The leased
+`reviewer-acceptance-drain.js` worker re-reads engagement state and performs
+contact/honorarium follow-up, notifications, and acceptance confirmation. The
+response does not establish that these side effects completed. Failed follow-up
+can retry or reach a terminal failure independently of the accepted state.
+The queue does not suppress Dataverse-triggered external automation; retain the
+human-supervised production-testing restriction.
+
+Two independent deferral gates sit on that post-accept honorarium pipeline:
 
 - **`HONORARIUM_ONBOARDING_DEFERRED=true`** (or discriminator GUIDs unset) →
   `ensureHonorariumOnboarding()` returns `status: 'deferred'` **before** minting
   the `akoya_request` or calling BILL. It captures the contact + mailing address
-  upstream and does not throw. `respond.js` picks the alert posture from the
+  upstream; address-copy failures are returned separately. The acceptance drain
+  picks the alert posture from the
   deferred result, in priority order:
   - `addressCaptureError` set (the address PATCH failed → no downstream copy) →
     emailing **warning** `honorarium_capture_failed`, deduped per suggestion, on

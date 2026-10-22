@@ -10,7 +10,12 @@ metadata:
 
 ## Recall Rule
 
-Read this when: deciding HOW/WHERE to test the reviewer Stage-2a accept flow (`pages/api/external/review/[token]/respond.js` → `lib/bill/honorarium-onboard-orchestrator.js`), or before any real-prod test that creates a honorarium `akoya_request` / updates a reviewer contact.
+Read this when: deciding HOW/WHERE to test the reviewer Stage-2a accept flow (`respond.js` → `respond-service.js` → `reviewer_acceptance_jobs` → `reviewer-acceptance-drain.js` → `honorarium-onboard-orchestrator.js`), or before any real-prod test that creates a honorarium `akoya_request` / updates a reviewer contact.
+
+The handler returns after recording acceptance; the drain performs later contact/
+honorarium work. Queuing delays those writes, but does not suppress their external
+automation. A handler-only test does not cover the drain. This source boundary was
+checked 2026-10-22; the automation inventory below remains the June 10 snapshot.
 
 Do:
 - For an AUTOMATED accept test (e.g. Playwright), MOCK the Dataverse data layer — the real handler logic runs (422 guard, opt-out, state machine) but NO `akoya_request` is created and NO contact is touched, so no Dataverse automation fires.

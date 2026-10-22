@@ -5,7 +5,7 @@ metadata:
   type: project
   status: active
   scope: reviewer
-  last_verified: 2026-07-12 — C0.2 promoted at e5ed38db; automated confirmed decisions are downgraded before persistence; production deployment READY with clean error scan.
+  last_verified: 2026-10-22 via researcher.js automated ETag/anchor/stickiness and no-clear branches; no fresh deployment probe
 ---
 
 ## Recall Rule
@@ -23,17 +23,30 @@ confidence alone is not provenance. The adapter boundary enforces provenance:
 - Every runtime resolver writer and identity backfill uses `automated`.
 - Automated incoming `confirmed` is cloned and downgraded to `probable`; the
   caller's decision object is not mutated.
-- Every automated write first reads current status, skips stored `confirmed`,
-  and propagates read failure without writing.
-- `clearIdentityFields` accepts only `automated`, reads current status, skips
-  stored `confirmed`, and propagates read failure without clearing.
+- Every automated write first reads current status and anchors, skips stored
+  `confirmed`, and propagates read failure without writing. Stored `probable`
+  cannot become `unresolved`/`ambiguous`; a probable refresh requires nonempty,
+  overlapping stored/incoming anchors.
+- A permitted automated write requires the current person ETag and passes it as
+  `ifMatch`; missing versions fail before mutation and conflicts require a fresh read.
+- `clearIdentityFields` accepts only `automated`, reads current status, and
+  deliberately abstains for every stored state. Read failures propagate; missing
+  same-binding field lineage never authorizes a blanket clear.
 - Missing or unknown origins fail before any Dataverse read or write.
 
 The marker is adapter-only and must not enter UI or resolver DTOs. It is
 containment, not the durable model: legacy `confirmed` rows do not encode their
-source, and the automated guard is read-then-write rather than an atomic
-conditional update. The reviewer holistic plan's I1 phase replaces it with a
-versioned binding source and coherent transition writer.
+source. Conditional automated writes do not supply the missing per-field lineage;
+keep that limitation distinct from ETag concurrency protection. The broader
+versioned-binding work is tracked in the reviewer holistic plan.
+
+## Historical containment
+
+C0.2 was promoted July 12 at `e5ed38db`, with deployment READY and a clean
+error scan recorded then. That first guard was read-then-write without an
+ETag-bound update and protected confirmed rows from clears. July 29 hardening
+(`676909500`) added the protections described above. These historical deployment
+observations are not a fresh statement about serving state.
 
 Ground truth: `lib/dataverse/adapters/researcher.js`,
 `lib/services/capture-self-reported-orcid.js`, all direct mutation callers,

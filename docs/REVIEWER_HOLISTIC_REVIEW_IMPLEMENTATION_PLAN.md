@@ -288,8 +288,8 @@ neither its success nor its failure may update the new request's roster.
 
 ### C0.2 Close the attestation-overwrite hole
 
-**[IMPLEMENTED + VERIFIED + PROMOTED 2026-07-12 at `e5ed38db`]**
-`researcher.writeIdentityDecision` now requires a server-only
+**Historical C0.2 baseline [IMPLEMENTED + VERIFIED + PROMOTED 2026-07-12 at `e5ed38db`]:**
+At that release, `researcher.writeIdentityDecision` required a server-only
 `identityOrigin` of `self_report` or `automated`; only `self_report` may persist
 `confirmed`. All six direct writers declare their origin (one self-report and
 five automated runtime/backfill paths). Automated `confirmed` decisions are
@@ -297,15 +297,29 @@ cloned and persisted as `probable`, stored
 `confirmed` rows remain sticky, and unknown origins/read failures write
 nothing. `clearIdentityFields` accepts only the automated origin and preserves
 the same sticky, fail-closed read. The adapter matrix and caller-path tests are
-implemented. The guard remains read-then-write rather than atomic; I1 must
-replace it with a durable binding contract. Verification: 133 targeted unit
+implemented. That baseline guard was read-then-write rather than atomic; the
+durable binding contract remained the I1 goal. Verification: 133 targeted unit
 tests, 24 route integrations, full suite 478/478 suites and 5,414/5,414 tests,
 ESLint, script syntax checks, typecheck, production build, and the applicable
 Dataverse/docs/memory gates plus self-tests. Production deployment
 `dpl_CLsy2yHBC4y5EvMquEWaaVKtqcgM` reached READY with all live aliases; the
 post-deploy error-level scan returned no logs.
 
-Until the durable binding fields exist, make the origin of a `confirmed`
+**Current adapter safety boundary [VERIFIED 2026-10-22 via
+`lib/dataverse/adapters/researcher.js`]:** automated decision writes preserve
+stored `confirmed`; they also preserve `probable` against unresolved/ambiguous
+downgrades and require overlapping stored/incoming anchors for a probable
+refresh. An automated write requires the current person ETag and uses an
+`If-Match` PATCH; missing ETags and read failures fail closed. The compatibility
+`clearIdentityFields` path reads fail closed and deliberately clears no fields
+because the legacy shared-person fields lack sufficient lineage. These guards
+supersede the original C0.2 concurrency/clearing description without completing
+the broader I1/I2 consumer migration. See
+`.claude-memory/project-reviewer-self-report-orcid-sticky-confirmed.md` for the
+current containment contract.
+
+The original C0.2 implementation requirements below are historical rationale:
+until the durable binding fields existed, make the origin of a `confirmed`
 decision explicit at the adapter boundary. Only the reviewer self-report path
 may pass the transitional attestation marker. Automated writers and backfills
 must identify themselves as automated; an automated incoming `confirmed` is

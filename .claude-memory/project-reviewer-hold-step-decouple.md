@@ -5,7 +5,7 @@ metadata:
   type: project
   status: active
   scope: reviewer-finder
-  last_verified: 2026-07-22 via respond-service.js, reviewer-acceptance-drain.js, Stage2aView.js, and current template source
+  last_verified: 2026-10-22 via respond-service response locks/withdrawal and acceptance-drain source; retired hold history retained
 ---
 
 ## Recall Rule
@@ -54,11 +54,25 @@ preserved in `docs/REVIEWER_HOLD_STEP_BUILD_PLAN.md` and
 
 ## Post-accept exit
 
-A reviewer who later cannot serve contacts the PD. The PD may adjust timing or
-remove the reviewer through the workbench. Do not add a portal self-service
-teardown that deletes financial or submitted-review records. Any future reset or
-payability annotation belongs to the separately scoped closeout work in
+Before materials have been released and before any review receipt, an accepted
+reviewer may decline through the portal. The ETag-bound response changeset
+deletes only that engagement's exact linked honorarium request. Acceptance jobs
+are cancelled where possible; the drain rechecks state after honorarium creation
+and compensates for a racing withdrawal. The person and suggestion history remain.
+See [[project-reviewer-accept-decline-links]].
+
+After materials release or review receipt, portal response changes are locked;
+the reviewer contacts the PD. Staff withdrawal and foundation-initiated release
+have distinct financial semantics: withdrawal deletes the exact linked request,
+while release retains and withdraws a safely open honorarium. Do not generalize
+this bounded cleanup into a reset of submitted-review or financial history.
+Closeout eligibility remains separate from Finance's final remit authority; see
 `project-reviewer-closeout-payability`.
+
+**Historical boundary:** the July 22 instruction prohibited portal teardown and
+routed later exits to the PD. July 24 self-withdrawal (`08c718d3a`) and staff
+withdrawal (`a4fdd7366`) superseded that blanket prohibition; the single-decision
+and retired hold/finalize rationale remains in force.
 
 ## Ground truth
 

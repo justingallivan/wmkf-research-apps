@@ -5,7 +5,7 @@ metadata:
   type: project
   status: active
   scope: reviewer
-  last_verified: 2026-07-02 via code-grounded memory triage for resolver/write-gate/backprop contracts; latest live Dataverse count snapshot remains 2026-06-04
+  last_verified: 2026-10-22 via researcher adapter and save-candidates source for preservation contract; historical counts below were not re-probed
 ---
 
 > **S219 — lone-ORCID residual CLOSED.** The S215 backfill only persisted institution-corroborated ORCIDs, leaving 454 lone (name-only) ORCID rows `unresolved`. `scripts/backfill-lone-orcid-scholar.js` ran Google Scholar over those 454 and, where Scholar was CLEAN (no name/inst mismatch), fed both weak anchors (lone public ORCID + clean Scholar) through `resolveIdentity` → `probable` → wrote the ORCID. Result: **240 clean → written, 144 rejected (correctly gated), 70 no-Scholar.** Pool: ORCID 1,533→**1,773** (+240), probable 1,532→**1,772** (+240), 0 failures/conflicts, independently re-counted. Scholar used as corroborating evidence ONLY — `wmkf_googlescholarid` NOT persisted (verified null on written rows). Two Codex rounds (transient-failure suppression + fail-closed apply re-read) + a live bug fix (SerpAPI 200-with-`data.error` "no results" must map to `sch_none`, not a retryable error). Same safety adapters as S215 (fill-if-empty ORCID + writeIdentityDecision skips `confirmed`).
@@ -16,7 +16,8 @@ Read this when: working on reviewer identity resolution, Scholar/ORCID enrichmen
 
 Do:
 - Treat the deterministic resolver verdict as the gate on ALL identity-bearing writes (scholar id/url+metrics+ORCID id/url) across `save-candidates`, `enrich-recommended`, AND `saveToDatabase`.
-- Use the keep-biased name/institution guards (reject only on positive conflict evidence); null-clear identity fields on downgrade via `clearIdentityFields`.
+- Use the keep-biased name/institution guards (reject only on positive conflict evidence). Block untrusted incoming identity fields without erasing shared-person evidence. `clearIdentityFields` is a compatibility guard that reads, then abstains for every stored state because same-binding field lineage is unavailable.
+- Automated decision writes preserve stored `confirmed` and protect stored `probable` against downgrades or disjoint-anchor refreshes; permitted writes require a current ETag. See [[project-reviewer-self-report-orcid-sticky-confirmed]].
 - Audit already-persisted Scholar/ORCID metrics (probe by URL, resolve `user=` id from URL) rather than trusting them; run the disconfirming-count query.
 
 Do not:
@@ -25,6 +26,10 @@ Do not:
 - Mark this work complete without the manual Workbench smoke (CI-green ≠ correct).
 
 Ground truth: `docs/REVIEWER_IDENTITY_RESOLVER_PHASE2_DESIGN.md`, `docs/REVIEWER_IDENTITY_RESOLUTION_PLAN.md`, `lib/services/reviewer-identity-resolver.js`, `scripts/audit-persisted-scholar-identity.js`, `scripts/remediate-scholar-identity.js`, `tests/unit/reviewer-identity-guard.test.js`.
+
+## Historical implementation and probes
+
+The following S214–S219 records preserve the original rollout. Their clear-on-downgrade behavior was superseded by July 29 shared-person preservation hardening (`676909500`); they are not instructions to clear fields or repeat production remediation.
 
 **Phase 2 PR1 SHIPPED S214 (2026-06-03).** The deterministic resolver landed: `lib/services/reviewer-identity-resolver.js` (`resolveIdentity` post-enrichment classifier — weak-only PR1 rules: lone weak→unresolved, 2 corroborating weak→probable, ORCID multi-match→ambiguous, Scholar name/inst-mismatch=rejected ANCHOR; confirmed/rejected not reachable in PR1). 6 `wmkf_identity*` decision fields **deployed to prod** on `wmkf_potentialreviewers` (`lib/dataverse/schema/wave6/03_*.json`; deploy was blocked ~15min by a rolling Microsoft managed-solution import wave, landed once it cleared). Verdict threaded through `enrichCandidate._finalize` → gates ALL identity-bearing writes (scholar id/url+metrics+ORCID id/url) in `save-candidates`, `enrich-recommended`, AND `saveToDatabase` (the 3rd path — Codex post-impl MUST-FIX catch); `clearIdentityFields` null-clears on downgrade; `relevance-score` counts bibliometrics only when trusted. ORCID `findContact` now returns `{status:'ambiguous'}` (was bare null). Manual `my-candidates` PATCH intentionally NOT gated (staff override). Full loop ran: design v1→v2→v3 (Codex pre-impl ×2 → READY) → impl → Codex post-impl (MUST-FIX fixed). Commits 8350551/19a9792/b6bfadc + schema 610286f/1f9b3a8. **⚠ Still needs manual Workbench smoke** (CI-green≠correct). Design/build-plan: `docs/REVIEWER_IDENTITY_RESOLVER_PHASE2_DESIGN.md` (later PRs: PubMed-cluster+faculty verification→enables `confirmed`; Postgres leads/rejected-anchor table; Perplexity Search-API lead source).
 

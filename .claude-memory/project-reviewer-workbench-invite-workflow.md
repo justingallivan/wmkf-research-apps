@@ -5,7 +5,7 @@ metadata:
   type: project
   status: active
   scope: reviewer
-  last_verified: 2026-06-26 (tab structure re-checked vs ReviewersTab.js:41-43 — 3 sub-tabs; signature claim 2026-06-04 vs pages/workbench/[requestId].js); rest S213 via memory-content
+  last_verified: 2026-10-22 via send-emails-service invitation sender/impersonation branches; other UI history retains its original verification dates
 ---
 
 ## Recall Rule
@@ -15,6 +15,7 @@ Read this when: building or debugging the Workbench Reviewers tab sub-tabs, revi
 Do:
 - Treat the 3 sub-tabs as Find (discover) → **Invite Reviewers** (saved-candidate roster, where you INVITE pre-accept; tab key `candidates`, `ReviewerInvitePanel`) → **Track Reviewers** (post-acceptance management — materials release through completion, `ReviewerManagePanel`; absorbed the old Invite + Completed sub-tabs, S280).
 - Keep outward-send safety SERVER-authoritative: gate attachments on recipient `wmkf_accepted`, not caller `templateType`; guard duplicate sends.
+- Invitations use the assigned active PD's mailbox and impersonation identity with `noFallback:true`; an unavailable PD sender skips the invitation. Other compatibility templates use the acting staff sender. Keep transport identity separate from staff attribution on lifecycle writes.
 - Disambiguate external enrichment by the affiliation already known (institution in query + keep-biased `institutionConflicts`).
 
 Do not:
@@ -35,7 +36,7 @@ The Request Workbench Reviewers tab (tier-3) has **3 sub-tabs** (collapsed S280 
 - **"Applicant-suggested" badge** (green) marks applicant-recommended rows (`wmkf_applicantdisposition===recommended`) on BOTH Find and Invite Reviewers tabs — wording deliberately identical across the two.
 
 - **Per-user email templates + invite timing (S212; UI narrowed 2026-09-01).** All four reviewer template records (invitation/materials/followup/thankyou) remain per-user in Dataverse `wmkf_appuserpreferences` under key `reviewer_email_templates`, via `shared/components/reviewers/email-template-store.js` — OFF browser-localStorage. They remain editable from "✎ Email templates" and supported by the shared render/send service for compatibility, but the current operational UI consumes `invitation` in `InviteEmailModal` and `materials` in `ReviewerManagePanel`'s release modal only. Review-due follow-up is the dedicated row-level reminder path; thank-yous are sent by the fire-once sweep. Distinct from the legacy single-template `reviewer_finder_email_template` key (standalone Finder). The invitation also has a review TIMELINE (respond-by / proposal-delivery / review-due) entered in the invite modal, sticky per-user under `reviewer_invite_timing`, interpolated CLIENT-SIDE via `{{respondBy}}`/`{{proposalDelivery}}`/`{{reviewDue}}` tokens (render-emails leaves them; blank date drops its line). Two-phase-cycle artifact — retiring after this last cycle.
-- **Per-user invite signature IS wired (verified 2026-06-04, S217 follow-on).** `pages/workbench/[requestId].js` (~L88-100) resolves `settings.signature` from the per-user `PREFERENCE_KEYS.SENDER_INFO` preference (`reviewer_finder_sender_info`), parsing `sender.signature || sender.name`, falling back to `session.user.profileName`. The signed-in MS account is always the actual sender; this only fills the `{{signature}}` template placeholder. Consumed by ReviewersTab/ReviewerInvitePanel/InviteEmailModal/ReviewerManagePanel. (Earlier "not yet wired" note was stale.)
+- **Per-user invite signature IS wired (verified 2026-06-04, S217 follow-on).** `pages/workbench/[requestId].js` (~L88-100) resolves `settings.signature` from the per-user `PREFERENCE_KEYS.SENDER_INFO` preference (`reviewer_finder_sender_info`), parsing `sender.signature || sender.name`, falling back to `session.user.profileName`. This June record describes the `{{signature}}` placeholder wiring, not current transport authority. The signed-in-account sender assumption was superseded for invitations by the July 24 redesign (`658b4fb1b`); current invitation transport uses the assigned PD as described in the Recall Rule and `lib/services/review-manager/send-emails-service.js`. Consumed by ReviewersTab/ReviewerInvitePanel/InviteEmailModal/ReviewerManagePanel. (Earlier "not yet wired" note was stale.)
 
 **Two durable design principles (learned the hard way, S211–212):**
 1. **Outward-send safety must be SERVER-authoritative, not caller-controlled.** `send-emails` gates proposal-material attachments on the recipient's `wmkf_accepted` state (`recipientMayReceiveAttachments`), NOT the caller's `templateType` — so a mislabeled/pre-acceptance send can't leak materials. Apply this shape to any future send/attach path. Also `shouldSkipDuplicateInvitation` prevents re-click double-sends. Helpers in `lib/utils/reviewer-invite.js`.

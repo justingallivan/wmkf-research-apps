@@ -3,7 +3,7 @@ title: "Reviewer Identity Resolver — Phase 2 design (v3)"
 domain: reviewer-identity
 kind: spec
 status: active
-summary: "- confirmed is explicitly NOT reachable in PR1 (needs the deferred faculty-page + publication-cluster evidence). PR1 tops out at probable."
+summary: "Historical S214–S215 resolver design; current automated persistence preserves shared identity fields and uses ETag/anchor safeguards."
 canonical: false
 cataloged: 2026-07-02
 owner: product-engineering
@@ -16,7 +16,26 @@ related:
 
 # Reviewer Identity Resolver — Phase 2 design (v3)
 
-**Status:** **PR1 SHIPPED (S214)** + **S215 extension SHIPPED** (institution-corroborated ORCID = strong anchor, §3.1). The v3 design (S214, 2026-06-02) resolved the PR1-blocking inconsistencies Codex flagged in v2; PR1 then landed (resolver + write-gates + clear-on-downgrade). S215 fixed the ORCID `family-names` parser bug that had blocked all ORCID capture and added the corroborated-ORCID strong-anchor rule (§3.1). Later PRs (PubMed-cluster + faculty-page → `confirmed`; Postgres leads table; Perplexity Search-API) remain unbuilt.
+## Current persistence safety boundary
+
+[VERIFIED via `lib/dataverse/adapters/researcher.js`, 2026-10-22]
+Automated writes preserve stored `confirmed`; stored `probable` cannot be downgraded
+to unresolved/ambiguous or refreshed without overlapping nonempty anchors. Permitted
+automated writes require a current ETag and use `ifMatch`. `clearIdentityFields`
+reads and abstains for every stored state because legacy fields do not establish
+same-binding lineage. Do not implement the old blanket-clear instruction below.
+Current persistence context: `docs/atlas/dataverse-wmkf-potentialreviewers.md` and
+`.claude-memory/project-reviewer-self-report-orcid-sticky-confirmed.md`.
+
+## Historical S214–S215 design
+
+The remainder preserves the June design, original build order, and then-open
+questions. Its clear-on-downgrade specification was superseded by July 29
+shared-person hardening (`676909500`); it is not a current remediation instruction
+or an authorization to deploy schema or clear records. Other later-phase status
+claims below are historical design observations, not a fresh implementation audit.
+
+**Historical status:** **PR1 SHIPPED (S214)** + **S215 extension SHIPPED** (institution-corroborated ORCID = strong anchor, §3.1). The v3 design (S214, 2026-06-02) resolved the PR1-blocking inconsistencies Codex flagged in v2; PR1 then landed (resolver + write-gates + clear-on-downgrade). S215 fixed the ORCID `family-names` parser bug that had blocked all ORCID capture and added the corroborated-ORCID strong-anchor rule (§3.1). Later PRs (PubMed-cluster + faculty-page → `confirmed`; Postgres leads table; Perplexity Search-API) remain unbuilt.
 
 **v3 changelog (what the v2 re-review changed):**
 - **PR1 resolver reframed as a post-enrichment *classifier*** — it consumes the ORCID/Scholar evidence the existing enrichment pipeline already gathered; **no new network calls, no new enumeration** in PR1. (Resolves: "no new external calls" vs §3 enumeration, "wrap not replace," where enumeration comes from.)
