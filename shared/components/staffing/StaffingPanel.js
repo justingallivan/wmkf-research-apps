@@ -4,7 +4,8 @@ import { useAppAccess } from '../../context/AppAccessContext';
 import { Button } from '../Layout';
 import FinalWriteupMatrixAudiencesSection from '../admin/FinalWriteupMatrixAudiencesSection';
 import { requestEnvelope } from '../../utils/api-request';
-const roles = [['president', 'President'], ['cso', 'CSO'], ['grantsManager', 'Grants Manager']];
+const roles = [['president', 'President'], ['cso', 'CSO'], ['grantsManager', 'Grants Manager'], ['programCoordinator', 'Program Coordinator'], ['systemsSpecialist', 'Systems Specialist']];
+const anyStaffRoles = ['president', 'programCoordinator', 'systemsSpecialist'];
 async function request(body, signal) {
   const result = await requestEnvelope('/api/workbench/staffing', { signal, ...(body ? { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) } : {}) });
   if (!result.ok) throw new Error(result.data?.error || 'Staffing is unavailable. Try reloading.');
@@ -49,7 +50,7 @@ function SharedRolesPanel() {
       <div className="mt-6 grid gap-6 sm:grid-cols-2">{roles.map(([role, label]) => {
         const value = drafts[role] ?? data.roles[role].value?.systemUserId ?? '';
         const message = feedback[role];
-        const eligiblePeople = data.staff.filter(person => role === 'president' || person.canUseWorkbench === true);
+        const eligiblePeople = data.staff.filter(person => anyStaffRoles.includes(role) || person.canUseWorkbench === true);
         const unavailable = value && !eligiblePeople.some(person => person.systemUserId === value);
         return <div key={role}><label className="block font-medium" htmlFor={`staffing-${role}`}>{label}</label><select id={`staffing-${role}`} className="mt-2 min-h-11 w-full rounded-lg border border-gray-300 bg-white px-3 py-2 focus:outline-none focus:ring-2 focus:ring-gray-500" value={value} disabled={Boolean(saving && saving !== role)} aria-disabled={Boolean(saving)} onChange={event => assign(role, event.target.value)}><option value="">Not assigned</option>{unavailable && <option value={value} disabled>Current assignee is unavailable — choose an eligible staff member</option>}{eligiblePeople.map(person => <option key={person.systemUserId} value={person.systemUserId}>{person.name}</option>)}</select>{saving === role && <p role="status" className="mt-2 text-sm">Saving assignment…</p>}{message && <p role={message.success ? 'status' : 'alert'} className={`mt-2 text-sm ${message.success ? 'text-green-800' : 'text-red-800'}`}>{message.text}</p>}{message && !message.success && <Button variant="outline" className="mt-2" disabled={Boolean(saving)} onClick={() => assign(role, value)}>Retry assignment</Button>}</div>;
       })}</div>
