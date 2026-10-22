@@ -42,14 +42,21 @@ deferred reliability-evidence design below. Production Wave 18 implements one nu
 `wmkf_appreviewersuggestion.wmkf_reviewduedateoverride`; null falls back to the
 request date. The accepted-row Track Reviewers modal permits a non-null date
 only when it is strictly after that request date (and current/future in the
-Foundation-Pacific calendar), with no maximum. Its dedicated writer first
+Foundation-Pacific calendar); there is no fixed calendar maximum, subject to
+the signed-token preflight below. Its dedicated writer first
 validates the admin body, Dynamics impersonation setting, assigned sender,
 confirmed recipient, signature, and calendar. Confirmed engagement snapshot
 name/email take precedence; legacy missing snapshot values fall back
 field-by-field to the server-read linked reviewer person, while absence from
 both sources still fails before the write. It then ETag-commits the change
 and automatically dispatches the
-fixed-subject message. Only an actual Dynamics dispatch failure leaves the date
+fixed-subject message. For a non-null override save with a stored token hash,
+preflight rejects a revoked token and requires an active token to cover the
+requested date. Otherwise the route returns `token_recovery_required` before
+saving; explicit replacement-link recovery and a retry are required. With no
+stored hash, the token check is skipped; null restore also skips this preflight.
+Saving the extension does not rotate token authority.
+Only an actual Dynamics dispatch failure leaves the date
 saved without the notice. The open modal supports a server-fresh retry, and an
 existing extension always offers Resend deadline email without another date
 write. There is no durable notification-owed marker, so a failed restore send

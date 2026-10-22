@@ -29,20 +29,43 @@ dry-run by default, self-cleans its `__probe*` rows). Verdict was GO on all thre
 
 ## How to apply
 
-- Atomic multi-row Dataverse writes ARE available — use a `$batch` changeset (create/PATCH/delete,
-  per-op `Content-ID`, per-op `If-Match`) when you need all-or-nothing semantics. The single-row
-  helpers in `lib/services/dynamics-service.js` (`createRecord`/`updateRecord`/`deleteRecord`) are
-  not the only option. **The helper now exists: `DynamicsService.executeChangeset(operations, { actingUserSystemId })`**
-  (built S302, 2026-06-28). Pass ordered ops `{ method, url, body?, ifMatch? }` (url is a v9.2-relative
-  path, no leading slash; POST/PATCH need a body). It throws a structured service-error on any op failure
-  (atomic → nothing committed) with `.status` = the failing op's HTTP status (412 on If-Match conflict),
-  mirroring the single-row helpers. Unit-tested in `tests/unit/dynamics-service-changeset.test.js`.
+- Atomic multi-row Dataverse writes ARE available, but use the current write
+  contract rather than constructing raw batch requests. Application callers
+  should declare named DAL operations and use the registered core
+  `runChangeset` path, which validates entity sets, builds operation URLs, and
+  requires trusted DAL context. The public `DynamicsService.executeChangeset(...)`
+  method is the raw batch transport and does not dispatch through `runChangeset`;
+  do not pass caller-built raw URLs through that facade for application writes.
+  Follow `docs/agent-wiki/topics/dataverse-dynamics.md` and the source contract
+  before adding an operation. Preserve operation order, per-operation
+  `If-Match`, and atomic failure behavior.
 - The reviewer review-form submit (Phase 3 of [[../docs/REVIEWER_REVIEW_FORM_AUTHORING_BUILD_PLAN]])
-  is the first consumer: `executeChangeset` upserts the `wmkf_appreviewanswer` snapshot child rows by
-  alternate key + PATCHes the parent ratings in one atomic changeset. The §5a non-atomic fallback (and
-  its unsolved P0-R1/P0-R2 controls) is **not needed**.
-- The prior `prompts/[name].js` non-atomic publish mirror predates this verification; if it's ever
-  reworked, $batch is now a real option (rename the belief, not just the doc — [[feedback-rename-code-not-just-docs]]).
+  is an atomic answer-snapshot plus parent-state write: `build-review-submission`
+  upserts `wmkf_appreviewanswer` child rows by alternate key and writes the
+  parent's receipt/status/affiliation fields. The two ratings are held in the
+  answer snapshots; the parent ratings are not patched by this flow.
+- The prior `prompts/[name].js` non-atomic publish mirror predates this
+  verification; if it is reworked, `$batch` is an available option. The prompt
+  page's current behavior still needs its own source review before changing it.
+
+## Historical S302 implementation record (2026-06-28)
+
+At the June S302 implementation checkpoint, the helper was documented as
+`DynamicsService.executeChangeset(operations, { actingUserSystemId })`, accepting
+ordered `{ method, url, body?, ifMatch? }` transport operations and returning a
+structured atomic-operation result. The reviewer submit was then described as
+the helper's first consumer: it upserted answer snapshots and patched the parent
+ratings in the same changeset. The authoring-plan §5a non-atomic fallback was
+considered unnecessary because the atomic path existed, removing uncertainty
+about whether a parent write could commit without the answer rows (or vice
+versa). This preserves the June raw-transport API, behavior, and atomicity
+rationale. It does not attribute the later DAL entity-registry validation or
+trusted-context guard to that June helper. The current consumer contract above
+supersedes the historical account of which parent fields were written: current
+submission writes parent receipt/status/affiliation and stores both ratings only
+in answer snapshots. The later core `runChangeset` wrapper validates named DAL
+operations and establishes the current application write path; its Stage 7
+trusted-context assertion postdates the June checkpoint.
 
 Related: [[project-dynamics-sandbox-state]] (probe ran against prod, not sandbox, because the sandbox
 lacks the reviewer schema), [[feedback-verify-external-platform-claims]].

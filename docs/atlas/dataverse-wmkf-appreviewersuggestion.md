@@ -78,7 +78,13 @@ Outreach timestamps:
   value and existing rows retain proposal-wide behavior. The dedicated
   accepted-reviewer writer permits only a current/future date strictly after
   the request default, evaluated in the Foundation's Pacific time zone, with
-  no maximum; null remains the supported restore value.
+  no fixed calendar maximum; null remains the supported restore value. For a
+  non-null override save with a stored token hash, preflight rejects a
+  revoked token and requires an active token to cover the requested date;
+  otherwise the route returns `token_recovery_required` before the date write.
+  With no stored hash, the token check is skipped; null restore also skips this
+  preflight. Saving an override does not rotate token authority; email dispatch
+  follows the write and can report partial success.
 - [VERIFIED via source/tests on `codex/reviewer-ui-surfacing`] `wmkf_reviewduedateextensiongrantedat`
   is a nullable current-engagement DateTime event timestamp. The dedicated
   writer sets it atomically with a non-null override and clears it when the
@@ -398,7 +404,7 @@ Write (verified 2026-05-07; +Phase 3 ingestion S210):
 - `pages/api/review-manager/revoke-token.js` — `revoke` from same; flips `wmkf_externaltokenrevoked`
 - `pages/api/review-manager/manual-review-entry.js` — structured staff receipt sink; shared guard freshly rejects terminal/already-received/non-accepted rows and binds the complete parent/answer snapshot changeset to that authorizing ETag
 - `pages/api/review-manager/mark-received-no-file.js` — partial/no-file staff receipt sink; the same shared guard and ETag protect both the bare parent PATCH and parent-plus-rating changeset
-- `lib/services/review-upload.js` `writeReviewFiles` — shared staff/self-token file receipt sink; the same guard authorizes the pre-upload row, its ETag protects the later parent PATCH/changeset, and every attempt uploads into a unique `attempt_<uuid>` SharePoint subfolder whose exact path is persisted by the winner. A lost race cleans up only the losing attempt and excludes any item id visible in the winning persisted folder before deletion. Also calls `extendForPostSubmissionWindow` after commit.
+- `lib/services/review-upload.js` `writeReviewFiles` — shared staff/self-token file receipt sink; the same guard authorizes the pre-upload row, its ETag protects the later parent PATCH/changeset, and every attempt uploads into a unique `attempt_<uuid>` SharePoint subfolder whose exact path is persisted by the winner. A lost race cleans up only the losing attempt and excludes any item id visible in the winning persisted folder before deletion. After commit, the legacy `extendForPostSubmissionWindow` helper sets the stored token expiry to `now + 7 days` by default, an absolute assignment that can shorten a later stored expiry and does not alter the signed JWT expiry. This does not grant editing permission: the shared receipt guard rejects any later upload once the review is received.
 - `pages/api/external/review/[token]/submit.js` — canonical structured external receipt sink; the verifier row (or the supported fresh missing-ETag fallback) passes the same shared guard and its ETag protects the atomic parent/answer changeset. The fallback selects `wmkf_reviewstatus`, so it cannot acquire a terminal row's fresh ETag blindly.
 - `pages/api/external/review/[token]/context.js` — best-effort `wmkf_proposalfirstaccessed` stamp on first reviewer access (non-fatal on failure)
 - `pages/api/cron/file-review-docx.js` — Production-active dedicated exact-cycle
@@ -443,8 +449,8 @@ table on 2026-06-04; this Dataverse entity is the sole live suggestion ledger.
 
 ## Token lifecycle (live, per `project_external_reviewer_file_access.md`)
 
-- **Mint expiry is per-recipient (reviewer-engagement Phase 2, S275; Wave 18 override-first extension live):** production `send-emails-service` sets it via `computeReviewerTokenExpiry` (`lib/external/reviewer-token-ttl.js`), keyed on ACCEPTED status — an accepted reviewer gets effective review-due + 90d (the intentional Board-meeting cushion, comfortably beyond normal roughly two-week reviewer extensions); an invitee/non-responder gets the early cap at effective review-due + 2d; with no sane future due date it falls back to now + 90d. Link-bearing `send-emails`, respond reminders, `regenerate-token`, and `ensureToken` use the override-first effective date. Review-due reminders are link-free and do not mint; they verify that the stored token covers the same effective date. An `ensureToken` request-read failure degrades to now + 90d. The 7-day post-submission modify window via `extendForPostSubmissionWindow` remains unchanged.
-- Token expiry is **event-driven**, not absolute — capped vs long at mint by accepted status, extension on submission, revocation on regenerate.
+- **Mint expiry is per-recipient (reviewer-engagement Phase 2, S275; Wave 18 override-first extension live):** `computeReviewerTokenExpiry` (`lib/external/reviewer-token-ttl.js`) uses the effective review due instant at 23:59:59 UTC: accepted reviewers get +90 days and invitees/non-responders +2 days. If there is no sane future due date, expiry falls back to now +90 days. Link-bearing sends, respond-by reminder sends, `regenerate-token`, and `ensureToken` use the override-first effective date. Review-due reminders and ordinary follow-up/thank-you messages are link-free and do not mint or rotate token authority. An `ensureToken` request-read failure degrades to now +90 days. **Historical upload behavior:** after a successful upload, `extendForPostSubmissionWindow` sets stored expiry to now +7 days by default; this absolute assignment can shorten a later stored expiry and does not change JWT expiry. The shared receipt guard prevents permission to write after receipt.
+- Token authority is **event-driven**: link-bearing sends mint latest-link-wins authority, explicit recovery can replace it, and revocation invalidates it. The legacy post-upload stored-expiry assignment does not extend the signed JWT and does not confer edit permission.
 - `wmkf_reviewbloburl` retains historical Vercel Blob URLs for legacy rows but the active write target is `wmkf_reviewsharepointfolder` (Vercel Blob retired 2026-05-03 via commit `2277d23`).
 
 ## Migration disposition (post-W3-W6 cutover 2026-05-12)

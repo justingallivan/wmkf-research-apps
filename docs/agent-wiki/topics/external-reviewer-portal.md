@@ -199,8 +199,16 @@ Playwright E2E harness, and the live prod automation that an accept triggers.
   roughly two-week reviewer extension does not require token rotation. Saving
   an override does not rotate an already-delivered token. For eligible accepted
   rows, Track Reviewers offers Grant/Change extension; the new date must be
-  current/future and strictly after the request's original date, with no
-  maximum, and null restores the original. Invite Reviewers has no editor and
+  current/future and strictly after the request's original date, with no fixed
+  calendar maximum, and null restores the original. For a non-null override
+  save with a stored token hash, preflight rejects a revoked token and requires
+  an active token to cover the requested date. Otherwise the route returns
+  `token_recovery_required` before saving. With no stored hash, the token check
+  is skipped; null restore also skips this preflight.
+  staff must use explicit replacement-link recovery and retry. Extension does
+  not rotate token authority. Email/calendar dispatch follows the date commit,
+  so a dispatch failure can leave the new date saved with an explicit
+  partial-success result. Invite Reviewers has no editor and
   generic candidate PATCH cannot write the field. The dedicated save first
   validates the admin body, Dynamics impersonation setting, assigned sender,
   confirmed recipient, signature, and calendar; it then ETag-commits the date
@@ -408,14 +416,15 @@ Playwright E2E harness, and the live prod automation that an accept triggers.
   submission has been recorded in the current evidence set. One owner-authorized
   staged production portal submission passed on 2026-07-26 and was cleaned up, so
   “zero submissions ever” is false; genuine usage remains a live-state probe.
-- **Smoke-testing the prod accept form (S308 procedure).** To get a working
-  magic link for a test reviewer WITHOUT sending an email: hit `POST /api/review-manager/
+- **Historical smoke procedure (S308; retained as history, not a current runbook).** The
+  old procedure was to get a working magic link for a test reviewer WITHOUT
+  sending an email: hit `POST /api/review-manager/
   regenerate-token { suggestionId }` from an authenticated STAFF session — it mints the
   token *in prod* (where the real `EXTERNAL_LINK_SECRET` lives) and returns `{ url }`, the
   `reviews.wmkeck.org/external/review/<jwt>` link. `REVIEWER_EMAIL_DELIVERY_MODE=capture`
   is hard-blocked in Vercel production (`send-emails.js:778`), so this prod-mint route is
   for accept/decline-link smoke only, not for rehearsing a send. Loading the
-  link is read-only (stamps first-access); a real ACCEPT fires the honorarium automation
+  link may persist the first-access stamp; a real ACCEPT fires the honorarium automation
   (creates an `akoya_request`), so for UI checks opt out of the honorarium and stop before
   accept. Revoke when done via `POST /api/review-manager/revoke-token { suggestionId }`
   (or the Invite-tab "X", which soft-deletes + revokes).
@@ -428,7 +437,16 @@ Playwright E2E harness, and the live prod automation that an accept triggers.
   `REVIEWER_EMAIL_DELIVERY_MODE=capture` (not prod-blocked locally), the full
   preview→render-with-non-live-placeholder→send-time-mint→capture-send→portal-view pipeline now runs end-to-end on
   `localhost:3000`. See memory `project-local-dev-auth-setup` for the full local-auth
-  checklist this session had to rediscover.
+  checklist this session had to rediscover. This procedure is retained to explain
+  the historical S308/S346 testing context; do not use it as current release or
+  rehearsal authorization. Current rehearsal must follow
+  `docs/CAMPAIGN_RELEASE_AND_DATAVERSE_TEST_STRATEGY.md`, use
+  disposable/nonproduction records,
+  and account for first-access writes and draft deletion on token revocation.
+  A local HMAC secret authorizes only local token signing; it does not authorize
+  production Dataverse writes or bypass the target interlock. Capture-mode sends
+  can still mint tokens and stamp invitations; see
+  `reviewer-invite-capture-mode-not-full-sandbox`.
 - **E2E harness runs against a real build, not `next dev`.** The Playwright
   reviewer-portal harness (`tests/e2e/`, `npm run test:e2e`) mocks the data layer and
   runs against `next build && next start` using deployed Turbopack — NOT `next dev`

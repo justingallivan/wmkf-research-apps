@@ -4,7 +4,7 @@ description: REVIEWER_EMAIL_DELIVERY_MODE=capture blocks reviewer email delivery
 metadata:
   type: project
   status: active
-last_verified: 2026-07-30 via render-emails-service.js, token-lifecycle.js, and send-emails-service.js
+last_verified: 2026-10-22 via render-emails-service.js, send-emails-service.js, token-lifecycle.js, and reviewer-suggestion.js
 ---
 
 ## Recall Rule
@@ -17,20 +17,27 @@ source proves every persistence side effect is disabled.
 makes the reviewer-invite send path route to `captureReviewerEmail` instead of
 `DynamicsService.createAndSendEmail` — so **no email leaves** [VERIFIED 2026-07-27
 via `lib/services/review-manager/send-emails-service.js:1201-1209,570-572`].
-It is NOT a full
-sandbox. Two write paths on the invite flow still hit real Dataverse in capture:
+It is not a full sandbox. **Historical checkpoint (2026-07-27):** this note
+recorded that template rendering called `mintAndStore()` for an external-link
+placeholder and persisted token state. Later source changed the preview
+contract. **Current source** renders `{{externalLink}}` as a deliberately
+non-live placeholder and does not mint or change token authority
+[`lib/services/review-manager/render-emails-service.js::renderEmails`]. That
+claim is limited to token minting; other preview setup may still perform its
+own reads or writes. The actual send service mints at the final dispatch
+boundary before capture is recorded, so a capture-mode send can still write
+Dataverse:
 
-1. **Token mint** — rendering a template that contains the external-link placeholder
-   calls `mintAndStore()` and persists a replacement hash/expiry via
-   `setExternalToken` [VERIFIED 2026-07-27 via
-   `lib/services/review-manager/render-emails-service.js:143-169`,
-   `lib/external/token-lifecycle.js:45-60`, and
-   `lib/dataverse/adapters/reviewer-suggestion.js:215-222`]. There is no
-   delivery-mode check in this path, so such a preview persists a token.
+1. **Token mint** — an actual send containing the external-link placeholder
+   calls `mintAndStore()` and persists a replacement token hash/expiry through
+   `setExternalToken` before the transport branch [VERIFIED via
+   `lib/services/review-manager/send-emails-service.js::sendEmails`,
+   `lib/external/token-lifecycle.js::mintAndStore`, and
+   `lib/dataverse/adapters/reviewer-suggestion.js::setExternalToken`]. Capture
+   suppresses transport only; it does not suppress this send-boundary mint.
 2. **Invite lifecycle stamp** — a `send-emails` invitation with `markAsSent:true`
    writes `wmkf_invited=true` + `emailSentAt` regardless of delivery mode
-   [VERIFIED 2026-07-27 via
-   `lib/services/review-manager/send-emails-service.js:625-647`].
+   [VERIFIED via `lib/services/review-manager/send-emails-service.js:977`].
 
 Contact promotion and ORCID back-prop are absent from **all** send modes after
 S389; capture returns the same legacy `contactPromoted:false` /
@@ -39,7 +46,10 @@ S389; capture returns the same legacy `contactPromoted:false` /
 `lib/services/review-manager/send-emails-service.js`]. The
 abstract-edit route (`update-abstract`) is a separate write, not capture-aware.
 
-**How to apply:** a render that needs an external link is not side-effect-free.
-Drive preview/send/edit tests against a **throwaway reviewer suggestion +
-proposal**, never a real reviewer. See
+**How to apply:** current preview rendering uses a non-live placeholder and
+does not mint, but a capture-mode send can still rotate token authority and
+stamp an invitation. Drive send/edit exercises against a **throwaway reviewer
+suggestion + proposal**, never a real reviewer. Keep the separate abstract-edit
+write in scope when testing `update-abstract`; capture mode does not make that
+route safe. See
 [[reviewer-workbench-lifecycle]] and the external-reviewer-portal topic.

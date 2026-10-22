@@ -145,9 +145,12 @@ change and matching tests; an environment edit cannot expose another folder.
 
 For reference — you don't need to build any of this; it's already in place.
 
-1. **Magic link generation** — when a reviewer accepts, the app mints
-   a one-time JWT and sends them a `https://[app]/external/review/{token}`
-   URL, embedded into the materials email body.
+1. **Magic link generation** — link-bearing reviewer emails mint a signed JWT
+   at the send boundary and send a `https://[app]/external/review/{token}` URL.
+   The link can be used repeatedly while its token remains valid; a later
+   link-bearing send mints the replacement and invalidates the previous link
+   (latest link wins). Preview rendering uses a non-live placeholder and does
+   not mint a token.
 2. **File listing** — the landing page calls Microsoft Graph, walks the
    request's SharePoint buckets, and returns only
    `Reviewer Materials/Proposal_{Request#}.pdf`.

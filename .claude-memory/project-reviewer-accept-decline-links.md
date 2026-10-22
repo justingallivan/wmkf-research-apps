@@ -30,7 +30,13 @@ Ground truth: `pages/api/external/review/[token]/respond.js`, `lib/external/toke
 - Token lifecycle: `lib/external/token-lifecycle.js` (`mintAndStore`, `revoke`, `ensureToken`, `extendForPostSubmissionWindow`, `buildExternalUrl`).
 - Public endpoints: `pages/external/review/[token].js` + `pages/api/external/review/[token]/{context,proposal,upload}.js`.
 - Hash-only storage in Dataverse so revoke is a single PATCH.
-- 7-day post-submission modify window via `extendForPostSubmissionWindow` (Session 125).
+- Historical token-lifecycle behavior (Session 125): after a successful review
+  upload, `extendForPostSubmissionWindow` sets the stored expiry to `now + 7
+  days` by default. This absolute assignment can shorten a later stored expiry;
+  it does not change the signed JWT expiry or grant permission to edit a
+  received review. The shared receipt guard rejects later upload writes. See
+  the current reviewer upload/receipt contract in the External Reviewer Portal
+  wiki.
 
 **Accept/decline endpoint SHIPPED (verified 2026-05-14):**
 - `pages/api/external/review/[token]/respond.js` is the unified accept/decline endpoint. Validates `action` as `'accept'` or `'decline'`.
