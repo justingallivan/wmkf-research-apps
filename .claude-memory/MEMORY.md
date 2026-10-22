@@ -18,32 +18,27 @@
 - Red gates / test trust: ../docs/CI_GATES_REFERENCE.md; feedback-red-gates-are-p0.md; feedback-one-session-runs-gates-per-worktree.md
 - External systems / literals: feedback-verify-external-platform-claims.md; feedback-no-fabricated-placeholder-values.md
 - Delegated work / builds / review cadence: ../docs/AGENT_COLLABORATION_PLAN.md; ../docs/agent-wiki/topics/dev-environment.md (Durable Memory); project-agent-worktree-base-is-main.md
-- Codex reviews (Claude may launch adversarial reviews itself via Bash; model flag): feedback-codex-delegation-review-vs-rescue-routing.md; feedback-codex-model-gpt56-sol.md
-- Owner-selected staged review cadence: feedback-multi-model-review-pipeline.md
-- Environment / deploy / Vercel / require(esm) / local containers / sandbox rehearsal / Factory ledger: ../docs/agent-wiki/topics/dev-environment.md (Durable Memory); feedback-verify-deploy-is-the-merge-build.md; feedback-postgres-url-handling-hazards.md; project-vercel-workflow-runs-pinned-to-deployment.md
-- Dependency / lock-file changes (CI npm 10 vs local npm 11): project-ci-npm10-lockfile-parity.md
+- Environment / deploy / Vercel / require(esm) / local containers / sandbox rehearsal / Factory ledger: ../docs/agent-wiki/topics/dev-environment.md (Durable Memory); project-vercel-workflow-runs-pinned-to-deployment.md
 - Production data access: feedback-never-self-authorize-prod-dataverse-reads.md
 - Production smoke residue / cleanup scope: project-test-residue-cleanup-is-for-data-mining.md
 
 ## Working Norms
 - Performance/caching/refactor plans: feedback-latency-plan-scope-accretion-postmortem.md
 - Multi-session features / MVP drift / owner review burden: feedback-anchor-multisession-features-to-the-original-ask.md; feedback-owner-review-burden-must-shrink.md; changing the owner's named input source: feedback-keep-the-owners-named-input-source.md
-- Git / releases: ../docs/CAMPAIGN_RELEASE_AND_DATAVERSE_TEST_STRATEGY.md; feedback-verify-branch-before-git-action.md; feedback-scope-git-stash-in-shared-worktrees.md; feedback-feature-branch-handoff-lands-on-main.md; feedback-merge-to-main-from-temp-worktree.md
+- Git / releases: ../docs/CAMPAIGN_RELEASE_AND_DATAVERSE_TEST_STRATEGY.md; feedback-verify-branch-before-git-action.md; feedback-scope-git-stash-in-shared-worktrees.md
 - Migration numbers / schema_migrations / branch-applied migrations: project-migration-numbers-claimed-off-main.md
 - Action affordances / UI gating: feedback-ui-gates-must-mirror-server-guards.md; feedback-match-existing-ui-patterns.md
 - Tunables / mutable parameters: feedback-mutable-parameters-not-in-code.md
 - Cycle-scoped settings / per-cycle allowlists / cycle literals: feedback-minimize-per-cycle-configuration.md
 - Test Request Factory safety vs fidelity / rehearsal venue: feedback-factory-safe-not-full-fidelity.md; feedback-question-the-rehearsal-venue.md
 - Reviewer product decisions: ../docs/agent-wiki/topics/reviewer-identity.md (Durable Memory); feedback-prioritize-contact-recall-over-identity-precision.md
-- Audits / completion: feedback-vacuous-clean-results-print-the-denominator.md; feedback-apply-measurement-artifacts-in-both-directions.md; feedback-briefs-are-snapshots-not-ship-state.md
-- Review posture: feedback-read-the-implementation-not-the-callers-docblock.md; feedback-weigh-the-risks-you-name.md; feedback-corrections-decay-unless-mechanized.md; feedback-consistency-over-preview-rationale.md; feedback-reviewer-differs-from-author.md
-- Test teeth / mutation checks: feedback-mutation-test-with-the-discriminating-fixture.md; feedback-mocked-sql-hides-parameter-typing.md; feedback-fixtures-return-raw-transport-shape.md
+- Audits / review / test evidence: ../docs/agent-wiki/topics/dev-environment.md (Durable Memory)
 - Tone / user context: feedback-no-performative-contrition.md; feedback-user-facing-error-copy-voice.md
 - Legacy labels / interim trims on surfaces with a decided target: feedback-skip-legacy-fixes-that-the-target-state-removes.md
 - Search / schema language: feedback-grep-general-codebase-terms.md; feedback-human-legibility-schema-principle.md; feedback-staff-ui-never-shows-internal-ids.md; feedback-staff-ui-desktop-first.md
 
 ## Task Routing
-- Outdated apps: project-grant-reporting-rework.md; project-literature-analyzer-rework.md
+- Grant Reporting / Literature Analyzer: project-grant-reporting-rework.md; project-literature-analyzer-rework.md
 - Reviewer search post-refactor limitations / separate Impeccable exceptions: ../docs/plans/REVIEWER_SEARCH_FOLLOW_UPS_2026-09-18.md
 - Reviewer origination / retrieval / excluded-reviewer intake: ../docs/agent-wiki/topics/reviewer-origination.md; ../docs/EXCLUDED_REVIEWERS_STRUCTURED_INTAKE_PLAN.md
 - Reviewer identity / finding / contact / COI / verify-fail safety: ../docs/agent-wiki/topics/reviewer-identity.md; ../docs/REVIEWER_IDENTITY_CONTACT_PLAN.md
@@ -53,19 +48,19 @@
 - Dataverse / Dynamics / Explorer / CRM facts / SharePoint DOCX-XLSX byte identity: ../docs/agent-wiki/topics/dataverse-dynamics.md (Durable Memory)
 - Dynamics Explorer behavior campaign / SoCal vernacular / telemetry+eval: ../docs/DYNAMICS_EXPLORER_BEHAVIOR_CAMPAIGN_PLAN.md
 - Prompt / Executor / prompt governance / thinking-budget truncation: ../docs/agent-wiki/topics/prompt-executor.md (Durable Memory)
-- Final Writeup SoCal workflow (parked by owner; Stage 4/5 recipient hazard): project-socal-writeup-workflow-parked.md
+- Final Writeup SoCal workflow / Stage 4–5 recipient hazard: project-socal-writeup-workflow-parked.md
 - Initial Assessment registry/controls and Final Writeup lineage/review: ../docs/DATAVERSE_SHAREPOINT_FILE_MODEL.md; ../docs/FINAL_WRITEUP_REVIEW_IMPLEMENTATION_PLAN.md; ../docs/agent-wiki/topics/intake-portal.md (J27)
 - BILL / honoraria / payment semantics: ../docs/agent-wiki/topics/finance-honoraria.md
 - Auth / admin / access / org-open reviewer access / private Blob: ../docs/agent-wiki/topics/security-auth.md; ../docs/Q9_PREFS_APPACCESS_DAL_MIGRATION_PLAN.md
 - Intake portal / attachments / institution match / virus scan: ../docs/agent-wiki/topics/intake-portal.md
 - Site Visit materials / applicant additional materials / briefing room: ../docs/APPLICANT_ADDITIONAL_MATERIALS_PLAN.md; project-site-visit-materials-planning-handoff.md
-- Cross-visit D26 sentiment vs ranking study (parked) / discussion misattribution diagnosis: project-d26-cross-visit-sentiment-ranking-study.md; ../docs/plans/DISCUSSION_MISATTRIBUTION_BRIEF_2026-10-17.md
+- Cross-visit D26 sentiment vs ranking / discussion misattribution diagnosis: project-d26-cross-visit-sentiment-ranking-study.md; ../docs/plans/DISCUSSION_MISATTRIBUTION_BRIEF_2026-10-17.md
 - PC Meeting Tracker / sessions / visits / agenda email / Staff Deliberations rail: ../docs/PC_MEETING_TRACKER_PLAN.md; project-deliberation-session-precedes-site-visit.md
 - Integrity screener / Retraction Watch / PubPeer / News: ../docs/agent-wiki/topics/integrity-screener.md
 - Grantee / email templates: ../docs/GRANTEE_PORTAL_SPEC.md; project-grantee-deliverable-email-voice.md; project-email-template-token-syntax.md
 - Deferred cleanup / dead code: project-deferred-code-cleanup.md
-- Invitation-link validation strictness (post-cycle decision): project-invitation-link-strictness-open-decision.md
+- Invitation-link validation strictness: project-invitation-link-strictness-open-decision.md
 - Public privacy / history remediation: ../docs/audits/public-repository-pii-history-audit-2026-07-27.md; ../docs/PUBLIC_GIT_HISTORY_REMEDIATION_PLAN.md
 
 ## Archive
-- Closed & shipped work index: project-closed-work-archive.md
+- History / completed-work index: project-closed-work-archive.md
