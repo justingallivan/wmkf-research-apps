@@ -3,7 +3,7 @@ title: Parallel Agent Worktree Runbook
 domain: docs-governance
 kind: runbook
 status: active
-summary: "- Yellow: same feature, different layers → implementer/reviewer split."
+summary: "Coordinate isolated agent work, preserve branch commits and local artifacts before reuse or disposal, and promote changes deliberately."
 canonical: false
 cataloged: 2026-07-02
 owner: product-engineering
@@ -97,6 +97,43 @@ Things that **do** travel automatically (no action): the tracked `AGENTS.md ->
 CLAUDE.md` symlink, and `.claude-memory/**` (git-tracked, so the memory store is
 present in the worktree).
 
+### Preservation preflight
+
+Run this before reusing, parking, or removing an existing worktree. Coordinate
+with its owner first; another session's checkout is not available merely because
+its branch appears merged.
+
+1. Inspect branch and local-file state without printing file contents:
+   ```bash
+   git -C <path> status --short --branch --untracked-files=all
+   git -C <path> ls-files --others --ignored --exclude-standard --directory
+   git -C <path> log --oneline HEAD --not --remotes=origin
+   ```
+   Ignored paths can include `.env.local`, output artifacts, and session data.
+   A clean ordinary status and a pushed branch do not preserve these files.
+2. Record the current branch tip. If a proposed destination branch already exists,
+   inspect its tip and commits too (`git log --oneline <branch> --not --remotes=origin`).
+   Fetch before relying on remote-tracking refs. A missing upstream is unresolved,
+   not evidence of zero unpushed commits. Preserve local-only commits on an agreed
+   remote branch before changing or deleting their branch reference.
+3. Preserve needed dirty, untracked, and ignored files in an agreed destination;
+   handle secrets through the credentials runbook without printing their values.
+   Leave unexplained or other-owner material in place until ownership is resolved.
+4. For reuse, resume the existing branch or create a new, unused task branch from
+   the agreed base. Use `git switch -c codex/<new-task-slug> origin/main` only after
+   the preflight; an existing name must be inspected, not reset with `checkout -B`.
+5. For approved disposal, complete preservation before even ordinary removal:
+   Git may not protect ignored files. Try `git worktree remove <path>`; a refusal
+   requires inspection, not automatic force. Force removal needs a separate,
+   explicit cleanup decision covering every inventoried residual. Check branch
+   preservation and ownership separately before `git branch -d <branch>`.
+
+Historical context: S318 stranded an unpushed docs branch on one machine. That
+incident explains the commit-preservation rule below; it does not establish that
+local artifacts are disposable. Earlier instructions used forced removal for
+`.codex/` and reset a fixed parking branch; those shortcuts are superseded by this
+preflight.
+
 ## Step 4 — Hand the agent its task brief
 
 Give Codex a self-contained brief. The S298 template that worked:
@@ -114,8 +151,9 @@ Give Codex a self-contained brief. The S298 template that worked:
   - Register + gate any new API route (`docs/API_ROUTE_SECURITY_MATRIX.md` +
     `npm run check:api-routes`) — but prefer not adding one if avoidable.
   - Commit to the branch with descriptive messages, and **push the branch itself**
-    (`git push -u origin codex/<slug>`) — pushing a *feature* branch is safe and does
-    NOT deploy (only `main` deploys); it makes the work recoverable from any machine.
+    (`git push -u origin codex/<slug>`) to make the work recoverable from any machine.
+    A feature push may create a Preview deployment under the current configuration;
+    it does not itself promote the work to Production.
     **Do not push to `main`.**
 
 ## Step 5 — Work in parallel
@@ -163,45 +201,40 @@ git push                                        # triggers Vercel deploy
 vercel inspect <url>                            # confirm deploy (don't poll-grep `vercel ls`)
 ```
 
-**Before disposing, push the branch if it isn't fully on `origin`.** Both options
-below move off (or delete) `codex/<slug>`; a commit that was never pushed and isn't
-merged to `main` then survives **only in this machine's `.git`** and is unrecoverable
+**Before changing branch references or disposing, preserve commits on `origin`.**
+A commit that was never pushed and isn't merged to `main` survives **only in this machine's `.git`** and is unrecoverable
 elsewhere (S318: a parked docs branch stranded on one computer). Guard:
 ```bash
-git -C ../WMKF_Apps-codex log --oneline @{upstream}..HEAD 2>/dev/null   # unpushed commits?
-git -C ../WMKF_Apps-codex push -u origin codex/<slug>                   # push if any (or no upstream)
+git -C ../WMKF_Apps-codex log --oneline HEAD --not --remotes=origin    # after fetch; commits absent from origin refs
+git -C ../WMKF_Apps-codex push -u origin <verified-current-branch>     # preserve that branch, not an assumed task name
 ```
+Confirm the branch name and tip first. If HEAD is detached, preserve its exact
+commit on an agreed new branch before disposal; do not assume a named task branch
+points at HEAD.
 This is mandatory when the branch is **parked for later** review rather than merged
 now — the merge is otherwise the only thing that preserves it.
 
-**Then dispose of the worktree — two options:**
+**Then choose retention or disposal after the Preservation preflight:**
 
-*Keep & reuse (preferred for a recurring workflow).* Leave the directory in place
-with its `node_modules` + symlinks (`.agents/skills`, `.env.local`); just free the
-merged branch by parking the worktree on `main`:
-```bash
-git -C ../WMKF_Apps-codex fetch origin
-git -C ../WMKF_Apps-codex checkout -B codex/parked origin/main   # move off the merged branch
-git branch -d codex/<slug>
-# next session, from the worktree: git fetch && git checkout -B codex/<next-slug> origin/main
-```
+*Keep & reuse (preferred).* Leave the directory, local files, and existing branch
+in place until the next task is chosen. Resume that branch or create a new,
+unused task branch after coordinating ownership; do not reset a shared parking
+branch or delete the previous branch as an automatic finishing step.
 
-*Full teardown (one-off / reclaim disk).* Deletes the directory too:
-```bash
-git worktree remove --force ../WMKF_Apps-codex  # --force: clears the agent's untracked .codex/
-git branch -d codex/<slug>
-```
+*Full teardown.* With preservation complete and cleanup scope authorized, use
+ordinary `git worktree remove <path>`. Inspect any refusal. The preflight governs
+any later force-removal decision and separate branch deletion.
 
 ## Gotchas (consolidated)
 
 - **`.agents/skills` symlink** is per-machine + gitignored → recreate in every
   worktree or the agent runs stale skills.
 - **`node_modules` / `.env.local`** don't travel into a worktree.
-- **`.codex/`** (the agent's own session dir) is untracked and **blocks
-  `git worktree remove`** → use `--force`.
+- **`.codex/` and ignored local files** may contain needed artifacts; inventory
+  and preserve them before removal. Do not infer disposability from their names.
 - **`main` auto-deploys** → keep work on the branch; merge is the deliberate deploy.
-- **Unpushed, unmerged branch lives only on its machine** → push the feature branch
-  (safe; doesn't deploy) before parking/teardown, especially when parked for later.
+- **Unpushed, unmerged branch lives only on its machine** → preserve its commits
+  before parking/teardown. Feature pushes may create Preview deployments.
 - **Cloud-synced folders** corrupt `.git` → keep repo + worktrees out of them.
 - **Disjoint surfaces are the real safety** — the worktree isolates the *working
   directory*, but two branches editing the same file still conflict at merge.

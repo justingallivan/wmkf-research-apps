@@ -95,8 +95,9 @@ if [ "${1:-}" = "--worktree" ]; then
   BRANCH="codex/$WT_NAME"
   step "6. Codex worktree: $WT_PATH  (branch $BRANCH)"
   if [ -d "$WT_PATH" ]; then
-    warn "worktree dir already exists — reuse it instead:"
-    warn "    git -C '$WT_PATH' fetch origin && git -C '$WT_PATH' checkout -B $BRANCH origin/main"
+    warn "worktree dir already exists — leave its branch and files unchanged."
+    warn "Check its owner, branch tips, dirty/untracked files, and ignored artifacts before reuse."
+    warn "Follow the Preservation preflight in docs/PARALLEL_AGENT_WORKTREE_RUNBOOK.md."
   else
     git fetch origin
     if git worktree add -b "$BRANCH" "$WT_PATH" origin/main; then

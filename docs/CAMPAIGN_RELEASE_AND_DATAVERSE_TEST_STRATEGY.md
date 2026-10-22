@@ -97,9 +97,15 @@ integrate, rehearse, freeze, operate, observe, then remove.
 The old default of doing nearly everything directly on `main` is superseded by
 this risk-tiered rule.
 
-**[PLANNED]** The current `/stop` skill still hard-codes `git push origin main`.
-Until that workflow is made branch-aware, do not use it blindly from a feature
-branch; verify and push the current branch explicitly.
+**[VERIFIED via `.claude/skills/start/SKILL.md` and `.claude/skills/stop/SKILL.md`,
+2026-10-22]** Session procedures are branch-aware: `/start` checks the branch
+before pulling; `/stop` confirms the handoff destination, rechecks the intended
+branch before committing, and pushes that branch. A feature-branch handoff does
+not authorize promoting runtime work to `main`.
+
+Historical context: this strategy originally required that session-procedure
+repair before feature-branch use. That prerequisite has been implemented; keep
+the branch checks rather than carrying it forward as unbuilt work.
 
 ### Tier 0 — direct-to-main is acceptable
 
@@ -403,8 +409,9 @@ Any unchecked item is an explicit risk acceptance, not an implied pass.
 The strategy can begin without waiting for a platform rebuild:
 
 1. **Now — operating discipline:** adopt risk tiers, campaign windows, the readiness
-   checklist, named test records, recipient allowlists, and rollback records; make
-   `/start` and `/stop` branch-aware before treating them as feature-branch automation.
+   checklist, named test records, recipient allowlists, and rollback records.
+   The branch-aware `/start` and `/stop` procedures are implemented (section 4);
+   follow their branch and handoff checks for each session.
 2. **Complete 2026-07-22 — fail-closed Dataverse interlock:** the
    deployment-target/write matrix in section 6 is enforced.
 3. **Next — sandbox parity:** re-probe, provision reviewer schema/config, and maintain

@@ -16,9 +16,19 @@ a feature branch and needed a cherry-pick rescue; see
 `feedback-verify-branch-before-git-action`).
 
 - On `main` → normal flow.
-- On any other branch → STOP and ask the user where the session docs
-  (SESSION_PROMPT.md etc.) should land — usually `main`, but a deliberate Tier 1–3
-  feature branch session may want them on the branch. Never assume.
+- On any other branch → confirm where session docs (SESSION_PROMPT.md etc.)
+  should land, using an explicit destination already authorized in the session;
+  ask if none is established. The owner's cross-machine preference is a docs-only
+  banner on `main` naming the feature branch, but a deliberate Tier 1–3 session
+  may keep its docs on the branch. Never infer permission to promote runtime work.
+
+For a confirmed docs-only landing on `main`, coordinate ownership of the handoff
+file. Use an available, authorized checkout or prepare only the docs changes on an
+isolated docs branch based on current `origin/main` for deliberate landing. Do not
+switch another session's worktree, merge the feature branch merely to carry its
+handoff, or reset an existing branch. Record the feature and docs destinations
+separately and recheck each before committing/pushing. Worktree reuse/disposal
+follows `docs/PARALLEL_AGENT_WORKTREE_RUNBOOK.md` Preservation preflight.
 
 Then check `git log --oneline -10` and `git status` to see what this session produced.
 
@@ -36,8 +46,10 @@ environment values, secrets, or live-record data into the observation table.
 
 ## Step 2: Commit Any Remaining Changes
 
-Review and commit any uncommitted changes with a descriptive message. Do NOT leave
-uncommitted changes — they may cause issues on another machine.
+Review and commit completed, session-owned changes with a descriptive message.
+Preserve unrelated or other-owner changes; do not stage, stash, or discard them
+to make the checkout clean. Name intentional WIP and its owner in the handoff so
+the next machine/session knows what was not committed.
 
 **Stop-time router advisory:** if the Stop hook emits a memory-router crossing
 or growth advisory, edits in this session moved `.claude-memory/MEMORY.md`
@@ -103,15 +115,18 @@ and claims participation, not sole causation. Either run the router diet now
 
 After updating documentation files — re-verify the branch immediately before the
 commit (`git rev-parse --abbrev-ref HEAD`); the Step 1 check is point-in-time and
-HEAD can drift mid-session. If it is not the branch confirmed in Step 1, stop and
+HEAD can drift mid-session. If it is not the destination branch confirmed in Step 1
+for this commit, stop and
 resolve before committing:
 ```bash
 git rev-parse --abbrev-ref HEAD   # must print the intended branch
-git add SESSION_PROMPT.md CLAUDE.md DEVELOPMENT_LOG.md .claude-memory/
+git add <explicit-session-owned-paths>
 git commit -m "Document Session N and create Session N+1 prompt"
 ```
 
-Including `.claude-memory/` ensures any memory writes from this session are committed and available on the other Mac after push.
+Include the individual memory files changed by this session so they travel to
+the other Mac after push. Inspect the staged diff before committing; do not stage
+the whole memory directory or another session's work by default.
 
 ## Step 5: Push to Remote (Critical for Multi-Mac Workflow)
 
@@ -121,7 +136,7 @@ hard-code `main`:
 BRANCH=$(git rev-parse --abbrev-ref HEAD)
 git push origin "$BRANCH"
 ```
-If `$BRANCH` is not the branch confirmed in Step 1, stop and resolve the drift
+If `$BRANCH` is not the destination branch confirmed in Step 1 for this push, stop and resolve the drift
 before pushing. Never push a feature branch's commits to `main` by ref-spec.
 
 Verify the push succeeded. If it fails:

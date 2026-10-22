@@ -13,7 +13,11 @@ Do: run merge steps as separate plain commands (a chained `cd … && … | …` 
 `Bash(git merge *)`/`Bash(git push:*)` allow rules and went to the classifier). If `git checkout main`
 fails because `main` is checked out in another worktree (another session's), do not use that worktree:
 `git worktree add --detach <tmp> origin/main`, `git -C <tmp> merge --no-ff <branch>`, run the tests there
-(symlink `node_modules` for jest), push, then `git worktree remove <tmp>`.
+(symlink `node_modules` for jest), push, then apply the Preservation preflight in
+`docs/PARALLEL_AGENT_WORKTREE_RUNBOOK.md` before removing the temporary worktree.
+These merge steps apply to an owner-approved runtime release. For a docs-only
+handoff, follow `.claude/skills/stop/SKILL.md`: prepare only the handoff changes on
+an isolated docs branch or authorized checkout; do not merge the runtime branch.
 
 Do not: retry a push the classifier blocked, or work around it. Give the owner
 `! git -C <repo> push origin <merge-sha>:main`; the merge commit survives worktree removal.
