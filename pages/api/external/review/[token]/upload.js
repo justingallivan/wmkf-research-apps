@@ -63,7 +63,9 @@ export default async function handler(req, res) {
     // the Phase-2 UI but still reachable directly. A submitted review is final —
     // refuse a reviewer-token (self-serve) upload once wmkf_reviewreceivedat is
     // set, so the legacy file path can't overwrite a completed in-browser review.
-    // The staff path (staff_upload, a different route) is unaffected.
+    // This early check is token-route-specific. The shared writeReviewFiles
+    // receipt guard independently locks staff uploads after receipt or terminal
+    // status too; a different route does not exempt staff from finality.
     if (verified.suggestion.wmkf_reviewreceivedat) {
       return res.status(409).json({
         ok: false,

@@ -26,8 +26,9 @@ Track Reviewers panel**. This is that action item.
 
 - **A modern review is structured data** (`wmkf_appreviewanswer` snapshot rows +
   parent affiliation/`wmkf_reviewreceivedat`/status PATCH), NOT a file. So the rescue
-  tool must let staff enter the **full structured review** — the 3 rating radios + the
-  **rich-text narrative answers** — mirroring `ReviewAuthoringForm` and the live
+  tool must let staff enter the **full live structured review** — rating,
+  categorical/multiselect, rich-text narrative, and affiliation fields — mirroring
+  `ReviewAuthoringForm` and the live
   staff-editable question set (`getActiveQuestionSet`). NB the old
   `shared/components/external/ReviewFormFields.js` was **deleted (S347)** — it only rendered
   picklist/string (NO rich-text), so it was insufficient anyway; do not resurrect it.
@@ -41,6 +42,15 @@ Track Reviewers panel**. This is that action item.
   string+picklist renderer with no rich-text, so it couldn't serve this tool anyway.
   Build the rescue UI on the full `ReviewAuthoringForm` (controlled + `RichReviewEditor`
   + `getActiveQuestionSet`), not a resurrected `ReviewFormFields`.
+
+## Question-shape history
+
+The original rescue requirement described three rating radios. The later
+multiselect contract uses two canonical ratings (`riskLevel`, `overallAssessment`)
+and categorical `impactAreas`; the operational requirement is to render and
+validate the full authoritative question set, not recreate the earlier fixed
+three-rating form. Preserve the frozen keys/types/options and owner release
+boundaries in [[project-review-form-checkbox-questions]].
 
 ## Implemented contract (2026-07-22)
 

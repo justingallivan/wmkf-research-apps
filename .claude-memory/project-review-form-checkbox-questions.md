@@ -19,8 +19,9 @@ Do:
 - Keep the producer→snapshot→consumer chain aligned: live options canonicalize
   numeric client values into `{value,label}` pairs; every reader isolates corrupt
   JSON; only explicit rating keys feed averages.
-- Hold reviewer exposure until synthesis succeeds and the remaining release
-  rehearsal/rollback gates are deliberately cleared.
+- Preserve the recorded release rehearsal/rollback and exposure gates until
+  deliberately cleared. The historical successful synthesis run and implemented
+  automatic mechanism do not independently clear those owner boundaries.
 
 Do not:
 - Reopen question keys, option values, storage shape, or the `multiselect` type
@@ -36,7 +37,22 @@ Ground truth: frozen plan above; source in
 `shared/utils/review-matrix.js`, and staff/external form consumers. Production
 evidence lives under `outputs/review-form-multiselect/`.
 
-## Current boundary (2026-07-28)
+## Implemented mechanism and release boundary
+
+[VERIFIED via repository source, 2026-10-22] Automatic synthesis is implemented:
+`pages/api/cron/drain-review-syntheses.js` requires the exact
+`REVIEW_SYNTHESIS_AUTOMATION_ENABLED=true` value before discovery/drain.
+`lib/services/review-synthesis-drain.js` scans readiness, enqueues input-bound jobs,
+and rechecks readiness and fingerprints before generation.
+`lib/services/review-manager/synthesize-reviews-service.js` enforces automatic
+readiness/job matching and explicit confirmation for manual early synthesis.
+These are source mechanisms, not evidence of current flag activation, prompt
+publication, deployment, or clearance of the remaining exposure/rollback gates.
+
+## Dated release evidence and held prerequisites (2026-07-28)
+
+The observations below retain their recorded dates. Production rows, versions,
+counts, fixtures and release prerequisites were not re-probed in this cleanup.
 
 [VERIFIED] Compatible code was merged at `5282cee8`; Wave 15 was applied/read
 back before deployment. The audited admin route published backward-compatible
@@ -71,8 +87,11 @@ resolves with content; decline/no-response/withdrawn-sufficient/withdrew/
 released or current revoked/expired token resolves without. Others block
 fail-closed (including live-token non-acceptance, unresolved duplicates, invalid
 state); re-minting reactivates only a participating nonterminal row whose token
-was its sole resolution. Unbuilt: no auto trigger; service/card remain
-zero-gated; staff keeps the explicit ≥1-receipt override.
+was its sole resolution. The earlier pre-lifecycle plan described automatic
+triggering as unbuilt and the service/card as zero-gated. That implementation
+snapshot was superseded by the guarded automatic mechanism above (lifecycle
+implementation `70956477c`, July 28); it is not a remaining build instruction.
+The explicit manual early-synthesis confirmation remains a separate path.
 
 ## Frozen owner decisions
 

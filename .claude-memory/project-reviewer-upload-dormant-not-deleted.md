@@ -5,7 +5,7 @@ metadata:
   type: project
   status: active
   scope: external-reviewers
-  last_verified: 2026-07-26 via owner clarification, retained upload/mark-received routes, and current MaterialsView/ReviewAuthoringForm source
+  last_verified: 2026-10-22 via shared receipt guard, legacy receipt writers, and implemented structured rescue; test-artifact classification remains the dated July 26 owner record
 ---
 
 ## Recall Rule
@@ -56,30 +56,45 @@ The staff-side counterparts on `ReviewerManagePanel` (Track Reviewers ⋮ menu) 
 (`/api/review-manager/mark-received-no-file`) — were **removed from the UI (S347)**.
 They were PDF-email-era holdovers: a modern review is structured answer-snapshot data
 (via the portal `/submit`), not a file, and `ReviewFormFields` can't even capture the
-rich-text answers (it renders picklist/string only). **Routes + services are RETAINED
-server-side** (unchanged), for a planned dedicated staff "manual review rescue" tool
-that must mirror the FULL `ReviewAuthoringForm` (incl. rich-text) — see
-[[project-staff-review-rescue-tool]]. `shared/components/external/ReviewFormFields.js` was **deleted (S347)** —
+rich-text answers (it renders picklist/string only). **Routes + services remain retained
+server-side as separate legacy partial writers.** The dedicated structured rescue
+is implemented on the Reviews tab: `ManualReviewEntryForm` →
+`/api/review-manager/manual-review-entry` uses the full live question set and the
+canonical snapshot producer. It is not a restoration of those file-era controls;
+see [[project-staff-review-rescue-tool]]. `shared/components/external/ReviewFormFields.js` was **deleted (S347)** —
 the legacy uncontrolled string+picklist renderer (no rich-text) was orphaned by this
 removal, had zero importers, and couldn't render the
-rich-text answers the rescue tool needs, so the rescue tool should reuse the full
-`ReviewAuthoringForm`, not this. Its dep `lib/external/review-form-schema.js` stays
+rich-text answers the rescue tool needed. That limitation motivated reuse of the
+full shared field renderer in the implemented structured rescue, not restoration
+of the deleted renderer. Its dep `lib/external/review-form-schema.js` stays
 (still used by 10+ files). [VERIFIED via `ReviewerManagePanel.js` (S347) + route files still present.]
-- **Hardened (Codex P0-1, S302):** the reviewer-token upload path
-  (`opts.source === 'reviewer_self_token'`) now **409s once `wmkf_reviewreceivedat`
-  is set**, so the dormant-but-reachable route can't overwrite a completed in-browser
-  review. [VERIFIED via `pages/api/external/review/[token]/upload.js`.]
+- **Current shared finality boundary:** `lib/services/review-receipt-guard.js`
+  rejects received or terminal rows, unaccepted/declined engagements, and missing
+  ETags. Portal submit, structured staff rescue, retained staff/token uploads, and
+  no-file receipt use the authorizing row version for their conditional write.
+  Staff upload is not an overwrite escape hatch for an already received review.
+  The token route's early receipt check is additional protection; its presence
+  does not exempt the shared staff service.
+- **Historical hardening:** S302 added the reviewer-token early guard; July 22
+  shared-receipt hardening (`a9ac471c6`) extended the common eligibility/finality
+  contract across the receipt writers. The old planned-rescue description predates
+  the dedicated full-form implementation recorded in the rescue memory.
 - **Not surfaced:** `MaterialsView` renders the authoring form; the file input / "replace
   your submission" affordances are gone (plan §7).
 
-## How to re-enable (if ever needed)
+## Historical restoration mechanics — not authorization
 
-The route is live and reachable directly today (just not linked). To restore the UI,
-re-add an upload card to `MaterialsView` / `ReviewAuthoringForm` that POSTs multipart
-to `/upload`. Note the finality guard: a reviewer who has already submitted in-browser
-will get 409 — by design. The download-on-read in `ReviewsTab` already shows the
-SharePoint link only when a file actually exists, so staff-uploaded files still
-surface.
+The old implementation note proposed re-adding an upload card to `MaterialsView`
+/ `ReviewAuthoringForm` that posted multipart to `/upload`. Preserve that as the
+mechanics of the retired experiment, not a current next step. The owner-directed
+structured workflow remains controlling: re-exposure would require a new owner
+decision and an explicitly reviewed receipt/content-authority design. Do not
+restore it merely because the route remains in source.
+
+The retained endpoints are still directly callable subject to their token or staff
+authorization and receipt guards; hidden UI is not proof of dead code. Keep files,
+pointers, and old test-artifact classifications distinct from authority to delete
+or reset them. This documentation change authorizes no restoration or cleanup.
 
 Related: [[../docs/REVIEWER_REVIEW_FORM_AUTHORING_BUILD_PLAN]] §7, agent-wiki
 `external-reviewer-portal`.

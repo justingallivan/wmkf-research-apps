@@ -253,7 +253,9 @@ Playwright E2E harness, and the live prod automation that an accept triggers.
   received (no file)"** (`/api/review-manager/mark-received-no-file`). These were PDF-email-era
   holdovers — a modern review is structured `wmkf_appreviewanswer` data via `/submit`, not a file,
   and `ReviewFormFields` only renders picklist/string (no rich-text). **Routes + services are
-  RETAINED unchanged** as legacy partial writers. The dedicated structured
+  RETAINED** as legacy partial writers, with the shared receipt guard rejecting
+  already-received, terminal, and non-accepted engagements for staff as well as
+  reviewer-token writes. The dedicated structured
   rescue is now `ManualReviewEntryForm` →
   `/api/review-manager/manual-review-entry` on the Workbench Reviews tab; it
   mirrors the full live question set, including rich text, and its success path

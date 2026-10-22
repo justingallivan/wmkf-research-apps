@@ -1348,7 +1348,9 @@ being manufactured in Production.
 
 The workbench Reviews tab (`shared/components/workbench/ReviewsTab.js`) is fed
 by `/api/review-manager/reviewers`; ratings project from the
-`wmkf_appreviewanswer` snapshot via `ratingsFromAnswers` (hardcoded 3-key).
+`wmkf_appreviewanswer` snapshot via `ratingsFromAnswers` (the two canonical
+rating keys, `riskLevel` and `overallAssessment`; categorical multiselect
+answers remain separate from numeric ratings).
 Submitted reviewers still render as a read-only per-reviewer card list
 (ratings decoded via the static schema, richtext narrative answers, SharePoint
 download). Panel-prep roll-up/export now exists client-side (Phase 3, below).
