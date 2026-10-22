@@ -1,3 +1,71 @@
+# Session 632 Prompt: Resolve calendar ownership and choose an overlapping-cycle implementation slice
+
+## Session 631 Summary — J27 overlapping-cycle planning and foundational checks (Codex, 2026-10-21 PT)
+
+### What Was Completed
+
+1. **Proposed minimal-setup overlapping-cycle plan.** [VERIFIED via saved plan and source investigation] Three agents traced UI defaults, backend cycle settings and operations. The plan retains independent cycle identity, task-specific navigation, one authority for each date, per-cycle reviewer defaults, bounded multi-cycle jobs and exception-only readiness. This is a proposal; no runtime implementation is authorized or shipped.
+2. **Production foundations checked read-only.** [VERIFIED via bounded GET census captured 2026-10-22T03:22:26Z] New Admin roles and all five assignments verified. Operations has J27 but no D27 row; reviewer configuration has both with blank meeting/review dates. All 21 J27-linked requests in the capture are Southern California grants, not Research intake. Audit and sanitized evidence retain counts, limitations and failed/recovered reads. No business writes, sends, paid processing or schedule changes occurred.
+3. **Owner workflow boundary recorded.** [OWNER-CONFIRMED] Reviews close months before the board meeting. Post-board abstract requests through Awardees must coexist with next-cycle work. Do not reopen a hypothetical post-board late-review policy.
+4. **Connor setup context recorded.** [ASSUMED from owner statement] Connor is building the J27 application. GOApply opportunity 001024 is an internal opportunity number for Research Application, not a proposal number. Its December 7 deadline matches the provisional timeline; final mapping/publication remains unconfirmed. Do not treat unfinished application setup as a new task for this agent.
+
+### Commits
+
+- `b08347fad` — proposed overlapping-cycle delivery plan.
+- `0c425683c` — role-based calendar authority.
+- `e23828077` — pending responsible-party decision.
+- `69800ba4d` — pre-board reviews versus post-board Awardees work.
+- `ab48e38e7` — production foundation audit, sanitized evidence and read-only probe.
+- Stop-time synchronization and this handoff follow; user explicitly requested landing the handoff on main.
+
+## Next Items
+
+### Verified Open
+
+1. **Choose and authorize an implementation slice.** Evidence: proposed plan §5 and audit. Reviewer-default isolation can be prepared independently of calendar ownership. No implementation was requested in this session; resume with owner scope, not an assumed instruction to build the entire plan.
+
+### Owner Decision Needed
+
+1. **Justin: calendar authority role/responsible party.** Evidence: plan §7; explicitly still pending. Existing Program Coordinator and Systems Specialist assignments do not confer calendar authority.
+2. **Justin: backup/escalation coverage and date-change approval.** Evidence: final discussion and plan stop-time context. Decide who covers calendar exceptions and whether the owner role publishes changes directly or needs approval for selected changes.
+3. **Connor: external calendar contract before calendar cutover.** Evidence: audit sections 2–4. Confirm final Research opportunity/cycle link and opening/cutoff dates, future operations-row creation (including D27), milestone ownership and request/board-date propagation. His assumed application-setup ownership is not proof these contracts are settled.
+
+### Parked
+
+1. **Custom applicant intake portal.** Evidence: J27 transition planning and memory; GOApply remains the intake path. No reopening requested.
+2. **Runtime rollout and live acceptance.** Evidence: proposed plan; slice authorization and relevant contracts remain prerequisites. No migration, live date edit, job widening, deployment or notification authorization is carried forward.
+
+### Verify Before Acting
+
+1. **Evidence is a dated bounded census.** Recheck affected live records and deployed non-secret cycle pins before changing their consumers. Active-state flags do not identify operational cycles; historical missing lookups are not automatically defects or a backfill list. SourceType=0 does not prove absence of synchronization.
+2. **Concurrent handoffs below remain their owners' context.** Preserved unchanged, not a freshly verified worklist. Sync latest main and inspect source before acting.
+
+### Do Not Reopen Without New Decision
+
+1. **Post-board late reviews.** Owner rejected that scenario; preserve pre-board review closure and continued Awardees follow-up instead.
+2. **Hardcoded calendar owner or duplicate date entry.** Owner requires authority through Admin roles and minimal recurring setup.
+
+## Key Files Reference
+
+| File | Purpose |
+|------|---------|
+| `docs/plans/CYCLE_ROLLOVER_MINIMAL_CONFIGURATION_PLAN_2026-10-06.md` | Proposed slices, acceptance and pending decisions |
+| `docs/audits/cycle-foundations-2026-10-21.md` | Read-only findings and limits |
+| `docs/audits/cycle-foundations-2026-10-21-evidence.json` | Sanitized census evidence |
+| `scripts/probe-cycle-foundations.cjs` | Explicitly invoked read-only census; requires existing app credentials and new output path |
+| `docs/CURRENT_WORK_QUEUE.md` | Current work pointer |
+| `.claude-memory/feedback-minimize-per-cycle-configuration.md` | Owner minimal-setup principle |
+
+## Verification and Handoff
+
+Owner: Codex → Justin/Connor for decisions, then an owner-authorized implementation session. Branch: `codex/session-630-start`, landing on main at owner request. Worktree retained at `/Users/gallivan/.codex/worktrees/session-start/WMKF_Apps`. Changed surfaces are planning docs, memory pointer, audit/evidence and manually invoked GET-only probe; no application runtime changes. Probe syntax, evidence arithmetic and 17 relevant gates/sequential self-tests passed during the investigation; stop-time checks are reported in the closing response. Claim-evidence report returned local state unavailable; no observation row invented.
+
+No DEVELOPMENT_LOG milestone entry required: planning and read-only investigation shipped no new production capability, architecture or cutover. CLAUDE.md remains unchanged: the diagnostic probe is documented in the audit, with no new global convention. Shared-main untracked critique/output artifacts belong to other work and must remain untouched. Preserve all concurrent handoffs below.
+
+---
+
+# Preserved concurrent handoffs — historical owning-session context
+
 # Session 631 Prompt: Choose the next active workflow; shared roles added
 
 ## Session 630 Summary — Program Coordinator and Systems Specialist shared roles (Claude, 2026-10-21 PT)
