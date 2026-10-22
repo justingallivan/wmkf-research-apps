@@ -245,27 +245,46 @@ existing rows.
 
 ---
 
-## 4. Structured-PI identity — fail-open + augment-only `[VERIFIED 2026-06-13]`
+## 4. Structured-PI identity — person checks plus role-source conflict `[SCOPED SOURCE RECHECK 2026-10-22]`
 
-**Contract.** `discover.js` and `enrich-recommended.js` resolve the proposal PI from STRUCTURED
-Dataverse data (`resolveProposalPI`: request `_wmkf_projectleader_value` → contact `wmkf_orcid`
-→ exact OpenAlex author via `OpenAlexService.getAuthorByOrcid`) instead of trusting the
-LLM-extracted PI name. It is **server-resolved from the request GUID** (clients send `requestId`,
-never a client-claimed identity), runs in a Dynamics bypass under the time budget, and is
-**FAIL-OPEN + AUGMENT-ONLY**:
+**Owner-attested meaning.** Under the S159 contact-role triad, `wmkf_projectleader` is the
+scientist/PI and `wmkf_researchleader` is the institution's senior research officer, not the PI.
+No approved program-specific exception was found.
 
-- Never throws for "couldn't resolve" — returns `{ resolved: false, reason }` so the caller falls
-  open to the existing proposal-text identity. Only abort/time-budget signals propagate.
-- Appends the canonical PI name to the author-exclusion/coauthor set (never replaces the LLM PI +
-  co-Is) and identity-excludes candidates sharing the PI's exact ORCID/OpenAlex id — **gated on
-  `confirmed`/`probable`** (unresolved rows keep their id fields; acting on them would risk a
-  namesake).
-- A mis-entered ORCID is caught by a forename/surname name guard (`forenamesContradict`) → abstain.
+**Current person-identity behavior [VERIFIED via source].** `resolveProposalPI` selects
+`projectleader || researchleader` unconditionally (`lib/services/proposal-pi-identity.js:140,148`);
+there is no program/era guard. `tests/unit/proposal-pi-identity.test.js:52-63` explicitly expects
+the fallback. The resolver returns a DTO; discovery and applicant-enrichment callers use it to
+append and deduplicate the selected contact's canonical name in the author-exclusion/coauthor set,
+never replacing existing proposal authors. Those callers fall through to proposal-text identity
+on ordinary resolution failure; abort and time-budget signals propagate. Save has a distinct
+contract: a failed PI context (`piResolution.state === 'failed'`) aborts with 503, while ordinary
+unresolved/no-ORCID context is not the same failure state (`save-candidates-service.js:652-673`).
+The callers identity-exclude exact ORCID/OpenAlex matches only for `confirmed`/`probable`
+evidence. The name guard compares available forename and surname values and abstains on
+contradiction or when it cannot safely check; ORCID-registry corroboration is best-effort, not a
+required runtime precondition. These checks validate person identity, not the selected contact's
+role. The unconditional fallback is therefore a known conflict with the owner meaning, not a
+role-safe PI guarantee. The June 2026 Dataverse/ORCID probes are sample evidence only; they do
+not establish all-program semantics or the affected live population, which remains UNKNOWN. No
+runtime fix or current live-state probe is recorded here. Detailed evidence and known consumers
+are tracked in `docs/audits/pi-identity-request-mutation-audit-2026-10-22.md`.
+
+**Scope/consumer caveat.** The helper remains server-resolved from the request GUID and uses the
+selected contact's ORCID for an exact OpenAlex person lookup. Discovery uses the result for
+identity exclusion (`discover.js:297-304`) and author-name augmentation (`discover.js:339-347`);
+applicant enrichment uses it (`lib/services/workbench/enrich-recommended-service.js:751-787`);
+save-time COI consumes request
+institution context through `loadCoiContext` (`reviewer-request-context.js:281,297`). A
+`resolved:false` result does not make every downstream use safe: `reviewer-roster-service.js:173-199`
+reads `piIdentity.contactName`, and `confirm_identity` rejects a `proposal_author_candidate` by
+officer name (`reviewer-roster-service.js:529-537`). See the audit for the broader traced paths
+and impact.
 
 **Enforcement points.** `lib/services/proposal-pi-identity.js`
 (`resolveProposalPI`) · `lib/services/reviewer-identity-evidence.js`
-(`forenamesContradict` — full-forename
-contradiction only; returns false if either name is initial-only).
+(`forenamesContradict` — full-forename contradiction only; returns false if either name is
+initial-only). These validate person identity; they do not validate role semantics.
 
 ---
 
@@ -509,7 +528,7 @@ switched to request B.
 | 1 | Slice-E client/server asymmetry | `save-candidates-service.js` (`isUnresolvedIdentity`, `saveCandidates`) + `reviewer-provenance.js` (`provenanceGroupOf`) |
 | 2 | PI-named/cited/referred exemption + force-null | `save-candidates-service.js` (`contactBlockedForUnresolvedExempt`, `saveCandidates`; kinds: `reviewer-provenance.js` `isIdentityReviewExemptProvenance`) |
 | 3 | Invite-confidence allowlist | `reviewer-invite.js` (`emailConfidence`) + `send-emails-service.js` |
-| 4 | Structured-PI fail-open/augment-only | `proposal-pi-identity.js` (`resolveProposalPI`) + `reviewer-identity-evidence.js` (`forenamesContradict`) |
+| 4 | Structured-PI role-source conflict; identity checks do not validate role | `proposal-pi-identity.js` (`resolveProposalPI`) + `reviewer-identity-evidence.js` (`forenamesContradict`) |
 | 5 | S240 institution COI default hard drop + flagged exception | `save-candidates-service.js` + `discover.js`/`DiscoveryService` (`partitionConflicts`) + `reviewer-roster-store.js` (`recordCoiDropped`) |
 | 6 | OpenAlex bibliometrics/verified-domain | `contact-enrichment-service.js` (`_attachOpenAlexMetrics`, `_validateEmailAgainstVerifiedDomain`) |
 | 7 | Faculty-page guarded fetch + ranked mailbox ownership | `safe-fetch.js` + `contact-enrichment/page-email.js` + roster/UI evidence projection |

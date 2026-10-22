@@ -49,6 +49,7 @@ and verification limits apply:
 - [Dynamics, Temporal, and Product-Direction Memory Repairs](dynamics-identity-temporal-memory-repair-2026-10-22.md) — five Sol findings repaired by Luna and parent-reviewed.
 - [Active Memory Safety and Write Audit](active-memory-safety-write-audit-2026-10-22.md) — 59 additional active leaves whole-read, 25 memory leaves repaired, source evidence and review limits recorded.
 - [Remaining Active Memory Audit](active-memory-remainder-audit-2026-10-22.md) — the final 176 active leaves whole-read, 19 further memories repaired, and prioritized evidence gaps.
+- [PI Identity and Request-Mutation Authorization](pi-identity-request-mutation-audit-2026-10-22.md) — confirmed PI role-source conflict, bounded mutation authorization trace, documentary repairs and unresolved runtime follow-ups.
 - [Active Memory Coverage Inventory](active-memory-review-coverage-2026-10-22.csv) — all 272 active leaves, sample membership, bounded disposition and evidence report. No active leaf remains outside the named whole-read samples.
 
 ## Remaining audit queue and holds
@@ -63,11 +64,12 @@ and verification limits apply:
   implemented checker change or a verified repository-wide coverage claim.
 - Preserve accepted owner holds. Do not reopen intake, reminders, or paid-run
   decisions through this router audit.
-- **P1: resolve remaining safety contract evidence.** Read the remainder audit’s
-  PI/Research-Leader semantic tension, narrow request-mutation authorization,
-  full identity/COI/exclusion/referral fanout, and action-specific read-only
-  exemptions before proposing runtime changes. These are evidence gaps, not
-  permission to change owner policy or probe Production.
+- **P1: resolve remaining safety contracts.** The PI/authorization follow-up
+  confirms a PI role-source conflict and records the bounded authorization
+  trace; runtime repair, population assessment and concurrency questions remain
+  open. Continue with full identity/COI/exclusion/referral fanout and action-specific
+  read-only exemptions. These records grant no permission to change owner policy
+  or probe Production.
 - **P2: finish deeper source verification.** The read inventory is closed;
   published prompt state, mutable output policy, enforcement scan coverage,
   local/tool/platform contracts and external state retain explicit limits and

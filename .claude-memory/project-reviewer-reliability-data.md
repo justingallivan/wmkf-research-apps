@@ -23,9 +23,11 @@ whether reviewers are on time and reliable — not just participation counts.
 - `[VERIFIED via lib/dataverse/adapters/reviewer-suggestion.js and focused tests]`
   `aggregateReviewHistory()` counts received-review timestamps. Treating a dropout as
   `complete` would therefore create false positive reliability evidence.
-- `[VERIFIED via lib/services/review-manager/terminal-transition-service.js,
+- `[VERIFIED via lib/services/reviewer-engagement/terminal-transition.js,
   shared/config/reviewerStatus.js, and
   docs/atlas/dataverse-wmkf-appreviewersuggestion.md]` The terminal statuses are live:
+  `lib/services/review-manager/terminal-transition-service.js` is a compatibility export only;
+  the implementation lives in `reviewer-engagement/terminal-transition.js`.
   `withdrew` means the reviewer ended an accepted engagement and is negative reliability
   evidence; `released` means WMKF ended it and is reliability-neutral. Neither stamps a
   received/completed timestamp. The dedicated ETag path revokes the token; staff-recorded
