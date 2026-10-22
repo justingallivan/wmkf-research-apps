@@ -120,20 +120,22 @@ sequence.
   The earlier November 1 reminder does not block preparation already completed.
   Await colleague feedback and explicit implementation scope before a suite-wide rename.
 
-- **Cycle rollover with minimal configuration (2026-10-06).** [OPEN —
-  investigation designed, not started] Owner principle: very few parameters may
-  need human care each cycle; prefer settings that derive from the record or the
-  J/D calendar, with at most a twice-yearly confirmation (the daylight-saving
-  analogy) and a loud drift check for anything still pinned to an old cycle.
-  Plan, seed inventory and owner questions:
-  `docs/plans/CYCLE_ROLLOVER_MINIMAL_CONFIGURATION_PLAN_2026-10-06.md`.
-  **Interim safeguard done 2026-10-07 (S584):** Production
-  `STAFF_DELIBERATIONS_AUTO_PREPARE_CYCLE_CODES=["D26","J27"]`, redeployed; the status
-  allowlist needs no change (register row J27-084). Coordinate with the J27 single-phase
-  transition (row 8 above) so J27 changes land rollover-free where practical. Partial
-  answer from ops (Connor, 2026-10-07): a planned Grant Cycle table (`wmkf_grantcycle`)
-  with a placeholder meeting date and other ops-maintained dates; see the plan §2a.
-  Owner priority 2026-10-07: a to-do, not the highest priority.
+- **Overlapping cycles with minimal configuration (2026-10-21).**
+  [SOURCE INVESTIGATION COMPLETE; DELIVERY PLAN PROPOSED; NOT IMPLEMENTED]
+  Owner requested a cross-app plan after three read-only agents inventoried
+  cycle selection, settings, jobs and schema. Proposed delivery: verify the
+  operations calendar contract, isolate reviewer dates per cycle, make app
+  context explicit, replace routine job pins with bounded eligibility, and
+  surface only actionable rollover exceptions in one readiness view.
+  `docs/plans/CYCLE_ROLLOVER_MINIMAL_CONFIGURATION_PLAN_2026-10-06.md`
+  now contains the evidence, migration order and acceptance scenarios.
+  No live state was re-probed, runtime change authorized or queue priority changed.
+  The production-derived schema snapshot defines operations `wmkf_grantcycle`
+  and a request lookup; current population and date propagation remain unknown.
+  Historical interim safeguard: owner-reported Production preparation list
+  `["D26","J27"]`, redeployed 2026-10-07 (J27-084), not read back this session.
+  Coordinate implementation with J27 row 8; routine future rollover should need
+  no code/env/deployment edits, while real business approvals remain explicit.
 
 - **Reduce transcription audio copies and stream verified uploads (2026-10-19).**
   [PRODUCTION-LIVE — PR #513, merge `413c5f048`, Ready deployment `dpl_Dh9KeHbpPbqoYEzvjuiKgymJR6hG`; all 12 CI checks passed] The reviewed
