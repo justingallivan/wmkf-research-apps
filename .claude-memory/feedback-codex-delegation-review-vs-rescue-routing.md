@@ -24,9 +24,10 @@ Codex delegation routing has two enforced paths (discovered S401, 2026-08-05):
   "<args>"` (or `review`) — through Bash, so long runs do not wait on the
   owner. Resolve the versioned plugin path under
   `~/.claude/plugins/cache/openai-codex/codex/` at run time. Pass the model from
-  [[feedback-codex-model-gpt56-sol]] (`--model gpt-5.6-sol`), `-C <worktree>` and a
+  [[feedback-codex-model-gpt56-sol]] without copying a model pin here, the
+  installed companion's supported worktree option, and a
   `--base <ref>` that scopes the diff; run larger reviews with
-  `run_in_background` and wait for completion; show the output verbatim
+  the current runtime's supported background mechanism and wait for completion; show the output verbatim
   ([[feedback-share-codex-verbatim]]). The owner may still run the slash
   command directly. This is still the review path: never route review
   verdicts through rescue.
@@ -45,7 +46,7 @@ smuggled through rescue where those contracts don't apply.
 
 **How to apply:** when a Codex review is due (the owner asks, or a workstream
 requires an adversarial review per stage), run the companion review command
-yourself as above; when
+yourself as above, using the cadence explicitly selected for the workstream; when
 the user says "have Codex fix X" and the prompt must reference review findings,
 lead with the CODEX RESCUE HANDOFF + INTENTIONAL-RESCUE preface. Rescue tasks
 may launch in background regardless of foreground intent — capture the
@@ -57,4 +58,7 @@ until-loop. Related: [[feedback-share-codex-verbatim]],
 it, you review", Claude is the reviewer. Do not also launch a Codex adversarial
 review of Codex's own build without asking — the owner questioned exactly that
 ("What adversarial review? Didn't we just get the build back from Codex?"). Offer
-it as an option instead; per-stage Codex reviews still apply to Claude-built work.
+it as an option instead. For staged orchestrated Claude work, the S596 cadence in
+[[feedback-multi-model-review-pipeline]] selects Codex after the pilot and at the
+end. Per-stage reviews apply only when explicitly required for the current work,
+not because the older S184 example used them.

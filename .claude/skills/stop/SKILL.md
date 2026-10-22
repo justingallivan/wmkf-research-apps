@@ -69,6 +69,13 @@ and claims participation, not sole causation. Either run the router diet now
    - Status-labeled next items for the next session
    - Any relevant context or gotchas for continuity
 
+   Keep one current handoff plus a compact index of concurrent workstreams with
+   their owning plans and latest recorded resume boundaries. Preserve unresolved
+   owner decisions and safety constraints, but do not append whole prior handoffs
+   repeatedly. When compressing existing snapshots, preserve their history in a
+   clearly labeled dated record or an exact Git reference and verify that it is
+   retrievable. Historical checkout paths and permissions are not current authority.
+
    **Verify every "next step" against ground truth before writing it as actionable.**
    Each next-step is a carryover *claim*, not a confirmed worklist — the same skepticism
    `/start` Step 5 applies to destructive carryover (drop/remove/retire) extends to

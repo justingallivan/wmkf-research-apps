@@ -14,6 +14,11 @@ metadata:
 Read when the owner asks for a staged build to be "orchestrated", names model roles, or asks for
 Codex to be "satisfied" before merge.
 
+Apply this owner-selected cadence to that workstream, subject to newer explicit
+instructions. It is not a requirement to launch this model roster for every task.
+The S184 per-chunk pattern in [[project-codex-design-pre-impl-iteration]] is
+historical and must not add review rounds to this cadence implicitly.
+
 **What the owner asked for (2026-10-11, Session 596):** Fable orchestrates. Sonnet does builds and
 reconnaissance. Opus reviews Sonnet's work and iterates until happy. Fable then does a final review and
 implements changes itself if needed. Codex performs an adversarial review; Fable adjudicates the
@@ -35,5 +40,7 @@ orchestrator commit instead of a re-dispatch.
 - Apply should-fix/nit findings yourself when they are deterministic one-liners; re-dispatch only for
   real rework. Log every verdict in the plan's Stage Log.
 - Launch Codex via the companion script per [[feedback-codex-delegation-review-vs-rescue-routing]] and
-  [[feedback-codex-model-gpt56-sol]] (`--model gpt-6-astra`), `--base origin/main`, from the branch worktree.
+  [[feedback-codex-model-gpt56-sol]] for the applicable owner model preference;
+  do not duplicate a model pin here. Use the intended worktree and a base that
+  scopes the actual review diff. Check the installed invocation contract before use.
 - This repo's ESLint does not report unused imports: import hygiene must be proven by counting uses.
