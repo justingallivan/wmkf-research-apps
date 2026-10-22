@@ -17,15 +17,16 @@ related:
 
 # Reviewer Find Browser Test and Rehearsal Plan
 
-> **CURRENT STATUS (2026-08-03):** [INCIDENT OPEN] The implementation and its
-> browser/no-send tooling were subsequently merged and deployed. Live checks
-> repaired a Katherine-Ferrara-shaped legacy row but exposed a production gap
-> the layered plan did not cover: a deterministic staff-action condition is
-> rendered retryable/queued and retains a non-progressing per-card refresh
-> action. See
-> `docs/REVIEWER_FIND_WARM_RECONCILIATION_INCIDENT_2026-08-03.md`. The
-> production-shaped outcome matrix must be added before this plan can be cited
-> as sufficient enablement evidence.
+> **Historical incident snapshot (2026-08-03; superseded):** The incident
+> statement and browser plan describe the then-deployed warm-stage branch. The
+> incident record later documents that this pipeline was reverted from current
+> source. The layered test and rehearsal contracts below are historical design
+> rationale, not current implementation requirements or enablement gates. For
+> current route behavior, use `docs/API_ROUTE_SECURITY_MATRIX.md` and
+> `docs/atlas/postgres-reviewer-find-roster.md`. Hosted deployment state is
+> unknown without a fresh probe. Recorded owner decisions remain decisions;
+> this framing does not rescind them or authorize rebuilding the reverted
+> implementation.
 >
 > **Historical status (2026-08-02):** [PARTIALLY IMPLEMENTED] Layers A and B, the scoped
 > warm-effect observation ledger, and the authenticated read-only Layer C runner
@@ -252,10 +253,10 @@ data, not a mirror of production records.
     the fresh generation exactly once; late outcomes from the abandoned
     generation cannot update the page. A second conflict reaches the implemented
     guarded failure state and produces no third bootstrap attempt.
-12. The primary Workbench path sends explicit `mode=cached|reconciled`. The
-    server's surviving no-mode compatibility branch is pinned in Layer B; no
-    browser scenario is invented for it because the live Workbench always passes
-    parent-owned roster state.
+12. [Historical branch assertion] The primary Workbench path sent explicit
+    `mode=cached|reconciled`. Current checkout source has no mode/snapshot-token
+    contract: the route consumes `requestId` and the client requests the roster
+    by `requestId`.
 
 ### 4.4 Timing assertions
 

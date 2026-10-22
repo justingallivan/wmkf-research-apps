@@ -229,7 +229,7 @@ Sample row had **364 total fields** (vendor + WMKF + standard Dataverse audit fi
   writes to whichever `akoya_request` field the prompt's `target.field`
   declares.** Used by the Phase I summarize-v2 route. Same skip-if-populated
   overwrite-guard pattern (`preflightGuards()`).
-- (Dynamics Explorer does NOT write — its 11 tools are read-only: search, get_entity, get_related, describe_table, query_records, count_records, aggregate, find_reports_due, list_documents, search_documents, export_csv. The `dynamics_restrictions` table exists but no write-tools are wired in.)
+- (Dynamics Explorer has no CRM business-record write tools; its 11 tools are search, get_entity, get_related, describe_table, query_records, count_records, aggregate, find_reports_due, list_documents, search_documents, and export_csv. The `dynamics_restrictions` table exists but no write-tools are wired in. The app still writes Postgres request/query/usage telemetry and logs model usage. In `export_csv`, an unconfirmed `process_instruction` estimate may sample one CRM record through the provider before bulk-export confirmation; confirmation samples again before batching. This documents the current runtime path, not a new approval policy.)
 - `lib/services/workbench/triage-service.js` — writes ONLY
   `wmkf_triagestatus` through `grantRequestAdapter.updateById`, with the acting
   caller supplied after the route's hard manage gate (superuser or lead PD).

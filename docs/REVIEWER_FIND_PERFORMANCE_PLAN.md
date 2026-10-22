@@ -20,16 +20,17 @@ related:
 
 # Reviewer Find Warm-Revisit Performance and State-Coherence Plan
 
-> **INCIDENT STATUS (2026-08-03):** [VERIFIED via Git, deployment checks,
-> signed-in no-send checks, user screenshots, and current source] the
-> implementation described here is merged, pushed, and deployed through
-> `7072d52a`. It remains **functionally incomplete in Production**: a
-> deterministic staff-action condition can be emitted as retryable/queued, and
-> the UI still offers a per-card **Refresh contact evidence** action that cannot
-> resolve that condition. See
-> `docs/REVIEWER_FIND_WARM_RECONCILIATION_INCIDENT_2026-08-03.md`. Older
-> branch-only and pre-release statements below are retained as historical
-> design evidence and do not describe current deployment state.
+> **Historical incident snapshot (2026-08-03; superseded):** The incident
+> statement and implementation snapshot below described the then-deployed
+> warm-stage branch. The incident record later documents that this pipeline was
+> reverted from current source. This plan is historical design and rollout
+> rationale; its implementation descriptions, route modes, and operational
+> instructions are not current contracts. For the current roster read and
+> mutation behavior, use `docs/API_ROUTE_SECURITY_MATRIX.md` and
+> `docs/atlas/postgres-reviewer-find-roster.md`. Hosted deployment state is
+> unknown without a fresh probe. Recorded owner decisions remain decisions;
+> this framing does not rescind them or authorize rebuilding the reverted
+> implementation. Preserve this body as dated design history.
 >
 > **Primary objective:** returning to a previously searched request should show its persisted candidates promptly and should not repeat proposal, model, publication, or contact work merely to reconstruct the screen.
 
@@ -64,9 +65,9 @@ P0 is therefore a **warm-bootstrap and cache-correctness release**:
 
 Cold-search progressive delivery remains important, but it follows the warm-path fix. Paid-provider usage is an operational cost metric, not the headline user-experience metric.
 
-## Implementation snapshot — 2026-08-03
+## Historical implementation snapshot — 2026-08-03
 
-[VERIFIED via source/tests] Current deployed source behavior is:
+[Historical source/tests record; not current behavior] The then-current branch behavior was:
 
 | Contract surface | Implemented branch behavior |
 |---|---|
@@ -96,8 +97,8 @@ reviewer was selected, promoted, or invited during those checks.
 
 The following baseline trace and planning findings were recorded before the
 branch implementation summarized above. They explain the original scope, but
-are not assertions of current branch behavior; current status is the
-**Implementation snapshot — 2026-08-03** and the source/tests it cites.
+are not assertions of current branch behavior; current source behavior is documented in the current matrix and Atlas; this
+review describes the pre-revert branch.
 
 - **Change surface:** Reviewer Workbench Find behavior from panel mount through cached roster display, authoritative revalidation, targeted refresh, explicit new search, and promotion.
 - **Entry points:** `ReviewerFindPanel`, `ReviewerSearchSection`, `reviewer-roster`, `applicant-reviewers`, `enrich-recommended`, proposal-load, analyze/discover/enrich routes, and both promotion services.
@@ -473,9 +474,9 @@ Failures add bounded provider/infrastructure codes but do not replace the invali
 
 Content or input changes do not automatically launch a full cold search. They keep cached cards visible/read-only, identify affected candidates/stages, and require the explicit targeted refresh or new-search action defined by policy.
 
-## Promotion authority matrix — branch source state
+## Historical promotion authority matrix — branch source state
 
-[VERIFIED via source/tests] both promotion entry points derive
+[Historical source/tests record; not current behavior] both promotion entry points derive
 `deriveReviewerPromotionAuthoritySnapshot(...)` from the authoritative roster
 candidate immediately before calling the shared, fail-closed promotion gate.
 The UI's `authorityState` and any cached receipt remain display/eligibility
@@ -538,9 +539,9 @@ Minimum legacy-compatibility/evidence-date fan-out:
 ## Historical implementation slices
 
 The slices below are the original delivery plan. They are retained for decision
-rationale; implemented branch state is recorded in the snapshot above, and the
-only intentionally unwired portion is generic explicit-cold
-attestation/coordinator routing.
+rationale; the former branch state is recorded in the historical snapshot above; none of
+its routes, mode contracts, or warm-stage operations should be treated as
+current. The intentionally unwired boundary is also historical.
 
 ### P0 — warm revisit first
 

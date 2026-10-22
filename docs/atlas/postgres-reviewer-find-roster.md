@@ -2,20 +2,25 @@
 
 <!-- drain-table:file-purpose=atlas-state-page -->
 
-**Last verified:** 2026-09-14 branch source/tests verify the dormant, exact-on
-institution-evidence projection and request/candidate-bound receipt described
-below; it is not enabled or deployment-verified. 2026-08-21 feature-branch source/tests verify the bounded
-prior-request context projection (deployment pending); 2026-08-20 in source/tests and signed-in Production UI smoke
-on Ready deployment `dpl_9yZ9xTHqfNgLcbZxJDekZkAjqpPS` for Neville's one-action
-card and the exact stored/found choice projection through neutral Cancel; the live write was not
-exercised. The broader roster lifecycle was
-last verified 2026-08-03 in current `main` source/tests plus signed-in
-production no-send behavior. The stage-evidence and request-level
-reconciliation implementation is deployed through `7072d52a`, but Production
-has an open outcome-classification incident: a deterministic contact/identity
-staff action can remain `failed_retryable`/queued and render **Refresh contact
-evidence** even though retry cannot make progress. See
-`docs/REVIEWER_FIND_WARM_RECONCILIATION_INCIDENT_2026-08-03.md`.
+**Source review:** current checkout source, read 2026-10-22. The GET route
+consumes a request ID, reads the Postgres roster, projects Dataverse suggestion
+engagement in `workbench-reviewer-roster-get`, and adds matching open address
+repair alerts. The read-only engagement projection introduced by Slice A is
+current; it is separate from the later reverted stage-evidence/warm-validation
+pipeline. No live Production probe was run in this review. The reverted
+pipeline's hosted deployment state is **UNKNOWN** without a fresh probe.
+Preserve the prior incident and owner-decision records as dated history; they do
+not describe the current source contract.
+
+**Historical verification checkpoints:** 2026-09-14 branch source/tests
+covered the dormant exact-on institution-evidence projection and
+request/candidate-bound receipt; 2026-08-21 feature-branch source/tests covered
+bounded prior-request context; 2026-08-20 source/tests and signed-in Production
+UI smoke on `dpl_9yZ9xTHqfNgLcbZxJDekZkAjqpPS` covered Neville's one-action card
+and the stored/found choice projection through Cancel, without exercising its
+live write. The broader roster lifecycle was checked 2026-08-03 in then-current
+source/tests and signed-in Production no-send behavior. These are checkpoint-
+scoped results, not a fresh verification of today's hosted state.
 
 Migration 029 adds the
 durable `blocked` status; migration 027 adds `ineligible`; migration 025 keeps
@@ -29,11 +34,11 @@ disposition / gotchas and
 diagnosis built from it are not current proof. The Session 393 review pass was
 complete and owner-accepted on 2026-08-01. Current incident handoff:
 `SESSION_PROMPT.md`.
-**Historical Slice A implementation status:** source and focused tests on
-branch `codex/reviewer-find-stabilization-slice-a` projected authoritative
-Dataverse engagement over every suggestion-anchored active roster row before
-the GET response reaches Find. That wording records the historical pre-deploy
-state; current deployment truth is in the incident notice above.
+**Slice A implementation history:** the branch implementation added the
+read-only Dataverse engagement projection over suggestion-anchored roster
+rows. That projection remains in the current GET path. The later warm
+validation/stage-refresh pipeline was a separate implementation and was
+reverted from current source.
 **Historical live row count:** 164 at the 2026-08-02 verification time; not
 re-probed for this documentation handoff.
 
@@ -95,7 +100,7 @@ accepted, review-received, or completed.
 | normalized_name | text | `normalizeReviewerName(candidate.name)` — conservative cross-run search exclusion only |
 | display_name | text | surface-time `candidate.name` for re-render |
 | status | text | `active` \| `excluded` \| `ineligible` \| `saved` \| `blocked` \| `coi_dropped` (CHECK-constrained) |
-| candidate | jsonb | pruned render DTO (only card/render evidence fields, not raw enrichment internals). Applicant-suggested enrichment rows carry `enrichedProposalKey` (`library::folder::name`), `applicantEnrichmentCacheVersion`, and an explicit `identityStatus` gate result (`confirmed`, `probable`, or `unresolved`). The UI restores the cache only when every currently expected recommendation either has its exact canonical `suggestion:<suggestionId>` active/ineligible row for that proposal with the current `APPLICANT_ENRICHMENT_CACHE_VERSION` and a terminal gate result, or its canonical key is already terminal by staff action (`excluded`/`saved`/`blocked`). Legacy, unversioned, older-version, and unknown terminal rows cannot satisfy a missing expected row; a missing/partial non-terminal canonical batch re-enriches. Applicant institution contradictions route to `unresolved` only after the shared identity-consistency checker has ruled out direct or one-hop associated-institution compatibility. For that final coherence check, a current-run PubMed/ORCID verification institution outranks the applicant/stored institution; the latter is used only when the current verifier has no institution, so a stale prior affiliation cannot veto a coherent current identity or self-confirm a later namesake substitution. Direct eligibility evidence carries `eligibilityStatus`, reason, and a bounded fetched first-party page DTO (URL/title/evidence sentence/domain/check time). Institution-COI ledger and flagged active rows carry `hasInstitutionCOI` and `institutionCOIDetails` (`piInstitution`, reviewer affiliation, `dropDecision`, corroboration reason, drop stage/source where applicable). An authenticated `confirm_identity` action may add bounded `staffIdentityConfirmation` (opaque id, canonical manual contact, actor ids, timestamp, source), `manualContactFields`, and its UI marker. A resolved stored/found staff choice may add only `addressChoice: { decision, selectedEmail }`; readers require a matching `staff_address_choice` receipt and exact candidate email before presenting it as ready. The roster-only `update_contact_draft` action may merge bounded manual website/affiliation fields into the exact active row; it cannot accept email or write Dataverse. Browser-authored POST/exclude/confirm-identity blobs have staff and institution evidence authority stripped; one bounded request/candidate-key roster read restores only an existing server confirmation and its canonical manual contact, while applicant mutations re-read the full canonical server blob. Automated candidates may carry a server-signed `automatedIdentityAttestation`. Current mint is projection v3; verification accepts v1/v2/v3. V3 binds the request, derived candidate key, optional roster candidate key when supplied, identity digests, exact contact-projection digest, and eligibility status/evidence digest; V3 does not bind `eligibilityCheckStatus`. V2 can bind the full identity decision; v1/v2 have no contact binding and retain their historical 14-day TTL. `contactAuthorityBound` is true only when the v3 contact digest matches and the projected contact decision is `ready`; the save boundary still applies separate address-trust checks. Behind exact-on `REVIEWER_INSTITUTION_PHASE2`, the DTO may also carry a validated `independentIdentity`, bounded typed `affiliationAssertions`, signed `affiliationAssertionsComplete`, and `serverInstitutionEvidenceReceipt`; the POST route strips browser claims unless its separate JWT binds the request, final server-derived candidate key, exact projection, completeness, and expiry. Save paths re-read and verify the stored receipt, screen every author-specific current additional affiliation, and hold missing, stale, conflicting, truncated, or otherwise incomplete evidence before Dataverse writes. Exact-off omits these fields and keeps the incumbent call/response shape, including COI-drop ledger writes. A blocked row also stores its server-owned promotion decision/code/reason. |
+| candidate | jsonb | pruned render DTO (only card/render evidence fields, not raw enrichment internals). Applicant-suggested enrichment rows carry `enrichedProposalKey` (`library::folder::name`), `applicantEnrichmentCacheVersion`, and an explicit `identityStatus` gate result (`confirmed`, `probable`, or `unresolved`). The UI restores the cache only when every currently expected recommendation either has its exact canonical `suggestion:<suggestionId>` active/ineligible row for that proposal with the current `APPLICANT_ENRICHMENT_CACHE_VERSION` and a terminal gate result, or its canonical key is already terminal by staff action (`excluded`/`saved`/`blocked`). Legacy, unversioned, older-version, and unknown terminal rows cannot satisfy a missing expected row; a missing/partial non-terminal canonical batch re-enriches. Applicant institution contradictions route to `unresolved` only after the shared identity-consistency checker has ruled out direct or one-hop associated-institution compatibility. For that final coherence check, a current-run PubMed/ORCID verification institution outranks the applicant/stored institution; the latter is used only when the current verifier has no institution, so a stale prior affiliation cannot veto a coherent current identity or self-confirm a later namesake substitution. Direct eligibility evidence carries `eligibilityStatus`, reason, and a bounded fetched first-party page DTO (URL/title/evidence sentence/domain/check time). Institution-COI ledger and flagged active rows carry `hasInstitutionCOI` and `institutionCOIDetails` (`piInstitution`, reviewer affiliation, `dropDecision`, corroboration reason, drop stage/source where applicable). An authenticated `confirm_identity` action may add bounded `staffIdentityConfirmation` (opaque id, canonical manual contact, actor ids, timestamp, source), `manualContactFields`, and its UI marker. A resolved stored/found staff choice may add only `addressChoice: { decision, selectedEmail }`; readers require a matching `staff_address_choice` receipt and exact candidate email before presenting it as ready. The roster-only `update_contact_draft` action may merge bounded manual website/affiliation fields into the exact active row; it cannot accept email or write Dataverse. Browser-authored POST/exclude payloads have staff and institution evidence authority stripped; their bounded request/candidate-key roster read restores only an existing server confirmation and its canonical manual contact. Applicant confirmation re-reads the exact stored request/candidate row and suggestion anchor; non-applicant confirmation starts from the submitted pruned candidate and may separately read stored state for proposal-author checks. Automated candidates may carry a server-signed `automatedIdentityAttestation`. Current mint is projection v3; verification accepts v1/v2/v3. V3 binds the request, derived candidate key, optional roster candidate key when supplied, identity digests, exact contact-projection digest, and eligibility status/evidence digest; V3 does not bind `eligibilityCheckStatus`. V2 can bind the full identity decision; v1/v2 have no contact binding and retain their historical 14-day TTL. `contactAuthorityBound` is true only when the v3 contact digest matches and the projected contact decision is `ready`; the save boundary still applies separate address-trust checks. Behind exact-on `REVIEWER_INSTITUTION_PHASE2`, the DTO may also carry a validated `independentIdentity`, bounded typed `affiliationAssertions`, signed `affiliationAssertionsComplete`, and `serverInstitutionEvidenceReceipt`; the POST route strips browser claims unless its separate JWT binds the request, final server-derived candidate key, exact projection, completeness, and expiry. Save paths re-read and verify the stored receipt, screen every author-specific current additional affiliation, and hold missing, stale, conflicting, truncated, or otherwise incomplete evidence before Dataverse writes. Exact-off omits these fields and keeps the incumbent call/response shape, including COI-drop ledger writes. A blocked row also stores its server-owned promotion decision/code/reason. |
 | source_kind | text | Provenance kind: `cited_reference` \| `proposal_named` \| `applicant_suggested` \| `literature_retrieved` \| `grounded_seed` \| `referred` \| `barred_parametric`. Legacy rows may hold `claude_verified` or `database`; reads normalize those to a `provenance` DTO without rewriting the row. |
 | first_seen_at | timestamptz | |
 | updated_at | timestamptz | Roster mutation timestamp; `update_contact_draft` uses the server-read value as a compare-and-swap guard so a concurrent candidate refresh is not overwritten. |
@@ -138,25 +143,23 @@ per-request row cap (oldest `active`/`saved` evicted; never `excluded`,
 
 **Provenance semantics:** `candidate.provenance` is the durable render DTO for origin/grounding (`kind`, ordered `sources[]`, `seedRole`, `groundingWorkIds[]`). `source_kind` is a queryable copy of `provenance.kind`, not a Claude-vs-database flag. During the migration window, candidate JSON also keeps legacy `source`, `sources`, and `isClaudeSuggestion` fields for downstream compatibility.
 
-**Deployed stage-evidence overlay (2026-08-03):** [VERIFIED via
-source/tests and production no-send observation] `candidate` also carries bounded `stageFreshness` evidence and
+**Historical stage-evidence overlay (2026-08-03; not in current source):**
+The then-deployed implementation carried bounded `stageFreshness` evidence and
 receipts for `applicant_anchor`, `identity`, `institution_domains`,
 `institution_coi`, `coauthor_coi`, `eligibility`, `contact`, `address_trust`,
-and `roster_persistence`. The terminal receipt is valid only for its exact
-applicable upstream set. The stored stage state is render/cache eligibility,
-not client authority or a replacement for current promotion enforcement. Cards
-display the server-supplied per-stage “Evidence checked as of” time. The
-standalone generic explicit-cold attestation/coordinator helpers are not route
-connected; this row format must not be read as proof that generic explicit
-cold search emitted the new authority envelope.
+and `roster_persistence`. The terminal receipt was valid only for its exact
+applicable upstream set. Cards displayed per-stage “Evidence checked as of”
+times. Current source has no `stageFreshness` overlay or matching targeted-
+refresh/reconcile routes; treat the former overlay and its worker details below
+as historical implementation evidence, not current operations.
 
 ## Read paths
 
 - `lib/services/reviewer-roster-store.js` `listForRequest(requestId)` reads the
   rendered roster and returns active/excluded/ineligible/blocked candidates,
   canonical saved applicant suggestion keys (`savedKeys`), and the all-status
-  name union. `pages/api/workbench/reviewer-roster.js` accepts only the request
-  GUID for GET; it has no `mode` or snapshot-token contract. The route delegates
+  name union. `pages/api/workbench/reviewer-roster.js` GET consumes `requestId`; it has no
+  `mode` or snapshot-token contract (other query fields are not a roster mode API). The route delegates
   to `lib/services/workbench/reviewer-roster-service.js`, which lists the
   Postgres roster, reconciles suggestion engagement in the narrow
   `workbench-reviewer-roster-get` DAL context, then reads matching open address
@@ -186,119 +189,112 @@ cold search emitted the new authority envelope.
 
 ## Write paths
 
-- `lib/services/reviewer-roster-store.js` is the only roster JSONB mutation
-  surface. [VERIFIED via source/tests] Its cold path is
-  `recordSurfacedWithStageEvidence`, which validates bounded projected stage
-  evidence and returns per-candidate `recorded`, `partial`, or `skipped`
-  outcomes rather than a count. Its manual path is
-  `startStageRefresh`/`completeStageRefreshWithEvidence`/
-  `failStageRefresh`/`recoverExpiredStageRefresh`; it also has the provider-free
-  `finalizeCachedRosterEvidence` terminal repair and
-  `completeStructuredAddressVerification` for the paired staff action.
-  Every stage write is an exact `(request_id, candidate_key, updated_at)` CAS
-  under a **candidate-wide** refresh lease, not a per-stage lease. A second
-  active stage reports `refresh_in_progress`; an expired owner is persisted as
-  an incomplete retryable outcome before a retry can start. If upstream
-  invalidation temporarily leaves that exact owner's normal source hash
-  underivable, recovery uses only the opaque
-  `reviewer-stage-expired-lease-recovery:v1` server-derived
-  request/candidate/stage marker and still writes an incomplete receipt. The
-  planner exposes it only as `recover_expired_lease` with canonical reason
-  `prior_refresh_incomplete`. A missing/non-canonical attempt or start time,
-  non-allowlisted stage, live owner, or foreign-stage owner is never recovered:
-  it is `lease_repair_required` and the UI provides an operator-repair-only
-  state. Neither branch can make evidence current or authorize promotion. JSONB projectors
-  retain prior display evidence on failure and reject arbitrary browser patches.
-  Successful cold/manual writes apply the requested projected stage and
-  `roster_persistence` atomically when the upstream set is complete; a lost CAS
-  records neither as successful. `warmCacheVersion` denotes only the current
-  cache envelope, never that every stage or promotion condition is current.
+- `lib/services/reviewer-roster-store.js` owns roster JSONB writes. Current
+  surfaced-candidate writes use `recordSurfaced`; its default return is a
+  numeric changed-row count, while the roster service requests indexed
+  per-input outcomes. Server callers may supply an expected `updated_at` value
+  to guard a write. Exclude, promote, identity confirmation, and contact-draft
+  edits operate on the request/candidate row.
 - `lib/services/workbench/reviewer-roster-service.js` owns record-on-results,
-  Exclude, Promote, authenticated identity confirmation, roster-only
-  website/affiliation draft edits, scoped removal, and GET reconciliation.
-  `pages/api/workbench/reviewer-roster.js` retains authentication, method and
-  request-scope validation, session-derived actor construction, and HTTP
-  mapping. The contact-draft action re-reads the exact
-  active row and merges only those bounded fields; email remains exclusive to
-  the structured address/identity actions, and no Dataverse person write occurs. Browser
+  Exclude, Promote, identity confirmation, roster-only website/affiliation
+  draft edits, scoped removal, and GET reconciliation. `pages/api/workbench/reviewer-roster.js` supplies actor IDs from authenticated access. Browser
   `action:'saved'` returns 409 `server_owned_transition`; clients cannot create
-  saved/blocked authority. Browser-authored blobs have staff authority stripped
-  and eligibility reconstructed only from a valid bound receipt. The POST service
-  uses `recordSurfaced`'s opt-in detailed mode and returns one outcome per original
-  input index, including the server-bound candidate key: `recorded`, `unchanged`,
-  `invalid`, or `failed`. The store's other callers retain the numeric result.
-  A processed batch returns HTTP 200; `success` is false if any input is invalid
-  or failed, while protected no-ops are legitimate `unchanged` outcomes. Neither
-  the count nor a recorded outcome proves retention after cap enforcement or
-  concurrent changes. Discovery uses GET for saved state; known failed new rows
-  can remain ephemeral only without a protected-key or conservative allNames
-  collision, and unsaved deceased results are counted in the warning rather than
-  rendered as durable. A fresh search may rediscover unsaved names but is not an
-  exact-candidate retry. Unverified-contact rescue requires an exact recorded
-  singleton acknowledgment and carries its canonical key into identity confirmation.
-  These are branch source changes under
-  `docs/plans/REVIEWER_ROSTER_PARTIAL_SAVE_PLAN_2026-10-01.md`, not a deployment claim.
-- `pages/api/workbench/enrich-recommended.js` is the connected cold applicant
-  producer. [VERIFIED via source/tests] it obtains Graph proposal binding
-  metadata before and after proposal-dependent analysis, discards a changed
-  authority/version, builds bounded applicant cold-stage evidence, and passes
-  it to `recordSurfacedWithStageEvidence` for per-candidate outcome accounting.
-  A display-only public-Blob fallback cannot authorize proposal-dependent
-  identity/coauthor evidence.
-- `pages/api/workbench/reviewer-stage-refresh.js` is the explicit manual
-  targeted-refresh surface. [VERIFIED via source/tests] its closed body accepts
-  only `{ requestId, candidateKey, stage, expectedUpdatedAt }`; it rejects
-  client evidence, authority, source/provider, proposal/version, and plan
-  fields. It dispatches the eight executable stages (`applicant_anchor`,
-  `identity`, `institution_domains`, `institution_coi`, `coauthor_coi`,
-  `eligibility`, `contact`, and `roster_persistence`). `address_trust` is
-  deliberately rejected here and routed only through the structured action.
-  The server re-reads the exact canonical row and derives all authority; it
-  never selects by name or launches a batch repair.
-- `pages/api/workbench/reviewer-reconcile.js` is the private request-level
-  legacy-recovery surface. [VERIFIED via source/tests] the browser submits the
-  exact active keys from its server-owned roster and accepts only a one-for-one
-  result before reloading the parent snapshot. When a legacy row has a verified
-  ORCID but lacks persisted person authority, the server may bind exactly one
-  active, name-consistent Dataverse reviewer using the freshly read person ID
-  and ETag. Only deterministic ready, quick-check, staff-verified, or
-  not-applicable address results can project matching `contact` and
-  `address_trust` receipts; ambiguity, conflict, research-only evidence,
-  inactive people, or an ETag change remains a dedicated staff action. An
-  applicant suggestion with no linked reviewer person is also terminal staff
-  action and never receives a fabricated person anchor. The route never runs a
-  cold search, promotes, invites, or sends email.
-- `lib/services/workbench/reviewer-roster-service.js` `confirm_identity`
-  performs applicant anchor/key checks, proposal-author checks, and roster
-  confirmation; `pages/api/workbench/reviewer-roster.js` supplies actor IDs
-  from authenticated access. The dedicated structured address route
-  accepts target/action input only; its server service
-  re-reads identity/person ETags, then atomically projects matching `contact`
-  and `address_trust` receipts in one roster CAS. For a fresh pending
-  stored/found conflict, the address-trust service also records the bounded
-  `addressChoice` projection only after the ETag-guarded person resolution;
-  promotion replay preserves the matching non-null person resolution.
-- `pages/api/reviewer-finder/discover.js` records institution-COI candidates hard-dropped by Track A verified discovery and referred-seed discovery as `status='coi_dropped'`. `lib/services/discovery-service.js` returns Track B institution-COI hard drops to the route for the same request-scoped write. Phase-C flag-not-drop candidates flow through the existing `recordSurfaced` active-row path instead.
+  saved/blocked authority. Browser-authored candidate blobs have staff authority
+  stripped and eligibility reconstructed only from a valid bound receipt on the
+  applicable POST/exclude paths. Applicant confirmation resolves the exact stored
+  request/candidate row and suggestion anchor and requires known person
+  hydration. Non-applicant confirmation starts with the submitted pruned
+  candidate; the stored row is separately consulted for proposal-author checks
+  where needed. The contact-draft action re-reads the exact active row and merges
+  only bounded website/affiliation fields; email remains exclusive to structured
+  address/identity actions, and no Dataverse person write occurs. The POST
+  service uses `recordSurfaced`'s opt-in detailed mode and returns one outcome
+  per original input index, including the server-bound candidate key:
+  `recorded`, `unchanged`, `invalid`, or `failed`. Other store callers retain
+  the numeric result. A processed batch returns HTTP 200; `success` is false if
+  any input is invalid or failed, while protected no-ops are legitimate
+  `unchanged` outcomes. Neither a count nor a recorded outcome proves retention
+  after cap enforcement or concurrent changes. Discovery uses GET for saved
+  state; known failed new rows can remain ephemeral only without a protected-key
+  or conservative `allNames` collision, and unsaved deceased results are counted
+  in the warning rather than rendered as durable. A fresh search may rediscover
+  unsaved names but is not an exact-candidate retry. Unverified-contact rescue
+  requires an exact recorded singleton acknowledgment and carries its canonical
+  key into identity confirmation. These partial-save mechanics are current in
+  checkout source; the October 1 plan is their historical rationale, not proof
+  of current hosted deployment.
+- `pages/api/workbench/enrich-recommended.js` sends applicant recommendations
+  through current enrichment and `recordSurfaced`. It may reuse an existing
+  analysis result or analyze the proposal blob, and records per-suggestion
+  attempted/recorded/skipped counts with optional stored-row `updated_at` guards
+  and institution measurements. The former Graph pre/post-binding and cold-stage
+  receipt behavior belonged to the reverted stage pipeline, not this current
+  producer contract.
+- `save-candidates-service.js` and applicant promotion are separate
+  Dataverse-side mutation paths. They finalize roster state after their
+  Dataverse operation; a Postgres finalization failure can leave Dataverse as
+  the canonical committed state and is surfaced through error/alert handling.
+  The current code does not expose a single shared promotion-authority
+  snapshot/gate used by both callers immediately before mutation.
+- `pages/api/reviewer-finder/discover.js` records institution-COI candidates
+  hard-dropped by verified discovery and referred-seed discovery as
+  `status='coi_dropped'`. Track B drops are returned by
+  `lib/services/discovery-service.js` for the same request-scoped write.
+  Phase-C flag-not-drop candidates use the active-row path.
+
+### Historical rolled-back stage and warm-validation implementation
+
+The following describes the former pipeline, not current source or a current
+operational instruction. The exact hosted deployment state is unknown without a
+fresh probe. Its background and resolution are retained in
+`docs/REVIEWER_FIND_WARM_RECONCILIATION_INCIDENT_2026-08-03.md` and the dated
+plan records.
+
+The former cold path was `recordSurfacedWithStageEvidence`; its manual path used
+`startStageRefresh`/`completeStageRefreshWithEvidence`/
+`failStageRefresh`/`recoverExpiredStageRefresh`, plus
+`finalizeCachedRosterEvidence` and `completeStructuredAddressVerification`.
+Writes used exact `(request_id, candidate_key, updated_at)` CAS under a
+candidate-wide refresh lease. A live owner returned `refresh_in_progress`; an
+expired owner was persisted as an incomplete retryable outcome. When the
+normal source hash was no longer derivable after upstream invalidation, recovery
+used the opaque `reviewer-stage-expired-lease-recovery:v1` marker and wrote an
+incomplete receipt. The planner exposed `recover_expired_lease` with reason
+`prior_refresh_incomplete`. A non-canonical attempt/start time, non-allowlisted
+stage, live owner, or foreign-stage owner was held for operator repair as
+`lease_repair_required`. Neither recovery branch made evidence current or
+authorized promotion. Failed JSONB projections retained prior display evidence;
+successful cold/manual writes applied the requested stage and
+`roster_persistence` atomically only when upstream evidence was complete.
+
+The former `/api/workbench/reviewer-stage-refresh` body accepted
+`{requestId,candidateKey,stage,expectedUpdatedAt}` and dispatched
+`applicant_anchor`, `identity`, `institution_domains`, `institution_coi`,
+`coauthor_coi`, `eligibility`, `contact`, or `roster_persistence`; address trust
+remained on its structured action. The former
+`/api/workbench/reviewer-reconcile` was a request-level legacy-recovery path:
+it could bind one exact active/name-consistent Dataverse person for a verified
+ORCID, then project deterministic contact/address receipts, while leaving
+ambiguous, conflicting, inactive, research-only, and changed records for staff
+action. It did not run cold search, promote, invite, or email. Current source
+contains neither route or its named helper path.
+
 
 ## Cross-system
 
-No Dataverse equivalent for the operational roster itself. Crossing points:
-`save-candidates-service.js` creates/reuses the canonical person and suggestion,
-then finalizes the exact roster key as `saved` and best-effort retires active
-same-ORCID aliases; applicant promotion selects the existing suggestion, then
-performs the same server-owned finalization.
-[VERIFIED via source/tests] both callers first derive a server-side
-promotion-authority snapshot from the authoritative roster candidate and pass
-it to the shared fail-closed gate immediately before mutation. A warm-plan
-state, browser payload, or existing receipt cannot replace that current check.
-Dataverse and Postgres are not one transaction, so a finalization failure or
-lost roster CAS is explicit partial success: it emits an operational alert, the
-canonical Dataverse row remains authoritative, and the current promotion path
-does not recreate the changed/evicted roster row from its stale snapshot.
-Applicant-excluded no-ops become `blocked`; the roster never governs the
-Dataverse `wmkf_applicantdisposition` picklist. The branch roster GET also
-projects suggestion engagement from Dataverse as a read-only terminal overlay;
-it does not rewrite Postgres or Dataverse.
+No Dataverse equivalent exists for the operational roster itself.
+`save-candidates-service.js` creates or reuses the canonical person and
+suggestion; applicant promotion selects an existing suggestion. Both use the
+current roster finalizer. That finalizer inserts a missing row and upserts its
+active/saved status; it does not use `updated_at` compare-and-swap. A preexisting
+non-active/non-saved row is not overwritten. Save-candidate finalization errors
+raise a best-effort alert; applicant promotion reports partial success when
+finalization fails. Dataverse and Postgres are not one transaction, so the
+Dataverse outcome can remain committed if roster finalization fails. Applicant-
+excluded no-ops become `blocked`; the roster does not govern the Dataverse
+`wmkf_applicantdisposition` picklist. The current roster GET projects suggestion
+engagement from Dataverse as a read-only overlay and does not rewrite either
+store.
 
 ## Migration disposition / gotchas
 
