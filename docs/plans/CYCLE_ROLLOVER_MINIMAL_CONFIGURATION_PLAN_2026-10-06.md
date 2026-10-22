@@ -55,7 +55,7 @@ Existing focused evidence: `cycle-code-defaults.test.js` and `reviewer-campaign-
 
 [PLANNED] Prefer operations' `wmkf_grantcycle` as the calendar authority **after Slice 0 confirms its data contract with operations and its authority mapping to the Admin role system**. Retain `wmkf_appgrantcycle` for reviewer configuration and `board_writeups.cycle.<code>` for board workflow. Do not merge or delete tables as part of this plan. Build the smallest common read boundary that resolves these sources into explicit cycle context.
 
-**[OWNER DIRECTION, 2026-10-21] Calendar authority is delegated to a role.** Another agent is adding roles to the Admin panel; that work owns role definitions, assignment and the lookup contract. This plan consumes that contract once available and does not introduce a parallel role store, invent a role key, or assign authority to named people. Calendar authority means who may maintain/confirm dates; the calendar record remains the data authority.
+**[OWNER DIRECTION, 2026-10-21] Calendar authority is delegated to a role.** The owner reports that additional Admin roles have now been added; their implementation and lookup contract have not been re-verified in this worktree. The role-owning workstream owns definitions and assignment. This plan consumes that contract after inspection and does not introduce a parallel role store, invent a role key, or assign authority to named people. Calendar authority means who may maintain/confirm dates; the calendar record remains the data authority.
 
 [PLANNED] Resolve calendar editing/confirmation permissions and readiness recipients from the configured role assignment, with server-side checks on each mutation. Changing the assignee should transfer responsibility without cycle-by-cycle edits or a redeploy. Do not hardcode Connor, Sarah or Justin as the permission or notification fallback. Role scope, multiple assignees/backups and escalation are mapped to the delivered role contract before implementation; no extra roles are assumed. An unassigned/unresolvable role is a visible setup exception and blocks affected calendar changes/confirmations, while reads and already-authorized unrelated workflows continue. A calendar role assignment does not itself grant board release, pilot activation or model-spend authority.
 
@@ -166,6 +166,8 @@ Verification per slice: relevant unit/integration/browser tests plus type/build 
 
 ## 7. Decisions to resolve once
 
+**OPEN OWNER DECISION — calendar responsibility (owner update, 2026-10-21).** Justin will determine which Admin role should hold calendar authority and who should be assigned to it. Additional roles have been added, per the owner, but **no calendar role or responsible party has been selected or assigned by this plan**. Readiness-recipient/escalation mapping remains pending that decision. Keep this item open until Justin names the responsible role/party; inspecting available roles is not authorization to choose one automatically.
+
 [PLANNED] Recommended defaults for owner review:
 
 - **Calendar authority:** a configured Admin role, per owner direction, using existing Grant Cycle records once verified. Consume the role work owned by the other agent; exact key and assignment scope wait for that contract. Apps consume dates and current role assignments, without a competing calendar or person list.
@@ -185,4 +187,4 @@ The October 7 note described an operations cycle table as planned/unverified. Se
 
 Independent read-only plan review (2026-10-21) returned READY WITH NAMED CHANGES as an outline: make the existing duplicate reviewer deadline defaults converge on one authority. The canonical-field rule and single-edit acceptance scenario above address that finding. This is a source-based plan review, not approval of live state, implementation, notifications or deployment.
 
-Owner clarification (2026-10-21): calendar authority must be role-based. The concurrent Admin-role implementation is an integration dependency; its files and role definitions remain with the other agent. This update changes the proposed ownership contract only, not runtime authorization.
+Owner clarification (2026-10-21): calendar authority must be role-based. The Admin-role contract is an integration dependency; its files and role definitions remain with the owning workstream. The owner subsequently reported additional roles added and retained the decision on the calendar role/responsible party as open (§7). This update changes the proposed ownership contract only, not runtime authorization.
