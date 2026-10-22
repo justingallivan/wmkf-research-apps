@@ -18,7 +18,7 @@ export default async function handler(req, res) {
         return res.json(await (req.query?.capabilities === 'true' ? staffingCapabilities(actor) : loadStaffing(actor)));
       }
       exact(req.body, ['role', 'value', 'expectedRevision']);
-      if (!Object.hasOwn(ROLE_KEYS, req.body.role)) fail('staffing_role_invalid', 'Choose a supported shared role.', 400);
+      if (typeof req.body.role !== 'string' || !Object.hasOwn(ROLE_KEYS, req.body.role)) fail('staffing_role_invalid', 'Choose a supported shared role.', 400);
       return res.json(await saveRole(actor, req.body.role, req.body.value, req.body.expectedRevision));
     } catch (error) {
       return res.status(error.httpStatus || error.status || 500).json({ error: error.httpStatus ? error.message : 'Staffing could not be updated. Reload the assignments before trying again.', code: error.code || 'staffing_unavailable' });

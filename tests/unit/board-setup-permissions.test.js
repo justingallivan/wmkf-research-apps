@@ -95,6 +95,13 @@ test.each(['president', 'cso', 'grantsManager'])('activation validates Workbench
   if (role === 'president') await expect(save).resolves.toMatchObject({ value: { active: true } });
   else { await expect(save).rejects.toMatchObject({ code: 'board_staff_app_access' }); expect(d.setSettingIfUnchanged).not.toHaveBeenCalled(); }
 });
+test('first Program Coordinator assignment saves against an absent setting', async () => {
+  const { d } = presidentWithoutWorkbench();
+  const getSetting = d.getSettingStrict;
+  d.getSettingStrict = async key => key === 'board_writeups.program_coordinator' ? { found: false } : getSetting(key);
+  await expect(saveRole(actor, 'programCoordinator', { version: 1, systemUserId: OTHER }, null, d)).resolves.toEqual({ value: null, revision: null });
+  expect(d.setSettingIfUnchanged).toHaveBeenCalledWith('board_writeups.program_coordinator', JSON.stringify({ version: 1, systemUserId: OTHER }), null, 'staff');
+});
 test('an unassigned Program Coordinator does not block activation', async () => {
   const { d, cycle } = presidentWithoutWorkbench();
   cycle.cycle = 'J27';
