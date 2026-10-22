@@ -18,6 +18,12 @@ related:
 
 The owner’s later hierarchy correction is controlling for the PD Workbench: **working writeup and review first, supporting materials second, meeting logistics behind a compact link**. The [revised mockup](meeting-tracker-2026-10-20/workbench-pd-writeup.html) explores that direction; the earlier materials-first Workbench mockup is superseded and retained only as history.
 
+## Transcript preparation — playback review, 2026-10-21
+
+[VERIFIED via owner direction] Put video playback beside the speaker/transcript review on desktop and above it on narrow screens. Provide **Use current playback time as presentation end** and retain audio as a fallback when video is unavailable. Applying a playback time must update the editable presentation-end value and clear the prior review confirmation, just like editing the time directly.
+
+[VERIFIED via mockup source] The [review-stage mockup](meeting-tracker-2026-10-20/transcript-preparation.html) includes a local synthetic, silent 38-second video excerpt representing recording times 00:41:52–00:42:30. Applicant tiles disappear at 00:42:18. Video and audio fallback share the recording-time offset; switching pauses the previous player and transfers position. These media files demonstrate controls only, without meeting footage, voices or external access. Application playback integration, real media availability/error handling and authorized media delivery remain pending. Earlier screenshots predate these playback controls.
+
 ## Transcript preparation — acknowledgement removal build requirement, 2026-10-21
 
 [VERIFIED via owner direction] The new layout omits the non-sensitive/provider/paid-credits acknowledgement checkbox. Keep manual import available through the subdued, initially collapsed **Import manually** disclosure below Import from Zoom, as shown in the [transcript preparation mockup](meeting-tracker-2026-10-20/transcript-preparation.html).
