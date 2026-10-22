@@ -53,7 +53,11 @@ Existing focused evidence: `cycle-code-defaults.test.js` and `reviewer-campaign-
 
 ### 3.1 One cycle identity; existing records keep distinct responsibilities
 
-[PLANNED] Prefer operations' `wmkf_grantcycle` as the calendar authority **after Slice 0 confirms its contract with Connor/Sarah**. Retain `wmkf_appgrantcycle` for reviewer configuration and `board_writeups.cycle.<code>` for board workflow. Do not merge or delete tables as part of this plan. Build the smallest common read boundary that resolves these sources into explicit cycle context.
+[PLANNED] Prefer operations' `wmkf_grantcycle` as the calendar authority **after Slice 0 confirms its data contract with operations and its authority mapping to the Admin role system**. Retain `wmkf_appgrantcycle` for reviewer configuration and `board_writeups.cycle.<code>` for board workflow. Do not merge or delete tables as part of this plan. Build the smallest common read boundary that resolves these sources into explicit cycle context.
+
+**[OWNER DIRECTION, 2026-10-21] Calendar authority is delegated to a role.** Another agent is adding roles to the Admin panel; that work owns role definitions, assignment and the lookup contract. This plan consumes that contract once available and does not introduce a parallel role store, invent a role key, or assign authority to named people. Calendar authority means who may maintain/confirm dates; the calendar record remains the data authority.
+
+[PLANNED] Resolve calendar editing/confirmation permissions and readiness recipients from the configured role assignment, with server-side checks on each mutation. Changing the assignee should transfer responsibility without cycle-by-cycle edits or a redeploy. Do not hardcode Connor, Sarah or Justin as the permission or notification fallback. Role scope, multiple assignees/backups and escalation are mapped to the delivered role contract before implementation; no extra roles are assumed. An unassigned/unresolvable role is a visible setup exception and blocks affected calendar changes/confirmations, while reads and already-authorized unrelated workflows continue. A calendar role assignment does not itself grant board release, pilot activation or model-spend authority.
 
 Proposed rules:
 
@@ -117,7 +121,7 @@ The cycle catalog must discover incoming cycles independently of reviewer eligib
 
 [PLANNED] Extend the existing Admin workflow/cycle surfaces with one consolidated view: what was derived, where dates came from, what is confirmed, missing configuration, conflicting records and remaining pilot pins. Show each affected capability separately. A missing board-packet date should not hide intake or stop reviewer follow-up.
 
-Run a recurring readiness check over an explicit registry of cycle-dependent consumers. Check when a new operational cycle appears or milestones/configuration change; a scheduled fallback detects missed updates. Notification cadence/owner is confirmed in Slice 0. Notify only for a new actionable issue, a changed issue or a required decision; deduplicate by cycle/capability/issue/revision, record delivery outcome, and leave a durable in-app warning if mail fails. Do not send routine unchanged-status emails.
+Run a recurring readiness check over an explicit registry of cycle-dependent consumers. Check when a new operational cycle appears or milestones/configuration change; a scheduled fallback detects missed updates. Notification cadence and recipient/escalation role mappings are confirmed in Slice 0 against the Admin role contract; unresolved recipients are shown as setup exceptions rather than falling back to named individuals. Notify only for a new actionable issue, a changed issue or a required decision; deduplicate by cycle/capability/issue/revision, record delivery outcome, and leave a durable in-app warning if mail fails. Do not send routine unchanged-status emails.
 
 The check reports its denominator and unsupported consumers. It must catch missing dates, conflicting lookup/date identities, stale global defaults, forgotten cycle pins, unreachable settings and incomplete/capped discovery. Unknown/unavailable data is not a green result. A proposed offline contract gate should catch new unregistered runtime cycle literals and missing policy coverage, with explicit exceptions for historical compatibility/tests/pilots; it cannot verify deployment values or external flows.
 
@@ -127,7 +131,7 @@ All slices below are **[PLANNED]**. Implement in bounded feature branches; this 
 
 | Slice | Deliverable and relevant surfaces | Exit evidence |
 |---|---|---|
-| **0. Establish authority** | Owner-run read-only census of operations/reviewer cycle rows, request/Apply lookups, GOApply windows and relevant PA flows; deployed pins checked without exposing secrets. Agree date ownership, stable identity, notification owner, closeout policy and date propagation. | Named field/source/owner/consumer map; complete paginated counts and unknowns; resolve J27/D27 mappings without assuming snapshot equals live state. This blocks authority cutover, not independent local UI/date-isolation work. |
+| **0. Establish authority** | Owner-run read-only census of operations/reviewer cycle rows, request/Apply lookups, GOApply windows and relevant PA flows; deployed pins checked without exposing secrets. Map calendar authority and notification/escalation to the other agent's Admin role contract; agree stable identity, closeout policy and date propagation. | Field/source/role/consumer map, including unassigned-role handling; complete paginated counts and unknowns; resolve J27/D27 mappings without assuming snapshot equals live state. This blocks authority cutover, not independent local UI/date-isolation work. |
 | **1. Isolate reviewer settings** | Per-cycle timeline resolution through existing reviewer cycle/settings surface; request-specific overrides remain strongest. Stop applying singleton/sticky absolute dates across cycles; enforce single-cycle materials batches. | One canonical deadline edit reaches invitation, campaign and render consumers without a second edit. Two cycles with different dates/materials; one lacks a field; no fallback to another cycle. Historical configured requests unchanged. Send rejected before dispatch on mixed cycles. |
 | **2. Make context explicit** | Minimal shared cycle read contract, independent catalog, URL-preserving app selectors/defaults; remove D26 landing defaults. Inventory every date-filter/fiscal-label reader and resolve disagreement policy. | Concurrent intake/board views remain independently bookmarkable; cycle switch races cannot update the wrong view; untriaged intake is discoverable without reviewer authorization widening. Calendar revision does not reclassify existing work silently. |
 | **3. Remove routine job rollover** | Migrate mature preparation, review filing and title discovery one capability at a time. Decide title trigger separately. Add closeout/late-work policy and bounded multi-cycle scans; retain all existing production guards. | Old/new cohort diff reviewed; fixtures for late previous-cycle work and new-cycle work; repeat runs and mid-flight revisions produce no duplicates, missed tails or starvation. Cutover/rollback verified per worker. |
@@ -156,6 +160,7 @@ Use shadow/read-only resolution and cohort comparison before worker activation. 
 8. Mixed-cycle materials send rejects before any email dispatch; ordinary single-request sending retains the existing behavior.
 9. Routine D27-to-J28 rollover adds verified operational records without code/env/deployment edits. Changed dates/template/roster appear as exceptions; no old-cycle absolute dates, proposal files or confirmation flags are inherited.
 10. A pilot, paused reminder schedule, unapproved program or Factory TEST request never enters a mature automation merely because a new cycle exists.
+11. Reassign the calendar role: the new assignee can maintain dates and receives applicable readiness notices; the former assignee loses delegated calendar authority unless authorized through another valid assignment. No cycle settings or code change. Missing/unavailable assignments surface a setup exception without blocking unrelated reads/workflows; changes are authorized again at save time.
 
 Verification per slice: relevant unit/integration/browser tests plus type/build where runtime changes require them; affected route, Atlas, migration, status, document and J27 gates with sequential self-tests. Test both admitted and excluded populations. Current planning-doc checks do not establish this acceptance.
 
@@ -163,12 +168,12 @@ Verification per slice: relevant unit/integration/browser tests plus type/build 
 
 [PLANNED] Recommended defaults for owner review:
 
-- **Calendar owner:** operations (Connor/Sarah), using existing Grant Cycle records once verified. Apps consume dates; they do not maintain a competing master calendar.
+- **Calendar authority:** a configured Admin role, per owner direction, using existing Grant Cycle records once verified. Consume the role work owned by the other agent; exact key and assignment scope wait for that contract. Apps consume dates and current role assignments, without a competing calendar or person list.
 - **Standing policy:** inherit unchanged approved operational policy with provenance; require action for missing/changed dates, content and business approvals. Never treat silence as authorization for a new capability or wider paid/sending scope.
-- **Readiness recipient:** the existing operations owner role, with Justin as escalation, subject to confirmation of actual identities and delivery channel.
+- **Readiness recipient and escalation:** resolve the configured roles through the same Admin role system; confirm the mapping and delivery channel once. No named-person fallback or per-cycle recipient list.
 - **Rollover UX:** a new cycle is visible as soon as a verified cycle record or actual request establishes it; readiness is capability-specific. No global current-cycle switch or single readiness checkbox controlling every app.
 
-Still unknown before build: current table population/lookup use, date-propagation behavior, exact GOApply/PA contracts, supported closeout/late-arrival windows, confirmed recipients, and which app-specific milestones operations already maintains. These are a bounded contract check, not reasons to build a second calendar or ask staff to enter everything twice.
+Still unknown before build: current table population/lookup use, date-propagation behavior, exact GOApply/PA contracts, supported closeout/late-arrival windows, the delivered Admin role key/scope and recipient mapping, and which app-specific milestones operations already maintains. These are a bounded contract check, not reasons to build a second calendar or ask staff to enter everything twice.
 
 ## 8. Evidence limits and reconciliation record
 
@@ -179,3 +184,5 @@ Historical operator report retained as dated evidence: on 2026-10-07 the owner r
 The October 7 note described an operations cycle table as planned/unverified. September's production-derived schema snapshot provides stronger evidence that the entity and lookup existed at capture time. Current populated rows, extra milestones and integration remain unverified. No schema deletion or correction is inferred.
 
 Independent read-only plan review (2026-10-21) returned READY WITH NAMED CHANGES as an outline: make the existing duplicate reviewer deadline defaults converge on one authority. The canonical-field rule and single-edit acceptance scenario above address that finding. This is a source-based plan review, not approval of live state, implementation, notifications or deployment.
+
+Owner clarification (2026-10-21): calendar authority must be role-based. The concurrent Admin-role implementation is an integration dependency; its files and role definitions remain with the other agent. This update changes the proposed ownership contract only, not runtime authorization.
