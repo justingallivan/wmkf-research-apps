@@ -26,6 +26,8 @@ The owner’s later hierarchy correction is controlling for the PD Workbench: **
 
 [VERIFIED via inspected current UI handlers] `RecordingAndTranscriptCard.js` currently separates saved edits (`saveNames`), transcript publication (`publishJob` / `publishCorrection`), derivative generation (`generatePresentationTranscript`), summary draft/publication and presentation-video approval. The proposed combined action changes that contract, rather than merely relabeling a button. Current Board-readiness logic can recognize a bound presentation transcript or published summary individually; implementation must prevent preparation from making those new outputs Board-visible before the new approval step.
 
+[VERIFIED via owner direction] Provide a separate **Save draft** action for the presentation summary, so edits can be saved without Board approval. Retain the video-ending and summary-review checkboxes for now; revisit their burden after use rather than removing them in this build. [PLANNED] Runtime draft saving must persist edits without granting Board access; the mockup only acknowledges a local simulated save.
+
 [PLANNED — implementation acceptance requirements]
 
 - Trace save → transcript publication/version → derived transcripts → summary drafts/video → Board consumer before implementation; use the existing authorized services and explicit presentation/internal boundaries. Resolve the approval/persistence contract through the architecture/data review, including whether approval covers the whole presentation bundle and how edits revoke readiness. No schema or route design is settled by the mockup.
