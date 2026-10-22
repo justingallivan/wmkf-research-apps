@@ -344,13 +344,20 @@ If you're touching a service or utility, read its header before this catalog. If
   client-token minting, atomic finalize leases, exact-path server reads, byte
   hash/size recording, durable SharePoint candidate identity, terminal result
   replay, and exact-path expiry cleanup. It never accepts a client pathname.
-  `cleanupExpiredPortalUploads`'s expiry sweep reconciles a `candidate_result`
-  recorded after the Graph upload against a per-scope binding proof
-  (`docs/plans/CONSULTANT_FEEDBACK_PLAN_2026-09-14.md` §4 "Slice 2 prerequisite"):
-  Each known scope has its own fail-closed proof. Transcript cleanup treats any exact
-  generation/request/type/producer/drive/item Request Document match as bound regardless
-  of lifecycle; only a proven zero-row generation lookup can discard its exact candidate.
-  Ambiguous, malformed, mismatched, or failed lookups retain the candidate.
+  `cleanupExpiredPortalUploads` claims eligible rows, excludes background-job
+  owners and live finalizing leases, and applies distinct fail-closed proofs per
+  scope before discarding an exact persisted candidate. Grantee-image cleanup
+  binds a current `imageRef` match and can discard only a proven non-match;
+  Consultant Feedback protects an exact feedback-bound registry item and can
+  supersede only the proven unbound candidate row before discarding that candidate;
+  Site Visit materials treats predecessor ids, any registry lifecycle, or any
+  request reference as a binding, and deletes only with a zero-row proof, no
+  request reference, and the exact recorded ETag; transcript cleanup protects
+  exact typed producer/request bindings in every lifecycle and requires stable-byte
+  verification before exact ETag deletion. Lookup failure, ambiguity, mismatched
+  evidence, or unknown state retains bytes. Cleanup never uses a client pathname
+  or broadly removes projected Request Document history. See
+  `docs/atlas/postgres-infra-tables.md` for the detailed contract.
 - **`portal-upload-client-failure.js`** — Closed-vocabulary parser and
   best-effort Operational Event writer for authenticated browser-direct upload
   failures. Stores only stage/category/status/declared size/type plus the

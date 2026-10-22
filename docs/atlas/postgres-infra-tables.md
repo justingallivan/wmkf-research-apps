@@ -680,12 +680,16 @@ applicant materials store the intended predecessor artifact id plus the Graph
 drive/item/version/filename. This lets an expired-lease retry recognize a
 committed response drop, retire only the recorded predecessor, or delete only
 an exact unreferenced candidate where that scope supports candidate cleanup.
-`result_payload` makes consumed retries idempotent. **[SOURCE-BUILT, NOT DEPLOYED:]
-For `site_visit_material` only, a terminal `scan_infected` rejection can also store
-the strict public `{ok:false, reason:'scan_infected', scanRejection:{category,flags}}`
-payload. Rejected-staging replay returns its safe diagnostic; an attention hold
-keeps staging pending and does not write that rejection payload. Other scopes
-retain their existing replay contract.**
+`result_payload` makes consumed retries idempotent. **[DATED PRODUCTION RELEASE
+RECEIPT via PRs #407/#410, 2026-10-02; not a fresh environment probe:]** An
+infected verdict stores the sanitized `{ok:false, scanRejection:{category,flags}}`
+in the existing job `result_payload`. For terminal failed jobs, staging is
+rejected and replay returns that safe diagnostic. An infected `needs_attention`
+hold instead leaves staging pending and retains the diagnostic for the staff
+projection. Applicant `jobs` expose it only for failed infected jobs; staff
+`uploadJobs` expose it for failed or attention-held infected jobs. Legacy or
+invalid diagnostics fall back to an unspecified reason. No table or migration
+change was needed; the job-level receipt and staging lifecycle are separate.
 
 For `post_presentation_transcript` (migration 055), the candidate binds the
 request/generation identity and exact Graph drive/item/name/version/ETag.
@@ -720,18 +724,32 @@ migration 043, S503; document content types, cap from the admin setting
 mint and finalize routes (scope `consultant_feedback`, migration 049,
 Consultant Feedback slice 2 — `docs/plans/CONSULTANT_FEEDBACK_PLAN_2026-09-14.md`
 §4; PDF/DOCX only, `lib/services/consultant-feedback-attachment-service.js`).
-Raw external
-tokens are never stored (SHA-256 binding only), and clients never choose or echo
-an authoritative pathname. Daily maintenance deletes exact table-selected Blob
-pathnames after expiry and prunes terminal ledger rows after seven days; since
-the Consultant Feedback prerequisite (same plan §4 "Slice 2 prerequisite"),
-that sweep also reconciles any `candidate_result` recorded after a Graph
-upload against a per-scope binding proof before expiring the row —
-`consultant_feedback` and `site_visit_material` scopes have a proof wired
-(fail-closed: an unbound Ready registry row is superseded before its Graph
-item is discarded); `grantee_image`/`staff_grantee_image` and any
-unrecognised candidate shape are always retained, never discarded, until a
-proof is wired for them too.
+Raw external tokens are never stored (SHA-256 binding only), and clients never
+choose or echo an authoritative pathname. Expiry cleanup claims eligible rows,
+excludes background-job owners and live finalizing leases, respects active
+claims, and applies a scope-specific proof. It deletes only the exact persisted
+Blob pathname and prunes terminal eligible ledger rows; it does not remove
+historical or projected Request Document records.
+
+Binding and deletion proofs differ by scope. For `grantee_image` and
+`staff_grantee_image`, a candidate whose `imageRef` matches the deliverable's
+current `wmkf_imagefileref` is bound; a proven non-match can be safely discarded.
+Lookup failure or invalid evidence retains it, while a consumed staging row is
+bound by construction. For `consultant_feedback`, ambiguous or failed generation
+lookup retains the item; an exact registry row bound through feedback protects
+it, and a proven unbound candidate may have its own registry row superseded before
+that candidate is discarded. For `site_visit_material`, a predecessor artifact
+id, any generation's registry row (including Draft or Superseded), or any request
+reference binds the item. Only a zero-row registry result and no request reference
+authorize deletion with the exact recorded ETag; missing ETag or Graph 412 clears
+the receipt without deleting changed bytes. For
+`post_presentation_transcript`, an exact typed producer/request binding in any
+lifecycle protects the item; only a proven zero-row lookup plus stable-byte
+verification permits exact ETag deletion. Mismatch, ambiguity, failed lookup,
+unknown state, or unavailable dependency retains bytes. These rules do not grant
+uploader-selected cleanup authority or authorize broad deletion/supersession of
+projected history. See `lib/services/portal-upload-staging.js` for the executable
+contract.
 
 Private-store prerequisite is covered by
 `scripts/probe-private-blob-client-access.mjs`: public-mode PUT must fail, private
@@ -741,8 +759,11 @@ Migration 060 adds the nullable `background_job_id` ownership marker used only
 by applicant materials background uploads. While present, staging cleanup and
 ordinary finalize claims must respect the exact job owner; the job ledger is
 coordination state and does not replace the staged pathname, Blob hash, or
-domain receipt. **[PRODUCTION-VERIFIED 2026-10-02: migration 060 is applied and
-the column exists; background admission remained off at the recorded probe.]**
+domain receipt. **[DATED PRODUCTION READBACK 2026-10-02: migration 060 was
+applied and the column existed. At the recorded schema-readiness probe admission
+was still off; the later activation and first-job receipt are recorded below and
+in `docs/plans/MATERIALS_BACKGROUND_PROCESSING_PLAN_2026-10-01.md` §18. No current
+configuration probe is asserted here.]**
 
 ## Monitoring / observability
 
@@ -1105,7 +1126,7 @@ the collection row and sealed contributor link are created only on explicit Send
 invitation/reminder subject and body defaults live in Dataverse `wmkf_appuserpreferences`, not in
 this Postgres row. One-off edits are not saved as defaults.
 
-### `materials_upload_jobs` (migration 060; Production admission live; first job completed 2026-10-02)
+### `materials_upload_jobs` (migration 060; Production admission activated and first job completed 2026-10-02)
 
 Owner: durable background processing for applicant Site Visit materials uploads.
 The ledger binds one `portal_upload_staging` row to a collection, request, fixed
@@ -1119,7 +1140,8 @@ subfolder so prior bytes remain preserved until the new receipt is committed.
 SharePoint remains the byte store and `wmkf_requestdocument` the published
 receipt; this table owns neither.
 
-**[PRODUCTION-LIVE via PR #407/#410, 2026-10-02:]** An infected verdict persists the sanitized
+**[DATED PRODUCTION RELEASE RECEIPT via PR #407/#410, 2026-10-02; no current
+configuration probe is asserted:]** An infected verdict persists the sanitized
 `{ok:false, scanRejection:{category,flags}}` in existing job `result_payload`,
 including an infected `needs_attention` hold. The terminal failed path also
 rejects staging and persists its replay payload; a hold leaves staging pending.
@@ -1149,7 +1171,9 @@ Admission is gated by `SITE_VISIT_MATERIALS_BACKGROUND_SCHEMA_READY=on`,
 `VIRUS_SCAN_ENABLED` enabled. The schema gate must follow a successful
 migration-060 apply and physical readiness check; admission also requires the
 schema gate. If admission is off, the existing synchronous finalize path is
-used. **Production verified 2026-10-02:** schema readiness and admission are `on`, and virus scanning is `true`. PRs #404,
+used. **Dated Production activation receipt 2026-10-02:** schema readiness and
+admission were enabled, and virus scanning was true at the recorded check. This
+is historical release evidence; no current environment probe is asserted. PRs #404,
 #407, and #410 are merged with all CI passing. Ready deployment
 `dpl_2AacXcc5YQX9dNvJ4gMn4PpGtWWN` serves commit
 `8fb8a6d83684a9d49b8450b26ef5bbef382f9a32` and the registered alias
