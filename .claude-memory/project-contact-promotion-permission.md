@@ -1,11 +1,11 @@
 ---
 name: Accepted-reviewer contact promotion and Contact permissions
-description: Contact promotion occurs on identity-bearing acceptance, not send; Create+AppendTo work, but the app user has NO DeleteAccess on Contact
+description: Ordinary identity-bearing acceptance triggers contact promotion, not invite send; historical controlled writes proved Create+AppendTo and S213 observed no Contact DeleteAccess
 type: project
 originSessionId: 9ea67012-f70f-47e6-ba56-ded9f73601c4
 status: active
 scope: reviewer
-last_verified: 2026-07-31 — acceptance-boundary contract deployed at 824bfcc6; Create/AppendTo grant and no-DeleteAccess remain privilege facts from the controlled writes
+last_verified: 2026-10-22 source review; S389 acceptance behavior and S213 Contact privilege observations are dated evidence, not fresh live-state probes
 ---
 
 ## Recall Rule
@@ -13,7 +13,7 @@ last_verified: 2026-07-31 — acceptance-boundary contract deployed at 824bfcc6;
 Read this when: working on Reviewer Finder/Manager contact promotion, send-emails, smoke-test cleanup, or any "remove a promoted reviewer" feature.
 
 Do:
-- Promote every accepted reviewer through `ensureAcceptedReviewerContact`; invitation sends never create or link contacts.
+- For ordinary accepted reviewer requests, promote through `ensureAcceptedReviewerContact`; invitation sends never create or link contacts. When test-request isolation is enabled, the acceptance drain skips all follow-up for marked test requests, including Contact promotion, identity capture, honorarium/BILL onboarding, and confirmation email. An unreadable request marker retries rather than dropping a real reviewer's follow-up. This is a source-level conditional; this note makes no claim about the flag's current live value.
 - Preserve fail-closed identity matching: ambiguity, email/ORCID split, and name mismatch remain unlinked for staff review.
 - Use ORCID-scoped deterministic Contact IDs (reviewer-ID fallback without a
   valid ORCID) and the atomic Contact-create + ETag-guarded reviewer-link
@@ -22,7 +22,7 @@ Do:
 - Build removal as unlink/deactivate (`wmkf_selected=false`), never hard-delete.
 
 Do not:
-- Assume the app can hard-delete a Contact — the role has NO DeleteAccess (`0x80048306` / `unManagedIdsAccessDenied`, verified S213).
+- Assume the app can hard-delete a Contact — a controlled write observed no DeleteAccess (`0x80048306` / `unManagedIdsAccessDenied`, S213). Treat that as dated privilege evidence; confirm current privileges before relying on them for an operational cleanup plan.
 - Assume deactivating an orphan unblocks re-use — `contact.findByEmail` matches regardless of statecode.
 
 Ground truth: `lib/services/reviewer-acceptance-drain.js`,
@@ -31,11 +31,12 @@ Ground truth: `lib/services/reviewer-acceptance-drain.js`,
 `lib/services/review-manager/send-emails-service.js` (explicit no-promotion
 boundary). Related: [[project-reviewer-workbench-invite-workflow]].
 
-**Current production behavior (S389; deployed 2026-07-31 as `824bfcc6`,
-`dpl_35pUuvT8DowJPHbyBsiJxKGRNMZT`):** sending an
-invitation does not merit promotion.
-Every accepted reviewer—including honorarium opt-outs—enters the
-identity-aware accepted-contact path; declines do not. Exact email and ORCID
+**Acceptance behavior recorded at S389 (deployed 2026-07-31 as `824bfcc6`,
+`dpl_35pUuvT8DowJPHbyBsiJxKGRNMZT`):** sending an invitation does not merit
+promotion. For ordinary accepted requests, accepted reviewers—including
+honorarium opt-outs—enter the identity-aware accepted-contact path; declines
+do not. With test-request isolation enabled, marked test requests skip the
+acceptance follow-up entirely as described above. Exact email and ORCID
 candidate sets are cross-checked with name consistency before linking.
 Conflicts preserve the unlinked reviewer and create a durable staff alert.
 Genuine no-matches derive one deterministic Contact ID from a valid ORCID
@@ -59,7 +60,7 @@ Create + AppendTo permission, not the current lifecycle trigger.
 - Tracked permission history remains in
   `docs/archive/PENDING_ADMIN_REQUESTS.md` Section 4 (Done; archived).
 
-**Delete is NOT granted (verified S213, 2026-06-02).** The app user's suite role (`WMKF Research Review App Suite - Staff`) has Create + AppendTo on Contact but **no DeleteAccess** (error `0x80048306` / `unManagedIdsAccessDenied`, 403). Consequences:
+**Historical Contact permission observation (S213, 2026-06-02).** The app user's suite role (`WMKF Research Review App Suite - Staff`) successfully exercised Create + AppendTo on Contact, while a delete attempt returned `0x80048306` / `unManagedIdsAccessDenied` (403). This is not a fresh current privilege probe. At that time:
 - `scripts/smoke-test-candidate.mjs cleanup` deletes the smoke person + suggestion but **cannot delete the promoted contact** — it's left orphaned (Active) in CRM. The script now reports this as PARTIAL cleanup (was previously a misleading "complete"). A sysadmin must delete the leftover contact manually.
 - `contact.findByEmail` (`lib/dataverse/adapters/contact.js`) matches on `emailaddress1` **regardless of statecode** — so deactivating the orphan does NOT unblock re-use. The smoke `create` guard refuses any email that already exists as a contact, so **re-smoke with a DIFFERENT throwaway email** unless the orphan is hard-deleted by an admin.
 - Same boundary applies to any future "fully remove a promoted reviewer" feature: the app can unlink/deactivate but never hard-delete a Contact. See [[project-reviewer-workbench-invite-workflow]] (S213 added a per-request soft-remove that revokes the link + sets `wmkf_selected=false` — it deliberately never touches the global person/contact).

@@ -1,45 +1,47 @@
 ---
 name: project-sharepoint-property-promotion-rewrites-docx
-description: "SharePoint property promotion rewrites every DOCX uploaded to the akoyaGO library (adds customXml items/props/rels, rewrites core.xml, custom.xml, [Content_Types].xml, document.xml.rels, leaves [trash] entries) while every word/ part stays byte-identical; a template carrying another library's customXml has those items rewritten in place; raw package digests never survive an upload round-trip. Verified live 2026-09-24 and 2026-09-27."
+description: "Two sandbox DOCX observations (2026-09-24, 2026-09-27) and one production XLSX-copy sample (2026-10-02) found SharePoint package rewrites. These are sample-specific; unpromoted XLSX and PPTX behavior is uncharacterized. Governed DOCX hashing includes reachable package parts outside word/."
 metadata:
   node_type: memory
   status: active
   type: project
   originSessionId: 0e6440df-6b18-41ae-9f22-49d30a1ed82f
-  modified: 2026-09-27T17:40:00.000Z
+  modified: 2026-10-22
+  last_verified: 2026-10-22 source-only hash/attestation review; live samples remain dated below
 ---
 
 ## Recall Rule
 Read before asserting or journaling byte identity for a DOCX, XLSX, or other Office file across a SharePoint upload, copy, or download.
 
-Do: compare the governed `word/` parts (`hashGovernedDocxContent`) plus the characterized allowlist in the attestation module; settle-check `size`/`eTag`/`cTag`/`versionId` before journaling a copy.
-Do not: compare whole-package SHA-256 or file size across a round-trip; widen the allowlist outside a reviewed commit.
+Do: compare governed DOCX content with `hashGovernedDocxContent` (all `word/` parts plus relationship-reachable parts outside `word/` and their relationship parts) and the characterized allowlist in the attestation module; settle-check `size`/`eTag`/`cTag`/`versionId` before journaling a copy.
+Do not: use whole-package SHA-256 or file-size equality alone to establish governed-content identity across a round-trip; widen the allowlist outside a reviewed commit.
 Ground truth: `lib/services/test-requests/docx-package-attestation.js`, `scripts/probe-sharepoint-download-stability.mjs`. Plain text (`.txt`) uploads are not covered here.
 
-**Fact (verified 2026-09-24, Session 542, live sandbox Request 1000342):** a DOCX
+**Sample (verified 2026-09-24, Session 542, live sandbox Request 1000342):** this DOCX
 uploaded through Graph to the akoyaGO `akoya_request` library and downloaded back
-is not byte-identical. SharePoint property promotion adds `customXml/item1-3.xml`
+was not byte-identical. In this sample, SharePoint property promotion added `customXml/item1-3.xml`
 (content-type schema, form templates, document-management properties),
 `customXml/itemProps1-3.xml` and their rels, rewrites `docProps/core.xml`,
 `docProps/custom.xml` (ContentTypeId), `[Content_Types].xml` and
-`word/_rels/document.xml.rels`, and leaves `[trash]/*.dat` entries. Every `word/`
-part is byte-identical, so `hashGovernedDocxContent` matches (9,478 bytes
+`word/_rels/document.xml.rels`, and left `[trash]/*.dat` entries. The content parts under `word/` were reported
+byte-identical apart from the document-relationship rewrite described above; the
+governed hash normalizes injected customXml relationships, so it matched (9,478 bytes
 rendered, 16,897 downloaded, same governed hash). `docProps/app.xml` was untouched.
 
-**Why:** a raw whole-package SHA-256 journaled at upload can never equal a
-download; the Test Request Factory's first byte-digest verify anchor failed on
-exactly this and was replaced by
+**Why:** the whole-package SHA-256 differed in this observed sample, so the Test
+Request Factory's first byte-digest verify anchor failed on exactly this and was replaced by
 `lib/services/test-requests/docx-package-attestation.js` (on `main` since PR #336), which normalizes only
 these characterized mutations. Earlier memory notes that Word Online re-saves
 re-serialize the package too; this is the upload-time counterpart.
 
-**Extension (verified 2026-09-27, Session 544, sandbox Request 1000348):** a
+**Second DOCX sample (verified 2026-09-27, Session 544, sandbox Request 1000348):** a
 package that already carries SharePoint customXml from ANOTHER library (the
 Pre-Site v6 template) has its `item1` contentTypeSchema, `item3` properties and
 `itemProps1` rewritten in place to the destination library's content type; the
 other customXml and rels parts stay byte-identical, and five `[trash]` entries
-appeared. The attestation accepts this for renders only
-(`validateSharePointRewrite`); an uploader-supplied source keeps byte identity.
+appeared. The attestation accepts these existing-customXml rewrites for renders
+only (`validateSharePointRewrite`); it requires uploader-supplied source
+customXml to remain byte-identical.
 
 **Extension to XLSX (verified 2026-10-02, production run `20407283`, test Request
 1003308, and the owner-run `scripts/probe-sharepoint-download-stability.mjs`):**
@@ -56,8 +58,9 @@ before the copy is journaled. Not characterized: an XLSX that had never been
 promoted (its `xl/_rels/workbook.xml.rels` would change; the attestation fails
 closed), and PPTX.
 
-**How to apply:** never assert byte identity across a SharePoint upload
-round-trip; compare `word/` parts (governed hash) plus a characterized allowlist
-for everything else. If SharePoint's promotion shape changes, the attestation
+**How to apply:** do not infer package identity behavior for every Office file or
+workflow from these samples. For governed DOCX content, use the hash that covers
+`word/` plus reachable outside-`word/` parts; use the attestation's characterized
+normalizations for the package changes it permits. If SharePoint's promotion shape changes, the attestation
 fails closed and the allowlist in that module is the place to extend, as a
 reviewed commit. See [[project-test-request-factory]].

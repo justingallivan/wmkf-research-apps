@@ -1,6 +1,6 @@
 ---
 name: feedback-verify-branch-before-git-action
-description: Before any commit, branch-affecting git action, background test run or delegated review in this repo, verify the active branch FIRST — the shared working directory's HEAD drifts when a concurrent Codex session checks out branches. Self-policing since S280; since S487 (2026-09-05) Codex sessions run in the sibling worktree ../WMKF_Apps-codex instead of the main checkout.
+description: Before git actions or background verification, inspect the actual checkout, branch, and worktree ownership; S280/S487 record historical shared-checkout branch drift, not a universal current topology.
 metadata:
   type: feedback
   status: active
@@ -18,10 +18,10 @@ The current branch must still be checked immediately before each git action.
 
 ## The fact (Justin, S280)
 
-This repo is worked by Claude AND a separate **Codex app session** (Justin sees the
-jobs in the Codex GUI) in the SAME working directory. A working dir has ONE HEAD, so
-when the Codex session checks out / deploys / splits branches, HEAD moves out from
-under Claude. In S280 this caused Claude's commits to land on the wrong branch
+In S280 this repo was worked by Claude AND a separate **Codex app session** (Justin
+sees the jobs in the Codex GUI) in the SAME working directory. A working dir has ONE
+HEAD, so when that Codex session checked out / deployed / split branches, HEAD moved
+out from under Claude. This caused Claude's commits to land on the wrong branch
 (`codex-portal-work`) before the branches were untangled.
 
 Justin is NOT git-fluent for multi-dev workflows and works across TWO machines
@@ -35,20 +35,20 @@ silent drift means commits land on the wrong branch and create a costly untangli
 **How to apply (every time):**
 - Before any commit or branch-affecting op, run `git status --short --branch` (or
   `git rev-parse --abbrev-ref HEAD`) and confirm the active branch is the intended one.
-- If HEAD has drifted: STOP, report it, switch back to the intended branch, THEN act.
-  Never commit assuming a branch.
+- If HEAD or checkout ownership differs from the task's expected state: STOP, report it,
+  and resolve the intended checkout/branch with its owner before acting. Do not switch
+  an existing shared checkout on assumption.
 - Don't run Claude git/branch operations while a Codex-app session is actively doing
   branch work / deploys on the same checkout — one driver on the repo at a time. If
   drift is detected mid-task, pause and flag.
-- **Update, S487 (2026-09-05):** the drift recurred. Justin opened a separate Codex
+- **Historical update, S487 (2026-09-05):** the drift recurred. Justin opened a separate Codex
   session in the main checkout while Claude orchestrated Stage 6B2; its `git checkout
   main` landed 24 seconds after a Claude commit and silently swapped the tree under a
   running full-suite job and a fresh-context reviewer. Both were voided and rerun. Justin
-  then accepted the worktree approach: Codex now runs in `../WMKF_Apps-codex` on
-  `codex/ui-features` (created with `scripts/bootstrap-machine.sh --worktree`). When a
-  parallel Codex session is mentioned, first ask whether it is in that worktree; if it is
-  in the main checkout, hand Justin the reorientation prompt from
-  `.claude/skills/parallel-agent-worktree/SKILL.md` before running anything.
+  then adopted that worktree approach for the described setup: Codex ran in
+  `../WMKF_Apps-codex` on `codex/ui-features` (created with
+  `scripts/bootstrap-machine.sh --worktree`). Check actual topology and owner for each
+  task; do not assume that sibling path is current or redirect an existing checkout.
 - Drift voids more than commits: a background test run, build, gate or delegated review
   reads whatever tree is on disk. Record `git rev-parse HEAD` at the start AND end of any
   background verification log and treat the totals as void if they differ; give every

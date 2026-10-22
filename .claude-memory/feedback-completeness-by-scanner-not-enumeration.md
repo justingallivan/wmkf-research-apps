@@ -23,16 +23,21 @@ invariant, because the field is dropped when a *caller* omits it, so completenes
 property of a set no behavioral test can observe — the defect is an OMISSION at a site nobody
 wrote a test for.
 
-Replacing the list with a mechanical check (`tests/unit/email-source-pairing-invariant.test.js`
-walks `lib/`, `pages/`, `scripts/`, `shared/`, parses each file, and fails on an address
-written without a source) found **seven** more sites immediately, including a live service
-path, that three adversarial passes and a Codex fix pass had all read past.
+Replacing the list with a mechanical check (`tests/unit/email-source-pairing-invariant.test.js`)
+found **seven** more sites immediately, including a live service path, that three adversarial
+passes and a Codex fix pass had all read past. That test's coverage is bounded by its four
+configured roots (`lib/`, `pages/`, `scripts/`, `shared/`), the `.js`/`.mjs` files it selects,
+its matching logic, and its explicit exemptions (see the test's current root/extension and
+exemption definitions); it does not establish repository-wide coverage outside that domain.
 
-**Why:** enumeration proves what you looked at. A scanner proves what exists. For an
-"every X" claim those are different claims, and only the second one is the one being made.
+**Why:** enumeration proves what you looked at. A scanner proves what exists only inside
+its defined roots, extensions, pattern, and exemptions. For an "every X" claim, state that
+coverage boundary and verify it matches the claim; neither a handwritten list nor a bounded
+scanner proves an unbounded repository-wide universal.
 
 **How to apply:**
-- If a claim is "every caller", the artifact backing it should be executable, not prose.
+- If a claim is "every caller", the artifact backing it should be executable, not prose;
+  document the scan roots, file types, match shape, and exemptions it actually covers.
 - Give the scanner a POSITIVE CONTROL (a literal of the real defect shape) so an empty or
   broken scan cannot pass silently, and assert the scanned file list is non-empty.
 - Parse, don't regex, when the pattern involves code structure — a brace inside a string,

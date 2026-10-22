@@ -4,7 +4,7 @@ description: Local `npm run dev` needs three separate things to behave like real
 metadata:
   type: project
   status: active
-  last_verified: 2026-07-27 via auth source and key-only local .env.local inspection
+  last_verified: 2026-10-22 source review; the 2026-07-27 key-only local .env.local observation is historical and no current secret presence was re-probed
 ---
 
 ## Recall Rule
@@ -54,9 +54,13 @@ missing local-dev auth plumbing that a stale memory claimed was already there
    does not disable their auth. [VERIFIED via `lib/utils/auth-policy.js`, 2026-10-22]
 3. **`EXTERNAL_LINK_SECRET`** (32+ chars) — needed to mint the reviewer
    accept/decline token. It's a purely internal HMAC key (sign+verify both
-   happen in the same process, per `lib/services/external-token.js` header;
-   never sent anywhere external), so **any throwaway 32+ char string works for
-   local-only testing** — it does not need to match the real prod secret.
+   happen in the same process, per `lib/services/external-token.js`); the code
+   requires at least 32 characters, so **any throwaway 32+ char string works
+   for locally minted tokens** — it does not need to match the real prod
+   secret. The key is not sent anywhere external. This signing key does not
+   authorize production data reads/writes or make them safe; use the target
+   interlock and the approved non-production or dedicated-test-record modes in
+   `docs/CAMPAIGN_RELEASE_AND_DATAVERSE_TEST_STRATEGY.md`.
    Without it, `mintAndStore` fails silently and the invite send-safety gate
    correctly refuses with `missing_secure_link` (working as designed — see
    [[external-reviewer-portal]] topic page) rather than shipping a broken link.

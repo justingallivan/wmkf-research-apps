@@ -332,7 +332,7 @@ Stages 3 and 4 may each be split into per-module commits if a review round wants
   and `checkExpertiseMismatch`. **Open question (Q2):** add targeted characterization tests for these
   before their stage, or accept the existing integration coverage as sufficient given pure code motion?
 - **Gates:** run the touched gates listed in C6 at each stage; full `npm test` before Stages 5/6 commit.
-- **Per-stage fresh-context Codex review** on the shipped diff (`reference-codex-detached-exec-protocol.md`).
+- **Historical completed-stage practice:** fresh-context Codex review on the shipped diff used the S335-era detached-exec reference (`reference-codex-detached-exec-protocol.md`). This plan's stages are complete; use the current managed review runtime and exact-job controls for new work.
 
 ## Open questions — RESOLVED after Codex review round 1
 

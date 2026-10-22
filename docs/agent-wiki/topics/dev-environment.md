@@ -58,7 +58,7 @@ Claude config sync, and environment-specific operating notes.
 - Vercel env and deploy verification (routed here from the memory router 2026-09-17): `feedback-verify-vercel-env-with-env-ls`, `feedback-deployment-monitoring-use-inspect`, `feedback-verify-deploy-is-the-merge-build`, `feedback-no-vercel-cli-update-reminders`, `reference-vercel-sensitive-env-unreadable`, `reference-vercel-logs-filtering`.
 - Review, audit, and test evidence: `feedback-vacuous-clean-results-print-the-denominator`, `feedback-apply-measurement-artifacts-in-both-directions`, `feedback-briefs-are-snapshots-not-ship-state`, `feedback-read-the-implementation-not-the-callers-docblock`, `feedback-weigh-the-risks-you-name`, `feedback-corrections-decay-unless-mechanized`, `feedback-consistency-over-preview-rationale`, `feedback-reviewer-differs-from-author`, `feedback-mutation-test-with-the-discriminating-fixture`, `feedback-mocked-sql-hides-parameter-typing`, `feedback-fixtures-return-raw-transport-shape`.
 - Historical deployed module-load failures and retained sanitizer/bundling safeguards: `project-vercel-node22-no-require-esm`, `project-jsdom-serverless-esm-incompat`. Inspect current build/runtime evidence before inferring compatibility from the incident's Node version.
-- Delegated builds and review cadence (contract in `docs/AGENT_COLLABORATION_PLAN.md`): `feedback-orchestrator-checks-builds-before-review`, `feedback-cap-subagent-load-in-reproduction-briefs`, `feedback-codex-worktree-owner-runs-it`, `feedback-codex-delegation-review-vs-rescue-routing`, `reference-codex-review-needs-a-committed-diff`, `feedback-codex-model-gpt56-sol`, `feedback-multi-model-review-pipeline`, `feedback-feature-branch-handoff-lands-on-main`, `feedback-merge-to-main-from-temp-worktree`, `project-agent-worktree-base-is-main` (also kept on the router as a live hazard).
+- Delegated builds and review cadence (contract in `docs/AGENT_COLLABORATION_PLAN.md`): `feedback-orchestrator-checks-builds-before-review`, `feedback-cap-subagent-load-in-reproduction-briefs`, `feedback-codex-worktree-owner-runs-it`, `feedback-codex-delegation-review-vs-rescue-routing`, `reference-codex-review-needs-a-committed-diff`, `feedback-codex-model-gpt56-sol`, `feedback-multi-model-review-pipeline`, `feedback-feature-branch-handoff-lands-on-main`, `feedback-merge-to-main-from-temp-worktree`, `project-agent-worktree-base-is-main` (historical S575 base observation; inspect actual task topology and checkout ownership).
 - Local containers, ledger Postgres, sandbox rehearsal, and owner-run durable state (routed here from the memory router 2026-10-05): `project-local-docker-is-colima`, `feedback-postgres-url-handling-hazards`, `project-sandbox-rehearsal-bypass-allow-rule`, `project-preview-rehearsal-venue-limits`, `feedback-operational-state-must-be-reachable-from-every-workstation` (plan `docs/plans/TEST_REQUEST_LEDGER_PORTABILITY_PLAN_2026-09-30.md`).
 - Handoff commits run `check:harness-framing` first: `feedback-run-harness-framing-before-handoff-commit`.
 
@@ -99,8 +99,8 @@ Claude config sync, and environment-specific operating notes.
   `git rev-parse --abbrev-ref HEAD` before any pull (never `git pull origin main`
   from a feature branch), and `/stop` verifies the branch at Step 1, re-verifies
   immediately before the docs commit, and pushes the current branch instead of a
-  hard-coded `main`. Hazard this guards: the shared checkout's HEAD drifts when a
-  concurrent Codex/subagent session does branch work (S280: commits landed on
+  hard-coded `main`. Historical hazard this guards: a shared checkout's HEAD can drift
+  when a concurrent Codex/subagent session does branch work (S280: commits landed on
   `codex-portal-work` and had to be untangled; S355: a docs commit landed on a
   feature branch and was recovered via cherry-pick). Policy memory: `feedback-verify-branch-before-git-action`.
 - **New-machine setup:** `scripts/bootstrap-machine.sh` (idempotent) recreates the

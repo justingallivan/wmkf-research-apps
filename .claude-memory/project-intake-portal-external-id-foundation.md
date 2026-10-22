@@ -1,11 +1,11 @@
 ---
 name: Intake portal — Entra External ID foundation shipped
-description: Tenant provisioned, NextAuth dual-provider wired, /apply route auth round-trip verified end-to-end (S129). Form/membership/Dynamics writes still ahead.
+description: Entra External ID auth foundation and /apply sign-in shell exist. Membership checks, contact bridge, draft persistence, and a submit queue are present in source; applicant form UI remains unfinished, and this pass does not establish a completed submission drain. Owner parked the custom portal and kept J27 intake on GOApply (2026-09-06).
 type: project
 originSessionId: 5fc8fbcf-cfc0-4f4b-a4d6-5abf1de8d42e
 status: active
 scope: auth
-last_verified: 2026-07-27 via NextAuth/proxy/_app source and intake design; tenant configuration and sign-in smoke remain bounded to S129
+last_verified: 2026-10-22 via apply UI, membership service, submit route, and intake draft service; tenant configuration and sign-in smoke remain bounded to S129
 ---
 
 ## Recall Rule
@@ -26,7 +26,13 @@ Ground truth: `docs/INTAKE_PORTAL_DESIGN.md`, `docs/archive/IT_ENTRA_EXTERNAL_TE
 The External ID auth foundation remains present in current source. The
 applicant OTP round-trip and stable Object-ID behavior were verified in Session
 129; current tenant/user-flow operation requires a fresh read-only configuration
-check and sign-in smoke before release reliance.
+check and sign-in smoke before release reliance. The current `/apply` page is
+still a sign-in shell that says form modules and institution selection arrive in
+a later release. Backend pieces do exist: the submit route bridges the session
+OID to a Dataverse contact, checks approved active Submitter membership, reads a
+Postgres draft, and queues a `submission_jobs` row; the draft service persists
+the draft. These pieces do not establish a completed applicant portal or an
+end-to-end Dynamics submission drain.
 
 **Tenant facts:**
 - Tenant ID: `04a1406b-3878-4286-bd17-b8c8118886f7`
@@ -47,12 +53,20 @@ check and sign-in smoke before release reliance.
 - The institution-as-identity model the portal needs (multiple collaborators, transferable primary contact, self-service requests) requires per-person persistent identity. OTP-only Entra External ID is the right primitive; HMAC magic links would have baked in person-centric identity instead.
 - The OID is permanent across email changes. Email is bootstrap key only — once OID is on a contact, OID-keyed lookup wins forever.
 
-**Out of scope (next sessions, in roughly this order):**
-1. Membership / institution selection (search by name+EIN, candidate list, request flow)
-2. Form schema rendering (Phase II Research forms-as-code module exists at `shared/forms/phase-ii-research-2026-06/`)
-3. Draft staging via `intake-draft-service.js` (Postgres, autosave, attachments)
-4. Submission → Dynamics writes (akoya_request + wmkf_portalmembership)
-5. `/apply/admin/*` for staff triage (collaborator approval, submitted list)
+**Historical S129 follow-up list (not a current build queue):**
+The original proposed order was membership/institution-selection UI, form schema
+rendering, draft staging, submission-to-Dynamics writes, and staff triage under
+`/apply/admin/*`. Later source includes backend primitives for several of these;
+this list preserves earlier planning rather than instructing a rebuild.
+
+**Current owner scope:** on 2026-09-06, the owner kept J27 intake on GOApply
+until further notice and parked the custom `/apply` portal for a future pilot
+([[project-intake-portal-parked]]). Treat the original build sequence in the
+earlier version of this note as superseded by that decision; do not describe membership or all Dynamics
+submission writes as wholly unbuilt, and do not describe the portal as complete.
+The applicant-facing form and institution-selection UI remain unfinished, and
+a complete queued submission-to-Dynamics drain was not established by this
+bounded review. The broader portal remains parked.
 
 **Watch out:**
 - `_app.js` excludes `/apply/*` from `ProfileProvider`/`AppAccessProvider` because those are staff-only; don't accidentally re-include it.

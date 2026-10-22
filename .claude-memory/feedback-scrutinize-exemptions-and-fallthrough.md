@@ -61,9 +61,13 @@ self-review + anti-patterns).
 **Deterministic control (S257) — because a written rule can't fire itself.** The misses kept
 recurring even after writing the rule down, since I never *ran* the checklist at build time.
 `scripts/check-status-enum-parity.js` (npm `check:status-enum-parity`, in the `/start` gate list)
-enforces a registry of producer↔consumer key-parity invariants, and a PreToolUse(Bash) hook
-`.claude/hooks/enum-parity-commit-guard.js` BLOCKS a `git commit` (exit 2) when they drift —
-verified end-to-end against the exact `held`-missing-from-`STAGE_META` regression. **When you add a
-producer set whose values must be mirrored by a consumer (label map / filter bucket / count rollup),
-add a REGISTRY entry** so the new pair is enforced too. The hook is the control; the prose above is
-why it exists.
+checks the producer↔consumer pairs explicitly registered in its registry. The configured
+PreToolUse(Bash) hook `.claude/hooks/enum-parity-commit-guard.js` invokes that checker for
+recognized `git commit` commands and blocks (exit 2) when a registered pair drifts; this was
+verified end-to-end against the exact `held`-missing-from-`STAGE_META` regression. This guarantee
+depends on the hook being configured and invoked on that tool path, and on its trigger/parser
+and helper loading successfully: the hook's outer input/require handling fails open on its own
+errors. It does not cover unregistered pairs or other command paths. **When you add a producer set
+whose values must be mirrored by a consumer (label map / filter bucket / count rollup), add a
+REGISTRY entry and ensure the configured gate/hook path applies** so the pair is checked. The
+registered checker is the scoped control; the prose above is why it exists.

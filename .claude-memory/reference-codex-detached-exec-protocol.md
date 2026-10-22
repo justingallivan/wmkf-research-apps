@@ -1,6 +1,6 @@
 ---
 name: reference-codex-detached-exec-protocol
-description: "Reliable protocol for running codex exec reviews — detached nohup launch, stdin redirect, prompt files, session-file stall watchdog"
+description: "Historical S331 detached codex exec observations; current reviews should use managed runtime and exact-job cancellation"
 status: active
 metadata: 
   node_type: memory
@@ -15,13 +15,14 @@ The normal path is the current in-app/subagent runtime plus
 `docs/AGENT_COLLABORATION_PLAN.md`; do not prefer this historical shell protocol
 over an available managed agent surface.
 
-Protocol for delegating reviews to Codex without hangs or kills (established S331, used ~8 times S331–S332 without a failure):
+Historical S331–S332 procedure and observations (used about eight times without a
+failure at that time); this is not the current review or cancellation protocol:
 
-1. **Never host `codex exec` inside a harness background Bash task** — the harness pair-kills the shell and codex together (observed twice S331). Launch DETACHED instead:
+1. **Historical S331 observation:** a harness background Bash task pair-killed the shell and Codex. Do not infer that every current managed runtime has this behavior. Prefer the current managed review/runtime surface; use native CLI only when explicitly chosen and authorized. The old detached launch example below is retained as incident-era evidence, not a current command to copy.
    `nohup /opt/homebrew/bin/bash -c "codex exec --sandbox read-only \"\$(cat <promptfile>)\" < /dev/null" > <outfile> 2>&1 & disown`
-2. **Always `< /dev/null`** — `codex exec` in any non-interactive shell otherwise blocks forever on "Reading additional input from stdin...".
-3. **Prompt-file pattern** (`"\$(cat file)"`) — avoids shell-quoting failures from apostrophes/backticks in review prompts.
-4. **Disposable poller** as a separate background task: every 30s check `pgrep -f "codex exec"`; liveness = the newest `~/.codex/sessions/<date>/*.jsonl` file's mtime/size. **Frozen ≥8 min = stall** (kill + relaunch); wall-clock alone is not a stall signal — long reviews legitimately run 10–30+ min while the session file keeps growing.
-5. **Read the verdict** from the outfile: the final message follows the LAST line equal to `codex` (`awk '/^codex$/{n=NR} END{print n}'`), duplicated after "tokens used".
-6. Codex read-only sandbox cannot run jest or fixture-writing self-tests (EPERM on temp writes) — expect static review of tests; local greens must come from the orchestrator's own runs.
-7. The plugin companion path (`/codex:*` jobs) can hang with 0 commands logged — kill the pid and delete the job JSON/log under `~/.claude/plugins/data/codex-openai-codex/state/.../jobs/`; never `/codex:cancel` (see [[reference-codex-plugin-job-tracking-bugs]]).
+2. **Historical stdin observation:** the S331 shell runs blocked on "Reading additional input from stdin..." without `< /dev/null`; this does not establish behavior for all current runtimes.
+3. **Historical prompt-file pattern** (`"\$(cat file)"`) avoided shell-quoting failures from apostrophes/backticks in those review prompts.
+4. **Historical S331–S332 polling observation only:** those runs sampled process/session-file growth. A frozen interval or elapsed time alone does not authorize killing or relaunching work. Use the managed runtime's status and cancellation controls. If native execution is explicitly authorized, identify and stop only the exact authorized job through its owning runtime; preserve job/session evidence.
+5. **Historical S331–S332 output convention:** those verdicts followed the last line equal to `codex` and were duplicated after "tokens used". Do not assume this format for current runtimes.
+6. **Historical sandbox limitation:** those read-only runs could not run Jest or fixture-writing self-tests (EPERM on temp writes); review the current runtime's actual permissions rather than relying on this old observation.
+7. **Historical S331 companion-job incident:** a `/codex:*` job was observed with no commands logged. The installed companion includes an exact-job cancellation path; its existence is not proof of absence of bugs. If cancellation is authorized, identify the exact job and use its owning runtime's exact-job control. Never broad-kill processes, choose the newest session blindly, or delete job JSON/log evidence. Preserve this incident record; it does not prohibit the current managed cancellation path (see [[reference-codex-plugin-job-tracking-bugs]]).

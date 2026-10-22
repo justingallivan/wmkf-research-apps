@@ -30,10 +30,12 @@ re-derived some fixes from the prompt text, missed others, and built on a diverg
 overlapping edits to openalex/discovery/dedup that needed a hand-merge, plus 2 regressions
 (deleted the verified-name dedup; dropped my Fix 1 honorific strip).
 
-**How to apply:** Before handing work to a worktree-isolated agent, **commit your in-progress
-changes** (or `git add -A && git diff --cached > patch` and give it the patch) so both sides share
-a real base. If you can't commit, at least tell the agent its base will be pristine HEAD and to
-expect your changes absent. Silver lining when it happens anyway: if the agent's worktree is at the
+**How to apply:** Before handing work across an isolated worktree boundary, establish the
+actual base and ownership. If sharing a patch, build it from explicit owned paths without
+changing the index; inspect staged, modified, and untracked files first, and account for
+any required untracked dependencies separately. Do not use `git add -A` to construct a
+patch because it can stage unrelated work. If you cannot share the needed changes, tell
+the agent exactly which changes are absent. Silver lining when it happens anyway: if the agent's worktree is at the
 SAME commit as yours, both change sets are diffs against that commit → reconcile is mechanical
 (take-mine / take-theirs / hand-merge the both-touched files). See [[feedback-share-codex-verbatim]],
 [[project-codex-recurring-review]], [[project-codex-design-pre-impl-iteration]].

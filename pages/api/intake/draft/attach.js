@@ -476,12 +476,12 @@ export default async function handler(req, res) {
     // only stable recipient. If/when intake adds a known program director
     // (e.g. cycle → PD lookup), add that email to explicitRecipients.
     //
-    // S190 harmonization (Codex review): awaited rather than fire-and-forget
-    // so the system_alerts row is durable before the client response — Fluid
-    // Compute can terminate the function instance after the response is
-    // sent and lose a fire-and-forget promise mid-write. The audit row at
-    // step 16 above is the per-event durable evidence; the system_alerts
-    // row is what surfaces on the admin dashboard for triage.
+    // S190 harmonization (Codex review): await the alert attempt rather than
+    // fire-and-forget because Fluid Compute can terminate the function after
+    // the response. The notify failure is caught below so client rejection is
+    // preserved; this is best-effort alerting, not guaranteed system_alerts
+    // persistence. The audit row at step 16 above is separate per-event
+    // durable evidence; system_alerts surfaces the alert on the admin dashboard.
     await withDalContext('notification-email', () => NotificationService.notify({
       type: 'virus_detection_intake',
       severity: 'error',

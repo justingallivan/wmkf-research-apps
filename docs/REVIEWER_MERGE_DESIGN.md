@@ -33,15 +33,16 @@ owner: reviewer-finder
 > Codex + an internal aggressive review + a live probe (chunk 4 got two more Codex
 > pre-impl passes); see "How we got here" at the end.
 
-## Problem
+## Original problem at S289 (2026-06-25; resolved by the shipped merge feature)
 
-On the Workbench **Candidates** tab, editing a saved candidate's email
+At S289, on the Workbench **Candidates** tab, editing a saved candidate's email
 (`CandidateEditModal` → `PATCH /api/reviewer-finder/my-candidates`) to an address
 another `wmkf_potentialreviewers` row already owns hits a 412 on the
 `wmkf_emailaddress_unique` alternate key. `translateDuplicateKeyError`
 (`my-candidates.js:600`) turns it into a 409 telling staff the two records "need to
-be merged" — with no way to do it. The API already returns `conflictingRecordId`
-(the row owning the email), unused by the client today.
+be merged". At that time there was no merge action and the client did not use the
+API's `conflictingRecordId` value. The merge feature described here subsequently
+shipped; the S289 statement is historical context, not a current defect report.
 
 Goal: a real **field-by-field merge** so staff can collapse two duplicate person
 records into one — a genuine data-tidying tool (reviewers move institutions /
@@ -69,38 +70,38 @@ contact-merge, and BILL reconciliation: all of them are unreachable once an enga
 or promoted loser is blocked. Deferred-to-v2 list at the end; v2 is justified only
 if a future probe shows the engaged-loser case is real.
 
-## The block predicate (comprehensive — the load-bearing safety rule)
+## The block predicate (known-field coverage; load-bearing safety rule)
 
-The merge is REFUSED (returns `blocked` with reasons, mutates nothing) unless the
-**loser** is fully pre-engagement. **Defined fail-closed as a positive whitelist,
-NOT a blacklist** (so a future lifecycle field defaults to *blocking* the merge,
-never silently passing — per `feedback-scrutinize-exemptions-and-fallthrough`): a
-loser suggestion row is **inert** only if it is a never-outreached curated
-candidate — it carries NO outreach, response, intake, token, honorarium, or
-reviewer-supplied signal whatsoever. The loser is **ineligible** (blocked) if
-EITHER:
+The merge is REFUSED (returns `blocked` with reasons, mutates nothing) when the
+**loser** has a known engagement signal or applicant-excluded disposition. The
+runtime checks an explicit known-field list; a populated listed field blocks,
+while null, false, and blank listed values do not. This is not a fail-closed
+positive whitelist of every lifecycle field: an unknown or newly added field
+does not automatically block. Add new engagement fields to the runtime list
+after explicit review. A loser is **ineligible** (blocked) if EITHER:
 
 - the loser PERSON has a `_wmkf_contact_value` (promoted to a CRM contact — O3),
   OR
 - ANY loser suggestion row — including soft-deleted/removed (`wmkf_selected=false`)
-  rows — is non-inert, i.e. has any of these set (non-exhaustive; the rule is "any
-  lifecycle/outreach/intake stamp blocks", these are the known ones — FINAL-1,
-  all present in `FIELD_SELECT` `reviewer-suggestion.js:23-68` and preserved by
-  `softDelete`):
-  - **outreach:** `wmkf_invited`, `wmkf_emailsentat`, `wmkf_materialssentat`,
-    `wmkf_remindersentat`, `wmkf_respondremindersentat`, `wmkf_thankyousentat`,
-    any live/issued token (`wmkf_externaltokenissued`, even if revoked — an invite
-    WAS sent), `wmkf_proposalfirstaccessed`;
-  - **response/intake:** `wmkf_accepted`, `wmkf_declined`, non-null
-    `wmkf_responsetype`, `wmkf_responsereceivedat`, `wmkf_reviewreceivedat`,
-    `wmkf_reviewfilename`, `wmkf_reviewsharepointfolder`, any rating field
-    (`wmkf_reviewerimpact`/`risk`/`overallrating`), any stage-2a reviewer-supplied
-    field (`wmkf_declinereason`, `wmkf_honorariumoptout`, reviewer name/email/orcid);
-  - **finance/disposition:** non-null `_wmkf_honorariumrequest_value`,
-    `wmkf_applicantdisposition` = excluded.
-
-  Implementation note: read the row's full lifecycle field set and block if ANY
-  non-inert field is populated; do not maintain only the literal list above.
+  rows — has a populated field in the runtime's `ENGAGEMENT_SIGNAL_FIELDS` list
+  in `lib/services/reviewer-merge.js`. That source list is authoritative and
+  currently contains: `wmkf_invited`, `wmkf_accepted`, `wmkf_declined`,
+  `wmkf_responsetype`, `wmkf_emailsentat`, `wmkf_materialssentat`,
+  `wmkf_remindersentat`, `wmkf_reviewduedateoverride`,
+  `wmkf_respondremindersentat`, `wmkf_responsereceivedat`,
+  `wmkf_reviewreceivedat`, `wmkf_thankyousentat`,
+  `wmkf_proposalfirstaccessed`, `wmkf_reviewfilename`,
+  `wmkf_reviewsharepointfolder`, `wmkf_externaltokenissued`,
+  `_wmkf_honorariumrequest_value`, `wmkf_declinereason`,
+  `wmkf_honorariumoptout`, `wmkf_completedat`,
+  `wmkf_honorariumeligibility`, `wmkf_coiackedat`, `wmkf_aiuseackedat`,
+  `wmkf_withdrawnsufficientat`, `wmkf_externaltokenrevoked`,
+  `wmkf_reviewerfirstname`, `wmkf_reviewerlastname`,
+  `wmkf_reviewernickname`, `wmkf_reviewertitle`, `wmkf_revieweremail`, and
+  `wmkf_reviewerorcid`. Applicant-excluded disposition is checked separately
+  by `isExcluded`. Ratings are not direct list entries: the source comment says
+  current rating writers also set `wmkf_reviewreceivedat`, which is checked.
+  Review source when fields change; unlisted fields do not block automatically.
 
 Two enumeration rules that make this correct (verified):
 - The removed marker is **`wmkf_selected = false`, NOT `statecode`** — any
@@ -110,11 +111,10 @@ Two enumeration rules that make this correct (verified):
   reviewstatus/heldat` only — `reviewer-suggestion.js:1988` `softDelete` — it does
   NOT null the FKs or clear reviewfile/honorarium). (O2)
   <!-- [RECHECKED after lib/dataverse/adapters/reviewer-suggestion.js change: reviewer-suggestion.js:1988 — softDelete field-clearing claim still accurate; corrected the stale :971-980 pointer to softDelete's current line. The T2 change added selectedAndNotRevokedFilter() only (additive) and does not affect merge behavior.] -->
-- The predicate is evaluated at **execute time from live source**, not trusted from
-  the plan response. The point-in-time probe is then irrelevant to safety: even if
-  the population shifts, an engaged loser is blocked at the moment of merge. The
-  one fatal way to get this wrong is a too-narrow predicate that passes an engaged
-  loser through — hence the explicit full list above. (O1)
+- The predicate is evaluated at **execute time from current source**, not trusted
+  from the plan response. The population is re-read before mutation, but safety
+  still depends on the explicit known-field list being kept aligned with lifecycle
+  signals. (O1)
 
 ## Execute flow (no journal — pre-engagement loser is recoverable on tear)
 
@@ -163,8 +163,9 @@ Resolve ALL chosen literal values BEFORE any clear/mutate (O6), then:
    With keeper defaulting to the edited record (§Keeper selection), this email move
    is the COMMON path in the trigger case; only the tear itself is rare (needs a 500
    in the clear→set window).
-7. **Re-verify the loser is dereferenced, THEN deactivate** (statecode=1; email
-   already blanked if it moved). Hard delete only if proven reference-free.
+7. **Re-verify the loser is dereferenced, THEN deactivate the person record**
+   (statecode=1; email already blanked if it moved). The runtime deactivates the
+   person; this step does not hard-delete it.
    The re-read (S423) is load-bearing, not belt-and-braces: the plan's enumeration
    is a snapshot from Step 1 and Steps 3-6 are many sequential round-trips, so a
    reference created in that window is never repointed — and the `If-Match` here
@@ -268,10 +269,10 @@ survivor email written before the clear, deleted after the set, for true idempot
 resume. Cleaner but re-introduces a migration; not warranted given the tear itself
 (a 500 inside the clear→set window) is rare and Option B's manual re-entry covers it.)
 
-## Chunked build plan
+## Historical implementation record — chunks 1–5 shipped
 
-Each chunk gets a Codex pre-impl + post-impl review; catches folded in a follow-up
-commit (not amended). Target ≤ ~1100 net lines per chunk.
+The following is the build record for the shipped feature, not a current build
+queue. Each chunk received the reviews and implementation recorded below.
 
 - **Chunk 1 — Adapter plumbing (behavior-neutral).**
   - `potential-reviewer.js`: a merge-only wide-select read incl. wave6 — a NEW

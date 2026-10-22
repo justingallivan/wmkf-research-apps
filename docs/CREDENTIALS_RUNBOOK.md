@@ -531,19 +531,21 @@ Server-side, every scan failure is logged with structured Cloudmersive error con
 
 If the scanner is down and uploads must be unblocked before Cloudmersive recovers:
 
-1. **Verify the outage is real and not a misconfiguration.** Run the smoke: `node scripts/smoke-virus-scan.mjs`. If it returns `scan_misconfigured`-class errors (4xx, missing key), fix that first — bypassing won't help.
-2. **In Vercel:** `vercel env rm VIRUS_SCAN_ENABLED <env>` for whichever environment is affected (preview or production). Or set it to `false`.
-3. **Redeploy.** The flag is read per-request via `lib/utils/virus-scan-config.js`, but the env var won't propagate to running functions without a deploy.
-4. **Annotate `system_alerts`** with the bypass reason + expected restoration time so the next operator on rotation can see why scanning is currently off.
-5. **Re-enable as soon as the scanner is healthy.** Bypass is a temporary measure, not a default.
+1. Follow the operator-authorized incident and change process for any diagnostic scan, environment change, or redeploy; this runbook does not authorize those actions by itself.
+2. **Before any diagnostic scan, obtain explicit authorization naming Cloudmersive and acknowledging that the call may consume money or credits.** Ordinary audit or E2E authorization does not grant this. The smoke below calls the real vendor endpoint.
+3. **Verify the outage is real and not a misconfiguration.** If explicitly authorized, run `node scripts/smoke-virus-scan.mjs`. If it returns `scan_misconfigured`-class errors (4xx, missing key), fix that first — bypassing won't help.
+4. **In Vercel:** `vercel env rm VIRUS_SCAN_ENABLED <env>` for whichever environment is affected (preview or production). Or set it to `false` under the approved incident/change process.
+5. **Redeploy under the approved release process.** The flag is read per-request via `lib/utils/virus-scan-config.js`, but the env var won't propagate to running functions without a deploy.
+6. **Annotate `system_alerts`** with the bypass reason + expected restoration time so the next operator on rotation can see why scanning is currently off.
+7. **Re-enable as soon as the scanner is healthy.** Bypass is a temporary measure, not a default.
 
-### Cost ceiling
+### Historical cost estimate (not verified current pricing)
 
-Free tier is 800 scans/month. Pilot-cycle estimate: ~150 reviewer uploads + (when intake portal launches) ~200 applicant attachments = ~350/cycle. Combined comfortably under the free tier; if cycle volume grows past 800/month, paid tier is ~$0.001/scan.
+An earlier estimate recorded a free tier of 800 scans/month and a paid rate near $0.001/scan, with a pilot-cycle volume estimate of ~350 scans. These figures have not been verified as current. Do not use them as a current price, spending cap, or authorization to scan; confirm current terms and obtain explicit Cloudmersive credit/spend authorization before any diagnostic scan.
 
 ### Verification smoke
 
-`scripts/smoke-virus-scan.mjs` posts an EICAR test string and a clean string against the real Cloudmersive endpoint. Run after rotating `CLOUDMERSIVE_API_KEY` or whenever you suspect the scanner integration is mis-wired.
+`scripts/smoke-virus-scan.mjs` posts an EICAR test string and a clean string against the real Cloudmersive endpoint and may consume money or credits. Run after rotating `CLOUDMERSIVE_API_KEY` or whenever you suspect the scanner integration is mis-wired only after obtaining explicit authorization naming Cloudmersive and acknowledging possible spend/credit use.
 
 ---
 

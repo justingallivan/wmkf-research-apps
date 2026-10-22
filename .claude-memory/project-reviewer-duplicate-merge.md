@@ -5,7 +5,7 @@ metadata:
   node_type: memory
   type: project
   status: active
-  last_verified: 2026-07-22 via reviewer-merge.js, CandidateEditModal.js, my-candidates-service.js, and focused tests
+  last_verified: 2026-10-22 source review; no live Dataverse state was probed
   originSessionId: ed5870c4-4bd6-482a-bda7-d3e82dd98db5
 ---
 
@@ -24,11 +24,15 @@ when staff hit a 412 on `wmkf_emailaddress_unique` editing a candidate's email.
 
 **v1 merge (problem #1):** `lib/services/reviewer-merge.js` (`planMerge`/`executeMerge`),
 route `pages/api/reviewer-finder/merge-candidates.js` (POST-only: plan vs `confirm:true`).
-Scoped to a **PRE-ENGAGEMENT, non-contact-promoted loser** — a **fail-closed block
-predicate** (positive whitelist: an unknown lifecycle field defaults to *blocking*),
-re-evaluated at execute time from live source, is the load-bearing safety rule, NOT a
+Scoped to a **PRE-ENGAGEMENT, non-contact-promoted loser** — a block predicate over
+an explicit list of known engagement-signal fields, plus the separate excluded-
+disposition check, is re-evaluated at execute time from current source. Any populated
+known signal or excluded disposition blocks; null, false, and blank known-field values
+do not. This is not a positive whitelist of every lifecycle field: adding a new
+engagement field does not automatically block merge and requires explicit review of
+`ENGAGEMENT_SIGNAL_FIELDS` and the design. The predicate is a safety rule, not a
 permission gate. That's why auth is the same as my-candidates: the predicate, not the
-role, restricts merge to the low-risk case so the colleague who hit the bug can fix it.
+role, restricts merge to the intended low-risk case so the colleague who hit the bug can fix it.
 This records the S289 design rationale. The route receives no `requestId` and
 performs no request-membership or pair authorization — and per the owner decision
 of 2026-08-15, that is **accepted as by-design**: app-level access is the intended

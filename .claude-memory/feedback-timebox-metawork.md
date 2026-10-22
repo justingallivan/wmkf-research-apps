@@ -15,7 +15,7 @@ Read this when: you're doing (or about to start) cleanup, doc/memory reconciliat
 Do:
 - Treat meta-work as **support work, not the goal.** Before it exceeds **~30 min or 2 commits** without project progress, STOP and check in: name what's left, roughly what it costs, and ask continue-or-return.
 - Prefer surfacing the trade-off ("this could go N more rounds; want me to keep going or get back to X?") over silently grinding it out.
-- Bound verification loops up front — decide "one Codex pass, then ship unless it finds a P0," not open-ended.
+- Bound verification loops up front — decide a review budget, then resolve applicable blocking findings and required red gates/release-promotion steps within scope; surface residual findings and owner decisions at the budget instead of auto-shipping on a P0-only threshold.
 
 Do not:
 - Let a "quick cleanup" snowball into a multi-hour session because each step spawned another step.

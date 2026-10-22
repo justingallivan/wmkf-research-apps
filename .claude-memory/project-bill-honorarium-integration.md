@@ -51,9 +51,14 @@ as reversible gates, NOT a teardown — no BILL code removed:
   compensation. Transient failures can retry; deterministic failures can be terminal.
   Do not equate a queued job or accepted response with completed contact, honorarium,
   or email work.
-- Opt-out skips honorarium creation and BILL, but accepted-contact follow-up still
-  runs. Request creation is separate from final authorization to remit; the app
-  does not set that Finance-controlled flag.
+- When test-request isolation is enabled, an unreadable request marker
+  retries the job; a confirmed test request cancels every follow-up (contact,
+  identity, honorarium, BILL, and email). For an ordinary non-opted-out request,
+  the drain may proceed through honorarium creation subject to the current
+  request-creation gates. For an ordinary opted-out request, it skips honorarium
+  creation and BILL but still attempts accepted-contact follow-up. Request
+  creation is separate from final authorization to remit; the app does not set
+  that Finance-controlled flag.
 
 Ground truth: `docs/HONORARIUM_PORTAL_CREATION_STRATEGY.md`, `docs/BILL_HONORARIUM_INTEGRATION_DESIGN.md`, `docs/BILL_CHUNK_4_DESIGN.md`, `docs/BILL_LIB_DESIGN.md`; `lib/bill/*`. Related: [[akoya-payment-field-semantics]], [[akoya-request-honorarium-nomenclature]], [[project-external-reviewer-file-access]].
 

@@ -32,7 +32,8 @@ run + its poll loop.
 - The wrapper overstepping its forwarder role (running `pkill`, grepping, orchestrating)
   is a known failure mode; the rescue skill contract says it should *only* invoke `task`
   once and relay stdout. Treat extra Bash activity from it as suspect.
-- A `codex:codex-rescue` design-review that enters via `contract-reconcile` fans out
-  across many files and tends to **hang without producing a verdict** — prefer
-  "implement then diff-review the focused diff" (read only named files, no
-  contract-reconcile). See [[project-codex-recurring-review]].
+- Historical S292 review failure: a rescue design-review entered through
+  `contract-reconcile` and hung without a verdict. That wrapper incident does not waive
+  current required contract review or reconciliation. Use the current review workflow;
+  report a failed review surface and continue only through an authorized available
+  review path. See [[project-codex-recurring-review]].

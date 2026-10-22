@@ -14,10 +14,12 @@ you notice yourself acknowledging a mistake and moving on.
 
 Do:
 - Immediately restate the correction as a mechanical step bound to each
-  subsequent act, and run it visibly: derive every number with a command in
+  subsequent act, and run it visibly: derive every number with evidence in
   the transcript; grep the exact old value repo-wide after every fact edit;
-  execute any command before prescribing it; re-read the target section in
-  the same turn as the edit.
+  validate prescribed commands against source and contracts where possible.
+  Run a command only when it is authorized and within scope; if it is unapproved,
+  live, destructive, or metered, mark it NOT RUN and never execute it merely to
+  verify the recommendation. Re-read the target section in the same turn as the edit.
 - Prefer extending an existing deterministic gate (e.g. a
   `scripts/lib/canonical-facts.js` registry entry) over adding advisory
   reminder hooks — advisory text that fires everywhere gets normalized and

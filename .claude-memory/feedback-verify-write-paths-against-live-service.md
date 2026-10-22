@@ -1,19 +1,27 @@
 ---
 name: feedback-verify-write-paths-against-live-service
-description: "Mocked-boundary tests can't catch real service write-contract bugs (property casing, payload shape) — verify a new Dataverse write path with a real write or a metadata probe, not just code review + green mocks."
+description: "Mocked-boundary tests can't catch real service write-contract bugs (property casing, payload shape). Before live verification, establish an authorized target and named read/write scope; start with isolated Mode A checks; choose Mode C sandbox or Mode D controlled production only as needed, with explicit production authorization for Mode D and named records, expected writes, readback, and cleanup."
 metadata: 
   node_type: memory
   type: feedback
   status: active
   originSessionId: abec04f6-7e77-489e-b52b-e14e75677c96
-  last_verified: 2026-07-27 as a historical S304 production incident; current write contracts require a live probe or metadata evidence
+  last_verified: 2026-10-22 source/mode guidance clarified; S304 remains a historical 2026-07-27 production incident
 ---
 
 ## Recall Rule
 
-Before declaring a new Dataverse write path live, verify its wire payload through
-a real reversible write or current metadata plus parity with a known-working
-payload; mocked service-boundary tests are insufficient.
+Before declaring a new Dataverse write path live, establish the approved target,
+operator authorization, and record-level read/write scope. Name the records,
+fields, expected effects, readback, and exact cleanup or restoration before any
+write. Start with Mode A isolation, then choose Mode C sandbox or Mode D
+controlled production as needed under the release strategy. Mode D requires
+explicit production authorization and that same named scope;
+production credentials or a successful metadata read do not authorize a write.
+Read-only metadata can establish schema or option values, and parity with a
+known-working payload can check property names, but neither alone proves runtime
+acceptance. Mocked service-boundary tests remain insufficient evidence of the
+live wire contract.
 
 A new Dataverse write path is not "done" because the unit/integration tests are
 green — if those tests mock the service boundary, they validate your *intent*,
@@ -34,10 +42,16 @@ not in our code. A mock asserts what we send; it can't assert what Dataverse
 accepts. Code review + green mocks give false confidence on exactly the part that
 fails.
 
-**How to apply:** before declaring a Dataverse write path live, do ONE of:
-(a) exercise it for real once (a live write, then revert if needed), or
-(b) confirm the payload against ground truth — a read-only **metadata probe** for
-state/option values, and **byte-for-byte parity with a known-working payload**
-(the seed) for property names/casing. Then add a regression assertion pinning the
-exact wire keys (e.g. assert `wmkf_name` present, `wmkf_Name` absent). Relates to
+**How to apply:** choose a verification mode only after the operator approves
+the target and scope under `docs/CAMPAIGN_RELEASE_AND_DATAVERSE_TEST_STRATEGY.md`.
+Use isolated Mode A checks first. In Mode C, use a designated sandbox record and
+record the expected changes and exact cleanup. A Mode D production check requires
+explicit production authorization, named records and fields, expected writes,
+readback, and an exact cleanup/restoration path; never self-authorize production
+reads or writes from available credentials. For schema or option-set questions,
+a read-only metadata probe is evidence within its scope; for property casing,
+compare with a known-working payload (such as the seed). Neither substitutes
+for authorization or a runtime write when live acceptance is the claim. Then add
+a regression assertion pinning the exact wire keys (e.g. assert `wmkf_name`
+present, `wmkf_Name` absent). Relates to
 [[feedback-behavior-claims-cite-the-producer]] and [[feedback-idempotency-name-the-mechanism]].

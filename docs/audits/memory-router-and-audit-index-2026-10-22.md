@@ -26,7 +26,7 @@ shortening route meaning or sending domain-specific work to an unrelated hub.
 | Router leaf references resolve | 44/44 present | Local documentation files |
 | Moved references resolve in the Dev Environment Durable Memory groups | 19/19 present | The moved review, test, delegation, toolchain, and Git routes |
 | Memory leaf census | 304 leaves; 272 marked active | Read-only local census; not a claim that all 304 leaf claims were audited |
-| Health flags | 10, parent-reported | Eight previously dispositioned flags remain documented; two oversize routed notes remain accepted size debt |
+| Health flags | 11, parent-run continuation check | Seven shadow-atlas, two weak-basis, two oversize-routed; the added preview-rehearsal flag reflects explicitly historical environment observations |
 | Drift report | Stale, Aug 24; read-only | Not refreshed by this bounded task |
 | Parent review | Complete for router and historical extraction | Reviewed routes and independently compared extracted history with committed source; repository checks recorded below |
 
@@ -46,6 +46,8 @@ and verification limits apply:
 - [Scheduled Email and Reader Guidance Repair](scheduled-email-and-reader-guidance-repair-2026-10-22.md)
 - [Upload Cleanup Authority Repair](upload-cleanup-authority-repair-2026-10-22.md)
 - [Dynamics, Temporal, and Product-Direction Memory Repairs](dynamics-identity-temporal-memory-repair-2026-10-22.md) — five Sol findings repaired by Luna and parent-reviewed.
+- [Active Memory Safety and Write Audit](active-memory-safety-write-audit-2026-10-22.md) — 59 additional active leaves whole-read, 25 memory leaves repaired, source evidence and review limits recorded.
+- [Active Memory Coverage Inventory](active-memory-review-coverage-2026-10-22.csv) — all 272 active leaves, named-sample coverage, and the 176-leaf complement.
 
 ## Remaining audit queue and holds
 
@@ -57,10 +59,10 @@ and verification limits apply:
   implemented checker change or a verified repository-wide coverage claim.
 - Preserve accepted owner holds. Do not reopen intake, reminders, or paid-run
   decisions through this router audit.
-- **P1: finish active safety and write directives.** Sol whole-read 38 leaves (37 active and one closed); 235 active leaves remain outside that whole-read sample. Start with write/security directives and retirement recommendations. Reading a leaf does not establish that every claim was source-verified.
-- **P2: investigate remaining tooling and roadmap memory.** Continue the 235-active-leaf complement in bounded source-verified batches; preserve historical snapshots and explicit owner holds.
+- **P1: continue active safety and write directives.** The earlier sample covered 37 active leaves; the continuation whole-read 59 additional active leaves. The CSV identifies the remaining 176 active leaves outside these named samples. Prioritize remaining identity-persistence/contact/address/COI/exclusion and upload/retirement instructions. A whole read does not establish that every claim was source-verified.
+- **P2: investigate remaining tooling and roadmap memory.** Continue the 176-active-leaf complement in bounded source-verified batches; preserve historical snapshots and explicit owner holds.
 - **P3: further large-hub compression.** Strategy wiki remains about 33 KB; reviewer lifecycle remains a large mixed reference. Split only with explicit current/historical authority boundaries and byte-preservation proof. The bounded strategy extraction did not rewrite later owner-decision chronology.
 
 ## Parent verification
 
-Router routes and the moved development-memory references were reviewed. The historical archive matches the committed pre-edit body exactly (13,302 bytes; SHA-256 recorded in its report), and the subsequent implementation-history body is unchanged. Earlier repair batches passed the applicable documentation gates and self-tests; the final router/extraction and five-memory repair checks passed: memory-router and self-test, agent-wiki and self-test, harness-framing and self-test, fact-consistency, canonical-pointers, doc-symbol-refs, doc-currency, and agent-invariants. Memory health remains ten advisory flags (seven shadow-atlas, one weak-basis, two oversize-routed); no checker or flag suppression changed. The three edited JavaScript files were compared against pre-batch non-comment parser tokens and are comments-only. The owner-review-burden memory is unchanged. All commits remain local; no push or live-system action is part of this pass.
+Router routes and the moved development-memory references were reviewed. The historical archive matches the committed pre-edit body exactly (13,302 bytes; SHA-256 recorded in its report), and the subsequent implementation-history body is unchanged. Earlier repair batches passed the applicable documentation gates and self-tests; the final router/extraction and five-memory repair checks passed: memory-router and self-test, agent-wiki and self-test, harness-framing and self-test, fact-consistency, canonical-pointers, doc-symbol-refs, doc-currency, and agent-invariants. The earlier batches recorded ten advisory flags; the continuation records eleven, with the added preview-rehearsal historical-basis advisory explained in its report. No checker or flag suppression changed. The three edited JavaScript files were compared against pre-batch non-comment parser tokens and are comments-only. The owner-review-burden memory is unchanged. All commits remain local; no push or live-system action is part of this pass.

@@ -16,7 +16,9 @@ current-state claim.
 
 ## Expert Procedure
 
-- Read the entire target file before editing a fact, status, or claim.
+- Read the entire target file before editing a fact, status, or claim, in every
+  agent/client. The Claude path-scoped rule delivers this instruction for covered
+  surfaces; instruction delivery is not proof that a whole-file read occurred.
 - Reconcile frontmatter, summaries, body text, lead-ins, tails, linked docs, and
   recall rules in the same pass.
 - Grep the repo for every restatement of the changed fact.
@@ -33,12 +35,13 @@ current-state claim.
 
 ## Related Rules
 
-- Mechanical delivery: `.claude/rules/durable-docs.md` (path-scoped rule injected
-  on every Read of docs/**, .claude-memory/**, CLAUDE.md, SESSION_PROMPT.md; every
-  Edit requires a prior Read, so coverage matches the retired hook). The dedicated
-  `doc-edit-reconcile-reminder.js` PreToolUse hook was retired S322 (2026-07-03) as
-  a duplicate of that rule — if whole-file-reconcile misses recur, reinstating the
-  hook is the historically proven lever (see rationale sidecar).
+- Instruction delivery: `.claude/rules/durable-docs.md` declares paths for
+  docs/**, .claude-memory/**, CLAUDE.md, and SESSION_PROMPT.md. That Claude
+  harness mechanism is not evidence of universal tool/client enforcement or a
+  completed prior whole-file read. The dedicated `doc-edit-reconcile-reminder.js`
+  PreToolUse hook was retired S322 (2026-07-03) as duplicate reminder delivery;
+  preserve that history without inferring an active whole-file-read checker.
+  Any future enforcement change needs its own reviewed scope and evidence.
 - Skill: `.claude/skills/sweep/SKILL.md`.
 - Related memories: `feedback-apply-reconcile-to-fix-work.md`,
   `feedback-red-gates-are-p0.md`, `feedback-surface-full-review-findings.md`.

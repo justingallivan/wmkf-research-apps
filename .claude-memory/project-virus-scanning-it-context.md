@@ -1,13 +1,13 @@
 ---
 name: virus-scanning-it-context
-description: "WMKF tenant has no MDO / no Safe Attachments for SharePoint; only workstation Defender + Huntress. DFT greenlit app-side scanning for public upload paths (reviewer, intake) and recommended against per-detection emails to DFT. Decisions locked S190."
+description: "DFT's 2026-05-26 exchange documented no MDO / Safe Attachments and recommended app-side scanning for public upload paths, with no per-detection emails to DFT. Treat that tenant posture as historical until freshly checked; preserve the no-DFT-email owner decision."
 metadata: 
   node_type: memory
   type: project
   originSessionId: 31a4b8ba-daca-4b1d-9ce6-4b88706b7693
   status: active
   scope: security
-  last_verified: 2026-07-12 re-reviewed — DFT email exchange + tenant M365 posture (no MDO / no Safe Attachments; Defender-for-Endpoint + Huntress only) are organizational IT-decision facts, not probeable
+  last_verified: 2026-10-22 source routing rechecked; tenant M365 posture remains based on the 2026-05-26 exchange, not a fresh infrastructure check
 ---
 
 ## Recall Rule
@@ -15,8 +15,9 @@ metadata:
 Read this when: working on `VIRUS_SCAN_ENABLED` rollout, upload-path virus scanning, or detection-notification design.
 
 Do:
-- Treat app-side Cloudmersive scanning as the PRIMARY defense for external upload paths (reviewer, intake) — tenant has no MDO/Safe Attachments.
-- On detection, write a `system_alerts` row AND email the UNION of the `'virus-detection'` category recipients plus per-event explicit recipients (the PD on the related request when resolvable).
+- Treat app-side Cloudmersive scanning as the approved primary defense for external upload paths (reviewer, intake), based on the tenant posture documented in the 2026-05-26 DFT exchange; verify current licensing and controls before describing that posture as current.
+- On detection, write a `system_alerts` row AND email the union of resolved category recipients plus per-event explicit recipients (the PD on the related request when resolvable). Resolve order is category → `default` → active-superuser roster; category is optional when explicit recipients are present and a sender is configured.
+- Configure the intended category and default recipients deliberately; an absent or empty category entry does not itself suppress an alert email because fallback routing exists.
 - Ship sender UX + internal alert + operational enable as a unit before flipping the flag; preserve typed text on rejection.
 
 Do not:
@@ -27,9 +28,9 @@ Ground truth: `docs/CREDENTIALS_RUNBOOK.md` § virus scanning; `lib/utils/virus-
 
 DFT email exchange 2026-05-26 — locked context for the `VIRUS_SCAN_ENABLED` rollout.
 
-**Tenant posture (S190).** WMKF currently has Microsoft 365 Business Standard. **No Microsoft Defender for Office 365, no Safe Attachments for SharePoint, OneDrive, and Teams.** Workstation coverage only: Defender for Endpoint + Huntress as a secondary layer on staff devices. Business Premium upgrade is an "open project" (timeline unspecified), would eventually bring MDO Plan 1.
+**Tenant posture reported in the 2026-05-26 DFT exchange (S190).** At that time, WMKF had Microsoft 365 Business Standard, no Microsoft Defender for Office 365 or Safe Attachments for SharePoint, OneDrive, and Teams, and workstation coverage through Defender for Endpoint plus Huntress. This is historical evidence, not a fresh statement of current tenant licensing or controls. Business Premium was then an open project with no timeline; recheck before relying on that status.
 
-**Why app-side scanning is the primary defense, not defense-in-depth.** External upload paths (reviewer files, intake portal attachments) come from machines DFT doesn't administer. Workstation Defender + Huntress catch nothing on these paths today. App-side Cloudmersive scanning IS the primary control — not a redundant layer.
+**S190 rationale for primary app-side scanning.** External upload paths (reviewer files, intake portal attachments) came from machines DFT did not administer. Under the tenant posture described in that exchange, staff workstation Defender + Huntress did not cover those uploads; app-side scanning was selected as the primary control. This rationale preserves the approved scanning design without claiming a fresh tenant-control inventory.
 
 **DFT scope recommendation.** Enable for public-facing paths (reviewer, intake). Lukewarm on internal staff paths (grant reporting, expense receipts) because Defender + Huntress already cover staff-OneDrive uploads.
 
@@ -37,9 +38,11 @@ DFT email exchange 2026-05-26 — locked context for the `VIRUS_SCAN_ENABLED` ro
 
 **Internal notification design — locked S190.** Per-detection: write a `system_alerts` row AND send an email. Recipients are the **union** of:
 1. The `'virus-detection'` category configured in `/admin → Alert Recipients`
-   (stored in `wmkf_appsystemsettings.alertRecipientsByCategory`). **Admin must
-   configure the current production recipient in the dashboard before
-   detection alerts will email anyone; the address does not belong in memory.**
+   (stored in `wmkf_appsystemsettings.alertRecipientsByCategory`). The resolver
+   falls back to `default`, then the active-superuser roster if this category is
+   absent or empty, so a category-specific entry is not required for an email
+   to be sent. Configure intended recipients deliberately; the address does not
+   belong in memory.
 2. `explicitRecipients` per-event: the PD on the related `akoya_request` when resolvable. Reviewer path: PD resolved via suggestion → request → wmkf_programdirector → systemuser.internalemailaddress. Intake path: PD-of-request is N/A (drafts are pre-submission, request_id is null) so explicitRecipients is empty there.
 
 `NotificationService.sendAdminEmail` was changed S190 from "explicit-bypasses-category" semantics to "explicit-unions-with-category" so this design works. See [[memory-store-propagation]] for how this lives across sessions.

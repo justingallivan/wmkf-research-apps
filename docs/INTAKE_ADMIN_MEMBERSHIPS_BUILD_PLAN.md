@@ -118,7 +118,7 @@ Any downstream PA flow or report reading these fields **must filter on `wmkf_app
 
 ### Lookup writes — `@odata.bind` syntax
 
-Read-side projections use `_wmkf_approvedby_value` (read-only shadow). **Writes use the navigation-property `@odata.bind`** in PascalCase per `project_dataverse_schema_deploy_gotchas.md`. Exact bind keys (e.g., `wmkf_ApprovedBy@odata.bind`) are determined at slice 0 schema deploy and recorded on the Atlas page. Slice 0 must record:
+Read-side projections use `_wmkf_approvedby_value` (read-only shadow). **Writes use the exact, case-sensitive navigation-property name in `@odata.bind`**, resolved from Dataverse relationship metadata (`ReferencingEntityNavigationPropertyName`) and recorded on the Atlas page. Casing varies by relationship; do not assume every navigation property is PascalCase or infer it from the lookup attribute's logical name. Slice 0 must record the exact verified bind keys, including:
 
 - `wmkf_ApprovedBy@odata.bind` → for approve/reject write
 - `wmkf_Contact@odata.bind` → for applicant-side upsert (cross-slice § 9)

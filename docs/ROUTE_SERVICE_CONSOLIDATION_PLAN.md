@@ -455,9 +455,10 @@ review verdict + findings + resolutions)*
   (integration test mocks `dynamics-context` below `withDalContext`) → static shell audit
   added to the per-file loop. All five P1 amendments folded into Decision 3 + per-wave
   contract. Operational notes: two more Codex hangs this stage — root cause found:
-  `codex exec` in a non-TTY background shell blocks on stdin ("Reading additional input from
-  stdin..."); ALWAYS launch with `< /dev/null`. Watchdog upgraded to session-file-growth
-  stall detection (8 min frozen = stall) rather than wall-clock-only.
+  `codex exec` in a non-TTY background shell blocked on stdin ("Reading additional input from
+  stdin..."); the S331 procedure launched with `< /dev/null`. Its watchdog used session-file-growth
+  stall detection (8 min frozen = stall) rather than wall-clock-only. This is an execution-era
+  record, not current guidance to launch detached work or kill/relaunch based on elapsed time.
 - 2026-07-05 (S331): **Stage 2 (review-manager non-streaming wave) executed.** Pre-stage
   re-probe: census 48, review-manager 9 (8 wave + send-emails→2b), zero drift. Phase A
   (`76a8d2eb`): envelope inventory + characterization gaps for all 8 routes (70/70 across 9
@@ -502,8 +503,9 @@ review verdict + findings + resolutions)*
   arrays + lifecycle-after-send ordering; enrich-recommended: empty/terminal frames +
   progress ordering). Operational note: harness background tasks hosting codex exec were
   externally reaped twice (task + watchdog pair-killed, codex process dying with them);
-  protocol now: launch codex exec DETACHED (`nohup … & disown`, output to scratchpad,
-  `< /dev/null`) with a disposable poller — the review survives poller loss.
+  the S331-era protocol launched codex exec detached (`nohup … & disown`, output to scratchpad,
+  `< /dev/null`) with a disposable poller — the review survived poller loss. Historical execution
+  record only; current reviews use the managed runtime and exact-job cancellation controls.
 - 2026-07-05 (S331): **Stage 2b executed and cleared — review-manager domain closed.**
   Phase A (`e56bf221`): full conditional SSE vocabulary pinned per P1s template notes (9
   added, 20→29 route tests; 61/61 combined), and the render-emails overlap question the
