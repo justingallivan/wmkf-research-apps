@@ -14,7 +14,17 @@ Read before touching reviewer contact enrichment, the Serp/Scholar/Claude contac
 identity→enrichment handoff, or `save-candidates`/`saveToDatabase` field persistence. Pairs with
 [[project-reviewer-identity-resolution]] and [[project-reviewer-verify-fail-dangerous]].
 
-## The diagnosis (verified against a production reviewer search)
+## Current routing
+
+The S234–S235 history below explains the anchoring policy, not the current
+provider stack or UI. Current metrics/domain evidence delegates to
+`lib/services/contact-enrichment/openalex-metrics.js`; the guarded automated
+faculty-page tier is implemented as described below. For current source and
+address-trust/send authority, read `docs/agent-wiki/topics/reviewer-identity.md`
+and `docs/REVIEWER_FINDER_ENFORCEMENT_CONTRACTS.md`. The old Scholar-domain,
+provenance-group, and manual-confirm descriptions are historical mechanics.
+
+## Historical S234 diagnosis (verified then against a production reviewer search)
 Candidate A surfaced with a namesake's email; Candidate B surfaced with an
 unrelated person's email/website and a wrong h-index — **despite both having
 correct identity resolution** (one via an `authorship_grounded` anchor and one
@@ -34,7 +44,7 @@ OpenAlex author institution already carried onto `candidate.affiliation` by `map
 anchors already fetched; do NOT add per-candidate round-trips (latency is the binding constraint, see
 [[project-serpapi-budget-latency]]).
 
-## What shipped (branch `reviewer-contact-anchor-fixes`, S234 — merged to main)
+## Historical rollout (branch `reviewer-contact-anchor-fixes`, S234 — merged to main)
 - **A**: ORCID-resolved affiliation threaded into Tier-3 Claude, Tier-4 Serp, AND Scholar via a
   search-only candidate clone (never mutates the input candidate → preserves the S224
   resolveIdentity-on-original-affiliation invariant); same effective institution feeds the contradiction guard.
@@ -61,7 +71,7 @@ anchors already fetched; do NOT add per-candidate round-trips (latency is the bi
   legitimately saved with field-level gating (`reviewer-route-identity-gate` tests would break otherwise),
   so the client select list is INTENTIONALLY stricter than the server save gate.
 
-## How contact gets validated (final design — NOT lexical institution-name matching)
+## Historical S234 domain-validation design (not lexical institution-name matching)
 The actual namesake fix is **Fix A's institution-scoped search** — searching
 `"<name>" <institution> email` returned the anchored candidate's institutional
 address instead of the namesake's. The email is then validated against the
@@ -88,7 +98,7 @@ false negative (wrong email shown) over suppressing a correct one; (3) **smoke a
 results** — the unit tests used a fabricated true-positive and never exercised
 the real abbreviated-domain case.
 
-## Still open for reliable invites (the email is needed to invite the reviewer)
+## Historical S235 invite and faculty-page decision (superseded implementation snapshot)
 When the scoped search returns no email / a contradicted one: (a) fetch the anchored institution's own
 faculty page (we already surface its URL) and parse the email; (b) gate
 the INVITE on contact confidence (auto-allow only ORCID / Scholar-domain-matched / institution-page
@@ -99,10 +109,27 @@ is IMPLEMENTED S235 (branch `reviewer-slice-g-invite-confidence`, design+impl in
 `render-emails` stamps per-draft confidence; `InviteEmailModal` warning + one-click confirm; manual email edits
 stamp `emailSource='manual'`. No schema change. Slice F (faculty-page email recovery) SHIPPED S235 via the
 ZERO-SSRF path — the automated server-side fetch was Codex-reviewed (READY WITH NAMED CHANGES: undici
-IP-pinning dispatcher, scholarVerifiedEmail-only allowlist, IPv6 private-IP blocklist) but NOT built; instead
+IP-pinning dispatcher, scholarVerifiedEmail-only allowlist, IPv6 private-IP blocklist) but was NOT built at S235; instead
 `my-candidates` surfaces the persisted `facultyPageUrl` and `ReviewerInvitePanel` shows a "find on faculty page →"
 link on no-email candidates → staff enter the address via the existing Edit (→ `emailSource='manual'` →
 Slice-G confirm). Design+decision: `docs/REVIEWER_FACULTY_PAGE_RECOVERY_DESIGN.md`.
+
+**Later source implementation [VERIFIED via current source, 2026-10-22]:** the
+guarded automated tier now exists in `lib/services/contact-enrichment/page-email.js`
+(`attachEmailFromResolvedPage`), delegated by
+`lib/services/contact-enrichment-service.js`, with the anchored-domain, HTTPS,
+private-address rejection and IP-pinned fetch in `lib/utils/safe-fetch.js`
+(`safeFetchInstitutionPage`). Later history includes the page-first experiment
+(`290e5b72c`) and ranked mailbox ownership (`831dbb6e6`); the maintained
+contract and design pointers are in `docs/agent-wiki/topics/reviewer-identity.md`.
+The tier remains flag-controlled; this source audit did not inspect current
+environment values or prove hosted activation. The S235 manual recovery path
+and its rationale remain historical context, not evidence that automated
+recovery is unbuilt. The later address-trust/send contract supersedes the old
+provenance-only Slice-G acknowledgement mechanics; see
+`docs/REVIEWER_FINDER_ENFORCEMENT_CONTRACTS.md` before changing sends. The
+manual-path decision did not authorize relaxed fetch bounds, paid-tier
+reordering, or the declined arXiv harvesting described below.
 
 ## Declined email-recovery source: arXiv author emails (S235 — don't re-propose as an automated fetch)
 arXiv DOES expose an email behind a `[view email]` link to logged-in registered users, but harvesting it for

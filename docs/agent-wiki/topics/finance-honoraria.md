@@ -42,27 +42,32 @@ source, Atlas, and the Power Automate owner before testing against production.
 
 ## Honorarium Request Creation And BILL Deferral
 
-**Reviewer closeout decision (owner-approved and source-built 2026-09-04;
-deployed on `main` since `d0a5fc07`, verified 2026-09-08):** a Program Director records `eligible`, `not_eligible`, or
-`not_applicable` on the reviewer engagement when closing a received review.
-For a linked honorarium where the reviewer did not opt out, the closeout UI asks
-only whether an honorarium should be paid: Yes maps to `eligible`, while No maps
-to `not_eligible` and requires a nonblank request-scoped reason. Opt-out or
-missing-link cases record `not_applicable` without presenting that question.
-That is not final authorization to pay. The application will not write
-`akoya_request.wmkf_authorizationtoremitpaymentflag`; Operations/Finance retains
-that control. Read-only Production probes found the flag explicitly false on all
-159 exact honorarium requests, while 87 broader Research requests were true, so
-the field is live elsewhere rather than the reviewer-closeout signal. The
-Production now contains the manually created, published/readable nullable local
-`wmkf_appreviewersuggestion.wmkf_honorariumeligibility` Picklist with exact
-values `Eligible=100000000`, `Not eligible=100000001`, and `Not
-applicable=100000002`; runtime `$select` succeeds. The tracked preflight reports
-only that the live description lacks the explicit Operations/Finance-authority
-warning. The app route/UI and thank-you decoupling are source-built but not
-deployed. Operations has built an AkoyaGO system view and will surface it later;
-the owner accepted that UI as a follow-up. Implementation details are specified in
-`docs/REVIEWER_COMPLETION_AND_HONORARIUM_DECISION_BRIEF.md`.
+### Closeout contract and recorded rollout
+
+**Owner decision 2026-09-04, present in repository source:** a Program Director
+records `eligible`, `not_eligible`, or `not_applicable` on a received review when
+closing it. For a linked honorarium without opt-out, Yes means `eligible`; No means
+`not_eligible` and requires a nonblank request-scoped reason. Opt-out/missing-link
+cases record `not_applicable`. Thank-you acknowledges receipt rather than completion.
+The application does not write `akoya_request.wmkf_authorizationtoremitpaymentflag`;
+Operations/Finance retains final authority.
+
+**Historical chronology:** September 4 recorded the branch source build with
+deployment pending. Session 479 in `DEVELOPMENT_LOG.md` later recorded runtime/UI
+`5e101861` in Ready Production deployment `dpl_2uJJQxY9TN4KcfHJGLRS2dW1QVge`.
+This wiki's September 8 record associated follow-on `d0a5fc07` with deployed closeout.
+These later records supersede the old pending-deployment statement, but do not
+establish today's serving version.
+
+The September 4 read-only metadata/runtime probe found the nullable local
+`wmkf_honorariumeligibility` Picklist published/readable with no default and exact
+values `Eligible=100000000`, `Not eligible=100000001`, `Not applicable=100000002`.
+The description lacked the Finance-authority warning. All 159 exact honorarium
+requests had final-remit false, while 87 broader Research requests were true.
+Those are dated observations, not current counts or metadata verification.
+Operations' view was built but not surfaced in that record; the owner accepted
+its visibility as a follow-up. Current view/description status remains unverified.
+Contract: `docs/REVIEWER_COMPLETION_AND_HONORARIUM_DECISION_BRIEF.md`.
 
 **OWNER DECISION 2026-07-12: the BILL API integration is TABLED for several
 months, possibly permanently.** Reviewer onboarding will instead use the
@@ -70,7 +75,13 @@ reviewer's address plus existing foundation systems. Do not build on or propose
 the BILL API pipeline without a new owner decision; the BILL code stays dormant,
 not deleted (`BILL_ENABLED` unset in every Vercel environment — verified
 2026-07-12). Detail: `project-honorarium-payment-landscape` memory. The
-2026-07-01 posture below remains the live mechanical state.
+no-BILL target below remains the owner decision; actual configuration requires
+fresh verification.
+
+### Historical BILL deferral incident and probes
+
+The following observations describe the July/August incident. Counts, flag values,
+alert outcomes, and deployments are bounded to their recorded dates.
 
 **`BILL_ONBOARDING_DEFERRED` misconfiguration, 2026-07-02 → 2026-08-10 (fixed
 S414).** The flag was present in Production and Preview since ~2026-06-10 but its
@@ -83,20 +94,21 @@ branch and wrote a `bill_manual_onboarding` warning alert
 `2026-07-02 17:48 UTC`, last `2026-08-10 19:52 UTC`, before the flag was
 overwritten to exactly `true` on Production and Preview and production redeployed
 `[VERIFIED via read-only system_alerts census, 2026-08-11; denominator is
-COUNT(*) over all statuses, not the 29+32 split]`. All 61 are now resolved.
+COUNT(*) over all statuses, not the 29+32 split]`. All 61 were recorded resolved at that census.
 
-**No BILL API call ever fired** `[VERIFIED via three disconfirming checks,
+**No BILL API call had fired through that probe** `[VERIFIED via three disconfirming checks,
 2026-08-11]`: `BILL_ENABLED` is unset (second lock); zero
 `bill_unavailable` / `bill_unhandled_error` / `bill_invalid_input` alerts exist,
 and all three are reachable only past the `BILL_ENABLED` gate; and
 `bill_onboarding_state` holds **0 rows**, though reservation precedes any BILL
 side effect, so a row would exist had the flow gone further.
 
-Two follow-ons. The flag is now stored **non-sensitive**, so its value is
-readable and this class of drift is detectable — it was previously Sensitive,
+Two follow-ons recorded then. The flag was changed to **non-sensitive**, making
+its value readable so this class of drift could be detected — it was previously Sensitive,
 which is why a wrong value went unnoticed for five weeks. And the "no new alerts"
 half of the fix is confirmed only by observing an accept *after* the redeploy, so
-treat that as **[ASSUMED]** until the census re-runs clean.
+that post-redeploy outcome remained **[ASSUMED]** in the incident record. This
+cleanup does not close it without a later census.
 
 **Timestamp trap when querying `system_alerts`:** `created_at` is
 `timestamp without time zone` holding UTC `[VERIFIED via information_schema,
@@ -106,15 +118,17 @@ driver are wrong by that much. Compare and render with `to_char(...)` in SQL, no
 in JS. The admin panel renders Pacific, so a `19:52 UTC` row displays as
 `12:52 PM`.
 
-**Current posture (2026-07-01 decision; live 2026-07-02):** full BILL.com onboarding
+### Owner target and historical July rollout
+
+**2026-07-01 decision; recorded go-live 2026-07-02:** full BILL.com onboarding
 remains deferred, but the portal is the sole creator of reviewer honorarium
 `akoya_request` rows for reviewers who come through it. Use
 `docs/HONORARIUM_PORTAL_CREATION_STRATEGY.md` as the current source of truth for
 the no-BILL cycle. **This posture WENT LIVE in Production 2026-07-02** (GUIDs set,
 `HONORARIUM_ONBOARDING_DEFERRED` removed from Production / kept `true` on Preview,
-BILL still deferred, prod redeployed) — honorarium-ON / BILL-off is the live
-posture, not a plan; a real honorarium `akoya_request` was created
-`[VERIFIED via #1003172, 2026-07-06]`. The clean go-live posture is:
+BILL still deferred, prod redeployed). Honorarium-ON / BILL-off was observed
+then; those values were not re-probed in this cleanup. A real honorarium `akoya_request` was created
+`[VERIFIED via #1003172, 2026-07-06]`. The owner-approved configuration target is:
 
 - set the three honorarium discriminator GUIDs;
 - unset `HONORARIUM_ONBOARDING_DEFERRED` so `ensureHonorariumOnboarding()` mints
@@ -146,9 +160,11 @@ unpaid, unauthorized `Pending` row to `Withdrawn`, and stamps
 the reviewer release. An honorarium that is paid, authorized, unreadable,
 non-versioned, or in another status blocks the reviewer transition; an already
 `Withdrawn` row is retained unchanged. Acceptance-job race compensation uses
-the same retain-and-withdraw rule. This path is source-built on 2026-09-16 and
-is not yet promoted; the two Production release-email defaults are seeded and
-verified, but no runtime deployment has occurred.
+the same retain-and-withdraw rule. **Historical September 16 snapshot:** source
+was built and the two Production release-email defaults were verified, with
+runtime promotion then pending. Implementation commits `1abc097a8` and `87af339b3`
+are ancestors of current HEAD (checked 2026-10-22). Git ancestry establishes
+repository inclusion, not a hosted deployment or today's setting values.
 
 The 2026-06-22 production lock was capture-only:
 `HONORARIUM_ONBOARDING_DEFERRED=true` with the discriminator GUIDs unset. Treat
@@ -194,8 +210,10 @@ Both are reversible env gates. Source:
 `docs/HONORARIUM_PORTAL_CREATION_STRATEGY.md`; older design banners:
 `docs/BILL_CHUNK_4_DESIGN.md` + `docs/BILL_HONORARIUM_INTEGRATION_DESIGN.md`.
 
-Reviewers who accepted while capture-only was on won't re-accept, so once the
-pipeline is live, mint their missing records with
+The historical capture-only rollout included a cycle-scoped backfill procedure.
+Do not infer a remaining population from that old plan: the July 2 sweep found no
+real reviewer needing it (`project-honorarium-payment-landscape`). If a newly
+verified missing-record cohort warrants separately authorized backfill, use
 `scripts/backfill-honorarium-capture-only.mjs --cycle <CODE>` (dry-run by default;
 cycle-scoped so it can't sweep older cohorts; drives the same idempotent
 `ensureHonorariumOnboarding`; refuses to run while still deferred). The two

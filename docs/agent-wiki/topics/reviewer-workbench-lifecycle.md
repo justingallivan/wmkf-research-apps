@@ -176,13 +176,18 @@ Record of truth for the increment (gitignored working doc):
 **Reviewer-engagement build (Model B):** spec is `docs/REVIEWER_ENGAGEMENT_SPEC.md`. The 9 backing Dataverse fields are **provisioned in prod (2026-06-21, wave `7-reviewer-engagement`)**. Per-request campaign config lives on `akoya_request`; the per-reviewer respond-reminder marker lives on `wmkf_appreviewersuggestion`. **Phases 1, 2, and 4 remain live. Phase 3 mechanism IMPLEMENTED (S275), schedule PAUSED (2026-09-01):** `/api/cron/reviewer-reminders` can send respond-by and review-due reminders, but it is absent from the Vercel cron registry under the reviewer-token incident hold. Respond reminders claim with If-Match, mint, and deliver a replacement pre-acceptance link. Review-due reminders claim with If-Match only after a fail-closed token-liveness/runway check; they are link-free and preserve the existing token. Runtime source at commit `4dd57369` contains the remediation. Incident-session operations observed Ready deployment `dpl_89s9MzdUnDST6Jm9Vs3cnMLPmUDu` and authenticated Workbench smoke, but deployment metadata exposed no source SHA and no tracked smoke artifact was retained. The post-deploy D26 read-only audit found all 51 never-reminded sweep candidates active and eligible with zero blocked; already-reminded rows were outside the audit. The owner lifted the procedural manual reminder freeze after that evidence; the automatic schedule remains held. The Campaign settings modal still omits reminder toggles/leads, the Dataverse schema defaults both flags true, and a 2026-09-01 read-only probe found 92 current-cycle active requests with both flags true. `scripts/check-reviewer-reminder-hold.js` blocks accidental re-registration in CI and Vercel prebuild. The manual "Re-invite already-invited" button was removed in S277; `allowResend` remains only as a programmatic re-mint contract. Campaign timing, accepted-only Materials delivery, token TTL, quota notification, and selective decline remain implemented as described in the canonical spec. See the two Atlas pages for the exact column list and the canonical spec for the remaining cron-reactivation prerequisites.
 
 **Reviewer closeout and honorarium eligibility (owner-approved and source-built
-2026-09-04; deployment pending):** Complete means a lead-PD human closeout of a
-received review, not “thank-you sent.” The same one-row ETag update will set
+2026-09-04; subsequently released):** The September 4 deployment-pending
+state is historical. `DEVELOPMENT_LOG.md` Session 479 records runtime/UI
+`5e101861` in Ready Production deployment
+`dpl_2uJJQxY9TN4KcfHJGLRS2dW1QVge`; this is retained release evidence, not a
+fresh hosted-state check. Complete means a lead-PD human closeout of a
+received review, not “thank-you sent.” The same one-row ETag update sets
 Complete, `wmkf_completedat`, and the nullable engagement Picklist
 `wmkf_honorariumeligibility` with `eligible`, `not_eligible`, or
-`not_applicable`. Production has the manually created, published/readable local
-Picklist with exact values `100000000..100000002`; the tracked preflight reports
-only a deficient description that must be corrected before runtime promotion. The app will
+`not_applicable`. The September 4 Production probe found the manually created,
+published/readable local Picklist with exact values `100000000..100000002` and
+a deficient description in the tracked preflight. That metadata observation
+is dated; its current description was not re-probed in this cleanup. The app will
 never write the linked honorarium request's
 `wmkf_authorizationtoremitpaymentflag`; Operations/Finance retains final remit
 authority. Generic status PATCH now rejects Complete in source; the dedicated
@@ -621,7 +626,8 @@ legacy free-text values visible, so no existing referral is lost. Until S349
 
 Shipped and smoke-tested in Production on Request `1002959` — drawer, evidence caveat,
 and neutral invitation wording all checked [VERIFIED via `DEVELOPMENT_LOG.md:32-46`].
-Latest behavior change is `19bd000a` (2026-08-12).
+The Phase 1 receipt-wording change was `19bd000a` (2026-08-12);
+the later dated-release behavior is described below.
 
 **Scope decision — this is operational convenience, not evidence (owner decision
 2026-08-12).** The drawer exists so staff can see what happened recently on a reviewer
@@ -720,16 +726,22 @@ failed dispatch; response stamps are classified from the current `responseType` 
 `reviewStatus`; receipt provenance stays deliberately neutral (above). Only genuine
 reviewer-originated portal access and responses assert reviewer action.
 **Last Action precedence — the undated header wins only when nothing dates the
-transition.** `reviewStatus=released` has no timestamp writer anywhere, so it is
-surfaced as an undated current-status header and as the Last Action summary, never
-inserted into the dated timeline. `withdrew` is the opposite case: its writer stamps
-`wmkf_responsereceivedat` in the same write as the status, so the dated "Withdrawal
-recorded by staff" event stays in Last Action — staff triage on *when* a withdrawal was
-recorded. Both symmetrical shortcuts are wrong and both are pinned by tests: deferring
-to the header for every terminal status hides the withdrawal date (Codex round 4), and
-preferring dated activity whenever any exists puts a released reviewer's Last Action
-back on a stale old reminder (Codex round 3). Actor identity is absent by construction —
-the reviewer DTO carries no acting-user field. Full findings and the Phase 2/3 gates:
+transition.** The August 11–12 Phase 1 investigation found no timestamp writer
+for `reviewStatus=released`; its undated-header rule remains the fallback for
+legacy released rows without a parseable release stamp. Since the September 16
+accepted-release implementation (`1abc097a8`), `applyStaffReviewerRelease` writes
+`wmkf_withdrawnsufficientat`, and `buildActivityHistory` renders it as
+“Released — sufficient reviews received” on a released row. Current
+`terminalStatusHasDatedEvent` recognizes that parseable stamp, so Last Action
+uses the newest dated activity; it does not let an undated legacy release fall
+back to a stale reminder. `withdrew` writes `wmkf_responsereceivedat` with the
+status, preserving the dated “Withdrawal recorded by staff” event. **[VERIFIED
+via the adapter writer and activity-history reader in current source,
+2026-10-22; no hosted-state check.]** The August Codex rounds 3/4 caught the
+opposite overgeneralizations: always preferring dated activity concealed an
+undated release, while always preferring a terminal header concealed a dated
+withdrawal. Actor identity is absent by construction — the reviewer DTO carries
+no acting-user field. Historical findings and Phase 2/3 gates:
 `outputs/reviewer-activity-history-opus-review-2026-08-11.md`.
 
 ## Invitation timeline validation (S422, production-live `4dd4a31d`)
@@ -1124,7 +1136,8 @@ Expertise, then a brief regenerate.
 
 **Review history on the Invite card (S308):** the Invite-tab candidate DTO (`my-candidates` GET) carries `priorReviewCount` + `lastReviewAt`, derived (not stored) from `suggestionAdapter.aggregateReviewHistory(personIds)` — one batched query over `wmkf_appreviewersuggestion` filtered to received-only rows (`wmkf_reviewreceivedat ne null`) for the request's candidate person-ids. "Completed a review" = the reviewer's review was **received** (`wmkf_reviewreceivedat`), NOT the PD's closeout stamp (`wmkf_completedat`). `ReviewerInvitePanel` renders "reviewed N× · last <date>" only when `priorReviewCount > 0`. The aggregation is supplementary — its query failure is caught non-fatally in `my-candidates` (degrades to no history; never 500s the candidate list). Not yet surfaced on Track Reviewers (fast-follow).
 
-**Terminal statuses and full staff-withdrawal cleanup are production-live.**
+**Terminal statuses and staff-withdrawal cleanup: historical Production
+release below; accepted-release expansion verified in current source.**
 `withdrew` and `released` are live in the Track pipeline, excluded from
 `MODE_WORK_REMAINING` and the Reviews-tab Outstanding list, and routed through
 `/api/review-manager/terminal-transition`. The service freshly reads each row,
@@ -1138,14 +1151,19 @@ read-only preview runs the same honorarium-state classifier before showing the
 composer; the commit path independently re-reads the honorarium and remains
 authoritative. Paid, authorized, non-Pending, unreadable, or non-versioned
 honoraria therefore block before composition and again before the transition.
-This accepted-reviewer release expansion is source-built on 2026-09-16 and is
-not yet promoted; the older staff-withdrawal behavior remains production-live.
+This accepted-reviewer release expansion was source-built on 2026-09-16
+(`1abc097a8`, with `87af339b3` follow-up); both commits are ancestors of
+current `HEAD` [VERIFIED via Git ancestry, 2026-10-22]. “Not yet promoted”
+was the September 16 checkpoint, not a current deployment conclusion. The
+older staff-withdrawal release evidence is retained below; present hosted
+release behavior was not checked in this cleanup.
 
-**Promotion prerequisite:** Production was prepared on 2026-09-16 through an
+**Historical settings preparation and promotion prerequisite:** Production was prepared on 2026-09-16 through an
 explicitly authorized, narrowly scoped settings write that created
 `email.reviewer_release.subject` and `email.reviewer_release.body`; an immediate
 read-back verified both values exactly match the committed seeds. Runtime
-promotion is still pending. Any other environment must seed and verify both
+promotion was pending at that checkpoint; this record does not establish its
+current status or renew authorization to seed settings. Any target environment must verify both
 keys before this runtime reaches it. The seed is initialization data, not a
 runtime fallback; without it, release remains fail-safe and available without
 email, but preview reports `defaults_unavailable` and records the
@@ -1453,13 +1471,15 @@ in `send-emails.js`, so compatibility callers cannot cause the sweep to
 double-send. `ReviewerManagePanel` no longer exposes a manual thank-you
 composer. Knobs: `?maxBatch=N`, `?dryRun=1`.
 
-**Source-built next behavior; deployment pending:** thank-you remains a prompt
+**Current source behavior; September 4 deployment-pending checkpoint superseded
+by the Session 479 closeout release record above:** thank-you remains a prompt
 receipt acknowledgement and retains the current claim-before-send/at-most-once
 mechanics. No thank-you path sets Complete or eligibility. The manual
 compatibility branch writes only `wmkf_thankyousentat`; the seeded default drops
 the honorarium-processing token, and existing stored templates resolve that
-legacy token to blank. The live Dataverse default is unchanged until a separately
-authorized settings write. Existing `wmkf_thankyousentat` values are not
+legacy token to blank. That runtime release does not establish today’s stored
+Dataverse default; any template change still requires a separately authorized
+settings write. Existing `wmkf_thankyousentat` values are not
 backfilled into either decision field.
 
 **Phase 2 DEPLOYED (S326; unit-tested; populated Compare view NOT browser-verifiable until the first portal submission — zero exist, portal built ahead of the D26 cycle; correct zero-submission absence drive-verified):** schema-free

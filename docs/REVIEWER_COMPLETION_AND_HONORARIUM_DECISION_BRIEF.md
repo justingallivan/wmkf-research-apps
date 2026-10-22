@@ -45,15 +45,21 @@ defined Complete as “review received and reviewer thanked.”
 
 The deeper-green Complete badge remains approved as a presentation-only change.
 
-**Implementation state (2026-09-04):** the application-side contract is
-source-built on `codex/reviewer-closeout-eligibility-app`; deployment is
-pending. Production already contains the manually created, published/readable
-local Picklist with the exact three values. The tracked preflight reports one
-named metadata divergence: the live field description does not yet state that
-Operations/Finance retains final authorization-to-remit authority. Operations'
-AkoyaGO system view exists but is not yet surfaced; the owner explicitly
-accepted that interface work as a later operational follow-up rather than an
-application-build blocker.
+**Repository state and release chronology (reviewed 2026-10-22):** the closeout
+route/UI and thank-you separation exist in current source. The September 4
+branch snapshot below is historical, not an outstanding deployment instruction.
+`DEVELOPMENT_LOG.md`, Session 479, records runtime/UI commit `5e101861` in Ready
+Production deployment `dpl_2uJJQxY9TN4KcfHJGLRS2dW1QVge`; the finance wiki also
+records follow-on `d0a5fc07` verification on September 8. Those are recorded release
+observations, not a fresh check of today's serving deployment or external metadata.
+
+**Historical implementation snapshot (2026-09-04):** the contract was source-built
+on `codex/reviewer-closeout-eligibility-app`, with deployment then pending.
+The Production probe found the manually created, published/readable exact Picklist;
+the preflight reported its missing Operations/Finance authority-warning description.
+Operations' AkoyaGO view existed but was not surfaced; the owner accepted that
+interface work as a later follow-up. Neither metadata correction nor view completion
+is established by this cleanup; obtain fresh evidence before claiming either.
 
 ## Pre-build baseline (superseded by the source build below)
 
@@ -185,7 +191,12 @@ must already exist.
 This keeps corrections possible without using the generic status picker or
 creating a second timestamp that falsely looks like a new closeout.
 
-## Build slices
+## Historical build slices and retained contract
+
+The slices below preserve the implementation checklist and its original rollout
+preconditions. They are not a new build/deployment queue; current external metadata
+and Operations-view status require separate evidence. Owner constraints and the
+application invariants above remain controlling.
 
 ### 1. Additive Dataverse schema
 
@@ -316,8 +327,11 @@ are not Tier 0 and must not land directly on `main`.
 
 ## Contract-reconcile verdict
 
-**APPLICATION CONTRACT SOURCE-BUILT; DEPLOYMENT PENDING.** The one-row ETag
-closeout has no honorarium-request write, so cross-record partial success is N/A
-by construction. Before promotion, correct the live field description and rerun
-the exact preflight. Surfacing Operations' already-built AkoyaGO view remains a
-separate accepted follow-up and is not replaced by writing the payment gate.
+**APPLICATION CONTRACT PRESENT IN SOURCE; HISTORICAL RELEASE RECORDED.**
+The one-row ETag closeout has no honorarium-request write, so cross-record partial
+success is N/A by construction. September 4's pending-promotion verdict and
+metadata-description precondition are historical; later release evidence is
+recorded above. Current serving deployment and external metadata/view state were
+not probed in this cleanup. Surfacing Operations' AkoyaGO view remains a separate
+owner-accepted follow-up unless newer evidence closes it; it is never replaced
+by writing the final payment gate.

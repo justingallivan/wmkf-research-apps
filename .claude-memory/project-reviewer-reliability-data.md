@@ -34,8 +34,11 @@ whether reviewers are on time and reliable — not just participation counts.
   marks a safely open honorarium `Withdrawn`, and derives “Review not received” from the
   guarded absence of receipt evidence. `[VERIFIED via an explicitly authorized,
   narrowly scoped Production write plus exact read-back on 2026-09-16]`
-  `email.reviewer_release.subject` and `email.reviewer_release.body` now exist in
-  Production and match the committed seed values; runtime promotion remains pending.
+  `email.reviewer_release.subject` and `email.reviewer_release.body` were created in
+  Production and matched the committed seed values on that date; runtime promotion
+  was then pending. The release implementation commits `1abc097a8` and `87af339b3`
+  are ancestors of current HEAD (checked 2026-10-22); current hosted deployment and
+  setting values were not probed.
 - `[VERIFIED via lib/services/reviewer-due-extension.js,
   lib/external/reviewer-due-date.js, and the Atlas]` A nullable suggestion-level
   `wmkf_reviewduedateoverride` is live for accepted reviewers. Its dedicated writer and

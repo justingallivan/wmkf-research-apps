@@ -98,11 +98,11 @@ no drift). The 9 contracts:
 
 1. **Slice-E identity-unresolved gate** — client FIND select list (`provenanceGroupOf`) is *stricter* than the server save gate (`isUnresolvedIdentity`, 422 on full-batch reject); the asymmetry is intentional.
 2. **PI-named / cited / referred exemption + contact force-null** — `cited_reference`/`proposal_named`/`referred` rows (the exempt kinds in `isIdentityReviewExemptProvenance`, S249) are selectable when unresolved but ALL contact + identity-derived fields are force-nulled (`contactBlockedForUnresolvedExempt`) until confirmed/probable.
-3. **Address-action gate** — `send-emails-service` recomputes `emailConfidence` per recipient: valid exact-bundle `staff_verified` is `ready`; legacy source-only `staff_verified` remains `quick_check`; `research_only` is refused for invitations; `missing` has no address; and `conflict_pending` blocks every outbound reviewer template. Evidence-backed verification uses `/api/workbench/reviewer-address-trust`; the former provenance-only `my-candidates verifyEmailAddress` action is retired. For a fresh stored/found conflict, staff explicitly choose **Keep stored** or **Replace with found** in Workbench. `staff_address_choice` is valid only with the exact non-null resolved tuple and then becomes ready without a second send acknowledgement. Duplicate-owner, inactive-person, and Contact-linkage states remain fail-closed until staff fix the identified AkoyaGO record and **Retry record check** succeeds. No client label authorizes a send. [PRODUCTION-LIVE 2026-08-20 in Ready deployment `dpl_9yZ9xTHqfNgLcbZxJDekZkAjqpPS`; source/tests and signed-in Neville card plus dialog-through-Cancel smoke verified; live write not exercised.] On the current feature branch, exact receipt-bound ORCID matches also receive bounded prior-request display context from both canonical suggestion links and the five legacy request slots. The card/dialog explicitly treat that history as recognition context, never proof of identity or current email; the person GUID remains server-only. Deployment and signed-in smoke are still pending.
+3. **Address-action gate** — `send-emails-service` recomputes `emailConfidence` per recipient: valid exact-bundle `staff_verified` is `ready`; legacy source-only `staff_verified` remains `quick_check`; `research_only` is refused for invitations; `missing` has no address; and `conflict_pending` blocks every outbound reviewer template. Evidence-backed verification uses `/api/workbench/reviewer-address-trust`; the former provenance-only `my-candidates verifyEmailAddress` action is retired. For a fresh stored/found conflict, staff explicitly choose **Keep stored** or **Replace with found** in Workbench. `staff_address_choice` is valid only with the exact non-null resolved tuple and then becomes ready without a second send acknowledgement. Duplicate-owner, inactive-person, and Contact-linkage states remain fail-closed until staff fix the identified AkoyaGO record and **Retry record check** succeeds. No client label authorizes a send. [PRODUCTION-LIVE 2026-08-20 in Ready deployment `dpl_9yZ9xTHqfNgLcbZxJDekZkAjqpPS`; source/tests and signed-in Neville card plus dialog-through-Cancel smoke verified; live write not exercised.] Current source includes bounded prior-request display context for exact receipt-bound ORCID matches from both canonical suggestion links and the five legacy request slots (`e15846c17`, 2026-08-21; ancestor of current `main`). The card/dialog explicitly treat that history as recognition context, never proof of identity or current email; the person GUID remains server-only. That commit recorded deployment and signed-in smoke as pending; this historical snapshot is not a current deployment verdict, and Git ancestry alone does not establish hosted state.
 4. **Structured-PI identity** — `resolveProposalPI` is server-resolved from the request GUID, FAIL-OPEN + AUGMENT-ONLY, gated on confirmed/probable, name-guarded by `forenamesContradict`.
 5. **S240 institution COI** — current same-institution is a default HARD DROP on both discovery tracks AND re-rejected at the durable save boundary (`rejectedInstitutionCOI`). Approved Phase C allows a visible read-only flag only for a single low-trust affiliation match contradicted by current-affiliation evidence; save still rejects it. Historical/former-shared COI is retired. The `POTENTIAL_CONCERNS` amber advisory was retired (Chunk 2b, S254) — the model no longer emits it and COI is screened deterministically server-side (`docs/REVIEWER_FINDER_COI_CHUNK2_DESIGN.md`, now historical).
 6. **OpenAlex bibliometrics + verified-domain** — `_attachOpenAlexMetrics` sources metrics/affiliation/verified-domain from OpenAlex (ORCID or carried author id; never a bare name search). Scholar deep-links dropped; field renames in `docs/REVIEWER_FINDER_SERPAPI_MIGRATION_PLAN.md`.
-7. **Faculty-page recovery — guarded fetch + ranked mailbox ownership (S265/S321; hardened 2026-07-19)** — The automated tier (`safeFetchInstitutionPage` + `_attachEmailFromResolvedPage`) is code-default off but explicitly enabled in production. It stamps invitation-ready `institution_page` only under the anchored-domain SSRF bound and a unique deterministic mailbox winner: full-name; or, on a title/sole-H1 identity page, initials+surname, surname+initials, or exact surname; then exact URL slug and narrow full-forename adjacency as fallbacks. Equal-best ties, body-only weak forms, domain-only matches, and unmatched role addresses abstain. The broad search-lead helper is not reused. Compact proof/source/alternatives survive `reviewer_find_roster` reload and the card links to the official page; Dataverse/send authorization remains the binary `institution_page` source. The paid-tier ordering experiment still did not authorize a reorder or plausible-domain fetch relaxation. A later zero-paid-call selector replay preserved all prior correct results and added four verified correct people. Design/outcome: `docs/RESOLVED_PAGE_EMAIL_TIER_DESIGN.md`, `docs/REVIEWER_GATING_STRATEGY_REDESIGN.md`, and `docs/REVIEWER_PAGE_FIRST_EMAIL_EXPERIMENT_PLAN.md`.
+7. **Faculty-page recovery — guarded fetch + ranked mailbox ownership (S265/S321; hardened 2026-07-19)** — The automated tier (`safeFetchInstitutionPage` + `_attachEmailFromResolvedPage`) is code-default off. The historical S265/S321 rollout record reports it explicitly enabled in production; current environment activation was not re-probed in this 2026-10-22 source/documentation audit. It stamps invitation-ready `institution_page` only under the anchored-domain SSRF bound and a unique deterministic mailbox winner: full-name; or, on a title/sole-H1 identity page, initials+surname, surname+initials, or exact surname; then exact URL slug and narrow full-forename adjacency as fallbacks. Equal-best ties, body-only weak forms, domain-only matches, and unmatched role addresses abstain. The broad search-lead helper is not reused. Compact proof/source/alternatives survive `reviewer_find_roster` reload and the card links to the official page; Dataverse/send authorization remains the binary `institution_page` source. The paid-tier ordering experiment still did not authorize a reorder or plausible-domain fetch relaxation. A later zero-paid-call selector replay preserved all prior correct results and added four verified correct people. Design/outcome: `docs/RESOLVED_PAGE_EMAIL_TIER_DESIGN.md`, `docs/REVIEWER_GATING_STRATEGY_REDESIGN.md`, and `docs/REVIEWER_PAGE_FIRST_EMAIL_EXPERIMENT_PLAN.md`.
 8. **Work-grounding rescue** — `rescueByWorkGrounding` is purely additive, strict-forename-gated, `probable`-ceiling; can only resolve an already-abstained name.
 
 ## Operating Notes
@@ -133,8 +133,8 @@ PD-typed email/website/affiliation (manual provenance), while declining to
 promote resolver-sourced ORCID/Scholar/metrics; institution COI is still
 enforced. Independently, automated `confirmed`/`probable` identity fields
 loosen persistence only with the request- and identity-bundle-bound signed
-receipt minted by `/api/reviewer-finder/enrich-contacts`. **Hardened on the
-non-deployed feature branch:** new receipts mint v4; v3/v4 bind the exact
+receipt minted by `/api/reviewer-finder/enrich-contacts`. **Current source contract (the original note described a non-deployed
+feature branch, not a continuing deployment verdict):** new receipts mint v4; v3/v4 bind the exact
 contact projection (normalized email/source plus persistence flags), and v4
 also binds `eligibilityCheckStatus`. A valid v3 receipt remains authoritative
 for its eligibility result/evidence but cannot overwrite the stored check
@@ -150,8 +150,8 @@ authority, attestation, contradictory envelopes, stale values, and UI
 reconciliation. This covers the *contact-wrong, person-right* case; the
 *person-wrong* (namesake) case below is still deferred.
 
-**Promotion parity — one canonical contact projection (2026-07-29 in source;
-not deployed).** For every Find-origin candidate,
+**Promotion parity — one canonical contact projection (source contract;
+original 2026-07-29 snapshot recorded not deployed).** For every Find-origin candidate,
 `projectReviewerContact` is the shared identity/contact authority: it prefers
 the effective nested identity result over contradictory top-level UI hints,
 requires an authoritative normalized email/source, enforces persistence flags,
@@ -167,7 +167,8 @@ applicant-excluded collision becomes read-only `blocked`. The placeholder-key
 hazard remains documented in
 `docs/atlas/postgres-reviewer-find-roster.md`.
 
-**Shared-person monotonicity (2026-07-29 in source; not deployed).** Automated
+**Shared-person monotonicity (source contract; the original 2026-07-29
+snapshot recorded not deployed).** Automated
 `confirmed` is sticky, `probable` resists unresolved/ambiguous downgrades, and a
 probable refresh requires overlapping trusted anchors. A different-binding
 result abstains and alerts rather than overwriting a person shared by other
@@ -277,8 +278,12 @@ for the roster's current authority. The flag is required by the interlock for a 
 (`lib/dataverse/core/interlock.js:326-330`) and is a per-invocation operator act —
 do not persist it in `.env.local`. **Worked example (S414):** alert 383
 (`keeper_has_suggestion`, 2026-07-30) probed **ALREADY_RESOLVED** — the duplicate
-suggestion had been deselected. It remains the sole active alert row until the
-ordering correction is promoted and a non-dry-run sweep revisits it.
+suggestion had been deselected. At that probe, it remained the sole active alert row awaiting promotion of the
+ordering correction and a non-dry-run sweep. The promotion was subsequently
+recorded above on 2026-08-11 (`5f7baf9a`, deployment
+`dpl_ZyyAd6v77dDUq4kYscWsXMoikdq5`). Neither that historical probe nor the
+promotion record establishes whether a later sweep cleared alert 383; its
+current row status was not re-probed in the 2026-10-22 documentation audit.
 An `ALREADY_RESOLVED` verdict means the *reconciler's* work item is stale; the
 read-only probe does not clear the alert or establish that the duplicate
 `wmkf_potentialreviewers` records were merged.

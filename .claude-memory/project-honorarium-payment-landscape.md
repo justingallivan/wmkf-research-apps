@@ -21,15 +21,15 @@ possibly permanently. Reviewer onboarding uses the address already collected by
 the portal plus existing foundation systems. The BILL code remains dormant, not
 deleted.
 
-**Portal request creation is live.** Since 2026-07-02, reviewers who accept through
+**Recorded rollout (2026-07-02; not a fresh configuration check).** Reviewers who accept through
 the portal can receive an app-created reviewer-honorarium `akoya_request` through
 `ensureHonorariumOnboarding()`:
 
 - the three honorarium discriminator GUIDs identify Research Reviewer / Honorarium /
   Individual;
-- `HONORARIUM_ONBOARDING_DEFERRED` is unset in Production, so the request may be
-  created;
-- `BILL_ONBOARDING_DEFERRED=true` prevents the BILL tail;
+- the July rollout recorded `HONORARIUM_ONBOARDING_DEFERRED` unset in Production,
+  permitting request creation;
+- the owner target keeps `BILL_ONBOARDING_DEFERRED=true` to prevent the BILL tail;
 - the request binds the reviewer contact and parent proposal, and the suggestion
   junction holds the deterministic honorarium marker.
 
@@ -38,8 +38,7 @@ honoraria: all 40 had the direct `wmkf_reviewedproposal` link, all 40 had the
 suggestion-junction marker, and all 40 proposal identities agreed. Re-run
 `scripts/probe-honorarium-link-population.js` before quoting a later population.
 
-The earlier capture-only posture is the safety/off mode, not the current Production
-target. Detailed configuration and rollout evidence live in
+The earlier capture-only posture is the safety/off mode, not the owner's no-BILL request-creation target. Recheck actual values before an operational decision. Detailed configuration and rollout evidence live in
 `docs/HONORARIUM_PORTAL_CREATION_STRATEGY.md`; current operational routing lives in
 `docs/agent-wiki/topics/finance-honoraria.md`.
 
@@ -87,9 +86,12 @@ design documents, but agents must not present them as the next step.
 `wmkf_authorizationtoremitpaymentflag`. The PD will record a separate
 engagement-level eligibility disposition (`eligible`, `not_eligible`, or
 `not_applicable`) when closing a received review; the app workflow is source-built
-and awaiting deployment. Production contains the published/readable exact local
-Picklist, though its description still needs the tracked authority-warning
-correction. Operations/Finance retains the final remit decision. A
+on the September 4 branch snapshot, with deployment then pending. Session 479 in
+`DEVELOPMENT_LOG.md` later recorded runtime/UI `5e101861` in Ready Production
+deployment `dpl_2uJJQxY9TN4KcfHJGLRS2dW1QVge`; this is historical release evidence,
+not today's deployment verification. The September 4 probe found the exact local
+Picklist readable and its authority-warning description divergent; its current
+metadata status requires fresh evidence. Operations/Finance retains the final remit decision. A
 read-only Production probe that day found all 159 exact honorarium requests
 explicitly false on the remit flag, while a broader Research-request scan found
 87 true values, confirming that the field is live elsewhere rather than the

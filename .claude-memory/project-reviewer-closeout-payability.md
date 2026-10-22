@@ -26,7 +26,7 @@ Owner-endorsed direction (Justin, S343, 2026-07-07). Two-part framing for the
    context in [[reviewer-workbench-lifecycle]] wiki.
 
 2. **Accept-side "oops, don't pay" → annotation, NOT teardown (APPROVED and
-   source-built; deployment pending).**
+   implemented in source; recorded release chronology below).**
    Never delete the honorarium `akoya_request` (a financial record) for a bad/test
    accept. Instead, extend the **review closeout** so a PD marks payability.
    **SUPERSEDED IN PART (owner, S369, 2026-07-22):** `did_not_serve` is NOT a
@@ -58,18 +58,25 @@ reviewer opted out or no honorarium is linked, the UI skips the question and
 records `not_applicable`; notes remain optional.
 
 **[VERIFIED via read-only Production metadata/runtime `$select` 2026-09-04]:**
-the manually created local Picklist `wmkf_honorariumeligibility` is
+the manually created local Picklist `wmkf_honorariumeligibility` was
 published/readable, nullable, has no default, and has exact values
-`100000000..100000002`. The tracked source preflight reports one divergence:
-the live description lacks the explicit Operations/Finance-authority warning.
+`100000000..100000002`. The preflight then reported one divergence:
+the description lacked the explicit Operations/Finance-authority warning.
 All 159 exact honorarium requests had the separate authorization flag
 explicitly false, while a broader Research-request scan found 87 true values;
 the field is live elsewhere but is not the reviewer-closeout signal.
 
-Implementation contract:
-`docs/REVIEWER_COMPLETION_AND_HONORARIUM_DECISION_BRIEF.md`. The app route/UI
-and thank-you decoupling are source-built on
-`codex/reviewer-closeout-eligibility-app`; deployment is pending. Operations has
-built the AkoyaGO system view but has not surfaced it. The owner accepted that
-interface step as a later follow-up; never compensate by writing the final remit
-flag.
+## Source and historical rollout
+
+Implementation contract: `docs/REVIEWER_COMPLETION_AND_HONORARIUM_DECISION_BRIEF.md`.
+The app route/UI and thank-you separation are present in source. The September 4
+`codex/reviewer-closeout-eligibility-app` snapshot recorded deployment pending;
+Session 479 in `DEVELOPMENT_LOG.md` subsequently recorded `5e101861` in Ready
+Production deployment `dpl_2uJJQxY9TN4KcfHJGLRS2dW1QVge`. The finance wiki records
+follow-on `d0a5fc07` verification on September 8. These are historical release
+records, not fresh evidence of today's deployment, metadata description, or counts.
+
+The September 4 record said Operations had built the AkoyaGO system view but had
+not surfaced it. The owner accepted that interface step as a later follow-up;
+its present completion remains unverified. Never compensate by writing the
+final remit flag.
