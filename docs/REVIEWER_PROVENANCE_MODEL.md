@@ -3,7 +3,7 @@ title: "Reviewer Finder — what \"Claude-suggested\" means in the provenance mo
 domain: reviewer-identity
 kind: source-of-truth
 status: canonical
-summary: "In the old model there was a binary axis: a candidate was either a *Claude suggestion* or a *database discovery*, and being Claude-suggested..."
+summary: "Historical S232 migration; current seven-kind provenance and grounded-ranking membership, without implying candidate-origination flows shipped."
 canonical: true
 cataloged: 2026-07-02
 owner: product-engineering
@@ -11,38 +11,42 @@ owner: product-engineering
 
 # Reviewer Finder — what "Claude-suggested" means in the provenance model
 
-Status: explains the **Session 232 provenance-DTO migration** (sequencing step 1 of
-`REVIEWER_FINDER_RETRIEVAL_REDESIGN_PLAN.md`). `[VERIFIED]` = read from current
-source; `[PROPOSED]` = end-state not yet built. The pipeline still uses Claude as a
-seed generator today; the redesign's later steps replace that with retrieval-first
-origination.
+This document preserves the **Session 232 provenance-DTO migration** as historical
+context. **[VERIFIED via `lib/utils/reviewer-provenance.js` 2026-10-22]** The
+current helper accepts seven provenance kinds and includes three kinds in its
+grounded-ranking bonus. A kind being accepted by that helper does not
+prove that a corresponding candidate-origination flow has shipped. The S232
+ranking-delta analysis near the end is a dated snapshot, not a guarantee about the
+current pipeline.
 
-## TL;DR
+## Current model and S232 context
 
 In the **old** model there was a binary axis: a candidate was either a *Claude
 suggestion* or a *database discovery*, and being Claude-suggested earned a +25
 ranking bonus and its own UI section.
 
-In the **new** model that axis is gone. The provenance axis is **groundedness, not
-"did Claude touch it."** Claude is demoted from a *candidate source* to a **query
-seed generator**. A name Claude proposes is only a *hypothesis*; it becomes a real,
-selectable candidate **only if the literature grounds it**:
+In the S232 Track A/Track B model that axis was replaced. The provenance axis is
+**groundedness, not "did Claude touch it."** Claude is demoted from a *candidate
+source* to a **query
+seed generator**. In that workflow, a name Claude proposes is only a *hypothesis*;
+it becomes a literature-retrieved candidate only if the literature grounds it:
 
 - **Claude name that verifies in PubMed** → `provenance.kind = literature_retrieved`
   — **identical** to a database-discovered author. The only residue that Claude
   originated it is the legacy `isClaudeSuggestion: true` flag and
-  `seedRole: query_seed`. It gets **no ranking bonus** and sits in the same UI group
-  as DB discoveries.
+  `seedRole: query_seed`. It gets no Claude-originated +25 bonus and sits in the
+  same UI group as DB discoveries; the seed origin adds no current
+  grounded-provenance bonus.
 - **Claude name that cannot be grounded** → `provenance.kind = barred_parametric`
   — an ungrounded parametric invention, grouped under **"Needs identity review"**
   and (`[PROPOSED]` end-state) slated to be dropped silently.
 
-So **"Claude-suggested" is no longer a provenance category.** There is no
+So in this model, **"Claude-suggested" is not a provenance category.** There is no
 `claude_suggestion` kind, no Claude-vs-database split, and no +25 for being
 Claude-suggested. Claude proposes *query seeds*; the databases decide who is a real
 candidate.
 
-## Workflow
+## Historical workflow (S232, with S248/S253 updates)
 
 ```mermaid
 flowchart TD
@@ -67,7 +71,7 @@ flowchart TD
     DP --> G1
     UP --> G2["UI group: Needs identity review"]
 
-    G1 --> R["Ranking (relevance-score.js):<br/>recency 0–35 · affiliation 10 · multi-source 0–10 · keyword 0–10<br/>grounded +25 bonus = cited_reference / proposal_named ONLY<br/>→ literature_retrieved gets NO bonus"]
+    G1 --> R["Historical S232 ranking terms (relevance-score.js):<br/>recency 0–35 · affiliation 10 · multi-source 0–10 · keyword 0–10<br/>grounded +25 bonus = cited_reference / proposal_named ONLY<br/>→ literature_retrieved gets NO bonus"]
     G2 --> R
 
     classDef barred fill:#fde8e8,stroke:#c0392b;
@@ -78,8 +82,8 @@ flowchart TD
 
 ## Why a verified-Claude candidate is `literature_retrieved`, not its own kind
 
-`[VERIFIED]` In `discovery-service.js`, a Claude suggestion that passes PubMed
-verification is built with `withReviewerProvenance({...suggestion,
+The historical S232 path in `discovery-service.js` built a Claude suggestion that
+passed PubMed verification with `withReviewerProvenance({...suggestion,
 source:'claude_suggestion', verificationSource:'pubmed'}, {kind:
 LITERATURE_RETRIEVED, sources:['pubmed'], seedRole: QUERY_SEED})`. The candidate was
 *grounded against real PubMed publications* — that grounding is what makes it a
@@ -88,34 +92,42 @@ pulled from a literature search. "Claude proposed the name" is recorded only as 
 `seedRole` and the legacy `isClaudeSuggestion` boolean — neither is a provenance
 kind, and neither earns a ranking advantage.
 
-## The full provenance kind vocabulary
+## Current provenance kind vocabulary
+
+**[VERIFIED via `lib/utils/reviewer-provenance.js` 2026-10-22]** The helper
+accepts the seven kinds in this table.
 
 | `provenance.kind` | Grounded by | Today's pipeline | Disposition |
 |---|---|---|---|
-| `cited_reference` | DOI/PMID → exact authorship | `[PROPOSED]` (Step 4) | Top precision; +25 bonus |
-| `proposal_named` | proposal text (expert-authored) | `[PROPOSED]` (Step 4) | High-value + COI flag; +25 bonus |
+| `cited_reference` | A cited reference | Accepted by the provenance helper; origination flow is not established by kind membership alone | Included in grounded-ranking bonus |
+| `proposal_named` | A person named in proposal text | Accepted by the provenance helper; origination flow is not established by kind membership alone | Included in grounded-ranking bonus |
 | `applicant_suggested` | the applicant | existing flow | Own UI group |
-| `literature_retrieved` | the databases | **the spine today** (Track A verified; Track B archived off S248 — `DiscoveryService.TRACK_B_ENABLED=false`, dormant) | Hypotheses until resolved; no bonus |
-| `grounded_seed` | a query seed that grounded | `[PROPOSED]` | Ground-or-drop |
-| `barred_parametric` | training data only | **Track A unverified today** | Needs identity review → `[PROPOSED]` drop |
+| `referred` | A contacted reviewer suggested the person | Implemented referral capture; see `REVIEWER_FINDER_REFERRAL_CAPTURE_DESIGN.md` and its current-contract section | Included in grounded-ranking bonus; identity-review-exempt |
+| `literature_retrieved` | Literature evidence | S232 recorded a Track A path; current Track A origination is not established by kind membership here. Track B was archived off S248. | No grounded-provenance bonus |
+| `grounded_seed` | a query seed that grounded | Accepted by the provenance helper; no origination claim implied | No grounded-ranking bonus |
+| `barred_parametric` | No external grounding recorded | Accepted by the provenance helper | Needs identity review |
 
-## What still carries the legacy `isClaudeSuggestion` flag (and why)
+## S232 legacy `isClaudeSuggestion` flag (and why)
 
-`[VERIFIED]` `isClaudeSuggestion` is still set (`true` for Track A, `false` for
-Track B) and still rides on the candidate during migration, but it is **no longer
+In the S232 snapshot, `isClaudeSuggestion` was still set (`true` for Track A,
+`false` for Track B) and rode on the candidate during migration, but it was **no longer
 authoritative**: provenance, the UI grouping, and the ranking bonus all read
 `provenance`, never `isClaudeSuggestion`. The flag remains only so legacy
 roster/save/UI reads don't break mid-migration. Provenance is **never** inferred
 from it (`reviewer-provenance.js`).
 
-## Net effect on ranking
+## Historical S232 ranking-delta analysis
+
+The following analysis describes the Session 232 code/sample only. Later provenance
+kinds and source changes mean it must not be read as the current universal ranking
+delta.
 
 Two things change for a verified-Claude (Track-A) candidate: it is now
 `literature_retrieved` so it loses the +25 grounded bonus, **and**
 `claude_suggestion` no longer counts as a corroborating "source" so its
 multi-source bonus falls 10→5.
 
-**Analytically guaranteed by the current code** (recency/affiliation/keyword terms
+**Analytically guaranteed for that S232 code snapshot** (recency/affiliation/keyword terms
 are untouched, so they cancel in the delta):
 - Every Track-A candidate drops **exactly 30 points** (−25 bonus, −5 multi-source);
   every Track-B candidate is **unchanged (0)**. This holds because Track A only ever

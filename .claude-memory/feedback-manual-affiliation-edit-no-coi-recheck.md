@@ -16,13 +16,19 @@ When working on the reviewer on-card manual contact edit (`setManualContact` in 
 + `CandidateEditModal` local mode) or any future affiliation-edit affordance, do NOT gate or
 re-run institution-COI on a manually edited affiliation.
 
-**Why:** S267, building the on-card "✏️ Edit contact". Codex flagged (MED) that a hand-typed
-affiliation isn't re-checked for institution COI, so a same-institution reviewer could slip past
-the save gate (which reads only the pre-computed `hasInstitutionCOI`/`coiRecomputed` flags). The
-product owner (Justin) decided NOT to add a COI re-check: in practice the affiliation errors he
-fixes are "listed a department or a center instead of the parent institution" — i.e. refinements,
-not institution changes. Such a refinement would, if anything, REVEAL a real same-institution COI
-(dept string → "MIT") rather than introduce a hidden one, so the residual risk is low and accepted.
+**Why:** S267, building the on-card "✏️ Edit contact". The original concern and rationale were
+recorded against the save boundary as it stood then: a hand-typed affiliation was not rechecked
+there, so a same-institution reviewer might slip past the precomputed flags. That is historical
+rationale, not a description of the current save path. The product owner (Justin) decided NOT to
+add a COI re-check to the on-card manual edit: in practice the affiliation errors he fixes are
+"listed a department or a center instead of the parent institution" — refinements, not
+institution changes. Such a refinement would, if anything, REVEAL a real same-institution COI
+(dept string → "MIT") rather than introduce a hidden one, so the owner accepted that rationale.
+
+**Current save boundary:** `saveCandidates` loads trusted request/applicant/PI institution
+context and recomputes institution COI before persisting a person or suggestion. The recompute
+checks the candidate affiliation and any server-known matched-reviewer affiliations; it does not
+add a client-side COI re-check to the on-card edit. Preserve the owner's decision above.
 
 **How to apply:**
 - Keep affiliation (and h-index) editable on the Find card without a client COI re-derivation.

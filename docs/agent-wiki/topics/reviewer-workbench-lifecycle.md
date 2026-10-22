@@ -367,11 +367,15 @@ selectable for **Promote to Invite**. `needs_identity_confirmation` and
 `missing_email` remain visible with their exact staff action and produce no
 person/suggestion write.
 
-New automated receipts mint v4. V3/v4 bind that exact contact projection to
-the request and immutable roster key; v4 also binds
-`eligibilityCheckStatus`, while a valid v3 receipt cannot replace the stored
-check status. V1/v2 remain identity-only during their TTL. A staff
-override remains an exact actor-bound server record. `save-candidates-service`
+Current automated receipts mint v3; verification accepts v1/v2/v3. V3 binds
+the request, derived candidate key, optional roster key when supplied, identity
+and contact digests, and eligibility status/evidence digest. Its
+`contactAuthorityBound` signal requires an exact contact-digest match and a
+`ready` projected contact decision; save still applies separate address-trust
+checks. V2 can bind the full identity decision; v1/v2 have no contact binding
+and retain their historical 14-day TTL. V3 does not bind
+`eligibilityCheckStatus`. A staff override remains an exact
+actor-bound server record. `save-candidates-service`
 recomputes authority before adapters, resolves a unique active exact-email
 owner before creation, converges create races, checks applicant exclusion, and
 returns exact per-key `saved`/`withheld`/`failed` results. Only the server

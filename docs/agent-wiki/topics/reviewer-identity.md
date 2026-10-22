@@ -86,7 +86,7 @@ Use this page before work on reviewer identity, enrichment, ORCID propagation, c
 
 - `wmkf_potentialreviewers` is the person-level reviewer record and carries identity, contact, and bibliometric fields after the sidecar collapse. Verify current schema and source-of-truth details in `docs/APPLICATION_STATE_ATLAS.md` and `docs/atlas/dataverse-wmkf-potentialreviewers.md`.
 - `wmkf_appreviewersuggestion` is the per-request lifecycle ledger. Verify suggestion lifecycle and request-specific persistence in `docs/atlas/dataverse-wmkf-appreviewersuggestion.md`.
-- Postgres reviewer tables are historical or dropped for this domain. Before acting on a Postgres reviewer-table claim, check the Atlas page and live callers.
+- `reviewer_find_roster` is current operational state for Find candidates and promotion evidence. Canonical reviewer person identity/contact and per-request suggestion lifecycle live in Dataverse (`wmkf_potentialreviewers` and `wmkf_appreviewersuggestion`). Other reviewer-related Postgres tables have distinct purposes and lifecycle; do not generalize that they are all historical or dropped. Check `docs/APPLICATION_STATE_ATLAS.md`, the relevant Atlas page, and live callers before making a storage claim.
 - Generic user/profile input must not be trusted for authenticated identity. Preserve route auth and Dynamics restriction context.
 
 ## Live Enforcement Contracts → `docs/REVIEWER_FINDER_ENFORCEMENT_CONTRACTS.md`
@@ -96,11 +96,11 @@ The fail-closed gates that protect against wrong-person invite risk are owned by
 source file:line). Read it before changing any of these; do not restate its detail here (one home,
 no drift). The 9 contracts:
 
-1. **Slice-E identity-unresolved gate** — client FIND select list (`provenanceGroupOf`) is *stricter* than the server save gate (`isUnresolvedIdentity`, 422 on full-batch reject); the asymmetry is intentional.
-2. **PI-named / cited / referred exemption + contact force-null** — `cited_reference`/`proposal_named`/`referred` rows (the exempt kinds in `isIdentityReviewExemptProvenance`, S249) are selectable when unresolved but ALL contact + identity-derived fields are force-nulled (`contactBlockedForUnresolvedExempt`) until confirmed/probable.
+1. **Find promotion readiness gate** — the client select list requires the candidate not be deceased, `getCandidatePromotionDecision(...).decision === 'ready'`, ready email action, and no institution COI. The server recomputes the canonical contact projection and independently verifies address authority before person/suggestion writes. For roster-managed, nonsynthetic candidates using quick-check or research-only addresses, save requires the exact server-stored staff receipt; this is not a universal rule for the separate bare legacy-compatibility path. A whole batch with no promotable rows is rejected; mixed batches can retain independent ready rows.
+2. **PI-named / cited / referred retention without name-only promotion** — `cited_reference`/`proposal_named`/`referred` provenance (the exempt kinds in `isIdentityReviewExemptProvenance`, S249) avoids only the earlier unresolved-identity rejection so the candidate can receive a specific withheld outcome. It does not authorize name-only promotion: the complete promotion gate requires the contact projection, independent address authority, and any required exact staff identity confirmation or validated referred seed before writes.
 3. **Address-action gate** — `send-emails-service` recomputes `emailConfidence` per recipient: valid exact-bundle `staff_verified` is `ready`; legacy source-only `staff_verified` remains `quick_check`; `research_only` is refused for invitations; `missing` has no address; and `conflict_pending` blocks every outbound reviewer template. Evidence-backed verification uses `/api/workbench/reviewer-address-trust`; the former provenance-only `my-candidates verifyEmailAddress` action is retired. For a fresh stored/found conflict, staff explicitly choose **Keep stored** or **Replace with found** in Workbench. `staff_address_choice` is valid only with the exact non-null resolved tuple and then becomes ready without a second send acknowledgement. Duplicate-owner, inactive-person, and Contact-linkage states remain fail-closed until staff fix the identified AkoyaGO record and **Retry record check** succeeds. No client label authorizes a send. [PRODUCTION-LIVE 2026-08-20 in Ready deployment `dpl_9yZ9xTHqfNgLcbZxJDekZkAjqpPS`; source/tests and signed-in Neville card plus dialog-through-Cancel smoke verified; live write not exercised.] Current source includes bounded prior-request display context for exact receipt-bound ORCID matches from both canonical suggestion links and the five legacy request slots (`e15846c17`, 2026-08-21; ancestor of current `main`). The card/dialog explicitly treat that history as recognition context, never proof of identity or current email; the person GUID remains server-only. That commit recorded deployment and signed-in smoke as pending; this historical snapshot is not a current deployment verdict, and Git ancestry alone does not establish hosted state.
 4. **Structured-PI identity — person checks and known role-source conflict.** `resolveProposalPI` is server-resolved by request GUID and selects `projectleader || researchleader` without a program/era guard, contrary to the S159 owner-attested triad (`researchleader` is an institutional research officer, NOT the PI). Discovery and applicant-enrichment callers fall through to proposal-text identity on ordinary resolution failure; abort/time-budget signals propagate. Save treats `piResolution.state === 'failed'` as a 503 and distinguishes ordinary unresolved/no-ORCID context. Callers append and deduplicate the selected contact's canonical name, never replacing existing proposal authors, and exact-identity exclude only on `confirmed`/`probable`. The name guard compares available forename/surname values and abstains on contradiction or uncheckable input; ORCID-registry corroboration is best-effort. These checks validate the selected person, not the person's role. The unit test explicitly expects the fallback. June 2026 probes are sample evidence only, and the affected live population is UNKNOWN. Read `docs/REVIEWER_FINDER_ENFORCEMENT_CONTRACTS.md` §4 and `docs/audits/pi-identity-request-mutation-audit-2026-10-22.md` before relying on this value as PI identity. Other wiki facts were not rechecked in this scoped update.
-5. **S240 institution COI** — current same-institution is a default HARD DROP on both discovery tracks AND re-rejected at the durable save boundary (`rejectedInstitutionCOI`). Approved Phase C allows a visible read-only flag only for a single low-trust affiliation match contradicted by current-affiliation evidence; save still rejects it. Historical/former-shared COI is retired. The `POTENTIAL_CONCERNS` amber advisory was retired (Chunk 2b, S254) — the model no longer emits it and COI is screened deterministically server-side (`docs/REVIEWER_FINDER_COI_CHUNK2_DESIGN.md`, now historical).
+5. **S240 institution COI** — current same-institution is a default HARD DROP on both discovery tracks AND re-rejected at the durable save boundary (`rejectedInstitutionCOI`). Approved Phase C allows a visible read-only flag only for a single low-trust affiliation match contradicted by current-affiliation evidence; save still rejects that flagged row. A separate owner-approved Broad/HHMI exemption applies only when that named institute is the sole shared institutional overlap; it yields `dropDecision='exempt'`, and any separate direct institution conflict still wins. Historical/former-shared COI is retired. The `POTENTIAL_CONCERNS` amber advisory was retired (Chunk 2b, S254) — the model no longer emits it and COI is screened deterministically server-side (`docs/REVIEWER_FINDER_COI_CHUNK2_DESIGN.md`, now historical).
 6. **OpenAlex bibliometrics + verified-domain** — `_attachOpenAlexMetrics` sources metrics/affiliation/verified-domain from OpenAlex (ORCID or carried author id; never a bare name search). Scholar deep-links dropped; field renames in `docs/REVIEWER_FINDER_SERPAPI_MIGRATION_PLAN.md`.
 7. **Faculty-page recovery — guarded fetch + ranked mailbox ownership (S265/S321; hardened 2026-07-19)** — The automated tier (`safeFetchInstitutionPage` + `_attachEmailFromResolvedPage`) is code-default off. The historical S265/S321 rollout record reports it explicitly enabled in production; current environment activation was not re-probed in this 2026-10-22 source/documentation audit. It stamps invitation-ready `institution_page` only under the anchored-domain SSRF bound and a unique deterministic mailbox winner: full-name; or, on a title/sole-H1 identity page, initials+surname, surname+initials, or exact surname; then exact URL slug and narrow full-forename adjacency as fallbacks. Equal-best ties, body-only weak forms, domain-only matches, and unmatched role addresses abstain. The broad search-lead helper is not reused. Compact proof/source/alternatives survive `reviewer_find_roster` reload and the card links to the official page; Dataverse/send authorization remains the binary `institution_page` source. The paid-tier ordering experiment still did not authorize a reorder or plausible-domain fetch relaxation. A later zero-paid-call selector replay preserved all prior correct results and added four verified correct people. Design/outcome: `docs/RESOLVED_PAGE_EMAIL_TIER_DESIGN.md`, `docs/REVIEWER_GATING_STRATEGY_REDESIGN.md`, and `docs/REVIEWER_PAGE_FIRST_EMAIL_EXPERIMENT_PLAN.md`.
 8. **Work-grounding rescue** — `rescueByWorkGrounding` is purely additive, strict-forename-gated, `probable`-ceiling; can only resolve an already-abstained name.
@@ -134,11 +134,12 @@ promote resolver-sourced ORCID/Scholar/metrics; institution COI is still
 enforced. Independently, automated `confirmed`/`probable` identity fields
 loosen persistence only with the request- and identity-bundle-bound signed
 receipt minted by `/api/reviewer-finder/enrich-contacts`. **Current source contract (the original note described a non-deployed
-feature branch, not a continuing deployment verdict):** new receipts mint v4; v3/v4 bind the exact
-contact projection (normalized email/source plus persistence flags), and v4
-also binds `eligibilityCheckStatus`. A valid v3 receipt remains authoritative
-for its eligibility result/evidence but cannot overwrite the stored check
-status. V1/v2 remain identity-only during their TTL. Unsigned or mismatched
+feature branch, not a continuing deployment verdict):** new receipts mint projection v3 and
+accept v1, v2, and v3. V3 binds the exact contact projection (normalized email/source plus
+persistence flags), request, the immutable roster key when supplied, the identity decision,
+and eligibility status/evidence; `eligibilityCheckStatus` is not signed. V2 binds the full
+identity projection but is not contact-authoritative; v1/v2 verify only their historical identity
+claims during their TTL. Unsigned or mismatched
 client identity is deny-only for persistence and durable decision writes. The legacy person row
 lacks per-field lineage, so the invalid/abstain path now preserves shared
 resolver fields instead of blanket-clearing them; destructive automated clears
@@ -152,14 +153,17 @@ reconciliation. This covers the *contact-wrong, person-right* case; the
 
 **Promotion parity — one canonical contact projection (source contract;
 original 2026-07-29 snapshot recorded not deployed).** For every Find-origin candidate,
-`projectReviewerContact` is the shared identity/contact authority: it prefers
+`projectReviewerContact` is the shared identity/contact projection: it prefers
 the effective nested identity result over contradictory top-level UI hints,
-requires an authoritative normalized email/source, enforces persistence flags,
-applies the same affiliation rescue, and rejects research-only/scraped contact.
-`isCandidateSelectable` requires `decision==='ready'`, while
-`save-candidates-service` recomputes that decision before any adapter write.
-Proposal/cited/referred provenance can keep a row visible but cannot turn an
-unresolved or email-less row into a name-only Invite candidate. Applicant
+enforces its persistence flags and affiliation rescue, and rejects anti-scrape-munged
+email addresses; it does not reject all search-derived contact sources. It does not
+alone authorize every address source. `isCandidateSelectable`
+also applies the promotion decision, email-readiness action, and institution-COI
+gate; the server recomputes the projection and checks independent address authority
+(including the exact staff receipt for roster-managed, nonsynthetic candidates
+using quick-check/research-only addresses; the separate bare legacy-compatibility
+path is not covered by this receipt requirement) before writes. Proposal/cited/referred provenance can keep a row visible but cannot
+turn an unresolved or email-less row into a name-only Invite candidate. Applicant
 promotion retains its `requiresStaffIdentityConfirmation` parity and now also
 requires the canonical roster row plus a fresh canonical person email before
 selection. The server alone finalizes exact roster keys as `saved`; an
@@ -168,11 +172,14 @@ hazard remains documented in
 `docs/atlas/postgres-reviewer-find-roster.md`.
 
 **Shared-person monotonicity (source contract; the original 2026-07-29
-snapshot recorded not deployed).** Automated
-`confirmed` is sticky, `probable` resists unresolved/ambiguous downgrades, and a
+snapshot recorded not deployed).** Stored `confirmed` decision metadata is
+sticky, `probable` resists unresolved/ambiguous downgrades, and incoming
+automated `confirmed` decisions are capped at `probable`; a
 probable refresh requires overlapping trusted anchors. A different-binding
-result abstains and alerts rather than overwriting a person shared by other
-requests. Compatibility writes require the person ETag. Normal edits ignore an
+result abstains and alerts rather than overwriting identity-decision metadata for a
+person shared by other requests. This guarantee is scoped to the decision metadata
+write; other person-field writers have separate contracts. Compatibility writes
+require the person ETag. Normal edits ignore an
 empty email; an intentional clear is a distinct exact-value/source/reason/ETag
 command.
 

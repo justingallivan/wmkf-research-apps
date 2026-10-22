@@ -1,6 +1,6 @@
 ---
 name: project-reviewer-referral-capture
-description: "SHIPPED S249; structured portal capture and durable referral closure added 2026-08-01, with exact per-row structured dismissal added 2026-08-14. The external decline form collects up to four Name/Institution/Email rows; structured closure derives from referred-candidate provenance or a persisted dismissal mask, while legacy free-text records remain readable and are dismissible after staff resolves them only when the preserved marker fits the Dataverse memo. Identity resolution still uses manual-reviewer-add plus the hardened abstain-or-confirm spine."
+description: "SHIPPED S249; structured portal capture and durable referral closure added 2026-08-01, with exact per-row structured dismissal added 2026-08-14. Candidate-based closure requires the referred source plus a normalized exact name/email match to a selected or handled non-declined candidate; dismissal is separate. Legacy free text remains readable and dismissible only when its preserved marker fits the Dataverse memo."
 metadata:
   node_type: memory
   type: project
@@ -34,19 +34,24 @@ is a STRONG signal (≈ proposal_named strength) and worth surfacing in ranking/
 See [[project-reviewer-apps-redesign-direction]] (human-in-the-loop).
 
 ## The feature
-A contacted reviewer suggests an alternate → one action adds that person to the
-request's Candidates pool, enriched/verified, tagged provenance **referred** +
-**referredBy** (who suggested them).
+A contacted reviewer suggests an alternate → manual Add/Refer adds the
+staff-entered person to the request's Candidates pool, with lookup and
+confirmation as applicable, tagged provenance **referred** + **referredBy**
+(who suggested them). The manual path intentionally allows a sparse person and
+selected suggestion when staff supplies no email; that does not establish
+resolved identity or outreach readiness.
 
 ## The hard part (Justin) + the safety posture
 The external decline form now captures up to four structured rows with a
 required published name and optional institution/email. Existing records may
 still contain legacy free text. The Workbench never submits a legacy prose
 block as one person's name: staff add its people separately, then dismiss the
-resolved legacy note when its preserved marker fits the memo. Structured rows disappear when the request already has
-an exact-name referred candidate (and exact email too when the referral supplied
-one) that is selected or engaged, or when staff dismisses that exact row after
-recognizing it as already considered. Structured dismissal stores a four-bit
+resolved legacy note when its preserved marker fits the memo. Candidate-based
+closure of a structured row requires a `referred` source token and a selected or
+handled, non-declined candidate with a normalized exact name match and an exact
+email match when the referral supplied one. Staff can dismiss that exact row
+after recognizing it as already considered; dismissal is a separate closure
+path. Structured dismissal stores a four-bit
 mask in a same-width memo prefix and leaves the reviewer-submitted JSON payload
 unchanged. The PATCH is bound to the exact GET-issued payload identity, so a
 mask-only ETag race can merge but reordered/replaced content returns 409 rather
@@ -61,10 +66,22 @@ would exceed the field's 2,000-character limit. Staff can still enter a sparse r
 Resolving any referral to a canonical person is the **same name→identity problem
 the pipeline already solves** — apply the same
 posture as [[project-reviewer-verify-fail-dangerous]]: resolve confidently OR
-present the top matches for **1-click human confirmation**; on ambiguity keep a
-**sparse name-only candidate flagged "unresolved — needs contact"** (do NOT
-fabricate or auto-resolve to a namesake — wrong-person here means emailing the
-wrong reviewer).
+present the top matches for **1-click human confirmation**; on ambiguity do not
+auto-resolve to a namesake. The manual workflow can still record the staff-entered
+name as a sparse selected candidate, which must not be mistaken for identity
+resolution or contact readiness (wrong-person here means emailing the wrong
+reviewer).
+
+Keep the Find and manual Add/Refer contracts distinct. Find's `save-candidates`
+path keeps unresolved cited/proposal/referred candidates in its roster but
+withholds them before person/suggestion writes unless the exact contact
+projection is ready. Manual Add/Refer intentionally allows a sparse,
+staff-entered selected person/suggestion after the lookup/confirmation flow;
+that row is not proof of resolved identity or outreach readiness. Referral
+closure requires the `referred` source token and a non-declined selected or
+handled candidate with a normalized exact request-local name match and, when
+supplied, exact email match. Explicit dismissal is a separate path. Neither
+closure path proves person identity.
 
 ## Reuse, don't rebuild
 `pages/api/workbench/manual-reviewer.js` (S236 manual add) already adds a sparse

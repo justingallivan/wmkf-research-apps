@@ -50,6 +50,7 @@ and verification limits apply:
 - [Active Memory Safety and Write Audit](active-memory-safety-write-audit-2026-10-22.md) — 59 additional active leaves whole-read, 25 memory leaves repaired, source evidence and review limits recorded.
 - [Remaining Active Memory Audit](active-memory-remainder-audit-2026-10-22.md) — the final 176 active leaves whole-read, 19 further memories repaired, and prioritized evidence gaps.
 - [PI Identity and Request-Mutation Authorization](pi-identity-request-mutation-audit-2026-10-22.md) — confirmed PI role-source conflict, bounded mutation authorization trace, documentary repairs and unresolved runtime follow-ups.
+- [Identity, COI, Referral and Provenance](identity-coi-referral-provenance-audit-2026-10-22.md) — retention/promotion and receipt corrections, preserved manual/COI decisions, referral/acknowledgement evidence and the shared-person write-ordering gap.
 - [Active Memory Coverage Inventory](active-memory-review-coverage-2026-10-22.csv) — all 272 active leaves, sample membership, bounded disposition and evidence report. No active leaf remains outside the named whole-read samples.
 
 ## Remaining audit queue and holds
@@ -67,9 +68,10 @@ and verification limits apply:
 - **P1: resolve remaining safety contracts.** The PI/authorization follow-up
   confirms a PI role-source conflict and records the bounded authorization
   trace; runtime repair, population assessment and concurrency questions remain
-  open. Continue with full identity/COI/exclusion/referral fanout and action-specific
-  read-only exemptions. These records grant no permission to change owner policy
-  or probe Production.
+  open. The identity/COI/referral follow-up records a shared-person field/decision
+  ordering gap and remaining consumer-proof limits. Continue with those focused
+  safety tests and action-specific read-only exemptions. These records grant no
+  permission to change owner policy or probe Production.
 - **P2: finish deeper source verification.** The read inventory is closed;
   published prompt state, mutable output policy, enforcement scan coverage,
   local/tool/platform contracts and external state retain explicit limits and

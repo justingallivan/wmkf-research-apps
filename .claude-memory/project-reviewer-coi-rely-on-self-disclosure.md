@@ -1,6 +1,6 @@
 ---
 name: project-reviewer-coi-rely-on-self-disclosure
-description: "Reviewer COI philosophy (Justin S240 + approved Contract 5 Phase C): hard-act on self-evident POLICY conflicts (proposal authors + corroborated CURRENT same-institution); rely on reviewer SELF-DISCLOSURE for relationship/inferred conflicts. The only approved institution soft flag is a read-only, unsaveable row for a single low-trust affiliation match contradicted by current-affiliation evidence. HISTORICAL/former-shared institution does NOT count."
+description: "Reviewer COI philosophy (Justin S240 + approved Contract 5 Phase C): hard-act on self-evident POLICY conflicts (proposal authors + corroborated CURRENT same-institution), with the owner-approved Broad/HHMI sole-overlap exemption; rely on reviewer SELF-DISCLOSURE for relationship/inferred conflicts. The approved institution soft flag is a read-only, unsaveable row for a single low-trust affiliation match contradicted by current-affiliation evidence. HISTORICAL/former-shared institution does NOT count."
 metadata:
   node_type: memory
   type: project
@@ -24,6 +24,11 @@ candidate-card consumers.]
   one low-trust affiliation string may surface as a read-only, unsaveable flag when independent current
   affiliation evidence contradicts it. This is not a waiver: `hasInstitutionCOI` remains true, the Find UI
   keeps it unselectable, and `save-candidates` rejects it.
+- **Separate owner-approved institutional exemption:** a Broad Institute or HHMI match is classified
+  `exempt` only when that named institute is the sole shared institutional overlap. The signal remains
+  visible with `hasInstitutionCOI=true` and `institutionCOIExempt=true`; this is a scoped save-time
+  policy exemption, not the Phase C soft flag. A separate direct university match wins and remains a
+  conflict.
 - **Rely on reviewer self-disclosure for relationship/inferred conflicts.** Reviewers reliably disclose
   ("Professor X was my former colleague and we're ongoing friends") and reviewers over-recuse. The
   accept/decline flow is where these surface.
@@ -39,7 +44,9 @@ became a HARD DROP on both tracks against the PI-institution UNION; historical/f
 RETIRED; authoritative save-gate in `save-candidates`; canonical institution maps in the agent-wiki
 `reviewer-identity` topic + `docs/REVIEWER_FINDER_COI_CHUNK2_DESIGN.md`. **Contract 5 Phase C =
 APPROVED/IMPLEMENTED 2026-07-03:** default hard drop remains, but single low-trust matches contradicted
-by current-affiliation evidence surface as read-only, unsaveable flags. **Chunk 2b = SHIPPED (S254):
+by current-affiliation evidence surface as read-only, unsaveable flags. The separately owner-approved
+Broad/HHMI exemption applies only when that institute is the sole shared institutional overlap;
+direct university conflicts still win. **Chunk 2b = SHIPPED (S254):
 retired the AI `POTENTIAL_CONCERNS` advisory** — removed from prompt/validator/repair/render/persist;
 the parser keeps `POTENTIAL_CONCERNS` only as a REASONING terminator (parse-and-discard) so a lingering
 emission can't bleed into reasoning; prod Dataverse `analyze` reseed (`--execute --only=analyze`) is

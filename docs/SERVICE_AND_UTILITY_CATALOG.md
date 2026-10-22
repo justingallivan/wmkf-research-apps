@@ -279,11 +279,14 @@ If you're touching a service or utility, read its header before this catalog. If
   CAS preserves prior evidence on failed refreshes. It never accepts
   name/receipt/dependency authority or calls the full applicant batch.
 - **`reviewer-candidate-attestation.js`** — `NEXTAUTH_SECRET`-signed
-  request/candidate receipt. New receipts mint projection v4; v3/v4 are
-  contact-authoritative when their exact canonical contact projection is ready
-  and matches, and v4 additionally binds `eligibilityCheckStatus`. v1/v2
-  remain verifiable against their historical projections but are never
-  contact-authoritative. A compact server-only roster receipt preserves a
+  request/candidate receipt. Current mint is projection v3; verification accepts
+  v1/v2/v3. V3 binds request, derived candidate key, optional roster key (when
+  supplied), identity/contact digests, and eligibility status/evidence digest.
+  `contactAuthorityBound` requires an exact contact-digest match and a `ready`
+  contact projection; save still applies separate address-trust checks. V3 does
+  not bind `eligibilityCheckStatus`. V2 can bind the full identity decision;
+  v1/v2 have no contact binding and retain their historical 14-day TTL. A
+  compact server-only roster receipt preserves a
   canonical digest of the accepted identity decision after ingestion and must
   still match the current row at use time. Mutable address/affiliation fields
   are deliberately excluded.
@@ -311,8 +314,8 @@ If you're touching a service or utility, read its header before this catalog. If
   successful `accepted:true` corrections retain nonfatal token follow-up before
   person edits. Dedicated closeout owns eligibility/notes corrections.
 - **`reviewer-finder/save-candidates-service.js`** — Server-owned Find→Invite
-  promotion boundary: canonical contact projection, contact-bound v3/v4 or
-  staff authority,
+  promotion boundary: canonical contact projection, v3 contact binding or
+  staff authority, and applicable independent address-trust checks,
   exact-email owner reuse and race convergence, per-row result contract,
   bounded new-person compensation, and exact roster finalization.
 - **`reviewer-promotion-repair-classifier.js`** — Pure read-only historical

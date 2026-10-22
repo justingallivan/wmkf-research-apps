@@ -386,8 +386,9 @@ Write (verified 2026-05-07; +Phase 3 ingestion S210):
   roster-finalization failure never reports a clean promotion.
 - `pages/api/workbench/manual-reviewer.js` — adapter `ensureStaffManualCandidate` for sparse staff-entered reviewers. Creates/reuses the person through the identity-safe manual-add path, then writes/reselects the per-request suggestion with `staff_manual` and, for reviewer referrals, `referred` in `wmkf_sources`. It does not carry or mutate decline-referral indexes.
 - `pages/api/workbench/decline-referrals.js` — GET expands unresolved referral items and issues their exact-content `referralVersion`. Structured rows are omitted when their persisted prefix mask marks the exact index dismissed or exact request-scoped `referred` candidate evidence proves selection/engagement; legacy rows carrying the resolved memo prefix are omitted. PATCH calls `dismissDeclineReferral`, requiring that version and accepting an exact `referralIndex` for structured rows or no index for legacy prose.
-- `pages/api/reviewer-finder/save-candidates.js` — canonical contact projection
-  and contact-bound v3/v4 or staff-confirmation authority are checked before person/suggestion
+- `pages/api/reviewer-finder/save-candidates.js` — canonical contact projection,
+  v3 contact-binding or staff-confirmation authority, and applicable independent
+  address-trust checks are applied before person/suggestion
   writes. Adapter `upsert` creates/converges the per-(reviewer,request)
   suggestion; the service returns exact per-key `saved`/`withheld`/`failed`
   results and performs the server-owned roster finalization. An

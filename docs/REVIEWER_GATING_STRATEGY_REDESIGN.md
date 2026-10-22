@@ -2,8 +2,8 @@
 title: "Reviewer Fail-Closed Gating — Strategy Verdict and Redesign"
 domain: reviewers
 kind: spec
-status: active
-summary: "Per-gate over-gating verdict + redesign recovering or surfacing all 5 Cause #2 email misses without opening a wrong-person send path."
+status: historical
+summary: "Historical July 3, 2026 strategy for Cause #2 email misses; current enforcement lives in the contracts and Contact Leads spec."
 canonical: false
 cataloged: 2026-07-03
 owner: product-engineering
@@ -22,9 +22,12 @@ related:
 
 # Reviewer Fail-Closed Gating — Strategy Verdict and Redesign
 
-Produced per the brief in `docs/REVIEWER_GATING_STRATEGY_REVIEW_PROMPT.md`. Every
-current-behavior claim below was verified against live source this session
-(2026-07-03); line numbers are live as of commit `73d017aa`. Guiding principle
+Produced per the brief in `docs/REVIEWER_GATING_STRATEGY_REVIEW_PROMPT.md`. The
+behavior claims and redesign below are a historical July 3, 2026 snapshot verified
+against source then; line numbers refer to commit `73d017aa`, not current source.
+For current behavior, follow `docs/REVIEWER_FINDER_ENFORCEMENT_CONTRACTS.md`
+and `docs/REVIEWER_CONTACT_LEADS_SPEC.md`. The PI role-source correction is in
+`docs/audits/pi-identity-request-mutation-audit-2026-10-22.md`. Guiding principle
 applied throughout (per the brief §1): the harm to prevent is **sending** to the
 wrong person; the safe default for uncertainty is **surface for one-click staff
 confirm**, not silent drop. The send-time confirm gate (Contract 3) is the true
@@ -71,7 +74,7 @@ recover an email or admit a fetch; everything else routes to the contested
 (LOW → confirm) lane. It also folds in the review's three mechanics findings
 (adapter source-overwrite, save-gate default shape, `getInstitution` API surface).
 
-## 1. Verdict on the strategy
+## 1. Historical verdict on the strategy (July 3, 2026)
 
 **The gate *policies* are individually defensible; the system over-gates because two
 gates consume the wrong input or fire at the wrong stage, and because the discard
@@ -97,7 +100,7 @@ stage/order? (c) right input?
 Adjacent contracts (assess-only per the brief §5) — verified live this session:
 
 - **Contract 2** (exempt-kind contact force-null, `save-candidates.js:83–86`, applied `:238`): fires by design on unverified cited/PI-named/referred rows and *can* null a correct email — but it is the intended anchor-or-abstain posture with two working recovery paths (PD identity confirm; validated referred-seed anchor). Not implicated in the five Cause #2 cases (all were enrichment-path). **No redesign.**
-- **Contract 4** (structured-PI, `proposal-pi-identity.js:125+`): confirmed fail-open, augment-only; cannot drop an email or candidate. **No redesign.**
+- **Contract 4** (structured-PI, `proposal-pi-identity.js:125+`): this July 3 snapshot described the PI lookup as fail-open and augment-only. That statement is superseded: current role selection can choose `wmkf_researchleader`, an institutional research officer, as well as `wmkf_projectleader`; downstream logic can use that selected identity to exclude candidates. See the current structured-PI contract and October 22 audit above. The affected live population remains unknown.
 - **Contract 5** (institution-COI default hard drop + durable save re-reject, `save-candidates.js`; `deduplication-service.js`): consumes a *different* input from the email guards (lexical affiliation-NAME match, not the domain field), but the S321 residual risk was the same single-source trust pattern: an OpenAlex affiliation mis-map could hard-drop an entire correct candidate. **Follow-up implemented 2026-07-03:** `docs/REVIEWER_COI_PRECISION_PLAN.md` Phases A-C added the `coi_dropped` ledger, a stricter COI matcher, and the approved read-only flag path for single low-trust institution matches contradicted by current-affiliation evidence. Save still rejects `hasInstitutionCOI`.
 - **Contract 8** (work-grounding rescue, `reviewer-identity-evidence.js:212–285`): confirmed purely additive (every branch promotes-an-abstain or abstains; `:271` never promotes on partial evidence). **No redesign.**
 
@@ -327,7 +330,7 @@ contested-vs-rejected lead split.
 `docs/REVIEWER_CONTACT_LEADS_SPEC.md`, `docs/RESOLVED_PAGE_EMAIL_TIER_DESIGN.md`,
 `docs/agent-wiki/topics/reviewer-identity.md`.
 
-## 5. Non-goals and residual risks
+## 5. Historical non-goals and residual risks (July 3, 2026)
 
 **Non-goals (deliberately unchanged):**
 - Contracts 1, 2, 4, 8 — verified sound (§1); the client/server asymmetry and the
@@ -367,7 +370,7 @@ contested-vs-rejected lead split.
 - **Case 5 with the flag off** stays manual — an accepted recall gap until the
   owner enables the tier.
 
-## 6. Pass/fail walkthrough (the five Cause #2 cases)
+## 6. Historical pass/fail walkthrough (the five Cause #2 cases; July 3, 2026)
 
 | # | Case | Proposed-pipeline outcome |
 |---|---|---|

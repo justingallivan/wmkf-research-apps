@@ -2,8 +2,8 @@
 title: "D26 Reviewer-Finding Pipeline — Flowchart & Status"
 domain: reviewer-identity
 kind: spec
-status: active
-summary: "Legend — 🟩 green = exists/shipped · 🟨 amber = needs building/fixing · 🟪 purple = open policy decision · ⬛ gray/dashed-X = off / abandoned /..."
+status: historical
+summary: "S246–S254 D26 pipeline snapshot dated June 12, 2026; consult current enforcement contracts and reviewer-origination wiki for live behavior."
 canonical: false
 cataloged: 2026-07-02
 owner: product-engineering
@@ -22,6 +22,14 @@ Operational plan for finding appropriate reviewers for the **D26 Phase-I** cycle
 with each pipeline stage marked by status. Direction reflects the **S246 forward
 sniff-test experiment** ("Claude-assisted wins" gate) plus the attribution probes and
 corrected-posture reconciliation worked out this session.
+
+**Historical snapshot:** this diagram and status inventory record the S246–S254
+posture for the D26 cycle; they do not establish current rollout or current
+selectability. For current promotion and save behavior, use
+`docs/REVIEWER_FINDER_ENFORCEMENT_CONTRACTS.md` and
+`docs/agent-wiki/topics/reviewer-identity.md`. Referral capture remains a distinct
+manual-add/referral path; its historical `referred` provenance does not itself
+make a candidate selectable or authorize name-only promotion.
 
 The core posture: **Claude is the origination engine** (recall-oriented, human-curated);
 the grounded-*origination* family (Track B keyword→author, and the retrieval-first
@@ -112,7 +120,7 @@ flowchart TD
 open policy decision · ⬛ gray/dashed-X =
 off / abandoned / deferred (don't wire in).
 
-## What's settled (S246 + this session)
+## What the S246–S254 snapshot recorded as settled
 
 - **Claude-assisted origination is the engine.** S246's "Claude-assisted wins" gate
   fired for the D26 Phase-I cohort. Keep the Claude spine; defer the retrieval-first
@@ -198,7 +206,7 @@ document in front of it → grounding expert names against OpenAlex/ORCID is the
 caveat just makes the labeling honest. (A further cross-check against the proposal's own
 named personnel is a sensible future add — NOT yet implemented.)
 
-## 🟩 What exists today (live pipeline)
+## 🟩 What the June 2026 snapshot recorded as existing
 
 - **Claude Analysis** + name suggestion (`analyze.js`) — the origination engine
 - **Track A — verify/ground** Claude's names against PubMed/OpenAlex/ORCID,
@@ -213,7 +221,7 @@ named personnel is a sensible future add — NOT yet implemented.)
 - **Contact enrichment** (identity-anchored structured publication evidence before guarded web search), **save to Dataverse**, **email/.eml generation**
 - Admin-configurable **search time budget** (S223)
 
-## 🟨 What needs building/fixing (the leverage is downstream)
+## 🟨 What the June 2026 snapshot recorded as needing work
 
 1. **Identity-resolution recall hardening — work-grounding rescue ✅ SHIPPED S249.** So
    low-footprint *correct* names aren't lost to famous namesakes (the Christina case).
@@ -244,7 +252,9 @@ named personnel is a sensible future add — NOT yet implemented.)
 3. **Referral capture** ("add or refer a reviewer") — ✅ SHIPPED S249. A declining
    reviewer's free-text suggestion → resolved candidate; reuses manual-add (S236) +
    the hardened identity spine with abstain-or-confirm safety. New `referred`
-   provenance kind (grounded-rank bonus + selectable-with-verify like proposal_named);
+   provenance kind (historically described as a grounded-rank bonus and
+   selectable-with-verify like `proposal_named`; current promotion follows the
+   canonical promotion and address-authority gates linked above);
    referrer stored in the match reason (no new Dataverse field) + persisted as a
    `referred` source so it survives reload. One of the three signals that made last
    cycle work. Codex-reviewed (durability). Design:

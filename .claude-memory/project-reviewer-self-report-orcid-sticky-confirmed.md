@@ -23,11 +23,11 @@ confidence alone is not provenance. The adapter boundary enforces provenance:
 - Every runtime resolver writer and identity backfill uses `automated`.
 - Automated incoming `confirmed` is cloned and downgraded to `probable`; the
   caller's decision object is not mutated.
-- Every automated write first reads current status and anchors, skips stored
+- Every automated `writeIdentityDecision` first reads current status and anchors, skips stored
   `confirmed`, and propagates read failure without writing. Stored `probable`
   cannot become `unresolved`/`ambiguous`; a probable refresh requires nonempty,
   overlapping stored/incoming anchors.
-- A permitted automated write requires the current person ETag and passes it as
+- A permitted automated `writeIdentityDecision` requires the current person ETag and passes it as
   `ifMatch`; missing versions fail before mutation and conflicts require a fresh read.
 - `clearIdentityFields` accepts only `automated`, reads current status, and
   deliberately abstains for every stored state. Read failures propagate; missing
@@ -39,6 +39,18 @@ containment, not the durable model: legacy `confirmed` rows do not encode their
 source. Conditional automated writes do not supply the missing per-field lineage;
 keep that limitation distinct from ETag concurrency protection. The broader
 versioned-binding work is tracked in the reviewer holistic plan.
+
+These stickiness, overlap, and ETag guarantees apply to the identity-decision
+metadata written by `writeIdentityDecision`; they do not govern every field on
+the shared person. `upsertByPotentialReviewer` writes ORCID, affiliation, and
+bibliometric fields through a separate update path and can run before the
+decision-metadata write. The 2026-10-22 source audit records this ordering gap
+for follow-up; it establishes a possible contract gap, not observed corruption
+or a proven exploit: `docs/audits/identity-coi-referral-provenance-audit-2026-10-22.md`.
+
+Reviewer self-report capture in the acceptance drain also has a distinct
+versioned binding path through `reviewer-identity-binding-writer.js`; do not
+collapse that path into the resolver decision-metadata contract above.
 
 ## Historical containment
 

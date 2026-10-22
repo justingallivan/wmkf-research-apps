@@ -1,12 +1,12 @@
 ---
 name: project-reviewer-ack-provenance-parity-followup
-description: "Minor follow-up: reviewer COI/AI-use acks record version+timestamp but no body-hash and bind the version at-submit, unlike the grantee waiver's render-bound version+body-hash."
+description: "Minor follow-up: reviewer COI/AI-use acks record version+timestamp but no body-hash and bind the version at-submit; the grantee waiver records signed-context version+body-hash, without proving a human viewed or read it."
 metadata: 
   node_type: memory
   type: project
   status: active
   scope: global
-  last_verified: 2026-07-09 via source read (respond-service.js + grantee-upload.js)
+  last_verified: 2026-10-22 via source read (respond-service.js + grantee-upload.js)
   originSessionId: c238c19b-e78c-4f94-9e8d-c7f1432af984
 ---
 
@@ -25,13 +25,18 @@ Do not:
 - Claim reviewer acknowledgments currently prove the exact rendered body.
 - Add schema fields without migration/Atlas/consumer reconciliation.
 
-Ground truth: `lib/services/external-review/respond-service.js` and
-`lib/services/grantee-upload.js`; follow-up remains `[PLANNED]`.
+Ground truth: `lib/services/external-review/respond-service.js` resolves active
+policy versions in the submit path, while `lib/services/grantee-upload.js`
+records the version and body hash from the signed render context. This is
+version-at-submit versus render-bound version/body evidence; neither reviewer
+version value proves the reviewer read a rendered policy. Follow-up remains
+`[PLANNED]` and owner-prioritized as minor; no schema change is authorized by
+this memory.
 
 MINOR follow-up (owner-approved priority, S351): make the reviewer COI/AI-use
 acknowledgments match the grantee waiver's stronger provenance model.
 
-**Current state (verified 2026-07-09):**
+**Current state (verified 2026-10-22):**
 - **Reviewer acks** (`lib/services/external-review/respond-service.js` ~L283): record
   `coiVersionId` / `aiUseVersionId` (version provenance) + `ackedAt`
   (persisted as `wmkf_coiackedat` / `wmkf_aiuseackedat`). NO body hash. The
@@ -39,9 +44,11 @@ acknowledgments match the grantee waiver's stronger provenance model.
   "whatever was active at submit," NOT bound to what the reviewer was shown
   (small TOCTOU window if staff republish between render and accept).
 - **Grantee waiver** (`lib/services/grantee-upload.js`): records
-  `wmkf_WaiverPolicyVersion` + `wmkf_waiverackedat` + `wmkf_waiverbodyhash`,
-  where version + body-hash come from the signed render token minted at page
-  load (context route) — so it binds to EXACTLY what the grantee saw.
+  `wmkf_WaiverPolicyVersion` + `wmkf_waiverackedat` + `wmkf_waiverbodyhash`.
+  The signed context token binds the version ID and hash of the policy body
+  returned in `waiverPolicy.body`; submit verifies that token and persists its
+  values. This records the signed context/response policy version and body hash.
+  It does not prove the browser rendered the body or that a human viewed or read it.
 
 **Why:** an auditor asking "what text did this person actually agree to, and
 when" gets a stronger answer for grantees than reviewers. Parity would make the

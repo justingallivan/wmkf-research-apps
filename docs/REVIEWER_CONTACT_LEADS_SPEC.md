@@ -75,9 +75,12 @@ Current live behavior separates invite-safe contact data poorly from staff-usefu
   isUnresolvedIdentity/saveCandidates]` unresolved system-discovered
   identities are hard-rejected at save.
 - `[VERIFIED via lib/services/reviewer-finder/save-candidates-service.js
-  contactBlockedForUnresolvedExempt/saveCandidates]` unresolved exempt rows can
-  save as name rows, but contact and identity-derived fields are force-nulled
-  or field-gated before persistence.
+  isUnresolvedIdentity/saveCandidates and projectReviewerContact]` unresolved exempt rows can
+  bypass only the earlier unresolved-identity rejection so they can remain in
+  Find for staff resolution. The current Find promotion path does not save them
+  as name-only rows: it requires a ready promotion decision, contact projection,
+  and independent address authority before person/suggestion writes. This
+  candidate-save contract is separate from intentional sparse manual Add.
 - `[VERIFIED via shared/components/reviewers/ReviewerInvitePanel.js
   candidateContactPageUrl and its saved-candidate render consumer]` the
   saved-candidates UI already has a manual recovery pattern: when no email

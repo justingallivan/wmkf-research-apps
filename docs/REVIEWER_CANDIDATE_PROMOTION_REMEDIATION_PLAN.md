@@ -33,11 +33,14 @@ related:
 > Every production repair still requires an explicit reviewed allowlist and
 > separate execute authorization.
 >
-> **Feature-branch update 2026-08-02:** `codex/reviewer-find-performance-build`
-> mints projection v4 and accepts v1-v4 against their own historical
-> projections. V4 retains v3 contact authority and additionally binds
-> `eligibilityCheckStatus`. The v3 sections below remain the production record
-> of the 2026-07-29 deployment, not the current mint-version description.
+> **Historical feature-branch snapshot, 2026-08-02:**
+> `codex/reviewer-find-performance-build` recorded a v4 mint/accept change that
+> added `eligibilityCheckStatus` to the v3 contact projection. That dated branch
+> snapshot does not describe the current checkout. **[VERIFIED via current
+> source 2026-10-22]** `lib/services/reviewer-candidate-attestation.js` mints
+> projection v3 and accepts versions 1, 2, and 3. V3 binds contact authority;
+> it does not bind `eligibilityCheckStatus`. This is a checked-in source claim,
+> not a production deployment claim.
 
 ## Evidence labels
 
@@ -69,6 +72,15 @@ Unresolved or email-less rows remain actionable in Find as **Needs identity
 confirmation** or **Missing verified email**; they do not create a selected
 Dataverse suggestion and are not marked `saved`.
 
+**[VERIFIED via current source 2026-10-22]** In Find `save-candidates`,
+proposal/cited/referred provenance is exempted from the early unresolved-identity
+hard rejection so the row can remain in Find. The service then computes
+`projectReviewerContact` before any person or suggestion write. If identity or
+contact is not ready, the row is withheld before those writes. A validated
+referred seed may satisfy identity only through its exact email/ORCID anchor.
+This gate is specific to Find promotion. Manual Add/Refer can create a sparse
+staff-entered person and selected suggestion through its separate service path.
+
 This preserves recall without presenting a name-only row as ready for outreach.
 Invite continues to read the linked canonical person; it must not fall back to
 the roster's email for sending.
@@ -93,6 +105,13 @@ It does not:
 - replay the broad manual cleanup performed earlier on 2026-07-29;
 - authorize a production repair.
 
+These promotion guarantees cover the Find `save-candidates` path. Manual
+Workbench Add/Refer is a separate staff-entered workflow with its own lookup and
+identity-confirmation contract; it intentionally permits a sparse selected
+person/suggestion when no email is supplied. That row does not prove resolved
+identity or outreach readiness and does not make the Find promotion projection
+ready.
+
 ## Incident evidence
 
 | Case | Evidence | Consequence |
@@ -115,7 +134,7 @@ work. It is not the contract implemented on the remediation branch.
 | Layer | Current behavior | Risk |
 |---|---|---|
 | Find selection | `isCandidateSelectable` delegates identity grouping to `provenanceGroupOf`. Proposal/cited/referred provenance can be treated as selectable despite unresolved nested identity evidence. **[VERIFIED via source]** | The staff action looks like promotion eligibility even when only a name may safely persist. |
-| Attestation | `reviewer-candidate-attestation.js` projection v2 binds request, candidate/roster keys, identity decision, identifiers, and metrics. It does not bind the exact effective email, email source, or contact persistence flags. **[VERIFIED via source]** | A valid identity receipt is not sufficient contact authority. |
+| Attestation | `reviewer-candidate-attestation.js` projection v2 binds request, the derived candidate key, identity decision, identifiers, and metrics; it may also bind a roster candidate key when supplied. It does not bind the exact effective email, email source, or contact persistence flags. **[VERIFIED via source]** | A valid identity receipt is not sufficient contact authority. |
 | Save gate | `isUnresolvedIdentity` exempts proposal/cited/referred provenance. `contactBlockedForUnresolvedExempt` then force-nulls contact and identity-derived fields when nested identity is not `confirmed`/`probable`. **[VERIFIED via source]** | A candidate can pass the save gate only to lose the email that made the card appear invite-ready. |
 | Person persistence | `potentialReviewerAdapter.upsertByEmail` reuses by exact email only when email exists. With null email it creates a person row. **[VERIFIED via source]** | Silent withholding can create a new same-name, email-empty person instead of reusing the intended person. |
 | Suggestion persistence | `reviewerSuggestionAdapter.upsert` returns `{ skippedExcluded: true }` for an applicant-excluded collision. **[VERIFIED via source]** | The caller can mistake a guarded no-op for a successful promotion unless it checks the result. |
@@ -156,8 +175,8 @@ The remedy is not to persist the uncertain email. It is to stop conflating
 ### 1. One server-authoritative decision
 
 **[DEPLOYED TO PRODUCTION 2026-07-29]** The pure
-`projectReviewerContact` helper computes a complete persistence
-projection before any write:
+`projectReviewerContact` helper computes the contact persistence projection
+before any person or suggestion write:
 
 ```text
 ready
@@ -168,16 +187,21 @@ blocked_applicant_excluded
 ineligible
 ```
 
-The projection includes:
+The helper projection includes:
 
-- exact request and immutable roster candidate key;
 - effective nested identity decision;
 - exact normalized email and source;
 - email/website/affiliation persistence authority;
+- contact decision and reason;
+
+The enclosing Find service separately supplies request and roster identity and
+checks:
+
+- exact request and immutable roster candidate key;
 - existing trusted `suggestionId`/`potentialReviewerId` anchors;
 - exact-email owner, if any;
 - applicant-excluded collision state;
-- the reason and staff action required when not `ready`.
+- exact per-row promotion status and the staff action required when not `ready`.
 
 The browser may render this decision but may not supply it as authority.
 
@@ -195,7 +219,7 @@ The browser may render this decision but may not supply it as authority.
 Proposal/cited/referred provenance may influence what remains visible, but it
 does not bypass this promotion matrix.
 
-### 3. Attestation v3 introduced contact authority; v4 also binds check completion
+### 3. Attestation contract in the current checkout
 
 **[DEPLOYED TO PRODUCTION 2026-07-29]** Projection v3 binds:
 
@@ -204,7 +228,8 @@ does not bypass this promotion matrix.
 - `emailPersistAllowed`, `websitePersistAllowed`, and
   `affiliationPersistAllowed`;
 - nested identity decision and resolver version;
-- request ID and immutable roster candidate key;
+- request ID and `candidateKey` derived through `reviewerSaveKey`;
+- optional `rosterCandidateKey`, when the candidate carries one;
 - eligibility evidence already bound by v2.
 
 The receipt binds the server-computed contact projection at mint time. Mint and
@@ -213,13 +238,19 @@ address/source coherence, and anti-scrape rejection. Save may not introduce a
 different address after verification; a later server rescue must mint a fresh
 v3 receipt or route through staff confirmation.
 
+Minting requires the derived `candidateKey`, but `rosterCandidateKey` is
+optional: mint includes it only when present, and verification accepts its
+absence while comparing it when supplied. This receipt field is not a universal
+roster-membership requirement. Roster-managed save and status enforcement is a
+separate route/service contract.
+
 Any mismatch returns `identity_attestation_required` or `claim_mismatch` before
-writes. Verification is explicitly per-version: v1, v2, v3, and v4 tokens are
+writes. Verification is explicitly per-version: v1, v2, and v3 tokens are
 accepted against their own projection functions. V1/v2 receipts may continue
 to prove the exact legacy identity claims they originally bound, but they are
 never contact-authoritative. This avoids invalidating in-flight v2 receipts
-during their 14-day TTL. V3 remains contact-authoritative but does not bind
-`eligibilityCheckStatus`; v4 does. To promote contact from a legacy v1/v2
+during their 14-day TTL. V3 is contact-authoritative and does not bind
+`eligibilityCheckStatus`. To promote contact from a legacy v1/v2
 receipt, the server must re-enrich/re-attest or use an exact staff confirmation.
 
 ### 4. Staff confirmation reuses the existing exact-value contract
@@ -473,8 +504,8 @@ Required focused tests:
 - mint/save contact projection parity for affiliation rescue and anti-scrape
   rejection;
 - exact staff confirmation and stale-value mismatch;
-- unresolved cited/proposal/referred candidate remains in Find but is not
-  promoted;
+- in Find `save-candidates`, an unresolved cited/proposal/referred candidate
+  remains in Find and is withheld before person/suggestion writes;
 - resolved candidate with no authoritative email returns `missing_email`;
 - exact-email reuse and same-name/different-person non-reuse;
 - inactive exact-email owner is not reused and produces a repair signal;
@@ -498,7 +529,7 @@ Required focused tests:
   suggestion.
 
 For every allow branch, add the complement: missing receipt, wrong request,
-wrong roster key, changed email, changed source, stale ETag, excluded collision,
+wrong roster key when supplied, changed email, changed source, stale ETag, excluded collision,
 and partial dependency failure.
 
 ## Repair classifier
@@ -588,7 +619,7 @@ is skipped, never force-applied.
 | Alternative | Reason rejected |
 |---|---|
 | Persist the roster email whenever it is displayed | The displayed address can belong to a namesake; it bypasses the identity/contact authority boundary. |
-| Let unresolved proposal/cited/referred rows promote name-only | This is the current ambiguity: it preserves recall but falsely signals Invite readiness and can create duplicates. Keep the row in Find instead. |
+| Let unresolved proposal/cited/referred rows in Find promote name-only | This conflates roster retention with Invite promotion and can create duplicates. Keep the Find row and withhold the promotion. Manual Add/Refer has a separate, intentionally sparse staff-entry contract. |
 | Make Invite fall back to roster email | Hides a failed canonical write, creates two contact authorities, and weakens render/send gates. |
 | Reuse/merge by normalized name | Production contains many legitimate same-name clusters; name is discovery evidence, never identity authority. |
 | Treat all duplicate-looking clusters as a cleanup queue | Normalized-name and ORCID clusters are not equivalent to confirmed duplicate people. |

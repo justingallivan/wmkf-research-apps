@@ -23,7 +23,7 @@ related:
 `dpl_9yZ9xTHqfNgLcbZxJDekZkAjqpPS` — Contract 3 was
 re-traced through the fresh stored/found choice, exact resolved-bundle replay,
 structural retry, and legacy-alert closeout. Contracts 1–3 were previously
-re-traced through the canonical contact projection, v3/v4 attestation,
+re-traced through the canonical contact projection and v3 attestation,
 server-owned roster finalization, explicit contact-clear command, and focused
 tests. Contract 5 was last re-verified 2026-07-06 against the server-side save
 recompute; Contract 7 was last re-verified 2026-07-03. See `[VERIFIED]` tags per
@@ -60,30 +60,39 @@ Promotion contact authority additionally lives in
 
 **Contract.** Find retention and Invite promotion are separate decisions. An
 unresolved row may remain visible and actionable for staff resolution, but it
-does not become selectable for promotion and the server writes neither a
-person nor a suggestion until the canonical contact projection is `ready`.
+does not become selectable for promotion. The client requires a ready promotion
+decision, a ready email action, and no institution COI. Before person or
+suggestion writes, the server recomputes the canonical contact projection and
+checks independent address authority. For roster-managed, nonsynthetic
+candidates using quick-check or research-only addresses, it also requires the
+exact server-stored staff receipt; the separate bare legacy-compatibility path
+does not use that receipt requirement.
 
-- **Client (Find select list).** `isCandidateSelectable` requires both the
-  existing provenance/identity group to be selectable and
-  `projectReviewerContact(candidate).decision === 'ready'`. Rows needing
-  identity confirmation or an authoritative email remain visible with the
-  exact required action, but are excluded from select-all/promotion.
+- **Client (Find select list).** `isCandidateSelectable` requires the
+  candidate not be deceased, the promotion decision to be `ready`, email
+  readiness to be `ready`, and no institution COI. Rows needing identity confirmation or an authoritative
+  email remain visible with the exact required action, but are excluded from
+  select-all/promotion.
 - **Server (`lib/services/reviewer-finder/save-candidates-service.js`,
-  `saveCandidates`).** Recomputes the same canonical contact projection before
-  any durable write. `needs_identity_confirmation` and `missing_email` return
-  explicit per-candidate `withheld` results. A mixed batch can still save its
-  independent ready rows; only server-confirmed saved keys graduate.
+  `saveCandidates`).** Recomputes the canonical contact projection and checks
+  address authority before any person/suggestion write. For roster-managed,
+  nonsynthetic candidates using quick-check or research-only addresses, the
+  server requires the exact stored staff receipt (around `save-candidates-service.js:1313–1319`).
+  The separate bare legacy-compatibility path (around `:767–775`) is not covered
+  by that receipt requirement. Identity confirmation remains a separate
+  requirement. A mixed batch can still save its independent ready rows; only
+  server-confirmed saved keys graduate.
 
-**Enforcement points.** `lib/utils/reviewer-provenance.js` (`provenanceGroupOf`) ·
+**Enforcement points.** `shared/components/reviewers/reviewer-search-logic.js`
+(`isCandidateSelectable`, `getCandidatePromotionDecision`, email readiness) ·
 `lib/services/reviewer-finder/save-candidates-service.js`
-(`saveCandidates`) · `lib/utils/reviewer-vetted-email.js`
-(`projectReviewerContact`) ·
-`shared/components/reviewers/reviewer-search-logic.js`
-(`isCandidateSelectable`).
+(`isUnresolvedIdentity`, `saveCandidates`) · `lib/utils/reviewer-vetted-email.js`
+(`projectReviewerContact`) · `lib/services/reviewer-candidate-attestation.js`
+(automated identity receipt).
 
 **Why.** Client gating is explanatory only; a direct caller can still POST the
-row. The server projection is therefore the authority and the roster preserves
-the evidence needed to reproduce the same decision after reload.
+row. The server independently checks the projection and address authority, and
+the roster preserves the evidence needed to reproduce the decision after reload.
 
 **Audit.** `tests/unit/reviewer-route-identity-gate.test.js`.
 
@@ -94,28 +103,29 @@ the evidence needed to reproduce the same decision after reload.
 **Contract.** `cited_reference`, `proposal_named`, and `referred` provenance may
 retain a candidate in Find even when automated identity resolution abstains.
 That provenance is discovery evidence, not contact authority. Until the exact
-identity/contact projection is ready—or staff stores an exact actor-bound
-identity/contact confirmation—the row is read-only for promotion and no
-potential-reviewer or selected suggestion is created.
+identity/contact projection and independent address authority are satisfied,
+with any needed exact actor-bound identity confirmation or validated referred
+seed, the row is read-only for promotion and no potential-reviewer or selected
+suggestion is created.
 
 **Enforcement points.**
 `lib/utils/reviewer-vetted-email.js` (`projectReviewerContact`) derives the
 effective nested identity decision, exact normalized email/source, persistence
-flags, affiliation rescue, and anti-scrape rejection. The Find card renders
+flags, affiliation rescue, and anti-scrape rejection of munged email addresses;
+it does not reject all search-derived contact sources. The Find card renders
 **Needs identity confirmation** or **Missing verified email**; only `ready`
-renders a promotion checkbox. `save-candidates-service.js` recomputes the
-decision before adapters are called.
+renders a promotion checkbox after the promotion decision, email-readiness, and
+institution-COI checks. `save-candidates-service.js` recomputes the projection
+and independently checks address authority before adapters are called.
 
-New automated attestations mint projection v4. V3 and v4 bind the exact
-projected email, source, persistence flags, request, immutable roster key,
-identity decision, and eligibility evidence, so both remain
-contact-authoritative during their TTL. V4 additionally binds
-`eligibilityCheckStatus`; a valid legacy v3 receipt may restore the bound
-eligibility result/evidence but not overwrite the stored check-status field.
-V1/v2 receipts still verify their historical identity claims during their TTL
-but are never contact-authoritative. Staff confirmation remains an exact
-server-stored, actor-bound value contract; changing any confirmed contact field
-requires reconfirmation.
+New automated attestations mint projection v3; the verifier accepts versions
+1, 2, and 3. V3 binds the exact projected email, source, persistence flags,
+request, the immutable roster key when supplied, identity decision, and eligibility
+status/evidence. `eligibilityCheckStatus` is not signed. V3 is the only contact-authoritative automated receipt during
+its TTL. V2 binds the full identity projection but is not contact-authoritative;
+v1/v2 verify only their historical identity claims during their TTL. Staff
+confirmation remains an exact server-stored, actor-bound value contract;
+changing any confirmed contact field requires reconfirmation.
 
 **Why.** The old force-null path safely withheld a possibly wrong email but
 still created a selected name-only row, which made retention look like a
@@ -308,6 +318,13 @@ foundation POLICY conflict, **hard-dropped by default on BOTH discovery tracks**
   signals, or insufficient evidence all stay hard-dropped. Flagged rows carry
   `hasInstitutionCOI=true` with `institutionCOIDetails.dropDecision='flagged'`; they are not
   selectable in the Find UI and are still rejected by the save route.
+- **Separate Broad/HHMI exemption.** Curated identity/name matches for the Broad Institute or
+  Howard Hughes Medical Institute are classified `exempt` only when that institute is the sole
+  shared institutional overlap. The candidate remains visibly marked with
+  `hasInstitutionCOI=true` and `institutionCOIExempt=true`; save honors the explicit
+  `dropDecision='exempt'` rather than treating that overlap alone as a hard drop. A separate
+  direct institution match takes precedence. The client still applies its own `hasInstitutionCOI`
+  selection gate, so this COI classification does not itself make the row selectable.
 - **Matcher precision.** The COI path uses `DeduplicationService.institutionsMatchForCOI`, not the
   looser generic `institutionsMatch`. COI matching now compares shared OpenAlex/ROR institution ids
   first when both sides carry ids, keeps exact-normalized / abbreviation-expanded / exact key-word
@@ -318,14 +335,14 @@ foundation POLICY conflict, **hard-dropped by default on BOTH discovery tracks**
   candidate loop, so save-time COI screening uses trusted request/applicant/PI institution context
   and fails closed with a 503 `ServiceHttpError` if a valid applicant-account alias set cannot be
   loaded after retry. The save path computes persisted contact fields, calls
-  `lookupReviewerIdentity`, then HARD-REJECTS before any `wmkf_potentialreviewer`,
-  researcher-overlay, or suggestion upsert when any of these are true: client top-level
-  `hasInstitutionCOI`, post-enrichment `contactEnrichment.coiRecomputed &&
-  contactEnrichment.hasInstitutionCOI`, or a fresh server recompute via
-  `DeduplicationService.institutionCOIDecision`. The recompute evaluates payload affiliation
-  signals and, when `lookupReviewerIdentity` returns a confident match, the server-known CRM
-  reviewer affiliation from `match.context.affiliation`. Rejections increment
-  `rejectedInstitutionCOI`; 422 still applies when the whole batch is COI/unresolved.
+  `lookupReviewerIdentity`, and screens payload affiliation signals plus, on a confident match,
+  the server-known CRM reviewer affiliation from `match.context.affiliation`. Before any
+  `wmkf_potentialreviewer`, researcher-overlay, or suggestion upsert, it hard-rejects a non-exempt
+  fresh server decision or an unrefuted client/post-enrichment COI flag. A server-recomputed
+  Broad/HHMI-only `exempt` decision suppresses those COI hard-reject checks; it does not bypass
+  earlier evidence requirements or the client's separate `hasInstitutionCOI` selection gate.
+  Rejections increment `rejectedInstitutionCOI`; 422 still applies when the whole batch is
+  COI/unresolved.
 - **Retired.** Historical / former-shared institution COI is RETIRED — `markInstitutionCOI` is
   current-affiliation only; `institutionCOIDetails.historical` is gone. `affiliationHistory` is
   still produced but COI-inert (deferred dead-code). The SOFT flag survives only on the
@@ -525,8 +542,8 @@ switched to request B.
 
 | # | Contract | Primary enforcement point |
 |---|----------|---------------------------|
-| 1 | Slice-E client/server asymmetry | `save-candidates-service.js` (`isUnresolvedIdentity`, `saveCandidates`) + `reviewer-provenance.js` (`provenanceGroupOf`) |
-| 2 | PI-named/cited/referred exemption + force-null | `save-candidates-service.js` (`contactBlockedForUnresolvedExempt`, `saveCandidates`; kinds: `reviewer-provenance.js` `isIdentityReviewExemptProvenance`) |
+| 1 | Shared ready-only Find selection and server recomputation before person/suggestion writes | `reviewer-search-logic.js` (`isCandidateSelectable`) + `reviewer-vetted-email.js` (`projectReviewerContact`) + `save-candidates-service.js` (`saveCandidates`) |
+| 2 | PI-named/cited/referred retention without name-only promotion | `save-candidates-service.js` (`isUnresolvedIdentity`, `saveCandidates`; kinds: `reviewer-provenance.js` `isIdentityReviewExemptProvenance`) + `reviewer-vetted-email.js` (`projectReviewerContact`) |
 | 3 | Invite-confidence allowlist | `reviewer-invite.js` (`emailConfidence`) + `send-emails-service.js` |
 | 4 | Structured-PI role-source conflict; identity checks do not validate role | `proposal-pi-identity.js` (`resolveProposalPI`) + `reviewer-identity-evidence.js` (`forenamesContradict`) |
 | 5 | S240 institution COI default hard drop + flagged exception | `save-candidates-service.js` + `discover.js`/`DiscoveryService` (`partitionConflicts`) + `reviewer-roster-store.js` (`recordCoiDropped`) |
