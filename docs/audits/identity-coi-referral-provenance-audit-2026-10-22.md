@@ -137,8 +137,10 @@ per-sentence census. Unread or untraced readers remain in the backlog below.
    partial-save and transport recovery, send/materials eligibility closure, and
    all raw acknowledgement/provenance field readers remain only partially traced.
    Confirm excluded-disposition producer coverage before declaring it absent.
-5. **P1 — action-specific read-only exceptions.** Awardee Preview/Copy/Export
-   remains the next separate backlog area after these safety findings.
+5. **P1 — action-specific read-only exceptions.** The subsequent
+   [Awardee audit](awardee-read-only-exceptions-audit-2026-10-22.md) records the
+   bounded Preview/Copy/Export trace and follow-ups. Other actions still require
+   their own handler/persistence evidence; this is not a universal exemption.
 6. **P2 — acknowledgement parity.** Retain the owner's minor priority. A future
    render-bound reviewer token/body-hash change requires schema, Atlas, consumer
    and failure-path review. No schema work is authorized by this documentation pass.

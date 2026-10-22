@@ -63,4 +63,12 @@ re-implementing the predicate client-side, which is only the second-best fix and
 the one the two failures above needed.
 
 The other affordances on that tab (Preview email, Copy website HTML, Cycle
-export) are read-only and need no gate — checked, not assumed.
+export) need no **deliverable-lifecycle** gate: they do not send the invitation,
+mint its live token, or change package lifecycle. This is not an authentication
+or restriction exception. Their routes retain app access, input validation, and
+their established Dynamics restriction context; POST preview also retains the
+app guard's Origin check. “Read-only” describes business-state writes at those
+route boundaries, not every browser effect: the UI can render a preview, copy
+HTML to the clipboard, or initiate an export. Do not generalize this note to
+every Awardee-tab action; save, send, generate, and replacement paths have their
+own server guards.
