@@ -33,3 +33,14 @@ test('route and server flag must both match before global providers are skipped'
   rerender(<App Component={() => <p>Page</p>} pageProps={{ rehearsalEnabled: true }} />);
   expect(screen.getByTestId('require-auth')).toBeInTheDocument();
 });
+
+
+test('request rendering preserves page initial props through the shared App loader', async () => {
+  const Page = () => null;
+  Page.getInitialProps = jest.fn(async (ctx) => ({ workspace: ctx.query.workspace }));
+  const ctx = { pathname: '/admin', query: { workspace: 'people' } };
+  await expect(App.getInitialProps({ Component: Page, ctx })).resolves.toEqual({
+    pageProps: { workspace: 'people' },
+  });
+  expect(Page.getInitialProps).toHaveBeenCalledWith(ctx);
+});

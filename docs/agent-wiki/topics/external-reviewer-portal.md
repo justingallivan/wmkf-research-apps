@@ -429,7 +429,8 @@ Playwright E2E harness, and the live prod automation that an accept triggers.
   checklist this session had to rediscover.
 - **E2E harness runs against a real build, not `next dev`.** The Playwright
   reviewer-portal harness (`tests/e2e/`, `npm run test:e2e`) mocks the data layer and
-  runs against `next build --webpack && next start` — NOT `next dev`. It is CI-gated
+  runs against `next build && next start` using deployed Turbopack — NOT `next dev`
+  or the webpack fallback. Install locked dependencies in the checkout. It is CI-gated
   by `.github/workflows/e2e.yml`. Setup + mock conventions: `tests/e2e/README.md` and
   memory `project-e2e-playwright-harness`.
 - **External reviewers get scoped file access.** Confirm the access path and

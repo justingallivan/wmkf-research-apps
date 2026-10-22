@@ -1,3 +1,4 @@
+import NextApp from 'next/app'
 import Head from 'next/head'
 import { Analytics } from '@vercel/analytics/next'
 import { useRouter } from 'next/router'
@@ -64,3 +65,10 @@ export default function App({ Component, pageProps: { session, ...pageProps } })
     </SessionProvider>
   )
 }
+
+// Pages covered by the proxy need its request-specific CSP nonce. Automatic static
+// optimization renders Document without a request and freezes nonce="" into
+// HTML; Turbopack's inline startup then cannot run under that policy. Keep
+// pages request-rendered so Document can use the matching x-nonce. Delegating
+// preserves page-level initial props and existing getServerSideProps behavior.
+App.getInitialProps = async (appContext) => NextApp.getInitialProps(appContext)
