@@ -1,7 +1,7 @@
 ---
 agent_wiki: topic
 status: active
-last_verified: 2026-09-15
+last_verified: 2026-10-22
 stale_after_days: 90
 owner: product-strategy
 source_files:
@@ -9,7 +9,6 @@ source_files:
   - docs/SYSTEM_MODEL.md
   - docs/DATAVERSE_SHAREPOINT_FILE_MODEL.md
   - DEVELOPMENT_LOG.md
-  - SESSION_PROMPT.md
   - docs/GROUP_B_WRITEUP_SPINE_DESIGN.md
   - docs/audits/AUDIT_REQUEST_WORKBENCH_TRUTH_2026-07-26.md
   - docs/REQUEST_WORKBENCH_NEAR_TERM_EXECUTION_PLAN.md
@@ -33,7 +32,6 @@ watch_paths:
   - docs/CURRENT_WORK_QUEUE.md
   - docs/SYSTEM_MODEL.md
   - DEVELOPMENT_LOG.md
-  - SESSION_PROMPT.md
   - docs/**/*ROADMAP*.md
   - docs/GROUP_B_WRITEUP_SPINE_DESIGN.md
   - benchmarks/compact-ror-index/**
@@ -57,7 +55,31 @@ and broad AI capability planning.
 Start with `docs/CURRENT_WORK_QUEUE.md` for ordered commitments. The catalog is a
 document inventory, and individual implementation plans do not establish priority.
 
+## Current direction and owner holds
+
+- **Final writeups dashboard:** cycle scoping, review views, bookmarkable PD filtering,
+  and publication-version context are implemented and have dated September 2026
+  release/smoke evidence. Queue item 5 is a completed release record, not a current
+  recommendation to build filters. This pass verified source/merge ancestry, not current
+  Production configuration.
+- **Reviewer materials on acceptance:** still planned for J27, not built. The D26
+  materials-release modal is manual; Stage 6B3 is not an automated acceptance-triggered
+  send. J27 proposals are expected in December 2026 and reviewer invitations in 2027.
+  Follow queue item 6 and `project-accepted-awaiting-materials-is-transient`.
+- **S2AFF:** retained as a possible comparator after the prior skip recommendation was
+  withdrawn, but it is not an active queue commitment or execution authorization. Owner
+  decision and a pinned Python environment are prerequisites.
+- **Applicant-materials and briefing roadmap:** use the current work queue and their
+  implementation plans for shipped boundaries and residuals. The dated entries below
+  preserve research history and must not be treated as current build instructions.
+
 ## Durable Memory
+
+The following subsections preserve benchmark figures, corrected conclusions, owner
+decisions, and implementation evidence from their original dates. Current direction and
+work priority are summarized above and in the canonical queue.
+
+### Dated reviewer-matching research and decision history
 
 - **Reviewer matching sequencing (S403, 2026-08-06):** the Find-tab candidate-card
   redesign AND the containment-first institution comparison fix are both downstream of
@@ -69,7 +91,7 @@ document inventory, and individual implementation plans do not establish priorit
   `outputs/fuzzy-matching-owner-answers-2026-08-06.md`: no near-zero precision floor
   (union-over-ambiguity COI with human adjudication instead of suppression); review
   volume tolerated not accepted (cut per-item cost; owner suggested a Google-search-link
-  affordance, unbuilt); ROR namespace YES; falsification suite approved as next work /
+  affordance, built in the 2026-08-07 merge below); ROR namespace YES; falsification suite approved as next work /
   representative benchmark parked; all concurrent affiliations shown and COI-screened,
   recency-ranked; contact status is a dated evidence ledger, no binary verified flag.
   Falsification suite BUILT S405 and the incumbent baseline FROZEN the same session
@@ -107,12 +129,13 @@ document inventory, and individual implementation plans do not establish priorit
   rewriting v1. Evidence limit: the
   institution slice is 15 real / 126 synthetic and ALL 64 unsafe resolutions are
   synthetic — the mechanism transfers to production (the S400 shape), the
-  magnitude does not. **Comparator #2 (S2AFF) IS ON THE QUEUE — the earlier
-  "skip it" recommendation was WITHDRAWN in review.** S2AFF is parse →
+  magnitude does not. **Comparator #2 (S2AFF) remained a candidate after the earlier
+  "skip it" recommendation was withdrawn; it is not an approved active queue item.** S2AFF is parse →
   high-recall ROR retrieval → LightGBM rerank → margin-based abstention, the
   closest existing analogue to the scorer we intend to build, so it is the most
-  informative remaining comparator, not the least. Needs a pinned Python
-  3.10/3.11 venv (local is 3.14, no uv/pyenv) and its own session.
+  informative remaining comparator, not the least. Any run requires an owner decision,
+  a pinned Python 3.10/3.11 environment, and a separate bounded session; the dated local
+  environment note below is not a current setup assertion.
   **CODEX OWNS THE INSTITUTION-RESOLUTION MODEL from 2026-08-07 (owner
   decision).** Claude's runtime/deployment assessment was superseded by
   adversarial review (needs-attention, five findings accepted); the
@@ -232,16 +255,18 @@ document inventory, and individual implementation plans do not establish priorit
   and hazards in `project-reviewer-card-simplification-direction`; S395 scope-accretion
   caution applies; high-risk automation stays review-only until the representative
   benchmark exists.
-- Current priorities: `docs/CURRENT_WORK_QUEUE.md`. **Queue item 5 (added 2026-09-06, owner-directed,
-  prioritized first): Final writeups dashboard completion — build the Editor Dashboard contract
-  filters and server-side cycle scoping, retire inline preview, keep residuals; Slice 6 of
-  `docs/FINAL_WRITEUP_REVIEW_IMPLEMENTATION_PLAN.md`; 6A cycle scoping in Production since 2026-09-06 (merge `842c9f13`, deployment `dpl_2xuEv64c5NQVXEhA3rSXZRQQaWPa`, owner-run signed-in smoke passed).** **Queue item 6 added 2026-09-06
-  (owner-directed, not started, plan-first): automated materials-on-acceptance email for
-  the December 2026 cycle** — on acceptance + onboarding the system emails the reviewer a
-  materials link; nothing does this today (materials go out only via the PD release modal).
-  Decision context: `project-accepted-awaiting-materials-is-transient`. **Review-DOCX release complete
-  2026-09-03:** the formatting work is Production-live at `3101f067` in Ready
-  deployment `dpl_AjT5FeDh5wkdeFSoZWJsVDM5oBqs`.
+### Dated implementation and owner-decision history
+
+The entries below are historical implementation and release snapshots. Use
+`docs/CURRENT_WORK_QUEUE.md` for current priorities. Queue item 5 records the
+Final Writeup dashboard's implemented contract and dated 2026-09-06–07 release
+smokes; it does not call for another filter build. Queue item 6 remains plan-first
+and not built: the J27 automated materials-on-acceptance email. Its timing and
+manual-modal boundary are summarized above. The detailed reviewer lifecycle and
+release evidence below is retained as history.
+
+Review-DOCX release complete 2026-09-03: the formatting work is Production-live
+at `3101f067` in Ready deployment `dpl_AjT5FeDh5wkdeFSoZWJsVDM5oBqs`.
   The existing Reviews-tab action remains one combined, server-authoritative
   download, and the thank-you sweep produces the separate individual courtesy
   attachment. No SharePoint export registry/upload is part of this phase. New
@@ -312,8 +337,9 @@ document inventory, and individual implementation plans do not establish priorit
   entries below describe the pre-merge two-tab UI; their document-lifecycle
   guarantees are unchanged. (Rail superseded by PC Meeting Tracker slice 3,
   2026-09-09 — four keyed stops with admin-editable labels; see
-  `docs/PC_MEETING_TRACKER_PLAN.md` §7.) Design record: the Site Visit
-  Workspace proposal artifact (link in `SESSION_PROMPT.md`).
+  `docs/PC_MEETING_TRACKER_PLAN.md` §7.) A prior session handoff linked a
+  Site Visit Workspace proposal artifact; that link is not available in the
+  current workspace.
 - **Curated Site Visit recipient directory (S468, 2026-08-29, production):**
   superusers curate at most 50 active app-staff/existing-Contact references for
   the materials composer's Consultant/Board menu. The Dataverse setting stores
@@ -458,7 +484,9 @@ document inventory, and individual implementation plans do not establish priorit
   route, while the legacy retained PDF route still uses
   `createSummarizationPrompt()`.
 - Frozen Pre-Site distribution (**owner-decided and Production-proved
-  2026-08-24 on Request `1002379`**; since Pre-RP Brief slice 4, **[BUILT on `claude/pre-rp-brief` — not merged, not deployed]**, the distributed document is the Pre-Research Presentation Brief, not the Pre-Site writeup — `docs/plans/PRE_RESEARCH_PRESENTATION_BRIEF_PLAN_2026-09-16.md`): the send is explicit and
+  2026-08-24 on Request `1002379`**; Pre-RP Brief slice 4 is now on `main` in the
+  PR #307/#308/#309 merge history; queue item 12 records the dated 2026-09-17
+  release smoke; the distributed document is the Pre-Research Presentation Brief, not the Pre-Site writeup — `docs/plans/PRE_RESEARCH_PRESENTATION_BRIEF_PLAN_2026-09-16.md`): the send is explicit and
   informational, never a handoff side effect. It first retains an exact Word
   snapshot, optionally derives PDF from that immutable item, and lets staff
   attach DOCX, PDF, or both. Recipients are known staff/consultants entered by
@@ -581,31 +609,17 @@ document inventory, and individual implementation plans do not establish priorit
   from the v2-capable Production deployment proved the stored v1 setting also
   contained a six-person Southern California audience. The 2026-09-01 UTC v2
   migration preserved both audiences exactly at ETag `W/"96944113"`.
-- Calendar direction (owner-confirmed 2026-07-28): the first gate is a
-  human-in-the-loop, end-to-end Initial Assessment pilot, originally targeted at
-  2026-08-10, before proposals begin arriving around 2026-08-18. **The 2026-08-10
-  date was a deliberately early internal buffer, not an external commitment
-  (owner, 2026-08-10 / S412), and has passed unmet with the administrator evidence
-  still outstanding — expected, not slippage. Do not treat it as a live deadline;
-  the work-queue row 1 completion decision is the real gate.** The 2026-07-29 environment
-  decision is a controlled production rehearsal using colleague-created
-  representative dummy requests; building the existing Dataverse sandbox
-  organization into an integrated application/file test environment is out of
-  scope. Authorized staff inspect and edit the canonical SharePoint Word file
-  and find/open the same registered artifact in both the Workbench and
-  cycle-wide pilot locator. The pilot also exercises a safe failure/retry
-  path. It is draft-functional proof, not broad production readiness, and does
-  not require the later lifecycle tabs. Request `1002788` is the authorized
-  mechanics pilot target; generation and exact retry passed, but its old
-  Phase I source invalidated semantic proof. Request `1003109` then
-  production-proved canonical input, exact-input reuse, new-run lineage, and
-  interrupted-finalization recovery using the same row/run/item/version.
-  Attributed substantive editing then passed on the same stable item through
-  both consumers. Response-only current-version refresh is deployed and
-  live-verified in both consumers on Request `1003109` via deployment
-  `dpl_HhiYXVFAtsGMwjU9UDcKz22AfvR2`; native version restore and first-stage
-  recycle recovery now pass, while administrator policy/access evidence and
-  product history/milestone controls remain open. See the near-term plan.
+- **Historical calendar and pilot direction (owner-confirmed 2026-07-28):** the
+  first human-in-the-loop Initial Assessment pilot had an internal 2026-08-10
+  buffer before the expected 2026-08-18 proposal arrivals. The owner explicitly
+  said the buffer was early and not an external commitment (2026-08-10 / S412);
+  it is not a current deadline or queue item. The 2026-07-29 environment choice
+  was a controlled Production rehearsal with colleague-created representative
+  requests, not an integrated sandbox application/file environment. The dated
+  Request `1002788` and `1003109` rehearsal results and owner-gated restore and
+  Board-snapshot proof are preserved in
+  `.claude-memory/project-j27-doc-capture-history.md`; consult the current
+  queue and transition register for present sequencing and release authority.
 - **2026-09-07 note (J27: J27-051):** the 2026-08-18 date above was the D26
   Phase II proposal due date, not J27 intake. J27 proposals arrive in early
   December 2026, exact date TBD (owner, 2026-09-06). See
@@ -627,5 +641,5 @@ document inventory, and individual implementation plans do not establish priorit
 ## Standard Probe
 
 ```bash
-rg -n "roadmap|phase|cycle|interim|post-award|proposal extract|review pipeline|EIN" docs .claude-memory SESSION_PROMPT.md DEVELOPMENT_LOG.md
+rg -n "roadmap|phase|cycle|interim|post-award|proposal extract|review pipeline|EIN" docs .claude-memory DEVELOPMENT_LOG.md
 ```

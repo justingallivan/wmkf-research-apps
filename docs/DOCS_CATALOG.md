@@ -495,6 +495,6 @@ related:
 | [FINAL_WRITEUP_REVIEW_IMPLEMENTATION_PLAN.md](FINAL_WRITEUP_REVIEW_IMPLEMENTATION_PLAN.md) | plan | active |  | Final runtime, staffing, lenses, and dashboard Slices 6A–6C are live; completed reviews stay green after edits with original review version/date. | 2026-08-28 |
 | [FINAL_WRITEUPS_DASHBOARD_CYCLE_SCOPING_PLAN.md](FINAL_WRITEUPS_DASHBOARD_CYCLE_SCOPING_PLAN.md) | plan | active |  | Scopes the Final writeups dashboard read model to one grant cycle before the global row bound fails the page; PD lens retention decided. | 2026-09-06 |
 | [FINAL_WRITEUPS_DASHBOARD_VIEWS_AND_VERSION_PLAN.md](FINAL_WRITEUPS_DASHBOARD_VIEWS_AND_VERSION_PLAN.md) | plan | active |  | Final Writeups opens on Needs my review with two alternate views and a PD filter; completed reviews stay green after edits. | 2026-09-06 |
-| [PC_MEETING_TRACKER_PLAN.md](PC_MEETING_TRACKER_PLAN.md) | plan | active |  | Production-live PC app for deliberation sessions, proposal slots, site visits, and agenda email preparation; Wave 28 is exact and the readiness flag is on. | 2026-09-09 |
+| [PC_MEETING_TRACKER_PLAN.md](PC_MEETING_TRACKER_PLAN.md) | plan | active |  | Implemented PC app for sessions, proposal slots, site visits, and agenda email; see dated release evidence below. | 2026-09-09 |
 | [WORKBENCH_WRITEUP_LIFECYCLE_PLAN.md](WORKBENCH_WRITEUP_LIFECYCLE_PLAN.md) | plan | active |  | Pre-Site/Site Visit lifecycle, Final acknowledgement, dashboard, and persona lenses are live; leadership-review transition Production-live since 2026-09-07. | 2026-08-17 |
 

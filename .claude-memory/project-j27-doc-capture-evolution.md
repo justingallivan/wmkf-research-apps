@@ -4,7 +4,7 @@ description: The D26 Proposal tab displays its Phase I bridge plus files from Ph
 type: project
 status: active
 scope: strategy
-last_verified: 2026-08-30 via Production-deployed Initial Assessment controls, signed-in read smoke, and prior production evidence
+last_verified: 2026-10-22
 ---
 
 ## Recall Rule
@@ -53,9 +53,9 @@ will label and fingerprint both sources so cited authors can inform discovery.
 Its current-cycle resolver remains unchanged.
 **Owner 2026-09-09 (register J27-082):** D26 pre-site drafts are being generated for every advancing request by an owner-run script that depends on this exact path; in J27 the source file name and location *may* change, so the J27 planning must settle the source contract before designing the next-cycle auto-generation trigger (which will not be a script).
 
-**Filename-match is FRAGILE — but do NOT assert it "will break in J27."** (Corrected S265, Justin: the earlier "J27 will use new naming conventions / a different collection mechanism, so filename-match WILL break" claim was **unsubstantiated** — Connor pushed back on dropping filename-reconciliation on that premise. There is **no evidence** J27 changes naming; filename-match only breaks **if the names actually change**, which isn't established.) The real, durable case for moving OFF filename-match is **fragility + Dataverse legibility**, NOT a J27-will-break prediction: it depends on PDs naming files consistently/correctly, with **no structured fallback** when they don't. **Strongest argument:** if we **auto-generate writeups** in a future cycle, there is **nowhere structured to store them that the apps can read back** — a filename heuristic can't anchor a machine-produced doc that a PD may never (re)name correctly. Keep the D26 name→label map in one small per-cycle config; never hard-code D26 names as permanent (consistent with [[project-grant-phasing-evolution]]).
+**Filename-match is FRAGILE — but do NOT assert it "will break in J27."** (Corrected S265, Justin: the earlier "J27 will use new naming conventions / a different collection mechanism, so filename-match WILL break" claim was **unsubstantiated** — Connor pushed back on dropping filename-reconciliation on that premise. There is **no evidence** J27 changes naming; filename-match only breaks **if the names actually change**, which isn't established.) The durable case for moving OFF filename-match is **fragility + Dataverse legibility**, not a J27-will-break prediction: it depends on PDs naming files consistently/correctly. The earlier S258 claim that there was **no structured place** for app-readable generated writeups is historical and superseded: `wmkf_requestdocument` now provides a typed, durable document registry and documents are linked directly rather than filename-joined. That registry solves document identity and registration, but does not establish that future J27 writeup producers, capture triggers, or input contracts are built. Keep the D26 name→label map in one small per-cycle config; never hard-code D26 names as permanent (consistent with [[project-grant-phasing-evolution]]).
 
-**Initial Assessment pilot record (2026-07-29 → 2026-08-30) and the retired reviewer hold step** moved verbatim to [[project-j27-doc-capture-history]] (closed) on 2026-09-17. Live invariants to keep: documents are registered on the typed `wmkf_requestdocument` table and pointed at directly, never filename-joined; governed Word identity is the normalized-parts hash, never whole-package bytes; the restore and first-snapshot writes remain unexercised and need explicit owner authorization (deferred 2026-08-30 to a pre-J27-scale checkpoint); the Dataverse sandbox is not a test environment for this work.
+**Initial Assessment pilot record (2026-07-29 → 2026-08-30) and the retired reviewer hold step** moved verbatim to [[project-j27-doc-capture-history]] (closed) on 2026-09-17. Current invariants and boundaries: documents are registered on the typed `wmkf_requestdocument` table and pointed at directly, never filename-joined; governed Word identity is the normalized-parts hash, never whole-package bytes. The 2026-08-30 owner deferral of Initial Assessment restore and first exact-byte Board snapshot writes was a pre-J27-scale checkpoint decision; it is not proof that those writes have since been exercised. Keep native SharePoint previous-version restore/recycle-recovery proof distinct from app-controlled restore and Board-snapshot proof. The statement that the Dataverse sandbox is not a test environment records the D26 pilot decision and does not define current release authority; consult the current queue, J27 transition register, and applicable release plan for present authorization and environment scope.
 
 ## Sequencing / urgency (user, S258)
 
@@ -74,9 +74,9 @@ single-submission proposal gets one before advancement) and precedes reviewer id
 view moves left of Request list then and a Find reviewers view surfaces alongside it — plan that
 reorder as J27 product work.
 
-J27 design is a **large planning effort with many moving parts** that must **start soon after the bulk of the D26 Workbench work lands** — treat it as the next major planning push, not a someday item. J27 specifics (exactly what is collected up front, timing, final table shape) are **not yet decided** — re-confirm with Justin/Connor before building.
+The S258 sequencing note treated J27 as the next major planning push after the bulk of D26 Workbench work landed; that relative timing is historical. Current J27-sensitive work and owner questions are tracked in `docs/J27_TRANSITION_REGISTER.md` and the work queue. J27 specifics (exactly what is collected up front, timing, final table shape) remain unresolved; settle those with the owners before building.
 
-Ground truth: [VERIFIED 2026-08-01 via
+The following is dated pilot evidence, not a current environment probe: [VERIFIED 2026-08-01 via
 `shared/config/workbenchProposalDocuments.js`,
 `lib/external/reviewer-materials.js`,
 `lib/services/workbench-proposal-documents.js`,
@@ -85,5 +85,6 @@ Ground truth: [VERIFIED 2026-08-01 via
 deployment inspection, the Request `1002788` mechanics rehearsal, and the
 signed-in Request `1003109` generation/retry/recovery plus live lineage probes,
 and focused Reviewer Finder proposal-resolver tests].
-The typed registry is live and exercised; broader J27 applicant-capture
-producers and the partial-pilot blockers remain open.
+Source on `main` and later release receipts establish the typed registry contract;
+this documentation pass did not re-probe live environment state. Broader J27
+applicant-capture producers and the partial-pilot blockers remain open.

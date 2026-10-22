@@ -6,7 +6,7 @@ status: active
 summary: "Long-term product direction; current execution priority is owned by CURRENT_WORK_QUEUE.md."
 canonical: false
 cataloged: 2026-07-02
-last_verified: 2026-09-04
+last_verified: 2026-10-22
 owner: product-engineering
 related:
   - docs/SYSTEM_MODEL.md
@@ -18,7 +18,8 @@ related:
 
 # Where We're Headed
 
-**Last verified: 2026-09-04.** This document owns long-term direction and principles. The
+**Reconciled 2026-10-22 from source, Git ancestry, and dated release receipts; current live
+configuration was not re-probed.** This document owns long-term direction and principles. The
 ordered, current delivery agenda lives in `docs/CURRENT_WORK_QUEUE.md`; this document is not a
 backlog.
 
@@ -48,7 +49,10 @@ The workflow for reviewing applications is high-touch with manual tasks repeated
 
 AkoyaGO, as a Dynamics app, cannot directly display documents stored in SharePoint, requiring users to navigate between two systems for a single record. Information about individual applications lives in two places — Dataverse and SharePoint — with no unified view.
 
-### What the workflow looks like today
+### Historical workflow snapshot — manual D26 document handling
+
+This was the pre-integration workflow described during the early D26 planning;
+it is not a complete description of every current path.
 
 ```
 AkoyaGO → Export PDFs → Upload to apps → AI drafts → Download → Edit → Re-upload to AkoyaGO
@@ -291,30 +295,31 @@ Site Visit materials-recipient menu, and Graph-search/Operational Events error
 reliability are Production-live. The recipient directory is capped at 50 active
 staff/existing Contact references, never creates or edits Contacts, never
 auto-adds anyone to an email draft, and signals when a one-request search has
-more than 50 matches. See `SESSION_PROMPT.md` Session 468 and
-`DEVELOPMENT_LOG.md` for the release record.
+more than 50 matches. The current release record is
+`DEVELOPMENT_LOG.md`'s Session 468 entry; directory behavior is also described
+in `docs/CURRENT_WORK_QUEUE.md`.
 
 Power Automate automation, the general applicant-intake product, automated BILL
 onboarding, the post-cycle reviewer-reminders ledger, invitation-link
 strictness, and broader reviewer cleanup retain their dependency, cycle, or
 owner gates. None is an implied next step.
 
-**Scheduled, not started (owner-directed 2026-09-06):** the automated
-materials-on-acceptance email. For the December 2026 cycle, review materials
-will be in hand at request time, and on acceptance plus onboarding the system
-will email the reviewer a link to the materials with no PD action. Today
-materials go out only through the PD-driven release modal. This is a J27 (June
-2027 cycle) item: D26 acceptances have already happened (owner, 2026-09-06). Plan
-first, build when the current campaigns settle, live before the first J27 acceptance;
-sequence and boundary in `docs/CURRENT_WORK_QUEUE.md` item 6.
+**J27 owner-directed work, not built:** the automated materials-on-acceptance
+email. J27 proposals are expected in December 2026 and reviewer invitations
+follow in 2027. The intended send occurs after acceptance and onboarding once
+materials are ready; currently materials are sent through the PD-driven release
+modal. Plan and build before J27 reviewer invitations. Stage 6B3 hardened that
+manual modal and is not evidence of an automated send. Current scope and the
+dated owner correction are in `docs/CURRENT_WORK_QUEUE.md` item 6.
 
-**Prioritized ahead of it (owner-directed 2026-09-06):** completing the Final
-writeups dashboard against the Editor Dashboard contract. The dashboard is
-Production-live for Final artifacts; the owner kept the filters requirement
-(cycle, program/PD, stage, review state), retired inline preview, and kept the
-residuals. Cycle scoping was dated before D26 Final writeups exist because the
-list spanned all cycles under one hard 100-row cap; it is in Production since 2026-09-06 (merge `842c9f13`, deployment `dpl_2xuEv64c5NQVXEhA3rSXZRQQaWPa`, owner-run signed-in smoke passed). Plan: Slice 6 of
-`docs/FINAL_WRITEUP_REVIEW_IMPLEMENTATION_PLAN.md`; queue item 5.
+**Final writeups dashboard contract — implemented.** Cycle scoping, the three
+views, bookmarkable Program Director filtering, and publication-version context
+were released and signed-in-smoked in September 2026. The stage filter was
+dropped because stage is shown on each row; inline preview was retired in favor
+of opening Word. The owner closed the remaining 6D/6E ideas for D26. The dated
+release record and any future dashboard work are tracked in
+`docs/CURRENT_WORK_QUEUE.md` item 5. This document does not assert a fresh
+Production probe.
 
 ---
 

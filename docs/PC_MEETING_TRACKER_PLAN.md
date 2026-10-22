@@ -3,10 +3,10 @@ title: PC Meeting Tracker — Deliberation Sessions and Site Visits as the Sched
 domain: workbench
 kind: plan
 status: active
-summary: "Production-live PC app for deliberation sessions, proposal slots, site visits, and agenda email preparation; Wave 28 is exact and the readiness flag is on."
+summary: "Implemented PC app for sessions, proposal slots, site visits, and agenda email; see dated release evidence below."
 canonical: false
 cataloged: 2026-09-09
-last_verified: 2026-10-05
+last_verified: 2026-10-22
 owner: product-engineering
 related:
   - docs/plans/TRANSCRIPT_SUMMARY_UX_FIX_PLAN_2026-10-07.md
@@ -23,16 +23,19 @@ related:
 
 # PC Meeting Tracker — Deliberation Sessions and Site Visits as the Schedule of Record
 
-This document began as the 2026-09-09 Session 501 plan and now records the
-shipped implementation. Production Wave 28 is exact, the readiness flag is on,
-and the routes/UI are live; explicitly historical build notes remain dated.
-The October 7 UX corrections are separate branch work, not a deployment claim;
-see `docs/plans/TRANSCRIPT_SUMMARY_UX_FIX_PLAN_2026-10-07.md` for implementation and review status.
+This document began as the 2026-09-09 Session 501 plan and records the
+implemented Meeting Tracker contract. Its September 15 Wave 28 readback and
+September 29 post-presentation receipt are dated release evidence; this document
+pass did not re-probe current Production configuration. The October 7 transcript
+summary UX corrections are separate branch work; see
+`docs/plans/TRANSCRIPT_SUMMARY_UX_FIX_PLAN_2026-10-07.md` for their implementation
+and review status.
 
 ## 1. The process this serves (owner, 2026-09-09)
 
-Every advancing proposal now starts at **AI draft ready**: on 2026-09-09 an owner-run batch
-generated a Pre-Site Visit Word draft for all 23 advancing D26 requests
+At the time of the 2026-09-09 design decision, advancing D26 proposals started at
+**AI draft ready**: an owner-run batch generated a Pre-Site Visit Word draft for all 23
+advancing D26 requests
 `[VERIFIED via outputs/pre-site-drafts-D26.json: 21 generated, 2 reused, 0 errors]`. After the
 PD shares that draft (the existing guarded lock, lifecycle Review), two meetings follow:
 
@@ -44,12 +47,12 @@ PD shares that draft (the existing guarded lock, lifecycle Review), two meetings
 2. **The site visit.** Scheduled in advance by the Program Coordinator (PC; today Duncan Spore),
    who already knows dates, times, and attendees.
 
-Today neither meeting is visible on the Staff Deliberations tab or the cycle view, and the
-only place a visit is recorded is a Dataverse Activity that someone keys in directly. The
-owner's direction: build a **PC meeting tracker** — its own app — where the PC sees every
-advancing proposal and attaches both meetings to it. That record is the schedule of record;
-the rail and the cycle view read it; when a meeting moves, the PC moves it once and the PD
-does nothing.
+At the time of this design decision, neither meeting was visible on the Staff
+Deliberations tab or cycle view, and staff entered visits directly as Dataverse
+Activities. The owner-directed response was a separate PC Meeting Tracker app
+that owns session and slot scheduling, edits the existing visit Activity, and
+feeds the rail and cycle view. The implementation and later release status are
+recorded in §3 and §7.
 
 ## 2. Owner decisions (2026-09-09)
 
@@ -58,7 +61,7 @@ does nothing.
 | D1 | The tracker is **its own app** in the registry, not a Workbench view. The Workbench is PD-centric; this is a different job. Anyone granted the app in Admin sees it (vacation cover is a grant). | New `appRegistry` entry; new page namespace; access via the existing grant table. |
 | D2 | **Site visits stay on the existing `wmkf_sitevisit` Activity.** The tracker becomes the editor that record lost on 2026-08-28. Deliberation sessions are a **new** record. | No migration of the calendar invite, recipients, or materials linking. One new schema wave. |
 | D3 | Sessions are **squishy by design**: one date/time/duration with N ordered slots; a request may hold slots in more than one session; the rail reads the **latest** slot; 90 minutes and 15 minutes are defaults, not limits (over-full is a quiet warning, never a refusal). | Slot is its own row with a request lookup; no uniqueness constraint on request. |
-| D4 | **Grant means edit.** The org-open posture applies (see `project-reviewer-org-open-access-by-design`); the grant controls dashboard visibility, not authority. No PC role. Every write is stamped with the acting user. | One server-side write gate ("holds the grant") that can later tighten without UI change. |
+| D4 | **Grant means edit.** The org-open posture applies (see `project-reviewer-org-open-access-by-design`); a `meeting-tracker` app grant gates the app. There is no separate PC-specific authorization role. Every write is stamped with the acting user. | One server-side app-grant write gate ("holds the grant") that can later tighten without UI change. |
 | D5 | **"Shared" means locked** (the Start-sharing transition to lifecycle Review), not "first email sent". "Not yet sent" is a substate. | Rail stop 2 keys on lifecycle; distribution is a substate. |
 | D7 | **"Visited" is date-derived.** The visit happened when the Activity's scheduled start is in the past. No confirmation, no Word-version signal. If the PC moves the date, the rail follows. | Stop 3 reads one field; no new status, no write. |
 | D8 | **Every advancing D26 request gets a site visit.** Visits are scheduled before the reviews are in this cycle, so "no visit scheduled" is a PC to-do and the cycle view counts it. **J27 changes this:** proposals may go out for review and then not be visited, so stop 3 must be allowed to be absent next cycle. Build the D26 assumption behind one predicate, not scattered. | One `visitExpected(request)` predicate, D26 = always true; a J27 register row binds it. |
@@ -75,7 +78,11 @@ Two earlier decisions are **superseded in part** and must be read with this plan
   Read as "not in that plan's release", not "not at all". That plan assumes a visit is already on
   the Activity when materials collection starts; this tracker is what puts it there.
 
-## 3. Current state (all [VERIFIED 2026-09-09 via source])
+## 3. Implemented state and dated release evidence
+
+The source details below are the current code contract where cited. Production
+claims are tied to their dated receipts and were not freshly probed in this
+documentation pass.
 
 - **The Activity.** `wmkf_sitevisit`, entity set `wmkf_sitevisits`, one active per request, bound
   by `regardingobjectid`. Standard Activity fields (`scheduledstart`, `scheduledend`,
@@ -95,7 +102,7 @@ Two earlier decisions are **superseded in part** and must be read with this plan
 - **The readers.** `useSiteVisitContext` reads the Activity headlessly for the materials composer
   (calendar `.ics`, linked materials, suggested recipients). A visit created directly in Dynamics
   has no reference map; the read projection falls back to manual refs from ActivityParty emails.
-- **The rail today.** `StaffDeliberationsTab.js` derives Draft → Share → Wrap Up; Wrap Up is
+- **Original rail before slice 3 (superseded 2026-09-09).** `StaffDeliberationsTab.js` derived Draft → Share → Wrap Up; Wrap Up was
   derived from the first transport-accepted materials send (`currentSourceEverSent`), and the
   tab renders **no visit date at all**. The 2026-09-09 cycle view (`StaffDeliberationsPanel.js`)
   shows registry lifecycle/operation only. (Superseded by slice 3, 2026-09-09; see §7.)
@@ -106,43 +113,40 @@ Two earlier decisions are **superseded in part** and must be read with this plan
   runtime and UI are live.
 - **[PRODUCTION-LIVE 2026-09-29; VERIFIED via the
   [Production receipt](plans/evidence/post-presentation/production-bounded-2026-09-29.md).]**
-  Production Dataverse Wave 30 is applied, schema readiness is `on`, and
-  `POST_PRESENTATION_MATERIALS_ACCESS` is `on` (general access) at deployment
-  `dpl_Gw8dTzcA1JaUc2ifQjbzbBe7wCoT`. Destructive cleanup is a separate control. The Preview
-  history below is retained as the pre-release record. Recording, transcript, and transcript-summary have
-  governed producers under the post-presentation rollout gates. The current visit
-  card exposes browser-direct MP4 upload, Pause/Resume, Finish saving, Cancel, Retry upload,
-  and independent 60-day Board presentation-link Copy/Reissue controls; Zoom URL and transcript
-  staff inputs passed a bounded signed-in Preview save/finalize/readback on synthetic sandbox
-  Request `1000350`. A later signed-in recipient Preview run showed the two current materials,
-  redirected to the synthetic Zoom URL, downloaded the transcript, and proved old-link rejection
-  after reissue. Real Zoom playback and anonymous private-window viewing remain unproved because
-  the synthetic recording does not exist and Vercel protection sent Safari Private Browsing to
-  sign-in. The Staff Deliberations tab reads the current three slots. Shared Postgres migration 055 was
-  applied, while the Dataverse Wave 30 test was sandbox-only. The bounded Preview test window
-  is closed and presentation access is off there. See the presentation-materials plan
-  for the Production release record and the offline-tested staff Cancel/Retry controls.
+  Production Dataverse Wave 30 was applied, schema readiness was `on`, and
+  `POST_PRESENTATION_MATERIALS_ACCESS` was `on` (general access) at deployment
+  `dpl_Gw8dTzcA1JaUc2ifQjbzbBe7wCoT`; this is dated Production evidence, not a
+  current configuration probe. Destructive cleanup is a separate control. The
+  following interaction details are from the earlier, bounded Preview test window:
+  the visit card exposed browser-direct MP4 upload, Pause/Resume, Finish saving,
+  Cancel, Retry upload, and independent 60-day Board presentation-link Copy/Reissue
+  controls; Zoom URL and transcript inputs passed signed-in Preview save/finalize/readback
+  on synthetic sandbox Request `1000350`. A later Preview recipient run showed both
+  materials, redirected to the synthetic Zoom URL, downloaded the transcript, and
+  proved old-link rejection after reissue. Real Zoom playback and anonymous private-window
+  viewing remained unproved in that Preview exercise. Shared Postgres migration 055 was
+  applied. The bounded Preview window is closed and presentation access is off in Preview;
+  these Preview facts do not change the separate Production release receipt above. See the
+  presentation-materials plan for dated Production evidence and the offline-tested
+  staff Cancel/Retry controls.
 
-## 4. The conflict the build must resolve first
+## 4. Resolved design conflict — slice 0
 
-`assertActiveStage` makes the Activity unwritable until the draft is shared. The process is the
-other way round: the PC schedules the visit weeks ahead, while the PD is still editing. The gate
-was appropriate when the only writer was the PD's Site Visit tab; it is wrong for a PC surface.
+The original conflict was that `assertActiveStage` made the Activity unwritable
+until the draft was shared, although the PC schedules the visit earlier. Slice 0
+resolved it by replacing the stage precondition with the request precondition.
 
-**Decision for the build:** replace the stage precondition with a **request precondition** — the
-request must be an advancing request in a cycle with a meeting date (the same visibility
-predicate the Request list uses, `shared/config/workbenchVisibility.js`). Keep every other
-guard: actor required, readiness flag, one active visit, ETag fence, server-side recipient
-resolution. The Workbench route keeps working unchanged; the tracker's route is a sibling that
-calls the same service.
+**[SOURCE ON MAIN; slice 0 built 2026-09-09.]** Writes require an advancing
+request in a cycle with a meeting date, plus actor, readiness, one-active-visit,
+ETag, and server-side recipient checks. Reads remain available if the request
+later leaves the advancing state. The Workbench and tracker use the shared
+logistics service.
 
-**Built 2026-09-09 on `claude/site-visit-schedulable-gate` (slice 0).** Review note (Opus): the gate applies to the **write** path only; `getSiteVisitLogistics` is not gated on schedulability, so a visit recorded while a request was advancing stays readable (calendar invite, materials) after a later triage change.
-
-## 5. Target model
+## 5. Implemented contract and source map
 
 ### 5.1 App
 
-- `appRegistry` entry, key `meeting-tracker` (placeholder; rename freely before build), name
+- `appRegistry` entry, key `meeting-tracker`, name
   "Meeting Tracker", href `/meeting-tracker`, category `phase-ii`. Grant through the existing
   Admin app-access panel.
 - One list page per cycle: every advancing request (Request-list predicate), one row each, showing
@@ -177,31 +181,31 @@ calls the same service.
   Only the Tracker GET requests these contact suggestions; the Workbench logistics GET keeps its
   existing visit-and-materials response without the extra Dataverse reads.
 
-### 5.2 Schema (new wave, `kind: new-entity`)
+### 5.2 Schema (Wave 28; dated Production readback in §3)
 
 Two tables, Dataverse, following the wave conventions under `lib/dataverse/schema/`:
 
 - `wmkf_deliberationsession`: `scheduledstart`, `scheduledend` (or duration), `wmkf_ianatimezone`,
   `wmkf_locationorlink`, `wmkf_meetinglink` (owner, 2026-09-09: the PC saves the Zoom link here;
   the Share email carries it the way it carries the site-visit calendar entry, see §5.6),
-  `wmkf_notes`, status (planned / held / cancelled). Attendees: **decide in
-  the build** between ActivityParty (make it an Activity, visible on timelines) and a reference map
-  like `wmkf_attendeerefsjson` (simpler, already has a resolver). Recommendation: a plain table with
-  the reference map; a session is not "regarding" one request, so the Activity timeline gains little.
+  `wmkf_notes`, status (planned / held / cancelled). Attendees use the implemented
+  server-owned reference map: the admin-configured staff list plus per-session Board
+  members (owner decision D10; reader and writer source paths are recorded below).
 - `wmkf_deliberationslot`: N:1 to session, N:1 to `akoya_request`, `wmkf_order` (int),
   `wmkf_minutes` (int, default 15), N:1 lead PD (`systemuser`), `wmkf_notes`. **No** uniqueness
   on request (D3).
 
-Both carry the Wave 24 explicit-actor convention if the build finds it applies (check
-`lib/services/request-document-actor-service.js` for the pattern before copying it).
+Both session and slot records use explicit Updated By actor lookups. Wave 28's
+Production readback and readiness status are dated in §3; a current environment
+readback is not claimed here.
 
 ### 5.3 Writers
 
 | Write | Path | Guard |
 |---|---|---|
 | Site visit create/edit | tracker route → `saveSiteVisitLogistics` (stage gate replaced, §4) | grant + actor + readiness + one-active + ETag |
-| Session create/edit/cancel | new service | grant + actor + ETag |
-| Slot add/move/reorder/remove | new service; a move is a PATCH of the session lookup and order | grant + actor + ETag on the slot; an over-full session warns in the response, never refuses |
+| Session create/edit/cancel | Meeting Tracker session service | grant + actor + ETag |
+| Slot add/move/reorder/remove | Meeting Tracker slot service; a move patches the session lookup and order | grant + actor + ETag on the slot; an over-full session warns in the response, never refuses |
 
 No client-supplied identity anywhere; request and session ids are GUID-validated at the edge
 and re-read server-side (`check:trust-boundary-guid`).
@@ -271,7 +275,10 @@ that link is the carrier for reviews and the proposal narrative, which are never
 - Matrix rows and the Atlas pages (`dataverse-wmkf-sitevisit.md` gains the tracker as a writer;
   two new Atlas pages for the session and slot tables) are part of the build's docs slice.
 
-## 7. Build slices and tiers
+## 7. Implementation and release history
+
+The slice table is a dated record of how the implementation reached Production,
+not a remaining build plan.
 
 | Slice | Content | Tier |
 |---|---|---|
@@ -292,15 +299,20 @@ schema readback and the readiness flip are complete.
 - The applicant-materials collection (Codex plan). The deliberation briefing page itself is
   built separately (`docs/DELIBERATION_BRIEFING_PAGE_PLAN.md`); the tracker only reads its live link.
 - Distribution email and logistics copy edits (owner: "noting for later").
-- Post-presentation recording/transcript product behavior remains governed by
+- Post-presentation recording/transcript product behavior is governed by
   `docs/plans/POST_RESEARCH_PRESENTATION_MATERIALS_PLAN_2026-09-21.md`, outside
-  this tracker plan's original slices. Its Zoom/transcript/MP4 producers,
-  Staff Deliberations projection, and separate materials-only Board link are
-  source-built and offline-tested only; none is deployed or enabled.
-- A PC role. D4 stands until evidence says otherwise.
+  this tracker's original slices. The dated Production receipt in §3 records
+  Wave 30 and the enabled rollout at deployment `dpl_Gw8dTzcA1JaUc2ifQjbzbBe7wCoT`;
+  current environment state was not re-probed in this documentation pass.
+- A separate PC-specific authorization role. Later shared `programCoordinator` and
+  `systemsSpecialist` assignments are central staffing records, not app permissions;
+  they grant no access. PR #516 (`4822bb267`) added those shared role labels, while
+  Meeting Tracker routes remain gated by the app grant (`lib/services/board-writeups/model.js`;
+  `pages/api/meeting-tracker/` routes; `lib/utils/auth.js`). This implements D4's
+  no-separate-PC-authorization decision without treating the staffing designation as absent.
 - J27 differences (the auto-generation trigger and the narrative source path; register J27-082).
 
-## 9. Open questions for the owner
+## 9. Recorded owner questions and later decisions
 
 1. ~~§5.5, the three "visited" questions.~~ Decided 2026-09-09: D7–D9.
 2. ~~Who attends deliberation sessions by default?~~ **Decided 2026-09-09 (D10):** a fixed staff
@@ -338,8 +350,8 @@ schema readback and the readiness flip are complete.
      de-duplicates as the deliberation email does; an empty To refuses.
    - **D25 One agenda for everyone.** No per-recipient filtering; Board members find their
      proposals by the times.
-   **[DEPLOYED; migration 041 applied; transport not independently
-   production-smoked as of 2026-09-15.]** The session-page card/composer is
+   **[DEPLOYED; migration 041 applied; owner-run Production send and inbox
+   receipt recorded 2026-09-16 in `docs/CURRENT_WORK_QUEUE.md` item 10.]** The session-page card/composer is
    `shared/components/meeting-tracker/SessionAgendaPanel.js`, mounted below the
    proposal order in `SessionEditor.js`. The guarded GET/prepare/send endpoint
    is `pages/api/meeting-tracker/sessions/[id]/agenda.js`; exact rendering,
