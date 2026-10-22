@@ -1,11 +1,11 @@
 # Atlas: `irs_exempt_orgs` (Postgres)
 
-**Last verified:** 2026-05-12 (initial creation, migration 008; first real-data load completed 2026-05-13)
-**Live row count:** **~1.26M** post-import unique-EIN baseline. The IRS publishes ~1.95M total records in the broader BMF, but the four regional CSVs (eo1–eo4) we load aggregate to ~1.26M after dropping rows missing required fields (EIN/NAME/SUBSECTION/STATUS) and deduping cross-region overlap. A future operator seeing 1.26M should NOT treat that as suspicious — the gap to 1.95M reflects how the IRS scopes the regional files plus our schema-required-field filter, not a partial download.
+**Last live-state probe:** 2026-06-04. It observed 1,264,156 rows and zero IRS/BMF maintenance-run records. These are historical observations only; current rowcount, refresh history, endpoint consumers, and PA deployment status are **unknown** without fresh probes. The code/schema descriptions below are source-based.
+**Historical row-count context:** the first-load count was 1,264,156 unique EINs. The broader IRS BMF is filtered for required fields and deduplicated across regional files. Do not use the dated count as current state.
 
 ## Source of truth
 
-**External (IRS Business Master File extract).** Bulk extract held in Postgres as durable reference data. WMKF does not own this data — the IRS does, and we refresh from their publish quarterly. **Not Wave-2 migrate-eligible** — Dataverse storage tiers don't fit ~2M reference rows, and there's no relational value to other Dynamics entities.
+**External (IRS Business Master File extract).** Bulk extract held in Postgres as durable reference data. WMKF does not own this data — the IRS does. The source config schedules quarterly refreshes; current execution and freshness require a live probe. **Not Wave-2 migrate-eligible** — Dataverse storage tiers don't fit ~2M reference rows, and there's no relational value to other Dynamics entities.
 
 ## Schema (from `lib/db/migrations/008_irs_exempt_orgs.sql`)
 
@@ -35,13 +35,13 @@ Indexes: PK on `ein`, partial on `state WHERE state IS NOT NULL`, composite on `
 
 ## Live state notes
 
-- Refresh strategy is **atomic swap**. The cron creates `irs_exempt_orgs_new` as a staging table, populates it from the 4 IRS CSVs via COPY, then renames staging → live in a single transaction. A partial download or IRS format change fails before the live table is touched.
-- The IRS publishes the BMF **monthly**; we refresh **quarterly** (15th of Jan/Apr/Jul/Oct) per `vercel.json` cron config. Reasoning: research-program applicants (pilot scope) are mostly universities with decades-stable status. Bump to monthly when SoCal program (smaller, less-stable orgs) comes online.
+- Refresh strategy is **atomic swap**. The cron creates and populates a staging table; the live swap occurs only after the import passes its checks. GET/POST with `dryRun=1` still perform schema/staging work and attempt to record a maintenance run; dry-run skips the live swap. Audit logging can itself fail, and a failed run can also create a failure alert.
+- The source config schedules quarterly refreshes (15th of Jan/Apr/Jul/Oct). Whether a run has occurred or the data is current requires a live probe. The recorded owner decision is quarterly for the research pilot, moving to monthly when SoCal comes online. Whether that condition now holds is unverified; no cadence change is part of this audit.
 - **Removed-org semantic.** When the IRS revokes an exemption, the org is removed from the published file. Our atomic-swap refresh naturally surfaces this — a previously-verified EIN that drops from the BMF returns `found: false` after the next refresh. Callers (PA) should re-verify on cycle open rather than trusting historical results.
 
 ## Read paths
 
-- `pages/api/irs/verify-ein.js` — single-EIN lookup, PowerAutomate-callable via `IRS_VERIFY_SECRET` shared-secret header. Returns subsection/status/deductibility + descriptive labels + derived `is501c3PublicCharity` boolean.
+- `pages/api/irs/verify-ein.js` — single-EIN lookup, PowerAutomate-callable via `IRS_VERIFY_SECRET` shared-secret header outside development; development bypasses this auth check. Returns subsection/status/deductibility + descriptive labels + derived `is501c3PublicCharity` boolean.
 - `lib/services/irs-bmf-service.js` `verifyEin()` — the implementation called by the endpoint.
 
 ## Write paths
@@ -54,7 +54,7 @@ No live application paths write individual rows. This is a wholesale-refresh tab
 
 ## Cross-system
 
-The verified result (boolean exempt yes/no, verification date) lives on the Dynamics `account` row, written by PowerAutomate flows that consume the `/api/irs/verify-ein` response. **This app never writes to Dynamics for IRS verification** — PA owns that boundary.
+The verified result (boolean exempt yes/no, verification date) is owned on the Dynamics `account` row by the PA writeback contract. **This app never writes to Dynamics for IRS verification** — PA owns that boundary. The endpoint performs a SELECT-only lookup; current PA consumer deployment is unknown without deployment verification.
 
 There is no Dataverse counterpart entity for the bulk IRS extract; the bulk data is intentionally Postgres-resident.
 

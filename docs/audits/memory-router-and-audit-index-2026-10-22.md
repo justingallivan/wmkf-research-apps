@@ -52,6 +52,7 @@ and verification limits apply:
 - [PI Identity and Request-Mutation Authorization](pi-identity-request-mutation-audit-2026-10-22.md) — confirmed PI role-source conflict, bounded mutation authorization trace, documentary repairs and unresolved runtime follow-ups.
 - [Identity, COI, Referral and Provenance](identity-coi-referral-provenance-audit-2026-10-22.md) — retention/promotion and receipt corrections, preserved manual/COI decisions, referral/acknowledgement evidence and the shared-person write-ordering gap.
 - [Awardee Read-Only Exceptions](awardee-read-only-exceptions-audit-2026-10-22.md) — action-specific Preview/Copy/Export contracts, scope corrections and browser/export follow-ups; no blanket exemption for other actions.
+- [Remaining Read-Only Exceptions](remaining-read-only-exceptions-audit-2026-10-22.md) — reviewer GET effects, public proposal cache and IRS lookup/refresh boundaries; matrix/roster/export follow-ups remain open.
 - [Active Memory Coverage Inventory](active-memory-review-coverage-2026-10-22.csv) — all 272 active leaves, sample membership, bounded disposition and evidence report. No active leaf remains outside the named whole-read samples.
 
 ## Remaining audit queue and holds
@@ -73,7 +74,7 @@ and verification limits apply:
   ordering gap and remaining consumer-proof limits. Continue with those focused
   safety tests. The Awardee follow-up traces Preview/Copy/Export and leaves
   browser-output cancellation, completeness and other action-specific read-only
-  exemptions open. These records grant no permission to change owner policy or
+  exemptions open. The remaining-read audit narrows reviewer GET, proposal cache and IRS refresh exceptions, retaining matrix/roster/export gaps. These records grant no permission to change owner policy or
   probe Production.
 - **P2: finish deeper source verification.** The read inventory is closed;
   published prompt state, mutable output policy, enforcement scan coverage,

@@ -45,8 +45,12 @@ Ground truth: `pages/api/external/review/[token]/respond.js`, `lib/external/toke
 
 **Email action UX shipped (2026-07-24):**
 - Invitation buttons deep-link to the existing portal with `?action=accept` or
-  `?action=decline`; GET only selects a form and never mutates state, so scanner
-  prefetch is harmless.
+  `?action=decline`; these query values select the displayed form. The
+  external context GET also performs a best-effort first-access timestamp
+  update when `wmkf_proposalfirstaccessed` is empty, and requests use
+  Postgres-backed rate-limit accounting. Scanner prefetch can therefore cause
+  this first-access stamp and rate-limit accounting, but cannot accept or
+  decline a reviewer.
 - The acceptance-confirmation email stores the portal token encrypted in the
   durable acceptance job and links to `?action=decline`.
 - Accepted reviewers may self-withdraw only before materials/review receipt.
@@ -57,8 +61,9 @@ Ground truth: `pages/api/external/review/[token]/respond.js`, `lib/external/toke
   capability lives in the portal + `respond.js`.
 
 **How to apply:**
-- If accept/decline email buttons change, preserve the current GET-as-view-hint /
-  POST-as-only-mutation boundary. Don't add a separate
+- If accept/decline email buttons change, preserve the decision boundary:
+  accept/decline transitions are POST-only, while GET may select a view and
+  perform the best-effort first-access stamp. Don't add a separate
   `REVIEWER_RESPONSE_SECRET` (use `EXTERNAL_LINK_SECRET`).
 - `response_received_at` auto-fills when the reviewer responds through the
   landing page. Production merge `70f51f45` also lets a PD record an accepted
