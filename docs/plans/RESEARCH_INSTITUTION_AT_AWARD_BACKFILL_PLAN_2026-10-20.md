@@ -1,6 +1,6 @@
 # Research PI/co-PI Institution at Award backfill — plan
 
-Date: 2026-10-20. Status: **Stage A (PIs) applied to production 2026-10-20; Stage B (co-PIs) read-only resolve run in production 2026-10-20 (current hash `05b61fa0`); group approvals with the owner and individual checks with staff (2026-10-21); staff answers returned and owner-reviewed, resolve re-run `77fa82fc`, all approvals given (2026-10-23); read-back and apply not built.** Owner: Justin Gallivan.
+Date: 2026-10-20. Status: **Stage A (PIs) applied to production 2026-10-20; Stage B (co-PIs) read-only resolve run in production 2026-10-20 (hash `05b61fa0`; current hash `77fa82fc`, 2026-10-23); group approvals with the owner and individual checks with staff (2026-10-21); staff answers returned and owner-reviewed, resolve re-run `77fa82fc`, all approvals given (2026-10-23); read-back and apply not built.** Owner: Justin Gallivan.
 
 ## 1. Goal and decisions
 
