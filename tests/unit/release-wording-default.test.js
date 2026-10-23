@@ -211,3 +211,73 @@ describe('pending withdrawal dialog', () => {
     expect(global.fetch.mock.calls.some(([url]) => String(url).startsWith(PREFS))).toBe(false);
   });
 });
+
+describe('a slow Save locks the dialog until it settles (Codex build review)', () => {
+  function deferred() {
+    let resolve;
+    const promise = new Promise((r) => { resolve = r; });
+    return { promise, resolve };
+  }
+
+  test('accepted release: email fields and Release are locked while saving, then the refresh applies', async () => {
+    const save = deferred();
+    routeFetch({
+      'POST /api/review-manager/terminal-transition': [
+        response({ ok: true, drafts: [acceptedDraft()] }),
+        response({ ok: true, drafts: [acceptedDraft({ subject: 'PD subject', templateSource: 'personal' })] }),
+      ],
+      [`GET ${PREFS}`]: [prefsGet(PD)],
+      [`PUT ${PREFS}`]: [() => save.promise],
+    });
+    const onRelease = jest.fn();
+    render(<AcceptedReviewerReleaseModal reviewer={{ suggestionId: SUGGESTION_ID }} requestId={REQUEST_ID} onClose={jest.fn()} onRelease={onRelease} />);
+    const details = await openDefaults();
+    fireEvent.click(within(details).getByRole('button', { name: 'Save as my default' }));
+
+    await waitFor(() => expect(screen.getAllByLabelText('Subject')[0]).toBeDisabled());
+    expect(screen.getAllByLabelText('Message')[0]).toBeDisabled();
+    const release = screen.getByRole('button', { name: 'Release reviewer' });
+    expect(release).toBeDisabled();
+    fireEvent.click(release);
+    expect(onRelease).not.toHaveBeenCalled();
+
+    save.resolve(response({ ok: true, kind: 'release', template: sharedTemplate }));
+    await waitFor(() => expect(screen.getAllByLabelText('Subject')[0]).toHaveValue('PD subject'));
+    expect(screen.getAllByLabelText('Subject')[0]).not.toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Release reviewer' })).not.toBeDisabled();
+    expect(window.confirm).not.toHaveBeenCalled();
+  });
+
+  test('pending withdrawal: drafts and Release are locked while saving, then re-render', async () => {
+    const save = deferred();
+    routeFetch({
+      'POST /api/review-manager/render-withdraw-emails': [
+        response({ ok: true, drafts: [{
+          suggestionId: SUGGESTION_ID, status: 'ok', name: 'R', to: 'r@example.org', from: 'pd@example.org',
+          senderId: PD, subject: 'Admin subject', bodyText: 'Admin body', templateSource: 'shared',
+        }] }),
+        response({ ok: true, drafts: [{
+          suggestionId: SUGGESTION_ID, status: 'ok', name: 'R', to: 'r@example.org', from: 'pd@example.org',
+          senderId: PD, subject: 'PD subject', bodyText: 'PD body', templateSource: 'personal',
+        }] }),
+      ],
+      [`GET ${PREFS}`]: [prefsGet(PD)],
+      [`PUT ${PREFS}`]: [() => save.promise],
+    });
+    render(<ReleaseEmailModal requestId={REQUEST_ID} suggestionIds={[SUGGESTION_ID]} onClose={jest.fn()} onReleased={jest.fn()} />);
+    fireEvent.click(screen.getByLabelText(/No longer needed/));
+    const draftSubject = await screen.findByDisplayValue('Admin subject');
+    const details = await openDefaults();
+    fireEvent.click(within(details).getByRole('button', { name: 'Save as my default' }));
+
+    await waitFor(() => expect(draftSubject).toBeDisabled());
+    const release = screen.getByRole('button', { name: /Release \(1\)/ });
+    expect(release).toBeDisabled();
+    fireEvent.click(release);
+    expect(global.fetch.mock.calls.some(([url]) => String(url).includes('withdraw-sufficient'))).toBe(false);
+
+    save.resolve(response({ ok: true, kind: 'withdraw', template: sharedTemplate }));
+    expect(await screen.findByDisplayValue('PD subject')).not.toBeDisabled();
+    expect(screen.getByRole('button', { name: /Release \(1\)/ })).not.toBeDisabled();
+  });
+});

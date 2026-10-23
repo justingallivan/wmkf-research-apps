@@ -81,6 +81,7 @@ export default function AcceptedReviewerReleaseModal({ reviewer, requestId, onCl
   const [error, setError] = useState(null);
   const [feedback, setFeedback] = useState(null);
   const [refreshing, setRefreshing] = useState(false);
+  const [wordingBusy, setWordingBusy] = useState(false);
   const mountedRef = useRef(true);
   const refreshGenerationRef = useRef(0);
 
@@ -127,7 +128,7 @@ export default function AcceptedReviewerReleaseModal({ reviewer, requestId, onCl
   // preview are never touched, so a colleague's concurrent note change still
   // surfaces as notes_changed at release (Codex plan review, 2026-10-22).
   const refreshWording = async () => {
-    if (!draft || draft.status !== 'ok' || saving) return;
+    if (!draft || draft.status !== 'ok' || saving || refreshing) return;
     const edited = subject !== draft.subject || bodyText !== draft.bodyText;
     if (edited && !window.confirm('Replace your edits to this email with your saved wording?')) return;
     const generation = ++refreshGenerationRef.current;
@@ -160,7 +161,7 @@ export default function AcceptedReviewerReleaseModal({ reviewer, requestId, onCl
   };
 
   const submit = async () => {
-    if (!draft || saving || refreshing) return;
+    if (!draft || saving || refreshing || wordingBusy) return;
     if (sendEmail && (!subject.trim() || !bodyText.trim())) {
       setError('Subject and message cannot be empty.');
       return;
@@ -281,13 +282,13 @@ export default function AcceptedReviewerReleaseModal({ reviewer, requestId, onCl
                   )}
                   <label className="block">
                     <span className="text-xs font-medium text-gray-600">Subject</span>
-                    <input value={subject} onChange={(event) => setSubject(event.target.value)} disabled={refreshing} className="mt-1 w-full rounded border border-gray-300 px-2 py-1 text-sm" />
+                    <input value={subject} onChange={(event) => setSubject(event.target.value)} disabled={refreshing || wordingBusy} className="mt-1 w-full rounded border border-gray-300 px-2 py-1 text-sm" />
                   </label>
                   <label className="block">
                     <span className="text-xs font-medium text-gray-600">Message</span>
-                    <textarea rows={10} value={bodyText} onChange={(event) => setBodyText(event.target.value)} disabled={refreshing} className="mt-1 w-full rounded border border-gray-300 px-2 py-1 text-sm font-mono" />
+                    <textarea rows={10} value={bodyText} onChange={(event) => setBodyText(event.target.value)} disabled={refreshing || wordingBusy} className="mt-1 w-full rounded border border-gray-300 px-2 py-1 text-sm font-mono" />
                   </label>
-                  <ReleaseWordingDefault kind="release" senderId={draft.senderId} disabled={saving || refreshing} onChanged={refreshWording} />
+                  <ReleaseWordingDefault kind="release" senderId={draft.senderId} disabled={saving || refreshing} onChanged={refreshWording} onBusyChange={setWordingBusy} />
                 </div>
               )}
             </>
@@ -298,7 +299,7 @@ export default function AcceptedReviewerReleaseModal({ reviewer, requestId, onCl
 
           <div className="flex justify-end gap-2 pt-2">
             <button type="button" onClick={requestClose} disabled={saving} className="px-3 py-1.5 text-sm text-gray-600 hover:text-gray-800 disabled:opacity-40">{completed ? 'Done' : 'Cancel'}</button>
-            {!completed && <button type="button" onClick={submit} disabled={loading || !draft || saving || refreshing} className="rounded-md bg-blue-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50">{saving ? 'Releasing…' : 'Release reviewer'}</button>}
+            {!completed && <button type="button" onClick={submit} disabled={loading || !draft || saving || refreshing || wordingBusy} className="rounded-md bg-blue-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50">{saving ? 'Releasing…' : 'Release reviewer'}</button>}
           </div>
         </div>
       </div>

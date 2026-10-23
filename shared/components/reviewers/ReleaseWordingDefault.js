@@ -10,7 +10,10 @@
  *   - senderId  : systemuserid of the PD the email is sent from (draft.senderId)
  *   - disabled  : true while the parent is sending
  *   - onChanged(): called after a successful Save/Clear when the user is the
- *                  sender, so the parent can re-render its drafts
+ *                  sender, so the parent can re-render its drafts. The latest
+ *                  callback is used, so it sees the parent's current state.
+ *   - onBusyChange(busy): true while a Save/Clear is in flight, so the parent
+ *                  can lock its email fields and Send until it settles
  */
 import { useEffect, useRef, useState } from 'react';
 import { requestEnvelope } from '../../utils/api-request';
@@ -32,7 +35,7 @@ function validationMessage(errors = []) {
   return 'The wording could not be saved. Check the subject and message.';
 }
 
-export default function ReleaseWordingDefault({ kind, senderId, disabled = false, onChanged }) {
+export default function ReleaseWordingDefault({ kind, senderId, disabled = false, onChanged, onBusyChange }) {
   const [open, setOpen] = useState(false);
   const [loaded, setLoaded] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -45,7 +48,19 @@ export default function ReleaseWordingDefault({ kind, senderId, disabled = false
   const [message, setMessage] = useState(null);
   const generationRef = useRef(0);
 
-  useEffect(() => () => { generationRef.current += 1; }, []);
+  // Read the parent's callbacks at completion time, never the ones captured
+  // when Save was clicked (Codex build review, 2026-10-22).
+  const onChangedRef = useRef(onChanged);
+  const onBusyChangeRef = useRef(onBusyChange);
+  useEffect(() => {
+    onChangedRef.current = onChanged;
+    onBusyChangeRef.current = onBusyChange;
+  });
+  useEffect(() => () => {
+    generationRef.current += 1;
+    // Never leave the parent locked if this section unmounts mid-save.
+    onBusyChangeRef.current?.(false);
+  }, []);
 
   const loadOwn = () => {
     if (loaded || loading) return;
@@ -85,6 +100,7 @@ export default function ReleaseWordingDefault({ kind, senderId, disabled = false
     if (busy || disabled || !loaded) return;
     const generation = ++generationRef.current;
     setBusy(true);
+    onBusyChangeRef.current?.(true);
     setMessage(null);
     try {
       const envelope = await requestEnvelope('/api/review-manager/release-email-preferences', {
@@ -108,11 +124,14 @@ export default function ReleaseWordingDefault({ kind, senderId, disabled = false
         setBody(shared?.body || '');
         setMessage('Your default wording was cleared; new emails start from the shared Admin wording.');
       }
-      if (isSender && onChanged) onChanged();
+      if (isSender) onChangedRef.current?.();
     } catch {
       if (generation === generationRef.current) setMessage('The change could not be confirmed. Reload before trying again.');
     } finally {
-      if (generation === generationRef.current) setBusy(false);
+      if (generation === generationRef.current) {
+        setBusy(false);
+        onBusyChangeRef.current?.(false);
+      }
     }
   };
 

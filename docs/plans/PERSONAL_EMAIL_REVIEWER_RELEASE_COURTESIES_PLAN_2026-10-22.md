@@ -177,6 +177,19 @@ consistency, canonical pointer, doc symbol, build-claim, catalog, currency, Atla
 scaffolding, harness-framing, reminder-hold and prompt-injection gates passed, each with its
 self-test run sequentially. No Dataverse, email or other live service was called.
 
+## Codex build review follow-up
+
+[VERIFIED via Codex adversarial review of `821d374cf` and branch source] Codex found that a
+slow Save/Clear invoked the dialog's refresh callback captured at click time, so email edits
+typed meanwhile could be overwritten without the replace confirmation, and the accepted
+dialog could refresh after Release had started. `ReleaseWordingDefault` now reports
+`onBusyChange`, both dialogs lock their email fields and Release button while a Save/Clear is
+in flight, and the section calls the parent's latest callbacks (and releases the lock if it
+unmounts mid-save). Deferred-response tests in both dialogs assert the lock and the refresh;
+removing the lock makes the accepted-dialog test fail. The reviewer-related run passed
+376 suites / 6,822 tests; lint, types, secret, scaffolding and harness gates passed with
+self-tests; `npm run build` passed.
+
 ## Coordination
 
 Codex currently owns documentation. The inventory slice-status row and the

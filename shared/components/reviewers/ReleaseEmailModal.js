@@ -120,6 +120,7 @@ export default function ReleaseEmailModal({ requestId, suggestionIds, onClose, o
     setSendCourtesyEmail(value === RELEASE_REASONS.no_longer_needed);
   };
   const [refreshing, setRefreshing] = useState(false);
+  const [wordingBusy, setWordingBusy] = useState(false);
   const mountedRef = useRef(true);
   const refreshGenerationRef = useRef(0);
   const sendGenerationRef = useRef(0);
@@ -194,7 +195,7 @@ export default function ReleaseEmailModal({ requestId, suggestionIds, onClose, o
   // draft from the server. Per-recipient edits are replaced only after staff
   // confirm; on failure the current drafts stay as they are.
   const refreshWording = async () => {
-    if (sendingRef.current || drafts === null) return;
+    if (sendingRef.current || drafts === null || refreshing) return;
     const hasEdits = Object.keys(edits).length > 0;
     if (hasEdits && !window.confirm('Replace your edits to these emails with your saved wording?')) return;
     const generation = ++refreshGenerationRef.current;
@@ -224,7 +225,7 @@ export default function ReleaseEmailModal({ requestId, suggestionIds, onClose, o
   const fallbackDraft = sendable.find((d) => d.templateSource === 'shared_fallback');
 
   const handleSend = async () => {
-    if (releaseableIds.length === 0 || sendingRef.current || blankEdit || refreshing) return;
+    if (releaseableIds.length === 0 || sendingRef.current || blankEdit || refreshing || wordingBusy) return;
     const n = releaseableIds.length;
     const ok = window.confirm(
       releaseWithoutEmail
@@ -419,7 +420,7 @@ export default function ReleaseEmailModal({ requestId, suggestionIds, onClose, o
                   type="text"
                   value={valueFor(draft, 'subject')}
                   onChange={(e) => setField(draft.suggestionId, 'subject', e.target.value)}
-                  disabled={refreshing}
+                  disabled={refreshing || wordingBusy}
                   className="mt-1 w-full rounded border border-gray-300 px-2 py-1 text-sm"
                 />
               </label>
@@ -429,7 +430,7 @@ export default function ReleaseEmailModal({ requestId, suggestionIds, onClose, o
                   rows={12}
                   value={valueFor(draft, 'bodyText')}
                   onChange={(e) => setField(draft.suggestionId, 'bodyText', e.target.value)}
-                  disabled={refreshing}
+                  disabled={refreshing || wordingBusy}
                   className="mt-1 w-full rounded border border-gray-300 px-2 py-1 text-sm font-mono"
                 />
               </label>
@@ -442,6 +443,7 @@ export default function ReleaseEmailModal({ requestId, suggestionIds, onClose, o
               senderId={sendable[0].senderId}
               disabled={sending || refreshing}
               onChanged={refreshWording}
+              onBusyChange={setWordingBusy}
             />
           )}
 
@@ -467,7 +469,7 @@ export default function ReleaseEmailModal({ requestId, suggestionIds, onClose, o
             {!completed && <button
               type="button"
               onClick={handleSend}
-              disabled={!reason || (showPreviews && (loading || drafts === null)) || sending || refreshing || releaseableIds.length === 0 || blankEdit}
+              disabled={!reason || (showPreviews && (loading || drafts === null)) || sending || refreshing || wordingBusy || releaseableIds.length === 0 || blankEdit}
               className="px-3 py-1.5 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-50 rounded-md"
             >
               {sending ? 'Releasing…' : `Release (${releaseCount})`}
