@@ -26,10 +26,16 @@
    your review. If you need to correct or add anything, please contact your Program
    Director.” The assigned PD's name is a mailto link on both immediate and return
    screens. Receipt date remains below. 29 focused tests and scoped lint passed.
-5. **Release checks.** [VERIFIED via GitHub check-runs for `187f27f16`] Jest,
-   PostgreSQL integration, CodeQL's three language jobs, Semgrep, Trivy and Gitleaks
-   succeeded. Playwright was cancelled, not passed; no optional rerun was started.
-   Prior Linux and exact pinned FFmpeg evidence retain their documented scope.
+5. **Release checks and browser assertion correction.** [VERIFIED via GitHub
+   check-runs for `6de6e465c`] All nine checks succeeded, including Playwright,
+   Jest, PostgreSQL integration, CodeQL's three language jobs, Semgrep, Trivy and
+   Gitleaks. The initial release run `187f27f16` was cancelled for Playwright;
+   the subsequent handoff run `b4072933b` failed three assertions still expecting
+   “Your review is final” after the owner-approved copy change (48 tests passed).
+   `6de6e465c` corrected only those three assertions, preserving every read-only
+   check. The three affected tests passed locally without retries before push;
+   the subsequent hosted Playwright run passed. No runtime code changed in this
+   correction. Prior Linux and pinned FFmpeg evidence retain their documented scope.
 
 ### Commits
 
@@ -38,7 +44,9 @@
 - `a713ded8b` — verified pinned FFmpeg archive / bounded Linux media evidence.
 - `405d17bb8` — owner-approved confirmation and named PD email link.
 - `187f27f16` — integrated release, including all preceding documentation repairs.
-- This docs-only handoff follows the release on main.
+- `b4072933b` — release handoff and milestone record.
+- `6de6e465c` — three browser assertions updated; affected local tests and all
+  hosted checks passed. This docs-only update records that result on main.
 
 ## Next Items
 

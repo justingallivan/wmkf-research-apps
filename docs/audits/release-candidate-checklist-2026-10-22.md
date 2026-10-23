@@ -28,8 +28,13 @@ related:
 [VERIFIED via Git push, Vercel inspect and GitHub check-runs] Owner authorized
 release; `187f27f16` integrated candidate `405d17bb8` and current main, then
 reached Production Ready as `dpl_55owR5tGAZkLi1fTfwt7399JgDDK` with application
-domains assigned. Jest, PostgreSQL and the security jobs passed; Playwright was
-cancelled. The final confirmation change passed 29 focused tests and lint.
+domains assigned. The final confirmation change passed 29 focused tests and lint.
+The initial release Playwright run was cancelled; the subsequent `b4072933b`
+run failed three stale copy assertions (48 tests passed). Test-only fix
+`6de6e465c` preserved the read-only checks and passed all three affected tests
+locally without retries. All nine hosted checks on that commit then succeeded,
+including Playwright, Jest, PostgreSQL and the security jobs (verified via GitHub
+check-runs).
 No unresolved concrete application blocker was identified. Owner declined further
 broad audits, optional tests and mock repairs. Additional generic target/rollback
 verification was not established as a release blocker. This disposition does not
