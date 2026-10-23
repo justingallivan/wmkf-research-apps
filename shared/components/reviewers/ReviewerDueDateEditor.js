@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { currentYmdInTimeZone, isYmd } from '../../../lib/utils/date-ymd';
 import EmailSendFeedback from '../EmailSendFeedback';
 import { requestEnvelope } from '../../utils/api-request';
@@ -68,6 +68,7 @@ export default function ReviewerDueDateEditor({
   effectiveDate = null,
   defaultDate = null,
   canManage = true,
+  requestContextId = null,
   onSaved,
 }) {
   const [open, setOpen] = useState(false);
@@ -80,7 +81,37 @@ export default function ReviewerDueDateEditor({
   const [savedWithoutNotification, setSavedWithoutNotification] = useState(false);
   const generationRef = useRef(0);
   const mountedRef = useRef(true);
+  const onSavedRef = useRef(onSaved);
+  const context = JSON.stringify([
+    suggestionId, requestContextId, canManage, defaultDate, overrideDate, effectiveDate,
+  ]);
+  const currentContextRef = useRef(context);
+  const previousContextRef = useRef(context);
   const minimumDate = minimumExtensionDate(defaultDate);
+
+  const resetTransientState = () => {
+    setOpen(false);
+    setDraft('');
+    setWorking(false);
+    setError(null);
+    setErrorOutcome('failed');
+    setNotificationRetryable(false);
+    setSuccessMessage(null);
+    setSavedWithoutNotification(false);
+  };
+
+  useLayoutEffect(() => {
+    onSavedRef.current = onSaved;
+  }, [onSaved]);
+
+  useLayoutEffect(() => {
+    currentContextRef.current = context;
+    if (previousContextRef.current !== context) {
+      generationRef.current += 1;
+      previousContextRef.current = context;
+      resetTransientState();
+    }
+  }, [context]);
 
   useEffect(() => {
     mountedRef.current = true;
@@ -91,6 +122,7 @@ export default function ReviewerDueDateEditor({
   }, []);
 
   const close = ({ refresh = savedWithoutNotification } = {}) => {
+    if (!canManage || !suggestionId || !isYmd(defaultDate)) return;
     generationRef.current += 1;
     setOpen(false);
     setDraft(overrideDate || '');
@@ -100,10 +132,12 @@ export default function ReviewerDueDateEditor({
     setNotificationRetryable(false);
     setSuccessMessage(null);
     setSavedWithoutNotification(false);
-    if (refresh && onSaved) onSaved();
+    if (refresh && onSavedRef.current) onSavedRef.current();
   };
 
   const submit = async ({ action = 'save', reviewDueDateOverride } = {}) => {
+    if (!canManage || !suggestionId || !isYmd(defaultDate)
+      || currentContextRef.current !== context) return;
     const generation = ++generationRef.current;
     setWorking(true);
     setError(null);
@@ -120,7 +154,8 @@ export default function ReviewerDueDateEditor({
         tolerantBody: () => MALFORMED_BODY,
       });
       const data = envelope.data;
-      if (!mountedRef.current || generation !== generationRef.current) return;
+      if (!mountedRef.current || generation !== generationRef.current
+        || currentContextRef.current !== context) return;
 
       if (envelope.ok && data === MALFORMED_BODY) {
         throw Object.assign(new Error('I could not complete the deadline update.'), { outcome: 'uncertain' });
@@ -144,19 +179,22 @@ export default function ReviewerDueDateEditor({
       }
       setSavedWithoutNotification(false);
       setSuccessMessage('sent');
-      if (onSaved) onSaved();
+      if (onSavedRef.current) onSavedRef.current();
     } catch (requestError) {
-      if (!mountedRef.current || generation !== generationRef.current) return;
+      if (!mountedRef.current || generation !== generationRef.current
+        || currentContextRef.current !== context) return;
       const detail = requestError.message || 'I could not complete the deadline update.';
       setErrorOutcome(requestError.outcome || 'uncertain');
       if (savedWithoutNotification) setNotificationRetryable(requestError.retryable === true);
       setError(savedWithoutNotification ? `The deadline is still saved. ${detail}` : detail);
     } finally {
-      if (mountedRef.current && generation === generationRef.current) setWorking(false);
+      if (mountedRef.current && generation === generationRef.current
+        && currentContextRef.current === context) setWorking(false);
     }
   };
 
   const openModal = () => {
+    if (!canManage || !suggestionId || !isYmd(defaultDate)) return;
     setDraft(overrideDate || minimumDate);
     setError(null);
     setErrorOutcome('failed');
@@ -192,7 +230,7 @@ export default function ReviewerDueDateEditor({
         </button>
       )}
 
-      {open && (
+      {open && canManage && suggestionId && isYmd(defaultDate) && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
           <div
             role="dialog"

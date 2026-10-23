@@ -13,7 +13,7 @@ jest.mock('../../lib/services/reviewer-due-extension', () => ({
   retryReviewerDueDateNotification: jest.fn(),
 }));
 jest.mock('../../lib/services/reviewer-request-authorization', () => ({
-  authorizeReviewerRequestMutation: jest.fn(async () => ({})),
+  authorizeReviewerRequestMutation: jest.fn(async () => ({ requestIds: ['33333333-3333-4333-8333-333333333333'] })),
 }));
 
 import handler from '../../pages/api/review-manager/review-due-extension';
@@ -27,6 +27,7 @@ import { authorizeReviewerRequestMutation } from '../../lib/services/reviewer-re
 
 const SUGGESTION_ID = '11111111-1111-4111-8111-111111111111';
 const ACTOR_ID = '22222222-2222-4222-8222-222222222222';
+const REQUEST_ID = '33333333-3333-4333-8333-333333333333';
 
 function response() {
   return {
@@ -65,6 +66,7 @@ test('save validates the selector and dispatches inside the review-manager DAL c
   expect(withDalContext).toHaveBeenCalledWith('review-manager-review-due-extension', expect.any(Function));
   expect(saveReviewerDueDateExtension).toHaveBeenCalledWith({
     suggestionId: SUGGESTION_ID,
+    expectedRequestId: REQUEST_ID,
     reviewDueDateOverride: '2099-09-15',
     actingUserSystemId: ACTOR_ID,
   });
@@ -127,7 +129,7 @@ test('retry sends from freshly stored state and does not accept a client deadlin
     body: { action: 'retry', suggestionId: SUGGESTION_ID, reviewDueDateOverride: '1900-01-01' },
   }, res);
 
-  expect(retryReviewerDueDateNotification).toHaveBeenCalledWith({ suggestionId: SUGGESTION_ID });
+  expect(retryReviewerDueDateNotification).toHaveBeenCalledWith({ suggestionId: SUGGESTION_ID, expectedRequestId: REQUEST_ID });
   expect(saveReviewerDueDateExtension).not.toHaveBeenCalled();
   expect(res.statusCode).toBe(200);
   expect(res.body).toMatchObject({ saved: false, notified: true });

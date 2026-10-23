@@ -28,7 +28,10 @@ import { ServiceHttpError } from '../../lib/services/service-http-error';
 beforeEach(() => {
   delete process.env.TEST_REQUEST_ISOLATION;
   jest.clearAllMocks();
-  queryAllRequests.mockResolvedValue({ records: [{ akoya_requestid: 'a' }, { akoya_requestid: 'b' }], totalCount: 2, capped: false });
+  queryAllRequests.mockResolvedValue({ records: [
+    { akoya_requestid: 'a', akoya_requestnum: '1001' },
+    { akoya_requestid: 'b', akoya_requestnum: '1002' },
+  ], totalCount: 2, capped: false });
   assembleGranteeDocument.mockResolvedValue({ institution: 'X' });
 });
 
@@ -56,7 +59,10 @@ test('fail-soft: a failed assembly is skipped; renderer receives only successful
   expect(html).toContain('page');
   const [models, opts] = renderCyclePage.mock.calls[0];
   expect(models).toEqual([{ institution: 'Caltech' }]);
-  expect(opts).toEqual({ cycleLabel: 'June 2026', includeImage: true, capped: false, totalCount: 2, returnedCount: 2 });
+  expect(opts).toEqual({
+    cycleLabel: 'June 2026', includeImage: true, capped: false, totalCount: 2, returnedCount: 2,
+    omittedCount: 1, omittedRequestNumbers: ['1002'], omittedRequestNumbersTruncated: false,
+  });
   expect(assembleGranteeDocument).toHaveBeenCalledWith('a', { includeImageRef: true });
 });
 
@@ -71,4 +77,40 @@ test('empty cycle renders with zero models and never calls assembly', async () =
   const out = await exportGranteeCycle({ cycleCode: 'J26' });
   expect(out).toEqual({ html: '<!DOCTYPE html><html>page</html>' });
   expect(assembleGranteeDocument).not.toHaveBeenCalled();
+});
+
+test('null assembly results retain their matching omitted request IDs in order', async () => {
+  queryAllRequests.mockResolvedValue({
+    records: [
+      { akoya_requestid: 'a', akoya_requestnum: '1001' },
+      { akoya_requestid: 'b', akoya_requestnum: '1002' },
+      { akoya_requestid: 'c', akoya_requestnum: '1003' },
+    ],
+    totalCount: 3, capped: false,
+  });
+  assembleGranteeDocument.mockImplementation(async (id) => id === 'b' ? null : ({ institution: id }));
+  await exportGranteeCycle({ cycleCode: 'J26' });
+  expect(renderCyclePage.mock.calls[0][0]).toEqual([{ institution: 'a' }, { institution: 'c' }]);
+  expect(renderCyclePage.mock.calls[0][1]).toMatchObject({ omittedCount: 1, omittedRequestNumbers: ['1002'] });
+});
+
+test('omitted request numbers passed to the renderer are bounded and keep the full omission count', async () => {
+  const ids = Array.from({ length: 25 }, (_, index) => `request-${index}`);
+  const numbers = Array.from({ length: 25 }, (_, index) => String(1000 + index));
+  queryAllRequests.mockResolvedValue({ records: ids.map((akoya_requestid, index) => ({ akoya_requestid, akoya_requestnum: numbers[index] })), totalCount: 25, capped: false });
+  assembleGranteeDocument.mockResolvedValue(null);
+  await exportGranteeCycle({ cycleCode: 'J26' });
+  expect(renderCyclePage.mock.calls[0][1]).toMatchObject({
+    omittedCount: 25, omittedRequestNumbers: numbers.slice(0, 20), omittedRequestNumbersTruncated: true,
+  });
+});
+
+test('missing request numbers use a safe label instead of passing internal request IDs', async () => {
+  queryAllRequests.mockResolvedValue({ records: [{ akoya_requestid: 'internal-guid' }], totalCount: 1, capped: false });
+  assembleGranteeDocument.mockRejectedValue(new Error('unavailable'));
+  await exportGranteeCycle({ cycleCode: 'J26' });
+  const options = renderCyclePage.mock.calls[0][1];
+  expect(options.omittedRequestNumbers).toEqual(['Request number unavailable']);
+  expect(options).not.toHaveProperty('omittedIds');
+  expect(queryAllRequests.mock.calls[0][0].select).toContain('akoya_requestnum');
 });

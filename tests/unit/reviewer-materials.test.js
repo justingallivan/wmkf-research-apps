@@ -13,6 +13,7 @@ import {
   getReviewerMaterialFolders,
   isReviewerProposalFile,
   listReviewerMaterials,
+  listReviewerMaterialsWithAvailability,
 } from '../../lib/external/reviewer-materials.js';
 
 describe('reviewer proposal file policy', () => {
@@ -136,5 +137,57 @@ describe('listReviewerMaterials', () => {
         folder: '1002379_GUID/Reviewer Materials',
       }),
     ]);
+  });
+
+  test('detailed listing distinguishes a failed bucket from an empty successful one', async () => {
+    const deps = {
+      getRequestSharePointBuckets: jest.fn().mockResolvedValue([
+        { library: 'primary', folder: 'R-1', source: 'dynamics' },
+        { library: 'archive', folder: 'R-1', source: 'archive' },
+      ]),
+      listFiles: jest.fn()
+        .mockResolvedValueOnce([{ id: 'other', name: 'notes.pdf', folder: 'R-1/Reviewer Materials' }])
+        .mockRejectedValueOnce(new Error('archive unavailable')),
+    };
+    const result = await listReviewerMaterialsWithAvailability('request-id', '1002379', deps);
+    expect(result).toEqual({ files: [], unavailable: true });
+  });
+
+  test('a matching file in one bucket does not hide an unavailable sibling bucket', async () => {
+    const result = await listReviewerMaterialsWithAvailability('request-id', '1002379', {
+      getRequestSharePointBuckets: jest.fn().mockResolvedValue([
+        { library: 'primary', folder: 'R-1', source: 'dynamics' },
+        { library: 'archive', folder: 'R-1', source: 'archive' },
+      ]),
+      listFiles: jest.fn()
+        .mockResolvedValueOnce([{ id: 'proposal', name: 'Proposal_1002379.pdf', folder: 'R-1/Reviewer Materials' }])
+        .mockRejectedValueOnce(new Error('archive unavailable')),
+    });
+    expect(result).toEqual({
+      files: [expect.objectContaining({ id: 'proposal', name: 'Proposal_1002379.pdf' })],
+      unavailable: true,
+    });
+  });
+
+  test('a successful listing with only non-canonical files is verified empty', async () => {
+    const result = await listReviewerMaterialsWithAvailability('request-id', '1002379', {
+      getRequestSharePointBuckets: jest.fn().mockResolvedValue([
+        { library: 'primary', folder: 'R-1', source: 'dynamics' },
+      ]),
+      listFiles: jest.fn().mockResolvedValue([
+        { id: 'wrong', name: 'Proposal_1009999.pdf', folder: 'R-1/Reviewer Materials' },
+      ]),
+    });
+    expect(result).toEqual({ files: [], unavailable: false });
+  });
+
+  test('portal array contract remains fail-soft when a bucket is unavailable', async () => {
+    const result = await listReviewerMaterials('request-id', '1002379', {
+      getRequestSharePointBuckets: jest.fn().mockResolvedValue([
+        { library: 'primary', folder: 'R-1', source: 'dynamics' },
+      ]),
+      listFiles: jest.fn().mockRejectedValue(new Error('Graph unavailable')),
+    });
+    expect(result).toEqual([]);
   });
 });

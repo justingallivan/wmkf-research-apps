@@ -49,9 +49,30 @@ describe('resolveProposalPI', () => {
     expect(await resolveProposalPI(GUID)).toEqual({ resolved: false, reason: 'no_project_leader' });
   });
 
-  test('falls back to Research Leader when Project Leader is absent', async () => {
+  test('does not use a valid Research Leader identity when Project Leader is absent', async () => {
     mockDynamics({
       request: { _wmkf_researchleader_value: PL_ID },
+      contact: {
+        fullname: 'Wen Li',
+        wmkf_orcid: ORCID,
+        emailaddress1: 'wen.li@wayne.edu',
+        institution: 'Wayne State University',
+      },
+    });
+    const out = await resolveProposalPI(GUID);
+    expect(out).toEqual({ resolved: false, reason: 'no_project_leader' });
+    expect(DynamicsService.getRecord).toHaveBeenCalledTimes(1);
+    expect(DynamicsService.getRecord).not.toHaveBeenCalledWith('contacts', expect.anything(), expect.anything());
+    expect(OpenAlexService.getAuthorByOrcid).not.toHaveBeenCalled();
+    expect(ORCIDService.getProfile).not.toHaveBeenCalled();
+  });
+
+  test('uses Project Leader when both request roles have distinct contacts', async () => {
+    mockDynamics({
+      request: {
+        _wmkf_projectleader_value: PL_ID,
+        _wmkf_researchleader_value: '33333333-3333-4333-8333-333333333333',
+      },
       contact: { fullname: 'Wen Li', wmkf_orcid: ORCID },
     });
     OpenAlexService.getAuthorByOrcid.mockResolvedValue({

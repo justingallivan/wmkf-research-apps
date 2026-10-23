@@ -101,10 +101,9 @@ jest.mock('../../lib/services/review-upload', () => ({
 }));
 
 jest.mock('../../lib/dataverse/adapters/reviewer-suggestion', () => {
-  // getForEtagRefresh / stampProposalFirstAccessed are thin DynamicsService
-  // passthroughs (data-access-layer conversion, Stages 3-6) — forward through
-  // the ALSO-mocked dynamics-service module so the existing assertions on
-  // DynamicsService.getRecord/updateRecord below still see these calls.
+  // Mock the adapter seam to exercise context response/ETag behavior. The
+  // stamp's fresh-read/CAS implementation is tested separately in
+  // reviewer-suggestion-review-flow-writes.test.js; this mock is not its twin.
   const { DynamicsService } = jest.requireMock('../../lib/services/dynamics-service');
   return {
     applyStage2aResponse: jest.fn(async () => ({})),
@@ -384,6 +383,28 @@ describe('/api/external/review/[token]/context', () => {
     const res = createMockRes();
     await handler(req, res);
 
+    expect(res.status).toHaveBeenCalledWith(200);
+    expect(res._data.etag).toBeNull();
+  });
+
+  it('refreshes the etag after a failed conditional stamp because a concurrent writer may have won', async () => {
+    verifySuggestionToken.mockResolvedValue(verifiedSuggestion);
+    getRequestSharePointBuckets.mockResolvedValue([]);
+    DynamicsService.updateRecord.mockRejectedValueOnce(Object.assign(new Error('concurrent stamp'), { status: 412 }));
+    DynamicsService.getRecord.mockResolvedValueOnce({ _etag: 'W/"winner"' });
+    const res = createMockRes();
+    await handler(createMockReq({ method: 'GET', query: { token: 'good-token' } }), res);
+    expect(res.status).toHaveBeenCalledWith(200);
+    expect(res._data.etag).toBe('W/"winner"');
+  });
+
+  it('does not return a stale snapshot etag when both stamp and refresh fail', async () => {
+    verifySuggestionToken.mockResolvedValue(verifiedSuggestion);
+    getRequestSharePointBuckets.mockResolvedValue([]);
+    DynamicsService.updateRecord.mockRejectedValueOnce(Object.assign(new Error('concurrent stamp'), { status: 412 }));
+    DynamicsService.getRecord.mockRejectedValueOnce(new Error('refresh unavailable'));
+    const res = createMockRes();
+    await handler(createMockReq({ method: 'GET', query: { token: 'good-token' } }), res);
     expect(res.status).toHaveBeenCalledWith(200);
     expect(res._data.etag).toBeNull();
   });

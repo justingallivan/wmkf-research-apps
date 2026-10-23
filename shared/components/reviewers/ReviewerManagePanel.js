@@ -1245,6 +1245,7 @@ export default function ReviewerManagePanel({
                     <td className="px-4 py-3 align-top">
                       <ReviewerDueDateEditor
                         suggestionId={r.suggestionId}
+                        requestContextId={proposal?.proposalId}
                         reviewerName={r.name}
                         overrideDate={r.reviewDueDateOverride}
                         effectiveDate={r.effectiveReviewDeadline}

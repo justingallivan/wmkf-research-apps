@@ -763,6 +763,14 @@ test('ordinary saving refreshes verification when the authoritative roster row i
 });
 
 test('stored staff confirmation supplies the authoritative roster key when the automated receipt expired', async () => {
+  const protectedExistingPerson = {
+    wmkf_potentialreviewersid: 'PID-PROTECTED',
+    wmkf_emailaddress: 'ann@example.edu',
+    wmkf_identitystatus: 'confirmed',
+    wmkf_identityverifiedanchorsjson: 'malformed legacy value',
+  };
+  potentialReviewerAdapter.getByEmail.mockResolvedValueOnce(protectedExistingPerson);
+  potentialReviewerAdapter.upsertByEmail.mockResolvedValueOnce({ id: 'PID-PROTECTED', created: false });
   verifyAutomatedIdentityAttestation.mockResolvedValueOnce({ valid: false, reason: 'expired' });
   reviewerRosterStore.findIdentityConfirmation.mockResolvedValueOnce({
     source: 'staff_confirmed',
@@ -802,6 +810,15 @@ test('stored staff confirmation supplies the authoritative roster key when the a
     expect.objectContaining({ candidateKey: 'candidate:staff-confirmed' }),
   );
   expect(out.savedCount).toBe(1);
+  expect(potentialReviewerAdapter.upsertByEmail).toHaveBeenCalledWith(
+    expect.objectContaining({ email: 'ann@example.edu' }),
+    expect.objectContaining({ existing: protectedExistingPerson, readOnlyReuse: false }),
+  );
+  expect(researcherAdapter.upsertByPotentialReviewer).toHaveBeenCalledWith(
+    'PID-PROTECTED',
+    expect.objectContaining({ email: 'ann@example.edu', affiliation: 'Example University' }),
+    { actingUserSystemId: BASE.actingUserSystemId },
+  );
 });
 
 test('staff and automated roster bindings that disagree fail closed before writes', async () => {
@@ -1476,12 +1493,15 @@ test('threads the gate-fetched email reuse row into upsertByEmail on a safe reus
       name: 'Dr Safe Reuse',
       email: 'safe@example.edu',
     }),
-    { actingUserSystemId: BASE.actingUserSystemId, existing: existingReviewer },
+    { actingUserSystemId: BASE.actingUserSystemId, existing: existingReviewer, readOnlyReuse: true },
   );
   expect(researcherAdapter.upsertByPotentialReviewer).toHaveBeenCalledWith(
     'PID-SAFE',
     expect.objectContaining({ name: 'Dr Safe Reuse' }),
-    { actingUserSystemId: BASE.actingUserSystemId },
+    expect.objectContaining({
+      actingUserSystemId: BASE.actingUserSystemId,
+      automatedIdentityDecision: { decision: null, persistDecision: false },
+    }),
   );
   expect(reviewerSuggestionAdapter.upsert).toHaveBeenCalledWith(
     expect.objectContaining({ potentialReviewerId: 'PID-SAFE' }),
@@ -1507,7 +1527,7 @@ test('threads a checked email miss into upsertByEmail so the write path cannot r
       name: 'Dr Checked Miss',
       email: 'miss@example.edu',
     }),
-    { actingUserSystemId: BASE.actingUserSystemId, existing: null },
+    { actingUserSystemId: BASE.actingUserSystemId, existing: null, readOnlyReuse: true },
   );
 });
 

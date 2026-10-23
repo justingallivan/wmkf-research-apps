@@ -6,12 +6,16 @@
  * the signed token IS the gate; /run executes the token's embedded spec, not
  * the request body). One SSE invocation: re-validate → resolve operational
  * labels live → backoff-hardened FetchXML paging → disclosure → workbook →
- * PRIVATE Vercel Blob → terminal {ready, downloadUrl, expiresInSec, bytes}.
+ * PRIVATE Vercel Blob → download-token mint → terminal
+ * {ready, downloadUrl, expiresInSec, bytes}. A token-mint failure returns no
+ * usable download, though the private Blob upload may already have succeeded.
  *
  * downloadUrl is the authenticated /download proxy (requireAppAccess + a
  * short-lived signed token), NOT a permanent public Blob URL (Codex S160
- * P1). Loud truncation; a terminal error writes NO Blob. The paging budget
- * is clamped to leave route headroom for count+build+upload (Codex S160 P1).
+ * P1). Loud truncation; failures before Blob upload write no Blob, but a
+ * failure while minting its download token can leave a private object. The
+ * paging budget is clamped to leave route headroom for count+build+upload
+ * (Codex S160 P1).
  */
 
 import { put } from '@vercel/blob';
@@ -202,7 +206,8 @@ export default async function handler(req, res) {
     });
     return res.end();
   } catch (err) {
-    // Terminal failure — NO Blob written; nothing for the client to fetch.
+    // No usable download was produced. If failure came after put(), the private
+    // Blob may exist even though no download token was returned.
     // Sanitized client message (raw error to the server log only — lower
     // layers can carry a truncated Dataverse body; Codex S160 P2).
     const stage = err instanceof WorkbookError ? 'workbook'
@@ -211,8 +216,9 @@ export default async function handler(req, res) {
     console.error('[dataverse-export/run] terminal error:', err);
     send('error', {
       stage,
-      message: 'The export failed before any file was produced — nothing was '
-        + 'published. Retry; if it persists, narrow the filter.',
+      message: 'The export failed before a usable download was ready. A private '
+        + 'export object may remain if the failure happened after upload. Retry; '
+        + 'if it persists, narrow the filter.',
       retryable: !!(err instanceof FetchXmlError && err.retryable),
     });
     return res.end();

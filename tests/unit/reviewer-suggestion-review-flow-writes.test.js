@@ -56,16 +56,65 @@ describe('getByIdWithSelect (generic passthrough)', () => {
 });
 
 describe('stampProposalFirstAccessed', () => {
-  it('PATCHes only wmkf_proposalfirstaccessed with an ISO timestamp', async () => {
+  it('fresh-reads and conditionally PATCHes only wmkf_proposalfirstaccessed', async () => {
+    const read = jest.spyOn(DynamicsService, 'getRecord').mockResolvedValue({ _etag: 'W/"7"', wmkf_proposalfirstaccessed: null });
     const spy = jest.spyOn(DynamicsService, 'updateRecord').mockResolvedValue({});
     await stampProposalFirstAccessed(SUGGESTION_ID);
+    expect(read).toHaveBeenCalledWith('wmkf_appreviewersuggestions', SUGGESTION_ID, {
+      select: 'wmkf_appreviewersuggestionid,wmkf_proposalfirstaccessed',
+    });
     expect(spy).toHaveBeenCalledTimes(1);
     const [entitySet, id, payload, opts] = spy.mock.calls[0];
     expect(entitySet).toBe('wmkf_appreviewersuggestions');
     expect(id).toBe(SUGGESTION_ID);
     expect(Object.keys(payload)).toEqual(['wmkf_proposalfirstaccessed']);
     expect(new Date(payload.wmkf_proposalfirstaccessed).toString()).not.toBe('Invalid Date');
-    expect(opts).toBeUndefined();
+    expect(opts).toEqual({ ifMatch: 'W/"7"' });
+  });
+
+  it('preserves a timestamp written after the caller snapshot without PATCHing', async () => {
+    jest.spyOn(DynamicsService, 'getRecord').mockResolvedValue({
+      _etag: 'W/"8"', wmkf_proposalfirstaccessed: '2026-10-22T10:00:00Z',
+    });
+    const patch = jest.spyOn(DynamicsService, 'updateRecord').mockResolvedValue({});
+    await expect(stampProposalFirstAccessed(SUGGESTION_ID)).resolves.toEqual({ alreadySet: true });
+    expect(patch).not.toHaveBeenCalled();
+  });
+
+  it('fails closed when the fresh row has no etag', async () => {
+    jest.spyOn(DynamicsService, 'getRecord').mockResolvedValue({ wmkf_proposalfirstaccessed: null });
+    const patch = jest.spyOn(DynamicsService, 'updateRecord').mockResolvedValue({});
+    await expect(stampProposalFirstAccessed(SUGGESTION_ID)).rejects.toThrow('requires a concrete suggestion etag');
+    expect(patch).not.toHaveBeenCalled();
+  });
+
+  it('after a 412 preserves the winner, or retries once only if still empty', async () => {
+    jest.spyOn(DynamicsService, 'getRecord')
+      .mockResolvedValueOnce({ _etag: 'W/"7"', wmkf_proposalfirstaccessed: null })
+      .mockResolvedValueOnce({ _etag: 'W/"8"', wmkf_proposalfirstaccessed: '2026-10-22T10:00:00Z' });
+    const patch = jest.spyOn(DynamicsService, 'updateRecord').mockRejectedValueOnce(Object.assign(new Error('changed'), { status: 412 }));
+    await expect(stampProposalFirstAccessed(SUGGESTION_ID)).resolves.toEqual({ alreadySet: true });
+    expect(patch).toHaveBeenCalledTimes(1);
+
+    jest.restoreAllMocks();
+    jest.spyOn(DynamicsService, 'getRecord')
+      .mockResolvedValueOnce({ _etag: 'W/"7"', wmkf_proposalfirstaccessed: null })
+      .mockResolvedValueOnce({ _etag: 'W/"8"', wmkf_proposalfirstaccessed: null });
+    const retryPatch = jest.spyOn(DynamicsService, 'updateRecord').mockRejectedValueOnce(Object.assign(new Error('changed'), { status: 412 })).mockResolvedValueOnce({});
+    await stampProposalFirstAccessed(SUGGESTION_ID);
+    expect(retryPatch).toHaveBeenCalledTimes(2);
+    expect(retryPatch.mock.calls[1][3]).toEqual({ ifMatch: 'W/"8"' });
+  });
+
+  it('propagates initial and retry reads that fail', async () => {
+    jest.spyOn(DynamicsService, 'getRecord').mockRejectedValueOnce(new Error('read failed'));
+    await expect(stampProposalFirstAccessed(SUGGESTION_ID)).rejects.toThrow('read failed');
+    jest.restoreAllMocks();
+    jest.spyOn(DynamicsService, 'getRecord')
+      .mockResolvedValueOnce({ _etag: 'W/"7"', wmkf_proposalfirstaccessed: null })
+      .mockRejectedValueOnce(new Error('retry read failed'));
+    jest.spyOn(DynamicsService, 'updateRecord').mockRejectedValueOnce(Object.assign(new Error('changed'), { status: 412 }));
+    await expect(stampProposalFirstAccessed(SUGGESTION_ID)).rejects.toThrow('retry read failed');
   });
 });
 

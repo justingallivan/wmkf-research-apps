@@ -13,9 +13,9 @@ jest.mock('../../lib/dataverse/adapters/grant-request.js', () => ({
   getById: (...a) => getById(...a),
   SELECT_PROFILES: { IDENTITY: 'akoya_requestid,akoya_requestnum' },
 }));
-const listReviewerMaterials = jest.fn();
+const listReviewerMaterialsWithAvailability = jest.fn();
 jest.mock('../../lib/external/reviewer-materials', () => ({
-  listReviewerMaterials: (...a) => listReviewerMaterials(...a),
+  listReviewerMaterialsWithAvailability: (...a) => listReviewerMaterialsWithAvailability(...a),
 }));
 
 const REQ = '11111111-1111-4111-8111-111111111111';
@@ -34,11 +34,11 @@ beforeEach(() => {
 
 test('available: returns { ok:true, fileCount } from the reviewer-visible listing', async () => {
   getById.mockResolvedValueOnce({ akoya_requestid: REQ, akoya_requestnum: 'R-1001' });
-  listReviewerMaterials.mockResolvedValueOnce([{ name: 'a.pdf' }, { name: 'b.pdf' }]);
+  listReviewerMaterialsWithAvailability.mockResolvedValueOnce({ files: [{ name: 'a.pdf' }, { name: 'b.pdf' }], unavailable: false });
   const out = await materialsPreflight({ requestId: REQ });
   expect(out).toEqual({ ok: true, fileCount: 2 });
   expect(getById).toHaveBeenCalledWith(REQ, { select: 'akoya_requestid,akoya_requestnum' });
-  expect(listReviewerMaterials).toHaveBeenCalledWith(REQ, 'R-1001');
+  expect(listReviewerMaterialsWithAvailability).toHaveBeenCalledWith(REQ, 'R-1001');
 });
 
 test('request row missing id/requestnum → 404 MaterialsPreflightError with explicit body', async () => {
@@ -47,7 +47,7 @@ test('request row missing id/requestnum → 404 MaterialsPreflightError with exp
   expect(err).toBeInstanceOf(MaterialsPreflightError);
   expect(err.httpStatus).toBe(404);
   expect(err.body).toEqual({ ok: false, reason: 'not_found' });
-  expect(listReviewerMaterials).not.toHaveBeenCalled();
+  expect(listReviewerMaterialsWithAvailability).not.toHaveBeenCalled();
 });
 
 test('lookup failure propagates UNTYPED (shell maps to sanitized 200 materials_unavailable)', async () => {
@@ -59,8 +59,26 @@ test('lookup failure propagates UNTYPED (shell maps to sanitized 200 materials_u
 
 test('listing failure propagates UNTYPED (shell maps to sanitized 200 materials_unavailable)', async () => {
   getById.mockResolvedValueOnce({ akoya_requestid: REQ, akoya_requestnum: 'R-1001' });
-  listReviewerMaterials.mockRejectedValueOnce(new Error('graph 500'));
+  listReviewerMaterialsWithAvailability.mockRejectedValueOnce(new Error('graph 500'));
   const err = await materialsPreflight({ requestId: REQ }).catch((e) => e);
   expect(err).not.toBeInstanceOf(MaterialsPreflightError);
   expect(err.message).toBe('graph 500');
+});
+
+test('a failed SharePoint bucket is unavailable, not verified empty', async () => {
+  getById.mockResolvedValueOnce({ akoya_requestid: REQ, akoya_requestnum: 'R-1001' });
+  listReviewerMaterialsWithAvailability.mockResolvedValueOnce({ files: [], unavailable: true });
+  await expect(materialsPreflight({ requestId: REQ })).resolves.toEqual({ ok: false, reason: 'materials_unavailable' });
+});
+
+test('a found file cannot turn a partial bucket scan into verified availability', async () => {
+  getById.mockResolvedValueOnce({ akoya_requestid: REQ, akoya_requestnum: 'R-1001' });
+  listReviewerMaterialsWithAvailability.mockResolvedValueOnce({ files: [{ name: 'Proposal_R-1001.pdf' }], unavailable: true });
+  await expect(materialsPreflight({ requestId: REQ })).resolves.toEqual({ ok: false, reason: 'materials_unavailable' });
+});
+
+test('a successful complete listing with no matching canonical file is verified empty', async () => {
+  getById.mockResolvedValueOnce({ akoya_requestid: REQ, akoya_requestnum: 'R-1001' });
+  listReviewerMaterialsWithAvailability.mockResolvedValueOnce({ files: [], unavailable: false });
+  await expect(materialsPreflight({ requestId: REQ })).resolves.toEqual({ ok: true, fileCount: 0 });
 });

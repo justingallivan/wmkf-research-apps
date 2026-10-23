@@ -2,7 +2,7 @@
  * @jest-environment jsdom
  */
 
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import ReviewerDueDateEditor, { minimumExtensionDate } from '../../shared/components/reviewers/ReviewerDueDateEditor';
 
 const SUGGESTION_ID = '11111111-1111-4111-8111-111111111111';
@@ -280,4 +280,85 @@ test('ignores a response that finishes after the component unmounts', async () =
 
   await Promise.resolve();
   expect(onSaved).not.toHaveBeenCalled();
+});
+
+const staleResponses = [
+  ['success', successfulResponse()],
+  ['partial success', {
+    ok: false,
+    status: 502,
+    json: async () => ({ ok: false, saved: true, notified: false, retryable: true, reason: 'send_failed' }),
+  }],
+  ['error', {
+    ok: false,
+    status: 409,
+    json: async () => ({ ok: false, reason: 'conflict' }),
+  }],
+];
+
+const changedContexts = [
+  ['suggestion', { suggestionId: '22222222-2222-4222-8222-222222222222' }],
+  ['default date', { defaultDate: '2099-09-02' }],
+  ['request/profile context', { requestContextId: 'request-b' }],
+];
+
+test.each(staleResponses.flatMap(([responseName, response]) => changedContexts.map(([contextName, change]) => [
+  responseName, contextName, response, change,
+])))('ignores a %s response after %s changes', async (_responseName, _contextName, response, change) => {
+  let finishRequest;
+  global.fetch = jest.fn(() => new Promise((resolve) => { finishRequest = () => resolve(response); }));
+  const onSaved = jest.fn();
+  const props = {
+    suggestionId: SUGGESTION_ID,
+    requestContextId: 'request-a',
+    defaultDate: '2099-09-01',
+    onSaved,
+  };
+  const view = render(<ReviewerDueDateEditor {...props} />);
+  fireEvent.click(screen.getByRole('button', { name: /grant extension/i }));
+  fireEvent.change(screen.getByLabelText(/new deadline/i), { target: { value: '2099-09-15' } });
+  fireEvent.click(screen.getByRole('button', { name: /save extension/i }));
+  await waitFor(() => expect(global.fetch).toHaveBeenCalledTimes(1));
+
+  view.rerender(<ReviewerDueDateEditor {...props} {...change} />);
+  expect(screen.queryByRole('dialog')).toBeNull();
+  await act(async () => { finishRequest(); });
+
+  expect(onSaved).not.toHaveBeenCalled();
+  expect(screen.queryByText(/deadline was saved, but the reviewer notification was not sent/i)).toBeNull();
+  expect(screen.queryByText(/changed while this dialog was open/i)).toBeNull();
+});
+
+test('permission revocation closes an open dialog and blocks a new request', async () => {
+  const props = {
+    suggestionId: SUGGESTION_ID,
+    defaultDate: '2099-09-01',
+    canManage: true,
+  };
+  const view = render(<ReviewerDueDateEditor {...props} />);
+  fireEvent.click(screen.getByRole('button', { name: /grant extension/i }));
+  view.rerender(<ReviewerDueDateEditor {...props} canManage={false} />);
+
+  expect(screen.queryByRole('dialog')).toBeNull();
+  expect(screen.queryByRole('button', { name: /grant extension/i })).toBeNull();
+  expect(global.fetch).not.toHaveBeenCalled();
+});
+
+test('a valid current-context success refreshes through the latest callback', async () => {
+  const oldOnSaved = jest.fn();
+  const currentOnSaved = jest.fn();
+  const props = {
+    suggestionId: SUGGESTION_ID,
+    requestContextId: 'request-a',
+    defaultDate: '2099-09-01',
+    onSaved: oldOnSaved,
+  };
+  const view = render(<ReviewerDueDateEditor {...props} />);
+  fireEvent.click(screen.getByRole('button', { name: /grant extension/i }));
+  fireEvent.change(screen.getByLabelText(/new deadline/i), { target: { value: '2099-09-15' } });
+  view.rerender(<ReviewerDueDateEditor {...props} onSaved={currentOnSaved} />);
+  fireEvent.click(screen.getByRole('button', { name: /save extension/i }));
+
+  await waitFor(() => expect(currentOnSaved).toHaveBeenCalledTimes(1));
+  expect(oldOnSaved).not.toHaveBeenCalled();
 });

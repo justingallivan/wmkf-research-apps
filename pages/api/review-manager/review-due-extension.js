@@ -32,6 +32,7 @@ const REASON_STATUS = {
   token_recovery_required: 409,
   send_failed: 502,
   send_unconfirmed: 202,
+  request_mismatch: 409,
 };
 
 export default async function handler(req, res) {
@@ -64,14 +65,15 @@ export default async function handler(req, res) {
 
   try {
     const result = await withDalContext('review-manager-review-due-extension', async () => {
-      await authorizeReviewerRequestMutation({
+      const authorization = await authorizeReviewerRequestMutation({
         profileId: access.profileId,
         callerSystemId: actingUserSystemId,
         suggestionIds: [suggestionId],
       });
+      const expectedRequestId = authorization.requestIds[0];
       return action === 'retry'
-        ? retryReviewerDueDateNotification({ suggestionId })
-        : saveReviewerDueDateExtension({ suggestionId, reviewDueDateOverride, actingUserSystemId });
+        ? retryReviewerDueDateNotification({ suggestionId, expectedRequestId })
+        : saveReviewerDueDateExtension({ suggestionId, expectedRequestId, reviewDueDateOverride, actingUserSystemId });
     });
     if (!result.ok) {
       return res.status(REASON_STATUS[result.reason] || 500).json(result);

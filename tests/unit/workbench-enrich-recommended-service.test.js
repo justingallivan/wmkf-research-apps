@@ -41,6 +41,11 @@ jest.mock('../../lib/dataverse/adapters/researcher', () => ({
   clearIdentityFields: (...a) => clearIdentityFields(...a),
 }));
 
+const mockBackPropReviewerOrcidToContact = jest.fn(async () => {});
+jest.mock('../../lib/services/backprop-reviewer-orcid', () => ({
+  backPropReviewerOrcidToContact: (...args) => mockBackPropReviewerOrcidToContact(...args),
+}));
+
 const verifyClaudeSuggestions = jest.fn();
 jest.mock('../../lib/services/discovery-service', () => ({
   DiscoveryService: {
@@ -107,10 +112,6 @@ const createInstitutionStage2Evaluator = jest.fn(() => ({
 }));
 jest.mock('../../lib/services/institution-affiliation-stage2', () => ({
   createInstitutionStage2Evaluator: (...a) => createInstitutionStage2Evaluator(...a),
-}));
-
-jest.mock('../../lib/services/backprop-reviewer-orcid', () => ({
-  backPropReviewerOrcidToContact: jest.fn(async () => {}),
 }));
 
 const getReviewerTimeBudgetSeconds = jest.fn(async () => 600);
@@ -221,6 +222,8 @@ beforeEach(() => {
   upsertByPotentialReviewer.mockResolvedValue({});
   updatePerson.mockResolvedValue(undefined);
 });
+
+afterEach(() => jest.restoreAllMocks());
 
 afterAll(() => {
   delete process.env.NEXT_PUBLIC_INSTITUTION_STAGE2_PRESENTATION;
@@ -565,7 +568,10 @@ test('stored A plus enriched B surfaces a mismatch and never relabels A with B p
   expect(upsertByPotentialReviewer).toHaveBeenCalledWith(
     PR,
     expect.objectContaining({ email: null, emailSource: null }),
-    { actingUserSystemId: 'u-1' },
+    expect.objectContaining({
+      actingUserSystemId: 'u-1',
+      automatedIdentityDecision: { decision: expect.any(Object), persistDecision: true },
+    }),
   );
   const complete = rec.events.find((event) => event.event === 'complete');
   expect(complete.data.recommended[0]).toMatchObject({
@@ -754,7 +760,10 @@ test('vetted email for a person with no stored address stays paired in the roste
       email: 'new@example.edu',
       emailSource: null,
     }),
-    { actingUserSystemId: 'u-1' },
+    expect.objectContaining({
+      actingUserSystemId: 'u-1',
+      automatedIdentityDecision: { decision: expect.any(Object), persistDecision: true },
+    }),
   );
   expect(rec.events.at(-1).data.recommended[0]).toMatchObject({
     email: 'new@example.edu',
@@ -1419,7 +1428,10 @@ test('current-run verifier institution is not vetoed by a stale stored applicant
     hIndex: 4,
   });
   expect(upsertByPotentialReviewer).toHaveBeenCalled();
-  expect(writeIdentityDecision).toHaveBeenCalled();
+  expect(writeIdentityDecision).not.toHaveBeenCalled();
+  expect(upsertByPotentialReviewer.mock.calls.at(-1)[2]).toMatchObject({
+    automatedIdentityDecision: { decision: expect.any(Object), persistDecision: true },
+  });
 });
 
 test('ORCID employment history connects a legitimate institutional move without a network reconciliation call', async () => {
@@ -1469,7 +1481,46 @@ test('ORCID employment history connects a legitimate institutional move without 
     email: 'mover@stanford.edu',
   });
   expect(upsertByPotentialReviewer).toHaveBeenCalled();
-  expect(writeIdentityDecision).toHaveBeenCalled();
+  expect(writeIdentityDecision).not.toHaveBeenCalled();
+});
+
+test('ORCID back-prop uses only a successful canonical person reread', async () => {
+  mockBackPropReviewerOrcidToContact.mockClear();
+  upsertByPotentialReviewer.mockResolvedValueOnce({ updated: true });
+  getPersonById.mockResolvedValue({
+    wmkf_potentialreviewersid: PR,
+    wmkf_orcid: '0000-0002-1111-2222',
+    wmkf_identitystatus: 'confirmed',
+    _wmkf_contact_value: 'CONTACT-CANONICAL',
+    wmkf_primaryaffiliation: 'Rec University',
+  });
+  enrichCandidates.mockImplementation(async (candidates) => ({
+    enriched: candidates.map((c) => ({
+      ...c,
+      orcidId: '0000-0002-9999-9999',
+      contactEnrichment: { identity: { status: 'probable', anchors: [{ canonicalKey: 'openalex:A' }] } },
+    })),
+  }));
+  await enrichRecommended(args(), recorder().onEvent);
+  expect(mockBackPropReviewerOrcidToContact).toHaveBeenCalledWith(expect.objectContaining({
+    reviewer: expect.objectContaining({ wmkf_orcid: '0000-0002-1111-2222' }),
+    contactId: 'CONTACT-CANONICAL',
+    actingUserSystemId: 'u-1',
+  }));
+});
+
+test('ORCID back-prop is skipped when the guarded person write abstains', async () => {
+  mockBackPropReviewerOrcidToContact.mockClear();
+  upsertByPotentialReviewer.mockResolvedValueOnce({ updated: false, reason: 'binding_conflict' });
+  enrichCandidates.mockImplementation(async (candidates) => ({
+    enriched: candidates.map((c) => ({
+      ...c,
+      orcidId: '0000-0002-9999-9999',
+      contactEnrichment: { identity: { status: 'probable', anchors: [{ canonicalKey: 'openalex:B' }] } },
+    })),
+  }));
+  await enrichRecommended(args(), recorder().onEvent);
+  expect(mockBackPropReviewerOrcidToContact).not.toHaveBeenCalled();
 });
 
 test('a resolved co-affiliation suppresses the string mismatch instead of creating staff work', async () => {

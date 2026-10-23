@@ -12,8 +12,6 @@ jest.mock('../../lib/dataverse/adapters/potential-reviewer', () => ({
 }));
 jest.mock('../../lib/dataverse/adapters/researcher', () => ({
   upsertByPotentialReviewer: jest.fn(),
-  writeIdentityDecision: jest.fn(),
-  clearIdentityFields: jest.fn(),
 }));
 
 const { ContactEnrichmentService } = require('../../lib/services/contact-enrichment-service');
@@ -28,8 +26,6 @@ describe('saveToDatabase — identity gate on the email-keyed side path', () => 
     potentialReviewerAdapter.getByEmail.mockResolvedValue({ wmkf_potentialreviewersid: 'PID-1', wmkf_issyntheticreviewer: false });
     potentialReviewerAdapter.upsertByEmail.mockResolvedValue({ id: 'PID-1' });
     researcherAdapter.upsertByPotentialReviewer.mockResolvedValue({ id: 'PID-1' });
-    researcherAdapter.writeIdentityDecision.mockResolvedValue(undefined);
-    researcherAdapter.clearIdentityFields.mockResolvedValue(undefined);
   });
   afterAll(() => {
     if (originalSwitch === undefined) delete process.env.SYNTHETIC_REVIEWER_ISOLATION;
@@ -57,22 +53,16 @@ describe('saveToDatabase — identity gate on the email-keyed side path', () => 
     expect(researcherAdapter.upsertByPotentialReviewer).not.toHaveBeenCalled();
   });
 
-  test('unresolved verdict → ORCID + Scholar URL NOT written; decision written; stale fields cleared', async () => {
+  test('unresolved verdict → ORCID + Scholar URL withheld and decision travels in the guarded write', async () => {
     await ContactEnrichmentService.saveToDatabase({ name: 'Dr X', affiliation: 'MIT' }, enrichment({ status: 'unresolved' }));
     const payload = researcherAdapter.upsertByPotentialReviewer.mock.calls[0][1];
     expect(payload.orcid).toBeNull();
     expect(payload.orcidUrl).toBeNull();
     expect(payload.googleScholarUrl).toBeNull();
-    expect(researcherAdapter.writeIdentityDecision).toHaveBeenCalledWith(
-      'PID-1',
-      expect.objectContaining({ status: 'unresolved' }),
-      { identityOrigin: 'automated' },
-    );
-    expect(researcherAdapter.clearIdentityFields).toHaveBeenCalledWith(
-      'PID-1',
-      expect.any(Array),
-      { identityOrigin: 'automated' },
-    );
+    expect(researcherAdapter.upsertByPotentialReviewer.mock.calls[0][2]).toMatchObject({
+      automatedIdentityDecision: { decision: { status: 'unresolved' }, persistDecision: true },
+    });
+    expect(researcherAdapter.upsertByPotentialReviewer).toHaveBeenCalledTimes(1);
   });
 
   test('probable verdict → ORCID + Scholar URL written; no clear', async () => {
@@ -80,15 +70,16 @@ describe('saveToDatabase — identity gate on the email-keyed side path', () => 
     const payload = researcherAdapter.upsertByPotentialReviewer.mock.calls[0][1];
     expect(payload.orcid).toBe('0000-0001');
     expect(payload.googleScholarUrl).toContain('scholar.google.com');
-    expect(researcherAdapter.clearIdentityFields).not.toHaveBeenCalled();
+    expect(researcherAdapter.upsertByPotentialReviewer.mock.calls[0][2].automatedIdentityDecision)
+      .toMatchObject({ decision: { status: 'probable' }, persistDecision: true });
   });
 
   test('no verdict (resolver absent) → fail-open, writes as before (no regression)', async () => {
     await ContactEnrichmentService.saveToDatabase({ name: 'Dr X', affiliation: 'MIT' }, enrichment(null));
     const payload = researcherAdapter.upsertByPotentialReviewer.mock.calls[0][1];
     expect(payload.orcid).toBe('0000-0001');
-    expect(researcherAdapter.writeIdentityDecision).not.toHaveBeenCalled();
-    expect(researcherAdapter.clearIdentityFields).not.toHaveBeenCalled();
+    expect(researcherAdapter.upsertByPotentialReviewer.mock.calls[0][2])
+      .toMatchObject({ automatedIdentityDecision: { decision: null, persistDecision: false } });
   });
 
   test('emailPersistAllowed false → email-keyed side path does not look up or write by the denied email', async () => {
@@ -130,5 +121,15 @@ describe('saveToDatabase — identity gate on the email-keyed side path', () => 
     );
     const payload = researcherAdapter.upsertByPotentialReviewer.mock.calls[0][1];
     expect(payload.facultyPageUrl).toBeNull();
+  });
+
+  test('threads the initially resolved owner and disables early fill-only reuse writes', async () => {
+    const owner = { wmkf_potentialreviewersid: 'PID-1', wmkf_issyntheticreviewer: false };
+    potentialReviewerAdapter.getByEmail.mockResolvedValueOnce(owner);
+    await ContactEnrichmentService.saveToDatabase({ name: 'Dr X', affiliation: 'MIT' }, enrichment(null));
+    expect(potentialReviewerAdapter.upsertByEmail).toHaveBeenCalledWith(
+      expect.objectContaining({ email: 'x@mit.edu' }),
+      { existing: owner, readOnlyReuse: true },
+    );
   });
 });

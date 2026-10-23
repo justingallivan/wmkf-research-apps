@@ -149,6 +149,20 @@ describe('switch ON — (a) exclude marker-true rows unconditionally', () => {
   });
 });
 
+describe('automated reuse guard', () => {
+  beforeEach(() => { process.env.SYNTHETIC_REVIEWER_ISOLATION = 'on'; });
+
+  it('validates an existing owner but does not prefill shared descriptive fields', async () => {
+    const update = jest.spyOn(DynamicsService, 'updateRecord').mockResolvedValue(undefined);
+    const out = await upsertByEmail({
+      name: 'New candidate name', email: 'ada@example.edu', affiliation: 'New institution', expertise: 'New area',
+    }, { existing: ordinaryRow(), readOnlyReuse: true });
+
+    expect(out).toMatchObject({ id: ORDINARY_ID, created: false });
+    expect(update).not.toHaveBeenCalled();
+  });
+});
+
 // (c) findSyntheticByEmail's own describe block was removed with the
 // function (Opus round 2, decision): it had no production importer once
 // lib/services/test-requests/reviews-sandbox-deps.js#findAnyPersonByEmail

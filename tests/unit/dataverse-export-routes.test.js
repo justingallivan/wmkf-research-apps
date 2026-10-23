@@ -440,6 +440,30 @@ describe('run — the stateless confirm gate', () => {
     expect(put).not.toHaveBeenCalled();
   });
 
+  test('download-token mint failure after upload reports no usable download', async () => {
+    const savedSecret = process.env.NEXTAUTH_SECRET;
+    put.mockImplementationOnce(async () => {
+      delete process.env.NEXTAUTH_SECRET;
+      return { pathname: 'dataverse-export/orphaned-private-object.xlsx' };
+    });
+    try {
+      const { token } = await mintResultToken(baseSpec(), { trueTotal: 3 });
+      const res = mockRes();
+      await runHandler({ method: 'POST', body: { resultToken: token } }, res);
+
+      const events = sseEvents(res);
+      const failure = events.find(event => event.event === 'error');
+      expect(put).toHaveBeenCalledTimes(1);
+      expect(failure).toBeTruthy();
+      expect(failure.message).toMatch(/before a usable download was ready/i);
+      expect(failure.message).toMatch(/private export object may remain/i);
+      expect(events.find(event => event.event === 'ready')).toBeFalsy();
+    } finally {
+      if (savedSecret === undefined) delete process.env.NEXTAUTH_SECRET;
+      else process.env.NEXTAUTH_SECRET = savedSecret;
+    }
+  });
+
   test('truncated run still writes the blob + labels it', async () => {
     fetchXmlAll.mockResolvedValue({
       rows: [], fetched: 50000, pages: 50, capped: true, truncatedByBudget: false,

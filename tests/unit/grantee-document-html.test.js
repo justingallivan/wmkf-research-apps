@@ -106,4 +106,41 @@ describe('renderCyclePage', () => {
     expect(page).toContain('class="export-notice"');
     expect(page).toContain('Export truncated: Dataverse returned 1 of 30 award records');
   });
+
+  test('assembly omissions render escaped request numbers without internal IDs', () => {
+    const page = renderCyclePage([], {
+      omittedCount: 2,
+      omittedRequestNumbers: ['R<&1', 'R2'],
+    });
+    expect(page).toContain('2 awards could not be assembled and were omitted.');
+    expect(page).toContain('Affected requests: #R&lt;&amp;1, #R2.');
+    expect(page).not.toContain('Affected request IDs');
+  });
+
+  test('capped and omitted warnings coexist, while a true empty cycle has no omission warning', () => {
+    const page = renderCyclePage([], { capped: true, totalCount: 50, returnedCount: 20, omittedCount: 1, omittedRequestNumbers: ['1001'] });
+    expect(page.match(/class="export-notice"/g)).toHaveLength(2);
+    expect(renderCyclePage([])).not.toContain('could not be assembled');
+  });
+
+  test('omitted request-number output stays bounded and reports the overflow count', () => {
+    const numbers = Array.from({ length: 22 }, (_, index) => String(1000 + index));
+    const page = renderCyclePage([], {
+      omittedCount: 22,
+      omittedRequestNumbers: numbers,
+      omittedRequestNumbersTruncated: true,
+    });
+    expect(page).toContain('Affected requests: #1000, #1001');
+    expect(page).toContain('(first 20 of 22 shown; 2 more not shown)');
+    expect(page).not.toContain('#1020');
+    expect(page).not.toContain('00000000-');
+  });
+
+  test('missing request number uses a useful safe label', () => {
+    const page = renderCyclePage([], {
+      omittedCount: 1,
+      omittedRequestNumbers: ['Request number unavailable'],
+    });
+    expect(page).toContain('Affected requests: Request number unavailable.');
+  });
 });

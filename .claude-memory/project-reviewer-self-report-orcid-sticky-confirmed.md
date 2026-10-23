@@ -5,7 +5,7 @@ metadata:
   type: project
   status: active
   scope: reviewer
-  last_verified: 2026-10-22 via researcher.js automated ETag/anchor/stickiness and no-clear branches; no fresh deployment probe
+  last_verified: 2026-10-22 via branch-source researcher.js and three automated callers; no fresh deployment probe
 ---
 
 ## Recall Rule
@@ -40,13 +40,26 @@ source. Conditional automated writes do not supply the missing per-field lineage
 keep that limitation distinct from ETag concurrency protection. The broader
 versioned-binding work is tracked in the reviewer holistic plan.
 
-These stickiness, overlap, and ETag guarantees apply to the identity-decision
-metadata written by `writeIdentityDecision`; they do not govern every field on
-the shared person. `upsertByPotentialReviewer` writes ORCID, affiliation, and
-bibliometric fields through a separate update path and can run before the
-decision-metadata write. The 2026-10-22 source audit records this ordering gap
-for follow-up; it establishes a possible contract gap, not observed corruption
-or a proven exploit: `docs/audits/identity-coi-referral-provenance-audit-2026-10-22.md`.
+The contracts above remain scoped to `writeIdentityDecision` and
+`clearIdentityFields`. Separately, the current branch routes the three
+automated enrichment callers through `upsertByPotentialReviewer`'s combined
+field/decision ETag write. For stored `confirmed`/`probable` rows, it requires
+valid overlapping person identifiers and a match to the initially observed
+stored email before writing any enrichment field or timestamp; it recomputes
+both checks after a 412 reread. Confirmed decision metadata remains unchanged
+on a compatible enrichment, while compatible probable refreshes retain the
+existing downgrade/cap rules. Save-candidates passes resolver identity only for
+a verified, identity-bound receipt. The identity parser for this automated
+guard is separate from the legacy `writeIdentityDecision` anchor semantics.
+These are branch-source changes only; no deployment is asserted. The
+2026-10-22 audit accurately described the earlier ordering gap and possible
+contract gap at the time, not observed corruption or a proven exploit:
+`docs/audits/identity-coi-referral-provenance-audit-2026-10-22.md`.
+
+This repair does not activate the separate Wave 13 versioned lineage writer
+for automated resolver enrichment. The acceptance-drain self-report binding
+path remains distinct and must not be collapsed into the resolver
+decision-metadata contract above.
 
 Reviewer self-report capture in the acceptance drain also has a distinct
 versioned binding path through `reviewer-identity-binding-writer.js`; do not

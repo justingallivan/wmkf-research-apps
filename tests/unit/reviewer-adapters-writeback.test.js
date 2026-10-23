@@ -680,6 +680,193 @@ describe('researcher.upsertByPotentialReviewer — writes bibliometrics onto the
     expect(payload.wmkf_hindex).toBe(9);                     // metric always overwrites
   });
 
+  test('automated overlays abstain before any field or timestamp when confirmed binding is missing or different', async () => {
+    const existing = {
+      wmkf_identitystatus: 'confirmed',
+      wmkf_identityverifiedanchorsjson: JSON.stringify([{ canonicalKey: 'openalex:A1' }]),
+      wmkf_hindex: 9,
+      wmkf_primaryaffiliation: 'Existing institution',
+      _etag: 'W/"1"',
+    };
+    const get = jest.spyOn(DynamicsService, 'getRecord')
+      .mockResolvedValueOnce(existing)
+      .mockResolvedValueOnce({ ...existing, wmkf_identityverifiedanchorsjson: '{malformed' })
+      .mockResolvedValueOnce(existing);
+    const update = jest.spyOn(DynamicsService, 'updateRecord').mockResolvedValue(undefined);
+
+    const noAnchors = await upsertByPotentialReviewer('pr-strong', { hIndex: 12, affiliation: 'New institution' }, {
+      automatedIdentityDecision: { decision: null, persistDecision: false },
+    });
+    expect(noAnchors).toMatchObject({ updated: false, reason: 'continuity_unproven' });
+
+    const malformedStoredAnchors = await upsertByPotentialReviewer('pr-strong', { hIndex: 12 }, {
+      automatedIdentityDecision: {
+        decision: { status: 'probable', anchors: [{ canonicalKey: 'openalex:A1' }] },
+        persistDecision: false,
+      },
+    });
+    expect(malformedStoredAnchors).toMatchObject({ updated: false, reason: 'continuity_unproven' });
+
+    const mismatch = await upsertByPotentialReviewer('pr-strong', { hIndex: 12, affiliation: 'New institution' }, {
+      automatedIdentityDecision: {
+        decision: { status: 'probable', anchors: [{ canonicalKey: 'orcid:0000-0002-1825-0097' }] },
+        persistDecision: false,
+      },
+    });
+    expect(mismatch).toMatchObject({ updated: false, reason: 'binding_conflict' });
+    expect(get).toHaveBeenCalledTimes(3);
+    expect(update).not.toHaveBeenCalled();
+  });
+
+  test('compatible confirmed binding writes enrichment once with ETag and retains decision metadata', async () => {
+    jest.spyOn(DynamicsService, 'getRecord').mockResolvedValue({
+      wmkf_identitystatus: 'confirmed',
+      wmkf_identityverifiedanchorsjson: JSON.stringify([{ canonicalKey: 'OpenAlex:A1' }]),
+      wmkf_identityconfidenceband: 'high',
+      wmkf_identityresolverversion: 'self-report',
+      wmkf_hindex: 9,
+      _etag: 'W/"2"',
+    });
+    const update = jest.spyOn(DynamicsService, 'updateRecord').mockResolvedValue(undefined);
+    const out = await upsertByPotentialReviewer('pr-strong', { hIndex: 12, affiliation: 'Compatible institution' }, {
+      automatedIdentityDecision: {
+        decision: { status: 'probable', anchors: [{ canonicalKey: 'openalex:a1' }] },
+        persistDecision: true,
+      },
+    });
+
+    expect(out).toMatchObject({ updated: true });
+    expect(update).toHaveBeenCalledTimes(1);
+    expect(update.mock.calls[0][2]).toMatchObject({ wmkf_hindex: 12, wmkf_primaryaffiliation: 'Compatible institution' });
+    expect(update.mock.calls[0][2].wmkf_identitystatus).toBeUndefined();
+    expect(update.mock.calls[0][2].wmkf_identityconfidenceband).toBeUndefined();
+    expect(update.mock.calls[0][3]).toMatchObject({ ifMatch: 'W/"2"' });
+  });
+
+  test('compatible probable binding combines enrichment and capped decision metadata in one PATCH', async () => {
+    jest.spyOn(DynamicsService, 'getRecord').mockResolvedValue({
+      wmkf_identitystatus: 'probable',
+      wmkf_identityverifiedanchorsjson: JSON.stringify([{ canonicalKey: 'openalex:A1' }]),
+      _etag: 'W/"2p"',
+    });
+    const update = jest.spyOn(DynamicsService, 'updateRecord').mockResolvedValue(undefined);
+    await upsertByPotentialReviewer('pr-probable', { hIndex: 6 }, {
+      automatedIdentityDecision: {
+        decision: {
+          status: 'confirmed', confidenceBand: 'high', resolverVersion: 'v2', resolvedAt: 'now',
+          evidenceSummary: 'confirmed — same work', anchors: [{ canonicalKey: 'OPENALEX:a1', type: 'authorship' }],
+        },
+        persistDecision: true,
+      },
+    });
+    expect(update).toHaveBeenCalledTimes(1);
+    expect(update.mock.calls[0][2]).toMatchObject({
+      wmkf_hindex: 6,
+      wmkf_identitystatus: 'probable',
+      wmkf_identityconfidenceband: 'medium',
+      wmkf_identityresolverversion: 'v2',
+    });
+    expect(update.mock.calls[0][3]).toMatchObject({ ifMatch: 'W/"2p"' });
+  });
+
+  test.each(['missing_etag', 'wildcard_etag', 'invalid_etag', 'read_failure'])('automated write with %s performs zero PATCHes', async (state) => {
+    const get = jest.spyOn(DynamicsService, 'getRecord');
+    if (state !== 'read_failure') {
+      const etag = state === 'missing_etag' ? null : state === 'wildcard_etag' ? '*' : 'not-an-etag';
+      get.mockResolvedValue({ wmkf_identitystatus: 'unresolved', _etag: etag });
+    } else {
+      get.mockRejectedValue(new Error('read failed'));
+    }
+    const update = jest.spyOn(DynamicsService, 'updateRecord').mockResolvedValue(undefined);
+    const operation = upsertByPotentialReviewer('pr-closed', { hIndex: 3 }, {
+      automatedIdentityDecision: { decision: null, persistDecision: false },
+    });
+    if (state === 'read_failure') await expect(operation).rejects.toThrow('read failed');
+    else await expect(operation).rejects.toMatchObject({ code: 'identity_etag_missing' });
+    expect(update).not.toHaveBeenCalled();
+  });
+
+  test('invalid automated decision status cannot prove binding or trigger enrichment writes', async () => {
+    const get = jest.spyOn(DynamicsService, 'getRecord');
+    const update = jest.spyOn(DynamicsService, 'updateRecord');
+    await expect(upsertByPotentialReviewer('pr-invalid', { hIndex: 4 }, {
+      automatedIdentityDecision: {
+        decision: { status: 'invented', anchors: [{ canonicalKey: 'openalex:A1' }] },
+        persistDecision: false,
+      },
+    })).rejects.toThrow('known automated decision status required');
+    expect(get).not.toHaveBeenCalled();
+    expect(update).not.toHaveBeenCalled();
+  });
+
+  test('412 retry recomputes binding and abstains when the fresh row changed identity', async () => {
+    jest.spyOn(DynamicsService, 'getRecord')
+      .mockResolvedValueOnce({
+        wmkf_identitystatus: 'probable',
+        wmkf_identityverifiedanchorsjson: JSON.stringify([{ canonicalKey: 'openalex:A1' }]),
+        _etag: 'W/"3"',
+      })
+      .mockResolvedValueOnce({
+        wmkf_identitystatus: 'confirmed',
+        wmkf_identityverifiedanchorsjson: JSON.stringify([{ canonicalKey: 'openalex:A2' }]),
+        _etag: 'W/"4"',
+      });
+    const conflict = err412();
+    const update = jest.spyOn(DynamicsService, 'updateRecord').mockRejectedValueOnce(conflict);
+    const out = await upsertByPotentialReviewer('pr-race', { hIndex: 4 }, {
+      automatedIdentityDecision: {
+        decision: { status: 'probable', anchors: [{ canonicalKey: 'openalex:A1' }] },
+        persistDecision: true,
+      },
+    });
+    expect(out).toMatchObject({ updated: false, reason: 'binding_conflict' });
+    expect(update).toHaveBeenCalledTimes(1);
+  });
+
+  test.each([
+    ['incoming object key', [{ canonicalKey: { id: 'A1' } }], [{ canonicalKey: 'openalex:A1' }]],
+    ['incoming numeric key', [{ canonicalKey: 42 }], [{ canonicalKey: 'openalex:A1' }]],
+    ['incoming institution-only key', [{ type: 'affiliation_match', canonicalKey: 'affiliation_match:Same University' }], [{ type: 'affiliation_match', canonicalKey: 'affiliation_match:Same University' }]],
+    ['stored numeric key', [{ canonicalKey: 42 }], [{ canonicalKey: 42 }]],
+    ['case-distinct Scholar keys', [{ canonicalKey: 'scholar:AbCd_123' }], [{ canonicalKey: 'scholar:abcd_123' }]],
+  ])('automated guard rejects %s as person continuity', async (_label, storedAnchors, incomingAnchors) => {
+    jest.spyOn(DynamicsService, 'getRecord').mockResolvedValue({
+      wmkf_identitystatus: 'confirmed',
+      wmkf_identityverifiedanchorsjson: JSON.stringify(storedAnchors),
+      _etag: 'W/"binding"',
+    });
+    const update = jest.spyOn(DynamicsService, 'updateRecord').mockResolvedValue(undefined);
+    const out = await upsertByPotentialReviewer('pr-malformed-binding', { hIndex: 9 }, {
+      automatedIdentityDecision: {
+        decision: { status: 'probable', anchors: incomingAnchors },
+        persistDecision: false,
+      },
+    });
+    expect(out).toMatchObject({ updated: false });
+    expect(update).not.toHaveBeenCalled();
+  });
+
+  test('automated guard pins the fresh row email and rechecks it after 412', async () => {
+    jest.spyOn(DynamicsService, 'getRecord')
+      .mockResolvedValueOnce({
+        wmkf_emailaddress: 'a@example.edu',
+        wmkf_identitystatus: 'unresolved',
+        _etag: 'W/"email-a"',
+      })
+      .mockResolvedValueOnce({
+        wmkf_emailaddress: 'b@example.edu',
+        wmkf_identitystatus: 'unresolved',
+        _etag: 'W/"email-b"',
+      });
+    const update = jest.spyOn(DynamicsService, 'updateRecord').mockRejectedValueOnce(err412());
+    const out = await upsertByPotentialReviewer('pr-email-race', { hIndex: 6 }, {
+      automatedIdentityDecision: { decision: null, persistDecision: false },
+      expectedStoredEmail: 'a@example.edu',
+    });
+    expect(out).toMatchObject({ updated: false, reason: 'binding_conflict' });
+    expect(update).toHaveBeenCalledTimes(1);
+  });
+
   // Manual and contested sources are authoritative safety downgrades and must
   // overwrite a stale trusted value; ordinary search sources stay fill-only.
   test("emailSource:'manual'/'search_contested' OVERWRITE an existing source; ordinary search stays fill-only", async () => {

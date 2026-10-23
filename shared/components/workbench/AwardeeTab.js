@@ -198,6 +198,10 @@ export default function AwardeeTab({ requestId, context }) {
   const [dirty, setDirty] = useState(false);
   const [templateMode, setTemplateMode] = useState('auto');
   const currentRequestIdRef = useRef(requestId);
+  const currentProfileIdRef = useRef(null);
+  const mountedRef = useRef(false);
+  const previewAttemptRef = useRef(0);
+  const copyAttemptRef = useRef(0);
   const prevProfileIdRef = useRef(undefined);
   const subjectDirtyRef = useRef(false);
   const defaultLoadSeqRef = useRef(0);
@@ -417,6 +421,11 @@ export default function AwardeeTab({ requestId, context }) {
 
   useEffect(() => {
     currentRequestIdRef.current = requestId;
+    previewAttemptRef.current += 1;
+    copyAttemptRef.current += 1;
+    setFetchingHtml(false);
+    setWebsiteHtml(null);
+    setCopyMsg(null);
     abstractSaveSeqRef.current += 1;
     setSavingAbstract(false);
     setAbstractConflict(null);
@@ -426,6 +435,24 @@ export default function AwardeeTab({ requestId, context }) {
     setReplaceFile(null);
     setReplacing(false);
   }, [requestId]);
+
+  useEffect(() => {
+    currentProfileIdRef.current = currentProfile?.id;
+    previewAttemptRef.current += 1;
+    copyAttemptRef.current += 1;
+    setFetchingHtml(false);
+    setWebsiteHtml(null);
+    setCopyMsg(null);
+  }, [currentProfile?.id]);
+
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+      previewAttemptRef.current += 1;
+      copyAttemptRef.current += 1;
+    };
+  }, []);
 
   useEffect(() => {
     if (!currentProfile?.id) return;
@@ -605,12 +632,20 @@ export default function AwardeeTab({ requestId, context }) {
   // Opens the exact send HTML (with a placeholder link) in a new tab, behind a
   // PREVIEW banner so it can't be confused with a real send.
   async function previewEmail() {
+    const attempt = ++previewAttemptRef.current;
+    const previewRequestId = requestId;
+    const previewProfileId = currentProfile?.id;
+    const isCurrent = () => mountedRef.current
+      && previewAttemptRef.current === attempt
+      && currentRequestIdRef.current === previewRequestId
+      && currentProfileIdRef.current === previewProfileId;
     setError(null);
     try {
       const data = await requestJson('/api/workbench/grantee-deliverables/preview-invite', {
-        method: 'POST', body: { requestId, bodyText: body }, tolerantBody: true,
+        method: 'POST', body: { requestId: previewRequestId, bodyText: body }, tolerantBody: true,
         fallbackMessage: 'Could not render the preview.',
       });
+      if (!isCurrent()) return;
       const w = window.open('', '_blank');
       if (!w) { setError('Allow pop-ups to preview the email in a new tab.'); return; }
       const safeSubject = fillInviteSubject(subject, { title: awardTitle }).replace(/[&<>"']/g, (c) =>
@@ -626,6 +661,7 @@ export default function AwardeeTab({ requestId, context }) {
         '</body></html>');
       w.document.close();
     } catch (err) {
+      if (!isCurrent()) return;
       setError(err instanceof ApiRequestError ? err.message : 'Could not render the preview.');
     }
   }
@@ -635,23 +671,35 @@ export default function AwardeeTab({ requestId, context }) {
   // the clipboard API is unavailable (e.g. a non-secure context).
   async function copyWebsiteHtml() {
     if (!requestId) return;
+    const attempt = ++copyAttemptRef.current;
+    const copyRequestId = requestId;
+    const copyProfileId = currentProfile?.id;
+    const isCurrent = () => mountedRef.current
+      && copyAttemptRef.current === attempt
+      && currentRequestIdRef.current === copyRequestId
+      && currentProfileIdRef.current === copyProfileId;
     setFetchingHtml(true); setError(null); setCopyMsg(null);
     try {
-      const data = await requestJson(`/api/workbench/grantee-deliverables/website-html?requestId=${encodeURIComponent(requestId)}`, {
+      const data = await requestJson(`/api/workbench/grantee-deliverables/website-html?requestId=${encodeURIComponent(copyRequestId)}`, {
         tolerantBody: true,
         fallbackMessage: 'Could not build the website HTML.',
       });
+      if (!isCurrent()) return;
       setWebsiteHtml(data.html || '');
       try {
         await navigator.clipboard.writeText(data.html || '');
+        if (!isCurrent()) return;
         setCopyMsg('Website HTML copied to the clipboard.');
       } catch {
+        if (!isCurrent()) return;
         setCopyMsg('Website HTML ready — select the text below to copy.');
       }
     } catch (err) {
+      if (!isCurrent()) return;
       setError(err instanceof ApiRequestError ? err.message : 'Could not build the website HTML.');
+    } finally {
+      if (isCurrent()) setFetchingHtml(false);
     }
-    setFetchingHtml(false);
   }
 
   function closeReplace() {

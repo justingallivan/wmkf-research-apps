@@ -1084,15 +1084,15 @@ function DataverseBulkExport() {
               {runError && (
                 <div className="bg-red-50 border border-red-300 rounded-lg p-4">
                   <div className="text-base font-semibold text-red-900 mb-1">
-                    Export failed — nothing was produced
+                    Export failed — no usable download was produced
                   </div>
                   <p className="text-sm text-red-900">
                     Stage: <span className="font-mono text-xs">{runError.stage}</span>.{' '}
                     {runError.message}
                   </p>
                   <p className="text-sm text-red-900 mt-2">
-                    No file was written — there is nothing to download. A failure can never present
-                    as a short-but-complete file.
+                    No download is available. A private export object may remain if the failure
+                    happened after upload. A failure can never be mistaken for a complete file.
                     {runError.retryable
                       ? ' This condition is retryable.'
                       : ' Re-preview and adjust the filter before retrying.'}

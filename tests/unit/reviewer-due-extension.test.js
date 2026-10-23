@@ -104,9 +104,26 @@ beforeEach(() => {
   assertReviewerDirectedEmailBound.mockResolvedValue({ kind: 'ordinary' });
 });
 
+test('a changed suggestion parent is rejected before request reads, notification preparation, writes, or email', async () => {
+  suggestionAdapter.getByIdWithSelect.mockResolvedValueOnce(suggestion({
+    _wmkf_request_value: '55555555-5555-4555-8555-555555555555',
+  }));
+  const result = await saveReviewerDueDateExtension({
+    expectedRequestId: REQUEST_ID,
+    suggestionId: SUGGESTION_ID,
+    reviewDueDateOverride: '2099-09-15',
+  });
+  expect(result).toEqual({ ok: false, reason: 'request_mismatch' });
+  expect(getRequestById).not.toHaveBeenCalled();
+  expect(readRequiredEmailDefaults).not.toHaveBeenCalled();
+  expect(suggestionAdapter.updateLifecycle).not.toHaveBeenCalled();
+  expect(DynamicsService.createAndSendEmail).not.toHaveBeenCalled();
+});
+
 test('an unbound reviewer email stops the deadline change before any write', async () => {
   assertReviewerDirectedEmailBound.mockRejectedValueOnce(new Error('unbound'));
   const result = await saveReviewerDueDateExtension({
+    expectedRequestId: REQUEST_ID,
     suggestionId: SUGGESTION_ID, reviewDueDateOverride: '2099-09-15',
   });
   expect(result).toMatchObject({ ok: false, reason: 'notification_unavailable' });
@@ -121,6 +138,7 @@ test('a binding lost after the deadline write prevents dispatch', async () => {
   assertReviewerDirectedEmailBound.mockResolvedValueOnce({ kind: 'ordinary' })
     .mockRejectedValueOnce(Object.assign(new Error('unbound'), { dispatched: false }));
   const result = await saveReviewerDueDateExtension({
+    expectedRequestId: REQUEST_ID,
     suggestionId: SUGGESTION_ID, reviewDueDateOverride: '2099-09-15',
   });
   expect(result).toMatchObject({ ok: false, saved: true, notified: false, retryable: true, reason: 'send_failed' });
@@ -138,6 +156,7 @@ afterAll(() => {
 
 test('saves first, then automatically sends the confirmed reviewer a fixed-subject calendar update', async () => {
   const result = await saveReviewerDueDateExtension({
+    expectedRequestId: REQUEST_ID,
     suggestionId: SUGGESTION_ID,
     reviewDueDateOverride: '2099-09-15',
     actingUserSystemId: PD_ID,
@@ -191,6 +210,7 @@ test('falls back to the linked reviewer identity when a legacy accepted row has 
   });
 
   const result = await saveReviewerDueDateExtension({
+    expectedRequestId: REQUEST_ID,
     suggestionId: SUGGESTION_ID,
     reviewDueDateOverride: '2099-09-15',
   });
@@ -215,6 +235,7 @@ test('fills only missing identity fields and keeps confirmed engagement snapshot
   });
 
   const result = await saveReviewerDueDateExtension({
+    expectedRequestId: REQUEST_ID,
     suggestionId: SUGGESTION_ID,
     reviewDueDateOverride: '2099-09-15',
   });
@@ -237,6 +258,7 @@ test('still fails before writing when neither the snapshots nor linked reviewer 
   getPotentialReviewerById.mockRejectedValueOnce(new Error('Dataverse unavailable'));
 
   const result = await saveReviewerDueDateExtension({
+    expectedRequestId: REQUEST_ID,
     suggestionId: SUGGESTION_ID,
     reviewDueDateOverride: '2099-09-15',
   });
@@ -252,6 +274,7 @@ test('restoring clears the override and notifies with the original deadline', as
   }));
 
   const result = await saveReviewerDueDateExtension({
+    expectedRequestId: REQUEST_ID,
     suggestionId: SUGGESTION_ID,
     reviewDueDateOverride: null,
   });
@@ -270,12 +293,14 @@ test('restoring clears the override and notifies with the original deadline', as
 test('rejects non-accepted rows and dates that are not after the original deadline before writing', async () => {
   suggestionAdapter.getByIdWithSelect.mockResolvedValueOnce(suggestion({ wmkf_accepted: false }));
   await expect(saveReviewerDueDateExtension({
+    expectedRequestId: REQUEST_ID,
     suggestionId: SUGGESTION_ID,
     reviewDueDateOverride: '2099-09-15',
   })).resolves.toEqual({ ok: false, reason: 'ineligible' });
 
   suggestionAdapter.getByIdWithSelect.mockResolvedValueOnce(suggestion());
   await expect(saveReviewerDueDateExtension({
+    expectedRequestId: REQUEST_ID,
     suggestionId: SUGGESTION_ID,
     reviewDueDateOverride: '2099-09-01',
   })).resolves.toEqual({ ok: false, reason: 'invalid_extension_date' });
@@ -291,6 +316,7 @@ test('rejects review-received status even when its receipt timestamp is anomalou
   }));
 
   await expect(saveReviewerDueDateExtension({
+    expectedRequestId: REQUEST_ID,
     suggestionId: SUGGESTION_ID,
     reviewDueDateOverride: '2099-09-15',
   })).resolves.toEqual({ ok: false, reason: 'ineligible' });
@@ -303,6 +329,7 @@ test('rejects an unchanged extension so save cannot become an accidental resend'
   }));
 
   await expect(saveReviewerDueDateExtension({
+    expectedRequestId: REQUEST_ID,
     suggestionId: SUGGESTION_ID,
     reviewDueDateOverride: '2099-09-15',
   })).resolves.toEqual({ ok: false, reason: 'no_change' });
@@ -316,6 +343,7 @@ test('fails before writing or notifying when the requested deadline exceeds the 
   }));
 
   await expect(saveReviewerDueDateExtension({
+    expectedRequestId: REQUEST_ID,
     suggestionId: SUGGESTION_ID,
     reviewDueDateOverride: '2099-09-15',
   })).resolves.toEqual({ ok: false, reason: 'token_recovery_required' });
@@ -332,6 +360,7 @@ test('allows a pre-materials deadline extension when no token has been issued ye
   }));
 
   await expect(saveReviewerDueDateExtension({
+    expectedRequestId: REQUEST_ID,
     suggestionId: SUGGESTION_ID,
     reviewDueDateOverride: '2099-09-15',
   })).resolves.toMatchObject({ ok: true, effectiveReviewDeadline: '2099-09-15' });
@@ -341,6 +370,7 @@ test('keeps the saved deadline and returns retryable partial success when sendin
   DynamicsService.createAndSendEmail.mockRejectedValueOnce(Object.assign(new Error('mail unavailable'), { dispatched: false }));
 
   const result = await saveReviewerDueDateExtension({
+    expectedRequestId: REQUEST_ID,
     suggestionId: SUGGESTION_ID,
     reviewDueDateOverride: '2099-09-15',
   });
@@ -360,6 +390,7 @@ test('fails before writing when the fresh suggestion row lacks a concurrency tok
   suggestionAdapter.getByIdWithSelect.mockResolvedValueOnce(suggestion({ _etag: null }));
 
   const result = await saveReviewerDueDateExtension({
+    expectedRequestId: REQUEST_ID,
     suggestionId: SUGGESTION_ID,
     reviewDueDateOverride: '2099-09-15',
   });
@@ -374,7 +405,7 @@ test('retry re-reads and sends the currently stored effective deadline without a
     wmkf_reviewduedateoverride: '2099-09-20',
   }));
 
-  const result = await retryReviewerDueDateNotification({ suggestionId: SUGGESTION_ID });
+  const result = await retryReviewerDueDateNotification({ suggestionId: SUGGESTION_ID, expectedRequestId: REQUEST_ID });
 
   expect(result).toMatchObject({ ok: true, saved: false, notified: true, effectiveReviewDeadline: '2099-09-20' });
   expect(suggestionAdapter.updateLifecycle).not.toHaveBeenCalled();
@@ -387,7 +418,7 @@ test('retry send failure reports no date write and remains retryable', async () 
   }));
   DynamicsService.createAndSendEmail.mockRejectedValueOnce(Object.assign(new Error('mail unavailable'), { dispatched: false }));
 
-  const result = await retryReviewerDueDateNotification({ suggestionId: SUGGESTION_ID });
+  const result = await retryReviewerDueDateNotification({ suggestionId: SUGGESTION_ID, expectedRequestId: REQUEST_ID });
 
   expect(result).toMatchObject({
     ok: false,
@@ -404,6 +435,7 @@ test('fails before writing when Dynamics impersonation is disabled', async () =>
   process.env.DYNAMICS_IMPERSONATION_ENABLED = 'false';
 
   const result = await saveReviewerDueDateExtension({
+    expectedRequestId: REQUEST_ID,
     suggestionId: SUGGESTION_ID,
     reviewDueDateOverride: '2099-09-15',
   });
@@ -421,6 +453,7 @@ test('fails before writing when the admin body omits required recipient/date/sig
   });
 
   const result = await saveReviewerDueDateExtension({
+    expectedRequestId: REQUEST_ID,
     suggestionId: SUGGESTION_ID,
     reviewDueDateOverride: '2099-09-15',
   });
@@ -433,6 +466,7 @@ test('fails before writing when the admin body omits required recipient/date/sig
 test('fails before writing when sender or confirmed recipient prerequisites are unavailable', async () => {
   getSystemUserById.mockResolvedValueOnce(null);
   const missingPd = await saveReviewerDueDateExtension({
+    expectedRequestId: REQUEST_ID,
     suggestionId: SUGGESTION_ID,
     reviewDueDateOverride: '2099-09-15',
   });
@@ -445,6 +479,7 @@ test('fails before writing when sender or confirmed recipient prerequisites are 
   });
   suggestionAdapter.getByIdWithSelect.mockResolvedValueOnce(suggestion({ wmkf_revieweremail: null }));
   const missingRecipient = await saveReviewerDueDateExtension({
+    expectedRequestId: REQUEST_ID,
     suggestionId: SUGGESTION_ID,
     reviewDueDateOverride: '2099-09-15',
   });
@@ -461,18 +496,21 @@ test('distinguishes structured missing rows, transient reads, and write conflict
     dataverseCode: '0x80040217',
   });
   await expect(saveReviewerDueDateExtension({
+    expectedRequestId: REQUEST_ID,
     suggestionId: SUGGESTION_ID,
     reviewDueDateOverride: '2099-09-15',
   })).resolves.toEqual({ ok: false, reason: 'not_found' });
 
   suggestionAdapter.getByIdWithSelect.mockRejectedValueOnce(new Error('Dataverse unavailable'));
   await expect(saveReviewerDueDateExtension({
+    expectedRequestId: REQUEST_ID,
     suggestionId: SUGGESTION_ID,
     reviewDueDateOverride: '2099-09-15',
   })).resolves.toEqual({ ok: false, reason: 'read_failed' });
 
   suggestionAdapter.updateLifecycle.mockRejectedValueOnce(Object.assign(new Error('changed'), { status: 412 }));
   await expect(saveReviewerDueDateExtension({
+    expectedRequestId: REQUEST_ID,
     suggestionId: SUGGESTION_ID,
     reviewDueDateOverride: '2099-09-15',
   })).resolves.toMatchObject({ ok: false, reason: 'conflict' });
@@ -484,6 +522,7 @@ test('classifies adapter race rejections without exposing internal error text', 
     new Error(`reviewer-suggestion.updateLifecycle: refusing to mutate an applicant-excluded suggestion (${SUGGESTION_ID})`),
   );
   const excluded = await saveReviewerDueDateExtension({
+    expectedRequestId: REQUEST_ID,
     suggestionId: SUGGESTION_ID,
     reviewDueDateOverride: '2099-09-15',
   });
@@ -493,6 +532,7 @@ test('classifies adapter race rejections without exposing internal error text', 
     new Error('reviewer-suggestion: reviewDueDateOverride must be today or later'),
   );
   const crossedMidnight = await saveReviewerDueDateExtension({
+    expectedRequestId: REQUEST_ID,
     suggestionId: SUGGESTION_ID,
     reviewDueDateOverride: '2099-09-15',
   });

@@ -172,16 +172,41 @@ applicant-excluded collision becomes read-only `blocked`. The placeholder-key
 hazard remains documented in
 `docs/atlas/postgres-reviewer-find-roster.md`.
 
-**Shared-person monotonicity (source contract; the original 2026-07-29
-snapshot recorded not deployed).** Stored `confirmed` decision metadata is
-sticky, `probable` resists unresolved/ambiguous downgrades, and incoming
-automated `confirmed` decisions are capped at `probable`; a
-probable refresh requires overlapping trusted anchors. A different-binding
-result abstains and alerts rather than overwriting identity-decision metadata for a
-person shared by other requests. This guarantee is scoped to the decision metadata
-write; other person-field writers have separate contracts. Compatibility writes
-require the person ETag. Normal edits ignore an
-empty email; an intentional clear is a distinct exact-value/source/reason/ETag
+**Shared-person automated persistence (current branch source; not a deployment
+claim).** The three automated enrichment paths—Reviewer Finder save,
+contact-enrichment persistence, and Workbench recommended-reviewer enrichment—send
+field updates and any permitted decision update through one `researcherAdapter`
+ETag-conditional write. Before any fields or timestamps are written to a stored
+`confirmed` or `probable` person, the fresh row must still match the caller's
+initially observed email and the stored and incoming decisions must overlap on a
+valid person identifier: checksum-valid ORCID, OpenAlex author ID, or Scholar
+profile ID. Affiliation-only anchors, malformed/coerced keys, missing anchors,
+and disjoint identifiers do not establish continuity; the automated overlay is
+withheld. The expected stored email and identity checks are recomputed after a
+412 reread before the bounded retry. Compatible `confirmed` rows may receive
+enrichment such as metrics while their confirmed decision metadata stays
+unchanged. A compatible `probable` refresh retains the existing status rules,
+including refusing unresolved/ambiguous downgrades and capping incoming
+automated `confirmed` metadata at `probable`.
+
+Save-candidates supplies the resolver decision to this guard only when the
+server-verified receipt is valid and explicitly identity-bound. Existing
+server-owned roster and validated-seed authority still governs its other
+contact/save policy, but does not substitute for that automated decision
+binding. Reusing an existing person during automated save skips the early
+candidate-derived descriptive-field fill so the guarded researcher write owns
+those changes. Explicit PD contact correction and manual Add/Refer retain their
+separate staff-authorized behavior. Workbench Contact ORCID back-propagation
+follows only a successful guarded write and rereads the canonical person before
+using its ORCID. These are branch-source contracts, not a statement that the
+changes are deployed.
+
+This combined enrichment guard is separate from `writeIdentityDecision` and
+`clearIdentityFields`, whose legacy origin, stickiness, and clear semantics
+remain scoped to their own explicit operations. The automated guard does not
+activate the separate Wave 13 versioned lineage writer for resolver enrichment;
+per-field lineage remains a distinct concern. Normal edits ignore an empty
+email; an intentional clear is a distinct exact-value/source/reason/ETag
 command.
 
 ## Future Work — Edit-and-Re-Resolve (Deferred)

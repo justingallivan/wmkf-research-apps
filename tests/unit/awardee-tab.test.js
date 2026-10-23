@@ -661,6 +661,78 @@ test('Preview email renders into a new tab without sending (no send-invite call)
   openSpy.mockRestore();
 });
 
+test('a preview for request A cannot open after the component switches to request B', async () => {
+  const requestA = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa';
+  const requestB = 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb';
+  let resolveA;
+  let resolveB;
+  const h = mountReadyFetch();
+  h.preview = (_url, opts) => new Promise((resolve) => {
+    const request = JSON.parse(opts.body).requestId;
+    if (request === requestA) resolveA = resolve;
+    else resolveB = resolve;
+  });
+  const openSpy = jest.spyOn(window, 'open').mockReturnValue({ document: { write: jest.fn(), close: jest.fn() } });
+  const { rerender } = render(<AwardeeTab requestId={requestA} context={CYCLE_CTX} />);
+  await waitFor(() => expect(screen.getByLabelText('To email')).toBeInTheDocument());
+  fireEvent.click(screen.getByRole('button', { name: /preview email/i }));
+  await waitFor(() => expect(resolveA).toBeDefined());
+
+  rerender(<AwardeeTab requestId={requestB} context={CYCLE_CTX} />);
+  fireEvent.click(screen.getByRole('button', { name: /preview email/i }));
+  await waitFor(() => expect(resolveB).toBeDefined());
+  await act(async () => resolveB({ ok: true, json: async () => ({ html: '<p>B</p>' }) }));
+  expect(openSpy).toHaveBeenCalledTimes(1);
+  await act(async () => resolveA({ ok: true, json: async () => ({ html: '<p>A</p>' }) }));
+  expect(openSpy).toHaveBeenCalledTimes(1);
+  openSpy.mockRestore();
+});
+
+test('stale preview rejection after unmount does not report a false error', async () => {
+  let rejectPreview;
+  const h = mountReadyFetch();
+  h.preview = () => new Promise((_resolve, reject) => { rejectPreview = reject; });
+  const { unmount } = render(<AwardeeTab requestId={REQ} context={CYCLE_CTX} />);
+  await waitFor(() => expect(screen.getByLabelText('To email')).toBeInTheDocument());
+  fireEvent.click(screen.getByRole('button', { name: /preview email/i }));
+  await waitFor(() => expect(rejectPreview).toBeDefined());
+  unmount();
+  await act(async () => rejectPreview(new Error('late failure')));
+});
+
+test('only the latest preview attempt may open, even for the same request and profile', async () => {
+  const pending = [];
+  const h = mountReadyFetch();
+  h.preview = () => new Promise((resolve) => pending.push(resolve));
+  const openSpy = jest.spyOn(window, 'open').mockReturnValue({ document: { write: jest.fn(), close: jest.fn() } });
+  render(<AwardeeTab requestId={REQ} context={CYCLE_CTX} />);
+  await waitFor(() => expect(screen.getByLabelText('To email')).toBeInTheDocument());
+  const preview = screen.getByRole('button', { name: /preview email/i });
+  fireEvent.click(preview);
+  fireEvent.click(preview);
+  await waitFor(() => expect(pending).toHaveLength(2));
+  await act(async () => pending[1]({ ok: true, json: async () => ({ html: '<p>latest</p>' }) }));
+  await act(async () => pending[0]({ ok: true, json: async () => ({ html: '<p>stale</p>' }) }));
+  expect(openSpy).toHaveBeenCalledTimes(1);
+  openSpy.mockRestore();
+});
+
+test('profile change invalidates a pending preview before it opens', async () => {
+  let resolvePreview;
+  const h = mountReadyFetch();
+  h.preview = () => new Promise((resolve) => { resolvePreview = resolve; });
+  const openSpy = jest.spyOn(window, 'open');
+  const { rerender } = render(<AwardeeTab requestId={REQ} context={CYCLE_CTX} />);
+  await waitFor(() => expect(screen.getByLabelText('To email')).toBeInTheDocument());
+  fireEvent.click(screen.getByRole('button', { name: /preview email/i }));
+  await waitFor(() => expect(resolvePreview).toBeDefined());
+  mockProfileId = 'p2';
+  rerender(<AwardeeTab requestId={REQ} context={CYCLE_CTX} />);
+  await act(async () => resolvePreview({ ok: true, json: async () => ({ html: '<p>stale</p>' }) }));
+  expect(openSpy).not.toHaveBeenCalled();
+  openSpy.mockRestore();
+});
+
 // --- Deliverable outputs (chunk 8 b/c; Close-out pane since S412) ---
 
 // The outputs moved out of the shared footer into the third pane, so every test
@@ -701,6 +773,23 @@ test('Copy website HTML still shows the fragment when the clipboard API is unava
   fireEvent.click(screen.getByRole('button', { name: /copy website html/i }));
   await waitFor(() => expect(screen.getByLabelText('Website HTML')).toBeInTheDocument());
   expect(screen.getByText(/select the text below to copy/i)).toBeInTheDocument();
+});
+
+test('a pending clipboard completion after request change cannot show a stale copied message', async () => {
+  const requestB = 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb';
+  let resolveClipboard;
+  mountReadyFetch();
+  const writeText = jest.fn(() => new Promise((resolve) => { resolveClipboard = resolve; }));
+  Object.defineProperty(navigator, 'clipboard', { value: { writeText }, configurable: true });
+  const { rerender } = render(<AwardeeTab requestId={REQ} context={CYCLE_CTX} />);
+  await waitFor(() => expect(screen.getByLabelText('To email')).toBeInTheDocument());
+  await openCloseout();
+  fireEvent.click(screen.getByRole('button', { name: /copy website html/i }));
+  await waitFor(() => expect(writeText).toHaveBeenCalled());
+  rerender(<AwardeeTab requestId={requestB} context={CYCLE_CTX} />);
+  await act(async () => resolveClipboard());
+  expect(screen.queryByText(/copied to the clipboard/i)).not.toBeInTheDocument();
+  expect(screen.queryByText(/select the text below to copy/i)).not.toBeInTheDocument();
 });
 
 test('a website-html error surfaces and no fragment is shown', async () => {
