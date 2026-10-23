@@ -10,7 +10,7 @@ remain untouched.
 
 ## Work ledger
 
-| Area | Evidence / disposition | Remaining execution |
+| Area | Original finding / evidence | Current disposition |
 |---|---|---|
 | Enforcement coverage | Sol traced selected gates, CI and configured Claude hooks. Luna repaired CI inventory, Stop-mode distinctions, startup law-mode/ledger guidance and two gate memories. | Reviewed and committed in `31f5e26b0`; scoped documentation checks passed. Configured Claude hooks do not establish Codex invocation. |
 | Prompt/output contracts | Sole-current lookup is name + iscurrent, not a prompt-status predicate. Shared create-only seeds and legacy reviewer in-place seeds are separate contracts. Executor rejects incomplete output before business persistence. | Luna clarified Executor wording; preserve existing governance policy. |
@@ -53,7 +53,7 @@ The retained redacted artifact is
 
 ## Verification and decision boundaries
 
-Documentation/evidence is recorded in local commit `31f5e26b0`; runtime validation is recorded below.
+Documentation/evidence is recorded in local commit `31f5e26b0`; runtime repairs and focused validation are recorded in `e86e5f80d` and below.
 Documentation gates are not proof of live behavior. Runtime repairs remain
 unreleased until the repository's Tier 2 promotion requirements and explicit
 owner release decision are satisfied. Changes requiring new product policy
@@ -90,7 +90,7 @@ adapter state/race tests and separate caller-threading tests have distinct scope
 | P2 policy | Preserve known unresolved manual/COI/exclusion questions | Broad/HHMI UI/server selectability, sparse manual screening, foundation exclusion breadth and excluded-producer coverage require focused evidence/design | Existing owner decisions are not changed. |
 | P2 output lifecycle | Decide proposal public-cache and DVX retention | Inventory authorized store metadata/access/retention; propose exact scope before lifecycle changes | Token expiry is not Blob deletion. No live objects touched. |
 | P2 evidence | Verify deployed flags, external callers and effective privileges when needed | Values/effective behavior require a separate authorized evidence plan; metadata presence, direct roles and visible-flow searches are insufficient | IRS local DB counts and current prompt metadata are dated scoped observations. |
-| P2 documentation | Refresh stale origination topic and remaining model/output claims | Source/metadata trace per claim, including current model override and prompt contents/schema; topic is explicitly stale, not silently redated | No paid generation, reseeding or publication as a probe. |
+| P2 live evidence | Establish current model/output configuration only when needed | Origination code claims received a fresh source trace; August model/admin observations remain historical. Current override and prompt contents/schema need bounded evidence before a live-behavior claim | No paid generation, reseeding or publication as a probe. |
 | P3 structure | Optional small handoff extraction and remaining non-active inventory | Grantee email and Site Visit notes retain useful owner decisions; 32 non-active leaves remain outside active census | Advisory size/weak-basis flags are not defects and are not suppressed. |
 
 All-claim and whole-live-state verification remains **AUDIT INCOMPLETE**. The
@@ -128,8 +128,11 @@ effect regions. No full-build or hosted verification is inferred.
 body hashes match the manifest. Boundary newlines are distinct from source body
 bytes. Two documented source corrections are explicit; later due-date branch
 notes sit outside the preserved extraction blocks. The topic expiry discovered
-for origination was marked stale, preserving its August evidence date; its model
-observation was not silently promoted to today's deployed state.
+for origination was first marked stale, then independently checked against current
+source. Sol confirmed disabled Track B, removed query generation, default count
+15, route orchestration and recency ranking. Luna corrected fixed-versus-requested
+count and the historical next-cycle expectation; scoped verification does not
+refresh the August model/admin observation into today's deployed state.
 
 Memory health remains advisory: **16 flags / 304 leaves**, comprising eight
 shadow-Atlas, six weak-basis and two oversize-routed flags. The exact weak-basis

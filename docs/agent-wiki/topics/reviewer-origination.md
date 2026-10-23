@@ -1,7 +1,8 @@
 ---
 agent_wiki: topic
-status: stale
-last_verified: 2026-08-23
+status: active
+last_verified: 2026-10-22
+verification_scope: "Scoped repository-source review of requested reviewer-count handling and proposal-input status only; no whole-page or live-state recertification"
 stale_after_days: 60
 owner: reviewer-finder
 source_files:
@@ -41,11 +42,12 @@ lanes, provenance, ranking, and the recall-vs-precision posture. For who a
 candidate *is* (identity, contact, COI, PI identity), use the
 [Reviewer Identity](reviewer-identity.md) page instead.
 
-> **Stale page-level review:** the last whole-page review was 2026-08-23 and its
-> 60-day freshness window has expired. The dated experiment and owner decisions
-> remain historical evidence; current source or live-state claims need a scoped
-> recheck before use. A source-only check of the model note on 2026-10-22 did not
-> recertify this page or probe live settings.
+> **Scoped source review (2026-10-22):** only requested reviewer-count handling
+> and proposal-input status were checked against repository sources and the
+> linked durable note. This date does not recertify the whole page or live state.
+> The model entry remains a 2026-08-23 observation; current setting, runtime
+> resolution, and deployment remain unprobed. Other dated experiments and owner
+> decisions retain their original evidence scope.
 
 ## Production Signal & Current Posture
 
@@ -102,8 +104,9 @@ Holistic-review analysis: `docs/audits/reviewer-holistic-review-fable-2026-07-08
   S286 switch away from Sonnet was justified by a niche
   out-of-mainstream proposal (synthetic torpor; req 1002821) Sonnet 4.6 fell into a
   token-repetition/hallucination loop: it could confidently name only the ~6 reviewers
-  the applicant already cited in the proposal prose, then padded the fixed 15-quota with
-  an invented, repeated name ("Dr. Bhanu Bhanu") until truncation — intermittently
+  the applicant already cited in the proposal prose, then padded that run's requested
+  15-reviewer target with an invented, repeated name ("Dr. Bhanu Bhanu") until
+  truncation — intermittently
   hard-failing the whole search (`analysis_invalid`). Opus 4.8 handled the same proposal
   cleanly on the first attempt and added real *independent* names. Two code guardrails
   shipped with it: (1) a code-owned anti-fabrication block (`ANALYZE_INTEGRITY_BLOCK`,
@@ -218,9 +221,12 @@ bare keyword→author lane is what underperformed.
 - **Coverage is a union; surface removals.** When a lane or filter removes a
   candidate the PD might expect, surface it (excluded-summary) rather than hiding it.
   Count invariants live in memory `project-reviewer-count-invariant`.
-- **Proposal-doc context is thin in Phase I (no bibliography).** Phase I under-delivers
-  on signal; the next cycle combines Phase I+II with a bibliography assembled by a
-  Power Automate flow. Memory `project-reviewer-finder-proposal-doc-context`.
+- **Proposal-input history and next-cycle status:** the earlier plan expected the
+  combined Phase I+II cycle to collect a bibliography assembled by a Power Automate
+  flow. That is a historical planning expectation; the next-cycle intake and
+  Reviewer Finder input configuration are not established by the current repository
+  evidence. Check the current Reviewer Materials producer and the routing in
+  memory `project-reviewer-finder-proposal-doc-context` before relying on that expectation.
 - **OpenAlex MERGES same-name authors.** Use the ORCID works list as the corpus, not
   a name lookup. Memory `project-openalex-merge-use-orcid-works`.
 - **Applicant exclusion breadth is an open policy decision** — one vague
@@ -230,7 +236,8 @@ bare keyword→author lane is what underperformed.
   It IS injected into the analyze prompt as `ADDITIONAL CONTEXT FROM USER`
   (`shared/config/prompts/reviewer-finder.js`, `reviewer-prompt-composer.js`), but three
   code-owned mechanisms downstream defeat a prompt-only "use these names" instruction:
-  the fixed target count (`DEFAULT_REVIEWER_COUNT`), the appended anti-fabrication
+  the requested reviewer count (default 15; the route accepts `reviewerCount` and
+  the UI varies the requested count), the appended anti-fabrication
   `ANALYZE_INTEGRITY_BLOCK` (return FEWER rather than include an unresolvable name), and
   discover-stage verification/ranking. A PD pasting a known-names list into notes will get
   only *some* back — expected, not a bug. Guaranteeing referred/PD-recommended names is now
