@@ -3,7 +3,7 @@ title: Private Store and Release Preparation Receipt
 domain: engineering-process
 kind: audit
 status: active
-summary: "Local Ubuntu core checks passed with documented skips. Tested Linux FFmpeg 6.1.1 and macOS FFmpeg 9.0.2 builds differ on identical output bytes; exact Production artifact parity and three release decision groups remain open."
+summary: "Local Ubuntu core checks passed with documented skips. The exact pinned private FFmpeg archive and its Linux media behavior are verified in a bounded emulated harness; current Production configuration and three release decision groups remain open."
 canonical: false
 cataloged: 2026-10-22
 last_verified: 2026-10-23
@@ -19,6 +19,7 @@ related:
   - docs/audits/linux-ci-evidence-2026-10-23.json
   - docs/audits/ffmpeg-media-investigation-2026-10-23.md
   - docs/audits/ffmpeg-media-evidence-2026-10-23.json
+  - docs/audits/pinned-ffmpeg-linux-evidence-2026-10-23.json
   - docs/audits/blob-store-binding-evidence-2026-10-22.json
   - docs/audits/blob-retention-metadata-evidence-2026-10-22.json
 ---
@@ -26,7 +27,7 @@ related:
 # Private Store and Release Preparation Receipt
 
 **Assessment date:** 2026-10-22 (America/Los_Angeles); rehearsal update 2026-10-22 (America/Los_Angeles).
-**Status:** Fully gated candidate `81b8a063b` passed its recorded isolated Node 22/macOS checks: Turbopack build, browser suite, ESLint, 42 npm check gates, Jest coverage run, and selected PostgreSQL integration suites. Fixture candidate `9b2ec0060` passed its scoped build, 51-test browser suite, focused unit suites, scoped ESLint, diff check, and two headless CLI smoke runs. The assessed code candidate `eaa126028d7918c94340e75f1ea3213ad041f010` is a four-document descendant of `9b2ec0060`, with unchanged code/test and runtime/dependency trees; the `9b` scoped results therefore apply to the same code and test bytes through `eaa`. The reviewed comparison is recorded in [lineage evidence](release-candidate-lineage-2026-10-22.json). Candidate `94447672fe04a788b0e6aadb5deeb9d2fc85e82a` received local Ubuntu workflow-equivalent verification with core checks passed and documented Jest skips. Follow-up cross-decoder checks show different behavior between the tested Linux FFmpeg 6.1.1 and macOS FFmpeg 9.0.2 builds on the same encoded MP4 bytes. The initial Linux run retained one diagnostic; follow-up diagnostics reproduced all seven `audio_past_cut` failures. The exact pinned `9.0.2-23` private artifact and current Production pathname remain unverified; see the [Linux verification record](linux-ci-verification-2026-10-23.md) and [FFmpeg investigation](ffmpeg-media-investigation-2026-10-23.md). The guided human session remains the partial observation on candidate `5b1656b3dfad110fb5d23fc4fa2514d573e6a638`. Three release-decision groups remain open as listed in the [release-candidate checklist](release-candidate-checklist-2026-10-22.md): disposition of internal staff/reviewer-role outcomes, authorized hosted-target and rollback verification, and the final owner promotion decision with strategy §12 operating controls. External first-time reviewer usability remains unverified and is not an external-recruitment prerequisite under current owner direction. Private Dataverse-export Blob store binding remains unknown as a separate investigation; no release dependency has been established.
+**Status:** Fully gated candidate `81b8a063b` passed its recorded isolated Node 22/macOS checks: Turbopack build, browser suite, ESLint, 42 npm check gates, Jest coverage run, and selected PostgreSQL integration suites. Fixture candidate `9b2ec0060` passed its scoped build, 51-test browser suite, focused unit suites, scoped ESLint, diff check, and two headless CLI smoke runs. The assessed code candidate `eaa126028d7918c94340e75f1ea3213ad041f010` is a four-document descendant of `9b2ec0060`, with unchanged code/test and runtime/dependency trees; the `9b` scoped results therefore apply to the same code and test bytes through `eaa`. The reviewed comparison is recorded in [lineage evidence](release-candidate-lineage-2026-10-22.json). Candidate `94447672fe04a788b0e6aadb5deeb9d2fc85e82a` received local Ubuntu workflow-equivalent verification with core checks passed and documented Jest skips. Historical cross-decoder checks show different behavior between tested Linux FFmpeg 6.1.1 and macOS FFmpeg 9.0.2 builds on identical encoded MP4 bytes. A later bounded private read verified the fixed-path archive at 151,144,252 bytes against the pinned SHA-256; the canonical installer succeeded, a separate binary preflight verified pinned x86-64 FFmpeg/ffprobe and their version lines, and the unchanged 26-test media suite passed 26/26 on a Debian 12 Linux ARM64 harness using those binaries through emulation. This does not establish a native x86-64 application stack or the current Production revision/effective pathname. Details are in the [pinned Linux evidence](pinned-ffmpeg-linux-evidence-2026-10-23.json), [Linux verification record](linux-ci-verification-2026-10-23.md), and [FFmpeg investigation](ffmpeg-media-investigation-2026-10-23.md). The guided human session remains the partial observation on candidate `5b1656b3dfad110fb5d23fc4fa2514d573e6a638`. Three release-decision groups remain open as listed in the [release-candidate checklist](release-candidate-checklist-2026-10-22.md): disposition of internal staff/reviewer-role outcomes, authorized hosted-target and rollback verification, and the final owner promotion decision with strategy §12 operating controls. External first-time reviewer usability remains unverified and is not an external-recruitment prerequisite under current owner direction. Private Dataverse-export Blob store binding remains unknown as a separate investigation; no release dependency has been established.
 **Fully gated candidate:** `81b8a063b`; **latest code/test candidate:** `9b2ec0060`; **assessed code candidate:** `eaa126028d7918c94340e75f1ea3213ad041f010`; **human observation candidate:** `5b1656b3dfad110fb5d23fc4fa2514d573e6a638`; application runtime checkpoint `4720980ed`. Earlier release evidence below includes candidate `c589cbb6e` (`codex/memory-audit-followups`) and remains scoped to that candidate.
 
 This receipt records the evidence available for the local release candidate and
@@ -42,10 +43,11 @@ later candidates. The `9b2ec0060` scoped test results apply through
 comparison found only four documentation changes. Human rehearsal, hosted
 verification, and release authorization remain separate and incomplete. A
 later local Ubuntu run provides workflow-equivalent core-check evidence with
-documented skips. Follow-up tests show a behavior difference between the tested
-Linux FFmpeg 6.1.1 and macOS FFmpeg 9.0.2 builds on the same encoded outputs,
-while exact Production artifact parity remains unverified. The results do not
-claim hosted GitHub Actions, amd64, or Production media evidence.
+documented skips. Historical tests show a behavior difference between Linux
+FFmpeg 6.1.1 and macOS FFmpeg 9.0.2 on identical encoded outputs. The exact
+pinned archive and its 26-test Linux media behavior are now verified within the
+bounded emulated harness; this does not claim hosted GitHub Actions, a native
+x86-64 application stack, or the media binary currently used by Production.
 
 ## Later fixture candidate `9b2ec0060`
 
@@ -187,12 +189,15 @@ partial materials to remain nonblocking, and submitted authoring to remain locke
 Current Stage 2b uses in-browser authoring; its former file-upload control is not
 a missing rehearsal fixture. Internal staff observation is partial, not
 complete; human rehearsal, hosted verification, and release authorization remain
-separate gates. The later local Ubuntu core checks passed with skips. Follow-up
-diagnostics reproduced all seven `audio_past_cut` failures under the tested
-Linux FFmpeg 6.1.1 build; the same encoded outputs passed on the isolated macOS
-FFmpeg 9.0.2 build. The pinned Production archive remains unverified, as
-recorded in the [Linux verification record](linux-ci-verification-2026-10-23.md)
-and [FFmpeg investigation](ffmpeg-media-investigation-2026-10-23.md).
+separate gates. The later local Ubuntu core checks passed with skips. Historical
+diagnostics reproduced all seven `audio_past_cut` failures under Linux FFmpeg
+6.1.1; the same outputs passed under macOS FFmpeg 9.0.2. A later bounded read
+verified the exact pinned archive, and the unmodified media suite passed 26/26
+on a Linux ARM64 harness using the pinned x86-64 binaries through emulation.
+Current Production configuration remains unverified. See the [Linux
+verification record](linux-ci-verification-2026-10-23.md), [FFmpeg
+investigation](ffmpeg-media-investigation-2026-10-23.md), and [pinned Linux
+evidence](pinned-ffmpeg-linux-evidence-2026-10-23.json).
 The current owner direction uses internal
 staff for staff and role-played reviewer tasks; external first-time usability
 remains unverified, with no external recruitment prerequisite. See the
@@ -324,13 +329,16 @@ does not prove that a maintenance invocation resolves to the intended private
 store. Without an authorized credential-bearing runtime context, the effective
 store identity and private object population remain **UNKNOWN**.
 
-The private-only probe and its safeguards are prepared but have not been run
-against a live store. Their intended bounds are: at most five SDK pages, zero
-retries, a fixed private prefix, separate candidate/public-store guards, and an
-aggregate-only receipt. No credential was available locally, no production
-environment values were pulled or exported, and no private object was read,
-listed, changed, or deleted. No retention decision follows from token expiry,
-public inventory age, or cached whole-store counts.
+The Dataverse-export (DVX) private-only probe and its safeguards are prepared
+but have not been run against a live store. Their intended bounds are: at most
+five SDK pages, zero retries, a fixed private prefix, separate candidate/public-
+store guards, and an aggregate-only receipt. At that DVX probe, no usable
+Dataverse-export (DVX) credential was available; no Production environment
+values were pulled or exported; and no private Dataverse-export-store object
+was read, listed, changed, or deleted. The separate authorized FFmpeg archive
+read used the uploads-store token and does not establish DVX-store access. No
+retention decision follows from token expiry, public inventory age, or cached
+whole-store counts.
 
 The prior history remains in
 [the historical impact and concurrency follow-up](historical-impact-concurrency-followup-2026-10-22.md),
@@ -365,7 +373,7 @@ does not reverse data or email effects.
 |---|---|---|
 | Candidate source review | Fully gated candidate `81b8a063b` and fixture candidate `9b2ec0060` reviewed | Application runtime remains at `4720980ed`; the recorded human observation candidate `5b1656b3dfad110fb5d23fc4fa2514d573e6a638` is separate; hosted behavior remains unverified. |
 | Latest fixture-candidate checks | Candidate `9b2ec0060` passed the recorded scoped checks | Isolated Node 22.23.4/macOS Turbopack build passed; 51/51 browser tests passed with no retries; three focused unit suites passed 40 tests; scoped ESLint and diff check exited 0. This is not the full gate set recorded for `81b8a063b`. |
-| Local Ubuntu verification | Candidate `94447672f` passed configured core checks with skips; tested Linux FFmpeg 6.1.1 and macOS FFmpeg 9.0.2 builds differ on the same encoded outputs; exact Production artifact parity remains unknown | Build, 42 workflow check steps, coverage Jest (1,432 suites / 24,763 tests), and ten required PostgreSQL suites passed. Historical FFmpeg 6 suite: 19/26 with one initial `audio_past_cut` diagnostic; follow-up diagnostics reproduced all seven failures at that guard. Seven case outputs comprise four unique MP4 hashes. The isolated FFmpeg 9.0.2 host was not Linux and did not use pinned `9.0.2-23` bytes. Current private-object and Production-path checks were not performed. See the [Linux record](linux-ci-verification-2026-10-23.md) and [FFmpeg investigation](ffmpeg-media-investigation-2026-10-23.md). No hosted GitHub Actions or amd64 pass is claimed. |
+| Local Ubuntu and pinned FFmpeg verification | Candidate `94447672f` passed configured core checks with skips. Historical Linux FFmpeg 6.1.1 and macOS FFmpeg 9.0.2 builds differ on identical outputs. The exact pinned archive and bounded Linux media behavior are verified; Production configuration remains unknown. | Core evidence: build, 42 workflow check steps, coverage Jest (1,432 suites / 24,763 tests), and ten required PostgreSQL suites passed. Historical FFmpeg 6 suite: 19/26; follow-up diagnostics reproduced all seven failures at `audio_past_cut`. Seven outputs comprise four unique MP4 hashes. Later, one Blob SDK metadata call and one content GET read the fixed-path private archive; 151,144,252 bytes matched the pinned SHA. The canonical installer succeeded; a separate binary preflight verified x86-64 FFmpeg/ffprobe and their version lines. The unmodified suite passed 26/26 on Debian 12 Linux ARM64 with the pinned x86-64 binaries emulated. This does not establish a native x86-64 app stack, hosted GitHub Actions, or current Production deployment/configuration. See the [Linux record](linux-ci-verification-2026-10-23.md), [FFmpeg investigation](ffmpeg-media-investigation-2026-10-23.md), and [pinned Linux evidence](pinned-ffmpeg-linux-evidence-2026-10-23.json). |
 | Clean locked install | Complete on prior candidate `c589cbb6e` | Completed offline in its isolated workspace. |
 | Locked production build | Prior candidate `c589cbb6e` passed; fully gated candidate build passed | Prior build passed on Node 24.19.0 and Node 22.23.4/macOS. `81b8a063b` completed canonical Turbopack `next build` through Playwright `webServer`; that invocation skipped package `npm prebuild`, which passed separately with unchanged manifest bytes. |
 | Full Jest coverage run | Fully gated candidate passed | Node 22: 1,433 suites / 24,784 tests, five snapshots; 17 suites / 215 tests skipped, 512.717 seconds. Jest coverage thresholds are disabled; opt-in PostgreSQL suites are separate. |
@@ -395,8 +403,9 @@ not a release approval. The concrete remaining gates are listed in the
 [release-candidate checklist](release-candidate-checklist-2026-10-22.md):
 disposition of internal staff and reviewer-role outcomes, authorized hosted
 target/rollback verification, and the release owner's promotion decision.
-Local Ubuntu core-check evidence and the bounded decoder comparison are recorded
-separately; neither is a hosted CI pass or exact Production artifact check.
+Local Ubuntu core-check evidence and the pinned-binary media run are recorded
+separately; neither is a hosted CI pass or proof of the current Production
+deployment's effective pathname or binary.
 External first-time reviewer usability is unverified and is not an
 external-recruitment prerequisite under current owner direction.
 

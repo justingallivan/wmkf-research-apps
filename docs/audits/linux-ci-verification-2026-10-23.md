@@ -3,7 +3,7 @@ title: Local Ubuntu Workflow-Equivalent Verification
 domain: engineering-process
 kind: audit
 status: active
-summary: "Core Ubuntu workflow-equivalent checks passed with documented skips. Follow-up cross-decoder evidence shows different behavior between the tested Linux FFmpeg 6.1.1 and macOS FFmpeg 9.0.2 builds on identical output bytes; exact production artifact parity remains unverified."
+summary: "Core Ubuntu workflow-equivalent checks passed with documented skips. The exact pinned private FFmpeg archive was verified and its unmodified media suite passed on a Linux ARM64 harness using emulated x86_64 binaries; current Production deployment configuration remains unverified."
 canonical: false
 cataloged: 2026-10-23
 last_verified: 2026-10-23
@@ -13,6 +13,7 @@ related:
   - docs/audits/release-candidate-checklist-2026-10-22.md
   - docs/audits/release-preparation-private-store-2026-10-22.md
   - docs/audits/linux-ci-evidence-2026-10-23.json
+  - docs/audits/pinned-ffmpeg-linux-evidence-2026-10-23.json
 ---
 
 # Local Ubuntu Workflow-Equivalent Verification
@@ -59,16 +60,31 @@ The production worker pins FFmpeg archive SHA-256
 provisioning script uses pathname
 `stage4/ffmpeg-n9.0.2-23-g27b46f0fbc-linux64-gpl-9.0.tar.xz`, while the worker
 reads the effective pathname from `PRESENTATION_VIDEO_FFMPEG_BLOB_PATHNAME`.
-The public artifact URL returned 404 in the earlier check. The historical
-rollout record says the exact tarball was uploaded to the private store on
-October 10, but current object presence, bytes, checksum, and effective
-Production configuration have not been checked. The FFmpeg 9.0.2 host run was
-not on Linux and did not use the pinned `9.0.2-23` bytes. Thus production-pin
-compatibility remains unverified. No source fix is justified by the FFmpeg 6
-result alone. The bounded exact-object probe is prepared but not run; a private
-Blob read may incur usage charges. See the [FFmpeg media investigation](ffmpeg-media-investigation-2026-10-23.md)
-and its [machine evidence](ffmpeg-media-evidence-2026-10-23.json). This is
-separate from the private Dataverse-export Blob store investigation.
+The public artifact URL returned 404 in the earlier check. The exact fixed-path
+private object was subsequently read with one Blob SDK metadata call and one
+content GET:
+151,144,252 bytes matched the pinned SHA-256 before extraction. The canonical
+installer succeeded and reported `n9.0.2-23-g27b46f0fbc-20261008`; a separate
+binary preflight verified both FFmpeg and ffprobe as ELF 64-bit x86-64 and
+recorded both version lines. The full unmodified 26-test suite then passed
+in one invocation (26/26, no skips) on Debian 12 Linux ARM64 with Node 22.23.4
+and Python 3.11.2, using the exact pinned binaries via QEMU user-mode
+emulation. This establishes pinned-binary media behavior in that bounded
+harness; it does not establish a native x86-64 application stack, hosted CI,
+or what the current Production deployment runs. The current effective
+Production pathname and active revision remain unchecked. See the [pinned
+Linux evidence](pinned-ffmpeg-linux-evidence-2026-10-23.json), [FFmpeg media
+investigation](ffmpeg-media-investigation-2026-10-23.md), and its [historical
+cross-decoder evidence](ffmpeg-media-evidence-2026-10-23.json). This is separate
+from the private Dataverse-export Blob store investigation.
+
+An earlier full emulated x86-64 harness run passed 25 tests and failed the
+two-audio-stream receipt test with ENOENT after the original seven FFmpeg 6
+failures passed; child status and stderr were unavailable, so the cause remains
+unknown and is not attributed to FFmpeg behavior. An unchanged targeted rerun
+ended with exit status 139 before producing Jest JSON. The later full 26/26
+result is from the Linux ARM64 harness with pinned x86-64 FFmpeg/ffprobe
+emulated, not a full x86-64 application stack.
 
 An initial build and full Jest run were killed by the original 2 GB Docker
 memory limit. The successful build ran in the Ubuntu container on the disposable
@@ -80,8 +96,10 @@ this addressed container PID 1 cleanup and is not part of the full Jest count.
 The temporary VM was deleted, and the default Docker context remained unchanged.
 
 This local Ubuntu result does not claim hosted GitHub Actions or amd64 coverage.
-It provides Linux execution evidence for the configured core checks and for
-the FFmpeg 6 decoder behavior; the isolated FFmpeg 9.0.2 comparison narrows the
-cause but does not verify the pinned production artifact. Hosted target, human
-rehearsal, rollback, and owner promotion decisions remain governed by the
+The separate pinned-binary run uses x86-64 FFmpeg/ffprobe under emulation in a
+Linux ARM64 harness; it does not constitute a native x86-64 application-stack
+or hosted CI pass. The historical FFmpeg 6 decoder behavior remains recorded
+above; exact pinned-binary media behavior is now verified within the bounded
+harness. Current Production configuration remains unknown. Hosted target,
+human rehearsal, rollback, and owner promotion decisions remain governed by the
 [release checklist](release-candidate-checklist-2026-10-22.md).

@@ -1,0 +1,503 @@
+{
+  "schemaVersion": 1,
+  "date": "2026-10-23",
+  "candidate": "7b83211cfb9d694d38f28d8e90e7c858ef4c1c5c",
+  "status": "PINNED_MEDIA_SUITE_PASSED_ON_LINUX_ARM64_HARNESS_WITH_EMULATED_X86_64_FFMPEG; FULL_X86_64_HARNESS_INCONCLUSIVE",
+  "authorization": {
+    "source": "Explicit user authorization in this chat for bounded Vercel Blob metadata read and download including possible charges; checksum and Linux tests; no push/deploy/live changes",
+    "maxBytes": 201326592
+  },
+  "blobRead": {
+    "metadataCalls": 1,
+    "contentGetCalls": 1,
+    "sdkRetries": 0,
+    "pathname": "stage4/ffmpeg-n9.0.2-23-g27b46f0fbc-linux64-gpl-9.0.tar.xz",
+    "bytes": 151144252,
+    "sha256": "14020417ff8ef01470e8cb771355e65c37aff62b80fb0be41eeb7611d1360902",
+    "matchesWorkerPin": true,
+    "credential": "UPLOADS_BLOB_RW_TOKEN, parsed only into the bounded probe; never passed into containers",
+    "archiveRetainedLocally": true,
+    "archiveMode": "0600",
+    "probeSha256": "9180d66bc679c112afe16d81ba46dc207e30d7fc4ff974782f087ffa81b685d4",
+    "scope": "Presence and bytes at fixed historical pathname in store selected by local uploads token; not effective current Production deployment/configuration"
+  },
+  "passingRun": {
+    "os": "Debian GNU/Linux12",
+    "harnessArchitecture": "arm64",
+    "node": "22.23.4",
+    "python": "3.11.2",
+    "targetBinaryArchitecture": "x86_64 (ELF machine62), emulated by binfmt/QEMU",
+    "vmMemoryBytes": 4095578112,
+    "vmCpus": 2,
+    "baseImage": {
+      "Id": "sha256:1684026b8229e224f54c790fd2c567415fda3f919e5da616155af700e36cf301",
+      "Architecture": "arm64",
+      "Os": "linux"
+    },
+    "binaryTools": [
+      {
+        "name": "ffmpeg",
+        "path": "/verification/ffmpeg/bin/ffmpeg",
+        "elfMachine": 62,
+        "version": "ffmpeg version n9.0.2-23-g27b46f0fbc-20261008 Copyright (c) 2000-2026 the FFmpeg developers"
+      },
+      {
+        "name": "ffprobe",
+        "path": "/verification/ffmpeg/bin/ffprobe",
+        "elfMachine": 62,
+        "version": "ffprobe version n9.0.2-23-g27b46f0fbc-20261008 Copyright (c) 2007-2026 the FFmpeg developers"
+      }
+    ],
+    "resolvedTools": {
+      "resolvedPaths": {
+        "ffmpeg": "/verification/ffmpeg/bin/ffmpeg",
+        "ffprobe": "/verification/ffmpeg/bin/ffprobe"
+      },
+      "FFMPEG_BIN_DIR": "/verification/ffmpeg/bin",
+      "python": "3.11.2",
+      "pythonElfMachine": 183
+    },
+    "installerReceipt": {
+      "ok": true,
+      "code": "ok",
+      "ffmpegVersionLine": "ffmpeg version n9.0.2-23-g27b46f0fbc-20261008 Copyright (c) 2000-2026 the FFmpeg developers"
+    },
+    "recipe": {
+      "scriptVersion": "2",
+      "recipeSha256": "7c04b5379e264277e138555d4ba776d6965507d783d1a81e7b9abfe9a8a971c4"
+    },
+    "cleanInstall": "npm ci --no-audit --no-fund, native arm64 container,1364packages; no live env files or credentials",
+    "command": "node node_modules/jest/bin/jest.js tests/unit/presentation-video-cut-script.test.js --runInBand --ci --watchAll=false --no-coverage --json --outputFile=/verification/jest-native-results.json",
+    "testEnvironmentOverrides": {
+      "PATH": "/verification/ffmpeg/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
+      "FFMPEG_BIN_DIR": "/verification/ffmpeg/bin",
+      "NODE_OPTIONS": "--max-old-space-size=768",
+      "RAYON_NUM_THREADS": "1"
+    },
+    "sourceBefore": {
+      "changedTrackedPaths": [],
+      "checkedPaths": 5486
+    },
+    "sourceAfter": {
+      "changedTrackedPaths": [],
+      "checkedPaths": 5486
+    },
+    "testsPassed": 26,
+    "testsFailed": 0,
+    "testsSkipped": 0,
+    "testsTodo": 0,
+    "suitesPassed": 1,
+    "seconds": 122.549,
+    "assertions": [
+      {
+        "name": "presentation-video-cut-script 1. 25 fps cut at 12.437 s is accepted with 310 frames and a clean tail",
+        "status": "passed",
+        "durationMs": 11625
+      },
+      {
+        "name": "presentation-video-cut-script 2. 25 fps cut at 10.010 s keeps 250 frames (first omitted frame straddles T)",
+        "status": "passed",
+        "durationMs": 9920
+      },
+      {
+        "name": "presentation-video-cut-script 3. video start_time offset is rejected as unsupported_timeline",
+        "status": "passed",
+        "durationMs": 462
+      },
+      {
+        "name": "presentation-video-cut-script 4. audio start_time offset is rejected as unsupported_timeline",
+        "status": "passed",
+        "durationMs": 471
+      },
+      {
+        "name": "presentation-video-cut-script 5. B-frame codec-delay edit list is tolerated: accepted, tail clean, delay recorded",
+        "status": "passed",
+        "durationMs": 15036
+      },
+      {
+        "name": "presentation-video-cut-script 5b. an edit list that shifts the presentation (start 1 s into the media) is rejected",
+        "status": "passed",
+        "durationMs": 606
+      },
+      {
+        "name": "presentation-video-cut-script 5c. standard AAC priming edit list is accepted and the priming is recorded",
+        "status": "passed",
+        "durationMs": 10596
+      },
+      {
+        "name": "presentation-video-cut-script 6. variable frame rate is rejected as unsupported_timeline",
+        "status": "passed",
+        "durationMs": 3210
+      },
+      {
+        "name": "presentation-video-cut-script 7. two audio streams are rejected as unsupported_streams",
+        "status": "passed",
+        "durationMs": 343
+      },
+      {
+        "name": "presentation-video-cut-script 8. wrong SOURCE_SIZE is rejected as source_size_mismatch",
+        "status": "passed",
+        "durationMs": 30
+      },
+      {
+        "name": "presentation-video-cut-script source content identity (SOURCE_QXH) the correct SOURCE_QXH passes and the computed source hash is recorded",
+        "status": "passed",
+        "durationMs": 12087
+      },
+      {
+        "name": "presentation-video-cut-script source content identity (SOURCE_QXH) a wrong SOURCE_QXH is rejected as source_hash_mismatch, with the computed hash recorded and no output",
+        "status": "passed",
+        "durationMs": 133
+      },
+      {
+        "name": "presentation-video-cut-script source content identity (SOURCE_QXH) production (SOURCE_URL) without SOURCE_QXH fails closed even when the bytes are right",
+        "status": "passed",
+        "durationMs": 92
+      },
+      {
+        "name": "presentation-video-cut-script install 9a. wrong sha256 exits 3 with ffmpeg_checksum_mismatch and extracts nothing",
+        "status": "passed",
+        "durationMs": 61
+      },
+      {
+        "name": "presentation-video-cut-script install 9b. matching sha256 extracts with the top directory stripped",
+        "status": "passed",
+        "durationMs": 77
+      },
+      {
+        "name": "presentation-video-cut-script 10. quickXorHash empty file is 20 zero bytes",
+        "status": "passed",
+        "durationMs": 57
+      },
+      {
+        "name": "presentation-video-cut-script 10. quickXorHash python matches the independent reference on small, aligned-boundary and 1 MiB inputs",
+        "status": "passed",
+        "durationMs": 1525
+      },
+      {
+        "name": "presentation-video-cut-script 10. quickXorHash hash spans multiple fold blocks (10 MiB + tail)",
+        "status": "passed",
+        "durationMs": 6326
+      },
+      {
+        "name": "presentation-video-cut-script 11. mutation: with the timeline rejection neutralised the offset fixture is no longer caught as unsupported_timeline",
+        "status": "passed",
+        "durationMs": 1342
+      },
+      {
+        "name": "presentation-video-cut-script 11b. mutation: with the output correspondence check removed and the encode mistimed (-r 30) the cut is accepted, the real script rejects it",
+        "status": "passed",
+        "durationMs": 20296
+      },
+      {
+        "name": "presentation-video-cut-script audio continuity (gap before the boundary) fixture really has a timestamp gap",
+        "status": "passed",
+        "durationMs": 311
+      },
+      {
+        "name": "presentation-video-cut-script audio continuity (gap before the boundary) 12. cut after the gap is rejected as unsupported_timeline at audio_timeline",
+        "status": "passed",
+        "durationMs": 1027
+      },
+      {
+        "name": "presentation-video-cut-script audio continuity (gap before the boundary) 12b. mutation: with the continuity check patched out the gap fixture is accepted",
+        "status": "passed",
+        "durationMs": 6238
+      },
+      {
+        "name": "presentation-video-cut-script audio continuity (gap before the boundary) continuous sources record audioFramesChecked",
+        "status": "passed",
+        "durationMs": 10884
+      },
+      {
+        "name": "presentation-video-cut-script upload (local server) chunks sequentially, resumes after a 503 via nextExpectedRanges, parses the item id, sends no Authorization",
+        "status": "passed",
+        "durationMs": 190
+      },
+      {
+        "name": "presentation-video-cut-script upload (local server) a 400 is upload_rejected",
+        "status": "passed",
+        "durationMs": 45
+      }
+    ],
+    "containment": {
+      "Image": "sha256:1684026b8229e224f54c790fd2c567415fda3f919e5da616155af700e36cf301",
+      "Platform": "linux",
+      "State": {
+        "Status": "running",
+        "Running": true,
+        "Paused": false,
+        "Restarting": false,
+        "OOMKilled": false,
+        "Dead": false,
+        "Pid": 3639,
+        "ExitCode": 0,
+        "Error": "",
+        "StartedAt": "2026-10-23T16:46:04.944199267Z",
+        "FinishedAt": "0001-01-01T00:00:00Z"
+      },
+      "NetworkMode": "none",
+      "MountTypes": [
+        "volume"
+      ]
+    },
+    "x86RuntimeSupport": {
+      "source": "same Debian12 Node22 amd64 image used in initial test",
+      "paths": [
+        "lib/x86_64-linux-gnu/libm.so.6",
+        "lib/x86_64-linux-gnu/libdl.so.2",
+        "lib/x86_64-linux-gnu/librt.so.1",
+        "lib/x86_64-linux-gnu/libpthread.so.0",
+        "lib/x86_64-linux-gnu/libmvec.so.1",
+        "lib/x86_64-linux-gnu/libc.so.6",
+        "lib/x86_64-linux-gnu/libgcc_s.so.1",
+        "lib64/ld-linux-x86-64.so.2"
+      ],
+      "tarSha256": "1e8f51878986f0d14968c900e9f8fa7a09cfdb9160c6f222127b6b4ea018c197",
+      "scope": "local native-arm64 harness container only; no host or live changes"
+    }
+  },
+  "earlierAttempts": [
+    {
+      "attempt": "Ubuntu amd64 image setup",
+      "result": "Python3.12 package-configuration subprocess segfaulted; tests never ran"
+    },
+    {
+      "attempt": "Docker legacy custom-image build",
+      "result": "Unexpected arm64 image resolution; not used for test claim"
+    },
+    {
+      "attempt": "Direct config-image-ID launch",
+      "result": "Image reference rejected; no tests"
+    },
+    {
+      "attempt": "Debian amd64 harness on original2GB VM",
+      "result": {
+        "candidate": "7b83211cfb9d694d38f28d8e90e7c858ef4c1c5c",
+        "attempt": "Initial Debian12 amd64 on original local2GB VM",
+        "state": {
+          "Status": "running",
+          "Running": true,
+          "Paused": false,
+          "Restarting": false,
+          "OOMKilled": true,
+          "Dead": false,
+          "Pid": 82635,
+          "ExitCode": 0,
+          "Error": "",
+          "StartedAt": "2026-10-23T16:31:42.414938714Z",
+          "FinishedAt": "0001-01-01T00:00:00Z"
+        },
+        "vmMemoryBytes": 2054832128,
+        "nodeHeapMb": 768,
+        "testExit": 137,
+        "testSeconds": 14.389,
+        "jestOutputBytes": 0,
+        "jestResultExists": false,
+        "verdict": "Infrastructure OOM before Jest result; no media test verdict"
+      }
+    },
+    {
+      "attempt": "Debian amd64 harness on dedicated4GB VM",
+      "testsPassed": 25,
+      "testsFailed": 1,
+      "testsSkipped": 0,
+      "seconds": 202.507,
+      "failure": "Test7 two audio streams: expected rejection receipt absent (ENOENT); child status/stderr not exposed by test helper; exact cause remains unknown",
+      "allOriginalSevenFailuresPassed": true,
+      "containerOomKilled": false
+    },
+    {
+      "attempt": "Unchanged targeted test7 rerun on amd64 harness",
+      "result": {
+        "exit": 139,
+        "seconds": 21.287
+      },
+      "jestResultProduced": false,
+      "meaning": "Process crashed after workflow compilation; full amd64 harness remains inconclusive"
+    },
+    {
+      "attempt": "ARM64 harness initial x86 runtime setup",
+      "result": "Installer rejected missing /lib64/ld-linux-x86-64.so.2; required eight runtime files copied from known Debian12 amd64 image into owned test container only; subsequent shipped installer passed"
+    }
+  ],
+  "limits": [
+    "No successful full x86_64 Node/Python harness invocation established; one25/26 run and a targeted process crash remain recorded",
+    "Passing run uses native arm64 Node/Python and emulated exact pinned x86_64 FFmpeg/ffprobe",
+    "Native x86_64 hardware, hosted CI, and current Production deployment revision/effective pathname remain unverified",
+    "Original Ubuntu FFmpeg6 failures remain historical; safety guards and test assertions unchanged",
+    "No runtime source changes, Blob writes, database writes, pushes, deployments, or application live-system reads beyond authorized exact-object retrieval"
+  ],
+  "cleanup": {
+    "removedContainers": [
+      {
+        "context": "colima",
+        "container": "wmkf-pinned-linux-kch6pnkk"
+      },
+      {
+        "context": "colima-wmkf-pin-kch6pnkk",
+        "container": "wmkf-pinned-linux-kch6pnkk-4gb"
+      },
+      {
+        "context": "colima-wmkf-pin-kch6pnkk",
+        "container": "wmkf-pinned-linux-kch6pnkk-arm64"
+      }
+    ],
+    "removedVolumes": [
+      {
+        "context": "colima",
+        "volume": "wmkf-pinned-linux-kch6pnkk"
+      },
+      {
+        "context": "colima-wmkf-pin-kch6pnkk",
+        "volume": "wmkf-pinned-linux-kch6pnkk-4gb"
+      },
+      {
+        "context": "colima-wmkf-pin-kch6pnkk",
+        "volume": "wmkf-pinned-linux-kch6pnkk-arm64"
+      }
+    ],
+    "removedFailedBuildContainers": [
+      "b3edae591213"
+    ],
+    "removedOwnedImageTag": "wmkf-pinned-linux:media",
+    "removedTransportArchives": [
+      {
+        "name": "source.tar",
+        "bytes": 85903360,
+        "sha256": "7f660cb3ead7e5527eeec32fc6a3c116d9e935c9dbd5e86385dd28dff49b0c12"
+      },
+      {
+        "name": "node_modules.tar",
+        "bytes": 999464960,
+        "sha256": "0d246c8d945ec6d0aa543cea68d1f3f66ea1000221415171e4ddf90723e93d61"
+      },
+      {
+        "name": "node-image-amd64.tar",
+        "bytes": 424555520,
+        "sha256": "8307cdfc8c082ba989552a6087e1b148b0d9a863abfbf9bcea00c988044cc659"
+      },
+      {
+        "name": "node-image-arm64.tar",
+        "bytes": 415800320,
+        "sha256": "02318c90e11c38fb93ac2957d7843e9046360bf1500e9824b117f4a79925e668"
+      }
+    ],
+    "defaultContext": "colima",
+    "disposableVmDeletionPending": false,
+    "pinnedArchiveRetainedLocally": true,
+    "disposableVmAndDataDeleted": true,
+    "defaultContextAfter": "colima",
+    "ownedDefaultContainersRemaining": []
+  },
+  "localEvidenceFiles": [
+    {
+      "path": "/private/tmp/wmkf-media-investigation-qx7b5evb/authorized-archive-inspection.json",
+      "sha256": "f2db82a4390b81feda200ca11f6fdfee7c408d9c124cd6cb631cf6c03382af8a"
+    },
+    {
+      "path": "/private/tmp/wmkf-pinned-linux-kch6pnkk/metadata.json",
+      "sha256": "4b17653a3433b4b3cd9c2ce6491edb26c0993a0e0aed7a492005f25b6a356076"
+    },
+    {
+      "path": "/private/tmp/wmkf-pinned-linux-kch6pnkk/linux-results.json",
+      "sha256": "5dd828af62218a1a8df67fd1b425bc97552cc03fd02b416a389e2b9fc38157d6"
+    },
+    {
+      "path": "/private/tmp/wmkf-pinned-linux-kch6pnkk/linux-4gb-results.json",
+      "sha256": "59fc1432db27bd916cb755175b3c5fe3e8af85f1d7c57bd63702f8780ffa9e4a"
+    },
+    {
+      "path": "/private/tmp/wmkf-pinned-linux-kch6pnkk/linux-native-results.json",
+      "sha256": "69c9cbf87b215517861c4fc6b79911f0cfd6b220e97508d6d0ac23aa9942fd02"
+    },
+    {
+      "path": "/private/tmp/wmkf-pinned-linux-kch6pnkk/first-test-oom.json",
+      "sha256": "2ebee0215f32e5ca0e195333797b7103b60d51461db5823c6ab510da998fa518"
+    },
+    {
+      "path": "/private/tmp/wmkf-pinned-linux-kch6pnkk/first-4gb-state.json",
+      "sha256": "027cae947e45b91c3395c3d9b56f10eba8bc6c972f58b4c88c2fd83373500d84"
+    },
+    {
+      "path": "/private/tmp/wmkf-pinned-linux-kch6pnkk/targeted-two-audio-result.json",
+      "sha256": "099a797def6fd0359c9ff0a073f38735d6bcab78efa441c7c882dd12705f15e0"
+    },
+    {
+      "path": "/private/tmp/wmkf-pinned-linux-kch6pnkk/targeted-two-audio.log",
+      "sha256": "1955cf9c8055d11c4c24c7135e63beb7ac2399f023fbb9f0e6f80b16d9c30aef"
+    },
+    {
+      "path": "/private/tmp/wmkf-pinned-linux-kch6pnkk/jest-results.json",
+      "sha256": "082a03105ed3b24e77760012d68b75d9ba073fd56bb38f88ab5d71019a61a7a2"
+    },
+    {
+      "path": "/private/tmp/wmkf-pinned-linux-kch6pnkk/jest-native-results.json",
+      "sha256": "41856e0c9022054ea056ee84e5d8b23298b74f3e97d32ce663af6efab24c70c7"
+    },
+    {
+      "path": "/private/tmp/wmkf-pinned-linux-kch6pnkk/install-native.json",
+      "sha256": "354bddc010228f7d7c15acb44d4e811075ee531ae9a6495126446c5e875e7cae"
+    },
+    {
+      "path": "/private/tmp/wmkf-pinned-linux-kch6pnkk/native-architecture-preflight.log",
+      "sha256": "2a2df9745d23ea67d6d5fed126ff0872261643456086cc87c62f78c2287c0515"
+    },
+    {
+      "path": "/private/tmp/wmkf-pinned-linux-kch6pnkk/native-binary-preflight.log",
+      "sha256": "ba0995e907e66f2717b05a6190d25bb03807f900c43536b4788dfe2a7a66555f"
+    },
+    {
+      "path": "/private/tmp/wmkf-pinned-linux-kch6pnkk/native-resolved-tool-paths.log",
+      "sha256": "89ea7b5aaad35f8d5621f703faefbcdf93ff361810148cb7a139d05a4a48b01c"
+    },
+    {
+      "path": "/private/tmp/wmkf-pinned-linux-kch6pnkk/native-image-inspection.json",
+      "sha256": "a85f2e894b07f1ab4dbbcce583213773e5bbe48fff0402c2c6e5923f845bd92b"
+    },
+    {
+      "path": "/private/tmp/wmkf-pinned-linux-kch6pnkk/native-container-inspection.json",
+      "sha256": "51df6b7c2b543098dc7443489336a55533af20df9dc0112749a51964a222940d"
+    },
+    {
+      "path": "/private/tmp/wmkf-pinned-linux-kch6pnkk/native-source-before.log",
+      "sha256": "46ff0eeb7e50e6fc27f74b0f406c32d89237b34ce7811f7e1d760cc9544a043e"
+    },
+    {
+      "path": "/private/tmp/wmkf-pinned-linux-kch6pnkk/native-source-after.log",
+      "sha256": "46ff0eeb7e50e6fc27f74b0f406c32d89237b34ce7811f7e1d760cc9544a043e"
+    },
+    {
+      "path": "/private/tmp/wmkf-pinned-linux-kch6pnkk/native-pinned-linux-media-jest.log",
+      "sha256": "d25b07fd4e4510cfcd081936bfee706b9a9375a41eeb5d64e6869ee45c01f9fd"
+    },
+    {
+      "path": "/private/tmp/wmkf-pinned-linux-kch6pnkk/4gb-pinned-linux-media-jest.log",
+      "sha256": "5ec2bd072954f21b49382df0bab67d4b2d7e51f948b4ed6edcc82fea53f68109"
+    },
+    {
+      "path": "/private/tmp/wmkf-pinned-linux-kch6pnkk/x86-runtime-support.json",
+      "sha256": "a0458519325d65ccee1bb14c0b6d80d2107120b541868d65be9a23d08c7a9035"
+    },
+    {
+      "path": "/private/tmp/wmkf-pinned-linux-kch6pnkk/transport-result.json",
+      "sha256": "e0d9e4c7b6c427a1dfc3d4461ee4676811fb8fa7d025f7d5f544e14f0654e6ba"
+    },
+    {
+      "path": "/private/tmp/wmkf-pinned-linux-kch6pnkk/cleanup-final.json",
+      "sha256": "1bdc68c00b67fb549bf0e3f8739abd7b7ba455fd580f3d5e9e2c9ba3b040fbaa"
+    },
+    {
+      "path": "/private/tmp/wmkf-pinned-linux-kch6pnkk/source-manifest.json",
+      "sha256": "f52bcf8ffdf0c80f8411ce69cf34bed17e18513ed8f01a3f32cbb310ce024831"
+    },
+    {
+      "path": "/private/tmp/wmkf-media-investigation-qx7b5evb/authorized-artifact-read.log",
+      "sha256": "ef4bc2ba28d5c7b903fc380b437a32696b07cd4acb6c0ee67b85dd43bbad849a"
+    }
+  ],
+  "priorEvidence": [
+    "docs/audits/ffmpeg-media-evidence-2026-10-23.json",
+    "docs/audits/linux-ci-evidence-2026-10-23.json"
+  ]
+}
