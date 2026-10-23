@@ -132,7 +132,12 @@ beforeEach(() => {
 async function run(drafts, templateType = 'materials') {
   const emitted = [];
   await sendEmails(
-    { requestBody: { drafts, templateType }, fromEmail: 'staff@wmkeck.org', actingUserSystemId: 'u-1' },
+    {
+      requestBody: { drafts, templateType },
+      fromEmail: 'staff@wmkeck.org',
+      actingUserSystemId: 'u-1',
+      authorizedProgramDirectorByRequestId: { [REQUEST_ID]: REQUEST._wmkf_programdirector_value },
+    },
     (e) => emitted.push(e),
   );
   return emitted;

@@ -81,9 +81,10 @@ export default async function handler(req, res) {
   const suggestionIds = Array.isArray(drafts)
     ? drafts.map((draft) => draft?.suggestionId)
     : [];
+  let authorization = null;
   if (suggestionIds.length > 0 && suggestionIds.every((id) => isGuid(id))) {
     try {
-      await withDalContext('review-manager-send-authorize', () =>
+      authorization = await withDalContext('review-manager-send-authorize', () =>
         authorizeReviewerRequestMutation({
           profileId: access.profileId,
           callerSystemId: actingUserSystemId,
@@ -117,6 +118,7 @@ export default async function handler(req, res) {
         requestBody: req.body,
         fromEmail,
         actingUserSystemId,
+        authorizedProgramDirectorByRequestId: authorization?.programDirectorByRequestId,
       }, ({ event, data }) => sendEvent(event, data))
     );
   } catch (error) {

@@ -20,12 +20,17 @@ related:
 > and web-suggestion integration remain deferred. Live-state claims are marked
 > `[VERIFIED]`; design choices are marked `[PROPOSED]`.
 >
-> **Objective:** Let a program director manually add a sparse reviewer candidate
-> (name required; email/affiliation optional) to a request's reviewer candidate
-> pool, then optionally run that candidate through the same enrichment and COI
-> pipeline used for applicant-recommended reviewers.
+> **Original objective:** Let a program director manually add a sparse reviewer
+> candidate (name required; email/affiliation optional) to a request's reviewer
+> candidate pool, then optionally run that candidate through the same enrichment
+> and COI pipeline used for applicant-recommended reviewers. The enrichment and
+> web-suggestion portions remain deferred; see Current Local Contract below for
+> the shipped path and the first-invitation guard.
 
 ## Summary
+
+This section preserves the original Phase 1 design record. Its proposed flow is
+not the current service contract; current behavior is summarized below.
 
 `[PROPOSED]` Add a Workbench "Add reviewer" path that creates a selected
 per-request candidate in Dataverse immediately, with distinct staff-manual
@@ -86,8 +91,9 @@ suggestion rows, verifies/COI-checks them, runs contact enrichment with
 `[VERIFIED]` The Candidates tab reads selected suggestion rows via
 `GET /api/reviewer-finder/my-candidates?requestId=...` and renders them with
 invite state, contact data, metrics, and the applicant-recommended badge
-(`shared/components/reviewers/CandidatesPanel.js`,
-`pages/api/reviewer-finder/my-candidates.js`).
+(`pages/api/reviewer-finder/my-candidates.js` and
+`lib/services/reviewer-finder/my-candidates-service.js`). The API route is a
+thin auth/validation/HTTP shell; service behavior is the current contract.
 
 `[VERIFIED]` `wmkf_appreviewersuggestion.wmkf_applicantdisposition` is a
 request-junction field where `recommended` means applicant-suggested and `null`
@@ -99,7 +105,49 @@ this field `null`.
 email or create a new person when no email match exists
 (`lib/dataverse/adapters/potential-reviewer.js`).
 
+## Current Local Contract (scoped source recheck 2026-10-22)
+
+`[SCOPED SOURCE RECHECK 2026-10-22; EXISTING SHIPPING HISTORY RETAINED; NO NEW HOSTED PROBE]` The shipped
+`POST /api/workbench/manual-reviewer` route delegates to
+`lib/services/workbench/manual-reviewer-service.js`. That service resolves the
+person/contact identity and persists the request-scoped manual suggestion
+through `ensureStaffManualCandidate` in
+`lib/dataverse/adapters/reviewer-suggestion.js`; this is the active write path,
+not the original proposed generic `upsert` sketch below. Enrichment and
+web-suggestion integration remain deferred. The manual-add endpoint does not
+create a Postgres table or a separate candidate schema.
+
+`[LOCAL SOURCE + FOCUSED TESTS VERIFIED 2026-10-22; NOT DEPLOYED]`
+`lib/services/reviewer-first-manual-invitation-coi.js` provides a fresh-read
+institution screen for a first invitation from a `staff_manual` suggestion
+without prior invitation or engagement. Current call sites cover the normal
+invitation send, copyable-link regeneration, and manual invited stamp. The
+generic `correctResponse` path is a fourth entry point when the requested
+lifecycle includes `invited: true` or a non-empty `emailSentAt`. The
+person-side current-institution input is only server-persisted
+`wmkf_maininstitution`. `wmkf_primaryaffiliation`, `wmkf_organizationname`,
+and source text by themselves do not establish a trusted current institution;
+an empty main institution remains unknown. The helper reports confirmed
+conflict as 409 and unavailable request/person/institution context as 503;
+callers map those outcomes at their route-specific boundary. The correction
+path rejects a combined `mainInstitution` edit and first-invite stamp before
+either write, so staff must save the main institution first and then refresh
+before recording the first invitation. Only a known COI decision of `dropped`
+blocks; the Broad HHMI exemption remains exempt. For email sends,
+`send-emails-service.js` emits `manual_invitation_changed` when its fresh
+suggestion read finds that the row no longer qualifies as a
+first-manual-invitation row. The additional read can withhold non-manual
+invitation or regeneration when unavailable, so the guard has an availability
+cost. This
+screen adds no schema and no staff acknowledgement; it runs for
+first-invitation actions only, not each person edit or an already-engaged
+reviewer. Local source and focused tests were verified 2026-10-22; this is not
+hosted verification or deployment proof.
+
 ## Data Model
+
+The following subsections preserve the initial proposal and should be read as
+design history where they differ from the Current Local Contract above.
 
 ### `wmkf_potentialreviewer`
 
@@ -161,6 +209,11 @@ and identity-review gates. Manual rows are durable Candidates-tab rows, not
 search-result rows.
 
 ## API Design
+
+The route and enrichment sketches below are historical proposals. In
+particular, the old `bypassDynamicsRestrictions` sketch is not the shipped
+route's context contract; follow the route and service references under Current
+Local Contract.
 
 ### `POST /api/workbench/manual-reviewer`
 
@@ -302,7 +355,12 @@ should eventually call the same manual add route, not append fake
 
 This keeps web-sourced leads human-vouched before persistence.
 
-## Enrichment and Identity Safety
+## Enrichment and Identity Safety (deferred proposal)
+
+The following safeguards were proposed for a future manual-enrichment flow.
+That flow remains deferred; they do not describe an active manual enrichment
+path. The first-invitation institution screen is the separate current local
+guard described above.
 
 Manual adds are high-risk for wrong-person enrichment because name-only input
 can match a same-named stranger. Therefore:

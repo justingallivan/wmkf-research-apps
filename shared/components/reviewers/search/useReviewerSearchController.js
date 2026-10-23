@@ -344,6 +344,7 @@ export default function useReviewerSearchController({
     setRosterBlocked,
     setRosterHandled,
     setRosterSavedKeys,
+    setUnverified,
     setRosterNames,
     setSelected,
     setRosterNote,

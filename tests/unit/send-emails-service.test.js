@@ -60,8 +60,9 @@ jest.mock('../../lib/dataverse/adapters/system-user', () => ({
   getByIdWithSelect: (...a) => getSystemUserById(...a),
 }));
 const updateRequestById = jest.fn(async () => {});
+const getRequestById = jest.fn(async (id) => id === REQUEST_ID_2 ? REQUEST_TWO : REQUEST);
 jest.mock('../../lib/dataverse/adapters/grant-request', () => ({
-  getById: jest.fn(async () => REQUEST),
+  getById: (...a) => getRequestById(...a),
   updateById: (...a) => updateRequestById(...a),
 }));
 const mockBackPropReviewerOrcidToContact = jest.fn(async () => ({ action: 'noop' }));
@@ -88,19 +89,41 @@ const fetchCoPIs = jest.fn(async () => []);
 jest.mock('../../lib/services/proposal-participants', () => ({
   fetchCoPIs: (...a) => fetchCoPIs(...a),
 }));
+const mockRecordDeliveredInvitation = jest.fn(async ({ suggestionId, actingUserSystemId }) => (
+  updateLifecycle(suggestionId, {
+    invited: true,
+    emailSentAt: new Date().toISOString(),
+    respondReminderSentAt: null,
+  }, { actingUserSystemId })
+));
+jest.mock('../../lib/services/reviewer-engagement/record-invitation', () => ({
+  recordDeliveredInvitation: (...a) => mockRecordDeliveredInvitation(...a),
+}));
+const mockScreenFirstManualInvitationInstitutionCOI = jest.fn(async () => ({ applicable: false, screened: false }));
+jest.mock('../../lib/services/reviewer-first-manual-invitation-coi', () => {
+  const actual = jest.requireActual('../../lib/services/reviewer-first-manual-invitation-coi');
+  return {
+    ...actual,
+    screenFirstManualInvitationInstitutionCOI: (...a) => mockScreenFirstManualInvitationInstitutionCOI(...a),
+  };
+});
 
 const { sendEmails } = require('../../lib/services/review-manager/send-emails-service');
 const { loadCycleConfigs } = require('../../lib/services/review-manager/cycle-config-loader');
 const { stampFingerprint } = require('../helpers/draft-fingerprint');
+const { isFirstManualInvitation } = require('../../lib/services/reviewer-first-manual-invitation-coi');
 
 const SUG_OK = '11111111-1111-4111-8111-111111111111';
 const SUG_NO_EMAIL = '22222222-2222-4222-8222-222222222222';
 const SUG_MISSING = '33333333-3333-4333-8333-333333333333';
 const REQUEST_ID = '44444444-4444-4444-8444-444444444444';
+const SUG_OK_2 = '55555555-5555-4555-8555-555555555555';
+const REQUEST_ID_2 = '66666666-6666-4666-8666-666666666666';
 
 let SUGGESTIONS;
 let PERSONS;
 let REQUEST;
+let REQUEST_TWO;
 let CYCLE_CODE;
 let CYCLE;
 
@@ -130,12 +153,15 @@ function person(id, over = {}) {
 
 beforeEach(() => {
   jest.clearAllMocks();
-  getSystemUserById.mockResolvedValue({
-    systemuserid: 'pd-1',
-    fullname: 'PD',
-    internalemailaddress: 'pd@wmkeck.org',
-    isdisabled: false,
-  });
+  verifySuggestionToken.mockImplementation(async () => ({
+    ok: true,
+    payload: { suggestionId: SUG_OK, requestId: REQUEST_ID },
+  }));
+  mockScreenFirstManualInvitationInstitutionCOI.mockReset();
+  mockScreenFirstManualInvitationInstitutionCOI.mockResolvedValue({ applicable: false, screened: false });
+  getSystemUserById.mockImplementation(async (pdId) => pdId === 'pd-2'
+    ? { systemuserid: 'pd-2', fullname: 'PD Two', internalemailaddress: 'pd-two@wmkeck.org', isdisabled: false }
+    : { systemuserid: 'pd-1', fullname: 'PD', internalemailaddress: 'pd@wmkeck.org', isdisabled: false });
   SUGGESTIONS = { [SUG_OK]: suggestion(SUG_OK) };
   PERSONS = { [`person-${SUG_OK}`]: person(`person-${SUG_OK}`) };
   REQUEST = {
@@ -144,6 +170,13 @@ beforeEach(() => {
     wmkf_meetingdate: null,
     _wmkf_programdirector_value: 'pd-1',
   };
+  REQUEST_TWO = {
+    akoya_requestid: REQUEST_ID_2,
+    akoya_requestnum: 'REQ-002',
+    wmkf_meetingdate: null,
+    _wmkf_programdirector_value: 'pd-2',
+  };
+  getRequestById.mockImplementation(async (id) => id === REQUEST_ID_2 ? REQUEST_TWO : REQUEST);
   CYCLE_CODE = null;
   CYCLE = null;
   delete process.env.REVIEWER_EMAIL_DELIVERY_MODE;
@@ -167,19 +200,25 @@ function autoStampDraft(d, templateType) {
   if (!d || typeof d !== 'object' || Object.prototype.hasOwnProperty.call(d, 'draftFingerprint')) return d;
   const sug = SUGGESTIONS[d.suggestionId];
   const per = (sug && PERSONS[sug._wmkf_potentialreviewer_value]) || PERSONS[`person-${d.suggestionId}`];
+  const req = sug?._wmkf_request_value === REQUEST_ID_2 ? REQUEST_TWO : REQUEST;
   return stampFingerprint(d, {
     templateType,
     suggestionId: d.suggestionId,
     suggestion: sug,
     person: per,
-    request: REQUEST,
+    request: req,
     coPINames: [],
     cycle: {},
     honorariumAmount: 250,
   });
 }
 
-async function run(requestBody) {
+async function run(requestBody, {
+  authorizedProgramDirectorByRequestId = {
+    [REQUEST_ID]: REQUEST._wmkf_programdirector_value,
+    [REQUEST_ID_2]: REQUEST_TWO._wmkf_programdirector_value,
+  },
+} = {}) {
   const emitted = [];
   const stampedBody = {
     ...requestBody,
@@ -188,13 +227,19 @@ async function run(requestBody) {
       : requestBody.drafts,
   };
   await sendEmails(
-    { requestBody: stampedBody, fromEmail: 'staff@wmkeck.org', actingUserSystemId: 'u-1' },
+    {
+      requestBody: stampedBody,
+      fromEmail: 'staff@wmkeck.org',
+      actingUserSystemId: 'u-1',
+      authorizedProgramDirectorByRequestId,
+    },
     (e) => emitted.push(e),
   );
   return emitted;
 }
 const names = (emitted) => emitted.map((e) => e.event);
 const resultOf = (emitted) => emitted.find((e) => e.event === 'result')?.data;
+const coiError = (code) => Object.assign(new Error('institution screen result'), { code });
 // A real three-base64url-segment shape (content is irrelevant — verifySuggestionToken
 // is mocked above) so both the invitation body-integrity gate AND the S404 send-time
 // token-authority gate's extraction regex match it.
@@ -891,7 +936,6 @@ describe('send-emails-service — invitation body-integrity gate', () => {
   });
 
   test.each([
-    ['missing assignment', { request: { _wmkf_programdirector_value: null }, pd: null }],
     ['disabled Program Director', { request: {}, pd: { systemuserid: 'pd-1', internalemailaddress: 'pd@wmkeck.org', isdisabled: true } }],
     ['Program Director without email', { request: {}, pd: { systemuserid: 'pd-1', internalemailaddress: '', isdisabled: false } }],
   ])('%s fails closed before invitation transport', async (_label, setup) => {
@@ -905,6 +949,20 @@ describe('send-emails-service — invitation body-integrity gate', () => {
     expect(resultOf(emitted).skipped[0]).toMatchObject({
       suggestionId: SUG_OK,
       reason: 'program_director_sender_unavailable',
+    });
+  });
+
+  test('an invitation with no assigned Program Director fails closed as assignment drift', async () => {
+    REQUEST = { ...REQUEST, _wmkf_programdirector_value: null };
+
+    const emitted = await run({ drafts: [draft(SUG_OK)], templateType: 'invitation' });
+
+    expect(createAndSendEmail).not.toHaveBeenCalled();
+    expect(mintAndStore).not.toHaveBeenCalled();
+    expect(updateLifecycle).not.toHaveBeenCalled();
+    expect(resultOf(emitted).skipped[0]).toMatchObject({
+      suggestionId: SUG_OK,
+      reason: 'program_director_changed',
     });
   });
 
@@ -1588,6 +1646,336 @@ describe('send-emails-service — Stage 6D draft fingerprint', () => {
     ]);
     expect(mintAndStore).not.toHaveBeenCalled();
     expect(createAndSendEmail).not.toHaveBeenCalled();
+  });
+
+  test('an invitation preview is stale when the request Program Director changes before send', async () => {
+    const previewed = stampFingerprint(draft(SUG_OK), fingerprintFor({ templateType: 'invitation' }));
+    REQUEST = { ...REQUEST, _wmkf_programdirector_value: 'pd-b' };
+    getSystemUserById.mockResolvedValue({
+      systemuserid: 'pd-b', fullname: 'PD B', internalemailaddress: 'pd-b@wmkeck.org', isdisabled: false,
+    });
+
+    const emitted = await run({ drafts: [previewed], templateType: 'invitation' });
+
+    expect(resultOf(emitted).skipped).toEqual([
+      expect.objectContaining({ suggestionId: SUG_OK, reason: 'draft_stale' }),
+    ]);
+    expect(mintAndStore).not.toHaveBeenCalled();
+    expect(createAndSendEmail).not.toHaveBeenCalled();
+  });
+
+  test('an assignment cleared after authorization is treated as invitation drift', async () => {
+    REQUEST = { ...REQUEST, _wmkf_programdirector_value: null };
+
+    const emitted = await run({ drafts: [draft(SUG_OK)], templateType: 'invitation' }, {
+      authorizedProgramDirectorByRequestId: { [REQUEST_ID]: 'pd-1' },
+    });
+
+    expect(resultOf(emitted).skipped).toEqual([
+      expect.objectContaining({ suggestionId: SUG_OK, reason: 'program_director_changed' }),
+    ]);
+    expect(mintAndStore).not.toHaveBeenCalled();
+    expect(createAndSendEmail).not.toHaveBeenCalled();
+    expect(updateLifecycle).not.toHaveBeenCalled();
+  });
+
+  test('a PD reassignment detected at the pre-mint read skips before mint or transport', async () => {
+    let reads = 0;
+    getRequestById.mockImplementation(async (id) => {
+      reads += 1;
+      if (reads === 1) return REQUEST; // send-time hydration sees the authorized PD
+      return { ...REQUEST, _wmkf_programdirector_value: 'pd-b' }; // fresh pre-mint guard
+    });
+
+    const emitted = await run({ drafts: [draft(SUG_OK)], templateType: 'invitation' });
+
+    expect(reads).toBe(2);
+    expect(resultOf(emitted).skipped).toEqual([
+      expect.objectContaining({ suggestionId: SUG_OK, reason: 'program_director_changed' }),
+    ]);
+    expect(mintAndStore).not.toHaveBeenCalled();
+    expect(createAndSendEmail).not.toHaveBeenCalled();
+    expect(updateLifecycle).not.toHaveBeenCalled();
+  });
+
+  test('an invitation with no server authorization snapshot is skipped before mint or transport', async () => {
+    const emitted = await run({ drafts: [draft(SUG_OK)], templateType: 'invitation' }, {
+      authorizedProgramDirectorByRequestId: null,
+    });
+
+    expect(resultOf(emitted).skipped).toEqual([
+      expect.objectContaining({ suggestionId: SUG_OK, reason: 'program_director_changed' }),
+    ]);
+    expect(mintAndStore).not.toHaveBeenCalled();
+    expect(createAndSendEmail).not.toHaveBeenCalled();
+  });
+
+  test('a fresh assignment read failure skips before mint or transport', async () => {
+    let reads = 0;
+    getRequestById.mockImplementation(async () => {
+      reads += 1;
+      if (reads === 1) return REQUEST;
+      throw new Error('Dataverse request read failed');
+    });
+
+    const emitted = await run({ drafts: [draft(SUG_OK)], templateType: 'invitation' });
+
+    expect(reads).toBe(2);
+    expect(resultOf(emitted).skipped).toEqual([
+      expect.objectContaining({ suggestionId: SUG_OK, reason: 'program_director_changed' }),
+    ]);
+    expect(mintAndStore).not.toHaveBeenCalled();
+    expect(createAndSendEmail).not.toHaveBeenCalled();
+  });
+
+  test('a PD change during token mint is rechecked after the delivery-bound await and withholds transport', async () => {
+    mintAndStore.mockImplementationOnce(async () => {
+      REQUEST = { ...REQUEST, _wmkf_programdirector_value: 'pd-b' };
+      return { jwt: 'minted.before.pd.drift' };
+    });
+
+    const emitted = await run({ drafts: [draft(SUG_OK)], templateType: 'invitation' });
+
+    expect(mintAndStore).toHaveBeenCalledTimes(1);
+    expect(createAndSendEmail).not.toHaveBeenCalled();
+    expect(resultOf(emitted).skipped).toEqual([
+      expect.objectContaining({ suggestionId: SUG_OK, reason: 'program_director_changed' }),
+    ]);
+    expect(updateLifecycle).not.toHaveBeenCalled();
+  });
+
+  test('a mixed batch keeps an earlier healthy invite recorded when a later request is reassigned', async () => {
+    SUGGESTIONS[SUG_OK_2] = suggestion(SUG_OK_2, {
+      _wmkf_request_value: REQUEST_ID_2,
+      wmkf_invited: false,
+    });
+    PERSONS[`person-${SUG_OK_2}`] = person(`person-${SUG_OK_2}`);
+    let requestTwoReads = 0;
+    getRequestById.mockImplementation(async (id) => {
+      if (id === REQUEST_ID) return REQUEST;
+      requestTwoReads += 1;
+      return requestTwoReads === 1
+        ? REQUEST_TWO
+        : { ...REQUEST_TWO, _wmkf_programdirector_value: 'pd-new' };
+    });
+    getSystemUserById.mockImplementation(async (pdId) => ({
+      systemuserid: pdId,
+      fullname: pdId,
+      internalemailaddress: `${pdId}@wmkeck.org`,
+      isdisabled: false,
+    }));
+
+    const secondDraft = {
+      ...draft(SUG_OK_2),
+      body: `B\nhttps://reviews.example.org/external/review/${SUG_OK_2}.${REQUEST_ID_2}.sig`,
+    };
+    verifySuggestionToken.mockImplementation(async (jwt) => {
+      const [suggestionId, requestId] = String(jwt).split('.');
+      return { ok: true, payload: { suggestionId, requestId } };
+    });
+
+    const firstDraft = {
+      ...draft(SUG_OK),
+      body: `B\nhttps://reviews.example.org/external/review/${SUG_OK}.${REQUEST_ID}.sig`,
+    };
+    const emitted = await run({ drafts: [firstDraft, secondDraft], templateType: 'invitation' });
+
+    expect(resultOf(emitted).skipped).toEqual([
+      expect.objectContaining({ suggestionId: SUG_OK_2, reason: 'program_director_changed' }),
+    ]);
+    expect(resultOf(emitted).sent.map((row) => row.suggestionId)).toEqual([SUG_OK]);
+    expect(mintAndStore).toHaveBeenCalledTimes(1);
+    expect(createAndSendEmail).toHaveBeenCalledTimes(1);
+    expect(mockRecordDeliveredInvitation).toHaveBeenCalledTimes(1);
+    expect(mockRecordDeliveredInvitation).toHaveBeenCalledWith({ suggestionId: SUG_OK, actingUserSystemId: 'u-1' });
+  });
+
+  test('a first-manual-invitation COI conflict skips before token mint and delivery bookkeeping', async () => {
+    mockScreenFirstManualInvitationInstitutionCOI.mockRejectedValueOnce(coiError('manual_institution_coi'));
+
+    const emitted = await run({ drafts: [draft(SUG_OK)], templateType: 'invitation' });
+
+    expect(mockScreenFirstManualInvitationInstitutionCOI).toHaveBeenCalledTimes(1);
+    expect(mockScreenFirstManualInvitationInstitutionCOI).toHaveBeenCalledWith({
+      suggestionId: SUG_OK,
+      expectedRequestId: REQUEST_ID,
+      expectedPersonId: `person-${SUG_OK}`,
+    });
+    expect(resultOf(emitted).skipped).toEqual([
+      expect.objectContaining({ suggestionId: SUG_OK, reason: 'manual_institution_coi' }),
+    ]);
+    expect(mintAndStore).not.toHaveBeenCalled();
+    expect(createAndSendEmail).not.toHaveBeenCalled();
+    expect(mockRecordDeliveredInvitation).not.toHaveBeenCalled();
+  });
+
+  test('an unavailable first-manual-invitation COI check has its own actionable skip reason', async () => {
+    mockScreenFirstManualInvitationInstitutionCOI.mockRejectedValueOnce(coiError('manual_institution_coi_unavailable'));
+
+    const emitted = await run({ drafts: [draft(SUG_OK)], templateType: 'invitation' });
+
+    expect(resultOf(emitted).skipped).toEqual([
+      expect.objectContaining({ suggestionId: SUG_OK, reason: 'manual_institution_coi_unavailable' }),
+    ]);
+    expect(mintAndStore).not.toHaveBeenCalled();
+    expect(createAndSendEmail).not.toHaveBeenCalled();
+    expect(mockRecordDeliveredInvitation).not.toHaveBeenCalled();
+  });
+
+  test('a COI conflict on the post-mint check withholds transport and invitation bookkeeping', async () => {
+    mockScreenFirstManualInvitationInstitutionCOI
+      .mockResolvedValueOnce({ applicable: true, screened: true, reason: 'clear' })
+      .mockRejectedValueOnce(coiError('manual_institution_coi'));
+
+    const emitted = await run({ drafts: [draft(SUG_OK)], templateType: 'invitation' });
+
+    expect(mockScreenFirstManualInvitationInstitutionCOI).toHaveBeenCalledTimes(2);
+    expect(mockScreenFirstManualInvitationInstitutionCOI).toHaveBeenNthCalledWith(1, {
+      suggestionId: SUG_OK,
+      expectedRequestId: REQUEST_ID,
+      expectedPersonId: `person-${SUG_OK}`,
+    });
+    expect(mockScreenFirstManualInvitationInstitutionCOI).toHaveBeenNthCalledWith(2, {
+      suggestionId: SUG_OK,
+      expectedRequestId: REQUEST_ID,
+      expectedPersonId: `person-${SUG_OK}`,
+    });
+    expect(resultOf(emitted).skipped).toEqual([
+      expect.objectContaining({ suggestionId: SUG_OK, reason: 'manual_institution_coi' }),
+    ]);
+    expect(mintAndStore).toHaveBeenCalledTimes(1);
+    expect(createAndSendEmail).not.toHaveBeenCalled();
+    expect(mockRecordDeliveredInvitation).not.toHaveBeenCalled();
+  });
+
+  test('a later COI conflict preserves the earlier healthy invitation send and stamp', async () => {
+    SUGGESTIONS[SUG_OK_2] = suggestion(SUG_OK_2, { _wmkf_request_value: REQUEST_ID_2 });
+    PERSONS[`person-${SUG_OK_2}`] = person(`person-${SUG_OK_2}`);
+    mockScreenFirstManualInvitationInstitutionCOI.mockImplementation(async ({ suggestionId }) => {
+      if (suggestionId === SUG_OK_2) throw coiError('manual_institution_coi');
+      return { applicable: true, screened: true, reason: 'clear' };
+    });
+    verifySuggestionToken.mockImplementation(async (jwt) => {
+      const [suggestionId, requestId] = String(jwt).split('.');
+      return { ok: true, payload: { suggestionId, requestId } };
+    });
+
+    const firstDraft = {
+      ...draft(SUG_OK),
+      body: `B\nhttps://reviews.example.org/external/review/${SUG_OK}.${REQUEST_ID}.sig`,
+    };
+    const secondDraft = {
+      ...draft(SUG_OK_2),
+      body: `B\nhttps://reviews.example.org/external/review/${SUG_OK_2}.${REQUEST_ID_2}.sig`,
+    };
+    const emitted = await run({ drafts: [firstDraft, secondDraft], templateType: 'invitation' });
+
+    expect(mockScreenFirstManualInvitationInstitutionCOI).toHaveBeenCalledTimes(3);
+    expect(mockScreenFirstManualInvitationInstitutionCOI).toHaveBeenNthCalledWith(1, {
+      suggestionId: SUG_OK,
+      expectedRequestId: REQUEST_ID,
+      expectedPersonId: `person-${SUG_OK}`,
+    });
+    expect(mockScreenFirstManualInvitationInstitutionCOI).toHaveBeenNthCalledWith(2, {
+      suggestionId: SUG_OK,
+      expectedRequestId: REQUEST_ID,
+      expectedPersonId: `person-${SUG_OK}`,
+    });
+    expect(mockScreenFirstManualInvitationInstitutionCOI).toHaveBeenNthCalledWith(3, {
+      suggestionId: SUG_OK_2,
+      expectedRequestId: REQUEST_ID_2,
+      expectedPersonId: `person-${SUG_OK_2}`,
+    });
+    expect(resultOf(emitted).sent.map((row) => row.suggestionId)).toEqual([SUG_OK]);
+    expect(resultOf(emitted).skipped).toEqual([
+      expect.objectContaining({ suggestionId: SUG_OK_2, reason: 'manual_institution_coi' }),
+    ]);
+    expect(mintAndStore).toHaveBeenCalledTimes(1);
+    expect(createAndSendEmail).toHaveBeenCalledTimes(1);
+    expect(mockRecordDeliveredInvitation).toHaveBeenCalledTimes(1);
+    expect(mockRecordDeliveredInvitation).toHaveBeenCalledWith({ suggestionId: SUG_OK, actingUserSystemId: 'u-1' });
+  });
+
+  test('a hydrated first-manual invitation is withheld if the pre-mint screen says it is no longer applicable', async () => {
+    SUGGESTIONS[SUG_OK] = suggestion(SUG_OK, { wmkf_sources: 'staff_manual' });
+    expect(isFirstManualInvitation(SUGGESTIONS[SUG_OK])).toBe(true);
+    mockScreenFirstManualInvitationInstitutionCOI.mockResolvedValueOnce({ applicable: false, screened: false });
+
+    const emitted = await run({ drafts: [draft(SUG_OK)], templateType: 'invitation' });
+
+    expect(mockScreenFirstManualInvitationInstitutionCOI).toHaveBeenCalledTimes(1);
+    expect(resultOf(emitted).skipped).toEqual([
+      expect.objectContaining({ suggestionId: SUG_OK, reason: 'manual_invitation_changed' }),
+    ]);
+    expect(mintAndStore).not.toHaveBeenCalled();
+    expect(createAndSendEmail).not.toHaveBeenCalled();
+    expect(mockRecordDeliveredInvitation).not.toHaveBeenCalled();
+  });
+
+  test('a hydrated first-manual invitation is withheld if it leaves scope after mint', async () => {
+    SUGGESTIONS[SUG_OK] = suggestion(SUG_OK, { wmkf_sources: 'staff_manual' });
+    expect(isFirstManualInvitation(SUGGESTIONS[SUG_OK])).toBe(true);
+    mockScreenFirstManualInvitationInstitutionCOI
+      .mockResolvedValueOnce({ applicable: true, screened: true, reason: 'clear' })
+      .mockResolvedValueOnce({ applicable: false, screened: false });
+
+    const emitted = await run({ drafts: [draft(SUG_OK)], templateType: 'invitation' });
+
+    expect(mockScreenFirstManualInvitationInstitutionCOI).toHaveBeenCalledTimes(2);
+    expect(resultOf(emitted).skipped).toEqual([
+      expect.objectContaining({ suggestionId: SUG_OK, reason: 'manual_invitation_changed' }),
+    ]);
+    expect(mintAndStore).toHaveBeenCalledTimes(1);
+    expect(createAndSendEmail).not.toHaveBeenCalled();
+    expect(mockRecordDeliveredInvitation).not.toHaveBeenCalled();
+  });
+
+  test('a non-manual invitation remains sendable when both fresh screens say not applicable', async () => {
+    expect(isFirstManualInvitation(SUGGESTIONS[SUG_OK])).toBe(false);
+
+    const emitted = await run({ drafts: [draft(SUG_OK)], templateType: 'invitation' });
+
+    expect(mockScreenFirstManualInvitationInstitutionCOI).toHaveBeenCalledTimes(2);
+    expect(mockScreenFirstManualInvitationInstitutionCOI).toHaveBeenNthCalledWith(1, {
+      suggestionId: SUG_OK,
+      expectedRequestId: REQUEST_ID,
+      expectedPersonId: `person-${SUG_OK}`,
+    });
+    expect(mockScreenFirstManualInvitationInstitutionCOI).toHaveBeenNthCalledWith(2, {
+      suggestionId: SUG_OK,
+      expectedRequestId: REQUEST_ID,
+      expectedPersonId: `person-${SUG_OK}`,
+    });
+    expect(resultOf(emitted).sent).toHaveLength(1);
+    expect(resultOf(emitted).skipped).toEqual([]);
+    expect(createAndSendEmail).toHaveBeenCalledTimes(1);
+    expect(mockRecordDeliveredInvitation).toHaveBeenCalledTimes(1);
+  });
+
+  test('a fresh unknown-institution first-manual result latches the state and blocks a later non-applicable result', async () => {
+    expect(isFirstManualInvitation(SUGGESTIONS[SUG_OK])).toBe(false);
+    mockScreenFirstManualInvitationInstitutionCOI
+      .mockResolvedValueOnce({ applicable: true, screened: false, reason: 'institution_unknown' })
+      .mockResolvedValueOnce({ applicable: false, screened: false });
+
+    const emitted = await run({ drafts: [draft(SUG_OK)], templateType: 'invitation' });
+
+    expect(mockScreenFirstManualInvitationInstitutionCOI).toHaveBeenCalledTimes(2);
+    expect(resultOf(emitted).skipped).toEqual([
+      expect.objectContaining({ suggestionId: SUG_OK, reason: 'manual_invitation_changed' }),
+    ]);
+    expect(mintAndStore).toHaveBeenCalledTimes(1);
+    expect(createAndSendEmail).not.toHaveBeenCalled();
+    expect(mockRecordDeliveredInvitation).not.toHaveBeenCalled();
+  });
+
+  test('non-invitation sends do not call the first-manual-invitation COI screen', async () => {
+    SUGGESTIONS[SUG_OK] = suggestion(SUG_OK, { wmkf_accepted: true });
+
+    const emitted = await run({ drafts: [draft(SUG_OK)], templateType: 'materials' });
+
+    expect(resultOf(emitted).sent).toHaveLength(1);
+    expect(mockScreenFirstManualInvitationInstitutionCOI).not.toHaveBeenCalled();
   });
 
   test('send-time selects widened to match render: person/request reads include the fingerprinted fields', async () => {

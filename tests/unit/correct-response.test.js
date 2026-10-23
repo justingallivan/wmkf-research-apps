@@ -18,10 +18,18 @@ jest.mock('../../lib/external/token-lifecycle', () => ({
   ensureToken: jest.fn(),
   buildExternalUrl: jest.fn(),
 }));
+jest.mock('../../lib/services/reviewer-first-manual-invitation-coi', () => ({
+  __esModule: true,
+  isFirstManualInvitation: jest.fn((row) => row?.wmkf_sources === 'staff_manual'
+    && row?.wmkf_invited !== true
+    && !row?.wmkf_emailsentat),
+  screenFirstManualInvitationInstitutionCOI: jest.fn(),
+}));
 
 const suggestionAdapter = require('../../lib/dataverse/adapters/reviewer-suggestion');
 const { ensureToken } = require('../../lib/external/token-lifecycle');
 const { correctResponse } = require('../../lib/services/reviewer-engagement/correct-response');
+const { screenFirstManualInvitationInstitutionCOI } = require('../../lib/services/reviewer-first-manual-invitation-coi');
 
 const REQUEST_ID = '11111111-1111-1111-1111-111111111111';
 const SUGGESTION_ID = '33333333-3333-3333-3333-333333333333';
@@ -35,6 +43,8 @@ function source(overrides = {}) {
     wmkf_reviewreceivedat: null,
     wmkf_completedat: null,
     wmkf_applicantdisposition: null,
+    wmkf_sources: 'literature_retrieved',
+    _wmkf_potentialreviewer_value: '22222222-2222-2222-2222-222222222222',
     _etag: 'W/"correction-1"',
     ...overrides,
   };
@@ -54,6 +64,7 @@ beforeEach(() => {
   suggestionAdapter.findById.mockReset().mockResolvedValue(source());
   suggestionAdapter.updateLifecycle.mockReset().mockResolvedValue(undefined);
   ensureToken.mockReset().mockResolvedValue(undefined);
+  screenFirstManualInvitationInstitutionCOI.mockReset().mockResolvedValue({ applicable: false, screened: false });
 });
 
 describe('correctResponse', () => {
@@ -119,6 +130,31 @@ describe('correctResponse', () => {
       { accepted: true, invited: true },
       { actingUserSystemId: SYS, ifMatch: 'W/"correction-1"' },
     );
+  });
+
+  test.each([
+    ['invited true', { invited: true }],
+    ['emailSentAt only', { emailSentAt: '2026-10-22T10:00:00Z' }],
+  ])('first staff_manual invitation correction screens on %s before writing', async (_label, lifecycle) => {
+    suggestionAdapter.findById.mockResolvedValueOnce(source({ wmkf_sources: 'staff_manual' }));
+    await correct(lifecycle);
+    expect(screenFirstManualInvitationInstitutionCOI).toHaveBeenCalledWith({
+      suggestionId: SUGGESTION_ID,
+      expectedRequestId: REQUEST_ID,
+      expectedPersonId: '22222222-2222-2222-2222-222222222222',
+    });
+    expect(suggestionAdapter.updateLifecycle).toHaveBeenCalled();
+  });
+
+  test('closed invitation keeps correction_closed precedence without running the institution screen', async () => {
+    suggestionAdapter.findById.mockResolvedValueOnce(source({
+      wmkf_sources: 'staff_manual',
+      wmkf_reviewstatus: 100000004,
+    }));
+    await expect(correct({ invited: true })).rejects.toMatchObject({
+      body: { code: 'correction_closed' },
+    });
+    expect(screenFirstManualInvitationInstitutionCOI).not.toHaveBeenCalled();
   });
 
   test('accepted: true mints a token after the lifecycle write commits', async () => {

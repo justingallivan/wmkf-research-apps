@@ -22,6 +22,7 @@ function baseArgs() {
       akoya_title: 'Proposal T',
       wmkf_abstract: 'Abstract text',
       _wmkf_projectleader_value_formatted: 'Dr. Sam PI',
+      _wmkf_programdirector_value: 'PD-A',
       _akoya_applicantid_value_formatted: 'Org A',
       wmkf_organizationname: 'N/A',
       wmkf_reviewduedate: '2099-01-01',
@@ -46,6 +47,22 @@ describe('fingerprintDraft golden hashes', () => {
     const args = baseArgs();
     args.request.wmkf_organizationname = 'Some Other Org';
     expect(fingerprintDraft(buildDraftFingerprintInputs(args))).toBe(BASE_HASH);
+  });
+
+  test('only invitation fingerprints use v2 and bind the normalized request Program Director', () => {
+    const invite = { ...baseArgs(), templateType: 'invitation' };
+    const first = buildDraftFingerprintInputs(invite);
+    expect(first.v).toBe(2);
+    expect(first.request.programDirectorId).toBe('pd-a');
+
+    invite.request._wmkf_programdirector_value = 'pd-b';
+    expect(fingerprintDraft(buildDraftFingerprintInputs(invite)))
+      .not.toBe(fingerprintDraft(first));
+
+    const materials = buildDraftFingerprintInputs(baseArgs());
+    expect(materials.v).toBe(1);
+    expect(materials.request).not.toHaveProperty('programDirectorId');
+    expect(fingerprintDraft(materials)).toBe(BASE_HASH);
   });
 
   test('determinism: same inputs (fresh objects) hash identically', () => {
@@ -81,7 +98,7 @@ describe('fingerprintDraft golden hashes', () => {
   // field proving each flips the hash") plus the co-PI *order* sensitivity
   // case (order is part of the body — the plan documents this explicitly).
   test.each([
-    ['templateType', (a) => { a.templateType = 'invitation'; }, '265c2616ad4c21597bbc51f325451c753353eef822c2cf032e94ae752cf77ab1'],
+    ['templateType (invitation v2)', (a) => { a.templateType = 'invitation'; }, '4778746ef4ce8a7774ed9473b1b66747af2fc1460aacc707c2d27affd1d19e22'],
     ['suggestionId (a different GUID)', (a) => { a.suggestionId = '33333333-3333-4333-8333-333333333333'; }, 'b454ccfd09b01964f0d1654447ecc17128d7bde3510b0467fd12568b32a5b654'],
     ['candidate.name', (a) => { a.person.wmkf_name = 'Dr. Other Name'; }, '9bf6544f5e3cdba822a1c5ded5592244f827d32140c687b20e86e65e564d1838'],
     ['candidate.affiliation', (a) => { a.person.wmkf_primaryaffiliation = 'Uni B'; }, '5a193e49a6b8874d5514e662df434e75202b74a4cca171183cddfd2a66261498'],

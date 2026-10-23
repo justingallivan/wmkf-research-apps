@@ -411,11 +411,21 @@ Round 2 is spent on the build.
 
 **Owner decision 6D-2 (2026-09-06, S490): PARKED.** Extending the fingerprint to cover batch-start
 hydration and Admin template drift is not scheduled; revisit only if a real stale send is observed.
-The limits below stand as written.
+The broader limits below remain the historical/current baseline, except for the
+owner-approved invitation lead-PD follow-up described next.
+
+**Owner decision 2026-10-22 — narrow lead-PD exception, locally implemented and verified,
+unreleased:** if a pending invitation observes lead-PD reassignment, stop before
+the next unsent write/send and require a fresh preview. Bind the assigned PD in
+invitation preview evidence and compare the server authorization snapshot plus
+fresh assignment reads before token mint/dispatch. This does not reopen general
+mid-batch body-input refresh or Admin-template drift. See
+`docs/audits/historical-impact-concurrency-followup-2026-10-22.md` for evidence,
+implementation status and non-atomicity limits; no hosted change is claimed.
 
 Fingerprint inputs are hydrated once per send batch; a CRM edit between hydration and a later
-recipient's dispatch within the same batch is not detected (Codex round 2 high, declined — see the
-record).
+recipient's dispatch within the same batch is not generally detected (Codex round 2 high,
+declined — see the record). The approved narrow lead-PD exception above is tracked separately.
 
 Template text edited in Admin between preview and send is not detected (Codex round 1 high,
 declined — see the planning record). Composer settings and template text are outside the fingerprint (client key covers settings;

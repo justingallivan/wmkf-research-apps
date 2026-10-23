@@ -23,7 +23,11 @@ jest.mock('../../lib/services/dynamics-context', () => ({
   bypassDynamicsRestrictions: (_label, fn) => fn(),
 }));
 jest.mock('../../lib/services/reviewer-request-authorization', () => ({
-  authorizeReviewerRequestMutation: jest.fn(async () => ({})),
+  authorizeReviewerRequestMutation: jest.fn(async () => ({
+    requestIds: ['req-1'],
+    isSuperuser: false,
+    programDirectorByRequestId: { 'req-1': 'pd-1' },
+  })),
 }));
 const { authorizeReviewerRequestMutation } = require('../../lib/services/reviewer-request-authorization');
 const { ServiceHttpError } = require('../../lib/services/service-http-error');
@@ -340,7 +344,7 @@ test('real preauthorization rejects a caller who is not the lead PD before openi
   expect(createAndSendEmail).not.toHaveBeenCalled();
 });
 
-test('a request PD change after real preauthorization is used by the service fresh read for invitation transport', async () => {
+test('a request PD change after real preauthorization skips the invitation before token mint or transport', async () => {
   const actualAuthorize = jest.requireActual('../../lib/services/reviewer-request-authorization')
     .authorizeReviewerRequestMutation;
   const requestId = '22222222-2222-4222-8222-222222222222';
@@ -374,12 +378,51 @@ test('a request PD change after real preauthorization is used by the service fre
 
   expect(res.status).not.toHaveBeenCalledWith(403);
   expect(authorizeReviewerRequestMutation).toHaveBeenCalledTimes(1);
-  expect(createAndSendEmail).toHaveBeenCalledTimes(1);
-  expect(createAndSendEmail.mock.calls[0][0]).toMatchObject({
-    from: 'pd-b@wmkeck.org',
-    actingUserSystemId: pdB,
+  expect(mintAndStore).not.toHaveBeenCalled();
+  expect(createAndSendEmail).not.toHaveBeenCalled();
+  expect(updateLifecycle).not.toHaveBeenCalled();
+  expect(resultOf(res).skipped).toEqual([
+    expect.objectContaining({ suggestionId: SUG_1, reason: 'program_director_changed' }),
+  ]);
+});
+
+test('a superuser cannot send a preview authorized under a different Program Director assignment', async () => {
+  const actualAuthorize = jest.requireActual('../../lib/services/reviewer-request-authorization')
+    .authorizeReviewerRequestMutation;
+  const requestId = '22222222-2222-4222-8222-222222222222';
+  const pdA = 'pd-a';
+  const pdB = 'pd-b';
+  mockGetUserRole.mockResolvedValueOnce('superuser');
+  REQUEST.akoya_requestid = requestId;
+  REQUEST._wmkf_programdirector_value = pdA;
+  SUGGESTIONS[SUG_1]._wmkf_request_value = requestId;
+  SYSTEMUSER.systemuserid = pdB;
+  SYSTEMUSER.fullname = 'PD B';
+  SYSTEMUSER.internalemailaddress = 'pd-b@wmkeck.org';
+  mockRequireAppAccess.mockResolvedValueOnce({
+    profileId: 7,
+    session: { user: { azureEmail: 'staff@wmkeck.org', dynamicsSystemuserId: 'superuser-actor' } },
   });
-  expect(createAndSendEmail.mock.calls[0][0].body).toContain('pd-b@wmkeck.org');
+  authorizeReviewerRequestMutation.mockImplementationOnce(async (args) => {
+    const result = await actualAuthorize(args);
+    REQUEST._wmkf_programdirector_value = pdB;
+    return result;
+  });
+
+  const res = await run({
+    drafts: [{
+      ...draft(SUG_1),
+      body: `B\nhttps://reviews.example.org/external/review/${TOKEN_FOR(SUG_1, requestId)}`,
+    }],
+    templateType: 'invitation',
+  });
+
+  expect(res.status).not.toHaveBeenCalledWith(403);
+  expect(mintAndStore).not.toHaveBeenCalled();
+  expect(createAndSendEmail).not.toHaveBeenCalled();
+  expect(resultOf(res).skipped).toEqual([
+    expect.objectContaining({ suggestionId: SUG_1, reason: 'program_director_changed' }),
+  ]);
 });
 // Fake three-segment token whose first two segments the mocked
 // verifySuggestionToken above decodes back into suggestionId/requestId — real

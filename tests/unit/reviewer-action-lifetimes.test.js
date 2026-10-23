@@ -490,6 +490,19 @@ describe.each([false, true])('Stage 6B1 action lifetimes (StrictMode: %s)', (str
   });
 
   describe('regenerate clipboard', () => {
+    test('a withheld first link shows the public institution message without copying a URL', async () => {
+      const message = 'This reviewer has a confirmed institution conflict with the current proposal.';
+      regenerateFetch.mockResolvedValue(response({
+        ok: false, reason: 'manual_institution_coi', message,
+      }, 409));
+      renderPanel();
+      regenerate();
+      await act(async () => {});
+      expect(window.alert).toHaveBeenCalledWith(`Could not generate a new link: ${message}`);
+      expect(navigator.clipboard.writeText).not.toHaveBeenCalled();
+      expect(window.prompt).not.toHaveBeenCalled();
+    });
+
     test('clipboard resolve while current shows the expiry alert', async () => {
       regenerateFetch.mockResolvedValue(response({ ok: true, url: REGEN_URL, expiresAt: '2027-01-01T00:00:00Z' }));
       navigator.clipboard.writeText.mockResolvedValue(undefined);

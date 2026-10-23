@@ -280,6 +280,18 @@ action. It did not run cold search, promote, invite, or email. Current source
 contains neither route or its named helper path.
 
 
+## Local saved-row exclusion repair (2026-10-22; unreleased)
+
+The owner approved preserving a saved row when a stale Find exclusion arrives.
+The local repair adds a status-qualified exclusion upsert that protects `saved`
+and the existing `ineligible` hold. A saved conflict returns 409
+`candidate_already_saved` with guidance to use Invite removal; it does not record
+an exclusion measurement. Both Find exclusion actions reload the roster and
+remove only the conflicted exact key from local transient cards. Missing-row
+exclusion remains eviction-tolerant. This is a local implementation checkpoint,
+not deployment evidence; parent focused tests and independent review passed as recorded in
+`docs/audits/historical-impact-concurrency-followup-2026-10-22.md`.
+
 ## Cross-system
 
 No Dataverse equivalent exists for the operational roster itself.

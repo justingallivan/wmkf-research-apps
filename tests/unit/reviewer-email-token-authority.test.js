@@ -166,7 +166,12 @@ async function render(suggestionIds) {
 async function send(drafts) {
   const emitted = [];
   await sendEmails(
-    { requestBody: { drafts, templateType: 'materials' }, fromEmail: 'staff@wmkeck.org', actingUserSystemId: 'u-1' },
+    {
+      requestBody: { drafts, templateType: 'materials' },
+      fromEmail: 'staff@wmkeck.org',
+      actingUserSystemId: 'u-1',
+      authorizedProgramDirectorByRequestId: { [REQUEST_ID]: null },
+    },
     (e) => emitted.push(e),
   );
   return emitted;

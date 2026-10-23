@@ -67,6 +67,13 @@ jest.mock('../../lib/services/external-token', () => ({
   hashToken: jest.fn((token) => `hash:${token}`),
 }));
 jest.mock('../../lib/dataverse/duplicate-key', () => ({ translateDuplicateKeyError: jest.fn(() => null) }));
+jest.mock('../../lib/services/reviewer-first-manual-invitation-coi', () => {
+  const actual = jest.requireActual('../../lib/services/reviewer-first-manual-invitation-coi');
+  return {
+    ...actual,
+    screenFirstManualInvitationInstitutionCOI: jest.fn(),
+  };
+});
 
 const { resolveByEmail } = require('../../lib/services/program-director-resolver');
 const grantRequestAdapter = require('../../lib/dataverse/adapters/grant-request');
@@ -74,6 +81,10 @@ const suggestionAdapter = require('../../lib/dataverse/adapters/reviewer-suggest
 const potentialReviewerAdapter = require('../../lib/dataverse/adapters/potential-reviewer');
 const researcherAdapter = require('../../lib/dataverse/adapters/researcher');
 const { ensureToken } = require('../../lib/external/token-lifecycle');
+const {
+  ReviewerFirstManualInvitationCoiError,
+  screenFirstManualInvitationInstitutionCOI,
+} = require('../../lib/services/reviewer-first-manual-invitation-coi');
 const { translateDuplicateKeyError } = require('../../lib/dataverse/duplicate-key');
 const { resolveReviewerBindCapability } = require('../../lib/services/test-requests/synthetic-reviewer-capability.js');
 const {
@@ -92,6 +103,7 @@ const SYS = 'u-1';
 beforeEach(() => {
   jest.clearAllMocks();
   translateDuplicateKeyError.mockReturnValue(null);
+  screenFirstManualInvitationInstitutionCOI.mockReset().mockResolvedValue({ applicable: false, screened: false });
 });
 
 describe('getMyCandidates', () => {
@@ -548,6 +560,9 @@ describe('patchMyCandidates', () => {
   test('manual invitation: verifies the current official link and records the normal invite lifecycle with an optimistic lock', async () => {
     suggestionAdapter.findById.mockResolvedValue({
       _etag: 'W/"7"',
+      _wmkf_request_value: REQUEST_ID,
+      _wmkf_potentialreviewer_value: PERSON_ID,
+      wmkf_sources: 'staff_manual',
       wmkf_selected: true,
       wmkf_invited: false,
       wmkf_accepted: false,
@@ -572,6 +587,11 @@ describe('patchMyCandidates', () => {
       expect.objectContaining({ invited: true, emailSentAt: expect.any(String), respondReminderSentAt: null }),
       { actingUserSystemId: SYS, ifMatch: 'W/"7"' },
     );
+    expect(screenFirstManualInvitationInstitutionCOI).toHaveBeenCalledWith({
+      suggestionId: SUGGESTION_ID,
+      expectedRequestId: REQUEST_ID,
+      expectedPersonId: PERSON_ID,
+    });
     expect(out).toMatchObject({
       success: true,
       message: 'Manual invitation recorded',
@@ -622,6 +642,36 @@ describe('patchMyCandidates', () => {
       httpStatus: 409,
       body: { code: 'stale_manual_link' },
     });
+    expect(suggestionAdapter.updateLifecycle).not.toHaveBeenCalled();
+  });
+
+  test('manual invitation COI conflict prevents the lifecycle stamp', async () => {
+    suggestionAdapter.findById.mockResolvedValue({
+      _etag: 'W/"7"',
+      _wmkf_request_value: REQUEST_ID,
+      _wmkf_potentialreviewer_value: PERSON_ID,
+      wmkf_sources: 'staff_manual',
+      wmkf_selected: true,
+      wmkf_invited: false,
+      wmkf_accepted: false,
+      wmkf_declined: false,
+      wmkf_responsetype: null,
+      wmkf_externaltokenhash: 'hash:manual.token',
+      wmkf_externaltokenrevoked: false,
+      wmkf_externaltokenexpires: '2099-01-01T00:00:00.000Z',
+    });
+    screenFirstManualInvitationInstitutionCOI.mockRejectedValueOnce(
+      new ReviewerFirstManualInvitationCoiError('manual_institution_coi'),
+    );
+
+    await expect(patchMyCandidates({
+      body: {
+        suggestionId: SUGGESTION_ID,
+        markManualInviteSent: true,
+        manualLink: 'https://reviews.wmkeck.org/external/review/manual.token',
+      },
+      actingUserSystemId: SYS,
+    })).rejects.toMatchObject({ httpStatus: 409, body: { code: 'manual_institution_coi' } });
     expect(suggestionAdapter.updateLifecycle).not.toHaveBeenCalled();
   });
 
@@ -949,6 +999,22 @@ describe('Stage 1D generic invitation/response corrections', () => {
     expect(potentialReviewerAdapter.update).not.toHaveBeenCalled();
     expect(researcherAdapter.updateById).not.toHaveBeenCalled();
   }
+
+  test.each([
+    ['invited alone', { invited: true }],
+    ['emailSentAt alone', { emailSentAt: '2026-10-22T10:00:00Z' }],
+  ])('a first manual invitation plus a main-institution edit is rejected before writes (%s)', async (_label, lifecycle) => {
+    suggestionAdapter.findById.mockResolvedValue(source({ wmkf_sources: 'staff_manual' }));
+    await expect(correct({ ...lifecycle, mainInstitution: 'New University' }))
+      .rejects.toMatchObject({
+        httpStatus: 409,
+        body: {
+          code: 'manual_institution_save_separately',
+          instruction: 'Save the main institution, refresh the reviewer, then record the invitation.',
+        },
+      });
+    noWrites();
+  });
 
   test.each(['off', 'unset', 'invalid', 'cast'])('a %s identity gate blocks a mixed lifecycle, person and email edit before writes', async (caseName) => {
     resolveReviewerBindCapability.mockRejectedValueOnce(new Error(caseName));

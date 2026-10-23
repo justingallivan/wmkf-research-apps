@@ -108,6 +108,7 @@ jest.mock('../../lib/dataverse/adapters/grant-request', () => ({
 
 const { renderEmails } = require('../../lib/services/review-manager/render-emails-service');
 const { sendEmails } = require('../../lib/services/review-manager/send-emails-service');
+const { computeFixtureFingerprint } = require('../helpers/draft-fingerprint');
 
 const SUG = '11111111-1111-4111-8111-111111111111';
 const REQUEST_ID = '22222222-2222-4222-8222-222222222222';
@@ -157,7 +158,12 @@ const TEMPLATE = { subject: 'Review Materials', body: 'Hello, please review {{pr
 async function send(drafts, templateType = 'materials') {
   const emitted = [];
   await sendEmails(
-    { requestBody: { drafts, templateType }, fromEmail: 'staff@wmkeck.org', actingUserSystemId: 'u-1' },
+    {
+      requestBody: { drafts, templateType },
+      fromEmail: 'staff@wmkeck.org',
+      actingUserSystemId: 'u-1',
+      authorizedProgramDirectorByRequestId: { [REQUEST_ID]: REQUEST_FULL._wmkf_programdirector_value },
+    },
     (e) => emitted.push(e),
   );
   return emitted.find((e) => e.event === 'result')?.data;
@@ -196,6 +202,30 @@ test('Case A: both routes’ real selects request every fingerprinted field — 
   expect(result.skipped).toEqual([]);
   expect(result.sent).toHaveLength(1);
   expect(createAndSendEmail).toHaveBeenCalledTimes(1);
+});
+
+test('invitation render selects and fingerprints the server-read Program Director assignment', async () => {
+  const { drafts } = await renderEmails({
+    suggestionIds: [SUG],
+    template: TEMPLATE,
+    settings: {},
+    templateType: 'invitation',
+    actingUserSystemId: 'u-1',
+  });
+  const [, options] = getRequestById.mock.calls[0];
+  expect(String(options.select).split(',')).toContain('_wmkf_programdirector_value');
+  expect(drafts[0].draftFingerprint).toMatch(/^[0-9a-f]{64}$/);
+  const programDirectorB = { ...REQUEST_FULL, _wmkf_programdirector_value: 'pd-b' };
+  expect(computeFixtureFingerprint({
+    templateType: 'invitation',
+    suggestionId: SUG,
+    suggestion: SUGGESTION,
+    person: PERSON_FULL,
+    request: programDirectorB,
+    coPINames: ['Dr. Alex Co'],
+    cycle: {},
+    honorariumAmount: 500,
+  })).not.toBe(drafts[0].draftFingerprint);
 });
 
 test('Case B: a request read whose select omits wmkf_abstract (simulated, production untouched) refuses the SAME draft as draft_stale, with no dispatch or write', async () => {

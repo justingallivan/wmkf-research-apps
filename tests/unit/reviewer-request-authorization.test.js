@@ -39,7 +39,11 @@ test('authorizes a lead PD case-insensitively using server-resolved suggestion o
     profileId: 7,
     callerSystemId: 'PD-1',
     suggestionIds: [SUGGESTION_A],
-  })).resolves.toEqual({ requestIds: [REQUEST_A], isSuperuser: false });
+  })).resolves.toEqual({
+    requestIds: [REQUEST_A],
+    isSuperuser: false,
+    programDirectorByRequestId: { [REQUEST_A]: 'pd-1' },
+  });
 });
 
 test('superuser override does not require a linked Dynamics actor', async () => {
@@ -81,7 +85,11 @@ test('deduplicates repeated targets before authorization reads', async () => {
     profileId: 7,
     callerSystemId: 'pd-1',
     requestIds: [REQUEST_CASE, REQUEST_CASE.toUpperCase()],
-  })).resolves.toEqual({ requestIds: [REQUEST_CASE], isSuperuser: false });
+  })).resolves.toEqual({
+    requestIds: [REQUEST_CASE],
+    isSuperuser: false,
+    programDirectorByRequestId: { [REQUEST_CASE]: 'pd-1' },
+  });
   expect(findByIds).toHaveBeenCalledWith([REQUEST_CASE], expect.any(Object));
 });
 

@@ -1,10 +1,10 @@
 # Historical impact and concurrency follow-up — 2026-10-22
 
-**ASSESSMENT COMPLETE — bounded read-only live assessment and local reviews;
-implementation pending.** Owner: Codex; branch:
+**BOUNDED ASSESSMENT AND LOCAL REPAIRS COMPLETE — unreleased.** Owner: Codex; branch:
 `codex/memory-audit-followups`. Sol's bounded source, caller and fixture reviews
-are complete. The safe local probe sources and evidence artifacts are prepared
-for parent review and commit. No live record changes, sends, provider generation,
+are complete. The safe local probe sources, evidence artifacts and assessment checkpoint
+are retained in local commit `93756b522`; parent reran four suites / 115 tests
+and the scoped documentation/safety checks successfully. No live record changes, sends, provider generation,
 deployment, environment changes or pushes. The local repairs remain unreleased.
 Unrelated critique/output and the owner-review-burden memory remain untouched.
 
@@ -14,7 +14,7 @@ Sweep Mode B / contract-reconcile review. Entry points: structured PI resolution
 automated shared-person enrichment, request-authorized reviewer mutations and
 roster finalization. Persistence under assessment: Dataverse request/person/
 suggestion state and Postgres roster state; local evidence/docs/tests are the
-only changed surfaces in this assessment. The subsequent three approved local runtime repairs are tracked separately below. Consumers: screening, reviewer staff workflows,
+changed surfaces in the assessment. The three subsequently approved local runtime repairs are documented below; live systems remain unchanged. Consumers: screening, reviewer staff workflows,
 future agents and the owner. Historical exposure is not proof of a wrong outcome.
 
 | Invariant | Verification |
@@ -23,14 +23,14 @@ future agents and the owner. Historical exposure is not proof of a wrong outcome
 | Historical attribution requires historical evidence | Separate current vulnerable-shape population, shared-person use and demonstrated past mutation; never infer corruption from count alone |
 | Concurrency findings name real writers and guard timing | Trace request owner writes and roster finalizer SQL/callers; use isolated local fixtures, no production race reproduction |
 | Owner decisions stay settled | Identity continuity required; staff/manual correction preserved; apply the three explicit decisions below; no inferred retention or release policy |
-| Evidence remains reproducible and bounded | Keep safe probe sources local pending parent review/commit; retain aggregate-only redacted results, explicit caps/completeness and failure status |
+| Evidence remains reproducible and bounded | Retain reviewed safe probe sources in local commits; retain aggregate-only redacted results, explicit caps/completeness and failure status |
 
 Safe local probe sources prepared for this assessment and included in the local
 changed surfaces: `scripts/probe-memory-historical-impact.cjs`,
 `scripts/probe-memory-maintenance-receipts.cjs`,
 `scripts/probe-memory-blob-retention.cjs`, and
 `scripts/probe-memory-blob-store-bindings.cjs`. These sources and their evidence
-artifacts are pending parent review/commit; they are not yet committed.
+artifacts were reviewed and committed locally in `93756b522`.
 
 ## Investigation ledger
 
@@ -46,13 +46,13 @@ artifacts are pending parent review/commit; they are not yet committed.
 ## Decisions
 
 The owner approved all three recommended behaviors in the decision table below.
-This settles those product choices; their implementation remains pending. The
+This settles those product choices; their implementation and focused local verification are complete. The
 approval does not authorize release or live record correction, which remain
 outside this continuation.
 
-## Concurrency evidence (local source and controlled fixtures)
+## Pre-repair concurrency evidence (local source and controlled fixtures)
 
-[VERIFIED via source and 49 passing mocked route/service tests] The shared
+[HISTORICAL characterization at `93756b522`, source and 49 passing mocked route/service tests] The shared
 request authorizer observes lead PD once. A deterministic fixture authorizes
 PD A, changes the request to PD B before the service reread, and reaches the
 invitation transport with PD B as From/impersonated user. Positive control keeps
@@ -67,9 +67,9 @@ Source chain: `reviewer-request-authorization.js:56-133` →
 `review-manager/draft-fingerprint.js:69-97` omits assigned PD. Close-review binds
 fresh suggestion parent/ETag but not the Request ownership revision. Bounded
 writer search did not find ordinary reassignment in app routes; an external CRM
-edit can supply the interleaving. No mid-flight ownership semantics changed.
+edit can supply the interleaving. That checkpoint preceded the approved local guard changes described below.
 
-[VERIFIED via source; real database concurrency NOT TESTED] Roster finalization
+[HISTORICAL pre-repair source; real database concurrency NOT TESTED] Roster finalization
 (`reviewer-roster-store.js:730-775`) intentionally recreates absent rows and
 merges anchors into active/saved rows while preserving excluded/ineligible/blocked
 rows. `recordSurfaced` cannot replace saved/excluded rows. `setExcluded` at
@@ -171,22 +171,113 @@ Artifacts prepared locally: `maintenance-retention-evidence-2026-10-22.json`,
 `blob-store-binding-evidence-2026-10-22.json`,
 `memory-audit-history-access-evidence-2026-10-22.json`, and
 `memory-historical-impact-evidence-2026-10-22.json`. The probe sources listed
-above are prepared locally pending parent review/commit. The observed CLI is
+above are retained in local commit `93756b522`. The observed CLI is
 65.2.0; no CLI installation/update was performed.
 
-## Owner-approved behaviors; implementation pending
+## Owner-approved behaviors; implemented locally
 
 | Decision | Current evidence | Recommended behavior | Alternative / consequence |
 |---|---|---|---|
-| Lead-PD change during an unsent operation | Real authorization/service fixture can authorize A then dispatch as fresh B | **APPROVED:** On detected reassignment before the next unsent write/send, stop and require the currently authorized PD plus a fresh preview; bind assigned sender in preview evidence | Let an already-authorized action finish under current behavior, including fresh B sender. No promise to undo an already-dispatched send. |
-| Stale Find exclusion after promotion | Exclude can overwrite newly saved roster row/blob; invitation suggestion remains separate | **APPROVED:** Preserve saved row and reject stale Find exclusion with guidance to use Invite removal | Permit Find exclusion to hide roster state after promotion while the canonical Invite record remains; document intentional split. |
-| Known current institution conflict on sparse manual Add/Refer | Sparse creation is intentional; manual/send paths lack Find's trusted COI check and no explicit waiver was found | **APPROVED:** Keep sparse Add/Refer; apply trusted, corroborated-current-institution screening before the first manual invitation, blocking confirmed conflicts only. Unknown affiliation keeps the current sparse behavior; no new per-edit COI recheck or staff acknowledgement | Keep manual invitation exempt from this automated screen, relying on staff/reviewer handling. This would be an explicit exception, not inferred from sparse entry. |
+| Lead-PD change during an unsent operation | Real authorization/service fixture can authorize A then dispatch as fresh B | **IMPLEMENTED LOCALLY:** On detected reassignment before the next unsent write/send, stop and require the currently authorized PD plus a fresh preview; bind assigned sender in preview evidence | Let an already-authorized action finish under current behavior, including fresh B sender. No promise to undo an already-dispatched send. |
+| Stale Find exclusion after promotion | Exclude can overwrite newly saved roster row/blob; invitation suggestion remains separate | **IMPLEMENTED LOCALLY:** Preserve saved row and reject stale Find exclusion with guidance to use Invite removal | Permit Find exclusion to hide roster state after promotion while the canonical Invite record remains; document intentional split. |
+| Known current institution conflict on sparse manual Add/Refer | Sparse creation is intentional; manual/send paths lack Find's trusted COI check and no explicit waiver was found | **IMPLEMENTED LOCALLY:** Keep sparse Add/Refer; apply trusted, corroborated-current-institution screening before the first manual invitation, blocking confirmed conflicts only. Unknown affiliation keeps the current sparse behavior; no new per-edit COI recheck or staff acknowledgement | Keep manual invitation exempt from this automated screen, relying on staff/reviewer handling. This would be an explicit exception, not inferred from sparse entry. |
 
-All three behaviors are owner-approved. Their implementation is pending; the
-approval records decisions and does not describe shipped behavior.
+All three behaviors are owner-approved and implemented on the local branch.
+They do not describe shipped behavior.
 
 Broad/HHMI sole-overlap rows are deliberately visible but unselectable in the
 current documented Find contract. No change or new owner decision is needed to
 preserve that behavior. Foundation exclusion breadth remains an existing
 foundation-owned hold. Retention changes are not proposed from incomplete
 private inventory or an unproven cleanup-target comparison.
+
+
+## Approved implementation invariants and parent verification
+
+| Invariant | Boundary | Required validation |
+|---|---|---|
+| Invitation sender remains the previewed, authorized lead PD | Server authorization snapshot → invitation fingerprint → fresh assignment checks before mint and dispatch | A→A positive; auth/preview→B refusals; drift during mint withholds dispatch; already-sent receipts preserved |
+| A stale Find exclusion cannot overwrite a saved row | Conditional Postgres upsert → typed service conflict → both client actions reload | SQL predicate + service conflict/no measurement + browser reconciliation; real Postgres concurrency remains untested without disposable local DB |
+| Only trustworthy current institution evidence may block a first manual invitation | Server-held evidence → current request/PI context → existing institution matcher → first invitation/link boundaries | Unknown and enrichment-only affiliation must not become a confirmed conflict by inference; no extra acknowledgement or per-edit/reinvite recheck |
+
+The focused implementation and validation enforce these bounded requirements;
+this is not a hosted or whole-repository certification.
+Fresh reads detect observed reassignment but cannot atomically revoke an external
+CRM change after the final read. A token write already completed before detected
+drift is not undone; the remaining email is withheld.
+
+
+### Implementation evidence and limits
+
+- Invitation preview version 2 adds only assigned-PD ID; other template types
+  retain version 1. The route passes the server-derived request/PD authorization
+  snapshot separately from browser input. The service compares it to hydration,
+  then freshly rechecks assignment before mint and dispatch. The fingerprint
+  still uses batch-hydrated body inputs; general mid-batch body/template refresh
+  remains parked. A null assignment, failed read, or mismatch withholds the
+  invitation with fresh-preview guidance. Post-send receipts remain intact.
+- `setExcluded` protects saved/ineligible rows in the SQL conflict predicate.
+  Its follow-up read classifies the no-op only. Saved conflicts return 409
+  without exclusion measurement. Both Find actions remove only exact-key stale
+  cards, including unverified twins, then reload; a failed reload cannot restore
+  the stale card. The finalizer's intentional missing-row recreation is unchanged.
+- `reviewer-first-manual-invitation-coi.js` reads the fresh suggestion and person,
+  validates server-derived request/person pins when supplied, and screens exact
+  `staff_manual` first-invitation rows. Only reviewer/staff-confirmed current
+  `wmkf_maininstitution` supplies institution authority. Sparse manual entry and
+  enrichment-only primary/organization values remain unknown for this gate;
+  they are not silently promoted into trusted current evidence. No new schema,
+  acknowledgement, or per-edit/reinvite COI check was introduced.
+- The existing complete request/PI context and real institution matcher decide
+  conflicts. Only `dropped` blocks; Broad/HHMI sole-overlap exemptions and direct
+  university conflicts retain existing semantics. Context failures are distinct
+  from confirmed conflicts. The guard covers normal invitation sends, copyable
+  first-link generation, manual invitation recording, and generic correction
+  that first sets either invited=true or a sent date. Combined current-institution
+  edit plus first-invite correction is rejected before writes so staff saves the
+  institution first. Already-dispatched external mail cannot be undone.
+- Send checks again before transport. If fresh state ceases to be first-manual
+  after it was observed as first-manual, the attempt stops rather than treating
+  'not applicable' as permission to send a duplicate. Ordinary nonmanual rows
+  remain outside institution matching, but the fresh suggestion read itself is
+  fail-closed: its outage can withhold an invitation or regeneration. This is an
+  availability cost of avoiding inference from stale provenance.
+
+[VERIFIED via parent local run] **26 suites / 1,269 tests passed** across the
+invitation authorization/fingerprint and token paths, first-manual classifier and
+real COI matcher, correction/manual recording, UI action lifetimes, roster store/
+service/client, concurrency fixtures, and safe probe parsers. The real matcher
+fixtures cover same/different institutions, Broad and HHMI exemption, and a
+request's Broad institution not exempting a direct university match. Pure mocks
+and local fixtures performed no live writes or sends. Earlier fixture failures
+and a transient undefined helper in WIP were repaired before this final run.
+
+[VERIFIED via parent checks] Type checking and sequential scoped safety/docs
+gates plus available self-tests passed. Scoped lint had zero errors and three
+pre-existing React-effect warnings in unchanged effect regions. Fresh Sol review challenged both runtime
+repairs; the cleared-PD edge and fresh first-invitation state race were fixed and
+covered before the final passing run. No gate was weakened. Real Postgres race
+execution, full production build, signed-in hosted smoke and release were not run.
+
+### Remaining actionable backlog and owner boundaries
+
+1. **Release, when requested:** run the repository's deliberate Tier 2 promotion
+   checks and scoped hosted smoke on an authorized target; obtain the owner release
+   decision before main/promotion. These local tests are not a release receipt.
+2. **Private export lifecycle evidence:** establish actual runtime DVX store binding
+   in an authorized credential-bearing context, then finish the bounded metadata
+   inventory before proposing exact retention/cleanup. No retention decision is
+   justified by the name-only store candidate or public-cache ages alone.
+3. **Historical attribution, only with new evidence:** current population and the
+   seven sampled histories provide no demonstrated correction set. Expand exact
+   field/writer history if an incident supplies a concrete target; do not relabel
+   or repair records automatically from aggregate counts.
+4. **Preserved owner holds:** foundation exclusion breadth, automatic reminders,
+   parked intake/BILL/paid-run scopes and review-burden policy remain unchanged.
+   Other reviewer mutation routes' cross-row PD timing is outside the approved
+   pending-invitation repair and remains a bounded future audit topic.
+
+No new product decision is required for the completed local batch. Release and
+any live correction/cleanup remain separately authorized actions. All 304 memory
+leaves have whole-read coverage (272 active, 32 non-active); source/live proof
+remains selective, so the all-claim audit remains **AUDIT INCOMPLETE**.

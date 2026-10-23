@@ -427,12 +427,29 @@ describe('recordCoiDropped', () => {
 });
 
 describe('setExcluded', () => {
-  test('upserts (eviction-tolerant) and forces status excluded', async () => {
-    await store.setExcluded(REQ, { name: 'Bob Roe' });
+  test('upserts missing rows and atomically excludes existing rows except saved/ineligible', async () => {
+    sql.mockResolvedValueOnce({ rows: [{ candidate_key: 'candidate:bob' }] });
+    await expect(store.setExcluded(REQ, { name: 'Bob Roe' })).resolves.toEqual({ outcome: 'excluded' });
     const text = queryTextOf(0);
     expect(text).toMatch(/INSERT INTO reviewer_find_roster/);
     expect(text).toMatch(/status = 'excluded'/);
+    expect(text).toMatch(/status NOT IN \('ineligible', 'saved'\)/);
+    expect(text).toMatch(/RETURNING candidate_key/);
     expect(allInterpolations()).toContain('bob roe');
+    expect(sql).toHaveBeenCalledTimes(1);
+  });
+
+  test.each([
+    ['saved', 'saved'],
+    ['ineligible', 'ineligible'],
+    [null, 'missing'],
+  ])('classifies a guarded no-row upsert as %s', async (status, outcome) => {
+    sql.mockResolvedValueOnce({ rows: [] }).mockResolvedValueOnce({ rows: status ? [{ status }] : [] });
+    await expect(store.setExcluded(REQ, { name: 'Bob Roe' })).resolves.toEqual({ outcome });
+    expect(sql).toHaveBeenCalledTimes(2);
+    expect(queryTextOf(1)).toMatch(/SELECT status/);
+    expect(queryTextOf(1)).toMatch(/request_id\s*=/);
+    expect(queryTextOf(1)).toMatch(/candidate_key\s*=/);
   });
 
   test('throws on a nameless candidate', async () => {

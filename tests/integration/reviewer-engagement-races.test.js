@@ -183,6 +183,7 @@ function send(templateType = 'followup') {
   const promise = trusted(() => sendEmails({
     requestBody: { templateType, drafts: [stampedDraft] },
     fromEmail: 'staff@example.org',
+    authorizedProgramDirectorByRequestId: { [REQUEST]: transport.get(REQUESTS, REQUEST)?._wmkf_programdirector_value },
   }, (event) => events.push(event)));
   return { promise, events };
 }
@@ -803,6 +804,7 @@ describe('Stage 6D draft fingerprint through the real adapter/transport chain', 
     await trusted(() => sendEmails({
       requestBody: { templateType: 'followup', drafts: [staleDraft] },
       fromEmail: 'staff@example.org',
+      authorizedProgramDirectorByRequestId: { [REQUEST]: transport.get(REQUESTS, REQUEST)?._wmkf_programdirector_value },
     }, (event) => events.push(event)));
 
     expect(email).not.toHaveBeenCalled();

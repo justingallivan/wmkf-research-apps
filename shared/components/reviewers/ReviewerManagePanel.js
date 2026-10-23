@@ -561,7 +561,7 @@ export default function ReviewerManagePanel({
       if (!isCurrent()) return;
       const data = envelope.data;
       if (!envelope.ok || !data.ok) {
-        alert(`Could not generate a new link: ${data.reason || envelope.status}`);
+        alert(`Could not generate a new link: ${data.message || data.reason || envelope.status}`);
         return;
       }
       // A new token already exists server-side at this point (mintAndStore

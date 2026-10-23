@@ -90,8 +90,9 @@ function buildFingerprintInputsFromFixture({
   const institution = String(request?._akoya_applicantid_value_formatted || '').trim() || null;
   const coInvestigators = (Array.isArray(coPINames) ? coPINames : []).map(stripHonorific);
 
+  const isInvitation = templateType === 'invitation';
   return {
-    v: 1,
+    v: isInvitation ? 2 : 1,
     templateType: templateType ?? null,
     suggestionId: String(suggestionId || '').toLowerCase(),
     candidate: {
@@ -111,6 +112,9 @@ function buildFingerprintInputsFromFixture({
     request: {
       reviewDueDate: request?.wmkf_reviewduedate ?? null,
       meetingDate: request?.wmkf_meetingdate ?? null,
+      ...(isInvitation ? {
+        programDirectorId: String(request?._wmkf_programdirector_value || '').trim().toLowerCase() || null,
+      } : {}),
     },
     cycle: {
       programName: cycle?.program_name ?? null,

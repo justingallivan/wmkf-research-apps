@@ -2,7 +2,7 @@
 agent_wiki: topic
 status: active
 last_verified: 2026-10-22
-verification_scope: "Inherited hub date; extraction integrity only, no claim or live-state recertification"
+verification_scope: "Scoped 2026-10-22 local-source and focused-test verification of invitation authorization/fingerprint and first-manual-invitation COI paths; not deployed, no hosted behavior or whole-topic recertification"
 stale_after_days: 90
 owner: reviewers
 title: "Reviewer Invitation and Email Delivery"
@@ -18,6 +18,8 @@ source_files:
   - lib/services/reviewer-reminder-sweep.js
   - lib/utils/invitation-link-validator.js
   - lib/services/review-manager/draft-fingerprint.js
+  - lib/services/reviewer-request-authorization.js
+  - lib/services/reviewer-first-manual-invitation-coi.js
   - pages/api/review-manager/review-due-extension.js
   - lib/services/reviewer-due-extension.js
   - shared/components/reviewers/ReviewerDueDateEditor.js
@@ -32,6 +34,8 @@ watch_paths:
   - shared/components/reviewers/email-template-store.js
   - lib/services/review-manager/send-emails-service.js
   - lib/services/review-manager/render-emails-service.js
+  - lib/services/reviewer-request-authorization.js
+  - lib/services/reviewer-first-manual-invitation-coi.js
   - lib/utils/invitation-link-validator.js
   - pages/api/review-manager/review-due-extension.js
   - lib/services/reviewer-due-extension.js
@@ -50,7 +54,11 @@ extraction_segments:
 
 # Reviewer Invitation and Email Delivery
 
-> The source page mixed current guidance with dated history and owner decisions; those distinctions are preserved in the extracts. The inherited `last_verified` date does not certify these claims anew. This pass verifies only extraction bounds and byte provenance, not runtime behavior, repository-wide drift, or live state.
+> The source page mixed current guidance with dated history and owner decisions; those distinctions are preserved in the extracts. The 2026-10-22 recheck below is scoped to local invitation authorization/fingerprinting and first-manual-invitation screening, verified in local source and focused tests; it is not deployment or hosted verification. It does not recertify the rest of this topic.
+
+**Invitation authorization and draft freshness (local source and focused tests verified 2026-10-22; not deployed).** Version 2 of `draftFingerprint` applies to invitations only and adds the assigned Program Director ID; request/date inputs were already present in version 1, and other template types remain on version 1. It does not bind the request ID or sender mailbox/name/details. The route authorizes the complete batch and passes a server request→authorized-PD snapshot into the send service. The service computes the send-time fingerprint once from batch hydration; separate fresh-PD checks compare current request assignment with the authorization snapshot before mint and again before dispatch. These checks do not rerun all fingerprint inputs. If drift is found at the later check, dispatch is withheld even when the token has already been minted. The separate assignment reads and later transport cannot atomically prevent an external Program Director change after the final read; a token minted earlier is not rolled back. Observed drift stops the affected and subsequent unsent effects, but cannot erase an effect that already occurred. This describes current local source only; no deployment or hosted invitation was checked for this update.
+
+**First invitation for a staff-manual reviewer (local source and focused tests verified 2026-10-22; not deployed).** The shared `reviewer-first-manual-invitation-coi.js` helper fresh-reads the suggestion, linked person, and proposal institution context before a normal first send, copyable-link regeneration, or recording a manually sent first invitation. The generic `correctResponse` path is a fourth entry point when the requested lifecycle includes `invited: true` or a non-empty `emailSentAt`. Only server-persisted `wmkf_maininstitution` is trusted as the person's current institution. A blank value is unknown; `wmkf_primaryaffiliation`, `wmkf_organizationname`, or source text alone does not establish current institution. Only a known COI decision of `dropped` blocks; the Broad HHMI exemption remains exempt. Unavailable required context fails closed. The separate correction guard rejects a combined `mainInstitution` edit plus first-invite stamp before either write. For email sends, `send-emails-service.js` emits `manual_invitation_changed` when its fresh suggestion read finds that the row no longer qualifies as a first-manual-invitation row. This additional read can withhold non-manual invitation or regeneration when unavailable, so it has an availability cost. This is limited to first-invitation actions for a `staff_manual` suggestion with no invitation/engagement history: there is no new schema or acknowledgement, no recheck for each edit, and no recheck for an already-engaged reviewer. No hosted behavior is claimed.
 
 <!-- source-lines: 343-359 -->
 **Per-reviewer extension workflow (Wave 18 production-live 2026-08-11; current source contract checked 2026-10-22):** eligible accepted rows in **Track Reviewers** expose Grant/Change extension. The dedicated `/api/review-manager/review-due-extension` route freshly enforces accepted/non-terminal/no-receipt state. A non-null date must be strictly after the request default and current/future in Foundation-Pacific time; there is no fixed calendar maximum. Before a non-null override save, a present stored token hash must pass expiry and revocation preflight: a revoked hash or an expiry shorter than the proposed cover date fails with `token_recovery_required` before the date write. No stored hash means that preflight is skipped, and clearing the override to null to restore the original date also skips it. These checks do not rotate a token. The route validates the admin body, Dynamics impersonation setting, assigned sender, confirmed recipient, signature, and calendar. Confirmed engagement snapshot name/email take precedence; legacy missing values fall back field-by-field to the server-read linked reviewer person, and absence from both sources still fails before the write. It then ETag-saves and automatically dispatches the fixed-subject message with the assigned-PD signature and stable-UID calendar update. Only an actual Dynamics dispatch failure preserves the date without the notice. The open modal offers a server-fresh retry, and an existing extension always offers Resend deadline email without another date write; there is no durable notification-owed marker for a failed restore send. Invite Reviewers and generic `my-candidates` PATCH cannot write the field. The 90-day accepted-token cushion remains intentional and saving does not rotate a delivered token. [VERIFIED via production create/publish/exact/runtime-select probes, the non-clobbering admin-body seed, main `8647af33`, Vercel `dpl_AbTvWvMYb5inwPnYKTK2mkrkNXZz`, and live HTTP checks on 2026-08-11 / 2026-08-12 UTC] the column and runtime are live. [VERIFIED via the exact read-only production Request `1002788`/Test Homer row probe, main `ccb7e0c8`, Vercel `dpl_DjRmd4axNpUUpHAo6ZmeoBgumxTe`, and live HTTP checks] the legacy identity fallback is live. [VERIFIED via owner production smoke on Request `1002788`] the retry saved the extension and delivered the automatic deadline email. Its `Dear Test Homer,` greeting exposed the last copy defect. The admin body now requires `{{greeting}}`, the shared reviewer honorific helper renders `Dear Dr. Homer,`, and the live Dataverse setting matches the source default. [VERIFIED via main `6526a934`, Vercel `dpl_33KVRu3WmQhWBztd7RqDd2X6LBCr`, 610 suites / 7,717 tests, webpack build, and live HTTP 200] that correction is production-live; no second test email was sent.

@@ -9,6 +9,7 @@
 
 const getForTokenRegeneration = jest.fn();
 jest.mock('../../lib/dataverse/adapters/reviewer-suggestion', () => ({
+  __esModule: true,
   getForTokenRegeneration: (...a) => getForTokenRegeneration(...a),
   APPLICANT_DISPOSITION_EXCLUDED: 100000002,
   RESPONSE_TYPE_MAP: {
@@ -43,11 +44,25 @@ const getRequestById = jest.fn();
 jest.mock('../../lib/dataverse/adapters/grant-request', () => ({
   getById: (...a) => getRequestById(...a),
 }));
+jest.mock('../../lib/services/reviewer-first-manual-invitation-coi', () => ({
+  ReviewerFirstManualInvitationCoiError: class ReviewerFirstManualInvitationCoiError extends Error {
+    constructor(code) {
+      super('Institution check unavailable');
+      this.code = code;
+      this.httpStatus = code === 'manual_institution_coi' ? 409 : 503;
+    }
+  },
+  screenFirstManualInvitationInstitutionCOI: jest.fn(),
+}));
 const SUG = '22222222-2222-4222-8222-222222222222';
 const REQ = '11111111-1111-4111-8111-111111111111';
 const ACTOR = 'su-1';
 const REQUEST_DUE = '2099-09-01';
 const DEFAULT_EXPIRES = new Date(Date.parse(`${REQUEST_DUE}T23:59:59Z`) + 90 * 24 * 60 * 60 * 1000);
+const {
+  ReviewerFirstManualInvitationCoiError,
+  screenFirstManualInvitationInstitutionCOI,
+} = require('../../lib/services/reviewer-first-manual-invitation-coi');
 
 let regenerateToken;
 let RegenerateTokenError;
@@ -59,6 +74,7 @@ beforeAll(async () => {
 
 beforeEach(() => {
   jest.clearAllMocks();
+  screenFirstManualInvitationInstitutionCOI.mockResolvedValue({ applicable: false, screened: false });
   getForTokenRegeneration.mockResolvedValue({
     _wmkf_request_value: REQ,
     _etag: 'W/"1"',
@@ -76,6 +92,10 @@ beforeEach(() => {
 
 test('success: server derives expiry from request default and returns the replacement link without touching drafts', async () => {
   const out = await regenerateToken({ suggestionId: SUG, actingUserSystemId: ACTOR });
+  expect(screenFirstManualInvitationInstitutionCOI).toHaveBeenCalledWith({
+    suggestionId: SUG,
+    expectedRequestId: REQ,
+  });
   expect(getRequestById).toHaveBeenCalledWith(REQ, { select: 'wmkf_reviewduedate' });
   expect(mintAndStore).toHaveBeenCalledWith({
     suggestionId: SUG,
@@ -90,6 +110,23 @@ test('success: server derives expiry from request default and returns the replac
     expiresAt: DEFAULT_EXPIRES.toISOString(),
     jti: 'jti-1',
   });
+});
+
+test('first manual invitation screen failure preserves the route envelope and prevents minting', async () => {
+  screenFirstManualInvitationInstitutionCOI.mockRejectedValueOnce(
+    new ReviewerFirstManualInvitationCoiError('manual_institution_coi_unavailable'),
+  );
+
+  const err = await regenerateToken({ suggestionId: SUG, actingUserSystemId: ACTOR }).catch((e) => e);
+
+  expect(err).toBeInstanceOf(RegenerateTokenError);
+  expect(err.httpStatus).toBe(503);
+  expect(err.body).toEqual({
+    ok: false,
+    reason: 'manual_institution_coi_unavailable',
+    message: 'Institution check unavailable',
+  });
+  expect(mintAndStore).not.toHaveBeenCalled();
 });
 
 test('suggestion override wins over the request default for regenerated-token expiry', async () => {

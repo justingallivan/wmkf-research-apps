@@ -46,7 +46,7 @@ jest.mock('../../lib/services/reviewer-roster-store', () => ({
         }
       : 0
   )),
-  setExcluded: jest.fn(async () => {}),
+  setExcluded: jest.fn(async () => ({ outcome: 'excluded' })),
   promote: jest.fn(async () => ({ name: 'Bob Roe' })),
   confirmIdentity: jest.fn(async () => ({ confirmationId: 'confirm-1', candidate: { name: 'Ann Lee' } })),
   updateContactDraft: jest.fn(async (_requestId, candidateKey, updates) => ({

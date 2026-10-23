@@ -173,7 +173,12 @@ async function run(requestBody) {
     drafts: requestBody.drafts.map((d) => autoStampDraft(d, requestBody.templateType)),
   };
   await sendEmails(
-    { requestBody: stampedBody, fromEmail: 'staff@wmkeck.org', actingUserSystemId: 'u-1' },
+    {
+      requestBody: stampedBody,
+      fromEmail: 'staff@wmkeck.org',
+      actingUserSystemId: 'u-1',
+      authorizedProgramDirectorByRequestId: { [REQUEST_ID]: REQUEST._wmkf_programdirector_value },
+    },
     onEvent,
   );
   return { emitted, onEvent };
@@ -232,7 +237,12 @@ describe('send-emails-service delegates the post-send invitation stamp to record
       markAsSent: false,
     };
     await sendEmails(
-      { requestBody: stampedBody, fromEmail: 'staff@wmkeck.org', actingUserSystemId: 'u-1' },
+      {
+        requestBody: stampedBody,
+        fromEmail: 'staff@wmkeck.org',
+        actingUserSystemId: 'u-1',
+        authorizedProgramDirectorByRequestId: { [REQUEST_ID]: REQUEST._wmkf_programdirector_value },
+      },
       onEvent,
     );
     expect(recordDeliveredInvitation).not.toHaveBeenCalled();

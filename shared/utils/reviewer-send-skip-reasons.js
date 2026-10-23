@@ -20,6 +20,10 @@
 export const SEND_SKIP_REASON = {
   no_email: 'no_email',
   program_director_sender_unavailable: 'program_director_sender_unavailable',
+  program_director_changed: 'program_director_changed',
+  manual_institution_coi: 'manual_institution_coi',
+  manual_institution_coi_unavailable: 'manual_institution_coi_unavailable',
+  manual_invitation_changed: 'manual_invitation_changed',
   not_accepted: 'not_accepted',
   materials_already_sent: 'materials_already_sent',
   materials_release_ineligible: 'materials_release_ineligible',
@@ -41,6 +45,10 @@ export const SEND_SKIP_REASON = {
 export const SEND_SKIP_REASON_LABEL = {
   no_email: 'No email address on file.',
   program_director_sender_unavailable: 'The assigned Program Director\'s sender mailbox is unavailable.',
+  program_director_changed: 'The assigned Program Director changed while this invitation was being prepared. Reopen the preview and confirm authorization before sending.',
+  manual_institution_coi: 'The reviewer’s confirmed current institution conflicts with this proposal. Nothing was sent to this reviewer.',
+  manual_institution_coi_unavailable: 'The first-invitation institution check is unavailable. Nothing was sent to this reviewer; check the reviewer and proposal records before trying again.',
+  manual_invitation_changed: 'The reviewer’s invitation state changed while this first invitation was being prepared. Nothing was sent by this attempt; reopen the preview before continuing.',
   not_accepted: 'The reviewer has not accepted — materials were withheld.',
   materials_already_sent: 'Materials were already sent to this reviewer.',
   materials_release_ineligible: 'The reviewer is not currently awaiting materials.',

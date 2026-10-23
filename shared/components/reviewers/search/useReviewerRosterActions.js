@@ -4,7 +4,7 @@
 import { useCallback } from 'react';
 import { pruneCandidateForRoster } from '../reviewer-search-logic';
 import { candKey, dedupeByName } from './candidateKeys';
-import { requestJson, requestEnvelope } from '../../../utils/api-request';
+import { requestEnvelope } from '../../../utils/api-request';
 
 export default function useReviewerRosterActions({
   requestId,
@@ -23,6 +23,7 @@ export default function useReviewerRosterActions({
   setRosterBlocked,
   setRosterHandled,
   setRosterSavedKeys,
+  setUnverified,
   setRosterNames,
   setSelected,
   setRosterNote,
@@ -40,13 +41,27 @@ export default function useReviewerRosterActions({
     setRosterNames((prev) => Array.from(new Set([...prev, cand.name])));
     setSelected((prev) => { const next = new Set(prev); next.delete(key); return next; });
     try {
-      await requestJson('/api/workbench/reviewer-roster', {
+      const { ok, status, data } = await requestEnvelope('/api/workbench/reviewer-roster', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ requestId, action: 'exclude', candidate: pruned }),
         tolerantBody: true,
-        fallbackMessage: 'exclude failed',
       });
+      if (genRef.current !== myGen) return;
+      if (status === 409 && data?.code === 'candidate_already_saved') {
+        setRosterActive((prev) => prev.filter((c) => candKey(c) !== key));
+        setRosterExcluded((prev) => prev.filter((c) => candKey(c) !== key));
+        setUnverified((prev) => prev.filter((c) => candKey(c) !== key));
+        let snapshot = null;
+        try { snapshot = await reloadRoster(myGen); } catch { /* The server conflict still identifies this saved key. */ }
+        if (genRef.current === myGen) {
+          setRosterNote(snapshot
+            ? 'This reviewer is already on Invite. Remove them from this request on the Invite tab.'
+            : 'This reviewer is already on Invite. Reload the reviewer roster before continuing.');
+        }
+        return;
+      }
+      if (!ok) throw new Error(data?.error || 'exclude failed');
     } catch {
       // Roll back the optimistic move so the card isn't silently lost.
       if (genRef.current === myGen) {
@@ -55,7 +70,7 @@ export default function useReviewerRosterActions({
         setRosterNote("Couldn't exclude that reviewer — please try again.");
       }
     }
-  }, [requestId, genRef, setCandidates, setRecCandidates, setRosterActive, setRosterExcluded, setRosterNames, setSelected, setRosterNote]);
+  }, [requestId, genRef, reloadRoster, setCandidates, setRecCandidates, setRosterActive, setRosterExcluded, setRosterNames, setSelected, setUnverified, setRosterNote]);
 
   // Exclude an ephemeral unverified suggestion. Same durable PATCH (the server
   // exclude is an upsert, so no prior roster row is needed), but the rollback
@@ -71,13 +86,30 @@ export default function useReviewerRosterActions({
     setRosterExcluded((prev) => dedupeByName([pruned, ...prev]));
     setRosterNames((prev) => Array.from(new Set([...prev, cand.name])));
     try {
-      await requestJson('/api/workbench/reviewer-roster', {
+      const { ok, status, data } = await requestEnvelope('/api/workbench/reviewer-roster', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ requestId, action: 'exclude', candidate: pruned }),
         tolerantBody: true,
-        fallbackMessage: 'exclude failed',
       });
+      if (genRef.current !== myGen) return;
+      if (status === 409 && data?.code === 'candidate_already_saved') {
+        setCandidates((prev) => prev.filter((c) => candKey(c) !== key));
+        setRecCandidates((prev) => prev.filter((c) => candKey(c) !== key));
+        setRosterActive((prev) => prev.filter((c) => candKey(c) !== key));
+        setRosterExcluded((prev) => prev.filter((c) => candKey(c) !== key));
+        setUnverified((prev) => prev.filter((c) => candKey(c) !== key));
+        setSelected((prev) => { const next = new Set(prev); next.delete(key); return next; });
+        let snapshot = null;
+        try { snapshot = await reloadRoster(myGen); } catch { /* The server conflict still identifies this saved key. */ }
+        if (genRef.current === myGen) {
+          setRosterNote(snapshot
+            ? 'This reviewer is already on Invite. Remove them from this request on the Invite tab.'
+            : 'This reviewer is already on Invite. Reload the reviewer roster before continuing.');
+        }
+        return;
+      }
+      if (!ok) throw new Error(data?.error || 'exclude failed');
     } catch {
       if (genRef.current === myGen) {
         setRosterExcluded((prev) => prev.filter((c) => candKey(c) !== key));
@@ -87,7 +119,7 @@ export default function useReviewerRosterActions({
         setRosterNote("Couldn't exclude that reviewer — please try again.");
       }
     }
-  }, [requestId, genRef, rosterNames, setRosterExcluded, setRosterNames, setRosterNote]);
+  }, [requestId, genRef, reloadRoster, rosterNames, setCandidates, setRecCandidates, setRosterActive, setRosterExcluded, setRosterNames, setSelected, setUnverified, setRosterNote]);
 
   // Promote an excluded candidate back to the active, selectable list.
   const promoteCandidate = useCallback(async (cand) => {

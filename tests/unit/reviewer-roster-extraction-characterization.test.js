@@ -101,7 +101,7 @@ beforeEach(() => {
   mockListRepairRequests.mockResolvedValue([]);
   store.listForRequest.mockResolvedValue({ active: [], excluded: [], ineligible: [], blocked: [], savedKeys: [], allNames: [] });
   store.recordSurfaced.mockResolvedValue(0);
-  store.setExcluded.mockResolvedValue(undefined);
+  store.setExcluded.mockResolvedValue({ outcome: 'excluded' });
   store.promote.mockResolvedValue({ name: 'Bob Roe', candidateKey: 'candidate:bob' });
   store.confirmIdentity.mockResolvedValue({ confirmationId: 'confirmation-41', candidate: { name: 'Morgan Analyst' } });
   store.updateContactDraft.mockResolvedValue({ name: 'Morgan Analyst', candidateKey: 'candidate:morgan' });
@@ -619,6 +619,38 @@ describe('pre-extraction shell contract', () => {
     expect(mockRecordInstitutionMeasurement).not.toHaveBeenCalled();
     expect(r.statusCode).toBe(200);
     expect(r.body).toEqual({ success: true });
+  });
+
+  it('returns a saved conflict with Invite guidance and skips exclusion measurement', async () => {
+    mockMeasurementEnabled.mockReturnValue(true);
+    store.setExcluded.mockResolvedValueOnce({ outcome: 'saved' });
+    const r = response();
+    await handler({ method: 'PATCH', body: {
+      requestId: REQ, action: 'exclude', candidate: { name: 'Morgan Analyst', candidateKey: 'candidate:morgan' },
+    } }, r);
+
+    expect(r.statusCode).toBe(409);
+    expect(r.body).toEqual({
+      success: false,
+      error: 'This reviewer is already on Invite. Remove them from this request on the Invite tab.',
+      code: 'candidate_already_saved',
+    });
+    expect(mockMeasurementEnabled).not.toHaveBeenCalled();
+    expect(mockRecordInstitutionMeasurement).not.toHaveBeenCalled();
+  });
+
+  it('keeps an ineligible row as a successful no-op without exclusion measurement', async () => {
+    mockMeasurementEnabled.mockReturnValue(true);
+    store.setExcluded.mockResolvedValueOnce({ outcome: 'ineligible' });
+    const r = response();
+    await handler({ method: 'PATCH', body: {
+      requestId: REQ, action: 'exclude', candidate: { name: 'Morgan Analyst', candidateKey: 'candidate:morgan' },
+    } }, r);
+
+    expect(r.statusCode).toBe(200);
+    expect(r.body).toEqual({ success: true });
+    expect(mockMeasurementEnabled).not.toHaveBeenCalled();
+    expect(mockRecordInstitutionMeasurement).not.toHaveBeenCalled();
   });
 
   it('preserves omitted versus explicit null contact-draft fields and exact rejection envelopes', async () => {
