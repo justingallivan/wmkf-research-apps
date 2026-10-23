@@ -51,7 +51,7 @@ import { lc } from './lib/research-iaa-backfill.mjs';
 import { groupNewContacts } from './lib/research-copi-stage-b.mjs';
 import {
   GUID, ROLE_COPI, parseDecision, selectLine, contactCreatePayload, junctionCreatePayload, foldLedger, applyDone, rollbackEligible,
-  makeApplier, runOperations, planOverwriteBlocked, ledgerPlanHash, JUNCTION, REQUEST_SELECT, ROW_SELECT, CONTACT_SELECT, SET_TARGETS,
+  makeApplier, runOperations, planOverwriteBlocked, ledgerPlanHash, recordedRowMismatch, JUNCTION, REQUEST_SELECT, ROW_SELECT, CONTACT_SELECT, SET_TARGETS,
 } from './lib/research-copi-apply.mjs';
 
 try {
@@ -205,6 +205,8 @@ async function runPlan() {
       if (x.line.cohort === 'recorded') {
         const row = rows.find((j) => lc(j.wmkf_apprequestpersonid) === lc(x.line.junctionRowId));
         if (!row) { x.held = 'recorded junction row not found'; continue; }
+        const mismatch = recordedRowMismatch(x.line, row);
+        if (mismatch) { x.held = mismatch; continue; }
         x.existingRow = row;
       } else if (x.contactId) {
         const mine = rows.filter((j) => lc(j._wmkf_contact_value) === x.contactId);
@@ -232,8 +234,8 @@ async function runPlan() {
       if (x.held) { hold(x.line, x.held); continue; }
       const source = { key: x.line.key, requestId: lc(x.line.requestId), requestNum: x.line.requestNum, meetingDate: x.line.meetingDate, applicantId: lc(x.line.applicantId), projectLeaderId: lc(x.line.projectLeaderId) };
       if (x.existingRow) {
-        // The row's request/contact/role are re-checked before the write.
-        const expect = { requestId: lc(x.existingRow._wmkf_request_value), contactId: lc(x.existingRow._wmkf_contact_value), role: x.existingRow.wmkf_role };
+        // Apply re-checks the row against the approved identity (snapshot for recorded rows, the matched contact otherwise), not whatever the row holds now.
+        const expect = { requestId: source.requestId, contactId: lc(x.line.cohort === 'recorded' ? x.line.contactId : x.contactId), role: ROLE_COPI };
         if (x.sel.iaaAccountId) ops.push({ op: 'iaa-set', id: lc(x.existingRow.wmkf_apprequestpersonid), value: guid(x.sel.iaaAccountId, 'iaa'), expect, source });
         else hold(x.line, 'co-PI row exists and no institution to set');
         continue;

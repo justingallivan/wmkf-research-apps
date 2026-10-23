@@ -365,3 +365,15 @@ export function ledgerPlanHash(appliedLines) {
   if (hashes.length > 1) throw new Error(`apply log mixes plans ${hashes.join(', ')}`);
   return hashes[0] || null;
 }
+
+/**
+ * Why a live recorded co-PI row no longer belongs to the resolve line it was
+ * approved for ('' when it does): the approved institution is for that request,
+ * that contact, as Co-PI.
+ */
+export function recordedRowMismatch(line, row) {
+  if (id(row._wmkf_request_value) !== id(line.requestId)) return 'recorded row moved to another request';
+  if (id(row._wmkf_contact_value) !== id(line.contactId)) return 'recorded row reassigned to another contact';
+  if (row.wmkf_role !== ROLE_COPI) return 'recorded row is no longer Co-PI';
+  return '';
+}

@@ -3,7 +3,7 @@
  */
 import {
   parseDecision, selectLine, splitName, contactCreatePayload, junctionCreatePayload, foldLedger, applyDone, rollbackEligible, ROLE_COPI,
-  makeApplier, requestDrift, runOperations, planOverwriteBlocked, ledgerPlanHash,
+  makeApplier, requestDrift, runOperations, planOverwriteBlocked, ledgerPlanHash, recordedRowMismatch,
 } from '../../scripts/lib/research-copi-apply.mjs';
 
 const G = (n) => `${String(n).padStart(8, '0')}-0000-4000-8000-000000000000`;
@@ -240,6 +240,14 @@ describe('apply failure replay', () => {
     const op = { ...junctionOp, id: G(300), contactId: OLDC, newContact: false, contactPayload: undefined };
     db.wmkf_apprequestpersons.delete(ROW);
     expect((await apply(op, new Map())).result).toBe('blocked');
+  });
+  test('a recorded row reassigned or re-roled between resolve and plan is rejected', () => {
+    const line = { requestId: REQ.toUpperCase(), contactId: OLDC };
+    const row = { _wmkf_request_value: REQ, _wmkf_contact_value: OLDC, wmkf_role: ROLE_COPI };
+    expect(recordedRowMismatch(line, row)).toBe('');
+    expect(recordedRowMismatch(line, { ...row, _wmkf_contact_value: G(400) })).toMatch(/reassigned/);
+    expect(recordedRowMismatch(line, { ...row, _wmkf_request_value: G(401) })).toMatch(/another request/);
+    expect(recordedRowMismatch(line, { ...row, wmkf_role: 100000000 })).toMatch(/no longer Co-PI/);
   });
   test('re-planning is refused once the apply log has activity, and a log names one plan', () => {
     expect(planOverwriteBlocked([])).toBe(false);
