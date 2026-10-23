@@ -174,6 +174,25 @@ The existing Jest configuration disables coverage thresholds, so this confirms
 coverage-instrumented test execution, not threshold certification. The ten
 opt-in PostgreSQL integration suites (130 tests) are reported separately above.
 
+### Internal staff rehearsal: confirmation-dialog blocker
+
+The first guided local baseline attempt opened the invitation preview, but a
+single Send click produced unreadable transient feedback and left it unchanged.
+Source review traced this to the headed harness: the app requires
+`window.confirm`, and Playwright dismisses dialogs without a listener. This
+cancelled the action before the mocked send request. The launcher now registers
+a headed-only context listener that leaves the native choice to the participant;
+it does not automatically accept or dismiss. Smoke mode stays noninteractive. Parent isolated checks passed 35 focused
+unit tests, scoped lint, and two Chromium dialog-contract tests using native CDP
+events (not an additional Playwright dialog listener). The latter run used the
+credential-free guarded copy; the shared E2E configuration still built/started
+Next, while the test pages themselves used synthetic data URLs. Automated choices
+prove pending/cancel/accept behavior, not visible human interaction.
+A fresh human check must establish that both Cancel and OK are usable on this
+host. The interrupted attempt is not a successful send or completed rehearsal.
+The minimal synthetic preview also does not establish real invitation-copy or
+Program Director clarity; its future fixture dates are not campaign evidence.
+
 ### Verification containment incident
 
 **[VERIFIED via agent tool transcript and startup source]** One agent

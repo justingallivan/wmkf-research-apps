@@ -83,6 +83,7 @@ async function runInIsolatedCandidate({ candidateDir, baseUrl, tempRoot, pathVal
       viewport: { width: 1240, height: 740 },
       serviceWorkers: 'block',
     });
+    launcher.keepNativeDialogsForHuman(context, !options.headless);
     fixtureRun = await fixtureModule.installMocks(context, {
       baseUrl,
       buildId,

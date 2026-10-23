@@ -172,6 +172,14 @@ function browserRequestDecision(url, expectedOrigin, isMockedApiRequest, method 
   return { allow: false, reason: 'unmocked_local_route' };
 }
 
+function keepNativeDialogsForHuman(context, headed) {
+  if (!headed) return;
+  context.on('dialog', () => {
+    // Intentionally do not accept or dismiss: Playwright leaves the native
+    // confirm/cancel prompt open for the person running the headed rehearsal.
+  });
+}
+
 function normalizeViolationReason(reason) {
   const value = String(reason || 'unknown');
   if (value.includes('origin')) return 'api_origin_violation';
@@ -644,6 +652,7 @@ module.exports = {
   assertLauncherCommitted,
   assertLoopbackHttp,
   browserRequestDecision,
+  keepNativeDialogsForHuman,
   cleanupOwnedWorkspace,
   createOwnedWorkspace,
   createAbortBoundary,
