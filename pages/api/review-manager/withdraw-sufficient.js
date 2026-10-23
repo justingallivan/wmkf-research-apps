@@ -23,8 +23,10 @@
  * state-before-email ordering, If-Match TOCTOU close, per-suggestion partial
  * success) lives in lib/services/review-manager/withdraw-sufficient-service.js.
  *
- * Auth: review-manager 'reviewers' (same staff-shared boundary as the rest of
- * the surface). requestId + every suggestionId are GUID-validated before use.
+ * Auth: review-manager 'reviewers', then lead PD for every target or superuser
+ * (authorizeReviewerRequestMutation), matching the accepted-release
+ * terminal-transition route and the UI's canManage gate. requestId + every
+ * suggestionId are GUID-validated before use.
  */
 
 import { requireAppAccess } from '../../../lib/utils/auth';
@@ -32,6 +34,7 @@ import { isGuid, allGuids } from '../../../lib/utils/guid';
 import { withDalContext } from '../../../lib/dataverse/core/context';
 import { ServiceHttpError } from '../../../lib/services/service-http-error';
 import { withdrawSufficient } from '../../../lib/services/review-manager/withdraw-sufficient-service';
+import { authorizeReviewerRequestMutation } from '../../../lib/services/reviewer-request-authorization';
 import { RELEASE_REASON_VALUES, RELEASE_REASONS } from '../../../shared/config/reviewerLifecycle';
 
 const MAX_BATCH = 100;
@@ -127,6 +130,12 @@ export default async function handler(req, res) {
 
   return withDalContext('review-manager-withdraw-sufficient', async () => {
     try {
+      await authorizeReviewerRequestMutation({
+        profileId: access.profileId,
+        callerSystemId: actingUserSystemId,
+        requestIds: [requestId],
+        suggestionIds,
+      });
       const result = await withdrawSufficient({ requestId, suggestionIds, actingUserSystemId, overrides, reason, sendEmail });
       return res.status(200).json(result);
     } catch (error) {

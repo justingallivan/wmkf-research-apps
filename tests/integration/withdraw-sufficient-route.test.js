@@ -6,6 +6,9 @@
 jest.mock('../../lib/utils/auth', () => ({
   requireAppAccess: jest.fn(async () => ({ profileId: 'p-1', session: { user: { dynamicsSystemuserId: 'u-1' } } })),
 }));
+jest.mock('../../lib/services/reviewer-request-authorization', () => ({
+  authorizeReviewerRequestMutation: jest.fn(async () => ({})),
+}));
 jest.mock('../../lib/services/dynamics-context', () => ({
   bypassDynamicsRestrictions: (_ctx, fn) => fn(),
 }));
