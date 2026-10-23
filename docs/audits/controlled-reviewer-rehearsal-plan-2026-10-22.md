@@ -3,7 +3,7 @@ title: Controlled Reviewer Rehearsal Plan
 domain: reviewer-workbench
 kind: plan
 status: active
-summary: "Guarded Mode A launcher and synthetic rehearsal fixtures, with human observation and any live integration still pending."
+summary: "Guarded Mode A fixtures are ready for internal staff role-play; observation and any live integration remain pending."
 canonical: false
 cataloged: 2026-10-22
 last_verified: 2026-10-22
@@ -16,8 +16,8 @@ related:
 
 # Controlled Reviewer Rehearsal Plan
 
-**Status:** Current candidate `81b8a063b` passed 44/44 isolated browser tests on Node 22; details are in the release preparation receipt. Human rehearsal remains pending.
-Human observation, Linux CI, hosted integration, and promotion remain separate.
+**Status:** Current candidate `81b8a063b` passed 44/44 isolated browser tests on Node 22; details are in the release preparation receipt. Internal staff observation remains pending. External first-time reviewer usability is unverified and is not an external-recruitment release prerequisite under the current owner direction.
+Internal staff observation, Linux CI, hosted integration, and promotion remain separate.
 
 **Candidate:** the launcher exports committed `HEAD` and records its exact SHA.
 The current evaluated candidate is `81b8a063b`; its application runtime remains
@@ -69,31 +69,40 @@ A launcher receipt never marks human scenarios passed.
 
 ## People and session sequence
 
-Use one staff participant and two first-time reviewers who did not build the
-feature. Do not count the staff participant toward the two reviewers. A
-facilitator operates/reset the harness; an observer records task outcomes without
-coaching. Use synthetic proposal content and only the provided `example.test`
-identities. Do not enter real names, addresses, proposal content, or credentials.
+Internal staff perform both the staff workflow and a role-played reviewer
+workflow. Prefer staff who did not build the feature when available; there is no
+fixed participant count or external recruitment requirement. Record each
+operator, facilitator, and observer role and whether one person combined roles.
+Record role familiarity and any coaching or intervention. Use synthetic proposal
+content and only the provided `example.test` identities. Do not enter real names,
+addresses, proposal content, or credentials. Internal role-play can expose
+workflow issues but does not verify first-time external reviewer usability.
 
 1. Copy the generated aggregate receipt's candidate SHA, scenario, browser and
    date into a separate human-observation receipt. Add the Node runtime version,
    operator/participant roles and declared mock-route inventory there; the
    launcher does not collect those human fields or a full route list. Keep
    participant identities out of the committed receipt.
-2. Staff performs the baseline invitation preview/send, campaign-date edit,
-   accepted-reviewer materials release, and pending-reviewer withdrawal. Captured
-   email is a mock response here; it never calls the real send service.
-3. Each first-time reviewer independently follows the paired Yes/No mock links,
-   interprets policy acknowledgements, accepts or declines, returns later, and
-   finds help. Close/relaunch between participants or alternative responses so
-   each starts with fresh fixture state. A fixture-controller reset is only an
-   in-memory reset, not a new browser session.
+2. Internal staff performs the baseline invitation preview/send, campaign-date
+   edit, accepted-reviewer materials release, and pending-reviewer withdrawal.
+   Captured email is a mock response here; it never calls the real send service.
+3. An internal staff member takes the reviewer role and follows the paired
+   Yes/No mock links, interprets policy acknowledgements, accepts or declines,
+   returns later, and finds help. Close/relaunch for alternate responses so each
+   starts with fresh fixture state. A fixture-controller reset is only an
+   in-memory reset, not a new browser session. Record any instructions or
+   coaching given during the role-play.
 4. Staff runs the named edge scenarios below, one fresh launcher run per case.
    Run `reviewer-authoring` separately for the current Stage 2b draft/submit flow.
-5. Record success, confusion, validation/recovery, and blocked outcomes. Close
-   browser contexts and stop only this session's server; do not clean shared or
-   live data. A boundary violation invalidates the session: preserve its receipt,
-   investigate, and reconcile possible effects before retrying.
+5. Record task outcomes, confusion, validation/recovery, and blocked outcomes;
+   leave unrun items explicitly marked `Not run`. To test resumption, return to
+   the same role-play task after a pause and record whether the workflow resumes
+   as expected. At finality, record the observed accepted, declined, withdrawn,
+   or submitted/read-only state without inferring a result from a mock setup.
+   Close browser contexts and stop only this session's server; do not clean
+   shared or live data. A boundary violation invalidates the session: preserve
+   its receipt, stop the session, investigate, and reconcile possible effects
+   before retrying.
 6. Attach the observation receipt to release review. Automation and mock behavior
    do not substitute for human observation, target readiness, or owner promotion.
 
@@ -115,6 +124,52 @@ They are not evidence that a real email, token, or Dataverse operation was tried
 | `decline-reset` | Inspect and dismiss the synthetic decline referral; reset by closing/relaunching | Referral state is local to the fixture. Portal decline/reset is also exercised through the paired links. |
 | `reviewer-authoring` | Open Stage 2b, edit answers, observe autosave, reload, submit, and return | In-memory GET/PUT draft and POST submit. Current reviewer UI replaced the old file-upload card with authoring; file upload is N/A, not an unbuilt fixture. |
 
+## Internal staff observation worksheet
+
+Complete this header before the session. A facilitator may also operate the
+browser or observe if staffing is limited; note combined roles. Do not add
+participant names or contact details.
+
+| Session field | Record |
+|---|---|
+| Candidate SHA / date / browser / Node |  |
+| Operator role and feature familiarity |  |
+| Facilitator role and feature familiarity |  |
+| Observer role and feature familiarity |  |
+| Combined roles, if any |  |
+| Staff workflow actor role / familiarity |  |
+| Reviewer-role actor role / familiarity |  |
+| Coaching, prompts, or interventions |  |
+| Stop events / boundary violations |  |
+
+For every scenario, record the observed result, confusion or recovery notes,
+whether coaching occurred, and any follow-up. `Not run` is the initial status;
+this worksheet does not define pass criteria.
+
+| Scenario ID | Staff workflow observation | Internal reviewer-role observation | Outcome / notes |
+|---|---|---|---|
+| `baseline` | Preview/send, campaign dates, materials release, pending withdrawal | Follow paired Yes/No links; accept or decline; return and find help | Not run — |
+| `pd-drift` | Preview with PD A; observe changed-assignment send response and fresh-preview guidance | N/A | Not run — |
+| `saved-find-exclusion` | Exclude stale Find card; inspect saved-row result | N/A | Not run — |
+| `manual-coi-blocked` | Attempt first invite for preseeded trusted conflict | N/A | Not run — |
+| `manual-coi-unavailable` | Observe unavailable first-invite check | N/A | Not run — |
+| `manual-coi-unknown-allowed` | Add sparse manual reviewer and send first mock invite | N/A | Not run — |
+| `materials-partial` | Release to accepted reviewer while availability is unknown; verify the pending reviewer is excluded | N/A | Not run — |
+| `decline-reset` | Inspect/dismiss referral and reset fixture | Decline through paired link and inspect final state | Not run — |
+| `reviewer-authoring` | N/A | Edit, wait for autosave, reload, submit, confirm read-only return | Not run — |
+
+The nine fixtures do not cover every campaign strategy scenario. Keep these
+separate observations explicit; do not treat their absence as a pass:
+
+| Broader scenario | Status | Reason / notes |
+|---|---|---|
+| Return on a different device or browser | Not run | The fixtures use one controlled browser context; no cross-device claim. |
+| Expired or revoked link | Not run | Not among the nine current fixture scenarios. |
+| Two tabs or an older link | Not run | Not among the nine current fixture scenarios. |
+| Double-click or double-submit | Not run | Fixture coverage does not establish human behavior under repeated submission. |
+| Deployment while a form is open | Not run | Synthetic local rehearsal does not exercise deployment replacement. |
+| File upload in current Stage 2b | N/A | Current authoring UI has no file-upload control. |
+
 ## Contract checks kept outside the headed walkthrough
 
 These do not need invented browser actions or extra participant burden:
@@ -131,7 +186,7 @@ These do not need invented browser actions or extra participant burden:
 
 ## Historical correction and limits
 
-The first plan treated every matrix entry as a missing browser fixture and
+The earlier plan treated every matrix entry as a missing browser fixture and
 identified reviewer file upload as a coverage gap. Source investigation showed
 that some entries are server/component contracts already tested, and the current
 portal has no file-upload control. It also exposed the old headed harness's
@@ -141,13 +196,19 @@ the owner decisions: hold automated identity changes until continuity, require a
 fresh preview after PD drift, preserve saved rows against stale exclusions, allow
 sparse manual Add, and screen trusted known conflicts before first invitation.
 
-No owner policy decision changed. Verification included an unintended
+Historical rationale for independent first-time external reviewers remains
+valid for measuring external usability. The current owner direction is to use
+internal staff for staff and role-played reviewer workflows, with no external
+recruitment prerequisite. That choice leaves first-time external reviewer
+usability unverified; no internal rehearsal is claimed complete.
+
+No other owner policy decision changed. Verification included an unintended
 main-checkout startup. A later bounded read-only observation found no evidence
 of durable impact in the checked `system_alerts` and recovery-event records for
 the observed window; it does not establish that no write was attempted or rule
 out effects outside those records. The evidence and limits are recorded in the
 [release preparation receipt](release-preparation-private-store-2026-10-22.md).
-Human observations remain pending even after automated checks pass. Verification
+Internal human observations remain pending even after automated checks pass. Verification
 counts and retained limits belong in the linked release-preparation receipt.
 
 ## Gate for later data integration
@@ -200,8 +261,10 @@ For each future run, preserve an aggregate receipt with:
   choices, and the disposition of every possible durable side effect.
 
 Keep credentials, bearer tokens, recipient addresses, proposal text, and reviewer
-identity data out of the receipt. Do not call the rehearsal complete until the
-staff and first-time reviewer scenarios have outcomes, all stop events are
+identity data out of the receipt. Do not call the internal rehearsal complete
+until the staff and role-played reviewer scenarios have outcomes, all stop events are
 resolved, the receipt is reviewed, and the release owner has separately decided
 whether the evidence supports the next release step. Completion of this plan
-does not itself authorize promotion.
+does not itself authorize promotion. First-time external usability remains an
+evidence gap when external reviewers do not participate and is not an external
+recruitment prerequisite under the current owner direction.

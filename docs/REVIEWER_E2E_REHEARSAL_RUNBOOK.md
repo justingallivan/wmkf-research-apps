@@ -152,10 +152,12 @@ headless navigation check only; it never records human scenarios passed.
 
 The [controlled rehearsal plan](audits/controlled-reviewer-rehearsal-plan-2026-10-22.md)
 lists the PD-drift, manual-invitation COI, stale Find exclusion, partial-materials,
-decline/referral and authoring scenarios, plus service-only checks and the two
-first-time reviewer roles. Every mock identity uses `example.test`. Use a fresh
-run for a participant or alternate accept/decline path; the private aggregate
-receipt contains no tokens, addresses or raw exception text.
+decline/referral and authoring scenarios, plus service-only checks and the
+internal staff reviewer-role walkthrough. The current owner direction does not
+require external recruitment; internal role-play does not verify first-time
+external reviewer usability. Every mock identity uses `example.test`. Use a
+fresh run for an alternate accept/decline path; the private aggregate receipt
+contains no tokens, addresses or raw exception text.
 
 Expected:
 

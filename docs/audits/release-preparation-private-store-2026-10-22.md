@@ -3,7 +3,7 @@ title: Private Store and Release Preparation Receipt
 domain: engineering-process
 kind: audit
 status: active
-summary: "Current candidate passed recorded isolated Node 22/macOS checks; Ubuntu CI, human rehearsal, release authorization, and private-store binding remain open."
+summary: "Current candidate passed recorded isolated Node 22/macOS checks; Ubuntu CI, internal staff rehearsal, release authorization, and private-store binding remain open."
 canonical: false
 cataloged: 2026-10-22
 last_verified: 2026-10-22
@@ -19,7 +19,7 @@ related:
 # Private Store and Release Preparation Receipt
 
 **Assessment date:** 2026-10-22 (America/Los_Angeles)  
-**Status:** All recorded isolated Node 22/macOS checks for the current candidate passed: Turbopack build, browser rehearsal, ESLint, 42 npm check gates, Jest coverage run, and selected PostgreSQL integration suites. Ubuntu CI, human/hosted rehearsal, release authorization, and private-store binding remain incomplete.
+**Status:** All recorded isolated Node 22/macOS checks for the current candidate passed: Turbopack build, browser rehearsal, ESLint, 42 npm check gates, Jest coverage run, and selected PostgreSQL integration suites. Ubuntu CI, internal staff rehearsal, hosted verification, release authorization, and private-store binding remain incomplete. External first-time reviewer usability remains unverified and is not an external-recruitment prerequisite under current owner direction.
 **Current evaluated candidate:** `81b8a063b`; application runtime checkpoint `4720980ed`. Earlier release evidence below includes candidate `c589cbb6e` (`codex/memory-audit-followups`) and remains scoped to that candidate.
 
 This receipt records the evidence available for the local release candidate and
@@ -74,8 +74,9 @@ Parent review and independent Sol review found no unresolved issue in the local
 preparation changes. Five stale tests were repaired without runtime changes: guarded
 identity upsert, enriched-person options, identity select fields, partial materials
 availability, and required request binding. The private probe passed 11 mocked tests.
-Sequential documentation/safety gates and available self-tests passed. A targeted human rehearsal and owner release
-decision remain separate gates; neither is implied by passing automation.
+Sequential documentation/safety gates and available self-tests passed. The
+targeted internal staff rehearsal and owner release decision remain separate
+gates; neither is implied by passing automation.
 
 ## Prior Node 22 verification and human rehearsal preparation
 
@@ -120,8 +121,11 @@ outcomes, partial materials, saved Find exclusion, decline/reset, and reviewer
 authoring. Source review corrected manual COI screening to occur at first invite,
 partial materials to remain nonblocking, and submitted authoring to remain locked.
 Current Stage 2b uses in-browser authoring; its former file-upload control is not
-a missing rehearsal fixture. Human observation, Linux CI, hosted verification,
-and release authorization remain separate gates.
+a missing rehearsal fixture. Internal staff observation, Linux CI, hosted
+verification, and release authorization remain separate gates. The current
+owner direction uses internal staff for staff and role-played reviewer tasks;
+external first-time usability remains unverified, with no external recruitment
+prerequisite.
 
 **[VERIFIED via isolated precommit rehearsal snapshots later committed in current candidate `81b8a063b`]** The expanded browser run passed
 43 of 44 tests; its one failure was an undefined schema import in the new authoring
@@ -283,8 +287,9 @@ does not reverse data or email effects.
 | Prior Node 22 verification | Complete on prior candidate `c589cbb6e` | Build, configured types, full Jest (1,431 suites / 24,751 tests), and its browser checks passed. |
 | Private-store binding | Unknown | Requires a separately authorized credential-bearing context; metadata alone is insufficient. |
 | Private object inventory | Not run | Keep within the existing bounded authorization and prepared fixed-prefix safeguards. |
-| Targeted human rehearsal | Guarded launcher/fixtures verified; execution pending | Human observations remain pending; any live target, identities, writes and cleanup require separate authorization. |
-| Release owner decision | Pending | Decide only after candidate checks, target evidence, and required human rehearsal are concrete. |
+| Internal staff rehearsal | Guarded launcher/fixtures verified; execution pending | Internal staff observations remain pending; role-play does not verify first-time external usability. Any live target, identities, writes and cleanup require separate authorization. |
+| External first-time reviewer usability | Unverified | No external recruitment prerequisite under current owner direction; retain the usability evidence gap. |
+| Release owner decision | Pending | Decide only after candidate checks, target evidence, and internal staff rehearsal evidence are concrete. |
 | Push, deployment, intentional live mutation/cleanup | Not performed | No push/deploy or deliberate live action. The bounded read-only check found no evidence of durable impact in the checked alert/event records; its limits are documented above. |
 
 ## Exit conditions
@@ -295,9 +300,11 @@ rehearsal, full ESLint, full Jest coverage run, selected PostgreSQL integration
 suites, 42 listed npm check gates, package prebuild, and configured types on
 isolated Node 22/macOS. Coverage thresholds are disabled in the Jest
 configuration, so the coverage run does not certify threshold values. This is
-not a release approval: Ubuntu CI verification, targeted human rehearsal on a
-named authorized target, hosted verification, private-store binding, and the
-applicable owner release decision remain outstanding.
+not a release approval: Ubuntu CI verification, internal staff rehearsal,
+hosted verification, private-store binding, and the applicable owner release
+decision remain outstanding. External first-time reviewer usability is
+unverified and is not an external-recruitment prerequisite under current owner
+direction.
 The private-store question remains a separate evidence
 item: do not mark its identity or contents verified until an authorized probe
 measures the intended private target. Any resulting live object or retention

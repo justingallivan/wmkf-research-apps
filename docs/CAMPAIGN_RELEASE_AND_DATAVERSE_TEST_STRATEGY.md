@@ -3,10 +3,10 @@ title: Campaign Release and Dataverse Test Strategy
 domain: engineering-process
 kind: decision
 status: active
-summary: "Campaign-aware release, rehearsal, Dataverse isolation, promotion, and rollback strategy for the twice-yearly proposal-review workflow."
+summary: "Campaign-aware release strategy with internal staff role-play for reviewer workflows, Dataverse isolation, promotion, and rollback."
 canonical: false
 cataloged: 2026-07-09
-last_verified: 2026-07-30
+last_verified: 2026-10-22
 owner: product-engineering
 related:
   - docs/REVIEWER_E2E_REHEARSAL_RUNBOOK.md
@@ -59,9 +59,13 @@ behavior able to coexist until the new path has survived real campaign use.
 
 1. **Production availability wins during an active campaign.** Architectural
    cleanup waits unless it is required to resolve an incident.
-2. **External users are part of the release contract.** A staff-only happy path
-   is insufficient; invitation, link, accept/decline, return, upload, validation,
-   retry, and help/error states must be rehearsed as a first-time reviewer sees them.
+2. **External reviewer workflows are part of the release contract.** Invitation,
+   link, accept/decline, return, validation, retry, and help/error states need
+   rehearsal. Under the current owner direction, internal staff perform the
+   staff and role-played reviewer workflows; prefer nonbuilders when available.
+   There is no fixed participant count or external recruitment prerequisite.
+   Internal role-play does not establish first-time external reviewer usability,
+   which remains an evidence gap until observed with external reviewers.
 3. **Deployment isolation is not data isolation.** Any preview or local process
    pointed at production Dataverse is treated as production-capable.
 4. **No test sends to unapproved addresses.** Rehearsals use capture mode, browser
@@ -84,7 +88,7 @@ drift. The campaign owner records actual dates for each cycle.
 | Post-campaign, weeks 0-2 | Repair, retrospective, incident follow-up, test gaps | Ranked failure list; production data cleanup accounted for |
 | Quiet window | Refactors, additive schema, branch-by-abstraction, shadow comparison | Characterization tests; old path retained; rollback demonstrated |
 | T-8 weeks | Feature complete for campaign-critical work | Integrated preview; data contract and migration review complete |
-| T-6 weeks | Rehearsal and defect repair only | Staff UAT; naive-user rehearsal; controlled Dataverse rehearsal |
+| T-6 weeks | Rehearsal and defect repair only | Staff UAT; internal staff reviewer-role rehearsal; controlled Dataverse rehearsal; record external usability evidence gap if no external reviewers participate |
 | T-3 weeks | Soft freeze | Only campaign blockers or low-risk isolated fixes; owner approval |
 | T-1 week through campaign close | Hard freeze | Incident fixes only; explicit rollback plan; focused regression |
 | Post-campaign observation | Stabilize before removing old path | One complete campaign on new behavior plus reviewed telemetry |
@@ -132,7 +136,10 @@ Requirements:
 1. Branch or worktree isolated from `main`.
 2. Characterization coverage for current behavior before changing it.
 3. Integrated preview or local deployment using one of the approved data modes below.
-4. Staff rehearsal and, for external flows, naive-user rehearsal.
+4. Staff rehearsal and internal staff reviewer-role rehearsal for external flows;
+   record first-time external usability as unverified when no external reviewers
+   participate. External recruitment is not a prerequisite under the current
+   owner direction.
 5. Recorded last-known-good production deployment and rollback steps.
 6. Explicit owner decision to merge and push `main`.
 
@@ -360,19 +367,26 @@ Rollback order:
 
 Never describe code rollback as data rollback.
 
-## 11. External-User Rehearsal
+## 11. External Reviewer Workflow Rehearsal
 
-At T-6 weeks, recruit at least two people who did not build the feature. Give them
-only the instructions a real reviewer receives. Observe rather than coach.
+Historical rationale: independent first-time reviewers can expose comprehension
+and usability problems that staff may miss. The current owner direction is to
+have internal staff perform both staff and role-played reviewer workflows. Prefer
+staff who did not build the feature when available; use no fixed participant
+count, and do not make external recruitment a release prerequisite. Record role
+familiarity and any coaching. Internal role-play does not establish first-time
+external reviewer usability; leave that evidence gap explicit when external
+reviewers do not participate.
 
 Minimum scenarios:
 
 - invitation comprehension and link opening
 - accept and decline paths
 - policy acknowledgment
-- return later on the same and a different device/browser
+- return later in the same browser; a different device/browser is a separate
+  scenario and should be recorded as not run if not exercised
 - materials access
-- structured review entry and file upload
+- structured review entry; file upload only where the current UI supports it
 - validation and recovery from an error
 - double-click/double-submit
 - two tabs or an older link
@@ -380,7 +394,11 @@ Minimum scenarios:
 - expired/revoked link and help path
 
 Use synthetic proposal content and staff-controlled identities. Record confusion as
-a product defect even when the software technically behaves as designed.
+a product defect even when the software technically behaves as designed. The
+controlled nine-fixture rehearsal does not cover every strategy scenario, including
+cross-device return, expired/revoked links, two tabs or an older link, and deployment
+while a form is open; mark each not run or N/A with a reason. Do not infer campaign-
+wide usability evidence from fixture coverage.
 
 ## 12. Campaign Readiness Gate
 
@@ -407,7 +425,10 @@ Before the soft freeze, the campaign owner and developer review this checklist:
 
 - [ ] Automated critical-path tests pass.
 - [ ] Staff UAT passes.
-- [ ] Naive external-user rehearsal passes or accepted defects have workarounds.
+- [ ] Staff and internal role-played reviewer rehearsal is recorded; external
+      first-time usability is marked verified only when actually observed. If no
+      external reviewers participate, record that evidence gap without treating
+      external recruitment as a release prerequisite under current owner direction.
 - [ ] Last-known-good deployment and rollback steps are recorded and rehearsed.
 - [ ] Health signals and incident severity/contact rules are written down.
 - [ ] Campaign freeze dates and exception authority are announced.

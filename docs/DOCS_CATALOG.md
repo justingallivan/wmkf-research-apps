@@ -162,7 +162,7 @@ related:
 
 | File | Kind | Status | Canonical | Summary | Cataloged |
 |---|---|---|---|---|---|
-| [CAMPAIGN_RELEASE_AND_DATAVERSE_TEST_STRATEGY.md](CAMPAIGN_RELEASE_AND_DATAVERSE_TEST_STRATEGY.md) | decision | active |  | Campaign-aware release, rehearsal, Dataverse isolation, promotion, and rollback strategy for the twice-yearly proposal-review workflow. | 2026-07-09 |
+| [CAMPAIGN_RELEASE_AND_DATAVERSE_TEST_STRATEGY.md](CAMPAIGN_RELEASE_AND_DATAVERSE_TEST_STRATEGY.md) | decision | active |  | Campaign-aware release strategy with internal staff role-play for reviewer workflows, Dataverse isolation, promotion, and rollback. | 2026-07-09 |
 | [DATAVERSE_TARGET_WRITE_INTERLOCK_PLAN.md](DATAVERSE_TARGET_WRITE_INTERLOCK_PLAN.md) | plan | active |  | Stages 1–3 shipped; the Dataverse target/write interlock is enforced in local, Preview, and Production. | 2026-07-11 |
 | [FABLE_AUDIT_SECURITY_REFACTOR_MASTER_BRIEF.md](FABLE_AUDIT_SECURITY_REFACTOR_MASTER_BRIEF.md) | plan | draft |  | Fable-led brief for current-state audit, safe production and security probes, evidence-based refactor selection, and staged migration planning. | 2026-08-14 |
 | [REVIEWER_TERMINAL_STATUS_AND_DUE_DATE_PLAN.md](REVIEWER_TERMINAL_STATUS_AND_DUE_DATE_PLAN.md) | plan | active |  | Terminal post-accept reviewer statuses are live; design durable deadline evidence around Dynamics email activities before adding schema. | 2026-07-22 |
