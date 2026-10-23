@@ -6,7 +6,7 @@ status: active
 summary: "Safe reviewer invitation and return rehearsal through browser mocks, capture-mode controlled writes, or an allowlisted live smoke."
 canonical: false
 cataloged: 2026-07-02
-last_verified: 2026-09-01
+last_verified: 2026-10-22
 owner: product-engineering
 related:
   - docs/CAMPAIGN_RELEASE_AND_DATAVERSE_TEST_STRATEGY.md
@@ -18,11 +18,11 @@ related:
 
 # Reviewer End-to-End Rehearsal Runbook
 
-Date: 2026-06-21
+Originally prepared: 2026-06-21. Mode A source/fixture guidance checked 2026-10-22; live operational observations below retain their dated evidence.
 
 Purpose: rehearse the reviewer invitation and return flow while choosing an
-explicit side-effect boundary. The browser-mocked path reaches no external data
-service. Capture mode blocks real Dynamics email but is **not** a full Dataverse
+explicit side-effect boundary. The guarded Mode A launcher scrubs credentials and
+blocks external Node connections while serving explicit browser mocks. Capture mode blocks real Dynamics email but is **not** a full Dataverse
 sandbox.
 
 This runbook covers the current browser-mocked, capture-mode, and allowlisted live
@@ -47,7 +47,7 @@ environment-variable definitions and rotation guidance.
   connected to production Dataverse.
 - The browser E2E tests mock external-reviewer portal data routes at the browser boundary. They render the real reviewer pages, but they do not reach Dataverse, SharePoint, Dynamics, or Blob storage.
 - Do not use a real reviewer or a live production request for manual experiments unless you intend to create real lifecycle records.
-- Do not set `EMERGENCY_AUTH_BYPASS=true` for testing. Use normal staff sign-in for live browser smoke tests, or run the local mocked rehearsal in development mode.
+- Do not set `EMERGENCY_AUTH_BYPASS=true` for testing. Use normal staff sign-in for live browser smoke tests, or use the guarded local mock launcher with its synthetic staff session.
 
 ---
 
@@ -72,6 +72,14 @@ Notes:
 ---
 
 ## Fast Local Verification
+
+Run the direct browser commands below only in an isolated, credential-free copy
+with no `.env.local` or other credential-bearing environment files, a restricted
+environment, and an outbound Node guard. Browser route mocks do not contain
+server startup: Playwright starts Next, whose instrumentation can update alerts
+or send notifications before any browser test. Do not run these direct commands
+from a configured working checkout. For the contained human mock rehearsal, use
+the guarded launcher in the next section instead.
 
 Run the invitation/capture unit and integration coverage:
 
@@ -111,7 +119,7 @@ Expected:
 - A captured `Yes, I Can Review` button opens the existing Stage 2a accept form,
   while `No, Not This Time` opens the existing decline/referral form.
 - Reviewer accept posts the expected payload.
-- Stage 2b authoring exercises rich-text draft, submission, and conflict behavior with mocked APIs. This spec does not prove reviewer file upload; treat file upload as a separate rehearsal scenario until matching coverage exists.
+- Stage 2b authoring exercises rich-text draft, submission, and conflict behavior with mocked APIs. Current Stage 2b has no file-upload control; the former upload card was replaced by in-browser authoring. Do not add a file-upload step to this rehearsal.
 - The Program Director reviewer-engagement rehearsal drives the real Workbench Reviewers tab through captured invite, campaign-settings edit, accepted-reviewer release, and "no longer needed" withdraw flows with all data routes mocked in the browser.
 
 For just the Program Director reviewer-engagement rehearsal:
@@ -124,31 +132,48 @@ npm run test:e2e:reviewer-engagement
 
 ## Manual Director-Side Rehearsal
 
-For a browser-first rehearsal, prepare an isolated, credential-free candidate copy before using the headed local mock harness. The harness inherits its process environment and mocks named browser routes; it does not itself establish a fail-closed boundary for every possible API request. Require outbound-network protection and deny unhandled browser API calls before treating the session as isolated. Do not launch it from a credentialed checkout.
-
-The existing harness command is:
+Use the guarded launcher with Node 22. It exports committed HEAD into a private
+temporary copy, installs locked dependencies offline, and runs a synthetic staff
+session with normal authentication. It does not inherit project credentials,
+environment files, or browser state. Unknown browser API calls and external
+requests stop the session; the Node preload is a separate Node-level network
+guard, not a universal native-process firewall.
 
 ```bash
-npm run rehearse:reviewer-invite:browser
+npm run rehearse:reviewer-invite:browser -- --scenario baseline
 ```
+
+An existing matching Playwright browser is required. If it is in a separate
+cache, pass `--browser-cache /absolute/path/to/locked-browser-cache`. No packages
+or browsers are downloaded by the launcher. Use an unused port with `--port`;
+existing servers are not reused. Close the browser to stop the owned processes,
+reset fixtures and remove the marked temporary workspace. `--smoke` is a
+headless navigation check only; it never records human scenarios passed.
+
+The [controlled rehearsal plan](audits/controlled-reviewer-rehearsal-plan-2026-10-22.md)
+lists the PD-drift, manual-invitation COI, stale Find exclusion, partial-materials,
+decline/referral and authoring scenarios, plus service-only checks and the two
+first-time reviewer roles. Every mock identity uses `example.test`. Use a fresh
+run for a participant or alternate accept/decline path; the private aggregate
+receipt contains no tokens, addresses or raw exception text.
 
 Expected:
 
 - A headed browser opens the real Workbench `Reviewers -> Candidates` UI.
-- The test candidate, a pending invitee, and an accepted reviewer are route-mocked in the browser.
+- The synthetic candidate, pending invitee, and accepted reviewer are route-mocked in the browser.
 - `campaign-config`, `withdraw-sufficient`, `render-emails`, `send-emails`, and external reviewer portal API routes are route-mocked in the browser.
 - Selecting the candidate, sending the invitation, editing campaign settings, releasing accepted reviewers, releasing a pending invitee as "no longer needed", and opening the local reviewer link create no Dataverse records and send no Dynamics email.
 
 Suggested click paths while the browser stays open:
 
-1. `Candidates`: select `Dr. New Candidate (not invited)` -> `Send invitation` -> fill dates -> send.
+1. `Candidates`: select `Dr. Saved Reviewer` -> `Send invitation` -> fill dates -> send.
 2. `Campaign settings`: edit `Days to respond` / `Review due date` -> save.
 3. `Invite`: `Release to reviewers` -> preview -> send.
-4. `Candidates`: select `Dr. Pending Invitee (already invited)` -> `Release as no longer needed`.
+4. `Candidates`: select `Dr. Pending Reviewer` -> `Release as no longer needed`.
 
 There is no manual `Re-invite already-invited` button. The respond-by reminder mechanism remains implemented at `/api/cron/reviewer-reminders`, but its Vercel schedule has been paused since 2026-09-01 and remains protected by the hold gate. The procedural manual-reminder freeze was lifted after production deployment `4dd57369`, authenticated smoke, and the D26 token-liveness audit. Respond-by nudges intentionally mint and deliver a replacement pre-acceptance link; review-due reminders are link-free, preserve the current token, and fail closed when that token is not live through the effective deadline. Live-email rehearsals still require the allowlisted procedure below; never substitute a Materials resend for a reminder. For a pending invitee you want to drop, use `Release as no longer needed`.
 
-Stop the rehearsal with `Ctrl-C` in the terminal that launched it.
+Close the browser when finished. `Ctrl-C` also stops owned processes and records an interrupted result; it is not a successful human rehearsal.
 
 For a capture-mode rehearsal against local/live APIs instead of browser route mocks:
 
@@ -265,9 +290,9 @@ Use the captured artifact from the director-side rehearsal:
 4. Accept the invitation.
 5. Acknowledge the COI and AI-use policies.
 6. Confirm the post-accept state.
-7. For a Stage 2b test token/context, upload a small PDF/DOCX test file and complete the structured rating fields.
+7. For a Stage 2b mock context, complete the in-browser answers, check draft autosave and return/rehydration, then submit and verify the read-only receipt state. Current Stage 2b does not expose the former file-upload card.
 
-Expected: the reviewer-facing UX is understandable, links are branded as expected, and upload/structured-review controls behave correctly.
+Expected: the reviewer-facing UX is understandable, links are branded as expected, and in-browser authoring, validation, recovery, and submitted read-only state behave correctly.
 
 Repeat with `No, Not This Time` and confirm the existing decline form still
 offers the optional referral field. Merely fetching either email URL must not
@@ -310,7 +335,7 @@ Do not run capture mode in Vercel Production. For production, the smoke check sh
 |---|---|---|
 | Captured artifact uses the Vercel URL | `REVIEWER_PORTAL_BASE_URL` is unset or still points at Vercel | Set `REVIEWER_PORTAL_BASE_URL` to the intended reviewer domain and redeploy |
 | Capture mode errors in production | `REVIEWER_EMAIL_DELIVERY_MODE=capture` with `VERCEL_ENV=production` | Use capture only in local/preview; production should be `send` |
-| Auth bypass warning email appears | `EMERGENCY_AUTH_BYPASS=true` was used in a production-mode process | Stop the process, verify the variable is absent from Vercel env, and use normal auth or the local development-mode mock harness |
+| Auth bypass warning email appears | `EMERGENCY_AUTH_BYPASS=true` was used in a production-mode process | Stop the process, verify the variable is absent from Vercel env, and use normal auth or the guarded local mock harness |
 | `WARNING — honorarium onboard failed` after reviewer accept | Reviewer accepted without opting out AND honorarium-create reached the discriminator assert — only possible when the GUIDs ARE configured but a later step failed (an UNconfigured env now auto-defers to capture-only, no alert) | Investigate the specific failure in the alert metadata. To intentionally suppress honorarium creation entirely, set `HONORARIUM_ONBOARDING_DEFERRED=true` (capture-only, no alert email; one non-emailing `honorarium_capture_only` notice per accept) |
 | Playwright cannot launch Chromium | Browser binary is missing | Run `npx playwright install chromium` |
 | Playwright cannot bind the test server port | Another server is using `3100` or sandbox blocked the bind | Stop the existing server or set `E2E_PORT=<free port>` |

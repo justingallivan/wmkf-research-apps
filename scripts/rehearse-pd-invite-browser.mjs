@@ -1,475 +1,386 @@
 #!/usr/bin/env node
-/**
- * Safe headed browser rehearsal for the Program Director reviewer-invite flow.
- *
- * Builds and starts a local production Next server, route-mocks the Workbench
- * reviewer-invite APIs at the browser boundary, and opens the real Candidates
- * UI. No Dataverse, Dynamics email, Blob, or SharePoint request is allowed
- * through for the mocked invitation/reviewer routes.
- *
- * Usage:
- *   npm run rehearse:reviewer-invite:browser
- *   node scripts/rehearse-pd-invite-browser.mjs --port 3110
- */
-import { spawn } from 'child_process';
-import { createRequire } from 'module';
-import { setTimeout as delay } from 'timers/promises';
-import { chromium } from 'playwright';
+import { createRequire } from 'node:module';
+import fs from 'node:fs';
+import path from 'node:path';
+import { spawn } from 'node:child_process';
+import { fileURLToPath } from 'node:url';
 
 const require = createRequire(import.meta.url);
-const { buildContext } = require('../tests/e2e/helpers/reviewer-portal');
+const launcher = require('./lib/reviewer-rehearsal-launcher.cjs');
+const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 
-const REQUEST_ID = '00000000-0000-4000-8000-000000000001';
-const REQUEST_NUM = '1002788';
-const SUGGESTION_ID = '11111111-1111-4111-8111-111111111111';
-const PENDING_SUGGESTION_ID = '22222222-2222-4222-8222-222222222222';
-const ACCEPTED_SUGGESTION_ID = '33333333-3333-4333-8333-333333333333';
-const REVIEW_TOKEN = 'pd-rehearsal-reviewer-token';
-const NEXTAUTH_SECRET = process.env.NEXTAUTH_SECRET || 'pd-rehearsal-nextauth-secret-32-chars';
-const TEST_REVIEWER_EMAIL = process.env.PD_INVITE_REHEARSAL_EMAIL || 'berets.eyeful-0f@icloud.com';
-
-function arg(name, def = null) {
-  const i = process.argv.indexOf(`--${name}`);
-  return i >= 0 ? process.argv[i + 1] : def;
-}
-
-function hasFlag(name) {
-  return process.argv.includes(`--${name}`);
-}
-
-if (hasFlag('help') || hasFlag('h')) {
-  console.log(`Usage: node scripts/rehearse-pd-invite-browser.mjs [--port 3110] [--keep-server]
-
-Opens a headed browser on a local, mocked Program Director invitation flow.
-Safe: no real Dataverse, Dynamics email, Blob, or SharePoint calls are made.`);
-  process.exit(0);
-}
-
+// Keep the legacy refusal contract. This check occurs before reading project
+// modules, creating a temporary checkout, or starting any process.
 if (process.env.EMERGENCY_AUTH_BYPASS === 'true') {
   console.error('Refusing to run with EMERGENCY_AUTH_BYPASS=true. This rehearsal does not need it.');
   process.exit(1);
 }
 
-const PORT = Number(arg('port', process.env.PD_INVITE_REHEARSAL_PORT || '3110'));
-const BASE_URL = `http://localhost:${PORT}`;
-const KEEP_SERVER = hasFlag('keep-server');
+const usage = `Usage: npm run rehearse:reviewer-invite:browser -- [--port 3110] [--scenario baseline] [--browser-cache /absolute/path] [--headless --smoke]
 
-const candidate = {
-  suggestionId: SUGGESTION_ID,
-  name: 'Dr. New Candidate (not invited)',
-  affiliation: 'Example University',
-  email: TEST_REVIEWER_EMAIL,
-  invited: false,
-  accepted: false,
-  declined: false,
-  reasoning: 'Strong fit for the proposal area and available for this cycle.',
-  keywords: 'cell biology; instrumentation',
-  applicantRecommended: false,
-  manualAdded: false,
-  googleScholarUrl: 'https://scholar.google.com/',
-  website: 'https://example.edu/faculty/capture-candidate',
-};
+Exports committed HEAD to a private temporary directory, installs the lockfile
+offline, builds the app, and serves the route-mocked rehearsal on loopback.
+The owned server and temporary checkout are removed on normal exit and handled
+signals. A failed private-receipt write retains the owned temp directory.
+Without --browser-cache, the existing platform-default Playwright browser cache
+is used; browser downloads are disabled.\n`;
 
-const pendingCandidate = {
-  suggestionId: PENDING_SUGGESTION_ID,
-  name: 'Dr. Pending Invitee (already invited)',
-  affiliation: 'Example Institute',
-  email: 'pending.reviewer@example.edu',
-  invited: true,
-  accepted: false,
-  declined: false,
-  emailSentAt: '2026-07-01T00:00:00Z',
-  reasoning: 'Already invited, still awaiting a response. Useful for testing the no-longer-needed release.',
-  keywords: 'bioengineering; imaging',
-  applicantRecommended: false,
-  manualAdded: false,
-  googleScholarUrl: 'https://scholar.google.com/',
-  website: 'https://example.edu/faculty/pending-invitee',
-};
-
-const acceptedReviewer = {
-  suggestionId: ACCEPTED_SUGGESTION_ID,
-  name: 'Dr. Accepted Reviewer (awaiting materials)',
-  affiliation: 'Example University',
-  email: 'accepted.reviewer@example.edu',
-  reviewStatus: 'accepted',
-  tokenState: 'active',
-  tokenExpiresAt: '2026-08-01T00:00:00Z',
-  reminderCount: 0,
-  notes: '',
-};
-
-function sseResult(result) {
-  return [
-    'event: progress',
-    `data: ${JSON.stringify({ current: result.stats.sent, total: result.stats.total, message: 'Captured email' })}`,
-    '',
-    'event: result',
-    `data: ${JSON.stringify(result)}`,
-    '',
-    'event: complete',
-    `data: ${JSON.stringify({
-      message: `Sent ${result.stats.sent} of ${result.stats.total} email(s)`,
-      sent: result.stats.sent,
-      failed: result.stats.failed,
-      skipped: result.stats.skipped,
-    })}`,
-    '',
-    '',
-  ].join('\n');
-}
-
-async function waitForBuild(child) {
-  const code = await new Promise((resolve) => {
-    child.on('exit', resolve);
-  });
-  if (code !== 0) {
-    throw new Error(`next build exited with code ${code}`);
+async function runInIsolatedCandidate({ candidateDir, baseUrl, tempRoot, pathValue, options, onViolation, signal, reportStage = () => {} }) {
+  const candidateRequire = createRequire(path.join(candidateDir, 'package.json'));
+  const fixtureModule = candidateRequire('./scripts/lib/reviewer-rehearsal-fixtures.cjs');
+  if (typeof fixtureModule.installMocks !== 'function'
+      || typeof fixtureModule.isMockedApiRequest !== 'function'
+      || typeof fixtureModule.isMockedPassiveRequest !== 'function'
+      || !fixtureModule.SCENARIOS || typeof fixtureModule.SCENARIOS !== 'object') {
+    throw new Error('Committed rehearsal fixture module does not expose the required safe fixture contract');
   }
-}
-
-async function waitForServer(url, child) {
-  const deadline = Date.now() + 120_000;
-  while (Date.now() < deadline) {
-    if (child.exitCode != null) {
-      throw new Error(`next start exited early with code ${child.exitCode}`);
-    }
-    try {
-      const res = await fetch(`${url}/api/auth/status`);
-      if (res.ok) return;
-    } catch {
-      // server still warming
-    }
-    await delay(500);
+  if (!Object.values(fixtureModule.SCENARIOS).includes(options.scenario)) {
+    throw new Error(`Unknown rehearsal scenario: ${options.scenario}`);
   }
-  throw new Error(`Timed out waiting for ${url}`);
-}
 
-async function installMocks(context) {
-  let reviewerContext = buildContext({ longBody: true });
-  let candidates = [candidate, pendingCandidate];
-  let reviewers = [acceptedReviewer];
-  let campaignConfig = {
-    respondOffsetDays: 7,
-    reviewDueDate: '2026-07-22',
-    respondReminderEnabled: true,
-    respondReminderLeadDays: 1,
-    reviewDueReminderEnabled: true,
-    reviewDueReminderLeadDays: 3,
-    desiredCount: 1,
-    quotaNotifiedAt: null,
+  reportStage('browser-module');
+  const { chromium } = candidateRequire('playwright');
+  reportStage('browser-binary');
+  const executablePath = launcher.resolveBrowserExecutable(chromium, options.browserCache);
+  const browserEnv = {
+    PATH: pathValue,
+    TMPDIR: path.join(tempRoot, 'tmp'),
+    REHEARSAL_PRIVATE_HOME: path.join(tempRoot, 'home'),
+    XDG_CONFIG_HOME: path.join(tempRoot, 'home/config'),
+    XDG_CACHE_HOME: path.join(tempRoot, 'home/cache'),
+    XDG_DATA_HOME: path.join(tempRoot, 'home/data'),
+    LANG: 'C',
+    LC_ALL: 'C',
   };
-  const reviewerUrl = `${BASE_URL}/external/review/${REVIEW_TOKEN}`;
-  const recipientFor = (suggestionId) => (
-    candidates.find((c) => c.suggestionId === suggestionId)
-    || reviewers.find((r) => r.suggestionId === suggestionId)
-  );
-
-  await context.route('**/api/auth/status', (route) =>
-    route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ enabled: false }) }));
-  await context.route('**/api/auth/session', (route) =>
-    route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({}) }));
-  await context.route('**/api/app-access', (route) =>
-    route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ apps: ['reviewers'], isSuperuser: false }) }));
-  await context.route('**/api/user-profiles', (route) =>
-    route.fulfill({
-      status: 200,
-      contentType: 'application/json',
-      body: JSON.stringify({
-        profiles: [{
-          id: 1,
-          name: 'Program Director',
-          displayName: 'Program Director',
-          isDefault: true,
-          avatarColor: '#111827',
-        }],
-      }),
-    }));
-  await context.route('**/api/user-preferences**', async (route) => {
-    if (route.request().method() === 'POST') {
-      return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ success: true }) });
-    }
-    const url = new URL(route.request().url());
-    if (url.searchParams.get('key')) {
-      return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ value: '' }) });
-    }
-    return route.fulfill({
-      status: 200,
-      contentType: 'application/json',
-      body: JSON.stringify({ preferences: { email_signature: JSON.stringify({ signature: 'Program Director Signature' }) } }),
-    });
+  if (options.browserCache) browserEnv.PLAYWRIGHT_BROWSERS_PATH = launcher.validateBrowserCacheDirectory(options.browserCache);
+  for (const key of ['DISPLAY', 'WAYLAND_DISPLAY', 'XAUTHORITY', 'DBUS_SESSION_BUS_ADDRESS']) {
+    if (process.env[key]) browserEnv[key] = process.env[key];
+  }
+  reportStage('browser-launch');
+  const browser = await chromium.launch({
+    executablePath,
+    env: browserEnv,
+    headless: options.headless,
+    args: [
+      '--disable-background-networking',
+      '--disable-component-update',
+      '--disable-sync',
+      '--metrics-recording-only',
+      '--disable-extensions',
+      ...(options.headless ? [] : ['--window-size=1240,820', '--window-position=80,80']),
+    ],
   });
-  await context.route('**/api/workbench/resolve-request**', (route) =>
-    route.fulfill({
-      status: 200,
-      contentType: 'application/json',
-      body: JSON.stringify({
-        requestId: REQUEST_ID,
-        requestNumber: REQUEST_NUM,
-        title: 'A Study of Test-Driven Reviewer Onboarding',
-        cycleLabel: 'J26',
-        grantProgram: 'Research',
-        institution: 'Example University',
-        programDirectorId: null,
-      }),
-    }));
-  await context.route('**/api/review-manager/reviewers**', (route) =>
-    route.fulfill({
-      status: 200,
-      contentType: 'application/json',
-      body: JSON.stringify({
-        success: true,
-        proposals: [{
-          proposalId: REQUEST_ID,
-          proposalTitle: 'A Study of Test-Driven Reviewer Onboarding',
-          reviewDeadline: campaignConfig.reviewDueDate,
-          reviewers,
-        }],
-      }),
-    }));
-  await context.route('**/api/reviewer-finder/my-candidates**', (route) =>
-    route.fulfill({
-      status: 200,
-      contentType: 'application/json',
-      body: JSON.stringify({ proposals: [{ proposalId: REQUEST_ID, candidates }] }),
-    }));
-  await context.route('**/api/review-manager/campaign-config**', async (route) => {
-    if (route.request().method() === 'GET') {
-      return route.fulfill({
-        status: 200,
-        contentType: 'application/json',
-        body: JSON.stringify({ requestId: REQUEST_ID, config: campaignConfig }),
+  let context;
+  let fixtureRun;
+  const result = { browserVersion: browser.version(), navigationStatus: null, mockedApiCount: 0 };
+  try {
+    reportStage('mock-setup');
+    const buildId = fs.readFileSync(path.join(candidateDir, '.next/BUILD_ID'), 'utf8').trim();
+    if (!/^[A-Za-z0-9_-]{1,128}$/.test(buildId)) {
+      throw new Error('Built candidate does not expose a safe Next.js build ID');
+    }
+    context = await browser.newContext({
+      viewport: { width: 1240, height: 740 },
+      serviceWorkers: 'block',
+    });
+    fixtureRun = await fixtureModule.installMocks(context, {
+      baseUrl,
+      buildId,
+      scenario: options.scenario,
+      onViolation: (reason) => {
+        onViolation(reason);
+        if (typeof process.send === 'function') process.send({ type: 'violation', reason });
+      },
+    });
+
+    // Installed after the named mocks so this single dispatcher sees every
+    // request first. It validates origin and the fixture API method/path before
+    // falling through to any mock; unknown local APIs never reach Next routes.
+    await context.route('**/*', async (route) => {
+      const request = route.request();
+      const isMockedApiRequest = fixtureModule.isMockedApiRequest(request, {
+        baseUrl,
+        scenario: options.scenario,
       });
-    }
-    const body = route.request().postDataJSON();
-    campaignConfig = { ...campaignConfig, ...body.config };
-    return route.fulfill({
-      status: 200,
-      contentType: 'application/json',
-      body: JSON.stringify({ success: true, requestId: REQUEST_ID, config: campaignConfig }),
-    });
-  });
-  await context.route('**/api/review-manager/withdraw-sufficient', (route) => {
-    const body = route.request().postDataJSON();
-    const ids = new Set(body.suggestionIds || []);
-    candidates = candidates.map((c) => (
-      ids.has(c.suggestionId) ? { ...c, responseType: 'withdrawn_sufficient' } : c
-    ));
-    return route.fulfill({
-      status: 200,
-      contentType: 'application/json',
-      body: JSON.stringify({
-        ok: true,
-        withdrawn: ids.size,
-        results: [...ids].map((suggestionId) => ({ suggestionId, status: 'withdrawn_no_pd' })),
-      }),
-    });
-  });
-  await context.route('**/api/review-manager/render-emails', (route) => {
-    const body = route.request().postDataJSON();
-    const drafts = (body.suggestionIds || []).map((suggestionId) => {
-      const recipient = recipientFor(suggestionId);
-      if (!recipient?.email) {
-        return {
-          suggestionId,
-          candidateName: recipient?.name || '(unnamed)',
-          candidateEmail: '',
-          skipped: 'no_email',
-          body: 'No email address is available.',
-        };
+      const isMockedPassiveRequest = fixtureModule.isMockedPassiveRequest(request, { baseUrl, buildId });
+      const decision = launcher.browserRequestDecision(
+        request.url(), baseUrl, isMockedApiRequest, request.method(), isMockedPassiveRequest,
+      );
+      if (!decision.allow) {
+        onViolation(decision.reason);
+        if (typeof process.send === 'function') process.send({ type: 'violation', reason: decision.reason });
+        await route.abort('blockedbyclient');
+        return;
       }
-      return {
-        suggestionId,
-        candidateName: recipient.name,
-        candidateEmail: recipient.email,
-        subject: body.templateType === 'materials'
-          ? 'Reviewer materials'
-          : 'Reviewer invitation',
-        body: body.templateType === 'materials'
-          ? [
-            'Dear Reviewer,',
-            '',
-            'The proposal materials are ready.',
-            reviewerUrl,
-            '',
-            'Review due: {{reviewDueDate}}',
-          ].join('\n')
-          : [
-            'Dear Dr. Candidate,',
-            '',
-            'Please use your secure personal link:',
-            reviewerUrl,
-            '',
-            'Review timeline:',
-            '- Respond by {{respondBy}}',
-            '- Proposal delivered on {{proposalDelivery}}',
-            '- Review due by {{reviewDue}}',
-            '',
-            '{{signature}}',
-          ].join('\n'),
-        emailConfidence: { level: 'high', reason: 'confirmed_identity' },
-      };
+      if (new URL(request.url()).pathname.startsWith('/api/')) result.mockedApiCount += 1;
+      await route.fallback();
     });
-    return route.fulfill({
-      status: 200,
-      contentType: 'application/json',
-      body: JSON.stringify({ drafts }),
-    });
-  });
-  await context.route('**/api/review-manager/send-emails', (route) => {
-    const body = route.request().postDataJSON();
-    const sent = (body.drafts || []).map((draft) => {
-      const recipient = recipientFor(draft.suggestionId);
-      if (body.templateType === 'materials') {
-        reviewers = reviewers.map((r) => (
-          r.suggestionId === draft.suggestionId
-            ? { ...r, reviewStatus: 'materials_sent', materialsSentAt: '2026-07-08T00:00:00Z' }
-            : r
-        ));
-      } else if (body.templateType === 'invitation') {
-        candidates = candidates.map((c) => (
-          c.suggestionId === draft.suggestionId
-            ? { ...c, invited: true, emailSentAt: '2026-07-08T00:00:00Z' }
-            : c
-        ));
-      }
-      return {
-        suggestionId: draft.suggestionId,
-        candidateName: recipient?.name,
-        candidateEmail: recipient?.email,
-        deliveryMode: 'capture',
-        emailId: `captured-${draft.suggestionId}`,
-        capturedEmail: {
-          subject: draft.subject,
-          from: 'pd@wmkeck.org',
-          to: recipient?.email,
-          htmlBody: [
-            '<main>',
-            '<p>The W. M. Keck Foundation invites you to serve as a peer reviewer.</p>',
-            `<table role="presentation"><tr><td><a href="${reviewerUrl}?action=accept">Yes, I Can Review</a></td></tr></table>`,
-            `<p>If the button does not work, copy and paste this link: <a href="${reviewerUrl}">${reviewerUrl}</a></p>`,
-            '</main>',
-          ].join(''),
-        },
-      };
-    });
-    const result = {
-      sent,
-      failed: [],
-      skipped: [],
-      stats: { sent: sent.length, failed: 0, skipped: 0, total: sent.length },
-    };
-    return route.fulfill({ status: 200, contentType: 'text/event-stream', body: sseResult(result) });
-  });
 
-  await context.route(`**/api/external/review/${REVIEW_TOKEN}/context`, (route) =>
-    route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(reviewerContext) }));
-  await context.route(`**/api/external/review/${REVIEW_TOKEN}/respond`, async (route) => {
-    const body = route.request().postDataJSON();
-    if (body.action === 'accept') {
-      reviewerContext = buildContext({ view: 'accepted-pre-materials' });
+    // The app has no WebSocket feature in this flow. Fail closed if one is
+    // attempted rather than letting a non-HTTP channel bypass route auditing.
+    if (typeof context.routeWebSocket !== 'function') {
+      throw new Error('This Playwright version cannot enforce the WebSocket deny boundary; update the locked harness before rehearsal');
     }
-    return route.fulfill({
-      status: 200,
-      contentType: 'application/json',
-      body: JSON.stringify({ ok: true, idempotent: false, engagementState: reviewerContext.engagementState }),
+    await context.routeWebSocket('**/*', (socket) => {
+      onViolation('network:websocket_blocked');
+      if (typeof process.send === 'function') process.send({ type: 'violation', reason: 'network:websocket_blocked' });
+      socket.close({ code: 1008, reason: 'Reviewer rehearsal permits no WebSockets' });
     });
-  });
-}
 
-const serverEnv = {
-  ...process.env,
-  NEXTAUTH_URL: BASE_URL,
-  NEXTAUTH_SECRET,
-  EXTERNAL_LINK_SECRET: process.env.EXTERNAL_LINK_SECRET || 'pd-rehearsal-external-link-secret-32-chars',
-  REVIEWER_PORTAL_BASE_URL: BASE_URL,
-};
+    const page = await context.newPage();
+    const targetPath = options.scenario === 'reviewer-authoring'
+      ? '/external/review/pd-reviewer-rehearsal-token'
+      : '/workbench/00000000-0000-4000-8000-000000000001?tab=reviewers&sub=candidates&n=1002788';
+    if (options.scenario !== 'reviewer-authoring') {
+      reportStage('staff-session');
+      await installSyntheticStaffSession(context, baseUrl, fixtureModule, candidateRequire);
+    }
+    const targetUrl = `${baseUrl}${targetPath}`;
+    reportStage('navigation');
+    const response = await page.goto(targetUrl, { waitUntil: 'domcontentloaded' });
+    result.navigationStatus = response?.status() ?? null;
+    const pagePath = new URL(page.url()).pathname;
+    if (pagePath.startsWith('/api/auth/signin') || pagePath.startsWith('/auth/signin')) {
+      const error = new Error('The synthetic staff session was not accepted');
+      error.rehearsalFailureCode = 'staff_session_rejected';
+      throw error;
+    }
+    if (!response?.ok()) throw new Error(`Local rehearsal page returned HTTP ${result.navigationStatus}`);
+    if (options.scenario !== 'reviewer-authoring'
+        && await page.getByRole('heading', { name: 'Sign In Required' }).count() > 0) {
+      const error = new Error('The synthetic staff session was not accepted');
+      error.rehearsalFailureCode = 'staff_session_rejected';
+      throw error;
+    }
+    if (page.url().startsWith(baseUrl) !== true) throw new Error('Browser left the isolated loopback origin');
+    reportStage('page-ready');
+    const pageReady = options.scenario === 'reviewer-authoring'
+      ? page.getByRole('heading', { name: 'W. M. Keck Foundation Reviewer Portal' })
+      : page.locator('main');
+    await pageReady.waitFor({ state: 'visible', timeout: 15000 });
 
-const startEnv = {
-  ...serverEnv,
-  // Keep the local rehearsal on the repo's non-production auth-off path. This
-  // avoids EMERGENCY_AUTH_BYPASS and avoids requiring a real Microsoft login.
-  NODE_ENV: 'development',
-  AUTH_REQUIRED: 'false',
-};
+    if (options.smoke) {
+      reportStage('smoke-idle');
+      try { await page.waitForLoadState('networkidle', { timeout: 15000 }); }
+      catch { throw new Error('Smoke navigation did not reach an idle, mock-backed page'); }
+      result.mockedApiCount = fixtureRun.state.calls.length;
+      if (result.mockedApiCount < 1) throw new Error('Smoke navigation did not reach a declared mock API route');
+      if (onViolation.count > 0) throw new Error('Smoke run encountered a blocked network request');
+      return result;
+    }
 
-let server;
-const build = spawn('npx', ['next', 'build', '--webpack'], {
-  env: serverEnv,
-  stdio: ['ignore', 'pipe', 'pipe'],
-});
-
-build.stdout.on('data', (chunk) => process.stdout.write(`[next-build] ${chunk}`));
-build.stderr.on('data', (chunk) => process.stderr.write(`[next-build] ${chunk}`));
-
-function startServer() {
-  server = spawn('npx', ['next', 'start', '-p', String(PORT)], {
-    env: startEnv,
-    stdio: ['ignore', 'pipe', 'pipe'],
-  });
-  server.stdout.on('data', (chunk) => process.stdout.write(`[next-start] ${chunk}`));
-  server.stderr.on('data', (chunk) => process.stderr.write(`[next-start] ${chunk}`));
-}
-
-function killServer() {
-  if (server && server.exitCode == null) {
-    server.kill('SIGTERM');
+    console.log('\nProgram Director invite rehearsal is open in the isolated mock.');
+    console.log('Use synthetic fixture data only. Close the browser when finished; the owned server and temporary checkout will then be removed.');
+    if (options.headless) return result;
+    reportStage('headed-session');
+    await new Promise((resolve) => {
+      browser.once('disconnected', resolve);
+      page.once('close', () => browser.close().catch(() => {}));
+      if (signal.aborted) resolve();
+      else signal.addEventListener('abort', resolve, { once: true });
+    });
+    return result;
+  } finally {
+    result.mockedApiCount = fixtureRun?.state?.calls?.length ?? result.mockedApiCount;
+    if (fixtureRun?.reset) fixtureRun.reset();
+    if (context) await context.close().catch(() => {});
+    await browser.close().catch(() => {});
   }
 }
 
-/*
- * Keep the startup path aligned with playwright.config.js for the build step.
- * `next dev --webpack` currently fails on the instrumentation.js node-only
- * import chain, while `next build --webpack && next start` serves the same pages
- * cleanly. NODE_ENV=development is local-only so the normal auth-off dev switch
- * works without EMERGENCY_AUTH_BYPASS.
- */
-async function prepareServer() {
-  await waitForBuild(build);
-  startServer();
+async function main() {
+  if (process.argv[2] === '--__reviewer-browser-child') {
+    const options = launcher.parseArgs(process.argv.slice(3));
+    const controller = new AbortController();
+    let childStage = 'child-environment';
+    const onSignal = () => controller.abort('supervisor-signal');
+    process.once('SIGINT', onSignal);
+    process.once('SIGTERM', onSignal);
+    try {
+      assertBrowserChildEnvironment(options);
+      childStage = 'fixture-module';
+      const result = await runInIsolatedCandidate({
+        candidateDir: repoRoot,
+        baseUrl: `http://127.0.0.1:${options.port}`,
+        tempRoot: process.env.REHEARSAL_TEMP_ROOT,
+        pathValue: process.env.PATH,
+        options,
+        onViolation: () => {},
+        signal: controller.signal,
+        reportStage: (stage) => { childStage = stage; },
+      });
+      if (typeof process.send === 'function') process.send({ type: 'result', result });
+    } catch (error) {
+      const failureCode = {
+        'child-environment': 'child_environment_invalid',
+        'fixture-module': 'fixture_module_unavailable',
+        'browser-module': 'browser_module_unavailable',
+        'browser-binary': 'browser_binary_unavailable',
+        'browser-launch': 'browser_launch_failed',
+        'mock-setup': 'mock_setup_failed',
+        'staff-session': 'staff_session_setup_failed',
+        navigation: 'navigation_failed',
+        'page-ready': 'page_ready_failed',
+        'smoke-idle': 'smoke_not_idle',
+        'headed-session': 'browser_session_failed',
+      }[childStage] || 'browser_rehearsal_failed';
+      const safeFailureCode = error?.rehearsalFailureCode === 'staff_session_rejected'
+        ? error.rehearsalFailureCode
+        : failureCode;
+      if (typeof process.send === 'function') process.send({ type: 'failure', stage: childStage, code: safeFailureCode });
+      console.error(`Isolated browser rehearsal stopped (${childStage}/${safeFailureCode}).`);
+      process.exitCode = 1;
+    } finally {
+      process.removeListener('SIGINT', onSignal);
+      process.removeListener('SIGTERM', onSignal);
+      if (typeof process.send === 'function') process.disconnect();
+    }
+    return;
+  }
+
+  let options;
+  try {
+    options = launcher.parseArgs(process.argv.slice(2));
+  } catch (error) {
+    console.error(error.message);
+    console.error(usage);
+    process.exitCode = 2;
+    return;
+  }
+  if (options.help) {
+    console.log(usage);
+    return;
+  }
+  try {
+    await launcher.launchRehearsal({
+      repoRoot,
+      options,
+      runBrowser: runBrowserChild,
+    });
+  } catch (error) {
+    console.error(`Reviewer rehearsal stopped safely (${error.stage || 'startup'}).`);
+    console.error(error.message);
+    process.exitCode = 1;
+  }
 }
 
-let browser;
-let exiting = false;
-async function shutdown() {
-  if (exiting) return;
-  exiting = true;
-  if (browser) await browser.close().catch(() => {});
-  if (!KEEP_SERVER) killServer();
+async function installSyntheticStaffSession(context, baseUrl, fixtureModule, candidateRequire) {
+  if (fixtureModule.PD_ID !== '77777777-7777-4777-8777-777777777777'
+      || fixtureModule.PD_EMAIL !== 'program.director@example.test'
+      || process.env.NEXTAUTH_SECRET !== 'reviewer-rehearsal-nextauth-secret-not-a-credential') {
+    throw new Error('Synthetic staff identity contract is unavailable');
+  }
+  const { encode } = candidateRequire('next-auth/jwt');
+  const expires = Math.floor(Date.now() / 1000) + 60 * 60;
+  const token = await encode({
+    secret: process.env.NEXTAUTH_SECRET,
+    token: {
+      sub: 'pd-e2e-user',
+      name: 'Program Director',
+      email: fixtureModule.PD_EMAIL,
+      azureId: 'pd-e2e-azure-id',
+      userType: 'staff',
+      profileId: 1,
+      dynamicsSystemuserId: fixtureModule.PD_ID,
+      lastActivity: Date.now(),
+      iat: Math.floor(Date.now() / 1000),
+      exp: expires,
+    },
+  });
+  await context.addCookies([{
+    name: 'next-auth.session-token',
+    value: token,
+    domain: new URL(baseUrl).hostname,
+    path: '/',
+    httpOnly: true,
+    sameSite: 'Lax',
+    expires,
+  }]);
 }
-process.on('SIGINT', async () => { await shutdown(); process.exit(0); });
-process.on('SIGTERM', async () => { await shutdown(); process.exit(0); });
 
-try {
-  await prepareServer();
-  await waitForServer(BASE_URL, server);
-  browser = await chromium.launch({
-    headless: false,
-    args: ['--window-size=1240,820', '--window-position=80,80'],
+function assertBrowserChildEnvironment(options) {
+  const expectedGuard = path.join(repoRoot, 'scripts/lib/reviewer-rehearsal-network-guard.cjs');
+  const tempRoot = process.env.REHEARSAL_TEMP_ROOT;
+  const privateHome = path.join(tempRoot || '', 'home');
+  const markerPath = path.join(tempRoot || '', '.rehearsal-owner');
+  if (typeof process.send !== 'function'
+      || !tempRoot
+      || !path.isAbsolute(tempRoot)
+      || process.env.REHEARSAL_PRIVATE_HOME !== privateHome
+      || process.env.NODE_OPTIONS !== `--require=${expectedGuard}`
+      || process.env.HOME
+      || !fs.existsSync(markerPath)) {
+    throw new Error('Browser child can only run under the isolated rehearsal supervisor');
+  }
+  const forbiddenEnvironment = Object.keys(process.env).filter((name) => {
+    if (name === 'NEXTAUTH_SECRET' || name === 'EXTERNAL_LINK_SECRET') return false;
+    if (['DATAVERSE_TARGET_INTERLOCK', 'DATAVERSE_DAL_ENFORCEMENT'].includes(name) && process.env[name] === 'on') return false;
+    return /TOKEN|SECRET|DATAVERSE|BLOB|SHAREPOINT|VERCEL|AUTH0|AZURE|API_KEY|DATABASE|POSTGRES|OAUTH/i.test(name);
   });
-  const context = await browser.newContext({ viewport: { width: 1240, height: 740 } });
-  await installMocks(context);
-  const page = await context.newPage();
-  page.on('dialog', async (dialog) => {
-    console.log(`[browser-dialog] ${dialog.type()}: ${dialog.message()}`);
-    console.log('Respond to this dialog in the browser window to continue.');
-  });
-  const workbenchUrl = `${BASE_URL}/workbench/${REQUEST_ID}?tab=reviewers&sub=candidates&n=${REQUEST_NUM}`;
-  await page.goto(workbenchUrl, { waitUntil: 'domcontentloaded' });
-  console.log('\nProgram Director invite rehearsal is open:');
-  console.log(`  ${workbenchUrl}`);
-  console.log('\nSafe mocks are active for Workbench invite APIs and the reviewer portal APIs.');
-  console.log('Try these sandboxed UI paths:');
-  console.log('  1. Candidates: select Dr. New Candidate (not invited) -> Send invitation -> fill dates -> Send.');
-  console.log('  2. Campaign settings: edit Days to respond / Review due date -> Save.');
-  console.log('  3. Invite tab: Release to reviewers -> Preview -> Send.');
-  console.log('  4. Candidates: select Dr. Pending Invitee (already invited) -> Release as no longer needed.');
-  console.log('     There is no manual re-invite button. Automatic reviewer reminders are paused, and live token-issuing resends are frozen during the incident hold.');
-  console.log('  5. Open the captured local reviewer link to inspect the reviewer-facing accept page.');
-  console.log('\nPress Ctrl-C in this terminal when finished.');
-  await new Promise(() => {});
-} catch (error) {
-  console.error(`ERROR: ${error.message}`);
-  await shutdown();
-  process.exit(1);
+  if (forbiddenEnvironment.length > 0) {
+    throw new Error('Browser child environment contains a credential-shaped variable');
+  }
+  if (process.env.NEXTAUTH_SECRET !== 'reviewer-rehearsal-nextauth-secret-not-a-credential'
+      || process.env.EXTERNAL_LINK_SECRET !== 'reviewer-rehearsal-external-link-secret-not-a-credential') {
+    throw new Error('Browser child environment does not contain the isolated synthetic secrets');
+  }
+  if (process.env.DATAVERSE_TARGET_INTERLOCK !== 'on' || process.env.DATAVERSE_DAL_ENFORCEMENT !== 'on') {
+    throw new Error('Browser child environment does not preserve the fail-closed Dataverse guards');
+  }
+  const expectedBrowserCache = options.browserCache ? launcher.validateBrowserCacheDirectory(options.browserCache) : null;
+  if (!expectedBrowserCache || process.env.PLAYWRIGHT_BROWSERS_PATH !== expectedBrowserCache) {
+    throw new Error('Browser child path does not match the explicit sanitized browser cache option');
+  }
 }
+
+function runBrowserChild({ candidateDir, baseUrl, options, childEnv, onViolation, onChild, signal }) {
+  const args = [path.join(candidateDir, 'scripts/rehearse-pd-invite-browser.mjs'), '--__reviewer-browser-child'];
+  args.push('--port', String(options.port), '--scenario', options.scenario);
+  if (options.browserCache) args.push('--browser-cache', options.browserCache);
+  if (options.smoke) args.push('--smoke');
+  const browserChildEnv = { ...childEnv };
+  if (options.browserCache) {
+    browserChildEnv.PLAYWRIGHT_BROWSERS_PATH = launcher.validateBrowserCacheDirectory(options.browserCache);
+  }
+  let child;
+  return new Promise((resolve, reject) => {
+    child = spawn(process.execPath, args, {
+      cwd: candidateDir,
+      env: browserChildEnv,
+      stdio: ['ignore', 'pipe', 'pipe', 'ipc'],
+      detached: process.platform !== 'win32',
+      shell: false,
+    });
+    let result = null;
+    let failureDetails = null;
+    child.stdout.on('data', (chunk) => process.stdout.write(`[reviewer-browser] ${chunk}`));
+    child.stderr.on('data', (chunk) => process.stderr.write(`[reviewer-browser] ${chunk}`));
+    child.once('error', () => reject(new Error('Could not start the isolated browser rehearsal process')));
+    child.on('message', (message) => {
+      if (message?.type === 'violation') {
+        onViolation(message.reason);
+        return;
+      }
+      if (message?.type === 'result') result = message.result;
+      if (message?.type === 'failure') failureDetails = message;
+    });
+    child.once('exit', (code, signal) => {
+      if (code === 0 && result) resolve(result);
+      else {
+        const failure = new Error(failureDetails
+          ? `Isolated browser rehearsal failed at ${failureDetails.stage} (${failureDetails.code})`
+          : `Isolated browser rehearsal process exited ${signal || `with code ${code}`}`);
+        if (failureDetails) {
+          failure.rehearsalStage = failureDetails.stage;
+          failure.rehearsalCode = failureDetails.code;
+        }
+        reject(failure);
+      }
+    });
+    onChild?.(child);
+    if (signal.aborted) launcher.killProcessGroup(child, 'SIGTERM');
+    else signal.addEventListener('abort', () => launcher.killProcessGroup(child, 'SIGTERM'), { once: true });
+  });
+}
+
+await main();

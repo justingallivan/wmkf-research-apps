@@ -90,14 +90,58 @@ enforcement and outbound protection; browser/build settings retain the interlock
 Temporary independent Git metadata supports Git-dependent fixtures without
 writing to the source repository metadata.
 
-**[PLANNED]** The [controlled human rehearsal plan](controlled-reviewer-rehearsal-plan-2026-10-22.md)
-names staff and two first-time reviewer participants, baseline flows, authorization
-edge drills, containment prerequisites, stop conditions, and cleanup/receipt ownership.
-It is a plan, not evidence that a human rehearsal occurred. The headed launcher
-still needs a sanitized environment and fail-closed request boundary, plus a
-truthful decline fixture; new edge fixtures and reviewer file-upload coverage
-remain unbuilt. Parent and independent Sol review corrected the fixture contracts.
-No live target or participant identity has been selected, and no invitation was sent.
+## Guarded mock launcher and rehearsal fixtures
+
+**[VERIFIED via source review and isolated Node 22 checks]** The headed mock
+launcher now exports committed HEAD to private temporary storage, installs locked
+dependencies offline without lifecycle scripts, and scrubs inherited credentials.
+Its Node guard denies external connections; browser requests use a finite,
+fail-closed route policy with explicit synthetic API and passive-resource mocks.
+Normal staff authentication uses a throwaway synthetic session. Owned processes
+and temporary files are cleaned up, with aggregate private receipts retained.
+The Node guard is not a comprehensive native-process firewall.
+
+The [controlled human rehearsal plan](controlled-reviewer-rehearsal-plan-2026-10-22.md)
+and runbook name nine scenarios: baseline, lead-PD drift, three manual COI
+outcomes, partial materials, saved Find exclusion, decline/reset, and reviewer
+authoring. Source review corrected manual COI screening to occur at first invite,
+partial materials to remain nonblocking, and submitted authoring to remain locked.
+Current Stage 2b uses in-browser authoring; its former file-upload control is not
+a missing rehearsal fixture. Human observation, Linux CI, hosted verification,
+and release authorization remain separate gates.
+
+**[VERIFIED via isolated Node 22 parent runs]** The full browser run passed
+43 of 44 tests; its one failure was an undefined schema import in the new authoring
+test. After that correction and the submission-version assertion correction,
+the authoring scenario passed, exercising autosave, reload, final submission,
+and read-only return. This is consolidated 44-test evidence, not a claim of one
+green full invocation. Another 477 distinct existing service/component checks
+passed for identity, manual COI, roster authorization, due dates, materials,
+invitation sending, candidate state, and provenance selection. The three scoped harness/fixture suites passed 35 tests, including rejected
+submission replay and immutable submitted state. Scoped lint and 24 sequential
+documentation/safety gates and self-tests passed.
+Baseline and reviewer-authoring guarded CLI smoke reached their mock-backed pages
+with HTTP 200 and zero blocked requests (16 and 3 mocked API calls respectively).
+Both private receipts record navigation only, never human approval. The authoring
+readiness check was corrected to use its portal heading because that page has no
+`main` element. Owned temporary directories were removed after both successful runs.
+
+### Verification containment incident
+
+**[VERIFIED via agent tool transcript and startup source; outcome UNKNOWN]** One
+agent mistakenly ran the new Playwright scenario directly in the main checkout,
+without the required isolated environment or network preload. Next reported loading
+`.env.local`, built, and started. Chromium was missing, so the test body never
+ran. No stdout file or timestamped startup-result evidence was retained. This
+failure does **not** establish that live systems were unchanged.
+
+Node startup invokes the auth-bypass monitor and migration-drift detector.
+Depending on connectivity and configuration, these can update `system_alerts`
+and `operational_events`, create alerts/events, or send security/ops notifications.
+The actual result of that main-checkout startup is unknown. No live rollback,
+query, or cleanup was performed to resolve the uncertainty. Subsequent parent
+verification used credential-free isolated copies and the reviewed guard; their
+missing-connection-string failures apply only to those isolated runs.
 
 ## Private Blob store investigation
 
@@ -166,13 +210,13 @@ does not reverse data or email effects.
 | Clean locked install | Complete | Completed offline in the isolated workspace. |
 | Locked production build | Complete | Passed on Node 24.19.0 and Node 22.23.4/macOS; Linux CI remains separate. |
 | Full Jest suite | Passed | Node 22: 1,431 suites / 24,751 tests in one invocation; 17 suites / 215 tests skipped. Earlier Node 24 evidence remains above. |
-| Mode A browser rehearsal | Complete | 36 route-mocked tests passed; no hosted/live-data proof. |
+| Automated Mode A browser checks | Complete locally | Original 36 tests plus consolidated 44-test fixture evidence above; human Mode A rehearsal and hosted/live-data proof remain pending. |
 | Node 22 verification | Complete on macOS | Build, configured types, full Jest (1,431 suites / 24,751 tests), and 36 browser tests passed. Linux CI remains unverified. |
 | Private-store binding | Unknown | Requires a separately authorized credential-bearing context; metadata alone is insufficient. |
 | Private object inventory | Not run | Keep within the existing bounded authorization and prepared fixed-prefix safeguards. |
-| Targeted human rehearsal | Plan prepared; execution pending | Guarded Mode A launcher/fixtures first; any live target, identities, writes and cleanup require separate authorization. |
+| Targeted human rehearsal | Guarded launcher/fixtures verified; execution pending | Human observations remain pending; any live target, identities, writes and cleanup require separate authorization. |
 | Release owner decision | Pending | Decide only after candidate checks, target evidence, and required human rehearsal are concrete. |
-| Push, deployment, live mutation, cleanup | Not authorized/performed | No such action is part of this receipt. |
+| Push, deployment, intentional live mutation/cleanup | Not performed | No push/deploy or deliberate live action; unintended main-checkout startup effects remain UNKNOWN as documented above. |
 
 ## Exit conditions
 
