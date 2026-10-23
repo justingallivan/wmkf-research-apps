@@ -29,6 +29,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { RELEASE_REASONS } from '../../config/reviewerLifecycle';
 import EmailSendFeedback from '../EmailSendFeedback';
+import ReleaseWordingDefault from './ReleaseWordingDefault';
 import { requestEnvelope } from '../../utils/api-request';
 
 const EXCLUDED_REASON = {
@@ -38,6 +39,11 @@ const EXCLUDED_REASON = {
   no_email: 'No email address on the reviewer record',
   no_pd: 'No active Program Director on this request — nothing can be sent',
   defaults_unavailable: 'The withdrawal email template is missing or blank in Admin',
+};
+
+const TEMPLATE_NOTICE = {
+  preference_unavailable: 'The sender’s saved wording could not be read, so these emails start from the shared Admin wording.',
+  preference_invalid: 'The sender’s saved wording needs correction, so these emails start from the shared Admin wording.',
 };
 
 const SEND_RESULT_REASON = {
@@ -113,7 +119,10 @@ export default function ReleaseEmailModal({ requestId, suggestionIds, onClose, o
     setReason(value);
     setSendCourtesyEmail(value === RELEASE_REASONS.no_longer_needed);
   };
+  const [refreshing, setRefreshing] = useState(false);
+  const [wordingBusy, setWordingBusy] = useState(false);
   const mountedRef = useRef(true);
+  const refreshGenerationRef = useRef(0);
   const sendGenerationRef = useRef(0);
   const sendingRef = useRef(false);
   const previewsRequestedRef = useRef(false);
@@ -152,6 +161,7 @@ export default function ReleaseEmailModal({ requestId, suggestionIds, onClose, o
     return () => {
       mountedRef.current = false;
       sendGenerationRef.current += 1;
+      refreshGenerationRef.current += 1;
     };
   }, []);
 
@@ -181,8 +191,41 @@ export default function ReleaseEmailModal({ requestId, suggestionIds, onClose, o
     onClose();
   };
 
+  // After the sender saves or clears their default wording, re-render every
+  // draft from the server. Per-recipient edits are replaced only after staff
+  // confirm; on failure the current drafts stay as they are.
+  const refreshWording = async () => {
+    if (sendingRef.current || drafts === null || refreshing) return;
+    const hasEdits = Object.keys(edits).length > 0;
+    if (hasEdits && !window.confirm('Replace your edits to these emails with your saved wording?')) return;
+    const generation = ++refreshGenerationRef.current;
+    setRefreshing(true);
+    setLoadError(null);
+    try {
+      const envelope = await requestEnvelope('/api/review-manager/render-withdraw-emails', {
+        method: 'POST',
+        body: { requestId, suggestionIds },
+        tolerantBody: true,
+      });
+      if (!mountedRef.current || generation !== refreshGenerationRef.current) return;
+      if (!envelope.ok) {
+        setLoadError('The emails could not be refreshed with your saved wording. The current emails are unchanged.');
+        return;
+      }
+      setDrafts(envelope.data.drafts || []);
+      setEdits({});
+    } catch {
+      if (mountedRef.current && generation === refreshGenerationRef.current) {
+        setLoadError('The emails could not be refreshed with your saved wording. The current emails are unchanged.');
+      }
+    } finally {
+      if (mountedRef.current && generation === refreshGenerationRef.current) setRefreshing(false);
+    }
+  };
+  const fallbackDraft = sendable.find((d) => d.templateSource === 'shared_fallback');
+
   const handleSend = async () => {
-    if (releaseableIds.length === 0 || sendingRef.current || blankEdit) return;
+    if (releaseableIds.length === 0 || sendingRef.current || blankEdit || refreshing || wordingBusy) return;
     const n = releaseableIds.length;
     const ok = window.confirm(
       releaseWithoutEmail
@@ -361,6 +404,10 @@ export default function ReleaseEmailModal({ requestId, suggestionIds, onClose, o
             </div>
           )}
 
+          {showPreviews && fallbackDraft && (
+            <p className="text-sm text-amber-700">{TEMPLATE_NOTICE[fallbackDraft.templateNotice] || TEMPLATE_NOTICE.preference_unavailable}</p>
+          )}
+
           {showPreviews && sendable.map((draft) => (
             <div key={draft.suggestionId} className="rounded-md border border-gray-200 p-3 space-y-2">
               <div className="text-sm">
@@ -373,6 +420,7 @@ export default function ReleaseEmailModal({ requestId, suggestionIds, onClose, o
                   type="text"
                   value={valueFor(draft, 'subject')}
                   onChange={(e) => setField(draft.suggestionId, 'subject', e.target.value)}
+                  disabled={refreshing || wordingBusy}
                   className="mt-1 w-full rounded border border-gray-300 px-2 py-1 text-sm"
                 />
               </label>
@@ -382,11 +430,22 @@ export default function ReleaseEmailModal({ requestId, suggestionIds, onClose, o
                   rows={12}
                   value={valueFor(draft, 'bodyText')}
                   onChange={(e) => setField(draft.suggestionId, 'bodyText', e.target.value)}
+                  disabled={refreshing || wordingBusy}
                   className="mt-1 w-full rounded border border-gray-300 px-2 py-1 text-sm font-mono"
                 />
               </label>
             </div>
           ))}
+
+          {showPreviews && !completed && sendable.length > 0 && (
+            <ReleaseWordingDefault
+              kind="withdraw"
+              senderId={sendable[0].senderId}
+              disabled={sending || refreshing}
+              onChanged={refreshWording}
+              onBusyChange={setWordingBusy}
+            />
+          )}
 
           {showPreviews && !loading && !loadError && sendable.length === 0 && (
             <p className="text-sm text-gray-600">There is nothing to send.</p>
@@ -410,7 +469,7 @@ export default function ReleaseEmailModal({ requestId, suggestionIds, onClose, o
             {!completed && <button
               type="button"
               onClick={handleSend}
-              disabled={!reason || (showPreviews && (loading || drafts === null)) || sending || releaseableIds.length === 0 || blankEdit}
+              disabled={!reason || (showPreviews && (loading || drafts === null)) || sending || refreshing || wordingBusy || releaseableIds.length === 0 || blankEdit}
               className="px-3 py-1.5 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-50 rounded-md"
             >
               {sending ? 'Releasing…' : `Release (${releaseCount})`}

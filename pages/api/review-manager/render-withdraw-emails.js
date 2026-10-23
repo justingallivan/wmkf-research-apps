@@ -4,7 +4,8 @@
  * POST /api/review-manager/render-withdraw-emails
  *   body: { requestId: <GUID>, suggestionIds: <GUID[]> }
  *   → { ok: true, drafts: [{ suggestionId, status, name?, to?, from?,
- *                            senderId?, subject?, bodyText? }] }
+ *                            senderId?, subject?, bodyText?,
+ *                            templateSource?, templateNotice? }] }
  *
  * Read-only counterpart to POST /api/review-manager/withdraw-sufficient, mirroring
  * the existing render-emails → send-emails split: this renders what WOULD be sent
@@ -19,17 +20,20 @@
  * ones the send applies, so a draft can never be offered for a row the send
  * would refuse.
  *
- * Auth: review-manager 'reviewers' — the same staff-shared boundary as
- * withdraw-sufficient. It exposes reviewer names and email addresses for one
- * request, which that boundary already permits. requestId + every suggestionId
+ * Auth: review-manager 'reviewers', then lead PD for every target or superuser
+ * (authorizeReviewerRequestMutation), matching withdraw-sufficient and the
+ * accepted-release preview. The draft starts from the sending PD's saved
+ * wording, so it is not shown to other staff. requestId + every suggestionId
  * are GUID-validated before use.
  */
 
 import { requireAppAccess } from '../../../lib/utils/auth';
+import { actorRefFromSession } from '../../../lib/utils/actor-ref';
 import { isGuid, allGuids } from '../../../lib/utils/guid';
 import { withDalContext } from '../../../lib/dataverse/core/context';
 import { ServiceHttpError } from '../../../lib/services/service-http-error';
 import { renderWithdrawPreviews } from '../../../lib/services/review-manager/withdraw-sufficient-service';
+import { authorizeReviewerRequestMutation } from '../../../lib/services/reviewer-request-authorization';
 
 const MAX_BATCH = 100;
 
@@ -59,6 +63,12 @@ export default async function handler(req, res) {
 
   return withDalContext('review-manager-render-withdraw-emails', async () => {
     try {
+      await authorizeReviewerRequestMutation({
+        profileId: access.profileId,
+        callerSystemId: actorRefFromSession(access.session),
+        requestIds: [requestId],
+        suggestionIds,
+      });
       const result = await renderWithdrawPreviews({ requestId, suggestionIds });
       return res.status(200).json(result);
     } catch (error) {

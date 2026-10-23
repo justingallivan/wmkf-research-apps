@@ -43,6 +43,11 @@ jest.mock('../../lib/services/email-defaults', () => ({
   readRequiredEmailDefaults: (...a) => readRequiredEmailDefaults(...a),
 }));
 
+const resolveSenderReleaseTemplate = jest.fn();
+jest.mock('../../lib/services/reviewer-release-personalization', () => ({
+  resolveSenderReleaseTemplate: (...a) => resolveSenderReleaseTemplate(...a),
+}));
+
 const REQ = '11111111-1111-4111-8111-111111111111';
 const SUG = '22222222-2222-4222-8222-222222222222';
 const OTHER_SUG = '44444444-4444-4444-8444-444444444444';
@@ -80,6 +85,7 @@ function reviewedOverride(over = {}) {
 
 beforeEach(() => {
   jest.clearAllMocks();
+  resolveSenderReleaseTemplate.mockImplementation(async (_sender, _kind, shared) => ({ template: shared, templateSource: 'shared' }));
   getRequestById.mockResolvedValue({
     akoya_requestid: REQ, akoya_title: 'A Proposal', _wmkf_programdirector_value: 'pd-1',
   });
@@ -332,5 +338,40 @@ describe('withdrawSufficient overrides', () => {
     expect(result.results[0].status).toBe('not_pending');
     expect(updateLifecycle).not.toHaveBeenCalled();
     expect(createAndSendEmail).not.toHaveBeenCalled();
+  });
+});
+
+describe('renderWithdrawPreviews wording source', () => {
+  test('starts from the sending PD saved wording', async () => {
+    resolveSenderReleaseTemplate.mockResolvedValueOnce({
+      template: { subject: 'From Avery', body: '{{greeting}}, we are all set for {{proposalClause}}.\n\n{{signature}}' },
+      templateSource: 'personal',
+    });
+    const { drafts } = await renderWithdrawPreviews({ requestId: REQ, suggestionIds: [SUG] });
+    expect(resolveSenderReleaseTemplate).toHaveBeenCalledWith('pd-1', 'withdraw', expect.objectContaining({
+      subject: 'Thank you — W. M. Keck Foundation review',
+    }));
+    expect(drafts[0]).toMatchObject({ status: 'ok', subject: 'From Avery', templateSource: 'personal' });
+    expect(drafts[0].bodyText).toContain('we are all set for the proposal “A Proposal”');
+    expect(drafts[0].to).toBe('rev@example.org');
+  });
+
+  test('an unreadable PD default renders Admin copy with a notice', async () => {
+    resolveSenderReleaseTemplate.mockImplementationOnce(async (_s, _k, shared) => ({
+      template: shared, templateSource: 'shared_fallback', templateNotice: 'preference_invalid',
+    }));
+    const { drafts } = await renderWithdrawPreviews({ requestId: REQ, suggestionIds: [SUG] });
+    expect(drafts[0]).toMatchObject({
+      subject: 'Thank you — W. M. Keck Foundation review',
+      templateSource: 'shared_fallback',
+      templateNotice: 'preference_invalid',
+    });
+  });
+
+  test('missing Admin defaults skip the preference read', async () => {
+    readRequiredEmailDefaults.mockResolvedValueOnce({ ok: false, failures: [] });
+    const { drafts } = await renderWithdrawPreviews({ requestId: REQ, suggestionIds: [SUG] });
+    expect(drafts[0].status).toBe('defaults_unavailable');
+    expect(resolveSenderReleaseTemplate).not.toHaveBeenCalled();
   });
 });

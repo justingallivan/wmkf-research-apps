@@ -46,6 +46,7 @@
     "test:ci": "jest --ci --coverage --watchAll=false",
     "rehearse:reviewer-invite:browser": "node scripts/rehearse-pd-invite-browser.mjs",
     "rehearse:reviewer-reminders": "node scripts/rehearse-reviewer-reminders.js",
+    "rehearse:reviewer-release": "node scripts/rehearse-reviewer-release.js",
     "smoke:reviewer-invite:auth": "node scripts/save-playwright-auth-state.mjs",
     "smoke:reviewer-invite:live": "node scripts/live-reviewer-invite-smoke.mjs",
     "check:api-routes": "node scripts/check-api-route-security-matrix.js",
