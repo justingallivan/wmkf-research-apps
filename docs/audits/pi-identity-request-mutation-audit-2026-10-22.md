@@ -1,5 +1,7 @@
 # PI identity and request-mutation authorization audit — 2026-10-22
 
+> **Historical audit checkpoint.** The findings, authorization limits and test receipts below describe the earlier documentation-only batch. The later [autonomous cleanup ledger](autonomous-memory-cleanup-2026-10-22.md) owns current repair status, scoped live evidence and remaining actions; runtime repairs there remain local and unreleased. Original findings and historical context are retained below.
+
 **Documentation repairs; runtime PI claim NOT RECONCILED.** Sol investigated two
 P1 backlog items, Luna repaired confirmed documentary defects, and the parent
 reviewed the diffs and material source branches. No runtime code, live records,

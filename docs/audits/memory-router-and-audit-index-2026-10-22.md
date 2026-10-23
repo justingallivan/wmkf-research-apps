@@ -40,6 +40,7 @@ parent-reported rather than independently recalculated here.
 These dated reports cover separate documentation scopes. Each report's own status
 and verification limits apply:
 
+- [Autonomous Cleanup Follow-ups](autonomous-memory-cleanup-2026-10-22.md) — current local repair/evidence status and remaining release limits.
 - [Reviewer Communications Guidance Repair](reviewer-communications-guidance-repair-2026-10-22.md) — local commit `85dbe6cd0`.
 - [Roadmap Reader Guidance Repair](roadmap-reader-guidance-repair-2026-10-22.md) — local commit `9500fdb8b`.
 - [Strategy Wiki Compression](strategy-wiki-compression-2026-10-22.md) — byte-preserving historical extraction.
@@ -56,34 +57,23 @@ and verification limits apply:
 - [Matrix, Roster Contract and Exports](matrix-roster-export-audit-2026-10-22.md) — current roster dispatch/mutations, IRS matrix corrections and three export families; remaining export/live-state limits retained.
 - [Active Memory Coverage Inventory](active-memory-review-coverage-2026-10-22.csv) — all 272 active leaves, sample membership, bounded disposition and evidence report. No active leaf remains outside the named whole-read samples.
 
-## Remaining audit queue and holds
+## Current follow-up status and holds
 
-- Reconcile unresolved live-state probes only with an explicitly named owner and
-  authorized probe; this report performed none.
-- All 272 active leaves have been whole-read across the named samples. The
-  remaining 32 non-active leaves were outside this active-memory continuation
-  (the earlier sample included one closed leaf). All-claim source/live-state
-  verification remains incomplete.
-- Linked canonical gate-coverage numerals remain a proposal for review, not an
-  implemented checker change or a verified repository-wide coverage claim.
-- Preserve accepted owner holds. Do not reopen intake, reminders, or paid-run
-  decisions through this router audit.
-- **P1: resolve remaining safety contracts.** The PI/authorization follow-up
-  confirms a PI role-source conflict and records the bounded authorization
-  trace; runtime repair, population assessment and concurrency questions remain
-  open. The identity/COI/referral follow-up records a shared-person field/decision
-  ordering gap and remaining consumer-proof limits. Continue with those focused
-  safety tests. The Awardee follow-up traces Preview/Copy/Export and leaves
-  browser-output cancellation, completeness and other action-specific read-only
-  exemptions open. The remaining-read audit narrows reviewer GET, proposal cache and IRS refresh exceptions, with matrix/roster corrections and three export traces continued in the linked follow-up; other export/live-state gaps remain. These records grant no permission to change owner policy or
-  probe Production.
-- **P2: finish deeper source verification.** The read inventory is closed;
-  published prompt state, mutable output policy, enforcement scan coverage,
-  local/tool/platform contracts and external state retain explicit limits and
-  evidence plans in the remainder audit. Do not equate whole-reading with
-  source verification of every sentence.
-- **P3: further large-hub compression.** Strategy wiki remains about 33 KB; reviewer lifecycle remains a large mixed reference. Split only with explicit current/historical authority boundaries and byte-preservation proof. The bounded strategy extraction did not rewrite later owner-decision chronology.
+The [autonomous cleanup ledger](autonomous-memory-cleanup-2026-10-22.md) now owns
+execution status for the four authorized follow-up areas: deeper source checks,
+large-hub compression, runtime repairs and read-only external evidence. The
+reports above retain their original checkpoint findings and test receipts as
+history. Do not use their original pending lists as the current work queue.
 
-## Parent verification
+The lifecycle hub now routes nine capability extracts; the exact original and
+segment proof are retained in the [extraction audit](reviewer-lifecycle-extraction-2026-10-22.md).
+Scoped external observations are retained in the live-evidence JSON linked by
+the ledger; local source changes are not deployed behavior. Whole-read coverage
+still does not certify every claim. The 32 non-active leaves remain outside the
+active-memory census, and unprobed populations/effective permissions remain
+unknown. Existing intake, BILL, reminder, paid-run and owner-review-burden
+holds remain in force. No gate-coverage numeral or checker policy was changed.
+
+## Historical parent verification for the router batch
 
 Router routes and the moved development-memory references were reviewed. The historical archive matches the committed pre-edit body exactly (13,302 bytes; SHA-256 recorded in its report), and the subsequent implementation-history body is unchanged. Earlier repair batches passed the applicable documentation gates and self-tests; the final router/extraction and five-memory repair checks passed: memory-router and self-test, agent-wiki and self-test, harness-framing and self-test, fact-consistency, canonical-pointers, doc-symbol-refs, doc-currency, and agent-invariants. Earlier checkpoints recorded ten and then eleven advisory flags; the final remainder audit records sixteen, with the named retained-history and unknown-freshness dispositions explained there. No checker or flag suppression changed. The earlier three JavaScript corrections and the continuation’s two source-file corrections were independently compared against pre-batch non-comment parser tokens; all are comments-only. The owner-review-burden memory is unchanged. All commits remain local; no push or live-system action is part of this pass.

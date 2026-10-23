@@ -1,6 +1,6 @@
 ---
 name: project-irs-exempt-verification
-description: "IRS tax-exempt BMF verification — code shipped 2026-05-12. The 1,264,156-row count and zero-run observation were verified by live probe on 2026-06-04 and are historical snapshots; current rowcount, refresh history, verify-EIN consumers, and PA deployment status are unknown without fresh probes. PA owns the account writeback boundary."
+description: "IRS tax-exempt BMF verification — code shipped 2026-05-12. The 2026-10-22 evidence artifact records 1,975,975 rows, refresh_date 2026-10-15, and one completed logged run; this is a local-configured database observation, not proof of deployed connection identity. PA owns the account writeback boundary."
 metadata:
   node_type: memory
   type: project
@@ -15,7 +15,7 @@ metadata:
 Read this when: working on IRS tax-exempt (BMF) verification — the verify-EIN endpoint, the BMF refresh cron, or PA's account writeback contract.
 
 Do:
-- Treat the code as shipped. The 1,264,156-row count and zero IRS maintenance-run count were verified on 2026-06-04 only; current rowcount and refresh history require live probes. Current built consumers of `verifyEin` and PA deployment status also require source/deployment verification.
+- Treat the code as shipped. The 2026-10-22 evidence artifact `docs/audits/memory-live-state-evidence-2026-10-22.json` records 1,975,975 IRS rows, all with `refresh_date` 2026-10-15, and a logged completed `irs-bmf-refresh` run processing 1,975,975 rows on 2026-10-15. The database target was selected by local configuration, so this does not prove deployed connection identity or production state. Current consumers and PA deployment status still require source/deployment verification.
 - Keep `verify-ein` SELECT-only: PA owns the Dynamics `account` writeback, while the separate cron/CLI refresh paths write the Postgres reference table.
 - Preserve the recorded cadence decision: quarterly for the research pilot, monthly when SoCal comes online. Whether that condition now holds is unverified; this documentation audit does not change the schedule.
 
@@ -25,7 +25,7 @@ Do not:
 
 Ground truth: `lib/db/migrations/008_irs_exempt_orgs.sql`, `lib/services/irs-bmf-service.js`, `pages/api/cron/refresh-irs-bmf.js`, `pages/api/irs/verify-ein.js`, `scripts/import-irs-bmf.js`, `vercel.json` cron entry, `proxy.js` allowlist.
 
-**Status:** code shipped 2026-05-12 (Session 147). The first-load probe found 1,264,156 rows and zero IRS/BMF maintenance runs on 2026-06-04; those are dated observations, not current-state claims. Current rowcount, refresh history, consumer existence, production traffic, and PA deployment are **unknown** without current probes/source review. The verify-EIN service performs a SELECT-only lookup; PA owns the Dynamics account writeback boundary.
+**Status:** code shipped 2026-05-12 (Session 147). The 2026-10-22 evidence artifact reports 1,975,975 rows with `refresh_date` 2026-10-15 and one completed logged run on that date processing that count. The artifact's Postgres connection was selected by local configuration and does not prove deployed connection identity; use the exact dated evidence and its limitations rather than calling this production state. The verify-EIN service performs a SELECT-only lookup; PA owns the Dynamics account writeback boundary.
 
 ## What got built
 
@@ -50,8 +50,8 @@ Ground truth: `lib/db/migrations/008_irs_exempt_orgs.sql`, `lib/services/irs-bmf
 
 ## Open items + gotchas (carry these into future sessions)
 
-- **Historical first-load observation:** the 2026-06-04 probe found 1,264,156 rows. The load mechanism and current rowcount have not been re-probed here.
-- **Historical refresh observation:** the 2026-06-04 probe found zero IRS/BMF `maintenance_runs` rows. This records zero logged runs at that time, not proof that the refresh had never executed; current refresh history and freshness are unknown. Verify live before relying on them. The configured quarterly cadence and proposed SoCal monthly change remain subject to the existing owner decision.
+- **Historical first-load observation:** the 2026-06-04 probe found 1,264,156 rows. The later 2026-10-22 evidence artifact records 1,975,975 rows, `refresh_date` 2026-10-15, and one completed logged run; its local-configured DB target does not establish production. Before changing cadence or asserting deployed freshness, query a newer bounded state using an authorized probe. The configured quarterly cadence and conditional SoCal monthly direction remain the owner decision; no schedule change is implied.
+- **Historical refresh observation:** the 2026-06-04 probe found zero IRS/BMF `maintenance_runs` rows at that time; it did not prove the refresh had never executed.
 - **CSV encoding.** Not formally declared by the IRS. We use `csv-parse` with `bom: true`; if Latin-1 (e.g. accented org names) surfaces, the importer may need an encoding pass. Watch refresh-cron logs.
 - **Pub 78 + Auto-Revocation List are NOT loaded.** BMF alone answers "currently exempt?" (removal from BMF = effectively revoked per the data dictionary). Add if a real edge case surfaces.
 - **PA timing decision:** retain the prior owner hold recorded in intake portal Track 1B (`docs/archive/INTAKE_PORTAL_MEETING_AGENDA_2026-05-13.md`); current timing and deployment status are unverified.

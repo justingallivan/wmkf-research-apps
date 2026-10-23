@@ -1,5 +1,7 @@
 # Matrix, roster contract and exports — 2026-10-22
 
+> **Historical audit checkpoint.** The findings, authorization limits and test receipts below describe the earlier documentation-only batch. The later [autonomous cleanup ledger](autonomous-memory-cleanup-2026-10-22.md) owns current repair status, scoped live evidence and remaining actions; runtime repairs there remain local and unreleased. Original findings and historical context are retained below.
+
 **Bounded source audit; whole-class verdict: CLAIM NOT RECONCILED.** Sol
 investigated, Luna repaired documentation, and the parent reviewed source and
 diffs. No runtime/source files, live systems, credentials, environments,

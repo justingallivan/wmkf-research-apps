@@ -1,5 +1,7 @@
 # Awardee Preview, Copy and Export audit — 2026-10-22
 
+> **Historical audit checkpoint.** The findings, authorization limits and test receipts below describe the earlier documentation-only batch. The later [autonomous cleanup ledger](autonomous-memory-cleanup-2026-10-22.md) owns current repair status, scoped live evidence and remaining actions; runtime repairs there remain local and unreleased. Original findings and historical context are retained below.
+
 **Bounded read-only exception audit; whole-repository verification INCOMPLETE.**
 Sol investigated action and UI contracts, Luna repaired documentation, and the
 parent reviewed source and changes. Only documentation changes are authorized.

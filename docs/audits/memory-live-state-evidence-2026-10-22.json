@@ -1,0 +1,438 @@
+{
+  "observedAt": "2026-10-22T23:46:35.323Z",
+  "mode": "read-only direct SQL/Dataverse GET; OAuth token POST only",
+  "postgres": {
+    "status": "ok",
+    "target": "app database selected by local configuration; not proof of deployed connection",
+    "irs": {
+      "rows": "1975975",
+      "oldest_refresh_date": "2026-10-15",
+      "newest_refresh_date": "2026-10-15"
+    },
+    "recordedRuns": [
+      {
+        "job_name": "irs-bmf-refresh",
+        "status": "completed",
+        "started_at": "2026-10-15T06:00:07.204Z",
+        "completed_at": "2026-10-15T06:02:39.418Z",
+        "records_processed": 1975975
+      }
+    ]
+  },
+  "dataverse": {
+    "status": "ok",
+    "target": "wmkf.crm.dynamics.com",
+    "prompts": {
+      "httpStatus": 200,
+      "rows": [
+        {
+          "wmkf_ai_publisheddatetime": "2026-05-22T17:26:44Z",
+          "wmkf_promptversion": 1,
+          "wmkf_ai_maxtokens": 16384,
+          "wmkf_ai_promptstatus": 682090001,
+          "wmkf_ai_model": "sonnet",
+          "wmkf_ai_promptname": "phase-i.summary"
+        },
+        {
+          "wmkf_ai_publisheddatetime": "2026-07-08T04:50:30Z",
+          "wmkf_promptversion": 2,
+          "wmkf_ai_maxtokens": 4096,
+          "wmkf_ai_promptstatus": 682090001,
+          "wmkf_ai_model": "sonnet",
+          "wmkf_ai_promptname": "reviewer-finder.analyze"
+        },
+        {
+          "wmkf_ai_publisheddatetime": "2026-07-08T17:10:24Z",
+          "wmkf_promptversion": 1,
+          "wmkf_ai_maxtokens": 2500,
+          "wmkf_ai_promptstatus": 682090001,
+          "wmkf_ai_model": "sonnet",
+          "wmkf_ai_promptname": "peer-review-summarizer.analyze"
+        },
+        {
+          "wmkf_ai_publisheddatetime": "2026-06-20T02:28:38Z",
+          "wmkf_promptversion": 1,
+          "wmkf_ai_maxtokens": 100,
+          "wmkf_ai_promptstatus": 682090001,
+          "wmkf_ai_model": "sonnet",
+          "wmkf_ai_promptname": "grantee-title.generate"
+        },
+        {
+          "wmkf_ai_publisheddatetime": "2026-06-06T19:49:20Z",
+          "wmkf_promptversion": 1,
+          "wmkf_ai_maxtokens": 1024,
+          "wmkf_ai_promptstatus": 682090001,
+          "wmkf_ai_model": "sonnet",
+          "wmkf_ai_promptname": "reviewer-finder.score-candidates"
+        },
+        {
+          "wmkf_ai_publisheddatetime": "2026-07-08T17:10:25Z",
+          "wmkf_promptversion": 1,
+          "wmkf_ai_maxtokens": 16384,
+          "wmkf_ai_promptstatus": 682090001,
+          "wmkf_ai_model": "sonnet",
+          "wmkf_ai_promptname": "peer-review-summarizer.questions"
+        },
+        {
+          "wmkf_ai_publisheddatetime": "2026-05-22T17:31:53Z",
+          "wmkf_promptversion": 1,
+          "wmkf_ai_maxtokens": 3000,
+          "wmkf_ai_promptstatus": 682090001,
+          "wmkf_ai_model": "sonnet",
+          "wmkf_ai_promptname": "phase-ii.refine"
+        },
+        {
+          "wmkf_ai_publisheddatetime": "2026-05-22T17:31:53Z",
+          "wmkf_promptversion": 1,
+          "wmkf_ai_maxtokens": 4096,
+          "wmkf_ai_promptstatus": 682090001,
+          "wmkf_ai_model": "sonnet",
+          "wmkf_ai_promptname": "phase-ii.qa"
+        },
+        {
+          "wmkf_ai_publisheddatetime": "2026-06-22T21:34:40Z",
+          "wmkf_promptversion": 2,
+          "wmkf_ai_maxtokens": 4096,
+          "wmkf_ai_promptstatus": 682090001,
+          "wmkf_ai_model": "sonnet",
+          "wmkf_ai_promptname": "grantee-abstract.generate"
+        },
+        {
+          "wmkf_ai_publisheddatetime": "2026-10-18T18:27:33Z",
+          "wmkf_promptversion": 1,
+          "wmkf_ai_maxtokens": 2048,
+          "wmkf_ai_promptstatus": 682090001,
+          "wmkf_ai_model": "sonnet",
+          "wmkf_ai_promptname": "meeting-transcript.fragment-review"
+        },
+        {
+          "wmkf_ai_publisheddatetime": "2026-09-13T21:05:36Z",
+          "wmkf_promptversion": 3,
+          "wmkf_ai_maxtokens": 12000,
+          "wmkf_ai_promptstatus": 682090001,
+          "wmkf_ai_model": "claude-opus-5",
+          "wmkf_ai_promptname": "review-panel.chair"
+        },
+        {
+          "wmkf_ai_publisheddatetime": "2026-10-12T21:41:32Z",
+          "wmkf_promptversion": 1,
+          "wmkf_ai_maxtokens": 1000,
+          "wmkf_ai_promptstatus": 682090001,
+          "wmkf_ai_model": "sonnet",
+          "wmkf_ai_promptname": "funding-gap.extract"
+        },
+        {
+          "wmkf_ai_publisheddatetime": "2026-10-12T21:41:41Z",
+          "wmkf_promptversion": 1,
+          "wmkf_ai_maxtokens": 3500,
+          "wmkf_ai_promptstatus": 682090001,
+          "wmkf_ai_model": "sonnet",
+          "wmkf_ai_promptname": "multi-perspective.integrator"
+        },
+        {
+          "wmkf_ai_publisheddatetime": "2026-10-13T02:59:13Z",
+          "wmkf_promptversion": 2,
+          "wmkf_ai_maxtokens": 16000,
+          "wmkf_ai_promptstatus": 682090001,
+          "wmkf_ai_model": "sonnet",
+          "wmkf_ai_promptname": "meeting-transcript.staff-discussion-summary"
+        },
+        {
+          "wmkf_ai_publisheddatetime": "2026-09-16T23:47:44Z",
+          "wmkf_promptversion": 5,
+          "wmkf_ai_maxtokens": 8000,
+          "wmkf_ai_promptstatus": 682090001,
+          "wmkf_ai_model": "sonnet",
+          "wmkf_ai_promptname": "review-synthesis.generate"
+        },
+        {
+          "wmkf_ai_publisheddatetime": "2026-08-19T00:28:09Z",
+          "wmkf_promptversion": 2,
+          "wmkf_ai_maxtokens": 256,
+          "wmkf_ai_promptstatus": 682090001,
+          "wmkf_ai_model": "sonnet",
+          "wmkf_ai_promptname": "executor.echo-parity"
+        },
+        {
+          "wmkf_ai_publisheddatetime": "2026-08-19T00:28:26Z",
+          "wmkf_promptversion": 2,
+          "wmkf_ai_maxtokens": 16384,
+          "wmkf_ai_promptstatus": 682090001,
+          "wmkf_ai_model": "opus",
+          "wmkf_ai_promptname": "field-primer.generate"
+        },
+        {
+          "wmkf_ai_publisheddatetime": "2026-08-19T00:28:57Z",
+          "wmkf_promptversion": 2,
+          "wmkf_ai_maxtokens": 2200,
+          "wmkf_ai_promptstatus": 682090001,
+          "wmkf_ai_model": "opus",
+          "wmkf_ai_promptname": "initial-assessment.generate"
+        },
+        {
+          "wmkf_ai_publisheddatetime": "2026-05-22T17:31:50Z",
+          "wmkf_promptversion": 1,
+          "wmkf_ai_maxtokens": 16384,
+          "wmkf_ai_promptstatus": 682090001,
+          "wmkf_ai_model": "sonnet",
+          "wmkf_ai_promptname": "phase-ii.summarize"
+        },
+        {
+          "wmkf_ai_publisheddatetime": "2026-05-22T17:31:52Z",
+          "wmkf_promptversion": 1,
+          "wmkf_ai_maxtokens": 1000,
+          "wmkf_ai_promptstatus": 682090001,
+          "wmkf_ai_model": "sonnet",
+          "wmkf_ai_promptname": "phase-ii.extract-structured"
+        },
+        {
+          "wmkf_ai_publisheddatetime": "2026-10-12T21:41:37Z",
+          "wmkf_promptversion": 1,
+          "wmkf_ai_maxtokens": 4000,
+          "wmkf_ai_promptstatus": 682090001,
+          "wmkf_ai_model": "sonnet",
+          "wmkf_ai_promptname": "literature-analyzer.compare"
+        },
+        {
+          "wmkf_ai_publisheddatetime": "2026-10-12T21:41:39Z",
+          "wmkf_promptversion": 1,
+          "wmkf_ai_maxtokens": 2500,
+          "wmkf_ai_promptstatus": 682090001,
+          "wmkf_ai_model": "sonnet",
+          "wmkf_ai_promptname": "multi-perspective.optimist"
+        },
+        {
+          "wmkf_ai_publisheddatetime": "2026-10-12T21:41:40Z",
+          "wmkf_promptversion": 1,
+          "wmkf_ai_maxtokens": 2500,
+          "wmkf_ai_promptstatus": 682090001,
+          "wmkf_ai_model": "sonnet",
+          "wmkf_ai_promptname": "multi-perspective.neutral"
+        },
+        {
+          "wmkf_ai_publisheddatetime": "2026-10-13T16:44:09Z",
+          "wmkf_promptversion": 1,
+          "wmkf_ai_maxtokens": 16000,
+          "wmkf_ai_promptstatus": 682090001,
+          "wmkf_ai_model": "sonnet",
+          "wmkf_ai_promptname": "meeting-transcript.staff-discussion-sentiment"
+        },
+        {
+          "wmkf_ai_publisheddatetime": "2026-09-12T20:03:07Z",
+          "wmkf_promptversion": 2,
+          "wmkf_ai_maxtokens": 3000,
+          "wmkf_ai_promptstatus": 682090001,
+          "wmkf_ai_model": "claude-opus-5",
+          "wmkf_ai_promptname": "cycle-dossier.research-plan"
+        },
+        {
+          "wmkf_ai_publisheddatetime": "2026-09-12T20:04:14Z",
+          "wmkf_promptversion": 2,
+          "wmkf_ai_maxtokens": 12000,
+          "wmkf_ai_promptstatus": 682090001,
+          "wmkf_ai_model": "claude-opus-5",
+          "wmkf_ai_promptname": "cycle-dossier.entry"
+        },
+        {
+          "wmkf_ai_publisheddatetime": "2026-09-13T20:50:02Z",
+          "wmkf_promptversion": 2,
+          "wmkf_ai_maxtokens": 8000,
+          "wmkf_ai_promptstatus": 682090001,
+          "wmkf_ai_model": "claude-opus-5",
+          "wmkf_ai_promptname": "review-panel.seat"
+        },
+        {
+          "wmkf_ai_publisheddatetime": "2026-10-05T19:36:40Z",
+          "wmkf_promptversion": 1,
+          "wmkf_ai_maxtokens": 16000,
+          "wmkf_ai_promptstatus": 682090001,
+          "wmkf_ai_model": "sonnet",
+          "wmkf_ai_promptname": "meeting-transcript.presentation-summary"
+        },
+        {
+          "wmkf_ai_publisheddatetime": "2026-10-12T21:41:35Z",
+          "wmkf_promptversion": 1,
+          "wmkf_ai_maxtokens": 4000,
+          "wmkf_ai_promptstatus": 682090001,
+          "wmkf_ai_model": "sonnet",
+          "wmkf_ai_promptname": "literature-analyzer.extract-paper"
+        },
+        {
+          "wmkf_ai_publisheddatetime": "2026-10-12T21:41:38Z",
+          "wmkf_promptversion": 1,
+          "wmkf_ai_maxtokens": 2000,
+          "wmkf_ai_promptstatus": 682090001,
+          "wmkf_ai_model": "sonnet",
+          "wmkf_ai_promptname": "multi-perspective.initial-analysis"
+        },
+        {
+          "wmkf_ai_publisheddatetime": "2026-10-12T21:41:30Z",
+          "wmkf_promptversion": 1,
+          "wmkf_ai_maxtokens": 4096,
+          "wmkf_ai_promptstatus": 682090001,
+          "wmkf_ai_model": "sonnet",
+          "wmkf_ai_promptname": "expertise-finder.match"
+        },
+        {
+          "wmkf_ai_publisheddatetime": "2026-10-12T21:41:32Z",
+          "wmkf_promptversion": 1,
+          "wmkf_ai_maxtokens": 4000,
+          "wmkf_ai_promptstatus": 682090001,
+          "wmkf_ai_model": "sonnet",
+          "wmkf_ai_promptname": "funding-gap.analyze"
+        },
+        {
+          "wmkf_ai_publisheddatetime": "2026-10-12T21:41:33Z",
+          "wmkf_promptversion": 1,
+          "wmkf_ai_maxtokens": 1000,
+          "wmkf_ai_promptstatus": 682090001,
+          "wmkf_ai_model": "haiku",
+          "wmkf_ai_promptname": "expense-reporter.extract-document"
+        },
+        {
+          "wmkf_ai_publisheddatetime": "2026-10-12T21:41:40Z",
+          "wmkf_promptversion": 1,
+          "wmkf_ai_maxtokens": 2500,
+          "wmkf_ai_promptstatus": 682090001,
+          "wmkf_ai_model": "sonnet",
+          "wmkf_ai_promptname": "multi-perspective.skeptic"
+        },
+        {
+          "wmkf_ai_publisheddatetime": "2026-08-18T23:40:55Z",
+          "wmkf_promptversion": 5,
+          "wmkf_ai_maxtokens": 16384,
+          "wmkf_ai_promptstatus": 682090001,
+          "wmkf_ai_model": "claude-sonnet-5",
+          "wmkf_ai_promptname": "pre-site-visit.proposal-core.generate"
+        },
+        {
+          "wmkf_ai_publisheddatetime": "2026-10-04T17:31:16Z",
+          "wmkf_promptversion": 1,
+          "wmkf_ai_maxtokens": 16384,
+          "wmkf_ai_promptstatus": 682090001,
+          "wmkf_ai_model": "sonnet",
+          "wmkf_ai_promptname": "meeting-transcript.speaker-alignment"
+        },
+        {
+          "wmkf_ai_publisheddatetime": "2026-10-12T21:41:34Z",
+          "wmkf_promptversion": 1,
+          "wmkf_ai_maxtokens": 1000,
+          "wmkf_ai_promptstatus": 682090001,
+          "wmkf_ai_model": "haiku",
+          "wmkf_ai_promptname": "expense-reporter.extract-image"
+        },
+        {
+          "wmkf_ai_publisheddatetime": "2026-10-12T21:41:39Z",
+          "wmkf_promptversion": 1,
+          "wmkf_ai_maxtokens": 1500,
+          "wmkf_ai_promptstatus": 682090001,
+          "wmkf_ai_model": "sonnet",
+          "wmkf_ai_promptname": "multi-perspective.proposal-summary"
+        },
+        {
+          "wmkf_ai_publisheddatetime": "2026-10-12T21:41:36Z",
+          "wmkf_promptversion": 1,
+          "wmkf_ai_maxtokens": 6000,
+          "wmkf_ai_promptstatus": 682090001,
+          "wmkf_ai_model": "sonnet",
+          "wmkf_ai_promptname": "literature-analyzer.synthesize"
+        }
+      ],
+      "complete": true,
+      "distinctNameCount": 39
+    },
+    "flows": {
+      "httpStatus": 200,
+      "complete": true,
+      "visibleCloudFlowCount": 123,
+      "irsDefinitionMatches": [],
+      "limit": "visible definitions and literal matches only; no execution/caller proof"
+    },
+    "roles": {
+      "httpStatus": 200,
+      "complete": true,
+      "names": [
+        "Delegate",
+        "System Customizer",
+        "WMKF AI Elevated TEMP",
+        "WMKF AI Tools",
+        "WMKF Custom Entities",
+        "WMKF Proposal Ranking Application User",
+        "WMKF Research Review App Suite - Staff",
+        "akoyaGO Team User (no accounting)"
+      ]
+    }
+  },
+  "limitations": [
+    "Local Postgres configuration does not establish deployed connection identity.",
+    "Visible category-5 workflow definitions and literal matching do not establish all external callers.",
+    "Direct application-user role assignments do not establish effective privileges, team roles or organizational authorization.",
+    "Prompt current-row metadata does not verify prompt contents or execution.",
+    "GET probes do not change application records; OAuth token issuance and service access/audit logs may occur."
+  ],
+  "vercelEnvironmentMetadata": {
+    "cliExit": 0,
+    "project": "wmkf_research_apps (linked project)",
+    "environment": "Production",
+    "presence": {
+      "DATAVERSE_DAL_ENFORCEMENT": true,
+      "DATAVERSE_TARGET_INTERLOCK": true,
+      "AUTH_REQUIRED": true,
+      "EMERGENCY_AUTH_BYPASS": false,
+      "REVIEWER_EMAIL_DELIVERY_MODE": false,
+      "REVIEWER_INSTITUTION_PHASE2": false,
+      "PROPOSAL_RANKING_ENABLED": true,
+      "CYCLE_DOSSIER_ENABLED": true,
+      "TRANSCRIPTION_PILOT_ENABLED": false,
+      "TRANSCRIPTION_SUBMISSIONS_ENABLED": false
+    },
+    "limitation": "Metadata presence only. Values, effective deployed configuration and runtime behavior were not inspected."
+  },
+  "schemaMetadata": {
+    "status": "ok",
+    "target": "wmkf.crm.dynamics.com",
+    "entities": {
+      "akoya_request": {
+        "httpStatus": 200,
+        "entitySet": "akoya_requests"
+      },
+      "wmkf_appreviewersuggestion": {
+        "httpStatus": 200,
+        "entitySet": "wmkf_appreviewersuggestions"
+      },
+      "wmkf_appreviewanswer": {
+        "httpStatus": 200,
+        "entitySet": "wmkf_appreviewanswers"
+      },
+      "wmkf_reviewquestion": {
+        "httpStatus": 200,
+        "entitySet": "wmkf_reviewquestions"
+      },
+      "wmkf_potentialreviewer": {
+        "httpStatus": 404
+      },
+      "wmkf_apprequestperson": {
+        "httpStatus": 200,
+        "entitySet": "wmkf_apprequestpersons"
+      },
+      "wmkf_ai_prompt": {
+        "httpStatus": 200,
+        "entitySet": "wmkf_ai_prompts"
+      }
+    },
+    "limit": "entity existence/set names only; no attribute/relationship or effective privilege proof",
+    "observedAt": "2026-10-22T23:50:18.965Z",
+    "canonicalReviewerPerson": {
+      "httpStatus": 200,
+      "rows": [
+        {
+          "MetadataId": "379e203b-297b-ee11-8179-00224802aaea",
+          "LogicalName": "wmkf_potentialreviewers",
+          "EntitySetName": "wmkf_potentialreviewerses"
+        }
+      ],
+      "complete": true
+    },
+    "wrongName404Note": "The singular wmkf_potentialreviewer lookup returned 404; this is not absence of the reviewer table. Entity-set lookup resolves actual logical name wmkf_potentialreviewers to wmkf_potentialreviewerses."
+  }
+}

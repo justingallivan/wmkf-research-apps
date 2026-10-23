@@ -6,7 +6,7 @@ metadata:
   type: feedback
   status: active
   originSessionId: c513ecfd-f41e-4862-b3e3-65c7dd7d7a3e
-  last_verified: 2026-07-27 via scripts/check-application-state-atlas.js scan roots and synthetic allowlist
+  last_verified: 2026-10-22 via scanner root declarations and synthetic fixture rules
 ---
 
 ## Recall Rule
@@ -21,14 +21,18 @@ S329: Stage 0's self-test fixture used the synthetic entity name
 main for THREE pushes before it was noticed — the touched-surface gate
 selection ("this is a scripts/ probe, not data-layer") skipped atlas each time.
 
-**Why:** scanner gates sweep paths regardless of what surface a script
-"belongs" to. Verified scopes (S329): `check:atlas` scans code incl.
-`scripts/` for entity-set strings (the gate that fired); `check:secret-scan`
-scans ALL tracked files (`git ls-files`); `check:doc-symbol-refs` resolves
-`scripts/...` path refs written in memory/wiki text. (`drain-table-mentions`
-and `prompt-storage-mentions` scan only `docs/` + `.claude-memory/` — md
-surfaces, not scripts.) A NEW script with synthetic entity- or secret-shaped
-fixture strings is inside the first two gates' blast radius.
+**Why:** scanner gates sweep their configured roots regardless of what surface
+a script "belongs" to. Current scopes: `check:atlas` scans source including
+`scripts/` for entity-set strings; `check:secret-scan` scans tracked content
+(`git ls-files`, excluding lockfiles); `check:doc-symbol-refs` and `check:build-claim-freshness` scan
+Markdown in `.claude-memory/` and `docs/agent-wiki/` only, not all of `docs/`.
+`check:drain-table-mentions`, `check:prompt-storage-mentions`,
+`check:fact-consistency`, and `check:canonical-pointers` scan Markdown in
+`docs/` and `.claude-memory/` plus the selected root files `CLAUDE.md`,
+`SESSION_PROMPT.md`, `README.md`, and `GEMINI.md`; they do not scan `scripts/`.
+A NEW script with synthetic entity- or secret-shaped fixture strings is inside
+the first two gates' blast radius, while fixture paths and text under the docs
+and memory roots can affect the corresponding documentation scanners.
 
 **How to apply:** when a commit ADDS or edits a gate script or its self-test
 fixtures, run the full `check:*` suite (or at minimum every scanner gate)

@@ -1,11 +1,11 @@
 # Atlas: `irs_exempt_orgs` (Postgres)
 
-**Last live-state probe:** 2026-06-04. It observed 1,264,156 rows and zero IRS/BMF maintenance-run records. These are historical observations only; current rowcount, refresh history, endpoint consumers, and PA deployment status are **unknown** without fresh probes. The code/schema descriptions below are source-based.
+**Dated state evidence (2026-10-22):** the read-only evidence artifact [`docs/audits/memory-live-state-evidence-2026-10-22.json`](../audits/memory-live-state-evidence-2026-10-22.json) records 1,975,975 rows, with oldest and newest `refresh_date` both 2026-10-15, plus one logged completed `irs-bmf-refresh` run on 2026-10-15 processing 1,975,975 rows. The Postgres target was selected by local configuration, not proven to be the deployed connection; this does not establish Production state. Refresh history after that observation and PA deployment remain unverified. The code/schema descriptions below are source-based.
 **Historical row-count context:** the first-load count was 1,264,156 unique EINs. The broader IRS BMF is filtered for required fields and deduplicated across regional files. Do not use the dated count as current state.
 
 ## Source of truth
 
-**External (IRS Business Master File extract).** Bulk extract held in Postgres as durable reference data. WMKF does not own this data — the IRS does. The source config schedules quarterly refreshes; current execution and freshness require a live probe. **Not Wave-2 migrate-eligible** — Dataverse storage tiers don't fit ~2M reference rows, and there's no relational value to other Dynamics entities.
+**External (IRS Business Master File extract).** Bulk extract held in Postgres as durable reference data. WMKF does not own this data — the IRS does. The source config schedules quarterly refreshes; execution/freshness beyond the dated evidence above requires a newer bounded-state query. **Not Wave-2 migrate-eligible** — Dataverse storage tiers don't fit ~2M reference rows, and there's no relational value to other Dynamics entities.
 
 ## Schema (from `lib/db/migrations/008_irs_exempt_orgs.sql`)
 
@@ -36,7 +36,7 @@ Indexes: PK on `ein`, partial on `state WHERE state IS NOT NULL`, composite on `
 ## Live state notes
 
 - Refresh strategy is **atomic swap**. The cron creates and populates a staging table; the live swap occurs only after the import passes its checks. GET/POST with `dryRun=1` still perform schema/staging work and attempt to record a maintenance run; dry-run skips the live swap. Audit logging can itself fail, and a failed run can also create a failure alert.
-- The source config schedules quarterly refreshes (15th of Jan/Apr/Jul/Oct). Whether a run has occurred or the data is current requires a live probe. The recorded owner decision is quarterly for the research pilot, moving to monthly when SoCal comes online. Whether that condition now holds is unverified; no cadence change is part of this audit.
+- The source config schedules quarterly refreshes (15th of Jan/Apr/Jul/Oct). The dated artifact records one completed 2026-10-15 run and rows refreshed that date, but its local-configured target does not prove deployed state. Query a newer bounded state before asserting later freshness or changing the recorded owner decision: quarterly for the research pilot, with monthly refresh conditional on SoCal coming online. No cadence change is part of this audit.
 - **Removed-org semantic.** When the IRS revokes an exemption, the org is removed from the published file. Our atomic-swap refresh naturally surfaces this — a previously-verified EIN that drops from the BMF returns `found: false` after the next refresh. Callers (PA) should re-verify on cycle open rather than trusting historical results.
 
 ## Read paths

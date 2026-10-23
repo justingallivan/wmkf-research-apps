@@ -1,0 +1,334 @@
+{
+  "artifact": "Reviewer Workbench lifecycle capability extraction",
+  "created_on": "2026-10-22",
+  "source": {
+    "path": "docs/audits/evidence/reviewer-workbench-lifecycle-2026-10-22.txt",
+    "kind": "byte-preserved historical snapshot",
+    "bytes": 189477,
+    "lines": 2260,
+    "sha256": "fdccedfe393f7ae7db7afa04b5b48297080b5c269290637bbf70e192f68888e7"
+  },
+  "verification_scope": "Mechanical extraction integrity only. Listed source segments were compared against child bodies; retained hub source regions were compared byte-for-byte. No whole-claim, source, runtime, repository-drift, or live-state recertification was performed.",
+  "capability_topics": [
+    "reviewer-find-applicant-flow.md",
+    "reviewer-address-referrals.md",
+    "reviewer-engagement-closeout.md",
+    "reviewer-invitation-email.md",
+    "reviewer-activity-history.md",
+    "reviewer-institution-display.md",
+    "submitted-reviews-and-documents.md",
+    "review-synthesis.md",
+    "workbench-shell-handoffs.md"
+  ],
+  "segments": [
+    {
+      "topic_file": "docs/agent-wiki/topics/reviewer-find-applicant-flow.md",
+      "segment_index": 1,
+      "source_line_start": 139,
+      "source_line_end": 179,
+      "source_byte_length": 2786,
+      "source_sha256": "827bea07bf1ae41dfce61de732dd22be4dcc8cea990a4acaa047a78813c6414a",
+      "extracted_body_byte_length": 2786,
+      "extracted_body_sha256": "827bea07bf1ae41dfce61de732dd22be4dcc8cea990a4acaa047a78813c6414a",
+      "exact_byte_match": true,
+      "correction": null
+    },
+    {
+      "topic_file": "docs/agent-wiki/topics/reviewer-find-applicant-flow.md",
+      "segment_index": 2,
+      "source_line_start": 360,
+      "source_line_end": 391,
+      "source_byte_length": 1925,
+      "source_sha256": "4c8d46a3e25d208336ded93c4b427aa94c6c66baf7763a7683affe06eec4920e",
+      "extracted_body_byte_length": 1925,
+      "extracted_body_sha256": "4c8d46a3e25d208336ded93c4b427aa94c6c66baf7763a7683affe06eec4920e",
+      "exact_byte_match": true,
+      "correction": null
+    },
+    {
+      "topic_file": "docs/agent-wiki/topics/reviewer-find-applicant-flow.md",
+      "segment_index": 3,
+      "source_line_start": 808,
+      "source_line_end": 944,
+      "source_byte_length": 14526,
+      "source_sha256": "18ae1b07e4ed0750a94f19ee66cdf4091fa09782540a8417bd1300a89db3dc49",
+      "extracted_body_byte_length": 14526,
+      "extracted_body_sha256": "18ae1b07e4ed0750a94f19ee66cdf4091fa09782540a8417bd1300a89db3dc49",
+      "exact_byte_match": true,
+      "correction": null
+    },
+    {
+      "topic_file": "docs/agent-wiki/topics/reviewer-find-applicant-flow.md",
+      "segment_index": 4,
+      "source_line_start": 1117,
+      "source_line_end": 1146,
+      "source_byte_length": 5120,
+      "source_sha256": "1e8d18ee3d245f06107580edae9b2a22ac2cc76d01ff5cbae680c194d492f6e7",
+      "extracted_body_byte_length": 5120,
+      "extracted_body_sha256": "1e8d18ee3d245f06107580edae9b2a22ac2cc76d01ff5cbae680c194d492f6e7",
+      "exact_byte_match": true,
+      "correction": null
+    },
+    {
+      "topic_file": "docs/agent-wiki/topics/reviewer-find-applicant-flow.md",
+      "segment_index": 5,
+      "source_line_start": 1204,
+      "source_line_end": 1253,
+      "source_byte_length": 5055,
+      "source_sha256": "659e3cdedc21358386a3154ac45a6069dd003d05b525f7b71a9ced6dbb60a217",
+      "extracted_body_byte_length": 5055,
+      "extracted_body_sha256": "659e3cdedc21358386a3154ac45a6069dd003d05b525f7b71a9ced6dbb60a217",
+      "exact_byte_match": true,
+      "correction": null
+    },
+    {
+      "topic_file": "docs/agent-wiki/topics/reviewer-find-applicant-flow.md",
+      "segment_index": 6,
+      "source_line_start": 2201,
+      "source_line_end": 2255,
+      "source_byte_length": 4954,
+      "source_sha256": "14519ff65094a8fb35172284cd43ceef8cc62e12a85cfbafa3a184214e783720",
+      "extracted_body_byte_length": 4954,
+      "extracted_body_sha256": "14519ff65094a8fb35172284cd43ceef8cc62e12a85cfbafa3a184214e783720",
+      "exact_byte_match": true,
+      "correction": null
+    },
+    {
+      "topic_file": "docs/agent-wiki/topics/reviewer-address-referrals.md",
+      "segment_index": 1,
+      "source_line_start": 427,
+      "source_line_end": 632,
+      "source_byte_length": 14701,
+      "source_sha256": "c36ccff79848da59b1ec679e5ed77e500a49ec597fd22c99fd3b590d81a1e6d7",
+      "extracted_body_byte_length": 14701,
+      "extracted_body_sha256": "c36ccff79848da59b1ec679e5ed77e500a49ec597fd22c99fd3b590d81a1e6d7",
+      "exact_byte_match": true,
+      "correction": null
+    },
+    {
+      "topic_file": "docs/agent-wiki/topics/reviewer-address-referrals.md",
+      "segment_index": 2,
+      "source_line_start": 1254,
+      "source_line_end": 1350,
+      "source_byte_length": 6746,
+      "source_sha256": "de53dff350070dc2f1b9cd89ec5ab3c07e826f9b02f8ab13c6295d9fb7bca022",
+      "extracted_body_byte_length": 6746,
+      "extracted_body_sha256": "de53dff350070dc2f1b9cd89ec5ab3c07e826f9b02f8ab13c6295d9fb7bca022",
+      "exact_byte_match": true,
+      "correction": null
+    },
+    {
+      "topic_file": "docs/agent-wiki/topics/reviewer-engagement-closeout.md",
+      "segment_index": 1,
+      "source_line_start": 180,
+      "source_line_end": 342,
+      "source_byte_length": 14726,
+      "source_sha256": "854da8b6e962ffe8187a5712673ed4d1ee6c49e108a57dc8882c9318245e332f",
+      "extracted_body_byte_length": 14726,
+      "extracted_body_sha256": "854da8b6e962ffe8187a5712673ed4d1ee6c49e108a57dc8882c9318245e332f",
+      "exact_byte_match": true,
+      "correction": null
+    },
+    {
+      "topic_file": "docs/agent-wiki/topics/reviewer-engagement-closeout.md",
+      "segment_index": 2,
+      "source_line_start": 392,
+      "source_line_end": 426,
+      "source_byte_length": 8145,
+      "source_sha256": "029099b2a0991a67fd19c87c315cee21a2e5dfd8c1d5753d403c6ce35f3c1735",
+      "extracted_body_byte_length": 8145,
+      "extracted_body_sha256": "029099b2a0991a67fd19c87c315cee21a2e5dfd8c1d5753d403c6ce35f3c1735",
+      "exact_byte_match": true,
+      "correction": null
+    },
+    {
+      "topic_file": "docs/agent-wiki/topics/reviewer-engagement-closeout.md",
+      "segment_index": 3,
+      "source_line_start": 1147,
+      "source_line_end": 1203,
+      "source_byte_length": 4118,
+      "source_sha256": "b45860d6fc581d0b8a6b9e00f4768ad8ae7e25c6d89598265e1895564d4975a6",
+      "extracted_body_byte_length": 4118,
+      "extracted_body_sha256": "b45860d6fc581d0b8a6b9e00f4768ad8ae7e25c6d89598265e1895564d4975a6",
+      "exact_byte_match": true,
+      "correction": null
+    },
+    {
+      "topic_file": "docs/agent-wiki/topics/reviewer-engagement-closeout.md",
+      "segment_index": 4,
+      "source_line_start": 2120,
+      "source_line_end": 2134,
+      "source_byte_length": 1454,
+      "source_sha256": "8bd5b1cd6086f4ad235fc375c083cce61045bf5d65aff79fbeb544e47f74369d",
+      "extracted_body_byte_length": 1454,
+      "extracted_body_sha256": "8bd5b1cd6086f4ad235fc375c083cce61045bf5d65aff79fbeb544e47f74369d",
+      "exact_byte_match": true,
+      "correction": null
+    },
+    {
+      "topic_file": "docs/agent-wiki/topics/reviewer-engagement-closeout.md",
+      "segment_index": 5,
+      "source_line_start": 2154,
+      "source_line_end": 2200,
+      "source_byte_length": 4169,
+      "source_sha256": "4d00752784369baeecde4c92b82d9dbdb472106b9e61296e9c338168b834b32f",
+      "extracted_body_byte_length": 4375,
+      "extracted_body_sha256": "033ff6a21703188f13ca917ee68284f8cdcdefa6762316c6263d89437cb0356f",
+      "exact_byte_match": false,
+      "correction": {
+        "replaced_source_text_sha256": "a1860b99f0635d41072c5b401d26110652dbd3dfbaa10e39e86e5a668d169cd9",
+        "replacement_sha256": "19de5ba936c6cd7bc180582734f410f55bc02917038527d1c00b65f9477e2fe5",
+        "reason": "D1–D5 resolved; D5 archived three raw-fetch writers and gates the remaining script writer set."
+      }
+    },
+    {
+      "topic_file": "docs/agent-wiki/topics/reviewer-invitation-email.md",
+      "segment_index": 1,
+      "source_line_start": 343,
+      "source_line_end": 359,
+      "source_byte_length": 3820,
+      "source_sha256": "cf42cc1584f781532ac7fa5c902a6d8bde85e81f4cc3d2228b8dc482befc3868",
+      "extracted_body_byte_length": 3820,
+      "extracted_body_sha256": "cf42cc1584f781532ac7fa5c902a6d8bde85e81f4cc3d2228b8dc482befc3868",
+      "exact_byte_match": true,
+      "correction": null
+    },
+    {
+      "topic_file": "docs/agent-wiki/topics/reviewer-invitation-email.md",
+      "segment_index": 2,
+      "source_line_start": 755,
+      "source_line_end": 795,
+      "source_byte_length": 2656,
+      "source_sha256": "8ddfeb54a322facd1e719bb05e04db03f9cc3a77bbcffb9da9f79679fe06f2bb",
+      "extracted_body_byte_length": 2656,
+      "extracted_body_sha256": "8ddfeb54a322facd1e719bb05e04db03f9cc3a77bbcffb9da9f79679fe06f2bb",
+      "exact_byte_match": true,
+      "correction": null
+    },
+    {
+      "topic_file": "docs/agent-wiki/topics/reviewer-invitation-email.md",
+      "segment_index": 3,
+      "source_line_start": 1847,
+      "source_line_end": 2012,
+      "source_byte_length": 14309,
+      "source_sha256": "afa736050828cf26950d9a947bd0552fec883301819fc70701900977d4a7c948",
+      "extracted_body_byte_length": 14331,
+      "extracted_body_sha256": "523897682433df5a07da3cdd9ab5669b40b33330b7af4dd088fa2cb784675945",
+      "exact_byte_match": false,
+      "correction": {
+        "replaced_source_text_sha256": "237ec6262f5273389243a1f99954d88c163a8c2b85d6af1472896b043b69c235",
+        "replacement_sha256": "5f00d2170b58fde30f6c0dcbe7e2f232ffe6f5f068764809a61fe84481c7bda2",
+        "reason": "Only the fixed review-due/proposal-release comparison blocks; respondBy conditions do not block Send."
+      }
+    },
+    {
+      "topic_file": "docs/agent-wiki/topics/reviewer-activity-history.md",
+      "segment_index": 1,
+      "source_line_start": 633,
+      "source_line_end": 754,
+      "source_byte_length": 8687,
+      "source_sha256": "e0807b50afbd1fb8d82d647df4dd4a105bc0f5d8486e73183ad921d29a763446",
+      "extracted_body_byte_length": 8687,
+      "extracted_body_sha256": "e0807b50afbd1fb8d82d647df4dd4a105bc0f5d8486e73183ad921d29a763446",
+      "exact_byte_match": true,
+      "correction": null
+    },
+    {
+      "topic_file": "docs/agent-wiki/topics/reviewer-activity-history.md",
+      "segment_index": 2,
+      "source_line_start": 2099,
+      "source_line_end": 2119,
+      "source_byte_length": 1933,
+      "source_sha256": "9f09093864b9f85015430928087d8c3264bc96e6c2879ea09bc6d003ac381a8e",
+      "extracted_body_byte_length": 1933,
+      "extracted_body_sha256": "9f09093864b9f85015430928087d8c3264bc96e6c2879ea09bc6d003ac381a8e",
+      "exact_byte_match": true,
+      "correction": null
+    },
+    {
+      "topic_file": "docs/agent-wiki/topics/reviewer-institution-display.md",
+      "segment_index": 1,
+      "source_line_start": 945,
+      "source_line_end": 1116,
+      "source_byte_length": 12046,
+      "source_sha256": "a905f1edc8713b542eef241af4319a5279b589121d7fbb2cbfc1c8458631e326",
+      "extracted_body_byte_length": 12046,
+      "extracted_body_sha256": "a905f1edc8713b542eef241af4319a5279b589121d7fbb2cbfc1c8458631e326",
+      "exact_byte_match": true,
+      "correction": null
+    },
+    {
+      "topic_file": "docs/agent-wiki/topics/submitted-reviews-and-documents.md",
+      "segment_index": 1,
+      "source_line_start": 1355,
+      "source_line_end": 1645,
+      "source_byte_length": 20930,
+      "source_sha256": "2f3c4b0bce3e42aade147488d6e27b3bd6fcbcecddefdefaa4bc000d1d7bdceb",
+      "extracted_body_byte_length": 20930,
+      "extracted_body_sha256": "2f3c4b0bce3e42aade147488d6e27b3bd6fcbcecddefdefaa4bc000d1d7bdceb",
+      "exact_byte_match": true,
+      "correction": null
+    },
+    {
+      "topic_file": "docs/agent-wiki/topics/review-synthesis.md",
+      "segment_index": 1,
+      "source_line_start": 1646,
+      "source_line_end": 1846,
+      "source_byte_length": 14259,
+      "source_sha256": "4538abf48ca8bb52ec8e18b1a60c3f2ff294edeeca49654f1f6e8202de729650",
+      "extracted_body_byte_length": 14259,
+      "extracted_body_sha256": "4538abf48ca8bb52ec8e18b1a60c3f2ff294edeeca49654f1f6e8202de729650",
+      "exact_byte_match": true,
+      "correction": null
+    },
+    {
+      "topic_file": "docs/agent-wiki/topics/workbench-shell-handoffs.md",
+      "segment_index": 1,
+      "source_line_start": 2013,
+      "source_line_end": 2098,
+      "source_byte_length": 12115,
+      "source_sha256": "79ee4cb154ac21b42ababd2d69bfaa6a9e0e4abfe9d7f04f644707f647de1e30",
+      "extracted_body_byte_length": 12115,
+      "extracted_body_sha256": "79ee4cb154ac21b42ababd2d69bfaa6a9e0e4abfe9d7f04f644707f647de1e30",
+      "exact_byte_match": true,
+      "correction": null
+    },
+    {
+      "topic_file": "docs/agent-wiki/topics/workbench-shell-handoffs.md",
+      "segment_index": 2,
+      "source_line_start": 2135,
+      "source_line_end": 2153,
+      "source_byte_length": 1857,
+      "source_sha256": "6a72f010adca1aae93f21934a4fd4b22bd1517876dccd077766ff043c44f96fe",
+      "extracted_body_byte_length": 1857,
+      "extracted_body_sha256": "6a72f010adca1aae93f21934a4fd4b22bd1517876dccd077766ff043c44f96fe",
+      "exact_byte_match": true,
+      "correction": null
+    }
+  ],
+  "hub_retained_segments": [
+    {
+      "source_line_start": 796,
+      "source_line_end": 807,
+      "byte_length": 1474,
+      "sha256": "ee3e07a702ab0191bc6d896e7239ce20404bf225dcf03dd1df0288f6d01c1c8b",
+      "exact_byte_match": true
+    },
+    {
+      "source_line_start": 1351,
+      "source_line_end": 1354,
+      "byte_length": 460,
+      "sha256": "6a9db636a964d4b87781370a30f9b931b44358e38e5a9a68d054c293f16116fb",
+      "exact_byte_match": true
+    },
+    {
+      "source_line_start": 2256,
+      "source_line_end": 2260,
+      "byte_length": 226,
+      "sha256": "65095893d639f859c4fe130ea9c0f3b648fa92657d27ced277a072cbae877245",
+      "exact_byte_match": true
+    }
+  ],
+  "documented_corrections": 2,
+  "j27_060_rebound_to": "docs/agent-wiki/topics/workbench-shell-handoffs.md:148"
+}

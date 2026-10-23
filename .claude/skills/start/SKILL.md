@@ -79,15 +79,14 @@ Do NOT run the `migrate-to-codex` skill to populate `.agents/` — it writes a
 corrupted `s/Claude/Codex/` copy and severs the `AGENTS.md` symlink (see CLAUDE.md
 header). The symlink above is the only sanctioned way to share skills with Codex.
 
-## Step 2: Run rubric-enforcement gates
+## Step 2: Run repository check gates
 
-Before reading any session context, run the project's CI gates to surface rubric violations *before* doing other work. A red gate is a violation of the ground-truth rule (`docs/CLAUDE_REMEDIATION_PLAN.md` + CLAUDE.md "Ground-truth requirement"), regardless of which session caused it.
+Before reading any session context, run the project's check gates to surface repository-policy violations *before* doing other work. A relevant red gate blocks completion on its affected surface under CLAUDE.md Universal Operating Rule 4, regardless of which session caused it.
 
-Run **every** `check:*` gate, not a subset. Run each gate and its `:self-test` **sequentially, never in parallel** — the self-tests write synthetic fixtures into paths the main gate scans (CLAUDE.md "Operating rules"). The `&&` below pairs each gate with its self-test so a red gate skips its own self-test but the next gate still runs:
+Run **every** `check:*` gate, not a subset. Run each gate and its `:self-test` **sequentially, never in parallel**, as required by CLAUDE.md Universal Operating Rule 4; some self-tests write synthetic fixtures into paths the main gate or another scanner reads. The `&&` below pairs each gate with its self-test so a red gate skips its own self-test but the next gate still runs:
 ```bash
 npm run check:migrations-manifest                                              # migrations-manifest ↔ on-disk .sql files
-npm run check:factory-ledger                                                   # Factory ledger contract
-npm run check:factory-ledger -- --allow-unreachable                           # Factory ledger schema vs lib/db/ledger-schema-fingerprint.json (prints 'skipped' when no TEST_REQUEST_*LEDGER_URL is set; --allow-unreachable makes a still-unreachable-after-retries managed ledger advisory at session start — a refused URL or schema drift still fails red)
+npm run check:factory-ledger -- --allow-unreachable                           # Factory ledger vs tracked schema; no configured URLs skips, unreachable after retries is advisory at startup, but refused URLs and schema drift stay red
 npm run check:reviewer-reminder-hold && npm run check:reviewer-reminder-hold:self-test # automatic reviewer reminder hold
 npm run check:agent-invariants                                                # local symlinks for CLAUDE/AGENTS and Codex skills
 npm run check:agent-invariants:ci                                             # tracked symlink invariant for CI
@@ -110,7 +109,7 @@ npm run check:model-override-warming && npm run check:model-override-warming:sel
 npm run check:agent-wiki && npm run check:agent-wiki:self-test                 # agent retrieval-layer structure
 npm run check:status-enum-parity && npm run check:status-enum-parity:self-test # producer↔consumer key parity (status/enum/workRemaining vs label/bucket maps)
 npm run check:trust-boundary-guid && npm run check:trust-boundary-guid:self-test # client-supplied id → Dataverse selector must be GUID-validated (also a blocking commit guard)
-npm run check:dataverse-access-layer && npm run check:dataverse-access-layer:self-test # raw DynamicsService access ratchet; line-tolerant allowlist counts
+npm run check:dataverse-access-layer && npm run check:dataverse-access-layer:self-test # LAW gate: raw entity-attributed DynamicsService access is prohibited outside the DAL and explicit scanner exemptions; no allowlist or ratchet
 npm run check:odata-escape && npm run check:odata-escape:self-test            # hand-rolled OData single-quote escapes must route through odata.escape (sequential pairing, same convention as the gates above)
 npm run check:dynamics-context-boundary && npm run check:dynamics-context-boundary:self-test # bypassDynamicsRestrictions import boundary + empty-restrictions withDynamicsContext + script-only-outside-scripts (LAW mode, S333 bypass-strip Stage 3)
 npm run check:route-lifecycle-auth && npm run check:route-lifecycle-auth:self-test # ROUTE_NAMESPACE_LIFECYCLE.guardAppKeys must match each route's real requireAppAccess args (fail-closed)
@@ -136,7 +135,7 @@ npm run check:types                                                            #
 propose the routine audit from `docs/MEMORY_HYGIENE_RUNBOOK.md` §6 (router
 diet §10) as a candidate task.
 
-**If any gate is red:** report it as the FIRST thing in the Step 4 summary, before recapping the previous session. A red gate is a P0 blocker for any new feature work in the affected area (data layer for `check:atlas`, API routes for `check:api-routes`, docs/memory drift for the rest), regardless of which session caused it. Treat fixing it as a candidate first task, not a side-note.
+**If any gate is red:** report it as the FIRST thing in the Step 4 summary, before recapping the previous session. A relevant red gate blocks completion on its affected surface under CLAUDE.md Universal Operating Rule 4, regardless of branch or which session caused it. Treat resolving it as a candidate first task, not a side-note.
 
 ## Step 3: Load Context
 
@@ -148,7 +147,7 @@ Read the following files to get context for this session:
 ## Step 4: Present Summary
 
 After completing the above:
-- **First, report any red CI gate from Step 2** as a P0 blocker — name the gate, what it's complaining about, and propose fixing it before other work.
+- **First, report any red check gate from Step 2** as a P0 blocker — name the gate, what it's complaining about, and propose resolving it before other work.
 - Report git sync status (up to date, pulled N commits, or any issues)
 - Summarize what was accomplished in the previous session
 - List the potential next steps from SESSION_PROMPT.md

@@ -26,15 +26,22 @@ hook, `/start`, or a manual release procedure.
 
 | Location | Current contract |
 |---|---|
-| GitHub Actions | `.github/workflows/test.yml` is authoritative. It runs lint; API-route, Atlas, doc-currency, docs-catalog, migration-manifest, reviewer-reminder incident-hold, agent-invariant, instruction-architecture, memory-router, doc-symbol, build-claim, model-warming, DAL/OData/context/route-service/route-lifecycle, Request Document writer, secret, scaffolding, harness, and type checks; most listed gate self-tests; build; and `test:ci`. |
+| GitHub Actions | `.github/workflows/test.yml` is authoritative. It runs lint; API-route, Atlas, doc-currency, docs-catalog, migration-manifest, reviewer-reminder incident-hold, agent-invariant, instruction-architecture, memory-router, doc-symbol, build-claim, model-warming, DAL/OData/context/route-service/reviewer-engagement-boundary/script-suggestion-writers/route-lifecycle, Request Document writer, secret, scaffolding, harness, and type checks; most listed gate self-tests; build; and `test:ci`. |
 | Blocking commit hooks | `check:docs-catalog` runs for catalog-relevant staged/command paths. `check:status-enum-parity` and `check:trust-boundary-guid` run on every recognized `git commit`. These hooks fail open on hook-internal errors, so `/start` remains their backstop. |
-| Session-stop changed-surface hook | `check:api-routes`, `check:atlas`, `check:migrations-manifest`, `check:prompt-injection-tagging`, `check:agent-wiki`, and `check:fact-consistency` are selected by changed paths. `CLAUDE_STOP_GATE_MODE` defaults to `advisory`; only an explicit `block` value makes failures blocking. |
+| Claude Code Stop hook | `.claude/settings.json` registers `.claude/hooks/session-lifecycle.js`. Its changed-surface checks are `check:api-routes`, `check:atlas`, `check:migrations-manifest`, `check:prompt-injection-tagging`, `check:agent-wiki`, and `check:fact-consistency`, selected by changed paths. `CLAUDE_STOP_GATE_MODE` defaults to `advisory`; only an explicit `block` value makes those gate failures blocking. |
 | Session start / manual | `.claude/skills/start/SKILL.md` owns the broader startup battery. Advisory checks such as the read-only `check:memory-drift` / `check:memory-drift:no-write` aliases and `check:memory-health` do not become blocking merely because they have package scripts. |
 
-Do not describe a check as “in CI,” “blocking,” or “session-stop enforced” from
-its name alone. Verify the applicable workflow or hook. The repository policy
-still requires relevant red gates to be resolved before completion even when a
-particular enforcement layer is advisory.
+Do not describe a check as “in CI,” “blocking,” or “Stop-hook enforced” from
+its name alone. Verify the applicable workflow or hook. The Stop-hook row is
+evidence of Claude Code wiring only; it does not establish that Codex or another
+client runs Claude hooks. With a session ledger present, `session-lifecycle.js`
+blocks newly broken protected symlinks, strict unresolved doc staleness, and
+missing or stale adversarial-review receipts independently of
+`CLAUDE_STOP_GATE_MODE`. If the ledger is missing, the hook returns silently.
+Only changed-surface check failures use the mode. The outer hook error handler
+reports an advisory and fails open. The repository policy still requires
+relevant red gates to be resolved before completion even when a particular
+enforcement layer is advisory.
 
 ## P0 gates
 

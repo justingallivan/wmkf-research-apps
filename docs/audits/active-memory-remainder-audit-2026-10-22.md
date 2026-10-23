@@ -1,5 +1,7 @@
 # Remaining active-memory inventory and repair audit — 2026-10-22
 
+> **Historical audit checkpoint.** The findings, authorization limits and test receipts below describe the earlier documentation-only batch. The later [autonomous cleanup ledger](autonomous-memory-cleanup-2026-10-22.md) owns current repair status, scoped live evidence and remaining actions; runtime repairs there remain local and unreleased. Original findings and historical context are retained below.
+
 **Whole-read inventory complete; all-claim verification AUDIT INCOMPLETE.**
 Sol agents whole-read the remaining 176 active memory leaves in three disjoint
 batches (75 operating/feedback, 55 reviewer/finance, 46 application/strategy).

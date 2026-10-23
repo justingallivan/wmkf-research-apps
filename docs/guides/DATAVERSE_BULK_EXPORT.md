@@ -63,7 +63,7 @@ After **Confirm & run export**, the run streams progress (counting → paging). 
 
 - **Ready** — the Excel file is built and a **Download Excel** button appears. The link is authenticated and short-lived (~1 hour); re-run for a fresh link.
 - **Truncated** — the result hit the 50,000-row cap or the time budget. You will see a loud banner with the true total vs. how many rows were written, and a prompt to narrow by program / year / status / institution. The truncated file is still produced and is clearly labelled as truncated in its Methods sheet.
-- **Failed** — nothing is produced and there is nothing to download. A failure can never present as a short-but-complete file.
+- **Failed** — no usable download is returned. The run route writes the private Blob object before minting the short-lived download token, so a token-mint failure can leave an object without a usable download. The token TTL does not establish Blob-object retention, and no cleanup schedule is claimed here. A failure can never present as a short-but-complete file.
 
 ## The Methods / Provenance sheet
 

@@ -1,5 +1,7 @@
 # Identity, COI, exclusion, referral and provenance audit — 2026-10-22
 
+> **Historical audit checkpoint.** The findings, authorization limits and test receipts below describe the earlier documentation-only batch. The later [autonomous cleanup ledger](autonomous-memory-cleanup-2026-10-22.md) owns current repair status, scoped live evidence and remaining actions; runtime repairs there remain local and unreleased. Original findings and historical context are retained below.
+
 **Bounded source audit; whole-domain verification AUDIT INCOMPLETE.** Sol
 investigated the remaining safety contracts, Luna repaired documentation, and
 the parent checked source branches and diffs. Only documentation changes are

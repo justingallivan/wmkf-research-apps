@@ -19,7 +19,7 @@ related:
 **Status:** MAINTAINED current-state reference (owns the live behavioral guarantees below).
 **Owner:** reviewer-finder.
 **Created:** 2026-06-13 (S253).
-**Last verified:** 2026-08-20 in Ready Production deployment
+**Last deployment evidence:** 2026-08-20 in Ready Production deployment
 `dpl_9yZ9xTHqfNgLcbZxJDekZkAjqpPS` — Contract 3 was
 re-traced through the fresh stored/found choice, exact resolved-bundle replay,
 structural retry, and legacy-alert closeout. Contracts 1–3 were previously
@@ -255,16 +255,17 @@ existing rows.
 
 ---
 
-## 4. Structured-PI identity — person checks plus role-source conflict `[SCOPED SOURCE RECHECK 2026-10-22]`
+## 4. Structured-PI identity — Project Leader-only source selection `[BRANCH SOURCE RECHECK 2026-10-22; DEPLOYMENT UNKNOWN]`
 
 **Owner-attested meaning.** Under the S159 contact-role triad, `wmkf_projectleader` is the
 scientist/PI and `wmkf_researchleader` is the institution's senior research officer, not the PI.
 No approved program-specific exception was found.
 
-**Current person-identity behavior [VERIFIED via source].** `resolveProposalPI` selects
-`projectleader || researchleader` unconditionally (`lib/services/proposal-pi-identity.js:140,148`);
-there is no program/era guard. `tests/unit/proposal-pi-identity.test.js:52-63` explicitly expects
-the fallback. The resolver returns a DTO; discovery and applicant-enrichment callers use it to
+**Current branch source behavior [VERIFIED via source].** `resolveProposalPI` selects only
+`projectleader` (`lib/services/proposal-pi-identity.js`) and returns `no_project_leader` if that
+lookup is absent; it does not select `researchleader` as a fallback. The focused unit fixture
+retains a Research Leader with valid identity metadata and verifies it remains inert. This is a
+source-branch repair, not a deployment or live-behavior verdict. The resolver returns a DTO; discovery and applicant-enrichment callers use it to
 append and deduplicate the selected contact's canonical name in the author-exclusion/coauthor set,
 never replacing existing proposal authors. Those callers fall through to proposal-text identity
 on ordinary resolution failure; abort and time-budget signals propagate. Save has a distinct
@@ -274,10 +275,10 @@ The callers identity-exclude exact ORCID/OpenAlex matches only for `confirmed`/`
 evidence. The name guard compares available forename and surname values and abstains on
 contradiction or when it cannot safely check; ORCID-registry corroboration is best-effort, not a
 required runtime precondition. These checks validate person identity, not the selected contact's
-role. The unconditional fallback is therefore a known conflict with the owner meaning, not a
-role-safe PI guarantee. The June 2026 Dataverse/ORCID probes are sample evidence only; they do
-not establish all-program semantics or the affected live population, which remains UNKNOWN. No
-runtime fix or current live-state probe is recorded here. Detailed evidence and known consumers
+role. Project Leader-only selection follows the owner-attested role meaning, but source alone does
+not establish production deployment. The June 2026 Dataverse/ORCID probes are sample evidence
+only; they do not establish all-program semantics or the affected live population/impact, which
+remain UNKNOWN. No current live-state probe is recorded here. Detailed evidence and known consumers
 are tracked in `docs/audits/pi-identity-request-mutation-audit-2026-10-22.md`.
 
 **Scope/consumer caveat.** The helper remains server-resolved from the request GUID and uses the

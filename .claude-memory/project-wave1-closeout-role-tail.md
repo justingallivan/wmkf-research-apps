@@ -7,7 +7,7 @@ metadata:
   originSessionId: e2f71cb4-b29c-4510-b8fe-1da4a49ec6ee
   status: active
   scope: dataverse
-  last_verified: 2026-07-12 — Wave1 tables-dropped stands; role tail RE-PROBED (elevations attached) and RESOLVED by owner decision the same day: elevations intentionally retained for the rest of the project
+  last_verified: 2026-10-22 — bounded artifact records direct role assignments only; it does not establish effective privileges, team roles, org authorization, or current Wave 1 table state
 ---
 
 ## Recall Rule
@@ -40,7 +40,8 @@ Wave 1 closed out cleanly on **2026-05-12**.
 **Role tail RESOLVED by owner decision (2026-07-12): elevations stay.**
 
 - **Owner decision 2026-07-12 (Justin, in-session):** the temp elevations are needed for the rest of the project and are intentionally retained. Any eventual revert is Justin's conversation with Connor, handled outside agent sessions. Do not re-surface this as an open item.
-- **RE-PROBED 2026-07-12** (`scripts/probe-app-user-roles.js`): app user `systemuserid 53e97fb3-a006-f111-8406-000d3a352682` has BOTH elevations — `WMKF AI Elevated TEMP` + `System Customizer` — attached. Full current role set: `Delegate`, `System Customizer`, `WMKF AI Elevated TEMP`, `WMKF AI Tools`, `WMKF Custom Entities`, `WMKF Research Review App Suite - Staff`, `akoyaGO Team User (no accounting)`.
+- **Role observation from 2026-07-12** (`scripts/probe-app-user-roles.js`): app user `systemuserid 53e97fb3-a006-f111-8406-000d3a352682` had BOTH elevations — `WMKF AI Elevated TEMP` + `System Customizer` — attached. The seven-role list observed then was `Delegate`, `System Customizer`, `WMKF AI Elevated TEMP`, `WMKF AI Tools`, `WMKF Custom Entities`, `WMKF Research Review App Suite - Staff`, `akoyaGO Team User (no accounting)`; it is a dated observation, not a current role inventory.
+- **Bounded re-observation 2026-10-22:** the read-only evidence artifact `docs/audits/memory-live-state-evidence-2026-10-22.json` again lists `WMKF AI Elevated TEMP` and `System Customizer` among eight direct role assignments. The artifact does not establish effective privileges, team roles, or organizational authorization. This evidence does not reopen or alter the owner decision to retain the elevations.
 - **Naming clarification (probe-verified 2026-07-12):** `# WMK: Research Review App Suite` is the app USER's display name (systemuser `fullname`, created 2026-02-10 — confirmed via read-only systemusers GET). The suite security ROLE has been named `WMKF Research Review App Suite - Staff` since its creation on 2026-04-24 (role record createdon 2026-04-24T18:32Z, modifiedon 18:58Z same day; no role with the old string exists). Earlier memories that said "the `# WMK: Research Review App Suite` role" were conflating the user name with the role name — there was no tenant-side rename.
 - **Why elevations were kept** (Justin's original policy call 2026-05-11, superseded by the 2026-07-12 decision above): active entity/field creation under Connor's delegated authority (`project_dataverse_creator_privileges`, summary-after model) makes revert-and-re-add churn worse than the marginal security gain.
 

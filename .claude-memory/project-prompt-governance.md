@@ -4,15 +4,17 @@ description: Tier-1 system prompts (Dataverse wmkf_ai_prompts, versioned, create
 type: project
 status: active
 scope: prompts
-last_verified: 2026-08-18 publication/deployment snapshot; current live prompt version and generation-smoke status are unknown
+last_verified: 2026-10-22 source and bounded metadata reconciliation; prompt bodies/execution and deployment state not inspected
 ---
 
-**Dated live-state snapshot:** The publication and deployment observations below were
-verified on 2026-08-18. They do not establish the current live prompt version, prompt
-body/schema, or smoke status. Establish a named, authorized read-only evidence
-plan before re-reading live rows or deployment state; this memory does not
-authorize a production probe. The owner-confirmed create-only/versioning governance below
-remains the durable policy.
+**Dated evidence boundaries:** Publication/deployment observations below were verified on
+2026-08-18. The read-only evidence artifact
+`docs/audits/memory-live-state-evidence-2026-10-22.json` contains metadata for 39 distinct
+prompt names with current rows (`wmkf_ai_iscurrent=true`) from a complete metadata query. The
+lookup does not independently filter prompt status. It does not include prompt contents or prove
+execution, and is not a deployment smoke test. Link to that dated artifact rather than
+creating a mutable prompt inventory. The owner-confirmed create-only/versioning governance below
+remains durable policy; individual legacy upsert seeds remain separate exceptions.
 
 ## Recall Rule
 
@@ -54,7 +56,8 @@ Read this before adding a new prompt, writing/editing a seed script, or touching
 **Pre-Site resilience boundary recorded 2026-08-18:** that review reported
 pre-side-effect validation of body, variables, schema and assertions, full
 publication readback, and sole-current v4 matching the then-tracked schema.
-Current prompt contents, version, and smoke status remain UNKNOWN.
+The 2026-10-22 metadata artifact includes a current-row version number for each
+returned prompt name, but it does not establish prompt contents or smoke status.
 
 **Admin model/schema publication (observed 2026-08-18; current live status unknown):** the Prompt Templates editor
 can select `wmkf_ai_model` and edit the validated output-schema JSON; either

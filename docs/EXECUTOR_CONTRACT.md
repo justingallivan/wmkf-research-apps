@@ -68,7 +68,7 @@ The contract covers **Pattern A + dual-caller prompts and Pattern B/C Vercel-onl
 
 | Name | Type | Required | Purpose |
 |---|---|---|---|
-| `promptName` | string | yes | Matches `wmkf_ai_prompt.wmkf_ai_promptname`. Executor picks the current published version (`wmkf_ai_iscurrent = true`). |
+| `promptName` | string | yes | Matches `wmkf_ai_prompt.wmkf_ai_promptname`. Executor requires the sole row with `wmkf_ai_iscurrent = true` for that name; the lookup filters on name and current flag and errors if zero or multiple rows match. It does not independently filter `wmkf_ai_promptstatus`, so runtime selection relies on the publisher's current-row lifecycle. |
 | `requestId` | GUID | conditional | `akoya_request` row GUID. Required for prompts that declare any `dynamics:akoya_request.*` or `sharepoint` source variables. Optional for all-`override` prompts (Pattern B/C). |
 | `overrideVariables` | object | no | Per-invocation variable overrides. Keys must match names declared in `wmkf_ai_promptvariables`. Used for user-session overrides (Vercel) and test harness runs. |
 | `runSource` | enum | yes | One of the `wmkf_ai_runsource` picklist values (e.g., `PowerAutomate Auto`, `Vercel Interactive`, `Vercel User`, `Vercel Test`). Caller supplies. |

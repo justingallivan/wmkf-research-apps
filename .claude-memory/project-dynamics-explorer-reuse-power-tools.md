@@ -5,7 +5,7 @@ metadata:
   type: project
   status: active
   scope: dynamics
-  last_verified: 2026-07-02 against repository source/docs, not live Dataverse
+  last_verified: 2026-10-22 against repository source; no live Explorer probe
 ---
 
 # Dynamics Explorer Reuse / Power Tools
@@ -17,7 +17,7 @@ Read this when changing Dynamics Explorer schema discovery, OData validation, co
 ## Do
 
 - Treat the Path A Explorer reliability work as implemented in source and extend it rather than rebuilding parallel behavior.
-- Verify current behavior in `lib/services/dynamics-explorer-taxonomy.js`, `lib/services/dynamics-odata-validator.js`, `lib/services/dynamics-service.js`, `pages/api/dynamics-explorer/chat.js`, and the related tests before making claims.
+- Verify current behavior across `pages/api/dynamics-explorer/chat.js`, `lib/services/dynamics-explorer/chat-session.js`, `lib/services/dynamics-explorer/tool-errors.js`, `lib/services/dynamics-explorer/tool-executor.js`, `lib/services/dynamics-odata-validator.js`, `lib/services/dynamics-explorer-taxonomy.js`, and `lib/services/dynamics-service.js`; the route delegates chat-session coordination and tool handling to the session and tool modules.
 - Reuse Power Tools assets where they fit, especially taxonomy/constants and FetchXML export helpers. Confirm the caller has the same query shape before reusing a helper.
 - Preserve restriction guards at the Explorer injection boundary because lower-level taxonomy and FetchXML helpers can bypass `checkRestriction`.
 - Keep operational log tables such as `wmkf_ai_run` out of Explorer user-facing schema/query paths unless source/docs deliberately change that policy.
@@ -32,16 +32,20 @@ Read this when changing Dynamics Explorer schema discovery, OData validation, co
 
 ## Current Source-Backed Guardrails
 
-- [VERIFIED via repo source 2026-07-02] `pages/api/dynamics-explorer/chat.js` imports `buildResolvedTaxonomyPromptBlock` and `validateODataCall`, and `count_records` calls `DynamicsService.countRecords`.
+- [VERIFIED via repo source 2026-10-22] Explorer is a session/tool pipeline: the route/session code handles chat-session state, the tool-errors module validates tool calls, and the tool-executor dispatches tools. Keep those responsibilities distinct when tracing errors or describing architecture.
+- [VERIFIED via repo source 2026-10-22] `count_records` calls `DynamicsService.countRecords`; verify its exact current count implementation before reusing or describing it.
 - [VERIFIED via repo source 2026-07-02] `DynamicsService.countRecords` uses `$apply=...countdistinct` on the primary key instead of Dataverse `/$count`.
 - [VERIFIED via repo source 2026-07-02] `buildResolvedTaxonomyPromptBlock` filters taxonomy sources against active table-level restrictions before injection.
-- [VERIFIED via repo source/tests 2026-07-02] Explorer denies direct `wmkf_ai_run` schema access and strips `wmkf_ai_run` Dataverse Search hits before returning tool results.
+- [VERIFIED via repo source 2026-07-02] Explorer denies direct `wmkf_ai_run` schema access and strips `wmkf_ai_run` Dataverse Search hits before returning tool results. This is a source fact, not a claim about external callers or runtime traffic.
 
 ## Ground Truth
 
 - `docs/DYNAMICS_EXPLORER_PATH_A_PLAN.md`
 - `docs/DYNAMICS_EXPLORER_ODATA_VALIDATOR_DESIGN.md`
 - `pages/api/dynamics-explorer/chat.js`
+- `lib/services/dynamics-explorer/chat-session.js`
+- `lib/services/dynamics-explorer/tool-errors.js`
+- `lib/services/dynamics-explorer/tool-executor.js`
 - `shared/config/prompts/dynamics-explorer.js`
 - `lib/services/dynamics-explorer-taxonomy.js`
 - `lib/services/dynamics-odata-validator.js`
