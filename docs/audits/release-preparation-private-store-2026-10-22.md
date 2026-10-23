@@ -3,7 +3,7 @@ title: Private Store and Release Preparation Receipt
 domain: engineering-process
 kind: audit
 status: active
-summary: "Fully gated candidate 81b8a063b passed its recorded isolated checks; fixture candidate 9b2ec0060 passed a later 51-test browser run while the 5b1656b3dfad110fb5d23fc4fa2514d573e6a638 staff observations remain partial."
+summary: "Assessed code candidate eaa126028 is a docs-only descendant of fixture candidate 9b2ec0060; four release gates remain, while private-store binding is separate unless it becomes a release dependency."
 canonical: false
 cataloged: 2026-10-22
 last_verified: 2026-10-22
@@ -13,6 +13,8 @@ related:
   - docs/REVIEWER_E2E_REHEARSAL_RUNBOOK.md
   - docs/audits/internal-staff-rehearsal-observations-2026-10-22.md
   - docs/audits/historical-impact-concurrency-followup-2026-10-22.md
+  - docs/audits/release-candidate-checklist-2026-10-22.md
+  - docs/audits/release-candidate-lineage-2026-10-22.json
   - docs/audits/blob-store-binding-evidence-2026-10-22.json
   - docs/audits/blob-retention-metadata-evidence-2026-10-22.json
 ---
@@ -20,8 +22,8 @@ related:
 # Private Store and Release Preparation Receipt
 
 **Assessment date:** 2026-10-22 (America/Los_Angeles); rehearsal update 2026-10-22 (America/Los_Angeles).
-**Status:** Fully gated candidate `81b8a063b` passed its recorded isolated Node 22/macOS checks: Turbopack build, browser suite, ESLint, 42 npm check gates, Jest coverage run, and selected PostgreSQL integration suites. Later fixture candidate `9b2ec0060` passed its scoped isolated build, 51-test browser suite, focused unit suites, scoped ESLint, and diff check. The guided human session remains the partial observation on candidate `5b1656b3dfad110fb5d23fc4fa2514d573e6a638`; the full human rehearsal, Ubuntu CI, hosted verification, release authorization, and private-store binding remain incomplete. External first-time reviewer usability remains unverified and is not an external-recruitment prerequisite under current owner direction.
-**Fully gated candidate:** `81b8a063b`; **latest fixture candidate:** `9b2ec0060`; **human observation candidate:** `5b1656b3dfad110fb5d23fc4fa2514d573e6a638`; application runtime checkpoint `4720980ed`. Earlier release evidence below includes candidate `c589cbb6e` (`codex/memory-audit-followups`) and remains scoped to that candidate.
+**Status:** Fully gated candidate `81b8a063b` passed its recorded isolated Node 22/macOS checks: Turbopack build, browser suite, ESLint, 42 npm check gates, Jest coverage run, and selected PostgreSQL integration suites. Fixture candidate `9b2ec0060` passed its scoped build, 51-test browser suite, focused unit suites, scoped ESLint, diff check, and two headless CLI smoke runs. The assessed code candidate `eaa126028d7918c94340e75f1ea3213ad041f010` is a four-document descendant of `9b2ec0060`, with unchanged code/test and runtime/dependency trees; the `9b` scoped results therefore apply to the same code and test bytes through `eaa`. The reviewed comparison is recorded in [lineage evidence](release-candidate-lineage-2026-10-22.json). The guided human session remains the partial observation on candidate `5b1656b3dfad110fb5d23fc4fa2514d573e6a638`. Four release-decision groups remain open as listed in the [release-candidate checklist](release-candidate-checklist-2026-10-22.md): Linux CI, disposition of internal staff/reviewer-role outcomes, authorized hosted-target and rollback verification, and the final owner promotion decision with strategy §12 operating controls. External first-time reviewer usability remains unverified and is not an external-recruitment prerequisite under current owner direction. Private-store binding remains unknown as a separate investigation; no release dependency has been established.
+**Fully gated candidate:** `81b8a063b`; **latest code/test candidate:** `9b2ec0060`; **assessed code candidate:** `eaa126028d7918c94340e75f1ea3213ad041f010`; **human observation candidate:** `5b1656b3dfad110fb5d23fc4fa2514d573e6a638`; application runtime checkpoint `4720980ed`. Earlier release evidence below includes candidate `c589cbb6e` (`codex/memory-audit-followups`) and remains scoped to that candidate.
 
 This receipt records the evidence available for the local release candidate and
 the private Dataverse-export Blob store question. It does not authorize or record
@@ -30,8 +32,11 @@ Evidence from earlier audits remains historical where indicated; it is linked
 rather than recast as a result of this assessment.
 
 In this receipt, “fully gated” refers only to the recorded local automated
-checks. Human rehearsal, Ubuntu CI, hosted verification, private-store binding,
-and release authorization remain separate and incomplete.
+checks. The `81b8a063b` results do not transfer to changed harness/test files in
+later candidates. The `9b2ec0060` scoped test results apply through
+`eaa126028d7918c94340e75f1ea3213ad041f010` because the intervening source-lineage
+comparison found only four documentation changes. Human rehearsal, Ubuntu CI,
+hosted verification, and release authorization remain separate and incomplete.
 
 ## Later fixture candidate `9b2ec0060`
 
@@ -62,8 +67,11 @@ These are automation results and do not change the partial 5b human observations
 `humanScenarioPassRecorded: false`. Both owned temporary workspaces were removed
 and the launcher exited 0. These smoke receipts establish navigation and cleanup,
 not scenario completion; the 51-test browser suite supplies the scenario evidence.
-The documentation follow-up passed 24 sequential documentation/safety gates and
-self-tests. No runtime code, environment, deployment, or live system changed.
+The preceding documentation follow-up passed 24 sequential documentation/safety
+gates and self-tests. The consolidated receipt, checklist, and lineage evidence
+also passed a fresh run of those 24 gates; its retained log is
+`/private/tmp/wmkf-final-candidate-doc-gates.log`. No runtime code, environment,
+deployment, or live system changed.
 
 Private evidence retained on this host:
 
@@ -352,8 +360,8 @@ does not reverse data or email effects.
 | 42 npm check gates and available self-tests | Fully gated candidate passed sequentially | Exact set listed in `.github/workflows/test.yml`, including configured types. |
 | Package prebuild | Fully gated candidate passed separately | Reviewer-reminder hold and migration-manifest generation passed; generated manifest bytes matched `81b8a063b`. |
 | Prior Node 22 verification | Complete on prior candidate `c589cbb6e` | Build, configured types, full Jest (1,431 suites / 24,751 tests), and its browser checks passed. |
-| Private-store binding | Unknown | Requires a separately authorized credential-bearing context; metadata alone is insufficient. |
-| Private object inventory | Not run | Keep within the existing bounded authorization and prepared fixed-prefix safeguards. |
+| Private-store binding | Unknown; separate investigation | Requires a separately authorized credential-bearing context; metadata alone is insufficient. Not a release blocker without an established campaign-release dependency. |
+| Private object inventory | Not run; separate investigation | Keep within the existing bounded authorization and prepared fixed-prefix safeguards. Not required for release absent an established dependency. |
 | Internal staff rehearsal | Partial guided local-mock baseline on `5b1656b3dfad110fb5d23fc4fa2514d573e6a638` | In that historical 5b session, invitation preview/mock send, portal acknowledgement/acceptance/reload, and materials mock release UI were observed; assistant-driven campaign save and withdrawal readback were unverified/inconsistent. Assistant also exercised authoring UI, but it is not a human observation. Candidate `9b2ec0060` later passed all nine declared fixture scenarios automatically and repaired the campaign and withdrawal fixture readback; no new participant observation was made. See [observation record](internal-staff-rehearsal-observations-2026-10-22.md). No real email or live write; external usability remains unverified. |
 | External first-time reviewer usability | Unverified | No external recruitment prerequisite under current owner direction; retain the usability evidence gap. |
 | Release owner decision | Pending | Decide only after candidate checks, target evidence, and internal staff rehearsal evidence are concrete. |
@@ -367,12 +375,15 @@ rehearsal, full ESLint, full Jest coverage run, selected PostgreSQL integration
 suites, 42 listed npm check gates, package prebuild, and configured types on
 isolated Node 22/macOS. Coverage thresholds are disabled in the Jest
 configuration, so the coverage run does not certify threshold values. This is
-not a release approval: Ubuntu CI verification, completion of the internal
-staff rehearsal, hosted verification, private-store binding, and the applicable
-owner release decision remain outstanding. External first-time reviewer usability is
-unverified and is not an external-recruitment prerequisite under current owner
-direction.
-The private-store question remains a separate evidence
-item: do not mark its identity or contents verified until an authorized probe
-measures the intended private target. Any resulting live object or retention
-action requires its own explicit scope and receipt.
+not a release approval. The concrete remaining gates are listed in the
+[release-candidate checklist](release-candidate-checklist-2026-10-22.md): Linux
+CI, disposition of internal staff and reviewer-role outcomes, authorized hosted
+target/rollback verification, and the release owner's promotion decision.
+External first-time reviewer usability is unverified and is not an
+external-recruitment prerequisite under current owner direction.
+
+Private-store identity and contents remain a separate evidence item. Do not mark
+them verified until an authorized probe measures the intended private target.
+This question is not a release blocker without an established dependency on the
+private store. Any future live object or retention action requires its own
+explicit scope and receipt.

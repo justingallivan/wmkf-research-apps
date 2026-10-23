@@ -1,0 +1,84 @@
+{
+  "format": "release-candidate-lineage-v1",
+  "refs": {
+    "assessedCandidate": "eaa126028d7918c94340e75f1ea3213ad041f010",
+    "fixtureCandidate": "9b2ec0060cc90d060ac28c49a5e0f97af9ca1e64",
+    "priorFullCheckCandidate": "81b8a063bd8528a8b0080469cfdbd593f84115fd",
+    "runtimeCheckpoint": "4720980edb6b2c769907e54102e27779c3f567e0"
+  },
+  "fixtureToCandidateChangedPaths": [
+    "docs/REVIEWER_E2E_REHEARSAL_RUNBOOK.md",
+    "docs/audits/controlled-reviewer-rehearsal-plan-2026-10-22.md",
+    "docs/audits/internal-staff-rehearsal-observations-2026-10-22.md",
+    "docs/audits/release-preparation-private-store-2026-10-22.md"
+  ],
+  "fullCheckToCandidateChangedPaths": [
+    "docs/CAMPAIGN_RELEASE_AND_DATAVERSE_TEST_STRATEGY.md",
+    "docs/DOCS_CATALOG.md",
+    "docs/REVIEWER_E2E_REHEARSAL_RUNBOOK.md",
+    "docs/audits/controlled-reviewer-rehearsal-plan-2026-10-22.md",
+    "docs/audits/internal-staff-rehearsal-observations-2026-10-22.md",
+    "docs/audits/release-preparation-private-store-2026-10-22.md",
+    "scripts/lib/reviewer-rehearsal-fixtures.cjs",
+    "scripts/lib/reviewer-rehearsal-launcher.cjs",
+    "scripts/rehearse-pd-invite-browser.mjs",
+    "tests/e2e/reviewer-rehearsal-edges.spec.js",
+    "tests/e2e/reviewer-rehearsal-native-dialog.spec.js",
+    "tests/unit/reviewer-rehearsal-fixtures.test.js",
+    "tests/unit/reviewer-rehearsal-launcher.test.js"
+  ],
+  "runtimeContractTreeHashes": {
+    "lib": {
+      "assessedCandidate": "8e6d77f95dbfa3fec72cb5cfc4ba72928e47c6a5",
+      "fixtureCandidate": "8e6d77f95dbfa3fec72cb5cfc4ba72928e47c6a5",
+      "priorFullCheckCandidate": "8e6d77f95dbfa3fec72cb5cfc4ba72928e47c6a5",
+      "runtimeCheckpoint": "8e6d77f95dbfa3fec72cb5cfc4ba72928e47c6a5"
+    },
+    "pages": {
+      "assessedCandidate": "06367f877f02247996c89f37a5cd13f444b0896a",
+      "fixtureCandidate": "06367f877f02247996c89f37a5cd13f444b0896a",
+      "priorFullCheckCandidate": "06367f877f02247996c89f37a5cd13f444b0896a",
+      "runtimeCheckpoint": "06367f877f02247996c89f37a5cd13f444b0896a"
+    },
+    "shared": {
+      "assessedCandidate": "fe90d3710ffc2ff2358899ebbff61e3d66b59524",
+      "fixtureCandidate": "fe90d3710ffc2ff2358899ebbff61e3d66b59524",
+      "priorFullCheckCandidate": "fe90d3710ffc2ff2358899ebbff61e3d66b59524",
+      "runtimeCheckpoint": "fe90d3710ffc2ff2358899ebbff61e3d66b59524"
+    },
+    "package.json": {
+      "assessedCandidate": "f6e8a409b2490a7ca25617b7d97bdeb6b36ffbbd",
+      "fixtureCandidate": "f6e8a409b2490a7ca25617b7d97bdeb6b36ffbbd",
+      "priorFullCheckCandidate": "f6e8a409b2490a7ca25617b7d97bdeb6b36ffbbd",
+      "runtimeCheckpoint": "f6e8a409b2490a7ca25617b7d97bdeb6b36ffbbd"
+    },
+    "package-lock.json": {
+      "assessedCandidate": "4207ba99dcdbf99d962c34f4ae916f573c8eb46d",
+      "fixtureCandidate": "4207ba99dcdbf99d962c34f4ae916f573c8eb46d",
+      "priorFullCheckCandidate": "4207ba99dcdbf99d962c34f4ae916f573c8eb46d",
+      "runtimeCheckpoint": "4207ba99dcdbf99d962c34f4ae916f573c8eb46d"
+    },
+    "next.config.js": {
+      "assessedCandidate": "e3d91178cbe8495cfcad3e165c8040646bd132a1",
+      "fixtureCandidate": "e3d91178cbe8495cfcad3e165c8040646bd132a1",
+      "priorFullCheckCandidate": "e3d91178cbe8495cfcad3e165c8040646bd132a1",
+      "runtimeCheckpoint": "e3d91178cbe8495cfcad3e165c8040646bd132a1"
+    },
+    ".github": {
+      "assessedCandidate": "d9b2198d95be7bbbac30aff157e023a605c93dbb",
+      "fixtureCandidate": "d9b2198d95be7bbbac30aff157e023a605c93dbb",
+      "priorFullCheckCandidate": "d9b2198d95be7bbbac30aff157e023a605c93dbb",
+      "runtimeCheckpoint": "d9b2198d95be7bbbac30aff157e023a605c93dbb"
+    }
+  },
+  "limits": [
+    "Git evidence only; no hosted/external-state probe",
+    "Historical test execution is not recast as an exact-HEAD full-CI run"
+  ],
+  "commitTreeHashes": {
+    "assessedCandidate": "6d37acb69547408d57b491e60db0c4725fd12677",
+    "fixtureCandidate": "3ef6db5491bcccafb26f8fa511d08ed35e836262",
+    "priorFullCheckCandidate": "eb987b7e4e12181023604a9effe41adb31900a9d",
+    "runtimeCheckpoint": "543a5448d9cd3d7fdbea73f151f531b3565e8bc6"
+  }
+}
