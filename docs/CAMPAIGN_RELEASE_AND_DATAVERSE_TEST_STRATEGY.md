@@ -257,24 +257,34 @@ controls. A Dataverse interlock alone does not make a flow harmless.
 
 ## 7. Capture Mode Is an Email Control, Not a Sandbox
 
-**[CURRENT — verified from source 2026-07-30]**
+**[CURRENT — verified from source 2026-10-22]**
 
 - `REVIEWER_EMAIL_DELIVERY_MODE=capture` is refused when `VERCEL_ENV=production`.
-- It returns a rendered artifact instead of creating/sending a Dynamics email.
-- The send service performs no contact promotion or ORCID back-propagation in
-  capture or live mode. Those writes occur later on identity-bearing acceptance.
-- Rendering a template that contains an external-review link calls
-  `mintAndStore()` and persists a fresh token hash/expiry on the reviewer suggestion.
-- A captured invitation send with `markAsSent=true` still stamps the invitation
-  lifecycle fields.
+- A draft render builds its external-review link with
+  `buildSendTimeExternalUrlPlaceholder()`. This is a non-live placeholder; draft
+  rendering does not mint or persist a reviewer token.
+- For a reviewer-linked invitation, the send service mints and persists the
+  external-review token at send time before delivery. Capture mode returns the
+  rendered email artifact instead of dispatching a Dynamics email, but does not
+  skip that token write.
+- A captured invitation send still stamps invitation lifecycle fields when
+  `markAsSent=true` (the service default).
+- The send service does not promote contacts or back-propagate ORCID values during
+  capture or live sends. Those writes occur later on identity-bearing acceptance.
+
+Historical note: an earlier verification dated 2026-07-30 described token minting
+during draft rendering. That behavior is no longer current; token minting now
+happens at send time, while draft rendering uses the placeholder described above.
 
 Therefore:
 
 - Browser route mocks are the side-effect-free rehearsal path.
-- Local/preview capture against live APIs is a **controlled-write rehearsal**.
+- Local/preview capture against live APIs is a **controlled-write rehearsal**:
+  sending an invitation can persist a token and invitation lifecycle fields even
+  though no Dynamics email is dispatched.
 - Capture against production Dataverse uses Mode D test records only.
-- A future true dry-run must explicitly suppress or redirect token and lifecycle
-  writes; changing email delivery alone is insufficient.
+- A true dry-run must explicitly suppress or redirect token and lifecycle writes;
+  changing email delivery alone is insufficient.
 
 The concrete reviewer commands and cleanup procedure remain in
 `docs/REVIEWER_E2E_REHEARSAL_RUNBOOK.md`.

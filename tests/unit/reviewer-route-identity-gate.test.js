@@ -1,15 +1,14 @@
 /**
  * @jest-environment node
  *
- * Phase 2 post-impl (Codex round-2 MUST-FIX): the two ROUTE-OWNED write paths —
- * /api/reviewer-finder/save-candidates and /api/workbench/enrich-recommended —
- * each gate identity-bearing persistence on the resolver verdict and CLEAR stale
- * resolver-sourced fields on a below-`probable` downgrade. The email-keyed
+ * Phase 2 route contract: /api/reviewer-finder/save-candidates and
+ * /api/workbench/enrich-recommended gate identity-bearing persistence on the
+ * resolver verdict and pass automated decisions through the guarded person
+ * upsert. The email-keyed
  * saveToDatabase side path was already covered (save-to-database-identity-gate);
- * these two route handlers had no coverage for the downgrade branch, and a silent
- * regression would leave a wrong/stale ORCID/Scholar on the wmkf_potentialreviewer
- * person row (data-quality corruption). These tests drive each handler and assert
- * the block-and-clear behavior against mocked adapters.
+ * these route handlers need coverage to ensure a below-probable verdict cannot
+ * overwrite a stronger stored identity. These tests drive each handler and
+ * assert the block and guarded-upsert contract against mocked adapters.
  */
 
 // ── shared adapter / infra mocks ──────────────────────────────────────────────
@@ -132,7 +131,6 @@ const rosterStore = require('../../lib/services/reviewer-roster-store');
 const { verifyAutomatedIdentityAttestation } = require('../../lib/services/reviewer-candidate-attestation');
 const { lookupReviewerIdentity } = require('../../lib/services/reviewer-identity-lookup');
 const NotificationService = require('../../lib/services/notification-service').default;
-const { RESOLVER_SOURCED_FIELDS } = require('../../lib/services/reviewer-identity-resolver');
 
 function mockRes() {
   const res = {};
@@ -166,7 +164,7 @@ const readyCandidate = (name, email, extra = {}) => ({
 });
 
 // ── /api/reviewer-finder/save-candidates ──────────────────────────────────────
-describe('save-candidates route — identity gate + clear-on-downgrade', () => {
+describe('save-candidates route — identity gate + guarded decision upsert', () => {
   let handler;
   beforeAll(() => { handler = require('../../pages/api/reviewer-finder/save-candidates').default; });
   beforeEach(() => {
@@ -195,7 +193,7 @@ describe('save-candidates route — identity gate + clear-on-downgrade', () => {
     return handler(req, res).then(() => res);
   };
 
-  test('unresolved verdict → ORCID/Scholar nulled, decision written, stale fields CLEARED', async () => {
+  test('unresolved verdict → ORCID/Scholar nulled and decision passed to guarded upsert', async () => {
     await run({ status: 'unresolved' });
     const payload = researcherAdapter.upsertByPotentialReviewer.mock.calls[0][1];
     expect(payload.orcid).toBeNull();
@@ -204,17 +202,29 @@ describe('save-candidates route — identity gate + clear-on-downgrade', () => {
     expect(payload.googleScholarUrl).toBeNull();
     expect(payload.hIndex).toBeNull();
     expect(payload.totalCitations).toBeNull();
-    expect(researcherAdapter.writeIdentityDecision).toHaveBeenCalledWith('PID-1', expect.objectContaining({ status: 'unresolved' }), expect.objectContaining({ identityOrigin: 'automated' }));
-    expect(researcherAdapter.clearIdentityFields).toHaveBeenCalledWith('PID-1', RESOLVER_SOURCED_FIELDS, expect.objectContaining({ identityOrigin: 'automated' }));
+    expect(researcherAdapter.upsertByPotentialReviewer.mock.calls[0][2]).toEqual(expect.objectContaining({
+      automatedIdentityDecision: expect.objectContaining({
+        decision: expect.objectContaining({ status: 'unresolved' }),
+        persistDecision: true,
+      }),
+    }));
+    expect(researcherAdapter.writeIdentityDecision).not.toHaveBeenCalled();
+    expect(researcherAdapter.clearIdentityFields).not.toHaveBeenCalled();
   });
 
-  test('probable verdict → ORCID/Scholar persisted, NO clear', async () => {
+  test('probable verdict → ORCID/Scholar and decision passed to guarded upsert', async () => {
     await run({ status: 'probable' });
     const payload = researcherAdapter.upsertByPotentialReviewer.mock.calls[0][1];
     expect(payload.orcid).toBe('0000-0001');
     expect(payload.googleScholarId).toBe('ABC');
     expect(payload.hIndex).toBe(40);
-    expect(researcherAdapter.writeIdentityDecision).toHaveBeenCalledWith('PID-1', expect.objectContaining({ status: 'probable' }), expect.objectContaining({ identityOrigin: 'automated' }));
+    expect(researcherAdapter.upsertByPotentialReviewer.mock.calls[0][2]).toEqual(expect.objectContaining({
+      automatedIdentityDecision: expect.objectContaining({
+        decision: expect.objectContaining({ status: 'probable' }),
+        persistDecision: true,
+      }),
+    }));
+    expect(researcherAdapter.writeIdentityDecision).not.toHaveBeenCalled();
     expect(researcherAdapter.clearIdentityFields).not.toHaveBeenCalled();
   });
 
@@ -240,6 +250,9 @@ describe('save-candidates route — identity gate + clear-on-downgrade', () => {
     const payload = researcherAdapter.upsertByPotentialReviewer.mock.calls[0][1];
     expect(payload.orcid).toBe('0000-0001');
     expect(payload.hIndex).toBe(40);
+    expect(researcherAdapter.upsertByPotentialReviewer.mock.calls[0][2]).toEqual(expect.objectContaining({
+      automatedIdentityDecision: expect.objectContaining({ decision: null, persistDecision: false }),
+    }));
     expect(researcherAdapter.writeIdentityDecision).not.toHaveBeenCalled();
     expect(researcherAdapter.clearIdentityFields).not.toHaveBeenCalled();
   });
@@ -818,7 +831,7 @@ describe('save-candidates route — identity gate + clear-on-downgrade', () => {
     expect(potentialReviewerAdapter.upsertByEmail).not.toHaveBeenCalled();
   });
 
-  test('client confirmed status without a valid server receipt cannot persist automated identity fields', async () => {
+  test('client confirmed status without a valid server receipt is not authorized by the guarded upsert', async () => {
     verifyAutomatedIdentityAttestation.mockResolvedValueOnce({ valid: false, reason: 'no_token' });
     const res = await run({ status: 'confirmed' });
     expect(res.statusCode).toBe(200);
@@ -826,8 +839,11 @@ describe('save-candidates route — identity gate + clear-on-downgrade', () => {
     expect(payload.orcid).toBeNull();
     expect(payload.googleScholarId).toBeNull();
     expect(payload.hIndex).toBeNull();
+    expect(researcherAdapter.upsertByPotentialReviewer.mock.calls[0][2]).toEqual(expect.objectContaining({
+      automatedIdentityDecision: expect.objectContaining({ decision: null, persistDecision: false }),
+    }));
     expect(researcherAdapter.writeIdentityDecision).not.toHaveBeenCalled();
-    expect(researcherAdapter.clearIdentityFields).toHaveBeenCalled();
+    expect(researcherAdapter.clearIdentityFields).not.toHaveBeenCalled();
   });
 
   test('explicit contact persist flags false → promotion is withheld before person writes', async () => {
@@ -1239,12 +1255,18 @@ describe('enrich-recommended route — applicant identity gate', () => {
     });
   });
 
-  test('probable verdict → ORCID/Scholar persisted, decision written, NO clear', async () => {
+  test('probable verdict → ORCID/Scholar and decision passed to guarded upsert', async () => {
     await run({ status: 'probable' });
     const payload = researcherAdapter.upsertByPotentialReviewer.mock.calls[0][1];
     expect(payload.orcid).toBe('0000-0001');
     expect(payload.hIndex).toBe(40);
-    expect(researcherAdapter.writeIdentityDecision).toHaveBeenCalledWith('PID-1', expect.objectContaining({ status: 'probable' }), expect.objectContaining({ identityOrigin: 'automated' }));
+    expect(researcherAdapter.upsertByPotentialReviewer.mock.calls[0][2]).toEqual(expect.objectContaining({
+      automatedIdentityDecision: expect.objectContaining({
+        decision: expect.objectContaining({ status: 'probable' }),
+        persistDecision: true,
+      }),
+    }));
+    expect(researcherAdapter.writeIdentityDecision).not.toHaveBeenCalled();
     expect(researcherAdapter.clearIdentityFields).not.toHaveBeenCalled();
   });
 

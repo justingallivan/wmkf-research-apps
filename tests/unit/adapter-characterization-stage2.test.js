@@ -163,7 +163,9 @@ describe('researcher.getByPotentialReviewer (characterization)', () => {
     'wmkf_potentialreviewersid,wmkf_emailaddress,wmkf_primaryaffiliation,wmkf_department,wmkf_orcid,wmkf_orcidurl,' +
     'wmkf_googlescholarid,wmkf_googlescholarurl,wmkf_hindex,wmkf_i10index,wmkf_totalcitations,' +
     'wmkf_website,wmkf_facultypageurl,wmkf_keywords,wmkf_emailsource,wmkf_lastchecked,' +
-    'wmkf_metricsupdatedat,wmkf_contactenrichedat,wmkf_contactenrichmentsource';
+    'wmkf_metricsupdatedat,wmkf_contactenrichedat,wmkf_contactenrichmentsource,' +
+    'wmkf_identitystatus,wmkf_identityverifiedanchorsjson,wmkf_identityconfidenceband,' +
+    'wmkf_identityresolverversion,wmkf_identityresolvedat,wmkf_identityevidencesummary';
   test('golden: getRecord with the bibliometric select', async () => {
     const g = jest.spyOn(DynamicsService, 'getRecord').mockResolvedValue({ wmkf_potentialreviewersid: GUID_A });
     const out = await researcher.getByPotentialReviewer(GUID_A);

@@ -115,6 +115,7 @@ afterAll(() => {
 test('delegates the deadline write to changeReviewDeadline with the suggestion _etag, after prepareNotification and before the send', async () => {
   const result = await saveReviewerDueDateExtension({
     suggestionId: SUGGESTION_ID,
+    expectedRequestId: REQUEST_ID,
     reviewDueDateOverride: '2099-09-15',
     actingUserSystemId: PD_ID,
   });
@@ -149,6 +150,7 @@ test('a thrown 412 from the command yields the existing classifySaveError confli
 
   const result = await saveReviewerDueDateExtension({
     suggestionId: SUGGESTION_ID,
+    expectedRequestId: REQUEST_ID,
     reviewDueDateOverride: '2099-09-15',
     actingUserSystemId: PD_ID,
   });

@@ -2,14 +2,14 @@
  * GET /api/review-manager/materials-preflight
  *
  * Covers: auth gate, requestId GUID rejection, fileCount mapping from
- * listReviewerMaterials, request-not-found, and sanitized upstream failure
+ * listReviewerMaterialsWithAvailability, request-not-found, and sanitized upstream failure
  * (no raw Graph/Dataverse error text reaches the client — 'materials_unavailable').
  */
 
 import { createMockReq, createMockRes } from '../helpers/auth-mock';
 import { requireAppAccess } from '../../lib/utils/auth';
 import { DynamicsService } from '../../lib/services/dynamics-service';
-import { listReviewerMaterials } from '../../lib/external/reviewer-materials';
+import { listReviewerMaterialsWithAvailability } from '../../lib/external/reviewer-materials';
 
 jest.mock('../../lib/utils/auth', () => ({ requireAppAccess: jest.fn() }));
 jest.mock('../../lib/services/dynamics-context', () => ({
@@ -19,7 +19,7 @@ jest.mock('../../lib/services/dynamics-service', () => ({
   DynamicsService: { getRecord: jest.fn() },
 }));
 jest.mock('../../lib/external/reviewer-materials', () => ({
-  listReviewerMaterials: jest.fn(),
+  listReviewerMaterialsWithAvailability: jest.fn(),
 }));
 
 const REQUEST_ID = '550e8400-e29b-41d4-a716-446655440000';
@@ -90,33 +90,47 @@ test('rejects a non-GUID requestId before it reaches Dataverse', async () => {
   expect(res.json).toHaveBeenCalledWith(expect.objectContaining({ ok: false, reason: 'validation' }));
 });
 
-test('maps listReviewerMaterials length to fileCount', async () => {
-  listReviewerMaterials.mockResolvedValue([{ id: 'a' }, { id: 'b' }, { id: 'c' }]);
+test('maps the available listReviewerMaterialsWithAvailability files to fileCount', async () => {
+  listReviewerMaterialsWithAvailability.mockResolvedValue({
+    files: [{ id: 'a' }, { id: 'b' }, { id: 'c' }],
+    unavailable: false,
+  });
   const { req, res } = get({ requestId: REQUEST_ID });
   await handler(req, res);
-  expect(listReviewerMaterials).toHaveBeenCalledWith(REQUEST_ID, 'REQ-1');
+  expect(listReviewerMaterialsWithAvailability).toHaveBeenCalledWith(REQUEST_ID, 'REQ-1');
   expect(res.status).toHaveBeenCalledWith(200);
   expect(res.json).toHaveBeenCalledWith({ ok: true, fileCount: 3 });
 });
 
 test('empty folder maps to fileCount 0', async () => {
-  listReviewerMaterials.mockResolvedValue([]);
+  listReviewerMaterialsWithAvailability.mockResolvedValue({ files: [], unavailable: false });
   const { req, res } = get({ requestId: REQUEST_ID });
   await handler(req, res);
   expect(res.json).toHaveBeenCalledWith({ ok: true, fileCount: 0 });
+});
+
+test('partial listing is unavailable instead of reporting an incomplete file count', async () => {
+  listReviewerMaterialsWithAvailability.mockResolvedValue({
+    files: [{ id: 'a' }],
+    unavailable: true,
+  });
+  const { req, res } = get({ requestId: REQUEST_ID });
+  await handler(req, res);
+  expect(res.status).toHaveBeenCalledWith(200);
+  expect(res.json).toHaveBeenCalledWith({ ok: false, reason: 'materials_unavailable' });
 });
 
 test('unknown requestId (no matching request) returns not_found, not a 500', async () => {
   DynamicsService.getRecord.mockResolvedValue(null);
   const { req, res } = get({ requestId: REQUEST_ID });
   await handler(req, res);
-  expect(listReviewerMaterials).not.toHaveBeenCalled();
+  expect(listReviewerMaterialsWithAvailability).not.toHaveBeenCalled();
   expect(res.status).toHaveBeenCalledWith(404);
   expect(res.json).toHaveBeenCalledWith({ ok: false, reason: 'not_found' });
 });
 
 test('upstream listing failure is sanitized — no raw error text to the client', async () => {
-  listReviewerMaterials.mockRejectedValue(new Error('Graph 503: secret-internal-detail'));
+  listReviewerMaterialsWithAvailability.mockRejectedValue(new Error('Graph 503: secret-internal-detail'));
   const { req, res } = get({ requestId: REQUEST_ID });
   await handler(req, res);
   expect(res.status).toHaveBeenCalledWith(200);

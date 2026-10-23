@@ -441,7 +441,18 @@ describe('happy path (progress ordering + full card payload)', () => {
     });
 
     // Writeback + roster persistence happened (id-keyed, best-effort).
-    expect(upsertByPotentialReviewer).toHaveBeenCalledWith(PR, expect.objectContaining({ email: 'rec.one@rec.edu' }), { actingUserSystemId: 'u-1' });
+    expect(upsertByPotentialReviewer).toHaveBeenCalledWith(
+      PR,
+      expect.objectContaining({ email: 'rec.one@rec.edu' }),
+      {
+        actingUserSystemId: 'u-1',
+        automatedIdentityDecision: {
+          decision: expect.objectContaining({ status: 'probable' }),
+          persistDecision: true,
+        },
+        expectedStoredEmail: null,
+      },
+    );
     expect(recordSurfaced).toHaveBeenCalledWith(
       REQ,
       [expect.objectContaining({ name: 'Dr. Rec One' })],
