@@ -148,7 +148,11 @@ cache, pass `--browser-cache /absolute/path/to/locked-browser-cache`. No package
 or browsers are downloaded by the launcher. Use an unused port with `--port`;
 existing servers are not reused. Close the browser to stop the owned processes,
 reset fixtures and remove the marked temporary workspace. `--smoke` is a
-headless navigation check only; it never records human scenarios passed.
+headless navigation check only; it never records human scenarios passed. In a
+headed run, native confirmation dialogs stay open for the participant to accept
+or cancel. The headed handler never chooses either result. `--headless --smoke`
+does not register that handler, so dialogs retain Playwright's default
+dismissal behavior.
 
 The [controlled rehearsal plan](audits/controlled-reviewer-rehearsal-plan-2026-10-22.md)
 lists the PD-drift, manual-invitation COI, stale Find exclusion, partial-materials,
@@ -325,9 +329,11 @@ Do not run capture mode in Vercel Production. For production, the smoke check sh
 | Invitation modal capture result rendering | `tests/unit/invite-email-modal-capture.test.js` |
 | Send route capture mode and production refusal | `tests/integration/send-emails-route.test.js` |
 | Program Director reviewer-engagement rehearsal: captured invite, campaign settings, release to reviewers, no-longer-needed withdraw | `tests/e2e/program-director-invite.spec.js` |
+| Guarded reviewer-rehearsal shared fixture state: all nine scenarios, campaign reload, pending withdrawal, invitation cancel/referral dismiss, linked acceptance/materials, supported navigation | `tests/e2e/reviewer-rehearsal-edges.spec.js` |
 | Captured email button -> reviewer portal accept | `tests/e2e/reviewer-captured-invite.spec.js` |
 | Reviewer Stage 2a accept UX | `tests/e2e/reviewer-accept.spec.js` |
 | Reviewer Stage 2b rich-text authoring/submission/conflict UX (not file upload) | `tests/e2e/reviewer-stage2b-authoring.spec.js` |
+| Guarded rehearsal native-dialog contract: default dismissal without listener; headed helper leaves prompt pending until explicit accept or cancel (synthetic `data:` page, no app API) | `tests/e2e/reviewer-rehearsal-native-dialog.spec.js` |
 
 ---
 

@@ -3,7 +3,7 @@ title: Private Store and Release Preparation Receipt
 domain: engineering-process
 kind: audit
 status: active
-summary: "Fully gated candidate 81b8a063b passed isolated Node 22/macOS checks; rehearsal candidate 5b1656b3dfad110fb5d23fc4fa2514d573e6a638 has partial staff observations."
+summary: "Fully gated candidate 81b8a063b passed its recorded isolated checks; fixture candidate 9b2ec0060 passed a later 51-test browser run while the 5b1656b3dfad110fb5d23fc4fa2514d573e6a638 staff observations remain partial."
 canonical: false
 cataloged: 2026-10-22
 last_verified: 2026-10-22
@@ -20,8 +20,8 @@ related:
 # Private Store and Release Preparation Receipt
 
 **Assessment date:** 2026-10-22 (America/Los_Angeles); rehearsal update 2026-10-22 (America/Los_Angeles).
-**Status:** Fully gated candidate `81b8a063b` passed its recorded isolated Node 22/macOS checks: Turbopack build, browser suite, ESLint, 42 npm check gates, Jest coverage run, and selected PostgreSQL integration suites. Later guided rehearsal candidate `5b1656b3dfad110fb5d23fc4fa2514d573e6a638` has partial internal-staff observations; the full rehearsal, Ubuntu CI, hosted verification, release authorization, and private-store binding remain incomplete. External first-time reviewer usability remains unverified and is not an external-recruitment prerequisite under current owner direction.
-**Fully gated candidate:** `81b8a063b`; **current rehearsal candidate:** `5b1656b3dfad110fb5d23fc4fa2514d573e6a638`; application runtime checkpoint `4720980ed`. Earlier release evidence below includes candidate `c589cbb6e` (`codex/memory-audit-followups`) and remains scoped to that candidate.
+**Status:** Fully gated candidate `81b8a063b` passed its recorded isolated Node 22/macOS checks: Turbopack build, browser suite, ESLint, 42 npm check gates, Jest coverage run, and selected PostgreSQL integration suites. Later fixture candidate `9b2ec0060` passed its scoped isolated build, 51-test browser suite, focused unit suites, scoped ESLint, and diff check. The guided human session remains the partial observation on candidate `5b1656b3dfad110fb5d23fc4fa2514d573e6a638`; the full human rehearsal, Ubuntu CI, hosted verification, release authorization, and private-store binding remain incomplete. External first-time reviewer usability remains unverified and is not an external-recruitment prerequisite under current owner direction.
+**Fully gated candidate:** `81b8a063b`; **latest fixture candidate:** `9b2ec0060`; **human observation candidate:** `5b1656b3dfad110fb5d23fc4fa2514d573e6a638`; application runtime checkpoint `4720980ed`. Earlier release evidence below includes candidate `c589cbb6e` (`codex/memory-audit-followups`) and remains scoped to that candidate.
 
 This receipt records the evidence available for the local release candidate and
 the private Dataverse-export Blob store question. It does not authorize or record
@@ -32,6 +32,47 @@ rather than recast as a result of this assessment.
 In this receipt, “fully gated” refers only to the recorded local automated
 checks. Human rehearsal, Ubuntu CI, hosted verification, private-store binding,
 and release authorization remain separate and incomplete.
+
+## Later fixture candidate `9b2ec0060`
+
+**[VERIFIED via parent-reported isolated Node 22.23.4/macOS run]** The latest
+fixture-only candidate passed its canonical Turbopack build, the full browser
+suite (51/51, one invocation, no retries), three focused unit suites (40 tests),
+scoped ESLint (exit 0), and `git diff --check` (exit 0). Sol's scoped source
+review found no blocker. These results apply to candidate `9b2ec0060`; they do
+not replace candidate `81b8a063b` as the candidate with the recorded full gate
+set below. They do not establish Linux CI, hosted behavior, live data behavior,
+or release authorization.
+
+The browser run covers all nine declared local mock scenarios and the supported
+Back → Workbench list → request-row navigation. The five fixture gaps recorded
+from the 5b baseline have local mock resolutions: consistent pending-invitee
+readback, shared portal/staff acceptance state, synthetic template rendering,
+campaign POST/GET fixture persistence, and exact supported navigation plus
+passive prefetch mocks. The earlier 5b blocked navigation path remains unknown;
+the later prefetch test does not identify it. Synthetic templates use supported
+placeholders, raw dates, and greeting text, not production-copy parity. Portal
+token links cover Dr. Saved Reviewer only; preaccepted Dr. Accepted Reviewer has
+no portal link. Locator/search navigation remains undeclared and fail-closed.
+These are automation results and do not change the partial 5b human observations.
+
+**Final local harness checks:** The committed `9b2ec0060` launcher passed
+`baseline` and `reviewer-authoring` headless smoke runs with navigation status
+200, respectively 16 and 3 mocked API calls, no blocked requests, and
+`humanScenarioPassRecorded: false`. Both owned temporary workspaces were removed
+and the launcher exited 0. These smoke receipts establish navigation and cleanup,
+not scenario completion; the 51-test browser suite supplies the scenario evidence.
+The documentation follow-up passed 24 sequential documentation/safety gates and
+self-tests. No runtime code, environment, deployment, or live system changed.
+
+Private evidence retained on this host:
+
+- Browser suite: `/private/tmp/wmkf-five-fixtures-browser-final.log`.
+- Focused units and lint: `/private/tmp/wmkf-five-fixtures-final-static.log`;
+  structured unit result: `/private/tmp/wmkf-five-fixtures-final-unit.json`.
+- Documentation/safety gates: `/private/tmp/wmkf-five-fixtures-doc-gates.log`.
+- Baseline launcher receipt: `/private/tmp/wmkf-reviewer-rehearsal-receipts/2026-10-23T05-00-32-542Z-b473ba89-119c-4550-a7f9-961d5aac5660.json`.
+- Authoring launcher receipt: `/private/tmp/wmkf-reviewer-rehearsal-receipts/2026-10-23T05-02-27-238Z-a8cd2ee8-e4d1-4a0b-963a-64e50a292bdb.json`.
 
 ## Fully gated candidate and prior release evidence
 
@@ -195,7 +236,7 @@ events (not an additional Playwright dialog listener). The latter run used the
 credential-free guarded copy; the shared E2E configuration still built/started
 Next, while the test pages themselves used synthetic data URLs. Automated choices
 prove pending/cancel/accept behavior, not visible human interaction.
-The later guided follow-up on rehearsal candidate `5b1656b3dfad110fb5d23fc4fa2514d573e6a638` observed OK for invitation mock send and both Cancel then OK for materials mock send. This confirms those observed UI paths, but not invitation-specific Cancel. The [observation record](internal-staff-rehearsal-observations-2026-10-22.md) records the partial results; the interrupted pre-repair attempt was not a successful send or completed rehearsal.
+The later guided follow-up on rehearsal candidate `5b1656b3dfad110fb5d23fc4fa2514d573e6a638` observed OK for invitation mock send and both Cancel then OK for materials mock send. As a human observation, it does not include a participant choosing Cancel on invitation. The automated native-dialog contract now verifies cancellation behavior in isolation, without exercising the invitation UI. The [observation record](internal-staff-rehearsal-observations-2026-10-22.md) records the partial results; the interrupted pre-repair attempt was not a successful send or completed rehearsal.
 The minimal synthetic preview also does not establish real invitation-copy or
 Program Director clarity; its future fixture dates are not campaign evidence.
 
@@ -299,12 +340,13 @@ does not reverse data or email effects.
 
 | Action | Status | Next evidence or boundary |
 |---|---|---|
-| Candidate source review | Fully gated candidate `81b8a063b` reviewed | Application runtime remains at `4720980ed`; rehearsal candidate `5b1656b3dfad110fb5d23fc4fa2514d573e6a638` is separate; hosted behavior remains unverified. |
+| Candidate source review | Fully gated candidate `81b8a063b` and fixture candidate `9b2ec0060` reviewed | Application runtime remains at `4720980ed`; the recorded human observation candidate `5b1656b3dfad110fb5d23fc4fa2514d573e6a638` is separate; hosted behavior remains unverified. |
+| Latest fixture-candidate checks | Candidate `9b2ec0060` passed the recorded scoped checks | Isolated Node 22.23.4/macOS Turbopack build passed; 51/51 browser tests passed with no retries; three focused unit suites passed 40 tests; scoped ESLint and diff check exited 0. This is not the full gate set recorded for `81b8a063b`. |
 | Clean locked install | Complete on prior candidate `c589cbb6e` | Completed offline in its isolated workspace. |
 | Locked production build | Prior candidate `c589cbb6e` passed; fully gated candidate build passed | Prior build passed on Node 24.19.0 and Node 22.23.4/macOS. `81b8a063b` completed canonical Turbopack `next build` through Playwright `webServer`; that invocation skipped package `npm prebuild`, which passed separately with unchanged manifest bytes. |
 | Full Jest coverage run | Fully gated candidate passed | Node 22: 1,433 suites / 24,784 tests, five snapshots; 17 suites / 215 tests skipped, 512.717 seconds. Jest coverage thresholds are disabled; opt-in PostgreSQL suites are separate. |
 | Prior full Jest suite | Passed on prior candidate `c589cbb6e` | Node 22: 1,431 suites / 24,751 tests in one invocation; 17 suites / 215 tests skipped. Historical evidence, not evidence for fully gated `81b8a063b` or rehearsal `5b1656b3dfad110fb5d23fc4fa2514d573e6a638`. |
-| Automated Mode A browser checks | Fully gated candidate passed locally | `81b8a063b`: 44/44 browser tests passed in one Node 22 invocation. Human rehearsal on `5b1656b3dfad110fb5d23fc4fa2514d573e6a638` is partial; hosted/live-data proof remains pending. |
+| Automated Mode A browser checks | Fully gated and later fixture candidates passed locally | `81b8a063b`: 44/44 browser tests passed in one Node 22 invocation. `9b2ec0060`: 51/51 passed in one Node 22.23.4/macOS invocation with no retries. Human rehearsal on `5b1656b3dfad110fb5d23fc4fa2514d573e6a638` is partial; hosted/live-data proof remains pending. |
 | Full ESLint | Fully gated candidate passed | Exit 0, zero errors, 163 warnings. |
 | PostgreSQL integration suites | Fully gated candidate passed in isolation | 10 opt-in suites / 130 tests passed in 11.731 seconds against cached `postgres:16-alpine` in a removed scratch container. Node was macOS; this does not establish Ubuntu CI. |
 | 42 npm check gates and available self-tests | Fully gated candidate passed sequentially | Exact set listed in `.github/workflows/test.yml`, including configured types. |
@@ -312,7 +354,7 @@ does not reverse data or email effects.
 | Prior Node 22 verification | Complete on prior candidate `c589cbb6e` | Build, configured types, full Jest (1,431 suites / 24,751 tests), and its browser checks passed. |
 | Private-store binding | Unknown | Requires a separately authorized credential-bearing context; metadata alone is insufficient. |
 | Private object inventory | Not run | Keep within the existing bounded authorization and prepared fixed-prefix safeguards. |
-| Internal staff rehearsal | Partial guided local-mock baseline | Invitation preview/mock invitation, portal acknowledgement/acceptance/reload, and materials mock release UI were observed; assistant-driven campaign save and withdrawal have unverified persistence/inconsistent readback. Assistant also exercised authoring UI, but it is not a human observation. Other human scenarios remain pending. See [observation record](internal-staff-rehearsal-observations-2026-10-22.md). No real email or live write; external usability remains unverified. |
+| Internal staff rehearsal | Partial guided local-mock baseline on `5b1656b3dfad110fb5d23fc4fa2514d573e6a638` | In that historical 5b session, invitation preview/mock send, portal acknowledgement/acceptance/reload, and materials mock release UI were observed; assistant-driven campaign save and withdrawal readback were unverified/inconsistent. Assistant also exercised authoring UI, but it is not a human observation. Candidate `9b2ec0060` later passed all nine declared fixture scenarios automatically and repaired the campaign and withdrawal fixture readback; no new participant observation was made. See [observation record](internal-staff-rehearsal-observations-2026-10-22.md). No real email or live write; external usability remains unverified. |
 | External first-time reviewer usability | Unverified | No external recruitment prerequisite under current owner direction; retain the usability evidence gap. |
 | Release owner decision | Pending | Decide only after candidate checks, target evidence, and internal staff rehearsal evidence are concrete. |
 | Push, deployment, intentional live mutation/cleanup | Not performed | No push/deploy or deliberate live action. The bounded read-only check found no evidence of durable impact in the checked alert/event records; its limits are documented above. |

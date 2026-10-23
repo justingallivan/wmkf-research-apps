@@ -3,7 +3,7 @@ title: Controlled Reviewer Rehearsal Plan
 domain: reviewer-workbench
 kind: plan
 status: active
-summary: "Guarded Mode A fixtures have partial internal staff baseline observations; the rehearsal and any live integration remain incomplete."
+summary: "Candidate 9b2ec0060 passed all nine declared Mode A scenarios in automation; the 5b internal-staff baseline remains partial and live integration remains incomplete."
 canonical: false
 cataloged: 2026-10-22
 last_verified: 2026-10-22
@@ -17,13 +17,14 @@ related:
 
 # Controlled Reviewer Rehearsal Plan
 
-**Status:** The current guided internal-staff baseline on rehearsal candidate `5b1656b3dfad110fb5d23fc4fa2514d573e6a638` is partial; see the [observation record](internal-staff-rehearsal-observations-2026-10-22.md). It does not complete the rehearsal. Fully gated candidate `81b8a063b` passed 44/44 isolated browser tests on Node 22; details are in the release preparation receipt. External first-time reviewer usability is unverified and is not an external-recruitment release prerequisite under the current owner direction.
+**Status:** The guided internal-staff baseline on rehearsal candidate `5b1656b3dfad110fb5d23fc4fa2514d573e6a638` remains partial; see the [observation record](internal-staff-rehearsal-observations-2026-10-22.md). Later, candidate `9b2ec0060` passed an isolated Turbopack build, 51/51 browser tests, three focused unit suites (40 tests), scoped ESLint, and diff check. That is automated fixture evidence and does not complete the human rehearsal. Fully gated candidate `81b8a063b` retains its separate 44/44 browser and full-gate evidence in the release receipt. External first-time reviewer usability is unverified and is not an external-recruitment release prerequisite under the current owner direction.
 Assistant-driven authoring UI evidence is recorded separately; the human `reviewer-authoring` worksheet item remains Not run.
 Internal staff observation, Linux CI, hosted integration, and promotion remain separate.
 
 **Candidate:** the launcher exports committed `HEAD` and records its exact SHA.
-The last fully gated candidate is `81b8a063b`; the current rehearsal candidate
-is `5b1656b3dfad110fb5d23fc4fa2514d573e6a638`. Application runtime remains at
+The last fully gated candidate is `81b8a063b`; the latest fixture-verification
+candidate is `9b2ec0060`; the recorded guided human session remains on
+`5b1656b3dfad110fb5d23fc4fa2514d573e6a638`. Application runtime remains at
 checkpoint `4720980ed`. The earlier plan was prepared against `c589cbb6e`.
 Launcher/test changes do not alter application runtime code.
 
@@ -117,15 +118,26 @@ They are not evidence that a real email, token, or Dataverse operation was tried
 
 | Scenario option | Participant task and expected outcome | Evidence boundary |
 |---|---|---|
-| `baseline` | Preview and mock-send an invitation; use paired Yes/No links; release materials to accepted reviewers; withdraw the pending invitee | Exact browser routes and in-memory lifecycle transitions. Draft preview makes no fixture send transition. Closing/relaunching resets all fixture state. |
+| `baseline` | Preview and mock-send an invitation; use paired Yes/No links; release materials to accepted reviewers; withdraw the pending invitee | Exact browser routes and in-memory lifecycle transitions. Draft preview makes no fixture send transition. Closing/relaunching resets all fixture state. The paired portal links belong to Dr. Saved Reviewer; preaccepted Dr. Accepted Reviewer has no portal link in this fixture. |
 | `pd-drift` | Preview with PD A, send after the fixture changes assignment to B, read fresh-preview guidance | Fixture records preview A and current B and returns `program_director_changed`; invitation remains unsent. Real pre-mint/pre-dispatch protection is checked in service tests. |
 | `saved-find-exclusion` | Exclude the stale Find card, read the Invite-removal message, verify the saved row remains | Starts with an active Find snapshot; PATCH returns `candidate_already_saved`, then reload supplies savedKeys and removes the stale card. It must not become an Excluded row. |
 | `manual-coi-blocked` | Invite the preseeded staff-manual reviewer with a separately saved, trusted conflicting main institution | Mock send returns `manual_institution_coi`, with no invited transition. It does not reject manual Add or derive trusted institution from affiliation text. |
 | `manual-coi-unavailable` | Attempt the first invitation when its institution check is unavailable | Mock send returns `manual_institution_coi_unavailable`; no token or live operation exists in this test. |
 | `manual-coi-unknown-allowed` | Add a sparse manual reviewer, then send their first mock invitation | Add succeeds; enrichment/affiliation text does not become trusted main-institution evidence. Captured-send success is preserved. |
-| `materials-partial` | Release to accepted reviewers while materials availability is unknown | Displays unavailable rather than zero files. Current policy allows preview/send; pending reviewers are excluded from the selected IDs and stay unchanged. |
+| `materials-partial` | Release to accepted reviewers while materials availability is unknown | Displays unavailable rather than zero files. Current policy allows preview/send; pending reviewers are excluded from the selected IDs and stay unchanged. Synthetic templates exercise supported placeholders, raw dates, and greeting text; production copy fidelity is not established. |
 | `decline-reset` | Inspect and dismiss the synthetic decline referral; reset by closing/relaunching | Referral state is local to the fixture. Portal decline/reset is also exercised through the paired links. |
 | `reviewer-authoring` | Open Stage 2b, edit answers, observe autosave, reload, submit, and return | In-memory GET/PUT draft and POST submit. Current reviewer UI replaced the old file-upload card with authoring; file upload is N/A, not an unbuilt fixture. |
+
+**Automated fixture result:** On candidate `9b2ec0060`, an isolated Node
+22.23.4/macOS run passed the Turbopack build and 51/51 browser tests with no
+retries. Three focused unit suites passed 40 tests; scoped ESLint and diff check
+passed. The run covers the nine declared scenarios and supported navigation
+Back → Workbench list → request row. Exact passive prefetch routes are mocked;
+an undeclared sibling path remains denied, and locator/search navigation is
+outside the fixture. The earlier 5b blocked navigation path was not captured,
+so it cannot be identified from this later run. This automation does not change
+the worksheet below: the 5b guided staff observations stay partial, and
+assistant-run browser checks do not count as human task outcomes.
 
 ## Internal staff observation worksheet
 
