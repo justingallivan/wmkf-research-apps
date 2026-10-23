@@ -110,6 +110,12 @@ merged. The reminder slice (PR #332, plan
    wording" action re-renders after confirming that unsent edits will be discarded. Drafts
    with `shared_fallback` show the notice. Generation guards cover load/save/clear/re-render
    across close.
+8. **Re-render replaces email copy only.** [Codex plan review 2026-10-22] In the accepted
+   release dialog, the preview also seeds `internalNote` and the `expectedNotes` concurrency
+   baseline that `terminal-transition` checks. A wording re-render updates only the drafts'
+   subject/body (and `templateSource`/notice); it never resets the staff-typed note and never
+   advances `expectedNotes`. A colleague's concurrent note change therefore still surfaces as
+   the existing `notes_changed` rejection at release.
 
 ## Contract-reconcile, Mode A
 
@@ -136,6 +142,7 @@ service catalog, inventory slice status. No migration, no cron, no shared helper
 | Read failure / damaged row → Admin wording with notice, never a block | both preview services, modals | service and modal tests |
 | Per-recipient edits never persist | modals | modal tests assert no preference write on send |
 | Non-lead, non-superuser staff cannot preview or send the pending withdrawal | two withdraw routes | route tests (403, service not called) |
+| Wording re-render keeps the unsaved internal note and the original `expectedNotes` baseline | accepted-release modal | modal tests: unsaved note survives re-render; a server-side note change during re-render still yields `notes_changed` |
 | Existing send guards and statuses unchanged | send services | existing characterization suites stay green |
 
 Mode A verdict: READY, pending owner review of this plan. No external state probed.
