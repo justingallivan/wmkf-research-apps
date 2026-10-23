@@ -3,7 +3,7 @@ title: Controlled Reviewer Rehearsal Plan
 domain: reviewer-workbench
 kind: plan
 status: active
-summary: "Guarded Mode A fixtures are ready for internal staff role-play; observation and any live integration remain pending."
+summary: "Guarded Mode A fixtures have partial internal staff baseline observations; the rehearsal and any live integration remain incomplete."
 canonical: false
 cataloged: 2026-10-22
 last_verified: 2026-10-22
@@ -11,17 +11,20 @@ owner: product-engineering
 related:
   - docs/CAMPAIGN_RELEASE_AND_DATAVERSE_TEST_STRATEGY.md
   - docs/REVIEWER_E2E_REHEARSAL_RUNBOOK.md
+  - docs/audits/internal-staff-rehearsal-observations-2026-10-22.md
   - docs/audits/release-preparation-private-store-2026-10-22.md
 ---
 
 # Controlled Reviewer Rehearsal Plan
 
-**Status:** Current candidate `81b8a063b` passed 44/44 isolated browser tests on Node 22; details are in the release preparation receipt. Internal staff observation remains pending. External first-time reviewer usability is unverified and is not an external-recruitment release prerequisite under the current owner direction.
+**Status:** The current guided internal-staff baseline on rehearsal candidate `5b1656b3dfad110fb5d23fc4fa2514d573e6a638` is partial; see the [observation record](internal-staff-rehearsal-observations-2026-10-22.md). It does not complete the rehearsal. Fully gated candidate `81b8a063b` passed 44/44 isolated browser tests on Node 22; details are in the release preparation receipt. External first-time reviewer usability is unverified and is not an external-recruitment release prerequisite under the current owner direction.
+Assistant-driven authoring UI evidence is recorded separately; the human `reviewer-authoring` worksheet item remains Not run.
 Internal staff observation, Linux CI, hosted integration, and promotion remain separate.
 
 **Candidate:** the launcher exports committed `HEAD` and records its exact SHA.
-The current evaluated candidate is `81b8a063b`; its application runtime remains
-at checkpoint `4720980ed`. The earlier plan was prepared against `c589cbb6e`.
+The last fully gated candidate is `81b8a063b`; the current rehearsal candidate
+is `5b1656b3dfad110fb5d23fc4fa2514d573e6a638`. Application runtime remains at
+checkpoint `4720980ed`. The earlier plan was prepared against `c589cbb6e`.
 Launcher/test changes do not alter application runtime code.
 
 **Mode:** A only — synthetic browser/API mocks. No real invitation, reviewer,
@@ -148,7 +151,7 @@ this worksheet does not define pass criteria.
 
 | Scenario ID | Staff workflow observation | Internal reviewer-role observation | Outcome / notes |
 |---|---|---|---|
-| `baseline` | Preview/send, campaign dates, materials release, pending withdrawal | Follow paired Yes/No links; accept or decline; return and find help | Not run — |
+| `baseline` | Preview/send, campaign dates, materials release, pending withdrawal | Follow paired Yes/No links; accept or decline; return and find help | Partial — guided invitation/portal/materials observations; campaign edit and withdrawal were assistant-driven and persistence/readback is incomplete. See observation record. |
 | `pd-drift` | Preview with PD A; observe changed-assignment send response and fresh-preview guidance | N/A | Not run — |
 | `saved-find-exclusion` | Exclude stale Find card; inspect saved-row result | N/A | Not run — |
 | `manual-coi-blocked` | Attempt first invite for preseeded trusted conflict | N/A | Not run — |
@@ -208,8 +211,10 @@ of durable impact in the checked `system_alerts` and recovery-event records for
 the observed window; it does not establish that no write was attempted or rule
 out effects outside those records. The evidence and limits are recorded in the
 [release preparation receipt](release-preparation-private-store-2026-10-22.md).
-Internal human observations remain pending even after automated checks pass. Verification
-counts and retained limits belong in the linked release-preparation receipt.
+Internal human observations are partial even after automated checks pass. The
+baseline does not complete the plan; the other human scenarios remain pending.
+Verification counts and retained limits belong in the linked release-preparation
+receipt.
 
 ## Gate for later data integration
 

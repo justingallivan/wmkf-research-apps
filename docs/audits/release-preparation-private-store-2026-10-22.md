@@ -3,7 +3,7 @@ title: Private Store and Release Preparation Receipt
 domain: engineering-process
 kind: audit
 status: active
-summary: "Current candidate passed recorded isolated Node 22/macOS checks; Ubuntu CI, internal staff rehearsal, release authorization, and private-store binding remain open."
+summary: "Fully gated candidate 81b8a063b passed isolated Node 22/macOS checks; rehearsal candidate 5b1656b3dfad110fb5d23fc4fa2514d573e6a638 has partial staff observations."
 canonical: false
 cataloged: 2026-10-22
 last_verified: 2026-10-22
@@ -11,6 +11,7 @@ owner: product-engineering
 related:
   - docs/CAMPAIGN_RELEASE_AND_DATAVERSE_TEST_STRATEGY.md
   - docs/REVIEWER_E2E_REHEARSAL_RUNBOOK.md
+  - docs/audits/internal-staff-rehearsal-observations-2026-10-22.md
   - docs/audits/historical-impact-concurrency-followup-2026-10-22.md
   - docs/audits/blob-store-binding-evidence-2026-10-22.json
   - docs/audits/blob-retention-metadata-evidence-2026-10-22.json
@@ -18,9 +19,9 @@ related:
 
 # Private Store and Release Preparation Receipt
 
-**Assessment date:** 2026-10-22 (America/Los_Angeles)  
-**Status:** All recorded isolated Node 22/macOS checks for the current candidate passed: Turbopack build, browser rehearsal, ESLint, 42 npm check gates, Jest coverage run, and selected PostgreSQL integration suites. Ubuntu CI, internal staff rehearsal, hosted verification, release authorization, and private-store binding remain incomplete. External first-time reviewer usability remains unverified and is not an external-recruitment prerequisite under current owner direction.
-**Current evaluated candidate:** `81b8a063b`; application runtime checkpoint `4720980ed`. Earlier release evidence below includes candidate `c589cbb6e` (`codex/memory-audit-followups`) and remains scoped to that candidate.
+**Assessment date:** 2026-10-22 (America/Los_Angeles); rehearsal update 2026-10-22 (America/Los_Angeles).
+**Status:** Fully gated candidate `81b8a063b` passed its recorded isolated Node 22/macOS checks: Turbopack build, browser suite, ESLint, 42 npm check gates, Jest coverage run, and selected PostgreSQL integration suites. Later guided rehearsal candidate `5b1656b3dfad110fb5d23fc4fa2514d573e6a638` has partial internal-staff observations; the full rehearsal, Ubuntu CI, hosted verification, release authorization, and private-store binding remain incomplete. External first-time reviewer usability remains unverified and is not an external-recruitment prerequisite under current owner direction.
+**Fully gated candidate:** `81b8a063b`; **current rehearsal candidate:** `5b1656b3dfad110fb5d23fc4fa2514d573e6a638`; application runtime checkpoint `4720980ed`. Earlier release evidence below includes candidate `c589cbb6e` (`codex/memory-audit-followups`) and remains scoped to that candidate.
 
 This receipt records the evidence available for the local release candidate and
 the private Dataverse-export Blob store question. It does not authorize or record
@@ -28,18 +29,23 @@ a push, deployment, production test, credential export or disclosure, live appli
 Evidence from earlier audits remains historical where indicated; it is linked
 rather than recast as a result of this assessment.
 
-## Current evaluated candidate and prior release evidence
+In this receipt, “fully gated” refers only to the recorded local automated
+checks. Human rehearsal, Ubuntu CI, hosted verification, private-store binding,
+and release authorization remain separate and incomplete.
+
+## Fully gated candidate and prior release evidence
 
 **[VERIFIED via isolated Git archive comparison supplied for this receipt]**
-The current evaluated committed candidate is `81b8a063b`. It contains no
+The fully gated committed candidate is `81b8a063b`. It contains no
 application runtime changes after runtime checkpoint `4720980ed`; its changes
 since that checkpoint are documentation, test, and rehearsal preparation. The
 earlier Jest evidence of 24,751 tests, configured type check, and prior build
-results below were produced for `c589cbb6e`, not `81b8a063b`. The current
+results below were produced for `c589cbb6e`, not `81b8a063b`. The fully gated
 candidate's full Jest coverage run is recorded separately below. The expanded
 43/44 browser rehearsal and focused harness/fixture/CLI runs used precommit
-rehearsal snapshots later committed in `81b8a063b`; the current candidate's
-44/44 run is recorded separately below.
+rehearsal snapshots later committed in `81b8a063b`; its 44/44 run is recorded
+separately below. Subsequent rehearsal observations use candidate
+`5b1656b3dfad110fb5d23fc4fa2514d573e6a638` and do not inherit that full-gate result.
 
 ### Prior candidate `c589cbb6e`
 
@@ -121,13 +127,14 @@ outcomes, partial materials, saved Find exclusion, decline/reset, and reviewer
 authoring. Source review corrected manual COI screening to occur at first invite,
 partial materials to remain nonblocking, and submitted authoring to remain locked.
 Current Stage 2b uses in-browser authoring; its former file-upload control is not
-a missing rehearsal fixture. Internal staff observation, Linux CI, hosted
-verification, and release authorization remain separate gates. The current
-owner direction uses internal staff for staff and role-played reviewer tasks;
-external first-time usability remains unverified, with no external recruitment
-prerequisite.
+a missing rehearsal fixture. Internal staff observation is partial, not
+complete; the full rehearsal, Linux CI, hosted verification, and release
+authorization remain separate gates. The current owner direction uses internal
+staff for staff and role-played reviewer tasks; external first-time usability
+remains unverified, with no external recruitment prerequisite. See the
+[guided observation record](internal-staff-rehearsal-observations-2026-10-22.md).
 
-**[VERIFIED via isolated precommit rehearsal snapshots later committed in current candidate `81b8a063b`]** The expanded browser run passed
+**[VERIFIED via isolated precommit rehearsal snapshots later committed in fully gated candidate `81b8a063b`]** The expanded browser run passed
 43 of 44 tests; its one failure was an undefined schema import in the new authoring
 test. After that correction and the submission-version assertion correction,
 the authoring scenario passed, exercising autosave, reload, final submission,
@@ -145,28 +152,28 @@ record navigation only, never human approval. The authoring readiness check was
 corrected to use its portal heading because that page has no `main` element.
 Owned temporary directories were removed after both successful runs.
 
-**[VERIFIED via parent-reported isolated Git archive run on current candidate `81b8a063b`]** The
+**[VERIFIED via parent-reported isolated Git archive run on fully gated candidate `81b8a063b`]** The
 complete 44-test browser rehearsal passed in one Node 22 invocation. This confirms
-the current candidate's browser fixture coverage. Playwright's `webServer` path
+that candidate's browser fixture coverage. Playwright's `webServer` path
 also completed the canonical Turbopack `next build` successfully on this candidate.
 The run skipped the package `npm prebuild` step, so that package hook was not
 verified by this invocation.
 
-**[VERIFIED via current-candidate isolated Node 22 checks]** Full ESLint exited
+**[VERIFIED via fully gated candidate's isolated Node 22 checks]** Full ESLint exited
 0 with zero errors and 163 warnings. The ten PostgreSQL integration suites from the CI job passed all 130 tests
 in 11.731 seconds against the cached `postgres:16-alpine` image. They ran in an
 owned scratch container on a random loopback port with a dummy connection URL;
 the container was stopped and removed. Node ran on macOS and the database ran
 in a Linux container, which is not Ubuntu CI.
 
-**[VERIFIED via separate isolated current-candidate checks]** All 42 npm check
+**[VERIFIED via separate isolated checks on fully gated candidate `81b8a063b`]** All 42 npm check
 gates and the available self-tests listed in `.github/workflows/test.yml`
 passed sequentially, including the configured type check. Separately,
 `npm run prebuild` passed the reviewer-reminder hold and migration-manifest
 generation; the generated manifest bytes matched `81b8a063b`. These checks are
 separate from the Playwright invocation, which did not run package prebuild.
 
-**[VERIFIED via isolated current-candidate Node 22 Jest coverage run]**
+**[VERIFIED via isolated Node 22 Jest coverage run on fully gated candidate `81b8a063b`]**
 `npx jest --ci --coverage --watchAll=false --runInBand` exited 0 in 512.717
 seconds: 1,433 suites, 24,784 tests, five snapshots passed; 17 suites / 215
 tests were skipped. The run emitted a nonblocking `MaxListenersExceededWarning`.
@@ -176,7 +183,7 @@ opt-in PostgreSQL integration suites (130 tests) are reported separately above.
 
 ### Internal staff rehearsal: confirmation-dialog blocker
 
-The first guided local baseline attempt opened the invitation preview, but a
+The first guided local baseline attempt on pre-repair candidate `345682e27` opened the invitation preview, but a
 single Send click produced unreadable transient feedback and left it unchanged.
 Source review traced this to the headed harness: the app requires
 `window.confirm`, and Playwright dismisses dialogs without a listener. This
@@ -188,8 +195,7 @@ events (not an additional Playwright dialog listener). The latter run used the
 credential-free guarded copy; the shared E2E configuration still built/started
 Next, while the test pages themselves used synthetic data URLs. Automated choices
 prove pending/cancel/accept behavior, not visible human interaction.
-A fresh human check must establish that both Cancel and OK are usable on this
-host. The interrupted attempt is not a successful send or completed rehearsal.
+The later guided follow-up on rehearsal candidate `5b1656b3dfad110fb5d23fc4fa2514d573e6a638` observed OK for invitation mock send and both Cancel then OK for materials mock send. This confirms those observed UI paths, but not invitation-specific Cancel. The [observation record](internal-staff-rehearsal-observations-2026-10-22.md) records the partial results; the interrupted pre-repair attempt was not a successful send or completed rehearsal.
 The minimal synthetic preview also does not establish real invitation-copy or
 Program Director clarity; its future fixture dates are not campaign evidence.
 
@@ -293,20 +299,20 @@ does not reverse data or email effects.
 
 | Action | Status | Next evidence or boundary |
 |---|---|---|
-| Candidate source review | Current candidate `81b8a063b` reviewed | Application runtime remains at `4720980ed`; hosted behavior remains unverified. |
+| Candidate source review | Fully gated candidate `81b8a063b` reviewed | Application runtime remains at `4720980ed`; rehearsal candidate `5b1656b3dfad110fb5d23fc4fa2514d573e6a638` is separate; hosted behavior remains unverified. |
 | Clean locked install | Complete on prior candidate `c589cbb6e` | Completed offline in its isolated workspace. |
-| Locked production build | Prior candidate `c589cbb6e` passed; current candidate Turbopack build passed | Prior build passed on Node 24.19.0 and Node 22.23.4/macOS. Current `81b8a063b` completed canonical Turbopack `next build` through Playwright `webServer`; that invocation skipped package `npm prebuild`, which passed separately with unchanged manifest bytes. |
-| Full Jest coverage run | Current candidate passed | Node 22: 1,433 suites / 24,784 tests, five snapshots; 17 suites / 215 tests skipped, 512.717 seconds. Jest coverage thresholds are disabled; opt-in PostgreSQL suites are separate. |
-| Prior full Jest suite | Passed on prior candidate `c589cbb6e` | Node 22: 1,431 suites / 24,751 tests in one invocation; 17 suites / 215 tests skipped. Historical evidence, not current-candidate suite evidence. |
-| Automated Mode A browser checks | Current candidate passed locally | Current candidate `81b8a063b`: 44/44 browser tests passed in one Node 22 invocation. Human Mode A rehearsal and hosted/live-data proof remain pending. |
-| Full ESLint | Current candidate passed | Exit 0, zero errors, 163 warnings. |
-| PostgreSQL integration suites | Current candidate passed in isolation | 10 opt-in suites / 130 tests passed in 11.731 seconds against cached `postgres:16-alpine` in a removed scratch container. Node was macOS; this does not establish Ubuntu CI. |
-| 42 npm check gates and available self-tests | Current candidate passed sequentially | Exact set listed in `.github/workflows/test.yml`, including configured types. |
-| Package prebuild | Current candidate passed separately | Reviewer-reminder hold and migration-manifest generation passed; generated manifest bytes matched `81b8a063b`. |
+| Locked production build | Prior candidate `c589cbb6e` passed; fully gated candidate build passed | Prior build passed on Node 24.19.0 and Node 22.23.4/macOS. `81b8a063b` completed canonical Turbopack `next build` through Playwright `webServer`; that invocation skipped package `npm prebuild`, which passed separately with unchanged manifest bytes. |
+| Full Jest coverage run | Fully gated candidate passed | Node 22: 1,433 suites / 24,784 tests, five snapshots; 17 suites / 215 tests skipped, 512.717 seconds. Jest coverage thresholds are disabled; opt-in PostgreSQL suites are separate. |
+| Prior full Jest suite | Passed on prior candidate `c589cbb6e` | Node 22: 1,431 suites / 24,751 tests in one invocation; 17 suites / 215 tests skipped. Historical evidence, not evidence for fully gated `81b8a063b` or rehearsal `5b1656b3dfad110fb5d23fc4fa2514d573e6a638`. |
+| Automated Mode A browser checks | Fully gated candidate passed locally | `81b8a063b`: 44/44 browser tests passed in one Node 22 invocation. Human rehearsal on `5b1656b3dfad110fb5d23fc4fa2514d573e6a638` is partial; hosted/live-data proof remains pending. |
+| Full ESLint | Fully gated candidate passed | Exit 0, zero errors, 163 warnings. |
+| PostgreSQL integration suites | Fully gated candidate passed in isolation | 10 opt-in suites / 130 tests passed in 11.731 seconds against cached `postgres:16-alpine` in a removed scratch container. Node was macOS; this does not establish Ubuntu CI. |
+| 42 npm check gates and available self-tests | Fully gated candidate passed sequentially | Exact set listed in `.github/workflows/test.yml`, including configured types. |
+| Package prebuild | Fully gated candidate passed separately | Reviewer-reminder hold and migration-manifest generation passed; generated manifest bytes matched `81b8a063b`. |
 | Prior Node 22 verification | Complete on prior candidate `c589cbb6e` | Build, configured types, full Jest (1,431 suites / 24,751 tests), and its browser checks passed. |
 | Private-store binding | Unknown | Requires a separately authorized credential-bearing context; metadata alone is insufficient. |
 | Private object inventory | Not run | Keep within the existing bounded authorization and prepared fixed-prefix safeguards. |
-| Internal staff rehearsal | Guarded launcher/fixtures verified; execution pending | Internal staff observations remain pending; role-play does not verify first-time external usability. Any live target, identities, writes and cleanup require separate authorization. |
+| Internal staff rehearsal | Partial guided local-mock baseline | Invitation preview/mock invitation, portal acknowledgement/acceptance/reload, and materials mock release UI were observed; assistant-driven campaign save and withdrawal have unverified persistence/inconsistent readback. Assistant also exercised authoring UI, but it is not a human observation. Other human scenarios remain pending. See [observation record](internal-staff-rehearsal-observations-2026-10-22.md). No real email or live write; external usability remains unverified. |
 | External first-time reviewer usability | Unverified | No external recruitment prerequisite under current owner direction; retain the usability evidence gap. |
 | Release owner decision | Pending | Decide only after candidate checks, target evidence, and internal staff rehearsal evidence are concrete. |
 | Push, deployment, intentional live mutation/cleanup | Not performed | No push/deploy or deliberate live action. The bounded read-only check found no evidence of durable impact in the checked alert/event records; its limits are documented above. |
@@ -314,14 +320,14 @@ does not reverse data or email effects.
 ## Exit conditions
 
 Prior candidate `c589cbb6e` completed its recorded Node 22/macOS verification;
-current candidate `81b8a063b` passed its Turbopack build, 44-test browser
+fully gated candidate `81b8a063b` passed its Turbopack build, 44-test browser
 rehearsal, full ESLint, full Jest coverage run, selected PostgreSQL integration
 suites, 42 listed npm check gates, package prebuild, and configured types on
 isolated Node 22/macOS. Coverage thresholds are disabled in the Jest
 configuration, so the coverage run does not certify threshold values. This is
-not a release approval: Ubuntu CI verification, internal staff rehearsal,
-hosted verification, private-store binding, and the applicable owner release
-decision remain outstanding. External first-time reviewer usability is
+not a release approval: Ubuntu CI verification, completion of the internal
+staff rehearsal, hosted verification, private-store binding, and the applicable
+owner release decision remain outstanding. External first-time reviewer usability is
 unverified and is not an external-recruitment prerequisite under current owner
 direction.
 The private-store question remains a separate evidence
