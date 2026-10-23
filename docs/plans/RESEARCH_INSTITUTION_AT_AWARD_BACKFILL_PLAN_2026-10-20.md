@@ -122,11 +122,15 @@ Standing constraints (unchanged): creating contacts or junction rows happens onl
 
 ### 3.3 Apply
 
-Writes only owner-approved `write` rows: a single PATCH of `wmkf_InstitutionAtAward@odata.bind` with an ETag `If-Match`, skipping rows changed since resolve. Requires same-day `DATAVERSE_PROD_WRITE_ACK`. Logs every outcome to a CSV outside the repo.
+Stage A: writes only owner-approved `write` rows: a single PATCH of `wmkf_InstitutionAtAward@odata.bind` with an ETag `If-Match`, skipping rows changed since resolve. Requires same-day `DATAVERSE_PROD_WRITE_ACK`. Logs every outcome outside the repo.
+
+Stage B (`scripts/apply-research-copi-stage-b.mjs`, built 2026-10-23, not yet reviewed or run): `--plan` (read-only) overlays the v3 approvals and `research-copi-decisions.csv` on the frozen resolve, resolves staff-confirmed existing contacts by exact email (exactly one active contact, else held), re-checks every new contact's final email against active contacts, re-runs the new-contact grouping, copies Pao's account for Ogawa (the OIST Foundation record is held for the owner), and turns an existing co-PI row into an Institution at Award update; it writes a hashed plan. `--apply --confirm=<plan hash>` runs the plan in order: contact create (plan-minted GUID, account bound in the POST), junction create (Institution at Award bound in the POST; skipped unless its new contact was created; re-checks the request is still awarded/active with the same meeting date, applicant and PI, that the contact is neither PI nor primary contact, and that the contact has no row on the request), then PATCHes of empty Institution at Award and contact accounts with If-Match, and Ross's owner-approved contact update. Legacy `wmkf_copi1..5` slots are not written.
 
 ### 3.4 Verify and rollback
 
-Verify re-reads every applied row and reports counts. Rollback clears only rows that the apply log shows this run wrote and that still hold the written value.
+Stage A: verify re-reads every applied row and reports counts; rollback clears only rows the apply log shows this run wrote and that still hold the written value.
+
+Stage B: verify re-reads every created or set target. Rollback runs junction deletes before contact deletes, deletes only records whose ETag is unchanged since the write, refuses to delete a created contact that any junction row or potential-reviewer row references, clears set values that are unchanged, and restores Ross's prior email and account. Created records are recognized on a rerun by their plan GUID.
 
 ## 4. Before any apply
 
