@@ -12,6 +12,8 @@ related:
 
 # Meeting Tracker landing structure and mockups
 
+[PLANNED] The staged [implementation plan](../MEETING_COORDINATION_IMPLEMENTATION_PLAN_2026-10-23.md) carries the settled product decisions into proposed persistence, recovery, approval, consumer and release contracts. Runtime implementation and live-state verification remain pending.
+
 ## Current organizing direction
 
 [VERIFIED via owner direction, 2026-10-20] The newer [audience flow map](meeting-tracker-2026-10-20/workbench-audience-flow.md) makes the Workbench the PDs’ main entry for meeting information, agendas, materials and post-meeting video/transcript/summary links. Duncan and superusers handle preparation, including transcript assignments. This supersedes the mixed-audience organization implicit in the earlier mockups; it does not approve implementation or settle terminology. Earlier screen layouts remain design explorations to revisit against this flow.
