@@ -10,6 +10,20 @@ The chronological archive after the `Legacy chronological session log` divider c
 
 ---
 
+## October 2026 — Personal default wording for reviewer release courtesy emails (Session 633)
+
+**Milestone:** Slice 3 of personal email defaults shipped: PDs can save their own wording for the pending-withdrawal and accepted-release courtesy emails.
+**Sessions:** Session 633 (Claude, worktree `claude/session-2026-10-22`).
+**Ship state:**
+- PR #517 merged as `00a706afb`; Vercel production deployment completed. Signed-in production check was handed to the owner and not observed in-session.
+- New own-profile route `/api/review-manager/release-email-preferences`; previews start from the sending PD's saved wording, falling back to Admin copy (with a notice when unreadable).
+- `render-withdraw-emails` and `withdraw-sufficient` now require the lead PD or a superuser, matching the existing UI gate (owner decision).
+- Codex plan review and two build-review rounds (final approve); owner passed a synthetic click-through (`npm run rehearse:reviewer-release`).
+**Why it matters:** third of the owner-ordered personal-email slices; closes a server/UI authorization mismatch on pending-reviewer release.
+**Pointers:** `docs/plans/PERSONAL_EMAIL_REVIEWER_RELEASE_COURTESIES_PLAN_2026-10-22.md`; PR #517 / `00a706afb`.
+
+---
+
 ## October 2026 — Admin startup restored under request-specific CSP (Session 632)
 
 **Milestone:** Resolved the Admin panel remaining on Loading after the Next.js 16.4.2 upgrade exposed statically rendered startup code with an empty nonce.
