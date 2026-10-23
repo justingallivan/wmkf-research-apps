@@ -1,0 +1,560 @@
+{
+  "schemaVersion": 1,
+  "date": "2026-10-23",
+  "candidate": "9c4a6a830e7dea183d9bfe977468330ece18bcce",
+  "scope": "Synthetic-media-only local investigation; no runtime source changes or live reads/writes",
+  "conclusion": "All seven failures reproduced at decoded-sample guard; byte-identical staged MP4s decode differently in tested FFmpeg6/Linux versus FFmpeg9/macOS toolchains; pinned Linux build remains untested",
+  "hostFullSuite": {
+    "ffmpeg": "9.0.2",
+    "platform": "macOS-27.0.1-arm64-arm-64bit-Mach-O",
+    "node": "22.23.4",
+    "suitesPassed": 1,
+    "testsPassed": 26,
+    "testsFailed": 0,
+    "seconds": 21.684,
+    "sourceCopy": "git archive HEAD; no live env copied; dependencies symlinked; sanitized environment",
+    "command": "node node_modules/jest/bin/jest.js tests/unit/presentation-video-cut-script.test.js --runInBand --no-coverage"
+  },
+  "pairedDiagnostics": {
+    "linux6": {
+      "recipeSha256": "7c04b5379e264277e138555d4ba776d6965507d783d1a81e7b9abfe9a8a971c4",
+      "sourceFileSha256": "9ea4fd629ecb9c92f335f5410f0b2e52f0b2eb0dfc340c698818223fb782df63",
+      "ffmpegVersion": "ffmpeg version 6.1.1-3ubuntu5 Copyright (c) 2000-2023 the FFmpeg developers",
+      "ffprobeVersion": "ffprobe version 6.1.1-3ubuntu5 Copyright (c) 2007-2023 the FFmpeg developers",
+      "pythonVersion": "3.12.3",
+      "fixtureRecipe": {
+        "src25": "makeSource(priv=12.437), test lines 52-57 and 126-127",
+        "srcPlain": "makeSource(priv=10.01), test lines 52-57 and 128-129",
+        "bframe": "makeSource(priv=12.437, vcodec=[-preset veryfast -bf 3 -movflags +faststart]), test line 188",
+        "gap": "AAC sine 440 Hz for 1.5 s + 3000 Hz for 5 s, concat duration 1.55, copy with src25 video to 10 s, test lines 370-380"
+      },
+      "fixtureReuse": false,
+      "fixtures": {
+        "src25": {
+          "sha256": "c0fb28cf446f4ad04ee6389da12bcb52cdde0f8f442ac1686b25b0eb9ffc0565",
+          "bytes": 137286
+        },
+        "srcPlain": {
+          "sha256": "dd7d660e8f938571bb68fe676d2933439122e1d0308569bd751025865e0f3220",
+          "bytes": 137265
+        },
+        "bframe": {
+          "sha256": "cb1e3dbb2ab4f2163ad12de1628643e3607edd9b64fa1273605125c1532f1ff4",
+          "bytes": 140340
+        },
+        "gap": {
+          "sha256": "5378b1f6915ace4f45339646315e713b3cb741f0670360b4e09564859cc3d84d",
+          "bytes": 113633
+        }
+      },
+      "cases": {
+        "1_standard_12437": {
+          "exit": 3,
+          "ok": false,
+          "code": "audio_past_cut",
+          "step": "accept",
+          "framesKept": 310,
+          "samplesKept": 596976,
+          "audioFramesChecked": 583,
+          "audioPacketsEqual": null,
+          "diagnostic": {
+            "timeBase": "1/48000",
+            "durationTs": 596976,
+            "expectedSamples": 596976,
+            "decodedSamples": 596992,
+            "durationExcessSamples": 0,
+            "decodedExcessSamples": 16,
+            "firstRejectingGuard": "decoded_samples"
+          }
+        },
+        "2_standard_10010": {
+          "exit": 3,
+          "ok": false,
+          "code": "audio_past_cut",
+          "step": "accept",
+          "framesKept": 250,
+          "samplesKept": 480480,
+          "audioFramesChecked": 470,
+          "audioPacketsEqual": null,
+          "diagnostic": {
+            "timeBase": "1/48000",
+            "durationTs": 480480,
+            "expectedSamples": 480480,
+            "decodedSamples": 481280,
+            "durationExcessSamples": 0,
+            "decodedExcessSamples": 800,
+            "firstRejectingGuard": "decoded_samples"
+          }
+        },
+        "5_bframe": {
+          "exit": 3,
+          "ok": false,
+          "code": "audio_past_cut",
+          "step": "accept",
+          "framesKept": 310,
+          "samplesKept": 596976,
+          "audioFramesChecked": 583,
+          "audioPacketsEqual": null,
+          "diagnostic": {
+            "timeBase": "1/48000",
+            "durationTs": 596976,
+            "expectedSamples": 596976,
+            "decodedSamples": 596992,
+            "durationExcessSamples": 0,
+            "decodedExcessSamples": 16,
+            "firstRejectingGuard": "decoded_samples"
+          }
+        },
+        "5c_aac_priming": {
+          "exit": 3,
+          "ok": false,
+          "code": "audio_past_cut",
+          "step": "accept",
+          "framesKept": 310,
+          "samplesKept": 596976,
+          "audioFramesChecked": 583,
+          "audioPacketsEqual": null,
+          "diagnostic": {
+            "timeBase": "1/48000",
+            "durationTs": 596976,
+            "expectedSamples": 596976,
+            "decodedSamples": 596992,
+            "durationExcessSamples": 0,
+            "decodedExcessSamples": 16,
+            "firstRejectingGuard": "decoded_samples"
+          }
+        },
+        "source_qxh_correct": {
+          "exit": 3,
+          "ok": false,
+          "code": "audio_past_cut",
+          "step": "accept",
+          "framesKept": 310,
+          "samplesKept": 596976,
+          "audioFramesChecked": 583,
+          "audioPacketsEqual": null,
+          "diagnostic": {
+            "timeBase": "1/48000",
+            "durationTs": 596976,
+            "expectedSamples": 596976,
+            "decodedSamples": 596992,
+            "durationExcessSamples": 0,
+            "decodedExcessSamples": 16,
+            "firstRejectingGuard": "decoded_samples"
+          }
+        },
+        "11b_real_control": {
+          "exit": 3,
+          "ok": false,
+          "code": "frame_timestamp_mismatch",
+          "step": "accept",
+          "framesKept": 310,
+          "samplesKept": 596976,
+          "audioFramesChecked": 583,
+          "audioPacketsEqual": null,
+          "diagnostic": null
+        },
+        "11b_mutant": {
+          "exit": 3,
+          "ok": false,
+          "code": "audio_past_cut",
+          "step": "accept",
+          "framesKept": 310,
+          "samplesKept": 596976,
+          "audioFramesChecked": 583,
+          "audioPacketsEqual": null,
+          "diagnostic": {
+            "timeBase": "1/48000",
+            "durationTs": 596976,
+            "expectedSamples": 596976,
+            "decodedSamples": 596992,
+            "durationExcessSamples": 0,
+            "decodedExcessSamples": 16,
+            "firstRejectingGuard": "decoded_samples"
+          }
+        },
+        "12b_real_control": {
+          "exit": 3,
+          "ok": false,
+          "code": "unsupported_timeline",
+          "step": "audio_timeline",
+          "framesKept": 50,
+          "samplesKept": 96000,
+          "audioFramesChecked": null,
+          "audioPacketsEqual": null,
+          "diagnostic": null
+        },
+        "12b_mutant": {
+          "exit": 3,
+          "ok": false,
+          "code": "audio_past_cut",
+          "step": "accept",
+          "framesKept": 50,
+          "samplesKept": 96000,
+          "audioFramesChecked": 94,
+          "audioPacketsEqual": null,
+          "diagnostic": {
+            "timeBase": "1/48000",
+            "durationTs": 96000,
+            "expectedSamples": 96000,
+            "decodedSamples": 96256,
+            "durationExcessSamples": 0,
+            "decodedExcessSamples": 256,
+            "firstRejectingGuard": "decoded_samples"
+          }
+        }
+      }
+    },
+    "host9SameSourceFixtures": {
+      "recipeSha256": "7c04b5379e264277e138555d4ba776d6965507d783d1a81e7b9abfe9a8a971c4",
+      "sourceFileSha256": "9ea4fd629ecb9c92f335f5410f0b2e52f0b2eb0dfc340c698818223fb782df63",
+      "ffmpegVersion": "ffmpeg version 9.0.2 Copyright (c) 2000-2026 the FFmpeg developers",
+      "ffprobeVersion": "ffprobe version 9.0.2 Copyright (c) 2007-2026 the FFmpeg developers",
+      "pythonVersion": "3.15.0",
+      "fixtureRecipe": {
+        "src25": "makeSource(priv=12.437), test lines 52-57 and 126-127",
+        "srcPlain": "makeSource(priv=10.01), test lines 52-57 and 128-129",
+        "bframe": "makeSource(priv=12.437, vcodec=[-preset veryfast -bf 3 -movflags +faststart]), test line 188",
+        "gap": "AAC sine 440 Hz for 1.5 s + 3000 Hz for 5 s, concat duration 1.55, copy with src25 video to 10 s, test lines 370-380"
+      },
+      "fixtureReuse": true,
+      "fixtures": {
+        "src25": {
+          "sha256": "c0fb28cf446f4ad04ee6389da12bcb52cdde0f8f442ac1686b25b0eb9ffc0565",
+          "bytes": 137286
+        },
+        "srcPlain": {
+          "sha256": "dd7d660e8f938571bb68fe676d2933439122e1d0308569bd751025865e0f3220",
+          "bytes": 137265
+        },
+        "bframe": {
+          "sha256": "cb1e3dbb2ab4f2163ad12de1628643e3607edd9b64fa1273605125c1532f1ff4",
+          "bytes": 140340
+        },
+        "gap": {
+          "sha256": "5378b1f6915ace4f45339646315e713b3cb741f0670360b4e09564859cc3d84d",
+          "bytes": 113633
+        }
+      },
+      "cases": {
+        "1_standard_12437": {
+          "exit": 0,
+          "ok": true,
+          "code": "ok",
+          "step": null,
+          "framesKept": 310,
+          "samplesKept": 596976,
+          "audioFramesChecked": 583,
+          "audioPacketsEqual": true,
+          "diagnostic": {
+            "timeBase": "1/48000",
+            "durationTs": 596976,
+            "expectedSamples": 596976,
+            "decodedSamples": 596976,
+            "durationExcessSamples": 0,
+            "decodedExcessSamples": 0,
+            "firstRejectingGuard": "none"
+          }
+        },
+        "2_standard_10010": {
+          "exit": 0,
+          "ok": true,
+          "code": "ok",
+          "step": null,
+          "framesKept": 250,
+          "samplesKept": 480480,
+          "audioFramesChecked": 470,
+          "audioPacketsEqual": true,
+          "diagnostic": {
+            "timeBase": "1/48000",
+            "durationTs": 480480,
+            "expectedSamples": 480480,
+            "decodedSamples": 480480,
+            "durationExcessSamples": 0,
+            "decodedExcessSamples": 0,
+            "firstRejectingGuard": "none"
+          }
+        },
+        "5_bframe": {
+          "exit": 0,
+          "ok": true,
+          "code": "ok",
+          "step": null,
+          "framesKept": 310,
+          "samplesKept": 596976,
+          "audioFramesChecked": 583,
+          "audioPacketsEqual": true,
+          "diagnostic": {
+            "timeBase": "1/48000",
+            "durationTs": 596976,
+            "expectedSamples": 596976,
+            "decodedSamples": 596976,
+            "durationExcessSamples": 0,
+            "decodedExcessSamples": 0,
+            "firstRejectingGuard": "none"
+          }
+        },
+        "5c_aac_priming": {
+          "exit": 0,
+          "ok": true,
+          "code": "ok",
+          "step": null,
+          "framesKept": 310,
+          "samplesKept": 596976,
+          "audioFramesChecked": 583,
+          "audioPacketsEqual": true,
+          "diagnostic": {
+            "timeBase": "1/48000",
+            "durationTs": 596976,
+            "expectedSamples": 596976,
+            "decodedSamples": 596976,
+            "durationExcessSamples": 0,
+            "decodedExcessSamples": 0,
+            "firstRejectingGuard": "none"
+          }
+        },
+        "source_qxh_correct": {
+          "exit": 0,
+          "ok": true,
+          "code": "ok",
+          "step": null,
+          "framesKept": 310,
+          "samplesKept": 596976,
+          "audioFramesChecked": 583,
+          "audioPacketsEqual": true,
+          "diagnostic": {
+            "timeBase": "1/48000",
+            "durationTs": 596976,
+            "expectedSamples": 596976,
+            "decodedSamples": 596976,
+            "durationExcessSamples": 0,
+            "decodedExcessSamples": 0,
+            "firstRejectingGuard": "none"
+          }
+        },
+        "11b_real_control": {
+          "exit": 3,
+          "ok": false,
+          "code": "frame_timestamp_mismatch",
+          "step": "accept",
+          "framesKept": 310,
+          "samplesKept": 596976,
+          "audioFramesChecked": 583,
+          "audioPacketsEqual": null,
+          "diagnostic": null
+        },
+        "11b_mutant": {
+          "exit": 0,
+          "ok": true,
+          "code": "ok",
+          "step": null,
+          "framesKept": 310,
+          "samplesKept": 596976,
+          "audioFramesChecked": 583,
+          "audioPacketsEqual": true,
+          "diagnostic": {
+            "timeBase": "1/48000",
+            "durationTs": 596976,
+            "expectedSamples": 596976,
+            "decodedSamples": 596976,
+            "durationExcessSamples": 0,
+            "decodedExcessSamples": 0,
+            "firstRejectingGuard": "none"
+          }
+        },
+        "12b_real_control": {
+          "exit": 3,
+          "ok": false,
+          "code": "unsupported_timeline",
+          "step": "audio_timeline",
+          "framesKept": 50,
+          "samplesKept": 96000,
+          "audioFramesChecked": null,
+          "audioPacketsEqual": null,
+          "diagnostic": null
+        },
+        "12b_mutant": {
+          "exit": 0,
+          "ok": true,
+          "code": "ok",
+          "step": null,
+          "framesKept": 50,
+          "samplesKept": 96000,
+          "audioFramesChecked": 94,
+          "audioPacketsEqual": true,
+          "diagnostic": {
+            "timeBase": "1/48000",
+            "durationTs": 96000,
+            "expectedSamples": 96000,
+            "decodedSamples": 96000,
+            "durationExcessSamples": 0,
+            "decodedExcessSamples": 0,
+            "firstRejectingGuard": "none"
+          }
+        }
+      }
+    }
+  },
+  "sameEncodedOutputCrossDecode": {
+    "linux6": {
+      "ffmpegVersion": "ffmpeg version 6.1.1-3ubuntu5 Copyright (c) 2000-2023 the FFmpeg developers",
+      "cases": [
+        {
+          "case": "work-11b_mutant",
+          "sha256": "4f015aa68d108c21cad70d442c11140e9829c30bd2776598c3f2bee6599148c8",
+          "decodedSamples": 596992
+        },
+        {
+          "case": "work-12b_mutant",
+          "sha256": "63800459fc61398393f9eb44d294052559f398119f5435b5f14406a61b1a03b8",
+          "decodedSamples": 96256
+        },
+        {
+          "case": "work-1_standard_12437",
+          "sha256": "f20c0c68749a37a8e556c6d3f99148ea06f7112075d1189a9a8137c259823085",
+          "decodedSamples": 596992
+        },
+        {
+          "case": "work-2_standard_10010",
+          "sha256": "350afecc8e37e73ebb447e0a91a3ce8b8250e3306c85cf29078dfb7da9863fdb",
+          "decodedSamples": 481280
+        },
+        {
+          "case": "work-5_bframe",
+          "sha256": "f20c0c68749a37a8e556c6d3f99148ea06f7112075d1189a9a8137c259823085",
+          "decodedSamples": 596992
+        },
+        {
+          "case": "work-5c_aac_priming",
+          "sha256": "f20c0c68749a37a8e556c6d3f99148ea06f7112075d1189a9a8137c259823085",
+          "decodedSamples": 596992
+        },
+        {
+          "case": "work-source_qxh_correct",
+          "sha256": "f20c0c68749a37a8e556c6d3f99148ea06f7112075d1189a9a8137c259823085",
+          "decodedSamples": 596992
+        }
+      ]
+    },
+    "host9": {
+      "ffmpegVersion": "ffmpeg version 9.0.2 Copyright (c) 2000-2026 the FFmpeg developers",
+      "cases": [
+        {
+          "case": "work-11b_mutant",
+          "sha256": "4f015aa68d108c21cad70d442c11140e9829c30bd2776598c3f2bee6599148c8",
+          "decodedSamples": 596976
+        },
+        {
+          "case": "work-12b_mutant",
+          "sha256": "63800459fc61398393f9eb44d294052559f398119f5435b5f14406a61b1a03b8",
+          "decodedSamples": 96000
+        },
+        {
+          "case": "work-1_standard_12437",
+          "sha256": "f20c0c68749a37a8e556c6d3f99148ea06f7112075d1189a9a8137c259823085",
+          "decodedSamples": 596976
+        },
+        {
+          "case": "work-2_standard_10010",
+          "sha256": "350afecc8e37e73ebb447e0a91a3ce8b8250e3306c85cf29078dfb7da9863fdb",
+          "decodedSamples": 480480
+        },
+        {
+          "case": "work-5_bframe",
+          "sha256": "f20c0c68749a37a8e556c6d3f99148ea06f7112075d1189a9a8137c259823085",
+          "decodedSamples": 596976
+        },
+        {
+          "case": "work-5c_aac_priming",
+          "sha256": "f20c0c68749a37a8e556c6d3f99148ea06f7112075d1189a9a8137c259823085",
+          "decodedSamples": 596976
+        },
+        {
+          "case": "work-source_qxh_correct",
+          "sha256": "f20c0c68749a37a8e556c6d3f99148ea06f7112075d1189a9a8137c259823085",
+          "decodedSamples": 596976
+        }
+      ]
+    }
+  },
+  "limits": [
+    "Not an exact production-pinned archive test",
+    "Not current Production deployment revision/pathname/store evidence",
+    "Version, build, and operating system differ; no upstream fix commit established",
+    "Diagnostic cases replay seven failures plus two controls; do not replace full26 suite",
+    "AAC end-padding inference does not justify weakening privacy/safety guards"
+  ],
+  "preparedArtifactProbe": {
+    "status": "NOT_RUN",
+    "operations": "one exact-object metadata read plus at most one private content GET; retries disabled",
+    "maxBytes": 201326592,
+    "metadataTimeoutMs": 30000,
+    "contentTimeoutMs": 180000,
+    "pathname": "stage4/ffmpeg-n9.0.2-23-g27b46f0fbc-linux64-gpl-9.0.tar.xz",
+    "sha256": "14020417ff8ef01470e8cb771355e65c37aff62b80fb0be41eeb7611d1360902",
+    "requires": "Explicit authorization for Vercel Blob read operations and data transfer, which may incur charges",
+    "retention": "0600 local archive only after hash+size verification; no extraction/execution by probe",
+    "source": "#!/usr/bin/env node\n// Prepared for review only. Do not run without separate authorization for a private Blob read.\nimport { createHash, randomUUID } from 'node:crypto';\nimport { createReadStream } from 'node:fs';\nimport { link, lstat, open, unlink } from 'node:fs/promises';\nimport { createInterface } from 'node:readline';\nimport { createRequire } from 'node:module';\n\nconst ENV_FILE = '/Users/gallivan/Code/WMKF_Apps/.env.local';\nconst PATHNAME = 'stage4/ffmpeg-n9.0.2-23-g27b46f0fbc-linux64-gpl-9.0.tar.xz';\nconst EXPECTED_SHA256 = '14020417ff8ef01470e8cb771355e65c37aff62b80fb0be41eeb7611d1360902';\nconst MAX_BYTES = 192 * 1024 * 1024;\nconst FINAL_FILE = '/private/tmp/wmkf-media-investigation-qx7b5evb/ffmpeg-n9.0.2-23-g27b46f0fbc-linux64-gpl-9.0.tar.xz';\nconst require = createRequire('/Users/gallivan/Code/WMKF_Apps/package.json');\n\nasync function readOnlyUploadsToken() {\n  let token;\n  const lines = createInterface({ input: createReadStream(ENV_FILE), crlfDelay: Infinity });\n  for await (const line of lines) {\n    if (!line.startsWith('UPLOADS_BLOB_RW_TOKEN=')) continue;\n    if (token !== undefined) throw new Error('duplicate_token');\n    token = line.slice('UPLOADS_BLOB_RW_TOKEN='.length).trim();\n    if (token.startsWith('\"') && token.endsWith('\"')) token = token.slice(1, -1);\n  }\n  if (!token) throw new Error('missing_token');\n  return token;\n}\n\nlet stage = 'local_preflight';\ntry {\n  try {\n    await lstat(FINAL_FILE);\n    throw new Error('local_archive_already_exists');\n  } catch (error) {\n    if (error?.code !== 'ENOENT') throw error;\n  }\n\n  stage = 'local_setup';\n  const token = await readOnlyUploadsToken();\n  process.env.VERCEL_BLOB_RETRIES = '0';\n  const { head, get } = require('@vercel/blob');\n\n  stage = 'metadata';\n  const metadata = await head(PATHNAME, { token, abortSignal: AbortSignal.timeout(30_000) });\n  if (metadata.pathname !== PATHNAME || !Number.isSafeInteger(metadata.size) ||\n      metadata.size <= 0 || metadata.size > MAX_BYTES) throw new Error('metadata_rejected');\n\n  stage = 'content';\n  const controller = new AbortController();\n  const timer = setTimeout(() => controller.abort(), 180_000);\n  try {\n    const result = await get(PATHNAME, {\n      access: 'private', token, useCache: false, abortSignal: controller.signal,\n    });\n    if (result?.statusCode !== 200 || !result.stream ||\n        result.blob.pathname !== PATHNAME || result.blob.size !== metadata.size ||\n        (metadata.etag && result.blob.etag && metadata.etag !== result.blob.etag)) {\n      throw new Error('content_metadata_rejected');\n    }\n\n    const hash = createHash('sha256');\n    const reader = result.stream.getReader();\n    let bytes = 0;\n    const partialFile = `${FINAL_FILE}.part-${process.pid}-${randomUUID()}`;\n    const handle = await open(partialFile, 'wx', 0o600);\n    try {\n      while (true) {\n        const { done, value } = await reader.read();\n        if (done) break;\n        bytes += value.byteLength;\n        if (bytes > MAX_BYTES || bytes > metadata.size) {\n          controller.abort();\n          throw new Error('content_too_large');\n        }\n        hash.update(value);\n        const chunk = Buffer.from(value);\n        let offset = 0;\n        while (offset < chunk.length) {\n          const written = await handle.write(chunk, offset, chunk.length - offset, null);\n          if (written.bytesWritten <= 0) throw new Error('local_write_failed');\n          offset += written.bytesWritten;\n        }\n      }\n      if (bytes !== metadata.size || hash.digest('hex') !== EXPECTED_SHA256) {\n        throw new Error('content_hash_or_size_mismatch');\n      }\n      await handle.sync();\n      await handle.close();\n      // link() is atomic and refuses an existing final file; it cannot overwrite one.\n      await link(partialFile, FINAL_FILE);\n      await unlink(partialFile);\n      console.log(`PASS: sha256_match=true bytes=${bytes} archive_retained=true`);\n    } catch (error) {\n      controller.abort();\n      await handle.close().catch(() => {});\n      await unlink(partialFile).catch(() => {});\n      throw error;\n    } finally {\n      reader.releaseLock();\n    }\n  } finally {\n    controller.abort();\n    clearTimeout(timer);\n  }\n} catch {\n  // Avoid printing SDK exceptions, local environment content, tokens, or Blob URLs.\n  console.error(`FAIL: ${stage}; no content retained`);\n  process.exitCode = 1;\n}\n"
+  },
+  "reproduction": {
+    "harness": "#!/usr/bin/env python3\n\"\"\"Synthetic, detached comparison of the seven cut-script failures.\n\nRun with a PATH containing the FFmpeg/ffprobe pair to compare. No network,\ncredentials, production worker, or repository writes. Synthetic media is\nremoved after each run; only content-free JSON results are retained.\n\"\"\"\nimport argparse\nimport hashlib\nimport json\nimport os\nfrom pathlib import Path\nimport re\nimport shutil\nimport subprocess\nimport sys\nimport tempfile\n\n\ndef digest(data):\n    return hashlib.sha256(data).hexdigest()\n\n\ndef run(cmd, env=None, input_bytes=None):\n    done = subprocess.run(cmd, input=input_bytes, stdout=subprocess.PIPE,\n                          stderr=subprocess.PIPE, env=env, check=False)\n    if done.returncode:\n        raise RuntimeError(f\"command failed ({done.returncode}): {Path(cmd[0]).name}\")\n    return done.stdout\n\n\ndef ff(*args):\n    run(['ffmpeg', '-hide_banner', '-nostdin', '-y', '-loglevel', 'error', *map(str, args)])\n\n\ndef make_source(out, *, fps=25, dur=15, priv=12.437, vcodec=(), vf=''):\n    red = f\"drawbox=x=0:y=0:w=320:h=180:c=red:t=fill:enable='gte(t,{priv})'\"\n    aud = (f\"aevalsrc='if(lt(t,{priv}),0.3*sin(2*PI*440*t),0.3*sin(2*PI*3000*t))\"\n           f\"|if(lt(t,{priv}),0.3*sin(2*PI*440*t),0.3*sin(2*PI*3000*t))':s=48000:d={dur}\")\n    ff('-f', 'lavfi', '-i', f'color=c=0xf6f8fc:s=320x180:r={fps}:d={dur}',\n       '-f', 'lavfi', '-i', aud, '-vf', f'{red},{vf}' if vf else red,\n       '-fps_mode', 'passthrough', '-c:v', 'libx264', '-preset', 'ultrafast',\n       '-bf', '0', '-pix_fmt', 'yuv420p', '-g', '50', *vcodec,\n       '-c:a', 'aac', '-b:a', '64k', out)\n\n\ndef extract_recipe(source):\n    text = source.read_text()\n    version = re.search(r'export const CUT_SCRIPT_VERSION = (\\d+);', text)\n    if not version:\n        raise RuntimeError('version literal not found')\n    start = 'export const CUT_SCRIPT_PY = String.raw`'\n    a = text.index(start) + len(start)\n    b = text.index('`;', a)\n    recipe = text[a:b].replace('${CUT_SCRIPT_VERSION}', version.group(1))\n    if '${' in recipe:\n        raise RuntimeError('unexpanded template interpolation')\n    return recipe\n\n\ndef instrument(recipe):\n    anchor = \"        if out_a.get('time_base') == '1/%d' % rate and int(out_a.get('duration_ts', 0)) > samples:\"\n    if recipe.count(anchor) != 1:\n        raise RuntimeError('audio guard anchor changed')\n    # Diagnostic measurement runs before either unchanged guard. It only adds\n    # receipt fields and does not bypass or weaken the production checks.\n    addition = (\n        \"        diagnostic_decoded = decoded_sample_count(tools, partial, channels, step)\\n\"\n        \"        diagnostic_duration = int(out_a.get('duration_ts', 0))\\n\"\n        \"        diagnostic_duration_guard = out_a.get('time_base') == '1/%d' % rate and diagnostic_duration > samples\\n\"\n        \"        R['diagnostic'] = {\\n\"\n        \"            'timeBase': out_a.get('time_base'), 'durationTs': diagnostic_duration,\\n\"\n        \"            'expectedSamples': samples, 'decodedSamples': diagnostic_decoded,\\n\"\n        \"            'durationExcessSamples': diagnostic_duration - samples,\\n\"\n        \"            'decodedExcessSamples': diagnostic_decoded - samples,\\n\"\n        \"            'firstRejectingGuard': ('stream_duration' if diagnostic_duration_guard else\\n\"\n        \"                                    'decoded_samples' if diagnostic_decoded > samples else 'none')}\\n\"\n    )\n    return recipe.replace(anchor, addition + anchor)\n\n\ndef replace_once(recipe, needle, replacement):\n    if recipe.count(needle) != 1:\n        raise RuntimeError('mutant anchor changed')\n    return recipe.replace(needle, replacement, 1)\n\n\ndef run_cut(recipe_file, source, cut_ms, work, *, qxh=None):\n    work.mkdir()\n    env = {'PATH': os.environ.get('PATH', ''), 'HOME': os.environ.get('HOME', '/tmp'),\n           'LANG': 'C', 'SOURCE_PATH': str(source),\n           'SOURCE_SIZE': str(source.stat().st_size), 'CUT_MS': str(cut_ms),\n           'WORK_DIR': str(work)}\n    if qxh is not None:\n        env['SOURCE_QXH'] = qxh\n    done = subprocess.run([sys.executable, str(recipe_file), 'cut'], env=env,\n                          stdin=subprocess.DEVNULL, stdout=subprocess.PIPE,\n                          stderr=subprocess.PIPE, check=False)\n    receipt = json.loads((work / 'receipt.json').read_text())\n    return {'exit': done.returncode, 'ok': receipt['ok'], 'code': receipt['code'],\n            'step': receipt['step'], 'framesKept': receipt['framesKept'],\n            'samplesKept': receipt['samplesKept'],\n            'audioFramesChecked': receipt['audioFramesChecked'],\n            'audioPacketsEqual': receipt['audioPacketsEqual'],\n            'diagnostic': receipt.get('diagnostic')}\n\n\ndef main():\n    ap = argparse.ArgumentParser()\n    ap.add_argument('--source', type=Path, required=True,\n                    help='tracked source-copy presentation-video-cut-script.js')\n    ap.add_argument('--output', type=Path, required=True,\n                    help='JSON result location outside the repository')\n    ap.add_argument('--fixture-dir', type=Path,\n                    help='persistent directory for generated synthetic fixtures')\n    ap.add_argument('--reuse-fixtures', action='store_true',\n                    help='use existing --fixture-dir bytes without regenerating')\n    args = ap.parse_args()\n    if args.reuse_fixtures and args.fixture_dir is None:\n        ap.error('--reuse-fixtures requires --fixture-dir')\n    recipe = extract_recipe(args.source)\n    args.output.parent.mkdir(parents=True, exist_ok=True)\n    scratch = Path(tempfile.mkdtemp(prefix='wmkf-media-guard-'))\n    fixture_dir = args.fixture_dir or scratch\n    results = {'recipeSha256': digest(recipe.encode()), 'sourceFileSha256': digest(args.source.read_bytes()),\n               'ffmpegVersion': run(['ffmpeg', '-version']).decode().splitlines()[0],\n               'ffprobeVersion': run(['ffprobe', '-version']).decode().splitlines()[0],\n               'pythonVersion': sys.version.split()[0],\n               'fixtureRecipe': {\n                   'src25': 'makeSource(priv=12.437), test lines 52-57 and 126-127',\n                   'srcPlain': 'makeSource(priv=10.01), test lines 52-57 and 128-129',\n                   'bframe': \"makeSource(priv=12.437, vcodec=[-preset veryfast -bf 3 -movflags +faststart]), test line 188\",\n                   'gap': 'AAC sine 440 Hz for 1.5 s + 3000 Hz for 5 s, concat duration 1.55, copy with src25 video to 10 s, test lines 370-380',\n               },\n               'fixtureReuse': args.reuse_fixtures, 'fixtures': {}, 'cases': {}}\n    try:\n        normal = scratch / 'normal.py'\n        normal.write_text(instrument(recipe))\n        fixture_dir.mkdir(parents=True, exist_ok=True)\n        src25 = fixture_dir / 'src-12437.mp4'\n        src_plain = fixture_dir / 'src-10010.mp4'\n        bframe = fixture_dir / 'src-bframe.mp4'\n        gap = fixture_dir / 'gap-source.mp4'\n        if not args.reuse_fixtures:\n            for file in (src25, src_plain, bframe, gap):\n                if file.exists():\n                    raise RuntimeError('refusing to overwrite an existing fixture')\n            make_source(src25, priv=12.437)\n            make_source(src_plain, priv=10.01)\n            make_source(bframe, priv=12.437,\n                        vcodec=('-preset', 'veryfast', '-bf', '3', '-movflags', '+faststart'))\n            # Exact test 12b fixture: audio concat with a 50 ms timestamp gap.\n            a1, a2 = scratch / 'gap-a1.m4a', scratch / 'gap-a2.m4a'\n            ff('-f', 'lavfi', '-i', 'sine=f=440:r=48000:d=1.5', '-ac', '2', '-c:a', 'aac', a1)\n            ff('-f', 'lavfi', '-i', 'sine=f=3000:r=48000:d=5', '-ac', '2', '-c:a', 'aac', a2)\n            concat = scratch / 'gap-list.txt'\n            concat.write_text(f\"file '{a1}'\\nduration 1.55\\nfile '{a2}'\\n\")\n            joined = scratch / 'gap-joined.m4a'\n            ff('-f', 'concat', '-safe', '0', '-i', concat, '-c', 'copy', joined)\n            ff('-i', src25, '-i', joined, '-map', '0:v', '-map', '1:a', '-c', 'copy', '-t', '10', gap)\n        else:\n            if not all(file.is_file() for file in (src25, src_plain, bframe, gap)):\n                raise RuntimeError('fixture directory is incomplete')\n        for label, file in [('src25', src25), ('srcPlain', src_plain), ('bframe', bframe)]:\n            results['fixtures'][label] = {'sha256': digest(file.read_bytes()), 'bytes': file.stat().st_size}\n\n        qxh_env = {'PATH': os.environ.get('PATH', ''), 'HOME': os.environ.get('HOME', '/tmp'),\n                   'LANG': 'C', 'FILE': str(src25)}\n        qxh = json.loads(run([sys.executable, str(normal), 'qxh'], env=qxh_env))['quickXorHash']\n\n        # The first five cases are the exact successful cuts underlying failures\n        # 1, 2, 5, 5c, and correct SOURCE_QXH. Case 5c intentionally repeats 1.\n        cases = [\n            ('1_standard_12437', normal, src25, 12437, None),\n            ('2_standard_10010', normal, src_plain, 10010, None),\n            ('5_bframe', normal, bframe, 12437, None),\n            ('5c_aac_priming', normal, src25, 12437, None),\n            ('source_qxh_correct', normal, src25, 12437, qxh),\n        ]\n\n        # Exact test 11b replacements: both a mistimed encode alone (control)\n        # and the same encode with only the frame timestamp rejection patched.\n        bad = replace_once(recipe, \"'-fps_mode', 'passthrough',\",\n                           \"'-fps_mode', 'cfr', '-r', '30',\")\n        bad_real = scratch / 'bad-real.py'\n        bad_real.write_text(instrument(bad))\n        bad_mutant = scratch / 'bad-mutant.py'\n        bad_mutant.write_text(instrument(replace_once(\n            bad, \"raise Fail('frame_timestamp_mismatch', step)\", 'pass')))\n        cases += [('11b_real_control', bad_real, src25, 12437, None),\n                  ('11b_mutant', bad_mutant, src25, 12437, None)]\n\n        # Unchanged recipe control and the two precise continuity replacements.\n        results['fixtures']['gap'] = {'sha256': digest(gap.read_bytes()), 'bytes': gap.stat().st_size}\n        needle = \"        if not covered:\\n            timeline_fail(step)\"\n        hit = \"            if f.get('pts') is None or f.get('nb_samples') is None or int(f['pts']) != pos:\\n                timeline_fail(step)\"\n        gap_mutant_recipe = replace_once(replace_once(recipe, needle, '        pass'), hit, '            pass')\n        gap_mutant = scratch / 'gap-mutant.py'\n        gap_mutant.write_text(instrument(gap_mutant_recipe))\n        cases += [('12b_real_control', normal, gap, 2000, None),\n                  ('12b_mutant', gap_mutant, gap, 2000, None)]\n\n        for label, py, src, cut_ms, identity in cases:\n            results['cases'][label] = run_cut(py, src, cut_ms, scratch / ('work-' + label), qxh=identity)\n        args.output.write_text(json.dumps(results, indent=2) + '\\n')\n        print(json.dumps(results, separators=(',', ':')))\n    finally:\n        shutil.rmtree(scratch)\n\n\nif __name__ == '__main__':\n    main()\n",
+    "crossDecode": "import hashlib,json,pathlib,subprocess,sys\nrows=[]\nfor p in sorted(pathlib.Path(sys.argv[1]).glob('*.mp4')):\n raw=subprocess.run(['ffmpeg','-v','error','-i',str(p),'-map','0:a:0','-f','s16le','-ac','2','-ar','48000','-'],capture_output=True,check=True).stdout\n rows.append({'case':p.stem,'sha256':hashlib.sha256(p.read_bytes()).hexdigest(),'decodedSamples':len(raw)//4})\nprint(json.dumps({'ffmpegVersion':subprocess.check_output(['ffmpeg','-version'],text=True).splitlines()[0],'cases':rows},indent=2))\n",
+    "exportInstrumentationHarnessSha256": "6c8a3e33e57a89fb02bd8a68d46def8429bec3cb4dc3597755be5a42282683e7"
+  },
+  "cleanup": {
+    "ownedContainersRemoved": 3,
+    "ownedImageRemoved": true,
+    "volumeCreated": false,
+    "networkCreated": false,
+    "hostMounts": false,
+    "diagnosticNetwork": "none",
+    "liveCredentialsProvided": false,
+    "defaultContext": "colima"
+  },
+  "localEvidenceFiles": [
+    {
+      "path": "/private/tmp/wmkf-media-investigation-qx7b5evb/host-ffmpeg9.log",
+      "sha256": "feb7a256fcb1df0717162eafb34b32f89e3aeeb33870165347e10d96335851b4"
+    },
+    {
+      "path": "/private/tmp/wmkf-media-investigation-qx7b5evb/media_guard_harness.py",
+      "sha256": "83210d8ed8b88bd6ffd2587be93767edd9925046fc7f2d14547df9f75b3f69f7"
+    },
+    {
+      "path": "/private/tmp/wmkf-media-investigation-qx7b5evb/export_stage_harness.py",
+      "sha256": "6c8a3e33e57a89fb02bd8a68d46def8429bec3cb4dc3597755be5a42282683e7"
+    },
+    {
+      "path": "/private/tmp/wmkf-media-investigation-qx7b5evb/cross_decode.py",
+      "sha256": "5b7c3de945cb57649d8b5bdcc76099a91c3a0da34e6195028b91e0886682975d"
+    },
+    {
+      "path": "/private/tmp/wmkf-media-investigation-qx7b5evb/probe-private-ffmpeg.mjs",
+      "sha256": "9180d66bc679c112afe16d81ba46dc207e30d7fc4ff974782f087ffa81b685d4"
+    },
+    {
+      "path": "/private/tmp/wmkf-media-investigation-qx7b5evb/artifact-investigation.md",
+      "sha256": "3cf329dad299f1fcb793273e23fd5963f6e4f5adeec1e96ecb5111a514ec3cf8"
+    },
+    {
+      "path": "/private/tmp/wmkf-media-investigation-qx7b5evb/linux6-diagnostic.json",
+      "sha256": "1c786ad2e9e86417be955f41c3022b17327b8b1c438cb8682644a74c740d9b0f"
+    },
+    {
+      "path": "/private/tmp/wmkf-media-investigation-qx7b5evb/host9-linux6-fixtures.json",
+      "sha256": "80eff33d4b7bcaea4e8b14bd54f502feb195b14e8e3350de11f62d823e28752b"
+    },
+    {
+      "path": "/private/tmp/wmkf-media-investigation-qx7b5evb/same-output-linux6-decode.json",
+      "sha256": "96ac08521387ee5688af609fc531c27440b87339e3727bf33848e4f53161e21c"
+    },
+    {
+      "path": "/private/tmp/wmkf-media-investigation-qx7b5evb/same-output-host9-decode.json",
+      "sha256": "f6054d2b85d73800cbb2da9d44f1ebe44dbc76ee2b0a89efc84effc4be5c44bb"
+    },
+    {
+      "path": "/private/tmp/wmkf-media-investigation-qx7b5evb/cleanup.json",
+      "sha256": "621950a62f9a40a6463066dd060dca5e92f5cb4dd0cd21ac31ee388b9a606c12"
+    }
+  ]
+}

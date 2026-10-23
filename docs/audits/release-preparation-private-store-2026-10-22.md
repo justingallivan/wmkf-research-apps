@@ -3,7 +3,7 @@ title: Private Store and Release Preparation Receipt
 domain: engineering-process
 kind: audit
 status: active
-summary: "Local Ubuntu core checks passed with a supplementary FFmpeg verification gap; three release decision groups remain, while private-store binding is separate unless it becomes a release dependency."
+summary: "Local Ubuntu core checks passed with documented skips. Tested Linux FFmpeg 6.1.1 and macOS FFmpeg 9.0.2 builds differ on identical output bytes; exact Production artifact parity and three release decision groups remain open."
 canonical: false
 cataloged: 2026-10-22
 last_verified: 2026-10-23
@@ -17,6 +17,8 @@ related:
   - docs/audits/release-candidate-lineage-2026-10-22.json
   - docs/audits/linux-ci-verification-2026-10-23.md
   - docs/audits/linux-ci-evidence-2026-10-23.json
+  - docs/audits/ffmpeg-media-investigation-2026-10-23.md
+  - docs/audits/ffmpeg-media-evidence-2026-10-23.json
   - docs/audits/blob-store-binding-evidence-2026-10-22.json
   - docs/audits/blob-retention-metadata-evidence-2026-10-22.json
 ---
@@ -24,7 +26,7 @@ related:
 # Private Store and Release Preparation Receipt
 
 **Assessment date:** 2026-10-22 (America/Los_Angeles); rehearsal update 2026-10-22 (America/Los_Angeles).
-**Status:** Fully gated candidate `81b8a063b` passed its recorded isolated Node 22/macOS checks: Turbopack build, browser suite, ESLint, 42 npm check gates, Jest coverage run, and selected PostgreSQL integration suites. Fixture candidate `9b2ec0060` passed its scoped build, 51-test browser suite, focused unit suites, scoped ESLint, diff check, and two headless CLI smoke runs. The assessed code candidate `eaa126028d7918c94340e75f1ea3213ad041f010` is a four-document descendant of `9b2ec0060`, with unchanged code/test and runtime/dependency trees; the `9b` scoped results therefore apply to the same code and test bytes through `eaa`. The reviewed comparison is recorded in [lineage evidence](release-candidate-lineage-2026-10-22.json). Candidate `94447672fe04a788b0e6aadb5deeb9d2fc85e82a` received local Ubuntu workflow-equivalent verification: core checks passed with documented Jest skips, while supplemental FFmpeg compatibility remains unresolved because the pinned public artifact could not be retrieved; no production artifact store was queried. See the [Linux verification record](linux-ci-verification-2026-10-23.md). The guided human session remains the partial observation on candidate `5b1656b3dfad110fb5d23fc4fa2514d573e6a638`. Three release-decision groups remain open as listed in the [release-candidate checklist](release-candidate-checklist-2026-10-22.md): disposition of internal staff/reviewer-role outcomes, authorized hosted-target and rollback verification, and the final owner promotion decision with strategy §12 operating controls. External first-time reviewer usability remains unverified and is not an external-recruitment prerequisite under current owner direction. Private-store binding remains unknown as a separate investigation; no release dependency has been established.
+**Status:** Fully gated candidate `81b8a063b` passed its recorded isolated Node 22/macOS checks: Turbopack build, browser suite, ESLint, 42 npm check gates, Jest coverage run, and selected PostgreSQL integration suites. Fixture candidate `9b2ec0060` passed its scoped build, 51-test browser suite, focused unit suites, scoped ESLint, diff check, and two headless CLI smoke runs. The assessed code candidate `eaa126028d7918c94340e75f1ea3213ad041f010` is a four-document descendant of `9b2ec0060`, with unchanged code/test and runtime/dependency trees; the `9b` scoped results therefore apply to the same code and test bytes through `eaa`. The reviewed comparison is recorded in [lineage evidence](release-candidate-lineage-2026-10-22.json). Candidate `94447672fe04a788b0e6aadb5deeb9d2fc85e82a` received local Ubuntu workflow-equivalent verification with core checks passed and documented Jest skips. Follow-up cross-decoder checks show different behavior between the tested Linux FFmpeg 6.1.1 and macOS FFmpeg 9.0.2 builds on the same encoded MP4 bytes. The initial Linux run retained one diagnostic; follow-up diagnostics reproduced all seven `audio_past_cut` failures. The exact pinned `9.0.2-23` private artifact and current Production pathname remain unverified; see the [Linux verification record](linux-ci-verification-2026-10-23.md) and [FFmpeg investigation](ffmpeg-media-investigation-2026-10-23.md). The guided human session remains the partial observation on candidate `5b1656b3dfad110fb5d23fc4fa2514d573e6a638`. Three release-decision groups remain open as listed in the [release-candidate checklist](release-candidate-checklist-2026-10-22.md): disposition of internal staff/reviewer-role outcomes, authorized hosted-target and rollback verification, and the final owner promotion decision with strategy §12 operating controls. External first-time reviewer usability remains unverified and is not an external-recruitment prerequisite under current owner direction. Private Dataverse-export Blob store binding remains unknown as a separate investigation; no release dependency has been established.
 **Fully gated candidate:** `81b8a063b`; **latest code/test candidate:** `9b2ec0060`; **assessed code candidate:** `eaa126028d7918c94340e75f1ea3213ad041f010`; **human observation candidate:** `5b1656b3dfad110fb5d23fc4fa2514d573e6a638`; application runtime checkpoint `4720980ed`. Earlier release evidence below includes candidate `c589cbb6e` (`codex/memory-audit-followups`) and remains scoped to that candidate.
 
 This receipt records the evidence available for the local release candidate and
@@ -40,8 +42,10 @@ later candidates. The `9b2ec0060` scoped test results apply through
 comparison found only four documentation changes. Human rehearsal, hosted
 verification, and release authorization remain separate and incomplete. A
 later local Ubuntu run provides workflow-equivalent core-check evidence with
-documented skips and a supplementary media gap; it does not claim hosted
-GitHub Actions or amd64 coverage.
+documented skips. Follow-up tests show a behavior difference between the tested
+Linux FFmpeg 6.1.1 and macOS FFmpeg 9.0.2 builds on the same encoded outputs,
+while exact Production artifact parity remains unverified. The results do not
+claim hosted GitHub Actions, amd64, or Production media evidence.
 
 ## Later fixture candidate `9b2ec0060`
 
@@ -183,9 +187,12 @@ partial materials to remain nonblocking, and submitted authoring to remain locke
 Current Stage 2b uses in-browser authoring; its former file-upload control is not
 a missing rehearsal fixture. Internal staff observation is partial, not
 complete; human rehearsal, hosted verification, and release authorization remain
-separate gates. The later local Ubuntu core checks passed with skips and an
-unresolved supplemental media comparison, as recorded in the
-[Linux verification record](linux-ci-verification-2026-10-23.md).
+separate gates. The later local Ubuntu core checks passed with skips. Follow-up
+diagnostics reproduced all seven `audio_past_cut` failures under the tested
+Linux FFmpeg 6.1.1 build; the same encoded outputs passed on the isolated macOS
+FFmpeg 9.0.2 build. The pinned Production archive remains unverified, as
+recorded in the [Linux verification record](linux-ci-verification-2026-10-23.md)
+and [FFmpeg investigation](ffmpeg-media-investigation-2026-10-23.md).
 The current owner direction uses internal
 staff for staff and role-played reviewer tasks; external first-time usability
 remains unverified, with no external recruitment prerequisite. See the
@@ -358,7 +365,7 @@ does not reverse data or email effects.
 |---|---|---|
 | Candidate source review | Fully gated candidate `81b8a063b` and fixture candidate `9b2ec0060` reviewed | Application runtime remains at `4720980ed`; the recorded human observation candidate `5b1656b3dfad110fb5d23fc4fa2514d573e6a638` is separate; hosted behavior remains unverified. |
 | Latest fixture-candidate checks | Candidate `9b2ec0060` passed the recorded scoped checks | Isolated Node 22.23.4/macOS Turbopack build passed; 51/51 browser tests passed with no retries; three focused unit suites passed 40 tests; scoped ESLint and diff check exited 0. This is not the full gate set recorded for `81b8a063b`. |
-| Local Ubuntu verification | Candidate `94447672f` passed configured core checks with skips; supplemental media remains unresolved | Build, 42 workflow check steps, coverage Jest (1,432 suites / 24,763 tests), and ten required PostgreSQL suites passed. The separate FFmpeg 6 suite failed 7/26; the pinned production binary was not obtained. See the [Linux record](linux-ci-verification-2026-10-23.md). No hosted GitHub Actions or amd64 pass is claimed. |
+| Local Ubuntu verification | Candidate `94447672f` passed configured core checks with skips; tested Linux FFmpeg 6.1.1 and macOS FFmpeg 9.0.2 builds differ on the same encoded outputs; exact Production artifact parity remains unknown | Build, 42 workflow check steps, coverage Jest (1,432 suites / 24,763 tests), and ten required PostgreSQL suites passed. Historical FFmpeg 6 suite: 19/26 with one initial `audio_past_cut` diagnostic; follow-up diagnostics reproduced all seven failures at that guard. Seven case outputs comprise four unique MP4 hashes. The isolated FFmpeg 9.0.2 host was not Linux and did not use pinned `9.0.2-23` bytes. Current private-object and Production-path checks were not performed. See the [Linux record](linux-ci-verification-2026-10-23.md) and [FFmpeg investigation](ffmpeg-media-investigation-2026-10-23.md). No hosted GitHub Actions or amd64 pass is claimed. |
 | Clean locked install | Complete on prior candidate `c589cbb6e` | Completed offline in its isolated workspace. |
 | Locked production build | Prior candidate `c589cbb6e` passed; fully gated candidate build passed | Prior build passed on Node 24.19.0 and Node 22.23.4/macOS. `81b8a063b` completed canonical Turbopack `next build` through Playwright `webServer`; that invocation skipped package `npm prebuild`, which passed separately with unchanged manifest bytes. |
 | Full Jest coverage run | Fully gated candidate passed | Node 22: 1,433 suites / 24,784 tests, five snapshots; 17 suites / 215 tests skipped, 512.717 seconds. Jest coverage thresholds are disabled; opt-in PostgreSQL suites are separate. |
@@ -388,8 +395,8 @@ not a release approval. The concrete remaining gates are listed in the
 [release-candidate checklist](release-candidate-checklist-2026-10-22.md):
 disposition of internal staff and reviewer-role outcomes, authorized hosted
 target/rollback verification, and the release owner's promotion decision.
-Local Ubuntu core-check evidence and its unresolved supplemental media
-qualification are recorded separately; they are not a hosted CI pass.
+Local Ubuntu core-check evidence and the bounded decoder comparison are recorded
+separately; neither is a hosted CI pass or exact Production artifact check.
 External first-time reviewer usability is unverified and is not an
 external-recruitment prerequisite under current owner direction.
 
