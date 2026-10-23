@@ -21,17 +21,22 @@
  *       (the apply input) and research-copi-apply-plan.csv (owner dry run), then
  *       prints counts and the plan hash.
  *   --apply --confirm=<plan hash> --approver="<name>" [--first=N]
- *       Runs the plan's operations in order. Creates use plan-minted GUIDs, so a
- *       rerun recognizes its own rows; every write re-reads its target first,
- *       patches only empty values with If-Match, and logs intent/result lines to
- *       research-copi-applied.jsonl. A junction row whose new contact was not
- *       created is skipped.
- *   --verify  READ-ONLY. Re-reads every applied, not-rolled-back write.
- *   --rollback --ids=<file of ids | all>
+ *       Runs the plan's operations in order (per-operation logic: makeApplier in the
+ *       lib). Creates use plan-minted GUIDs; every write re-reads its target first,
+ *       patches only empty values with If-Match on that same read, and logs
+ *       intent/result lines to research-copi-applied.jsonl. A junction row whose new
+ *       contact is not created yet is `blocked` and retried on the next run, like
+ *       `failed`. After an interrupted or failed write, a target found in exactly the
+ *       planned state is `recovered`; one edited since is `recovered_modified`.
+ *   --verify  READ-ONLY. Re-reads every applied write and lists unresolved planned
+ *       operations, recovered writes and records edited since creation.
+ *   --rollback --ids=<file of ids | all> [--include-recovered]
  *       Reverses only this script's writes that are unchanged since (ETag): junction
  *       rows are deleted before contacts; a created contact is deleted only when no
  *       junction row or potential-reviewer row references it; set values are cleared;
- *       Ross's contact update is restored.
+ *       Ross's contact update is restored. `recovered` writes need --include-recovered
+ *       (an edit between the write and its recovery cannot be ruled out);
+ *       `recovered_modified` is never reversed automatically.
  * Write modes need DATAVERSE_PROD_WRITE_ACK="<purpose> <YYYY-MM-DD>"; every mode that
  * reaches production needs DATAVERSE_ALLOW_PROD_READS=yes.
  */
@@ -40,10 +45,11 @@ import fs from 'fs';
 import path from 'path';
 import crypto from 'crypto';
 import ExcelJS from 'exceljs';
-import { AWARDED, lc } from './lib/research-iaa-backfill.mjs';
+import { lc } from './lib/research-iaa-backfill.mjs';
 import { groupNewContacts } from './lib/research-copi-stage-b.mjs';
 import {
   GUID, ROLE_COPI, parseDecision, selectLine, contactCreatePayload, junctionCreatePayload, foldLedger, applyDone, rollbackEligible,
+  makeApplier, JUNCTION, REQUEST_SELECT, ROW_SELECT, CONTACT_SELECT, SET_TARGETS,
 } from './lib/research-copi-apply.mjs';
 
 try {
@@ -75,11 +81,7 @@ const { bypassDynamicsRestrictions } = await import('../lib/services/dynamics-co
 const { fetchWithTimeout, buildHeaders } = await import('../lib/services/dynamics/http.js');
 const { escape } = await import('../lib/dataverse/core/odata.js');
 
-const JUNCTION = 'wmkf_apprequestpersons';
 const OIST_FOUNDATION = '00c4fa37-3fea-f011-8544-6045bd0510d4';
-const REQUEST_SELECT = 'akoya_requestid,akoya_requestnum,wmkf_meetingdate,akoya_requeststatus,statecode,_akoya_applicantid_value,_wmkf_projectleader_value,_akoya_primarycontactid_value';
-const ROW_SELECT = 'wmkf_apprequestpersonid,wmkf_role,_wmkf_request_value,_wmkf_contact_value,_wmkf_institutionataward_value';
-const CONTACT_SELECT = 'contactid,statecode,emailaddress1,emailaddress2,emailaddress3,_parentcustomerid_value';
 const sha = (s) => crypto.createHash('sha256').update(s).digest('hex');
 const now = () => new Date().toISOString();
 const host = (() => { try { return new URL(process.env.DYNAMICS_URL).host; } catch { return ''; } })();
@@ -224,7 +226,9 @@ async function runPlan() {
       if (x.held) { hold(x.line, x.held); continue; }
       const source = { key: x.line.key, requestId: lc(x.line.requestId), requestNum: x.line.requestNum, meetingDate: x.line.meetingDate, applicantId: lc(x.line.applicantId), projectLeaderId: lc(x.line.projectLeaderId) };
       if (x.existingRow) {
-        if (x.sel.iaaAccountId) ops.push({ op: 'iaa-set', id: lc(x.existingRow.wmkf_apprequestpersonid), value: guid(x.sel.iaaAccountId, 'iaa'), source });
+        // The row's request/contact/role are re-checked before the write.
+        const expect = { requestId: lc(x.existingRow._wmkf_request_value), contactId: lc(x.existingRow._wmkf_contact_value), role: x.existingRow.wmkf_role };
+        if (x.sel.iaaAccountId) ops.push({ op: 'iaa-set', id: lc(x.existingRow.wmkf_apprequestpersonid), value: guid(x.sel.iaaAccountId, 'iaa'), expect, source });
         else hold(x.line, 'co-PI row exists and no institution to set');
         continue;
       }
@@ -281,10 +285,7 @@ async function runPlan() {
 }
 
 // ── Apply ──
-const SETS = {
-  'iaa-set': { entitySet: JUNCTION, select: '_wmkf_institutionataward_value', value: (r) => lc(r?._wmkf_institutionataward_value), bind: (v) => ({ 'wmkf_InstitutionAtAward@odata.bind': v ? `/accounts(${v})` : null }) },
-  'contact-account-set': { entitySet: 'contacts', select: '_parentcustomerid_value,statecode', value: (r) => lc(r?._parentcustomerid_value), bind: (v) => ({ 'parentcustomerid_account@odata.bind': v ? `/accounts(${v})` : null }) },
-};
+const SETS = SET_TARGETS;
 async function patchReturning(entitySet, id, select, body, ifMatch) {
   const token = await DynamicsService.getAccessToken();
   const headers = { ...buildHeaders(token), Prefer: 'return=representation,odata.include-annotations="*"', 'If-Match': ifMatch };
@@ -292,67 +293,13 @@ async function patchReturning(entitySet, id, select, body, ifMatch) {
   if (!res.ok) { const err = new Error(`PATCH failed (${res.status}): ${(await res.text()).slice(0, 200)}`); err.status = res.status; throw err; }
   return DynamicsService.processAnnotations(await res.json());
 }
-function requestDrift(src, r) {
-  if (!r) return 'request missing';
-  if (r.statecode !== 0 || !AWARDED.includes(r.akoya_requeststatus)) return 'request no longer awarded/active';
-  if ((r.wmkf_meetingdate || '').slice(0, 10) !== src.meetingDate) return 'meeting date changed';
-  if (lc(r._akoya_applicantid_value) !== src.applicantId) return 'applicant changed';
-  if (lc(r._wmkf_projectleader_value) !== src.projectLeaderId) return 'PI changed';
-  return '';
-}
-
-async function applyOp(o, ledger) {
-  if (o.op === 'contact-create') {
-    const existing = await getOrNull('contacts', o.id, CONTACT_SELECT);
-    if (existing) return { result: 'created', postEtag: existing._etag, detail: 'found from an earlier interrupted run' };
-    if (o.payload.emailaddress1 && (await activeContactsWithEmail(o.payload.emailaddress1)).length) return { result: 'skipped', detail: 'email now held by an active contact' };
-    const drift = requestDrift(o.source, await getOrNull('akoya_requests', o.source.requestId, REQUEST_SELECT));
-    if (drift) return { result: 'changed_since_plan', detail: drift };
-    const rec = await DynamicsService.createRecord('contacts', o.payload);
-    return { result: 'created', postEtag: rec?._etag || null };
-  }
-  if (o.op === 'junction-create') {
-    if (o.newContact) {
-      const c = ledger.get(`contact-create|${o.contactId}`);
-      if (c?.receipt?.result !== 'created' || c.undone) return { result: 'skipped', detail: 'its new contact was not created' };
-    }
-    const existing = await getOrNull(JUNCTION, o.id, ROW_SELECT);
-    if (existing) return { result: 'created', postEtag: existing._etag, detail: 'found from an earlier interrupted run' };
-    const r = await getOrNull('akoya_requests', o.source.requestId, REQUEST_SELECT);
-    const drift = requestDrift(o.source, r);
-    if (drift) return { result: 'changed_since_plan', detail: drift };
-    if ([lc(r._wmkf_projectleader_value), lc(r._akoya_primarycontactid_value)].includes(lc(o.contactId))) return { result: 'skipped', detail: 'contact is the PI or primary contact' };
-    if ((await rowsForRequest(o.source.requestId)).some((j) => lc(j._wmkf_contact_value) === lc(o.contactId))) return { result: 'skipped', detail: 'contact already has a row on this request' };
-    const rec = await DynamicsService.createRecord(JUNCTION, o.payload);
-    return { result: 'created', postEtag: rec?._etag || null };
-  }
-  if (o.op === 'iaa-set' || o.op === 'contact-account-set') {
-    const t = SETS[o.op];
-    const cur = await getOrNull(t.entitySet, o.id, t.select);
-    if (!cur) return { result: 'missing' };
-    if (o.op === 'contact-account-set' && cur.statecode !== 0) return { result: 'skipped', detail: 'contact inactive' };
-    const v = t.value(cur);
-    if (v === o.value) return { result: 'already_set' };
-    if (v) return { result: 'conflict', detail: `already holds ${v}` };
-    if (!cur._etag) return { result: 'skipped', detail: 'no ETag on re-read' };
-    try {
-      const post = await patchReturning(t.entitySet, o.id, t.select, t.bind(o.value), cur._etag);
-      return { result: t.value(post) === o.value ? 'set' : 'write_then_changed', postEtag: post?._etag || null };
-    } catch (err) { if (err?.status === 412) return { result: 'changed_since_plan', detail: '412 on write' }; throw err; }
-  }
-  if (o.op === 'contact-update') {
-    const cur = await getOrNull('contacts', o.id, CONTACT_SELECT);
-    if (!cur) return { result: 'missing' };
-    const now_ = { emailaddress1: lc(cur.emailaddress1), emailaddress2: lc(cur.emailaddress2), parentcustomerid: lc(cur._parentcustomerid_value) };
-    if (JSON.stringify(now_) !== JSON.stringify(o.before)) return { result: 'changed_since_plan', detail: 'contact email/account changed' };
-    const body = { emailaddress1: o.after.emailaddress1, emailaddress2: o.after.emailaddress2 || null, 'parentcustomerid_account@odata.bind': `/accounts(${guid(o.after.parentcustomerid, 'account')})` };
-    try {
-      const post = await patchReturning('contacts', o.id, '_parentcustomerid_value,emailaddress1,emailaddress2', body, cur._etag);
-      return { result: 'set', postEtag: post?._etag || null };
-    } catch (err) { if (err?.status === 412) return { result: 'changed_since_plan', detail: '412 on write' }; throw err; }
-  }
-  throw new Error(`unknown op ${o.op}`);
-}
+const applyOp = makeApplier({
+  getOrNull: (entitySet, id, select) => getOrNull(entitySet, guid(id, 'id'), select),
+  activeContactsWithEmail,
+  rowsForRequest,
+  create: (entitySet, payload) => DynamicsService.createRecord(entitySet, payload),
+  patch: patchReturning,
+});
 
 function loadPlan() {
   if (!fs.existsSync(PLAN)) { console.error('No plan; run --plan first.'); process.exit(2); }
@@ -372,6 +319,7 @@ async function runApply() {
   const runId = `${now()}-${crypto.randomBytes(3).toString('hex')}`;
   let done = 0; const counts = {};
   await bypassDynamicsRestrictions('research-copi-stage-b-apply', async () => {
+    // Plan order puts each contact before its junction row, so one pass settles both.
     for (const o of ops) {
       const key = `${o.op}|${o.id}`;
       if (applyDone(ledger.get(key))) continue;
@@ -385,7 +333,7 @@ async function runApply() {
       append(APPLIED, rec);
       ledger.set(key, { receipt: rec, undone: false, interrupted: false });
       counts[`${o.op}:${out.result}`] = (counts[`${o.op}:${out.result}`] || 0) + 1;
-      if (!['created', 'set', 'already_set'].includes(out.result) || out.detail) console.log(`  ${o.op} ${base.requestNum} ${out.result}${out.detail ? ` (${out.detail})` : ''}`);
+      if (!['created', 'set', 'already_set', 'blocked'].includes(out.result) || out.detail) console.log(`  ${o.op} ${base.requestNum} ${out.result}${out.detail ? ` (${out.detail})` : ''}`);
     }
   });
   console.log(`Apply this run: ${JSON.stringify(counts)}. Log: ${APPLIED}`);
@@ -395,27 +343,36 @@ async function runApply() {
 async function runVerify() {
   const { ops } = loadPlan();
   const ledger = foldLedger(readJsonl(APPLIED));
-  let ok = 0; const bad = [];
+  let ok = 0; const bad = []; const open = []; const modified = []; const recovered = [];
   await bypassDynamicsRestrictions('research-copi-stage-b-verify', async () => {
     for (const o of ops) {
       const s = ledger.get(`${o.op}|${o.id}`);
-      if (!s?.receipt || !['created', 'set'].includes(s.receipt.result) || s.undone) continue;
+      const label = `${o.op} ${o.source.requestNum || ''} ${o.id}`;
+      if (!applyDone(s)) { open.push(`${label} (${s?.receipt?.result || (s?.interrupted ? 'interrupted' : 'not run')})`); continue; }
+      if (s.undone) continue;
+      if (s.receipt.result === 'recovered_modified') { modified.push(label); continue; }
+      if (!['created', 'set', 'recovered'].includes(s.receipt.result)) continue;
+      if (s.receipt.result === 'recovered') recovered.push(label);
       let good;
       if (o.op === 'contact-create') good = Boolean(await getOrNull('contacts', o.id, 'contactid'));
       else if (o.op === 'junction-create') { const j = await getOrNull(JUNCTION, o.id, ROW_SELECT); good = Boolean(j) && lc(j._wmkf_contact_value) === lc(o.contactId); }
       else if (o.op === 'contact-update') { const c = await getOrNull('contacts', o.id, CONTACT_SELECT); good = lc(c?.emailaddress1) === o.after.emailaddress1 && lc(c?._parentcustomerid_value) === o.after.parentcustomerid; }
       else good = SETS[o.op].value(await getOrNull(SETS[o.op].entitySet, o.id, SETS[o.op].select)) === o.value;
-      if (good) ok += 1; else bad.push(`${o.op} ${o.source.requestNum || ''} ${o.id}`);
+      if (good) ok += 1; else bad.push(label);
     }
   });
-  console.log(`Verify: ${ok} applied writes hold; ${bad.length} mismatch.`);
+  console.log(`Verify: ${ok} applied writes hold; ${bad.length} mismatch; ${open.length} planned operations unresolved; ${recovered.length} recovered after an interrupted run; ${modified.length} edited by someone else after creation.`);
   for (const b of bad) console.log(`  MISMATCH ${b}`);
+  for (const b of open) console.log(`  UNRESOLVED ${b}`);
+  for (const b of recovered) console.log(`  RECOVERED ${b} (rollback needs --include-recovered)`);
+  for (const b of modified) console.log(`  EDITED-SINCE-CREATE ${b} (never rolled back automatically)`);
 }
 
 async function runRollback() {
   const ids = arg('ids');
   if (!ids) { console.error('--ids=<file of ids | all> is required'); process.exit(2); }
   const { ops } = loadPlan();
+  const includeRecovered = flag('include-recovered');
   const wanted = ids === 'all' ? null : new Set(fs.readFileSync(ids, 'utf8').split(/\s+/).filter(Boolean).map((s) => s.toLowerCase()));
   const ledger = foldLedger(readJsonl(APPLIED));
   // Junction rows before the contacts they reference; plain sets after.
@@ -428,7 +385,7 @@ async function runRollback() {
       if (!s?.receipt) continue;
       let outcome;
       if (s.undone) outcome = 'already_undone';
-      else if (!rollbackEligible(s)) outcome = 'not_eligible';
+      else if (!rollbackEligible(s, { includeRecovered })) outcome = s.receipt.result === 'recovered' ? 'not_eligible_recovered' : 'not_eligible';
       else {
         try {
           if (o.op === 'junction-create' || o.op === 'contact-create') {

@@ -181,7 +181,8 @@ export function junctionCreatePayload({ junctionId, requestId, requestNum, conta
 
 /**
  * Fold the apply log into per-target state. Targets are keyed "<kind>|<id>".
- * `created`/`set` results are reversible; a later rollback line marks them undone.
+ * `interrupted` means an intent line has no result after it: the write may or
+ * may not have committed. A later rollback line marks the target undone.
  */
 export function foldLedger(lines) {
   const m = new Map();
@@ -195,6 +196,130 @@ export function foldLedger(lines) {
   }
   return m;
 }
-export const applyDone = (s) => Boolean(s?.receipt && s.receipt.result !== 'failed') || Boolean(s?.undone);
-export const REVERSIBLE = new Set(['created', 'set']);
-export const rollbackEligible = (s) => Boolean(s?.receipt && REVERSIBLE.has(s.receipt.result) && s.receipt.postEtag && !s.undone);
+// `failed` and `blocked` (a prerequisite not done yet) are retried on the next run.
+const RETRY = new Set(['failed', 'blocked']);
+export const applyDone = (s) => Boolean(s?.receipt && !RETRY.has(s.receipt.result)) || Boolean(s?.undone);
+// A write whose outcome this script cannot be sure of: interrupted, or failed after sending.
+export const uncertain = (s) => Boolean(s?.interrupted || s?.receipt?.result === 'failed');
+/**
+ * `created`/`set` were observed in the write response. `recovered` was found
+ * after an uncertain run in exactly the planned state; an edit between that
+ * write and the recovery cannot be ruled out, so its rollback needs an explicit
+ * opt-in. `recovered_modified` is never rolled back automatically.
+ */
+export function rollbackEligible(s, { includeRecovered = false } = {}) {
+  if (!s?.receipt || s.undone || !s.receipt.postEtag) return false;
+  return s.receipt.result === 'created' || s.receipt.result === 'set' || (includeRecovered && s.receipt.result === 'recovered');
+}
+
+// ── Apply ──
+
+export const JUNCTION = 'wmkf_apprequestpersons';
+export const AWARDED_STATUSES = ['Approved', 'Active', 'Closed'];
+export const REQUEST_SELECT = 'akoya_requestid,akoya_requestnum,wmkf_meetingdate,akoya_requeststatus,statecode,_akoya_applicantid_value,_wmkf_projectleader_value,_akoya_primarycontactid_value';
+export const ROW_SELECT = 'wmkf_apprequestpersonid,wmkf_role,_wmkf_request_value,_wmkf_contact_value,_wmkf_institutionataward_value';
+export const CONTACT_SELECT = 'contactid,statecode,firstname,middlename,lastname,emailaddress1,emailaddress2,emailaddress3,_parentcustomerid_value';
+const id = (v) => (v ? String(v).trim().toLowerCase() : '');
+const bindId = (v) => id(String(v || '').match(/\(([^)]+)\)/)?.[1]);
+
+/** Why an awarded request no longer matches its plan snapshot ('' when it does). */
+export function requestDrift(src, r) {
+  if (!r) return 'request missing';
+  if (r.statecode !== 0 || !AWARDED_STATUSES.includes(r.akoya_requeststatus)) return 'request no longer awarded/active';
+  if ((r.wmkf_meetingdate || '').slice(0, 10) !== src.meetingDate) return 'meeting date changed';
+  if (id(r._akoya_applicantid_value) !== src.applicantId) return 'applicant changed';
+  if (id(r._wmkf_projectleader_value) !== src.projectLeaderId) return 'PI changed';
+  return '';
+}
+/** Whether a contact read back still holds exactly what the create sent. */
+export function contactMatchesPayload(c, p) {
+  return (c.firstname || '') === (p.firstname || '') && (c.middlename || '') === (p.middlename || '') && (c.lastname || '') === (p.lastname || '')
+    && id(c.emailaddress1) === id(p.emailaddress1) && id(c._parentcustomerid_value) === bindId(p['parentcustomerid_account@odata.bind']);
+}
+export function junctionMatchesPayload(j, p) {
+  return id(j._wmkf_request_value) === bindId(p['wmkf_Request@odata.bind']) && id(j._wmkf_contact_value) === bindId(p['wmkf_Contact@odata.bind'])
+    && j.wmkf_role === p.wmkf_role && id(j._wmkf_institutionataward_value) === bindId(p['wmkf_InstitutionAtAward@odata.bind']);
+}
+const SETS = {
+  'iaa-set': { entitySet: JUNCTION, select: ROW_SELECT, value: (r) => id(r?._wmkf_institutionataward_value), bind: (v) => ({ 'wmkf_InstitutionAtAward@odata.bind': v ? `/accounts(${v})` : null }) },
+  'contact-account-set': { entitySet: 'contacts', select: CONTACT_SELECT, value: (r) => id(r?._parentcustomerid_value), bind: (v) => ({ 'parentcustomerid_account@odata.bind': v ? `/accounts(${v})` : null }) },
+};
+export const SET_TARGETS = SETS;
+const contactState = (c) => ({ emailaddress1: id(c.emailaddress1), emailaddress2: id(c.emailaddress2), parentcustomerid: id(c._parentcustomerid_value) });
+const same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
+
+/**
+ * The per-operation write step, with Dataverse access injected so failures can
+ * be replayed in tests. io: getOrNull(entitySet, id, select), activeContactsWithEmail(email),
+ * rowsForRequest(requestId), create(entitySet, payload) -> record with _etag,
+ * patch(entitySet, id, select, body, ifMatch) -> record with _etag (throws err.status 412 on ETag mismatch).
+ * Returns the result fields for the ledger line.
+ */
+export function makeApplier(io) {
+  const guarded = async (fn) => {
+    try { return await fn(); } catch (err) { if (err?.status === 412) return { result: 'changed_since_plan', detail: '412 on write' }; throw err; }
+  };
+  return async function applyOp(o, ledger) {
+    const state = ledger.get(`${o.op}|${o.id}`);
+    const unsure = uncertain(state);
+    if (o.op === 'contact-create') {
+      // The id was minted by the plan, so a record with it is this script's own create.
+      const found = await io.getOrNull('contacts', o.id, CONTACT_SELECT);
+      if (found) return contactMatchesPayload(found, o.payload) ? { result: 'recovered', postEtag: found._etag } : { result: 'recovered_modified', detail: 'edited since created' };
+      if (o.payload.emailaddress1 && (await io.activeContactsWithEmail(o.payload.emailaddress1)).length) return { result: 'skipped', detail: 'email now held by an active contact' };
+      const drift = requestDrift(o.source, await io.getOrNull('akoya_requests', o.source.requestId, REQUEST_SELECT));
+      if (drift) return { result: 'changed_since_plan', detail: drift };
+      const rec = await io.create('contacts', o.payload);
+      return { result: 'created', postEtag: rec?._etag || null };
+    }
+    if (o.op === 'junction-create') {
+      if (o.newContact) {
+        const c = ledger.get(`contact-create|${o.contactId}`);
+        const ok = ['created', 'recovered', 'recovered_modified'].includes(c?.receipt?.result) && !c.undone;
+        if (!ok) return { result: 'blocked', detail: 'its new contact is not created yet' };
+      }
+      const found = await io.getOrNull(JUNCTION, o.id, ROW_SELECT);
+      if (found) return junctionMatchesPayload(found, o.payload) ? { result: 'recovered', postEtag: found._etag } : { result: 'recovered_modified', detail: 'edited since created' };
+      const r = await io.getOrNull('akoya_requests', o.source.requestId, REQUEST_SELECT);
+      const drift = requestDrift(o.source, r);
+      if (drift) return { result: 'changed_since_plan', detail: drift };
+      if ([id(r._wmkf_projectleader_value), id(r._akoya_primarycontactid_value)].includes(id(o.contactId))) return { result: 'skipped', detail: 'contact is the PI or primary contact' };
+      if ((await io.rowsForRequest(o.source.requestId)).some((j) => id(j._wmkf_contact_value) === id(o.contactId))) return { result: 'skipped', detail: 'contact already has a row on this request' };
+      const rec = await io.create(JUNCTION, o.payload);
+      return { result: 'created', postEtag: rec?._etag || null };
+    }
+    if (o.op === 'iaa-set' || o.op === 'contact-account-set') {
+      const t = SETS[o.op];
+      const cur = await io.getOrNull(t.entitySet, o.id, t.select);
+      if (!cur) return { result: 'missing' };
+      if (o.op === 'iaa-set') {
+        const e = o.expect || {};
+        if (id(cur._wmkf_request_value) !== e.requestId || id(cur._wmkf_contact_value) !== e.contactId || cur.wmkf_role !== e.role) return { result: 'changed_since_plan', detail: 'row request/contact/role changed' };
+        const drift = requestDrift(o.source, await io.getOrNull('akoya_requests', o.source.requestId, REQUEST_SELECT));
+        if (drift) return { result: 'changed_since_plan', detail: drift };
+      } else if (cur.statecode !== 0) return { result: 'skipped', detail: 'contact inactive' };
+      const v = t.value(cur);
+      if (v === o.value) return unsure ? { result: 'recovered', postEtag: cur._etag } : { result: 'already_set' };
+      if (v) return { result: 'conflict', detail: `already holds ${v}` };
+      if (!cur._etag) return { result: 'skipped', detail: 'no ETag on re-read' };
+      // If-Match on the same read that passed the checks above.
+      return guarded(async () => {
+        const post = await io.patch(t.entitySet, o.id, t.select, t.bind(o.value), cur._etag);
+        return { result: t.value(post) === o.value ? 'set' : 'write_then_changed', postEtag: post?._etag || null };
+      });
+    }
+    if (o.op === 'contact-update') {
+      const cur = await io.getOrNull('contacts', o.id, CONTACT_SELECT);
+      if (!cur) return { result: 'missing' };
+      const now = contactState(cur);
+      if (unsure && same(now, o.after)) return { result: 'recovered', postEtag: cur._etag };
+      if (!same(now, o.before)) return { result: 'changed_since_plan', detail: 'contact email/account changed' };
+      const body = { emailaddress1: o.after.emailaddress1, emailaddress2: o.after.emailaddress2 || null, 'parentcustomerid_account@odata.bind': `/accounts(${o.after.parentcustomerid})` };
+      return guarded(async () => {
+        const post = await io.patch('contacts', o.id, CONTACT_SELECT, body, cur._etag);
+        return { result: same(contactState(post), o.after) ? 'set' : 'write_then_changed', postEtag: post?._etag || null };
+      });
+    }
+    throw new Error(`unknown op ${o.op}`);
+  };
+}
