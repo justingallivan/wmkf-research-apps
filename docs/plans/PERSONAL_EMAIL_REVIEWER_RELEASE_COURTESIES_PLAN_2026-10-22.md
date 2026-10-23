@@ -2,8 +2,8 @@
 title: Personal reviewer release-courtesy defaults
 domain: reviewer-engagement
 kind: plan
-status: proposed
-summary: Slice 3 of the personal email defaults initiative — saved per-PD wording for the pending-reviewer withdrawal and accepted-reviewer release courtesy emails; plan only, not built.
+status: built-in-branch
+summary: Slice 3 of the personal email defaults initiative — saved per-PD wording for the pending-reviewer withdrawal and accepted-reviewer release courtesy emails; built on branch claude/session-2026-10-22, not merged or deployed.
 owner: product-engineering
 related:
   - docs/plans/PERSONAL_EMAIL_DEFAULTS_TODO_2026-09-20.md
@@ -156,6 +156,26 @@ with its self-test, sequentially: api-routes, route-lifecycle-auth, route-servic
 reviewer-engagement-boundary, dataverse-access-layer, trust-boundary-guid, fact-consistency,
 doc-symbol-refs, docs-catalog, doc-currency, types, secret-scan. Live behavior (real PD
 wording, delivery) stays unverified until an authorized smoke test.
+
+## Branch implementation evidence
+
+[VERIFIED via branch source and local commands, 2026-10-22] Built on
+`claude/session-2026-10-22` as planned: preference keys, `reviewer-release-personalization.js`,
+`/api/review-manager/release-email-preferences`, generic-route reservation, sender-PD wording in
+both preview services, lead-PD/superuser authorization on `render-withdraw-emails` and
+`withdraw-sufficient`, and the shared `ReleaseWordingDefault` section in both dialogs. The
+accepted-release refresh updates only subject/body/source and leaves the internal note and
+`expectedNotes` untouched. Route matrix, service catalog and canonical counts updated.
+
+Tests: new `reviewer-release-personalization`, `release-email-preferences-route`,
+`render-withdraw-emails-route-auth` and `release-wording-default` suites; wording-source cases
+added to `withdraw-sufficient-preview` and `terminal-transition-service`; the withdraw route
+suites now stub authorization and cover the 403 path; reserved-key tests cover both new keys.
+The reviewer-related run passed 376 suites / 6,820 tests. ESLint (quiet) is clean. Types, API
+route, lifecycle auth, route-service, reviewer-engagement, DAL, GUID, OData, context, fact
+consistency, canonical pointer, doc symbol, build-claim, catalog, currency, Atlas, secret,
+scaffolding, harness-framing, reminder-hold and prompt-injection gates passed, each with its
+self-test run sequentially. No Dataverse, email or other live service was called.
 
 ## Coordination
 

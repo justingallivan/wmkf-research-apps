@@ -5,11 +5,16 @@
  */
 
 const withdrawSufficient = jest.fn(async () => ({ ok: true, withdrawn: 0, results: [] }));
+const authorizeReviewerRequestMutation = jest.fn(async () => ({}));
 
 jest.mock('../../lib/utils/auth', () => ({
   requireAppAccess: jest.fn(async () => ({
+    profileId: 'profile-1',
     session: { user: { dynamicsSystemuserId: 'staff-1' } },
   })),
+}));
+jest.mock('../../lib/services/reviewer-request-authorization', () => ({
+  authorizeReviewerRequestMutation: (...args) => authorizeReviewerRequestMutation(...args),
 }));
 jest.mock('../../lib/dataverse/core/context', () => ({
   withDalContext: jest.fn(async (_source, fn) => fn()),
@@ -31,6 +36,31 @@ beforeAll(async () => {
 
 beforeEach(() => {
   withdrawSufficient.mockClear();
+  authorizeReviewerRequestMutation.mockReset();
+  authorizeReviewerRequestMutation.mockResolvedValue({});
+});
+
+test('authorizes the lead PD or a superuser for every target before the service runs', async () => {
+  const res = await run(undefined, 'no_response', false);
+  expect(res.statusCode).toBe(200);
+  expect(authorizeReviewerRequestMutation).toHaveBeenCalledWith({
+    profileId: 'profile-1',
+    callerSystemId: 'staff-1',
+    requestIds: [REQUEST_ID],
+    suggestionIds: [SUGGESTION_ID],
+  });
+  expect(withdrawSufficient).toHaveBeenCalledTimes(1);
+});
+
+test('a non-owner is refused with 403 and nothing is withdrawn or sent', async () => {
+  const { ServiceHttpError } = require('../../lib/services/service-http-error');
+  authorizeReviewerRequestMutation.mockRejectedValue(new ServiceHttpError(
+    'Only the lead Program Director (or a superuser) can manage reviewer activity for this request.',
+    { httpStatus: 403 },
+  ));
+  const res = await run(undefined, 'no_response', false);
+  expect(res.statusCode).toBe(403);
+  expect(withdrawSufficient).not.toHaveBeenCalled();
 });
 
 async function run(overrides, reason, sendEmail) {

@@ -45,6 +45,10 @@ jest.mock('../../lib/services/reviewer-acceptance-job-service', () => ({
   cancelReviewerAcceptanceJobsForSuggestion: (...args) =>
     cancelReviewerAcceptanceJobsForSuggestion(...args),
 }));
+const resolveSenderReleaseTemplate = jest.fn();
+jest.mock('../../lib/services/reviewer-release-personalization', () => ({
+  resolveSenderReleaseTemplate: (...args) => resolveSenderReleaseTemplate(...args),
+}));
 const assertReviewerDirectedEmailBound = jest.fn();
 jest.mock('../../lib/services/test-requests/reviewer-directed-email', () => ({
   assertReviewerDirectedEmailBound: (...args) => assertReviewerDirectedEmailBound(...args),
@@ -104,6 +108,7 @@ const acceptedReleaseArgs = (overrides = {}) => args({
 beforeEach(() => {
   assertReviewerDirectedEmailBound.mockReset().mockResolvedValue({ kind: 'ordinary' });
   jest.clearAllMocks();
+  resolveSenderReleaseTemplate.mockImplementation(async (_sender, _kind, shared) => ({ template: shared, templateSource: 'shared' }));
   findById.mockResolvedValue(row());
   updateLifecycle.mockResolvedValue(undefined);
   applyStaffReviewerWithdrawal.mockResolvedValue(undefined);
@@ -682,4 +687,43 @@ test.each([
   expect(applyStaffReviewerRelease).toHaveBeenCalledTimes(1);
   expect(result.transitioned).toBe(1);
   expect(result.results[0].status).toBe(expectedStatus);
+});
+
+describe('release preview wording source', () => {
+  test('starts from the sending PD saved wording and reports its source', async () => {
+    resolveSenderReleaseTemplate.mockResolvedValueOnce({
+      template: { subject: 'PD subject', body: 'PD says {{greeting}} about {{proposalClause}}' },
+      templateSource: 'personal',
+    });
+    const { drafts } = await renderAcceptedReleasePreviews({ requestId: REQUEST, suggestionIds: [SUGGESTION] });
+    expect(resolveSenderReleaseTemplate).toHaveBeenCalledWith('pd-1', 'release', {
+      subject: 'Thank you',
+      body: '{{greeting}} — {{proposalClause}} — {{signature}}',
+    });
+    expect(drafts[0]).toMatchObject({ status: 'ok', subject: 'PD subject', templateSource: 'personal' });
+    expect(drafts[0].bodyText).toMatch(/^PD says .* about the proposal/);
+    expect(drafts[0]).not.toHaveProperty('templateNotice');
+  });
+
+  test('a fallback draft carries the notice and Admin copy', async () => {
+    resolveSenderReleaseTemplate.mockImplementationOnce(async (_s, _k, shared) => ({
+      template: shared, templateSource: 'shared_fallback', templateNotice: 'preference_unavailable',
+    }));
+    const { drafts } = await renderAcceptedReleasePreviews({ requestId: REQUEST, suggestionIds: [SUGGESTION] });
+    expect(drafts[0]).toMatchObject({
+      status: 'ok', subject: 'Thank you', templateSource: 'shared_fallback', templateNotice: 'preference_unavailable',
+    });
+  });
+
+  test('the PD wording is read once per preview, not per reviewer', async () => {
+    await renderAcceptedReleasePreviews({ requestId: REQUEST, suggestionIds: [SUGGESTION, SECOND] });
+    expect(resolveSenderReleaseTemplate).toHaveBeenCalledTimes(1);
+  });
+
+  test('no PD mailbox means no preference read', async () => {
+    getSystemUserById.mockResolvedValue(null);
+    const { drafts } = await renderAcceptedReleasePreviews({ requestId: REQUEST, suggestionIds: [SUGGESTION] });
+    expect(drafts[0].status).toBe('no_pd');
+    expect(resolveSenderReleaseTemplate).not.toHaveBeenCalled();
+  });
 });

@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import EmailSendFeedback from '../EmailSendFeedback';
+import ReleaseWordingDefault from './ReleaseWordingDefault';
 import { requestEnvelope } from '../../utils/api-request';
 
 const REASON = 'sufficient_reviews_received';
@@ -51,6 +52,24 @@ function failureMessage(status, fallback = 'The reviewer could not be released.'
   return FAILURE_LABELS[status] || fallback;
 }
 
+const TEMPLATE_NOTICE = {
+  preference_unavailable: 'The sender’s saved wording could not be read, so this email starts from the shared Admin wording.',
+  preference_invalid: 'The sender’s saved wording needs correction, so this email starts from the shared Admin wording.',
+};
+
+function previewRequest(requestId, suggestionId) {
+  return requestEnvelope('/api/review-manager/terminal-transition', {
+    method: 'POST',
+    body: {
+      requestId,
+      suggestionIds: [suggestionId],
+      terminalStatus: 'released',
+      preview: true,
+    },
+    tolerantBody: true,
+  });
+}
+
 export default function AcceptedReviewerReleaseModal({ reviewer, requestId, onClose, onRelease }) {
   const [draft, setDraft] = useState(null);
   const [subject, setSubject] = useState('');
@@ -61,20 +80,13 @@ export default function AcceptedReviewerReleaseModal({ reviewer, requestId, onCl
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState(null);
   const [feedback, setFeedback] = useState(null);
+  const [refreshing, setRefreshing] = useState(false);
   const mountedRef = useRef(true);
+  const refreshGenerationRef = useRef(0);
 
   useEffect(() => {
     let cancelled = false;
-    requestEnvelope('/api/review-manager/terminal-transition', {
-      method: 'POST',
-      body: {
-        requestId,
-        suggestionIds: [reviewer.suggestionId],
-        terminalStatus: 'released',
-        preview: true,
-      },
-      tolerantBody: true,
-    }).then((envelope) => {
+    previewRequest(requestId, reviewer.suggestionId).then((envelope) => {
       if (cancelled) return;
       if (!envelope.ok) throw new Error(envelope.data.error || `Could not prepare the release (${envelope.status})`);
       const data = envelope.data;
@@ -100,15 +112,55 @@ export default function AcceptedReviewerReleaseModal({ reviewer, requestId, onCl
 
   useEffect(() => {
     mountedRef.current = true;
-    return () => { mountedRef.current = false; };
+    return () => {
+      mountedRef.current = false;
+      refreshGenerationRef.current += 1;
+    };
   }, []);
 
   const requestClose = () => {
     if (!saving) onClose();
   };
 
+  // After the sender saves or clears their default wording, re-render the email
+  // copy only. The internal note and the expectedNotes baseline from the first
+  // preview are never touched, so a colleague's concurrent note change still
+  // surfaces as notes_changed at release (Codex plan review, 2026-10-22).
+  const refreshWording = async () => {
+    if (!draft || draft.status !== 'ok' || saving) return;
+    const edited = subject !== draft.subject || bodyText !== draft.bodyText;
+    if (edited && !window.confirm('Replace your edits to this email with your saved wording?')) return;
+    const generation = ++refreshGenerationRef.current;
+    setRefreshing(true);
+    setError(null);
+    try {
+      const envelope = await previewRequest(requestId, reviewer.suggestionId);
+      if (!mountedRef.current || generation !== refreshGenerationRef.current) return;
+      const next = envelope.data?.drafts?.[0];
+      if (!envelope.ok || next?.status !== 'ok') {
+        setError('The email could not be refreshed with your saved wording. The current email is unchanged.');
+        return;
+      }
+      setDraft((prev) => ({
+        ...prev,
+        subject: next.subject,
+        bodyText: next.bodyText,
+        templateSource: next.templateSource,
+        templateNotice: next.templateNotice,
+      }));
+      setSubject(next.subject || '');
+      setBodyText(next.bodyText || '');
+    } catch {
+      if (mountedRef.current && generation === refreshGenerationRef.current) {
+        setError('The email could not be refreshed with your saved wording. The current email is unchanged.');
+      }
+    } finally {
+      if (mountedRef.current && generation === refreshGenerationRef.current) setRefreshing(false);
+    }
+  };
+
   const submit = async () => {
-    if (!draft || saving) return;
+    if (!draft || saving || refreshing) return;
     if (sendEmail && (!subject.trim() || !bodyText.trim())) {
       setError('Subject and message cannot be empty.');
       return;
@@ -224,14 +276,18 @@ export default function AcceptedReviewerReleaseModal({ reviewer, requestId, onCl
               {sendEmail && (
                 <div className="space-y-2 rounded-md border border-gray-200 p-3">
                   <p className="text-sm"><span className="font-medium">To:</span> {draft.name || reviewer.name} &lt;{draft.to}&gt;</p>
+                  {draft.templateSource === 'shared_fallback' && (
+                    <p className="text-sm text-amber-700">{TEMPLATE_NOTICE[draft.templateNotice] || TEMPLATE_NOTICE.preference_unavailable}</p>
+                  )}
                   <label className="block">
                     <span className="text-xs font-medium text-gray-600">Subject</span>
-                    <input value={subject} onChange={(event) => setSubject(event.target.value)} className="mt-1 w-full rounded border border-gray-300 px-2 py-1 text-sm" />
+                    <input value={subject} onChange={(event) => setSubject(event.target.value)} disabled={refreshing} className="mt-1 w-full rounded border border-gray-300 px-2 py-1 text-sm" />
                   </label>
                   <label className="block">
                     <span className="text-xs font-medium text-gray-600">Message</span>
-                    <textarea rows={10} value={bodyText} onChange={(event) => setBodyText(event.target.value)} className="mt-1 w-full rounded border border-gray-300 px-2 py-1 text-sm font-mono" />
+                    <textarea rows={10} value={bodyText} onChange={(event) => setBodyText(event.target.value)} disabled={refreshing} className="mt-1 w-full rounded border border-gray-300 px-2 py-1 text-sm font-mono" />
                   </label>
+                  <ReleaseWordingDefault kind="release" senderId={draft.senderId} disabled={saving || refreshing} onChanged={refreshWording} />
                 </div>
               )}
             </>
@@ -242,7 +298,7 @@ export default function AcceptedReviewerReleaseModal({ reviewer, requestId, onCl
 
           <div className="flex justify-end gap-2 pt-2">
             <button type="button" onClick={requestClose} disabled={saving} className="px-3 py-1.5 text-sm text-gray-600 hover:text-gray-800 disabled:opacity-40">{completed ? 'Done' : 'Cancel'}</button>
-            {!completed && <button type="button" onClick={submit} disabled={loading || !draft || saving} className="rounded-md bg-blue-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50">{saving ? 'Releasing…' : 'Release reviewer'}</button>}
+            {!completed && <button type="button" onClick={submit} disabled={loading || !draft || saving || refreshing} className="rounded-md bg-blue-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50">{saving ? 'Releasing…' : 'Release reviewer'}</button>}
           </div>
         </div>
       </div>

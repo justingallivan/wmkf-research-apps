@@ -57,6 +57,8 @@ export const PREFERENCE_KEYS = {
   SITE_VISIT_MATERIALS_REMINDER_TEMPLATE: 'site_visit_materials_reminder_template',
   REVIEWER_RESPOND_REMINDER_TEMPLATE: 'reviewer_respond_reminder_template',
   REVIEWER_REVIEW_DUE_REMINDER_TEMPLATE: 'reviewer_review_due_reminder_template',
+  REVIEWER_WITHDRAW_TEMPLATE: 'reviewer_withdraw_template',
+  REVIEWER_RELEASE_TEMPLATE: 'reviewer_release_template',
   // Per-PD scheduled-email review-all override: { reviewAll: boolean }
   // (contract in shared/config/emailAutomation.js). Absent means the default,
   // VIP-only review. Writes use the dedicated /api/email-automation-preferences
