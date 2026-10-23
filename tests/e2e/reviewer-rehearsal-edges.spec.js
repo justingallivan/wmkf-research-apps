@@ -217,7 +217,7 @@ test.describe('private reviewer rehearsal edge fixtures', () => {
     await expect(page.locator('.ProseMirror')).toHaveCount(0);
 
     await page.reload();
-    await expect(page.getByText(/Your review is final/i)).toBeVisible();
+    await expect(page.getByText('Thank you for submitting your review. If you need to correct or add anything, please contact your Program Director.', { exact: true })).toBeVisible();
     await expect(page.locator('.ProseMirror')).toHaveCount(0);
     await expect(page.getByRole('button', { name: 'Submit review' })).toHaveCount(0);
     const finalDraft = await page.evaluate(async (token) => {

@@ -115,7 +115,7 @@ test.describe('Reviewer stage2b in-browser authoring', () => {
     // Submit transitions the UI to a final, read-only receipt — no editors, no
     // Submit button (the server has the snapshot; the draft is gone).
     await expect(page.getByText('Review received')).toBeVisible();
-    await expect(page.getByText(/Your review is final/i)).toBeVisible();
+    await expect(page.getByText('Thank you for submitting your review. If you need to correct or add anything, please contact your Program Director.', { exact: true })).toBeVisible();
     await expect(page.locator('.ProseMirror')).toHaveCount(0);
     await expect(page.getByRole('button', { name: 'Submit review' })).toHaveCount(0);
     expect(submitBody.answers.foreseenImpacts).toContain('a');
@@ -250,7 +250,7 @@ test.describe('Reviewer stage2b in-browser authoring', () => {
 
     await page.goto(portalUrl(TOKEN));
     await expect(page.getByText('Review received')).toBeVisible();
-    await expect(page.getByText(/Your review is final/i)).toBeVisible();
+    await expect(page.getByText('Thank you for submitting your review. If you need to correct or add anything, please contact your Program Director.', { exact: true })).toBeVisible();
     // No authoring surface: no editors, no Submit button, no draft fetch.
     await expect(page.locator('.ProseMirror')).toHaveCount(0);
     await expect(page.getByRole('button', { name: 'Submit review' })).toHaveCount(0);
