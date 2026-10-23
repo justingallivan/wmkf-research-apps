@@ -16,12 +16,13 @@ related:
 
 # Controlled Reviewer Rehearsal Plan
 
-**Status:** Launcher and fixtures implemented; isolated parent verification recorded in the release preparation receipt. Human rehearsal remains pending.
+**Status:** Current candidate `81b8a063b` passed 44/44 isolated browser tests on Node 22; details are in the release preparation receipt. Human rehearsal remains pending.
 Human observation, Linux CI, hosted integration, and promotion remain separate.
 
 **Candidate:** the launcher exports committed `HEAD` and records its exact SHA.
-The application runtime checkpoint remains `4720980ed`; the earlier plan was
-prepared against `c589cbb6e`. Launcher/test changes do not alter application code.
+The current evaluated candidate is `81b8a063b`; its application runtime remains
+at checkpoint `4720980ed`. The earlier plan was prepared against `c589cbb6e`.
+Launcher/test changes do not alter application runtime code.
 
 **Mode:** A only — synthetic browser/API mocks. No real invitation, reviewer,
 request, file service, or deployment is part of this rehearsal.
@@ -140,11 +141,14 @@ the owner decisions: hold automated identity changes until continuity, require a
 fresh preview after PD drift, preserve saved rows against stale exclusions, allow
 sparse manual Add, and screen trusted known conflicts before first invitation.
 
-No owner policy decision changed. Verification included an unintended main-checkout
-startup whose operational-alert impact is unknown; see the release preparation
-receipt. Human observations
-remain pending even after automated checks pass. Verification counts and retained
-limits belong in the linked release-preparation receipt.
+No owner policy decision changed. Verification included an unintended
+main-checkout startup. A later bounded read-only observation found no evidence
+of durable impact in the checked `system_alerts` and recovery-event records for
+the observed window; it does not establish that no write was attempted or rule
+out effects outside those records. The evidence and limits are recorded in the
+[release preparation receipt](release-preparation-private-store-2026-10-22.md).
+Human observations remain pending even after automated checks pass. Verification
+counts and retained limits belong in the linked release-preparation receipt.
 
 ## Gate for later data integration
 

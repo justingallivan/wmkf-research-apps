@@ -3,7 +3,7 @@ title: Private Store and Release Preparation Receipt
 domain: engineering-process
 kind: audit
 status: active
-summary: "Local release evidence including Node 22 build, full tests, browser verification, human rehearsal plan, and unresolved private-store binding."
+summary: "Current candidate passed recorded isolated Node 22/macOS checks; Ubuntu CI, human rehearsal, release authorization, and private-store binding remain open."
 canonical: false
 cataloged: 2026-10-22
 last_verified: 2026-10-22
@@ -19,19 +19,32 @@ related:
 # Private Store and Release Preparation Receipt
 
 **Assessment date:** 2026-10-22 (America/Los_Angeles)  
-**Status:** LOCAL PREPARATION COMPLETE — Node 22/macOS verification passed. Linux CI, human/hosted rehearsal, release authorization, and private-store binding remain incomplete.
-**Release candidate:** `c589cbb6e` (`codex/memory-audit-followups`); original runtime checkpoint `4720980ed`.
+**Status:** All recorded isolated Node 22/macOS checks for the current candidate passed: Turbopack build, browser rehearsal, ESLint, 42 npm check gates, Jest coverage run, and selected PostgreSQL integration suites. Ubuntu CI, human/hosted rehearsal, release authorization, and private-store binding remain incomplete.
+**Current evaluated candidate:** `81b8a063b`; application runtime checkpoint `4720980ed`. Earlier release evidence below includes candidate `c589cbb6e` (`codex/memory-audit-followups`) and remains scoped to that candidate.
 
 This receipt records the evidence available for the local release candidate and
 the private Dataverse-export Blob store question. It does not authorize or record
-a push, deployment, production test, secret retrieval, data write, or cleanup.
+a push, deployment, production test, credential export or disclosure, live application data write, or live cleanup.
 Evidence from earlier audits remains historical where indicated; it is linked
 rather than recast as a result of this assessment.
 
-## Release candidate and local evidence
+## Current evaluated candidate and prior release evidence
+
+**[VERIFIED via isolated Git archive comparison supplied for this receipt]**
+The current evaluated committed candidate is `81b8a063b`. It contains no
+application runtime changes after runtime checkpoint `4720980ed`; its changes
+since that checkpoint are documentation, test, and rehearsal preparation. The
+earlier Jest evidence of 24,751 tests, configured type check, and prior build
+results below were produced for `c589cbb6e`, not `81b8a063b`. The current
+candidate's full Jest coverage run is recorded separately below. The expanded
+43/44 browser rehearsal and focused harness/fixture/CLI runs used precommit
+rehearsal snapshots later committed in `81b8a063b`; the current candidate's
+44/44 run is recorded separately below.
+
+### Prior candidate `c589cbb6e`
 
 **[VERIFIED via candidate repository comparison supplied for this receipt]** The
-original runtime checkpoint is local commit `4720980ed`. Compared with `origin/main` at
+original runtime checkpoint was local commit `4720980ed`. Compared with `origin/main` at
 `23d09e48235c1e5a7aea61e5f76715933d3701a1`, it is 28 commits ahead: 23 commits
 from local main containing documentation, comments, or bootstrap-warning work,
 plus five candidate commits (three documentation and two runtime). No migration,
@@ -64,9 +77,9 @@ availability, and required request binding. The private probe passed 11 mocked t
 Sequential documentation/safety gates and available self-tests passed. A targeted human rehearsal and owner release
 decision remain separate gates; neither is implied by passing automation.
 
-## Node 22 verification and human rehearsal preparation
+## Prior Node 22 verification and human rehearsal preparation
 
-**[VERIFIED via isolated candidate and official binary]** Candidate `c589cbb6e`
+**[VERIFIED via isolated candidate and official binary]** Prior candidate `c589cbb6e`
 was exported separately with the lockfile-installed dependencies from the prior
 clean offline install. The official Node.js `node-v22.23.4-darwin-arm64.tar.gz`
 archive matched its published SHA-256
@@ -110,37 +123,88 @@ Current Stage 2b uses in-browser authoring; its former file-upload control is no
 a missing rehearsal fixture. Human observation, Linux CI, hosted verification,
 and release authorization remain separate gates.
 
-**[VERIFIED via isolated Node 22 parent runs]** The full browser run passed
+**[VERIFIED via isolated precommit rehearsal snapshots later committed in current candidate `81b8a063b`]** The expanded browser run passed
 43 of 44 tests; its one failure was an undefined schema import in the new authoring
 test. After that correction and the submission-version assertion correction,
 the authoring scenario passed, exercising autosave, reload, final submission,
-and read-only return. This is consolidated 44-test evidence, not a claim of one
-green full invocation. Another 477 distinct existing service/component checks
+and read-only return. This precommit snapshot evidence is not a single green
+full-invocation result. Another 477 distinct existing service/component checks
 passed for identity, manual COI, roster authorization, due dates, materials,
-invitation sending, candidate state, and provenance selection. The three scoped harness/fixture suites passed 35 tests, including rejected
-submission replay and immutable submitted state. Scoped lint and 24 sequential
-documentation/safety gates and self-tests passed.
+invitation sending, candidate state, and provenance selection. The three scoped
+harness/fixture suites passed 35 tests, including rejected submission replay
+and immutable submitted state. Scoped lint and 24 sequential documentation/safety
+gates and self-tests passed on those precommit rehearsal snapshots.
 Baseline and reviewer-authoring guarded CLI smoke reached their mock-backed pages
 with HTTP 200 and zero blocked requests (16 and 3 mocked API calls respectively).
-Both private receipts record navigation only, never human approval. The authoring
-readiness check was corrected to use its portal heading because that page has no
-`main` element. Owned temporary directories were removed after both successful runs.
+These CLI runs used the same precommit rehearsal snapshots; both private receipts
+record navigation only, never human approval. The authoring readiness check was
+corrected to use its portal heading because that page has no `main` element.
+Owned temporary directories were removed after both successful runs.
+
+**[VERIFIED via parent-reported isolated Git archive run on current candidate `81b8a063b`]** The
+complete 44-test browser rehearsal passed in one Node 22 invocation. This confirms
+the current candidate's browser fixture coverage. Playwright's `webServer` path
+also completed the canonical Turbopack `next build` successfully on this candidate.
+The run skipped the package `npm prebuild` step, so that package hook was not
+verified by this invocation.
+
+**[VERIFIED via current-candidate isolated Node 22 checks]** Full ESLint exited
+0 with zero errors and 163 warnings. The ten PostgreSQL integration suites from the CI job passed all 130 tests
+in 11.731 seconds against the cached `postgres:16-alpine` image. They ran in an
+owned scratch container on a random loopback port with a dummy connection URL;
+the container was stopped and removed. Node ran on macOS and the database ran
+in a Linux container, which is not Ubuntu CI.
+
+**[VERIFIED via separate isolated current-candidate checks]** All 42 npm check
+gates and the available self-tests listed in `.github/workflows/test.yml`
+passed sequentially, including the configured type check. Separately,
+`npm run prebuild` passed the reviewer-reminder hold and migration-manifest
+generation; the generated manifest bytes matched `81b8a063b`. These checks are
+separate from the Playwright invocation, which did not run package prebuild.
+
+**[VERIFIED via isolated current-candidate Node 22 Jest coverage run]**
+`npx jest --ci --coverage --watchAll=false --runInBand` exited 0 in 512.717
+seconds: 1,433 suites, 24,784 tests, five snapshots passed; 17 suites / 215
+tests were skipped. The run emitted a nonblocking `MaxListenersExceededWarning`.
+The existing Jest configuration disables coverage thresholds, so this confirms
+coverage-instrumented test execution, not threshold certification. The ten
+opt-in PostgreSQL integration suites (130 tests) are reported separately above.
 
 ### Verification containment incident
 
-**[VERIFIED via agent tool transcript and startup source; outcome UNKNOWN]** One
-agent mistakenly ran the new Playwright scenario directly in the main checkout,
-without the required isolated environment or network preload. Next reported loading
-`.env.local`, built, and started. Chromium was missing, so the test body never
-ran. No stdout file or timestamped startup-result evidence was retained. This
-failure does **not** establish that live systems were unchanged.
+**[VERIFIED via agent tool transcript and startup source]** One agent
+mistakenly ran the new Playwright scenario directly in the main checkout,
+without the required isolated environment or network preload. Next reported
+loading `.env.local`, built, and started. Chromium was missing, so the test body
+never ran. No stdout file or timestamped startup-result evidence was retained.
+The root-checkout startup result was initially unknown; a later bounded,
+read-only database observation checked for durable monitor changes.
 
-Node startup invokes the auth-bypass monitor and migration-drift detector.
-Depending on connectivity and configuration, these can update `system_alerts`
-and `operational_events`, create alerts/events, or send security/ops notifications.
-The actual result of that main-checkout startup is unknown. No live rollback,
-query, or cleanup was performed to resolve the uncertainty. Subsequent parent
-verification used credential-free isolated copies and the reviewed guard; their
+**[VERIFIED via read-only Postgres observation at 2026-10-23 02:41:33Z]** The
+observer ran `BEGIN READ ONLY` and confirmed `transaction_read_only` was on.
+The database connection came from `.env.local`; no inherited `POSTGRES_URL`
+was present, and no `.env.production` or `.env.production.local` files were
+present. The four startup-related `system_alerts` categories showed no open
+rows: migration-drift 55 total (latest created 2026-10-18 22:17:41.920564;
+latest resolved 2026-10-19 00:50:35.057474), ahead 122 (latest created
+2026-10-15 02:29:39.117011; latest resolved 2026-10-15 02:29:49.335504),
+auth-bypass 2 (latest created 2026-09-22 02:21:05.028798; latest resolved
+2026-09-22 02:21:14.083502), and tracker-missing 0. These alert timestamps
+were read as raw `timestamp without time zone` values. The alert cutoff was
+the literal `2026-10-22 00:00` without a timezone, with the database session
+in GMT; no category had a creation or resolution at or after that cutoff.
+Matching `operational_events` recovery/alert dedupe keys had two rows, zero
+open, and no first-seen, last-seen, recorded, or status-changed activity since
+`2026-10-22T00:00:00Z`. The latest matching event's **status change** was
+`2026-10-19T00:50:35.082263Z`; this is not an event-occurrence timestamp.
+
+This is **NO EVIDENCE OF DURABLE IMPACT in the checked alert and recovery-event
+records for that window**. It does not establish that startup made no SQL write
+attempts, that failed writes or effects outside these records did not occur, or
+that an immutable audit captured every attempt. No email-triggering new alert
+appears in the checked evidence; the mailbox was not independently checked.
+No rollback, repair, or cleanup was performed. Subsequent parent verification
+used credential-free isolated copies and the reviewed guard; their
 missing-connection-string failures apply only to those isolated runs.
 
 ## Private Blob store investigation
@@ -206,23 +270,34 @@ does not reverse data or email effects.
 
 | Action | Status | Next evidence or boundary |
 |---|---|---|
-| Candidate source review | Local preparation reviewed | Parent and Sol checked the documentation, safe probe, and five test repairs; hosted behavior remains unverified. |
-| Clean locked install | Complete | Completed offline in the isolated workspace. |
-| Locked production build | Complete | Passed on Node 24.19.0 and Node 22.23.4/macOS; Linux CI remains separate. |
-| Full Jest suite | Passed | Node 22: 1,431 suites / 24,751 tests in one invocation; 17 suites / 215 tests skipped. Earlier Node 24 evidence remains above. |
-| Automated Mode A browser checks | Complete locally | Original 36 tests plus consolidated 44-test fixture evidence above; human Mode A rehearsal and hosted/live-data proof remain pending. |
-| Node 22 verification | Complete on macOS | Build, configured types, full Jest (1,431 suites / 24,751 tests), and 36 browser tests passed. Linux CI remains unverified. |
+| Candidate source review | Current candidate `81b8a063b` reviewed | Application runtime remains at `4720980ed`; hosted behavior remains unverified. |
+| Clean locked install | Complete on prior candidate `c589cbb6e` | Completed offline in its isolated workspace. |
+| Locked production build | Prior candidate `c589cbb6e` passed; current candidate Turbopack build passed | Prior build passed on Node 24.19.0 and Node 22.23.4/macOS. Current `81b8a063b` completed canonical Turbopack `next build` through Playwright `webServer`; that invocation skipped package `npm prebuild`, which passed separately with unchanged manifest bytes. |
+| Full Jest coverage run | Current candidate passed | Node 22: 1,433 suites / 24,784 tests, five snapshots; 17 suites / 215 tests skipped, 512.717 seconds. Jest coverage thresholds are disabled; opt-in PostgreSQL suites are separate. |
+| Prior full Jest suite | Passed on prior candidate `c589cbb6e` | Node 22: 1,431 suites / 24,751 tests in one invocation; 17 suites / 215 tests skipped. Historical evidence, not current-candidate suite evidence. |
+| Automated Mode A browser checks | Current candidate passed locally | Current candidate `81b8a063b`: 44/44 browser tests passed in one Node 22 invocation. Human Mode A rehearsal and hosted/live-data proof remain pending. |
+| Full ESLint | Current candidate passed | Exit 0, zero errors, 163 warnings. |
+| PostgreSQL integration suites | Current candidate passed in isolation | 10 opt-in suites / 130 tests passed in 11.731 seconds against cached `postgres:16-alpine` in a removed scratch container. Node was macOS; this does not establish Ubuntu CI. |
+| 42 npm check gates and available self-tests | Current candidate passed sequentially | Exact set listed in `.github/workflows/test.yml`, including configured types. |
+| Package prebuild | Current candidate passed separately | Reviewer-reminder hold and migration-manifest generation passed; generated manifest bytes matched `81b8a063b`. |
+| Prior Node 22 verification | Complete on prior candidate `c589cbb6e` | Build, configured types, full Jest (1,431 suites / 24,751 tests), and its browser checks passed. |
 | Private-store binding | Unknown | Requires a separately authorized credential-bearing context; metadata alone is insufficient. |
 | Private object inventory | Not run | Keep within the existing bounded authorization and prepared fixed-prefix safeguards. |
 | Targeted human rehearsal | Guarded launcher/fixtures verified; execution pending | Human observations remain pending; any live target, identities, writes and cleanup require separate authorization. |
 | Release owner decision | Pending | Decide only after candidate checks, target evidence, and required human rehearsal are concrete. |
-| Push, deployment, intentional live mutation/cleanup | Not performed | No push/deploy or deliberate live action; unintended main-checkout startup effects remain UNKNOWN as documented above. |
+| Push, deployment, intentional live mutation/cleanup | Not performed | No push/deploy or deliberate live action. The bounded read-only check found no evidence of durable impact in the checked alert/event records; its limits are documented above. |
 
 ## Exit conditions
 
-Local preparation and Node 22/macOS verification are complete. This is not a
-release approval: Linux CI verification, targeted human rehearsal on a named
-authorized target, and the applicable owner release decision remain outstanding.
+Prior candidate `c589cbb6e` completed its recorded Node 22/macOS verification;
+current candidate `81b8a063b` passed its Turbopack build, 44-test browser
+rehearsal, full ESLint, full Jest coverage run, selected PostgreSQL integration
+suites, 42 listed npm check gates, package prebuild, and configured types on
+isolated Node 22/macOS. Coverage thresholds are disabled in the Jest
+configuration, so the coverage run does not certify threshold values. This is
+not a release approval: Ubuntu CI verification, targeted human rehearsal on a
+named authorized target, hosted verification, private-store binding, and the
+applicable owner release decision remain outstanding.
 The private-store question remains a separate evidence
 item: do not mark its identity or contents verified until an authorized probe
 measures the intended private target. Any resulting live object or retention
