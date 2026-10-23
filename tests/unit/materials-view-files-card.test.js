@@ -76,8 +76,8 @@ describe('MaterialsView FilesCard', () => {
       />,
     );
     expect(screen.getByText(/please contact your Program Director/i))
-      .toHaveTextContent('Program Director (Jane Director, jane.director@wmkeck.org)');
-    expect(screen.getByRole('link', { name: 'jane.director@wmkeck.org' }))
+      .toHaveTextContent('Thank you for submitting your review. If you need to correct or add anything, please contact your Program Director (Jane Director).');
+    expect(screen.getByRole('link', { name: 'Jane Director' }))
       .toHaveAttribute('href', 'mailto:jane.director@wmkeck.org');
   });
 

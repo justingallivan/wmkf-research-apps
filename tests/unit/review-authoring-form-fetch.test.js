@@ -118,9 +118,9 @@ test('PUT: a network rejection shows the save-error indicator', async () => {
 
 // --- submit POST ---
 
-async function primeSubmittable() {
+async function primeSubmittable(props = {}) {
   global.fetch.mockResolvedValueOnce({ ok: true, status: 200, json: async () => ({ ok: true }) }); // GET draft
-  const view = renderForm();
+  const view = renderForm(props);
   await screen.findByLabelText('Affiliation', { exact: false });
   fireEvent.change(screen.getByLabelText('Affiliation', { exact: false }), { target: { value: 'Filled in' } });
   return view;
@@ -128,10 +128,22 @@ async function primeSubmittable() {
 
 test('(a) a successful submit shows the received state', async () => {
   global.fetch = jest.fn();
-  await primeSubmittable();
+  await primeSubmittable({
+    data: {
+      questions: FIELDS,
+      questionSetVersion: 'set-v1',
+      prefill: {},
+      programDirector: { name: 'Jane Director', email: 'jane.director@wmkeck.org' },
+    },
+  });
   global.fetch.mockResolvedValueOnce({ ok: true, status: 200, json: async () => ({ ok: true, receivedAt: '2026-09-20T00:00:00Z' }) });
   fireEvent.click(screen.getByRole('button', { name: 'Submit review' }));
   await screen.findByText('Review received');
+  expect(screen.getByRole('status')).toHaveTextContent(
+    'Thank you for submitting your review. If you need to correct or add anything, please contact your Program Director (Jane Director).',
+  );
+  expect(screen.getByRole('link', { name: 'Jane Director' }))
+    .toHaveAttribute('href', 'mailto:jane.director@wmkeck.org');
   const [url, opts] = global.fetch.mock.calls[1];
   expect(url).toBe('/api/external/review/tok/submit');
   expect(opts.method).toBe('POST');

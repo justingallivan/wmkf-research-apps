@@ -114,14 +114,17 @@ function SubmittedNotice({ data }) {
     <div className="bg-green-50 border border-green-200 rounded-2xl p-5">
       <p className="text-sm font-semibold text-green-900">Review received</p>
       <p className="text-sm text-green-800 mt-1">
-        We received your review on{' '}
+        Thank you for submitting your review. If you need to correct or add anything,
+        please contact your Program Director
+        <ProgramDirectorContact programDirector={data.programDirector} linkName />.
+      </p>
+      <p className="text-xs text-green-800 mt-2">
+        Received on{' '}
         {new Date(data.submission.receivedAt).toLocaleString(undefined, {
           dateStyle: 'long',
           timeStyle: 'short',
         })}
         {data.submission.filename ? ` (${data.submission.filename})` : ''}.
-        Your review is final. If you need to make a change, please contact your Program Director
-        <ProgramDirectorContact programDirector={data.programDirector} />.
       </p>
     </div>
   );
