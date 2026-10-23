@@ -8,10 +8,13 @@
  * shouldSkipDuplicateInvitation, emailConfidence) — those are the contract under test.
  */
 
+const mockRequireAppAccess = jest.fn(async () => ({
+  session: { user: { azureEmail: 'staff@wmkeck.org', dynamicsSystemuserId: 'u-1' } },
+}));
+const mockGetUserRole = jest.fn(async () => 'read_write');
 jest.mock('../../lib/utils/auth', () => ({
-  requireAppAccess: jest.fn(async () => ({
-    session: { user: { azureEmail: 'staff@wmkeck.org', dynamicsSystemuserId: 'u-1' } },
-  })),
+  requireAppAccess: (...args) => mockRequireAppAccess(...args),
+  getUserRole: (...args) => mockGetUserRole(...args),
 }));
 jest.mock('../../shared/api/middleware/rateLimiter', () => ({
   nextRateLimiter: () => async () => true,
@@ -37,14 +40,23 @@ jest.mock('../../lib/services/dynamics-service', () => ({
   DynamicsService: {
     createAndSendEmail: (...a) => createAndSendEmail(...a),
     getRecord: (...a) => getRecord(...a),
+    queryRecords: async (entity) => ({ records: entity === 'akoya_requests' ? [REQUEST] : [] }),
     updateRecord: (...a) => updateRecord(...a),
   },
 }));
 
 const findById = jest.fn(async (id) => SUGGESTIONS[id] ?? null);
+const queryAllSuggestions = jest.fn(async () => ({
+  records: Object.values(SUGGESTIONS || {}).map((suggestion) => ({
+    wmkf_appreviewersuggestionid: suggestion.wmkf_appreviewersuggestionid,
+    _wmkf_request_value: suggestion._wmkf_request_value,
+  })),
+  capped: false,
+}));
 const updateLifecycle = jest.fn(async () => {});
 jest.mock('../../lib/dataverse/adapters/reviewer-suggestion', () => ({
   findById: (...a) => findById(...a),
+  queryAllSuggestions: (...a) => queryAllSuggestions(...a),
   updateLifecycle: (...a) => updateLifecycle(...a),
   REVIEW_STATUS_MAP: { accepted: 100000000, materials_sent: 100000001, under_review: 100000002 },
 }));
@@ -278,6 +290,96 @@ test('preauthorizes the complete draft batch and rejects before opening the send
   expect(res.status).toHaveBeenCalledWith(403);
   expect(createAndSendEmail).not.toHaveBeenCalled();
   expect(res.write).not.toHaveBeenCalled();
+});
+
+test('real preauthorization for the unchanged lead PD allows that PD to send the invitation', async () => {
+  const actualAuthorize = jest.requireActual('../../lib/services/reviewer-request-authorization')
+    .authorizeReviewerRequestMutation;
+  const requestId = '22222222-2222-4222-8222-222222222222';
+  REQUEST.akoya_requestid = requestId;
+  REQUEST._wmkf_programdirector_value = 'pd-a';
+  SUGGESTIONS[SUG_1]._wmkf_request_value = requestId;
+  SYSTEMUSER.systemuserid = 'pd-a';
+  SYSTEMUSER.internalemailaddress = 'pd-a@wmkeck.org';
+  mockRequireAppAccess.mockResolvedValueOnce({
+    profileId: 7,
+    session: { user: { azureEmail: 'staff@wmkeck.org', dynamicsSystemuserId: 'pd-a' } },
+  });
+  authorizeReviewerRequestMutation.mockImplementationOnce(actualAuthorize);
+
+  const res = await run({
+    drafts: [{
+      ...draft(SUG_1),
+      body: `B\nhttps://reviews.example.org/external/review/${TOKEN_FOR(SUG_1, requestId)}`,
+    }],
+    templateType: 'invitation',
+  });
+
+  expect(createAndSendEmail).toHaveBeenCalledTimes(1);
+  expect(createAndSendEmail.mock.calls[0][0]).toMatchObject({ from: 'pd-a@wmkeck.org', actingUserSystemId: 'pd-a' });
+  expect(res.write).toHaveBeenCalled();
+});
+
+test('real preauthorization rejects a caller who is not the lead PD before opening the send stream', async () => {
+  const actualAuthorize = jest.requireActual('../../lib/services/reviewer-request-authorization')
+    .authorizeReviewerRequestMutation;
+  const requestId = '22222222-2222-4222-8222-222222222222';
+  REQUEST.akoya_requestid = requestId;
+  REQUEST._wmkf_programdirector_value = 'pd-a';
+  SUGGESTIONS[SUG_1]._wmkf_request_value = requestId;
+  mockRequireAppAccess.mockResolvedValueOnce({
+    profileId: 7,
+    session: { user: { azureEmail: 'staff@wmkeck.org', dynamicsSystemuserId: 'other-pd' } },
+  });
+  authorizeReviewerRequestMutation.mockImplementationOnce(actualAuthorize);
+
+  const res = await run({ drafts: [draft(SUG_1)], templateType: 'invitation' });
+
+  expect(res.status).toHaveBeenCalledWith(403);
+  expect(res.write).not.toHaveBeenCalled();
+  expect(createAndSendEmail).not.toHaveBeenCalled();
+});
+
+test('a request PD change after real preauthorization is used by the service fresh read for invitation transport', async () => {
+  const actualAuthorize = jest.requireActual('../../lib/services/reviewer-request-authorization')
+    .authorizeReviewerRequestMutation;
+  const requestId = '22222222-2222-4222-8222-222222222222';
+  const pdA = 'pd-a';
+  const pdB = 'pd-b';
+  REQUEST.akoya_requestid = requestId;
+  REQUEST._wmkf_programdirector_value = pdA;
+  SUGGESTIONS[SUG_1]._wmkf_request_value = requestId;
+  SYSTEMUSER.systemuserid = pdB;
+  SYSTEMUSER.fullname = 'PD B';
+  SYSTEMUSER.internalemailaddress = 'pd-b@wmkeck.org';
+  mockRequireAppAccess.mockResolvedValueOnce({
+    profileId: 7,
+    session: { user: { azureEmail: 'staff@wmkeck.org', dynamicsSystemuserId: pdA } },
+  });
+  authorizeReviewerRequestMutation.mockImplementationOnce(async (args) => {
+    const result = await actualAuthorize(args);
+    // Deterministic interleaving: authorization observed PD A; the subsequent
+    // send-service request read observes the reassignment to PD B.
+    REQUEST._wmkf_programdirector_value = pdB;
+    return result;
+  });
+
+  const res = await run({
+    drafts: [{
+      ...draft(SUG_1),
+      body: `B\nhttps://reviews.example.org/external/review/${TOKEN_FOR(SUG_1, requestId)}`,
+    }],
+    templateType: 'invitation',
+  });
+
+  expect(res.status).not.toHaveBeenCalledWith(403);
+  expect(authorizeReviewerRequestMutation).toHaveBeenCalledTimes(1);
+  expect(createAndSendEmail).toHaveBeenCalledTimes(1);
+  expect(createAndSendEmail.mock.calls[0][0]).toMatchObject({
+    from: 'pd-b@wmkeck.org',
+    actingUserSystemId: pdB,
+  });
+  expect(createAndSendEmail.mock.calls[0][0].body).toContain('pd-b@wmkeck.org');
 });
 // Fake three-segment token whose first two segments the mocked
 // verifySuggestionToken above decodes back into suggestionId/requestId — real

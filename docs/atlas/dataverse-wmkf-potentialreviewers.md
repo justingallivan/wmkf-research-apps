@@ -4,8 +4,8 @@
 
 <!-- drain-table:file-purpose=atlas-state-page -->
 
-**Last verified:** Row count re-probed 2026-08-13 via `scripts/reconcile-memory-claims.js`; Wave 13 metadata/population refreshed 2026-07-14 via `node scripts/preflight-reviewer-identity-binding-fields.mjs --target=prod --include-population`; Wave 17 metadata read back EXACT in Production and its receipt-backed runtime was exercised on Request `1002912` on 2026-07-31 PT / 2026-08-01 UTC; stored/found staff-choice UI semantics are Production-live in Ready deployment `dpl_9yZ9xTHqfNgLcbZxJDekZkAjqpPS` and signed-in smoke-verified on Neville's one-action card plus the exact-choice dialog through neutral Cancel on 2026-08-20 (live choice write not exercised); exact-person prior-request context read verified in feature-branch source/tests 2026-08-21 (deployment pending)
-**Live row count:** 4,474
+**Last verified:** All-state row count re-probed 2026-10-23 UTC from the read-only Production population query in `docs/audits/memory-historical-impact-evidence-2026-10-22.json`; prior scoped checks remain dated as recorded: Wave 13 metadata/population refreshed 2026-07-14 via `node scripts/preflight-reviewer-identity-binding-fields.mjs --target=prod --include-population`; Wave 17 metadata read back EXACT in Production and its receipt-backed runtime was exercised on Request `1002912` on 2026-07-31 PT / 2026-08-01 UTC; stored/found staff-choice UI semantics are Production-live in Ready deployment `dpl_9yZ9xTHqfNgLcbZxJDekZkAjqpPS` and signed-in smoke-verified on Neville's one-action card plus the exact-choice dialog through neutral Cancel on 2026-08-20 (live choice write not exercised); exact-person prior-request context read verified in feature-branch source/tests 2026-08-21 (deployment pending)
+**Live row count:** 4,545 (all states; read-only Production observation 2026-10-23 UTC; prior 2026-08-13 receipt was 4,474)
 **Entity set:** `wmkf_potentialreviewerses` (note Dynamics-pluralized form)
 **Adapter:** `lib/dataverse/adapters/potential-reviewer.js`
 **Extension manifests:** `lib/dataverse/schema/wave2-existing/wmkf_potentialreviewers-extensions.json` + `lib/dataverse/schema/wave13-reviewer-identity-binding/01_wmkf_potentialreviewers_identity_binding.json` + `lib/dataverse/schema/wave17-reviewer-address-trust/01_wmkf_potentialreviewers_address_trust.json`; Wave 17 is production-live and read back EXACT
@@ -17,7 +17,7 @@ per-proposal. Email is the de-dupe key. An identity-bearing acceptance promotes
 the person to a CRM `contact` via `wmkf_contact`; invitation send does not.
 Honorarium opt-outs promote, while declines do not.
 
-This is the **canonical person record** for the reviewer-finder domain. Dataverse `wmkf_potentialreviewers` has 4,474 rows because Connor's team also tracks reviewers from other systems and historical outreach; dropped Postgres `researchers` was only a small, 331-row historical pool.
+This is the **canonical person record** for the reviewer-finder domain. The 2026-10-23 all-state Production query observed 4,545 Dataverse `wmkf_potentialreviewers` rows; the earlier 2026-08-13 receipt observed 4,474. Connor's team also tracks reviewers from other systems and historical outreach; dropped Postgres `researchers` was only a small, 331-row historical pool.
 
 ## Key fields (live, sample-probed 2026-05-07)
 
@@ -212,7 +212,7 @@ decision and must preserve current person reuse and relationship semantics.
 
 ## Open questions / gotchas
 
-- Dataverse `wmkf_potentialreviewers` currently has 4,474 rows, much larger than the dropped Postgres `researchers` 331-row historical pool. Per the migration plan: don't import researchers in bulk — engagement-history approach replaces the bulk-import pattern.
+- The 2026-10-23 all-state Production query observed 4,545 Dataverse `wmkf_potentialreviewers` rows, much larger than the dropped Postgres `researchers` 331-row historical pool. Per the migration plan: don't import researchers in bulk — engagement-history approach replaces the bulk-import pattern.
 - `wmkf_contact` lookup population is a mutable live-state question; re-probe it
   before contact-promotion or retention work.
 - The table is per-person (email is the dedupe key and `upsertByEmail` is

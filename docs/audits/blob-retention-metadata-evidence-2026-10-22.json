@@ -1,0 +1,32 @@
+{
+  "generatedAt": "2026-10-23T00:32:41.487Z",
+  "scope": "Local configured shared-store reviewer-finder prefix only; deployed store identity not established",
+  "complete": false,
+  "stores": [
+    {
+      "name": "shared-public-reviewer-finder",
+      "prefix": "reviewer-finder/",
+      "complete": true,
+      "pages": 1,
+      "rowsSeen": 335,
+      "validRows": 335,
+      "invalidRows": 0,
+      "bytes": 230987633,
+      "ageBuckets": {
+        "under30Days": 3,
+        "30To89Days": 108,
+        "90To179Days": 224,
+        "180To364Days": 0,
+        "365DaysOrMore": 0
+      },
+      "oldestAgeDays": 110,
+      "newestAgeDays": 20,
+      "failure": null
+    },
+    {
+      "name": "private-dataverse-export",
+      "complete": false,
+      "failure": "private_store_not_listed_local_credential_unavailable"
+    }
+  ]
+}

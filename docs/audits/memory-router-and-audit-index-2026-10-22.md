@@ -2,7 +2,7 @@
 
 **Status: AUDIT INCOMPLETE — router and active whole-read inventory reviewed; all-claim verification remains incomplete.**
 This index covers the router changes and subsequent active-memory audits. All
-272 active leaves have a recorded whole read; source verification remains selective.
+272 active and 32 non-active leaves now have a recorded whole read; source verification remains selective.
 It does not certify every memory claim or current live state.
 
 ## Router change
@@ -40,6 +40,8 @@ parent-reported rather than independently recalculated here.
 These dated reports cover separate documentation scopes. Each report's own status
 and verification limits apply:
 
+- [Historical Impact and Concurrency Follow-up](historical-impact-concurrency-followup-2026-10-22.md) — bounded historical/configuration/retention evidence, non-active memory repairs and three accepted behavior decisions pending implementation.
+- [Non-active Memory Coverage](nonactive-memory-review-coverage-2026-10-22.csv) — 32 whole-read leaves, preserving 25 closed, three stale and four superseded statuses.
 - [Autonomous Cleanup Follow-ups](autonomous-memory-cleanup-2026-10-22.md) — current local repair/evidence status and remaining release limits.
 - [Reviewer Communications Guidance Repair](reviewer-communications-guidance-repair-2026-10-22.md) — local commit `85dbe6cd0`.
 - [Roadmap Reader Guidance Repair](roadmap-reader-guidance-repair-2026-10-22.md) — local commit `9500fdb8b`.
@@ -70,7 +72,7 @@ segment proof are retained in the [extraction audit](reviewer-lifecycle-extracti
 Scoped external observations are retained in the live-evidence JSON linked by
 the ledger; local source changes are not deployed behavior. Whole-read coverage
 still does not certify every claim. The 32 non-active leaves remain outside the
-active-memory census, and unprobed populations/effective permissions remain
+active-memory census but now have their own whole-read inventory and scoped repairs. Unprobed populations/effective permissions remain
 unknown. Existing intake, BILL, reminder, paid-run and owner-review-burden
 holds remain in force. No gate-coverage numeral or checker policy was changed.
 

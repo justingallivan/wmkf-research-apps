@@ -2,7 +2,7 @@
 agent_wiki: topic
 status: active
 last_verified: 2026-10-22
-verification_scope: "Scoped repository-source review of requested reviewer-count handling and proposal-input status only; no whole-page or live-state recertification"
+verification_scope: "Scoped repository-source review of requested reviewer-count handling and proposal-input status, plus read-only Production observation of the reviewer model-override setting; no provider-list call, runtime/cache/environment resolution, or whole-page/live-state recertification"
 stale_after_days: 60
 owner: reviewer-finder
 source_files:
@@ -95,12 +95,13 @@ Holistic-review analysis: `docs/audits/reviewer-holistic-review-fable-2026-07-08
 - Keep targeted hardening for Claude's senior-bias and the
   niche/pivot/sparse tail are REAL (the S231 probe found 2/10 analyze under-deliveries).
   Treat that tail as a sparse-case toolkit, not an engine replacement.
-- **Model observation (2026-08-23; stale):** the Production Admin Models surface
-  displayed Reviewer Finder as resolving to **Opus 5** at that time. The then-current
-  `model_override:reviewer-finder:model=opus` Dataverse setting took precedence over
-  the configured `claude-opus-4-8` fallback. This is a point-in-time metadata
-  observation, not a current model check; the current Dataverse setting, runtime
-  resolution, and deployment are unprobed. The
+- **Model observations:** On 2026-08-23 the Production Admin Models surface
+  displayed Reviewer Finder as resolving to **Opus 5** at that time; retain this
+  as historical. A read-only Production setting query observed
+  `model_override:reviewer-finder:model=opus` on 2026-10-23 UTC. `opus` is a tier
+  alias, not a concrete effective model ID. No provider-list call was made, and
+  runtime resolution, caches, environment configuration, and deployment were not
+  inspected; the effective concrete model therefore remains unknown. The
   S286 switch away from Sonnet was justified by a niche
   out-of-mainstream proposal (synthetic torpor; req 1002821) Sonnet 4.6 fell into a
   token-repetition/hallucination loop: it could confidently name only the ~6 reviewers

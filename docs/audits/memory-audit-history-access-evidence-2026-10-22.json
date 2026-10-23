@@ -1,0 +1,83 @@
+{
+  "observedAt": "2026-10-23T00:30:45.334Z",
+  "target": "https://wmkf.crm.dynamics.com",
+  "mode": "bounded per-record history GET; OAuth token POST only",
+  "inputsComplete": true,
+  "maxPeople": 7,
+  "maxDetailsPerPerson": 50,
+  "maxPagesPerPerson": 5,
+  "samples": [
+    {
+      "sample": 1,
+      "status": 200,
+      "detailCount": 6,
+      "moreRecords": false,
+      "detailsTouchingIdentityFields": 2,
+      "nonblankOrcidReplacementEvents": 0,
+      "pages": 1,
+      "complete": true
+    },
+    {
+      "sample": 2,
+      "status": 200,
+      "detailCount": 16,
+      "moreRecords": false,
+      "detailsTouchingIdentityFields": 5,
+      "nonblankOrcidReplacementEvents": 0,
+      "pages": 2,
+      "complete": true
+    },
+    {
+      "sample": 3,
+      "status": 200,
+      "detailCount": 10,
+      "moreRecords": false,
+      "detailsTouchingIdentityFields": 5,
+      "nonblankOrcidReplacementEvents": 0,
+      "pages": 1,
+      "complete": true
+    },
+    {
+      "sample": 4,
+      "status": 200,
+      "detailCount": 19,
+      "moreRecords": false,
+      "detailsTouchingIdentityFields": 8,
+      "nonblankOrcidReplacementEvents": 0,
+      "pages": 2,
+      "complete": true
+    },
+    {
+      "sample": 5,
+      "status": 200,
+      "detailCount": 39,
+      "moreRecords": false,
+      "detailsTouchingIdentityFields": 14,
+      "nonblankOrcidReplacementEvents": 0,
+      "pages": 4,
+      "complete": true
+    },
+    {
+      "sample": 6,
+      "status": 200,
+      "detailCount": 13,
+      "moreRecords": false,
+      "detailsTouchingIdentityFields": 3,
+      "nonblankOrcidReplacementEvents": 0,
+      "pages": 2,
+      "complete": true
+    },
+    {
+      "sample": 7,
+      "status": 200,
+      "detailCount": 9,
+      "moreRecords": false,
+      "detailsTouchingIdentityFields": 4,
+      "nonblankOrcidReplacementEvents": 0,
+      "pages": 1,
+      "complete": true
+    }
+  ],
+  "limitation": "Current shared protected-person cohort; bounded history pages only. No identifiers, values, actors, dates or full audit details retained; history itself need not establish writer or historical protected status.",
+  "cohortCount": 7
+}

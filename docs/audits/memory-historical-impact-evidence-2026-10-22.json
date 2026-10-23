@@ -1,0 +1,879 @@
+{
+  "observedAt": "2026-10-23T00:25:50.502Z",
+  "target": "https://wmkf.crm.dynamics.com",
+  "mode": "GET-only application reads; OAuth token POST only",
+  "limits": {
+    "maxPagesPerQuery": 40,
+    "maxRowsPerQuery": 20000,
+    "redirects": "error",
+    "timeoutMs": 20000
+  },
+  "queries": {
+    "requests": {
+      "status": 200,
+      "complete": true,
+      "rows": 157
+    },
+    "suggestions": {
+      "status": 200,
+      "complete": true,
+      "rows": 811
+    },
+    "people": {
+      "status": 200,
+      "complete": true,
+      "rows": 4545
+    },
+    "model": {
+      "status": 200,
+      "complete": true,
+      "rows": 1
+    },
+    "retention": {
+      "status": 200,
+      "complete": true,
+      "rows": 0
+    },
+    "excluded": {
+      "status": 200,
+      "complete": true,
+      "rows": 0
+    },
+    "prompts": {
+      "status": 200,
+      "complete": true,
+      "rows": 39
+    }
+  },
+  "limitations": [
+    "Current rows are not historical invocation or causation evidence.",
+    "Independent query pages are not one atomic database snapshot.",
+    "Anchor buckets validate syntax only, not checksum, identity or historical continuity.",
+    "No raw identifiers, names, email, ORCID, affiliation, anchors, prompt bodies or credentials retained."
+  ],
+  "aggregate": {
+    "piCurrentShape": {
+      "allStates": 157,
+      "active": 155,
+      "linkedSuggestions": 0,
+      "selectedLinkedSuggestions": 0,
+      "linkedRequests": 0,
+      "distinctLinkedPeople": 0
+    },
+    "people": {
+      "rows": 4545,
+      "statuses": {
+        "missing_or_other": 2530,
+        "probable": 1805,
+        "unresolved": 166,
+        "confirmed": 36,
+        "ambiguous": 8
+      },
+      "protectedPeople": 1841,
+      "protectedAnchors": {
+        "person_key_syntax_only": 1841
+      },
+      "protectedWithStoredFields": 1841,
+      "crossRequest": {
+        "zero": 3773,
+        "one": 743,
+        "multiple": 29
+      },
+      "protectedShared": 7,
+      "currentBindingOrLineagePresent": 24
+    },
+    "missingProjectLeaderWithResearchLeader": {
+      "requests": 157,
+      "linkedSuggestions": 0,
+      "selectedLinkedSuggestions": 0,
+      "linkedRequests": 0,
+      "linkedPeople": {
+        "distinctLinkedPeople": 0,
+        "availablePeopleRows": 0,
+        "missingPeopleRows": 0,
+        "statuses": {},
+        "protectedPeople": 0,
+        "protectedAnchors": {},
+        "protectedWithStoredFields": 0,
+        "sharedPeople": 0,
+        "protectedSharedPeople": 0
+      },
+      "activeRequestLinked": {
+        "activeRequests": 155,
+        "linkedRequests": 0,
+        "requestsWithLinkedPeople": 0,
+        "people": {
+          "distinctLinkedPeople": 0,
+          "availablePeopleRows": 0,
+          "missingPeopleRows": 0,
+          "statuses": {},
+          "protectedPeople": 0,
+          "protectedAnchors": {},
+          "protectedWithStoredFields": 0,
+          "sharedPeople": 0,
+          "protectedSharedPeople": 0
+        }
+      }
+    }
+  },
+  "aggregateState": "complete",
+  "aggregateError": null,
+  "incompletePopulationQueries": [],
+  "modelOverride": [
+    {
+      "key": "model_override:reviewer-finder:model",
+      "value": "opus"
+    }
+  ],
+  "retention": {
+    "complete": true,
+    "found": false,
+    "configuredPositiveDays": null,
+    "effectiveDaysUnderCurrentSource": 90,
+    "limit": "Source parseInt/default rule; no proof of hosted settings cache or completed cleanup"
+  },
+  "structuredExcluded": {
+    "complete": true,
+    "rows": 0,
+    "limit": "Current junction rows do not establish producer or exclusion policy."
+  },
+  "promptShapes": [
+    {
+      "name": "phase-i.summary",
+      "version": 1,
+      "variables": {
+        "state": "valid_json",
+        "sha256": "ddd0d32c69d1b253f39bc2e4331909a5c1a9d925c8cf01dc92f760b737c5f856",
+        "outputCount": null,
+        "allTargetsNone": null,
+        "generationMode": null,
+        "rawRetention": null
+      },
+      "schema": {
+        "state": "valid_json",
+        "sha256": "a5ad34e6c919c54d2c670e3350e4f5311b90d17b5c51fb860fafd3787a4d2815",
+        "outputCount": 1,
+        "allTargetsNone": false,
+        "generationMode": null,
+        "rawRetention": "hash"
+      }
+    },
+    {
+      "name": "reviewer-finder.analyze",
+      "version": 2,
+      "variables": {
+        "state": "valid_json",
+        "sha256": "800a9ad1e17c78be5367b5c665e7ca28b1e3657ed2f92f8854f7b355e0feca52",
+        "outputCount": null,
+        "allTargetsNone": null,
+        "generationMode": null,
+        "rawRetention": null
+      },
+      "schema": {
+        "state": "valid_json",
+        "sha256": "97eee3cf48b6cff4adb94749fb32293abbe261833f6288b2b9b6dcc3a9a34779",
+        "outputCount": 1,
+        "allTargetsNone": true,
+        "generationMode": null,
+        "rawRetention": null
+      }
+    },
+    {
+      "name": "peer-review-summarizer.analyze",
+      "version": 1,
+      "variables": {
+        "state": "valid_json",
+        "sha256": "2b9738b12499415b67fbe5f3dcba179a46668397e9bf88638cdcf92cd03b8c81",
+        "outputCount": null,
+        "allTargetsNone": null,
+        "generationMode": null,
+        "rawRetention": null
+      },
+      "schema": {
+        "state": "valid_json",
+        "sha256": "97eee3cf48b6cff4adb94749fb32293abbe261833f6288b2b9b6dcc3a9a34779",
+        "outputCount": 1,
+        "allTargetsNone": true,
+        "generationMode": null,
+        "rawRetention": null
+      }
+    },
+    {
+      "name": "grantee-title.generate",
+      "version": 1,
+      "variables": {
+        "state": "valid_json",
+        "sha256": "3c880b2e88c95b1413a4245454f50752314eb21da9e0950e407fb9bd7966ca32",
+        "outputCount": null,
+        "allTargetsNone": null,
+        "generationMode": null,
+        "rawRetention": null
+      },
+      "schema": {
+        "state": "valid_json",
+        "sha256": "0d59d0c39e358d82c40ea835d1005813fd2603555a8e3c3dc1b9c6d97c2d6a0e",
+        "outputCount": 1,
+        "allTargetsNone": true,
+        "generationMode": null,
+        "rawRetention": "full"
+      }
+    },
+    {
+      "name": "reviewer-finder.score-candidates",
+      "version": 1,
+      "variables": {
+        "state": "valid_json",
+        "sha256": "4aaeaf32dc2bcec97ccc15175bcd43b26edb57630367e0fb20abd684936f7da9",
+        "outputCount": null,
+        "allTargetsNone": null,
+        "generationMode": null,
+        "rawRetention": null
+      },
+      "schema": {
+        "state": "valid_json",
+        "sha256": "97eee3cf48b6cff4adb94749fb32293abbe261833f6288b2b9b6dcc3a9a34779",
+        "outputCount": 1,
+        "allTargetsNone": true,
+        "generationMode": null,
+        "rawRetention": null
+      }
+    },
+    {
+      "name": "peer-review-summarizer.questions",
+      "version": 1,
+      "variables": {
+        "state": "valid_json",
+        "sha256": "9024ec9076d3e23e8b259914255398b3af65c63d48ee816b31c06b42f30b6c71",
+        "outputCount": null,
+        "allTargetsNone": null,
+        "generationMode": null,
+        "rawRetention": null
+      },
+      "schema": {
+        "state": "valid_json",
+        "sha256": "97eee3cf48b6cff4adb94749fb32293abbe261833f6288b2b9b6dcc3a9a34779",
+        "outputCount": 1,
+        "allTargetsNone": true,
+        "generationMode": null,
+        "rawRetention": null
+      }
+    },
+    {
+      "name": "phase-ii.refine",
+      "version": 1,
+      "variables": {
+        "state": "valid_json",
+        "sha256": "a2ef5f99981ee211908bb93f87bfe9e313b90c2d28b184bc6565b08dd29daeb4",
+        "outputCount": null,
+        "allTargetsNone": null,
+        "generationMode": null,
+        "rawRetention": null
+      },
+      "schema": {
+        "state": "valid_json",
+        "sha256": "97eee3cf48b6cff4adb94749fb32293abbe261833f6288b2b9b6dcc3a9a34779",
+        "outputCount": 1,
+        "allTargetsNone": true,
+        "generationMode": null,
+        "rawRetention": null
+      }
+    },
+    {
+      "name": "phase-ii.qa",
+      "version": 1,
+      "variables": {
+        "state": "valid_json",
+        "sha256": "e59474c1703aeec3a12ecfd8cf7489a50b62b37e50aaf72bd240d2650bac3fcd",
+        "outputCount": null,
+        "allTargetsNone": null,
+        "generationMode": null,
+        "rawRetention": null
+      },
+      "schema": {
+        "state": "valid_json",
+        "sha256": "97eee3cf48b6cff4adb94749fb32293abbe261833f6288b2b9b6dcc3a9a34779",
+        "outputCount": 1,
+        "allTargetsNone": true,
+        "generationMode": null,
+        "rawRetention": null
+      }
+    },
+    {
+      "name": "grantee-abstract.generate",
+      "version": 2,
+      "variables": {
+        "state": "valid_json",
+        "sha256": "dddd8c240d9894f25300530d0c2e7fd33f911795f36dc2c122db55a2dcda655e",
+        "outputCount": null,
+        "allTargetsNone": null,
+        "generationMode": null,
+        "rawRetention": null
+      },
+      "schema": {
+        "state": "valid_json",
+        "sha256": "78ee0ab6628de41b93cdc7dd8b568e6c37bbc7af33a524509032da4cf9ecdc2b",
+        "outputCount": 1,
+        "allTargetsNone": true,
+        "generationMode": null,
+        "rawRetention": "full"
+      }
+    },
+    {
+      "name": "meeting-transcript.fragment-review",
+      "version": 1,
+      "variables": {
+        "state": "valid_json",
+        "sha256": "593b8c9f388dc47ec5ba6236306ee76ae298becfe21e96b9719947fb293acb8d",
+        "outputCount": null,
+        "allTargetsNone": null,
+        "generationMode": null,
+        "rawRetention": null
+      },
+      "schema": {
+        "state": "valid_json",
+        "sha256": "6ba315b7118c902984942763645815ef72a740f6342fddb99ab41f9871d474ee",
+        "outputCount": 1,
+        "allTargetsNone": true,
+        "generationMode": null,
+        "rawRetention": "none"
+      }
+    },
+    {
+      "name": "review-panel.chair",
+      "version": 3,
+      "variables": {
+        "state": "valid_json",
+        "sha256": "1d1689842102c40618afa26437f491dbd1048bd7bc4f690aff9408ee58a12a48",
+        "outputCount": null,
+        "allTargetsNone": null,
+        "generationMode": null,
+        "rawRetention": null
+      },
+      "schema": {
+        "state": "valid_json",
+        "sha256": "d87a584fb85e1dcd4ed166e4ab8bd5484182e99a87e857a2593f617acdbc18cf",
+        "outputCount": 1,
+        "allTargetsNone": true,
+        "generationMode": null,
+        "rawRetention": null
+      }
+    },
+    {
+      "name": "funding-gap.extract",
+      "version": 1,
+      "variables": {
+        "state": "valid_json",
+        "sha256": "d9749bd70ffeec255ee12d1496e68f7c8982101241404f4a35f6816ecf7e8d77",
+        "outputCount": null,
+        "allTargetsNone": null,
+        "generationMode": null,
+        "rawRetention": null
+      },
+      "schema": {
+        "state": "missing"
+      }
+    },
+    {
+      "name": "multi-perspective.integrator",
+      "version": 1,
+      "variables": {
+        "state": "valid_json",
+        "sha256": "6d01b2eb402addcf912ba61dd9d31cab6f1e8af4109efe33de8ea6f9f761c936",
+        "outputCount": null,
+        "allTargetsNone": null,
+        "generationMode": null,
+        "rawRetention": null
+      },
+      "schema": {
+        "state": "missing"
+      }
+    },
+    {
+      "name": "meeting-transcript.staff-discussion-summary",
+      "version": 2,
+      "variables": {
+        "state": "valid_json",
+        "sha256": "99eb5af7b34eb885384ae4d406381393ec808772cb1769b1c8d212eb0115b35b",
+        "outputCount": null,
+        "allTargetsNone": null,
+        "generationMode": null,
+        "rawRetention": null
+      },
+      "schema": {
+        "state": "valid_json",
+        "sha256": "0d2b7e870e6720751a67e0bedbf6ec51340bfc18cacff8c15d8d62a78121588d",
+        "outputCount": 1,
+        "allTargetsNone": true,
+        "generationMode": null,
+        "rawRetention": "none"
+      }
+    },
+    {
+      "name": "review-synthesis.generate",
+      "version": 5,
+      "variables": {
+        "state": "valid_json",
+        "sha256": "32caad76786c58011886b229cfdc3dafe891926533082963547d0c4b501c3166",
+        "outputCount": null,
+        "allTargetsNone": null,
+        "generationMode": null,
+        "rawRetention": null
+      },
+      "schema": {
+        "state": "valid_json",
+        "sha256": "c6785390abb72196d8ce551949e5879084ea35598b48683293856239ab9f837a",
+        "outputCount": 1,
+        "allTargetsNone": false,
+        "generationMode": "native-json-schema",
+        "rawRetention": "hash"
+      }
+    },
+    {
+      "name": "executor.echo-parity",
+      "version": 2,
+      "variables": {
+        "state": "valid_json",
+        "sha256": "5262085dc59aee5c2594c5336a40aeaa5e8831c5971c56fb082005d2b16eaf5f",
+        "outputCount": null,
+        "allTargetsNone": null,
+        "generationMode": null,
+        "rawRetention": null
+      },
+      "schema": {
+        "state": "valid_json",
+        "sha256": "204fad1f1d65d54040ca765724ecc40140e86368c972188786b58ce100bf5dbc",
+        "outputCount": 1,
+        "allTargetsNone": true,
+        "generationMode": null,
+        "rawRetention": "full"
+      }
+    },
+    {
+      "name": "field-primer.generate",
+      "version": 2,
+      "variables": {
+        "state": "valid_json",
+        "sha256": "d3500d9afa57adb2ea41f57365209c986dad730df400db67360dfdfe72b20443",
+        "outputCount": null,
+        "allTargetsNone": null,
+        "generationMode": null,
+        "rawRetention": null
+      },
+      "schema": {
+        "state": "valid_json",
+        "sha256": "6070ddedc7a8a9772cd987133245291050c2e7e11b489793f0c1197015a2264f",
+        "outputCount": 1,
+        "allTargetsNone": true,
+        "generationMode": null,
+        "rawRetention": "full"
+      }
+    },
+    {
+      "name": "initial-assessment.generate",
+      "version": 2,
+      "variables": {
+        "state": "valid_json",
+        "sha256": "193a64d92acd65296ff14f1192dca192fdf6cb371ad361119b8c1b186689cb76",
+        "outputCount": null,
+        "allTargetsNone": null,
+        "generationMode": null,
+        "rawRetention": null
+      },
+      "schema": {
+        "state": "valid_json",
+        "sha256": "8d3394bc3782953d6d46fe3020a40795ae1b689c412a88e6dd21b958a8005c28",
+        "outputCount": 1,
+        "allTargetsNone": true,
+        "generationMode": null,
+        "rawRetention": "hash"
+      }
+    },
+    {
+      "name": "phase-ii.summarize",
+      "version": 1,
+      "variables": {
+        "state": "valid_json",
+        "sha256": "1c21710cf82a3e914b27f22b6578e3db2fc19f4c09d6993c0a216bc07d339df8",
+        "outputCount": null,
+        "allTargetsNone": null,
+        "generationMode": null,
+        "rawRetention": null
+      },
+      "schema": {
+        "state": "valid_json",
+        "sha256": "97eee3cf48b6cff4adb94749fb32293abbe261833f6288b2b9b6dcc3a9a34779",
+        "outputCount": 1,
+        "allTargetsNone": true,
+        "generationMode": null,
+        "rawRetention": null
+      }
+    },
+    {
+      "name": "phase-ii.extract-structured",
+      "version": 1,
+      "variables": {
+        "state": "valid_json",
+        "sha256": "0e4c323dd36e3e6838295c2b5e1e1c67773fec6df808b7905f04ede2343e7b0a",
+        "outputCount": null,
+        "allTargetsNone": null,
+        "generationMode": null,
+        "rawRetention": null
+      },
+      "schema": {
+        "state": "valid_json",
+        "sha256": "97eee3cf48b6cff4adb94749fb32293abbe261833f6288b2b9b6dcc3a9a34779",
+        "outputCount": 1,
+        "allTargetsNone": true,
+        "generationMode": null,
+        "rawRetention": null
+      }
+    },
+    {
+      "name": "literature-analyzer.compare",
+      "version": 1,
+      "variables": {
+        "state": "valid_json",
+        "sha256": "bdf21b2531b4a8fd0a9f7b9fd245aa854637803c78c569ef9758ed8e98ddd40f",
+        "outputCount": null,
+        "allTargetsNone": null,
+        "generationMode": null,
+        "rawRetention": null
+      },
+      "schema": {
+        "state": "missing"
+      }
+    },
+    {
+      "name": "multi-perspective.optimist",
+      "version": 1,
+      "variables": {
+        "state": "valid_json",
+        "sha256": "1619910f99021b35eea45054ebcfeee3c8bdeab18aad3d27a90052448e98ed57",
+        "outputCount": null,
+        "allTargetsNone": null,
+        "generationMode": null,
+        "rawRetention": null
+      },
+      "schema": {
+        "state": "missing"
+      }
+    },
+    {
+      "name": "multi-perspective.neutral",
+      "version": 1,
+      "variables": {
+        "state": "valid_json",
+        "sha256": "1619910f99021b35eea45054ebcfeee3c8bdeab18aad3d27a90052448e98ed57",
+        "outputCount": null,
+        "allTargetsNone": null,
+        "generationMode": null,
+        "rawRetention": null
+      },
+      "schema": {
+        "state": "missing"
+      }
+    },
+    {
+      "name": "meeting-transcript.staff-discussion-sentiment",
+      "version": 1,
+      "variables": {
+        "state": "valid_json",
+        "sha256": "99eb5af7b34eb885384ae4d406381393ec808772cb1769b1c8d212eb0115b35b",
+        "outputCount": null,
+        "allTargetsNone": null,
+        "generationMode": null,
+        "rawRetention": null
+      },
+      "schema": {
+        "state": "valid_json",
+        "sha256": "e448dea40d112b0de63d43c0c9408b69e7c0e21f6191e78f4a961d512f007aad",
+        "outputCount": 1,
+        "allTargetsNone": true,
+        "generationMode": "native-json-schema",
+        "rawRetention": "none"
+      }
+    },
+    {
+      "name": "cycle-dossier.research-plan",
+      "version": 2,
+      "variables": {
+        "state": "valid_json",
+        "sha256": "ac7ea5b438ce0767791ccbeb7babe371a2eccf383a7909994ae0d5de21180716",
+        "outputCount": null,
+        "allTargetsNone": null,
+        "generationMode": null,
+        "rawRetention": null
+      },
+      "schema": {
+        "state": "valid_json",
+        "sha256": "8043eba944aef0d5f7bc2f826c5bb6d964b9df68d94b1545e50d8da74a013143",
+        "outputCount": 1,
+        "allTargetsNone": true,
+        "generationMode": null,
+        "rawRetention": null
+      }
+    },
+    {
+      "name": "cycle-dossier.entry",
+      "version": 2,
+      "variables": {
+        "state": "valid_json",
+        "sha256": "0b84116a0eccba48515f2a4c88e8038d3766c10942654c8388c693fc44bb6e01",
+        "outputCount": null,
+        "allTargetsNone": null,
+        "generationMode": null,
+        "rawRetention": null
+      },
+      "schema": {
+        "state": "valid_json",
+        "sha256": "8de85e876bf6233a8c874b803468cae3fe2a5d01363f770f839f848ed9fb9dd7",
+        "outputCount": 1,
+        "allTargetsNone": true,
+        "generationMode": null,
+        "rawRetention": null
+      }
+    },
+    {
+      "name": "review-panel.seat",
+      "version": 2,
+      "variables": {
+        "state": "valid_json",
+        "sha256": "3f9358ec8992552dfdde7c6290ea4cde4716a2c51c8b6129416546111d9e96c8",
+        "outputCount": null,
+        "allTargetsNone": null,
+        "generationMode": null,
+        "rawRetention": null
+      },
+      "schema": {
+        "state": "valid_json",
+        "sha256": "571483ab39f167fa08f79fb0a7ed4c2c4e8b63fb5384b195576ea35fd9d6881e",
+        "outputCount": 1,
+        "allTargetsNone": true,
+        "generationMode": null,
+        "rawRetention": null
+      }
+    },
+    {
+      "name": "meeting-transcript.presentation-summary",
+      "version": 1,
+      "variables": {
+        "state": "valid_json",
+        "sha256": "c5d112aadee938e8c574d9a2e5f3cd1beb1ab1e86199906ce17447931d732079",
+        "outputCount": null,
+        "allTargetsNone": null,
+        "generationMode": null,
+        "rawRetention": null
+      },
+      "schema": {
+        "state": "valid_json",
+        "sha256": "0d2b7e870e6720751a67e0bedbf6ec51340bfc18cacff8c15d8d62a78121588d",
+        "outputCount": 1,
+        "allTargetsNone": true,
+        "generationMode": null,
+        "rawRetention": "none"
+      }
+    },
+    {
+      "name": "literature-analyzer.extract-paper",
+      "version": 1,
+      "variables": {
+        "state": "valid_json",
+        "sha256": "ac2d350d083c461f1b68bebbb199eb23a2a09f96cb257f9bc7c4690ddd10b735",
+        "outputCount": null,
+        "allTargetsNone": null,
+        "generationMode": null,
+        "rawRetention": null
+      },
+      "schema": {
+        "state": "missing"
+      }
+    },
+    {
+      "name": "multi-perspective.initial-analysis",
+      "version": 1,
+      "variables": {
+        "state": "valid_json",
+        "sha256": "fa5183f508c26f8b30be3004e10a619b1255d42d6c4de2b17833804301dc30f7",
+        "outputCount": null,
+        "allTargetsNone": null,
+        "generationMode": null,
+        "rawRetention": null
+      },
+      "schema": {
+        "state": "missing"
+      }
+    },
+    {
+      "name": "expertise-finder.match",
+      "version": 1,
+      "variables": {
+        "state": "valid_json",
+        "sha256": "05e3ac04df782d3e30282d84f172b2928709e26dc8e3fd0e3abbe268fb367df1",
+        "outputCount": null,
+        "allTargetsNone": null,
+        "generationMode": null,
+        "rawRetention": null
+      },
+      "schema": {
+        "state": "missing"
+      }
+    },
+    {
+      "name": "funding-gap.analyze",
+      "version": 1,
+      "variables": {
+        "state": "valid_json",
+        "sha256": "1d986110461840483ac5d2998a771cbafa14f6008fd6a45afdb2e67db1952c7a",
+        "outputCount": null,
+        "allTargetsNone": null,
+        "generationMode": null,
+        "rawRetention": null
+      },
+      "schema": {
+        "state": "missing"
+      }
+    },
+    {
+      "name": "expense-reporter.extract-document",
+      "version": 1,
+      "variables": {
+        "state": "valid_json",
+        "sha256": "77b689c39e54c44f5fdff79ab9924919d1829c92d71d59208bcb09407f0df501",
+        "outputCount": null,
+        "allTargetsNone": null,
+        "generationMode": null,
+        "rawRetention": null
+      },
+      "schema": {
+        "state": "missing"
+      }
+    },
+    {
+      "name": "multi-perspective.skeptic",
+      "version": 1,
+      "variables": {
+        "state": "valid_json",
+        "sha256": "1619910f99021b35eea45054ebcfeee3c8bdeab18aad3d27a90052448e98ed57",
+        "outputCount": null,
+        "allTargetsNone": null,
+        "generationMode": null,
+        "rawRetention": null
+      },
+      "schema": {
+        "state": "missing"
+      }
+    },
+    {
+      "name": "pre-site-visit.proposal-core.generate",
+      "version": 5,
+      "variables": {
+        "state": "valid_json",
+        "sha256": "e03496ca93d7e1f320663acd837192dd172b327faaa68f010da686cfb6732fe0",
+        "outputCount": null,
+        "allTargetsNone": null,
+        "generationMode": null,
+        "rawRetention": null
+      },
+      "schema": {
+        "state": "valid_json",
+        "sha256": "05f0d574232d5b3b01b408faf94bcc658ce07ba699679736113b1d07ee55c00f",
+        "outputCount": 1,
+        "allTargetsNone": true,
+        "generationMode": "native-json-schema",
+        "rawRetention": "full"
+      }
+    },
+    {
+      "name": "meeting-transcript.speaker-alignment",
+      "version": 1,
+      "variables": {
+        "state": "valid_json",
+        "sha256": "41da017fcb7350018acc27dee5772c413ca62164e1a44182c13338dc74690797",
+        "outputCount": null,
+        "allTargetsNone": null,
+        "generationMode": null,
+        "rawRetention": null
+      },
+      "schema": {
+        "state": "valid_json",
+        "sha256": "c704ae8e94567d45ddc02fa322e33dc8ebd427176856acef6df186b12ab8b245",
+        "outputCount": 1,
+        "allTargetsNone": true,
+        "generationMode": null,
+        "rawRetention": "none"
+      }
+    },
+    {
+      "name": "expense-reporter.extract-image",
+      "version": 1,
+      "variables": {
+        "state": "valid_json",
+        "sha256": "a02f909dd71aeafdd352545e3267c419e6ac955ad6ccb406eb3d8aa4fb65d6d2",
+        "outputCount": null,
+        "allTargetsNone": null,
+        "generationMode": null,
+        "rawRetention": null
+      },
+      "schema": {
+        "state": "missing"
+      }
+    },
+    {
+      "name": "multi-perspective.proposal-summary",
+      "version": 1,
+      "variables": {
+        "state": "valid_json",
+        "sha256": "f664db2fcdc12bf2721b5e5a4791483dd9a33385a7e033699152d062227f82d9",
+        "outputCount": null,
+        "allTargetsNone": null,
+        "generationMode": null,
+        "rawRetention": null
+      },
+      "schema": {
+        "state": "missing"
+      }
+    },
+    {
+      "name": "literature-analyzer.synthesize",
+      "version": 1,
+      "variables": {
+        "state": "valid_json",
+        "sha256": "c47f841da72f4a1a5a85aab6ea0617e669c8435f230450df80dce28900872753",
+        "outputCount": null,
+        "allTargetsNone": null,
+        "generationMode": null,
+        "rawRetention": null
+      },
+      "schema": {
+        "state": "missing"
+      }
+    }
+  ],
+  "audit": {
+    "organization": {
+      "status": 200,
+      "enabled": true
+    },
+    "akoya_request": {
+      "metadataStatus": 200,
+      "enabled": true,
+      "sampleStatus": 403,
+      "sampleRows": null,
+      "newestVisibleAuditAt": null
+    },
+    "wmkf_potentialreviewers": {
+      "metadataStatus": 200,
+      "enabled": true,
+      "sampleStatus": 403,
+      "sampleRows": null,
+      "newestVisibleAuditAt": null
+    },
+    "wmkf_appreviewersuggestion": {
+      "metadataStatus": 200,
+      "enabled": true,
+      "sampleStatus": 403,
+      "sampleRows": null,
+      "newestVisibleAuditAt": null
+    }
+  }
+}

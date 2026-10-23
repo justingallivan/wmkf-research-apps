@@ -1,6 +1,6 @@
 ---
 name: project-reviewer-lifecycle-autonomy-directive-2026-09-05
-description: Owner directive (2026-09-05 evening) to build lifecycle Stages 2, 3, 5, 7 autonomously with the plan→Sonnet→Opus→Codex(≤2) cycle; COMPLETED 2026-09-06 (17 PRs). Owner resolved D0–D5 on 2026-09-06 (D0/D3/D5 taken, D1 preserved, D2/D4 removed, 6D-1 confirmed, 6D-2 parked); PRs #170–#173 merged to Production 2026-09-06 (S491) — Stage 7 plan decisions table is authoritative.
+description: Historical record of the 2026-09-05 reviewer-lifecycle autonomy grant, completed 2026-09-06 (17 PRs); it grants no ongoing build, review, or merge authority. Owner decisions and production outcome are recorded in the Stage 7 plan and S491 history.
 metadata:
   type: project
   status: closed
@@ -20,14 +20,17 @@ moves with no observed defect and that promotion during the D26 review window wa
 The owner weighed that and chose to build now. Stage 4 remains skipped (audit: benefit not
 established).
 
-**How to apply:** Operating cycle per stage: architect plan (with contract-reconcile for
-anything touching routes/services/persistence) → Sonnet builds on a fresh branch from main
-→ Opus independent review → Codex adversarial, at most two rounds as a stopping rule →
-PR. Try `gh pr merge`; if the permission classifier blocks it, leave the PR green for the
-owner and cut the next stage so it stacks. Record each stage in its receipt and the
-readiness audit. Stop and report if a stage hits the Codex cap without converging or a
-decision is genuinely the owner's. Architect took the 6D uniform-enforcement decision
-under this grant (both reviewers recommended it); flagged for morning review. See
+## Historical execution record (completed 2026-09-06)
+
+The campaign used an architect plan (with contract-reconcile for route/service/persistence
+work), implementation on a fresh branch, independent review, and at most two Codex
+adversarial rounds before PR. Each stage was recorded in its receipt and the readiness
+audit. This describes the completed S489 campaign; it is not standing authorization to
+build later stages, merge PRs, or reuse that campaign's workflow. Any new work follows
+current owner direction and repository process.
+
+The architect made the 6D uniform-enforcement decision under that one-time grant after both
+reviewers recommended it and flagged it for the owner's morning review. See
 [[project-accepted-awaiting-materials-is-transient]] and the readiness audit
 `docs/audits/REVIEWER_LIFECYCLE_REMAINING_READINESS_2026-09-05.md`.
 

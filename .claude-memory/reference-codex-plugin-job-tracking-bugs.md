@@ -1,6 +1,6 @@
 ---
 name: reference-codex-plugin-job-tracking-bugs
-description: "Historical codex plugin v1.0.4/1.0.5 job-tracking failures; re-check the installed version before applying these mitigations"
+description: "Historical incident record for Codex plugin v1.0.4/1.0.5 job-tracking failures; not current operational guidance"
 metadata: 
   node_type: memory
   type: reference
@@ -8,16 +8,30 @@ metadata:
   originSessionId: c18124b6-2252-442d-b924-73ea740f86cf
 ---
 
-## Recall Rule
+## Historical incident record — 2026-07-04 (S330)
 
-When plugin-launched Codex job tracking misbehaves, prefer a synchronous fresh
-run and verify actual process/job state directly. Re-check the installed plugin
-version before assuming these 1.0.4/1.0.5 defects still apply.
+This record documents failures observed with plugin versions 1.0.4/1.0.5. It is not a
+current troubleshooting recipe and does not authorize changing or deleting plugin job
+state. For a present incident, establish the installed version and consult current plugin
+documentation and supported controls; these dated findings alone do not establish current
+behavior.
 
-Researched 2026-07-04 (S330) after repeated lost/zombie Codex jobs. Confirmed causes, all present in plugin 1.0.5 (upgrading does not help):
+The 2026-07-04 investigation followed repeated lost/zombie Codex jobs and attributed the
+following causes to the then-installed plugin 1.0.5:
 
-- **Never background a codex-rescue run.** The rescue subagent backgrounding the companion lets Claude Code reap the process tree at turn end, killing the broker mid-flight → jobs stuck `running` forever or reported under IDs that never existed (openai/codex-plugin-cc#432). Run rescue agents synchronously and tell them: foreground only.
-- **Never call `status`/`result`/`cancel` while a job is live.** `state.json` has no locking; concurrent read-modify-writes DROP job entries and delete their on-disk logs ("No job found" for real IDs) (#428). Wedged jobs: delete the entry under `~/.claude/plugins/data/codex-openai-codex/state/<repo-hash>/jobs/` rather than trusting `/codex:cancel` (#423).
-- **Write tasks need a fresh session** (`--fresh`), never `--resume-last` — resume pins the original sandbox policy (plugin #412, upstream openai/codex#15310). Extends [[reference-codex-rescue-plan-task-runs-readonly]].
-- **Owner's Codex console won't show plugin-launched runs** — upstream: the desktop app only indexes sessions its own app-server started (openai/codex#24197). Restarting the app re-indexes `~/.codex/sessions`. When the owner wants console visibility, hand them a paste-ready prompt instead of launching via the plugin.
-- Deterministic alternative when tracking matters: synchronous `codex exec --json` (no daemon state at all).
+- **Backgrounded rescue run:** the investigation attributed jobs stuck at `running` or reported
+  under nonexistent IDs to Claude Code reaping a backgrounded companion process at turn end
+  (openai/codex-plugin-cc#432).
+- **Concurrent job-state operations:** the investigation found that concurrent
+  `status`/`result`/`cancel` operations could lose job entries and on-disk logs because the
+  then-observed `state.json` had no locking (#428); a separate report described wedged jobs
+  (#423). The original incident notes mentioned direct state-file deletion; that historical
+  action is not a present instruction or supported remedy.
+- **Session policy:** plugin #412 and upstream openai/codex#15310 were cited for resumed
+  sessions retaining their original sandbox policy. The note extended
+  [[reference-codex-rescue-plan-task-runs-readonly]].
+- **Console visibility:** upstream openai/codex#24197 was cited for the desktop app indexing
+  only sessions started by its own app-server. The observed re-index behavior and workaround
+  were specific to the 2026-07-04 environment.
+- Synchronous `codex exec --json` was recorded as a deterministic tracking option at that
+  time. Its current suitability is not established by this incident record.

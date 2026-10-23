@@ -4,17 +4,20 @@ description: Tier-1 system prompts (Dataverse wmkf_ai_prompts, versioned, create
 type: project
 status: active
 scope: prompts
-last_verified: 2026-10-22 source and bounded metadata reconciliation; prompt bodies/execution and deployment state not inspected
+last_verified: 2026-10-22 PT (2026-10-23 UTC) bounded read-only Production prompt metadata reconciliation; prompt bodies/execution, writer/consumer behavior, and deployment state not inspected
 ---
 
 **Dated evidence boundaries:** Publication/deployment observations below were verified on
-2026-08-18. The read-only evidence artifact
-`docs/audits/memory-live-state-evidence-2026-10-22.json` contains metadata for 39 distinct
-prompt names with current rows (`wmkf_ai_iscurrent=true`) from a complete metadata query. The
-lookup does not independently filter prompt status. It does not include prompt contents or prove
-execution, and is not a deployment smoke test. Link to that dated artifact rather than
-creating a mutable prompt inventory. The owner-confirmed create-only/versioning governance below
-remains durable policy; individual legacy upsert seeds remain separate exceptions.
+2026-08-18. The retained read-only evidence artifact
+`docs/audits/memory-historical-impact-evidence-2026-10-22.json` records a complete Production
+metadata query observed 2026-10-23 UTC, returning 39 current prompt rows
+(`wmkf_ai_iscurrent=true`). All 39 `variables` values were valid JSON; each present output-schema
+value was valid JSON, while some rows had no output-schema value. The current
+`pre-site-visit.proposal-core.generate` row was v5 with `native-json-schema` and `rawRetention=full`;
+this is metadata only, not prompt-body/contract-hash parity, code/deployment parity, or execution
+proof. Link to that dated artifact rather than creating a mutable prompt inventory. The
+owner-confirmed create-only/versioning governance below remains durable policy; individual legacy
+upsert seeds remain separate exceptions.
 
 ## Recall Rule
 
@@ -56,8 +59,9 @@ Read this before adding a new prompt, writing/editing a seed script, or touching
 **Pre-Site resilience boundary recorded 2026-08-18:** that review reported
 pre-side-effect validation of body, variables, schema and assertions, full
 publication readback, and sole-current v4 matching the then-tracked schema.
-The 2026-10-22 metadata artifact includes a current-row version number for each
-returned prompt name, but it does not establish prompt contents or smoke status.
+The 2026-10-23 metadata query observed current v5 with native JSON-schema metadata
+and full raw-retention metadata for Pre-Site proposal-core, but it does not establish
+prompt-body parity, deployed implementation, or smoke status.
 
 **Admin model/schema publication (observed 2026-08-18; current live status unknown):** the Prompt Templates editor
 can select `wmkf_ai_model` and edit the validated output-schema JSON; either

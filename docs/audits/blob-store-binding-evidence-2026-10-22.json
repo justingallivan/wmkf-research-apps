@@ -1,0 +1,24 @@
+{
+  "observedAt": "2026-10-23T00:35:18.092Z",
+  "mode": "Vercel account-authenticated store metadata read only",
+  "inspectedStoreMetadataRows": 11,
+  "stores": [
+    {
+      "localConfiguredPublicTokenMatches": false,
+      "exportNameCandidateOnly": true,
+      "storeFingerprint": "ffb75e44e30e",
+      "linkedToCurrentProject": false,
+      "reportedCount": 2,
+      "reportedBytes": 32185
+    },
+    {
+      "localConfiguredPublicTokenMatches": true,
+      "exportNameCandidateOnly": false,
+      "storeFingerprint": "6060259031fd",
+      "linkedToCurrentProject": true,
+      "reportedCount": 347,
+      "reportedBytes": 232239023
+    }
+  ],
+  "limitation": "Store-wide cached metadata, not prefix object inventory, environment credential binding or effective cleanup-target proof. Name matching does not establish DVX token ownership."
+}

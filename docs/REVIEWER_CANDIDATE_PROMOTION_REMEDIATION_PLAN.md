@@ -268,11 +268,19 @@ closed and staff must reconfirm.
 
 **[VERIFIED via source]** Applicant promotion is not the source of the
 null-email person-creation shape: it operates on an existing suggestion/person
-behind server-read identity gates and does not call `upsertByEmail`. It still
-shares the client-authoritative roster-`saved` seam and a legacy successful
-no-roster-row path. **[DEPLOYED TO PRODUCTION 2026-07-29]** It now uses the
-same server-owned finalization and fails closed when the canonical roster row
-is absent.
+behind server-read identity gates and does not call `upsertByEmail`. Before the
+2026-07-29 deployment, applicant promotion had a legacy successful path without
+a roster row and relied on client-side `saved` stamping. **[DEPLOYED TO
+PRODUCTION 2026-07-29; VERIFIED via current source 2026-10-22]** The current
+service requires and validates the canonical roster candidate before any
+Dataverse promotion write. After a successful Dataverse selection, the
+server-owned finalizer marks the exact row `saved`; if that row was evicted
+after validation, it may recreate it from the validated candidate. It preserves
+other existing statuses, including `excluded`, `ineligible`, and `blocked`, and
+does not make the Dataverse write and Postgres finalization atomic. A failed
+finalization can therefore leave the Dataverse promotion committed while the
+roster remains unfinalized; the service reports `rosterFinalized: false` and
+raises a best-effort alert.
 
 `pickVettedEmail`, applicant B1 backfill, and the email reconciler currently
 implement related but divergent persistence envelopes.

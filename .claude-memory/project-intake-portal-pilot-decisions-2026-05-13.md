@@ -1,6 +1,6 @@
 ---
 name: Intake portal pilot — Track 1 decisions 2026-05-13
-description: Sarah+Connor sync Track 1 closed all four agenda items. Two notable deltas from 2026-05-06: 1C reversed to PA-built packet, 1D narrowed scope (deployed S178 as wmkf_proposalbudgetline + wmkf_apprequestperson extensions, not the in-meeting "two new entities" sketch). See top-of-file banner.
+description: Historical Sarah+Connor Track 1 decisions from 2026-05-13. The recorded schema decisions later shipped, but this meeting record does not authorize current custom-portal work; see the owner parking decision and current system model.
 type: project
 originSessionId: 3c35888d-8da4-46e3-83ac-31a25bbdc4e4
 status: closed
@@ -8,28 +8,20 @@ scope: intake
 last_verified: 2026-07-08 (S348 audit) — closed: point-in-time meeting decisions; the 1C/1D deltas shipped (wmkf_proposalbudgetline + wmkf_apprequestperson extensions, verified in lib/dataverse/schema/wave4/). Historical record; for current shape read docs/atlas + wave4 schema.
 ---
 
-## Recall Rule
+## Historical decision record — 2026-05-13
 
-Read this when: implementing the intake-portal reviewer-consumable artifact (1C) or structured-tables persistence (1D).
+This file records the Track 1 meeting decisions and subsequent schema follow-through. It is
+not current implementation authority or a route to resume portal work. The owner later
+parked the custom portal and kept J27 intake on GOApply until further notice; see
+[[project-system-model]], `docs/SYSTEM_MODEL.md` (Applicant Intake), and
+`docs/J27_TRANSITION_REGISTER.md` Q19. If a pilot is reopened, re-establish scope and
+authorization from those current authorities and source before applying this record.
 
-Do:
-- Treat this as ground truth for items 1C (PA-built review packet on `'Phase II Pending'` flip, Connor owns) and 1D (real child entities, budget + roster only).
-- Use the as-deployed S178 shape: budget = NEW `wmkf_proposalbudgetline`; roster = EXTENSIONS on `wmkf_apprequestperson` (3 nullable fields + 3 role enum values), NOT a new entity.
-- Use the 2026-05-06 memory for items not re-decided here.
-
-Do not:
-- Use the withdrawn names `wmkf_proposalroster` or the `lib/dataverse/schema/intake/` path — neither exists; specs landed under `lib/dataverse/schema/wave4/` + `wave4-existing/` and `docs/BUDGET_FORM_SPEC.md`.
-- Add a `wmkf_originatingsystem` field for pilot (PA flows are origin-agnostic per 1B).
-
-Ground truth: `docs/INTAKE_PORTAL_SCHEMA_CHANGES.md:38-40`, `docs/INTAKE_PORTAL_DESIGN.md:587-588`, `docs/BUDGET_FORM_SPEC.md`.
-
-> **⚠️ SUPERSEDED IN PART BY 2026-05-14 SCHEMA REVIEW.** Item 1D's "two child entities (budget + roster)" framing was refined the next day: budget is a new `wmkf_proposalbudgetline` entity (with cost-share unified into its `wmkf_category` enum), but **roster is NOT a new entity** — it extends the existing `wmkf_apprequestperson` junction via 3 nullable fields + 3 new role enum values. The `wmkf_proposalroster` name is withdrawn. Authoritative: `docs/INTAKE_PORTAL_SCHEMA_CHANGES.md:38-40`, `docs/INTAKE_PORTAL_DESIGN.md:587-588`. The `lib/dataverse/schema/intake/` path mentioned in this memory does not exist; the budget spec landed at `docs/BUDGET_FORM_SPEC.md` instead.
+> **Historical schema correction (2026-05-14; applied S178):** Item 1D's "two child entities (budget + roster)" framing was refined the next day: budget became a new `wmkf_proposalbudgetline` entity (with cost-share unified into its `wmkf_category` enum), while roster extended the existing `wmkf_apprequestperson` junction via 3 nullable fields + 3 new role enum values. The `wmkf_proposalroster` name was withdrawn. The specs landed under `docs/INTAKE_PORTAL_SCHEMA_CHANGES.md:38-40`, `docs/INTAKE_PORTAL_DESIGN.md:587-588`, and `docs/BUDGET_FORM_SPEC.md`; the proposed `lib/dataverse/schema/intake/` path does not exist. This records historical schema follow-through, not current portal authorization.
 
 Sarah+Connor sync 2026-05-13. Track 1 (Connor-side decisions, 4 items) ran to completion. Track 2 (Sarah's Phase II Research field inventory) was not reached — carry to next Sarah session.
 
-**Why this matters**: Two items reverse or narrow 2026-05-06 decisions. Future sessions should treat 2026-05-13 as ground truth for items 1C and 1D; the older memory's resolutions on those rows are superseded.
-
-**How to apply**: Use the resolutions below directly. The 2026-05-06 memory remains correct for items not re-decided here (membership shape, account creation policy, reviewer-suggestion lifecycle, T&C magic-link pattern, etc.).
+**Meeting context:** Two items reversed or narrowed the May 6 decisions. The table records what participants decided on May 13; its then-current choices do not establish present authorization or implementation status.
 
 ## Four Track 1 decisions
 
@@ -49,7 +41,7 @@ Deployed names: `wmkf_proposalbudgetline` (NEW entity, the meeting sketch) + `wm
 - ~~**Track 2 — Sarah field inventory**~~ — see Sarah session work, separately tracked.
 - ~~**Connor's flow-list response** (1B email)~~ — handled; PA flows are origin-agnostic per 1B decision.
 - ~~**Two JSON schema specs** under `lib/dataverse/schema/intake/` (budget + roster)~~ **DONE S178** — landed under `lib/dataverse/schema/wave4/` (budget = `wmkf_proposalbudgetline.json`, membership = `wmkf_portalmembership.json`) and `lib/dataverse/schema/wave4-existing/` (roster extensions = `wmkf_apprequestperson-roster-fields.json`). The `lib/dataverse/schema/intake/` directory does not exist.
-- **`/apply/admin/memberships`** UI + endpoints (Option A path) — ongoing pilot work.
+- **`/apply/admin/memberships`** UI + endpoints (Option A path) — recorded as ongoing pilot work at the time of this note.
 
 ## Calendar checkpoints (historical — slice 0 deployed S178 2026-05-22)
 

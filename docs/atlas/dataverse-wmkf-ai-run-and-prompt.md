@@ -16,7 +16,7 @@ the earlier governed runs/direct QA, and 24 prompt rows;
 2026-07-30 for governed `initial-assessment.generate` v1 production
 provisioning; 2026-07-28 for governed
 `review-synthesis.generate` v3 and its successful controlled production execution; 2026-07-12 for the broader entity inventory via
-`scripts/reconcile-memory-claims.js`
+`scripts/reconcile-memory-claims.js`; 2026-10-23 UTC for a complete read-only Production metadata query of 39 current prompt rows and JSON validity/shape only (see `docs/audits/memory-historical-impact-evidence-2026-10-22.json`; no prompt-body, deployment, or execution verification)
 **Source spec:** `docs/DYNAMICS_AI_FIELDS_SPEC_v3_cn.md` (canonical; v2 archived)
 
 ## `wmkf_ai_run` (mutable row count; probe before quoting)
@@ -85,8 +85,9 @@ Migration plans touching either entity must preserve these foreign keys.
 - Connor edits in Dynamics directly (per `project_dynamics_as_prompt_ground_truth.md` — staff-readable/editable prompts).
 - `scripts/seed-phase-i-summary-prompt.js`, `scripts/seed-phase-ii-prompts.js` (4 `phase-ii.*` rows), `scripts/seed-reviewer-finder-prompts.js` (2 `reviewer-finder.*` rows), `scripts/seed-peer-review-summarizer-prompts.js` (2 `peer-review-summarizer.*` rows) — **upsert** prompt rows keyed on `wmkf_ai_promptname` + `wmkf_ai_iscurrent` (update-in-place when current). LEGACY pattern; not yet converted (a separate audited sweep — S269 Codex review).
 - **Seed governance (S269) — `lib/services/prompt-seed.js`, the GO-FORWARD default for Tier-1 system prompts.** The grantee title/abstract, Initial Assessment, Review Synthesis, and local Pre-Site Visit proposal-core seeds use it: **create-only by default** (refuses if ANY row for the name exists — admin's versioned history is never clobbered; the file is a bootstrap artifact, not the live state), and **`--force` is version-preserving** (publishes `max(version)+1` as a new current row, flips priors with ETag — same invariant as the admin publish path). Stamps `wmkf_ai_publisheddatetime` on every version. **Dataverse `wmkf_ai_prompts` is the source of truth; after bootstrap, `/admin` versioned publish is the governed edit path.** Admin publish can change body, system prompt, validated output-schema JSON, and `wmkf_ai_model` only by creating a new immutable version. It checks the editor's expected version, validates the complete template/schema, and rejects unreviewed models; native-structured prompts additionally require a reviewed compatible concrete model whose output limit covers the stored token budget. Provenance is legible via `createdon` (version created) / `wmkf_ai_publisheddatetime` (domain publish) / `modifiedon` (last touch) / `_modifiedby_value` (seed = app identity, admin = superuser). Rationale: [[project-prompt-governance]].
-- **Meeting transcript speaker alignment (branch-built 2026-10-04; NOT SEEDED in
-  any environment):** `shared/config/prompts/meeting-speaker-alignment.js`
+- **Meeting transcript speaker alignment (branch-built 2026-10-04; a current v1
+  Production row's metadata observed 2026-10-23 UTC; runtime activation/execution
+  unverified):** `shared/config/prompts/meeting-speaker-alignment.js`
   defines `meeting-transcript.speaker-alignment` (three `override` variables, all
   `untrusted` with `dataClass: 'meeting_transcript'`; json-mode `record` verdict
   keyed by provider speaker ID; `rawOutputRetention: 'none'`; single `kind: none`
@@ -95,8 +96,12 @@ Migration plans touching either entity must preserve these foreign keys.
   The caller `lib/services/meeting-tracker-transcription/alignment-service.js`
   passes `requireNoPersistence: true` and the Executor's `auditRetention:
   'content-free'` option (added on the same branch) so no run row carries
-  transcript text or names on any path. The row must be seeded before alignment
-  is enabled so its variable caps match the code.
+  transcript text or names on any path. The read-only Production metadata query
+  found current v1 variables and output-schema values were valid JSON; the schema
+  declared one output, `targets: none`, and `rawOutputRetention: none`. This
+  metadata does not establish prompt-body parity with the branch, deployment,
+  runtime activation, or execution. The 2026-10-04 branch-history observation
+  remains separate from this current-row metadata observation.
 - **Meeting transcript staff discussion summary (Production-live 2026-10-09,
   merge `5b8225ed8`, Production deployment 6952181551 success; SEEDED IN PRODUCTION 2026-10-09 by the
   owner-run bootstrap as v1, current row `87768430-90c3-f111-aaad-6045bd063e21`,
