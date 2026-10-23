@@ -3,7 +3,7 @@
  */
 import {
   parseDecision, selectLine, splitName, contactCreatePayload, junctionCreatePayload, foldLedger, applyDone, rollbackEligible, ROLE_COPI,
-  makeApplier, requestDrift,
+  makeApplier, requestDrift, runOperations,
 } from '../../scripts/lib/research-copi-apply.mjs';
 
 const G = (n) => `${String(n).padStart(8, '0')}-0000-4000-8000-000000000000`;
@@ -172,14 +172,10 @@ function fakeDataverse() {
   };
   return { db, io };
 }
+// Same loop as production: earlier lines folded once, this run's intent not folded in first.
 async function run(apply, ops, ledgerLines) {
-  for (const o of ops) {
-    const key = `${o.op}|${o.id}`;
-    if (applyDone(foldLedger(ledgerLines).get(key))) continue;
-    ledgerLines.push({ kind: o.op, id: o.id, phase: 'intent' });
-    let out; try { out = await apply(o, foldLedger(ledgerLines)); } catch (err) { out = { result: 'failed', detail: err.message }; }
-    ledgerLines.push({ kind: o.op, id: o.id, phase: 'result', ...out });
-  }
+  const ledger = foldLedger(ledgerLines);
+  await runOperations({ ops, ledger, applyOp: apply, log: (l) => ledgerLines.push(l) });
   return foldLedger(ledgerLines);
 }
 const contactOp = { op: 'contact-create', id: NEWC, payload: contactCreatePayload({ contactId: NEWC, name: 'Ann Lee', email: 'ann@x.edu', accountId: ACC }), source };
@@ -217,6 +213,33 @@ describe('apply failure replay', () => {
     const m = await run(apply, [contactOp], log);
     expect(m.get(`contact-create|${NEWC}`).receipt.result).toBe('recovered_modified');
     expect(rollbackEligible(m.get(`contact-create|${NEWC}`), { includeRecovered: true })).toBe(false);
+  });
+  test('a recovered contact edited by someone else blocks its junction row', async () => {
+    const { db, io } = fakeDataverse(); const apply = makeApplier(io); const log = [];
+    io.fail.createResponse = true;
+    await run(apply, [contactOp], log);
+    db.contacts.get(NEWC).lastname = 'Someone-Else';
+    const m = await run(apply, [contactOp, junctionOp], log);
+    expect(m.get(`contact-create|${NEWC}`).receipt.result).toBe('recovered_modified');
+    expect(m.get(`junction-create|${JN}`).receipt).toMatchObject({ result: 'blocked', detail: expect.stringMatching(/edited after creation/) });
+    expect(applyDone(m.get(`junction-create|${JN}`))).toBe(false);
+    expect(db.wmkf_apprequestpersons.has(JN)).toBe(false);
+  });
+  test('first run on a value someone else already set is already_set, with no rollback', async () => {
+    const { db, io } = fakeDataverse(); const apply = makeApplier(io); const log = [];
+    db.wmkf_apprequestpersons.get(ROW)._wmkf_institutionataward_value = ACC;
+    const m = await run(apply, [iaaOp], log);
+    expect(m.get(`iaa-set|${ROW}`).receipt.result).toBe('already_set');
+    expect(rollbackEligible(m.get(`iaa-set|${ROW}`), { includeRecovered: true })).toBe(false);
+  });
+  test('restart after an intent with no result (crash after commit) recovers the write', async () => {
+    const { db, io } = fakeDataverse(); const apply = makeApplier(io);
+    db.wmkf_apprequestpersons.get(ROW)._wmkf_institutionataward_value = ACC; // committed before the crash
+    const log = [{ kind: 'iaa-set', id: ROW, phase: 'intent' }];
+    const m = await run(apply, [iaaOp], log);
+    expect(m.get(`iaa-set|${ROW}`).receipt.result).toBe('recovered');
+    expect(rollbackEligible(m.get(`iaa-set|${ROW}`))).toBe(false);
+    expect(rollbackEligible(m.get(`iaa-set|${ROW}`), { includeRecovered: true })).toBe(true);
   });
   test('a PATCH whose response was lost is recovered with rollback coverage, not marked already_set', async () => {
     const { io } = fakeDataverse(); const apply = makeApplier(io); const log = [];

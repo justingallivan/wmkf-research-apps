@@ -49,7 +49,7 @@ import { lc } from './lib/research-iaa-backfill.mjs';
 import { groupNewContacts } from './lib/research-copi-stage-b.mjs';
 import {
   GUID, ROLE_COPI, parseDecision, selectLine, contactCreatePayload, junctionCreatePayload, foldLedger, applyDone, rollbackEligible,
-  makeApplier, JUNCTION, REQUEST_SELECT, ROW_SELECT, CONTACT_SELECT, SET_TARGETS,
+  makeApplier, runOperations, JUNCTION, REQUEST_SELECT, ROW_SELECT, CONTACT_SELECT, SET_TARGETS,
 } from './lib/research-copi-apply.mjs';
 
 try {
@@ -317,24 +317,17 @@ async function runApply() {
   const first = Number(arg('first')) || Infinity;
   const ledger = foldLedger(readJsonl(APPLIED));
   const runId = `${now()}-${crypto.randomBytes(3).toString('hex')}`;
-  let done = 0; const counts = {};
+  let counts;
   await bypassDynamicsRestrictions('research-copi-stage-b-apply', async () => {
     // Plan order puts each contact before its junction row, so one pass settles both.
-    for (const o of ops) {
-      const key = `${o.op}|${o.id}`;
-      if (applyDone(ledger.get(key))) continue;
-      if (done >= first) break;
-      done += 1;
-      const base = { runId, planHash: hash, approver, host, kind: o.op, id: o.id, requestNum: o.source.requestNum || '' };
-      append(APPLIED, { ...base, phase: 'intent', at: now() });
-      let out;
-      try { out = await applyOp(o, ledger); } catch (err) { out = { result: 'failed', detail: String(err.message || err).slice(0, 200) }; }
-      const rec = { ...base, phase: 'result', ...out, at: now() };
-      append(APPLIED, rec);
-      ledger.set(key, { receipt: rec, undone: false, interrupted: false });
-      counts[`${o.op}:${out.result}`] = (counts[`${o.op}:${out.result}`] || 0) + 1;
-      if (!['created', 'set', 'already_set', 'blocked'].includes(out.result) || out.detail) console.log(`  ${o.op} ${base.requestNum} ${out.result}${out.detail ? ` (${out.detail})` : ''}`);
-    }
+    counts = await runOperations({
+      ops, ledger, applyOp, first,
+      base: () => ({ runId, planHash: hash, approver, host }),
+      log: (line) => {
+        append(APPLIED, line);
+        if (line.phase === 'result' && (!['created', 'set', 'already_set', 'blocked'].includes(line.result) || line.detail)) console.log(`  ${line.kind} ${line.requestNum} ${line.result}${line.detail ? ` (${line.detail})` : ''}`);
+      },
+    });
   });
   console.log(`Apply this run: ${JSON.stringify(counts)}. Log: ${APPLIED}`);
   console.log(`Operations not yet applied: ${ops.filter((o) => !applyDone(ledger.get(`${o.op}|${o.id}`))).length} of ${ops.length}`);

@@ -275,8 +275,8 @@ export function makeApplier(io) {
     if (o.op === 'junction-create') {
       if (o.newContact) {
         const c = ledger.get(`contact-create|${o.contactId}`);
-        const ok = ['created', 'recovered', 'recovered_modified'].includes(c?.receipt?.result) && !c.undone;
-        if (!ok) return { result: 'blocked', detail: 'its new contact is not created yet' };
+        if (c?.receipt?.result === 'recovered_modified') return { result: 'blocked', detail: 'its new contact was edited after creation; owner to reconcile' };
+        if (!['created', 'recovered'].includes(c?.receipt?.result) || c.undone) return { result: 'blocked', detail: 'its new contact is not created yet' };
       }
       const found = await io.getOrNull(JUNCTION, o.id, ROW_SELECT);
       if (found) return junctionMatchesPayload(found, o.payload) ? { result: 'recovered', postEtag: found._etag } : { result: 'recovered_modified', detail: 'edited since created' };
@@ -322,4 +322,31 @@ export function makeApplier(io) {
     }
     throw new Error(`unknown op ${o.op}`);
   };
+}
+
+/**
+ * The apply loop shared by the script and the tests. The ledger passed to each
+ * operation is the state from earlier runs plus earlier operations in this run;
+ * this run's own intent line is logged but not folded in first, so `uncertain`
+ * reflects only a previous interrupted or failed attempt.
+ * @param {{ops: object[], ledger: Map, applyOp: Function, log: (line: object) => void, base?: (o: object) => object, first?: number}} args
+ * @returns {Promise<Record<string, number>>} counts by "<op>:<result>"
+ */
+export async function runOperations({ ops, ledger, applyOp, log, base = () => ({}), first = Infinity }) {
+  let done = 0; const counts = {};
+  for (const o of ops) {
+    const key = `${o.op}|${o.id}`;
+    if (applyDone(ledger.get(key))) continue;
+    if (done >= first) break;
+    done += 1;
+    const b = { ...base(o), kind: o.op, id: o.id, requestNum: o.source?.requestNum || '' };
+    log({ ...b, phase: 'intent', at: new Date().toISOString() });
+    let out;
+    try { out = await applyOp(o, ledger); } catch (err) { out = { result: 'failed', detail: String(err.message || err).slice(0, 200) }; }
+    const rec = { ...b, phase: 'result', ...out, at: new Date().toISOString() };
+    log(rec);
+    ledger.set(key, { receipt: rec, undone: false, interrupted: false });
+    counts[`${o.op}:${out.result}`] = (counts[`${o.op}:${out.result}`] || 0) + 1;
+  }
+  return counts;
 }
