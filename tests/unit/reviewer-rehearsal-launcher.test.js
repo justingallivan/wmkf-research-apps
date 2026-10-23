@@ -378,8 +378,8 @@ describe('reviewer rehearsal Node network guard', () => {
     const child = spawn(process.execPath, ['--input-type=commonjs', '-e', `
       const { spawn } = require('node:child_process');
       const worker = spawn(process.execPath, ['-e', "process.on('SIGTERM', () => {}); setInterval(() => {}, 1000)"], { stdio: 'ignore' });
-      process.stdout.write(String(worker.pid));
       process.on('SIGTERM', () => process.exit(0));
+      process.stdout.write(String(worker.pid));
       setInterval(() => {}, 1000);
     `], { stdio: ['ignore', 'pipe', 'ignore'], detached: process.platform !== 'win32' });
     let descendantPid;
