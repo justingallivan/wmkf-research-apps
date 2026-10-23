@@ -3,7 +3,7 @@ title: Private Store and Release Preparation Receipt
 domain: engineering-process
 kind: audit
 status: active
-summary: "Evidence receipt for the 2026-10-22 private Blob store investigation and unreleased campaign-runtime candidate."
+summary: "Local release evidence including Node 22 build, full tests, browser verification, human rehearsal plan, and unresolved private-store binding."
 canonical: false
 cataloged: 2026-10-22
 last_verified: 2026-10-22
@@ -19,8 +19,8 @@ related:
 # Private Store and Release Preparation Receipt
 
 **Assessment date:** 2026-10-22 (America/Los_Angeles)  
-**Status:** LOCAL PREPARATION COMPLETE — release authorization, Node 22/Linux parity, hosted rehearsal, and private-store binding remain incomplete.  
-**Release candidate:** `4720980ed` (`codex/memory-audit-followups`).
+**Status:** LOCAL PREPARATION COMPLETE — Node 22/macOS verification passed. Linux CI, human/hosted rehearsal, release authorization, and private-store binding remain incomplete.
+**Release candidate:** `c589cbb6e` (`codex/memory-audit-followups`); original runtime checkpoint `4720980ed`.
 
 This receipt records the evidence available for the local release candidate and
 the private Dataverse-export Blob store question. It does not authorize or record
@@ -31,7 +31,7 @@ rather than recast as a result of this assessment.
 ## Release candidate and local evidence
 
 **[VERIFIED via candidate repository comparison supplied for this receipt]** The
-candidate is based on local commit `4720980ed`. Compared with `origin/main` at
+original runtime checkpoint is local commit `4720980ed`. Compared with `origin/main` at
 `23d09e48235c1e5a7aea61e5f76715933d3701a1`, it is 28 commits ahead: 23 commits
 from local main containing documentation, comments, or bootstrap-warning work,
 plus five candidate commits (three documentation and two runtime). No migration,
@@ -49,11 +49,11 @@ normal dependency tree and environment were not changed by this isolated setup.
 |---|---|---|
 | Initial Turbopack production build | Passed with the pre-existing install | That install had Next.js 16.3.8, Blob SDK 2.8.0, and Playwright 1.63.0, while the lockfile specifies 16.4.2, 2.8.2, and 1.64.1. This is not locked-dependency evidence. |
 | Clean locked install | `npm ci --offline --ignore-scripts` passed in the isolated workspace; locked versions were confirmed | This confirms installability from the available cache, not runtime or deployment behavior. |
-| Locked-dependency production build | Passed: canonical Turbopack build on Node 24.19.0, Next.js 16.4.2 | Migration-manifest bytes remained identical to candidate HEAD; Node 22/Linux parity is not established. |
-| Jest full run plus focused reruns | 1,431 distinct suites and 24,751 tests passed; 17 suites / 215 tests skipped | Initial full run had 38 failed suites: 30 from over-strict test interlock / mismatched auth origin, three from missing archive Git metadata, five from stale test contracts. All 38 passed together after fixture corrections and test repairs (631 tests). This is consolidated evidence, not a claim that the initial full invocation was green. |
-| Mode A browser rehearsal | 36 tests passed with locked Playwright 1.64.1 and matching temporary Chromium | Node 24.19.0/macOS, route mocks, isolated credential-free app; sandbox Chromium launch was blocked, host rerun passed on port 3101. |
+| Locked-dependency production build | Passed: canonical Turbopack build on Node 24.19.0, Next.js 16.4.2 | Migration-manifest bytes remained identical to candidate HEAD. This initial Node 24 result is supplemented by the Node 22/macOS verification below; Linux parity remains unverified. |
+| Initial Node 24 Jest full run plus focused reruns | 1,431 distinct suites and 24,751 tests passed; 17 suites / 215 tests skipped | Initial full run had 38 failed suites: 30 from over-strict test interlock / mismatched auth origin, three from missing archive Git metadata, five from stale test contracts. All 38 passed together after fixture corrections and test repairs (631 tests). This is consolidated evidence, not a claim that the initial full invocation was green. |
+| Initial Node 24 Mode A browser rehearsal | 36 tests passed with locked Playwright 1.64.1 and matching temporary Chromium | Node 24.19.0/macOS, route mocks, isolated credential-free app; sandbox Chromium launch was blocked, host rerun passed on port 3101. |
 | Existing local test/type/gate checkpoint | Historical checkpoint reported as passing: 1,269 tests plus type and gate checks | This predates the clean locked install and is not the candidate's final verification. |
-| Node version comparison | Host has Node 26 and a bundled Node 24; Node 22 is unavailable | CI and Production pin Node 22. No Node 22 parity is claimed. |
+| Node version comparison | A temporary official Node 22.23.4 binary is now available; host installs remain untouched | Node 22 macOS verification below does not establish Linux CI or hosted-runtime parity. |
 
 The candidate includes runtime repairs and is therefore held to the campaign
 release controls in the [release strategy](../CAMPAIGN_RELEASE_AND_DATAVERSE_TEST_STRATEGY.md).
@@ -63,6 +63,41 @@ identity upsert, enriched-person options, identity select fields, partial materi
 availability, and required request binding. The private probe passed 11 mocked tests.
 Sequential documentation/safety gates and available self-tests passed. A targeted human rehearsal and owner release
 decision remain separate gates; neither is implied by passing automation.
+
+## Node 22 verification and human rehearsal preparation
+
+**[VERIFIED via isolated candidate and official binary]** Candidate `c589cbb6e`
+was exported separately with the lockfile-installed dependencies from the prior
+clean offline install. The official Node.js `node-v22.23.4-darwin-arm64.tar.gz`
+archive matched its published SHA-256
+`c9e1dbc748b33ed2d14f42445191ecaf14c56259c7a9a26d0042c49ec2b66428`.
+The extracted binary reported `v22.23.4`. Download and extraction were confined to
+temporary storage; no host runtime, repo dependencies, or environment files changed.
+
+The canonical Turbopack production build and configured type check
+(`tsc -p tsconfig.check.json`) passed under that binary. The package lock and
+migration manifest remained byte-identical to the candidate. The full Jest run
+passed in one invocation: 1,431 suites / 24,751 tests, 17 suites / 215 tests
+skipped, and five snapshots passed. All 36 Playwright tests passed under Node 22
+with locked Playwright 1.64.1 and matching Chromium revision 1248 on loopback
+port 3102. Chromium ran outside the sandbox; the app remained credential-free
+and guarded. This establishes macOS results, not Linux CI or hosted parity.
+The Jest run emitted a nonblocking process-listener warning; it had zero failures.
+The credential-free environment uses disposable local auth values and the same
+Node-only outbound guard described above. Jest uses fixture origin port 3000 and
+the normal test default for the Dataverse target interlock, while retaining DAL
+enforcement and outbound protection; browser/build settings retain the interlock.
+Temporary independent Git metadata supports Git-dependent fixtures without
+writing to the source repository metadata.
+
+**[PLANNED]** The [controlled human rehearsal plan](controlled-reviewer-rehearsal-plan-2026-10-22.md)
+names staff and two first-time reviewer participants, baseline flows, authorization
+edge drills, containment prerequisites, stop conditions, and cleanup/receipt ownership.
+It is a plan, not evidence that a human rehearsal occurred. The headed launcher
+still needs a sanitized environment and fail-closed request boundary, plus a
+truthful decline fixture; new edge fixtures and reviewer file-upload coverage
+remain unbuilt. Parent and independent Sol review corrected the fixture contracts.
+No live target or participant identity has been selected, and no invitation was sent.
 
 ## Private Blob store investigation
 
@@ -129,21 +164,22 @@ does not reverse data or email effects.
 |---|---|---|
 | Candidate source review | Local preparation reviewed | Parent and Sol checked the documentation, safe probe, and five test repairs; hosted behavior remains unverified. |
 | Clean locked install | Complete | Completed offline in the isolated workspace. |
-| Locked production build | Complete | Passed on Node 24.19.0; configured Node 22 parity remains separate. |
-| Full Jest suite | Reconciled | 1,431 suites / 24,751 tests passed across full run and focused reruns; 17 suites / 215 tests skipped. |
+| Locked production build | Complete | Passed on Node 24.19.0 and Node 22.23.4/macOS; Linux CI remains separate. |
+| Full Jest suite | Passed | Node 22: 1,431 suites / 24,751 tests in one invocation; 17 suites / 215 tests skipped. Earlier Node 24 evidence remains above. |
 | Mode A browser rehearsal | Complete | 36 route-mocked tests passed; no hosted/live-data proof. |
-| Node 22 parity | Unavailable here | Use the configured CI/runtime evidence when accessible; do not label Node 24/26 results as Node 22. |
+| Node 22 verification | Complete on macOS | Build, configured types, full Jest (1,431 suites / 24,751 tests), and 36 browser tests passed. Linux CI remains unverified. |
 | Private-store binding | Unknown | Requires a separately authorized credential-bearing context; metadata alone is insufficient. |
 | Private object inventory | Not run | Keep within the existing bounded authorization and prepared fixed-prefix safeguards. |
-| Targeted human rehearsal | Pending | Name the target, controlled identities, expected writes, and cleanup owner before any live rehearsal. |
+| Targeted human rehearsal | Plan prepared; execution pending | Guarded Mode A launcher/fixtures first; any live target, identities, writes and cleanup require separate authorization. |
 | Release owner decision | Pending | Decide only after candidate checks, target evidence, and required human rehearsal are concrete. |
 | Push, deployment, live mutation, cleanup | Not authorized/performed | No such action is part of this receipt. |
 
 ## Exit conditions
 
-Local preparation is complete. This is not a release approval: Node 22/Linux
-verification, targeted human rehearsal on a named authorized target, and the
-applicable owner release decision remain outstanding. The private-store question remains a separate evidence
+Local preparation and Node 22/macOS verification are complete. This is not a
+release approval: Linux CI verification, targeted human rehearsal on a named
+authorized target, and the applicable owner release decision remain outstanding.
+The private-store question remains a separate evidence
 item: do not mark its identity or contents verified until an authorized probe
 measures the intended private target. Any resulting live object or retention
 action requires its own explicit scope and receipt.
