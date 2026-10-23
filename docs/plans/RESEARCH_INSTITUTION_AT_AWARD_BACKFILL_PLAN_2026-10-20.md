@@ -14,7 +14,7 @@ Decisions (owner, 2026-10-20):
 - **Meaning of the value:** the institution named on the request when it was decided. For PIs that is `akoya_applicantid`. GoApply writes it at submission; if the applicant institution changes before the decision, the flow (or a later check) should bring it into line. [PROPOSED to Connor 2026-10-20.]
 - **Special grants stay in scope** (owner, 2026-10-20): the program + status scope includes 24 non-Program awards with a PI, 19 of them UCLA Keck Court Biomedical Initiative grants. Stage A covered them; Stage B includes their co-PIs where the documents name any. Facts and filter guidance: `docs/atlas/dataverse-akoya-request.md` → Open questions / gotchas. [DERIVED-FROM: Stage A production resolve; independent of TBD count]
 - **Earlier years are deferred, not ruled out.** Extend only if this cohort turns out to be useful. Earlier work is likely harder: Dec 2016 proposals are mostly scans and pre-2016 documents were not inventoried. §6 records what to change.
-- **2024 onward is in scope here,** using the best available evidence, so that Connor's flow only handles new submissions. [PROPOSED to Connor 2026-10-20; confirm so both do not write the same rows.]
+- **2024 onward is in scope here,** using the best available evidence, so that Connor's flow only handles new submissions. [PROPOSED to Connor 2026-10-20; the confirmation request was retired by the owner 2026-10-23 and the backfill applied without it.]
 
 ## 2. Sources of institution evidence
 
@@ -89,7 +89,7 @@ Codex adversarial review (gpt-6-astra, 2026-10-20, base `45e8b4ead`) returned ne
 - Aaron Diaz (1001012) is the request's liaison, not a co-PI, although Dynamics records him in a co-PI slot and junction row. The resolve now blocks any co-PI who is the request's primary contact (`akoya_primarycontactid`) or the applicant account's primary contact (`is-liaison`); the bad co-PI record is a staff fix in Dynamics.
 - Simon Billinge (1001565, 2025): Columbia was right for Institution at Award (he was there at the award) but wrong as his current institution (now UCSB). Copying the latest award's institution into an empty contact account can therefore be stale, so those contact-level rows are now checked against a web search on first + last name (option 1: fill now, correct later): agreement or no evidence keeps the proposal; a page at another institution sends the row to review (`contact-account-web-disagrees`). Billinge was not searched in the first run because only new contacts were.
 - Review by group, not row by row (as in Stage A): `scripts/build-research-copi-confirm-workbook.mjs` builds the approval workbook from a resolve run, with one decision per strong-evidence group (2024-on recorded; 2017–2023 existing contacts with two or more agreeing signals; the same for new contacts; contact accounts where the web agrees; where the web found nothing), an Exclude? column for exceptions, and individual checks only for possible duplicates, web disagreements, single-signal Institution at Award, web suggestions for new contacts, and unanswered recorded rows. Earlier answers carry over by row key. Rules: `approvalBucket` in `scripts/lib/research-copi-stage-b.mjs`.
-- **Parked follow-up (owner, 2026-10-20): an email campaign asking PIs and co-PIs to confirm their current institution and email.** People are the best source for where they are now; the web search and latest-award rules are stopgaps. Institution at Award is unaffected (award-era, from our data). A campaign needs a working address, and new contacts have only proposal-era email, which bears on the open email question below. Not designed or scheduled.
+- **Tabled (owner, 2026-10-23; may be taken up in another context), first parked 2026-10-20: an email campaign asking PIs and co-PIs to confirm their current institution and email.** People are the best source for where they are now; the web search and latest-award rules are stopgaps. Institution at Award is unaffected (award-era, from our data). A campaign needs a working address, and new contacts have only proposal-era email, which bears on the open email question below. Not designed or scheduled.
 
 **Production re-run, 2026-10-20** [VERIFIED via owner-run resolve at `c2d154fe5`, hash `05b61fa0`, 37 new searches, 118 cached]: extracted unchanged; recorded 47 `ready`, 1 `is-liaison` (1001012, as the owner said), 2 `is-pi`, 2 `no-account-match`; contact-level 31 `ready` (web agrees 3, no evidence 28), 2 `contact-account-web-disagrees`, 4 `contact-account-web-ambiguous`, 2 unresolved. The web check is weak: for 28 of 37 contacts it found nothing usable. Billinge is one of them — the top results are still Columbia pages, and the only UCSB result is an Instagram post, which the classifier ignores — so his contact row stays a Columbia proposal; the owner's correction is carried into the workbook as an exclusion. Approval workbook `research-copi-confirm-v2.xlsx` (owner folder): 5 group decisions (recorded 47, pre-approved from the owner's row-by-row answers; existing-strong 15; new-strong 61; contact web-agrees 3; contact web-silent 28) and 58 individual checks (15 possible duplicates, 6 contact-account web conflicts, 22 single-signal, 15 web suggestions).
 
@@ -116,7 +116,7 @@ Codex adversarial review (gpt-6-astra, 2026-10-20, base `45e8b4ead`) returned ne
 
 Owner approved all five groups in `research-copi-confirm-v3.xlsx` on 2026-10-23 (recorded 47, existing-strong 16, new-strong 65, contact web-agrees 3, contact web-silent 27).
 
-Status after the 2026-10-23 apply: the read-back, apply/verify/rollback build, new-contact email lookup and Codex adversarial review are done and the apply is verified (above). Not done: Connor's confirmation of the 2024 split (§4) was listed as a precondition but was not obtained or explicitly waived before the apply; the 2024-on recorded rows took Institution at Award from the contact's current account, PI email domain or domain map, so a Connor correction would mean a targeted fix (rollback by id is available while those values are unchanged). Also open: the parked confirm-your-details email campaign, the held Connor message (§7), the 1001012 liaison fix in Dynamics, and Grant Reporting's lookup still reading only the legacy co-PI slots.
+Status after the 2026-10-23 apply: the read-back, apply/verify/rollback build, new-contact email lookup and Codex adversarial review are done and the apply is verified (above). The Connor confirmation of the 2024 split and the held note to Connor (§7) were retired by the owner 2026-10-23; the 2024-on recorded rows took Institution at Award from the contact's current account, PI email domain or domain map (rollback by id remains available while those values are unchanged). The confirm-your-details email campaign is tabled. Still open: the 1001012 liaison fix in Dynamics (staff Part 5, unanswered) and Grant Reporting's lookup still reading only the legacy co-PI slots.
 
 Standing constraints (unchanged): creating contacts or junction rows happens only after owner approval of those rows. A contact's current account (`parentcustomerid`) is filled only when it is empty. An existing current account is never overwritten: award-era evidence can be older than what the contact already holds.
 
@@ -136,7 +136,7 @@ Stage B: verify re-reads every created or set target. Rollback runs junction del
 
 - Codex adversarial review of the script and this plan (same as the ORCID backfill).
 - Owner reviews the resolve workbook, including `contact-elsewhere` and every non-`write` class.
-- Connor confirms the 2024+ split (§1).
+- ~~Connor confirms the 2024+ split (§1).~~ Retired by the owner, 2026-10-23.
 
 ## 5. Non-goals
 
@@ -146,9 +146,9 @@ No overwriting a contact's existing current account, no new contacts/accounts/ju
 
 Change the meeting-date floor in resolve. PIs extend cheaply (applicant account exists on migrated requests). Co-PIs need a new document inventory and extraction for the added years (`scripts/probe-research-proposal-file-inventory.mjs`, then the extraction script, which is paid and needs owner approval); expect scanned documents before mid-2017 and more missing biosketches.
 
-## 7. Held note to Connor (unsent)
+## 7. Note to Connor (retired, unsent)
 
-Status: **drafted 2026-10-20, held by the owner** until an unrelated thread with Connor resolves; send as one message, not several in quick succession. Counts are from §3.1.
+Status: **retired by the owner, 2026-10-23; not to be sent.** Drafted 2026-10-20 and held; kept below as a historical record of the contact-creation patterns it describes. Counts are from §3.1.
 
 > Thanks for agreeing to the lookup. The column is live in production and the sandbox: **"Institution at Award"** (`wmkf_InstitutionAtAward`) on `wmkf_apprequestperson`, a lookup to Account. For new submissions, please set it to the applicant's Account on every PI and co-PI row. I'll fill in Research awards from 2017 on myself.
 >
