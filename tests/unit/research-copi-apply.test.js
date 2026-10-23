@@ -61,7 +61,7 @@ describe('selectLine', () => {
     expect(selectLine(line, ctx({ checks: new Map([['web-suggestion|ext|a', 'Yes']]) })).newContactAccount).toBe(G(8));
     expect(selectLine(line, ctx({ checks: new Map([['web-suggestion|ext|a', 'No']]) })).newContactAccount).toBe('');
     expect(selectLine(line, ctx({ decision: { newContactAccountId: '' }, checks: new Map([['web-suggestion|ext|a', 'Yes']]) })).newContactAccount).toBe('');
-    expect(selectLine(line, ctx({ decision: { newContactAccountFrom: 'pao-contact' } })).newContactAccount).toBe('pao-contact');
+    expect(selectLine(line, ctx({ decision: { newContactAccountFrom: 'copy-account-of:ext|p' } }))).toMatchObject({ copyAccountOf: 'ext|p', newContactAccount: '' });
   });
   test('recorded rows: group approval, unanswered check, staff-settled no-account-match', () => {
     const rec = { key: 'rec|r|c', cohort: 'recorded', class: 'ready', actions: ['set-iaa'], iaaAccountId: G(9), contactId: G(10) };

@@ -68,7 +68,7 @@ const STAFF_SETTLED = new Set(['possible-existing-contact', 'no-account-match', 
  *   contact?: {mode: 'existing'|'lookup'|'new', contactId?: string, email?: string},
  *   newContactAccount?: string, contactAccountId?: string}}
  *   `iaaAccountId` and `newContactAccount` may be '' (written empty / not set);
- *   `newContactAccount` 'pao-contact' means "copy that contact's account".
+ *   `copyAccountOf` names the line whose resolved contact's current account a new contact copies.
  */
 export function selectLine(line, ctx) {
   const d = ctx.decision || {};
@@ -122,8 +122,7 @@ export function selectLine(line, ctx) {
 
   const out = { include: true, kind: 'extracted', iaaAccountId, contact };
   if (contact.mode === 'new') {
-    if (d.newContactAccountFrom === 'pao-contact') out.newContactAccount = 'pao-contact';
-    else if (d.newContactAccountId !== undefined) out.newContactAccount = d.newContactAccountId;
+    if (d.newContactAccountFrom?.startsWith('copy-account-of:')) { out.copyAccountOf = d.newContactAccountFrom.slice('copy-account-of:'.length); out.newContactAccount = ''; } else if (d.newContactAccountId !== undefined) out.newContactAccount = d.newContactAccountId;
     else if (bucket.checks.includes('web-suggestion') && answer('web-suggestion') === 'Yes') out.newContactAccount = line.suggestedContactAccount || '';
     else out.newContactAccount = '';
   } else if (d.contactAccountId) {
