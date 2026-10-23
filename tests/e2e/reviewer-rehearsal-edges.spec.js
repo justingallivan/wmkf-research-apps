@@ -185,7 +185,7 @@ test.describe('private reviewer rehearsal edge fixtures', () => {
     const { baseURL, fixture } = await prepare(page, context, testInfo, SCENARIOS.REVIEWER_AUTHORING);
     const url = new URL(`/external/review/${REVIEW_TOKEN}`, baseURL).toString();
     await page.goto(url);
-    await expect(page.getByRole('heading', { name: 'Submit your review' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Submit your review', level: 2 })).toBeVisible();
 
     const firstRichText = QUESTION_SET.find((field) => field.type === 'richtext');
     await page.getByLabel(firstRichText.label).fill('A synthetic answer saved before returning.');
@@ -450,7 +450,7 @@ test.describe('private reviewer rehearsal edge fixtures', () => {
     expect(fixture.state.sentBodies.at(-1).drafts.find((draft) => draft.suggestionId === '11111111-1111-4111-8111-111111111111').body)
       .toContain('Synthetic materials for Synthetic reviewer rehearsal');
     await page.goto(new URL(`/external/review/${REVIEW_TOKEN}`, baseURL).toString());
-    await expect(page.getByRole('heading', { name: 'Submit your review' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Submit your review', level: 2 })).toBeVisible();
     expect(fixture.state.reviewerContext.engagementState.view).toBe('stage2b');
     expect(fixture.state.violations).toEqual([]);
   });
