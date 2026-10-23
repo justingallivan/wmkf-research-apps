@@ -158,9 +158,11 @@ function browserRequestDecision(url, expectedOrigin, isMockedApiRequest, method 
   }
   if (method !== 'GET' && method !== 'HEAD') return { allow: false, reason: 'unmocked_local_method' };
   const passivePath = pathname === '/_vercel/insights/script.js'
-    || /^\/_next\/data\/[A-Za-z0-9_-]{1,128}\/(?:index|workbench|guide|profile-settings)\.json$/.test(pathname);
+    || /^\/_next\/data\/[A-Za-z0-9_-]{1,128}\/(?:index|workbench|guide|profile-settings)\.json$/.test(pathname)
+    || /^\/_next\/data\/[A-Za-z0-9_-]{1,128}\/workbench\/00000000-0000-4000-8000-000000000001\.json$/.test(pathname);
   if (isMockedPassiveRequest && passivePath) return { allow: true, reason: 'declared_passive_mock' };
-  if (pathname === '/workbench/00000000-0000-4000-8000-000000000001'
+  if (pathname === '/workbench'
+      || pathname === '/workbench/00000000-0000-4000-8000-000000000001'
       || pathname === '/external/review/pd-reviewer-rehearsal-token') {
     return { allow: true, reason: 'declared_document' };
   }

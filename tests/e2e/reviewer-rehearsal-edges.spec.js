@@ -121,6 +121,66 @@ async function sendInvitation(page, reviewerName) {
 }
 
 test.describe('private reviewer rehearsal edge fixtures', () => {
+  test('Workbench landing page opens the synthetic request row through the exact document route', async ({ page, context }, testInfo) => {
+    const { baseURL, fixture } = await prepare(page, context, testInfo, SCENARIOS.BASELINE);
+    await page.goto(workbenchUrl(baseURL));
+    await page.getByRole('link', { name: '← Back to Workbench' }).click();
+    await expect(page.getByRole('heading', { name: 'Workbench', exact: true })).toBeVisible();
+    const requestLink = page.getByRole('link', { name: '#1002788', exact: true });
+    await expect(requestLink).toBeVisible();
+    await requestLink.click();
+    await expect(page).toHaveURL(new RegExp(`/workbench/${REQUEST_ID}\\?tab=reviewers&n=${REQUEST_NUM}`));
+    await expect(page.getByRole('button', { name: /track reviewers/i })).toBeVisible();
+    await expect(page.getByText('Dr. Accepted Reviewer')).toBeVisible();
+    await page.getByRole('button', { name: /^Invite Reviewers/ }).first().click();
+    await expect(page.getByText('Dr. Saved Reviewer')).toBeVisible();
+    expect(fixture.state.calls.filter((call) => call.pathname === '/api/workbench/dashboard').length).toBeGreaterThanOrEqual(2);
+    expect(fixture.state.violations).toEqual([]);
+  });
+
+  test('campaign settings save 7 to 10, reopen, and rehydrate after reload', async ({ page, context }, testInfo) => {
+    const { baseURL, fixture } = await prepare(page, context, testInfo, SCENARIOS.BASELINE);
+    await page.goto(workbenchUrl(baseURL));
+    await page.getByRole('button', { name: /campaign settings/i }).click();
+    await expect(page.getByText('Campaign settings', { exact: true })).toBeVisible();
+    await expect(page.getByLabel('Days to respond')).toHaveValue('7');
+    await page.getByLabel('Days to respond').fill('10');
+    await page.getByLabel('Review due date').fill('2099-08-15');
+    await page.getByLabel('Reviewer quota').fill('4');
+    await page.getByRole('button', { name: 'Save', exact: true }).click();
+    await expect(page.getByText('Campaign settings', { exact: true })).toBeHidden();
+    expect(fixture.state.campaignConfig).toMatchObject({ respondOffsetDays: 10, reviewDueDate: '2099-08-15', desiredCount: 4 });
+
+    await page.getByRole('button', { name: /campaign settings/i }).click();
+    await expect(page.getByLabel('Days to respond')).toHaveValue('10');
+    await expect(page.getByLabel('Review due date')).toHaveValue('2099-08-15');
+    await page.reload();
+    await page.getByRole('button', { name: /campaign settings/i }).click();
+    await expect(page.getByLabel('Days to respond')).toHaveValue('10');
+    await expect(page.getByLabel('Review due date')).toHaveValue('2099-08-15');
+    await expect(page.getByLabel('Reviewer quota')).toHaveValue('4');
+    expect(fixture.state.calls.filter((call) => call.pathname === '/api/review-manager/campaign-config' && call.method === 'GET').length).toBeGreaterThanOrEqual(3);
+    expect(fixture.state.violations).toEqual([]);
+  });
+
+  test('pending withdrawal is reflected in candidate status after reload', async ({ page, context }, testInfo) => {
+    const { baseURL, fixture } = await prepare(page, context, testInfo, SCENARIOS.BASELINE);
+    await page.goto(workbenchUrl(baseURL, 'candidates'));
+    const pendingRow = page.getByRole('listitem').filter({ hasText: 'Dr. Pending Reviewer' });
+    await expect(pendingRow).toBeVisible();
+    await page.getByLabel('Select Dr. Pending Reviewer').check();
+    await page.getByRole('button', { name: 'Release invitee (1)', exact: true }).click();
+    await page.getByRole('radio', { name: 'No longer needed' }).check();
+    await expect(page.getByRole('button', { name: 'Release (1)', exact: true })).toBeEnabled();
+    page.once('dialog', (dialog) => dialog.accept());
+    await page.getByRole('button', { name: 'Release (1)', exact: true }).click();
+    await expect(pendingRow).toContainText('Released — no longer needed');
+    expect(fixture.state.candidateRows.find((row) => row.name === 'Dr. Pending Reviewer')).toMatchObject({ responseType: 'withdrawn_sufficient' });
+    await page.reload();
+    await expect(page.getByRole('listitem').filter({ hasText: 'Dr. Pending Reviewer' })).toContainText('Released — no longer needed');
+    expect(fixture.state.violations).toEqual([]);
+  });
+
   test('reviewer authoring autosaves, rehydrates, submits, and stays read-only on return', async ({ page, context }, testInfo) => {
     const { baseURL, fixture } = await prepare(page, context, testInfo, SCENARIOS.REVIEWER_AUTHORING);
     const url = new URL(`/external/review/${REVIEW_TOKEN}`, baseURL).toString();
@@ -188,6 +248,49 @@ test.describe('private reviewer rehearsal edge fixtures', () => {
     expect(fixture.state.rosterMutations[0]).toMatchObject({ requestId: REQUEST_ID, action: 'exclude' });
     expect(fixture.state.calls.filter((call) => call.pathname === '/api/workbench/reviewer-roster' && call.method === 'GET').length).toBeGreaterThanOrEqual(2);
     expect(fixture.state.roster.savedKeys).toEqual(['candidate:dr.saved reviewer']);
+    expect(fixture.state.violations).toEqual([]);
+  });
+
+  test('invitation-specific Cancel leaves the preview intact and a later confirmation captures one email', async ({ page, context }, testInfo) => {
+    const { baseURL, fixture } = await prepare(page, context, testInfo, SCENARIOS.BASELINE);
+    await page.goto(workbenchUrl(baseURL, 'candidates'));
+    await page.getByLabel('Select Dr. Saved Reviewer').check();
+    await page.getByRole('button', { name: /send invitation \(1\)/i }).click();
+    await expect(page.getByText('Invite reviewers (1)', { exact: true })).toBeVisible();
+    await page.getByRole('button', { name: /reviewer campaign timeline/i }).click();
+    await page.getByLabel('Days to respond').fill('7');
+    await page.getByLabel('Proposals released to reviewers').fill('2099-07-15');
+    await page.getByLabel('Reviews due').fill('2099-07-22');
+    page.once('dialog', (dialog) => dialog.dismiss());
+    await page.getByRole('button', { name: 'Send 1 invitation' }).click();
+    await expect(page.getByRole('button', { name: 'Send 1 invitation' })).toBeVisible();
+    expect(fixture.state.sentBodies).toEqual([]);
+    expect(fixture.state.capturedEmails).toEqual([]);
+
+    page.once('dialog', (dialog) => dialog.accept());
+    await page.getByRole('button', { name: 'Send 1 invitation' }).click();
+    await expect(page.getByText(/captured 1 invitation email for rehearsal/i)).toBeVisible();
+    expect(fixture.state.sentBodies).toHaveLength(1);
+    expect(fixture.state.capturedEmails).toHaveLength(1);
+    expect(fixture.state.violations).toEqual([]);
+  });
+
+  test('staff dismisses a decline referral and the dismissal survives reload', async ({ page, context }, testInfo) => {
+    const { baseURL, fixture } = await prepare(page, context, testInfo, SCENARIOS.DECLINE_RESET);
+    await page.goto(workbenchUrl(baseURL, 'invite'));
+    await expect(page.getByText('Dr. Suggested Reviewer')).toBeVisible();
+    await expect(page.getByText(/suggested by Dr. Declining Reviewer/i)).toBeVisible();
+    const referral = page.getByRole('listitem').filter({ hasText: 'Dr. Suggested Reviewer' });
+    await referral.getByRole('button', { name: /dismiss/i }).click();
+    await expect(page.getByText('Dr. Suggested Reviewer')).toBeHidden();
+    expect(fixture.state.declineMutations).toEqual([{
+      requestId: REQUEST_ID,
+      suggestionId: '11111111-1111-4111-8111-111111111111',
+      referralVersion: 'v1',
+      referralIndex: 0,
+    }]);
+    await page.reload();
+    await expect(page.getByText('Dr. Suggested Reviewer')).toBeHidden();
     expect(fixture.state.violations).toEqual([]);
   });
 
@@ -262,6 +365,8 @@ test.describe('private reviewer rehearsal edge fixtures', () => {
     await expect(page.getByText('Sent for delivery.')).toBeVisible();
     expect(fixture.state.sentBodies).toHaveLength(1);
     expect(fixture.state.sentBodies[0].drafts.map((draft) => draft.suggestionId)).toEqual(['cccccccc-cccc-4ccc-8ccc-cccccccccccc']);
+    expect(fixture.state.sentBodies[0].drafts[0].body).toContain('Synthetic materials for Synthetic reviewer rehearsal');
+    expect(fixture.state.sentBodies[0].drafts[0].body).toContain(`/external/review/${REVIEW_TOKEN}`);
     expect(fixture.state.materialsSentIds).toEqual(['cccccccc-cccc-4ccc-8ccc-cccccccccccc']);
     expect(fixture.state.reviewerRows.find((row) => row.suggestionId === 'cccccccc-cccc-4ccc-8ccc-cccccccccccc')).toMatchObject({ reviewStatus: 'materials_sent' });
     expect(fixture.state.reviewerRows.find((row) => row.suggestionId === 'dddddddd-dddd-4ddd-8ddd-dddddddddddd')).toMatchObject({ reviewStatus: 'pending', invited: true });
@@ -293,6 +398,8 @@ test.describe('private reviewer rehearsal edge fixtures', () => {
     await sendInvitation(page, 'Dr. Saved Reviewer');
     await expect(page.getByText(/captured 1 invitation email for rehearsal/i)).toBeVisible();
     expect(fixture.state.candidateRows[0]).toMatchObject({ invited: true });
+    expect(fixture.state.reviewerRows.find((row) => row.suggestionId === '11111111-1111-4111-8111-111111111111')).toMatchObject({ invited: true, tokenState: 'active' });
+    expect(fixture.state.campaignConfig).toMatchObject({ respondOffsetDays: 7, reviewDueDate: '2099-07-22' });
 
     const capturedHtml = fixture.state.capturedEmails[0].htmlBody;
     expect(capturedHtml).toContain('Yes, I Can Review');
@@ -306,6 +413,8 @@ test.describe('private reviewer rehearsal edge fixtures', () => {
     await expect(page.getByText("Thank you. We've recorded your decline.")).toBeVisible();
     expect(fixture.state.transitions).toContainEqual({ type: 'reviewer-decline', action: 'decline' });
     expect(fixture.state.reviewerContext.engagementState).toMatchObject({ declined: true });
+    expect(fixture.state.candidateRows.find((row) => row.suggestionId === '11111111-1111-4111-8111-111111111111')).toMatchObject({ declined: true, responseType: 'declined' });
+    expect(fixture.state.reviewerRows.find((row) => row.suggestionId === '11111111-1111-4111-8111-111111111111')).toMatchObject({ reviewStatus: 'declined', responseType: 'declined' });
 
     fixture.reset();
     expect(fixture.state.resetCount).toBe(1);
@@ -319,6 +428,30 @@ test.describe('private reviewer rehearsal edge fixtures', () => {
     await expect(page.getByRole('button', { name: 'Accept and continue' })).toBeHidden();
     expect(fixture.state.transitions).toContainEqual({ type: 'reviewer-accept', action: 'accept' });
     expect(fixture.state.transitions).not.toContainEqual({ type: 'reviewer-decline', action: 'decline' });
+    expect(fixture.state.candidateRows.find((row) => row.suggestionId === '11111111-1111-4111-8111-111111111111')).toMatchObject({ invited: true, accepted: true, responseType: 'accepted' });
+    expect(fixture.state.reviewerRows.find((row) => row.suggestionId === '11111111-1111-4111-8111-111111111111')).toMatchObject({ reviewStatus: 'accepted', responseType: 'accepted' });
+    await page.goto(workbenchUrl(baseURL, 'candidates'));
+    await expect(page.getByRole('listitem').filter({ hasText: 'Dr. Saved Reviewer' })).toContainText('Accepted');
+    await page.reload();
+    await expect(page.getByRole('listitem').filter({ hasText: 'Dr. Saved Reviewer' })).toContainText('Accepted');
+    await page.goto(workbenchUrl(baseURL, 'invite'));
+    await expect(page.getByRole('button', { name: /release proposal to reviewers \(2\)/i })).toBeVisible();
+    await page.getByRole('button', { name: /release proposal to reviewers \(2\)/i }).click();
+    await expect(page.getByRole('heading', { name: 'Release proposal to reviewers', exact: true })).toBeVisible();
+    await page.getByRole('button', { name: /preview 2 emails/i }).click();
+    await expect(page.getByRole('button', { name: /send 2 emails/i })).toBeEnabled();
+    page.once('dialog', (dialog) => dialog.accept());
+    await page.getByRole('button', { name: /send 2 emails/i }).click();
+    await expect(page.getByText('Sent for delivery.')).toBeVisible();
+    expect(fixture.state.sentBodies.at(-1).drafts.map((draft) => draft.suggestionId)).toEqual([
+      'cccccccc-cccc-4ccc-8ccc-cccccccccccc',
+      '11111111-1111-4111-8111-111111111111',
+    ]);
+    expect(fixture.state.sentBodies.at(-1).drafts.find((draft) => draft.suggestionId === '11111111-1111-4111-8111-111111111111').body)
+      .toContain('Synthetic materials for Synthetic reviewer rehearsal');
+    await page.goto(new URL(`/external/review/${REVIEW_TOKEN}`, baseURL).toString());
+    await expect(page.getByRole('heading', { name: 'Submit your review' })).toBeVisible();
+    expect(fixture.state.reviewerContext.engagementState.view).toBe('stage2b');
     expect(fixture.state.violations).toEqual([]);
   });
 });

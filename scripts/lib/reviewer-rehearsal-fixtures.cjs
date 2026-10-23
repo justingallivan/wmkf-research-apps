@@ -2,6 +2,7 @@
 
 const REQUEST_ID = '00000000-0000-4000-8000-000000000001';
 const REQUEST_NUM = '1002788';
+const PROGRAM_ID = '99999999-9999-4999-8999-999999999999';
 const SUGGESTION_ID = '11111111-1111-4111-8111-111111111111';
 const REVIEW_TOKEN = 'pd-reviewer-rehearsal-token';
 const REVIEWER_EMAIL = 'reviewer.capture@example.test';
@@ -9,7 +10,13 @@ const PD_EMAIL = 'program.director@example.test';
 const PD_ID = '77777777-7777-4777-8777-777777777777';
 const PD_ID_NEXT = '88888888-8888-4888-8888-888888888888';
 const CANDIDATE_KEY = 'candidate:dr.saved reviewer';
-const PASSIVE_DATA_PATHS = Object.freeze(['index.json', 'workbench.json', 'guide.json', 'profile-settings.json']);
+const PASSIVE_DATA_PATHS = Object.freeze([
+  'index.json',
+  'workbench.json',
+  'workbench/00000000-0000-4000-8000-000000000001.json',
+  'guide.json',
+  'profile-settings.json',
+]);
 const { buildContext, QUESTION_SET_VERSION } = require('../../tests/e2e/helpers/reviewer-portal');
 
 const SCENARIOS = Object.freeze({
@@ -34,6 +41,7 @@ const REQUEST_PATHS = Object.freeze({
   'GET /api/workbench/staffing': 1,
   'GET /api/workbench/board-writeups': 1,
   'GET /api/workbench/resolve-request': 1,
+  'GET /api/workbench/dashboard': 1,
   'GET /api/workbench/applicant-reviewers': 1,
   'GET /api/workbench/reviewer-roster': 1,
   'PATCH /api/workbench/reviewer-roster': 1,
@@ -165,6 +173,38 @@ function portalContext(view = 'stage2a') {
   return context;
 }
 
+function fillSyntheticTemplate(template, recipient, { origin, signature = 'Program Director', reviewDueDate = '' } = {}) {
+  const link = new URL(`/external/review/${REVIEW_TOKEN}`, origin).toString();
+  const values = {
+    greeting: `Dear ${recipient.name || 'Reviewer'}`,
+    recipientName: recipient.name || 'Reviewer',
+    proposalTitle: 'Synthetic reviewer rehearsal',
+    piName: 'Synthetic Principal Investigator',
+    piInstitution: 'Example University',
+    proposalDetails: 'Synthetic details for private rehearsal.',
+    reviewDueDate: reviewDueDate || '',
+    signature,
+    externalLink: link,
+  };
+  const replace = (value) => String(value || '').replace(/\{\{(greeting|recipientName|proposalTitle|piName|piInstitution|proposalDetails|reviewDueDate|signature|externalLink)\}\}/g, (match, key) => values[key] ?? match);
+  return { subject: replace(template?.subject), body: replace(template?.body) };
+}
+
+function syntheticTemplates() {
+  return {
+    invitation: {
+      subject: 'Invitation to review {{proposalTitle}}',
+      body: '{{greeting}},\n\nPlease consider reviewing {{proposalTitle}}.\n{{externalLink}}\n\n{{signature}}',
+    },
+    materials: {
+      subject: 'Materials for {{proposalTitle}}',
+      body: '{{greeting}},\n\nSynthetic materials for {{proposalTitle}} are ready. Review due {{reviewDueDate}}.\n{{externalLink}}\n\n{{signature}}',
+    },
+    followup: { subject: 'Follow-up: {{proposalTitle}}', body: '{{greeting}},\n\nA follow-up about {{proposalTitle}}.\n\n{{signature}}' },
+    thankyou: { subject: 'Thank you', body: '{{greeting}},\n\nThank you.\n\n{{signature}}' },
+  };
+}
+
 function createState(scenario, buildId = null) {
   const isPreseededManualCoi = [SCENARIOS.MANUAL_COI_BLOCKED, SCENARIOS.MANUAL_COI_UNAVAILABLE].includes(scenario);
   const preseededManual = candidate({
@@ -175,7 +215,16 @@ function createState(scenario, buildId = null) {
     manualAdded: true,
     mainInstitution: scenario === SCENARIOS.MANUAL_COI_BLOCKED ? 'Example University' : undefined,
   });
-  const candidateRows = isPreseededManualCoi ? [preseededManual] : [candidate()];
+  const candidateRows = isPreseededManualCoi ? [preseededManual] : [
+    candidate(),
+    ...([SCENARIOS.BASELINE, SCENARIOS.PD_DRIFT].includes(scenario) ? [candidate({
+      suggestionId: 'ffffffff-ffff-4fff-8fff-ffffffffffff',
+      candidateKey: 'candidate:dr.pending reviewer',
+      name: 'Dr. Pending Reviewer',
+      email: 'pending.reviewer@example.test',
+      invited: true,
+    })] : []),
+  ];
   const savedFindScenario = scenario === SCENARIOS.SAVED_FIND_EXCLUSION;
   const materialAccepted = {
     suggestionId: 'cccccccc-cccc-4ccc-8ccc-cccccccccccc',
@@ -283,6 +332,16 @@ function createState(scenario, buildId = null) {
     materialsSentIds: [],
     currentProgramDirectorId: PD_ID,
     currentProgramDirectorEmail: PD_EMAIL,
+    campaignConfig: {
+      respondOffsetDays: 7,
+      reviewDueDate: '2099-07-22',
+      desiredCount: null,
+      respondReminderEnabled: false,
+      respondReminderLeadDays: null,
+      reviewDueReminderEnabled: false,
+      reviewDueReminderLeadDays: null,
+      quotaNotifiedAt: null,
+    },
     reviewDraft: null,
     reviewSubmit: null,
     reviewReceivedAt: null,
@@ -370,6 +429,42 @@ function installMocks(context, { baseUrl, buildId = null, scenario = SCENARIOS.B
       title: 'Synthetic reviewer rehearsal', cycleLabel: 'J26', grantProgram: 'Research',
       institution: 'Example University', programDirectorId: state.currentProgramDirectorId,
     });
+    if (key === 'GET /api/workbench/dashboard') {
+      const programDirector = { systemuserid: state.currentProgramDirectorId, fullName: 'Program Director' };
+      const programs = [{ programId: PROGRAM_ID, name: 'Synthetic program' }];
+      const programId = url.searchParams.get('programId') || PROGRAM_ID;
+      const cycleCode = url.searchParams.get('cycleCode');
+      const scopeParam = url.searchParams.get('scope');
+      if (programId !== PROGRAM_ID || (cycleCode && cycleCode !== 'J26') || (scopeParam && !['my', 'all'].includes(scopeParam))) {
+        return respond(route, 404, { success: false, error: 'Synthetic dashboard context not found' });
+      }
+      const program = programs.find((item) => item.programId === programId) || programs[0];
+      const metadata = {
+        success: true,
+        programDirector,
+        programs,
+        programId: program.programId,
+        defaultProgramId: PROGRAM_ID,
+        programName: program.name,
+      };
+      if (!cycleCode) return respond(route, 200, {
+        ...metadata,
+        cycles: [{ code: 'J26', label: 'June 2026', year: 2026, month: 6, meetingDate: '2026-06-30', count: 1, setAsideCount: 0, myCount: 1, mySetAsideCount: 0 }],
+        defaultCycleCode: 'J26',
+        lastDecidedCycleCode: null,
+      });
+      const scope = url.searchParams.get('scope') || 'my';
+      const includeSetAside = url.searchParams.get('includeSetAside') === '1';
+      return respond(route, 200, {
+        ...metadata,
+        cycleCode,
+        cycleLabel: cycleCode === 'J26' ? 'June 2026' : cycleCode,
+        scope,
+        includeSetAside,
+        rollup: { total: 1, stages: { find: 0, invite: 1, awaiting: 0, review: 0, done: 0 } },
+        proposals: [{ requestId: REQUEST_ID, requestNumber: REQUEST_NUM, title: 'Synthetic reviewer rehearsal', institution: 'Example University', programDirector: 'Program Director', projectLeader: 'Synthetic Principal Investigator', workRemaining: 'invite' }],
+      });
+    }
     if (key === 'GET /api/workbench/applicant-reviewers') return respond(route, 200, {
       success: true, recommended: [], recommendedFailed: [], knownLookupFailed: [], slotsPopulated: 0,
       excludedNames: ['Dr. Already Excluded'], excludedRaw: 'Dr. Already Excluded', excludedParseFailed: false,
@@ -457,9 +552,33 @@ function installMocks(context, { baseUrl, buildId = null, scenario = SCENARIOS.B
     }
     if (key === 'GET /api/review-manager/reviewer-vip-flags') return respond(route, 200, { pdSystemUserId: state.currentProgramDirectorId, flaggedPotentialReviewerIds: [] });
     if (key === 'GET /api/review-manager/release-settings') return respond(route, 200, { attachProposalEmail: false });
-    if (key === 'GET /api/email-defaults/reviewer-templates') return respond(route, 200, { templates: {}, configured: false, unavailable: false });
-    if (key === 'GET /api/review-manager/campaign-config') return respond(route, 200, { requestId: REQUEST_ID, config: { respondOffsetDays: 7, reviewDueDate: '2099-07-22', respondReminderEnabled: false, reviewDueReminderEnabled: false } });
-    if (key === 'POST /api/review-manager/campaign-config') return respond(route, 200, { success: true, requestId: REQUEST_ID, config: body.config || {} });
+    if (key === 'GET /api/email-defaults/reviewer-templates') return respond(route, 200, { templates: syntheticTemplates(), configured: true, unavailable: false });
+    if (key === 'GET /api/review-manager/campaign-config') {
+      if (url.searchParams.get('requestId') !== REQUEST_ID) return respond(route, 404, { error: 'No request found' });
+      return respond(route, 200, { requestId: REQUEST_ID, config: { ...state.campaignConfig } });
+    }
+    if (key === 'POST /api/review-manager/campaign-config') {
+      const writable = new Set(['respondOffsetDays', 'reviewDueDate', 'respondReminderEnabled', 'respondReminderLeadDays', 'reviewDueReminderEnabled', 'reviewDueReminderLeadDays', 'desiredCount']);
+      const config = body.config;
+      if (body.requestId !== REQUEST_ID || !config || typeof config !== 'object' || Array.isArray(config) || Object.keys(config).length === 0) {
+        return respond(route, 400, { error: 'config must contain at least one editable field' });
+      }
+      for (const [name, value] of Object.entries(config)) {
+        if (!writable.has(name)) return respond(route, 400, { error: `Unknown or read-only config field: ${name}` });
+        if (value === null) continue;
+        if (['respondOffsetDays', 'respondReminderLeadDays', 'reviewDueReminderLeadDays', 'desiredCount'].includes(name)
+            && (!Number.isInteger(value) || value < 0)) return respond(route, 400, { error: `${name} must be a non-negative integer` });
+        if (['respondReminderEnabled', 'reviewDueReminderEnabled'].includes(name) && typeof value !== 'boolean') {
+          return respond(route, 400, { error: `${name} must be a boolean` });
+        }
+        if (name === 'reviewDueDate' && value !== null && (typeof value !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(value)
+            || !Number.isFinite(Date.parse(value)) || new Date(`${value}T00:00:00Z`).toISOString().slice(0, 10) !== value)) {
+          return respond(route, 400, { error: 'reviewDueDate must be a YYYY-MM-DD date or null' });
+        }
+      }
+      state.campaignConfig = { ...state.campaignConfig, ...(body.config || {}) };
+      return respond(route, 200, { success: true, requestId: REQUEST_ID, config: { ...state.campaignConfig } });
+    }
     if (key === 'POST /api/review-manager/render-withdraw-emails') {
       state.withdrawRenderBodies.push(body);
       const drafts = (body.suggestionIds || []).map((suggestionId) => {
@@ -490,6 +609,12 @@ function installMocks(context, { baseUrl, buildId = null, scenario = SCENARIOS.B
         && (reason === 'no_longer_needed' || reviewedMode);
       const results = ids.map((suggestionId) => {
         const recipient = state.reviewerRows.find((row) => row.suggestionId === suggestionId);
+        if (!recipient) return { suggestionId, status: 'not_found' };
+        const stillPending = recipient.invited === true
+          && recipient.accepted !== true
+          && recipient.declined !== true
+          && recipient.responseType == null;
+        if (!stillPending) return { suggestionId, status: 'not_pending' };
         if (!shouldSendEmail) return { suggestionId, status: 'withdrawn_no_email_by_reason', reason };
         if (!state.currentProgramDirectorId || !state.currentProgramDirectorEmail) return { suggestionId, status: 'withdrawn_no_pd', reason };
         if (!recipient?.email) return { suggestionId, status: 'withdrawn_no_email', reason };
@@ -502,12 +627,15 @@ function installMocks(context, { baseUrl, buildId = null, scenario = SCENARIOS.B
         });
         return { suggestionId, status: 'withdrawn_emailed', reason };
       });
-      const withdrawnIds = new Set(results.map((row) => row.suggestionId));
+      const withdrawnIds = new Set(results.filter((row) => row.status.startsWith('withdrawn_')).map((row) => row.suggestionId));
       state.reviewerRows = state.reviewerRows.map((row) => (withdrawnIds.has(row.suggestionId)
         ? { ...row, responseType: 'withdrawn_sufficient' }
         : row));
+      state.candidateRows = state.candidateRows.map((row) => (withdrawnIds.has(row.suggestionId)
+        ? { ...row, invited: true, accepted: false, declined: false, responseType: 'withdrawn_sufficient', withdrawnSufficientAt: '2099-06-30T12:00:00Z' }
+        : row));
       state.withdrawTransitions.push(...results.map(({ suggestionId, status, reason: resultReason }) => ({ suggestionId, status, reason: resultReason })));
-      return respond(route, 200, { ok: true, withdrawn: results.length, results });
+      return respond(route, 200, { ok: true, withdrawn: withdrawnIds.size, results });
     }
     if (key === 'GET /api/review-manager/campaign-timeline-defaults') return respond(route, 200, {
       key: 'reviewer.campaign_timeline_defaults',
@@ -517,21 +645,38 @@ function installMocks(context, { baseUrl, buildId = null, scenario = SCENARIOS.B
     });
     if (key === 'POST /api/review-manager/render-emails') {
       state.renderBodies.push(body);
+      if (!Array.isArray(body.suggestionIds) || body.suggestionIds.length === 0) return respond(route, 400, { error: 'suggestionIds array is required' });
+      if (!body.template || !body.template.subject || !body.template.body) return respond(route, 400, { error: 'template with subject and body is required' });
+      if (!['invitation', 'materials', 'followup', 'thankyou'].includes(body.templateType || 'materials')) {
+        return respond(route, 400, { error: `Unknown templateType: ${body.templateType}` });
+      }
       state.previewSnapshots.push({
         templateType: body.templateType,
         programDirectorId: state.currentProgramDirectorId,
         suggestionIds: body.suggestionIds || [],
       });
-      return respond(route, 200, { drafts: (body.suggestionIds || []).map((suggestionId) => {
-        const recipient = state.candidateRows.find((row) => row.suggestionId === suggestionId)
+      const selectedTemplate = body.template && typeof body.template === 'object'
+        ? body.template
+        : syntheticTemplates()[body.templateType];
+      const signature = body.settings?.signature || 'Program Director';
+      const resolved = body.suggestionIds.map((suggestionId) => ({ suggestionId,
+        recipient: state.candidateRows.find((row) => row.suggestionId === suggestionId)
           || state.reviewerRows.find((row) => row.suggestionId === suggestionId)
-          || { name: 'Dr. Saved Reviewer', email: REVIEWER_EMAIL };
+      })).filter((item) => item.recipient);
+      if (resolved.length === 0) return respond(route, 404, { error: 'No reviewers found for the provided IDs' });
+      const reviewDueDate = Object.prototype.hasOwnProperty.call(body.settings || {}, 'reviewDueDate')
+        ? body.settings.reviewDueDate
+        : state.campaignConfig.reviewDueDate;
+      const drafts = resolved.map(({ suggestionId, recipient }) => {
+        const rendered = fillSyntheticTemplate(selectedTemplate, recipient, { origin, signature, reviewDueDate });
         return {
         suggestionId, candidateName: recipient.name, candidateEmail: recipient.email,
-        subject: 'Synthetic reviewer invitation',
-        body: `Please respond using the secure link.\n${new URL(`/external/review/${REVIEW_TOKEN}`, origin)}`,
+        subject: rendered.subject,
+        body: rendered.body,
         emailConfidence: { level: 'high', reason: 'confirmed_identity' },
-      }; }) });
+      };
+      });
+      return respond(route, 200, { drafts, stats: { total: drafts.length, ready: drafts.length, skipped: body.suggestionIds.length - drafts.length } });
     }
     if (key === 'POST /api/review-manager/send-emails') {
       state.sentBodies.push(body);
@@ -580,12 +725,31 @@ function installMocks(context, { baseUrl, buildId = null, scenario = SCENARIOS.B
         state.transitions.push({ type: 'manual-first-invite-allowed', mainInstitution: state.institutionScreen.mainInstitution });
       }
       if (body.templateType === 'materials') {
-        const ids = (body.drafts || []).map((draft) => draft.suggestionId);
+        const drafts = body.drafts || [];
+        const skipped = [];
+        const eligibleDrafts = [];
+        for (const draft of drafts) {
+          const recipient = state.reviewerRows.find((row) => row.suggestionId === draft.suggestionId);
+          const reason = !recipient
+            ? 'not_found'
+            : recipient.materialsSentAt || recipient.reviewStatus === 'materials_sent'
+              ? 'materials_already_sent'
+              : recipient.reviewStatus !== 'accepted'
+                ? 'not_accepted'
+                : null;
+          if (reason) skipped.push({ suggestionId: draft.suggestionId, candidateName: recipient?.name || draft.candidateName || '', candidateEmail: recipient?.email || draft.candidateEmail || '', reason });
+          else eligibleDrafts.push(draft);
+        }
+        const ids = eligibleDrafts.map((draft) => draft.suggestionId);
         state.materialsSentIds.push(...ids);
         state.reviewerRows = state.reviewerRows.map((row) => (ids.includes(row.suggestionId)
           ? { ...row, reviewStatus: 'materials_sent', materialsSentAt: '2099-06-30T12:00:00Z' }
           : row));
-        const sent = (body.drafts || []).map((draft) => {
+        state.candidateRows = state.candidateRows.map((row) => (ids.includes(row.suggestionId)
+          ? { ...row, responseType: 'accepted' }
+          : row));
+        if (ids.includes(SUGGESTION_ID)) state.reviewerContext = portalContext('stage2b');
+        const sent = eligibleDrafts.map((draft) => {
           const recipient = state.reviewerRows.find((row) => row.suggestionId === draft.suggestionId)
             || { name: 'Dr. Accepted Reviewer', email: REVIEWER_EMAIL };
           return {
@@ -604,14 +768,17 @@ function installMocks(context, { baseUrl, buildId = null, scenario = SCENARIOS.B
         });
         state.capturedEmails.push(...sent.map((item) => item.capturedEmail));
         return route.fulfill({ status: 200, contentType: 'text/event-stream', body: [
-          'event: progress', `data: ${JSON.stringify({ current: sent.length, total: sent.length, message: 'Captured materials email.' })}`, '',
-          'event: result', `data: ${JSON.stringify({ sent, failed: [], skipped: [], stats: { sent: sent.length, failed: 0, skipped: 0, total: sent.length } })}`, '',
-          'event: complete', `data: ${JSON.stringify({ message: 'Sent for delivery.', sent: sent.length, failed: 0, skipped: 0 })}`, '', '',
+          'event: progress', `data: ${JSON.stringify({ current: sent.length, total: drafts.length, message: 'Captured materials email.' })}`, '',
+          'event: result', `data: ${JSON.stringify({ sent, failed: [], skipped, stats: { sent: sent.length, failed: 0, skipped: skipped.length, total: drafts.length } })}`, '',
+          'event: complete', `data: ${JSON.stringify({ message: sent.length ? 'Sent for delivery.' : 'No materials emails were sent.', sent: sent.length, failed: 0, skipped: skipped.length })}`, '', '',
         ].join('\n') });
       }
       const invitedIds = new Set((body.drafts || []).map((draft) => draft.suggestionId));
       state.candidateRows = state.candidateRows.map((row) => (invitedIds.has(row.suggestionId)
         ? { ...row, invited: true, emailSentAt: '2099-06-30T12:00:00Z' }
+        : row));
+      state.reviewerRows = state.reviewerRows.map((row) => (invitedIds.has(row.suggestionId)
+        ? { ...row, invited: true, tokenState: 'active', tokenExpiresAt: '2099-08-01T00:00:00Z' }
         : row));
       state.transitions.push({ type: 'invite-captured', count: (body.drafts || []).length });
       const sent = (body.drafts || []).map((draft) => {
@@ -632,8 +799,24 @@ function installMocks(context, { baseUrl, buildId = null, scenario = SCENARIOS.B
     if (key === `GET /api/external/review/${REVIEW_TOKEN}/context`) return respond(route, 200, state.reviewerContext);
     if (key === `POST /api/external/review/${REVIEW_TOKEN}/respond`) {
       state.transitions.push({ type: `reviewer-${body.action}`, action: body.action });
-      if (body.action === 'accept') state.reviewerContext = portalContext('accepted-pre-materials');
-      if (body.action === 'decline') state.reviewerContext = portalContext('declined');
+      if (body.action === 'accept') {
+        state.reviewerContext = portalContext('accepted-pre-materials');
+        state.candidateRows = state.candidateRows.map((row) => row.suggestionId === SUGGESTION_ID
+          ? { ...row, invited: true, accepted: true, declined: false, responseType: 'accepted', responseReceivedAt: '2099-06-30T12:10:00Z' }
+          : row);
+        state.reviewerRows = state.reviewerRows.map((row) => row.suggestionId === SUGGESTION_ID
+          ? { ...row, invited: true, accepted: true, reviewStatus: 'accepted', responseType: 'accepted', responseReceivedAt: '2099-06-30T12:10:00Z' }
+          : row);
+      }
+      if (body.action === 'decline') {
+        state.reviewerContext = portalContext('declined');
+        state.candidateRows = state.candidateRows.map((row) => row.suggestionId === SUGGESTION_ID
+          ? { ...row, invited: true, accepted: false, declined: true, responseType: 'declined', responseReceivedAt: '2099-06-30T12:10:00Z' }
+          : row);
+        state.reviewerRows = state.reviewerRows.map((row) => row.suggestionId === SUGGESTION_ID
+          ? { ...row, invited: true, accepted: false, reviewStatus: 'declined', responseType: 'declined', responseReceivedAt: '2099-06-30T12:10:00Z' }
+          : row);
+      }
       return respond(route, 200, { ok: true, idempotent: false, engagementState: state.reviewerContext.engagementState });
     }
     if (key === `GET /api/external/review/${REVIEW_TOKEN}/draft`) {

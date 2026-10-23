@@ -77,9 +77,10 @@ describe('reviewer rehearsal launcher boundaries', () => {
     }
   });
 
-  test('allows only exact synthetic document routes, static GETs, and declared API mocks', () => {
+  test('allows exact Workbench document routes, static GETs, and declared API mocks', () => {
     const origin = 'http://127.0.0.1:3110';
     const decision = (url, mocked = false, method = 'GET', passive = false) => launcher.browserRequestDecision(url, origin, mocked, method, passive);
+    expect(decision(`${origin}/workbench`)).toMatchObject({ allow: true, reason: 'declared_document' });
     expect(decision(`${origin}/workbench/00000000-0000-4000-8000-000000000001`).allow).toBe(true);
     expect(decision(`${origin}/_next/static/chunks/app.js`).allow).toBe(true);
     expect(decision(`${origin}/api/reviewer-finder/my-candidates`, true, 'POST')).toMatchObject({ allow: true, reason: 'declared_mock_api' });
@@ -89,12 +90,14 @@ describe('reviewer rehearsal launcher boundaries', () => {
       `${origin}/%61pi/unlisted`,
       `${origin}/%2fapi/unlisted`,
       `${origin}/workbench/another-request`,
+      `${origin}/workbench/`,
       'https://example.invalid/api/reviewer-finder/my-candidates',
       'http://localhost:3110/workbench/00000000-0000-4000-8000-000000000001',
     ]) {
       expect(decision(url).allow).toBe(false);
     }
     expect(decision(`${origin}/workbench/00000000-0000-4000-8000-000000000001`, false, 'POST').allow).toBe(false);
+    expect(decision(`${origin}/workbench`, false, 'POST')).toMatchObject({ allow: false, reason: 'unmocked_local_method' });
   });
 
   test('allows only finite passive asset and prefetch paths when declared by a mock', () => {
@@ -106,6 +109,7 @@ describe('reviewer rehearsal launcher boundaries', () => {
       '/_vercel/insights/script.js',
       '/_next/data/0123456789abcdef/index.json',
       '/_next/data/0123456789abcdef/workbench.json',
+      '/_next/data/0123456789abcdef/workbench/00000000-0000-4000-8000-000000000001.json',
       '/_next/data/0123456789abcdef/guide.json',
       '/_next/data/0123456789abcdef/profile-settings.json',
     ]) {
@@ -117,6 +121,7 @@ describe('reviewer rehearsal launcher boundaries', () => {
       '/_vercel/insights/collect',
       '/_next/data/0123456789abcdef/not-in-allowlist.json',
       '/_next/data/0123456789abcdef/workbench.json/extra',
+      '/_next/data/0123456789abcdef/workbench/00000000-0000-4000-8000-000000000002.json',
     ]) {
       expect(decision(path)).toMatchObject({ allow: false, reason: 'unmocked_local_route' });
     }

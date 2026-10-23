@@ -51,11 +51,12 @@ describe('review rehearsal fixture boundary and state', () => {
     expect(isMockedApiRequest(request('/api/auth/status', 'GET'), { baseUrl: BASE_URL, scenario: 'unknown-scenario' })).toBe(false);
   });
 
-  test('passive fixtures match only analytics and four exact pages under the known build ID', async () => {
+  test('passive fixtures match only analytics and five exact pages under the known build ID', async () => {
     const passivePaths = [
       '/_vercel/insights/script.js',
       `/_next/data/${BUILD_ID}/index.json`,
       `/_next/data/${BUILD_ID}/workbench.json`,
+      `/_next/data/${BUILD_ID}/workbench/00000000-0000-4000-8000-000000000001.json`,
       `/_next/data/${BUILD_ID}/guide.json`,
       `/_next/data/${BUILD_ID}/profile-settings.json`,
     ];
@@ -66,6 +67,7 @@ describe('review rehearsal fixture boundary and state', () => {
     expect(isMockedPassiveRequest(request(`/_next/data/other-build/index.json`), { baseUrl: BASE_URL, buildId: BUILD_ID })).toBe(false);
     expect(isMockedPassiveRequest(request(`/_next/data/${BUILD_ID}/other.json`), { baseUrl: BASE_URL, buildId: BUILD_ID })).toBe(false);
     expect(isMockedPassiveRequest(request(`/_next/data/${BUILD_ID}/nested/index.json`), { baseUrl: BASE_URL, buildId: BUILD_ID })).toBe(false);
+    expect(isMockedPassiveRequest(request(`/_next/data/${BUILD_ID}/workbench/00000000-0000-4000-8000-000000000002.json`), { baseUrl: BASE_URL, buildId: BUILD_ID })).toBe(false);
     expect(isMockedPassiveRequest(request(passivePaths[0], 'POST'), { baseUrl: BASE_URL, buildId: BUILD_ID })).toBe(false);
     expect(isMockedPassiveRequest(request(passivePaths[0], 'GET', 'https://example.test'), { baseUrl: BASE_URL, buildId: BUILD_ID })).toBe(false);
     expect(isMockedPassiveRequest(request(passivePaths[1]), { baseUrl: BASE_URL })).toBe(false);
@@ -113,6 +115,43 @@ describe('review rehearsal fixture boundary and state', () => {
     expect(JSON.parse(capabilities.response.body)).toEqual({ canManageSharedRoles: false, isSuperuser: false });
     const board = await invoke('/api/workbench/board-writeups');
     expect(JSON.parse(board.response.body)).toEqual({ canRelease: false, canArchive: false, isSuperuser: false, cycles: [] });
+  });
+
+  test('dashboard fixtures return exact cycle metadata and echoed proposal-list context', async () => {
+    const { invoke } = harness(SCENARIOS.BASELINE);
+    const cycles = JSON.parse((await invoke('/api/workbench/dashboard?programId=99999999-9999-4999-8999-999999999999')).response.body);
+    expect(cycles).toMatchObject({
+      success: true,
+      programId: '99999999-9999-4999-8999-999999999999',
+      defaultProgramId: '99999999-9999-4999-8999-999999999999',
+      defaultCycleCode: 'J26',
+      cycles: [{ code: 'J26', label: 'June 2026' }],
+    });
+    const list = JSON.parse((await invoke('/api/workbench/dashboard?cycleCode=J26&scope=all&programId=99999999-9999-4999-8999-999999999999&includeSetAside=1')).response.body);
+    expect(list).toMatchObject({
+      success: true,
+      programId: '99999999-9999-4999-8999-999999999999',
+      cycleCode: 'J26',
+      scope: 'all',
+      includeSetAside: true,
+      rollup: expect.any(Object),
+      proposals: [{ requestId: REQUEST_ID, requestNumber: '1002788' }],
+    });
+    expect((await invoke('/api/workbench/dashboard?cycleCode=J99&scope=all&programId=99999999-9999-4999-8999-999999999999')).response.status).toBe(404);
+  });
+
+  test('baseline candidate projection includes a pending invite row for the invitation and withdrawal workflow', async () => {
+    const { invoke } = harness(SCENARIOS.BASELINE);
+    const payload = JSON.parse((await invoke(`/api/reviewer-finder/my-candidates?requestId=${REQUEST_ID}`)).response.body);
+    expect(payload.proposals[0].candidates).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        suggestionId: 'ffffffff-ffff-4fff-8fff-ffffffffffff',
+        name: 'Dr. Pending Reviewer',
+        invited: true,
+        accepted: false,
+        declined: false,
+      }),
+    ]));
   });
 
   test('returns all seven roster arrays and the saved candidate key for the 409 rehearsal', () => {
@@ -250,6 +289,7 @@ describe('review rehearsal fixture boundary and state', () => {
       requestId: REQUEST_ID,
       templateType: 'invitation',
       suggestionIds: ['11111111-1111-4111-8111-111111111111'],
+      template: { subject: 'Invitation to {{proposalTitle}}', body: '{{greeting}}, please review {{proposalTitle}}: {{externalLink}}' },
     });
     const driftResult = await drift.invoke('/api/review-manager/send-emails', 'POST', {
       drafts: [{ suggestionId: '11111111-1111-4111-8111-111111111111' }],
@@ -278,6 +318,7 @@ describe('review rehearsal fixture boundary and state', () => {
       requestId: REQUEST_ID,
       templateType: 'materials',
       suggestionIds: ['cccccccc-cccc-4ccc-8ccc-cccccccccccc'],
+      template: { subject: 'Materials for {{proposalTitle}}', body: 'Synthetic materials for {{proposalTitle}}. {{externalLink}}' },
     });
     expect(JSON.parse(preview.response.body).drafts[0]).toMatchObject({ candidateName: 'Dr. Accepted Reviewer' });
     const sent = await materials.invoke('/api/review-manager/send-emails', 'POST', {
@@ -288,6 +329,27 @@ describe('review rehearsal fixture boundary and state', () => {
     expect(sent.response.contentType).toBe('text/event-stream');
     expect(materials.fixture.state.materialsSentIds).toEqual(['cccccccc-cccc-4ccc-8ccc-cccccccccccc']);
     expect(materials.fixture.state.reviewerRows.find((row) => row.suggestionId === 'dddddddd-dddd-4ddd-8ddd-dddddddddddd')).toMatchObject({ reviewStatus: 'pending', invited: true });
+
+    const mixed = harness(SCENARIOS.MATERIALS_PARTIAL);
+    const mixedSend = await mixed.invoke('/api/review-manager/send-emails', 'POST', {
+      requestId: REQUEST_ID,
+      templateType: 'materials',
+      drafts: [
+        { suggestionId: 'cccccccc-cccc-4ccc-8ccc-cccccccccccc', subject: 'Synthetic accepted materials' },
+        { suggestionId: 'dddddddd-dddd-4ddd-8ddd-dddddddddddd', subject: 'Must remain pending' },
+      ],
+    });
+    const mixedResult = JSON.parse(mixedSend.response.body.split('\n').find((line) => line.startsWith('data: {"sent"')).slice('data: '.length));
+    expect(mixedResult.sent.map((row) => row.suggestionId)).toEqual(['cccccccc-cccc-4ccc-8ccc-cccccccccccc']);
+    expect(mixedResult.skipped).toMatchObject([{ suggestionId: 'dddddddd-dddd-4ddd-8ddd-dddddddddddd', reason: 'not_accepted' }]);
+    expect(mixed.fixture.state.materialsSentIds).toEqual(['cccccccc-cccc-4ccc-8ccc-cccccccccccc']);
+    expect(mixed.fixture.state.reviewerRows.find((row) => row.suggestionId === 'dddddddd-dddd-4ddd-8ddd-dddddddddddd')).toMatchObject({ reviewStatus: 'pending', invited: true });
+    const repeat = await mixed.invoke('/api/review-manager/send-emails', 'POST', {
+      templateType: 'materials', drafts: [{ suggestionId: 'cccccccc-cccc-4ccc-8ccc-cccccccccccc', subject: 'Repeat' }],
+    });
+    const repeatedResult = JSON.parse(repeat.response.body.split('\n').find((line) => line.startsWith('data: {"sent"')).slice('data: '.length));
+    expect(repeatedResult.sent).toEqual([]);
+    expect(repeatedResult.skipped).toMatchObject([{ suggestionId: 'cccccccc-cccc-4ccc-8ccc-cccccccccccc', reason: 'materials_already_sent' }]);
   });
 
   test('withdraw-sufficient captures a courtesy email for the active PD and updates only the selected pending row', async () => {
@@ -327,7 +389,77 @@ describe('review rehearsal fixture boundary and state', () => {
       subject: 'Thank you',
     }]);
     expect(fixture.state.reviewerRows.find((row) => row.suggestionId === pending.suggestionId).responseType).toBe('withdrawn_sufficient');
+    const candidates = JSON.parse((await invoke(`/api/reviewer-finder/my-candidates?requestId=${REQUEST_ID}`)).response.body).proposals[0].candidates;
+    expect(candidates.find((row) => row.suggestionId === pending.suggestionId)).toMatchObject({
+      invited: true,
+      accepted: false,
+      declined: false,
+      responseType: 'withdrawn_sufficient',
+    });
+    expect(candidates.find((row) => row.suggestionId === '11111111-1111-4111-8111-111111111111')).toMatchObject({ invited: false });
     expect(fixture.state.reviewerRows.find((row) => row.name === 'Dr. Accepted Reviewer').reviewStatus).toBe('accepted');
+  });
+
+  test('portal acceptance updates only the associated saved candidate and reviewer projection', async () => {
+    const { fixture, invoke } = harness(SCENARIOS.BASELINE);
+    await invoke(`/api/external/review/${'pd-reviewer-rehearsal-token'}/respond`, 'POST', { action: 'accept' });
+    expect(JSON.parse((await invoke(`/api/external/review/${'pd-reviewer-rehearsal-token'}/context`)).response.body).engagementState.accepted).toBe(true);
+    const candidates = JSON.parse((await invoke(`/api/reviewer-finder/my-candidates?requestId=${REQUEST_ID}`)).response.body).proposals[0].candidates;
+    expect(candidates.find((row) => row.suggestionId === '11111111-1111-4111-8111-111111111111')).toMatchObject({ accepted: true, responseType: 'accepted' });
+    const reviewers = JSON.parse((await invoke(`/api/review-manager/reviewers?requestId=${REQUEST_ID}`)).response.body).proposals[0].reviewers;
+    expect(reviewers.find((row) => row.suggestionId === '11111111-1111-4111-8111-111111111111')).toMatchObject({ accepted: true, reviewStatus: 'accepted' });
+    expect(reviewers.find((row) => row.suggestionId === 'cccccccc-cccc-4ccc-8ccc-cccccccccccc')).toMatchObject({ accepted: true, reviewStatus: 'accepted' });
+    expect(fixture.state.candidateRows.find((row) => row.suggestionId === 'ffffffff-ffff-4fff-8fff-ffffffffffff')).toMatchObject({ invited: true, accepted: false });
+  });
+
+  test('campaign config persists in fixture memory and renderer retains edited copy with supported placeholders', async () => {
+    const { invoke } = harness(SCENARIOS.BASELINE);
+    expect(JSON.parse((await invoke(`/api/review-manager/campaign-config?requestId=${REQUEST_ID}`)).response.body).config.respondOffsetDays).toBe(7);
+    const saved = await invoke('/api/review-manager/campaign-config', 'POST', {
+      requestId: REQUEST_ID,
+      config: { respondOffsetDays: 10, reviewDueDate: null, desiredCount: 4 },
+    });
+    expect(JSON.parse(saved.response.body).config).toMatchObject({ respondOffsetDays: 10, reviewDueDate: null, desiredCount: 4 });
+    expect(JSON.parse((await invoke(`/api/review-manager/campaign-config?requestId=${REQUEST_ID}`)).response.body).config)
+      .toMatchObject({ respondOffsetDays: 10, reviewDueDate: null, desiredCount: 4 });
+    const invalid = await invoke('/api/review-manager/campaign-config', 'POST', {
+      requestId: REQUEST_ID,
+      config: { quotaNotifiedAt: '2099-07-22T00:00:00Z' },
+    });
+    expect(invalid.response.status).toBe(400);
+    expect(JSON.parse(invalid.response.body).error).toContain('Unknown or read-only config field');
+
+    const templates = JSON.parse((await invoke('/api/email-defaults/reviewer-templates')).response.body);
+    expect(templates.templates.invitation.subject).toContain('{{proposalTitle}}');
+    expect(templates.templates.materials.body).toContain('{{externalLink}}');
+    const rendered = await invoke('/api/review-manager/render-emails', 'POST', {
+      requestId: REQUEST_ID,
+      templateType: 'materials',
+      suggestionIds: ['cccccccc-cccc-4ccc-8ccc-cccccccccccc'],
+      template: {
+        subject: 'Custom subject for {{recipientName}}',
+        body: 'Edited materials for {{proposalTitle}} are due {{reviewDueDate}}. {{externalLink}} {{unknownField}}',
+      },
+      settings: { signature: 'Synthetic Team', reviewDueDate: '2099-08-15' },
+    });
+    const draft = JSON.parse(rendered.response.body).drafts[0];
+    expect(draft.subject).toBe('Custom subject for Dr. Accepted Reviewer');
+    expect(draft.body).toContain('Edited materials for Synthetic reviewer rehearsal are due 2099-08-15.');
+    expect(draft.body).toContain(`http://localhost:3110/external/review/${'pd-reviewer-rehearsal-token'}`);
+    expect(draft.body).toContain('{{unknownField}}');
+    expect(draft.candidateEmail).toBe('reviewer.capture@example.test');
+    const unknownType = await invoke('/api/review-manager/render-emails', 'POST', {
+      templateType: 'unexpected', suggestionIds: ['cccccccc-cccc-4ccc-8ccc-cccccccccccc'],
+      template: { subject: 'Subject', body: 'Body' },
+    });
+    expect(unknownType.response.status).toBe(400);
+    expect(JSON.parse(unknownType.response.body)).toEqual({ error: 'Unknown templateType: unexpected' });
+    const unknownRecipient = await invoke('/api/review-manager/render-emails', 'POST', {
+      templateType: 'materials', suggestionIds: ['eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee'],
+      template: { subject: 'Subject', body: 'Body' },
+    });
+    expect(unknownRecipient.response.status).toBe(404);
+    expect(JSON.parse(unknownRecipient.response.body)).toEqual({ error: 'No reviewers found for the provided IDs' });
   });
 
   test('deliberate no-email withdrawal reports the source-defined reason outcome', async () => {
@@ -342,6 +474,30 @@ describe('review rehearsal fixture boundary and state', () => {
       { suggestionId: pending.suggestionId, status: 'withdrawn_no_email_by_reason', reason: 'no_response' },
     ]);
     expect(fixture.state.withdrawCapturedEmails).toEqual([]);
+  });
+
+  test('withdrawal rejects accepted and unknown IDs without mutating rows or capturing email', async () => {
+    const { fixture, invoke } = harness(SCENARIOS.BASELINE);
+    const acceptedBefore = { ...fixture.state.reviewerRows.find((row) => row.suggestionId === 'cccccccc-cccc-4ccc-8ccc-cccccccccccc') };
+    const acceptedCandidateBefore = { ...fixture.state.candidateRows[0] };
+    const result = await invoke('/api/review-manager/withdraw-sufficient', 'POST', {
+      requestId: REQUEST_ID,
+      suggestionIds: ['cccccccc-cccc-4ccc-8ccc-cccccccccccc', 'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee'],
+      reason: 'no_longer_needed',
+      sendEmail: true,
+    });
+    expect(JSON.parse(result.response.body)).toEqual({
+      ok: true,
+      withdrawn: 0,
+      results: [
+        { suggestionId: 'cccccccc-cccc-4ccc-8ccc-cccccccccccc', status: 'not_pending' },
+        { suggestionId: 'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee', status: 'not_found' },
+      ],
+    });
+    expect(fixture.state.reviewerRows.find((row) => row.suggestionId === 'cccccccc-cccc-4ccc-8ccc-cccccccccccc')).toEqual(acceptedBefore);
+    expect(fixture.state.candidateRows[0]).toEqual(acceptedCandidateBefore);
+    expect(fixture.state.withdrawCapturedEmails).toEqual([]);
+    expect(fixture.state.candidateRows.find((row) => row.suggestionId === 'ffffffff-ffff-4fff-8fff-ffffffffffff').responseType).toBeUndefined();
   });
 
   test('stage2b authoring draft GET/PUT/submit stays in fixture memory with question-set version', async () => {
