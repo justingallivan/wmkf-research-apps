@@ -1,0 +1,756 @@
+{
+  "format": "wmkf-local-linux-verification-v1",
+  "assessmentDate": "2026-10-23",
+  "candidateCommit": "94447672fe04a788b0e6aadb5deeb9d2fc85e82a",
+  "status": "CONFIGURED_STAGES_PASSED_WITH_SKIPS; SUPPLEMENTAL_MEDIA_FAILURES_UNRESOLVED",
+  "execution": "Local isolated Ubuntu containers; consolidated evidence across resource-adjusted runs, not hosted GitHub Actions",
+  "platform": {
+    "distribution": "Ubuntu 24.04.5 LTS",
+    "architecture": "arm64",
+    "node": "22.23.4",
+    "npm": "10.9.9",
+    "caseSensitiveFilesystemVerified": true,
+    "imageId": "sha256:3eb0198c60fff4606a1fb00eb2eeb0c76bff234e2b47d59373957c814563f0a6",
+    "nodeImageDigest": "sha256:63538dfe497cc29dfafdda25ada09b46db68a3f4cc205abf1f5d6bf0913f3384",
+    "ubuntuImageDigest": "sha256:68ee22004a9109b44973313b02ff7b1de250f1de0f5ecb628d73f579aaff33ac"
+  },
+  "containment": {
+    "source": "Detached tracked-only checkout from local Git bundle into Docker volume",
+    "hostCredentialsAndEnvironmentFilesCopied": false,
+    "checksAndBuildNetwork": "none",
+    "dependencyInstallNetwork": "Package downloads only; no host credentials passed",
+    "postgresNetwork": "Internal-only Docker network; test process shared PostgreSQL network namespace; no published port",
+    "postgresConnection": "Disposable loopback PostgreSQL16 only",
+    "sourceReadbackClean": true
+  },
+  "results": {
+    "cleanInstall": {
+      "exitCode": 0
+    },
+    "lint": {
+      "exitCode": 0,
+      "errors": 0,
+      "warnings": 161
+    },
+    "workflowCheckGates": {
+      "passed": 42,
+      "failed": 0,
+      "includesConfiguredTypes": true
+    },
+    "canonicalBuild": {
+      "exitCode": 0,
+      "seconds": 129.22,
+      "memoryBytes": 4095569920,
+      "cpus": 2,
+      "nodeHeapMB": 1536,
+      "rayonThreads": 1,
+      "migrationManifestUnchanged": true
+    },
+    "fullJest": {
+      "exitCode": 0,
+      "seconds": 541,
+      "suitesPassed": 1432,
+      "suitesSkipped": 18,
+      "testsPassed": 24763,
+      "testsSkipped": 241,
+      "snapshotsPassed": 5,
+      "coverageEnabled": true,
+      "coverageThresholdsEnabled": false,
+      "resourceOnlyOverrides": {
+        "nodeHeapMB": 768,
+        "maxWorkers": 1,
+        "workerIdleMemoryLimit": "384MB",
+        "dockerInit": true,
+        "temporaryConfigOutsideCheckout": true
+      }
+    },
+    "requiredPostgresIntegration": {
+      "exitCode": 0,
+      "suitesPassed": 10,
+      "testsPassed": 130,
+      "seconds": 7.541
+    },
+    "launcherInitRerun": {
+      "exitCode": 0,
+      "testsPassed": 18
+    },
+    "supplementalMedia": {
+      "exitCode": 1,
+      "testsPassed": 19,
+      "testsFailed": 7,
+      "seconds": 20.352,
+      "ffmpeg": "6.1.1-3ubuntu5",
+      "ffprobe": "6.1.1-3ubuntu5",
+      "python": "3.12.3",
+      "confirmedRejection": {
+        "casesDiagnosed": 1,
+        "code": "audio_past_cut",
+        "step": "accept"
+      },
+      "codeAndTestsMatchRecordedOriginMain": "c09a4f9a7453956b267b45e10f8deae083351e6d",
+      "trackedProductionPin": {
+        "version": "n9.0.2-23",
+        "architecture": "x86_64",
+        "url": "https://github.com/BtbN/FFmpeg-Builds/releases/download/autobuild-2026-10-08-13-05/ffmpeg-n9.0.2-23-g27b46f0fbc-linux64-gpl-9.0.tar.xz",
+        "sha256": "14020417ff8ef01470e8cb771355e65c37aff62b80fb0be41eeb7611d1360902",
+        "observedPublicHttpStatus": 404,
+        "matchingArtifactExecuted": false,
+        "productionStoredCopyQueried": false
+      },
+      "nextEvidence": "Obtain checksum-verified pinned artifact and rerun the 26-test suite; no runtime change inferred"
+    }
+  },
+  "attemptHistory": {
+    "twoGiBBuildAttempts": "Two exits 137 with Docker OOM events; succeeded in separate 4 GiB VM",
+    "firstFullJest": "Stopped by confirmed OOM; one process-group test also failed without a PID1 reaper",
+    "processGroupFollowup": "Same suite passed 18 tests with Docker --init; no source change",
+    "initialMediaSkip": "Media suite intentionally skipped when ffmpeg/ffprobe were absent; installed tools exposed seven failures"
+  },
+  "skippedSuitePathsInFullRun": [
+    "tests/integration/test-request-run-ledger.pg.test.js",
+    "tests/integration/test-request-run-runner.pg.test.js",
+    "tests/integration/scheduled-email-engine.pg.test.js",
+    "tests/integration/site-visit-materials-background-jobs.pg.test.js",
+    "tests/integration/zoom-video-copies.pg.test.js",
+    "tests/integration/transcription-pilot.pg.test.js",
+    "tests/integration/meeting-tracker-transcription.pg.test.js",
+    "tests/integration/factory-ledger-fingerprint.pg.test.js",
+    "tests/unit/presentation-video-cut-script.test.js",
+    "tests/integration/discussion-sentiments.pg.test.js",
+    "tests/integration/final-writeup-handoff-email.pg.test.js",
+    "tests/integration/database-bootstrap.pg.test.js",
+    "tests/integration/integrity-screening-reviews.pg.test.js",
+    "tests/integration/final-writeup-leadership-digest.pg.test.js",
+    "tests/integration/site-visit-materials-claim.pg.test.js",
+    "tests/integration/presentation-upload-dismissal.pg.test.js",
+    "tests/integration/board-writeup-postgres.test.js",
+    "tests/integration/transcription-preview-bootstrap.pg.test.js"
+  ],
+  "stepResults": [
+    {
+      "step": "checkout",
+      "exitCode": 0,
+      "seconds": 3.22,
+      "log": "checkout.log"
+    },
+    {
+      "step": "install",
+      "exitCode": 0,
+      "seconds": 24.13,
+      "log": "install.log"
+    },
+    {
+      "step": "01-npm-run-lint",
+      "exitCode": 0,
+      "seconds": 99.85,
+      "log": "01-npm-run-lint.log"
+    },
+    {
+      "step": "02-npm-run-check-api-routes",
+      "exitCode": 0,
+      "seconds": 0.2,
+      "log": "02-npm-run-check-api-routes.log"
+    },
+    {
+      "step": "03-npm-run-check-atlas",
+      "exitCode": 0,
+      "seconds": 0.39,
+      "log": "03-npm-run-check-atlas.log"
+    },
+    {
+      "step": "04-npm-run-check-atlas-self-test",
+      "exitCode": 0,
+      "seconds": 1.66,
+      "log": "04-npm-run-check-atlas-self-test.log"
+    },
+    {
+      "step": "05-npm-run-check-doc-currency",
+      "exitCode": 0,
+      "seconds": 0.25,
+      "log": "05-npm-run-check-doc-currency.log"
+    },
+    {
+      "step": "06-npm-run-check-doc-currency-self-test",
+      "exitCode": 0,
+      "seconds": 1.35,
+      "log": "06-npm-run-check-doc-currency-self-test.log"
+    },
+    {
+      "step": "07-npm-run-check-docs-catalog",
+      "exitCode": 0,
+      "seconds": 0.19,
+      "log": "07-npm-run-check-docs-catalog.log"
+    },
+    {
+      "step": "08-npm-run-check-migrations-manifest",
+      "exitCode": 0,
+      "seconds": 0.13,
+      "log": "08-npm-run-check-migrations-manifest.log"
+    },
+    {
+      "step": "09-npm-run-check-reviewer-reminder-hold",
+      "exitCode": 0,
+      "seconds": 0.13,
+      "log": "09-npm-run-check-reviewer-reminder-hold.log"
+    },
+    {
+      "step": "10-npm-run-check-reviewer-reminder-hold-self-test",
+      "exitCode": 0,
+      "seconds": 0.28,
+      "log": "10-npm-run-check-reviewer-reminder-hold-self-test.log"
+    },
+    {
+      "step": "11-npm-run-check-agent-invariants-ci",
+      "exitCode": 0,
+      "seconds": 0.15,
+      "log": "11-npm-run-check-agent-invariants-ci.log"
+    },
+    {
+      "step": "12-npm-run-check-instruction-architecture",
+      "exitCode": 0,
+      "seconds": 0.19,
+      "log": "12-npm-run-check-instruction-architecture.log"
+    },
+    {
+      "step": "13-npm-run-check-memory-router",
+      "exitCode": 0,
+      "seconds": 0.14,
+      "log": "13-npm-run-check-memory-router.log"
+    },
+    {
+      "step": "14-npm-run-check-memory-router-self-test",
+      "exitCode": 0,
+      "seconds": 0.39,
+      "log": "14-npm-run-check-memory-router-self-test.log"
+    },
+    {
+      "step": "15-npm-run-check-doc-symbol-refs",
+      "exitCode": 0,
+      "seconds": 0.17,
+      "log": "15-npm-run-check-doc-symbol-refs.log"
+    },
+    {
+      "step": "16-npm-run-check-doc-symbol-refs-self-test",
+      "exitCode": 0,
+      "seconds": 0.29,
+      "log": "16-npm-run-check-doc-symbol-refs-self-test.log"
+    },
+    {
+      "step": "17-npm-run-check-build-claim-freshness",
+      "exitCode": 0,
+      "seconds": 0.18,
+      "log": "17-npm-run-check-build-claim-freshness.log"
+    },
+    {
+      "step": "18-npm-run-check-build-claim-freshness-self-test",
+      "exitCode": 0,
+      "seconds": 0.25,
+      "log": "18-npm-run-check-build-claim-freshness-self-test.log"
+    },
+    {
+      "step": "19-npm-run-check-model-override-warming",
+      "exitCode": 0,
+      "seconds": 1.2,
+      "log": "19-npm-run-check-model-override-warming.log"
+    },
+    {
+      "step": "20-npm-run-check-model-override-warming-self-test",
+      "exitCode": 0,
+      "seconds": 1.74,
+      "log": "20-npm-run-check-model-override-warming-self-test.log"
+    },
+    {
+      "step": "21-npm-run-check-dataverse-access-layer",
+      "exitCode": 0,
+      "seconds": 5.15,
+      "log": "21-npm-run-check-dataverse-access-layer.log"
+    },
+    {
+      "step": "22-npm-run-check-dataverse-access-layer-self-test",
+      "exitCode": 0,
+      "seconds": 4.97,
+      "log": "22-npm-run-check-dataverse-access-layer-self-test.log"
+    },
+    {
+      "step": "23-npm-run-check-request-document-writers",
+      "exitCode": 0,
+      "seconds": 0.22,
+      "log": "23-npm-run-check-request-document-writers.log"
+    },
+    {
+      "step": "24-npm-run-check-request-document-writers-self-test",
+      "exitCode": 0,
+      "seconds": 0.13,
+      "log": "24-npm-run-check-request-document-writers-self-test.log"
+    },
+    {
+      "step": "25-npm-run-check-odata-escape",
+      "exitCode": 0,
+      "seconds": 0.24,
+      "log": "25-npm-run-check-odata-escape.log"
+    },
+    {
+      "step": "26-npm-run-check-odata-escape-self-test",
+      "exitCode": 0,
+      "seconds": 0.2,
+      "log": "26-npm-run-check-odata-escape-self-test.log"
+    },
+    {
+      "step": "27-npm-run-check-dynamics-context-boundary",
+      "exitCode": 0,
+      "seconds": 2.36,
+      "log": "27-npm-run-check-dynamics-context-boundary.log"
+    },
+    {
+      "step": "28-npm-run-check-dynamics-context-boundary-self-test",
+      "exitCode": 0,
+      "seconds": 0.26,
+      "log": "28-npm-run-check-dynamics-context-boundary-self-test.log"
+    },
+    {
+      "step": "29-npm-run-check-route-service-boundary",
+      "exitCode": 0,
+      "seconds": 1.55,
+      "log": "29-npm-run-check-route-service-boundary.log"
+    },
+    {
+      "step": "30-npm-run-check-route-service-boundary-self-test",
+      "exitCode": 0,
+      "seconds": 1.98,
+      "log": "30-npm-run-check-route-service-boundary-self-test.log"
+    },
+    {
+      "step": "31-npm-run-check-reviewer-engagement-boundary",
+      "exitCode": 0,
+      "seconds": 1.77,
+      "log": "31-npm-run-check-reviewer-engagement-boundary.log"
+    },
+    {
+      "step": "32-npm-run-check-reviewer-engagement-boundary-self-test",
+      "exitCode": 0,
+      "seconds": 3.65,
+      "log": "32-npm-run-check-reviewer-engagement-boundary-self-test.log"
+    },
+    {
+      "step": "33-npm-run-check-script-suggestion-writers",
+      "exitCode": 0,
+      "seconds": 0.17,
+      "log": "33-npm-run-check-script-suggestion-writers.log"
+    },
+    {
+      "step": "34-npm-run-check-script-suggestion-writers-self-test",
+      "exitCode": 0,
+      "seconds": 0.25,
+      "log": "34-npm-run-check-script-suggestion-writers-self-test.log"
+    },
+    {
+      "step": "35-npm-run-check-route-lifecycle-auth",
+      "exitCode": 0,
+      "seconds": 0.25,
+      "log": "35-npm-run-check-route-lifecycle-auth.log"
+    },
+    {
+      "step": "36-npm-run-check-route-lifecycle-auth-self-test",
+      "exitCode": 0,
+      "seconds": 0.26,
+      "log": "36-npm-run-check-route-lifecycle-auth-self-test.log"
+    },
+    {
+      "step": "37-npm-run-check-secret-scan",
+      "exitCode": 0,
+      "seconds": 0.93,
+      "log": "37-npm-run-check-secret-scan.log"
+    },
+    {
+      "step": "38-npm-run-check-secret-scan-self-test",
+      "exitCode": 0,
+      "seconds": 2.28,
+      "log": "38-npm-run-check-secret-scan-self-test.log"
+    },
+    {
+      "step": "39-npm-run-check-scaffolding-tokens",
+      "exitCode": 0,
+      "seconds": 0.48,
+      "log": "39-npm-run-check-scaffolding-tokens.log"
+    },
+    {
+      "step": "40-npm-run-check-scaffolding-tokens-self-test",
+      "exitCode": 0,
+      "seconds": 0.83,
+      "log": "40-npm-run-check-scaffolding-tokens-self-test.log"
+    },
+    {
+      "step": "41-npm-run-check-harness-framing",
+      "exitCode": 0,
+      "seconds": 0.15,
+      "log": "41-npm-run-check-harness-framing.log"
+    },
+    {
+      "step": "42-npm-run-check-harness-framing-self-test",
+      "exitCode": 0,
+      "seconds": 0.23,
+      "log": "42-npm-run-check-harness-framing-self-test.log"
+    },
+    {
+      "step": "43-npm-run-check-types",
+      "exitCode": 0,
+      "seconds": 1.75,
+      "log": "43-npm-run-check-types.log"
+    },
+    {
+      "step": "44-npm-run-build",
+      "exitCode": 137,
+      "seconds": 36.32,
+      "log": "44-npm-run-build.log"
+    },
+    {
+      "step": "build-memory-bounded-retry",
+      "exitCode": 137,
+      "seconds": 42.8,
+      "log": "build-memory-bounded-retry.log"
+    },
+    {
+      "step": "manifest-after-build",
+      "exitCode": 0,
+      "seconds": 0.6,
+      "log": "manifest-after-build.log"
+    },
+    {
+      "step": "full-jest-linux",
+      "exitCode": 137,
+      "seconds": 240.42,
+      "log": "full-jest-linux.log"
+    },
+    {
+      "step": "postgres-integration",
+      "exitCode": 0,
+      "seconds": 10.3,
+      "log": "postgres-integration.log"
+    },
+    {
+      "step": "launcher-init-rerun",
+      "exitCode": 0,
+      "seconds": 5.55,
+      "log": "launcher-init-rerun.log"
+    },
+    {
+      "step": "full-jest-memory-bounded",
+      "exitCode": 0,
+      "seconds": 544.83,
+      "log": "full-jest-memory-bounded.log"
+    }
+  ],
+  "buildVmStepResults": [
+    {
+      "step": "vm-checkout",
+      "exitCode": 0,
+      "seconds": 4.02,
+      "log": "vm-checkout.log"
+    },
+    {
+      "step": "vm-clean-install",
+      "exitCode": 0,
+      "seconds": 58.82,
+      "log": "vm-clean-install.log"
+    },
+    {
+      "step": "vm-canonical-build",
+      "exitCode": 0,
+      "seconds": 129.22,
+      "log": "vm-canonical-build.log"
+    },
+    {
+      "step": "vm-manifest-readback",
+      "exitCode": 0,
+      "seconds": 0.48,
+      "log": "vm-manifest-readback.log"
+    },
+    {
+      "step": "vm-source-readback",
+      "exitCode": 0,
+      "seconds": 0.21,
+      "log": "vm-source-readback.log"
+    }
+  ],
+  "cleanup": {
+    "ownedContainersAndInternalNetworkRemoved": true,
+    "ownedCandidateVolumeRemoved": true,
+    "customImageTagsRemoved": true,
+    "disposableBuildVmAndDataDeleted": true,
+    "activeDockerContextBefore": "colima",
+    "activeDockerContextAfter": "colima",
+    "existingVmConfigurationChanged": false
+  },
+  "evidenceDirectory": "/private/tmp/wmkf-linux-ci-xagihahy",
+  "evidenceFiles": {
+    "checkout.log": {
+      "sha256": "29a8d47fce0f44bd00b6d11f81413605ba43fcd7014106d004b21ff24a9fb327",
+      "bytes": 1121
+    },
+    "install.log": {
+      "sha256": "976d60e790b500e05b9bc1a775f2403f6302b9b875c8303ad474fe0ef30961dc",
+      "bytes": 1365
+    },
+    "01-npm-run-lint.log": {
+      "sha256": "87294efce0f40d59766cf30cfa4451302dd4143ac537d09e84baa75b46b317dd",
+      "bytes": 150716
+    },
+    "progress.log": {
+      "sha256": "799be8f7b0a55190101892efde939bc425a2e81a7d541646e0b90c97d6f91fd3",
+      "bytes": 4407
+    },
+    "resume-progress.log": {
+      "sha256": "5d00c1befbbbbeb9fa2280ea2906fd7076170088180fcb5683d98729d60454d2",
+      "bytes": 409
+    },
+    "build-vm-progress.log": {
+      "sha256": "0b6d8f0d1c25d6e19ba53a1d25ba51571ca825b5851bc9ce79afba5c5b30b65a",
+      "bytes": 342
+    },
+    "vm-canonical-build.log": {
+      "sha256": "82aa1a488411902c25eddd61e13b8bb80e7e1d99b82b6e80c8fdf58816c696fc",
+      "bytes": 26923
+    },
+    "vm-manifest-readback.log": {
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    "full-jest-memory-bounded.log": {
+      "sha256": "5abc28c8dd318c03f3e601ccfc67a6c8257b8ff4be204db7e31e982152c6704c",
+      "bytes": 5220459
+    },
+    "postgres-integration.log": {
+      "sha256": "e34585a6530a1023f693a9b45509033f500b829867d3e6c9d9766e5124827242",
+      "bytes": 24729
+    },
+    "launcher-init-rerun.log": {
+      "sha256": "1210d17f9f6a9893bc28abbb79de971b2cb2fcc6529a0dac0092674e81b5add7",
+      "bytes": 1912
+    },
+    "media-suite.log": {
+      "sha256": "0a9053266588aa7eac5b8589a7bc1b505a8ea22c6d558c28a361d798fdc8e5b3",
+      "bytes": 11326
+    },
+    "media-diagnostic.log": {
+      "sha256": "f291f3fbe0f8a735263464233622c290b5b6f3dccf3b2e97e92e3e4930ef2aaf",
+      "bytes": 4875
+    },
+    "pinned-artifact-http-status.log": {
+      "sha256": "f8bf41177a5f5e808a7ccb648b51080b031f15ca8018d91a576263d6cc626eb6",
+      "bytes": 4
+    },
+    "oom-events-final.jsonl": {
+      "sha256": "640f5fe6de1962e500a177b76b2e6ff772657673959b465f1b58c380b35b7953",
+      "bytes": 1053
+    },
+    "final-source-readback-after-diagnostics.log": {
+      "sha256": "2ac5d5374194a21a6d73d324c51996b04dbcb164a05e1892356458ec1fb9de58",
+      "bytes": 41
+    },
+    "disposable-vm-cleanup.log": {
+      "sha256": "1d70222d20426a54f8e150a26b3b93f2b46f10a1660774f14fb3449ea254864e",
+      "bytes": 1422
+    },
+    "volume-cleanup.log": {
+      "sha256": "0acea315b2aaf431bdd273a9774ff4df25568d8de5d57526ac3c7b42c15e57d7",
+      "bytes": 23
+    },
+    "image-cleanup.log": {
+      "sha256": "08287b46768ec89bc1115eef72e91b2b6a618f38a445adaed4eddf67152b30de",
+      "bytes": 485
+    },
+    "02-npm-run-check-api-routes.log": {
+      "sha256": "6a21c9e160d6e540e44db4cbae9e97e95fbfdb1dcc936ff16f0cf6ef80b3e4d0",
+      "bytes": 513
+    },
+    "03-npm-run-check-atlas.log": {
+      "sha256": "2d7879f6f5e58ce6efa0c0691c438c79c891adc78a64622c53b829691225a435",
+      "bytes": 149
+    },
+    "04-npm-run-check-atlas-self-test.log": {
+      "sha256": "32c6437d8a485c55db983e92f1755ff8bc65d5808f6087182a851c55fc7a6b53",
+      "bytes": 136
+    },
+    "05-npm-run-check-doc-currency.log": {
+      "sha256": "b5eda40f7f4ee62a0456d56e03ad0e179c69745a8375e50ffd8e056353719bcc",
+      "bytes": 122
+    },
+    "06-npm-run-check-doc-currency-self-test.log": {
+      "sha256": "38c426997251266905fa10437d721824b25d3b901ac4a786e0f6f5d08a2b2741",
+      "bytes": 162
+    },
+    "07-npm-run-check-docs-catalog.log": {
+      "sha256": "f45334816d3b4c53e65d5e1432d338c0773d4dd675c8a42b1280f46ccca8c12e",
+      "bytes": 137
+    },
+    "08-npm-run-check-migrations-manifest.log": {
+      "sha256": "2e09cb3bed8f5515add560319a08c4d1bcc530db43bdae801934c69091d3f57a",
+      "bytes": 125
+    },
+    "09-npm-run-check-reviewer-reminder-hold.log": {
+      "sha256": "1e4b13f4f940157e53d98055b4972aac9ba919189e1d5d217c2e87ec94720ef7",
+      "bytes": 206
+    },
+    "10-npm-run-check-reviewer-reminder-hold-self-test.log": {
+      "sha256": "6b6d434034623c68fbe202ea8b25f5216a2772feeaed515020862bb25262a9c6",
+      "bytes": 166
+    },
+    "11-npm-run-check-agent-invariants-ci.log": {
+      "sha256": "cbcc3a4ba326018c2e2072efc7641a01ffee6e2a1aab95ab64ab2c87b08888b0",
+      "bytes": 136
+    },
+    "12-npm-run-check-instruction-architecture.log": {
+      "sha256": "6546ab11f09dcbbe5026f0a532757aec5afff700e3f96e690cadf52cab5a3272",
+      "bytes": 1392
+    },
+    "13-npm-run-check-memory-router.log": {
+      "sha256": "f7b3431f0168d572e08d2dc0d72ee1a67796e30ab44a94fa24279d7d2dd25754",
+      "bytes": 228
+    },
+    "14-npm-run-check-memory-router-self-test.log": {
+      "sha256": "5d55ccc8286f6424f29d5707c460afe5aad3998e195e78b256f00d1000b0f774",
+      "bytes": 2485
+    },
+    "15-npm-run-check-doc-symbol-refs.log": {
+      "sha256": "c71615b960f802dc1a42a3b34110018b3905497091ac526f674b766a451845e8",
+      "bytes": 225
+    },
+    "16-npm-run-check-doc-symbol-refs-self-test.log": {
+      "sha256": "386154dd7977836c13b70373725d6d28b3091197514f791c04f609e22bb9411e",
+      "bytes": 202
+    },
+    "17-npm-run-check-build-claim-freshness.log": {
+      "sha256": "4db74bf6b28dcd4912b5660e0b24b4f8c281c5ba5e7567a8e445f1204420e342",
+      "bytes": 248
+    },
+    "18-npm-run-check-build-claim-freshness-self-test.log": {
+      "sha256": "f7128ac503c318cafdfe04beed3df3822a9fb3475a6624bd3a5f72a4f38aff91",
+      "bytes": 220
+    },
+    "19-npm-run-check-model-override-warming.log": {
+      "sha256": "f8635e90355bef74dcf41b728e9fb3f9df8473b881ef665c7b277fe1b7b6dc07",
+      "bytes": 263
+    },
+    "20-npm-run-check-model-override-warming-self-test.log": {
+      "sha256": "b78d3bc485ac8758cd2d5157fcc55bb23849c150f7e7ea819991982616451261",
+      "bytes": 1179
+    },
+    "21-npm-run-check-dataverse-access-layer.log": {
+      "sha256": "98047fcce7b1ab3723da307eb6f51181f36bb44d6e791fd896a034b19a9ce2fe",
+      "bytes": 96
+    },
+    "22-npm-run-check-dataverse-access-layer-self-test.log": {
+      "sha256": "88c385383169da6f634a19b128b59328809a84ed578e8d874d00e903f2de73d7",
+      "bytes": 1765
+    },
+    "23-npm-run-check-request-document-writers.log": {
+      "sha256": "62f4a5f493a3cd6431583bd74e727a03c4f754b0cda0da047065de26e76d99d3",
+      "bytes": 198
+    },
+    "24-npm-run-check-request-document-writers-self-test.log": {
+      "sha256": "aa6ba5a7627fe84dd27f9a9d905d7e8f2966de0fda25a76fd508988e6ab0db3b",
+      "bytes": 203
+    },
+    "25-npm-run-check-odata-escape.log": {
+      "sha256": "a36b1fcb76684f51f9ef41fa9f4e745720370357fa4a1436637a34fd32f17ca4",
+      "bytes": 157
+    },
+    "26-npm-run-check-odata-escape-self-test.log": {
+      "sha256": "5ebceee0b57fd18e96564b207f83837266fc5c578882563f125d244fce505db5",
+      "bytes": 314
+    },
+    "27-npm-run-check-dynamics-context-boundary.log": {
+      "sha256": "82a8d87a5141b48cc0bb7ea7373811b0ab2889eec3e0cc707286ced42053f018",
+      "bytes": 171
+    },
+    "28-npm-run-check-dynamics-context-boundary-self-test.log": {
+      "sha256": "d8034304ded81bd07522e474f4cdce07ff45d9d7de1ec0bcf38897b29a7eec1e",
+      "bytes": 269
+    },
+    "29-npm-run-check-route-service-boundary.log": {
+      "sha256": "686fc607490d19425c501946aba9676e1217db02ec997f44f5ae10486a5810d9",
+      "bytes": 96
+    },
+    "30-npm-run-check-route-service-boundary-self-test.log": {
+      "sha256": "4ebf5d4867e3bd0c1b1e825812d11c97cae247af987f97aecde3e8646b57a1f0",
+      "bytes": 476
+    },
+    "31-npm-run-check-reviewer-engagement-boundary.log": {
+      "sha256": "b4092e2b01d597695e538be18495354d1eea37f86e2b4e5bce326c24f7d8623a",
+      "bytes": 108
+    },
+    "32-npm-run-check-reviewer-engagement-boundary-self-test.log": {
+      "sha256": "59c3d7a53d500384ce70d5279b4955e5f7c5a7cdcfb877276229ed5364cf9ef6",
+      "bytes": 1026
+    },
+    "33-npm-run-check-script-suggestion-writers.log": {
+      "sha256": "01097304a0d4f31cf762df1fb0d118c52ca6b0e9432851d758663afa508d260c",
+      "bytes": 221
+    },
+    "34-npm-run-check-script-suggestion-writers-self-test.log": {
+      "sha256": "562e533bb09c49a172da303d0ca7db177642303abb14b5da562a931a96f460e6",
+      "bytes": 1378
+    },
+    "35-npm-run-check-route-lifecycle-auth.log": {
+      "sha256": "3ec692216b5a89dfc0c56a6404f5fc9ecba52b1776510900821f408b840a775f",
+      "bytes": 192
+    },
+    "36-npm-run-check-route-lifecycle-auth-self-test.log": {
+      "sha256": "9cd94ebb15bd95b1b556b5c13e0ebd027fa0dc34c1ba1a3d3b02ab22ea3d9543",
+      "bytes": 195
+    },
+    "37-npm-run-check-secret-scan.log": {
+      "sha256": "7fd7ceb4952fb825fc0dbaf831810aabc031d07d47e0e8d1e71053ed90abef3d",
+      "bytes": 158
+    },
+    "38-npm-run-check-secret-scan-self-test.log": {
+      "sha256": "385552dd265d84ef24f6b78ce6a25eac4e8395a738e73b206731bf4e530dd6fc",
+      "bytes": 192
+    },
+    "39-npm-run-check-scaffolding-tokens.log": {
+      "sha256": "f34db1b5a35e421d2b83127f4e3f8cb06c6355a04973e69e56656f68eac2182d",
+      "bytes": 165
+    },
+    "40-npm-run-check-scaffolding-tokens-self-test.log": {
+      "sha256": "a3656964aea998d7ebf7482844bda235a6e440a1e4650d5fbd679dec02b5a93e",
+      "bytes": 217
+    },
+    "41-npm-run-check-harness-framing.log": {
+      "sha256": "2fc4f858e4360febf64dc11e09508baa1145a7d0f6bcc18190c62119e10f861e",
+      "bytes": 162
+    },
+    "42-npm-run-check-harness-framing-self-test.log": {
+      "sha256": "b8f6fda69f1962f1bbe719ce085feb38c322a5f47c7a3782e6d20f0b4e9818ee",
+      "bytes": 442
+    },
+    "43-npm-run-check-types.log": {
+      "sha256": "eaca8c01998ed87da8358833108e820622a812a744b440136d060f10270d7c4b",
+      "bytes": 61
+    },
+    "final-source-readback.log": {
+      "sha256": "74ef0fb428a554747843eaf480f1d91b4ddce49764f725d6e471dfb00aefaef6",
+      "bytes": 76
+    },
+    "resource-jest.config.cjs": {
+      "sha256": "803d886ece005b23f37faa364aab0a4ddc63fe74449d2f8b9b0a649317803bc0",
+      "bytes": 209
+    }
+  },
+  "limits": [
+    "Not a single unmodified hosted CI invocation",
+    "No GitHub Actions or linux/amd64 application run",
+    "Supplemental media suite is not green; exact production FFmpeg comparison remains unverified",
+    "No hosted app, production artifact store, live email, deployment, push, or live data mutation"
+  ],
+  "lineageComparison": {
+    "fromCommit": "eaa126028d7918c94340e75f1ea3213ad041f010",
+    "toCommit": "94447672fe04a788b0e6aadb5deeb9d2fc85e82a",
+    "changedPaths": [
+      "docs/audits/release-candidate-checklist-2026-10-22.md",
+      "docs/audits/release-candidate-lineage-2026-10-22.json",
+      "docs/audits/release-preparation-private-store-2026-10-22.md"
+    ],
+    "codeAndTestsDiffEmpty": true,
+    "command": "git diff --exit-code eaa126028..94447672f -- scripts tests pages lib shared package.json package-lock.json next.config.js .github"
+  }
+}

@@ -3,10 +3,10 @@ title: Private Store and Release Preparation Receipt
 domain: engineering-process
 kind: audit
 status: active
-summary: "Assessed code candidate eaa126028 is a docs-only descendant of fixture candidate 9b2ec0060; four release gates remain, while private-store binding is separate unless it becomes a release dependency."
+summary: "Local Ubuntu core checks passed with a supplementary FFmpeg verification gap; three release decision groups remain, while private-store binding is separate unless it becomes a release dependency."
 canonical: false
 cataloged: 2026-10-22
-last_verified: 2026-10-22
+last_verified: 2026-10-23
 owner: product-engineering
 related:
   - docs/CAMPAIGN_RELEASE_AND_DATAVERSE_TEST_STRATEGY.md
@@ -15,6 +15,8 @@ related:
   - docs/audits/historical-impact-concurrency-followup-2026-10-22.md
   - docs/audits/release-candidate-checklist-2026-10-22.md
   - docs/audits/release-candidate-lineage-2026-10-22.json
+  - docs/audits/linux-ci-verification-2026-10-23.md
+  - docs/audits/linux-ci-evidence-2026-10-23.json
   - docs/audits/blob-store-binding-evidence-2026-10-22.json
   - docs/audits/blob-retention-metadata-evidence-2026-10-22.json
 ---
@@ -22,7 +24,7 @@ related:
 # Private Store and Release Preparation Receipt
 
 **Assessment date:** 2026-10-22 (America/Los_Angeles); rehearsal update 2026-10-22 (America/Los_Angeles).
-**Status:** Fully gated candidate `81b8a063b` passed its recorded isolated Node 22/macOS checks: Turbopack build, browser suite, ESLint, 42 npm check gates, Jest coverage run, and selected PostgreSQL integration suites. Fixture candidate `9b2ec0060` passed its scoped build, 51-test browser suite, focused unit suites, scoped ESLint, diff check, and two headless CLI smoke runs. The assessed code candidate `eaa126028d7918c94340e75f1ea3213ad041f010` is a four-document descendant of `9b2ec0060`, with unchanged code/test and runtime/dependency trees; the `9b` scoped results therefore apply to the same code and test bytes through `eaa`. The reviewed comparison is recorded in [lineage evidence](release-candidate-lineage-2026-10-22.json). The guided human session remains the partial observation on candidate `5b1656b3dfad110fb5d23fc4fa2514d573e6a638`. Four release-decision groups remain open as listed in the [release-candidate checklist](release-candidate-checklist-2026-10-22.md): Linux CI, disposition of internal staff/reviewer-role outcomes, authorized hosted-target and rollback verification, and the final owner promotion decision with strategy §12 operating controls. External first-time reviewer usability remains unverified and is not an external-recruitment prerequisite under current owner direction. Private-store binding remains unknown as a separate investigation; no release dependency has been established.
+**Status:** Fully gated candidate `81b8a063b` passed its recorded isolated Node 22/macOS checks: Turbopack build, browser suite, ESLint, 42 npm check gates, Jest coverage run, and selected PostgreSQL integration suites. Fixture candidate `9b2ec0060` passed its scoped build, 51-test browser suite, focused unit suites, scoped ESLint, diff check, and two headless CLI smoke runs. The assessed code candidate `eaa126028d7918c94340e75f1ea3213ad041f010` is a four-document descendant of `9b2ec0060`, with unchanged code/test and runtime/dependency trees; the `9b` scoped results therefore apply to the same code and test bytes through `eaa`. The reviewed comparison is recorded in [lineage evidence](release-candidate-lineage-2026-10-22.json). Candidate `94447672fe04a788b0e6aadb5deeb9d2fc85e82a` received local Ubuntu workflow-equivalent verification: core checks passed with documented Jest skips, while supplemental FFmpeg compatibility remains unresolved because the pinned public artifact could not be retrieved; no production artifact store was queried. See the [Linux verification record](linux-ci-verification-2026-10-23.md). The guided human session remains the partial observation on candidate `5b1656b3dfad110fb5d23fc4fa2514d573e6a638`. Three release-decision groups remain open as listed in the [release-candidate checklist](release-candidate-checklist-2026-10-22.md): disposition of internal staff/reviewer-role outcomes, authorized hosted-target and rollback verification, and the final owner promotion decision with strategy §12 operating controls. External first-time reviewer usability remains unverified and is not an external-recruitment prerequisite under current owner direction. Private-store binding remains unknown as a separate investigation; no release dependency has been established.
 **Fully gated candidate:** `81b8a063b`; **latest code/test candidate:** `9b2ec0060`; **assessed code candidate:** `eaa126028d7918c94340e75f1ea3213ad041f010`; **human observation candidate:** `5b1656b3dfad110fb5d23fc4fa2514d573e6a638`; application runtime checkpoint `4720980ed`. Earlier release evidence below includes candidate `c589cbb6e` (`codex/memory-audit-followups`) and remains scoped to that candidate.
 
 This receipt records the evidence available for the local release candidate and
@@ -35,8 +37,11 @@ In this receipt, “fully gated” refers only to the recorded local automated
 checks. The `81b8a063b` results do not transfer to changed harness/test files in
 later candidates. The `9b2ec0060` scoped test results apply through
 `eaa126028d7918c94340e75f1ea3213ad041f010` because the intervening source-lineage
-comparison found only four documentation changes. Human rehearsal, Ubuntu CI,
-hosted verification, and release authorization remain separate and incomplete.
+comparison found only four documentation changes. Human rehearsal, hosted
+verification, and release authorization remain separate and incomplete. A
+later local Ubuntu run provides workflow-equivalent core-check evidence with
+documented skips and a supplementary media gap; it does not claim hosted
+GitHub Actions or amd64 coverage.
 
 ## Later fixture candidate `9b2ec0060`
 
@@ -177,8 +182,11 @@ authoring. Source review corrected manual COI screening to occur at first invite
 partial materials to remain nonblocking, and submitted authoring to remain locked.
 Current Stage 2b uses in-browser authoring; its former file-upload control is not
 a missing rehearsal fixture. Internal staff observation is partial, not
-complete; the full rehearsal, Linux CI, hosted verification, and release
-authorization remain separate gates. The current owner direction uses internal
+complete; human rehearsal, hosted verification, and release authorization remain
+separate gates. The later local Ubuntu core checks passed with skips and an
+unresolved supplemental media comparison, as recorded in the
+[Linux verification record](linux-ci-verification-2026-10-23.md).
+The current owner direction uses internal
 staff for staff and role-played reviewer tasks; external first-time usability
 remains unverified, with no external recruitment prerequisite. See the
 [guided observation record](internal-staff-rehearsal-observations-2026-10-22.md).
@@ -350,6 +358,7 @@ does not reverse data or email effects.
 |---|---|---|
 | Candidate source review | Fully gated candidate `81b8a063b` and fixture candidate `9b2ec0060` reviewed | Application runtime remains at `4720980ed`; the recorded human observation candidate `5b1656b3dfad110fb5d23fc4fa2514d573e6a638` is separate; hosted behavior remains unverified. |
 | Latest fixture-candidate checks | Candidate `9b2ec0060` passed the recorded scoped checks | Isolated Node 22.23.4/macOS Turbopack build passed; 51/51 browser tests passed with no retries; three focused unit suites passed 40 tests; scoped ESLint and diff check exited 0. This is not the full gate set recorded for `81b8a063b`. |
+| Local Ubuntu verification | Candidate `94447672f` passed configured core checks with skips; supplemental media remains unresolved | Build, 42 workflow check steps, coverage Jest (1,432 suites / 24,763 tests), and ten required PostgreSQL suites passed. The separate FFmpeg 6 suite failed 7/26; the pinned production binary was not obtained. See the [Linux record](linux-ci-verification-2026-10-23.md). No hosted GitHub Actions or amd64 pass is claimed. |
 | Clean locked install | Complete on prior candidate `c589cbb6e` | Completed offline in its isolated workspace. |
 | Locked production build | Prior candidate `c589cbb6e` passed; fully gated candidate build passed | Prior build passed on Node 24.19.0 and Node 22.23.4/macOS. `81b8a063b` completed canonical Turbopack `next build` through Playwright `webServer`; that invocation skipped package `npm prebuild`, which passed separately with unchanged manifest bytes. |
 | Full Jest coverage run | Fully gated candidate passed | Node 22: 1,433 suites / 24,784 tests, five snapshots; 17 suites / 215 tests skipped, 512.717 seconds. Jest coverage thresholds are disabled; opt-in PostgreSQL suites are separate. |
@@ -376,9 +385,11 @@ suites, 42 listed npm check gates, package prebuild, and configured types on
 isolated Node 22/macOS. Coverage thresholds are disabled in the Jest
 configuration, so the coverage run does not certify threshold values. This is
 not a release approval. The concrete remaining gates are listed in the
-[release-candidate checklist](release-candidate-checklist-2026-10-22.md): Linux
-CI, disposition of internal staff and reviewer-role outcomes, authorized hosted
+[release-candidate checklist](release-candidate-checklist-2026-10-22.md):
+disposition of internal staff and reviewer-role outcomes, authorized hosted
 target/rollback verification, and the release owner's promotion decision.
+Local Ubuntu core-check evidence and its unresolved supplemental media
+qualification are recorded separately; they are not a hosted CI pass.
 External first-time reviewer usability is unverified and is not an
 external-recruitment prerequisite under current owner direction.
 
