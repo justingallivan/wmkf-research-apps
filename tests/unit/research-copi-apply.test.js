@@ -3,7 +3,7 @@
  */
 import {
   parseDecision, selectLine, splitName, contactCreatePayload, junctionCreatePayload, foldLedger, applyDone, rollbackEligible, ROLE_COPI,
-  makeApplier, requestDrift, runOperations,
+  makeApplier, requestDrift, runOperations, planOverwriteBlocked, ledgerPlanHash,
 } from '../../scripts/lib/research-copi-apply.mjs';
 
 const G = (n) => `${String(n).padStart(8, '0')}-0000-4000-8000-000000000000`;
@@ -179,7 +179,7 @@ async function run(apply, ops, ledgerLines) {
   return foldLedger(ledgerLines);
 }
 const contactOp = { op: 'contact-create', id: NEWC, payload: contactCreatePayload({ contactId: NEWC, name: 'Ann Lee', email: 'ann@x.edu', accountId: ACC }), source };
-const junctionOp = { op: 'junction-create', id: JN, contactId: NEWC, newContact: true, payload: junctionCreatePayload({ junctionId: JN, requestId: REQ, requestNum: '990001', contactId: NEWC, iaaAccountId: ACC, position: 2 }), source };
+const junctionOp = { op: 'junction-create', id: JN, contactId: NEWC, newContact: true, contactPayload: contactOp.payload, payload: junctionCreatePayload({ junctionId: JN, requestId: REQ, requestNum: '990001', contactId: NEWC, iaaAccountId: ACC, position: 2 }), source };
 const iaaOp = { op: 'iaa-set', id: ROW, value: ACC, expect: { requestId: REQ, contactId: OLDC, role: ROLE_COPI }, source };
 
 describe('apply failure replay', () => {
@@ -224,6 +224,28 @@ describe('apply failure replay', () => {
     expect(m.get(`junction-create|${JN}`).receipt).toMatchObject({ result: 'blocked', detail: expect.stringMatching(/edited after creation/) });
     expect(applyDone(m.get(`junction-create|${JN}`))).toBe(false);
     expect(db.wmkf_apprequestpersons.has(JN)).toBe(false);
+  });
+  test('a contact created earlier and edited before its junction retry blocks the junction', async () => {
+    const { db, io } = fakeDataverse(); const apply = makeApplier(io); const log = [];
+    await runOperations({ ops: [contactOp, junctionOp], ledger: foldLedger(log), applyOp: apply, log: (l) => log.push(l), first: 1 });
+    expect(foldLedger(log).get(`contact-create|${NEWC}`).receipt.result).toBe('created');
+    db.contacts.get(NEWC).emailaddress1 = 'someone.else@x.edu';
+    const m = await run(apply, [contactOp, junctionOp], log);
+    expect(m.get(`junction-create|${JN}`).receipt).toMatchObject({ result: 'blocked', detail: expect.stringMatching(/edited after creation/) });
+    expect(db.wmkf_apprequestpersons.has(JN)).toBe(false);
+  });
+  test('a junction to an existing contact that became inactive is blocked', async () => {
+    const { db, io } = fakeDataverse(); const apply = makeApplier(io);
+    db.contacts.get(OLDC).statecode = 1;
+    const op = { ...junctionOp, id: G(300), contactId: OLDC, newContact: false, contactPayload: undefined };
+    db.wmkf_apprequestpersons.delete(ROW);
+    expect((await apply(op, new Map())).result).toBe('blocked');
+  });
+  test('re-planning is refused once the apply log has activity, and a log names one plan', () => {
+    expect(planOverwriteBlocked([])).toBe(false);
+    expect(planOverwriteBlocked([{ phase: 'intent', planHash: 'aaaa1111' }])).toBe(true);
+    expect(ledgerPlanHash([{ planHash: 'aaaa1111' }, { planHash: 'aaaa1111' }, {}])).toBe('aaaa1111');
+    expect(() => ledgerPlanHash([{ planHash: 'aaaa1111' }, { planHash: 'bbbb2222' }])).toThrow(/mixes plans/);
   });
   test('first run on a value someone else already set is already_set, with no rollback', async () => {
     const { db, io } = fakeDataverse(); const apply = makeApplier(io); const log = [];

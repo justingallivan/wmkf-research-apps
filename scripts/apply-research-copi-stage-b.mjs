@@ -18,8 +18,10 @@
  *       decisions on the snapshot, resolves the staff "same person" contacts by
  *       exact email, re-checks every new contact's final email against existing
  *       contacts, finds existing co-PI rows, and writes research-copi-apply-plan.jsonl
- *       (the apply input) and research-copi-apply-plan.csv (owner dry run), then
- *       prints counts and the plan hash.
+ *       (the apply input, also kept as research-copi-apply-plan-<hash>.jsonl) and
+ *       research-copi-apply-plan.csv (owner dry run), then prints counts and the plan
+ *       hash. Refuses to run once research-copi-applied.jsonl records any activity;
+ *       verify and rollback load the plan that log names.
  *   --apply --confirm=<plan hash> --approver="<name>" [--first=N]
  *       Runs the plan's operations in order (per-operation logic: makeApplier in the
  *       lib). Creates use plan-minted GUIDs; every write re-reads its target first,
@@ -49,7 +51,7 @@ import { lc } from './lib/research-iaa-backfill.mjs';
 import { groupNewContacts } from './lib/research-copi-stage-b.mjs';
 import {
   GUID, ROLE_COPI, parseDecision, selectLine, contactCreatePayload, junctionCreatePayload, foldLedger, applyDone, rollbackEligible,
-  makeApplier, runOperations, JUNCTION, REQUEST_SELECT, ROW_SELECT, CONTACT_SELECT, SET_TARGETS,
+  makeApplier, runOperations, planOverwriteBlocked, ledgerPlanHash, JUNCTION, REQUEST_SELECT, ROW_SELECT, CONTACT_SELECT, SET_TARGETS,
 } from './lib/research-copi-apply.mjs';
 
 try {
@@ -125,6 +127,10 @@ function readCsv(file) {
 
 // ── Plan ──
 async function runPlan() {
+  if (planOverwriteBlocked(readJsonl(APPLIED))) {
+    console.error(`${APPLIED} already records apply activity for the current plan; re-planning would drop those writes from verify and rollback. Finish (or roll back) that plan, then move the plan and log aside before planning again.`);
+    process.exit(2);
+  }
   const resolveText = fs.readFileSync(F('research-copi-iaa-resolve.jsonl'), 'utf8');
   const resolveHash = sha(resolveText).slice(0, 8);
   if (arg('resolve-hash') !== resolveHash) { console.error(`--resolve-hash must equal ${resolveHash}`); process.exit(2); }
@@ -244,6 +250,7 @@ async function runPlan() {
       const junctionId = crypto.randomUUID();
       ops.push({
         op: 'junction-create', id: junctionId, contactId, newContact: x.sel.contact.mode === 'new',
+        ...(x.sel.contact.mode === 'new' ? { contactPayload: ops.at(-1).payload } : {}),
         payload: junctionCreatePayload({ junctionId, requestId: reqId, requestNum: x.line.requestNum, contactId, iaaAccountId: x.sel.iaaAccountId ? guid(x.sel.iaaAccountId, 'iaa') : '', position: position.get(reqId) }),
         source,
       });
@@ -266,6 +273,8 @@ async function runPlan() {
 
   const planText = `${[{ meta: true, host, resolveHash, at: now() }, ...ops].map((o) => JSON.stringify(o)).join('\n')}\n`;
   fs.writeFileSync(PLAN, planText);
+  // Immutable copy by hash: verify and rollback load the plan an apply log names.
+  fs.writeFileSync(F(`research-copi-apply-plan-${sha(planText).slice(0, 8)}.jsonl`), planText);
   const nameOf = new Map(coPi.map((x) => [x.line.key, x.name]));
   const q = (v) => `"${String(v ?? '').replace(/"/g, '""')}"`;
   const csv = [['op', 'request', 'person', 'detail', 'key'].join(',')];
@@ -301,9 +310,12 @@ const applyOp = makeApplier({
   patch: patchReturning,
 });
 
-function loadPlan() {
-  if (!fs.existsSync(PLAN)) { console.error('No plan; run --plan first.'); process.exit(2); }
-  const text = fs.readFileSync(PLAN, 'utf8');
+function loadPlan({ fromLedger = false } = {}) {
+  const logged = fromLedger ? ledgerPlanHash(readJsonl(APPLIED)) : null;
+  const file = logged ? F(`research-copi-apply-plan-${logged}.jsonl`) : PLAN;
+  if (!fs.existsSync(file)) { console.error(`No plan file ${file}; run --plan first.`); process.exit(2); }
+  const text = fs.readFileSync(file, 'utf8');
+  if (logged && sha(text).slice(0, 8) !== logged) { console.error(`${file} does not match its hash.`); process.exit(2); }
   const [meta, ...ops] = text.trim().split('\n').map((l) => JSON.parse(l));
   if (meta.host !== host) { console.error('Plan is for another host.'); process.exit(2); }
   return { hash: sha(text).slice(0, 8), ops };
@@ -312,6 +324,8 @@ function loadPlan() {
 async function runApply() {
   const { hash, ops } = loadPlan();
   if (arg('confirm') !== hash) { console.error(`--confirm must equal the plan hash ${hash}.`); process.exit(2); }
+  const logged = ledgerPlanHash(readJsonl(APPLIED));
+  if (logged && logged !== hash) { console.error(`The apply log belongs to plan ${logged}; this plan is ${hash}. Use that plan or move the log aside.`); process.exit(2); }
   const approver = arg('approver');
   if (!approver) { console.error('--approver="<name>" is required'); process.exit(2); }
   const first = Number(arg('first')) || Infinity;
@@ -334,7 +348,7 @@ async function runApply() {
 }
 
 async function runVerify() {
-  const { ops } = loadPlan();
+  const { ops } = loadPlan({ fromLedger: true });
   const ledger = foldLedger(readJsonl(APPLIED));
   let ok = 0; const bad = []; const open = []; const modified = []; const recovered = [];
   await bypassDynamicsRestrictions('research-copi-stage-b-verify', async () => {
@@ -364,7 +378,7 @@ async function runVerify() {
 async function runRollback() {
   const ids = arg('ids');
   if (!ids) { console.error('--ids=<file of ids | all> is required'); process.exit(2); }
-  const { ops } = loadPlan();
+  const { ops } = loadPlan({ fromLedger: true });
   const includeRecovered = flag('include-recovered');
   const wanted = ids === 'all' ? null : new Set(fs.readFileSync(ids, 'utf8').split(/\s+/).filter(Boolean).map((s) => s.toLowerCase()));
   const ledger = foldLedger(readJsonl(APPLIED));

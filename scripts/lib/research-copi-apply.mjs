@@ -278,6 +278,10 @@ export function makeApplier(io) {
         if (c?.receipt?.result === 'recovered_modified') return { result: 'blocked', detail: 'its new contact was edited after creation; owner to reconcile' };
         if (!['created', 'recovered'].includes(c?.receipt?.result) || c.undone) return { result: 'blocked', detail: 'its new contact is not created yet' };
       }
+      // Re-read the contact now: a stored receipt says nothing about edits since.
+      const contact = await io.getOrNull('contacts', o.contactId, CONTACT_SELECT);
+      if (!contact || contact.statecode !== 0) return { result: 'blocked', detail: 'contact missing or inactive; owner to reconcile' };
+      if (o.newContact && !contactMatchesPayload(contact, o.contactPayload || {})) return { result: 'blocked', detail: 'its new contact was edited after creation; owner to reconcile' };
       const found = await io.getOrNull(JUNCTION, o.id, ROW_SELECT);
       if (found) return junctionMatchesPayload(found, o.payload) ? { result: 'recovered', postEtag: found._etag } : { result: 'recovered_modified', detail: 'edited since created' };
       const r = await io.getOrNull('akoya_requests', o.source.requestId, REQUEST_SELECT);
@@ -349,4 +353,15 @@ export async function runOperations({ ops, ledger, applyOp, log, base = () => ({
     counts[`${o.op}:${out.result}`] = (counts[`${o.op}:${out.result}`] || 0) + 1;
   }
   return counts;
+}
+
+/** Re-planning would orphan the writes recorded against the current plan. */
+export function planOverwriteBlocked(appliedLines) {
+  return appliedLines.some((l) => l.phase === 'intent' || l.phase === 'result' || l.phase === 'rollback');
+}
+/** The one plan hash an apply log was written against (verify/rollback load that plan). */
+export function ledgerPlanHash(appliedLines) {
+  const hashes = [...new Set(appliedLines.map((l) => l.planHash).filter(Boolean))];
+  if (hashes.length > 1) throw new Error(`apply log mixes plans ${hashes.join(', ')}`);
+  return hashes[0] || null;
 }
