@@ -10,6 +10,20 @@ The chronological archive after the `Legacy chronological session log` divider c
 
 ---
 
+## October 2026 — Reviewer safeguards and guidance cleanup released (Session 634)
+
+**Milestone:** Released owner-decided reviewer identity and invitation-authority safeguards with reconciled operating guidance.
+**Sessions:** Multi-turn Codex cleanup / release preparation, concluded in Session 634.
+**Ship state:**
+- `187f27f16` pushed to main; Vercel production `dpl_55owR5tGAZkLi1fTfwt7399JgDDK` reported Ready with application domains assigned.
+- Identity continuity, request-mutation / PD-send authority, stale Find exclusion and first-manual-invitation conflict protections released; concurrent PR #517 work preserved.
+- Confirmation now uses owner wording and links the assigned PD's name to email; 29 focused tests and lint passed. Synthetic walkthrough covered draft/reload and submission lock.
+- Release Jest, PostgreSQL and security jobs passed; Playwright was cancelled. No blanket all-checks-green claim.
+**Why it matters:** preserves staff decisions and reviewer identity while preventing stale actions from silently changing authorization or roster state.
+**Pointers:** `docs/audits/release-candidate-checklist-2026-10-22.md`; `e86e5f80d`, `4720980ed`, `405d17bb8`, `187f27f16`.
+
+---
+
 ## October 2026 — Personal default wording for reviewer release courtesy emails (Session 633)
 
 **Milestone:** Slice 3 of personal email defaults shipped: PDs can save their own wording for the pending-withdrawal and accepted-release courtesy emails.

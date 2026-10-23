@@ -2,8 +2,8 @@
 title: Release Candidate Checklist
 domain: engineering-process
 kind: audit
-status: active
-summary: "Core local Ubuntu checks passed with documented skips. The exact pinned FFmpeg archive and Linux media behavior are verified in a bounded emulated harness; current Production deployment configuration remains unverified. Three release decision groups remain open."
+status: historical
+summary: "Historical preparation evidence. Owner authorized release; combined commit 187f27f16 reached Vercel Production Ready on 2026-10-23. Earlier open decision groups below are historical, not current release blockers."
 canonical: false
 cataloged: 2026-10-22
 last_verified: 2026-10-23
@@ -22,6 +22,23 @@ related:
 ---
 
 # Release Candidate Checklist
+
+## Release disposition — 2026-10-23
+
+[VERIFIED via Git push, Vercel inspect and GitHub check-runs] Owner authorized
+release; `187f27f16` integrated candidate `405d17bb8` and current main, then
+reached Production Ready as `dpl_55owR5tGAZkLi1fTfwt7399JgDDK` with application
+domains assigned. Jest, PostgreSQL and the security jobs passed; Playwright was
+cancelled. The final confirmation change passed 29 focused tests and lint.
+No unresolved concrete application blocker was identified. Owner declined further
+broad audits, optional tests and mock repairs. Additional generic target/rollback
+verification was not established as a release blocker. This disposition does not
+claim hosted functional testing or first-time external usability.
+
+## Historical pre-release assessment
+
+The remaining assessment and open-item table record the preparation state before
+the owner decision. They are preserved as evidence history, not a current worklist.
 
 **Assessed code candidate:** `eaa126028d7918c94340e75f1ea3213ad041f010`;
 application runtime checkpoint `4720980edb6b2c769907e54102e27779c3f567e0`.
