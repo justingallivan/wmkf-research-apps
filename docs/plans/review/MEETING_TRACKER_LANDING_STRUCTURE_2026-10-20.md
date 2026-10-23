@@ -3,7 +3,7 @@ title: Meeting Tracker Landing Structure and Mockups
 domain: product
 kind: plan
 status: proposed
-summary: Meeting layout explorations and newer Workbench-first audience flow; terminology is approved as of 2026-10-21 and app implementation remains pending.
+summary: Workbench-first meeting design with 2026-10-23 decisions on required video, corrections, durable preparation and Program Coordinator review/Board approval; application implementation remains pending.
 canonical: false
 owner: product-engineering
 related:
@@ -18,9 +18,16 @@ related:
 
 The owner’s later hierarchy correction is controlling for the PD Workbench: **working writeup and review first, supporting materials second, meeting logistics behind a compact link**. The [revised mockup](meeting-tracker-2026-10-20/workbench-pd-writeup.html) explores that direction; the earlier materials-first Workbench mockup is superseded and retained only as history.
 
-## Review paused — next session, 2026-10-21
+## Preparation and Board approval decisions — 2026-10-23
 
-[VERIFIED via owner instruction] Pause here and revisit these cases in a future session: **no video available** (audio-only approval), **changes after approval** (names/boundary/summary revisions and existing Board materials), and **returning later** (draft persistence, ongoing preparation and partial-failure recovery). These are parked design/contract decisions, not authorized runtime work. The implementation acceptance requirements below identify their unresolved safeguards; do not treat the simplified preview as a settled persistence or publication contract.
+[VERIFIED via explicit owner decisions in this session; PLANNED application behavior]
+
+- **Required video:** Research presentations are expected to have video. Missing video requires recovery; there is no audio-only Board approval path. This product requirement does not assert that audio and video failures are technically coupled.
+- **Corrections:** Keep the approved presentation materials Board-accessible while corrections are drafted. A replacement requires review and explicit approval before becoming Board-visible. Provide a separate immediate **Withdraw from Board** action for material that must no longer be accessible.
+- **Returning later:** Persist checked speaker names, presentation ending and summary drafts. Processing continues after leaving the page; returning shows current progress. Preserve successful outputs and retry only failed or unfinished work. Approval remains a separate explicit action.
+- **Responsibility:** The assigned **Program Coordinator** reviews the presentation summary and approves materials for the Board. No additional PD review is required by this product decision. Resolve the coordinator through the existing shared role assignment; do not hardcode a person. Existing superuser preparation access is a separate capability, not a newly granted approval role.
+
+These resolve the three cases parked on 2026-10-21 and the presentation-summary/approval ownership questions. Application implementation, persistence design, permission enforcement and end-to-end verification remain pending. The saved HTML previews predate these decisions.
 
 [VERIFIED via owner direction] Materials collection belongs to the assigned **Program Coordinator** in Admin; requests, reminders and confirmations should come from that person (Duncan currently, per owner). Resolve the role at runtime rather than hardcoding Duncan or inferring ownership from a Meeting Tracker permission. The shared Program Coordinator role was added by the concurrent role workstream; consumer wiring remains unbuilt and requires source/role verification when implementation resumes.
 
@@ -36,9 +43,9 @@ The owner’s later hierarchy correction is controlling for the PD Workbench: **
 
 [PLANNED — implementation acceptance requirements]
 
-- Trace save → transcript publication/version → derived transcripts → summary drafts/video → Board consumer before implementation; use the existing authorized services and explicit presentation/internal boundaries. Resolve the approval/persistence contract through the architecture/data review, including whether approval covers the whole presentation bundle and how edits revoke readiness. No schema or route design is settled by the mockup.
-- Coordinate preparation durably against the saved transcript/boundary version. Show per-item progress and failures, preserve successful outputs, and retry only unfinished/failed work. Reloads and repeat clicks must not create duplicate processing or charges. A changed source/boundary must invalidate stale derivatives and approvals; never approve a mixed-version bundle.
-- Missing video, preparation failures, uncertain paid submissions and partial publication must retain visible recovery paths. Do not infer completion or retry safety from a successful save alone. Define the no-video approval case explicitly before runtime implementation.
+- Trace save → transcript publication/version → derived transcripts → summary drafts/video → Board consumer before implementation; use the existing authorized services and explicit presentation/internal boundaries. Resolve the approval/persistence contract through the architecture/data review, including version-consistent replacement approval and immediate withdrawal. Draft corrections must not revoke the existing approved version. No schema or route design is settled by the mockup.
+- Coordinate preparation durably against the saved transcript/boundary version. Show per-item progress and failures, preserve successful outputs, and retry only unfinished/failed work. Reloads and repeat clicks must not create duplicate processing or charges. A changed source/boundary must invalidate stale draft derivatives and draft approval eligibility; never approve a mixed-version bundle. Preserve the separately approved version until replacement approval or explicit withdrawal.
+- Missing video, preparation failures, uncertain paid submissions and partial publication must retain visible recovery paths. Do not infer completion or retry safety from a successful save alone. Missing video blocks Board approval until recovered; do not offer audio-only approval.
 - Test both import paths, resumed preparation, partial failure/retry, duplicate clicks, stale edits, approval/revocation and Board access. Verify that preparation exposes neither new unapproved presentation artifacts nor internal discussion through the Board page. Preserve unrelated access, recovery and review safeguards.
 
 [VERIFIED via mockup source] The standalone [transcript mockup](meeting-tracker-2026-10-20/transcript-preparation.html) demonstrates the combined action, collapsed review receipt, two result groups, editable summaries, simulated Preparing/Ready/Failure states, retry and separate simulated Board approval. Preview state buttons advance examples without real jobs, paid calls, persistence or sharing. The video is the synthetic source excerpt, not a generated trimmed output. Earlier screenshots and workspace descriptions are dated explorations, not this flow's implementation evidence.
@@ -47,7 +54,7 @@ Changed-fact sweep scope: this owner-approved future flow and its standalone pre
 
 ## Transcript preparation — playback review, 2026-10-21
 
-[VERIFIED via owner direction] Put video playback beside the speaker/transcript review on desktop and above it on narrow screens. Provide **Use current playback time as presentation end** and retain audio as a fallback when video is unavailable. Applying a playback time must update the editable presentation-end value and clear the prior review confirmation, just like editing the time directly.
+[VERIFIED via owner direction] Put video playback beside the speaker/transcript review on desktop and above it on narrow screens. Provide **Use current playback time as presentation end** and allow audio playback during preparation if useful. The 2026-10-23 owner decision requires video for Board approval; audio playback does not satisfy that requirement. Applying a playback time must update the editable presentation-end value and clear the prior review confirmation, just like editing the time directly.
 
 [VERIFIED via mockup source] The [review-stage mockup](meeting-tracker-2026-10-20/transcript-preparation.html) includes a local synthetic, silent 38-second video excerpt representing recording times 00:41:52–00:42:30. Applicant tiles disappear at 00:42:18. Video and audio fallback share the recording-time offset; switching pauses the previous player and transfers position. These media files demonstrate controls only, without meeting footage, voices or external access. Application playback integration, real media availability/error handling and authorized media delivery remain pending. Earlier screenshots predate these playback controls.
 
@@ -213,7 +220,7 @@ Setup shows time/duration/location, attendees and agenda checking. Invitations d
 
 [VERIFIED via prior source inspection] Existing SessionEditor/SessionAgendaPanel, SiteVisitMaterialsCard and RecordingAndTranscriptCard ground the capabilities. The task queue, combined workspace and review controls shown are proposals, not built state. Transcript example uses a generated transcript: do not infer that uploaded transcript files support speaker reassignment/splitting. Recording intake, transcription generation, source selection, approval and output creation flows still need fuller design. No paid processing was run.
 
-Duncan and superusers are the intended preparation audience, but runtime authorization is not changed or verified by this mockup. Preserve existing access restrictions, upload recovery, uncertain-send handling, draft/speaker editing, presentation/internal discussion boundaries and separate Board sharing. PDs receive authorized output links in the writeup-first Workbench view; readiness here does not itself publish anything. Summary editorial responsibility remains open.
+Duncan and superusers are the intended preparation audience, but runtime authorization is not changed or verified by this mockup. Preserve existing access restrictions, upload recovery, uncertain-send handling, draft/speaker editing, presentation/internal discussion boundaries and separate Board sharing. PDs receive authorized output links in the writeup-first Workbench view; readiness here does not itself publish anything. The assigned Program Coordinator reviews the presentation summary and approves materials for the Board, per the 2026-10-23 owner decision; runtime enforcement remains to be implemented.
 
 Task switching was exercised at 1440px and 390px, with no horizontal document overflow in all four task views. All eight captures received independent visual review, ship for mockup review. The source is standalone; only task switching, selects and local links/disclosures respond. Save, review, send, upload, processing and publication actions are inert. Full keyboard/assistive-technology behavior and end-to-end contracts are unverified. DESIGN.md and application files remain unchanged.
 
