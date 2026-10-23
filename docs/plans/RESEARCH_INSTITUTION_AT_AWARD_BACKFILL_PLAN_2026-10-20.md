@@ -1,6 +1,6 @@
 # Research PI/co-PI Institution at Award backfill — plan
 
-Date: 2026-10-20. Status: **Stage A (PIs) applied to production 2026-10-20; Stage B (co-PIs) read-only resolve run in production 2026-10-20 (current hash `05b61fa0`); group approvals with the owner and individual checks with staff (2026-10-21); staff answers returned and owner-reviewed (2026-10-23); apply not built.** Owner: Justin Gallivan.
+Date: 2026-10-20. Status: **Stage A (PIs) applied to production 2026-10-20; Stage B (co-PIs) read-only resolve run in production 2026-10-20 (current hash `05b61fa0`); group approvals with the owner and individual checks with staff (2026-10-21); staff answers returned and owner-reviewed, resolve re-run `77fa82fc`, all approvals given (2026-10-23); read-back and apply not built.** Owner: Justin Gallivan.
 
 ## 1. Goal and decisions
 
@@ -110,7 +110,9 @@ Codex adversarial review (gpt-6-astra, 2026-10-20, base `45e8b4ead`) returned ne
 - Resolve re-run, 2026-10-23 [VERIFIED via owner-run resolve, hash `77fa82fc`, 4 new searches, 122 cached; local diff against `05b61fa0`]: 231 rows (was 227). New: the 5 second-PI co-PIs, all `ready` (4 new contacts; Kono matched by email). 1000954 (Winn) moved from `is-pi` to `ready` after the staff PI fix. Billinge's contact-level row is gone (staff set his account). All 85 Part 1–4 staff keys resolve in the new run. Billinge's Institution at Award on 1001565 changed from Columbia (proposal email domain) to UCSB (his updated contact account); owner, 2026-10-23: he applied from Columbia but was at UCSB at award, so UCSB is correct. Approval workbook `research-copi-confirm-v3.xlsx` (stage-b-2 folder), built from `77fa82fc` with the first-round answers carried over (47): of its 62 checks, 58 are covered by the staff answers and the decisions above, and the owner answered the other 4 — Bao (994359) Stanford and Ferguson (995123) UC San Diego as new-contact accounts, Winn (1000954) Princeton; He (995677) is at NYU Grossman School of Medicine, which has no account (owner-run probe: no account name contains "Grossman", "NYU" or "Langone"), so her new contact's account stays empty while her Institution at Award stays New York University.
 - Part 5 merges and a direct account change (1001565) altered Dynamics after `05b61fa0`; the resolve must be re-run (with `--approve-extracted-pi`) before any apply, and keys built from contact ids are checked against the merges.
 
-Still open before any apply: the owner's group approvals, the account-name probe for typed institutions, the resolve re-run, an apply/verify/rollback build with delete-based rollback for created contacts and junction rows (own ledger kinds), what email a new contact carries (the proposal-era address may be out of date), Codex adversarial review, and Connor's confirmation of the 2024 split (§4).
+Owner approved all five groups in `research-copi-confirm-v3.xlsx` on 2026-10-23 (recorded 47, existing-strong 16, new-strong 65, contact web-agrees 3, contact web-silent 27).
+
+Still open before any apply: a read-back that merges the v3 approvals, the staff answers and the owner decisions above into one approved list for `77fa82fc`, an apply/verify/rollback build with delete-based rollback for created contacts and junction rows (own ledger kinds), what email a new contact carries (the proposal-era address may be out of date), Codex adversarial review, and Connor's confirmation of the 2024 split (§4).
 
 Standing constraints (unchanged): creating contacts or junction rows happens only after owner approval of those rows. A contact's current account (`parentcustomerid`) is filled only when it is empty. An existing current account is never overwritten: award-era evidence can be older than what the contact already holds.
 
