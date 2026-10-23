@@ -4,17 +4,21 @@
  * contacts (plan docs/plans/RESEARCH_INSTITUTION_AT_AWARD_BACKFILL_PLAN_2026-10-20.md §3.2).
  * Their only address is the proposal-era one, which may be years old.
  *
- * Runs the Reviewer Finder's ContactEnrichmentService with FREE tiers only
- * (owner, 2026-10-23): affiliation-embedded email, PubMed, ORCID, the structured
- * NCBI + Europe PMC tier, OpenAlex and resolved institution pages. Claude and
- * SerpAPI tiers stay off and no paid keys are passed. persist:false and the
- * legacy identity mode keep it write-free: no Dataverse, no Postgres. Reads
- * only files in --dir and --staff.
+ * Runs the Reviewer Finder's ContactEnrichmentService with FREE tiers by
+ * default (owner, 2026-10-23): affiliation-embedded email, PubMed, ORCID, the
+ * structured NCBI + Europe PMC tier, OpenAlex and resolved institution pages;
+ * no paid keys are passed. --paid (owner-authorized 2026-10-23: Claude Haiku web
+ * search and SerpAPI) re-runs only the rows the free pass left on an
+ * unconfirmed proposal address, with a hard --max-usd cap (default 5) charged
+ * at the COSTS constants before each person. persist:false and the legacy
+ * identity mode keep it write-free: no Dataverse, no Postgres. Reads only
+ * files in --dir and --staff.
  *
  *   node scripts/lookup-research-copi-current-emails.mjs --dir=<stage-b-2 folder> \
- *     --staff=<returned staff workbook> [--limit=N]
+ *     --staff=<returned staff workbook> [--limit=N] [--paid [--max-usd=5]]
  *
- * Writes research-copi-current-emails.csv to --dir (names; keep it out of git).
+ * Writes research-copi-current-emails.csv (or, with --paid,
+ * research-copi-current-emails-paid.csv) to --dir (names; keep it out of git).
  * Email choice per row: a staff-supplied address, else a found address the
  * service rates `ready`, else the proposal address; a found address that
  * differs from the choice and is not `ready` is flagged for owner review.
@@ -38,8 +42,11 @@ const arg = (name) => process.argv.find((a) => a.startsWith(`--${name}=`))?.spli
 const DIR = arg('dir');
 const STAFF = arg('staff');
 const LIMIT = Number(arg('limit') || 0);
+const PAID = process.argv.includes('--paid');
+const MAX_USD = Number(arg('max-usd') || 5);
+if (PAID && !(MAX_USD > 0)) { console.error('--max-usd must be a positive number'); process.exit(2); }
 if (!DIR || !STAFF) { console.error('--dir=<folder with the resolve output> and --staff=<staff workbook> are required'); process.exit(2); }
-const OUT = path.join(DIR, 'research-copi-current-emails.csv');
+const OUT = path.join(DIR, PAID ? 'research-copi-current-emails-paid.csv' : 'research-copi-current-emails.csv');
 const repoAbs = path.resolve('.');
 if (path.resolve(OUT).startsWith(`${repoAbs}${path.sep}`)) { console.error('The CSV holds names: write it outside the repository.'); process.exit(2); }
 
@@ -80,19 +87,35 @@ for (const r of await sheetRows(STAFF, 1, 5)) {
   if (found.length === 1) staffEmail.set(key, found[0]);
 }
 
-const targets = lines.filter((x) => x.cohort === 'extracted' && (x.contactMatch === 'new-contact' || staffNew.has(x.key)));
+let targets = lines.filter((x) => x.cohort === 'extracted' && (x.contactMatch === 'new-contact' || staffNew.has(x.key)));
+if (PAID) {
+  // Only the rows the free pass left on a proposal address with no evidence.
+  const free = fs.readFileSync(path.join(DIR, 'research-copi-current-emails.csv'), 'utf8').trim().split('\n').slice(1)
+    .map((l) => [...l.matchAll(/"((?:[^"]|"")*)"/g)].map((m) => m[1].replace(/""/g, '"')));
+  const unconfirmed = new Set(free.filter((c) => c[13] === 'proposal' && !c[7]).map((c) => c[0]));
+  targets = targets.filter((x) => unconfirmed.has(x.key));
+}
 const work = LIMIT ? targets.slice(0, LIMIT) : targets;
 console.log(`New-contact co-PIs: ${targets.length} (${staffNew.size} from staff "New person"); looking up ${work.length}. Staff-supplied addresses: ${[...staffEmail.keys()].filter((k) => targets.some((x) => x.key === k)).length}.`);
 
 const { ContactEnrichmentService } = (await import('../lib/services/contact-enrichment-service.js')).default
   ?? await import('../lib/services/contact-enrichment-service.js');
 const credentials = { orcidClientId: process.env.ORCID_CLIENT_ID, orcidClientSecret: process.env.ORCID_CLIENT_SECRET };
+if (PAID) Object.assign(credentials, { claudeApiKey: process.env.CLAUDE_API_KEY, serpApiKey: process.env.SERP_API_KEY });
+if (PAID && (!credentials.claudeApiKey || !credentials.serpApiKey)) { console.error('CLAUDE_API_KEY and SERP_API_KEY are required for --paid'); process.exit(2); }
+// Resolves the 'haiku' tier key (contact-enrichment's model) to a live model id.
+if (PAID) await (await import('../lib/services/model-override-loader.js')).loadModelOverrides();
+// Worst case per person: one Claude web search, the SerpAPI contact search
+// (up to 3 queries) and one eligibility query.
+const PER_PERSON_USD = ContactEnrichmentService.COSTS.CLAUDE_WEB_SEARCH + 4 * ContactEnrichmentService.COSTS.SERP_GOOGLE_SEARCH;
+let spent = 0;
 
 const csv = (v) => `"${String(v ?? '').replace(/"/g, '""')}"`;
 const cols = ['key', 'request', 'year', 'person', 'searchAffiliation', 'proposalEmail', 'staffEmail', 'foundEmail', 'foundSource', 'foundAction', 'foundReason', 'foundYear', 'chosenEmail', 'chosenFrom', 'review'];
 const out = [cols.join(',')];
 const tally = {};
 for (const [i, x] of work.entries()) {
+  if (PAID && spent + PER_PERSON_USD > MAX_USD) { console.log(`Stopping: the next person could exceed the $${MAX_USD} cap ($${spent.toFixed(3)} charged).`); break; }
   const r = review.get(x.key) || {};
   const name = r.Person;
   const proposalEmail = (r['Proposal email'] || '').toLowerCase();
@@ -100,9 +123,14 @@ for (const [i, x] of work.entries()) {
   let ce = {};
   try {
     const res = await ContactEnrichmentService.enrichCandidate({ name, affiliation }, {
-      credentials, usePubmed: true, useOrcid: true, useClaudeSearch: false, useSerpSearch: false, persist: false,
+      credentials, usePubmed: true, useOrcid: true, useClaudeSearch: PAID, useSerpSearch: PAID, persist: false,
     });
     ce = res.contactEnrichment || {};
+    if (PAID) {
+      const used = ce.tiersUsed || [];
+      spent += (used.includes('claude_search') ? ContactEnrichmentService.COSTS.CLAUDE_WEB_SEARCH : 0)
+        + (used.some((t) => /serp|eligibility/.test(t)) ? 4 * ContactEnrichmentService.COSTS.SERP_GOOGLE_SEARCH : 0);
+    }
   } catch (err) {
     ce = { emailAction: 'error', emailActionReason: err.message };
   }
@@ -119,4 +147,5 @@ for (const [i, x] of work.entries()) {
 }
 fs.writeFileSync(OUT, `${out.join('\n')}\n`);
 console.log(`Chosen from: ${JSON.stringify(tally)}`);
+if (PAID) console.log(`Charged at cost constants: $${spent.toFixed(3)} of $${MAX_USD}`);
 console.log(`Wrote ${OUT}`);
