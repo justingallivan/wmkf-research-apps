@@ -142,7 +142,7 @@ describe('reviewer rehearsal launcher boundaries', () => {
   });
 
   test('requires an existing non-symlink browser cache and resolves only within it', () => {
-    const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'reviewer-browser-cache-test-'));
+    const tempRoot = fs.mkdtempSync(path.join(fs.realpathSync(os.tmpdir()), 'reviewer-browser-cache-test-'));
     const cache = path.join(tempRoot, 'cache');
     fs.mkdirSync(cache);
     const executable = path.join(cache, 'chrome');
@@ -201,7 +201,7 @@ describe('reviewer rehearsal launcher boundaries', () => {
   });
 
   test('selects the real Playwright module cache before importing its registry', async () => {
-    const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'playwright-cache-registry-test-'));
+    const tempRoot = fs.mkdtempSync(path.join(fs.realpathSync(os.tmpdir()), 'playwright-cache-registry-test-'));
     const cache = path.join(tempRoot, 'playwright-real-module-cache');
     fs.mkdirSync(cache);
     const result = await runNode(`
