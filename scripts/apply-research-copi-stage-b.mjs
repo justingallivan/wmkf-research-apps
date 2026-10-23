@@ -263,13 +263,17 @@ async function runPlan() {
       ops.push({ op: 'contact-account-set', id: contactId, value: guid(w.accountId, 'contact account'), source: { key: w.keys.join(' ') } });
     }
     if (rossUpdate) {
+      // Same normalization as the apply-side contactState ('' for empty), so an unchanged contact compares equal.
+      const n = (v) => lc(v) || '';
       const b = rossUpdate.before;
-      ops.push({
-        op: 'contact-update', id: rossUpdate.contactId,
-        before: { emailaddress1: lc(b.emailaddress1), emailaddress2: lc(b.emailaddress2), parentcustomerid: lc(b._parentcustomerid_value) },
-        after: { emailaddress1: rossUpdate.email, emailaddress2: lc(b.emailaddress2) || lc(b.emailaddress1), parentcustomerid: rossUpdate.accountId },
-        source: { key: rossKey },
-      });
+      const before = { emailaddress1: n(b.emailaddress1), emailaddress2: n(b.emailaddress2), parentcustomerid: n(b._parentcustomerid_value) };
+      const after = {
+        emailaddress1: rossUpdate.email,
+        emailaddress2: before.emailaddress1 === rossUpdate.email ? before.emailaddress2 : before.emailaddress2 || before.emailaddress1,
+        parentcustomerid: rossUpdate.accountId,
+      };
+      if (JSON.stringify(before) === JSON.stringify(after)) held.push({ key: rossKey, requestNum: '', reason: 'contact update: already in the target state' });
+      else ops.push({ op: 'contact-update', id: rossUpdate.contactId, before, after, source: { key: rossKey } });
     }
   });
 
