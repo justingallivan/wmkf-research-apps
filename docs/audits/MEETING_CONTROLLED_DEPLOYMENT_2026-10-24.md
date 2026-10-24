@@ -5,11 +5,13 @@
 ## Deployment and cohort
 
 - Production: [applications.wmkeck.org](https://applications.wmkeck.org).
-- Corrected deployment: `dpl_HEMqCQUMDTBaHkaui8QkWxsscqcq`, Ready/promoted, [immutable deployment](https://wmkfresearchapps-38md2x7dy-justin-gallivans-projects.vercel.app), commit `6f418b54e67215a2148ecb1512c5d2d22e7ead59`.
+- Initial test-mock correction deployment: `dpl_HEMqCQUMDTBaHkaui8QkWxsscqcq`, Ready/promoted, [immutable deployment](https://wmkfresearchapps-38md2x7dy-justin-gallivans-projects.vercel.app), commit `6f418b54e67215a2148ecb1512c5d2d22e7ead59`.
+- Final test-contract follow-up: `1c30f9b2af006a655e3cc943b667d67ee6a2fc74`, deployment `dpl_21TWsMEkVDeBSNhHQ8HLzNvG1vZc`, Ready/promoted, [immutable deployment](https://wmkfresearchapps-59k8goanp-justin-gallivans-projects.vercel.app). Follow-ups after `d54b8b008` change tests, operator probes and documentation only.
 - Initial identical-runtime deployment: `dpl_8aJeL3RS5KwsNi6r3jSehviGqwco`, Ready; runtime `d54b8b0086a12c0436ef59a9d665370288f435ea`.
 - Dedicated test request **1003371**, `185415ef-3750-4806-84c7-fb6dd032af31`.
 - `MEETING_MATERIAL_PREPARATION_ACCESS`, `MEETING_MANUAL_VIDEO_PAIRING_ACCESS`, `MEETING_PRESENTATION_INVITATION_ACCESS` are each exactly `test:185415ef-3750-4806-84c7-fb6dd032af31`, verified by production readback. Broader activation remains held.
 - First enrollment into retained approval also checks the preparation cohort before writing. Existing enrolled reader/withdrawal behavior remains independent of new enrollment admission. Existing transcription, split and materials-reader access settings were preserved; no existing request was enrolled by this release.
+- The configured Coordinator resolves to one active mapped Production profile (read-only identity check); no role or profile reassignment was needed.
 - `DYNAMICS_IMPERSONATION_ENABLED=true`, `TEST_REQUEST_ISOLATION=on` and `DATAVERSE_TARGET_INTERLOCK=on` were read back, not weakened. No rehearsal signing secret or operator fetch fence was deployed.
 
 ## Production migration evidence
@@ -26,7 +28,7 @@ Physical readback verified all six new tables, summary ownership/acknowledgement
 
 [VERIFIED via final exact-fixture probe] The request is still test-marked, has no applicant/payee/primary-contact/recommender/payment-contact bindings, both reminder flags remain false, and regarding-email query returned zero rows. This deployment ran no send action or new media/provider job and edited no existing business record. Existing authentication bookkeeping is normal application behavior, not fixture business data.
 
-Validation: integrated focused unit tests **12 suites / 126 tests passed**; the corrected visit-editor suite **18 tests passed**; full local lint **zero errors**; types, migration manifest, agent invariants, DAL gate/self-test and secret-scan gate/self-test passed. Initial CI stopped at the test mock's hook naming error; the corrected follow-up addresses only that error. Final hosted CI outcome is recorded below when complete.
+Validation: integrated focused unit tests **12 suites / 126 tests passed**; the corrected visit-editor suite **18 tests passed**; full local lint **zero errors**; types, migration manifest, agent invariants, DAL gate/self-test and secret-scan gate/self-test passed. Initial CI stopped at the test mock's hook naming error; the corrected follow-up addresses only that error. The full hosted run initially exposed eleven stale suites (Coordinator fixtures, deliberately removed acknowledgement, sender/cron censuses and newly reachable SDK seams); their expectations/mocks were reconciled without changing runtime contracts. All eleven repaired suites passed locally (229 tests). Final hosted Tests run `40109453185` passed: **1,455 suites / 25,059 tests**, five snapshots; 22 suites / 276 tests skipped under the existing CI configuration. Separate PostgreSQL job passed 10 suites / 130 tests. Playwright, Semgrep, Trivy, Gitleaks and Python/Actions CodeQL checks passed. JavaScript CodeQL remains pending at this checkpoint.
 
 ## Rollback and next boundary
 
@@ -35,3 +37,5 @@ Pre-release known-good deployment: `dpl_6YiRQ5YR8p57au1HLEvQixfUrrdr` (main `85e
 No ordinary-traffic activation is performed. Real mail and a fresh genuine Zoom/ASR run were not part of these production smoke checks. Keep the cohort limited while observing the dedicated request; a successful smoke check is not evidence of a new end-to-end Coordinator production run.
 
 Contract-reconcile Mode B: release entry → canonical migrations → physical constraints → request-scoped admission → authenticated routes → existing artifact readers → scheduled worker checked; partial processing and retained-edition semantics rely on the separately recorded bounded rehearsal. Sweep scope: current Atlas pages, release checklist, implementation checkpoint, handoff and this receipt. Dated planning/review receipts remain historical.
+
+Current verdict: **controlled deployment and production functional checks passed; access remains limited to the dedicated request**. Full hosted tests are green. The outstanding JavaScript CodeQL run is not represented as a pass; no broader activation follows from this receipt.
