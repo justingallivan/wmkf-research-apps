@@ -18,7 +18,7 @@ jest.mock('../../shared/components/meeting-tracker/RecordingAndTranscriptCard', 
 }));
 
 jest.mock('../../shared/components/meeting-tracker/PresentationInvitationPanel',()=>{
- const React=require('react');return {__esModule:true,default:()=>{const [text,setText]=React.useState('');return <label>Unsent invitation<input value={text} onChange={e=>setText(e.target.value)}/></label>;}};
+ const React=require('react');return {__esModule:true,default:function MockPresentationInvitationPanel(){const [text,setText]=React.useState('');return <label>Unsent invitation<input value={text} onChange={e=>setText(e.target.value)}/></label>;}};
 });
 
 const REQUEST_ID = '11111111-1111-4111-8111-111111111111';
