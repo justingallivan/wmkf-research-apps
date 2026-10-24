@@ -84,8 +84,10 @@ recorded owner boundaries, not newly verified actionable tasks:
   handoff above, not selected or promoted into current tasks.
 - Meeting coordination supersedes its historical parked boundary: owner authorized
   implementation and bounded hosted rehearsal on `codex/session-start-20261023`.
-  Source candidate `f96529e0d` is built; production promotion is not authorized.
-  Hosted rehearsal is partial because sandbox synthetic request creation failed.
+  Runtime candidate `1f99d7635` passed the isolated cloud and owner-authorized
+  dedicated production-fixture rehearsal; ready for controlled deployment.
+  Zero emails; no existing business records changed; reader links revoked and
+  owned compute cleaned. Production deployment/migrations remain unauthorized.
   `docs/plans/MEETING_COORDINATION_RELEASE_CHECKLIST_2026-10-23.md` and
   `docs/audits/MEETING_HOSTED_REHEARSAL_2026-10-23.md` own the current evidence.
 - J27 / overlapping cycles: proposed; calendar authority, backup/escalation,

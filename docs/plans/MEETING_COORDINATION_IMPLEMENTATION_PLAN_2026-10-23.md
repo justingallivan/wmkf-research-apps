@@ -3,7 +3,7 @@ title: Meeting Coordination Implementation Plan
 domain: product
 kind: plan
 status: in-progress
-summary: Staged implementation of the Workbench-first meeting design, durable preparation and Program Coordinator approval of versioned Board materials; approval and durable-preparation increments branch-built; remaining workflow slices planned, not deployed.
+summary: Staged implementation of the Workbench-first meeting design, durable preparation and Program Coordinator approval of versioned Board materials; workflow branch-built and bounded rehearsal passed; ready for controlled deployment, not deployed.
 canonical: false
 owner: product-engineering
 related:
@@ -35,7 +35,7 @@ Scope includes cycle/session navigation, meeting setup and agenda controls, invi
 
 [VERIFIED via source, focused service/route/UI tests and actual PostgreSQL] The research-presentation invitation now has its own frozen-email ledger and strict preview/send/read-only-reconcile route (migration 088, not applied to Production). Exact email proof, leases, original-sender dispatch and unresolved transport fences survive content expiry. Visit and session task navigation separates setup/agenda, invitations, materials collection and transcript preparation as appropriate; active upload/progress state and existing deep links are retained. Opus review fixes, actual PostgreSQL recovery tests, build and synthetic browser validation are recorded in the invitation review receipt.
 
-[VERIFIED via branch source, isolated PostgreSQL, fresh-install replay and synthetic media tests] Rare manual original-audio/MP4 pairing now feeds the existing split worker, with durable correspondence proof, source-pinned reuse, explicit review replacement and exact-path cleanup (migration 089, not applied to Production). Opus reviewed the product increment; its verified upload and recovery findings are corrected. [PLANNED] Hosted rollout rehearsal, live integration checks and owner promotion remain. The combined workflow remains unreleased; slices 1–3 retain the integrated release requirement below. Opus product-review findings and final verification belong in the implementation receipts, separately from the historical plan review.
+[VERIFIED via branch source, isolated PostgreSQL, fresh-install replay and synthetic media tests] Rare manual original-audio/MP4 pairing now feeds the existing split worker, with durable correspondence proof, source-pinned reuse, explicit review replacement and exact-path cleanup (migration 089, not applied to Production). Opus reviewed the product increment; its verified upload and recovery findings are corrected. [VERIFIED via bounded rehearsal receipts] Isolated cloud tests and the owner-authorized dedicated production-fixture workflow passed, including retained approved bytes, replacement and withdrawal through both external readers. Runtime candidate `1f99d7635` is ready for controlled deployment; see [current evidence and limits](../audits/MEETING_HOSTED_REHEARSAL_2026-10-23.md). [PLANNED] Production migrations, deployment and owner promotion remain. The combined workflow remains unreleased; slices 1–3 retain the integrated release requirement below. Opus product-review findings and final verification belong in the implementation receipts, separately from the historical plan review.
 
 ## Settled product requirements
 

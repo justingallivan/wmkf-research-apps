@@ -1,0 +1,53 @@
+{
+  "runtimeCandidate": "1f99d7635",
+  "dateLocal": "2026-10-23 America/Los_Angeles",
+  "scope": "Owned synthetic production fixture plus isolated DB/Blob; loopback candidate, no production application deployment",
+  "passed": true,
+  "checks": [
+    "while correction is drafted: both readers retain exact old approved members/bytes",
+    "after new candidate publication, before approval: both readers retain exact old approved members/bytes",
+    "replacement approval switches both readers to reviewed new summary bytes",
+    "immediate withdrawal removes presentation members and direct opens from both readers",
+    "neither stale version nor replayed command at a fresh version can revive withdrawn edition"
+  ],
+  "finalSafety": {
+    "requestId": "185415ef-3750-4806-84c7-fb6dd032af31",
+    "requestMarkerVerified": true,
+    "nullBusinessBindings": [
+      "_wmkf_paymentcontact_value",
+      "_akoya_payee_value",
+      "_akoya_gofundrecommender_value",
+      "_akoya_primarycontactid_value",
+      "_akoya_applicantid_value"
+    ],
+    "regardingEmails": 0,
+    "splits": [
+      {
+        "id": "548259d4-e815-4f32-a7af-5b357831bb1d",
+        "state": "failed",
+        "sandbox_name": "s4-548259d4-e815-4f32-a7af-5b357831bb1d",
+        "sandbox_created_at": null,
+        "sandbox_cleaned_at": "2026-10-24T04:50:25.502Z",
+        "sandbox_active_cpu_ms": null,
+        "sandbox_provisioned_ms": null,
+        "sandbox_vcpus": null
+      },
+      {
+        "id": "2987497c-1de1-46b7-8779-7030f5a34e65",
+        "state": "approved",
+        "sandbox_name": "s4-2987497c-1de1-46b7-8779-7030f5a34e65",
+        "sandbox_created_at": "2026-10-24T04:50:36.748Z",
+        "sandbox_cleaned_at": "2026-10-24T05:02:11.489Z",
+        "sandbox_active_cpu_ms": "19658",
+        "sandbox_provisioned_ms": "600198",
+        "sandbox_vcpus": 2
+      }
+    ],
+    "verifiedAt": "2026-10-24T05:15:12.247Z"
+  },
+  "readerLinksRevoked": true,
+  "localCandidateStopped": true,
+  "productionPrimaryDatabaseChanged": false,
+  "productionApplicationDeployed": false,
+  "evidence": "Detailed protected machine-local receipts indexed by MEETING_HOSTED_REHEARSAL_2026-10-23.md"
+}
