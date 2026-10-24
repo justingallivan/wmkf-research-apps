@@ -17,6 +17,7 @@ import { REQUEST_DOCUMENT_ARTIFACT_TYPE } from '../../config/requestDocument';
 import { PAIRED_SUMMARY_ACKNOWLEDGMENT, SUMMARY_TEXT_MAX_CHARS } from '../../config/transcriptSummary';
 import { Button } from '../Layout';
 import ArtifactRow from './ArtifactRow';
+import ManualVideoPairPanel from './ManualVideoPairPanel';
 import PresentationVideoPlayer from '../PresentationVideoPlayer';
 import OverflowMenu from '../workbench/OverflowMenu';
 import { formatTranscriptTurnTime, getTranscriptSpeakers, groupTranscriptByTurn } from '../../../lib/services/transcription-pilot/transcript-format';
@@ -3230,6 +3231,13 @@ const PV_SERVER_LIST_LIMIT = 10;
 const PV_PROCESSING = new Set(['queued', 'cutting', 'uploading', 'registering']);
 const PV_STALE_TEXT = 'The transcript or video changed. Create it again.';
 const PV_FAILURE_TEXT = Object.freeze({
+  manual_video_audio_mismatch:'The audio does not exactly match the transcript source and MP4. Choose the original unconverted audio and matching recording, or import from Zoom.',
+  manual_video_timeline_mismatch:'The original audio and MP4 do not share a zero-start timeline. Use matching original files or import from Zoom.',
+  manual_video_decode_failed:'The original audio could not be compared with this MP4. Check both files before trying another pairing.',
+  manual_video_proof_invalid:'The audio/video comparison receipt could not be verified. Check the source before trying another pairing.',
+  manual_video_audio_missing:'The original audio upload is missing. Upload the original file again before creating the video.',
+  manual_video_audio_unavailable:'The original audio could not be read. Resume the saved pairing to retry this video only.',
+  manual_video_audio_deadline:'Audio verification ran out of time before video processing started. Resume the saved pairing to retry.',
   unsupported_timeline: 'This recording’s timing can’t be cut safely (it has gaps or shifted tracks).',
   insufficient_scratch: 'The recording was too large to cut. Ask for help if this keeps happening.',
   source_download_failed: 'The recording could not be downloaded to cut it. Try again.',
@@ -3255,6 +3263,7 @@ function usePresentationVideo(requestId, { enabled = true, revisionKey = '', ref
   const path = `${API_PATH}/${encodeURIComponent(requestId || '')}/presentation-video-splits`;
   const [available, setAvailable] = useState(false);
   const [splits, setSplits] = useState([]);
+  const [manualPairAvailable,setManualPairAvailable]=useState(false);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState(null);
   // { kind: 'approve' | 'recreate', splitId } — bound to the video it was opened for, so a refresh that brings in a
@@ -3284,6 +3293,7 @@ function usePresentationVideo(requestId, { enabled = true, revisionKey = '', ref
           .sort((a, b) => String(b.createdAt || '').localeCompare(String(a.createdAt || ''))) : [];
       setAvailable(body?.available === true && Array.isArray(body.splits));
       setSplits(rows);
+      setManualPairAvailable(body?.manualPairAvailable===true);
       setLoaded(true);
       setLoadFailed(false);
       setLoadedKey(revisionKey);
@@ -3335,7 +3345,7 @@ function usePresentationVideo(requestId, { enabled = true, revisionKey = '', ref
       if (mountedRef.current) setBusy(false);
     }
   };
-  const create = () => post({ action: 'start' }, 'The presentation video could not be started. Try again.');
+  const create = (confirmedReviewId) => post({ action: 'start', ...(manualPairAvailable ? {expectedReviewId:newest?.state==='review' ? (confirmedReviewId || newest.id) : null} : {}) }, 'The presentation video could not be started. Try again.');
   const approve = (splitId) => post({ action: 'approve', splitId }, 'The video could not be approved. Try again.');
   const newestState = newest?.state || null;
   const confirmTargetLive = Boolean(confirming) && confirming.splitId === (newest?.id || null)
@@ -3343,7 +3353,7 @@ function usePresentationVideo(requestId, { enabled = true, revisionKey = '', ref
       : newestState === 'review' || (newestState === 'approved' && newest?.boardReady !== false));
   // A stale confirmation is never rendered (it shows only while it matches the newest video in a confirmable state).
   return {
-    path, available, newest, processing, busy, message, confirming, setConfirming, loaded, loadFailed,
+    path, available, manualPairAvailable, newest, processing, busy, message, confirming, setConfirming, loaded, loadFailed,
     load, create, approve, confirmTargetLive,
     // True only while the shown status was read successfully for the current transcript revision.
     statusCurrent: loaded && !loadFailed && loadedKey === revisionKey,
@@ -3353,7 +3363,7 @@ function usePresentationVideo(requestId, { enabled = true, revisionKey = '', ref
 
 function PresentationVideoLine({ v }) {
   const {
-    path, available, newest, processing, busy, message, confirming, setConfirming, loaded, loadFailed,
+    path, available, manualPairAvailable, newest, processing, busy, message, confirming, setConfirming, loaded, loadFailed,
     load, create, approve, confirmTargetLive,
   } = v;
   // The player is open only for the video it was opened on, so a new newest video starts collapsed.
@@ -3406,6 +3416,7 @@ function PresentationVideoLine({ v }) {
           <PresentationVideoPlayer key={newest.id} size="compact" label="Watch the presentation video" srcFor={(attempt) => `${openHref}?attempt=${attempt}`} />
         </div>
       )}
+      {manualPairAvailable && !processing && <ManualVideoPairPanel key={path} path={path} expectedReviewId={state==='review'?newest.id:null} onQueued={load} />}
       <div aria-live="polite">
         {loadFailed && <p className="mt-1 text-xs text-gray-700">Couldn’t refresh the video status. Retrying…</p>}
         {boardStale && <p className="mt-1 text-sm text-gray-700">{PV_STALE_TEXT}</p>}
@@ -3425,7 +3436,7 @@ function PresentationVideoLine({ v }) {
         <div className="mt-2 rounded border border-amber-200 bg-amber-50 p-3 text-sm text-amber-950" role="alertdialog" aria-label="Create the presentation video again">
           <p>{state === 'review' ? 'This discards the video waiting for your check and makes a new one.' : 'This replaces the approved video once the new one is approved.'}</p>
           <div className="mt-2 flex gap-2">
-            <Button size="sm" variant="primary" type="button" onClick={() => void create()} disabled={busy}>Create again</Button>
+            <Button size="sm" variant="primary" type="button" onClick={() => void create(confirming.splitId)} disabled={busy}>Create again</Button>
             <Button size="sm" variant="outline" type="button" onClick={() => setConfirming(null)} disabled={busy}>Keep current video</Button>
           </div>
         </div>

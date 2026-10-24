@@ -86,6 +86,7 @@
     "085_board_writeup_runs.sql",
     "086_meeting_presentation_editions.sql",
     "087_meeting_material_preparations.sql",
-    "088_meeting_presentation_invitations.sql"
+    "088_meeting_presentation_invitations.sql",
+    "089_manual_presentation_video_pairs.sql"
   ]
 }

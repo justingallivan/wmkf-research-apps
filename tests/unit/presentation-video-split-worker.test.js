@@ -105,6 +105,7 @@ function world(over = {}) {
     log: line => w.logs.push(line),
     recordEvent: event => { w.events.push(event); return Promise.resolve(); },
     access: () => w.access,
+    cleanupManualAudio:async()=>({cleaned:0}),
     requestAllowed: () => true,
     config: () => ({ sandboxTimeoutMs: 10_800_000, vcpus: 2, leaseSeconds: 600 }),
     envTag: () => 'test',
@@ -561,3 +562,17 @@ describe('config', () => {
     expect(warn).toHaveBeenCalledTimes(2);
   });
 });
+
+function manualWorld(state='attached'){
+ const w=world();const pair={id:COPY,request_id:REQ,state,source_id:REV,audio_sha256:'a'.repeat(64),audio_bytes:10,recording_id:ID,drive_id:'drv',item_id:'itm',video_size:1000,video_quickxor_hash:'qx'};
+ w.row.source_copy_id=null;w.row.manual_pairing_id=COPY;w.row.source_document_id=ID;w.row.lineage={provenance:{sourceId:REV,audioSha256:pair.audio_sha256}};
+ w.deps.manualPairAllowed=()=>true;w.deps.manualPairs={get:jest.fn(async()=>({...pair})),verify:jest.fn(async()=>{pair.state='verified';return {...pair};})};w.deps.readManualVideoAudio=jest.fn(async()=>Buffer.from('original'));
+ return w;
+}
+test('manual cut receives verified original bytes and no broad Blob token in its environment',async()=>{const w=manualWorld();expect((await w.tick()).outcome).toBe('cut_started');expect(w.deps.readManualVideoAudio).toHaveBeenCalledTimes(1);expect(w.lastDetached.env).toMatchObject({MANUAL_AUDIO_PATH:'/vercel/sandbox/manual-audio',MANUAL_AUDIO_SHA256:'a'.repeat(64),MANUAL_AUDIO_BYTES:'10'});expect(Object.keys(w.lastDetached.env).some(k=>/TOKEN|SECRET/.test(k))).toBe(false);});
+test('manual proof must persist under the cutting lease before any output upload',async()=>{const w=manualWorld();await toCutting(w);w.files[`${WORK}/receipt.json`]=json({...GOOD_RECEIPT,manualPcmSha256:'b'.repeat(64),manualPcmSamples:16000});w.setCommand('cmd-1',0);expect((await w.tick()).outcome).toBe('upload_started');expect(w.deps.manualPairs.verify).toHaveBeenCalledWith(expect.objectContaining({manual_pairing_id:COPY}),expect.any(String),{sha256:'b'.repeat(64),samples:16000});});
+test('missing manual correspondence receipt fails before any output upload',async()=>{const w=manualWorld();await toCutting(w);w.files[`${WORK}/receipt.json`]=json(GOOD_RECEIPT);w.setCommand('cmd-1',0);await w.tick();expect(w.row).toMatchObject({state:'failed',failure_code:'manual_video_proof_invalid'});expect(w.filename).toBeUndefined();});
+test('verified unchanged source pair reuses proof without reading original audio again',async()=>{const w=manualWorld('verified');await toCutting(w);expect(w.deps.readManualVideoAudio).not.toHaveBeenCalled();expect(w.lastDetached.env.MANUAL_AUDIO_PATH).toBeUndefined();});
+test('manual access off supersedes pending processing while retaining cleanup ownership',async()=>{const w=manualWorld();w.deps.manualPairAllowed=()=>false;await w.tick();expect(w.row).toMatchObject({state:'superseded',failure_code:'manual_video_pair_access_off'});expect(w.created).toHaveLength(0);});
+
+test('wrong original bytes fail before creating or naming a paid Sandbox',async()=>{const w=manualWorld();w.deps.readManualVideoAudio.mockRejectedValue(Object.assign(new Error('Wrong original'),{code:'manual_video_audio_mismatch'}));await w.tick();expect(w.row).toMatchObject({state:'failed',failure_code:'manual_video_audio_mismatch',sandbox_name:null});expect(w.created).toHaveLength(0);});

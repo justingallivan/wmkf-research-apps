@@ -13,6 +13,11 @@ jest.mock('../../lib/services/post-presentation-materials/material-service.js', 
   _internal: { assertFeature: jest.fn() },
 }));
 
+jest.mock('../../lib/services/meeting-tracker-recordings/manual-video-pair-service.js',()=>({
+ ...jest.requireActual('../../lib/services/meeting-tracker-recordings/manual-video-pair-service.js'),
+ loadManualVideoPairContext:jest.fn(),MANUAL_PAIR_DEPENDENCIES:{store:{findVerified:jest.fn(),get:jest.fn()}},
+}));
+
 import { bindPresentationVideo } from '../../lib/services/post-presentation-materials/presentation-video-binding.js';
 import { resolveCurrentMeetingTranscriptSource } from '../../lib/services/meeting-tracker-transcription/service.js';
 import * as store from '../../lib/services/meeting-tracker-recordings/presentation-video-split-store.js';
@@ -126,7 +131,7 @@ describe('startPresentationVideoSplit: refusals', () => {
   });
 
   test.each([
-    ['an upload source', () => resolveCurrentMeetingTranscriptSource.mockResolvedValue(resolved({ status: 'upload' })), 'presentation_video_source_not_zoom'],
+    ['an upload source', () => resolveCurrentMeetingTranscriptSource.mockResolvedValue(resolved({ status: 'upload' })), 'manual_video_pair_required'],
     ['an invalid source', () => resolveCurrentMeetingTranscriptSource.mockResolvedValue({ status: 'invalid', provenance: null }), 'presentation_video_source_not_zoom'],
     ['two audio files', () => resolveCurrentMeetingTranscriptSource.mockResolvedValue(resolved({ provenance: provenance({ audioOnlyFileCount: 2 }) })), 'presentation_video_audio_ambiguous'],
     ['no boundary', () => resolveCurrentMeetingTranscriptSource.mockResolvedValue(resolved({ presentationEnd: null })), 'presentation_video_boundary_required'],
@@ -150,13 +155,13 @@ describe('startPresentationVideoSplit: refusals', () => {
   });
 
   test.each([
-    ['upload', resolved({ status: 'upload' }), /was uploaded.*Earlier runs/],
-    ['legacy_unknown', { status: 'legacy_unknown', provenance: null }, /Zoom source wasn't recorded.*Import the recording from Zoom again/],
-    ['invalid', { status: 'invalid', provenance: null }, /Zoom source wasn't recorded.*Import the recording from Zoom again/],
+    ['upload', resolved({ status: 'upload' }), /matching original audio/],
+    ['legacy_unknown', { status: 'legacy_unknown', provenance: null }, /Import the recording from Zoom/],
+    ['invalid', { status: 'invalid', provenance: null }, /Import the recording from Zoom/],
   ])('a %s source names its next step', async (_status, value, message) => {
     resolveCurrentMeetingTranscriptSource.mockResolvedValue(value);
     const error = await rejection(startPresentationVideoSplit(args()));
-    expect(error).toMatchObject({ httpStatus: 422, code: 'presentation_video_source_not_zoom' });
+    expect(error).toMatchObject({ httpStatus: 422, code: _status === 'upload' ? 'manual_video_pair_required' : 'presentation_video_source_not_zoom' });
     expect(error.message).toMatch(message);
   });
 
@@ -302,4 +307,14 @@ describe('getPresentationVideoSplits', () => {
   test('rejects an invalid request id', async () => {
     expect(await rejection(getPresentationVideoSplits({ requestId: 'nope' }))).toMatchObject({ httpStatus: 400 });
   });
+});
+
+test('a verified unchanged manual pair queues through the existing split store with explicit replacement identity',async()=>{
+ const manual=await import('../../lib/services/meeting-tracker-recordings/manual-video-pair-service.js');const prior=process.env.MEETING_MANUAL_VIDEO_PAIRING_ACCESS;process.env.MEETING_MANUAL_VIDEO_PAIRING_ACCESS='on';
+ const p={...provenance(),kind:'upload',zoom:null};resolveCurrentMeetingTranscriptSource.mockResolvedValue(resolved({status:'upload',provenance:p}));
+ const current={sourceId:REV,audioSha256:p.audioSha256,audioBytes:p.audioBytes,audioDurationMs:p.audioDurationMs,recordingId:WINNER,driveId:'Drive',itemId:'Item',videoSize:555,videoQuickXorHash:'qx'};
+ const pair={id:COPY,state:'verified',source_id:REV,audio_sha256:p.audioSha256,audio_bytes:p.audioBytes,audio_duration_ms:p.audioDurationMs,recording_id:WINNER,drive_id:'Drive',item_id:'Item',video_size:555,video_quickxor_hash:'qx'};
+ manual.loadManualVideoPairContext.mockResolvedValue(current);manual.MANUAL_PAIR_DEPENDENCIES.store.findVerified.mockResolvedValue(pair);
+ try{expect(await startPresentationVideoSplit(args({expectedReviewId:SPLIT}))).toMatchObject({status:202,body:{split:{id:SPLIT,state:'queued'}}});expect(store.startPresentationVideoSplit).toHaveBeenCalledWith(expect.objectContaining({sourceCopyId:null,manualPairingId:COPY,expectedReviewId:SPLIT,lineage:expect.objectContaining({provenance:p})}));expect(store.findCopiedZoomVideoCopyForDocument).not.toHaveBeenCalled();}
+ finally{if(prior===undefined)delete process.env.MEETING_MANUAL_VIDEO_PAIRING_ACCESS;else process.env.MEETING_MANUAL_VIDEO_PAIRING_ACCESS=prior;}
 });

@@ -40,7 +40,7 @@ test('start runs lock, processing check, locked awaiting check, insert in one tr
   expect(texts[2]).toContain("state IN ('review', 'registering') FOR UPDATE");
   expect(texts[3]).toContain('INSERT INTO presentation_video_splits');
   expect(texts[3]).toContain("'queued'");
-  expect(calls[3].params).toEqual([ID, REQ, SITE, 7, COPY, REV, 1234, DOC, 'd', 'i', '3', 'e', 99, 'q', '{"version":1}']);
+  expect(calls[3].params).toEqual([ID, REQ, SITE, 7, COPY, REV, 1234, DOC, 'd', 'i', '3', 'e', 99, 'q', '{"version":1}', null]);
   expect(texts).toHaveLength(4);
 });
 

@@ -186,6 +186,7 @@ The presentation-video cut (`docs/plans/STAGE4_BUILD_PLAN_2026-10-10.md`) runs F
 
 | Variable | Purpose | Default / where to get it |
 |----------|---------|---------------------------|
+| `MEETING_MANUAL_VIDEO_PAIRING_ACCESS` | Manual original-audio/MP4 pairing admission, separate from existing Zoom splitting | Branch-built, not deployed; off by default. `on` or exact `test:<request GUID>`. Apply migration 089 before this code release. Private media uses existing `UPLOADS_BLOB_RW_TOKEN`; no new provider or credential. Cleanup continues when admission is off. |
 | `PRESENTATION_VIDEO_SPLIT_ACCESS` | Rollout flag: `off`, `on` or `test:<request GUID>`. Unset means off; any other value fails closed as off. | Production `on` (owner, 2026-10-11, Config); was `test:<1003222 GUID>` from 2026-10-10 |
 | `PRESENTATION_VIDEO_FFMPEG_BLOB_PATHNAME` | Pathname of the verified FFmpeg 9.0.2 tarball in the private uploads Blob store. The SHA-256 is pinned in code. | Set after the owner-approved one-time upload |
 | `PRESENTATION_VIDEO_SANDBOX_TIMEOUT_MS` | Sandbox timeout, which is also the per-job cost ceiling. | 10800000 (3 h). First real cut (2026-10-10) took 40 min on 2 vCPUs; lower to about 5400000 after a 4-vCPU run is measured |

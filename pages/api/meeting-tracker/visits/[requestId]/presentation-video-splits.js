@@ -4,13 +4,16 @@ import { withDalContext } from '../../../../../lib/dataverse/core/context.js';
 import { isGuid } from '../../../../../lib/utils/guid.js';
 import { ServiceHttpError } from '../../../../../lib/services/service-http-error.js';
 import {
-  getPresentationVideoSplits, startPresentationVideoSplit,
+  getPresentationVideoSplits, startPresentationVideoSplit, startManualPresentationVideoSplit,
 } from '../../../../../lib/services/meeting-tracker-recordings/presentation-video-split-service.js';
 import { approvePresentationVideoSplit } from '../../../../../lib/services/meeting-tracker-recordings/presentation-video-approval-service.js';
 
+import {manualVideoPairEnabled} from '../../../../../lib/services/meeting-tracker-recordings/manual-video-pair-policy.js';
+import {mintManualVideoAudio,getManualVideoPair} from '../../../../../lib/services/meeting-tracker-recordings/manual-video-pair-service.js';
+
 // Lists, starts and approves the Stage 4 presentation-video split. Start only queues the cut (the slice 3 cron does the
 // work). Approve registers the reviewed cut under the slot fence (Graph + Dataverse), so it gets the summary publish budget.
-export const config = { api: { bodyParser: { sizeLimit: '8kb' } }, maxDuration: 120 };
+export const config = { api: { bodyParser: { sizeLimit: '8kb' } }, maxDuration: 300 };
 function errorResponse(res, error) {
   const status = error instanceof ServiceHttpError ? error.httpStatus : Number(error?.httpStatus ?? error?.status) || 500;
   const code = error?.code || 'presentation_video_split_failed';
@@ -23,6 +26,10 @@ function exactKeys(body, keys) {
 // Returns the parsed command, or null when the body is not exactly a start or an approve.
 function parseBody(body) {
   if (!body || typeof body !== 'object' || Array.isArray(body)) return null;
+  if(body.action==='manual-status' && exactKeys(body,['action']))return body;
+  if(body.action==='manual-upload' && exactKeys(body,['action','bytes','contentType']) && Number.isSafeInteger(body.bytes) && typeof body.contentType==='string')return body;
+  if(body.action==='manual-start' && exactKeys(body,['action','pairingId','expectedReviewId']) && isGuid(body.pairingId||'') && (body.expectedReviewId===null || isGuid(body.expectedReviewId||'')))return body;
+  if(body.action==='start' && exactKeys(body,['action','expectedReviewId']) && (body.expectedReviewId===null||isGuid(body.expectedReviewId||'')))return body;
   if (body.action === 'start' && exactKeys(body, ['action'])) return { action: 'start' };
   if (body.action === 'approve' && exactKeys(body, ['action', 'splitId']) && typeof body.splitId === 'string' && body.splitId === body.splitId.trim() && isGuid(body.splitId)) {
     return { action: 'approve', splitId: body.splitId };
@@ -47,11 +54,17 @@ export default async function handler(req, res) {
   res.setHeader('Cache-Control', 'private, no-store');
   return withDalContext('meeting-tracker-presentation-video-splits', async () => {
     try {
-      if (!command) return res.status(200).json(await getPresentationVideoSplits({ requestId }));
+      if (!command) return res.status(200).json({...await getPresentationVideoSplits({ requestId }),manualPairAvailable:manualVideoPairEnabled(requestId)});
       const actor = { requestId, actorProfileId: access.profileId, actingUserSystemId: actorRefFromSession(access.session) };
+      if(command.action==='manual-status')return res.status(200).json(await getManualVideoPair(actor));
+      if(command.action==='manual-upload')return res.status(200).json(await mintManualVideoAudio({...actor,bytes:command.bytes,contentType:command.contentType}));
+      if(command.action==='manual-start'){
+        const queued=await startManualPresentationVideoSplit({...actor,manualPairingId:command.pairingId,expectedReviewId:command.expectedReviewId});
+        return res.status(queued.status).json(queued.body);
+      }
       const result = command.action === 'approve'
         ? await approvePresentationVideoSplit({ ...actor, splitId: command.splitId })
-        : await startPresentationVideoSplit(actor);
+        : await startPresentationVideoSplit({...actor,...(Object.hasOwn(command,'expectedReviewId')?{expectedReviewId:command.expectedReviewId}:{})});
       return res.status(result.status).json(result.body);
     } catch (error) { return errorResponse(res, error); }
   });

@@ -95,3 +95,7 @@ Recovery pass (`claimPresentationVideoSplitRecovery`, runs first every tick, ind
 ## Not covered
 
 The worker (slice 3) writes no Dataverse row and registers nothing; the output stays in SharePoint, recorded only on the split row until the staff approve route (slice 4) registers it. `cut_attempts` is unused (a crashed cut is terminal in v1).
+
+## Manual source extension on the implementation branch
+
+[VERIFIED via branch source and isolated tests, 2026-10-23; not deployed] Migration 089 changes `source_copy_id` to nullable and adds `manual_pairing_id`, enforcing exactly one source kind. The existing queue, leases, cut/upload, cleanup, human review and edition approval remain authoritative. A separate default-off manual gate does not opt ordinary Zoom traffic into pairing. See [manual source staging and proof](postgres-manual-presentation-video-pairs.md) for original-audio admission, exact PCM correspondence, reuse and cleanup. Version 3 of the recipe retains all existing cut-content checks. Apply migration 089 before deploying code that reads or writes the new source column; disabling manual admission is not a schema compatibility fallback.

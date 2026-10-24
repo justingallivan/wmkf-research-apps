@@ -128,6 +128,19 @@ d('presentation-video-cut-script', () => {
     srcPlain = path.join(root, 'src-10010.mp4');
     await makeSource(srcPlain, { priv: 10.01 });
   });
+
+  test('manual pairing accepts an exact copied audio stream and retains the existing clean-tail proof',async()=>{
+    const audio=path.join(root,'matching.m4a');await ff('-i',src25,'-vn','-c:a','copy',audio);
+    const bytes=fs.readFileSync(audio);const r=await cut(src25,12437,{MANUAL_AUDIO_PATH:audio,MANUAL_AUDIO_BYTES:String(bytes.length),MANUAL_AUDIO_SHA256:crypto.createHash('sha256').update(bytes).digest('hex')});
+    expect(r.receipt).toMatchObject({ok:true,manualPcmSamples:240000});expect(r.receipt.manualPcmSha256).toMatch(/^[a-f0-9]{64}$/);assertCleanTail(r.outPath);
+  });
+  test('manual pairing rejects re-encoded audio despite a valid raw original upload receipt',async()=>{
+    const audio=path.join(root,'reencoded.m4a');await ff('-i',src25,'-vn','-c:a','aac','-b:a','32k',audio);const bytes=fs.readFileSync(audio);
+    const r=await cut(src25,12437,{MANUAL_AUDIO_PATH:audio,MANUAL_AUDIO_BYTES:String(bytes.length),MANUAL_AUDIO_SHA256:crypto.createHash('sha256').update(bytes).digest('hex')});expect(r.receipt).toMatchObject({ok:false,code:'manual_video_audio_mismatch'});expect(fs.existsSync(r.outPath)).toBe(false);
+  });
+  test('manual pairing rejects replacement of the original audio bytes before decoding',async()=>{
+    const r=await cut(src25,12437,{MANUAL_AUDIO_PATH:src25,MANUAL_AUDIO_BYTES:String(fs.statSync(src25).size),MANUAL_AUDIO_SHA256:'a'.repeat(64)});expect(r.receipt).toMatchObject({ok:false,code:'manual_video_audio_mismatch'});
+  });
   afterAll(() => { fs.rmSync(bframeSrc, { force: true }); fs.rmSync(root, { recursive: true, force: true }); });
 
   const expectRejected = (r, code) => {
