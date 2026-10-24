@@ -405,8 +405,9 @@ describe('proposal ranking list calculations', () => {
 
 describe('amountLabel', () => {
   test('labels invited, requested-fallback, and pre-invited snapshot amounts', () => {
-    expect(amountLabel({ amountSource: 'invited' })).toEqual({ label: 'Invited', note: null });
-    expect(amountLabel({ amountSource: 'requested' })).toEqual({ label: 'Requested', note: 'No invited amount; showing requested amount.' });
-    expect(amountLabel({})).toEqual({ label: 'Requested', note: null });
+    expect(amountLabel({ amountSource: 'invited', amountMinorUnits: 100 })).toEqual({ label: 'Invited', note: null });
+    expect(amountLabel({ amountSource: 'requested', amountMinorUnits: 100 })).toEqual({ label: 'Requested', note: 'No invited amount; showing requested amount.' });
+    expect(amountLabel({ amountMinorUnits: 100 })).toEqual({ label: 'Requested', note: null });
+    expect(amountLabel({ amountSource: null, amountMinorUnits: null })).toEqual({ label: 'Amount', note: null });
   });
 });

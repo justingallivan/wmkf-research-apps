@@ -24,6 +24,7 @@ export function reviewerScoreIndicator(score) {
 
 // Rounds opened before invited amounts were used have no amountSource; their amounts are requested.
 export function amountLabel(proposal) {
+  if (proposal?.amountMinorUnits == null) return { label: 'Amount', note: null };
   if (proposal?.amountSource === 'invited') return { label: 'Invited', note: null };
   if (proposal?.amountSource === 'requested') return { label: 'Requested', note: 'No invited amount; showing requested amount.' };
   return { label: 'Requested', note: null };

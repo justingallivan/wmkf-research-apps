@@ -36,7 +36,7 @@ function StatusBanner({ kind = 'info', children, className = '' }) {
 function ProposalCardRow({ proposal, position, count, total, score, rank, editable, onMove, dragging, onDragStart, onDragOver, onDrop, onDragEnd }) {
   const amountKind = amountLabel(proposal);
   const amount = proposal.amountMinorUnits == null
-    ? 'Amount unavailable'
+    ? 'Unavailable'
     : formatMoney(proposal.amountMinorUnits, proposal.currency);
   const accumulated = total
     ? formatMoney(total.cumulativeMinorUnits, proposal.currency, { incomplete: !total.complete })
