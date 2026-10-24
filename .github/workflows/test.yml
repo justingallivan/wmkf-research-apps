@@ -9,8 +9,41 @@ permissions:
   contents: read
 
 jobs:
+  # Docs-only changes (every changed file is Markdown) still run lint and every
+  # check:* gate below, but skip the Next build and the full Jest/Postgres
+  # suites. Tests read JSON fixtures under docs/, never live .md files, so only
+  # *.md counts as docs. Anything unclear (new branch, force push, missing base)
+  # counts as code.
+  changes:
+    name: Detect docs-only change
+    runs-on: ubuntu-latest
+    outputs:
+      code: ${{ steps.diff.outputs.code }}
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+      - id: diff
+        env:
+          BASE: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.sha || github.event.before }}
+          HEAD: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
+        run: |
+          if [ -z "$BASE" ] || [ "$BASE" = "0000000000000000000000000000000000000000" ] || ! git cat-file -e "$BASE^{commit}" 2>/dev/null; then
+            echo "No usable base; treating as a code change."
+            echo "code=true" >> "$GITHUB_OUTPUT"; exit 0
+          fi
+          changed=$(git diff --name-only "$BASE...$HEAD")
+          echo "$changed" | sed 's/^/changed: /'
+          if [ -n "$changed" ] && ! printf '%s\n' "$changed" | grep -qvE '\.md$'; then
+            echo "Docs-only change: build and full test suites skipped."
+            echo "code=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "code=true" >> "$GITHUB_OUTPUT"
+          fi
+
   test:
     name: Jest
+    needs: changes
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
@@ -69,8 +102,11 @@ jobs:
       # committed manifest is in sync. Catches "added a migration but forgot
       # to regenerate the manifest" before it reaches prod.
       - run: npm run build
+        if: needs.changes.outputs.code == 'true'
       - run: git diff --exit-code lib/db/migrations-manifest.json
+        if: needs.changes.outputs.code == 'true'
       - run: npm run test:ci
+        if: needs.changes.outputs.code == 'true'
 
   ledger-postgres:
     # Live PostgreSQL proofs for the Test Request Factory run ledger, the
@@ -79,6 +115,8 @@ jobs:
     # once passed it), so this suite is REQUIRED here: it fails, not skips,
     # when the connection URL is missing (TEST_REQUEST_LEDGER_REQUIRE=1).
     name: Postgres integration (PostgreSQL 16)
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
     runs-on: ubuntu-latest
     services:
       postgres:

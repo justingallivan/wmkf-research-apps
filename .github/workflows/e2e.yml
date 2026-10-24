@@ -25,6 +25,9 @@ on:
       - '.github/workflows/e2e.yml'
   push:
     branches: [main]
+    # Skipped only when every changed file is Markdown (docs-only push).
+    paths-ignore:
+      - '**/*.md'
 
 permissions:
   contents: read
