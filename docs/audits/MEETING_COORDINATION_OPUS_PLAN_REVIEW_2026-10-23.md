@@ -3,7 +3,7 @@ title: Claude Opus Meeting Coordination Plan Review
 domain: product
 kind: audit
 status: adjudicated
-summary: Read-only OAuth Claude Opus review of the Meeting coordination plan at a9076fb9c; nine findings verified and narrowed where overstated, with accepted changes applied to the plan and four owner choices pending.
+summary: Read-only OAuth Claude Opus review of the Meeting coordination plan at a9076fb9c; nine findings verified and narrowed where overstated, with accepted plan corrections and all four subsequent owner choices resolved; implementation remains pending.
 canonical: false
 owner: product-engineering
 related:
@@ -21,7 +21,11 @@ related:
 - Model usage metadata identifies `claude-opus-5-5` and also `claude-fable-5-1`. Opus was the requested reviewer; the CLI reports additional Fable usage. No claim that every internal CLI operation used Opus exclusively. List-price cost estimates in CLI metadata are not proof of an API charge; this run used the verified OAuth session.
 - Scope: plan review only. At receipt, findings below were the reviewer's conclusions rather than independently adjudicated acceptance. The subsequent adjudication and plan corrections are recorded separately below; neither is implementation evidence. Repository policy/product intent takes precedence over a proposed reviewer remedy.
 
-# Source verification and plan corrections — 2026-10-23
+# Subsequent owner decisions — current plan authority
+
+[VERIFIED via explicit owner instructions, 2026-10-23] All four product questions identified during verification are resolved: remove separate summary-provider consent; support matching manual audio/transcript plus MP4 as rare recovery while preferring Zoom API; permit explicit coordinator retry after a possible-duplicate-charge warning; and require the assigned Program Coordinator personally to send materials requests/reminders, while helpers may prepare/review drafts. These are planned behaviors, not implementation evidence. The [implementation plan](../plans/MEETING_COORDINATION_IMPLEMENTATION_PLAN_2026-10-23.md) contains the resulting contracts. No delegated send-as feature is included. The snapshot and raw review below preserve what was open when reviewed.
+
+# Historical verification snapshot — before subsequent owner decisions, 2026-10-23
 
 [VERIFIED via primary-agent source reads, an independent bounded read-only check, and focused existing tests] Scope: verify F1–F9 against caller → persistence → consumer and update the proposed plan. No runtime edits, live probes, schema changes, actual emails or paid processing occurred. The original review below is an immutable historical receipt of the reviewed commit; its absolute wording does not override this adjudication.
 
