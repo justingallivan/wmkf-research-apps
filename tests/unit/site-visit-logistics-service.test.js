@@ -372,9 +372,21 @@ test('the Meeting Tracker opt-in adds the request identity for the page header (
   expect(deps.getRequestIdentity).toHaveBeenCalledWith(REQUEST_ID);
   const cycleCode = meetingDateToCycleCode('2026-12-11T00:00:00Z');
   expect(result.request).toEqual({
+    shareStatus: 'Review',
     requestNumber: '1003222', title: 'Quantum dots for imaging', institution: 'Example University',
     grantProgram: 'Research Program', cycleLabel: cycleCode ? cycleCodeToLabel(cycleCode) : null,
   });
+});
+
+test.each([
+  [null, 'No Pre-Site artifact'],
+  [{ lifecycleState: 999999999 }, 'Unknown'],
+  [{ lifecycleState: REQUEST_DOCUMENT_LIFECYCLE_STATE.FINAL }, 'Final'],
+])('detail share status labels missing and unrecognized artifacts without inventing readiness: %p', async (currentArtifact, expected) => {
+  const result = await getSiteVisitLogistics({ requestId: REQUEST_ID, includeRequestIdentity: true }, dependencies({
+    getArtifactStatus: jest.fn(async () => ({ currentArtifact })),
+  }));
+  expect(result.request.shareStatus).toBe(expected);
 });
 
 test('a failed identity read leaves the visit usable and returns a null request', async () => {

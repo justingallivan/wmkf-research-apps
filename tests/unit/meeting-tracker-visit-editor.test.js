@@ -338,15 +338,17 @@ test('the header shows the request identity from the visit read, and only the nu
       return response({ success: true, siteVisit: visit, request });
     });
   };
-  route({ requestNumber: '1003222', title: 'Quantum dots for imaging', institution: 'Example University', grantProgram: 'Research Program', cycleLabel: 'December 2026' });
+  route({ shareStatus: 'Final', requestNumber: '1003222', title: 'Quantum dots for imaging', institution: 'Example University', grantProgram: 'Research Program', cycleLabel: 'December 2026' });
   const view = render(<SiteVisitEditor />);
   expect(await screen.findByTestId('visit-request-identity')).toHaveTextContent('Example University — Quantum dots for imaging · Research Program · December 2026');
+  expect(screen.getByText('Share status: Final')).toBeVisible();
   expect(screen.getByRole('heading', { name: /^Meeting coordination · #1003222/ })).toBeInTheDocument();
   view.unmount();
   route(null);
   render(<SiteVisitEditor />);
   expect(await screen.findByRole('heading', { name: /^Meeting coordination · #1003222/ })).toBeInTheDocument();
   expect(screen.queryByTestId('visit-request-identity')).toBeNull();
+  expect(screen.queryByText('Share status: Final')).not.toBeInTheDocument();
 });
 
 describe('header identity follows client-side navigation between visits (Codex review, commit 7)', () => {

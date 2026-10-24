@@ -231,6 +231,7 @@ let writes = [],
         siteVisit: visit,
         invitationAvailable: true,
         request: {
+          shareStatus: 'Final',
           requestNumber: '123456',
           institution: 'Example University',
           title: proposals[0].title
@@ -271,6 +272,8 @@ let writes = [],
       name: '#123456',
       exact: true
     }).waitFor();
+    await page.getByText('PD: Fixture Director · PI: Fixture Investigator').first().waitFor();
+    if (await page.getByText('People and share status', { exact: true }).count()) throw Error('Landing retains the disclosure');
     await shot('landing-desktop');
     await page.getByRole('searchbox', {
       name: 'Find a request'
@@ -327,6 +330,7 @@ let writes = [],
     await page.getByRole('button', {
       name: 'Edit visit details'
     }).waitFor();
+    await page.getByText('Share status: Final', { exact: true }).waitFor();
     await shot('workspace-setup-desktop');
     await page.setViewportSize({
       width: 390,
