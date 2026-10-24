@@ -10,6 +10,18 @@ The chronological archive after the `Legacy chronological session log` divider c
 
 ---
 
+## October 2026 — Meeting Tracker durable preparation and approved editions released (Session 637)
+
+**Milestone:** Meeting Tracker now prepares materials durably and exposes Coordinator-approved presentation editions that survive corrections until explicit replacement or withdrawal.
+**Sessions:** Session 637, including ordinary Claude Opus OAuth review, isolated cloud tests, dedicated Production-fixture rehearsal and owner-authorized release.
+**Ship state:**
+- Migrations 086–089 applied with the canonical runner and physical readback; edition-aware readers, selective retry, edited-summary preservation and unknown-attempt fences deployed.
+- Coordinator-owned collection emails, reviewed invitations, consultant/recipient continuity, keyboard agenda ordering, task workspace and writeup-first Workbench released; automatic applicant reminders remain unscheduled.
+- Original-audio/MP4 pairing and real hosted cut verified; full recording/private discussion exclusion, retained approved bytes, replacement and immediate withdrawal proved through both readers.
+- All pre-activation checks passed, including CodeQL; 1,455 suites / 25,059 unit tests and 130 PostgreSQL integration tests green. Owner-authorized ordinary admission is on; production reads verified without sends or existing-business-record edits.
+**Why it matters:** staff can leave preparation running, recover only unfinished work and correct materials without disrupting the Board's approved version.
+**Pointers:** `docs/audits/MEETING_ORDINARY_ACTIVATION_2026-10-24.md`; `docs/audits/MEETING_CONTROLLED_DEPLOYMENT_2026-10-24.md`; `docs/audits/MEETING_HOSTED_REHEARSAL_2026-10-23.md`; `d54b8b008`, `1c30f9b2a`, `f66eee9e0`.
+
 ## October 2026 — Proposal Ranking uses invited amounts; open D26 round corrected in place (Session 636)
 
 **Milestone:** Proposal Ranking now ranks on `wmkf_invitedamount`, falling back to `akoya_request` with a card note, and the open D26 round was corrected without any PD re-ranking.
