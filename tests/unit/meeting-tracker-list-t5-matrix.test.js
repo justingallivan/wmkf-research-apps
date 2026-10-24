@@ -42,7 +42,8 @@ test('dashboard non-2xx {error} surfaces its own fallback text verbatim', async 
   expect(await screen.findByRole('alert')).toHaveTextContent('boom');
 });
 
-test('sessions non-2xx falls to the fixed fallback text, never silent', async () => {
+test('sessions non-2xx is visible in the separate sessions view', async () => {
+  routerQuery = { ...routerQuery, view: 'sessions' };
   global.fetch = jest.fn((url) => (
     String(url).includes('/sessions')
       ? Promise.resolve({ ok: false, status: 500, json: async () => ({}) })
@@ -52,7 +53,7 @@ test('sessions non-2xx falls to the fixed fallback text, never silent', async ()
       })
   ));
   render(<MeetingTrackerList />);
-  expect(await screen.findByRole('alert')).toHaveTextContent('The meeting sessions could not be loaded. Please try again.');
+  expect(await screen.findByRole('alert')).toHaveTextContent('Sessions could not be loaded.');
 });
 
 test('network rejection is never silent', async () => {
@@ -69,4 +70,14 @@ test('dashboard axis (e): non-2xx unparseable body falls to the fixed fallback t
   ));
   render(<MeetingTrackerList />);
   expect(await screen.findByRole('alert')).toHaveTextContent('The meeting schedule could not be loaded. Please try again.');
+});
+
+
+test('a failed global session read does not hide the cycle schedule', async () => {
+  global.fetch = jest.fn((url) => String(url).includes('/sessions')
+    ? Promise.reject(new Error('session endpoint offline'))
+    : Promise.resolve({ ok: true, json: async () => ({ proposals: [{ requestId: 'request-1', requestNumber: '123456', title: 'Visible request' }], programs: [], cycles: [{code:'D26'}] }) }));
+  render(<MeetingTrackerList />);
+  expect(await screen.findByRole('heading', {name:'#123456'})).toBeInTheDocument();
+  expect(screen.queryByRole('alert')).not.toBeInTheDocument();
 });

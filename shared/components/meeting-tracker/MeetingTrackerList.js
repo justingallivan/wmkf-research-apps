@@ -1,13 +1,13 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
-import { requestJson, requestEnvelope } from '../../utils/api-request';
-import Layout, { PageHeader } from '../Layout';
+import { requestEnvelope } from '../../utils/api-request';
+import Layout from '../Layout';
 import ToolbarSelect from '../ToolbarSelect';
-import ScopeSegment from '../workbench/ScopeSegment';
 import MaterialsStatusPill from './MaterialsStatusPill';
 import { classifySiteVisitMaterialsStatus, MATERIALS_STATUS_FILTERS } from '../../utils/site-visit-materials-status';
 import TestRequestBadge from '../TestRequestBadge';
+import MeetingSessionsView from './MeetingSessionsView';
 
 const DATE_FORMAT = new Intl.DateTimeFormat('en-US', {
   weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit',
@@ -41,65 +41,34 @@ export function MeetingTrackerRequestRow({ proposal, cycleCode, programId }) {
       : '/meeting-tracker/sessions/new',
     { cycleCode, programId, requestId: proposal.requestId },
   );
+  const actionClass = 'mt-1 inline text-sm font-semibold text-blue-700 hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-600';
   return (
-    <article className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm transition-colors hover:border-gray-300">
-      <div className="flex flex-wrap items-start justify-between gap-4">
-        <div className="min-w-0 w-full sm:w-auto sm:flex-1">
-          <div className="flex flex-wrap items-center gap-2">
-            <h2 className="text-lg font-semibold text-gray-900">#{proposal.requestNumber}</h2>
-            {proposal.institution && <span className="text-base text-gray-600">{proposal.institution}</span>}
-            <TestRequestBadge isTestRequest={proposal.isTestRequest} />
-            {proposal.needsScheduling && (
-              <span className="rounded-full border border-amber-200 bg-amber-50 px-2.5 py-1 text-xs font-semibold text-amber-800">Needs scheduling</span>
-            )}
-          </div>
-          <p className="mt-1 text-base text-gray-800">{proposal.title || 'Untitled request'}</p>
-          <p className="mt-1 text-sm text-gray-500">
-            {`PD: ${proposal.programDirector || 'Not assigned'}`}
-            {proposal.projectLeader ? ` · PI: ${proposal.projectLeader}` : ''}
-          </p>
+    <article className="grid grid-cols-2 gap-4 border-b border-gray-200 bg-white px-4 py-3 last:border-b-0 lg:grid-cols-[minmax(0,1fr)_11.5rem_11.5rem_8.5rem] lg:items-center lg:gap-5">
+      <div className="col-span-2 min-w-0 lg:col-span-1">
+        <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
+          <h2 className="text-sm font-medium text-gray-600">#{proposal.requestNumber}</h2>
+          {proposal.institution && <span className="text-sm font-semibold text-gray-900">{proposal.institution}</span>}
+          <TestRequestBadge isTestRequest={proposal.isTestRequest} />
         </div>
-        <div className="flex flex-wrap gap-2">
-          <Link href={sessionHref} className="rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm font-semibold text-gray-800 hover:bg-gray-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-gray-500 focus-visible:ring-offset-2">
-            {proposal.deliberation ? 'Open session' : 'Schedule session'}
-          </Link>
-          <a href={visitHref} data-full-page-navigation="true" className="rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm font-semibold text-gray-800 hover:bg-gray-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-gray-500 focus-visible:ring-offset-2">
-            {proposal.siteVisit ? 'Open visit' : 'Schedule visit'}
-          </a>
-        </div>
+        <p className="mt-1 text-sm text-gray-700">{proposal.title || 'Untitled request'}</p>
+        <details className="mt-1 text-xs text-gray-600">
+          <summary className="w-fit cursor-pointer hover:text-gray-900">People and share status</summary>
+          <p className="mt-1">{`PD: ${proposal.programDirector || 'Not assigned'}`}{proposal.projectLeader ? ` · PI: ${proposal.projectLeader}` : ''}</p>
+          <p>{proposal.shareState?.lifecycleLabel || 'No Pre-Site artifact'}</p>
+        </details>
       </div>
-
-      <div className="mt-5 grid gap-4 border-t border-gray-100 pt-4 md:grid-cols-4">
-        <section>
-          <h3 className="text-xs font-semibold uppercase tracking-wide text-gray-500">Share state</h3>
-          <p className="mt-1 text-sm font-medium text-gray-900">{proposal.shareState?.lifecycleLabel || 'No Pre-Site artifact'}</p>
-        </section>
-        <section>
-          <h3 className="text-xs font-semibold uppercase tracking-wide text-gray-500">Deliberation</h3>
-          {proposal.deliberation ? (
-            <div className="mt-1 text-sm text-gray-700">
-              <p>{formatDate(proposal.deliberation.scheduledStartIso)} · #{proposal.deliberation.order} · {proposal.deliberation.minutes} min</p>
-              {proposal.deliberation.meetingLink ? (
-                <a href={proposal.deliberation.meetingLink} target="_blank" rel="noopener noreferrer" className="mt-1 inline-flex font-semibold text-blue-700 underline decoration-blue-300 underline-offset-4 hover:text-blue-900">Join</a>
-              ) : <p className="mt-1 font-medium text-amber-700">No link</p>}
-            </div>
-          ) : <p className="mt-1 text-sm font-medium text-amber-700">No session</p>}
-        </section>
-        <section>
-          <h3 className="text-xs font-semibold uppercase tracking-wide text-gray-500">Site visit</h3>
-          {proposal.siteVisit ? (
-            <div className="mt-1 text-sm text-gray-700">
-              <p>{formatDate(proposal.siteVisit.scheduledStartIso)}</p>
-              <p className="mt-1 text-gray-500">{[proposal.siteVisit.formatLabel, proposal.siteVisit.location].filter(Boolean).join(' · ') || 'Details not set'}</p>
-              {proposal.siteVisitNeedsReconciliation && <p className="mt-1 font-medium text-amber-800">More than one active Site Visit; showing the earliest. Reconcile in the Workbench.</p>}
-            </div>
-          ) : <p className="mt-1 text-sm font-medium text-amber-700">No site visit</p>}
-        </section>
-        <section>
-          <h3 className="text-xs font-semibold uppercase tracking-wide text-gray-500">Materials</h3>
-          <MaterialsStatusPill summary={proposal.materials} availability={proposal.materialsAvailability} hasSiteVisit={Boolean(proposal.siteVisit)} requestMaterialsHref={visitHref} />
-        </section>
+      <div>
+        <h3 className="text-xs font-medium text-gray-500 lg:sr-only">Proposal discussion session</h3>
+        <p className="mt-1 text-sm text-gray-700 lg:mt-0">{proposal.deliberation ? formatDate(proposal.deliberation.scheduledStartIso) : 'Not scheduled'}</p>
+        <Link href={sessionHref} className={actionClass}>{proposal.deliberation ? 'Open session' : 'Schedule session'}<span aria-hidden="true" className="ml-1">→</span></Link>
       </div>
+      <div>
+        <h3 className="text-xs font-medium text-gray-500 lg:sr-only">Research presentation</h3>
+        <p className="mt-1 text-sm text-gray-700 lg:mt-0">{proposal.siteVisit ? formatDate(proposal.siteVisit.scheduledStartIso) : 'Not scheduled'}</p>
+        <a href={visitHref} data-full-page-navigation="true" className={actionClass}>{proposal.siteVisit ? 'Open research presentation' : 'Schedule research presentation'}<span aria-hidden="true" className="ml-1">→</span></a>
+        {proposal.siteVisitNeedsReconciliation && <p className="mt-1 text-xs text-amber-800">Multiple active visits; showing the earliest. Reconcile in the Workbench.</p>}
+      </div>
+      <div className="col-span-2 lg:col-span-1"><span className="mr-2 text-xs font-medium text-gray-500 lg:sr-only">Materials: </span><MaterialsStatusPill compact summary={proposal.materials} availability={proposal.materialsAvailability} hasSiteVisit={Boolean(proposal.siteVisit)} requestMaterialsHref={`${visitHref}#materials`} /></div>
     </article>
   );
 }
@@ -114,8 +83,11 @@ export default function MeetingTrackerList() {
   const [proposals, setProposals] = useState([]);
   const [notices, setNotices] = useState([]);
   const [sessions, setSessions] = useState([]);
+  const [sessionsError, setSessionsError] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [search, setSearch] = useState('');
+  const view = router.query.view === 'sessions' ? 'sessions' : 'cycle';
   const [materialsFilter, setMaterialsFilter] = useState('all');
   const loadToken = useRef(0);
   // The cycle picker's options come only from the dashboard's no-cycle
@@ -142,15 +114,16 @@ export default function MeetingTrackerList() {
       if (selectedProgramId) pickerQuery.set('programId', selectedProgramId);
       const [dashboardEnvelope, sessionsEnvelope, pickerEnvelope] = await Promise.all([
         requestEnvelope(`/api/meeting-tracker/dashboard${query.size ? `?${query}` : ''}`, { tolerantBody: true }),
-        requestEnvelope('/api/meeting-tracker/sessions', { tolerantBody: true }),
+        requestEnvelope('/api/meeting-tracker/sessions', { tolerantBody: true }).catch(() => ({ ok: false, data: {} })),
         needsPicker ? requestEnvelope(`/api/meeting-tracker/dashboard${pickerQuery.size ? `?${pickerQuery}` : ''}`, { tolerantBody: true }) : Promise.resolve(null),
       ]);
       const dashboard = dashboardEnvelope.data;
       const sessionBody = sessionsEnvelope.data;
       const picker = pickerEnvelope?.ok ? pickerEnvelope.data : null;
       if (token !== loadToken.current) return;
+      setSessions(sessionBody.sessions || []);
+      setSessionsError(sessionsEnvelope.ok ? null : 'The meeting sessions could not be loaded.');
       if (!dashboardEnvelope.ok) throw new Error(dashboard.error || 'The meeting schedule could not be loaded. Please try again.');
-      if (!sessionsEnvelope.ok) throw new Error(sessionBody.error || 'The meeting sessions could not be loaded. Please try again.');
       setPrograms((current) => dashboard.programs || picker?.programs || current);
       const nextCycles = dashboard.cycles || picker?.cycles || cyclesRef.current;
       cyclesRef.current = nextCycles;
@@ -168,6 +141,7 @@ export default function MeetingTrackerList() {
               programId: selectedProgramId || dashboard.programId || '',
               cycleCode: nextCycle,
               ...(selectedScope === 'all' ? { scope: 'all' } : {}),
+              ...(router.query.view === 'sessions' ? { view: 'sessions' } : {}),
             },
           }, undefined, { shallow: true });
           if (navigated === false) throw new Error('The cycle view could not be opened. Please try again.');
@@ -237,9 +211,11 @@ export default function MeetingTrackerList() {
     result[item.status.key] = (result[item.status.key] || 0) + 1;
     return result;
   }, {});
-  const visibleProposals = materialsFilter === 'all'
+  const statusProposals = materialsFilter === 'all'
     ? proposals
     : classified.filter((item) => item.status.key === materialsFilter).map((item) => item.proposal);
+  const normalizedSearch = search.trim().toLowerCase();
+  const visibleProposals = statusProposals.filter((proposal) => !normalizedSearch || [proposal.requestNumber, proposal.institution, proposal.title].some((value) => String(value || '').toLowerCase().includes(normalizedSearch)));
   const optionalFilters = ['closed', 'no_visit', 'unavailable'].filter((key) => counts[key]);
   const filterOptions = [
     ...MATERIALS_STATUS_FILTERS,
@@ -248,40 +224,30 @@ export default function MeetingTrackerList() {
 
   return (
     <Layout title="Meeting Tracker">
-      <PageHeader title="Meeting Tracker" subtitle="Keep deliberation sessions and site visits visible in one cycle schedule." />
-      <div className="mb-6 flex flex-wrap items-end justify-between gap-4">
-        <div className="flex flex-wrap items-end gap-4">
-          <ToolbarSelect id="meeting-program" label="Grant program" value={programId} disabled={!programs.length} onChange={(event) => changeFilters({ programId: event.target.value, cycleCode: '' })}>
-            {!programs.length && <option value="">Loading programs…</option>}
-            {programs.map((program) => <option key={program.programId} value={program.programId}>{program.name}</option>)}
-          </ToolbarSelect>
-          <ToolbarSelect id="meeting-cycle" label="Grant cycle" value={cycleCode} disabled={!cycles.length} onChange={(event) => changeFilters({ cycleCode: event.target.value })}>
-            {cycles.map((cycle) => <option key={cycle.code} value={cycle.code}>{cycle.label || cycle.code}</option>)}
-          </ToolbarSelect>
-          <ScopeSegment scope={scope} onChange={(value) => changeFilters({ scope: value })} allLabel="All program directors" />
-        </div>
-        <div className="flex flex-wrap items-center gap-3">
-          <Link href="/meeting-tracker/program-briefing" className="inline-flex h-12 items-center rounded-lg border border-gray-300 bg-white px-5 text-sm font-semibold text-gray-800 hover:bg-gray-50 focus-visible:outline focus-visible:outline-2">
-            Program briefing
-          </Link>
-          <Link href="/meeting-tracker/discussion-sentiment" className="inline-flex h-12 items-center rounded-lg border border-gray-300 bg-white px-5 text-sm font-semibold text-gray-800 hover:bg-gray-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-gray-500 focus-visible:ring-offset-2">
-            Discussion sentiment
-          </Link>
-          <Link href={trackerHref('/meeting-tracker/sessions/new', { cycleCode, programId })} className="inline-flex h-12 items-center rounded-lg bg-gray-900 px-5 text-sm font-semibold text-white hover:bg-gray-800 focus:outline-none focus-visible:ring-2 focus-visible:ring-gray-500 focus-visible:ring-offset-2">
-            Create session
-          </Link>
+      <div className="mb-5 flex flex-wrap items-center justify-between gap-3 pt-6">
+        <h1 className="text-2xl font-semibold text-gray-900">Meeting Tracker</h1>
+        <div className="flex flex-wrap gap-5 text-sm font-semibold text-gray-600">
+          <Link href="/meeting-tracker/program-briefing" className="hover:text-gray-900 hover:underline">Program briefing</Link>
+          <Link href="/meeting-tracker/discussion-sentiment" className="hover:text-gray-900 hover:underline">Discussion sentiment</Link>
         </div>
       </div>
-
-      {sessions.length > 0 && (
-        <nav aria-label="Deliberation sessions" className="mb-6 flex gap-2 overflow-x-auto pb-1">
-          {sessions.map((session) => (
-            <Link key={session.sessionId} href={trackerHref(`/meeting-tracker/sessions/${session.sessionId}`, { cycleCode, programId })} className="shrink-0 rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm font-medium text-gray-700 hover:border-gray-400 hover:text-gray-900">
-              {formatDate(session.scheduledStartIso)}
-            </Link>
-          ))}
-        </nav>
-      )}
+      <nav aria-label="Meeting Tracker views" className="mb-5 flex gap-6 border-b border-gray-300">
+        {[['cycle', 'Cycle schedule'], ['sessions', 'Proposal discussion sessions']].map(([key, label]) => <Link key={key} href={{ pathname: '/meeting-tracker', query: { ...router.query, view: key } }} shallow aria-current={view === key ? 'page' : undefined} className={`border-b-2 pb-3 text-left text-sm font-semibold focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-600 ${view === key ? 'border-gray-900 text-gray-900' : 'border-transparent text-gray-500 hover:text-gray-900'}`}>{label}</Link>)}
+      </nav>
+      {view === 'sessions' ? <MeetingSessionsView sessions={sessions} loading={loading} error={sessionsError} onRetry={() => load(programId, cycleCode, scope)} cycleCode={cycleCode} programId={programId} /> : <>
+      <div className="mb-5 flex flex-wrap items-end gap-4">
+        <ToolbarSelect className="min-w-[9rem] flex-1 sm:flex-none" size="compact" id="meeting-program" label="Grant program" value={programId} disabled={!programs.length} onChange={(event) => changeFilters({ programId: event.target.value, cycleCode: '' })}>
+          {!programs.length && <option value="">Loading programs…</option>}
+          {programs.map((program) => <option key={program.programId} value={program.programId}>{program.name}</option>)}
+        </ToolbarSelect>
+        <ToolbarSelect className="min-w-[9rem] flex-1 sm:flex-none" size="compact" id="meeting-cycle" label="Grant cycle" value={cycleCode} disabled={!cycles.length} onChange={(event) => changeFilters({ cycleCode: event.target.value })}>
+          {cycles.map((cycle) => <option key={cycle.code} value={cycle.code}>{cycle.label || cycle.code}</option>)}
+        </ToolbarSelect>
+        <div role="group" aria-label="Request scope" className="flex max-w-full flex-col gap-1.5"><span className="text-sm font-medium text-gray-700">Request scope</span><div className="flex h-11 overflow-hidden rounded-lg border border-gray-300 bg-white">{[['my', 'My requests'], ['all', 'All program directors']].map(([value, label]) => <button key={value} type="button" aria-pressed={scope === value} onClick={() => changeFilters({ scope: value })} className={`px-3 text-sm font-medium focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-600 ${scope === value ? 'bg-gray-900 text-white' : 'text-gray-700 hover:bg-gray-50'}`}>{label}</button>)}</div></div>
+        <label className="flex min-w-full flex-1 flex-col gap-1.5 sm:min-w-[15rem] text-sm font-medium text-gray-700 lg:ml-auto lg:max-w-xs">Find a request
+          <input type="search" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Request, institution, or title" className="h-11 w-full rounded-lg border border-gray-300 bg-white px-3 text-base font-normal focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-600 sm:text-sm" />
+        </label>
+      </div>
 
       {error && (
         <div role="alert" className="mb-6 rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-800">
@@ -294,27 +260,27 @@ export default function MeetingTrackerList() {
         </ul>
       )}
       {!loading && !error && proposals.length > 0 && (
-        <nav aria-label="Materials status filters" className="mb-6 flex flex-wrap gap-2">
-          <button type="button" aria-pressed={materialsFilter === 'all'} onClick={() => setMaterialsFilter('all')} className={`rounded-lg border px-3 py-2 text-sm font-semibold focus:outline-none focus-visible:ring-2 focus-visible:ring-gray-500 focus-visible:ring-offset-2 ${materialsFilter === 'all' ? 'border-gray-900 bg-gray-900 text-white' : 'border-gray-300 bg-white text-gray-700 hover:bg-gray-50'}`}>All ({proposals.length})</button>
-          {filterOptions.map((option) => (
-            <button key={option.key} type="button" aria-pressed={materialsFilter === option.key} onClick={() => setMaterialsFilter(option.key)} className={`rounded-lg border px-3 py-2 text-sm font-semibold focus:outline-none focus-visible:ring-2 focus-visible:ring-gray-500 focus-visible:ring-offset-2 ${materialsFilter === option.key ? 'border-gray-900 bg-gray-900 text-white' : 'border-gray-300 bg-white text-gray-700 hover:bg-gray-50'}`}>
-              {option.label} ({counts[option.key] || 0})
-            </button>
-          ))}
-        </nav>
+        <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
+          <p role="status" className="text-sm text-gray-600"><strong className="font-semibold text-gray-900">{visibleProposals.length} request{visibleProposals.length === 1 ? '' : 's'}</strong><span className="hidden sm:inline"> · In this cycle and scope</span></p>
+          <label className="text-sm text-gray-700"><span className="sr-only">Materials status</span><select aria-label="Materials status" value={materialsFilter} onChange={(event) => setMaterialsFilter(event.target.value)} className="h-10 max-w-full rounded-lg border border-gray-300 bg-white px-3 text-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-600">
+            <option value="all">Materials: All statuses ({proposals.length})</option>
+            {filterOptions.map((option) => <option key={option.key} value={option.key} disabled={!counts[option.key]}>{option.label} ({counts[option.key] || 0})</option>)}
+          </select></label>
+        </div>
       )}
       {loading ? (
         <div className="rounded-xl border border-gray-200 bg-white p-8 text-center text-gray-500">Loading the cycle schedule…</div>
       ) : visibleProposals.length ? (
-        <div className="space-y-3">{visibleProposals.map((proposal) => <MeetingTrackerRequestRow key={proposal.requestId} proposal={proposal} cycleCode={cycleCode} programId={programId} />)}</div>
+        <div className="overflow-hidden rounded-lg border border-gray-200"><div aria-hidden="true" className="hidden grid-cols-[minmax(0,1fr)_11.5rem_11.5rem_8.5rem] gap-5 border-b border-gray-200 bg-gray-100 px-4 py-3 text-xs font-semibold text-gray-600 lg:grid"><span>Request</span><span>Proposal discussion session</span><span>Research presentation</span><span>Materials</span></div>{visibleProposals.map((proposal) => <MeetingTrackerRequestRow key={proposal.requestId} proposal={proposal} cycleCode={cycleCode} programId={programId} />)}</div>
       ) : proposals.length ? (
-        <div className="rounded-xl border border-gray-200 bg-white p-8 text-center"><h2 className="text-lg font-semibold text-gray-900">No requests match this materials status</h2><button type="button" onClick={() => setMaterialsFilter('all')} className="mt-2 font-semibold text-blue-700 underline">Show all requests</button></div>
+        <div className="rounded-xl border border-gray-200 bg-white p-8 text-center"><h2 className="text-lg font-semibold text-gray-900">No requests match these filters</h2><button type="button" onClick={() => { setMaterialsFilter('all'); setSearch(''); }} className="mt-2 font-semibold text-blue-700 underline">Show all requests</button></div>
       ) : !error && (
         <div className="rounded-xl border border-gray-200 bg-white p-8 text-center">
           <h2 className="text-lg font-semibold text-gray-900">No advancing requests are in this view</h2>
           <p className="mt-2 text-sm text-gray-600">Choose another cycle, program, or scope.</p>
         </div>
       )}
+      </>}
     </Layout>
   );
 }

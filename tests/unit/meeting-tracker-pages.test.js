@@ -61,9 +61,9 @@ function proposal(overrides = {}) {
 
 test('list row links to the tracker\'s visit editor with the request number and cycle context (slice 2b)', () => {
   render(<MeetingTrackerRequestRow proposal={proposal({ siteVisit: null })} cycleCode="D26" programId="p1" />);
-  expect(screen.getByRole('link', { name: 'Schedule visit' }))
+  expect(screen.getByRole('link', { name: /Schedule research presentation/ }))
     .toHaveAttribute('href', `/meeting-tracker/visits/${proposal().requestId}?cycleCode=D26&programId=p1&n=1002003`);
-  expect(screen.getByRole('link', { name: 'Schedule visit' }))
+  expect(screen.getByRole('link', { name: /Schedule research presentation/ }))
     .toHaveAttribute('data-full-page-navigation', 'true');
 });
 
@@ -78,36 +78,21 @@ test('list row puts the institution beside the request number and labels the PD 
 
 test('a saved visit is labeled as the workspace entry, while a missing visit only offers scheduling', () => {
   const { rerender } = render(<MeetingTrackerRequestRow proposal={proposal({ siteVisit: { activityId: 'visit-1' } })} cycleCode="D26" programId="p1" />);
-  expect(screen.getByRole('link', { name: 'Open visit' })).toHaveAttribute('href', expect.stringContaining('/meeting-tracker/visits/'));
+  expect(screen.getByRole('link', { name: /Open research presentation/ })).toHaveAttribute('href', expect.stringContaining('/meeting-tracker/visits/'));
   rerender(<MeetingTrackerRequestRow proposal={proposal({ siteVisit: null })} cycleCode="D26" programId="p1" />);
-  expect(screen.getByRole('link', { name: 'Schedule visit' })).toBeInTheDocument();
-  expect(screen.queryByRole('link', { name: 'Open visit' })).not.toBeInTheDocument();
+  expect(screen.getByRole('link', { name: /Schedule research presentation/ })).toBeInTheDocument();
+  expect(screen.queryByRole('link', { name: /Open research presentation/ })).not.toBeInTheDocument();
 });
 
-test('list row shows scheduling and missing-link cues when either meeting is missing', () => {
+test('compact rows keep both scheduling actions visible and logistics in the detail workspace', () => {
   const { rerender } = render(<MeetingTrackerRequestRow proposal={proposal()} cycleCode="D26" programId={SESSION_ID} />);
-
-  expect(screen.getByText('Needs scheduling')).toBeInTheDocument();
-  expect(screen.getByText('No link')).toBeInTheDocument();
-  expect(screen.getByText('No site visit')).toBeInTheDocument();
-
-  rerender(<MeetingTrackerRequestRow proposal={proposal({
-    deliberation: null,
-    siteVisit: { scheduledStartIso: '2026-09-16T18:00:00.000Z', formatLabel: 'In person', location: 'Los Angeles' },
-  })} cycleCode="D26" programId={SESSION_ID} />);
-  expect(screen.getByText('Needs scheduling')).toBeInTheDocument();
-  expect(screen.getByText('No session')).toBeInTheDocument();
-});
-
-test('valid meeting link renders as a protected Join link and complete rows omit the cue', () => {
-  render(<MeetingTrackerRequestRow proposal={proposal({
-    deliberation: { ...proposal().deliberation, meetingLink: 'https://zoom.us/j/123' },
-    siteVisit: { scheduledStartIso: '2026-09-16T18:00:00.000Z', formatLabel: 'In person', location: 'Los Angeles' },
-    needsScheduling: false,
-  })} cycleCode="D26" programId={SESSION_ID} />);
-
-  expect(screen.queryByText('Needs scheduling')).not.toBeInTheDocument();
-  expect(screen.getByRole('link', { name: 'Join' })).toHaveAttribute('rel', 'noopener noreferrer');
+  expect(screen.getByRole('link', { name: /Open session/ })).toBeInTheDocument();
+  expect(screen.getByRole('link', { name: /Schedule research presentation/ })).toBeInTheDocument();
+  expect(screen.queryByRole('link', { name: 'Join' })).not.toBeInTheDocument();
+  expect(screen.getByText('People and share status').closest('details')).not.toHaveAttribute('open');
+  rerender(<MeetingTrackerRequestRow proposal={proposal({ deliberation: null, siteVisit: { scheduledStartIso: '2026-09-16T18:00:00.000Z' } })} cycleCode="D26" programId={SESSION_ID} />);
+  expect(screen.getByRole('link', { name: /Schedule session/ })).toBeInTheDocument();
+  expect(screen.getByRole('link', { name: /Open research presentation/ })).toBeInTheDocument();
 });
 
 test('session reorder posts every slot with its current ETag and complete new order', async () => {
@@ -525,35 +510,20 @@ describe('SessionEditor optimistic reorder', () => {
   });
 });
 
-test('the materials section carries the applicant-materials status and count', () => {
-  const visit = { activityId: 'v', scheduledStartIso: '2026-09-20T16:00:00.000Z', formatLabel: 'Hybrid', location: 'Board room' };
-  const { rerender } = render(<MeetingTrackerRequestRow proposal={proposal({ siteVisit: visit, materials: null })} cycleCode="D26" programId="p1" />);
-  expect(screen.getByTestId('materials-status')).toHaveTextContent('Not requested');
-  expect(screen.getByRole('link', { name: 'Request materials' })).toHaveAttribute('href', `/meeting-tracker/visits/${proposal().requestId}?cycleCode=D26&programId=p1&n=1002003`);
-  rerender(<MeetingTrackerRequestRow proposal={proposal({ siteVisit: visit, materials: { state: 'missing', receivedCount: 2, requiredCount: 3, otherCount: 0, dueAt: '2026-09-18T19:00:00Z', closesAt: '2026-09-27T17:00:00Z', overdue: true, invited: true } })} cycleCode="D26" programId="p1" />);
-  expect(screen.getByTestId('materials-status')).toHaveTextContent('Late');
-  expect(screen.getByText(/2\/3 received/)).toBeInTheDocument();
-  const expectedDue = new Date('2026-09-18T19:00:00Z').toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-  expect(screen.getByTestId('materials-status')).toHaveTextContent(`due ${expectedDue}`);
-  rerender(<MeetingTrackerRequestRow proposal={proposal({ siteVisit: null, materials: null })} cycleCode="D26" programId="p1" />);
-  expect(screen.getByTestId('materials-status')).toHaveTextContent('No visit');
-  expect(screen.queryByRole('link', { name: 'Request materials' })).not.toBeInTheDocument();
-  rerender(<MeetingTrackerRequestRow proposal={proposal({ siteVisit: visit, materials: null, materialsAvailability: 'unavailable' })} cycleCode="D26" programId="p1" />);
-  expect(screen.queryByRole('link', { name: 'Request materials' })).not.toBeInTheDocument();
-});
-
-
-test('received materials link to review controls only when the visit is available', () => {
-  const materials = { state: 'received', receivedCount: 3, requiredCount: 3, invited: true, overdue: false };
-  const row = (overrides = {}) => <MeetingTrackerRequestRow proposal={proposal({ siteVisit: { activityId: 'v' }, materials, ...overrides })} cycleCode="D26" programId="p1" />;
+test('compact materials statuses preserve counts in the accessible description and open their workspace task', () => {
+  const visit = { activityId: 'v' };
+  const row = (overrides = {}) => <MeetingTrackerRequestRow proposal={proposal({ siteVisit: visit, materials: null, ...overrides })} cycleCode="D26" programId="p1" />;
   const { rerender } = render(row());
-  expect(screen.getByText('3/3 received; awaiting confirmation.')).toBeInTheDocument();
-  expect(screen.getByRole('link', { name: 'Review materials' })).toHaveAttribute('href', `/meeting-tracker/visits/${proposal().requestId}?cycleCode=D26&programId=p1&n=1002003`);
-  expect(screen.getByRole('link', { name: 'Review materials' })).toHaveAttribute('data-full-page-navigation', 'true');
-  for (const overrides of [{ siteVisit: null }, { materialsAvailability: 'unavailable' }, { materials: { ...materials, state: 'ready' } }]) {
-    rerender(row(overrides));
-    expect(screen.queryByRole('link', { name: 'Review materials' })).not.toBeInTheDocument();
-  }
+  expect(screen.getByRole('link', { name: /Not requested.*Open materials/ })).toHaveAttribute('href', `/meeting-tracker/visits/${proposal().requestId}?cycleCode=D26&programId=p1&n=1002003#materials`);
+  rerender(row({ materials: { state: 'missing', receivedCount: 2, requiredCount: 3, overdue: true, invited: true } }));
+  expect(screen.getByTestId('materials-status')).toHaveTextContent('Late');
+  expect(screen.getByTestId('materials-status')).toHaveTextContent('2/3 received');
+  rerender(row({ materials: { state: 'received', receivedCount: 3, requiredCount: 3, overdue: false, invited: true } }));
+  expect(screen.getByRole('link', { name: /Check files.*Open materials/ })).toHaveAttribute('data-full-page-navigation', 'true');
+  expect(screen.getByRole('link', { name: /Check files.*Open materials/ })).toHaveAccessibleName('Check files. 3/3 received; awaiting confirmation. Open materials');
+  rerender(row({ siteVisit: null }));
+  expect(screen.getByTestId('materials-status')).toHaveTextContent('No visit');
+  expect(screen.queryByRole('link', { name: /Open materials/ })).not.toBeInTheDocument();
 });
 
 test('a saved session opens as a read-only summary with its status; Edit opens the form and Cancel discards', async () => {

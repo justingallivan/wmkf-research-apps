@@ -580,11 +580,12 @@ export default function SessionEditor() {
         <div>
           <Link href={{ pathname: '/meeting-tracker', query: { ...(cycleCode ? { cycleCode } : {}), ...(programId ? { programId } : {}) } }} className="text-sm font-semibold text-gray-600 underline decoration-gray-300 underline-offset-4 hover:text-gray-900">Back to the cycle schedule</Link>
           <div className="mt-3 flex flex-wrap items-center gap-3">
-            <h1 className="text-2xl font-semibold text-gray-900">{isNew ? 'Create a deliberation session' : 'Deliberation session'}</h1>
+            <h1 className="text-2xl font-semibold text-gray-900">{isNew ? 'Create a proposal discussion session' : 'Meeting coordination'}</h1>
             {!isNew && session && SESSION_STATUS_LABEL[session.status] && (
               <span className={`inline-flex rounded-full px-2.5 py-0.5 text-xs font-semibold ${SESSION_STATUS_CLASS[session.status]}`}>{SESSION_STATUS_LABEL[session.status]}</span>
             )}
           </div>
+          {!isNew && session && <p className="mt-1 text-sm text-gray-600">Proposal discussion session · {sessionWhen(session)}</p>}
           {(isNew || editing) && <p className="mt-2 text-sm text-gray-600">Set the meeting details, attendees, and proposal order.</p>}
         </div>
         {!isNew && session?.meetingLink && <a href={session.meetingLink} target="_blank" rel="noopener noreferrer" className="rounded-lg bg-gray-900 px-5 py-3 text-sm font-semibold text-white hover:bg-gray-800">Join meeting</a>}
@@ -594,17 +595,19 @@ export default function SessionEditor() {
       {notice && <div role="status" className="mb-5 rounded-lg border border-blue-200 bg-blue-50 p-4 text-sm text-blue-800">{notice}</div>}
       {(warning || overFull) && <div role="status" className="mb-5 rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">{warning?.message || `Scheduled discussion time is ${slotMinutes - sessionMinutes} minutes longer than this session.`}</div>}
 
+      <div className={`meeting-workspace grid min-w-0 gap-x-7 ${!isNew && session ? 'lg:grid-cols-[13.75rem_minmax(0,1fr)]' : ''}`}>
       {!isNew && session && <MeetingTaskNavigation idPrefix={taskPrefix} selected={task} onChange={chooseTask} tabs={[
         { id: 'setup', label: 'Meeting setup and agenda', group: 'Before the meeting' },
         { id: 'invitations', label: 'Invitations', group: 'Before the meeting' },
       ]} />}
-      <div role="tabpanel" id={`${taskPrefix}-panel-setup`} aria-labelledby={!isNew && session ? `${taskPrefix}-task-setup` : undefined} hidden={task !== 'setup'}>
+      <div className={`min-w-0 ${!isNew && session ? 'lg:col-start-2 lg:row-start-1' : ''}`} role="tabpanel" id={`${taskPrefix}-panel-setup`} aria-labelledby={!isNew && session ? `${taskPrefix}-task-setup` : undefined} hidden={task !== 'setup'}>
+        <div className="mb-6"><h2 className="text-xl font-semibold text-gray-900">Meeting setup</h2><p className="mt-2 text-sm text-gray-600">Confirm the time, location and attendees before preparing invitations.</p></div>
       {!isNew && session && !editing ? (
         <SessionSummary session={session} recipients={recipients} onEdit={() => { setNotice(null); setEditingFor(sessionId); }} />
       ) : (
       <form onSubmit={saveSession} className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
         {createdSessionId && <p role="status" className="mb-5 rounded-lg border border-blue-200 bg-blue-50 p-3 text-sm text-blue-900">The session has been created. Its details are locked while you continue to the saved session.</p>}
-        <div className="grid gap-5 md:grid-cols-2 lg:grid-cols-4">
+        <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-2">
           <label className="text-sm font-medium text-gray-700">Date and start time<input required type="datetime-local" disabled={Boolean(createdSessionId)} value={form.startLocal} onChange={(event) => updateForm('startLocal', event.target.value)} className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2" /></label>
           <label className="text-sm font-medium text-gray-700">Duration in minutes<input required type="number" min="1" disabled={Boolean(createdSessionId)} value={form.durationMinutes} onChange={(event) => updateForm('durationMinutes', event.target.value)} className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2" /></label>
           <label className="text-sm font-medium text-gray-700">Time zone<input required disabled={Boolean(createdSessionId)} value={form.ianaTimeZone} onChange={(event) => updateForm('ianaTimeZone', event.target.value)} placeholder="America/Los_Angeles" className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2" /></label>
@@ -664,7 +667,8 @@ export default function SessionEditor() {
       )}
 
       </div>
-      <div role="tabpanel" id={`${taskPrefix}-panel-invitations`} aria-labelledby={!isNew && session ? `${taskPrefix}-task-invitations` : undefined} hidden={task !== 'invitations'}>
+      <div className={`min-w-0 ${!isNew && session ? 'lg:col-start-2 lg:row-start-1' : ''}`} role="tabpanel" id={`${taskPrefix}-panel-invitations`} aria-labelledby={!isNew && session ? `${taskPrefix}-task-invitations` : undefined} hidden={task !== 'invitations'}>
+        <div className="mb-6"><h2 className="text-xl font-semibold text-gray-900">Invitations</h2><p className="mt-2 text-sm text-gray-600">Review the recipients and message before explicitly sending the invitation.</p></div>
       {!isNew && session && (
         <SessionAgendaPanel
           sessionId={sessionId}
@@ -673,6 +677,8 @@ export default function SessionEditor() {
           recipients={recipients}
         />
       )}
+
+      </div>
 
       </div>
 

@@ -11,56 +11,58 @@ const response=(proposals)=>({ok:true,status:200,json:async()=>({proposals,progr
 let rows;
 beforeEach(()=>{rows=fixtures();mockRouter.query={programId:'p1',cycleCode:'D26'};mockRouter.replace.mockClear();global.fetch=jest.fn(async()=>response(rows));});
 afterEach(()=>jest.restoreAllMocks());
-const filters=()=>screen.getByRole('navigation',{name:'Materials status filters'});
-const filter=(name)=>within(filters()).getByRole('button',{name});
+const filters=()=>screen.getByRole('combobox',{name:'Materials status'});
+const filter=(name)=>within(filters()).getByRole('option',{name:name.startsWith('All (')?name.replace('All (','Materials: All statuses ('):name});
+const select=(name)=>fireEvent.change(filters(),{target:{value:filter(name).value}});
 const titles=()=>screen.getAllByRole('heading',{level:2}).map(x=>x.textContent);
 
 test('25 rows have exclusive stable counts; every normal filter retains source order without refetching',async()=>{
- render(<MeetingTrackerList/>);await screen.findByRole('button',{name:'All (25)'});
+ render(<MeetingTrackerList/>);await screen.findByRole('option',{name:'Materials: All statuses (25)'});
  const dashboardUrl=String(global.fetch.mock.calls.find(([url])=>String(url).includes('/api/meeting-tracker/dashboard'))[0]);
  expect(new URL(dashboardUrl,'https://example.org').searchParams.get('projection')).toBe('schedule');
  const calls=global.fetch.mock.calls.length;
  for(const [offset,label] of ['Not requested','Waiting','Late','Check files','Ready'].entries()){
-  fireEvent.click(filter(`${label} (5)`));
+  select(`${label} (5)`);
   expect(titles()).toEqual(Array.from({length:5},(_,i)=>`#${offset+1+i*5}`));
-  expect(filter(`${label} (5)`)).toHaveAttribute('aria-pressed','true');
-  expect(within(filters()).getAllByRole('button').map(b=>b.textContent)).toEqual(['All (25)','Not requested (5)','Waiting (5)','Saving files (0)','Needs attention (0)','Late (5)','Check files (5)','Ready (5)']);
+  expect(filters()).toHaveValue(filter(`${label} (5)`).value);
+  expect(within(filters()).getAllByRole('option').map(b=>b.textContent)).toEqual(['Materials: All statuses (25)','Not requested (5)','Waiting (5)','Saving files (0)','Needs attention (0)','Late (5)','Check files (5)','Ready (5)']);
  }
  expect(global.fetch).toHaveBeenCalledTimes(calls);
- fireEvent.click(filter('All (25)'));expect(titles()).toHaveLength(25);
+ select('All (25)');expect(titles()).toHaveLength(25);
 });
 
-test('diagnostic buckets count every row and zero-count filters show an explicit empty result',async()=>{
+test('diagnostic buckets count every row and zero-count filters are disabled and search has an explicit empty result',async()=>{
  rows=[{...fixtures()[0],siteVisit:null},{...fixtures()[1],materialsAvailability:'unavailable'},{...fixtures()[2],materials:summary('closed')}];
- render(<MeetingTrackerList/>);await screen.findByRole('button',{name:'All (3)'});
+ render(<MeetingTrackerList/>);await screen.findByRole('option',{name:'Materials: All statuses (3)'});
  for(const label of ['No visit','Status unavailable','Closed'])expect(filter(`${label} (1)`)).toBeInTheDocument();
- fireEvent.click(filter('Ready (0)'));expect(screen.getByText('No requests match this materials status')).toBeInTheDocument();
+ expect(filter('Ready (0)')).toBeDisabled();
+ fireEvent.change(screen.getByRole('searchbox',{name:'Find a request'}),{target:{value:'no matching request'}});expect(screen.getByText('No requests match these filters')).toBeInTheDocument();
  expect(screen.queryByRole('link',{name:'Edit visit'})).not.toBeInTheDocument();
  fireEvent.click(screen.getByRole('button',{name:'Show all requests'}));expect(titles()).toHaveLength(3);
 });
 
 test.each([{scope:'all'},{cycleCode:'J27'},{programId:'p2'}])('URL scope change resets filter and uses new scoped results: %p',async(change)=>{
- const view=render(<MeetingTrackerList/>);await screen.findByRole('button',{name:'All (25)'});
- fireEvent.click(filter('Late (5)'));
+ const view=render(<MeetingTrackerList/>);await screen.findByRole('option',{name:'Materials: All statuses (25)'});
+ select('Late (5)');
  rows=[{...fixtures()[4],requestNumber:'900',title:'New scope'}];
  mockRouter.query={...mockRouter.query,...change};view.rerender(<MeetingTrackerList/>);
- await screen.findByRole('button',{name:'All (1)'});
- expect(filter('All (1)')).toHaveAttribute('aria-pressed','true');expect(titles()).toEqual(['#900']);
+ await screen.findByRole('option',{name:'Materials: All statuses (1)'});
+ expect(filters()).toHaveValue('all');expect(titles()).toEqual(['#900']);
 });
 
 test('scope-control click immediately hides old actions even before router navigation completes',async()=>{
- render(<MeetingTrackerList/>);await screen.findByRole('button',{name:'All (25)'});
+ render(<MeetingTrackerList/>);await screen.findByRole('option',{name:'Materials: All statuses (25)'});
  fireEvent.click(screen.getByRole('button',{name:'All program directors'}));
  expect(mockRouter.replace).toHaveBeenCalled();
- expect(screen.queryByRole('navigation',{name:'Materials status filters'})).not.toBeInTheDocument();
+ expect(screen.queryByRole('combobox',{name:'Materials status'})).not.toBeInTheDocument();
  expect(screen.queryByRole('heading',{name:'#1',exact:true})).not.toBeInTheDocument();
 });
 
 test('new-scope load failure never displays previous-scope requests or counts',async()=>{
- const view=render(<MeetingTrackerList/>);await screen.findByRole('button',{name:'All (25)'});
+ const view=render(<MeetingTrackerList/>);await screen.findByRole('option',{name:'Materials: All statuses (25)'});
  global.fetch=jest.fn(async()=>({ok:false,status:503,json:async()=>({error:'Scoped load failed'})}));
  mockRouter.query={programId:'p2',cycleCode:'D26'};view.rerender(<MeetingTrackerList/>);
- await screen.findByRole('alert');expect(screen.queryByRole('navigation',{name:'Materials status filters'})).not.toBeInTheDocument();
+ await screen.findByRole('alert');expect(screen.queryByRole('combobox',{name:'Materials status'})).not.toBeInTheDocument();
  expect(screen.queryByRole('heading',{name:'#1',exact:true})).not.toBeInTheDocument();
 });
 
@@ -69,17 +71,17 @@ test('a late response from the old scope cannot overwrite the new scope',async()
  global.fetch=jest.fn(url=>String(url).includes('programId=p1')?old:Promise.resolve(response([{...fixtures()[0],requestNumber:'900'}])));
  const view=render(<MeetingTrackerList/>);await waitFor(()=>expect(global.fetch).toHaveBeenCalled());
  mockRouter.query={programId:'p2',cycleCode:'D26'};view.rerender(<MeetingTrackerList/>);
- await screen.findByRole('button',{name:'All (1)'});
+ await screen.findByRole('option',{name:'Materials: All statuses (1)'});
  await act(async()=>{resolveOld(response(fixtures()));});
  expect(titles()).toEqual(['#900']);expect(filter('All (1)')).toBeInTheDocument();
 });
 
 test('missing availability renders unknown even with a valid summary or known-looking null', async()=>{
  rows=[{...fixtures()[0],materialsAvailability:undefined},{...fixtures()[1],materialsAvailability:undefined}];
- render(<MeetingTrackerList/>);await screen.findByRole('button',{name:'All (2)'});
+ render(<MeetingTrackerList/>);await screen.findByRole('option',{name:'Materials: All statuses (2)'});
  expect(filter('Status unavailable (2)')).toBeInTheDocument();
  expect(filter('Not requested (0)')).toBeInTheDocument();
- expect(screen.getAllByText('Reload this page to refresh materials.')).toHaveLength(2);
+ expect(screen.getAllByText('Status unavailable',{exact:true})).toHaveLength(2);
 });
 
 test('cycle discovery keeps loading until navigation completes, without a false empty state',async()=>{
@@ -96,7 +98,7 @@ test('cycle discovery keeps loading until navigation completes, without a false 
 });
 
 test.each(['reject','cancel'])('scope navigation %s offers recovery instead of remaining stuck loading',async(kind)=>{
- render(<MeetingTrackerList/>);await screen.findByRole('button',{name:'All (25)'});
+ render(<MeetingTrackerList/>);await screen.findByRole('option',{name:'Materials: All statuses (25)'});
  if(kind==='reject')mockRouter.replace.mockRejectedValueOnce(new Error('navigation failed'));
  else mockRouter.replace.mockResolvedValueOnce(false);
  fireEvent.click(screen.getByRole('button',{name:'All program directors'}));
@@ -112,8 +114,8 @@ test('processing and attention filters include active work after collection clos
   { ...fixtures()[1], materials: summary('closed', { attentionCount:1 }) },
   { ...fixtures()[2], materials: summary('closed') },
  ];
- render(<MeetingTrackerList/>); await screen.findByRole('button', {name:'All (3)'});
- fireEvent.click(filter('Saving files (1)')); expect(titles()).toEqual(['#1']);
- fireEvent.click(filter('Needs attention (1)')); expect(titles()).toEqual(['#2']);
- fireEvent.click(filter('Closed (1)')); expect(titles()).toEqual(['#3']);
+ render(<MeetingTrackerList/>); await screen.findByRole('option', {name:'Materials: All statuses (3)'});
+ select('Saving files (1)'); expect(titles()).toEqual(['#1']);
+ select('Needs attention (1)'); expect(titles()).toEqual(['#2']);
+ select('Closed (1)'); expect(titles()).toEqual(['#3']);
 });

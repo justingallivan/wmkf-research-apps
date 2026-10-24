@@ -128,7 +128,7 @@ test('a new visit: the form posts the fields the logistics service expects, with
   });
   render(<SiteVisitEditor />);
 
-  expect(await screen.findByRole('heading', { name: /Schedule the site visit · #1003222/ })).toBeInTheDocument();
+  expect(await screen.findByRole('heading', { name: /Schedule the research presentation · #1003222/ })).toBeInTheDocument();
   expect(await screen.findByLabelText('Subject')).toHaveValue('Site Visit — #1003222');
   // Virtual by default (owner 2026-09-10).
   expect(screen.getByLabelText('Format')).toHaveValue('100000001');
@@ -181,7 +181,7 @@ test('an existing visit: the form loads it, sends activityId + etag, and a write
   });
   render(<SiteVisitEditor />);
 
-  expect(await screen.findByRole('heading', { name: /^Site visit · #1003222/ })).toBeInTheDocument();
+  expect(await screen.findByRole('heading', { name: /^Meeting coordination · #1003222/ })).toBeInTheDocument();
   fireEvent.click(await screen.findByRole('button', { name: 'Edit visit details' }));
   expect(screen.getByLabelText('Location or meeting link')).toHaveValue('https://zoom.example/v');
   expect(screen.getByLabelText('Format')).toHaveValue('100000001');
@@ -341,11 +341,11 @@ test('the header shows the request identity from the visit read, and only the nu
   route({ requestNumber: '1003222', title: 'Quantum dots for imaging', institution: 'Example University', grantProgram: 'Research Program', cycleLabel: 'December 2026' });
   const view = render(<SiteVisitEditor />);
   expect(await screen.findByTestId('visit-request-identity')).toHaveTextContent('Example University — Quantum dots for imaging · Research Program · December 2026');
-  expect(screen.getByRole('heading', { name: /^Site visit · #1003222/ })).toBeInTheDocument();
+  expect(screen.getByRole('heading', { name: /^Meeting coordination · #1003222/ })).toBeInTheDocument();
   view.unmount();
   route(null);
   render(<SiteVisitEditor />);
-  expect(await screen.findByRole('heading', { name: /^Site visit · #1003222/ })).toBeInTheDocument();
+  expect(await screen.findByRole('heading', { name: /^Meeting coordination · #1003222/ })).toBeInTheDocument();
   expect(screen.queryByTestId('visit-request-identity')).toBeNull();
 });
 
