@@ -39,3 +39,13 @@ test('malformed success is an agenda error, and retry recovers without a write',
   expect(await screen.findByText('Recovered agenda')).toBeInTheDocument();
   expect(global.fetch.mock.calls.every(([, options]) => !options.method || options.method === 'GET')).toBe(true);
 });
+
+
+test('empty, loading and failed lists never treat an absent selection as loaded detail', () => {
+  const view = render(<Sessions sessions={[]} loading />);
+  expect(screen.getByRole('status')).toHaveTextContent('Loading sessions');
+  view.rerender(<Sessions sessions={[]} />);
+  expect(screen.getByText(/No sessions have been scheduled/)).toBeInTheDocument();
+  view.rerender(<Sessions sessions={[]} error="offline" onRetry={() => {}} />);
+  expect(screen.getByRole('alert')).toHaveTextContent('Sessions could not be loaded');
+});

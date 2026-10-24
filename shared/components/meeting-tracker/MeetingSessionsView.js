@@ -56,7 +56,7 @@ export default function MeetingSessionsView({ sessions, loading, error, onRetry,
     if (programId) query.set('programId', programId);
     return `/meeting-tracker/sessions/${sessionId}${query.size ? `?${query}` : ''}`;
   };
-  const ready = detail?.forId === id;
+  const ready = Boolean(id && detail?.forId === id);
   const slots = ready ? detail.slots : [];
   const previewSession = ready ? detail.session : selected;
   const preview = (sessionId) => {

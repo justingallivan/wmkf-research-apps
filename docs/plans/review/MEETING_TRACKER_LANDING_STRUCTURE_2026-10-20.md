@@ -3,7 +3,7 @@ title: Meeting Tracker Landing Structure and Mockups
 domain: product
 kind: plan
 status: in-progress
-summary: Approved Meeting Tracker design references; functional workflow released, with the omitted compact landing and focused task workspace now implemented on the UI completion branch and undergoing final review.
+summary: Approved Meeting Tracker design references; functional workflow released, with the omitted compact landing and focused task workspace now implemented on the UI completion branch with actual-page visual verification and Opus review passed; candidate release is tracked separately.
 canonical: false
 owner: product-engineering
 related:
@@ -16,7 +16,7 @@ related:
 
 [VERIFIED via source and release receipts] The functional meeting workflow is released for ordinary eligible requests. The earlier release did **not** implement the approved compact cycle landing or desktop task rail. Its horizontal task tabs were only a partial workspace implementation.
 
-[VERIFIED via branch source and actual built Next pages] `codex/meeting-ui-completion` implements the compact cycle schedule, request search, single materials select, separate global Sessions view with selected agenda preview, and focused Meeting coordination task workspace. Desktop uses a left task rail; narrow screens keep task selectors above the active content and both request actions visible. The selected landing view is URL-addressable. Final review and release evidence is owned by [the UI completion receipt](../../audits/MEETING_UI_COMPLETION_2026-10-24.md); this design record does not independently claim deployment.
+[VERIFIED via branch source and actual built Next pages] `codex/meeting-ui-completion` implements the compact cycle schedule, request search, single materials select, separate global Sessions view with selected agenda preview, and focused Meeting coordination task workspace. Desktop uses a left task rail; narrow screens keep task selectors above the active content and both request actions visible. The selected landing view is URL-addressable. Final review passed; release evidence is owned by [the UI completion receipt](../../audits/MEETING_UI_COMPLETION_2026-10-24.md); this design record does not independently claim deployment.
 
 The approved composition remains the saved [cycle schedule](meeting-tracker-2026-10-20/index.html), [Sessions](meeting-tracker-2026-10-20/sessions.html), [preparation workspace](meeting-tracker-2026-10-20/preparation-workspace.html) and [transcript preparation](meeting-tracker-2026-10-20/transcript-preparation.html). Mockup dates, queue counts, people and artifacts are synthetic. Runtime uses existing request/session scopes and capability checks, with no invented queue counts. Session search names its supported date/time/location/status fields; agenda text search was an exploratory control, not an existing list API contract. No membership or persistence change is implied.
 

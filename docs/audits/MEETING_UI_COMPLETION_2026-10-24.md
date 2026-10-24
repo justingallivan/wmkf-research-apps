@@ -1,6 +1,6 @@
 # Meeting Tracker UI completion — 2026-10-24
 
-Status: implemented and verified locally against the saved mockups; final Opus confirmation and release pending. This receipt does not claim deployment.
+Status: UI implementation, actual-page visual verification and final Opus review passed; candidate release checks/promotion pending. This receipt does not claim deployment.
 
 The earlier functional release did not complete the approved landing-page layout. The saved October 20 mockups in `docs/plans/review/meeting-tracker-2026-10-20/` remain the design authority. This work completes their cycle/session navigation and focused task workspace using existing application data and controls.
 
@@ -42,9 +42,9 @@ The final round captured **16 screens at 1440px and 390px**, including all four 
 
 [VERIFIED via direct image inspection] The candidate follows the approved composition rather than reproducing synthetic queue counts or changing existing operational controls. Landing rows are approximately 89px with real disclosure/count content; the mockup is approximately 87px. This deliberately remains above DESIGN.md's approximate 64px density preference to keep the actual information readable. The shared production shell is retained. Session search truthfully supports date/time/location/status; an exploratory agenda-text search is not advertised.
 
-[VERIFIED via browser interactions and 8 Jest suites / 283 tests] Request search, status filtering, URL-addressable views, preview selection/focus, stale response rejection, malformed-success recovery, same-day identity, mounted task state and invitation draft preservation pass. Existing visit/form, preparation and recording/video tests remain green. Lint has zero errors and five pre-existing hook warnings in the retained editors; types and production-mode webpack build pass. The required Impeccable detector returned `[]`. Source scaffolding gate/self-test, doc-currency gate/self-test, docs catalog and agent symlink invariants pass.
+[VERIFIED via browser interactions and 10 Jest suites / 302 tests] Request search, status filtering, URL-addressable views, preview selection/focus, stale response rejection, malformed-success recovery, same-day identity, mounted task state and invitation draft preservation pass. Existing visit/form, preparation and recording/video tests remain green. Lint has zero errors and five pre-existing hook warnings in the retained editors; types and production-mode webpack build pass. The required Impeccable detector returned `[]`. Source scaffolding gate/self-test, doc-currency gate/self-test, docs catalog and agent symlink invariants pass.
 
-Proof limits: this is a UI-only Mode A rehearsal, not a new hosted media/mail or production business-write rehearsal. The canonical deployed bundler remains Turbopack; the local build uses the existing webpack fallback because dependencies are symlinked across checkout roots. A local fixture-auth full reload reached the sign-in UI despite its mocked client session; the final UI pass verifies URL updates and selection without claiming a fresh sign-in/reload acceptance result.
+Proof limits: this is a UI-only Mode A rehearsal, not a new hosted media/mail or production business-write rehearsal. The canonical deployed bundler remains Turbopack; the local build uses the existing webpack fallback because dependencies are symlinked across checkout roots. The broader T5/error-state suites exposed an empty-selection startup crash after the first visual review. `Boolean(id && detail?.forId === id)` now prevents absent IDs from making a null detail appear ready. The final real-page pass includes direct Sessions reload with the actual authentication guard and URL query intact; it passes. This is local fixture authentication, not a new Microsoft SSO acceptance test.
 
 ## Claude Opus review and adjudication
 
@@ -61,7 +61,11 @@ Proof limits: this is a UI-only Mode A rehearsal, not a new hosted media/mail or
 
 The suggestion that materials filters were not reset on program/cycle change was refuted by the existing `setMaterialsFilter('all')` calls. The session date identity and URL-addressable view suggestions were implemented. Synthetic task queue counts were not invented.
 
-Final Opus confirmation is pending; do not call the task complete until its findings are adjudicated.
+[VERIFIED via final ordinary OAuth Opus review] Final verdict: **pass — no blocking defects in this bounded UI completion**. Opus compared the final real Next-page screenshots to the approved references and checked the source fixes, response fences, direct view links and preserved scope. Optional styling/legacy-component suggestions are not new scope.
+
+The subsequent broader contract test caught the startup crash described above, missed by both visual reviews. A targeted Opus follow-up explicitly verified the guard and empty/loading/error regressions: **fix correct; no remaining concrete defect in this fix**. The prior visual verdict remains valid because the guard changes only empty-detail readiness. This receipt records that review miss rather than presenting reviews as exhaustive proof.
+
+The final browser rerun passed all 16 screens, including direct Sessions reload, after the crash fix. The existing materials filter suites were updated for the deliberately approved single select and disabled zero-count options; order/count/stale-scope/recovery assertions remain. The T5 session-error test now targets the separate view, and a new test proves a failed global session read leaves cycle requests usable.
 
 ## Contract-reconcile and bounded sweep
 

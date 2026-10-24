@@ -313,7 +313,10 @@ let writes = [],
     await page.getByRole('button', { name: /Preview agenda.*1:00 PM/ }).click();
     await page.getByRole('region', { name: 'Selected session preview' }).waitFor();
     if (!(await page.getByRole('region', {name:'Selected session preview'}).evaluate(el=>el===document.activeElement))) throw Error('Preview focus did not move');
-    if (!new URL(page.url()).searchParams.has('view')) throw Error('View is not URL-addressable');
+    if (new URL(page.url()).searchParams.get('view') !== 'sessions') throw Error('View is not URL-addressable');
+    await page.reload();
+    await page.getByRole('heading', {name:'Agenda preview'}).waitFor();
+    await page.getByText('#123456 · Example University').waitFor();
     await shot('sessions-narrow');
     await page.setViewportSize({
       width: 1440,
@@ -385,7 +388,7 @@ let writes = [],
     if (errors.length) throw Error(errors.join('\n'));
     fs.writeFileSync(out + '/evidence.json', JSON.stringify({
       screens: evidence,
-      checks: ['request search', 'materials select', 'both mobile actions', 'separate sessions preview', 'all visit task panels', 'invitation draft preservation', 'session workspace', 'URL-addressable sessions view', 'preview focus and scroll', 'generated speaker review', 'WCAG A/AA automated scan', 'no horizontal overflow', 'no writes', 'no browser exceptions']
+      checks: ['request search', 'materials select', 'both mobile actions', 'separate sessions preview', 'all visit task panels', 'invitation draft preservation', 'session workspace', 'URL-addressable sessions view and direct reload', 'preview focus and scroll', 'generated speaker review', 'WCAG A/AA automated scan', 'no horizontal overflow', 'no writes', 'no browser exceptions']
     }, null, 2));
     console.log(JSON.stringify(evidence));
   } finally {
