@@ -1,6 +1,6 @@
 # Proposal Ranking D26 — invited-amount correction to the open round
 
-Date: 2026-10-23. Status: **Plan; nothing written.** Owner: Justin Gallivan.
+Date: 2026-10-23. Status: **Plan approved 2026-10-23 (merge branch first; append a round log event). Script `scripts/correct-ranking-invited-amounts.mjs` written; nothing written to production.** Owner: Justin Gallivan.
 
 ## 1. Goal and decision
 
@@ -60,7 +60,7 @@ Each claim was read in source on 2026-10-23.
   lands between plan and apply. [VERIFIED via source]
 - **Readiness is unaffected.** Readiness and preparation versions live in
   `wmkf_workflowjson` and the list rows, which this edit does not touch.
-  [VERIFIED via source: the edit's field set is only `wmkf_snapshotjson`]
+  [VERIFIED via source: the edit writes only `wmkf_snapshotjson` and `wmkf_administrationlogjson`]
 - **V2 retries don't depend on the stamps.** V2 resolves retries through `o:<UUID>`
   receipt rows, not the round's `wmkf_lastoperationid`; that field is read only on
   the v1 path (`service.js:509`). The edit leaves all stamp fields as they are.
@@ -86,13 +86,18 @@ per §2). Whether the cards say so depends on what production is running:
 
 Either order is safe. The key is harmless to code that ignores it.
 
+**Decision (owner, 2026-10-23): merge first, then edit.**
+
 ### 4.1 Plan (read-only, owner runs)
 
-A new script, `scripts/correct-ranking-d26-invited-amounts.mjs --plan`:
+`scripts/correct-ranking-invited-amounts.mjs --plan --dir=<owner folder> --approver="<name>"`
+(pure logic in `scripts/lib/ranking-invited-correction.mjs`, tested in
+`tests/unit/ranking-invited-correction.test.js`):
 
 1. Reads the D26 cycle coordinator and its active round. Requires round
    `49279ac7-3ab9-41d8-b2d6-5aaf4085e642` to be the active pointer, active state,
-   snapshot `version: 2`, exactly 23 proposals, and USD with precision 2.
+   snapshot `version: 2`, exactly 23 proposals, each with a frozen currency, and a
+   snapshot that round-trips through JSON unchanged.
 2. For each frozen proposal, reads the live request by `requestId` and requires
    `wmkf_invitedamount` non-null and not a test request. Computes the new
    `amountMinorUnits` with the app's `moneyToMinorUnits(invited, precision)`
@@ -122,7 +127,8 @@ value is identical.
 
 1. Re-reads the round. Refuses if the ETag or snapshot hash differs from the plan.
 2. Issues one `PATCH wmkf_proposalrankingrounds(<id>)` with `If-Match: <plan ETag>`
-   and body `{ wmkf_snapshotjson }` only.
+   and body `{ wmkf_snapshotjson, wmkf_administrationlogjson }` only, through the
+   adapter's `patchRound`.
 3. Appends the outcome (old/new hash, new ETag, time) to an apply log beside the
    plan.
 
@@ -169,7 +175,10 @@ In that case re-plan a reverse edit from the current state; don't force it.
    (`workflow-service.js:677`), and no V2 action appends to it. The plan as
    written leaves it alone and keeps the record in the local plan file and apply
    log. Alternative: append one `invited-amount-correction` event in the same
-   PATCH, so the round itself shows the change.
+   PATCH, so the round itself shows the change. **Decision (owner, 2026-10-23):
+   append the event.** Log readers match events by operation ID and type
+   (`service.js:72-75`, `523-526`, `883-884`), so a new type with a fresh UUID
+   cannot collide. [VERIFIED via source]
 6. **Timing.** The two PDs not yet ready will see the corrected amounts on their
    next load. The two already ready will see them too, but their readiness and
    orders are unchanged. The owner may want to tell all four that these two
