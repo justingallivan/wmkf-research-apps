@@ -46,7 +46,7 @@ does not select an API or generalized editor for suite-wide use.
 
 ## Slice 2 owner decisions — 2026-10-24
 
-[BUILT IN BRANCH; verification/review in progress, not deployed.] Reviewer deadline emails follow
+[BUILT IN BRANCH; checks and OAuth Opus build recheck passed, not deployed.] Reviewer deadline emails follow
 `docs/plans/PERSONAL_EMAIL_REVIEWER_DEADLINE_DEFAULTS_PLAN_2026-10-24.md`.
 Only the assigned PD may change/restore the deadline or retry/resend its email;
 there is no superuser exception. From/To stay server-controlled; optional Cc is

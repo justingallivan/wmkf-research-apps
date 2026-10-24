@@ -51,8 +51,30 @@ not ready. Parent verified reviewed HEAD and SHA256 of every changed file unchan
 | P3-5: bad shared config prevents repairing own defaults | Preference GET exposes own-row repair with sharedUnavailable flag; default editor is reachable even when initial preview fails; Save/Clear remains independent |
 | Test gap: defaults Save/Clear versus one-send edits | Deferred-save editor test locks conflicting edits and proves one-send draft survives Save and Clear |
 
-Corrected focused run: 131 tests in seven suites passed. Second review and final
-candidate verification are pending; do not treat the first verdict as approval.
+Corrected focused run: 131 tests in seven suites passed. OAuth Opus recheck of
+runtime candidate `26010e1b0` returned PASS, no P1/P2 remaining and no new
+actionable regressions. Parent confirmed HEAD and all reviewed file hashes
+unchanged. The first verdict remains historical, not an approval of a79003426.
+
+Final verification of `26010e1b0`: 1,460 suites / 25,175 tests / five snapshots
+passed; 21 suites / 247 tests skipped. Full run started and ended at that HEAD
+(`/tmp/slice2-jest-final-isolated.log`, exit 0). One prior broad run collided with
+an Atlas self-test temporary fixture and failed one repository-scanner test;
+after the gates finished, the entire isolated rerun passed. Do not run fixture-
+writing gates concurrently with repository-scanning unit tests. Jest reported an
+ungraceful worker-exit warning; exit status was 0 and no teardown repair was made
+outside this feature's scope.
+
+Final production build (`/tmp/slice2-build-final.log`), changed-file lint,
+api-routes, route-lifecycle-auth, route-service-boundary,
+reviewer-engagement-boundary, dataverse-access-layer, trust-boundary-guid,
+odata-escape, dynamics-context-boundary, status-enum-parity, Atlas,
+fact-consistency, canonical-pointers, docs-catalog, doc-currency, doc-symbol-refs,
+build-claim-freshness, secret-scan, scaffolding-tokens, harness-framing and types
+passed; each applicable gate/self-test ran sequentially. Local browser confirmation
+at 1440px/390px passed the same checks as the first round. Both owned localhost
+rehearsal servers were stopped. Unrelated critique and output/ files remain
+untouched. No push, merge or deployment was performed.
 
 ## Whole-flow / contract-reconcile
 
@@ -87,3 +109,92 @@ Proofs expire after five minutes but are not single-use; manual resend/retry
 replay outside the UI is an existing-pattern limitation. A transport timeout on
 the date PATCH still has the baseline ambiguous-write limitation; this change does
 not claim to solve it. No migration or PostgreSQL integration change is in scope.
+
+## Final Opus recheck — verbatim receipt
+
+The following is the read-only review result for `26010e1b0`, not an independent
+execution of tests by Opus. Build/test results above were run by the parent.
+
+# Slice 2 build recheck: SLICE2_OPUS_BUILD_RECHECK_2026_10_24
+
+**Verdict: PASS.** All nine earlier findings are resolved in source, and each fix has a test that would have failed on the old code. No P1 or P2 remains. I found no new actionable regressions, only three small test and copy nits.
+
+I used only Read/Grep/Glob and made no edits. I did not run tests, a build or git. The "131 tests in seven suites passed" figure is your report; I didn't reproduce it. I'm making no claim about the full suite, the production build or the gates on this HEAD.
+
+## Earlier findings
+
+**P1-1: the email never sent after a real save or restore — RESOLVED**
+- **Fix:** `lib/services/reviewer-due-extension.js:233-235` adds `selectedSnapshot`, which keeps only the `SUGGESTION_SELECT` / `REQUEST_SELECT` fields plus `_etag`, in a fixed order. The binding uses it at `:283`, so `_formatted` annotations never enter the proof digest. `postWriteStableDigest` (`:341-344`) removes only the date override, the grant timestamp and the ETag. That is safe because `changeReviewDeadline` → `updateLifecycle` writes only those two fields (`change-review-deadline.js:25-31`; `reviewer-suggestion.js:1968-1993`).
+- **Key order:** `deadlinePreviewDigest` (`reviewer-deadline-personalization.js:25-33`) now sorts the keys of plain objects at every level and leaves arrays in order, so Cc order still counts. Test: `reviewer-deadline-personalization.test.js:53-57`.
+- **Tests that would fail on the old code:**
+  - `reviewer-due-extension.test.js:182-194` covers both save and restore. After the write it adds `wmkf_reviewstatus_formatted`, changes or clears `wmkf_reviewduedateoverride_formatted`, adds a request annotation and reverses every key. It then asserts `notified:true` and exactly one dispatch. The old exclusion list didn't cover `wmkf_reviewstatus_formatted`, so the old code would have returned `preview_stale` here.
+  - `:195-198` covers annotations that change between preview and send. Proof drift on real business data is still caught at `:111-118`.
+
+**P2-1: an empty Admin body stored as null blocked every email — RESOLVED**
+- **Fix:** `reviewer-deadline-personalization.js:20-21` accepts a found body with a null value and treats it as `''`. A missing key, or a subject that is null or not a string, still returns `misconfigured`.
+- **Test:** `reviewer-deadline-personalization.test.js:48-52` covers a null body succeeding and a null subject blocking.
+- **Consistency:** the Admin GET already shows null as `''` (`pages/api/admin/email-defaults.js:21`).
+
+**P2-2: the saved-but-unsent message also said "No deadline was changed" — RESOLVED**
+- **Fix:** `ReviewerDueDateEditor.js:158-167` uses separate saved-state wording for `read_failed`, `notification_unavailable`, `misconfigured` and `token_recovery_required`. I checked every other reason the post-write re-check can return: none contains "No deadline was changed".
+- **Test:** `reviewer-due-date-editor.test.js:76-81` runs each of the three reachable reasons and asserts "No deadline was changed" is absent.
+
+**P3-1: the seed overwrote an intentionally empty Admin body — RESOLVED**
+- **Fix:** `scripts/seed-email-defaults.mjs:161` skips the extension body whenever `current.found` is true.
+- **Test:** `seed-email-defaults.test.js:206-213` runs `--execute` with `''`, `'   '` and `null`, and asserts nothing is written.
+
+**P3-2: the post-write failure branch always said `retryable: true` — RESOLVED**
+- **Fix:** `reviewer-due-extension.js:366` is now `retryable: current.ok || current.retryable !== false`.
+- **Test:** `reviewer-due-extension.test.js:99-104` asserts `retryable:false` for `cc_not_allowed_for_test_request` after the write.
+
+**P3-3: a non-PD got a 403 without `assigned_pd_required` — RESOLVED**
+- **Fix:** `pages/api/review-manager/review-due-extension.js:96` maps a 403 `ServiceHttpError` to `{ok:false, reason:'assigned_pd_required'}`.
+- **Scope:** the only 403 the shared helper throws is the lead-PD denial (`reviewer-request-authorization.js:130-133`). Its 400 and 404 errors pass through unchanged, so the mapping is exact.
+- **Test:** `reviewer-due-extension-route.test.js:39-44`.
+
+**P3-4: `request_mismatch` had no editor message — RESOLVED**
+- **Fix:** editor message at `ReviewerDueDateEditor.js:39`.
+- **Test:** route mapping (409) at `reviewer-due-extension-route.test.js:35`.
+
+**P3-5: a broken shared config blocked repairing personal wording — RESOLVED**
+- **Route:** the preferences GET (`deadline-email-preferences.js:37-53`) now always reads the personal row.
+  - A damaged personal row returns 409 with `sharedUnavailable`.
+  - A good row returns 200 with `sharedUnavailable` and `shared:null`.
+  - A failed personal read still returns 503.
+- **UI:** `DeadlineWordingDefault` sits outside the `template &&` block (`ReviewerDueDateEditor.js:211`), so it stays reachable when the first preview fails. Its messages are at `DeadlineWordingDefault.js:65,73`.
+- **Tests:** `deadline-email-preferences-route.test.js:109-115` and `reviewer-due-date-editor.test.js:95-102`.
+
+**Test gap: defaults Save/Clear during a one-send edit — RESOLVED**
+- `reviewer-due-date-editor.test.js:82-93` holds a Save open, asserts the one-send message field is locked, then asserts its text survives both Save and Clear.
+
+## New findings (all non-blocking)
+
+1. **Route test is one reason short.** The reason-to-status table at `reviewer-due-extension-route.test.js:35` has 21 entries, but `REASON_STATUS` has 22: `send_failed` (502) is missing. "All reason statuses" is really all but one.
+2. **A test name overclaims.** `reviewer-due-extension.test.js:195` says "selected business data still does" invalidate a preview, but it only checks the annotation half. The business-data half is covered at `:111-118`, so this is a naming issue, not a coverage gap.
+3. **One saved-state message can't be reached.** The `token_recovery_required` message at `ReviewerDueDateEditor.js:163` can't appear after a save. The post-write re-check runs as a retry, which skips the token check at `reviewer-due-extension.js:250`. The copy is harmless; it just isn't evidence of a reachable path.
+
+I found no regressions in these areas:
+- Assigned-PD-only gating.
+- Proof binding (operation, actor, Cc, template, ETag).
+- Synthetic-request Cc refusal, before the write and at dispatch.
+- Empty or whitespace body passthrough.
+- Retry and resend never writing a date.
+- No retry proof after an uncertain send.
+- Exact own-user Save/Clear.
+- The personal-read fallback notice.
+
+## Unchanged baseline limits (not introduced by this change)
+
+- Retry and resend proofs can be reused within their five minutes.
+- The race between the request and suggestion records remains; the suggestion ETag doesn't lock the request.
+- A timed-out date PATCH is still reported as `save_failed` even if it may have been written.
+- Dynamics accepting an empty email description hasn't been checked live.
+- Errors from the shared helper other than 403 still return the raw message as `reason`, so the editor shows its generic text.
+
+## Review limits
+
+- I re-read only the changed files and their direct callees. For unchanged files (`dynamics/{http,annotations}.js` and most of `reviewer-request-authorization.js`) I relied on the earlier review.
+- I read only the relevant parts of the plan doc and the security matrix, and only the extension-body block of `seed-email-defaults.test.js`.
+- I didn't confirm that `getRequestById` returns `_etag`. If it doesn't, post-write change detection on the request rests on its four selected fields. That was already true before this change.
+- Whether Dataverse stores an empty body as null, and whether it emits formatted annotations on these date columns, still isn't observed live. Both are covered only by source reasoning and mocks.
+- HEAD, the changed-file SHA256s and the full suite, build and gate results are yours to verify.

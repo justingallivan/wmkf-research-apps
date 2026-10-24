@@ -3,7 +3,7 @@ title: Personal reviewer deadline email defaults — slice 2
 domain: reviewer-engagement
 kind: plan
 status: built-in-branch
-summary: Owner-approved slice 2 decisions for assigned-PD-only deadline changes, editable preview and personal wording, optional empty bodies, one-send Cc barred on synthetic requests, and truthful retry outcomes. Implementation built on codex/reviewer-deadline-email-defaults; checks and Opus build review in progress, not deployed.
+summary: Owner-approved slice 2 decisions for assigned-PD-only deadline changes, editable preview and personal wording, optional empty bodies, one-send Cc barred on synthetic requests, and truthful retry outcomes. Implementation built on codex/reviewer-deadline-email-defaults; checks and OAuth Opus build re-review passed; not deployed.
 owner: product-engineering
 related:
   - docs/plans/PERSONAL_EMAIL_DEFAULTS_INVENTORY_2026-09-24.md
@@ -16,9 +16,9 @@ related:
 
 ## Status and scope
 
-[PLANNED; explicit owner decisions in the 2026-10-24 conversation.] This is the
+[BUILT IN BRANCH; owner decisions agreed in the 2026-10-24 conversation.] This is the
 implementation plan for slice 2. Product decisions below are agreed; runtime
-implementation and acceptance tests are now built on `codex/reviewer-deadline-email-defaults`; verification and Opus build review are in progress. No live configuration, email or external record was changed.
+implementation and acceptance tests are now built on `codex/reviewer-deadline-email-defaults`; verification and OAuth Opus build re-review passed. No live configuration, email or external record was changed.
 
 Change surface: reviewer deadline editor, deadline preview/save/retry service and
 route, own-user wording preferences, and shared Admin subject/body registration.
@@ -326,5 +326,9 @@ Admin bodies as empty; preserve empty Admin bodies during seed; use saved-state
 error wording; preserve non-retryable recipient-policy reasons; map non-PD errors
 and request mismatch; and permit own-default repair even with broken shared
 configuration. Regression cases for those changes pass (131 focused tests).
-A fresh Opus verification of the corrected candidate is pending. Full receipt:
+Fresh OAuth Opus verification of corrected runtime candidate `26010e1b0` returned
+PASS with no P1/P2 remaining or new actionable regressions. Final isolated broad
+run passed 25,175 tests / five snapshots (247 skipped), with matching start/end
+HEAD; production build, changed-file lint, scoped gates/self-tests and the second
+desktop/mobile confirmation passed. Full receipt:
 `docs/audits/REVIEWER_DEADLINE_EMAIL_BUILD_2026-10-24.md`.
