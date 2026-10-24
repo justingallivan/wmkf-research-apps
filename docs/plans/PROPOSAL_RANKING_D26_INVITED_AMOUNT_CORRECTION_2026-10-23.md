@@ -6,7 +6,7 @@ Date: 2026-10-23. Status: **Plan; nothing written.** Owner: Justin Gallivan.
 
 The D26 round froze `akoya_request` (requested amount) for each proposal when it
 opened. The meeting should use `wmkf_invitedamount` (invited amount). Two of four
-PDs have already marked themselves ready, and the owner does not want anyone to
+PDs have already submitted [owner-reported; step 4.1 records it], and the owner does not want anyone to
 re-rank. So correct the amounts **inside the open round's frozen snapshot**, in
 place, without touching any PD assessment, readiness, or workflow state.
 
@@ -72,14 +72,19 @@ Best to apply when no PD is actively editing.
 
 ## 4. Steps
 
-### 4.0 Prerequisite — release the labelling change first
+### 4.0 Ordering choice — amount only, or amount and label
 
-Branch `proposal-ranking-invited-amount` (`1553bc0a3`) makes cards label amounts
-**Invited** when the snapshot says `amountSource: 'invited'`. Production code
-today hard-codes "Requested" and drops `amountSource` (the v2 allowlist). If the
-edit ran first, the corrected $1.3M would display as "Requested". So merge and
-deploy the branch first, then run the edit. The edit sets `amountSource:
-'invited'` on all 23 proposals (true for every one, per §2).
+The edit sets `amountSource: 'invited'` on all 23 proposals (true for every one,
+per §2). Whether the cards say so depends on what production is running:
+
+- **Edit without merging the branch:** amounts and totals are correct. Production
+  code drops `amountSource` (the v2 `publicSnapshot` allowlist) and labels every
+  card "Requested", so the two cards would read "Requested $1,300,000.00".
+- **Merge `proposal-ranking-invited-amount` first, then edit:** amounts are
+  correct and every card reads **Invited**. This puts the branch's formal
+  `/contract-reconcile` pass and deliberate promotion ahead of the edit.
+
+Either order is safe. The key is harmless to code that ignores it.
 
 ### 4.1 Plan (read-only, owner runs)
 
@@ -90,7 +95,8 @@ A new script, `scripts/correct-ranking-d26-invited-amounts.mjs --plan`:
    snapshot `version: 2`, exactly 23 proposals, and USD with precision 2.
 2. For each frozen proposal, reads the live request by `requestId` and requires
    `wmkf_invitedamount` non-null and not a test request. Computes the new
-   `amountMinorUnits` = invited × 100 (must be a safe integer).
+   `amountMinorUnits` with the app's `moneyToMinorUnits(invited, precision)`
+   (`calculations.js:102`), so it matches what a fresh preview would freeze.
 3. Requires exactly the two changes in §2. Each must have its old value equal to
    the frozen requested amount, and nothing else may differ. Otherwise it stops
    and prints the difference.
@@ -148,16 +154,26 @@ In that case re-plan a reverse edit from the current state; don't force it.
    Atlas notes that ordinary staff must not gain direct privileges. If the local
    identity lacks it, the apply fails closed with 403, and we decide then. No
    role change without a separate decision.
-2. **Interlock.** That the target interlock permits a local, acknowledged PATCH
+2. **Write context.** Plan, apply, verify and rollback run inside
+   `bypassDynamicsRestrictions(<purpose>, …)`, the same trusted script context
+   `scripts/apply-research-copi-stage-b.mjs` used for production writes on
+   2026-10-23. [VERIFIED via source, `apply-research-copi-stage-b.mjs:341`]
+3. **Interlock.** That the target interlock permits a local, acknowledged PATCH
    on this entity set is [ASSUMED]. The Stage B co-PI apply used the same ack
    path for other entities. The apply surfaces a refusal as an error, not a
    bypass.
-3. **Dataverse audit** on `wmkf_proposalrankinground` is [ASSUMED — not
+4. **Dataverse audit** on `wmkf_proposalrankinground` is [ASSUMED — not
    probed]. The plan file and apply log are the record of this change either way.
-4. **Timing.** The two PDs not yet ready will see the corrected amounts on their
+5. **In-round record (owner decision).** The round has
+   `wmkf_administrationlogjson`. V2 creates it as `[]`
+   (`workflow-service.js:677`), and no V2 action appends to it. The plan as
+   written leaves it alone and keeps the record in the local plan file and apply
+   log. Alternative: append one `invited-amount-correction` event in the same
+   PATCH, so the round itself shows the change.
+6. **Timing.** The two PDs not yet ready will see the corrected amounts on their
    next load. The two already ready will see them too, but their readiness and
    orders are unchanged. The owner may want to tell all four that these two
    amounts changed.
-5. **Workbook already shared?** If anyone exported a workbook before the edit, it
+7. **Workbook already shared?** If anyone exported a workbook before the edit, it
    has the old amounts. Reveal hasn't happened (2 of 4 ready), so no collective
    workbook should exist yet [ASSUMED; step 4.1 reports the workflow stage].
