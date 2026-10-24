@@ -3422,7 +3422,7 @@ function PresentationVideoLine({ v }) {
 function TranscriptWorkflow({ m, t, z, requestId, transcriptInputRef, refreshToken = 0, shell, setupHeader, onStatusChange }) {
   const [editionPolicy, setEditionPolicy] = useState(null);
   const handleEditionPolicy = useCallback((enrolled, policy) => {
-    setEditionPolicy({ enrolled, activeEditionId: policy?.activeEditionId || null });
+    setEditionPolicy({ enrolled, activeEditionId: policy?.activeEditionId || null, available: policy?.activeEditionAvailable });
   }, []);
   const [step1Open, setStep1Open] = useState(false);
   const [uploadInstead, setUploadInstead] = useState(false);
@@ -3500,7 +3500,7 @@ function TranscriptWorkflow({ m, t, z, requestId, transcriptInputRef, refreshTok
     ...(boardReadiness.video ? [boardReadiness.video.key] : []), ...(videoPending ? ['pending'] : []),
     ...(videoNeverRead ? ['unknown'] : [])].join(',');
   const boardSignature = !editionPolicy ? 'pending' : editionPolicy.enrolled === null ? 'unknown'
-    : editionPolicy.enrolled ? (editionPolicy.activeEditionId ? 'on' : 'not_yet') : legacyBoardSignature;
+    : editionPolicy.enrolled ? (editionPolicy.activeEditionId ? (editionPolicy.available === false || editionPolicy.available === null ? 'unknown' : 'on') : 'not_yet') : legacyBoardSignature;
   const hasTranscript = Boolean(material || editionPolicy?.activeEditionId);
   // A failed refresh keeps the cached materials on screen, so the chip says unknown until a read succeeds again.
   const readFailed = Boolean(m.readFailed);

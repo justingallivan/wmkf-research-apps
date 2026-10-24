@@ -45,3 +45,8 @@ test('an older request read cannot populate a new request after navigation',asyn
  await act(async()=>{resolveOld(await response(approved));});
  await waitFor(()=>expect(screen.queryByRole('button',{name:'Withdraw from Board'})).toBeNull());
 });
+
+test.each([[false,/approved presentation needs attention/],[null,/files could not be checked/]])('does not claim Board availability when approved health is %s',async(health,message)=>{
+ global.fetch.mockImplementation(()=>response({...approved,activeEditionAvailable:health}));render(<PresentationApprovalPanel requestId={requestId}/>);
+ await screen.findByText(message);expect(screen.queryByText(/The approved presentation is available to the Board/)).toBeNull();expect(screen.getByRole('button',{name:'Withdraw from Board'})).toBeEnabled();
+});

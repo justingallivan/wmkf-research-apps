@@ -186,6 +186,7 @@ export default function BriefingPage() {
 
       <section className="mt-6 rounded-xl border border-gray-200 bg-white p-5">
         <h2 className="text-base font-semibold text-gray-900">Research presentation materials</h2>
+        {data.presentationUnavailable && <p className="mt-2 text-sm text-gray-600" role="status">Presentation materials could not be checked. Refresh this page to try again.</p>}
         {data.materials?.length ? (
           <ul className="mt-2 space-y-1 text-sm">
             {data.materials.map((material) => (
@@ -203,7 +204,7 @@ export default function BriefingPage() {
             ))}
           </ul>
         ) : (
-          <p className="mt-2 text-sm text-gray-600">No research presentation materials yet. Slides, recordings, and transcripts appear here as staff add them.</p>
+          <p className="mt-2 text-sm text-gray-600">{data.presentationUnavailable ? 'Available applicant materials will appear here when they can be checked.' : 'No research presentation materials yet. Slides, recordings, and transcripts appear here as staff add them.'}</p>
         )}
       </section>
 

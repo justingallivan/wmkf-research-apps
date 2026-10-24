@@ -138,7 +138,9 @@ function Page({ token, data, proposal }) {
         </p>
       </header>
 
-      {!video && !summary && (
+      {data.presentationUnavailable && <p className="mt-10 rounded-xl bg-gray-50 px-6 py-5 text-lg text-gray-700" role="status">Presentation materials could not be checked. Refresh this page to try again.</p>}
+
+      {!data.presentationUnavailable && !video && !summary && (
         <p className="mt-10 rounded-xl bg-gray-50 px-6 py-5 text-lg text-gray-700">
           The presentation recording and summary will be added after the site visit.
         </p>

@@ -135,8 +135,8 @@ test('writes the presentation-only TXT, registers the row under the derivative k
   expect(uploadedBytes.toString('utf8')).toBe(`\uFEFF${expectedText}`);
   expect(expectedText).toContain('Our project.');
   expect(expectedText).not.toContain('Staff only discussion.');
-  expect(deps.uploadFile).toHaveBeenCalledWith('akoya_request', 'akoya_request/1002912_x/Site Visit - Presentation Transcript',
-    PRESENTATION_FILENAME, uploadedBytes, 'text/plain; charset=utf-8', { conflictBehavior: 'replace' });
+  expect(deps.uploadFile).toHaveBeenCalledWith('akoya_request', `akoya_request/1002912_x/Site Visit - Presentation Transcript/revision-${REVISION_ID}/attempt-${LEASE_TOKEN}`,
+    PRESENTATION_FILENAME, uploadedBytes, 'text/plain; charset=utf-8', { conflictBehavior: 'fail' });
   expect(PRESENTATION_FILENAME).not.toMatch(/[0-9a-f]{8}-[0-9a-f]{4}-/i);
 
   const [payload, options] = deps.createDocument.mock.calls[0];
@@ -169,8 +169,8 @@ test('one action writes both halves: the presentation first, then the staff disc
   expect(deps.acquireSlotLease.mock.calls.map(([arg]) => arg.artifactType)).toEqual([
     REQUEST_DOCUMENT_ARTIFACT_TYPE.PRESENTATION_TRANSCRIPT, REQUEST_DOCUMENT_ARTIFACT_TYPE.STAFF_DISCUSSION_TRANSCRIPT]);
   expect(deps.uploadFile.mock.calls.map((call) => [call[1], call[2]])).toEqual([
-    ['akoya_request/1002912_x/Site Visit - Presentation Transcript', PRESENTATION_FILENAME],
-    ['akoya_request/1002912_x/Site Visit - Staff Discussion Transcript', DISCUSSION_FILENAME],
+    [`akoya_request/1002912_x/Site Visit - Presentation Transcript/revision-${REVISION_ID}/attempt-${LEASE_TOKEN}`, PRESENTATION_FILENAME],
+    [`akoya_request/1002912_x/Site Visit - Staff Discussion Transcript/revision-${REVISION_ID}/attempt-${LEASE_TOKEN}`, DISCUSSION_FILENAME],
   ]);
   const discussionText = uploads.get('disc-item').bytes.toString('utf8');
   expect(discussionText).toBe(`\uFEFF${buildStaffDiscussionTranscriptText(content, speakerNames, 2000)}`);
@@ -367,4 +367,12 @@ test('v7 discussion derivative supplies unidentified labels while presentation k
   expect(discussion).toContain('Staff only discussion.');
   expect(discussion).not.toContain('Foundation Staff');
   expect(speakerNames.A).toBe('Foundation Staff');
+});
+
+test('a correction attempt never uploads to an earlier presentation candidate path',async()=>{
+ await call();const firstPath=deps.uploadFile.mock.calls[0][1];
+ state.rows=[transcriptRow];state.byKey=[];deps.randomUUID.mockReturnValue('bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb');
+ await call();const secondPath=deps.uploadFile.mock.calls[2][1];
+ expect(secondPath).not.toBe(firstPath);
+ for(const upload of deps.uploadFile.mock.calls)expect(upload[5]).toEqual({conflictBehavior:'fail'});
 });

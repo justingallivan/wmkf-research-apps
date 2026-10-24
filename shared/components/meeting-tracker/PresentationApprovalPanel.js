@@ -69,7 +69,10 @@ export default function PresentationApprovalPanel({ requestId, refreshToken = 0,
     {!loading && data && <>
       <p className="mt-2 max-w-prose text-sm leading-6 text-gray-700">{!data.enrolled
         ? 'Set up one reviewed presentation version for the Board. Preparing corrections will keep that approved version available.'
-        : active ? 'The approved presentation is available to the Board. It stays available while corrections are drafted.'
+        : active ? (data.activeEditionAvailable === false
+          ? 'The approved presentation needs attention: one or more approved files no longer match. Prepare and approve a replacement, or withdraw it.'
+          : data.activeEditionAvailable === null ? 'The approved version is retained, but its files could not be checked. Refresh before relying on Board availability.'
+            : 'The approved presentation is available to the Board. It stays available while corrections are drafted.')
           : data.withdrawnAt ? 'The presentation has been withdrawn. Approve a reviewed version before making it available again.'
             : 'No presentation version has been approved. Applicant materials remain available under their existing sharing settings.'}</p>
       {!data.canApprove && <p className="mt-2 text-sm text-gray-600">The assigned Program Coordinator approves or withdraws presentation materials.</p>}

@@ -249,3 +249,12 @@ test('expired or revoked context fails closed without rendering material names',
   expect(await screen.findByText('This presentation link is unavailable or has expired.')).toBeInTheDocument();
   expect(screen.queryByText('Slides')).not.toBeInTheDocument();
 });
+
+test('approval lookup failure is unavailable rather than a promise of future materials', async () => {
+  requestJson.mockImplementation(async url => url.includes('mode=check') ? {ok:true,material:PROPOSAL}
+    : {...context([SLIDES_PDF]),presentationUnavailable:true});
+  render(<PresentationMaterialsPage />);
+  await screen.findByText('Presentation materials could not be checked. Refresh this page to try again.');
+  expect(screen.queryByText('The presentation recording and summary will be added after the site visit.')).toBeNull();
+  expect(await screen.findByText('Slides')).toBeVisible();
+});

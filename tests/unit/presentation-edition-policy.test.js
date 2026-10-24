@@ -69,13 +69,20 @@ test('GET keeps withdrawal status available when candidate sources cannot be loa
 
 test('both Board readers serve the retained approved video after a replacement supersedes its split and source',async()=>{
  const newer={...rows[2],wmkf_requestdocumentid:'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee',wmkf_sharepointitemid:'unapproved-replacement',wmkf_lifecyclestate:LIFE.DRAFT};
- const internal={...rows[0],wmkf_requestdocumentid:'ffffffff-ffff-4fff-8fff-ffffffffffff',wmkf_artifacttype:TYPE.STAFF_DISCUSSION_SUMMARY};
- const d={getRequest:async()=>({akoya_requestid:requestId,akoya_requestnum:'123456'}),findDocuments:async()=>({records:[...rows,newer,internal]}),readPresentationVisibility:async()=>visibility,presentationSchemaReady:()=>true,presentationRequestAllowed:()=>true,resolveMediaDownloadUrl:async(driveId,itemId)=>({driveId,itemId,size:10,quickXorHash:'video-hash',eTag:'metadata-changed',mimeType:'video/mp4',filename:'cut.mp4',downloadUrl:'https://example.org/verified-download'}),getApprovedVideoCut:jest.fn(()=>{throw new Error('mutable split lookup must not run');})};
+ const internalRows=[TYPE.RECORDING,TYPE.TRANSCRIPT,TYPE.STAFF_DISCUSSION_TRANSCRIPT,TYPE.STAFF_DISCUSSION_SUMMARY].map((type,i)=>({...rows[0],wmkf_requestdocumentid:`ffffffff-ffff-4fff-8fff-fffffffffff${i}`,wmkf_artifacttype:type}));
+ const d={getRequest:async()=>({akoya_requestid:requestId,akoya_requestnum:'123456'}),findDocuments:async()=>({records:[...rows,newer,...internalRows]}),readPresentationVisibility:async()=>visibility,presentationSchemaReady:()=>true,presentationRequestAllowed:()=>true,resolveMediaDownloadUrl:async(driveId,itemId)=>({driveId,itemId,size:10,quickXorHash:'video-hash',eTag:'metadata-changed',mimeType:'video/mp4',filename:'cut.mp4',downloadUrl:'https://example.org/verified-download'}),getApprovedVideoCut:jest.fn(()=>{throw new Error('mutable split lookup must not run');})};
  for(const resolver of [resolvePresentationMember,resolveBriefingMediaMember]){
    await expect(resolver({requestId,member:`material:${rows[2].wmkf_requestdocumentid}`,mode:'watch'},d)).resolves.toMatchObject({redirectUrl:'https://example.org/verified-download'});
    await expect(resolver({requestId,member:`material:${newer.wmkf_requestdocumentid}`,mode:'watch'},d)).rejects.toMatchObject({httpStatus:404});
-   await expect(resolver({requestId,member:`material:${internal.wmkf_requestdocumentid}`,mode:'open'},d)).rejects.toMatchObject({httpStatus:404});
+   for(const internal of internalRows) await expect(resolver({requestId,member:`material:${internal.wmkf_requestdocumentid}`,mode:'open'},d)).rejects.toMatchObject({httpStatus:404});
    await expect(resolver({requestId,member:`material:${rows[2].wmkf_requestdocumentid}`,mode:'watch'},{...d,readPresentationVisibility:async()=>({...visibility,active_edition_id:null})})).rejects.toMatchObject({httpStatus:404});
+ }
+ for(const resolver of [resolvePresentationMember,resolveBriefingMediaMember]) {
+   let withdrawn=false;
+   await expect(resolver({requestId,member:`material:${rows[2].wmkf_requestdocumentid}`,mode:'watch'}, {...d,
+     readPresentationVisibility:async()=>withdrawn?{...visibility,version:4,active_edition_id:null}:visibility,
+     resolveMediaDownloadUrl:async(...args)=>{withdrawn=true;return d.resolveMediaDownloadUrl(...args);},
+   })).rejects.toMatchObject({httpStatus:404});
  }
  expect(d.getApprovedVideoCut).not.toHaveBeenCalled();
 });

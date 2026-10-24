@@ -333,3 +333,10 @@ test('consultant feedback: no attachment link when the item carries none', async
   await screen.findByText('Jane Doe');
   expect(screen.queryByRole('link', { name: /notes\./ })).not.toBeInTheDocument();
 });
+
+test('approval lookup failure is distinct from no presentation materials', async () => {
+  global.fetch=jest.fn().mockResolvedValue(response({ok:true,title:'Example University',reviews:[],materials:[],presentationUnavailable:true}));
+  render(<BriefingPage />);
+  await screen.findByText('Presentation materials could not be checked. Refresh this page to try again.');
+  expect(screen.queryByText(/No research presentation materials yet/)).toBeNull();
+});
