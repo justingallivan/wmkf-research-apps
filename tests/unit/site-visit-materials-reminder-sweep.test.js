@@ -92,7 +92,7 @@ test('nothing missing, no sender mailbox, and a lost claim each skip without sen
   expect(complete.claim).not.toHaveBeenCalled();
 
   const noSender = deps({ getSender: async () => null });
-  expect(await sweepMaterialsReminders({}, noSender)).toMatchObject({ skippedNoSender: 1, sent: 0, errors: [{ id: 'c1', error: 'collection creator has no mailbox' }] });
+  expect(await sweepMaterialsReminders({}, noSender)).toMatchObject({ skippedNoSender: 1, sent: 0, errors: [{ id: 'c1', error: 'Automatic delivery is retired. The Program Coordinator must send the reminder in Meeting Tracker.' }] });
   expect(noSender.claim).not.toHaveBeenCalled();
 
   const noRecipient = deps({ resolveContacts: async () => { throw recipientsRequired(); } });
@@ -190,7 +190,7 @@ test('the default sender lookup refuses a disabled or mailbox-less creator', asy
   const { DEFAULT_DEPENDENCIES } = require('../../lib/services/site-visit-materials/reminder-sweep');
   expect(await DEFAULT_DEPENDENCIES.getSender('disabled')).toBeNull();
   expect(await DEFAULT_DEPENDENCIES.getSender('nomail')).toBeNull();
-  expect(await DEFAULT_DEPENDENCIES.getSender('ok')).toEqual({ email: 'pc@wmkeck.org', systemUserId: 'ok' });
+  expect(await DEFAULT_DEPENDENCIES.getSender('ok')).toBeNull();
   expect(DEFAULT_DEPENDENCIES.canReadLink({ token_ciphertext: 'not-sealed' })).toBe(false);
   jest.dontMock('../../lib/dataverse/adapters/system-user.js');
 });

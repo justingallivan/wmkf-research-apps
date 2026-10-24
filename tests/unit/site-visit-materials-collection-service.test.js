@@ -67,6 +67,7 @@ function deps(overrides = {}) {
   let stored = null;
   const d = {
     schemaReady: () => true,
+    getCoordinator: jest.fn(async () => ({ systemUserId: ACTOR, profileId: 7, email: 'pc@wmkeck.org', name: 'Casey Coordinator', revision: 'r1' })),
     getDueBusinessDays: jest.fn(async () => ({ dueBusinessDays: 2, dueDaysSource: 'default' })),
     getRequest: jest.fn(async () => request()),
     findActiveSiteVisit: jest.fn(async () => visit()),
@@ -137,13 +138,13 @@ function openMaterialsRow() {
 
 async function runMaterialsAction(action, d) {
   if (action === 'create') {
-    return createMaterialsCollection({ requestId: REQUEST_ID, actorId: ACTOR, fromEmail: 'pc@wmkeck.org', preparedEmail: MATERIALS_PREPARED_EMAIL }, d);
+    return createMaterialsCollection({ requestId: REQUEST_ID, actorId: ACTOR, profileId: 7, fromEmail: 'pc@wmkeck.org', preparedEmail: MATERIALS_PREPARED_EMAIL }, d);
   }
   d.__setStored(openMaterialsRow());
   if (action === 'invite') {
-    return inviteMaterialsContributors({ requestId: REQUEST_ID, actorId: ACTOR, fromEmail: 'pc@wmkeck.org', preparedEmail: MATERIALS_PREPARED_EMAIL }, d);
+    return inviteMaterialsContributors({ requestId: REQUEST_ID, actorId: ACTOR, profileId: 7, fromEmail: 'pc@wmkeck.org', preparedEmail: MATERIALS_PREPARED_EMAIL }, d);
   }
-  return remindMaterialsContributors({ requestId: REQUEST_ID, actorId: ACTOR, fromEmail: 'pc@wmkeck.org', preparedEmail: MATERIALS_PREPARED_EMAIL }, d);
+  return remindMaterialsContributors({ requestId: REQUEST_ID, actorId: ACTOR, profileId: 7, fromEmail: 'pc@wmkeck.org', preparedEmail: MATERIALS_PREPARED_EMAIL }, d);
 }
 
 function expectMaterialsEffects(d, action, happened) {
@@ -233,7 +234,7 @@ test('canonical filenames follow §7.3 and the registry match is by artifact typ
 
 test('create: advancing request + active visit → due two business days before in the visit zone, closes visit end + 7d, sealed link, invitation to PI and liaison', async () => {
   const d = deps();
-  const result = await createMaterialsCollection({ requestId: REQUEST_ID, actorId: ACTOR, fromEmail: 'pc@wmkeck.org' }, d);
+  const result = await createMaterialsCollection({ requestId: REQUEST_ID, actorId: ACTOR, profileId: 7, fromEmail: 'pc@wmkeck.org' }, d);
   const inserted = d.insertCollection.mock.calls[0][0];
   expect(inserted.dueAt.toISOString()).toBe('2026-10-05T16:00:00.000Z'); // Mon, same wall-clock time
   expect(inserted.closesAt.toISOString()).toBe('2026-10-14T19:00:00.000Z');
@@ -268,19 +269,19 @@ test('create: advancing request + active visit → due two business days before 
 });
 
 test('create refusals: no visit, already open, no recipient email, not schedulable; an email failure keeps the row and reports invitationSent=false', async () => {
-  await expect(createMaterialsCollection({ requestId: REQUEST_ID, actorId: ACTOR, fromEmail: 'pc@wmkeck.org' }, deps({ findActiveSiteVisit: jest.fn(async () => null) })))
+  await expect(createMaterialsCollection({ requestId: REQUEST_ID, actorId: ACTOR, profileId: 7, fromEmail: 'pc@wmkeck.org' }, deps({ findActiveSiteVisit: jest.fn(async () => null) })))
     .rejects.toMatchObject({ code: 'site_visit_materials_visit_required' });
-  await expect(createMaterialsCollection({ requestId: REQUEST_ID, actorId: ACTOR, fromEmail: 'pc@wmkeck.org' }, deps({ getOpenCollection: jest.fn(async () => ({ id: 'x' })) })))
+  await expect(createMaterialsCollection({ requestId: REQUEST_ID, actorId: ACTOR, profileId: 7, fromEmail: 'pc@wmkeck.org' }, deps({ getOpenCollection: jest.fn(async () => ({ id: 'x' })) })))
     .rejects.toMatchObject({ code: 'site_visit_materials_exists' });
-  await expect(createMaterialsCollection({ requestId: REQUEST_ID, actorId: ACTOR, fromEmail: 'pc@wmkeck.org' }, deps({ resolveRecipients: jest.fn(async () => ({ pi: { email: null }, liaison: { email: null } })) })))
+  await expect(createMaterialsCollection({ requestId: REQUEST_ID, actorId: ACTOR, profileId: 7, fromEmail: 'pc@wmkeck.org' }, deps({ resolveRecipients: jest.fn(async () => ({ pi: { email: null }, liaison: { email: null } })) })))
     .rejects.toMatchObject({ code: 'site_visit_materials_recipients_required' });
-  await expect(createMaterialsCollection({ requestId: REQUEST_ID, actorId: ACTOR, fromEmail: 'pc@wmkeck.org' }, deps({ getRequest: jest.fn(async () => ({ ...request(), wmkf_triagestatus: 100000001, akoya_requeststatus: 1 })) })))
+  await expect(createMaterialsCollection({ requestId: REQUEST_ID, actorId: ACTOR, profileId: 7, fromEmail: 'pc@wmkeck.org' }, deps({ getRequest: jest.fn(async () => ({ ...request(), wmkf_triagestatus: 100000001, akoya_requeststatus: 1 })) })))
     .rejects.toMatchObject({ code: 'site_visit_materials_request_not_schedulable' });
   await expect(createMaterialsCollection({ requestId: REQUEST_ID, actorId: 'nope', fromEmail: 'pc@wmkeck.org' }, deps()))
     .rejects.toMatchObject({ code: 'site_visit_materials_actor_required' });
 
   const failing = deps({ sendEmail: jest.fn(async () => { throw new Error('transport down'); }) });
-  const result = await createMaterialsCollection({ requestId: REQUEST_ID, actorId: ACTOR, fromEmail: 'pc@wmkeck.org' }, failing);
+  const result = await createMaterialsCollection({ requestId: REQUEST_ID, actorId: ACTOR, profileId: 7, fromEmail: 'pc@wmkeck.org' }, failing);
   expect(failing.insertCollection).toHaveBeenCalledTimes(1);
   expect(failing.recordInvitation).not.toHaveBeenCalled();
   expect(result.invitationSent).toBe(false);
@@ -289,7 +290,7 @@ test('create refusals: no visit, already open, no recipient email, not schedulab
 
 test('invite and remind reject an unlinked actor before reading or claiming a collection', async () => {
   const d = deps();
-  await createMaterialsCollection({ requestId: REQUEST_ID, actorId: ACTOR, fromEmail: 'pc@wmkeck.org' }, d);
+  await createMaterialsCollection({ requestId: REQUEST_ID, actorId: ACTOR, profileId: 7, fromEmail: 'pc@wmkeck.org' }, d);
   d.getRequest.mockClear();
   d.readEmailDefaults.mockClear();
   for (const action of [inviteMaterialsContributors, remindMaterialsContributors]) {
@@ -304,7 +305,7 @@ test('invite and remind reject an unlinked actor before reading or claiming a co
 
 test('read joins the registry: state moves missing → received → ready; waive removes an item from the requirement; reminder names only the missing items', async () => {
   const d = deps();
-  await createMaterialsCollection({ requestId: REQUEST_ID, actorId: ACTOR, fromEmail: 'pc@wmkeck.org' }, d);
+  await createMaterialsCollection({ requestId: REQUEST_ID, actorId: ACTOR, profileId: 7, fromEmail: 'pc@wmkeck.org' }, d);
   d.findDocumentsByRequest.mockResolvedValue({ records: [
     registryRow({ id: 'pdf', filename: '1003222 Site Visit Presentation.pdf' }),
     registryRow({ id: 'bios', filename: '1003222 Site Visit Participant Bios.pdf', wmkf_artifacttype: 100000004 }),
@@ -313,9 +314,9 @@ test('read joins the registry: state moves missing → received → ready; waive
   expect(collection.state).toBe('missing');
   expect(collection.missing).toEqual(['presentation_source']);
 
-  await expect(confirmMaterialsReady({ requestId: REQUEST_ID, actorId: ACTOR }, d)).rejects.toMatchObject({ code: 'site_visit_materials_incomplete' });
+  await expect(confirmMaterialsReady({ requestId: REQUEST_ID, actorId: ACTOR, profileId: 7, fromEmail: 'pc@wmkeck.org' }, d)).rejects.toMatchObject({ code: 'site_visit_materials_incomplete' });
 
-  ({ collection } = await remindMaterialsContributors({ requestId: REQUEST_ID, actorId: ACTOR, fromEmail: 'pc@wmkeck.org' }, d));
+  ({ collection } = await remindMaterialsContributors({ requestId: REQUEST_ID, actorId: ACTOR, profileId: 7, fromEmail: 'pc@wmkeck.org' }, d));
   const reminder = d.sendEmail.mock.calls[1][0];
   expect(reminder.bodyText).toContain('Presentation source (PowerPoint or Keynote)');
   expect(reminder.bodyText).not.toContain('Presentation (PDF)');
@@ -330,9 +331,9 @@ test('read joins the registry: state moves missing → received → ready; waive
   ({ collection } = await waiveMaterialsItem({ requestId: REQUEST_ID, key: 'presentation_source', waived: true }, d));
   expect(collection.state).toBe('received');
   expect(collection.missing).toEqual([]);
-  await expect(remindMaterialsContributors({ requestId: REQUEST_ID, actorId: ACTOR, fromEmail: 'pc@wmkeck.org' }, d)).rejects.toMatchObject({ code: 'site_visit_materials_nothing_missing' });
+  await expect(remindMaterialsContributors({ requestId: REQUEST_ID, actorId: ACTOR, profileId: 7, fromEmail: 'pc@wmkeck.org' }, d)).rejects.toMatchObject({ code: 'site_visit_materials_nothing_missing' });
 
-  ({ collection } = await confirmMaterialsReady({ requestId: REQUEST_ID, actorId: ACTOR }, d));
+  ({ collection } = await confirmMaterialsReady({ requestId: REQUEST_ID, actorId: ACTOR, profileId: 7, fromEmail: 'pc@wmkeck.org' }, d));
   expect(collection.state).toBe('ready');
   expect(d.markReady).toHaveBeenCalledWith('44444444-4444-4444-8444-444444444444', ACTOR);
   await expect(waiveMaterialsItem({ requestId: REQUEST_ID, key: 'nope', waived: true }, d)).rejects.toMatchObject({ code: 'site_visit_materials_item_unknown' });
@@ -353,7 +354,7 @@ test('reminder preview excludes a job-held required slot and its proof sends whe
   d.__setStored(row);
 
   try {
-    const preview = await previewMaterialsEmail({ requestId: REQUEST_ID, action: 'remind', actorId: ACTOR, fromEmail: 'pc@wmkeck.org', emailTemplate }, d);
+    const preview = await previewMaterialsEmail({ requestId: REQUEST_ID, action: 'remind', actorId: ACTOR, profileId: 7, fromEmail: 'pc@wmkeck.org', emailTemplate }, d);
     expect(preview.missingKeys).toEqual(['presentation_source']);
     expect(preview.bodyText).toContain('Presentation source');
     expect(preview.bodyText).not.toContain('Presentation (PDF)');
@@ -371,7 +372,7 @@ test('reminder preview excludes a job-held required slot and its proof sends whe
       visitSnapshot: preview.visitSnapshot,
       template: emailTemplate,
     };
-    await remindMaterialsContributors({ requestId: REQUEST_ID, actorId: ACTOR, fromEmail: 'pc@wmkeck.org', emailTemplate, preparedEmail }, d);
+    await remindMaterialsContributors({ requestId: REQUEST_ID, actorId: ACTOR, profileId: 7, fromEmail: 'pc@wmkeck.org', emailTemplate, preparedEmail }, d);
     expect(d.sendEmail).toHaveBeenCalledTimes(1);
     expect(d.sendEmail.mock.calls[0][0].bodyText).toContain('Presentation source');
     expect(d.sendEmail.mock.calls[0][0].bodyText).not.toContain('Presentation (PDF)');
@@ -383,21 +384,21 @@ test('reminder preview excludes a job-held required slot and its proof sends whe
 
 test('manual reminder claims before sending (S507): claim order, 409 on a lost claim, and an email id attached only after a successful send', async () => {
   const d = deps();
-  await createMaterialsCollection({ requestId: REQUEST_ID, actorId: ACTOR, fromEmail: 'pc@wmkeck.org' }, d);
+  await createMaterialsCollection({ requestId: REQUEST_ID, actorId: ACTOR, profileId: 7, fromEmail: 'pc@wmkeck.org' }, d);
 
   const order = [];
   d.claimManualReminder.mockImplementation(async (id) => { order.push('claim'); const stored = d.__stored(); const next = { ...stored, last_reminder_at: NOW, reminder_count: stored.reminder_count + 1 }; d.__setStored(next); return next; });
   d.sendEmail.mockImplementation(async (...args) => { order.push('send'); return '55555555-5555-4555-8555-555555555555'; });
   d.attachReminderEmailId.mockImplementation(async (id, emailId) => { order.push('attach'); const stored = d.__stored(); const next = { ...stored, last_reminder_email_id: emailId }; d.__setStored(next); return next; });
 
-  await remindMaterialsContributors({ requestId: REQUEST_ID, actorId: ACTOR, fromEmail: 'pc@wmkeck.org' }, d);
+  await remindMaterialsContributors({ requestId: REQUEST_ID, actorId: ACTOR, profileId: 7, fromEmail: 'pc@wmkeck.org' }, d);
   expect(order).toEqual(['claim', 'send', 'attach']);
   expect(d.claimManualReminder).toHaveBeenCalledWith(d.__stored().id, NOW, d.__stored().contacts, d.__stored().contacts);
 
   // Claim lost (e.g. the cron claimed moments earlier): 409, never sends, never attaches.
   d.claimManualReminder.mockImplementation(async () => null);
   const sendCallsBefore = d.sendEmail.mock.calls.length;
-  await expect(remindMaterialsContributors({ requestId: REQUEST_ID, actorId: ACTOR, fromEmail: 'pc@wmkeck.org' }, d))
+  await expect(remindMaterialsContributors({ requestId: REQUEST_ID, actorId: ACTOR, profileId: 7, fromEmail: 'pc@wmkeck.org' }, d))
     .rejects.toMatchObject({ code: 'site_visit_materials_reminder_just_sent', httpStatus: 409 });
   expect(d.sendEmail.mock.calls.length).toBe(sendCallsBefore);
   expect(d.attachReminderEmailId).not.toHaveBeenCalledWith(expect.anything(), undefined);
@@ -407,7 +408,7 @@ test('manual reminder claims before sending (S507): claim order, 409 on a lost c
   const attachCallsBefore = d.attachReminderEmailId.mock.calls.length;
   const reminderCountBefore = d.__stored().reminder_count;
   d.sendEmail.mockImplementation(async () => { throw new Error('transport down'); });
-  await expect(remindMaterialsContributors({ requestId: REQUEST_ID, actorId: ACTOR, fromEmail: 'pc@wmkeck.org' }, d))
+  await expect(remindMaterialsContributors({ requestId: REQUEST_ID, actorId: ACTOR, profileId: 7, fromEmail: 'pc@wmkeck.org' }, d))
     .rejects.toMatchObject({ code: 'site_visit_materials_send_unconfirmed', httpStatus: 202 });
   expect(d.attachReminderEmailId.mock.calls.length).toBe(attachCallsBefore);
   expect(d.__stored().reminder_count).toBe(reminderCountBefore + 1);
@@ -416,7 +417,7 @@ test('manual reminder claims before sending (S507): claim order, 409 on a lost c
 test('send actions refuse a fetched Request or collection bound to a different Request before side effects', async () => {
   const otherRequestId = '99999999-9999-4999-8999-999999999999';
   const mismatchedRequest = deps({ getRequest: jest.fn(async () => ({ ...request(), akoya_requestid: otherRequestId })) });
-  await expect(createMaterialsCollection({ requestId: REQUEST_ID, actorId: ACTOR }, mismatchedRequest))
+  await expect(createMaterialsCollection({ requestId: REQUEST_ID, actorId: ACTOR, profileId: 7, fromEmail: 'pc@wmkeck.org' }, mismatchedRequest))
     .rejects.toMatchObject({ code: 'site_visit_materials_request_mismatch' });
   expect(mismatchedRequest.mint).not.toHaveBeenCalled();
   expect(mismatchedRequest.insertCollection).not.toHaveBeenCalled();
@@ -426,7 +427,7 @@ test('send actions refuse a fetched Request or collection bound to a different R
   wrongInsertedCollection.insertCollection.mockImplementation(async (input) => ({
     ...openMaterialsRow(), id: input.id, request_id: otherRequestId,
   }));
-  const created = await createMaterialsCollection({ requestId: REQUEST_ID, actorId: ACTOR }, wrongInsertedCollection);
+  const created = await createMaterialsCollection({ requestId: REQUEST_ID, actorId: ACTOR, profileId: 7, fromEmail: 'pc@wmkeck.org' }, wrongInsertedCollection);
   expect(created.invitationSent).toBe(false);
   expect(created.invitationOutcome).toBe('failed');
   expect(wrongInsertedCollection.sendEmail).not.toHaveBeenCalled();
@@ -434,7 +435,7 @@ test('send actions refuse a fetched Request or collection bound to a different R
   for (const action of [inviteMaterialsContributors, remindMaterialsContributors]) {
     const mismatchedCollection = deps();
     mismatchedCollection.__setStored({ ...openMaterialsRow(), request_id: otherRequestId });
-    await expect(action({ requestId: REQUEST_ID, actorId: ACTOR }, mismatchedCollection))
+    await expect(action({ requestId: REQUEST_ID, actorId: ACTOR, profileId: 7, fromEmail: 'pc@wmkeck.org' }, mismatchedCollection))
       .rejects.toMatchObject({ code: 'site_visit_materials_request_mismatch' });
     expect(mismatchedCollection.updateContacts).not.toHaveBeenCalled();
     expect(mismatchedCollection.claimManualReminder).not.toHaveBeenCalled();
@@ -444,7 +445,7 @@ test('send actions refuse a fetched Request or collection bound to a different R
 
 test('a collection past its close instant reads as closed even before the sweep marks it; the schema flag off is 503', async () => {
   const d = deps();
-  await createMaterialsCollection({ requestId: REQUEST_ID, actorId: ACTOR, fromEmail: 'pc@wmkeck.org' }, d);
+  await createMaterialsCollection({ requestId: REQUEST_ID, actorId: ACTOR, profileId: 7, fromEmail: 'pc@wmkeck.org' }, d);
   d.now = () => new Date('2026-10-20T00:00:00Z');
   const { collection } = await getMaterialsCollection({ requestId: REQUEST_ID }, d);
   expect(collection.state).toBe('closed');
@@ -465,7 +466,7 @@ test('edited invitation and reminder settings supply distinct subjects and bodie
     readEmailDefaults: jest.fn(async (keys) => ({ ok: true, values: Object.fromEntries(keys.map((key) => [key, custom[key]])) })),
     buildContributorUrl: jest.fn((jwt) => `https://apps.test/external/materials/${jwt}?a=1&b=2`),
   });
-  await createMaterialsCollection({ requestId: REQUEST_ID, actorId: ACTOR, fromEmail: 'pc@wmkeck.org' }, d);
+  await createMaterialsCollection({ requestId: REQUEST_ID, actorId: ACTOR, profileId: 7, fromEmail: 'pc@wmkeck.org' }, d);
   const invite = d.sendEmail.mock.calls[0][0];
   expect(invite.subject).toBe('INVITE The Secret History of Our Sun');
   expect(invite.bodyText).toContain('Invite The Secret History of Our Sun / Franklin Cat University / Wednesday, October 7, 2026 / Monday, October 5, 2026');
@@ -477,7 +478,7 @@ test('edited invitation and reminder settings supply distinct subjects and bodie
   expect(html).toContain('a=1&amp;b=2');
   expect(html).not.toContain('a=1&b=2');
 
-  await remindMaterialsContributors({ requestId: REQUEST_ID, actorId: ACTOR, fromEmail: 'pc@wmkeck.org' }, d);
+  await remindMaterialsContributors({ requestId: REQUEST_ID, actorId: ACTOR, profileId: 7, fromEmail: 'pc@wmkeck.org' }, d);
   const reminder = d.sendEmail.mock.calls[1][0];
   expect(reminder.subject).toBe('REMIND The Secret History of Our Sun');
   expect(reminder.bodyText).toContain('Remind items are:');
@@ -492,17 +493,17 @@ test('blank required settings block both sends before invitation receipt or remi
   const log = jest.spyOn(console, 'error').mockImplementation(() => undefined);
   const blank = { ok: false, values: {}, failures: [{ key: 'email.site_visit_materials_invite.body', reason: 'blank' }] };
   const failedInvite = deps({ readEmailDefaults: jest.fn(async () => blank) });
-  const result = await createMaterialsCollection({ requestId: REQUEST_ID, actorId: ACTOR, fromEmail: 'pc@wmkeck.org' }, failedInvite);
+  const result = await createMaterialsCollection({ requestId: REQUEST_ID, actorId: ACTOR, profileId: 7, fromEmail: 'pc@wmkeck.org' }, failedInvite);
   expect(result.invitationSent).toBe(false);
   expect(failedInvite.sendEmail).not.toHaveBeenCalled();
   expect(failedInvite.recordInvitation).not.toHaveBeenCalled();
   expect(failedInvite.__stored().invited_at).toBeUndefined();
 
   const existingInvite = deps();
-  await createMaterialsCollection({ requestId: REQUEST_ID, actorId: ACTOR, fromEmail: 'pc@wmkeck.org' }, existingInvite);
+  await createMaterialsCollection({ requestId: REQUEST_ID, actorId: ACTOR, profileId: 7, fromEmail: 'pc@wmkeck.org' }, existingInvite);
   const invitedBefore = existingInvite.__stored();
   existingInvite.readEmailDefaults.mockResolvedValue(blank);
-  await expect(inviteMaterialsContributors({ requestId: REQUEST_ID, actorId: ACTOR, fromEmail: 'pc@wmkeck.org' }, existingInvite))
+  await expect(inviteMaterialsContributors({ requestId: REQUEST_ID, actorId: ACTOR, profileId: 7, fromEmail: 'pc@wmkeck.org' }, existingInvite))
     .rejects.toMatchObject({ code: 'site_visit_materials_email_defaults_unavailable', httpStatus: 503 });
   expect(existingInvite.sendEmail).toHaveBeenCalledTimes(1);
   expect(existingInvite.__stored()).toEqual(invitedBefore);
@@ -512,15 +513,15 @@ test('blank required settings block both sends before invitation receipt or remi
     'email.site_visit_materials_invite.body': SITE_VISIT_MATERIALS_INVITE_SEED_BODY,
   } });
   existingInvite.sendEmail.mockRejectedValue(new Error('transport down'));
-  await expect(inviteMaterialsContributors({ requestId: REQUEST_ID, actorId: ACTOR, fromEmail: 'pc@wmkeck.org' }, existingInvite))
+  await expect(inviteMaterialsContributors({ requestId: REQUEST_ID, actorId: ACTOR, profileId: 7, fromEmail: 'pc@wmkeck.org' }, existingInvite))
     .rejects.toMatchObject({ code: 'site_visit_materials_send_unconfirmed', httpStatus: 202 });
   expect(existingInvite.__stored()).toEqual(invitedBefore);
 
   const d = deps();
-  await createMaterialsCollection({ requestId: REQUEST_ID, actorId: ACTOR, fromEmail: 'pc@wmkeck.org' }, d);
+  await createMaterialsCollection({ requestId: REQUEST_ID, actorId: ACTOR, profileId: 7, fromEmail: 'pc@wmkeck.org' }, d);
   const before = d.__stored();
   d.readEmailDefaults.mockResolvedValue({ ok: false, values: {}, failures: [{ key: 'email.site_visit_materials_reminder.body', reason: 'blank' }] });
-  await expect(remindMaterialsContributors({ requestId: REQUEST_ID, actorId: ACTOR, fromEmail: 'pc@wmkeck.org' }, d))
+  await expect(remindMaterialsContributors({ requestId: REQUEST_ID, actorId: ACTOR, profileId: 7, fromEmail: 'pc@wmkeck.org' }, d))
     .rejects.toMatchObject({ code: 'site_visit_materials_email_defaults_unavailable', httpStatus: 503 });
   expect(d.claimManualReminder).not.toHaveBeenCalled();
   expect(d.sendEmail).toHaveBeenCalledTimes(1);
@@ -530,10 +531,10 @@ test('blank required settings block both sends before invitation receipt or remi
 
 test('an invitation receipt failure preserves the accepted Dynamics activity id for reconciliation', async () => {
   const d = deps();
-  await createMaterialsCollection({ requestId: REQUEST_ID, actorId: ACTOR, fromEmail: 'pc@wmkeck.org' }, d);
+  await createMaterialsCollection({ requestId: REQUEST_ID, actorId: ACTOR, profileId: 7, fromEmail: 'pc@wmkeck.org' }, d);
   d.recordInvitation.mockRejectedValue(new Error('receipt write failed'));
 
-  await expect(inviteMaterialsContributors({ requestId: REQUEST_ID, actorId: ACTOR, fromEmail: 'pc@wmkeck.org' }, d))
+  await expect(inviteMaterialsContributors({ requestId: REQUEST_ID, actorId: ACTOR, profileId: 7, fromEmail: 'pc@wmkeck.org' }, d))
     .rejects.toMatchObject({
       code: 'site_visit_materials_send_unconfirmed',
       httpStatus: 202,
@@ -553,7 +554,7 @@ test('seed reminder retains singular grammar and excludes received items', () =>
 
 test('summarizeCollection keeps state, counts, and the window; drops the link, contacts, and per-item detail; waived items leave the denominator', async () => {
   const d = deps();
-  await createMaterialsCollection({ requestId: REQUEST_ID, actorId: ACTOR, fromEmail: 'pc@wmkeck.org' }, d);
+  await createMaterialsCollection({ requestId: REQUEST_ID, actorId: ACTOR, profileId: 7, fromEmail: 'pc@wmkeck.org' }, d);
   d.findDocumentsByRequest.mockResolvedValue({ records: [registryRow({ id: 'p', filename: '1003222 Site Visit Presentation.pdf' })] });
   await waiveMaterialsItem({ requestId: REQUEST_ID, key: 'participant_bios', waived: true }, d);
   const { collection } = await getMaterialsCollection({ requestId: REQUEST_ID }, d);
@@ -579,7 +580,7 @@ test('staff projection exposes sanitized cross-collection jobs and blocks Ready 
       { job_id: 'job-2', collection_id: 'old-collection', slot: 'participant_bios', status: 'needs_attention', filename: 'bios.pdf', attempt_count: 8, error_code: 'coordinator_action_required' },
     ]),
   });
-  await createMaterialsCollection({ requestId: REQUEST_ID, actorId: ACTOR, fromEmail: 'pc@wmkeck.org' }, d);
+  await createMaterialsCollection({ requestId: REQUEST_ID, actorId: ACTOR, profileId: 7, fromEmail: 'pc@wmkeck.org' }, d);
   const { collection } = await getMaterialsCollection({ requestId: REQUEST_ID }, d);
   expect(d.listUploadJobsForRequest).toHaveBeenCalledWith(REQUEST_ID, { collectionIds: ['44444444-4444-4444-8444-444444444444'] });
   expect(collection).toMatchObject({ state: 'needs_attention', processingCount: 1, attentionCount: 1 });
@@ -587,7 +588,7 @@ test('staff projection exposes sanitized cross-collection jobs and blocks Ready 
     expect.objectContaining({ jobId: 'job-1', status: 'processing', errorCode: null }),
     expect.objectContaining({ jobId: 'job-2', status: 'needs_attention', errorCode: 'coordinator_action_required' }),
   ]);
-  await expect(confirmMaterialsReady({ requestId: REQUEST_ID, actorId: ACTOR }, d)).rejects.toMatchObject({ code: 'site_visit_materials_uploads_incomplete' });
+  await expect(confirmMaterialsReady({ requestId: REQUEST_ID, actorId: ACTOR, profileId: 7, fromEmail: 'pc@wmkeck.org' }, d)).rejects.toMatchObject({ code: 'site_visit_materials_uploads_incomplete' });
   expect(d.markReady).not.toHaveBeenCalled();
 });
 
@@ -615,7 +616,7 @@ test('new collection creation immediately exposes an active job held by its prev
       { job_id: 'job-old', collection_id: 'old-collection', slot: 'presentation_pdf', status: 'processing', filename: 'replacement.pdf', attempt_count: 1 },
     ]),
   });
-  const result = await createMaterialsCollection({ requestId: REQUEST_ID, actorId: ACTOR, fromEmail: 'pc@wmkeck.org' }, d);
+  const result = await createMaterialsCollection({ requestId: REQUEST_ID, actorId: ACTOR, profileId: 7, fromEmail: 'pc@wmkeck.org' }, d);
   expect(result.collection).toMatchObject({ state: 'processing', processingCount: 1 });
   expect(result.collection.uploadJobs).toEqual([expect.objectContaining({ jobId: 'job-old', status: 'processing' })]);
 });
@@ -626,7 +627,7 @@ test('job status read failure after invitation preserves successful collection c
     backgroundJobsSchemaReady: () => true,
     listUploadJobsForRequest: jest.fn(async () => { throw new Error('ledger unavailable'); }),
   });
-  const result = await createMaterialsCollection({ requestId: REQUEST_ID, actorId: ACTOR, fromEmail: 'pc@wmkeck.org' }, d);
+  const result = await createMaterialsCollection({ requestId: REQUEST_ID, actorId: ACTOR, profileId: 7, fromEmail: 'pc@wmkeck.org' }, d);
   expect(result.invitationSent).toBe(true);
   expect(result.collection).toMatchObject({ uploadJobs: [], uploadStatusUnavailable: true });
   expect(log).toHaveBeenCalled();
@@ -675,7 +676,7 @@ describe('Liaison of record in the contacts snapshot', () => {
     expect(PI_ONLY_BODY).not.toContain('{{liaisonFullName}}');
     const d = deps({ resolveRecipients: noLiaison() });
     await createMaterialsCollection({
-      requestId: REQUEST_ID, actorId: ACTOR, fromEmail: 'pc@wmkeck.org',
+      requestId: REQUEST_ID, actorId: ACTOR, profileId: 7, fromEmail: 'pc@wmkeck.org',
       emailTemplate: { subject: SITE_VISIT_MATERIALS_INVITE_SEED_SUBJECT, body: PI_ONLY_BODY },
     }, d);
     expect(d.insertCollection.mock.calls[0][0].contacts).toEqual({
@@ -686,7 +687,7 @@ describe('Liaison of record in the contacts snapshot', () => {
 
   test('none with a {{liaisonFullName}} template is refused, naming the missing institution Primary Contact', async () => {
     const d = deps({ resolveRecipients: noLiaison() });
-    const error = await previewMaterialsEmail({ requestId: REQUEST_ID, action: 'create', actorId: ACTOR, fromEmail: 'pc@wmkeck.org' }, d).catch((e) => e);
+    const error = await previewMaterialsEmail({ requestId: REQUEST_ID, action: 'create', actorId: ACTOR, profileId: 7, fromEmail: 'pc@wmkeck.org' }, d).catch((e) => e);
     expect(error).toMatchObject({ code: 'site_visit_materials_email_name_unavailable', httpStatus: 409 });
     expect(error.message).toMatch(/no Primary Contact/);
     expect(d.sendEmail).not.toHaveBeenCalled();
@@ -699,10 +700,10 @@ describe('Liaison of record in the contacts snapshot', () => {
       liaisonStatus: 'found',
     })) });
     await expect(createMaterialsCollection({
-      requestId: REQUEST_ID, actorId: ACTOR, fromEmail: 'pc@wmkeck.org',
+      requestId: REQUEST_ID, actorId: ACTOR, profileId: 7, fromEmail: 'pc@wmkeck.org',
       emailTemplate: { subject: SITE_VISIT_MATERIALS_INVITE_SEED_SUBJECT, body: PI_ONLY_BODY },
     }, d)).rejects.toThrow(/Liaison/);
-    await expect(createMaterialsCollection({ requestId: REQUEST_ID, actorId: ACTOR, fromEmail: 'pc@wmkeck.org' }, d))
+    await expect(createMaterialsCollection({ requestId: REQUEST_ID, actorId: ACTOR, profileId: 7, fromEmail: 'pc@wmkeck.org' }, d))
       .rejects.toMatchObject({ code: 'site_visit_materials_recipients_required', httpStatus: 409 });
     expect(d.insertCollection).not.toHaveBeenCalled();
     expect(d.sendEmail).not.toHaveBeenCalled();
@@ -710,11 +711,11 @@ describe('Liaison of record in the contacts snapshot', () => {
 
   test('a legacy snapshot without liaisonStatus still requires the Liaison for a reminder', async () => {
     const d = deps();
-    await createMaterialsCollection({ requestId: REQUEST_ID, actorId: ACTOR, fromEmail: 'pc@wmkeck.org' }, d);
+    await createMaterialsCollection({ requestId: REQUEST_ID, actorId: ACTOR, profileId: 7, fromEmail: 'pc@wmkeck.org' }, d);
     d.__setStored({ ...d.__stored(), invited_at: NOW, contacts: { pi: { role: 'pi', name: 'Pat Investigator', email: 'PI@example.edu' }, liaison: null } });
     d.sendEmail.mockClear();
     const { prepareMaterialsReminderEmail } = jest.requireActual('../../lib/services/site-visit-materials/collection-service');
-    await expect(prepareMaterialsReminderEmail({ row: d.__stored(), request: request(), visit: visit(), missing: [], actorId: ACTOR }, d))
+    await expect(prepareMaterialsReminderEmail({ row: d.__stored(), request: request(), visit: visit(), missing: [], actorId: ACTOR, profileId: 7, fromEmail: 'pc@wmkeck.org' }, d))
       .rejects.toMatchObject({ code: 'site_visit_materials_recipients_required' });
   });
 });
@@ -750,7 +751,7 @@ test.each([null, '', 'not a URL', 'javascript:alert(1)', 'http://tenant.sharepoi
 
 test('the staff read marks a receipt as a staff upload only when its registry row records a staff actor (staff replacement plan §3.4)', async () => {
   const d = deps();
-  await createMaterialsCollection({ requestId: REQUEST_ID, actorId: ACTOR, fromEmail: 'pc@wmkeck.org' }, d);
+  await createMaterialsCollection({ requestId: REQUEST_ID, actorId: ACTOR, profileId: 7, fromEmail: 'pc@wmkeck.org' }, d);
   d.findDocumentsByRequest.mockResolvedValue({ records: [
     registryRow({ id: 'pdf', filename: '1003222 Site Visit Presentation.pdf', _wmkf_initiatedby_value: '66666666-6666-4666-8666-666666666666' }),
     registryRow({ id: 'bios', filename: '1003222 Site Visit Participant Bios.pdf', wmkf_artifacttype: 100000004 }),

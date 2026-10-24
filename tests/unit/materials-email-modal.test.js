@@ -13,7 +13,7 @@ const ok = (body) => ({ ok: true, status: 200, json: async () => body });
 test('editing after preview disables send until refresh', async () => {
   global.fetch = jest.fn(async (url, options = {}) => {
     if (!options.method) return ok({ template: shared, shared });
-    return ok({ subject: 'Rendered', bodyText: 'Body', proof: 'proof', recipients: [{ email: 'pi@example.edu' }], ccRecipients: [{ email: 'liaison@example.edu' }], secureLinkPlaceholder: true });
+    return ok({ subject: 'Rendered', bodyText: 'Body', canSend: true, proof: 'proof', recipients: [{ email: 'pi@example.edu' }], ccRecipients: [{ email: 'liaison@example.edu' }], secureLinkPlaceholder: true });
   });
   render(<MaterialsEmailModal requestId={ID} action="create" onClose={jest.fn()} />);
   fireEvent.click(await screen.findByRole('button', { name: 'Refresh preview' }));
@@ -27,7 +27,7 @@ test('partial create result stays open and reports uncertainty', async () => {
   const onClose = jest.fn();
   global.fetch = jest.fn(async (url, options = {}) => {
     if (!options.method) return ok({ template: shared, shared });
-    if (JSON.parse(options.body).action === 'preview') return ok({ subject: 'Rendered', bodyText: 'Body', proof: 'proof', recipients: [] });
+    if (JSON.parse(options.body).action === 'preview') return ok({ subject: 'Rendered', bodyText: 'Body', canSend: true, proof: 'proof', recipients: [] });
     return ok({ invitationSent: false, invitationOutcome: 'uncertain' });
   });
   render(<MaterialsEmailModal requestId={ID} action="create" onClose={onClose} />);
@@ -36,4 +36,15 @@ test('partial create result stays open and reports uncertainty', async () => {
   fireEvent.click(await screen.findByRole('button', { name: 'Send' }));
   expect(await screen.findByRole('status')).toHaveTextContent('could not be confirmed');
   expect(onClose).not.toHaveBeenCalled();
+});
+
+
+test('helper may view a rendered preview but cannot send it', async () => {
+  global.fetch = jest.fn(async (_url, options = {}) => !options.method ? ok({ template: shared, shared })
+    : ok({ subject: 'Rendered', bodyText: 'Coordinator signature', canSend: false, proof: 'helper-proof', recipients: [{ email: 'pi@example.edu' }], fromEmail: 'pc@wmkeck.org' }));
+  render(<MaterialsEmailModal requestId={ID} action="create" onClose={jest.fn()} />);
+  fireEvent.click(await screen.findByRole('button', { name: 'Refresh preview' }));
+  await screen.findByText('Coordinator signature');
+  expect(screen.getByRole('button', { name: 'Send' })).toBeDisabled();
+  expect(screen.getByRole('note')).toHaveTextContent('Only the assigned Program Coordinator');
 });

@@ -11,7 +11,13 @@ jest.mock('../../lib/dataverse/adapters/contact', () => ({ getByIdWithSelect: je
 jest.mock('../../lib/dataverse/adapters/account', () => ({ __esModule: true, queryAccounts: jest.fn(), getById: jest.fn() }));
 jest.mock('../../lib/dataverse/adapters/system-user', () => ({ getByIdWithSelect: jest.fn(), getById: jest.fn() }));
 jest.mock('../../lib/dataverse/adapters/email-activity', () => ({ create: jest.fn(async () => 'fake-email'), send: jest.fn() }));
+jest.mock('../../lib/services/meeting-coordination/coordinator-access', () => ({ ...jest.requireActual('../../lib/services/meeting-coordination/coordinator-access'), getAssignedCoordinator: jest.fn() }));
+jest.mock('../../lib/services/dataverse-identity-map', () => ({ resolveSystemUserToProfile: jest.fn(async () => 7) }));
+jest.mock('../../lib/services/database-service', () => ({ DatabaseService: { getUserPreferences: jest.fn(async () => ({})) } }));
 jest.mock('../../lib/utils/encryption', () => ({ decrypt: () => 'sample-token', encrypt: (x) => x }));
+import crypto from 'node:crypto';
+import { getAssignedCoordinator } from '../../lib/services/meeting-coordination/coordinator-access';
+import { prepareMaterialsReminderEmail, sendReminderEmail } from '../../lib/services/site-visit-materials/collection-service';
 import * as requestAdapter from '../../lib/dataverse/adapters/grant-request';
 import * as contactAdapter from '../../lib/dataverse/adapters/contact';
 import * as accountAdapter from '../../lib/dataverse/adapters/account';
@@ -38,42 +44,30 @@ const CONTACTS = {
 beforeEach(() => {
   jest.clearAllMocks();
   currentRequest = request;
+  getAssignedCoordinator.mockResolvedValue({ systemUserId: COORDINATOR, profileId: 7, name: 'Shared Coordinator', email: 'pc@wmkeck.org', revision: 'r1' });
   requestAdapter.getById.mockImplementation(async (_id, { select }) => Object.fromEntries(select.filter(k => k in currentRequest).map(k => [k, currentRequest[k]])));
   contactAdapter.getByIdWithSelect.mockImplementation(async (id) => CONTACTS[id]);
   contactAdapter.getInviteRecipientById.mockImplementation(async (id) => CONTACTS[id]);
   accountAdapter.queryAccounts.mockResolvedValue({ records: [{ accountid: ACCOUNT, _primarycontactid_value: INSTITUTION_LIAISON }], totalCount: 1, hasMore: false });
-  userAdapter.getByIdWithSelect.mockImplementation(async (id) => ({ systemuserid: id, fullname: id === COORDINATOR ? 'Assigned Coordinator' : 'Wrong Actor', isdisabled: false }));
+  userAdapter.getByIdWithSelect.mockImplementation(async (id) => ({ systemuserid: id, fullname: id === COORDINATOR ? 'Assigned Coordinator' : 'Wrong Actor', isdisabled: false, internalemailaddress: 'pc@wmkeck.org' }));
 });
 
-test('actual name resolver uses explicit surname and request-assigned system user', async () => {
+test('actual name resolver uses explicit surname and Shared Admin coordinator independently of the request field', async () => {
   const result = await collection.resolveMaterialNames({ request });
-  expect(result).toMatchObject({ piLastName: 'de la Cruz', liaisonFullName: 'Lee Liaison', programCoordinatorName: 'Assigned Coordinator' });
+  expect(result).toMatchObject({ piLastName: 'de la Cruz', liaisonFullName: 'Lee Liaison', programCoordinatorName: 'Shared Coordinator' });
   expect(contactAdapter.getByIdWithSelect).toHaveBeenCalledWith(PI, expect.arrayContaining(['lastname', 'emailaddress1']));
-  expect(userAdapter.getByIdWithSelect).toHaveBeenCalledWith(COORDINATOR, expect.any(String));
+  expect(getAssignedCoordinator).toHaveBeenCalled();
 });
 
-test.each([false, true])('real cron projection and preparation resolve names before claim (missing coordinator: %s)', async (missing) => {
-  if (missing) userAdapter.getByIdWithSelect.mockResolvedValue({ fullname: '' });
-  const row = { id: 'collection', request_id: REQUEST, created_by: ACTOR, due_at: '2030-10-01T16:00:00Z', token_ciphertext: 'sealed', checklist: [{ key: 'participant_bios', label: 'Participant bios', required: true }], contacts: { pi: { name: 'Pat de la Cruz', email: 'pi@example.invalid' }, liaison: { name: 'Lee Liaison', email: 'liaison@example.invalid' } } };
-  const claim = jest.fn(async () => ({ ...row, reminder_count: 1 }));
-  const deps = { ...cron, schemaReady: () => true, listDue: async () => [row], findDocumentsByRequest: async () => ({ records: [] }), canReadLink: () => true, getSender: async () => ({ email: 'actor@example.invalid', systemUserId: ACTOR }), findActiveSiteVisit: async () => ({ scheduledstart: '2030-10-03T16:00:00Z' }), readEmailDefaults: async (keys) => ({ ok: true, values: Object.fromEntries(keys.map(k => [k, k.endsWith('.subject') ? subject : body])) }), claim, attachEmailId: jest.fn(), now: () => new Date('2030-10-02T12:00:00Z') };
-  const result = await sweepMaterialsReminders({}, deps);
-  if (missing) {
-    expect(result.sent).toBe(0);
-    expect(claim).not.toHaveBeenCalled();
-    expect(emailAdapter.create).not.toHaveBeenCalled();
-  } else {
-    expect(result.sent).toBe(1);
-    expect(emailAdapter.create).toHaveBeenCalledWith(expect.objectContaining({
-      subject, to: ['pi@example.invalid'], cc: ['liaison@example.invalid'],
-      regardingId: REQUEST, regardingType: 'akoya_request',
-    }));
-    const html = emailAdapter.create.mock.calls[0][0].body;
-    expect(html).toContain('Dear Dr. de la Cruz,');
-    expect(html).toContain('Assigned Coordinator');
-    expect(html).not.toContain('Wrong Actor');
-    expect(html).not.toContain('{{');
-  }
+test('the callable retired sweep refuses before claiming or dispatching even for an enabled creator mailbox', async () => {
+  const row = { id: 'collection', request_id: REQUEST, created_by: ACTOR, due_at: '2030-10-01T16:00:00Z', token_ciphertext: 'sealed', checklist: [{ key: 'participant_bios', label: 'Participant bios', required: true }], contacts: { pi: { email: 'pi@example.invalid' }, liaison: { email: 'liaison@example.invalid' } } };
+  userAdapter.getById.mockResolvedValue({ internalemailaddress: 'creator@wmkeck.org', isdisabled: false });
+  const claim = jest.fn();
+  const result = await sweepMaterialsReminders({}, { ...cron, schemaReady: () => true, listDue: async () => [row], findDocumentsByRequest: async () => ({ records: [] }), canReadLink: () => true, claim, now: () => new Date('2030-10-02T12:00:00Z') });
+  expect(result.skippedNoSender).toBe(1);
+  expect(claim).not.toHaveBeenCalled();
+  expect(emailAdapter.create).not.toHaveBeenCalled();
+  expect(emailAdapter.send).not.toHaveBeenCalled();
 });
 
 test('the default materials sender refuses to create an activity without a valid Request GUID', async () => {
@@ -84,20 +78,38 @@ test('the default materials sender refuses to create an activity without a valid
   expect(emailAdapter.create).not.toHaveBeenCalled();
 });
 
-test('Research: the sweep sends to the institution Liaison and names that same person, never the divergent Request copy', async () => {
+test('Research: manual preparation uses the institution Liaison and Shared Admin coordinator; transport disables fallback at both seams', async () => {
   currentRequest = { ...request, _akoya_programid_value: RESEARCH_PROGRAM_IDS[1], _akoya_applicantid_value: ACCOUNT };
-  const liaisonTemplate = `${body}\n\nCc: {{liaisonFullName}}`;
-  const saved = { pi: { role: 'pi', name: 'Pat de la Cruz', email: 'pi@example.invalid' }, liaison: { role: 'liaison', name: 'Lee Liaison', email: 'liaison@example.invalid' } };
-  const row = { id: 'collection', request_id: REQUEST, created_by: ACTOR, due_at: '2030-10-01T16:00:00Z', token_ciphertext: 'sealed', checklist: [{ key: 'participant_bios', label: 'Participant bios', required: true }], contacts: saved };
-  const claim = jest.fn(async (_id, _now, _expected, contacts) => ({ ...row, contacts, reminder_count: 1 }));
-  const deps = { ...cron, schemaReady: () => true, listDue: async () => [row], findDocumentsByRequest: async () => ({ records: [] }), canReadLink: () => true, getSender: async () => ({ email: 'actor@example.invalid', systemUserId: ACTOR }), findActiveSiteVisit: async () => ({ scheduledstart: '2030-10-03T16:00:00Z' }), readEmailDefaults: async (keys) => ({ ok: true, values: Object.fromEntries(keys.map(k => [k, k.endsWith('.subject') ? subject : liaisonTemplate])) }), claim, attachEmailId: jest.fn(), now: () => new Date('2030-10-02T12:00:00Z') };
-  const result = await sweepMaterialsReminders({}, deps);
-  expect(result.sent).toBe(1);
-  expect(claim).toHaveBeenCalledWith('collection', expect.any(Date), saved, expect.objectContaining({
-    liaison: expect.objectContaining({ email: 'ivy@example.invalid' }), liaisonStatus: 'found',
-  }));
-  expect(emailAdapter.create).toHaveBeenCalledWith(expect.objectContaining({ to: ['pi@example.invalid'], cc: ['ivy@example.invalid'] }));
+  const contacts = await collection.resolveRecipients(REQUEST, currentRequest);
+  const row = { id: 'collection', request_id: REQUEST, due_at: '2030-10-01T16:00:00Z', token_ciphertext: 'sealed', contacts };
+  const prepared = await prepareMaterialsReminderEmail({ row, request: currentRequest, visit: { scheduledstart: '2030-10-03T16:00:00Z' }, missing: [{ label: 'Participant bios' }], actorId: COORDINATOR, profileId: 7, emailTemplate: { subject, body: `${body}\nCc: {{liaisonFullName}}` } }, { ...collection, readEmailDefaults: async keys => ({ ok: true, values: Object.fromEntries(keys.map(key => [key, key.endsWith('.subject') ? subject : body])) }), resolvePcSignature: async () => 'Shared Coordinator' });
+  await sendReminderEmail({ row, prepared, fromEmail: 'pc@wmkeck.org', actorId: COORDINATOR, profileId: 7, sequence: 1 });
+  expect(emailAdapter.create).toHaveBeenCalledWith(expect.objectContaining({ to: ['pi@example.invalid'], cc: ['ivy@example.invalid'], regardingId: REQUEST, actingUserSystemId: COORDINATOR, noFallback: true }));
+  expect(emailAdapter.send).toHaveBeenCalledWith('fake-email', { actingUserSystemId: COORDINATOR, noFallback: true });
   const html = emailAdapter.create.mock.calls[0][0].body;
   expect(html).toContain('Ivy Institution');
+  expect(html).toContain('Shared Coordinator');
   expect(html).not.toContain('Lee Liaison');
+});
+
+test('assignment changes after email creation prevent the final SendEmail call', async () => {
+  const coordinator = await getAssignedCoordinator();
+  getAssignedCoordinator.mockResolvedValueOnce(coordinator).mockResolvedValueOnce({ ...coordinator, revision: 'r2' });
+  await expect(collection.sendEmail({ regardingId: REQUEST, subject: 'Materials', bodyText: 'Upload', from: coordinator.email, to: ['pi@example.invalid'], cc: [], actingUserSystemId: COORDINATOR, profileId: 7, coordinatorSnapshot: coordinator })).rejects.toMatchObject({ code: 'site_visit_materials_preview_stale', emailId: 'fake-email' });
+  expect(emailAdapter.create).toHaveBeenCalledTimes(1);
+  expect(emailAdapter.send).not.toHaveBeenCalled();
+});
+
+
+test('a changed signature after activity creation leaves the draft unsent', async () => {
+  const coordinator = await getAssignedCoordinator();
+  const signature = await collection.resolvePcSignature(COORDINATOR);
+  const snapshot = { ...coordinator, signatureFingerprint: crypto.createHash('sha256').update(signature).digest('hex') };
+  emailAdapter.create.mockImplementationOnce(async () => {
+    userAdapter.getByIdWithSelect.mockResolvedValue({ fullname: 'New Signature', isdisabled: false, internalemailaddress: 'pc@wmkeck.org' });
+    return 'draft-email';
+  });
+  await expect(collection.sendEmail({ regardingId: REQUEST, subject: 'Materials', bodyText: 'Upload', from: coordinator.email, to: ['pi@example.invalid'], cc: [], actingUserSystemId: COORDINATOR, profileId: 7, coordinatorSnapshot: snapshot })).rejects.toMatchObject({ code: 'site_visit_materials_preview_stale', emailId: 'draft-email', dispatched: false });
+  expect(emailAdapter.create).toHaveBeenCalledTimes(1);
+  expect(emailAdapter.send).not.toHaveBeenCalled();
 });

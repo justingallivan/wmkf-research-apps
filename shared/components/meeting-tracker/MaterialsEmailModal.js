@@ -137,7 +137,7 @@ export default function MaterialsEmailModal({ requestId, action, onClose, onSent
   };
 
   const send = async () => {
-    if (!preview?.proof || sendingRef.current || busy || saving) return;
+    if (preview?.canSend !== true || !preview?.proof || sendingRef.current || busy || saving) return;
     sendingRef.current = true;
     setSending(true);
     const generation = generationRef.current;
@@ -153,7 +153,7 @@ export default function MaterialsEmailModal({ requestId, action, onClose, onSent
       if (!mountedRef.current || activeSendRef.current !== sendMarker || contextRef.current !== expectedContext) return;
       const data = result.data || result || {};
       if (!result.ok) {
-        const status = result.status === 400 || result.status === 409 || data.outcome === 'failed' ? 'failed' : 'uncertain';
+        const status = result.status === 400 || result.status === 403 || result.status === 409 || data.outcome === 'failed' ? 'failed' : 'uncertain';
         onSent?.({ ...(data && typeof data === 'object' ? data : {}), outcome: status });
         setPreview(null);
         setFeedback({ status, message: data.error || UNCERTAIN_COPY });
@@ -199,8 +199,9 @@ export default function MaterialsEmailModal({ requestId, action, onClose, onSent
         <label className="mt-4 block text-sm font-semibold">Subject<input value={template.subject} onChange={(e) => update('subject', e.target.value)} disabled={sending || saving} className="mt-1 w-full rounded border border-gray-300 p-2 font-normal" /></label>
         <label className="mt-4 block text-sm font-semibold">Message<textarea value={template.body} onChange={(e) => update('body', e.target.value)} disabled={sending || saving} rows={10} className="mt-1 w-full rounded border border-gray-300 p-2 font-normal" /></label>
         <p className="mt-2 text-xs text-gray-500">Keep the required {kind === 'invitation' ? '{{checklist}}' : '{{missingItems}}'} placeholder. The secure upload link and action button are added by the server.</p>
+        {preview?.canSend === false && <p role="note" className="mt-4 text-sm text-gray-700">Only the assigned Program Coordinator can send this email. They must open and review their own preview.</p>}
         {preview && <div className="mt-5 rounded-lg border border-gray-200 bg-gray-50 p-4"><p className="text-xs font-semibold uppercase tracking-wide text-gray-500">Rendered preview</p><p className="mt-2 text-xs text-gray-600"><strong>From:</strong> {preview.fromEmail}</p><p className="text-xs text-gray-600"><strong>To:</strong> {preview.recipients?.map((person) => person.email).join(', ')}</p>{preview.ccRecipients?.length > 0 && <p className="text-xs text-gray-600"><strong>Cc:</strong> {preview.ccRecipients.map((person) => person.email).join(', ')}</p>}<p className="mt-2 font-semibold">{preview.subject}</p><pre className="mt-2 whitespace-pre-wrap font-sans text-sm text-gray-800">{preview.bodyText}</pre>{preview.secureLinkPlaceholder && <p className="mt-3 text-xs font-medium text-amber-800">The secure link will be generated when you send.</p>}</div>}
-        <div className="mt-5 flex flex-wrap justify-end gap-2"><button type="button" disabled={saving || busy} onClick={saveDefault} className="rounded border border-gray-300 px-3 py-2 text-sm font-semibold">{saving ? 'Saving…' : 'Save as my default'}</button><button type="button" disabled={saving || busy} onClick={resetDefault} className="rounded border border-gray-300 px-3 py-2 text-sm font-semibold">Use shared default</button><button type="button" disabled={busy || saving} onClick={renderPreview} className="rounded border border-gray-700 px-3 py-2 text-sm font-semibold">{busy ? 'Working…' : 'Refresh preview'}</button><button type="button" disabled={busy || saving || !preview} onClick={send} className="rounded bg-gray-900 px-3 py-2 text-sm font-semibold text-white disabled:opacity-50">Send</button></div>
+        <div className="mt-5 flex flex-wrap justify-end gap-2"><button type="button" disabled={saving || busy} onClick={saveDefault} className="rounded border border-gray-300 px-3 py-2 text-sm font-semibold">{saving ? 'Saving…' : 'Save as my default'}</button><button type="button" disabled={saving || busy} onClick={resetDefault} className="rounded border border-gray-300 px-3 py-2 text-sm font-semibold">Use shared default</button><button type="button" disabled={busy || saving} onClick={renderPreview} className="rounded border border-gray-700 px-3 py-2 text-sm font-semibold">{busy ? 'Working…' : 'Refresh preview'}</button><button type="button" disabled={busy || saving || preview?.canSend !== true} onClick={send} className="rounded bg-gray-900 px-3 py-2 text-sm font-semibold text-white disabled:opacity-50">Send</button></div>
       </div>
     </div>
   );

@@ -9,7 +9,7 @@ let mockProfile = 7;
 jest.mock('next-auth/react', () => ({ useSession: () => ({ data: { user: { profileId: mockProfile } }, status: 'authenticated' }) }));
 jest.mock('../../shared/context/ProfileContext', () => ({ useProfile: () => ({ profileId: mockProfile, currentProfile: { id: mockProfile }, session: { user: { profileId: mockProfile } } }) }));
 const template = { subject: 'Personal subject', body: 'Hello {{checklist}}' };
-const draft = { success: true, subject: 'Personal subject', bodyText: 'Hello presentation', proof: 'signed-proof', recipients: [{ email: 'pat@example.edu' }], fromEmail: 'duncan@example.org', secureLinkPlaceholder: true };
+const draft = { success: true, subject: 'Personal subject', bodyText: 'Hello presentation', canSend: true, proof: 'signed-proof', recipients: [{ email: 'pat@example.edu' }], fromEmail: 'duncan@example.org', secureLinkPlaceholder: true };
 const ok = (data) => ({ ok: true, status: 200, data });
 function deferred() { let resolve; const promise = new Promise((r) => { resolve = r; }); return { promise, resolve }; }
 let onClose;

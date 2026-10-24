@@ -5,16 +5,14 @@ import { REQUEST_DOCUMENT_ARTIFACT_TYPE, REQUEST_DOCUMENT_LIFECYCLE_STATE, REQUE
 import { SITE_VISIT_MATERIALS_CHECKLIST } from '../../shared/config/siteVisitMaterials';
 import AlertRecipients from '../../lib/services/alert-recipients';
 import * as grantRequestAdapter from '../../lib/dataverse/adapters/grant-request';
-import * as systemUserAdapter from '../../lib/dataverse/adapters/system-user';
+import { getAssignedCoordinator } from '../../lib/services/meeting-coordination/coordinator-access';
+jest.mock('../../lib/services/meeting-coordination/coordinator-access', () => ({ getAssignedCoordinator: jest.fn() }));
 
 jest.mock('../../lib/dataverse/adapters/grant-request', () => ({
   ...jest.requireActual('../../lib/dataverse/adapters/grant-request'),
   getById: jest.fn(),
 }));
-jest.mock('../../lib/dataverse/adapters/system-user', () => ({
-  ...jest.requireActual('../../lib/dataverse/adapters/system-user'),
-  getByIdWithSelect: jest.fn(),
-}));
+
 
 const REQUEST_ID = '11111111-1111-4111-8111-111111111111';
 const COLLECTION_ID = '22222222-2222-4222-8222-222222222222';
@@ -94,36 +92,18 @@ test('applicant context exposes safe diagnostics only for terminal infected jobs
 describe('Program Coordinator context', () => {
   afterEach(() => jest.restoreAllMocks());
 
-  test('returns only the enabled assigned coordinator name and validated email', async () => {
-    systemUserAdapter.getByIdWithSelect.mockResolvedValue({
-      systemuserid: COORDINATOR_ID,
-      fullname: ' Casey Coordinator ',
-      internalemailaddress: 'casey@wmkeck.org',
-      isdisabled: false,
-    });
+  test('uses Shared Admin assignment even when the request has another coordinator', async () => {
+    getAssignedCoordinator.mockResolvedValue({ name: 'Casey Coordinator', email: 'casey@wmkeck.org', profileId: 7, systemUserId: COORDINATOR_ID, revision: 'r1', privateField: 'secret' });
     const { DEFAULT_DEPENDENCIES } = await import('../../lib/services/site-visit-materials/contributor-service');
-    await expect(DEFAULT_DEPENDENCIES.getProgramCoordinator({ _wmkf_programcoordinator_value: COORDINATOR_ID }))
+    await expect(DEFAULT_DEPENDENCIES.getProgramCoordinator({ _wmkf_programcoordinator_value: 'different' }))
       .resolves.toEqual({ name: 'Casey Coordinator', email: 'casey@wmkeck.org' });
-    expect(systemUserAdapter.getByIdWithSelect).toHaveBeenCalledWith(COORDINATOR_ID, 'systemuserid,fullname,internalemailaddress,isdisabled');
+    expect(getAssignedCoordinator).toHaveBeenCalledWith();
   });
 
-  test('request projection includes the assigned coordinator lookup', async () => {
-    grantRequestAdapter.getById.mockResolvedValue(REQUEST);
+  test('an unavailable assignment is not replaced by the request coordinator', async () => {
+    getAssignedCoordinator.mockRejectedValue(new Error('inactive coordinator'));
     const { DEFAULT_DEPENDENCIES } = await import('../../lib/services/site-visit-materials/contributor-service');
-    await DEFAULT_DEPENDENCIES.getRequest(REQUEST_ID);
-    expect(grantRequestAdapter.getById.mock.calls[0][1].select).toContain('_wmkf_programcoordinator_value');
-  });
-
-  test.each([
-    ['disabled', { fullname: 'Casey', internalemailaddress: 'casey@wmkeck.org', isdisabled: true }, null],
-    ['missing email', { fullname: 'Casey', internalemailaddress: '', isdisabled: false }, { name: 'Casey', email: null }],
-    ['invalid email', { fullname: 'Casey', internalemailaddress: 'not-an-email', isdisabled: false }, { name: 'Casey', email: null }],
-    ['missing name and email', { fullname: '', internalemailaddress: '', isdisabled: false }, null],
-  ])('handles %s without exposing the lookup record', async (_label, record, expected) => {
-    systemUserAdapter.getByIdWithSelect.mockResolvedValue({ systemuserid: COORDINATOR_ID, ...record });
-    const { DEFAULT_DEPENDENCIES } = await import('../../lib/services/site-visit-materials/contributor-service');
-    await expect(DEFAULT_DEPENDENCIES.getProgramCoordinator({ _wmkf_programcoordinator_value: COORDINATOR_ID }))
-      .resolves.toEqual(expected);
+    await expect(DEFAULT_DEPENDENCIES.getProgramCoordinator({ _wmkf_programcoordinator_value: COORDINATOR_ID })).rejects.toThrow('inactive coordinator');
   });
 
   test('lookup failure does not prevent building the upload context', async () => {

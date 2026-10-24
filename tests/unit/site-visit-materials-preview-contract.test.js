@@ -35,6 +35,7 @@ function fixture() {
   let row = null;
   const d = {
     schemaReady: () => true,
+    getCoordinator: jest.fn(async () => ({ systemUserId: ACTOR, profileId: 7, email: 'pc@example.org', name: 'Duncan', revision: 'r1' })),
     getDueBusinessDays: jest.fn(async () => ({ dueBusinessDays: 2, dueDaysSource: 'default' })),
     getRequest: jest.fn(async () => ({ akoya_requestid: REQUEST, akoya_requestnum: '1003222', akoya_title: 'Study A', wmkf_meetingdate: '2030-12-11', akoya_requeststatus: 100000001, wmkf_triagestatus: 100000000 })),
     findActiveSiteVisit: jest.fn(async () => ({ activityid: VISIT, scheduledstart: '2030-10-07T16:00:00Z', scheduledend: '2030-10-07T19:00:00Z', wmkf_ianatimezone: 'America/Los_Angeles' })),
@@ -459,4 +460,27 @@ test('an unavailable offset refuses new preview and send before side effects', a
     expect(result.body.error).toBe('Due-date setting unavailable');
   }
   for (const name of ['insertCollection', 'mint', 'sendEmail']) expect(mockDeps[name]).not.toHaveBeenCalled();
+});
+
+
+test('helper can review the coordinator sender but cannot mint a link or send with their own valid preview', async () => {
+  requireAppAccess.mockResolvedValue(session(8, '66666666-6666-4666-8666-666666666666', 'helper@example.org'));
+  const draft = await preview();
+  expect(draft).toMatchObject({ fromEmail: 'pc@example.org', canSend: false });
+  expect(mockDeps.resolvePcSignature).toHaveBeenCalledWith(ACTOR);
+  const result = await post({ action: 'create', emailTemplate: invitation, proof: draft.proof });
+  expect(result.statusCode).toBe(403);
+  expect(mockDeps.mint).not.toHaveBeenCalled();
+  expect(mockDeps.insertCollection).not.toHaveBeenCalled();
+  expect(mockDeps.sendEmail).not.toHaveBeenCalled();
+});
+
+test.each(['revision', 'email', 'systemUserId', 'profileId'])('coordinator %s change invalidates a signed preview before writes', async field => {
+  const draft = await preview();
+  const coordinator = await mockDeps.getCoordinator();
+  mockDeps.getCoordinator.mockResolvedValue({ ...coordinator, [field]: field === 'profileId' ? 9 : 'changed' });
+  const result = await post({ action: 'create', emailTemplate: invitation, proof: draft.proof });
+  expect(result.statusCode).toBe(409);
+  expect(mockDeps.mint).not.toHaveBeenCalled();
+  expect(mockDeps.sendEmail).not.toHaveBeenCalled();
 });
