@@ -51,7 +51,11 @@ does not select an API or generalized editor for suite-wide use.
 Only the assigned PD may change/restore the deadline or retry/resend its email;
 there is no superuser exception. From/To stay server-controlled; optional Cc is
 for one send only. Unlike required-content policies in other families, the PD may
-edit or delete all body content, including signature and deadline placeholders.
+edit or delete all body content, including signature and deadline placeholders,
+leaving an empty/whitespace-only one-send or saved personal body. An empty saved
+body remains a configured override; Clear restores Admin fallback. Synthetic test
+requests reject every Cc before deadline writes and again at dispatch. The linked
+plan includes the OAuth Opus review corrections and post-write retry proofs.
 The authoritative saved date/calendar remain server-controlled. Review precedes
 save/send, restore and resend; explicit defaults, fallback notices, local retry
 wording/Cc and customizable subjects are specified in that plan. Not implemented.
