@@ -31,7 +31,7 @@ const snapshot = {
   ],
   seedOrders: { mr: ['m'], se: ['s'] },
   proposals: [
-    { requestId: 'm', programKey: 'mr', score: { mean: 4 } },
+    { requestId: 'm', programKey: 'mr', amountSource: 'invited', score: { mean: 4 } },
     { requestId: 's', programKey: 'se', score: { mean: 3 } },
   ],
 };
@@ -186,6 +186,9 @@ test('private response excludes actual peer assessments; a nonparticipant superu
   });
   expect(admin.viewer.isObserver).toBe(true);
   expect(admin.round.snapshot.proposals).toHaveLength(snapshot.proposals.length);
+  // amountSource survives the allowlist; snapshots frozen before it existed stay without it.
+  expect(admin.round.snapshot.proposals.map((p) => p.amountSource)).toEqual(['invited', undefined]);
+  expect(Object.hasOwn(admin.round.snapshot.proposals[1], 'amountSource')).toBe(false);
   expect(admin.collective).toBeNull();
   expect(admin.confirmations).toEqual({});
   expect(admin.own).toBeNull();

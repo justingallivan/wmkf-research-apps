@@ -22,6 +22,13 @@ export function reviewerScoreIndicator(score) {
   };
 }
 
+// Rounds opened before invited amounts were used have no amountSource; their amounts are requested.
+export function amountLabel(proposal) {
+  if (proposal?.amountSource === 'invited') return { label: 'Invited', note: null };
+  if (proposal?.amountSource === 'requested') return { label: 'Requested', note: 'No invited amount; showing requested amount.' };
+  return { label: 'Requested', note: null };
+}
+
 export function moveProposal(order, from, to) {
   if (!Array.isArray(order) || from === to || from < 0 || to < 0 || from >= order.length || to >= order.length) {
     return order;

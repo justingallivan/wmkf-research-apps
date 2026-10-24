@@ -39,6 +39,19 @@ order isolation, two-facilitator races, captured membership through restart, and
 source pool. Independent profile/grant/SSO authorization and WebKit/iPad acceptance
 remain open. Prior D97/D98 rehearsal receipts remain unchanged.
 
+## Proposal amount source — branch `proposal-ranking-invited-amount`, 2026-10-23
+
+[VERIFIED via branch source] Ranking amounts now come from `wmkf_invitedamount`,
+falling back to `akoya_request` when the invited amount is blank; both use the
+request's `transactioncurrencyid` and the existing currency/precision blocks.
+`proposal-ranking-source.js` emits `amountSource` (`invited` | `requested` | null);
+`preview-service.js` freezes it into the snapshot and the v2 `publicSnapshot`
+allowlist passes it through. Cards label Invited or Requested, and note the
+requested fallback. Snapshots frozen earlier have no `amountSource` and keep
+showing their requested amounts as Requested; they are not backfilled. The
+workbook columns are now Amount / Cumulative amount. This supersedes the
+October 13 `akoya_request` statement below for new previews and rounds only.
+
 ## Historical version-1 source and deployment boundary — October 13 main
 
 [VERIFIED via main source] The existing app still stores separate individual SE/MR

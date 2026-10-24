@@ -654,3 +654,15 @@ test('preparation toolbar stays pinned while the list scrolls', () => {
   expect(toolbar.className).toMatch(/\btop-0\b/);
   expect(toolbar.className).toMatch(/\bbg-gray-50\b/);
 });
+
+test('cards label invited amounts and note a requested-amount fallback', () => {
+  const sourced = [
+    { ...proposals[0], amountSource: 'invited' },
+    { ...proposals[1], amountSource: 'requested' },
+    { ...proposals[2] },
+  ];
+  render(<AssessmentList assessment={{ ...list, order: sourced.map((p) => p.requestId), boundaries: [1, 3] }} proposals={sourced} roster={[]} editable={false} onChange={jest.fn()} />);
+  expect(screen.getAllByText('Invited')).toHaveLength(1);
+  expect(screen.getAllByText('Requested')).toHaveLength(2);
+  expect(screen.getAllByText('No invited amount; showing requested amount.')).toHaveLength(1);
+});
