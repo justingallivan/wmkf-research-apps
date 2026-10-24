@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
+import { DragDropContext, Draggable, Droppable } from '@hello-pangea/dnd';
 import { useRouter } from 'next/router';
 import Layout, { Button } from '../Layout';
 import { formatZonedLocalInput, resolveZonedDateTime } from '../../../lib/utils/zoned-date-time';
@@ -87,7 +88,7 @@ export function sessionWhen(session) {
 }
 
 function SessionSummary({ session, recipients, onEdit }) {
-  const people = [...(recipients.staff || []), ...(recipients.board || [])];
+  const people = [...(recipients.staff || []), ...(recipients.board || []), ...(recipients.consultants || [])];
   const names = (session.attendeeRefs || []).map((ref) => people.find((person) => sameRef(person.ref, ref))?.name || 'Person no longer in the directory');
   let linkHost = null;
   try { linkHost = session.meetingLink ? new URL(session.meetingLink).hostname : null; } catch { linkHost = null; }
@@ -137,7 +138,7 @@ function sessionForm(session) {
   };
 }
 
-function SlotRow({ slot, proposal, sessions, sessionId, cycleCode, programId, busy, savingSlotId, onChange, onMove, onRemove, onPositionChange, index, count, isDragging, dropEdge, onDragStart, onDragOver, onDrop, onDragEnd, readOnly = false }) {
+function SlotRow({ slot, proposal, sessions, sessionId, cycleCode, programId, busy, savingSlotId, onChange, onMove, onRemove, onPositionChange, index, count, isDragging, dragProvided, readOnly = false }) {
   const [minutes, setMinutes] = useState(slot.wmkf_minutes || 15);
   const [targetSessionId, setTargetSessionId] = useState('');
   const [panel, setPanel] = useState(null); // 'move' | 'remove' | null
@@ -147,26 +148,24 @@ function SlotRow({ slot, proposal, sessions, sessionId, cycleCode, programId, bu
 
   return (
     <li
-      className={`relative flex overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm transition-transform duration-150 ${isDragging ? 'opacity-40' : ''} ${isSaving ? 'opacity-70' : ''} ${dropEdge ? 'ring-2 ring-inset ring-blue-600' : ''}`}
-      onDragOver={onDragOver}
-      onDrop={onDrop}
+      ref={dragProvided?.innerRef}
+      {...dragProvided?.draggableProps}
+      style={dragProvided?.draggableProps.style}
+      className={`relative flex overflow-hidden rounded-xl border border-gray-200 bg-white ${isDragging ? 'shadow-lg ring-2 ring-blue-600' : 'shadow-sm'} ${isSaving ? 'opacity-70' : ''}`}
     >
-      {dropEdge && (
-        <span aria-hidden="true" className={`pointer-events-none absolute inset-x-0 z-10 h-1 bg-blue-600 ${dropEdge === 'top' ? 'top-0' : 'bottom-0'}`} />
-      )}
-      {!readOnly && <div
-        aria-hidden="true"
-        title="Drag to reorder"
-        draggable={!busy}
-        onDragStart={onDragStart}
-        onDragEnd={onDragEnd}
-        className={`flex w-7 shrink-0 self-stretch items-center justify-center border-r border-gray-200 bg-gray-50 text-gray-500 transition-colors ${!busy ? 'cursor-grab hover:bg-gray-100 hover:text-gray-700 active:cursor-grabbing' : ''}`}
+      {!readOnly && <button
+        {...dragProvided?.dragHandleProps}
+        type="button"
+        aria-label={`Reorder proposal #${requestNumber}, position ${index + 1}`}
+        title="Drag or use Space and arrow keys to reorder"
+        disabled={!dragProvided?.dragHandleProps}
+        className="flex w-11 shrink-0 self-stretch cursor-grab items-center justify-center border-r border-gray-200 bg-gray-50 text-gray-500 hover:bg-gray-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-600 active:cursor-grabbing disabled:cursor-not-allowed"
       >
         <svg aria-hidden="true" viewBox="0 0 20 20" fill="currentColor" className="h-4 w-4">
           <circle cx="6" cy="4" r="1.3" /><circle cx="6" cy="10" r="1.3" /><circle cx="6" cy="16" r="1.3" />
           <circle cx="14" cy="4" r="1.3" /><circle cx="14" cy="10" r="1.3" /><circle cx="14" cy="16" r="1.3" />
         </svg>
-      </div>}
+      </button>}
       <div className="min-w-0 flex-1 p-4">
         <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
           <p className="flex min-w-0 items-center gap-2 font-semibold leading-9 text-gray-900"><span className="sr-only">Position </span><span className="tabular-nums text-gray-500">{index + 1}</span><span aria-hidden="true" className="text-gray-400"> · </span>#{requestNumber}<TestRequestBadge isTestRequest={proposal?.isTestRequest} /></p>
@@ -255,91 +254,46 @@ function SlotRow({ slot, proposal, sessions, sessionId, cycleCode, programId, bu
 }
 
 export function ProposalOrderList({ slots, proposalById, sessions, sessionId, cycleCode, programId, busy, savingSlotId, onChange, onMove, onRemove, onReorder, readOnly = false }) {
-  const [draggingIndex, setDraggingIndex] = useState(null);
-  const [overIndex, setOverIndex] = useState(null);
-  const [overEdge, setOverEdge] = useState(null);
-
-  const resetDrag = () => {
-    setDraggingIndex(null);
-    setOverIndex(null);
-    setOverEdge(null);
-  };
-
-  const handleDragStart = (index) => (event) => {
-    if (busy) return;
-    setDraggingIndex(index);
-    try { event.dataTransfer?.setData('text/plain', String(index)); } catch { /* dataTransfer unavailable */ }
-    try { if (event.dataTransfer) event.dataTransfer.effectAllowed = 'move'; } catch { /* dataTransfer unavailable */ }
-  };
-
-  const handleDragOver = (index) => (event) => {
-    event.preventDefault();
-    if (busy || draggingIndex === null) return;
-    const rect = event.currentTarget.getBoundingClientRect();
-    const edge = event.clientY - rect.top < rect.height / 2 ? 'top' : 'bottom';
-    if (overIndex === index && overEdge === edge) return;
-    setOverIndex(index);
-    setOverEdge(edge);
-  };
-
-  const handleDrop = (index) => (event) => {
-    event.preventDefault();
-    if (busy || draggingIndex === null) {
-      resetDrag();
-      return;
-    }
-    const rawTarget = overEdge === 'bottom' ? index + 1 : index;
-    const targetIndex = rawTarget > draggingIndex ? rawTarget - 1 : rawTarget;
-    const movedSlot = slots[draggingIndex];
-    const next = moveSlot(slots, draggingIndex, targetIndex);
-    resetDrag();
-    if (next !== slots) onReorder(next, movedSlot, targetIndex);
-  };
-
+  const dragSnapshot = useRef(null);
+  const [dragging, setDragging] = useState(false);
+  const [orderNotice, setOrderNotice] = useState(null);
+  const fingerprint = JSON.stringify([sessionId, cycleCode, programId,
+    slots.map(row => [row.wmkf_deliberationslotid, row._etag, row._wmkf_request_value, row.wmkf_order, row.wmkf_minutes])]);
   const handlePositionChange = (index, position) => {
+    if (busy || readOnly || dragging) return;
     const targetIndex = position - 1;
-    const movedSlot = slots[index];
     const next = moveSlot(slots, index, targetIndex);
-    if (next !== slots) onReorder(next, movedSlot, targetIndex);
+    if (next !== slots) onReorder(next, slots[index], targetIndex);
   };
-
-  const handleKeyDown = (event) => {
-    if (event.key === 'Escape' && draggingIndex !== null) resetDrag();
-  };
-
-  return (
-    <>
-      {!readOnly && <p className="sr-only">Drag a proposal by the handle on its left edge, or open its More actions menu and choose Change position, to reorder. Choosing a position saves immediately.</p>}
-      <ol aria-label="Proposal order" className="mt-4 space-y-3" onKeyDown={handleKeyDown}>
-        {slots.map((slot, index) => (
-          <SlotRow
-            key={slot.wmkf_deliberationslotid}
-            slot={slot}
-            proposal={proposalById.get(String(slot._wmkf_request_value).toLowerCase())}
-            sessions={sessions}
-            sessionId={sessionId}
-            cycleCode={cycleCode}
-            programId={programId}
-            busy={busy}
-            savingSlotId={savingSlotId}
-            index={index}
-            count={slots.length}
-            onChange={onChange}
-            onMove={onMove}
-            onRemove={onRemove}
-            onPositionChange={handlePositionChange}
-            isDragging={draggingIndex === index}
-            dropEdge={overIndex === index && draggingIndex !== index ? overEdge : null}
-            onDragStart={handleDragStart(index)}
-            onDragOver={handleDragOver(index)}
-            onDrop={handleDrop(index)}
-            onDragEnd={resetDrag}
-            readOnly={readOnly}
-          />
-        ))}
-      </ol>
-    </>
-  );
+  return <>
+    {!readOnly && <p className="sr-only">Use the reorder handle: Space lifts a proposal, arrow keys move it, Space drops it, and Escape cancels. Or choose Change position in its More actions menu.</p>}
+    {orderNotice && <p role="status" className="mt-2 text-sm text-amber-800">{orderNotice}</p>}
+    <DragDropContext
+      onDragStart={() => { dragSnapshot.current = fingerprint; setDragging(true); setOrderNotice(null); }}
+      onDragEnd={({ source, destination, draggableId }) => {
+        const started = dragSnapshot.current; dragSnapshot.current = null; setDragging(false);
+        if (!destination || busy || readOnly) return;
+        if (started !== fingerprint || destination.droppableId !== `session-${sessionId}`
+          || source.droppableId !== destination.droppableId || slots[source.index]?.wmkf_deliberationslotid !== draggableId) {
+          setOrderNotice('The agenda changed while you were moving a proposal. Review the current order and try again.'); return;
+        }
+        const next = moveSlot(slots, source.index, destination.index);
+        if (next !== slots) onReorder(next, slots[source.index], destination.index);
+      }}>
+      <Droppable droppableId={`session-${sessionId}`} isDropDisabled={busy || readOnly}>
+        {drop => <ol ref={drop.innerRef} {...drop.droppableProps} aria-label="Proposal order" className="mt-4 space-y-3">
+          {slots.map((slot, index) => <Draggable key={slot.wmkf_deliberationslotid} draggableId={slot.wmkf_deliberationslotid} index={index} disableInteractiveElementBlocking isDragDisabled={busy || readOnly}>
+            {(drag, snapshot) => <SlotRow slot={slot} proposal={proposalById.get(String(slot._wmkf_request_value).toLowerCase())}
+              sessions={sessions} sessionId={sessionId} cycleCode={cycleCode} programId={programId}
+              busy={busy || dragging} savingSlotId={savingSlotId} index={index} count={slots.length}
+              onChange={onChange} onMove={onMove} onRemove={onRemove} onPositionChange={handlePositionChange}
+              isDragging={snapshot.isDragging} dragProvided={drag} readOnly={readOnly} />}
+          </Draggable>)}
+          {drop.placeholder}
+        </ol>}
+      </Droppable>
+    </DragDropContext>
+  </>;
 }
 
 export default function SessionEditor() {
@@ -357,7 +311,7 @@ export default function SessionEditor() {
   const creationRecoveryRouteRef = useRef(routeKey);
   const [slots, setSlots] = useState([]);
   const [sessions, setSessions] = useState([]);
-  const [recipients, setRecipients] = useState({ staff: [], board: [] });
+  const [recipients, setRecipients] = useState({ staff: [], board: [], consultants: [] });
   const [proposals, setProposals] = useState([]);
   const [selectedRequestId, setSelectedRequestId] = useState(initialRequestId);
   const [loading, setLoading] = useState(true);
@@ -653,7 +607,7 @@ export default function SessionEditor() {
           )}
           <p className="mt-1 text-sm text-gray-600">The fixed staff list is selected for new sessions. Add Board members for this meeting.</p>
           <div className="mt-4 grid gap-4 md:grid-cols-2">
-            {[['Staff', recipients.staff], ['Board', recipients.board]].map(([label, rows]) => <div key={label}><h2 className="text-sm font-semibold text-gray-700">{label}</h2><div className="mt-2 flex flex-wrap gap-2">{rows.map((person) => { const selected = form.attendees.some((ref) => sameRef(ref, person.ref)); const noEmail = !person.email; return <button key={`${person.ref.kind}-${person.ref.profileId || person.ref.rosterId}`} type="button" aria-pressed={selected} disabled={Boolean(createdSessionId) || (noEmail && !selected)} title={noEmail ? noEmailHint(person) : undefined} onClick={() => toggleAttendee(person.ref)} className={`rounded-full border px-3 py-1.5 text-sm font-medium disabled:cursor-not-allowed disabled:opacity-50 ${selected ? 'border-gray-900 bg-gray-900 text-white' : 'border-gray-300 bg-white text-gray-700 hover:bg-gray-50'}`}>{person.name}{noEmail ? ' · no email' : ''}</button>; })}{rows.length === 0 && <p className="text-sm text-gray-500">No eligible people found.</p>}{rows.some((person) => !person.email) && <p className="w-full text-xs text-gray-500">{NO_EMAIL_SECTION_HINT}</p>}</div></div>)}
+            {[['Staff', recipients.staff], ['Board', recipients.board], ['Consultants', recipients.consultants || []]].map(([label, rows]) => <div key={label}><h2 className="text-sm font-semibold text-gray-700">{label}</h2><div className="mt-2 flex flex-wrap gap-2">{rows.map((person) => { const selected = form.attendees.some((ref) => sameRef(ref, person.ref)); const noEmail = !person.email; return <button key={`${person.ref.kind}-${person.ref.profileId || person.ref.rosterId}`} type="button" aria-pressed={selected} disabled={Boolean(createdSessionId) || (noEmail && !selected)} title={noEmail ? noEmailHint(person) : undefined} onClick={() => toggleAttendee(person.ref)} className={`rounded-full border px-3 py-1.5 text-sm font-medium disabled:cursor-not-allowed disabled:opacity-50 ${selected ? 'border-gray-900 bg-gray-900 text-white' : 'border-gray-300 bg-white text-gray-700 hover:bg-gray-50'}`}>{person.name}{noEmail ? ' · no email' : ''}</button>; })}{rows.length === 0 && <p className="text-sm text-gray-500">No eligible people found.</p>}{rows.some((person) => !person.email) && <p className="w-full text-xs text-gray-500">{NO_EMAIL_SECTION_HINT}</p>}</div></div>)}
           </div>
         </fieldset>
 

@@ -153,7 +153,7 @@ export default function MaterialsEmailModal({ requestId, action, onClose, onSent
       if (!mountedRef.current || activeSendRef.current !== sendMarker || contextRef.current !== expectedContext) return;
       const data = result.data || result || {};
       if (!result.ok) {
-        const status = result.status === 400 || result.status === 403 || result.status === 409 || data.outcome === 'failed' ? 'failed' : 'uncertain';
+        const status = result.status === 400 || result.status === 403 || result.status === 409 || (result.status === 503 && ['meeting_coordinator_unavailable', 'site_visit_materials_signature_unavailable', 'site_visit_materials_email_defaults_unavailable'].includes(data.code)) || data.outcome === 'failed' ? 'failed' : 'uncertain';
         onSent?.({ ...(data && typeof data === 'object' ? data : {}), outcome: status });
         setPreview(null);
         setFeedback({ status, message: data.error || UNCERTAIN_COPY });
@@ -166,7 +166,7 @@ export default function MaterialsEmailModal({ requestId, action, onClose, onSent
         const status = data.invitationOutcome === 'failed' ? 'failed' : 'uncertain';
         onSent?.({ ...(data && typeof data === 'object' ? data : {}), outcome: status });
         setPreview(null);
-        setFeedback({ status, message: status === 'failed' ? 'The collection was created, but the invitation was not sent. You can refresh and try again.' : UNCERTAIN_COPY });
+        setFeedback({ status, message: status === 'failed' ? (data.invitationError || 'The collection was created, but the invitation was not sent. You can refresh and try again.') : UNCERTAIN_COPY });
         return;
       }
       onSent?.({ ...data, outcome: 'sent' });

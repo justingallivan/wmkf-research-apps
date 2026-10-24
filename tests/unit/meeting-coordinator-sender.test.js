@@ -27,3 +27,9 @@ test('a changed role revision refuses even when the same coordinator is assigned
   const coordinator = await getAssignedCoordinator(dependencies());
   expect(() => assertCoordinatorSender(coordinator, { actorId: ID, profileId: 7, fromEmail: coordinator.email }, { ...coordinator, revision: 'old' })).toThrow('assignment changed');
 });
+
+
+test('an inactive configured coordinator returns actionable meeting configuration feedback',async()=>{
+ const d=dependencies();d.eligibleStaff.mockRejectedValue(Object.assign(new Error('staff unavailable'),{code:'board_staff_unavailable'}));
+ await expect(getAssignedCoordinator(d)).rejects.toMatchObject({httpStatus:503,code:'meeting_coordinator_unavailable'});
+});

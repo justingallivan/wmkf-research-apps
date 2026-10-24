@@ -1708,6 +1708,35 @@ function useTranscription(requestId, { onMaterialsChanged, summaryRefresh = REFR
     await onMaterialsChangedRef.current?.();
   };
 
+  // Save the explicit human attendance review, then return its exact persisted
+  // version to the durable preparation admission. Publication belongs to its worker.
+  const saveReviewForPreparation = async () => {
+    const artifact = correctionDetail?.currentArtifact;
+    if (!correction || !artifact || dirtyNames || dirtyEnd || !attendanceReview || !speakerIds.length || correction.state !== 'draft' || busy) return null;
+    if (artifact.id !== correction.expectedCurrentArtifactId || artifact.fingerprint !== correction.expectedCurrentFingerprint) {
+      throw new Error('The published transcript changed. Refresh the review before preparing materials.');
+    }
+    const generation = generationRef.current, targetKey = editorKey;
+    const owner = claimBusy('prepare-review');
+    setError(null); setNotice(null);
+    try {
+      let saved = correction;
+      if (!correction.discussionAttribution || dirtyAttendance) {
+        const result = await requestJson(`${basePath}/corrections/${encodeURIComponent(correction.operationId)}`, {
+          method: 'PATCH', body: { expectedVersion: correction.version, speakerNames: names,
+            attendanceConfirmation: { reviewId: attendanceReview.id, kept: attendanceKept } },
+          fallbackMessage: 'Attendance could not be saved. Materials preparation has not started.',
+        });
+        if (!isCurrent(generation) || editorKeyRef.current !== targetKey) return null;
+        if (!result.correction?.operationId || !Number.isSafeInteger(result.correction.version)) throw new Error('The saved review could not be confirmed. Refresh before preparing materials.');
+        saved = result.correction;
+        setCorrectionDetail(detail => detail ? { ...detail, correction: saved } : detail);
+      }
+      if (!isCurrent(generation) || editorKeyRef.current !== targetKey) return null;
+      return { kind: 'correction', operationId: saved.operationId, expectedVersion: saved.version };
+    } finally { if (isCurrent(generation)) releaseBusy(owner); }
+  };
+
   const publishCorrection = async () => {
     const artifact = correctionDetail?.currentArtifact;
     if (!correction || !artifact || dirtyNames || dirtyEnd || !attendanceReview || !speakerIds.length || correction.state !== 'draft' || busy) return;
@@ -2048,7 +2077,7 @@ function useTranscription(requestId, { onMaterialsChanged, summaryRefresh = REFR
     correction, correctionDetail, content, speakerIds, names, setNames: editNames, baseline, dirtyNames, dirtyEnd, dirty, presentationEndMs, setPresentationEndMs, suggestionPicks, setSuggestionPicks,
     detail, audioFile, vttFile, setVttFile, acknowledged, setAcknowledged, uploadProgress, busy, error, notice, conflict,
     closeAcknowledgedId, setCloseAcknowledgedId, confirmNoVtt, setNoVttConfirmation,
-    newerTranscriptPending, transcriptUpdating, loadCollection, reviewRun, refreshReview, saveNames, publishJob, publishCorrection, generatePresentationTranscript, beginEditNames, cancelEditNames,
+    newerTranscriptPending, transcriptUpdating, loadCollection, reviewRun, refreshReview, saveNames, saveReviewForPreparation, closePreparedReview: operationId => setCorrectionDetail(detail => detail?.correction?.operationId === operationId ? null : detail), publishJob, publishCorrection, generatePresentationTranscript, beginEditNames, cancelEditNames,
     discardRun, checkPublication, closePublication, chooseFiles, uploadAndStart,
   };
 }
@@ -2489,7 +2518,7 @@ function clip(text, max) {
   return value.length > max ? `${value.slice(0, max).trimEnd()}…` : value;
 }
 
-function PresentationEndEditor({ t, readOnly }) {
+function PresentationEndEditor({ t, readOnly, editionManaged = false }) {
   const { content, names, presentationEndMs, setPresentationEndMs, busy } = t;
   const proposed = t.correctionDetail?.presentationEnd?.proposed || null;
   const turns = useMemo(() => groupTranscriptByTurn(content, names || {}), [content, names]);
@@ -2548,7 +2577,7 @@ function PresentationEndEditor({ t, readOnly }) {
       {selected !== null && (t.dirtyNames || t.dirtyEnd) && <p className="mt-3 text-xs text-gray-600">Save changes to review attendance.</p>}
       {t.attendanceReview && !t.dirtyNames && !t.dirtyEnd && <fieldset className="mt-4 space-y-2" disabled={disabled}>
         <legend className="text-sm font-semibold">Discussion attendance</legend>
-        <p className="text-xs text-gray-600">Uncheck anyone whose discussion turns should say “Unidentified speaker”. Publish to confirm.</p>
+        <p className="text-xs text-gray-600">Uncheck anyone whose discussion turns should say “Unidentified speaker”. {editionManaged ? 'Save and prepare materials to confirm.' : 'Publish to confirm.'}</p>
         {t.attendanceReview.decision.attendance.status !== 'complete' && <p className="text-xs text-gray-600">Attendance is unavailable or incomplete. Review the voices in the discussion.</p>}
         {['attendee', 'voice'].map(kind => <div key={kind}>
           {kind === 'voice' && t.attendanceDecision.rows.some(row => row.kind === kind) && <p className="mt-3 text-xs font-semibold">Other voices in the discussion</p>}
@@ -2638,15 +2667,15 @@ function ReviewBlock({ t, editionManaged = false }) {
         {matchingActive && <div className="mt-3" aria-live="polite"><Notice tone="info">Matching names from Zoom captions…</Notice></div>}
         {alignmentShown && ALIGNMENT_REASONS[alignmentStatus] && <p className="mt-3 text-sm leading-5 text-gray-700">{ALIGNMENT_REASONS[alignmentStatus]}</p>}
         <SpeakerEditor t={{ ...t, collection }} alignment={alignment} readOnly={matchingActive || (correction && correction.state !== 'draft')} />
-        {correction && <PresentationEndEditor t={t} readOnly={correction.state !== 'draft'} />}
+        {correction && <PresentationEndEditor t={t} editionManaged={editionManaged} readOnly={correction.state !== 'draft'} />}
         {alignmentShown && !matchingActive && <FragmentReviewWarnings review={alignment?.fragmentReview} content={t.content} names={t.names} presentationEndMs={t.presentationEndMs} />}
         <TranscriptPreview content={resolveDiscussionAttribution(t.content, t.presentationEndMs, t.previewDecision)} names={t.names} />
         <div className="mt-3 flex flex-wrap items-center gap-2">
           <span className="mr-auto text-xs text-gray-600" aria-live="polite">{correction ? (dirty ? 'Unsaved changes' : 'Saved') : (dirty ? 'Unsaved name changes' : 'Names saved')}</span>
           <Button size="sm" variant="outline" type="button" onClick={t.saveNames} disabled={!dirty || Boolean(busy) || matchingActive}>{busy === 'speakers' ? (correction ? 'Saving…' : 'Saving names…') : (correction ? 'Save changes' : 'Save names')}</Button>
-          <Button size="sm" variant="primary" type="button" onClick={correction ? t.publishCorrection : t.publishJob} disabled={Boolean(publishBlockedReason) || Boolean(busy)}>{busy === 'publish' ? 'Publishing…' : 'Publish transcript'}</Button>
+          {!(editionManaged && correction) && <Button size="sm" variant="primary" type="button" onClick={correction ? t.publishCorrection : t.publishJob} disabled={Boolean(publishBlockedReason) || Boolean(busy)}>{busy === 'publish' ? 'Publishing…' : 'Publish transcript'}</Button>}
         </div>
-        {correction && <div className="mt-2"><Notice tone="warning">{editionManaged ? 'Publishing this correction keeps the approved Board presentation available. Prepare and approve a replacement to update what the Board sees, or withdraw it separately.' : 'Publishing this correction, including a names-only change, withholds the Board presentation transcript and summary while the presentation and staff discussion transcripts update automatically, which takes a few minutes. The summary stays out of date until you summarize again.'}</Notice></div>}
+        {correction && <div className="mt-2"><Notice tone="warning">{editionManaged ? 'Save and prepare materials below keeps the approved Board presentation available. Review and approve the replacement separately to update what the Board sees.' : 'Publishing this correction, including a names-only change, withholds the Board presentation transcript and summary while the presentation and staff discussion transcripts update automatically, which takes a few minutes. The summary stays out of date until you summarize again.'}</Notice></div>}
         {publishBlockedReason && <p className="mt-2 text-xs leading-5 text-gray-600">{publishBlockedReason}</p>}
       </>}
       {conflict && <p className="mt-3 text-sm text-amber-950" role="alert">Another session changed this. Refresh to load the latest version; your edits stay in the fields.</p>}
@@ -3603,7 +3632,10 @@ function TranscriptWorkflow({ m, t, z, requestId, transcriptInputRef, refreshTok
       {editionPolicy?.enrolled === true && <PreparationPanel key={requestId} requestId={requestId}
         source={t.correction?.state === 'draft' ? {kind:'correction',operationId:t.correction.operationId,expectedVersion:t.correction.version}
           : artifact?.id && artifact?.fingerprint && presentationEnd ? {kind:'published',artifactId:artifact.id,fingerprint:artifact.fingerprint} : null}
-        blockedReason={t.dirtyNames || t.dirtyEnd ? 'Save checked names and the presentation ending first.' : t.correction && !t.attendanceReview ? 'Review attendance before preparing the saved review.' : null}
+        beforeStart={t.correction?.state === 'draft' ? t.saveReviewForPreparation : null}
+        onStarted={t.correction?.state === 'draft' ? () => t.closePreparedReview(t.correction.operationId) : null}
+        startLabel={t.correction?.state === 'draft' ? 'Save and prepare materials' : 'Prepare saved materials'}
+        blockedReason={t.busy ? 'Wait for the current action to finish.' : t.savedDraft && !t.correction ? 'Continue editing the saved review above before preparing new materials.' : t.dirtyNames || t.dirtyEnd ? 'Save checked names and the presentation ending first.' : t.correction && !t.attendanceReview ? 'Review attendance before preparing the saved review.' : null}
         onUpdated={onPreparationUpdated} />}
       <EarlierRuns t={t} />
     </section>

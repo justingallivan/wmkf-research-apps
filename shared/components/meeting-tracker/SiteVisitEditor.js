@@ -3,7 +3,7 @@
  * slice 2b). One visit per request, written through the existing Site Visit
  * logistics service via /api/meeting-tracker/visits/[requestId]; the Activity
  * stays the record the Staff Deliberations rail, the cycle view, the briefing
- * page, and the Share email already read. Attendees are staff/Board references
+ * page, and the Share email already read. Attendees are staff/Board/consultant references
  * from the tracker's recipient directory plus manual applicant-side entries.
  */
 import { useCallback, useEffect, useRef, useState } from 'react';
@@ -55,7 +55,7 @@ function formFromVisit(visit, requestNumber) {
 
 function emailForRef(ref, directory) {
   if (ref?.kind === 'manual') return String(ref.email || '').trim().toLowerCase();
-  const people = ref?.kind === 'staff' ? directory?.staff || [] : ref?.kind === 'roster' ? directory?.board || [] : [];
+  const people = ref?.kind === 'staff' ? directory?.staff || [] : ref?.kind === 'roster' ? [...(directory?.board || []), ...(directory?.consultants || [])] : [];
   return String(people.find((person) => sameRef(person.ref, ref))?.email || '').trim().toLowerCase();
 }
 
@@ -123,7 +123,7 @@ export function visitWhen(visit) {
 function personName(ref, directory) {
   if (!ref) return null;
   if (ref.kind === 'manual') return ref.name || ref.email;
-  const people = ref.kind === 'staff' ? directory.staff : ref.kind === 'roster' ? directory.board : [];
+  const people = ref.kind === 'staff' ? directory.staff : ref.kind === 'roster' ? [...(directory.board || []), ...(directory.consultants || [])] : [];
   return people.find((person) => sameRef(person.ref, ref))?.name || 'Person no longer in the directory';
 }
 
@@ -184,7 +184,7 @@ export default function SiteVisitEditor() {
   const programId = Array.isArray(router.query.programId) ? '' : router.query.programId || '';
   const [visit, setVisit] = useState(null);
   const [form, setForm] = useState(() => emptyForm(requestNumber));
-  const [recipients, setRecipients] = useState({ staff: [], board: [] });
+  const [recipients, setRecipients] = useState({ staff: [], board: [], consultants: [] });
   const [manual, setManual] = useState({ name: '', email: '', role: 'required' });
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
@@ -231,7 +231,7 @@ export default function SiteVisitEditor() {
       if (recipientSettled.status === 'rejected') throw recipientSettled.reason;
       const visitBody = visitSettled.value;
       const recipientBody = recipientSettled.value;
-      const directory = { staff: recipientBody.staff || [], board: recipientBody.board || [] };
+      const directory = { staff: recipientBody.staff || [], board: recipientBody.board || [], consultants: recipientBody.consultants || [] };
       setVisit(visitBody.siteVisit || null);
       const savedForm = formFromVisit(visitBody.siteVisit, requestNumber);
       setForm(visitBody.siteVisit ? savedForm : withApplicantAttendees(savedForm, visitBody.applicantAttendees, directory));
@@ -263,7 +263,7 @@ export default function SiteVisitEditor() {
       [other]: current[other].filter((row) => !sameRef(row, ref)),
     };
   });
-  // Staff and Board attendees (redesign §3.1): one list, each person Required or Optional.
+  // Staff, Board and consultant attendees (redesign §3.1): one list, each person Required or Optional.
   const removeAttendee = (ref) => setForm((current) => ({
     ...current,
     requiredAttendees: current.requiredAttendees.filter((row) => !sameRef(row, ref)),
@@ -398,16 +398,16 @@ export default function SiteVisitEditor() {
           </fieldset>
 
           <fieldset className="mt-6 border-t border-gray-100 pt-5">
-            <legend className="text-base font-semibold text-gray-900">Staff and Board attendees</legend>
+            <legend className="text-base font-semibold text-gray-900">Staff, Board and consultant attendees</legend>
             <p className="mt-1 text-sm text-gray-600">Each person is Required or Optional on the calendar entry.</p>
             <div className="mt-3">
-              {recipients.staff.length + recipients.board.length === 0
+              {recipients.staff.length + recipients.board.length + recipients.consultants.length === 0
                 ? <p className="text-sm text-gray-500">No eligible people found.</p>
-                : <AttendeePicker label="Find a staff or Board member" people={[...recipients.staff, ...recipients.board]}
+                : <AttendeePicker label="Find a staff member, Board member or consultant" people={[...recipients.staff, ...recipients.board, ...recipients.consultants]}
                   selected={[...form.requiredAttendees, ...form.optionalAttendees]} roles={attendeeRole}
                   onAdd={addAttendee} onRemove={removeAttendee} onRole={setAttendeeRole} roleFull={roleFull}
                   disabled={busy} hintFor={noEmailHint} full={roleFull('required') && roleFull('optional')} />}
-              {[...recipients.staff, ...recipients.board].some((person) => !person.email) && <p className="mt-2 text-xs text-gray-500">{NO_EMAIL_SECTION_HINT}</p>}
+              {[...recipients.staff, ...recipients.board, ...recipients.consultants].some((person) => !person.email) && <p className="mt-2 text-xs text-gray-500">{NO_EMAIL_SECTION_HINT}</p>}
             </div>
           </fieldset>
 

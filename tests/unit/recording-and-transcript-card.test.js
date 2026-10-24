@@ -1,5 +1,6 @@
 /** @jest-environment jsdom */
-jest.mock('../../shared/components/meeting-tracker/PresentationApprovalPanel', () => ({ __esModule: true, default: ({ onPolicyChange }) => { require('react').useEffect(() => { onPolicyChange?.(false); }, [onPolicyChange]); return null; } }));
+let mockEditionManaged = false;
+jest.mock('../../shared/components/meeting-tracker/PresentationApprovalPanel', () => ({ __esModule: true, default: ({ onPolicyChange }) => { require('react').useEffect(() => { onPolicyChange?.(mockEditionManaged); }, [onPolicyChange]); return null; } }));
 
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { put } from '@vercel/blob/client';
@@ -161,7 +162,7 @@ const shortDate = (iso) => new Date(iso).toLocaleString(undefined, { month: 'sho
 const detailFor = (jobOverrides) => () => ({ job: job(jobOverrides), content, candidates: [] });
 
 let originalScrollIntoViewDescriptor;
-beforeEach(() => { originalScrollIntoViewDescriptor = Object.getOwnPropertyDescriptor(HTMLElement.prototype, 'scrollIntoView'); });
+beforeEach(() => { mockEditionManaged = false; originalScrollIntoViewDescriptor = Object.getOwnPropertyDescriptor(HTMLElement.prototype, 'scrollIntoView'); });
 afterEach(() => {
   jest.restoreAllMocks();
   put.mockReset();
@@ -2248,4 +2249,36 @@ test('incomplete Zoom lookup retains request contacts and manual entry', async (
   expect(screen.getByLabelText('Name for Speaker A')).toHaveValue('Request Person');
   fireEvent.change(screen.getByLabelText('Name for Speaker A'), { target: { value: 'Typed Name' } });
   expect(screen.getByLabelText('Name for Speaker A')).toHaveValue('Typed Name');
+});
+
+
+test('enrolled save and prepare persists checked attendance then queues its exact version without synchronous publication', async () => {
+  mockEditionManaged = true;
+  const artifact = boundaryArtifact();
+  let draft = attendanceDraft({ discussionAttribution: null });
+  let confirmations = 0, queued = null;
+  route({ materials: [transcriptRow()], collection: collection({ jobs: [], currentArtifact: artifact }), detail: detailFor({}) }, {
+    '/presentation-approval': { respond: () => response({ enrolled: true, canApprove: false, activeEditionId: null, candidate: null }) },
+    '/preparation': { respond: (_path, options) => {
+      if (options.method === 'POST') { queued = JSON.parse(options.body); return response({ preparation: { id: OP_ID, version: 1, steps: [] } }); }
+      return response({ preparation: null });
+    } },
+    '/corrections': { method: 'POST', respond: () => response(correctionDetail(artifact, { correction: draft })) },
+    [`/corrections/${CORRECTION_ID}`]: { method: 'PATCH', respond: (_path, options) => {
+      const body = JSON.parse(options.body); confirmations += 1;
+      expect(body.attendanceConfirmation).toEqual({ reviewId: 'review', kept: [true, true] });
+      draft = { ...draft, version: 8, discussionAttribution: draft.attendanceReview.decision };
+      return response({ correction: draft });
+    } },
+  });
+  render(<RecordingAndTranscriptCard requestId={REQUEST_ID} />);
+  await stepAction('Edit speaker names');
+  const prepare = await screen.findByRole('button', { name: 'Save and prepare materials' });
+  await waitFor(() => expect(prepare).not.toBeDisabled());
+  expect(screen.queryByRole('button', { name: 'Publish transcript' })).toBeNull();
+  fireEvent.click(prepare);
+  await waitFor(() => expect(queued).toEqual({ action: 'start', source: { kind: 'correction', operationId: CORRECTION_ID, expectedVersion: 8 } }));
+  expect(confirmations).toBe(1);
+  await waitFor(() => expect(screen.queryByTestId('presentation-end-editor')).toBeNull());
+  expect(global.fetch.mock.calls.some(([url, options]) => String(url).endsWith('/publish') && options?.method === 'POST')).toBe(false);
 });

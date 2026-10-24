@@ -80,7 +80,7 @@ test('manual and copied-email attendee data is rejected before directory access'
   })).toThrow();
 });
 
-test('recipient picker includes staff and Board only and reuses one directory read', async () => {
+test('recipient picker includes staff, Board and consultants and reuses one directory read', async () => {
   const directory = {
     staff: [{ profileId: 7, name: 'Alex Staff', email: 'alex@example.org' }],
     external: [
@@ -100,6 +100,7 @@ test('recipient picker includes staff and Board only and reuses one directory re
   expect(deps.getRecipientDirectory).toHaveBeenCalledTimes(1);
   expect(result.staff).toHaveLength(1);
   expect(result.board).toEqual([expect.objectContaining({ name: 'Bailey Board', linked: true })]);
+  expect(result.consultants).toEqual([expect.objectContaining({ name: 'Casey Consultant', linked: false })]);
   expect(result.defaultAttendeeRefs).toEqual(refs.attendees);
   expect(result.defaultAttendees).toEqual([{ name: 'Alex Staff', email: 'alex@example.org' }]);
 });
@@ -126,7 +127,7 @@ test('lenient parse and resolve never throw and name what could not be resolved'
   const deps = dependencies({
     resolveRecipientRefs: jest.fn(async ([ref]) => {
       if (ref.kind === 'staff') return [{ name: 'Alex Staff', email: 'alex@example.org', roleType: 'Staff' }];
-      if (ref.rosterId === 9) return [{ name: 'Former Board', email: 'former@example.org', roleType: 'Consultant' }];
+      if (ref.rosterId === 9) return [{ name: 'Former Board', email: 'former@example.org', roleType: 'Reviewer' }];
       throw new Error('unresolved');
     }),
   });
@@ -136,7 +137,7 @@ test('lenient parse and resolve never throw and name what could not be resolved'
   );
   expect(result.attendees).toEqual([{ name: 'Alex Staff', email: 'alex@example.org' }]);
   expect(result.issues).toEqual([
-    'roster entry 9 is no longer a current Board member.',
+    'roster entry 9 is no longer a current Board member or consultant.',
     'roster entry 10 could not be resolved from the current directory.',
   ]);
 });
@@ -199,4 +200,21 @@ test('a linked Board member with no Contact email receives the Dataverse remedy'
     message: expect.stringMatching(/linked Dataverse contact.*fix or relink.*unlink/i),
   });
   expect(resolveRecipientRefs).not.toHaveBeenCalled();
+});
+
+
+test('consultants resolve strictly and leniently; unrelated roster roles still refuse', async () => {
+  const refs = { version: 1, attendees: [{ kind: 'roster', rosterId: 10 }] };
+  const consultant = { name: 'Casey Consultant', email: 'casey@example.org', roleType: 'Consultant' };
+  const d = dependencies({ resolveRecipientRefs: jest.fn(async () => [consultant]) });
+  expect(await resolveMeetingAttendeeRefs(refs, d)).toEqual([{ name: consultant.name, email: consultant.email }]);
+  expect(await resolveMeetingAttendeesLenient(refs, d)).toEqual({ attendees: [{ name: consultant.name, email: consultant.email }], issues: [] });
+  d.resolveRecipientRefs.mockResolvedValue([{ ...consultant, roleType: 'Reviewer' }]);
+  await expect(resolveMeetingAttendeeRefs(refs, d)).rejects.toMatchObject({ code: 'meeting_tracker_attendee_unresolved' });
+});
+
+test('an explicitly saved empty default list is configured and does not repopulate', async () => {
+  const refs = { version: 1, attendees: [] };
+  const d = dependencies({ getSetting: jest.fn(async () => JSON.stringify(refs)) });
+  expect(await getDefaultMeetingAttendees(d)).toEqual({ refs, attendees: [], notice: null });
 });

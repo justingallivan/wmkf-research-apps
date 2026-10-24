@@ -36,3 +36,45 @@ test('a late read for an earlier request cannot replace the current progress',as
  const view=render(<PreparationPanel requestId={id} source={source}/>);await waitFor(()=>expect(global.fetch).toHaveBeenCalledTimes(1));view.rerender(<PreparationPanel requestId={other} source={source}/>);
  await screen.findByText('Prepared');await act(async()=>{resolveOld(await response({preparation:preparation([step('unknown')])}));});expect(screen.queryByText('Outcome unknown')).toBeNull();
 });
+
+
+test('save and prepare queues the exact newly saved version after the review save completes', async()=>{
+ const savedSource={kind:'correction',operationId:other,expectedVersion:9};
+ let resolveSave;const beforeStart=jest.fn(()=>new Promise(resolve=>{resolveSave=resolve;}));
+ render(<PreparationPanel requestId={id} source={{...savedSource,expectedVersion:8}} beforeStart={beforeStart} startLabel="Save and prepare materials"/>);
+ fireEvent.click(await screen.findByRole('button',{name:'Save and prepare materials'}));
+ expect(global.fetch.mock.calls.some(([,o])=>o?.method==='POST')).toBe(false);
+ await act(async()=>resolveSave(savedSource));
+ await waitFor(()=>expect(global.fetch.mock.calls.some(([,o])=>o?.method==='POST')).toBe(true));
+ expect(JSON.parse(global.fetch.mock.calls.find(([,o])=>o?.method==='POST')[1].body)).toEqual({action:'start',source:savedSource});
+});
+
+test('failed review save never starts preparation',async()=>{
+ render(<PreparationPanel requestId={id} source={source} beforeStart={async()=>{throw new Error('Attendance changed. Review it again.');}} startLabel="Save and prepare materials"/>);
+ fireEvent.click(await screen.findByRole('button',{name:'Save and prepare materials'}));
+ expect(await screen.findByRole('alert')).toHaveTextContent('Attendance changed');
+ expect(global.fetch.mock.calls.some(([,o])=>o?.method==='POST')).toBe(false);
+});
+
+test('navigating during a review save cannot queue preparation for either page',async()=>{
+ let resolveSave;const beforeStart=()=>new Promise(resolve=>{resolveSave=resolve;});
+ const view=render(<PreparationPanel requestId={id} source={source} beforeStart={beforeStart}/>);
+ fireEvent.click(await screen.findByRole('button',{name:'Prepare saved materials'}));
+ view.rerender(<PreparationPanel requestId={other} source={source} beforeStart={beforeStart}/>);
+ await act(async()=>resolveSave(source));
+ expect(global.fetch.mock.calls.some(([,o])=>o?.method==='POST')).toBe(false);
+});
+
+
+test('changed saved inputs require a new preparation rather than retrying the immutable old version',async()=>{
+ global.fetch.mockImplementation(()=>response({preparation:preparation([step('blocked',{failureCode:'preparation_source_changed'})])}));
+ render(<PreparationPanel requestId={id} source={source}/>);
+ expect(await screen.findByText('The transcript changed. Start preparation from the saved review.')).toBeVisible();
+ expect(screen.queryByRole('button',{name:'Retry this step'})).toBeNull();
+});
+
+test('an incomplete admission receipt never closes the saved review',async()=>{
+ const onStarted=jest.fn();render(<PreparationPanel requestId={id} source={source} onStarted={onStarted}/>);
+ fireEvent.click(await screen.findByRole('button',{name:'Prepare saved materials'}));
+ expect(await screen.findByRole('alert')).toHaveTextContent('Preparation could not be confirmed');expect(onStarted).not.toHaveBeenCalled();
+});

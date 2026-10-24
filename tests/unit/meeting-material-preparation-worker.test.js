@@ -29,3 +29,8 @@ test('database JSONB key ordering does not look like changed input',async()=>{co
 
 test('a live publication recovery lease waits without consuming the parent retry budget',async()=>{const {d,row}=fixture('source');row.input.source={kind:'correction',operationId:id,expectedVersion:2};d.publication=async()=>({state:'publishing'});d.reconcile=jest.fn(async()=>{throw {code:'meeting_transcript_publication_busy'};});row.attempts=3;expect((await runPreparationTick(d)).outcome).toBe('pending');expect(d.store.finish).toHaveBeenCalledWith(expect.objectContaining({state:'pending',failureCode:null}));});
 test('a video attempt waits at most a day without cancelling or recreating its child',async()=>{const {d,row}=fixture('video');row.attempt_created_at=new Date(Date.now()-25*60*60*1000);expect((await runPreparationTick(d)).outcome).toBe('blocked');expect(d.startVideo).not.toHaveBeenCalled();expect(d.store.finish).toHaveBeenCalledWith(expect.objectContaining({failureCode:'preparation_video_wait_expired'}));});
+
+test.each(['meeting_transcript_correction_changed','meeting_attendance_confirmation_required','correction_draft_not_found'])('stale correction %s asks for new reviewed inputs rather than an impossible retry',async code=>{
+ const {d,row}=fixture('source');row.input.source={kind:'correction',operationId:id,expectedVersion:2};d.publication=jest.fn(async()=>({state:'draft'}));d.publish=jest.fn(async()=>{throw {code};});
+ await runPreparationTick(d);expect(d.store.finish).toHaveBeenCalledWith(expect.objectContaining({state:'blocked',failureCode:'preparation_source_changed'}));
+});

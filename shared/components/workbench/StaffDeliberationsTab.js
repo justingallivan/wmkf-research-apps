@@ -1413,7 +1413,7 @@ export default function StaffDeliberationsTab({
   const briefingStep = (
     <Step
       id="deliberations-briefing"
-      number={1}
+      number={3}
       title="Pre-site briefing"
       status={briefStatus}
       summary={(
@@ -1540,27 +1540,21 @@ export default function StaffDeliberationsTab({
     </Step>
   );
 
-  const sessionStep = (
-    <Step
-      number={2}
-      title="Deliberation session"
-      status={stepStatus('session')}
-      summary={(
-        <>
-          <p className={summaryClass} data-testid="deliberations-session-line">
-            {sessionLine(session)}
-            {' · '}
-            <Link href="/meeting-tracker" className="font-medium text-blue-700 underline-offset-4 hover:underline">Meeting Tracker</Link>
-          </p>
-          {currentStep === 'session' && nowLine && <p className="mt-1 text-sm text-gray-900">{nowLine}</p>}
-        </>
-      )}
-    />
+  const meetingDetails = (
+    <details className="rounded-lg border border-gray-200 bg-white px-4 py-3 text-sm">
+      <summary className="cursor-pointer font-medium text-blue-800">Meeting details</summary>
+      <div className="mt-2 space-y-2 text-gray-600">
+        <p data-testid="deliberations-session-line">{sessionLine(session)}</p>
+        {currentStep === 'session' && nowLine && <p className="text-gray-900">{nowLine}</p>}
+        <p>{timingLabel}</p>
+        <Link href={session?.sessionId ? `/meeting-tracker/sessions/${encodeURIComponent(session.sessionId)}` : `/meeting-tracker/visits/${encodeURIComponent(requestId)}`} className="font-medium text-blue-800 underline">Open meeting coordination</Link>
+      </div>
+    </details>
   );
 
   const presentationStep = (
     <Step
-      number={3}
+      number={4}
       title="Presentation"
       status={stepStatus('presentation')}
       summary={(
@@ -1591,7 +1585,7 @@ export default function StaffDeliberationsTab({
   const writeupStep = (
     <Step
       id="deliberations-writeup"
-      number={4}
+      number={1}
       title="Post-presentation writeup"
       status={writeupStatus}
       summary={<p className={summaryClass}>{writeupSummary}</p>}
@@ -1746,7 +1740,7 @@ export default function StaffDeliberationsTab({
 
   const reviewStep = (
     <Step
-      number={5}
+      number={2}
       title={leadershipReview ? 'Group and leadership review' : 'Group review'}
       status={stepStatus('review')}
       summary={(
@@ -1812,13 +1806,13 @@ export default function StaffDeliberationsTab({
             </p>
           </div>
         )}
+        {meetingDetails}
         <Card hover={false} padding="p-0">
           <ol aria-label="Staff deliberations steps" className="divide-y divide-gray-200">
-            {briefingStep}
-            {sessionStep}
-            {presentationStep}
             {writeupStep}
             {reviewStep}
+            {briefingStep}
+            {presentationStep}
           </ol>
         </Card>
       </section>
@@ -1841,8 +1835,8 @@ export default function StaffDeliberationsTab({
           session={session}
           // Tracker §5.6: the session's attendees are the default recipients
           // once a slot exists; before that, the site-visit party.
-          suggestedTo={sessionAttendees.length ? sessionAttendees.map((person) => person.email) : (siteVisitContext?.suggestedTo || EMPTY_LIST)}
-          suggestedCc={sessionAttendees.length ? EMPTY_LIST : (siteVisitContext?.suggestedCc || EMPTY_LIST)}
+          suggestedTo={session ? sessionAttendees.map((person) => person.email) : (siteVisitContext?.suggestedTo || EMPTY_LIST)}
+          suggestedCc={session ? EMPTY_LIST : (siteVisitContext?.suggestedCc || EMPTY_LIST)}
           onHistory={onDistributionHistory}
           composer={composerOpen ? 'dialog' : 'hidden'}
           onCloseComposer={() => setComposerOpen(false)}

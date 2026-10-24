@@ -1,6 +1,6 @@
 /** @jest-environment jsdom */
 
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { AppCard, getServerSideProps as getLandingProps } from '../../pages/index';
 import MeetingTrackerList, { MeetingTrackerRequestRow } from '../../shared/components/meeting-tracker/MeetingTrackerList';
 
@@ -18,6 +18,19 @@ jest.mock('../../shared/components/Layout', () => ({
 jest.mock('next/link', () => function MockLink({ children, href }) {
   return <a href={typeof href === 'string' ? href : href.pathname}>{children}</a>;
 });
+let mockDndHandlers;
+jest.mock('@hello-pangea/dnd', () => ({
+  DragDropContext: ({ children, ...handlers }) => { mockDndHandlers = handlers; return children; },
+  Droppable: ({ children, droppableId }) => children({ innerRef: () => {}, droppableProps: { 'data-droppable-id': droppableId }, placeholder: null }),
+  Draggable: ({ children, draggableId, isDragDisabled }) => children({ innerRef: () => {}, draggableProps: { 'data-drag-id': draggableId }, dragHandleProps: isDragDisabled ? null : { tabIndex: 0, role: 'button', 'data-handle-id': draggableId } }, { isDragging: false }),
+}));
+function simulateAgendaDrop(container, from, to) {
+  const rows = container.querySelectorAll('[data-drag-id]');
+  const draggableId = rows[from].getAttribute('data-drag-id');
+  const droppableId = rows[from].closest('[data-droppable-id]').getAttribute('data-droppable-id');
+  act(() => mockDndHandlers.onDragStart({ draggableId }));
+  act(() => mockDndHandlers.onDragEnd({ draggableId, source: { index: from, droppableId }, destination: to === null ? null : { index: to, droppableId } }));
+}
 import SessionEditor, { moveSlot, noEmailHint, ProposalOrderList, reorderSessionSlots, slotBriefingText } from '../../shared/components/meeting-tracker/SessionEditor';
 
 const SESSION_ID = '11111111-1111-4111-8111-111111111111';
@@ -253,108 +266,33 @@ describe('ProposalOrderList drag-and-drop', () => {
     return { container, slots };
   }
 
-  test('dragging row 3\'s handle onto row 1 reorders the list and calls onReorder', () => {
-    const onReorder = jest.fn();
-    const { container, slots } = renderList(onReorder);
-    const rows = container.querySelectorAll('li');
-    const handles = container.querySelectorAll('[draggable="true"]');
-    expect(rows).toHaveLength(3);
-    expect(handles).toHaveLength(3);
-
-    jest.spyOn(rows[0], 'getBoundingClientRect').mockReturnValue({ top: 0, height: 40, bottom: 40, left: 0, right: 100, width: 100 });
-
-    // React's synthetic drag events only need the native event type to fire; the
-    // MouseEvent constructor (unlike jsdom's DragEvent init dict) reliably applies
-    // `clientY`, which the drop-edge calculation depends on.
-    fireEvent(handles[2], new MouseEvent('dragstart', { bubbles: true, cancelable: true }));
-    fireEvent(rows[0], new MouseEvent('dragover', { bubbles: true, cancelable: true, clientY: 5 }));
-    fireEvent(rows[0], new MouseEvent('drop', { bubbles: true, cancelable: true, clientY: 5 }));
-
+  test.each([[2,0,['slot-c','slot-a','slot-b']], [0,2,['slot-b','slot-c','slot-a']], [0,1,['slot-b','slot-a','slot-c']]])('library drop from %s to %s preserves IDs and ETags', (from,to,expected) => {
+    const onReorder=jest.fn();const {container,slots}=renderList(onReorder);
+    simulateAgendaDrop(container,from,to);
     expect(onReorder).toHaveBeenCalledTimes(1);
-    const [nextSlots, movedSlot, targetIndex] = onReorder.mock.calls[0];
-    expect(nextSlots.map((slot) => slot.wmkf_deliberationslotid)).toEqual(['slot-c', 'slot-a', 'slot-b']);
-    expect(nextSlots.map((slot) => slot._etag)).toEqual(['W/"3"', 'W/"1"', 'W/"2"']);
-    expect(movedSlot).toBe(slots[2]);
-    expect(targetIndex).toBe(0);
+    expect(onReorder.mock.calls[0][0]).toEqual(expected.map(id=>slots.find(row=>row.wmkf_deliberationslotid===id)));
+    expect(onReorder.mock.calls[0][1]).toBe(slots[from]);
+    expect(onReorder.mock.calls[0][2]).toBe(to);
   });
-
-  test('drop is a no-op when nothing is being dragged', () => {
-    const onReorder = jest.fn();
-    const { container } = renderList(onReorder);
-    const rows = container.querySelectorAll('li');
-    fireEvent(rows[0], new MouseEvent('drop', { bubbles: true, cancelable: true, clientY: 5 }));
-    expect(onReorder).not.toHaveBeenCalled();
+  test.each([null,1])('cancel or same-position drop does not save: %s', to => {
+    const onReorder=jest.fn();const {container}=renderList(onReorder);simulateAgendaDrop(container,1,to);expect(onReorder).not.toHaveBeenCalled();
   });
-
-  test('dragging row 1 onto the lower half of the last row moves it to the end', () => {
-    const onReorder = jest.fn();
-    const { container, slots } = renderList(onReorder);
-    const rows = container.querySelectorAll('li');
-    const handles = container.querySelectorAll('[draggable="true"]');
-
-    jest.spyOn(rows[2], 'getBoundingClientRect').mockReturnValue({ top: 80, height: 40, bottom: 120, left: 0, right: 100, width: 100 });
-
-    fireEvent(handles[0], new MouseEvent('dragstart', { bubbles: true, cancelable: true }));
-    fireEvent(rows[2], new MouseEvent('dragover', { bubbles: true, cancelable: true, clientY: 115 }));
-    fireEvent(rows[2], new MouseEvent('drop', { bubbles: true, cancelable: true, clientY: 115 }));
-
-    expect(onReorder).toHaveBeenCalledTimes(1);
-    const [nextSlots, movedSlot, targetIndex] = onReorder.mock.calls[0];
-    expect(nextSlots.map((slot) => slot.wmkf_deliberationslotid)).toEqual(['slot-b', 'slot-c', 'slot-a']);
-    expect(nextSlots.map((slot) => slot._etag)).toEqual(['W/"2"', 'W/"3"', 'W/"1"']);
-    expect(movedSlot).toBe(slots[0]);
-    expect(targetIndex).toBe(2);
+  test('busy controls cannot initiate a library move or save a drop',()=>{
+    const onReorder=jest.fn();const {container}=renderList(onReorder,{busy:true});
+    expect(container.querySelectorAll('[data-handle-id]')).toHaveLength(0);
+    simulateAgendaDrop(container,2,0);expect(onReorder).not.toHaveBeenCalled();
   });
-
-  test('dragging row 1 onto the upper half of the last row moves it just before it', () => {
-    const onReorder = jest.fn();
-    const { container, slots } = renderList(onReorder);
-    const rows = container.querySelectorAll('li');
-    const handles = container.querySelectorAll('[draggable="true"]');
-
-    jest.spyOn(rows[2], 'getBoundingClientRect').mockReturnValue({ top: 80, height: 40, bottom: 120, left: 0, right: 100, width: 100 });
-
-    fireEvent(handles[0], new MouseEvent('dragstart', { bubbles: true, cancelable: true }));
-    fireEvent(rows[2], new MouseEvent('dragover', { bubbles: true, cancelable: true, clientY: 90 }));
-    fireEvent(rows[2], new MouseEvent('drop', { bubbles: true, cancelable: true, clientY: 90 }));
-
-    expect(onReorder).toHaveBeenCalledTimes(1);
-    const [nextSlots, movedSlot, targetIndex] = onReorder.mock.calls[0];
-    expect(nextSlots.map((slot) => slot.wmkf_deliberationslotid)).toEqual(['slot-b', 'slot-a', 'slot-c']);
-    expect(movedSlot).toBe(slots[0]);
-    expect(targetIndex).toBe(1);
-  });
-
-  test('dropping a row onto its own lower half is a no-op', () => {
-    const onReorder = jest.fn();
-    const { container } = renderList(onReorder);
-    const rows = container.querySelectorAll('li');
-    const handles = container.querySelectorAll('[draggable="true"]');
-
-    jest.spyOn(rows[0], 'getBoundingClientRect').mockReturnValue({ top: 0, height: 40, bottom: 40, left: 0, right: 100, width: 100 });
-
-    fireEvent(handles[1], new MouseEvent('dragstart', { bubbles: true, cancelable: true }));
-    fireEvent(rows[0], new MouseEvent('dragover', { bubbles: true, cancelable: true, clientY: 30 }));
-    fireEvent(rows[0], new MouseEvent('drop', { bubbles: true, cancelable: true, clientY: 30 }));
-
-    expect(onReorder).not.toHaveBeenCalled();
-  });
-
-  test('while busy, no handle is draggable and the drag sequence is inert', () => {
-    const onReorder = jest.fn();
-    const { container } = renderList(onReorder, { busy: true });
-    const rows = container.querySelectorAll('li');
-    const draggableHandles = container.querySelectorAll('[draggable="true"]');
-    const handles = container.querySelectorAll('[title="Drag to reorder"]');
-    expect(draggableHandles).toHaveLength(0);
-    expect(handles).toHaveLength(3);
-
-    jest.spyOn(rows[0], 'getBoundingClientRect').mockReturnValue({ top: 0, height: 40, bottom: 40, left: 0, right: 100, width: 100 });
-    fireEvent(handles[2], new MouseEvent('dragstart', { bubbles: true, cancelable: true }));
-    fireEvent(rows[0], new MouseEvent('dragover', { bubbles: true, cancelable: true, clientY: 5 }));
-    fireEvent(rows[0], new MouseEvent('drop', { bubbles: true, cancelable: true, clientY: 5 }));
-
-    expect(onReorder).not.toHaveBeenCalled();
+  test.each(['etag','membership','session'])('a %s change during a drag refuses the stale move', change=>{
+    const onReorder=jest.fn();const slots=[orderSlot('slot-a','v1'),orderSlot('slot-b','v1'),orderSlot('slot-c','v1')];
+    // Update the same mounted instance rather than remounting its drag ref.
+    const viewProps={slots,proposalById:new Map(),sessions:[],sessionId:SESSION_ID,busy:false,onChange:jest.fn(),onMove:jest.fn(),onRemove:jest.fn(),onReorder};
+    // Use a separate mounted list to make the initial and updated renders explicit.
+    const view=render(<ProposalOrderList {...viewProps}/>);
+    act(()=>mockDndHandlers.onDragStart({draggableId:'slot-c'}));
+    const updated=change==='etag'?slots.map((row,i)=>i===1?{...row,_etag:'new'}:row):change==='membership'?slots.slice(1):slots;
+    view.rerender(<ProposalOrderList {...viewProps} slots={updated} sessionId={change==='session'?'other':SESSION_ID}/>);
+    act(()=>mockDndHandlers.onDragEnd({draggableId:'slot-c',source:{index:2,droppableId:`session-${SESSION_ID}`},destination:{index:0,droppableId:`session-${SESSION_ID}`}}));
+    expect(onReorder).not.toHaveBeenCalled();expect(screen.getByRole('status')).toHaveTextContent('agenda changed');
   });
 
   test('no arrow buttons remain; the position select lets keyboard users move any distance in one save', async () => {
@@ -417,25 +355,6 @@ describe('ProposalOrderList drag-and-drop', () => {
     expect(onRemove).toHaveBeenCalledWith(slots[0]);
   });
 
-  test('Escape during a drag clears the dragging state and a subsequent drop does nothing', () => {
-    const onReorder = jest.fn();
-    const { container } = renderList(onReorder);
-    const rows = container.querySelectorAll('li');
-    const handles = container.querySelectorAll('[title="Drag to reorder"]');
-    const ol = container.querySelector('ol');
-
-    fireEvent(handles[2], new MouseEvent('dragstart', { bubbles: true, cancelable: true }));
-    expect(rows[2]).toHaveClass('opacity-40');
-
-    fireEvent.keyDown(ol, { key: 'Escape' });
-    expect(rows[2]).not.toHaveClass('opacity-40');
-
-    jest.spyOn(rows[0], 'getBoundingClientRect').mockReturnValue({ top: 0, height: 40, bottom: 40, left: 0, right: 100, width: 100 });
-    fireEvent(rows[0], new MouseEvent('dragover', { bubbles: true, cancelable: true, clientY: 5 }));
-    fireEvent(rows[0], new MouseEvent('drop', { bubbles: true, cancelable: true, clientY: 5 }));
-    expect(onReorder).not.toHaveBeenCalled();
-  });
-
   test('while busy, the row that initiated the save is opacity-70 and its controls disabled; other rows only disable', () => {
     const { container } = renderList(jest.fn(), { busy: true, savingSlotId: 'slot-b' });
     const rows = container.querySelectorAll('li');
@@ -478,14 +397,10 @@ describe('ProposalOrderList drag-and-drop', () => {
     expect(screen.getByText('Lead PD: Not assigned')).toBeInTheDocument();
   });
 
-  test('the drag handle is a full-height rail on the row\'s left edge and is inert while busy', () => {
-    const { container } = renderList(jest.fn(), { busy: true, savingSlotId: 'slot-b' });
-    const handle = container.querySelector('[draggable]');
-    expect(handle.getAttribute('class')).toContain('self-stretch');
-    expect(handle.parentElement.tagName).toBe('LI');
-    expect(handle.parentElement.getAttribute('class')).toContain('flex');
-    expect(handle.getAttribute('draggable')).toBe('false');
-    expect(handle.getAttribute('class')).not.toContain('cursor-grab');
+  test('the dedicated full-height handle is keyboard focusable and inert while busy', () => {
+    const {container}=renderList(jest.fn(),{busy:true});const handle=screen.getByRole('button',{name:'Reorder proposal #slot-a, position 1'});
+    expect(handle).toBeDisabled();expect(handle).toHaveClass('self-stretch');expect(handle.parentElement.tagName).toBe('LI');
+    expect(container.querySelectorAll('[data-handle-id]')).toHaveLength(0);
   });
 
   test('the position select carries the request number even when proposal is undefined, falling back to the expanded request', async () => {
@@ -515,18 +430,10 @@ describe('ProposalOrderList drag-and-drop', () => {
     expect(screen.getByRole('combobox', { name: 'Position of #1009001' })).toBeInTheDocument();
   });
 
-  test('the drag handle covers only the grip and index, not the row, arrows, or form controls', () => {
-    const { container } = renderList(jest.fn());
-    const draggableElements = container.querySelectorAll('[draggable="true"]');
-    expect(draggableElements).toHaveLength(3);
-    draggableElements.forEach((handle) => {
-      expect(handle.tagName).not.toBe('LI');
-      expect(handle.querySelector('button')).toBeNull();
-      expect(handle.querySelector('input')).toBeNull();
-      expect(handle.querySelector('select')).toBeNull();
-    });
-    expect(container.querySelectorAll('li[draggable="true"]')).toHaveLength(0);
-    expect(container.querySelectorAll('input[draggable="true"], select[draggable="true"], button[draggable="true"]')).toHaveLength(0);
+  test('only the dedicated grip carries the library handle, not row inputs or menu controls',()=>{
+    const {container}=renderList(jest.fn());const handles=container.querySelectorAll('[data-handle-id]');expect(handles).toHaveLength(3);
+    handles.forEach(handle=>{expect(handle.tagName).toBe('BUTTON');expect(handle).toHaveAttribute('tabindex','0');expect(handle.querySelector('input,select')).toBeNull();});
+    expect(container.querySelectorAll('li[data-handle-id],input[data-handle-id],select[data-handle-id]')).toHaveLength(0);
   });
 });
 
@@ -563,14 +470,7 @@ describe('SessionEditor optimistic reorder', () => {
   function headers(container) {
     return [...container.querySelectorAll('ol[aria-label="Proposal order"] li p.font-semibold')].map((node) => node.textContent);
   }
-  function drag(container, fromIndex, toIndex, clientY) {
-    const rows = container.querySelectorAll('ol[aria-label="Proposal order"] li');
-    const handles = container.querySelectorAll('[title="Drag to reorder"]');
-    jest.spyOn(rows[toIndex], 'getBoundingClientRect').mockReturnValue({ top: 0, height: 40, bottom: 40, left: 0, right: 100, width: 100 });
-    fireEvent(handles[fromIndex], new MouseEvent('dragstart', { bubbles: true, cancelable: true }));
-    fireEvent(rows[toIndex], new MouseEvent('dragover', { bubbles: true, cancelable: true, clientY }));
-    fireEvent(rows[toIndex], new MouseEvent('drop', { bubbles: true, cancelable: true, clientY }));
-  }
+  function drag(container, fromIndex, toIndex) { simulateAgendaDrop(container,fromIndex,toIndex); }
 
   beforeEach(() => { routerQuery = { id: SESSION_ID }; });
 
@@ -611,17 +511,17 @@ describe('SessionEditor optimistic reorder', () => {
     mockFetch({});
     const { container } = render(<SessionEditor />);
     await waitFor(() => expect(headers(container)).toEqual(['Position 1 · #A', 'Position 2 · #B', 'Position 3 · #C']));
-    expect(container.querySelectorAll('[title="Drag to reorder"]')).toHaveLength(0);
+    expect(container.querySelectorAll('[data-handle-id]')).toHaveLength(0);
     expect(screen.queryByRole('button', { name: /More actions for #/ })).not.toBeInTheDocument();
     expect(screen.queryByRole('combobox', { name: 'Proposal to add' })).not.toBeInTheDocument();
     expect(container.querySelector('ol[aria-label="Proposal order"] input[type="number"]')).toBeNull();
 
     fireEvent.click(screen.getByRole('button', { name: 'Edit proposal order' }));
-    expect(container.querySelectorAll('[title="Drag to reorder"]')).toHaveLength(3);
+    expect(container.querySelectorAll('[data-handle-id]')).toHaveLength(3);
     expect(screen.getByRole('combobox', { name: 'Proposal to add' })).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole('button', { name: 'Done' }));
-    expect(container.querySelectorAll('[title="Drag to reorder"]')).toHaveLength(0);
+    expect(container.querySelectorAll('[data-handle-id]')).toHaveLength(0);
   });
 });
 

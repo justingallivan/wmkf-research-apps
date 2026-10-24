@@ -761,3 +761,19 @@ test('the staff read marks a receipt as a staff upload only when its registry ro
   expect(byKey.presentation_pdf.received.uploadedByStaff).toBe(true);
   expect(byKey.participant_bios.received.uploadedByStaff).toBe(false);
 });
+
+test('a coordinator read refusal after a reminder claim is a definite non-send', async () => {
+  const d=deps();d.__setStored(openMaterialsRow());
+  const coordinator=await d.getCoordinator();
+  d.getCoordinator.mockResolvedValueOnce(coordinator).mockRejectedValueOnce(new Error('staffing read unavailable'));
+  await expect(remindMaterialsContributors({requestId:REQUEST_ID,actorId:ACTOR,profileId:7,fromEmail:'pc@wmkeck.org',preparedEmail:MATERIALS_PREPARED_EMAIL},d)).rejects.toMatchObject({httpStatus:502,body:expect.objectContaining({outcome:'failed',retryable:true})});
+  expect(d.claimManualReminder).toHaveBeenCalledTimes(1);expect(d.sendEmail).not.toHaveBeenCalled();
+});
+
+test('a post-create coordinator read failure returns the saved collection with definite invitation failure', async () => {
+  const d=deps();const coordinator=await d.getCoordinator();
+  d.getCoordinator.mockResolvedValueOnce(coordinator).mockRejectedValueOnce(new Error('staffing read unavailable'));
+  const result=await createMaterialsCollection({requestId:REQUEST_ID,actorId:ACTOR,profileId:7,fromEmail:'pc@wmkeck.org',preparedEmail:MATERIALS_PREPARED_EMAIL},d);
+  expect(result).toMatchObject({collection:{id:expect.any(String)},invitationSent:false,invitationOutcome:'failed'});
+  expect(d.insertCollection).toHaveBeenCalledTimes(1);expect(d.sendEmail).not.toHaveBeenCalled();
+});

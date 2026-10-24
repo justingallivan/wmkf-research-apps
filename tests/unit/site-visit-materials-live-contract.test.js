@@ -113,3 +113,9 @@ test('a changed signature after activity creation leaves the draft unsent', asyn
   expect(emailAdapter.create).toHaveBeenCalledTimes(1);
   expect(emailAdapter.send).not.toHaveBeenCalled();
 });
+
+
+test('the default retired sweep returns without reading or claiming collections',async()=>{
+ expect(await sweepMaterialsReminders()).toMatchObject({skipped:'automatic_reminders_retired',scanned:0,sent:0,errors:[]});
+ expect(requestAdapter.getById).not.toHaveBeenCalled();expect(emailAdapter.create).not.toHaveBeenCalled();expect(emailAdapter.send).not.toHaveBeenCalled();
+});

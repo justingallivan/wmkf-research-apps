@@ -1756,7 +1756,7 @@ test('stepper: a sent briefing collapses to its share summary and keeps Open in 
   expect(screen.getByRole('link', { name: 'Open briefing in Word' })).toBeInTheDocument();
   expect(screen.getByText('A concise summary to circulate before the presentation.').closest('details').open).toBe(false);
   expect(screen.getByRole('heading', { name: /Pre-site briefing \(done\)/ })).toBeInTheDocument();
-  expect(screen.getByRole('list', { name: 'Staff deliberations steps' }).querySelectorAll(':scope > li')).toHaveLength(5);
+  expect(screen.getByRole('list', { name: 'Staff deliberations steps' }).querySelectorAll(':scope > li')).toHaveLength(4);
 });
 
 test('stepper: a finished briefing folds its warnings behind Details instead of dropping them', async () => {
@@ -1801,7 +1801,7 @@ test.each([
   if (phase === 'leadership-review') expect(screen.getByText(/now in leadership review/)).toBeInTheDocument();
 });
 
-test('the deliberation session is its own step before the presentation, and is current once the briefing is shared', async () => {
+test('writeup and review come first; meeting details stay behind a compact disclosure', async () => {
   distributionHistoryFeed = { attempts: [{ operationId: 'op-5', transportAccepted: true, createdAt: '2026-09-12T17:00:00Z', to: ['a@x.org'], cc: [] }], currentSourceEverSent: true };
   queueRoute('briefGet', statusResponse({ currentArtifact: briefArtifact(REVIEW) }));
   queueRoute('presiteGet', statusResponse({ session: { scheduledStartIso: '2099-01-15T17:00:00Z', ianaTimeZone: 'America/Los_Angeles' } }));
@@ -1809,9 +1809,11 @@ test('the deliberation session is its own step before the presentation, and is c
   expect(await screen.findByText(/Nothing else is needed before the deliberation session/)).toBeInTheDocument();
   const steps = Array.from(screen.getByRole('list', { name: 'Staff deliberations steps' }).querySelectorAll(':scope > li h3'))
     .map((heading) => heading.textContent.replace(/\s*\(.*\)$/, ''));
-  expect(steps).toEqual(['Pre-site briefing', 'Deliberation session', 'Presentation', 'Post-presentation writeup', 'Group review']);
-  expect(screen.getByRole('heading', { name: /Deliberation session \(current step\)/ })).toBeInTheDocument();
-  expect(within(screen.getByTestId('deliberations-session-line').closest('li')).getByRole('heading', { name: /Deliberation session/ })).toBeInTheDocument();
+  expect(steps).toEqual(['Post-presentation writeup', 'Group review', 'Pre-site briefing', 'Presentation']);
+  const details = screen.getByText('Meeting details').closest('details');
+  expect(details.open).toBe(false);
+  expect(within(details).getByTestId('deliberations-session-line')).toBeInTheDocument();
+  expect(within(details).getByRole('link', { name: 'Open meeting coordination' })).toHaveAttribute('href', `/meeting-tracker/visits/${REQUEST_ID}`);
 });
 
 test('a worker-prepared writeup says it was prepared automatically', async () => {
@@ -1901,4 +1903,15 @@ test.each([
   const dialog = screen.getByRole('dialog', { name: 'Ready for group review?' });
   expect(dialog).toHaveTextContent(shown);
   expect(dialog).not.toHaveTextContent(absent);
+});
+
+
+test('an intentionally empty saved session recipient list never falls back to the visit party', async () => {
+  siteVisitContextFeed = { siteVisit: { startIso: null }, suggestedTo: ['visit-organizer@example.org'], suggestedCc: ['visit-optional@example.org'] };
+  queueRoute('briefGet', statusResponse({ currentArtifact: briefArtifact(REVIEW) }));
+  queueRoute('presiteGet', statusResponse({ session: { sessionId: 'saved-session', scheduledStartIso: '2026-12-01T18:00:00Z', ianaTimeZone: 'America/Los_Angeles' }, sessionAttendees: [] }));
+  render(<StaffDeliberationsTab requestId={REQUEST_ID} />);
+  await waitFor(() => expect(screen.getByRole('link', { name: 'Open meeting coordination' })).toHaveAttribute('href', '/meeting-tracker/sessions/saved-session'));
+  expect(screen.getByTestId('mock-suggested-to')).toBeEmptyDOMElement();
+  expect(screen.getByTestId('mock-suggested-cc')).toBeEmptyDOMElement();
 });
