@@ -165,10 +165,13 @@ async function verify() {
     const proposal = stored.proposals.find((x) => x.requestId === c.requestId);
     console.log(`  #${c.requestNumber}: stored ${money(proposal.amountMinorUnits)} (${proposal.amountSource || 'no source'})`);
   }
+  const coordinator = await findCycleCoordinator(CYCLE);
+  const pointerOk = coordinator?.wmkf_activeroundid?.toLowerCase() === ROUND_ID;
+  console.log(`${CYCLE} active round is still ${ROUND_ID}: ${pointerOk ? 'yes' : 'NO'}`);
   const now = await baselineOf(round);
   console.log(`Workflow unchanged since plan: ${now.workflowSha === p.baseline.workflowSha ? 'yes' : 'no (PD activity since the plan)'}`);
   console.log(`List rows unchanged since plan: ${sameLists(now.lists, p.baseline.lists) ? 'yes' : 'no (PD activity since the plan)'}`);
-  if (!snapshotOk || !logOk) process.exit(1);
+  if (!snapshotOk || !logOk || !pointerOk) process.exit(1);
 }
 
 async function rollback() {
