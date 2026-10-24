@@ -1,52 +1,38 @@
-# Session 638 Prompt: Await owner-selected work after Meeting Tracker UI completion
+# Session 639 Prompt: Await owner-selected work after Meeting Tracker UI release
 
-## Session 638 Update — approved Meeting Tracker UI now shipped
+## Session 638 Summary — approved UI and compact contacts shipped
 
-[VERIFIED via source, Opus OAuth reviews, real Next-page screenshots, green candidate checks and production browser] The earlier functional release omitted the approved compact landing and desktop task rail. PR #519 completes them, including the separate global Sessions agenda preview, search/status controls, grouped responsive workspace and accessible materials counts. Source `3170781e0` is deployed Ready and the production landing, Sessions preview and dedicated request 1003371 workspace were checked read-only. No real emails, preparation jobs or existing business records were changed.
+[VERIFIED via source, OAuth Opus review, actual built Next-page screenshots, candidate checks and authenticated Production browser] PR #519 completed the approved compact cycle schedule, separate global Sessions view/agenda preview, search/status controls, responsive task workspace and visible materials counts. PR #520 then removed the People and share status disclosure: PD and PI appear directly on one compact line, while the existing Pre-Site lifecycle label appears as Share status in the request detail header.
 
-Actual UI was compared with saved mockups at 1440px/390px across 16 screens, with zero automated main-content WCAG A/AA violations or horizontal overflow. Opus verified its findings were fixed. Broader tests caught an empty Sessions startup crash that both visual reviews missed; the guard, regressions, direct reload and targeted Opus follow-up now pass. Final candidate checks included 25,062 passing unit tests, 130 PostgreSQL tests and CodeQL. Evidence and screenshots: `docs/audits/MEETING_UI_COMPLETION_2026-10-24.md`. No new migration or environment change was needed.
+### Completed and verified
 
-## Historical Session 637 Summary — functional release and ordinary activation
+- Initial UI release `3170781e0` passed 25,062 unit tests, 130 PostgreSQL tests and CodeQL; 16 actual built screens at 1440px/390px were compared with the saved mockups. The empty Sessions startup crash found after visual review was fixed and re-reviewed.
+- Final follow-up `951c4383a` (PR #520, candidate `730c2fad1`) passed all candidate checks, including full Jest, PostgreSQL integration, CodeQL, security scans, OAuth Claude review and Vercel build. Local proof: 109 focused tests, types, production-mode build, status parity gate/self-test; lint zero errors with one existing editor hook warning. The 16-screen read-only browser rehearsal passed with no horizontal overflow or automated main-content axe violations.
+- Production deployment `7302334669` is successful on `951c4383a`: `https://wmkfresearchapps-337v7k55i-justin-gallivans-projects.vercel.app`. Authenticated production readback confirmed inline PD/PI on request 1002912, zero disclosure labels, and Share status in dedicated synthetic request 1003371's detail header. No email, preparation job, upload, migration/configuration change or business-record edit was invoked.
+- Ordinary Claude Opus subscription OAuth reviews passed. No direct model API or Ultrareview was used. Original and follow-up evidence: `docs/audits/MEETING_UI_COMPLETION_2026-10-24.md`.
 
-### What Was Completed
+### Commits
 
-1. **Meeting coordination workflow shipped.** [VERIFIED via source, reviews, tests and Production Ready deployment] Durable preparation survives navigation/process restarts, preserves successful steps and edited summaries, supports selective retry and fences unknown paid outcomes. Coordinator-approved retained presentation editions keep approved bytes available during corrections; replacement and immediate withdrawal govern both external readers. Video is required for approval.
-2. **Before-meeting and staff functional workflow shipped; visual completion was partial.** Coordinator-owned applicant collection emails, reviewed research-presentation invitations, consultant selection, explicitly empty recipient groups, keyboard agenda ordering, task navigation and writeup-first Workbench. Automatic applicant reminders remain retired/unscheduled. Explicit Send and strict sender/no-fallback checks remain.
-3. **Manual media recovery verified.** Original audio plus MP4 correspondence is proven in the existing cut worker, with reusable proof, content/tail verification and bounded cleanup. Ordinary Claude Opus OAuth reviews were completed; verified findings were fixed. Hosted testing additionally found and fixed the bundled settings import and unsupported Blob client options.
-4. **Rehearsal and migrations completed.** Isolated Neon/Blob and actual hosted Sandbox synthetic media passed. The sandbox's broken fixture creation was not repaired; the owner authorized dedicated Production test records instead. Test request 1003371 was used without applicant/payee/contact bindings or real email. Migrations 086–089 applied through the canonical runner: 4 applied, 84 skipped, 88 total; tables, columns and constraints physically verified.
-5. **Controlled rollout then ordinary activation.** [VERIFIED via owner authorization, all green pre-activation checks, Production flag readback and real staff browser] Three new controls are now `on`: `MEETING_MATERIAL_PREPARATION_ACCESS`, `MEETING_MANUAL_VIDEO_PAIRING_ACCESS`, `MEETING_PRESENTATION_INVITATION_ACCESS`. Existing requests are not automatically enrolled/approved; Coordinator enrollment remains deliberate. Ordinary preparation, invitation and manual-pair availability were checked read-only while preserving an existing approved video.
-6. **Validation and release state.** Runtime/test release `1c30f9b2a`: all ten checks succeeded, including CodeQL; 1,455 suites / 25,059 unit tests, 130 PostgreSQL integration tests and Playwright passed. All applicable checks also passed on documentation follow-up `d4f73e62a` before activation. Latest observed Production deployment `dpl_BMqGhtxGw7o2RtTWFoMuiRx2snUg` is Ready on `f66eee9e0`; it contains activation bookkeeping/operator documentation, with no additional runtime change. Its tests/Postgres/browser/security checks passed; its separate JavaScript CodeQL was still running at the stop checkpoint. Do not confuse that follow-up run with the completed pre-activation gate.
-
-No real email was sent, no ordinary-request processing was started and no existing business record was edited during rehearsal/deployment checks. Actual Azure sign-in and scheduled empty-worker execution were verified in Production; a fresh genuine Zoom/ASR run and real mailbox delivery were outside the synthetic rehearsal proof.
-
-### Key Commits
-
-- `f96529e0d` — integrated feature and original-audio/video proof.
-- `d72283c60`, `1f99d7635` — bundled Coordinator settings lookup and private upload SDK repairs.
-- `064f4d9a8` — bounded cloud and dedicated Production-fixture evidence.
-- `0b3c3e83a` — integrated current main, preserving concurrent Proposal Ranking/Grant Reporting work.
-- `d54b8b008` — cohort-guarded first enrollment and canonical migration operator; runtime release.
-- `6f418b54e`, `1c30f9b2a` — test mock/contract reconciliation; full hosted checks passed.
-- `f4121312c`, `d4f73e62a` — controlled deployment and passing full-suite records.
-- `f66eee9e0` — verified ordinary activation and current rollout documentation.
+- `3170781e0` — approved landing and workspace design (#519).
+- `a01032ebb` — verified initial UI production release record.
+- `951c4383a` — inline contacts and detail share status (#520).
 
 ## Next Items
 
 ### Verified Open
 
-- The selected Meeting Tracker UI task is complete and served in Production. Await the next owner-selected task. Do not replay migrations, activation, paid media rehearsals or completed visual-review loops as startup work. The retained isolated worktree is `codex/meeting-ui-completion`; PR #519 and the UI completion receipt own this release evidence.
-- If checking the bookkeeping follow-up's pending CodeQL, inspect `f66eee9e0` check-runs; do not infer it failed or reopen the already-passed release gate. This is a status lookup, not a new audit or release blocker.
+- No remaining implementation item in the selected Meeting Tracker UI scope. Await the next owner-selected task. Do not replay completed migrations, activation, paid rehearsals or visual-review loops.
 
 ### Verify Before Acting
 
-- Retained synthetic fixture/resources are owned test assets, not a cleanup instruction: request 1003371, its own SharePoint folder, isolated `meeting_coord_rehearsal_20261023` database and `meeting-coord-rehearsal-20261023` Preview/private Blob store. Rehearsal compute was cleaned, local candidate stopped, isolated reader links revoked and final approved edition withdrawn. Sensitive local journals and credentials remain outside Git. Do not rerun one-release operators or delete other agents' resources.
-- Rollback: turn off new-work controls while retaining sticky edition-aware readers, approval references and withdrawal tombstones. Never roll enrolled requests back to a pre-edition reader; code rollback does not undo files, provider calls or mail. Exact floor and migration evidence are in the release receipts.
-- Main was fast-forwarded to the shipped source before this handoff. The preserved feature worktree is now on `codex/meeting-ui-completion` for the selected UI task. Unrelated untracked `.impeccable/critique/2026-10-19T02-04-42Z__…boardwriteups-js.md` and `output/` remain untouched in the main checkout.
+- Retained synthetic fixture/resources are owned test assets, not cleanup instructions: request 1003371, its own SharePoint folder, isolated rehearsal database and Preview/private Blob store. Preserve the release receipts' resource and rollback constraints. No new resource deletion is authorized.
+- All owned local UI proof servers are stopped. Main is on the final shipped runtime source. The retained isolated checkout `/Users/gallivan/.codex/worktrees/session-start-7630/WMKF_Apps` is clean on `codex/meeting-people-line` at `730c2fad1`, merged through PR #520. Recheck ownership/state before reuse; do not treat this recorded path as current permission authority.
+- Main's unrelated untracked `.impeccable/critique/2026-10-19T02-04-42Z__shared-components-board-writeups-boardwriteups-js.md` and `output/` were preserved untouched. No session-owned runtime WIP remains.
 
 ### Do Not Reopen Without New Decision
 
-- Required video, Coordinator approval/sending ownership, retained approved materials during corrections, immediate withdrawal, deliberate confirmation removal and rare matching manual audio/video recovery are settled owner decisions.
-- No new real sends, metered processing, sandbox repairs, broad audits or resource deletion are authorized by this handoff. Existing D26/Stage B repair and rollback work is not selected.
+- Video required; Coordinator approval and collection-email ownership; approved materials retained during corrections with separate immediate withdrawal; no provider-confirmation step; rare matching manual audio/video fallback. These owner decisions remain settled.
+- Ordinary admission was already activated. UI rollback must preserve edition-aware readers, approval references and withdrawal tombstones. No real sends, metered processing, sandbox repairs, broad audits or existing-business-record writes are authorized by this handoff.
 
 ## Concurrent Workstreams — historical resume index
 
@@ -60,10 +46,9 @@ Exact prior handoff: `git show f66eee9e0:SESSION_PROMPT.md` (verified retrievabl
 
 ## Key Files and Evidence
 
-- `docs/audits/MEETING_ORDINARY_ACTIVATION_2026-10-24.md` — effective ordinary access and read-only proof.
-- `docs/audits/MEETING_CONTROLLED_DEPLOYMENT_2026-10-24.md` — migrations, controlled checks and rollback floor.
-- `docs/audits/MEETING_HOSTED_REHEARSAL_2026-10-23.md` — full synthetic workflow, safety inventory and proof limits.
-- `docs/plans/MEETING_COORDINATION_IMPLEMENTATION_PLAN_2026-10-23.md` and `MEETING_COORDINATION_RELEASE_CHECKLIST_2026-10-23.md` in the same directory — settled design and release sequence.
-- `docs/atlas/postgres-meeting-material-preparations.md`, `postgres-meeting-presentation-editions.md`, `postgres-meeting-presentation-invitations.md` and `postgres-manual-presentation-video-pairs.md` in the same directory — live durable contracts.
+- `docs/audits/MEETING_UI_COMPLETION_2026-10-24.md` — actual screenshots, review, contract and production release proof.
+- `docs/audits/MEETING_ORDINARY_ACTIVATION_2026-10-24.md` and `MEETING_CONTROLLED_DEPLOYMENT_2026-10-24.md` — prior functional activation, migrations and rollback floor.
+- `docs/plans/MEETING_COORDINATION_IMPLEMENTATION_PLAN_2026-10-23.md` — settled implementation design.
+- Exact previous handoff: `git show a01032ebb:SESSION_PROMPT.md` (verified retrievable); historical functional release and safety inventory remain there.
 
-Milestone determination: Production Meeting Tracker capability and ordinary activation merit a DEVELOPMENT_LOG entry (Session 637). CLAUDE.md remains the canonical compact instruction file; its existing pointers suffice. Claim-evidence report was unavailable because local observation state could not be read; no observation row was invented. No memory-router advisory was received.
+Milestone determination: no new DEVELOPMENT_LOG entry required for the UI composition/refinement; the underlying production capability is recorded in the Session 637 milestone. CLAUDE.md requires no change. Claim-evidence report was unavailable because local state could not be read; no observation row was invented. No memory-router advisory was received.

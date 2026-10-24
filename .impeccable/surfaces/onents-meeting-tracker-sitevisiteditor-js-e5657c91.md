@@ -9,7 +9,7 @@ related_targets: ["shared/components/meeting-tracker/RecordingAndTranscriptCard.
 
 Mode: Operate. Visual authority: DESIGN.md Clear Workbench and the approved October 20 cycle/sessions/preparation mockups. No new visual identity or fabricated aggregate counts.
 
-The cycle schedule is the default request queue: one scope toolbar, request search, result count and one precise materials-status select. Compact rows show request number, institution and title, both session and research-presentation actions, and materials status. PD/PI/share context is disclosed. At narrow widths both actions stay side by side below identity; no horizontal scrolling.
+The cycle schedule is the default request queue: one scope toolbar, request search, result count and one precise materials-status select. Compact rows show request number, institution and title, both session and research-presentation actions, and materials status. PD and PI appear directly on one compact line. Share status appears in the request detail workspace header. At narrow widths both actions stay side by side below identity; no horizontal scrolling.
 
 Sessions are a separate URL-addressable view independent of the cycle filters. Its desktop list and selected agenda preview sit side by side; narrow screens stack them. Each row has time range/time zone, location, status, Open session and a preview action. Upcoming sessions come first. Preview includes request count, allotted minutes and calculated slot starts from the actual authorized detail response. Search explicitly covers date/time/location/status; no partial agenda-search promise.
 
