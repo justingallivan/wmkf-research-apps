@@ -89,7 +89,9 @@ test('compact rows keep both scheduling actions visible and logistics in the det
   expect(screen.getByRole('link', { name: /Open session/ })).toBeInTheDocument();
   expect(screen.getByRole('link', { name: /Schedule research presentation/ })).toBeInTheDocument();
   expect(screen.queryByRole('link', { name: 'Join' })).not.toBeInTheDocument();
-  expect(screen.getByText('People and share status').closest('details')).not.toHaveAttribute('open');
+  expect(screen.getByText('PD: Alex Staff · PI: Jordan Investigator')).toBeVisible();
+  expect(screen.queryByText('People and share status')).not.toBeInTheDocument();
+  expect(screen.queryByText('Ready for review')).not.toBeInTheDocument();
   rerender(<MeetingTrackerRequestRow proposal={proposal({ deliberation: null, siteVisit: { scheduledStartIso: '2026-09-16T18:00:00.000Z' } })} cycleCode="D26" programId={SESSION_ID} />);
   expect(screen.getByRole('link', { name: /Schedule session/ })).toBeInTheDocument();
   expect(screen.getByRole('link', { name: /Open research presentation/ })).toBeInTheDocument();

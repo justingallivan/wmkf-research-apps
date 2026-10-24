@@ -51,11 +51,7 @@ export function MeetingTrackerRequestRow({ proposal, cycleCode, programId }) {
           <TestRequestBadge isTestRequest={proposal.isTestRequest} />
         </div>
         <p className="mt-1 text-sm text-gray-700">{proposal.title || 'Untitled request'}</p>
-        <details className="mt-1 text-xs text-gray-600">
-          <summary className="w-fit cursor-pointer hover:text-gray-900">People and share status</summary>
-          <p className="mt-1">{`PD: ${proposal.programDirector || 'Not assigned'}`}{proposal.projectLeader ? ` · PI: ${proposal.projectLeader}` : ''}</p>
-          <p>{proposal.shareState?.lifecycleLabel || 'No Pre-Site artifact'}</p>
-        </details>
+        <p className="mt-1 text-xs text-gray-600">{`PD: ${proposal.programDirector || 'Not assigned'}`}{proposal.projectLeader ? ` · PI: ${proposal.projectLeader}` : ''}</p>
       </div>
       <div>
         <h3 className="text-xs font-medium text-gray-500 lg:sr-only">Proposal discussion session</h3>

@@ -390,6 +390,7 @@ export default function SiteVisitEditor() {
               .filter((part) => typeof part === 'string' && part).join(' · ')}
           </p>
         )}
+        {requestIdentity?.shareStatus && <p className="mt-1 text-sm text-gray-600">Share status: {requestIdentity.shareStatus}</p>}
         {(!visit || editing) && <p className="mt-2 text-sm text-gray-600">The date here feeds the Staff Deliberations rail, the cycle view, the briefing page, and the Share email's calendar entry.</p>}
       </div>
 
