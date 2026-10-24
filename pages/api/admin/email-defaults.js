@@ -5,6 +5,7 @@
  * Dataverse `wmkf_appsystemsettings`.
  */
 
+import { validateDeadlineTemplate } from '../../../shared/config/reviewerDeadlineEmail';
 import { requireSuperuser } from '../../../lib/utils/auth';
 import { getSettingStrict, setSetting } from '../../../lib/services/settings-service';
 import {
@@ -55,6 +56,11 @@ export default async function handler(req, res) {
     return res.status(400).json({ error: 'value must be a string' });
   }
   const entry = EDITABLE_TEXT_DEFAULTS_BY_KEY[key];
+  if (key === 'email.reviewer_extension.subject' || key === 'email.reviewer_extension.body') {
+    const checked = validateDeadlineTemplate({ subject: key.endsWith('.subject') ? value : 'Deadline', body: key.endsWith('.body') ? value : '' });
+    if (!checked.valid) return res.status(400).json({ error: 'Use a single-line subject and supported placeholders; the body may be empty.' });
+  }
+
   const missingPlaceholders = (entry.requiredPlaceholders || []).filter((token) => !value.includes(token));
   if (missingPlaceholders.length > 0) {
     return res.status(400).json({

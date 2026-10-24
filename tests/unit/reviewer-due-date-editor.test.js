@@ -1,364 +1,75 @@
-/**
- * @jest-environment jsdom
- */
-
+/** @jest-environment jsdom */
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import ReviewerDueDateEditor, { minimumExtensionDate } from '../../shared/components/reviewers/ReviewerDueDateEditor';
-
-const SUGGESTION_ID = '11111111-1111-4111-8111-111111111111';
-
-function successfulResponse() {
-  return {
-    ok: true,
-    status: 200,
-    json: async () => ({ ok: true, saved: true, notified: true, effectiveReviewDeadline: '2099-09-15' }),
-  };
-}
-
-beforeEach(() => {
-  global.fetch = jest.fn(async () => successfulResponse());
+const ID = '11111111-1111-4111-8111-111111111111';
+const props = { suggestionId: ID, reviewerName: 'Ada Lovelace', defaultDate: '2099-09-01', canManage: true, assignedPdContext: 'pd:pd' };
+const initial = { ok: true, preview: { template: { subject: 'Deadline: {{proposalTitle}}', body: '{{greeting}}\n{{signature}}' }, subject: 'Deadline: Telescope', bodyText: 'Ada\nPat', from: 'pd@example.org', to: 'ada@example.org', cc: [], proof: 'proof', effectiveReviewDeadline: '2099-09-15' } };
+const reply = (data, status = 200) => ({ ok: status < 400, status, json: async () => data });
+beforeEach(() => { global.fetch = jest.fn(async () => reply(initial)); });
+async function open() { fireEvent.click(screen.getByRole('button', { name: /grant extension|change extension/i })); await screen.findByLabelText('Subject'); }
+async function review() { fireEvent.click(screen.getByRole('button', { name: 'Preview email' })); await screen.findByRole('button', { name: /save deadline and send|restore deadline and send|send deadline email/i }); }
+function payload() { return JSON.parse(global.fetch.mock.calls.at(-1)[1].body); }
+test('read-only default, including a superuser without explicit assigned PD capability, has no action', () => { render(<ReviewerDueDateEditor {...props} canManage={false} />); expect(screen.queryByRole('button')).toBeNull(); });
+test('minimum extension date is later of today or day after original', () => { expect(minimumExtensionDate('2099-09-01', '2099-08-01')).toBe('2099-09-02'); expect(minimumExtensionDate('2020-01-01', '2099-08-01')).toBe('2099-08-01'); });
+test('opens with visible read-only addresses and no writes; final action needs preview', async () => {
+  render(<ReviewerDueDateEditor {...props} />); await open();
+  expect(screen.getByText('pd@example.org')).toBeInTheDocument(); expect(screen.getByText('ada@example.org')).toBeInTheDocument();
+  expect(payload()).toMatchObject({ action: 'preview', operation: 'resend', cc: [] });
+  expect(screen.queryByRole('button', { name: 'Save deadline and send' })).toBeNull();
+  fireEvent.change(screen.getByLabelText('New deadline'), { target: { value: '2099-09-15' } });
+  await review(); expect(payload()).toMatchObject({ action: 'preview', operation: 'save', reviewDueDateOverride: '2099-09-15' });
+  global.fetch.mockResolvedValueOnce(reply({ ok: true, saved: true, notified: true })); fireEvent.click(screen.getByRole('button', { name: 'Save deadline and send' }));
+  await screen.findByText('Sent for delivery.'); expect(payload()).toMatchObject({ action: 'save', proof: 'proof', reviewDueDateOverride: '2099-09-15' }); expect(payload()).not.toHaveProperty('operation');
+});
+test('empty message and one-send Cc are submitted, edits invalidate prior preview', async () => {
+  render(<ReviewerDueDateEditor {...props} />); await open();
+  fireEvent.change(screen.getByLabelText('Message (optional)'), { target: { value: '' } });
+  fireEvent.change(screen.getByLabelText('Cc (this send only)'), { target: { value: 'friend@example.org' } });
+  global.fetch.mockResolvedValueOnce(reply({ ...initial, preview: { ...initial.preview, template: { subject: 'Deadline', body: '' }, bodyText: '', cc: ['friend@example.org'] } }));
+  await review(); expect(payload()).toMatchObject({ template: { body: '' }, cc: ['friend@example.org'] });
+  fireEvent.change(screen.getByLabelText('Subject'), { target: { value: 'Changed' } }); expect(screen.queryByRole('button', { name: 'Save deadline and send' })).toBeNull();
+});
+test('restore and resend require review and never post a client date', async () => {
+  render(<ReviewerDueDateEditor {...props} overrideDate="2099-09-15" />); await open();
+  fireEvent.change(screen.getByLabelText('Action'), { target: { value: 'restore' } }); await review(); expect(payload()).toMatchObject({ operation: 'restore' }); expect(payload()).not.toHaveProperty('reviewDueDateOverride');
+  fireEvent.change(screen.getByLabelText('Action'), { target: { value: 'resend' } }); await review(); expect(payload()).toMatchObject({ operation: 'resend' });
+});
+test('saved but unsent retains wording and Cc, posts renewed retry proof and no date', async () => {
+  render(<ReviewerDueDateEditor {...props} />); await open();
+  fireEvent.change(screen.getByLabelText('Message (optional)'), { target: { value: 'My words' } });
+  fireEvent.change(screen.getByLabelText('Cc (this send only)'), { target: { value: 'friend@example.org' } });
+  global.fetch.mockResolvedValueOnce(reply({ ...initial, preview: { ...initial.preview, cc: ['friend@example.org'] } })); await review();
+  global.fetch.mockResolvedValueOnce(reply({ ok: false, saved: true, notified: false, reason: 'send_failed', retryable: true, retryProof: 'renewed' }, 502));
+  fireEvent.click(screen.getByRole('button', { name: 'Save deadline and send' })); await screen.findByRole('button', { name: 'Retry email' });
+  expect(screen.getByLabelText('Message (optional)')).toHaveValue('My words'); expect(screen.getByLabelText('Cc (this send only)')).toHaveValue('friend@example.org');
+  global.fetch.mockResolvedValueOnce(reply({ ok: true, saved: false, notified: true })); fireEvent.click(screen.getByRole('button', { name: 'Retry email' }));
+  await screen.findByText('Sent for delivery.'); expect(payload()).toMatchObject({ action: 'retry', proof: 'renewed' }); expect(payload()).not.toHaveProperty('reviewDueDateOverride');
+});
+test('uncertain delivery blocks retry and instructs checking history', async () => {
+  render(<ReviewerDueDateEditor {...props} />); await open(); await review();
+  global.fetch.mockResolvedValueOnce(reply({ ok: false, saved: true, notified: false, reason: 'send_unconfirmed' }, 202)); fireEvent.click(screen.getByRole('button', { name: 'Save deadline and send' }));
+  await screen.findByText(/Dynamics did not confirm/); expect(screen.queryByRole('button', { name: 'Retry email' })).toBeNull(); expect(screen.queryByRole('button', { name: 'Preview email' })).toBeNull();
+});
+test('close/reopen clears Cc and wording; loads current defaults', async () => {
+  render(<ReviewerDueDateEditor {...props} />); await open(); fireEvent.change(screen.getByLabelText('Cc (this send only)'), { target: { value: 'friend@example.org' } });
+  fireEvent.click(screen.getByRole('button', { name: 'Close' })); await open(); expect(screen.getByLabelText('Cc (this send only)')).toHaveValue('');
+});
+test.each([{ suggestionId: 'other' }, { defaultDate: '2099-09-02' }, { assignedPdContext: 'pd:new' }, { canManage: false }])('late load cannot populate changed context %p', async (patch) => {
+  let finish; global.fetch = jest.fn(() => new Promise((resolve) => { finish = () => resolve(reply(initial)); })); const view = render(<ReviewerDueDateEditor {...props} />);
+  fireEvent.click(screen.getByRole('button', { name: 'Grant extension' })); view.rerender(<ReviewerDueDateEditor {...props} {...patch} />); await act(async () => finish()); expect(screen.queryByRole('dialog')).toBeNull();
+});
+test('fallback notice shows without overwriting stored default', async () => {
+  global.fetch.mockResolvedValueOnce(reply({ ...initial, preview: { ...initial.preview, templateNotice: 'preference_unavailable' } }));
+  render(<ReviewerDueDateEditor {...props} />); await open(); expect(screen.getByText(/Your saved wording couldn’t be loaded/)).toBeInTheDocument(); expect(global.fetch).toHaveBeenCalledTimes(1);
+});
+test('in-flight send locks edits and defaults controls', async () => {
+  render(<ReviewerDueDateEditor {...props} />); await open(); await review();
+  let finish; global.fetch.mockImplementationOnce(() => new Promise((resolve) => { finish = () => resolve(reply({ ok: true, saved: true, notified: true })); }));
+  fireEvent.click(screen.getByRole('button', { name: 'Save deadline and send' })); expect(screen.getByLabelText('Subject')).toBeDisabled(); expect(screen.getByRole('button', { name: 'Close' })).toBeDisabled(); await act(async () => finish());
 });
 
-test('Grant extension opens a modal showing the original date and saves with automatic notification', async () => {
-  const onSaved = jest.fn();
-  render(
-    <ReviewerDueDateEditor
-      suggestionId={SUGGESTION_ID}
-      reviewerName="Ada Lovelace"
-      effectiveDate="2099-09-01"
-      defaultDate="2099-09-01"
-      onSaved={onSaved}
-    />,
-  );
-
-  fireEvent.click(screen.getByRole('button', { name: /grant extension/i }));
-  expect(screen.getByRole('dialog', { name: /grant extension/i })).toBeInTheDocument();
-  expect(screen.getByText(/original deadline/i)).toBeInTheDocument();
-  expect(screen.getByText('Sep 1, 2099')).toBeInTheDocument();
-  const dateInput = screen.getByLabelText(/new deadline/i);
-  expect(dateInput).toHaveAttribute('min', '2099-09-02');
-  fireEvent.change(dateInput, { target: { value: '2099-09-15' } });
-  fireEvent.click(screen.getByRole('button', { name: /save extension/i }));
-
-  await waitFor(() => expect(global.fetch).toHaveBeenCalledWith(
-    '/api/review-manager/review-due-extension',
-    expect.objectContaining({
-      method: 'POST',
-      body: JSON.stringify({
-        action: 'save',
-        suggestionId: SUGGESTION_ID,
-        reviewDueDateOverride: '2099-09-15',
-      }),
-    }),
-  ));
-  await waitFor(() => expect(onSaved).toHaveBeenCalledTimes(1));
-});
-
-test('an existing extension displays original and extended dates and can be restored', async () => {
-  render(
-    <ReviewerDueDateEditor
-      suggestionId={SUGGESTION_ID}
-      reviewerName="Ada Lovelace"
-      overrideDate="2099-09-15"
-      effectiveDate="2099-09-15"
-      defaultDate="2099-09-01"
-    />,
-  );
-
-  expect(screen.getByText('Extended: Sep 15, 2099')).toBeInTheDocument();
-  expect(screen.getByText('Original: Sep 1, 2099')).toBeInTheDocument();
-  fireEvent.click(screen.getByRole('button', { name: /change extension/i }));
-  fireEvent.click(screen.getByRole('button', { name: /restore original deadline/i }));
-
-  await waitFor(() => expect(global.fetch).toHaveBeenCalledWith(
-    '/api/review-manager/review-due-extension',
-    expect.objectContaining({
-      body: JSON.stringify({
-        action: 'save',
-        suggestionId: SUGGESTION_ID,
-        reviewDueDateOverride: null,
-      }),
-    }),
-  ));
-});
-
-test('an existing extension exposes an explicit server-fresh resend without changing the date', async () => {
-  render(
-    <ReviewerDueDateEditor
-      suggestionId={SUGGESTION_ID}
-      reviewerName="Ada Lovelace"
-      overrideDate="2099-09-15"
-      effectiveDate="2099-09-15"
-      defaultDate="2099-09-01"
-    />,
-  );
-
-  fireEvent.click(screen.getByRole('button', { name: /change extension/i }));
-  fireEvent.click(screen.getByRole('button', { name: /resend deadline email/i }));
-
-  await waitFor(() => expect(global.fetch).toHaveBeenCalledWith(
-    '/api/review-manager/review-due-extension',
-    expect.objectContaining({
-      body: JSON.stringify({ action: 'retry', suggestionId: SUGGESTION_ID }),
-    }),
-  ));
-});
-
-test('shows a reload instruction for a server-side concurrency conflict', async () => {
-  global.fetch.mockResolvedValueOnce({
-    ok: false,
-    status: 409,
-    json: async () => ({ ok: false, reason: 'conflict' }),
-  });
-  render(
-    <ReviewerDueDateEditor
-      suggestionId={SUGGESTION_ID}
-      effectiveDate="2099-09-01"
-      defaultDate="2099-09-01"
-    />,
-  );
-
-  fireEvent.click(screen.getByRole('button', { name: /grant extension/i }));
-  fireEvent.change(screen.getByLabelText(/new deadline/i), { target: { value: '2099-09-15' } });
-  fireEvent.click(screen.getByRole('button', { name: /save extension/i }));
-
-  expect(await screen.findByText(/changed while this dialog was open.*reload/i)).toBeInTheDocument();
-});
-
-test('a saved-but-unsent response keeps the modal open and retries from server state', async () => {
-  const onSaved = jest.fn();
-  global.fetch
-    .mockResolvedValueOnce({
-      ok: false,
-      status: 502,
-      json: async () => ({ ok: false, saved: true, notified: false, retryable: true, reason: 'send_failed' }),
-    })
-    .mockResolvedValueOnce(successfulResponse());
-  render(
-    <ReviewerDueDateEditor
-      suggestionId={SUGGESTION_ID}
-      reviewerName="Ada Lovelace"
-      effectiveDate="2099-09-01"
-      defaultDate="2099-09-01"
-      onSaved={onSaved}
-    />,
-  );
-
-  fireEvent.click(screen.getByRole('button', { name: /grant extension/i }));
-  fireEvent.change(screen.getByLabelText(/new deadline/i), { target: { value: '2099-09-15' } });
-  fireEvent.click(screen.getByRole('button', { name: /save extension/i }));
-
-  expect(await screen.findByText(/deadline was saved, but the reviewer notification was not sent/i)).toBeInTheDocument();
-  expect(onSaved).not.toHaveBeenCalled();
-  fireEvent.click(screen.getByRole('button', { name: /retry email/i }));
-
-  await waitFor(() => expect(global.fetch).toHaveBeenLastCalledWith(
-    '/api/review-manager/review-due-extension',
-    expect.objectContaining({
-      body: JSON.stringify({ action: 'retry', suggestionId: SUGGESTION_ID }),
-    }),
-  ));
-  await waitFor(() => expect(onSaved).toHaveBeenCalledTimes(1));
-});
-
-test('a failed retry keeps the saved-deadline fact visible', async () => {
-  global.fetch
-    .mockResolvedValueOnce({
-      ok: false,
-      status: 502,
-      json: async () => ({ ok: false, saved: true, notified: false, retryable: true, reason: 'send_failed' }),
-    })
-    .mockResolvedValueOnce({
-      ok: false,
-      status: 502,
-      json: async () => ({ ok: false, saved: false, notified: false, retryable: true, reason: 'send_failed' }),
-    });
-  render(
-    <ReviewerDueDateEditor
-      suggestionId={SUGGESTION_ID}
-      effectiveDate="2099-09-01"
-      defaultDate="2099-09-01"
-    />,
-  );
-
-  fireEvent.click(screen.getByRole('button', { name: /grant extension/i }));
-  fireEvent.change(screen.getByLabelText(/new deadline/i), { target: { value: '2099-09-15' } });
-  fireEvent.click(screen.getByRole('button', { name: /save extension/i }));
-  fireEvent.click(await screen.findByRole('button', { name: /retry email/i }));
-
-  expect(await screen.findByText(/deadline is still saved.*could not send the deadline email/i)).toBeInTheDocument();
-  expect(screen.getByRole('button', { name: /retry email/i })).toBeInTheDocument();
-});
-
-test('read-only mode shows the dates without extension controls', () => {
-  render(
-    <ReviewerDueDateEditor
-      suggestionId={SUGGESTION_ID}
-      overrideDate="2099-09-15"
-      effectiveDate="2099-09-15"
-      defaultDate="2099-09-01"
-      canManage={false}
-    />,
-  );
-
-  expect(screen.getByText('Extended: Sep 15, 2099')).toBeInTheDocument();
-  expect(screen.queryByRole('button')).toBeNull();
-});
-
-test('minimum extension date is the later of today and the day after the original', () => {
-  expect(minimumExtensionDate('2099-09-01', '2099-08-01')).toBe('2099-09-02');
-  expect(minimumExtensionDate('2020-09-01', '2099-08-01')).toBe('2099-08-01');
-});
-
-test('D10 fix: a malformed 2xx body reports the uncertain receipt, not the generic extension-failed message', async () => {
-  global.fetch.mockResolvedValueOnce({ ok: true, status: 200, json: async () => { throw new Error('bad json'); } });
-  render(
-    <ReviewerDueDateEditor
-      suggestionId={SUGGESTION_ID}
-      effectiveDate="2099-09-01"
-      defaultDate="2099-09-01"
-    />,
-  );
-  fireEvent.click(screen.getByRole('button', { name: /grant extension/i }));
-  fireEvent.change(screen.getByLabelText(/new deadline/i), { target: { value: '2099-09-15' } });
-  fireEvent.click(screen.getByRole('button', { name: /save extension/i }));
-  expect(await screen.findByText('I could not complete the deadline update.')).toBeInTheDocument();
-  expect(screen.queryByText('The extension could not be saved.')).not.toBeInTheDocument();
-});
-
-test('T4 axis (e): a non-2xx body that fails to parse is never silent (reports the generic extension-failed message)', async () => {
-  global.fetch.mockResolvedValueOnce({ ok: false, status: 502, json: async () => { throw new Error('bad gateway html'); } });
-  render(
-    <ReviewerDueDateEditor
-      suggestionId={SUGGESTION_ID}
-      effectiveDate="2099-09-01"
-      defaultDate="2099-09-01"
-    />,
-  );
-  fireEvent.click(screen.getByRole('button', { name: /grant extension/i }));
-  fireEvent.change(screen.getByLabelText(/new deadline/i), { target: { value: '2099-09-15' } });
-  fireEvent.click(screen.getByRole('button', { name: /save extension/i }));
-  expect(await screen.findByText('The extension could not be saved.')).toBeInTheDocument();
-});
-
-test('T4 axis (network): a rejected fetch surfaces its message with an uncertain outcome', async () => {
-  global.fetch.mockRejectedValueOnce(new Error('offline'));
-  render(
-    <ReviewerDueDateEditor
-      suggestionId={SUGGESTION_ID}
-      effectiveDate="2099-09-01"
-      defaultDate="2099-09-01"
-    />,
-  );
-  fireEvent.click(screen.getByRole('button', { name: /grant extension/i }));
-  fireEvent.change(screen.getByLabelText(/new deadline/i), { target: { value: '2099-09-15' } });
-  fireEvent.click(screen.getByRole('button', { name: /save extension/i }));
-  expect(await screen.findByText('offline')).toBeInTheDocument();
-});
-
-test('ignores a response that finishes after the component unmounts', async () => {
-  let finishRequest;
-  global.fetch = jest.fn(() => new Promise((resolve) => {
-    finishRequest = () => resolve(successfulResponse());
-  }));
-  const onSaved = jest.fn();
-  const { unmount } = render(
-    <ReviewerDueDateEditor
-      suggestionId={SUGGESTION_ID}
-      effectiveDate="2099-09-01"
-      defaultDate="2099-09-01"
-      onSaved={onSaved}
-    />,
-  );
-
-  fireEvent.click(screen.getByRole('button', { name: /grant extension/i }));
-  fireEvent.change(screen.getByLabelText(/new deadline/i), { target: { value: '2099-09-15' } });
-  fireEvent.click(screen.getByRole('button', { name: /save extension/i }));
-  await waitFor(() => expect(global.fetch).toHaveBeenCalledTimes(1));
-  unmount();
-  finishRequest();
-
-  await Promise.resolve();
-  expect(onSaved).not.toHaveBeenCalled();
-});
-
-const staleResponses = [
-  ['success', successfulResponse()],
-  ['partial success', {
-    ok: false,
-    status: 502,
-    json: async () => ({ ok: false, saved: true, notified: false, retryable: true, reason: 'send_failed' }),
-  }],
-  ['error', {
-    ok: false,
-    status: 409,
-    json: async () => ({ ok: false, reason: 'conflict' }),
-  }],
-];
-
-const changedContexts = [
-  ['suggestion', { suggestionId: '22222222-2222-4222-8222-222222222222' }],
-  ['default date', { defaultDate: '2099-09-02' }],
-  ['request/profile context', { requestContextId: 'request-b' }],
-];
-
-test.each(staleResponses.flatMap(([responseName, response]) => changedContexts.map(([contextName, change]) => [
-  responseName, contextName, response, change,
-])))('ignores a %s response after %s changes', async (_responseName, _contextName, response, change) => {
-  let finishRequest;
-  global.fetch = jest.fn(() => new Promise((resolve) => { finishRequest = () => resolve(response); }));
-  const onSaved = jest.fn();
-  const props = {
-    suggestionId: SUGGESTION_ID,
-    requestContextId: 'request-a',
-    defaultDate: '2099-09-01',
-    onSaved,
-  };
-  const view = render(<ReviewerDueDateEditor {...props} />);
-  fireEvent.click(screen.getByRole('button', { name: /grant extension/i }));
-  fireEvent.change(screen.getByLabelText(/new deadline/i), { target: { value: '2099-09-15' } });
-  fireEvent.click(screen.getByRole('button', { name: /save extension/i }));
-  await waitFor(() => expect(global.fetch).toHaveBeenCalledTimes(1));
-
-  view.rerender(<ReviewerDueDateEditor {...props} {...change} />);
-  expect(screen.queryByRole('dialog')).toBeNull();
-  await act(async () => { finishRequest(); });
-
-  expect(onSaved).not.toHaveBeenCalled();
-  expect(screen.queryByText(/deadline was saved, but the reviewer notification was not sent/i)).toBeNull();
-  expect(screen.queryByText(/changed while this dialog was open/i)).toBeNull();
-});
-
-test('permission revocation closes an open dialog and blocks a new request', async () => {
-  const props = {
-    suggestionId: SUGGESTION_ID,
-    defaultDate: '2099-09-01',
-    canManage: true,
-  };
-  const view = render(<ReviewerDueDateEditor {...props} />);
-  fireEvent.click(screen.getByRole('button', { name: /grant extension/i }));
-  view.rerender(<ReviewerDueDateEditor {...props} canManage={false} />);
-
-  expect(screen.queryByRole('dialog')).toBeNull();
-  expect(screen.queryByRole('button', { name: /grant extension/i })).toBeNull();
-  expect(global.fetch).not.toHaveBeenCalled();
-});
-
-test('a valid current-context success refreshes through the latest callback', async () => {
-  const oldOnSaved = jest.fn();
-  const currentOnSaved = jest.fn();
-  const props = {
-    suggestionId: SUGGESTION_ID,
-    requestContextId: 'request-a',
-    defaultDate: '2099-09-01',
-    onSaved: oldOnSaved,
-  };
-  const view = render(<ReviewerDueDateEditor {...props} />);
-  fireEvent.click(screen.getByRole('button', { name: /grant extension/i }));
-  fireEvent.change(screen.getByLabelText(/new deadline/i), { target: { value: '2099-09-15' } });
-  view.rerender(<ReviewerDueDateEditor {...props} onSaved={currentOnSaved} />);
-  fireEvent.click(screen.getByRole('button', { name: /save extension/i }));
-
-  await waitFor(() => expect(currentOnSaved).toHaveBeenCalledTimes(1));
-  expect(oldOnSaved).not.toHaveBeenCalled();
+test.each([reply({}, 502), reply({ ok: false, reason: 'server_error' }, 500)])('unstructured failure is uncertain and cannot invite duplicate send', async (response) => {
+  render(<ReviewerDueDateEditor {...props} />); await open(); await review(); global.fetch.mockResolvedValueOnce(response);
+  fireEvent.click(screen.getByRole('button', { name: 'Save deadline and send' })); await screen.findByText(/result could not be confirmed/);
+  expect(screen.queryByRole('button', { name: 'Preview email' })).toBeNull();
 });

@@ -2,8 +2,8 @@
 title: Personal reviewer deadline email defaults — slice 2
 domain: reviewer-engagement
 kind: plan
-status: planned
-summary: Owner-approved slice 2 decisions for assigned-PD-only deadline changes, editable preview and personal wording, optional empty bodies, one-send Cc barred on synthetic requests, and truthful retry outcomes. Opus review corrections recorded; implementation has not started.
+status: built-in-branch
+summary: Owner-approved slice 2 decisions for assigned-PD-only deadline changes, editable preview and personal wording, optional empty bodies, one-send Cc barred on synthetic requests, and truthful retry outcomes. Implementation built on codex/reviewer-deadline-email-defaults; checks and Opus build review in progress, not deployed.
 owner: product-engineering
 related:
   - docs/plans/PERSONAL_EMAIL_DEFAULTS_INVENTORY_2026-09-24.md
@@ -18,8 +18,7 @@ related:
 
 [PLANNED; explicit owner decisions in the 2026-10-24 conversation.] This is the
 implementation plan for slice 2. Product decisions below are agreed; runtime
-implementation, new preference keys/routes, configuration and acceptance tests are
-not built by this document update. No email or external record was changed.
+implementation and acceptance tests are now built on `codex/reviewer-deadline-email-defaults`; verification and Opus build review are in progress. No live configuration, email or external record was changed.
 
 Change surface: reviewer deadline editor, deadline preview/save/retry service and
 route, own-user wording preferences, and shared Admin subject/body registration.
@@ -109,10 +108,11 @@ accepts save/retry without a preview or Cc. Those are existing behaviors to chan
 not the target contract. The current route body limit is 8 KB: select bounded
 subject/body/Cc/proof limits and align the parser limit with their serialized size.
 
-## Planned implementation contract
+## Implementation contract
 
-All items below are PLANNED. Opus's source review supports the named baseline
-risks, not a claim that these protections are already implemented.
+The following is the agreed contract; branch source now implements it. Verification
+and independent build review are recorded separately below; deployment and live
+configuration remain pending. The earlier Opus review covered the plan only.
 
 1. **Own-user preference and fallback.** Add
    `PREFERENCE_KEYS.REVIEWER_DEADLINE_UPDATE_TEMPLATE` (stored key
@@ -301,12 +301,11 @@ exception and session routing pointer. The September inventory case row is an
 explicit historical baseline, not a current permission requirement. Other slice
 numbers are unrelated; slice-3 historical implementation status is outside this
 change. No current runtime/security-matrix claim is changed to describe unbuilt
-behavior. Product decisions are PLANNED, not deployment evidence.
+behavior. Product decisions specify the contract, not deployment evidence.
 
 Follow-up Mode A reconciliation: owner now explicitly allows empty/whitespace
 bodies for one send and personal defaults; Clear remains distinct. Synthetic
 requests refuse all Cc before writes and at dispatch. Updated this plan,
-inventory slice-2 summary and suite to-do exception; current runtime docs remain
-baseline because implementation has not begun. Opus findings were checked against
+inventory slice-2 summary and suite to-do exception; current runtime docs now identify branch-built behavior separately from deployment. Opus findings were checked against
 named source paths; no shared-helper audience reuse, mandatory nonblank personal
 body rule or blanket stored-copy validity assertion survives in this plan.

@@ -71,6 +71,8 @@ export default function ReviewersTab({
   requestId,
   context,
   canManage = true,
+  canChangeDeadline = false,
+  deadlineActorContext = null,
   settings = {},
   previewReadOnly = false,
 }) {
@@ -620,6 +622,8 @@ export default function ReviewersTab({
             settings={settings}
             mode={current}
             canManage={canEdit}
+            canChangeDeadline={canChangeDeadline && !previewReadOnly}
+            deadlineActorContext={deadlineActorContext}
             showReviewReminderAction={current === 'track'}
             previewReadOnly={previewReadOnly}
             degraded={Boolean(error)}

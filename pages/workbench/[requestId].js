@@ -252,6 +252,8 @@ export function WorkbenchRequest({ previewReadOnly = false }) {
           key={typeof requestId === 'string' ? requestId : ''}
           requestId={typeof requestId === 'string' ? requestId : ''}
           context={visibleContext}
+          canChangeDeadline={Boolean(myUserId && pdId && myUserId.toLowerCase() === pdId.toLowerCase())}
+          deadlineActorContext={`${myUserId}:${pdId}`}
           canManage={canManage}
           settings={reviewerSettings}
           previewReadOnly={reviewerSurfaceReadOnly}

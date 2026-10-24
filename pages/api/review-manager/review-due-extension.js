@@ -11,6 +11,7 @@ import { actorRefFromSession } from '../../../lib/utils/actor-ref';
 import { isGuid } from '../../../lib/utils/guid';
 import { withDalContext } from '../../../lib/dataverse/core/context';
 import {
+  previewReviewerDueDateNotification,
   retryReviewerDueDateNotification,
   saveReviewerDueDateExtension,
 } from '../../../lib/services/reviewer-due-extension';
@@ -18,6 +19,13 @@ import { ServiceHttpError } from '../../../lib/services/service-http-error';
 import { authorizeReviewerRequestMutation } from '../../../lib/services/reviewer-request-authorization';
 
 const REASON_STATUS = {
+  assigned_pd_required: 403,
+  sender_changed: 409,
+  preview_stale: 409,
+  invalid_preview: 400,
+  invalid_cc: 400,
+  cc_not_allowed_for_test_request: 409,
+  recipient_policy_refused: 409,
   not_found: 404,
   ineligible: 409,
   original_due_date_missing: 409,
@@ -45,22 +53,20 @@ export default async function handler(req, res) {
   if (!access) return;
   const actingUserSystemId = actorRefFromSession(access.session);
 
-  const { action, suggestionId, reviewDueDateOverride } = req.body || {};
-  if (!isGuid(suggestionId)) {
-    return res.status(400).json({ ok: false, reason: 'validation', errors: ['suggestionId must be a valid GUID.'] });
-  }
-  if (action !== 'save' && action !== 'retry') {
-    return res.status(400).json({ ok: false, reason: 'validation', errors: ['action must be save or retry.'] });
-  }
-  if (
-    action === 'save'
-    && reviewDueDateOverride !== null
-    && typeof reviewDueDateOverride !== 'string'
-  ) {
-    return res.status(400).json({ ok: false, reason: 'validation', errors: ['reviewDueDateOverride must be a date string or null.'] });
-  }
-  if (action === 'save' && !Object.prototype.hasOwnProperty.call(req.body || {}, 'reviewDueDateOverride')) {
-    return res.status(400).json({ ok: false, reason: 'validation', errors: ['reviewDueDateOverride is required for save.'] });
+  if (!isGuid(actingUserSystemId)) return res.status(403).json({ ok: false, reason: 'assigned_pd_required' });
+  const { action, operation, suggestionId, reviewDueDateOverride, template, cc, proof } = req.body || {};
+  const allowed = ['action', 'suggestionId', 'template', 'cc', 'proof', 'reviewDueDateOverride', 'operation'];
+  const finalOperations = ['save', 'restore', 'retry', 'resend'];
+  const target = action === 'preview' ? operation : action;
+  if (!isGuid(suggestionId) || !finalOperations.includes(target)
+    || (action !== 'preview' && action !== target)
+    || Object.keys(req.body || {}).some((key) => !allowed.includes(key))
+    || (action !== 'preview' && operation !== undefined)
+    || (action === 'preview' && proof !== undefined)
+    || (target === 'save' ? typeof reviewDueDateOverride !== 'string' : reviewDueDateOverride !== undefined)
+    || (action !== 'preview' && (typeof proof !== 'string' || !template))
+    || (proof !== undefined && proof.length > 8192)) {
+    return res.status(400).json({ ok: false, reason: 'invalid_preview' });
   }
 
   try {
@@ -71,9 +77,15 @@ export default async function handler(req, res) {
         suggestionIds: [suggestionId],
       });
       const expectedRequestId = authorization.requestIds[0];
-      return action === 'retry'
-        ? retryReviewerDueDateNotification({ suggestionId, expectedRequestId })
-        : saveReviewerDueDateExtension({ suggestionId, expectedRequestId, reviewDueDateOverride, actingUserSystemId });
+      const pdId = authorization.programDirectorByRequestId[expectedRequestId];
+      if (!isGuid(pdId) || pdId.toLowerCase() !== actingUserSystemId.toLowerCase()) {
+        return { ok: false, reason: 'assigned_pd_required' };
+      }
+      const input = { suggestionId, expectedRequestId, reviewDueDateOverride,
+        actingUserSystemId, operation: target, template, cc, proof };
+      if (action === 'preview') return previewReviewerDueDateNotification(input);
+      if (target === 'retry' || target === 'resend') return retryReviewerDueDateNotification(input);
+      return saveReviewerDueDateExtension(input);
     });
     if (!result.ok) {
       return res.status(REASON_STATUS[result.reason] || 500).json(result);
@@ -89,5 +101,5 @@ export default async function handler(req, res) {
 }
 
 export const config = {
-  api: { bodyParser: { sizeLimit: '8kb' } },
+  api: { bodyParser: { sizeLimit: '128kb' } },
 };

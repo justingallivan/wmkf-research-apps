@@ -40,6 +40,7 @@ const REMINDER_KEYS = [
   // Release courtesy copy shares the same private, dedicated-route contract.
   PREFERENCE_KEYS.REVIEWER_WITHDRAW_TEMPLATE,
   PREFERENCE_KEYS.REVIEWER_RELEASE_TEMPLATE,
+  PREFERENCE_KEYS.REVIEWER_DEADLINE_UPDATE_TEMPLATE,
 ];
 
 function mockRes() {

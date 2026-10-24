@@ -1,148 +1,38 @@
-/**
- * @jest-environment node
- */
-
-jest.mock('../../lib/utils/auth', () => ({
-  requireAppAccess: jest.fn(),
-}));
-jest.mock('../../lib/dataverse/core/context', () => ({
-  withDalContext: jest.fn(async (_label, fn) => fn()),
-}));
-jest.mock('../../lib/services/reviewer-due-extension', () => ({
-  saveReviewerDueDateExtension: jest.fn(),
-  retryReviewerDueDateNotification: jest.fn(),
-}));
-jest.mock('../../lib/services/reviewer-request-authorization', () => ({
-  authorizeReviewerRequestMutation: jest.fn(async () => ({ requestIds: ['33333333-3333-4333-8333-333333333333'] })),
-}));
-
+/** @jest-environment node */
+jest.mock('../../lib/utils/auth', () => ({ requireAppAccess: jest.fn() }));
+jest.mock('../../lib/dataverse/core/context', () => ({ withDalContext: jest.fn(async (_name, fn) => fn()) }));
+jest.mock('../../lib/services/reviewer-due-extension', () => ({ previewReviewerDueDateNotification: jest.fn(), saveReviewerDueDateExtension: jest.fn(), retryReviewerDueDateNotification: jest.fn() }));
+jest.mock('../../lib/services/reviewer-request-authorization', () => ({ authorizeReviewerRequestMutation: jest.fn() }));
 import handler from '../../pages/api/review-manager/review-due-extension';
 import { requireAppAccess } from '../../lib/utils/auth';
-import { withDalContext } from '../../lib/dataverse/core/context';
-import {
-  retryReviewerDueDateNotification,
-  saveReviewerDueDateExtension,
-} from '../../lib/services/reviewer-due-extension';
 import { authorizeReviewerRequestMutation } from '../../lib/services/reviewer-request-authorization';
-
-const SUGGESTION_ID = '11111111-1111-4111-8111-111111111111';
-const ACTOR_ID = '22222222-2222-4222-8222-222222222222';
-const REQUEST_ID = '33333333-3333-4333-8333-333333333333';
-
-function response() {
-  return {
-    statusCode: 200,
-    body: null,
-    headers: {},
-    setHeader(name, value) { this.headers[name.toLowerCase()] = value; return this; },
-    status(code) { this.statusCode = code; return this; },
-    json(body) { this.body = body; return this; },
-  };
-}
-
-beforeEach(() => {
-  jest.clearAllMocks();
-  requireAppAccess.mockResolvedValue({
-    profileId: 7,
-    session: { user: { dynamicsSystemuserId: ACTOR_ID } },
-  });
-});
-
-test('save validates the selector and dispatches inside the review-manager DAL context', async () => {
-  saveReviewerDueDateExtension.mockResolvedValue({
-    ok: true,
-    saved: true,
-    notified: true,
-    effectiveReviewDeadline: '2099-09-15',
-  });
-  const res = response();
-
-  await handler({
-    method: 'POST',
-    body: { action: 'save', suggestionId: SUGGESTION_ID, reviewDueDateOverride: '2099-09-15' },
-  }, res);
-
-  expect(requireAppAccess).toHaveBeenCalledWith(expect.anything(), res, 'review-manager', 'reviewers');
-  expect(withDalContext).toHaveBeenCalledWith('review-manager-review-due-extension', expect.any(Function));
-  expect(saveReviewerDueDateExtension).toHaveBeenCalledWith({
-    suggestionId: SUGGESTION_ID,
-    expectedRequestId: REQUEST_ID,
-    reviewDueDateOverride: '2099-09-15',
-    actingUserSystemId: ACTOR_ID,
-  });
-  expect(authorizeReviewerRequestMutation).toHaveBeenCalledWith({
-    profileId: 7,
-    callerSystemId: ACTOR_ID,
-    suggestionIds: [SUGGESTION_ID],
-  });
+import * as service from '../../lib/services/reviewer-due-extension';
+const ID = '11111111-1111-4111-8111-111111111111'; const PD = '22222222-2222-4222-8222-222222222222'; const REQUEST = '33333333-3333-4333-8333-333333333333';
+const response = () => ({ statusCode: 200, setHeader: jest.fn(), status(n) { this.statusCode = n; return this; }, json(body) { this.body = body; return this; } });
+beforeEach(() => { jest.resetAllMocks(); require('../../lib/dataverse/core/context').withDalContext.mockImplementation(async (_name, fn) => fn()); requireAppAccess.mockResolvedValue({ profileId: 7, session: { user: { dynamicsSystemuserId: PD } } }); authorizeReviewerRequestMutation.mockResolvedValue({ requestIds: [REQUEST], isSuperuser: true, programDirectorByRequestId: { [REQUEST]: PD } }); Object.values(service).filter(jest.isMockFunction).forEach((fn) => fn.mockResolvedValue({ ok: true, notified: true })); });
+test.each(['save', 'restore', 'retry', 'resend'])('final %s has explicit proof contract and server identity', async (action) => {
+  const res = response(); await handler({ method: 'POST', body: { action, suggestionId: ID, ...(action === 'save' ? { reviewDueDateOverride: '2099-09-15' } : {}), template: { subject: 'Deadline', body: '' }, cc: [], proof: 'proof' } }, res);
   expect(res.statusCode).toBe(200);
+  const fn = ['retry', 'resend'].includes(action) ? service.retryReviewerDueDateNotification : service.saveReviewerDueDateExtension;
+  expect(fn).toHaveBeenCalledWith(expect.objectContaining({ actingUserSystemId: PD, expectedRequestId: REQUEST, operation: action, proof: 'proof' }));
 });
-
-test('partial notification failure returns 502 while preserving saved=true for retry UI', async () => {
-  saveReviewerDueDateExtension.mockResolvedValue({
-    ok: false,
-    saved: true,
-    notified: false,
-    retryable: true,
-    reason: 'send_failed',
-  });
-  const res = response();
-
-  await handler({
-    method: 'POST',
-    body: { action: 'save', suggestionId: SUGGESTION_ID, reviewDueDateOverride: '2099-09-15' },
-  }, res);
-
-  expect(res.statusCode).toBe(502);
-  expect(res.body).toMatchObject({ saved: true, notified: false, retryable: true });
+test('preview is app-gated and delegates without writes', async () => {
+  const res = response(); await handler({ method: 'POST', body: { action: 'preview', operation: 'save', suggestionId: ID, reviewDueDateOverride: '2099-09-15' } }, res);
+  expect(requireAppAccess).toHaveBeenCalledWith(expect.anything(), res, 'review-manager', 'reviewers'); expect(service.previewReviewerDueDateNotification).toHaveBeenCalled(); expect(service.saveReviewerDueDateExtension).not.toHaveBeenCalled();
 });
-
-test('extension beyond the current signed-link expiry returns 409 before any save', async () => {
-  saveReviewerDueDateExtension.mockResolvedValue({
-    ok: false,
-    saved: false,
-    notified: false,
-    retryable: false,
-    reason: 'token_recovery_required',
-  });
-  const res = response();
-
-  await handler({
-    method: 'POST',
-    body: { action: 'save', suggestionId: SUGGESTION_ID, reviewDueDateOverride: '2099-09-15' },
-  }, res);
-
-  expect(res.statusCode).toBe(409);
-  expect(res.body).toMatchObject({
-    saved: false,
-    notified: false,
-    reason: 'token_recovery_required',
-  });
+test('superuser who is not assigned PD is denied despite shared helper approval', async () => {
+  authorizeReviewerRequestMutation.mockResolvedValue({ isSuperuser: true, requestIds: [REQUEST], programDirectorByRequestId: { [REQUEST]: REQUEST } });
+  const res = response(); await handler({ method: 'POST', body: { action: 'preview', operation: 'resend', suggestionId: ID } }, res);
+  expect(res.statusCode).toBe(403); expect(service.previewReviewerDueDateNotification).not.toHaveBeenCalled();
 });
-
-test('retry sends from freshly stored state and does not accept a client deadline', async () => {
-  retryReviewerDueDateNotification.mockResolvedValue({ ok: true, saved: false, notified: true });
-  const res = response();
-
-  await handler({
-    method: 'POST',
-    body: { action: 'retry', suggestionId: SUGGESTION_ID, reviewDueDateOverride: '1900-01-01' },
-  }, res);
-
-  expect(retryReviewerDueDateNotification).toHaveBeenCalledWith({ suggestionId: SUGGESTION_ID, expectedRequestId: REQUEST_ID });
-  expect(saveReviewerDueDateExtension).not.toHaveBeenCalled();
-  expect(res.statusCode).toBe(200);
-  expect(res.body).toMatchObject({ saved: false, notified: true });
+test('null actor denied before ownership reads', async () => {
+  requireAppAccess.mockResolvedValue({ profileId: 7, session: { user: {} } }); const res = response(); await handler({ method: 'POST', body: {} }, res);
+  expect(res.statusCode).toBe(403); expect(authorizeReviewerRequestMutation).not.toHaveBeenCalled();
 });
-
-test('rejects malformed ids and unknown actions before any service call', async () => {
-  const badId = response();
-  await handler({ method: 'POST', body: { action: 'save', suggestionId: 'bad', reviewDueDateOverride: null } }, badId);
-  expect(badId.statusCode).toBe(400);
-
-  const badAction = response();
-  await handler({ method: 'POST', body: { action: 'send', suggestionId: SUGGESTION_ID } }, badAction);
-  expect(badAction.statusCode).toBe(400);
-  expect(saveReviewerDueDateExtension).not.toHaveBeenCalled();
-  expect(retryReviewerDueDateNotification).not.toHaveBeenCalled();
+test.each([{ action: 'unknown', suggestionId: ID }, { action: 'save', suggestionId: ID }, { action: 'preview', operation: 'retry', suggestionId: 'bad' }, { action: 'preview', operation: 'retry', suggestionId: ID, owner: PD }, { action: 'preview', operation: 'retry', suggestionId: ID, reviewDueDateOverride: '1900-01-01' }])('invalid input is rejected before services %p', async (body) => {
+  const res = response(); await handler({ method: 'POST', body }, res); expect(res.statusCode).toBe(400); expect(authorizeReviewerRequestMutation).not.toHaveBeenCalled();
+});
+test.each([['send_unconfirmed', 202], ['preview_stale', 409], ['invalid_cc', 400], ['cc_not_allowed_for_test_request', 409]])('reason %s maps to %s', async (reason, status) => {
+  service.previewReviewerDueDateNotification.mockResolvedValue({ ok: false, reason, saved: true, notified: false });
+  const res = response(); await handler({ method: 'POST', body: { action: 'preview', operation: 'resend', suggestionId: ID } }, res); expect(res.statusCode).toBe(status); expect(res.body.saved).toBe(true);
 });

@@ -103,31 +103,13 @@ describe('/api/admin/email-defaults', () => {
     expect(r.body).toEqual({ key: subjectKey, value: '' });
   });
 
-  test('deadline-update body requires honorific greeting, date, and signature placeholders', async () => {
-    const key = 'email.reviewer_extension.body';
-    const rejected = res();
-    await adminHandler({ method: 'PUT', body: { key, value: 'Hello {{greeting}}' } }, rejected);
-
-    expect(rejected.statusCode).toBe(400);
-    expect(rejected.body.error).toContain('{{reviewDueDate}}');
-    expect(rejected.body.error).toContain('{{signature}}');
-    expect(setSetting).not.toHaveBeenCalled();
-
-    const legacy = res();
-    await adminHandler({
-      method: 'PUT',
-      body: { key, value: 'Dear {{reviewerName}}, due {{reviewDueDate}}. {{signature}}' },
-    }, legacy);
-    expect(legacy.statusCode).toBe(400);
-    expect(legacy.body.error).toContain('{{greeting}}');
-    expect(setSetting).not.toHaveBeenCalled();
-
-    const accepted = res();
-    const value = '{{greeting}}, due {{reviewDueDate}}. {{signature}}';
-    await adminHandler({ method: 'PUT', body: { key, value } }, accepted);
-
-    expect(accepted.statusCode).toBe(200);
-    expect(setSetting).toHaveBeenCalledWith(key, value, 42);
+  test.each(['', '   ', 'Hello {{greeting}}', 'Dear {{reviewerName}}, due {{reviewDueDate}}.'])('deadline body may omit every placeholder or be empty: %p', async (value) => {
+    const r = res(); await adminHandler({ method: 'PUT', body: { key: 'email.reviewer_extension.body', value } }, r);
+    expect(r.statusCode).toBe(200); expect(setSetting).toHaveBeenCalledWith('email.reviewer_extension.body', value, 42);
+  });
+  test('deadline subject supports proposalTitle but invalid tokens and multiline are rejected', async () => {
+    const r = res(); await adminHandler({ method: 'PUT', body: { key: 'email.reviewer_extension.subject', value: 'Update: {{proposalTitle}}' } }, r); expect(r.statusCode).toBe(200);
+    const bad = res(); await adminHandler({ method: 'PUT', body: { key: 'email.reviewer_extension.body', value: '{{unknown}}' } }, bad); expect(bad.statusCode).toBe(400);
   });
 
   test.each([
