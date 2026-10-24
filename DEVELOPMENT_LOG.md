@@ -10,6 +10,17 @@ The chronological archive after the `Legacy chronological session log` divider c
 
 ---
 
+## October 2026 — Proposal Ranking uses invited amounts; open D26 round corrected in place (Session 636)
+
+**Milestone:** Proposal Ranking now ranks on `wmkf_invitedamount`, falling back to `akoya_request` with a card note, and the open D26 round was corrected without any PD re-ranking.
+**Sessions:** Session 636.
+**Ship state:**
+- `4a37f2f9b` (Tier 1 merge): adapter reads both amounts; `amountSource` is frozen into the snapshot and passes the v2 `publicSnapshot` allowlist; cards label Invited or Requested; workbook columns are Amount / Cumulative amount. Older snapshots still read Requested.
+- Owner-run `scripts/correct-ranking-invited-amounts.mjs` (13 tests, two Codex adversarial passes), plan `7cccbe76`: #1002821 $1.6M→$1.3M and #1003000 $1.5M→$1.3M; all 23 tagged invited; one `invited-amount-correction` round log event; verify found no app activity since the plan.
+- Apply and rollback decide from stored round state. Rollback is fenced by the round's last-operation stamp, workflow and list rows, not a post-write ETag.
+**Why it matters:** program meeting totals now reflect what applicants were invited to request. The script shows how to correct a frozen round without disturbing submitted assessments.
+**Pointers:** `docs/plans/PROPOSAL_RANKING_D26_INVITED_AMOUNT_CORRECTION_2026-10-23.md`; `docs/atlas/dataverse-proposal-ranking.md`; `6c38da155`, `a7190c848`.
+
 ## October 2026 — Research co-PIs backfilled into Dataverse with Institution at Award (Session 635)
 
 **Milestone:** Stage B of the Research Institution at Award backfill applied to production: co-PIs on awarded Research requests since 2017 are now Personnel (`wmkf_apprequestperson`) rows with their award-era institution.
