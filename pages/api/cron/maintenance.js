@@ -22,6 +22,7 @@ import ReviewDraftService from '../../../lib/services/review-draft-service';
 import AlertService from '../../../lib/services/alert-service';
 import FeedbackService from '../../../lib/services/feedback-service';
 import NotificationService from '../../../lib/services/notification-service';
+import { cleanupInvitations } from '../../../lib/services/meeting-coordination/invitation-service';
 import { expireSummaryDrafts } from '../../../lib/services/post-presentation-materials/summary-draft-store';
 
 export default async function handler(req, res) {
@@ -236,6 +237,15 @@ export default async function handler(req, res) {
       totalDeleted += expired;
     } catch (error) {
       results.summaryDrafts = { error: error.message };
+    }
+
+    // Presentation invitation text expires after thirty days. Unresolved
+    // transport keeps its content-free fence and is never resubmitted here.
+    try {
+      results.presentationInvitations = await cleanupInvitations();
+      totalDeleted += results.presentationInvitations.deleted || 0;
+    } catch (error) {
+      results.presentationInvitations = { error: error.message };
     }
 
     // 7.6a. Durable presentation MP4 intents. Off/test rollout modes inspect,

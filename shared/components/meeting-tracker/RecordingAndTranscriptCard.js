@@ -3836,7 +3836,7 @@ function BoardPageHeading({ m }) {
   );
 }
 
-function RecordingAndTranscriptCardForRequest({ requestId, onStatusChange }) {
+function RecordingAndTranscriptCardForRequest({ requestId, onStatusChange, active = true }) {
   const transcriptInputRef = useRef(null);
   const hashScrollDoneRef = useRef(false);
   const m = useMaterials(requestId, transcriptInputRef);
@@ -3845,12 +3845,12 @@ function RecordingAndTranscriptCardForRequest({ requestId, onStatusChange }) {
   const jobsSignature = t.jobs.map((job) => `${job.id}:${job.status}:${job.cleanupPending === true ? 'c' : ''}`).join('|');
   const z = useZoomImport(requestId, { onImported: t.loadCollection, jobsSignature, onVideoCopied: m.load });
   useEffect(() => {
-    if (hashScrollDoneRef.current || typeof window === 'undefined' || window.location.hash !== '#recording-and-transcript-card') return;
+    if (!active || hashScrollDoneRef.current || typeof window === 'undefined' || window.location.hash !== '#recording-and-transcript-card') return;
     const card = document.getElementById('recording-and-transcript-card');
     if (!card) return;
     hashScrollDoneRef.current = true;
     card.scrollIntoView?.({ block: 'start' });
-  }, []);
+  }, [active]);
   const heading = <h2 className="text-lg font-semibold text-gray-950">Recording setup</h2>;
   // One Refresh for all four cards (redesign §6 B): transcription status, materials and Board link, the Zoom list, the
   // presentation video and then both summaries (once each; see useSummaryKind). A failed load keeps its own Retry where
@@ -3911,7 +3911,7 @@ function RecordingAndTranscriptCardForRequest({ requestId, onStatusChange }) {
   );
 }
 
-export default function RecordingAndTranscriptCard({ requestId, onStatusChange }) {
+export default function RecordingAndTranscriptCard({ requestId, onStatusChange, active = true }) {
   if (!requestId) return null;
-  return <RecordingAndTranscriptCardForRequest key={requestId} requestId={requestId} onStatusChange={onStatusChange} />;
+  return <RecordingAndTranscriptCardForRequest key={requestId} requestId={requestId} active={active} onStatusChange={onStatusChange} />;
 }

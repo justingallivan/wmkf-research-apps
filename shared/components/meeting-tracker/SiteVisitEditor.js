@@ -14,6 +14,8 @@ import Layout, { Button } from '../Layout';
 import { SITE_VISIT_FORMAT, SITE_VISIT_FORMAT_LABEL, SITE_VISIT_LIMITS } from '../../config/siteVisit';
 import SiteVisitMaterialsCard from './SiteVisitMaterialsCard';
 import RecordingAndTranscriptCard from './RecordingAndTranscriptCard';
+import PresentationInvitationPanel from './PresentationInvitationPanel';
+import MeetingTaskNavigation from './MeetingTaskNavigation';
 import AttendeePicker from './AttendeePicker';
 import { STATUS_TONES } from './ArtifactRow';
 import { resolveSiteVisitHeaderStatus } from '../../utils/site-visit-header-status';
@@ -183,6 +185,8 @@ export default function SiteVisitEditor() {
   const cycleCode = Array.isArray(router.query.cycleCode) ? '' : router.query.cycleCode || '';
   const programId = Array.isArray(router.query.programId) ? '' : router.query.programId || '';
   const [visit, setVisit] = useState(null);
+  const [invitationAvailability, setInvitationAvailability] = useState(null);
+  const invitationAvailable = invitationAvailability?.requestId === requestId && invitationAvailability.available;
   const [form, setForm] = useState(() => emptyForm(requestNumber));
   const [recipients, setRecipients] = useState({ staff: [], board: [], consultants: [] });
   const [manual, setManual] = useState({ name: '', email: '', role: 'required' });
@@ -212,6 +216,26 @@ export default function SiteVisitEditor() {
   // request so a client-side move to another visit starts read-only again.
   const [editingFor, setEditingFor] = useState(null);
   const editing = Boolean(requestId) && editingFor === requestId;
+  const [taskEntry, setTaskEntry] = useState(null);
+  const [invitationVisitedFor, setInvitationVisitedFor] = useState(null);
+  const requestedTask = taskEntry?.requestId === requestId ? taskEntry.task : 'setup';
+  const task = requestedTask === 'invitations' && !invitationAvailable ? 'setup' : requestedTask;
+  const taskPrefix = `visit-${requestId}`;
+  const recordingTaskRef = useRef(null);
+  useEffect(() => {
+    if (typeof window !== 'undefined' && window.location.hash === '#recording-and-transcript-card') {
+      void Promise.resolve().then(() => setTaskEntry({ requestId, task: 'recordings' }));
+    }
+  }, [requestId, router.asPath]);
+  useEffect(() => {
+    if (task !== 'recordings') for (const media of recordingTaskRef.current?.querySelectorAll('video,audio') || []) media.pause();
+  }, [task]);
+  const chooseTask = (next) => {
+    if (editing && next !== 'setup') { setError('Save or cancel your meeting edits before changing tasks.'); return false; }
+    if (next === 'invitations') setInvitationVisitedFor(requestId);
+    setTaskEntry({ requestId, task: next }); return true;
+  };
+
 
   const load = useCallback(async () => {
     if (!requestId) return;
@@ -233,6 +257,7 @@ export default function SiteVisitEditor() {
       const recipientBody = recipientSettled.value;
       const directory = { staff: recipientBody.staff || [], board: recipientBody.board || [], consultants: recipientBody.consultants || [] };
       setVisit(visitBody.siteVisit || null);
+      setInvitationAvailability({ requestId: forRequest, available: visitBody.invitationAvailable === true });
       const savedForm = formFromVisit(visitBody.siteVisit, requestNumber);
       setForm(visitBody.siteVisit ? savedForm : withApplicantAttendees(savedForm, visitBody.applicantAttendees, directory));
       setRecipients(directory);
@@ -370,6 +395,13 @@ export default function SiteVisitEditor() {
       {error && <div role="alert" className="mb-5 rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-800">{error}</div>}
       {notice && <div role="status" className="mb-5 rounded-lg border border-blue-200 bg-blue-50 p-4 text-sm text-blue-800">{notice}</div>}
 
+      {!loading && visit && <MeetingTaskNavigation idPrefix={taskPrefix} selected={task} onChange={chooseTask} tabs={[
+        { id: 'setup', label: 'Meeting setup', group: 'Before the meeting' },
+        ...(invitationAvailable ? [{ id: 'invitations', label: 'Invitations', group: 'Before the meeting' }] : []),
+        { id: 'materials', label: 'Materials collection', group: 'Before the meeting' },
+        { id: 'recordings', label: 'Transcript preparation', group: 'After the meeting' },
+      ]} />}
+      <div role="tabpanel" id={`${taskPrefix}-panel-setup`} aria-labelledby={visit ? `${taskPrefix}-task-setup` : undefined} hidden={task !== 'setup'}>
       {loading ? (
         <div className="rounded-xl border border-gray-200 bg-white p-8 text-center text-gray-500">Loading the site visit…</div>
       ) : visit && !editing ? (
@@ -455,8 +487,18 @@ export default function SiteVisitEditor() {
         </form>
       )}
 
-      {!loading && visit && <SiteVisitMaterialsCard key={requestId} requestId={requestId} requestNumber={requestNumber} onStatusChange={reportMaterials} />}
-      {!loading && visit && <RecordingAndTranscriptCard requestId={requestId} onStatusChange={reportRecording} />}
+      </div>
+      {!loading && visit && <>
+        <div role="tabpanel" id={`${taskPrefix}-panel-invitations`} aria-labelledby={`${taskPrefix}-task-invitations`} hidden={task !== 'invitations'}>
+          {(task === 'invitations' || invitationVisitedFor === requestId) && <PresentationInvitationPanel key={requestId} requestId={requestId} requestNumber={requestIdentity?.requestNumber || requestNumber} />}
+        </div>
+        <div role="tabpanel" id={`${taskPrefix}-panel-materials`} aria-labelledby={`${taskPrefix}-task-materials`} hidden={task !== 'materials'}>
+          <SiteVisitMaterialsCard key={requestId} requestId={requestId} requestNumber={requestNumber} onStatusChange={reportMaterials} />
+        </div>
+        <div ref={recordingTaskRef} role="tabpanel" id={`${taskPrefix}-panel-recordings`} aria-labelledby={`${taskPrefix}-task-recordings`} hidden={task !== 'recordings'}>
+          <RecordingAndTranscriptCard requestId={requestId} active={task === 'recordings'} onStatusChange={reportRecording} />
+        </div>
+      </>}
 
       {/* The page is long: the exit is reachable at the bottom as well as in
           the header (owner, 2026-09-10, on the session page). */}

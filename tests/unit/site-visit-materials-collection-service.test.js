@@ -67,6 +67,7 @@ function deps(overrides = {}) {
   let stored = null;
   const d = {
     schemaReady: () => true,
+    impersonationEnabled: () => true,
     getCoordinator: jest.fn(async () => ({ systemUserId: ACTOR, profileId: 7, email: 'pc@wmkeck.org', name: 'Casey Coordinator', revision: 'r1' })),
     getDueBusinessDays: jest.fn(async () => ({ dueBusinessDays: 2, dueDaysSource: 'default' })),
     getRequest: jest.fn(async () => request()),
@@ -776,4 +777,9 @@ test('a post-create coordinator read failure returns the saved collection with d
   const result=await createMaterialsCollection({requestId:REQUEST_ID,actorId:ACTOR,profileId:7,fromEmail:'pc@wmkeck.org',preparedEmail:MATERIALS_PREPARED_EMAIL},d);
   expect(result).toMatchObject({collection:{id:expect.any(String)},invitationSent:false,invitationOutcome:'failed'});
   expect(d.insertCollection).toHaveBeenCalledTimes(1);expect(d.sendEmail).not.toHaveBeenCalled();
+});
+
+test.each(['create','invite','remind'])('impersonation-off %s refuses before mint, persistence, claim or transport',async action=>{
+ const d=deps({impersonationEnabled:()=>false});await expect(runMaterialsAction(action,d)).rejects.toMatchObject({httpStatus:503,code:'site_visit_materials_impersonation_required',dispatched:false});
+ for(const name of ['mint','insertCollection','updateContacts','claimManualReminder','sendEmail'])expect(d[name]).not.toHaveBeenCalled();
 });

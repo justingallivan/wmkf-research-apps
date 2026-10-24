@@ -35,6 +35,7 @@ function fixture() {
   let row = null;
   const d = {
     schemaReady: () => true,
+    impersonationEnabled: () => true,
     getCoordinator: jest.fn(async () => ({ systemUserId: ACTOR, profileId: 7, email: 'pc@example.org', name: 'Duncan', revision: 'r1' })),
     getDueBusinessDays: jest.fn(async () => ({ dueBusinessDays: 2, dueDaysSource: 'default' })),
     getRequest: jest.fn(async () => ({ akoya_requestid: REQUEST, akoya_requestnum: '1003222', akoya_title: 'Study A', wmkf_meetingdate: '2030-12-11', akoya_requeststatus: 100000001, wmkf_triagestatus: 100000000 })),

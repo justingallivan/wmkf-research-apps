@@ -17,6 +17,10 @@ jest.mock('../../shared/components/meeting-tracker/RecordingAndTranscriptCard', 
   default: ({ requestId }) => <div data-testid="recording-transcript-in-editor">{requestId}</div>,
 }));
 
+jest.mock('../../shared/components/meeting-tracker/PresentationInvitationPanel',()=>{
+ const React=require('react');return {__esModule:true,default:()=>{const [text,setText]=React.useState('');return <label>Unsent invitation<input value={text} onChange={e=>setText(e.target.value)}/></label>;}};
+});
+
 const REQUEST_ID = '11111111-1111-4111-8111-111111111111';
 const recipients = {
   staff: [{ ref: { kind: 'staff', profileId: 7 }, name: 'Duncan Staff', email: 'd@wmkeck.org' }, { ref: { kind: 'staff', profileId: 8 }, name: 'Chris Staff', email: 'c@wmkeck.org' }],
@@ -243,10 +247,10 @@ describe('one attendee picker (Site Visit redesign §3.1)', () => {
     await openEditor();
     // Not every name rendered twice: the directory is searched, not listed.
     expect(screen.queryByRole('button', { name: /Chris Staff/ })).toBeNull();
-    const chosen = screen.getByRole('list', { name: 'Find a staff or Board member: chosen' });
+    const chosen = screen.getByRole('list', { name: 'Find a staff member, Board member or consultant: chosen' });
     expect(within(chosen).getByRole('group', { name: 'Board Member: attendance' })).toBeInTheDocument();
     expect(within(chosen).getByRole('button', { name: 'Required' })).toHaveAttribute('aria-pressed', 'true');
-    fireEvent.change(screen.getByLabelText('Find a staff or Board member'), { target: { value: 'chris' } });
+    fireEvent.change(screen.getByLabelText('Find a staff member, Board member or consultant'), { target: { value: 'chris' } });
     fireEvent.click(screen.getByRole('button', { name: /Add Chris Staff/ }));
     fireEvent.click(within(within(chosen).getByRole('group', { name: 'Chris Staff: attendance' })).getByRole('button', { name: 'Optional' }));
     fireEvent.click(screen.getByRole('button', { name: 'Remove Board Member' }));
@@ -260,7 +264,7 @@ describe('one attendee picker (Site Visit redesign §3.1)', () => {
 
   test('a person with no email is listed but cannot be added, with the reason on hover', async () => {
     await openEditor();
-    fireEvent.change(screen.getByLabelText('Find a staff or Board member'), { target: { value: 'pat' } });
+    fireEvent.change(screen.getByLabelText('Find a staff member, Board member or consultant'), { target: { value: 'pat' } });
     const option = screen.getByRole('button', { name: /Add Pat Noemail · no email/ });
     expect(option).toBeDisabled();
     expect(option).toHaveAttribute('title', noEmailHint({ linked: false }));
@@ -288,7 +292,7 @@ describe('one attendee picker (Site Visit redesign §3.1)', () => {
 
     test('with Required full, a new person is added to Optional', async () => {
       await openWith(manualRows(100, 'r'), []);
-      fireEvent.change(screen.getByLabelText('Find a staff or Board member'), { target: { value: 'chris' } });
+      fireEvent.change(screen.getByLabelText('Find a staff member, Board member or consultant'), { target: { value: 'chris' } });
       fireEvent.click(screen.getByRole('button', { name: /Add Chris Staff/ }));
       const payload = await saved();
       expect(payload.requiredAttendees).toHaveLength(100);
@@ -308,7 +312,7 @@ describe('one attendee picker (Site Visit redesign §3.1)', () => {
 
     test('with both lists full the search is disabled', async () => {
       await openWith(manualRows(100, 'r'), manualRows(100, 'o'));
-      expect(screen.getByLabelText('Find a staff or Board member')).toBeDisabled();
+      expect(screen.getByLabelText('Find a staff member, Board member or consultant')).toBeDisabled();
       expect(screen.getByText('Both attendee lists are full.')).toBeInTheDocument();
     });
   });
@@ -385,4 +389,9 @@ describe('header identity follows client-side navigation between visits (Codex r
     expect(screen.getByTestId('visit-request-identity')).toHaveTextContent('Request B');
     expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('#1009999');
   });
+});
+
+test('task navigation retains unsent invitation edits and hides invitation admission when unavailable',async()=>{
+ global.fetch=jest.fn(async url=>String(url).includes('/recipients')?response(recipients):String(url).endsWith('/materials')?response({error:'off'},503):response({success:true,invitationAvailable:true,siteVisit:{activityId:'a1',etag:'v1',subject:'Saved presentation',startLocal:'2026-10-01T09:00',endLocal:'2026-10-01T12:00',timeZone:'America/Los_Angeles',requiredAttendees:[],optionalAttendees:[]}}));
+ render(<SiteVisitEditor/>);fireEvent.click(await screen.findByRole('tab',{name:/Invitations/}));fireEvent.change(await screen.findByLabelText('Unsent invitation'),{target:{value:'Keep this draft'}});fireEvent.click(screen.getByRole('tab',{name:/Meeting setup/}));fireEvent.click(screen.getByRole('tab',{name:/Invitations/}));expect(screen.getByLabelText('Unsent invitation')).toHaveValue('Keep this draft');
 });

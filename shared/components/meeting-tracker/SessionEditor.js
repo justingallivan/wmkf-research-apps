@@ -5,6 +5,7 @@ import { useRouter } from 'next/router';
 import Layout, { Button } from '../Layout';
 import { formatZonedLocalInput, resolveZonedDateTime } from '../../../lib/utils/zoned-date-time';
 import SessionAgendaPanel from './SessionAgendaPanel';
+import MeetingTaskNavigation from './MeetingTaskNavigation';
 import OverflowMenu from '../workbench/OverflowMenu';
 import { requestEnvelope } from '../../utils/api-request';
 import TestRequestBadge from '../TestRequestBadge';
@@ -330,6 +331,16 @@ export default function SessionEditor() {
   // mode still saves immediately, so Done only leaves edit mode.
   const [orderEditingFor, setOrderEditingFor] = useState(null);
   const orderEditing = Boolean(sessionId) && orderEditingFor === sessionId;
+  const [taskEntry, setTaskEntry] = useState(null);
+  const task = taskEntry?.sessionId === sessionId ? taskEntry.task : 'setup';
+  const taskPrefix = `session-${sessionId}`;
+  const chooseTask = (next) => {
+    if (editing && next !== 'setup') { setError('Save or cancel your meeting edits before changing tasks.'); return false; }
+    if (busy && next !== 'setup') { setError('Wait for the agenda change to finish before changing tasks.'); return false; }
+    if (orderEditing && next !== 'setup') setOrderEditingFor(null);
+    setTaskEntry({ sessionId, task: next }); return true;
+  };
+
   const loadGenerationRef = useRef(0);
   const currentLoadRef = useRef({ routeKey: null, generation: 0, ready: false });
   const contextReady = loadedRouteKey === routeKey && currentLoadRef.current.routeKey === routeKey && currentLoadRef.current.ready;
@@ -583,6 +594,11 @@ export default function SessionEditor() {
       {notice && <div role="status" className="mb-5 rounded-lg border border-blue-200 bg-blue-50 p-4 text-sm text-blue-800">{notice}</div>}
       {(warning || overFull) && <div role="status" className="mb-5 rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">{warning?.message || `Scheduled discussion time is ${slotMinutes - sessionMinutes} minutes longer than this session.`}</div>}
 
+      {!isNew && session && <MeetingTaskNavigation idPrefix={taskPrefix} selected={task} onChange={chooseTask} tabs={[
+        { id: 'setup', label: 'Meeting setup and agenda', group: 'Before the meeting' },
+        { id: 'invitations', label: 'Invitations', group: 'Before the meeting' },
+      ]} />}
+      <div role="tabpanel" id={`${taskPrefix}-panel-setup`} aria-labelledby={!isNew && session ? `${taskPrefix}-task-setup` : undefined} hidden={task !== 'setup'}>
       {!isNew && session && !editing ? (
         <SessionSummary session={session} recipients={recipients} onEdit={() => { setNotice(null); setEditingFor(sessionId); }} />
       ) : (
@@ -647,6 +663,8 @@ export default function SessionEditor() {
         </section>
       )}
 
+      </div>
+      <div role="tabpanel" id={`${taskPrefix}-panel-invitations`} aria-labelledby={!isNew && session ? `${taskPrefix}-task-invitations` : undefined} hidden={task !== 'invitations'}>
       {!isNew && session && (
         <SessionAgendaPanel
           sessionId={sessionId}
@@ -655,6 +673,8 @@ export default function SessionEditor() {
           recipients={recipients}
         />
       )}
+
+      </div>
 
       {/* The page is long: the exit and the save confirmation are reachable at
           the bottom as well as in the header (owner, 2026-09-10). */}

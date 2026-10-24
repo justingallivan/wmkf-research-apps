@@ -105,6 +105,7 @@ Promote any of these to a per-entity page if app code starts writing to it.
 
 | Group | Tables | Page |
 |---|---|---|
+| Presentation invitation emails | `meeting_presentation_invitations` — migration 088; frozen request/visit previews, original-sender dispatch and read-only uncertain-send reconciliation. Branch-built, not deployed; admission defaults off. | [postgres-meeting-presentation-invitations.md](atlas/postgres-meeting-presentation-invitations.md) |
 | Durable meeting preparation | `meeting_material_preparations`, `meeting_material_preparation_steps` and summary ownership/initiation columns — [VERIFIED via source and isolated PostgreSQL tests 2026-10-23] migration 087; branch-built, not deployed, new admission defaults off. | [postgres-meeting-material-preparations.md](atlas/postgres-meeting-material-preparations.md) |
 | Meeting presentation approvals | `meeting_presentation_visibility`, `meeting_presentation_editions` — [VERIFIED via source and isolated PostgreSQL tests 2026-10-23] migration 086 and approval/withdrawal readers are branch-built; not applied or deployed. | [postgres-meeting-presentation-editions.md](atlas/postgres-meeting-presentation-editions.md) |
 | AssemblyAI transcription pilot | `transcription_jobs`, `transcription_workflow_dispatches` — migrations 060–062 are applied to the dedicated pilot Neon database and the separate Meeting Tracker Preview test Neon database; neither is a shared application database. | [postgres-transcription-pilot.md](atlas/postgres-transcription-pilot.md) |

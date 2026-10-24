@@ -27,6 +27,9 @@ import * as emailAdapter from '../../lib/dataverse/adapters/email-activity';
 import { DEFAULT_DEPENDENCIES as collection } from '../../lib/services/site-visit-materials/collection-service';
 import { DEFAULT_DEPENDENCIES as cron, sweepMaterialsReminders } from '../../lib/services/site-visit-materials/reminder-sweep';
 import { SITE_VISIT_MATERIALS_REMINDER_SEED_BODY as body, SITE_VISIT_MATERIALS_REMINDER_SEED_SUBJECT as subject } from '../../lib/seed/email-defaults/site-visit-materials';
+const priorImpersonation = process.env.DYNAMICS_IMPERSONATION_ENABLED;
+beforeAll(() => { process.env.DYNAMICS_IMPERSONATION_ENABLED = 'true'; });
+afterAll(() => { if (priorImpersonation === undefined) delete process.env.DYNAMICS_IMPERSONATION_ENABLED; else process.env.DYNAMICS_IMPERSONATION_ENABLED = priorImpersonation; });
 const REQUEST = '11111111-1111-4111-8111-111111111111';
 const PI = '22222222-2222-4222-8222-222222222222';
 const LIAISON = '33333333-3333-4333-8333-333333333333';
@@ -118,4 +121,10 @@ test('a changed signature after activity creation leaves the draft unsent', asyn
 test('the default retired sweep returns without reading or claiming collections',async()=>{
  expect(await sweepMaterialsReminders()).toMatchObject({skipped:'automatic_reminders_retired',scanned:0,sent:0,errors:[]});
  expect(requestAdapter.getById).not.toHaveBeenCalled();expect(emailAdapter.create).not.toHaveBeenCalled();expect(emailAdapter.send).not.toHaveBeenCalled();
+});
+
+test('real default materials transport refuses an otherwise valid coordinator when impersonation is off',async()=>{
+ const prior=process.env.DYNAMICS_IMPERSONATION_ENABLED;delete process.env.DYNAMICS_IMPERSONATION_ENABLED;
+ try{await expect(collection.sendEmail({regardingId:REQUEST,subject:'Materials',bodyText:'Upload',from:'pc@wmkeck.org',to:['pi@example.invalid'],cc:[],actingUserSystemId:COORDINATOR,profileId:7})).rejects.toMatchObject({code:'site_visit_materials_impersonation_required',dispatched:false});expect(emailAdapter.create).not.toHaveBeenCalled();expect(emailAdapter.send).not.toHaveBeenCalled();}
+ finally{process.env.DYNAMICS_IMPERSONATION_ENABLED=prior;}
 });

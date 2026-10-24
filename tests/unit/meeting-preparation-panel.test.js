@@ -78,3 +78,9 @@ test('an incomplete admission receipt never closes the saved review',async()=>{
  fireEvent.click(await screen.findByRole('button',{name:'Prepare saved materials'}));
  expect(await screen.findByRole('alert')).toHaveTextContent('Preparation could not be confirmed');expect(onStarted).not.toHaveBeenCalled();
 });
+
+
+test('a flag-off API error does not expose preparation controls',async()=>{
+ global.fetch.mockResolvedValue({ok:false,status:503,json:async()=>({error:'Not enabled',code:'preparation_not_available'})});render(<PreparationPanel requestId={id} source={source}/>);
+ await waitFor(()=>expect(global.fetch).toHaveBeenCalled());await act(async()=>{});expect(screen.queryByTestId('material-preparation')).toBeNull();
+});

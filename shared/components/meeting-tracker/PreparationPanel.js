@@ -21,7 +21,7 @@ export default function PreparationPanel({requestId,source,blockedReason=null,on
    const next=JSON.stringify(result.preparation?.steps?.map(s=>[s.id,s.state,s.version]));
    if(signature.current!==null&&signature.current!==next)void onUpdatedRef.current?.();signature.current=next;
   }catch(e){if(!mounted.current||seq!==generation.current||read!==readSequence.current||controller.signal.aborted)return;
-   if(e?.code==='preparation_not_available'||e?.status===404){setAvailable(false);return;}setAvailable(true);setError(e.message);
+   if((e?.payload?.code||e?.code)==='preparation_not_available'||e?.status===404){setAvailable(false);return;}setAvailable(true);setError(e.message);
   }finally{controllers.current.delete(controller);}
  },[endpoint]);
  useEffect(()=>{mounted.current=true;const seq=++generation.current;

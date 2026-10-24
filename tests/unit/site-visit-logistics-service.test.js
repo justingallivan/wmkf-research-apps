@@ -1,5 +1,6 @@
 import {
   getSiteVisitLogistics,
+  getSiteVisitLogisticsSnapshot,
   SITE_VISIT_LOGISTICS_DEPENDENCIES,
   saveSiteVisitLogistics,
 } from '../../lib/services/site-visit/logistics-service';
@@ -665,4 +666,10 @@ describe('Workbench presentation video state (staff reader plan §1)', () => {
     const result = await read([vf.transcriptRow(), vf.recordingRow(), vf.videoRow()]);
     expect(result).not.toHaveProperty('presentationVideoPlayable');
   });
+});
+
+
+test('invitation snapshot uses the saved visit projection without loading artifacts or applicant/writeup context',async()=>{
+ const d=dependencies({findActiveByRequest:jest.fn(async()=>({records:[savedRow()]}))});const result=await getSiteVisitLogisticsSnapshot({requestId:REQUEST_ID},d);expect(result.siteVisit).toMatchObject({activityId:ACTIVITY_ID,etag:'W/"10"'});
+ for(const key of ['findDocumentsByRequest','getRequest','getRequestIdentity','resolveApplicantContacts','getArtifactStatus'])if(d[key]?.mock)expect(d[key]).not.toHaveBeenCalled();
 });
