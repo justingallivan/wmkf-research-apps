@@ -1,4 +1,6 @@
 /** @jest-environment jsdom */
+jest.mock('../../shared/components/meeting-tracker/PresentationApprovalPanel', () => ({ __esModule: true, default: ({ onPolicyChange }) => { require('react').useEffect(() => { onPolicyChange?.(false); }, [onPolicyChange]); return null; } }));
+
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import RecordingAndTranscriptCard from '../../shared/components/meeting-tracker/RecordingAndTranscriptCard';
 import { REQUEST_DOCUMENT_ARTIFACT_TYPE } from '../../shared/config/requestDocument';

@@ -1,4 +1,6 @@
 /** @jest-environment jsdom */
+jest.mock('../../shared/components/meeting-tracker/PresentationApprovalPanel', () => ({ __esModule: true, default: ({ onPolicyChange }) => { require('react').useEffect(() => { onPolicyChange?.(false); }, [onPolicyChange]); return null; } }));
+
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { put } from '@vercel/blob/client';
 import RecordingAndTranscriptCard from '../../shared/components/meeting-tracker/RecordingAndTranscriptCard';
@@ -174,8 +176,8 @@ test('an existing Board page can be opened and its included and excluded materia
   });
   render(<RecordingAndTranscriptCard requestId={REQUEST_ID} />);
   expect(await screen.findByRole('link', { name: 'Open Board page' })).toHaveAttribute('href', 'https://example.test/external/presentation/token');
-  expect(screen.getByText(/The Board page shows the applicant materials and the presentation items below once they are ready/)).toBeInTheDocument();
-  expect(screen.getByText(/never the full recording or the staff discussion/)).toBeInTheDocument();
+  expect(screen.getByText(/The Board page shows applicant materials and eligible presentation items/)).toBeInTheDocument();
+  expect(screen.getByText(/the full recording and staff discussion are never included/)).toBeInTheDocument();
   // The raw link is never printed; it is reached through Open and Copy.
   expect(screen.queryByText('https://example.test/external/presentation/token')).toBeNull();
   expect(global.fetch.mock.calls.some(([, options]) => options?.method === 'POST')).toBe(false);

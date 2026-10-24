@@ -104,7 +104,7 @@ Application services create Dynamics email activities and attachments, then invo
 | Research sources | HTTPS APIs/search: OpenAlex, PubMed, ORCID, NSF, NIH RePORTER, USAspending, preprint sources and configured web/news search | Search terms, publication/researcher information, funding records and integrity evidence. |
 | Scheduled/inbound integrations | Vercel cron HTTP calls with bearer-secret checks; provider-specific callback/webhook authentication | Worker triggers, completion events and operational signals. |
 
-The repository contains **[307 API route files](CANONICAL_COUNTS.md#api-route-file-count)**. This counts files under `pages/api`, not HTTP methods, public services, or independently deployed applications. Routes include staff APIs, token-based external surfaces, cron jobs, callbacks/webhooks, authentication, administrative and retained legacy endpoints. Their individual access contracts are catalogued in the API Route Security Matrix.
+The repository contains **[308 API route files](CANONICAL_COUNTS.md#api-route-file-count)**. This counts files under `pages/api`, not HTTP methods, public services, or independently deployed applications. Routes include staff APIs, token-based external surfaces, cron jobs, callbacks/webhooks, authentication, administrative and retained legacy endpoints. Their individual access contracts are catalogued in the API Route Security Matrix.
 
 ## 6. Security controls and qualifications
 

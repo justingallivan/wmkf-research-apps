@@ -4,6 +4,8 @@
  *
  * @jest-environment node
  */
+jest.mock('../../lib/services/post-presentation-materials/edition-store.js', () => ({ readPresentationVisibility: jest.fn(async () => null) }));
+
 import {
   buildBriefingContext,
   resolveBriefingMediaMember,

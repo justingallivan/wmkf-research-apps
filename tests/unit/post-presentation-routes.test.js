@@ -1,4 +1,6 @@
 /** @jest-environment node */
+jest.mock('../../lib/services/post-presentation-materials/edition-store.js', () => ({ readPresentationVisibility: jest.fn(async () => null) }));
+
 jest.mock('../../lib/utils/auth', () => ({
   requireAppAccess: jest.fn(),
 }));

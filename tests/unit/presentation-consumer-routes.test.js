@@ -1,4 +1,6 @@
 /** @jest-environment node */
+jest.mock('../../lib/services/post-presentation-materials/edition-store.js', () => ({ readPresentationVisibility: jest.fn(async () => null) }));
+
 jest.mock('../../lib/utils/auth', () => ({ requireAppAccess: jest.fn() }));
 jest.mock('../../shared/config/meetingTracker', () => ({ isMeetingTrackerSchemaReady: jest.fn() }));
 jest.mock('../../lib/dataverse/core/context', () => ({ withDalContext: jest.fn(async (_name, fn) => fn()) }));

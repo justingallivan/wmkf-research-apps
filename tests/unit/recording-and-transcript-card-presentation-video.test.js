@@ -1,4 +1,6 @@
 /** @jest-environment jsdom */
+jest.mock('../../shared/components/meeting-tracker/PresentationApprovalPanel', () => ({ __esModule: true, default: ({ onPolicyChange }) => { require('react').useEffect(() => { onPolicyChange?.(mockApprovalPolicy.enrolled, mockApprovalPolicy); }, [onPolicyChange]); return null; } }));
+
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import RecordingAndTranscriptCard from '../../shared/components/meeting-tracker/RecordingAndTranscriptCard';
 import { REQUEST_DOCUMENT_ARTIFACT_TYPE } from '../../shared/config/requestDocument';
@@ -24,8 +26,10 @@ const collection = () => ({
 const transcriptRow = () => ({ artifactId: ARTIFACT_ID, artifactType: REQUEST_DOCUMENT_ARTIFACT_TYPE.TRANSCRIPT, artifactTypeLabel: 'Transcript',
   backing: 'file', filename: 'transcript.txt', createdAt: '2026-10-04T22:24:00.000Z', slotVersion: 3, webUrl: 'https://example.sharepoint.com/transcript.txt' });
 
+let mockApprovalPolicy = { enrolled: false };
 let state;
 function route(handlers = {}) {
+  mockApprovalPolicy = handlers.approvalPolicy || { enrolled: false };
   state = { splits: { available: true, splits: [] }, posts: [], ...handlers.state };
   global.fetch = jest.fn(async (url, options = {}) => {
     const path = String(url);
@@ -648,3 +652,9 @@ describe('the page header status report matches the Board materials list (redesi
   });
 });
 const readinessVideo = () => screen.findByTestId('board-readiness-video');
+
+// The page header reflects retained Board approval, independently of current preparation.
+test.each([[{enrolled:true,activeEditionId:SPLIT_ID},'on'],[{enrolled:true,activeEditionId:null},'not_yet'],[{enrolled:null},'unknown']])('reports actual Board policy %j to the page header',async(policy,key)=>{
+  route({approvalPolicy:policy});const onStatusChange=jest.fn();await renderLine({onStatusChange});
+  await waitFor(()=>expect(onStatusChange).toHaveBeenLastCalledWith(expect.objectContaining({board:[key]})));
+});

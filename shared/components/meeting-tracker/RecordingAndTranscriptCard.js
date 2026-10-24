@@ -1,3 +1,4 @@
+import PresentationApprovalPanel from './PresentationApprovalPanel';
 import FragmentReviewWarnings from './FragmentReviewWarnings';
 import { resolveDiscussionAttribution } from '../../../lib/services/meeting-tracker-transcription/presentation-boundary';
 /** Site Visit "Recording and transcript" card: recording, transcript upload/generation, speaker names, board link. */
@@ -3419,6 +3420,10 @@ function PresentationVideoLine({ v }) {
 }
 
 function TranscriptWorkflow({ m, t, z, requestId, transcriptInputRef, refreshToken = 0, shell, setupHeader, onStatusChange }) {
+  const [editionPolicy, setEditionPolicy] = useState(null);
+  const handleEditionPolicy = useCallback((enrolled, policy) => {
+    setEditionPolicy({ enrolled, activeEditionId: policy?.activeEditionId || null });
+  }, []);
   const [step1Open, setStep1Open] = useState(false);
   const [uploadInstead, setUploadInstead] = useState(false);
   const [summarizeRequest, setSummarizeRequest] = useState(null); // { kinds, anchor } while a Summarize confirmation is open
@@ -3491,10 +3496,12 @@ function TranscriptWorkflow({ m, t, z, requestId, transcriptInputRef, refreshTok
   // A first read that failed has not shown whether the video feature is on, so it counts as unknown (Codex round 2).
   const videoPending = boardReadiness.videoPending || (showProducts && !video.loaded && !video.loadFailed);
   const videoNeverRead = showProducts && !video.loaded && video.loadFailed;
-  const boardSignature = [boardReadiness.transcript.key, boardReadiness.summary.key,
+  const legacyBoardSignature = [boardReadiness.transcript.key, boardReadiness.summary.key,
     ...(boardReadiness.video ? [boardReadiness.video.key] : []), ...(videoPending ? ['pending'] : []),
     ...(videoNeverRead ? ['unknown'] : [])].join(',');
-  const hasTranscript = Boolean(material);
+  const boardSignature = !editionPolicy ? 'pending' : editionPolicy.enrolled === null ? 'unknown'
+    : editionPolicy.enrolled ? (editionPolicy.activeEditionId ? 'on' : 'not_yet') : legacyBoardSignature;
+  const hasTranscript = Boolean(material || editionPolicy?.activeEditionId);
   // A failed refresh keeps the cached materials on screen, so the chip says unknown until a read succeeds again.
   const readFailed = Boolean(m.readFailed);
   useEffect(() => {
@@ -3636,7 +3643,8 @@ function TranscriptWorkflow({ m, t, z, requestId, transcriptInputRef, refreshTok
 
     <section className={shell} data-testid="card-board-materials" aria-labelledby="board-card-title">
       <BoardPageHeading m={m} />
-      <BoardReadiness readiness={boardReadiness} />
+      <PresentationApprovalPanel key={requestId} requestId={requestId} refreshToken={refreshToken} onPolicyChange={handleEditionPolicy} />
+      {editionPolicy?.enrolled === false && <BoardReadiness readiness={boardReadiness} />}
     </section>
     </>
   );
@@ -3787,7 +3795,7 @@ function BoardPageHeading({ m }) {
           ]} />}
         </div>
       </div>
-      <p className="mt-1 text-xs text-gray-600">The Board page shows the applicant materials and the presentation items below once they are ready, never the full recording or the staff discussion. Making or copying the link sends no email.</p>
+      <p className="mt-1 text-xs text-gray-600">The Board page shows applicant materials and eligible presentation items. Reviewed presentation approval controls which version is available; the full recording and staff discussion are never included. Making or copying the link sends no email.</p>
       {link && !link.url && <p className="mt-2 text-sm text-amber-800">The current link cannot be read. Issue a new link to replace it.</p>}
       {manualCopy && link?.url && <input aria-label="Presentation link for manual copy" readOnly value={link.url} onFocus={(event) => event.currentTarget.select()} className="mt-2 w-full rounded border border-gray-300 p-2 font-mono text-xs" />}
       {confirmReissue && (

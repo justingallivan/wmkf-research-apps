@@ -2,8 +2,8 @@
 title: Meeting Coordination Implementation Plan
 domain: product
 kind: plan
-status: proposed
-summary: Staged implementation of the Workbench-first meeting design, durable preparation and Program Coordinator approval of versioned Board materials; source-reviewed, not implemented.
+status: in-progress
+summary: Staged implementation of the Workbench-first meeting design, durable preparation and Program Coordinator approval of versioned Board materials; first approval increment branch-built; remaining workflow slices planned, not deployed.
 canonical: false
 owner: product-engineering
 related:
@@ -23,6 +23,14 @@ related:
 
 Scope includes cycle/session navigation, meeting setup and agenda controls, invitation continuity, materials collection, recording import/review, durable output preparation, summary editing, Board approval/withdrawal and Workbench consumption. Existing meeting/calendar automation is not expanded into a new calendar invitation service. Do not rename internal app keys, existing routes, entities or artifact enums merely to adopt approved display terminology.
 
+## Implementation checkpoint — 2026-10-23
+
+[VERIFIED via owner instruction] Implementation and a Claude Opus product review are now authorized. The earlier planning evidence below is a dated pre-implementation baseline, not a claim that this branch still contains only documentation.
+
+[VERIFIED via source, focused tests and isolated PostgreSQL] The first increment implements explicit coordinator enrollment, three-member presentation approval, retained approved identities through corrections, version-fenced withdrawal, both external consumers and a focused approval panel. Migration 086 is registered after the owner-authorized filenames-only tracker query and inspection of 355 local/remote refs; it is **not applied to Production**. See [approval state and release prerequisites](../atlas/postgres-meeting-presentation-editions.md).
+
+[PLANNED] This is a partial implementation of Slice 1. Durable preparation, acknowledgement removal, manual source pairing/cutting, coordinator-only collection dispatch, before-meeting and Workbench redesign remain unimplemented. Existing preparation controls still feed the approval candidate. The combined workflow remains unreleased; slices 1–3 retain the integrated release requirement below. Opus product-review findings and final verification belong in the implementation receipt, separately from the historical plan review.
+
 ## Settled product requirements
 
 [VERIFIED via the owner's decisions in this chat and the linked design record]
@@ -40,7 +48,7 @@ Scope includes cycle/session navigation, meeting setup and agenda controls, invi
 11. Support matching manually uploaded transcript/audio and MP4 as a rare recovery path to Board approval; Zoom API import remains preferred. Validate source pairing and timing before cutting/approval.
 12. Allow the Program Coordinator to explicitly abandon an unrecoverable unknown summary attempt and start another after a possible-duplicate-charge warning. Never retry unknown submissions automatically.
 
-## Current implementation evidence and gaps
+## Pre-implementation source baseline and gaps
 
 [VERIFIED via source inspection on branch codex/session-start-20261023, base b8c957076; source facts only]
 
@@ -222,7 +230,7 @@ Owner decisions resolved on 2026-10-23:
 
 - The Program Coordinator personally sends materials requests/reminders; other authorized preparers may prepare/review drafts, with server-enforced coordinator-only dispatch.
 
-No identified product decision remains open. Bounded Slice 0 source/schema/permission verification still precedes runtime implementation.
+No identified product decision remains open. The implementation checkpoint above records subsequent branch work; technical verification still precedes release.
 
 No additional choices are needed about contact-system ownership, reactivating automatic reminders, new confirmation emails or a new calendar provider; those are not added to scope. Concrete metadata retention and target permissions remain bounded implementation specification/probe tasks.
 
