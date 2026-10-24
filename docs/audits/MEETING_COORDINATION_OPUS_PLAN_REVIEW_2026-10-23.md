@@ -2,8 +2,8 @@
 title: Claude Opus Meeting Coordination Plan Review
 domain: product
 kind: audit
-status: review-received
-summary: Read-only OAuth Claude Opus review of the Meeting coordination plan at a9076fb9c; nine findings, ready with named changes, not yet adjudicated or applied.
+status: adjudicated
+summary: Read-only OAuth Claude Opus review of the Meeting coordination plan at a9076fb9c; nine findings verified and narrowed where overstated, with accepted changes applied to the plan and four owner choices pending.
 canonical: false
 owner: product-engineering
 related:
@@ -19,9 +19,36 @@ related:
 - Plan SHA-256: `b8e0dbdc4d4e96513ed8cd0d4925d901e167bf1ee0907c660846c4c328823fe7`.
 - CLI result: success, exit 0; no permission denials; 72 turns, about 11 minutes 39 seconds.
 - Model usage metadata identifies `claude-opus-5-5` and also `claude-fable-5-1`. Opus was the requested reviewer; the CLI reports additional Fable usage. No claim that every internal CLI operation used Opus exclusively. List-price cost estimates in CLI metadata are not proof of an API charge; this run used the verified OAuth session.
-- Scope: plan review only. Findings below are the reviewer's conclusions, not independently adjudicated acceptance or implementation evidence. No plan corrections have been applied from this report. Repository policy/product intent takes precedence over a proposed reviewer remedy.
+- Scope: plan review only. At receipt, findings below were the reviewer's conclusions rather than independently adjudicated acceptance. The subsequent adjudication and plan corrections are recorded separately below; neither is implementation evidence. Repository policy/product intent takes precedence over a proposed reviewer remedy.
 
-# Claude review output
+# Source verification and plan corrections — 2026-10-23
+
+[VERIFIED via primary-agent source reads, an independent bounded read-only check, and focused existing tests] Scope: verify F1–F9 against caller → persistence → consumer and update the proposed plan. No runtime edits, live probes, schema changes, actual emails or paid processing occurred. The original review below is an immutable historical receipt of the reviewed commit; its absolute wording does not override this adjudication.
+
+| ID | Verdict and source evidence | Required correction applied to plan |
+|---|---|---|
+| F1 | CONFIRMED gap, NARROWED wording. `execute-prompt.js:223` may log a preflight block; :268-364 logs dispatched attempts afterward and returns/throws post-call run IDs. No guaranteed pre-dispatch recoverable summary result receipt. `transcript-summary-service.js:380-384` loses paid-call classification. | Distinguish undispatched, known response and unknown attempt; preserve durable submission intent. Propose fenced abandon/new-attempt recovery with possible duplicate charge warning, subject to owner policy. “No receipts at all” and inevitable permanent blockage are not accepted literally. |
+| F2 | CONFIRMED. `summary-draft-store.js:36-64,166-175,288-295` covers replacement, expiry-filtered reads and indiscriminate expiry; maintenance invokes it. | Uncertainty/ownership tombstone survives text expiry and is consulted by reservation/legacy endpoints. Include >360-second and >14-day races with maintenance/late responses. |
+| F3 | CONFIRMED; broad risk was already in plan, concrete mechanism incomplete. `presentation-video-approval-service.js:272-281` supersedes earlier splits; split-store :463-467 requires approved state for lookup; `briefing-page-service.js:812-815` uses ETag unlike presentation reader's size/quickXorHash check. | Approved member identities independent of mutable split/current winner; shared type-aware resolver and E2 partial-registration/E1-availability test. Preserve differing existing transcript listing behavior across the two pages. |
+| F4 | CONFIRMED enrollment omission, REJECTED existing flag-off exposure assertion. `post-presentation-materials-readiness.js:20-40`, `verify-presentation-token.js:15-20` fail closed. `presentation-page-service.js:145-158,386-387` serves currently bound derivatives. | Sticky visibility-row enrollment; server guards new/legacy producer paths; outage distinct from no enrollment; no pre-edition code rollback. Existing flag-off is not a current leak. |
+| F5 | CONFIRMED. `summary-draft-store.js:28-64` protects ready draft unless exact replacement requested; summary service :357-360 maps conflict. | Blocked-existing-draft step, keep/review or exact-version explicit replacement, approval source consistency. |
+| F6 | CONFIRMED separate compatibility decision. `transcriptSummary.js:7-20`, summary service :339-354 and migration 070:34-36 require summary acknowledgement. Controlling design's import-removal section explicitly preserves unrelated acknowledgements. Import timestamp in migration 060:10 already nullable. | Ask narrowly about separate summary consent; keep import removal settled, preserve historical records and truthful initiating actor. Do not invent run-source enum: Executor :56-63 currently has no background value. |
+| F7 | CONFIRMED existing source restriction, remedy NOT OWNER-APPROVED. video-split service :100-147 refuses uploads/unverified or unmatched copied sources. | Manual Board path is an explicit owner scope choice; do not silently select Zoom-only from review advice. Existing staff-only manual work remains possible. |
+| F8 | CONFIRMED sender/source mismatch, NARROWED scope. materials route :57-64 uses session actor/email; collection service :150,637-647,865-872 uses request coordinator and operator signature/template; contributor service :79-93 uses request coordinator. Dynamics email :191-201 and :238-240 separate sender from actor. Cron route :10-13 explicitly records retirement. `confirmMaterialsReady`:899-910 is an in-app state write, not email. | Shared configured sender/name/signature/template with authenticated operator audit, preview binding and proven send-as if delegation selected. Keep automatic reminders retired; no new confirmation email. Owner selects who can perform Send. |
+| F9 | PARTLY CONFIRMED; consultant source absence REFUTED. recipient-directory-service :27-33,104-146 supports Board/Consultant; attendee-service :198-205,218-219,310-311 filters/rejects them. Curated-recipient-service independently supplies configured Contact options for existing Workbench composer. Session agenda service/route exists; visit logistics has no invitation mail command. | Reuse each established identity source; extend tracker refs/validation/pickers; add request/visit invitation preview-send-reconcile contract and distinguish absent vs explicitly empty selection. No third directory or calendar service. |
+
+[VERIFIED via focused Jest run] Eight suites / 254 tests passed: execute-prompt-provider, summary-draft-store-reserve, transcript-summary-service, presentation-page-service, presentation-video-approval-service, site-visit-recipient-directory, curated-site-visit-recipient-service, meeting-tracker-attendees. Scripted SQL/mocked providers verify existing behavior only; they do not prove real concurrency, proposed new code, live schema or send-as rights.
+
+Contract audits: whole-flow and symbol fan-out covered named routes/stores/readers; partial success covers candidate registration/old edition; async covers unknown provider work and late completion; helper semantics preserve staff/external and directory differences; durable surfaces remain proposed; doc reconciliation updates the plan and this receipt while leaving historical review text labeled. No new runtime/schema status is asserted.
+
+Disconfirming checks: existing Consultant query disproves source absence; token/readiness guards disprove existing flag-off exposure; Executor post-call/preflight audit disproves absolute receipt absence; imported-source guards confirm the cut limitation. Current live metadata/permissions and proposed race protections remain NOT TESTED. All four pending product choices are listed in the updated plan; coordinator authority and required video remain settled.
+
+Planning verification: documentation currency, symbol references, build-claim freshness (each followed sequentially by its self-test), docs catalogue and diff whitespace checks passed for this correction. No whole-repository implementation-truth audit is claimed.
+
+Verdict: source verification complete for the nine named findings; accepted technical corrections are in the plan. Four product choices and the named Slice 0 technical prerequisites remain; implementation readiness is conditional on those inputs.
+
+# Historical Claude review output — reviewed a9076fb9c
+
 
 ## Meeting coordination plan review: verdict READY WITH NAMED CHANGES
 
