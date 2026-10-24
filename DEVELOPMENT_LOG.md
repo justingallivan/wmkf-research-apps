@@ -10,6 +10,20 @@ The chronological archive after the `Legacy chronological session log` divider c
 
 ---
 
+## October 2026 — Research co-PIs backfilled into Dataverse with Institution at Award (Session 635)
+
+**Milestone:** Stage B of the Research Institution at Award backfill applied to production: co-PIs on awarded Research requests since 2017 are now Personnel (`wmkf_apprequestperson`) rows with their award-era institution.
+**Sessions:** Stage B resolve and staff review (Sessions 622–628), read-back, apply build, reviews and apply in Session 635.
+**Ship state:**
+- Owner-run apply, plan `378673af`: 109 contacts and 139 Co-PI rows created on 76 requests, Institution at Award set on 50 existing rows, 39 empty contact accounts filled; owner-run verify 337/337 hold, 0 unresolved.
+- `scripts/apply-research-copi-stage-b.mjs` (+ `scripts/lib/research-copi-apply.mjs`, 30 tests) after four Codex adversarial-review passes: plan-minted GUIDs, retryable `blocked`, `recovered` / `recovered_modified`, snapshot drift checks, plan archived by hash.
+- New-contact emails from staff, a free and a capped paid (Haiku + SerpAPI, $1.71) ContactEnrichment lookup, and owner overrides; follow-ups fixed 1001012 (liaison removed as co-PI) and merged the duplicate Aaron Diaz contact.
+- Grant Reporting header now lists junction co-PIs (`529e8081a`); `DATAVERSE_ALLOW_PROD_READS` removed from every local `.env.local`.
+**Why it matters:** who Keck funded, with whom and from where is now queryable from one junction, and every co-PI reader (invitations, review context, Grant Reporting) sees the backfilled people.
+**Pointers:** `docs/plans/RESEARCH_INSTITUTION_AT_AWARD_BACKFILL_PLAN_2026-10-20.md` §3.2–3.4; `docs/atlas/dataverse-wmkf-apprequestperson.md`; `10535fcb3`, `6514e748b`, `529e8081a`.
+
+---
+
 ## October 2026 — Reviewer safeguards and guidance cleanup released (Session 634)
 
 **Milestone:** Released owner-decided reviewer identity and invitation-authority safeguards with reconciled operating guidance.
