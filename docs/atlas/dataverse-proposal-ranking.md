@@ -39,9 +39,9 @@ order isolation, two-facilitator races, captured membership through restart, and
 source pool. Independent profile/grant/SSO authorization and WebKit/iPad acceptance
 remain open. Prior D97/D98 rehearsal receipts remain unchanged.
 
-## Proposal amount source — branch `proposal-ranking-invited-amount`, 2026-10-23
+## Proposal amount source — on main since `4a37f2f9b`, 2026-10-23
 
-[VERIFIED via branch source] Ranking amounts now come from `wmkf_invitedamount`,
+[VERIFIED via source] Ranking amounts now come from `wmkf_invitedamount`,
 falling back to `akoya_request` when the invited amount is blank; both use the
 request's `transactioncurrencyid` and the existing currency/precision blocks.
 `proposal-ranking-source.js` emits `amountSource` (`invited` | `requested` | null);
@@ -51,6 +51,14 @@ requested fallback. Snapshots frozen earlier have no `amountSource` and keep
 showing their requested amounts as Requested; they are not backfilled. The
 workbook columns are now Amount / Cumulative amount. This supersedes the
 October 13 `akoya_request` statement below for new previews and rounds only.
+
+[VERIFIED 2026-10-23 via owner-run `scripts/correct-ranking-invited-amounts.mjs --verify`]
+The open D26 round `49279ac7-3ab9-41d8-b2d6-5aaf4085e642` was corrected in place:
+its frozen snapshot now has invited amounts with `amountSource: 'invited'` on all 23
+proposals (#1002821 and #1003000 changed from requested to $1,300,000), and its
+administration log has one `invited-amount-correction` event. PD assessments,
+readiness and workflow were not touched. See
+`../plans/PROPOSAL_RANKING_D26_INVITED_AMOUNT_CORRECTION_2026-10-23.md`.
 
 ## Historical version-1 source and deployment boundary — October 13 main
 

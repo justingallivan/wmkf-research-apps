@@ -1,6 +1,6 @@
 # Proposal Ranking D26 — invited-amount correction to the open round
 
-Date: 2026-10-23. Status: **Plan approved 2026-10-23 (merge branch first; append a round log event). Script `scripts/correct-ranking-invited-amounts.mjs` written; nothing written to production.** Owner: Justin Gallivan.
+Date: 2026-10-23. Status: **Applied and verified in production 2026-10-23** (plan hash `7cccbe76`; owner-run). Verify: round holds the correction, #1002821 and #1003000 stored $1,300,000.00 (invited), D26 active round unchanged, no app activity since the plan. Owner decisions: merge the labelling branch first (done, `4a37f2f9b`); append a round log event (done). Plan file and journal are in the owner folder `~/Downloads/Ranking D26 invited amounts/`, outside git. Owner: Justin Gallivan.
 
 ## 1. Goal and decision
 
