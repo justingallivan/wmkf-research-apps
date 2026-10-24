@@ -61,3 +61,18 @@ test('status reports exact approved file health independently of current candida
  d.media.mockRejectedValue(new Error('unavailable'));d.canCoordinate=async()=>{throw new Error('settings unavailable');};
  expect(await getPresentationApproval(actor,d)).toMatchObject({activeEditionId:id,activeEditionAvailable:null,canApprove:false});
 });
+
+
+test('new enrollment is limited to the configured preparation cohort', async () => {
+ const d=fixture();d.enroll=jest.fn().mockResolvedValue({version:1});
+ const prior=process.env.MEETING_MATERIAL_PREPARATION_ACCESS;
+ try {
+  for(const value of ['off', 'test:00000000-0000-4000-8000-000000000000']) {
+   process.env.MEETING_MATERIAL_PREPARATION_ACCESS=value;
+   await expect(mutatePresentationApproval({...actor,body:{action:'enroll',expectedVersion:0}},d)).rejects.toMatchObject({code:'presentation_enrollment_not_available',httpStatus:503});
+  }
+  expect(d.enroll).not.toHaveBeenCalled();
+  process.env.MEETING_MATERIAL_PREPARATION_ACCESS=`test:${REQUEST_ID}`;
+  await expect(mutatePresentationApproval({...actor,body:{action:'enroll',expectedVersion:0}},d)).resolves.toMatchObject({enrolled:true});
+ } finally {if(prior===undefined)delete process.env.MEETING_MATERIAL_PREPARATION_ACCESS;else process.env.MEETING_MATERIAL_PREPARATION_ACCESS=prior;}
+});
