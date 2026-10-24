@@ -24,7 +24,7 @@ function ManualVideoPairPanelForContext({path,expectedReviewId,onQueued}){
   const capability=result.upload;
   if(!result.pairing?.id||!capability?.pathname||!capability.token)throw new Error('The upload receipt was incomplete.');
   if(alive.current)setPair(result.pairing);
-  await put(capability.pathname,file,{access:'private',token:capability.token,contentType:capability.contentType,multipart:true,addRandomSuffix:false,allowOverwrite:false});
+  await put(capability.pathname,file,{access:'private',token:capability.token,contentType:capability.contentType,multipart:true});
   // A navigation never authorizes starting a cut on a different mounted request.
   if(!alive.current)return;
   await queue(result.pairing.id);
