@@ -1,6 +1,12 @@
-# Session 638 Prompt: Complete the approved Meeting Tracker UI
+# Session 638 Prompt: Await owner-selected work after Meeting Tracker UI completion
 
-## Session 637 Summary — Meeting Tracker released and ordinary requests enabled
+## Session 638 Update — approved Meeting Tracker UI now shipped
+
+[VERIFIED via source, Opus OAuth reviews, real Next-page screenshots, green candidate checks and production browser] The earlier functional release omitted the approved compact landing and desktop task rail. PR #519 completes them, including the separate global Sessions agenda preview, search/status controls, grouped responsive workspace and accessible materials counts. Source `3170781e0` is deployed Ready and the production landing, Sessions preview and dedicated request 1003371 workspace were checked read-only. No real emails, preparation jobs or existing business records were changed.
+
+Actual UI was compared with saved mockups at 1440px/390px across 16 screens, with zero automated main-content WCAG A/AA violations or horizontal overflow. Opus verified its findings were fixed. Broader tests caught an empty Sessions startup crash that both visual reviews missed; the guard, regressions, direct reload and targeted Opus follow-up now pass. Final candidate checks included 25,062 passing unit tests, 130 PostgreSQL tests and CodeQL. Evidence and screenshots: `docs/audits/MEETING_UI_COMPLETION_2026-10-24.md`. No new migration or environment change was needed.
+
+## Historical Session 637 Summary — functional release and ordinary activation
 
 ### What Was Completed
 
@@ -28,7 +34,7 @@ No real email was sent, no ordinary-request processing was started and no existi
 
 ### Verified Open
 
-- Owner-selected work: finish the approved Meeting Tracker landing-page/workspace design, obtain Claude Opus OAuth review and compare the real rendered UI to saved mockups. The earlier functional release omitted the compact landing and desktop task rail. The candidate is in the owned isolated worktree on `codex/meeting-ui-completion`; current evidence/release status is in `docs/audits/MEETING_UI_COMPLETION_2026-10-24.md`. Ordinary workflow access is already enabled. Do not replay migrations, activation or paid media rehearsals for this UI-only task.
+- The selected Meeting Tracker UI task is complete and served in Production. Await the next owner-selected task. Do not replay migrations, activation, paid media rehearsals or completed visual-review loops as startup work. The retained isolated worktree is `codex/meeting-ui-completion`; PR #519 and the UI completion receipt own this release evidence.
 - If checking the bookkeeping follow-up's pending CodeQL, inspect `f66eee9e0` check-runs; do not infer it failed or reopen the already-passed release gate. This is a status lookup, not a new audit or release blocker.
 
 ### Verify Before Acting

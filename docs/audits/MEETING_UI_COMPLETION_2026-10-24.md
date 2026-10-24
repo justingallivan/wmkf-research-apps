@@ -1,6 +1,6 @@
 # Meeting Tracker UI completion — 2026-10-24
 
-Status: UI implementation, actual-page visual verification and final Opus review passed; candidate release checks/promotion pending. This receipt does not claim deployment.
+Status: deployed and verified in Production after all candidate release checks passed.
 
 The earlier functional release did not complete the approved landing-page layout. The saved October 20 mockups in `docs/plans/review/meeting-tracker-2026-10-20/` remain the design authority. This work completes their cycle/session navigation and focused task workspace using existing application data and controls.
 
@@ -73,4 +73,19 @@ Mode B implementation audit: UI → existing guarded GET routes → existing ser
 
 Sweep Mode A: changed fact is the earlier release's incomplete landing/workspace composition and this candidate's actual implementation status. Authoritative evidence is source, built-page screenshots/tests and the existing release receipts. Live restatements in `SESSION_PROMPT.md`, the implementation plan, design record and focused surface briefs were corrected structurally. Pre-implementation source/permission/schema claims are now explicitly historical records, not current next steps. Release/activation receipts remain dated functional-release evidence; the historical approval-only reviews are not rewritten. Memory/wiki hits are routing pointers, not a competing UI-completion claim. No current production UI-deployment claim is inferred from local evidence.
 
-Disconfirming check: read the actual built landing instead of relying on a green test count; confirmed compact rows and view navigation are present. The previous production screenshot did not contain those controls, explaining the owner's report. Remaining live stale claims within this bounded scope: zero. Remaining unknown: candidate deployment/production UI readback, until separately recorded below.
+Disconfirming check: read the actual built landing instead of relying on a green test count; confirmed compact rows and view navigation are present. The previous production screenshot did not contain those controls, explaining the owner's report. Remaining live stale claims within this bounded scope: zero. Candidate deployment and production UI readback are now verified below. No remaining unknown is asserted for this bounded UI completion; the explicit proof limits above remain.
+
+
+## Production release and readback — 2026-10-24
+
+[VERIFIED via GitHub candidate checks] Final reviewed head `c16142a68ab59b61433b7bdcb4e9dc3bcfab04aa` passed every applicable check before promotion: full Jest run **1,456 passing suites / 25,062 passing tests** (22 suites / 276 tests explicitly skipped), **130 PostgreSQL integration tests**, JavaScript/Python/Actions CodeQL, automatic OAuth Claude review, Semgrep, Trivy, Gitleaks and canonical Vercel build. Run `40115811662` is the passing full test run; the superseded first head's old-filter assertions are not the release gate.
+
+[VERIFIED via merged PR and production deployment status] [PR #519](https://github.com/justingallivan/wmkf-research-apps/pull/519) merged as `3170781e0cae28e0f523d5b7eb4b74b352eb77d1`. The normal Git-to-Production build completed successfully: GitHub deployment `7302050510`, environment **Production**, [immutable deployment](https://wmkfresearchapps-p2fwj84b0-justin-gallivans-projects.vercel.app). The production-domain readback below was performed after Ready, rather than inferring delivery from the merge alone.
+
+[VERIFIED via actual authenticated Chrome on `applications.wmkeck.org`] The production landing displays Cycle schedule / Proposal discussion sessions links, request search, a single materials select with disabled zero-count choices, compact request rows and both meeting actions. The separate Sessions page renders its search and authorized agenda preview. Dedicated synthetic request **1003371** displays **Meeting coordination**, the grouped desktop task rail, read-first setup and all four task selectors. Transcript preparation selected successfully and switching back restored setup. A production screenshot visibly confirmed the rail and focused content. No new email, upload, preparation run, approval, schema/configuration change or business-record edit was invoked.
+
+Release tier: contained Tier 1 UI change using existing APIs. Main was deliberately promoted only after the final candidate's green checks. The shared main checkout was fast-forwarded after checking that its only unrelated changes were the pre-existing untracked critique and output directory; they remain untouched. The isolated feature worktree is retained.
+
+Rollback: revert UI merge `3170781e0` or restore the prior `237f10fdf` production source/deployment. That floor already contains the edition-aware workflow and ordinary activation; do not roll back further to a pre-edition reader or alter admission controls/migrations for a layout rollback. This UI release adds no data migration to undo.
+
+**Verdict: the approved landing-page and focused workspace composition is implemented, Opus-reviewed, compared against the saved mockups in the actual built UI, and verified served in Production.**

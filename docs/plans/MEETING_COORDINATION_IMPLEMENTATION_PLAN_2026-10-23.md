@@ -2,8 +2,8 @@
 title: Meeting Coordination Implementation Plan
 domain: product
 kind: plan
-status: in-progress
-summary: Staged implementation of the Workbench-first meeting design, durable preparation and Program Coordinator approval of versioned Board materials; workflow deployed with migrations 086–089 after bounded rehearsal; ordinary admission enabled after all green release checks; omitted landing/workspace composition is being completed and verified separately.
+status: complete
+summary: Staged implementation of the Workbench-first meeting design, durable preparation and Program Coordinator approval of versioned Board materials; workflow deployed with migrations 086–089 after bounded rehearsal; ordinary admission enabled after all green release checks; omitted landing/workspace composition is now separately reviewed, visually verified and deployed through PR #519.
 canonical: false
 owner: product-engineering
 related:
@@ -17,7 +17,7 @@ related:
 
 ## Purpose and boundary
 
-[VERIFIED via released source and linked release receipts] The functional workflow is deployed. The remaining UI composition is implemented on `codex/meeting-ui-completion`, with final visual review and release tracked separately. The intended complete experience remains: Program Coordinators prepare meetings and materials in Meeting coordination; PDs work from the request Workbench, with draft writeup/review first, supporting outputs second and meeting logistics behind a compact link. Reuse existing scheduling, collection, upload, transcription, document and email services.
+[VERIFIED via released source and linked release receipts] The functional workflow is deployed. The omitted UI composition is now implemented, reviewed and deployed through PR #519; the UI receipt records actual-page and production verification. The intended complete experience remains: Program Coordinators prepare meetings and materials in Meeting coordination; PDs work from the request Workbench, with draft writeup/review first, supporting outputs second and meeting logistics behind a compact link. Reuse existing scheduling, collection, upload, transcription, document and email services.
 
 [VERIFIED via owner instruction, 2026-10-24] Complete the approved landing/workspace UI, obtain Claude Opus review and compare the actual UI against saved mockups. The original plan-only authorization and pre-implementation source claims are retained as historical evidence below. They do not supersede the later implementation/deployment authorizations.
 
@@ -27,9 +27,9 @@ Scope includes cycle/session navigation, meeting setup and agenda controls, invi
 
 [VERIFIED via owner authorization, all green release checks and production flag readback] The three new workflow controls are `on` for eligible ordinary requests. Explicit Coordinator enrollment/approval, current access checks, unknown-attempt fences and email safeguards remain. No historical request is automatically enrolled or approved. See [the activation receipt](../audits/MEETING_ORDINARY_ACTIVATION_2026-10-24.md). The controlled-production checkpoint below is the earlier restricted phase.
 
-## UI completion and remaining release work — 2026-10-24
+## UI completion and production verification — 2026-10-24
 
-[VERIFIED via source and actual built-page browser tests] The earlier release omitted the compact landing and cohesive desktop workspace. The completion branch now contains both, plus a separate Sessions list/agenda preview. Existing endpoints, permissions, invitations, uploads and durable preparation are retained. [UI proof and verified Opus findings](../audits/MEETING_UI_COMPLETION_2026-10-24.md) own final acceptance and deployment status. Do not equate the earlier functional release with completed visual design.
+[VERIFIED via source and actual built-page browser tests] The earlier release omitted the compact landing and cohesive desktop workspace. PR #519 shipped both, plus a separate Sessions list/agenda preview. Existing endpoints, permissions, invitations, uploads and durable preparation are retained. [UI proof and verified Opus findings](../audits/MEETING_UI_COMPLETION_2026-10-24.md) record passed final acceptance and verified production deployment. Do not equate the earlier functional release with completed visual design.
 
 <details>
 <summary>Historical controlled-deployment and implementation checkpoints</summary>
