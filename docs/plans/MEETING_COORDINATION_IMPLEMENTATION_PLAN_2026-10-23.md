@@ -3,7 +3,7 @@ title: Meeting Coordination Implementation Plan
 domain: product
 kind: plan
 status: in-progress
-summary: Staged implementation of the Workbench-first meeting design, durable preparation and Program Coordinator approval of versioned Board materials; workflow deployed with migrations 086–089 after bounded rehearsal; ordinary admission enabled after all green release checks and owner authorization.
+summary: Staged implementation of the Workbench-first meeting design, durable preparation and Program Coordinator approval of versioned Board materials; workflow deployed with migrations 086–089 after bounded rehearsal; ordinary admission enabled after all green release checks; omitted landing/workspace composition is being completed and verified separately.
 canonical: false
 owner: product-engineering
 related:
@@ -17,15 +17,22 @@ related:
 
 ## Purpose and boundary
 
-[PLANNED] Finish the saved Meeting Tracker redesign as one coherent workflow: Program Coordinators prepare meetings and materials in Meeting coordination; PDs work from the request Workbench, with draft writeup/review first, supporting outputs second and meeting logistics behind a compact link. Reuse existing scheduling, collection, upload, transcription, document and email services.
+[VERIFIED via released source and linked release receipts] The functional workflow is deployed. The remaining UI composition is implemented on `codex/meeting-ui-completion`, with final visual review and release tracked separately. The intended complete experience remains: Program Coordinators prepare meetings and materials in Meeting coordination; PDs work from the request Workbench, with draft writeup/review first, supporting outputs second and meeting logistics behind a compact link. Reuse existing scheduling, collection, upload, transcription, document and email services.
 
-[VERIFIED via owner instruction, 2026-10-23] This session authorizes preparing this implementation plan. No runtime code, schema, deployment, live records, mail, paid processing or environment settings are changed by this plan. The owner subsequently authorized verification of the Opus findings and plan correction; the subsequent owner decisions below settle the identified product alternatives. The product decisions below are settled; the proposed technical design requires implementation verification. No live schema or production configuration was probed for this planning pass.
+[VERIFIED via owner instruction, 2026-10-24] Complete the approved landing/workspace UI, obtain Claude Opus review and compare the actual UI against saved mockups. The original plan-only authorization and pre-implementation source claims are retained as historical evidence below. They do not supersede the later implementation/deployment authorizations.
 
 Scope includes cycle/session navigation, meeting setup and agenda controls, invitation continuity, materials collection, recording import/review, durable output preparation, summary editing, Board approval/withdrawal and Workbench consumption. Existing meeting/calendar automation is not expanded into a new calendar invitation service. Do not rename internal app keys, existing routes, entities or artifact enums merely to adopt approved display terminology.
 
 ## Ordinary activation — 2026-10-24
 
 [VERIFIED via owner authorization, all green release checks and production flag readback] The three new workflow controls are `on` for eligible ordinary requests. Explicit Coordinator enrollment/approval, current access checks, unknown-attempt fences and email safeguards remain. No historical request is automatically enrolled or approved. See [the activation receipt](../audits/MEETING_ORDINARY_ACTIVATION_2026-10-24.md). The controlled-production checkpoint below is the earlier restricted phase.
+
+## UI completion and remaining release work — 2026-10-24
+
+[VERIFIED via source and actual built-page browser tests] The earlier release omitted the compact landing and cohesive desktop workspace. The completion branch now contains both, plus a separate Sessions list/agenda preview. Existing endpoints, permissions, invitations, uploads and durable preparation are retained. [UI proof and verified Opus findings](../audits/MEETING_UI_COMPLETION_2026-10-24.md) own final acceptance and deployment status. Do not equate the earlier functional release with completed visual design.
+
+<details>
+<summary>Historical controlled-deployment and implementation checkpoints</summary>
 
 ## Controlled production checkpoint — 2026-10-24
 
@@ -45,6 +52,8 @@ Scope includes cycle/session navigation, meeting setup and agenda controls, invi
 
 [VERIFIED via branch source, isolated PostgreSQL, fresh-install replay and synthetic media tests] Rare manual original-audio/MP4 pairing now feeds the existing split worker, with durable correspondence proof, source-pinned reuse, explicit review replacement and exact-path cleanup (migration 089, not applied to Production). Opus reviewed the product increment; its verified upload and recovery findings are corrected. [VERIFIED via bounded rehearsal receipts] Isolated cloud tests and the owner-authorized dedicated production-fixture workflow passed, including retained approved bytes, replacement and withdrawal through both external readers. Runtime candidate `1f99d7635` is ready for controlled deployment; see [current evidence and limits](../audits/MEETING_HOSTED_REHEARSAL_2026-10-23.md). [PLANNED] Production migrations, deployment and owner promotion remain. The combined workflow remains unreleased; slices 1–3 retain the integrated release requirement below. Opus product-review findings and final verification belong in the implementation receipts, separately from the historical plan review.
 
+</details>
+
 ## Settled product requirements
 
 [VERIFIED via the owner's decisions in this chat and the linked design record]
@@ -61,6 +70,11 @@ Scope includes cycle/session navigation, meeting setup and agenda controls, invi
 10. Remove both the Meeting Tracker import/transcription acknowledgement and the separate summary-provider confirmation (explicit owner decision, 2026-10-23). Preserve historical acknowledgement records and the separate admin pilot contract; record truthful initiation provenance rather than fabricate consent.
 11. Support matching manually uploaded transcript/audio and MP4 as a rare recovery path to Board approval; Zoom API import remains preferred. Validate source pairing and timing before cutting/approval.
 12. Allow the Program Coordinator to explicitly abandon an unrecoverable unknown summary attempt and start another after a possible-duplicate-charge warning. Never retry unknown submissions automatically.
+
+<details>
+<summary>Historical technical plan, source baseline and planning review — October 23</summary>
+
+This is the pre-implementation design and its then-current gap inventory, not a current release checklist. The linked runtime/activation/UI receipts supersede its pending-schema, unbuilt-service and unreleased statements. Product requirements above remain controlling.
 
 ## Pre-implementation source baseline and gaps
 
@@ -255,3 +269,5 @@ No additional choices are needed about contact-system ownership, reactivating au
 Documentation gates and diff validation are recorded in the verification receipt. Changed-fact scope is this plan and the review adjudication; the controlling design's settled product decisions remain intact and link here. Historical handoff snapshots and raw Opus findings stay historical. No task-priority/roadmap change is made.
 
 Plan verdict: **READY WITH NAMED CHANGES recorded; all identified product decisions are settled; bounded Slice 0 technical verification precedes dependent implementation**. Proposed mechanisms remain PLANNED and NOT TESTED; no production-ready claim is made.
+
+</details>

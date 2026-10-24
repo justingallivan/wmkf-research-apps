@@ -2,8 +2,8 @@
 title: Meeting Tracker Landing Structure and Mockups
 domain: product
 kind: plan
-status: proposed
-summary: Workbench-first meeting design with 2026-10-23 decisions on required video, corrections, durable preparation and Program Coordinator review/Board approval; application implementation remains pending.
+status: in-progress
+summary: Approved Meeting Tracker design references; functional workflow released, with the omitted compact landing and focused task workspace now implemented on the UI completion branch and undergoing final review.
 canonical: false
 owner: product-engineering
 related:
@@ -12,9 +12,24 @@ related:
 
 # Meeting Tracker landing structure and mockups
 
+## Current implementation status — 2026-10-24
+
+[VERIFIED via source and release receipts] The functional meeting workflow is released for ordinary eligible requests. The earlier release did **not** implement the approved compact cycle landing or desktop task rail. Its horizontal task tabs were only a partial workspace implementation.
+
+[VERIFIED via branch source and actual built Next pages] `codex/meeting-ui-completion` implements the compact cycle schedule, request search, single materials select, separate global Sessions view with selected agenda preview, and focused Meeting coordination task workspace. Desktop uses a left task rail; narrow screens keep task selectors above the active content and both request actions visible. The selected landing view is URL-addressable. Final review and release evidence is owned by [the UI completion receipt](../../audits/MEETING_UI_COMPLETION_2026-10-24.md); this design record does not independently claim deployment.
+
+The approved composition remains the saved [cycle schedule](meeting-tracker-2026-10-20/index.html), [Sessions](meeting-tracker-2026-10-20/sessions.html), [preparation workspace](meeting-tracker-2026-10-20/preparation-workspace.html) and [transcript preparation](meeting-tracker-2026-10-20/transcript-preparation.html). Mockup dates, queue counts, people and artifacts are synthetic. Runtime uses existing request/session scopes and capability checks, with no invented queue counts. Session search names its supported date/time/location/status fields; agenda text search was an exploratory control, not an existing list API contract. No membership or persistence change is implied.
+
+[VERIFIED via owner instruction, 2026-10-24] Finish this approved landing-page/workspace design, have Claude Opus review it, and compare the actual rendered UI to the mockups before completion. This supersedes the design-only boundary recorded below. Required video, retained approved editions through corrections, immediate withdrawal and Coordinator ownership remain settled in the [implementation plan](../MEETING_COORDINATION_IMPLEMENTATION_PLAN_2026-10-23.md).
+
+<details>
+<summary>Historical design-only record — October 20–23, before implementation</summary>
+
+All implementation-pending statements, source snapshots and next-step checklists within this historical record describe those dates. They are not current operating instructions or evidence that the released functional workflow is unbuilt. Current status and remaining release work are defined above and in the linked UI receipt.
+
 [PLANNED] The staged [implementation plan](../MEETING_COORDINATION_IMPLEMENTATION_PLAN_2026-10-23.md) carries the settled product decisions into proposed persistence, recovery, approval, consumer and release contracts. Runtime implementation and live-state verification remain pending.
 
-## Current organizing direction
+## Organizing direction at design time
 
 [VERIFIED via owner direction, 2026-10-20] The newer [audience flow map](meeting-tracker-2026-10-20/workbench-audience-flow.md) makes the Workbench the PDs’ main entry for meeting information, agendas, materials and post-meeting video/transcript/summary links. Duncan and superusers handle preparation, including transcript assignments. This supersedes the mixed-audience organization implicit in the earlier mockups; it does not approve implementation or settle terminology. Earlier screen layouts remain design explorations to revisit against this flow.
 
@@ -228,7 +243,7 @@ Duncan and superusers are the intended preparation audience, but runtime authori
 
 Task switching was exercised at 1440px and 390px, with no horizontal document overflow in all four task views. All eight captures received independent visual review, ship for mockup review. The source is standalone; only task switching, selects and local links/disclosures respond. Save, review, send, upload, processing and publication actions are inert. Full keyboard/assistive-technology behavior and end-to-end contracts are unverified. DESIGN.md and application files remain unchanged.
 
-## Before implementation, after vocabulary is settled
+## Historical pre-implementation checklist
 
 1. Obtain the owner-approved meeting names from the vocabulary decision; do not assume the proposed table is final.
 2. Update mockup tabs, column headings and action labels consistently, and review wrapping at both saved widths.
@@ -241,3 +256,5 @@ Task switching was exercised at 1440px and 390px, with no horizontal document ov
 Owner: Codex for these new design artifacts. Claude retains the Research Institution at Award workstream and shared session handoff documentation. No edits to SESSION_PROMPT.md, the vocabulary review, the original audit, DESIGN.md or application source are part of this save.
 
 Changed-fact sweep scope: owner-selected landing structure and the existence of these saved mockups. Authoritative evidence is the owner’s chat decisions and the rendered standalone artifacts; runtime persistence/consumer hops are not applicable to this design-only decision. The original audit remains historical evidence. The original handoff asked the owner to choose a landing task. At owner-authorized stop, the current SESSION_PROMPT.md links this design record and preserves Claude’s newer data work as a separate historical carryover. Whole-repository reconciliation is not claimed. Other search matches concerning Workbench rows are unrelated.
+
+</details>

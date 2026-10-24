@@ -8,7 +8,7 @@ const TONE = {
 };
 const ICONS = { unavailable: CircleHelp, no_visit: CalendarX2, not_requested: MinusCircle, waiting: Clock3, processing: Clock3, needs_attention: TriangleAlert, late: TriangleAlert, check_files: FileCheck2, ready: CheckCircle2, closed: Archive };
 
-export default function MaterialsStatusPill({ summary, availability, hasSiteVisit, requestMaterialsHref }) {
+export default function MaterialsStatusPill({ summary, availability, hasSiteVisit, requestMaterialsHref, compact = false }) {
   const status = classifySiteVisitMaterialsStatus(summary, { availability, hasSiteVisit });
   const count = summary && Number.isFinite(summary.receivedCount) && Number.isFinite(summary.requiredCount)
     ? (summary.requiredCount === 0 ? 'No required items' : `${summary.receivedCount}/${summary.requiredCount}`) : null;
@@ -21,6 +21,16 @@ export default function MaterialsStatusPill({ summary, availability, hasSiteVisi
       : status.key === 'not_requested' ? (summary ? 'Invitation not sent.' : 'Request materials.')
         : countText ? `${countText}${summary?.state === 'received' ? '; awaiting confirmation' : ''}${status.key === 'waiting' || status.key === 'late' ? dueText : ''}.` : '';
   const Icon = ICONS[status.key] || CircleHelp;
+  if (compact) {
+    const badge = <span className={`inline-flex items-center rounded px-2 py-1 text-xs font-semibold ${TONE[status.tone] || TONE.neutral}`}><Icon aria-hidden="true" size={14} className="mr-1" />{status.label}</span>;
+    return <div data-testid="materials-status" className="inline-flex flex-col items-start gap-1 text-xs text-gray-600">
+      {requestMaterialsHref && hasSiteVisit
+        ? <a href={requestMaterialsHref} data-full-page-navigation="true" aria-label={`${status.label}. ${detail} Open materials`} className="inline-flex rounded focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-600">{badge}</a>
+        : badge}
+      {countText && <span>{countText}{dueText}</span>}
+    </div>;
+  }
+
   return (
     <div data-testid="materials-status" className="mt-1 flex flex-col items-start gap-1 text-sm">
       <span className={`inline-flex items-center rounded-full border px-2.5 py-1 text-xs font-semibold ${TONE[status.tone] || TONE.neutral}`}>

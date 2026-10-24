@@ -1,0 +1,134 @@
+{
+  "screens": [
+    {
+      "name": "landing-desktop",
+      "accessibilityViolations": 0,
+      "width": 1440,
+      "scrollWidth": 1440,
+      "heading": "Meeting Tracker",
+      "firstRow": 388
+    },
+    {
+      "name": "landing-narrow",
+      "accessibilityViolations": 0,
+      "width": 390,
+      "scrollWidth": 390,
+      "heading": "Meeting Tracker",
+      "firstRow": 543
+    },
+    {
+      "name": "sessions-narrow",
+      "accessibilityViolations": 0,
+      "width": 390,
+      "scrollWidth": 390,
+      "heading": "Meeting Tracker"
+    },
+    {
+      "name": "sessions-desktop",
+      "accessibilityViolations": 0,
+      "width": 1440,
+      "scrollWidth": 1440,
+      "heading": "Meeting Tracker"
+    },
+    {
+      "name": "workspace-setup-desktop",
+      "accessibilityViolations": 0,
+      "width": 1440,
+      "scrollWidth": 1440,
+      "heading": "Meeting coordination · #123456"
+    },
+    {
+      "name": "workspace-setup-narrow",
+      "accessibilityViolations": 0,
+      "width": 390,
+      "scrollWidth": 390,
+      "heading": "Meeting coordination · #123456"
+    },
+    {
+      "name": "workspace-invitations-narrow",
+      "accessibilityViolations": 0,
+      "width": 390,
+      "scrollWidth": 390,
+      "heading": "Meeting coordination · #123456"
+    },
+    {
+      "name": "workspace-invitations-desktop",
+      "accessibilityViolations": 0,
+      "width": 1440,
+      "scrollWidth": 1440,
+      "heading": "Meeting coordination · #123456"
+    },
+    {
+      "name": "workspace-materials-narrow",
+      "accessibilityViolations": 0,
+      "width": 390,
+      "scrollWidth": 390,
+      "heading": "Meeting coordination · #123456"
+    },
+    {
+      "name": "workspace-materials-desktop",
+      "accessibilityViolations": 0,
+      "width": 1440,
+      "scrollWidth": 1440,
+      "heading": "Meeting coordination · #123456"
+    },
+    {
+      "name": "workspace-recordings-narrow",
+      "accessibilityViolations": 0,
+      "width": 390,
+      "scrollWidth": 390,
+      "heading": "Meeting coordination · #123456"
+    },
+    {
+      "name": "workspace-recordings-desktop",
+      "accessibilityViolations": 0,
+      "width": 1440,
+      "scrollWidth": 1440,
+      "heading": "Meeting coordination · #123456"
+    },
+    {
+      "name": "session-workspace-desktop",
+      "accessibilityViolations": 0,
+      "width": 1440,
+      "scrollWidth": 1440,
+      "heading": "Meeting coordination"
+    },
+    {
+      "name": "session-workspace-narrow",
+      "accessibilityViolations": 0,
+      "width": 390,
+      "scrollWidth": 390,
+      "heading": "Meeting coordination"
+    },
+    {
+      "name": "workspace-transcript-review-narrow",
+      "accessibilityViolations": 0,
+      "width": 390,
+      "scrollWidth": 390,
+      "heading": "Meeting coordination · #123456"
+    },
+    {
+      "name": "workspace-transcript-review-desktop",
+      "accessibilityViolations": 0,
+      "width": 1440,
+      "scrollWidth": 1440,
+      "heading": "Meeting coordination · #123456"
+    }
+  ],
+  "checks": [
+    "request search",
+    "materials select",
+    "both mobile actions",
+    "separate sessions preview",
+    "all visit task panels",
+    "invitation draft preservation",
+    "session workspace",
+    "URL-addressable sessions view",
+    "preview focus and scroll",
+    "generated speaker review",
+    "WCAG A/AA automated scan",
+    "no horizontal overflow",
+    "no writes",
+    "no browser exceptions"
+  ]
+}

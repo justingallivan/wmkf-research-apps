@@ -223,8 +223,9 @@ export default function SiteVisitEditor() {
   const taskPrefix = `visit-${requestId}`;
   const recordingTaskRef = useRef(null);
   useEffect(() => {
-    if (typeof window !== 'undefined' && window.location.hash === '#recording-and-transcript-card') {
-      void Promise.resolve().then(() => setTaskEntry({ requestId, task: 'recordings' }));
+    const linkedTask = typeof window !== 'undefined' && ({ '#recording-and-transcript-card': 'recordings', '#materials': 'materials' })[window.location.hash];
+    if (linkedTask) {
+      void Promise.resolve().then(() => setTaskEntry({ requestId, task: linkedTask }));
     }
   }, [requestId, router.asPath]);
   useEffect(() => {
@@ -378,7 +379,7 @@ export default function SiteVisitEditor() {
       <div className="pt-6 mb-6">
         {backLink}
         <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1">
-          <h1 className="text-2xl font-semibold text-gray-900">{visit ? 'Site visit' : 'Schedule the site visit'}{(requestIdentity?.requestNumber || requestNumber) ? ` · #${requestIdentity?.requestNumber || requestNumber}` : ''}</h1>
+          <h1 className="text-2xl font-semibold text-gray-900">{visit ? 'Meeting coordination' : 'Schedule the research presentation'}{(requestIdentity?.requestNumber || requestNumber) ? ` · #${requestIdentity?.requestNumber || requestNumber}` : ''}</h1>
           {visit && headerStatus && (
             <span data-testid="visit-header-status" className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-sm font-medium ${STATUS_TONES[headerStatus.tone] || STATUS_TONES.gray}`}>{headerStatus.label}</span>
           )}
@@ -395,13 +396,15 @@ export default function SiteVisitEditor() {
       {error && <div role="alert" className="mb-5 rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-800">{error}</div>}
       {notice && <div role="status" className="mb-5 rounded-lg border border-blue-200 bg-blue-50 p-4 text-sm text-blue-800">{notice}</div>}
 
+      <div className={`meeting-workspace grid min-w-0 gap-x-7 ${!loading && visit ? 'lg:grid-cols-[13.75rem_minmax(0,1fr)]' : ''}`}>
       {!loading && visit && <MeetingTaskNavigation idPrefix={taskPrefix} selected={task} onChange={chooseTask} tabs={[
         { id: 'setup', label: 'Meeting setup', group: 'Before the meeting' },
         ...(invitationAvailable ? [{ id: 'invitations', label: 'Invitations', group: 'Before the meeting' }] : []),
         { id: 'materials', label: 'Materials collection', group: 'Before the meeting' },
         { id: 'recordings', label: 'Transcript preparation', group: 'After the meeting' },
       ]} />}
-      <div role="tabpanel" id={`${taskPrefix}-panel-setup`} aria-labelledby={visit ? `${taskPrefix}-task-setup` : undefined} hidden={task !== 'setup'}>
+      <div className={`min-w-0 ${!loading && visit ? 'lg:col-start-2 lg:row-start-1' : ''}`} role="tabpanel" id={`${taskPrefix}-panel-setup`} aria-labelledby={visit ? `${taskPrefix}-task-setup` : undefined} hidden={task !== 'setup'}>
+        <div className="mb-6"><h2 className="text-xl font-semibold text-gray-900">Meeting setup</h2><p className="mt-2 text-sm text-gray-600">Confirm the time, location and attendees before preparing invitations.</p></div>
       {loading ? (
         <div className="rounded-xl border border-gray-200 bg-white p-8 text-center text-gray-500">Loading the site visit…</div>
       ) : visit && !editing ? (
@@ -489,16 +492,21 @@ export default function SiteVisitEditor() {
 
       </div>
       {!loading && visit && <>
-        <div role="tabpanel" id={`${taskPrefix}-panel-invitations`} aria-labelledby={`${taskPrefix}-task-invitations`} hidden={task !== 'invitations'}>
+        <div className={`min-w-0 ${!loading && visit ? 'lg:col-start-2 lg:row-start-1' : ''}`} role="tabpanel" id={`${taskPrefix}-panel-invitations`} aria-labelledby={`${taskPrefix}-task-invitations`} hidden={task !== 'invitations'}>
+        <div className="mb-6"><h2 className="text-xl font-semibold text-gray-900">Invitations</h2><p className="mt-2 text-sm text-gray-600">Review the recipients and message before explicitly sending the invitation.</p></div>
           {(task === 'invitations' || invitationVisitedFor === requestId) && <PresentationInvitationPanel key={requestId} requestId={requestId} requestNumber={requestIdentity?.requestNumber || requestNumber} />}
         </div>
-        <div role="tabpanel" id={`${taskPrefix}-panel-materials`} aria-labelledby={`${taskPrefix}-task-materials`} hidden={task !== 'materials'}>
+        <div className={`min-w-0 ${!loading && visit ? 'lg:col-start-2 lg:row-start-1' : ''}`} role="tabpanel" id={`${taskPrefix}-panel-materials`} aria-labelledby={`${taskPrefix}-task-materials`} hidden={task !== 'materials'}>
+        <div className="mb-6"><h2 className="text-xl font-semibold text-gray-900">Materials collection</h2><p className="mt-2 text-sm text-gray-600">Request applicant materials and check the received files.</p></div>
           <SiteVisitMaterialsCard key={requestId} requestId={requestId} requestNumber={requestNumber} onStatusChange={reportMaterials} />
         </div>
-        <div ref={recordingTaskRef} role="tabpanel" id={`${taskPrefix}-panel-recordings`} aria-labelledby={`${taskPrefix}-task-recordings`} hidden={task !== 'recordings'}>
+        <div className={`min-w-0 ${!loading && visit ? 'lg:col-start-2 lg:row-start-1' : ''}`} ref={recordingTaskRef} role="tabpanel" id={`${taskPrefix}-panel-recordings`} aria-labelledby={`${taskPrefix}-task-recordings`} hidden={task !== 'recordings'}>
+        <div className="mb-6"><h2 className="text-xl font-semibold text-gray-900">Transcript preparation</h2><p className="mt-2 text-sm text-gray-600">Prepare the recording, check speakers and the presentation end, then review the outputs.</p></div>
           <RecordingAndTranscriptCard requestId={requestId} active={task === 'recordings'} onStatusChange={reportRecording} />
         </div>
       </>}
+
+      </div>
 
       {/* The page is long: the exit is reachable at the bottom as well as in
           the header (owner, 2026-09-10, on the session page). */}

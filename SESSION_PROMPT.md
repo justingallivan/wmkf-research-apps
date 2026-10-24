@@ -1,11 +1,11 @@
-# Session 638 Prompt: Await owner-selected work after Meeting Tracker release
+# Session 638 Prompt: Complete the approved Meeting Tracker UI
 
 ## Session 637 Summary — Meeting Tracker released and ordinary requests enabled
 
 ### What Was Completed
 
 1. **Meeting coordination workflow shipped.** [VERIFIED via source, reviews, tests and Production Ready deployment] Durable preparation survives navigation/process restarts, preserves successful steps and edited summaries, supports selective retry and fences unknown paid outcomes. Coordinator-approved retained presentation editions keep approved bytes available during corrections; replacement and immediate withdrawal govern both external readers. Video is required for approval.
-2. **Before-meeting and staff workflow completed.** Coordinator-owned applicant collection emails, reviewed research-presentation invitations, consultant selection, explicitly empty recipient groups, keyboard agenda ordering, task navigation and writeup-first Workbench. Automatic applicant reminders remain retired/unscheduled. Explicit Send and strict sender/no-fallback checks remain.
+2. **Before-meeting and staff functional workflow shipped; visual completion was partial.** Coordinator-owned applicant collection emails, reviewed research-presentation invitations, consultant selection, explicitly empty recipient groups, keyboard agenda ordering, task navigation and writeup-first Workbench. Automatic applicant reminders remain retired/unscheduled. Explicit Send and strict sender/no-fallback checks remain.
 3. **Manual media recovery verified.** Original audio plus MP4 correspondence is proven in the existing cut worker, with reusable proof, content/tail verification and bounded cleanup. Ordinary Claude Opus OAuth reviews were completed; verified findings were fixed. Hosted testing additionally found and fixed the bundled settings import and unsupported Blob client options.
 4. **Rehearsal and migrations completed.** Isolated Neon/Blob and actual hosted Sandbox synthetic media passed. The sandbox's broken fixture creation was not repaired; the owner authorized dedicated Production test records instead. Test request 1003371 was used without applicant/payee/contact bindings or real email. Migrations 086–089 applied through the canonical runner: 4 applied, 84 skipped, 88 total; tables, columns and constraints physically verified.
 5. **Controlled rollout then ordinary activation.** [VERIFIED via owner authorization, all green pre-activation checks, Production flag readback and real staff browser] Three new controls are now `on`: `MEETING_MATERIAL_PREPARATION_ACCESS`, `MEETING_MANUAL_VIDEO_PAIRING_ACCESS`, `MEETING_PRESENTATION_INVITATION_ACCESS`. Existing requests are not automatically enrolled/approved; Coordinator enrollment remains deliberate. Ordinary preparation, invitation and manual-pair availability were checked read-only while preserving an existing approved video.
@@ -28,14 +28,14 @@ No real email was sent, no ordinary-request processing was started and no existi
 
 ### Verified Open
 
-- No new owner-selected implementation task. Meeting Tracker is released and enabled for ordinary eligible requests. Do not replay migrations, activation or paid rehearsals as startup work.
+- Owner-selected work: finish the approved Meeting Tracker landing-page/workspace design, obtain Claude Opus OAuth review and compare the real rendered UI to saved mockups. The earlier functional release omitted the compact landing and desktop task rail. The candidate is in the owned isolated worktree on `codex/meeting-ui-completion`; current evidence/release status is in `docs/audits/MEETING_UI_COMPLETION_2026-10-24.md`. Ordinary workflow access is already enabled. Do not replay migrations, activation or paid media rehearsals for this UI-only task.
 - If checking the bookkeeping follow-up's pending CodeQL, inspect `f66eee9e0` check-runs; do not infer it failed or reopen the already-passed release gate. This is a status lookup, not a new audit or release blocker.
 
 ### Verify Before Acting
 
 - Retained synthetic fixture/resources are owned test assets, not a cleanup instruction: request 1003371, its own SharePoint folder, isolated `meeting_coord_rehearsal_20261023` database and `meeting-coord-rehearsal-20261023` Preview/private Blob store. Rehearsal compute was cleaned, local candidate stopped, isolated reader links revoked and final approved edition withdrawn. Sensitive local journals and credentials remain outside Git. Do not rerun one-release operators or delete other agents' resources.
 - Rollback: turn off new-work controls while retaining sticky edition-aware readers, approval references and withdrawal tombstones. Never roll enrolled requests back to a pre-edition reader; code rollback does not undo files, provider calls or mail. Exact floor and migration evidence are in the release receipts.
-- Main was fast-forwarded to the shipped source before this handoff. Feature worktree `codex/session-start-20261023` is preserved. Unrelated untracked `.impeccable/critique/2026-10-19T02-04-42Z__…boardwriteups-js.md` and `output/` remain untouched in the main checkout.
+- Main was fast-forwarded to the shipped source before this handoff. The preserved feature worktree is now on `codex/meeting-ui-completion` for the selected UI task. Unrelated untracked `.impeccable/critique/2026-10-19T02-04-42Z__…boardwriteups-js.md` and `output/` remain untouched in the main checkout.
 
 ### Do Not Reopen Without New Decision
 
