@@ -122,24 +122,30 @@ value is identical.
 
 ### 4.2 Apply (owner runs; same-day write ack)
 
-`--apply --plan=<file>` with `DATAVERSE_ALLOW_PROD_READS=yes` and a same-UTC-day
-`DATAVERSE_PROD_WRITE_ACK`:
+`--apply --dir=<folder> --confirm=<plan hash>` with `DATAVERSE_ALLOW_PROD_READS=yes`
+and a same-UTC-day `DATAVERSE_PROD_WRITE_ACK`. It decides from the stored round,
+not from the local journal (`decideApply`):
 
-1. Re-reads the round. Refuses if the ETag or snapshot hash differs from the plan.
-2. Issues one `PATCH wmkf_proposalrankingrounds(<id>)` with `If-Match: <plan ETag>`
-   and body `{ wmkf_snapshotjson, wmkf_administrationlogjson }` only, through the
-   adapter's `patchRound`.
-3. Appends the outcome (old/new hash, new ETag, time) to an apply log beside the
-   plan.
+1. Round already holds the planned correction → nothing to do. This covers a PATCH
+   that committed but whose response or readback was lost.
+2. Round holds the planned original with the planned ETag → one
+   `PATCH wmkf_proposalrankingrounds(<id>)` with `If-Match: <plan ETag>` and body
+   `{ wmkf_snapshotjson, wmkf_administrationlogjson }` only, through the adapter's
+   `patchRound`.
+3. Anything else (the ETag moved, or the content matches neither state) → refuse.
+
+If the PATCH or readback doesn't confirm, the script says the outcome is unknown.
+Run `--verify`, then re-run `--apply`. The journal
+(`ranking-invited-applied.jsonl`) is a record only.
 
 ### 4.3 Verify (owner runs; read-only)
 
-`--verify --plan=<file>`:
+`--verify --dir=<folder>` reports:
 
-- the stored snapshot hash equals the planned new hash;
-- the two amounts read back as $1.3M with `amountSource: 'invited'`;
-- `wmkf_workflowjson`, every list row's version and status, and the active
-  pointer equal the baseline.
+- whether the round holds the original, the correction, or neither;
+- the two stored amounts and their `amountSource`;
+- whether D26's active round is still this one;
+- any app activity since the plan (round last-operation stamp, workflow, list rows).
 
 Then the owner opens the round in the app. The two cards should show
 **Invited $1,300,000.00**, and the Recommended total and running totals should
@@ -147,10 +153,25 @@ reflect it.
 
 ### 4.4 Rollback
 
-`--rollback --plan=<file>`: `If-Match` on the post-apply ETag. It restores the
-original snapshot JSON byte-for-byte, and refuses if the round changed since
-apply. If a PD has saved since then, the ETag has moved and rollback refuses.
-In that case re-plan a reverse edit from the current state; don't force it.
+`--rollback --dir=<folder>` restores the original snapshot and log byte-for-byte
+(`decideRollback`). It runs only if the round holds the correction **and** shows no
+app write since the plan. Every app round write stamps `wmkf_lastoperationid`
+(`service.js` `actorPatch`, at all four round write sites; `workflow-service.js:734-738`
+`stamp`), and v2 actions also rewrite `wmkf_workflowjson` and list rows. This
+script's own PATCH changes none of them, so the fence doesn't depend on capturing
+the ETag after the write. [VERIFIED via source; writer set from `grep patchRound\|patchRoundAndList\|cancelRoundChangeset\|commitAssessmentChanges lib/services/proposal-ranking`]
+If the round already holds the original, rollback is done. If a PD has acted
+since the plan, it refuses: plan a reverse edit from the current state rather than
+forcing it. Re-planning in the same folder is refused while the round still
+holds that plan's correction, so the only copy of the original is never
+overwritten (dated copies are also kept as `ranking-invited-plan-<hash>.json`).
+
+Codex adversarial review, 2026-10-23, found two gaps, both fixed before any apply:
+- rollback trusted an ETag read after the write, which a PD action could already
+  have advanced;
+- a committed write with a lost response could not be reconciled.
+
+Both are tested in `tests/unit/ranking-invited-correction.test.js`.
 
 ## 5. Open questions and assumptions
 

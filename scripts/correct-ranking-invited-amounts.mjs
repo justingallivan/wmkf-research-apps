@@ -10,16 +10,18 @@
  *       and writes ranking-invited-plan.json (also kept as -<hash>.json). Prints
  *       the before/after table and the plan hash. No reviewer scores or PD orders.
  *   --apply --dir=<folder> --confirm=<plan hash>
- *       Re-reads the round; refuses unless its ETag and snapshot are exactly as
- *       planned. One If-Match PATCH of wmkf_snapshotjson + wmkf_administrationlogjson
- *       (lib/dataverse/adapters/proposal-ranking.js patchRound). Logs to
- *       ranking-invited-applied.jsonl.
+ *       Decides from the stored round, not the local log: already corrected -> done;
+ *       original with the planned ETag -> one If-Match PATCH of wmkf_snapshotjson +
+ *       wmkf_administrationlogjson (adapter patchRound); anything else -> refuse.
+ *       After a lost response or crash, run it again.
  *   --verify --dir=<folder>
- *       READ-ONLY. Confirms the stored snapshot and log are the planned ones, and
- *       reports whether workflow and list rows are unchanged since the plan.
+ *       READ-ONLY. Reports whether the round holds the original or corrected state,
+ *       and any app activity since the plan.
  *   --rollback --dir=<folder>
- *       Restores the original snapshot and log byte-for-byte, If-Match on the
- *       post-apply ETag. Refuses if the round changed after apply.
+ *       Restores the original snapshot and log byte-for-byte. Refuses unless the round
+ *       holds the corrected state AND shows no app write since the plan (last
+ *       operation stamp, workflow and list rows all as planned). Re-runnable.
+ * ranking-invited-applied.jsonl in --dir is a journal only; no decision reads it.
  *
  * Write modes need DATAVERSE_PROD_WRITE_ACK="<purpose> <YYYY-MM-DD>"; every mode
  * that reaches production needs DATAVERSE_ALLOW_PROD_READS=yes.
@@ -28,7 +30,7 @@
 import fs from 'fs';
 import path from 'path';
 import crypto from 'crypto';
-import { correctSnapshot, appendCorrectionEvent, sha } from './lib/ranking-invited-correction.mjs';
+import { correctSnapshot, appendCorrectionEvent, sha, roundStateVs, activitySincePlan, decideApply, decideRollback } from './lib/ranking-invited-correction.mjs';
 
 try {
   const env = fs.readFileSync('.env.local', 'utf8');
@@ -66,26 +68,43 @@ const { findCycleCoordinator, readAssessmentRound, listRoundRows, patchRound } =
 const fail = (message) => { console.error(`Refused: ${message}`); process.exit(1); };
 const money = (minor) => `$${(minor / 100).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 const appendLog = (entry) => fs.appendFileSync(LOG, `${JSON.stringify({ at: new Date().toISOString(), ...entry })}\n`);
-const readLog = () => (fs.existsSync(LOG) ? fs.readFileSync(LOG, 'utf8').trim().split('\n').filter(Boolean).map((l) => JSON.parse(l)) : []);
 const loadPlan = () => {
   if (!fs.existsSync(PLAN)) fail(`no plan at ${PLAN}; run --plan first.`);
   const text = fs.readFileSync(PLAN, 'utf8');
   return { plan: JSON.parse(text), hash: sha(text).slice(0, 8) };
 };
+const listsOf = async () => (await listRoundRows(ROUND_ID)).map((row) => ({ key: row.wmkf_listkey, etag: row['@odata.etag'], status: row.wmkf_status, version: row.wmkf_version }));
 const baselineOf = async (round) => ({
+  lastOperationId: round.wmkf_lastoperationid ?? null,
   workflowSha: sha(round.wmkf_workflowjson || ''),
-  lists: (await listRoundRows(ROUND_ID)).map((row) => ({ key: row.wmkf_listkey, etag: row['@odata.etag'], status: row.wmkf_status, version: row.wmkf_version })),
+  lists: await listsOf(),
 });
-const sameLists = (a, b) => JSON.stringify(a) === JSON.stringify(b);
+// A PATCH whose response was lost may still have committed; the next run reads the round to decide.
+async function patchAndReport(round, patch, label) {
+  try {
+    await patchRound(round, patch);
+  } catch (error) {
+    appendLog({ outcome: `${label}_unconfirmed`, error: String(error?.message || error).slice(0, 300) });
+    fail(`${label} PATCH did not confirm (${error?.message || error}). It may or may not have committed; run --verify, then re-run --${label}.`);
+  }
+  try {
+    return await readAssessmentRound(ROUND_ID);
+  } catch (error) {
+    appendLog({ outcome: `${label}_unconfirmed`, error: `readback: ${String(error?.message || error).slice(0, 280)}` });
+    fail(`${label} PATCH returned but readback failed; run --verify, then re-run --${label} if needed.`);
+  }
+}
 
 async function plan() {
   const approver = arg('approver');
   if (!approver) fail('--approver="<name>" is required; it is recorded in the round log.');
-  const outcomes = readLog().map((e) => e.outcome);
-  if (outcomes.lastIndexOf('applied') > outcomes.lastIndexOf('rolled_back')) fail(`${LOG} records an applied run; verify or roll it back first.`);
   const coordinator = await findCycleCoordinator(CYCLE);
   if (coordinator?.wmkf_activeroundid?.toLowerCase() !== ROUND_ID) fail(`${CYCLE} active round is ${coordinator?.wmkf_activeroundid || 'none'}, not ${ROUND_ID}.`);
   const round = await readAssessmentRound(ROUND_ID);
+  // Never overwrite the only copy of an original snapshot that is still needed for rollback.
+  if (fs.existsSync(PLAN) && roundStateVs(round, JSON.parse(fs.readFileSync(PLAN, 'utf8'))) === 'corrected') {
+    fail(`the round already holds the correction from ${PLAN}; run --verify or --rollback.`);
+  }
   if (round.wmkf_state !== ROUND_ACTIVE) fail(`round state is ${round.wmkf_state}, not active.`);
   if (!round['@odata.etag']) fail('round has no ETag.');
   const snapshot = JSON.parse(round.wmkf_snapshotjson);
@@ -135,31 +154,27 @@ async function plan() {
 async function apply() {
   const { plan: p, hash } = loadPlan();
   if (arg('confirm') !== hash) fail(`--confirm must be the current plan hash ${hash}.`);
-  if (readLog().some((e) => e.outcome === 'applied' && e.planHash === hash)) fail('this plan was already applied; run --verify.');
   const round = await readAssessmentRound(ROUND_ID);
-  if (round['@odata.etag'] !== p.etag) fail('the round changed since the plan (ETag moved); re-run --plan.');
-  if (sha(round.wmkf_snapshotjson) !== p.original.snapshotSha) fail('stored snapshot differs from the plan; re-run --plan.');
-  appendLog({ outcome: 'intent', planHash: hash, etag: p.etag });
-  try {
-    await patchRound(round, { wmkf_snapshotjson: p.corrected.snapshotJson, wmkf_administrationlogjson: p.corrected.logJson });
-  } catch (error) {
-    appendLog({ outcome: 'failed', planHash: hash, error: String(error?.message || error).slice(0, 300) });
-    fail(`PATCH failed: ${error?.message || error}`);
+  const decision = decideApply(round, p);
+  if (decision.action === 'done') {
+    appendLog({ outcome: 'applied_confirmed', planHash: hash, etag: round['@odata.etag'] });
+    console.log('The round already holds the correction. Nothing to do; run --verify.');
+    return;
   }
-  const after = await readAssessmentRound(ROUND_ID);
-  const ok = sha(after.wmkf_snapshotjson) === p.corrected.snapshotSha;
-  appendLog({ outcome: ok ? 'applied' : 'applied_mismatch', planHash: hash, postEtag: after['@odata.etag'] });
-  console.log(ok ? `Applied. New ETag ${after['@odata.etag']}. Run --verify.` : 'PATCH returned, but readback differs from the plan. Run --verify and stop.');
-  if (!ok) process.exit(1);
+  if (decision.action === 'refuse') fail(decision.reason);
+  appendLog({ outcome: 'apply_intent', planHash: hash, etag: p.etag });
+  const after = await patchAndReport(round, { wmkf_snapshotjson: p.corrected.snapshotJson, wmkf_administrationlogjson: p.corrected.logJson }, 'apply');
+  const state = roundStateVs(after, p);
+  appendLog({ outcome: state === 'corrected' ? 'applied' : `apply_readback_${state}`, planHash: hash, etag: after['@odata.etag'] });
+  if (state !== 'corrected') fail(`PATCH returned, but the round reads back as '${state}'. Run --verify and stop.`);
+  console.log('Applied. Run --verify.');
 }
 
 async function verify() {
   const { plan: p } = loadPlan();
   const round = await readAssessmentRound(ROUND_ID);
-  const snapshotOk = sha(round.wmkf_snapshotjson) === p.corrected.snapshotSha;
-  const logOk = (round.wmkf_administrationlogjson ?? null) === p.corrected.logJson;
-  console.log(`Snapshot is the corrected one: ${snapshotOk ? 'yes' : 'NO'}`);
-  console.log(`Administration log has the correction event: ${logOk ? 'yes' : 'NO'}`);
+  const state = roundStateVs(round, p);
+  console.log(`Round holds: ${state === 'corrected' ? 'the correction' : state === 'original' ? 'the ORIGINAL (not applied, or rolled back)' : 'NEITHER planned state'}`);
   const stored = JSON.parse(round.wmkf_snapshotjson);
   for (const c of p.changes) {
     const proposal = stored.proposals.find((x) => x.requestId === c.requestId);
@@ -168,30 +183,27 @@ async function verify() {
   const coordinator = await findCycleCoordinator(CYCLE);
   const pointerOk = coordinator?.wmkf_activeroundid?.toLowerCase() === ROUND_ID;
   console.log(`${CYCLE} active round is still ${ROUND_ID}: ${pointerOk ? 'yes' : 'NO'}`);
-  const now = await baselineOf(round);
-  console.log(`Workflow unchanged since plan: ${now.workflowSha === p.baseline.workflowSha ? 'yes' : 'no (PD activity since the plan)'}`);
-  console.log(`List rows unchanged since plan: ${sameLists(now.lists, p.baseline.lists) ? 'yes' : 'no (PD activity since the plan)'}`);
-  if (!snapshotOk || !logOk || !pointerOk) process.exit(1);
+  const activity = activitySincePlan(round, await listsOf(), p);
+  console.log(`App activity since the plan: ${activity.length ? activity.join('; ') : 'none'}`);
+  if (state !== 'corrected' || !pointerOk) process.exit(1);
 }
 
 async function rollback() {
   const { plan: p } = loadPlan();
-  const applied = readLog().filter((e) => e.outcome === 'applied').pop();
-  if (!applied) fail('no applied run in the log.');
   const round = await readAssessmentRound(ROUND_ID);
-  if (round['@odata.etag'] !== applied.postEtag) fail('the round changed after apply (ETag moved); plan a reverse edit from current state instead.');
-  if (sha(round.wmkf_snapshotjson) !== p.corrected.snapshotSha) fail('stored snapshot is not the corrected one.');
-  try {
-    await patchRound(round, { wmkf_snapshotjson: p.original.snapshotJson, wmkf_administrationlogjson: p.original.logJson });
-  } catch (error) {
-    appendLog({ outcome: 'rollback_failed', error: String(error?.message || error).slice(0, 300) });
-    fail(`PATCH failed: ${error?.message || error}`);
+  const decision = decideRollback(round, await listsOf(), p);
+  if (decision.action === 'done') {
+    appendLog({ outcome: 'rolled_back_confirmed', etag: round['@odata.etag'] });
+    console.log('The round already holds the original snapshot and log. Nothing to do.');
+    return;
   }
-  const after = await readAssessmentRound(ROUND_ID);
-  const ok = sha(after.wmkf_snapshotjson) === p.original.snapshotSha;
-  appendLog({ outcome: ok ? 'rolled_back' : 'rollback_mismatch', postEtag: after['@odata.etag'] });
-  console.log(ok ? 'Rolled back to the original snapshot and log.' : 'PATCH returned, but readback differs from the original.');
-  if (!ok) process.exit(1);
+  if (decision.action === 'refuse') fail(decision.reason);
+  appendLog({ outcome: 'rollback_intent', etag: round['@odata.etag'] });
+  const after = await patchAndReport(round, { wmkf_snapshotjson: p.original.snapshotJson, wmkf_administrationlogjson: p.original.logJson }, 'rollback');
+  const state = roundStateVs(after, p);
+  appendLog({ outcome: state === 'original' ? 'rolled_back' : `rollback_readback_${state}`, etag: after['@odata.etag'] });
+  if (state !== 'original') fail(`PATCH returned, but the round reads back as '${state}'. Run --verify and stop.`);
+  console.log('Rolled back to the original snapshot and log.');
 }
 
 await bypassDynamicsRestrictions(`ranking-invited-amounts-${MODE}`, async () => {

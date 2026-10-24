@@ -53,3 +53,45 @@ export function appendCorrectionEvent(logJson, event, maxBytes = 131072) {
   if (Buffer.byteLength(json, 'utf8') > maxBytes) throw new Error('Round administration log would exceed its storage limit.');
   return json;
 }
+
+/** What the round's stored snapshot and log are, relative to a plan. */
+export function roundStateVs(round, plan) {
+  const snapshotSha = sha(round.wmkf_snapshotjson || '');
+  const log = round.wmkf_administrationlogjson ?? null;
+  if (snapshotSha === plan.corrected.snapshotSha && log === plan.corrected.logJson) return 'corrected';
+  if (snapshotSha === plan.original.snapshotSha && log === plan.original.logJson) return 'original';
+  return 'other';
+}
+
+/**
+ * Evidence of any app write since the plan. Every app round write stamps
+ * wmkf_lastoperationid (service.js actorPatch; workflow-service.js stamp), and v2
+ * actions also rewrite wmkf_workflowjson and list rows. This script's own PATCH
+ * changes none of the three, so an empty result means no PD or facilitator write.
+ */
+export function activitySincePlan(round, lists, plan) {
+  const reasons = [];
+  if ((round.wmkf_lastoperationid ?? null) !== plan.baseline.lastOperationId) reasons.push('round last operation changed');
+  if (sha(round.wmkf_workflowjson || '') !== plan.baseline.workflowSha) reasons.push('workflow state changed');
+  if (JSON.stringify(lists) !== JSON.stringify(plan.baseline.lists)) reasons.push('list rows changed');
+  return reasons;
+}
+
+/** Decide --apply from stored state, so a lost response or crash can be re-run. */
+export function decideApply(round, plan) {
+  const state = roundStateVs(round, plan);
+  if (state === 'corrected') return { action: 'done' };
+  if (state === 'original' && round['@odata.etag'] === plan.etag) return { action: 'patch' };
+  if (state === 'original') return { action: 'refuse', reason: 'the round changed since the plan (ETag moved); re-run --plan.' };
+  return { action: 'refuse', reason: 'stored snapshot or log matches neither the original nor the corrected plan state.' };
+}
+
+/** Decide --rollback from stored state; refuse if anyone wrote to the round since the plan. */
+export function decideRollback(round, lists, plan) {
+  const state = roundStateVs(round, plan);
+  if (state === 'original') return { action: 'done' };
+  if (state !== 'corrected') return { action: 'refuse', reason: 'stored snapshot or log matches neither the original nor the corrected plan state.' };
+  const activity = activitySincePlan(round, lists, plan);
+  if (activity.length) return { action: 'refuse', reason: `app activity since the plan (${activity.join('; ')}); plan a reverse edit from current state instead.` };
+  return { action: 'patch' };
+}
