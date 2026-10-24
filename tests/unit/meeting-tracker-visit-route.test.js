@@ -45,7 +45,7 @@ test('GET requires the tracker grant, validates the id before auth, and returns 
   expect(requireAppAccess).toHaveBeenCalledWith(expect.anything(), res, 'meeting-tracker');
   expect(getSiteVisitLogistics).toHaveBeenCalledWith({ requestId: REQUEST_ID, includeApplicantAttendees: true, includeRequestIdentity: true });
   expect(res.statusCode).toBe(200);
-  expect(res.body).toEqual({ success: true, siteVisit: { activityId: 'a1', etag: 'W/"1"' }, applicantAttendees: [{ kind: 'manual', name: 'Franklin Cat', email: 'franklin@example.edu' }], applicantAttendeesUnavailable: false, request: null });
+  expect(res.body).toEqual({ success: true, invitationAvailable: false, siteVisit: { activityId: 'a1', etag: 'W/"1"' }, applicantAttendees: [{ kind: 'manual', name: 'Franklin Cat', email: 'franklin@example.edu' }], applicantAttendeesUnavailable: false, request: null });
 });
 
 test('PATCH takes the request id from the path only, passes the session actor, and refuses unsupported fields', async () => {

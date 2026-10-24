@@ -33,6 +33,8 @@ const ROW = {
 function dependencies() {
   return {
     schemaReady: () => true,
+    impersonationEnabled:()=>true,
+    getCoordinator:async()=>({systemUserId:ACTOR_ID,profileId:7,email:'pd@example.org',name:'Coordinator',revision:'1'}),
     getRequest: jest.fn(async () => ({ akoya_requestid: REQUEST_ID, akoya_requestnum: '1003222', akoya_title: 'Proposal', wmkf_meetingdate: '2026-12-11', akoya_requeststatus: 100000001, wmkf_triagestatus: 100000000 })),
     getOpenCollection: jest.fn(async () => ROW),
     findActiveSiteVisit: jest.fn(async () => VISIT),
@@ -55,7 +57,7 @@ test.each([
 ])('%s checks the current PI and Liaison before side effects', async (name, fn) => {
   const deps = dependencies();
   if (name === 'createMaterialsCollection') deps.getOpenCollection.mockResolvedValue(null);
-  await expect(fn({ requestId: REQUEST_ID, actorId: ACTOR_ID }, deps)).rejects.toBe(refusal);
+  await expect(fn({ requestId: REQUEST_ID, actorId: ACTOR_ID,profileId:7,fromEmail:'pd@example.org' }, deps)).rejects.toBe(refusal);
 
   expect(assertRequestEmailAllowed).toHaveBeenCalledWith(REQUEST_ID, {
     recipients: ['PI@example.edu', 'liaison@example.edu'],
@@ -71,12 +73,12 @@ test.each([
 
 
 test('sendReminderEmail does not repeat the service-level recipient check', async () => {
-  const deps = { sendEmail: jest.fn(async () => 'email-1') };
+  const deps = {...dependencies(), sendEmail: jest.fn(async () => 'email-1') };
   await expect(sendReminderEmail({
     row: { id: 7, request_id: REQUEST_ID, contacts: CONTACTS },
     prepared: { subject: 's', bodyText: 'b' },
     fromEmail: 'pd@example.org',
-    actorId: ACTOR_ID,
+    actorId: ACTOR_ID,profileId:7,
     sequence: 1,
   }, deps)).resolves.toBe('email-1');
   expect(assertRequestEmailAllowed).not.toHaveBeenCalled();

@@ -63,7 +63,6 @@ async function openPanel() {
 }
 async function importMeetingA(panel) {
   fireEvent.click(within(panel).getByRole('radio', { name: /Oct 5/ }));
-  fireEvent.click(within(panel).getByRole('checkbox'));
   fireEvent.click(within(panel).getByRole('button', { name: 'Import, transcribe and copy video' }));
 }
 afterEach(() => { jest.useRealTimers(); jest.restoreAllMocks(); });
@@ -78,7 +77,6 @@ describe('off by default', () => {
     expect(screen.queryByRole('button', { name: /Copy video|Try again|Cancel copy/ })).not.toBeInTheDocument();
     expect(screen.queryByTestId('video-copy-status')).not.toBeInTheDocument();
     fireEvent.click(within(panel).getByRole('radio', { name: /Oct 5/ }));
-    fireEvent.click(within(panel).getByRole('checkbox'));
     expect(within(panel).getByRole('button', { name: 'Import and transcribe' })).toBeEnabled();
   });
 });
@@ -117,7 +115,7 @@ describe('Import starts audio and video as two independent POSTs', () => {
     await importMeetingA(panel);
     await waitFor(() => expect(posts('audio')).toHaveLength(1));
     expect(posts('video')).toEqual([{ path: 'video', body: { action: 'start', meetingUuid: UUID_A, replaces: null } }]);
-    expect(posts('audio')[0].body).toEqual({ meetingUuid: UUID_A, nonSensitiveAcknowledged: true });
+    expect(posts('audio')[0].body).toEqual({ meetingUuid: UUID_A });
     expect(await within(panel).findByText(/Video copy started/)).toBeInTheDocument();
     expect(within(panel).getAllByText(/Imported, transcribing…/)).toHaveLength(2);
   });
@@ -141,7 +139,6 @@ describe('Import starts audio and video as two independent POSTs', () => {
     route({ state: { list: list({ a: { video: video({ segmented: true }) } }) } });
     const panel = await openPanel();
     fireEvent.click(within(panel).getByRole('radio', { name: /Oct 5/ }));
-    fireEvent.click(within(panel).getByRole('checkbox'));
     fireEvent.click(within(panel).getByRole('button', { name: 'Import and transcribe' }));
     await waitFor(() => expect(posts('audio')).toHaveLength(1));
     expect(posts('video')).toHaveLength(0);

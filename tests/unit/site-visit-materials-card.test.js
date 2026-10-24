@@ -42,7 +42,7 @@ test('before a collection exists the card opens a preview composer and sends act
     if (url.includes('materials-email-preferences')) return response({ shared: { subject: 'Subject', body: '{{checklist}}' }, template: { subject: 'Subject', body: '{{checklist}}' } });
     if (options.method === 'POST') {
       const body = JSON.parse(options.body);
-      if (body.action === 'preview') return response({ subject: 'Subject', bodyText: 'Rendered', proof: 'proof', recipients: [{ email: 'pi@example.edu' }], secureLinkPlaceholder: true });
+      if (body.action === 'preview') return response({ subject: 'Subject', bodyText: 'Rendered', proof: 'proof', canSend: true, recipients: [{ email: 'pi@example.edu' }], secureLinkPlaceholder: true });
       return response({ success: true, collection: collection(), invitationSent: true });
     }
     return response({ success: true, collection: null });

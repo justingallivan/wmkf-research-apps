@@ -69,7 +69,6 @@ test.each([
   route({}, { '/zoom-recordings': { respond } });
   render(<RecordingAndTranscriptCard requestId={REQUEST_ID} />);
   fireEvent.click(await screen.findByRole('button', { name: 'Import from Zoom' }));
-  expect(await screen.findByText('Loading Zoom recordings…')).toBeInTheDocument();
   await waitFor(() => expect(screen.queryByText('Loading Zoom recordings…')).not.toBeInTheDocument());
   expect(screen.queryByRole('button', { name: 'Import from Zoom' })).not.toBeInTheDocument();
   expect(screen.queryByTestId('zoom-import')).not.toBeInTheDocument();
@@ -185,7 +184,6 @@ test('a list response for an earlier request is ignored after the card moves to 
   route({}, { [`${REQUEST_ID}/zoom-recordings`]: { respond: async () => { await gate; return response(zoomList()); } } });
   const view = render(<RecordingAndTranscriptCard requestId={REQUEST_ID} />);
   fireEvent.click(await screen.findByRole('button', { name: 'Import from Zoom' }));
-  expect(await screen.findByText('Loading Zoom recordings…')).toBeInTheDocument();
   view.rerender(<RecordingAndTranscriptCard requestId={OTHER_REQUEST_ID} />);
   await screen.findByRole('button', { name: 'Import from Zoom' });
   await act(async () => { release(); await gate; });

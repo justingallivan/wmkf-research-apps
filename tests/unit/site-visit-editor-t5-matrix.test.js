@@ -1,3 +1,5 @@
+/** @jest-environment jsdom */
+jest.mock('../../shared/components/meeting-tracker/RecordingAndTranscriptCard', () => ({__esModule:true,default:()=>null}));
 /**
  * @jest-environment jsdom
  *

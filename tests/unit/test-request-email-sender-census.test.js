@@ -30,6 +30,7 @@ const SENDER_PATTERN = /\.createAndSendEmail\(|\.createEmailActivity\(|DynamicsS
 // records or sending (senders the delivery seam cannot see, or that act before
 // it).
 const RECORDED_SENDERS = {
+  'lib/services/meeting-coordination/invitation-service.js': {audience:'materials',early:[],note:'assertCurrent checks resolved recipients with assertEmailAllowed before both creation and send; request-bound Dynamics transport rechecks test state'},
   // Cycle-level notices: release notices reject nonordinary roster rows before
   // journal/email writes; historical notices expose only revalidated labels.
   'lib/services/board-writeups/notifications.js': { audience: 'staff', early: [] },

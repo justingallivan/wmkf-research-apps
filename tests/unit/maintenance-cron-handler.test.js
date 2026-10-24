@@ -1,3 +1,6 @@
+/** @jest-environment node */
+jest.mock('../../lib/services/meeting-coordination/invitation-service', () => ({ cleanupInvitations: jest.fn(async () => ({deleted:0,redacted:0})) }));
+jest.mock('../../lib/services/meeting-tracker-recordings/manual-video-pair-runtime', () => ({ cleanupManualVideoAudio: jest.fn(async () => ({deleted:0,errors:0,pruned:0})) }));
 /**
  * Integration-ish coverage for the daily maintenance cron handler's wiring of
  * the maintenance_runs retention step (eval #3 follow-up). The service method

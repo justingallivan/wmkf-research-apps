@@ -23,6 +23,7 @@ const GUARD = /createRequestTestStateLookup\(|resolveRequestTestState|resolveTes
 //   operational — global monitoring, pricing, retention or reference data; no per-request action
 //   n/a         — cannot reach a test request
 const RECORDED_CRONS = {
+  'drain-meeting-material-preparations': {scheduled:true,class:'allowed',note:'continues explicitly initiated staff preparation on its exact request; request-scoped admission and current staff authorization rechecked before child work; never approves or emails'},
   'board-writeups': { scheduled: true, class: 'guarded', guardFiles: ['lib/services/board-writeups/source.js'], note: 'ordinary Research roster only; release and archive paths revalidate request eligibility, and release notices refuse nonordinary requests before journal or email writes' },
   'auth-bypass-check': { scheduled: true, class: 'operational' },
   'drain-materials-uploads': { scheduled: true, class: 'allowed', note: 'continues an explicitly submitted token-authorized applicant upload; no request selection or email; materials background plan records this decision' },
@@ -70,14 +71,14 @@ test('every cron route is recorded', () => {
     .filter((name) => name.endsWith('.js'))
     .map((name) => name.replace(/\.js$/, ''))
     .sort();
-  expect(routes).toHaveLength(32);
+  expect(routes).toHaveLength(33);
   expect(routes).toEqual(Object.keys(RECORDED_CRONS).sort());
 });
 
 test('the recorded schedule matches vercel.json', () => {
   const crons = JSON.parse(fs.readFileSync(path.join(ROOT, 'vercel.json'), 'utf8')).crons;
-  expect(crons).toHaveLength(31);
-  expect(new Set(crons.map(({ path: cronPath }) => cronPath.split('?')[0])).size).toBe(30);
+  expect(crons).toHaveLength(32);
+  expect(new Set(crons.map(({ path: cronPath }) => cronPath.split('?')[0])).size).toBe(31);
   const transcriptionCrons = crons.filter((cron) =>
     typeof cron.path === 'string' && cron.path.split('?')[0] === '/api/cron/drain-transcriptions'
   ).map(({ path: cronPath, schedule }) => ({ path: cronPath, schedule })).sort((a, b) => a.path.localeCompare(b.path));

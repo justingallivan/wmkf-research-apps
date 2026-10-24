@@ -1,3 +1,4 @@
+jest.mock('../../lib/services/meeting-coordination/coordinator-access.js', () => ({...jest.requireActual('../../lib/services/meeting-coordination/coordinator-access.js'),getAssignedCoordinator:jest.fn(async()=>({systemUserId:'44444444-4444-4444-8444-444444444444',profileId:7,email:'pd@example.org',name:'Coordinator',revision:'1'}))}));
 /**
  * Test Request email refusal (Stage 1b): the shared delivery seam in
  * DynamicsService.createEmailActivity and the early service-level refusal
@@ -94,17 +95,20 @@ describe('createEmailActivity delivery seam', () => {
 
   test('materials default sender classifies shared Request guard refusal as a definite non-send', ctx(async () => {
     process.env.TEST_REQUEST_ISOLATION = 'on';
+    const previousImpersonation=process.env.DYNAMICS_IMPERSONATION_ENABLED;
+    process.env.DYNAMICS_IMPERSONATION_ENABLED='true';
     getRecord.mockRejectedValue(new Error('temporary Request read failure'));
     let refusal;
     try {
       await materialsDependencies.sendEmail({
         subject: 'Materials', bodyText: 'Upload', from: 'pd@example.org',
         to: ['reviewer@example.org'], cc: [], regardingId: REQUEST_ID,
-        url: 'https://example.org/materials', buttonLabel: 'Upload',
+        url: 'https://example.org/materials', buttonLabel: 'Upload',profileId:7,actingUserSystemId:'44444444-4444-4444-8444-444444444444',
       });
     } catch (error) {
       refusal = error;
     }
+    if(previousImpersonation===undefined)delete process.env.DYNAMICS_IMPERSONATION_ENABLED;else process.env.DYNAMICS_IMPERSONATION_ENABLED=previousImpersonation;
     expect(refusal).toMatchObject({ code: 'test_request_email_denied', dispatched: false });
     expect(classifyEmailDispatchError(refusal)).toMatchObject({ outcome: 'failed', retryable: true });
     expect(getRecord).toHaveBeenCalledWith('akoya_requests', REQUEST_ID, {

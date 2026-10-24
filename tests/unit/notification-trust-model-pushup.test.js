@@ -1,3 +1,6 @@
+/** @jest-environment node */
+jest.mock('../../lib/services/meeting-coordination/invitation-service', () => ({ cleanupInvitations: jest.fn(async () => ({deleted:0,redacted:0})) }));
+jest.mock('../../lib/services/meeting-tracker-recordings/manual-video-pair-runtime', () => ({ cleanupManualVideoAudio: jest.fn(async () => ({deleted:0,errors:0,pruned:0})) }));
 /**
  * S334 notification trust-model Stage 1 characterization
  * (docs/NOTIFICATION_TRUST_MODEL_PLAN.md sites 9, 12-22).
