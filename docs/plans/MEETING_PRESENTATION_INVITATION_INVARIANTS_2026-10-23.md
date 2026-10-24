@@ -1,6 +1,6 @@
 # Research-presentation invitation guardrails
 
-[VERIFIED via branch source and isolated tests; not deployed] Entry: visit workspace → request/visit-scoped preview/send/reconcile route. Persistence: separate Postgres frozen-email ledger and Dynamics email activity; existing Dataverse visit/attendee maps remain authoritative. Consumers: staff preview/history and the selected existing visit attendees. No calendar event, automatic reminder or new mail provider is added.
+[VERIFIED via source, isolated tests and controlled production release, 2026-10-24] Entry: visit workspace → request/visit-scoped preview/send/reconcile route. Persistence: separate Postgres frozen-email ledger and Dynamics email activity; existing Dataverse visit/attendee maps remain authoritative. Consumers: staff preview/history and the selected existing visit attendees. No calendar event, automatic reminder or new mail provider is added.
 
 | Invariant | Surfaces | Verification |
 |---|---|---|
@@ -14,4 +14,4 @@
 | Retention is bounded without forgetting uncertainty | Fifteen-minute preview expiry, thirty-day content retention | Admission-independent cleanup deletes expired previews and old resolved rows; redacts unresolved content but retains metadata fence; expired previews never send |
 | Existing scheduling and applicant collection semantics remain separate | Visit details and collection card | Email describes saved meeting details; it does not create a calendar invitation or request applicant uploads |
 
-Migration allocation evidence: the authorized production filenames-only tracker query returned 84 filenames, latest 085. Inspection of 355 local/remote refs found 085/086/087 and no higher number. Migration 088 is allocated for this ledger on the isolated feature branch; it is not applied to Production. The admission control defaults off until the schema and rehearsal are verified.
+Migration allocation evidence: the authorized production filenames-only tracker query returned 84 filenames, latest 085. Inspection of 355 local/remote refs found 085/086/087 and no higher number. That was the allocation baseline. Migration 088 was applied with the canonical runner and physically verified on 2026-10-24 before controlled production deployment. Admission is exact-request-only; see [the release receipt](../audits/MEETING_CONTROLLED_DEPLOYMENT_2026-10-24.md). No real email was sent.

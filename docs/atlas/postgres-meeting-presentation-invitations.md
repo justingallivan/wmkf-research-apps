@@ -1,12 +1,12 @@
 ---
 title: Research-presentation invitation receipts
-status: branch-built
-last_verified: 2026-10-23
+status: controlled-production
+last_verified: 2026-10-24
 ---
 
 # Research-presentation invitation receipts
 
-[VERIFIED via source and isolated local PostgreSQL, 2026-10-23] `meeting_presentation_invitations` is the separate request/visit-scoped email ledger introduced by migration 088. It is branch-built and not applied to Production. It does not create calendar events, use the session agenda ledger, or request applicant uploads. `MEETING_PRESENTATION_INVITATION_ACCESS` defaults off and accepts `on` or `test:<request-guid>`; apply and verify migration 088 before enabling it.
+[VERIFIED via source and isolated local PostgreSQL, 2026-10-23] `meeting_presentation_invitations` is the separate request/visit-scoped email ledger introduced by migration 088. Migration 088 is applied to Production and the runtime is deployed (2026-10-24 canonical-runner and schema readback). Admission is limited to `185415ef-3750-4806-84c7-fb6dd032af31`; see the [controlled production release](../audits/MEETING_CONTROLLED_DEPLOYMENT_2026-10-24.md). It does not create calendar events, use the session agenda ledger, or request applicant uploads. `MEETING_PRESENTATION_INVITATION_ACCESS` defaults off and accepts `on` or `test:<request-guid>`; apply and verify migration 088 before enabling it.
 
 The Meeting Tracker invitation route checks app access and DAL context; service checks require a current eligible linked staff profile, the session mailbox and an accessible eligible request. Preview resolves the saved visit's required To and optional Cc groups from the existing recipient directory, without filling empty groups. The frozen snapshot includes request/visit identity and ETag, attendee refs and mailboxes, sender identity/signature and reviewed subject/message. Preview creates a frozen Postgres row only. Sending verifies the full context before creation and again before dispatch, with lease and impersonation checks at each intervening boundary, requires the original sender and exact operation version, and requires `DYNAMICS_IMPERSONATION_ENABLED=true` and uses explicit actor plus `noFallback:true` for Dynamics create and SendEmail.
 
@@ -16,6 +16,6 @@ Previews expire after fifteen minutes. Existing daily maintenance runs independe
 
 Producers: `lib/services/meeting-coordination/invitation-service.js` and `invitation-store.js`; maintenance calls `cleanupInvitations`. Consumers: strict `/api/meeting-tracker/visits/[requestId]/invitation` and PresentationInvitationPanel in the before-meeting workspace. No raw media, provider credentials or tokens are stored.
 
-Tests apply the actual SQL in a random loopback PostgreSQL schema: concurrent claim, lease expiry/token mismatch, unresolved uniqueness, recipient shape, content redaction, scoped cleanup and concurrent cap enforcement including differently cased UUIDs. Service/route/UI tests replace all remote transport and identity seams. No real email, production write or deployment is part of verification.
+Tests apply the actual SQL in a random loopback PostgreSQL schema: concurrent claim, lease expiry/token mismatch, unresolved uniqueness, recipient shape, content redaction, scoped cleanup and concurrent cap enforcement including differently cased UUIDs. Service/route/UI tests replace all remote transport and identity seams. The isolated tests send no real email or production write; subsequent deployment is recorded above. No real email rehearsal was performed.
 
 Operational recovery: use the retained activity ID to inspect the exact email in Dynamics. If an uncertain Send still shows Draft, the original sender or administrator must confirm it is unsent and cancel it using the existing Dynamics controls, then choose **Check email status**. A closed/cancelled activity resolves without dispatch. For mismatched or duplicate correlation activities, an administrator inspects the exact activities and closes the unsent drafts; reconciliation remains read-only. Never clear the ledger fence in SQL or use another preview to bypass uncertain transport. A missing activity after durable Send intent remains unknown and requires transport investigation; absence alone cannot prove non-delivery.

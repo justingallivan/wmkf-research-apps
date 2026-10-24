@@ -1,5 +1,7 @@
 # Meeting Tracker bounded rehearsal — passed; controlled deployment recommended
 
+Subsequent status (2026-10-24): owner-authorized deployment and migrations are recorded in the [controlled production receipt](MEETING_CONTROLLED_DEPLOYMENT_2026-10-24.md). The rehearsal and pre-release verdict below retain their dated scope.
+
 [VERIFIED via API receipts, isolated Postgres, Vercel builds, real Blob/Sandbox execution and exact production-fixture readback, 2026-10-23 America/Los_Angeles] Runtime candidate `1f99d7635` on `codex/session-start-20261023`. The owner explicitly authorized isolated Preview tests followed by a production rehearsal using dedicated synthetic records, without emails or changes to existing business records. Production application deployment, configuration and primary-database migrations were not performed.
 
 ## Results and execution boundary

@@ -1,12 +1,12 @@
 ---
 title: Manual presentation video pairs
-status: branch-built
-last_verified: 2026-10-23
+status: controlled-production
+last_verified: 2026-10-24
 ---
 
 # Manual presentation video pairs
 
-[VERIFIED via branch source and isolated media/database tests, 2026-10-23; not deployed] Migration 089 introduces `manual_presentation_video_pairs` and adds nullable `manual_pairing_id` to `presentation_video_splits`. Each split must have exactly one source: the existing copied Zoom row or a manual pair. The production migration tracker remains through 085; 086–089 have not been applied there. Fresh installs replay the same migration manifest.
+[VERIFIED via source, isolated media/database tests and owner-authorized Production schema readback, 2026-10-24] Migration 089 introduces `manual_presentation_video_pairs` and adds nullable `manual_pairing_id` to `presentation_video_splits`. Each split must have exactly one source: the existing copied Zoom row or a manual pair. Migrations 086–089 are applied to Production and the runtime is deployed. Manual admission remains exact-request-only for `185415ef-3750-4806-84c7-fb6dd032af31`; see the [controlled production release](../audits/MEETING_CONTROLLED_DEPLOYMENT_2026-10-24.md). Fresh installs replay the same migration manifest.
 
 Admission requires both existing video-split access and separate `MEETING_MANUAL_VIDEO_PAIRING_ACCESS` (`off` by default, `on` or exact `test:<request GUID>`), current Meeting Tracker staff identity and the authoritative active request/visit binding. An uploaded-audio transcript must retain its normalized original source ID, SHA-256, bytes and duration. A plain text transcript cannot prove correspondence. Current RECORDING winner and Graph size/quickXorHash establish MP4 identity. Staff cannot supply file paths, hashes, provenance or a claimed verification receipt.
 
@@ -20,6 +20,6 @@ States: `awaiting_audio` → `ready` → `attached` → `verified`; definite cor
 
 The existing video drain and daily maintenance each clean at most two eligible stages per pass, even with admission off. Verified/rejected raw input becomes eligible after capability expiry; other staging expires after 24 hours. Cleanup locks the exact stage, excludes active attached processing, deletes only its stored pathname and clears it after successful deletion. Failures retain it with fifteen-minute backoff so one failing path does not starve unrelated cleanup. Verified proof metadata remains; unused cleaned unverified rows without split references expire after thirty more days. Cleanup skips only a missing table before migration. Existing Sandbox cleanup stays independent of processing state.
 
-Tests use actual migrations in random loopback PostgreSQL schemas and tiny local synthetic FFmpeg media; route/worker/UI tests replace all external transport. No paid Sandbox, real staff media, production migration or deployment was used. The conservative exact-audio requirement is a supported limitation, not a claim that arbitrary converted files can synchronize.
+Tests use actual migrations in random loopback PostgreSQL schemas and tiny local synthetic FFmpeg media; route/worker/UI tests replace all external transport. Those isolated tests used no paid Sandbox, real staff media, production migration or deployment; subsequent bounded cloud rehearsal and controlled release are separately recorded. The conservative exact-audio requirement is a supported limitation, not a claim that arbitrary converted files can synchronize.
 
 Metadata eTag distinction: worker/pair reuse checks content size/quickXorHash and tolerates metadata-only eTag drift. Existing candidate approval remains stricter: changing the saved RECORDING row eTag requires a fresh cut/review. This increment does not weaken that existing approval contract.

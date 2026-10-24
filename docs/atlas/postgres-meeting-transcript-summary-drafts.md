@@ -22,9 +22,9 @@ related:
 
 # Atlas: Site Visit summary drafts (Postgres)
 
-## Branch continuation — 2026-10-23
+## Controlled production continuation — 2026-10-24
 
-[VERIFIED via source and isolated PostgreSQL] Migration 087 and the durable preparation continuation are branch-built, not applied or deployed. See [durable preparation](postgres-meeting-material-preparations.md). Owned summary attempts add preparation/outcome/initiation metadata; protected reserved/dispatched/unknown ownership survives both the six-minute abandonment age and fourteen-day text expiry, and every legacy reservation checks it under the same advisory lock. The provider acknowledgement is intentionally removed for new Meeting Tracker calls; historical true acknowledgements remain and initiation is recorded separately. The dated Production release evidence below predates this branch.
+[VERIFIED via source and isolated PostgreSQL] Migration 087 is applied to Production with validated uncertainty/acknowledgement constraints and the durable preparation continuation is deployed behind an exact-request admission control. See [durable preparation](postgres-meeting-material-preparations.md). Owned summary attempts add preparation/outcome/initiation metadata; protected reserved/dispatched/unknown ownership survives both the six-minute abandonment age and fourteen-day text expiry, and every legacy reservation checks it under the same advisory lock. The provider acknowledgement is intentionally removed for new Meeting Tracker calls; historical true acknowledgements remain and initiation is recorded separately. The dated Production release evidence below predates this branch.
 
 ## Status
 
@@ -134,7 +134,7 @@ those correction drafts are label-only (speaker names and the presentation end; 
 
 ## Readers and writers
 
-`lib/services/post-presentation-materials/summary-draft-store.js` owns ordinary draft CRUD. The branch-built `meeting-coordination/preparation-store.js` also reads owned-result state and performs explicit abandonment and expired-worker uncertainty transitions under the shared reservation lock. Its callers:
+`lib/services/post-presentation-materials/summary-draft-store.js` owns ordinary draft CRUD. The deployed `meeting-coordination/preparation-store.js` also reads owned-result state and performs explicit abandonment and expired-worker uncertainty transitions under the shared reservation lock. Its callers:
 - `transcript-summary-service.js`, through the routes
   `/api/meeting-tracker/visits/[requestId]/transcriptions/summary-draft` and
   `.../summary-draft/publish` (`meeting-tracker` app access);

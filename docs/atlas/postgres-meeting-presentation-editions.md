@@ -1,12 +1,12 @@
 ---
 title: Meeting presentation approvals
-status: branch-built
-last_verified: 2026-10-23
+status: controlled-production
+last_verified: 2026-10-24
 ---
 
 # Meeting presentation approvals
 
-[VERIFIED via migration 086 and isolated PostgreSQL tests, 2026-10-23] Source-built on `codex/session-start-20261023`; not deployed. The owner-authorized filenames-only Production tracker query found no migration 086, and 355 local/remote refs had no allocation above 085. This does not prove physical Production schema. Apply migration 086 with the canonical migration runner and verify both tables and constraints before deploying the new readers; no production apply is authorized by that filename query.
+[VERIFIED via owner-authorized canonical migration runner and physical schema readback, 2026-10-24] Migration 086 is applied to Production; tables and composite foreign key are verified. Edition-aware readers/writers are deployed. New enrollment is admitted only when the request matches `MEETING_MATERIAL_PREPARATION_ACCESS`; existing enrolled readers and withdrawal are retained independently of that new-enrollment control. See the [controlled production release](../audits/MEETING_CONTROLLED_DEPLOYMENT_2026-10-24.md). No broader activation is authorized.
 
 `meeting_presentation_visibility` holds one sticky enrollment row per Dataverse Request GUID, a nullable active edition UUID, monotonic optimistic version, and enrollment/change/withdrawal actors and times. Its composite foreign key prevents a cross-request active pointer. No row means existing legacy presentation selection; an enrolled row with no active edition means no presentation members. Database errors never authorize legacy fallback.
 

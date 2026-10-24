@@ -3,7 +3,7 @@ title: Meeting Coordination Implementation Plan
 domain: product
 kind: plan
 status: in-progress
-summary: Staged implementation of the Workbench-first meeting design, durable preparation and Program Coordinator approval of versioned Board materials; workflow branch-built and bounded rehearsal passed; ready for controlled deployment, not deployed.
+summary: Staged implementation of the Workbench-first meeting design, durable preparation and Program Coordinator approval of versioned Board materials; workflow deployed with migrations 086–089 after bounded rehearsal; new admission limited to the dedicated test request.
 canonical: false
 owner: product-engineering
 related:
@@ -22,6 +22,10 @@ related:
 [VERIFIED via owner instruction, 2026-10-23] This session authorizes preparing this implementation plan. No runtime code, schema, deployment, live records, mail, paid processing or environment settings are changed by this plan. The owner subsequently authorized verification of the Opus findings and plan correction; the subsequent owner decisions below settle the identified product alternatives. The product decisions below are settled; the proposed technical design requires implementation verification. No live schema or production configuration was probed for this planning pass.
 
 Scope includes cycle/session navigation, meeting setup and agenda controls, invitation continuity, materials collection, recording import/review, durable output preparation, summary editing, Board approval/withdrawal and Workbench consumption. Existing meeting/calendar automation is not expanded into a new calendar invitation service. Do not rename internal app keys, existing routes, entities or artifact enums merely to adopt approved display terminology.
+
+## Controlled production checkpoint — 2026-10-24
+
+[VERIFIED via owner instruction, canonical migration runner, physical readback and Vercel Ready deployment] Controlled deployment is authorized and migrations 086–089 are applied. New preparation, manual pairing, invitations and first approval enrollment remain restricted to dedicated request `185415ef-3750-4806-84c7-fb6dd032af31`. Existing materials access is retained. See [production evidence and rollback boundary](../audits/MEETING_CONTROLLED_DEPLOYMENT_2026-10-24.md). Earlier implementation/planning checkpoints below are dated historical evidence, including their then-unapplied migration and release statements.
 
 ## Implementation checkpoint — 2026-10-23
 
