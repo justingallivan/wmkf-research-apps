@@ -5,7 +5,8 @@
  *
  * Selects proposals the same way `readProposalRankingSource` does: exact cycle,
  * SE/MR research programs, ordinary (non-test) requests, the trial cutoff, and
- * Phase II Pending. Prints every proposal whose amounts differ or whose invited
+ * Phase II Pending. Test requests are always excluded, as production does, and
+ * listed separately. Prints every proposal whose amounts differ or whose invited
  * amount is blank, then a summary.
  *
  *   node scripts/probe-ranking-invited-amounts.mjs --cycle=D26
@@ -28,7 +29,7 @@ if (!cycleCode) { console.error('Give --cycle=<code>, e.g. --cycle=D26'); proces
 
 const { DynamicsService } = await import('../lib/services/dynamics-service.js');
 const { bypassDynamicsRestrictions } = await import('../lib/services/dynamics-context.js');
-const { withOrdinaryTestRequestODataFilter } = await import('../lib/services/test-requests/isolation.js');
+const { TEST_REQUEST_ISOLATION_FIELDS } = await import('../lib/services/test-requests/isolation.js');
 const { cycleCodeToOdataFilter } = await import('../lib/utils/cycle-code.js');
 const { RESEARCH_PROGRAM_IDS } = await import('../shared/config/researchPrograms.js');
 const { PHASE_II_PENDING } = await import('../shared/config/workbenchVisibility.js');
@@ -42,13 +43,16 @@ const money = (v) => (v == null ? '(blank)' : `$${Number(v).toLocaleString('en-U
 await bypassDynamicsRestrictions('probe-ranking-invited-amounts', async () => {
   console.log(`host: ${new URL(process.env.DYNAMICS_URL).host}`);
   const result = await DynamicsService.queryAllRecords('akoya_requests', {
-    select: 'akoya_requestid,akoya_requestnum,akoya_title,akoya_request,wmkf_invitedamount,akoya_requeststatus,_akoya_programid_value',
-    filter: withOrdinaryTestRequestODataFilter(`${cycleFilter} and ${programFilter}`, process.env),
+    select: `akoya_requestid,akoya_requestnum,akoya_title,akoya_request,wmkf_invitedamount,akoya_requeststatus,_akoya_programid_value,${TEST_REQUEST_ISOLATION_FIELDS.marker},${TEST_REQUEST_ISOLATION_FIELDS.runId}`,
+    filter: `${cycleFilter} and ${programFilter}`,
     orderby: 'akoya_requestnum asc,akoya_requestid asc',
   });
   if (result.capped) { console.error('Request scan was capped; results would be incomplete.'); process.exit(1); }
-  const { requests } = applyProposalRankingTrialCutoff(result.records);
+  // Same predicate as TEST_REQUEST_ORDINARY_OData_FILTER, applied here so excluded test requests can be listed.
+  const isTest = (row) => row[TEST_REQUEST_ISOLATION_FIELDS.marker] === true || row[TEST_REQUEST_ISOLATION_FIELDS.runId] != null;
+  const { requests } = applyProposalRankingTrialCutoff(result.records.filter((row) => !isTest(row)));
   const eligible = requests.filter((row) => row.akoya_requeststatus === PHASE_II_PENDING);
+  const tests = result.records.filter((row) => isTest(row) && row.akoya_requeststatus === PHASE_II_PENDING);
 
   const differ = [];
   const blank = [];
@@ -68,4 +72,6 @@ await bypassDynamicsRestrictions('probe-ranking-invited-amounts', async () => {
   console.log(`\n== Invited amount blank (ranking falls back to requested): ${blank.length}`);
   blank.forEach((l) => console.log(l));
   console.log(`\n== Invited equals requested: ${eligible.length - differ.length - blank.length}`);
+  console.log(`\n== Excluded Phase II Pending test requests: ${tests.length}`);
+  tests.forEach((row) => console.log(`  #${row.akoya_requestnum} | ${row.akoya_title || ''}`));
 });
