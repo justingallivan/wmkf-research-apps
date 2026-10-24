@@ -44,6 +44,18 @@ preference and preview mechanisms after tracing their contracts. The Meeting
 Tracker implementation selects its own route and existing preference store; this note
 does not select an API or generalized editor for suite-wide use.
 
+## Slice 2 owner decisions — 2026-10-24
+
+[PLANNED; explicit owner direction.] Reviewer deadline emails follow
+`docs/plans/PERSONAL_EMAIL_REVIEWER_DEADLINE_DEFAULTS_PLAN_2026-10-24.md`.
+Only the assigned PD may change/restore the deadline or retry/resend its email;
+there is no superuser exception. From/To stay server-controlled; optional Cc is
+for one send only. Unlike required-content policies in other families, the PD may
+edit or delete all body content, including signature and deadline placeholders.
+The authoritative saved date/calendar remain server-controlled. Review precedes
+save/send, restore and resend; explicit defaults, fallback notices, local retry
+wording/Cc and customizable subjects are specified in that plan. Not implemented.
+
 ## Current evidence and next work
 
 [VERIFIED via source, tests, merge and Production evidence 2026-09-20]

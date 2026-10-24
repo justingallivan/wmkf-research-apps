@@ -39,7 +39,7 @@
 Exact prior handoff: `git show f66eee9e0:SESSION_PROMPT.md` (verified retrievable). It retains the full Session 636 D26 correction history, optional suggestions, private-folder and rollback constraints. These are recorded boundaries, not newly selected work:
 
 - Proposal Ranking D26 invited-amount correction is DONE; no re-ranking or new write authorized. Rollback requires the correction script's unchanged-state checks and a fresh owner instruction. Owning plan: `docs/plans/PROPOSAL_RANKING_D26_INVITED_AMOUNT_CORRECTION_2026-10-23.md`.
-- Personal email defaults: slice 3 shipped (PR #517); slice 2 remains plan-first. `docs/plans/PERSONAL_EMAIL_DEFAULTS_INVENTORY_2026-09-24.md`.
+- Personal email defaults: slice 3 shipped (PR #517); slice 2 owner decisions agreed 2026-10-24; implementation remains planned. `docs/plans/PERSONAL_EMAIL_REVIEWER_DEADLINE_DEFAULTS_PLAN_2026-10-24.md`.
 - J27 / overlapping cycles: proposed; calendar authority and related owner decisions remain open in `docs/plans/CYCLE_ROLLOVER_MINIMAL_CONFIGURATION_PLAN_2026-10-06.md`.
 - Research Institution at Award: Stages A/B applied and verified; confirm-your-details campaign tabled 2026-10-24, Connor confirmation/message retired. Preserve sensitive owner folders and conditional rollback rules. `docs/plans/RESEARCH_INSTITUTION_AT_AWARD_BACKFILL_PLAN_2026-10-20.md`.
 - Grant Reporting sunset is parked; any successor investigator list should use `lib/services/proposal-participants.js` `fetchCoPIs`. Shared roles shipped in PR #516. Reviewer panel coverage remains parked; Expense Reporter unchanged; Literature Analyzer has no selected task.
