@@ -1,12 +1,12 @@
 ---
 title: Meeting presentation approvals
-status: controlled-production
+status: live
 last_verified: 2026-10-24
 ---
 
 # Meeting presentation approvals
 
-[VERIFIED via owner-authorized canonical migration runner and physical schema readback, 2026-10-24] Migration 086 is applied to Production; tables and composite foreign key are verified. Edition-aware readers/writers are deployed. New enrollment is admitted only when the request matches `MEETING_MATERIAL_PREPARATION_ACCESS`; existing enrolled readers and withdrawal are retained independently of that new-enrollment control. See the [controlled production release](../audits/MEETING_CONTROLLED_DEPLOYMENT_2026-10-24.md). No broader activation is authorized.
+[VERIFIED via owner-authorized canonical migration runner and physical schema readback, 2026-10-24] Migration 086 is applied to Production; tables and composite foreign key are verified. Edition-aware readers/writers are deployed. New enrollment is admitted only when the request matches `MEETING_MATERIAL_PREPARATION_ACCESS`; existing enrolled readers and withdrawal are retained independently of that new-enrollment control. See the [controlled production release](../audits/MEETING_CONTROLLED_DEPLOYMENT_2026-10-24.md). The owner subsequently authorized ordinary activation once all release checks passed; see [the activation receipt](../audits/MEETING_ORDINARY_ACTIVATION_2026-10-24.md).
 
 `meeting_presentation_visibility` holds one sticky enrollment row per Dataverse Request GUID, a nullable active edition UUID, monotonic optimistic version, and enrollment/change/withdrawal actors and times. Its composite foreign key prevents a cross-request active pointer. No row means existing legacy presentation selection; an enrolled row with no active edition means no presentation members. Database errors never authorize legacy fallback.
 

@@ -3,7 +3,7 @@ title: Meeting Coordination Implementation Plan
 domain: product
 kind: plan
 status: in-progress
-summary: Staged implementation of the Workbench-first meeting design, durable preparation and Program Coordinator approval of versioned Board materials; workflow deployed with migrations 086–089 after bounded rehearsal; new admission limited to the dedicated test request.
+summary: Staged implementation of the Workbench-first meeting design, durable preparation and Program Coordinator approval of versioned Board materials; workflow deployed with migrations 086–089 after bounded rehearsal; ordinary admission enabled after all green release checks and owner authorization.
 canonical: false
 owner: product-engineering
 related:
@@ -22,6 +22,10 @@ related:
 [VERIFIED via owner instruction, 2026-10-23] This session authorizes preparing this implementation plan. No runtime code, schema, deployment, live records, mail, paid processing or environment settings are changed by this plan. The owner subsequently authorized verification of the Opus findings and plan correction; the subsequent owner decisions below settle the identified product alternatives. The product decisions below are settled; the proposed technical design requires implementation verification. No live schema or production configuration was probed for this planning pass.
 
 Scope includes cycle/session navigation, meeting setup and agenda controls, invitation continuity, materials collection, recording import/review, durable output preparation, summary editing, Board approval/withdrawal and Workbench consumption. Existing meeting/calendar automation is not expanded into a new calendar invitation service. Do not rename internal app keys, existing routes, entities or artifact enums merely to adopt approved display terminology.
+
+## Ordinary activation — 2026-10-24
+
+[VERIFIED via owner authorization, all green release checks and production flag readback] The three new workflow controls are `on` for eligible ordinary requests. Explicit Coordinator enrollment/approval, current access checks, unknown-attempt fences and email safeguards remain. No historical request is automatically enrolled or approved. See [the activation receipt](../audits/MEETING_ORDINARY_ACTIVATION_2026-10-24.md). The controlled-production checkpoint below is the earlier restricted phase.
 
 ## Controlled production checkpoint — 2026-10-24
 

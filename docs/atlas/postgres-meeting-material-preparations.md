@@ -1,12 +1,12 @@
 ---
 title: Durable meeting material preparation
-status: controlled-production
+status: live
 last_verified: 2026-10-24
 ---
 
 # Durable meeting material preparation
 
-[VERIFIED via owner-authorized canonical migration runner, physical schema readback and deployed production GET, 2026-10-24] Migrations 086–089 are applied and runtime is deployed. Durable preparation access is exact-request-only for `185415ef-3750-4806-84c7-fb6dd032af31`; another request was denied. A scheduled production drain returned HTTP 200. See the [controlled production release](../audits/MEETING_CONTROLLED_DEPLOYMENT_2026-10-24.md). Full synthetic processing evidence remains the preceding bounded rehearsal, not a claim of fresh production provider processing.
+[VERIFIED via owner-authorized canonical migration runner, physical schema readback and deployed production GET, 2026-10-24] Migrations 086–089 are applied and runtime is deployed. The initial dedicated-request restriction was subsequently lifted by owner authorization after all release checks passed on 2026-10-24; `MEETING_MATERIAL_PREPARATION_ACCESS=on` admits eligible ordinary requests. The earlier cohort negative control was denied before activation. A scheduled production drain returned HTTP 200. See the [controlled production release](../audits/MEETING_CONTROLLED_DEPLOYMENT_2026-10-24.md). Full synthetic processing evidence remains the preceding bounded rehearsal, not a claim of fresh production provider processing.
 
 `meeting_material_preparations` identifies one request/active-visit/input fingerprint, frozen content-free source and recording/slides references, initiating profile/system user, published source identity and monotonic version. The request foreign key requires sticky presentation-approval enrollment. Creation and all five child rows commit together; a repeated input uses `ON CONFLICT DO NOTHING` without restamping.
 
@@ -26,6 +26,6 @@ The Meeting Tracker audio/Zoom provider checkbox is removed across strict routes
 
 ## Limits and retention
 
-No automatic parent/step cleanup in this increment: one bounded row per deliberate input identity, five bounded child rows; retry updates the same step and preserves successful siblings. No transcript text, speaker names, credentials, tokens or media URLs are stored in the new ledgers. Source/file/lease checks use snapshot semantics across Postgres/Dataverse/SharePoint, not a cross-system transaction. Migration-first deployment, disabled-by-default admission and the edition-aware rollback floor are release prerequisites. The combined save/review interaction, coordinator collection dispatch, consultant pickers, keyboard agenda ordering and writeup-first Workbench are deployed continuations; see the implementation plan and continuation review receipt. Manual video-source pairing is also deployed behind its separate exact-request control. Presentation invitation email uses its own migration-088 ledger, not this preparation queue.
+No automatic parent/step cleanup in this increment: one bounded row per deliberate input identity, five bounded child rows; retry updates the same step and preserves successful siblings. No transcript text, speaker names, credentials, tokens or media URLs are stored in the new ledgers. Source/file/lease checks use snapshot semantics across Postgres/Dataverse/SharePoint, not a cross-system transaction. Migration-first deployment, disabled-by-default admission and the edition-aware rollback floor are release prerequisites. The combined save/review interaction, coordinator collection dispatch, consultant pickers, keyboard agenda ordering and writeup-first Workbench are deployed continuations; see the implementation plan and continuation review receipt. Manual video-source pairing is also deployed behind its separate request admission control (now `on` after owner-authorized activation). Presentation invitation email uses its own migration-088 ledger, not this preparation queue.
 
 Tests: actual 070/071/075/086/087 SQL in random local schemas; duplicate input, concurrent claim, fenced finish, six-minute/fourteen-day ownership, legacy reservation refusal, explicit abandonment, late completion and recovery of saved results. Worker/route/UI tests use fake provider and remote services. Those isolated tests perform no Production write, deployment, mail or paid model processing; the later controlled release is recorded above.

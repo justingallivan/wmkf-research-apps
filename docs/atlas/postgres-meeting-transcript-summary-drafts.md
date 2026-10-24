@@ -24,7 +24,7 @@ related:
 
 ## Controlled production continuation — 2026-10-24
 
-[VERIFIED via source and isolated PostgreSQL] Migration 087 is applied to Production with validated uncertainty/acknowledgement constraints and the durable preparation continuation is deployed behind an exact-request admission control. See [durable preparation](postgres-meeting-material-preparations.md). Owned summary attempts add preparation/outcome/initiation metadata; protected reserved/dispatched/unknown ownership survives both the six-minute abandonment age and fourteen-day text expiry, and every legacy reservation checks it under the same advisory lock. The provider acknowledgement is intentionally removed for new Meeting Tracker calls; historical true acknowledgements remain and initiation is recorded separately. The dated Production release evidence below predates this branch.
+[VERIFIED via source and isolated PostgreSQL] Migration 087 is applied to Production with validated uncertainty/acknowledgement constraints and the durable preparation continuation is deployed with `MEETING_MATERIAL_PREPARATION_ACCESS=on` after owner-authorized activation on 2026-10-24. See [durable preparation](postgres-meeting-material-preparations.md). Owned summary attempts add preparation/outcome/initiation metadata; protected reserved/dispatched/unknown ownership survives both the six-minute abandonment age and fourteen-day text expiry, and every legacy reservation checks it under the same advisory lock. The provider acknowledgement is intentionally removed for new Meeting Tracker calls; historical true acknowledgements remain and initiation is recorded separately. The dated Production release evidence below predates this branch.
 
 ## Status
 

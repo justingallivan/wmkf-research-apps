@@ -1,5 +1,7 @@
 # Meeting Tracker controlled production deployment — 2026-10-24
 
+Subsequent status: all release checks, including JavaScript CodeQL on the current production source, passed. The owner authorized ordinary activation; see [the activation receipt](MEETING_ORDINARY_ACTIVATION_2026-10-24.md). The restriction and pending-analysis statements below describe the historical controlled phase.
+
 [VERIFIED via owner instruction, Git push, canonical migration runner, schema readback, Vercel Ready status and authenticated production browser] The owner authorized this controlled release and required migrations while retaining exact-request admission. Runtime change `d54b8b008` integrated current main `85e106bb5`; test-only follow-up `6f418b54e` names a stateful mock to satisfy the full CI lint gate. No other agent's working checkout was switched or reset.
 
 ## Deployment and cohort
@@ -38,4 +40,4 @@ No ordinary-traffic activation is performed. Real mail and a fresh genuine Zoom/
 
 Contract-reconcile Mode B: release entry → canonical migrations → physical constraints → request-scoped admission → authenticated routes → existing artifact readers → scheduled worker checked; partial processing and retained-edition semantics rely on the separately recorded bounded rehearsal. Sweep scope: current Atlas pages, release checklist, implementation checkpoint, handoff and this receipt. Dated planning/review receipts remain historical.
 
-Current verdict: **controlled deployment and production functional checks passed; access remains limited to the dedicated request**. Full hosted tests are green. The outstanding JavaScript CodeQL run is not represented as a pass; no broader activation follows from this receipt.
+Controlled-phase verdict (before ordinary activation): **controlled deployment and production functional checks passed; access remains limited to the dedicated request**. Full hosted tests are green. The outstanding JavaScript CodeQL run is not represented as a pass; no broader activation follows from this receipt.

@@ -1,12 +1,12 @@
 ---
 title: Research-presentation invitation receipts
-status: controlled-production
+status: live
 last_verified: 2026-10-24
 ---
 
 # Research-presentation invitation receipts
 
-[VERIFIED via source and isolated local PostgreSQL, 2026-10-23] `meeting_presentation_invitations` is the separate request/visit-scoped email ledger introduced by migration 088. Migration 088 is applied to Production and the runtime is deployed (2026-10-24 canonical-runner and schema readback). Admission is limited to `185415ef-3750-4806-84c7-fb6dd032af31`; see the [controlled production release](../audits/MEETING_CONTROLLED_DEPLOYMENT_2026-10-24.md). It does not create calendar events, use the session agenda ledger, or request applicant uploads. `MEETING_PRESENTATION_INVITATION_ACCESS` defaults off and accepts `on` or `test:<request-guid>`; apply and verify migration 088 before enabling it.
+[VERIFIED via source and isolated local PostgreSQL, 2026-10-23] `meeting_presentation_invitations` is the separate request/visit-scoped email ledger introduced by migration 088. Migration 088 is applied to Production and the runtime is deployed (2026-10-24 canonical-runner and schema readback). After all release checks passed, owner-authorized ordinary activation set `MEETING_PRESENTATION_INVITATION_ACCESS=on` on 2026-10-24; see the [controlled production release](../audits/MEETING_CONTROLLED_DEPLOYMENT_2026-10-24.md). It does not create calendar events, use the session agenda ledger, or request applicant uploads. `MEETING_PRESENTATION_INVITATION_ACCESS` defaults off and accepts `on` or `test:<request-guid>`; apply and verify migration 088 before enabling it.
 
 The Meeting Tracker invitation route checks app access and DAL context; service checks require a current eligible linked staff profile, the session mailbox and an accessible eligible request. Preview resolves the saved visit's required To and optional Cc groups from the existing recipient directory, without filling empty groups. The frozen snapshot includes request/visit identity and ETag, attendee refs and mailboxes, sender identity/signature and reviewed subject/message. Preview creates a frozen Postgres row only. Sending verifies the full context before creation and again before dispatch, with lease and impersonation checks at each intervening boundary, requires the original sender and exact operation version, and requires `DYNAMICS_IMPERSONATION_ENABLED=true` and uses explicit actor plus `noFallback:true` for Dynamics create and SendEmail.
 

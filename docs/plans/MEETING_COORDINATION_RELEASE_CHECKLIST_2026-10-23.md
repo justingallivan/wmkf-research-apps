@@ -1,6 +1,6 @@
 # Meeting coordination release checklist
 
-[VERIFIED via branch implementation and local validation, 2026-10-23] Code is on `codex/session-start-20261023` in its isolated worktree. Product decisions are settled. The owner authorized controlled production deployment and required migrations on 2026-10-24, retaining dedicated-request admission. This does not authorize ordinary-traffic activation or real email.
+[VERIFIED via branch implementation and local validation, 2026-10-23] Code is on `codex/session-start-20261023` in its isolated worktree. Product decisions are settled. The owner authorized controlled production deployment and required migrations on 2026-10-24, retaining dedicated-request admission. The owner subsequently authorized ordinary activation once all checks passed; this activation sends no real email.
 
 ## Prepared
 
@@ -12,7 +12,7 @@
 - Rare manual original-audio/MP4 correspondence in the existing cut worker, reusable proof, explicit replacement and bounded cleanup.
 - Ordinary Opus product reviews, findings verified/fixed, scoped tests, build, gates and synthetic browser/media checks; linked receipts in `docs/audits/MEETING_*OPUS_REVIEW_2026-10-23.md`.
 
-## Promotion sequence — controlled release authorized; broader activation held
+## Release sequence — controlled deployment and ordinary activation completed
 
 1. Re-check migration allocation and branch integration against other agents before promotion. Preserve unrelated changes. Apply 086–089 to the authorized release environment using `scripts/apply-migrations.js`; never use fresh setup on an existing database. This source release requires the new columns even while new admission flags are off.
 2. Deploy the consistent edition-aware readers and writers together with new-work admission off. Keep `MEETING_MATERIAL_PREPARATION_ACCESS`, `MEETING_PRESENTATION_INVITATION_ACCESS` and `MEETING_MANUAL_VIDEO_PAIRING_ACCESS` off for ordinary traffic. Verify Shared Admin Coordinator identity and explicit `DYNAMICS_IMPERSONATION_ENABLED=true` without exposing credentials.
@@ -23,4 +23,4 @@
 
 [VERIFIED via bounded isolated cloud tests and dedicated production fixture, 2026-10-23] Preparation, edited-summary preservation/selective retry, real manual upload/cut, both external readers, retained old approved bytes during correction, replacement and withdrawal passed. Two runtime defects were fixed and approved by ordinary OAuth Opus reviews. Zero regarding emails; null business bindings verified; reader links revoked and owned compute cleaned. See [the rehearsal receipt](../audits/MEETING_HOSTED_REHEARSAL_2026-10-23.md) for exact candidate/deployments, safety inventory and test limits.
 
-[VERIFIED via canonical migration runner, physical readback and Vercel Ready deployment, 2026-10-24] Controlled production deployment and migrations 086–089 are complete. New preparation, manual pairing and invitation admission remain exact-request-only; new enrollment uses that same preparation cohort. See [the production receipt](../audits/MEETING_CONTROLLED_DEPLOYMENT_2026-10-24.md). [PLANNED] Broader activation remains held. Actual SSO callback, genuine Zoom/ASR ingestion, real email and clock-driven scheduling remain outside this rehearsal's proof; no further product decision is identified.
+[VERIFIED via canonical migration runner, physical readback and Vercel Ready deployment, 2026-10-24] Controlled production deployment and migrations 086–089 are complete. The three new admission controls are now `on` after all release checks passed and owner-authorized ordinary activation; new enrollment follows preparation admission. See [the production receipt](../audits/MEETING_CONTROLLED_DEPLOYMENT_2026-10-24.md). [VERIFIED via activation readback and Ready deployment] See [ordinary activation](../audits/MEETING_ORDINARY_ACTIVATION_2026-10-24.md). Actual SSO and scheduled empty-worker execution were verified in production; genuine Zoom/ASR ingestion and real email remain outside the synthetic rehearsal proof. No further product decision is identified.

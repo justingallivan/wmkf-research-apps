@@ -1,12 +1,12 @@
 ---
 title: Manual presentation video pairs
-status: controlled-production
+status: live
 last_verified: 2026-10-24
 ---
 
 # Manual presentation video pairs
 
-[VERIFIED via source, isolated media/database tests and owner-authorized Production schema readback, 2026-10-24] Migration 089 introduces `manual_presentation_video_pairs` and adds nullable `manual_pairing_id` to `presentation_video_splits`. Each split must have exactly one source: the existing copied Zoom row or a manual pair. Migrations 086–089 are applied to Production and the runtime is deployed. Manual admission remains exact-request-only for `185415ef-3750-4806-84c7-fb6dd032af31`; see the [controlled production release](../audits/MEETING_CONTROLLED_DEPLOYMENT_2026-10-24.md). Fresh installs replay the same migration manifest.
+[VERIFIED via source, isolated media/database tests and owner-authorized Production schema readback, 2026-10-24] Migration 089 introduces `manual_presentation_video_pairs` and adds nullable `manual_pairing_id` to `presentation_video_splits`. Each split must have exactly one source: the existing copied Zoom row or a manual pair. Migrations 086–089 are applied to Production and the runtime is deployed. After all release checks passed, owner-authorized ordinary activation set `MEETING_MANUAL_VIDEO_PAIRING_ACCESS=on` on 2026-10-24; see the [controlled production release](../audits/MEETING_CONTROLLED_DEPLOYMENT_2026-10-24.md). Fresh installs replay the same migration manifest.
 
 Admission requires both existing video-split access and separate `MEETING_MANUAL_VIDEO_PAIRING_ACCESS` (`off` by default, `on` or exact `test:<request GUID>`), current Meeting Tracker staff identity and the authoritative active request/visit binding. An uploaded-audio transcript must retain its normalized original source ID, SHA-256, bytes and duration. A plain text transcript cannot prove correspondence. Current RECORDING winner and Graph size/quickXorHash establish MP4 identity. Staff cannot supply file paths, hashes, provenance or a claimed verification receipt.
 

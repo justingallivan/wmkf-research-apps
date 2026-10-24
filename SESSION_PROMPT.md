@@ -64,7 +64,7 @@
 Prior handoffs: `git show 4105474a1:SESSION_PROMPT.md` (Session 635) and `git show 5ba8efaf2:SESSION_PROMPT.md`. Recorded owner boundaries, not newly verified tasks:
 
 - Personal email defaults: slice 3 shipped (PR #517); slice 2 is plan-first. `docs/plans/PERSONAL_EMAIL_DEFAULTS_INVENTORY_2026-09-24.md`.
-- Meeting coordination: owner authorized implementation, bounded rehearsal and controlled production deployment including migrations (2026-10-24). Runtime `d54b8b008` is deployed and migrations 086–089 are applied; dedicated request `185415ef-3750-4806-84c7-fb6dd032af31` only until production checks pass. Current release evidence: `docs/audits/MEETING_CONTROLLED_DEPLOYMENT_2026-10-24.md`; release sequence: `docs/plans/MEETING_COORDINATION_RELEASE_CHECKLIST_2026-10-23.md`.
+- Meeting coordination: owner authorized implementation, bounded rehearsal and controlled production deployment including migrations (2026-10-24). Runtime `d54b8b008` is deployed and migrations 086–089 are applied; all checks including CodeQL passed and owner-authorized ordinary admission is now on. Current activation evidence: `docs/audits/MEETING_ORDINARY_ACTIVATION_2026-10-24.md`; release sequence: `docs/plans/MEETING_COORDINATION_RELEASE_CHECKLIST_2026-10-23.md`.
 - J27 / overlapping cycles: proposed; calendar authority and related owner decisions open. `docs/plans/CYCLE_ROLLOVER_MINIMAL_CONFIGURATION_PLAN_2026-10-06.md`.
 - Shared roles: PR #516 released; read assignment through config.
 - Research Institution at Award backfill: Stages A and B applied and verified. `docs/plans/RESEARCH_INSTITUTION_AT_AWARD_BACKFILL_PLAN_2026-10-20.md`.
