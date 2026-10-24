@@ -82,8 +82,12 @@ recorded owner boundaries, not newly verified actionable tasks:
   Owning record: `docs/plans/PERSONAL_EMAIL_DEFAULTS_INVENTORY_2026-09-24.md`.
   Prior owner production-check / queue-drift suggestions are retained in the exact
   handoff above, not selected or promoted into current tasks.
-- Meeting coordination: design parked, no runtime build authorization.
-  `docs/plans/review/MEETING_TRACKER_LANDING_STRUCTURE_2026-10-20.md`.
+- Meeting coordination supersedes its historical parked boundary: owner authorized
+  implementation and bounded hosted rehearsal on `codex/session-start-20261023`.
+  Source candidate `f96529e0d` is built; production promotion is not authorized.
+  Hosted rehearsal is partial because sandbox synthetic request creation failed.
+  `docs/plans/MEETING_COORDINATION_RELEASE_CHECKLIST_2026-10-23.md` and
+  `docs/audits/MEETING_HOSTED_REHEARSAL_2026-10-23.md` own the current evidence.
 - J27 / overlapping cycles: proposed; calendar authority, backup/escalation,
   date-change approval and Connor's external calendar contract remain owner decisions.
   `docs/plans/CYCLE_ROLLOVER_MINIMAL_CONFIGURATION_PLAN_2026-10-06.md`.
