@@ -49,6 +49,11 @@ do before telling the user you can't.
   `loadEnvLocal()` restores it after `env -u`, so the read succeeds. `[VERIFIED
   via S590, 2026-10-09: probe-recording-slot-versions.mjs ran against prod]`
   Check a new probe with `node --check` only, then hand it over.
+- Owner removed `DATAVERSE_ALLOW_PROD_READS=yes` from every local `.env.local`
+  (S635, 2026-10-24), so prod reads now need the flag on the command line.
+  The S635 slip: an added `loadModelOverrides()` call read prod Dataverse
+  settings during a "local-only" lookup test. Treat any script that loads
+  repo services (model overrides, settings, adapters) as prod-touching.
 
 Related: [[feedback-verify-external-platform-claims]],
 [[feedback-cite-ground-truth]].

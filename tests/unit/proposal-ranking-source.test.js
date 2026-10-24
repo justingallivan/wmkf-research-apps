@@ -209,3 +209,39 @@ test('December 2026 trial fails clearly for a malformed request number before do
   })).rejects.toThrow('December 2026 Proposal Ranking trial encountered a missing or malformed request number.');
   expect(DynamicsService.queryAllRecords).toHaveBeenCalledTimes(1);
 });
+
+test.each([
+  ['invited amount when present', { wmkf_invitedamount: 250000, akoya_request: 300000 }, 250000, 'invited'],
+  ['requested amount when invited is blank', { wmkf_invitedamount: null, akoya_request: 300000 }, 300000, 'requested'],
+  ['no amount when both are blank', { wmkf_invitedamount: null, akoya_request: null }, null, null],
+])('uses the %s', async (_label, amounts, amount, amountSource) => {
+  DynamicsService.queryAllRecords.mockImplementation(async (entitySet, options) => {
+    if (entitySet === 'akoya_requests') {
+      expect(options.select.split(',')).toEqual(expect.arrayContaining(['akoya_request', 'wmkf_invitedamount']));
+      return { records: [{
+        akoya_requestid: REQUEST_ID,
+        akoya_requestnum: '1001',
+        akoya_title: 'Proposal',
+        ...amounts,
+        wmkf_meetingdate: '2026-06-15T00:00:00Z',
+        akoya_requeststatus: 'Phase II Pending',
+        _akoya_programid_value: RESEARCH_PROGRAM_IDS[0],
+        _wmkf_programdirector_value: LEAD_ID,
+        _transactioncurrencyid_value: CURRENCY_ID,
+      }] };
+    }
+    if (entitySet === 'wmkf_appreviewersuggestions') return { records: [] };
+    if (entitySet === 'transactioncurrencies') return { records: [{
+      transactioncurrencyid: CURRENCY_ID, currencyname: 'US Dollar', isocurrencycode: 'USD', currencyprecision: 2,
+    }] };
+    if (entitySet === 'systemusers') return { records: [{ systemuserid: LEAD_ID, fullname: 'Active staff', isdisabled: false }] };
+    throw new Error(`Unexpected source entity set: ${entitySet}`);
+  });
+
+  const source = await readProposalRankingSource('J26', {
+    TEST_REQUEST_ISOLATION: 'on',
+    SYNTHETIC_REVIEWER_ISOLATION: 'on',
+  });
+
+  expect(source.proposals[0]).toMatchObject({ amount, amountSource });
+});

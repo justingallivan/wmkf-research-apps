@@ -16,6 +16,9 @@ jest.mock('../../lib/utils/sharepoint-buckets', () => ({
 jest.mock('../../lib/services/graph-service', () => ({
   GraphService: { listFiles: jest.fn() },
 }));
+jest.mock('../../lib/services/proposal-participants.js', () => ({
+  fetchCoPIs: jest.fn(async () => []),
+}));
 const mockSiteVisitFilter = jest.fn();
 const mockCreateSiteVisitFilter = jest.fn();
 jest.mock('../../lib/services/site-visit-materials/recursive-reader-filter.js', () => ({
@@ -26,6 +29,7 @@ import * as grantRequestAdapter from '../../lib/dataverse/adapters/grant-request
 import { getRequestSharePointBuckets } from '../../lib/utils/sharepoint-buckets';
 import { GraphService } from '../../lib/services/graph-service';
 import { lookupGrant } from '../../lib/services/grant-reporting/lookup-grant-service';
+import { fetchCoPIs } from '../../lib/services/proposal-participants.js';
 
 const record = (over = {}) => ({
   akoya_requestid: 'guid-1', akoya_requestnum: '1002836', akoya_title: 'T', ...over,
@@ -36,6 +40,31 @@ beforeEach(() => {
   mockCreateSiteVisitFilter.mockReturnValue(mockSiteVisitFilter);
   mockSiteVisitFilter.mockImplementation(async (_library, _folder, files) => ({ files, omittedFiles: [], error: null }));
   getRequestSharePointBuckets.mockResolvedValue([]);
+});
+
+describe('lookupGrant co-PI header', () => {
+  const rec = record({ _wmkf_projectleader_value_formatted: 'Pat PI', _wmkf_copi1_value_formatted: 'Sam Slot', _wmkf_copi2_value_formatted: 'Jo Junction' });
+  it('lists the PI, then junction co-PIs, then legacy-slot co-PIs not already listed', async () => {
+    grantRequestAdapter.findByRequestNumber.mockResolvedValue({ records: [rec] });
+    fetchCoPIs.mockResolvedValue(['Jo Junction', 'New Copi']);
+    const r = await lookupGrant({ requestNumber: '1002836' });
+    expect(fetchCoPIs).toHaveBeenCalledWith('guid-1');
+    expect(r.header.pis).toEqual(['Pat PI', 'Jo Junction', 'New Copi', 'Sam Slot']);
+  });
+  it('a junction-only co-PI (no slot) appears in the header', async () => {
+    grantRequestAdapter.findByRequestNumber.mockResolvedValue({ records: [record({ _wmkf_projectleader_value_formatted: 'Pat PI' })] });
+    fetchCoPIs.mockResolvedValue(['New Copi']);
+    expect((await lookupGrant({ requestNumber: '1002836' })).header.pis).toEqual(['Pat PI', 'New Copi']);
+  });
+  it('a failed junction read falls back to the legacy slots and still returns found', async () => {
+    grantRequestAdapter.findByRequestNumber.mockResolvedValue({ records: [rec] });
+    fetchCoPIs.mockRejectedValue(new Error('down'));
+    const spy = jest.spyOn(console, 'error').mockImplementation(() => {});
+    const r = await lookupGrant({ requestNumber: '1002836' });
+    expect(r.found).toBe(true);
+    expect(r.header.pis).toEqual(['Pat PI', 'Sam Slot', 'Jo Junction']);
+    spy.mockRestore();
+  });
 });
 
 describe('lookupGrant', () => {

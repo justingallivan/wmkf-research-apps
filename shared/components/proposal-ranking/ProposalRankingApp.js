@@ -3,7 +3,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Button, Card, PageHeader } from '../Layout';
 import { conventionalCycles, cycleCodeToLabel, resolveWorkingCycle } from '../../../lib/utils/cycle-code';
 import { createOperationId, loadProposalRanking, sendProposalRankingAction } from './client';
-import { buildCumulativeTotals, errorMessage, formatMoney, formatScore, moveProposal, PROGRAMS, reviewerScoreIndicator } from './model';
+import { amountLabel, buildCumulativeTotals, errorMessage, formatMoney, formatScore, moveProposal, PROGRAMS, reviewerScoreIndicator } from './model';
 
 const EMPTY_CAPABILITIES = {
   preview: false, open: false, saveOwnList: false, submitOwnList: false,
@@ -34,8 +34,9 @@ function StatusBanner({ kind = 'info', children, className = '' }) {
 }
 
 function ProposalCardRow({ proposal, position, count, total, score, rank, editable, onMove, dragging, onDragStart, onDragOver, onDrop, onDragEnd }) {
+  const amountKind = amountLabel(proposal);
   const amount = proposal.amountMinorUnits == null
-    ? 'Requested amount unavailable'
+    ? 'Unavailable'
     : formatMoney(proposal.amountMinorUnits, proposal.currency);
   const accumulated = total
     ? formatMoney(total.cumulativeMinorUnits, proposal.currency, { incomplete: !total.complete })
@@ -78,7 +79,7 @@ function ProposalCardRow({ proposal, position, count, total, score, rank, editab
               <p className="mt-1 text-sm text-gray-600">{proposal.organization || 'Organization unavailable'}</p>
               {proposal.leadName && <p className="mt-1 text-sm text-gray-600">Lead PD: {proposal.leadName}</p>}
               <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm">
-                <span><span className="font-medium text-gray-700">Requested:</span> {amount}</span>
+                <span><span className="font-medium text-gray-700">{amountKind.label}:</span> {amount}{amountKind.note && <span className="ml-1 text-amber-800">({amountKind.note})</span>}</span>
                 <span><span className="font-medium text-gray-700">Review score:</span> {formatScore(proposal.score)}</span>
                 {score && <span><span className="font-medium text-gray-700">Composite:</span> {score.averageRank.toFixed(2)}{score.tied ? ' · tied' : ''}</span>}
                 {rank?.disagreement && <span className="rounded-full bg-amber-100 px-2 py-0.5 text-xs font-semibold text-amber-900">Disagreement</span>}
@@ -102,9 +103,9 @@ function ProposalCardRow({ proposal, position, count, total, score, rank, editab
               >Open proposal #{proposal.requestNumber}</a>
             </div>
             <div className="w-full rounded-lg bg-gray-50 p-3 text-sm sm:w-52">
-              <p className="text-xs font-medium uppercase tracking-wide text-gray-500">Requested through this rank</p>
+              <p className="text-xs font-medium uppercase tracking-wide text-gray-500">Total through this rank</p>
               <p className="mt-1 font-semibold tabular-nums text-gray-900">{accumulated}</p>
-              {!total?.complete && <p className="mt-1 text-xs text-amber-800">A requested amount is missing or incompatible.</p>}
+              {!total?.complete && <p className="mt-1 text-xs text-amber-800">A proposal amount is missing or incompatible.</p>}
             </div>
           </div>
           <div className="mt-3 flex items-center justify-between gap-3">

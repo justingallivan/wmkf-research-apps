@@ -1,7 +1,7 @@
 import React from 'react';
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import ProposalRankingApp from '../../shared/components/proposal-ranking/ProposalRankingApp';
-import { buildCumulativeTotals, formatMoney, formatScore, moveProposal, reviewerScoreIndicator } from '../../shared/components/proposal-ranking/model';
+import { amountLabel, buildCumulativeTotals, formatMoney, formatScore, moveProposal, reviewerScoreIndicator } from '../../shared/components/proposal-ranking/model';
 import { conventionalCycles, resolveWorkingCycle } from '../../lib/utils/cycle-code';
 
 const mockLoad = jest.fn();
@@ -400,5 +400,14 @@ describe('proposal ranking list calculations', () => {
   test('shows the backend null-mean score shape as not scored', () => {
     expect(formatScore({ mean: null, displayMean: null, ratedCount: 0, receivedCount: 4 })).toBe('Not scored');
     expect(formatScore({ displayMean: 4.25, ratedCount: 2, receivedCount: 4 })).toBe('4.3 · 2/4 rated');
+  });
+});
+
+describe('amountLabel', () => {
+  test('labels invited, requested-fallback, and pre-invited snapshot amounts', () => {
+    expect(amountLabel({ amountSource: 'invited', amountMinorUnits: 100 })).toEqual({ label: 'Invited', note: null });
+    expect(amountLabel({ amountSource: 'requested', amountMinorUnits: 100 })).toEqual({ label: 'Requested', note: 'No invited amount; showing requested amount.' });
+    expect(amountLabel({ amountMinorUnits: 100 })).toEqual({ label: 'Requested', note: null });
+    expect(amountLabel({ amountSource: null, amountMinorUnits: null })).toEqual({ label: 'Amount', note: null });
   });
 });

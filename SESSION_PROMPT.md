@@ -1,114 +1,90 @@
-# Session 635 Prompt: Await owner-selected work after release
+# Session 637 Prompt: Await owner-selected work after the D26 invited-amount correction
 
-## Session 634 Summary — reviewer safeguards and documentation cleanup released
+## Session 636 Summary — Proposal Ranking uses invited amounts; D26 round corrected in place
 
 ### What Was Completed
 
-1. **Released completed work.** [VERIFIED via Git push and Vercel deployment status]
-   `187f27f16` merged candidate `405d17bb8` with current main `c09a4f9a7` and was
-   pushed to main with explicit owner authorization. Production deployment
-   `dpl_55owR5tGAZkLi1fTfwt7399JgDDK` reported Ready and the application domains
-   were assigned. Other session's personal email defaults were preserved.
-2. **Guidance and reviewer safeguards.** Earlier commits in the released branch
-   reconcile active memories/instructions and implement owner-decided identity
-   continuity, request mutation, stale invitation/PD authority, Find exclusion,
-   and first-manual-invitation conflict protections. Detailed evidence remains in
-   `docs/audits/release-candidate-checklist-2026-10-22.md` and linked records.
-3. **Focused local walkthrough.** On `a713ded8b`, synthetic invitation capture,
-   acceptance/reload, staff acceptance, materials preview/send, draft/reload,
-   required answers, submission and post-reload read-only state were exercised.
-   Receipt: `/private/tmp/wmkf-reviewer-rehearsal-receipts/2026-10-23T17-28-11-142Z-7b3ba4d6-fcb8-4883-9436-98158a95262e.json`.
-   It records 90 mocked API calls, no blocked requests, and no human scenario pass.
-   The owned browser/server/temp candidate were closed and cleaned up. The mock
-   does not propagate submission into the staff roster; this is no evidence of a
-   production defect and is not a release blocker.
-4. **Owner-approved confirmation copy.** `405d17bb8` uses “Thank you for submitting
-   your review. If you need to correct or add anything, please contact your Program
-   Director.” The assigned PD's name is a mailto link on both immediate and return
-   screens. Receipt date remains below. 29 focused tests and scoped lint passed.
-5. **Release checks and browser assertion correction.** [VERIFIED via GitHub
-   check-runs for `6de6e465c`] All nine checks succeeded, including Playwright,
-   Jest, PostgreSQL integration, CodeQL's three language jobs, Semgrep, Trivy and
-   Gitleaks. The initial release run `187f27f16` was cancelled for Playwright;
-   the subsequent handoff run `b4072933b` failed three assertions still expecting
-   “Your review is final” after the owner-approved copy change (48 tests passed).
-   `6de6e465c` corrected only those three assertions, preserving every read-only
-   check. The three affected tests passed locally without retries before push;
-   the subsequent hosted Playwright run passed. No runtime code changed in this
-   correction. Prior Linux and pinned FFmpeg evidence retain their documented scope.
+1. **Proposal Ranking ranks on the invited amount.** [VERIFIED via GitHub check-runs on `4a37f2f9b`: six workflows green]
+   - Branch `proposal-ranking-invited-amount`, fast-forward merged by the owner (`4a37f2f9b`).
+   - `lib/dataverse/adapters/proposal-ranking-source.js` selects `wmkf_invitedamount` and falls back to `akoya_request` when blank. It emits `amountSource` (`invited` | `requested` | null). Same currency/precision blocks.
+   - `preview-service.js` freezes `amountSource`; the v2 `publicSnapshot` allowlist passes it (`workflow-service.js:285`).
+   - Cards (V1 `ProposalRankingApp`, V2 `AssessmentWorkflow`) use `amountLabel` (`shared/components/proposal-ranking/model.js`): Invited; Requested + "No invited amount; showing requested amount."; Requested for older snapshots; "Amount Unavailable" when none.
+   - Workbook columns are now Amount / Cumulative amount.
+   - `/contract-reconcile` pass run; it caught the both-blank label case (`ed88d82cb`). Full Jest 1,440 suites green.
+2. **D26 open round corrected in place, without re-ranking.** [VERIFIED via owner-run `--verify`: correction held, D26 active round unchanged, no app activity since the plan]
+   - `scripts/probe-ranking-invited-amounts.mjs` (read-only) found 23 ordinary D26 proposals, 2 with invited ≠ requested, and 0 blank. The five ZZTEST requests #1003220–#1003224 are excluded; local `.env.local` has no `TEST_REQUEST_ISOLATION`, so the probe applies the predicate itself.
+   - `scripts/correct-ranking-invited-amounts.mjs` + `scripts/lib/ranking-invited-correction.mjs` (13 tests). Plan `7cccbe76` changed #1002821 $1.6M→$1.3M and #1003000 $1.5M→$1.3M, tagged all 23 invited, and appended one `invited-amount-correction` event to `wmkf_administrationlogjson`.
+   - Two Codex adversarial-review passes. Pass 1 found that rollback trusted a post-write ETag and that a lost response was unrecoverable; both were fixed in `6c38da155`. Pass 2 approved.
+   - Confirmed: the local app identity can PATCH `wmkf_proposalrankingrounds` in production under a same-day write ack and the target interlock.
+3. Plan doc, Atlas section and DEVELOPMENT_LOG milestone entry added.
 
 ### Commits
 
-- `e86e5f80d`, `4720980ed` — reviewer safety/authorization repairs.
-- `81b8a063b`, `9b2ec0060` — guarded rehearsal and fixture follow-ups.
-- `a713ded8b` — verified pinned FFmpeg archive / bounded Linux media evidence.
-- `405d17bb8` — owner-approved confirmation and named PD email link.
-- `187f27f16` — integrated release, including all preceding documentation repairs.
-- `b4072933b` — release handoff and milestone record.
-- `6de6e465c` — three browser assertions updated; affected local tests and all
-  hosted checks passed. This docs-only update records that result on main.
+- `1553bc0a3`, `ed88d82cb`: invited amount with requested fallback; neutral missing-amount label.
+- `c18ae2af5`, `dda2713d4`: read-only invited/requested probe.
+- `afed1413f`, `614b05f11`: correction plan.
+- `c5a442ac0`, `4a37f2f9b`, `6c38da155`: correction script and review fixes.
+- `a7190c848`: applied/verified record.
 
 ## Next Items
 
-### Do Not Reopen Without New Evidence or Owner Direction
+### Verified Open
 
-- Release is completed. No concrete unresolved application blocker was identified.
-- Owner explicitly stopped broad audits, optional testing, mock fixes and generic
-  release-readiness investigations. Do not turn an unverified detail into a defect
-  or another release gate. No further work is selected by this handoff.
-- Private-store work stays separate; first-time external usability remains untested.
-  Neither is an established blocker. Earlier bounded read/write/cost approvals are
-  historical and do not authorize unrelated operations.
-- Preserve the owner review-burden memory note and unrelated critique / `output/`.
+- None selected. No owner-chosen next task.
+
+### Optional (owner's call)
+
+1. **Script-level mocked tests for the correction script.** Codex pass 2 suggested them: the current tests cover the decision helpers, not orchestration or `If-Match` wiring.
+   Evidence: `tests/unit/ranking-invited-correction.test.js`. Worth doing only if the script is reused for another cycle; its round ID, count and expected changes are D26 constants.
+2. **"Amount source" workbook column.** Offered, not requested; the workbook doesn't show which proposals fell back to requested.
+
+### Parked
+
+1. **Confirm-your-details email campaign.** Tabled by the owner 2026-10-24. Evidence: `docs/plans/RESEARCH_INSTITUTION_AT_AWARD_BACKFILL_PLAN_2026-10-20.md` §3.2.
+2. **Grant Reporting app sunset** (owner). Any successor that lists investigators should call `fetchCoPIs` (`lib/services/proposal-participants.js`).
 
 ### Verify Before Acting
 
-- Original checkout remains on `codex/memory-audit-followups` at `405d17bb8` with
-  the preexisting untracked critique and `output/` untouched. It predates the
-  merged release. Do not push it to main or overwrite newer main with it.
-- Isolated checkout `/private/tmp/wmkf-release-memory-reviewer-cleanup` is on main
-  for this handoff. No other worktree was switched, reset or removed.
-- Pre-release rollback reference: `dpl_ET59rCfoBxuSjBK6KScCmArPehg6`,
-  `wmkfresearchapps-fhwelay0k-justin-gallivans-projects.vercel.app`. It is a dated
-  reference, not a rollback instruction; code rollback does not undo business writes.
+1. **D26 correction rollback** is available only while nobody has written to the round since plan `7cccbe76`: `--rollback --dir="$HOME/Downloads/Ranking D26 invited amounts"` (prod-read flag + same-day ack). It refuses once a PD saves; any reversal then needs a new plan.
+   Evidence: plan §4.4.
+2. **Owner folders hold sensitive data, keep out of git:**
+   - `~/Downloads/Ranking D26 invited amounts/` holds the original snapshot, including reviewer scores.
+   - `~/Downloads/Research Co-PI Searches/stage-b-2/` holds names.
+3. **Stage B rollback** applies only to writes unchanged since apply. Evidence: `docs/plans/RESEARCH_INSTITUTION_AT_AWARD_BACKFILL_PLAN_2026-10-20.md` §3.4.
+4. **Untracked, not session-owned:** `.impeccable/critique/2026-10-19T02-04-42Z__…boardwriteups-js.md` and `output/`. Preserved untouched.
+
+### Do Not Reopen Without New Decision
+
+- D26 amounts: applied and verified. Further changes need a new plan.
+- Connor 2024-split confirmation and the §7 note to Connor: retired (owner, 2026-10-23).
+- Stage B row decisions: applied and verified.
 
 ## Concurrent Workstreams — historical resume index
 
-Exact previous handoff: `git show 187f27f16:SESSION_PROMPT.md`; earlier guidance
-handoff: `git show 405d17bb8:SESSION_PROMPT.md`. Both are retrievable. These are
-recorded owner boundaries, not newly verified actionable tasks:
+Prior handoffs: `git show 4105474a1:SESSION_PROMPT.md` (Session 635) and `git show 5ba8efaf2:SESSION_PROMPT.md`. Recorded owner boundaries, not newly verified tasks:
 
-- Personal email defaults: slice 3 shipped in PR #517; next slice 2 is plan-first.
-  Owning record: `docs/plans/PERSONAL_EMAIL_DEFAULTS_INVENTORY_2026-09-24.md`.
-  Prior owner production-check / queue-drift suggestions are retained in the exact
-  handoff above, not selected or promoted into current tasks.
-- Meeting coordination supersedes its historical parked boundary: owner authorized
-  implementation and bounded hosted rehearsal on `codex/session-start-20261023`.
-  Runtime candidate `1f99d7635` passed the isolated cloud and owner-authorized
-  dedicated production-fixture rehearsal; ready for controlled deployment.
-  Zero emails; no existing business records changed; reader links revoked and
-  owned compute cleaned. Production deployment/migrations remain unauthorized.
-  `docs/plans/MEETING_COORDINATION_RELEASE_CHECKLIST_2026-10-23.md` and
-  `docs/audits/MEETING_HOSTED_REHEARSAL_2026-10-23.md` own the current evidence.
-- J27 / overlapping cycles: proposed; calendar authority, backup/escalation,
-  date-change approval and Connor's external calendar contract remain owner decisions.
-  `docs/plans/CYCLE_ROLLOVER_MINIMAL_CONFIGURATION_PLAN_2026-10-06.md`.
-- Shared roles: PR #516 released; read assignment through config, never hardcode.
-- Stage B: awaiting staff workbook / owner decisions in the prior handoff. Preserve
-  workbook keys, do not record replaced award-time PIs, rerun Stage A writes or the
-  paid co-PI check, or send the held Connor message.
-  `docs/plans/RESEARCH_INSTITUTION_AT_AWARD_BACKFILL_PLAN_2026-10-20.md`.
-- Reviewer panel coverage pilot parked; Expense Reporter leave as is; Grant Reporting
-  and Literature Analyzer directions await scope. No new work or metered run implied.
+- Personal email defaults: slice 3 shipped (PR #517); slice 2 is plan-first. `docs/plans/PERSONAL_EMAIL_DEFAULTS_INVENTORY_2026-09-24.md`.
+- Meeting coordination: owner authorized implementation, bounded rehearsal and controlled production deployment including migrations (2026-10-24). Candidate `064f4d9a8`; dedicated request `185415ef-3750-4806-84c7-fb6dd032af31` only until production checks pass. Current evidence: `docs/audits/MEETING_HOSTED_REHEARSAL_2026-10-23.md`; release sequence: `docs/plans/MEETING_COORDINATION_RELEASE_CHECKLIST_2026-10-23.md`.
+- J27 / overlapping cycles: proposed; calendar authority and related owner decisions open. `docs/plans/CYCLE_ROLLOVER_MINIMAL_CONFIGURATION_PLAN_2026-10-06.md`.
+- Shared roles: PR #516 released; read assignment through config.
+- Research Institution at Award backfill: Stages A and B applied and verified. `docs/plans/RESEARCH_INSTITUTION_AT_AWARD_BACKFILL_PLAN_2026-10-20.md`.
+- Reviewer panel coverage pilot parked; Expense Reporter as is; Literature Analyzer direction awaits scope.
 
-## Key Files and Evidence
+## Key Files Reference
 
-- `shared/components/external/MaterialsView.js`, `ReviewAuthoringForm.js`,
-  `ProgramDirectorContact.js` — confirmation copy / contact rendering.
-- `docs/audits/release-candidate-checklist-2026-10-22.md` — release evidence index.
-- `docs/audits/linux-ci-verification-2026-10-23.md` — historical Linux run scope.
-- `docs/audits/pinned-ffmpeg-linux-evidence-2026-10-23.json` — pinned media result.
+| File | Purpose |
+|------|---------|
+| `lib/dataverse/adapters/proposal-ranking-source.js` | Ranking source; invited amount with requested fallback |
+| `shared/components/proposal-ranking/model.js` | `amountLabel` for cards |
+| `scripts/correct-ranking-invited-amounts.mjs` | D26 frozen-snapshot correction (plan/apply/verify/rollback) |
+| `scripts/lib/ranking-invited-correction.mjs` | Pure snapshot rebuild and state-based decisions |
+| `scripts/probe-ranking-invited-amounts.mjs` | Read-only invited vs requested comparison per cycle |
+| `docs/plans/PROPOSAL_RANKING_D26_INVITED_AMOUNT_CORRECTION_2026-10-23.md` | Plan, safety argument, outcome |
 
-Milestone determination: production reviewer safeguard release merits a
-DEVELOPMENT_LOG entry. CLAUDE.md requires no change. Claim-evidence pilot report
-was unavailable because local state could not be read; no observation row invented.
+## Testing
+
+```bash
+npx jest tests/unit/proposal-ranking tests/unit/ranking-invited-correction.test.js
+```
+
+Milestone determination: invited-amount ranking plus the in-place D26 production correction merits a DEVELOPMENT_LOG entry (added). CLAUDE.md requires no change.

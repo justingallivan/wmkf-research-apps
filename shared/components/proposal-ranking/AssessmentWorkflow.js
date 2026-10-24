@@ -11,7 +11,7 @@ import {
   loadProposalRanking,
   sendProposalRankingAction,
 } from './client';
-import { formatMoney } from './model';
+import { amountLabel, formatMoney } from './model';
 import {
   assessmentItems,
   moveAssessmentItem,
@@ -305,7 +305,7 @@ export function AssessmentList({
                                   <h3 className="text-lg font-semibold text-gray-900">{proposal.organization || 'Institution unavailable'}</h3>
                                   <a href={`/workbench/${encodeURIComponent(proposal.requestId)}`} className="break-words text-base text-blue-800 underline underline-offset-2 focus-visible:outline focus-visible:outline-2">{proposal.title || 'Untitled proposal'}</a>
                                 </div>
-                                <p className="col-start-2 text-right tabular-nums sm:col-start-3"><span className="mr-2 text-xs text-gray-600">Requested</span><strong>{proposal.amountMinorUnits == null ? 'Unavailable' : formatMoney(proposal.amountMinorUnits, proposal.currency)}</strong></p>
+                                <p className="col-start-2 text-right tabular-nums sm:col-start-3"><span className="mr-2 text-xs text-gray-600">{amountLabel(proposal).label}</span><strong>{proposal.amountMinorUnits == null ? 'Unavailable' : formatMoney(proposal.amountMinorUnits, proposal.currency)}</strong>{amountLabel(proposal).note && <span className="block text-xs text-amber-800">{amountLabel(proposal).note}</span>}</p>
                               </div>
                               <div className="ml-11 mt-3 grid grid-cols-[minmax(0,1fr)_auto] items-end gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(8rem,.55fr)_auto]">
                                 {collective ? <div className="col-span-2 grid grid-cols-[repeat(auto-fill,minmax(4.5rem,1fr))] items-end gap-x-2 gap-y-3 lg:col-span-1">
