@@ -74,7 +74,6 @@ describe('POST zoom-imports', () => {
   test.each([
     ['an extra key', { ...body(), actingUserSystemId: 'x' }],
     ['an extra profile key', { ...body(), ownerProfileId: 1 }],
-    ['a missing acknowledgement', { meetingUuid: 'abc==' }],
     ['a missing uuid', { nonSensitiveAcknowledged: true }],
     ['an array body', []],
     ['a null body', null],

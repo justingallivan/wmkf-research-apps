@@ -32,6 +32,9 @@ const MIGRATION_PATHS = [
   '063_meeting_tracker_transcription.sql',
   '064_meeting_transcript_close_attribution.sql',
   '065_transcription_zoom_transcript.sql',
+  '074_zoom_recording_imports.sql',
+  '077_zoom_transcript_provenance.sql',
+  '078_zoom_attendance_attribution.sql',
 ].map(file => path.join(process.cwd(), 'lib/db/migrations', file));
 const uuid = () => crypto.randomUUID();
 
@@ -142,6 +145,8 @@ describeIf('Meeting Tracker publication store (isolated local Postgres proof)', 
     const owner = await database.query("INSERT INTO user_profiles(name) VALUES ('tracker-owner') RETURNING id");
     ownerId = owner.rows[0].id;
     for (const migrationPath of MIGRATION_PATHS) await database.query(fs.readFileSync(migrationPath, 'utf8'));
+    // Migration 087 adds initiation provenance independently of historical consent.
+    await database.query('ALTER TABLE transcription_jobs ADD COLUMN initiated_by_profile_id INTEGER REFERENCES user_profiles(id), ADD COLUMN initiated_at TIMESTAMPTZ');
     store = createTranscriptionPilotStore(database);
   });
 

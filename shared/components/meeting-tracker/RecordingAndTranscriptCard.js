@@ -1,4 +1,5 @@
 import PresentationApprovalPanel from './PresentationApprovalPanel';
+import PreparationPanel from './PreparationPanel';
 import FragmentReviewWarnings from './FragmentReviewWarnings';
 import { resolveDiscussionAttribution } from '../../../lib/services/meeting-tracker-transcription/presentation-boundary';
 /** Site Visit "Recording and transcript" card: recording, transcript upload/generation, speaker names, board link. */
@@ -1241,7 +1242,7 @@ function useSummaryKind(kind, { requestId, basePath, currentArtifact, busy, setB
       const result = await requestJson(summaryPath, {
         method: 'POST',
         // Replacing names the shown draft; the server refuses to discard any other ready draft (paired summaries plan D2).
-        body: { ...spec.postBody, acknowledgmentVersion: spec.acknowledgmentVersion,
+        body: { ...spec.postBody,
           expectedCurrentArtifactId: currentArtifact.id, expectedCurrentFingerprint: currentArtifact.fingerprint,
           ...(summaryDraft ? { replaceDraft: { draftId: summaryDraft.id, expectedVersion: summaryDraft.version } } : {}) },
         fallbackMessage: 'The summary could not be generated.',
@@ -1920,7 +1921,7 @@ function useTranscription(requestId, { onMaterialsChanged, summaryRefresh = REFR
 
   const confirmNoVtt = noVttConfirmation?.audio === audioFile && noVttConfirmation?.vtt === vttFile;
   const uploadAndStart = async () => {
-    if (!audioFile || audioFormat(audioFile) || !acknowledged || busy || !requestId) return;
+    if (!audioFile || audioFormat(audioFile) || busy || !requestId) return;
     if (audioFile.size < 1 || audioFile.size > MAX_AUDIO_BYTES) {
       setError(`Choose an audio recording no larger than ${MAX_TRANSCRIPTION_MIB} MiB.`);
       return;
@@ -1984,7 +1985,7 @@ function useTranscription(requestId, { onMaterialsChanged, summaryRefresh = REFR
       setBusy('starting');
       const started = await requestJson(`${basePath}/${encodeURIComponent(job.id)}/start`, {
         method: 'POST', signal: controller.signal,
-        body: { expectedVersion: job.version, nonSensitiveAcknowledged: true },
+        body: { expectedVersion: job.version },
         fallbackMessage: 'The recording uploaded, but the transcription start needs attention.',
       });
       if (!isCurrent(generation)) return;
@@ -2017,7 +2018,6 @@ function useTranscription(requestId, { onMaterialsChanged, summaryRefresh = REFR
   };
 
   // ---- Summaries: one hook per kind, sharing the generation guard and `busy`. ----
-  const [summaryAck, setSummaryAck] = useState(false);
   const summaryHookArgs = { requestId, basePath, currentArtifact: collection?.currentArtifact || null,
     busy, setBusy, generationRef, isCurrent, loadCollection, onMaterialsChangedRef, summaryRefresh };
   const presentationSummary = useSummaryKind('presentation', summaryHookArgs);
@@ -2029,7 +2029,7 @@ function useTranscription(requestId, { onMaterialsChanged, summaryRefresh = REFR
   // result lands on its own. A single-kind Try again or Summarize again goes through here with one kind.
   const summarizeKinds = async (kinds) => {
     const runs = kinds.map((kind) => summaryHooks[kind]).filter(Boolean);
-    if (!collection?.currentArtifact?.id || busy || !summaryAck || !runs.length) return;
+    if (!collection?.currentArtifact?.id || busy || !runs.length) return;
     const generation = generationRef.current;
     setBusy('summarize');
     try {
@@ -2037,13 +2037,12 @@ function useTranscription(requestId, { onMaterialsChanged, summaryRefresh = REFR
     } finally {
       if (isCurrent(generation)) {
         setBusy(null);
-        setSummaryAck(false);
       }
     }
   };
 
   return {
-    presentationSummary, discussionSummary, summaryAck, setSummaryAck, pairedSummaryKinds, summarizeKinds,
+    presentationSummary, discussionSummary, pairedSummaryKinds, summarizeKinds,
     basePath, collection, collectionCheckedAt, collectionCurrent: Boolean(collection) && !collectionReadFailed, savedDraft, loading, jobs, publications, newestJob, focusJob, showReview, selectedJob,
     attendanceReview, attendanceDecision, attendanceKept, setAttendanceKept, previewDecision,
     correction, correctionDetail, content, speakerIds, names, setNames: editNames, baseline, dirtyNames, dirtyEnd, dirty, presentationEndMs, setPresentationEndMs, suggestionPicks, setSuggestionPicks,
@@ -2276,7 +2275,7 @@ function useZoomImport(requestId, { onImported, jobsSignature, onVideoCopied }) 
   const sendAudio = async (meeting, generation) => {
     try {
       const body = await requestJson(`${basePath}/zoom-imports`, {
-        method: 'POST', body: { meetingUuid: meeting.meetingUuid, nonSensitiveAcknowledged: true },
+        method: 'POST', body: { meetingUuid: meeting.meetingUuid },
         fallbackMessage: 'The Zoom import could not be completed.',
       });
       if (!isCurrent(generation)) return;
@@ -2297,7 +2296,7 @@ function useZoomImport(requestId, { onImported, jobsSignature, onVideoCopied }) 
   // confirmation, nothing else is sent until staff confirm.
   const importSelected = async () => {
     const meeting = meetings.find((item) => item.meetingUuid === selectedUuid);
-    if (!meeting || !acknowledged || busy || videoBusy || !requestId) return;
+    if (!meeting || busy || videoBusy || !requestId) return;
     const generation = generationRef.current;
     setBusy(true);
     setError(null);
@@ -2588,7 +2587,7 @@ function TranscriptPreview({ content, names }) {
   );
 }
 
-function ReviewBlock({ t }) {
+function ReviewBlock({ t, editionManaged = false }) {
   const { selectedJob: job, correction, busy, conflict, dirty, collection, publications } = t;
   const status = job?.status;
   const alignment = correction ? null : job?.speaker_alignment || null;
@@ -2647,7 +2646,7 @@ function ReviewBlock({ t }) {
           <Button size="sm" variant="outline" type="button" onClick={t.saveNames} disabled={!dirty || Boolean(busy) || matchingActive}>{busy === 'speakers' ? (correction ? 'Saving…' : 'Saving names…') : (correction ? 'Save changes' : 'Save names')}</Button>
           <Button size="sm" variant="primary" type="button" onClick={correction ? t.publishCorrection : t.publishJob} disabled={Boolean(publishBlockedReason) || Boolean(busy)}>{busy === 'publish' ? 'Publishing…' : 'Publish transcript'}</Button>
         </div>
-        {correction && <div className="mt-2"><Notice tone="warning">Publishing this correction, including a names-only change, withholds the Board presentation transcript and summary while the presentation and staff discussion transcripts update automatically, which takes a few minutes. The summary stays out of date until you summarize again.</Notice></div>}
+        {correction && <div className="mt-2"><Notice tone="warning">{editionManaged ? 'Publishing this correction keeps the approved Board presentation available. Prepare and approve a replacement to update what the Board sees, or withdraw it separately.' : 'Publishing this correction, including a names-only change, withholds the Board presentation transcript and summary while the presentation and staff discussion transcripts update automatically, which takes a few minutes. The summary stays out of date until you summarize again.'}</Notice></div>}
         {publishBlockedReason && <p className="mt-2 text-xs leading-5 text-gray-600">{publishBlockedReason}</p>}
       </>}
       {conflict && <p className="mt-3 text-sm text-amber-950" role="alert">Another session changed this. Refresh to load the latest version; your edits stay in the fields.</p>}
@@ -2741,12 +2740,9 @@ function GenerateForm({ t }) {
       <input id="recording-transcript-vtt" ref={vttInputRef} type="file" accept=".vtt,text/vtt" multiple disabled={Boolean(busy)} onChange={(event) => t.chooseFiles(event.target.files, 'vtt')} className={FILE_INPUT} />
       {vttFile && <p className="mt-2 break-all text-xs text-gray-700">{vttFile.name} · {(vttFile.size / 1024).toFixed(0)} KiB</p>}
       {vttError && <p className="mt-2 text-sm text-red-800" role="alert">{vttError}</p>}
-      <label className="mt-3 flex items-start gap-2 text-xs leading-5 text-gray-800">
-        <input type="checkbox" checked={t.acknowledged} disabled={Boolean(busy)} onChange={(event) => t.setAcknowledged(event.target.checked)} className="mt-0.5 h-4 w-4 rounded border-gray-300 text-gray-900 focus:ring-2 focus:ring-blue-600" />
-        <span>This recording is non-sensitive and may be sent to our transcription provider.{vttFile ? ' Excerpts of both transcripts are also sent to Anthropic to match speaker names.' : ''} Transcription uses paid credits.</span>
-      </label>
+
       {t.uploadProgress !== null && <div className="mt-3" aria-live="polite"><div className="flex justify-between text-xs text-gray-700"><span>{busy === 'upload-captions' ? 'Uploading Zoom captions' : t.uploadProgress < 100 ? 'Uploading to private storage' : 'Upload complete'}</span><span>{t.uploadProgress}%</span></div><progress className="mt-1 h-2 w-full accent-gray-900" max="100" value={t.uploadProgress} aria-label="Private upload progress" /></div>}
-      <Button size="sm" variant="primary" type="button" onClick={t.uploadAndStart} disabled={!audioFile || Boolean(audioError) || Boolean(vttError) || Boolean(sizeError) || !t.acknowledged || Boolean(busy)} className="mt-3">{busy === 'upload' ? 'Uploading…' : busy === 'upload-captions' ? 'Uploading Zoom captions…' : busy === 'starting' ? 'Starting transcription…' : 'Start transcription'}</Button>
+      <Button size="sm" variant="primary" type="button" onClick={t.uploadAndStart} disabled={!audioFile || Boolean(audioError) || Boolean(vttError) || Boolean(sizeError) || Boolean(busy)} className="mt-3">{busy === 'upload' ? 'Uploading…' : busy === 'upload-captions' ? 'Uploading Zoom captions…' : busy === 'starting' ? 'Starting transcription…' : 'Start transcription'}</Button>
       {t.confirmNoVtt && !vttFile && !busy && <div className="mt-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm leading-5 text-amber-950" role="alert">
         <p>Add Zoom captions to name speakers automatically?</p>
         <div className="mt-2 flex flex-wrap gap-2">
@@ -2798,15 +2794,14 @@ const SUMMARY_BLOCK_COPY = Object.freeze({
   }),
 });
 
-// One acknowledgment and one confirm button for both kinds (plan D6, D9). It opens under the row whose action asked
-// for it, so consent is given at the moment a summary is requested rather than kept on screen (redesign §4).
+// One final command for the requested summary kinds. Provider acknowledgement was intentionally retired.
 function summarizeLabel(kinds) {
   return kinds.length === 2 ? 'Summarize presentation and discussion'
     : kinds[0] === 'discussion' ? 'Summarize staff discussion' : 'Summarize presentation';
 }
 // What a Summarize confirmation was opened for: the transcript, each target kind's load state, draft identity and
 // conflict. If any of it changes while the confirmation is open, the confirmation closes (Codex review, commit 1),
-// so an acknowledgment never carries over to a target the user did not see.
+// so a command never carries over to a target the user did not see.
 function summaryTargetKey(h) {
   const draft = h?.summary?.draft || null;
   return [h?.summaryLoadKey, h?.summaryLoadedKey, h?.summaryReadState, draft?.id || '', draft?.version ?? '', draft?.state || '',
@@ -2821,14 +2816,10 @@ function summarizeSignature(t, mode, kinds) {
 function SummarizeConfirm({ t, kinds, valid, onClose }) {
   return (
     <div className="mt-3 rounded-lg border border-gray-200 bg-gray-50 p-3" data-testid="paired-summary-form">
-      <label htmlFor="paired-summary-ack" className="flex items-start gap-2 text-sm leading-6 text-gray-900">
-        <input id="paired-summary-ack" type="checkbox" className="mt-1.5" checked={t.summaryAck} disabled={Boolean(t.busy)}
-          onChange={(event) => t.setSummaryAck(event.target.checked)} />
-        <span>{PAIRED_SUMMARY_ACKNOWLEDGMENT.text}</span>
-      </label>
+
       <div className="mt-2 flex flex-wrap items-center gap-2">
-        <Button size="sm" variant="primary" type="button" onClick={() => { onClose(); if (valid) void t.summarizeKinds(kinds); }} disabled={!valid || Boolean(t.busy) || !t.summaryAck || !kinds.length}>{summarizeLabel(kinds)}</Button>
-        <Button size="sm" variant="outline" type="button" onClick={() => { t.setSummaryAck(false); onClose(); }} disabled={Boolean(t.busy)}>Cancel</Button>
+        <Button size="sm" variant="primary" type="button" onClick={() => { onClose(); if (valid) void t.summarizeKinds(kinds); }} disabled={!valid || Boolean(t.busy) || !kinds.length}>{summarizeLabel(kinds)}</Button>
+        <Button size="sm" variant="outline" type="button" onClick={() => { onClose(); }} disabled={Boolean(t.busy)}>Cancel</Button>
       </div>
     </div>
   );
@@ -2894,7 +2885,7 @@ function SummaryBlock({ t, s, kind = 'presentation', materials = [], request = n
   const paired = t.collection?.currentArtifact?.presentationTranscript?.state === 'bound' ? t.pairedSummaryKinds : [];
   const pairedHere = paired.length > 0 && paired[0] === kind;
   const pairedSingleHere = pairedHere && paired.length === 1;
-  const open = (mode, kinds) => { t.setSummaryAck(false); setRequest({ mode, kinds, anchor: kind, signature: summarizeSignature(t, mode, kinds) }); };
+  const open = (mode, kinds) => { setRequest({ mode, kinds, anchor: kind, signature: summarizeSignature(t, mode, kinds) }); };
   const rerunInline = !pairedHere && againAllowed && !draft && (failed || runAbandoned || published?.state === 'stale');
   const rerunInMenu = againAllowed && !pairedSingleHere && !rerunInline;
   const pairedLabel = paired.length === 2 ? 'Summarize both' : againLabel === 'Try again' ? 'Try again' : ['bound', 'stale'].includes(published?.state) ? 'Summarize again' : 'Summarize';
@@ -2912,7 +2903,6 @@ function SummaryBlock({ t, s, kind = 'presentation', materials = [], request = n
   const closeStale = Boolean(mine) && !requestValid;
   useEffect(() => {
     if (!closeStale) return;
-    t.setSummaryAck(false);
     setRequest(null);
   }, [closeStale]); // eslint-disable-line react-hooks/exhaustive-deps
   const menuItems = rerunInMenu ? [{ key: 'again', label: againLabel, disabled: Boolean(t.busy), onSelect: () => open('single', [kind]) }] : [];
@@ -2987,7 +2977,7 @@ function SummaryBlock({ t, s, kind = 'presentation', materials = [], request = n
             maxLength={SUMMARY_TEXT_MAX_CHARS} disabled={Boolean(t.busy) || draft.state !== 'ready'}
             onChange={(event) => s.setSummaryText(event.target.value)} />
           <div className="mt-2 flex flex-wrap items-center gap-2">
-            <Button size="sm" variant="primary" type="button" onClick={s.publishSummaryDraft} 
+            <Button size="sm" variant="primary" type="button" onClick={s.publishSummaryDraft}
               disabled={Boolean(t.busy) || !summaryCurrent || !s.summary?.draftMatchesTranscript || !s.summaryText.trim()}>
               {t.busy === busyKeys.publish ? 'Publishing…' : 'Publish summary'}
             </Button>
@@ -3148,11 +3138,8 @@ function ZoomImportSection({ z, activeJob, transcriptionBusy, hasTranscript }) {
       {z.confirm?.origin === 'picker' && !z.meetings.some((meeting) => meeting.meetingUuid === z.confirm.meetingUuid) && <ReplaceConfirm z={z} />}
       {z.videoMessage?.origin === 'picker' && <div className="mt-3"><Notice tone={z.videoMessage.tone === 'error' ? 'error' : 'info'}>{z.videoMessage.text}</Notice></div>}
       {selected && <>
-        <label className="mt-3 flex items-start gap-2 text-xs leading-5 text-gray-800">
-          <input type="checkbox" checked={z.acknowledged} disabled={z.busy} onChange={(event) => z.setAcknowledged(event.target.checked)} className="mt-0.5 h-4 w-4 rounded border-gray-300 text-gray-900 focus:ring-2 focus:ring-blue-600" />
-          <span>This recording is non-sensitive and may be sent to our transcription provider.{selected.transcript ? ' Excerpts of both transcripts are also sent to Anthropic to match speaker names.' : ''} Transcription uses paid credits.</span>
-        </label>
-        <Button size="sm" variant="primary" type="button" onClick={z.importSelected} disabled={!z.acknowledged || z.busy || z.videoBusy || Boolean(z.confirm) || blocked} className="mt-3">{z.busy ? 'Importing from Zoom…' : z.videoStartable(selected) ? 'Import, transcribe and copy video' : 'Import and transcribe'}</Button>
+
+        <Button size="sm" variant="primary" type="button" onClick={z.importSelected} disabled={z.busy || z.videoBusy || Boolean(z.confirm) || blocked} className="mt-3">{z.busy ? 'Importing from Zoom…' : z.videoStartable(selected) ? 'Import, transcribe and copy video' : 'Import and transcribe'}</Button>
         {z.videoStartable(selected) && !z.busy && <p className="mt-2 text-xs text-gray-600">The video will also be copied from Zoom into SharePoint. This can take several minutes.</p>}
         {blocked && !z.busy && <p className="mt-2 text-xs text-gray-600">Another transcription is already running. Wait for it to finish.</p>}
       </>}
@@ -3419,7 +3406,7 @@ function PresentationVideoLine({ v }) {
   );
 }
 
-function TranscriptWorkflow({ m, t, z, requestId, transcriptInputRef, refreshToken = 0, shell, setupHeader, onStatusChange }) {
+function TranscriptWorkflow({ m, t, z, requestId, transcriptInputRef, refreshToken = 0, shell, setupHeader, onStatusChange, onPreparationUpdated }) {
   const [editionPolicy, setEditionPolicy] = useState(null);
   const handleEditionPolicy = useCallback((enrolled, policy) => {
     setEditionPolicy({ enrolled, activeEditionId: policy?.activeEditionId || null, available: policy?.activeEditionAvailable });
@@ -3589,7 +3576,7 @@ function TranscriptWorkflow({ m, t, z, requestId, transcriptInputRef, refreshTok
           { key: 'names', label: `${t.savedDraft ? 'Continue editing names' : 'Edit speaker names'}${pendingSuffix}`, disabled: editBlocked, onSelect: t.beginEditNames },
           { key: 'end', label: `${t.savedDraft ? 'Continue editing presentation end' : 'Edit presentation end'}${pendingSuffix}`, disabled: editBlocked, onSelect: t.beginEditNames },
         ] : []}>
-        {reviewOpen && <ReviewBlock t={t} />}
+        {reviewOpen && <ReviewBlock t={t} editionManaged={editionPolicy?.enrolled === true} />}
         {step2Collapsed ? null : editable && !editing ? <>
             {reviewOpen && <p className="mt-4 border-t border-gray-200 pt-4 text-sm font-semibold text-gray-950">Current published transcript</p>}
             <div className="mt-2 flex flex-wrap items-center gap-2">
@@ -3613,6 +3600,11 @@ function TranscriptWorkflow({ m, t, z, requestId, transcriptInputRef, refreshTok
             </p>}
       </Step>
 
+      {editionPolicy?.enrolled === true && <PreparationPanel key={requestId} requestId={requestId}
+        source={t.correction?.state === 'draft' ? {kind:'correction',operationId:t.correction.operationId,expectedVersion:t.correction.version}
+          : artifact?.id && artifact?.fingerprint && presentationEnd ? {kind:'published',artifactId:artifact.id,fingerprint:artifact.fingerprint} : null}
+        blockedReason={t.dirtyNames || t.dirtyEnd ? 'Save checked names and the presentation ending first.' : t.correction && !t.attendanceReview ? 'Review attendance before preparing the saved review.' : null}
+        onUpdated={onPreparationUpdated} />}
       <EarlierRuns t={t} />
     </section>
 
@@ -3848,6 +3840,16 @@ function RecordingAndTranscriptCardForRequest({ requestId, onStatusChange }) {
       setRefreshing(false);
     }
   };
+  const preparationUpdatesLive = useRef(false);
+  useEffect(() => { preparationUpdatesLive.current=true;return () => { preparationUpdatesLive.current=false; }; }, []);
+  const onPreparationUpdated = useCallback(async () => {
+    if (!preparationUpdatesLive.current) return;
+    setSummaryRefresh(value => ({...value,begin:value.begin+1}));
+    await Promise.allSettled([m.load(),t.loadCollection()]);
+    if (!preparationUpdatesLive.current) return;
+    setSummaryRefresh(value => ({...value,settle:value.settle+1}));
+    setRefreshToken(value=>value+1);
+  }, [m.load,t.loadCollection]);
   const shell = 'mt-8 min-w-0 rounded-xl border border-gray-200 bg-white p-5 shadow-sm sm:p-6';
   // Without the materials data the four cards cannot say where the visit stands, so the header chip shows it as unknown.
   const cardUnavailable = Boolean(m.unavailable || (!m.data && m.readFailed));
@@ -3865,7 +3867,7 @@ function RecordingAndTranscriptCardForRequest({ requestId, onStatusChange }) {
   return (
     <div id="recording-and-transcript-card" className="min-w-0" data-testid="recording-and-transcript-card">
       {m.data
-        ? <TranscriptWorkflow m={m} t={t} z={z} requestId={requestId} transcriptInputRef={transcriptInputRef} refreshToken={refreshToken} shell={shell} setupHeader={setupHeader} onStatusChange={onStatusChange} />
+        ? <TranscriptWorkflow m={m} t={t} z={z} requestId={requestId} transcriptInputRef={transcriptInputRef} refreshToken={refreshToken} shell={shell} setupHeader={setupHeader} onStatusChange={onStatusChange} onPreparationUpdated={onPreparationUpdated} />
         : (
           <section className={shell} data-testid="card-recording-setup" aria-labelledby="recording-transcript-title">
             {setupHeader}

@@ -179,12 +179,16 @@ const publish = (overrides = {}) => publishSummaryDraft({ requestId: REQUEST_ID,
 describe('create', () => {
   beforeEach(() => { deps.randomUUID = jest.fn(() => DRAFT_ID); });
   test.each([
-    ['missing', undefined],
     ['an older version', 'presentation-summary-2020-01-01'],
   ])('an acknowledgment that is %s is refused before any draft row or provider call', async (_label, version) => {
-    await expect(create({ acknowledgmentVersion: version })).rejects.toMatchObject({ httpStatus: 400, code: 'summary_acknowledgment_required' });
+    await expect(create({ acknowledgmentVersion: version })).rejects.toMatchObject({ httpStatus: 400, code: 'summary_request_invalid' });
     expect(drafts.reserveSummaryDraftRun).not.toHaveBeenCalled();
     expect(deps.executePrompt).not.toHaveBeenCalled();
+  });
+
+  test('new summary runs no longer require an acknowledgement',async()=>{
+    await expect(create({acknowledgmentVersion:undefined})).resolves.toMatchObject({draft:{state:'ready'}});
+    expect(drafts.reserveSummaryDraftRun).toHaveBeenCalledWith(expect.objectContaining({acknowledgmentVersion:undefined}));
   });
 
   test('records the acknowledgment before the provider call, sends the bound transcript text, and returns a ready draft', async () => {
@@ -567,7 +571,7 @@ describe('staff discussion kind (paired summaries plan D1-D4, D8)', () => {
 
   test('the presentation-only acknowledgment is refused for the discussion kind before any read', async () => {
     await expect(createDiscussion({ acknowledgmentVersion: PRESENTATION_SUMMARY_ACKNOWLEDGMENT.version }))
-      .rejects.toMatchObject({ httpStatus: 400, code: 'summary_acknowledgment_required' });
+      .rejects.toMatchObject({ httpStatus: 400, code: 'summary_request_invalid' });
     expect(deps.loadVerifiedSource).not.toHaveBeenCalled();
     expect(drafts.reserveSummaryDraftRun).not.toHaveBeenCalled();
   });

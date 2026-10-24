@@ -99,7 +99,7 @@ function stepMenuItem(label, stepTestId = 'step-review') {
 async function openSummarize(name, scopeElement = null) {
   const scope = scopeElement ? within(scopeElement) : screen;
   fireEvent.click(await scope.findByRole('button', { name }));
-  return screen.getByLabelText(/may be sent to Anthropic/);
+  return screen.getByTestId('paired-summary-form');
 }
 
 test('the visit fragment scrolls to the card once after it mounts', async () => {
@@ -971,7 +971,7 @@ describe('presentation summary', () => {
     expect(screen.queryByText('No summary published yet.')).toBeNull();
   });
 
-  test('one paired click sends one POST per kind with the paired acknowledgment, and clears the box afterwards', async () => {
+  test('one paired click sends one POST per kind without fabricating an acknowledgment', async () => {
     const postBodies = [];
     route({ materials: [transcriptRow()], collection: withSummary(), detail: detailFor({}) }, {
       '/summary-draft': { method: 'GET', respond: () => response(summaryState()) },
@@ -990,15 +990,13 @@ describe('presentation summary', () => {
     expect(row('discussion-summary-block')).toHaveTextContent('Not made yet');
     // One paired action, on the presentation row only.
     expect(within(row('discussion-summary-block')).queryByRole('button', { name: 'Summarize both' })).toBeNull();
-    const ack = await openSummarize('Summarize both', row('presentation-summary-block'));
+    await openSummarize('Summarize both', row('presentation-summary-block'));
     const button = screen.getByRole('button', { name: 'Summarize presentation and discussion' });
-    expect(button).toBeDisabled();
-    fireEvent.click(ack);
     expect(button).not.toBeDisabled();
     fireEvent.click(button);
     expect(await screen.findByLabelText(/^Draft/)).toHaveValue('What was presented\nQuantum dots.');
     expect(await screen.findByLabelText(/^Discussion draft/)).toHaveValue('Staff discussed scope.');
-    const expected = { acknowledgmentVersion: ACK, expectedCurrentArtifactId: ARTIFACT_ID, expectedCurrentFingerprint: 'e'.repeat(64) };
+    const expected = { expectedCurrentArtifactId: ARTIFACT_ID, expectedCurrentFingerprint: 'e'.repeat(64) };
     expect(postBodies).toHaveLength(2);
     expect(postBodies).toEqual(expect.arrayContaining([expected, { ...expected, kind: 'discussion' }]));
     expect(screen.getByText(/Slide text was not included/)).toBeInTheDocument();
@@ -1006,7 +1004,7 @@ describe('presentation summary', () => {
     expect(screen.queryByLabelText(/may be sent to Anthropic/)).toBeNull();
     openRowMenu(row('presentation-summary-block'));
     fireEvent.click(screen.getByRole('menuitem', { name: 'Replace draft with a new summary' }));
-    expect(screen.getByLabelText(/may be sent to Anthropic/)).not.toBeChecked();
+    expect(screen.queryByLabelText(/may be sent to Anthropic/)).toBeNull();
   });
 
   test('Replace draft names the shown draft, and a newer draft elsewhere reloads instead of replacing', async () => {
@@ -1029,10 +1027,9 @@ describe('presentation summary', () => {
     expect(await screen.findByLabelText(/^Draft/)).toHaveValue('What was presented\nQuantum dots.');
     openRowMenu(row('presentation-summary-block'));
     fireEvent.click(screen.getByRole('menuitem', { name: 'Replace draft with a new summary' }));
-    fireEvent.click(screen.getByLabelText(/may be sent to Anthropic/));
     fireEvent.click(screen.getByRole('button', { name: 'Summarize presentation' }));
     expect(await screen.findByText(/A newer draft was saved elsewhere, so nothing was replaced/)).toBeInTheDocument();
-    expect(postBody).toEqual({ acknowledgmentVersion: ACK, expectedCurrentArtifactId: ARTIFACT_ID, expectedCurrentFingerprint: 'e'.repeat(64),
+    expect(postBody).toEqual({ expectedCurrentArtifactId: ARTIFACT_ID, expectedCurrentFingerprint: 'e'.repeat(64),
       replaceDraft: { draftId: DRAFT_ID, expectedVersion: 2 } });
     await waitFor(() => expect(screen.getByLabelText(/^Draft/)).toHaveValue('Edited in another tab.'));
   });
@@ -1239,7 +1236,6 @@ describe('presentation summary', () => {
       await screen.findByLabelText(/^Draft/);
       openRowMenu(row('presentation-summary-block'));
       fireEvent.click(screen.getByRole('menuitem', { name: 'Replace draft with a new summary' }));
-      fireEvent.click(screen.getByLabelText(/may be sent to Anthropic/));
       expect(screen.getByRole('button', { name: 'Summarize presentation' })).toBeEnabled();
     }
 
@@ -1608,8 +1604,6 @@ describe('presentation summary', () => {
     openRowMenu(row('presentation-summary-block'));
     fireEvent.click(screen.getByRole('menuitem', { name: 'Replace draft with a new summary' }));
     const confirm = screen.getByRole('button', { name: 'Summarize presentation' });
-    expect(confirm).toBeDisabled();
-    fireEvent.click(screen.getByLabelText(/may be sent to Anthropic/));
     expect(confirm).not.toBeDisabled();
   });
 
@@ -1654,7 +1648,7 @@ describe('presentation summary', () => {
       pairedRoute({ presentation: summaryState({ draft: readyDraft(), draftMatchesTranscript: true }),
         post: (body) => { posts.push(body); return ready(body); } });
       render(<RecordingAndTranscriptCard requestId={REQUEST_ID} />);
-      fireEvent.click(await openSummarize('Summarize', await findRow('discussion-summary-block')));
+      await openSummarize('Summarize', await findRow('discussion-summary-block'));
       fireEvent.click(screen.getByRole('button', { name: 'Summarize staff discussion' }));
       expect(await screen.findByLabelText(/^Discussion draft/)).toHaveValue('Staff discussed scope.');
       expect(posts).toEqual([expect.objectContaining({ kind: 'discussion' })]);
@@ -1679,7 +1673,7 @@ describe('presentation summary', () => {
         },
       });
       render(<RecordingAndTranscriptCard requestId={REQUEST_ID} />);
-      fireEvent.click(await openSummarize('Summarize both', await findRow('presentation-summary-block')));
+      await openSummarize('Summarize both', await findRow('presentation-summary-block'));
       fireEvent.click(screen.getByRole('button', { name: 'Summarize presentation and discussion' }));
       const discussionBlock = await screen.findByTestId('discussion-summary-block');
       const presentationBlock = screen.getByTestId('presentation-summary-block');
@@ -1688,7 +1682,7 @@ describe('presentation summary', () => {
       expect(within(presentationBlock).queryByRole('button', { name: 'Try again' })).toBeNull();
       expect(within(presentationBlock).getByLabelText(/^Draft/)).toHaveValue('What was presented\nQuantum dots.');
       expect(posts).toHaveLength(2);
-      fireEvent.click(await openSummarize('Try again', discussionBlock));
+      await openSummarize('Try again', discussionBlock);
       fireEvent.click(screen.getByRole('button', { name: 'Summarize staff discussion' }));
       expect(await within(discussionBlock).findByLabelText(/^Discussion draft/)).toHaveValue('Staff discussed scope.');
       expect(posts).toHaveLength(3);
@@ -1700,7 +1694,7 @@ describe('presentation summary', () => {
       const pending = { presentation: deferred(), discussion: deferred() };
       pairedRoute({ post: (body) => pending[body.kind || 'presentation'].promise.then(() => ready(body)) });
       render(<RecordingAndTranscriptCard requestId={REQUEST_ID} />);
-      fireEvent.click(await openSummarize('Summarize both', await findRow('presentation-summary-block')));
+      await openSummarize('Summarize both', await findRow('presentation-summary-block'));
       fireEvent.click(screen.getByRole('button', { name: 'Summarize presentation and discussion' }));
       await waitFor(() => expect(stepMenuItem('Edit speaker names')).toBeDisabled());
       await act(async () => { pending.presentation.resolve(); });
@@ -1758,7 +1752,7 @@ describe('presentation summary', () => {
         },
       });
       render(<RecordingAndTranscriptCard requestId={REQUEST_ID} />);
-      fireEvent.click(await openSummarize('Summarize both', await findRow('presentation-summary-block')));
+      await openSummarize('Summarize both', await findRow('presentation-summary-block'));
       fireEvent.click(screen.getByRole('button', { name: 'Summarize presentation and discussion' }));
       const discussionBlock = await screen.findByTestId('discussion-summary-block');
       await waitFor(() => expect(discussionBlock).toHaveTextContent('Not recorded'));
@@ -1794,7 +1788,6 @@ describe('presentation summary', () => {
       await within(discussionBlock).findByLabelText(/^Discussion draft/);
       openRowMenu(discussionBlock);
       fireEvent.click(screen.getByRole('menuitem', { name: 'Replace draft with a new summary' }));
-      fireEvent.click(screen.getByLabelText(/may be sent to Anthropic/));
       fireEvent.click(screen.getByRole('button', { name: 'Summarize staff discussion' }));
       await waitFor(() => expect(posts).toHaveLength(1));
       expect(posts[0]).toEqual(expect.objectContaining({ kind: 'discussion', replaceDraft: { draftId: DISCUSSION_DRAFT_ID, expectedVersion: 4 } }));

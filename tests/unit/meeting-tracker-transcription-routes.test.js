@@ -273,7 +273,6 @@ describe('summary-draft routes', () => {
 
   test.each([
     ['POST with an extra key', 'POST', { ...createBody, profileId: 77 }],
-    ['POST without the acknowledgment', 'POST', { expectedCurrentArtifactId: createBody.expectedCurrentArtifactId, expectedCurrentFingerprint: createBody.expectedCurrentFingerprint }],
     ['PATCH with a non-GUID draft', 'PATCH', { draftId: 'x', expectedVersion: 2, text: 'a' }],
     ['PATCH with a zero version', 'PATCH', { draftId, expectedVersion: 0, text: 'a' }],
     ['PATCH with non-string text', 'PATCH', { draftId, expectedVersion: 2, text: 5 }],

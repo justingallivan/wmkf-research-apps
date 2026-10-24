@@ -105,23 +105,14 @@ test('available: meetings list by Pacific date and time and the manual disclosur
   expect(zoomCalls().every(([url]) => String(url).endsWith('/zoom-recordings'))).toBe(true);
 });
 
-test('choosing a meeting shows the consent text and gates Import and transcribe on it', async () => {
-  route({}, { '/zoom-recordings': { respond: () => response(zoomList()) } });
-  const panel = await openPanel();
-  expect(within(panel).queryByRole('button', { name: 'Import and transcribe' })).not.toBeInTheDocument();
-  fireEvent.click(within(panel).getByRole('radio', { name: /Oct 5/ }));
-  expect(within(panel).getByText(/Excerpts of both transcripts are also sent to Anthropic/)).toBeInTheDocument();
-  expect(within(panel).getByText(/Transcription uses paid credits/)).toBeInTheDocument();
-  const submit = within(panel).getByRole('button', { name: 'Import and transcribe' });
-  expect(submit).toBeDisabled();
-  fireEvent.click(within(panel).getByRole('radio', { name: /Oct 4/ }));
-  expect(within(panel).queryByText(/sent to Anthropic/)).not.toBeInTheDocument();
-  fireEvent.click(within(panel).getByRole('checkbox'));
-  expect(within(panel).getByRole('button', { name: 'Import and transcribe' })).toBeEnabled();
-  expect(zoomCalls().some(([, options]) => options?.method === 'POST')).toBe(false);
+test('choosing a meeting enables import without the retired provider checkbox',async()=>{
+ route({}, {'/zoom-recordings':{respond:()=>response(zoomList())}});const panel=await openPanel();
+ fireEvent.click(within(panel).getByRole('radio',{name:/Oct 5/}));
+ expect(within(panel).queryByRole('checkbox')).toBeNull();expect(within(panel).getByRole('button',{name:'Import and transcribe'})).toBeEnabled();
+ expect(zoomCalls().some(([,options])=>options?.method==='POST')).toBe(false);
 });
 
-test('importing posts only the meeting and the acknowledgement, reloads the collection, and shows the meeting as imported', async () => {
+test('importing posts only the meeting, reloads the collection, and shows the meeting as imported', async () => {
   const post = jest.fn(() => response({ import: { id: 'i1', state: 'started', failureCode: null }, job: { id: JOB_ID } }));
   route({}, {
     '/zoom-recordings': { respond: () => response(zoomList()) },
@@ -130,12 +121,11 @@ test('importing posts only the meeting and the acknowledgement, reloads the coll
   const panel = await openPanel();
   const before = global.fetch.mock.calls.filter(([url]) => String(url).endsWith('/transcriptions')).length;
   fireEvent.click(within(panel).getByRole('radio', { name: /Oct 5/ }));
-  fireEvent.click(within(panel).getByRole('checkbox'));
   fireEvent.click(within(panel).getByRole('button', { name: 'Import and transcribe' }));
-  await waitFor(() => expect(post).toHaveBeenCalledWith({ meetingUuid: UUID_A, nonSensitiveAcknowledged: true }));
+  await waitFor(() => expect(post).toHaveBeenCalledWith({ meetingUuid: UUID_A }));
   const call = global.fetch.mock.calls.find(([url]) => String(url).endsWith('/zoom-imports'));
   expect(call[0]).toBe(`/api/meeting-tracker/visits/${REQUEST_ID}/zoom-imports`);
-  expect(Object.keys(JSON.parse(call[1].body)).sort()).toEqual(['meetingUuid', 'nonSensitiveAcknowledged']);
+  expect(Object.keys(JSON.parse(call[1].body)).sort()).toEqual(['meetingUuid']);
   await waitFor(() => expect(global.fetch.mock.calls.filter(([url]) => String(url).endsWith('/transcriptions')).length).toBeGreaterThan(before));
   expect(await within(panel).findByText('62 min · Audio + Zoom transcript · Imported, transcribing…')).toBeInTheDocument();
   expect(within(panel).getByRole('radio', { name: /Oct 5/ })).toBeDisabled();
@@ -157,7 +147,6 @@ test('a busy import keeps step 1 open even when a finished transcript would have
   fireEvent.click(await screen.findByRole('button', { name: 'Import from Zoom' }));
   const panel = await screen.findByTestId('zoom-import');
   fireEvent.click(within(panel).getByRole('radio', { name: /Oct 4/ }));
-  fireEvent.click(within(panel).getByRole('checkbox'));
   fireEvent.click(within(panel).getByRole('button', { name: 'Import and transcribe' }));
   expect(await within(panel).findByRole('button', { name: 'Importing from Zoom…' })).toBeDisabled();
   expect(within(panel).getByText(/Keep this page open/)).toBeInTheDocument();
@@ -175,7 +164,6 @@ test('a failed import shows the server message and refreshes the list quietly', 
   });
   const panel = await openPanel();
   fireEvent.click(within(panel).getByRole('radio', { name: /Oct 5/ }));
-  fireEvent.click(within(panel).getByRole('checkbox'));
   fireEvent.click(within(panel).getByRole('button', { name: 'Import and transcribe' }));
   expect(await within(panel).findByRole('alert')).toHaveTextContent('This recording is already being imported.');
   expect(await within(panel).findByText('62 min · Audio + Zoom transcript · Importing…')).toBeInTheDocument();
@@ -187,7 +175,6 @@ test('an active transcription blocks starting another import', async () => {
     { '/zoom-recordings': { respond: () => response(zoomList()) } });
   const panel = await openPanel();
   fireEvent.click(within(panel).getByRole('radio', { name: /Oct 5/ }));
-  fireEvent.click(within(panel).getByRole('checkbox'));
   expect(within(panel).getByRole('button', { name: 'Import and transcribe' })).toBeDisabled();
   expect(within(panel).getByText(/Another transcription is already running/)).toBeInTheDocument();
 });
@@ -217,7 +204,6 @@ test('an import response for an earlier request never reloads or marks the curre
   fireEvent.click(await screen.findByRole('button', { name: 'Import from Zoom' }));
   const panel = await screen.findByTestId('zoom-import');
   fireEvent.click(within(panel).getByRole('radio', { name: /Oct 5/ }));
-  fireEvent.click(within(panel).getByRole('checkbox'));
   fireEvent.click(within(panel).getByRole('button', { name: 'Import and transcribe' }));
   await screen.findByRole('button', { name: 'Importing from Zoom…' });
   view.rerender(<RecordingAndTranscriptCard requestId={OTHER_REQUEST_ID} />);
@@ -242,7 +228,6 @@ test('an import response after the card unmounts writes nothing and reloads noth
   fireEvent.click(await screen.findByRole('button', { name: 'Import from Zoom' }));
   const panel = await screen.findByTestId('zoom-import');
   fireEvent.click(within(panel).getByRole('radio', { name: /Oct 5/ }));
-  fireEvent.click(within(panel).getByRole('checkbox'));
   fireEvent.click(within(panel).getByRole('button', { name: 'Import and transcribe' }));
   await screen.findByRole('button', { name: 'Importing from Zoom…' });
   view.unmount();
@@ -279,7 +264,6 @@ describe('a stranded uploading job does not block step 1', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Import from Zoom' }));
     const panel = await screen.findByTestId('zoom-import');
     fireEvent.click(within(panel).getByRole('radio', { name: /Oct 5/ }));
-    fireEvent.click(within(panel).getByRole('checkbox'));
     expect(within(panel).getByRole('button', { name: 'Import and transcribe' })).toBeEnabled();
   });
 
@@ -301,7 +285,6 @@ test('while this browser is uploading, a live uploading job shows progress but a
     const form = await screen.findByTestId('generate-form');
     const file = new File(['abc'], 'a.m4a', { type: 'audio/mp4' });
     fireEvent.change(within(form).getByLabelText(/Audio file/), { target: { files: [file] } });
-    fireEvent.click(within(form).getByRole('checkbox'));
     fireEvent.click(within(form).getByRole('button', { name: 'Start transcription' }));
     fireEvent.click(await screen.findByRole('button', { name: 'Continue without it' }));
     await waitFor(() => expect(global.fetch.mock.calls.some(([, o]) => o?.method === 'POST')).toBe(true));

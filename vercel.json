@@ -175,6 +175,10 @@
     {
       "path": "/api/cron/board-writeups",
       "schedule": "0 * * * *"
+    },
+    {
+      "path": "/api/cron/drain-meeting-material-preparations",
+      "schedule": "* * * * *"
     }
   ]
 }

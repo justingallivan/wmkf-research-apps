@@ -18,7 +18,8 @@ function errorResponse(res, error) {
 }
 function exactBody(body) {
   return body && typeof body === 'object' && !Array.isArray(body)
-    && Object.keys(body).length === BODY_KEYS.length && BODY_KEYS.every(key => Object.hasOwn(body, key));
+    && Object.hasOwn(body, 'meetingUuid') && Object.keys(body).every(key => BODY_KEYS.includes(key))
+    && (body.nonSensitiveAcknowledged === undefined || body.nonSensitiveAcknowledged === true);
 }
 
 export default async function handler(req, res) {

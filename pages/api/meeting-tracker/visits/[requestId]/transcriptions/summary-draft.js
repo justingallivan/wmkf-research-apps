@@ -16,8 +16,8 @@ const isVersion = (value) => Number.isSafeInteger(value) && value > 0;
 // Summary kinds (paired summaries plan D2). Absent means presentation.
 const KINDS = new Set(['presentation', 'discussion']);
 const isKind = (value) => typeof value === 'string' && KINDS.has(value);
-const CREATE_KEYS = ['acknowledgmentVersion', 'expectedCurrentArtifactId', 'expectedCurrentFingerprint'];
-const CREATE_OPTIONAL_KEYS = ['kind', 'replaceDraft'];
+const CREATE_KEYS = ['expectedCurrentArtifactId', 'expectedCurrentFingerprint'];
+const CREATE_OPTIONAL_KEYS = ['kind', 'replaceDraft', 'acknowledgmentVersion'];
 
 // replaceDraft names the exact ready draft a Summarize again replaces: null or {draftId, expectedVersion}.
 function validReplaceDraft(value) {
@@ -40,7 +40,7 @@ function validBody(method, body) {
       && keys.every((key) => CREATE_KEYS.includes(key) || CREATE_OPTIONAL_KEYS.includes(key))
       && (!Object.prototype.hasOwnProperty.call(body, 'kind') || isKind(body.kind))
       && (!Object.prototype.hasOwnProperty.call(body, 'replaceDraft') || validReplaceDraft(body.replaceDraft))
-      && typeof body.acknowledgmentVersion === 'string' && body.acknowledgmentVersion.length <= 100
+      && (body.acknowledgmentVersion === undefined || (typeof body.acknowledgmentVersion === 'string' && body.acknowledgmentVersion.length <= 100))
       && typeof body.expectedCurrentArtifactId === 'string' && isGuid(body.expectedCurrentArtifactId)
       && typeof body.expectedCurrentFingerprint === 'string' && /^[0-9a-f]{64}$/.test(body.expectedCurrentFingerprint);
   }

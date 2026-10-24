@@ -39,7 +39,7 @@ beforeEach(() => { db.connect.mockReset(); sql.mockReset(); });
 test('no active row: locks the (request, kind) key, inserts, and commits', async () => {
   script(null);
   await expect(reserveSummaryDraftRun(ARGS)).resolves.toEqual({ draft: { id: ARGS.id, state: 'generating' } });
-  expect(statements()).toEqual(['BEGIN', 'SELECT pg_advisory_xact_lock(hashtext($1))', 'SELECT id,', 'INSERT INTO', 'COMMIT']);
+  expect(statements()).toEqual(['BEGIN', 'SELECT pg_advisory_xact_lock(hashtext($1))', 'SELECT id', 'SELECT id,', 'INSERT INTO', 'COMMIT']);
   expect(client.query.mock.calls[1][1]).toEqual([`summary-draft:${ARGS.requestId}:100000010`]);
   expect(client.release).toHaveBeenCalled();
 });
@@ -48,7 +48,7 @@ test('a ready draft is not replaced without a matching replaceDraft: typed confl
   script(ready());
   await expect(reserveSummaryDraftRun(ARGS)).resolves.toEqual({
     conflict: { code: 'summary_draft_exists', draftId: ACTIVE_ID, version: 3 } });
-  expect(statements()).toEqual(['BEGIN', 'SELECT pg_advisory_xact_lock(hashtext($1))', 'SELECT id,', 'ROLLBACK']);
+  expect(statements()).toEqual(['BEGIN', 'SELECT pg_advisory_xact_lock(hashtext($1))', 'SELECT id', 'SELECT id,', 'ROLLBACK']);
 });
 
 test('a ready draft named at an older version is still a conflict', async () => {
@@ -62,9 +62,9 @@ test('a ready draft named by exact id (any case) and version is superseded, then
   script(ready());
   await expect(reserveSummaryDraftRun({ ...ARGS, replaceDraft: { draftId: ACTIVE_ID.toUpperCase(), expectedVersion: 3 } }))
     .resolves.toMatchObject({ draft: { id: ARGS.id } });
-  expect(statements()).toEqual(['BEGIN', 'SELECT pg_advisory_xact_lock(hashtext($1))', 'SELECT id,',
+  expect(statements()).toEqual(['BEGIN', 'SELECT pg_advisory_xact_lock(hashtext($1))', 'SELECT id', 'SELECT id,',
     'UPDATE meeting_transcript_summary_drafts', 'INSERT INTO', 'COMMIT']);
-  expect(client.query.mock.calls[3][1]).toEqual([ACTIVE_ID, 12]);
+  expect(client.query.mock.calls[4][1]).toEqual([ACTIVE_ID, 12]);
 });
 
 test.each([

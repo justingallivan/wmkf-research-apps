@@ -22,6 +22,10 @@ related:
 
 # Atlas: Site Visit summary drafts (Postgres)
 
+## Branch continuation — 2026-10-23
+
+[VERIFIED via source and isolated PostgreSQL] Migration 087 and the durable preparation continuation are branch-built, not applied or deployed. See [durable preparation](postgres-meeting-material-preparations.md). Owned summary attempts add preparation/outcome/initiation metadata; protected reserved/dispatched/unknown ownership survives both the six-minute abandonment age and fourteen-day text expiry, and every legacy reservation checks it under the same advisory lock. The provider acknowledgement is intentionally removed for new Meeting Tracker calls; historical true acknowledgements remain and initiation is recorded separately. The dated Production release evidence below predates this branch.
+
 ## Status
 
 **[PRODUCTION-LIVE 2026-10-05.]** The owner applied migration 070 to the shared
@@ -52,7 +56,7 @@ after migration 075). `request_id`, `source_revision_id`, `source_artifact_id`, 
 
 | Column group | Meaning |
 |---|---|
-| `acknowledgment_version`, `acknowledged_by_profile_id`, `acknowledged_at` | The summarization acknowledgment (plan §6), written when the row is inserted, before the provider call; kept in every state |
+| `acknowledgment_version`, `acknowledged_by_profile_id`, `acknowledged_at` | Historical summarization acknowledgement, kept in every state. After migration 087, new calls without acknowledgement store all three fields NULL; initiation uses separate fields |
 | `source_revision_id`, `presentation_end_ms`, `source_artifact_id` | The transcript revision, confirmed boundary, and bound source row the summary was made from (Presentation Transcript for 100000007, Staff Discussion Transcript for 100000010); publish refuses a draft whose pair is no longer current |
 | `summary_text`, `text_edited`, `version` | The generated (then staff-edited) text and an optimistic version; text is allowed only in states `ready` and `publishing` (CHECK) and is at most 100,000 characters |
 | `prompt_name`, `prompt_version`, `prompt_id`, `ai_run_id`, `failure_code` | Executor provenance; the run row keeps content-free audit only |
@@ -67,7 +71,7 @@ States: `generating` → `ready` | `failed`; `ready` → `publishing` |
 **Run reservation (plan D2).** `reserveSummaryDraftRun` replaces the
 two-statement `beginSummaryDraft` with one transaction under
 `pg_advisory_xact_lock` keyed on request and type. It reads the active row of that
-type. With no active row, or an abandoned `generating`/`publishing` row, it
+type. After migration 087 the reservation first refuses any protected `reserved`/`dispatched`/`unknown` ownership row, regardless of state age or content expiry. With no active row, or an abandoned unowned `generating`/`publishing` row, it
 supersedes that row and inserts a new `generating` row. A `ready` row is
 superseded (text cleared) only when it has expired or the request's `replaceDraft`
 names its id and current version; otherwise the result is the typed conflict
@@ -105,7 +109,7 @@ abandoned and can be taken over (the publish route allows 120 s). A new run
 retires a `publishing` row that no request holds (yielded or abandoned);
 whatever it registered stays published. A partial unique index allows at most
 one `generating`, `ready`, or `publishing` row per request and type, so the two
-kinds run independently; a `generating` row older than 360 s is abandoned.
+kinds run independently; only an unowned legacy `generating` row older than 360 s is abandoned automatically.
 
 ## Retention
 
@@ -113,7 +117,7 @@ Generated text lives here only while a draft is `ready` or `publishing`. Publish
 discarding, superseding, or expiring clears `summary_text` and keeps the
 metadata, so the acknowledgment record survives. Drafts expire 14 days after
 creation, for either kind (paired summaries owner decision 7); the daily maintenance cron (`pages/api/cron/maintenance.js`) clears
-the text of expired active rows through `expireSummaryDrafts`. The published
+the text of expired active rows through `expireSummaryDrafts`, except protected reserved/dispatched/unknown ownership. Those tombstones remain visible and block resubmission until explicit version-fenced coordinator recovery. The published
 presentation summary is a TXT in governed SharePoint (`Site Visit - Transcript Summary`),
 registered as a Transcript Summary row whose `wmkf_inputfingerprint` binds it
 to the source revision and boundary
@@ -130,8 +134,7 @@ those correction drafts are label-only (speaker names and the presentation end; 
 
 ## Readers and writers
 
-Only `lib/services/post-presentation-materials/summary-draft-store.js` reads or
-writes the table. Its callers:
+`lib/services/post-presentation-materials/summary-draft-store.js` owns ordinary draft CRUD. The branch-built `meeting-coordination/preparation-store.js` also reads owned-result state and performs explicit abandonment and expired-worker uncertainty transitions under the shared reservation lock. Its callers:
 - `transcript-summary-service.js`, through the routes
   `/api/meeting-tracker/visits/[requestId]/transcriptions/summary-draft` and
   `.../summary-draft/publish` (`meeting-tracker` app access);

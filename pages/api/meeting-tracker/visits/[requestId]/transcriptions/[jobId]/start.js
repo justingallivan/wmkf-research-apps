@@ -17,8 +17,8 @@ export default async function handler(req, res) {
   if (!access) return;
   if (!Number.isSafeInteger(access.profileId) || access.profileId < 1) return res.status(401).json({ error: 'An active linked staff profile is required.' });
   const body = req.body;
-  if (!body || typeof body !== 'object' || Array.isArray(body) || Object.keys(body).sort().join(',') !== 'expectedVersion,nonSensitiveAcknowledged'
-    || !Number.isSafeInteger(body.expectedVersion) || body.nonSensitiveAcknowledged !== true) return res.status(400).json({ error: 'The transcription-start acknowledgement is invalid.' });
+  if (!body || typeof body !== 'object' || Array.isArray(body) || Object.keys(body).some(key => !['expectedVersion','nonSensitiveAcknowledged'].includes(key))
+    || !Number.isSafeInteger(body.expectedVersion) || body.expectedVersion < 1 || (body.nonSensitiveAcknowledged !== undefined && body.nonSensitiveAcknowledged !== true)) return res.status(400).json({ error: 'The transcription-start request is invalid.' });
   res.setHeader('Cache-Control','private, no-store');
   return withDalContext('meeting-tracker-transcription-start', async () => {
     try { return res.status(200).json(await startMeetingTranscription({ requestId, ownerProfileId: access.profileId,

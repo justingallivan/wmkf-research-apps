@@ -3,7 +3,7 @@ title: Meeting Coordination Implementation Plan
 domain: product
 kind: plan
 status: in-progress
-summary: Staged implementation of the Workbench-first meeting design, durable preparation and Program Coordinator approval of versioned Board materials; first approval increment branch-built; remaining workflow slices planned, not deployed.
+summary: Staged implementation of the Workbench-first meeting design, durable preparation and Program Coordinator approval of versioned Board materials; approval and durable-preparation increments branch-built; remaining workflow slices planned, not deployed.
 canonical: false
 owner: product-engineering
 related:
@@ -29,7 +29,9 @@ Scope includes cycle/session navigation, meeting setup and agenda controls, invi
 
 [VERIFIED via source, focused tests and isolated PostgreSQL] The first increment implements explicit coordinator enrollment, three-member presentation approval, retained approved identities through corrections, version-fenced withdrawal, both external consumers and a focused approval panel. Migration 086 is registered after the owner-authorized filenames-only tracker query and inspection of 355 local/remote refs; it is **not applied to Production**. See [approval state and release prerequisites](../atlas/postgres-meeting-presentation-editions.md).
 
-[PLANNED] This is a partial implementation of Slice 1. Durable preparation, acknowledgement removal, manual source pairing/cutting, coordinator-only collection dispatch, before-meeting and Workbench redesign remain unimplemented. Existing preparation controls still feed the approval candidate. The combined workflow remains unreleased; slices 1–3 retain the integrated release requirement below. Opus product-review findings and final verification belong in the implementation receipt, separately from the historical plan review.
+[VERIFIED via source and isolated PostgreSQL] The continuation adds the durable parent/step queue, persisted source-publication intent, browser-independent child execution, summary uncertainty/expiry protections shared by legacy reservations, explicit coordinator abandonment and selective retry. Both Meeting Tracker provider confirmations are removed with truthful initiation provenance and the admin pilot unchanged. See [durable storage and release prerequisites](../atlas/postgres-meeting-material-preparations.md). Migration 087 is registered but not applied to Production; admission defaults off.
+
+[PLANNED] The combined save/review interaction, rare manual video source pairing/cutting, coordinator-only collection dispatch, before-meeting and Workbench redesign remain. The current panel prepares an already saved review. The combined workflow remains unreleased; slices 1–3 retain the integrated release requirement below. Opus product-review findings and final verification belong in the implementation receipts, separately from the historical plan review.
 
 ## Settled product requirements
 
