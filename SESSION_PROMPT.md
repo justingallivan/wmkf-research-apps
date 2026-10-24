@@ -15,7 +15,8 @@
    - Follow-ups (owner-run, logged in the stage-b-2 folder): Nelson and Paddison → Fred Hutch; 1001012 liaison Aaron Diaz removed from `wmkf_copi1` and his Co-PI row deleted; duplicate Diaz contacts merged (kept `d6b3d757-…`, UC Berkeley liaison, which took UC Berkeley as account).
 3. **Grant Reporting header lists junction co-PIs** (`529e8081a`, Tier 1 branch merge): PI, then `fetchCoPIs` Personnel co-PIs, then any slot-only co-PI; slot fallback on junction failure. [VERIFIED via GitHub check-runs on `529e8081a`: six workflows green]
 4. **Production-read flag removed** from `.env.local` in this checkout and in `WMKF_Apps-claude-2026-10-22`, `-claude-debug`, `-claude-session` (owner-approved). Production reads now need `DATAVERSE_ALLOW_PROD_READS=yes` on the command line; writes still need a same-UTC-day `DATAVERSE_PROD_WRITE_ACK`.
-5. **Owner retired** the Connor 2024-split confirmation and the held note to Connor (plan §7); **tabled** the confirm-your-details email campaign.
+5. **CI slimmed for Markdown-only changes** (`9830bdad2`, `dc0a8296e`): a `changes` job in `test.yml` skips the build, full Jest and Postgres integration when every changed file is `*.md` (lint and all `check:*` gates still run); `e2e.yml` skips docs-only main pushes. CodeQL (GitHub default setup) still runs. See `docs/CI_GATES_REFERENCE.md`.
+6. **Owner retired** the Connor 2024-split confirmation and the held note to Connor (plan §7); **tabled** the confirm-your-details email campaign.
 
 ### Commits
 
