@@ -45,3 +45,13 @@ test('proof is deadline audience only, exact digest, five-minute TTL', async () 
   verifyToken.mockResolvedValue({ valid: true, payload: { subject: 'digest', aud: 'reviewer-deadline-preview', ops: ['send'] } }); expect(await verifyDeadlinePreviewProof('jwt', 'digest')).toBe(true);
   verifyToken.mockResolvedValue({ valid: true, payload: { subject: 'digest', aud: 'reviewer-reminder-preview', ops: ['send'] } }); expect(await verifyDeadlinePreviewProof('jwt', 'digest')).toBe(false);
 });
+test('present null Admin body is read as intentionally empty; null subject still blocks', async () => {
+  getSettingStrict.mockImplementation(async (key) => ({ found: true, value: key.endsWith('.subject') ? TEMPLATE.subject : null }));
+  expect(await sharedDeadlineTemplate()).toEqual({ ok: true, template: TEMPLATE });
+  getSettingStrict.mockResolvedValue({ found: true, value: null }); expect(await sharedDeadlineTemplate()).toMatchObject({ reason: 'misconfigured' });
+});
+test('digest does not depend on plain-object key ordering', () => {
+  const { deadlinePreviewDigest } = require('../../lib/services/reviewer-deadline-personalization');
+  expect(deadlinePreviewDigest({ row: { a: 1, b: 2 }, cc: ['one', 'two'] })).toBe(deadlinePreviewDigest({ cc: ['one', 'two'], row: { b: 2, a: 1 } }));
+  expect(deadlinePreviewDigest({ cc: ['two', 'one'] })).not.toBe(deadlinePreviewDigest({ cc: ['one', 'two'] }));
+});

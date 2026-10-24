@@ -123,8 +123,9 @@ configuration remain pending. The earlier Opus review covered the plan only.
    exact-owner reads and the **release** slice's fallback-with-notice pattern;
    do not copy the reminder slice's blocking personal-read-failure policy.
    GET returns own identity, shared copy, configured state and own template;
-   a damaged own row returns 409 `preference_invalid` with shared copy so Save
-   can repair it. Preview reports `personal`, `shared` or `shared_fallback`
+   a damaged own row returns 409 `preference_invalid` with shared copy (or
+   `sharedUnavailable: true` and null shared copy) so Save/Clear can repair it
+   independently of shared configuration. Preview reports `personal`, `shared` or `shared_fallback`
    and a notice for unavailable/invalid personal data. Add the key to both
    `RESERVED_WRITE_KEYS` and `PRIVATE_REMINDER_KEYS` in the generic preference
    route, with reserved read/write tests. No new table or migration.
@@ -139,7 +140,7 @@ configuration remain pending. The earlier Opus review covered the plan only.
    Add `email.reviewer_extension.subject`; retain the current body key.
    Remove extension `requiredPlaceholders` and the fixed-subject description
    from `editableTextDefaults.js`, and the service's `requiredTokens` check.
-   Make extension Admin validation and reads distinguish a present empty body
+   Make extension Admin validation and reads distinguish a present empty/null body value
    from a missing/unavailable key. The generic `readRequiredEmailDefaults`
    rejects blank values: use an extension-specific strict read/validation path
    for the body, without changing other email families. Missing/unavailable or
@@ -182,7 +183,9 @@ configuration remain pending. The earlier Opus review covered the plan only.
    dates, suggestion ETag, lifecycle/token eligibility facts, current request
    date/title/PD, reviewer name, resolved signature, sender ID/mailbox, To,
    normalized Cc, raw subject/body and rendered output/calendar facts. Editing
-   copy/Cc/date or changing any bound fact requires another preview.
+   copy/Cc/date or changing any bound fact requires another preview. Project
+   business rows from fixed selected field lists, excluding formatted display
+   annotations; use stable object-key ordering for digest serialization.
 7. **Conditional write and post-write retry proof.** Compare fresh request fields
    and suggestion state with the preview immediately before the write, and pass
    the preview's expected suggestion ETag to `changeReviewDeadline`'s If-Match.
@@ -273,7 +276,8 @@ email, configuration write or business-record edit is authorized by this plan.
 of the new shared subject key, then strict readback/validation of subject and
 body with the candidate validator. Confirm no-title rendering and preserved
 existing wording. Do not deploy runtime that requires the new subject before
-that key is present and valid. Missing/invalid configuration blocks promotion;
+that key is present and valid. The seed preserves any present extension body,
+including empty, whitespace-only and null-stored empty values. Missing/invalid configuration blocks promotion;
 this plan does not itself authorize the seed or live readback. Use a branch/PR
 and deliberate promotion; do not alter shared helper behavior for sibling flows.
 
@@ -309,3 +313,18 @@ requests refuse all Cc before writes and at dispatch. Updated this plan,
 inventory slice-2 summary and suite to-do exception; current runtime docs now identify branch-built behavior separately from deployment. Opus findings were checked against
 named source paths; no shared-helper audience reuse, mandatory nonblank personal
 body rule or blanket stored-copy validity assertion survives in this plan.
+
+## Build verification and first Opus build review — 2026-10-24
+
+[VERIFIED via local source/tests; not deployed.] Candidate `a79003426` passed
+25,143 tests / five snapshots (247 skipped), production build, changed-file lint,
+scoped policy gates/self-tests and desktop/mobile synthetic UI checks. Its OAuth
+Opus build review (`SLICE2_OPUS_BUILD_REVIEW_2026_10_24`) found a blocking
+formatted-annotation comparison defect plus smaller issues. The fixes now project
+only selected business fields with stable digest ordering; accept present null
+Admin bodies as empty; preserve empty Admin bodies during seed; use saved-state
+error wording; preserve non-retryable recipient-policy reasons; map non-PD errors
+and request mismatch; and permit own-default repair even with broken shared
+configuration. Regression cases for those changes pass (131 focused tests).
+A fresh Opus verification of the corrected candidate is pending. Full receipt:
+`docs/audits/REVIEWER_DEADLINE_EMAIL_BUILD_2026-10-24.md`.

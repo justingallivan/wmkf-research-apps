@@ -30,7 +30,8 @@ Last updated: 2026-10-22
 > 2026-08-11 / 2026-08-12 UTC] the Wave 18 column is live and EXACT. The
 > non-clobbering admin-body seed and runtime promotion completed in main
 > `8647af33` / Vercel `dpl_AbTvWvMYb5inwPnYKTK2mkrkNXZz`; the route
-> behaviors below are production-live.
+> base workflow was production-live at that release; later branch-source changes
+> are identified separately below.
 
 > **Route→Service consolidation (Stage 7, 2026-07-05):** the business logic of
 > the `pages/api` routes now lives in per-domain `lib/services/<domain>/`

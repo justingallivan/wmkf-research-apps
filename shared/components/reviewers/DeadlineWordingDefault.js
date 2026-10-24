@@ -62,14 +62,15 @@ export default function DeadlineWordingDefault({ disabled = false, onBusyChange 
           setSubject(data.template?.subject || '');
           setBody(data.template?.body || '');
           setLoaded(true);
-        } else if (data.reason === 'preference_invalid' && data.ownSystemId && data.shared) {
+          if (data.sharedUnavailable) setMessage('Shared wording is unavailable. You can save or clear your default; deadline emails remain blocked until an administrator repairs the shared wording.');
+        } else if (data.reason === 'preference_invalid' && data.ownSystemId) {
 
           setConfigured(true);
           setShared(data.shared);
-          setSubject(data.shared.subject || '');
-          setBody(data.shared.body || '');
+          setSubject(data.shared?.subject || '');
+          setBody(data.shared?.body || '');
           setLoaded(true);
-          setMessage('Your saved wording needs correction. Replace it below and save, or clear it.');
+          setMessage(data.sharedUnavailable ? 'Your saved wording needs correction and shared wording is unavailable. You can replace or clear your default here; an administrator must repair shared wording before deadline emails can be sent.' : 'Your saved wording needs correction. Replace it below and save, or clear it.');
         } else {
           setMessage('Your default wording could not be loaded. Close this section and try again.');
         }

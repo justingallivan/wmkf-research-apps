@@ -32,7 +32,13 @@ test('null actor denied before ownership reads', async () => {
 test.each([{ action: 'unknown', suggestionId: ID }, { action: 'save', suggestionId: ID }, { action: 'preview', operation: 'retry', suggestionId: 'bad' }, { action: 'preview', operation: 'retry', suggestionId: ID, owner: PD }, { action: 'preview', operation: 'retry', suggestionId: ID, reviewDueDateOverride: '1900-01-01' }])('invalid input is rejected before services %p', async (body) => {
   const res = response(); await handler({ method: 'POST', body }, res); expect(res.statusCode).toBe(400); expect(authorizeReviewerRequestMutation).not.toHaveBeenCalled();
 });
-test.each([['send_unconfirmed', 202], ['preview_stale', 409], ['invalid_cc', 400], ['cc_not_allowed_for_test_request', 409]])('reason %s maps to %s', async (reason, status) => {
+test.each([['send_unconfirmed', 202], ['preview_stale', 409], ['invalid_cc', 400], ['cc_not_allowed_for_test_request', 409], ['assigned_pd_required', 403], ['sender_changed', 409], ['invalid_preview', 400], ['recipient_policy_refused', 409], ['request_mismatch', 409], ['read_failed', 502], ['notification_unavailable', 502], ['misconfigured', 502], ['token_recovery_required', 409], ['save_failed', 502], ['conflict', 409], ['no_change', 409], ['no_extension_to_restore', 409], ['invalid_extension_date', 400], ['original_due_date_missing', 409], ['ineligible', 409], ['not_found', 404]])('reason %s maps to %s', async (reason, status) => {
   service.previewReviewerDueDateNotification.mockResolvedValue({ ok: false, reason, saved: true, notified: false });
   const res = response(); await handler({ method: 'POST', body: { action: 'preview', operation: 'resend', suggestionId: ID } }, res); expect(res.statusCode).toBe(status); expect(res.body.saved).toBe(true);
+});
+test('ordinary non-PD shared-helper denial uses the PD-only error reason', async () => {
+  const { ServiceHttpError } = require('../../lib/services/service-http-error');
+  authorizeReviewerRequestMutation.mockRejectedValue(new ServiceHttpError('Only the lead PD (or superuser)', { httpStatus: 403 }));
+  const res = response(); await handler({ method: 'POST', body: { action: 'preview', operation: 'resend', suggestionId: ID } }, res);
+  expect(res.body).toEqual({ ok: false, reason: 'assigned_pd_required' });
 });

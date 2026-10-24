@@ -202,3 +202,13 @@ describe('seed-email-defaults script core', () => {
     expect(setSetting.mock.calls[0][0]).toBe('email.grantee_invite.subject');
   });
 });
+
+describe('deadline empty Admin body preservation', () => {
+  test.each(['', '   ', null])('execute preserves a present %p deadline body, including Dataverse null storage', async (value) => {
+    const { seedEmailDefaults } = await import('../../scripts/seed-email-defaults.mjs');
+    const getSettingStrict = jest.fn(async (key) => ({ found: true, value: key === 'email.reviewer_extension.body' ? value : 'Already configured' }));
+    const setSetting = jest.fn(async () => true);
+    const results = await seedEmailDefaults({ getSettingStrict, setSetting, dryRun: false, logger: { log: jest.fn() } });
+    expect(results.find((row) => row.key === 'email.reviewer_extension.body').action).toBe('skip-existing'); expect(setSetting).not.toHaveBeenCalled();
+  });
+});

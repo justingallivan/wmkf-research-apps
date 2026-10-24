@@ -36,6 +36,7 @@ const MALFORMED_BODY = Symbol('malformed-body');
 
 function messageForReason(reason, fallback) {
   const messages = {
+    request_mismatch: 'This reviewer now belongs to a different request. Reload the reviewer list.',
     assigned_pd_required: 'Only the assigned Program Director can change this deadline or send its notification.',
     sender_changed: 'The assigned Program Director or mailbox changed. Reload before continuing.',
     preview_stale: 'The deadline or email details changed. Review a fresh preview before continuing.',
@@ -155,7 +156,15 @@ export default function ReviewerDueDateEditor({ suggestionId, reviewerName, over
       const unknown = data.reason === 'send_unconfirmed';
       setUncertain(unknown);
       const hasSaved = saved || data.saved === true;
-      setError((hasSaved ? 'The deadline is saved. ' : '') + messageForReason(data.reason, 'The email was not sent. Preview again before continuing.'));
+      const savedMessages = {
+        read_failed: 'The email details could not be reloaded. Preview again before sending.',
+        notification_unavailable: 'The reviewer or Program Director information could not be confirmed. Reload before sending.',
+        misconfigured: 'The email configuration could not be loaded. Contact an administrator before sending.',
+        token_recovery_required: 'The secure link needs attention before sending. Reload the reviewer list.',
+      };
+      const detail = hasSaved && savedMessages[data.reason]
+        ? savedMessages[data.reason] : messageForReason(data.reason, 'The email was not sent. Preview again before continuing.');
+      setError((hasSaved ? 'The deadline is saved. ' : '') + detail);
       if (hasSaved && !unknown) setOperation('retry');
       if (data.retryable && data.retryProof && !unknown) setRetryProof(data.retryProof);
     } catch {
@@ -198,8 +207,8 @@ export default function ReviewerDueDateEditor({ suggestionId, reviewerName, over
               <textarea className={inputClass} rows={7} maxLength={12000} value={template.body} disabled={locked} onChange={(e) => { invalidate(); setTemplate({ ...template, body: e.target.value }); }} />
             </label>
             <p className="text-xs text-gray-500">Optional placeholders: {'{{greeting}}, {{reviewerName}}, {{proposalTitle}}, {{reviewDueDate}}, {{signature}}'}. The calendar attachment always uses the saved deadline.</p>
-            <DeadlineWordingDefault disabled={working || uncertain || sent} onBusyChange={setPreferenceBusy} />
           </div>}
+          <div className="mt-3"><DeadlineWordingDefault disabled={working || uncertain || sent} onBusyChange={setPreferenceBusy} /></div>
           {working && <p role="status" className="mt-3 text-sm text-gray-600">Preparing the deadline email…</p>}
           {preview && <section className="mt-4 border-t border-gray-200 pt-4" aria-label="Email preview">
             <p className="text-sm font-medium text-gray-900">{preview.subject}</p>

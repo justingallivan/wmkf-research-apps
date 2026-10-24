@@ -158,8 +158,8 @@ export async function seedEmailDefaults({
 
     const current = await getSettingStrict(entry.key);
     const value = current?.found ? String(current.value ?? '') : '';
-    if (value.trim() !== '') {
-      logger.log(`SKIP ${entry.key}: existing non-empty value (${value.length} chars)`);
+    if ((entry.key === 'email.reviewer_extension.body' && current?.found) || value.trim() !== '') {
+      logger.log(`SKIP ${entry.key}: existing configured value (${value.length} chars)`);
       results.push({ key: entry.key, action: 'skip-existing', currentLength: value.length });
       continue;
     }

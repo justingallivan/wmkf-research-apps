@@ -93,6 +93,7 @@ export default async function handler(req, res) {
     return res.status(200).json(result);
   } catch (error) {
     if (error instanceof ServiceHttpError) {
+      if (error.httpStatus === 403) return res.status(403).json({ ok: false, reason: 'assigned_pd_required' });
       return res.status(error.httpStatus).json(error.body ?? { ok: false, reason: error.message });
     }
     console.error('[review-manager review-due-extension] error:', error);

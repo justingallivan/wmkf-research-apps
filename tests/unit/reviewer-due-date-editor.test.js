@@ -73,3 +73,30 @@ test.each([reply({}, 502), reply({ ok: false, reason: 'server_error' }, 500)])('
   fireEvent.click(screen.getByRole('button', { name: 'Save deadline and send' })); await screen.findByText(/result could not be confirmed/);
   expect(screen.queryByRole('button', { name: 'Preview email' })).toBeNull();
 });
+test.each(['read_failed', 'notification_unavailable', 'misconfigured'])('saved deadline is never described as unchanged after %s', async (reason) => {
+  render(<ReviewerDueDateEditor {...props} />); await open(); await review();
+  global.fetch.mockResolvedValueOnce(reply({ ok: false, saved: true, notified: false, reason, requiresPreview: true }, 502));
+  fireEvent.click(screen.getByRole('button', { name: 'Save deadline and send' })); await screen.findAllByText(/The deadline is saved\. /);
+  expect(screen.queryByText(/No deadline was changed/)).toBeNull();
+});
+test('preference save/clear cannot replace one-send draft, including edits while save is pending', async () => {
+  render(<ReviewerDueDateEditor {...props} />); await open();
+  fireEvent.change(screen.getByLabelText('Message (optional)'), { target: { value: 'One send only' } });
+  global.fetch.mockResolvedValueOnce(reply({ ok: true, configured: true, template: { subject: 'Personal', body: '' }, shared: { subject: 'Admin', body: 'Admin' } }));
+  const details = screen.getByText('Your default wording').closest('details'); details.open = true; fireEvent(details, new Event('toggle'));
+  await screen.findByRole('button', { name: 'Save as my default' });
+  let finish; global.fetch.mockImplementationOnce(() => new Promise((resolve) => { finish = () => resolve(reply({ ok: true })); }));
+  fireEvent.click(screen.getByRole('button', { name: 'Save as my default' })); expect(screen.getByLabelText('Message (optional)')).toBeDisabled();
+  await act(async () => finish()); expect(screen.getByLabelText('Message (optional)')).toHaveValue('One send only');
+  global.fetch.mockResolvedValueOnce(reply({ ok: true })); fireEvent.click(screen.getByRole('button', { name: 'Clear my default' }));
+  await screen.findByText(/Your default wording was cleared/); expect(screen.getByLabelText('Message (optional)')).toHaveValue('One send only');
+});
+
+test('default repair remains reachable when shared configuration blocks the initial email', async () => {
+  global.fetch.mockResolvedValueOnce(reply({ ok: false, reason: 'misconfigured' }, 502));
+  render(<ReviewerDueDateEditor {...props} />); fireEvent.click(screen.getByRole('button', { name: 'Grant extension' })); await screen.findByText(/could not prepare the deadline email/);
+  global.fetch.mockResolvedValueOnce(reply({ ok: false, reason: 'preference_invalid', ownSystemId: 'own', configured: true, shared: null, sharedUnavailable: true }, 409));
+  const details = screen.getByText('Your default wording').closest('details'); details.open = true; fireEvent(details, new Event('toggle'));
+  await screen.findByRole('button', { name: 'Clear my default' }); expect(screen.getByLabelText('Subject')).toHaveValue('');
+  expect(screen.getByText(/administrator must repair shared wording/)).toBeInTheDocument();
+});

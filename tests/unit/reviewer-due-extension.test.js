@@ -99,7 +99,7 @@ test('synthetic rejects a nonempty otherwise-valid Cc even if allowlisted; unkno
 test('test classification change after write stops dispatch without losing saved fact or offering unchanged retry', async () => {
   const input = await reviewed({ ...INPUT, cc: ['safe@example.org'] });
   suggestions.updateLifecycle.mockImplementation(async () => { row.wmkf_reviewduedateoverride = '2099-09-15'; row._etag = 'W/"8"'; resolveRequestTestState.mockResolvedValue({ kind: 'synthetic' }); });
-  expect(await save(input)).toMatchObject({ saved: true, notified: false, reason: 'cc_not_allowed_for_test_request' });
+  expect(await save(input)).toMatchObject({ saved: true, notified: false, retryable: false, reason: 'cc_not_allowed_for_test_request' });
   expect(DynamicsService.createAndSendEmail).not.toHaveBeenCalled();
 });
 test('absent actor denied before any read and reassigned PD cannot send as new PD', async () => {
@@ -177,4 +177,22 @@ test('no-title subject preserves fallback; hostile title is escaped in body and 
   const rendered = renderReviewerDueDateUpdate({ bodyTemplate: '{{proposalTitle}}', reviewerName: 'Ada', proposalTitle: '<img>\r\nInjected', dueDate: '2099-09-15' });
   expect(rendered.subject).not.toMatch(/[\r\n]/); expect(rendered.body).toContain('&lt;img&gt;');
   expect(normalizeDeadlineCc(null, 'a@example.org', 'b@example.org')).toBeNull();
+});
+
+test.each(['save', 'restore'])('formatted date annotations and property ordering cannot block %s dispatch', async (operation) => {
+  if (operation === 'restore') { row.wmkf_reviewduedateoverride = '2099-09-15'; row.wmkf_reviewduedateoverride_formatted = '9/15/2099'; }
+  const input = await reviewed({ ...INPUT, operation, reviewDueDateOverride: operation === 'restore' ? undefined : '2099-09-15' });
+  // Reverse every incoming key and change locale-only labels after the write,
+  // as processAnnotations does for actual Dataverse formatted annotations.
+  suggestions.updateLifecycle.mockImplementation(async (_id, change) => {
+    row = Object.fromEntries(Object.entries({ ...row, wmkf_reviewduedateoverride: change.reviewDueDateOverride, _etag: 'W/"8"',
+      wmkf_reviewduedateoverride_formatted: operation === 'restore' ? null : '15.09.2099',
+      wmkf_reviewstatus_formatted: 'A localized label' }).reverse());
+    request = Object.fromEntries(Object.entries({ ...request, wmkf_reviewduedate_formatted: 'Another localized date' }).reverse());
+  });
+  expect(await save(input)).toMatchObject({ ok: true, saved: true, notified: true }); expect(DynamicsService.createAndSendEmail).toHaveBeenCalledTimes(1);
+});
+test('annotations alone do not invalidate a preview but selected business data still does', async () => {
+  const input = await reviewed(); row.wmkf_reviewduedateoverride_formatted = 'localized'; request.akoya_title_formatted = 'localized title';
+  expect(await save(input)).toMatchObject({ ok: true, notified: true });
 });

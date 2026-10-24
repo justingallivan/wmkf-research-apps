@@ -106,3 +106,10 @@ test('missing session systemuser is 503 and touches nothing', async () => {
   expect(res.statusCode).toBe(503);
   expect(saveOwnDeadlineTemplate).not.toHaveBeenCalled();
 });
+test('shared misconfiguration does not prevent own-row repair or Clear', async () => {
+  sharedDeadlineTemplate.mockResolvedValue({ ok: false, reason: 'misconfigured' });
+  loadOwnerDeadlineTemplate.mockResolvedValue({ ok: false, reason: 'preference_invalid' });
+  const broken = call('GET'); await handler(broken.req, broken.res);
+  expect(broken.res.statusCode).toBe(409); expect(broken.res._data).toMatchObject({ configured: true, shared: null, sharedUnavailable: true });
+  const cleared = call('DELETE'); await handler(cleared.req, cleared.res); expect(clearOwnDeadlineTemplate).toHaveBeenCalledWith(ownSystemId);
+});

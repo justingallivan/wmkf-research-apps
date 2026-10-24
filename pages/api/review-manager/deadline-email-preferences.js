@@ -36,20 +36,20 @@ export default async function handler(req, res) {
     return await withDalContext('review-manager-deadline-email-preferences', async () => {
       if (req.method === 'GET') {
         const shared = await sharedDeadlineTemplate();
-        if (!shared.ok) return res.status(503).json({ ok: false, reason: shared.reason });
         const own = await loadOwnerDeadlineTemplate(ownSystemId);
         if (!own.ok) {
           if (own.reason === 'preference_invalid') {
-            return res.status(409).json({ ok: false, reason: own.reason, ownSystemId, shared: shared.template, configured: true });
+            return res.status(409).json({ ok: false, reason: own.reason, ownSystemId, shared: shared.ok ? shared.template : null, configured: true, ...(!shared.ok ? { sharedUnavailable: true } : {}) });
           }
           return res.status(503).json({ ok: false, reason: own.reason });
         }
         return res.status(200).json({
           ok: true,
           ownSystemId,
-          shared: shared.template,
+          shared: shared.ok ? shared.template : null,
+          ...(!shared.ok ? { sharedUnavailable: true } : {}),
           configured: own.configured,
-          template: own.configured ? own.template : shared.template,
+          template: own.configured ? own.template : shared.ok ? shared.template : null,
         });
       }
       if (req.method === 'DELETE') {
