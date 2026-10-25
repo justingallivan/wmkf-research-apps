@@ -1,111 +1,157 @@
-# Session 639 Prompt: Await owner-selected work after Meeting Tracker UI release
+# Session 640 Prompt: J27 readiness — collect Connor's answers and the Wednesday meeting outcomes
 
-## Current selected work — personal email defaults slice 6
+## Session 639 Summary
 
-[PRODUCTION-VERIFIED via PR #522, 9d12b24ce, 2026-10-24.] Implementation plan:
-`docs/plans/PERSONAL_EMAIL_MEETING_AGENDA_DEFAULTS_PLAN_2026-10-24.md`.
-PCs normally send pre-discussion agendas; other Meeting Tracker staff can cover,
-using their own mailbox/defaults. Scope: personal subject/optional opening;
-generated agenda stays server-owned. Owner adopted the newer collapsed **Your
-default wording** pattern after a read-only agent + Impeccable source review.
-All agreed Save/Clear, empty opening, addressing, fallback, placeholder, reopen,
-drift and unresolved-send decisions are in the plan. OAuth Opus 5.5 reviewed via
-Claude.ai Team OAuth and returned READY WITH NAMED CHANGES. All eight findings
-are incorporated: complete drift checks and strict link lookup, raw templates,
-shared validation, source/status/defaults refresh, separate busy/controllers,
-both generic privacy key sets, empty-opening guards and explicit limits.
-Receipt: `docs/audits/MEETING_AGENDA_DEFAULTS_PLAN_REVIEW_2026-10-24.md`.
-[VERIFIED via source, parent checks and OAuth Opus recheck.] Build is on
-`codex/meeting-agenda-email-defaults`; corrected runtime `693e637d1` passed
-25,231 tests / five snapshots, production build and scoped gates. Final test-only
-coverage passed 194 tests in 12 suites. Opus build recheck returned PASS after
-all eight findings were fixed, using subscription OAuth without API-key auth.
-Owner-authorized Production preflight validated existing agenda wording unchanged.
-One standalone synthetic agenda email is Sent (3), activity
-`986dffdc-15d0-f111-a05b-6045bd04539e`; exact HTML/parties and no regarding verified.
-Owner confirmed inbox receipt and correct appearance. Released through PR #522
-as `9d12b24ce`; all PR checks passed, including 25,204 CI tests / five snapshots
-and 130 PostgreSQL tests. Production `dpl_FScmxXBiRS5EvCJzBEjfPGoJNbyc` is READY
-and serves applications.wmkeck.org. Signed-in agenda compose/default-editor smoke
-passed without writes or another send; bounded runtime error scan returned zero.
-Existing-calendar agenda updates and suite Impeccable audit remain queued. Evidence:
-`docs/audits/MEETING_AGENDA_DEFAULTS_BUILD_2026-10-24.md`.
-A separate suite-wide Impeccable email-interface consistency review is queued in
-`docs/plans/PERSONAL_EMAIL_DEFAULTS_TODO_2026-09-20.md`; it does not block slice 6.
+Two agents worked concurrently. Claude (worktree
+`/Users/gallivan/Code/WMKF_Apps-claude-2026-10-24`, branch
+`claude/session-2026-10-24`, docs only) walked through J27 readiness with the
+owner and started a meeting log. Codex (main checkout and `codex/*` worktrees)
+shipped personal email defaults slices 2 and 6.
 
-## Current session update — personal email defaults slice 2
+### Claude — J27 alignment log and decisions (docs only, no runtime change)
 
-[VERIFIED via source, local tests and OAuth Opus review 2026-10-24.] Built on
-`codex/reviewer-deadline-email-defaults` (`a79003426`, then reviewed fixes
-`26010e1b0`). Assigned-PD-only deadline changes/restores/notifications; saved
-subject/body defaults including empty bodies; exact preview; optional one-send
-Cc barred on synthetic requests; truthful post-write email failure and retry.
-Opus's first review found an annotation-comparison defect and smaller issues;
-fixes passed fresh OAuth Opus re-review with no P1/P2 remaining. Final isolated
-run: 25,175 tests / five snapshots passed, 247 skipped; production build, scoped
-gates and desktop/mobile synthetic UI confirmation passed. Local proof servers
-stopped. PR #521 merged/released runtime as `687994c2a`; all PR checks passed.
-Production deployment `dpl_3DCEznTAZnPy8vJNq7hRYi5byzm7` is READY and serves
-applications.wmkeck.org. Staff sign-in and synthetic reviewer panel smoke passed.
-Owner authorized Production subject seeding and one standalone test email. The
-subject was created and validated with the existing body unchanged. Empty-body
-SendEmail succeeded and attachment readback matched; final status Sent (3),
-senton 2026-10-25T00:08:17Z, activity cf454711-08d0-f111-a05b-000d3a361c1f.
-Owner confirmed inbox receipt with blank body and calendar invitation for Monday,
-October 26, 2026. Selected release prerequisites and runtime promotion passed. Evidence and residuals:
-`docs/audits/REVIEWER_DEADLINE_EMAIL_BUILD_2026-10-24.md`. The two original
-untracked items were preserved untouched.
+[VERIFIED via the committed docs] `docs/plans/J27_ALIGNMENT_LOG_2026-10-24.md`
+is the single place for J27 decisions, meeting questions and tasks. It is
+written for the owner's meeting with Sarah (Grants Manager), Duncan (Program
+Coordinator), Connor (Systems Specialist) and the CSO, expected **Wednesday
+2026-10-28**. Owner decisions recorded 2026-10-24:
 
+- **D1:** Calendar authority = Grants Manager role, Program Coordinator role as
+  fallback (role-bound, not person-bound). Mirrored in the rollover plan §7.
+- **D2:** Reviewer reminders stay manual for J27; automatic schedule stays
+  paused (register Q10, `docs/REVIEWER_ENGAGEMENT_SPEC.md`).
+- **D3:** All D26 reviews are in (owner-reported); review filing switches
+  D26 → J27 once (register Q15). Who/when is task T3.
+- **D4:** Reviewer campaign values (deadline, respond-by days, quota) move to
+  central cycle-level settings; per-PD campaign settings are not the target.
+  Email wording is excluded: per-user wording over central seeds stays.
+  Rollover plan Slice 1 is scheduled for **November 2026**; its slice 2
+  dependency shipped (#521). New memory:
+  `.claude-memory/feedback-centralize-over-pd-specific-settings.md`.
+- **D5:** Volume of the Dec 8 AI pass is not a concern (owner).
+- **D6:** Expertise matching is rebuilt to run inline in the intake AI pass,
+  not on demand (current app is an early version of the CSO's Claude project).
 
-## Session 638 Summary — approved UI and compact contacts shipped
+The log also holds the provisional J27 key dates (Dec 7 submission, Dec 8 AI
+pass, Dec 9 release; Jan 6 decline notes; Jan 14 First Cut; Feb 24 reviewer
+invitations; Jun 9–10 Board with D27 intake the same week), the December and
+January readiness lists, and meeting questions A1–A5, B1, C1–C5, R1–R2, X1,
+F1–F3. **B1 correction:** the AI input files were already decided 2026-08-17
+(`AI Materials/ProposalNarrative_{n}.pdf` + `ProposalBibliography_{n}.pdf`,
+`docs/DATAVERSE_SHAREPOINT_FILE_MODEL.md`); Connor only confirms J27
+production. The owner is sending Connor a pre-meeting question email (drafted
+in session, grouped as: proposal files B1, intake records C1/C4/C5, AI-pass
+trigger R2, cycle dates C2/C3, lower-priority register Q7/Q14/Q23).
 
-[VERIFIED via source, OAuth Opus review, actual built Next-page screenshots, candidate checks and authenticated Production browser] PR #519 completed the approved compact cycle schedule, separate global Sessions view/agenda preview, search/status controls, responsive task workspace and visible materials counts. PR #520 then removed the People and share status disclosure: PD and PI appear directly on one compact line, while the existing Pre-Site lifecycle label appears as Share status in the request detail header.
+Timeline source: owner-shared provisional J27/D27 timeline PDF, generated from
+`keck_6months_timelines_updated.xlsx` (OneDrive, New Cycle Development/
+timelines) by a Claude-built script. Its hand-typed Day column has weekday
+errors, mostly on the D27 page (incl. D27 Board Dec 9–10, 2027 = Thu–Fri). The
+owner emailed the timeline owner a correction prompt; tracked as T5,
+non-blocking for J27.
 
-### Completed and verified
+Incidental: three pre-existing "unknown" phrasings in the rollover plan were
+reworded because the scope-claim hook misreads date digits as counts.
 
-- Initial UI release `3170781e0` passed 25,062 unit tests, 130 PostgreSQL tests and CodeQL; 16 actual built screens at 1440px/390px were compared with the saved mockups. The empty Sessions startup crash found after visual review was fixed and re-reviewed.
-- Final follow-up `951c4383a` (PR #520, candidate `730c2fad1`) passed all candidate checks, including full Jest, PostgreSQL integration, CodeQL, security scans, OAuth Claude review and Vercel build. Local proof: 109 focused tests, types, production-mode build, status parity gate/self-test; lint zero errors with one existing editor hook warning. The 16-screen read-only browser rehearsal passed with no horizontal overflow or automated main-content axe violations.
-- Production deployment `7302334669` is successful on `951c4383a`: `https://wmkfresearchapps-337v7k55i-justin-gallivans-projects.vercel.app`. Authenticated production readback confirmed inline PD/PI on request 1002912, zero disclosure labels, and Share status in dedicated synthetic request 1003371's detail header. No email, preparation job, upload, migration/configuration change or business-record edit was invoked.
-- Ordinary Claude Opus subscription OAuth reviews passed. No direct model API or Ultrareview was used. Original and follow-up evidence: `docs/audits/MEETING_UI_COMPLETION_2026-10-24.md`.
+### Codex — personal email defaults (production)
 
-### Commits
+[Recorded by Codex; see the exact prior handoff below.] Slice 2 (assigned-PD
+reviewer deadline email defaults) shipped as PR #521 `687994c2a`; slice 6
+(personal meeting agenda email defaults) shipped as PR #522 `9d12b24ce`, with
+release evidence in `docs/audits/REVIEWER_DEADLINE_EMAIL_BUILD_2026-10-24.md`
+and `docs/audits/MEETING_AGENDA_DEFAULTS_BUILD_2026-10-24.md`. Codex's full
+Session 639 text: `git show ad4cbac85:SESSION_PROMPT.md` (verified
+retrievable).
 
-- `3170781e0` — approved landing and workspace design (#519).
-- `a01032ebb` — verified initial UI production release record.
-- `951c4383a` — inline contacts and detail share status (#520).
+### Commits (Claude, docs only, landed on main)
+
+`b6c0ddeaf`-era series rebased onto `ad4cbac85`: calendar authority + log
+start; reminders/filing; December readiness; central campaign settings;
+November scheduling; Slice 1 unblocked + email-wording exclusion; T5; timeline
+rebuild; D6; trigger/flag questions; B1 Connor questions; B1 correction. See
+`git log --oneline ad4cbac85..HEAD`.
 
 ## Next Items
 
 ### Verified Open
 
-- No remaining implementation item in the selected Meeting Tracker UI scope. Await the next owner-selected task. Do not replay completed migrations, activation, paid rehearsals or visual-review loops.
+1. **Record Connor's pre-meeting answers in the log.** Evidence: log B1 detail,
+   C1–C5, R2. Update the matching rows; B1 answers 1–3 unblock the Dec 8 pass.
+2. **After the Wednesday meeting, record decisions** for A1–A5, C1–C5, R1–R2,
+   X1, F1–F3 and assign T3. Evidence: log "To confirm at the meeting".
+3. **Draft the Dec 8 automatic AI-pass plan** (Initial Assessment + inline
+   expertise matching + flags; one background worker per proposal, steps run
+   separately, narrative file as input, model as a setting, Board names moved
+   from the prompt into the roster). Owner agreed no non-meeting planning
+   question remains; meeting answers become placeholders. Evidence: log R-3,
+   D5, D6; `shared/config/prompts/expertise-finder-dynamics.js`;
+   `lib/services/initial-assessment/artifact-service.js`. Run
+   `/contract-reconcile` before implementation.
+4. **Slice 1 central reviewer settings (November).** Needs A4/A5 from Sarah.
+   Evidence: rollover plan §3.2 owner decision, log D4.
+
+### Owner Decision Needed (meeting)
+
+- Calendar fallback meaning, readiness recipients, approval rules (A1–A3).
+- Per-proposal exception to central settings; J27 central values (A4–A5).
+- Triage flags definition and visibility; Dec 9 list shape; unassigned
+  proposals (F1–F3). Roster ownership and whether the suggested PD is written
+  to the request (X1). Program (S&E/MR) recording (C5).
 
 ### Verify Before Acting
 
-- Retained synthetic fixture/resources are owned test assets, not cleanup instructions: request 1003371, its own SharePoint folder, isolated rehearsal database and Preview/private Blob store. Preserve the release receipts' resource and rollback constraints. No new resource deletion is authorized.
-- All owned local UI proof servers are stopped. Main is on the final shipped runtime source. The retained isolated checkout `/Users/gallivan/.codex/worktrees/session-start-7630/WMKF_Apps` is clean on `codex/meeting-people-line` at `730c2fad1`, merged through PR #520. Recheck ownership/state before reuse; do not treat this recorded path as current permission authority.
-- Main's unrelated untracked `.impeccable/critique/2026-10-19T02-04-42Z__shared-components-board-writeups-boardwriteups-js.md` and `output/` were preserved untouched. No session-owned runtime WIP remains.
+- **December readiness R-1/R-2/R-4** were checked against code 2026-10-24:
+  untriaged `Phase I Pending` requests do not appear in the Workbench list
+  (`shared/config/workbenchVisibility.js`); only Advancing/Set aside triage
+  states exist. R-4 (advance to Phase II Pending from Workbench) was not
+  verified. January items J-1/J-2 were not checked against code.
+- The Expertise roster (`expertise_roster`, Postgres) is also read by Site
+  Visit/meeting attendee services; a rebuild must preserve that contract.
+- Retained synthetic fixtures (request 1003371, its SharePoint folder,
+  isolated rehearsal database, Preview/private Blob store) are owned test
+  assets, not cleanup instructions. No resource deletion is authorized.
+- Main checkout's untracked `.impeccable/critique/...boardwriteups-js.md` and
+  `output/` belong to the owner/Codex; preserve them.
+
+### Parked / queued (from Codex's handoff)
+
+- Existing-calendar agenda updates and the suite-wide Impeccable email-interface
+  review: `docs/plans/PERSONAL_EMAIL_DEFAULTS_TODO_2026-09-20.md`.
+- Grant Reporting sunset parked; reviewer panel coverage parked; Research
+  Institution confirm-your-details campaign tabled.
 
 ### Do Not Reopen Without New Decision
 
-- Video required; Coordinator approval and collection-email ownership; approved materials retained during corrections with separate immediate withdrawal; no provider-confirmation step; rare matching manual audio/video fallback. These owner decisions remain settled.
-- Ordinary admission was already activated. UI rollback must preserve edition-aware readers, approval references and withdrawal tombstones. No real sends, metered processing, sandbox repairs, broad audits or existing-business-record writes are authorized by this handoff.
+- D1–D6 above. Meeting Tracker decisions (video required, Coordinator approval,
+  materials retention/withdrawal, no provider confirmation, manual audio/video
+  fallback). D26 invited-amount correction is DONE; no re-ranking authorized.
+- No real sends, metered processing, sandbox repairs or business-record writes
+  are authorized by this handoff.
 
-## Concurrent Workstreams — historical resume index
+## Concurrent Workstreams — resume index
 
-Exact prior handoff: `git show f66eee9e0:SESSION_PROMPT.md` (verified retrievable). It retains the full Session 636 D26 correction history, optional suggestions, private-folder and rollback constraints. These are recorded boundaries, not newly selected work:
+- J27 / overlapping cycles: `docs/plans/J27_ALIGNMENT_LOG_2026-10-24.md`,
+  `docs/plans/CYCLE_ROLLOVER_MINIMAL_CONFIGURATION_PLAN_2026-10-06.md`,
+  `docs/J27_TRANSITION_REGISTER.md`.
+- Personal email defaults: slices 2, 3 and 6 shipped (#521, #517, #522).
+  `docs/plans/PERSONAL_EMAIL_DEFAULTS_TODO_2026-09-20.md`.
+- Research Institution at Award:
+  `docs/plans/RESEARCH_INSTITUTION_AT_AWARD_BACKFILL_PLAN_2026-10-20.md`.
+- Older history: `git show ad4cbac85:SESSION_PROMPT.md`, then
+  `git show f66eee9e0:SESSION_PROMPT.md`.
 
-- Proposal Ranking D26 invited-amount correction is DONE; no re-ranking or new write authorized. Rollback requires the correction script's unchanged-state checks and a fresh owner instruction. Owning plan: `docs/plans/PROPOSAL_RANKING_D26_INVITED_AMOUNT_CORRECTION_2026-10-23.md`.
-- Personal email defaults: slice 3 shipped (PR #517); slice 2 built on `codex/reviewer-deadline-email-defaults`, runtime candidate `26010e1b0`; OAuth Opus build recheck PASS; shipped through PR #521 as `687994c2a`, Production verified. `docs/plans/PERSONAL_EMAIL_REVIEWER_DEADLINE_DEFAULTS_PLAN_2026-10-24.md`.
-- J27 / overlapping cycles: proposed; calendar authority decided 2026-10-24 (Grants Manager role, Program Coordinator fallback); related owner decisions remain open in `docs/plans/CYCLE_ROLLOVER_MINIMAL_CONFIGURATION_PLAN_2026-10-06.md` and the meeting log `docs/plans/J27_ALIGNMENT_LOG_2026-10-24.md`.
-- Research Institution at Award: Stages A/B applied and verified; confirm-your-details campaign tabled 2026-10-24, Connor confirmation/message retired. Preserve sensitive owner folders and conditional rollback rules. `docs/plans/RESEARCH_INSTITUTION_AT_AWARD_BACKFILL_PLAN_2026-10-20.md`.
-- Grant Reporting sunset is parked; any successor investigator list should use `lib/services/proposal-participants.js` `fetchCoPIs`. Shared roles shipped in PR #516. Reviewer panel coverage remains parked; Expense Reporter unchanged; Literature Analyzer has no selected task.
+## Key Files
 
-## Key Files and Evidence
+| File | Purpose |
+|---|---|
+| `docs/plans/J27_ALIGNMENT_LOG_2026-10-24.md` | J27 decisions, meeting questions, readiness lists, tasks |
+| `docs/plans/CYCLE_ROLLOVER_MINIMAL_CONFIGURATION_PLAN_2026-10-06.md` | Overlapping cycles plan; §7 calendar decision; §3.2 central settings |
+| `docs/J27_TRANSITION_REGISTER.md` | Single-phase change register; Q10/Q15 updated |
+| `docs/DATAVERSE_SHAREPOINT_FILE_MODEL.md` | Decided AI Materials narrative/bibliography contract |
+| `.claude-memory/feedback-centralize-over-pd-specific-settings.md` | Owner direction on central vs per-PD settings |
 
-- `docs/audits/MEETING_UI_COMPLETION_2026-10-24.md` — actual screenshots, review, contract and production release proof.
-- `docs/audits/MEETING_ORDINARY_ACTIVATION_2026-10-24.md` and `MEETING_CONTROLLED_DEPLOYMENT_2026-10-24.md` — prior functional activation, migrations and rollback floor.
-- `docs/plans/MEETING_COORDINATION_IMPLEMENTATION_PLAN_2026-10-23.md` — settled implementation design.
-- Exact previous handoff: `git show a01032ebb:SESSION_PROMPT.md` (verified retrievable); historical functional release and safety inventory remain there.
-
-Milestone determination: no new DEVELOPMENT_LOG entry required for the UI composition/refinement; the underlying production capability is recorded in the Session 637 milestone. CLAUDE.md requires no change. Claim-evidence report was unavailable because local state could not be read; no observation row was invented. No memory-router advisory was received.
+Milestone determination: no DEVELOPMENT_LOG entry from Claude (planning and
+decisions only, nothing shipped); Codex's slice releases are feature slices
+recorded in their audits. CLAUDE.md requires no change. Claim-evidence pilot:
+`--current` report showed zero advisory events and no eligible documents, so
+no observation row was added. No memory-router advisory was received.
