@@ -3,7 +3,7 @@ title: Research request file corpus — derived legible layer
 kind: plan
 domain: dataverse
 status: proposed
-summary: "Build a derived, rebuildable index (and extracted text) over the SharePoint files attached to Research requests, 1990–present, without moving or renaming originals, so staff can browse and AI/portfolio/outcome analyses can run. Based on the 2026-10-25 read-only inventory of 9,001 requests and 60,369 files (de-duplicated across runs); storage location and content-access steps await owner decisions."
+summary: "Build a derived, rebuildable index (and extracted text) over the SharePoint files attached to Research requests, 1990–present, without moving or renaming originals, so staff can browse and AI/portfolio/outcome analyses can run. Based on the 2026-10-25 read-only inventory of 9,001 requests and 60,369 files (de-duplicated across runs); index starts in Postgres and settled fields are promoted to Dataverse as the durable record (owner decision 2026-10-25); content access and visibility await owner decisions."
 owner: product-engineering
 related:
   - scripts/probe-request-file-inventory.mjs
@@ -87,8 +87,9 @@ history runs.
   Before 2016 they are spread across statuses (236 "Office Visit", 98 "Site
   Visit", 66 "Closed" among the 1990–2015 empties), and early years are sparse
   (40 of 56 requests in 1990 have no files).
-- **Early absence is unexplained.** Whether pre-2016 empty folders mean "never
-  had files" or a migration gap is not known [ASSUMED either way].
+- **Early absence is unexplained.** A pre-2016 empty folder may mean nothing was
+  ever attached, or that attachments were lost in migration; the cause is open
+  [ASSUMED either way].
 - **Test requests are flagged.** `wmkf_istestrequest` marks Factory requests (6 in
   2026, 132 files); the corpus excludes them.
 - **Two listing errors to resolve:** one request (1001703) has a document location
@@ -151,16 +152,40 @@ Other copies stay indexed but are not extracted again.
 - Scanned PDFs without a text layer: flagged `needs-ocr`, not processed in the
   first pass.
 
-### 5. Where the index lives — owner decision
+### 5. Where the index lives — decided: Postgres first, Dataverse as the durable record
 
-| Option | Fits | Costs |
-|---|---|---|
-| **A. Postgres index + private Blob text** (recommended) | Rebuildable, not-yet-clean derived data, which matches the Postgres *staging* tier; types that prove broadly useful (e.g. document type per file) can later be promoted to Dataverse [VERIFIED via docs/SYSTEM_MODEL.md:229-234]; cheap to re-run; good for analysis queries | Not visible in AkoyaGO; staff browse through an app page |
-| B. Dataverse table | Visible next to the request in AkoyaGO | 60,000+ rows (60,237 non-test files today) plus text is costly in Dataverse storage; slower to rebuild |
-| C. Clean mirror library in SharePoint (converted PDFs, normalized names) | Easiest staff browsing | Duplicates the corpus; a second copy to keep in sync |
+[DECIDED by owner 2026-10-25.] The index starts in **Postgres**, with extracted
+text in a **private Blob** store, while the vocabulary and rules are still
+changing. Once they settle, a small set of stable fields per document (for
+example document type and phase) is **promoted to Dataverse as the durable
+record**, so it sits beside the request in AkoyaGO. This follows the System
+Model's storage tiers: Postgres stages data that is not yet clean, and what
+proves broadly useful is promoted to Dataverse [VERIFIED via
+docs/SYSTEM_MODEL.md:229-234].
 
-A new table means a migration, an Atlas page and a security review of who may
-read extracted applicant text.
+Why this order:
+
+- The index is rebuilt every time the rules improve (60,237 non-test files
+  today). Postgres takes bulk rewrites cheaply; Dataverse writes go through the
+  Web API (batched at best), the target interlock (CLAUDE.md safety invariants)
+  and Microsoft's service-protection limits [ASSUMED from Microsoft
+  documentation, not probed], and each column change is a schema wave.
+- Portfolio, outcome and full-text queries are natural in SQL.
+- Embedding support for AI search is an open check before relying on it
+  [ASSUMED available].
+- The Postgres layer is disposable: it can be dropped and rebuilt from SharePoint.
+- Extracted text lives in private Blob in both phases, not in either database;
+  its size is open until the extraction pilot [ASSUMED several GB].
+
+Alternatives considered: a Dataverse table from the start (visible in AkoyaGO
+immediately, but slow to rebuild while rules change; its storage cost was not
+checked against capacity) and a cleaned mirror library in SharePoint (easiest
+browsing, but a second copy of the corpus to keep in sync).
+
+The Postgres phase needs a migration, an Atlas page and a security review of who
+may read extracted applicant text. Promotion to Dataverse needs its own reviewed
+plan: which fields, a schema-as-code wave, and the history load. The System Model
+notes promotion governance is under-specified; define it in that plan.
 
 ### 6. Rollout, newest first
 
@@ -173,10 +198,15 @@ read extracted applicant text.
    full run.
 6. **Staff browsing surface** and the first analyses.
 7. **Keeping current:** a scheduled re-listing for new and changed files.
+8. **Promote settled fields to Dataverse** under its own reviewed plan.
 
-## Owner decisions needed
+## Owner decisions
 
-1. **Index location:** option A, B or C (recommended A).
+1. **Index location — decided 2026-10-25:** Postgres first, then promote settled
+   fields to Dataverse as the durable record (section 5).
+
+Still needed:
+
 2. **Content access:** reading file contents (download and extraction) is a
    larger step than the metadata listing done so far. Approve a bounded pilot,
    and whether a model may classify content.
