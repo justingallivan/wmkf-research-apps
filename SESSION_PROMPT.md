@@ -97,7 +97,7 @@ Exact prior handoff: `git show f66eee9e0:SESSION_PROMPT.md` (verified retrievabl
 
 - Proposal Ranking D26 invited-amount correction is DONE; no re-ranking or new write authorized. Rollback requires the correction script's unchanged-state checks and a fresh owner instruction. Owning plan: `docs/plans/PROPOSAL_RANKING_D26_INVITED_AMOUNT_CORRECTION_2026-10-23.md`.
 - Personal email defaults: slice 3 shipped (PR #517); slice 2 built on `codex/reviewer-deadline-email-defaults`, runtime candidate `26010e1b0`; OAuth Opus build recheck PASS; shipped through PR #521 as `687994c2a`, Production verified. `docs/plans/PERSONAL_EMAIL_REVIEWER_DEADLINE_DEFAULTS_PLAN_2026-10-24.md`.
-- J27 / overlapping cycles: proposed; calendar authority and related owner decisions remain open in `docs/plans/CYCLE_ROLLOVER_MINIMAL_CONFIGURATION_PLAN_2026-10-06.md`.
+- J27 / overlapping cycles: proposed; calendar authority decided 2026-10-24 (Grants Manager role, Program Coordinator fallback); related owner decisions remain open in `docs/plans/CYCLE_ROLLOVER_MINIMAL_CONFIGURATION_PLAN_2026-10-06.md` and the meeting log `docs/plans/J27_ALIGNMENT_LOG_2026-10-24.md`.
 - Research Institution at Award: Stages A/B applied and verified; confirm-your-details campaign tabled 2026-10-24, Connor confirmation/message retired. Preserve sensitive owner folders and conditional rollback rules. `docs/plans/RESEARCH_INSTITUTION_AT_AWARD_BACKFILL_PLAN_2026-10-20.md`.
 - Grant Reporting sunset is parked; any successor investigator list should use `lib/services/proposal-participants.js` `fetchCoPIs`. Shared roles shipped in PR #516. Reviewer panel coverage remains parked; Expense Reporter unchanged; Literature Analyzer has no selected task.
 
