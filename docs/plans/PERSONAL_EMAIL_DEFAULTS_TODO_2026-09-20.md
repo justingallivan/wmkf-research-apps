@@ -79,6 +79,20 @@ Production shared wording validated unchanged; one isolated synthetic agenda
 email reached Sent. Owner confirmed inbox receipt and correct appearance; not deployed.
 Evidence: `docs/audits/MEETING_AGENDA_DEFAULTS_BUILD_2026-10-24.md`.
 
+## Existing pre-discussion calendar events — follow-up queued 2026-10-24
+
+- [ ] Investigate explicitly updating the existing pre-discussion calendar
+  invitations with the generated agenda, rather than sending duplicate events.
+  Owner believes Duncan blocks these sessions in advance; verify the actual
+  calendar owner, event creation method, recurrence and app permissions first.
+  Determine how to link a Meeting Tracker session to the correct event and how
+  authorized backup staff may update it. Propose an explicit reviewed update of
+  a clearly marked agenda section, preserving organizer copy, attendees and
+  unrelated event details. Review recurring-series versus occurrence behavior,
+  notification recipients and failure/retry semantics before implementation.
+  This is a scoped investigation/planning task, not authorization to edit calendar
+  events or send updates. It is separate from slice 6 and does not block release.
+
 ## Email interface consistency review — queued 2026-10-24
 
 - [ ] Have **Impeccable review email interfaces across the app suite for
