@@ -3,7 +3,7 @@ title: Meeting agenda defaults — build and OAuth Opus review evidence
 domain: meeting-tracker
 kind: audit
 status: active
-summary: Slice 6 built on a feature branch; corrected candidate passed full tests/build and OAuth Opus recheck. Not deployed; Production wording validated unchanged and one isolated agenda email confirmed Sent; owner confirmed inbox receipt and appearance.
+summary: Slice 6 released through PR 522; OAuth Opus recheck and all CI checks passed. Production READY and signed-in smoke passed; shared wording unchanged, isolated mail Sent and inbox appearance owner-confirmed.
 owner: product-engineering
 related:
   - docs/plans/PERSONAL_EMAIL_MEETING_AGENDA_DEFAULTS_PLAN_2026-10-24.md
@@ -124,8 +124,8 @@ Sweep Mode A updated plan, inventory, suite to-do, session, security matrix,
 service catalogue, Atlas and generated route counts for branch-built status.
 Historical September baselines and original review receipts remain historical.
 
-No push/merge/deployment or live configuration/personal-default/business-record
-write occurred. The subsequent owner-authorized release preflight below created
+Initial build verification made no deployment or live configuration/personal-default/
+business-record write; the approved Production promotion is recorded below. The subsequent owner-authorized release preflight below created
 one standalone email; it did not execute the session/ledger workflow. Production
 briefing-flag state remains unprobed. Published Microsoft Email entity reference
 supports Subject MaxLength 800; the agenda's 500-character limit is stricter,
@@ -192,8 +192,9 @@ opening, Monday October 26 agenda times and two synthetic items displayed correc
 The selected wording and isolated delivery prerequisites are complete. This isolated check establishes
 candidate rendering plus real Production mail transport, not authenticated
 session prepare/send, live briefing links or personal preference persistence.
-Those branch behaviors retain the automated evidence above. Runtime remains
-unreleased; do not treat the test as authorization to promote it.
+Those behaviors retain the automated evidence above. At preflight time runtime
+was unreleased; the subsequent explicit owner release authorization and promotion
+are recorded below.
 
 Sweep Mode A: changed fact is Production wording/delivery verification, scoped
 to this audit, slice-6 plan, inventory, suite to-do and session. Source/readback
@@ -203,6 +204,61 @@ Current no-send/unprobed-transport statements were replaced; unrelated families
 and historical baselines are excluded. Disconfirming readback checked settings,
 recipients, regarding and exact body: all passed. No claim of UI/persistence
 end-to-end live verification is made.
+
+## Production release — owner authorized 2026-10-24 PDT
+
+[VERIFIED via GitHub PR checks/merge, Vercel inspection and authenticated browser.]
+Owner said “You can push this now.” PR [#522](https://github.com/justingallivan/wmkf-research-apps/pull/522)
+merged reviewed candidate `97ca2df1f860562b0f64d23009437b5b1badfafc` as
+`9d12b24ce01804c1990f2caf10e67a55e893366e` at `2026-10-25T02:01:07Z`.
+All candidate checks passed: CI 25,204 tests / five snapshots (276 tests skipped),
+130 PostgreSQL integration tests, lint/build, applicable repository gates, security
+scans, CodeQL analyses and ordinary automated Claude review. The aggregate CodeQL
+placeholder check was skipped; its three analyses passed. CI counts differ from
+the local isolated run because the configured CI suite skips additional cases;
+no skipped test is counted as passing. Logs: `/tmp/slice6-ci-release.log` and
+`/tmp/slice6-all-checks-final.txt`.
+
+Production deployment `dpl_FScmxXBiRS5EvCJzBEjfPGoJNbyc` reached READY at
+`https://wmkfresearchapps-pxt7fl767-justin-gallivans-projects.vercel.app` and
+`applications.wmkeck.org` resolved to that exact deployment. Signed-in Justin
+Gallivan loaded Meeting Tracker, opened existing session
+`c67dbfbe-47ad-f111-aaab-000d3a361c1f`, opened the agenda composer and expanded
+Your default wording. Shared subject/opening loaded, To matched attendees, Cc was
+empty, optional-opening label and separate raw default fields/Save control were
+visible; Close worked. No field was edited, preference saved/cleared, preview
+prepared, email sent, calendar changed or business record written in the smoke.
+This session includes synthetic and ordinary proposals; it was used read-only.
+Screenshot: `/tmp/slice6-production-composer.png`.
+
+Bounded deployment runtime error query (`level:error`, ten minutes ending
+`2026-10-25T02:03:04.847Z`) returned zero records, with no excluded intervals.
+This is an initial observation, not continuous monitoring or a verified drain.
+Browser log contained two old pre-release entries from `01:54:28Z` (extension
+message-channel failure and stale-chunk profile JSON error); no new post-reload
+app error was observed. No broad browser/runtime cleanup was undertaken.
+
+Rollback target captured immediately before promotion:
+`dpl_J5TbgkTAhhxVHhGUquu8Ym6kYZdZ`, URL
+`https://wmkfresearchapps-abb2ea197-justin-gallivans-projects.vercel.app`.
+Authorized operator Justin can use `vercel rollback` with that deployment URL.
+No schema/seed/flag changes were required. Rollback does not retract delivered
+mail or erase subsequently saved personal preferences/agenda audit rows; preserve
+them and reconcile any unresolved send before reuse. No rollback was invoked.
+
+Calendar-event agenda updates are queued in the suite to-do: verify Duncan's
+existing event ownership, recurrence, linking and permissions, then plan an
+explicit reviewed agenda-section update preserving event details. No calendar
+integration or event write is part of this release. Suite-wide Impeccable audit
+also remains queued. Release sweep replaced slice-6 not-deployed claims in the
+plan, suite to-do/inventory, session, Atlas and service catalog; original Opus
+reports remain historical. Live personal writes and ledger dispatch were not
+rehearsed; tests remain their evidence.
+
+Local main contained two pre-existing unmerged plan commits, so fast-forward
+sync was refused without mutation. Those commits were preserved; release
+receipts were recorded from `origin/main` on `codex/meeting-agenda-release-evidence`.
+Unrelated critique/output files were preserved. No history rewrite or force push.
 
 ## Initial Opus report — historical verbatim receipt
 

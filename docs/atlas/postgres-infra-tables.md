@@ -480,13 +480,13 @@ the receipt/drift note and separately returns the latest unresolved
 `send_requested` row; prepare refuses a different operation until that pending
 send is resolved. Send has the same guard, and unique partial index
 `uq_deliberation_agenda_one_unresolved` enforces at most one `send_requested`
-row per session under concurrency. Drift compares the live start as an instant plus ordered
-request/minutes tuples with the frozen sent snapshot. Read/write
+row per session under concurrency. Drift compares the full session/proposal/link snapshot with the frozen sent
+snapshot, including exact briefing URL and stored link identity. Read/write
 paths are `lib/services/meeting-tracker/agenda-store.js` and
 `lib/services/meeting-tracker/agenda-service.js`; the guarded API is
 `/api/meeting-tracker/sessions/[id]/agenda`. No cleanup is scheduled; rows
 remain audit history until a retention policy is explicitly approved.
-**Slice 6 branch extension (not deployed):** personal raw subject/optional opening
+**Slice 6 deployed extension (PR #522 / 9d12b24ce, 2026-10-24):** personal raw subject/optional opening
 lives in existing Dataverse `wmkf_appuserpreferences`, key `meeting_agenda_template`,
 not in this ledger. The agenda preference route uses the session Dynamics owner
 and explicit Save/Clear. Prepared snapshots add briefing link identity and retain
@@ -494,9 +494,11 @@ resolved copy only; complete session/proposal/link freshness is checked before
 transport. No table/column/index migration. Existing send-intent recovery remains.
 **[VERIFIED 2026-09-10 via migration/fresh-install parity and focused service,
 route, and panel tests; tracker state reverified 2026-09-15.]** Migration 041 is
-applied/tracked and the Meeting Tracker readiness flag is exact-on. The agenda
-transport itself has not been independently production-smoked, so no live-send
-claim is made.
+applied/tracked and the Meeting Tracker readiness flag is exact-on. An
+isolated Production agenda renderer/transport check reached Sent with owner-confirmed
+inbox appearance on 2026-10-24; signed-in composer/default-editor read smoke passed
+after PR #522. This does not establish a live ledger/session send or personal
+preference write. Evidence: `docs/audits/MEETING_AGENDA_DEFAULTS_BUILD_2026-10-24.md`.
 
 ### `scheduled_email_messages` — MIGRATION 036 APPLIED 2026-08-26; LIVE IN PRODUCTION
 

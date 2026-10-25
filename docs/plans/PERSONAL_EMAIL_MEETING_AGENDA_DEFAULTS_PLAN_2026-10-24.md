@@ -2,7 +2,7 @@
 title: Personal meeting agenda email defaults — slice 6
 domain: meeting-tracker
 kind: plan
-status: built-in-branch
+status: released
 summary: Owner-agreed personal subject and optional opening message for pre-discussion agenda emails, with sender-owned defaults, separate one-send edits, familiar default-wording disclosure and unchanged exact-send recovery.
 owner: product-engineering
 related:
@@ -17,12 +17,13 @@ related:
 
 ## Status and scope
 
-[BUILT IN BRANCH; owner decisions agreed 2026-10-24.] This is the implementation plan
+[PRODUCTION-VERIFIED via PR #522 / 9d12b24ce, 2026-10-24.] This is the implementation plan
 for personal defaults for the agenda of the pre-discussion before the site visit /
 research presentation. Product decisions are settled. Implementation is built on
 `codex/meeting-agenda-email-defaults`; corrected runtime passed full tests,
 production build and OAuth Opus build recheck. Production wording validated unchanged; isolated synthetic mail reached Sent.
-Owner confirmed inbox receipt and correct appearance; runtime is not deployed.
+Owner confirmed inbox receipt and correct appearance. Released through PR #522
+as `9d12b24ce`; Production READY and signed-in read-only smoke passed.
 OAuth Claude Opus 5.5 reviewed the earlier plan at `f36ca94fe` and returned
 READY WITH NAMED CHANGES. This revision incorporates those findings; the implemented source subsequently
 passed the separate OAuth Opus build recheck.
@@ -305,7 +306,7 @@ September inventory case rows remain explicitly historical. Earlier Admin build
 brief remains its own completed shared-default work. Unrelated slice numbers,
 email-family permissions and old release receipts are outside this change.
 Product intent was PLANNED at the original documentation pass. Branch build
-status now supersedes that implementation status; no deployment is claimed.
+status superseded that implementation status; release evidence now records PR #522.
 No product decision remains open. Independent build review and final verification
 are recorded separately from the plan review.
 
@@ -341,7 +342,7 @@ session/slot/link records through transport; compare as late as possible and kee
 that remaining race explicit in the implementation review. No destructive cleanup
 or new live action is authorized by this plan update.
 
-## Branch build — verified, not deployed
+## Build and release — verified
 
 Implementation source now includes exact-owner agenda defaults, shared/personal/
 prepare validation, raw date templates, optional opening, independent preference
@@ -354,7 +355,8 @@ PASS after all eight build findings were fixed. GET link outages retain receipts
 and unresolved sends with unknown drift; legacy snapshots compare link IDs only
 when stored. Loaded-draft origin stays fixed when future defaults change, and
 Close cancels initialization safely. Subsequent owner-authorized Production preflight validated shared wording unchanged
-and one isolated synthetic agenda email reached Sent; owner confirmed inbox receipt and correct appearance. No runtime deployment occurred.
+and one isolated synthetic agenda email reached Sent; owner confirmed inbox receipt and correct appearance. Runtime released through PR #522 as `9d12b24ce`; see the build audit for
+Production deployment, signed-in smoke and rollback evidence.
 Full receipts and remaining release boundaries:
 [build audit](../audits/MEETING_AGENDA_DEFAULTS_BUILD_2026-10-24.md).
 Microsoft's current Email entity reference documents Subject MaxLength 800;

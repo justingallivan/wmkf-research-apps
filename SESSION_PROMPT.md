@@ -2,7 +2,7 @@
 
 ## Current selected work — personal email defaults slice 6
 
-[BUILT IN BRANCH; owner decisions agreed 2026-10-24; not deployed.] Implementation plan:
+[PRODUCTION-VERIFIED via PR #522, 9d12b24ce, 2026-10-24.] Implementation plan:
 `docs/plans/PERSONAL_EMAIL_MEETING_AGENDA_DEFAULTS_PLAN_2026-10-24.md`.
 PCs normally send pre-discussion agendas; other Meeting Tracker staff can cover,
 using their own mailbox/defaults. Scope: personal subject/optional opening;
@@ -23,7 +23,12 @@ all eight findings were fixed, using subscription OAuth without API-key auth.
 Owner-authorized Production preflight validated existing agenda wording unchanged.
 One standalone synthetic agenda email is Sent (3), activity
 `986dffdc-15d0-f111-a05b-6045bd04539e`; exact HTML/parties and no regarding verified.
-Owner confirmed inbox receipt and correct appearance. No runtime deployment. Evidence:
+Owner confirmed inbox receipt and correct appearance. Released through PR #522
+as `9d12b24ce`; all PR checks passed, including 25,204 CI tests / five snapshots
+and 130 PostgreSQL tests. Production `dpl_FScmxXBiRS5EvCJzBEjfPGoJNbyc` is READY
+and serves applications.wmkeck.org. Signed-in agenda compose/default-editor smoke
+passed without writes or another send; bounded runtime error scan returned zero.
+Existing-calendar agenda updates and suite Impeccable audit remain queued. Evidence:
 `docs/audits/MEETING_AGENDA_DEFAULTS_BUILD_2026-10-24.md`.
 A separate suite-wide Impeccable email-interface consistency review is queued in
 `docs/plans/PERSONAL_EMAIL_DEFAULTS_TODO_2026-09-20.md`; it does not block slice 6.
