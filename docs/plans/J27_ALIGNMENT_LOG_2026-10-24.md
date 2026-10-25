@@ -68,7 +68,8 @@ J27/D27 timeline PDF and workbook (OneDrive, New Cycle Development/timelines).
 
 Every automatic Dec 8 step starts by reading the proposal from the request's
 SharePoint folder, so the apps need the exact folder and file name. For D26
-the apps use four different conventions (checked in the code 2026-10-24):
+the apps use at least four different conventions (found in the code
+2026-10-24; not an exhaustive search):
 
 | Tool | Reads |
 |---|---|
