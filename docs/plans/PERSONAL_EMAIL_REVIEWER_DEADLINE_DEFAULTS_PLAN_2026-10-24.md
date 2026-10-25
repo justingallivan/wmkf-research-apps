@@ -18,7 +18,7 @@ related:
 
 [BUILT IN BRANCH; owner decisions agreed in the 2026-10-24 conversation.] This is the
 implementation plan for slice 2. Product decisions below are agreed; runtime
-implementation and acceptance tests are now built on `codex/reviewer-deadline-email-defaults`; verification and OAuth Opus build re-review passed. No live configuration, email or external record was changed.
+implementation and acceptance tests are now built on `codex/reviewer-deadline-email-defaults`; verification and OAuth Opus build re-review passed. Owner-authorized release preflight subsequently seeded the Production subject and verified empty-body sending with Dynamics Sent status; exact evidence is recorded in the linked build audit. Runtime remains undeployed.
 
 Change surface: reviewer deadline editor, deadline preview/save/retry service and
 route, own-user wording preferences, and shared Admin subject/body registration.
@@ -111,8 +111,7 @@ subject/body/Cc/proof limits and align the parser limit with their serialized si
 ## Implementation contract
 
 The following is the agreed contract; branch source now implements it. Verification
-and independent build review are recorded separately below; deployment and live
-configuration remain pending. The earlier Opus review covered the plan only.
+and independent build review are recorded separately below; deployment remains pending; the Production shared subject was subsequently seeded and validated. The earlier Opus review covered the plan only.
 
 1. **Own-user preference and fallback.** Add
    `PREFERENCE_KEYS.REVIEWER_DEADLINE_UPDATE_TEMPLATE` (stored key
@@ -272,10 +271,10 @@ email, configuration write or business-record edit is authorized by this plan.
 
 ## Release order and review follow-up
 
-[PLANNED.] Before runtime promotion, perform an authorized non-overwriting seed
-of the new shared subject key, then strict readback/validation of subject and
-body with the candidate validator. Confirm no-title rendering and preserved
-existing wording. Do not deploy runtime that requires the new subject before
+[VERIFIED via owner-authorized Production preflight; see build audit.] Completed the non-overwriting seed
+of the new shared subject key and strict readback/validation of subject and
+body with the candidate validator. Existing body wording was preserved exactly.
+No-title rendering remains covered by passing branch tests. Do not deploy runtime that requires the new subject before
 that key is present and valid. The seed preserves any present extension body,
 including empty, whitespace-only and null-stored empty values. Missing/invalid configuration blocks promotion;
 this plan does not itself authorize the seed or live readback. Use a branch/PR

@@ -58,7 +58,7 @@ requests reject every Cc before deadline writes and again at dispatch. The linke
 plan includes the OAuth Opus review corrections and post-write retry proofs.
 The authoritative saved date/calendar remain server-controlled. Review precedes
 save/send, restore and resend; explicit defaults, fallback notices, local retry
-wording/Cc and customizable subjects are specified in that plan. Branch-built; no live send verified.
+wording/Cc and customizable subjects are specified in that plan. Branch-built; Production subject seed and empty-body sending verified with Dynamics Sent status; limits are in the linked build audit.
 
 ## Current evidence and next work
 

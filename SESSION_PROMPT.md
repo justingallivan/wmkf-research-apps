@@ -11,9 +11,12 @@ Opus's first review found an annotation-comparison defect and smaller issues;
 fixes passed fresh OAuth Opus re-review with no P1/P2 remaining. Final isolated
 run: 25,175 tests / five snapshots passed, 247 skipped; production build, scoped
 gates and desktop/mobile synthetic UI confirmation passed. Local proof servers
-stopped. Main was not merged/pushed; no deployment, live seed or email was run.
-Next: owner-selected release work must first authorize/verify the non-overwriting
-shared subject seed and isolated delivery acceptance. Evidence and residuals:
+stopped. Main was not merged/pushed; runtime remains undeployed.
+Owner authorized Production subject seeding and one standalone test email. The
+subject was created and validated with the existing body unchanged. Empty-body
+SendEmail succeeded and attachment readback matched; final status Sent (3),
+senton 2026-10-25T00:08:17Z, activity cf454711-08d0-f111-a05b-000d3a361c1f.
+Selected release prerequisites passed; runtime promotion remains a separate step. Evidence and residuals:
 `docs/audits/REVIEWER_DEADLINE_EMAIL_BUILD_2026-10-24.md`. The two original
 untracked items were preserved untouched.
 

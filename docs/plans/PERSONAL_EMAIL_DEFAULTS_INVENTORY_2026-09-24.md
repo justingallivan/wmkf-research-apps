@@ -3,7 +3,7 @@ title: Personal email defaults — suite-wide send inventory (2026-09-24 baselin
 domain: platform
 kind: plan
 status: active
-summary: Historical 2026-09-24 source inventory of 56 outbound email cases; current source and merge status rechecked only for slices 4 and 1 on 2026-10-19. Remaining suite-wide gaps are open; no live delivery verification.
+summary: Historical 2026-09-24 source inventory of 56 outbound email cases; current source and merge status rechecked only for slices 4 and 1 on 2026-10-19. Remaining suite-wide gaps are open; slice 2 Production subject and isolated Dynamics Sent verification recorded in its plan.
 cataloged: 2026-09-24
 last_verified: 2026-10-19
 owner: product-engineering
@@ -111,7 +111,7 @@ The descriptions below preserve the original proposals; the table records curren
 | 4. Grantee abstract invitation | Merged; current source checked | [#330](https://github.com/justingallivan/wmkf-research-apps/pull/330) | Yes (`185c9f35f`) |
 | 1. Reviewer reminders, manual and automated | Merged; current source checked | [#332](https://github.com/justingallivan/wmkf-research-apps/pull/332) | Yes (`bab0d3989`) |
 | 3. Reviewer release courtesies | Not started | — | No |
-| 2. Reviewer due-date extension | Built in branch; OAuth Opus recheck passed, not deployed ([plan](PERSONAL_EMAIL_REVIEWER_DEADLINE_DEFAULTS_PLAN_2026-10-24.md)) | — | No |
+| 2. Reviewer due-date extension | Built in branch; OAuth Opus passed; Production subject seeded and empty-body Dynamics Sent verified, runtime not deployed ([plan](PERSONAL_EMAIL_REVIEWER_DEADLINE_DEFAULTS_PLAN_2026-10-24.md)) | — | No |
 | 6. Meeting agenda | Not started | — | No |
 | 7. Deliberation distribution | Not started | — | No |
 | 5. Scheduled grantee reminder | Not started | — | No |

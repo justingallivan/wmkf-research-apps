@@ -3,7 +3,7 @@ title: Reviewer deadline email defaults — build and review evidence
 domain: reviewer-engagement
 kind: audit
 status: active
-summary: Branch-only slice 2 build evidence and OAuth Opus review corrections; no deployment or live email verification.
+summary: Slice 2 branch build and OAuth Opus review; Production subject seeded with body preserved and authorized empty-body transport accepted. Dynamics Sent status verified; runtime not deployed.
 owner: product-engineering
 related:
   - docs/plans/PERSONAL_EMAIL_REVIEWER_DEADLINE_DEFAULTS_PLAN_2026-10-24.md
@@ -96,14 +96,51 @@ route counts regenerated, service catalog updated. Symbol fan-out: raw key,
 extension Admin keys, operation/result reasons and both UI mounting paths checked.
 Documentation reconciliation uses branch-built labels, not production claims.
 
+## Release preflight — owner-authorized 2026-10-24 PDT
+
+[VERIFIED via exact Production setting reads and create-only seed receipt.]
+The existing Admin body was present and passed the candidate validator. The new
+subject was absent; only `email.reviewer_extension.subject` was created as
+`Updated review deadline: {{proposalTitle}}`. Strict readback passed and body
+SHA256 stayed `c1d7e41b30992167514116e75ded14c60fec4b0bb55aca2f95bdd7f98941fbee`.
+Subject SHA256: `6aeb12cf88c43b4e449bad34eec4522fe510b2e61f033fc846f1223a005ad4d0`.
+Receipt: `/tmp/slice2-production-subject-seed-2026-10-24.json`.
+`scripts/seed-reviewer-deadline-subject.mjs` defaults to dry-run, preserves any
+existing subject, validates before writing and refuses mismatched readback.
+Its seven focused tests and changed-file lint passed.
+
+[VERIFIED via shared Dynamics email helpers and exact activity readback.]
+Owner approved one standalone Production message from Justin to the configured
+test mailbox. Activity `cf454711-08d0-f111-a05b-000d3a361c1f` used strict sender
+impersonation with no fallback, an empty description, no Cc and no regarding
+record. Only one email and its attachment were created; no request, suggestion,
+deadline or personal preference was written. A process-local fetch fence allowed
+only those mail writes, with a short-lived interlock grant and a journal before
+creation and dispatch. No automatic retry was used. Initial local preflight
+stopped before any network call because impersonation was disabled locally; the
+actual authorized run explicitly enabled it for that process only.
+
+SendEmail returned success; Dynamics stored the empty description as null.
+The labeled `SLICE2-TEST-ONLY.ics` attachment read back byte-exact, SHA256
+`d216cf842cfa60411dfced2180f15e54c638a7aaef30d15bdacbb2096052f4d3`.
+Actual sender and To parties match the approved addresses; no Cc/Bcc party exists.
+Receipts: `/tmp/slice2-production-delivery-2026-10-24.json` and
+`/tmp/slice2-production-delivery-readback-2026-10-24.json`.
+At first readback the activity was Pending Send (status 6), with senton null.
+Subsequent readback at 2026-10-25T00:08:53.993Z confirmed Sent (status 3),
+state Completed (1), senton 2026-10-25T00:08:17Z (October 24 PDT). Attachment and
+parties remained correct. Dynamics appended its CRM tracking suffix to the
+stored subject. This proves server-side sending, not recipient inbox arrival. The isolated check
+does not exercise an authenticated deadline mutation or prove date annotation
+behavior; branch acceptance tests remain the evidence for those paths.
+
 ## Remaining verification boundaries
 
-No Dataverse, email, configuration seed, production deployment or business-record
-write was invoked by this task. Before promotion, authorize and perform the
-non-overwriting subject seed and exact readback with candidate validation; verify
-empty description acceptance in the chosen isolated delivery rehearsal. Actual
-null/annotation storage behavior has source-based compatibility coverage, not a
-fresh live observation. The suggestion ETag cannot atomically lock request fields;
+Runtime is not merged or deployed. The two selected release prerequisites are
+complete: shared subject configuration and isolated empty-body transport with
+server-side Sent status. Recipient inbox observation was not available; no second
+test or resend is needed for the selected transport acceptance check.
+Date annotation storage behavior remains unobserved live. The suggestion ETag cannot atomically lock request fields;
 a remaining cross-record race is documented, not described as owner-accepted.
 Proofs expire after five minutes but are not single-use; manual resend/retry
 replay outside the UI is an existing-pattern limitation. A transport timeout on
@@ -198,3 +235,18 @@ I found no regressions in these areas:
 - I didn't confirm that `getRequestById` returns `_etag`. If it doesn't, post-write change detection on the request rests on its four selected fields. That was already true before this change.
 - Whether Dataverse stores an empty body as null, and whether it emits formatted annotations on these date columns, still isn't observed live. Both are covered only by source reasoning and mocks.
 - HEAD, the changed-file SHA256s and the full suite, build and gate results are yours to verify.
+
+## Release-preflight contract and reconciliation
+
+Sweep Mode A: updated the plan, inventory slice-2 row, suite to-do and session
+status for the verified seed and isolated server-side Sent result. Earlier Opus
+review statements below are historical observations at reviewed runtime HEAD.
+Source → settings persistence → candidate validator and mail helpers → email /
+attachment / activity-party readback are traced above. Partial-success journals
+identify each stage; no repair or retry writes occur after a mismatch. UI async
+and deadline mutations are N/A to this operator-only preflight. No schema, route
+or runtime helper changed. Seven seed tests and scoped lint passed; relevant
+documentation and script gates passed: doc-currency, docs-catalog, doc-symbol-refs,
+fact-consistency, canonical-pointers, build-claim-freshness, script-suggestion-
+writers and secret-scan, with applicable sequential self-tests. No runtime
+source changed after the full-suite candidate verification above.
