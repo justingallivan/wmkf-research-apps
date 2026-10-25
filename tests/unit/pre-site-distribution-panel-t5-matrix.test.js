@@ -10,17 +10,12 @@
  *   - reissueBriefingLink POST /api/workbench/pre-site-visit/briefing-link
  *   - send          POST /api/workbench/pre-site-visit/distribution/send
  *
- * This file adds the missing axes: network rejection and axis (e) — a
- * non-2xx response whose body cannot be parsed — for each site, pinned
- * never-silent. All four sites already parse with `.json().catch(() => ({}))`,
- * so this is a no-op behavior change.
- *
- * Test-teeth pass (Stage 5a review finding 2): adds axis (d) — a malformed
- * or empty 2xx body under `tolerantBody: true` produces today's tolerant
- * outcome, never a thrown/visible parse error — for all 4 sites, and exact
- * request-bytes (URL, method, headers, exact body string) for the 3 POSTs.
- * Each axis-(d) test is written to go RED under a `tolerantBody: true ->
- * false` mutation in the component (see handback for the count).
+ * This matrix covers network and malformed-body outcomes for those four legacy
+ * sites. The dedicated preference URL is independently stubbed; its contract
+ * and concurrency cases live in distribution-defaults-panel.test.js.
+ * Under the reviewed distribution-defaults contract, malformed or empty send
+ * receipts now retain the exact frozen operation and visibly report uncertainty.
+ * History/prepare/reissue retain their existing tolerant-body behavior.
  */
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import PreSiteDistributionPanel from '../../shared/components/workbench/PreSiteDistributionPanel';

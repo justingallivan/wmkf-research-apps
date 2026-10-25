@@ -2,9 +2,8 @@ import { useEffect } from 'react';
 import { useRouter } from 'next/router';
 
 
-
 /** Guard distribution edits across shell links, router navigation, history and reload. */
-export default function useDistributionUnsavedChanges(dirty, recovery = false) {
+export default function useDistributionUnsavedChanges(dirty, recovery = false, preferencePending = false) {
   const router = useRouter();
   useEffect(() => {
     if (!dirty) return undefined;
@@ -14,7 +13,7 @@ export default function useDistributionUnsavedChanges(dirty, recovery = false) {
     const allow = url => {
       const destination = destinationKey(url);
       if (approvedDestination === destination) return true;
-      if (!window.confirm(recovery ? 'Leaving loses the local retry state for this email. Reconcile the original email before sending another. Leave this page?' : 'Discard your unsaved email changes?')) return false;
+      if (!window.confirm(recovery ? 'Leaving loses the local retry state for this email. Reconcile the original email before sending another. Leave this page?' : preferencePending ? 'A default wording change is pending or unconfirmed and may already be saved. Leave this page? Reload defaults before another change.' : 'Discard your unsaved email changes?')) return false;
       approvedDestination = destination;
       return true;
     };
@@ -49,5 +48,5 @@ export default function useDistributionUnsavedChanges(dirty, recovery = false) {
       router.events.off('routeChangeError', clearApproval);
       router.beforePopState(() => true);
     };
-  }, [dirty, recovery, router]);
+  }, [dirty, recovery, preferencePending, router]);
 }

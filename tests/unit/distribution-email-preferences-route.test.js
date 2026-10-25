@@ -50,3 +50,12 @@ test('parser permits worst-case escaped bounded Unicode template without weakeni
   const serialized = JSON.stringify({ template: { subject: 'x'.repeat(500), body: '\u0001'.repeat(20000) } });
   expect(Buffer.byteLength(serialized, 'utf8')).toBeLessThan(256 * 1024);
 });
+
+test.each(['PUT', 'DELETE'])('unexpected %s mutation exception is unconfirmed, never a success', async method => {
+  const mutation = method === 'PUT' ? saveDistributionPreference : clearDistributionPreference;
+  mutation.mockRejectedValueOnce(new Error('unexpected mutation throw'));
+  const c = call(method, method === 'PUT' ? { template: { subject: 'X', body: 'Y' } } : {});
+  await handler(c.req, c.res);
+  expect(c.res.statusCode).toBe(503); expect(c.res._data).toEqual({ ok: false, reason: 'persistence_unconfirmed' });
+  expect(getDistributionPreferences).not.toHaveBeenCalled();
+});

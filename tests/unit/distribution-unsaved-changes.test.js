@@ -52,3 +52,9 @@ test('recovery departure names loss of exact retry state', () => {
   expect(() => handlers.routeChangeStart('/elsewhere', {})).toThrow();
   expect(window.confirm).toHaveBeenCalledWith(expect.stringContaining('Reconcile the original email'));
 });
+test('pending or unconfirmed default mutation warns that the change may already be saved', () => {
+  function Pending() { useDistributionUnsavedChanges(true, false, true); return null; }
+  render(<Pending />);
+  expect(() => handlers.routeChangeStart('/elsewhere', {})).toThrow();
+  expect(window.confirm).toHaveBeenCalledWith(expect.stringContaining('may already be saved'));
+});

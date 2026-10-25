@@ -24,15 +24,9 @@ jest.mock('../../shared/components/workbench/DistributionSenderPanel', () => ({ 
 
 let distributionHistoryFeed = null;
 let lastDistributionProps = null;
-// Codex adversarial review finding 3 (2026-09-16 round 2): records the
-// sourceArtifact id seen on each MOUNT (empty deps -- a real component
-// mount, not merely a re-render with new props) of the mocked panel. The
-// real panel's own history-load effect only re-runs on `requestId` change
-// (never on `sourceArtifact` alone -- lib/services is not in play here, this
-// mirrors PreSiteDistributionPanel.js's own effect dependency array), so
-// proving the tab actually forces a fresh mount for a new brief artifact id
-// (via the `key` on <PreSiteDistributionPanel>) is what proves history gets
-// reloaded rather than silently keeping the predecessor's cached state.
+// Track actual mounts: source replacement must retain the same panel instance.
+// Its own source generation now owns history refresh; the focused panel suite
+// proves the fresh read and the parent suite proves cached sent-state reset.
 // The Research Presentation Materials card owns its own fetch and has its own
 // suite (research-presentation-materials-card.test.js); here it is a probe
 // that records the props the tab passes.
@@ -814,13 +808,7 @@ test('the guarded brief-reopen dialog stays disabled until reason, a valid note,
 });
 
 test('a successful guarded brief regeneration retains the panel and resets current-source sent state', async () => {
-  // Codex adversarial review finding 3 (2026-09-16 round 2): the mocked
-  // panel's history-load effect only fires on a genuine mount (empty deps),
-  // mirroring the real PreSiteDistributionPanel's own effect, which only
-  // re-runs on a `requestId` change, never on `sourceArtifact` alone. So
-  // `mountedSourceArtifactIds` below only grows if the tab's `key` on
-  // <PreSiteDistributionPanel> actually changed, proving a real remount
-  // (and therefore a fresh history load) happened for the new artifact id.
+  // Parent source summary resets without destroying owned panel state.
   distributionHistoryFeed = { attempts: [{ operationId: 'op-1', transportAccepted: true }], currentSourceEverSent: true };
   queueRoute('briefGet', statusResponse({ currentArtifact: briefArtifact(REVIEW) }));
   queueRoute('briefReopen', response({
@@ -851,9 +839,8 @@ test('a successful guarded brief regeneration retains the panel and resets curre
   await waitFor(() => expect(calls('briefReopen')).toHaveLength(1));
   await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Regenerate a brief the Board already received?' })).not.toBeInTheDocument());
   expect(await screen.findByRole('link', { name: /Edit (?:briefing|writeup) in Word/ })).toBeInTheDocument();
-  // Proves an actual remount happened for the new artifact id (a second,
-  // fresh history load) rather than the mock merely re-rendering with
-  // updated props under a stale, already-mounted history load.
+  // The same panel instance survives source replacement. The real panel suite
+  // separately proves its explicit source-scoped history refresh.
   await waitFor(() => expect(mountedSourceArtifactIds).toEqual([BRIEF_ARTIFACT_ID]));
 
   // Share the new Draft again, reaching the exact state where a stale
@@ -908,7 +895,7 @@ test('a 202 (still-generating) guarded regeneration suppresses new Share/send-ag
   distributionHistoryFeed = null;
 
   // Open the composer first (via the still-correct, still-sent predecessor's
-  // "Send the deliberation email again…"), to prove it gets force-closed
+  // "Send the deliberation email again…"), to prove it is retained and paused
   // once the pending regeneration is discovered. OverflowMenu closes itself
   // on every item selection (OverflowMenu.js: `onClick={() => { setOpen(false); item.onSelect?.(); }}`),
   // so each menu action below needs its own opening click.
@@ -924,7 +911,7 @@ test('a 202 (still-generating) guarded regeneration suppresses new Share/send-ag
 
   await waitFor(() => expect(calls('briefReopen')).toHaveLength(1));
   expect(await screen.findByText(/already in progress/i)).toBeInTheDocument();
-  // The still-open composer from before is now force-closed.
+  // The open composer survives and receives an explicit pause signal.
   expect(screen.getByText('Distribution panel: dialog (record)')).toBeInTheDocument();
   expect(lastDistributionProps.sourceUnavailable).toBe(true);
   // The predecessor's artifact id is unchanged, so no remount happened —
@@ -1918,4 +1905,19 @@ test('an intentionally empty saved session recipient list never falls back to th
   await waitFor(() => expect(screen.getByRole('link', { name: 'Open meeting coordination' })).toHaveAttribute('href', '/meeting-tracker/sessions/saved-session'));
   expect(screen.getByTestId('mock-suggested-to')).toBeEmptyDOMElement();
   expect(screen.getByTestId('mock-suggested-cc')).toBeEmptyDOMElement();
+});
+
+test.each(['draftDirty', 'recoveryPending', 'mutationPending'])('retains a closed panel with %s when source eligibility disappears, then releases clean retention', async flag => {
+  queueRoute('briefGet', statusResponse({ currentArtifact: briefArtifact(DRAFT) }));
+  queueRoute('briefLock', response({ success: true, artifact: { ...briefArtifact(REVIEW), file: null } }));
+  render(<StaffDeliberationsTab requestId={REQUEST_ID} requestNumber="1002379" />);
+  await screen.findByTestId('mock-source-artifact-id');
+  const originalMounts = [...mountedSourceArtifactIds];
+  await act(async () => lastDistributionProps.onRetentionChange({ [flag]: true }));
+  await act(async () => lastDistributionProps.beforePrepare());
+  expect(screen.getByTestId('mock-source-artifact-id')).toBeInTheDocument();
+  expect(lastDistributionProps.composer).toBe('hidden'); expect(lastDistributionProps.sourceUnavailable).toBe(true);
+  expect(mountedSourceArtifactIds).toEqual(originalMounts);
+  await act(async () => lastDistributionProps.onRetentionChange({ draftDirty: false, editorDirty: false, mutationPending: false, recoveryPending: false }));
+  expect(screen.queryByTestId('mock-source-artifact-id')).toBeNull();
 });

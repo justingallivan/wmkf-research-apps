@@ -18,6 +18,7 @@ import {
 
 const EMPTY_LIST = Object.freeze([]);
 const STALE_PREVIEW_CODES = new Set(['distribution_stale_source', 'distribution_material_stale', 'distribution_site_visit_stale', 'distribution_preview_changed', 'distribution_briefing_stale', 'distribution_session_stale']);
+const sameDistributionId = (left, right) => typeof left === 'string' && typeof right === 'string' && left.toLowerCase() === right.toLowerCase();
 const MILLISECONDS_PER_DAY = 24 * 60 * 60 * 1000;
 
 function localDayOrdinal(date) {
@@ -442,10 +443,10 @@ export default function PreSiteDistributionPanel({
 
   const draftDirty = !recovery && Object.keys(baseline.current).some(key => form[key] !== baseline.current[key]);
   const editorDirty = editor.subject !== editorBaseline.current.subject || editor.body !== editorBaseline.current.body;
-  useDistributionUnsavedChanges(draftDirty || editorDirty || preferenceBusy || Boolean(recovery), Boolean(recovery));
+  useDistributionUnsavedChanges(draftDirty || editorDirty || preferenceBusy || preferenceUncertain || Boolean(recovery), Boolean(recovery), preferenceBusy || preferenceUncertain);
   useEffect(() => {
-    onRetentionChange?.({ draftDirty, editorDirty, mutationPending: preferenceBusy, recoveryPending: Boolean(recovery) });
-  }, [draftDirty, editorDirty, preferenceBusy, recovery, onRetentionChange]);
+    onRetentionChange?.({ draftDirty, editorDirty, mutationPending: preferenceBusy || preferenceUncertain, recoveryPending: Boolean(recovery) });
+  }, [draftDirty, editorDirty, preferenceBusy, preferenceUncertain, recovery, onRetentionChange]);
   useEffect(() => () => onRetentionChange?.({ draftDirty: false, editorDirty: false, mutationPending: false, recoveryPending: false }), [onRetentionChange]);
 
   const readDefaults = async ({ initialize = false } = {}) => {
@@ -461,11 +462,17 @@ export default function PreSiteDistributionPanel({
       const template = data.own || data.shared || data.effective;
       setEditor(template);
       editorBaseline.current = template;
-      setPreferenceMessage(data.source !== 'personal' && Object.values(data.sharedStatus || {}).some(status => ['invalid', 'unavailable'].includes(status)) ? 'Some shared wording could not be used. Built-in fallback is shown for those fields.' : data.ownStatus === 'duplicates' ? 'Multiple saved defaults were found. Clear them before saving.'
-        : ['invalid', 'encrypted', 'unavailable'].includes(data.ownStatus) ? 'Your saved default could not be used. Review the fallback or reload to confirm.' : null);
+      setPreferenceMessage([
+        data.ownStatus === 'duplicates' ? 'Multiple saved defaults were found. Clear them before saving.' : null,
+        ['invalid', 'encrypted', 'unavailable'].includes(data.ownStatus) ? 'Your saved default could not be used. Review the fallback or reload to confirm.' : null,
+        data.source !== 'personal' && Object.values(data.sharedStatus || {}).some(status => ['invalid', 'unavailable'].includes(status)) ? 'Some shared wording could not be used. Built-in fallback is shown for those fields.' : null,
+      ].filter(Boolean).join(' ') || null);
       if (initialize && !composerTouchedRef.current && !recoveryRef.current) {
         const patch = { subject: renderDeliberationShareSubject(data.effective.subject, requestNumber), bodyText: data.effective.body };
-        if (patch.subject.length > 500 || /[\r\n]/.test(patch.subject)) throw new Error('The resolved default subject is too long or invalid. Edit the built-in wording before previewing.');
+        if (patch.subject.length > 500 || /[\r\n]/.test(patch.subject)) {
+          setPreferenceMessage('The resolved default subject is too long or invalid. Built-in wording is shown. Edit your default subject or the current email.');
+          return;
+        }
         setComposeSource(data.source);
         Object.assign(baseline.current, patch);
         applyFormPatch(patch);
@@ -482,8 +489,10 @@ export default function PreSiteDistributionPanel({
   const seenOpen = useRef(null);
   useEffect(() => {
     if (composer === 'hidden' || seenOpen.current === composeOpenVersion) return;
+    const alreadyOpened = seenOpen.current !== null;
     seenOpen.current = composeOpenVersion;
-    if (recoveryRef.current) return;
+    if (recoveryRef.current || preferenceBusy) return;
+    if (alreadyOpened && (draftDirty || editorDirty)) { setDiscarding('close'); return; }
     const fresh = { to: seedTo, cc: seedCc, subject: renderDeliberationShareSubject(DELIBERATION_SHARE_SEED_SUBJECT, requestNumber), bodyText: DELIBERATION_SHARE_SEED_BODY, includeCalendar: false };
     baseline.current = fresh; setComposeSource('built_in');
     autoOwnedRef.current = { to: true, cc: true };
@@ -512,14 +521,21 @@ export default function PreSiteDistributionPanel({
       if (!mounted.current || generation !== preferenceGeneration.current) return;
       if (result?.ok !== true) throw new Error('The change could not be confirmed.');
       editorBaseline.current = editor;
-      setPreferenceMessage(method === 'PUT' ? 'Default saved. The current email is unchanged.' : 'Default cleared. The current email is unchanged.');
+      setPreferenceMessage((method === 'PUT' ? 'Default saved. The current email is unchanged.' : 'Default cleared. The current email is unchanged.')
+        + (result.refreshUnavailable ? ' Reload defaults to refresh the editor before another change.' : ''));
       if (result.effective) {
         setDefaultsData(result);
         const next = result.own || result.shared || result.effective;
         editorBaseline.current = next; setEditor(next);
       } else setDefaultsData(null);
-    } catch {
+    } catch (mutationError) {
       if (mounted.current && generation === preferenceGeneration.current) {
+        const reason = mutationError?.payload?.reason;
+        if (reason === 'validation' || reason === 'duplicates') {
+          setPreferenceMessage(reason === 'duplicates' ? 'Multiple saved defaults were found. Clear them before saving.' : mutationError.payload.errors?.join(' ') || 'Check the default subject and message.');
+          if (reason === 'duplicates') setDefaultsData(current => ({ ...current, canSave: false, canClear: true }));
+          return;
+        }
         setPreferenceUncertain(true);
         setPreferenceMessage('The change could not be confirmed. Reload defaults before trying another change.');
       }
@@ -528,11 +544,12 @@ export default function PreSiteDistributionPanel({
   const closeComposer = () => {
     if (preparing || sending || preferenceBusy) return;
     if (discarding) { setDiscarding(false); return; }
-    if (draftDirty || editorDirty) { setDiscarding(true); return; }
+    if (draftDirty || editorDirty) { setDiscarding('close'); return; }
     onCloseComposer?.();
   };
   const discardAndClose = () => {
     setEditor(editorBaseline.current);
+    if (discarding === 'reload') { setDiscarding(false); readDefaults(); return; }
     if (!recoveryRef.current) { setForm({ ...baseline.current }); setPreview(null); setConfirmed(false); setStaleInputs(null); }
     setDiscarding(false); onCloseComposer?.();
   };
@@ -749,7 +766,7 @@ export default function PreSiteDistributionPanel({
       if (!active()) return;
       const body = result.data;
       const attempt = body?.attempt;
-      const complete = result.ok ? attempt?.operationId === frozen.operationId && attempt?.requestId === id
+      const complete = result.ok ? sameDistributionId(attempt?.operationId, frozen.operationId) && sameDistributionId(attempt?.requestId, id)
         && typeof attempt.transportAccepted === 'boolean' && attempt.previewHash === frozen.previewHash
         && typeof attempt.from === 'string' && attempt.from === frozen.from
         && Array.isArray(attempt.to) && Array.isArray(attempt.cc) && Array.isArray(attempt.attachments)
@@ -759,7 +776,13 @@ export default function PreSiteDistributionPanel({
       if (!complete || body?.inProgress || body?.code === 'distribution_send_unconfirmed' || body?.outcome === 'uncertain') envelope.uncertain = true;
       envelope.calls--;
       if (complete && result.ok && attempt.transportAccepted === true) {
-        recoveryRef.current = null; setRecovery(null); setPreview(attempt); setConfirmed(false);
+        recoveryRef.current = null; setRecovery(null); setConfirmed(false);
+        if (sourceRef.current === envelope.sourceKey) setPreview(attempt);
+        else {
+          setPreview(null);
+          setSendFeedback({ status: 'sent' });
+          setNotice('The original email was sent. The brief changed; create a new preview to share the current brief.');
+        }
         baseline.current = { ...form };
         if (sourceRef.current === envelope.sourceKey) {
           try { await loadHistory(id, undefined, historySequence.current); } catch (refreshError) { if (mounted.current) setHistoryError(refreshError.message); }
@@ -771,7 +794,7 @@ export default function PreSiteDistributionPanel({
         try {
           const fresh = await requestJson(`/api/workbench/pre-site-visit/distribution/history?requestId=${encodeURIComponent(id)}`, { headers: { 'Cache-Control': 'no-cache' } });
           if (!active()) return;
-          const row = fresh?.attempts?.find(item => item.requestId === id && item.operationId === frozen.operationId);
+          const row = fresh?.attempts?.find(item => sameDistributionId(item.requestId, id) && sameDistributionId(item.operationId, frozen.operationId));
           if (row?.transportAccepted === false && row.dynamicsEmailId === null && row.sendRequestedAt === null) {
             recoveryRef.current = null; setRecovery(null); setPreview(null); setConfirmed(false); setNotice(message);
             return;
@@ -809,9 +832,9 @@ export default function PreSiteDistributionPanel({
         {<p className="mt-3 text-sm text-gray-600">Wording source: {composeSource === 'personal' ? 'your personal default' : composeSource === 'shared' ? 'shared defaults (built-in fallback where needed)' : 'built-in defaults'}.</p>}
         {!defaultsLoading && preferenceMessage && !editorOpen && <p role="status" className="mt-3 text-sm text-gray-800">{preferenceMessage}</p>}
         {discarding && <div className="mt-4 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-950" role="alert">
-          <p>Discard your unsaved email edits?</p>
+          <p>{discarding === 'reload' ? 'Discard your unsaved default wording and reload?' : 'Discard your unsaved email edits?'}</p>
           <div className="mt-3 flex gap-3"><Button type="button" variant="secondary" onClick={() => setDiscarding(false)}>Keep editing</Button>
-          <Button type="button" variant="secondary" onClick={discardAndClose}>Discard edits and close</Button></div>
+          <Button type="button" variant="secondary" onClick={discardAndClose}>{discarding === 'reload' ? 'Discard default edits and reload' : 'Discard edits and close'}</Button></div>
         </div>}
 
         <div className="mt-4 rounded-lg border border-gray-200 bg-gray-50 p-3 text-sm text-gray-800" data-testid="composer-session-slot">
@@ -890,7 +913,7 @@ export default function PreSiteDistributionPanel({
         <DistributionWordingDefault open={editorOpen} onOpen={setEditorOpen} template={editor} onChange={setEditor}
           data={defaultsData} busy={preferenceBusy || defaultsLoading} blocked={preparing || sending || preferenceUncertain || actionsPaused}
           message={preferenceMessage} onSave={() => mutatePreference('PUT')} onClear={() => mutatePreference('DELETE')}
-          onReload={() => { if (!editorDirty || window.confirm('Discard your unsaved default wording?')) readDefaults(); }} />
+          onReload={() => { if (editorDirty) setDiscarding('reload'); else readDefaults(); }} />
         {needsLock && (
           <p className="mt-4 text-sm text-gray-600" data-testid="composer-lock-note">
             Creating the preview locks this exact Word version as the working document and turns off regeneration.

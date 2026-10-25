@@ -149,3 +149,103 @@ test.each([{}, { ...attempt, requestId: 'other', transportAccepted: true }, { ..
   await act(async () => sendResult.resolve(response({ attempt: invalid })));
   expect(screen.getByLabelText('Subject')).toBeDisabled(); expect(screen.getByTestId('distribution-send-feedback')).toHaveTextContent('uncertain');
 });
+
+test('deferred editor reload is future-only even with a confirmed preview', async () => {
+  await ready(); await preview(); fireEvent.click(screen.getByText('Your default wording'));
+  const load = deferred(), fetcher = global.fetch;
+  global.fetch = jest.fn((url, options) => url.includes('email-preferences') ? load.promise : fetcher(url, options));
+  fireEvent.click(screen.getByRole('button', { name: 'Reload defaults' }));
+  await act(async () => load.resolve(response(defaults({ subject: 'Future {{requestNumber}}', body: 'Future body' }))));
+  expect(screen.getByLabelText('Default subject')).toHaveValue('Future {{requestNumber}}');
+  expect(screen.getByLabelText('Subject')).toHaveValue('Personal 123'); expect(screen.getByRole('checkbox')).toBeChecked();
+  expect(calls('/prepare')).toHaveLength(0); expect(calls('/send')).toHaveLength(0);
+});
+test('confirmed mutation survives source pause and independent refresh failure', async () => {
+  const view = await ready(); fireEvent.click(screen.getByText('Your default wording')); preferenceResult = deferred();
+  fireEvent.click(screen.getByRole('button', { name: 'Clear my default' }));
+  view.rerender(<PreSiteDistributionPanel {...props} sourceUnavailable />);
+  await act(async () => preferenceResult.resolve(response({ ok: true, refreshUnavailable: true })));
+  expect(screen.getByText(/Default cleared. The current email is unchanged/)).toBeInTheDocument();
+  expect(screen.queryByText(/could not be confirmed/)).toBeNull(); expect(screen.getByLabelText('Message')).toHaveValue('Personal message');
+});
+test('actual unmount after uncertain mutation forces a strict read before any next write', async () => {
+  const view = await ready(); fireEvent.click(screen.getByText('Your default wording')); preferenceResult = deferred();
+  fireEvent.click(screen.getByRole('button', { name: 'Save as my default' })); view.unmount();
+  const load = deferred(), fetcher = global.fetch;
+  global.fetch = jest.fn((url, options) => url.includes('email-preferences') && options.method === 'GET' ? load.promise : fetcher(url, options));
+  render(<PreSiteDistributionPanel {...props} />); fireEvent.click(screen.getByText('Your default wording'));
+  expect(screen.getByRole('button', { name: 'Save as my default' })).toBeDisabled();
+  await act(async () => preferenceResult.reject(new Error('lost old response')));
+  expect(screen.getByRole('button', { name: 'Save as my default' })).toBeDisabled();
+  await act(async () => load.resolve(response(defaults())));
+  expect(screen.getByRole('button', { name: 'Save as my default' })).toBeEnabled();
+});
+test('recipient changes during an uncertain send cannot rebase its frozen values or retry identity', async () => {
+  const view = await ready(); await preview(); sendResult = deferred(); fireEvent.click(screen.getByRole('button', { name: 'Send email' }));
+  view.rerender(<PreSiteDistributionPanel {...props} suggestedTo={['new@example.org']} suggestedCc={['newcc@example.org']} />);
+  expect(screen.getByLabelText('To')).toHaveValue('staff@example.org'); expect(screen.getByLabelText('Cc')).toHaveValue('');
+  await act(async () => sendResult.reject(new Error('uncertain')));
+  fireEvent.change(screen.getByLabelText('To'), { target: { value: 'forged@example.org' } });
+  expect(screen.getByLabelText('To')).toHaveValue('staff@example.org');
+  expect(JSON.parse(calls('/send')[0][1].body)).toEqual({ requestId: ID, operationId: 'op1', previewHash: 'hash1' });
+});
+test.each([true, false])('source replacement during document locking ignores late success/error and clears prepare busy (%s)', async success => {
+  const lock = deferred(); const view = await ready({ ...props, beforePrepare: () => lock.promise });
+  fireEvent.click(screen.getByRole('button', { name: 'Create preview' }));
+  view.rerender(<PreSiteDistributionPanel {...props} sourceArtifact={{ artifactId: 'newsource' }} beforePrepare={() => lock.promise} />);
+  await act(async () => success ? lock.resolve() : lock.reject(new Error('old lock error')));
+  expect(calls('/prepare')).toHaveLength(0); expect(screen.getByRole('button', { name: 'Create preview' })).toBeEnabled(); expect(screen.queryByText('old lock error')).toBeNull();
+});
+
+test.each([true, false])('uppercase request URL resolves exact lowercase acceptance/no-transport proof (%s)', async accepted => {
+  const lower = 'abcdef12-abcd-4abc-8abc-abcdefabcdef';
+  const stored = { ...attempt, requestId: lower, createdAt: '2026-10-25T20:00:00Z' };
+  let issued = false;
+  const fetcher = global.fetch;
+  global.fetch = jest.fn((url, options) => {
+    if (url.includes('/prepare')) return Promise.resolve(response({ attempt: stored }));
+    if (url.includes('/send')) { issued = true; return Promise.resolve(accepted ? response({ attempt: { ...stored, transportAccepted: true } }) : response({ code: 'refused' }, 409)); }
+    if (url.includes('/history')) return Promise.resolve(response({ attempts: issued ? [stored] : [] }));
+    return fetcher(url, options);
+  });
+  await ready({ ...props, requestId: lower.toUpperCase() }); await preview(); fireEvent.click(screen.getByRole('button', { name: 'Send email' }));
+  await waitFor(() => expect(screen.getByLabelText('Subject')).toBeEnabled());
+  expect(screen.queryByText(/Reconcile the original email before/)).toBeNull();
+  if (accepted) expect(screen.queryByRole('checkbox')).toBeNull();
+  else expect(screen.queryByRole('heading', { name: 'Email preview' })).toBeNull();
+});
+test('late acceptance after source replacement resolves recovery with a receipt, never the old preview', async () => {
+  const view = await ready(); await preview(); sendResult = deferred(); fireEvent.click(screen.getByRole('button', { name: 'Send email' }));
+  view.rerender(<PreSiteDistributionPanel {...props} sourceArtifact={{ artifactId: 'successor' }} />);
+  await act(async () => sendResult.resolve(response({ attempt: { ...attempt, transportAccepted: true } })));
+  expect(screen.getByText(/The original email was sent/)).toBeInTheDocument(); expect(screen.queryByRole('heading', { name: 'Email preview' })).toBeNull(); expect(screen.getByLabelText('Subject')).toBeEnabled();
+});
+test('Reload warns inline before discarding future edits; Escape keeps them', async () => {
+  await ready(); fireEvent.click(screen.getByText('Your default wording'));
+  fireEvent.change(screen.getByLabelText('Default message'), { target: { value: 'Unsaved future edit' } });
+  fireEvent.click(screen.getByRole('button', { name: 'Reload defaults' }));
+  expect(screen.getByRole('button', { name: 'Discard default edits and reload' })).toBeInTheDocument();
+  fireEvent(screen.getByRole('dialog'), new Event('cancel', { bubbles: false, cancelable: true }));
+  expect(screen.getByLabelText('Default message')).toHaveValue('Unsaved future edit');
+  fireEvent.click(screen.getByRole('button', { name: 'Reload defaults' })); fireEvent.click(screen.getByRole('button', { name: 'Discard default edits and reload' }));
+  await waitFor(() => expect(screen.getByLabelText('Default message')).toHaveValue('Personal message'));
+});
+test.each(['validation', 'duplicates'])('known %s refusal is not an uncertain mutation', async reason => {
+  await ready(); fireEvent.click(screen.getByText('Your default wording')); preferenceResult = deferred();
+  fireEvent.click(screen.getByRole('button', { name: 'Save as my default' }));
+  await act(async () => preferenceResult.resolve(response({ ok: false, reason, errors: ['Check wording'] }, reason === 'duplicates' ? 409 : 400)));
+  expect(screen.queryByText(/could not be confirmed/)).toBeNull();
+  expect(screen.getByRole('button', { name: 'Save as my default' }).disabled).toBe(reason === 'duplicates');
+  if (reason === 'duplicates') expect(screen.getByRole('button', { name: 'Clear my default' })).toBeEnabled();
+});
+test('new open signal cannot silently reset an already dirty retained draft', async () => {
+  const view = await ready(); fireEvent.change(screen.getByLabelText('Message'), { target: { value: 'Keep this edit' } });
+  view.rerender(<PreSiteDistributionPanel {...props} composeOpenVersion={2} />);
+  expect(screen.getByLabelText('Message')).toHaveValue('Keep this edit'); expect(screen.getByRole('button', { name: 'Keep editing' })).toBeInTheDocument();
+});
+test('actual scope teardown clears parent retention signal', async () => {
+  const retention = jest.fn(); const view = await ready({ ...props, onRetentionChange: retention });
+  fireEvent.change(screen.getByLabelText('Message'), { target: { value: 'Dirty' } });
+  expect(retention).toHaveBeenLastCalledWith(expect.objectContaining({ draftDirty: true })); view.unmount();
+  expect(retention).toHaveBeenLastCalledWith({ draftDirty: false, editorDirty: false, mutationPending: false, recoveryPending: false });
+});
