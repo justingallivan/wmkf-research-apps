@@ -39,9 +39,25 @@ Prerequisite tests: response lost before receipt; JSON parse failure after a
 committed save; applicant transport failure; mixed partial success; non-suggestion
 saved key; empty-roster notice visibility; exact onSaved counts; safe retry.
 
-### F2 — Same-context exclusion rollback — fixed in isolated worktree
+### F2 — Same-context exclusion rollback — Production released
 
-[VERIFIED via source and regression tests, 2026-10-25; not released.]
+[VERIFIED via source, tests, merged PR #527 and Vercel, 2026-10-25.]
+PR #527 merged as `3e53510ff0ac164be256a1b3ca7804870f64d8a1`.
+Production deployment `dpl_GRxuMFsP2ZEDf5juzWdVMVu5UAC2` reached Ready and
+owns `applications.wmkeck.org`. The signed-in landing page and Research/D26
+Workbench request list loaded after promotion; the deployment-specific bounded
+error scan returned zero records. No live exclusion or failure injection was run.
+
+Independent OAuth Claude review confirmed F1–F5 resolved at `b3ec15085` and
+returned READY for final `fe721ddc7` after the neutral-feedback correction.
+All PR checks passed, including the production build, full Jest run, Playwright,
+Postgres integration and security checks. Local scoped verification passed
+28 suites / 428 tests. These are bounded release receipts, not proof of every
+live concurrency outcome. Last-known-good rollback deployment:
+`dpl_GWvCmNW1RPPqAbu85FhmQUVyGcMN` (`847f86141`); this fix changes no schema,
+environment settings or persistence contract. Claude's separate inventory-probe
+commit remains in main, and its database checkout/work was not modified.
+
 `shared/components/reviewers/search/useReviewerRosterActions.js` tracks overlapping
 name additions per request generation and roster revision. An added name is removed
 only after every overlapping attempt for it fails; a pre-existing name or a
@@ -73,7 +89,8 @@ controller toggle mutations and overlapping recovery through a hook integration 
 This is a client recovery fix; persisted exclusion semantics and the existing
 handling of transport failures remain unchanged. A rejected transport still does
 not prove whether the server committed; unknown-outcome reconciliation is separate
-work, not established by these tests. No live writes or Production smoke performed.
+work, not established by these tests. No live exclusion writes were performed; Production smoke was read-only and
+limited to the landing page and Workbench list described above.
 
 ### F3 — Streams are invalidated but not cancelled (third)
 
