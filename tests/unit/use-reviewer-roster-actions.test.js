@@ -23,6 +23,8 @@ function Harness({
   previousSearchRefs = [{ candidateKey: 'suggestion:s-2' }],
   includeActive = true,
   includeCandidate = true,
+  initialNames = [CAND.name],
+  initialSelected = [],
 }) {
   const genRef = useRef(0);
   const [rosterActive, setRosterActive] = useState(includeActive ? [CAND] : []);
@@ -31,8 +33,8 @@ function Harness({
   const [rosterBlocked, setRosterBlocked] = useState([]);
   const [rosterHandled, setRosterHandled] = useState([]);
   const [rosterSavedKeys, setRosterSavedKeys] = useState([]);
-  const [rosterNames, setRosterNames] = useState(['Ada Lovelace']);
-  const [selected, setSelected] = useState(new Set());
+  const [rosterNames, setRosterNames] = useState(initialNames);
+  const [selected, setSelected] = useState(new Set(initialSelected));
   const [rosterNote, setRosterNote] = useState(null);
   const [removingPrevious, setRemovingPrevious] = useState(false);
   const [candidates, setCandidates] = useState(includeCandidate ? [CAND] : []);
@@ -55,7 +57,7 @@ function Harness({
 
   const actions = useReviewerRosterActions({
     requestId: REQ, genRef, busy: false, removingPrevious,
-    rosterNames, previousSearchKeys: new Set(previousSearchRefs.map((r) => r.candidateKey)),
+    rosterNames, selected, previousSearchKeys: new Set(previousSearchRefs.map((r) => r.candidateKey)),
     previousSearchRefs, reloadRoster: reloadAndApplySnapshot,
     setCandidates, setRecCandidates, setRosterActive, setRosterExcluded, setRosterIneligible,
     setRosterBlocked, setRosterHandled, setRosterSavedKeys, setRosterNames, setSelected,
@@ -71,6 +73,15 @@ function Harness({
       <div data-testid="candidates-visible">{JSON.stringify(candidates)}</div>
       <div data-testid="rec-candidates-visible">{JSON.stringify(recCandidates)}</div>
       <div data-testid="unverified-visible">{JSON.stringify(unverified)}</div>
+      <div data-testid="roster-names">{JSON.stringify(rosterNames)}</div>
+      <div data-testid="selected">{JSON.stringify([...selected])}</div>
+      <button data-testid="select-other" onClick={() => setSelected((prev) => new Set([...prev, 'other']))}>select other</button>
+      <button data-testid="clear-selection" onClick={() => setSelected(new Set())}>clear</button>
+      <button data-testid="switch-context" onClick={() => {
+        genRef.current++;
+        setRosterActive([]); setRosterExcluded([]); setRosterNames(['New request']);
+        setSelected(new Set(['new-request'])); setRosterNote(null);
+      }}>switch</button>
       <button data-testid="exclude" onClick={() => actions.excludeCandidate(CAND)}>exclude</button>
       <button data-testid="exclude-unverified" onClick={() => actions.excludeUnverifiedCandidate(CAND)}>exclude-unverified</button>
       <button data-testid="promote" onClick={() => actions.promoteCandidate(CAND)}>promote</button>
@@ -237,4 +248,85 @@ test('removePreviousResults: non-2xx unparseable body is tolerated and surfaces 
   render(<Harness />);
   await act(async () => { screen.getByTestId('remove-previous').click(); });
   await waitFor(() => expect(screen.getByTestId('roster-note').textContent).toBe("Couldn't remove the previous search results — please try again."));
+});
+
+// Keep the request pending so user edits happen between the optimistic move and recovery.
+function pendingExclusion(httpFailure = false) {
+  let finish;
+  global.fetch = jest.fn(() => new Promise((resolve, reject) => {
+    finish = () => httpFailure
+      ? resolve({ ok: false, status: 500, json: async () => ({ error: 'failed' }) })
+      : reject(new Error('offline'));
+  }));
+  return async () => { await act(async () => { finish(); }); };
+}
+const state = (id) => JSON.parse(screen.getByTestId(id).textContent);
+
+test.each([[true, false], [false, false], [true, true], [false, true]])('failed exclusion restores its name/selection changes (existing name: %s, HTTP failure: %s)', async (alreadyPresent, httpFailure) => {
+  const fail = pendingExclusion(httpFailure);
+  render(<Harness initialNames={alreadyPresent ? [CAND.name, 'Existing'] : ['Existing']} initialSelected={[CAND.candidateKey, 'keep']} />);
+  await act(async () => { screen.getByTestId('exclude').click(); });
+  expect(state('selected')).toEqual(['keep']);
+  expect(state('roster-names')).toContain(CAND.name);
+  await fail();
+  expect(state('roster-active')).toEqual([expect.objectContaining(CAND)]);
+  expect(state('roster-excluded')).toEqual([]);
+  expect(state('roster-names')).toEqual(alreadyPresent ? [CAND.name, 'Existing'] : ['Existing']);
+  expect(state('selected')).toEqual(['keep', CAND.candidateKey]);
+});
+
+test('failed exclusion does not select an initially unselected card', async () => {
+  const fail = pendingExclusion();
+  render(<Harness initialSelected={['keep']} />);
+  await act(async () => { screen.getByTestId('exclude').click(); });
+  await fail();
+  expect(state('selected')).toEqual(['keep']);
+});
+
+test.each(['select-other', 'clear-selection'])('failed exclusion preserves newer selection intent: %s', async (edit) => {
+  const fail = pendingExclusion();
+  render(<Harness initialNames={[]} initialSelected={[CAND.candidateKey, 'keep']} />);
+  await act(async () => { screen.getByTestId('exclude').click(); });
+  await act(async () => { screen.getByTestId(edit).click(); });
+  await fail();
+  expect(state('selected')).toEqual(edit === 'select-other' ? ['keep', 'other'] : []);
+  expect(state('roster-active')).toEqual([expect.objectContaining(CAND)]);
+  expect(state('roster-names')).toEqual([]);
+});
+
+test('late exclusion failure cannot restore state into a different request', async () => {
+  const fail = pendingExclusion();
+  render(<Harness initialNames={[]} initialSelected={[CAND.candidateKey]} />);
+  await act(async () => { screen.getByTestId('exclude').click(); });
+  await act(async () => { screen.getByTestId('switch-context').click(); });
+  await fail();
+  expect(state('roster-active')).toEqual([]);
+  expect(state('roster-excluded')).toEqual([]);
+  expect(state('roster-names')).toEqual(['New request']);
+  expect(state('selected')).toEqual(['new-request']);
+  expect(screen.getByTestId('roster-note').textContent).toBe('');
+});
+
+test.each([true, false])('unverified exclusion keeps its separate rollback (name already present: %s)', async (alreadyPresent) => {
+  const fail = pendingExclusion();
+  render(<Harness includeActive={false} initialNames={alreadyPresent ? [CAND.name] : []} initialSelected={['keep']} />);
+  await act(async () => { screen.getByTestId('exclude-unverified').click(); });
+  await fail();
+  expect(state('roster-active')).toEqual([]);
+  expect(state('roster-excluded')).toEqual([]);
+  expect(state('roster-names')).toEqual(alreadyPresent ? [CAND.name] : []);
+  expect(state('selected')).toEqual(['keep']);
+  expect(state('unverified-visible')).toEqual([CAND]);
+});
+
+
+test('successful exclusion keeps the new name and removes only the excluded selection', async () => {
+  global.fetch = jest.fn(async () => ({ ok: true, status: 200, json: async () => ({ success: true }) }));
+  render(<Harness initialNames={['Existing']} initialSelected={[CAND.candidateKey, 'keep']} />);
+  await act(async () => { screen.getByTestId('exclude').click(); });
+  expect(state('roster-active')).toEqual([]);
+  expect(state('roster-excluded')).toEqual([expect.objectContaining(CAND)]);
+  expect(state('roster-names')).toEqual(['Existing', CAND.name]);
+  expect(state('selected')).toEqual(['keep']);
+  expect(screen.getByTestId('roster-note').textContent).toBe('');
 });

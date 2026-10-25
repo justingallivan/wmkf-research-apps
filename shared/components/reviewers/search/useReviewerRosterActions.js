@@ -12,6 +12,7 @@ export default function useReviewerRosterActions({
   busy,
   removingPrevious,
   rosterNames,
+  selected,
   previousSearchKeys,
   previousSearchRefs,
   reloadRoster,
@@ -34,12 +35,16 @@ export default function useReviewerRosterActions({
     if (!key || !requestId) return;
     const myGen = genRef.current;
     const pruned = pruneCandidateForRoster(cand);
+    const nameAlreadyInRoster = rosterNames.includes(cand.name);
+    const wasSelected = selected.has(key);
+    const optimisticSelection = new Set(selected);
+    optimisticSelection.delete(key);
     setCandidates((prev) => prev.filter((c) => candKey(c) !== key));
     setRecCandidates((prev) => prev.filter((c) => candKey(c) !== key));
     setRosterActive((prev) => prev.filter((c) => candKey(c) !== key));
     setRosterExcluded((prev) => dedupeByName([pruned, ...prev]));
     setRosterNames((prev) => Array.from(new Set([...prev, cand.name])));
-    setSelected((prev) => { const next = new Set(prev); next.delete(key); return next; });
+    setSelected(optimisticSelection);
     try {
       const { ok, status, data } = await requestEnvelope('/api/workbench/reviewer-roster', {
         method: 'PATCH',
@@ -67,10 +72,18 @@ export default function useReviewerRosterActions({
       if (genRef.current === myGen) {
         setRosterExcluded((prev) => prev.filter((c) => candKey(c) !== key));
         setRosterActive((prev) => dedupeByName([pruned, ...prev]));
+        if (!nameAlreadyInRoster) {
+          setRosterNames((prev) => prev.filter((name) => name !== cand.name));
+        }
+        // Restore only if this attempt still owns the selection. Any newer
+        // selection edit (including clear-all) wins over this late rollback.
+        if (wasSelected) {
+          setSelected((prev) => prev === optimisticSelection ? new Set([...prev, key]) : prev);
+        }
         setRosterNote("Couldn't exclude that reviewer — please try again.");
       }
     }
-  }, [requestId, genRef, reloadRoster, setCandidates, setRecCandidates, setRosterActive, setRosterExcluded, setRosterNames, setSelected, setUnverified, setRosterNote]);
+  }, [requestId, genRef, reloadRoster, rosterNames, selected, setCandidates, setRecCandidates, setRosterActive, setRosterExcluded, setRosterNames, setSelected, setUnverified, setRosterNote]);
 
   // Exclude an ephemeral unverified suggestion. Same durable PATCH (the server
   // exclude is an upsert, so no prior roster row is needed), but the rollback

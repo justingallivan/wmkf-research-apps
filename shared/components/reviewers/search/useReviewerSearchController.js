@@ -333,6 +333,7 @@ export default function useReviewerSearchController({
     busy,
     removingPrevious,
     rosterNames,
+    selected,
     previousSearchKeys,
     previousSearchRefs,
     reloadRoster,

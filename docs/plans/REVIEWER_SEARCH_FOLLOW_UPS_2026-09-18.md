@@ -39,21 +39,29 @@ Prerequisite tests: response lost before receipt; JSON parse failure after a
 committed save; applicant transport failure; mixed partial success; non-suggestion
 saved key; empty-roster notice visibility; exact onSaved counts; safe retry.
 
-### F2 — Same-context exclusion rollback is incomplete (second)
+### F2 — Same-context exclusion rollback — fixed in isolated worktree
 
-[VERIFIED via source; user impact needs a targeted reproduction] In
-`shared/components/reviewers/search/useReviewerRosterActions.js`, excludeCandidate
-adds the name to rosterNames and removes selection. On failure it restores
-active/excluded buckets and the notice, but not those two state changes. Discovery
-uses rosterNames in its exclusion input. This existed before extraction.
+[VERIFIED via source and regression tests, 2026-10-25; not released.]
+`shared/components/reviewers/search/useReviewerRosterActions.js` now removes a
+name on ordinary-exclusion failure only when that attempt added it. Existing
+roster names remain intact. A previously selected card is reselected only while
+the selection still equals the optimistic Set created by that attempt. Any newer
+selection edit, including selecting another card or clearing all, takes precedence;
+recovery does not restore an older selection snapshot over it.
 
-Next step: reproduce separately for a name already in the roster and a newly added
-name. Do not blindly remove a pre-existing roster name or restore a stale selection
-snapshot over concurrent user edits. Decide which optimistic state must be restored
-or refreshed authoritatively.
-Prerequisite tests: both name-membership cases, initially selected/unselected row,
-concurrent selection edits, same-context rejection, and stale rejection after a
-request switch. Keep the existing unverified-candidate rollback semantics distinct.
+`useReviewerSearchController.js` supplies current selection to the action hook.
+The existing request-generation guard prevents late failures from restoring state
+into another request. The unverified-card path retains its distinct rollback:
+it unmasks the unverified row without adding it to the active roster.
+
+Regression evidence: `tests/unit/use-reviewer-roster-actions.test.js` reproduces
+the missing name/selection recovery against the original hook, and covers existing
+versus newly added names, initially selected/unselected cards, pending-request
+selection edits, context switches, saved conflicts and unverified rollback.
+This is a client recovery fix; persisted exclusion semantics and the existing
+handling of transport failures remain unchanged. A rejected transport still does
+not prove whether the server committed; unknown-outcome reconciliation is separate
+work, not established by these tests. No live writes or Production smoke performed.
 
 ### F3 — Streams are invalidated but not cancelled (third)
 
