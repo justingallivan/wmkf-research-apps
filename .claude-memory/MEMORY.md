@@ -30,6 +30,7 @@
 - Action affordances / UI gating: feedback-ui-gates-must-mirror-server-guards.md; feedback-match-existing-ui-patterns.md
 - Tunables / mutable parameters: feedback-mutable-parameters-not-in-code.md
 - Cycle-scoped settings / per-cycle allowlists / cycle literals: feedback-minimize-per-cycle-configuration.md
+- Per-request/PD campaign settings vs central defaults: feedback-centralize-over-pd-specific-settings.md
 - Test Request Factory safety vs fidelity / rehearsal venue: feedback-factory-safe-not-full-fidelity.md; feedback-question-the-rehearsal-venue.md
 - Reviewer product decisions: ../docs/agent-wiki/topics/reviewer-identity.md (Durable Memory); feedback-prioritize-contact-recall-over-identity-precision.md
 - Audits / review / test evidence: ../docs/agent-wiki/topics/dev-environment.md (Durable Memory)

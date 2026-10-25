@@ -134,8 +134,12 @@ sequence.
   Foundational read-only Production checks now verify shared roles/assignments,
   cycle rows, selected settings and request/GOApply linkage. Evidence and remaining
   owner/Connor questions: `docs/audits/cycle-foundations-2026-10-21.md`. J27
-  exists in operations; D27 does not yet. Calendar-role selection, intended
-  Research opportunity/publication and date propagation remain unresolved.
+  exists in operations; D27 does not yet. Calendar role decided 2026-10-24:
+  Grants Manager, Program Coordinator fallback. Fallback semantics, recipients,
+  intended Research opportunity/publication and date propagation remain
+  unresolved; meeting log: `docs/plans/J27_ALIGNMENT_LOG_2026-10-24.md`.
+  Slice 1 (central reviewer campaign settings, owner decision D4) is scheduled
+  for November 2026; its slice 2 dependency shipped as PR #521.
   No runtime/live write or queue-priority change was made.
   Historical interim safeguard: owner-reported Production preparation list
   `["D26","J27"]`, redeployed 2026-10-07 (J27-084), not read back this session.
