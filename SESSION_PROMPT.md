@@ -1,49 +1,45 @@
-# Session 641 Prompt: Duncan calendar walkthrough and J27 readiness
+# Session 642 Prompt: Duncan walkthrough checklist ready; await meeting decisions
 
-## Session 640 Summary
+## Session 641 Summary
 
-[VERIFIED via release receipts and committed follow-up.] Email-interface
-consistency is released and Production-smoke verified. Existing pre-discussion
-invitation updates were investigated read-only; the owner wants to walk through
-Duncan's scheduling process before deciding the design. No calendar changes made.
+[VERIFIED via merged PRs and tracked documentation, 2026-10-25.] Saved the short
+Duncan meeting checklist beside the detailed calendar follow-up and placed it on
+main. Calendar implementation remains on hold until the owner and Duncan walk
+through scheduling and resolve the questions. No calendar updates or sends made.
 
 ### What Was Completed
 
-1. **Email consistency release:** PR #523 / `5de197918` reached Production READY
-   (`dpl_2bfVxUMoqRQKdXpA9nmUHx19dKtD`). Signed-in Profile/defaults, agenda,
-   materials and scheduled-addressing checks passed. Hosted tests: Jest 25,227,
-   PostgreSQL 130, Playwright 51. Native 200% zoom and narrow-window checks closed.
-   Evidence: `docs/audits/EMAIL_INTERFACE_CONSISTENCY_BUILD_2026-10-24.md`.
-2. **Calendar feasibility and Duncan follow-up:** Microsoft supports updating an
-   existing event body with appropriate access. The inspected accepted attendee
-   copy showed Shared Calendar / Research Staff and existing Zoom information,
-   notes and a manual proposal list. Actual organizer account/type, edit rights
-   and recurrence remain unverified. Meeting Tracker has no event binding;
-   existing agenda transport is Dynamics email. Questions about linkage, first
-   manual-list conversion, audience, notifications and recovery are logged in
+1. **Meeting checklist saved:** findings plus six checkboxes covering scheduling,
+   event linkage, agenda content, audience, notifications and update/recovery
+   control are in **Meeting checklist — pre-discussion calendar agenda** within
    `docs/plans/PERSONAL_EMAIL_DEFAULTS_TODO_2026-09-20.md`.
-3. **Milestone record:** DEVELOPMENT_LOG.md records the released personal deadline
-   and agenda defaults plus desktop email consistency. CLAUDE.md needed no change.
+2. **Documentation landed on main:** PR #524 saved the prior handoff and email
+   release milestone; PR #525 saved the meeting checklist. The owner explicitly
+   requires the final handoff on main while retaining the original branch.
+3. **Release boundary unchanged:** email consistency (#523), reviewer deadline
+   defaults (#521), release courtesy defaults (#517), and agenda defaults (#522)
+   are shipped. Production evidence is in their linked build audits; no runtime
+   changes were made during this closeout.
 
-### Commits and destinations
+### Commits / destinations
 
-- `5de197918` — email consistency runtime release (#523, main).
-- `67f1fce4a` — Production release and smoke documentation (main).
-- `ca07940f2` — Duncan follow-up on retained, pushed
-  `codex/email-consistency-release-record`; documentation-only copy `a56fe8d4f`
-  on `codex/session-640-handoff`, prepared from origin/main for landing on main.
-- Final handoff/milestone commit follows this summary. Only documentation is
-  being promoted; the original checkout and local main are preserved.
+- `ca07940f2` — original Duncan follow-up, preserved on pushed
+  `codex/email-consistency-release-record` (original checkout remains there).
+- `bc99a8694` — prior handoff/milestone; PR #524 merged to main as `efb633f9c`.
+- `a036ffb87` — saved checklist; PR #525 merged to main as `ac38b55e6`.
+- Final handoff is prepared on `codex/session-641-final-handoff` from origin/main
+  for a documentation-only PR to main. Keep all existing branches/local main.
 
-Prior detailed handoff, including Session 639 J27 context and slice 6 evidence:
-`git show ca07940f2:SESSION_PROMPT.md` (retrievability checked at session close).
+Prior release/J27 handoff: `git show efb633f9c:SESSION_PROMPT.md` (retrievability
+checked). Full earlier context: `git show ca07940f2:SESSION_PROMPT.md`.
 
 ## Next Items
 
 ### Owner Decision Needed
 
 - **Duncan walkthrough — awaiting discussion, no implementation authorized.**
-  Use the findings and five question groups in the personal-email TODO. No date
+  Use the **Meeting checklist — pre-discussion calendar agenda** section,
+  followed by the detailed findings/questions in the personal-email TODO. No date
   set. A marked app-managed Agenda section is a proposal, not an adopted design.
   Confirm organizer access and synthetic-event behavior before any real update.
 - **J27 meeting answers — awaiting colleagues.** The alignment log still records
@@ -87,8 +83,9 @@ Prior detailed handoff, including Session 639 J27 context and slice 6 evidence:
 ## Verification and Closeout
 
 Follow-up documentation passed doc-currency, fact-consistency, doc-symbol-refs,
-their sequential self-tests, docs-catalog and diff whitespace checks. Run those
-again for the final handoff. The claim-evidence pilot report was unavailable
+their sequential self-tests, docs-catalog and diff whitespace checks. Final handoff checks also passed. The claim-evidence pilot report was unavailable
 because local state could not be read; no observation row was invented.
 No memory-router advisory received. No memory/instruction/skill changes.
-Milestone determination: entry required and added for the Production email releases.
+Milestone determination: no new entry required for this checklist/handoff-only
+closeout. The Production email-release milestone already exists in DEVELOPMENT_LOG.md
+(added through PR #524).
