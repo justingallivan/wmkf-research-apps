@@ -20,6 +20,8 @@ owner questions Q1–Q25), `docs/audits/cycle-foundations-2026-10-21.md`
 | # | Date | Decision | Decided by | Source |
 |---|---|---|---|---|
 | D1 | 2026-10-24 | **Calendar authority is the Grants Manager role** (currently Sarah), with the **Program Coordinator role** (currently Duncan) as fallback. Authority attaches to the role, not the person: reassigning the role in Admin staffing moves the responsibility with no code or settings change. Authority means maintaining and confirming cycle dates used by the apps; the dates themselves stay in the operations Grant Cycle record. | Justin | Rollover plan §3.1, §7 |
+| D2 | 2026-10-24 | **Reviewer reminders stay manual for J27.** PDs send reminders themselves, as in D26; the automatic reminder schedule stays off. | Justin | Register Q10 |
+| D3 | 2026-10-24 | **Review filing switches from D26 to J27 once; it never has to handle both.** All D26 reviews are in, so no late D26 reviews will overlap with J27 reviews. Who makes the switch and when is task T3. | Justin | Register Q15 |
 
 ## To confirm at the meeting
 
@@ -38,9 +40,6 @@ owner questions Q1–Q25), `docs/audits/cycle-foundations-2026-10-21.md`
 Justin and Claude are reviewing the remaining items one at a time; they will
 be added above as they are settled.
 
-- Register Q10: turn automatic reviewer reminders back on for J27?
-- Register Q15: when review-document filing moves from D26 to J27, and whether
-  late D26 and early J27 reviews ever need filing at the same time.
 - December readiness: what must work when J27 proposals arrive.
 - Reviewer settings per cycle (rollover plan Slice 1).
 
@@ -49,3 +48,5 @@ be added above as they are settled.
 | # | Task | Owner | Status |
 |---|---|---|---|
 | T1 | Record D1 in the rollover plan and work queue. | Claude | Done 2026-10-24 |
+| T2 | Record D2 in the J27 register (Q10) and reviewer engagement spec. | Claude | Done 2026-10-24 |
+| T3 | Switch automatic review-document filing from D26 to J27 (one Production setting, `REVIEW_DOCX_SHAREPOINT_CYCLE`, plus redeploy) after confirming D26 filing is complete and before the first J27 review comes back in 2027. | To assign at meeting | Open; date to agree (see D3) |
