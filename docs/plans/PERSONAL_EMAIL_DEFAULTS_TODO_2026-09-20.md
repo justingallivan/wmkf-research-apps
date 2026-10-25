@@ -95,7 +95,7 @@ Evidence: `docs/audits/MEETING_AGENDA_DEFAULTS_BUILD_2026-10-24.md`.
   This is a scoped investigation/planning task, not authorization to edit calendar
   events or send updates. It is separate from slice 6 and does not block release.
 
-## Email interface consistency review — completed 2026-10-24; fixes proposed
+## Email interface consistency — audit complete; owner-approved build planned
 
 - [x] Have **Impeccable review email interfaces across the app suite for
   consistency**. Inventory and inspect current rendered compose/defaults/preview/
@@ -116,10 +116,13 @@ Evidence: `docs/audits/MEETING_AGENDA_DEFAULTS_BUILD_2026-10-24.md`.
   Completed report: `docs/audits/EMAIL_INTERFACE_CONSISTENCY_AUDIT_2026-10-24.md`.
   Nine findings (three P1, six P2). Accessible dialog/labels/contrast first, then
   future-only default actions, truthful sender/source summaries and control/target
-  consistency. Product UI is unchanged; harmonization awaits owner decisions.
-- [ ] Review and approve the bounded harmonization plan in the audit before
-  implementing behavior changes. Calendar-event updates and remaining personal-
-  default slices remain separate.
+  consistency. Product UI is unchanged at plan creation; owner approved all nine recommendations
+  with an explicit desktop-first constraint.
+- [x] Review the audit recommendations with the owner; all nine agreed.
+- [ ] Independently review and implement the three-pass contract in
+  `docs/plans/EMAIL_INTERFACE_CONSISTENCY_IMPLEMENTATION_PLAN_2026-10-24.md`.
+  Preserve desktop density; no phone-driven redesign. Calendar-event updates
+  and remaining personal-default slices remain separate.
 
 ## Current evidence and next work
 

@@ -330,20 +330,26 @@ and nested pickers at 390px and on a touch device.
    confirmation pass. Include dirty drafts, shared read failure, partial save,
    uncertain mail, actor/session changes and the nested directory picker.
 
-### Decisions needed
+### Owner decisions — agreed after the audit
 
-- Adopt **future-only Save/Clear everywhere**, changing materials/release behavior?
-  Recommended yes. If staff want to apply new wording immediately, retain it as
-  a separate explicit action, rather than a side effect of saving a default.
-- Adopt a read-only actual **From / To / Cc** summary at exact review everywhere?
-  Recommended yes, subject to each service supplying authoritative display data.
-- Implementation scope/order: begin with foundation plus labels/contrast, then
-  defaults semantics, then summaries/control polish. Calendar updates and missing
-  personal-default slices remain separate projects.
+[VERIFIED via subsequent conversation.] Owner approved all nine recommendations:
+shared accessible dialog behavior; associated recipient-aware labels; readable
+placeholder guidance; future-only Save/Clear with separate explicit apply-to-open
+where retained; server-verified read-only From/To/Cc; visible fallback/Retry and
+baseline-dependent write guards; clearly labeled Legacy templates; consistent
+field/control vocabulary; and practical hit-area/scroll/zoom/focus improvements.
 
-No implementation authorization is inferred from the audit. Existing runtime
-remains released; these findings do not justify rollback or replaying delivery
-checks.
+**Desktop first:** these apps are not intended for phone use. Preserve desktop
+information density, useful side-by-side layouts and compact controls. Do not
+make desktop compromises or force oversized controls to service phones. Narrow
+screens are a regression check, not the design priority or a physical-phone UAT
+requirement. This supersedes F9's original phone-oriented verification wording.
+
+Owner requested the implementation plan, independent review and continuation
+into the build after review passes. Authoritative execution contract:
+`docs/plans/EMAIL_INTERFACE_CONSISTENCY_IMPLEMENTATION_PLAN_2026-10-24.md`.
+Runtime remains unchanged at this documentation pass. Release requires a separate
+instruction; calendar integration and missing default slices remain separate.
 
 ## Recommendation evidence and contract reconciliation
 
@@ -369,7 +375,7 @@ scratch settings) were incorporated. Fresh-agent read-only findings agreed on de
 focus/labels, sender, fallback and compatibility drift; parent verified the
 rendered examples and excluded fixture-only errors.
 
-Sweep Mode A: queued review → completed audit, **harmonization still planned**.
+Sweep Mode A: queued review → completed audit, **harmonization approved and planned, not implemented**.
 Current suite to-do, inventory and session pointer reconciled; historical release
 receipts retain their dated scope. No claim of all P1 fixes or full a11y/performance
 certification is made. Re-run `$impeccable audit` after approved fixes.
