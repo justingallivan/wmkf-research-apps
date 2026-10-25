@@ -3,7 +3,7 @@ title: Meeting agenda defaults — build and OAuth Opus review evidence
 domain: meeting-tracker
 kind: audit
 status: active
-summary: Slice 6 built on a feature branch; corrected candidate passed full tests/build and OAuth Opus recheck. Not deployed; no live agenda/defaults writes or delivery rehearsal.
+summary: Slice 6 built on a feature branch; corrected candidate passed full tests/build and OAuth Opus recheck. Not deployed; Production wording validated unchanged and one isolated agenda email confirmed Sent; inbox appearance awaits owner confirmation.
 owner: product-engineering
 related:
   - docs/plans/PERSONAL_EMAIL_MEETING_AGENDA_DEFAULTS_PLAN_2026-10-24.md
@@ -124,16 +124,84 @@ Sweep Mode A updated plan, inventory, suite to-do, session, security matrix,
 service catalogue, Atlas and generated route counts for branch-built status.
 Historical September baselines and original review receipts remain historical.
 
-No push/merge/deployment, live configuration/personal-default write, email,
-Dataverse or business-record mutation was invoked by this build. Before release,
-authorize/read/validate existing Admin agenda copy and choose any isolated delivery
-verification under the release strategy; no new shared seed is required. Production
-briefing-flag state and live agenda transport remain unprobed here. Published
-Microsoft Email entity reference supports Subject MaxLength 800; the agenda's
-500-character limit is stricter, without claiming a fresh tenant metadata probe.
+No push/merge/deployment or live configuration/personal-default/business-record
+write occurred. The subsequent owner-authorized release preflight below created
+one standalone email; it did not execute the session/ledger workflow. Production
+briefing-flag state remains unprobed. Published Microsoft Email entity reference
+supports Subject MaxLength 800; the agenda's 500-character limit is stricter,
+without claiming a fresh tenant metadata probe.
 The cross-record session/link-read-to-transport race and concurrent-save possibility
 remain named residuals; no atomic uniqueness or cross-record transaction is claimed.
 Unrelated critique and output/ items remain untouched.
+
+## Owner-authorized release preflight — 2026-10-24 PDT
+
+[VERIFIED via exact Production reads, candidate renderer and email readback.]
+Owner requested Production wording verification and isolated delivery. Target:
+`wmkf.crm.dynamics.com`; local controlled Production rehearsal, interlock on.
+No seeding was needed. Existing `email.deliberation_agenda.subject` was
+`Discussion Agenda`; opening was:
+
+> Dear Colleagues,
+>
+> Please find the agenda to discuss the upcoming research presentations.
+>
+> Each item contains a link to the materials.
+
+Both exact keys existed, passed the candidate raw and resolved validators, and
+read back unchanged after delivery. SHA256 over JSON-encoded values:
+subject `130f5bc23906010ab98e96716f153b205c3b8044701b44d50abc50c174c99a92`;
+body `be9f8aeb15b175206cf21a02be1676834705bb2b5b6711276a28a30fb5326661`.
+Receipt: `/tmp/slice6-production-wording.json`.
+
+One standalone message from `jgallivan@wmkeck.org` to the previously approved
+staff-controlled `funeral.candor_0r@icloud.com` used the candidate's actual
+`computeAgenda` / `renderAgendaEmail` and current shared opening, with subject
+`[TEST ONLY — Slice 6] Discussion Agenda`. Synthetic Monday October 26, 2026,
+10–11 AM America/Los_Angeles session, two 30-minute items, example.org meeting /
+briefing links and a clearly labeled test location; no actual session, proposal,
+briefing token, agenda ledger or preference was read/written. Candidate empty
+opening retains generated agenda and `{{sessionDate}}` resolves correctly in
+additional local assertions; that empty-opening variant was not a second send.
+
+Strict sender impersonation/no fallback; short-lived interlock grant limited to
+POST emails, narrowed to the exact created activity before dispatch. A process
+fetch fence enforced one exact content/party/correlation create and one exact
+SendEmail action; all other Dataverse writes were denied. Journal reserved before
+create and send intent. No attachments or Cc/Bcc. Activity:
+`986dffdc-15d0-f111-a05b-6045bd04539e`. Dynamics accepted dispatch and later
+reported Sent (status 3), Completed (state 1), senton `2026-10-25T01:46:54Z`.
+Readback HTML matched exactly, SHA256
+`0340617c53606cfa00774ca8eaa2999d25e76ee9f957f2c6de6627fd138473b5`.
+Sender/recipient parties matched; Dynamics also records its normal Owner party
+(mask 9), which is not an additional recipient. No regarding record. Dynamics
+appended its CRM tracking suffix to the subject. Receipts:
+`/tmp/slice6-production-delivery-run2.json` and
+`/tmp/slice6-production-readback.json`.
+
+The first scratch process stopped on a Node extension-resolution import error
+before any network call or email creation; receipt
+`/tmp/slice6-production-delivery.json` records no activity/send attempt. A
+process-only extension resolver allowed the unchanged candidate module to load.
+The first readback checker incorrectly counted Dynamics' Owner party as a mail
+recipient; it was corrected to check sender/To/Cc/Bcc masks, then passed. No mail
+retry or duplicate create occurred. Scratch scripts remained outside the repo.
+
+[UNKNOWN pending owner response.] Inbox receipt and appearance have been requested;
+server-side Sent alone does not establish those. This isolated check establishes
+candidate rendering plus real Production mail transport, not authenticated
+session prepare/send, live briefing links or personal preference persistence.
+Those branch behaviors retain the automated evidence above. Runtime remains
+unreleased; do not treat the test as authorization to promote it.
+
+Sweep Mode A: changed fact is Production wording/delivery verification, scoped
+to this audit, slice-6 plan, inventory, suite to-do and session. Source/readback
+establish wording validity, unchanged settings, exact content/parties and Sent;
+inbox appearance remains UNKNOWN. Original review receipts below are HISTORICAL.
+Current no-send/unprobed-transport statements were replaced; unrelated families
+and historical baselines are excluded. Disconfirming readback checked settings,
+recipients, regarding and exact body: all passed. No claim of UI/persistence
+end-to-end live verification is made.
 
 ## Initial Opus report — historical verbatim receipt
 
