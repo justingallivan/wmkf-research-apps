@@ -70,7 +70,10 @@ Use the adopted collapsed **Your default wording** editor with separate raw
 template fields and **Save as my default** / **Clear my default** actions;
 neither changes the open email. Empty saved opening differs from Clear.
 Fallback, session-date placeholders, fresh reopen, session drift and original
-unresolved-send recovery follow the linked plan.
+unresolved-send recovery follow the linked plan. OAuth Opus returned READY WITH
+NAMED CHANGES on the original plan; the revised plan incorporates all eight
+findings, with raw-template, full freshness, privacy and async requirements.
+Revised text is not independently re-reviewed; implementation is not started.
 
 ## Email interface consistency review — queued 2026-10-24
 
