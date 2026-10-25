@@ -76,7 +76,7 @@ findings, with raw-template, full freshness, privacy and async requirements.
 The revised plan is implemented on `codex/meeting-agenda-email-defaults`;
 corrected runtime passed full tests/build and OAuth Opus recheck (PASS).
 Production shared wording validated unchanged; one isolated synthetic agenda
-email reached Sent. Inbox appearance awaits owner confirmation; not deployed.
+email reached Sent. Owner confirmed inbox receipt and correct appearance; not deployed.
 Evidence: `docs/audits/MEETING_AGENDA_DEFAULTS_BUILD_2026-10-24.md`.
 
 ## Email interface consistency review — queued 2026-10-24

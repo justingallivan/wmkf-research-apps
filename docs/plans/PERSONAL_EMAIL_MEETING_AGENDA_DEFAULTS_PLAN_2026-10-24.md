@@ -22,7 +22,7 @@ for personal defaults for the agenda of the pre-discussion before the site visit
 research presentation. Product decisions are settled. Implementation is built on
 `codex/meeting-agenda-email-defaults`; corrected runtime passed full tests,
 production build and OAuth Opus build recheck. Production wording validated unchanged; isolated synthetic mail reached Sent.
-Inbox appearance awaits owner confirmation; runtime is not deployed.
+Owner confirmed inbox receipt and correct appearance; runtime is not deployed.
 OAuth Claude Opus 5.5 reviewed the earlier plan at `f36ca94fe` and returned
 READY WITH NAMED CHANGES. This revision incorporates those findings; the implemented source subsequently
 passed the separate OAuth Opus build recheck.
@@ -354,8 +354,7 @@ PASS after all eight build findings were fixed. GET link outages retain receipts
 and unresolved sends with unknown drift; legacy snapshots compare link IDs only
 when stored. Loaded-draft origin stays fixed when future defaults change, and
 Close cancels initialization safely. Subsequent owner-authorized Production preflight validated shared wording unchanged
-and one isolated synthetic agenda email reached Sent; inbox appearance awaits
-owner confirmation. No runtime deployment occurred.
+and one isolated synthetic agenda email reached Sent; owner confirmed inbox receipt and correct appearance. No runtime deployment occurred.
 Full receipts and remaining release boundaries:
 [build audit](../audits/MEETING_AGENDA_DEFAULTS_BUILD_2026-10-24.md).
 Microsoft's current Email entity reference documents Subject MaxLength 800;

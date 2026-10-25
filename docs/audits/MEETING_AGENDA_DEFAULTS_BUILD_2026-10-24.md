@@ -3,7 +3,7 @@ title: Meeting agenda defaults — build and OAuth Opus review evidence
 domain: meeting-tracker
 kind: audit
 status: active
-summary: Slice 6 built on a feature branch; corrected candidate passed full tests/build and OAuth Opus recheck. Not deployed; Production wording validated unchanged and one isolated agenda email confirmed Sent; inbox appearance awaits owner confirmation.
+summary: Slice 6 built on a feature branch; corrected candidate passed full tests/build and OAuth Opus recheck. Not deployed; Production wording validated unchanged and one isolated agenda email confirmed Sent; owner confirmed inbox receipt and appearance.
 owner: product-engineering
 related:
   - docs/plans/PERSONAL_EMAIL_MEETING_AGENDA_DEFAULTS_PLAN_2026-10-24.md
@@ -187,8 +187,9 @@ The first readback checker incorrectly counted Dynamics' Owner party as a mail
 recipient; it was corrected to check sender/To/Cc/Bcc masks, then passed. No mail
 retry or duplicate create occurred. Scratch scripts remained outside the repo.
 
-[UNKNOWN pending owner response.] Inbox receipt and appearance have been requested;
-server-side Sent alone does not establish those. This isolated check establishes
+[OWNER-CONFIRMED via conversation reply: “Looks good to me.”] Inbox receipt and
+opening, Monday October 26 agenda times and two synthetic items displayed correctly.
+The selected wording and isolated delivery prerequisites are complete. This isolated check establishes
 candidate rendering plus real Production mail transport, not authenticated
 session prepare/send, live briefing links or personal preference persistence.
 Those branch behaviors retain the automated evidence above. Runtime remains
@@ -197,7 +198,7 @@ unreleased; do not treat the test as authorization to promote it.
 Sweep Mode A: changed fact is Production wording/delivery verification, scoped
 to this audit, slice-6 plan, inventory, suite to-do and session. Source/readback
 establish wording validity, unchanged settings, exact content/parties and Sent;
-inbox appearance remains UNKNOWN. Original review receipts below are HISTORICAL.
+owner confirmed inbox receipt and correct appearance. Original review receipts below are HISTORICAL.
 Current no-send/unprobed-transport statements were replaced; unrelated families
 and historical baselines are excluded. Disconfirming readback checked settings,
 recipients, regarding and exact body: all passed. No claim of UI/persistence
