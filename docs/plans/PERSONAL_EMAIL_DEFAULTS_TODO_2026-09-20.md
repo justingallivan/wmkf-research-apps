@@ -60,6 +60,57 @@ The authoritative saved date/calendar remain server-controlled. Review precedes
 save/send, restore and resend; explicit defaults, fallback notices, local retry
 wording/Cc and customizable subjects are specified in that plan. Released; Production subject seed and empty-body sending verified with Dynamics Sent status; limits are in the linked build audit.
 
+## Slice 6 owner decisions — 2026-10-24
+
+[BUILT IN BRANCH; checks and OAuth Opus recheck passed, not deployed.] The pre-discussion agenda defaults plan is
+`docs/plans/PERSONAL_EMAIL_MEETING_AGENDA_DEFAULTS_PLAN_2026-10-24.md`. PCs normally send, with other Meeting Tracker staff permitted
+as backup, using their own mailbox/defaults. Save subject and optional opening
+only; generated agenda details stay server-owned. To/Cc remain one-send edits.
+Use the adopted collapsed **Your default wording** editor with separate raw
+template fields and **Save as my default** / **Clear my default** actions;
+neither changes the open email. Empty saved opening differs from Clear.
+Fallback, session-date placeholders, fresh reopen, session drift and original
+unresolved-send recovery follow the linked plan. OAuth Opus returned READY WITH
+NAMED CHANGES on the original plan; the revised plan incorporates all eight
+findings, with raw-template, full freshness, privacy and async requirements.
+The revised plan is implemented on `codex/meeting-agenda-email-defaults`;
+corrected runtime passed full tests/build and OAuth Opus recheck (PASS).
+Production shared wording validated unchanged; one isolated synthetic agenda
+email reached Sent. Owner confirmed inbox receipt and correct appearance; not deployed.
+Evidence: `docs/audits/MEETING_AGENDA_DEFAULTS_BUILD_2026-10-24.md`.
+
+## Existing pre-discussion calendar events — follow-up queued 2026-10-24
+
+- [ ] Investigate explicitly updating the existing pre-discussion calendar
+  invitations with the generated agenda, rather than sending duplicate events.
+  Owner believes Duncan blocks these sessions in advance; verify the actual
+  calendar owner, event creation method, recurrence and app permissions first.
+  Determine how to link a Meeting Tracker session to the correct event and how
+  authorized backup staff may update it. Propose an explicit reviewed update of
+  a clearly marked agenda section, preserving organizer copy, attendees and
+  unrelated event details. Review recurring-series versus occurrence behavior,
+  notification recipients and failure/retry semantics before implementation.
+  This is a scoped investigation/planning task, not authorization to edit calendar
+  events or send updates. It is separate from slice 6 and does not block release.
+
+## Email interface consistency review — queued 2026-10-24
+
+- [ ] Have **Impeccable review email interfaces across the app suite for
+  consistency**. Inventory and inspect current rendered compose/defaults/preview/
+  confirmation/recovery interfaces, including reviewer invitations, reminders,
+  release courtesies, deadline updates, grantee invitations/scheduled messages,
+  Meeting Tracker materials/agenda and deliberation distribution. Include
+  relevant Profile Settings and shared Admin wording entry points. Compare
+  labels, placement, control hierarchy, sender/recipient visibility, template
+  versus one-send boundaries, Save/Clear/reset semantics, placeholders, fallback,
+  loading/error/success/uncertain states, accessibility and narrow-screen usability.
+  Start with the adopted **Your default wording** pattern; distinguish justified
+  workflow differences from accidental inconsistency. Produce a source-backed
+  visual audit and prioritized, bounded harmonization plan for owner review.
+  Preserve family-specific permissions, required/generated content and transport
+  safety. This is a queued review, not approval for suite-wide implementation,
+  live sends or DESIGN.md changes; it does not block slice 6.
+
 ## Current evidence and next work
 
 [VERIFIED via source, tests, merge and Production evidence 2026-09-20]

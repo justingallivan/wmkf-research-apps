@@ -180,3 +180,16 @@ describe('/api/email-defaults/grantee-invite', () => {
     });
   });
 });
+
+test('agenda Admin validation accepts empty opening but rejects unknown/triple tokens and multiline subjects', async () => {
+  setSetting.mockResolvedValue(true);
+  for (const [key, value, status] of [
+    ['email.deliberation_agenda.body', '', 200],
+    ['email.deliberation_agenda.subject', 'Agenda {{sessionDate}}', 200],
+    ['email.deliberation_agenda.subject', 'Agenda\nunsafe', 400],
+    ['email.deliberation_agenda.body', '{{unknown}}', 400],
+    ['email.deliberation_agenda.body', '{{{sessionDate}}}', 400],
+  ]) {
+    const result = res(); await adminHandler({ method: 'PUT', body: { key, value } }, result); expect(result.statusCode).toBe(status);
+  }
+});

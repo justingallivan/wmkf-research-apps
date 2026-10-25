@@ -1,5 +1,33 @@
 # Session 639 Prompt: Await owner-selected work after Meeting Tracker UI release
 
+## Current selected work — personal email defaults slice 6
+
+[BUILT IN BRANCH; owner decisions agreed 2026-10-24; not deployed.] Implementation plan:
+`docs/plans/PERSONAL_EMAIL_MEETING_AGENDA_DEFAULTS_PLAN_2026-10-24.md`.
+PCs normally send pre-discussion agendas; other Meeting Tracker staff can cover,
+using their own mailbox/defaults. Scope: personal subject/optional opening;
+generated agenda stays server-owned. Owner adopted the newer collapsed **Your
+default wording** pattern after a read-only agent + Impeccable source review.
+All agreed Save/Clear, empty opening, addressing, fallback, placeholder, reopen,
+drift and unresolved-send decisions are in the plan. OAuth Opus 5.5 reviewed via
+Claude.ai Team OAuth and returned READY WITH NAMED CHANGES. All eight findings
+are incorporated: complete drift checks and strict link lookup, raw templates,
+shared validation, source/status/defaults refresh, separate busy/controllers,
+both generic privacy key sets, empty-opening guards and explicit limits.
+Receipt: `docs/audits/MEETING_AGENDA_DEFAULTS_PLAN_REVIEW_2026-10-24.md`.
+[VERIFIED via source, parent checks and OAuth Opus recheck.] Build is on
+`codex/meeting-agenda-email-defaults`; corrected runtime `693e637d1` passed
+25,231 tests / five snapshots, production build and scoped gates. Final test-only
+coverage passed 194 tests in 12 suites. Opus build recheck returned PASS after
+all eight findings were fixed, using subscription OAuth without API-key auth.
+Owner-authorized Production preflight validated existing agenda wording unchanged.
+One standalone synthetic agenda email is Sent (3), activity
+`986dffdc-15d0-f111-a05b-6045bd04539e`; exact HTML/parties and no regarding verified.
+Owner confirmed inbox receipt and correct appearance. No runtime deployment. Evidence:
+`docs/audits/MEETING_AGENDA_DEFAULTS_BUILD_2026-10-24.md`.
+A separate suite-wide Impeccable email-interface consistency review is queued in
+`docs/plans/PERSONAL_EMAIL_DEFAULTS_TODO_2026-09-20.md`; it does not block slice 6.
+
 ## Current session update — personal email defaults slice 2
 
 [VERIFIED via source, local tests and OAuth Opus review 2026-10-24.] Built on

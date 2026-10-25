@@ -12,7 +12,7 @@ import {
 import { isMeetingTrackerSchemaReady } from '../../../../../shared/config/meetingTracker';
 
 export const config = {
-  api: { bodyParser: { sizeLimit: '64kb' } },
+  api: { bodyParser: { sizeLimit: '256kb' } },
   maxDuration: 300,
 };
 
@@ -68,7 +68,7 @@ export default async function handler(req, res) {
   return withDalContext('meeting-tracker-session-agenda', async () => {
     try {
       if (req.method === 'GET') {
-        return res.status(200).json(await getAgendaStatus({ sessionId }));
+        return res.status(200).json(await getAgendaStatus({ sessionId, actingUserSystemId }));
       }
       if (req.method === 'POST') {
         const result = await prepareAgendaEmail({

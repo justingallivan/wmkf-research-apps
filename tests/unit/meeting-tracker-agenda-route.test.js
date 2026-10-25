@@ -69,7 +69,7 @@ test('validates the path id before auth and discloses readiness only after auth'
 test('GET returns sent and unresolved agenda projections separately', async () => {
   const res = mockRes();
   await handler({ method: 'GET', query: { id: SESSION_ID } }, res);
-  expect(getAgendaStatus).toHaveBeenCalledWith({ sessionId: SESSION_ID });
+  expect(getAgendaStatus).toHaveBeenCalledWith({ sessionId: SESSION_ID, actingUserSystemId: ACTOR_ID });
   expect(res.statusCode).toBe(200);
   expect(res.body).toMatchObject({
     lastAgenda: { operationId: OPERATION_ID, state: 'sent' },

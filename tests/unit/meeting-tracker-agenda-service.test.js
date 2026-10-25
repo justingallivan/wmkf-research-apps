@@ -217,9 +217,9 @@ test('rendered agenda separates items with a blank line (text) and spacing (HTML
   expect(rendered.bodyHtml.match(/<li style="margin-bottom:12px">/g)).toHaveLength(2);
 });
 
-test('drift compares session start and ordered request/minutes tuples only', () => {
+test('drift compares all session and proposal facts', () => {
   const snapshot = computeAgenda(session(), slots());
-  expect(agendaScheduleChanged(session({ location: 'Changed room' }), slots(), snapshot)).toBe(false);
+  expect(agendaScheduleChanged(session({ location: 'Changed room' }), slots(), snapshot)).toBe(true);
   expect(agendaScheduleChanged(session({ scheduledStartIso: '2026-09-14T16:00:00Z' }), slots(), snapshot)).toBe(false);
   expect(agendaScheduleChanged(session({ scheduledStartIso: '2026-09-14T16:05:00.000Z' }), slots(), snapshot)).toBe(true);
   const reordered = slots().map((slot, index) => ({ ...slot, wmkf_order: index + 1 }));
@@ -388,11 +388,11 @@ test('status reports the last sent receipt separately from a newer unresolved se
     lastAgenda: { state: 'sent', sentAt: sent.sent_at },
     pendingSend: { state: 'send_requested', operationId: pending.operation_id },
     scheduleChanged: false,
-    defaults: { subject: '', message: '', unavailable: false },
+    defaults: { subject: '', message: '', source: 'empty', personalStatus: 'absent', sharedStatus: 'missing' },
   });
 });
 
-test('status resolves the sessionDate token in admin-configured agenda defaults', async () => {
+test('status retains raw reusable tokens in admin-configured agenda defaults', async () => {
   const getSettingStrict = jest.fn(async (key) => (
     key === 'email.deliberation_agenda.subject'
       ? { found: true, value: 'Agenda for {{sessionDate}}' }
@@ -408,9 +408,9 @@ test('status resolves the sessionDate token in admin-configured agenda defaults'
     getSettingStrict,
   });
   expect(result.defaults).toEqual({
-    subject: 'Agenda for Monday, September 14',
-    message: 'Here is the agenda for Monday, September 14, opening message.',
-    unavailable: false,
+    subject: 'Agenda for {{sessionDate}}',
+    message: 'Here is the agenda for {{sessionDate}}, opening message.',
+    source: 'shared', personalStatus: 'absent', sharedStatus: 'available',
   });
 });
 
@@ -429,8 +429,7 @@ test('status blanks a default that is unset or blank, and flags unavailable on a
     getLatestUnresolvedAgenda: jest.fn(async () => null),
     getSettingStrict,
   });
-  expect(result.defaults).toEqual({ subject: '', message: '', unavailable: true });
-  expect(consoleError).toHaveBeenCalled();
+  expect(result.defaults).toEqual({ subject: '', message: '', source: 'empty', personalStatus: 'absent', sharedStatus: 'unavailable' });
   consoleError.mockRestore();
 });
 
@@ -714,4 +713,56 @@ describe('resolveAgendaDefault', () => {
     );
     expect(result).toBe('Deliberation session agenda — Monday, September 14');
   });
+});
+
+test.each([
+  ['end', { scheduledEndIso: '2026-09-14T17:30:00Z' }],
+  ['zone', { ianaTimeZone: 'Pacific/Honolulu' }],
+  ['room', { location: 'Different room' }],
+  ['meeting URL', { meetingLink: 'https://zoom.us/j/999' }],
+])('send refuses changed %s before activity creation', async (_name, changed) => {
+  const deps = sendDependencies(row(), { getSession: jest.fn(async () => ({ session: session(changed), slots: slots() })) });
+  await expect(sendAgendaEmail({ sessionId: SESSION_ID, operationId: OPERATION_ID, fromEmail: 'pc@example.org', actingUserSystemId: ACTOR_ID }, deps)).rejects.toMatchObject({ code: 'agenda_operation_stale' });
+  expect(deps.createEmailActivity).not.toHaveBeenCalled(); expect(deps.sendEmail).not.toHaveBeenCalled();
+});
+test.each(['briefingUrl', 'briefingId', 'title', 'leadPd'])('changed %s invalidates the exact preview', (field) => {
+  const before = slots(); before[1].briefing.id = 'link-one'; const snapshot = computeAgenda(session(), before);
+  const after = slots(); after[1].briefing.id = 'link-one';
+  if (field === 'briefingUrl') after[1].briefing.url = 'https://example.org/replaced';
+  if (field === 'briefingId') after[1].briefing.id = 'link-two';
+  if (field === 'title') after[1].wmkf_Request.akoya_title = 'Changed title';
+  if (field === 'leadPd') after[1].wmkf_LeadPd.fullname = 'Different PD';
+  expect(agendaScheduleChanged(session(), after, snapshot)).toBe(true);
+});
+test('prepare resolves raw tokens from the same agenda snapshot and renders no empty intro', async () => {
+  const deps = prepareDependencies();
+  const result = await prepareAgendaEmail({ sessionId: SESSION_ID, operationId: OPERATION_ID, fromEmail: 'pc@example.org', actingUserSystemId: ACTOR_ID, to: 'staff@example.org', cc: '', subject: 'Agenda {{sessionDate}}', bodyText: '   ' }, deps);
+  expect(result.agenda.subject).toBe('Agenda Monday, September 14');
+  expect(result.agenda.bodyText).toContain('Agenda');
+  expect(deps.createOrGetAgenda.mock.calls[0][0].bodyHtml).not.toContain('<p></p>');
+  expect(deps.getSession).toHaveBeenCalledTimes(1);
+});
+test('late drift after activity creation retains identity but never dispatches stale content', async () => {
+  const base = row();
+  const deps = sendDependencies(base, { getEmailActivity: jest.fn(async () => emailActivity(base, 1)), getSession: jest.fn().mockResolvedValueOnce({ session: session(), slots: slots() }).mockResolvedValueOnce({ session: session({ location: 'Changed late' }), slots: slots() }) });
+  await expect(sendAgendaEmail({ sessionId: SESSION_ID, operationId: OPERATION_ID, fromEmail: 'pc@example.org', actingUserSystemId: ACTOR_ID }, deps)).rejects.toMatchObject({ code: 'agenda_operation_stale' });
+  expect(deps.recordEmailActivity).toHaveBeenCalled(); expect(deps.sendEmail).not.toHaveBeenCalled();
+});
+
+test('status retains receipt, unresolved operation and raw defaults during a briefing outage', async () => {
+  const pending = row(undefined, { state: 'send_requested', dynamics_email_id: EMAIL_ID });
+  const result = await getAgendaStatus({ sessionId: SESSION_ID }, {
+    getSession: jest.fn(async () => { throw Object.assign(Error('links offline'), { code: 'agenda_links_unavailable' }); }),
+    getLatestSentAgenda: jest.fn(async () => row(undefined, { state: 'sent' })),
+    getLatestUnresolvedAgenda: jest.fn(async () => pending),
+    getSettingStrict: jest.fn(async (key) => ({ found: true, value: key.endsWith('subject') ? 'Agenda {{sessionDate}}' : '' })),
+  });
+  expect(result).toMatchObject({ linksUnavailable: true, scheduleChanged: null, lastAgenda: { state: 'sent' }, pendingSend: { operationId: OPERATION_ID }, defaults: { subject: 'Agenda {{sessionDate}}', message: '' } });
+});
+test('older snapshots without link identity still compare exact URLs and other facts', () => {
+  const current = slots(); current[1].briefing.id = 'new-metadata';
+  const older = computeAgenda(session(), current); older.slots.forEach((slot) => { delete slot.briefingLinkId; });
+  expect(agendaScheduleChanged(session(), current, older)).toBe(false);
+  current[1].briefing.url = 'https://example.org/new-link';
+  expect(agendaScheduleChanged(session(), current, older)).toBe(true);
 });

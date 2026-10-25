@@ -486,6 +486,12 @@ paths are `lib/services/meeting-tracker/agenda-store.js` and
 `lib/services/meeting-tracker/agenda-service.js`; the guarded API is
 `/api/meeting-tracker/sessions/[id]/agenda`. No cleanup is scheduled; rows
 remain audit history until a retention policy is explicitly approved.
+**Slice 6 branch extension (not deployed):** personal raw subject/optional opening
+lives in existing Dataverse `wmkf_appuserpreferences`, key `meeting_agenda_template`,
+not in this ledger. The agenda preference route uses the session Dynamics owner
+and explicit Save/Clear. Prepared snapshots add briefing link identity and retain
+resolved copy only; complete session/proposal/link freshness is checked before
+transport. No table/column/index migration. Existing send-intent recovery remains.
 **[VERIFIED 2026-09-10 via migration/fresh-install parity and focused service,
 route, and panel tests; tracker state reverified 2026-09-15.]** Migration 041 is
 applied/tracked and the Meeting Tracker readiness flag is exact-on. The agenda
