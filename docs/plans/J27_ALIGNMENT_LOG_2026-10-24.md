@@ -22,6 +22,7 @@ owner questions Q1–Q25), `docs/audits/cycle-foundations-2026-10-21.md`
 | D1 | 2026-10-24 | **Calendar authority is the Grants Manager role** (currently Sarah), with the **Program Coordinator role** (currently Duncan) as fallback. Authority attaches to the role, not the person: reassigning the role in Admin staffing moves the responsibility with no code or settings change. Authority means maintaining and confirming cycle dates used by the apps; the dates themselves stay in the operations Grant Cycle record. | Justin | Rollover plan §3.1, §7 |
 | D2 | 2026-10-24 | **Reviewer reminders stay manual for J27.** PDs send reminders themselves, as in D26; the automatic reminder schedule stays off. | Justin | Register Q10 |
 | D3 | 2026-10-24 | **Review filing switches from D26 to J27 once; it never has to handle both.** All D26 reviews are in, so no late D26 reviews will overlap with J27 reviews. Who makes the switch and when is task T3. | Justin | Register Q15 |
+| D4 | 2026-10-24 | **Reviewer campaign settings are handled centrally, not per PD.** The review deadline, respond-by days and reviewer quota become cycle-wide values maintained centrally (under D1), replacing the per-request campaign settings PDs set today. Changing one reviewer's deadline stays a PD action. | Justin | Rollover plan Slice 1 |
 
 ## To confirm at the meeting
 
@@ -30,6 +31,8 @@ owner questions Q1–Q25), `docs/audits/cycle-foundations-2026-10-21.md`
 | A1 | What does "fallback" mean in practice: Duncan may also edit at any time, or only when the Grants Manager role is unassigned? | Sarah, Duncan, Justin | Decides whether the app grants both roles edit rights or switches to Duncan only when Sarah's role is empty. | D1 |
 | A2 | Who is notified when a cycle is missing a date or has conflicting records? Proposed: Grants Manager and Systems Specialist. | Sarah, Connor | Readiness notices need named roles; there is no fallback to individuals. | Rollover plan §3.5, §7 |
 | A3 | May the calendar owner publish any date change directly, or do some changes (board date, review deadline) need a second person? | Sarah, Justin | Decides whether a confirmation step is built. | Rollover plan §7 |
+| A4 | Under D4, is there ever a reason one proposal needs a different reviewer quota or review deadline than the rest of the cycle? If so, who may set that exception? | Sarah, Duncan | Decides whether any per-request override survives, and whether it belongs to the PD or the calendar owner. | D4 |
+| A5 | What are the J27 central values: review deadline, days a reviewer has to respond, and reviewer quota? | Sarah | These replace the values PDs entered per request. | D4 |
 | B1 | Where in SharePoint is the J27 submitted proposal filed, and under what filename? | Connor | Initial Assessment, reviewer materials and proposal lookup all depend on it. Needed well before December. | Register Q5 |
 | C1 | Is GOApply opportunity 001024 the J27 Research form? What are its real open window and submission cutoff, and when does it get its J27 cycle link? | Connor | Confirms which records intake comes from. | Foundations audit §3 |
 | C2 | When the board meeting date on a Grant Cycle record changes, do linked requests' dates update, and by what mechanism? | Connor | The apps currently derive the cycle from each request's meeting date. | Foundations audit §2 |
@@ -60,12 +63,9 @@ per-PD triage view could follow in early January while staff are reading.
 bibliographies, the automatic materials email on reviewer acceptance (must be
 live before J27 invitations), reviewer settings per cycle, and task T3.
 
-## Still to walk through
-
-Justin and Claude are reviewing the remaining items one at a time; they will
-be added above as they are settled.
-
-- Reviewer settings per cycle (rollover plan Slice 1).
+**Planned for January (before J27 reviewer invitations):** central reviewer
+settings per D4 (rollover plan Slice 1), started after the current reviewer
+deadline email work merges so the two do not edit the same files at once.
 
 ## Tasks
 
