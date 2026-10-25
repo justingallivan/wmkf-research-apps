@@ -2,8 +2,8 @@
 title: Research request file corpus — derived legible layer
 kind: plan
 domain: dataverse
-status: proposed
-summary: "Build a derived, rebuildable index (and extracted text) over the SharePoint files attached to Research requests, 1990–present, without moving or renaming originals, so staff can browse and AI/portfolio/outcome analyses can run. Based on the 2026-10-25 read-only inventory of 9,001 requests and 60,369 files (de-duplicated across runs); index starts in Postgres and settled fields are promoted to Dataverse as the durable record (owner decision 2026-10-25); content access and visibility await owner decisions."
+status: active
+summary: "Build a derived, rebuildable index (and extracted text) over the SharePoint files attached to Research requests, 1990–present, without moving or renaming originals, so staff can browse and AI/portfolio/outcome analyses can run. Based on the 2026-10-25 read-only inventory of 9,001 requests and 60,369 files (de-duplicated across runs); index starts in Postgres and settled fields are promoted to Dataverse as the durable record (owner decision 2026-10-25); owner approved a past-weighted content pilot (~55 requests) focused on science proposals, reviews, grant reports and staff writeups, with visibility matching request access."
 owner: product-engineering
 related:
   - scripts/probe-request-file-inventory.mjs
@@ -17,7 +17,7 @@ related:
 
 ## Goal and boundary
 
-[PROPOSED; owner direction 2026-10-25.] Make the files attached to Research
+[ACTIVE; owner direction and decisions 2026-10-25; nothing built beyond the inventory script.] Make the files attached to Research
 requests simple to find and usable for later analysis: AI over full text,
 portfolio statistics, linking proposal content to reviews and outcomes, and
 staff browsing.
@@ -119,6 +119,20 @@ A short, human-legible list, applied across all eras. Draft:
 Each file also gets a **phase** (`concept`, `phase-i`, `phase-ii`, `site-visit`,
 `post-award`, `unknown`) and an **era**.
 
+**Reading priority** [DECIDED by owner 2026-10-25]. Every file is typed, but
+text is extracted only for the documents the analyses need to read:
+
+| Priority | Types | Treatment |
+|---|---|---|
+| **Read** | Science proposal documents (`project-summary`, `project-description`, `application-form` narrative sections, `graphical-abstract`, `bibliography`); reviews (`external-review`, `staff-review`, `agency-reviews`, `site-visit-report`); `interim-report`, `final-report`; `staff-writeup` | Classify and extract text |
+| **Already legible** | `site-visit-transcript`, `site-visit-summary`, `staff-discussion-transcript`, `staff-discussion-summary`, `site-visit-slides` | Classify; these are recent, app-generated and text already, so no conversion work |
+| **Type only** | `budget`, `budget-spreadsheet`, `financial-narrative`, `financial-report`, `biosketches`, `cover-page`, `governing-board`, `status-letter`, `other-funding`, `institutional-priority`, `no-cost-extension`, `budget-reallocation`, `correspondence`, other administrative types, `media` | Classify so they can be filtered out; no text extraction |
+
+Staff writeups from before AkoyaGO have no recognizable name. The working
+hypothesis is that they sit among era 1–2 documents (e.g. `Final Report Write
+Up` folders, number-named `.doc`), which the pilot is meant to test.
+That hypothesis is [ASSUMED].
+
 ### 2. Classification, cheapest first
 
 1. **Folder and filename rules** per era (exact GOapply names, request-number
@@ -187,33 +201,44 @@ may read extracted applicant text. Promotion to Dataverse needs its own reviewed
 plan: which fields, a schema-as-code wave, and the history load. The System Model
 notes promotion governance is under-specified; define it in that plan.
 
-### 6. Rollout, newest first
+### 6. Rollout
 
 1. **Rules offline** against the CSVs; report coverage per era. (No Production
    access.)
-2. **Owner decisions** below.
-3. **Index build for era 4 (Dec 2026 cycle), then era 3** (metadata only, from a fresh listing).
-4. **Text extraction pilot** on a bounded set of recent requests; check quality.
-5. **Eras 2 and 1** with content classification, sampled and reviewed before the
-   full run.
-6. **Staff browsing surface** and the first analyses.
-7. **Keeping current:** a scheduled re-listing for new and changed files.
-8. **Promote settled fields to Dataverse** under its own reviewed plan.
+2. **Content pilot, weighted to the past** [APPROVED by owner 2026-10-25]: about
+   55 requests: ~10 each from era 1 years (e.g. 1995, 2005, 2012), ~10 each from
+   era 2 years (e.g. 2017, 2020), and ~5 from a recent cycle as a known-good
+   baseline. Goals: learn what number-named `.doc` files contain; test `.doc`,
+   `Application<n>.html` and `.xls` conversion; measure extraction quality on
+   Read-priority types. A model may classify content through
+   `lib/services/llm-client.js`. Results come back to the owner before any
+   scale-up; the full run needs a further approval.
+3. **Index build** (metadata, from a fresh listing), newest era first, using the
+   rules from step 1 and what the pilot learned.
+4. **Text extraction at scale** for Read-priority types, after approval.
+5. **Staff browsing surface** and the first analyses.
+6. **Keeping current:** a scheduled re-listing for new and changed files.
+7. **Promote settled fields to Dataverse** under its own reviewed plan.
 
-## Owner decisions
+## Owner decisions (all made 2026-10-25)
 
-1. **Index location — decided 2026-10-25:** Postgres first, then promote settled
-   fields to Dataverse as the durable record (section 5).
-
-Still needed:
-
-2. **Content access:** reading file contents (download and extraction) is a
-   larger step than the metadata listing done so far. Approve a bounded pilot,
-   and whether a model may classify content.
-3. **Who may see extracted text and the browsing page:** all staff, Research
-   staff, or a named group.
-4. **Pre-1990 and requests with no meeting date:** whether to look for them.
-5. **Grant reports:** in scope for the first pass or later.
+1. **Index location:** Postgres first, then promote settled fields to Dataverse
+   as the durable record (section 5).
+2. **Content access:** the past-weighted pilot of about 55 requests (rollout
+   step 2), with model classification allowed; full-scale extraction needs a
+   further approval after the pilot report.
+3. **Visibility:** match request access. Whoever can open a request's files today
+   may see its extracted text and browsing entries; nobody gains access to a
+   request they cannot already reach. How the app enforces this (existing
+   request restriction context vs. a SharePoint permission check) is a design
+   step for the browsing surface.
+4. **History gaps:** count pre-1990 Research requests and Research requests with
+   no meeting date (read-only), then decide whether to include them.
+5. **Reading scope:** read science proposal documents, reviews, interim and
+   final reports, and staff writeups. Budgets, biosketches and administrative
+   documents (no-cost extensions, budget reallocations, emails) are typed but
+   not read. Site Visit transcripts and summaries and staff discussion
+   summaries are already legible (section 1, reading priority).
 
 ## Not in scope
 
