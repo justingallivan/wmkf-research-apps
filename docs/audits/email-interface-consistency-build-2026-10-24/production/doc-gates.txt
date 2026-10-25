@@ -1,0 +1,15 @@
+check:atlas PASS
+check:atlas:self-test PASS
+check:doc-currency PASS
+check:doc-currency:self-test PASS
+check:fact-consistency PASS
+check:fact-consistency:self-test PASS
+check:canonical-pointers PASS
+check:canonical-pointers:self-test PASS
+check:doc-symbol-refs PASS
+check:doc-symbol-refs:self-test PASS
+check:build-claim-freshness PASS
+check:build-claim-freshness:self-test PASS
+check:docs-catalog PASS
+check:secret-scan PASS
+check:secret-scan:self-test PASS

@@ -1,0 +1,13 @@
+{
+  "type": "summary",
+  "recordsReturned": 0,
+  "timeRange": {
+    "start": "2026-10-25T18:04:23.819Z",
+    "end": "2026-10-25T18:14:23.819Z"
+  },
+  "pagination": {
+    "hasMore": false,
+    "next": null
+  },
+  "excludedIntervals": []
+}

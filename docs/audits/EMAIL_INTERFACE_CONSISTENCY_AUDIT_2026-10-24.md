@@ -13,7 +13,7 @@ related:
 
 # Email interface consistency audit
 
-[CURRENT FOLLOW-UP, 2026-10-24.] The approved fixes are branch-built; see
+[CURRENT FOLLOW-UP, 2026-10-24.] The approved fixes are Production-released via PR #523 (`5de197918`); see
 `docs/audits/EMAIL_INTERFACE_CONSISTENCY_BUILD_2026-10-24.md` for review, checks and
 remaining release verification. Findings below describe the original audited base.
 

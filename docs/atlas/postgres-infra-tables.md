@@ -41,7 +41,7 @@ loud at module load.
 to Dataverse; the former Postgres preference branch is removed and
 `WAVE1_BACKEND_PREFS=postgres` fails loud at module load.
 **Encryption:** values AES-256-GCM when `is_encrypted = true`.
-**Branch-built email-consistency read contract (2026-10-24):** the legacy reviewer
+**Production email-consistency read contract (PR #523, 2026-10-25):** the legacy reviewer
 template key has a strict own-owner/key GET that distinguishes confirmed absence
 from identity, duplicate/encrypted-row and enumeration failures. Family edits
 re-read the raw map plus shared copy and preserve sibling fields/inheritance.

@@ -1,6 +1,6 @@
 # Session 640 Prompt: J27 readiness — collect Connor's answers and the Wednesday meeting outcomes
 
-## Current work — email consistency build; slice 6 released
+## Current work — email consistency released; slice 6 released
 
 [PRODUCTION-VERIFIED via PR #522, 9d12b24ce, 2026-10-24.] Implementation plan:
 `docs/plans/PERSONAL_EMAIL_MEETING_AGENDA_DEFAULTS_PLAN_2026-10-24.md`.
@@ -41,11 +41,15 @@ Plan review passed after five corrections; three-pass runtime implemented on
 `codex/email-interface-consistency-build`. Independent build source review returned
 READY after materials reopen/busy-lock and grantee-dialog fixes. Build receipt:
 `docs/audits/EMAIL_INTERFACE_CONSISTENCY_BUILD_2026-10-24.md`. Audit report:
-`docs/audits/EMAIL_INTERFACE_CONSISTENCY_AUDIT_2026-10-24.md`. UI changes are branch-only; no live data writes or sends. DESIGN.md preserved.
+`docs/audits/EMAIL_INTERFACE_CONSISTENCY_AUDIT_2026-10-24.md`. Released through PR #523 as `5de197918` on 2026-10-25. Production
+`dpl_2bfVxUMoqRQKdXpA9nmUHx19dKtD` is READY; authenticated Profile/defaults,
+agenda/nested picker, materials and scheduled addressing smoke passed.
+Hosted Jest 25,227, PostgreSQL 130 and Playwright 51 tests passed; error scan zero.
+No saved-default/business-record/mail write; DESIGN.md preserved.
 Calendar follow-up remains queued. Exact 200% native Chrome zoom and a fresh
 390 × 844 narrow-window pass completed 2026-10-25 with no source changes.
 Both previously outstanding UI release checks are closed; evidence is in the
-linked build receipt. No promotion or live writes were performed.
+linked build receipt. Production promotion subsequently completed as recorded above.
 ## Session 639 Summary
 
 Two agents worked concurrently. Claude (worktree
@@ -162,7 +166,7 @@ rebuild; D6; trigger/flag questions; B1 Connor questions; B1 correction. See
 ### Parked / queued (from Codex's handoff)
 
 - Existing-calendar agenda updates remain queued. The suite-wide Impeccable
-  email-interface build is complete and owner-authorized for release; see the
+  email-interface release and Production smoke are complete; see the
   current-work section and `docs/audits/EMAIL_INTERFACE_CONSISTENCY_BUILD_2026-10-24.md`.
 - Grant Reporting sunset parked; reviewer panel coverage parked; Research
   Institution confirm-your-details campaign tabled.

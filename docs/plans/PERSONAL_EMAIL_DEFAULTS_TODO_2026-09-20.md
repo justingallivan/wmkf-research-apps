@@ -95,7 +95,7 @@ Evidence: `docs/audits/MEETING_AGENDA_DEFAULTS_BUILD_2026-10-24.md`.
   This is a scoped investigation/planning task, not authorization to edit calendar
   events or send updates. It is separate from slice 6 and does not block release.
 
-## Email interface consistency — audit and branch build complete
+## Email interface consistency — Production released and verified
 
 - [x] Have **Impeccable review email interfaces across the app suite for
   consistency**. Inventory and inspect current rendered compose/defaults/preview/
@@ -121,7 +121,7 @@ Evidence: `docs/audits/MEETING_AGENDA_DEFAULTS_BUILD_2026-10-24.md`.
 - [x] Review the audit recommendations with the owner; all nine agreed.
 - [x] Independently review and implement the three-pass contract in
   `docs/plans/EMAIL_INTERFACE_CONSISTENCY_IMPLEMENTATION_PLAN_2026-10-24.md`.
-  Branch build and independent source review complete; checks/limits in
+  Released and Production-smoke verified through PR #523 (`5de197918`); checks/limits in
   `docs/audits/EMAIL_INTERFACE_CONSISTENCY_BUILD_2026-10-24.md`.
   Preserve desktop density; no phone-driven redesign. Calendar-event updates
   and remaining personal-default slices remain separate.

@@ -92,7 +92,7 @@ If you're touching a service or utility, read its header before this catalog. If
 - **`dataverse-prefs-service.js`** — Dataverse `wmkf_appuserpreferences`
   adapter. Postgres `user_preferences` was dropped 2026-05-12 and its old
   database-service branch was removed; unsupported Postgres configuration fails
-  loudly. The email-consistency branch adds `getReviewerEmailTemplatesStrict`:
+  loudly. Production release PR #523 adds `getReviewerEmailTemplatesStrict`:
   complete exact-owner/key enumeration, explicit identity/read/duplicate/encrypted
   failures, raw value or confirmed absence. Only the legacy reviewer-template
   key uses it; other generic reads retain their existing behavior.

@@ -1,15 +1,15 @@
 ---
-title: Email interface consistency — branch build and review
+title: Email interface consistency — build, release and verification
 kind: audit
 domain: platform
-status: branch-built
-summary: Desktop-first email consistency implementation, independent source review and local verification; no Production promotion or live writes.
+status: production-verified
+summary: Desktop-first email consistency released through PR 523; hosted checks, native zoom/narrow checks and authenticated read-only Production smoke passed.
 related:
   - docs/plans/EMAIL_INTERFACE_CONSISTENCY_IMPLEMENTATION_PLAN_2026-10-24.md
   - docs/audits/EMAIL_INTERFACE_CONSISTENCY_AUDIT_2026-10-24.md
 ---
 
-# Email consistency branch build
+# Email consistency build and Production release
 
 [VERIFIED via source and local tests, 2026-10-24.] Built on
 `codex/email-interface-consistency-build`, based on plan commit `c93956a82`.
@@ -69,8 +69,8 @@ provider API-key agent authentication was used.
 
 ## Limits
 
-No deployment, live setting/preference write, business-record edit, real send or
-calendar mutation occurred. Live end-to-end delivery was not repeated for this UI
+The build/rehearsal phase made no deployment or live setting/preference,
+business-record, mail or calendar write. Production release is recorded below. Live end-to-end delivery was not repeated for this UI
 build. No screen-reader certification or physical-phone testing is claimed.
 The formerly outstanding zoom/narrow checks are now complete; see below.
 
@@ -109,5 +109,55 @@ are not the current default-saving behavior; no Save/Send/Release was invoked.
 
 The two outstanding UI release checks are closed. Existing full-suite/build/type
 and independent-review receipts remain applicable: this follow-up changed evidence
-and documentation only. Production promotion still requires the separate release
-step; no deployment or real message/data write was made.
+and documentation only. The subsequent owner-authorized Production release
+and read-only verification are recorded below.
+
+
+## Production release — 2026-10-25
+
+[PRODUCTION-VERIFIED via GitHub, Vercel deployment metadata and signed-in Chrome.]
+Owner explicitly authorized release and deployed-interface verification. PR #523
+merged as `5de1979180c033e3c55fe6076ce33395ddb32a7e`; Production deployment
+`dpl_2bfVxUMoqRQKdXpA9nmUHx19dKtD` was verified READY and serving
+applications.wmkeck.org at the release check. Later documentation-only rebuilds
+retain this runtime; this dated receipt identifies the verified release artifact.
+Immutable deployment: https://wmkfresearchapps-kfp31m0od-justin-gallivans-projects.vercel.app.
+
+All checks passed on final candidate `591c5927a`: hosted Jest **25,227 tests /
+1,465 suites / five snapshots**, PostgreSQL **130 tests / 10 suites**, Playwright
+**51 tests**, all CodeQL analyses, Semgrep, Trivy, Gitleaks, automated review and
+Vercel build. Existing CI skips were 22 suites / 276 tests. Release-only fixes:
+an exact Gitleaks fingerprint exception for a reproducible tracked-source SHA-256
+(not a credential), and named-dialog selectors in two browser tests. No runtime
+change followed the independently reviewed build. Newer main documentation was
+merged while preserving the J27 workstream.
+
+Authenticated Production smoke passed:
+
+- Profile labels show explicit Save/Clear-my-default wording; reviewer template
+  modal loads the strict own/shared preferences without fallback errors.
+- Native dialog is actually modal. Reverse/forward Tab wrap inside; Escape closes
+  it and restores Edit reviewer email templates. No Save/Clear was clicked.
+- Agenda composer and separate default fields load; nested directory closes first
+  on Escape and restores Add from directory. No preview row was created.
+- Materials composer on retained synthetic request 1003371 loads current and
+  independent default wording. Send stays disabled before a reviewed preview.
+  It was closed without creating a collection, saving preferences or sending.
+- Scheduled Emails renders From / To / Cc with values from persisted metadata;
+  the existing stopped synthetic message remains read-only. No approval, stop,
+  send-now or per-recipient preference control was invoked.
+
+Sanitized checks, a generic-template screenshot and check rollup are in
+`email-interface-consistency-build-2026-10-24/production/`. The bounded deployment
+runtime scan returned **zero error records**; its exact time window is retained
+in `runtime-error-scan.json`. This is bounded observation, not a zero-error guarantee.
+Other recipient/write/send outcomes retain their local/CI evidence; this smoke
+neither repeats live delivery nor claims screen-reader or external-user UAT.
+
+No schema/migration, seed, flag or permission change was needed. No business
+record, saved default, message or calendar mutation was part of verification.
+Last known good before release: `dpl_6pka63EQRDsaR7oMaTNx315RLd48`, main
+`dcc856195ad0b657b8d0a8c5e5ca74cedbd60b9e`. Rollback, if needed, is
+`vercel rollback wmkfresearchapps-m96qpnni9-justin-gallivans-projects.vercel.app`.
+There is no release data migration to undo; rollback does not undo subsequent
+ordinary user writes. The owner-authorized operator retains rollback control.

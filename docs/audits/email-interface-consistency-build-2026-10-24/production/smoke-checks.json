@@ -1,0 +1,72 @@
+[
+  {
+    "defaultFields": [
+      "Default subject",
+      "Default message{{greeting}},\n\n"
+    ],
+    "dialogName": "Your email defaults",
+    "nativeModal": true,
+    "saveEnabled": true,
+    "surface": "Profile reviewer defaults"
+  },
+  {
+    "check": "reverse Tab",
+    "focus": "Save as my default"
+  },
+  {
+    "check": "forward Tab",
+    "focus": "Close"
+  },
+  {
+    "check": "Escape restores opener",
+    "dialogs": 0,
+    "focus": "Edit reviewer email templates"
+  },
+  {
+    "createPreviewPresent": true,
+    "defaultLabels": [
+      "To",
+      "Cc",
+      "Subject",
+      "Opening message (optional)",
+      "Default subject",
+      "Default opening message (optional)"
+    ],
+    "nativeModal": true,
+    "openingLabel": true,
+    "subjectLabel": true,
+    "surface": "Production agenda"
+  },
+  {
+    "check": "Production nested picker Escape",
+    "focus": "Add from directory",
+    "openDialogs": [
+      "Send session agenda"
+    ]
+  },
+  {
+    "currentFields": true,
+    "defaultFields": [
+      "Default subject",
+      "Default messageDear Dr. {{piLastName}},"
+    ],
+    "defaultSaveEnabled": true,
+    "nativeModal": true,
+    "sendDisabled": true,
+    "surface": "Production materials defaults"
+  },
+  {
+    "addressLabels": [
+      "From:",
+      "To:",
+      "Cc:"
+    ],
+    "addressValuesPresent": [
+      true,
+      true,
+      true
+    ],
+    "currentMessageDisabled": true,
+    "surface": "Production scheduled emails"
+  }
+]

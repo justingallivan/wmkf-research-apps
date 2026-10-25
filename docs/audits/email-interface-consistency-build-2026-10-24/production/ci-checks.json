@@ -1,0 +1,86 @@
+[
+  {
+    "bucket": "pass",
+    "link": "https://vercel.com/github",
+    "name": "Vercel Preview Comments",
+    "state": "SUCCESS"
+  },
+  {
+    "bucket": "pass",
+    "link": "https://github.com/justingallivan/wmkf-research-apps/runs/121246488814",
+    "name": "CodeQL",
+    "state": "SUCCESS"
+  },
+  {
+    "bucket": "pass",
+    "link": "https://github.com/justingallivan/wmkf-research-apps/actions/runs/40219039551/job/121246438725",
+    "name": "Postgres integration (PostgreSQL 16)",
+    "state": "SUCCESS"
+  },
+  {
+    "bucket": "pass",
+    "link": "https://github.com/justingallivan/wmkf-research-apps/actions/runs/40219039551/job/121246438712",
+    "name": "Jest",
+    "state": "SUCCESS"
+  },
+  {
+    "bucket": "pass",
+    "link": "https://github.com/justingallivan/wmkf-research-apps/actions/runs/40219039555/job/121246394297",
+    "name": "Playwright",
+    "state": "SUCCESS"
+  },
+  {
+    "bucket": "pass",
+    "link": "https://github.com/justingallivan/wmkf-research-apps/actions/runs/40219039549/job/121246393940",
+    "name": "Static Analysis (Semgrep)",
+    "state": "SUCCESS"
+  },
+  {
+    "bucket": "pass",
+    "link": "https://github.com/justingallivan/wmkf-research-apps/actions/runs/40219039551/job/121246394148",
+    "name": "Detect docs-only change",
+    "state": "SUCCESS"
+  },
+  {
+    "bucket": "pass",
+    "link": "https://github.com/justingallivan/wmkf-research-apps/actions/runs/40219039576/job/121246393947",
+    "name": "Gitleaks",
+    "state": "SUCCESS"
+  },
+  {
+    "bucket": "pass",
+    "link": "https://github.com/justingallivan/wmkf-research-apps/actions/runs/40219039561/job/121246393971",
+    "name": "claude-review",
+    "state": "SUCCESS"
+  },
+  {
+    "bucket": "pass",
+    "link": "https://github.com/justingallivan/wmkf-research-apps/actions/runs/40219039553/job/121246393894",
+    "name": "Trivy CVE Scan",
+    "state": "SUCCESS"
+  },
+  {
+    "bucket": "pass",
+    "link": "https://github.com/justingallivan/wmkf-research-apps/actions/runs/40219036993/job/121246388768",
+    "name": "Analyze (javascript-typescript)",
+    "state": "SUCCESS"
+  },
+  {
+    "bucket": "pass",
+    "link": "https://github.com/justingallivan/wmkf-research-apps/actions/runs/40219036993/job/121246388886",
+    "name": "Analyze (python)",
+    "state": "SUCCESS"
+  },
+  {
+    "bucket": "pass",
+    "link": "https://github.com/justingallivan/wmkf-research-apps/actions/runs/40219036993/job/121246388667",
+    "name": "Analyze (actions)",
+    "state": "SUCCESS"
+  },
+  {
+    "bucket": "pass",
+    "link": "https://vercel.com/justin-gallivans-projects/wmkf_research_apps/FQxvmP5QUnyKyxNcMJHqatPdTWr5",
+    "name": "Vercel",
+    "state": "SUCCESS"
+  }
+]

@@ -3,7 +3,7 @@ title: Email interface consistency — implementation plan
 domain: platform
 kind: plan
 status: implemented
-summary: Owner-approved desktop-first email consistency pass: accessible dialogs and fields, readable guidance, future-only defaults, truthful fallback and sender summaries, legacy explanations and shared controls. Independent plan/build review required; no release authorization.
+summary: Owner-approved desktop-first email consistency pass: accessible dialogs and fields, readable guidance, future-only defaults, truthful fallback and sender summaries, legacy explanations and shared controls. Independent plan/build reviews complete; released through PR 523 and Production smoke verified.
 owner: product-engineering
 related:
   - docs/audits/EMAIL_INTERFACE_CONSISTENCY_AUDIT_2026-10-24.md
@@ -15,9 +15,9 @@ related:
 
 ## Status and authority
 
-[BRANCH-BUILT; source reviewed 2026-10-24.] Owner approved all nine audit
+[PRODUCTION-VERIFIED via PR #523 / `5de197918`, 2026-10-25.] Owner approved all nine audit
 recommendations, the implementation plan and continuation into the build.
-The three passes are implemented on `codex/email-interface-consistency-build`;
+The three passes shipped from `codex/email-interface-consistency-build`;
 verification and explicit limits are recorded in the linked build receipt.
 No product question remains about dialog behavior, labels, contrast, future-only
 Save/Clear, actual addressing, truthful fallback, legacy-template explanation or
@@ -29,9 +29,11 @@ not a redesign brief or requirement for 44px controls everywhere.
 Base audit `7715fc6eb`; inherited runtime `ad4cbac85`. Follow-up calendar-event
 integration, new personal-default slices, email transport/lifecycle policy,
 shared Admin copy, identity ownership and DESIGN.md changes are excluded.
-Build uses a feature branch and independent source review before release. No
-Production promotion, live sends or live preference/business-record writes are
-authorized by this task. Local synthetic tests and review are authorized.
+Build used a feature branch and independent source review. At plan creation,
+authorization covered local synthetic tests and review only. The owner
+subsequently authorized Production release and read-only verification on
+2026-10-25; this is complete through PR #523. Live sends and saved-default or
+business-record writes were not part of release verification.
 
 ## Verified prerequisites and existing boundaries
 
@@ -217,4 +219,4 @@ review receipt, fingerprints and untested live/assistive-technology boundaries.
 [VERIFIED 2026-10-25 via native Chrome zoom, DOM geometry and keyboard/screenshot
 rehearsal.] Exact 200% zoom and 390 × 844 narrow-window checks passed without
 source changes. The build receipt closes these two formerly outstanding UI checks;
-Production promotion remains separate.
+Production promotion and authenticated read-only smoke subsequently passed through PR #523; see the build receipt.
