@@ -2,7 +2,7 @@
 import { createMockReq, createMockRes } from '../helpers/auth-mock';
 import { requireAppAccess } from '../../lib/utils/auth';
 import { getAgendaPreferences, saveAgendaPreference, clearAgendaPreference } from '../../lib/services/meeting-tracker/agenda-personalization';
-import handler from '../../pages/api/meeting-tracker/agenda-email-preferences';
+import handler, { config } from '../../pages/api/meeting-tracker/agenda-email-preferences';
 jest.mock('../../lib/utils/auth', () => ({ requireAppAccess: jest.fn() }));
 jest.mock('../../lib/dataverse/core/context', () => ({ withDalContext: jest.fn(async (_name, fn) => fn()) }));
 jest.mock('../../lib/services/meeting-tracker/agenda-personalization', () => ({ getAgendaPreferences: jest.fn(), saveAgendaPreference: jest.fn(), clearAgendaPreference: jest.fn() }));
@@ -34,4 +34,10 @@ test('missing identity, disabled schema and denied access prevent personal opera
   requireAppAccess.mockResolvedValueOnce({ session: { user: {} } }); let c = call('GET'); await handler(c.req, c.res); expect(c.res.statusCode).toBe(503);
   process.env.MEETING_TRACKER_SCHEMA_READY = 'off'; c = call('PUT', { template: {} }); await handler(c.req, c.res); expect(c.res.statusCode).toBe(503);
   requireAppAccess.mockResolvedValueOnce(null); c = call('GET'); await handler(c.req, c.res); expect(getAgendaPreferences).not.toHaveBeenCalled();
+});
+
+test('parser permits worst-case escaped bounded Unicode template without weakening field validation', () => {
+  expect(config.api.bodyParser.sizeLimit).toBe('256kb');
+  const serialized = JSON.stringify({ template: { subject: 'x'.repeat(500), body: '\u0001'.repeat(20000) } });
+  expect(Buffer.byteLength(serialized, 'utf8')).toBeLessThan(256 * 1024);
 });

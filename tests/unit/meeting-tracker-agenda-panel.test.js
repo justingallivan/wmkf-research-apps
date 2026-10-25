@@ -15,7 +15,7 @@ const REQUEST_ID = '33333333-3333-4333-8333-333333333333';
 const DEFAULTS = {
   subject: 'Admin subject ZZZ',
   message: 'Admin opening message ZZZ',
-  unavailable: false,
+  source: 'shared', personalStatus: 'absent', sharedStatus: 'available',
 };
 
 const session = {
@@ -538,6 +538,8 @@ test('a stale status read cannot replace defaults saved while it was in flight',
   await waitFor(() => expect(oldStatus).toBeDefined());
   fireEvent.change(screen.getByLabelText('Default subject'), { target: { value: nextDefaults.subject } });
   fireEvent.click(screen.getByRole('button', { name: 'Save as my default' })); await screen.findByText(/Saved as your default wording/);
+  expect(screen.getByText(/Started from shared wording/)).toBeInTheDocument();
+  expect(screen.queryByText(/Started from your saved wording/)).not.toBeInTheDocument();
   await act(async () => { oldStatus(response({ defaults: { ...DEFAULTS, subject: 'Stale old default' } })); });
   expect(screen.getByLabelText('Subject')).toHaveValue(DEFAULTS.subject);
   fireEvent.click(screen.getAllByRole('button', { name: 'Close' })[0]); fireEvent.click(screen.getByRole('button', { name: 'Send agenda…' }));
@@ -564,4 +566,15 @@ test('actor change during Save discards the old composer and ignores the late re
   await act(async () => { finish(response({ ok: true, defaults: { subject: 'Old user secret wording', message: '' }, template: { subject: 'Old user secret wording', body: '' } })); });
   expect(screen.queryByText(/Old user secret wording/)).not.toBeInTheDocument();
   await flushLoadStatus(); expect(screen.getByRole('button', { name: 'Send agenda…' })).toBeEnabled();
+});
+
+test('a briefing outage keeps sent and unresolved receipts visible without claiming schedule drift', async () => {
+  global.fetch.mockResolvedValue(response({ defaults: DEFAULTS, linksUnavailable: true, scheduleChanged: null,
+    lastAgenda: prepared({ state: 'sent', transportAccepted: true, sentAt: '2026-09-10T19:00:00Z' }),
+    pendingSend: prepared({ state: 'send_requested', sendRequestedAt: '2026-09-10T19:01:00Z' }) }));
+  render(<SessionAgendaPanel sessionId={SESSION_ID} session={session} slots={slots} recipients={recipients} />);
+  expect(await screen.findByText(/Briefing links could not be confirmed/)).toBeInTheDocument();
+  expect(screen.getByText(/Agenda sent/)).toBeInTheDocument();
+  expect(screen.getByRole('button', { name: 'Review unresolved send…' })).toBeEnabled();
+  expect(screen.queryByText('Schedule changed since the last agenda.')).not.toBeInTheDocument();
 });

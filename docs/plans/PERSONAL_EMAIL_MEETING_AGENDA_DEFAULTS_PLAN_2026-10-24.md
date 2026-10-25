@@ -20,11 +20,11 @@ related:
 [BUILT IN BRANCH; owner decisions agreed 2026-10-24.] This is the implementation plan
 for personal defaults for the agenda of the pre-discussion before the site visit /
 research presentation. Product decisions are settled. Implementation is built on
-`codex/meeting-agenda-email-defaults`; build review and final verification are
-in progress. No deployment or live agenda delivery is claimed.
+`codex/meeting-agenda-email-defaults`; corrected runtime passed full tests,
+production build and OAuth Opus build recheck. No deployment or live agenda delivery is claimed.
 OAuth Claude Opus 5.5 reviewed the earlier plan at `f36ca94fe` and returned
-READY WITH NAMED CHANGES. This revision incorporates those findings; it has
-not itself been re-reviewed by Opus.
+READY WITH NAMED CHANGES. This revision incorporates those findings; the implemented source subsequently
+passed the separate OAuth Opus build recheck.
 The September Admin-defaults build brief describes earlier shared-default work;
 it is not the personal-default implementation plan.
 
@@ -340,15 +340,21 @@ session/slot/link records through transport; compare as late as possible and kee
 that remaining race explicit in the implementation review. No destructive cleanup
 or new live action is authorized by this plan update.
 
-## Branch build — verification in progress
+## Branch build — verified, not deployed
 
 Implementation source now includes exact-owner agenda defaults, shared/personal/
 prepare validation, raw date templates, optional opening, independent preference
 editor, separate async controllers and full snapshot freshness with strict
 briefing reads. Existing ledger/recovery is retained. No schema or seed change.
-Initial focused run passed 134 tests; final focused/full verification and OAuth
-Opus build review remain in progress. Production-mode build and scoped gates
-passed before the bounded browser focus correction; final build is required.
+[VERIFIED via source, parent checks and OAuth Opus recheck.] Corrected runtime
+`693e637d1` passed 25,231 tests / five snapshots, production-mode build and scoped
+gates. Final test-only strengthening passed 194 tests in 12 suites. Opus returned
+PASS after all eight build findings were fixed. GET link outages retain receipts
+and unresolved sends with unknown drift; legacy snapshots compare link IDs only
+when stored. Loaded-draft origin stays fixed when future defaults change, and
+Close cancels initialization safely. No deployment or live delivery occurred.
+Full receipts and remaining release boundaries:
+[build audit](../audits/MEETING_AGENDA_DEFAULTS_BUILD_2026-10-24.md).
 Microsoft's current Email entity reference documents Subject MaxLength 800;
 the agenda's stricter 500 raw/resolved bound fits that published contract
 (https://learn.microsoft.com/en-us/power-apps/developer/data-platform/reference/entities/email#subject).
