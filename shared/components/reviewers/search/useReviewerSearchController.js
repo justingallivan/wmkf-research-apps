@@ -57,7 +57,12 @@ export default function useReviewerSearchController({
   // `selected` is keyed by the stable per-candidate correlation key, not by a
   // normalized name or flat array index. Same-name people must remain separate
   // through enrichment, durable roster actions, and partial-save handling.
-  const [selected, setSelected] = useState(() => new Set());
+  const selectionRevisionRef = useRef(0);
+  const [selected, setExclusionSelection] = useState(() => new Set());
+  const setSelected = useCallback((value) => {
+    selectionRevisionRef.current++;
+    setExclusionSelection(value);
+  }, []);
   // Durable per-request roster (reviewer_find_roster via /api/workbench/reviewer-roster):
   // active candidates (selectable, persist across reload), the collapsed Excluded
   // set, and the full surfaced-name list fed into the cross-run dedup.
@@ -67,7 +72,12 @@ export default function useReviewerSearchController({
   const [rosterBlocked, setRosterBlocked] = useState([]);
   const [rosterHandled, setRosterHandled] = useState([]);
   const [rosterSavedKeys, setRosterSavedKeys] = useState([]);
-  const [rosterNames, setRosterNames] = useState([]);
+  const rosterNamesRevisionRef = useRef(0);
+  const [rosterNames, setExclusionNames] = useState([]);
+  const setRosterNames = useCallback((value) => {
+    rosterNamesRevisionRef.current++;
+    setExclusionNames(value);
+  }, []);
   const [repairRequestsByCandidateKey, setRepairRequestsByCandidateKey] = useState({});
   const [repairRequestsUnavailable, setRepairRequestsUnavailable] = useState(false);
   // Gates the search button until the roster GET resolves, so a run can't skip
@@ -333,6 +343,11 @@ export default function useReviewerSearchController({
     busy,
     removingPrevious,
     rosterNames,
+    selected,
+    selectionRevisionRef,
+    rosterNamesRevisionRef,
+    setExclusionNames,
+    setExclusionSelection,
     previousSearchKeys,
     previousSearchRefs,
     reloadRoster,

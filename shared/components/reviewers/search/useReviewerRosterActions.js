@@ -1,7 +1,7 @@
 /**
  * Ownership: operation hook: owns roster action commands; controller owns state and view modules render.
  */
-import { useCallback } from 'react';
+import { useCallback, useRef } from 'react';
 import { pruneCandidateForRoster } from '../reviewer-search-logic';
 import { candKey, dedupeByName } from './candidateKeys';
 import { requestEnvelope } from '../../../utils/api-request';
@@ -12,6 +12,11 @@ export default function useReviewerRosterActions({
   busy,
   removingPrevious,
   rosterNames,
+  selected,
+  selectionRevisionRef,
+  rosterNamesRevisionRef,
+  setExclusionNames,
+  setExclusionSelection,
   previousSearchKeys,
   previousSearchRefs,
   reloadRoster,
@@ -29,17 +34,53 @@ export default function useReviewerRosterActions({
   setRosterNote,
   setRemovingPrevious,
 }) {
+  // Exclusion-only mutations compose without invalidating sibling recovery.
+  // Other roster writers advance the revision, so a newer snapshot wins.
+  const nameAttemptsRef = useRef(null);
+  const beginNameAttempt = useCallback((name) => {
+    const generation = genRef.current;
+    const revision = rosterNamesRevisionRef.current;
+    let ledger = nameAttemptsRef.current;
+    if (!ledger || ledger.generation !== generation || ledger.revision !== revision) {
+      ledger = { generation, revision, names: new Map() };
+      nameAttemptsRef.current = ledger;
+    }
+    let entry = ledger.names.get(name);
+    if (!entry) {
+      entry = { retained: rosterNames.includes(name), pending: 0 };
+      ledger.names.set(name, entry);
+    }
+    entry.pending++;
+    setExclusionNames((prev) => prev.includes(name) ? prev : [...prev, name]);
+    return {
+      revision,
+      settle(success) {
+        entry.pending--;
+        if (success) entry.retained = true;
+        if (!success && !entry.retained && entry.pending === 0
+          && genRef.current === generation && rosterNamesRevisionRef.current === revision) {
+          setExclusionNames((prev) => prev.filter((value) => value !== name));
+        }
+      },
+    };
+  }, [genRef, rosterNamesRevisionRef, rosterNames, setExclusionNames]);
+
   const excludeCandidate = useCallback(async (cand) => {
     const key = candKey(cand);
     if (!key || !requestId) return;
     const myGen = genRef.current;
     const pruned = pruneCandidateForRoster(cand);
+    const nameAttempt = beginNameAttempt(cand.name);
+    const selectionRevision = selectionRevisionRef.current;
+    const wasSelected = selected.has(key);
     setCandidates((prev) => prev.filter((c) => candKey(c) !== key));
     setRecCandidates((prev) => prev.filter((c) => candKey(c) !== key));
     setRosterActive((prev) => prev.filter((c) => candKey(c) !== key));
     setRosterExcluded((prev) => dedupeByName([pruned, ...prev]));
-    setRosterNames((prev) => Array.from(new Set([...prev, cand.name])));
-    setSelected((prev) => { const next = new Set(prev); next.delete(key); return next; });
+    setExclusionSelection((prev) => {
+      if (!prev.has(key)) return prev;
+      const next = new Set(prev); next.delete(key); return next;
+    });
     try {
       const { ok, status, data } = await requestEnvelope('/api/workbench/reviewer-roster', {
         method: 'PATCH',
@@ -49,6 +90,7 @@ export default function useReviewerRosterActions({
       });
       if (genRef.current !== myGen) return;
       if (status === 409 && data?.code === 'candidate_already_saved') {
+        nameAttempt.settle(true);
         setRosterActive((prev) => prev.filter((c) => candKey(c) !== key));
         setRosterExcluded((prev) => prev.filter((c) => candKey(c) !== key));
         setUnverified((prev) => prev.filter((c) => candKey(c) !== key));
@@ -62,15 +104,25 @@ export default function useReviewerRosterActions({
         return;
       }
       if (!ok) throw new Error(data?.error || 'exclude failed');
+      nameAttempt.settle(true);
     } catch {
       // Roll back the optimistic move so the card isn't silently lost.
-      if (genRef.current === myGen) {
+      if (genRef.current === myGen && rosterNamesRevisionRef.current === nameAttempt.revision) {
         setRosterExcluded((prev) => prev.filter((c) => candKey(c) !== key));
         setRosterActive((prev) => dedupeByName([pruned, ...prev]));
+        nameAttempt.settle(false);
+        if (wasSelected && selectionRevisionRef.current === selectionRevision) {
+          setExclusionSelection((prev) => new Set([...prev, key]));
+        }
         setRosterNote("Couldn't exclude that reviewer — please try again.");
+      } else {
+        nameAttempt.settle(false);
+        if (genRef.current === myGen) {
+          setRosterNote('The reviewer list changed while this action was pending. Check Excluded before trying again.');
+        }
       }
     }
-  }, [requestId, genRef, reloadRoster, setCandidates, setRecCandidates, setRosterActive, setRosterExcluded, setRosterNames, setSelected, setUnverified, setRosterNote]);
+  }, [beginNameAttempt, requestId, genRef, reloadRoster, selected, selectionRevisionRef, rosterNamesRevisionRef, setExclusionSelection, setCandidates, setRecCandidates, setRosterActive, setRosterExcluded, setUnverified, setRosterNote]);
 
   // Exclude an ephemeral unverified suggestion. Same durable PATCH (the server
   // exclude is an upsert, so no prior roster row is needed), but the rollback
@@ -82,9 +134,8 @@ export default function useReviewerRosterActions({
     if (!key || !requestId) return;
     const myGen = genRef.current;
     const pruned = pruneCandidateForRoster(cand);
-    const nameAlreadyInRoster = rosterNames.includes(cand.name);
+    const nameAttempt = beginNameAttempt(cand.name);
     setRosterExcluded((prev) => dedupeByName([pruned, ...prev]));
-    setRosterNames((prev) => Array.from(new Set([...prev, cand.name])));
     try {
       const { ok, status, data } = await requestEnvelope('/api/workbench/reviewer-roster', {
         method: 'PATCH',
@@ -94,6 +145,7 @@ export default function useReviewerRosterActions({
       });
       if (genRef.current !== myGen) return;
       if (status === 409 && data?.code === 'candidate_already_saved') {
+        nameAttempt.settle(true);
         setCandidates((prev) => prev.filter((c) => candKey(c) !== key));
         setRecCandidates((prev) => prev.filter((c) => candKey(c) !== key));
         setRosterActive((prev) => prev.filter((c) => candKey(c) !== key));
@@ -110,16 +162,20 @@ export default function useReviewerRosterActions({
         return;
       }
       if (!ok) throw new Error(data?.error || 'exclude failed');
+      nameAttempt.settle(true);
     } catch {
-      if (genRef.current === myGen) {
+      if (genRef.current === myGen && rosterNamesRevisionRef.current === nameAttempt.revision) {
         setRosterExcluded((prev) => prev.filter((c) => candKey(c) !== key));
-        if (!nameAlreadyInRoster) {
-          setRosterNames((prev) => prev.filter((name) => name !== cand.name));
-        }
+        nameAttempt.settle(false);
         setRosterNote("Couldn't exclude that reviewer — please try again.");
+      } else {
+        nameAttempt.settle(false);
+        if (genRef.current === myGen) {
+          setRosterNote('The reviewer list changed while this action was pending. Check Excluded before trying again.');
+        }
       }
     }
-  }, [requestId, genRef, reloadRoster, rosterNames, setCandidates, setRecCandidates, setRosterActive, setRosterExcluded, setRosterNames, setSelected, setUnverified, setRosterNote]);
+  }, [beginNameAttempt, requestId, genRef, reloadRoster, rosterNamesRevisionRef, setCandidates, setRecCandidates, setRosterActive, setRosterExcluded, setSelected, setUnverified, setRosterNote]);
 
   // Promote an excluded candidate back to the active, selectable list.
   const promoteCandidate = useCallback(async (cand) => {

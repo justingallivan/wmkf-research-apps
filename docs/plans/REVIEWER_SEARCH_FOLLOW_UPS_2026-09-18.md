@@ -39,21 +39,41 @@ Prerequisite tests: response lost before receipt; JSON parse failure after a
 committed save; applicant transport failure; mixed partial success; non-suggestion
 saved key; empty-roster notice visibility; exact onSaved counts; safe retry.
 
-### F2 — Same-context exclusion rollback is incomplete (second)
+### F2 — Same-context exclusion rollback — fixed in isolated worktree
 
-[VERIFIED via source; user impact needs a targeted reproduction] In
-`shared/components/reviewers/search/useReviewerRosterActions.js`, excludeCandidate
-adds the name to rosterNames and removes selection. On failure it restores
-active/excluded buckets and the notice, but not those two state changes. Discovery
-uses rosterNames in its exclusion input. This existed before extraction.
+[VERIFIED via source and regression tests, 2026-10-25; not released.]
+`shared/components/reviewers/search/useReviewerRosterActions.js` tracks overlapping
+name additions per request generation and roster revision. An added name is removed
+only after every overlapping attempt for it fails; a pre-existing name or a
+successful sibling attempt retains it. Both ordinary and unverified exclusion use
+this accounting. A newer roster-name update invalidates the older rollback,
+including its active/excluded bucket and selection changes, so a same-request
+refresh is not overwritten by a late failure. Same-generation failures after a
+refresh show a neutral note to check Excluded before retrying; cross-request
+failures remain silent. This does not claim whether the server committed.
 
-Next step: reproduce separately for a name already in the roster and a newly added
-name. Do not blindly remove a pre-existing roster name or restore a stale selection
-snapshot over concurrent user edits. Decide which optimistic state must be restored
-or refreshed authoritatively.
-Prerequisite tests: both name-membership cases, initially selected/unselected row,
-concurrent selection edits, same-context rejection, and stale rejection after a
-request switch. Keep the existing unverified-candidate rollback semantics distinct.
+`useReviewerSearchController.js` supplies revision-tracked normal setters and
+separate exclusion-only setters. Optimistic selection removal uses a pure functional
+update, so multiple exclusions before a render compose. Failed selected cards are
+reselected independently unless a non-exclusion selection mutation occurred since
+their attempt began. These mutations include checkbox/toggle-all edits, search resets,
+promotion/save updates and saved-conflict handling, even when their Set contents
+happen to be unchanged. Excluding an unselected card and sibling exclusion recovery
+do not invalidate reselection. No Set identity or content equality is used as an
+ownership test. The existing generation guard still prevents cross-request rollback.
+The unverified path unmasks its row without adding it to the active roster.
+
+Regression evidence: `tests/unit/use-reviewer-roster-actions.test.js` covers HTTP
+and transport failures, existing/new names, selected/unselected cards, newer selection
+edits, context switches, saved conflicts, ordinary/unverified rollback, same-render
+and overlapping exclusions under StrictMode, same-name siblings and newer roster
+snapshots. The seven concurrency regressions failed against the first fix.
+`tests/unit/reviewer-search-context-lifecycle.test.js` additionally exercises real
+controller toggle mutations and overlapping recovery through a hook integration test.
+This is a client recovery fix; persisted exclusion semantics and the existing
+handling of transport failures remain unchanged. A rejected transport still does
+not prove whether the server committed; unknown-outcome reconciliation is separate
+work, not established by these tests. No live writes or Production smoke performed.
 
 ### F3 — Streams are invalidated but not cancelled (third)
 
