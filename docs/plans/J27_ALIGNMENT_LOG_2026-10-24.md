@@ -5,15 +5,31 @@ Duncan (Program Coordinator) and Connor (Systems Specialist). Justin owns the
 log; entries are added as decisions are made. Each item points at its source
 document so the detail is not repeated here.
 
-**Timing.** J27 proposals arrive in early December 2026 through GOApply. The
-D26 board also meets in December 2026, so D26 board preparation and J27 intake
-overlap from then on. J27 reviewer invitations follow in 2027; the provisional
-J27 board date is June 10, 2027.
+**Timing.** J27 proposals arrive through GOApply. The D26 board also meets in
+December 2026, so D26 board preparation and J27 intake overlap. Key J27 dates
+from the provisional J27/D27 timeline (owned outside this repo; see T5):
+
+| Date | Step | What the apps must supply |
+|---|---|---|
+| Mon Dec 7, 2026 | Full proposals submitted (three per institution; not pre-designated as S&E or MR) | Proposals visible to staff (R-1) |
+| Tue Dec 8 | AI analysis, summary, PD assignment, expertise match (Board, PD, consultants), triage flags | R-3 |
+| Wed Dec 9 – Jan 6 | Release to staff; staff read and review flags (holiday closure Dec 25 – Jan 1) | R-2 |
+| Wed Jan 6, 2027 | First (AI) triage meeting: rescue or finalize decline notes | J-1 |
+| Jan 13–14 | PD triage meetings to First Cut | R-2 |
+| Thu Jan 14 | "First Cut" spreadsheet to Program Committee: ~50 summaries, personalized by expertise | J-2 |
+| Feb 10–12 | One-page writeups; Program Chairs book in Diligent (20–25 semi-finalists) | Existing writeup tools (not checked) |
+| Wed Feb 24 | Program Chairs meeting; reviewer invitations | D4 settings; materials email on acceptance |
+| Mar 17 | Reviews due | T3 filing switch before this |
+| Apr 19 – May 7 | Oral presentations / staff evaluations over Zoom (no site visits) | Not yet checked against Meeting Tracker / Staff Deliberations |
+| May 12–13 | Ranking meetings | Proposal Ranking |
+| Thu May 27 | Board books mailed | |
+| Jun 9–10 | J27 Board meeting; D27 proposals arrive Jun 7–9 in the same week | Rollover plan overlap scenario |
 
 Sources: `docs/plans/CYCLE_ROLLOVER_MINIMAL_CONFIGURATION_PLAN_2026-10-06.md`
 (overlapping cycles), `docs/J27_TRANSITION_REGISTER.md` (single-phase changes,
 owner questions Q1–Q25), `docs/audits/cycle-foundations-2026-10-21.md`
-(production read-only check of roles and cycle records).
+(production read-only check of roles and cycle records), and the owner's
+J27/D27 timeline PDF and workbook (OneDrive, New Cycle Development/timelines).
 
 ## Decisions
 
@@ -23,6 +39,7 @@ owner questions Q1–Q25), `docs/audits/cycle-foundations-2026-10-21.md`
 | D2 | 2026-10-24 | **Reviewer reminders stay manual for J27.** PDs send reminders themselves, as in D26; the automatic reminder schedule stays off. | Justin | Register Q10 |
 | D3 | 2026-10-24 | **Review filing switches from D26 to J27 once; it never has to handle both.** All D26 reviews are in, so no late D26 reviews will overlap with J27 reviews. Who makes the switch and when is task T3. | Justin | Register Q15 |
 | D4 | 2026-10-24 | **Reviewer campaign settings are handled centrally, not per PD.** The review deadline, respond-by days and reviewer quota become cycle-wide values maintained centrally (under D1), replacing the per-request campaign settings PDs set today. Changing one reviewer's deadline stays a PD action. Email wording is not affected: PDs keep personal wording built on centrally seeded defaults (slice 2). | Justin | Rollover plan Slice 1 |
+| D5 | 2026-10-24 | **Volume of the Dec 8 AI pass is not a concern.** A less sophisticated model will likely be used, and applications arrive over several days (heaviest near the deadline); at about 2 minutes each, 300 can be processed overnight. | Justin | Timeline Dec 8 |
 
 ## To confirm at the meeting
 
@@ -38,7 +55,9 @@ owner questions Q1–Q25), `docs/audits/cycle-foundations-2026-10-21.md`
 | C2 | When the board meeting date on a Grant Cycle record changes, do linked requests' dates update, and by what mechanism? | Connor | The apps currently derive the cycle from each request's meeting date. | Foundations audit §2 |
 | C3 | When and how is the next operations cycle row (D27) created, and does operations maintain only the board date or other milestones too? | Connor, Sarah | D27 has no operations row yet; the apps should read dates from one place. | Foundations audit §2 |
 | C4 | What request status do J27 proposals carry when they arrive from GOApply (expected `Phase I Pending`)? | Connor | The Workbench list and triage depend on that exact label. | Register Q8, J27-064 |
+| C5 | Applicants no longer choose S&E or MR. How is the program recorded on the request, who assigns it, and when? | Connor, Sarah, Duncan | Apps that filter or assign by program will find it empty at intake. | Timeline Dec 7 |
 | R1 | Is the day-one list below right, and how quickly do staff need to triage in December? | Sarah, Duncan | Sets what must be built in the next six weeks versus early January. | December readiness below |
+| R2 | Who starts and watches the Dec 8 AI pass, and what happens to proposals that arrive after it runs? | Justin, Connor | Volume is not a concern (D5), but the run needs an owner. | Timeline Dec 8 |
 
 ## December readiness (proposed for the meeting to confirm)
 
@@ -46,22 +65,31 @@ Justin agreed with this assessment on 2026-10-24; colleagues may correct it at
 the meeting. Code status was checked against the repository on 2026-10-24;
 nothing here is built yet unless it says so.
 
-**Needed when proposals arrive (early December):**
+**Needed when proposals arrive (Dec 7–9):**
 
 | # | Need | Status today | Depends on |
 |---|---|---|---|
 | R-1 | Staff can see incoming J27 proposals in the Workbench. | Not built. The request list shows only requests that are `Phase II Pending` or marked Advancing, so new untriaged proposals would not appear. | C4 |
 | R-2 | Staff can triage about 300 proposals, including the "Save for now" state approved 2026-09-06. | Partly built. Only Advancing and Set aside exist; triage is reachable one row at a time. The per-PD view (each PD focused on their own requests, able to see others', nothing lost) is not designed. | R1 |
-| R-3 | Every proposal gets an Initial Assessment. | Partly ready. The D26 tooling exists and its view is not hidden for J27. Not yet done: running it at about 300 proposals and the deferred Production write check. | B1 |
+| R-3 | By Dec 9, every proposal has an AI summary/Initial Assessment, a suggested PD, an expertise match (Board, PD, consultants) and triage flags. | Partly ready. The D26 Initial Assessment tooling exists and its view is not hidden for J27; the WMKF Expertise app is registered as covering staff assignment, consultant matching and Board interest (app registry description; behavior not checked). Not yet done: combining these into one run per proposal, and the deferred Production write check. Volume is not a concern (D5). | B1, C5, R2 |
 | R-4 | PDs can advance a proposal to `Phase II Pending` from the Workbench. | Not verified whether this exists. | C4 |
 
 **Proposed minimum for December:** proposals visible in a list, the
-"Save for now" state, and Initial Assessments generated in batches. The fuller
-per-PD triage view could follow in early January while staff are reading.
+"Save for now" state, and the R-3 AI pass run as proposals arrive. The fuller
+per-PD triage view could follow in early January, before the Jan 13–14 PD
+triage meetings.
 
-**Can wait until 2027 (before reviewer season):** Reviewer Finder using
-bibliographies, the automatic materials email on reviewer acceptance (must be
-live before J27 invitations) and task T3.
+**Needed in January (not yet checked against the code):**
+
+| # | Need | By |
+|---|---|---|
+| J-1 | Decline notes for proposals that are not advancing, ready to rescue or finalize | Jan 6 |
+| J-2 | "First Cut" spreadsheet: ~50 summaries, personalized to each Program Committee member's expertise | Jan 14 |
+
+**Needed by Feb 24 (reviewer invitations):** central reviewer settings (D4),
+the automatic materials email on reviewer acceptance, and Reviewer Finder
+using bibliographies if it is in scope. Task T3 must be done before reviews
+come back on Mar 17.
 
 **Scheduled for November 2026 (Justin, 2026-10-24):** central reviewer
 settings per D4 (rollover plan Slice 1), unblocked: the reviewer deadline email
