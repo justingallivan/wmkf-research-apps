@@ -3,7 +3,7 @@ title: Personal defaults for deliberation-distribution emails
 domain: workbench
 kind: plan
 status: draft
-summary: "Draft slice 7: own-sender subject/message defaults before the existing frozen distribution preview, with explicit future-only Save/Clear, strict owner isolation and bounded recovery. Owner selected non-empty messages and fresh reopen with discard warning; revised for Claude findings; independent re-review pending. No implementation authorized."
+summary: "Draft slice 7: own-sender subject/message defaults before the existing frozen distribution preview, with explicit future-only Save/Clear, strict owner isolation and bounded recovery. Owner selected non-empty messages and fresh reopen with discard warning; independently re-reviewed READY TO IMPLEMENT; owner warning requirement preserved. No implementation authorized."
 owner: product-engineering
 related:
   - docs/plans/PERSONAL_EMAIL_DEFAULTS_TODO_2026-09-20.md
@@ -25,8 +25,9 @@ environment edits or deployments are authorized by this planning task. Claude
 owns separate database work; its checkout and live operations remain untouched.
 The owner confirmed both §3 choices on 2026-10-25: keep non-empty messages
 and reopen with fresh defaults, warning before discarding edits. These are
-planned requirements, not implemented behavior. The first independent review returned named changes. This revision addresses
-them; independent re-review is pending before any coding (see §9).
+planned requirements, not implemented behavior. The first independent review returned named changes. The revisions address
+them; final independent review returned READY TO IMPLEMENT (see §9). Coding
+and live operations still require a separate instruction.
 
 Source and mocked tests establish the baseline below. Live preference contents,
 duplicate-row prevalence and tenant permissions were not probed. No claim of
@@ -119,7 +120,7 @@ explicit owner decisions; the remaining implementation proposals await review.
    posting Send, record an actor/request-scoped local recovery envelope containing
    the original operation/hash, frozen preview, sender and compose snapshot. Keep
    it until that same operation returns `transportAccepted === true` or satisfies
-   the exact no-activity proof below. HTTP success
+   the exact no-transport proof below. HTTP success
    alone, a Failed label, an error code or absence of a client receipt never
    clears it. There is deliberately **no error-code allowlist** for resetting an
    issued attempt in this slice: stale/identity errors on later retries do not
@@ -130,10 +131,16 @@ explicit owner decisions; the remaining implementation proposals await review.
    it exists. Close hides the recovery view without discarding its frozen state.
    Unsaved default-editor edits still require the discard warning; their discard
    never discards the envelope. Retry uses only the original operation/hash and
-   actor. If neither exact retry nor the no-activity proof resolves it, show an actionable
+   actor. If neither exact retry nor the no-transport proof resolves it, show an actionable
    reconcile-the-original-email notice; do not unlock a new send. This is a
    conservative client policy, not a new transport or recovery API.
-   **No-activity proof:** keep an attempt-local ledger of all issued Send calls.
+   **No-transport proof (null recorded activity/intent):** keep an attempt-local ledger of all issued Send calls.
+   “No transport” does not prove no Dynamics draft activity was ever created;
+   a failed activity-ID persistence/recovery can leave an unsent orphan draft.
+   The response-completeness check is explicit: a 2xx must contain a correctly
+   shaped attempt for the exact operation/request (including acceptance state),
+   and a non-2xx must contain a string error code. Tolerant JSON parsing alone,
+   missing identity/fields or an error message without code cannot qualify.
    Release an unsent envelope only after every call for it has settled with a
    complete, structurally valid server response and none ever had a network
    rejection, abort, unreadable/malformed response, in-progress or unconfirmed
@@ -146,8 +153,14 @@ explicit owner decisions; the remaining implementation proposals await review.
    ID before send intent/transport; it is not an error-code allowlist. On proof,
    clear envelope/preview/confirmation, preserve editable wording/recipients and
    show the relevant refused/stale notice. Allow an explicit new preview, never
-   create one or send automatically. Test first-call stale refusal and
-   regeneration-refusal → later stale refusal; both can recover when proof holds.
+   create one or send automatically. This intentionally clears preview and
+   confirmation even for a proven-unsent regeneration refusal, unlike today's
+   keep-preview branch; one-send text remains intact, and a fresh preview and
+   confirmation are required after regeneration. Test first-call stale refusal
+   and regeneration-refusal → later stale refusal; both can recover when proof
+   holds. Those fixtures explicitly include null recorded activity and send
+   intent. Refusal after activity creation (non-null ID, null intent) does not
+   meet this strict proof and must retain the envelope.
    The envelope is memory-only. An intentional page/request departure warns of
    losing local retry state before allowing navigation; after an actual page
    reload/unmount no attempt is automatically rehydrated. Current history may
@@ -285,7 +298,7 @@ and invalidates ordinary preview/confirmation/acknowledgement without discarding
 text or unsaved default-editor edits. This replaces the old remount's freshness
 purpose; test it rather than simply deleting the key. No preparing or new sending
 from a stale source. An issued envelope remains frozen; its exact server retry
-may reconcile an already accepted send, and otherwise remains unresolved unless §3.7's complete-response/no-activity proof
+may reconcile an already accepted send, and otherwise remains unresolved unless §3.7's complete-response/no-transport proof
 permits an explicit new preview. Never rewrite its original source identity.
 
 **Ordinary reset and dirty baseline.** On an approved ordinary open reset
@@ -423,7 +436,7 @@ this proves existing behavior, not planned personal defaults or live delivery.
 | Confirmed mutations | Exact readback, create/update errors, lost response, duplicate first-Save race, partial duplicate Clear, repeated Clear, independent post-write read failure; source pause/hide during Save/Clear retains outcome; interrupted actual unmount requires strict read before another write |
 | Future-only actions | Save/Clear/deferred editor loads leave form, recipients, preview/hash and confirmation unchanged; no prepare/link/lock/send callback calls |
 | Lifecycle | Explicit open versions; unchanged suggestions reseed; late autofill does not mark dirty; close/escape/picker/inline confirmation; forced source change retains edits; new artifact history/sent flag refreshes; actual tab/router/back cancel/confirm; one prompt; browser warning cleanup; transient auth loading retains scope while real actor change clears it; late success/error/finally |
-| Frozen recovery | For persist_failed, lease_lost, network rejection, in-progress and unknown 5xx: Send → Close → Resend preserves operation/hash/sender/wording; later stale/403 error cannot clear earlier uncertainty; only exact acceptance or complete-response + fresh no-activity proof clears it; prior uncertainty permanently blocks proof; editor discard preserves envelope; intentional departure warns; no auto-rehydration after reload |
+| Frozen recovery | For persist_failed, lease_lost, network rejection, in-progress and unknown 5xx: Send → Close → Resend preserves operation/hash/sender/wording; later stale/403 error cannot clear earlier uncertainty; only exact acceptance or complete-response + fresh no-transport proof clears it; prior uncertainty permanently blocks proof; editor discard preserves envelope; intentional departure warns; no auto-rehydration after reload |
 | Content/transport authority | Generated session/link/bundle/expiry survives arbitrary wording; To/Cc one-send; HTML escaping; existing stale-refusal new-preview scenario remains recoverable after added proof history read (extend fixture); accepted-send tests remain green |
 | Desktop interaction | Keyboard disclosure/labels/focus, busy/validation/notices, desktop density plus zoom/narrow regression; preserve existing dialog |
 
@@ -456,9 +469,10 @@ plan and a TODO pointer only. No existing implementation is relabeled shipped.
 | Independent future-default editor | Agenda and shared editor patterns exist | Source examined; no distribution editor/route found in bounded search; no new UI rendered | VERIFIED precedent; UX PLANNED |
 | Refresh ordinary reopen | Parent keeps panel mounted on Close | Parent/panel lifecycle inspected; fresh reopen is owner-confirmed planned behavior, not current behavior | Owner decision recorded; implementation PLANNED |
 
-Verdict: **REVISED FOR INDEPENDENT RE-REVIEW — NOT IMPLEMENTATION APPROVAL.**
-Owner choices remain unchanged. Required review findings have concrete proposed
-contracts in §§3–4D and acceptance cases in §7; none are implemented. Live
+Verdict: **INDEPENDENTLY REVIEWED — READY TO IMPLEMENT, NOT CODING AUTHORIZATION.**
+Owner choices remain unchanged. Review findings have concrete proposed
+contracts in §§3–4D and acceptance cases in §7, accepted by the final independent
+review; none are implemented. Live
 permission proof, visual validation and independent implementation review remain
 future obligations.
 
@@ -472,7 +486,7 @@ tests successfully; baseline compatibility is not proof of planned behavior.
 
 | Finding | Resolution specified in this revision (PLANNED) |
 | --- | --- |
-| H1 — exact unresolved-send rule | §3.7 retains an issued-operation envelope until exact acceptance or an uncertainty-free fresh no-activity proof; no error-code reset allowlist; ordinary reopen bypassed; explicit tests for persistence/lease/network/unknown errors and later retries |
+| H1 — exact unresolved-send rule | §3.7 retains an issued-operation envelope until exact acceptance or an uncertainty-free fresh no-transport proof; no error-code reset allowlist; ordinary reopen bypassed; explicit tests for persistence/lease/network/unknown errors and later retries |
 | M1 — reopen/reset ownership | §4D names parent open version, complete reset, value-independent recipient reseeding, separate auto-fill and staff dirty baselines, parent/page file surface and tests |
 | M2 — close paths and mutation outcomes | §4D lists all paths, chooses inline modal confirmation, retains drafts during forced source pauses and removes artifact/eligibility teardown of owned state; navigation warns before discard; panel owns mutation outcome |
 | L1 — actor scope | §4D names useSession/client key, verified server session projection and privacy-first invalidation; no retry under another actor |
@@ -496,9 +510,33 @@ new tests or live operations were run. Historical full report:
 
 | Refinement | Contract in this final-recheck revision (PLANNED) |
 | --- | --- |
-| N1 — avoid trapping provably unsent attempts | §3.7 selects source-backed no-activity proof, not an owner escape: all calls terminal/complete with no uncertainty ever, then fresh exact-row explicit null ID/intent and false acceptance. Stale-refusal baseline fixture gains the proof read; no automatic new send. |
+| N1 — avoid trapping provably unsent attempts | §3.7 selects source-backed no-transport proof, not an owner escape: all calls terminal/complete with no uncertainty ever, then fresh exact-row explicit null ID/intent and false acceptance. Stale-refusal baseline fixture gains the proof read; no automatic new send. |
 | N2 — navigation signal/mechanism/proof | §4D names panel retention callback, family-local Board-pattern hook, allow-all cleanup, expected cancellation catch and real-router mocked-data Playwright gate. |
 | N3 — transient auth scope | §4D excludes status from mount key; loading pauses an existing confirmed sender without remount; actual identity replacement clears old private state. |
 | N4 — async request lanes | §4B names history/init/preferences/prepare/send/reissue separately; exact operation/actor/call gates send result and finally; source change cannot cancel or erase it. |
 
-Independent final recheck of these refinements is pending before coding.
+### Final independent review — READY TO IMPLEMENT
+
+[VERIFIED via read-only OAuth Claude final review.] Reviewed HEAD
+`7baa3ad99004673f93caca9ad99da4b64395f12e`, plan SHA256
+`22002ac5628caaf69554c61bbbb9f2586562edf6ab2c3439172f1d13c5735de1`.
+Full report: `docs/audits/DISTRIBUTION_DEFAULTS_PLAN_CLAUDE_FINAL_REVIEW_2026-10-25.md`.
+Claude confirmed N1–N4 resolved in substance and returned READY TO IMPLEMENT,
+with no blocker. No tests were run in the re-review/final review because runtime
+was unchanged; planned acceptance tests and browser compatibility are not yet
+proved. No database work, live operations or other checkout access occurred.
+
+Non-blocking clarifications incorporated after that reviewed fingerprint: call
+response shape must be explicitly checked; the proof is named no-transport
+because an unsent orphan activity may exist; a refusal after activity creation
+retains its envelope; proven-unsent regeneration refusal intentionally requires
+a new preview; proof fixtures need explicit null ID/intent. These clarify the
+reviewed contract, not implemented behavior. The final report also corrects the
+second review's overly broad claim about other beforePopState users: Board,
+Assessment and Admin guards exist, but competing mounts must be checked on the
+actual request page. History's 25-attempt limit means an older missing row cannot
+satisfy proof; it retains the envelope. No new exact-attempt endpoint is implied.
+
+Owner decisions remain unchanged, including warning before voluntary discard
+and preserving edits on background source changes. No runtime coding, preference
+write, migration, seed, send or release has begun or is authorized by this receipt.
