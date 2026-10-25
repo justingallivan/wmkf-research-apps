@@ -1,6 +1,6 @@
 # Session 639 Prompt: Await owner-selected work after Meeting Tracker UI release
 
-## Current selected work — personal email defaults slice 6
+## Current work — email consistency audit; slice 6 released
 
 [PRODUCTION-VERIFIED via PR #522, 9d12b24ce, 2026-10-24.] Implementation plan:
 `docs/plans/PERSONAL_EMAIL_MEETING_AGENDA_DEFAULTS_PLAN_2026-10-24.md`.
@@ -28,10 +28,15 @@ as `9d12b24ce`; all PR checks passed, including 25,204 CI tests / five snapshots
 and 130 PostgreSQL tests. Production `dpl_FScmxXBiRS5EvCJzBEjfPGoJNbyc` is READY
 and serves applications.wmkeck.org. Signed-in agenda compose/default-editor smoke
 passed without writes or another send; bounded runtime error scan returned zero.
-Existing-calendar agenda updates and suite Impeccable audit remain queued. Evidence:
+Existing-calendar agenda updates remain queued. Release evidence:
 `docs/audits/MEETING_AGENDA_DEFAULTS_BUILD_2026-10-24.md`.
-A separate suite-wide Impeccable email-interface consistency review is queued in
-`docs/plans/PERSONAL_EMAIL_DEFAULTS_TODO_2026-09-20.md`; it does not block slice 6.
+Suite-wide Impeccable email-interface audit completed against `ad4cbac85`: real
+components at 1440/390px, DOM/keyboard probes, detector and independent source
+review; 120 tests / 11 suites passed. Nine findings (three P1, six P2), with
+bounded harmonization proposed, not implemented. Pending owner decisions: future-only
+Save/Clear throughout and verified From/To/Cc summary at review. Report:
+`docs/audits/EMAIL_INTERFACE_CONSISTENCY_AUDIT_2026-10-24.md`. No UI/live data
+changes or sends; DESIGN.md preserved. Calendar follow-up remains queued.
 
 ## Current session update — personal email defaults slice 2
 
