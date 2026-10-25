@@ -51,7 +51,7 @@ J27/D27 timeline PDF and workbook (OneDrive, New Cycle Development/timelines).
 | A3 | May the calendar owner publish any date change directly, or do some changes (board date, review deadline) need a second person? | Sarah, Justin | Decides whether a confirmation step is built. | Rollover plan §7 |
 | A4 | Under D4, is there ever a reason one proposal needs a different reviewer quota or review deadline than the rest of the cycle? If so, who may set that exception? | Sarah, Duncan | Decides whether any per-request override survives, and whether it belongs to the PD or the calendar owner. | D4 |
 | A5 | What are the J27 central values: review deadline, days a reviewer has to respond, and reviewer quota? | Sarah | These replace the values PDs entered per request. | D4 |
-| B1 | **Priority — settle first.** Where in SharePoint is the J27 submitted proposal filed, and under what filename? Today the Initial Assessment reads `AI Materials/ProposalNarrative_{n}.pdf` and the Expertise batch reads a `Phase_I_Staff_Version` file; the automatic pass should read one agreed file. | Connor | Initial Assessment, expertise matching, reviewer materials and proposal lookup all depend on it. | Register Q5 |
+| B1 | **Priority — confirm first.** The AI input files are already decided (owner, 2026-08-17): `AI Materials/ProposalNarrative_{n}.pdf` and `AI Materials/ProposalBibliography_{n}.pdf`, produced by Power Automate. Confirm the flows produce both for J27's single submission, when, and what else lands in the request folder. The Dec 8 pass, including expertise matching, reads the narrative file. | Connor | Initial Assessment, expertise matching, reviewer materials and proposal lookup all depend on it. | Register Q5 |
 | C1 | Is GOApply opportunity 001024 the J27 Research form? What are its real open window and submission cutoff, and when does it get its J27 cycle link? | Connor | Confirms which records intake comes from. | Foundations audit §3 |
 | C2 | When the board meeting date on a Grant Cycle record changes, do linked requests' dates update, and by what mechanism? | Connor | The apps currently derive the cycle from each request's meeting date. | Foundations audit §2 |
 | C3 | When and how is the next operations cycle row (D27) created, and does operations maintain only the board date or other milestones too? | Connor, Sarah | D27 has no operations row yet; the apps should read dates from one place. | Foundations audit §2 |
@@ -67,9 +67,16 @@ J27/D27 timeline PDF and workbook (OneDrive, New Cycle Development/timelines).
 ### B1 detail: questions for Connor
 
 Every automatic Dec 8 step starts by reading the proposal from the request's
-SharePoint folder, so the apps need the exact folder and file name. For D26
-the apps use at least four different conventions (found in the code
-2026-10-24; not an exhaustive search):
+SharePoint folder. The forward contract is already decided
+(`docs/DATAVERSE_SHAREPOINT_FILE_MODEL.md`, owner decision 2026-08-17): Power
+Automate keeps two separate files, `AI Materials/ProposalNarrative_{n}.pdf`
+and `AI Materials/ProposalBibliography_{n}.pdf`. Initial Assessment, Pre-Site
+and Field Primer read only the narrative; the planned J27 Reviewer Finder reads
+both, so cited authors become reviewer leads (register J27-065). The Dec 8
+pass, including expertise matching, will read the narrative. What remains is
+confirming J27 production of these files. For reference, D26 tools use at
+least these conventions (found in the code 2026-10-24; not an exhaustive
+search):
 
 | Tool | Reads |
 |---|---|
@@ -82,24 +89,22 @@ For a cycle it does not recognize, the Proposal tab silently falls back to the
 D26 names, so differently named J27 files would show as empty slots without an
 error.
 
-1. What does a J27 request's SharePoint folder contain after submission? A
-   real example (e.g. a test submission) with exact subfolders and file names
-   is ideal.
-2. Which of those files does GOApply place, and which do Power Automate flows
-   create? Do the flows that produce the `Reviewer Materials` and
-   `AI Materials` copies still run for J27?
-3. Can one agreed file be the input for all AI analysis (Initial Assessment,
-   expertise matching, flags)? Is `ProposalNarrative` the full proposal or only
-   the narrative? Matching may also need the biosketches.
-4. When does that file appear after submission, and what signals that it is
-   ready (a status, a field, a flow finishing)? This decides whether Power
-   Automate or a scheduled job starts the AI pass (R2).
-5. Can file names change after submission (resubmission, staff replacement)?
-6. Will there still be a separate reviewer version of the proposal, and is
-   anything in the full proposal off limits to reviewers or the AI
-   (register Q21)?
+1. Will the same flows produce both `ProposalNarrative_{n}.pdf` and
+   `ProposalBibliography_{n}.pdf` for J27 proposals, from the single
+   submission?
+2. Does the J27 submission have a separate references section or upload that
+   the bibliography file can be cut from? (Register Q23.)
+3. How long after submission do those files appear, and what signals that
+   they are ready (a status, a field, a flow finishing)? This decides whether
+   Power Automate or a scheduled job starts the AI pass (R2).
+4. Can they change after submission (resubmission, staff replacement)?
+5. What else lands in the request folder (biosketches, budget)? The Workbench
+   Proposal tab shows those to staff and needs a J27 entry.
+6. Will there still be a separate reviewer copy
+   (`Reviewer Materials/Proposal_{n}.pdf`), and is anything in the full
+   proposal off limits to reviewers or the AI (register Q21)?
 
-Questions 1–3 unblock building; question 4 decides how the run is triggered.
+Questions 1–3 unblock building; question 3 decides how the run is triggered.
 
 ## December readiness (proposed for the meeting to confirm)
 
