@@ -10,6 +10,8 @@ export default function AgendaWordingDefault({ disabled, onBusyChange, onChanged
   const [loading, setLoading] = useState(false);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState('');
+  const checked = validateAgendaTemplate(template);
+  const validationText = !checked.valid ? 'Enter a one-line subject (up to 500 characters) and optional opening (up to 20,000 characters). Only {{sessionDate}} placeholders are supported.' : '';
   const generation = useRef(0);
   const controller = useRef(null);
   const callbacks = useRef({ onBusyChange, onChanged });
@@ -36,7 +38,7 @@ export default function AgendaWordingDefault({ disabled, onBusyChange, onChanged
     try {
       const result = await requestEnvelope('/api/meeting-tracker/agenda-email-preferences', { method, body: method === 'PUT' ? { template } : {}, signal: abort.signal, tolerantBody: true });
       if (generation.current !== current) return;
-      if (!result.ok) { setMessage(result.data?.reason === 'validation' ? 'Check the subject, opening length and optional {{sessionDate}} placeholders.' : 'The change could not be confirmed. Reload before trying again.'); return; }
+      if (!result.ok) { setMessage(result.data?.reason === 'preference_invalid' ? 'Clear my default to remove duplicate saved wording, then save again.' : result.data?.reason === 'validation' ? 'Check the subject, opening length and optional {{sessionDate}} placeholders.' : 'The change could not be confirmed. Reload before trying again.'); return; }
       setData(result.data); setTemplate(result.data.template || { subject: '', body: '' });
       callbacks.current.onChanged?.(result.data.defaults);
       setMessage(method === 'PUT' ? 'Saved as your default wording. The current email is unchanged.' : 'Your default was cleared. Future emails use shared wording; the current email is unchanged.');
@@ -49,11 +51,12 @@ export default function AgendaWordingDefault({ disabled, onBusyChange, onChanged
       <p className="text-sm text-gray-600">Used for future agenda emails. Edits to the email above are not saved here. Optional placeholder: {'{{sessionDate}}'}.</p>
       {loading && <p role="status">Loading your default wording…</p>}
       {data && <>
-        <label className="block text-sm">Default subject<input className="mt-1 w-full rounded-lg border border-gray-300 p-2" value={template.subject} onChange={(e) => setTemplate({ ...template, subject: e.target.value })} disabled={busy || disabled} /></label>
-        <label className="block text-sm">Default opening message (optional)<textarea rows={4} className="mt-1 w-full rounded-lg border border-gray-300 p-2" value={template.body} onChange={(e) => setTemplate({ ...template, body: e.target.value })} disabled={busy || disabled} /></label>
+        <label className="block text-sm">Default subject<input className="mt-1 w-full rounded-lg border border-gray-300 p-2" aria-describedby={validationText ? "agenda-default-validation" : undefined} value={template.subject} onChange={(e) => setTemplate({ ...template, subject: e.target.value })} disabled={busy || disabled} /></label>
+        <label className="block text-sm">Default opening message (optional)<textarea rows={4} className="mt-1 w-full rounded-lg border border-gray-300 p-2" aria-describedby={validationText ? "agenda-default-validation" : undefined} value={template.body} onChange={(e) => setTemplate({ ...template, body: e.target.value })} disabled={busy || disabled} /></label>
+        {validationText && <p id="agenda-default-validation" role="status" className="text-sm text-gray-700">{validationText}</p>}
         <div className="flex flex-wrap justify-end gap-3">
           {data.configured && <Button type="button" size="sm" variant="link" onClick={() => void write('DELETE')} disabled={busy || disabled}>Clear my default</Button>}
-          <Button type="button" size="sm" variant="outline" onClick={() => void write('PUT')} disabled={busy || disabled || !validateAgendaTemplate(template).valid}>{busy ? 'Saving…' : 'Save as my default'}</Button>
+          <Button type="button" size="sm" variant="outline" onClick={() => void write('PUT')} disabled={busy || disabled || !checked.valid}>{busy ? 'Saving…' : 'Save as my default'}</Button>
         </div>
       </>}
       {message && <p role="status" className="text-sm text-gray-700">{message}</p>}

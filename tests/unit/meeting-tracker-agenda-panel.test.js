@@ -1,6 +1,7 @@
 /** @jest-environment jsdom */
 
-jest.mock('next-auth/react', () => ({ useSession: () => ({ status: 'authenticated', data: { user: { email: 'pc@example.org' } } }) }));
+let mockAgendaActor = 'pc@example.org';
+jest.mock('next-auth/react', () => ({ useSession: () => ({ status: 'authenticated', data: { user: { email: mockAgendaActor } } }) }));
 
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import SessionAgendaPanel from '../../shared/components/meeting-tracker/SessionAgendaPanel';
@@ -79,6 +80,7 @@ function prepared(overrides = {}) {
 }
 
 beforeEach(() => {
+  mockAgendaActor = 'pc@example.org';
   jest.clearAllMocks();
   global.fetch = jest.fn(async () => response({ lastAgenda: null, scheduleChanged: false, defaults: DEFAULTS }));
 });
@@ -473,6 +475,7 @@ test('Save/Clear default leaves current wording, recipients and preview unchange
   expect(screen.getByRole('button', { name: 'Create preview' })).toBeDisabled();
   await act(async () => { releaseSave(); });
   expect(await screen.findByText(/Saved as your default wording/)).toBeInTheDocument();
+  expect(screen.getByText(/Started from your saved wording/)).toBeInTheDocument();
   expect(screen.getByLabelText('Subject')).toHaveValue('One-send subject'); expect(screen.getByLabelText('To')).toHaveValue('one-off@example.org');
   fireEvent.click(screen.getByRole('button', { name: 'Create preview' })); await screen.findByText(/First proposal/);
   fireEvent.click(screen.getByLabelText(/I reviewed the recipients/));
@@ -497,4 +500,68 @@ test('empty opening allows preview and date/room prop changes require a new revi
   view.rerender(<SessionAgendaPanel sessionId={SESSION_ID} session={{ ...session, location: 'New room' }} slots={slots} recipients={recipients} />);
   expect(screen.queryByRole('button', { name: 'Send agenda' })).not.toBeInTheDocument();
   expect(screen.getByLabelText('Subject')).toHaveValue('My raw {{sessionDate}}');
+  view.rerender(<SessionAgendaPanel sessionId={SESSION_ID} session={session} slots={slots} recipients={recipients} />);
+  expect(screen.queryByRole('button', { name: 'Send agenda' })).not.toBeInTheDocument();
+});
+
+test('Close remains available during initialization, cancels it and ignores a late response', async () => {
+  let resolveOpening;
+  global.fetch.mockResolvedValueOnce(response({ defaults: DEFAULTS })).mockImplementationOnce(() => new Promise((resolve) => { resolveOpening = resolve; }));
+  render(<SessionAgendaPanel sessionId={SESSION_ID} session={session} slots={slots} recipients={recipients} />);
+  await flushLoadStatus(); fireEvent.click(screen.getByRole('button', { name: 'Send agenda…' }));
+  const close = screen.getAllByRole('button', { name: 'Close' })[0];
+  expect(close).toBeEnabled(); expect(close).toHaveFocus();
+  fireEvent.click(close); expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+  await act(async () => { resolveOpening(response({ defaults: { subject: 'Late old subject', message: '' } })); });
+  expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+  fireEvent.click(screen.getByRole('button', { name: 'Send agenda…' })); await flushLoadStatus();
+  expect(screen.getByLabelText('Subject')).toHaveValue(DEFAULTS.subject);
+});
+
+test('a stale status read cannot replace defaults saved while it was in flight', async () => {
+  let getCount = 0; let oldStatus; let reopening; let saved = false;
+  const nextDefaults = { subject: 'Future {{sessionDate}}', message: '', source: 'personal', personalStatus: 'configured', sharedStatus: 'available' };
+  global.fetch = jest.fn(async (url, options) => {
+    if (url.includes('agenda-email-preferences')) {
+      if (options?.method === 'PUT') saved = true;
+      return response({ ok: true, configured: saved, template: { subject: saved ? nextDefaults.subject : DEFAULTS.subject, body: '' }, defaults: saved ? nextDefaults : DEFAULTS });
+    }
+    getCount += 1;
+    if (getCount === 3) return new Promise((resolve) => { oldStatus = resolve; });
+    if (getCount === 4) return new Promise((resolve) => { reopening = resolve; });
+    return response({ defaults: DEFAULTS });
+  });
+  const view = render(<SessionAgendaPanel sessionId={SESSION_ID} session={session} slots={slots} recipients={recipients} />);
+  await flushLoadStatus(); fireEvent.click(screen.getByRole('button', { name: 'Send agenda…' })); await flushLoadStatus();
+  const details = screen.getByText('Your default wording').closest('details'); details.open = true; fireEvent(details, new Event('toggle')); await screen.findByLabelText('Default subject');
+  view.rerender(<SessionAgendaPanel sessionId={SESSION_ID} session={{ ...session, location: 'Changed' }} slots={slots} recipients={recipients} />);
+  await waitFor(() => expect(oldStatus).toBeDefined());
+  fireEvent.change(screen.getByLabelText('Default subject'), { target: { value: nextDefaults.subject } });
+  fireEvent.click(screen.getByRole('button', { name: 'Save as my default' })); await screen.findByText(/Saved as your default wording/);
+  await act(async () => { oldStatus(response({ defaults: { ...DEFAULTS, subject: 'Stale old default' } })); });
+  expect(screen.getByLabelText('Subject')).toHaveValue(DEFAULTS.subject);
+  fireEvent.click(screen.getAllByRole('button', { name: 'Close' })[0]); fireEvent.click(screen.getByRole('button', { name: 'Send agenda…' }));
+  await waitFor(() => expect(reopening).toBeDefined());
+  expect(screen.getByLabelText('Subject')).toHaveValue(nextDefaults.subject); expect(screen.getByLabelText('Subject')).toBeDisabled();
+  await act(async () => { reopening(response({ defaults: nextDefaults })); }); expect(screen.getByLabelText('Subject')).toBeEnabled();
+});
+
+test('actor change during Save discards the old composer and ignores the late result', async () => {
+  let finish;
+  global.fetch = jest.fn(async (url, options) => {
+    if (url.includes('agenda-email-preferences')) {
+      if (options?.method === 'PUT') return new Promise((resolve) => { finish = resolve; });
+      return response({ configured: true, template: { subject: 'Old user', body: '' }, defaults: DEFAULTS });
+    }
+    return response({ defaults: DEFAULTS });
+  });
+  const view = render(<SessionAgendaPanel sessionId={SESSION_ID} session={session} slots={slots} recipients={recipients} />);
+  await flushLoadStatus(); fireEvent.click(screen.getByRole('button', { name: 'Send agenda…' })); await flushLoadStatus();
+  const details = screen.getByText('Your default wording').closest('details'); details.open = true; fireEvent(details, new Event('toggle')); await screen.findByLabelText('Default subject');
+  fireEvent.click(screen.getByRole('button', { name: 'Save as my default' })); await waitFor(() => expect(finish).toBeDefined());
+  mockAgendaActor = 'backup@example.org'; view.rerender(<SessionAgendaPanel sessionId={SESSION_ID} session={session} slots={slots} recipients={recipients} />);
+  expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+  await act(async () => { finish(response({ ok: true, defaults: { subject: 'Old user secret wording', message: '' }, template: { subject: 'Old user secret wording', body: '' } })); });
+  expect(screen.queryByText(/Old user secret wording/)).not.toBeInTheDocument();
+  await flushLoadStatus(); expect(screen.getByRole('button', { name: 'Send agenda…' })).toBeEnabled();
 });

@@ -57,3 +57,17 @@ test('unlinked identity never reads personal rows; invalid shared pair does not 
   expect(deps.listByOwnerAndKey).not.toHaveBeenCalled();
   expect(data.defaults).toMatchObject({ source: 'empty', subject: '', message: '', personalStatus: 'identity_unavailable', sharedStatus: 'shared_invalid' });
 });
+
+test('corrupt JSON is invalid and repairable rather than an unavailable read', async () => {
+  const deps = fixture(); deps.listByOwnerAndKey.mockResolvedValue([{ wmkf_appuserpreferenceid: 'corrupt', wmkf_preferencevalue: '{' }]);
+  expect(await ownAgendaTemplate(OWNER, deps)).toMatchObject({ status: 'invalid' });
+});
+test('partial Clear reports completed identifiers; concurrent Save duplicates never report success', async () => {
+  const deps = fixture([{ subject: 'One', body: '' }, { subject: 'Two', body: '' }]);
+  const remove = deps.remove.getMockImplementation();
+  deps.remove.mockImplementationOnce(remove).mockRejectedValueOnce(Error('second delete failed'));
+  expect(await clearAgendaPreference(OWNER, deps)).toMatchObject({ ok: false, reason: 'persistence_unconfirmed', removed: ['id-0'] });
+  const concurrent = fixture(); const create = concurrent.create.getMockImplementation();
+  concurrent.create.mockImplementation(async (body) => { await create(body); await create(body); });
+  expect(await saveAgendaPreference(OWNER, { subject: 'Concurrent', body: '' }, concurrent)).toMatchObject({ ok: false, reason: 'persistence_unconfirmed' });
+});

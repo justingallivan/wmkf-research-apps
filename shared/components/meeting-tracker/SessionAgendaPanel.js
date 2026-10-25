@@ -86,7 +86,7 @@ function DirectoryDialog({ target, recipients, form, onAdd, onClose }) {
             const email = String(person.email || '').toLowerCase();
             const added = present.has(email);
             return (
-              <Button
+              <Button variant="outline" size="sm"
                 key={`${person.category}-${person.ref?.profileId || person.ref?.rosterId || email}`}
                 type="button"
                 disabled={added || !email}
@@ -151,8 +151,10 @@ function AgendaPanel({ sessionId, session, slots, recipients }) {
   const [lastAgenda, setLastAgenda] = useState(null);
   const [pendingSend, setPendingSend] = useState(null);
   const [changed, setChanged] = useState(false);
+  const [linksUnavailable, setLinksUnavailable] = useState(false);
   const [loadError, setLoadError] = useState(null);
   const [defaults, setDefaults] = useState(EMPTY_DEFAULTS);
+  const [draftDefaults, setDraftDefaults] = useState(EMPTY_DEFAULTS);
   const [statusLoaded, setStatusLoaded] = useState(false);
   const [composerOpen, setComposerOpen] = useState(false);
   const [directoryTarget, setDirectoryTarget] = useState(null);
@@ -188,6 +190,7 @@ function AgendaPanel({ sessionId, session, slots, recipients }) {
     setLastAgenda(body.lastAgenda || null);
     setPendingSend(body.pendingSend || null);
     setChanged(body.scheduleChanged === true);
+    setLinksUnavailable(body.linksUnavailable === true);
     if (defaultsGeneration.current === expectedDefaults) setDefaults(body.defaults || EMPTY_DEFAULTS);
     setStatusLoaded(true);
     setLoadError(null);
@@ -209,6 +212,13 @@ function AgendaPanel({ sessionId, session, slots, recipients }) {
 
   useEffect(() => () => { sequence.current += 1; openSequence.current += 1; controllerRef.current?.abort(); initController.current?.abort(); }, []);
 
+  useEffect(() => {
+    // A changed-then-restored schedule still requires a new human review.
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- invalidate a reviewed snapshot when its external schedule changes
+    setConfirmed(false);
+    setPreviewState((current) => current && (current.snapshot.transportAccepted || current.snapshot.operationId === pendingSend?.operationId) ? current : null);
+  }, [currentScheduleKey, pendingSend?.operationId]);
+
   const openComposer = async () => {
     if (pendingSend?.operationId) {
       setForm({ to: '', cc: '', subject: '', bodyText: '' });
@@ -224,6 +234,10 @@ function AgendaPanel({ sessionId, session, slots, recipients }) {
       setComposerOpen(true);
       return;
     }
+    // Cached defaults are only a disabled loading placeholder; every opening
+    // still gets a fresh server read before the fields become editable.
+    setForm({ to: attendeeEmails(session), cc: '', subject: defaults.subject, bodyText: defaults.message });
+    setDraftDefaults(defaults);
     const opening = ++openSequence.current;
     const generation = ++defaultsGeneration.current;
     initController.current?.abort(); const abort = new AbortController(); initController.current = abort;
@@ -242,6 +256,7 @@ function AgendaPanel({ sessionId, session, slots, recipients }) {
     }
     if (opening !== openSequence.current) return;
     setBusy(null);
+    setDraftDefaults(starting);
     setForm({
       to: attendeeEmails(session),
       cc: '',
@@ -258,11 +273,12 @@ function AgendaPanel({ sessionId, session, slots, recipients }) {
   };
 
   const closeComposer = useCallback(() => {
-    if (locked) return;
+    if (defaultsBusy || (busy && busy !== 'initialize')) return;
+    setBusy(null);
     openSequence.current += 1; initController.current?.abort();
     setDirectoryTarget(null); setComposerOpen(false); setPreview(null); setConfirmed(false);
     setForm({ to: '', cc: '', subject: '', bodyText: '' });
-  }, [locked, setPreview]);
+  }, [busy, defaultsBusy, setPreview]);
 
   const edit = (patch) => {
     setForm((current) => ({ ...current, ...patch }));
@@ -334,6 +350,7 @@ function AgendaPanel({ sessionId, session, slots, recipients }) {
     } catch { /* Manual entry remains available when wording cannot load. */ }
     if (sequence.current !== currentSequence || defaultsGeneration.current !== generation) return;
     setDefaults(starting);
+    setDraftDefaults(starting);
     setForm({ to: attendeeEmails(session), cc: '', subject: starting.subject, bodyText: starting.message });
   };
 
@@ -453,21 +470,24 @@ function AgendaPanel({ sessionId, session, slots, recipients }) {
             A send from {formatReceipt(pendingSend.sendRequestedAt, session?.ianaTimeZone)} is unresolved. Review and retry this same send before creating another agenda.
           </p>
         )}
+        {linksUnavailable && <p role="status" className="mt-2 text-sm text-amber-800">Briefing links could not be confirmed. Previous sends remain available; try again before creating a new preview.</p>}
         {loadError && <p role="alert" className="mt-2 text-sm text-red-700">{loadError} Please try again. If the problem continues, contact an administrator.</p>}
         <Button
+          variant={lastAgenda?.sentAt ? 'outline' : 'primary'}
           type="button"
           onClick={openComposer}
           disabled={!statusLoaded && !loadError}
-          className={`mt-4 rounded-lg px-4 py-2 text-sm font-semibold disabled:opacity-50 ${lastAgenda?.sentAt ? 'border border-gray-300 bg-white text-gray-900' : 'bg-gray-900 text-white'}`}
+          className="mt-4"
         >
           {pendingSend?.operationId ? 'Review unresolved send…' : lastAgenda?.sentAt ? 'Send agenda again…' : 'Send agenda…'}
         </Button>
       </section>
 
       {composerOpen && (
-        <ComposerDialog busy={locked} directoryOpen={directoryTarget !== null} onClose={closeComposer}>
+        <ComposerDialog busy={defaultsBusy || (Boolean(busy) && busy !== 'initialize')} directoryOpen={directoryTarget !== null} onClose={closeComposer}>
+          {busy === 'initialize' && <p role="status" className="mt-3 text-sm text-gray-600">Loading current wording…</p>}
           {error && <div role="alert" className="mt-4 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-800">{error}</div>}
-          {showEditableFields && (['unavailable', 'invalid', 'identity_unavailable'].includes(defaults.personalStatus) || defaults.source === 'empty') && (
+          {showEditableFields && (['unavailable', 'invalid', 'identity_unavailable'].includes(draftDefaults.personalStatus) || draftDefaults.source === 'empty') && (
             <p role="status" className="mt-4 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
               Your saved wording or shared wording could not be loaded. You can enter a subject and optional opening below. Your saved settings are unchanged.
             </p>
@@ -493,7 +513,7 @@ function AgendaPanel({ sessionId, session, slots, recipients }) {
           )}
 
           {showEditableFields && <>
-            <p className="mt-2 text-sm text-gray-600">{defaults.source === 'personal' ? 'Using your saved wording.' : defaults.source === 'empty' ? 'Enter wording for this email.' : 'Using shared wording.'} Optional {'{{sessionDate}}'} is filled into the preview.</p>
+            <p className="mt-2 text-sm text-gray-600">{draftDefaults.source === 'personal' ? 'Started from your saved wording.' : draftDefaults.source === 'empty' ? 'Enter wording for this email.' : 'Started from shared wording.'} Optional {'{{sessionDate}}'} is filled into the preview.</p>
             <AgendaWordingDefault disabled={Boolean(busy)} onBusyChange={setDefaultsBusy} onChanged={(next) => { defaultsGeneration.current += 1; if (next) setDefaults(next); }} />
           </>}
           <div className="mt-5 rounded-lg border border-gray-200 bg-gray-50 p-4">

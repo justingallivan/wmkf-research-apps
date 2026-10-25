@@ -748,3 +748,21 @@ test('late drift after activity creation retains identity but never dispatches s
   await expect(sendAgendaEmail({ sessionId: SESSION_ID, operationId: OPERATION_ID, fromEmail: 'pc@example.org', actingUserSystemId: ACTOR_ID }, deps)).rejects.toMatchObject({ code: 'agenda_operation_stale' });
   expect(deps.recordEmailActivity).toHaveBeenCalled(); expect(deps.sendEmail).not.toHaveBeenCalled();
 });
+
+test('status retains receipt, unresolved operation and raw defaults during a briefing outage', async () => {
+  const pending = row(undefined, { state: 'send_requested', dynamics_email_id: EMAIL_ID });
+  const result = await getAgendaStatus({ sessionId: SESSION_ID }, {
+    getSession: jest.fn(async () => { throw Object.assign(Error('links offline'), { code: 'agenda_links_unavailable' }); }),
+    getLatestSentAgenda: jest.fn(async () => row(undefined, { state: 'sent' })),
+    getLatestUnresolvedAgenda: jest.fn(async () => pending),
+    getSettingStrict: jest.fn(async (key) => ({ found: true, value: key.endsWith('subject') ? 'Agenda {{sessionDate}}' : '' })),
+  });
+  expect(result).toMatchObject({ linksUnavailable: true, scheduleChanged: null, lastAgenda: { state: 'sent' }, pendingSend: { operationId: OPERATION_ID }, defaults: { subject: 'Agenda {{sessionDate}}', message: '' } });
+});
+test('older snapshots without link identity still compare exact URLs and other facts', () => {
+  const current = slots(); current[1].briefing.id = 'new-metadata';
+  const older = computeAgenda(session(), current); older.slots.forEach((slot) => { delete slot.briefingLinkId; });
+  expect(agendaScheduleChanged(session(), current, older)).toBe(false);
+  current[1].briefing.url = 'https://example.org/new-link';
+  expect(agendaScheduleChanged(session(), current, older)).toBe(true);
+});
