@@ -7,6 +7,7 @@
  * prepare POST, send PATCH), migrated to requestJson/requestEnvelope with
  * tolerantBody: true. This file adds network-rejection and axis (e).
  */
+jest.mock('next-auth/react', () => ({ useSession: () => ({ status: 'authenticated', data: { user: { email: 'pc@example.org' } } }) }));
 import { render, screen, fireEvent } from '@testing-library/react';
 import SessionAgendaPanel from '../../shared/components/meeting-tracker/SessionAgendaPanel';
 
@@ -44,6 +45,7 @@ async function readyPanel() {
   const openButton = await screen.findByRole('button', { name: 'Send agenda…' });
   await new Promise((resolve) => setTimeout(resolve, 0));
   fireEvent.click(openButton);
+  await new Promise((resolve) => setTimeout(resolve, 0));
   return screen.findByRole('button', { name: 'Create preview' });
 }
 

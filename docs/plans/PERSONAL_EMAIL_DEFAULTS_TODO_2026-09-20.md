@@ -62,7 +62,7 @@ wording/Cc and customizable subjects are specified in that plan. Released; Produ
 
 ## Slice 6 owner decisions — 2026-10-24
 
-[PLANNED; owner agreed; not built.] The pre-discussion agenda defaults plan is
+[BUILT IN BRANCH; verification/review in progress, not deployed.] The pre-discussion agenda defaults plan is
 `docs/plans/PERSONAL_EMAIL_MEETING_AGENDA_DEFAULTS_PLAN_2026-10-24.md`. PCs normally send, with other Meeting Tracker staff permitted
 as backup, using their own mailbox/defaults. Save subject and optional opening
 only; generated agenda details stay server-owned. To/Cc remain one-send edits.
@@ -73,7 +73,8 @@ Fallback, session-date placeholders, fresh reopen, session drift and original
 unresolved-send recovery follow the linked plan. OAuth Opus returned READY WITH
 NAMED CHANGES on the original plan; the revised plan incorporates all eight
 findings, with raw-template, full freshness, privacy and async requirements.
-Revised text is not independently re-reviewed; implementation is not started.
+The revised plan is implemented on `codex/meeting-agenda-email-defaults`;
+OAuth Opus build review and final verification are in progress.
 
 ## Email interface consistency review — queued 2026-10-24
 

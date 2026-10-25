@@ -1,3 +1,4 @@
+import { validateAgendaTemplate } from '../../../shared/config/agendaEmail';
 /**
  * API Route: /api/admin/email-defaults
  *
@@ -61,6 +62,10 @@ export default async function handler(req, res) {
     if (!checked.valid) return res.status(400).json({ error: 'Use a single-line subject and supported placeholders; the body may be empty.' });
   }
 
+  if (key === 'email.deliberation_agenda.subject' || key === 'email.deliberation_agenda.body') {
+    const checked = validateAgendaTemplate({ subject: key.endsWith('.subject') ? value : 'Agenda', body: key.endsWith('.body') ? value : '' });
+    if (!checked.valid) return res.status(400).json({ error: 'Use a single-line subject and only optional {{sessionDate}} placeholders; the opening may be empty.' });
+  }
   const missingPlaceholders = (entry.requiredPlaceholders || []).filter((token) => !value.includes(token));
   if (missingPlaceholders.length > 0) {
     return res.status(400).json({

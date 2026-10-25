@@ -1,8 +1,11 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { requestJson, requestEnvelope } from '../../utils/api-request';
+import { useSession } from 'next-auth/react';
+import AgendaWordingDefault from './AgendaWordingDefault';
+import { Button } from '../Layout';
 import EmailSendFeedback from '../EmailSendFeedback';
 
-const EMPTY_DEFAULTS = { subject: '', message: '', unavailable: false };
+const EMPTY_DEFAULTS = { subject: '', message: '', source: 'empty', personalStatus: 'unavailable', sharedStatus: 'unavailable' };
 
 function newOperationId() {
   if (globalThis.crypto?.randomUUID) return globalThis.crypto.randomUUID();
@@ -59,12 +62,7 @@ function formatReceipt(iso, timeZone) {
 }
 
 function scheduleKey(session, slots) {
-  return JSON.stringify({
-    start: session?.scheduledStartIso || '',
-    slots: [...(slots || [])]
-      .sort((left, right) => Number(left.wmkf_order || 0) - Number(right.wmkf_order || 0))
-      .map((slot) => [slot._wmkf_request_value, slot.wmkf_minutes]),
-  });
+  return JSON.stringify({ session, slots });
 }
 
 function DirectoryDialog({ target, recipients, form, onAdd, onClose }) {
@@ -81,14 +79,14 @@ function DirectoryDialog({ target, recipients, form, onAdd, onClose }) {
             <h3 id="agenda-directory-title" className="font-semibold text-gray-900">Add recipients to {target === 'cc' ? 'Cc' : 'To'}</h3>
             <p className="mt-1 text-xs text-gray-500">Staff and Board members from the Meeting Tracker directory.</p>
           </div>
-          <button type="button" onClick={onClose} className="text-sm text-gray-500 hover:text-gray-800">Close</button>
+          <Button variant="outline" size="sm" type="button" onClick={onClose} className="text-sm text-gray-500 hover:text-gray-800">Close</Button>
         </div>
         <div className="max-h-[55vh] space-y-2 overflow-y-auto p-4">
           {rows.map((person) => {
             const email = String(person.email || '').toLowerCase();
             const added = present.has(email);
             return (
-              <button
+              <Button
                 key={`${person.category}-${person.ref?.profileId || person.ref?.rosterId || email}`}
                 type="button"
                 disabled={added || !email}
@@ -97,13 +95,13 @@ function DirectoryDialog({ target, recipients, form, onAdd, onClose }) {
               >
                 <span><span className="block font-medium">{person.name}</span><span className="block text-xs">{email}</span></span>
                 <span className="text-xs font-medium">{added ? 'Already added' : person.category}</span>
-              </button>
+              </Button>
             );
           })}
           {rows.length === 0 && <p className="py-6 text-center text-sm text-gray-500">No eligible people found.</p>}
         </div>
         <div className="flex justify-end border-t border-gray-200 p-4">
-          <button type="button" onClick={onClose} className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium">Close</button>
+          <Button variant="outline" size="sm" type="button" onClick={onClose} className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium">Close</Button>
         </div>
       </section>
     </div>
@@ -114,7 +112,7 @@ function ComposerDialog({ children, busy, directoryOpen, onClose }) {
   const closeRef = useRef(null);
   useEffect(() => {
     const previouslyFocused = document.activeElement;
-    closeRef.current?.focus();
+    closeRef.current?.querySelector('button')?.focus();
     return () => previouslyFocused?.focus?.();
   }, []);
   useEffect(() => {
@@ -132,18 +130,24 @@ function ComposerDialog({ children, busy, directoryOpen, onClose }) {
             <h3 id="agenda-composer-title" className="text-lg font-semibold text-gray-900">Send session agenda</h3>
             <p className="mt-1 text-sm text-gray-600">You are sending one agenda from your Dynamics mailbox to the session attendees.</p>
           </div>
-          <button ref={closeRef} type="button" onClick={onClose} disabled={busy} className="rounded-lg border border-gray-300 px-3 py-1.5 text-sm font-medium disabled:opacity-50">Close</button>
+          <span ref={closeRef}><Button variant="outline" size="sm" type="button" onClick={onClose} disabled={busy} className="rounded-lg border border-gray-300 px-3 py-1.5 text-sm font-medium disabled:opacity-50">Close</Button></span>
         </div>
         {children}
         <div className="mt-6 flex justify-end border-t border-gray-200 pt-4">
-          <button type="button" onClick={onClose} disabled={busy} className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium disabled:opacity-50">Close</button>
+          <Button variant="outline" size="sm" type="button" onClick={onClose} disabled={busy} className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium disabled:opacity-50">Close</Button>
         </div>
       </section>
     </div>
   );
 }
 
-export default function SessionAgendaPanel({ sessionId, session, slots, recipients }) {
+export default function SessionAgendaPanel(props) {
+  const { data: auth, status } = useSession();
+  const actor = `${status}:${auth?.user?.dynamicsSystemuserId || ''}:${auth?.user?.azureEmail || auth?.user?.email || ''}`;
+  return <AgendaPanel key={`${props.sessionId}:${actor}`} {...props} />;
+}
+
+function AgendaPanel({ sessionId, session, slots, recipients }) {
   const [lastAgenda, setLastAgenda] = useState(null);
   const [pendingSend, setPendingSend] = useState(null);
   const [changed, setChanged] = useState(false);
@@ -153,49 +157,59 @@ export default function SessionAgendaPanel({ sessionId, session, slots, recipien
   const [composerOpen, setComposerOpen] = useState(false);
   const [directoryTarget, setDirectoryTarget] = useState(null);
   const [form, setForm] = useState({ to: '', cc: '', subject: '', bodyText: '' });
-  const [preview, setPreview] = useState(null);
+  const [previewState, setPreviewState] = useState(null);
   const [confirmed, setConfirmed] = useState(false);
   const [busy, setBusy] = useState(null);
+  const [defaultsBusy, setDefaultsBusy] = useState(false);
+  const locked = Boolean(busy) || defaultsBusy;
   const [error, setError] = useState(null);
   const [sendFeedback, setSendFeedback] = useState(null);
   const [notice, setNotice] = useState(null);
   const sequence = useRef(0);
   const controllerRef = useRef(null);
+  const statusSequence = useRef(0);
+  const defaultsGeneration = useRef(0);
+  const openSequence = useRef(0);
+  const initController = useRef(null);
   const currentScheduleKey = scheduleKey(session, slots);
+  const preview = previewState && (previewState.snapshot.transportAccepted
+    || (pendingSend?.operationId && previewState.snapshot.operationId === pendingSend.operationId)
+    || previewState.key === currentScheduleKey) ? previewState.snapshot : null;
+  const setPreview = useCallback((snapshot) => setPreviewState(snapshot ? { snapshot, key: currentScheduleKey } : null), [currentScheduleKey]);
 
-  const loadStatus = useCallback(async (signal, expectedSequence) => {
+
+  const loadStatus = useCallback(async (signal, expectedSequence, expectedDefaults) => {
     const body = await requestJson(`/api/meeting-tracker/sessions/${sessionId}/agenda`, {
       signal,
       fallbackMessage: 'The last agenda could not be loaded.',
       tolerantBody: true,
     });
-    if (sequence.current !== expectedSequence) return;
+    if (statusSequence.current !== expectedSequence) return;
     setLastAgenda(body.lastAgenda || null);
     setPendingSend(body.pendingSend || null);
     setChanged(body.scheduleChanged === true);
-    setDefaults(body.defaults || EMPTY_DEFAULTS);
+    if (defaultsGeneration.current === expectedDefaults) setDefaults(body.defaults || EMPTY_DEFAULTS);
     setStatusLoaded(true);
     setLoadError(null);
   }, [sessionId]);
 
   useEffect(() => {
-    const currentSequence = ++sequence.current;
-    controllerRef.current?.abort();
+    const currentSequence = ++statusSequence.current;
     const controller = new AbortController();
-    controllerRef.current = controller;
-    loadStatus(controller.signal, currentSequence).catch((loadFailure) => {
-      if (loadFailure?.name !== 'AbortError' && sequence.current === currentSequence) {
+    loadStatus(controller.signal, currentSequence, defaultsGeneration.current).catch((loadFailure) => {
+      if (loadFailure?.name !== 'AbortError' && statusSequence.current === currentSequence) {
         setLoadError(loadFailure.message);
       }
     });
     return () => {
-      sequence.current += 1;
+      statusSequence.current += 1;
       controller.abort();
-      if (controllerRef.current === controller) controllerRef.current = null;
     };
   }, [currentScheduleKey, loadStatus]);
 
-  const openComposer = () => {
+  useEffect(() => () => { sequence.current += 1; openSequence.current += 1; controllerRef.current?.abort(); initController.current?.abort(); }, []);
+
+  const openComposer = async () => {
     if (pendingSend?.operationId) {
       setForm({ to: '', cc: '', subject: '', bodyText: '' });
       setPreview(pendingSend);
@@ -210,11 +224,29 @@ export default function SessionAgendaPanel({ sessionId, session, slots, recipien
       setComposerOpen(true);
       return;
     }
+    const opening = ++openSequence.current;
+    const generation = ++defaultsGeneration.current;
+    initController.current?.abort(); const abort = new AbortController(); initController.current = abort;
+    setComposerOpen(true); setBusy('initialize'); setError(null);
+    let starting = EMPTY_DEFAULTS;
+    try {
+      const status = await requestJson(`/api/meeting-tracker/sessions/${sessionId}/agenda`, { signal: abort.signal, tolerantBody: true });
+      if (opening !== openSequence.current || generation !== defaultsGeneration.current) return;
+      if (status.pendingSend?.operationId) {
+        setPendingSend(status.pendingSend); setPreview(status.pendingSend); setConfirmed(false); setBusy(null); return;
+      }
+      starting = status.defaults || EMPTY_DEFAULTS; setDefaults(starting);
+    } catch {
+      if (opening !== openSequence.current) return;
+      setDefaults(EMPTY_DEFAULTS);
+    }
+    if (opening !== openSequence.current) return;
+    setBusy(null);
     setForm({
       to: attendeeEmails(session),
       cc: '',
-      subject: defaults.subject,
-      bodyText: defaults.message,
+      subject: starting.subject,
+      bodyText: starting.message,
     });
     setPreview(null);
     setConfirmed(false);
@@ -226,10 +258,11 @@ export default function SessionAgendaPanel({ sessionId, session, slots, recipien
   };
 
   const closeComposer = useCallback(() => {
-    if (busy) return;
-    setDirectoryTarget(null);
-    setComposerOpen(false);
-  }, [busy]);
+    if (locked) return;
+    openSequence.current += 1; initController.current?.abort();
+    setDirectoryTarget(null); setComposerOpen(false); setPreview(null); setConfirmed(false);
+    setForm({ to: '', cc: '', subject: '', bodyText: '' });
+  }, [locked, setPreview]);
 
   const edit = (patch) => {
     setForm((current) => ({ ...current, ...patch }));
@@ -250,7 +283,7 @@ export default function SessionAgendaPanel({ sessionId, session, slots, recipien
   };
 
   const prepare = async () => {
-    if (busy || !form.to.trim() || !form.subject.trim() || !form.bodyText.trim()) return;
+    if (locked || !form.to.trim() || !form.subject.trim()) return;
     const currentSequence = ++sequence.current;
     controllerRef.current?.abort();
     const controller = new AbortController();
@@ -292,8 +325,20 @@ export default function SessionAgendaPanel({ sessionId, session, slots, recipien
     }
   };
 
+  const resetRecoveredDraft = async (currentSequence, signal) => {
+    const generation = ++defaultsGeneration.current;
+    let starting = EMPTY_DEFAULTS;
+    try {
+      const status = await requestJson(`/api/meeting-tracker/sessions/${sessionId}/agenda`, { signal, tolerantBody: true });
+      starting = status.defaults || EMPTY_DEFAULTS;
+    } catch { /* Manual entry remains available when wording cannot load. */ }
+    if (sequence.current !== currentSequence || defaultsGeneration.current !== generation) return;
+    setDefaults(starting);
+    setForm({ to: attendeeEmails(session), cc: '', subject: starting.subject, bodyText: starting.message });
+  };
+
   const send = async () => {
-    if (!confirmed || !preview?.operationId || busy) return;
+    if (!confirmed || !preview?.operationId || locked) return;
     const currentSequence = ++sequence.current;
     controllerRef.current?.abort();
     const controller = new AbortController();
@@ -326,12 +371,8 @@ export default function SessionAgendaPanel({ sessionId, session, slots, recipien
         if (sequence.current === currentSequence) {
           setPendingSend(null);
           if (recoveringPending) {
-            setForm({
-              to: attendeeEmails(session),
-              cc: '',
-              subject: defaults.subject,
-              bodyText: defaults.message,
-            });
+            await resetRecoveredDraft(currentSequence, controller.signal);
+            if (sequence.current !== currentSequence) return;
           }
           setPreview(null);
           setConfirmed(false);
@@ -343,12 +384,8 @@ export default function SessionAgendaPanel({ sessionId, session, slots, recipien
         if (sequence.current === currentSequence) {
           setPendingSend(null);
           if (recoveringPending) {
-            setForm({
-              to: attendeeEmails(session),
-              cc: '',
-              subject: defaults.subject,
-              bodyText: defaults.message,
-            });
+            await resetRecoveredDraft(currentSequence, controller.signal);
+            if (sequence.current !== currentSequence) return;
           }
           setPreview(null);
           setConfirmed(false);
@@ -417,22 +454,22 @@ export default function SessionAgendaPanel({ sessionId, session, slots, recipien
           </p>
         )}
         {loadError && <p role="alert" className="mt-2 text-sm text-red-700">{loadError} Please try again. If the problem continues, contact an administrator.</p>}
-        <button
+        <Button
           type="button"
           onClick={openComposer}
           disabled={!statusLoaded && !loadError}
           className={`mt-4 rounded-lg px-4 py-2 text-sm font-semibold disabled:opacity-50 ${lastAgenda?.sentAt ? 'border border-gray-300 bg-white text-gray-900' : 'bg-gray-900 text-white'}`}
         >
           {pendingSend?.operationId ? 'Review unresolved send…' : lastAgenda?.sentAt ? 'Send agenda again…' : 'Send agenda…'}
-        </button>
+        </Button>
       </section>
 
       {composerOpen && (
-        <ComposerDialog busy={Boolean(busy)} directoryOpen={directoryTarget !== null} onClose={closeComposer}>
+        <ComposerDialog busy={locked} directoryOpen={directoryTarget !== null} onClose={closeComposer}>
           {error && <div role="alert" className="mt-4 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-800">{error}</div>}
-          {showEditableFields && (defaults.unavailable || !defaults.subject || !defaults.message) && (
+          {showEditableFields && (['unavailable', 'invalid', 'identity_unavailable'].includes(defaults.personalStatus) || defaults.source === 'empty') && (
             <p role="status" className="mt-4 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
-              Default subject or message is not configured. Enter them below, or set them in Admin → Workflow email defaults.
+              Your saved wording or shared wording could not be loaded. You can enter a subject and optional opening below. Your saved settings are unchanged.
             </p>
           )}
           {showEditableFields && <div className="mt-5 grid gap-4 md:grid-cols-2">
@@ -440,21 +477,25 @@ export default function SessionAgendaPanel({ sessionId, session, slots, recipien
               <div key={field}>
                 <div className="flex items-center justify-between gap-2">
                   <label htmlFor={`agenda-${field}`} className="text-sm font-medium text-gray-800">{label}</label>
-                  <button type="button" onClick={() => setDirectoryTarget(field)} disabled={Boolean(busy)} className="text-xs font-medium text-blue-700 disabled:opacity-50">Add from directory</button>
+                  <Button variant="outline" size="sm" type="button" onClick={() => setDirectoryTarget(field)} disabled={locked} className="text-xs font-medium text-blue-700 disabled:opacity-50">Add from directory</Button>
                 </div>
-                <textarea id={`agenda-${field}`} rows={2} value={form[field]} onChange={(event) => edit({ [field]: event.target.value })} disabled={Boolean(busy)} placeholder={field === 'cc' ? 'Optional' : 'One or more addresses'} className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm" />
+                <textarea id={`agenda-${field}`} rows={2} value={form[field]} onChange={(event) => edit({ [field]: event.target.value })} disabled={locked} placeholder={field === 'cc' ? 'Optional' : 'One or more addresses'} className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm" />
               </div>
             ))}
           </div>}
           {showEditableFields && (
             <>
               <label htmlFor="agenda-subject" className="mt-4 block text-sm font-medium text-gray-800">Subject</label>
-              <input id="agenda-subject" value={form.subject} onChange={(event) => edit({ subject: event.target.value })} disabled={Boolean(busy)} className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm" />
-              <label htmlFor="agenda-message" className="mt-4 block text-sm font-medium text-gray-800">Message</label>
-              <textarea id="agenda-message" rows={4} value={form.bodyText} onChange={(event) => edit({ bodyText: event.target.value })} disabled={Boolean(busy)} className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm" />
+              <input id="agenda-subject" value={form.subject} onChange={(event) => edit({ subject: event.target.value })} disabled={locked} className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm" />
+              <label htmlFor="agenda-message" className="mt-4 block text-sm font-medium text-gray-800">Opening message (optional)</label>
+              <textarea id="agenda-message" rows={4} value={form.bodyText} onChange={(event) => edit({ bodyText: event.target.value })} disabled={locked} className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm" />
             </>
           )}
 
+          {showEditableFields && <>
+            <p className="mt-2 text-sm text-gray-600">{defaults.source === 'personal' ? 'Using your saved wording.' : defaults.source === 'empty' ? 'Enter wording for this email.' : 'Using shared wording.'} Optional {'{{sessionDate}}'} is filled into the preview.</p>
+            <AgendaWordingDefault disabled={Boolean(busy)} onBusyChange={setDefaultsBusy} onChanged={(next) => { defaultsGeneration.current += 1; if (next) setDefaults(next); }} />
+          </>}
           <div className="mt-5 rounded-lg border border-gray-200 bg-gray-50 p-4">
             <h4 className="font-semibold text-gray-900">Agenda preview</h4>
             {preview ? (
@@ -473,10 +514,10 @@ export default function SessionAgendaPanel({ sessionId, session, slots, recipien
                 ) : (
                   <>
                     <label className="mt-4 flex items-start gap-2 text-sm text-gray-800">
-                      <input type="checkbox" checked={confirmed} onChange={(event) => setConfirmed(event.target.checked)} disabled={Boolean(busy)} className="mt-0.5" />
+                      <input type="checkbox" checked={confirmed} onChange={(event) => setConfirmed(event.target.checked)} disabled={locked} className="mt-0.5" />
                       I reviewed the recipients, message, and agenda shown above.
                     </label>
-                    <button type="button" onClick={send} disabled={!confirmed || Boolean(busy)} className="mt-3 rounded-lg bg-blue-800 px-4 py-2 text-sm font-medium text-white disabled:opacity-50">{busy === 'send' ? 'Sending…' : 'Send agenda'}</button>
+                    <Button size="sm" type="button" onClick={send} variant="primary" disabled={!confirmed || locked} className="mt-3 rounded-lg px-4 py-2 text-sm font-medium disabled:opacity-50">{busy === 'send' ? 'Sending…' : 'Send agenda'}</Button>
                   </>
                 )}
               </>
@@ -493,7 +534,7 @@ export default function SessionAgendaPanel({ sessionId, session, slots, recipien
             />
           )}
           {notice && <div role="status" className="mt-3 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">{notice}</div>}
-          {!preview && <button type="button" onClick={prepare} disabled={Boolean(busy) || !form.to.trim() || !form.subject.trim() || !form.bodyText.trim()} className="mt-4 rounded-lg bg-gray-900 px-4 py-2 text-sm font-medium text-white disabled:opacity-50">{busy === 'prepare' ? 'Creating preview…' : 'Create preview'}</button>}
+          {!preview && <Button size="sm" type="button" onClick={prepare} variant="primary" disabled={locked || !form.to.trim() || !form.subject.trim()} className="mt-4 rounded-lg px-4 py-2 text-sm font-medium disabled:opacity-50">{busy === 'prepare' ? 'Creating preview…' : 'Create preview'}</Button>}
         </ComposerDialog>
       )}
 

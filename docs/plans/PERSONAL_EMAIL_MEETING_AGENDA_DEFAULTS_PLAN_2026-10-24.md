@@ -2,7 +2,7 @@
 title: Personal meeting agenda email defaults — slice 6
 domain: meeting-tracker
 kind: plan
-status: planned
+status: built-in-branch
 summary: Owner-agreed personal subject and optional opening message for pre-discussion agenda emails, with sender-owned defaults, separate one-send edits, familiar default-wording disclosure and unchanged exact-send recovery.
 owner: product-engineering
 related:
@@ -17,10 +17,11 @@ related:
 
 ## Status and scope
 
-[PLANNED; owner decisions agreed 2026-10-24.] This is the implementation plan
+[BUILT IN BRANCH; owner decisions agreed 2026-10-24.] This is the implementation plan
 for personal defaults for the agenda of the pre-discussion before the site visit /
-research presentation. Product decisions are settled; this document does not
-claim implementation, independent implementation review, deployment or live delivery.
+research presentation. Product decisions are settled. Implementation is built on
+`codex/meeting-agenda-email-defaults`; build review and final verification are
+in progress. No deployment or live agenda delivery is claimed.
 OAuth Claude Opus 5.5 reviewed the earlier plan at `f36ca94fe` and returned
 READY WITH NAMED CHANGES. This revision incorporates those findings; it has
 not itself been re-reviewed by Opus.
@@ -98,7 +99,7 @@ No new table, migration, cron or generalized email-editor framework is proposed.
     for failed-load fallback. Preference actions stay secondary to preview/send.
     No separate Profile Settings destination or additional modal is needed.
 
-## Verified baseline and gaps
+## Pre-build baseline and gaps — historical source review
 
 [VERIFIED via source and 47 passing tests in two agenda suites during this review.]
 `agenda-service.js` reads shared `email.deliberation_agenda.subject` and `.body`,
@@ -130,7 +131,8 @@ hierarchy: familiar controls, restrained state feedback, clear send commitment.
 
 ## Implementation contract
 
-[PLANNED technical design; verify against current source before building.]
+[IMPLEMENTATION CONTRACT; branch source implements this target. Final verification
+and independent build review are recorded separately, not inferred from this text.]
 
 1. **Exact-owner preference route and namespace.** Add an agenda-only raw
    `{ subject, body }` pair using the existing preference registry/store; `body`
@@ -301,10 +303,10 @@ Updated the inventory's slice-6 row/description, suite to-do and session pointer
 September inventory case rows remain explicitly historical. Earlier Admin build
 brief remains its own completed shared-default work. Unrelated slice numbers,
 email-family permissions and old release receipts are outside this change.
-Product intent is PLANNED; no personal agenda implementation is claimed. No
-product decision remains open; this revision incorporates the named plan changes
-from Opus, while independent review of the revised text and build verification
-remain distinct from implementation completion.
+Product intent was PLANNED at the original documentation pass. Branch build
+status now supersedes that implementation status; no deployment is claimed.
+No product decision remains open. Independent build review and final verification
+are recorded separately from the plan review.
 
 ## OAuth Opus plan review — incorporated 2026-10-24
 
@@ -337,3 +339,17 @@ asserted. The same-snapshot comparison still cannot atomically lock all Datavers
 session/slot/link records through transport; compare as late as possible and keep
 that remaining race explicit in the implementation review. No destructive cleanup
 or new live action is authorized by this plan update.
+
+## Branch build — verification in progress
+
+Implementation source now includes exact-owner agenda defaults, shared/personal/
+prepare validation, raw date templates, optional opening, independent preference
+editor, separate async controllers and full snapshot freshness with strict
+briefing reads. Existing ledger/recovery is retained. No schema or seed change.
+Initial focused run passed 134 tests; final focused/full verification and OAuth
+Opus build review remain in progress. Production-mode build and scoped gates
+passed before the bounded browser focus correction; final build is required.
+Microsoft's current Email entity reference documents Subject MaxLength 800;
+the agenda's stricter 500 raw/resolved bound fits that published contract
+(https://learn.microsoft.com/en-us/power-apps/developer/data-platform/reference/entities/email#subject).
+This is published provider metadata, not a new tenant metadata probe.

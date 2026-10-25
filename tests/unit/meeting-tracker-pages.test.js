@@ -1,5 +1,7 @@
 /** @jest-environment jsdom */
 
+jest.mock('next-auth/react', () => ({ useSession: () => ({ status: 'authenticated', data: { user: { email: 'pc@example.org' } } }) }));
+
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { AppCard, getServerSideProps as getLandingProps } from '../../pages/index';
 import MeetingTrackerList, { MeetingTrackerRequestRow } from '../../shared/components/meeting-tracker/MeetingTrackerList';

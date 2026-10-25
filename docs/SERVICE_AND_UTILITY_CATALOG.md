@@ -83,6 +83,8 @@ If you're touching a service or utility, read its header before this catalog. If
 - **`program-director-resolver.js`** — Email → Dynamics `systemuser` bridge for Reviewer Finder's PD-filtered picker.
 - **`grant-cycles-dataverse.js`** — Dataverse `wmkf_appgrantcycle` adapter (Migrates / Replaced `grant_cycles` at W3 cutover 2026-05-12 — drain-only thereafter). Consumed by Reviewer Finder + Review Manager (`render-emails`, `send-emails`) + `maintenance-service` blob cleanup.
 
+- **`meeting-tracker/agenda-personalization.js`** — Slice 6 branch-built, not deployed: strict exact-systemuser raw agenda defaults in existing Dataverse preferences, independent shared pair validation, source/status DTO, verified Save and duplicate-aware Clear. Empty opening is explicit configured data; no session, email or ledger writes. The shared `agendaEmail.js` validator bounds raw/resolved text and accepts only optional sessionDate tokens. Agenda preview resolves them against its fresh session snapshot; the existing send ledger remains authoritative for exact recovery.
+
 ### Wave 1 dispatch (Dataverse-default since 2026-05-12)
 
 - **`settings-service.js`** / **`dataverse-settings-service.js`** — Dataverse `wmkf_appsystemsettings`. Legacy Postgres `system_settings` was dropped 2026-05-12 (Migrates / Replaced); dispatch retained as fail-loud opt-out. Exposes throwing metadata-prefix reads with `odata.maxpagesize`/`@odata.nextLink` paging and formatted lookup provenance, plus create-only writes for immutable versioned settings, in addition to the legacy fail-soft/upsert surface.

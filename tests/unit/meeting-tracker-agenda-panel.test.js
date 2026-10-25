@@ -1,5 +1,7 @@
 /** @jest-environment jsdom */
 
+jest.mock('next-auth/react', () => ({ useSession: () => ({ status: 'authenticated', data: { user: { email: 'pc@example.org' } } }) }));
+
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import SessionAgendaPanel from '../../shared/components/meeting-tracker/SessionAgendaPanel';
 
@@ -86,15 +88,17 @@ afterEach(() => jest.restoreAllMocks());
 test('defaults attendees, subject, and message and posts the exact prepare payload', async () => {
   global.fetch
     .mockResolvedValueOnce(response({ lastAgenda: null, scheduleChanged: false, defaults: DEFAULTS }))
+    .mockResolvedValueOnce(response({ lastAgenda: null, scheduleChanged: false, defaults: DEFAULTS }))
     .mockResolvedValueOnce(response({ success: true, agenda: prepared() }));
   render(<SessionAgendaPanel sessionId={SESSION_ID} session={session} slots={slots} recipients={recipients} />);
   await waitFor(() => expect(global.fetch).toHaveBeenCalledTimes(1));
   await flushLoadStatus();
   fireEvent.click(screen.getByRole('button', { name: 'Send agenda…' }));
+  await flushLoadStatus();
 
   expect(screen.getByLabelText('To')).toHaveValue('alex@example.org, bailey@example.org');
   expect(screen.getByLabelText('Subject')).toHaveValue(DEFAULTS.subject);
-  expect(screen.getByLabelText('Message')).toHaveValue(DEFAULTS.message);
+  expect(screen.getByLabelText('Opening message (optional)')).toHaveValue(DEFAULTS.message);
   fireEvent.click(screen.getByRole('button', { name: 'Create preview' }));
 
   await screen.findByText(/First proposal/);
@@ -112,6 +116,7 @@ test('defaults attendees, subject, and message and posts the exact prepare paylo
 test('requires confirmation, sends the prepared operation, and renders the exact receipt', async () => {
   global.fetch
     .mockResolvedValueOnce(response({ lastAgenda: null, scheduleChanged: false, defaults: DEFAULTS }))
+    .mockResolvedValueOnce(response({ lastAgenda: null, scheduleChanged: false, defaults: DEFAULTS }))
     .mockResolvedValueOnce(response({ success: true, agenda: prepared() }))
     .mockResolvedValueOnce(response({
       success: true,
@@ -121,6 +126,7 @@ test('requires confirmation, sends the prepared operation, and renders the exact
   await waitFor(() => expect(global.fetch).toHaveBeenCalledTimes(1));
   await flushLoadStatus();
   fireEvent.click(screen.getByRole('button', { name: 'Send agenda…' }));
+  await flushLoadStatus();
   fireEvent.click(screen.getByRole('button', { name: 'Create preview' }));
   const sendButton = await screen.findByRole('button', { name: 'Send agenda' });
   expect(sendButton).toBeDisabled();
@@ -138,6 +144,7 @@ test('requires confirmation, sends the prepared operation, and renders the exact
 test('a stale send destroys the preview and requires a new confirmation', async () => {
   global.fetch
     .mockResolvedValueOnce(response({ lastAgenda: null, scheduleChanged: false, defaults: DEFAULTS }))
+    .mockResolvedValueOnce(response({ lastAgenda: null, scheduleChanged: false, defaults: DEFAULTS }))
     .mockResolvedValueOnce(response({ success: true, agenda: prepared() }))
     .mockResolvedValueOnce(response({
       error: 'The session schedule changed after this preview.', code: 'agenda_operation_stale',
@@ -146,9 +153,10 @@ test('a stale send destroys the preview and requires a new confirmation', async 
   await waitFor(() => expect(global.fetch).toHaveBeenCalledTimes(1));
   await flushLoadStatus();
   fireEvent.click(screen.getByRole('button', { name: 'Send agenda…' }));
+  await flushLoadStatus();
   fireEvent.change(screen.getByLabelText('To'), { target: { value: 'custom@example.org' } });
   fireEvent.change(screen.getByLabelText('Subject'), { target: { value: 'Custom agenda subject' } });
-  fireEvent.change(screen.getByLabelText('Message'), { target: { value: 'Custom agenda message' } });
+  fireEvent.change(screen.getByLabelText('Opening message (optional)'), { target: { value: 'Custom agenda message' } });
   fireEvent.click(screen.getByRole('button', { name: 'Create preview' }));
   await screen.findByText(/First proposal/);
   fireEvent.click(screen.getByLabelText(/I reviewed the recipients/));
@@ -158,7 +166,7 @@ test('a stale send destroys the preview and requires a new confirmation', async 
   expect(screen.queryByText(/First proposal/)).not.toBeInTheDocument();
   expect(screen.getByLabelText('To')).toHaveValue('custom@example.org');
   expect(screen.getByLabelText('Subject')).toHaveValue('Custom agenda subject');
-  expect(screen.getByLabelText('Message')).toHaveValue('Custom agenda message');
+  expect(screen.getByLabelText('Opening message (optional)')).toHaveValue('Custom agenda message');
   expect(screen.getByRole('button', { name: 'Create preview' })).toBeInTheDocument();
 });
 
@@ -180,7 +188,7 @@ test('a stale unresolved retry restores usable composer defaults', async () => {
 
   expect(await screen.findByLabelText('To')).toHaveValue('alex@example.org, bailey@example.org');
   expect(screen.getByLabelText('Subject')).toHaveValue(DEFAULTS.subject);
-  expect(screen.getByLabelText('Message')).toHaveValue(DEFAULTS.message);
+  expect(screen.getByLabelText('Opening message (optional)')).toHaveValue(DEFAULTS.message);
   expect(screen.getByRole('button', { name: 'Create preview' })).toBeEnabled();
 });
 
@@ -191,6 +199,7 @@ test('a prepare-time unresolved conflict pins the existing operation', async () 
     sendRequestedAt: '2026-09-10T19:00:00.000Z',
   });
   global.fetch
+    .mockResolvedValueOnce(response({ lastAgenda: null, scheduleChanged: false, defaults: DEFAULTS }))
     .mockResolvedValueOnce(response({ lastAgenda: null, scheduleChanged: false, defaults: DEFAULTS }))
     .mockResolvedValueOnce(response({
       error: 'A session agenda send is still unresolved.',
@@ -205,6 +214,7 @@ test('a prepare-time unresolved conflict pins the existing operation', async () 
   await waitFor(() => expect(global.fetch).toHaveBeenCalledTimes(1));
   await flushLoadStatus();
   fireEvent.click(screen.getByRole('button', { name: 'Send agenda…' }));
+  await flushLoadStatus();
   fireEvent.click(screen.getByRole('button', { name: 'Create preview' }));
 
   expect(await screen.findByText(/Another session agenda send is unresolved/)).toBeInTheDocument();
@@ -230,6 +240,7 @@ test('a send-time unresolved conflict marks B not sent and preserves A for expli
   });
   global.fetch
     .mockResolvedValueOnce(response({ lastAgenda: null, scheduleChanged: false, defaults: DEFAULTS }))
+    .mockResolvedValueOnce(response({ lastAgenda: null, scheduleChanged: false, defaults: DEFAULTS }))
     .mockResolvedValueOnce(response({ success: true, agenda: competingPreview }))
     .mockResolvedValueOnce(response({
       error: 'A session agenda send is still unresolved.',
@@ -249,6 +260,7 @@ test('a send-time unresolved conflict marks B not sent and preserves A for expli
   await waitFor(() => expect(global.fetch).toHaveBeenCalledTimes(1));
   await flushLoadStatus();
   fireEvent.click(screen.getByRole('button', { name: 'Send agenda…' }));
+  await flushLoadStatus();
   fireEvent.click(screen.getByRole('button', { name: 'Create preview' }));
   await screen.findByText('Competing B subject');
   fireEvent.click(screen.getByLabelText(/I reviewed the recipients/));
@@ -298,7 +310,7 @@ test('a terminal retry unblocks a new preview without retaining the failed opera
   expect(await screen.findByText(/Dynamics closed this agenda email/)).toBeInTheDocument();
   expect(screen.getByLabelText('To')).toHaveValue('alex@example.org, bailey@example.org');
   expect(screen.getByLabelText('Subject')).toHaveValue(DEFAULTS.subject);
-  expect(screen.getByLabelText('Message')).toHaveValue(DEFAULTS.message);
+  expect(screen.getByLabelText('Opening message (optional)')).toHaveValue(DEFAULTS.message);
   expect(screen.getByRole('button', { name: 'Create preview' })).toBeEnabled();
   expect(screen.queryByRole('button', { name: 'Review unresolved send…' })).not.toBeInTheDocument();
 });
@@ -309,6 +321,7 @@ test('a 202 unconfirmed transport status stays recoverable on the same operation
     sendRequestedAt: '2026-09-10T19:00:00.000Z',
   });
   global.fetch
+    .mockResolvedValueOnce(response({ lastAgenda: null, scheduleChanged: false, defaults: DEFAULTS }))
     .mockResolvedValueOnce(response({ lastAgenda: null, scheduleChanged: false, defaults: DEFAULTS }))
     .mockResolvedValueOnce(response({ success: true, agenda: prepared() }))
     .mockResolvedValueOnce(response({
@@ -324,6 +337,7 @@ test('a 202 unconfirmed transport status stays recoverable on the same operation
   await waitFor(() => expect(global.fetch).toHaveBeenCalledTimes(1));
   await flushLoadStatus();
   fireEvent.click(screen.getByRole('button', { name: 'Send agenda…' }));
+  await flushLoadStatus();
   fireEvent.click(screen.getByRole('button', { name: 'Create preview' }));
   await screen.findByText(/First proposal/);
   fireEvent.click(screen.getByLabelText(/I reviewed the recipients/));
@@ -377,19 +391,20 @@ test('shows the last sent receipt and a newer unresolved send independently', as
 });
 
 test('shows an unavailable note and leaves the subject and message blank when defaults are not configured', async () => {
-  global.fetch.mockResolvedValueOnce(response({
+  global.fetch.mockResolvedValue(response({
     lastAgenda: null,
     scheduleChanged: false,
-    defaults: { subject: '', message: '', unavailable: true },
+    defaults: { subject: '', message: '', source: 'empty', personalStatus: 'absent', sharedStatus: 'unavailable' },
   }));
   render(<SessionAgendaPanel sessionId={SESSION_ID} session={session} slots={slots} recipients={recipients} />);
   await waitFor(() => expect(global.fetch).toHaveBeenCalledTimes(1));
   await flushLoadStatus();
   fireEvent.click(screen.getByRole('button', { name: 'Send agenda…' }));
+  await flushLoadStatus();
 
   expect(screen.getByLabelText('Subject')).toHaveValue('');
-  expect(screen.getByLabelText('Message')).toHaveValue('');
-  expect(screen.getByText(/Default subject or message is not configured/)).toBeInTheDocument();
+  expect(screen.getByLabelText('Opening message (optional)')).toHaveValue('');
+  expect(screen.getByText(/Your saved wording or shared wording could not be loaded/)).toBeInTheDocument();
   expect(screen.getByRole('button', { name: 'Create preview' })).toBeDisabled();
 });
 
@@ -414,6 +429,7 @@ test('adds tracker directory recipients without creating To/Cc conflicts', async
   await waitFor(() => expect(global.fetch).toHaveBeenCalledTimes(1));
   await flushLoadStatus();
   fireEvent.click(screen.getByRole('button', { name: 'Send agenda…' }));
+  await flushLoadStatus();
   const composer = screen.getByRole('dialog', { name: 'Send session agenda' });
   const directoryButtons = within(composer).getAllByRole('button', { name: 'Add from directory' });
   fireEvent.click(directoryButtons[0]);
@@ -425,4 +441,60 @@ test('adds tracker directory recipients without creating To/Cc conflicts', async
   fireEvent.click(directoryButtons[1]);
   const secondDirectory = screen.getByRole('dialog', { name: /Add recipients to Cc/ });
   expect(within(secondDirectory).getByRole('button', { name: /Alex Staff.*Already added/ })).toBeDisabled();
+});
+
+test('Save/Clear default leaves current wording, recipients and preview unchanged; reopen uses refreshed defaults', async () => {
+  let saved = { subject: 'Saved {{sessionDate}}', body: '' };
+  let releaseSave;
+  const defaults = () => ({ subject: saved.subject, message: saved.body, source: 'personal', personalStatus: 'configured', sharedStatus: 'available' });
+  const prefs = () => ({ ok: true, configured: true, template: saved, defaults: defaults() });
+  global.fetch = jest.fn(async (url, options) => {
+    if (url.includes('agenda-email-preferences')) {
+      if (options?.method === 'PUT') {
+        await new Promise((resolve) => { releaseSave = resolve; }); saved = JSON.parse(options.body).template;
+      }
+      if (options?.method === 'DELETE') saved = { subject: 'Shared next', body: 'Shared next opening' };
+      return response(prefs());
+    }
+    if (options?.method === 'POST') return response({ success: true, agenda: prepared({ subject: 'One-send subject' }) });
+    return response({ defaults: defaults() });
+  });
+  render(<SessionAgendaPanel sessionId={SESSION_ID} session={session} slots={slots} recipients={recipients} />);
+  await flushLoadStatus(); fireEvent.click(screen.getByRole('button', { name: 'Send agenda…' })); await flushLoadStatus();
+  fireEvent.change(screen.getByLabelText('Subject'), { target: { value: 'One-send subject' } });
+  fireEvent.change(screen.getByLabelText('To'), { target: { value: 'one-off@example.org' } });
+  fireEvent.click(screen.getByText('Your default wording'));
+  const details = screen.getByText('Your default wording').closest('details'); details.open = true; fireEvent(details, new Event('toggle'));
+  await screen.findByLabelText('Default subject');
+  fireEvent.change(screen.getByLabelText('Default subject'), { target: { value: 'Future {{sessionDate}}' } });
+  fireEvent.click(screen.getByRole('button', { name: 'Save as my default' }));
+  await waitFor(() => expect(releaseSave).toBeDefined());
+  expect(screen.getAllByRole('button', { name: 'Close' }).every((b) => b.disabled)).toBe(true);
+  expect(screen.getByRole('button', { name: 'Create preview' })).toBeDisabled();
+  await act(async () => { releaseSave(); });
+  expect(await screen.findByText(/Saved as your default wording/)).toBeInTheDocument();
+  expect(screen.getByLabelText('Subject')).toHaveValue('One-send subject'); expect(screen.getByLabelText('To')).toHaveValue('one-off@example.org');
+  fireEvent.click(screen.getByRole('button', { name: 'Create preview' })); await screen.findByText(/First proposal/);
+  fireEvent.click(screen.getByLabelText(/I reviewed the recipients/));
+  fireEvent.click(screen.getByRole('button', { name: 'Clear my default' })); await screen.findByText(/Your default was cleared/);
+  expect(screen.getByLabelText(/I reviewed the recipients/)).toBeChecked();
+  expect(screen.getByRole('button', { name: 'Send agenda' })).toBeEnabled();
+  fireEvent.click(screen.getAllByRole('button', { name: 'Close' })[0]);
+  fireEvent.click(screen.getByRole('button', { name: 'Send agenda…' })); await flushLoadStatus();
+  expect(screen.getByLabelText('Subject')).toHaveValue('Shared next');
+  expect(screen.getByLabelText('To')).toHaveValue('alex@example.org, bailey@example.org'); expect(screen.getByLabelText('Cc')).toHaveValue('');
+});
+
+test('empty opening allows preview and date/room prop changes require a new review without overwriting edits', async () => {
+  global.fetch = jest.fn(async (_url, options) => response(options?.method === 'POST' ? { success: true, agenda: prepared() } : { defaults: { ...DEFAULTS, message: '', source: 'shared', personalStatus: 'absent', sharedStatus: 'available' } }));
+  const view = render(<SessionAgendaPanel sessionId={SESSION_ID} session={session} slots={slots} recipients={recipients} />);
+  await flushLoadStatus(); fireEvent.click(screen.getByRole('button', { name: 'Send agenda…' })); await flushLoadStatus();
+  expect(screen.getByRole('button', { name: 'Create preview' })).toBeEnabled();
+  expect(screen.queryByText(/could not be loaded/)).not.toBeInTheDocument();
+  fireEvent.change(screen.getByLabelText('Subject'), { target: { value: 'My raw {{sessionDate}}' } });
+  fireEvent.click(screen.getByRole('button', { name: 'Create preview' })); await screen.findByText(/First proposal/);
+  fireEvent.click(screen.getByLabelText(/I reviewed the recipients/));
+  view.rerender(<SessionAgendaPanel sessionId={SESSION_ID} session={{ ...session, location: 'New room' }} slots={slots} recipients={recipients} />);
+  expect(screen.queryByRole('button', { name: 'Send agenda' })).not.toBeInTheDocument();
+  expect(screen.getByLabelText('Subject')).toHaveValue('My raw {{sessionDate}}');
 });

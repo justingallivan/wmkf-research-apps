@@ -2,7 +2,7 @@
 
 ## Current selected work — personal email defaults slice 6
 
-[PLANNED; owner decisions agreed 2026-10-24.] Implementation plan:
+[BUILT IN BRANCH; owner decisions agreed 2026-10-24; not deployed.] Implementation plan:
 `docs/plans/PERSONAL_EMAIL_MEETING_AGENDA_DEFAULTS_PLAN_2026-10-24.md`.
 PCs normally send pre-discussion agendas; other Meeting Tracker staff can cover,
 using their own mailbox/defaults. Scope: personal subject/optional opening;
@@ -15,7 +15,9 @@ are incorporated: complete drift checks and strict link lookup, raw templates,
 shared validation, source/status/defaults refresh, separate busy/controllers,
 both generic privacy key sets, empty-opening guards and explicit limits.
 Receipt: `docs/audits/MEETING_AGENDA_DEFAULTS_PLAN_REVIEW_2026-10-24.md`.
-Revised text is not re-reviewed; no implementation started.
+Build is on `codex/meeting-agenda-email-defaults`; focused tests, production build
+and scoped gates passed before the final browser focus correction. Final
+verification and requested OAuth Opus build review remain in progress.
 A separate suite-wide Impeccable email-interface consistency review is queued in
 `docs/plans/PERSONAL_EMAIL_DEFAULTS_TODO_2026-09-20.md`; it does not block slice 6.
 
