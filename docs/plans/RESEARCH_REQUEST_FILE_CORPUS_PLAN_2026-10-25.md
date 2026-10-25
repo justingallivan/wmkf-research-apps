@@ -61,12 +61,12 @@ history runs.
 |---|---|---|---|
 | 1 | 1990–2015 | `RequestArchive1` (1990–2004), `RequestArchive2` (2004–2015), some `RequestArchive3` from 2014 | Flat folders; 92% legacy `.doc`; 15,837 files named only `<number>.doc` |
 | 2 | 2016–2021 | `RequestArchive3`; `akoya_request` from 2018 | Flat; old form exports (`Application<n>.html`), legacy `.doc` (reviews stored as files, e.g. `<institution> - Phase II Review.doc`), interim/final reports mixed in |
-| 3 | 2022–2025 | `akoya_request` | Mostly flat GOapply names (`projectdescription.pdf`, `application cover page.docx`); some staff-made subfolders (`Phase II/<institution> Reviews`, `Relevant Papers`) |
-| 4 | 2026 | `akoya_request` | Consistent `Phase I` / `Phase II` / `Site Visit - …` / `Artifacts/…` structure; app-generated files well named |
+| 3 | 2022 – Jun 2026 cycle | `akoya_request` | Mostly flat GOapply names (`projectdescription.pdf`, `application cover page.docx`); `Phase I`/`Phase II` folders appear inconsistently from 2025 (Jun 2026 cycle: 1,879 of 2,108 files still in the root); staff-made subfolders (`Phase II/<institution> Reviews`, `Relevant Papers`) |
+| 4 | Dec 2026 cycle onward (requests created 2026) | `akoya_request` | Consistent `Phase I` / `Phase II` / `Site Visit - …` / `Artifacts/…` structure; app-generated files well named |
 
 ### Findings that shape the design
 
-- **Era 4 Phase I is uniform.** Seven GOapply filenames each appear on 203–213
+- **Era 4 (Dec 2026 cycle) Phase I is uniform.** Seven GOapply filenames each appear on 203–213
   of the 213 requests created in 2026 (application form, project description,
   cover page, biosketches, governing board list, budget PDF, budget
   spreadsheet), and `otherfunding.pdf` on 113, so filename rules should
@@ -145,7 +145,9 @@ Other copies stay indexed but are not extracted again.
   [ASSUMED: Microsoft documents `.doc`/`.html`/`.xls` as convertible; probe a
   small sample of each before relying on it.]
 - Spreadsheets: extract the cells as text (exceljs).
-- Recordings: not extracted; their transcripts stand in.
+- Recordings: not extracted; their transcripts stand in. In the 2026 created-year
+  run all 24 requests with an MP4 also have at least one transcript file; a
+  recording without one is flagged rather than transcribed.
 - Scanned PDFs without a text layer: flagged `needs-ocr`, not processed in the
   first pass.
 
@@ -153,7 +155,7 @@ Other copies stay indexed but are not extracted again.
 
 | Option | Fits | Costs |
 |---|---|---|
-| **A. Postgres index + private Blob text** (recommended) | Rebuildable cache, not a business record; cheap to re-run; good for analysis queries | Not visible in AkoyaGO; staff browse through an app page |
+| **A. Postgres index + private Blob text** (recommended) | Rebuildable, not-yet-clean derived data, which matches the Postgres *staging* tier; types that prove broadly useful (e.g. document type per file) can later be promoted to Dataverse [VERIFIED via docs/SYSTEM_MODEL.md:229-234]; cheap to re-run; good for analysis queries | Not visible in AkoyaGO; staff browse through an app page |
 | B. Dataverse table | Visible next to the request in AkoyaGO | 60,000+ rows (60,237 non-test files today) plus text is costly in Dataverse storage; slower to rebuild |
 | C. Clean mirror library in SharePoint (converted PDFs, normalized names) | Easiest staff browsing | Duplicates the corpus; a second copy to keep in sync |
 
@@ -165,7 +167,7 @@ read extracted applicant text.
 1. **Rules offline** against the CSVs; report coverage per era. (No Production
    access.)
 2. **Owner decisions** below.
-3. **Index build for era 4, then era 3** (metadata only, from a fresh listing).
+3. **Index build for era 4 (Dec 2026 cycle), then era 3** (metadata only, from a fresh listing).
 4. **Text extraction pilot** on a bounded set of recent requests; check quality.
 5. **Eras 2 and 1** with content classification, sampled and reviewed before the
    full run.
