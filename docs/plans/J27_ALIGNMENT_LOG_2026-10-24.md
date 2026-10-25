@@ -40,6 +40,7 @@ J27/D27 timeline PDF and workbook (OneDrive, New Cycle Development/timelines).
 | D3 | 2026-10-24 | **Review filing switches from D26 to J27 once; it never has to handle both.** All D26 reviews are in, so no late D26 reviews will overlap with J27 reviews. Who makes the switch and when is task T3. | Justin | Register Q15 |
 | D4 | 2026-10-24 | **Reviewer campaign settings are handled centrally, not per PD.** The review deadline, respond-by days and reviewer quota become cycle-wide values maintained centrally (under D1), replacing the per-request campaign settings PDs set today. Changing one reviewer's deadline stays a PD action. Email wording is not affected: PDs keep personal wording built on centrally seeded defaults (slice 2). | Justin | Rollover plan Slice 1 |
 | D5 | 2026-10-24 | **Volume of the Dec 8 AI pass is not a concern.** A less sophisticated model will likely be used, and applications arrive over several days (heaviest near the deadline); at about 2 minutes each, 300 can be processed overnight. | Justin | Timeline Dec 8 |
+| D6 | 2026-10-24 | **Expertise matching is rebuilt to run inline.** Each proposal is matched automatically as part of the intake AI pass, instead of a person running the Expertise app on demand. The current app is an early version based on the CSO's draft Claude project and needs improvement. | Justin | R-3 |
 
 ## To confirm at the meeting
 
@@ -57,6 +58,7 @@ J27/D27 timeline PDF and workbook (OneDrive, New Cycle Development/timelines).
 | C4 | What request status do J27 proposals carry when they arrive from GOApply (expected `Phase I Pending`)? | Connor | The Workbench list and triage depend on that exact label. | Register Q8, J27-064 |
 | C5 | Applicants no longer choose S&E or MR. How is the program recorded on the request, who assigns it, and when? | Connor, Sarah, Duncan | Apps that filter or assign by program will find it empty at intake. | Timeline Dec 7 |
 | R1 | Is the day-one list below right, and how quickly do staff need to triage in December? | Sarah, Duncan | Sets what must be built in the next six weeks versus early January. | December readiness below |
+| X1 | For inline expertise matching (D6): who maintains the roster of staff, consultants and Board members and their expertise; should the suggested PD be written to the request or only shown for staff to accept; and can the CSO's current Claude project prompt be shared as the starting point? | CSO, Sarah, Duncan | Defines what the rebuilt matcher reads, produces and who trusts it. | D6 |
 | R2 | Who starts and watches the Dec 8 AI pass, and what happens to proposals that arrive after it runs? | Justin, Connor | Volume is not a concern (D5), but the run needs an owner. | Timeline Dec 8 |
 
 ## December readiness (proposed for the meeting to confirm)
@@ -71,7 +73,7 @@ nothing here is built yet unless it says so.
 |---|---|---|---|
 | R-1 | Staff can see incoming J27 proposals in the Workbench. | Not built. The request list shows only requests that are `Phase II Pending` or marked Advancing, so new untriaged proposals would not appear. | C4 |
 | R-2 | Staff can triage about 300 proposals, including the "Save for now" state approved 2026-09-06. | Partly built. Only Advancing and Set aside exist; triage is reachable one row at a time. The per-PD view (each PD focused on their own requests, able to see others', nothing lost) is not designed. | R1 |
-| R-3 | By Dec 9, every proposal has an AI summary/Initial Assessment, a suggested PD, an expertise match (Board, PD, consultants) and triage flags. | Partly ready. The D26 Initial Assessment tooling exists and its view is not hidden for J27; the WMKF Expertise app is registered as covering staff assignment, consultant matching and Board interest (app registry description; behavior not checked). Not yet done: combining these into one run per proposal, and the deferred Production write check. Volume is not a concern (D5). | B1, C5, R2 |
+| R-3 | By Dec 9, every proposal has an AI summary/Initial Assessment, a suggested PD, an expertise match (Board, PD, consultants) and triage flags. | Partly ready. The D26 Initial Assessment tooling exists and its view is not hidden for J27. Expertise matching must be rebuilt to run inline (D6): today a person runs it per proposal (PDF upload or a chosen batch), the batch looks for D26's `Phase_I_Staff_Version` PDF, and results stay in the app's own Postgres tables rather than on the request. Not yet done: one automatic run per proposal covering all four outputs, and the deferred Production write check. Volume is not a concern (D5). | B1, C5, R2, X1 |
 | R-4 | PDs can advance a proposal to `Phase II Pending` from the Workbench. | Not verified whether this exists. | C4 |
 
 **Proposed minimum for December:** proposals visible in a list, the
