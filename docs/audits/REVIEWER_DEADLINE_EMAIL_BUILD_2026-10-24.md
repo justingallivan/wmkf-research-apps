@@ -3,7 +3,7 @@ title: Reviewer deadline email defaults — build and review evidence
 domain: reviewer-engagement
 kind: audit
 status: active
-summary: Slice 2 branch build and OAuth Opus review; Production subject seeded with body preserved and authorized empty-body transport accepted. Dynamics Sent status and owner-confirmed inbox receipt verified; runtime not deployed.
+summary: Slice 2 branch build and OAuth Opus review; Production subject seeded with body preserved and authorized empty-body transport accepted. Dynamics Sent status and owner-confirmed inbox receipt verified; released through PR #521; Production verified.
 owner: product-engineering
 related:
   - docs/plans/PERSONAL_EMAIL_REVIEWER_DEADLINE_DEFAULTS_PLAN_2026-10-24.md
@@ -94,7 +94,7 @@ authorization. Durable surfaces: existing stores only, new route in security mat
 namespace guard verified, both private/reserved preference key sets, canonical
 route counts regenerated, service catalog updated. Symbol fan-out: raw key,
 extension Admin keys, operation/result reasons and both UI mounting paths checked.
-Documentation reconciliation uses branch-built labels, not production claims.
+The original build audit used branch-built labels; Production promotion evidence follows below.
 
 ## Release preflight — owner-authorized 2026-10-24 PDT
 
@@ -139,7 +139,7 @@ behavior; branch acceptance tests remain the evidence for those paths.
 
 ## Remaining verification boundaries
 
-Runtime is not merged or deployed. The two selected release prerequisites are
+Runtime shipped through PR #521 as recorded below. The two selected release prerequisites are
 complete: shared subject configuration and isolated empty-body transport with
 server-side Sent status and owner-confirmed inbox receipt, blank body and correct
 calendar date. No second test or resend is needed.
@@ -253,3 +253,44 @@ documentation and script gates passed: doc-currency, docs-catalog, doc-symbol-re
 fact-consistency, canonical-pointers, build-claim-freshness, script-suggestion-
 writers and secret-scan, with applicable sequential self-tests. No runtime
 source changed after the full-suite candidate verification above.
+
+## Production promotion — 2026-10-24 PDT
+
+[VERIFIED via GitHub PR/checks, Vercel inspection and authenticated browser.]
+Owner explicitly authorized Production release. PR #521 merged candidate
+`f5da58d973b309a03fffa7ab29b21ff3f57958e2` as
+`687994c2a4b4a55a915637ee5f12fca5cb3da0bb` at 2026-10-25T00:19:05Z.
+All PR checks passed: Jest 1,460 suites / 25,153 tests / five snapshots (22 suites
+and 276 tests skipped under CI configuration); PostgreSQL 130 tests in 10 suites;
+Playwright; CodeQL for actions, JavaScript/TypeScript and Python; Semgrep;
+Gitleaks; Trivy; subscription OAuth Claude review; Vercel preview. CI run:
+https://github.com/justingallivan/wmkf-research-apps/actions/runs/40145677982.
+Local and CI totals are separate environments, not a rerun with identical skip policy.
+
+Production deployment `dpl_3DCEznTAZnPy8vJNq7hRYi5byzm7` reached READY:
+https://wmkfresearchapps-j17sg1bsw-justin-gallivans-projects.vercel.app.
+Inspection of https://applications.wmkeck.org resolved that same deployment.
+Authenticated staff sign-in, Workbench list and synthetic request 1003222's
+reviewer panel and management surface loaded after deployment. The synthetic
+reviewers already have received reviews, so no live deadline save/restore or
+notification was invoked in this smoke check. Preview/date-mutation behavior
+retains branch test evidence and the separate owner-confirmed transport rehearsal.
+
+Rollback operator: Justin Gallivan, with Codex acting under his release instruction.
+Last-known-good deployment before promotion:
+`dpl_HSTs9J1E7ADcnL1dQk5xLougubUh`, READY at
+https://wmkfresearchapps-1xivslbt2-justin-gallivans-projects.vercel.app
+(main `a610b0a5882806163b781e95af7608501791a662`). Emergency path:
+`vercel rollback https://wmkfresearchapps-1xivslbt2-justin-gallivans-projects.vercel.app`.
+No new flag/cohort, cron, schema or migration. Retain the additive subject key and
+any saved personal preferences on code rollback; rollback cannot recall sent mail
+or undo staff deadline changes. No destructive data repair is part of rollback.
+
+Sweep Mode A: promoted current slice-2 status in plan, inventory, suite to-do,
+security matrix and session handoff. Historical plan/build/review statements
+retain their dated meaning. No sibling email-family status was changed.
+
+Post-deployment error scan: Vercel runtime query `level:error`, restricted to
+`dpl_3DCEznTAZnPy8vJNq7hRYi5byzm7`, returned zero records in the initial
+00:10:52Z–00:20:52Z window. This is a short smoke observation, not sustained
+monitoring or a claim about unrelated deployments.

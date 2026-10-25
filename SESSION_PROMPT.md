@@ -11,13 +11,15 @@ Opus's first review found an annotation-comparison defect and smaller issues;
 fixes passed fresh OAuth Opus re-review with no P1/P2 remaining. Final isolated
 run: 25,175 tests / five snapshots passed, 247 skipped; production build, scoped
 gates and desktop/mobile synthetic UI confirmation passed. Local proof servers
-stopped. Main was not merged/pushed; runtime remains undeployed.
+stopped. PR #521 merged/released runtime as `687994c2a`; all PR checks passed.
+Production deployment `dpl_3DCEznTAZnPy8vJNq7hRYi5byzm7` is READY and serves
+applications.wmkeck.org. Staff sign-in and synthetic reviewer panel smoke passed.
 Owner authorized Production subject seeding and one standalone test email. The
 subject was created and validated with the existing body unchanged. Empty-body
 SendEmail succeeded and attachment readback matched; final status Sent (3),
 senton 2026-10-25T00:08:17Z, activity cf454711-08d0-f111-a05b-000d3a361c1f.
 Owner confirmed inbox receipt with blank body and calendar invitation for Monday,
-October 26, 2026. Selected release prerequisites passed; runtime promotion remains a separate step. Evidence and residuals:
+October 26, 2026. Selected release prerequisites and runtime promotion passed. Evidence and residuals:
 `docs/audits/REVIEWER_DEADLINE_EMAIL_BUILD_2026-10-24.md`. The two original
 untracked items were preserved untouched.
 
@@ -61,7 +63,7 @@ untracked items were preserved untouched.
 Exact prior handoff: `git show f66eee9e0:SESSION_PROMPT.md` (verified retrievable). It retains the full Session 636 D26 correction history, optional suggestions, private-folder and rollback constraints. These are recorded boundaries, not newly selected work:
 
 - Proposal Ranking D26 invited-amount correction is DONE; no re-ranking or new write authorized. Rollback requires the correction script's unchanged-state checks and a fresh owner instruction. Owning plan: `docs/plans/PROPOSAL_RANKING_D26_INVITED_AMOUNT_CORRECTION_2026-10-23.md`.
-- Personal email defaults: slice 3 shipped (PR #517); slice 2 built on `codex/reviewer-deadline-email-defaults`, runtime candidate `26010e1b0`; OAuth Opus build recheck PASS, not merged/deployed. `docs/plans/PERSONAL_EMAIL_REVIEWER_DEADLINE_DEFAULTS_PLAN_2026-10-24.md`.
+- Personal email defaults: slice 3 shipped (PR #517); slice 2 built on `codex/reviewer-deadline-email-defaults`, runtime candidate `26010e1b0`; OAuth Opus build recheck PASS; shipped through PR #521 as `687994c2a`, Production verified. `docs/plans/PERSONAL_EMAIL_REVIEWER_DEADLINE_DEFAULTS_PLAN_2026-10-24.md`.
 - J27 / overlapping cycles: proposed; calendar authority and related owner decisions remain open in `docs/plans/CYCLE_ROLLOVER_MINIMAL_CONFIGURATION_PLAN_2026-10-06.md`.
 - Research Institution at Award: Stages A/B applied and verified; confirm-your-details campaign tabled 2026-10-24, Connor confirmation/message retired. Preserve sensitive owner folders and conditional rollback rules. `docs/plans/RESEARCH_INSTITUTION_AT_AWARD_BACKFILL_PLAN_2026-10-20.md`.
 - Grant Reporting sunset is parked; any successor investigator list should use `lib/services/proposal-participants.js` `fetchCoPIs`. Shared roles shipped in PR #516. Reviewer panel coverage remains parked; Expense Reporter unchanged; Literature Analyzer has no selected task.

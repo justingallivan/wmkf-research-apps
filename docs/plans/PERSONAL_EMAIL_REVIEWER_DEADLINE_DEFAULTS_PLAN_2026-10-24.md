@@ -2,8 +2,8 @@
 title: Personal reviewer deadline email defaults — slice 2
 domain: reviewer-engagement
 kind: plan
-status: built-in-branch
-summary: Owner-approved slice 2 decisions for assigned-PD-only deadline changes, editable preview and personal wording, optional empty bodies, one-send Cc barred on synthetic requests, and truthful retry outcomes. Implementation built on codex/reviewer-deadline-email-defaults; checks and OAuth Opus build re-review passed; not deployed.
+status: implemented
+summary: Owner-approved slice 2 decisions for assigned-PD-only deadline changes, editable preview and personal wording, optional empty bodies, one-send Cc barred on synthetic requests, and truthful retry outcomes. Released through PR #521 (687994c2a); checks, OAuth Opus build re-review, subject seed and isolated inbox delivery passed.
 owner: product-engineering
 related:
   - docs/plans/PERSONAL_EMAIL_DEFAULTS_INVENTORY_2026-09-24.md
@@ -16,9 +16,9 @@ related:
 
 ## Status and scope
 
-[BUILT IN BRANCH; owner decisions agreed in the 2026-10-24 conversation.] This is the
+[PRODUCTION-VERIFIED via PR #521 and linked build audit; owner decisions agreed 2026-10-24.] This is the
 implementation plan for slice 2. Product decisions below are agreed; runtime
-implementation and acceptance tests are now built on `codex/reviewer-deadline-email-defaults`; verification and OAuth Opus build re-review passed. Owner-authorized release preflight subsequently seeded the Production subject and verified empty-body sending with Dynamics Sent status; exact evidence is recorded in the linked build audit. Runtime remains undeployed.
+implementation and acceptance tests are now built on `codex/reviewer-deadline-email-defaults`; verification and OAuth Opus build re-review passed. Owner-authorized release preflight subsequently seeded the Production subject and verified empty-body sending with Dynamics Sent status; exact evidence is recorded in the linked build audit. Runtime shipped as `687994c2a` through PR #521; Production domain/deployment and authenticated read-only smoke check passed.
 
 Change surface: reviewer deadline editor, deadline preview/save/retry service and
 route, own-user wording preferences, and shared Admin subject/body registration.
@@ -111,7 +111,7 @@ subject/body/Cc/proof limits and align the parser limit with their serialized si
 ## Implementation contract
 
 The following is the agreed contract; branch source now implements it. Verification
-and independent build review are recorded separately below; deployment remains pending; the Production shared subject was subsequently seeded and validated. The earlier Opus review covered the plan only.
+and independent build review are recorded separately below; deployment completed through PR #521; the Production shared subject was seeded and validated before promotion. The earlier Opus review covered the plan only.
 
 1. **Own-user preference and fallback.** Add
    `PREFERENCE_KEYS.REVIEWER_DEADLINE_UPDATE_TEMPLATE` (stored key

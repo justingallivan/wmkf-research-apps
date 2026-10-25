@@ -46,7 +46,7 @@ does not select an API or generalized editor for suite-wide use.
 
 ## Slice 2 owner decisions — 2026-10-24
 
-[BUILT IN BRANCH; checks and OAuth Opus build recheck passed, not deployed.] Reviewer deadline emails follow
+[PRODUCTION-VERIFIED via PR #521, 687994c2a, 2026-10-24.] Reviewer deadline emails follow
 `docs/plans/PERSONAL_EMAIL_REVIEWER_DEADLINE_DEFAULTS_PLAN_2026-10-24.md`.
 Only the assigned PD may change/restore the deadline or retry/resend its email;
 there is no superuser exception. From/To stay server-controlled; optional Cc is
@@ -58,7 +58,7 @@ requests reject every Cc before deadline writes and again at dispatch. The linke
 plan includes the OAuth Opus review corrections and post-write retry proofs.
 The authoritative saved date/calendar remain server-controlled. Review precedes
 save/send, restore and resend; explicit defaults, fallback notices, local retry
-wording/Cc and customizable subjects are specified in that plan. Branch-built; Production subject seed and empty-body sending verified with Dynamics Sent status; limits are in the linked build audit.
+wording/Cc and customizable subjects are specified in that plan. Released; Production subject seed and empty-body sending verified with Dynamics Sent status; limits are in the linked build audit.
 
 ## Current evidence and next work
 
