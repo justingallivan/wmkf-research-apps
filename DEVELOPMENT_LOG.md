@@ -10,6 +10,18 @@ The chronological archive after the `Legacy chronological session log` divider c
 
 ---
 
+## October 2026 — Personal email defaults and consistent desktop composers released (Sessions 639–640)
+
+**Milestone:** Released personal defaults for reviewer deadline and pre-discussion agenda emails, then harmonized email interfaces across the suite.
+**Sessions:** Sessions 639–640; owner decisions, ordinary Claude Opus OAuth review, isolated delivery checks and authorized Production releases.
+**Ship state:**
+- Slice 2 (#521 / `687994c2a`): assigned PD controls deadline changes and sends; personal wording supports an empty body, with one-send Cc and synthetic-request Cc rejection.
+- Slice 6 (#522 / `9d12b24ce`): PCs and authorized staff backups use their own agenda subject/opening defaults; generated agenda details remain server-owned. Owner confirmed isolated delivery.
+- Consistency (#523 / `5de197918`): accessible dialogs, future-only Save/Clear defaults, sender/recipient visibility and desktop density verified; native 200% zoom and narrow-window checks passed.
+- Production READY and signed-in read-only smoke passed; hosted consistency tests: Jest 25,227, PostgreSQL 130, Playwright 51. Existing-invitation agenda updates await a walkthrough with Duncan.
+**Why it matters:** staff can reuse personal wording while reviewing each send through consistent controls and preserving workflow-specific authority.
+**Pointers:** `docs/audits/REVIEWER_DEADLINE_EMAIL_BUILD_2026-10-24.md`; `docs/audits/MEETING_AGENDA_DEFAULTS_BUILD_2026-10-24.md`; `docs/audits/EMAIL_INTERFACE_CONSISTENCY_BUILD_2026-10-24.md`; `docs/plans/PERSONAL_EMAIL_DEFAULTS_TODO_2026-09-20.md`.
+
 ## October 2026 — Meeting Tracker durable preparation and approved editions released (Session 637)
 
 **Milestone:** Meeting Tracker now prepares materials durably and exposes Coordinator-approved presentation editions that survive corrections until explicit replacement or withdrawal.
