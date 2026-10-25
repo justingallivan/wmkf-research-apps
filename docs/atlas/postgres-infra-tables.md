@@ -41,6 +41,11 @@ loud at module load.
 to Dataverse; the former Postgres preference branch is removed and
 `WAVE1_BACKEND_PREFS=postgres` fails loud at module load.
 **Encryption:** values AES-256-GCM when `is_encrypted = true`.
+**Branch-built email-consistency read contract (2026-10-24):** the legacy reviewer
+template key has a strict own-owner/key GET that distinguishes confirmed absence
+from identity, duplicate/encrypted-row and enumeration failures. Family edits
+re-read the raw map plus shared copy and preserve sibling fields/inheritance.
+No storage, schema or identity mapping change; generic other-key reads unchanged.
 
 ### `system_settings` — RETIRED 2026-05-12 (was Postgres / now Dataverse-only)
 **Source of truth:** **Dataverse `wmkf_appsystemsettings`**. Postgres table dropped via migration `007_drop_wave1_tables.sql` on 2026-05-12. Final reconciliation on 2026-05-11 synced 10 tier-keyed `model_override:*` rows from S145 dev writes (PG→DV); counts matched (45/45) before the drop.

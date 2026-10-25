@@ -91,8 +91,10 @@ test('double click produces one send; completion after unmount invokes no callba
 test('failed reset does not erase current edits and reports the failure', async () => {
   await open(); fireEvent.change(screen.getByLabelText('Subject'), { target: { value: 'Keep this edit' } });
   requestEnvelope.mockResolvedValueOnce({ ok: false, status: 500, data: { error: 'Reset failed' } });
-  fireEvent.click(screen.getByRole('button', { name: 'Use shared default' }));
-  expect(await screen.findByRole('alert')).toHaveTextContent(/reset|default/i);
+  const details = screen.getByText('Your default wording').closest('details');
+  details.open = true; fireEvent(details, new Event('toggle'));
+  expect(await screen.findByText(/Your default wording could not be loaded/)).toBeInTheDocument();
+  expect(screen.getByRole('button', { name: 'Retry loading default wording' })).toBeEnabled();
   expect(screen.getByLabelText('Subject')).toHaveValue('Keep this edit');
 });
 

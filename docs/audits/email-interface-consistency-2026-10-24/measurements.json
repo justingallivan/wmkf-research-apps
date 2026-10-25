@@ -1,0 +1,1076 @@
+[
+  {
+    "mode": "materials",
+    "label": "desktop",
+    "dialogs": 1,
+    "fields": [
+      {
+        "id": "",
+        "label": "Subject",
+        "tag": "INPUT"
+      },
+      {
+        "id": "",
+        "label": "Message",
+        "tag": "TEXTAREA"
+      }
+    ],
+    "scrollWidth": 1440,
+    "smallButtons": [
+      {
+        "height": 20,
+        "text": "Close"
+      }
+    ],
+    "width": 1440,
+    "axLength": 1200
+  },
+  {
+    "mode": "materialsReminder",
+    "label": "desktop",
+    "dialogs": 1,
+    "fields": [
+      {
+        "id": "",
+        "label": "Subject",
+        "tag": "INPUT"
+      },
+      {
+        "id": "",
+        "label": "Message",
+        "tag": "TEXTAREA"
+      }
+    ],
+    "scrollWidth": 1440,
+    "smallButtons": [
+      {
+        "height": 20,
+        "text": "Close"
+      }
+    ],
+    "width": 1440,
+    "axLength": 1229
+  },
+  {
+    "mode": "invite",
+    "label": "desktop",
+    "dialogs": 0,
+    "fields": [
+      {
+        "id": "",
+        "label": "",
+        "tag": "INPUT"
+      },
+      {
+        "id": "",
+        "label": "",
+        "tag": "TEXTAREA"
+      }
+    ],
+    "scrollWidth": 1440,
+    "smallButtons": [
+      {
+        "height": 20,
+        "text": "×"
+      }
+    ],
+    "width": 1440,
+    "axLength": 1139
+  },
+  {
+    "mode": "reviewerMaterials",
+    "label": "desktop",
+    "dialogs": 0,
+    "fields": [
+      {
+        "id": "",
+        "label": "",
+        "tag": "INPUT"
+      },
+      {
+        "id": "",
+        "label": "",
+        "tag": "INPUT"
+      },
+      {
+        "id": "",
+        "label": "",
+        "tag": "INPUT"
+      },
+      {
+        "id": "",
+        "label": "",
+        "tag": "TEXTAREA"
+      }
+    ],
+    "scrollWidth": 1440,
+    "smallButtons": [],
+    "width": 1440,
+    "axLength": 1984
+  },
+  {
+    "mode": "distribution",
+    "label": "desktop",
+    "dialogs": 1,
+    "fields": [
+      {
+        "id": "distribution-to",
+        "label": "To",
+        "tag": "TEXTAREA"
+      },
+      {
+        "id": "distribution-cc",
+        "label": "Cc",
+        "tag": "TEXTAREA"
+      },
+      {
+        "id": "distribution-subject",
+        "label": "Subject",
+        "tag": "INPUT"
+      },
+      {
+        "id": "distribution-body",
+        "label": "Message",
+        "tag": "TEXTAREA"
+      }
+    ],
+    "scrollWidth": 1440,
+    "smallButtons": [
+      {
+        "height": 16,
+        "text": "Add from directory"
+      },
+      {
+        "height": 16,
+        "text": "Add from directory"
+      }
+    ],
+    "width": 1440,
+    "axLength": 1506
+  },
+  {
+    "mode": "templates",
+    "label": "desktop",
+    "dialogs": 0,
+    "fields": [
+      {
+        "id": "",
+        "label": "",
+        "tag": "INPUT"
+      },
+      {
+        "id": "",
+        "label": "",
+        "tag": "TEXTAREA"
+      }
+    ],
+    "scrollWidth": 1440,
+    "smallButtons": [
+      {
+        "height": 20,
+        "text": "×"
+      },
+      {
+        "height": 16,
+        "text": "Reset this template to the default"
+      }
+    ],
+    "width": 1440,
+    "axLength": 1137
+  },
+  {
+    "mode": "admin",
+    "label": "desktop",
+    "dialogs": 0,
+    "fields": [
+      {
+        "id": "email-default-email.reviewer_reminder_respond_by.subject",
+        "label": "Reviewer respond-by reminder subject",
+        "tag": "INPUT"
+      },
+      {
+        "id": "email-default-email.reviewer_reminder_respond_by.body",
+        "label": "Reviewer respond-by reminder body",
+        "tag": "TEXTAREA"
+      },
+      {
+        "id": "email-default-email.reviewer_reminder_review_due.subject",
+        "label": "Reviewer review-due reminder subject",
+        "tag": "INPUT"
+      },
+      {
+        "id": "email-default-email.reviewer_reminder_review_due.body",
+        "label": "Reviewer review-due reminder body",
+        "tag": "TEXTAREA"
+      },
+      {
+        "id": "email-default-email.reviewer_acceptance.subject",
+        "label": "Reviewer acceptance confirmation subject",
+        "tag": "INPUT"
+      },
+      {
+        "id": "email-default-email.reviewer_acceptance.body",
+        "label": "Reviewer acceptance confirmation body",
+        "tag": "TEXTAREA"
+      },
+      {
+        "id": "email-default-email.reviewer_extension.subject",
+        "label": "Reviewer deadline update subject",
+        "tag": "INPUT"
+      },
+      {
+        "id": "email-default-email.reviewer_extension.body",
+        "label": "Reviewer deadline update body",
+        "tag": "TEXTAREA"
+      },
+      {
+        "id": "email-default-email.reviewer_withdraw.subject",
+        "label": "Reviewer withdraw-sufficient subject",
+        "tag": "INPUT"
+      },
+      {
+        "id": "email-default-email.reviewer_withdraw.body",
+        "label": "Reviewer withdraw-sufficient body",
+        "tag": "TEXTAREA"
+      },
+      {
+        "id": "email-default-email.reviewer_release.subject",
+        "label": "Accepted reviewer release subject",
+        "tag": "INPUT"
+      },
+      {
+        "id": "email-default-email.reviewer_release.body",
+        "label": "Accepted reviewer release body",
+        "tag": "TEXTAREA"
+      },
+      {
+        "id": "email-default-email.reviewer_invitation.subject",
+        "label": "Reviewer invitation subject",
+        "tag": "INPUT"
+      },
+      {
+        "id": "email-default-email.reviewer_invitation.body",
+        "label": "Reviewer invitation body",
+        "tag": "TEXTAREA"
+      },
+      {
+        "id": "email-default-email.reviewer_materials.subject",
+        "label": "Reviewer materials subject",
+        "tag": "INPUT"
+      },
+      {
+        "id": "email-default-email.reviewer_materials.body",
+        "label": "Reviewer materials body",
+        "tag": "TEXTAREA"
+      },
+      {
+        "id": "email-default-email.reviewer_materials.button_label",
+        "label": "Reviewer materials button label",
+        "tag": "INPUT"
+      },
+      {
+        "id": "email-default-email.reviewer_followup.subject",
+        "label": "Reviewer follow-up subject",
+        "tag": "INPUT"
+      },
+      {
+        "id": "email-default-email.reviewer_followup.body",
+        "label": "Reviewer follow-up body",
+        "tag": "TEXTAREA"
+      },
+      {
+        "id": "email-default-email.reviewer_followup.button_label",
+        "label": "Reviewer follow-up button label",
+        "tag": "INPUT"
+      },
+      {
+        "id": "email-default-email.reviewer_thankyou.subject",
+        "label": "Reviewer thank-you subject",
+        "tag": "INPUT"
+      },
+      {
+        "id": "email-default-email.reviewer_thankyou.body",
+        "label": "Reviewer thank-you body",
+        "tag": "TEXTAREA"
+      },
+      {
+        "id": "email-default-email.grantee_invite.subject",
+        "label": "Grantee invite subject",
+        "tag": "INPUT"
+      },
+      {
+        "id": "email-default-email.grantee_invite.body",
+        "label": "Grantee invite body",
+        "tag": "TEXTAREA"
+      },
+      {
+        "id": "email-default-email.grantee_reminder.subject",
+        "label": "Grantee reminder subject",
+        "tag": "INPUT"
+      },
+      {
+        "id": "email-default-email.grantee_reminder.body",
+        "label": "Grantee reminder body",
+        "tag": "TEXTAREA"
+      },
+      {
+        "id": "email-default-email.site_visit_materials_invite.subject",
+        "label": "Site-visit materials invitation subject",
+        "tag": "INPUT"
+      },
+      {
+        "id": "email-default-email.site_visit_materials_invite.body",
+        "label": "Site-visit materials invitation body",
+        "tag": "TEXTAREA"
+      },
+      {
+        "id": "email-default-email.site_visit_materials_reminder.subject",
+        "label": "Site-visit materials reminder subject",
+        "tag": "INPUT"
+      },
+      {
+        "id": "email-default-email.site_visit_materials_reminder.body",
+        "label": "Site-visit materials reminder body",
+        "tag": "TEXTAREA"
+      },
+      {
+        "id": "email-default-email.deliberation_share.subject",
+        "label": "Share for deliberation subject",
+        "tag": "INPUT"
+      },
+      {
+        "id": "email-default-email.deliberation_share.body",
+        "label": "Share for deliberation message",
+        "tag": "TEXTAREA"
+      },
+      {
+        "id": "email-default-email.deliberation_share.briefing_heading",
+        "label": "Share for deliberation briefing heading",
+        "tag": "INPUT"
+      },
+      {
+        "id": "email-default-email.deliberation_share.briefing_link_text",
+        "label": "Share for deliberation briefing link text",
+        "tag": "INPUT"
+      },
+      {
+        "id": "email-default-email.deliberation_share.briefing_description",
+        "label": "Share for deliberation briefing description",
+        "tag": "INPUT"
+      },
+      {
+        "id": "email-default-email.deliberation_share.briefing_expiry_lead_in",
+        "label": "Share for deliberation briefing expiry wording",
+        "tag": "INPUT"
+      },
+      {
+        "id": "email-default-email.deliberation_share.review_bundle_link_text",
+        "label": "Share for deliberation review bundle link text",
+        "tag": "INPUT"
+      },
+      {
+        "id": "email-default-email.deliberation_agenda.subject",
+        "label": "Deliberation agenda subject",
+        "tag": "INPUT"
+      },
+      {
+        "id": "email-default-email.deliberation_agenda.body",
+        "label": "Deliberation agenda message",
+        "tag": "TEXTAREA"
+      },
+      {
+        "id": "email-default-email.final_writeup_handoff.subject",
+        "label": "Group review handoff subject",
+        "tag": "INPUT"
+      },
+      {
+        "id": "email-default-email.final_writeup_handoff.body",
+        "label": "Group review handoff message",
+        "tag": "TEXTAREA"
+      },
+      {
+        "id": "email-default-email.final_writeup_leadership_digest.subject",
+        "label": "Leadership digest subject",
+        "tag": "INPUT"
+      },
+      {
+        "id": "email-default-email.final_writeup_leadership_digest.body",
+        "label": "Leadership digest message",
+        "tag": "TEXTAREA"
+      },
+      {
+        "id": "email-default-stage.deliberations.draft",
+        "label": "Deliberations stage label: draft",
+        "tag": "INPUT"
+      },
+      {
+        "id": "email-default-stage.deliberations.shared",
+        "label": "Deliberations stage label: shared",
+        "tag": "INPUT"
+      },
+      {
+        "id": "email-default-stage.deliberations.visit",
+        "label": "Deliberations stage label: visit",
+        "tag": "INPUT"
+      },
+      {
+        "id": "email-default-stage.deliberations.final",
+        "label": "Deliberations stage label: final",
+        "tag": "INPUT"
+      }
+    ],
+    "scrollWidth": 1440,
+    "smallButtons": [],
+    "width": 1440,
+    "axLength": 2160
+  },
+  {
+    "mode": "profile",
+    "label": "desktop",
+    "dialogs": 0,
+    "fields": [
+      {
+        "id": "",
+        "label": "Name",
+        "tag": "INPUT"
+      },
+      {
+        "id": "",
+        "label": "Email",
+        "tag": "INPUT"
+      },
+      {
+        "id": "",
+        "label": "Signature",
+        "tag": "TEXTAREA"
+      },
+      {
+        "id": "",
+        "label": "My signature already includes its own closing (for example, “Best wishes,”).",
+        "tag": "INPUT"
+      },
+      {
+        "id": "",
+        "label": "Email subject",
+        "tag": "INPUT"
+      },
+      {
+        "id": "",
+        "label": "Email body",
+        "tag": "TEXTAREA"
+      }
+    ],
+    "scrollWidth": 1440,
+    "smallButtons": [
+      {
+        "height": 20,
+        "text": "Set Default"
+      },
+      {
+        "height": 20,
+        "text": "Edit"
+      }
+    ],
+    "width": 1440,
+    "axLength": 4449
+  },
+  {
+    "mode": "scheduled",
+    "label": "desktop",
+    "dialogs": 0,
+    "fields": [
+      {
+        "id": "",
+        "label": "Review every automated email before it sends\nOff: only mail to recipients you flag waits for approval. Applies to future messages only.",
+        "tag": "INPUT"
+      },
+      {
+        "id": "",
+        "label": "Subject",
+        "tag": "INPUT"
+      },
+      {
+        "id": "",
+        "label": "Message",
+        "tag": "TEXTAREA"
+      }
+    ],
+    "scrollWidth": 1440,
+    "smallButtons": [],
+    "width": 1440,
+    "axLength": 2877
+  },
+  {
+    "mode": "grantee",
+    "label": "desktop",
+    "dialogs": 0,
+    "fields": [
+      {
+        "id": "",
+        "label": "To email",
+        "tag": "INPUT"
+      },
+      {
+        "id": "",
+        "label": "Cc email",
+        "tag": "INPUT"
+      },
+      {
+        "id": "grantee-invite-subject",
+        "label": "Subject",
+        "tag": "INPUT"
+      },
+      {
+        "id": "",
+        "label": "Email body",
+        "tag": "TEXTAREA"
+      }
+    ],
+    "scrollWidth": 1440,
+    "smallButtons": [
+      {
+        "height": 16,
+        "text": "Reset to default"
+      }
+    ],
+    "width": 1440,
+    "axLength": 2847
+  },
+  {
+    "mode": "materials",
+    "label": "narrow",
+    "dialogs": 1,
+    "fields": [
+      {
+        "id": "",
+        "label": "Subject",
+        "tag": "INPUT"
+      },
+      {
+        "id": "",
+        "label": "Message",
+        "tag": "TEXTAREA"
+      }
+    ],
+    "scrollWidth": 390,
+    "smallButtons": [
+      {
+        "height": 20,
+        "text": "Close"
+      }
+    ],
+    "width": 390,
+    "axLength": 1200
+  },
+  {
+    "mode": "materialsReminder",
+    "label": "narrow",
+    "dialogs": 1,
+    "fields": [
+      {
+        "id": "",
+        "label": "Subject",
+        "tag": "INPUT"
+      },
+      {
+        "id": "",
+        "label": "Message",
+        "tag": "TEXTAREA"
+      }
+    ],
+    "scrollWidth": 390,
+    "smallButtons": [
+      {
+        "height": 20,
+        "text": "Close"
+      }
+    ],
+    "width": 390,
+    "axLength": 1229
+  },
+  {
+    "mode": "invite",
+    "label": "narrow",
+    "dialogs": 0,
+    "fields": [
+      {
+        "id": "",
+        "label": "",
+        "tag": "INPUT"
+      },
+      {
+        "id": "",
+        "label": "",
+        "tag": "TEXTAREA"
+      }
+    ],
+    "scrollWidth": 390,
+    "smallButtons": [
+      {
+        "height": 20,
+        "text": "×"
+      }
+    ],
+    "width": 390,
+    "axLength": 1139
+  },
+  {
+    "mode": "reviewerMaterials",
+    "label": "narrow",
+    "dialogs": 0,
+    "fields": [
+      {
+        "id": "",
+        "label": "",
+        "tag": "INPUT"
+      },
+      {
+        "id": "",
+        "label": "",
+        "tag": "INPUT"
+      },
+      {
+        "id": "",
+        "label": "",
+        "tag": "INPUT"
+      },
+      {
+        "id": "",
+        "label": "",
+        "tag": "TEXTAREA"
+      }
+    ],
+    "scrollWidth": 390,
+    "smallButtons": [],
+    "width": 390,
+    "axLength": 1984
+  },
+  {
+    "mode": "distribution",
+    "label": "narrow",
+    "dialogs": 1,
+    "fields": [
+      {
+        "id": "distribution-to",
+        "label": "To",
+        "tag": "TEXTAREA"
+      },
+      {
+        "id": "distribution-cc",
+        "label": "Cc",
+        "tag": "TEXTAREA"
+      },
+      {
+        "id": "distribution-subject",
+        "label": "Subject",
+        "tag": "INPUT"
+      },
+      {
+        "id": "distribution-body",
+        "label": "Message",
+        "tag": "TEXTAREA"
+      }
+    ],
+    "scrollWidth": 390,
+    "smallButtons": [
+      {
+        "height": 16,
+        "text": "Add from directory"
+      },
+      {
+        "height": 16,
+        "text": "Add from directory"
+      }
+    ],
+    "width": 390,
+    "axLength": 1506
+  },
+  {
+    "mode": "templates",
+    "label": "narrow",
+    "dialogs": 0,
+    "fields": [
+      {
+        "id": "",
+        "label": "",
+        "tag": "INPUT"
+      },
+      {
+        "id": "",
+        "label": "",
+        "tag": "TEXTAREA"
+      }
+    ],
+    "scrollWidth": 390,
+    "smallButtons": [
+      {
+        "height": 20,
+        "text": "×"
+      },
+      {
+        "height": 16,
+        "text": "Reset this template to the default"
+      }
+    ],
+    "width": 390,
+    "axLength": 1137
+  },
+  {
+    "mode": "admin",
+    "label": "narrow",
+    "dialogs": 0,
+    "fields": [
+      {
+        "id": "email-default-email.reviewer_reminder_respond_by.subject",
+        "label": "Reviewer respond-by reminder subject",
+        "tag": "INPUT"
+      },
+      {
+        "id": "email-default-email.reviewer_reminder_respond_by.body",
+        "label": "Reviewer respond-by reminder body",
+        "tag": "TEXTAREA"
+      },
+      {
+        "id": "email-default-email.reviewer_reminder_review_due.subject",
+        "label": "Reviewer review-due reminder subject",
+        "tag": "INPUT"
+      },
+      {
+        "id": "email-default-email.reviewer_reminder_review_due.body",
+        "label": "Reviewer review-due reminder body",
+        "tag": "TEXTAREA"
+      },
+      {
+        "id": "email-default-email.reviewer_acceptance.subject",
+        "label": "Reviewer acceptance confirmation subject",
+        "tag": "INPUT"
+      },
+      {
+        "id": "email-default-email.reviewer_acceptance.body",
+        "label": "Reviewer acceptance confirmation body",
+        "tag": "TEXTAREA"
+      },
+      {
+        "id": "email-default-email.reviewer_extension.subject",
+        "label": "Reviewer deadline update subject",
+        "tag": "INPUT"
+      },
+      {
+        "id": "email-default-email.reviewer_extension.body",
+        "label": "Reviewer deadline update body",
+        "tag": "TEXTAREA"
+      },
+      {
+        "id": "email-default-email.reviewer_withdraw.subject",
+        "label": "Reviewer withdraw-sufficient subject",
+        "tag": "INPUT"
+      },
+      {
+        "id": "email-default-email.reviewer_withdraw.body",
+        "label": "Reviewer withdraw-sufficient body",
+        "tag": "TEXTAREA"
+      },
+      {
+        "id": "email-default-email.reviewer_release.subject",
+        "label": "Accepted reviewer release subject",
+        "tag": "INPUT"
+      },
+      {
+        "id": "email-default-email.reviewer_release.body",
+        "label": "Accepted reviewer release body",
+        "tag": "TEXTAREA"
+      },
+      {
+        "id": "email-default-email.reviewer_invitation.subject",
+        "label": "Reviewer invitation subject",
+        "tag": "INPUT"
+      },
+      {
+        "id": "email-default-email.reviewer_invitation.body",
+        "label": "Reviewer invitation body",
+        "tag": "TEXTAREA"
+      },
+      {
+        "id": "email-default-email.reviewer_materials.subject",
+        "label": "Reviewer materials subject",
+        "tag": "INPUT"
+      },
+      {
+        "id": "email-default-email.reviewer_materials.body",
+        "label": "Reviewer materials body",
+        "tag": "TEXTAREA"
+      },
+      {
+        "id": "email-default-email.reviewer_materials.button_label",
+        "label": "Reviewer materials button label",
+        "tag": "INPUT"
+      },
+      {
+        "id": "email-default-email.reviewer_followup.subject",
+        "label": "Reviewer follow-up subject",
+        "tag": "INPUT"
+      },
+      {
+        "id": "email-default-email.reviewer_followup.body",
+        "label": "Reviewer follow-up body",
+        "tag": "TEXTAREA"
+      },
+      {
+        "id": "email-default-email.reviewer_followup.button_label",
+        "label": "Reviewer follow-up button label",
+        "tag": "INPUT"
+      },
+      {
+        "id": "email-default-email.reviewer_thankyou.subject",
+        "label": "Reviewer thank-you subject",
+        "tag": "INPUT"
+      },
+      {
+        "id": "email-default-email.reviewer_thankyou.body",
+        "label": "Reviewer thank-you body",
+        "tag": "TEXTAREA"
+      },
+      {
+        "id": "email-default-email.grantee_invite.subject",
+        "label": "Grantee invite subject",
+        "tag": "INPUT"
+      },
+      {
+        "id": "email-default-email.grantee_invite.body",
+        "label": "Grantee invite body",
+        "tag": "TEXTAREA"
+      },
+      {
+        "id": "email-default-email.grantee_reminder.subject",
+        "label": "Grantee reminder subject",
+        "tag": "INPUT"
+      },
+      {
+        "id": "email-default-email.grantee_reminder.body",
+        "label": "Grantee reminder body",
+        "tag": "TEXTAREA"
+      },
+      {
+        "id": "email-default-email.site_visit_materials_invite.subject",
+        "label": "Site-visit materials invitation subject",
+        "tag": "INPUT"
+      },
+      {
+        "id": "email-default-email.site_visit_materials_invite.body",
+        "label": "Site-visit materials invitation body",
+        "tag": "TEXTAREA"
+      },
+      {
+        "id": "email-default-email.site_visit_materials_reminder.subject",
+        "label": "Site-visit materials reminder subject",
+        "tag": "INPUT"
+      },
+      {
+        "id": "email-default-email.site_visit_materials_reminder.body",
+        "label": "Site-visit materials reminder body",
+        "tag": "TEXTAREA"
+      },
+      {
+        "id": "email-default-email.deliberation_share.subject",
+        "label": "Share for deliberation subject",
+        "tag": "INPUT"
+      },
+      {
+        "id": "email-default-email.deliberation_share.body",
+        "label": "Share for deliberation message",
+        "tag": "TEXTAREA"
+      },
+      {
+        "id": "email-default-email.deliberation_share.briefing_heading",
+        "label": "Share for deliberation briefing heading",
+        "tag": "INPUT"
+      },
+      {
+        "id": "email-default-email.deliberation_share.briefing_link_text",
+        "label": "Share for deliberation briefing link text",
+        "tag": "INPUT"
+      },
+      {
+        "id": "email-default-email.deliberation_share.briefing_description",
+        "label": "Share for deliberation briefing description",
+        "tag": "INPUT"
+      },
+      {
+        "id": "email-default-email.deliberation_share.briefing_expiry_lead_in",
+        "label": "Share for deliberation briefing expiry wording",
+        "tag": "INPUT"
+      },
+      {
+        "id": "email-default-email.deliberation_share.review_bundle_link_text",
+        "label": "Share for deliberation review bundle link text",
+        "tag": "INPUT"
+      },
+      {
+        "id": "email-default-email.deliberation_agenda.subject",
+        "label": "Deliberation agenda subject",
+        "tag": "INPUT"
+      },
+      {
+        "id": "email-default-email.deliberation_agenda.body",
+        "label": "Deliberation agenda message",
+        "tag": "TEXTAREA"
+      },
+      {
+        "id": "email-default-email.final_writeup_handoff.subject",
+        "label": "Group review handoff subject",
+        "tag": "INPUT"
+      },
+      {
+        "id": "email-default-email.final_writeup_handoff.body",
+        "label": "Group review handoff message",
+        "tag": "TEXTAREA"
+      },
+      {
+        "id": "email-default-email.final_writeup_leadership_digest.subject",
+        "label": "Leadership digest subject",
+        "tag": "INPUT"
+      },
+      {
+        "id": "email-default-email.final_writeup_leadership_digest.body",
+        "label": "Leadership digest message",
+        "tag": "TEXTAREA"
+      },
+      {
+        "id": "email-default-stage.deliberations.draft",
+        "label": "Deliberations stage label: draft",
+        "tag": "INPUT"
+      },
+      {
+        "id": "email-default-stage.deliberations.shared",
+        "label": "Deliberations stage label: shared",
+        "tag": "INPUT"
+      },
+      {
+        "id": "email-default-stage.deliberations.visit",
+        "label": "Deliberations stage label: visit",
+        "tag": "INPUT"
+      },
+      {
+        "id": "email-default-stage.deliberations.final",
+        "label": "Deliberations stage label: final",
+        "tag": "INPUT"
+      }
+    ],
+    "scrollWidth": 390,
+    "smallButtons": [],
+    "width": 390,
+    "axLength": 2160
+  },
+  {
+    "mode": "profile",
+    "label": "narrow",
+    "dialogs": 0,
+    "fields": [
+      {
+        "id": "",
+        "label": "Name",
+        "tag": "INPUT"
+      },
+      {
+        "id": "",
+        "label": "Email",
+        "tag": "INPUT"
+      },
+      {
+        "id": "",
+        "label": "Signature",
+        "tag": "TEXTAREA"
+      },
+      {
+        "id": "",
+        "label": "My signature already includes its own closing (for example, “Best wishes,”).",
+        "tag": "INPUT"
+      },
+      {
+        "id": "",
+        "label": "Email subject",
+        "tag": "INPUT"
+      },
+      {
+        "id": "",
+        "label": "Email body",
+        "tag": "TEXTAREA"
+      }
+    ],
+    "scrollWidth": 390,
+    "smallButtons": [
+      {
+        "height": 20,
+        "text": "Set Default"
+      },
+      {
+        "height": 20,
+        "text": "Edit"
+      }
+    ],
+    "width": 390,
+    "axLength": 3990
+  },
+  {
+    "mode": "scheduled",
+    "label": "narrow",
+    "dialogs": 0,
+    "fields": [
+      {
+        "id": "",
+        "label": "Review every automated email before it sends\nOff: only mail to recipients you flag waits for approval. Applies to future messages only.",
+        "tag": "INPUT"
+      },
+      {
+        "id": "",
+        "label": "Subject",
+        "tag": "INPUT"
+      },
+      {
+        "id": "",
+        "label": "Message",
+        "tag": "TEXTAREA"
+      }
+    ],
+    "scrollWidth": 390,
+    "smallButtons": [],
+    "width": 390,
+    "axLength": 2418
+  },
+  {
+    "mode": "grantee",
+    "label": "narrow",
+    "dialogs": 0,
+    "fields": [
+      {
+        "id": "",
+        "label": "To email",
+        "tag": "INPUT"
+      },
+      {
+        "id": "",
+        "label": "Cc email",
+        "tag": "INPUT"
+      },
+      {
+        "id": "grantee-invite-subject",
+        "label": "Subject",
+        "tag": "INPUT"
+      },
+      {
+        "id": "",
+        "label": "Email body",
+        "tag": "TEXTAREA"
+      }
+    ],
+    "scrollWidth": 390,
+    "smallButtons": [
+      {
+        "height": 16,
+        "text": "Reset to default"
+      }
+    ],
+    "width": 390,
+    "axLength": 2847
+  }
+]

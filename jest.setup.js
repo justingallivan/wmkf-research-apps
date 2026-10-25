@@ -136,3 +136,9 @@ Object.defineProperty(global, 'crypto', {
   },
   writable: true,
 })
+// jsdom does not implement the native dialog lifecycle. This models visibility
+// only; browser rehearsals verify top-layer focus, inertness and Escape.
+if (typeof HTMLDialogElement !== 'undefined') {
+  HTMLDialogElement.prototype.showModal = function () { this.setAttribute('open', ''); };
+  HTMLDialogElement.prototype.close = function () { this.removeAttribute('open'); };
+}

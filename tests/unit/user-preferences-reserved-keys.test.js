@@ -14,6 +14,7 @@ jest.mock('../../lib/services/database-service', () => ({
     setUserPreference: jest.fn(async () => true),
     setUserPreferences: jest.fn(async () => true),
     deleteUserPreference: jest.fn(async () => true),
+    getReviewerEmailTemplatesStrict: jest.fn(async () => null),
     getUserPreferences: jest.fn(async () => ({})),
     ENCRYPTED_PREFERENCE_KEYS: [],
   },
@@ -201,4 +202,17 @@ describe('reserved-key guard', () => {
     expect(getSettingStrict).toHaveBeenCalledTimes(2);
     expect(DatabaseService.setUserPreference).toHaveBeenCalledWith(1, EMAIL_TEMPLATES, value);
   });
+});
+
+
+test('legacy template GET uses a strict own read and preserves absence', async () => {
+  const res = mockRes(); await handler({ method: 'GET', query: { key: EMAIL_TEMPLATES } }, res);
+  expect(res.statusCode).toBe(200); expect(res.body.value).toBeNull();
+  expect(DatabaseService.getReviewerEmailTemplatesStrict).toHaveBeenCalledWith(1);
+  expect(DatabaseService.getUserPreferences).not.toHaveBeenCalled();
+});
+test.each([['preference_invalid', 409], ['preference_unavailable', 503]])('strict %s is not serialized as empty settings', async (code, status) => {
+  DatabaseService.getReviewerEmailTemplatesStrict.mockRejectedValueOnce(Object.assign(new Error('failed'), { code }));
+  const res = mockRes(); await handler({ method: 'GET', query: { key: EMAIL_TEMPLATES } }, res);
+  expect(res.statusCode).toBe(status); expect(res.body).not.toHaveProperty('value');
 });

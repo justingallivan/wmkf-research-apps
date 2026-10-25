@@ -38,7 +38,7 @@ export default async function handler(req, res) {
   return withDalContext('grantee-recipients', async () => {
     try {
       const body = await resolveGranteeInviteRecipients({ requestId });
-      return res.status(200).json(body);
+      return res.status(200).json({ ...body, from: access.session?.user?.azureEmail || null });
     } catch (error) {
       if (error instanceof ServiceHttpError) {
         return res.status(error.httpStatus).json(error.body ?? { error: error.message });

@@ -97,6 +97,6 @@ test('default repair remains reachable when shared configuration blocks the init
   render(<ReviewerDueDateEditor {...props} />); fireEvent.click(screen.getByRole('button', { name: 'Grant extension' })); await screen.findByText(/could not prepare the deadline email/);
   global.fetch.mockResolvedValueOnce(reply({ ok: false, reason: 'preference_invalid', ownSystemId: 'own', configured: true, shared: null, sharedUnavailable: true }, 409));
   const details = screen.getByText('Your default wording').closest('details'); details.open = true; fireEvent(details, new Event('toggle'));
-  await screen.findByRole('button', { name: 'Clear my default' }); expect(screen.getByLabelText('Subject')).toHaveValue('');
+  await screen.findByRole('button', { name: 'Clear my default' }); expect(screen.getByLabelText('Default subject')).toHaveValue('');
   expect(screen.getByText(/administrator must repair shared wording/)).toBeInTheDocument();
 });

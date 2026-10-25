@@ -1,3 +1,7 @@
+import { Button } from '../Layout';
+import EmailAddressSummary from '../EmailAddressSummary';
+import LegacyWordingDefault from './LegacyWordingDefault';
+import EmailDialog from '../EmailDialog';
 /**
  * InviteEmailModal — a lean preview→send modal for INVITING saved candidates to
  * review (Workbench Candidates tab). Deliberately NOT the Review Manager
@@ -31,7 +35,7 @@ import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import EmailSendFeedback from '../EmailSendFeedback';
 import { readSseStream } from './sse';
 import { PREFERENCE_KEYS } from '../../config/reviewerFinderPreferences';
-import { loadEmailTemplates, EMPTY_TEMPLATES } from './email-template-store';
+import { loadEmailTemplateState, EMPTY_TEMPLATES } from './email-template-store';
 import {
   classifyInvitationLinks,
   INVALID_SECURE_LINK_SKIP_REASON,
@@ -225,6 +229,8 @@ export default function InviteEmailModal({ requestId = null, candidates = [], se
   const [timing, setTiming] = useState({ respondOffsetDays: 7, proposalSendDate: '', reviewDueDate: '' });
   const [timelineOpen, setTimelineOpen] = useState(false);
   const [template, setTemplate] = useState(EMPTY_TEMPLATES.invitation); // resolved invitation template (admin default + per-PD override), loaded on open
+  const [defaultWordingBusy, setDefaultWordingBusy] = useState(false);
+  const [templateNotice, setTemplateNotice] = useState(null);
   const [templateLoaded, setTemplateLoaded] = useState(false); // gate the first render until the template load settles (see renderPreviews) — the initial `template` is the EMPTY skeleton
   const [error, setError] = useState(null);
   // True only when the last preview render failed — gates the banner's Retry
@@ -329,7 +335,9 @@ export default function InviteEmailModal({ requestId = null, candidates = [], se
         setTiming((t) => ({ ...t, ...nextTiming }));
       }
       try {
-        const tpl = await loadEmailTemplates();
+        const loaded = await loadEmailTemplateState();
+        const tpl = loaded.templates;
+        if (!cancelled) setTemplateNotice(!['configured', 'absent'].includes(loaded.ownStatus) ? "Your saved wording could not be loaded. Showing shared wording where available." : !loaded.sharedAvailable ? "Shared wording could not be loaded. Enter wording or retry in Your default wording." : null);
         if (!cancelled && tpl?.invitation) setTemplate(tpl.invitation);
       } catch { /* falls back to the default invitation template */ }
       finally {
@@ -713,6 +721,7 @@ export default function InviteEmailModal({ requestId = null, candidates = [], se
   }, [timing]);
 
   const handleSend = async () => {
+    if (defaultWordingBusy) return;
     if (sendable.length === 0) { setError('No recipients with an email to send to.'); return; }
     if (timelineError) { setError(timelineError); return; }
     if (quickCheckSendable.length > 0 && !allQuickChecksConfirmed) {
@@ -814,28 +823,31 @@ export default function InviteEmailModal({ requestId = null, candidates = [], se
   };
 
   return (
+    <EmailDialog label="Invite reviewers" busy={step === 'sending' || defaultWordingBusy} onClose={onClose}>
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
       <div className="bg-white rounded-xl shadow-xl w-full max-w-3xl max-h-[90vh] flex flex-col">
         <div className="flex items-center justify-between px-5 py-3 border-b border-gray-200">
           <p className="font-medium text-gray-900">
             {allowResend ? 'Re-invite reviewers' : 'Invite reviewers'} ({candidates.length})
           </p>
-          <button type="button" onClick={onClose} className="text-gray-400 hover:text-gray-600 text-xl leading-none">×</button>
+          <Button aria-label="Close" variant="outline" size="sm" type="button" onClick={() => { if (!defaultWordingBusy && step !== 'sending') onClose(); }} disabled={defaultWordingBusy || step === 'sending'} className="text-gray-600 hover:text-gray-900 text-xl leading-none">×</Button>
         </div>
 
         <div className="flex-1 overflow-y-auto px-5 py-4">
+          {templateNotice && <p role="status" className="mb-3 text-sm text-amber-800">{templateNotice} Retry loading in Your default wording; the current email will stay unchanged.</p>}
+          <div className="mb-4"><LegacyWordingDefault type="invitation" scopeKey={requestId || ''} disabled={step === 'sending'} onBusyChange={setDefaultWordingBusy} /></div>
           {error && (
             <div className="p-3 bg-amber-50 text-amber-700 rounded-lg text-sm mb-3 flex items-start justify-between gap-3">
               <span>{error}</span>
               {previewFailed && (
-                <button
+                <Button variant="outline" size="sm"
                   type="button"
                   onClick={renderPreviews}
-                  disabled={rendering}
-                  className="shrink-0 px-2.5 py-1 rounded-md border border-amber-300 bg-white text-amber-800 text-xs font-medium hover:bg-amber-100 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-white"
+                  disabled={defaultWordingBusy || (rendering)}
+                  className="shrink-0 px-2.5 py-1 rounded-md border border-amber-300 text-amber-800 text-xs font-medium disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-white"
                 >
                   ↻ Retry
-                </button>
+                </Button>
               )}
             </div>
           )}
@@ -843,7 +855,7 @@ export default function InviteEmailModal({ requestId = null, candidates = [], se
           {step === 'preview' && (
             <>
               <div className="mb-4 border border-gray-200 rounded-lg p-3 bg-gray-50">
-                <button
+                <Button disabled={defaultWordingBusy} variant="outline" size="sm"
                   type="button"
                   onClick={() => setTimelineOpen((open) => !open)}
                   aria-expanded={timelineOpen}
@@ -854,30 +866,30 @@ export default function InviteEmailModal({ requestId = null, candidates = [], se
                     <span className="text-xs text-gray-500">{timelineOpen ? 'Collapse' : 'Edit'}</span>
                   </span>
                   <span className="mt-1 block text-xs text-gray-500">{timingSummary(timing)}</span>
-                </button>
+                </Button>
                 {timelineOpen && (
                   <div className="mt-3">
                     <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                       <label className="text-xs text-gray-600">
                         Days to respond
-                        <input type="number" min="0" step="1" value={timing.respondOffsetDays}
+                        <input disabled={defaultWordingBusy} type="number" min="0" step="1" value={timing.respondOffsetDays}
                           onChange={(e) => setTiming((t) => ({ ...t, respondOffsetDays: normalizeOffsetInput(e.target.value) }))}
                           className="mt-1 w-full text-sm border border-gray-300 rounded px-2 py-1" />
                       </label>
                       <label className="text-xs text-gray-600">
                         Proposals released to reviewers
-                        <input type="date" value={timing.proposalSendDate}
+                        <input disabled={defaultWordingBusy} type="date" value={timing.proposalSendDate}
                           onChange={(e) => setTiming((t) => ({ ...t, proposalSendDate: e.target.value }))}
                           className="mt-1 w-full text-sm border border-gray-300 rounded px-2 py-1" />
                       </label>
                       <label className="text-xs text-gray-600">
                         Reviews due
-                        <input type="date" value={timing.reviewDueDate}
+                        <input disabled={defaultWordingBusy} type="date" value={timing.reviewDueDate}
                           onChange={(e) => setTiming((t) => ({ ...t, reviewDueDate: e.target.value }))}
                           className="mt-1 w-full text-sm border border-gray-300 rounded px-2 py-1" />
                       </label>
                     </div>
-                    <p className="text-xs text-gray-400 mt-2">
+                    <p className="text-xs text-gray-600 mt-2">
                       Days to respond and reviews due are request-level campaign settings when saved. Proposal release is email-only copy for this invitation. A blank field omits its line.
                     </p>
                   </div>
@@ -905,17 +917,17 @@ export default function InviteEmailModal({ requestId = null, candidates = [], se
                     It&rsquo;s been auto-cleaned for these emails, but you can fix the source abstract so future
                     reads start from clean text.
                   </p>
-                  <button
+                  <Button disabled={defaultWordingBusy} variant="outline" size="sm"
                     type="button"
                     onClick={() => {
                       setAbstractDraft(flaggedAbstract.reflowedAbstract || '');
                       setAbstractError(null);
                       setAbstractEditorOpen(true);
                     }}
-                    className="mt-2 px-3 py-1.5 text-xs font-medium text-amber-900 bg-amber-100 border border-amber-300 rounded-lg hover:bg-amber-200"
+                    className="mt-2 px-3 py-1.5 text-xs font-medium text-amber-900 border border-amber-300 rounded-lg"
                   >
                     Edit abstract
-                  </button>
+                  </Button>
                 </div>
               )}
 
@@ -926,7 +938,7 @@ export default function InviteEmailModal({ requestId = null, candidates = [], se
                     We reflowed the wrapped text — add a blank line between paragraphs if needed. This updates the
                     proposal&rsquo;s abstract of record (used everywhere it appears, not just this email).
                   </p>
-                  <textarea
+                  <textarea disabled={defaultWordingBusy}
                     className="mt-2 w-full text-xs border border-gray-300 rounded px-2 py-1 font-mono resize-y min-h-[12rem]"
                     rows={12}
                     value={abstractDraft}
@@ -934,28 +946,28 @@ export default function InviteEmailModal({ requestId = null, candidates = [], se
                   />
                   {abstractError && <p className="mt-1 text-xs text-red-700">{abstractError}</p>}
                   <div className="mt-2 flex items-center gap-2">
-                    <button
+                    <Button variant="primary" size="sm"
                       type="button"
                       onClick={handleSaveAbstract}
-                      disabled={abstractSaving || !abstractDraft.trim()}
-                      className="px-3 py-1.5 text-xs font-medium text-white bg-gray-900 rounded-lg hover:bg-gray-800 disabled:opacity-40 disabled:cursor-not-allowed"
+                      disabled={defaultWordingBusy || (abstractSaving || !abstractDraft.trim())}
+                      className="px-3 py-1.5 text-xs font-medium rounded-lg disabled:opacity-40 disabled:cursor-not-allowed"
                     >
                       {abstractSaving ? 'Saving…' : 'Save abstract'}
-                    </button>
-                    <button
+                    </Button>
+                    <Button disabled={defaultWordingBusy} variant="outline" size="sm"
                       type="button"
                       onClick={() => { setAbstractEditorOpen(false); setAbstractError(null); }}
                       className="px-3 py-1.5 text-xs text-gray-600 hover:text-gray-800"
                     >
                       Cancel
-                    </button>
-                    <button
+                    </Button>
+                    <Button disabled={defaultWordingBusy} variant="outline" size="sm"
                       type="button"
                       onClick={() => setAbstractDraft(flaggedAbstract?.currentAbstract || '')}
                       className="px-3 py-1.5 text-xs text-gray-500 hover:text-gray-700"
                     >
                       Revert to original
-                    </button>
+                    </Button>
                   </div>
                 </div>
               )}
@@ -1013,7 +1025,7 @@ export default function InviteEmailModal({ requestId = null, candidates = [], se
                                   omits an unchanged email), so a staff attestation is its own action. */}
                               <div className="mt-2">
                                 <div className="mb-2 grid gap-2 sm:grid-cols-[11rem_1fr]">
-                                  <select
+                                  <select disabled={defaultWordingBusy}
                                     aria-label={`Evidence type for ${d.candidateName || 'reviewer'}`}
                                     value={verifyEvidence[d.suggestionId]?.type || 'publication_corresponding_author'}
                                     onChange={(e) => setVerifyEvidence((prev) => ({
@@ -1025,7 +1037,7 @@ export default function InviteEmailModal({ requestId = null, candidates = [], se
                                     <option value="publication_corresponding_author">Corresponding-author paper</option>
                                     <option value="institution_page">Institution or lab page</option>
                                   </select>
-                                  <input
+                                  <input disabled={defaultWordingBusy}
                                     type="url"
                                     aria-label={`Evidence link for ${d.candidateName || 'reviewer'}`}
                                     value={verifyEvidence[d.suggestionId]?.url || ''}
@@ -1037,24 +1049,24 @@ export default function InviteEmailModal({ requestId = null, candidates = [], se
                                     className="rounded border border-amber-300 bg-white px-2 py-1"
                                   />
                                 </div>
-                                <button
+                                <Button variant="outline" size="sm"
                                   type="button"
                                   onClick={() => verifyDraftAddress(d)}
                                   disabled={
-                                    verifyState[d.suggestionId]?.verifying === true
+                                    defaultWordingBusy || (verifyState[d.suggestionId]?.verifying === true
                                     // `requestId` defaults to null on this component; the
                                     // server requires it for scoping, so don't offer a
                                     // button that can only 400.
                                     || !requestId
-                                    || !d.candidateEmail
+                                    || !d.candidateEmail)
                                   }
-                                  className="rounded border border-amber-400 bg-white px-2.5 py-1 font-medium text-amber-900 hover:bg-amber-100 disabled:cursor-not-allowed disabled:opacity-50"
+                                  className="rounded border border-amber-400 px-2.5 py-1 font-medium text-amber-900 disabled:cursor-not-allowed disabled:opacity-50"
                                   title={`Record that you verified ${d.candidateEmail} against an independent source`}
                                 >
                                   {verifyState[d.suggestionId]?.verifying
                                     ? 'Recording…'
                                     : `✓ I verified ${d.candidateEmail} is correct`}
-                                </button>
+                                </Button>
                                 {verifyState[d.suggestionId]?.error && (
                                   <p role="alert" className="mt-1 text-xs text-red-700">
                                     {verifyState[d.suggestionId].error}
@@ -1072,7 +1084,7 @@ export default function InviteEmailModal({ requestId = null, candidates = [], se
                                 <div className="mt-2">
                                   <label className="block font-medium text-amber-900">
                                     Secure invitation link
-                                    <input
+                                    <input disabled={defaultWordingBusy}
                                       readOnly
                                       aria-label={`Secure invitation link for ${d.candidateName || 'reviewer'}`}
                                       value={d.manualLink}
@@ -1080,13 +1092,13 @@ export default function InviteEmailModal({ requestId = null, candidates = [], se
                                       className="mt-1 w-full rounded border border-amber-300 bg-white px-2 py-1 font-mono text-xs text-gray-700"
                                     />
                                   </label>
-                                  <button
+                                  <Button disabled={defaultWordingBusy} variant="outline" size="sm"
                                     type="button"
                                     onClick={() => copyManualLink(d)}
-                                    className="mt-2 rounded border border-amber-300 bg-amber-100 px-2.5 py-1 font-medium text-amber-900 hover:bg-amber-200"
+                                    className="mt-2 rounded border border-amber-300 px-2.5 py-1 font-medium text-amber-900"
                                   >
                                     Copy secure invitation link
-                                  </button>
+                                  </Button>
                                   {manualLinkCopyState[d.suggestionId]?.copied && (
                                     <p role="status" aria-live="polite" className="mt-1 text-xs text-amber-700">Copied to the clipboard.</p>
                                   )}
@@ -1098,14 +1110,14 @@ export default function InviteEmailModal({ requestId = null, candidates = [], se
                                   <p className="mt-2 text-xs text-amber-700">
                                     If you reload or regenerate this preview before recording the send, copy the newest link.
                                   </p>
-                                  <button
+                                  <Button variant="primary" size="sm"
                                     type="button"
                                     onClick={() => markManualInviteSent(d)}
-                                    disabled={manualLinkCopyState[d.suggestionId]?.marking === true}
-                                    className="mt-2 rounded bg-amber-800 px-2.5 py-1 font-medium text-white hover:bg-amber-900 disabled:cursor-not-allowed disabled:opacity-50"
+                                    disabled={defaultWordingBusy || (manualLinkCopyState[d.suggestionId]?.marking === true)}
+                                    className="mt-2 rounded px-2.5 py-1 font-medium disabled:cursor-not-allowed disabled:opacity-50"
                                   >
                                     {manualLinkCopyState[d.suggestionId]?.marking ? 'Recording…' : 'I sent it — mark manually sent'}
-                                  </button>
+                                  </Button>
                                   {manualLinkCopyState[d.suggestionId]?.markError && (
                                     <p role="alert" className="mt-1 text-xs text-red-700">
                                       {manualLinkCopyState[d.suggestionId].markError}
@@ -1134,7 +1146,7 @@ export default function InviteEmailModal({ requestId = null, candidates = [], se
                                     <legend className="font-medium">Which address did you verify?</legend>
                                     {[d.addressConflict.storedEmail, d.addressConflict.foundEmail].map((address) => (
                                       <label key={address} className="mt-1 flex items-center gap-2">
-                                        <input
+                                        <input disabled={defaultWordingBusy}
                                           type="radio"
                                           name={`conflict-address-${d.suggestionId}`}
                                           value={address}
@@ -1150,7 +1162,7 @@ export default function InviteEmailModal({ requestId = null, candidates = [], se
                                     ))}
                                   </fieldset>
                                   <div className="grid gap-2 sm:grid-cols-[11rem_1fr]">
-                                    <select
+                                    <select disabled={defaultWordingBusy}
                                       aria-label={`Evidence type for ${d.candidateName || 'reviewer'}`}
                                       value={verifyEvidence[d.suggestionId]?.type || 'publication_corresponding_author'}
                                       onChange={(e) => setVerifyEvidence((prev) => ({
@@ -1162,7 +1174,7 @@ export default function InviteEmailModal({ requestId = null, candidates = [], se
                                       <option value="publication_corresponding_author">Corresponding-author paper</option>
                                       <option value="institution_page">Institution or lab page</option>
                                     </select>
-                                    <input
+                                    <input disabled={defaultWordingBusy}
                                       type="url"
                                       aria-label={`Evidence link for ${d.candidateName || 'reviewer'}`}
                                       value={verifyEvidence[d.suggestionId]?.url || ''}
@@ -1174,14 +1186,14 @@ export default function InviteEmailModal({ requestId = null, candidates = [], se
                                       className="rounded border border-red-300 bg-white px-2 py-1"
                                     />
                                   </div>
-                                  <button
+                                  <Button variant="outline" size="sm"
                                     type="button"
                                     onClick={() => verifyDraftAddress(d)}
-                                    disabled={verifyState[d.suggestionId]?.verifying === true || !requestId}
-                                    className="rounded border border-red-300 bg-white px-2.5 py-1 font-medium hover:bg-red-50 disabled:opacity-50"
+                                    disabled={defaultWordingBusy || (verifyState[d.suggestionId]?.verifying === true || !requestId)}
+                                    className="rounded border border-red-300 px-2.5 py-1 font-medium hover:bg-red-50 disabled:opacity-50"
                                   >
                                     {verifyState[d.suggestionId]?.verifying ? 'Recording…' : 'Record verified address'}
-                                  </button>
+                                  </Button>
                                   {verifyState[d.suggestionId]?.error && (
                                     <p role="alert" className="text-xs text-red-700">
                                       {verifyState[d.suggestionId].error}
@@ -1193,14 +1205,14 @@ export default function InviteEmailModal({ requestId = null, candidates = [], se
                                   The current address pair could not be loaded. Create a repair request.
                                 </p>
                               )}
-                              <button
+                              <Button variant="outline" size="sm"
                                 type="button"
                                 onClick={() => requestAddressRepair(d)}
-                                disabled={!requestId || repairState[d.suggestionId]?.requesting}
-                                className="ml-2 mt-2 rounded border border-red-300 bg-white px-2.5 py-1 font-medium hover:bg-red-50 disabled:opacity-50"
+                                disabled={defaultWordingBusy || (!requestId || repairState[d.suggestionId]?.requesting)}
+                                className="ml-2 mt-2 rounded border border-red-300 px-2.5 py-1 font-medium hover:bg-red-50 disabled:opacity-50"
                               >
                                 {repairState[d.suggestionId]?.requesting ? 'Creating…' : 'Create repair request'}
-                              </button>
+                              </Button>
                               {repairState[d.suggestionId]?.message && (
                                 <p className="mt-1 text-xs">
                                   {repairState[d.suggestionId].message}{' '}
@@ -1215,14 +1227,19 @@ export default function InviteEmailModal({ requestId = null, candidates = [], se
                         </div>
                       ) : (
                         <div className="mt-2 space-y-2">
-                          <input
+                          <EmailAddressSummary from={d.from} to={d.candidateEmail} />
+                          <label className="block text-sm font-medium">Subject</label>
+                          <input disabled={defaultWordingBusy}
                             className="w-full text-sm border border-gray-300 rounded px-2 py-1"
+                            aria-label={`Subject for ${d.candidateName || d.candidateEmail || d.suggestionId}`}
                             value={d.subject}
                             onChange={(e) => updateEdit(d.suggestionId, 'subject', e.target.value)}
                           />
-                          <textarea
+                          <label className="block text-sm font-medium">Message</label>
+                          <textarea disabled={defaultWordingBusy}
                             className="w-full text-xs border border-gray-300 rounded px-2 py-1 font-mono resize-y min-h-[16rem]"
                             rows={16}
+                            aria-label={`Message for ${d.candidateName || d.candidateEmail || d.suggestionId}`}
                             value={d.body}
                             onChange={(e) => updateEdit(d.suggestionId, 'body', e.target.value)}
                           />
@@ -1245,13 +1262,13 @@ export default function InviteEmailModal({ requestId = null, candidates = [], se
                               <span className="font-medium">{d.candidateName || '(unnamed)'}</span>
                               {' '}<span className="text-gray-500">{d.candidateEmail}</span>
                             </span>
-                            <button
+                            <Button disabled={defaultWordingBusy} variant="link" size="sm"
                               type="button"
                               onClick={() => setExpandedIds((prev) => new Set(prev).add(d.suggestionId))}
                               className="text-blue-700 hover:text-blue-900 hover:underline flex-shrink-0"
                             >
                               Review
-                            </button>
+                            </Button>
                           </li>
                         ))}
                       </ul>
@@ -1263,7 +1280,7 @@ export default function InviteEmailModal({ requestId = null, candidates = [], se
                       <div className="mt-2 space-y-2">
                         {quickCheckSendable.map((d) => (
                           <label key={d.suggestionId} className="flex items-start gap-2 text-xs text-amber-900">
-                            <input
+                            <input disabled={defaultWordingBusy}
                               type="checkbox"
                               checked={confirmedLowConfidenceIds[d.suggestionId] === true}
                               onChange={(e) => {
@@ -1331,7 +1348,7 @@ export default function InviteEmailModal({ requestId = null, candidates = [], se
                         <p className="text-xs text-gray-600">
                           <span className="font-medium">Subject:</span> {r.capturedEmail.subject || r.subject || '(no subject)'}
                         </p>
-                        <textarea
+                        <textarea disabled={defaultWordingBusy}
                           readOnly
                           rows={8}
                           className="w-full rounded border border-gray-300 bg-gray-50 px-2 py-1 font-mono text-xs text-gray-700"
@@ -1357,11 +1374,11 @@ export default function InviteEmailModal({ requestId = null, candidates = [], se
         <div className="flex items-center justify-end gap-3 px-5 py-3 border-t border-gray-200">
           {step === 'preview' && (
             <>
-              <button type="button" onClick={onClose} className="px-4 py-2 text-sm text-gray-600 hover:text-gray-800">Cancel</button>
-              <button
+              <Button disabled={defaultWordingBusy} variant="outline" size="sm" type="button" onClick={() => { if (!defaultWordingBusy && step !== 'sending') onClose(); }} className="px-4 py-2 text-sm text-gray-600 hover:text-gray-800">Cancel</Button>
+              <Button variant="primary" size="sm"
                 type="button"
                 onClick={handleSend}
-                disabled={sendable.length === 0 || !!timelineError || (quickCheckSendable.length > 0 && !allQuickChecksConfirmed)}
+                disabled={defaultWordingBusy || (sendable.length === 0 || !!timelineError || (quickCheckSendable.length > 0 && !allQuickChecksConfirmed))}
                 className={`px-4 py-2 text-white text-sm font-medium rounded-lg disabled:opacity-40 disabled:cursor-not-allowed ${
                   quickCheckSendable.length > 0 ? 'bg-amber-600 hover:bg-amber-700' : 'bg-gray-900 hover:bg-gray-800'
                 }`}
@@ -1372,14 +1389,15 @@ export default function InviteEmailModal({ requestId = null, candidates = [], se
                 {quickCheckSendable.length > 0
                   ? `Confirm & send ${sendable.length} invitation${sendable.length === 1 ? '' : 's'}`
                   : `Send ${sendable.length > 0 ? sendable.length : ''} invitation${sendable.length === 1 ? '' : 's'}`}
-              </button>
+              </Button>
             </>
           )}
           {(step === 'sent' || step === 'error') && (
-            <button type="button" onClick={onClose} className="px-4 py-2 bg-gray-900 text-white text-sm font-medium rounded-lg hover:bg-gray-800">Done</button>
+            <Button disabled={defaultWordingBusy} variant="primary" size="sm" type="button" onClick={() => { if (!defaultWordingBusy && step !== 'sending') onClose(); }} className="px-4 py-2 text-sm font-medium rounded-lg">Done</Button>
           )}
         </div>
       </div>
     </div>
+    </EmailDialog>
   );
 }

@@ -1,5 +1,51 @@
 # Session 640 Prompt: J27 readiness — collect Connor's answers and the Wednesday meeting outcomes
 
+## Current work — email consistency build; slice 6 released
+
+[PRODUCTION-VERIFIED via PR #522, 9d12b24ce, 2026-10-24.] Implementation plan:
+`docs/plans/PERSONAL_EMAIL_MEETING_AGENDA_DEFAULTS_PLAN_2026-10-24.md`.
+PCs normally send pre-discussion agendas; other Meeting Tracker staff can cover,
+using their own mailbox/defaults. Scope: personal subject/optional opening;
+generated agenda stays server-owned. Owner adopted the newer collapsed **Your
+default wording** pattern after a read-only agent + Impeccable source review.
+All agreed Save/Clear, empty opening, addressing, fallback, placeholder, reopen,
+drift and unresolved-send decisions are in the plan. OAuth Opus 5.5 reviewed via
+Claude.ai Team OAuth and returned READY WITH NAMED CHANGES. All eight findings
+are incorporated: complete drift checks and strict link lookup, raw templates,
+shared validation, source/status/defaults refresh, separate busy/controllers,
+both generic privacy key sets, empty-opening guards and explicit limits.
+Receipt: `docs/audits/MEETING_AGENDA_DEFAULTS_PLAN_REVIEW_2026-10-24.md`.
+[VERIFIED via source, parent checks and OAuth Opus recheck.] Build is on
+`codex/meeting-agenda-email-defaults`; corrected runtime `693e637d1` passed
+25,231 tests / five snapshots, production build and scoped gates. Final test-only
+coverage passed 194 tests in 12 suites. Opus build recheck returned PASS after
+all eight findings were fixed, using subscription OAuth without API-key auth.
+Owner-authorized Production preflight validated existing agenda wording unchanged.
+One standalone synthetic agenda email is Sent (3), activity
+`986dffdc-15d0-f111-a05b-6045bd04539e`; exact HTML/parties and no regarding verified.
+Owner confirmed inbox receipt and correct appearance. Released through PR #522
+as `9d12b24ce`; all PR checks passed, including 25,204 CI tests / five snapshots
+and 130 PostgreSQL tests. Production `dpl_FScmxXBiRS5EvCJzBEjfPGoJNbyc` is READY
+and serves applications.wmkeck.org. Signed-in agenda compose/default-editor smoke
+passed without writes or another send; bounded runtime error scan returned zero.
+Existing-calendar agenda updates remain queued. Release evidence:
+`docs/audits/MEETING_AGENDA_DEFAULTS_BUILD_2026-10-24.md`.
+Suite-wide Impeccable email-interface audit completed against `ad4cbac85`: real
+components at 1440/390px, DOM/keyboard probes, detector and independent source
+review; 120 tests / 11 suites passed. Nine findings (three P1, six P2), with
+Owner approved all nine recommendations, explicitly desktop-first with no phone-
+driven density/layout compromises, then authorized independent plan review and
+continuation into the build. Implementation plan:
+`docs/plans/EMAIL_INTERFACE_CONSISTENCY_IMPLEMENTATION_PLAN_2026-10-24.md`.
+Plan review passed after five corrections; three-pass runtime implemented on
+`codex/email-interface-consistency-build`. Independent build source review returned
+READY after materials reopen/busy-lock and grantee-dialog fixes. Build receipt:
+`docs/audits/EMAIL_INTERFACE_CONSISTENCY_BUILD_2026-10-24.md`. Audit report:
+`docs/audits/EMAIL_INTERFACE_CONSISTENCY_AUDIT_2026-10-24.md`. UI changes are branch-only; no live data writes or sends. DESIGN.md preserved.
+Calendar follow-up remains queued. Exact 200% native Chrome zoom and a fresh
+390 × 844 narrow-window pass completed 2026-10-25 with no source changes.
+Both previously outstanding UI release checks are closed; evidence is in the
+linked build receipt. No promotion or live writes were performed.
 ## Session 639 Summary
 
 Two agents worked concurrently. Claude (worktree
@@ -115,8 +161,9 @@ rebuild; D6; trigger/flag questions; B1 Connor questions; B1 correction. See
 
 ### Parked / queued (from Codex's handoff)
 
-- Existing-calendar agenda updates and the suite-wide Impeccable email-interface
-  review: `docs/plans/PERSONAL_EMAIL_DEFAULTS_TODO_2026-09-20.md`.
+- Existing-calendar agenda updates remain queued. The suite-wide Impeccable
+  email-interface build is complete and owner-authorized for release; see the
+  current-work section and `docs/audits/EMAIL_INTERFACE_CONSISTENCY_BUILD_2026-10-24.md`.
 - Grant Reporting sunset parked; reviewer panel coverage parked; Research
   Institution confirm-your-details campaign tabled.
 

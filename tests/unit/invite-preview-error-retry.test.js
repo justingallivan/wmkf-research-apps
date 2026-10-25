@@ -26,6 +26,7 @@ import { act } from 'react';
 
 jest.mock('../../shared/components/reviewers/email-template-store', () => ({
   EMPTY_TEMPLATES: { invitation: { subject: '', body: '' } },
+  loadEmailTemplateState: jest.fn(async () => ({ templates: { invitation: { subject: 'Invitation', body: 'Hello {{externalLink}}' }, materials: { subject: 'S', body: 'B' }, followup: {}, thankyou: {} }, raw: {}, shared: {}, ownStatus: 'absent', sharedAvailable: true })),
   loadEmailTemplates: async () => ({ invitation: { subject: 'Invitation', body: 'Hello {{name}}' } }),
   saveEmailTemplates: async () => {},
 }));
@@ -104,7 +105,7 @@ test('server error body: message + reassurance + working Retry', async () => {
   // Retry with a now-healthy server: previews land, the banner clears.
   renderEmailsBehavior = () =>
     response({ drafts: [{ suggestionId: 's-1', candidateName: 'Jane Roe', candidateEmail: 'jane@example.edu', subject: 'S', body: 'B' }] });
-  fireEvent.click(screen.getByRole('button', { name: /Retry/ }));
+  fireEvent.click(screen.getByRole('button', { name: /↻ Retry/ }));
 
   await waitFor(() => expect(renderEmailsCalls().length).toBe(before + 1));
   await waitFor(() => expect(screen.queryByText(/retrying is safe/)).toBeNull());
@@ -117,7 +118,7 @@ test('non-JSON error response surfaces the status code, not a parse error', asyn
   await waitFor(() =>
     expect(screen.getByText(renderPreviewFailureMessage({ status: 502 }))).toBeTruthy(),
   );
-  expect(screen.getByRole('button', { name: /Retry/ })).toBeTruthy();
+  expect(screen.getByRole('button', { name: /↻ Retry/ })).toBeTruthy();
 });
 
 test('network failure surfaces the reachability message with Retry', async () => {
@@ -125,7 +126,7 @@ test('network failure surfaces the reachability message with Retry', async () =>
   openModal();
 
   await waitFor(() => expect(screen.getByText(RENDER_PREVIEW_NETWORK_MESSAGE)).toBeTruthy());
-  expect(screen.getByRole('button', { name: /Retry/ })).toBeTruthy();
+  expect(screen.getByRole('button', { name: /↻ Retry/ })).toBeTruthy();
 });
 
 function deferred() {
@@ -137,7 +138,7 @@ function deferred() {
 test('pin 6: Retry is disabled while its render is pending and re-enables once the render settles', async () => {
   renderEmailsBehavior = () => response({ error: 'boom' }, { ok: false, status: 503 });
   openModal();
-  const retryButton = await screen.findByRole('button', { name: /Retry/ });
+  const retryButton = await screen.findByRole('button', { name: /↻ Retry/ });
   expect(retryButton).not.toBeDisabled();
 
   const pending = deferred();
@@ -153,13 +154,13 @@ test('pin 6: Retry is disabled while its render is pending and re-enables once t
   // and remounts as a new node once the failure lands — re-query rather than
   // reuse the pre-render reference, which would now be a detached stale node.
   pending.resolve(response({ error: 'still broken' }, { ok: false, status: 503 }));
-  await waitFor(() => expect(screen.getByRole('button', { name: /Retry/ })).not.toBeDisabled());
+  await waitFor(() => expect(screen.getByRole('button', { name: /↻ Retry/ })).not.toBeDisabled());
 });
 
 test('pin 5: single-flight — a pending render cannot be re-triggered into a second concurrent fetch', async () => {
   renderEmailsBehavior = () => response({ error: 'boom' }, { ok: false, status: 503 });
   openModal();
-  const retryButton = await screen.findByRole('button', { name: /Retry/ });
+  const retryButton = await screen.findByRole('button', { name: /↻ Retry/ });
 
   let calls = 0;
   const pending = deferred();
@@ -178,7 +179,7 @@ test('pin 5: single-flight — a pending render cannot be re-triggered into a se
   expect(calls).toBe(1);
 
   pending.resolve(response({ drafts: [] }));
-  await waitFor(() => expect(screen.queryByRole('button', { name: /Retry/ })).toBeNull());
+  await waitFor(() => expect(screen.queryByRole('button', { name: /↻ Retry/ })).toBeNull());
   expect(calls).toBe(1);
 });
 
@@ -208,7 +209,7 @@ test('a hung render times out within the open session, and Retry re-enables and 
     });
 
     await waitFor(() => expect(screen.getByText(RENDER_PREVIEW_NETWORK_MESSAGE)).toBeTruthy());
-    const retryButton = screen.getByRole('button', { name: /Retry/ });
+    const retryButton = screen.getByRole('button', { name: /↻ Retry/ });
     expect(retryButton).not.toBeDisabled();
 
     fireEvent.click(retryButton);

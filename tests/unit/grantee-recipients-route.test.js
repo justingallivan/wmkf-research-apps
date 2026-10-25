@@ -27,7 +27,7 @@ function mockRes() {
 }
 
 beforeEach(() => {
-  requireAppAccess.mockReset().mockResolvedValue({ profileId: 'p', session: { user: {} } });
+  requireAppAccess.mockReset().mockResolvedValue({ profileId: 'p', session: { user: { azureEmail: 'actor@example.org' } } });
   DynamicsService.getRecord.mockReset();
 });
 
@@ -77,7 +77,7 @@ test('resolves PI + liaison with names and emails (full envelope pin)', async ()
   const res = mockRes();
   await handler({ method: 'GET', query: { requestId: GUID }, headers: {} }, res);
   expect(res.statusCode).toBe(200);
-  expect(res.body).toEqual({
+  expect(res.body).toEqual({ from: 'actor@example.org',
     pi: { contactId: 'pi-1', name: 'Monika Raj', email: 'monika.raj@emory.edu', hasEmail: true },
     liaison: { contactId: 'li-1', name: 'Lorena McLaren', email: 'lorena.mclaren@emory.edu', hasEmail: true },
   });

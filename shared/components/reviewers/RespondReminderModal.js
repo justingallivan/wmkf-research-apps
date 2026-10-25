@@ -1,3 +1,7 @@
+import { Button } from '../Layout';
+import EmailAddressSummary from '../EmailAddressSummary';
+import { EndpointWordingDefault } from '../EmailWordingDefault';
+import EmailDialog from '../EmailDialog';
 /** Editable, proof-bound composer for respond-by and review-due reminders. */
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import EmailSendFeedback from '../EmailSendFeedback';
@@ -56,6 +60,7 @@ export default function RespondReminderModal({ requestId, candidate, kind = 'res
   const [loadError, setLoadError] = useState(null);
   const [sending, setSending] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [wordingBusy, setWordingBusy] = useState(false);
   const [saveMessage, setSaveMessage] = useState(null);
   const [sendFeedback, setSendFeedback] = useState(null);
   const [ownSystemId, setOwnSystemId] = useState(null);
@@ -149,60 +154,10 @@ export default function RespondReminderModal({ requestId, candidate, kind = 'res
     setTemplate((current) => ({ ...current, [field]: value }));
     setSaveMessage(null);
   };
-  const requestClose = () => { if (!sendingRef.current) onClose(); };
-
-  const saveDefault = async () => {
-    if (!canSaveOwn || blankEdit || saving || sendingRef.current) return;
-    const generation = preferenceGenerationRef.current;
-    setSaving(true);
-    setSaveMessage(null);
-    try {
-      const envelope = await requestEnvelope('/api/review-manager/reminder-email-preferences', {
-        method: 'PUT', body: { kind, template }, tolerantBody: true,
-      });
-      if (mountedRef.current && generation === preferenceGenerationRef.current) {
-        setSaveMessage(envelope.ok && envelope.data?.ok ? 'Saved for future reminders from your mailbox.' : errorMessage(envelope.data, 'Could not save your default.'));
-        if (envelope.ok && envelope.data?.ok) {
-          setConfigured(true);
-          setRepairableOwnDefault(false);
-          if (!draft) loadPreview();
-        }
-      }
-    } catch {
-      if (mountedRef.current && generation === preferenceGenerationRef.current) setSaveMessage('Could not confirm the save. Reload your default before trying again.');
-    } finally {
-      if (mountedRef.current) setSaving(false);
-    }
-  };
-
-  const resetDefault = async () => {
-    if (!canSaveOwn || !configured || saving || sendingRef.current) return;
-    const generation = preferenceGenerationRef.current;
-    setSaving(true);
-    setSaveMessage(null);
-    try {
-      const envelope = await requestEnvelope('/api/review-manager/reminder-email-preferences', {
-        method: 'DELETE', body: { kind }, tolerantBody: true,
-      });
-      if (mountedRef.current && generation === preferenceGenerationRef.current) {
-        if (envelope.ok && envelope.data?.ok) {
-          setConfigured(false);
-          setRepairableOwnDefault(false);
-          setSaveMessage(draft ? 'Your saved default was cleared. This one-send draft is unchanged.' : 'Your saved default was cleared. Loading the shared Admin copy.');
-          if (!draft) loadPreview();
-        } else {
-          setSaveMessage(errorMessage(envelope.data, 'Could not clear your default.'));
-        }
-      }
-    } catch {
-      if (mountedRef.current && generation === preferenceGenerationRef.current) setSaveMessage('Could not confirm the reset. Reload your default before trying again.');
-    } finally {
-      if (mountedRef.current) setSaving(false);
-    }
-  };
+  const requestClose = () => { if (!sendingRef.current && !wordingBusy) onClose(); };
 
   const handleSend = async () => {
-    if (!draft || !previewCurrent || sendingRef.current || sendFeedback?.status === 'uncertain') return;
+    if (wordingBusy || !draft || !previewCurrent || sendingRef.current || sendFeedback?.status === 'uncertain') return;
     const generation = ++sendGenerationRef.current;
     sendingRef.current = true;
     setSending(true);
@@ -242,11 +197,12 @@ export default function RespondReminderModal({ requestId, candidate, kind = 'res
   };
 
   return (
+    <EmailDialog label="Reviewer reminder email" busy={sending || saving || wordingBusy} onClose={requestClose}>
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50" onClick={requestClose}>
       <div className="bg-white rounded-lg shadow-xl max-w-3xl w-full mx-4 max-h-[90vh] overflow-y-auto" onClick={(event) => event.stopPropagation()}>
         <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200 bg-gray-50">
           <h3 className="font-semibold text-gray-900">Review reminder email</h3>
-          <button type="button" onClick={requestClose} disabled={sending} className="text-gray-400 hover:text-gray-600 disabled:opacity-40" aria-label="Close">✕</button>
+          <Button variant="outline" size="sm" type="button" onClick={requestClose} disabled={sending || wordingBusy} className="text-gray-600 hover:text-gray-900 disabled:opacity-40" aria-label="Close">✕</Button>
         </div>
         <div className="p-4 space-y-4">
           <p className="text-sm text-gray-700">Edit the wording for {candidate.name || 'this reviewer'}, then refresh the preview before sending. Saving your default is a separate action.</p>
@@ -254,14 +210,14 @@ export default function RespondReminderModal({ requestId, candidate, kind = 'res
           {loading && <p className="text-sm text-gray-500">Rendering reminder…</p>}
           {loadError && <p className="text-sm text-red-600">{loadError}</p>}
           {draft && <div className="rounded-md border border-gray-200 bg-gray-50 p-3 text-sm space-y-1">
-            <p><span className="font-medium text-gray-700">From:</span> {draft.from}</p>
+            <EmailAddressSummary from={draft.from} to={draft.to} />
             <p><span className="font-medium text-gray-700">To:</span> {draft.name || candidate.name || 'Reviewer'} &lt;{draft.to}&gt;</p>
           </div>}
           <label className="block"><span className="text-xs font-medium text-gray-600">Subject template</span>
-            <input type="text" value={template.subject} onChange={(event) => editField('subject', event.target.value)} disabled={loading || sending || sendFeedback?.status === 'sent'} className="mt-1 w-full rounded border border-gray-300 px-2 py-1 text-sm disabled:bg-gray-100" />
+            <input type="text" value={template.subject} onChange={(event) => editField('subject', event.target.value)} disabled={wordingBusy || loading || sending || sendFeedback?.status === 'sent'} className="mt-1 w-full rounded border border-gray-300 px-2 py-1 text-sm disabled:bg-gray-100" />
           </label>
           <label className="block"><span className="text-xs font-medium text-gray-600">Message template</span>
-            <textarea rows={10} value={template.body} onChange={(event) => editField('body', event.target.value)} disabled={loading || sending || sendFeedback?.status === 'sent'} className="mt-1 w-full rounded border border-gray-300 px-2 py-1 text-sm font-mono disabled:bg-gray-100" />
+            <textarea rows={10} value={template.body} onChange={(event) => editField('body', event.target.value)} disabled={wordingBusy || loading || sending || sendFeedback?.status === 'sent'} className="mt-1 w-full rounded border border-gray-300 px-2 py-1 text-sm font-mono disabled:bg-gray-100" />
           </label>
           <p className="text-xs text-gray-500">Available: {'{{greeting}}'}, {'{{reviewerName}}'}, {'{{proposalClause}}'}, {'{{signature}}'}{kind === 'reviewdue' ? <>, {'{{reviewDueDate}}'} (required)</> : null}.</p>
           {draft && previewCurrent && <div className="rounded-md border border-blue-200 bg-blue-50 p-3 text-sm">
@@ -274,16 +230,16 @@ export default function RespondReminderModal({ requestId, candidate, kind = 'res
           </div>}
           {!previewCurrent && !loading && <p className="text-sm text-amber-700">Refresh the preview to review these edits.</p>}
           {saveMessage && <p className="text-sm text-gray-700">{saveMessage}</p>}
+          {canSaveOwn && sendFeedback?.status !== 'sent' && <EndpointWordingDefault formatError={(data) => errorMessage(data, 'The change could not be confirmed. Retry before trying again.')} endpoint="/api/review-manager/reminder-email-preferences" kind={kind} scopeKey={`${requestId}:${candidate.suggestionId}:${kind}`} disabled={loading || sending} onBusyChange={setWordingBusy} />}
           {sendFeedback && <EmailSendFeedback status={sendFeedback.status} message={sendFeedback.message} />}
           <div className="flex flex-wrap justify-end gap-2 pt-2">
-            <button type="button" onClick={requestClose} disabled={sending} className="px-3 py-1.5 text-sm text-gray-600 hover:text-gray-800 disabled:opacity-40">{sendFeedback?.status === 'sent' ? 'Done' : 'Cancel'}</button>
-            {canSaveOwn && sendFeedback?.status !== 'sent' && <button type="button" onClick={saveDefault} disabled={loading || saving || sending || blankEdit} className="px-3 py-1.5 text-sm border rounded-md disabled:opacity-50">{saving ? 'Saving…' : 'Save as my default'}</button>}
-            {canSaveOwn && configured && sendFeedback?.status !== 'sent' && <button type="button" onClick={resetDefault} disabled={loading || saving || sending} className="px-3 py-1.5 text-sm border rounded-md disabled:opacity-50">Clear my saved default</button>}
-            {sendFeedback?.status !== 'sent' && <button type="button" onClick={() => loadPreview(blankEdit && loadError ? undefined : template)} disabled={loading || sending || (blankEdit && !loadError)} className="px-3 py-1.5 text-sm border rounded-md disabled:opacity-50">{blankEdit && loadError ? 'Retry preview' : 'Refresh preview'}</button>}
-            {sendFeedback?.status !== 'sent' && <button type="button" onClick={handleSend} disabled={loading || sending || !previewCurrent || blankEdit || sendFeedback?.status === 'uncertain'} className="px-3 py-1.5 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-50 rounded-md">{sending ? 'Sending…' : 'Send reminder'}</button>}
+            <Button variant="outline" size="sm" type="button" onClick={requestClose} disabled={sending || wordingBusy} className="px-3 py-1.5 text-sm text-gray-600 hover:text-gray-800 disabled:opacity-40">{sendFeedback?.status === 'sent' ? 'Done' : 'Cancel'}</Button>
+            {sendFeedback?.status !== 'sent' && <Button variant="outline" size="sm" type="button" onClick={() => loadPreview(blankEdit && loadError ? undefined : template)} disabled={wordingBusy || loading || sending || (blankEdit && !loadError)} className="px-3 py-1.5 text-sm border rounded-md disabled:opacity-50">{blankEdit && loadError ? 'Retry preview' : 'Refresh preview'}</Button>}
+            {sendFeedback?.status !== 'sent' && <Button variant="primary" size="sm" type="button" onClick={handleSend} disabled={wordingBusy || loading || sending || !previewCurrent || blankEdit || sendFeedback?.status === 'uncertain'} className="px-3 py-1.5 text-sm font-medium disabled:opacity-50 rounded-md">{sending ? 'Sending…' : 'Send reminder'}</Button>}
           </div>
         </div>
       </div>
     </div>
+    </EmailDialog>
   );
 }

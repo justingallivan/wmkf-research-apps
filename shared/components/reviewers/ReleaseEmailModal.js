@@ -1,3 +1,6 @@
+import { Button } from '../Layout';
+import EmailAddressSummary from '../EmailAddressSummary';
+import EmailDialog from '../EmailDialog';
 /**
  * ReleaseEmailModal — choose why pending reviewers are being released, then
  * optionally review the courtesy emails before releasing them. No reason is
@@ -187,7 +190,7 @@ export default function ReleaseEmailModal({ requestId, suggestionIds, onClose, o
     && sendable.some((d) => !String(valueFor(d, 'subject')).trim() || !String(valueFor(d, 'bodyText')).trim());
 
   const requestClose = () => {
-    if (sendingRef.current) return;
+    if (sendingRef.current || refreshing || wordingBusy) return;
     onClose();
   };
 
@@ -322,19 +325,20 @@ export default function ReleaseEmailModal({ requestId, suggestionIds, onClose, o
   };
 
   return (
+    <EmailDialog label="Release invitations" busy={sending || wordingBusy || refreshing} onClose={requestClose}>
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50" onClick={requestClose}>
       <div className="bg-white rounded-lg shadow-xl max-w-3xl w-full mx-4 max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200 bg-gray-50">
           <h3 className="font-semibold text-gray-900">Release invitations</h3>
-          <button
+          <Button variant="outline" size="sm"
             type="button"
             onClick={requestClose}
             disabled={sending}
-            className="text-gray-400 hover:text-gray-600 disabled:opacity-40 disabled:cursor-not-allowed"
+            className="text-gray-600 hover:text-gray-900 disabled:opacity-40 disabled:cursor-not-allowed"
             aria-label="Close"
           >
             ✕
-          </button>
+          </Button>
         </div>
 
         <div className="p-4 space-y-4">
@@ -410,6 +414,7 @@ export default function ReleaseEmailModal({ requestId, suggestionIds, onClose, o
 
           {showPreviews && sendable.map((draft) => (
             <div key={draft.suggestionId} className="rounded-md border border-gray-200 p-3 space-y-2">
+              <EmailAddressSummary from={draft.from} to={draft.to} />
               <div className="text-sm">
                 <span className="font-medium text-gray-900">{draft.name || 'Reviewer'}</span>{' '}
                 <span className="text-gray-500">&lt;{draft.to}&gt;</span>
@@ -458,25 +463,26 @@ export default function ReleaseEmailModal({ requestId, suggestionIds, onClose, o
           {sendFeedback && <EmailSendFeedback status={sendFeedback.outcome} title={sendFeedback.title} message={sendFeedback.detail} />}
 
           <div className="flex justify-end gap-2 pt-2">
-            <button
+            <Button variant="outline" size="sm"
               type="button"
               onClick={requestClose}
               disabled={sending}
               className="px-3 py-1.5 text-sm text-gray-600 hover:text-gray-800 disabled:opacity-40 disabled:cursor-not-allowed"
             >
               {completed ? 'Done' : 'Cancel'}
-            </button>
-            {!completed && <button
+            </Button>
+            {!completed && <Button variant="primary" size="sm"
               type="button"
               onClick={handleSend}
               disabled={!reason || (showPreviews && (loading || drafts === null)) || sending || refreshing || wordingBusy || releaseableIds.length === 0 || blankEdit}
-              className="px-3 py-1.5 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-50 rounded-md"
+              className="px-3 py-1.5 text-sm font-medium disabled:opacity-50 rounded-md"
             >
               {sending ? 'Releasing…' : `Release (${releaseCount})`}
-            </button>}
+            </Button>}
           </div>
         </div>
       </div>
     </div>
+    </EmailDialog>
   );
 }

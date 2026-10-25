@@ -6,6 +6,7 @@ import { act, fireEvent, render, screen, waitFor, within } from '@testing-librar
 import PreSiteDistributionPanel from '../../shared/components/workbench/PreSiteDistributionPanel';
 
 jest.mock('../../shared/components/Layout', () => ({
+  Button: jest.requireActual('../../shared/components/Layout').Button,
   Card: ({ children }) => <div>{children}</div>,
 }));
 
@@ -303,19 +304,17 @@ test('recipient picker traps focus, closes with Escape, and restores the directo
   expect(filter).toHaveFocus();
   const closeButton = screen.getByRole('button', { name: 'Close' });
   const cancel = screen.getByRole('button', { name: 'Cancel' });
+  const rectangles = jest.spyOn(HTMLElement.prototype, 'getClientRects').mockReturnValue([{}]);
   cancel.focus();
-  fireEvent.keyDown(window, { key: 'Tab' });
+  fireEvent.keyDown(document.activeElement, { key: 'Tab' });
   expect(closeButton).toHaveFocus();
-  fireEvent.keyDown(window, { key: 'Tab', shiftKey: true });
+  fireEvent.keyDown(document.activeElement, { key: 'Tab', shiftKey: true });
   expect(cancel).toHaveFocus();
-  cancel.blur();
-  expect(document.body).toHaveFocus();
-  fireEvent.keyDown(window, { key: 'Tab' });
-  expect(closeButton).toHaveFocus();
 
-  fireEvent.keyDown(window, { key: 'Escape' });
+  fireEvent(screen.getByRole('dialog'), new Event('cancel', { cancelable: true }));
   await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
   expect(trigger).toHaveFocus();
+  rectangles.mockRestore();
 });
 
 test('directory failure leaves manual recipient entry available', async () => {
@@ -1000,14 +999,14 @@ test('dialog mode: Add from directory opens the picker above the composer, and E
   fireEvent.click(within(composer).getAllByRole('button', { name: 'Add from directory' })[0]);
   const picker = await screen.findByRole('dialog', { name: /directory|recipients/i });
   // Stacked above the composer (z-60 over z-50), so it is visible, not painted under.
-  expect(picker.closest('[class*="z-[60]"]')).not.toBeNull();
+  expect(picker).toHaveAttribute('open');
 
-  fireEvent.keyDown(document, { key: 'Escape' });
+  fireEvent(picker, new Event('cancel', { cancelable: true }));
   await waitFor(() => expect(screen.queryByRole('dialog', { name: /directory|recipients/i })).not.toBeInTheDocument());
   expect(onCloseComposer).not.toHaveBeenCalled();
   expect(screen.getByRole('dialog', { name: 'Share for the deliberation session' })).toBeInTheDocument();
 
-  fireEvent.keyDown(document, { key: 'Escape' });
+  fireEvent(composer, new Event('cancel', { cancelable: true }));
   expect(onCloseComposer).toHaveBeenCalledTimes(1);
 });
 

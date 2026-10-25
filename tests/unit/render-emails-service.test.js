@@ -1,3 +1,5 @@
+const getSender = jest.fn();
+jest.mock('../../lib/dataverse/adapters/system-user', () => ({ getByIdWithSelect: (...args) => getSender(...args) }));
 /**
  * Logic-level unit tests for lib/services/review-manager/render-emails-service.js
  * (Route→Service Consolidation Plan, Stage 2 wave).
@@ -482,4 +484,21 @@ describe('manual thank-you render strips the retired {{honorariumNote}} token', 
     expect(out.drafts[0].body).not.toContain('honorarium');
     expect(out.drafts[0].body).not.toContain('{{honorariumNote}}');
   });
+});
+
+
+test.each(['invitation', 'materials'])('%s exposes the mailbox used by that send path', async (templateType) => {
+  findById.mockResolvedValueOnce(suggestion());
+  getReviewerByIdWithSelect.mockResolvedValueOnce(person());
+  getRequestById.mockResolvedValue({ ...request, _wmkf_programdirector_value: 'assigned-pd' });
+  getSender.mockResolvedValue({ isdisabled: false, internalemailaddress: 'assigned-pd@example.org' });
+  const out = await renderEmails({ suggestionIds: [SUG1], template: TEMPLATE, templateType, settings: {}, fromEmail: 'acting-user@example.org' });
+  expect(out.drafts[0].from).toBe(templateType === 'invitation' ? 'assigned-pd@example.org' : 'acting-user@example.org');
+});
+test('a disabled assigned PD never supplies an invitation From address', async () => {
+  findById.mockResolvedValueOnce(suggestion()); getReviewerByIdWithSelect.mockResolvedValueOnce(person());
+  getRequestById.mockResolvedValue({ ...request, _wmkf_programdirector_value: 'assigned-pd' });
+  getSender.mockResolvedValue({ isdisabled: true, internalemailaddress: 'disabled@example.org' });
+  const out = await renderEmails({ suggestionIds: [SUG1], template: TEMPLATE, templateType: 'invitation', settings: {}, fromEmail: 'actor@example.org' });
+  expect(out.drafts[0].from).toBeNull();
 });

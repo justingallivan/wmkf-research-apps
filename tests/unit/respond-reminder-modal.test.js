@@ -16,7 +16,7 @@ const draft = {
 const response = (data, ok = true, status = 200) => ({ ok, status, json: async () => data });
 function installFetch({ preview = draft, send = { ok: true }, ownSystemId = SENDER_ID } = {}) {
   global.fetch = jest.fn((url, options) => {
-    if (url.startsWith('/api/review-manager/reminder-email-preferences?')) return Promise.resolve(response({ ok: true, ownSystemId }));
+    if (url.startsWith('/api/review-manager/reminder-email-preferences?')) return Promise.resolve(response({ ok: true, ownSystemId, template, shared: template }));
     if (url === '/api/review-manager/send-review-reminder') {
       const body = JSON.parse(options.body);
       if (body.action === 'preview') return Promise.resolve(response({ ok: true, draft: preview }));
@@ -25,6 +25,12 @@ function installFetch({ preview = draft, send = { ok: true }, ownSystemId = SEND
     if (url === '/api/review-manager/reminder-email-preferences') return Promise.resolve(response({ ok: true }));
     throw new Error(`Unexpected request ${url}`);
   });
+}
+async function openDefaults() {
+  const details = (await screen.findByText('Your default wording')).closest('details');
+  details.open = true;
+  fireEvent(details, new Event('toggle'));
+  await screen.findByLabelText('Default subject');
 }
 beforeEach(() => { jest.clearAllMocks(); installFetch(); });
 
@@ -61,8 +67,9 @@ test('one-send edits require refreshed preview and do not save a default', async
 test('explicit Save writes the raw template only for the mailbox owner', async () => {
   render(<RespondReminderModal requestId={REQUEST_ID} candidate={candidate} onClose={jest.fn()} />);
   await screen.findByText('Email preview');
+  await openDefaults();
   fireEvent.click(await screen.findByRole('button', { name: 'Save as my default' }));
-  await waitFor(() => expect(screen.getByText('Saved for future reminders from your mailbox.')).toBeInTheDocument());
+  await waitFor(() => expect(screen.getByText('Saved for future emails. The current email is unchanged.')).toBeInTheDocument());
   const put = global.fetch.mock.calls.find(([url, options]) => url === '/api/review-manager/reminder-email-preferences' && options.method === 'PUT');
   expect(JSON.parse(put[1].body)).toEqual({ kind: 'respond', template });
   expect(global.fetch.mock.calls.some(([url, options]) => url === '/api/review-manager/send-review-reminder' && JSON.parse(options.body).action === 'send')).toBe(false);
@@ -71,14 +78,15 @@ test('explicit Save writes the raw template only for the mailbox owner', async (
 test('Clear my saved default affects future drafts and preserves the current one-send copy', async () => {
   const shared = { subject: 'Admin copy', body: '{{greeting}} Admin {{signature}}' };
   global.fetch = jest.fn((url, options) => {
-    if (url.startsWith('/api/review-manager/reminder-email-preferences?')) return Promise.resolve(response({ ok: true, ownSystemId: SENDER_ID, configured: true, shared }));
+    if (url.startsWith('/api/review-manager/reminder-email-preferences?')) return Promise.resolve(response({ ok: true, ownSystemId: SENDER_ID, configured: true, template, shared }));
     if (url === '/api/review-manager/send-review-reminder') return Promise.resolve(response({ ok: true, draft }));
     if (url === '/api/review-manager/reminder-email-preferences' && options.method === 'DELETE') return Promise.resolve(response({ ok: true }));
     throw new Error(`Unexpected request ${url}`);
   });
   render(<RespondReminderModal requestId={REQUEST_ID} candidate={candidate} onClose={jest.fn()} />);
-  fireEvent.click(await screen.findByRole('button', { name: 'Clear my saved default' }));
-  expect(await screen.findByText('Your saved default was cleared. This one-send draft is unchanged.')).toBeInTheDocument();
+  await openDefaults();
+  fireEvent.click(await screen.findByRole('button', { name: 'Clear my default' }));
+  expect(await screen.findByText('Your default was cleared. The current email is unchanged.')).toBeInTheDocument();
   expect(screen.getByDisplayValue('Original subject')).toBeInTheDocument();
   expect(screen.getByRole('button', { name: 'Send reminder' })).toBeEnabled();
   const del = global.fetch.mock.calls.find(([url, options]) => url === '/api/review-manager/reminder-email-preferences' && options.method === 'DELETE');
@@ -96,10 +104,11 @@ test('refreshing the preview during Save does not leave the preference controls 
   });
   render(<RespondReminderModal requestId={REQUEST_ID} candidate={candidate} onClose={jest.fn()} />);
   await screen.findByText('Email preview');
+  await openDefaults();
   fireEvent.click(await screen.findByRole('button', { name: 'Save as my default' }));
   fireEvent.click(screen.getByRole('button', { name: 'Refresh preview' }));
   await act(async () => { finishSave(response({ ok: true })); });
-  expect(await screen.findByText('Saved for future reminders from your mailbox.')).toBeInTheDocument();
+  expect(await screen.findByText('Saved for future emails. The current email is unchanged.')).toBeInTheDocument();
   expect(screen.getByRole('button', { name: 'Save as my default' })).toBeEnabled();
 });
 
@@ -121,7 +130,11 @@ test('an invalid own default can be cleared and the Admin copy previewed again',
   render(<RespondReminderModal requestId={REQUEST_ID} candidate={candidate} onClose={jest.fn()} />);
   expect(await screen.findByText(/Your saved default needs correction/)).toBeInTheDocument();
   expect(screen.getByDisplayValue(template.subject)).toBeInTheDocument();
-  fireEvent.click(await screen.findByRole('button', { name: 'Clear my saved default' }));
+  await openDefaults();
+  fireEvent.click(await screen.findByRole('button', { name: 'Clear my default' }));
+  await screen.findByText('Your default was cleared. The current email is unchanged.');
+  expect(previews).toBe(1);
+  fireEvent.click(screen.getByRole('button', { name: 'Refresh preview' }));
   expect(await screen.findByText('Email preview')).toBeInTheDocument();
   expect(screen.getByRole('button', { name: 'Send reminder' })).toBeEnabled();
 });
@@ -146,8 +159,9 @@ test('superuser acting for another PD can save only their own default', async ()
   render(<RespondReminderModal requestId={REQUEST_ID} candidate={candidate} onClose={jest.fn()} />);
   await screen.findByText('Email preview');
   expect(await screen.findByText(/Saving a default changes only your own settings/)).toBeInTheDocument();
+  await openDefaults();
   fireEvent.click(screen.getByRole('button', { name: 'Save as my default' }));
-  await waitFor(() => expect(screen.getByText('Saved for future reminders from your mailbox.')).toBeInTheDocument());
+  await waitFor(() => expect(screen.getByText('Saved for future emails. The current email is unchanged.')).toBeInTheDocument());
   const put = global.fetch.mock.calls.find(([url, options]) => url === '/api/review-manager/reminder-email-preferences' && options.method === 'PUT');
   expect(JSON.parse(put[1].body)).toEqual({ kind: 'respond', template });
 });
@@ -252,7 +266,7 @@ test('a late invalid own-default response cannot overwrite staff edits to the re
   render(<RespondReminderModal requestId={REQUEST_ID} candidate={candidate} onClose={jest.fn()} />);
   fireEvent.change(await screen.findByDisplayValue('Admin recovery subject'), { target: { value: 'Staff edited recovery subject' } });
   await act(async () => {
-    finishOwn(response({ ok: false, reason: 'preference_invalid', ownSystemId: SENDER_ID, configured: true, shared }, false, 409));
+    finishOwn(response({ ok: false, reason: 'preference_invalid', ownSystemId: SENDER_ID, configured: true, template, shared }, false, 409));
   });
   expect(screen.getByDisplayValue('Staff edited recovery subject')).toBeInTheDocument();
   expect(screen.getByRole('button', { name: 'Send reminder' })).toBeDisabled();
@@ -280,6 +294,7 @@ test('preview and Save show plain language for template validation failures', as
   fireEvent.change(screen.getByRole('textbox', { name: 'Message template' }), { target: { value: `${template.body}\n{{reviewDueDate}}` } });
   fireEvent.click(screen.getByRole('button', { name: 'Refresh preview' }));
   await screen.findByText('Email preview');
+  await openDefaults();
   fireEvent.click(screen.getByRole('button', { name: 'Save as my default' }));
   expect(await screen.findByText(/placeholder \{\{externalLink\}\} is not supported/)).toBeInTheDocument();
 });

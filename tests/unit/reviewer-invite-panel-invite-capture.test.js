@@ -7,6 +7,7 @@ import ReviewerInvitePanel from '../../shared/components/reviewers/ReviewerInvit
 import { readSseStream } from '../../shared/components/reviewers/sse';
 
 jest.mock('../../shared/components/Layout', () => ({
+  Button: jest.requireActual('../../shared/components/Layout').Button,
   Card: ({ children }) => <div>{children}</div>,
 }));
 jest.mock('../../shared/components/reviewers/CandidateEditModal', () => function CandidateEditModal() {

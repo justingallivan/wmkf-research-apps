@@ -1,12 +1,16 @@
-import { useState, useEffect, useLayoutEffect, useRef, useCallback } from 'react';
+import EmailAddressSummary from '../EmailAddressSummary';
+import LegacyWordingDefault from './LegacyWordingDefault';
+import EmailDialog from '../EmailDialog';
+import { useState, useEffect, useLayoutEffect, useRef, useCallback, useContext } from 'react';
 import { CheckCircle2, Minus, XCircle } from 'lucide-react';
 import { Button } from '../Layout';
 import EmailSendFeedback from '../EmailSendFeedback';
-import { EMPTY_TEMPLATES, loadEmailTemplates, saveEmailTemplates } from './email-template-store';
+import { EMPTY_TEMPLATES, loadEmailTemplateState } from './email-template-store';
 import { renderPreviewFailureMessage, RENDER_PREVIEW_NETWORK_MESSAGE } from './render-preview-failure';
 import { membershipKeyFor } from './reviewer-draft-keys';
 import { SEND_SKIP_REASON_LABEL } from '../../utils/reviewer-send-skip-reasons';
 import { requestEnvelope } from '../../utils/api-request';
+import ProfileContext from '../../context/ProfileContext';
 
 // ─── Email Modal ────────────────────────────────────────────────────────────
 
@@ -40,7 +44,12 @@ export default function ReleaseMaterialsModal({ isOpen, onClose, reviewers, prop
   // thank-yous are handled by the dedicated sweep. Keeping those choices out of
   // the release modal prevents one generic composer from competing with the
   // lifecycle-specific actions.
+  const profile = useContext(ProfileContext);
+  const actorId = profile?.currentProfile?.id || '';
+  const templateEditRef = useRef(0);
   const templateType = 'materials';
+  const [defaultWordingBusy, setDefaultWordingBusy] = useState(false);
+  const [templateNotice, setTemplateNotice] = useState(null);
   const [templates, setTemplates] = useState(EMPTY_TEMPLATES);
   const [step, setStep] = useState('compose'); // compose | preview | sending | sent
   const [progress, setProgress] = useState({ current: 0, total: 0, message: '' });
@@ -434,16 +443,21 @@ export default function ReleaseMaterialsModal({ isOpen, onClose, reviewers, prop
     loadProposal();
   }, [isOpen, templateType, requestId, attachProposalEmailEnabled, loadProposal]);
 
-  // Templates load from the per-user Dataverse store; email-fields + attachments
-  // remain per-browser (localStorage) — they're per-send scratch, not templates.
+  // Each ordinary open reads future defaults again. Late loads never replace edits.
   useEffect(() => {
+    if (!isOpen) return;
     let cancelled = false;
+    const edit = templateEditRef.current;
+    const epoch = modalSessionRef.current;
     (async () => {
-      const t = await loadEmailTemplates();
-      if (!cancelled) setTemplates(t);
+      const t = await loadEmailTemplateState();
+      if (!cancelled && modalSessionRef.current === epoch && templateEditRef.current === edit) {
+        setTemplates(t.templates);
+        setTemplateNotice(!['configured', 'absent'].includes(t.ownStatus) || !t.sharedAvailable ? 'Saved or shared wording could not be loaded. Showing available fallback wording; retry in Your default wording.' : null);
+      }
     })();
     return () => { cancelled = true; };
-  }, []);
+  }, [isOpen, requestId, actorId]);
 
   useEffect(() => {
     try {
@@ -477,17 +491,16 @@ export default function ReleaseMaterialsModal({ isOpen, onClose, reviewers, prop
   // (deliberately outside its "deps"), and it's used only as an onClick
   // handler here — no downstream memoization depends on its identity.
   const saveTemplate = async () => {
-    // Templates → per-user Dataverse store (shared with the Workbench invite
-    // flow + the EmailTemplatesModal). Email-fields + attachments stay local.
-    // Preference persistence itself (localStorage + saveEmailTemplates) is
-    // NEVER reverted by a departed session — only the "Saved ✓" feedback and
-    // its 1.5s timer are session/mounted-owned (Stage 6B3 D-save-template).
+    // Browser-local scratch only. Wording defaults have their own editor.
     const epoch = modalSessionRef.current;
     try {
       localStorage.setItem(EMAIL_FIELDS_STORAGE_KEY, JSON.stringify(emailFields));
       localStorage.setItem(ATTACHMENTS_STORAGE_KEY, JSON.stringify(attachmentsByType));
-    } catch (e) { /* ignore */ }
-    const ok = await saveEmailTemplates(templates);
+    } catch (e) {
+      if (mountedRef.current && modalSessionRef.current === epoch) setError('Local email settings could not be saved in this browser.');
+      return;
+    }
+    const ok = true;
     if (!mountedRef.current || modalSessionRef.current !== epoch) return;
     setTemplateSaved(ok);
     if (saveTimerRef.current) {
@@ -665,6 +678,7 @@ export default function ReleaseMaterialsModal({ isOpen, onClose, reviewers, prop
   };
 
   const handleSend = async () => {
+    if (defaultWordingBusy) return;
     const sendable = drafts.filter(d => !d.skipped && d.candidateEmail);
     if (sendable.length === 0) {
       setError('No recipients with email to send to');
@@ -850,6 +864,7 @@ export default function ReleaseMaterialsModal({ isOpen, onClose, reviewers, prop
   if (!isOpen) return null;
 
   return (
+    <EmailDialog label="Release proposal to reviewers" busy={step === 'sending' || defaultWordingBusy} onClose={onClose}>
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
       <div className="bg-white rounded-xl max-w-3xl w-full max-h-[90vh] overflow-hidden flex flex-col shadow-2xl">
         {/* Header */}
@@ -857,7 +872,7 @@ export default function ReleaseMaterialsModal({ isOpen, onClose, reviewers, prop
           <h2 className="text-lg font-semibold text-gray-900">
             {step === 'download' ? 'Emails Ready' : 'Release proposal to reviewers'}
           </h2>
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-2xl leading-none">&times;</button>
+          <Button aria-label="Close" disabled={defaultWordingBusy || step === 'sending'} variant="outline" size="sm" onClick={() => { if (!defaultWordingBusy && step !== 'sending') onClose(); }} className="text-gray-600 hover:text-gray-900 text-2xl leading-none">&times;</Button>
         </div>
 
         {/* Content */}
@@ -868,14 +883,14 @@ export default function ReleaseMaterialsModal({ isOpen, onClose, reviewers, prop
                 <div className="p-3 bg-amber-50 text-amber-700 rounded-lg text-sm flex items-start justify-between gap-3">
                   <span>{error}</span>
                   {previewFailed && (
-                    <button
+                    <Button variant="outline" size="sm"
                       type="button"
                       onClick={handlePreview}
-                      disabled={rendering}
-                      className="shrink-0 px-2.5 py-1 rounded-md border border-amber-300 bg-white text-amber-800 text-xs font-medium hover:bg-amber-100 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-white"
+                      disabled={defaultWordingBusy || (rendering)}
+                      className="shrink-0 px-2.5 py-1 rounded-md border border-amber-300 text-amber-800 text-xs font-medium disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-white"
                     >
                       ↻ Retry
-                    </button>
+                    </Button>
                   )}
                 </div>
               )}
@@ -899,18 +914,18 @@ export default function ReleaseMaterialsModal({ isOpen, onClose, reviewers, prop
                 <div className="grid grid-cols-2 gap-2">
                   <div>
                     <label className="block text-xs text-gray-500 mb-0.5">Review Due Date</label>
-                    <input
+                    <input disabled={defaultWordingBusy}
                       type="date"
-                      value={emailFields.reviewDueDate}
+                      aria-label="Review due date" value={emailFields.reviewDueDate}
                       onChange={e => setEmailFields(prev => ({ ...prev, reviewDueDate: e.target.value }))}
                       className="w-full px-2 py-1 border border-gray-300 rounded text-sm focus:ring-1 focus:ring-gray-400 focus:outline-none"
                     />
                   </div>
                   <div>
                     <label className="block text-xs text-gray-500 mb-0.5">Proposal Send Date</label>
-                    <input
+                    <input disabled={defaultWordingBusy}
                       type="date"
-                      value={emailFields.proposalSendDate}
+                      aria-label="Proposal send date" value={emailFields.proposalSendDate}
                       onChange={e => setEmailFields(prev => ({ ...prev, proposalSendDate: e.target.value }))}
                       className="w-full px-2 py-1 border border-gray-300 rounded text-sm focus:ring-1 focus:ring-gray-400 focus:outline-none"
                     />
@@ -947,7 +962,7 @@ export default function ReleaseMaterialsModal({ isOpen, onClose, reviewers, prop
                   ) : proposalDoc.error ? (
                     <div className="p-3 bg-amber-50 text-amber-700 rounded-lg text-sm">
                       {proposalDoc.error}{' '}
-                      <button type="button" onClick={() => loadProposal()} className="underline font-medium">Retry</button>
+                      <Button disabled={defaultWordingBusy} variant="link" size="sm" type="button" onClick={() => loadProposal()} className="underline font-medium">Retry</Button>
                     </div>
                   ) : proposalDoc.loading ? (
                     <p className="text-sm text-gray-500">Loading the request’s proposal from SharePoint…</p>
@@ -971,7 +986,7 @@ export default function ReleaseMaterialsModal({ isOpen, onClose, reviewers, prop
                         id="proposal-document-picker"
                         className="w-full text-sm border border-gray-300 rounded px-2 py-1.5 bg-white"
                         value={proposalDoc.pickedKey || ''}
-                        disabled={proposalDoc.loading}
+                        disabled={defaultWordingBusy || (proposalDoc.loading)}
                         onChange={(ev) => { if (ev.target.value) loadProposal(ev.target.value); }}
                       >
                         {!proposalDoc.pickedKey && <option value="">Select a file…</option>}
@@ -1006,12 +1021,12 @@ export default function ReleaseMaterialsModal({ isOpen, onClose, reviewers, prop
                       accept=".pdf,.doc,.docx,.xls,.xlsx,.txt,.png,.jpg,.jpeg"
                       multiple
                       onChange={handleFileUpload}
-                      disabled={isUploading}
+                      disabled={defaultWordingBusy || (isUploading)}
                     />
                   </label>
                 </div>
                 {attachments.length === 0 ? (
-                  <p className="text-xs text-gray-400 italic">No attachments. Upload reviewer instructions, templates, etc.</p>
+                  <p className="text-xs text-gray-600 italic">No attachments. Upload reviewer instructions, templates, etc.</p>
                 ) : (
                   <div className="space-y-1">
                     {attachments.map((att, i) => (
@@ -1021,9 +1036,9 @@ export default function ReleaseMaterialsModal({ isOpen, onClose, reviewers, prop
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" />
                           </svg>
                           <span className="text-sm text-gray-700 truncate">{att.filename}</span>
-                          {att.size && <span className="text-xs text-gray-400 flex-shrink-0">{formatFileSize(att.size)}</span>}
+                          {att.size && <span className="text-xs text-gray-600 flex-shrink-0">{formatFileSize(att.size)}</span>}
                         </div>
-                        <button
+                        <Button disabled={defaultWordingBusy} variant="outline" size="sm"
                           onClick={() => removeAttachment(i)}
                           className="text-gray-400 hover:text-red-500 ml-2 flex-shrink-0"
                           title="Remove attachment"
@@ -1031,7 +1046,7 @@ export default function ReleaseMaterialsModal({ isOpen, onClose, reviewers, prop
                           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                           </svg>
-                        </button>
+                        </Button>
                       </div>
                     ))}
                   </div>
@@ -1039,29 +1054,31 @@ export default function ReleaseMaterialsModal({ isOpen, onClose, reviewers, prop
               </div>
               )}
 
+              {templateNotice && <p role="status" className="text-sm text-amber-800">{templateNotice}</p>}
+              <LegacyWordingDefault type="materials" scopeKey={String(requestId || proposalKey || '')} disabled={step === 'sending'} onBusyChange={setDefaultWordingBusy} />
               {/* Subject */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Subject</label>
-                <input
+                <input disabled={defaultWordingBusy}
                   type="text"
-                  value={currentTemplate.subject}
-                  onChange={e => setTemplates(prev => ({
+                  aria-label="Subject" value={currentTemplate.subject}
+                  onChange={e => { templateEditRef.current++; setTemplates(prev => ({
                     ...prev,
                     [templateType]: { ...prev[templateType], subject: e.target.value },
-                  }))}
+                  })); }}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-gray-400 focus:border-transparent"
                 />
               </div>
 
               {/* Body */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Body</label>
-                <textarea
-                  value={currentTemplate.body}
-                  onChange={e => setTemplates(prev => ({
+                <label className="block text-sm font-medium text-gray-700 mb-1">Message</label>
+                <textarea disabled={defaultWordingBusy}
+                  aria-label="Message" value={currentTemplate.body}
+                  onChange={e => { templateEditRef.current++; setTemplates(prev => ({
                     ...prev,
                     [templateType]: { ...prev[templateType], body: e.target.value },
-                  }))}
+                  })); }}
                   rows={14}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm font-mono focus:ring-2 focus:ring-gray-400 focus:border-transparent"
                 />
@@ -1116,6 +1133,7 @@ export default function ReleaseMaterialsModal({ isOpen, onClose, reviewers, prop
                     <div className="flex items-baseline justify-between mb-2">
                       <div>
                         <p className="text-sm font-medium text-gray-900">{d.candidateName}</p>
+                        <EmailAddressSummary from={d.from} to={d.candidateEmail} />
                         <p className="text-xs text-gray-500">
                           {d.candidateEmail || 'no email on file'}
                           {d.requestNumber && <span className="ml-2">· request {d.requestNumber}</span>}
@@ -1127,15 +1145,15 @@ export default function ReleaseMaterialsModal({ isOpen, onClose, reviewers, prop
                     </div>
                     {!d.skipped && (
                       <>
-                        <input
+                        <input disabled={defaultWordingBusy}
                           type="text"
-                          value={d.subject}
+                          aria-label={`Subject for ${d.candidateName || d.suggestionId}`} value={d.subject}
                           onChange={e => updateDraft(d.suggestionId, 'subject', e.target.value)}
                           className="w-full mb-2 px-3 py-1.5 text-sm border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-gray-400"
                           placeholder="Subject"
                         />
-                        <textarea
-                          value={d.body}
+                        <textarea disabled={defaultWordingBusy}
+                          aria-label={`Message for ${d.candidateName || d.suggestionId}`} value={d.body}
                           onChange={e => updateDraft(d.suggestionId, 'body', e.target.value)}
                           rows={8}
                           className="w-full px-3 py-1.5 text-sm border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-gray-400 font-mono"
@@ -1240,37 +1258,37 @@ export default function ReleaseMaterialsModal({ isOpen, onClose, reviewers, prop
 
         {/* Footer */}
         <div className="px-6 py-4 border-t border-gray-200 flex justify-between">
-          <button
-            onClick={onClose}
+          <Button variant="outline" size="sm"
+            onClick={() => { if (!defaultWordingBusy && step !== 'sending') onClose(); }}
             className="px-4 py-2 text-sm text-gray-600 hover:text-gray-800"
-            disabled={step === 'sending'}
+            disabled={defaultWordingBusy || (step === 'sending')}
           >
             {step === 'sent' ? 'Close' : 'Cancel'}
-          </button>
+          </Button>
           <div className="flex gap-2">
             {step === 'compose' && (
               <>
-                <button
+                <Button disabled={defaultWordingBusy} variant="outline" size="sm"
                   onClick={saveTemplate}
-                  className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg border border-gray-300 transition-colors"
-                  title="Save these as your default templates (stored to your account)"
+                  className="px-4 py-2 text-sm font-medium text-gray-700 rounded-lg border border-gray-300 transition-colors"
+                  title="Save date and attachment settings on this device; does not save wording"
                 >
-                  {templateSaved ? 'Saved ✓' : 'Save Template'}
-                </button>
-                <Button onClick={handlePreview} disabled={rendering}>
+                  {templateSaved ? 'Saved ✓' : 'Save local email settings'}
+                </Button>
+                <Button onClick={handlePreview} disabled={defaultWordingBusy || (rendering)}>
                   Preview {reviewers.filter(r => r.email).length} Email{reviewers.filter(r => r.email).length !== 1 ? 's' : ''}
                 </Button>
               </>
             )}
             {step === 'preview' && (
               <>
-                <button
+                <Button disabled={defaultWordingBusy} variant="outline" size="sm"
                   onClick={() => setStep('compose')}
-                  className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg border border-gray-300 transition-colors"
+                  className="px-4 py-2 text-sm font-medium text-gray-700 rounded-lg border border-gray-300 transition-colors"
                 >
                   Back
-                </button>
-                <Button onClick={handleSend} disabled={degraded} title={degraded ? 'Reviewer data could not be refreshed - retry before making changes' : undefined}>
+                </Button>
+                <Button onClick={handleSend} disabled={defaultWordingBusy || (degraded)} title={degraded ? 'Reviewer data could not be refreshed - retry before making changes' : undefined}>
                   Send {drafts.filter(d => !d.skipped).length} Email{drafts.filter(d => !d.skipped).length !== 1 ? 's' : ''}
                 </Button>
               </>
@@ -1279,5 +1297,6 @@ export default function ReleaseMaterialsModal({ isOpen, onClose, reviewers, prop
         </div>
       </div>
     </div>
+    </EmailDialog>
   );
 }

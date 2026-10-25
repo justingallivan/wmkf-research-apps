@@ -1,3 +1,6 @@
+import { Button } from '../Layout';
+import { EndpointWordingDefault } from '../EmailWordingDefault';
+import EmailDialog from '../EmailDialog';
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { requestEnvelope } from '../../utils/api-request';
 import EmailSendFeedback from '../EmailSendFeedback';
@@ -18,6 +21,7 @@ export default function MaterialsEmailModal({ requestId, action, onClose, onSent
   const [feedback, setFeedback] = useState(null);
   const [savedMessage, setSavedMessage] = useState(null);
   const [saving, setSaving] = useState(false);
+  const [wordingBusy, setWordingBusy] = useState(false);
   const [sending, setSending] = useState(false);
   const generationRef = useRef(0);
   const mountedRef = useRef(true);
@@ -73,7 +77,7 @@ export default function MaterialsEmailModal({ requestId, action, onClose, onSent
   };
 
   const renderPreview = async () => {
-    if (busy || saving) return;
+    if (busy || saving || wordingBusy) return;
     const generation = generationRef.current;
     const expectedContext = contextKey;
     setBusy(true); setError(null); setFeedback(null); setSavedMessage(null);
@@ -94,50 +98,8 @@ export default function MaterialsEmailModal({ requestId, action, onClose, onSent
     }
   };
 
-  const saveDefault = async () => {
-    if (busy || saving) return;
-    const generation = generationRef.current;
-    const expectedContext = contextKey;
-    setSaving(true); setError(null); setSavedMessage(null);
-    try {
-      const result = await request('/api/meeting-tracker/materials-email-preferences', {
-        method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: { kind, template }, tolerantBody: true,
-      });
-      if (!current(generation, expectedContext)) return;
-      if (!result.ok || result.data?.ok !== true) throw new Error(result.data?.error || 'The default could not be saved.');
-      setSavedMessage('Saved as your default.');
-    } catch (saveError) {
-      if (current(generation, expectedContext)) setError(saveError.message || 'The default could not be saved.');
-    } finally {
-      if (current(generation, expectedContext)) setSaving(false);
-    }
-  };
-
-  const resetDefault = async () => {
-    if (busy || saving) return;
-    const generation = generationRef.current;
-    const expectedContext = contextKey;
-    setSaving(true); setError(null); setSavedMessage(null);
-    try {
-      const result = await request('/api/meeting-tracker/materials-email-preferences', {
-        method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: { kind }, tolerantBody: true,
-      });
-      if (!current(generation, expectedContext)) return;
-      if (!result.ok || result.data?.ok !== true) throw new Error(result.data?.error || 'The shared default could not be restored.');
-      const refreshed = await request(`/api/meeting-tracker/materials-email-preferences?kind=${kind}`, { tolerantBody: true });
-      if (!current(generation, expectedContext)) return;
-      if (!refreshed.ok) throw new Error(refreshed.data?.error || 'The shared default could not be loaded.');
-      setTemplate(refreshed.data?.shared || refreshed.data?.template || { subject: '', body: '' });
-      setPreview(null); setFeedback(null); setSavedMessage('Using the shared default.');
-    } catch (resetError) {
-      if (current(generation, expectedContext)) setError(resetError.message || 'The shared default could not be restored.');
-    } finally {
-      if (current(generation, expectedContext)) setSaving(false);
-    }
-  };
-
   const send = async () => {
-    if (preview?.canSend !== true || !preview?.proof || sendingRef.current || busy || saving) return;
+    if (wordingBusy || preview?.canSend !== true || !preview?.proof || sendingRef.current || busy || saving) return;
     sendingRef.current = true;
     setSending(true);
     const generation = generationRef.current;
@@ -189,20 +151,23 @@ export default function MaterialsEmailModal({ requestId, action, onClose, onSent
   };
 
   return (
-    <div role="dialog" aria-modal="true" aria-labelledby="materials-email-title" className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+    <EmailDialog label="Materials email" busy={sending || saving || wordingBusy} onClose={onClose}>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
       <div className="max-h-[90vh] w-full max-w-3xl overflow-y-auto rounded-xl bg-white p-6 shadow-xl">
-        <div className="flex items-start justify-between gap-4"><div><h2 id="materials-email-title" className="text-lg font-semibold">{LABELS[action]} email</h2><p className="mt-1 text-sm text-gray-600">Edit this send, then refresh the preview before sending.</p></div><button type="button" onClick={onClose} disabled={sending || saving} className="text-sm underline">Close</button></div>
+        <div className="flex items-start justify-between gap-4"><div><h2 id="materials-email-title" className="text-lg font-semibold">{LABELS[action]} email</h2><p className="mt-1 text-sm text-gray-600">Edit this send, then refresh the preview before sending.</p></div><Button variant="link" size="sm" type="button" onClick={onClose} disabled={sending || saving || wordingBusy} className="text-sm underline">Close</Button></div>
         {notice && <div role="note" className="mt-4 rounded border border-amber-200 bg-amber-50 p-3 text-sm">{notice}</div>}
         {error && <div role="alert" className="mt-4 rounded border border-red-200 bg-red-50 p-3 text-sm text-red-800">{error}</div>}
         {feedback && <EmailSendFeedback className="mt-4" status={feedback.status} message={feedback.message} data-testid="materials-email-feedback" />}
         {savedMessage && <div role="status" className="mt-4 rounded border border-green-200 bg-green-50 p-3 text-sm text-green-800">{savedMessage}</div>}
-        <label className="mt-4 block text-sm font-semibold">Subject<input value={template.subject} onChange={(e) => update('subject', e.target.value)} disabled={sending || saving} className="mt-1 w-full rounded border border-gray-300 p-2 font-normal" /></label>
-        <label className="mt-4 block text-sm font-semibold">Message<textarea value={template.body} onChange={(e) => update('body', e.target.value)} disabled={sending || saving} rows={10} className="mt-1 w-full rounded border border-gray-300 p-2 font-normal" /></label>
+        <label className="mt-4 block text-sm font-semibold">Subject<input value={template.subject} onChange={(e) => update('subject', e.target.value)} disabled={sending || saving || wordingBusy} className="mt-1 w-full rounded border border-gray-300 p-2 font-normal" /></label>
+        <label className="mt-4 block text-sm font-semibold">Message<textarea value={template.body} onChange={(e) => update('body', e.target.value)} disabled={sending || saving || wordingBusy} rows={10} className="mt-1 w-full rounded border border-gray-300 p-2 font-normal" /></label>
         <p className="mt-2 text-xs text-gray-500">Keep the required {kind === 'invitation' ? '{{checklist}}' : '{{missingItems}}'} placeholder. The secure upload link and action button are added by the server.</p>
+        <div className="mt-4"><EndpointWordingDefault endpoint="/api/meeting-tracker/materials-email-preferences" kind={kind} scopeKey={contextKey} disabled={busy || saving || sending} onBusyChange={setWordingBusy} hint={`Keep the required ${kind === 'invitation' ? '{{checklist}}' : '{{missingItems}}'} placeholder.`} /></div>
         {preview?.canSend === false && <p role="note" className="mt-4 text-sm text-gray-700">{preview.sendUnavailableReason || 'Only the assigned Program Coordinator can send this email. They must open and review their own preview.'}</p>}
         {preview && <div className="mt-5 rounded-lg border border-gray-200 bg-gray-50 p-4"><p className="text-xs font-semibold uppercase tracking-wide text-gray-500">Rendered preview</p><p className="mt-2 text-xs text-gray-600"><strong>From:</strong> {preview.fromEmail}</p><p className="text-xs text-gray-600"><strong>To:</strong> {preview.recipients?.map((person) => person.email).join(', ')}</p>{preview.ccRecipients?.length > 0 && <p className="text-xs text-gray-600"><strong>Cc:</strong> {preview.ccRecipients.map((person) => person.email).join(', ')}</p>}<p className="mt-2 font-semibold">{preview.subject}</p><pre className="mt-2 whitespace-pre-wrap font-sans text-sm text-gray-800">{preview.bodyText}</pre>{preview.secureLinkPlaceholder && <p className="mt-3 text-xs font-medium text-amber-800">The secure link will be generated when you send.</p>}</div>}
-        <div className="mt-5 flex flex-wrap justify-end gap-2"><button type="button" disabled={saving || busy} onClick={saveDefault} className="rounded border border-gray-300 px-3 py-2 text-sm font-semibold">{saving ? 'Saving…' : 'Save as my default'}</button><button type="button" disabled={saving || busy} onClick={resetDefault} className="rounded border border-gray-300 px-3 py-2 text-sm font-semibold">Use shared default</button><button type="button" disabled={busy || saving} onClick={renderPreview} className="rounded border border-gray-700 px-3 py-2 text-sm font-semibold">{busy ? 'Working…' : 'Refresh preview'}</button><button type="button" disabled={busy || saving || preview?.canSend !== true} onClick={send} className="rounded bg-gray-900 px-3 py-2 text-sm font-semibold text-white disabled:opacity-50">Send</button></div>
+        <div className="mt-5 flex flex-wrap justify-end gap-2"><Button variant="outline" size="sm" type="button" disabled={busy || saving || wordingBusy} onClick={renderPreview} className="rounded border border-gray-700 px-3 py-2 text-sm font-semibold">{busy ? 'Working…' : 'Refresh preview'}</Button><Button variant="primary" size="sm" type="button" disabled={busy || saving || wordingBusy || preview?.canSend !== true} onClick={send} className="rounded px-3 py-2 text-sm font-semibold disabled:opacity-50">Send</Button></div>
       </div>
     </div>
+    </EmailDialog>
   );
 }

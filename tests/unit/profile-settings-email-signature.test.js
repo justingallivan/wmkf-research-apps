@@ -95,7 +95,7 @@ test('loads and resets the Request Abstract email body from the admin default en
 
   await waitFor(() => expect(screen.getByLabelText('Email body')).toHaveValue(GRANTEE_INVITE_SEED_BODY));
   fireEvent.change(screen.getByLabelText('Email body'), { target: { value: 'Personal override' } });
-  fireEvent.click(screen.getByRole('button', { name: /reset to default/i }));
+  fireEvent.click(screen.getByRole('button', { name: /Clear my default message/i }));
 
   await waitFor(() => expect(deletePreference).toHaveBeenCalledWith(PREFERENCE_KEYS.GRANTEE_INVITE_BODY));
   expect(screen.getByLabelText('Email body')).toHaveValue(GRANTEE_INVITE_SEED_BODY);
@@ -106,7 +106,7 @@ test('loads and explicitly saves a personal Request Abstract subject', async () 
   await waitFor(() => expect(screen.getByLabelText('Email subject')).toHaveValue('Stored subject'));
 
   fireEvent.change(screen.getByLabelText('Email subject'), { target: { value: 'My {{proposalTitle}} invitation' } });
-  fireEvent.click(screen.getByRole('button', { name: 'Save Email Subject' }));
+  fireEvent.click(screen.getByRole('button', { name: 'Save my default subject' }));
 
   await waitFor(() => expect(setPreference).toHaveBeenCalledWith(
     PREFERENCE_KEYS.GRANTEE_INVITE_SUBJECT,
@@ -119,7 +119,7 @@ test('resetting the personal Request Abstract subject deletes only its preferenc
   render(<ProfileSettings />);
   await waitFor(() => expect(screen.getByLabelText('Email subject')).toHaveValue('Stored subject'));
   fireEvent.change(screen.getByLabelText('Email subject'), { target: { value: 'One draft subject' } });
-  fireEvent.click(screen.getByRole('button', { name: 'Reset subject to default' }));
+  fireEvent.click(screen.getByRole('button', { name: 'Clear my default subject' }));
 
   await waitFor(() => expect(deletePreference).toHaveBeenCalledWith(PREFERENCE_KEYS.GRANTEE_INVITE_SUBJECT));
   expect(deletePreference).not.toHaveBeenCalledWith(PREFERENCE_KEYS.GRANTEE_INVITE_BODY);

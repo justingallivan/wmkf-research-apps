@@ -1,0 +1,224 @@
+[
+  {
+    "name": "templates-narrow",
+    "dialogs": [
+      {
+        "name": "Your email defaults",
+        "scrollWidth": 390,
+        "width": 390
+      }
+    ],
+    "documentWidth": 390,
+    "dpr": 1,
+    "height": 844,
+    "width": 390
+  },
+  {
+    "name": "materials-narrow",
+    "dialogs": [
+      {
+        "name": "Materials email",
+        "scrollWidth": 390,
+        "width": 390
+      }
+    ],
+    "documentWidth": 390,
+    "dpr": 1,
+    "height": 844,
+    "width": 390
+  },
+  {
+    "name": "materialsReminder-narrow",
+    "dialogs": [
+      {
+        "name": "Materials email",
+        "scrollWidth": 390,
+        "width": 390
+      }
+    ],
+    "documentWidth": 390,
+    "dpr": 1,
+    "height": 844,
+    "width": 390
+  },
+  {
+    "name": "invite-narrow",
+    "dialogs": [
+      {
+        "name": "Invite reviewers",
+        "scrollWidth": 390,
+        "width": 390
+      }
+    ],
+    "documentWidth": 390,
+    "dpr": 1,
+    "height": 844,
+    "width": 390
+  },
+  {
+    "name": "reviewerMaterials-narrow",
+    "dialogs": [
+      {
+        "name": "Release proposal to reviewers",
+        "scrollWidth": 390,
+        "width": 390
+      }
+    ],
+    "documentWidth": 390,
+    "dpr": 1,
+    "height": 844,
+    "width": 390
+  },
+  {
+    "name": "distribution-narrow",
+    "dialogs": [
+      {
+        "name": "Share for the deliberation session",
+        "scrollWidth": 390,
+        "width": 390
+      }
+    ],
+    "documentWidth": 390,
+    "dpr": 1,
+    "height": 844,
+    "width": 390
+  },
+  {
+    "name": "grantee-narrow",
+    "dialogs": [],
+    "documentWidth": 390,
+    "dpr": 1,
+    "height": 844,
+    "width": 390
+  },
+  {
+    "name": "scheduled-narrow",
+    "dialogs": [],
+    "documentWidth": 390,
+    "dpr": 1,
+    "height": 844,
+    "width": 390
+  },
+  {
+    "name": "profile-narrow",
+    "dialogs": [],
+    "documentWidth": 390,
+    "dpr": 1,
+    "height": 844,
+    "width": 390
+  },
+  {
+    "name": "admin-narrow",
+    "dialogs": [],
+    "documentWidth": 390,
+    "dpr": 1,
+    "height": 844,
+    "width": 390
+  },
+  {
+    "name": "agenda-narrow",
+    "dialogs": [
+      {
+        "name": "Send session agenda",
+        "scrollWidth": 390,
+        "width": 390
+      }
+    ],
+    "documentWidth": 390,
+    "dpr": 1,
+    "height": 844,
+    "width": 390
+  },
+  {
+    "name": "deadline-narrow",
+    "dialogs": [
+      {
+        "name": "Reviewer deadline",
+        "scrollWidth": 390,
+        "width": 390
+      }
+    ],
+    "documentWidth": 390,
+    "dpr": 1,
+    "height": 844,
+    "width": 390
+  },
+  {
+    "name": "acceptedRelease-narrow",
+    "dialogs": [
+      {
+        "name": "Release from assignment",
+        "scrollWidth": 390,
+        "width": 390
+      }
+    ],
+    "documentWidth": 390,
+    "dpr": 1,
+    "height": 844,
+    "width": 390
+  },
+  {
+    "name": "withdrawal-narrow",
+    "dialogs": [
+      {
+        "name": "Release invitations",
+        "scrollWidth": 390,
+        "width": 390
+      }
+    ],
+    "documentWidth": 390,
+    "dpr": 1,
+    "height": 844,
+    "width": 390
+  },
+  {
+    "name": "reminder-narrow",
+    "dialogs": [
+      {
+        "name": "Reviewer reminder email",
+        "scrollWidth": 390,
+        "width": 390
+      }
+    ],
+    "documentWidth": 390,
+    "dpr": 1,
+    "height": 844,
+    "width": 390
+  },
+  {
+    "name": "grantee-confirm-narrow",
+    "dialogs": [
+      {
+        "name": "Send invitation",
+        "scrollWidth": 390,
+        "width": 390
+      }
+    ],
+    "documentWidth": 390,
+    "dpr": 1,
+    "height": 844,
+    "width": 390
+  },
+  {
+    "name": "admin-expanded-narrow",
+    "dialogs": [],
+    "documentWidth": 390,
+    "dpr": 1,
+    "height": 844,
+    "width": 390
+  },
+  {
+    "name": "materials-defaults-narrow",
+    "dialogs": [
+      {
+        "name": "Materials email",
+        "scrollWidth": 390,
+        "width": 390
+      }
+    ],
+    "documentWidth": 390,
+    "dpr": 1,
+    "height": 844,
+    "width": 390
+  }
+]

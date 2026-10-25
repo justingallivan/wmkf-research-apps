@@ -1,0 +1,25 @@
+{
+  "head": "ad4cbac85fbbe9cfe4b3c4e823aa8a1f90f9c3c8",
+  "sha256": {
+    "shared/components/reviewers/InviteEmailModal.js": "729a4305ff677f0e59166bdb295c8aaa2480024a0e534cfeaf3b7180b65a8d46",
+    "shared/components/reviewers/ReleaseMaterialsModal.js": "2770766915ca17901544d2768b4aed034e51e5549419cd1e65cbd20aeffb990e",
+    "shared/components/reviewers/RespondReminderModal.js": "3415009f0c7daf7105d9a483464229e8bffdb3683f9d878e9d1c35f69b9ad96d",
+    "shared/components/reviewers/ReleaseEmailModal.js": "676f015c07ce16fd6eea90133d3cd3eaabf5ac4618c908a7d7a1195f2e472fa8",
+    "shared/components/reviewers/AcceptedReviewerReleaseModal.js": "1b18ff704e5dce62e62ea70e08b377b5a4222d85839a624f8a857f5eabcadaac",
+    "shared/components/reviewers/ReviewerDueDateEditor.js": "f7b338feba2c567dfc54f0a882f32aef5834c1331f30f16b3bf1826e98680ea5",
+    "shared/components/reviewers/ReleaseWordingDefault.js": "dc112dae8687b9f14892595d33e8eb7306abb7c75042e01beb38b578543e9bb5",
+    "shared/components/reviewers/DeadlineWordingDefault.js": "c1e054d2add06c45688649070cdd8f2ffa031e0ff811711e306292fabbb32a84",
+    "shared/components/reviewers/EmailTemplatesModal.js": "e859d6f4c2731e74cd640f2cde9741e1c5f0d5e1bb96e81366bbd608737f7094",
+    "shared/components/reviewers/email-template-store.js": "5ab26cca44483f2301ecbadc4ef743305bde16def65b3acaeb6eca0f42be9315",
+    "shared/components/meeting-tracker/MaterialsEmailModal.js": "83321a5574f582e47cdc1469e1999298010b183805f8332de03fb6b18a7fc285",
+    "shared/components/meeting-tracker/SessionAgendaPanel.js": "93b8e12e22eea90b9d0557b0a9aa622df24b4255f52de634c8864134cfab4acf",
+    "shared/components/meeting-tracker/AgendaWordingDefault.js": "b3548aeee3c4776b4ca702371f21d9c6dac513034dcd4e481d68005d4419b12b",
+    "shared/components/workbench/AwardeeTab.js": "dcbbb9f96decb65b848b2dff969253015d7394fa896bc1cdf0e3822a6af6a661",
+    "shared/components/workbench/PreSiteDistributionPanel.js": "4d3854c89bc0d221a94fff4537d913872c13de1482927e4da4729dde2abc3399",
+    "shared/components/admin/EmailDefaultsSection.js": "96c9e473c8ee91d973376302bfe4f5e7b68d5d0099df855cbe65e288647e3bc9",
+    "pages/profile-settings.js": "af6491af8b4d7be09b195c071dbc2ae7e373d7de3a24a921c6fc9b290d57435e",
+    "pages/scheduled-emails.js": "3f4c26829ab695be2b3b7e19f911465fe2bbf179f48c4c6a13185267f1b5cc04",
+    "DESIGN.md": "2d197c51e86ec989b56688508b9a5fd6f1f51d389b86bfd1f0e00b7b57e03800",
+    "PRODUCT.md": "cc888703d36e2d427a20660bfad14adfeea9cd949208bd92426343dda79fe277"
+  }
+}
