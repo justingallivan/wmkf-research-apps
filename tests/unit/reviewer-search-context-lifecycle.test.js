@@ -231,6 +231,7 @@ test('real roster refresh invalidates an older exclusion rollback in the same re
   refreshed = true;
   await act(async () => { await result.current.retryRosterLoad(); });
   await act(async () => { exclusion.reject(new Error('response lost')); });
+  expect(result.current.rosterNote).toBe('The reviewer list changed while this action was pending. Check Excluded before trying again.');
   expect(result.current.rosterExcluded).toEqual([a]);
   expect(result.current.displayCandidates).not.toEqual(expect.arrayContaining([expect.objectContaining({ candidateKey: a.candidateKey })]));
   expect(result.current.selected.has(a.candidateKey)).toBe(false);

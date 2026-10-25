@@ -117,6 +117,9 @@ export default function useReviewerRosterActions({
         setRosterNote("Couldn't exclude that reviewer — please try again.");
       } else {
         nameAttempt.settle(false);
+        if (genRef.current === myGen) {
+          setRosterNote('The reviewer list changed while this action was pending. Check Excluded before trying again.');
+        }
       }
     }
   }, [beginNameAttempt, requestId, genRef, reloadRoster, selected, selectionRevisionRef, rosterNamesRevisionRef, setExclusionSelection, setCandidates, setRecCandidates, setRosterActive, setRosterExcluded, setUnverified, setRosterNote]);
@@ -167,6 +170,9 @@ export default function useReviewerRosterActions({
         setRosterNote("Couldn't exclude that reviewer — please try again.");
       } else {
         nameAttempt.settle(false);
+        if (genRef.current === myGen) {
+          setRosterNote('The reviewer list changed while this action was pending. Check Excluded before trying again.');
+        }
       }
     }
   }, [beginNameAttempt, requestId, genRef, reloadRoster, rosterNamesRevisionRef, setCandidates, setRecCandidates, setRosterActive, setRosterExcluded, setSelected, setUnverified, setRosterNote]);

@@ -379,6 +379,7 @@ test.each([false, true])('overlapping selected exclusions compose and recover in
   expect(state('roster-names')).toEqual([OTHER.name]);
   await finish(1);
   expect(state('selected')).toEqual(['keep', CAND.candidateKey, OTHER.candidateKey]);
+  expect(state('roster-active')).toEqual(expect.arrayContaining([expect.objectContaining(CAND), expect.objectContaining(OTHER)]));
   expect(state('roster-names')).toEqual([]);
 });
 
@@ -403,6 +404,7 @@ test.each(['exclude', 'exclude-unverified'])('a fresh same-request roster wins o
   expect(state('roster-excluded')).toEqual([CAND]);
   expect(state('roster-active')).toEqual([]);
   expect(state('selected')).toEqual(button === 'exclude' ? [] : [CAND.candidateKey]);
+  expect(screen.getByTestId('roster-note').textContent).toBe('The reviewer list changed while this action was pending. Check Excluded before trying again.');
 });
 
 test.each([false, true])('same-name exclusions retain the name until all fail (second succeeds: %s)', async (success) => {

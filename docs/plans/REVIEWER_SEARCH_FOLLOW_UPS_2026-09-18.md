@@ -48,7 +48,9 @@ only after every overlapping attempt for it fails; a pre-existing name or a
 successful sibling attempt retains it. Both ordinary and unverified exclusion use
 this accounting. A newer roster-name update invalidates the older rollback,
 including its active/excluded bucket and selection changes, so a same-request
-refresh is not overwritten by a late failure.
+refresh is not overwritten by a late failure. Same-generation failures after a
+refresh show a neutral note to check Excluded before retrying; cross-request
+failures remain silent. This does not claim whether the server committed.
 
 `useReviewerSearchController.js` supplies revision-tracked normal setters and
 separate exclusion-only setters. Optimistic selection removal uses a pure functional
