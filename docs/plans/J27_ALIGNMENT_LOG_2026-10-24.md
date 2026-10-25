@@ -22,7 +22,7 @@ owner questions Q1–Q25), `docs/audits/cycle-foundations-2026-10-21.md`
 | D1 | 2026-10-24 | **Calendar authority is the Grants Manager role** (currently Sarah), with the **Program Coordinator role** (currently Duncan) as fallback. Authority attaches to the role, not the person: reassigning the role in Admin staffing moves the responsibility with no code or settings change. Authority means maintaining and confirming cycle dates used by the apps; the dates themselves stay in the operations Grant Cycle record. | Justin | Rollover plan §3.1, §7 |
 | D2 | 2026-10-24 | **Reviewer reminders stay manual for J27.** PDs send reminders themselves, as in D26; the automatic reminder schedule stays off. | Justin | Register Q10 |
 | D3 | 2026-10-24 | **Review filing switches from D26 to J27 once; it never has to handle both.** All D26 reviews are in, so no late D26 reviews will overlap with J27 reviews. Who makes the switch and when is task T3. | Justin | Register Q15 |
-| D4 | 2026-10-24 | **Reviewer campaign settings are handled centrally, not per PD.** The review deadline, respond-by days and reviewer quota become cycle-wide values maintained centrally (under D1), replacing the per-request campaign settings PDs set today. Changing one reviewer's deadline stays a PD action. | Justin | Rollover plan Slice 1 |
+| D4 | 2026-10-24 | **Reviewer campaign settings are handled centrally, not per PD.** The review deadline, respond-by days and reviewer quota become cycle-wide values maintained centrally (under D1), replacing the per-request campaign settings PDs set today. Changing one reviewer's deadline stays a PD action. Email wording is not affected: PDs keep personal wording built on centrally seeded defaults (slice 2). | Justin | Rollover plan Slice 1 |
 
 ## To confirm at the meeting
 
@@ -64,8 +64,8 @@ bibliographies, the automatic materials email on reviewer acceptance (must be
 live before J27 invitations) and task T3.
 
 **Scheduled for November 2026 (Justin, 2026-10-24):** central reviewer
-settings per D4 (rollover plan Slice 1), started after the current reviewer
-deadline email work merges so the two do not edit the same files at once.
+settings per D4 (rollover plan Slice 1), unblocked: the reviewer deadline email
+work (slice 2) shipped as PR #521 on 2026-10-24.
 A5 (the J27 central values) is needed from Sarah before it can ship.
 
 ## Tasks

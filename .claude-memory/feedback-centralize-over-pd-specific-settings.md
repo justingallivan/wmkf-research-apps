@@ -13,6 +13,7 @@ Read before adding or extending any per-request or per-PD setting for reviewer c
 
 Do: resolve the value from one central, cycle-level source maintained by the calendar authority (Grants Manager role, Program Coordinator fallback; see `docs/plans/J27_ALIGNMENT_LOG_2026-10-24.md` D1/D4). Keep individual-reviewer exceptions (e.g. one reviewer's deadline extension) as explicit PD actions.
 Do not: add new PD-facing per-request configuration screens, or treat the existing `CampaignConfigModal` per-request values as the target design.
+Not in scope: email wording. Per-user email customization layered over centrally seeded Admin defaults is the intended design (owner, 2026-10-24; personal email defaults slices 2–3). Do not centralize or remove personal wording under this rule.
 
 **Why:** owner, 2026-10-24: "I want to move as much of this to be centrally handled as possible. The PD-specific campaign settings were a clunky distraction."
 
