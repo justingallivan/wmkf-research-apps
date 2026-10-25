@@ -3,7 +3,7 @@ title: Personal defaults for deliberation-distribution emails
 domain: workbench
 kind: plan
 status: draft
-summary: "Draft slice 7: own-sender subject/message defaults before the existing frozen distribution preview, with explicit future-only Save/Clear, strict owner isolation and bounded recovery. Owner selected non-empty messages and fresh reopen with discard warning; independent plan review pending. No implementation authorized."
+summary: "Draft slice 7: own-sender subject/message defaults before the existing frozen distribution preview, with explicit future-only Save/Clear, strict owner isolation and bounded recovery. Owner selected non-empty messages and fresh reopen with discard warning; independent Claude review returned named changes required. No implementation authorized."
 owner: product-engineering
 related:
   - docs/plans/PERSONAL_EMAIL_DEFAULTS_TODO_2026-09-20.md
@@ -26,7 +26,7 @@ owns separate database work; its checkout and live operations remain untouched.
 The owner confirmed both §3 choices on 2026-10-25: keep non-empty messages
 and reopen with fresh defaults, warning before discarding edits. These are
 planned requirements, not implemented behavior. Independent plan review is
-required before any coding.
+now completed with named changes required before any coding; see §9.
 
 Source and mocked tests establish the baseline below. Live preference contents,
 duplicate-row prevalence and tenant permissions were not probed. No claim of
@@ -118,8 +118,10 @@ explicit owner decisions; the remaining implementation proposals await review.
    locally pending, transport-unconfirmed or in-progress sends onto new defaults.
    Keep their original sender, wording, recipients, operation and preview hash;
    retry/reconcile that same attempt through the existing send route. A defaults
-   save/clear cannot convert recovery into a new send. Preserve history warnings
-   after full page reload; this slice does not promise new recovery persistence
+   save/clear cannot convert recovery into a new send. Preserve existing history
+   presentation after full page reload, not an assumed recovery warning: an
+   unconfirmed attempt can currently appear Failed, and Resend after reload
+   starts a new compose. This slice does not promise new recovery persistence
    or automatic rehydration of historical attempts. Lost prepare responses and
    broader duplicate-send prevention remain existing residuals.
 8. **Preserve content authority.** User wording remains an introduction. Session
@@ -309,6 +311,50 @@ plan and a TODO pointer only. No existing implementation is relabeled shipped.
 | Independent future-default editor | Agenda and shared editor patterns exist | Source examined; no distribution editor/route found in bounded search; no new UI rendered | VERIFIED precedent; UX PLANNED |
 | Refresh ordinary reopen | Parent keeps panel mounted on Close | Parent/panel lifecycle inspected; fresh reopen is owner-confirmed planned behavior, not current behavior | Owner decision recorded; implementation PLANNED |
 
-Verdict: **DRAFT FOR OWNER REVIEW, NOT IMPLEMENTATION APPROVAL.** The source
-review and baseline tests support this bounded approach. Owner choices are recorded. Independent plan review, live permission proof,
-visual validation and independent implementation review remain.
+Verdict: **REVIEWED — NAMED CHANGES REQUIRED BEFORE CODING.** The source
+review and baseline tests support the approach, but the independent review of
+`f3d9a908c` identified the lifecycle gaps in §9. Owner choices remain recorded.
+Live permission proof, visual validation and independent implementation review
+remain future obligations; none are established by this source-only plan review.
+
+## 9. Independent Claude review — 2026-10-25
+
+[VERIFIED via read-only OAuth Claude review.] Reviewed HEAD `f3d9a908c`;
+plan SHA256 `144bdf426152e5fa7bc8bd5bd4d267538ee31892d3334ef603cc4b1108bc0e00`.
+Full report: `docs/audits/DISTRIBUTION_DEFAULTS_PLAN_CLAUDE_REVIEW_2026-10-25.md`.
+Verdict: READY WITH NAMED CHANGES, not implementation authorization.
+Claude ran nine existing suites / 345 tests successfully; this proves baseline
+compatibility, not planned functionality. No database operations or other checkout
+changes occurred.
+
+Required next revision, before coding:
+
+- **H1 — exact unresolved-send rule.** Some errors labeled failed follow transport
+  acceptance (`distribution_send_persist_failed`). Define explicit local send-issued
+  state and conservative reopen/Resend handling so a failure cannot discard the
+  original operation and create a duplicate. Preserve it unless acceptance or a
+  proven unsent outcome resolves it. Do not copy an error-code allowlist without
+  proving it safe for retries of previously issued attempts as well as first sends.
+- **M1 — reopen/reset ownership.** Specify who detects hidden-to-dialog transitions,
+  the complete form/seed/ownership/status reset and the baseline for late auto-filled
+  recipients. If the parent supplies an open counter, add that file/test surface.
+- **M2 — close paths and mutation outcomes.** Enumerate Close buttons, Escape,
+  forced regeneration close, artifact-key remount and panel unmount. Define a
+  confirmation presentation and preserve or recheck a preference mutation whose
+  result outlives its dialog. An inline confirmation is Claude's recommendation,
+  not a new approved interaction.
+- **L1 — actor scope.** Name the session-derived client actor key and behavior when
+  it changes; never permit a new actor to retry another actor's frozen preview.
+- **L2 — historical recovery limit (wording corrected).** Section 3.7 now
+  states: current unconfirmed history can show Failed and a reload offers Resend
+  as a new compose. Existing presentation is preserved, not proven safe recovery.
+- **L3 — fallback notice source.** Replace the seven-setting aggregate compose
+  notice with pair-specific status; decide whether briefing-only status is an
+  additive history projection or omitted from compose. Avoid falsely claiming
+  built-in wording when the personal pair is actually in use.
+
+Owner decisions remain non-empty messages and fresh ordinary reopen with warning
+before edited drafts are discarded. Claude's suggested silent forced-close discard
+is **not adopted**: resolve how forced lifecycle transitions preserve the warning
+contract or obtain a specific owner decision before making an exception. No coding,
+release or live action follows from this review receipt.
