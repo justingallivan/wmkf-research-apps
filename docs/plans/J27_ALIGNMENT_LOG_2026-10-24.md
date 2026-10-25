@@ -76,3 +76,4 @@ A5 (the J27 central values) is needed from Sarah before it can ship.
 | T2 | Record D2 in the J27 register (Q10) and reviewer engagement spec. | Claude | Done 2026-10-24 |
 | T3 | Switch automatic review-document filing from D26 to J27 (one Production setting, `REVIEW_DOCX_SHAREPOINT_CYCLE`, plus redeploy) after confirming D26 filing is complete and before the first J27 review comes back in 2027. | To assign at meeting | Open; date to agree (see D3) |
 | T4 | Record the December readiness list in this log. | Claude | Done 2026-10-24 |
+| T5 | Correct weekday-label errors in the J27/D27 timeline workbook (mostly the D27 page, including the D27 Board meeting days). Not blocking for J27: the J27 dates are correct apart from two labels. | Timeline owner | Emailed with a suggested fix prompt 2026-10-24; awaiting reply |
