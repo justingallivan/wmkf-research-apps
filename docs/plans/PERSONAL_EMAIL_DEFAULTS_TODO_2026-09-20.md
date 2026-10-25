@@ -90,6 +90,45 @@ Evidence: `docs/audits/MEETING_AGENDA_DEFAULTS_BUILD_2026-10-24.md`.
   agenda-section proposal below has not been adopted. This follow-up is separate
   from the released slice 6.
 
+### Meeting checklist — pre-discussion calendar agenda
+
+Start by having Duncan show how he creates a pre-discussion invitation and adds
+the proposal list.
+
+**What we found**
+
+- The example invitation showed **Shared Calendar** as organizer and **Research
+  Staff** as invitee. It already contained Zoom details, notes and a manual
+  proposal list.
+- Microsoft supports updating an existing invitation, provided the app has the
+  correct access.
+- Meeting Tracker generates agenda timings and briefing links but currently
+  sends a separate email; it has no connection to the calendar event.
+- We have not confirmed the actual organizing account, edit permissions or
+  whether these are recurring meetings. Evidence and limits are recorded below.
+
+**Walkthrough and decisions**
+
+- [ ] **Show the scheduling process.** Where does Duncan create the invitation?
+  Who owns the calendar, and who can edit when he is absent? Separate events or
+  a recurring series?
+- [ ] **Connect the correct meeting.** How should staff select and confirm the
+  invitation belonging to a Meeting Tracker session? Which system controls the
+  time and attendees?
+- [ ] **Agree on agenda content.** Would an app-managed Agenda section work,
+  preserving Zoom details and other notes? How should the first update replace
+  the manual proposal list?
+- [ ] **Confirm the audience.** Who receives Research Staff invitations? Should
+  everyone receive the briefing links, which grant access through the link?
+- [ ] **Choose notification behavior.** Should a calendar update replace the
+  separate agenda email, or should both remain available?
+- [ ] **Agree on control and recovery.** Who previews and applies updates? What
+  should happen if Duncan edits the invitation afterward, reschedules it or an
+  update fails?
+
+**Outcome:** Record the agreed workflow here, then prepare an implementation plan
+and test it on a synthetic invitation before changing real meetings.
+
 ### Findings to bring to the walkthrough
 
 - [VERIFIED via read-only Outlook inspection, 2026-10-25.] The owner-selected
