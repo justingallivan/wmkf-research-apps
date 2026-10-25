@@ -213,3 +213,8 @@ build review returned READY after fixes for materials reopen loading, conflictin
 preview locks and grantee dialog coverage. No outstanding source-review blockers.
 See `docs/audits/EMAIL_INTERFACE_CONSISTENCY_BUILD_2026-10-24.md` for checks,
 review receipt, fingerprints and untested live/assistive-technology boundaries.
+
+[VERIFIED 2026-10-25 via native Chrome zoom, DOM geometry and keyboard/screenshot
+rehearsal.] Exact 200% zoom and 390 × 844 narrow-window checks passed without
+source changes. The build receipt closes these two formerly outstanding UI checks;
+Production promotion remains separate.

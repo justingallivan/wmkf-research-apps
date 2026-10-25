@@ -1,0 +1,30 @@
+[
+  {
+    "case": "agenda",
+    "bottom": 780,
+    "focused": "Close",
+    "top": 742,
+    "visible": true
+  },
+  {
+    "case": "deadline",
+    "bottom": 781.703125,
+    "focused": "Preview email",
+    "top": 743.703125,
+    "visible": true
+  },
+  {
+    "case": "release",
+    "bottom": 785.703125,
+    "focused": "Release reviewer",
+    "top": 747.703125,
+    "visible": true
+  },
+  {
+    "case": "reminder",
+    "bottom": 785.703125,
+    "focused": "Send reminder",
+    "top": 749.703125,
+    "visible": true
+  }
+]

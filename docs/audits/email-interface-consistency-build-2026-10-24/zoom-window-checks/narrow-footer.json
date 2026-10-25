@@ -1,0 +1,37 @@
+[
+  {
+    "case": "templates",
+    "bottom": 768.703125,
+    "focused": "Save as my default",
+    "top": 730.703125,
+    "visible": true
+  },
+  {
+    "case": "materials",
+    "bottom": 712.5,
+    "focused": "Refresh preview",
+    "top": 674.5,
+    "visible": true
+  },
+  {
+    "case": "invite",
+    "bottom": 788.796875,
+    "focused": "Send 1 invitation",
+    "top": 752.796875,
+    "visible": true
+  },
+  {
+    "case": "reviewerMaterials",
+    "bottom": 785.796875,
+    "focused": "Preview 1 Email",
+    "top": 707.796875,
+    "visible": true
+  },
+  {
+    "case": "distribution",
+    "bottom": 780,
+    "focused": "Close",
+    "top": 742,
+    "visible": true
+  }
+]

@@ -1,0 +1,6 @@
+Chrome native accessibility readback, 2026-10-25
+Local real-component rehearsal: http://127.0.0.1:3187/
+111 container Zoom: 200%
+200% measurements: 600 x 368 CSS pixels, devicePixelRatio 4.
+After native Reset: 1200 x 736 CSS pixels at base devicePixelRatio 2.
+Narrow override: 390 x 844 CSS pixels, devicePixelRatio 1.

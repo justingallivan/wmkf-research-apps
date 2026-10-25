@@ -1,0 +1,302 @@
+{
+  "zoomResults": [
+    {
+      "name": "templates-200",
+      "dialogs": [
+        {
+          "name": "Your email defaults",
+          "scrollWidth": 600,
+          "width": 600
+        }
+      ],
+      "documentWidth": 600,
+      "dpr": 4,
+      "height": 368,
+      "width": 600
+    },
+    {
+      "name": "materials-200",
+      "dialogs": [
+        {
+          "name": "Materials email",
+          "scrollWidth": 600,
+          "width": 600
+        }
+      ],
+      "documentWidth": 600,
+      "dpr": 4,
+      "height": 368,
+      "width": 600
+    },
+    {
+      "name": "materialsReminder-200",
+      "dialogs": [
+        {
+          "name": "Materials email",
+          "scrollWidth": 600,
+          "width": 600
+        }
+      ],
+      "documentWidth": 600,
+      "dpr": 4,
+      "height": 368,
+      "width": 600
+    },
+    {
+      "name": "invite-200",
+      "dialogs": [
+        {
+          "name": "Invite reviewers",
+          "scrollWidth": 600,
+          "width": 600
+        }
+      ],
+      "documentWidth": 600,
+      "dpr": 4,
+      "height": 368,
+      "width": 600
+    },
+    {
+      "name": "reviewerMaterials-200",
+      "dialogs": [
+        {
+          "name": "Release proposal to reviewers",
+          "scrollWidth": 600,
+          "width": 600
+        }
+      ],
+      "documentWidth": 600,
+      "dpr": 4,
+      "height": 368,
+      "width": 600
+    },
+    {
+      "name": "distribution-200",
+      "dialogs": [
+        {
+          "name": "Share for the deliberation session",
+          "scrollWidth": 600,
+          "width": 600
+        }
+      ],
+      "documentWidth": 600,
+      "dpr": 4,
+      "height": 368,
+      "width": 600
+    },
+    {
+      "name": "grantee-200",
+      "dialogs": [],
+      "documentWidth": 600,
+      "dpr": 4,
+      "height": 368,
+      "width": 600
+    },
+    {
+      "name": "scheduled-200",
+      "dialogs": [],
+      "documentWidth": 600,
+      "dpr": 4,
+      "height": 368,
+      "width": 600
+    },
+    {
+      "name": "profile-200",
+      "dialogs": [],
+      "documentWidth": 600,
+      "dpr": 4,
+      "height": 368,
+      "width": 600
+    },
+    {
+      "name": "admin-200",
+      "dialogs": [],
+      "documentWidth": 600,
+      "dpr": 4,
+      "height": 368,
+      "width": 600
+    },
+    {
+      "name": "agenda-200",
+      "dialogs": [
+        {
+          "name": "Send session agenda",
+          "scrollWidth": 600,
+          "width": 600
+        }
+      ],
+      "documentWidth": 600,
+      "dpr": 4,
+      "height": 368,
+      "width": 600
+    },
+    {
+      "name": "deadline-200",
+      "dialogs": [
+        {
+          "name": "Reviewer deadline",
+          "scrollWidth": 600,
+          "width": 600
+        }
+      ],
+      "documentWidth": 600,
+      "dpr": 4,
+      "height": 368,
+      "width": 600
+    },
+    {
+      "name": "acceptedRelease-200",
+      "dialogs": [
+        {
+          "name": "Release from assignment",
+          "scrollWidth": 600,
+          "width": 600
+        }
+      ],
+      "documentWidth": 600,
+      "dpr": 4,
+      "height": 368,
+      "width": 600
+    },
+    {
+      "name": "withdrawal-200",
+      "dialogs": [
+        {
+          "name": "Release invitations",
+          "scrollWidth": 600,
+          "width": 600
+        }
+      ],
+      "documentWidth": 600,
+      "dpr": 4,
+      "height": 368,
+      "width": 600
+    },
+    {
+      "name": "reminder-200",
+      "dialogs": [
+        {
+          "name": "Reviewer reminder email",
+          "scrollWidth": 600,
+          "width": 600
+        }
+      ],
+      "documentWidth": 600,
+      "dpr": 4,
+      "height": 368,
+      "width": 600
+    },
+    {
+      "name": "materials-footer-200",
+      "dialogs": [
+        {
+          "name": "Materials email",
+          "scrollWidth": 600,
+          "width": 600
+        }
+      ],
+      "documentWidth": 600,
+      "dpr": 4,
+      "height": 368,
+      "width": 600
+    },
+    {
+      "name": "invite-footer-200",
+      "dialogs": [
+        {
+          "name": "Invite reviewers",
+          "scrollWidth": 600,
+          "width": 600
+        }
+      ],
+      "documentWidth": 600,
+      "dpr": 4,
+      "height": 368,
+      "width": 600
+    },
+    {
+      "name": "reviewerMaterials-footer-200",
+      "dialogs": [
+        {
+          "name": "Release proposal to reviewers",
+          "scrollWidth": 600,
+          "width": 600
+        }
+      ],
+      "documentWidth": 600,
+      "dpr": 4,
+      "height": 368,
+      "width": 600
+    },
+    {
+      "name": "distribution-footer-200",
+      "dialogs": [
+        {
+          "name": "Share for the deliberation session",
+          "scrollWidth": 600,
+          "width": 600
+        }
+      ],
+      "documentWidth": 600,
+      "dpr": 4,
+      "height": 368,
+      "width": 600
+    },
+    {
+      "name": "templates-footer-200",
+      "dialogs": [
+        {
+          "name": "Your email defaults",
+          "scrollWidth": 600,
+          "width": 600
+        }
+      ],
+      "documentWidth": 600,
+      "dpr": 4,
+      "height": 368,
+      "width": 600
+    }
+  ],
+  "footerChecks": [
+    {
+      "case": "materials",
+      "bottom": 325.6484375,
+      "focused": "Refresh preview",
+      "top": 287.6484375,
+      "viewportHeight": 368,
+      "visible": true
+    },
+    {
+      "case": "invite",
+      "bottom": 336.59765625,
+      "focused": "Send 1 invitation",
+      "top": 300.59765625,
+      "viewportHeight": 368,
+      "visible": true
+    },
+    {
+      "case": "reviewerMaterials",
+      "bottom": 333.59765625,
+      "focused": "Preview 1 Email",
+      "top": 285.59765625,
+      "viewportHeight": 368,
+      "visible": true
+    },
+    {
+      "case": "distribution",
+      "bottom": 304,
+      "focused": "Close",
+      "top": 266,
+      "viewportHeight": 368,
+      "visible": true
+    },
+    {
+      "case": "templates",
+      "bottom": 316.6484375,
+      "focused": "Save as my default",
+      "top": 278.6484375,
+      "viewportHeight": 368,
+      "visible": true
+    }
+  ]
+}

@@ -1,0 +1,7 @@
+check:doc-currency PASS
+check:doc-currency:self-test PASS
+check:fact-consistency PASS
+check:fact-consistency:self-test PASS
+check:doc-symbol-refs PASS
+check:doc-symbol-refs:self-test PASS
+check:docs-catalog PASS

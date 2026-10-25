@@ -42,7 +42,10 @@ Plan review passed after five corrections; three-pass runtime implemented on
 READY after materials reopen/busy-lock and grantee-dialog fixes. Build receipt:
 `docs/audits/EMAIL_INTERFACE_CONSISTENCY_BUILD_2026-10-24.md`. Audit report:
 `docs/audits/EMAIL_INTERFACE_CONSISTENCY_AUDIT_2026-10-24.md`. UI changes are branch-only; no live data writes or sends. DESIGN.md preserved.
-Calendar follow-up remains queued.
+Calendar follow-up remains queued. Exact 200% native Chrome zoom and a fresh
+390 × 844 narrow-window pass completed 2026-10-25 with no source changes.
+Both previously outstanding UI release checks are closed; evidence is in the
+linked build receipt. No promotion or live writes were performed.
 
 ## Current session update — personal email defaults slice 2
 
