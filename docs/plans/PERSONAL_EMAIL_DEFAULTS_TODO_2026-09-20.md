@@ -81,6 +81,15 @@ Released through PR #522 as `9d12b24ce`; Production READY and signed-in
 agenda composer/default-editor read-only smoke passed.
 Evidence: `docs/audits/MEETING_AGENDA_DEFAULTS_BUILD_2026-10-24.md`.
 
+## Slice 7 planning — deliberation-distribution defaults
+
+[PLANNED — owner requested review and draft only, 2026-10-25.]
+Bounded source review and proposed contract:
+`docs/plans/PERSONAL_EMAIL_DISTRIBUTION_DEFAULTS_PLAN_2026-10-25.md`.
+This covers own-sender subject/message defaults before the existing frozen
+preview. Runtime is unchanged. Non-empty-message and ordinary-reopen behavior
+remain explicit proposals for owner review; no database work or live sends.
+
 ## Existing pre-discussion calendar events — Duncan walkthrough pending 2026-10-25
 
 - [x] Investigate whether the generated agenda can update an existing invitation.
