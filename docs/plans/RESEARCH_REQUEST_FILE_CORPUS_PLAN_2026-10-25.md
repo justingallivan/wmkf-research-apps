@@ -145,19 +145,37 @@ That hypothesis is [ASSUMED].
 1. **Folder and filename rules** per era (exact GOapply names, request-number
    patterns, `Site Visit - …` folders). Developed and measured offline against the
    inventory CSVs: no Production access needed.
-2. **Content check** for what rules leave as `other`: extract the first page of
-   text and classify it, with a model where rules cannot decide. Required for
-   era 1 and much of era 2.
+2. **Template signatures** for what filename rules leave `other` or
+   `uncertain`: many documents are written on a template with fixed wording
+   (form headings, review prompts, report section titles). Regular expressions
+   over normalized extracted text (case, whitespace and line breaks
+   collapsed) identify the template, and therefore the type. Required for era 1
+   and much of era 2. [Owner suggestion 2026-10-25; the templates themselves are
+   [ASSUMED] until the pilot opens documents.]
+3. **Model classification** only for what neither rules nor signatures decide.
 
-Every row records how it was classified (`rule:<id>`, `content-rule`, `model`) so
+Every row records how it was classified (`rule:<id>`, `template:<id>`, `model`) so
 results can be audited and re-run when rules improve.
+
+**Template discovery is data-driven.** Within each era and candidate type,
+count the normalized lines that recur across many documents; the high-frequency
+lines are the template's fixed wording and become signatures. Templates drift,
+so each signature carries the era or date range it was found in, and a template
+seen in a new era is checked rather than assumed to match.
+
+**Section splitting.** Where a template is identified, its fixed headings or
+prompts also split the document into named sections (for example each review
+prompt and its answer, or a report's progress and outcomes sections). Sections
+are stored with the extracted text so analyses can compare like with like across
+years. A document whose template is found but whose sections do not all match
+keeps its full text and is flagged `sections-partial`, not forced.
 
 **Rules may not silently exclude.** A filename rule that labels a document
 Type-only would otherwise keep a misnamed proposal or writeup out of the
 reading set without any signal. So:
 
 - a rule that cannot decide assigns `uncertain`, never a forced type; `uncertain`
-  documents go to the content check;
+  documents go to template signatures, then the model;
 - the pilot independently labels a sample of rule-matched documents (Read and
   Type-only) from every era and measures **missed Read documents**, not only
   coverage;
@@ -229,8 +247,10 @@ notes promotion governance is under-specified; define it in that plan.
    era 2 years (e.g. 2017, 2020), and ~5 from a recent cycle as a known-good
    baseline. Goals: learn what number-named `.doc` files contain; test `.doc`,
    `Application<n>.html` and `.xls` conversion; measure extraction quality on
-   Read-priority types; and measure missed Read documents among rule-matched
-   samples (section 2). A model may classify content through
+   Read-priority types; measure missed Read documents among rule-matched
+   samples (section 2); and discover recurring templates per era, then test
+   whether their signatures classify and split documents reliably after
+   conversion. A model may classify content through
    `lib/services/llm-client.js`. Pilot output, including extracted text, goes to
    the owner's OneDrive Shuttle folder (owner-approved for the pilot). Results
    come back to the owner before any scale-up; the full run needs a further
