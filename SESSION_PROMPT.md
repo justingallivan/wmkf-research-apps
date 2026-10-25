@@ -28,7 +28,9 @@ as `9d12b24ce`; all PR checks passed, including 25,204 CI tests / five snapshots
 and 130 PostgreSQL tests. Production `dpl_FScmxXBiRS5EvCJzBEjfPGoJNbyc` is READY
 and serves applications.wmkeck.org. Signed-in agenda compose/default-editor smoke
 passed without writes or another send; bounded runtime error scan returned zero.
-Existing-calendar agenda updates remain queued. Release evidence:
+Existing-calendar agenda updates await the owner’s walkthrough with Duncan;
+findings and open questions are in
+`docs/plans/PERSONAL_EMAIL_DEFAULTS_TODO_2026-09-20.md`. Implementation is on hold. Release evidence:
 `docs/audits/MEETING_AGENDA_DEFAULTS_BUILD_2026-10-24.md`.
 Suite-wide Impeccable email-interface audit completed against `ad4cbac85`: real
 components at 1440/390px, DOM/keyboard probes, detector and independent source
@@ -46,7 +48,7 @@ READY after materials reopen/busy-lock and grantee-dialog fixes. Build receipt:
 agenda/nested picker, materials and scheduled addressing smoke passed.
 Hosted Jest 25,227, PostgreSQL 130 and Playwright 51 tests passed; error scan zero.
 No saved-default/business-record/mail write; DESIGN.md preserved.
-Calendar follow-up remains queued. Exact 200% native Chrome zoom and a fresh
+Calendar follow-up awaits the Duncan walkthrough described above. Exact 200% native Chrome zoom and a fresh
 390 × 844 narrow-window pass completed 2026-10-25 with no source changes.
 Both previously outstanding UI release checks are closed; evidence is in the
 linked build receipt. Production promotion subsequently completed as recorded above.
@@ -165,7 +167,12 @@ rebuild; D6; trigger/flag questions; B1 Connor questions; B1 correction. See
 
 ### Parked / queued (from Codex's handoff)
 
-- Existing-calendar agenda updates remain queued. The suite-wide Impeccable
+- Existing-calendar agenda updates: read-only investigation completed 2026-10-25;
+  owner will walk through scheduling with Duncan before design decisions. Findings
+  and questions: `docs/plans/PERSONAL_EMAIL_DEFAULTS_TODO_2026-09-20.md`.
+  Organizer account/type, recurrence, permissions, event linkage, audience and
+  notification behavior remain unresolved. No calendar updates authorized.
+  The suite-wide Impeccable
   email-interface release and Production smoke are complete; see the
   current-work section and `docs/audits/EMAIL_INTERFACE_CONSISTENCY_BUILD_2026-10-24.md`.
 - Grant Reporting sunset parked; reviewer panel coverage parked; Research
