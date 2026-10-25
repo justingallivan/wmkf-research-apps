@@ -20,7 +20,8 @@
  *
  * Unlike probe-research-proposal-file-inventory.mjs, a listing problem is never
  * read as "no files": only a missing archive folder is expected; truncation,
- * depth limits, throttling and auth errors are recorded per request.
+ * depth limits, throttling, auth errors and an unresolvable parent library
+ * (instead of the helper's silent akoya_request fallback) are recorded per request.
  * Known gaps: listFiles does not select createdDateTime/createdBy, and the
  * request query stops at the 5,000-row cap (narrow the window if it trips).
  *
@@ -112,7 +113,7 @@ for (const r of requests) {
   let totalBytes = 0;
   const lines = [];
   try {
-    const buckets = await withRetry(() => getRequestSharePointBuckets(r.akoya_requestid, r.akoya_requestnum, { requireCompleteResults: true }));
+    const buckets = await withRetry(() => getRequestSharePointBuckets(r.akoya_requestid, r.akoya_requestnum, { requireCompleteResults: true, requireResolvedParents: true }));
     for (const b of buckets) {
       let listed;
       try {

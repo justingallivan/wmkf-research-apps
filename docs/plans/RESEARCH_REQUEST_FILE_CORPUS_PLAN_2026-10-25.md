@@ -3,7 +3,7 @@ title: Research request file corpus — derived legible layer
 kind: plan
 domain: dataverse
 status: active
-summary: "Build a derived, rebuildable index (and extracted text) over the SharePoint files attached to Research requests, 1990–present, without moving or renaming originals, so staff can browse and AI/portfolio/outcome analyses can run. Based on the 2026-10-25 read-only inventory of 9,001 requests and 60,369 files (de-duplicated across runs); index starts in Postgres and settled fields are promoted to Dataverse as the durable record (owner decision 2026-10-25); owner approved a past-weighted content pilot (~55 requests) focused on science proposals, reviews, grant reports and staff writeups, with visibility matching request access."
+summary: "Build a derived, rebuildable index (and extracted text) over the SharePoint files attached to Research requests, 1990–present, without moving or renaming originals, so staff can browse and AI/portfolio/outcome analyses can run. Based on the 2026-10-25 read-only inventory of 9,001 requests and 60,369 files (de-duplicated across runs); index starts in Postgres and settled fields are promoted to Dataverse as the durable record (owner decision 2026-10-25); owner approved a past-weighted content pilot (~55 requests) focused on science proposals, reviews, grant reports and staff writeups, with visibility governed by the app's request restrictions; inventory counts are provisional pending a strict re-listing."
 owner: product-engineering
 related:
   - scripts/probe-request-file-inventory.mjs
@@ -40,6 +40,13 @@ or substitutes for it.
 Production listing; no downloads.] CSVs are kept outside the repo in the owner's
 OneDrive (`Research/Shuttle/request-file-inventory-2026-10-25/`) because filenames
 can name people.
+
+**These counts are provisional.** The runs did not pass `requireResolvedParents`,
+so if a request's parent-library lookup failed, `getRequestSharePointBuckets`
+silently fell back to `akoya_request` instead of reporting an error
+[VERIFIED via lib/utils/sharepoint-buckets.js:97-117]; a request stored in another
+library could then be under-listed while showing no error. The script now
+passes the strict option; the index build's fresh listing replaces these counts.
 
 | Run (selection) | Requests | Files | Listing errors |
 |---|---|---|---|
@@ -145,6 +152,18 @@ That hypothesis is [ASSUMED].
 Every row records how it was classified (`rule:<id>`, `content-rule`, `model`) so
 results can be audited and re-run when rules improve.
 
+**Rules may not silently exclude.** A filename rule that labels a document
+Type-only would otherwise keep a misnamed proposal or writeup out of the
+reading set without any signal. So:
+
+- a rule that cannot decide assigns `uncertain`, never a forced type; `uncertain`
+  documents go to the content check;
+- the pilot independently labels a sample of rule-matched documents (Read and
+  Type-only) from every era and measures **missed Read documents**, not only
+  coverage;
+- rules may exclude a type from extraction only after the owner accepts the
+  measured miss rate.
+
 ### 3. One preferred text copy
 
 When a document exists in several formats, mark one as the text source: `txt`
@@ -210,9 +229,12 @@ notes promotion governance is under-specified; define it in that plan.
    era 2 years (e.g. 2017, 2020), and ~5 from a recent cycle as a known-good
    baseline. Goals: learn what number-named `.doc` files contain; test `.doc`,
    `Application<n>.html` and `.xls` conversion; measure extraction quality on
-   Read-priority types. A model may classify content through
-   `lib/services/llm-client.js`. Results come back to the owner before any
-   scale-up; the full run needs a further approval.
+   Read-priority types; and measure missed Read documents among rule-matched
+   samples (section 2). A model may classify content through
+   `lib/services/llm-client.js`. Pilot output, including extracted text, goes to
+   the owner's OneDrive Shuttle folder (owner-approved for the pilot). Results
+   come back to the owner before any scale-up; the full run needs a further
+   approval.
 3. **Index build** (metadata, from a fresh listing), newest era first, using the
    rules from step 1 and what the pilot learned.
 4. **Text extraction at scale** for Read-priority types, after approval.
@@ -227,11 +249,17 @@ notes promotion governance is under-specified; define it in that plan.
 2. **Content access:** the past-weighted pilot of about 55 requests (rollout
    step 2), with model classification allowed; full-scale extraction needs a
    further approval after the pilot report.
-3. **Visibility:** match request access. Whoever can open a request's files today
-   may see its extracted text and browsing entries; nobody gains access to a
-   request they cannot already reach. How the app enforces this (existing
-   request restriction context vs. a SharePoint permission check) is a design
-   step for the browsing surface.
+3. **Visibility: the app's request restrictions are authoritative.** Request
+   restrictions and SharePoint permissions are different systems: SharePoint
+   access to the akoyaGO site is broader (a Public Microsoft 365 group with
+   Members holding Edit, per the IT capture recorded in
+   docs/DATAVERSE_SHAREPOINT_FILE_MODEL.md). So extracted text and index rows
+   are visible only to users the app's Dynamics request restriction context
+   allows, enforced server-side and fail-closed for **every** consumer:
+   browsing, search, text download, export and AI context selection. Tests for
+   a denied request and for access revocation are required before any consumer
+   is enabled. The pilot's local output in the owner's Shuttle folder is the one
+   owner-approved exception.
 4. **History gaps:** count pre-1990 Research requests and Research requests with
    no meeting date (read-only), then decide whether to include them.
 5. **Reading scope:** read science proposal documents, reviews, interim and
@@ -240,8 +268,18 @@ notes promotion governance is under-specified; define it in that plan.
    not read. Site Visit transcripts and summaries and staff discussion
    summaries are already legible (section 1, reading priority).
 
+## Likely future direction (not decided)
+
+The owner expects the corpus will eventually write new folders into request
+folders in SharePoint. If so, a sweep for requests that lack that folder (or
+an index row) catches **skipped requests**. It does not catch a request
+processed against the wrong library, which would still receive a folder; the
+strict parent-library check covers that case. Writing into request folders
+goes through the governed SharePoint path (target registry, interlock) and
+needs its own design before it is built.
+
 ## Not in scope
 
-Renaming, moving, deleting or re-permissioning any SharePoint file; changing
+Renaming, moving, deleting or re-permissioning any existing SharePoint file; changing
 GOapply or AkoyaGO folder conventions; writing `wmkf_requestdocument`; programs
 outside `RESEARCH_PROGRAM_IDS`.
