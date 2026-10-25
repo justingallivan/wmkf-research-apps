@@ -43,6 +43,7 @@ import {
   REVIEWER_RELEASE_SEED_BODY,
   REVIEWER_RELEASE_SEED_SUBJECT,
   REVIEWER_EXTENSION_SEED_BODY,
+  REVIEWER_EXTENSION_SEED_SUBJECT,
 } from '../lib/seed/email-defaults/reviewer-actions.js';
 import {
   DELIBERATION_AGENDA_SEED_SUBJECT,
@@ -77,6 +78,7 @@ export const EMAIL_DEFAULT_SEED_TEXT = Object.freeze({
   'email.reviewer_acceptance.subject': REVIEWER_ACCEPTANCE_SEED_SUBJECT,
   'email.reviewer_acceptance.body': REVIEWER_ACCEPTANCE_SEED_BODY,
   'email.reviewer_extension.body': REVIEWER_EXTENSION_SEED_BODY,
+  'email.reviewer_extension.subject': REVIEWER_EXTENSION_SEED_SUBJECT,
   'email.reviewer_withdraw.subject': REVIEWER_WITHDRAW_SEED_SUBJECT,
   'email.reviewer_withdraw.body': REVIEWER_WITHDRAW_SEED_BODY,
   'email.reviewer_release.subject': REVIEWER_RELEASE_SEED_SUBJECT,
@@ -156,8 +158,8 @@ export async function seedEmailDefaults({
 
     const current = await getSettingStrict(entry.key);
     const value = current?.found ? String(current.value ?? '') : '';
-    if (value.trim() !== '') {
-      logger.log(`SKIP ${entry.key}: existing non-empty value (${value.length} chars)`);
+    if ((entry.key === 'email.reviewer_extension.body' && current?.found) || value.trim() !== '') {
+      logger.log(`SKIP ${entry.key}: existing configured value (${value.length} chars)`);
       results.push({ key: entry.key, action: 'skip-existing', currentLength: value.length });
       continue;
     }

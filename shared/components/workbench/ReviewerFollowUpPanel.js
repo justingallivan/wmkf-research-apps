@@ -120,6 +120,8 @@ function ReviewerGroup({ proposal, previewReadOnly, onRefresh, degraded, loading
                 settings={{ reviewDueDate: proposal.reviewDeadline }}
                 mode="track"
                 canManage={canManage}
+                canChangeDeadline={!previewReadOnly && proposal.workbench?.canChangeDeadline === true}
+                deadlineActorContext={proposal.workbench?.deadlineActorContext}
                 showReviewReminderAction={canManage || previewReadOnly}
                 previewReadOnly={previewReadOnly}
                 degraded={degraded}

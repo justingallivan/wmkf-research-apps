@@ -346,6 +346,8 @@ export default function ReviewerManagePanel({
   settings = {},
   mode,
   canManage = true,
+  canChangeDeadline = false,
+  deadlineActorContext = null,
   showReviewReminderAction = false,
   previewReadOnly = false,
   degraded = false,
@@ -1250,7 +1252,8 @@ export default function ReviewerManagePanel({
                         overrideDate={r.reviewDueDateOverride}
                         effectiveDate={r.effectiveReviewDeadline}
                         defaultDate={proposal.reviewDeadline}
-                        canManage={canManage
+                        assignedPdContext={deadlineActorContext}
+                        canManage={canChangeDeadline && canManage
                           && mode === 'track'
                           && ['accepted', 'materials_sent', 'under_review'].includes(r.reviewStatus)
                           && !r.reviewReceivedAt}

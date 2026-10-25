@@ -1,5 +1,6 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { currentYmdInTimeZone, isYmd } from '../../../lib/utils/date-ymd';
+import DeadlineWordingDefault from './DeadlineWordingDefault';
 import EmailSendFeedback from '../EmailSendFeedback';
 import { requestEnvelope } from '../../utils/api-request';
 
@@ -35,6 +36,16 @@ const MALFORMED_BODY = Symbol('malformed-body');
 
 function messageForReason(reason, fallback) {
   const messages = {
+    request_mismatch: 'This reviewer now belongs to a different request. Reload the reviewer list.',
+    assigned_pd_required: 'Only the assigned Program Director can change this deadline or send its notification.',
+    sender_changed: 'The assigned Program Director or mailbox changed. Reload before continuing.',
+    preview_stale: 'The deadline or email details changed. Review a fresh preview before continuing.',
+    invalid_preview: 'Check the subject and placeholders, then preview again. The message may be empty.',
+    invalid_cc: 'Enter valid Cc email addresses, separated by commas. Do not repeat From or To; at most 20 addresses are allowed.',
+    cc_not_allowed_for_test_request: 'Cc is not available for synthetic test requests. Remove Cc and preview again.',
+    recipient_policy_refused: 'The recipients could not be approved. Check the addresses and preview again.',
+    preference_invalid: 'Your saved wording could not be loaded. Shared wording is shown below.',
+    preference_unavailable: 'Your saved wording could not be loaded. Shared wording is shown below.',
     ineligible: 'This reviewer is no longer eligible for a deadline change. Reload the reviewer list.',
     not_found: 'This reviewer is no longer available. Reload the reviewer list.',
     original_due_date_missing: 'I could not find the original review deadline. Reload the reviewer list, and contact an administrator if the problem continues.',
@@ -54,283 +65,170 @@ function messageForReason(reason, fallback) {
   return messages[reason] || fallback;
 }
 
-/**
- * Track Reviewers action for an accepted reviewer's operational due date.
- * Saving is one server-side workflow: preflight the notice, persist the date,
- * then dispatch the deadline email and stable-UID calendar update. Only an
- * actual dispatch failure produces partial success; retry/resend reads fresh
- * server state and performs no date write.
- */
-export default function ReviewerDueDateEditor({
-  suggestionId,
-  reviewerName,
-  overrideDate = null,
-  effectiveDate = null,
-  defaultDate = null,
-  canManage = true,
-  requestContextId = null,
-  onSaved,
-}) {
+/** Assigned-PD deadline composer. Every operation needs exact fresh review. */
+export default function ReviewerDueDateEditor({ suggestionId, reviewerName, overrideDate = null,
+  effectiveDate = null, defaultDate = null, canManage = false, assignedPdContext = null,
+  requestContextId = null, onSaved }) {
   const [open, setOpen] = useState(false);
   const [draft, setDraft] = useState('');
+  const [operation, setOperation] = useState('save');
+  const [template, setTemplate] = useState(null);
+  const [cc, setCc] = useState('');
+  const [addressing, setAddressing] = useState(null);
+  const [preview, setPreview] = useState(null);
   const [working, setWorking] = useState(false);
+  const [preferenceBusy, setPreferenceBusy] = useState(false);
+  const [notice, setNotice] = useState(null);
   const [error, setError] = useState(null);
-  const [errorOutcome, setErrorOutcome] = useState('failed');
-  const [notificationRetryable, setNotificationRetryable] = useState(false);
-  const [successMessage, setSuccessMessage] = useState(null);
-  const [savedWithoutNotification, setSavedWithoutNotification] = useState(false);
+  const [uncertain, setUncertain] = useState(false);
+  const [saved, setSaved] = useState(false);
+  const [sent, setSent] = useState(false);
+  const [retryProof, setRetryProof] = useState(null);
   const generationRef = useRef(0);
   const mountedRef = useRef(true);
   const onSavedRef = useRef(onSaved);
-  const context = JSON.stringify([
-    suggestionId, requestContextId, canManage, defaultDate, overrideDate, effectiveDate,
-  ]);
-  const currentContextRef = useRef(context);
-  const previousContextRef = useRef(context);
+  const context = JSON.stringify([suggestionId, requestContextId, canManage, assignedPdContext, defaultDate, overrideDate, effectiveDate]);
+  const contextRef = useRef(context);
   const minimumDate = minimumExtensionDate(defaultDate);
+  const busy = working || preferenceBusy;
 
-  const resetTransientState = () => {
-    setOpen(false);
-    setDraft('');
-    setWorking(false);
-    setError(null);
-    setErrorOutcome('failed');
-    setNotificationRetryable(false);
-    setSuccessMessage(null);
-    setSavedWithoutNotification(false);
+  const reset = () => {
+    setOpen(false); setDraft(''); setTemplate(null); setCc(''); setAddressing(null);
+    setPreview(null); setWorking(false); setPreferenceBusy(false); setNotice(null);
+    setError(null); setUncertain(false); setSaved(false); setSent(false); setRetryProof(null);
   };
-
+  useLayoutEffect(() => { onSavedRef.current = onSaved; }, [onSaved]);
   useLayoutEffect(() => {
-    onSavedRef.current = onSaved;
-  }, [onSaved]);
-
-  useLayoutEffect(() => {
-    currentContextRef.current = context;
-    if (previousContextRef.current !== context) {
-      generationRef.current += 1;
-      previousContextRef.current = context;
-      resetTransientState();
-    }
+    if (contextRef.current !== context) { generationRef.current += 1; contextRef.current = context; reset(); }
   }, [context]);
-
-  useEffect(() => {
-    mountedRef.current = true;
-    return () => {
-      mountedRef.current = false;
-      generationRef.current += 1;
-    };
-  }, []);
-
-  const close = ({ refresh = savedWithoutNotification } = {}) => {
-    if (!canManage || !suggestionId || !isYmd(defaultDate)) return;
-    generationRef.current += 1;
-    setOpen(false);
-    setDraft(overrideDate || '');
-    setWorking(false);
-    setError(null);
-    setErrorOutcome('failed');
-    setNotificationRetryable(false);
-    setSuccessMessage(null);
-    setSavedWithoutNotification(false);
-    if (refresh && onSavedRef.current) onSavedRef.current();
-  };
-
-  const submit = async ({ action = 'save', reviewDueDateOverride } = {}) => {
-    if (!canManage || !suggestionId || !isYmd(defaultDate)
-      || currentContextRef.current !== context) return;
+  useEffect(() => { mountedRef.current = true; return () => { mountedRef.current = false; generationRef.current += 1; }; }, []);
+  const fresh = (generation) => mountedRef.current && generation === generationRef.current && contextRef.current === context;
+  const invalidate = () => { generationRef.current += 1; setPreview(null); setRetryProof(null); setError(null); };
+  const bodyFor = (action, target = operation, initial = false) => ({
+    action, suggestionId, ...(action === 'preview' ? { operation: target } : {}),
+    ...(target === 'save' ? { reviewDueDateOverride: draft } : {}),
+    ...(!initial ? { template, cc: cc.split(/[;,]/).map((v) => v.trim()).filter(Boolean) } : { cc: [] }),
+  });
+  const showPreview = async (initial = false) => {
+    if (!canManage || busy) return;
     const generation = ++generationRef.current;
-    setWorking(true);
-    setError(null);
-    setErrorOutcome('failed');
-    setNotificationRetryable(false);
-    setSuccessMessage(null);
+    setWorking(true); setError(null); setPreview(null); setRetryProof(null);
     try {
-      const body = action === 'retry'
-        ? { action, suggestionId }
-        : { action, suggestionId, reviewDueDateOverride };
       const envelope = await requestEnvelope('/api/review-manager/review-due-extension', {
-        method: 'POST',
-        body,
-        tolerantBody: () => MALFORMED_BODY,
+        method: 'POST', body: bodyFor('preview', initial ? 'resend' : operation, initial), tolerantBody: true,
       });
-      const data = envelope.data;
-      if (!mountedRef.current || generation !== generationRef.current
-        || currentContextRef.current !== context) return;
-
-      if (envelope.ok && data === MALFORMED_BODY) {
-        throw Object.assign(new Error('I could not complete the deadline update.'), { outcome: 'uncertain' });
-      }
-
-      if (data.saved === true && data.notified === false) {
-        const nextOutcome = data.reason === 'send_unconfirmed' ? 'uncertain' : 'failed';
-        setSavedWithoutNotification(true);
-        setNotificationRetryable(nextOutcome === 'failed' && data.retryable !== false);
-        setErrorOutcome(nextOutcome);
-        setError(data.reason === 'send_unconfirmed'
-          ? 'The deadline was saved, but Dynamics did not confirm the email. Check reviewer activity before trying again.'
-          : 'The deadline was saved, but the reviewer notification was not sent.');
-        return;
-      }
-      if (!envelope.ok || !data.ok) {
-        const requestFailure = new Error(messageForReason(data.reason, data.error || 'The extension could not be saved.'));
-        requestFailure.outcome = data.reason === 'send_unconfirmed' ? 'uncertain' : 'failed';
-        requestFailure.retryable = requestFailure.outcome === 'failed' && data.retryable !== false;
-        throw requestFailure;
-      }
-      setSavedWithoutNotification(false);
-      setSuccessMessage('sent');
-      if (onSavedRef.current) onSavedRef.current();
-    } catch (requestError) {
-      if (!mountedRef.current || generation !== generationRef.current
-        || currentContextRef.current !== context) return;
-      const detail = requestError.message || 'I could not complete the deadline update.';
-      setErrorOutcome(requestError.outcome || 'uncertain');
-      if (savedWithoutNotification) setNotificationRetryable(requestError.retryable === true);
-      setError(savedWithoutNotification ? `The deadline is still saved. ${detail}` : detail);
-    } finally {
-      if (mountedRef.current && generation === generationRef.current
-        && currentContextRef.current === context) setWorking(false);
-    }
+      if (!fresh(generation)) return;
+      const data = envelope.data || {};
+      if (!envelope.ok || !data.ok || !data.preview) throw new Error(messageForReason(data.reason, 'The email preview could not be loaded. Try again.'));
+      const result = data.preview;
+      setAddressing({ from: result.from, to: result.to });
+      if (initial) { setTemplate(result.template); setNotice(result.templateNotice ? 'Your saved wording couldn’t be loaded. Shared wording is shown below.' : null); }
+      else { setPreview(result); setCc(result.cc.join(', ')); }
+    } catch (e) { if (fresh(generation)) setError(e.message || 'The preview could not be loaded.'); }
+    finally { if (fresh(generation)) setWorking(false); }
   };
-
   const openModal = () => {
     if (!canManage || !suggestionId || !isYmd(defaultDate)) return;
-    setDraft(overrideDate || minimumDate);
-    setError(null);
-    setErrorOutcome('failed');
-    setNotificationRetryable(false);
-    setSuccessMessage(null);
-    setSavedWithoutNotification(false);
-    setOpen(true);
+    setOpen(true); setDraft(overrideDate || minimumDate); setOperation('save');
+    showPreview(true);
   };
-
-  const validDraft = isYmd(draft)
-    && draft >= minimumDate
-    && draft > defaultDate
-    && draft !== overrideDate;
-
+  const close = () => {
+    if (busy) return;
+    generationRef.current += 1; reset();
+    if (saved || sent) onSavedRef.current?.();
+  };
+  const send = async (retry = false) => {
+    const proof = retry ? retryProof : preview?.proof;
+    if (!canManage || busy || !proof || uncertain || sent) return;
+    const generation = ++generationRef.current;
+    setWorking(true); setError(null);
+    try {
+      const action = retry ? 'retry' : operation;
+      const envelope = await requestEnvelope('/api/review-manager/review-due-extension', {
+        method: 'POST', body: { ...bodyFor(action, action), proof }, tolerantBody: () => MALFORMED_BODY,
+      });
+      if (!fresh(generation)) return;
+      const data = envelope.data;
+      setPreview(null); setRetryProof(null);
+      if (!data || data === MALFORMED_BODY || typeof data.ok !== 'boolean' || data.reason === 'server_error') { setUncertain(true); setError('The result could not be confirmed. Check reviewer activity before trying again.'); return; }
+      if (data.saved === true) setSaved(true);
+      if (data.ok && data.notified) { setSent(true); onSavedRef.current?.(); return; }
+      const unknown = data.reason === 'send_unconfirmed';
+      setUncertain(unknown);
+      const hasSaved = saved || data.saved === true;
+      const savedMessages = {
+        read_failed: 'The email details could not be reloaded. Preview again before sending.',
+        notification_unavailable: 'The reviewer or Program Director information could not be confirmed. Reload before sending.',
+        misconfigured: 'The email configuration could not be loaded. Contact an administrator before sending.',
+        token_recovery_required: 'The secure link needs attention before sending. Reload the reviewer list.',
+      };
+      const detail = hasSaved && savedMessages[data.reason]
+        ? savedMessages[data.reason] : messageForReason(data.reason, 'The email was not sent. Preview again before continuing.');
+      setError((hasSaved ? 'The deadline is saved. ' : '') + detail);
+      if (hasSaved && !unknown) setOperation('retry');
+      if (data.retryable && data.retryProof && !unknown) setRetryProof(data.retryProof);
+    } catch {
+      if (fresh(generation)) { setUncertain(true); setPreview(null); setRetryProof(null); setError('The result could not be confirmed. Check reviewer activity before trying again.'); }
+    } finally { if (fresh(generation)) setWorking(false); }
+  };
+  const validDraft = operation !== 'save' || (isYmd(draft) && draft >= minimumDate && draft > defaultDate && draft !== overrideDate);
+  const inputClass = 'mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200 disabled:bg-gray-50';
+  const locked = busy || uncertain || sent;
   return (
     <div className="text-xs">
-      {overrideDate ? (
-        <div className="space-y-0.5">
-          <p className="font-medium text-gray-800">Extended: {formatDate(effectiveDate)}</p>
-          <p className="text-gray-500">Original: {formatDate(defaultDate)}</p>
-        </div>
-      ) : (
-        <p className="text-gray-600">Due: {formatDate(effectiveDate || defaultDate)}</p>
-      )}
-
-      {canManage && isYmd(defaultDate) && (
-        <button
-          type="button"
-          onClick={openModal}
-          className="mt-1 text-blue-700 hover:text-blue-900 hover:underline"
-        >
-          {overrideDate ? 'Change extension' : 'Grant extension'}
-        </button>
-      )}
-
-      {open && canManage && suggestionId && isYmd(defaultDate) && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-          <div
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby={`review-extension-title-${suggestionId}`}
-            className="w-full max-w-md rounded-xl bg-white p-5 text-left shadow-xl"
-          >
-            <h2 id={`review-extension-title-${suggestionId}`} className="text-lg font-semibold text-gray-900">
-              {overrideDate ? 'Change extension' : 'Grant extension'}
-            </h2>
-            <p className="mt-1 text-sm text-gray-600">
-              {reviewerName ? `Reviewer: ${reviewerName}` : 'Reviewer deadline'}
-            </p>
-
-            <div className="mt-4 rounded-lg bg-gray-50 p-3">
-              <p className="text-xs font-medium uppercase tracking-wide text-gray-500">Original deadline</p>
-              <p className="mt-1 text-sm font-semibold text-gray-900">{formatDate(defaultDate)}</p>
-              {overrideDate && (
-                <p className="mt-1 text-xs text-gray-500">Current extension: {formatDate(overrideDate)}</p>
-              )}
-            </div>
-
-            <label className="mt-4 block text-sm font-medium text-gray-700" htmlFor={`review-extension-date-${suggestionId}`}>
-              New deadline
+      <p className="text-gray-700">{overrideDate ? 'Extended' : 'Due'}: {formatDate(effectiveDate || defaultDate)}</p>
+      {overrideDate && <p className="text-gray-500">Original: {formatDate(defaultDate)}</p>}
+      {canManage && isYmd(defaultDate) && <button type="button" onClick={openModal} className="mt-1 text-blue-700 hover:underline">{overrideDate ? 'Change extension' : 'Grant extension'}</button>}
+      {open && canManage && <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+        <div role="dialog" aria-modal="true" aria-labelledby={`deadline-title-${suggestionId}`} className="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-xl bg-white p-5 text-left shadow-xl">
+          <h2 id={`deadline-title-${suggestionId}`} className="text-lg font-semibold text-gray-900">Reviewer deadline</h2>
+          <p className="mt-1 text-sm text-gray-600">{reviewerName} · Original deadline: {formatDate(defaultDate)}</p>
+          {saved && <p role="status" className="mt-3 text-sm text-gray-800">The deadline is saved. Email actions below do not change it.</p>}
+          {!saved && <label className="mt-4 block text-sm font-medium text-gray-700">Action
+            <select className={inputClass} disabled={locked} value={operation} onChange={(e) => { invalidate(); setOperation(e.target.value); }}>
+              <option value="save">{overrideDate ? 'Change extension' : 'Grant extension'}</option>
+              {overrideDate && <option value="restore">Restore original deadline</option>}
+              <option value="resend">Resend deadline email</option>
+            </select>
+          </label>}
+          {operation === 'save' && <label className="mt-3 block text-sm font-medium text-gray-700">New deadline
+            <input type="date" className={inputClass} min={minimumDate} value={draft} disabled={locked} onChange={(e) => { invalidate(); setDraft(e.target.value); }} />
+          </label>}
+          {addressing && <dl className="mt-4 space-y-1 break-words text-sm text-gray-700"><div><dt className="inline font-medium">From: </dt><dd className="inline">{addressing.from}</dd></div><div><dt className="inline font-medium">To: </dt><dd className="inline">{addressing.to}</dd></div></dl>}
+          {notice && <p role="status" className="mt-3 text-sm text-amber-800">{notice}</p>}
+          {template && <div className="mt-3 space-y-3">
+            <label className="block text-sm font-medium text-gray-700">Cc (this send only)
+              <input className={inputClass} value={cc} disabled={locked} onChange={(e) => { invalidate(); setCc(e.target.value); }} placeholder="Separate email addresses with commas" />
             </label>
-            <input
-              id={`review-extension-date-${suggestionId}`}
-              type="date"
-              value={draft}
-              min={minimumDate}
-              onChange={(event) => setDraft(event.target.value)}
-              disabled={working || savedWithoutNotification || Boolean(successMessage)}
-              className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
-            />
-            <p className="mt-2 text-xs text-gray-500">
-              Saving automatically emails the reviewer and attaches the updated calendar date.
-            </p>
-
-            {successMessage && (
-              <EmailSendFeedback className="mt-4" status="sent" />
-            )}
-            {error && (
-              <div className="mt-4">
-                <EmailSendFeedback status={errorOutcome} message={error} />
-                {savedWithoutNotification && notificationRetryable && (
-                  <button
-                    type="button"
-                    onClick={() => submit({ action: 'retry' })}
-                    disabled={working}
-                    className="mt-2 text-sm font-medium text-red-800 underline underline-offset-4 disabled:opacity-50"
-                  >
-                    {working ? 'Retrying…' : 'Retry email'}
-                  </button>
-                )}
-              </div>
-            )}
-
-            <div className="mt-5 flex flex-wrap items-center justify-end gap-2">
-              {overrideDate && !savedWithoutNotification && !successMessage && (
-                <button
-                  type="button"
-                  onClick={() => submit({ action: 'save', reviewDueDateOverride: null })}
-                  disabled={working}
-                  className="mr-auto rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-700 disabled:opacity-50"
-                >
-                  Restore original deadline
-                </button>
-              )}
-              {overrideDate && !savedWithoutNotification && !successMessage && (
-                <button
-                  type="button"
-                  onClick={() => submit({ action: 'retry' })}
-                  disabled={working}
-                  className="rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-700 disabled:opacity-50"
-                >
-                  {working ? 'Sending…' : 'Resend deadline email'}
-                </button>
-              )}
-              <button
-                type="button"
-                onClick={() => close()}
-                disabled={working}
-                className="rounded-lg px-3 py-2 text-sm text-gray-600 disabled:opacity-50"
-              >
-                Close
-              </button>
-              {!savedWithoutNotification && !successMessage && (
-                <button
-                  type="button"
-                  onClick={() => submit({ action: 'save', reviewDueDateOverride: draft })}
-                  disabled={working || !validDraft}
-                  className="rounded-lg bg-blue-700 px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
-                >
-                  {working ? 'Saving and sending…' : 'Save extension'}
-                </button>
-              )}
-            </div>
+            <label className="block text-sm font-medium text-gray-700">Subject
+              <input className={inputClass} maxLength={500} value={template.subject} disabled={locked} onChange={(e) => { invalidate(); setTemplate({ ...template, subject: e.target.value }); }} />
+            </label>
+            <label className="block text-sm font-medium text-gray-700">Message (optional)
+              <textarea className={inputClass} rows={7} maxLength={12000} value={template.body} disabled={locked} onChange={(e) => { invalidate(); setTemplate({ ...template, body: e.target.value }); }} />
+            </label>
+            <p className="text-xs text-gray-500">Optional placeholders: {'{{greeting}}, {{reviewerName}}, {{proposalTitle}}, {{reviewDueDate}}, {{signature}}'}. The calendar attachment always uses the saved deadline.</p>
+          </div>}
+          <div className="mt-3"><DeadlineWordingDefault disabled={working || uncertain || sent} onBusyChange={setPreferenceBusy} /></div>
+          {working && <p role="status" className="mt-3 text-sm text-gray-600">Preparing the deadline email…</p>}
+          {preview && <section className="mt-4 border-t border-gray-200 pt-4" aria-label="Email preview">
+            <p className="text-sm font-medium text-gray-900">{preview.subject}</p>
+            <p className="mt-1 text-xs text-gray-600">Deadline: {formatDate(preview.effectiveReviewDeadline)} · Calendar update attached</p>
+            {preview.cc.length > 0 && <p className="mt-1 break-words text-xs text-gray-600">Cc: {preview.cc.join(', ')}</p>}
+            <div className="mt-3 whitespace-pre-wrap break-words text-sm text-gray-800">{preview.bodyText || 'No message body.'}</div>
+          </section>}
+          {error && <EmailSendFeedback className="mt-4" status={uncertain ? 'uncertain' : 'failed'} message={error} />}
+          {sent && <EmailSendFeedback className="mt-4" status="sent" />}
+          <div className="mt-5 flex flex-wrap justify-end gap-2">
+            <button type="button" onClick={close} disabled={busy} className="rounded-lg px-3 py-2 text-sm text-gray-700 hover:bg-gray-100 disabled:opacity-50">Close</button>
+            {!template && !locked && <button type="button" onClick={() => showPreview(true)} className="rounded-lg border border-gray-300 px-3 py-2 text-sm">Load email wording</button>}
+            {template && !uncertain && !sent && <>
+              <button type="button" disabled={busy || !validDraft} onClick={() => showPreview()} className="rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-800 hover:bg-gray-50 disabled:opacity-50">Preview email</button>
+              {retryProof && <button type="button" disabled={busy} onClick={() => send(true)} className="rounded-lg bg-gray-900 px-4 py-2 text-sm text-white disabled:opacity-50">Retry email</button>}
+              {preview && <button type="button" disabled={busy} onClick={() => send()} className="rounded-lg bg-gray-900 px-4 py-2 text-sm text-white disabled:opacity-50">{operation === 'save' ? 'Save deadline and send' : operation === 'restore' ? 'Restore deadline and send' : 'Send deadline email'}</button>}
+            </>}
           </div>
         </div>
-      )}
+      </div>}
     </div>
   );
 }
