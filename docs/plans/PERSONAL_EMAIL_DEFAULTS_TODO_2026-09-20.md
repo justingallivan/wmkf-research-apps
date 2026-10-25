@@ -81,19 +81,79 @@ Released through PR #522 as `9d12b24ce`; Production READY and signed-in
 agenda composer/default-editor read-only smoke passed.
 Evidence: `docs/audits/MEETING_AGENDA_DEFAULTS_BUILD_2026-10-24.md`.
 
-## Existing pre-discussion calendar events — follow-up queued 2026-10-24
+## Existing pre-discussion calendar events — Duncan walkthrough pending 2026-10-25
 
-- [ ] Investigate explicitly updating the existing pre-discussion calendar
-  invitations with the generated agenda, rather than sending duplicate events.
-  Owner believes Duncan blocks these sessions in advance; verify the actual
-  calendar owner, event creation method, recurrence and app permissions first.
-  Determine how to link a Meeting Tracker session to the correct event and how
-  authorized backup staff may update it. Propose an explicit reviewed update of
-  a clearly marked agenda section, preserving organizer copy, attendees and
-  unrelated event details. Review recurring-series versus occurrence behavior,
-  notification recipients and failure/retry semantics before implementation.
-  This is a scoped investigation/planning task, not authorization to edit calendar
-  events or send updates. It is separate from slice 6 and does not block release.
+- [x] Investigate whether the generated agenda can update an existing invitation.
+- [ ] Walk through Duncan's scheduling process with the owner, then resolve the
+  questions below before drafting an implementation plan. [OWNER-DIRECTED
+  2026-10-25.] No walkthrough date is set. Implementation is on hold; the
+  agenda-section proposal below has not been adopted. This follow-up is separate
+  from the released slice 6.
+
+### Findings to bring to the walkthrough
+
+- [VERIFIED via read-only Outlook inspection, 2026-10-25.] The owner-selected
+  example, **Pre-RP discussions**, was September 24, 2026, 1:30–3:00 PM. It showed
+  **Shared Calendar** as organizer and **Research Staff** as invitee. Its body
+  already contained Zoom joining information, an attendance note and a manually
+  written proposal list. The inspected item was the owner's accepted attendee
+  copy; it does not establish organizer-side access. Calendar type, organizing
+  account, recurrence and backup editing rights remain [UNVERIFIED]. The owner
+  identifies Duncan as the scheduler; his creation process has not been observed.
+- [VERIFIED via Microsoft documentation.] Updating an existing event body is
+  supported, subject to the correct calendar identity and permissions. Shared or
+  delegated calendar access is supported, but the correct model depends on the
+  actual calendar type. Preserve the current online-meeting information when
+  editing the body. Recurring-event updates can cause multiple notifications;
+  silent updates are not established. Sources:
+  [Update event](https://learn.microsoft.com/en-us/graph/api/event-update?view=graph-rest-1.0),
+  [shared/delegated calendars](https://learn.microsoft.com/en-us/graph/outlook-get-shared-events-calendars).
+- [VERIFIED via tracked schema, adapter and agenda service.] Meeting Tracker
+  sessions currently have no Outlook mailbox/calendar/event binding. The agenda
+  service already generates ordered proposal details, timings and briefing links,
+  but dispatches a separate Dynamics email. Evidence:
+  `lib/dataverse/schema/wave28-meeting-tracker/wmkf_deliberationsession.json`,
+  `lib/dataverse/adapters/deliberation-session.js`,
+  `lib/services/meeting-tracker/agenda-service.js`.
+- [VERIFIED via source.] Existing calendar attachments use informational
+  `METHOD:PUBLISH`; they are not an organizer update channel. Staff sign-in does
+  not request calendar permissions. The existing Graph service uses application
+  credentials; actual tenant calendar grants remain [UNVERIFIED]. Evidence:
+  `lib/external/calendar-invite.js`, `pages/api/auth/[...nextauth].js`,
+  `lib/services/graph/auth.js`.
+- [VERIFIED via source.] Briefing links grant token-based access. The calendar's
+  Research Staff audience may differ from the agenda email's To/Cc audience;
+  intended access and forwarding exposure need review before inserting links.
+  Evidence: `pages/external/briefing/[token].js` and
+  `lib/services/deliberation-briefing/briefing-link-service.js`.
+
+### Questions to resolve with Duncan
+
+1. **Scheduling and ownership:** How does he create the blocks, and in which
+   organizing account/calendar? Is it a shared mailbox, delegated calendar or
+   group? Who can edit, and who covers absences? Are sessions separate events,
+   copied events or occurrences of a recurring series?
+2. **Connecting the records:** How should staff confirm the exact existing event
+   for each Meeting Tracker session? Which system controls meeting times and
+   attendees when the records differ? Should an update affect only one occurrence?
+3. **Content and first conversion:** When does Duncan add or revise the manual
+   proposal list? Would a clearly marked app-managed Agenda section fit, preserving
+   Zoom details and other notes? How should the first update replace the manual
+   list without duplicates? Which proposal details, times and links belong there?
+4. **Audience and notifications:** Who is in Research Staff, and should everyone
+   receive briefing links? Should calendar attendees remain unchanged? What
+   calendar update notifications are expected, and should the standalone agenda
+   email remain optional, remain routine or be replaced for this workflow?
+5. **Action and recovery:** Who should preview and explicitly apply an update?
+   How should later Outlook edits, rescheduling, deleted/cancelled events and
+   uncertain failures be handled? Confirm permissions/admin requirements and
+   verify changed-event detection, readback and retry behavior on a synthetic
+   event before any real invitation update.
+
+[PLANNED.] Record the walkthrough answers here, then review a bounded plan.
+Technical feasibility is established in principle; actual organizer access and
+safe end-to-end update behavior are not verified. No calendar edits, permission
+changes or notification sends were made or authorized by this follow-up.
 
 ## Email interface consistency — Production released and verified
 
