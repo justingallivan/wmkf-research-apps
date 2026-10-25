@@ -87,8 +87,9 @@ Evidence: `docs/audits/MEETING_AGENDA_DEFAULTS_BUILD_2026-10-24.md`.
 Bounded source review and proposed contract:
 `docs/plans/PERSONAL_EMAIL_DISTRIBUTION_DEFAULTS_PLAN_2026-10-25.md`.
 This covers own-sender subject/message defaults before the existing frozen
-preview. Runtime is unchanged. Non-empty-message and ordinary-reopen behavior
-remain explicit proposals for owner review; no database work or live sends.
+preview. Runtime is unchanged. The owner confirmed non-empty messages and fresh
+ordinary reopen with a warning before discarding edits (2026-10-25). Independent
+Claude plan review is required before coding; no database work or live sends.
 
 ## Existing pre-discussion calendar events — Duncan walkthrough pending 2026-10-25
 

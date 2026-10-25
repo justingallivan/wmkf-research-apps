@@ -3,7 +3,7 @@ title: Personal defaults for deliberation-distribution emails
 domain: workbench
 kind: plan
 status: draft
-summary: "Draft slice 7: own-sender subject/message defaults before the existing frozen distribution preview, with explicit future-only Save/Clear, strict owner isolation and bounded recovery. No implementation authorized."
+summary: "Draft slice 7: own-sender subject/message defaults before the existing frozen distribution preview, with explicit future-only Save/Clear, strict owner isolation and bounded recovery. Owner selected non-empty messages and fresh reopen with discard warning; independent plan review pending. No implementation authorized."
 owner: product-engineering
 related:
   - docs/plans/PERSONAL_EMAIL_DEFAULTS_TODO_2026-09-20.md
@@ -23,7 +23,10 @@ branch: `codex/distribution-email-defaults-plan`, based on `1bb87c418`.
 No runtime changes, preference writes, schema probes, migrations, seeds, sends,
 environment edits or deployments are authorized by this planning task. Claude
 owns separate database work; its checkout and live operations remain untouched.
-The two product choices in §3 require review before implementation.
+The owner confirmed both §3 choices on 2026-10-25: keep non-empty messages
+and reopen with fresh defaults, warning before discarding edits. These are
+planned requirements, not implemented behavior. Independent plan review is
+required before any coding.
 
 Source and mocked tests establish the baseline below. Live preference contents,
 duplicate-row prevalence and tenant permissions were not probed. No claim of
@@ -64,9 +67,10 @@ Some Atlas/route-matrix entries retain older deployment descriptions; this plan
 uses current source for flow claims and does not broaden into their historical
 status reconciliation.
 
-## 3. Proposed product contract — review before coding
+## 3. Product contract — owner choices recorded, review before coding
 
-All items here are [PLANNED], not adopted new behavior.
+All items here are [PLANNED], not implemented behavior. Items 2 and 6 include
+explicit owner decisions; the remaining implementation proposals await review.
 
 1. **Save only subject and message.** A personal pair belongs to the actual
    authenticated sender, applies across requests, and is distinct from agenda,
@@ -74,7 +78,7 @@ All items here are [PLANNED], not adopted new behavior.
    session data, generated briefing copy, signatures or attachment choices as
    separate preference fields. Text may contain a staff-written closing; this
    slice does not introduce a signature service.
-2. **Preserve the current non-empty message rule (decision).** Recommend keeping
+2. **Preserve the current non-empty message rule (owner-confirmed).** Keep
    nonblank subject and message for both saved defaults and one-send compose.
    Existing compose validation requires them; optional/empty bodies would be a
    separate product change. Clear means remove the override, never save an empty
@@ -99,14 +103,17 @@ All items here are [PLANNED], not adopted new behavior.
    operation ID, stale-input acknowledgement or recovery snapshot. Success
    notices require a confirmed write; a read-after-write failure cannot relabel
    a confirmed write as failed, nor can an uncertain write be reported saved.
-6. **Fresh ordinary reopen (decision).** Recommend each ordinary new compose
+6. **Fresh ordinary reopen (owner-confirmed).** Each ordinary new compose
    fetches current defaults and reseeds recipient suggestions, clearing prior
-   preview/confirmation/acknowledgement. Close/reopen would discard an unsent
-   one-off draft; disclose that behavior and confirm discard if it is edited.
-   Do not silently replace today's persistent hidden-panel behavior without
-   approval. Alternative: preserve the unsent draft and require an explicit
-   “New email” action to apply future defaults; no implementation may choose
-   between these alternatives on its own.
+   preview/confirmation/acknowledgement. Before Close/Escape or another local
+   dismissal would discard edited one-send To/Cc/subject/message or unsaved
+   default-editor text, show a discard warning. Cancel keeps the dialog, edits,
+   preview and confirmation unchanged; confirm discards the unsent edits and
+   closes. The next ordinary open loads fresh defaults. Compare edits with the
+   loaded/seeded baseline, not simply whether an input ever received an event;
+   successfully saved editor text is no longer unsaved. Keep this warning out
+   of busy/blocked-close paths. Requirement 7 takes precedence for unresolved
+   sends: dismissing their view does not discard or rebase their recovery state.
 7. **Unresolved sends are an exception to new-compose refresh.** Never rebase
    locally pending, transport-unconfirmed or in-progress sends onto new defaults.
    Keep their original sender, wording, recipients, operation and preview hash;
@@ -268,12 +275,12 @@ this proves existing behavior, not planned personal defaults or live delivery.
 | Honest fallback | Absent vs unavailable vs invalid/encrypted/duplicate; partial shared config; valid personal over shared outage; briefing-copy status independent; no fallback writes |
 | Confirmed mutations | Exact readback, create/update errors, lost response, duplicate first-Save race, partial duplicate Clear, repeated Clear, independent post-write read failure |
 | Future-only actions | Save/Clear/deferred editor loads leave form, recipients, preview/hash and confirmation unchanged; no prepare/link/lock/send callback calls |
-| Lifecycle | Approved reopen choice, discard warning, latest defaults, fresh recipients, source/request/actor switches, unmount, late success/error/finally, concurrent lanes |
+| Lifecycle | Fresh reopen; discard confirm/cancel via Close/Escape; edited recipients/wording/default-editor text; unchanged drafts do not warn; latest defaults, fresh recipients, source/request/actor switches, unmount, late success/error/finally, concurrent lanes |
 | Frozen recovery | Change defaults after prepared/confirmed preview and during unresolved send; original payload/sender/hash retained; exact retry reuses activity; no new default write |
 | Content/transport authority | Generated session/link/bundle/expiry survives arbitrary wording; To/Cc one-send; HTML escaping; existing stale-input and transport-acceptance tests remain green |
 | Desktop interaction | Keyboard disclosure/labels/focus, busy/validation/notices, desktop density plus zoom/narrow regression; preserve existing dialog |
 
-Execution after owner choices: (1) strict key/service/API + tests; (2) independent
+Execution after independent plan review and coding authorization: (1) strict key/service/API + tests; (2) independent
 editor and initialization + race tests; (3) compatibility regression and source
 review; (4) bounded visual inspection and independent implementation review.
 Run scoped lint/types and affected API-route, route-lifecycle, DAL/context,
@@ -300,8 +307,8 @@ plan and a TODO pointer only. No existing implementation is relabeled shipped.
 | Apply defaults before prepare | Editable resolved subject/body already posted and frozen | Existing 180-test baseline; prepare/send allowlists and hash inputs inspected; send cannot accept replacement template | VERIFIED prerequisite; feature PLANNED |
 | Existing preference entity, no migration expected | Exact-owner/key DAL and agenda readback/Clear precedent | Source/Atlas inspected; duplicate/capped enumeration branches inspected; no live permission probe | VERIFIED source contract; live readiness UNKNOWN |
 | Independent future-default editor | Agenda and shared editor patterns exist | Source examined; no distribution editor/route found in bounded search; no new UI rendered | VERIFIED precedent; UX PLANNED |
-| Refresh ordinary reopen | Parent keeps panel mounted on Close | Parent/panel lifecycle inspected; fresh reopen is a proposed change, not current behavior | Owner decision pending |
+| Refresh ordinary reopen | Parent keeps panel mounted on Close | Parent/panel lifecycle inspected; fresh reopen is owner-confirmed planned behavior, not current behavior | Owner decision recorded; implementation PLANNED |
 
 Verdict: **DRAFT FOR OWNER REVIEW, NOT IMPLEMENTATION APPROVAL.** The source
-review and baseline tests support this bounded approach. Live permission proof,
-visual validation, owner choices and independent implementation review remain.
+review and baseline tests support this bounded approach. Owner choices are recorded. Independent plan review, live permission proof,
+visual validation and independent implementation review remain.
