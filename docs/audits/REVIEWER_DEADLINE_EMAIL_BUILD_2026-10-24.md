@@ -3,7 +3,7 @@ title: Reviewer deadline email defaults — build and review evidence
 domain: reviewer-engagement
 kind: audit
 status: active
-summary: Slice 2 branch build and OAuth Opus review; Production subject seeded with body preserved and authorized empty-body transport accepted. Dynamics Sent status verified; runtime not deployed.
+summary: Slice 2 branch build and OAuth Opus review; Production subject seeded with body preserved and authorized empty-body transport accepted. Dynamics Sent status and owner-confirmed inbox receipt verified; runtime not deployed.
 owner: product-engineering
 related:
   - docs/plans/PERSONAL_EMAIL_REVIEWER_DEADLINE_DEFAULTS_PLAN_2026-10-24.md
@@ -130,7 +130,10 @@ At first readback the activity was Pending Send (status 6), with senton null.
 Subsequent readback at 2026-10-25T00:08:53.993Z confirmed Sent (status 3),
 state Completed (1), senton 2026-10-25T00:08:17Z (October 24 PDT). Attachment and
 parties remained correct. Dynamics appended its CRM tracking suffix to the
-stored subject. This proves server-side sending, not recipient inbox arrival. The isolated check
+stored subject. [OWNER-CONFIRMED via subsequent conversation reply.] Justin
+received the email with a blank body and calendar invitation for Monday,
+October 26, 2026, matching the intended test date. This completes recipient-side
+delivery confirmation. The isolated check
 does not exercise an authenticated deadline mutation or prove date annotation
 behavior; branch acceptance tests remain the evidence for those paths.
 
@@ -138,8 +141,8 @@ behavior; branch acceptance tests remain the evidence for those paths.
 
 Runtime is not merged or deployed. The two selected release prerequisites are
 complete: shared subject configuration and isolated empty-body transport with
-server-side Sent status. Recipient inbox observation was not available; no second
-test or resend is needed for the selected transport acceptance check.
+server-side Sent status and owner-confirmed inbox receipt, blank body and correct
+calendar date. No second test or resend is needed.
 Date annotation storage behavior remains unobserved live. The suggestion ETag cannot atomically lock request fields;
 a remaining cross-record race is documented, not described as owner-accepted.
 Proofs expire after five minutes but are not single-use; manual resend/retry
@@ -240,7 +243,7 @@ I found no regressions in these areas:
 
 Sweep Mode A: updated the plan, inventory slice-2 row, suite to-do and session
 status for the verified seed and isolated server-side Sent result. Earlier Opus
-review statements below are historical observations at reviewed runtime HEAD.
+review statements above are historical observations at reviewed runtime HEAD.
 Source → settings persistence → candidate validator and mail helpers → email /
 attachment / activity-party readback are traced above. Partial-success journals
 identify each stage; no repair or retry writes occur after a mismatch. UI async
