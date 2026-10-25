@@ -81,25 +81,16 @@ Released through PR #522 as `9d12b24ce`; Production READY and signed-in
 agenda composer/default-editor read-only smoke passed.
 Evidence: `docs/audits/MEETING_AGENDA_DEFAULTS_BUILD_2026-10-24.md`.
 
-## Slice 7 planning — deliberation-distribution defaults
+## Slice 7 implementation — deliberation-distribution defaults
 
-[PLANNED — owner requested review and draft only, 2026-10-25.]
-Bounded source review and proposed contract:
-`docs/plans/PERSONAL_EMAIL_DISTRIBUTION_DEFAULTS_PLAN_2026-10-25.md`.
-This covers own-sender subject/message defaults before the existing frozen
-preview. Runtime is unchanged. The owner confirmed non-empty messages and fresh
-ordinary reopen with a warning before discarding edits (2026-10-25). The plan
-now specifies exact unresolved-send preservation, open/reset ownership, close-path
-warnings, retained source-paused drafts and pair-specific status. First Claude
-review is preserved in
-`docs/audits/DISTRIBUTION_DEFAULTS_PLAN_CLAUDE_REVIEW_2026-10-25.md`;
-Claude re-review confirmed the original findings addressed; four refinements
-(no-transport proof, concrete navigation guard, stable auth scope and async lanes)
-are incorporated. Final independent Claude verdict: READY TO IMPLEMENT on
-`7baa3ad99`; report:
-`docs/audits/DISTRIBUTION_DEFAULTS_PLAN_CLAUDE_FINAL_REVIEW_2026-10-25.md`.
-The owner discard warning is preserved. Coding still awaits separate instruction.
-No database work, runtime changes or live sends.
+[BRANCH IMPLEMENTATION — owner authorized coding 2026-10-25; not released.]
+Contract: `docs/plans/PERSONAL_EMAIL_DISTRIBUTION_DEFAULTS_PLAN_2026-10-25.md`.
+Independent plan review returned READY TO IMPLEMENT on `7baa3ad99`.
+The dedicated exact-sender preference route, future-only editor, fresh ordinary
+reopen, guarded discard and retained frozen-send recovery are implemented in
+this worktree. Verification and independent implementation review are in progress;
+no live preference writes, sends, schema operations or release have occurred.
+The non-empty message and discard-warning requirements remain unchanged.
 
 ## Existing pre-discussion calendar events — Duncan walkthrough pending 2026-10-25
 

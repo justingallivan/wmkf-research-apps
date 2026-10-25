@@ -27,3 +27,19 @@ export function renderDeliberationShareSubject(template, requestNumber) {
   const value = String(template || '').replaceAll('{{requestNumber}}', number);
   return number ? value : value.replace(/\s+[—–-]\s*$/, '').trim();
 }
+
+/** Personal raw pair only. Compose literals and Admin settings retain their own contracts. */
+export function validateDeliberationShareTemplate(template) {
+  const errors = [];
+  if (!template || typeof template !== 'object' || Array.isArray(template)
+    || Object.keys(template).length !== 2 || !Object.hasOwn(template, 'subject') || !Object.hasOwn(template, 'body')) {
+    return { valid: false, errors: ['Provide only subject and body.'] };
+  }
+  const { subject, body } = template;
+  if (typeof subject !== 'string' || !subject.trim() || subject.length > 500 || /[\r\n]/.test(subject)) errors.push('Subject is required, on one line, up to 500 characters.');
+  if (typeof body !== 'string' || !body.trim() || body.length > 20000) errors.push('Message is required, up to 20,000 characters.');
+  // Any remaining brace is a malformed or unsupported placeholder, including triple braces.
+  if (typeof subject === 'string' && /[{}]/.test(subject.replaceAll('{{requestNumber}}', ''))) errors.push('Only {{requestNumber}} is supported in the subject.');
+  if (typeof body === 'string' && /[{}]/.test(body)) errors.push('Message placeholders are not supported.');
+  return { valid: errors.length === 0, errors, ...(errors.length ? {} : { value: { subject, body } }) };
+}

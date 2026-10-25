@@ -2,8 +2,8 @@
 title: Personal defaults for deliberation-distribution emails
 domain: workbench
 kind: plan
-status: draft
-summary: "Draft slice 7: own-sender subject/message defaults before the existing frozen distribution preview, with explicit future-only Save/Clear, strict owner isolation and bounded recovery. Owner selected non-empty messages and fresh reopen with discard warning; independently re-reviewed READY TO IMPLEMENT; owner warning requirement preserved. No implementation authorized."
+status: active
+summary: "Reviewed slice 7 contract; owner authorized implementation 2026-10-25. Branch implementation and verification in progress; discard warnings preserved. Not released."
 owner: product-engineering
 related:
   - docs/plans/PERSONAL_EMAIL_DEFAULTS_TODO_2026-09-20.md
@@ -17,21 +17,20 @@ related:
 
 ## Status and boundary
 
-[PLANNED — owner requested flow review and a bounded plan, 2026-10-25.]
-This is inventory slice 7, not the earlier conversation's option number. Plan
-branch: `codex/distribution-email-defaults-plan`, based on `1bb87c418`.
-No runtime changes, preference writes, schema probes, migrations, seeds, sends,
-environment edits or deployments are authorized by this planning task. Claude
-owns separate database work; its checkout and live operations remain untouched.
-The owner confirmed both §3 choices on 2026-10-25: keep non-empty messages
-and reopen with fresh defaults, warning before discarding edits. These are
-planned requirements, not implemented behavior. The first independent review returned named changes. The revisions address
-them; final independent review returned READY TO IMPLEMENT (see §9). Coding
-and live operations still require a separate instruction.
+[BRANCH IMPLEMENTATION IN PROGRESS — owner authorized coding 2026-10-25.]
+This is inventory slice 7, on `codex/distribution-email-defaults-plan`.
+The contract below was independently reviewed READY TO IMPLEMENT (§9).
+Runtime and tests are now being implemented in this isolated worktree; verification
+and independent implementation review remain required before release.
+No live preference writes, schema probes, migrations, seeds, sends, environment
+changes or deployments are part of this task. Claude's separate database work and
+checkout remain untouched. Non-empty messages, fresh ordinary reopen and warning
+before voluntary discard remain owner requirements. Background source changes
+retain edits. Live preference contents and tenant permissions remain unprobed.
 
-Source and mocked tests establish the baseline below. Live preference contents,
-duplicate-row prevalence and tenant permissions were not probed. No claim of
-current Production configuration or live delivery is made by this plan.
+Sections describing the pre-implementation baseline and historical plan reviews
+retain their dated evidence. Acceptance criteria below remain the implementation
+contract; they are not automatically proof that every case passes.
 
 ## 1. Job and audience
 
@@ -538,5 +537,6 @@ actual request page. History's 25-attempt limit means an older missing row canno
 satisfy proof; it retains the envelope. No new exact-attempt endpoint is implied.
 
 Owner decisions remain unchanged, including warning before voluntary discard
-and preserving edits on background source changes. No runtime coding, preference
-write, migration, seed, send or release has begun or is authorized by this receipt.
+and preserving edits on background source changes. This historical plan-review receipt itself authorized no coding or live operations.
+The later owner coding instruction is recorded in the current status above; release
+and live operations remain outside this task.

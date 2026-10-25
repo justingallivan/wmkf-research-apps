@@ -47,6 +47,15 @@ from identity, duplicate/encrypted-row and enumeration failures. Family edits
 re-read the raw map plus shared copy and preserve sibling fields/inheritance.
 No storage, schema or identity mapping change; generic other-key reads unchanged.
 
+**Distribution personal defaults (branch implementation, 2026-10-25; not deployed):**
+`lib/services/pre-site-visit/distribution-personalization.js` uses the DAL's complete
+exact-owner/key enumeration in existing Dataverse `wmkf_appuserpreferences`, key
+`deliberation_share_template`. Its dedicated reviewers-gated preference route
+accepts only raw subject/message; owner comes from session. Generic preference
+reads/writes hide/refuse this key. No Postgres schema or distribution ledger change.
+The panel applies defaults on ordinary open; future Save/Clear never rewrites a
+prepared attempt. Recovery state is memory-only, scoped to the confirmed sender.
+
 ### `system_settings` — RETIRED 2026-05-12 (was Postgres / now Dataverse-only)
 **Source of truth:** **Dataverse `wmkf_appsystemsettings`**. Postgres table dropped via migration `007_drop_wave1_tables.sql` on 2026-05-12. Final reconciliation on 2026-05-11 synced 10 tier-keyed `model_override:*` rows from S145 dev writes (PG→DV); counts matched (45/45) before the drop.
 **Live adapter:** `lib/services/dataverse-settings-service.js`.

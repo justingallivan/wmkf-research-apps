@@ -17,6 +17,11 @@ jest.mock('../../shared/components/Layout', () => ({
   Card: ({ children }) => <div>{children}</div>,
 }));
 
+jest.mock('../../shared/components/workbench/DistributionSenderPanel', () => ({ __esModule: true, default: props => {
+  const Panel = require('../../shared/components/workbench/PreSiteDistributionPanel').default;
+  return <Panel {...props} />;
+} }));
+
 let distributionHistoryFeed = null;
 let lastDistributionProps = null;
 // Codex adversarial review finding 3 (2026-09-16 round 2): records the
@@ -808,7 +813,7 @@ test('the guarded brief-reopen dialog stays disabled until reason, a valid note,
   });
 });
 
-test('a successful guarded brief regeneration remounts distribution history for the new artifact id, so a later Share never reads the predecessor\'s "already sent" state', async () => {
+test('a successful guarded brief regeneration retains the panel and resets current-source sent state', async () => {
   // Codex adversarial review finding 3 (2026-09-16 round 2): the mocked
   // panel's history-load effect only fires on a genuine mount (empty deps),
   // mirroring the real PreSiteDistributionPanel's own effect, which only
@@ -849,7 +854,7 @@ test('a successful guarded brief regeneration remounts distribution history for 
   // Proves an actual remount happened for the new artifact id (a second,
   // fresh history load) rather than the mock merely re-rendering with
   // updated props under a stale, already-mounted history load.
-  await waitFor(() => expect(mountedSourceArtifactIds).toEqual([BRIEF_ARTIFACT_ID, REOPENED_BRIEF_ARTIFACT_ID]));
+  await waitFor(() => expect(mountedSourceArtifactIds).toEqual([BRIEF_ARTIFACT_ID]));
 
   // Share the new Draft again, reaching the exact state where a stale
   // "already sent" signal from the superseded source would previously have
@@ -874,7 +879,7 @@ test('a successful guarded brief regeneration remounts distribution history for 
 // be suppressed while ANY regeneration is pending, or staff could resend the
 // predecessor after cancelling the dialog, racing the successor's own
 // eventual send into a duplicate Board email.
-test('a 202 (still-generating) guarded regeneration suppresses every Share/send-again/resend path and closes the composer; both lift once the successor activates', async () => {
+test('a 202 (still-generating) guarded regeneration suppresses new Share/send-again/resend paths and pauses the retained composer; restrictions lift once the successor activates', async () => {
   distributionHistoryFeed = { attempts: [{ operationId: 'op-1', transportAccepted: true }], currentSourceEverSent: true };
   queueRoute('briefGet', statusResponse({ currentArtifact: briefArtifact(REVIEW) }));
   // First submit: the operation is claimed elsewhere and still GENERATING,
@@ -920,8 +925,8 @@ test('a 202 (still-generating) guarded regeneration suppresses every Share/send-
   await waitFor(() => expect(calls('briefReopen')).toHaveLength(1));
   expect(await screen.findByText(/already in progress/i)).toBeInTheDocument();
   // The still-open composer from before is now force-closed.
-  expect(screen.queryByText('Distribution panel: dialog (record)')).not.toBeInTheDocument();
-  expect(screen.getByText('Distribution panel: hidden (record)')).toBeInTheDocument();
+  expect(screen.getByText('Distribution panel: dialog (record)')).toBeInTheDocument();
+  expect(lastDistributionProps.sourceUnavailable).toBe(true);
   // The predecessor's artifact id is unchanged, so no remount happened —
   // proving the fix did not treat this as "the successor is now current".
   expect(mountedSourceArtifactIds).toEqual([BRIEF_ARTIFACT_ID]);
@@ -948,8 +953,7 @@ test('a 202 (still-generating) guarded regeneration suppresses every Share/send-
   rerender(<StaffDeliberationsTab key="mount-2" requestId={REQUEST_ID} requestNumber="1002379" isSuperuser />);
 
   expect(await screen.findByRole('link', { name: /Edit (?:briefing|writeup) in Word/ })).toBeInTheDocument();
-  // Only now — once the successor is confirmed current — does history
-  // remount for the new artifact id.
+  // This test deliberately remounts the entire tab to simulate revisiting it.
   await waitFor(() => expect(mountedSourceArtifactIds).toEqual([BRIEF_ARTIFACT_ID, REOPENED_BRIEF_ARTIFACT_ID]));
   fireEvent.click(screen.getByRole('button', { name: 'More brief actions' }));
   expect(screen.getByRole('menuitem', { name: 'Regenerate Brief' })).toBeInTheDocument();

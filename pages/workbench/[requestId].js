@@ -162,12 +162,12 @@ export function WorkbenchRequest({ previewReadOnly = false }) {
     };
   }, [requestId, loadCtx]);
 
-  const selectTab = (key) => {
-    router.push(
+  const selectTab = async (key) => {
+    try { await router.push(
       { pathname: `/workbench/${requestId}`, query: { ...(requestNumber ? { n: requestNumber } : {}), tab: key } },
       undefined,
       { shallow: true },
-    );
+    ); } catch (navigationError) { if (!navigationError?.cancelled) throw navigationError; }
   };
 
   // Fail-closed UI gate. Protected mutation routes independently enforce their
