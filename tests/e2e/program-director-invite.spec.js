@@ -645,7 +645,7 @@ test.describe('Program Director reviewer invitation flow', () => {
 
     await page.getByRole('button', { name: /release invitee \(1\)/i }).click();
     await expect(page.getByText('Release invitations')).toBeVisible();
-    const modal = page.locator('.fixed').filter({ hasText: 'Release invitations' });
+    const modal = page.getByRole('dialog', { name: 'Release invitations', exact: true });
     expect(withdrawRenderBodies.length).toBe(0);
     await modal.getByRole('radio', { name: /^No longer needed/ }).check();
     await expect.poll(() => withdrawRenderBodies.length).toBe(1);
@@ -705,7 +705,7 @@ test.describe('Program Director reviewer invitation flow', () => {
     await page.getByLabel('Select Dr. Failed Reviewer').check();
     await page.getByRole('button', { name: /release invitees \(2\)/i }).click();
 
-    const modal = page.locator('.fixed').filter({ hasText: 'Release invitations' });
+    const modal = page.getByRole('dialog', { name: 'Release invitations', exact: true });
     await modal.getByRole('radio', { name: /^No longer needed/ }).check();
     // exact: the draft textarea also contains the name ("Dear Dr. Failed Reviewer,"),
     // so a substring match resolves to two elements and trips strict mode.
