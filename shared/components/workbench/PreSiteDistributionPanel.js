@@ -498,6 +498,7 @@ export default function PreSiteDistributionPanel({
     }
   };
   const startFreshCompose = () => {
+    if (recoveryRef.current) { setDiscarding(false); return; }
     const fresh = { to: seedTo, cc: seedCc, subject: renderDeliberationShareSubject(DELIBERATION_SHARE_SEED_SUBJECT, requestNumber), bodyText: DELIBERATION_SHARE_SEED_BODY, includeCalendar: false };
     baseline.current = fresh; setComposeSource('built_in');
     autoOwnedRef.current = { to: true, cc: true };

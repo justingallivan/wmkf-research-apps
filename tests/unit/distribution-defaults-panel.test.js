@@ -265,14 +265,15 @@ test('scope teardown during reissue cannot refresh history or notify the old par
   await act(async () => reissue.resolve(response({ code: 'briefing_link_superseded' }, 409)));
   expect(calls('/history')).toHaveLength(1); expect(onHistory).toHaveBeenCalledTimes(previous);
 });
-test.each(['close', 'reload'])('busy Save prevents confirming an already-open %s discard prompt or issuing a GET', async mode => {
-  const close = jest.fn(); await ready({ ...props, onCloseComposer: close }); fireEvent.click(screen.getByText('Your default wording'));
+test.each(['close', 'reload', 'reopen'])('busy Save prevents confirming an already-open %s discard prompt or issuing a GET', async mode => {
+  const close = jest.fn(); const view = await ready({ ...props, onCloseComposer: close }); fireEvent.click(screen.getByText('Your default wording'));
   fireEvent.change(screen.getByLabelText('Default message'), { target: { value: 'Unsaved default edit' } });
-  if (mode === 'close') fireEvent.click(screen.getAllByRole('button', { name: 'Close' })[0]);
+  if (mode === 'reopen') view.rerender(<PreSiteDistributionPanel {...props} composeOpenVersion={2} onCloseComposer={close} />);
+  else if (mode === 'close') fireEvent.click(screen.getAllByRole('button', { name: 'Close' })[0]);
   else fireEvent.click(screen.getByRole('button', { name: 'Reload defaults' }));
   preferenceResult = deferred(); fireEvent.click(screen.getByRole('button', { name: 'Save as my default' }));
   const before = calls('email-preferences').length;
-  const discard = screen.getByRole('button', { name: mode === 'close' ? 'Discard edits and close' : 'Discard default edits and reload' });
+  const discard = screen.getByRole('button', { name: mode === 'close' ? 'Discard edits and close' : mode === 'reopen' ? 'Discard edits and start fresh' : 'Discard default edits and reload' });
   expect(discard).toBeDisabled(); fireEvent.click(discard); expect(close).not.toHaveBeenCalled(); expect(calls('email-preferences')).toHaveLength(before);
   await act(async () => preferenceResult.reject(new Error('uncertain')));
   expect(screen.getByRole('button', { name: 'Save as my default' })).toBeDisabled();
@@ -323,4 +324,33 @@ test('new open signal waits for document locking/prepare to settle before fresh 
   expect(calls('email-preferences')).toHaveLength(1);
   await act(async () => lock.resolve());
   await waitFor(() => expect(calls('email-preferences')).toHaveLength(2)); expect(screen.getByLabelText('Subject')).toHaveValue('Personal 123');
+});
+
+test('a start-fresh prompt cannot hide the frozen retry after a send becomes uncertain', async () => {
+  const view = await ready(); fireEvent.change(screen.getByLabelText('Message'), { target: { value: 'Dirty one-send message' } }); await preview();
+  view.rerender(<PreSiteDistributionPanel {...props} composeOpenVersion={2} />);
+  expect(screen.getByRole('button', { name: 'Discard edits and start fresh' })).toBeInTheDocument();
+  sendResult = deferred(); fireEvent.click(screen.getByRole('button', { name: 'Send email' }));
+  await act(async () => sendResult.reject(new Error('uncertain send')));
+  fireEvent.click(screen.getByRole('button', { name: 'Discard edits and start fresh' }));
+  expect(screen.getByRole('heading', { name: 'Email preview' })).toBeInTheDocument(); expect(screen.getByLabelText('Message')).toHaveValue('Dirty one-send message');
+  expect(screen.getByRole('button', { name: 'Send email' })).toBeInTheDocument(); expect(screen.getByLabelText('Subject')).toBeDisabled();
+  expect(calls('email-preferences')).toHaveLength(1);
+  sendResult = deferred(); fireEvent.click(screen.getByRole('checkbox')); fireEvent.click(screen.getByRole('button', { name: 'Send email' }));
+  await act(async () => sendResult.resolve(response({ attempt: { ...attempt, transportAccepted: true } })));
+  expect(calls('/send').map(([, options]) => JSON.parse(options.body))).toEqual(Array(2).fill({ requestId: ID, operationId: 'op1', previewHash: 'hash1' }));
+});
+test('new open signal waits for a pending preference mutation before fresh initialization', async () => {
+  const view = await ready(); fireEvent.click(screen.getByText('Your default wording')); preferenceResult = deferred(); fireEvent.click(screen.getByRole('button', { name: 'Save as my default' }));
+  view.rerender(<PreSiteDistributionPanel {...props} composeOpenVersion={2} />);
+  const reads = () => calls('email-preferences').filter(([, options]) => options.method === 'GET'); expect(reads()).toHaveLength(1);
+  await act(async () => preferenceResult.resolve(response(defaults())));
+  await waitFor(() => expect(reads()).toHaveLength(2)); expect(screen.getByLabelText('Subject')).toHaveValue('Personal 123');
+});
+test.each([true, false])('new open signal waits for Send, then starts fresh only after exact acceptance (%s)', async accepted => {
+  const view = await ready(); await preview(); sendResult = deferred(); fireEvent.click(screen.getByRole('button', { name: 'Send email' }));
+  view.rerender(<PreSiteDistributionPanel {...props} composeOpenVersion={2} />); expect(calls('email-preferences')).toHaveLength(1);
+  await act(async () => accepted ? sendResult.resolve(response({ attempt: { ...attempt, transportAccepted: true } })) : sendResult.reject(new Error('unknown send')));
+  if (accepted) await waitFor(() => expect(calls('email-preferences')).toHaveLength(2));
+  else { expect(calls('email-preferences')).toHaveLength(1); expect(screen.getByRole('heading', { name: 'Email preview' })).toBeInTheDocument(); expect(screen.getByLabelText('Subject')).toBeDisabled(); }
 });
