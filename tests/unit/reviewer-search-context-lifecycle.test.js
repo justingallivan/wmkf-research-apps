@@ -6,7 +6,8 @@
  * contacted by these tests.
  */
 
-import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, renderHook, screen, waitFor } from '@testing-library/react';
+import useReviewerSearchController from '../../shared/components/reviewers/search/useReviewerSearchController';
 import ReviewerSearchSection from '../../shared/components/reviewers/ReviewerSearchSection';
 
 const REQ_A = 'aaaaaaaa-1111-1111-1111-111111111111';
@@ -177,4 +178,60 @@ test('ordinary parent rerenders do not start another roster GET', async () => {
   rerender(<ReviewerSearchSection requestId={REQ_A} blobUrl="blob-a" proposalKey="proposal-a" onSaved={() => {}} />);
 
   await waitFor(() => expect(rosterGets()).toHaveLength(1));
+});
+
+test('real controller preserves overlapping exclusion recovery without losing newer selection edits', async () => {
+  const a = { ...candidate('Overlap A', 'search:overlap-a'), emailSource: 'institution_page' };
+  const b = { ...candidate('Overlap B', 'search:overlap-b'), emailSource: 'institution_page' };
+  const c = candidate('Overlap C', 'search:overlap-c');
+  const pending = {};
+  global.fetch = jest.fn((url, options = {}) => {
+    if (String(url).includes('/api/workbench/reviewer-roster?')) {
+      return Promise.resolve(response(rosterSnapshot([a, b, c])));
+    }
+    if (options.method === 'PATCH') {
+      const { candidate: row } = JSON.parse(options.body);
+      pending[row.candidateKey] = deferred();
+      return pending[row.candidateKey].promise;
+    }
+    throw new Error(`unexpected fetch ${url}`);
+  });
+  const { result } = renderHook(() => useReviewerSearchController({ requestId: REQ_A, blobUrl: 'blob-a', proposalKey: 'proposal-a' }));
+  await waitFor(() => expect(result.current.rosterLoaded).toBe(true));
+  act(() => { result.current.toggle(a.candidateKey); result.current.toggle(b.candidateKey); });
+  act(() => { void result.current.excludeCandidate(a); });
+  act(() => { void result.current.excludeCandidate(b); });
+  await act(async () => { pending[a.candidateKey].reject(new Error('offline')); });
+  expect(result.current.selected.has(a.candidateKey)).toBe(true);
+  // Use the real controller toggle, not a duplicated revision wrapper.
+  act(() => { result.current.toggle(c.candidateKey); });
+  await act(async () => { pending[b.candidateKey].reject(new Error('offline')); });
+  expect(result.current.selected.has(b.candidateKey)).toBe(false);
+  expect(result.current.selected.has(a.candidateKey)).toBe(true);
+  expect(result.current.selected.has(c.candidateKey)).toBe(true);
+});
+
+test('real roster refresh invalidates an older exclusion rollback in the same request', async () => {
+  const a = candidate('Refreshed reviewer', 'search:refreshed');
+  const exclusion = deferred();
+  let refreshed = false;
+  global.fetch = jest.fn((url, options = {}) => {
+    if (String(url).includes('/api/workbench/reviewer-roster?')) {
+      const snapshot = rosterSnapshot(refreshed ? [] : [a]);
+      if (refreshed) { snapshot.excluded = [a]; snapshot.allNames = [a.name]; }
+      return Promise.resolve(response(snapshot));
+    }
+    if (options.method === 'PATCH') return exclusion.promise;
+    throw new Error(`unexpected fetch ${url}`);
+  });
+  const { result } = renderHook(() => useReviewerSearchController({ requestId: REQ_A, blobUrl: 'blob-a', proposalKey: 'proposal-a' }));
+  await waitFor(() => expect(result.current.rosterLoaded).toBe(true));
+  act(() => { result.current.toggle(a.candidateKey); });
+  act(() => { void result.current.excludeCandidate(a); });
+  refreshed = true;
+  await act(async () => { await result.current.retryRosterLoad(); });
+  await act(async () => { exclusion.reject(new Error('response lost')); });
+  expect(result.current.rosterExcluded).toEqual([a]);
+  expect(result.current.displayCandidates).not.toEqual(expect.arrayContaining([expect.objectContaining({ candidateKey: a.candidateKey })]));
+  expect(result.current.selected.has(a.candidateKey)).toBe(false);
 });
