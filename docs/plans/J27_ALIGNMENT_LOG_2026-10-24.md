@@ -34,13 +34,37 @@ owner questions Q1–Q25), `docs/audits/cycle-foundations-2026-10-21.md`
 | C1 | Is GOApply opportunity 001024 the J27 Research form? What are its real open window and submission cutoff, and when does it get its J27 cycle link? | Connor | Confirms which records intake comes from. | Foundations audit §3 |
 | C2 | When the board meeting date on a Grant Cycle record changes, do linked requests' dates update, and by what mechanism? | Connor | The apps currently derive the cycle from each request's meeting date. | Foundations audit §2 |
 | C3 | When and how is the next operations cycle row (D27) created, and does operations maintain only the board date or other milestones too? | Connor, Sarah | D27 has no operations row yet; the apps should read dates from one place. | Foundations audit §2 |
+| C4 | What request status do J27 proposals carry when they arrive from GOApply (expected `Phase I Pending`)? | Connor | The Workbench list and triage depend on that exact label. | Register Q8, J27-064 |
+| R1 | Is the day-one list below right, and how quickly do staff need to triage in December? | Sarah, Duncan | Sets what must be built in the next six weeks versus early January. | December readiness below |
+
+## December readiness (proposed for the meeting to confirm)
+
+Justin agreed with this assessment on 2026-10-24; colleagues may correct it at
+the meeting. Code status was checked against the repository on 2026-10-24;
+nothing here is built yet unless it says so.
+
+**Needed when proposals arrive (early December):**
+
+| # | Need | Status today | Depends on |
+|---|---|---|---|
+| R-1 | Staff can see incoming J27 proposals in the Workbench. | Not built. The request list shows only requests that are `Phase II Pending` or marked Advancing, so new untriaged proposals would not appear. | C4 |
+| R-2 | Staff can triage about 300 proposals, including the "Save for now" state approved 2026-09-06. | Partly built. Only Advancing and Set aside exist; triage is reachable one row at a time. The per-PD view (each PD focused on their own requests, able to see others', nothing lost) is not designed. | R1 |
+| R-3 | Every proposal gets an Initial Assessment. | Partly ready. The D26 tooling exists and its view is not hidden for J27. Not yet done: running it at about 300 proposals and the deferred Production write check. | B1 |
+| R-4 | PDs can advance a proposal to `Phase II Pending` from the Workbench. | Not verified whether this exists. | C4 |
+
+**Proposed minimum for December:** proposals visible in a list, the
+"Save for now" state, and Initial Assessments generated in batches. The fuller
+per-PD triage view could follow in early January while staff are reading.
+
+**Can wait until 2027 (before reviewer season):** Reviewer Finder using
+bibliographies, the automatic materials email on reviewer acceptance (must be
+live before J27 invitations), reviewer settings per cycle, and task T3.
 
 ## Still to walk through
 
 Justin and Claude are reviewing the remaining items one at a time; they will
 be added above as they are settled.
 
-- December readiness: what must work when J27 proposals arrive.
 - Reviewer settings per cycle (rollover plan Slice 1).
 
 ## Tasks
@@ -50,3 +74,4 @@ be added above as they are settled.
 | T1 | Record D1 in the rollover plan and work queue. | Claude | Done 2026-10-24 |
 | T2 | Record D2 in the J27 register (Q10) and reviewer engagement spec. | Claude | Done 2026-10-24 |
 | T3 | Switch automatic review-document filing from D26 to J27 (one Production setting, `REVIEW_DOCX_SHAREPOINT_CYCLE`, plus redeploy) after confirming D26 filing is complete and before the first J27 review comes back in 2027. | To assign at meeting | Open; date to agree (see D3) |
+| T4 | Record the December readiness list in this log. | Claude | Done 2026-10-24 |
