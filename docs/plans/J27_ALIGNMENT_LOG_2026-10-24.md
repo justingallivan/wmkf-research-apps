@@ -64,6 +64,42 @@ J27/D27 timeline PDF and workbook (OneDrive, New Cycle Development/timelines).
 | F2 | On Dec 9, should the suggested PD, expertise matches and flags appear as sortable columns in the triage list (so each PD can filter to their own), or only on each request's page? | Sarah, Duncan | Decides the shape of the R-1/R-2 list. | R-1, R-2 |
 | F3 | If the suggested PD is not written to the request (X1), where do proposals without a confirmed PD appear so nothing is lost? | Sarah, Duncan | The "nothing gets lost" rule for triage. | X1, register J27-062 |
 
+### B1 detail: questions for Connor
+
+Every automatic Dec 8 step starts by reading the proposal from the request's
+SharePoint folder, so the apps need the exact folder and file name. For D26
+the apps use four different conventions (checked in the code 2026-10-24):
+
+| Tool | Reads |
+|---|---|
+| Workbench Proposal tab | `Phase I/` subfolder: `ProjectDescription.pdf`, `Biosketches.pdf`, `ProjectBudget.pdf`, budget spreadsheet |
+| Reviewer Finder and other proposal analysis | `Reviewer Materials/Proposal_{request#}.pdf` |
+| Initial Assessment | `AI Materials/ProposalNarrative_{request#}.pdf` |
+| Expertise app (batch) | a `Phase_I_Staff_Version` PDF |
+
+For a cycle it does not recognize, the Proposal tab silently falls back to the
+D26 names, so differently named J27 files would show as empty slots without an
+error.
+
+1. What does a J27 request's SharePoint folder contain after submission? A
+   real example (e.g. a test submission) with exact subfolders and file names
+   is ideal.
+2. Which of those files does GOApply place, and which do Power Automate flows
+   create? Do the flows that produce the `Reviewer Materials` and
+   `AI Materials` copies still run for J27?
+3. Can one agreed file be the input for all AI analysis (Initial Assessment,
+   expertise matching, flags)? Is `ProposalNarrative` the full proposal or only
+   the narrative? Matching may also need the biosketches.
+4. When does that file appear after submission, and what signals that it is
+   ready (a status, a field, a flow finishing)? This decides whether Power
+   Automate or a scheduled job starts the AI pass (R2).
+5. Can file names change after submission (resubmission, staff replacement)?
+6. Will there still be a separate reviewer version of the proposal, and is
+   anything in the full proposal off limits to reviewers or the AI
+   (register Q21)?
+
+Questions 1–3 unblock building; question 4 decides how the run is triggered.
+
 ## December readiness (proposed for the meeting to confirm)
 
 Justin agreed with this assessment on 2026-10-24; colleagues may correct it at
