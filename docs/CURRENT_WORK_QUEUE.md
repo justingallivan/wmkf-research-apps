@@ -138,6 +138,8 @@ sequence.
   Grants Manager, Program Coordinator fallback. Fallback semantics, recipients,
   intended Research opportunity/publication and date propagation remain
   unresolved; meeting log: `docs/plans/J27_ALIGNMENT_LOG_2026-10-24.md`.
+  Slice 1 (central reviewer campaign settings, owner decision D4) is scheduled
+  for November 2026, after the reviewer deadline email slice 2 merges.
   No runtime/live write or queue-priority change was made.
   Historical interim safeguard: owner-reported Production preparation list
   `["D26","J27"]`, redeployed 2026-10-07 (J27-084), not read back this session.

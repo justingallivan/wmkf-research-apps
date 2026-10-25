@@ -61,11 +61,12 @@ per-PD triage view could follow in early January while staff are reading.
 
 **Can wait until 2027 (before reviewer season):** Reviewer Finder using
 bibliographies, the automatic materials email on reviewer acceptance (must be
-live before J27 invitations), reviewer settings per cycle, and task T3.
+live before J27 invitations) and task T3.
 
-**Planned for January (before J27 reviewer invitations):** central reviewer
+**Scheduled for November 2026 (Justin, 2026-10-24):** central reviewer
 settings per D4 (rollover plan Slice 1), started after the current reviewer
 deadline email work merges so the two do not edit the same files at once.
+A5 (the J27 central values) is needed from Sarah before it can ship.
 
 ## Tasks
 
