@@ -1,7 +1,8 @@
 /** @jest-environment jsdom */
-import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import PreSiteDistributionPanel from '../../shared/components/workbench/PreSiteDistributionPanel';
-jest.mock('next/router', () => ({ useRouter: () => ({ events: { on: jest.fn(), off: jest.fn(), emit: jest.fn() }, beforePopState: jest.fn() }) }));
+let mockRoutingHandlers = {};
+jest.mock('next/router', () => ({ useRouter: () => ({ events: { on: (name, handler) => { mockRoutingHandlers[name] = handler; }, off: jest.fn(), emit: jest.fn() }, beforePopState: jest.fn() }) }));
 const ID = '11111111-1111-4111-8111-111111111111';
 const props = { requestId: ID, requestNumber: '123', sourceArtifact: { artifactId: 'sourceA' }, suggestedTo: ['staff@example.org'], composer: 'dialog', composeOpenVersion: 1 };
 const pair = { subject: 'Personal {{requestNumber}}', body: 'Personal message' };
@@ -11,7 +12,7 @@ const response = (data, status = 200) => ({ ok: status < 300, status, json: asyn
 const deferred = () => { let resolve, reject; const promise = new Promise((a,b) => { resolve=a; reject=b; }); return { promise, resolve, reject }; };
 let sendResult, preferenceResult, historyRows;
 beforeEach(() => {
-  sendResult = null; preferenceResult = null; historyRows = [];
+  mockRoutingHandlers = {}; sendResult = null; preferenceResult = null; historyRows = [];
   global.fetch = jest.fn(async (url, options = {}) => {
     if (url.includes('email-preferences')) return preferenceResult && options.method !== 'GET' ? preferenceResult.promise : response(defaults());
     if (url.includes('/prepare')) return response({ attempt });
@@ -248,4 +249,78 @@ test('actual scope teardown clears parent retention signal', async () => {
   fireEvent.change(screen.getByLabelText('Message'), { target: { value: 'Dirty' } });
   expect(retention).toHaveBeenLastCalledWith(expect.objectContaining({ draftDirty: true })); view.unmount();
   expect(retention).toHaveBeenLastCalledWith({ draftDirty: false, editorDirty: false, mutationPending: false, recoveryPending: false });
+});
+
+test('scope teardown during locking cannot issue a late prepare request', async () => {
+  const lock = deferred(); const view = await ready({ ...props, beforePrepare: () => lock.promise });
+  fireEvent.click(screen.getByRole('button', { name: 'Create preview' })); view.unmount();
+  await act(async () => lock.resolve()); expect(calls('/prepare')).toHaveLength(0);
+});
+test('scope teardown during reissue cannot refresh history or notify the old parent', async () => {
+  const reissue = deferred(), onHistory = jest.fn(); const fetcher = global.fetch;
+  global.fetch = jest.fn((url, options) => url.includes('/briefing-link') ? reissue.promise : url.includes('/history') ? Promise.resolve(response({ attempts: [], briefingLink: { id: 'link1', url: 'https://example.org/briefing' } })) : fetcher(url, options));
+  const view = await ready({ ...props, onHistory });
+  fireEvent.click(screen.getByRole('button', { name: 'Issue new link' })); fireEvent.click(screen.getByRole('button', { name: 'Issue new link' }));
+  const previous = onHistory.mock.calls.length; view.unmount();
+  await act(async () => reissue.resolve(response({ code: 'briefing_link_superseded' }, 409)));
+  expect(calls('/history')).toHaveLength(1); expect(onHistory).toHaveBeenCalledTimes(previous);
+});
+test.each(['close', 'reload'])('busy Save prevents confirming an already-open %s discard prompt or issuing a GET', async mode => {
+  const close = jest.fn(); await ready({ ...props, onCloseComposer: close }); fireEvent.click(screen.getByText('Your default wording'));
+  fireEvent.change(screen.getByLabelText('Default message'), { target: { value: 'Unsaved default edit' } });
+  if (mode === 'close') fireEvent.click(screen.getAllByRole('button', { name: 'Close' })[0]);
+  else fireEvent.click(screen.getByRole('button', { name: 'Reload defaults' }));
+  preferenceResult = deferred(); fireEvent.click(screen.getByRole('button', { name: 'Save as my default' }));
+  const before = calls('email-preferences').length;
+  const discard = screen.getByRole('button', { name: mode === 'close' ? 'Discard edits and close' : 'Discard default edits and reload' });
+  expect(discard).toBeDisabled(); fireEvent.click(discard); expect(close).not.toHaveBeenCalled(); expect(calls('email-preferences')).toHaveLength(before);
+  await act(async () => preferenceResult.reject(new Error('uncertain')));
+  expect(screen.getByRole('button', { name: 'Save as my default' })).toBeDisabled();
+});
+test('pending and uncertain preference results retain scope and wire the pending warning through the real panel', async () => {
+  const retention = jest.fn(), confirm = jest.spyOn(window, 'confirm').mockReturnValue(false);
+  await ready({ ...props, onRetentionChange: retention }); fireEvent.click(screen.getByText('Your default wording')); preferenceResult = deferred();
+  fireEvent.click(screen.getByRole('button', { name: 'Save as my default' }));
+  expect(retention).toHaveBeenLastCalledWith(expect.objectContaining({ mutationPending: true }));
+  expect(() => mockRoutingHandlers.routeChangeStart('/other', {})).toThrow();
+  expect(confirm).toHaveBeenLastCalledWith(expect.stringMatching(/discards unsaved email edits.*may already be saved/));
+  await act(async () => preferenceResult.reject(new Error('lost')));
+  expect(retention).toHaveBeenLastCalledWith(expect.objectContaining({ mutationPending: true }));
+  expect(() => mockRoutingHandlers.routeChangeStart('/other', {})).toThrow();
+  expect(confirm).toHaveBeenLastCalledWith(expect.stringContaining('may already be saved'));
+  confirm.mockRestore();
+});
+test.each([{ ok: true, refreshUnavailable: true }, { ...defaults(), ownStatus: 'unavailable', own: null, canSave: false, canClear: false }])('confirmed refresh failure gives Reload hint, disabled mutations and enabled Reload (%p)', async result => {
+  await ready(); fireEvent.click(screen.getByText('Your default wording')); preferenceResult = deferred(); fireEvent.click(screen.getByRole('button', { name: 'Save as my default' }));
+  await act(async () => preferenceResult.resolve(response(result)));
+  expect(screen.getByText(/Reload defaults to refresh the editor before another change/)).toBeInTheDocument();
+  expect(screen.getByRole('button', { name: 'Save as my default' })).toBeDisabled(); expect(screen.getByRole('button', { name: 'Clear my default' })).toBeDisabled(); expect(screen.getByRole('button', { name: 'Reload defaults' })).toBeEnabled();
+});
+test('overlong resolved subject preserves editable raw template with Save enabled and built-in compose', async () => {
+  const raw = { subject: '{{requestNumber}}'.repeat(25), body: 'Body' }; const fetcher = global.fetch;
+  global.fetch = jest.fn((url, options) => url.includes('email-preferences') ? Promise.resolve(response(defaults(raw))) : fetcher(url, options));
+  render(<PreSiteDistributionPanel {...props} requestNumber={'R'.repeat(25)} />);
+  await waitFor(() => expect(screen.queryByText('Loading current defaults…')).toBeNull()); fireEvent.click(screen.getByText('Your default wording'));
+  expect(screen.getByLabelText('Default subject')).toHaveValue(raw.subject); expect(screen.getByRole('button', { name: 'Save as my default' })).toBeEnabled();
+  expect(screen.getByLabelText('Subject')).toHaveValue(`Site Visit materials — ${'R'.repeat(25)}`); expect(within(screen.getByLabelText('Default subject').closest('details')).getByText(/resolved default subject is too long/)).toBeInTheDocument();
+});
+test('duplicate repair notice and shared outage fallback notice are both visible', async () => {
+  const fetcher = global.fetch;
+  global.fetch = jest.fn((url, options) => url.includes('email-preferences') ? Promise.resolve(response({ ...defaults(), source: 'built_in', own: null, ownStatus: 'duplicates', canSave: false, sharedStatus: { subject: 'unavailable', body: 'unavailable' } })) : fetcher(url, options));
+  await ready(); fireEvent.click(screen.getByText('Your default wording'));
+  expect(within(screen.getByLabelText('Default subject').closest('details')).getByText(/Multiple saved defaults.*Some shared wording/)).toBeInTheDocument();
+});
+test('new open can discard retained edits and start fresh within the same dialog', async () => {
+  const close = jest.fn(); const view = await ready({ ...props, onCloseComposer: close });
+  fireEvent.change(screen.getByLabelText('Message'), { target: { value: 'Discard this edit' } }); view.rerender(<PreSiteDistributionPanel {...props} composeOpenVersion={2} onCloseComposer={close} />);
+  fireEvent.click(screen.getByRole('button', { name: 'Discard edits and start fresh' }));
+  await waitFor(() => expect(screen.getByLabelText('Message')).toHaveValue('Personal message')); expect(close).not.toHaveBeenCalled(); expect(calls('email-preferences')).toHaveLength(2);
+});
+test('new open signal waits for document locking/prepare to settle before fresh initialization', async () => {
+  const lock = deferred(); const view = await ready({ ...props, beforePrepare: () => lock.promise });
+  fireEvent.click(screen.getByRole('button', { name: 'Create preview' }));
+  view.rerender(<PreSiteDistributionPanel {...props} composeOpenVersion={2} beforePrepare={() => lock.promise} />);
+  expect(calls('email-preferences')).toHaveLength(1);
+  await act(async () => lock.resolve());
+  await waitFor(() => expect(calls('email-preferences')).toHaveLength(2)); expect(screen.getByLabelText('Subject')).toHaveValue('Personal 123');
 });

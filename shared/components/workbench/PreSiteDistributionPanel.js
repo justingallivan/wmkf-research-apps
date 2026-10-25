@@ -327,7 +327,6 @@ export default function PreSiteDistributionPanel({
   const defaultsGeneration = useRef(0);
   const preferenceGeneration = useRef(0);
   const mounted = useRef(true);
-  useEffect(() => { mounted.current = true; return () => { mounted.current = false; defaultsGeneration.current++; preferenceGeneration.current++; }; }, []);
   const [preview, setPreview] = useState(null);
   const [confirmed, setConfirmed] = useState(false);
   // Plan §3.4b step 3: a dedicated confirmation state for the prepare-time
@@ -380,15 +379,27 @@ export default function PreSiteDistributionPanel({
   const sourceKey = `${requestId}:${sourceArtifact?.artifactId || ''}:${sourceUnavailable}`;
   const sourceRef = useRef(sourceKey);
   sourceRef.current = sourceKey;
+  useEffect(() => {
+    mounted.current = true;
+    return () => {
+      mounted.current = false;
+      defaultsGeneration.current++;
+      preferenceGeneration.current++;
+      sequence.current++;
+      reissueSequence.current++;
+      controllerRef.current?.abort();
+    };
+  }, []);
   const composerTouchedRef = useRef(false);
 
 
   const loadHistory = useCallback(async (id, signal, expectedSequence) => {
+    if (!mounted.current) return;
     const body = await requestJson(
       `/api/workbench/pre-site-visit/distribution/history?requestId=${encodeURIComponent(id)}`,
       { signal, fallbackMessage: 'Email history could not be loaded.', tolerantBody: true },
     );
-    if (historySequence.current !== expectedSequence || id !== requestId) return;
+    if (!mounted.current || historySequence.current !== expectedSequence || id !== requestId) return;
     setHistory(body.attempts || []);
     setBriefingLink(body.briefingLink || null);
     setHistoryError(null);
@@ -486,13 +497,7 @@ export default function PreSiteDistributionPanel({
       if (mounted.current && generation === defaultsGeneration.current) setDefaultsLoading(false);
     }
   };
-  const seenOpen = useRef(null);
-  useEffect(() => {
-    if (composer === 'hidden' || seenOpen.current === composeOpenVersion) return;
-    const alreadyOpened = seenOpen.current !== null;
-    seenOpen.current = composeOpenVersion;
-    if (recoveryRef.current || preferenceBusy) return;
-    if (alreadyOpened && (draftDirty || editorDirty)) { setDiscarding('close'); return; }
+  const startFreshCompose = () => {
     const fresh = { to: seedTo, cc: seedCc, subject: renderDeliberationShareSubject(DELIBERATION_SHARE_SEED_SUBJECT, requestNumber), bodyText: DELIBERATION_SHARE_SEED_BODY, includeCalendar: false };
     baseline.current = fresh; setComposeSource('built_in');
     autoOwnedRef.current = { to: true, cc: true };
@@ -500,11 +505,21 @@ export default function PreSiteDistributionPanel({
     setSeenSeed(seed);
     setForm(fresh);
     setPreview(null); setConfirmed(false); setStaleInputs(null); setError(null); setNotice(null); setSendFeedback(null);
+    setEditor(editorBaseline.current);
     setRecipientPickerTarget(null); setDiscarding(false); setEditorOpen(false);
     readDefaults({ initialize: true });
+  };
+  const seenOpen = useRef(null);
+  useEffect(() => {
+    if (composer === 'hidden' || seenOpen.current === composeOpenVersion || preferenceBusy || preparing || sending) return;
+    const alreadyOpened = seenOpen.current !== null;
+    seenOpen.current = composeOpenVersion;
+    if (recoveryRef.current) return;
+    if (alreadyOpened && (draftDirty || editorDirty)) { setDiscarding('reopen'); return; }
+    startFreshCompose();
     // Open versions, not recipient array identities, own initialization.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [composeOpenVersion, composer]);
+  }, [composeOpenVersion, composer, preferenceBusy, preparing, sending]);
 
   const mutatePreference = async method => {
     if (preferenceBusy || preparing || sending || preferenceUncertain || actionsPaused) return;
@@ -522,7 +537,7 @@ export default function PreSiteDistributionPanel({
       if (result?.ok !== true) throw new Error('The change could not be confirmed.');
       editorBaseline.current = editor;
       setPreferenceMessage((method === 'PUT' ? 'Default saved. The current email is unchanged.' : 'Default cleared. The current email is unchanged.')
-        + (result.refreshUnavailable ? ' Reload defaults to refresh the editor before another change.' : ''));
+        + ((result.refreshUnavailable || result.ownStatus === 'unavailable') ? ' Reload defaults to refresh the editor before another change.' : ''));
       if (result.effective) {
         setDefaultsData(result);
         const next = result.own || result.shared || result.effective;
@@ -548,6 +563,8 @@ export default function PreSiteDistributionPanel({
     onCloseComposer?.();
   };
   const discardAndClose = () => {
+    if (preparing || sending || preferenceBusy) return;
+    if (discarding === 'reopen') { startFreshCompose(); return; }
     setEditor(editorBaseline.current);
     if (discarding === 'reload') { setDiscarding(false); readDefaults(); return; }
     if (!recoveryRef.current) { setForm({ ...baseline.current }); setPreview(null); setConfirmed(false); setStaleInputs(null); }
@@ -720,6 +737,7 @@ export default function PreSiteDistributionPanel({
         signal: controller.signal,
         tolerantBody: true,
       });
+      if (!mounted.current || reissueSequence.current !== currentSequence || id !== requestId) return;
       if (!resOk && (body.code === 'briefing_link_superseded' || body.code === 'briefing_send_in_progress')) {
         // The link changed under us or a send still carries it: refresh the
         // header from history instead of retrying blindly.
@@ -832,9 +850,9 @@ export default function PreSiteDistributionPanel({
         {<p className="mt-3 text-sm text-gray-600">Wording source: {composeSource === 'personal' ? 'your personal default' : composeSource === 'shared' ? 'shared defaults (built-in fallback where needed)' : 'built-in defaults'}.</p>}
         {!defaultsLoading && preferenceMessage && !editorOpen && <p role="status" className="mt-3 text-sm text-gray-800">{preferenceMessage}</p>}
         {discarding && <div className="mt-4 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-950" role="alert">
-          <p>{discarding === 'reload' ? 'Discard your unsaved default wording and reload?' : 'Discard your unsaved email edits?'}</p>
-          <div className="mt-3 flex gap-3"><Button type="button" variant="secondary" onClick={() => setDiscarding(false)}>Keep editing</Button>
-          <Button type="button" variant="secondary" onClick={discardAndClose}>{discarding === 'reload' ? 'Discard default edits and reload' : 'Discard edits and close'}</Button></div>
+          <p>{discarding === 'reload' ? 'Discard your unsaved default wording and reload?' : discarding === 'reopen' ? 'Discard retained edits and start a fresh email?' : 'Discard your unsaved email edits?'}</p>
+          <div className="mt-3 flex gap-3"><Button type="button" variant="secondary" disabled={preparing || sending || preferenceBusy} onClick={() => setDiscarding(false)}>Keep editing</Button>
+          <Button type="button" variant="secondary" disabled={preparing || sending || preferenceBusy} onClick={discardAndClose}>{discarding === 'reload' ? 'Discard default edits and reload' : discarding === 'reopen' ? 'Discard edits and start fresh' : 'Discard edits and close'}</Button></div>
         </div>}
 
         <div className="mt-4 rounded-lg border border-gray-200 bg-gray-50 p-3 text-sm text-gray-800" data-testid="composer-session-slot">

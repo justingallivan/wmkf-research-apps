@@ -13,7 +13,7 @@ export default function useDistributionUnsavedChanges(dirty, recovery = false, p
     const allow = url => {
       const destination = destinationKey(url);
       if (approvedDestination === destination) return true;
-      if (!window.confirm(recovery ? 'Leaving loses the local retry state for this email. Reconcile the original email before sending another. Leave this page?' : preferencePending ? 'A default wording change is pending or unconfirmed and may already be saved. Leave this page? Reload defaults before another change.' : 'Discard your unsaved email changes?')) return false;
+      if (!window.confirm(recovery ? 'Leaving loses the local retry state for this email. Reconcile the original email before sending another. Leave this page?' : preferencePending ? 'Leaving discards unsaved email edits and local default results. A default wording change is pending or unconfirmed and may already be saved. Leave this page? Reload defaults before another change.' : 'Discard your unsaved email changes?')) return false;
       approvedDestination = destination;
       return true;
     };
