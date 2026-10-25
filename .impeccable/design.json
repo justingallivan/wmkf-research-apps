@@ -1,6 +1,6 @@
 {
   "schemaVersion": 2,
-  "generatedAt": "2026-10-02T21:47:36Z",
+  "generatedAt": "2026-10-25T00:00:25Z",
   "title": "Design System: WMKF Document Processing Suite",
   "extensions": {
     "colorMeta": {
@@ -167,6 +167,20 @@
       "description": "A clearly elevated transient layer for consequential choices.",
       "html": "<section class=\"ds-dialog\"><h3>Confirm action</h3><p>Review the effect before continuing.</p></section>",
       "css": ".ds-dialog { width: min(100%, 32rem); background: #fff; color: #111827; padding: 24px; border: 1px solid #e5e7eb; border-radius: 12px; box-shadow: 0 20px 25px -5px rgb(0 0 0 / 0.10), 0 8px 10px -6px rgb(0 0 0 / 0.10); font-family: Inter, system-ui, sans-serif; } .ds-dialog h3 { margin: 0 0 12px; font-size: 20px; line-height: 28px; } .ds-dialog p { margin: 0; color: #4b5563; font-size: 14px; line-height: 20px; }"
+    },
+    {
+      "name": "Link Button",
+      "kind": "button",
+      "description": "A quiet in-place action using the shared Button link variant; navigation remains an anchor.",
+      "html": "<button type=\"button\" class=\"ds-btn-link\">Cancel</button>",
+      "css": ".ds-btn-link { background: transparent; border: 0; padding: 0; color: #374151; font: 500 14px/20px Inter, system-ui, sans-serif; text-decoration: underline; text-underline-offset: 2px; cursor: pointer; } .ds-btn-link:hover { color: #030712; } .ds-btn-link:focus-visible { outline: 2px solid #2563eb; outline-offset: 2px; } .ds-btn-link:disabled { cursor: not-allowed; opacity: 0.5; }"
+    },
+    {
+      "name": "Global Navigation",
+      "kind": "nav",
+      "description": "One row of at most seven text items in muted gray on white: Home, Workbench, Meeting Tracker, a Tools menu (every other app the user can access, in registry order), Guide, Admin, and the user menu. The current item uses Foundation Ink text with an underline, and the Tools trigger is marked when the current page is one of its tools; no emoji. Hover adds a quiet gray surface and stronger text; mobile navigation becomes a menu with Tools as a labeled section.",
+      "html": "<nav class=\"ds-global-nav\" aria-label=\"Main navigation\"><a class=\"ds-global-link\" href=\"#home\">Home</a><a class=\"ds-global-link\" href=\"#workbench\" aria-current=\"page\">Workbench</a><a class=\"ds-global-link\" href=\"#meetings\">Meeting Tracker</a><button type=\"button\" class=\"ds-global-link\" aria-expanded=\"false\">Tools</button><a class=\"ds-global-link\" href=\"#guide\">Guide</a><a class=\"ds-global-link\" href=\"#admin\">Admin</a><button type=\"button\" class=\"ds-global-link\" aria-expanded=\"false\">Your account</button></nav>",
+      "css": ".ds-global-nav { display: flex; align-items: center; gap: 4px; max-width: 80rem; overflow-x: auto; background: #fff; font-family: Inter, system-ui, sans-serif; } .ds-global-link { display: inline-flex; align-items: center; padding: 8px 12px; border: 0; border-radius: 8px; background: transparent; color: #4b5563; font: 500 14px/20px Inter, system-ui, sans-serif; white-space: nowrap; text-decoration: none; transition: color 200ms ease, background 200ms ease; cursor: pointer; } .ds-global-link:hover { color: #111827; background: #f9fafb; } .ds-global-link:focus-visible { outline: 2px solid #2563eb; outline-offset: -2px; } .ds-global-link[aria-current=\"page\"] { color: #111827; text-decoration: underline; text-decoration-thickness: 2px; text-underline-offset: 8px; }"
     }
   ],
   "narrative": {
@@ -180,23 +194,125 @@
       "Rounded, lightly layered components with brief feedback."
     ],
     "rules": [
-      { "name": "The Meaningful Color Rule", "body": "Neutral surfaces carry structure. Blue is for action, green for confirmed success, amber for attention, red for danger or failure, and violet only where an analytical/review distinction already exists.", "section": "colors" },
-      { "name": "The Scan-First Type Rule", "body": "Hierarchy comes from size, weight, and spacing—not decorative font changes.", "section": "typography" },
-      { "name": "The Border-Before-Shadow Rule", "body": "Use borders and tonal contrast to establish structure; increase shadow only for interaction or true overlay depth.", "section": "elevation" }
+      {
+        "name": "The Meaningful Color Rule",
+        "body": "Neutral surfaces carry structure. Blue is for action, green for confirmed success, amber for attention, red for danger or failure, and violet only where an analytical/review distinction already exists.",
+        "section": "colors"
+      },
+      {
+        "name": "The Scan-First Type Rule",
+        "body": "Hierarchy comes from size, weight, and spacing—not decorative font changes.",
+        "section": "typography"
+      },
+      {
+        "name": "Desktop first",
+        "body": "Staff surfaces are used in the office on desktop screens. Design, review, and verify them at desktop width; narrow widths only need to stay usable in a pinch (no overflow, reachable navigation), never to drive a layout decision. External applicant and reviewer pages are out of this rule.",
+        "section": "layout"
+      },
+      {
+        "name": "The One Shell Rule",
+        "body": "Every authenticated page, the home page included, uses the same shell. The shell and nav are always `max-w-7xl`. Settings and reading pages may narrow only their main column (at most to `max-w-4xl`). Width classes come from a written-out map of literal class strings, never an interpolated `max-w-${...}` (Tailwind drops classes it cannot see literally).",
+        "section": "layout"
+      },
+      {
+        "name": "The Left Header Rule",
+        "body": "Page headers are left-aligned: one muted back-link or breadcrumb line, an H1 of at most `1.5rem`/600, and one metadata line. Status chips sit inline with the H1; the page's primary action sits right-aligned on the H1 row. Centered heroes, emoji in the H1, and multi-line taglines are reserved for the suite home page.",
+        "section": "layout"
+      },
+      {
+        "name": "The Content-First Queue Rule",
+        "body": "On Queue / List pages, filters and search live in the header area and the first record starts within `240px` of the top of the main area. Rows are at most about `64px` tall, are real links (so they open in a new tab), and show the next action.",
+        "section": "layout"
+      },
+      {
+        "name": "The Identity-Always Rule",
+        "body": "A Record Detail header always shows the record's identity (number, title, program and cycle), including while loading and after an error.",
+        "section": "layout"
+      },
+      {
+        "name": "The Read-First Rule",
+        "body": "Record Detail pages open read-only, with editing behind an explicit Edit control. A completed or closed record never opens as a form.",
+        "section": "layout"
+      },
+      {
+        "name": "The Section Order Rule",
+        "body": "Status and next action come first, then primary content, then supporting evidence; history, audit, and technical detail come last and start collapsed.",
+        "section": "layout"
+      },
+      {
+        "name": "The Four-Card Rule",
+        "body": "At most four top-level cards before the first fold; beyond that, use tabs, a stepper, or collapsible sections. Each card holds one topic and at most one primary action.",
+        "section": "layout"
+      },
+      {
+        "name": "The Finished-Work Rule",
+        "body": "A completed step collapses to one line: label, check, timestamp, and a \"…\" menu. Re-run, replace, and regenerate live in that menu, never as visible buttons beside a published or complete state.",
+        "section": "layout"
+      },
+      {
+        "name": "The Stepper Rule",
+        "body": "Multi-step flows use the Cycle Dossier stepper pattern; only the next incomplete step is expanded.",
+        "section": "layout"
+      },
+      {
+        "name": "The Status-Once Rule",
+        "body": "A record's status appears once, as a header chip using the chip meanings above. Green means confirmed success only; \"moved\" or redirect notices are neutral or blue.",
+        "section": "layout"
+      },
+      {
+        "name": "The One Button Vocabulary Rule",
+        "body": "Buttons come from the shared `Button` component (primary, secondary, outline, danger, link); no hand-colored `<button>`s. At most one ink primary per region. The underlined `link` variant is for quiet in-place actions (Cancel, Discard, a show/hide disclosure); `<a>` text links are for navigation only.",
+        "section": "layout"
+      },
+      {
+        "name": "The Tab Level Rule",
+        "body": "Underline tabs for page sections, a segmented control inside a section, chips for filters. At most seven tabs per level, in lifecycle order; a tab may carry a status dot or count.",
+        "section": "layout"
+      },
+      {
+        "name": "The Filter Rule",
+        "body": "Zero-count filter chips are hidden or disabled. More than six filter values collapse into a select or a \"More\" menu.",
+        "section": "layout"
+      },
+      {
+        "name": "The People Picker Rule",
+        "body": "More than eight selectable people means a typeahead with a selected list. The same list is never rendered twice.",
+        "section": "layout"
+      },
+      {
+        "name": "The State Rule",
+        "body": "Empty states say what is missing and offer the action that fills it. Loading uses skeletons in place. Errors appear in the affected region with plain wording and Retry, never replace page identity, and never show raw exception text.",
+        "section": "layout"
+      },
+      {
+        "name": "The No Internal Identifiers Rule",
+        "body": "Staff UI never shows UUIDs, raw tokens, storage paths, or full meeting-URL query strings; use human labels with an open or copy action.",
+        "section": "layout"
+      },
+      {
+        "name": "The Quiet Footer Rule",
+        "body": "Operational pages carry no attribution footer.",
+        "section": "layout"
+      },
+      {
+        "name": "The Border-Before-Shadow Rule",
+        "body": "Use borders and tonal contrast to establish structure; increase shadow only for interaction or true overlay depth.",
+        "section": "elevation"
+      }
     ],
     "dos": [
-      "Do use Foundation Ink for the primary operational action and active state.",
-      "Do let white surfaces, gray borders, and spacing carry most structural hierarchy.",
-      "Do reserve semantic color for action, status, risk, and established analytical meaning.",
-      "Do use 0.5rem controls, 0.75rem cards, and full rounding for compact status.",
-      "Do keep state feedback brief, explicit, and paired with text or iconography."
+      "**Do** use Foundation Ink for the primary operational action and active state.",
+      "**Do** let white surfaces, gray borders, and spacing carry most structural hierarchy.",
+      "**Do** reserve semantic color for action, status, risk, and established analytical meaning.",
+      "**Do** use `0.5rem` controls, `0.75rem` cards, and full rounding for compact status.",
+      "**Do** keep state feedback brief, explicit, and paired with text or iconography."
     ],
     "donts": [
-      "Don't turn the configured blue, green, and violet ramps into competing brand fields.",
-      "Don't elevate every container; use stronger shadows only for interaction and overlays.",
-      "Don't introduce consumer-SaaS gloss, theatrical effects, or decorative branding into operational surfaces.",
-      "Don't introduce a suite-wide logo treatment without a new explicit brand decision.",
-      "Don't communicate consequential state through color alone."
+      "**Don't** turn the configured blue, green, and violet ramps into competing brand fields.",
+      "**Don't** elevate every container; use stronger shadows only for interaction and overlays.",
+      "**Don't** introduce consumer-SaaS gloss, theatrical effects, or decorative branding into operational surfaces.",
+      "**Don't** introduce a suite-wide logo treatment without a new explicit brand decision.",
+      "**Don't** communicate consequential state through color alone."
     ]
   }
 }
