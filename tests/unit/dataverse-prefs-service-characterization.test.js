@@ -244,3 +244,19 @@ test('transport failures log and return historical falsy/empty values', async ()
   await expect(prefs.hasPreference(PROFILE_ID, 'key')).resolves.toBe(false);
   expect(console.error).toHaveBeenCalled();
 });
+
+describe('strict legacy reviewer wording read', () => {
+  test('distinguishes absence and raw configured wording using complete owner/key enumeration', async () => {
+    DynamicsService.queryAllRecords.mockResolvedValueOnce({ records: [] });
+    expect(await prefs.getReviewerEmailTemplatesStrict(PROFILE_ID)).toBeNull();
+    expect(DynamicsService.queryAllRecords).toHaveBeenCalledWith(ENTITY_SET, { select: FIND_SELECT, filter: ownerAndKeyFilter('reviewer_email_templates') });
+    DynamicsService.queryAllRecords.mockResolvedValueOnce({ records: [{ wmkf_preferencevalue: '{raw}', wmkf_isencrypted: false }] });
+    expect(await prefs.getReviewerEmailTemplatesStrict(PROFILE_ID)).toBe('{raw}');
+  });
+  test.each(['duplicates', 'encrypted', 'capped', 'read_failure', 'identity'])('%s fails closed instead of appearing absent', async (failure) => {
+    if (failure === 'identity') resolveProfileToSystemUser.mockResolvedValueOnce(null);
+    else if (failure === 'read_failure') DynamicsService.queryAllRecords.mockRejectedValueOnce(new Error('offline'));
+    else DynamicsService.queryAllRecords.mockResolvedValueOnce({ capped: failure === 'capped', records: failure === 'duplicates' ? [{}, {}] : [{ wmkf_isencrypted: failure === 'encrypted' }] });
+    await expect(prefs.getReviewerEmailTemplatesStrict(PROFILE_ID)).rejects.toThrow();
+  });
+});

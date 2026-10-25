@@ -1,3 +1,4 @@
+import EmailAddressSummary from '../shared/components/EmailAddressSummary';
 /** PD inbox for personalized emails awaiting their scheduled send. */
 
 import { useEffect, useMemo, useState } from 'react';
@@ -337,10 +338,7 @@ export default function ScheduledEmailsPage() {
                       Version {selected.version}
                     </span>
                   </div>
-                  <dl className="mt-5 grid gap-3 text-sm sm:grid-cols-2">
-                    <div><dt className="font-medium text-gray-700">To</dt><dd className="text-gray-600">{selected.toRecipients.join(', ')}</dd></div>
-                    <div><dt className="font-medium text-gray-700">Cc</dt><dd className="text-gray-600">{selected.ccRecipients.join(', ') || 'None'}</dd></div>
-                  </dl>
+                  <div className="mt-5"><EmailAddressSummary from={selected.from} to={selected.toRecipients} cc={selected.ccRecipients} /></div>
                   <div className="mt-5 rounded-lg border border-blue-200 bg-blue-50 p-3 text-sm text-blue-900">
                     {selected.automationNotice}
                   </div>

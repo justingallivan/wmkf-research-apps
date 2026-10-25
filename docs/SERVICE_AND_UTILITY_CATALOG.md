@@ -92,7 +92,10 @@ If you're touching a service or utility, read its header before this catalog. If
 - **`dataverse-prefs-service.js`** — Dataverse `wmkf_appuserpreferences`
   adapter. Postgres `user_preferences` was dropped 2026-05-12 and its old
   database-service branch was removed; unsupported Postgres configuration fails
-  loudly.
+  loudly. The email-consistency branch adds `getReviewerEmailTemplatesStrict`:
+  complete exact-owner/key enumeration, explicit identity/read/duplicate/encrypted
+  failures, raw value or confirmed absence. Only the legacy reviewer-template
+  key uses it; other generic reads retain their existing behavior.
 - **`email-signature.js`** — Unified per-user email-signature resolver. Reads the `email_signature` preference from Dataverse user preferences, falls back to legacy reviewer sender info, resolves request-scoped grantee signatures from the assigned Dataverse PD via `dataverse-identity-map`, and appends a Foundation-ending signature block for grantee invite/reminder mail.
 - **`email-automation-preferences.js`** — Strict reader for the reserved per-PD `email_automation` review-all override (`{ reviewAll: boolean }`). Absence means the system default (VIP-only review); malformed persisted JSON throws so a read/shape failure can never silently weaken a PD's review posture.
 - **`site-visit-materials/email-personalization.js`** — **Production-live via PR #320 / merge `834b83d8382` (2026-09-20).** Validates separate invitation/reminder subject and body templates, including existing tokens plus `{{piLastName}}`, `{{liaisonFullName}}`, and `{{programCoordinatorName}}`; layers own-profile Dataverse preference overrides over shared email defaults; and mints/verifies a five-minute, audience-scoped signed proof of the reviewed send context. The Meeting Tracker preference route owns saving and clearing personal defaults; ordinary send does not save them.

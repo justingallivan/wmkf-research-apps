@@ -1,3 +1,4 @@
+import { Button } from '../Layout';
 /** Own-user deadline defaults. Save/Clear never replaces the open one-send draft. */
 import { useEffect, useRef, useState } from 'react';
 import { requestEnvelope } from '../../utils/api-request';
@@ -134,18 +135,18 @@ export default function DeadlineWordingDefault({ disabled = false, onBusyChange 
               Used for future deadline emails. The body may be empty. Placeholders: {PLACEHOLDERS}. Edits to the email above are not saved here.
             </p>
             <label className="block">
-              <span className="text-xs font-medium text-gray-600">Subject</span>
+              <span className="text-xs font-medium text-gray-600">Default subject</span>
               <input value={subject} onChange={(event) => setSubject(event.target.value)} disabled={busy || disabled} className="mt-1 w-full rounded border border-gray-300 px-2 py-1 text-sm" />
             </label>
             <label className="block">
-              <span className="text-xs font-medium text-gray-600">Message</span>
+              <span className="text-xs font-medium text-gray-600">Default message</span>
               <textarea rows={8} value={body} onChange={(event) => setBody(event.target.value)} disabled={busy || disabled} className="mt-1 w-full rounded border border-gray-300 px-2 py-1 text-sm" />
             </label>
             <div className="flex justify-end gap-2">
               {configured && (
-                <button type="button" onClick={() => write('DELETE')} disabled={busy || disabled} className="px-3 py-1.5 text-sm text-gray-600 hover:text-gray-800 disabled:opacity-40">Clear my default</button>
+                <Button variant="outline" size="sm" type="button" onClick={() => write('DELETE')} disabled={busy || disabled} className="px-3 py-1.5 text-sm text-gray-600 hover:text-gray-800 disabled:opacity-40">Clear my default</Button>
               )}
-              <button type="button" onClick={() => write('PUT')} disabled={busy || disabled || !subject.trim()} className="rounded-md border border-gray-300 px-3 py-1.5 text-sm text-gray-800 hover:bg-gray-50 disabled:opacity-40">{busy ? 'Saving…' : 'Save as my default'}</button>
+              <Button variant="outline" size="sm" type="button" onClick={() => write('PUT')} disabled={busy || disabled || !subject.trim()} className="rounded-md border border-gray-300 px-3 py-1.5 text-sm text-gray-800 disabled:opacity-40">{busy ? 'Saving…' : 'Save as my default'}</Button>
             </div>
           </>
         )}

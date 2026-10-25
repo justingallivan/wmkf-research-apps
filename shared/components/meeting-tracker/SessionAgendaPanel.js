@@ -1,3 +1,5 @@
+import EmailAddressSummary from '../EmailAddressSummary';
+import EmailDialog from '../EmailDialog';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { requestJson, requestEnvelope } from '../../utils/api-request';
 import { useSession } from 'next-auth/react';
@@ -72,8 +74,9 @@ function DirectoryDialog({ target, recipients, form, onAdd, onClose }) {
   ], [recipients]);
   const present = new Set([...splitEmails(form.to), ...splitEmails(form.cc)]);
   return (
+    <EmailDialog label={`Add recipients to ${target === 'cc' ? 'Cc' : 'To'}`} busy={false} onClose={onClose}>
     <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/40 p-4" role="presentation">
-      <section role="dialog" aria-modal="true" aria-labelledby="agenda-directory-title" className="w-full max-w-lg rounded-xl bg-white shadow-xl">
+      <section className="w-full max-w-lg rounded-xl bg-white shadow-xl">
         <div className="flex items-start justify-between gap-4 border-b border-gray-200 p-4">
           <div>
             <h3 id="agenda-directory-title" className="font-semibold text-gray-900">Add recipients to {target === 'cc' ? 'Cc' : 'To'}</h3>
@@ -105,32 +108,21 @@ function DirectoryDialog({ target, recipients, form, onAdd, onClose }) {
         </div>
       </section>
     </div>
+    </EmailDialog>
   );
 }
 
 function ComposerDialog({ children, busy, directoryOpen, onClose }) {
-  const closeRef = useRef(null);
-  useEffect(() => {
-    const previouslyFocused = document.activeElement;
-    closeRef.current?.querySelector('button')?.focus();
-    return () => previouslyFocused?.focus?.();
-  }, []);
-  useEffect(() => {
-    const onKey = (event) => {
-      if (event.key === 'Escape' && !busy && !directoryOpen) onClose();
-    };
-    document.addEventListener('keydown', onKey);
-    return () => document.removeEventListener('keydown', onKey);
-  }, [busy, directoryOpen, onClose]);
   return (
+    <EmailDialog label="Send session agenda" busy={busy || directoryOpen} onClose={onClose}>
     <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/40 p-4" role="presentation">
-      <section role="dialog" aria-modal="true" aria-labelledby="agenda-composer-title" className="my-6 w-full max-w-3xl rounded-xl bg-white p-6 shadow-xl">
+      <section className="my-6 w-full max-w-3xl rounded-xl bg-white p-6 shadow-xl">
         <div className="flex items-start justify-between gap-4">
           <div>
             <h3 id="agenda-composer-title" className="text-lg font-semibold text-gray-900">Send session agenda</h3>
             <p className="mt-1 text-sm text-gray-600">You are sending one agenda from your Dynamics mailbox to the session attendees.</p>
           </div>
-          <span ref={closeRef}><Button variant="outline" size="sm" type="button" onClick={onClose} disabled={busy} className="rounded-lg border border-gray-300 px-3 py-1.5 text-sm font-medium disabled:opacity-50">Close</Button></span>
+          <span ><Button variant="outline" size="sm" type="button" onClick={onClose} disabled={busy} className="rounded-lg border border-gray-300 px-3 py-1.5 text-sm font-medium disabled:opacity-50">Close</Button></span>
         </div>
         {children}
         <div className="mt-6 flex justify-end border-t border-gray-200 pt-4">
@@ -138,6 +130,7 @@ function ComposerDialog({ children, busy, directoryOpen, onClose }) {
         </div>
       </section>
     </div>
+    </EmailDialog>
   );
 }
 
@@ -520,9 +513,8 @@ function AgendaPanel({ sessionId, session, slots, recipients }) {
             <h4 className="font-semibold text-gray-900">Agenda preview</h4>
             {preview ? (
               <>
+                <EmailAddressSummary from={preview.from} to={preview.to} cc={preview.cc} />
                 <dl className="mt-3 space-y-1 text-sm text-gray-700">
-                  <div><dt className="inline font-medium">To:</dt> <dd className="inline">{preview.to.join(', ')}</dd></div>
-                  {preview.cc.length > 0 && <div><dt className="inline font-medium">Cc:</dt> <dd className="inline">{preview.cc.join(', ')}</dd></div>}
                   <div><dt className="inline font-medium">Subject:</dt> <dd className="inline">{preview.subject}</dd></div>
                   <div><dt className="font-medium">Exact email:</dt><dd className="mt-1 whitespace-pre-wrap rounded border border-gray-200 bg-white p-3">{preview.bodyText}</dd></div>
                 </dl>

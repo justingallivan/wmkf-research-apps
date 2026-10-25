@@ -7,6 +7,7 @@ import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import ReviewsTab from '../../shared/components/workbench/ReviewsTab';
 
 jest.mock('../../shared/components/Layout', () => ({
+  Button: jest.requireActual('../../shared/components/Layout').Button,
   __esModule: true,
   default: ({ children }) => <div>{children}</div>,
   Card: ({ children }) => <div>{children}</div>,

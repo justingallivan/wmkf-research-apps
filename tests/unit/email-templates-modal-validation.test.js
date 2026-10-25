@@ -1,44 +1,31 @@
-/**
- * @jest-environment jsdom
- */
-
+/** @jest-environment jsdom */
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import EmailTemplatesModal from '../../shared/components/reviewers/EmailTemplatesModal';
-import { loadEmailTemplates, loadAdminTemplateDefaults, saveEmailTemplates } from '../../shared/components/reviewers/email-template-store';
-
-jest.mock('../../shared/components/reviewers/email-template-store', () => ({
-  TEMPLATE_TYPES: ['invitation'],
-  TEMPLATE_TYPE_LABELS: { invitation: 'Invitation' },
-  loadEmailTemplates: jest.fn(),
-  loadAdminTemplateDefaults: jest.fn(),
-  saveEmailTemplates: jest.fn(),
-}));
-
-const templates = (body) => ({ invitation: { subject: 'Invitation', body } });
-
+import { requestEnvelope } from '../../shared/utils/api-request';
+jest.mock('../../shared/utils/api-request', () => ({ requestEnvelope: jest.fn() }));
+const templates = { invitation: { subject: 'Invitation', body: 'Use {{externalLink}}' }, materials: { subject: 'Materials', body: 'Review materials' } };
 beforeEach(() => {
   jest.clearAllMocks();
-  loadAdminTemplateDefaults.mockResolvedValue(templates('Use {{externalLink}}'));
-  saveEmailTemplates.mockResolvedValue(true);
+  requestEnvelope.mockImplementation(async (url, options) => {
+    if (options?.method === 'POST') return { ok: true, data: { success: true } };
+    if (url.includes('reviewer-templates')) return { ok: true, data: { templates } };
+    return { ok: true, data: { value: null } };
+  });
 });
-
-test('Save templates rejects an invitation without {{externalLink}}', async () => {
-  loadEmailTemplates.mockResolvedValue(templates('Use a hardcoded link instead.'));
+test('a family save rejects an invitation without its required link', async () => {
   render(<EmailTemplatesModal onClose={() => {}} />);
-  const save = await screen.findByRole('button', { name: 'Save templates' });
-  await waitFor(() => expect(save).not.toBeDisabled());
-  fireEvent.click(save);
-  expect(await screen.findByText('Invitation templates must include {{externalLink}} in the subject or body.')).toBeTruthy();
-  expect(saveEmailTemplates).not.toHaveBeenCalled();
+  fireEvent.change(await screen.findByLabelText('Default message'), { target: { value: 'Hardcoded wording' } });
+  fireEvent.click(screen.getByRole('button', { name: 'Save as my default' }));
+  expect(await screen.findByText('Invitation wording must include {{externalLink}}.')).toBeInTheDocument();
+  expect(requestEnvelope.mock.calls.some(([, options]) => options?.method === 'POST')).toBe(false);
 });
-
-test('Save templates accepts an invitation containing {{externalLink}}', async () => {
-  const valid = templates('Use {{externalLink}} to respond.');
-  loadEmailTemplates.mockResolvedValue(valid);
+test('a family save persists only the explicitly edited field and preserves inheritance', async () => {
   render(<EmailTemplatesModal onClose={() => {}} />);
-  const save = await screen.findByRole('button', { name: 'Save templates' });
-  await waitFor(() => expect(save).not.toBeDisabled());
-  fireEvent.click(save);
-  await waitFor(() => expect(saveEmailTemplates).toHaveBeenCalledWith(valid));
-  expect(await screen.findByText('Saved ✓')).toBeTruthy();
+  fireEvent.change(await screen.findByLabelText('Default message'), { target: { value: 'Respond via {{externalLink}}' } });
+  fireEvent.click(screen.getByRole('button', { name: 'Save as my default' }));
+  await waitFor(() => expect(requestEnvelope.mock.calls.some(([, options]) => options?.method === 'POST')).toBe(true));
+  const [, options] = requestEnvelope.mock.calls.find(([, options]) => options?.method === 'POST');
+  expect(JSON.parse(options.body.value)).toEqual({ invitation: { body: 'Respond via {{externalLink}}' } });
+  expect(await screen.findByText('Saved for future emails. The current email is unchanged.')).toBeInTheDocument();
+  expect(screen.getByText('Legacy templates')).toBeInTheDocument();
 });

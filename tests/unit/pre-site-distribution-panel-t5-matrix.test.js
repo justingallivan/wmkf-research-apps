@@ -31,6 +31,7 @@ import {
 } from '../../shared/config/deliberationShareEmail';
 
 jest.mock('../../shared/components/Layout', () => ({
+  Button: jest.requireActual('../../shared/components/Layout').Button,
   Card: ({ children }) => <div>{children}</div>,
 }));
 

@@ -1,3 +1,4 @@
+import { Button } from '../Layout';
 /**
  * "Your default wording" for a reviewer release courtesy email. Loads and saves
  * only the signed-in user's own template through
@@ -9,9 +10,6 @@
  *   - kind      : 'withdraw' | 'release'
  *   - senderId  : systemuserid of the PD the email is sent from (draft.senderId)
  *   - disabled  : true while the parent is sending
- *   - onChanged(): called after a successful Save/Clear when the user is the
- *                  sender, so the parent can re-render its drafts. The latest
- *                  callback is used, so it sees the parent's current state.
  *   - onBusyChange(busy): true while a Save/Clear is in flight, so the parent
  *                  can lock its email fields and Send until it settles
  */
@@ -35,7 +33,7 @@ function validationMessage(errors = []) {
   return 'The wording could not be saved. Check the subject and message.';
 }
 
-export default function ReleaseWordingDefault({ kind, senderId, disabled = false, onChanged, onBusyChange }) {
+export default function ReleaseWordingDefault({ kind, senderId, disabled = false, onBusyChange }) {
   const [open, setOpen] = useState(false);
   const [loaded, setLoaded] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -50,10 +48,8 @@ export default function ReleaseWordingDefault({ kind, senderId, disabled = false
 
   // Read the parent's callbacks at completion time, never the ones captured
   // when Save was clicked (Codex build review, 2026-10-22).
-  const onChangedRef = useRef(onChanged);
   const onBusyChangeRef = useRef(onBusyChange);
   useEffect(() => {
-    onChangedRef.current = onChanged;
     onBusyChangeRef.current = onBusyChange;
   });
   useEffect(() => () => {
@@ -116,15 +112,15 @@ export default function ReleaseWordingDefault({ kind, senderId, disabled = false
       }
       if (method === 'PUT') {
         setConfigured(true);
-        setMessage('Saved as your default wording.');
+        setMessage('Saved for future emails. The current email is unchanged.');
       } else {
         setConfigured(false);
         // Show the shared copy the next preview will start from.
         setSubject(shared?.subject || '');
         setBody(shared?.body || '');
-        setMessage('Your default wording was cleared; new emails start from the shared Admin wording.');
+        setMessage('Your default wording was cleared; new emails start from the shared Admin wording. The current email is unchanged.');
       }
-      if (isSender) onChangedRef.current?.();
+      // Save/Clear deliberately leaves the open one-send draft unchanged.
     } catch {
       if (generation === generationRef.current) setMessage('The change could not be confirmed. Reload before trying again.');
     } finally {
@@ -147,7 +143,7 @@ export default function ReleaseWordingDefault({ kind, senderId, disabled = false
         {loaded && (
           <>
             <p className="text-xs text-gray-600">
-              Used to start this email whenever you send it. Placeholders: {PLACEHOLDERS}. Edits to the email above are not saved here.
+              Used for future emails. Placeholders: {PLACEHOLDERS}. Edits to the email above are not saved here.
             </p>
             {!isSender && (
               <p className="text-xs text-amber-700">
@@ -155,18 +151,18 @@ export default function ReleaseWordingDefault({ kind, senderId, disabled = false
               </p>
             )}
             <label className="block">
-              <span className="text-xs font-medium text-gray-600">Subject</span>
+              <span className="text-xs font-medium text-gray-600">Default subject</span>
               <input value={subject} onChange={(event) => setSubject(event.target.value)} disabled={busy || disabled} className="mt-1 w-full rounded border border-gray-300 px-2 py-1 text-sm" />
             </label>
             <label className="block">
-              <span className="text-xs font-medium text-gray-600">Message</span>
+              <span className="text-xs font-medium text-gray-600">Default message</span>
               <textarea rows={8} value={body} onChange={(event) => setBody(event.target.value)} disabled={busy || disabled} className="mt-1 w-full rounded border border-gray-300 px-2 py-1 text-sm font-mono" />
             </label>
             <div className="flex justify-end gap-2">
               {configured && (
-                <button type="button" onClick={() => write('DELETE')} disabled={busy || disabled} className="px-3 py-1.5 text-sm text-gray-600 hover:text-gray-800 disabled:opacity-40">Clear my default</button>
+                <Button variant="outline" size="sm" type="button" onClick={() => write('DELETE')} disabled={busy || disabled} className="px-3 py-1.5 text-sm text-gray-600 hover:text-gray-800 disabled:opacity-40">Clear my default</Button>
               )}
-              <button type="button" onClick={() => write('PUT')} disabled={busy || disabled || !subject.trim() || !body.trim()} className="rounded-md border border-gray-300 px-3 py-1.5 text-sm text-gray-800 hover:bg-gray-50 disabled:opacity-40">{busy ? 'Saving…' : 'Save as my default'}</button>
+              <Button variant="outline" size="sm" type="button" onClick={() => write('PUT')} disabled={busy || disabled || !subject.trim() || !body.trim()} className="rounded-md border border-gray-300 px-3 py-1.5 text-sm text-gray-800 disabled:opacity-40">{busy ? 'Saving…' : 'Save as my default'}</Button>
             </div>
           </>
         )}

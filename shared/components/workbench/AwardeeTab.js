@@ -1,3 +1,6 @@
+import EmailDialog from '../EmailDialog';
+import { Button } from '../Layout';
+import EmailAddressSummary from '../EmailAddressSummary';
 /**
  * Workbench Awardee tab (chunk 3d) — staff orchestration of the Grantee
  * Deliverables Portal. Drives the existing endpoints:
@@ -191,7 +194,7 @@ export default function AwardeeTab({ requestId, context }) {
   // Compose-state model (S272): the body is DERIVED from (identity, template choice,
   // recipients) unless the PD has taken ownership by typing. `dirty` = real manual
   // edit; `templateMode` = which template feeds the derive ('auto' = saved-or-default,
-  // 'foundation' = the shared default forced by "Reset to default"). This replaces a
+  // 'foundation' = the shared default forced by "Use shared wording for this email"). This replaces a
   // one-way userEditedBodyRef latch that went stale across identity changes and froze
   // placeholder refills after a reset — both fixed by tracking these explicitly plus
   // an identity-reset effect below.
@@ -236,6 +239,7 @@ export default function AwardeeTab({ requestId, context }) {
   };
 
   const resetSubjectToFoundationDefault = () => {
+    if (subjectDirtyRef.current && !window.confirm('Replace your subject edits with shared wording?')) return;
     // This choice applies to the current draft only; it never deletes the saved
     // personal subject in Profile Settings.
     subjectDirtyRef.current = true;
@@ -247,6 +251,7 @@ export default function AwardeeTab({ requestId, context }) {
   // so a later recipient load still fills [Name] (it does not bounce back to the
   // saved custom body because templateMode pins the default).
   const resetToFoundationDefault = () => {
+    if (dirty && !window.confirm('Replace your edits to this email with shared wording?')) return;
     setTemplateMode('foundation');
     setDirty(false);
   };
@@ -1309,13 +1314,14 @@ export default function AwardeeTab({ requestId, context }) {
             Always review automated emails to {recipients.liaison.name || 'this liaison'} before sending (future messages only)
           </label>
         )}
+        <EmailAddressSummary from={recipients?.from} to={toEmail} cc={ccEmail ? ccEmail.split(',').map((x) => x.trim()) : []} />
         <div className="space-y-1">
           <div className="flex items-center justify-between text-sm">
             <label htmlFor="grantee-invite-subject">Subject</label>
             {hasSavedSubject && (
-              <button type="button" onClick={resetSubjectToFoundationDefault} className="text-xs text-blue-700 underline">
+              <Button variant="link" size="sm" type="button" onClick={resetSubjectToFoundationDefault} className="text-xs text-blue-700 underline">
                 Use shared subject for this email
-              </button>
+              </Button>
             )}
           </div>
           <input id="grantee-invite-subject" aria-label="Subject" value={subject} onChange={handleSubjectChange} className="w-full border rounded p-1" />
@@ -1323,13 +1329,13 @@ export default function AwardeeTab({ requestId, context }) {
         <div className="space-y-1">
           <div className="flex items-center justify-between text-sm">
             <span className="font-medium text-gray-800">Email body — edit before sending</span>
-            <button
+            <Button variant="link" size="sm"
               type="button"
               onClick={resetToFoundationDefault}
               className="text-xs text-blue-700 underline"
             >
-              Reset to default
-            </button>
+              Use shared wording for this email
+            </Button>
           </div>
           <textarea aria-label="Email body" value={body} onChange={handleBodyChange} rows={8} className="w-full border rounded p-2" />
         </div>
@@ -1362,21 +1368,21 @@ export default function AwardeeTab({ requestId, context }) {
           </p>
         )}
         <div className="flex flex-wrap gap-2">
-          <button
+          <Button variant="outline" size="sm"
             type="button"
             onClick={previewEmail}
             className="px-3 py-2 text-sm rounded border border-gray-400 text-gray-800"
           >
             Preview email
-          </button>
-          <button
+          </Button>
+          <Button variant="primary" size="sm"
             type="button"
             onClick={() => { setSendReceipt(null); setSendStep('confirm'); }}
             disabled={!canSend}
-            className="px-3 py-2 text-sm rounded bg-blue-700 text-white disabled:opacity-50"
+            className="px-3 py-2 text-sm rounded disabled:opacity-50"
           >
             {sending ? 'Sending…' : sendButtonLabel}
-          </button>
+          </Button>
         </div>
         <p className="text-xs text-gray-500">
           {!hasAbstract
@@ -1405,14 +1411,14 @@ export default function AwardeeTab({ requestId, context }) {
         </p>
         {copyMsg && <p className="text-sm text-green-700">{copyMsg}</p>}
         <div className="flex flex-wrap gap-2">
-          <button
+          <Button variant="primary" size="sm"
             type="button"
             onClick={copyWebsiteHtml}
             disabled={fetchingHtml || !requestId}
-            className="px-3 py-2 text-sm rounded bg-gray-700 text-white disabled:opacity-50"
+            className="px-3 py-2 text-sm rounded disabled:opacity-50"
           >
             {fetchingHtml ? 'Working…' : 'Copy website HTML'}
-          </button>
+          </Button>
           {cycleCode ? (
             <a
               href={`/api/workbench/grantee-deliverables/cycle-export?cycleCode=${encodeURIComponent(cycleCode)}`}
@@ -1469,14 +1475,12 @@ export default function AwardeeTab({ requestId, context }) {
           confirm step, but the sent step has only an explicit Done, because a
           stray backdrop click should not dismiss the record of a real send. */}
       {sendStep && (
+        <EmailDialog label={sendStep === 'confirm' || sendStep === 'sending' ? 'Send invitation' : 'Invitation status'} busy={sendStep === 'sending'} onClose={() => { if (sendStep === 'confirm') setSendStep(null); }}>
         <div
           className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
           onClick={sendStep === 'confirm' ? () => setSendStep(null) : undefined}
         >
           <div
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="grantee-send-modal-title"
             className="w-full max-w-xl max-h-[85vh] overflow-y-auto rounded-lg bg-white p-8 shadow-xl space-y-5"
             onClick={(e) => e.stopPropagation()}
           >
@@ -1499,13 +1503,13 @@ export default function AwardeeTab({ requestId, context }) {
                   </p>
                 )}
                 <div className="flex justify-end">
-                  <button
+                  <Button variant="primary" size="sm"
                     type="button"
                     onClick={() => setSendStep(null)}
-                    className="px-3 py-2 text-sm rounded bg-blue-700 text-white"
+                    className="px-3 py-2 text-sm rounded"
                   >
                     Done
-                  </button>
+                  </Button>
                 </div>
               </>
             ) : (
@@ -1521,16 +1525,9 @@ export default function AwardeeTab({ requestId, context }) {
                     the original invitation date, so the estimated response date does not change.
                   </p>
                 )}
+                {recipients?.pi?.name && <p className="text-sm text-gray-700">{recipients.pi.name}</p>}
+                <EmailAddressSummary from={recipients?.from} to={toEmail} cc={ccEmail ? ccEmail.split(',').map((x) => x.trim()) : []} />
                 <dl className="text-sm text-gray-900 space-y-3">
-                  <div>
-                    <dt className="text-xs font-medium uppercase tracking-wide text-gray-500">To</dt>
-                    <dd className="font-mono text-sm break-all">{toEmail}</dd>
-                    {recipients?.pi?.name && <dd className="text-sm text-gray-600">{recipients.pi.name}</dd>}
-                  </div>
-                  <div>
-                    <dt className="text-xs font-medium uppercase tracking-wide text-gray-500">Cc</dt>
-                    <dd className="font-mono text-sm break-all">{ccEmail || '—'}</dd>
-                  </div>
                   <div>
                     <dt className="text-xs font-medium uppercase tracking-wide text-gray-500">Subject</dt>
                     <dd className="text-sm">{fillInviteSubject(subject, { title: awardTitle })}</dd>
@@ -1540,27 +1537,28 @@ export default function AwardeeTab({ requestId, context }) {
                   Sends a secure magic link and starts the 14-day response estimate.
                 </p>
                 <div className="flex justify-end gap-2">
-                  <button
+                  <Button variant="outline" size="sm"
                     type="button"
                     onClick={() => setSendStep(null)}
                     disabled={sendStep === 'sending'}
                     className="px-3 py-2 text-sm rounded border border-gray-400 text-gray-800 disabled:opacity-50"
                   >
                     Cancel
-                  </button>
-                  <button
+                  </Button>
+                  <Button variant="primary" size="sm"
                     type="button"
                     onClick={send}
                     disabled={sendStep === 'sending'}
-                    className="px-3 py-2 text-sm rounded bg-blue-700 text-white disabled:opacity-50"
+                    className="px-3 py-2 text-sm rounded disabled:opacity-50"
                   >
                     {sendStep === 'sending' ? 'Sending…' : sendButtonLabel}
-                  </button>
+                  </Button>
                 </div>
               </>
             )}
           </div>
         </div>
+        </EmailDialog>
       )}
     </div>
   );

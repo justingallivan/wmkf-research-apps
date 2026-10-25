@@ -477,7 +477,7 @@ export default function ProfileSettings() {
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-lg font-semibold text-gray-900">Request Abstract Email</h2>
               {inviteBodyStatus === 'saved' && <span className="text-sm text-green-700">Saved</span>}
-              {inviteBodyStatus === 'reset' && <span className="text-sm text-green-700">Reset to default</span>}
+              {inviteBodyStatus === 'reset' && <span className="text-sm text-green-700">Clear my default message</span>}
             </div>
             <p className="text-sm text-gray-600 mb-4">
               Your default subject and body for the grantee abstract-review email (the Workbench
@@ -512,7 +512,7 @@ export default function ProfileSettings() {
                   onClick={handleResetInviteSubject}
                   disabled={isSavingInviteSubject || !inviteDefault.loaded || inviteDefault.unavailable}
                 >
-                  Reset subject to default
+                  Clear my default subject
                 </Button>
                 <Button
                   variant="primary"
@@ -521,7 +521,7 @@ export default function ProfileSettings() {
                   disabled={isSavingInviteSubject}
                   loading={isSavingInviteSubject}
                 >
-                  Save Email Subject
+                  Save my default subject
                 </Button>
               </div>
             </form>
@@ -565,7 +565,7 @@ export default function ProfileSettings() {
                   onClick={handleResetInviteBody}
                   disabled={isSavingInviteBody || !inviteDefault.loaded || inviteDefault.unavailable}
                 >
-                  Reset to default
+                  Clear my default message
                 </Button>
                 <Button
                   variant="primary"
@@ -574,7 +574,7 @@ export default function ProfileSettings() {
                   disabled={isSavingInviteBody}
                   loading={isSavingInviteBody}
                 >
-                  Save Email Body
+                  Save my default message
                 </Button>
               </div>
             </form>

@@ -152,7 +152,7 @@ test('pin 1: manage-panel 503 preview failure shows owner-verbatim copy + reassu
       screen.getByText(/I'm having trouble accessing the server.*No emails have been sent — retrying is safe\./),
     ).toBeTruthy(),
   );
-  expect(screen.getByRole('button', { name: /Retry/ })).toBeTruthy();
+  expect(screen.getByRole('button', { name: /↻ Retry/ })).toBeTruthy();
 });
 
 test('pin 2: Retry issues exactly one new render-emails request; a healthy response clears the banner and advances to preview', async () => {
@@ -160,7 +160,7 @@ test('pin 2: Retry issues exactly one new render-emails request; a healthy respo
   renderPanel();
   openReleaseModal();
   fireEvent.click(await screen.findByRole('button', { name: /preview 1 email/i }));
-  await screen.findByRole('button', { name: /Retry/ });
+  await screen.findByRole('button', { name: /↻ Retry/ });
   const before = renderEmailsCalls().length;
 
   renderEmailsBehavior = () => mockJson({
@@ -172,7 +172,7 @@ test('pin 2: Retry issues exactly one new render-emails request; a healthy respo
       body: 'B',
     }],
   });
-  fireEvent.click(screen.getByRole('button', { name: /Retry/ }));
+  fireEvent.click(screen.getByRole('button', { name: /↻ Retry/ }));
 
   await waitFor(() => expect(renderEmailsCalls().length).toBe(before + 1));
   await waitFor(() => expect(screen.queryByText(/retrying is safe/)).toBeNull());
@@ -205,7 +205,7 @@ test('pin 3: a terminal send-stream error shows its message without Retry, and p
   fireEvent.click(sendButton);
 
   await waitFor(() => expect(screen.getByText('Dynamics rejected the batch')).toBeTruthy());
-  expect(screen.queryByRole('button', { name: /Retry/ })).toBeNull();
+  expect(screen.queryByRole('button', { name: /↻ Retry/ })).toBeNull();
 });
 
 test('pre-stream authorization failure returns to preview with the server message', async () => {
@@ -344,7 +344,7 @@ test('pin 5: a pending render disables Preview/Retry and a click while pending c
   expect(calls).toBe(1);
 
   first.resolve(mockJson({ error: 'still broken' }, false, 503));
-  const retryButton = await screen.findByRole('button', { name: /Retry/ });
+  const retryButton = await screen.findByRole('button', { name: /↻ Retry/ });
   expect(retryButton).not.toBeDisabled();
   expect(previewButton).not.toBeDisabled();
 
@@ -454,7 +454,7 @@ test('a hung render times out, surfaces the network-failure banner, and Retry re
     });
 
     await waitFor(() => expect(screen.getByText(RENDER_PREVIEW_NETWORK_MESSAGE)).toBeTruthy());
-    const retryButton = screen.getByRole('button', { name: /Retry/ });
+    const retryButton = screen.getByRole('button', { name: /↻ Retry/ });
     expect(retryButton).not.toBeDisabled();
 
     fireEvent.click(retryButton);

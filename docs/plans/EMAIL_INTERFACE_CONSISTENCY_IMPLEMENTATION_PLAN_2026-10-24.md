@@ -2,7 +2,7 @@
 title: Email interface consistency — implementation plan
 domain: platform
 kind: plan
-status: planned
+status: implemented
 summary: Owner-approved desktop-first email consistency pass: accessible dialogs and fields, readable guidance, future-only defaults, truthful fallback and sender summaries, legacy explanations and shared controls. Independent plan/build review required; no release authorization.
 owner: product-engineering
 related:
@@ -15,9 +15,10 @@ related:
 
 ## Status and authority
 
-[PLANNED; owner approved each audit recommendation in conversation, then requested
-plan, independent review and build.] The audit's nine findings are the baseline,
-not evidence that these changes exist. All nine recommendations are agreed.
+[BRANCH-BUILT; source reviewed 2026-10-24.] Owner approved all nine audit
+recommendations, the implementation plan and continuation into the build.
+The three passes are implemented on `codex/email-interface-consistency-build`;
+verification and explicit limits are recorded in the linked build receipt.
 No product question remains about dialog behavior, labels, contrast, future-only
 Save/Clear, actual addressing, truthful fallback, legacy-template explanation or
 shared controls. Owner explicitly requires **desktop first**: no loss of desktop
@@ -82,7 +83,7 @@ cancel handling and an explicit mutation-busy close lock. Preserve each surface'
 existing backdrop policy through an explicit prop; backdrop must never dismiss
 while locked. Keep dialog styling/desktop width and internal scrolling.
 
-Migrate invitation, reviewer materials, reminder, pending/accepted release,
+Migrate grantee confirmation/status, invitation, reviewer materials, reminder, pending/accepted release,
 legacy templates, deadline, agenda and distribution dialogs; include nested
 recipient pickers so only the topmost layer responds to Escape and focus returns
 to the parent control. Remove old duplicate Escape/focus handlers where replaced.
@@ -207,7 +208,8 @@ separate owner instruction. Existing delivery checks are not replayed by default
 Plan review: READY after five named corrections, independently source-reviewed
 by `email_plan_review` on 2026-10-24: per-draft reviewer From, always-visible
 grantee sender, raw inheritance provenance, precise invitation/materials sender
-branches and strict own-map prewrite reads. Runtime implementation: not started. No live probes or
-writes are required to settle this source-level plan. Commit plan/decisions and
-review corrections before implementation. Record source fingerprints and review
-verdicts, and retain explicit untested live/assistive-technology boundaries.
+branches and strict own-map prewrite reads. Runtime implemented on `codex/email-interface-consistency-build`. Independent
+build review returned READY after fixes for materials reopen loading, conflicting
+preview locks and grantee dialog coverage. No outstanding source-review blockers.
+See `docs/audits/EMAIL_INTERFACE_CONSISTENCY_BUILD_2026-10-24.md` for checks,
+review receipt, fingerprints and untested live/assistive-technology boundaries.

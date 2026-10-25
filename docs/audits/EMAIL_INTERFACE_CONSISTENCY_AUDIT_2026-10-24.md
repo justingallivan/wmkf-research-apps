@@ -13,6 +13,10 @@ related:
 
 # Email interface consistency audit
 
+[CURRENT FOLLOW-UP, 2026-10-24.] The approved fixes are branch-built; see
+`docs/audits/EMAIL_INTERFACE_CONSISTENCY_BUILD_2026-10-24.md` for review, checks and
+remaining release verification. Findings below describe the original audited base.
+
 ## Implementation integrity verdict
 
 **Needs a bounded consistency pass.** The suite has a recognizable operational

@@ -1,3 +1,6 @@
+import { Button } from '../Layout';
+import EmailAddressSummary from '../EmailAddressSummary';
+import EmailDialog from '../EmailDialog';
 import { useEffect, useRef, useState } from 'react';
 import EmailSendFeedback from '../EmailSendFeedback';
 import ReleaseWordingDefault from './ReleaseWordingDefault';
@@ -120,7 +123,7 @@ export default function AcceptedReviewerReleaseModal({ reviewer, requestId, onCl
   }, []);
 
   const requestClose = () => {
-    if (!saving) onClose();
+    if (!saving && !refreshing && !wordingBusy) onClose();
   };
 
   // After the sender saves or clears their default wording, re-render the email
@@ -232,11 +235,12 @@ export default function AcceptedReviewerReleaseModal({ reviewer, requestId, onCl
   const emailUnavailable = draft && draft.status !== 'ok';
 
   return (
+    <EmailDialog label="Release from assignment" busy={saving || refreshing || wordingBusy} onClose={requestClose}>
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50" onClick={requestClose}>
       <div className="mx-4 max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-lg bg-white shadow-xl" onClick={(event) => event.stopPropagation()}>
         <div className="flex items-center justify-between border-b border-gray-200 bg-gray-50 px-4 py-3">
           <h3 className="font-semibold text-gray-900">Release from assignment</h3>
-          <button type="button" onClick={requestClose} disabled={saving} aria-label="Close" className="text-gray-400 hover:text-gray-600 disabled:opacity-40">✕</button>
+          <Button variant="outline" size="sm" type="button" onClick={requestClose} disabled={saving} aria-label="Close" className="text-gray-600 hover:text-gray-900 disabled:opacity-40">✕</Button>
         </div>
         <div className="space-y-4 p-4">
           <div className="rounded-md border border-blue-200 bg-blue-50 p-3 text-sm text-blue-950">
@@ -276,7 +280,7 @@ export default function AcceptedReviewerReleaseModal({ reviewer, requestId, onCl
 
               {sendEmail && (
                 <div className="space-y-2 rounded-md border border-gray-200 p-3">
-                  <p className="text-sm"><span className="font-medium">To:</span> {draft.name || reviewer.name} &lt;{draft.to}&gt;</p>
+                  <EmailAddressSummary from={draft.from} to={draft.to} />
                   {draft.templateSource === 'shared_fallback' && (
                     <p className="text-sm text-amber-700">{TEMPLATE_NOTICE[draft.templateNotice] || TEMPLATE_NOTICE.preference_unavailable}</p>
                   )}
@@ -298,11 +302,12 @@ export default function AcceptedReviewerReleaseModal({ reviewer, requestId, onCl
           {feedback && <EmailSendFeedback status={feedback.outcome} title={feedback.title} message={feedback.detail} />}
 
           <div className="flex justify-end gap-2 pt-2">
-            <button type="button" onClick={requestClose} disabled={saving} className="px-3 py-1.5 text-sm text-gray-600 hover:text-gray-800 disabled:opacity-40">{completed ? 'Done' : 'Cancel'}</button>
-            {!completed && <button type="button" onClick={submit} disabled={loading || !draft || saving || refreshing || wordingBusy} className="rounded-md bg-blue-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50">{saving ? 'Releasing…' : 'Release reviewer'}</button>}
+            <Button variant="outline" size="sm" type="button" onClick={requestClose} disabled={saving} className="px-3 py-1.5 text-sm text-gray-600 hover:text-gray-800 disabled:opacity-40">{completed ? 'Done' : 'Cancel'}</Button>
+            {!completed && <Button variant="primary" size="sm" type="button" onClick={submit} disabled={loading || !draft || saving || refreshing || wordingBusy} className="rounded-md px-3 py-1.5 text-sm font-medium disabled:opacity-50">{saving ? 'Releasing…' : 'Release reviewer'}</Button>}
           </div>
         </div>
       </div>
     </div>
+    </EmailDialog>
   );
 }

@@ -901,7 +901,7 @@ test('"Reset to default" restores the Foundation default over a saved custom bod
   wireFetch();
   render(<AwardeeTab requestId={REQ} context={CYCLE_CTX} />);
   await waitFor(() => expect(screen.getByLabelText('Email body').value).toMatch(/^Custom body for Raj\./));
-  fireEvent.click(screen.getByRole('button', { name: /reset to default/i }));
+  fireEvent.click(screen.getByRole('button', { name: /use shared wording for this email/i }));
   expect(screen.getByLabelText('Email body').value).toMatch(/^Dear Professor Raj,/);
   // Stays reset — does not bounce back to the custom body on a later effect run.
   await new Promise((r) => setTimeout(r, 0));
@@ -1068,7 +1068,7 @@ test('reset BEFORE recipients load still fills [Name] when they arrive (#2)', as
   // Recipients not resolved yet → {{granteeName}} placeholder still present.
   await waitFor(() => expect(screen.getByLabelText('Email body').value).toMatch(/Dear Professor {{granteeName}},/));
 
-  fireEvent.click(screen.getByRole('button', { name: /reset to default/i }));
+  fireEvent.click(screen.getByRole('button', { name: /use shared wording for this email/i }));
   expect(screen.getByLabelText('Email body').value).toMatch(/Dear Professor {{granteeName}},/);
 
   resolveRecipients();

@@ -1,3 +1,5 @@
+import { Button } from '../Layout';
+import EmailDialog from '../EmailDialog';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { requestJson } from '../../utils/api-request';
 
@@ -54,49 +56,6 @@ export default function CuratedRecipientPicker({
     return undefined;
   }, [error, open, recipients]);
 
-  useEffect(() => {
-    if (!open) return undefined;
-    const previouslyFocused = document.activeElement;
-    filterInputRef.current?.focus();
-
-    const handleDialogKeyDown = (event) => {
-      if (event.key === 'Escape') {
-        event.preventDefault();
-        close();
-        return;
-      }
-      if (event.key !== 'Tab') return;
-
-      const focusable = Array.from(dialogRef.current?.querySelectorAll(
-        'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])',
-      ) || []);
-      if (focusable.length === 0) {
-        event.preventDefault();
-        return;
-      }
-      const first = focusable[0];
-      const last = focusable[focusable.length - 1];
-      if (!dialogRef.current?.contains(document.activeElement)) {
-        event.preventDefault();
-        (event.shiftKey ? last : first).focus();
-      } else if (event.shiftKey && document.activeElement === first) {
-        event.preventDefault();
-        last.focus();
-      } else if (!event.shiftKey && document.activeElement === last) {
-        event.preventDefault();
-        first.focus();
-      }
-    };
-
-    window.addEventListener('keydown', handleDialogKeyDown);
-    return () => {
-      window.removeEventListener('keydown', handleDialogKeyDown);
-      if (previouslyFocused instanceof HTMLElement && previouslyFocused.isConnected) {
-        previouslyFocused.focus();
-      }
-    };
-  }, [close, open]);
-
   useEffect(() => () => {
     loadSequence.current += 1;
   }, []);
@@ -137,12 +96,10 @@ export default function CuratedRecipientPicker({
   const loading = recipients === null && !error;
 
   return (
+    <EmailDialog initialFocusSelector="#curated-recipient-filter" label="Add recipients" onClose={close}>
     <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/40 p-4" role="presentation">
       <section
         ref={dialogRef}
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="curated-recipient-picker-title"
         className="max-h-[80vh] w-full max-w-lg overflow-hidden rounded-xl bg-white shadow-xl"
       >
         <div className="flex items-start justify-between gap-4 border-b border-gray-200 p-4">
@@ -152,7 +109,7 @@ export default function CuratedRecipientPicker({
             </h3>
             <p className="mt-1 text-xs text-gray-500">Choose from the directory maintained in Admin.</p>
           </div>
-          <button type="button" onClick={close} className="text-sm text-gray-500 hover:text-gray-800">Close</button>
+          <Button variant="outline" size="sm" type="button" onClick={close} className="text-sm text-gray-500 hover:text-gray-800">Close</Button>
         </div>
 
         <div className="p-4">
@@ -173,7 +130,7 @@ export default function CuratedRecipientPicker({
           {error && (
             <div className="rounded border border-red-200 bg-red-50 p-3 text-sm text-red-800" role="alert">
               <p>{error}</p>
-              <button type="button" onClick={retry} className="mt-2 font-medium underline">Retry</button>
+              <Button variant="link" size="sm" type="button" onClick={retry} className="mt-2 font-medium underline">Retry</Button>
             </div>
           )}
           {!loading && !error && visible.length === 0 && (
@@ -224,17 +181,18 @@ export default function CuratedRecipientPicker({
         </div>
 
         <div className="flex items-center justify-end gap-2 border-t border-gray-200 p-4">
-          <button type="button" onClick={close} className="rounded border border-gray-300 px-3 py-2 text-sm">Cancel</button>
-          <button
+          <Button variant="outline" size="sm" type="button" onClick={close} className="rounded border border-gray-300 px-3 py-2 text-sm">Cancel</Button>
+          <Button variant="primary" size="sm"
             type="button"
             onClick={addSelected}
             disabled={selected.size === 0}
-            className="rounded bg-blue-800 px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
+            className="rounded px-4 py-2 text-sm font-medium disabled:opacity-50"
           >
             {selected.size ? `Add ${selected.size} recipient${selected.size === 1 ? '' : 's'}` : 'Add recipients'}
-          </button>
+          </Button>
         </div>
       </section>
     </div>
+    </EmailDialog>
   );
 }

@@ -138,3 +138,48 @@ export async function saveEmailTemplates(templates) {
     return false;
   }
 }
+
+/** Status-bearing read; raw overrides retain inheritance and are never inferred from fallback. */
+export async function loadEmailTemplateState() {
+  const [sharedRead, ownRead] = await Promise.all([
+    requestEnvelope('/api/email-defaults/reviewer-templates', { tolerantBody: true }).catch(() => null),
+    requestEnvelope(`/api/user-preferences?key=${encodeURIComponent(PREFERENCE_KEYS.EMAIL_TEMPLATES)}`, { tolerantBody: true }).catch(() => null),
+  ]);
+  const sharedAvailable = Boolean(sharedRead?.ok && sharedRead.data?.templates && !sharedRead.data.unavailable);
+  const shared = toShape(sharedAvailable ? sharedRead.data.templates : null);
+  let raw = {}, ownStatus = ownRead?.ok ? 'absent' : ownRead?.status === 409 ? 'invalid' : 'unavailable';
+  if (ownRead?.ok && ownRead.data?.value != null) {
+    try {
+      raw = typeof ownRead.data.value === 'string' ? JSON.parse(ownRead.data.value) : ownRead.data.value;
+      if (!raw || typeof raw !== 'object' || Array.isArray(raw)) throw new Error('invalid');
+      for (const type of TEMPLATE_TYPES) {
+        if (raw[type] != null && (typeof raw[type] !== 'object' || Array.isArray(raw[type]))) throw new Error('invalid');
+        for (const field of ['subject', 'body']) if (raw[type]?.[field] != null && typeof raw[type][field] !== 'string') throw new Error('invalid');
+      }
+      ownStatus = 'configured';
+    } catch { raw = {}; ownStatus = 'invalid'; }
+  }
+  return { raw, shared, templates: mergeTemplates(['absent', 'configured'].includes(ownStatus) ? raw : null, shared), ownStatus, sharedAvailable };
+}
+
+/** Patch only explicitly edited fields in one family, never a stale resolved whole map. */
+export async function saveEmailTemplateFamily(type, template, changedFields, clear = false) {
+  if (!TEMPLATE_TYPES.includes(type)) return { ok: false, message: 'Unknown email template.' };
+  const state = await loadEmailTemplateState();
+  if (!['absent', 'configured'].includes(state.ownStatus) || !state.sharedAvailable) return { ok: false, message: 'Saved or shared wording could not be loaded. Retry before changing your default.' };
+  const raw = { ...state.raw };
+  if (clear) delete raw[type];
+  else {
+    const fields = { ...(raw[type] || {}) };
+    for (const field of changedFields) {
+      if (!['subject', 'body'].includes(field)) continue;
+      if (template[field] === state.shared[type][field]) delete fields[field];
+      else fields[field] = template[field];
+    }
+    if (Object.keys(fields).length) raw[type] = fields; else delete raw[type];
+  }
+  const resolved = mergeTemplates(raw, state.shared);
+  if (!validateInvitationTemplateForSave(resolved.invitation).valid) return { ok: false, message: 'Invitation wording must include {{externalLink}}.' };
+  const result = await requestEnvelope('/api/user-preferences', { method: 'POST', body: { key: PREFERENCE_KEYS.EMAIL_TEMPLATES, value: JSON.stringify(raw) }, tolerantBody: true });
+  return { ok: result.ok, message: result.ok ? null : 'The change could not be confirmed. Reload before trying again.' };
+}

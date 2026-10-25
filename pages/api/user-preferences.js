@@ -108,6 +108,14 @@ async function handleGet(req, res, profileId) {
 
     if (key) {
       if (PRIVATE_REMINDER_KEYS.has(key)) return res.status(403).json({ error: 'Use its dedicated email preferences endpoint.' });
+      if (key === PREFERENCE_KEYS.EMAIL_TEMPLATES) {
+        try {
+          const value = await DatabaseService.getReviewerEmailTemplatesStrict(profileId);
+          return res.status(200).json({ success: true, key, value, isEncrypted: false, masked: false });
+        } catch (error) {
+          return res.status(error.code === 'preference_invalid' ? 409 : 503).json({ error: 'Your saved templates could not be loaded.', reason: error.code || 'preference_unavailable' });
+        }
+      }
       const preferences = await DatabaseService.getUserPreferences(profileId, false);
       const isEncrypted = DatabaseService.ENCRYPTED_PREFERENCE_KEYS.includes(key);
       return res.status(200).json({

@@ -1,3 +1,6 @@
+import { Button } from '../Layout';
+import EmailAddressSummary from '../EmailAddressSummary';
+import EmailDialog from '../EmailDialog';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { requestJson, requestEnvelope } from '../../utils/api-request';
 import { Card } from '../Layout';
@@ -115,23 +118,23 @@ function BriefingLinkCard({ link, onReissue, busy, error }) {
         </div>
         <div className="flex shrink-0 items-center gap-2">
           {!unreadable && (
-            <button
+            <Button variant="outline" size="sm"
               type="button"
               onClick={copy}
-              className="rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-sm font-medium text-gray-800 hover:bg-gray-50"
+              className="rounded-lg border border-gray-300 px-3 py-1.5 text-sm font-medium text-gray-800"
             >
               {copied ? 'Copied' : 'Copy link'}
-            </button>
+            </Button>
           )}
           {!confirming && (
-            <button
+            <Button variant="outline" size="sm"
               type="button"
               onClick={() => setConfirming(true)}
               disabled={busy}
-              className="rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-sm font-medium text-gray-800 hover:bg-gray-50 disabled:opacity-50"
+              className="rounded-lg border border-gray-300 px-3 py-1.5 text-sm font-medium text-gray-800 disabled:opacity-50"
             >
               Issue new link
-            </button>
+            </Button>
           )}
         </div>
       </div>
@@ -139,22 +142,22 @@ function BriefingLinkCard({ link, onReissue, busy, error }) {
         <div className="mt-3 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
           <p>Issuing a new link stops the current one immediately. Anyone holding an earlier email will need the new link, so send the materials again afterward.</p>
           <div className="mt-2 flex gap-2">
-            <button
+            <Button variant="outline" size="sm"
               type="button"
               onClick={async () => { await onReissue(); setConfirming(false); }}
               disabled={busy}
-              className="rounded-lg bg-amber-700 px-3 py-1.5 text-sm font-medium text-white disabled:opacity-50"
+              className="rounded-lg px-3 py-1.5 text-sm font-medium disabled:opacity-50"
             >
               {busy ? 'Issuing…' : 'Issue new link'}
-            </button>
-            <button
+            </Button>
+            <Button variant="outline" size="sm"
               type="button"
               onClick={() => setConfirming(false)}
               disabled={busy}
-              className="rounded-lg border border-amber-300 bg-white px-3 py-1.5 text-sm font-medium text-amber-900"
+              className="rounded-lg border border-amber-300 px-3 py-1.5 text-sm font-medium text-amber-900"
             >
               Keep current link
-            </button>
+            </Button>
           </div>
         </div>
       )}
@@ -211,29 +214,10 @@ function attemptPresentation(attempt) {
  * returns to the opener on unmount.
  */
 function ComposerDialog({ onClose, busy, escapeDisabled = false, children }) {
-  const closeRef = useRef(null);
-  useEffect(() => {
-    const previouslyFocused = document.activeElement;
-    closeRef.current?.focus();
-    return () => {
-      if (previouslyFocused?.focus) previouslyFocused.focus();
-    };
-  }, []);
-  useEffect(() => {
-    // Escape closes the composer unless a nested dialog (the recipient
-    // picker, stacked above at z-60) owns the key right now.
-    const onKey = (event) => {
-      if (event.key === 'Escape' && !busy && !escapeDisabled) onClose?.();
-    };
-    document.addEventListener('keydown', onKey);
-    return () => document.removeEventListener('keydown', onKey);
-  }, [busy, escapeDisabled, onClose]);
   return (
+    <EmailDialog label="Share for the deliberation session" busy={busy || escapeDisabled} onClose={onClose}>
     <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/40 p-4" role="presentation">
       <div
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="share-composer-title"
         className="my-6 w-full max-w-3xl rounded-xl bg-white p-6 shadow-xl"
       >
         <div className="flex items-start justify-between gap-4">
@@ -243,29 +227,29 @@ function ComposerDialog({ onClose, busy, escapeDisabled = false, children }) {
               The email carries the briefing page link; the brief, every completed review, the proposal, and the site visit materials open there without a login.
             </p>
           </div>
-          <button
-            ref={closeRef}
+          <Button variant="outline" size="sm"
             type="button"
             onClick={onClose}
             disabled={busy}
-            className="rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-sm font-medium text-gray-800 hover:bg-gray-50 disabled:opacity-50"
+            className="rounded-lg border border-gray-300 px-3 py-1.5 text-sm font-medium text-gray-800 disabled:opacity-50"
           >
             Close
-          </button>
+          </Button>
         </div>
         {children}
         <div className="mt-6 flex justify-end border-t border-gray-200 pt-4">
-          <button
+          <Button variant="outline" size="sm"
             type="button"
             onClick={onClose}
             disabled={busy}
-            className="rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-800 hover:bg-gray-50 disabled:opacity-50"
+            className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-800 disabled:opacity-50"
           >
             Close
-          </button>
+          </Button>
         </div>
       </div>
     </div>
+    </EmailDialog>
   );
 }
 
@@ -759,14 +743,14 @@ export default function PreSiteDistributionPanel({
           <div>
             <div className="flex items-center justify-between gap-2">
               <label htmlFor="distribution-to" className="block text-sm font-medium text-gray-800">To</label>
-              <button
+              <Button variant="link" size="sm"
                 type="button"
                 onClick={() => setRecipientPickerTarget('to')}
                 disabled={preparing || sending}
                 className="text-xs font-medium text-blue-700 hover:text-blue-900 disabled:opacity-50"
               >
                 Add from directory
-              </button>
+              </Button>
             </div>
             <textarea
               id="distribution-to"
@@ -781,14 +765,14 @@ export default function PreSiteDistributionPanel({
           <div>
             <div className="flex items-center justify-between gap-2">
               <label htmlFor="distribution-cc" className="block text-sm font-medium text-gray-800">Cc</label>
-              <button
+              <Button variant="link" size="sm"
                 type="button"
                 onClick={() => setRecipientPickerTarget('cc')}
                 disabled={preparing || sending}
                 className="text-xs font-medium text-blue-700 hover:text-blue-900 disabled:opacity-50"
               >
                 Add from directory
-              </button>
+              </Button>
             </div>
             <textarea
               id="distribution-cc"
@@ -827,16 +811,16 @@ export default function PreSiteDistributionPanel({
             Creating the preview locks this exact Word version as the working document and turns off regeneration.
           </p>
         )}
-        <button
+        <Button variant="primary" size="sm"
           type="button"
           onClick={() => prepare()}
           disabled={preparing || sending || !form.to.trim() || !form.subject.trim() || !form.bodyText.trim()}
-          className="mt-4 rounded-lg bg-gray-900 px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
+          className="mt-4 rounded-lg px-4 py-2 text-sm font-medium disabled:opacity-50"
         >
           {preparing
             ? (needsLock ? 'Locking and creating preview…' : 'Creating preview…')
             : needsLock ? 'Lock and preview' : preview ? 'Create new preview' : 'Create preview'}
-        </button>
+        </Button>
         {notice && (
           <div className="mt-3 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900" role="status" aria-live="polite">
             {notice}
@@ -864,23 +848,22 @@ export default function PreSiteDistributionPanel({
                 Reviews: {staleInputs.delta?.generatedReviewCount ?? 0} at generation → {staleInputs.delta?.liveReviewCount ?? 0} now
               </li>
             </ul>
-            <button
+            <Button variant="primary" size="sm"
               type="button"
               onClick={() => prepare({ acknowledge: true })}
               disabled={preparing || sending}
-              className="mt-3 rounded-lg bg-amber-800 px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
+              className="mt-3 rounded-lg px-4 py-2 text-sm font-medium disabled:opacity-50"
             >
               I reviewed the changes above — share anyway
-            </button>
+            </Button>
           </div>
         )}
 
         {preview && (
           <div className="mt-5 rounded-lg border border-blue-200 bg-blue-50 p-4">
             <h4 className="font-semibold text-gray-900">Email preview</h4>
+            <EmailAddressSummary from={preview.from} to={preview.to} cc={preview.cc} />
             <dl className="mt-3 space-y-2 text-sm text-gray-700">
-              <div><dt className="inline font-medium">To:</dt> <dd className="inline">{preview.to.join(', ')}</dd></div>
-              {preview.cc.length > 0 && <div><dt className="inline font-medium">Cc:</dt> <dd className="inline">{preview.cc.join(', ')}</dd></div>}
               <div><dt className="inline font-medium">Subject:</dt> <dd className="inline">{preview.subject}</dd></div>
               <div><dt className="inline font-medium">Snapshot source:</dt> <dd className="inline">Word version {preview.sourceVersionId}; later edits are not included</dd></div>
               <div><dt className="inline font-medium">Pre-discussion:</dt> <dd className="inline">{deliberationSessionLine(preview.session).replace('Deliberation session: ', '')}{preview.session?.meetingLink ? ' · Join link included' : ''}</dd></div>
@@ -950,14 +933,14 @@ export default function PreSiteDistributionPanel({
                   />
                   I reviewed the recipients, message, and briefing page link shown above.
                 </label>
-                <button
+                <Button variant="primary" size="sm"
                   type="button"
                   onClick={send}
                   disabled={!confirmed || preparing || sending}
-                  className="mt-3 rounded-lg bg-blue-800 px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
+                  className="mt-3 rounded-lg px-4 py-2 text-sm font-medium disabled:opacity-50"
                 >
                   {sending ? 'Sending…' : 'Send email'}
-                </button>
+                </Button>
               </>
             )}
           </div>

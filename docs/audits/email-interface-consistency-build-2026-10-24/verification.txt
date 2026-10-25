@@ -1,0 +1,15 @@
+Test Suites: 21 skipped, 1466 passed, 1466 of 1487 total
+Tests:       247 skipped, 25254 passed, 25501 total
+Snapshots:   5 passed, 5 total
+Time:        230.602 s, estimated 245 s
+
+Final scoped regression run:
+Test Suites: 3 passed, 3 total
+Tests:       56 passed, 56 total
+Snapshots:   0 total
+Time:        2.264 s
+
+Production build: PASS
+Type check: PASS
+Changed-source lint: zero errors (warnings retained)
+Independent source review: READY; no outstanding blockers

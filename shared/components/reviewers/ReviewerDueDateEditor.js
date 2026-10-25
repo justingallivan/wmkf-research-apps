@@ -1,3 +1,6 @@
+import { Button } from '../Layout';
+import EmailAddressSummary from '../EmailAddressSummary';
+import EmailDialog from '../EmailDialog';
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { currentYmdInTimeZone, isYmd } from '../../../lib/utils/date-ymd';
 import DeadlineWordingDefault from './DeadlineWordingDefault';
@@ -178,9 +181,9 @@ export default function ReviewerDueDateEditor({ suggestionId, reviewerName, over
     <div className="text-xs">
       <p className="text-gray-700">{overrideDate ? 'Extended' : 'Due'}: {formatDate(effectiveDate || defaultDate)}</p>
       {overrideDate && <p className="text-gray-500">Original: {formatDate(defaultDate)}</p>}
-      {canManage && isYmd(defaultDate) && <button type="button" onClick={openModal} className="mt-1 text-blue-700 hover:underline">{overrideDate ? 'Change extension' : 'Grant extension'}</button>}
-      {open && canManage && <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-        <div role="dialog" aria-modal="true" aria-labelledby={`deadline-title-${suggestionId}`} className="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-xl bg-white p-5 text-left shadow-xl">
+      {canManage && isYmd(defaultDate) && <Button variant="link" size="sm" type="button" onClick={openModal} className="mt-1 text-blue-700 hover:underline">{overrideDate ? 'Change extension' : 'Grant extension'}</Button>}
+      {open && canManage && <EmailDialog initialFocusSelector="select" label="Reviewer deadline" busy={Boolean(busy)} onClose={close}><div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+        <div  className="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-xl bg-white p-5 text-left shadow-xl">
           <h2 id={`deadline-title-${suggestionId}`} className="text-lg font-semibold text-gray-900">Reviewer deadline</h2>
           <p className="mt-1 text-sm text-gray-600">{reviewerName} · Original deadline: {formatDate(defaultDate)}</p>
           {saved && <p role="status" className="mt-3 text-sm text-gray-800">The deadline is saved. Email actions below do not change it.</p>}
@@ -211,6 +214,7 @@ export default function ReviewerDueDateEditor({ suggestionId, reviewerName, over
           <div className="mt-3"><DeadlineWordingDefault disabled={working || uncertain || sent} onBusyChange={setPreferenceBusy} /></div>
           {working && <p role="status" className="mt-3 text-sm text-gray-600">Preparing the deadline email…</p>}
           {preview && <section className="mt-4 border-t border-gray-200 pt-4" aria-label="Email preview">
+            <EmailAddressSummary from={addressing?.from} to={addressing?.to} cc={preview.cc} />
             <p className="text-sm font-medium text-gray-900">{preview.subject}</p>
             <p className="mt-1 text-xs text-gray-600">Deadline: {formatDate(preview.effectiveReviewDeadline)} · Calendar update attached</p>
             {preview.cc.length > 0 && <p className="mt-1 break-words text-xs text-gray-600">Cc: {preview.cc.join(', ')}</p>}
@@ -219,16 +223,16 @@ export default function ReviewerDueDateEditor({ suggestionId, reviewerName, over
           {error && <EmailSendFeedback className="mt-4" status={uncertain ? 'uncertain' : 'failed'} message={error} />}
           {sent && <EmailSendFeedback className="mt-4" status="sent" />}
           <div className="mt-5 flex flex-wrap justify-end gap-2">
-            <button type="button" onClick={close} disabled={busy} className="rounded-lg px-3 py-2 text-sm text-gray-700 hover:bg-gray-100 disabled:opacity-50">Close</button>
-            {!template && !locked && <button type="button" onClick={() => showPreview(true)} className="rounded-lg border border-gray-300 px-3 py-2 text-sm">Load email wording</button>}
+            <Button variant="outline" size="sm" type="button" onClick={close} disabled={busy} className="rounded-lg px-3 py-2 text-sm text-gray-700 disabled:opacity-50">Close</Button>
+            {!template && !locked && <Button variant="outline" size="sm" type="button" onClick={() => showPreview(true)} className="rounded-lg border border-gray-300 px-3 py-2 text-sm">Load email wording</Button>}
             {template && !uncertain && !sent && <>
-              <button type="button" disabled={busy || !validDraft} onClick={() => showPreview()} className="rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-800 hover:bg-gray-50 disabled:opacity-50">Preview email</button>
-              {retryProof && <button type="button" disabled={busy} onClick={() => send(true)} className="rounded-lg bg-gray-900 px-4 py-2 text-sm text-white disabled:opacity-50">Retry email</button>}
-              {preview && <button type="button" disabled={busy} onClick={() => send()} className="rounded-lg bg-gray-900 px-4 py-2 text-sm text-white disabled:opacity-50">{operation === 'save' ? 'Save deadline and send' : operation === 'restore' ? 'Restore deadline and send' : 'Send deadline email'}</button>}
+              <Button variant="outline" size="sm" type="button" disabled={busy || !validDraft} onClick={() => showPreview()} className="rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-800 disabled:opacity-50">Preview email</Button>
+              {retryProof && <Button variant="primary" size="sm" type="button" disabled={busy} onClick={() => send(true)} className="rounded-lg px-4 py-2 text-sm disabled:opacity-50">Retry email</Button>}
+              {preview && <Button variant="primary" size="sm" type="button" disabled={busy} onClick={() => send()} className="rounded-lg px-4 py-2 text-sm disabled:opacity-50">{operation === 'save' ? 'Save deadline and send' : operation === 'restore' ? 'Restore deadline and send' : 'Send deadline email'}</Button>}
             </>}
           </div>
         </div>
-      </div>}
+      </div></EmailDialog>}
     </div>
   );
 }

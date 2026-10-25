@@ -54,7 +54,7 @@ async function openDefaults() {
   const details = summary.closest('details');
   details.open = true;
   fireEvent(details, new Event('toggle'));
-  await screen.findByText(/Used to start this email/);
+  await screen.findByLabelText('Default subject');
   return details;
 }
 
@@ -65,7 +65,7 @@ beforeEach(() => {
 afterEach(() => jest.restoreAllMocks());
 
 describe('accepted release dialog', () => {
-  test('saving the sender default re-renders the email but keeps the unsaved note and the original notes baseline', async () => {
+  test('saving the sender default preserves the email, unsaved note, and original notes baseline', async () => {
     routeFetch({
       'POST /api/review-manager/terminal-transition': [
         response({ ok: true, drafts: [acceptedDraft()] }),
@@ -86,10 +86,11 @@ describe('accepted release dialog', () => {
     fireEvent.change(note, { target: { value: 'My unsaved note' } });
 
     const details = await openDefaults();
-    fireEvent.change(within(details).getByLabelText('Subject'), { target: { value: 'PD subject' } });
+    fireEvent.change(within(details).getByLabelText('Default subject'), { target: { value: 'PD subject' } });
     fireEvent.click(within(details).getByRole('button', { name: 'Save as my default' }));
 
-    await waitFor(() => expect(screen.getAllByLabelText('Subject')[0]).toHaveValue('PD subject'));
+    await within(details).findByText('Saved for future emails. The current email is unchanged.');
+    expect(screen.getAllByLabelText('Subject')[0]).toHaveValue('Admin subject');
     expect(window.confirm).not.toHaveBeenCalled();
     expect(note).toHaveValue('My unsaved note');
 
@@ -99,13 +100,13 @@ describe('accepted release dialog', () => {
     expect(payload.internalNotes).toEqual({ [SUGGESTION_ID]: 'My unsaved note' });
     expect(payload.overrides[SUGGESTION_ID]).toMatchObject({
       expectedNotes: 'Existing note',
-      subject: 'PD subject',
-      bodyText: 'PD body',
+      subject: 'Admin subject',
+      bodyText: 'Admin body',
       senderId: PD,
     });
   });
 
-  test('edited email copy is replaced only after confirmation', async () => {
+  test('saving a default preserves edited email copy without replacement confirmation', async () => {
     routeFetch({
       'POST /api/review-manager/terminal-transition': [response({ ok: true, drafts: [acceptedDraft()] })],
       [`GET ${PREFS}`]: [prefsGet(PD)],
@@ -119,7 +120,8 @@ describe('accepted release dialog', () => {
     const details = await openDefaults();
     fireEvent.click(within(details).getByRole('button', { name: 'Save as my default' }));
 
-    await waitFor(() => expect(window.confirm).toHaveBeenCalledWith('Replace your edits to this email with your saved wording?'));
+    await within(details).findByText('Saved for future emails. The current email is unchanged.');
+    expect(window.confirm).not.toHaveBeenCalled();
     expect(screen.getAllByLabelText('Subject')[0]).toHaveValue('My one-off subject');
     const previewCalls = global.fetch.mock.calls.filter(([url]) => String(url).includes('terminal-transition'));
     expect(previewCalls).toHaveLength(1);
@@ -135,7 +137,7 @@ describe('accepted release dialog', () => {
     const details = await openDefaults();
     expect(within(details).getByText(/Saving here changes only your own default/)).toBeInTheDocument();
     fireEvent.click(within(details).getByRole('button', { name: 'Save as my default' }));
-    await within(details).findByText('Saved as your default wording.');
+    await within(details).findByText('Saved for future emails. The current email is unchanged.');
     const previewCalls = global.fetch.mock.calls.filter(([url]) => String(url).includes('terminal-transition'));
     expect(previewCalls).toHaveLength(1);
   });
@@ -170,7 +172,7 @@ describe('pending withdrawal dialog', () => {
     };
   }
 
-  test('after confirmation, saving the sender default replaces every draft and clears one-off edits', async () => {
+  test('saving the sender default preserves every draft and one-off edits', async () => {
     routeFetch({
       'POST /api/review-manager/render-withdraw-emails': [
         response({ ok: true, drafts: [withdrawDraft(SUGGESTION_ID), withdrawDraft(SECOND)] }),
@@ -190,9 +192,11 @@ describe('pending withdrawal dialog', () => {
     const details = await openDefaults();
     fireEvent.click(within(details).getByRole('button', { name: 'Save as my default' }));
 
-    await waitFor(() => expect(screen.getAllByDisplayValue('PD subject')).toHaveLength(2));
-    expect(window.confirm).toHaveBeenCalledWith('Replace your edits to these emails with your saved wording?');
-    expect(screen.queryByDisplayValue('One-off')).not.toBeInTheDocument();
+    await within(details).findByText('Saved for future emails. The current email is unchanged.');
+    expect(window.confirm).not.toHaveBeenCalled();
+    expect(screen.getByDisplayValue('One-off')).toBeInTheDocument();
+    expect(screen.getAllByDisplayValue('Admin subject')).toHaveLength(2);
+    expect(global.fetch.mock.calls.filter(([url]) => String(url).includes('render-withdraw-emails'))).toHaveLength(1);
     const saves = global.fetch.mock.calls.filter(([url, init]) => String(url).startsWith(PREFS) && init?.method === 'PUT');
     expect(saves).toHaveLength(1);
   });
@@ -219,7 +223,7 @@ describe('a slow Save locks the dialog until it settles (Codex build review)', (
     return { promise, resolve };
   }
 
-  test('accepted release: email fields and Release are locked while saving, then the refresh applies', async () => {
+  test('accepted release: email fields and Release are locked while saving, then the current email remains intact', async () => {
     const save = deferred();
     routeFetch({
       'POST /api/review-manager/terminal-transition': [
@@ -242,13 +246,14 @@ describe('a slow Save locks the dialog until it settles (Codex build review)', (
     expect(onRelease).not.toHaveBeenCalled();
 
     save.resolve(response({ ok: true, kind: 'release', template: sharedTemplate }));
-    await waitFor(() => expect(screen.getAllByLabelText('Subject')[0]).toHaveValue('PD subject'));
+    await within(details).findByText('Saved for future emails. The current email is unchanged.');
+    expect(screen.getAllByLabelText('Subject')[0]).toHaveValue('Admin subject');
     expect(screen.getAllByLabelText('Subject')[0]).not.toBeDisabled();
     expect(screen.getByRole('button', { name: 'Release reviewer' })).not.toBeDisabled();
     expect(window.confirm).not.toHaveBeenCalled();
   });
 
-  test('pending withdrawal: drafts and Release are locked while saving, then re-render', async () => {
+  test('pending withdrawal: drafts and Release are locked while saving, then preserve current drafts', async () => {
     const save = deferred();
     routeFetch({
       'POST /api/review-manager/render-withdraw-emails': [
@@ -277,7 +282,9 @@ describe('a slow Save locks the dialog until it settles (Codex build review)', (
     expect(global.fetch.mock.calls.some(([url]) => String(url).includes('withdraw-sufficient'))).toBe(false);
 
     save.resolve(response({ ok: true, kind: 'withdraw', template: sharedTemplate }));
-    expect(await screen.findByDisplayValue('PD subject')).not.toBeDisabled();
+    await within(details).findByText('Saved for future emails. The current email is unchanged.');
+    expect(draftSubject).toHaveValue('Admin subject');
+    expect(draftSubject).not.toBeDisabled();
     expect(screen.getByRole('button', { name: /Release \(1\)/ })).not.toBeDisabled();
   });
 });

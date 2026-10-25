@@ -21,13 +21,14 @@ jest.mock('../../shared/components/reviewers/email-template-store', () => {
   const actual = jest.requireActual('../../shared/components/reviewers/email-template-store');
   return {
     ...actual,
-    loadEmailTemplates: jest.fn(async () => actual.EMPTY_TEMPLATES),
+    loadEmailTemplateState: jest.fn(async () => ({ templates: { invitation: { subject: 'Invitation', body: 'Hello {{externalLink}}' }, materials: { subject: 'S', body: 'B' }, followup: {}, thankyou: {} }, raw: {}, shared: {}, ownStatus: 'absent', sharedAvailable: true })),
+  loadEmailTemplates: jest.fn(async () => actual.EMPTY_TEMPLATES),
     saveEmailTemplates: jest.fn(async () => true),
   };
 });
 
 const { upload } = require('@vercel/blob/client');
-const { saveEmailTemplates } = require('../../shared/components/reviewers/email-template-store');
+
 
 if (typeof global.TextDecoder === 'undefined') {
   global.TextDecoder = NodeTextDecoder;
@@ -404,7 +405,7 @@ describe('send (deferred SSE stream) invalidation', () => {
     expect(onRefresh).not.toHaveBeenCalled();
   });
 
-  test('close/reopen during an in-flight send invalidates it', async () => {
+  test('sending locks Close until the stream completes', async () => {
     const sse = controlledSse();
     renderEmailsBehavior = () => mockJson({ drafts: [draftFor(REVIEWER_A)] });
     sendEmailsBehavior = () => sse.response;
@@ -414,15 +415,13 @@ describe('send (deferred SSE stream) invalidation', () => {
     await send(1);
     await waitFor(() => expect(sendCalls().length).toBe(1));
 
-    // The footer Cancel button is disabled while sending — use the header
-    // close ("×") control, which is not step-gated, to close mid-send.
-    fireEvent.click(screen.getByText('×'));
-    openReleaseModal(1);
+    expect(screen.getByRole('button', { name: 'Close' })).toBeDisabled();
+    fireEvent.click(screen.getByRole('button', { name: 'Close' }));
 
     sse.push(sseChunk('complete', { message: 'done' }));
     sse.finish();
     await act(async () => { await Promise.resolve(); await Promise.resolve(); });
-    expect(screen.getByRole('button', { name: /preview 1 email/i })).toBeTruthy();
+    expect(screen.getAllByRole('button', { name: 'Close' })[0]).toBeEnabled();
   });
 
   test('request switch during an in-flight send invalidates it', async () => {
@@ -560,18 +559,16 @@ describe('load-proposal (deferred) invalidation', () => {
   // fixture.
 });
 
-describe('save-template (deferred) invalidation', () => {
-  test('membership change after clicking Save Template suppresses the late "Saved" feedback', async () => {
-    const first = deferred();
-    saveEmailTemplates.mockImplementationOnce(() => first.promise);
+describe('local-settings feedback invalidation', () => {
+  test('membership change after saving local settings clears the prior feedback', async () => {
+
     renderPanel({ reviewers: [REVIEWER_A, REVIEWER_B] });
     fireEvent.click(checkboxForRow('Accepted A'));
     openReleaseModal(1);
-    fireEvent.click(await screen.findByRole('button', { name: /save template/i }));
+    fireEvent.click(await screen.findByRole('button', { name: /save local email settings/i }));
 
     fireEvent.click(checkboxForRow('Accepted A'));
 
-    first.resolve(true);
     await act(async () => { await Promise.resolve(); await Promise.resolve(); });
     expect(screen.queryByText('Saved ✓')).toBeNull();
   });
@@ -579,10 +576,9 @@ describe('save-template (deferred) invalidation', () => {
   test('unmount clears the pending save-template timer', async () => {
     jest.useFakeTimers();
     try {
-      saveEmailTemplates.mockImplementationOnce(async () => true);
       const { rerender } = renderPanel({ reviewers: [REVIEWER_A] });
       openReleaseModal(1);
-      const saveButton = await screen.findByRole('button', { name: /save template/i });
+      const saveButton = await screen.findByRole('button', { name: /save local email settings/i });
       await act(async () => {
         fireEvent.click(saveButton);
         await Promise.resolve();
@@ -854,7 +850,7 @@ describe('send completion handshake (real parent onRefresh/selection)', () => {
     await act(async () => { await Promise.resolve(); await Promise.resolve(); await Promise.resolve(); });
     await screen.findByText('Sent for delivery.');
 
-    fireEvent.click(screen.getByRole('button', { name: /^close$/i }));
+    fireEvent.click(screen.getAllByRole('button', { name: /^close$/i })[0]);
     openReleaseModal(1);
     expect(screen.getByRole('button', { name: /preview 1 email/i })).toBeTruthy();
     expect(screen.queryByText('Sent for delivery.')).toBeNull();
@@ -1383,4 +1379,25 @@ describe('Stage 6D draft fingerprint (ReleaseMaterialsModal)', () => {
     expect(await screen.findByText(new RegExp(SEND_SKIP_REASON_LABEL.draft_stale.slice(0, 40), 'i')))
       .toBeTruthy();
   });
+});
+
+test('ordinary materials reopen reads future defaults without replacing in-session wording', async () => {
+  const { loadEmailTemplateState } = require('../../shared/components/reviewers/email-template-store');
+  const state = (subject) => ({ templates: { materials: { subject, body: 'Message' } }, raw: {}, shared: {}, ownStatus: 'configured', sharedAvailable: true });
+  loadEmailTemplateState.mockResolvedValueOnce(state('First opening')).mockResolvedValueOnce(state('Future default'));
+  renderPanel({ reviewers: [REVIEWER_A] }); openReleaseModal(1);
+  expect(await screen.findByDisplayValue('First opening')).toBeInTheDocument();
+  fireEvent.change(screen.getByLabelText('Subject'), { target: { value: 'One-send edit' } });
+  expect(screen.getByLabelText('Subject')).toHaveValue('One-send edit');
+  fireEvent.click(screen.getByRole('button', { name: 'Close' })); openReleaseModal(1);
+  expect(await screen.findByDisplayValue('Future default')).toBeInTheDocument();
+});
+
+test('a late initial materials default read cannot overwrite typed one-send edits', async () => {
+  const { loadEmailTemplateState } = require('../../shared/components/reviewers/email-template-store');
+  const pending = deferred(); loadEmailTemplateState.mockImplementationOnce(() => pending.promise);
+  renderPanel({ reviewers: [REVIEWER_A] }); openReleaseModal(1);
+  fireEvent.change(screen.getByLabelText('Subject'), { target: { value: 'Typed before defaults arrived' } });
+  await act(async () => pending.resolve({ templates: { materials: { subject: 'Late default', body: 'Late body' } }, raw: {}, shared: {}, ownStatus: 'configured', sharedAvailable: true }));
+  expect(screen.getByLabelText('Subject')).toHaveValue('Typed before defaults arrived');
 });

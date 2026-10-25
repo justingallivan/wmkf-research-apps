@@ -6,6 +6,7 @@ import ReviewerManagePanel, { ReviewReminderAction } from '../../shared/componen
 jest.mock('@vercel/blob/client', () => ({ upload: jest.fn() }));
 jest.mock('../../shared/components/reviewers/email-template-store', () => ({
   ...jest.requireActual('../../shared/components/reviewers/email-template-store'),
+  loadEmailTemplateState: jest.fn(async () => ({ templates: { invitation: { subject: 'Invitation', body: 'Hello {{externalLink}}' }, materials: { subject: 'S', body: 'B' }, followup: {}, thankyou: {} }, raw: {}, shared: {}, ownStatus: 'absent', sharedAvailable: true })),
   loadEmailTemplates: jest.fn(async () => ({ materials: { subject: 'S', body: 'B' }, followup: {}, thankyou: {} })),
 }));
 jest.mock('../../shared/components/reviewers/ReviewerCloseoutModal', () => function CloseoutStub() { return null; });
