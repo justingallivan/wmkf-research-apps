@@ -60,6 +60,36 @@ The authoritative saved date/calendar remain server-controlled. Review precedes
 save/send, restore and resend; explicit defaults, fallback notices, local retry
 wording/Cc and customizable subjects are specified in that plan. Released; Production subject seed and empty-body sending verified with Dynamics Sent status; limits are in the linked build audit.
 
+## Slice 6 owner decisions — 2026-10-24
+
+[PLANNED; owner agreed; not built.] The pre-discussion agenda defaults plan is
+`docs/plans/PERSONAL_EMAIL_MEETING_AGENDA_DEFAULTS_PLAN_2026-10-24.md`. PCs normally send, with other Meeting Tracker staff permitted
+as backup, using their own mailbox/defaults. Save subject and optional opening
+only; generated agenda details stay server-owned. To/Cc remain one-send edits.
+Use the adopted collapsed **Your default wording** editor with separate raw
+template fields and **Save as my default** / **Clear my default** actions;
+neither changes the open email. Empty saved opening differs from Clear.
+Fallback, session-date placeholders, fresh reopen, session drift and original
+unresolved-send recovery follow the linked plan.
+
+## Email interface consistency review — queued 2026-10-24
+
+- [ ] Have **Impeccable review email interfaces across the app suite for
+  consistency**. Inventory and inspect current rendered compose/defaults/preview/
+  confirmation/recovery interfaces, including reviewer invitations, reminders,
+  release courtesies, deadline updates, grantee invitations/scheduled messages,
+  Meeting Tracker materials/agenda and deliberation distribution. Include
+  relevant Profile Settings and shared Admin wording entry points. Compare
+  labels, placement, control hierarchy, sender/recipient visibility, template
+  versus one-send boundaries, Save/Clear/reset semantics, placeholders, fallback,
+  loading/error/success/uncertain states, accessibility and narrow-screen usability.
+  Start with the adopted **Your default wording** pattern; distinguish justified
+  workflow differences from accidental inconsistency. Produce a source-backed
+  visual audit and prioritized, bounded harmonization plan for owner review.
+  Preserve family-specific permissions, required/generated content and transport
+  safety. This is a queued review, not approval for suite-wide implementation,
+  live sends or DESIGN.md changes; it does not block slice 6.
+
 ## Current evidence and next work
 
 [VERIFIED via source, tests, merge and Production evidence 2026-09-20]

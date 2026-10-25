@@ -1,5 +1,18 @@
 # Session 639 Prompt: Await owner-selected work after Meeting Tracker UI release
 
+## Current selected work — personal email defaults slice 6
+
+[PLANNED; owner decisions agreed 2026-10-24.] Implementation plan:
+`docs/plans/PERSONAL_EMAIL_MEETING_AGENDA_DEFAULTS_PLAN_2026-10-24.md`.
+PCs normally send pre-discussion agendas; other Meeting Tracker staff can cover,
+using their own mailbox/defaults. Scope: personal subject/optional opening;
+generated agenda stays server-owned. Owner adopted the newer collapsed **Your
+default wording** pattern after a read-only agent + Impeccable source review.
+All agreed Save/Clear, empty opening, addressing, fallback, placeholder, reopen,
+drift and unresolved-send decisions are in the plan. No implementation started.
+A separate suite-wide Impeccable email-interface consistency review is queued in
+`docs/plans/PERSONAL_EMAIL_DEFAULTS_TODO_2026-09-20.md`; it does not block slice 6.
+
 ## Current session update — personal email defaults slice 2
 
 [VERIFIED via source, local tests and OAuth Opus review 2026-10-24.] Built on
