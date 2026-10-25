@@ -93,7 +93,9 @@ now specifies exact unresolved-send preservation, open/reset ownership, close-pa
 warnings, retained source-paused drafts and pair-specific status. First Claude
 review is preserved in
 `docs/audits/DISTRIBUTION_DEFAULTS_PLAN_CLAUDE_REVIEW_2026-10-25.md`;
-independent re-review of the revised plan is pending before coding.
+Claude re-review confirmed the original findings addressed; four refinements
+(no-activity proof, concrete navigation guard, stable auth scope and async lanes)
+are incorporated, with a focused final recheck pending before coding.
 No database work, runtime changes or live sends.
 
 ## Existing pre-discussion calendar events — Duncan walkthrough pending 2026-10-25

@@ -115,10 +115,11 @@ explicit owner decisions; the remaining implementation proposals await review.
    Background regeneration, source changes and temporary panel ineligibility
    pause actions and retain edits instead of forcing a discard; §4D specifies
    lifecycle ownership. No silent forced-close exception is adopted.
-7. **An issued send remains unresolved until positively accepted.** Just before
+7. **An issued send remains unresolved until positively resolved.** Just before
    posting Send, record an actor/request-scoped local recovery envelope containing
    the original operation/hash, frozen preview, sender and compose snapshot. Keep
-   it until that same operation returns `transportAccepted === true`. HTTP success
+   it until that same operation returns `transportAccepted === true` or satisfies
+   the exact no-activity proof below. HTTP success
    alone, a Failed label, an error code or absence of a client receipt never
    clears it. There is deliberately **no error-code allowlist** for resetting an
    issued attempt in this slice: stale/identity errors on later retries do not
@@ -129,9 +130,24 @@ explicit owner decisions; the remaining implementation proposals await review.
    it exists. Close hides the recovery view without discarding its frozen state.
    Unsaved default-editor edits still require the discard warning; their discard
    never discards the envelope. Retry uses only the original operation/hash and
-   actor. If exact retry cannot confirm acceptance, show an actionable reconcile-
-   the-original-email notice; do not unlock a new send automatically. This is a
+   actor. If neither exact retry nor the no-activity proof resolves it, show an actionable
+   reconcile-the-original-email notice; do not unlock a new send. This is a
    conservative client policy, not a new transport or recovery API.
+   **No-activity proof:** keep an attempt-local ledger of all issued Send calls.
+   Release an unsent envelope only after every call for it has settled with a
+   complete, structurally valid server response and none ever had a network
+   rejection, abort, unreadable/malformed response, in-progress or unconfirmed
+   outcome. This uncertainty latch is permanent for that envelope. Then fetch
+   history freshly (no browser cache); the exact request/operation row must be
+   present with `transportAccepted === false`, `dynamicsEmailId === null` and
+   `sendRequestedAt === null`, with all three fields explicitly present. Missing
+   row/fields, failed history, a pending call or any earlier uncertainty retains
+   the envelope. This is evidence of no transport because send persists the email
+   ID before send intent/transport; it is not an error-code allowlist. On proof,
+   clear envelope/preview/confirmation, preserve editable wording/recipients and
+   show the relevant refused/stale notice. Allow an explicit new preview, never
+   create one or send automatically. Test first-call stale refusal and
+   regeneration-refusal → later stale refusal; both can recover when proof holds.
    The envelope is memory-only. An intentional page/request departure warns of
    losing local retry state before allowing navigation; after an actual page
    reload/unmount no attempt is automatically rehydrated. Current history may
@@ -204,7 +220,15 @@ explicit owner decisions; the remaining implementation proposals await review.
   agenda editor. Reuse established layout controls, not its optional-body/token
   validator. Prefer local family code over changing every sibling editor.
 - Separate generations/controllers for history, compose initialization and
-  preference editing. Section 4D defines their owner and invalidation rules.
+  preference editing, and **separate prepare, send and link-reissue lanes**.
+  Section 4D defines their owner and invalidation rules. Source/history changes
+  must not abort Send, discard its response or leave its busy flag stuck. Gate
+  send/envelope responses and finally cleanup by exact operation + stable actor
+  scope + send-call token, not the history/source generation. A late accepted
+  receipt resolves its original envelope even after a source change; it cannot
+  rebase the current source's compose or sent flag. Prepare/reissue keep their
+  own source/request generation checks. Test source change during Send, including
+  a history reload, then accepted/error/finally results.
   A profile-context refresh is only a client invalidation signal, never the
   authority for the stored owner.
 - Init must finish or expose an explicit visible fallback before preview. A late
@@ -241,8 +265,15 @@ Do not derive an open solely from component mount or a changed recipients array.
 Inline compatibility mode initializes once per scope; it does not invent repeated
 opens during renders.
 
+**Retention signal.** Panel reports
+`onRetentionChange({ draftDirty, editorDirty, mutationPending, recoveryPending })`
+to `StaffDeliberationsTab`. Parent retains the panel when any flag or `composerOpen`
+is true; initial new-Share eligibility is still checked separately. Reset this
+signal on actual scope teardown, not on background source pause. The navigation
+hook lives inside the retained panel, so no page-level guard registration is needed.
+
 **Keep the same request/actor panel alive.** Replace the artifact-keyed remount
-with a stable request + authenticated actor key. After its first eligible mount,
+with a stable request + confirmed authenticated sender key. After its first eligible mount,
 keep the panel mounted while it has an open/dirty draft, pending preference
 mutation or recovery envelope, even when `showDistributionPanel` becomes false.
 The original condition still controls new-Share eligibility and public record
@@ -254,8 +285,8 @@ and invalidates ordinary preview/confirmation/acknowledgement without discarding
 text or unsaved default-editor edits. This replaces the old remount's freshness
 purpose; test it rather than simply deleting the key. No preparing or new sending
 from a stale source. An issued envelope remains frozen; its exact server retry
-may reconcile an already accepted send, and otherwise remains blocked/unresolved
-under the existing freshness rules. Never rewrite its original source identity.
+may reconcile an already accepted send, and otherwise remains unresolved unless §3.7's complete-response/no-activity proof
+permits an explicit new preview. Never rewrite its original source identity.
 
 **Ordinary reset and dirty baseline.** On an approved ordinary open reset
 `seenSeed`, `autoOwnedRef`, `composerTouchedRef`, preview, confirmed, staleInputs,
@@ -277,24 +308,41 @@ default does not change the current compose baseline.
 | Header/footer Close; outer Escape | Same guarded handler; inline discard confirmation if dirty. While recipient picker is open, its Escape closes only the picker. Busy preference/prepare/send blocks close without showing discard. Escape within discard confirmation means Keep editing. |
 | Issued-send recovery view Close/Resend | Preserve envelope and one-send values; only unsaved future-editor text may require a discard choice. Resend never increments a new attempt or rebases wording. |
 | Regeneration discovered; artifact replaced; eligibility becomes false | Keep draft/editor/envelope mounted. Pause new actions and show why. Offer the same guarded close/discard choice. No reset or silent discard from a status refresh. |
-| User switches tab/request or follows another in-app route | Request-page leave guard runs before unmount. Dirty draft/editor: confirm discard or cancel navigation. Issued envelope: warn that navigation loses local exact-retry state and that the original email must be reconciled; cancel keeps it. Confirmed departure may clear memory, never send or auto-retry. |
+| User switches tab/request or follows another in-app route | Panel-local route guard runs before unmount. Dirty draft/editor: confirm discard or cancel navigation. Issued envelope: warn that navigation loses local exact-retry state and that the original email must be reconciled; cancel keeps it. Confirmed departure may clear memory, never send or auto-retry. |
 | Browser reload/close | Install `beforeunload` only while unsaved edits, an unresolved mutation or envelope needs retention; use browser-provided warning. The browser may suppress it; crashes/forced browser termination have no preservation guarantee. No new storage persistence. |
 | Session expires or authenticated actor changes | Immediately disable actions and invalidate async updates. Do not render old content to the new actor; clear old actor memory. Where the old authorized session is still present, warn before user-triggered departure/logout. External revocation/replacement cannot be vetoed and is not permission to reveal content or retry as the new user. |
 
-`pages/workbench/[requestId].js` owns the app-navigation guard registration from
-the distribution session. Tab selection and router push/replace/back transitions
-must consult the same synchronous leave decision **before** committing navigation,
-including shallow tab changes. Use a single native confirmation for navigation
-(the inline dialog confirmation handles only modal dismissal); cancellation
-preserves route and state, and one confirmed navigation is allowed exactly once
-without a second prompt. Restore prior router hooks and remove listeners on
-cleanup. This is scoped to a live distribution draft, not a suite-wide unsaved-
-changes framework. Verify actual Next router integration in tests before accepting
-this design; don't claim an unmount cleanup can cancel a route already committed.
+**Concrete navigation mechanism.** Add a family-local hook, for example
+`shared/components/workbench/useDistributionUnsavedChanges.js`, using the existing
+`shared/components/board-writeups/useBoardUnsavedChanges.js` as the source-backed
+pattern; do not refactor or import the Board-specific wording into this family.
+Register it in the retained panel while dirty, mutation-pending or recovery-pending.
+It uses `routeChangeStart` to emit `routeChangeError` and throw an error marked
+`cancelled`, `beforePopState` to restore the edited URL/history state on cancelled
+Back, and conditional `beforeunload`. Destination-scoped approval prevents a
+second prompt, then clears on route complete/error. Remove event listeners and
+reset `beforePopState(() => true)` on cleanup; Next exposes no public getter to
+restore a previous callback. Check for competing registrants before implementation.
+Shallow tab pushes must pass through this hook. In request-page `selectTab`, catch
+only the expected `cancelled` rejection; surface unrelated navigation failures.
+Never rely on unmount cleanup to cancel an already committed route.
 
-**Actor identity and mutations.** Read `useSession` and use authenticated
-`status:dynamicsSystemuserId:azureEmail` (email fallback only for client keying) as
-scope, matching the agenda precedent. `pages/api/auth/[...nextauth].js` supplies
+Add a fixture-backed Playwright spec under `tests/e2e/` using the real Pages router
+and mocked auth/data, with no external writes. It must prove: cancelled shallow
+tab click preserves URL/state; cancelled Layout Link does the same; cancelled
+Back restores URL/state; confirmed navigation happens once with one prompt.
+Include dirty-editor, pending-mutation and recovery wording in unit tests.
+Mocked-router Jest tests alone are not browser compatibility evidence. The browser
+spec is a planned implementation gate, not a claim of proof in this document.
+
+**Actor identity and mutations.** Read `useSession`; the stable scope is request ID,
+confirmed Dynamics system-user ID and normalized sending email. **Do not key by
+transient auth status.** Before initial authentication, do not mount editable
+personal content. After first authenticated mount, `loading` pauses/hides sensitive
+UI and disables actions without remounting or dropping the envelope. Resume the
+same mounted scope if the same confirmed sender returns. Real authenticated
+identity/email replacement or unauthenticated status invalidates old memory before
+rendering another actor. Server send still checks the exact stored email and ID. `pages/api/auth/[...nextauth].js` supplies
 the system ID to staff sessions; server session identity still owns every write.
 Use panel-owned preference request/result/dirty state; the dialog editor is a
 view, so a source pause or dialog hide does not cancel the result. A confirmed
@@ -315,7 +363,8 @@ No cross-actor draft stash, session storage or localStorage is introduced.
 | Proposed family service and preference route | Exact-owner GET/Save/Clear and effective raw defaults |
 | `pages/api/user-preferences.js` | Both privacy/validation bypass guards |
 | `PreSiteDistributionPanel.js`, proposed default editor | Panel-owned draft/mutation/recovery state, raw defaults and guarded close |
-| `StaffDeliberationsTab.js`, `pages/workbench/[requestId].js` | Explicit open version, retained paused panel, source refresh and scoped navigation guard |
+| `StaffDeliberationsTab.js` | Explicit open version, retention callback, retained paused panel and source refresh |
+| Proposed family-local navigation hook; `pages/workbench/[requestId].js` | Board-pattern guard inside panel; expected navigation-cancellation catch in `selectTab` only |
 | Focused tests | Contract, identity/isolation, mutations, UI, races and frozen-send compatibility |
 | Route matrix, Atlas, service catalog and personal-default inventory/TODO | Add the new surface only when implemented; no claim that the route exists now |
 
@@ -373,9 +422,9 @@ this proves existing behavior, not planned personal defaults or live delivery.
 | Honest fallback | Absent vs unavailable vs invalid/encrypted/duplicate; partial shared config; valid personal over shared outage; briefing-copy status independent; no fallback writes |
 | Confirmed mutations | Exact readback, create/update errors, lost response, duplicate first-Save race, partial duplicate Clear, repeated Clear, independent post-write read failure; source pause/hide during Save/Clear retains outcome; interrupted actual unmount requires strict read before another write |
 | Future-only actions | Save/Clear/deferred editor loads leave form, recipients, preview/hash and confirmation unchanged; no prepare/link/lock/send callback calls |
-| Lifecycle | Explicit open versions; unchanged suggestions reseed; late autofill does not mark dirty; close/escape/picker/inline confirmation; forced source change retains edits; new artifact history/sent flag refreshes; actual tab/router/back cancel/confirm; one prompt; browser warning cleanup; actor/session invalidation; late success/error/finally |
-| Frozen recovery | For persist_failed, lease_lost, network rejection, in-progress and unknown 5xx: Send → Close → Resend preserves operation/hash/sender/wording; later stale/403 error cannot clear an earlier envelope; only exact transportAccepted clears it; editor discard preserves envelope; intentional departure warns; no auto-rehydration after reload |
-| Content/transport authority | Generated session/link/bundle/expiry survives arbitrary wording; To/Cc one-send; HTML escaping; existing stale-input and transport-acceptance tests remain green |
+| Lifecycle | Explicit open versions; unchanged suggestions reseed; late autofill does not mark dirty; close/escape/picker/inline confirmation; forced source change retains edits; new artifact history/sent flag refreshes; actual tab/router/back cancel/confirm; one prompt; browser warning cleanup; transient auth loading retains scope while real actor change clears it; late success/error/finally |
+| Frozen recovery | For persist_failed, lease_lost, network rejection, in-progress and unknown 5xx: Send → Close → Resend preserves operation/hash/sender/wording; later stale/403 error cannot clear earlier uncertainty; only exact acceptance or complete-response + fresh no-activity proof clears it; prior uncertainty permanently blocks proof; editor discard preserves envelope; intentional departure warns; no auto-rehydration after reload |
+| Content/transport authority | Generated session/link/bundle/expiry survives arbitrary wording; To/Cc one-send; HTML escaping; existing stale-refusal new-preview scenario remains recoverable after added proof history read (extend fixture); accepted-send tests remain green |
 | Desktop interaction | Keyboard disclosure/labels/focus, busy/validation/notices, desktop density plus zoom/narrow regression; preserve existing dialog |
 
 Execution after independent plan review and coding authorization: (1) strict key/service/API + tests; (2) independent
@@ -423,7 +472,7 @@ tests successfully; baseline compatibility is not proof of planned behavior.
 
 | Finding | Resolution specified in this revision (PLANNED) |
 | --- | --- |
-| H1 — exact unresolved-send rule | §3.7 records an issued-operation envelope and retains it until exact transport acceptance; no error-code reset allowlist; ordinary reopen bypassed; explicit tests for persistence/lease/network/unknown errors and later retries |
+| H1 — exact unresolved-send rule | §3.7 retains an issued-operation envelope until exact acceptance or an uncertainty-free fresh no-activity proof; no error-code reset allowlist; ordinary reopen bypassed; explicit tests for persistence/lease/network/unknown errors and later retries |
 | M1 — reopen/reset ownership | §4D names parent open version, complete reset, value-independent recipient reseeding, separate auto-fill and staff dirty baselines, parent/page file surface and tests |
 | M2 — close paths and mutation outcomes | §4D lists all paths, chooses inline modal confirmation, retains drafts during forced source pauses and removes artifact/eligibility teardown of owned state; navigation warns before discard; panel owns mutation outcome |
 | L1 — actor scope | §4D names useSession/client key, verified server session projection and privacy-first invalidation; no retry under another actor |
@@ -435,4 +484,21 @@ warning remains for voluntary discard; same-actor/request background source
 transitions preserve text and pause actions instead. Browser termination and
 external authentication revocation have explicit limits rather than a false
 preservation promise. No database, runtime, release or live action is authorized.
-Independent re-review of this revision is pending.
+
+### Second review and final-recheck target
+
+[VERIFIED via read-only OAuth Claude re-review of `85ad11acf`, plan SHA256
+`1dd0610427ea3ee5ee849e8f3580b3a19503fef055cec84a92e11b9b72f5a89b`.]
+Claude confirmed the six original findings addressed in substance, with owner
+choices intact. It returned READY WITH NAMED CHANGES for four refinements. No
+new tests or live operations were run. Historical full report:
+`docs/audits/DISTRIBUTION_DEFAULTS_PLAN_CLAUDE_REREVIEW_2026-10-25.md`.
+
+| Refinement | Contract in this final-recheck revision (PLANNED) |
+| --- | --- |
+| N1 — avoid trapping provably unsent attempts | §3.7 selects source-backed no-activity proof, not an owner escape: all calls terminal/complete with no uncertainty ever, then fresh exact-row explicit null ID/intent and false acceptance. Stale-refusal baseline fixture gains the proof read; no automatic new send. |
+| N2 — navigation signal/mechanism/proof | §4D names panel retention callback, family-local Board-pattern hook, allow-all cleanup, expected cancellation catch and real-router mocked-data Playwright gate. |
+| N3 — transient auth scope | §4D excludes status from mount key; loading pauses an existing confirmed sender without remount; actual identity replacement clears old private state. |
+| N4 — async request lanes | §4B names history/init/preferences/prepare/send/reissue separately; exact operation/actor/call gates send result and finally; source change cannot cancel or erase it. |
+
+Independent final recheck of these refinements is pending before coding.
