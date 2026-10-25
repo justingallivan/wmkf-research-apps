@@ -3,7 +3,7 @@ title: Personal defaults for deliberation-distribution emails
 domain: workbench
 kind: plan
 status: draft
-summary: "Draft slice 7: own-sender subject/message defaults before the existing frozen distribution preview, with explicit future-only Save/Clear, strict owner isolation and bounded recovery. Owner selected non-empty messages and fresh reopen with discard warning; independent Claude review returned named changes required. No implementation authorized."
+summary: "Draft slice 7: own-sender subject/message defaults before the existing frozen distribution preview, with explicit future-only Save/Clear, strict owner isolation and bounded recovery. Owner selected non-empty messages and fresh reopen with discard warning; revised for Claude findings; independent re-review pending. No implementation authorized."
 owner: product-engineering
 related:
   - docs/plans/PERSONAL_EMAIL_DEFAULTS_TODO_2026-09-20.md
@@ -25,8 +25,8 @@ environment edits or deployments are authorized by this planning task. Claude
 owns separate database work; its checkout and live operations remain untouched.
 The owner confirmed both §3 choices on 2026-10-25: keep non-empty messages
 and reopen with fresh defaults, warning before discarding edits. These are
-planned requirements, not implemented behavior. Independent plan review is
-now completed with named changes required before any coding; see §9.
+planned requirements, not implemented behavior. The first independent review returned named changes. This revision addresses
+them; independent re-review is pending before any coding (see §9).
 
 Source and mocked tests establish the baseline below. Live preference contents,
 duplicate-row prevalence and tenant permissions were not probed. No claim of
@@ -103,27 +103,42 @@ explicit owner decisions; the remaining implementation proposals await review.
    operation ID, stale-input acknowledgement or recovery snapshot. Success
    notices require a confirmed write; a read-after-write failure cannot relabel
    a confirmed write as failed, nor can an uncertain write be reported saved.
-6. **Fresh ordinary reopen (owner-confirmed).** Each ordinary new compose
-   fetches current defaults and reseeds recipient suggestions, clearing prior
-   preview/confirmation/acknowledgement. Before Close/Escape or another local
-   dismissal would discard edited one-send To/Cc/subject/message or unsaved
-   default-editor text, show a discard warning. Cancel keeps the dialog, edits,
-   preview and confirmation unchanged; confirm discards the unsent edits and
-   closes. The next ordinary open loads fresh defaults. Compare edits with the
-   loaded/seeded baseline, not simply whether an input ever received an event;
-   successfully saved editor text is no longer unsaved. Keep this warning out
-   of busy/blocked-close paths. Requirement 7 takes precedence for unresolved
-   sends: dismissing their view does not discard or rebase their recovery state.
-7. **Unresolved sends are an exception to new-compose refresh.** Never rebase
-   locally pending, transport-unconfirmed or in-progress sends onto new defaults.
-   Keep their original sender, wording, recipients, operation and preview hash;
-   retry/reconcile that same attempt through the existing send route. A defaults
-   save/clear cannot convert recovery into a new send. Preserve existing history
-   presentation after full page reload, not an assumed recovery warning: an
-   unconfirmed attempt can currently appear Failed, and Resend after reload
-   starts a new compose. This slice does not promise new recovery persistence
-   or automatic rehydration of historical attempts. Lost prepare responses and
-   broader duplicate-send prevention remain existing residuals.
+6. **Fresh ordinary reopen (owner-confirmed).** A new ordinary open fetches
+   current defaults and reseeds recipients. Close buttons and Escape go through
+   one guarded close handler. Edited To/Cc/subject/message or unsaved default
+   editor text produces an inline discard confirmation within the existing
+   dialog: **Keep editing** / **Discard edits and close**. Cancel or Escape while
+   that confirmation is shown returns to editing, without changing the form,
+   preview or confirmation. Only confirmed discard clears edits. An unchanged
+   draft closes without a warning. Successfully saved default-editor text is no
+   longer unsaved; changed one-send text remains dirty independently.
+   Background regeneration, source changes and temporary panel ineligibility
+   pause actions and retain edits instead of forcing a discard; §4D specifies
+   lifecycle ownership. No silent forced-close exception is adopted.
+7. **An issued send remains unresolved until positively accepted.** Just before
+   posting Send, record an actor/request-scoped local recovery envelope containing
+   the original operation/hash, frozen preview, sender and compose snapshot. Keep
+   it until that same operation returns `transportAccepted === true`. HTTP success
+   alone, a Failed label, an error code or absence of a client receipt never
+   clears it. There is deliberately **no error-code allowlist** for resetting an
+   issued attempt in this slice: stale/identity errors on later retries do not
+   prove an earlier call never transported. `persist_failed`, `lease_lost`, network,
+   unknown 5xx and in-progress outcomes all retain the envelope.
+   Reopen and Resend resume that envelope rather than initialize a new compose;
+   block Create preview/new-operation actions and editable one-send fields while
+   it exists. Close hides the recovery view without discarding its frozen state.
+   Unsaved default-editor edits still require the discard warning; their discard
+   never discards the envelope. Retry uses only the original operation/hash and
+   actor. If exact retry cannot confirm acceptance, show an actionable reconcile-
+   the-original-email notice; do not unlock a new send automatically. This is a
+   conservative client policy, not a new transport or recovery API.
+   The envelope is memory-only. An intentional page/request departure warns of
+   losing local retry state before allowing navigation; after an actual page
+   reload/unmount no attempt is automatically rehydrated. Current history may
+   show an unconfirmed attempt as Failed and offer Resend as a new compose. That
+   pre-existing cross-page duplicate-send gap remains explicit, not solved by
+   personal defaults. Session/actor replacement must never expose the prior
+   actor's envelope to a different user; see §4D.
 8. **Preserve content authority.** User wording remains an introduction. Session
    facts, generated briefing/review-bundle sections, expiry, URLs, current brief,
    snapshot files and hashes stay server-owned and are reviewed in the existing
@@ -178,16 +193,20 @@ explicit owner decisions; the remaining implementation proposals await review.
 - Keep history's shared read/DTO backwards compatible. Move this panel's wording
   initialization to the new own endpoint; eliminate the competing history seed
   so it cannot overwrite personal wording. No preference data added to shared
-  history responses. Resolve `{{requestNumber}}` using current request props;
+  history responses. Replace the existing seven-setting aggregate compose notice
+  with the new pair-specific source/status notice. Omit briefing-copy status from
+  compose in this slice; prepare still reads and freezes all five fields and the
+  exact preview shows their resulting content. Keep history DTO unchanged.
+  Resolve `{{requestNumber}}` using current request props;
   keep raw future templates in separate state.
 - Add a small family editor such as
   `shared/components/workbench/DistributionWordingDefault.js`, patterned on the
   agenda editor. Reuse established layout controls, not its optional-body/token
   validator. Prefer local family code over changing every sibling editor.
 - Separate generations/controllers for history, compose initialization and
-  preference editing. Key personal state by authenticated actor, request, current
-  source artifact and compose generation. A profile-context refresh is only a
-  client invalidation signal, never the authority for the stored owner.
+  preference editing. Section 4D defines their owner and invalidation rules.
+  A profile-context refresh is only a client invalidation signal, never the
+  authority for the stored owner.
 - Init must finish or expose an explicit visible fallback before preview. A late
   load must not overwrite staff edits (including To/Cc edits), newer Save/Clear,
   source/request/actor changes, an already prepared preview or a pending send.
@@ -210,6 +229,82 @@ explicit owner decisions; the remaining implementation proposals await review.
   Regression-test source/session/link freshness and existing sent/unconfirmed
   retry outcomes. Broad freshness/recovery redesign is outside this slice.
 
+### D. Explicit client lifecycle ownership
+
+All changes here are [PLANNED]; existing server/store/send contracts stay intact.
+
+**Owner and open signal.** `StaffDeliberationsTab` owns a monotonically increasing
+`composeOpenVersion`, advanced by every Share/Resend/open action. The panel consumes
+it once, including its first eligible open. Ordinary versions start a fresh draft;
+versions received while a recovery envelope exists only reveal that envelope.
+Do not derive an open solely from component mount or a changed recipients array.
+Inline compatibility mode initializes once per scope; it does not invent repeated
+opens during renders.
+
+**Keep the same request/actor panel alive.** Replace the artifact-keyed remount
+with a stable request + authenticated actor key. After its first eligible mount,
+keep the panel mounted while it has an open/dirty draft, pending preference
+mutation or recovery envelope, even when `showDistributionPanel` becomes false.
+The original condition still controls new-Share eligibility and public record
+cards, not ownership of pending draft state. Replace the parent's unconditional
+regeneration force-close with a `sourceUnavailable`/`sourceChanged` pause signal.
+A source/artifact change explicitly increments the source/history generation,
+reloads source-scoped history, clears the parent's cached current-source sent flag,
+and invalidates ordinary preview/confirmation/acknowledgement without discarding
+text or unsaved default-editor edits. This replaces the old remount's freshness
+purpose; test it rather than simply deleting the key. No preparing or new sending
+from a stale source. An issued envelope remains frozen; its exact server retry
+may reconcile an already accepted send, and otherwise remains blocked/unresolved
+under the existing freshness rules. Never rewrite its original source identity.
+
+**Ordinary reset and dirty baseline.** On an approved ordinary open reset
+`seenSeed`, `autoOwnedRef`, `composerTouchedRef`, preview, confirmed, staleInputs,
+error, notice, sendFeedback, recipient-picker state, editor disclosure/read state
+and all corresponding generations/busy flags. Reapply current To/Cc suggestions
+even when their value did not change. Fetch fresh raw defaults and render the
+subject for this request. Baseline is the loaded wording plus latest auto-filled
+recipient values. A later automatic recipient fill updates only baseline fields
+still auto-owned; it does not make the draft dirty, and it never changes a
+staff-owned field or its baseline. Compare actual current editable values against
+that baseline; returning to the baseline removes dirty state. Track editor dirty
+state separately against the last verified loaded/saved template. Saving a future
+default does not change the current compose baseline.
+
+**Close-path matrix.**
+
+| Path | Required behavior |
+| --- | --- |
+| Header/footer Close; outer Escape | Same guarded handler; inline discard confirmation if dirty. While recipient picker is open, its Escape closes only the picker. Busy preference/prepare/send blocks close without showing discard. Escape within discard confirmation means Keep editing. |
+| Issued-send recovery view Close/Resend | Preserve envelope and one-send values; only unsaved future-editor text may require a discard choice. Resend never increments a new attempt or rebases wording. |
+| Regeneration discovered; artifact replaced; eligibility becomes false | Keep draft/editor/envelope mounted. Pause new actions and show why. Offer the same guarded close/discard choice. No reset or silent discard from a status refresh. |
+| User switches tab/request or follows another in-app route | Request-page leave guard runs before unmount. Dirty draft/editor: confirm discard or cancel navigation. Issued envelope: warn that navigation loses local exact-retry state and that the original email must be reconciled; cancel keeps it. Confirmed departure may clear memory, never send or auto-retry. |
+| Browser reload/close | Install `beforeunload` only while unsaved edits, an unresolved mutation or envelope needs retention; use browser-provided warning. The browser may suppress it; crashes/forced browser termination have no preservation guarantee. No new storage persistence. |
+| Session expires or authenticated actor changes | Immediately disable actions and invalidate async updates. Do not render old content to the new actor; clear old actor memory. Where the old authorized session is still present, warn before user-triggered departure/logout. External revocation/replacement cannot be vetoed and is not permission to reveal content or retry as the new user. |
+
+`pages/workbench/[requestId].js` owns the app-navigation guard registration from
+the distribution session. Tab selection and router push/replace/back transitions
+must consult the same synchronous leave decision **before** committing navigation,
+including shallow tab changes. Use a single native confirmation for navigation
+(the inline dialog confirmation handles only modal dismissal); cancellation
+preserves route and state, and one confirmed navigation is allowed exactly once
+without a second prompt. Restore prior router hooks and remove listeners on
+cleanup. This is scoped to a live distribution draft, not a suite-wide unsaved-
+changes framework. Verify actual Next router integration in tests before accepting
+this design; don't claim an unmount cleanup can cancel a route already committed.
+
+**Actor identity and mutations.** Read `useSession` and use authenticated
+`status:dynamicsSystemuserId:azureEmail` (email fallback only for client keying) as
+scope, matching the agenda precedent. `pages/api/auth/[...nextauth].js` supplies
+the system ID to staff sessions; server session identity still owns every write.
+Use panel-owned preference request/result/dirty state; the dialog editor is a
+view, so a source pause or dialog hide does not cancel the result. A confirmed
+Save/Clear result remains confirmed if a later defaults refresh fails. A request
+that may have committed without a response sets a scoped **Reload to confirm**
+state, disables repeated mutation and forces a strict read before the next edit.
+After any actual owner/request unmount or interrupted mutation, the next editor
+open performs that strict read; it never assumes a previous abort rolled back.
+No cross-actor draft stash, session storage or localStorage is introduced.
+
 ## 5. Expected file surface
 
 [PLANNED; final implementation review may narrow it further.]
@@ -219,7 +314,8 @@ explicit owner decisions; the remaining implementation proposals await review.
 | `shared/config/reviewerFinderPreferences.js`, `deliberationShareEmail.js` | One reserved key; family raw-pair validator |
 | Proposed family service and preference route | Exact-owner GET/Save/Clear and effective raw defaults |
 | `pages/api/user-preferences.js` | Both privacy/validation bypass guards |
-| `PreSiteDistributionPanel.js`, proposed default editor | Separate raw defaults, compose initialization, reopen and async behavior |
+| `PreSiteDistributionPanel.js`, proposed default editor | Panel-owned draft/mutation/recovery state, raw defaults and guarded close |
+| `StaffDeliberationsTab.js`, `pages/workbench/[requestId].js` | Explicit open version, retained paused panel, source refresh and scoped navigation guard |
 | Focused tests | Contract, identity/isolation, mutations, UI, races and frozen-send compatibility |
 | Route matrix, Atlas, service catalog and personal-default inventory/TODO | Add the new surface only when implemented; no claim that the route exists now |
 
@@ -275,10 +371,10 @@ this proves existing behavior, not planned personal defaults or live delivery.
 | Exact sender isolation | A cannot read/change B via query/body, generic endpoint, profile remap, missing identity or wrong app grant; response is not public-cacheable |
 | Reusable raw wording | Raw subject token survives Save/load; request A/B resolve differently; current email text is never reverse-saved; rendered/raw bounds and malformed tokens |
 | Honest fallback | Absent vs unavailable vs invalid/encrypted/duplicate; partial shared config; valid personal over shared outage; briefing-copy status independent; no fallback writes |
-| Confirmed mutations | Exact readback, create/update errors, lost response, duplicate first-Save race, partial duplicate Clear, repeated Clear, independent post-write read failure |
+| Confirmed mutations | Exact readback, create/update errors, lost response, duplicate first-Save race, partial duplicate Clear, repeated Clear, independent post-write read failure; source pause/hide during Save/Clear retains outcome; interrupted actual unmount requires strict read before another write |
 | Future-only actions | Save/Clear/deferred editor loads leave form, recipients, preview/hash and confirmation unchanged; no prepare/link/lock/send callback calls |
-| Lifecycle | Fresh reopen; discard confirm/cancel via Close/Escape; edited recipients/wording/default-editor text; unchanged drafts do not warn; latest defaults, fresh recipients, source/request/actor switches, unmount, late success/error/finally, concurrent lanes |
-| Frozen recovery | Change defaults after prepared/confirmed preview and during unresolved send; original payload/sender/hash retained; exact retry reuses activity; no new default write |
+| Lifecycle | Explicit open versions; unchanged suggestions reseed; late autofill does not mark dirty; close/escape/picker/inline confirmation; forced source change retains edits; new artifact history/sent flag refreshes; actual tab/router/back cancel/confirm; one prompt; browser warning cleanup; actor/session invalidation; late success/error/finally |
+| Frozen recovery | For persist_failed, lease_lost, network rejection, in-progress and unknown 5xx: Send → Close → Resend preserves operation/hash/sender/wording; later stale/403 error cannot clear an earlier envelope; only exact transportAccepted clears it; editor discard preserves envelope; intentional departure warns; no auto-rehydration after reload |
 | Content/transport authority | Generated session/link/bundle/expiry survives arbitrary wording; To/Cc one-send; HTML escaping; existing stale-input and transport-acceptance tests remain green |
 | Desktop interaction | Keyboard disclosure/labels/focus, busy/validation/notices, desktop density plus zoom/narrow regression; preserve existing dialog |
 
@@ -311,50 +407,32 @@ plan and a TODO pointer only. No existing implementation is relabeled shipped.
 | Independent future-default editor | Agenda and shared editor patterns exist | Source examined; no distribution editor/route found in bounded search; no new UI rendered | VERIFIED precedent; UX PLANNED |
 | Refresh ordinary reopen | Parent keeps panel mounted on Close | Parent/panel lifecycle inspected; fresh reopen is owner-confirmed planned behavior, not current behavior | Owner decision recorded; implementation PLANNED |
 
-Verdict: **REVIEWED — NAMED CHANGES REQUIRED BEFORE CODING.** The source
-review and baseline tests support the approach, but the independent review of
-`f3d9a908c` identified the lifecycle gaps in §9. Owner choices remain recorded.
-Live permission proof, visual validation and independent implementation review
-remain future obligations; none are established by this source-only plan review.
+Verdict: **REVISED FOR INDEPENDENT RE-REVIEW — NOT IMPLEMENTATION APPROVAL.**
+Owner choices remain unchanged. Required review findings have concrete proposed
+contracts in §§3–4D and acceptance cases in §7; none are implemented. Live
+permission proof, visual validation and independent implementation review remain
+future obligations.
 
-## 9. Independent Claude review — 2026-10-25
+## 9. Independent review disposition — 2026-10-25
 
-[VERIFIED via read-only OAuth Claude review.] Reviewed HEAD `f3d9a908c`;
-plan SHA256 `144bdf426152e5fa7bc8bd5bd4d267538ee31892d3334ef603cc4b1108bc0e00`.
-Full report: `docs/audits/DISTRIBUTION_DEFAULTS_PLAN_CLAUDE_REVIEW_2026-10-25.md`.
-Verdict: READY WITH NAMED CHANGES, not implementation authorization.
-Claude ran nine existing suites / 345 tests successfully; this proves baseline
-compatibility, not planned functionality. No database operations or other checkout
-changes occurred.
+[VERIFIED via first read-only OAuth Claude review.] Reviewed HEAD `f3d9a908c`;
+original plan SHA256 `144bdf426152e5fa7bc8bd5bd4d267538ee31892d3334ef603cc4b1108bc0e00`.
+Historical full report: `docs/audits/DISTRIBUTION_DEFAULTS_PLAN_CLAUDE_REVIEW_2026-10-25.md`.
+First verdict: READY WITH NAMED CHANGES. Claude ran nine existing suites / 345
+tests successfully; baseline compatibility is not proof of planned behavior.
 
-Required next revision, before coding:
+| Finding | Resolution specified in this revision (PLANNED) |
+| --- | --- |
+| H1 — exact unresolved-send rule | §3.7 records an issued-operation envelope and retains it until exact transport acceptance; no error-code reset allowlist; ordinary reopen bypassed; explicit tests for persistence/lease/network/unknown errors and later retries |
+| M1 — reopen/reset ownership | §4D names parent open version, complete reset, value-independent recipient reseeding, separate auto-fill and staff dirty baselines, parent/page file surface and tests |
+| M2 — close paths and mutation outcomes | §4D lists all paths, chooses inline modal confirmation, retains drafts during forced source pauses and removes artifact/eligibility teardown of owned state; navigation warns before discard; panel owns mutation outcome |
+| L1 — actor scope | §4D names useSession/client key, verified server session projection and privacy-first invalidation; no retry under another actor |
+| L2 — historical recovery limit | §3.7 explicitly retains the existing Failed/Resend-after-reload gap, not an assumed warning or cross-page recovery implementation |
+| L3 — fallback notice source | §4B replaces aggregate compose notice with pair-specific status and omits briefing-only compose status; history DTO and server frozen generated copy remain unchanged |
 
-- **H1 — exact unresolved-send rule.** Some errors labeled failed follow transport
-  acceptance (`distribution_send_persist_failed`). Define explicit local send-issued
-  state and conservative reopen/Resend handling so a failure cannot discard the
-  original operation and create a duplicate. Preserve it unless acceptance or a
-  proven unsent outcome resolves it. Do not copy an error-code allowlist without
-  proving it safe for retries of previously issued attempts as well as first sends.
-- **M1 — reopen/reset ownership.** Specify who detects hidden-to-dialog transitions,
-  the complete form/seed/ownership/status reset and the baseline for late auto-filled
-  recipients. If the parent supplies an open counter, add that file/test surface.
-- **M2 — close paths and mutation outcomes.** Enumerate Close buttons, Escape,
-  forced regeneration close, artifact-key remount and panel unmount. Define a
-  confirmation presentation and preserve or recheck a preference mutation whose
-  result outlives its dialog. An inline confirmation is Claude's recommendation,
-  not a new approved interaction.
-- **L1 — actor scope.** Name the session-derived client actor key and behavior when
-  it changes; never permit a new actor to retry another actor's frozen preview.
-- **L2 — historical recovery limit (wording corrected).** Section 3.7 now
-  states: current unconfirmed history can show Failed and a reload offers Resend
-  as a new compose. Existing presentation is preserved, not proven safe recovery.
-- **L3 — fallback notice source.** Replace the seven-setting aggregate compose
-  notice with pair-specific status; decide whether briefing-only status is an
-  additive history projection or omitted from compose. Avoid falsely claiming
-  built-in wording when the personal pair is actually in use.
-
-Owner decisions remain non-empty messages and fresh ordinary reopen with warning
-before edited drafts are discarded. Claude's suggested silent forced-close discard
-is **not adopted**: resolve how forced lifecycle transitions preserve the warning
-contract or obtain a specific owner decision before making an exception. No coding,
-release or live action follows from this review receipt.
+Silent discard on forced lifecycle transitions is not adopted. The owner-required
+warning remains for voluntary discard; same-actor/request background source
+transitions preserve text and pause actions instead. Browser termination and
+external authentication revocation have explicit limits rather than a false
+preservation promise. No database, runtime, release or live action is authorized.
+Independent re-review of this revision is pending.

@@ -88,11 +88,12 @@ Bounded source review and proposed contract:
 `docs/plans/PERSONAL_EMAIL_DISTRIBUTION_DEFAULTS_PLAN_2026-10-25.md`.
 This covers own-sender subject/message defaults before the existing frozen
 preview. Runtime is unchanged. The owner confirmed non-empty messages and fresh
-ordinary reopen with a warning before discarding edits (2026-10-25). Independent
-Claude plan review returned READY WITH NAMED CHANGES: exact unresolved-send
-classification, reopen/reset ownership, close paths and status/privacy details
-need plan revision before coding. Report:
-`docs/audits/DISTRIBUTION_DEFAULTS_PLAN_CLAUDE_REVIEW_2026-10-25.md`.
+ordinary reopen with a warning before discarding edits (2026-10-25). The plan
+now specifies exact unresolved-send preservation, open/reset ownership, close-path
+warnings, retained source-paused drafts and pair-specific status. First Claude
+review is preserved in
+`docs/audits/DISTRIBUTION_DEFAULTS_PLAN_CLAUDE_REVIEW_2026-10-25.md`;
+independent re-review of the revised plan is pending before coding.
 No database work, runtime changes or live sends.
 
 ## Existing pre-discussion calendar events — Duncan walkthrough pending 2026-10-25
