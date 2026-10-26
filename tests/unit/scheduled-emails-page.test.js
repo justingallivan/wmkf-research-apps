@@ -12,7 +12,8 @@
 import { act, render, screen, fireEvent, waitFor } from '@testing-library/react';
 import ScheduledEmailsPage from '../../pages/scheduled-emails';
 
-const routerReplace = jest.fn();
+jest.mock('../../shared/components/ScheduledGranteeReminderDefaults', () => ({ __esModule: true, default: () => null }));
+const routerReplace = jest.fn(() => Promise.resolve(true));
 jest.mock('next/router', () => ({
   useRouter: () => ({ isReady: true, replace: routerReplace, query: {} }),
 }));

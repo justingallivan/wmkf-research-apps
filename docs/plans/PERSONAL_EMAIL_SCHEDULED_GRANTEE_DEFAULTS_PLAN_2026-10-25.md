@@ -3,7 +3,7 @@ title: Personal defaults for scheduled grantee reminders
 domain: workbench
 kind: plan
 status: active
-summary: "Slice 5 bounded proposal: exact-owner future reminder defaults, creation/handoff integration and independent editor; no runtime implementation or live writes. Owner chose hold-until-repaired for reassignment failures. Revised hold contract addresses N1–N7 and F1–F11; final independent Claude review READY TO IMPLEMENT at 1ece224d3. No coding or release authorization."
+summary: "Slice 5 branch-built, verification and implementation review in progress; not released. Reviewed contract: exact-owner future reminder defaults, creation/handoff integration and independent editor; no runtime implementation or live writes. Owner chose hold-until-repaired for reassignment failures. Revised hold contract addresses N1–N7 and F1–F11; final independent Claude review READY TO IMPLEMENT at 1ece224d3. Owner authorized implementation; no release authorization."
 owner: product-engineering
 related:
   - docs/plans/PERSONAL_EMAIL_DEFAULTS_INVENTORY_2026-09-24.md
@@ -16,7 +16,13 @@ related:
 
 ## 1. Status, ownership and scope
 
-[PLANNED — NOT IMPLEMENTED.] Justin authorized flow review, a bounded plan and
+[BRANCH-BUILT — VERIFICATION/IMPLEMENTATION REVIEW IN PROGRESS; NOT RELEASED.]
+Justin subsequently authorized implementation of this reviewed contract. No live
+preference or business-record writes, environment changes or schema operations
+have occurred. The sections below retain the reviewed acceptance criteria;
+implementation proof is being collected separately.
+
+Justin originally authorized flow review, a bounded plan and
 independent Claude review before coding. Claude reviewed draft `0ba91394d` and
 returned **READY WITH NAMED CHANGES**. Justin then chose **hold reassigned
 reminders until repaired**, not shared-wording fallback. This revision incorporates
@@ -496,7 +502,7 @@ that permits new sending while ownership differs. Source review is not runtime p
 | F11/N3 advisory | Exact brace grammar; same-path shallow exemption applies to route-start and beforePopState/history branches |
 
 The same-path exemption applies to `beforePopState` as well as routeChangeStart;
-a true departure still warns. Historical reports remain verbatim. No application
+a true departure still warns. Historical reports remain verbatim. During plan review, no application
 code, migrations or database/environment state changed. The targeted independent
 final review passed at `1ece224d325a3ba4e0c4c57209ec31880856533d`: **READY TO
 IMPLEMENT**, with no remaining blocking findings. Verbatim receipt:
@@ -510,12 +516,14 @@ the reviewed fingerprint.
 
 [VERIFIED via local mocked baseline tests at the initial draft.] Six current
 suites / 127 tests passed: cron reminders, scheduled routes/page/service/current
-recipients and grantee renderer. No proposed feature tests have been written.
+recipients and grantee renderer. At that planning checkpoint, no proposed feature
+tests had been written. Current implementation proof is in the build receipt.
 No Postgres integration or live data probe was run. Documentation gates and paired
 self-tests, docs catalog and secret scan passed for the revised plan and review
 receipts. These checks concern documentation; they do not test the planned hold.
 
-Next: present the reviewed contract to Justin. Implementation requires the next
-owner instruction; release remains a separate deliberate action. No implementation,
-migration, environment change or live data operation occurred. Claude's other
-checkout and database work remain untouched.
+The owner subsequently authorized implementation. The branch now implements the
+reviewed contract and is undergoing verification and independent implementation
+review. Release remains a separate deliberate action. No migration, environment
+change or live data operation occurred. Claude's other checkout and database work
+remain untouched.

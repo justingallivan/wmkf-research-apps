@@ -185,3 +185,17 @@ describe('Part A guards (shared helper, mirrored by the page)', () => {
     expect(deliverScheduledEmail).not.toHaveBeenCalled();
   });
 });
+
+test('ownership-held retry returns 409 projected row and never sent feedback', async () => {
+  const held = { ...row, status: 'failed', last_error_code: 'scheduled_email_pd_handoff_held' };
+  store.getScheduledEmailForPd.mockResolvedValue(held);
+  deliverScheduledEmail.mockResolvedValue({ held: true, reason: 'pd_handoff_held', message: { id: ID, version: 2, status: 'failed', attentionReason: 'pd_handoff_held' }, error: 'Current PD could not be verified.' });
+  const res = mockRes(); await actionHandler({ method: 'PATCH', query: { id: ID }, body: { action: 'send_now', version: 2 } }, res);
+  expect(deliverScheduledEmail).toHaveBeenCalledWith(ID, { force: true, pdSystemUserId: PD_ID, expectedVersion: 2 });
+  expect(res.statusCode).toBe(409); expect(res.body).toMatchObject({ held: true, reason: 'pd_handoff_held', message: { status: 'failed' } }); expect(res.body.outcome).toBeUndefined();
+});
+test.each(['edit', 'approve'])('ownership hold refuses %s while Stop remains available', async action => {
+  store.getScheduledEmailForPd.mockResolvedValue({ ...row, status: 'failed', last_error_code: 'scheduled_email_pd_handoff_held' });
+  const res = mockRes(); await actionHandler({ method: 'PATCH', query: { id: ID }, body: { action, version: 2, subject: 'a', bodyText: 'long enough message' } }, res);
+  expect(res.statusCode).toBe(409); expect(store.updateScheduledEmailDraft).not.toHaveBeenCalled(); expect(store.approveScheduledEmail).not.toHaveBeenCalled();
+});

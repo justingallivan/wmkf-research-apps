@@ -15,17 +15,21 @@ import { EMAIL_SEND_OUTCOME_COPY } from './email-send-outcome.js';
 
 export const SCHEDULED_EMAIL_ATTENTION = Object.freeze({
   UNCONFIRMED: 'unconfirmed',
+  PD_HANDOFF_HELD: 'pd_handoff_held',
   ACTIVITY_MISSING: 'activity_missing',
   ACTIVITY_FORBIDDEN: 'activity_forbidden',
 });
 
 const CODE_TO_REASON = Object.freeze({
+  scheduled_email_pd_handoff_held: SCHEDULED_EMAIL_ATTENTION.PD_HANDOFF_HELD,
   scheduled_email_send_unconfirmed: SCHEDULED_EMAIL_ATTENTION.UNCONFIRMED,
   scheduled_email_activity_missing: SCHEDULED_EMAIL_ATTENTION.ACTIVITY_MISSING,
   scheduled_email_activity_forbidden: SCHEDULED_EMAIL_ATTENTION.ACTIVITY_FORBIDDEN,
 });
 
 export const SCHEDULED_EMAIL_ATTENTION_COPY = Object.freeze({
+  [SCHEDULED_EMAIL_ATTENTION.PD_HANDOFF_HELD]:
+    'The current PD changed or could not be verified. No new send will occur until ownership is verified. Coordinate with the current PD to repair the request or defaults. A saved old-PD activity needs manual resolution; stopping this message ends automated reminders for this deliverable.',
   // A2: the same words the send-now response uses, so they cannot drift.
   [SCHEDULED_EMAIL_ATTENTION.UNCONFIRMED]:
     `${EMAIL_SEND_OUTCOME_COPY.uncertain.title} ${EMAIL_SEND_OUTCOME_COPY.uncertain.message}`,
@@ -55,7 +59,7 @@ export function scheduledEmailAttentionReason(row) {
   return CODE_TO_REASON[errorCode(row)] || null;
 }
 
-/** Row-level actions a PD may still take: only Stop remains on attention rows. */
+/** Transport attention is Stop-only. Ownership holds permit explicit, freshly guarded Retry send. */
 export function scheduledEmailActionsAllowed(row) {
   const reason = scheduledEmailAttentionReason(row);
   const hasActivity = Boolean(row?.dynamics_email_id ?? row?.hasActivity);
@@ -67,7 +71,7 @@ export function scheduledEmailActionsAllowed(row) {
     // A4: no edits or approval once the Dynamics activity exists.
     edit: openStatus && !reason && !hasActivity && !sendRequested,
     approve: openStatus && !reason && !hasActivity && !sendRequested,
-    sendNow: openStatus && !reason && !sendRequested,
+    sendNow: openStatus && (!reason || reason === SCHEDULED_EMAIL_ATTENTION.PD_HANDOFF_HELD) && !sendRequested,
     stop: openStatus,
   };
 }

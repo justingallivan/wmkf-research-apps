@@ -17,7 +17,11 @@ related:
 
 ## Current source status (checked 2026-10-22)
 
-The grantee abstract reminder workflow is shipped. Before an ordinary send,
+The grantee abstract reminder baseline workflow is shipped. A separate slice 5
+branch extension (2026-10-25, not deployed) adds personal wording at creation/handoff,
+current-PD delivery holds and lower-priority due rechecks for held rows; see
+`docs/plans/PERSONAL_EMAIL_SCHEDULED_GRANTEE_DEFAULTS_PLAN_2026-10-25.md`.
+The following describes the deployed baseline, not that branch extension. Before an ordinary send,
 `scheduled-email-service.js` re-reads the current Liaison and the assigned PD's
 review-all/VIP posture for a transport-pristine row. Recipient drift can
 re-address the row and recomputes posture for the new recipients in either

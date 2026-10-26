@@ -122,6 +122,7 @@ describeIf('scheduled email engine Parts A and B (live Postgres, migrations 036 
   function deps(overrides = {}) {
     return {
       getMessage: store.getScheduledEmail,
+      readCurrentPd: jest.fn(async message => message.pd_systemuser_id),
       claimSend: store.claimScheduledEmailSend,
       recordEmailActivity: store.recordScheduledEmailActivity,
       recordSendRequested: store.recordScheduledEmailSendRequested,
@@ -320,16 +321,19 @@ describeIf('scheduled email engine Parts A and B (live Postgres, migrations 036 
     expect(dSend.createEmailActivity).not.toHaveBeenCalled();
   });
 
-  test('A3 parity: the ordinary and reconciliation SQL agree with scheduledEmailAttentionReason on every code', async () => {
+  test('A3 parity: transport attention is excluded from due; ownership holds remain due-eligible, outside reconciliation', async () => {
     const unconfirmed = await seed({ set: { status: 'failed', dynamics_email_id: ACTIVITY, send_requested_at: new Date(), last_error_code: UNCONFIRMED } });
     const missing = await seed({ set: { status: 'failed', dynamics_email_id: ACTIVITY, last_error_code: MISSING } });
     const forbidden = await seed({ set: { status: 'failed', dynamics_email_id: ACTIVITY, last_error_code: FORBIDDEN } });
     const ordinaryFailed = await seed({ set: { status: 'failed', last_error_code: 'scheduled_email_send_failed' } });
     const ordinary = await seed();
+    const ownershipHeld = await seed({ set: { status: 'failed', last_error_code: 'scheduled_email_pd_handoff_held' } });
     const due = (await store.listDueScheduledEmails()).map((r) => r.id).sort();
-    expect(due).toEqual([ordinaryFailed.id, ordinary.id].sort());
+    expect(due).toEqual([ordinaryFailed.id, ordinary.id, ownershipHeld.id].sort());
+    expect(attention.scheduledEmailAttentionReason(ownershipHeld)).toBe('pd_handoff_held');
     const reconcile = (await store.listScheduledEmailReconciliationCandidates()).map((r) => r.id).sort();
     expect(reconcile).toEqual([unconfirmed.id, forbidden.id].sort());
+    expect(reconcile).not.toContain(ownershipHeld.id);
     for (const r of [unconfirmed, missing, forbidden]) {
       expect(attention.scheduledEmailAttentionReason(r)).not.toBeNull();
       expect(due).not.toContain(r.id);
@@ -674,4 +678,50 @@ describeIf('scheduled email engine Parts A and B (live Postgres, migrations 036 
     expect(after).toMatchObject({ status: 'sent', recipient_generation: 0 });
     expect(after.cc_recipients).toEqual(['liaison@example.edu']);
   });
+  test('ownership holds cannot displace ordinary NULL-code due mail even with 101 older holds', async () => {
+    for (let i = 0; i < 101; i++) await seed({ set: { status: 'failed', last_error_code: 'scheduled_email_pd_handoff_held' } });
+    const ordinary = await seed({ scheduledSendAt: '2026-02-01T00:00:00Z' });
+    const due = await store.listDueScheduledEmails();
+    expect(due).toHaveLength(100); expect(due[0].id).toBe(ordinary.id); expect(due[0].last_error_code).toBeNull();
+  });
+
+  test('actual due old-PD row is held without mutation of content/approval/generation; repair rebuilds once and preserves schedule', async () => {
+    const row = await seed({ set: { approved_at: new Date(), edited_at: new Date(), recipient_generation: 2 } });
+    const d = deps({ readCurrentPd: jest.fn(async () => PD_B) });
+    expect((await service.deliverScheduledEmail(row.id, {}, d)).held).toBe(true);
+    const held = await read(row.id);
+    for (const key of ['subject','body_text','signature_text','to_recipients','cc_recipients','approved_at','edited_at','recipient_generation','scheduled_send_at']) expect(held[key]).toEqual(row[key]);
+    expect(held.last_error_code).toBe('scheduled_email_pd_handoff_held'); expect(held.locked_until).toBeNull();
+    expect(d.readCurrentRecipients).not.toHaveBeenCalled(); expect(d.sendEmail).not.toHaveBeenCalled(); expect(d.mintForRequest).not.toHaveBeenCalled();
+    const repair = await store.reassignScheduledEmail({ workflowType: row.workflow_type, sourceRecordId: row.source_record_id, expectedVersion: held.version, pdSystemUserId: PD_B, pdName: 'New PD', pdEmail: 'new@example.org', toRecipients: ['pi@example.edu'], recipientContactIds: [], recipientName: 'PI', subject: 'New PD default', bodyText: 'New raw default rendered for this grant.', signatureText: 'New PD signature', approvalRequired: true });
+    expect(repair).toMatchObject({ subject: 'New PD default', pd_systemuser_id: PD_B, approved_at: null, edited_at: null, recipient_generation: 3, last_error_code: null });
+    expect(repair.scheduled_send_at).toEqual(row.scheduled_send_at); expect(await store.claimScheduledEmailSend(row.id)).toBeNull();
+    const manual = deps({ readCurrentPd: jest.fn(async () => PD_B) });
+    expect((await service.deliverScheduledEmail(row.id, { force: true, pdSystemUserId: PD_B, expectedVersion: repair.version }, manual)).sent).toBe(true);
+    expect(manual.createEmailActivity.mock.calls[0][0]).toMatchObject({ subject: 'New PD default', from: 'new@example.org' });
+    expect(manual.createEmailActivity.mock.calls[0][0].body).toContain('New raw default rendered');
+  });
+
+  test('repeat create with changed defaults never rewrites row edits or approval', async () => {
+    const row = await seed({ set: { subject: 'One-message edit', body_text: 'Retained row edit', approved_at: new Date() } });
+    await store.createOrGetScheduledEmail({ id: crypto.randomUUID(), workflowType: row.workflow_type, sourceRecordId: row.source_record_id, requestId: row.request_id, deliverableId: row.deliverable_id, pdSystemUserId: PD_A, pdName: 'PD', pdEmail: 'pd@example.org', toRecipients: ['new@example.edu'], recipientName: 'New name', subject: 'Changed reusable default', bodyText: 'Changed future default', signatureText: 'Different signature', scheduledSendAt: '2099-01-01', approvalRequired: false });
+    expect(await read(row.id)).toEqual(row);
+  });
+
+  test('competing real connections freeze one complete template and one source row', async () => {
+    const alternate = new Client({ connectionString: TEST_URL }); await alternate.connect(); await alternate.query(`SET search_path TO ${schema}`);
+    const primary = mockPg.client;
+    const input = { workflowType: 'grantee_abstract_reminder', sourceRecordId: crypto.randomUUID(), requestId: crypto.randomUUID(), deliverableId: crypto.randomUUID(), pdSystemUserId: PD_A, pdName: 'PD', pdEmail: 'pd@example.org', toRecipients: ['pi@example.org'], recipientName: 'PI', signatureText: 'Signature', scheduledSendAt: '2026-01-01' };
+    try {
+      const first = store.createOrGetScheduledEmail({ ...input, id: crypto.randomUUID(), subject: 'A subject', bodyText: 'A body' });
+      mockPg.client = alternate;
+      const second = store.createOrGetScheduledEmail({ ...input, id: crypto.randomUUID(), subject: 'B subject', bodyText: 'B body' });
+      mockPg.client = primary;
+      await Promise.all([first, second]);
+      const result = await primary.query('SELECT * FROM scheduled_email_messages WHERE source_record_id=$1', [input.sourceRecordId]);
+      expect(result.rows).toHaveLength(1); const winner = result.rows[0];
+      expect([[ 'A subject', 'A body' ], [ 'B subject', 'B body' ]]).toContainEqual([winner.subject, winner.body_text]);
+    } finally { mockPg.client = primary; await alternate.end(); }
+  });
+
 });

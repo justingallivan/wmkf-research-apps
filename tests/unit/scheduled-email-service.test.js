@@ -44,6 +44,7 @@ function dependencies(base = message()) {
   const finalized = { ...sent, finalized_at: '2026-08-25T00:00:02.000Z' };
   return {
     claimSend: jest.fn(async () => claimed),
+    readCurrentPd: jest.fn(async () => base.pd_systemuser_id),
     // Part B default: the current Liaison and posture match the row (no drift).
     readCurrentRecipients: jest.fn(async (row) => ({
       piContactId: '11111111-1111-4111-8111-111111111111',
@@ -736,5 +737,92 @@ describe('Part B: send-time recipient and posture re-check', () => {
     expect(result).toMatchObject({ sent: true, savedActivityNotReaddressed: true });
     expect(warn.mock.calls.some(([, payload]) => String(payload).includes('scheduled_email_saved_activity_not_readdressed'))).toBe(true);
     warn.mockRestore();
+  });
+});
+
+// Personal-default handoff safety: exercise real delivery with a due former-PD
+// message, actual drift fixtures, and mocked transport (never a live send).
+describe('current PD hold', () => {
+  const OTHER_PD = '99999999-9999-4999-8999-999999999999';
+  const HELD = 'scheduled_email_pd_handoff_held';
+  const prepare = (base = message()) => {
+    const deps = dependencies(base);
+    deps.readCurrentPd.mockResolvedValue(OTHER_PD);
+    deps.recordFailure.mockImplementation(async (row, error, code) => ({ ...row, status: 'failed', last_error_code: code, last_error_message: error.message, lease_token: null }));
+    return deps;
+  };
+  test.each([false, true])('mismatch prevents new send, mint, activity and Part B writes (force=%s)', async force => {
+    const base = message({ approved_at: 'approved', recipient_generation: 4 });
+    const deps = prepare(base);
+    deps.readCurrentRecipients.mockResolvedValue({ liaison: { contactId: 'changed', email: 'new@example.edu' }, approvalRequiredNow: true });
+    const outcome = await deliverScheduledEmail(base.id, { force, pdSystemUserId: base.pd_systemuser_id, expectedVersion: base.version }, deps);
+    expect(outcome).toMatchObject({ held: true, reason: 'pd_handoff_held', message: { status: 'failed', attentionReason: 'pd_handoff_held', subject: base.subject, recipientGeneration: 4, approvedAt: 'approved', ccRecipients: base.cc_recipients } });
+    expect(deps.readCurrentRecipients).not.toHaveBeenCalled(); expect(deps.reconcileRecipients).not.toHaveBeenCalled();
+    expect(deps.mintForRequest).not.toHaveBeenCalled(); expect(deps.createEmailActivity).not.toHaveBeenCalled(); expect(deps.sendEmail).not.toHaveBeenCalled(); expect(deps.recordSendRequested).not.toHaveBeenCalled();
+    expect(deps.recordFailure.mock.calls[0][2]).toBe(HELD);
+  });
+  test.each([null, undefined, 'bad'])('unknown/invalid current PD %s holds', async current => {
+    const deps = prepare(); deps.readCurrentPd.mockResolvedValue(current);
+    expect((await deliverScheduledEmail(message().id, {}, deps)).held).toBe(true); expect(deps.sendEmail).not.toHaveBeenCalled();
+  });
+  test('PD read failure holds with neutral copy; mixed case identity succeeds', async () => {
+    const deps = prepare(); deps.readCurrentPd.mockRejectedValue(new Error('tenant unavailable'));
+    expect((await deliverScheduledEmail(message().id, {}, deps)).held).toBe(true);
+    expect(deps.sendEmail).not.toHaveBeenCalled();
+    const matching = dependencies(); matching.readCurrentPd.mockResolvedValue(message().pd_systemuser_id.toUpperCase());
+    expect((await deliverScheduledEmail(message().id, {}, matching)).sent).toBe(true);
+    expect(matching.readCurrentPd).toHaveBeenCalledTimes(2);
+  });
+  test('change during activity awaits holds a persisted activity before intent; next step needs manual recovery', async () => {
+    const deps = prepare(); deps.readCurrentPd.mockResolvedValueOnce(message().pd_systemuser_id).mockResolvedValueOnce(OTHER_PD);
+    const outcome = await deliverScheduledEmail(message().id, {}, deps);
+    expect(outcome.held).toBe(true); expect(outcome.message.hasActivity).toBe(true);
+    expect(deps.createEmailActivity).toHaveBeenCalledTimes(1); expect(deps.recordEmailActivity).toHaveBeenCalledTimes(1);
+    expect(deps.recordSendRequested).not.toHaveBeenCalled(); expect(deps.sendEmail).not.toHaveBeenCalled();
+  });
+  test('change during recipient reconciliation is caught before intent even if an activity was created', async () => {
+    const deps = prepare(); let owner = message().pd_systemuser_id;
+    deps.readCurrentPd.mockImplementation(async () => owner);
+    deps.readCurrentRecipients.mockImplementation(async () => { owner = OTHER_PD; return { piContactId: message().recipient_contact_ids[0], liaison: { contactId: message().recipient_contact_ids[1], email: message().cc_recipients[0] }, approvalRequiredNow: false }; });
+    expect((await deliverScheduledEmail(message().id, {}, deps)).held).toBe(true); expect(deps.sendEmail).not.toHaveBeenCalled();
+  });
+  test('unaccepted correlation orphan stays unattached so generation-bumped handoff remains possible', async () => {
+    const deps = prepare(); deps.findEmailByCorrelation.mockResolvedValue([{ activityid: 'orphan', statuscode: 1 }]);
+    const out = await deliverScheduledEmail(message().id, {}, deps);
+    expect(out.message.hasActivity).toBe(false); expect(deps.recordEmailActivity).not.toHaveBeenCalled(); expect(deps.sendEmail).not.toHaveBeenCalled();
+  });
+  test.each(['stored', 'correlation'])('proven accepted %s activity is receipted/finalized without sending', async kind => {
+    const base = message(kind === 'stored' ? { dynamics_email_id: 'ffffffff-ffff-4fff-8fff-ffffffffffff' } : {});
+    const deps = prepare(base);
+    const activity = { activityid: 'ffffffff-ffff-4fff-8fff-ffffffffffff', statuscode: 7 };
+    deps.getEmailActivity.mockResolvedValue(activity); deps.findEmailByCorrelation.mockResolvedValue([activity]);
+    expect((await deliverScheduledEmail(base.id, {}, deps)).sent).toBe(true);
+    expect(deps.recordSent).toHaveBeenCalled(); expect(deps.updateDeliverable).toHaveBeenCalled(); expect(deps.sendEmail).not.toHaveBeenCalled(); expect(deps.createEmailActivity).not.toHaveBeenCalled();
+    expect(deps.recordEmailActivity).toHaveBeenCalledTimes(kind === 'correlation' ? 1 : 0);
+  });
+  test.each([[404, 'scheduled_email_activity_missing'], [403, 'scheduled_email_activity_forbidden']])('stored activity %s preserves transport classification', async (status, code) => {
+    const base = message({ dynamics_email_id: 'ffffffff-ffff-4fff-8fff-ffffffffffff' }), deps = prepare(base);
+    deps.getEmailActivity.mockRejectedValue(Object.assign(new Error('read failed'), { status }));
+    await expect(deliverScheduledEmail(base.id, {}, deps)).rejects.toMatchObject({ code });
+    expect(deps.recordFailure.mock.calls[0][2]).toBe(code); expect(deps.sendEmail).not.toHaveBeenCalled();
+  });
+  test('ambiguous correlation lookup holds without claiming acceptance', async () => {
+    const deps = prepare(); deps.findEmailByCorrelation.mockRejectedValue(new Error('offline'));
+    expect((await deliverScheduledEmail(message().id, {}, deps)).held).toBe(true); expect(deps.recordSent).not.toHaveBeenCalled(); expect(deps.sendEmail).not.toHaveBeenCalled();
+  });
+  test.each(['throw', 'null'])('hold persistence %s never reports success; catch keeps held reason', async kind => {
+    const deps = prepare(); if (kind === 'throw') deps.recordFailure.mockRejectedValue(new Error('db unavailable')); else deps.recordFailure.mockResolvedValue(null);
+    await expect(deliverScheduledEmail(message().id, {}, deps)).rejects.toMatchObject({ code: HELD });
+    expect(deps.recordFailure).toHaveBeenCalledTimes(2); expect(deps.recordFailure.mock.calls.every(call => call[2] === HELD)).toBe(true); expect(deps.sendEmail).not.toHaveBeenCalled();
+  });
+  test('a refused claim (intent/lease/version) does not perform an ownership read or send', async () => {
+    const deps = prepare(); deps.claimSend.mockResolvedValue(null);
+    expect(await deliverScheduledEmail(message().id, {}, deps)).toEqual({ skipped: true }); expect(deps.readCurrentPd).not.toHaveBeenCalled(); expect(deps.sendEmail).not.toHaveBeenCalled();
+  });
+  test('documented cross-system race after the final read cannot be made atomic by this guard', async () => {
+    const deps = dependencies(); let reads = 0, current = message().pd_systemuser_id;
+    deps.readCurrentPd.mockImplementation(async () => { reads++; return current; });
+    deps.recordSendRequested.mockImplementation(async row => { current = OTHER_PD; return { ...row, send_requested_at: 'intent' }; });
+    expect((await deliverScheduledEmail(message().id, {}, deps)).sent).toBe(true); expect(reads).toBe(2); expect(deps.sendEmail).toHaveBeenCalledTimes(1);
   });
 });
