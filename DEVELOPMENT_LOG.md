@@ -10,6 +10,17 @@ The chronological archive after the `Legacy chronological session log` divider c
 
 ---
 
+## October 2026 — Research request file corpus index built and loaded (Session 642, Claude)
+
+**Milestone:** A derived Postgres index of every SharePoint file on Research requests with meeting years 2018–2026, labelled by document type.
+**Sessions:** Session 642 (Claude, concurrent with Codex); owner decisions, content pilots, two Codex reviews plus a final review, owner-run Production loads.
+**Ship state:**
+- Migration 090 tables; strict listing across `Request` and `RequestArchive1`–`3`; filename rules plus template signatures; owner-run loader with resume.
+- Run `5631c55d-1b92-498f-9e93-e625dd1bfd16`: 3,853 requests, 38,399 files, 1 data error (992853). No route reads it; admin use only.
+- 1990–2017 parked (proposals likely on microfiche); text extraction, model pass and browsing surface await approval.
+**Why it matters:** first complete, queryable map of what documents exist per request, the base for corpus analyses.
+**Pointers:** `docs/plans/RESEARCH_REQUEST_FILE_CORPUS_PLAN_2026-10-25.md`; `docs/plans/RESEARCH_REQUEST_FILE_CORPUS_INDEX_BUILD_PLAN_2026-10-25.md`; `docs/atlas/postgres-request-corpus.md`; `460e4476a`, `56a692dfe`.
+
 ## October 2026 — Personal email defaults and reviewer recovery released (Session 642)
 
 **Milestone:** Released four personal email-default families and concurrent reviewer exclusion recovery while calendar/J27 decisions awaited colleagues.

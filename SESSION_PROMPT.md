@@ -53,6 +53,46 @@ rather than selecting another small reliability task. No new implementation is q
   `git show ed6d91630:SESSION_PROMPT.md` (verified). Older context remains at
   `git show efb633f9c:SESSION_PROMPT.md`; historical checkout paths are not authority.
 
+## Concurrent Claude session (S642, same days): Research request file corpus
+
+[VERIFIED via commits on main and owner-run output pasted into the session,
+2026-10-25–26.] Codex's handoff above is the primary prompt; this section is
+the Claude corpus workstream's resume boundary.
+
+- **Index built, merged and loaded.** Migration 090 (`request_corpus_runs`,
+  `request_corpus_requests`, `request_corpus_files`) applied from the branch
+  2026-10-25; branch `claude/request-corpus-index` merged `460e4476a` after a
+  final Codex review (fixes `56a692dfe`: the loader now needs
+  `POSTGRES_URL_NON_POOLING` for its session advisory lock; a rejected
+  `--resume` no longer touches the run). Full owner-run load, run
+  `5631c55d-1b92-498f-9e93-e625dd1bfd16`: **3,853 Research requests (meeting
+  years 2018–2026), 38,399 files, 1 error** (request 992853: a Dynamics pointer
+  to a missing `RequestArchive3` folder; passed to Connor). Record: build plan
+  "First Production load"; Atlas `docs/atlas/postgres-request-corpus.md`.
+- **Owner decisions this session** (recorded in the parent plan
+  `docs/plans/RESEARCH_REQUEST_FILE_CORPUS_PLAN_2026-10-25.md`): corpus starts
+  at meeting year 2018 (1990–2017 parked; proposals believed on microfiche);
+  pre-1990/no-date history gaps tabled; no per-request visibility rule (admin
+  exercise); request 1001931 flagged test (`156074df1`).
+- **Connor (SharePoint libraries):** four libraries (`Request` = Graph
+  `akoya_request`, `RequestArchive1`–`3`); the loader already lists all. He
+  removed 994366's stray pointer. `scripts/report-request-file-multi-library.mjs`
+  (`1a908ba6e`, offline over the 2026-10-25 inventory CSVs) found 36 requests
+  (2018–2021) with the application in `RequestArchive3` and later reports in
+  `Request`; CSV in the owner's Shuttle folder for Connor.
+- **Next (each needs owner approval):** step 4 text extraction for Read-priority
+  files; an optional model pass for undecided files; the admin-only browsing
+  surface. After Connor fixes 992853, resume the same run id to list it.
+- **Constraints:** Production reads (Dataverse and Postgres) are owner-run with
+  `!` — the auto-mode classifier blocks the agent, correctly. Inventory/pilot
+  CSVs name people and stay in the OneDrive Shuttle folder, never the repo.
+  `lib/utils/file-loader.js` `.doc` branch sends binary Word to mammoth
+  (noted, not fixed, out of scope).
+- **Git:** at /start the agent reset local main to origin; the two local-only
+  drafts it held are preserved on the unpushed branch
+  `backup/local-main-slice2-plan-drafts-2026-10-25` — keep it, delete nothing.
+  `claude/request-corpus-index` is merged and retained.
+
 ## Next Items
 
 ### Owner Decision Needed
@@ -98,7 +138,7 @@ rather than selecting another small reliability task. No new implementation is q
 | Exclusion recovery | Released; F2 in `docs/plans/REVIEWER_SEARCH_FOLLOW_UPS_2026-09-18.md` |
 | Duncan calendar workflow | Owner + Duncan walkthrough first; personal-email TODO checklist |
 | J27 / overlapping cycles | Await answers; alignment log, rollover plan and `docs/J27_TRANSITION_REGISTER.md` |
-| Claude corpus/database work | Claude-owned; `docs/plans/RESEARCH_REQUEST_FILE_CORPUS_INDEX_BUILD_PLAN_2026-10-25.md`; inspect its current committed state, never assume permission for DB operations |
+| Research request file corpus | Claude-owned; index merged and loaded 2026-10-26 (section above); next steps need owner approval; DB operations are owner-run |
 
 ## Verification and Closeout
 
