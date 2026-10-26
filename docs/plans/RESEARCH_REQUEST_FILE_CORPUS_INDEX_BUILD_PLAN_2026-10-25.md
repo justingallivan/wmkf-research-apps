@@ -3,7 +3,7 @@ title: Research request file corpus — index build (rollout step 3)
 kind: plan
 domain: dataverse
 status: active
-summary: "Approved: build the metadata index of SharePoint files for Research requests with a meeting year from 2018, in Postgres, from a fresh strict listing, classified by the filename rules; no text, no route, no model. Visibility decided (no per-request rule; admin exercise). Migration 090 free as of 2026-10-25. Owner-run local loader decided. Built on a branch; migration 090 applied from the branch; first full load run 2026-10-26 (3,852 requests, 38,340 files, 2 known errors); merged to main 2026-10-26 (460e4476a)."
+summary: "Approved: build the metadata index of SharePoint files for Research requests with a meeting year from 2018, in Postgres, from a fresh strict listing, classified by the filename rules; no text, no route, no model. Visibility decided (no per-request rule; admin exercise). Migration 090 free as of 2026-10-25. Owner-run local loader decided. Built on a branch; migration 090 applied from the branch; first full load run 2026-10-26 (3,853 requests, 38,399 files, 1 known error); merged to main 2026-10-26 (460e4476a)."
 owner: product-engineering
 related:
   - docs/plans/RESEARCH_REQUEST_FILE_CORPUS_PLAN_2026-10-25.md
@@ -159,11 +159,22 @@ whole-run summary, which `finishRun` recomputes from stored rows].
   (`filename-rules:bf050083cdd6`), about 85 minutes: 3,841 listed, 38,315
   files, 13 errors. Eleven were transient Dataverse timeouts among 2018–2019
   requests; one `--resume` of the same run retried them.
-- Whole run after the resume: **3,852 requests listed, 38,340 files, 2
+- Whole run after the first resume: **3,852 requests listed, 38,340 files, 2
   errors** — the two expected inventory errors: request 992853 (its
   `RequestArchive3` folder returns 404) and request 994366 (its document
   location points at request 1001703's library, which the Graph allowlist
   refuses). Both are Dynamics/SharePoint data problems, not loader faults.
+- 2026-10-26, after the owner's colleague removed request 994366's stray third
+  document location (a pointer into another request's folder) in Dynamics and
+  SharePoint, a second `--resume` listed it: whole run **3,853 requests, 38,399
+  files, 1 error** (request 992853 only). The colleague confirmed that request
+  documents live in four libraries (`Request`, shown in Graph as
+  `akoya_request`, and `RequestArchive1`–`3`), and that some requests active
+  at the GMS migration still have two pointers, one to `Request` and one to an
+  archive; the loader already lists every Dynamics pointer plus each archive's
+  standard folder, so both locations are covered. Request 992853's error is a
+  Dynamics pointer to a `RequestArchive3` folder that does not exist
+  [ASSUMED to be one of those leftover pointers].
 - The full load connected through the pooled `POSTGRES_URL`; only one loader
   ran at a time, so the lock weakness the final review found did not bite.
   The loader now requires the direct connection.
