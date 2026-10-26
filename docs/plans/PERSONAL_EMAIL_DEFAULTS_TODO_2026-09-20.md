@@ -109,6 +109,19 @@ N1 recovery follow-up implemented at `17f1969d2`:47 SQL / 125 unit
 tests passed; independent follow-up review PASS WITH NONBLOCKING NOTES. Proof and retained limits:
 `docs/audits/SCHEDULED_GRANTEE_RECOVERY_GAP_FIX_2026-10-25.md`.
 
+## Slice 8 plan — automated reviewer thank-you defaults
+
+[PLAN REVIEWED 2026-10-26; NOT BUILT.] Justin selected this next while Duncan/
+Connor decisions remain separate. Proposed separate exact-owner raw pair and
+Profile Settings disclosure; shared copy inherits only on confirmed absence.
+Pure rendering and the required DOCX complete before the at-most-once claim;
+legacy manual templates/transport remain unchanged. Claude rereview READY TO
+IMPLEMENT at `8af5b8381`, R1–R5 closed. One owner policy choice remains: whether
+new final rendered-copy safety refusals also apply to inherited Admin wording.
+No coding/release authorization, new route, schema or live operation yet.
+Plan: `docs/plans/PERSONAL_EMAIL_REVIEWER_THANKYOU_DEFAULTS_PLAN_2026-10-26.md`.
+Review: `docs/audits/REVIEWER_THANKYOU_DEFAULTS_PLAN_CLAUDE_REREVIEW_2026-10-26.md`.
+
 ## Existing pre-discussion calendar events — Duncan walkthrough pending 2026-10-25
 
 - [x] Investigate whether the generated agenda can update an existing invitation.
