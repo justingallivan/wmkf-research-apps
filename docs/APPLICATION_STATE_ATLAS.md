@@ -105,6 +105,7 @@ Promote any of these to a per-entity page if app code starts writing to it.
 
 | Group | Tables | Page |
 |---|---|---|
+| Research request file corpus | `request_corpus_runs`, `request_corpus_requests`, `request_corpus_files` — migration 090, branch-built 2026-10-25, not applied or loaded. Derived metadata index of SharePoint files for Research requests from the 2018 meeting year; owner-run loader only; no route reads it. | [postgres-request-corpus.md](atlas/postgres-request-corpus.md) |
 | Presentation invitation emails | `meeting_presentation_invitations` — migration 088; frozen request/visit previews, original-sender dispatch and read-only uncertain-send reconciliation. Branch-built, not deployed; admission defaults off. | [postgres-meeting-presentation-invitations.md](atlas/postgres-meeting-presentation-invitations.md) |
 | Durable meeting preparation | `meeting_material_preparations`, `meeting_material_preparation_steps` and summary ownership/initiation columns — [VERIFIED via source and isolated PostgreSQL tests 2026-10-23] migration 087; branch-built, not deployed, new admission defaults off. | [postgres-meeting-material-preparations.md](atlas/postgres-meeting-material-preparations.md) |
 | Meeting presentation approvals | `meeting_presentation_visibility`, `meeting_presentation_editions` — [VERIFIED via source and isolated PostgreSQL tests 2026-10-23] migration 086 and approval/withdrawal readers are branch-built; not applied or deployed. | [postgres-meeting-presentation-editions.md](atlas/postgres-meeting-presentation-editions.md) |

@@ -2,8 +2,8 @@
 title: Research request file corpus — index build (rollout step 3)
 kind: plan
 domain: dataverse
-status: draft
-summary: "Draft for owner approval: build the metadata index of SharePoint files for Research requests with a meeting year from 2018, in Postgres, from a fresh strict listing, classified by the filename rules; no text, no route, no model. Visibility decided (no per-request rule; admin exercise). Migration 090 free as of 2026-10-25. Owner decision still needed: where the first load runs."
+status: active
+summary: "Approved: build the metadata index of SharePoint files for Research requests with a meeting year from 2018, in Postgres, from a fresh strict listing, classified by the filename rules; no text, no route, no model. Visibility decided (no per-request rule; admin exercise). Migration 090 free as of 2026-10-25. Owner-run local loader decided. Built on a branch; not merged or applied."
 owner: product-engineering
 related:
   - docs/plans/RESEARCH_REQUEST_FILE_CORPUS_PLAN_2026-10-25.md
@@ -15,7 +15,7 @@ related:
 
 # Research request file corpus — index build (rollout step 3)
 
-[DRAFT, 2026-10-25; nothing built. Parent plan:
+[APPROVED by the owner 2026-10-25; built on branch `claude/request-corpus-index`, not merged, migration not applied, no load run. Parent plan:
 `docs/plans/RESEARCH_REQUEST_FILE_CORPUS_PLAN_2026-10-25.md`, rollout step 3.]
 
 ## Decisions needed from the owner
@@ -31,11 +31,15 @@ related:
    ruled there are no request restrictions to honour: the corpus is an admin
    exercise, not a staff feature. Any later surface is admin-only, and test
    requests stay excluded. This supersedes the parent plan's decision 3.
-2. **Where the first load runs.** Recommendation: an owner-run local script,
-   the same pattern as the inventory and the pilots (Production Dataverse reads
-   need `DATAVERSE_ALLOW_PROD_READS=yes`). Which database the local
-   `POSTGRES_URL` points at is [ASSUMED unknown]; the owner confirms the target
-   before the first load. A scheduled keep-current job is step 6.
+2. **Where the first load runs — DECIDED by the owner 2026-10-25: an owner-run
+   local script**, the same pattern as the inventory and the pilots (Production
+   Dataverse reads need `DATAVERSE_ALLOW_PROD_READS=yes`). The local
+   `POSTGRES_URL` points at the shared app database [VERIFIED 2026-10-25 by
+   hostname only: a `us-west-2.aws.neon.tech` host, database `neondb`; the
+   runbook describes one app database shared by Production and Preview,
+   `docs/CREDENTIALS_RUNBOOK.md` "Rotating the app Postgres password"], so a
+   local load writes the live database's new tables. The loader prints the
+   target hostname first. A scheduled keep-current job is step 6.
 3. **Migration number: 090 is free as of 2026-10-25** [VERIFIED via an
    owner-run read of Production `schema_migrations` (highest applied:
    `089_manual_presentation_video_pairs.sql`) and a scan of every local and
@@ -113,8 +117,9 @@ Any later surface is admin-only (decision 1).
 
 1. The migration, its manifest entry, and the fresh-install shape in
    `scripts/setup-database.js`.
-2. In `lib/services/request-file-corpus/`: the listing step (moved out of the
-   inventory probe so both use it), the per-request upsert, and reclassify.
+2. In `lib/services/request-file-corpus/`: the strict listing step
+   (`listing.js`; the inventory probe keeps its own per-bucket copy), the
+   per-request upsert, and reclassify (`index-store.js`).
 3. An owner-run script, `scripts/load-request-file-corpus.mjs`, with `--plan`
    (counts only), `--from`/`--to` meeting dates and resume.
 4. An Atlas page, `docs/atlas/postgres-request-corpus.md`, modelled on the
