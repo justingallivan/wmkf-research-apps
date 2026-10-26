@@ -3,7 +3,7 @@ title: Reviewer acceptance defaults — independent plan review
 domain: reviewers
 kind: audit
 status: active
-summary: "Claude READY WITH NAMED CHANGES on fc3097adb. Recovery and combined navigation-guard corrections required; revised draft incorporates source-backed fixes, with two owner policy choices pending. No runtime implementation."
+summary: "Claude READY WITH NAMED CHANGES on fc3097adb. Recovery and combined navigation-guard corrections required; historical initial findings; later owner choices resolved and final Claude READY TO IMPLEMENT at5fc27b570. No runtime implementation."
 owner: product-engineering
 related:
   - docs/plans/PERSONAL_EMAIL_REVIEWER_ACCEPTANCE_DEFAULTS_PLAN_2026-10-26.md

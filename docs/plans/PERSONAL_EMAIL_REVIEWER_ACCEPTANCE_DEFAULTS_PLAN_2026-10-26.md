@@ -3,7 +3,7 @@ title: Personal reviewer acceptance-confirmation defaults — bounded plan
 domain: reviewers
 kind: plan
 status: active
-summary: "Slice 9 planning only: exact-owner defaults for PD-attributed acceptance confirmations, shared wording for the existing non-PD fallback, and recoverable preparation before the email claim. Initial Claude review READY WITH NAMED CHANGES; source-backed corrections incorporated, both owner policy choices resolved; revised-plan independent review pending. No implementation or release authorized."
+summary: "Slice 9 planning only: exact-owner PD defaults, shared non-PD fallback, combined discard guard and recoverable pre-claim preparation. Owner policies resolved; Claude READY TO IMPLEMENT on5fc27b570 after required corrections closed. No coding or release authorized."
 owner: product-engineering
 related:
   - docs/plans/PERSONAL_EMAIL_DEFAULTS_INVENTORY_2026-09-24.md
@@ -366,7 +366,9 @@ Tests must include:
    case must now assert skipped/refused and no send under O2, not generic fallback.
    Replace pd-guid/su-1 fixtures with valid matching GUIDs and mock the own-reader
    for PD preparation. Pin the compatibility wrapper's {skipped:true, reason}
-   refusal shape and unchanged {sent:true} success shape. Retain genuine no-PD,
+   refusal shape and unchanged {sent:true} success shape. Preserve existing
+   missing-recipient/sender/request input errors as throws in the compatibility
+   wrapper; typed policy/preparation refusals return skipped. Retain genuine no-PD,
    confirmed disabled and confirmed missing-mailbox fallback cases.
    Regression red against prior claim-before-preparation source, then green.
    No real cron invocation, tenant mutation, or outbound email as test evidence.
@@ -404,8 +406,7 @@ READY WITH NAMED CHANGES. R1 finite recovery corrected, R2 single page-level gua
 R3 explicit test seams, R4 fresh suggestion and binding/recheck, R7 terminal siblings
 and job-bound alert lifecycle, R8 three privacy sets/naming/missing token corrected.
 R5 internal plain-text helper added; O1 owner approved subject-value normalization.
-R6 owner approved pre-claim retries on PD lookup errors; O2 resolved. These revisions have not yet had
-an independent final closure review. Rereview at `1aef57b70` returned READY WITH
+R6 owner approved pre-claim retries on PD lookup errors; O2 resolved. The independent review history follows. Rereview at `1aef57b70` returned READY WITH
 NAMED CHANGES: real transport receipt adapter, accurate retry timing, terminal
 alert placement, truthful event settlement and real-path test migration corrected
 above. Its low-priority signature/isolation/deleted-PD and clean-GET clarifications
@@ -413,7 +414,7 @@ are also incorporated. Targeted closure at `1a9ad691e` closed all prior required
 items but named N1: direct-wrapper test migration and refusal shape. Those are
 now explicitly specified above, along with its optional fresh-payload/lease-loss,
 manual-send eligibility and discriminating trust-model fixture clarifications.
-Final N1 closure check pending. Initial verbatim report is retained in
+Final N1 closure at `5fc27b570`: READY TO IMPLEMENT. Initial verbatim report is retained in
 `docs/audits/REVIEWER_ACCEPTANCE_DEFAULTS_PLAN_CLAUDE_REVIEW_2026-10-26.md`.
 
 [VERIFIED via root-run mocked baseline.] Four existing suites / 63 tests passed:
@@ -422,5 +423,9 @@ current code; it does not test this unbuilt plan. Doc currency/facts/symbol/buil
 claim gates/self-tests, docs catalog, API/Atlas gates/self-tests and secret scan/
 self-test passed during planning. Runtime files and Claude's DB work untouched.
 
-Owner choices O1/O2 resolved 2026-10-26 as recorded above. Revised-plan
-independent review pending. Implementation and release authorization: pending.
+Owner choices O1/O2 resolved 2026-10-26 as recorded above. Independent Claude
+review READY TO IMPLEMENT at `5fc27b570`; required findings closed. Final receipt:
+`docs/audits/REVIEWER_ACCEPTANCE_DEFAULTS_PLAN_CLAUDE_FINAL_2026-10-26.md`.
+The post-review input-error clarification preserves the existing wrapper contract
+and addresses the reviewer's nonblocking note. No runtime or test edits made.
+Implementation and release authorization: pending.
