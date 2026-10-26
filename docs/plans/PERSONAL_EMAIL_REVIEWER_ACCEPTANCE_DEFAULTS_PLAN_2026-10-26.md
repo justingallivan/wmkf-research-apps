@@ -146,7 +146,8 @@ No live send preview or test send button.
 
 Split sender orchestration into `prepareAcceptanceConfirmationEmail` and a
 transport-only `sendPreparedAcceptanceConfirmationEmail`; keep the existing
-`sendAcceptanceConfirmationEmail` wrapper for its current direct contract tests.
+`sendAcceptanceConfirmationEmail` wrapper as a compatibility entry point; migrate its direct tests for the new
+owner policies rather than preserving their old fallback assertions.
 New drain dependency seams: prepareAcceptanceEmail, sendPreparedAcceptanceEmail,
 readConfirmationRequest and readConfirmationSuggestion. Enumerate all old
 deps.sendAcceptanceEmail callers/tests (including operational-events and
@@ -160,7 +161,9 @@ not merely return the raw Dynamics result. Its failure throws for classification
 Only the drain's injected/adapter-level transport result needs the explicit
 sent:true check. The existing public sendAcceptanceConfirmationEmail wrapper
 prepares then awaits this helper and preserves its existing {sent:true} return
-shape for direct callers. Add a test using the real send-prepared helper, mocked
+shape on success for direct callers. On preparation refusal, that wrapper returns
+{skipped:true, reason} using the typed safe refusal reason; it never claims or
+sends, and the drain uses the split helpers rather than this wrapper. Add a test using the real send-prepared helper, mocked
 Dynamics resolving {emailId}, and the drain: verify claimedAt then sentAt, no
 uncertain alert. An injected undefined/malformed receipt remains uncertain.
 Only the drain owns the durable one-time claim. Helper extraction must preserve
@@ -253,7 +256,8 @@ leaves an explicit failed job. There is NO existing staff requeue route/tool.
 A reviewer repeat may collide and reopen status but does not reset attempts,
 steps or payload; it is not a supported recovery mechanism. After exhaustion
 the automatic confirmation is lost unless staff intervene manually; the terminal
-alert must say “confirmation not sent; send by hand.” No requeue tool or DB repair
+alert must say “confirmation not sent; confirm the reviewer is still accepted
+and eligible before sending by hand.” No requeue tool or DB repair
 is in this slice. Eight total attempts mean seven retry gaps. Theoretical minimum is 35 minutes
 (7 × 300 seconds); with a two-minute cron cadence the nominal first-refusal-to-
 exhaustion window is about 42 minutes (7 × 6 minutes), longer for slow passes or
@@ -286,7 +290,8 @@ slice into external cancellation writers. Terminal sibling failure still dominat
 if preparation was refused in that pass, the confirmation is not sent and will
 not automatically recover. Emit the manual-send :terminal alert in the OUTER drain catch only after
 recordReviewerAcceptanceJobFailure returns a fresh updated row, when
-updated.status === failed, the updated payload is not isAcceptRepeat, and
+updated is nonnull (null is lease loss), updated.status === failed,
+parsePayload(updated.payload).isAcceptRepeat !== true, and
 updated.steps.acceptance_confirmation has neither claimedAt nor sentAt. Use
 this returned row, not the stale claimed job, and a nonthrowing notifier. This
 single hook covers exhaustion and an immediate terminal sibling failure, including
@@ -351,9 +356,18 @@ Tests must include:
    readConfirmationSuggestion from injected suggestions. Include the intentionally
    real-sender trust-model case at notification-trust-model-pushup.test.js:1118:
    blank shared copy now expects followup_retry_required rather than completed,
-   with real preparation and mocked DAL readers. Do not force this real-path case
+   with real preparation and mocked DAL readers. Ensure the shared fixture has a
+   valid matching job.request_id and suggestion._wmkf_request_value so the case
+   actually reaches the missing-shared-default gate rather than failing identity.
+   Do not force this real-path case
    to inject the transport-only seam. Repeat-acceptance injections at :1012/:1358
    never call transport; do not cite them as undefined-receipt coverage.
+   Explicitly migrate reviewer-acceptance-email.test.js: its thrown PD lookup
+   case must now assert skipped/refused and no send under O2, not generic fallback.
+   Replace pd-guid/su-1 fixtures with valid matching GUIDs and mock the own-reader
+   for PD preparation. Pin the compatibility wrapper's {skipped:true, reason}
+   refusal shape and unchanged {sent:true} success shape. Retain genuine no-PD,
+   confirmed disabled and confirmed missing-mailbox fallback cases.
    Regression red against prior claim-before-preparation source, then green.
    No real cron invocation, tenant mutation, or outbound email as test evidence.
 
@@ -395,7 +409,11 @@ an independent final closure review. Rereview at `1aef57b70` returned READY WITH
 NAMED CHANGES: real transport receipt adapter, accurate retry timing, terminal
 alert placement, truthful event settlement and real-path test migration corrected
 above. Its low-priority signature/isolation/deleted-PD and clean-GET clarifications
-are also incorporated. Initial verbatim report is retained in
+are also incorporated. Targeted closure at `1a9ad691e` closed all prior required
+items but named N1: direct-wrapper test migration and refusal shape. Those are
+now explicitly specified above, along with its optional fresh-payload/lease-loss,
+manual-send eligibility and discriminating trust-model fixture clarifications.
+Final N1 closure check pending. Initial verbatim report is retained in
 `docs/audits/REVIEWER_ACCEPTANCE_DEFAULTS_PLAN_CLAUDE_REVIEW_2026-10-26.md`.
 
 [VERIFIED via root-run mocked baseline.] Four existing suites / 63 tests passed:
