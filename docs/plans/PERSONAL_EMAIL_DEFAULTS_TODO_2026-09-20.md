@@ -116,8 +116,8 @@ Connor decisions remain separate. Proposed separate exact-owner raw pair and
 Profile Settings disclosure; shared copy inherits only on confirmed absence.
 Pure rendering and the required DOCX complete before the at-most-once claim;
 legacy manual templates/transport remain unchanged. Claude rereview READY TO
-IMPLEMENT at `8af5b8381`, R1–R5 closed. One owner policy choice remains: whether
-new final rendered-copy safety refusals also apply to inherited Admin wording.
+IMPLEMENT at `8af5b8381`, R1–R5 closed. Justin confirmed on 2026-10-26 that final rendered-copy safety refusals apply to
+both personal and inherited Admin wording before claiming, with problem reporting.
 No coding/release authorization, new route, schema or live operation yet.
 Plan: `docs/plans/PERSONAL_EMAIL_REVIEWER_THANKYOU_DEFAULTS_PLAN_2026-10-26.md`.
 Review: `docs/audits/REVIEWER_THANKYOU_DEFAULTS_PLAN_CLAUDE_REREVIEW_2026-10-26.md`.

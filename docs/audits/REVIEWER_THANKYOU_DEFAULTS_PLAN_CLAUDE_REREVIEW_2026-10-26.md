@@ -3,7 +3,7 @@ title: Automated reviewer thank-you defaults — independent plan rereview
 domain: reviewers
 kind: audit
 status: active
-summary: "Claude READY TO IMPLEMENT at8af5b8381; R1–R5 closed. One owner policy choice remains for shared-path rendered-copy safety refusals. Plan-only; no implementation or release authorization."
+summary: "Claude READY TO IMPLEMENT at 8af5b8381; R1–R5 closed. Owner subsequently approved shared-path rendered-copy safety holds on 2026-10-26. Plan-only; no implementation or release authorization."
 owner: product-engineering
 related:
   - docs/plans/PERSONAL_EMAIL_REVIEWER_THANKYOU_DEFAULTS_PLAN_2026-10-26.md
@@ -19,8 +19,10 @@ Root ran baseline tests separately. The initial N1 correction was confirmed.
 Post-review mechanical clarification pins render refusals to skipped plus
 skippedMisconfigured and makes the missing-ETag preparation rule identical in
 real/dry runs. These are the report's nonblocking note2 dispositions, not a claim
-that Claude reviewed a later fingerprint. Owner confirmation of the shared-path
-rendered-copy refusal remains pending; it was asked explicitly. No code is built.
+that Claude reviewed a later fingerprint. The shared-path rendered-copy refusal was pending at review time. Justin
+subsequently confirmed on 2026-10-26: hold it before claiming and report the problem.
+The current plan records that decision; the historical report below is unchanged.
+No code is built.
 
 ## Verbatim report
 

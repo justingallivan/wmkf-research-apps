@@ -3,7 +3,7 @@ title: Personal defaults for automated reviewer thank-you emails
 domain: reviewers
 kind: plan
 status: active
-summary: "Plan-only slice 8; independent Claude READY TO IMPLEMENT at 8af5b8381 with R1–R5 closed. Separate exact-owner default/editor and pre-claim preparation. Owner confirmation pending for new rendered-copy safety refusals on inherited Admin wording; no runtime or live writes."
+summary: "Plan-only slice 8; independent Claude READY TO IMPLEMENT at 8af5b8381 with R1–R5 closed. Separate exact-owner default/editor and pre-claim preparation. Owner confirmed rendered-copy safety holds also apply to inherited Admin wording; no runtime or live writes."
 owner: product-engineering
 related:
   - docs/plans/PERSONAL_EMAIL_DEFAULTS_INVENTORY_2026-09-24.md
@@ -17,7 +17,7 @@ related:
 ## 1. Status, scope and ownership
 
 [PLANNED, NOT BUILT; INDEPENDENT REVIEW READY TO IMPLEMENT.]
-One owner policy confirmation is pending (§9). Justin authorized current-flow review, a bounded plan and
+Owner confirmed the final safety policy on 2026-10-26 (§9). Justin authorized current-flow review, a bounded plan and
 independent Claude review before coding. This plan proposes the contract below;
 it is not authorization to implement or release. Baseline `448ed17d1` on main;
 Codex owns `codex/reviewer-thankyou-defaults-plan` in the existing isolated worktree.
@@ -120,7 +120,7 @@ raw shared copy as a starting point with a notice if it needs token correction t
 save as personal. No seed/rebaseline operation is needed.
 
 Validate personal raw copy strictly; shared copy uses its unchanged presence/
-legacy-render behavior. [PROPOSED; owner confirmation pending for inherited/shared copy.]
+legacy-render behavior. [OWNER-APPROVED POLICY 2026-10-26; implementation still planned.]
 For BOTH sources, preflight the rendered business body
 (using existing buildThankYouBodyText, not the always-present HTML notice): trimmed
 nonempty check and at most 100000 code units. Final subject: trimmed nonempty check,
@@ -132,8 +132,9 @@ rendered strings. Overlong/newline/title-expansion failures use reason
 the underlying context/template is fixed (a PD can remove optional title tokens).
 Other empty rendered-copy failures use `rendered_copy_invalid`. These rendered
 safety refusals are deliberately new for inherited Admin copy, even though its
-TOKEN GRAMMAR remains unchanged. They need owner confirmation before coding; no
-approval is inferred from this technical review. Counts and errors
+TOKEN GRAMMAR remains unchanged. Justin explicitly confirmed these safety holds
+for inherited Admin wording on 2026-10-26; this policy decision is separate from
+implementation/release authorization. Counts and errors
 identify these separately from unreadable own preferences. No repeated auto-send
 is used to resolve them.
 Render the exact HTML once for transport before claim; use the same frozen input
@@ -396,19 +397,19 @@ The separately run post-send bookkeeping + reviewer-engagement-contract baseline
 also passed: 2 suites / 72 tests, all mocked. Total baseline: 7 suites / 121 tests.
 This proves existing contracts, not the planned feature.
 
-[OWNER CONFIRMATION PENDING.] Recommended: new rendered safety checks hold even
-inherited Admin copy before claim when subject is multiline/over 2000, business
-message is empty/over 100000, or context expansion violates those bounds. Report
-reason/counts; retry only after context or wording repair. Alternative: retain
-current shared-path rendered behavior and apply checks only to personal copy.
-The question was sent to Justin explicitly. No elapsed time implies a decision;
-implementation cannot start until this choice and implementation authorization.
-Shared TOKEN GRAMMAR remains unchanged under either option.
+[OWNER DECISION 2026-10-26 — CONFIRMED.] Justin selected: "Hold it before claiming
+the send and report the problem (Recommended)." Apply rendered safety checks to
+BOTH personal and inherited Admin copy before any send claim: subject nonempty,
+single-line and at most 2000 code units; business message nonempty and at most 100000.
+Report the distinct reason/counts, leave the marker untouched, and retry only after
+context or wording repair. Shared TOKEN GRAMMAR remains unchanged: unknown legacy
+shared tokens retain the existing literal-render behavior, subject to these final
+rendered safety checks. No remaining product-policy choice in this plan.
+Implementation and release still require separate authorization.
 
 Bounded sweep Mode A: slice 8 moved from not-started to plan-reviewed, not built.
 Current TODO and inventory link this plan/review; source, Atlas, route matrix and
 counts still describe deployed behavior, with no imaginary route/table. Historical
 review reports retained verbatim, other slices/corpus work excluded. Doc/fact/
 symbol/build/catalog and secret gates+self-tests run sequentially before closeout.
-Owner: Codex; plan branch above; next action: owner policy choice then authorize
-implementation if desired. No production or database state was touched.
+Owner: Codex; plan branch above; next action: authorize implementation if desired. No production or database state was touched.
