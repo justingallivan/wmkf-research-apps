@@ -3,7 +3,7 @@ title: Scheduled grantee reminder defaults — implementation verification
 domain: workbench
 kind: audit
 status: active
-summary: "Branch implementation at 2095db013: 290 focused tests, 69 caller/census tests, 32 scratch-Postgres tests and five fixture browser cases passed. Independent implementation review pending; not released."
+summary: "Branch implementation at 7a84a274a: 383 tests, 33 scratch-Postgres tests and six fixture browser cases passed. Independent Claude rereview PASS WITH NONBLOCKING NOTES; all hosted checks passed. Not released."
 owner: product-engineering
 related:
   - docs/plans/PERSONAL_EMAIL_SCHEDULED_GRANTEE_DEFAULTS_PLAN_2026-10-25.md
@@ -14,11 +14,13 @@ related:
 # Implementation and verification — 2026-10-25
 
 [VERIFIED via source, local mocked tests, disposable local Postgres and fixture-only
-Chromium.] Runtime fingerprint: `2095db01322869103540baecc7fe1c164d5e2a6c` on
+Chromium.] Runtime fingerprint: `7a84a274ab33cb8033248c9c6466ed80e125f6ad` on
 `codex/scheduled-grantee-defaults`. [Draft PR #531](https://github.com/justingallivan/wmkf-research-apps/pull/531).
 Justin authorized implementation of the reviewed plan and expressly selected
 hold-until-repaired for PD reassignment. Release is not authorized by this task.
-Independent ordinary OAuth Claude implementation review is in progress.
+Independent ordinary OAuth Claude rereview returned **PASS WITH NONBLOCKING NOTES**.
+All seven initial findings are closed. Verbatim receipt:
+`docs/audits/SCHEDULED_GRANTEE_DEFAULTS_IMPLEMENTATION_CLAUDE_REREVIEW_2026-10-25.md`. No blocking regression was found; see the retained recovery risk below.
 
 ## Invariants and contract trace
 
@@ -33,23 +35,22 @@ Independent ordinary OAuth Claude implementation review is in progress.
 | Past acceptance remains recoverable | Stored/correlation activity read → accepted receipt/finalization; intent remains read-only | Accepted recovery without SendEmail; unaccepted correlation orphan stays unattached; missing/forbidden classifications preserved; failure/lease-loss never reports hold success |
 | Held does not starve ordinary mail | Existing error column → shared reason/actions/digest → CASE-ordered due selection | 101 older held rows plus ordinary NULL-code row; ordinary wins. Approval/lease/time remain authoritative |
 | UI async independence | Actor-scoped editor generation + mounted/active guards → raw baseline and uncertainty latch → own defaults only | Pending/malformed/foreign receipts, loading pause, real actor change, unmount, row selection, late response, busy and strict Reload tests |
-| Deliberate discard | Editor-only warning hook → Pages router/Back/beforeunload → retained or deliberately discarded raw edits | Five real-browser fixture cases: selection no prompt, cancelled/confirmed departure, Back and pending-write warning |
+| Deliberate discard | Editor-only warning hook → Pages router/Back/beforeunload → retained or deliberately discarded raw edits | Six real-browser fixture cases: selection no prompt, cancelled/confirmed departure, Back, pending-write warning and fast Back after selection |
 
 ## Verification actually run
 
-- **13 focused Jest suites / 290 tests passed** at the runtime fingerprint:
-  the four new scheduled-grantee-reminder suites; cron, scheduled service/current
-  recipients/routes/page/schema, grantee renderer, reserved keys and cleanup.
-- **4 caller/census suites / 69 tests passed.** The existing direct cron-service
-  characterization fixture was updated to explicitly supply an absent personal
-  default; its runtime source did not change after the fingerprint.
-- **Disposable Docker PostgreSQL 16: 32 engine tests passed.** A new task-owned
+- **17 Jest suites / 383 tests passed** at the runtime fingerprint: the four new
+  scheduled-grantee-reminder suites; cron, scheduled service/current recipients/
+  routes/page/schema, grantee renderer, reserved keys and cleanup; plus the four
+  existing caller/census suites. The existing direct cron-service fixture now
+  explicitly supplies an absent personal default.
+- **Disposable Docker PostgreSQL 16: 33 engine tests passed.** A new task-owned
   container bound only to loopback hosted the test's random scratch schema. The
   suite applied existing migrations 036/059 only inside that schema, exercised
   real SQL and mocked Dynamics, and removed its schema. No shared or Claude
   database was used. Coverage includes true separate-connection competing INSERT,
   handoff/lease/version/transport fences, frozen edits and ordinary-mail priority.
-- **Fresh production Next/Turbopack build and five fixture-only Playwright cases
+- **Fresh production Next/Turbopack build and six fixture-only Playwright cases
   passed.** Every API call and external request was intercepted; no preference,
   preview, activity, token or send route ran live. Chromium required host execution
   because macOS blocked its launch inside the sandbox. A fixture desktop screenshot
@@ -105,5 +106,58 @@ is N/A. Shared renderer, identity mapper and distribution recovery were not extr
 Current plan, slice table/TODO, route matrix, preference/ledger Atlas, service
 catalog and technical-brief count pointer were updated. Plan-review reports and
 September inventory counts remain HISTORICAL. Calendar/J27 decisions, other email
-families and Claude's corpus/database work remain excluded. Independent review
-and hosted CI results will be recorded separately before release readiness.
+families and Claude's corpus/database work remain excluded. Independent review and all hosted checks passed on the runtime fingerprint.
+Release remains a separate owner-directed action; the branch is not deployed to Production.
+
+
+## Initial findings and revised implementation
+
+The first independent review at `2095db013` requested changes. The revised runtime
+at `7a84a274a` closes all seven findings (verified independently in the rereview):
+
+1. Bodyless GET now accepts Next's actual empty-string body. A test runs installed
+   Next's real parser; it failed before the fix and passed after it.
+2. Added held-page actions/copy/cancel tests, Needs-attention digest grouping and
+   stored-but-unaccepted activity preservation coverage.
+3. History snapshots update after beforeHistoryChange and route completion; stable
+   subscriptions plus a real-browser quick Back test preserve the latest selected row.
+4. Pre-write enumeration failure returns `preference_unavailable` and truthfully
+   says nothing changed; failed writes/readback remain `persistence_unconfirmed`.
+5. Known acceptance with failed local receipt persistence carries `acceptanceProven`:
+   response is 202, not retryable, and explains that delivery history needs repair.
+   Unit/route/Postgres tests cover stored-ID recovery without a transport retry.
+6. Updated due-order and attention helper headers.
+7. Confirmed Save with failed refresh has distinct navigation wording; pending or
+   unconfirmed writes retain the may-already-be-saved warning.
+
+Additional reviewed hardening canonicalizes casing/whitespace aliases of this one
+private preference key on generic preference routes, and shows unavailable shared
+configuration even when personal wording is configured. Shared configuration remains
+an existing cron prerequisite. Other preference keys retain their existing behavior.
+
+### Retained nonblocking review notes / release considerations
+
+[VERIFIED via independent source trace; not reproduced.] An existing narrow recovery
+exposure remains: Dynamics acceptance found only by correlation, followed by failure
+to persist the activity identity, can leave no stored ID or send intent. Subsequent
+handoff/re-addressing can change the correlation generation and permit another send.
+The stored-ID receipt-failure test does not prove this correlation-only case safe.
+Claude classified it as nonblocking and pre-existing; do not interpret the general
+no-blind-retry language above as covering that case. Follow-up: add a discriminating
+correlation-only failure test and a durable manual-recovery fence before relying on
+this path. This implementation has not been released.
+
+The remaining rereview notes are generic hold/Retry wording for acceptance repair
+(safe but imprecise), missing explicit array/nonempty-object GET negative cases
+(source rejects both), and documentation lag. Documentation lag is corrected in
+this receipt and the current slice records; the verbatim report remains historical.
+
+[VERIFIED via GitHub checks for exact head `7a84a274a`.] Hosted Jest, PostgreSQL 16,
+Playwright, Claude workflow, Vercel preview, Semgrep, Gitleaks, Trivy and all CodeQL
+checks passed. A preview build is not Production acceptance or a live mail probe.
+
+Mode A closeout: current slice 5 plan/TODO/inventory now state branch-built, locally
+verified, independently reviewed with nonblocking notes, and unreleased. Linked
+route matrix, Atlas and service catalog retain their correct branch-only boundary.
+Initial review and dated plan-review receipts remain historical. No live-state
+probe is implied. Relevant documentation gates are rerun for this closeout.

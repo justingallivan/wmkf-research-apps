@@ -3,7 +3,7 @@ title: Personal defaults for scheduled grantee reminders
 domain: workbench
 kind: plan
 status: active
-summary: "Slice 5 branch-built, verification and implementation review in progress; not released. Reviewed contract: exact-owner future reminder defaults, creation/handoff integration and independent editor; no runtime implementation or live writes. Owner chose hold-until-repaired for reassignment failures. Revised hold contract addresses N1–N7 and F1–F11; final independent Claude review READY TO IMPLEMENT at 1ece224d3. Owner authorized implementation; no release authorization."
+summary: "Slice 5 branch-built and locally verified at 7a84a274a; Claude implementation rereview PASS WITH NONBLOCKING NOTES. Exact-owner defaults, reassignment hold and discard warnings implemented; 383 tests, 33 scratch-Postgres and six browser cases passed. Pre-existing correlation-only recovery risk retained in build receipt. Not released."
 owner: product-engineering
 related:
   - docs/plans/PERSONAL_EMAIL_DEFAULTS_INVENTORY_2026-09-24.md
@@ -16,11 +16,12 @@ related:
 
 ## 1. Status, ownership and scope
 
-[BRANCH-BUILT — VERIFICATION/IMPLEMENTATION REVIEW IN PROGRESS; NOT RELEASED.]
+[BRANCH-BUILT — VERIFIED LOCALLY; CLAUDE PASS WITH NONBLOCKING NOTES; NOT RELEASED.]
 Justin subsequently authorized implementation of this reviewed contract. No live
 preference or business-record writes, environment changes or schema operations
 have occurred. The sections below retain the reviewed acceptance criteria;
-implementation proof is being collected separately.
+implementation proof and review limits are recorded in
+`docs/audits/SCHEDULED_GRANTEE_DEFAULTS_BUILD_2026-10-25.md`.
 
 Justin originally authorized flow review, a bounded plan and
 independent Claude review before coding. Claude reviewed draft `0ba91394d` and
@@ -523,7 +524,13 @@ self-tests, docs catalog and secret scan passed for the revised plan and review
 receipts. These checks concern documentation; they do not test the planned hold.
 
 The owner subsequently authorized implementation. The branch now implements the
-reviewed contract and is undergoing verification and independent implementation
-review. Release remains a separate deliberate action. No migration, environment
+reviewed contract. At `7a84a274a`, 383 Jest tests, 33 disposable local Postgres
+tests, six fixture browser cases, types/build/lint and relevant gates passed.
+Independent Claude rereview returned PASS WITH NONBLOCKING NOTES, closing all
+seven initial findings. The build receipt records the pre-existing correlation-only
+accepted-activity persistence risk and other nonblocking notes. Pre-write read
+failure now returns `preference_unavailable`; known acceptance/receipt failure uses
+`acceptanceProven`; casing/whitespace aliases of the new private key are guarded.
+These refinements preserve the reviewed discard-warning and reassignment-hold contract. Release remains a separate deliberate action. No migration, environment
 change or live data operation occurred. Claude's other checkout and database work
 remain untouched.
