@@ -3,7 +3,7 @@ title: Personal defaults for automated reviewer thank-you emails
 domain: reviewers
 kind: plan
 status: active
-summary: "Plan-only slice 8: exact-owner automatic thank-you defaults, independent Profile Settings editor, strict reads and complete pre-claim preparation. No runtime/schema/live writes. Independent Claude plan review pending. Legacy manual templates and at-most-once transport stay separate."
+summary: "Plan-only slice 8: exact-owner automatic thank-you defaults, independent Profile Settings editor, strict reads and complete pre-claim preparation. No runtime/schema/live writes. Claude initial review READY WITH NAMED CHANGES; R1–R5 addressed, delta rereview pending. Legacy manual templates and at-most-once transport stay separate."
 owner: product-engineering
 related:
   - docs/plans/PERSONAL_EMAIL_DEFAULTS_INVENTORY_2026-09-24.md
@@ -53,10 +53,14 @@ are UNKNOWN; Atlas dates and seed copy are not proof of current tenant content.
 I read the email-template-token-syntax memory: new personal copy uses mustache;
 legacy shared aliases remain supported, with no renderer cleanup in this slice.
 
-Two source/header contradictions need narrow correction during implementation:
+Three source/header overclaims need narrow correction during implementation:
 cron header calls attachment nonfatal, but actual code stops before claim when
 attachment generation fails; sendOneThankYou docs say render follows claim. The
 new order below makes rendering failures retryable before the irreversible marker.
+The sweep header also overclaims manual/automatic duplicate prevention: a callable
+legacy post-send bookkeeping path still writes the same marker without a pre-send
+claim. Preserve it as excluded compatibility behavior; promise concurrency safety
+only for overlapping automatic If-Match claimers, not arbitrary manual delivery.
 
 ## 3. Proposed product contract
 
@@ -84,8 +88,8 @@ new order below makes rendering failures retryable before the irreversible marke
 
 ### Validation and rendering
 
-[PLANNED.] Subject: trimmed, 1–300 characters, single line; optional exact
-`{{proposalTitle}}`, no other brace tokens. Message: trimmed, 1–20000 characters;
+[PLANNED.] Subject: trimmed, 1–300 JavaScript string code units, single line; optional exact
+`{{proposalTitle}}`, no other brace tokens. Message: trimmed, 1–20000 JavaScript string code units;
 optional exact `{{greeting}}`, `{{proposalTitle}}`, `{{signature}}`. Literal copy
 is valid; tokens are not mandatory. When used, greeting/title/signature values
 come only from the server's current context. This preserves the renderer's
@@ -94,19 +98,39 @@ existing optional-signature behavior, rather than adding an automatic second one
 Reject extra fields, arrays, nulls, nonstrings, unsupported/malformed braces,
 case variants, inner-space/triple-brace tokens and the renderer's known legacy
 bracket aliases in new personal values. Reject retired honorariumNote and secure
-link/action placeholders. Ordinary bracket prose is allowed. No new URL extraction
+link/action placeholders. Reject exactly `[greeting]`, `[proposal title]`, `[Program Director signature]`
+in personal input. Case-sensitive `[Greeting]` is ordinary prose and allowed.
+Literal URLs are allowed as text (unlike reminder validation); no generated secure
+link, link rewriting, token or action authority is added. These bounds and URL
+choices are deliberate for this family; do not reuse the reminder validator.
+No new URL extraction
 or transport/link behavior: thank-you remains without a generated action link.
 Shared Admin values retain their separate legacy-compatible renderer contract;
-new-personal validation must not invalidate existing shared aliases. Use a
-separate shared-compatibility check allowing the exact existing renderer aliases
-and retired honorariumNote stripping; unknown mustache tokens still fail before
-claim rather than leak unexpanded into automatic mail. UI shows
+new-personal validation must not be applied to shared Admin copy. **R1 decision:
+drop the proposed new shared grammar check.** Existing shared unknown/malformed
+tokens remain literal as today; this slice does not silently introduce a batch or
+per-PD grammar refusal for existing shared copy. The shared renderer still replaces
+subject `{{proposalTitle}}` / `[proposal title]`; body `{{greeting}}` / `[greeting]`,
+`{{proposalTitle}}` / `[proposal title]`, `{{signature}}` / `[Program Director signature]`,
+and strips `{{honorariumNote}}`. Inner-space/unbalanced unknown tokens also retain
+existing literal behavior for shared copy. Personal copy rejects them. Required
+shared nonblank presence remains batch-wide; no stricter shared token gate exists. UI shows
 raw shared copy as a starting point with a notice if it needs token correction to
 save as personal. No seed/rebaseline operation is needed.
 
-Validate the selected raw template before claim, then validate the rendered
-business body (using existing buildThankYouBodyText, not the always-present HTML
-notice) is nonempty/bounded and final subject is nonempty/bounded/single-line.
+Validate personal raw copy strictly; shared copy uses its unchanged presence/
+legacy-render behavior. For BOTH sources, preflight the rendered business body
+(using existing buildThankYouBodyText, not the always-present HTML notice): trimmed
+nonempty check and at most 100000 code units. Final subject: trimmed nonempty check,
+at most 2000 code units and no CR/LF. These are proposed application safety limits,
+not a claim about Dataverse metadata limits. Do not truncate or normalize request
+data or change renderer output; trim is only a blankness check. Send the exact
+rendered strings. Overlong/newline/title-expansion failures use reason
+`rendered_context_invalid` and leave the claim untouched; they remain paused until
+the underlying context/template is fixed (a PD can remove optional title tokens).
+Other empty rendered-copy failures use `rendered_copy_invalid`. Counts and errors
+identify these separately from unreadable own preferences. No repeated auto-send
+is used to resolve them.
 Render the exact HTML once for transport before claim; use the same frozen input
 for the body preflight. No settings, preference read, template render or attachment
 rebuild occurs after a successful claim. Keep existing escaping, legacy automation
@@ -114,20 +138,28 @@ marker stripping, server notice, sender identity and attachment builder unchange
 
 ## 4. Proposed persistence and exact-owner API
 
-[PLANNED.] New `/api/review-manager/thankyou-email-preferences`, GET/PUT/DELETE.
+[PLANNED.] New `/api/reviewer-thankyou-email-preferences` (outside the app-gated
+review-manager directory), GET/PUT/DELETE.
 Staff self-service settings only: requireAuth with explicit bypass/applicant
 refusal, positive linked profile, authenticated actor GUID, and server profile-map
 GUID equality inside withDalContext. Same exact-owner posture as the released
 scheduled-grantee default route. No request-selected owner/profile/PD/kind/request/
 message. This deliberately uses staff auth, not an app grant: Profile Settings is
 self-service, and reading/writing your future wording grants no send authority.
-The cron still chooses the actual sender solely from the request. No widening of
+A PD without the reviewers app grant may edit this automatic wording but still
+cannot edit app-gated reminder wording; this asymmetry is deliberate, not an
+expansion of reminder access. The new matrix row will document Profile/own-staff
+auth. [VERIFIED via scripts/check-api-route-security-matrix.js:12–30,93–108:] the
+gate recognizes guard tokens in each source file and explicit matrix coverage; it
+does not infer app authorization from the directory. The cron still chooses the
+actual sender solely from the request. No widening of
 any send/claim route authorization.
 
 Private no-store, bounded 256kb parser. GET allows only no query and an empty body,
 including Next's actual bodyless empty string. PUT exactly `{template}`; DELETE
 exactly `{}`; unsupported methods405, malformed400, actor mismatch403, identity/
-read unavailable503. Response includes exact ownerSystemId, ownStatus, own/shared
+read unavailable503. Response includes exact ownerSystemId, authenticatedProfileId (positive integer
+from session, never client input), ownStatus, own/shared
 raw pairs, sharedStatus/source and canSave/canClear. Own and shared read statuses
 stay independent; invalid own copy may show labelled shared copy for repair but
 must never appear configured/usable for automatic delivery.
@@ -146,7 +178,9 @@ means nothing changed; any mutation/readback/partial-Clear failure is unconfirme
 never success. Confirmed mutation plus failed refreshed DTO is distinct success
 with refreshUnavailable, requiring Reload before further writes.
 
-Register key and block canonical, casing and whitespace aliases in generic
+Register key in RESERVED_WRITE_KEYS and PRIVATE_REMINDER_KEYS; extend the narrow
+canonicalizer to a two-key set (existing scheduled key + new key only). Block
+canonical, casing and whitespace aliases in generic
 user-preferences keyed/list reads and single/batch writes/deletes. Preserve the
 scheduled-key alias guard and all other generic-key behavior. Family service
 uses existing DAL adapter directly; no identity-map/adapter/schema redesign.
@@ -159,27 +193,47 @@ strict future reads pause for explicit repair rather than select an arbitrary ro
 ETag claim, batch cap, dryRun and at-most-once transport semantics.
 
 1. Existing required shared-config read and test-request skip remain first.
-2. Resolve enabled PD + reviewer context; validate PD GUID for preference lookup.
+2. Resolve enabled PD + reviewer context; validate PD GUID. Increment eligible
+   once a candidate has the valid sender/reviewer context, BEFORE own preference
+   lookup. Thus a later preference/render refusal remains eligible AND skipped/
+   skippedMisconfigured. Existing batch-wide missing shared config returns before
+   row eligibility counts, unchanged.
 3. Resolve one strict raw pair per lowercase PD per sweep. Store the promise before
    awaiting, including error results. A later row for that PD reuses the same
    outcome; a new sweep reads fresh. Different PDs never share a pair. No new
    parallel worker pool, cross-run cache or unbounded fan-out.
-4. On failed own resolution: skipped + skippedMisconfigured, structured bounded
-   error id/reason (cap new preference-error entries at 100 per run, count every
-   refusal), no attachment/claim/send and no attempted++ for this refusal.
-   Use existing maintenance failure count so operational failure cannot be reported
-   as a clean run. DryRun resolves/validates defaults, reports blocked candidates
-   but does not build attachments, claim, mint tokens or send.
-5. In sendOneThankYou, check ETag, validate raw/fully rendered copy and render HTML,
+4. On failed own resolution: skipped + skippedMisconfigured and no attachment/
+   claim/send/attempted increment. No new preferenceFailed counter. Group NEW
+   preference/render refusals by normalized PD + reason, with affectedCount and
+   up to 10 sample candidate IDs. Cap new groups at 100 per run; count all refusals
+   even after the diagnostic cap. No template text or full reviewer/request data
+   in errors. Keep existing attachment/transport errors unchanged. Maintenance
+   uses skippedMisconfigured so neither real nor dryRun refusal looks clean.
+5. Pure per-row rendering/validation precedes the dryRun early return. DryRun
+   therefore reveals raw/expanded-copy failures and counts them identically, but
+   builds no attachment, claims nothing and sends nothing. A cron dryRun still
+   writes its existing Maintenance run record and may produce existing shared-
+   config alerts; it is NOT a read-only/live-probe shortcut and is not authorized
+   for this planning task. No new post-deploy dryRun requirement is introduced
+   after dropping the new shared grammar gate. Fixture dryRun proof is required.
+6. In sendOneThankYou, check ETag and use the exact subject/html from the same
+   family preparation function used in dryRun. The helper accepts raw frozen
+   templates/context (not arbitrary caller-provided prepared output) and calls
+   that pure preparation before attachment/claim. Non-dry sweep calls the helper;
+   dryRun calls only that pure preparation. This avoids different validation
+   rules or duplicate HTML rendering in the two paths,
    then build the full required attachment. Any preparation failure leaves the
    marker untouched; rendering/config failures are skippedMisconfigured, attachment
    failures retain attachmentFailed. Failed rows can recover on a later sweep.
-6. Claim with the original ETag and unchanged timestamp/attribution contract; reuse
+7. Claim with the original ETag and unchanged timestamp/attribution contract; reuse
    that timestamp for DOCX generatedAtIso. A lost claim means no transport.
-7. Send the frozen subject/html/attachment with unchanged PD/recipient/noFallback.
+8. Send the frozen subject/html/attachment with unchanged PD/recipient/noFallback.
    After-claim failure/unconfirmed classification stays at-most-once: record it,
    never clear the marker or auto-retry. Defaults changes cannot reopen it.
 
+The top-of-loop cap check still skips rows before context/preference reads once
+the non-dry attempted budget is reached. DryRun never increments attempted, so
+its scan remains uncapped by maxBatch as today.
 The existing attempted budget is a conservative upper bound on claims, not a new
 exact delivery count: preparation failures may consume the run's budget as today;
 preference-refused rows do not. Preserve no more than maxBatch potential claims.
@@ -191,7 +245,7 @@ Overlapping sweeps can prepare different snapshots but the original If-Match
 claim permits one winner; only that winner's frozen complete pair can send.
 There is no atomic transaction across owner preferences, request PD and the claim.
 Retain the existing per-run request-context snapshot; do not claim to solve live
-PD reassignment, reviewer address changes or historical manual-send races here.
+PD reassignment, reviewer address changes or compatibility manual-send races here.
 Any newly observed directly relevant unsafe race must be reported before coding.
 
 ## 6. Proposed client lifecycle and discard protection
@@ -204,9 +258,23 @@ Use a small family-owned lifecycle modeled on the reviewed scheduled component.
 
 Lazy open reads own/shared together; collapse retains local edits. Ordinary reopen
 of the page gets fresh defaults. Actor/profile pair scopes requests and state;
-strict identity match is required before enabling writes. Transient loading pauses
-retain the last same-actor draft while disabling actions; real actor change clears
-it and ignores late responses. Mounted/generation/inFlight guards cover reads,
+strict identity match is required before enabling writes: session profileId
+must equal currentProfile.id (normalized integer/string comparison), session actor
+must be a GUID, and every DTO authenticatedProfileId + ownerSystemId must match
+that exact pair (case-insensitive GUID). Mismatch hides raw fields and disables
+all writes, with an own-profile notice; never remap to the selected foreign
+profile. Transient loading pauses
+retain the last same-actor draft while disabling actions; real authenticated actor
+change clears it and ignores late responses. [VERIFIED via profile-settings.js:351:]
+the page has an isLoading early return, so child-only state would unmount and lose
+the draft. The family controller hook must run unconditionally in ProfileSettings
+before that return; the new form renders its model beside Reviewer Emails. This
+keeps state/uncertainty/navigation guards alive through loading without redesigning
+the page or generic editors. A foreign selected profile hides the form, never
+exposes another actor's draft. Wrap explicit Switch/current-profile Archive actions
+with the new family discard/pending warning before they change context; cancel
+keeps selection and draft. Forced session expiry/actor change prioritizes privacy.
+No unrelated profile mutations, persistence or permission rules are changed. Mounted/generation/inFlight guards cover reads,
 writes and finally branches. Raw fields never derive from rendered per-review text.
 
 Warn before Reload/Clear discards edits. Navigation/Back/reload/tab close warns for
@@ -216,7 +284,10 @@ loses only local state. A confirmed save with failed refresh has distinct truthf
 wording. Unconfirmed or malformed/foreign mutation receipt latches a write barrier
 until strict Reload; never offer blind repeated Save/Clear. Loading and disabled
 states must not silently dismiss dirty or uncertain edits. No mutation on collapse,
-navigation, load, preview or send. No unrelated Profile Settings behavior changes.
+navigation, load, preview or send. Update all affected help sites: EmailTemplatesModal legacy help; Profile Settings
+Reviewer Emails Admin-only thank-you sentence; reviewer-template source comment;
+and distinguish its legacy saved-signature explanation from this automatic
+setting's request-PD-resolved signature. No unrelated Profile Settings behavior changes.
 
 ## 7. Bounded files, planned tests and completion gates
 
@@ -276,4 +347,25 @@ fan-out and documentation checks are separate. New enum/status readers include
 API/UI/cron/Maintenance; the new key is hidden on generic paths. There is no new
 schema/transport state. Current live tenant configuration/delivery stays UNKNOWN.
 
-Independent Claude review pending. No runtime or database changes have been made.
+Initial independent Claude review at `dc9e65a5c`: READY WITH NAMED CHANGES.
+Verbatim: `docs/audits/REVIEWER_THANKYOU_DEFAULTS_PLAN_CLAUDE_REVIEW_2026-10-26.md`.
+R1–R5 revised above; delta rereview pending. No runtime or database changes.
+
+### Finding disposition / self-review
+
+| Finding | Plan resolution / independent evidence |
+| --- | --- |
+| R1 | Dropped new shared grammar refusal; no owner decision is invented. Existing shared unknown tokens remain literal. No new live dryRun requirement or unapproved Maintenance writes. |
+| R2 | Explicit rendered 2000/100000 code-unit limits, unchanged output/no trimming, CR/LF refusal, distinct context/copy reasons and repair behavior. No tenant metadata bound is assumed. |
+| R3 | Moved route outside review-manager; deliberate auth asymmetry and Profile matrix row specified; read the gate implementation, no directory inference. |
+| R4 | Eligible before lookup; pure render before dryRun; same failure counts, grouped capped diagnostics/no new counter; existing maxBatch/dry scan semantics pinned. |
+| R5 | Exact session/profile/DTO identity equality, mismatch hiding/disable; controller survives page loading early return; Switch/Archive guard and four help sites explicit. |
+| N1 | Partly REFUTED: manual marker writer still exists. send-emails-service.js:123,1178 imports/calls recordDeliveredEmail for non-invitation sends; record-email-outcome.js:28–33,73–88 maps thankyou→thankYouSentAt; reviewer-suggestion.js:1952 maps to wmkf_thankyousentat. It is post-send bookkeeping, not a pre-send claim. Preserve this baseline and excluded path, but do not repeat the cron header's incorrect claim that it can never double-thank versus manual delivery. Implementation header correction will describe sweep-to-sweep If-Match only and explicitly exclude manual coordination. |
+| N2/N3 | Family bounds/URL policy deliberate; literal URLs allowed as text; exact refused bracket aliases listed, case-sensitive prose allowed. |
+| N4 | Existing two guard sets and small two-key canonicalizer specified; all read/write paths and unrelated-key regression tests listed. |
+| N5/N6 | Existing pure body function runs separately for preflight and inside HTML render with identical frozen inputs; no clock/randomness. Test identical resolved subject/body/signature inputs/outputs; generatedAtIso reuse is explicitly retained behavior. |
+
+Additional tests pin R2 final bounds/context failures, R4 count placement/dryRun
+render failures/Maintenance status/group cap and maxBatch-before-lookup, R5 parent
+loading-unmount hazard/explicit Switch cancel and foreign DTO profile rejection.
+No claim that dryRun or this plan exercises Production delivery.
