@@ -3,7 +3,7 @@ title: Research request file corpus — index build (rollout step 3)
 kind: plan
 domain: dataverse
 status: draft
-summary: "Draft for owner approval: build the metadata index of SharePoint files for Research requests with a meeting year from 2018, in Postgres, from a fresh strict listing, classified by the filename rules; no text, no route, no model. Visibility decided (no per-request rule; admin exercise). Owner decisions still needed: where the first load runs and the migration number."
+summary: "Draft for owner approval: build the metadata index of SharePoint files for Research requests with a meeting year from 2018, in Postgres, from a fresh strict listing, classified by the filename rules; no text, no route, no model. Visibility decided (no per-request rule; admin exercise). Migration 090 free as of 2026-10-25. Owner decision still needed: where the first load runs."
 owner: product-engineering
 related:
   - docs/plans/RESEARCH_REQUEST_FILE_CORPUS_PLAN_2026-10-25.md
@@ -36,9 +36,11 @@ related:
    need `DATAVERSE_ALLOW_PROD_READS=yes`). Which database the local
    `POSTGRES_URL` points at is [ASSUMED unknown]; the owner confirms the target
    before the first load. A scheduled keep-current job is step 6.
-3. **Migration number: UNKNOWN** until an owner-run read of `schema_migrations`
-   is reconciled with the migration files on every branch
-   (`project-migration-numbers-claimed-off-main`).
+3. **Migration number: 090 is free as of 2026-10-25** [VERIFIED via an
+   owner-run read of Production `schema_migrations` (highest applied:
+   `089_manual_presentation_video_pairs.sql`) and a scan of every local and
+   `origin` branch (none has a migration numbered 090 or higher)]. Recheck both
+   just before the branch merges: another session can claim 090 first.
 
 ## Scope
 
