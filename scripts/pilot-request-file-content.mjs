@@ -7,6 +7,7 @@
  * SharePoint or Dataverse; makes no model calls.
  *
  *   node scripts/pilot-request-file-content.mjs --in=<inventory dir> --out-dir=<dir outside the repo> [--plan]
+ *     [--years=2018,2019,2021] [--recent=0]
  *
  * --plan is OFFLINE: it selects the sample from the inventory CSVs (see
  * report-request-file-rule-coverage.mjs), writes sample.csv and prints the
@@ -19,7 +20,10 @@
  *
  * Sample: non-test requests with files and no listing error; 10 each with a
  * meeting year of 1995, 2005, 2012, 2017 and 2020, and 5 with a meeting date
- * from 2025 on, taken at an even stride through request numbers. Every file of
+ * from 2025 on, taken at an even stride through request numbers. --years
+ * replaces the meeting years and --recent the recent count (the held-out
+ * 2018–2021 sample, owner-approved 2026-10-25, uses --years=2018,2019,2021
+ * --recent=0). Every file of
  * a sampled request is pulled (not just rule-matched Read files, so the pilot
  * can measure what the rules missed) except PowerPoint, which is deferred, up
  * to 40 files per request and 25 MB per file; each skip is recorded.
@@ -40,10 +44,11 @@ const PLAN_ONLY = process.argv.includes('--plan');
 if (!IN || !OUT_DIR) { console.error('--in=<inventory dir> and --out-dir=<dir outside the repo> are required'); process.exit(2); }
 if (path.resolve(OUT_DIR).startsWith(process.cwd() + path.sep)) { console.error('--out-dir must be outside the repo'); process.exit(2); }
 
-const YEARS = ['1995', '2005', '2012', '2017', '2020'];
+const YEARS = arg('years') ? arg('years').split(',') : ['1995', '2005', '2012', '2017', '2020'];
 const PER_YEAR = 10;
 const RECENT_FROM = '2025-01-01';
-const RECENT_COUNT = 5;
+const RECENT_COUNT = arg('recent') !== undefined ? Number(arg('recent')) : 5;
+if (YEARS.some((y) => !/^\d{4}$/.test(y)) || !Number.isInteger(RECENT_COUNT) || RECENT_COUNT < 0) { console.error('--years takes four-digit years; --recent a whole number'); process.exit(2); }
 const MAX_FILES_PER_REQUEST = 40;
 const MAX_BYTES = 25 * 1024 * 1024;
 const TIMEOUT_MS = 120_000;
@@ -86,7 +91,7 @@ const stride = (list, k) => {
 };
 const sample = [
   ...YEARS.flatMap((y) => stride(eligible.filter((r) => (r.meeting_date || '').startsWith(y)), PER_YEAR).map((r) => ({ ...r, cohort: y }))),
-  ...stride(eligible.filter((r) => (r.meeting_date || '') >= RECENT_FROM), RECENT_COUNT).map((r) => ({ ...r, cohort: 'recent' })),
+  ...(RECENT_COUNT ? stride(eligible.filter((r) => (r.meeting_date || '') >= RECENT_FROM), RECENT_COUNT).map((r) => ({ ...r, cohort: 'recent' })) : []),
 ];
 
 const extOf = (name) => (name.includes('.') ? name.split('.').pop().toLowerCase() : '');
@@ -129,7 +134,7 @@ console.log(`\nSample: ${sample.length} requests, ${toPull.length} files to pull
 for (const [cohort, p] of Object.entries(plan)) {
   console.log(`  ${cohort.padEnd(7)} ${String(p.requests.size).padStart(3)} requests  ${String(p.pull).padStart(4)} files  ${(p.bytes / 1e6).toFixed(0).padStart(5)} MB  skips: ${Object.entries(p.skips).map(([k, n]) => `${k} ${n}`).join(', ') || '-'}`);
 }
-for (const y of [...YEARS, 'recent']) if (!plan[y]) console.log(`  ${y}: no eligible requests`);
+for (const y of [...YEARS, ...(RECENT_COUNT ? ['recent'] : [])]) if (!plan[y]) console.log(`  ${y}: no eligible requests`);
 if (PLAN_ONLY) { console.log(`\nWrote ${path.join(OUT_DIR, 'sample.csv')} (plan only; nothing downloaded).`); process.exit(0); }
 
 // ---- download and extract (Production SharePoint, read-only) ----
