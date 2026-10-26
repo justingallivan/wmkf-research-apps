@@ -3,10 +3,11 @@ title: Research request file corpus — derived legible layer
 kind: plan
 domain: dataverse
 status: active
-summary: "Build a derived, rebuildable index (and extracted text) over the SharePoint files attached to Research requests, 1990–present, without moving or renaming originals, so staff can browse and AI/portfolio/outcome analyses can run. Based on the 2026-10-25 read-only inventory of 9,001 requests and 60,369 files (de-duplicated across runs); index starts in Postgres and settled fields are promoted to Dataverse as the durable record (owner decision 2026-10-25); owner approved a past-weighted content pilot (~55 requests) focused on science proposals, reviews, grant reports and staff writeups, with visibility governed by the app's request restrictions; inventory counts are provisional pending a strict re-listing."
+summary: "Build a derived, rebuildable index (and extracted text) over the SharePoint files attached to Research requests, 1990–present, without moving or renaming originals, so staff can browse and AI/portfolio/outcome analyses can run. Based on the 2026-10-25 read-only inventory of 9,001 requests and 60,369 files (de-duplicated across runs); index starts in Postgres and settled fields are promoted to Dataverse as the durable record (owner decision 2026-10-25); owner approved a past-weighted content pilot (~55 requests) focused on science proposals, reviews, grant reports and staff writeups, with visibility governed by the app's request restrictions; inventory counts are provisional pending a strict re-listing. The content pilot (55 requests, 449 files) found legacy .doc converts through Graph, about a quarter of PDFs need OCR, and the 1995–2012 archives hold staff and grant-management documents with strong first-line templates rather than proposals."
 owner: product-engineering
 related:
   - scripts/probe-request-file-inventory.mjs
+  - scripts/pilot-request-file-content.mjs
   - docs/DATAVERSE_SHAREPOINT_FILE_MODEL.md
   - shared/config/researchPrograms.js
   - lib/utils/sharepoint-buckets.js
@@ -227,6 +228,61 @@ status word beside "IRS". Tax determination letters themselves stay Type-only
 - These counts are a rule-quality signal, not a final classification: the pilot
   still measures missed Read documents among rule-matched samples (section 2).
 
+### 2b. Content pilot results — 2026-10-25 (rollout step 2)
+
+[VERIFIED via `scripts/pilot-request-file-content.mjs`, run by the owner against
+Production SharePoint, read-only; output in the owner's Shuttle folder.] Sample:
+55 non-test requests, 10 each with a meeting year of 1995, 2005, 2012, 2017 and
+2020 and 5 from 2025 on, taken at an even stride through request numbers. 466
+files were selected (every file except PowerPoint); 449 were downloaded with no
+download errors and 17 were skipped by the caps or as `.msg`. Findings hold for
+this sample only.
+
+- **Legacy `.doc` converts.** Graph's PDF conversion handled all 244 `.doc`
+  files: 232 gave full text, 11 gave little text and 1 none. All 25 `.xlsx`
+  converted. `.htm`/`.html` (19, including `Application<n>.html`) were read by
+  stripping tags locally, not through Graph. No `.xls` or `.rtf` was in the
+  sample, so their conversion is still untested.
+- **About a quarter of PDFs have no text layer.** Of 120 PDFs, 22 gave no text
+  and 7 gave very little (under 100 characters per page); these need OCR. Some
+  PDFs with a text layer carry poor OCR (misread letterheads, pages upside down),
+  so a text-quality check is needed besides "has text".
+- **Era 1 archives hold Foundation documents, not proposals.** In the 30
+  sampled requests from 1995, 2005 and 2012, no applicant proposal text was
+  found. The files are Foundation letters (66 by first line), staff memos,
+  grantee information sheets, proposal control sheets (1995), staff Phase I and
+  Phase II reviews (2005), Phase I Summary and Rationale write-ups (2012), grant
+  monitoring reports, financial summaries and grantee reports. For history, the
+  readable record in these years is the staff's account of each proposal.
+- **Opaque names hide strong templates.** Almost all of those files have
+  number-only names, but their first lines identify them: `PHASE I REVIEW`,
+  `PHASE II REVIEW`, `Phase I Summary and Rationale`, `Tracking Overview`,
+  `GRANTEE INFORMATION SHEET`, `GRANT MONITORING REPORT`, `Financial Summary
+  for:`, `Memorandum`, `PROPOSAL CONTROL SHEET`, and dated letters. Template
+  signatures (section 2) should classify most era 1–2 opaque files without a
+  model.
+- **"Phase II Review" names staff writeups in the older files.** In the sample,
+  documents headed `Phase II Review` (2005, 2017) are staff reviews with the
+  requested amount and budget, not external referee reviews (those are headed
+  `REFEREE REVIEW`). The filename rule that maps such names to `external-review`
+  (about 64 inventory filenames contain "Phase I(I) Review") needs a content check
+  before it is trusted; both types are Read, so nothing is excluded meanwhile.
+- **"References" files are referee lists, not bibliographies.** In 2020 the
+  files the `bibliography` rule matched are lists of suggested referees (names,
+  titles, addresses), and one 2017 match is a referee review. The type needs
+  renaming, and whether a referee list is Read or Type-only is an owner call.
+- **Type-only labels held in a spot check.** Type-only files were checked by
+  their first lines (up to six per type and cohort), and the 14 over 20,000
+  characters were searched for proposal terms; none was a proposal, review,
+  report or staff writeup. The large ones are audited financial statements,
+  annual reports and grant agreement packets.
+- **An unflagged test request.** One sampled recent request has placeholder
+  content ("blahblahblah", applicant "W M Keck Foundation") but no
+  `wmkf_istestrequest` flag, so the flag alone does not exclude all test data.
+- **No model pass yet.** Templates and filename rules explain the sample well
+  enough that the model is better spent on what remains after template
+  signatures than on the whole pilot.
+
 ### 3. One preferred text copy
 
 When a document exists in several formats, mark one as the text source: `txt`
@@ -237,16 +293,19 @@ Other copies stay indexed but are not extracted again.
 ### 4. Text extraction
 
 - PDF and DOCX: existing `pdf-parse` and `mammoth` (`lib/utils/file-loader.js`).
-- Legacy `.doc`, `.html`, `.xls`: convert through Graph's
-  PDF conversion (`GraphService.downloadFileAsPdf`) and then parse.
-  [ASSUMED: Microsoft documents `.doc`/`.html`/`.xls` as convertible; probe a
-  small sample of each before relying on it.]
+- Legacy `.doc` and `.xlsx`: convert through Graph's PDF conversion
+  (`GraphService.downloadFileAsPdf`) and then parse; the pilot converted all 244
+  `.doc` and 25 `.xlsx` files (section 2b). `.htm`/`.html`: strip tags locally.
+  `.xls` and `.rtf` were not in the pilot sample and stay [ASSUMED] convertible.
+  Do not route `.doc` through `lib/utils/file-loader.js`: its `.doc` branch
+  hands binary Word files to mammoth, which reads only `.docx`.
 - Spreadsheets: extract the cells as text (exceljs).
 - Recordings: not extracted; their transcripts stand in. In the 2026 created-year
   run all 24 requests with an MP4 also have at least one transcript file; a
   recording without one is flagged rather than transcribed.
 - Scanned PDFs without a text layer: flagged `needs-ocr`, not processed in the
-  first pass.
+  first pass. The pilot found about a quarter of PDFs in this state, plus some
+  with a poor OCR layer, so a text-quality score is recorded too (section 2b).
 
 ### 5. Where the index lives — decided: Postgres first, Dataverse as the durable record
 
