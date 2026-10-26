@@ -10,6 +10,18 @@ The chronological archive after the `Legacy chronological session log` divider c
 
 ---
 
+## October 2026 — Personal email defaults and reviewer recovery released (Session 642)
+
+**Milestone:** Released four personal email-default families and concurrent reviewer exclusion recovery while calendar/J27 decisions awaited colleagues.
+**Sessions:** Session 642; owner-approved contracts, independent ordinary OAuth Claude reviews, isolated tests and deliberate CI-gated releases.
+**Ship state:**
+- Reviewer exclusion recovery (#527 / `3e53510ff`) preserves concurrent selection/roster changes when exclusions fail.
+- Distribution (#529 / `7f2a6e9c8`) and scheduled grantee defaults/recovery (#531 / `6a37ea105`) retain discard warnings, reassignment holds and transport correlation.
+- Automatic thank-you (#533 / `a9e9b4de6`) and acceptance defaults (#534 / `8b02e8467`) prepare before claiming; acceptance subject-value normalization and PD-lookup retries preserve owner policies.
+- All release CI passed; production deployment/read-only verification recorded. Acceptance:421 focused tests,3 isolated PG cases,15 browser cases and final Claude PASS; no live acceptance email or preference mutation tested. Claude's database work untouched.
+**Why it matters:** staff can reuse their own wording while preserving server-owned email authority and explicit recovery for uncertain operations.
+**Pointers:** `docs/plans/PERSONAL_EMAIL_DEFAULTS_TODO_2026-09-20.md`; `docs/audits/REVIEWER_ACCEPTANCE_DEFAULTS_RELEASE_2026-10-26.md`; `docs/audits/SCHEDULED_GRANTEE_DEFAULTS_RELEASE_2026-10-25.md`; `docs/plans/REVIEWER_SEARCH_FOLLOW_UPS_2026-09-18.md` (F2).
+
 ## October 2026 — Personal email defaults and consistent desktop composers released (Sessions 639–640)
 
 **Milestone:** Released personal defaults for reviewer deadline and pre-discussion agenda emails, then harmonized email interfaces across the suite.
