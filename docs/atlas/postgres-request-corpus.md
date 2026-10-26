@@ -2,8 +2,8 @@
 title: "Atlas: Research request file corpus index"
 domain: postgres
 kind: state-page
-status: source-built
-summary: "Migration 090 adds request_corpus_runs, request_corpus_requests and request_corpus_files: a derived, rebuildable metadata index of SharePoint files for Research requests with meeting years from 2018, filled by an owner-run loader. Branch-built 2026-10-25; migration applied to the shared app database from the branch (not merged); first full load 2026-10-26: 3,852 requests, 38,340 files, 2 known errors. No route reads it; admin use only."
+status: live
+summary: "Migration 090 adds request_corpus_runs, request_corpus_requests and request_corpus_files: a derived, rebuildable metadata index of SharePoint files for Research requests with meeting years from 2018, filled by an owner-run loader. Branch-built 2026-10-25; migration applied to the shared app database from the branch; merged to main 2026-10-26; first full load 2026-10-26: 3,852 requests, 38,340 files, 2 known errors. No route reads it; admin use only."
 canonical: true
 cataloged: 2026-10-25
 owner: product-engineering
@@ -21,7 +21,7 @@ related:
 [VERIFIED via source and recording-client unit tests, 2026-10-25; branch
 `claude/request-corpus-index`. Migration 090 applied to the shared app database
 from that branch on 2026-10-25 by the owner (`scripts/apply-migrations.js`: 1
-applied, 88 skipped); not merged. First full load 2026-10-26, owner-run: run
+applied, 88 skipped); merged to `main` 2026-10-26 (`460e4476a`). First full load 2026-10-26, owner-run: run
 `5631c55d-1b92-498f-9e93-e625dd1bfd16`, 3,852 requests listed, 38,340 files,
 2 known listing errors (requests 992853 and 994366); details in the build
 plan, "First Production load".]

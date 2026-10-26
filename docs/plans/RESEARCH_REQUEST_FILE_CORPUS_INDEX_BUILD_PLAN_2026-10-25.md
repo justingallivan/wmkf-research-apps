@@ -3,7 +3,7 @@ title: Research request file corpus — index build (rollout step 3)
 kind: plan
 domain: dataverse
 status: active
-summary: "Approved: build the metadata index of SharePoint files for Research requests with a meeting year from 2018, in Postgres, from a fresh strict listing, classified by the filename rules; no text, no route, no model. Visibility decided (no per-request rule; admin exercise). Migration 090 free as of 2026-10-25. Owner-run local loader decided. Built on a branch; migration 090 applied from the branch; first full load run 2026-10-26 (3,852 requests, 38,340 files, 2 known errors); not merged."
+summary: "Approved: build the metadata index of SharePoint files for Research requests with a meeting year from 2018, in Postgres, from a fresh strict listing, classified by the filename rules; no text, no route, no model. Visibility decided (no per-request rule; admin exercise). Migration 090 free as of 2026-10-25. Owner-run local loader decided. Built on a branch; migration 090 applied from the branch; first full load run 2026-10-26 (3,852 requests, 38,340 files, 2 known errors); merged to main 2026-10-26 (460e4476a)."
 owner: product-engineering
 related:
   - docs/plans/RESEARCH_REQUEST_FILE_CORPUS_PLAN_2026-10-25.md
@@ -15,7 +15,7 @@ related:
 
 # Research request file corpus — index build (rollout step 3)
 
-[APPROVED by the owner 2026-10-25; built on branch `claude/request-corpus-index`, not merged; migration 090 applied from the branch; first full load completed 2026-10-26 (see "First Production load"). Parent plan:
+[APPROVED by the owner 2026-10-25; built on branch `claude/request-corpus-index`, merged to `main` 2026-10-26 (`460e4476a`) after a final review; migration 090 applied from the branch; first full load completed 2026-10-26 (see "First Production load"). Parent plan:
 `docs/plans/RESEARCH_REQUEST_FILE_CORPUS_PLAN_2026-10-25.md`, rollout step 3.]
 
 ## Decisions needed from the owner
@@ -43,8 +43,9 @@ related:
 3. **Migration number: 090 is free as of 2026-10-25** [VERIFIED via an
    owner-run read of Production `schema_migrations` (highest applied:
    `089_manual_presentation_video_pairs.sql`) and a scan of every local and
-   `origin` branch (none has a migration numbered 090 or higher)]. Recheck both
-   just before the branch merges: another session can claim 090 first.
+   `origin` branch (none has a migration numbered 090 or higher)]. Rechecked
+   2026-10-26 before the merge: no other local or `origin` branch had a
+   migration numbered 090 or higher.
    **Applied 2026-10-25 before merge**, by the owner running
    `scripts/apply-migrations.js` from branch `claude/request-corpus-index` at
    `4ab2124d2` against the shared app database (1 applied, 88 skipped). A
