@@ -71,4 +71,6 @@ None in the app. Owner analysis queries only.
 
 Filenames can name applicants and referees; the rows hold what SharePoint
 shows staff. No automatic deletion: absent files keep their row with
-`removed_at`. The tables can be dropped and rebuilt from SharePoint.
+`removed_at`. The tables can be dropped and rebuilt from SharePoint. File rows
+reference their request row; `last_run_id` is a plain column (no foreign key),
+so old run rows can be pruned without touching files.

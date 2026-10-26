@@ -134,7 +134,7 @@ describe('saveRequestListing', () => {
     const result = await saveRequestListing(client, { request, files: [file('a', 'ProjectDescription.pdf'), file('b', 'Budget.xlsx')], runId: RUN_ID, rulesVersion: 'v1' });
     const texts = client.calls.map((c) => c.text);
     expect(texts[0]).toBe('BEGIN');
-    expect(texts[1]).toMatch(/^INSERT INTO request_corpus_requests .* file_count = EXCLUDED.file_count/);
+    expect(texts[1]).toMatch(/^INSERT INTO request_corpus_requests .* file_count = CASE WHEN EXCLUDED.listing_status = 'ok' THEN EXCLUDED.file_count ELSE request_corpus_requests.file_count END/);
     expect(client.calls[1].params.slice(7, 11)).toEqual([4, 'ok', null, 2]);
     expect(texts[2]).toMatch(/^INSERT INTO request_corpus_files .* ON CONFLICT \(drive_id, item_id\) DO UPDATE SET request_id = EXCLUDED.request_id.* removed_at = NULL/);
     expect(client.calls[2].params[1]).toEqual(['a', 'b']);
@@ -171,7 +171,7 @@ describe('saveRequestError', () => {
     const client = recordingClient();
     await saveRequestError(client, { request, error: 'RequestArchive3: limit', runId: RUN_ID });
     expect(client.calls).toHaveLength(1);
-    expect(client.calls[0].text).toMatch(/file_count = request_corpus_requests.file_count/);
+    expect(client.calls[0].text).toMatch(/ELSE request_corpus_requests.file_count END/);
     expect(client.calls[0].params.slice(8, 10)).toEqual(['error', 'RequestArchive3: limit']);
     expect(client.calls[0].text).not.toMatch(/request_corpus_files/);
   });

@@ -26,7 +26,7 @@ CREATE TABLE IF NOT EXISTS request_corpus_requests (
   listing_error TEXT,
   file_count INTEGER NOT NULL DEFAULT 0,
   last_listed_at TIMESTAMPTZ NOT NULL,
-  last_run_id UUID NOT NULL REFERENCES request_corpus_runs(run_id)
+  last_run_id UUID NOT NULL
 );
 
 CREATE TABLE IF NOT EXISTS request_corpus_files (
@@ -49,7 +49,7 @@ CREATE TABLE IF NOT EXISTS request_corpus_files (
   first_seen_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   last_seen_at TIMESTAMPTZ NOT NULL,
   removed_at TIMESTAMPTZ,
-  last_run_id UUID NOT NULL REFERENCES request_corpus_runs(run_id),
+  last_run_id UUID NOT NULL,
   PRIMARY KEY (drive_id, item_id)
 );
 
