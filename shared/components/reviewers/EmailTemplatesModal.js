@@ -15,7 +15,7 @@ export default function EmailTemplatesModal({ onClose }) {
           <Button variant={type === 'materials' ? 'primary' : 'outline'} disabled={busy} onClick={() => setType('materials')}>Materials (post-accept)</Button>
         </div>
         <details className="mb-4 rounded border border-gray-200 p-3"><summary className="cursor-pointer text-sm font-medium">Legacy templates</summary>
-          <p className="mt-2 text-sm text-gray-600">Retained for compatibility. Current staff send actions do not use Follow-up reminder or Thank-you. Automatic reviewer thank-yous use separate Admin defaults.</p>
+          <p className="mt-2 text-sm text-gray-600">Retained for compatibility. Current staff send actions do not use Follow-up reminder or Thank-you. Automatic reviewer thank-yous use a separate setting in Profile Settings → Reviewer Emails; this legacy tab does not control them.</p>
           <div className="mt-3 flex gap-2"><Button variant="outline" disabled={busy} onClick={() => setType('followup')}>Follow-up reminder</Button><Button variant="outline" disabled={busy} onClick={() => setType('thankyou')}>Thank-you</Button></div>
         </details>
         <p className="mb-3 text-sm text-gray-600">Editing {({ invitation: 'Invitation', materials: 'Materials (post-accept)', followup: 'Legacy follow-up reminder', thankyou: 'Legacy thank-you' })[type]}. Changes apply to future emails only.</p>

@@ -65,6 +65,19 @@ absence alone inherits shared wording. Generic preference reads/writes hide/refu
 this key. No schema or uniqueness constraint added; release verification did
 not write live preferences. Proof: `docs/audits/SCHEDULED_GRANTEE_DEFAULTS_RELEASE_2026-10-25.md`.
 
+**Automatic reviewer thank-you defaults (branch-built 2026-10-26, not released):**
+`reviewer_automatic_thankyou_template` is a separate exact-owner raw subject/body
+pair in existing Dataverse preferences, not `reviewer_email_templates.thankyou`.
+The dedicated staff self-service route verifies session GUID/profile equality,
+completely enumerates exact owner/key rows and confirms Save/Clear readback.
+Profile Settings holds an independent actor-bound editor; generic key aliases
+are private/reserved. Sweep caches the sending PD's resolved pair per run;
+absence alone inherits shared Admin wording. Invalid/unreadable/duplicate values
+pause only that PD before claim. Both copy sources undergo final rendered safety
+checks before DOCX/If-Match claim; unknown shared tokens keep legacy behavior.
+No new schema or transport/claim semantics; no live preference operation performed.
+See `docs/plans/PERSONAL_EMAIL_REVIEWER_THANKYOU_DEFAULTS_PLAN_2026-10-26.md`.
+
 ### `system_settings` — RETIRED 2026-05-12 (was Postgres / now Dataverse-only)
 **Source of truth:** **Dataverse `wmkf_appsystemsettings`**. Postgres table dropped via migration `007_drop_wave1_tables.sql` on 2026-05-12. Final reconciliation on 2026-05-11 synced 10 tier-keyed `model_override:*` rows from S145 dev writes (PG→DV); counts matched (45/45) before the drop.
 **Live adapter:** `lib/services/dataverse-settings-service.js`.

@@ -17,6 +17,8 @@ jest.mock('../../lib/services/dynamics-service', () => ({
     createAndSendEmail: (...a) => createAndSendEmail(...a),
   },
 }));
+const ownReviewerThankYouTemplate = jest.fn();
+jest.mock('../../lib/services/reviewer-thankyou-personalization', () => ({ ownReviewerThankYouTemplate: (...args) => ownReviewerThankYouTemplate(...args) }));
 const readRequiredEmailDefaults = jest.fn();
 jest.mock('../../lib/services/email-defaults', () => ({
   readRequiredEmailDefaults: (...a) => readRequiredEmailDefaults(...a),
@@ -58,12 +60,12 @@ jest.mock('../../lib/services/test-requests/request-test-state', () => ({
   createRequestTestStateLookup: () => (requestId) => mockRequestTestState(requestId),
 }));
 
-const { sweepReviewThankYous } = require('../../lib/services/reviewer-thankyou-sweep');
+const { sweepReviewThankYous, prepareReviewerThankYou } = require('../../lib/services/reviewer-thankyou-sweep');
 const { claimThankYou } = require('../../lib/dataverse/adapters/reviewer-suggestion');
 
 const SUG = '11111111-1111-4111-8111-111111111111';
 const REQ = 'req-1';
-const PD = 'pd-1';
+const PD = 'dddddddd-dddd-4ddd-8ddd-dddddddddddd';
 const PERSON = 'person-1';
 const SUBJECT_KEY = 'email.reviewer_thankyou.subject';
 const BODY_KEY = 'email.reviewer_thankyou.body';
@@ -100,6 +102,8 @@ function candidate(over = {}) {
 
 beforeEach(() => {
   jest.clearAllMocks();
+  updateRecord.mockReset(); renderIndividualReviewDocx.mockReset(); ownReviewerThankYouTemplate.mockReset();
+  ownReviewerThankYouTemplate.mockReset().mockResolvedValue({ status: 'absent', template: null });
   mockRequestTestState.mockImplementation(async () => ({ kind: 'ordinary', reason: 'test' }));
   readRequiredEmailDefaults.mockResolvedValue({
     ok: true,
@@ -363,4 +367,96 @@ describe('Test Request isolation (Stage 1c)', () => {
     expect(updateRecord).not.toHaveBeenCalled();
     expect(createAndSendEmail).not.toHaveBeenCalled();
   });
+});
+
+describe('automatic personal defaults and pre-claim safety', () => {
+  const own = (subject, body) => ({ status: 'configured', template: { subject, body } });
+  const safe = { subject: 'Personal {{proposalTitle}}', body: '{{greeting}} thank you for {{proposalTitle}}. {{signature}}' };
+  test('personal raw pair is rendered before DOCX/claim and sends exact server sender, attachment and signature', async () => {
+    queryAllRecords.mockResolvedValue({ records: [candidate()] }); installReads(); ownReviewerThankYouTemplate.mockResolvedValue(own(safe.subject, safe.body));
+    const result = await sweepReviewThankYous(); expect(result.sent).toBe(1); expect(ownReviewerThankYouTemplate).toHaveBeenCalledWith(PD);
+    const email = createAndSendEmail.mock.calls[0][0]; expect(email.subject).toBe('Personal A Proposal'); expect(email.body).toContain('thank you for A Proposal'); expect(email.body).toContain('Dr. PD');
+    expect(email).toMatchObject({ from: 'pd@keck.org', to: 'rev@example.org', actingUserSystemId: PD, noFallback: true });
+    expect(email.attachments[0].content).toEqual(Buffer.from('docx-bytes'));
+  });
+  test.each(['invalid', 'duplicates', 'encrypted', 'unavailable', 'identity_unavailable'])('%s own defaults pause before attachment/claim without fallback', async status => {
+    queryAllRecords.mockResolvedValue({ records: [candidate()] }); installReads(); ownReviewerThankYouTemplate.mockResolvedValue({ status, template: null });
+    const result = await sweepReviewThankYous(); expect(result).toMatchObject({ eligible: 1, skipped: 1, skippedMisconfigured: 1, sent: 0 });
+    expect(result.errors[0].reason).toBe(`preference_${status}`); expect(renderIndividualReviewDocx).not.toHaveBeenCalled(); expect(updateRecord).not.toHaveBeenCalled(); expect(createAndSendEmail).not.toHaveBeenCalled();
+  });
+  test.each([false, true])('shared empty rendered business copy is refused before claim, then recovers in a fresh run (dry=%s)', async dryRun => {
+    queryAllRecords.mockResolvedValue({ records: [candidate()] }); installReads();
+    readRequiredEmailDefaults.mockResolvedValueOnce({ ok: true, values: { [SUBJECT_KEY]: SUBJECT, [BODY_KEY]: '{{honorariumNote}}' } });
+    const failed = await sweepReviewThankYous({ dryRun }); expect(failed).toMatchObject({ eligible: 1, skipped: 1, skippedMisconfigured: 1, claimFailed: 0, sent: 0 });
+    expect(failed.errors[0].reason).toBe('rendered_copy_invalid'); expect(updateRecord).not.toHaveBeenCalled(); expect(renderIndividualReviewDocx).not.toHaveBeenCalled();
+    const recovered = await sweepReviewThankYous(); expect(recovered.sent).toBe(1); expect(updateRecord).toHaveBeenCalledTimes(1); expect(ownReviewerThankYouTemplate).toHaveBeenCalledTimes(2);
+  });
+  test.each([['newline', 'A\nProposal', SUBJECT, BODY], ['long subject', 'x'.repeat(2001), '{{proposalTitle}}', BODY], ['long body', 'x'.repeat(60000), 'Thanks', '{{proposalTitle}}{{proposalTitle}}']])('expanded context %s refuses before DOCX/claim', async (_kind, title, subject, body) => {
+    queryAllRecords.mockResolvedValue({ records: [candidate()] }); installReads({ request: requestConfig({ akoya_title: title }) });
+    readRequiredEmailDefaults.mockResolvedValue({ ok: true, values: { [SUBJECT_KEY]: subject, [BODY_KEY]: body } });
+    const result = await sweepReviewThankYous(); expect(result.skippedMisconfigured).toBe(1); expect(result.errors[0].reason).toBe('rendered_context_invalid'); expect(updateRecord).not.toHaveBeenCalled(); expect(renderIndividualReviewDocx).not.toHaveBeenCalled();
+  });
+  test.each([false, true])('invalid concrete ETag and bad copy count claimFailed first in both modes (dry=%s)', async dryRun => {
+    queryAllRecords.mockResolvedValue({ records: [candidate({ _etag: '*' })] }); installReads();
+    readRequiredEmailDefaults.mockResolvedValue({ ok: true, values: { [SUBJECT_KEY]: 'x\ny', [BODY_KEY]: '{{honorariumNote}}' } });
+    expect(await sweepReviewThankYous({ dryRun })).toMatchObject({ claimFailed: 1, skipped: 0, skippedMisconfigured: 0 });
+    expect(updateRecord).not.toHaveBeenCalled(); expect(renderIndividualReviewDocx).not.toHaveBeenCalled();
+  });
+  test('shared unknown/legacy token grammar stays compatible, but personal unknown tokens do not', async () => {
+    queryAllRecords.mockResolvedValue({ records: [candidate()] }); installReads();
+    readRequiredEmailDefaults.mockResolvedValue({ ok: true, values: { [SUBJECT_KEY]: 'Shared {{future}} [proposal title]', [BODY_KEY]: '[greeting] {{future}} [Program Director signature]' } });
+    expect((await sweepReviewThankYous()).sent).toBe(1); expect(createAndSendEmail.mock.calls[0][0]).toMatchObject({ subject: 'Shared {{future}} A Proposal' });
+    expect(createAndSendEmail.mock.calls[0][0].body).toContain('{{future}}');
+    updateRecord.mockClear(); createAndSendEmail.mockClear(); ownReviewerThankYouTemplate.mockResolvedValue(own('{{future}}', '{{greeting}} Thanks'));
+    expect((await sweepReviewThankYous()).skippedMisconfigured).toBe(1); expect(updateRecord).not.toHaveBeenCalled(); expect(createAndSendEmail).not.toHaveBeenCalled();
+  });
+  test('same-PD failures share one snapshot/group while other PDs proceed; next run reads fresh', async () => {
+    const OTHER = 'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee';
+    queryAllRecords.mockResolvedValue({ records: [candidate(), candidate({ wmkf_appreviewersuggestionid: 'row2', _wmkf_request_value: 'req-2' }), candidate({ wmkf_appreviewersuggestionid: 'row3', _wmkf_request_value: 'req-3' })] });
+    getRecord.mockImplementation(async (set, id) => set === 'akoya_requests' ? requestConfig({ akoya_requestid: id, _wmkf_programdirector_value: id === 'req-3' ? OTHER : PD.toUpperCase() }) : set === 'systemusers' ? { systemuserid: id, internalemailaddress: 'pd@keck.org', isdisabled: false } : { wmkf_name: 'Reviewer', wmkf_emailaddress: 'rev@example.org' });
+    ownReviewerThankYouTemplate.mockImplementation(async id => id === PD ? { status: 'unavailable' } : { status: 'absent' });
+    const first = await sweepReviewThankYous(); expect(first).toMatchObject({ eligible: 3, skippedMisconfigured: 2, sent: 1 }); expect(ownReviewerThankYouTemplate).toHaveBeenCalledTimes(2); expect(first.errors[0]).toMatchObject({ affectedCount: 2, sampleIds: [SUG, 'row2'] });
+    queryAllRecords.mockResolvedValue({ records: [candidate()] }); installReads(); ownReviewerThankYouTemplate.mockResolvedValue({ status: 'absent' });
+    expect((await sweepReviewThankYous()).sent).toBe(1); expect(ownReviewerThankYouTemplate).toHaveBeenCalledTimes(3);
+  });
+  test('same-PD successful snapshot remains complete when saved default changes between rows', async () => {
+    queryAllRecords.mockResolvedValue({ records: [candidate(), candidate({ wmkf_appreviewersuggestionid: 'row2' })] }); installReads();
+    ownReviewerThankYouTemplate.mockResolvedValueOnce(own('First subject', 'First body')).mockResolvedValue(own('Later subject', 'Later body'));
+    expect((await sweepReviewThankYous()).sent).toBe(2); expect(ownReviewerThankYouTemplate).toHaveBeenCalledTimes(1);
+    expect(createAndSendEmail.mock.calls.every(([email]) => email.subject === 'First subject' && email.body.includes('First body'))).toBe(true);
+  });
+  test('overlapping sweeps with different default snapshots have one ETag winner and one unmixed pair', async () => {
+    queryAllRecords.mockResolvedValue({ records: [candidate()] }); installReads();
+    ownReviewerThankYouTemplate.mockResolvedValueOnce(own('Subject A', 'Body A')).mockResolvedValueOnce(own('Subject B', 'Body B'));
+    let release; const prepared = new Promise(r => { release = r; }); let arrivals = 0;
+    renderIndividualReviewDocx.mockImplementation(async () => { if (++arrivals === 2) release(); await prepared; return Buffer.from('docx-bytes'); });
+    let claimed = false; updateRecord.mockImplementation(async () => { if (claimed) throw Object.assign(new Error('etag mismatch'), { status: 412 }); claimed = true; });
+    const results = await Promise.all([sweepReviewThankYous(), sweepReviewThankYous()]);
+    expect(results.reduce((sum, x) => sum + x.sent, 0)).toBe(1); expect(results.reduce((sum, x) => sum + x.claimFailed, 0)).toBe(1); expect(createAndSendEmail).toHaveBeenCalledTimes(1);
+    const email = createAndSendEmail.mock.calls[0][0]; expect(email.body).toContain(email.subject === 'Subject A' ? 'Body A' : 'Body B'); expect(ownReviewerThankYouTemplate).toHaveBeenCalledTimes(2);
+  });
+  test('diagnostic caps do not hide refusal counts; maxBatch stops lookup on rows after an attempt', async () => {
+    const records = Array.from({ length: 120 }, (_, i) => candidate({ wmkf_appreviewersuggestionid: `row${i}` })); queryAllRecords.mockResolvedValue({ records }); installReads(); ownReviewerThankYouTemplate.mockResolvedValue({ status: 'unavailable' });
+    const failed = await sweepReviewThankYous({ maxBatch: 1 }); expect(failed.skippedMisconfigured).toBe(120); expect(failed.errors).toHaveLength(1); expect(failed.errors[0]).toMatchObject({ affectedCount: 120 }); expect(failed.errors[0].sampleIds).toHaveLength(10);
+    ownReviewerThankYouTemplate.mockClear().mockResolvedValue({ status: 'absent' });
+    expect(await sweepReviewThankYous({ maxBatch: 1 })).toMatchObject({ sent: 1, eligible: 1, skipped: 119 }); expect(ownReviewerThankYouTemplate).toHaveBeenCalledTimes(1);
+  });
+});
+
+
+test('final rendered bounds are inclusive, whitespace is checked but not rewritten, and unknown sources refuse', () => {
+  const args = { row: candidate(), request: requestConfig(), pd: { fullname: 'PD', internalemailaddress: 'pd@keck.org' }, reviewer: { wmkf_name: 'Reviewer' }, signatureBlock: { signature: 'PD' }, subjectTemplate: 'x'.repeat(2000), bodyTemplate: 'x'.repeat(100000) };
+  expect(prepareReviewerThankYou(args).ok).toBe(true);
+  expect(prepareReviewerThankYou({ ...args, subjectTemplate: 'x'.repeat(2001) }).reason).toBe('rendered_context_invalid');
+  expect(prepareReviewerThankYou({ ...args, bodyTemplate: 'x'.repeat(100001) }).reason).toBe('rendered_context_invalid');
+  expect(prepareReviewerThankYou({ ...args, subjectTemplate: '  Padded  ', bodyTemplate: ' Body ' }).subject).toBe('  Padded  ');
+  expect(prepareReviewerThankYou({ ...args, source: 'unknown' }).reason).toBe('preference_invalid');
+});
+test('new diagnostic groups cap at100 while every PD refusal is counted and no claim occurs', async () => {
+  const ids = Array.from({ length: 105 }, (_, i) => `${String(i + 1).padStart(8, '0')}-1111-4111-8111-111111111111`);
+  queryAllRecords.mockResolvedValue({ records: ids.map(id => candidate({ wmkf_appreviewersuggestionid: id, _wmkf_request_value: id })) });
+  getRecord.mockImplementation(async (set, id) => set === 'akoya_requests' ? requestConfig({ akoya_requestid: id, _wmkf_programdirector_value: id }) : set === 'systemusers' ? { systemuserid: id, internalemailaddress: 'pd@keck.org', isdisabled: false } : { wmkf_name: 'Reviewer', wmkf_emailaddress: 'rev@example.org' });
+  ownReviewerThankYouTemplate.mockResolvedValue({ status: 'duplicates' });
+  const result = await sweepReviewThankYous(); expect(result.skippedMisconfigured).toBe(105); expect(result.errors).toHaveLength(100);
+  expect(updateRecord).not.toHaveBeenCalled(); expect(createAndSendEmail).not.toHaveBeenCalled();
 });

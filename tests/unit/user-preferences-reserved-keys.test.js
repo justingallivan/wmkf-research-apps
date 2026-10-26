@@ -238,3 +238,16 @@ test.each([' scheduled_grantee_reminder_template ', '\tSCHEDULED_GRANTEE_REMINDE
   const post = mockRes(); await handler({ method: 'POST', body: { key, value: '{}' } }, post); expect(post.statusCode).toBe(403);
   const del = mockRes(); await handler({ method: 'DELETE', body: { key } }, del); expect(del.statusCode).toBe(403);
 });
+
+
+describe.each(['reviewer_automatic_thankyou_template', 'REVIEWER_AUTOMATIC_THANKYOU_TEMPLATE', ' \tReviewer_Automatic_Thankyou_Template\n'])('automatic thank-you private key %p', key => {
+  test('actual list/keyed rows cannot leak', async () => {
+    DatabaseService.getUserPreferences.mockResolvedValueOnce({ [key]: 'private copy', safe: 'visible' });
+    const list = mockRes(); await handler({ method: 'GET', query: {} }, list); expect(list.body.preferences).toEqual({ safe: 'visible' });
+    const keyed = mockRes(); await handler({ method: 'GET', query: { key } }, keyed); expect(keyed.statusCode).toBe(403);
+  });
+  test.each([['POST', { key, value: '{}' }], ['POST', { preferences: { [key]: '{}' } }], ['DELETE', { key }], ['DELETE', { keys: [key] }]])('refuses %s mutation %p', async (method, body) => {
+    const res = mockRes(); await handler({ method, body }, res); expect(res.statusCode).toBe(403);
+    expect(DatabaseService.setUserPreference).not.toHaveBeenCalled(); expect(DatabaseService.setUserPreferences).not.toHaveBeenCalled(); expect(DatabaseService.deleteUserPreference).not.toHaveBeenCalled();
+  });
+});

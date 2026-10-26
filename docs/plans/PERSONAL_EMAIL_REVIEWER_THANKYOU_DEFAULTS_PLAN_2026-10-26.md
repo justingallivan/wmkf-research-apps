@@ -3,7 +3,7 @@ title: Personal defaults for automated reviewer thank-you emails
 domain: reviewers
 kind: plan
 status: active
-summary: "Plan-only slice 8; independent Claude READY TO IMPLEMENT at 8af5b8381 with R1–R5 closed. Separate exact-owner default/editor and pre-claim preparation. Owner confirmed rendered-copy safety holds also apply to inherited Admin wording; no runtime or live writes."
+summary: "Slice 8 branch-built; implementation verification and independent Claude code review in progress, not released. Owner authorized implementation and approved rendered safety holds for both sources; separate exact-owner editor, pre-claim preparation and planned tests. No live writes or schema changes."
 owner: product-engineering
 related:
   - docs/plans/PERSONAL_EMAIL_DEFAULTS_INVENTORY_2026-09-24.md
@@ -16,11 +16,12 @@ related:
 
 ## 1. Status, scope and ownership
 
-[PLANNED, NOT BUILT; INDEPENDENT REVIEW READY TO IMPLEMENT.]
+[BRANCH-BUILT; VERIFICATION/CODE REVIEW IN PROGRESS; NOT RELEASED.]
 Owner confirmed the final safety policy on 2026-10-26 (§9). Justin authorized current-flow review, a bounded plan and
 independent Claude review before coding. This plan proposes the contract below;
-it is not authorization to implement or release. Baseline `448ed17d1` on main;
-Codex owns `codex/reviewer-thankyou-defaults-plan` in the existing isolated worktree.
+implementation was separately authorized by Justin on 2026-10-26. Release is not
+authorized. Baseline `448ed17d1` on main;
+Codex owns implementation branch `codex/reviewer-thankyou-defaults` in the existing isolated worktree.
 Claude's other checkout, corpus/database work, migrations and environment are
 excluded. No live tenant probe, preference/shared-setting write, cron invocation,
 mail send, migration, seed or deployment belongs to this planning task.
@@ -49,7 +50,8 @@ new scheduler, delivery ledger or transport retry policy. No schema change.
 
 [VERIFIED via tests.] Five baseline mocked suites / 49 tests passed: thank-you
 sweep, cron route, reminder renderer, email-template store and modal validation.
-No new feature tests exist yet. Production saved values, row counts and delivery
+At that planning checkpoint no feature tests existed; implementation tests are
+now present and undergoing verification. Production saved values, row counts and delivery
 are UNKNOWN; Atlas dates and seed copy are not proof of current tenant content.
 I read the email-template-token-syntax memory: new personal copy uses mustache;
 legacy shared aliases remain supported, with no renderer cleanup in this slice.
@@ -363,7 +365,7 @@ schema/transport state. Current live tenant configuration/delivery stays UNKNOWN
 Initial independent Claude review at `dc9e65a5c`: READY WITH NAMED CHANGES.
 Verbatim: `docs/audits/REVIEWER_THANKYOU_DEFAULTS_PLAN_CLAUDE_REVIEW_2026-10-26.md`.
 R1–R5 revised above; delta rereview at `8af5b8381` returned READY TO IMPLEMENT.
-Verbatim: `docs/audits/REVIEWER_THANKYOU_DEFAULTS_PLAN_CLAUDE_REREVIEW_2026-10-26.md`. No runtime or database changes.
+Verbatim: `docs/audits/REVIEWER_THANKYOU_DEFAULTS_PLAN_CLAUDE_REREVIEW_2026-10-26.md`. No runtime or database changes occurred during that plan review.
 
 ### Finding disposition / self-review
 
@@ -405,11 +407,12 @@ Report the distinct reason/counts, leave the marker untouched, and retry only af
 context or wording repair. Shared TOKEN GRAMMAR remains unchanged: unknown legacy
 shared tokens retain the existing literal-render behavior, subject to these final
 rendered safety checks. No remaining product-policy choice in this plan.
-Implementation and release still require separate authorization.
+Implementation was subsequently authorized on 2026-10-26; release remains a
+separate decision after independent code review.
 
-Bounded sweep Mode A: slice 8 moved from not-started to plan-reviewed, not built.
-Current TODO and inventory link this plan/review; source, Atlas, route matrix and
-counts still describe deployed behavior, with no imaginary route/table. Historical
+Bounded sweep Mode A: slice 8 is now branch-built, with verification/code review in progress; not released.
+Current TODO/inventory, source, Atlas, route matrix and counts distinguish this
+new branch implementation from deployed behavior. Historical
 review reports retained verbatim, other slices/corpus work excluded. Doc/fact/
 symbol/build/catalog and secret gates+self-tests run sequentially before closeout.
-Owner: Codex; plan branch above; next action: authorize implementation if desired. No production or database state was touched.
+Owner: Codex; plan branch above; next action: finish verification and independent implementation review. No production or database state was touched.

@@ -8,6 +8,7 @@ import ProfileSettings from '../../pages/profile-settings';
 import { PREFERENCE_KEYS } from '../../shared/config/reviewerFinderPreferences';
 import { GRANTEE_INVITE_SEED_BODY } from '../../lib/seed/email-defaults/grantee-invite';
 
+jest.mock('../../shared/components/reviewers/ReviewerThankYouDefault', () => ({ __esModule: true, default: () => null, useReviewerThankYouDefaults: () => ({ confirmContextChange: () => true }) }));
 const setPreference = jest.fn();
 const deletePreference = jest.fn();
 const refreshPreferences = jest.fn();
