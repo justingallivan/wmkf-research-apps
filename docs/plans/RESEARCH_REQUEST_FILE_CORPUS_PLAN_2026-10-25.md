@@ -121,7 +121,10 @@ A short, human-legible list, applied across all eras. Draft:
   (Initial Assessment / Pre-Site / Final).
 - **Post-award:** `interim-report`, `final-report`, `financial-report`,
   `no-cost-extension`, `budget-reallocation`, `publication`.
-- **Other:** `correspondence`, `relevant-paper`, `media` (recordings), `other`.
+- **Other:** `correspondence`, `relevant-paper`, `media` (recordings),
+  `institutional-info`, `ai-material`, `uncertain`.
+- **Added from rule building (section 2a):** `compiled-proposal`,
+  `institutional-info`, `ai-material`.
 
 Each file also gets a **phase** (`concept`, `phase-i`, `phase-ii`, `site-visit`,
 `post-award`, `unknown`) and an **era**.
@@ -131,9 +134,9 @@ text is extracted only for the documents the analyses need to read:
 
 | Priority | Types | Treatment |
 |---|---|---|
-| **Read** | Science proposal documents (`project-summary`, `project-description`, `application-form` narrative sections, `graphical-abstract`, `bibliography`); reviews (`external-review`, `staff-review`, `agency-reviews`, `site-visit-report`); `interim-report`, `final-report`; `staff-writeup` | Classify and extract text |
+| **Read** | Science proposal documents (`compiled-proposal`, `project-summary`, `project-description`, `application-form` narrative sections, `graphical-abstract`, `bibliography`); reviews (`external-review`, `staff-review`, `agency-reviews`, `site-visit-report`); `interim-report`, `final-report`; `staff-writeup` | Classify and extract text |
 | **Already legible** | `site-visit-transcript`, `site-visit-summary`, `staff-discussion-transcript`, `staff-discussion-summary`, `site-visit-slides` | Classify; these are recent, app-generated and text already, so no conversion work |
-| **Type only** | `budget`, `budget-spreadsheet`, `financial-narrative`, `financial-report`, `biosketches`, `cover-page`, `governing-board`, `status-letter`, `other-funding`, `institutional-priority`, `no-cost-extension`, `budget-reallocation`, `correspondence`, other administrative types, `media` | Classify so they can be filtered out; no text extraction |
+| **Type only** | `budget`, `budget-spreadsheet`, `financial-narrative`, `financial-report`, `biosketches`, `cover-page`, `governing-board`, `status-letter`, `other-funding`, `institutional-priority`, `no-cost-extension`, `budget-reallocation`, `correspondence`, `institutional-info`, `ai-material`, other administrative types, `media` | Classify so they can be filtered out; no text extraction |
 
 Staff writeups from before AkoyaGO have no recognizable name. The working
 hypothesis is that they sit among era 1–2 documents (e.g. `Final Report Write
@@ -181,6 +184,41 @@ reading set without any signal. So:
   coverage;
 - rules may exclude a type from extraction only after the owner accepts the
   measured miss rate.
+
+### 2a. Filename rule results — 2026-10-25 (rollout step 1)
+
+[VERIFIED via `lib/services/request-file-corpus/filename-rules.js` applied offline
+by `scripts/report-request-file-rule-coverage.mjs` to the provisional inventory
+CSVs; 60,237 non-test files; unit tests in
+`tests/unit/request-file-corpus-filename-rules.test.js`.]
+
+| Era | Files | Read | Already legible | Type-only | Uncertain (of which opaque names) |
+|---|---|---|---|---|---|
+| 1 | 18,181 | 503 | 0 | 449 | 17,229 (16,354) |
+| 2 | 22,461 | 4,745 | 1 | 8,527 | 9,188 (6,295) |
+| 3 | 16,902 | 6,958 | 0 | 7,714 | 2,230 (297) |
+| 4 | 2,693 | 873 | 364 | 1,456 | 0 |
+
+- **Opaque names are larger than the inventory summary showed.** Era 2 holds
+  4,148 `.doc` files named with hyphenated GUIDs in addition to 1,688
+  number-only `.doc` and 440 GUID `.html`; eras 1–2 together have 22,649 files
+  whose names carry no meaning. Only template signatures or the model can
+  classify them, which makes the content pilot the deciding step for history.
+- **Pre-AkoyaGO staff documents exist by name in era 3** (and a few in era 2):
+  252 "Phase I rationale" documents, 63 site visit memos and write-ups
+  (`SV memo …`, `… site visit WU`), 224 other write-ups, and office visit
+  memos. They are Read (`staff-review`, `site-visit-report`, `staff-writeup`).
+- **Reviews by name:** 980 files across eras 1–4 match the review rule.
+- **Vocabulary additions found while building rules:** `compiled-proposal` (a
+  Phase II package or staff version, Read), `institutional-info` (fact sheets,
+  audited financials, treasurer's reports; Type-only) and `ai-material`
+  (app-made AI inputs; Type-only, applied only after Read rules so a copied
+  proposal stays Read).
+- **Remaining non-opaque uncertain** (875 / 2,893 / 1,933 in eras 1–3) is a long
+  tail of institution-specific names. More rules have diminishing returns;
+  those documents go to template signatures and the model.
+- These counts are a rule-quality signal, not a final classification: the pilot
+  still measures missed Read documents among rule-matched samples (section 2).
 
 ### 3. One preferred text copy
 
