@@ -3,7 +3,7 @@ title: Personal reviewer acceptance-confirmation defaults — bounded plan
 domain: reviewers
 kind: plan
 status: active
-summary: "Slice 9 branch implementation authorized 2026-10-26; reviewed owner policies preserved. Exact-owner defaults, combined discard guard and recoverable preclaim preparation built; verification passed and independent Claude code review PASS, with retained nonblocking limits. Not released."
+summary: "Historical pre-release implementation/contract evidence; subsequently released PR534 at8b02e8467 on2026-10-26 after CI passed. Production verification is in the linked release receipt; retained limitations still apply."
 owner: product-engineering
 related:
   - docs/plans/PERSONAL_EMAIL_DEFAULTS_INVENTORY_2026-09-24.md
@@ -18,6 +18,13 @@ and review history below describe pre-implementation evidence. Build receipt:
 `docs/audits/REVIEWER_ACCEPTANCE_DEFAULTS_BUILD_2026-10-26.md`.
 
 # Scope and evidence
+
+[CURRENT RELEASE VERIFIED 2026-10-26.] PR #534 merged8b02e8467 after all CI
+passed; Production READY. [Release verification](../audits/REVIEWER_ACCEPTANCE_DEFAULTS_RELEASE_2026-10-26.md).
+The body below is historical pre-release evidence/contract; its not-released and
+authorization labels describe that recorded stage. Current release proof and
+verification limits are in the linked receipt.
+
 
 [VERIFIED via source at `a9e9b4de61cc544f1cdcf52cb7670dd5dc2fdde6`.]
 Change surface: one personal raw subject/body pair for automated reviewer acceptance

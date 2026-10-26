@@ -119,18 +119,16 @@ was exercised. Claude's database work untouched.
 Evidence: `docs/audits/REVIEWER_THANKYOU_DEFAULTS_RELEASE_2026-10-26.md`.
 Implementation/review: `docs/audits/REVIEWER_THANKYOU_DEFAULTS_BUILD_2026-10-26.md`.
 
-## Slice 9 — reviewer acceptance-confirmation defaults implementation
+## Slice 9 — reviewer acceptance-confirmation defaults released
 
-[BRANCH-BUILT, not released, 2026-10-26.] Justin authorized implementation after flow review, a bounded plan and independent
-Claude plan review before coding. Exact-owner personal wording for PD attribution;
-existing non-PD fallback keeps Admin wording. Pre-claim preparation/refusal recovery
-and discard warnings are explicit. Implementation and planned tests passed:421 focused tests,3 scratch-Postgres cases,15 fixture browser cases. Independent code review PASS at0ac9ce254; no schema changes or live operations.
-Plan: `docs/plans/PERSONAL_EMAIL_REVIEWER_ACCEPTANCE_DEFAULTS_PLAN_2026-10-26.md`.
-Claude final review: READY TO IMPLEMENT at `5fc27b570`. Required findings closed;
-both owner choices resolved (subject-value CR/LF normalization, preclaim retry on
-PD lookup failure). Implementation authorized, verified and independently code-reviewed; no release authorized.
-Build/code-review receipt: `docs/audits/REVIEWER_ACCEPTANCE_DEFAULTS_BUILD_2026-10-26.md`.
-Receipt: `docs/audits/REVIEWER_ACCEPTANCE_DEFAULTS_PLAN_CLAUDE_FINAL_2026-10-26.md`.
+[VERIFIED via PR/CI/Vercel/read-only probe, 2026-10-26.] PR #534 merged8b02e8467
+after full CI passed. Production READY and aliased; served acceptance settings
+assets, signed-out access protection and bounded error logs verified. Independent
+Claude code review PASS;421 focused tests,3 PG cases and15 browser cases passed.
+Both owner policies and combined discard warnings retained. No schema changes,
+live preference writes or test emails; Claude's database work untouched.
+Release proof: `docs/audits/REVIEWER_ACCEPTANCE_DEFAULTS_RELEASE_2026-10-26.md`.
+Reviewed contract: `docs/plans/PERSONAL_EMAIL_REVIEWER_ACCEPTANCE_DEFAULTS_PLAN_2026-10-26.md`.
 
 ## Existing pre-discussion calendar events — Duncan walkthrough pending 2026-10-25
 

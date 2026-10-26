@@ -3,13 +3,20 @@ title: Reviewer acceptance defaults — implementation verification
 domain: reviewers
 kind: audit
 status: active
-summary: "Branch implementation verified; independent Claude code review PASS with retained nonblocking limits; exact-owner defaults, combined discard warnings and recoverable preclaim preparation. Not released; no live database/email operation."
+summary: "Historical pre-release implementation/contract evidence; subsequently released PR534 at8b02e8467 on2026-10-26 after CI passed. Production verification is in the linked release receipt; retained limitations still apply."
 owner: product-engineering
 related:
   - docs/plans/PERSONAL_EMAIL_REVIEWER_ACCEPTANCE_DEFAULTS_PLAN_2026-10-26.md
 ---
 
 # Implementation evidence — 2026-10-26
+
+[CURRENT RELEASE VERIFIED 2026-10-26.] PR #534 merged8b02e8467 after all CI
+passed; Production READY. [Release verification](REVIEWER_ACCEPTANCE_DEFAULTS_RELEASE_2026-10-26.md).
+The body below is historical pre-release evidence/contract; its not-released and
+authorization labels describe that recorded stage. Current release proof and
+verification limits are in the linked receipt.
+
 
 Owner: Codex; branch codex/reviewer-acceptance-defaults, isolated existing worktree.
 Implementation target `2ff4e861e42c5225e2def34ca85d38fc9c6e6060`, draft
