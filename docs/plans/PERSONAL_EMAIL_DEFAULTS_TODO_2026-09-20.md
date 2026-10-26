@@ -109,20 +109,28 @@ N1 recovery follow-up implemented at `17f1969d2`:47 SQL / 125 unit
 tests passed; independent follow-up review PASS WITH NONBLOCKING NOTES. Proof and retained limits:
 `docs/audits/SCHEDULED_GRANTEE_RECOVERY_GAP_FIX_2026-10-25.md`.
 
-## Slice 8 plan — automated reviewer thank-you defaults
+## Slice 8 — automated reviewer thank-you defaults released
 
-[BRANCH-BUILT 2026-10-26; verification passed; Claude review passed with nonblocking notes; not released.] Justin selected this next while Duncan/
-Connor decisions remain separate. Proposed separate exact-owner raw pair and
-Profile Settings disclosure; shared copy inherits only on confirmed absence.
-Pure rendering and the required DOCX complete before the at-most-once claim;
-legacy manual templates/transport remain unchanged. Claude rereview READY TO
-IMPLEMENT at `8af5b8381`, R1–R5 closed. Justin confirmed on 2026-10-26 that final rendered-copy safety refusals apply to
-both personal and inherited Admin wording before claiming, with problem reporting.
-Owner authorized implementation. New exact-owner route/editor and pre-claim
-safety are implemented; tests/gates passed and independent Claude code review passed with nonblocking notes.
-No release authorization, schema change or live operation.
-Plan: `docs/plans/PERSONAL_EMAIL_REVIEWER_THANKYOU_DEFAULTS_PLAN_2026-10-26.md`.
-Review: `docs/audits/REVIEWER_THANKYOU_DEFAULTS_PLAN_CLAUDE_REREVIEW_2026-10-26.md`.
+[VERIFIED via GitHub/Vercel, 2026-10-26.] PR #533 merged `a9e9b4de6` after all
+CI passed. Production READY and aliased; signed-out availability/auth checks
+passed. Personal/shared rendered safety holds, exact-owner raw defaults and
+independent discard guards are deployed. No real email or preference mutation
+was exercised. Claude's database work untouched.
+Evidence: `docs/audits/REVIEWER_THANKYOU_DEFAULTS_RELEASE_2026-10-26.md`.
+Implementation/review: `docs/audits/REVIEWER_THANKYOU_DEFAULTS_BUILD_2026-10-26.md`.
+
+## Slice 9 — reviewer acceptance-confirmation defaults implementation
+
+[BRANCH-BUILT, not released, 2026-10-26.] Justin authorized implementation after flow review, a bounded plan and independent
+Claude plan review before coding. Exact-owner personal wording for PD attribution;
+existing non-PD fallback keeps Admin wording. Pre-claim preparation/refusal recovery
+and discard warnings are explicit. Implementation and planned tests passed:421 focused tests,3 scratch-Postgres cases,15 fixture browser cases. Independent code review PASS at0ac9ce254; no schema changes or live operations.
+Plan: `docs/plans/PERSONAL_EMAIL_REVIEWER_ACCEPTANCE_DEFAULTS_PLAN_2026-10-26.md`.
+Claude final review: READY TO IMPLEMENT at `5fc27b570`. Required findings closed;
+both owner choices resolved (subject-value CR/LF normalization, preclaim retry on
+PD lookup failure). Implementation authorized, verified and independently code-reviewed; no release authorized.
+Build/code-review receipt: `docs/audits/REVIEWER_ACCEPTANCE_DEFAULTS_BUILD_2026-10-26.md`.
+Receipt: `docs/audits/REVIEWER_ACCEPTANCE_DEFAULTS_PLAN_CLAUDE_FINAL_2026-10-26.md`.
 
 ## Existing pre-discussion calendar events — Duncan walkthrough pending 2026-10-25
 

@@ -1,6 +1,7 @@
 /** @jest-environment jsdom */
 import { act, render, screen, fireEvent, waitFor } from '@testing-library/react';
 import Editor, { useReviewerThankYouDefaults } from '../../shared/components/reviewers/ReviewerThankYouDefault';
+import useDefaultsGuard from '../../shared/components/reviewers/useReviewerEmailDefaultsGuard';
 import ProfileSettings from '../../pages/profile-settings';
 const EventEmitter = require('events');
 const mockRouter = { events: new EventEmitter(), beforePopState: jest.fn() };
@@ -15,7 +16,7 @@ const pair = { subject: 'Thank you {{proposalTitle}}', body: '{{greeting}}, than
 const dto = (extra = {}) => ({ ok: true, authenticatedProfileId: 42, ownerSystemId: OWNER, ownStatus: 'absent', own: null, configured: false, shared: pair, sharedStatus: 'available', source: 'shared', canSave: true, canClear: false, ...extra });
 const response = (data, status = 200) => ({ ok: status < 400, status, json: async () => data });
 const deferred = () => { let resolve; const promise = new Promise(r => { resolve = r; }); return { promise, resolve }; };
-function Harness(props) { const controller = useReviewerThankYouDefaults({ profileId: 42, profileStatus: 'ready', ...props }); return <Editor controller={controller} />; }
+function Harness(props) { const controller = useReviewerThankYouDefaults({ profileId: 42, profileStatus: 'ready', ...props }); useDefaultsGuard(controller); return <Editor controller={controller} />; }
 async function open() { const details = screen.getByText('Your default wording — automatic thank-you').closest('details'); await act(async () => { details.open = true; fireEvent(details, new Event('toggle')); }); await waitFor(() => expect(screen.getByLabelText('Default subject')).toBeEnabled()); }
 function edit(value = 'Personal subject') { fireEvent.change(screen.getByLabelText('Default subject'), { target: { value } }); }
 beforeEach(() => {

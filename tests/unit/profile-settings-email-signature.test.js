@@ -1,3 +1,5 @@
+jest.mock('../../shared/components/reviewers/ReviewerAcceptanceDefault', () => ({ __esModule: true, default: () => null, useReviewerAcceptanceDefaults: () => ({ resetWithoutPrompt: jest.fn() }) }));
+jest.mock('../../shared/components/reviewers/useReviewerEmailDefaultsGuard', () => ({ __esModule: true, default: () => () => true }));
 /**
  * @jest-environment jsdom
  *

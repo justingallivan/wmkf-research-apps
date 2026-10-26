@@ -5,7 +5,6 @@ import { Button } from '../Layout';
 import { requestEnvelope } from '../../utils/api-request';
 import { validateReviewerThankYouTemplate } from '../../config/reviewerThankYouEmail';
 import { isGuid } from '../../../lib/utils/guid';
-import useUnsavedChanges, { thankYouDiscardMessage } from './useReviewerThankYouDefaultsUnsavedChanges';
 
 const ENDPOINT = '/api/reviewer-thankyou-email-preferences';
 const EMPTY = { subject: '', body: '' };
@@ -45,7 +44,6 @@ export function useReviewerThankYouDefaults({ profileId, profileStatus, loading 
   }, [identity, scope, status]);
   const dirty = !same(template, baseline);
   const guarding = Boolean(scope && (scope === identity || status === 'loading') && (dirty || busy || uncertain));
-  useUnsavedChanges(guarding, busy || uncertain, confirmedReload);
   const matchesIdentity = next => next?.ok === true && typeof next.ownerSystemId === 'string'
     && next.ownerSystemId.toLowerCase() === actor?.toLowerCase() && next.authenticatedProfileId === authenticatedProfileId;
   const validResponse = next => {
@@ -135,14 +133,11 @@ export function useReviewerThankYouDefaults({ profileId, profileStatus, loading 
       if (fresh(op)) { setUncertain(true); setNotice('The change could not be confirmed and may already be saved. Reload defaults before another change.'); }
     } finally { finish(op); }
   };
-  const confirmContextChange = () => {
-    if (!guarding) return true;
-    if (!window.confirm(thankYouDiscardMessage(busy || uncertain, confirmedReload))) return false;
+  const resetWithoutPrompt = () => {
     epoch.current++; setOpen(false); setData(null); setTemplate(EMPTY); setBaseline(EMPTY); setErrors({});
     if (!busy && !uncertain) setNotice(null);
-    return true;
   };
-  return { active, open, setOpen, data, template, setTemplate, busy, uncertain, notice, errors, read, write, confirmContextChange };
+  return { active, open, setOpen, data, template, setTemplate, busy, uncertain, notice, errors, read, write, resetWithoutPrompt, guardState: { guarding, pending: busy || uncertain, confirmedReload } };
 }
 
 export default function ReviewerThankYouDefault({ controller: c }) {
@@ -151,7 +146,7 @@ export default function ReviewerThankYouDefault({ controller: c }) {
   const paused = c.data && !['configured', 'absent'].includes(c.data.ownStatus);
   return <details open={c.open} onToggle={event => c.setOpen(event.currentTarget.open)} className="mt-4 rounded-lg border border-gray-200">
     <summary className="cursor-pointer px-4 py-3 text-sm font-medium">Your default wording — automatic thank-you</summary>
-    <div className="space-y-3 border-t border-gray-200 p-4">
+    {c.open && <div className="space-y-3 border-t border-gray-200 p-4">
       <p className="text-sm text-gray-600">Used for future automatic reviewer thank-yous only. Each email acknowledges receipt and attaches the submitted review; it does not confirm closeout or payment approval. Legacy manual templates are separate.</p>
       <p className="text-xs text-gray-600">Subject supports {'{{proposalTitle}}'}. Message supports {'{{greeting}}'}, {'{{proposalTitle}}'} and {'{{signature}}'}. All are optional. Signature values come from the request’s Program Director, resolved by the server. Shared wording may need token corrections before saving as your default.</p>
       {c.busy && <p role="status">Working…</p>}
@@ -171,6 +166,6 @@ export default function ReviewerThankYouDefault({ controller: c }) {
         <Button type="button" variant="secondary" size="sm" disabled={blocked || !c.data?.canClear} onClick={() => c.write(true)}>Clear my default</Button>
         <Button type="button" variant="link" size="sm" disabled={c.busy} onClick={c.read}>Reload defaults</Button>
       </div>
-    </div>
+    </div>}
   </details>;
 }

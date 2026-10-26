@@ -13,6 +13,11 @@ related:
 
 # Implementation verification — 2026-10-26
 
+Historical build/review receipt. Subsequently released in PR #533 at `a9e9b4de6`;
+[production verification](REVIEWER_THANKYOU_DEFAULTS_RELEASE_2026-10-26.md).
+Pre-release authorization/status wording below describes the recorded build stage.
+
+
 [VERIFIED via source, mocked tests and fixture-only production-mode Chromium.]
 Runtime fingerprint `2a882dac2f55a6de19704d4839063a9e511f08e7`, branch
 `codex/reviewer-thankyou-defaults`. Justin authorized implementation and independent

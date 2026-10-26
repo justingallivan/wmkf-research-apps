@@ -432,6 +432,7 @@ function makeAcceptanceJob({ isAcceptRepeat = true } = {}) {
     lease_token: 'lease-1',
     status: 'accepted',
     suggestion_id: SUGGESTION_ID,
+    request_id: REQUEST_ID,
     accepted_at: ACCEPTED_AT,
     payload: {
       acceptedAt: ACCEPTED_AT,
@@ -480,6 +481,7 @@ function makeAcceptanceDrainDeps(overrides = {}) {
     suggestions: {
       getForAcceptanceDrain: jest.fn().mockResolvedValue({
         wmkf_appreviewersuggestionid: SUGGESTION_ID,
+        _wmkf_request_value: REQUEST_ID,
         _wmkf_potentialreviewer_value: REVIEWER_ID,
         _wmkf_honorariumrequest_value: HONORARIUM_REQUEST_ID,
         wmkf_accepted: true,
@@ -1009,7 +1011,7 @@ describe('notification trust-model Stage 2 pushed-up wrappers', () => {
     }));
     const deps = makeAcceptanceDrainDeps({
       ensureHonorarium,
-      sendAcceptanceEmail: jest.fn().mockResolvedValue({ sent: true }),
+      sendPreparedAcceptanceEmail: jest.fn().mockResolvedValue({ sent: true }),
     });
 
     await expect(withDalContext('cron-drain-reviewer-acceptances', () =>
@@ -1118,11 +1120,11 @@ describe('notification trust-model Stage 2 pushed-up wrappers', () => {
   test('site 11 - acceptance confirmation default alert inherits cron-drain-reviewer-acceptances context', async () => {
     const seen = watchNotifyEntry();
     mockBlankEmailDefault((key) => key === 'email.reviewer_acceptance.subject');
-    const deps = makeAcceptanceDrainDeps();
+    const deps = makeAcceptanceDrainDeps({ readConfirmationRequest: jest.fn(async () => ({ akoya_requestid: REQUEST_ID })) });
 
     await expect(withDalContext('cron-drain-reviewer-acceptances', () =>
       processReviewerAcceptanceJob(makeAcceptanceJob({ isAcceptRepeat: false }), deps),
-    )).resolves.toMatchObject({ status: 'completed' });
+    )).rejects.toThrow('reviewer_acceptance_followup_retry_required');
 
     expectTrustedNotify(seen, {
       type: 'email_default_misconfigured',
@@ -1355,7 +1357,7 @@ describe('notification trust-model already-covered characterization sites', () =
       alertEmail: jest.fn().mockResolvedValue(undefined),
       autoLinkAccount: jest.fn().mockResolvedValue({ skipped: 'no_exact_target' }),
       alertAffiliation: jest.fn().mockResolvedValue(undefined),
-      sendAcceptanceEmail: jest.fn().mockResolvedValue(undefined),
+      sendPreparedAcceptanceEmail: jest.fn().mockResolvedValue(undefined),
       quota: jest.fn().mockResolvedValue(undefined),
     };
 

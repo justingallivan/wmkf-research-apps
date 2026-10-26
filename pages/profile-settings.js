@@ -21,6 +21,8 @@ import {
 } from '../shared/config/reviewerFinderPreferences';
 import EmailTemplatesModal from '../shared/components/reviewers/EmailTemplatesModal';
 import ReviewerThankYouDefault, { useReviewerThankYouDefaults } from '../shared/components/reviewers/ReviewerThankYouDefault';
+import ReviewerAcceptanceDefault, { useReviewerAcceptanceDefaults } from '../shared/components/reviewers/ReviewerAcceptanceDefault';
+import useReviewerEmailDefaultsGuard from '../shared/components/reviewers/useReviewerEmailDefaultsGuard';
 import { TEMPLATE_TYPE_LABELS, TEMPLATE_TYPES } from '../shared/components/reviewers/email-template-store';
 
 // Preset colors for avatar selection
@@ -98,6 +100,8 @@ export default function ProfileSettings() {
   const [showReviewerTemplates, setShowReviewerTemplates] = useState(false);
   // Keep the family controller mounted above the loading early return.
   const thankYouDefaults = useReviewerThankYouDefaults({ profileId: currentProfile?.id, profileStatus: status, loading: isLoading });
+  const acceptanceDefaults = useReviewerAcceptanceDefaults({ profileId: currentProfile?.id, profileStatus: status, loading: isLoading });
+  const confirmDefaultsContextChange = useReviewerEmailDefaultsGuard(thankYouDefaults, acceptanceDefaults);
 
   useEffect(() => {
     if (status !== 'ready') return;
@@ -244,7 +248,7 @@ export default function ProfileSettings() {
       return;
     }
 
-    if (String(profile.id) === String(currentProfile?.id) && !thankYouDefaults.confirmContextChange()) return;
+    if (String(profile.id) === String(currentProfile?.id) && !confirmDefaultsContextChange()) return;
     try {
       await archiveProfile(profile.id);
     } catch (err) {
@@ -603,7 +607,7 @@ export default function ProfileSettings() {
             </ul>
             <p className="text-sm text-gray-600 mb-4">
               Follow-up reminder and Thank-you personal templates remain available for compatibility;
-              current staff send actions do not use them. Automatic thank-you wording is configured separately below.
+              current staff send actions do not use them. Automatic thank-you and acceptance-confirmation wording are configured separately below.
             </p>
             <div className="flex justify-end">
               <Button variant="primary" size="sm" type="button" onClick={() => setShowReviewerTemplates(true)}>
@@ -611,6 +615,7 @@ export default function ProfileSettings() {
               </Button>
             </div>
             <ReviewerThankYouDefault controller={thankYouDefaults} />
+            <ReviewerAcceptanceDefault controller={acceptanceDefaults} />
           </Card>
         )}
 
@@ -734,7 +739,7 @@ export default function ProfileSettings() {
                   <div className="flex items-center gap-2">
                     {currentProfile?.id !== profile.id && (
                       <button
-                        onClick={() => { if (thankYouDefaults.confirmContextChange()) selectProfile(profile.id); }}
+                        onClick={() => { if (confirmDefaultsContextChange()) selectProfile(profile.id); }}
                         className="text-sm text-indigo-600 hover:text-indigo-800 font-medium"
                       >
                         Switch

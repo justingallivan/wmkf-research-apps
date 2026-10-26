@@ -22,8 +22,10 @@ import { DynamicsService } from '../../lib/services/dynamics-service.js';
 import { readRequiredEmailDefaults } from '../../lib/services/email-defaults.js';
 import { resolveSignatureForRequest } from '../../lib/services/email-signature.js';
 import { buildReviewDueIcs } from '../../lib/external/calendar-invite.js';
-import { sendAcceptanceConfirmationEmail } from '../../lib/services/reviewer-acceptance-email.js';
+import { ownReviewerAcceptanceTemplate } from '../../lib/services/reviewer-acceptance-personalization';
+import { sendAcceptanceConfirmationEmail, prepareAcceptanceConfirmationEmail, sendPreparedAcceptanceConfirmationEmail, renderAcceptanceConfirmationEmail } from '../../lib/services/reviewer-acceptance-email.js';
 
+jest.mock('../../lib/services/reviewer-acceptance-personalization', () => ({ ownReviewerAcceptanceTemplate: jest.fn() }));
 const OLD_ENV = process.env.NOTIFICATION_EMAIL_FROM;
 
 function defaultsOk() {
@@ -38,6 +40,7 @@ function defaultsOk() {
 
 beforeEach(() => {
   jest.restoreAllMocks();
+  ownReviewerAcceptanceTemplate.mockReset().mockResolvedValue({ status: 'absent', template: null });
   readRequiredEmailDefaults.mockReset().mockResolvedValue(defaultsOk());
   resolveSignatureForRequest.mockReset().mockResolvedValue({ signature: 'Program Director' });
   buildReviewDueIcs.mockReset().mockReturnValue(null);
@@ -51,7 +54,7 @@ afterAll(() => {
 describe('sendAcceptanceConfirmationEmail — golden path', () => {
   test('PD found + enabled → sends from the PD sender', async () => {
     const getRecord = jest.spyOn(DynamicsService, 'getRecord').mockResolvedValue({
-      systemuserid: 'su-1',
+      systemuserid: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
       internalemailaddress: 'pd@example.org',
       isdisabled: false,
     });
@@ -61,14 +64,14 @@ describe('sendAcceptanceConfirmationEmail — golden path', () => {
       akoya_requestid: 'req-1',
       akoya_title: 'Test Proposal',
       wmkf_reviewduedate: '2026-08-01',
-      _wmkf_programdirector_value: 'pd-guid',
+      _wmkf_programdirector_value: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
     };
     const reviewer = { wmkf_name: 'Jane Reviewer', wmkf_emailaddress: 'jane@reviewer.org' };
 
     const out = await sendAcceptanceConfirmationEmail({ suggestion: {}, request, reviewer });
 
     expect(out).toEqual({ sent: true });
-    expect(getRecord).toHaveBeenCalledWith('systemusers', 'pd-guid', {
+    expect(getRecord).toHaveBeenCalledWith('systemusers', 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', {
       select: 'systemuserid,fullname,internalemailaddress,isdisabled',
     });
     expect(send).toHaveBeenCalledWith(expect.objectContaining({
@@ -76,14 +79,14 @@ describe('sendAcceptanceConfirmationEmail — golden path', () => {
       to: 'jane@reviewer.org',
       regardingId: 'req-1',
       regardingType: 'akoya_request',
-      actingUserSystemId: 'su-1',
+      actingUserSystemId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
       noFallback: true,
     }));
   });
 
   test('includes the secure withdrawal path and PD contact in the rendered email', async () => {
     jest.spyOn(DynamicsService, 'getRecord').mockResolvedValue({
-      systemuserid: 'su-1',
+      systemuserid: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
       fullname: 'Jane Director',
       internalemailaddress: 'pd@example.org',
       isdisabled: false,
@@ -95,7 +98,7 @@ describe('sendAcceptanceConfirmationEmail — golden path', () => {
       request: {
         akoya_requestid: 'req-withdraw',
         akoya_title: 'Test Proposal',
-        _wmkf_programdirector_value: 'pd-guid',
+        _wmkf_programdirector_value: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
       },
       reviewer: { wmkf_name: 'Jane Reviewer' },
       withdrawUrl: 'https://reviews.wmkeck.org/external/review/token?action=decline',
@@ -154,27 +157,27 @@ describe('sendAcceptanceConfirmationEmail — golden path', () => {
 });
 
 describe('sendAcceptanceConfirmationEmail — PD lookup fallback', () => {
-  test('PD lookup failure falls back to NOTIFICATION_EMAIL_FROM', async () => {
+  test('PD lookup failure refuses before transport under O2', async () => {
     jest.spyOn(DynamicsService, 'getRecord').mockRejectedValue(new Error('dataverse down'));
     const send = jest.spyOn(DynamicsService, 'createAndSendEmail').mockResolvedValue(undefined);
 
-    const request = { akoya_requestid: 'req-2', _wmkf_programdirector_value: 'pd-guid' };
+    const request = { akoya_requestid: 'req-2', _wmkf_programdirector_value: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa' };
     const reviewer = { wmkf_emailaddress: 'jane@reviewer.org' };
 
     const out = await sendAcceptanceConfirmationEmail({ suggestion: {}, request, reviewer });
-    expect(out).toEqual({ sent: true });
-    expect(send).toHaveBeenCalledWith(expect.objectContaining({ from: 'fallback@wmkeck.org' }));
+    expect(out).toEqual({ skipped: true, reason: 'sender_unavailable' });
+    expect(send).not.toHaveBeenCalled();
   });
 
   test('disabled PD → falls back to NOTIFICATION_EMAIL_FROM', async () => {
     jest.spyOn(DynamicsService, 'getRecord').mockResolvedValue({
-      systemuserid: 'su-1',
+      systemuserid: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
       internalemailaddress: 'pd@example.org',
       isdisabled: true,
     });
     const send = jest.spyOn(DynamicsService, 'createAndSendEmail').mockResolvedValue(undefined);
 
-    const request = { akoya_requestid: 'req-3', _wmkf_programdirector_value: 'pd-guid' };
+    const request = { akoya_requestid: 'req-3', _wmkf_programdirector_value: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa' };
     const reviewer = { wmkf_emailaddress: 'jane@reviewer.org' };
 
     await sendAcceptanceConfirmationEmail({ suggestion: {}, request, reviewer });
@@ -216,4 +219,82 @@ describe('sendAcceptanceConfirmationEmail — failure paths', () => {
       delete process.env.TEST_REQUEST_ISOLATION;
     }
   });
+});
+
+const PD = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
+const input = () => ({ suggestion: { wmkf_appreviewersuggestionid: 's', wmkf_revieweremail: 'confirmed@example.org' }, request: { akoya_requestid: 'r', akoya_title: 'Title', _wmkf_programdirector_value: PD }, reviewer: { wmkf_name: 'Dr. Jane Reviewer' } });
+function pdLookup(extra = {}) { return jest.spyOn(DynamicsService, 'getRecord').mockResolvedValue({ systemuserid: PD, isdisabled: false, internalemailaddress: 'pd@example.org', fullname: 'Director', ...extra }); }
+test('personal pair is frozen; real prepared sender adapts Dynamics emailId receipt without reading again', async () => {
+  pdLookup(); ownReviewerAcceptanceTemplate.mockResolvedValue({ status: 'configured', template: { subject: 'Own {{proposalTitle}}', body: 'Own body {{signature}}' } });
+  const send = jest.spyOn(DynamicsService, 'createAndSendEmail').mockResolvedValue({ emailId: 'sent-1' });
+  const prepared = await prepareAcceptanceConfirmationEmail(input()); expect(prepared.ok).toBe(true);
+  expect(prepared.message).toMatchObject({ subject: 'Own Title', from: 'pd@example.org', to: 'confirmed@example.org', actingUserSystemId: PD, noFallback: true });
+  ownReviewerAcceptanceTemplate.mockRejectedValue(new Error('changed')); readRequiredEmailDefaults.mockRejectedValue(new Error('changed'));
+  expect(await sendPreparedAcceptanceConfirmationEmail(prepared)).toEqual({ sent: true, emailId: 'sent-1' });
+  expect(send).toHaveBeenCalledWith(prepared.message); expect(ownReviewerAcceptanceTemplate).toHaveBeenCalledTimes(1);
+});
+test.each(['unavailable', 'duplicates', 'encrypted', 'invalid', 'identity_unavailable', 'new_status'])('own %s refuses before transport and never generic-falls-back', async status => {
+  pdLookup(); ownReviewerAcceptanceTemplate.mockResolvedValue({ status, template: null }); const send = jest.spyOn(DynamicsService, 'createAndSendEmail');
+  expect(await sendAcceptanceConfirmationEmail(input())).toEqual({ skipped: true, reason: `preference_${status}` }); expect(send).not.toHaveBeenCalled();
+});
+test.each([null, { systemuserid: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb' }])('assigned PD missing/mismatching result %p refuses with no own read', async result => {
+  pdLookup().mockResolvedValue(result); expect((await prepareAcceptanceConfirmationEmail(input())).ok).toBe(false); expect(ownReviewerAcceptanceTemplate).not.toHaveBeenCalled();
+});
+test.each([{ isdisabled: true }, { internalemailaddress: '' }])('confirmed unusable PD uses shared generic fallback without reading actual own default %p', async extra => {
+  pdLookup(extra); ownReviewerAcceptanceTemplate.mockResolvedValue({ status: 'configured', template: { subject: 'Private', body: 'Private' } });
+  expect((await prepareAcceptanceConfirmationEmail(input())).message).toMatchObject({ from: 'fallback@wmkeck.org', actingUserSystemId: undefined }); expect(ownReviewerAcceptanceTemplate).not.toHaveBeenCalled();
+});
+test('required shared outage cannot be masked by a configured personal pair', async () => {
+  pdLookup(); readRequiredEmailDefaults.mockResolvedValue({ ok: false }); ownReviewerAcceptanceTemplate.mockResolvedValue({ status: 'configured', template: { subject: 'Own', body: 'Own' } });
+  expect(await prepareAcceptanceConfirmationEmail(input())).toEqual({ ok: false, reason: 'defaults_unavailable' });
+});
+test.each(['personal', 'shared'])('subject substitutions normalize only values, preserving body text for %s copy', async source => {
+  pdLookup(); const template = { subject: 'For {{proposalTitle}} {{reviewerName}}', body: '{{proposalTitle}}' };
+  if (source === 'personal') ownReviewerAcceptanceTemplate.mockResolvedValue({ status: 'configured', template });
+  else readRequiredEmailDefaults.mockResolvedValue({ ok: true, values: { 'email.reviewer_acceptance.subject': template.subject, 'email.reviewer_acceptance.body': template.body } });
+  const args = input(); args.request.akoya_title = 'First\r\nSecond'; const prepared = await prepareAcceptanceConfirmationEmail(args);
+  expect(prepared.message.subject).toContain('First Second'); expect(prepared.message.subject).not.toMatch(/[\r\n]/); expect(prepared.message.body).toContain('First\r<br>Second');
+});
+test('legacy shared subject aliases normalize values, authored CR/LF and empty stripped business copy refuse', async () => {
+  pdLookup(); const args = input(); args.request.akoya_title = 'First\nSecond';
+  readRequiredEmailDefaults.mockResolvedValue({ ok: true, values: { 'email.reviewer_acceptance.subject': '[title]', 'email.reviewer_acceptance.body': 'Body' } });
+  expect((await prepareAcceptanceConfirmationEmail(args)).message.subject).toBe('First Second');
+  readRequiredEmailDefaults.mockResolvedValue({ ok: true, values: { 'email.reviewer_acceptance.subject': 'Bad\nSubject', 'email.reviewer_acceptance.body': 'Body' } });
+  expect((await prepareAcceptanceConfirmationEmail(args)).reason).toBe('rendered_copy_invalid');
+  readRequiredEmailDefaults.mockResolvedValue({ ok: true, values: { 'email.reviewer_acceptance.subject': 'Subject', 'email.reviewer_acceptance.body': '{{requestNumber}}' } });
+  expect((await prepareAcceptanceConfirmationEmail({ ...args, withdrawUrl: 'https://example.org/secure' })).reason).toBe('rendered_copy_invalid');
+});
+test.each(['personal', 'shared'])('final expanded subject/body caps refuse oversized %s copy before send', async source => {
+  pdLookup(); const args = input(); args.request.akoya_title = 'x'.repeat(100001);
+  const template = { subject: '{{proposalTitle}}', body: '{{proposalTitle}}' };
+  if (source === 'personal') ownReviewerAcceptanceTemplate.mockResolvedValue({ status: 'configured', template });
+  else readRequiredEmailDefaults.mockResolvedValue({ ok: true, values: { 'email.reviewer_acceptance.subject': template.subject, 'email.reviewer_acceptance.body': template.body } });
+  expect((await prepareAcceptanceConfirmationEmail(args)).reason).toBe('rendered_copy_invalid');
+});
+test('plain renderer public shape and server withdrawal append remain compatible', () => {
+  const out = renderAcceptanceConfirmationEmail({ ...input(), subjectTemplate: 'Hi', bodyTemplate: 'Body {{withdrawUrl}}', withdrawUrl: 'https://example.org/secure' });
+  expect(Object.keys(out).sort()).toEqual(['body', 'subject']); expect(out.body.match(/https:\/\/example.org\/secure/g)).toHaveLength(1);
+});
+test.each(['personal', 'shared'])('expanded %s business body independently enforces inclusive final limits', async source => {
+  pdLookup(); const args = input(), template = { subject: 'Subject', body: '{{proposalTitle}}' };
+  if (source === 'personal') ownReviewerAcceptanceTemplate.mockResolvedValue({ status: 'configured', template });
+  else readRequiredEmailDefaults.mockResolvedValue({ ok: true, values: { 'email.reviewer_acceptance.subject': template.subject, 'email.reviewer_acceptance.body': template.body } });
+  args.request.akoya_title = 'x'.repeat(100000); expect((await prepareAcceptanceConfirmationEmail(args)).ok).toBe(true);
+  args.request.akoya_title += 'x'; expect((await prepareAcceptanceConfirmationEmail(args)).reason).toBe('rendered_copy_invalid');
+  args.request.akoya_title = 'x'.repeat(99999); expect((await prepareAcceptanceConfirmationEmail({ ...args, withdrawUrl: 'https://example.org/secure' })).reason).toBe('rendered_copy_invalid');
+});
+test('expanded subject limit is inclusive; personal token-only body without available value refuses', async () => {
+  pdLookup(); ownReviewerAcceptanceTemplate.mockResolvedValue({ status: 'configured', template: { subject: '{{proposalTitle}}', body: 'Message' } });
+  const args = input(); args.request.akoya_title = 'x'.repeat(2000); expect((await prepareAcceptanceConfirmationEmail(args)).ok).toBe(true); args.request.akoya_title += 'x'; expect((await prepareAcceptanceConfirmationEmail(args)).reason).toBe('rendered_copy_invalid');
+  ownReviewerAcceptanceTemplate.mockResolvedValue({ status: 'configured', template: { subject: 'Subject', body: '{{withdrawUrl}}' } }); expect((await prepareAcceptanceConfirmationEmail(args)).reason).toBe('rendered_copy_invalid');
+});
+test('invalid assigned PD GUID refuses before any lookup or personal read', async () => {
+  const lookup = pdLookup(), args = input(); args.request._wmkf_programdirector_value = 'invalid-pd-guid';
+  expect(await prepareAcceptanceConfirmationEmail(args)).toEqual({ ok: false, reason: 'sender_identity_invalid' }); expect(lookup).not.toHaveBeenCalled(); expect(ownReviewerAcceptanceTemplate).not.toHaveBeenCalled();
+});
+test('no assigned PD uses shared generic fallback even when an actual personal default is available', async () => {
+  const lookup = pdLookup(), args = input(); delete args.request._wmkf_programdirector_value;
+  ownReviewerAcceptanceTemplate.mockResolvedValue({ status: 'configured', template: { subject: 'Private personal subject', body: 'Private personal message' } });
+  const prepared = await prepareAcceptanceConfirmationEmail(args); expect(prepared.message).toMatchObject({ from: 'fallback@wmkeck.org', actingUserSystemId: undefined }); expect(prepared.message.subject).not.toContain('Private'); expect(prepared.message.body).not.toContain('Private');
+  expect(lookup).not.toHaveBeenCalled(); expect(ownReviewerAcceptanceTemplate).not.toHaveBeenCalled();
 });
