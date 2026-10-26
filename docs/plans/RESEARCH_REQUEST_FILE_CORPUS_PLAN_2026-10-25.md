@@ -512,7 +512,8 @@ notes promotion governance is under-specified; define it in that plan.
    from it and checked against a held-out 2018–2021 sample (section 2c).
 3. **Index build** (metadata, from a fresh listing), newest era first (era 1
    parked, decision 6), using the
-   rules from step 1 and what the pilot learned.
+   rules from step 1 and what the pilot learned. Draft build plan, awaiting owner
+   approval: `docs/plans/RESEARCH_REQUEST_FILE_CORPUS_INDEX_BUILD_PLAN_2026-10-25.md`.
 4. **Text extraction at scale** for Read-priority types, after approval.
 5. **Staff browsing surface** and the first analyses.
 6. **Keeping current:** a scheduled re-listing for new and changed files.
