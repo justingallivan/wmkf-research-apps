@@ -3,7 +3,7 @@ title: Scheduled reminder correlation recovery gap fix
 domain: workbench
 kind: audit
 status: active
-summary: "Branch recovery fix at 17f1969d2 prevents correlation-generation loss after failed identity persistence. 47 scratch-Postgres and 125 focused unit tests pass; independent Claude review PASS WITH NONBLOCKING NOTES. Not released."
+summary: "Recovery fix at 17f1969d2 independently reviewed, 47 SQL/125 unit tests passed; released as 6a37ea105 in PR #531 after full CI. Production verification and remaining limits in release receipt."
 owner: product-engineering
 related:
   - docs/audits/SCHEDULED_GRANTEE_DEFAULTS_BUILD_2026-10-25.md
@@ -12,11 +12,14 @@ related:
 
 # Scheduled reminder recovery follow-up — 2026-10-25
 
+[RELEASED PR #531 / 6a37ea105.] Current release proof and limits:
+`docs/audits/SCHEDULED_GRANTEE_DEFAULTS_RELEASE_2026-10-25.md`. Build/review evidence below retains its pre-release fingerprints.
+
 [VERIFIED via source and local tests.] Runtime fingerprint: `17f1969d2`, branch
-`codex/scheduled-grantee-defaults`, draft PR #531. Justin explicitly authorized
+`codex/scheduled-grantee-defaults`, PR #531 (draft during that build checkpoint). Justin explicitly authorized
 fixing the prior review's N1 duplicate-send recovery gap, recovery and concurrent
-reassignment tests, and independent Claude review before release. No release is
-part of this task. Claude's other checkout/database work is excluded and untouched.
+reassignment tests, and independent Claude review before release. The owner later separately authorized release after CI, completed as recorded
+in the release receipt. Claude's other checkout/database work is excluded and untouched.
 
 ## Invariants and whole-flow trace
 
@@ -115,6 +118,5 @@ NOTES**, N1 closed, no blocking findings. Report:
   this availability tradeoff is explicit above.
 
 Mode A closeout re-search found no remaining current claim that N1 is uncorrected
-on this branch. Prior fingerprint reports remain visibly historical. Live shared
-state and Production acceptance are UNKNOWN because this task does not exercise
-or release there. No new runtime changes followed independent review.
+on this branch. Prior fingerprint reports remain visibly historical. Live write acceptance remains UNKNOWN; Production read-only verification is
+recorded in the release receipt. No new runtime changes followed independent review.

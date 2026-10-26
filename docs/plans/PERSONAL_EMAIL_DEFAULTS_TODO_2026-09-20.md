@@ -97,14 +97,15 @@ Claude's database work remains untouched. Release proof: `docs/audits/DISTRIBUTI
 
 ## Slice 5 implementation — scheduled grantee reminder defaults
 
-[BRANCH-BUILT 2026-10-25; locally verified; Claude PASS WITH NONBLOCKING NOTES; not released.]
+[RELEASED PR #531 / 6a37ea105, 2026-10-25 Pacific; Production READY and read-only UI verified.]
 The owner authorized the reviewed plan, including hold-until-repaired for
 reassignment. Exact-owner future wording is independent of stored row edits;
 current-PD delivery guards prevent new sends under mismatched/unknown ownership.
 No schema, shared default, environment or live business-record operation occurred.
 Contract: `docs/plans/PERSONAL_EMAIL_SCHEDULED_GRANTEE_DEFAULTS_PLAN_2026-10-25.md`.
 383 Jest tests, 33 scratch-Postgres tests and six browser cases passed. PR #531
-remains unreleased. N1 recovery follow-up implemented at `17f1969d2`:47 SQL / 125 unit
+is released after full CI. Release evidence/limits: `docs/audits/SCHEDULED_GRANTEE_DEFAULTS_RELEASE_2026-10-25.md`.
+N1 recovery follow-up implemented at `17f1969d2`:47 SQL / 125 unit
 tests passed; independent follow-up review PASS WITH NONBLOCKING NOTES. Proof and retained limits:
 `docs/audits/SCHEDULED_GRANTEE_RECOVERY_GAP_FIX_2026-10-25.md`.
 

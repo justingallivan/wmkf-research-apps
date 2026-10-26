@@ -56,13 +56,14 @@ reads/writes hide/refuse this key. No Postgres schema or distribution ledger cha
 The panel applies defaults on ordinary open; future Save/Clear never rewrites a
 prepared attempt. Recovery state is memory-only, scoped to the confirmed sender.
 
-**Scheduled grantee defaults (branch-built 2026-10-25; not deployed):**
+**Scheduled grantee defaults (released PR #531 / 6a37ea105, 2026-10-25 Pacific):**
 `scheduled_grantee_reminder_template` stores one exact-owner raw subject/body pair
 in existing Dataverse preferences. Strict dedicated self-service route requires
 session GUID/profile-map equality, excludes bypass/applicant callers and performs
 complete Save/Clear readback. Cron reads by the current server-resolved PD GUID;
 absence alone inherits shared wording. Generic preference reads/writes hide/refuse
-this key. No schema, uniqueness constraint or live preference operation added.
+this key. No schema or uniqueness constraint added; release verification did
+not write live preferences. Proof: `docs/audits/SCHEDULED_GRANTEE_DEFAULTS_RELEASE_2026-10-25.md`.
 
 ### `system_settings` — RETIRED 2026-05-12 (was Postgres / now Dataverse-only)
 **Source of truth:** **Dataverse `wmkf_appsystemsettings`**. Postgres table dropped via migration `007_drop_wave1_tables.sql` on 2026-05-12. Final reconciliation on 2026-05-11 synced 10 tier-keyed `model_override:*` rows from S145 dev writes (PG→DV); counts matched (45/45) before the drop.
@@ -638,7 +639,8 @@ as single interface, and PD onboarding as a rollout precondition (no
 unconfigured runtime state; the legacy direct claim-before-send path is
 deleted).
 
-**Slice 5 branch extension (2026-10-25; not deployed):** creation and eligible
+**Slice 5 released extension (PR #531 / 6a37ea105, 2026-10-25 Pacific):**
+Production READY/read-only UI verified; limits: `docs/audits/SCHEDULED_GRANTEE_DEFAULTS_RELEASE_2026-10-25.md`. creation and eligible
 handoff use the current PD's personal default; a later defaults change leaves
 frozen content/approval untouched. Delivery checks current PD before Part B writes
 and again before intent. Mismatch/unknown prevents new sends and records

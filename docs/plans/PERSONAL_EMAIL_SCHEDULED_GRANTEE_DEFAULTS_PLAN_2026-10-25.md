@@ -3,7 +3,7 @@ title: Personal defaults for scheduled grantee reminders
 domain: workbench
 kind: plan
 status: active
-summary: "Slice 5 branch-built and locally verified at 7a84a274a; Claude implementation rereview PASS WITH NONBLOCKING NOTES. Exact-owner defaults, reassignment hold and discard warnings implemented; 383 tests, 33 scratch-Postgres and six browser cases passed. N1 correlation recovery follow-up implemented at 17f1969d2 with 47 SQL / 125 unit tests; independent follow-up review PASS WITH NONBLOCKING NOTES. Not released."
+summary: "Released PR #531 / 6a37ea105 after full CI and independent Claude reviews. Production READY; authenticated defaults and discard warning verified. Recovery holds preserve correlation across failed identity writes and concurrent reassignment. Release evidence and limits linked."
 owner: product-engineering
 related:
   - docs/plans/PERSONAL_EMAIL_DEFAULTS_INVENTORY_2026-09-24.md
@@ -16,7 +16,8 @@ related:
 
 ## 1. Status, ownership and scope
 
-[BRANCH-BUILT — VERIFIED LOCALLY; CLAUDE PASS WITH NONBLOCKING NOTES; NOT RELEASED.]
+[RELEASED PR #531 / 6a37ea105; PRODUCTION READY; READ-ONLY UI VERIFIED.]
+Release evidence and verification limits: `docs/audits/SCHEDULED_GRANTEE_DEFAULTS_RELEASE_2026-10-25.md`.
 Justin subsequently authorized implementation of this reviewed contract. No live
 preference or business-record writes, environment changes or schema operations
 have occurred. The sections below retain the reviewed acceptance criteria;
@@ -33,7 +34,8 @@ CHANGES; F1–F11 are addressed below. Final independent delta review of
 `codex/scheduled-grantee-defaults-plan` in the existing isolated worktree.
 Baseline: `c7c3ce6e106ea0e9b6c390cfb49351af36377840` (main including the
 reviewed distribution release and its documentation receipt). Claude's other
-checkout, database work, migrations, environment and production state are excluded.
+checkout, database work, migrations and environment are excluded; production
+application release was separately authorized and is recorded above.
 No live tenant reads/writes, cron invocation, preference mutation or email send
 are part of this planning exercise. Live schema permissions and delivery are
 UNKNOWN; Atlas observations are dated evidence, not fresh production probes.
@@ -533,6 +535,7 @@ are implemented at `17f1969d2`; 47 SQL/125 unit tests pass, follow-up review PAS
 Proof: `docs/audits/SCHEDULED_GRANTEE_RECOVERY_GAP_FIX_2026-10-25.md`. Pre-write read
 failure now returns `preference_unavailable`; known acceptance/receipt failure uses
 `acceptanceProven`; casing/whitespace aliases of the new private key are guarded.
-These refinements preserve the reviewed discard-warning and reassignment-hold contract. Release remains a separate deliberate action. No migration, environment
+These refinements preserve the reviewed discard-warning and reassignment-hold contract. The owner subsequently authorized release after CI; PR #531 is merged
+and Production verified as recorded in the release receipt. No migration, environment
 change or live data operation occurred. Claude's other checkout and database work
 remain untouched.

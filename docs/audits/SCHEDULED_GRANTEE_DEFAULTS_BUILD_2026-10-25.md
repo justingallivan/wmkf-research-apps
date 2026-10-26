@@ -13,6 +13,8 @@ related:
 
 # Initial implementation and verification — 2026-10-25
 
+Current release: PR531 /6a37ea105, Production verified; `docs/audits/SCHEDULED_GRANTEE_DEFAULTS_RELEASE_2026-10-25.md`.
+
 This receipt describes historical fingerprint `7a84a274a`. The owner-authorized
 N1 follow-up is now implemented at `17f1969d2`; current proof and independent
 review status: `docs/audits/SCHEDULED_GRANTEE_RECOVERY_GAP_FIX_2026-10-25.md`.
