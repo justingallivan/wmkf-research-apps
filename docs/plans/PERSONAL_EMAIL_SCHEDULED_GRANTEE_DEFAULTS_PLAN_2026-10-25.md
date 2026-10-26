@@ -3,7 +3,7 @@ title: Personal defaults for scheduled grantee reminders
 domain: workbench
 kind: plan
 status: active
-summary: "Slice 5 bounded proposal: exact-owner future reminder defaults, creation/handoff integration and independent editor; no runtime implementation or live writes. Owner chose hold-until-repaired for reassignment failures. Revised contract addresses N1–N7; independent rereview pending."
+summary: "Slice 5 bounded proposal: exact-owner future reminder defaults, creation/handoff integration and independent editor; no runtime implementation or live writes. Owner chose hold-until-repaired for reassignment failures. Revised hold contract addresses N1–N7 and rereview F1–F11; final independent check pending."
 owner: product-engineering
 related:
   - docs/plans/PERSONAL_EMAIL_DEFAULTS_INVENTORY_2026-09-24.md
@@ -20,7 +20,8 @@ related:
 independent Claude review before coding. Claude reviewed draft `0ba91394d` and
 returned **READY WITH NAMED CHANGES**. Justin then chose **hold reassigned
 reminders until repaired**, not shared-wording fallback. This revision incorporates
-that choice and N1–N7; independent rereview is pending (§9). Codex owns this plan on
+that choice and N1–N7. Rereview of `69a2bd838` returned READY WITH NAMED
+CHANGES; F1–F11 are addressed below and await a final independent check (§9). Codex owns this plan on
 `codex/scheduled-grantee-defaults-plan` in the existing isolated worktree.
 Baseline: `c7c3ce6e106ea0e9b6c390cfb49351af36377840` (main including the
 reviewed distribution release and its documentation receipt). Claude's other
@@ -84,7 +85,9 @@ Proposed family bounds follow the existing scheduled row editing bounds:
   by the existing draft renderer; the real saved signature is always appended once.
 - Allow exactly `{{granteeName}}`, `{{proposalTitle}}`, `{{dueDate}}`,
   `{{signature}}` in the body. Reject unknown tokens and unmatched or extra brace
-  delimiters, including triple braces. Subject rejects any brace. Explicitly reject
+  delimiters, including triple braces. Body braces are allowed only as part of those exact case-sensitive tokens:
+  no single braces, inner whitespace, case variants or extra braces. Subject
+  rejects any brace. Explicitly reject
   `[Name]`, `[title]`, `COB [date]`, `[Program Director signature]` in personal
   templates: the reused renderer would otherwise replace these literals. Ordinary
   bracket prose remains literal. Preserve legacy alias support for shared copy;
@@ -174,9 +177,10 @@ to `deliverScheduledEmail`. Never read personal wording at send time. Validate
 both GUIDs and compare case-insensitively; missing/unreadable/invalid current PD
 means unknown ownership, not permission to use the stored sender.
 
-After the existing send lease and source-eligibility checks, but before token
-minting, activity creation or sending, require the current PD to equal the row's
-stored `pd_systemuser_id`. Recheck immediately before `recordSendRequested` after
+Immediately after the existing send lease and source-eligibility checks and
+BEFORE `reconcileRecipientsBeforeSend` (Part B), require the current PD to equal the row's
+stored `pd_systemuser_id`. Part B writes Cc, approval and generation, so it must
+not run on a known mismatched/unknown-owner row. Recheck immediately before `recordSendRequested` after
 all intervening awaits. This applies to cron and forced sends; `force` can bypass
 approval/schedule as today, never current-PD ownership.
 
@@ -186,17 +190,28 @@ On mismatch/unknown ownership:
 2. If an existing activity is proven accepted, persist any recovered activity ID,
    record sent and finalize through the existing lease-fenced path. This records
    history; it does not authorize a new send. Failed/ambiguous lookup cannot prove
-   acceptance and must hold. A recovered unaccepted activity ID must be persisted
-   before releasing the lease so producer reassignment cannot treat it as pristine.
+   acceptance and must hold. Do NOT persist an unaccepted correlation-recovered
+   activity ID on this mismatch branch when the row has no stored ID or intent:
+   existing A5 handoff increments generation and deliberately abandons that draft.
+   Preserve this repair path. The unsent old-generation Dynamics draft may linger,
+   which is existing A5 behavior; do not delete or send it. Acceptance alone
+   justifies persisting the recovered ID for receipt/finalization.
 3. Otherwise, unless existing missing/forbidden activity classification applies
    (precedence below), record `scheduled_email_pd_handoff_held` using the existing
    lease-fenced failure operation: status failed, lease released, hold reason
    persisted; subject/body/signature/recipients/schedule/edits/approval/activity
    identity/generation remain untouched. On persistence failure, return no success;
-   the last safe lease/receipt remains authoritative. Never call SendEmail.
-4. Return a distinct `{held:true, reason:'pd_handoff_held', message}` result after
-   confirmed hold persistence. The action route maps that to 409 with the held
-   message, not sent feedback, an uncertain-send notice or a generic retry claim.
+   the last safe lease/receipt remains authoritative. A thrown/null hold write
+   must carry `error.code = PD_HANDOFF_HELD` through the outer catch, so any
+   fallback write retains the reason. Never report success if both writes fail.
+   Because claiming clears the previous code, double write failure can leave a
+   reason-less `sending` row until lease expiry; it still makes no send call and
+   a later attempt must freshly check ownership. Never call SendEmail.
+4. Return `{held:true, reason:'pd_handoff_held', message: projectedRow, error: copy}`
+   only after confirmed hold persistence; `message` is always the existing projected
+   DTO, never copy text. The route checks `held` before its existing missing-message
+   branch and maps it to 409 with that DTO and truthful hold copy, not sent feedback,
+   an uncertain-send notice or a generic retry claim.
    Cron does not count a held attempt as sent. It may record the distinct reason
    in existing `failures`; no new counters or summary shape are required.
 
@@ -206,7 +221,14 @@ The new ownership hold must not replace an unconfirmed marker or reopen transpor
 A saved unaccepted activity without intent is also held on PD mismatch: the old
 B5 policy of sending that activity as created applies only when ownership still
 matches. It cannot be automatically rebuilt for the new PD; manual reconciliation
-or stopping the old message is required. No new reset/delete/send-by-hand action
+or stopping the old message is required. The second ownership check can discover
+a mismatch after this attempt created and persisted an activity: that is now the
+same stored-activity manual-recovery case, even though transport was not started.
+Stop is terminal for this deliverable: create-or-get returns that stopped row and
+never schedules a replacement automatically. Any later reminder must be sent by
+hand through the existing authorized process. If the former PD is unavailable,
+manual operational resolution is needed; this slice grants no new owner/admin
+override. No new reset/delete/send-by-hand action
 is added. Missing/forbidden activity classifications take precedence over the new hold:
 retain their existing persisted codes, no-send action rules and read-only recovery
 lanes instead of replacing them with `pd_handoff_held`. Any later ordinary send
@@ -225,8 +247,9 @@ unknown-ownership sends and does not widen existing send uncertainty.
 Use the existing `last_error_code` column: add `PD_HANDOFF_HELD` to the store error
 constant and `pd_handoff_held` to the shared attention reason/copy mapping. No new
 status/column/migration. Project the reason through the existing DTO; put the row
-in Needs attention in the digest and show **Held — PD reassignment needs repair**
-in the inbox. Copy explains that no new send will occur while ownership differs
+in Needs attention in the digest and show the ownership-held state
+in the inbox (label: **Held — current PD needs verification**, not a claim that
+every read failure proves reassignment). Copy explains that no new send will occur while ownership differs
 or cannot be checked. Do not promise that editing defaults alone repairs an
 already-created old-PD activity.
 
@@ -241,13 +264,35 @@ parity tests; preserve those other attention branches.
 
 Normal due queries keep ownership-held rows eligible for another ownership check
 under existing schedule/approval/lease rules; do not exclude them as if missing
-activities. Unapproved rows remain unapproved; they need explicit retry or a
+activities. Split the pinned invariant explicitly: transport-attention rows remain
+out of ordinary due slots; ownership-held rows are due-eligible with lower priority.
+Change the existing due SQL ordering to
+`ORDER BY CASE WHEN last_error_code = <held> THEN 1 ELSE 0 END, scheduled_send_at ASC`
+with the existing limit of 100. Use CASE so ordinary NULL error codes are first.
+Ordinary due rows must take slots before previously held rows; remaining slots
+may recheck holds. A sustained ordinary backlog may defer automatic hold rechecks;
+manual guarded Retry remains available. No separate worker/table/claim is added.
+Retitle/update the A3 integration parity test and due/attention headers to cover
+this deliberate ownership-vs-transport distinction; test 100+ held rows plus an
+ordinary NULL-code row, and assert the ordinary row remains selected.
+Unapproved rows remain unapproved; they need explicit retry or a
 successful producer handoff. A successful eligible handoff resets the held error
 using the existing version-fenced transition, including new PD wording/signature,
 recipients/posture, cleared edits/approval and incremented generation. It does not
 send immediately or bypass the new PD's review requirements. With a saved activity
 or intent, no automatic handoff reset: preserve receipts and offer existing manual
 recovery/Stop guidance. A defaults Save/Clear itself never clears a message hold.
+
+The guard covers every cause of deferred handoff: broken wording, missing/disabled
+PD, cleared assignment, PI/Liaison/posture/signature read failure, and capped scan,
+not just default errors. Unknown-owner read failures also prevent new sending;
+copy says verification is unavailable rather than asserting a reassignment.
+Holds remain visible in the stored/former PD's inbox and digest until handoff;
+the incoming PD does not gain access to that old row. Their editor can show own
+default problems, but cannot diagnose the other causes. Copy directs staff to
+resolve the request's PD/source facts or coordinate with the current PD; it must
+not imply the viewer can always repair through default wording. No new email
+notifications or cross-owner list access are introduced.
 
 ### 5.3 Race and complement requirements
 
@@ -330,8 +375,10 @@ manual resolution. No live mutation occurs on editor open.
 4. Cron: absent vs configured current-PD defaults at INSERT and eligible handoff;
    failure before any new draft write; same-owner stored row unchanged after
    defaults change; four simultaneous same-PD workers reach a deliberately blocked
-   snapshot and share one read (assert before releasing; never wait for four reader
-   calls); failure snapshot shared too;
+   snapshot and share one read. Observe all four upstream per-row PD/posture mock
+   completions and drain their resolved continuation microtasks before asserting
+   one blocked preference reader call; a resolved-value cache must fail this test.
+   Never wait for four reader calls; failure snapshot shared too;
    different PDs isolated; later run refreshes; personal failures do not abort
    existing due sends/digests/reconciliation/finalization; retain shared-config gate.
 5. Store/transport regressions: competing INSERTs, version/lease/transport/sent/stopped
@@ -352,7 +399,14 @@ manual resolution. No live mutation occurs on editor open.
    intent; accepted activity readback vs unaccepted/missing/forbidden/correlation
    failure; preserve already-requested no-resend reconciliation. Successful repair
    rebuilds pristine row with new wording and approval reset, preserves schedule;
-   activity/intent prevents automatic reset. Lost lease or failed hold persistence
+   activity/intent prevents automatic reset; correlation-only unaccepted orphan
+   remains unpersisted and eligible for A5 generation-bumped handoff; late mismatch
+   after persisted create requires manual recovery. Mismatch before Part B with
+   actual Liaison/posture drift leaves recipients, approval and generation identical.
+   PD change only after the final successful read is the explicitly accepted
+   bounded race; test/document that result without claiming atomic prevention.
+   100+ held rows cannot displace an ordinary NULL-code due row.
+   Lost lease or failed hold persistence
    returns no success. Hold reason appears in projection/digest/page/routes; only
    deliberate guarded Retry send or Stop is allowed, never uncertain-transport retry.
    Approval-required held row is not silently approved by a cron recheck; version,
@@ -389,6 +443,12 @@ or release is authorized by acceptance of this planning task.
   projected names through the store constant, shared maps/actions, page label,
   digest classification, action route and due-send/reconciliation selectors.
   Unknown error codes must not bypass the independent fresh ownership guard.
+- Implementation text reconciliation: cron header (narrow self-healing race),
+  store handoff/due headers, service B5 saved-activity comment, attention stop-only
+  header/action helper, action-route guard comment, digest Needs-attention copy,
+  and the A3 due-attention parity test must all describe the bounded new policy.
+  Keep historical initial review receipts verbatim. This is a due query ordering
+  change plus bounded send-guard/attention changes, not a no-store-change claim.
 
 ## 9. Review history, owner decision and next boundary
 
@@ -410,9 +470,30 @@ No shared fallback or acceptance of former-PD sending was selected.
 | N5 prefill | §4/6 says shared prefill need not pass personal validation and requires field errors without Admin writes |
 | N6 tests | §7 includes blocked-promise concurrency, actual foreign Clear fixtures, frozen-content assertions and the due old-PD complement matrix |
 
-These are plan changes only. They require independent rereview, especially the
-new delivery/hold semantics and the bounded cross-system race, before a claim of
-readiness. No application code, migrations or database/environment state changed.
+[VERIFIED via ordinary OAuth Claude rereview of `69a2bd8389ed012e5c020e0fd94a8140174e58cb`.]
+Second verdict: **READY WITH NAMED CHANGES**. Verbatim report:
+`docs/audits/SCHEDULED_GRANTEE_DEFAULTS_PLAN_CLAUDE_REREVIEW_2026-10-25.md`.
+The reviewer confirmed both entry paths are covered and found no planned bypass
+that permits new sending while ownership differs. Source review is not runtime proof.
+
+| Rereview item | Plan correction |
+| --- | --- |
+| F1 | First ownership guard explicitly precedes Part B writes; drift fixture proves untouched row context |
+| F2 | Do not persist unaccepted correlation-only drafts during mismatch; preserve A5 handoff; document persisted-create late-mismatch manual case |
+| F3 | Ownership-vs-transport attention split; CASE-order ordinary due rows before held rows; 100+ hold starvation regression and retitled parity test |
+| F4 | Enumerate all handoff-block causes, former-PD-only visibility, honest repair copy and terminal Stop/manual-send consequence; disclose to Justin |
+| F5 advisory | Keep fail-closed unknown-owner hold but use neutral verification-unavailable copy, never assert read failure proves reassignment |
+| F6 | Typed hold-write failure retains reason through catch; no success on null/double failure; reason-less lease-expiry state documented |
+| F7 | Explicit projected `message` DTO, separate `error` copy; held branch checked first |
+| F8 advisory | Retain deliberate Retry-send exception only for ownership hold; edit/approve disabled, other transport attention remains stop-only |
+| F9 | Enumerate source headers, comments, digest copy and parity test for implementation reconciliation |
+| F10 | Upstream four-worker arrival signal plus microtask drain before blocked-reader assertion |
+| F11/N3 advisory | Exact brace grammar; same-path shallow exemption applies to route-start and beforePopState/history branches |
+
+The same-path exemption applies to `beforePopState` as well as routeChangeStart;
+a true departure still warns. Historical reports remain verbatim. No application
+code, migrations or database/environment state changed. A targeted independent
+final review of these corrections is required before readiness is claimed.
 
 ### Verification for planning
 
