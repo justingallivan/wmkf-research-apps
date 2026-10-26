@@ -5,7 +5,7 @@ import DistributionSenderPanel from '../../shared/components/workbench/Distribut
 jest.mock('next-auth/react', () => ({ useSession: jest.fn() }));
 jest.mock('../../shared/components/workbench/PreSiteDistributionPanel', () => {
   const { useState } = require('react');
-  return { __esModule: true, default: props => {
+  return { __esModule: true, default: function MockDistributionPanel(props) {
     const [original] = useState(props.actorScope);
     return <div data-testid="scope" data-original={original} data-paused={props.authPaused} data-composer={props.composer}>{props.actorScope}</div>;
   } };
