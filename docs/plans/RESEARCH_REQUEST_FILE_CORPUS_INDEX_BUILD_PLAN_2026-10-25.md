@@ -111,7 +111,8 @@ Any later surface is admin-only (decision 1).
   requests with meeting years 2018–2026 in total.
 - **Idempotent.** Rerunning the same scope gives the same rows (upsert on drive
   id + item id). Each run records scope, rules version and counts. One load at a
-  time, under an advisory lock.
+  time, under a session advisory lock on a direct (non-pooled) connection,
+  `POSTGRES_URL_NON_POOLING` (final review, 2026-10-26).
 - **Reclassify offline.** When the rules change, a reclassify pass updates
   `doc_type`, `priority`, `classified_by` and `rules_version` from the stored
   name and subfolder, without listing SharePoint again.
@@ -162,5 +163,8 @@ whole-run summary, which `finishRun` recomputes from stored rows].
   `RequestArchive3` folder returns 404) and request 994366 (its document
   location points at request 1001703's library, which the Graph allowlist
   refuses). Both are Dynamics/SharePoint data problems, not loader faults.
+- The full load connected through the pooled `POSTGRES_URL`; only one loader
+  ran at a time, so the lock weakness the final review found did not bite.
+  The loader now requires the direct connection.
 - The provisional inventory counted 38,316 files for the same years; the load
   is within normal snapshot drift of it.

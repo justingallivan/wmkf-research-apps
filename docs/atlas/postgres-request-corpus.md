@@ -50,8 +50,10 @@ later consumers.
 ## Writers and rules
 
 Only `scripts/load-request-file-corpus.mjs` writes, through
-`lib/services/request-file-corpus/index-store.js`, holding a Postgres advisory
-lock so one load runs at a time.
+`lib/services/request-file-corpus/index-store.js`, holding a session-level Postgres
+advisory lock so one load runs at a time; the loader connects through
+`POSTGRES_URL_NON_POOLING` and refuses a `-pooler` host, because a transaction
+pooler can hand the locked backend to another session.
 
 - `saveRequestListing` writes one request per transaction: request row, file
   upsert (sets `request_id`, clears `removed_at`), then `removed_at` on that

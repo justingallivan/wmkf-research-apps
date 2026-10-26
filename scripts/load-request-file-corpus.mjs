@@ -4,7 +4,8 @@
  * docs/plans/RESEARCH_REQUEST_FILE_CORPUS_INDEX_BUILD_PLAN_2026-10-25.md.
  * Reads Production Dataverse (needs DATAVERSE_ALLOW_PROD_READS=yes) and
  * SharePoint through Graph; writes only the request_corpus_* tables in the
- * database POSTGRES_URL names (printed by hostname before anything is written).
+ * database POSTGRES_URL_NON_POOLING names (a direct connection, for the session
+ * advisory lock; printed by hostname before anything is written).
  * Never writes SharePoint or Dataverse.
  *
  *   node scripts/load-request-file-corpus.mjs --plan [--from=2018] [--to=2026]
@@ -55,9 +56,13 @@ const { default: pg } = await import('pg');
 const store = await import('../lib/services/request-file-corpus/index-store.js');
 
 async function connect() {
-  const url = process.env.POSTGRES_URL;
-  if (!url) { console.error('POSTGRES_URL is not set.'); process.exit(2); }
-  console.log(`Postgres target: ${new URL(url).hostname}`);
+  // The advisory lock is session-level, so it needs a direct connection: a
+  // transaction pooler can hand the locked backend to another loader.
+  const url = process.env.POSTGRES_URL_NON_POOLING;
+  if (!url) { console.error('POSTGRES_URL_NON_POOLING is not set.'); process.exit(2); }
+  const host = new URL(url).hostname;
+  console.log(`Postgres target: ${host}`);
+  if (/-pooler\./.test(host)) { console.error('POSTGRES_URL_NON_POOLING names a pooled host; the lock needs a direct connection.'); process.exit(2); }
   const client = new pg.Client({ connectionString: url });
   await client.connect();
   const { rows } = await client.query('SELECT pg_try_advisory_lock($1) AS locked', [store.LOCK_KEY]);
@@ -102,8 +107,10 @@ const client = await connect();
 const runId = RESUME || crypto.randomUUID();
 let status = 'failed';
 let totals = null;
+let admitted = false; // a rejected --resume leaves the existing run row untouched
 try {
   await store.startRun(client, { runId, scope: { from: FROM, to: TO, limit: LIMIT }, rulesVersion: RULES_VERSION, resume: Boolean(RESUME) });
+  admitted = true;
   const done = RESUME ? await store.listedInRun(client, runId) : new Set();
   console.log(`Run ${runId} (${RULES_VERSION})${done.size ? `; resuming, ${done.size} requests already listed` : ''}.`);
   const started = Date.now();
@@ -138,7 +145,7 @@ try {
   }
   status = 'completed';
 } finally {
-  totals = await store.finishRun(client, { runId, status }).catch((e) => { console.error(`Could not finish run row: ${e.message}`); return null; });
+  if (admitted) totals = await store.finishRun(client, { runId, status }).catch((e) => { console.error(`Could not finish run row: ${e.message}`); return null; });
   await client.end();
 }
 if (totals) {
