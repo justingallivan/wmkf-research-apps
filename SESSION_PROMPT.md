@@ -1,91 +1,112 @@
-# Session 642 Prompt: Duncan walkthrough checklist ready; await meeting decisions
+# Session 643 Prompt: Email defaults released; await Duncan and Connor
 
-## Session 641 Summary
+## Session 642 Summary
 
-[VERIFIED via merged PRs and tracked documentation, 2026-10-25.] Saved the short
-Duncan meeting checklist beside the detailed calendar follow-up and placed it on
-main. Calendar implementation remains on hold until the owner and Duncan walk
-through scheduling and resolve the questions. No calendar updates or sends made.
+[VERIFIED via merged PRs, release receipts and deployment checks, 2026-10-25–26.]
+Released reviewer exclusion recovery and four personal email-default families,
+after independent ordinary OAuth Claude reviews and CI. Justin ended the session
+rather than selecting another small reliability task. No new implementation is queued.
 
 ### What Was Completed
 
-1. **Meeting checklist saved:** findings plus six checkboxes covering scheduling,
-   event linkage, agenda content, audience, notifications and update/recovery
-   control are in **Meeting checklist — pre-discussion calendar agenda** within
-   `docs/plans/PERSONAL_EMAIL_DEFAULTS_TODO_2026-09-20.md`.
-2. **Documentation landed on main:** PR #524 saved the prior handoff and email
-   release milestone; PR #525 saved the meeting checklist. The owner explicitly
-   requires the final handoff on main while retaining the original branch.
-3. **Release boundary unchanged:** email consistency (#523), reviewer deadline
-   defaults (#521), release courtesy defaults (#517), and agenda defaults (#522)
-   are shipped. Production evidence is in their linked build audits; no runtime
-   changes were made during this closeout.
+1. **Reviewer exclusion recovery:** PR #527 / `3e53510ff` restored failed
+   exclusions without overwriting concurrent selection/roster changes.
+2. **Deliberation-distribution defaults:** PR #529 / `7f2a6e9c8`; nonempty message,
+   fresh ordinary reopen, discard warnings and frozen uncertain-send recovery.
+3. **Scheduled grantee reminder defaults and recovery:** PR #531 / `6a37ea105`;
+   reassignment holds, current-PD checks and preserved transport correlation.
+4. **Automatic reviewer thank-you defaults:** PR #533 / `a9e9b4de6`; separate
+   exact-owner wording and rendered-copy/DOCX preparation before the send claim.
+5. **Acceptance-confirmation defaults:** PR #534 / `8b02e8467`; personal PD wording,
+   shared non-PD fallback, one combined discard guard and recoverable preclaim
+   preparation. Owner policies: normalize CR/LF only in subject placeholder values,
+   preserve body text; retry assigned-PD lookup failures before claiming.
 
-### Commits / destinations
+### Release evidence and boundaries
 
-- `ca07940f2` — original Duncan follow-up, preserved on pushed
-  `codex/email-consistency-release-record` (original checkout remains there).
-- `bc99a8694` — prior handoff/milestone; PR #524 merged to main as `efb633f9c`.
-- `a036ffb87` — saved checklist; PR #525 merged to main as `ac38b55e6`.
-- Final handoff is prepared on `codex/session-641-final-handoff` from origin/main
-  for a documentation-only PR to main. Keep all existing branches/local main.
+- Final acceptance implementation review: Claude PASS at `0ac9ce254`;421 focused
+  tests,3 isolated PostgreSQL cases and15 fixture browser cases passed. All CI
+  passed before merge. Types, lint and scoped gates passed.
+- Release closeout `ed6d91630`: production deployment
+  `dpl_FfRgyPV3hwgQ7SewRuAMNy2fCECL` READY and active on production aliases.
+  Read-only probe verified public acceptance settings/discard assets and signed-out
+  protection; error scan returned zero records in its bounded window. No live
+  preference write or real confirmation send was tested.
+- Claude's committed corpus/database/report work was integrated unchanged.
+  Its other checkout, pre-existing database, migrations and environment were not
+  operated. Only an owned disposable PostgreSQL fixture was used and removed.
+- Retain family-specific sender/recipient authority, strict Save/Clear readback,
+  uncertain-write Reload barriers and postclaim at-most-once behavior. Acceptance
+  retries are finite; no staff requeue tool is claimed. Signature lookup remains
+  independent; cancellations outside the drain may leave stale preparation alerts.
 
-Prior release/J27 handoff: `git show efb633f9c:SESSION_PROMPT.md` (retrievability
-checked). Full earlier context: `git show ca07940f2:SESSION_PROMPT.md`.
+### Key commits / destinations
+
+- `b3ec15085`, `3e53510ff` — exclusion recovery and release.
+- `7f2a6e9c8`, `6a37ea105`, `a9e9b4de6`, `8b02e8467` — reviewed email releases.
+- `2ff4e861e` — acceptance implementation; `0ac9ce254` — review coverage corrections.
+- `ed6d91630` — acceptance production verification/probe and release-status records.
+- Feature branch `codex/reviewer-acceptance-defaults` is preserved; handoff prepared
+  separately on `codex/session-642-final-handoff` from current origin/main for a
+  docs-only landing on main, following the recorded cross-machine preference.
+- Prior Session 641 handoff is retrievable with
+  `git show ed6d91630:SESSION_PROMPT.md` (verified). Older context remains at
+  `git show efb633f9c:SESSION_PROMPT.md`; historical checkout paths are not authority.
 
 ## Next Items
 
 ### Owner Decision Needed
 
-- **Duncan walkthrough — awaiting discussion, no implementation authorized.**
-  Use the **Meeting checklist — pre-discussion calendar agenda** section,
-  followed by the detailed findings/questions in the personal-email TODO. No date
-  set. A marked app-managed Agenda section is a proposal, not an adopted design.
-  Confirm organizer access and synthetic-event behavior before any real update.
-- **J27 meeting answers — awaiting colleagues.** The alignment log still records
-  B1/C1–C5/R2 for Connor and A1–A5/R1/X1/F1–F3 for the meeting expected Oct 28.
-  D1 cycle-date authority is distinct from Outlook invitation ownership.
-  Evidence: `docs/plans/J27_ALIGNMENT_LOG_2026-10-24.md`, read at session close.
+- **Duncan scheduling walkthrough — blocked awaiting discussion.** No calendar
+  implementation authorized. Use the checklist in
+  `docs/plans/PERSONAL_EMAIL_DEFAULTS_TODO_2026-09-20.md`. Confirm organizer/edit
+  access, event linkage, audience, notifications and recovery before planning an
+  implementation. The app-managed Agenda section remains a proposal.
+- **Connor/J27 answers — awaiting colleagues.** Current authority is
+  `docs/plans/J27_ALIGNMENT_LOG_2026-10-24.md`, re-read at closeout. D1–D6 are
+  recorded owner decisions, not unresolved questions; remaining A/B/C/R/X/F items
+  need meeting answers. T3 filing-switch ownership/date is unassigned; T5 timeline
+  labels await a reply. Do not activate a filing switch, automatic reminder schedule,
+  central campaign settings or intake AI pass merely from this handoff.
+- **Next substantive project — owner to choose.** Justin called the proposed
+  reviewer-save recovery follow-up “small ball” and chose to wrap up. Do not
+  auto-resume it or substitute another minor hardening task as the next priority.
 
-### Verify Before Acting
+### Verify Before Acting / Parked
 
-- J27 automatic AI pass and November central reviewer settings remain planning
-  work in the alignment log (R-3, D4). Check new answers and source/Atlas before
-  resuming; earlier readiness code checks date to Oct 24, not this session.
-- J27 filing switch T3 remains unassigned in that log; timeline correction T5
-  awaits a reply. Neither is an instruction to change Production now.
-- Local main contains two old unpushed slice 2 planning commits (`e9f981e32`,
-  `c597aad55`); do not reset or silently promote them. The original checkout
-  remains on `codex/email-consistency-release-record`.
-- Preserve owner/Codex untracked `.impeccable/critique/2026-10-19T02-04-42Z__shared-components-board-writeups-boardwriteups-js.md`
-  and `output/`. Retained synthetic fixtures are not cleanup instructions.
-
-### Parked / Do Not Reopen Without New Decision
-
-- Calendar implementation is on hold pending the Duncan walkthrough. No calendar
-  edits, permission changes, new live sends or business-record writes authorized.
-- Email consistency and personal defaults slices 2, 3 and 6 are shipped (#523,
-  #521, #517, #522); retain family-specific authorization and desktop density.
-- J27 D1–D6 remain owner decisions; see the alignment log. Grant Reporting sunset,
-  reviewer panel coverage and Research Institution confirmation campaign remain
-  parked per the prior handoff; reverify before reopening.
+- Reviewer-save recovery is an unconfirmed potential issue. Source inspection and
+  the follow-up note motivated investigation, but no current failure was reproduced.
+  No fix or investigation was selected/authorized. Do not present it as a confirmed
+  defect. Search cancellation and acceptance-alert consolidation were alternatives,
+  not assignments.
+- Recheck source, current receipts and new owner answers before using older queue
+  entries as actionable work. Completed email releases above are DONE; no additional
+  personal-default family is selected here. Do not reopen calendar/J27 decisions,
+  Grant Reporting sunset, reviewer panel coverage or the Research Institution
+  confirmation campaign without a new owner direction.
+- Do not reset, stash, archive or clean another checkout/branch, its untracked
+  output/critique files or retained synthetic data based on historical handoffs.
+  No cleanup operation is authorized.
 
 ## Concurrent Workstreams / Key Files
 
-| Workstream | Resume boundary / source |
-|---|---|
-| Calendar agenda update | Owner + Duncan walkthrough first; `docs/plans/PERSONAL_EMAIL_DEFAULTS_TODO_2026-09-20.md` |
-| Email consistency | Released; `docs/audits/EMAIL_INTERFACE_CONSISTENCY_BUILD_2026-10-24.md` |
-| Personal defaults | Remaining families tracked in the personal-email TODO; slices 2/6 receipts linked there |
-| J27 / overlapping cycles | Await meeting answers; `docs/plans/J27_ALIGNMENT_LOG_2026-10-24.md`, `docs/plans/CYCLE_ROLLOVER_MINIMAL_CONFIGURATION_PLAN_2026-10-06.md`, `docs/J27_TRANSITION_REGISTER.md` |
-| Institution at Award | Prior boundary in `docs/plans/RESEARCH_INSTITUTION_AT_AWARD_BACKFILL_PLAN_2026-10-20.md`; not reverified this session |
+| Workstream | Owner / resume boundary |
+| --- | --- |
+| Acceptance defaults | Released; `docs/audits/REVIEWER_ACCEPTANCE_DEFAULTS_RELEASE_2026-10-26.md`; implementation limits in its build receipt |
+| Thank-you defaults | Released; `docs/audits/REVIEWER_THANKYOU_DEFAULTS_RELEASE_2026-10-26.md` |
+| Distribution / scheduled reminders | Released; `docs/audits/DISTRIBUTION_DEFAULTS_RELEASE_2026-10-25.md`, `docs/audits/SCHEDULED_GRANTEE_DEFAULTS_RELEASE_2026-10-25.md` |
+| Exclusion recovery | Released; F2 in `docs/plans/REVIEWER_SEARCH_FOLLOW_UPS_2026-09-18.md` |
+| Duncan calendar workflow | Owner + Duncan walkthrough first; personal-email TODO checklist |
+| J27 / overlapping cycles | Await answers; alignment log, rollover plan and `docs/J27_TRANSITION_REGISTER.md` |
+| Claude corpus/database work | Claude-owned; `docs/plans/RESEARCH_REQUEST_FILE_CORPUS_INDEX_BUILD_PLAN_2026-10-25.md`; inspect its current committed state, never assume permission for DB operations |
 
 ## Verification and Closeout
 
-Follow-up documentation passed doc-currency, fact-consistency, doc-symbol-refs,
-their sequential self-tests, docs-catalog and diff whitespace checks. Final handoff checks also passed. The claim-evidence pilot report was unavailable
-because local state could not be read; no observation row was invented.
-No memory-router advisory received. No memory/instruction/skill changes.
-Milestone determination: no new entry required for this checklist/handoff-only
-closeout. The Production email-release milestone already exists in DEVELOPMENT_LOG.md
-(added through PR #524).
+Milestone determination: production capabilities shipped; added **Personal email
+defaults and reviewer recovery released (Session 642)** to DEVELOPMENT_LOG.md.
+No CLAUDE.md, memory, instruction or skill changes needed: route, service and
+script details already live in their canonical catalogs/receipts, not the root
+instruction file. No memory-router advisory received. Claim-evidence report was
+unavailable because local state could not be read; no observation row invented.
+Final documentation gates/self-tests and push are completed as part of stop.
+No live emails, preference mutations or business-record writes authorized by stop.
