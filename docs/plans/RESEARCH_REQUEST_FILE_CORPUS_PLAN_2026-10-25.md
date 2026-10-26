@@ -291,10 +291,11 @@ this sample only.
 - **An unflagged test request.** One sampled recent request has placeholder
   content ("blahblahblah", applicant "W M Keck Foundation") but no
   `wmkf_istestrequest` flag, so the flag alone does not exclude all test data.
-  The owner approved setting the flag, but the Dataverse client refuses
-  test-flag writes to existing requests outside a fixed five-request D26
-  allowlist (`lib/dataverse/client.js`), so it is not set yet; the corpus can
-  keep its own exclusion list meanwhile.
+  Fixed 2026-10-26 (owner-approved): request 1001931 was added to the fixed
+  local-only marker-maintenance allowlist in `lib/dataverse/client.js` and
+  flagged with `scripts/mark-test-request-1001931.mjs` [VERIFIED: owner-run
+  apply returned `verified-marked` on ETag-checked readback]. Inventory CSVs
+  written before then still show it as non-test.
 - **No model pass yet.** Templates and filename rules explain the sample well
   enough that the model is better spent on what remains after template
   signatures than on the whole pilot.
