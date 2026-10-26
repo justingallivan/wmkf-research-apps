@@ -3,7 +3,7 @@ title: Personal defaults for scheduled grantee reminders
 domain: workbench
 kind: plan
 status: active
-summary: "Slice 5 bounded proposal: exact-owner future reminder defaults, creation/handoff integration and independent editor; no runtime implementation or live writes. Owner chose hold-until-repaired for reassignment failures. Revised hold contract addresses N1–N7 and rereview F1–F11; final independent check pending."
+summary: "Slice 5 bounded proposal: exact-owner future reminder defaults, creation/handoff integration and independent editor; no runtime implementation or live writes. Owner chose hold-until-repaired for reassignment failures. Revised hold contract addresses N1–N7 and F1–F11; final independent Claude review READY TO IMPLEMENT at 1ece224d3. No coding or release authorization."
 owner: product-engineering
 related:
   - docs/plans/PERSONAL_EMAIL_DEFAULTS_INVENTORY_2026-09-24.md
@@ -21,7 +21,8 @@ independent Claude review before coding. Claude reviewed draft `0ba91394d` and
 returned **READY WITH NAMED CHANGES**. Justin then chose **hold reassigned
 reminders until repaired**, not shared-wording fallback. This revision incorporates
 that choice and N1–N7. Rereview of `69a2bd838` returned READY WITH NAMED
-CHANGES; F1–F11 are addressed below and await a final independent check (§9). Codex owns this plan on
+CHANGES; F1–F11 are addressed below. Final independent delta review of
+`1ece224d3` returned **READY TO IMPLEMENT**, with no blocking findings (§9). Codex owns this plan on
 `codex/scheduled-grantee-defaults-plan` in the existing isolated worktree.
 Baseline: `c7c3ce6e106ea0e9b6c390cfb49351af36377840` (main including the
 reviewed distribution release and its documentation receipt). Claude's other
@@ -222,7 +223,8 @@ A saved unaccepted activity without intent is also held on PD mismatch: the old
 B5 policy of sending that activity as created applies only when ownership still
 matches. It cannot be automatically rebuilt for the new PD; manual reconciliation
 or stopping the old message is required. The second ownership check can discover
-a mismatch after this attempt created and persisted an activity: that is now the
+a mismatch after this attempt created or correlation-recovered and persisted an
+activity: that is now the
 same stored-activity manual-recovery case, even though transport was not started.
 Stop is terminal for this deliverable: create-or-get returns that stopped row and
 never schedules a replacement automatically. Any later reminder must be sent by
@@ -271,7 +273,10 @@ Change the existing due SQL ordering to
 with the existing limit of 100. Use CASE so ordinary NULL error codes are first.
 Ordinary due rows must take slots before previously held rows; remaining slots
 may recheck holds. A sustained ordinary backlog may defer automatic hold rechecks;
-manual guarded Retry remains available. No separate worker/table/claim is added.
+manual guarded Retry remains available. Within the held group, oldest-first
+ordering can also defer younger holds indefinitely under a persistent backlog.
+Producer handoff repair and manual Retry remain available; fair rotation within
+the held group is not introduced in this bounded slice. No separate worker/table/claim is added.
 Retitle/update the A3 integration parity test and due/attention headers to cover
 this deliberate ownership-vs-transport distinction; test 100+ held rows plus an
 ordinary NULL-code row, and assert the ordinary row remains selected.
@@ -492,8 +497,14 @@ that permits new sending while ownership differs. Source review is not runtime p
 
 The same-path exemption applies to `beforePopState` as well as routeChangeStart;
 a true departure still warns. Historical reports remain verbatim. No application
-code, migrations or database/environment state changed. A targeted independent
-final review of these corrections is required before readiness is claimed.
+code, migrations or database/environment state changed. The targeted independent
+final review passed at `1ece224d325a3ba4e0c4c57209ec31880856533d`: **READY TO
+IMPLEMENT**, with no remaining blocking findings. Verbatim receipt:
+`docs/audits/SCHEDULED_GRANTEE_DEFAULTS_PLAN_CLAUDE_FINAL_REVIEW_2026-10-25.md`.
+Its two non-blocking notes are reflected as documentation clarifications only:
+late persisted correlation recovery is also manual-recovery state, and oldest-first
+held-row rechecks can defer younger holds. No new runtime behavior was added after
+the reviewed fingerprint.
 
 ### Verification for planning
 
@@ -501,10 +512,10 @@ final review of these corrections is required before readiness is claimed.
 suites / 127 tests passed: cron reminders, scheduled routes/page/service/current
 recipients and grantee renderer. No proposed feature tests have been written.
 No Postgres integration or live data probe was run. Documentation gates and paired
-self-tests passed for the initial draft and review receipt; this revision must
-pass those gates after rereview is recorded.
+self-tests, docs catalog and secret scan passed for the revised plan and review
+receipts. These checks concern documentation; they do not test the planned hold.
 
-Next: independent read-only OAuth Claude review of this exact revised plan,
-record findings verbatim, and present readiness and any remaining issues to Justin.
-Do not implement or release in this task. Keep Claude's other checkout and database
-work untouched.
+Next: present the reviewed contract to Justin. Implementation requires the next
+owner instruction; release remains a separate deliberate action. No implementation,
+migration, environment change or live data operation occurred. Claude's other
+checkout and database work remain untouched.
