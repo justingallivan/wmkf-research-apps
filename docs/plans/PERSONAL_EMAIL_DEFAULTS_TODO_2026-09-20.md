@@ -127,7 +127,7 @@ existing non-PD fallback keeps Admin wording. Pre-claim preparation/refusal reco
 and discard warnings are explicit. No runtime or schema edits authorized yet.
 Plan: `docs/plans/PERSONAL_EMAIL_REVIEWER_ACCEPTANCE_DEFAULTS_PLAN_2026-10-26.md`.
 Claude initial review: READY WITH NAMED CHANGES. Source-backed corrections
-incorporated; two owner policy choices and revised-plan rereview remain.
+incorporated; both owner policy choices resolved; revised-plan rereview remains.
 Receipt: `docs/audits/REVIEWER_ACCEPTANCE_DEFAULTS_PLAN_CLAUDE_REVIEW_2026-10-26.md`.
 
 ## Existing pre-discussion calendar events — Duncan walkthrough pending 2026-10-25

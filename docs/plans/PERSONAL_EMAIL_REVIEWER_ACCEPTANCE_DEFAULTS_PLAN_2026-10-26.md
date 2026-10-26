@@ -3,7 +3,7 @@ title: Personal reviewer acceptance-confirmation defaults — bounded plan
 domain: reviewers
 kind: plan
 status: active
-summary: "Slice 9 planning only: exact-owner defaults for PD-attributed acceptance confirmations, shared wording for the existing non-PD fallback, and recoverable preparation before the email claim. Initial Claude review READY WITH NAMED CHANGES; source-backed corrections incorporated, two owner policy choices pending. No implementation or release authorized."
+summary: "Slice 9 planning only: exact-owner defaults for PD-attributed acceptance confirmations, shared wording for the existing non-PD fallback, and recoverable preparation before the email claim. Initial Claude review READY WITH NAMED CHANGES; source-backed corrections incorporated, both owner policy choices resolved; revised-plan independent review pending. No implementation or release authorized."
 owner: product-engineering
 related:
   - docs/plans/PERSONAL_EMAIL_DEFAULTS_INVENTORY_2026-09-24.md
@@ -89,12 +89,14 @@ with the existing escaping helper. Add an internal plain-text rendering step
 returning business text and final text; public renderAcceptanceConfirmationEmail
 continues returning exactly {subject, body}. Do not inspect HTML length as business length.
 
-Owner choice O1 pending: normalize CR/LF in subject placeholder VALUES to spaces
-(recommended; preserve body text and reject authored multiline subjects), or
-refuse data-caused unsafe subjects immediately terminal with an explicit manual-
-send alert. Do not silently choose or implement before the owner answers. Oversize/
-empty output remains a preparation refusal. The finalized policy and tests must
-distinguish raw authored copy failures from substituted context failures.
+[OWNER DECISION O1, 2026-10-26.] Replace CR/LF runs in subject placeholder
+VALUES with a single space, for both personal and inherited Admin wording.
+Preserve body substitutions verbatim; raw authored subject CR/LF still refuses.
+Use separate subject/body replacement maps in the internal renderer. Include
+supported shared legacy subject aliases in the same normalization so historical
+alias grammar does not bypass the policy. Do not normalize the entire subject,
+which would hide malformed authored copy. Final empty/oversize output still
+refuses preparation; tests distinguish authored copy from substituted values.
 
 ## 2. Staff self-service route and editor
 
@@ -186,10 +188,12 @@ non-PD fallback branch (no usable PD sender), never read a personal preference;
 use Admin wording and preserve NOTIFICATION_EMAIL_FROM behavior. Personal-read failure cannot take the generic fallback. An identity mismatch
 from the lookup is a preparation refusal.
 
-Owner choice O2 pending: lookup throws should become retryable pre-claim refusal
-(recommended), or retain historical generic-mailbox fallback on lookup errors.
-The no-PD/disabled/no-mailbox fallback remains shared in either choice. Do not
-implement the exception policy before the owner answers.
+[OWNER DECISION O2, 2026-10-26.] PD lookup throws are retryable preparation
+refusals before claim. Do not downgrade to shared wording or the generic mailbox
+on a transient/unreadable lookup. Retain shared generic fallback for no assigned
+PD, a confirmed disabled PD or a confirmed PD without a mailbox. Missing/null
+lookup result for an assigned PD is unreadable identity, so retry; malformed or
+mismatching GUID refuses. Validate the assigned GUID before the DAL lookup.
 
 Preserve required shared-default prerequisite for both branches, as in the
 thank-you slice; personal copy does not mask broken mandatory Admin configuration.
@@ -277,7 +281,11 @@ Tests must include:
    confirmed absence/shared, all own refusal statuses before claim, non-PD fallback
    with an own row present but reader uncalled, shared prerequisite, due override
    and ICS, server token append/explicit placeholder, confirmed recipient and
-   signature/escaping. Rendered empty/multiline/oversized both-source refusals.
+   signature/escaping. Both-source rendered empty/oversize and authored multiline
+   subject refusals. CR/LF in reviewer/title placeholder VALUES normalizes only
+   the subject, including shared legacy aliases; body remains byte-preserved.
+   Lookup throws/null for an assigned PD retries without shared or generic send;
+   confirmed no-PD/disabled/no-mailbox still uses the existing shared fallback.
 5. Real drain orchestration: first prep refused, no claim/no send/no false sentAt,
    retry then repair and single confirmed send; bounded exhaustion with manual-send alert and terminal sibling failure; already-claimed
    skip; repeat acceptance skip; withdrawal/release/timestamp changes after prep;
@@ -326,8 +334,8 @@ DB. Branch runtime work uses deliberate independent review and owner release.
 READY WITH NAMED CHANGES. R1 finite recovery corrected, R2 single page-level guard,
 R3 explicit test seams, R4 fresh suggestion and binding/recheck, R7 terminal siblings
 and job-bound alert lifecycle, R8 three privacy sets/naming/missing token corrected.
-R5 internal plain-text helper added; subject policy O1 pending owner choice.
-R6 sender lookup policy O2 pending owner choice. These revisions have not yet had
+R5 internal plain-text helper added; O1 owner approved subject-value normalization.
+R6 owner approved pre-claim retries on PD lookup errors; O2 resolved. These revisions have not yet had
 an independent rereview. Initial verbatim report is retained in
 `docs/audits/REVIEWER_ACCEPTANCE_DEFAULTS_PLAN_CLAUDE_REVIEW_2026-10-26.md`.
 
@@ -337,4 +345,5 @@ current code; it does not test this unbuilt plan. Doc currency/facts/symbol/buil
 claim gates/self-tests, docs catalog, API/Atlas gates/self-tests and secret scan/
 self-test passed during planning. Runtime files and Claude's DB work untouched.
 
-Owner choices O1/O2: pending. Implementation and release authorization: pending.
+Owner choices O1/O2 resolved 2026-10-26 as recorded above. Revised-plan
+independent review pending. Implementation and release authorization: pending.
