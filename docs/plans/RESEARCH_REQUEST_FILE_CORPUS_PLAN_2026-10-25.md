@@ -3,7 +3,7 @@ title: Research request file corpus — derived legible layer
 kind: plan
 domain: dataverse
 status: active
-summary: "Build a derived, rebuildable index (and extracted text) over the SharePoint files attached to Research requests, 1990–present, without moving or renaming originals, so staff can browse and AI/portfolio/outcome analyses can run. Based on the 2026-10-25 read-only inventory of 9,001 requests and 60,369 files (de-duplicated across runs); index starts in Postgres and settled fields are promoted to Dataverse as the durable record (owner decision 2026-10-25); owner approved a past-weighted content pilot (~55 requests) focused on science proposals, reviews, grant reports and staff writeups, with visibility governed by the app's request restrictions; inventory counts are provisional pending a strict re-listing. The content pilot (55 requests, 449 files) found legacy .doc converts through Graph, about a quarter of PDFs need OCR, and the 1995–2012 archives hold staff and grant-management documents with strong first-line templates rather than proposals; era 1 is parked until the proposals can be imported from microfiche (owner, 2026-10-25)."
+summary: "Build a derived, rebuildable index (and extracted text) over the SharePoint files attached to Research requests, 1990–present, without moving or renaming originals, so staff can browse and AI/portfolio/outcome analyses can run. Based on the 2026-10-25 read-only inventory of 9,001 requests and 60,369 files (de-duplicated across runs); index starts in Postgres and settled fields are promoted to Dataverse as the durable record (owner decision 2026-10-25); owner approved a past-weighted content pilot (~55 requests) focused on science proposals, reviews, grant reports and staff writeups, with visibility governed by the app's request restrictions; inventory counts are provisional pending a strict re-listing. The content pilot (55 requests, 449 files) found legacy .doc converts through Graph, about a quarter of PDFs need OCR, and the 1995–2012 archives hold staff and grant-management documents with strong first-line templates rather than proposals. Owner decision 2026-10-25: the corpus starts at the 2018 meeting year, where proposals become identifiable for 94–100% of requests with files; meeting years before 2018 (5,149 requests) are parked, with the evidence and revisit triggers recorded in the plan, until the proposals can be imported from microfiche."
 owner: product-engineering
 related:
   - scripts/probe-request-file-inventory.mjs
@@ -27,8 +27,9 @@ The owner chose a **derived layer**: originals stay exactly where GOapply,
 AkoyaGO and the migrations put them. Nothing in SharePoint is renamed, moved or
 deleted. The layer is a rebuildable index plus extracted text that points back to
 each original by its Graph item identity. Scope is Research only
-(`RESEARCH_PROGRAM_IDS`: S&E and Medical Research), working newest first and
-eventually back as far as the records go.
+(`RESEARCH_PROGRAM_IDS`: S&E and Medical Research), working newest first back
+to the 2018 meeting year. Earlier years are parked (see "Parked: meeting years
+before 2018" and owner decision 6).
 
 This layer is not the governed Request Document registry (`wmkf_requestdocument`),
 which tracks app-produced writeups and Site Visit artifacts with lifecycle and
@@ -65,12 +66,57 @@ date before 1990, were not covered by the history runs; decision 4 counts them.
 
 ### Four eras
 
+Recut 2026-10-25 at the 2018 meeting year (owner decision 6); era 1 previously
+ended at 2015.
+
 | Era | Meeting years | Library | Shape |
 |---|---|---|---|
-| 1 | 1990–2015 | `RequestArchive1` (1990–2004), `RequestArchive2` (2004–2015), some `RequestArchive3` from 2014 | Flat folders; 92% legacy `.doc`; 15,837 files named only `<number>.doc` |
-| 2 | 2016–2021 | `RequestArchive3`; `akoya_request` from 2018 | Flat; old form exports (`Application<n>.html`), legacy `.doc` (staff reviews stored as files, e.g. `<institution> - Phase II Review.doc`), interim/final reports mixed in |
+| 1 (parked) | 1990–2017 | `RequestArchive1` (1990–2004), `RequestArchive2` (2004–2015), `RequestArchive3` from 2014 | Flat folders; mostly legacy `.doc` named only by number or GUID; Foundation and staff documents, proposals not identifiable |
+| 2 | 2018–2021 | `RequestArchive3`; `akoya_request` from 2018 | Flat; old form exports (`Application<n>.html`), legacy `.doc` (staff reviews stored as files, e.g. `<institution> - Phase II Review.doc`), interim/final reports mixed in |
 | 3 | 2022 – Jun 2026 cycle | `akoya_request` | Mostly flat GOapply names (`projectdescription.pdf`, `application cover page.docx`); `Phase I`/`Phase II` folders appear inconsistently from 2025 (Jun 2026 cycle: 1,879 of 2,108 files still in the root); staff-made subfolders (`Phase II/<institution> Reviews`, `Relevant Papers`) |
 | 4 | Dec 2026 cycle onward (requests created 2026) | `akoya_request` | Consistent `Phase I` / `Phase II` / `Site Visit - …` / `Artifacts/…` structure; app-generated files well named |
+
+### Parked: meeting years before 2018
+
+[DECIDED by owner 2026-10-25.] The corpus does not index, extract or classify
+files for Research requests with a meeting year before 2018. Nothing about
+them is changed: the originals stay in `RequestArchive1`/`2`/`3` and
+`akoya_request`, and the inventory CSVs and pilot output stay in the owner's
+Shuttle folder (`request-file-inventory-2026-10-25/`,
+`request-file-pilot-2026-10-25/`).
+
+**What is parked:** 5,149 non-test requests with a meeting date from 1990
+through 2017, 4,476 of them with files, holding 21,921 non-test files
+[VERIFIED: inventory CSVs, de-duplicated; provisional like all inventory
+counts]. Separately tabled: 357 requests with a meeting date before 1990 and 46
+with none (owner decision 4).
+
+**Why:** the proposals are not identifiable in the SharePoint files before
+2018, and the owner believes they survive on microfiche, which would be a
+better source than reconstructing them from what SharePoint holds.
+
+- **By filename** (all inventoried files; proposal = a `project-description`,
+  `project-summary`, `compiled-proposal` or `application-form` match), the
+  share of requests with files that have a proposal falls from 94–100% in every
+  meeting year 2018–2026 to 0–8% in every year 2008–2017 (2017: 21 of 297;
+  2018: 291 of 302). In 2008–2017, 74–98% of each year's files have names with
+  no meaning.
+- **By content** (pilot, section 2b): the 40 sampled requests from 1995, 2005,
+  2012 and 2017 yielded no applicant proposal text. They hold the Foundation's
+  side of the record: letters, staff memos, proposal control sheets, staff
+  Phase I and Phase II reviews, Phase I Summary and Rationale write-ups,
+  tracking overviews, grant monitoring reports, financial summaries, grantee
+  reports, and the occasional scanned referee review.
+
+**What the parked years still offer:** those staff and grant-management
+documents convert well (legacy `.doc` through Graph) and carry strong
+first-line templates, so a smaller "staff record" corpus (staff judgments,
+outcomes, reports) is feasible later if it proves useful on its own.
+
+**Revisit when:** (a) the microfiche proposals can be imported, (b) the owner
+wants the staff-record corpus for pre-2018 years, or (c) an analysis needs
+pre-2018 outcomes. Start from the inventory CSVs and section 2b; re-list
+strictly before relying on counts.
 
 ### Findings that shape the design
 
@@ -143,10 +189,10 @@ text is extracted only for the documents the analyses need to read:
 | **Deferred** | Any `.pptx`/`.ppt`, whatever its type | Typed, not read this round [DECIDED by owner 2026-10-25]; revisit later |
 | **Type only** | `budget`, `budget-spreadsheet`, `financial-narrative`, `financial-report`, `biosketches`, `cover-page`, `governing-board`, `status-letter`, `other-funding`, `institutional-priority`, `no-cost-extension`, `budget-reallocation`, `correspondence`, `institutional-info`, `ai-material`, `referee-list`, other administrative types, `media` | Classify so they can be filtered out; no text extraction |
 
-Staff writeups from before AkoyaGO have no recognizable name. The working
-hypothesis is that they sit among era 1–2 documents (e.g. `Final Report Write
-Up` folders, number-named `.doc`), which the pilot is meant to test.
-That hypothesis is [ASSUMED].
+Staff writeups from before AkoyaGO often have no recognizable name. The pilot
+confirmed they sit among number-named `.doc` files in 1995–2017 (section 2b);
+for 2018–2021 (era 2) this is still [ASSUMED] until a 2018–2021 sample is
+opened.
 
 ### 2. Classification, cheapest first
 
@@ -157,8 +203,8 @@ That hypothesis is [ASSUMED].
    `uncertain`: many documents are written on a template with fixed wording
    (form headings, review prompts, report section titles). Regular expressions
    over normalized extracted text (case, whitespace and line breaks
-   collapsed) identify the template, and therefore the type. Required for era 1
-   and much of era 2. [Owner suggestion 2026-10-25; the templates themselves are
+   collapsed) identify the template, and therefore the type. Required for the
+   opaque names in era 2 (and for era 1 if it is unparked). [Owner suggestion 2026-10-25; the templates themselves are
    [ASSUMED] until the pilot opens documents.]
 3. **Model classification** only for what neither rules nor signatures decide.
 
@@ -199,8 +245,8 @@ CSVs; 60,237 non-test files; unit tests in
 
 | Era | Files | Read | Already legible | Type-only | Deferred (PowerPoint) | Uncertain (of which opaque names) |
 |---|---|---|---|---|---|---|
-| 1 | 18,181 | 429 | 0 | 451 | 0 | 17,301 (16,354) |
-| 2 | 22,461 | 3,664 | 0 | 9,545 | 19 | 9,233 (6,295) |
+| 1 (parked) | 21,921 | 633 | 0 | 800 | 0 | 20,488 (19,326) |
+| 2 | 18,721 | 3,460 | 0 | 9,196 | 19 | 6,046 (3,323) |
 | 3 | 16,902 | 6,411 | 0 | 8,264 | 25 | 2,202 (297) |
 | 4 | 2,693 | 898 | 314 | 1,456 | 25 | 0 |
 
@@ -216,13 +262,15 @@ and reviewer lists are Type-only `referee-list` (1,616 files), unless the name
 also signals proposal text; archive-dated `<year>_<JUN|DEC>_<institution>_<n>_References.pdf`
 names go to `uncertain` (`archive-references`; 105 files), because the pilot
 found a scanned referee review behind one. The table above reflects these
-rules.
+rules. The table uses the eras as recut at 2018; the bullets below were
+counted under the earlier cut (era 1 through 2015, era 2 from 2016) unless
+they say otherwise.
 
-- **Opaque names are larger than the inventory summary showed.** Era 2 holds
-  4,148 `.doc` files named with hyphenated GUIDs in addition to 1,688
-  number-only `.doc` and 440 GUID `.html`; eras 1–2 together have 22,649 files
-  whose names carry no meaning. Only template signatures or the model can
-  classify them, which makes the content pilot the deciding step for history.
+- **Opaque names are larger than the inventory summary showed.** Under the
+  earlier cut, era 2 held 4,148 `.doc` files named with hyphenated GUIDs in
+  addition to 1,688 number-only `.doc` and 440 GUID `.html`. Under the 2018
+  cut, 3,323 era 2 files (2018–2021) have names with no meaning; only template
+  signatures or the model can classify them.
 - **Pre-AkoyaGO staff documents exist by name in era 3** (and a few in era 2):
   252 "Phase I rationale" documents, 63 site visit memos and write-ups
   (`SV memo …`, `… site visit WU`), 224 other write-ups, and office visit
@@ -234,7 +282,8 @@ rules.
   audited financials, treasurer's reports; Type-only) and `ai-material`
   (app-made AI inputs; Type-only, applied only after Read rules so a copied
   proposal stays Read).
-- **Remaining non-opaque uncertain** (875 / 2,917 / 1,913 in eras 1–3) is a long
+- **Remaining non-opaque uncertain** (1,162 / 2,723 / 1,905 in eras 1–3 under
+  the 2018 cut) is a long
   tail of institution-specific names. More rules have diminishing returns;
   those documents go to template signatures and the model.
 - These counts are a rule-quality signal, not a final classification: the pilot
@@ -266,12 +315,16 @@ this sample only.
   Phase II reviews (2005), Phase I Summary and Rationale write-ups (2012), grant
   monitoring reports, financial summaries and grantee reports. For history, the
   readable record in these years is the staff's account of each proposal.
+  The 10 sampled 2017 requests looked the same (staff reviews, rationale
+  write-ups, tracking overviews, grantee reports, one scanned referee review);
+  together with the by-year filename counts this set the 2018 cutoff (see
+  "Parked: meeting years before 2018").
 - **Opaque names hide strong templates.** Almost all of those files have
   number-only names, but their first lines identify them: `PHASE I REVIEW`,
   `PHASE II REVIEW`, `Phase I Summary and Rationale`, `Tracking Overview`,
   `GRANTEE INFORMATION SHEET`, `GRANT MONITORING REPORT`, `Financial Summary
   for:`, `Memorandum`, `PROPOSAL CONTROL SHEET`, and dated letters. Template
-  signatures (section 2) should classify most era 1–2 opaque files without a
+  signatures (section 2) should classify most of these opaque files without a
   model.
 - **"Phase II Review" names staff writeups in the older files.** In the sample,
   documents headed `Phase II Review` (2005, 2017) are staff reviews with the
@@ -419,12 +472,12 @@ notes promotion governance is under-specified; define it in that plan.
    documents (no-cost extensions, budget reallocations, emails) are typed but
    not read. Site Visit transcripts and summaries and staff discussion
    summaries are already legible (section 1, reading priority).
-6. **Era 1 parked:** the 1995–2012 sample held Foundation documents, not
-   proposals (section 2b). The owner believes the proposals survive on
-   microfiche and could be imported, so era 1 waits for that better source
-   before any further work. Era 1 is defined as meeting years 1990–2015; the
-   parking is applied to the whole era pending owner confirmation of the edges
-   (the sample covered 1995, 2005 and 2012).
+6. **Start at 2018; park earlier years:** the corpus covers meeting years 2018
+   on. Meeting years 1990–2017 are parked until the proposals can be imported
+   from microfiche, which the owner believes is where they survive. The
+   evidence, what is parked and when to revisit are in "Parked: meeting years
+   before 2018". (First parked as 1995–2012 after the pilot, then moved to the
+   2018 break once the by-year counts showed 2013–2017 look the same.)
 
 ## Likely future direction (not decided)
 

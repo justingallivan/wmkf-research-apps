@@ -10,8 +10,8 @@
  * <inventory dir> holds one subfolder per run, each with files.csv and
  * requests.csv; runs are de-duplicated on request_id and item_id.
  * Eras (plan "Four eras"): 4 = created 2026 with a meeting date from 2026-07;
- * otherwise by meeting year (created year when absent): 1 ≤ 2015, 2 = 2016–2021,
- * 3 = 2022 on.
+ * otherwise by meeting year (created year when absent): 1 ≤ 2017 (parked), 2 =
+ * 2018–2021, 3 = 2022 on.
  */
 
 import fs from 'fs';
@@ -53,7 +53,7 @@ function eraOf(r) {
   const created = (r.created_on || '').slice(0, 4);
   if (created === '2026' && meeting >= '2026-07') return 4;
   const year = Number((meeting || created).slice(0, 4));
-  if (year <= 2015) return 1;
+  if (year <= 2017) return 1;
   if (year <= 2021) return 2;
   return 3;
 }

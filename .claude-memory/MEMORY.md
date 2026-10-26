@@ -55,6 +55,7 @@
 - Auth / admin / access / org-open reviewer access / private Blob: ../docs/agent-wiki/topics/security-auth.md; ../docs/Q9_PREFS_APPACCESS_DAL_MIGRATION_PLAN.md
 - Intake portal / attachments / institution match / virus scan: ../docs/agent-wiki/topics/intake-portal.md
 - Site Visit materials / applicant additional materials / briefing room: ../docs/APPLICANT_ADDITIONAL_MATERIALS_PLAN.md; project-site-visit-materials-planning-handoff.md
+- Research request file corpus / SharePoint file inventory / pre-2018 parked (microfiche): ../docs/plans/RESEARCH_REQUEST_FILE_CORPUS_PLAN_2026-10-25.md
 - Cross-visit D26 sentiment vs ranking / discussion misattribution diagnosis: project-d26-cross-visit-sentiment-ranking-study.md; ../docs/plans/DISCUSSION_MISATTRIBUTION_BRIEF_2026-10-17.md
 - PC Meeting Tracker / sessions / visits / agenda email / Staff Deliberations rail: ../docs/PC_MEETING_TRACKER_PLAN.md; project-deliberation-session-precedes-site-visit.md
 - Integrity screener / Retraction Watch / PubPeer / News: ../docs/agent-wiki/topics/integrity-screener.md
