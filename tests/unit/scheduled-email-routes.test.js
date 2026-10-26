@@ -137,6 +137,7 @@ test('a stale version returns conflict without mutating the row', async () => {
 describe('Part A guards (shared helper, mirrored by the page)', () => {
   test.each([
     ['unconfirmed', { last_error_code: 'scheduled_email_send_unconfirmed', send_requested_at: '2026-09-01T00:00:00Z', dynamics_email_id: 'ffffffff-ffff-4fff-8fff-ffffffffffff' }],
+    ['correlation recovery', { last_error_code: 'scheduled_email_correlation_recovery' }],
     ['activity missing', { last_error_code: 'scheduled_email_activity_missing', dynamics_email_id: 'ffffffff-ffff-4fff-8fff-ffffffffffff' }],
     ['activity forbidden', { last_error_code: 'scheduled_email_activity_forbidden', dynamics_email_id: 'ffffffff-ffff-4fff-8fff-ffffffffffff' }],
   ])('%s: edit, approve and send-now are refused with 409; stop still works', async (_label, fields) => {

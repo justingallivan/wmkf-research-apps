@@ -34,6 +34,7 @@ function statusLabel(message) {
   if (message.status === 'sending') return 'Sending';
   // A2/A3: attention rows are decided by the shared helper, never by status.
   const attention = scheduledEmailAttentionReason(message);
+  if (attention === SCHEDULED_EMAIL_ATTENTION.CORRELATION_RECOVERY) return 'Held — email history needs recovery';
   if (attention === SCHEDULED_EMAIL_ATTENTION.PD_HANDOFF_HELD) return 'Held — current PD needs verification';
   if (attention === SCHEDULED_EMAIL_ATTENTION.UNCONFIRMED) return 'Send status is uncertain';
   if (attention === SCHEDULED_EMAIL_ATTENTION.ACTIVITY_MISSING) return 'Needs attention — Dynamics email not found';

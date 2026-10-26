@@ -45,6 +45,8 @@ function dependencies(base = message()) {
   const finalized = { ...sent, finalized_at: '2026-08-25T00:00:02.000Z' };
   return {
     claimSend: jest.fn(async () => claimed),
+    freezeCorrelation: jest.fn(async row => ({ ...row, last_error_code: 'scheduled_email_correlation_recovery' })),
+    releaseCorrelation: jest.fn(async row => ({ ...row, last_error_code: null })),
     readCurrentPd: jest.fn(async () => base.pd_systemuser_id),
     // Part B default: the current Liaison and posture match the row (no drift).
     readCurrentRecipients: jest.fn(async (row) => ({
@@ -849,4 +851,13 @@ test('ownership-held row projects and groups under Needs attention, never approv
   expect(projectScheduledEmail(row).attentionReason).toBe('pd_handoff_held');
   const [group] = groupDigestRowsByPd([row]);
   expect(group.needsAttention).toEqual([row]); expect(group.approvalPending).toEqual([]); expect(group.upcoming).toEqual([]); expect(group.sentFyi).toEqual([]);
+});
+
+
+test('correlation recovery projects exclusively into Needs attention', () => {
+  const row = digestRow({ status: 'failed', last_error_code: 'scheduled_email_correlation_recovery', approval_required: true });
+  expect(projectScheduledEmail(row).attentionReason).toBe('correlation_recovery');
+  const [group] = groupDigestRowsByPd([row]);
+  expect(group.needsAttention.map(r => r.id)).toContain(row.id);
+  expect(group.approvalPending).toHaveLength(0); expect(group.upcoming).toHaveLength(0);
 });

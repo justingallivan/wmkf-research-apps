@@ -368,3 +368,15 @@ test.each([false, true])('held page shows guarded Retry/Stop and truthful 409 fe
   else expect(global.fetch.mock.calls.filter(([, opts]) => opts?.method === 'PATCH')).toHaveLength(0);
   expect(document.querySelector('[data-status="sent"]')).toBeNull(); expect(document.querySelector('[data-status="uncertain"]')).toBeNull();
 });
+
+
+test('correlation recovery is Stop-only with truthful history-recovery copy', async () => {
+  const held = { ...MESSAGE, status: 'failed', lastErrorCode: 'scheduled_email_correlation_recovery', attentionReason: 'correlation_recovery', hasActivity: false };
+  await renderWithMessage([['/api/scheduled-emails', async () => response(200, { messages: [held] })]]);
+  expect(screen.getAllByText('Held — email history needs recovery').length).toBeGreaterThan(0);
+  expect(screen.getByDisplayValue('Hi')).toBeDisabled();
+  expect(screen.getByRole('button', { name: 'Looks good' })).toBeDisabled();
+  expect(screen.getByRole('button', { name: 'Send now' })).toBeDisabled();
+  expect(screen.getByRole('button', { name: 'Stop this message' })).toBeEnabled();
+  expect(screen.getByRole('status')).toHaveTextContent('No new send will occur');
+});

@@ -124,6 +124,8 @@ describeIf('scheduled email engine Parts A and B (live Postgres, migrations 036 
       getMessage: store.getScheduledEmail,
       readCurrentPd: jest.fn(async message => message.pd_systemuser_id),
       claimSend: store.claimScheduledEmailSend,
+      freezeCorrelation: store.freezeScheduledEmailCorrelation,
+      releaseCorrelation: store.releaseScheduledEmailCorrelation,
       recordEmailActivity: store.recordScheduledEmailActivity,
       recordSendRequested: store.recordScheduledEmailSendRequested,
       recordSent: store.recordScheduledEmailSent,
@@ -732,6 +734,119 @@ describeIf('scheduled email engine Parts A and B (live Postgres, migrations 036 
     const held = await read(row.id); expect(held.last_error_code).toBe('scheduled_email_pd_handoff_held'); expect(held.last_error_message).toContain('Dynamics accepted'); expect(held.dynamics_email_id).toBe(ACTIVITY); expect(held.send_requested_at).toBeNull();
     expect((await service.deliverScheduledEmail(row.id, {}, d)).sent).toBe(true);
     expect((await read(row.id)).status).toBe('sent'); expect(d.sendEmail).not.toHaveBeenCalled(); expect(d.createEmailActivity).not.toHaveBeenCalled();
+  });
+
+  const RECOVERY = 'scheduled_email_correlation_recovery';
+  const handoffInput = row => ({ workflowType: row.workflow_type, sourceRecordId: row.source_record_id,
+    expectedVersion: row.version, pdSystemUserId: PD_B, pdName: 'New PD', pdEmail: 'new@example.org',
+    toRecipients: ['pi@example.edu'], recipientName: 'PI', recipientContactIds: [], subject: 'New default',
+    bodyText: 'New personal body', signatureText: 'New signature', approvalRequired: false });
+
+  test('correlation-only accepted identity failure cannot be reassigned, readdressed or resent, and later recovers', async () => {
+    const row = await seed();
+    const d = deps({ readCurrentPd: jest.fn(async () => PD_B),
+      findEmailByCorrelation: jest.fn(async () => [{ activityid: ACTIVITY, statuscode: 7 }]) });
+    d.recordEmailActivity = jest.fn().mockRejectedValueOnce(new Error('identity write unavailable'))
+      .mockImplementation(store.recordScheduledEmailActivity);
+    await expect(service.deliverScheduledEmail(row.id, {}, d)).rejects.toMatchObject({ acceptanceProven: true });
+    const failed = await read(row.id);
+    // The old implementation rewrites the owner and increments generation here.
+    expect(await store.reassignScheduledEmail(handoffInput(failed))).toBeNull();
+    expect(failed).toMatchObject({ last_error_code: RECOVERY, dynamics_email_id: null, send_requested_at: null, recipient_generation: 0 });
+    expect(await store.claimScheduledEmailSend(row.id, { force: true })).toBeNull();
+    expect(await store.listDueScheduledEmails()).toEqual([]);
+    expect((await store.listScheduledEmailReconciliationCandidates()).map(r => r.id)).toEqual([row.id]);
+    expect(attention.scheduledEmailActionsAllowed(failed)).toMatchObject({ edit: false, approve: false, sendNow: false, stop: true });
+    expect((await service.reconcileScheduledEmailCandidate(failed, d)).sent).toBe(true);
+    expect(await read(row.id)).toMatchObject({ status: 'sent', dynamics_email_id: ACTIVITY, recipient_generation: 0, pd_systemuser_id: PD_A });
+    expect(d.findEmailByCorrelation.mock.calls.every(([key]) => key === service.recipientCorrelationKey(row))).toBe(true);
+    expect(d.sendEmail).not.toHaveBeenCalled(); expect(d.createEmailActivity).not.toHaveBeenCalled();
+    expect(d.readCurrentRecipients).not.toHaveBeenCalled();
+  });
+
+  test.each(['null', 'throw'])('failed pre-read fence (%s) performs no external lookup or send', async kind => {
+    const row = await seed();
+    const d = deps({ readCurrentPd: jest.fn(async () => PD_B), freezeCorrelation: jest.fn(async () => {
+      if (kind === 'throw') throw new Error('db unavailable'); return null;
+    }) });
+    await expect(service.deliverScheduledEmail(row.id, {}, d)).rejects.toThrow();
+    expect(d.findEmailByCorrelation).not.toHaveBeenCalled(); expect(d.createEmailActivity).not.toHaveBeenCalled(); expect(d.sendEmail).not.toHaveBeenCalled();
+  });
+
+  test.each([[], [{ activityid: ACTIVITY, statuscode: 1 }], 'offline', 'duplicate'])('interrupted correlation lookup remains read-only with result %j', async result => {
+    const row = await seed(); const claimed = await store.claimScheduledEmailSend(row.id);
+    await store.freezeScheduledEmailCorrelation(claimed);
+    // Simulate process death and lease expiry before any receipt or generic catch.
+    await mockPg.client.query("UPDATE scheduled_email_messages SET locked_until=NOW()-interval '1 minute' WHERE id=$1", [row.id]);
+    const d = deps({ findEmailByCorrelation: jest.fn(async () => {
+      if (result === 'offline') throw new Error('offline');
+      return result === 'duplicate' ? [{ activityid: ACTIVITY, statuscode: 7 }, { activityid: PD_C, statuscode: 7 }] : result;
+    }) });
+    expect((await service.reconcileScheduledEmailCandidate(await read(row.id), d)).unresolved).toBe(true);
+    const held = await read(row.id); expect(held.last_error_code).toBe(RECOVERY);
+    expect(await store.reassignScheduledEmail(handoffInput(held))).toBeNull();
+    expect(await store.approveScheduledEmail({ id: row.id, pdSystemUserId: PD_A, expectedVersion: row.version, profileId: 42 })).toBeNull();
+    expect(await store.updateScheduledEmailDraft({ id: row.id, pdSystemUserId: PD_A, expectedVersion: row.version, profileId: 42, subject: 'changed', bodyText: 'changed' })).toBeNull();
+    expect(d.sendEmail).not.toHaveBeenCalled(); expect(d.createEmailActivity).not.toHaveBeenCalled();
+    expect(await store.stopScheduledEmail({ id: row.id, pdSystemUserId: PD_A, expectedVersion: held.version, profileId: 42 })).toMatchObject({ status: 'stopped', recipient_generation: 0 });
+  });
+
+  test.each(['reassign-first', 'recovery-first'])('two connections race reassignment with accepted recovery (%s)', async order => {
+    const row = await seed(); const claim = await store.claimScheduledEmailSend(row.id);
+    await store.freezeScheduledEmailCorrelation(claim);
+    await mockPg.client.query("UPDATE scheduled_email_messages SET locked_until=NOW()-interval '1 minute' WHERE id=$1", [row.id]);
+    const primary = mockPg.client;
+    const alternate = new Client({ connectionString: TEST_URL }); await alternate.connect();
+    await alternate.query(`SET search_path TO ${schema}`);
+    const frozen = await read(row.id);
+    const d = deps({ findEmailByCorrelation: jest.fn(async () => [{ activityid: ACTIVITY, statuscode: 7 }]) });
+    // Route every store call from recovery to a real independent connection.
+    const onAlternate = fn => (...args) => { const prev = mockPg.client; mockPg.client = alternate;
+      try { return fn(...args); } finally { mockPg.client = prev; } };
+    d.claimActivityRead = onAlternate(store.claimScheduledEmailActivityRead);
+    d.recordEmailActivity = onAlternate(store.recordScheduledEmailActivity);
+    d.recordSent = onAlternate(store.recordScheduledEmailSent);
+    d.recordFinalized = onAlternate(store.recordScheduledEmailFinalized);
+    d.recordFailure = onAlternate(store.recordScheduledEmailFailure);
+    try {
+      let handoff, recovery;
+      if (order === 'reassign-first') { handoff = store.reassignScheduledEmail(handoffInput(frozen)); recovery = service.reconcileScheduledEmailCandidate(frozen, d); }
+      else { recovery = service.reconcileScheduledEmailCandidate(frozen, d); handoff = store.reassignScheduledEmail(handoffInput(frozen)); }
+      const [rebuilt, recovered] = await Promise.all([handoff, recovery]);
+      expect(rebuilt).toBeNull(); expect(recovered.sent).toBe(true);
+      expect(await read(row.id)).toMatchObject({ status: 'sent', recipient_generation: 0, pd_systemuser_id: PD_A, dynamics_email_id: ACTIVITY });
+      expect(d.sendEmail).not.toHaveBeenCalled(); expect(d.createEmailActivity).not.toHaveBeenCalled();
+    } finally { mockPg.client = primary; await alternate.end(); }
+  });
+
+  test.each(['throw', 'null'])('ordinary-owner correlation acceptance with failed identity (%s) also freezes generation', async failure => {
+    const row = await seed();
+    const d = deps({ findEmailByCorrelation: jest.fn(async () => [{ activityid: ACTIVITY, statuscode: 7 }]),
+      recordEmailActivity: jest.fn(async () => { if (failure === 'throw') throw new Error('identity unavailable'); return null; }),
+      recordFailure: jest.fn(async () => { throw new Error('failure receipt also unavailable'); }) });
+    await expect(service.deliverScheduledEmail(row.id, {}, d)).rejects.toThrow();
+    await mockPg.client.query("UPDATE scheduled_email_messages SET locked_until=NOW()-interval '1 minute' WHERE id=$1", [row.id]);
+    const held = await read(row.id); expect(held.last_error_code).toBe(RECOVERY);
+    expect(await store.reassignScheduledEmail(handoffInput(held))).toBeNull();
+    expect(await store.claimScheduledEmailSend(row.id, { force: true })).toBeNull();
+    const recovery = deps({ findEmailByCorrelation: d.findEmailByCorrelation });
+    expect((await service.reconcileScheduledEmailCandidate(held, recovery)).sent).toBe(true);
+    expect(recovery.sendEmail).not.toHaveBeenCalled(); expect(d.sendEmail).not.toHaveBeenCalled();
+    expect(d.createEmailActivity).not.toHaveBeenCalled();
+  });
+
+  test('stale worker cannot release the frozen correlation or change recipients after recovery takes its lease', async () => {
+    const row = await seed(); const old = await store.claimScheduledEmailSend(row.id);
+    await store.freezeScheduledEmailCorrelation(old);
+    await mockPg.client.query("UPDATE scheduled_email_messages SET locked_until=NOW()-interval '1 minute' WHERE id=$1", [row.id]);
+    const current = await store.claimScheduledEmailActivityRead(row.id);
+    expect(current.lease_token).not.toBe(old.lease_token);
+    expect(await store.releaseScheduledEmailCorrelation(old)).toBeNull();
+    for (const candidate of [old, current]) expect(await store.reconcileScheduledEmailRecipients(candidate, {
+      recipientDrift: true, ccRecipients: ['changed@example.org'], recipientContactIds: [PD_C], approvalRequired: true,
+    })).toBeNull();
+    await store.recordScheduledEmailFailure(current, new Error('generic fallback cannot erase barrier'));
+    expect(await read(row.id)).toMatchObject({ last_error_code: RECOVERY, recipient_generation: 0, cc_recipients: [], approval_required: false });
   });
 
 });

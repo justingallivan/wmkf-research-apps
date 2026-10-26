@@ -8,7 +8,8 @@
  *
  * This is display/guard state only. The transport guard is the independent
  * `send_requested_at IS NULL` predicate in the store's claim SQL, so a missing
- * or temporarily cleared marker can never permit a resend.
+ * or temporarily cleared display marker cannot permit a resend after intent.
+ * Correlation recovery separately fences claims and generation changes in SQL.
  */
 
 import { EMAIL_SEND_OUTCOME_COPY } from './email-send-outcome.js';
@@ -16,11 +17,13 @@ import { EMAIL_SEND_OUTCOME_COPY } from './email-send-outcome.js';
 export const SCHEDULED_EMAIL_ATTENTION = Object.freeze({
   UNCONFIRMED: 'unconfirmed',
   PD_HANDOFF_HELD: 'pd_handoff_held',
+  CORRELATION_RECOVERY: 'correlation_recovery',
   ACTIVITY_MISSING: 'activity_missing',
   ACTIVITY_FORBIDDEN: 'activity_forbidden',
 });
 
 const CODE_TO_REASON = Object.freeze({
+  scheduled_email_correlation_recovery: SCHEDULED_EMAIL_ATTENTION.CORRELATION_RECOVERY,
   scheduled_email_pd_handoff_held: SCHEDULED_EMAIL_ATTENTION.PD_HANDOFF_HELD,
   scheduled_email_send_unconfirmed: SCHEDULED_EMAIL_ATTENTION.UNCONFIRMED,
   scheduled_email_activity_missing: SCHEDULED_EMAIL_ATTENTION.ACTIVITY_MISSING,
@@ -28,6 +31,8 @@ const CODE_TO_REASON = Object.freeze({
 });
 
 export const SCHEDULED_EMAIL_ATTENTION_COPY = Object.freeze({
+  [SCHEDULED_EMAIL_ATTENTION.CORRELATION_RECOVERY]:
+    "Email activity recovery is required. No new send will occur. Dynamics history is checked again automatically; check that history before stopping this message or sending manually.",
   [SCHEDULED_EMAIL_ATTENTION.PD_HANDOFF_HELD]:
     'The current PD changed or could not be verified. No new send will occur until ownership is verified. Coordinate with the current PD to repair the request or defaults. A saved old-PD activity needs manual resolution; stopping this message ends automated reminders for this deliverable.',
   // A2: the same words the send-now response uses, so they cannot drift.
@@ -52,7 +57,7 @@ export function isSendUnconfirmed(row) {
 
 /**
  * A3: `unconfirmed` (via isSendUnconfirmed), `activity_missing`,
- * `activity_forbidden`, `pd_handoff_held`, or null when no attention is needed.
+ * `activity_forbidden`, `pd_handoff_held`, `correlation_recovery`, or null.
  */
 export function scheduledEmailAttentionReason(row) {
   if (isSendUnconfirmed(row)) return SCHEDULED_EMAIL_ATTENTION.UNCONFIRMED;
