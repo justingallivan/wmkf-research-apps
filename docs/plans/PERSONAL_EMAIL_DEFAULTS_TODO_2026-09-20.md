@@ -95,6 +95,19 @@ Released after explicit owner authorization and full CI. Production defaults loa
 discard cancellation and fresh reopen passed without preference writes or sends.
 Claude's database work remains untouched. Release proof: `docs/audits/DISTRIBUTION_DEFAULTS_RELEASE_2026-10-25.md`.
 
+## Slice 5 implementation — scheduled grantee reminder defaults
+
+[BRANCH-BUILT 2026-10-25; locally verified; Claude PASS WITH NONBLOCKING NOTES; not released.]
+The owner authorized the reviewed plan, including hold-until-repaired for
+reassignment. Exact-owner future wording is independent of stored row edits;
+current-PD delivery guards prevent new sends under mismatched/unknown ownership.
+No schema, shared default, environment or live business-record operation occurred.
+Contract: `docs/plans/PERSONAL_EMAIL_SCHEDULED_GRANTEE_DEFAULTS_PLAN_2026-10-25.md`.
+383 Jest tests, 33 scratch-Postgres tests and six browser cases passed. PR #531
+remains unreleased. N1 recovery follow-up implemented at `17f1969d2`:47 SQL / 125 unit
+tests passed; independent follow-up review PASS WITH NONBLOCKING NOTES. Proof and retained limits:
+`docs/audits/SCHEDULED_GRANTEE_RECOVERY_GAP_FIX_2026-10-25.md`.
+
 ## Existing pre-discussion calendar events — Duncan walkthrough pending 2026-10-25
 
 - [x] Investigate whether the generated agenda can update an existing invitation.

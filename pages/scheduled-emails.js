@@ -1,3 +1,4 @@
+import ScheduledGranteeReminderDefaults from '../shared/components/ScheduledGranteeReminderDefaults';
 import EmailAddressSummary from '../shared/components/EmailAddressSummary';
 /** PD inbox for personalized emails awaiting their scheduled send. */
 
@@ -33,6 +34,8 @@ function statusLabel(message) {
   if (message.status === 'sending') return 'Sending';
   // A2/A3: attention rows are decided by the shared helper, never by status.
   const attention = scheduledEmailAttentionReason(message);
+  if (attention === SCHEDULED_EMAIL_ATTENTION.CORRELATION_RECOVERY) return 'Held — email history needs recovery';
+  if (attention === SCHEDULED_EMAIL_ATTENTION.PD_HANDOFF_HELD) return 'Held — current PD needs verification';
   if (attention === SCHEDULED_EMAIL_ATTENTION.UNCONFIRMED) return 'Send status is uncertain';
   if (attention === SCHEDULED_EMAIL_ATTENTION.ACTIVITY_MISSING) return 'Needs attention — Dynamics email not found';
   if (attention === SCHEDULED_EMAIL_ATTENTION.ACTIVITY_FORBIDDEN) return 'Needs attention — Dynamics email could not be read';
@@ -188,7 +191,7 @@ export default function ScheduledEmailsPage() {
 
   const chooseMessage = (id) => {
     setSelectedId(id);
-    router.replace({ pathname: '/scheduled-emails', query: { message: id } }, undefined, { shallow: true });
+    router.replace({ pathname: '/scheduled-emails', query: { message: id } }, undefined, { shallow: true }).catch(err => { if (!err.cancelled) setError(err.message); });
   };
 
   const runAction = async (action, extra = {}) => {
@@ -214,6 +217,7 @@ export default function ScheduledEmailsPage() {
             message.id === data.message.id ? data.message : message
           )));
         }
+        if (data.held) { setError(data.error); return; }
         const actionError = new Error(data.error || 'The scheduled email could not be updated.');
         actionError.outcome = data.outcome || 'failed';
         throw actionError;
@@ -260,6 +264,7 @@ export default function ScheduledEmailsPage() {
         subtitle="Review personalized messages that will be sent automatically on your behalf."
       />
       <div className="py-8">
+        <ScheduledGranteeReminderDefaults profileId={currentProfile?.id} profileStatus={profileStatus} disabled={saving} />
         {(postureErrors.preference || postureErrors.vip) && (
           <div role="alert" className="mb-4 space-y-1 rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-700">
             {postureErrors.preference && <p>Review preference: {postureErrors.preference}</p>}
@@ -425,10 +430,12 @@ export default function ScheduledEmailsPage() {
                             type="button"
                             disabled={saving || draftDirty || !actions?.sendNow}
                             onClick={() => {
-                              if (window.confirm('Send this message now?')) runAction('send_now');
+                              if (window.confirm(actions.reason === SCHEDULED_EMAIL_ATTENTION.PD_HANDOFF_HELD
+                                ? 'Retry sending this exact message now? Ownership is checked again. If verified, this sends immediately and approves this send.'
+                                : 'Send this message now?')) runAction('send_now');
                             }}
                           >
-                            Send now
+                            {actions.reason === SCHEDULED_EMAIL_ATTENTION.PD_HANDOFF_HELD ? 'Retry send' : 'Send now'}
                           </Button>
                           <Button
                             variant="primary"

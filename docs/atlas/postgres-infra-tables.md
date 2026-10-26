@@ -56,6 +56,14 @@ reads/writes hide/refuse this key. No Postgres schema or distribution ledger cha
 The panel applies defaults on ordinary open; future Save/Clear never rewrites a
 prepared attempt. Recovery state is memory-only, scoped to the confirmed sender.
 
+**Scheduled grantee defaults (branch-built 2026-10-25; not deployed):**
+`scheduled_grantee_reminder_template` stores one exact-owner raw subject/body pair
+in existing Dataverse preferences. Strict dedicated self-service route requires
+session GUID/profile-map equality, excludes bypass/applicant callers and performs
+complete Save/Clear readback. Cron reads by the current server-resolved PD GUID;
+absence alone inherits shared wording. Generic preference reads/writes hide/refuse
+this key. No schema, uniqueness constraint or live preference operation added.
+
 ### `system_settings` — RETIRED 2026-05-12 (was Postgres / now Dataverse-only)
 **Source of truth:** **Dataverse `wmkf_appsystemsettings`**. Postgres table dropped via migration `007_drop_wave1_tables.sql` on 2026-05-12. Final reconciliation on 2026-05-11 synced 10 tier-keyed `model_override:*` rows from S145 dev writes (PG→DV); counts matched (45/45) before the drop.
 **Live adapter:** `lib/services/dataverse-settings-service.js`.
@@ -629,6 +637,26 @@ branch: automatic-by-default sends, per-(PD, contact) VIP review flags, digest
 as single interface, and PD onboarding as a rollout precondition (no
 unconfigured runtime state; the legacy direct claim-before-send path is
 deleted).
+
+**Slice 5 branch extension (2026-10-25; not deployed):** creation and eligible
+handoff use the current PD's personal default; a later defaults change leaves
+frozen content/approval untouched. Delivery checks current PD before Part B writes
+and again before intent. Mismatch/unknown prevents new sends and records
+`scheduled_email_pd_handoff_held` in existing `last_error_code`, lease-fenced;
+branch follow-up `17f1969d2` also writes `scheduled_email_correlation_recovery`
+before correlation lookup/create. That durable marker prevents forced/ordinary
+claims, reassignment, recipient-generation changes, editing and approval; it
+survives failed identity/failure writes and lease expiry. Bounded read-only
+reconciliation accepts it without a stored ID and recovers only accepted activity
+under the original key. Unresolved results stay held; Stop is terminal. No schema
+change. See `docs/audits/SCHEDULED_GRANTEE_RECOVERY_GAP_FIX_2026-10-25.md`.
+Accepted activity can still be receipted/finalized. Intent remains read-only.
+Missing/forbidden activity codes retain their existing recovery lanes. Ownership
+attention permits only guarded explicit Retry send or Stop; ordinary due rows
+precede held rows under the existing cap. Handoff keeps its version/lease/activity
+fences. A stored old-PD activity requires manual resolution; Stop is terminal for
+that deliverable's automatic reminder. No new table/column/migration or live writes.
+See `docs/plans/PERSONAL_EMAIL_SCHEDULED_GRANTEE_DEFAULTS_PLAN_2026-10-25.md`.
 
 ### `scheduled_email_vip_flags` — MIGRATION 036 APPLIED 2026-08-26; CODE DEPLOYED
 

@@ -58,6 +58,7 @@ export const PREFERENCE_KEYS = {
   REVIEWER_RESPOND_REMINDER_TEMPLATE: 'reviewer_respond_reminder_template',
   REVIEWER_REVIEW_DUE_REMINDER_TEMPLATE: 'reviewer_review_due_reminder_template',
   REVIEWER_WITHDRAW_TEMPLATE: 'reviewer_withdraw_template',
+  SCHEDULED_GRANTEE_REMINDER_TEMPLATE: 'scheduled_grantee_reminder_template',
   DELIBERATION_SHARE_TEMPLATE: 'deliberation_share_template',
   MEETING_AGENDA_TEMPLATE: 'meeting_agenda_template',
   REVIEWER_DEADLINE_UPDATE_TEMPLATE: 'reviewer_deadline_update_template',

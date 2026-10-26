@@ -137,6 +137,7 @@ test('a stale version returns conflict without mutating the row', async () => {
 describe('Part A guards (shared helper, mirrored by the page)', () => {
   test.each([
     ['unconfirmed', { last_error_code: 'scheduled_email_send_unconfirmed', send_requested_at: '2026-09-01T00:00:00Z', dynamics_email_id: 'ffffffff-ffff-4fff-8fff-ffffffffffff' }],
+    ['correlation recovery', { last_error_code: 'scheduled_email_correlation_recovery' }],
     ['activity missing', { last_error_code: 'scheduled_email_activity_missing', dynamics_email_id: 'ffffffff-ffff-4fff-8fff-ffffffffffff' }],
     ['activity forbidden', { last_error_code: 'scheduled_email_activity_forbidden', dynamics_email_id: 'ffffffff-ffff-4fff-8fff-ffffffffffff' }],
   ])('%s: edit, approve and send-now are refused with 409; stop still works', async (_label, fields) => {
@@ -184,4 +185,24 @@ describe('Part A guards (shared helper, mirrored by the page)', () => {
     expect(res.statusCode).toBe(409);
     expect(deliverScheduledEmail).not.toHaveBeenCalled();
   });
+});
+
+test('ownership-held retry returns 409 projected row and never sent feedback', async () => {
+  const held = { ...row, status: 'failed', last_error_code: 'scheduled_email_pd_handoff_held' };
+  store.getScheduledEmailForPd.mockResolvedValue(held);
+  deliverScheduledEmail.mockResolvedValue({ held: true, reason: 'pd_handoff_held', message: { id: ID, version: 2, status: 'failed', attentionReason: 'pd_handoff_held' }, error: 'Current PD could not be verified.' });
+  const res = mockRes(); await actionHandler({ method: 'PATCH', query: { id: ID }, body: { action: 'send_now', version: 2 } }, res);
+  expect(deliverScheduledEmail).toHaveBeenCalledWith(ID, { force: true, pdSystemUserId: PD_ID, expectedVersion: 2 });
+  expect(res.statusCode).toBe(409); expect(res.body).toMatchObject({ held: true, reason: 'pd_handoff_held', message: { status: 'failed' } }); expect(res.body.outcome).toBeUndefined();
+});
+test.each(['edit', 'approve'])('ownership hold refuses %s while Stop remains available', async action => {
+  store.getScheduledEmailForPd.mockResolvedValue({ ...row, status: 'failed', last_error_code: 'scheduled_email_pd_handoff_held' });
+  const res = mockRes(); await actionHandler({ method: 'PATCH', query: { id: ID }, body: { action, version: 2, subject: 'a', bodyText: 'long enough message' } }, res);
+  expect(res.statusCode).toBe(409); expect(store.updateScheduledEmailDraft).not.toHaveBeenCalled(); expect(store.approveScheduledEmail).not.toHaveBeenCalled();
+});
+
+test('accepted receipt persistence failure is truthful, uncertain-local-state feedback with no blind retry', async () => {
+  deliverScheduledEmail.mockRejectedValue(Object.assign(new Error('receipt unavailable'), { emailOutcome: 'uncertain', acceptanceProven: true, retryable: false }));
+  const res = mockRes(); await actionHandler({ method: 'PATCH', query: { id: ID }, body: { action: 'send_now', version: 2 } }, res);
+  expect(res.statusCode).toBe(202); expect(res.body).toMatchObject({ outcome: 'uncertain', retryable: false }); expect(res.body.error).toContain('Dynamics accepted this message');
 });

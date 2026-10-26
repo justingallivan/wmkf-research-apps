@@ -10,6 +10,7 @@
  *
  * @jest-environment node
  */
+jest.mock('../../lib/services/scheduled-grantee-reminder-personalization', () => ({ ownScheduledGranteeReminderTemplate: jest.fn(async () => ({ status: 'absent', template: null })) }));
 jest.mock('../../lib/utils/cron-auth', () => ({ verifyCronSecret: jest.fn(() => true) }));
 jest.mock('../../lib/services/dynamics-context', () => ({
   bypassDynamicsRestrictions: (_label, fn) => Promise.resolve().then(fn),
@@ -60,6 +61,7 @@ jest.mock('../../lib/services/scheduled-email-service', () => ({
   reconcileStoppedScheduledEmail: jest.fn(),
 }));
 
+import { ownScheduledGranteeReminderTemplate } from '../../lib/services/scheduled-grantee-reminder-personalization';
 import { verifyCronSecret } from '../../lib/utils/cron-auth';
 import { DynamicsService } from '../../lib/services/dynamics-service';
 import { getSettingStrict } from '../../lib/services/settings-service';
@@ -128,6 +130,7 @@ const pdRow = (id) => ({
 });
 
 beforeEach(() => {
+  ownScheduledGranteeReminderTemplate.mockReset().mockResolvedValue({ status: 'absent', template: null });
   verifyCronSecret.mockReset().mockReturnValue(true);
   getSettingStrict.mockReset().mockImplementation(async (key) => {
     if (key === SUBJECT_KEY) return { found: true, value: SUBJECT };
@@ -674,4 +677,68 @@ describe('Liaison of record (Research)', () => {
       expectedVersion: 4,
     }));
   });
+});
+
+describe('personal future wording', () => {
+  const template = { subject: 'My reminder', body: 'Dear {{granteeName}}, {{proposalTitle}} is due {{dueDate}}. {{signature}}' };
+  test('configured pair seeds creation and eligible handoff; renders context and keeps signature separate', async () => {
+    DynamicsService.queryAllRecords.mockResolvedValue({ records: [deliv(1)] });
+    ownScheduledGranteeReminderTemplate.mockResolvedValue({ status: 'configured', template });
+    scheduledEmailStore.createOrGetScheduledEmail.mockResolvedValue({ id: 'existing', pd_systemuser_id: 'old-pd', version: 7 });
+    const res = mockRes(); await handler(req(), res);
+    expect(scheduledEmailStore.createOrGetScheduledEmail.mock.calls[0][0]).toMatchObject({ subject: template.subject, bodyText: expect.stringContaining('Award 1'), signatureText: 'Assigned PD\nW. M. Keck Foundation' });
+    expect(scheduledEmailStore.createOrGetScheduledEmail.mock.calls[0][0].bodyText).not.toContain('{{signature}}');
+    expect(scheduledEmailStore.reassignScheduledEmail.mock.calls[0][0]).toMatchObject({ subject: template.subject, expectedVersion: 7, pdSystemUserId: 'pd1' });
+  });
+  test.each(['duplicates', 'invalid', 'encrypted', 'unavailable'])('%s wording pauses producer but independent due/repair passes continue', async status => {
+    DynamicsService.queryAllRecords.mockResolvedValue({ records: [deliv(1), deliv(2)] });
+    ownScheduledGranteeReminderTemplate.mockResolvedValue({ status, template: null });
+    scheduledEmailStore.listDueScheduledEmails.mockResolvedValue([{ id: 'old-pd-due-row' }]); deliverScheduledEmail.mockResolvedValue({ held: true });
+    scheduledEmailStore.listUnfinalizedScheduledEmails.mockResolvedValue([{ id: 'sent-repair' }]);
+    const res = mockRes(); await handler(req(), res);
+    expect(res.body.preferenceFailed).toBe(2); expect(scheduledEmailStore.createOrGetScheduledEmail).not.toHaveBeenCalled(); expect(scheduledEmailStore.reassignScheduledEmail).not.toHaveBeenCalled();
+    expect(deliverScheduledEmail).toHaveBeenCalledWith('old-pd-due-row'); expect(finalizeScheduledEmail).toHaveBeenCalledWith({ id: 'sent-repair' }); expect(res.body.reminded).toBe(0);
+    expect(res.body.failures.some(f => f.reason.includes(`personal reminder default ${status}`))).toBe(true);
+  });
+  test.each(['configured', 'unavailable'])('four concurrent same-PD workers share blocked %s snapshot; next run reads freshly', async status => {
+    DynamicsService.queryAllRecords.mockResolvedValue({ records: [1, 2, 3, 4].map(n => deliv(n)) });
+    // All four current PD rows are the SAME actor. Observe upstream posture
+    // arrival before examining the blocked cache, not four calls to its reader.
+    const original = DynamicsService.getRecord.getMockImplementation();
+    DynamicsService.getRecord.mockImplementation((entity, id, ...rest) => entity === 'systemusers' ? Promise.resolve(pdRow('pd1')) : original(entity, id, ...rest));
+    let release; const pending = new Promise(resolve => { release = resolve; });
+    ownScheduledGranteeReminderTemplate.mockReturnValue(pending);
+    const runResponse = mockRes();
+    const run = handler(req(), runResponse);
+    for (let i = 0; i < 100 && scheduledEmailStore.filterVipFlaggedContacts.mock.calls.length < 4; i++) await new Promise(resolve => setImmediate(resolve));
+    expect(scheduledEmailStore.filterVipFlaggedContacts).toHaveBeenCalledTimes(4);
+    await Promise.resolve(); await Promise.resolve();
+    expect(ownScheduledGranteeReminderTemplate).toHaveBeenCalledTimes(1); expect(scheduledEmailStore.createOrGetScheduledEmail).not.toHaveBeenCalled();
+    release({ status, template: status === 'configured' ? template : null }); await run;
+    if (status === 'unavailable') {
+      const grouped = runResponse.body.failures.filter(f => f.reason.includes('personal reminder default unavailable'));
+      expect(grouped).toHaveLength(1); expect(grouped[0].affectedCount).toBe(4); expect(grouped[0].requestNums.slice().sort()).toEqual(['1001', '1002', '1003', '1004']);
+    }
+    expect(scheduledEmailStore.createOrGetScheduledEmail).toHaveBeenCalledTimes(status === 'configured' ? 4 : 0);
+    ownScheduledGranteeReminderTemplate.mockResolvedValue({ status: 'absent', template: null });
+    await handler(req(), mockRes()); expect(ownScheduledGranteeReminderTemplate).toHaveBeenCalledTimes(2);
+  });
+  test('rendered expansion overflow skips new draft before persistence', async () => {
+    DynamicsService.queryAllRecords.mockResolvedValue({ records: [deliv(1)] });
+    const original = DynamicsService.getRecord.getMockImplementation();
+    DynamicsService.getRecord.mockImplementation((entity, id, ...rest) => entity === 'akoya_requests' ? Promise.resolve(requestRow(1, { akoya_title: 'x'.repeat(20000) })) : original(entity, id, ...rest));
+    ownScheduledGranteeReminderTemplate.mockResolvedValue({ status: 'configured', template });
+    const res = mockRes(); await handler(req(), res);
+    expect(res.body.preferenceFailed).toBe(1); expect(scheduledEmailStore.createOrGetScheduledEmail).not.toHaveBeenCalled();
+  });
+});
+
+test('different PDs receive isolated raw default snapshots', async () => {
+  DynamicsService.queryAllRecords.mockResolvedValue({ records: [deliv(1), deliv(2)] });
+  ownScheduledGranteeReminderTemplate.mockImplementation(async id => ({ status: 'configured', template: { subject: `Subject for ${id}`, body: '{{granteeName}} {{proposalTitle}} {{dueDate}}' } }));
+  await handler(req(), mockRes());
+  expect(ownScheduledGranteeReminderTemplate.mock.calls.map(([id]) => id).sort()).toEqual(['pd1', 'pd2']);
+  const drafts = scheduledEmailStore.createOrGetScheduledEmail.mock.calls.map(([draft]) => draft);
+  expect(drafts.find(draft => draft.pdSystemUserId === 'pd1').subject).toBe('Subject for pd1');
+  expect(drafts.find(draft => draft.pdSystemUserId === 'pd2').subject).toBe('Subject for pd2');
 });

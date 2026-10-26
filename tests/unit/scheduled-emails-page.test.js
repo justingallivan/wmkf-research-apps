@@ -12,7 +12,8 @@
 import { act, render, screen, fireEvent, waitFor } from '@testing-library/react';
 import ScheduledEmailsPage from '../../pages/scheduled-emails';
 
-const routerReplace = jest.fn();
+jest.mock('../../shared/components/ScheduledGranteeReminderDefaults', () => ({ __esModule: true, default: () => null }));
+const routerReplace = jest.fn(() => Promise.resolve(true));
 jest.mock('next/router', () => ({
   useRouter: () => ({ isReady: true, replace: routerReplace, query: {} }),
 }));
@@ -349,4 +350,33 @@ describe('Part A attention and lock gating (mirrors the route guard)', () => {
     expect(screen.getByRole('button', { name: 'Looks good' })).toBeEnabled();
     expect(screen.getByRole('button', { name: 'Send now' })).toBeEnabled();
   });
+});
+
+test.each([false, true])('held page shows guarded Retry/Stop and truthful 409 feedback (confirm=%s)', async confirm => {
+  const held = { ...MESSAGE, status: 'failed', lastErrorCode: 'scheduled_email_pd_handoff_held', attentionReason: 'pd_handoff_held', hasActivity: true };
+  await renderWithMessage([
+    ['/api/scheduled-emails', async () => response(200, { messages: [held] })],
+    ['/api/scheduled-emails/m1', async () => response(409, { held: true, reason: 'pd_handoff_held', error: 'Current PD still needs repair.', message: held })],
+  ]);
+  expect(screen.getAllByText('Held — current PD needs verification').length).toBeGreaterThan(0);
+  expect(screen.getByRole('button', { name: 'Looks good' })).toBeDisabled(); expect(screen.getByDisplayValue('Hi')).toBeDisabled();
+  expect(screen.getByRole('button', { name: 'Stop this message' })).toBeEnabled();
+  const retry = screen.getByRole('button', { name: 'Retry send' }); expect(retry).toBeEnabled();
+  window.confirm.mockReturnValue(confirm); fireEvent.click(retry);
+  expect(window.confirm).toHaveBeenCalledWith(expect.stringContaining('approves this send'));
+  if (confirm) await screen.findByText('Current PD still needs repair.');
+  else expect(global.fetch.mock.calls.filter(([, opts]) => opts?.method === 'PATCH')).toHaveLength(0);
+  expect(document.querySelector('[data-status="sent"]')).toBeNull(); expect(document.querySelector('[data-status="uncertain"]')).toBeNull();
+});
+
+
+test('correlation recovery is Stop-only with truthful history-recovery copy', async () => {
+  const held = { ...MESSAGE, status: 'failed', lastErrorCode: 'scheduled_email_correlation_recovery', attentionReason: 'correlation_recovery', hasActivity: false };
+  await renderWithMessage([['/api/scheduled-emails', async () => response(200, { messages: [held] })]]);
+  expect(screen.getAllByText('Held — email history needs recovery').length).toBeGreaterThan(0);
+  expect(screen.getByDisplayValue('Hi')).toBeDisabled();
+  expect(screen.getByRole('button', { name: 'Looks good' })).toBeDisabled();
+  expect(screen.getByRole('button', { name: 'Send now' })).toBeDisabled();
+  expect(screen.getByRole('button', { name: 'Stop this message' })).toBeEnabled();
+  expect(screen.getByRole('status')).toHaveTextContent('No new send will occur');
 });

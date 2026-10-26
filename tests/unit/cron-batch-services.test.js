@@ -11,6 +11,7 @@
  * @jest-environment node
  */
 
+jest.mock('../../lib/services/scheduled-grantee-reminder-personalization', () => ({ ownScheduledGranteeReminderTemplate: jest.fn(async () => ({ status: 'absent', template: null })) }));
 jest.mock('../../lib/services/grantee-title-service', () => ({
   generateGranteeTitle: jest.fn(async () => ({ editedTitle: 'To do science' })),
 }));

@@ -57,7 +57,8 @@ export default async function handler(req, res) {
 
     // Part A guards (A2/A3/A4): the shared helper is the single predicate, and
     // pages/scheduled-emails.js disables the same actions from the same helper.
-    // The store's SQL fences repeat these conditions, so a bypass here still
+    // Ownership-held Retry still passes the independent fresh-PD send guard.
+    // The store's SQL fences repeat transport conditions, so a bypass here still
     // cannot mutate the row. Stop is always allowed on an open row.
     const allowed = scheduledEmailActionsAllowed(existing);
     const guardedActions = { edit: allowed.edit, approve: allowed.approve, send_now: allowed.sendNow };
@@ -110,6 +111,9 @@ export default async function handler(req, res) {
           pdSystemUserId: user.systemuserid,
           expectedVersion: version,
         });
+        if (outcome.held) {
+          return res.status(409).json({ error: outcome.error, held: true, reason: outcome.reason, message: outcome.message });
+        }
         if (!outcome.message) {
           return res.status(409).json({ error: 'The message changed or is already being processed. Reload and try again.' });
         }
@@ -128,7 +132,9 @@ export default async function handler(req, res) {
         console.error('[scheduled-email/send-now] failed:', error.message);
         const uncertain = error.emailOutcome === 'uncertain';
         return res.status(uncertain ? 202 : 502).json({
-          error: uncertain
+          error: error.acceptanceProven
+            ? 'Dynamics accepted this message, but its delivery record could not be completed. Reconcile its history before sending another message.'
+            : uncertain
             ? 'Dynamics may have accepted the message, but the result could not be confirmed.'
             : 'The message could not be sent. It remains available for retry.',
           outcome: uncertain ? 'uncertain' : 'failed',
