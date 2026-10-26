@@ -83,6 +83,7 @@ If you're touching a service or utility, read its header before this catalog. If
 - **`program-director-resolver.js`** — Email → Dynamics `systemuser` bridge for Reviewer Finder's PD-filtered picker.
 - **`grant-cycles-dataverse.js`** — Dataverse `wmkf_appgrantcycle` adapter (Migrates / Replaced `grant_cycles` at W3 cutover 2026-05-12 — drain-only thereafter). Consumed by Reviewer Finder + Review Manager (`render-emails`, `send-emails`) + `maintenance-service` blob cleanup.
 
+- **`pre-site-visit/distribution-personalization.js`** — Branch implementation (2026-10-25), not deployed: exact-session-owner raw distribution subject/message defaults in existing Dataverse preferences. Strict duplicate/encrypted/invalid/unavailable states, per-field shared fallback, exact Save readback and absence-confirmed Clear. No transport, ledger, schema or shared-setting writes.
 - **`meeting-tracker/agenda-personalization.js`** — Slice 6 released via PR #522 / 9d12b24ce (2026-10-24), signed-in read smoke passed: strict exact-systemuser raw agenda defaults in existing Dataverse preferences, independent shared pair validation, source/status DTO, verified Save and duplicate-aware Clear. Empty opening is explicit configured data; no session, email or ledger writes. The shared `agendaEmail.js` validator bounds raw/resolved text and accepts only optional sessionDate tokens. Agenda preview resolves them against its fresh session snapshot; the existing send ledger remains authoritative for exact recovery.
 
 ### Wave 1 dispatch (Dataverse-default since 2026-05-12)

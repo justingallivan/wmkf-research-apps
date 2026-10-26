@@ -10,6 +10,8 @@ jest.mock('../../shared/components/Layout', () => ({
   Card: ({ children }) => <div>{children}</div>,
 }));
 
+jest.mock('next/router', () => ({ useRouter: () => ({ events: { on: jest.fn(), off: jest.fn(), emit: jest.fn() }, beforePopState: jest.fn() }) }));
+
 const REQUEST_ID = '11111111-1111-4111-8111-111111111111';
 const ARTIFACT_ID = '22222222-2222-4222-8222-222222222222';
 
@@ -35,6 +37,7 @@ function preparedAttempt(mode = 'none') {
     }]),
   ];
   return {
+    from: 'sender@example.org',
     operationId: '33333333-3333-4333-8333-333333333333',
     requestId: REQUEST_ID,
     previewHash: 'a'.repeat(64),
@@ -46,9 +49,22 @@ function preparedAttempt(mode = 'none') {
     bodyText: 'The briefing page linked below has the materials.',
     state: 'prepared',
     transportAccepted: false,
+    dynamicsEmailId: null, sendRequestedAt: null,
     attachments,
   };
 }
+
+let preferencePair = null;
+let backingFetch = global.fetch;
+Object.defineProperty(global, 'fetch', { configurable: true, get: () => backingFetch, set: target => {
+  backingFetch = new Proxy(target, { apply(fn, thisArg, args) {
+    if (String(args[0]).includes('/email-preferences')) return Promise.resolve(response({ ok: true,
+      effective: preferencePair || { subject: 'Site Visit materials — {{requestNumber}}', body: 'The deliberation briefing page linked below has the Pre-Research Presentation Brief, every completed review, the proposal, and the research presentation materials.' },
+      ownStatus: 'absent', source: 'built_in', canSave: true, canClear: false }));
+    return Reflect.apply(fn, thisArg, args);
+  } });
+} });
+beforeEach(() => { preferencePair = null; });
 
 beforeEach(() => {
   jest.clearAllMocks();
@@ -73,7 +89,8 @@ test('offers no attachment choice; the default message names the briefing page a
   );
 });
 
-test('loads the admin Share subject and message and renders the request-number token', async () => {
+test('loads the shared pair from the dedicated endpoint and renders the request-number token', async () => {
+  preferencePair = { subject: 'Justin notes — {{requestNumber}}', body: 'Dear colleagues, please use the briefing page.' };
   global.fetch.mockResolvedValueOnce(response({
     success: true,
     attempts: [],
@@ -599,6 +616,7 @@ test('turns a stale material response into a recoverable notice and requires a f
       error: 'A linked Site Visit material changed after preview. Prepare a new exact preview.',
       code: 'distribution_material_stale',
     }, 409))
+    .mockResolvedValueOnce(response({ attempts: [preparedAttempt('pdf')] }))
     .mockResolvedValueOnce(response({ success: true, attempt: preparedAttempt('pdf') }));
 
   render(
@@ -617,8 +635,8 @@ test('turns a stale material response into a recoverable notice and requires a f
   fireEvent.click(confirmation);
   fireEvent.click(screen.getByRole('button', { name: 'Send email' }));
 
-  const notice = await screen.findByRole('status');
-  expect(notice).toHaveTextContent(/preview is out of date.*Create a new preview/i);
+  await waitFor(() => expect(screen.queryByText('Email preview')).not.toBeInTheDocument());
+  expect(screen.getByText(/linked Site Visit material changed/)).toBeInTheDocument();
   expect(screen.queryByText('Email preview')).not.toBeInTheDocument();
 
   fireEvent.click(screen.getByRole('button', { name: 'Create preview' }));
@@ -830,7 +848,7 @@ test('collapsed mode folds the composer behind a Send-materials-again disclosure
   expect(screen.getByRole('button', { name: 'Create preview' })).toBeInTheDocument();
 });
 
-test('keeps non-stale send failures as errors', async () => {
+test('keeps non-stale send failures unresolved', async () => {
   global.fetch
     .mockResolvedValueOnce(response({ success: true, attempts: [] }))
     .mockResolvedValueOnce(response({ success: true, attempt: preparedAttempt('pdf') }))
@@ -854,8 +872,8 @@ test('keeps non-stale send failures as errors', async () => {
   fireEvent.click(screen.getByLabelText(/I reviewed the recipients/));
   fireEvent.click(screen.getByRole('button', { name: 'Send email' }));
 
-  expect(await screen.findByRole('alert')).toHaveTextContent(/could not be found/i);
-  expect(screen.queryByRole('status')).not.toBeInTheDocument();
+  expect(await screen.findByTestId('distribution-send-feedback')).toHaveTextContent(/could not be found/i);
+  expect(screen.getByLabelText('Subject')).toBeDisabled();
 });
 
 // Codex adversarial review (2026-09-17, round 5 finding 1): the same
@@ -883,8 +901,7 @@ test('a brief_regeneration_in_progress send failure shows named copy and keeps t
   fireEvent.click(screen.getByLabelText(/I reviewed the recipients/));
   fireEvent.click(screen.getByRole('button', { name: 'Send email' }));
 
-  const alert = await screen.findByRole('alert');
-  expect(alert).toHaveTextContent(/replacement brief is being generated/i);
+  expect(await screen.findByTestId('distribution-send-feedback')).toHaveTextContent(/replacement brief is being generated/i);
   expect(screen.getByText('Email preview')).toBeInTheDocument();
 });
 

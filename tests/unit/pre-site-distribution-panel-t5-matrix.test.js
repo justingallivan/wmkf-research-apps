@@ -10,17 +10,12 @@
  *   - reissueBriefingLink POST /api/workbench/pre-site-visit/briefing-link
  *   - send          POST /api/workbench/pre-site-visit/distribution/send
  *
- * This file adds the missing axes: network rejection and axis (e) — a
- * non-2xx response whose body cannot be parsed — for each site, pinned
- * never-silent. All four sites already parse with `.json().catch(() => ({}))`,
- * so this is a no-op behavior change.
- *
- * Test-teeth pass (Stage 5a review finding 2): adds axis (d) — a malformed
- * or empty 2xx body under `tolerantBody: true` produces today's tolerant
- * outcome, never a thrown/visible parse error — for all 4 sites, and exact
- * request-bytes (URL, method, headers, exact body string) for the 3 POSTs.
- * Each axis-(d) test is written to go RED under a `tolerantBody: true ->
- * false` mutation in the component (see handback for the count).
+ * This matrix covers network and malformed-body outcomes for those four legacy
+ * sites. The dedicated preference URL is independently stubbed; its contract
+ * and concurrency cases live in distribution-defaults-panel.test.js.
+ * Under the reviewed distribution-defaults contract, malformed or empty send
+ * receipts now retain the exact frozen operation and visibly report uncertainty.
+ * History/prepare/reissue retain their existing tolerant-body behavior.
  */
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import PreSiteDistributionPanel from '../../shared/components/workbench/PreSiteDistributionPanel';
@@ -35,6 +30,8 @@ jest.mock('../../shared/components/Layout', () => ({
   Card: ({ children }) => <div>{children}</div>,
 }));
 
+jest.mock('next/router', () => ({ useRouter: () => ({ events: { on: jest.fn(), off: jest.fn(), emit: jest.fn() }, beforePopState: jest.fn() }) }));
+
 const REQUEST_ID = '11111111-1111-4111-8111-111111111111';
 const ARTIFACT_ID = '22222222-2222-4222-8222-222222222222';
 
@@ -46,6 +43,7 @@ const emptyBody = () => Promise.reject(new SyntaxError('Unexpected end of JSON i
 
 function preparedAttempt() {
   return {
+    from: 'sender@example.org',
     operationId: '33333333-3333-4333-8333-333333333333',
     requestId: REQUEST_ID,
     previewHash: 'a'.repeat(64),
@@ -60,6 +58,18 @@ function preparedAttempt() {
     attachments: [],
   };
 }
+
+let preferencePair = null;
+let backingFetch = global.fetch;
+Object.defineProperty(global, 'fetch', { configurable: true, get: () => backingFetch, set: target => {
+  backingFetch = new Proxy(target, { apply(fn, thisArg, args) {
+    if (String(args[0]).includes('/email-preferences')) return Promise.resolve(response({ ok: true,
+      effective: preferencePair || { subject: 'Site Visit materials — {{requestNumber}}', body: 'The deliberation briefing page linked below has the Pre-Research Presentation Brief, every completed review, the proposal, and the research presentation materials.' },
+      ownStatus: 'absent', source: 'built_in', canSave: true, canClear: false }));
+    return Reflect.apply(fn, thisArg, args);
+  } });
+} });
+beforeEach(() => { preferencePair = null; });
 
 beforeEach(() => {
   jest.clearAllMocks();
@@ -140,7 +150,7 @@ test('send axis (e): non-2xx unparseable body is never silent (falls to the stat
   ));
   fireEvent.click(screen.getByLabelText(/I reviewed the recipients/));
   fireEvent.click(screen.getByRole('button', { name: 'Send email' }));
-  expect(await screen.findByText('Send failed (502)')).toBeInTheDocument();
+  expect(await screen.findByTestId('distribution-send-feedback')).toHaveTextContent('unconfirmed');
 });
 
 async function withBriefingLink() {
@@ -227,7 +237,7 @@ test('prepare axis (d): empty 2xx body is tolerated silently (no error, no previ
   expect(screen.queryByText('Email preview')).not.toBeInTheDocument();
 });
 
-test('send axis (d): malformed 2xx body is tolerated silently (no feedback banner, preview kept)', async () => {
+test('send axis (d): malformed 2xx retains preview and reports uncertain outcome', async () => {
   await withPreparedPreview();
   global.fetch = jest.fn((url) => (
     String(url).includes('/send')
@@ -238,11 +248,12 @@ test('send axis (d): malformed 2xx body is tolerated silently (no feedback banne
   fireEvent.click(screen.getByRole('button', { name: 'Send email' }));
   await waitFor(() => expect(global.fetch).toHaveBeenCalled());
   await settleFetch();
-  expect(screen.queryByTestId('distribution-send-feedback')).not.toBeInTheDocument();
+  expect(screen.getByTestId('distribution-send-feedback')).toHaveTextContent('uncertain');
   expect(screen.getByText('Email preview')).toBeInTheDocument();
+  expect(screen.getByLabelText('Subject')).toBeDisabled();
 });
 
-test('send axis (d): empty 2xx body is tolerated silently (no feedback banner, preview kept)', async () => {
+test('send axis (d): empty 2xx retains preview and reports uncertain outcome', async () => {
   await withPreparedPreview();
   global.fetch = jest.fn((url) => (
     String(url).includes('/send')
@@ -253,8 +264,9 @@ test('send axis (d): empty 2xx body is tolerated silently (no feedback banner, p
   fireEvent.click(screen.getByRole('button', { name: 'Send email' }));
   await waitFor(() => expect(global.fetch).toHaveBeenCalled());
   await settleFetch();
-  expect(screen.queryByTestId('distribution-send-feedback')).not.toBeInTheDocument();
+  expect(screen.getByTestId('distribution-send-feedback')).toHaveTextContent('uncertain');
   expect(screen.getByText('Email preview')).toBeInTheDocument();
+  expect(screen.getByLabelText('Subject')).toBeDisabled();
 });
 
 test('reissueBriefingLink axis (d): malformed 2xx body is tolerated silently (link card unmounts, no error)', async () => {

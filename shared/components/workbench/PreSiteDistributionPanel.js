@@ -1,3 +1,5 @@
+import DistributionWordingDefault from './DistributionWordingDefault';
+import useDistributionUnsavedChanges from './useDistributionUnsavedChanges';
 import { Button } from '../Layout';
 import EmailAddressSummary from '../EmailAddressSummary';
 import EmailDialog from '../EmailDialog';
@@ -11,17 +13,12 @@ import {
   DELIBERATION_SHARE_SEED_BODY,
   DELIBERATION_SHARE_SEED_SUBJECT,
   renderDeliberationShareSubject,
+  validateDeliberationShareTemplate,
 } from '../../config/deliberationShareEmail';
 
 const EMPTY_LIST = Object.freeze([]);
-const STALE_PREVIEW_CODES = new Set([
-  'distribution_stale_source',
-  'distribution_material_stale',
-  'distribution_site_visit_stale',
-  'distribution_preview_changed',
-  'distribution_briefing_stale',
-  'distribution_session_stale',
-]);
+const STALE_PREVIEW_CODES = new Set(['distribution_stale_source', 'distribution_material_stale', 'distribution_site_visit_stale', 'distribution_preview_changed', 'distribution_briefing_stale', 'distribution_session_stale']);
+const sameDistributionId = (left, right) => typeof left === 'string' && typeof right === 'string' && left.toLowerCase() === right.toLowerCase();
 const MILLISECONDS_PER_DAY = 24 * 60 * 60 * 1000;
 
 function localDayOrdinal(date) {
@@ -275,6 +272,11 @@ export default function PreSiteDistributionPanel({
   // a dialog from its Share action. 'inline' is the legacy layout.
   composer = 'inline', // 'inline' | 'dialog' | 'hidden'
   onCloseComposer = null,
+  composeOpenVersion = 0,
+  onRetentionChange = null,
+  sourceUnavailable = false,
+  authPaused = false,
+  actorScope = '',
   // Runs before the prepare request; the tab locks the draft here (lock, then
   // preview, then send), so a lock failure surfaces in the composer.
   beforePrepare = null,
@@ -285,6 +287,7 @@ export default function PreSiteDistributionPanel({
   // is on (owner 2026-09-25: the tab's Research Presentation Materials card).
   beforeHistory = null,
 }) {
+  const actionsPaused = sourceUnavailable || authPaused;
   // No attachment field: since 2026-09-10 the email carries the briefing page
   // link instead of the writeup (owner; shape brief). The server records
   // attachment_mode 'none' when the field is absent.
@@ -308,6 +311,22 @@ export default function PreSiteDistributionPanel({
   // Explicit per-field ownership: true only after this component wrote its
   // own seed into the field; cleared by every staff edit of that field.
   const autoOwnedRef = useRef({ to: false, cc: false });
+  const baseline = useRef({ ...form });
+  const recoveryRef = useRef(null);
+  const [recovery, setRecovery] = useState(null);
+  const [discarding, setDiscarding] = useState(false);
+  const [defaultsLoading, setDefaultsLoading] = useState(false);
+  const [defaultsData, setDefaultsData] = useState(null);
+  const [composeSource, setComposeSource] = useState('built_in');
+  const [editorOpen, setEditorOpen] = useState(false);
+  const [editor, setEditor] = useState({ subject: DELIBERATION_SHARE_SEED_SUBJECT, body: DELIBERATION_SHARE_SEED_BODY });
+  const editorBaseline = useRef(editor);
+  const [preferenceBusy, setPreferenceBusy] = useState(false);
+  const [preferenceUncertain, setPreferenceUncertain] = useState(false);
+  const [preferenceMessage, setPreferenceMessage] = useState(null);
+  const defaultsGeneration = useRef(0);
+  const preferenceGeneration = useRef(0);
+  const mounted = useRef(true);
   const [preview, setPreview] = useState(null);
   const [confirmed, setConfirmed] = useState(false);
   // Plan §3.4b step 3: a dedicated confirmation state for the prepare-time
@@ -324,7 +343,7 @@ export default function PreSiteDistributionPanel({
     setConfirmed(false);
     setStaleInputs(null);
   };
-  if (seenSeed !== seed) {
+  if (seenSeed !== seed && !recoveryRef.current) {
     setSeenSeed(seed);
     // A field is replaceable when it is blank or auto-owned (the component
     // wrote its own seed there and staff have not edited it since). When the
@@ -335,8 +354,8 @@ export default function PreSiteDistributionPanel({
     const replaceCc = !form.cc.trim() || owned.cc;
     const nextTo = replaceTo ? seedTo : form.to;
     const nextCc = replaceCc ? seedCc : form.cc;
-    if (replaceTo && seedTo) owned.to = true;
-    if (replaceCc && seedCc) owned.cc = true;
+    if (replaceTo) { owned.to = true; baseline.current.to = seedTo; }
+    if (replaceCc) { owned.cc = true; baseline.current.cc = seedCc; }
     if (nextTo !== form.to || nextCc !== form.cc) applyFormPatch({ to: nextTo, cc: nextCc });
   }
   const [history, setHistory] = useState([]);
@@ -350,34 +369,40 @@ export default function PreSiteDistributionPanel({
   const [reissuing, setReissuing] = useState(false);
   const [briefingError, setBriefingError] = useState(null);
   const [recipientPickerTarget, setRecipientPickerTarget] = useState(null);
-  const [emailDefaultsStatus, setEmailDefaultsStatus] = useState(null);
-  const sequence = useRef(0);
+
+  const historySequence = useRef(0);
+  const sequence = useRef(0); // prepare lane
   const controllerRef = useRef(null);
+  const reissueSequence = useRef(0);
+  const sendSequence = useRef(0);
+  const sendInFlight = useRef(false);
+  const sourceKey = `${requestId}:${sourceArtifact?.artifactId || ''}:${sourceUnavailable}`;
+  const sourceRef = useRef(sourceKey);
+  sourceRef.current = sourceKey;
+  useEffect(() => {
+    mounted.current = true;
+    return () => {
+      mounted.current = false;
+      defaultsGeneration.current++;
+      preferenceGeneration.current++;
+      sequence.current++;
+      reissueSequence.current++;
+      controllerRef.current?.abort();
+    };
+  }, []);
   const composerTouchedRef = useRef(false);
-  const defaultsSeededRequestRef = useRef(null);
+
 
   const loadHistory = useCallback(async (id, signal, expectedSequence) => {
+    if (!mounted.current) return;
     const body = await requestJson(
       `/api/workbench/pre-site-visit/distribution/history?requestId=${encodeURIComponent(id)}`,
       { signal, fallbackMessage: 'Email history could not be loaded.', tolerantBody: true },
     );
-    if (sequence.current !== expectedSequence || id !== requestId) return;
+    if (!mounted.current || historySequence.current !== expectedSequence || id !== requestId) return;
     setHistory(body.attempts || []);
     setBriefingLink(body.briefingLink || null);
     setHistoryError(null);
-    if (body.emailDefaults && defaultsSeededRequestRef.current !== id) {
-      defaultsSeededRequestRef.current = id;
-      setEmailDefaultsStatus({
-        configured: body.emailDefaults.configured === true,
-        unavailable: body.emailDefaults.unavailable === true,
-      });
-      if (!composerTouchedRef.current) {
-        applyFormPatch({
-          subject: renderDeliberationShareSubject(body.emailDefaults.subjectTemplate, requestNumber),
-          bodyText: String(body.emailDefaults.bodyTemplate || ''),
-        });
-      }
-    }
     const attempts = body.attempts || [];
     const latest = attempts[0] || null;
     const latestPresentation = latest ? attemptPresentation(latest) : null;
@@ -390,40 +415,165 @@ export default function PreSiteDistributionPanel({
         ? { operationId: latest.operationId, message: latest.lastError }
         : null,
     });
-  }, [requestId, requestNumber, onHistory]);
+  }, [requestId, onHistory]);
 
   useEffect(() => {
-    const currentSequence = ++sequence.current;
-    controllerRef.current?.abort();
+    const currentSequence = ++historySequence.current;
     const controller = new AbortController();
-    controllerRef.current = controller;
     if (requestId) {
       loadHistory(requestId, controller.signal, currentSequence).catch((loadError) => {
         if (loadError?.name !== 'AbortError'
-          && sequence.current === currentSequence
+          && historySequence.current === currentSequence
           && requestId) setHistoryError(loadError.message);
       });
     }
     return () => {
-      sequence.current += 1;
+      historySequence.current += 1;
       controller.abort();
-      if (controllerRef.current === controller) controllerRef.current = null;
+
     };
-  }, [requestId, loadHistory]);
+  }, [requestId, loadHistory, sourceKey]);
 
   // Clear a pending stale-inputs confirmation whenever the request, the
   // source document, or the form changes underneath it — an acknowledgement
   // is bound to one exact delta and must never survive a context switch.
   // Derived during render (not an effect) so the clear lands in the same
   // commit as the key change, matching the `seenSeed` pattern above.
-  const staleInputsKey = `${requestId || ''}|${sourceArtifact?.artifactId || ''}`;
+  const staleInputsKey = sourceKey;
   const [seenStaleInputsKey, setSeenStaleInputsKey] = useState(staleInputsKey);
   if (seenStaleInputsKey !== staleInputsKey) {
     setSeenStaleInputsKey(staleInputsKey);
     setStaleInputs(null);
+    sequence.current++;
+    reissueSequence.current++;
+    controllerRef.current?.abort();
+    setPreparing(false);
+    setReissuing(false);
+    if (!recoveryRef.current) { setPreview(null); setConfirmed(false); }
   }
 
+  const draftDirty = !recovery && Object.keys(baseline.current).some(key => form[key] !== baseline.current[key]);
+  const editorDirty = editor.subject !== editorBaseline.current.subject || editor.body !== editorBaseline.current.body;
+  useDistributionUnsavedChanges(draftDirty || editorDirty || preferenceBusy || preferenceUncertain || Boolean(recovery), Boolean(recovery), preferenceBusy || preferenceUncertain);
+  useEffect(() => {
+    onRetentionChange?.({ draftDirty, editorDirty, mutationPending: preferenceBusy || preferenceUncertain, recoveryPending: Boolean(recovery) });
+  }, [draftDirty, editorDirty, preferenceBusy, preferenceUncertain, recovery, onRetentionChange]);
+  useEffect(() => () => onRetentionChange?.({ draftDirty: false, editorDirty: false, mutationPending: false, recoveryPending: false }), [onRetentionChange]);
+
+  const readDefaults = async ({ initialize = false } = {}) => {
+    const generation = ++defaultsGeneration.current;
+    const mutationVersion = preferenceGeneration.current;
+    setDefaultsLoading(true);
+    try {
+      const data = await requestJson('/api/workbench/pre-site-visit/distribution/email-preferences', { headers: { 'Cache-Control': 'no-cache' } });
+      if (!data?.effective || typeof data.effective.subject !== 'string' || typeof data.effective.body !== 'string') throw new Error('Defaults could not be read.');
+      if (!mounted.current || generation !== defaultsGeneration.current || mutationVersion !== preferenceGeneration.current) return;
+      setDefaultsData(data);
+      setPreferenceUncertain(false);
+      const template = data.own || data.shared || data.effective;
+      setEditor(template);
+      editorBaseline.current = template;
+      setPreferenceMessage([
+        data.ownStatus === 'duplicates' ? 'Multiple saved defaults were found. Clear them before saving.' : null,
+        ['invalid', 'encrypted', 'unavailable'].includes(data.ownStatus) ? 'Your saved default could not be used. Review the fallback or reload to confirm.' : null,
+        data.source !== 'personal' && Object.values(data.sharedStatus || {}).some(status => ['invalid', 'unavailable'].includes(status)) ? 'Some shared wording could not be used. Built-in fallback is shown for those fields.' : null,
+      ].filter(Boolean).join(' ') || null);
+      if (initialize && !composerTouchedRef.current && !recoveryRef.current) {
+        const patch = { subject: renderDeliberationShareSubject(data.effective.subject, requestNumber), bodyText: data.effective.body };
+        if (patch.subject.length > 500 || /[\r\n]/.test(patch.subject)) {
+          setPreferenceMessage('The resolved default subject is too long or invalid. Built-in wording is shown. Edit your default subject or the current email.');
+          return;
+        }
+        setComposeSource(data.source);
+        Object.assign(baseline.current, patch);
+        applyFormPatch(patch);
+      }
+    } catch (readError) {
+      if (mounted.current && generation === defaultsGeneration.current && mutationVersion === preferenceGeneration.current) {
+        setPreferenceMessage(readError.message || 'Defaults unavailable. Built-in wording is shown; edit it before previewing.');
+        setDefaultsData(null);
+      }
+    } finally {
+      if (mounted.current && generation === defaultsGeneration.current) setDefaultsLoading(false);
+    }
+  };
+  const startFreshCompose = () => {
+    if (recoveryRef.current) { setDiscarding(false); return; }
+    const fresh = { to: seedTo, cc: seedCc, subject: renderDeliberationShareSubject(DELIBERATION_SHARE_SEED_SUBJECT, requestNumber), bodyText: DELIBERATION_SHARE_SEED_BODY, includeCalendar: false };
+    baseline.current = fresh; setComposeSource('built_in');
+    autoOwnedRef.current = { to: true, cc: true };
+    composerTouchedRef.current = false;
+    setSeenSeed(seed);
+    setForm(fresh);
+    setPreview(null); setConfirmed(false); setStaleInputs(null); setError(null); setNotice(null); setSendFeedback(null);
+    setEditor(editorBaseline.current);
+    setRecipientPickerTarget(null); setDiscarding(false); setEditorOpen(false);
+    readDefaults({ initialize: true });
+  };
+  const seenOpen = useRef(null);
+  useEffect(() => {
+    if (composer === 'hidden' || seenOpen.current === composeOpenVersion || preferenceBusy || preparing || sending) return;
+    const alreadyOpened = seenOpen.current !== null;
+    seenOpen.current = composeOpenVersion;
+    if (recoveryRef.current) return;
+    if (alreadyOpened && (draftDirty || editorDirty)) { setDiscarding('reopen'); return; }
+    startFreshCompose();
+    // Open versions, not recipient array identities, own initialization.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [composeOpenVersion, composer, preferenceBusy, preparing, sending]);
+
+  const mutatePreference = async method => {
+    if (preferenceBusy || preparing || sending || preferenceUncertain || actionsPaused) return;
+    if (method === 'PUT') {
+      const checked = validateDeliberationShareTemplate(editor);
+      if (!checked.valid) { setPreferenceMessage(checked.errors.join(' ')); return; }
+    }
+    const generation = ++preferenceGeneration.current;
+    defaultsGeneration.current++;
+    setDefaultsLoading(false);
+    setPreferenceBusy(true); setPreferenceMessage(null);
+    try {
+      const result = await requestJson('/api/workbench/pre-site-visit/distribution/email-preferences', { method, body: method === 'PUT' ? { template: editor } : {} });
+      if (!mounted.current || generation !== preferenceGeneration.current) return;
+      if (result?.ok !== true) throw new Error('The change could not be confirmed.');
+      editorBaseline.current = editor;
+      setPreferenceMessage((method === 'PUT' ? 'Default saved. The current email is unchanged.' : 'Default cleared. The current email is unchanged.')
+        + ((result.refreshUnavailable || result.ownStatus === 'unavailable') ? ' Reload defaults to refresh the editor before another change.' : ''));
+      if (result.effective) {
+        setDefaultsData(result);
+        const next = result.own || result.shared || result.effective;
+        editorBaseline.current = next; setEditor(next);
+      } else setDefaultsData(null);
+    } catch (mutationError) {
+      if (mounted.current && generation === preferenceGeneration.current) {
+        const reason = mutationError?.payload?.reason;
+        if (reason === 'validation' || reason === 'duplicates') {
+          setPreferenceMessage(reason === 'duplicates' ? 'Multiple saved defaults were found. Clear them before saving.' : mutationError.payload.errors?.join(' ') || 'Check the default subject and message.');
+          if (reason === 'duplicates') setDefaultsData(current => ({ ...current, canSave: false, canClear: true }));
+          return;
+        }
+        setPreferenceUncertain(true);
+        setPreferenceMessage('The change could not be confirmed. Reload defaults before trying another change.');
+      }
+    } finally { if (mounted.current && generation === preferenceGeneration.current) setPreferenceBusy(false); }
+  };
+  const closeComposer = () => {
+    if (preparing || sending || preferenceBusy) return;
+    if (discarding) { setDiscarding(false); return; }
+    if (draftDirty || editorDirty) { setDiscarding('close'); return; }
+    onCloseComposer?.();
+  };
+  const discardAndClose = () => {
+    if (preparing || sending || preferenceBusy) return;
+    if (discarding === 'reopen') { startFreshCompose(); return; }
+    setEditor(editorBaseline.current);
+    if (discarding === 'reload') { setDiscarding(false); readDefaults(); return; }
+    if (!recoveryRef.current) { setForm({ ...baseline.current }); setPreview(null); setConfirmed(false); setStaleInputs(null); }
+    setDiscarding(false); onCloseComposer?.();
+  };
+
   const edit = (patch) => {
+    if (recoveryRef.current || actionsPaused || preferenceBusy) return;
     composerTouchedRef.current = true;
     if ('to' in patch) autoOwnedRef.current.to = false;
     if ('cc' in patch) autoOwnedRef.current.cc = false;
@@ -457,7 +607,7 @@ export default function PreSiteDistributionPanel({
   // confirmation UI below passes this; the plain Create-preview button never
   // does, so an unacknowledged drift always surfaces the confirmation first.
   const prepare = async ({ acknowledge = false } = {}) => {
-    if (!requestId || !sourceArtifact?.artifactId || preparing || sending) return;
+    if (!requestId || !sourceArtifact?.artifactId || preparing || sending || preferenceBusy || defaultsLoading || recoveryRef.current || actionsPaused) return;
     const id = requestId;
     const acknowledgeStaleInputs = acknowledge ? staleInputs?.liveFingerprint : null;
     const currentSequence = ++sequence.current;
@@ -574,12 +724,10 @@ export default function PreSiteDistributionPanel({
   };
 
   const reissueBriefingLink = async () => {
-    if (reissuing) return;
+    if (reissuing || recoveryRef.current || actionsPaused || preferenceBusy || preparing || sending) return;
     const id = requestId;
-    const currentSequence = ++sequence.current;
-    controllerRef.current?.abort();
+    const currentSequence = ++reissueSequence.current;
     const controller = new AbortController();
-    controllerRef.current = controller;
     setReissuing(true);
     setBriefingError(null);
     try {
@@ -590,10 +738,11 @@ export default function PreSiteDistributionPanel({
         signal: controller.signal,
         tolerantBody: true,
       });
+      if (!mounted.current || reissueSequence.current !== currentSequence || id !== requestId) return;
       if (!resOk && (body.code === 'briefing_link_superseded' || body.code === 'briefing_send_in_progress')) {
         // The link changed under us or a send still carries it: refresh the
         // header from history instead of retrying blindly.
-        await loadHistory(id, controller.signal, currentSequence);
+        await loadHistory(id, controller.signal, historySequence.current);
         const REISSUE_REFUSAL_FALLBACKS = {
           briefing_link_superseded: 'The briefing link was replaced by another action. Refresh to see the current link.',
           briefing_send_in_progress: 'A send that carries the current briefing link has not finished. Retry it (or wait for it to reconcile) before issuing a new link.',
@@ -601,108 +750,82 @@ export default function PreSiteDistributionPanel({
         throw new Error(body.error || REISSUE_REFUSAL_FALLBACKS[body.code]);
       }
       if (!resOk) throw new Error(body.error || `The new link could not be issued (${resStatus})`);
-      if (sequence.current !== currentSequence || id !== requestId) return;
+      if (reissueSequence.current !== currentSequence || id !== requestId) return;
       setBriefingLink(body.link || null);
       // Any prepared preview carried the old link; it can no longer be sent.
       setPreview(null);
       setConfirmed(false);
     } catch (reissueError) {
       if (reissueError?.name !== 'AbortError'
-        && sequence.current === currentSequence
+        && reissueSequence.current === currentSequence
         && id === requestId) setBriefingError(reissueError.message);
     } finally {
-      if (sequence.current === currentSequence && id === requestId) {
+      if (reissueSequence.current === currentSequence && id === requestId) {
         setReissuing(false);
-        if (controllerRef.current === controller) controllerRef.current = null;
+
       }
     }
   };
 
   const send = async () => {
-    if (!preview?.operationId || !preview.previewHash || !preview.briefingLinkId || !confirmed || notice || preparing || sending) return;
+    if (authPaused || sendInFlight.current || !preview?.operationId || !preview.previewHash || !preview.briefingLinkId || !confirmed || preparing || sending || preferenceBusy || (!recoveryRef.current && actionsPaused)) return;
     const id = requestId;
-    const currentSequence = ++sequence.current;
-    controllerRef.current?.abort();
-    const controller = new AbortController();
-    controllerRef.current = controller;
-    setSending(true);
-    setError(null);
-    setSendFeedback(null);
+    const envelope = recoveryRef.current || { preview, form: { ...form }, actorScope, sourceKey, calls: 0, uncertain: false };
+    recoveryRef.current = envelope; setRecovery(envelope);
+    const frozen = envelope.preview;
+    sendInFlight.current = true;
+    const call = ++sendSequence.current;
+    envelope.calls++;
+    setSending(true); setError(null); setSendFeedback(null);
+    const active = () => mounted.current && sendSequence.current === call && recoveryRef.current === envelope;
     try {
-      const { ok: resOk, status: resStatus, data: body } = await requestEnvelope('/api/workbench/pre-site-visit/distribution/send', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: {
-          requestId: id,
-          operationId: preview.operationId,
-          previewHash: preview.previewHash,
-        },
-        signal: controller.signal,
-        tolerantBody: true,
+      const result = await requestEnvelope('/api/workbench/pre-site-visit/distribution/send', {
+        method: 'POST', body: { requestId: id, operationId: frozen.operationId, previewHash: frozen.previewHash },
       });
-      if (body.code === 'distribution_send_unconfirmed' && body.pendingSend) {
-        if (sequence.current === currentSequence && id === requestId) {
-          setPreview(body.pendingSend);
-          setConfirmed(false);
-          setSendFeedback({ status: 'uncertain', message: body.error });
-        }
-        return;
-      }
-      if (body.inProgress) throw new Error(body.error || 'This exact send is already in progress.');
-      if (!resOk && STALE_PREVIEW_CODES.has(body.code)) {
-        if (sequence.current === currentSequence && id === requestId) {
+      if (!active()) return;
+      const body = result.data;
+      const attempt = body?.attempt;
+      const complete = result.ok ? sameDistributionId(attempt?.operationId, frozen.operationId) && sameDistributionId(attempt?.requestId, id)
+        && typeof attempt.transportAccepted === 'boolean' && attempt.previewHash === frozen.previewHash
+        && typeof attempt.from === 'string' && attempt.from === frozen.from
+        && Array.isArray(attempt.to) && Array.isArray(attempt.cc) && Array.isArray(attempt.attachments)
+        && attempt.to.every(value => typeof value === 'string') && attempt.cc.every(value => typeof value === 'string')
+        && typeof attempt.subject === 'string' && typeof attempt.bodyText === 'string'
+        : typeof body?.code === 'string' && !result.error?.parseError;
+      if (!complete || body?.inProgress || body?.code === 'distribution_send_unconfirmed' || body?.outcome === 'uncertain') envelope.uncertain = true;
+      envelope.calls--;
+      if (complete && result.ok && attempt.transportAccepted === true) {
+        recoveryRef.current = null; setRecovery(null); setConfirmed(false);
+        if (sourceRef.current === envelope.sourceKey) setPreview(attempt);
+        else {
           setPreview(null);
-          setConfirmed(false);
-          setNotice(body.code === 'distribution_briefing_stale'
-            ? 'The briefing page link for this preview is out of date. Create a new preview, review it, and then send.'
-            : body.code === 'distribution_session_stale'
-              ? 'The deliberation session changed after this preview. Create a new preview, review it, and then send.'
-              : 'This preview is out of date because the visit details or materials changed. Create a new preview, review it, and then send.');
+          setSendFeedback({ status: 'sent' });
+          setNotice('The original email was sent. The brief changed; create a new preview to share the current brief.');
+        }
+        baseline.current = { ...form };
+        if (sourceRef.current === envelope.sourceKey) {
+          try { await loadHistory(id, undefined, historySequence.current); } catch (refreshError) { if (mounted.current) setHistoryError(refreshError.message); }
         }
         return;
       }
-      // Codex adversarial review (2026-09-17, round 5 finding 1): the same
-      // freshness recheck prepare uses also runs at send time, so a guarded
-      // regeneration that started after this preview was prepared blocks
-      // completion here too. Named, and the existing (still valid) preview
-      // is kept rather than discarded, since nothing about it is stale.
-      if (!resOk && body.code === 'brief_regeneration_in_progress') {
-        if (sequence.current === currentSequence && id === requestId) {
-          setError('A replacement brief is being generated; sharing is paused until it is ready.');
-        }
-        return;
+      const message = body?.error || (body?.code === 'brief_regeneration_in_progress' ? 'A replacement brief is being generated; sharing is paused until it is ready.' : body?.inProgress ? 'This exact send is already in progress.' : 'The email outcome is unconfirmed. Retry the original email before preparing another.');
+      if (!envelope.uncertain && envelope.calls === 0) {
+        try {
+          const fresh = await requestJson(`/api/workbench/pre-site-visit/distribution/history?requestId=${encodeURIComponent(id)}`, { headers: { 'Cache-Control': 'no-cache' } });
+          if (!active()) return;
+          const row = fresh?.attempts?.find(item => sameDistributionId(item.requestId, id) && sameDistributionId(item.operationId, frozen.operationId));
+          if (row?.transportAccepted === false && row.dynamicsEmailId === null && row.sendRequestedAt === null) {
+            recoveryRef.current = null; setRecovery(null); setPreview(null); setConfirmed(false); setNotice(message);
+            return;
+          }
+        } catch { /* No proof: retain the exact envelope. */ }
       }
-      if (!resOk) {
-        const sendFailure = new Error(body.error || `Send failed (${resStatus})`);
-        sendFailure.outcome = body.outcome || 'failed';
-        throw sendFailure;
-      }
-      if (sequence.current !== currentSequence || id !== requestId) return;
-      setPreview(body.attempt || preview);
-      setConfirmed(false);
-      setNotice(null);
-      try {
-        await loadHistory(id, controller.signal, currentSequence);
-      } catch (historyRefreshError) {
-        if (historyRefreshError?.name !== 'AbortError'
-          && sequence.current === currentSequence
-          && id === requestId) setHistoryError(historyRefreshError.message);
-      }
+      if (active()) { setSendFeedback({ status: 'uncertain', message }); setConfirmed(false); }
     } catch (sendError) {
-      if (sendError?.name !== 'AbortError'
-        && sequence.current === currentSequence
-        && id === requestId) {
-        setSendFeedback({
-          status: sendError.outcome || 'uncertain',
-          message: sendError.message,
-        });
-      }
-    } finally {
-      if (sequence.current === currentSequence && id === requestId) {
-        setSending(false);
-        if (controllerRef.current === controller) controllerRef.current = null;
-      }
-    }
+      envelope.uncertain = true;
+      envelope.calls = Math.max(0, envelope.calls - 1);
+      if (active()) { setConfirmed(false); setSendFeedback({ status: 'uncertain', message: sendError.message }); }
+    } finally { if (sendSequence.current === call) { sendInFlight.current = false; if (mounted.current) setSending(false); } }
   };
 
   const composerBody = (
@@ -722,16 +845,16 @@ export default function PreSiteDistributionPanel({
           />
         )}
 
-        {emailDefaultsStatus?.unavailable && (
-          <div className="mt-4 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900" role="status">
-            The Admin email defaults could not be loaded. Built-in wording is shown and can be edited before previewing.
-          </div>
-        )}
-        {emailDefaultsStatus && !emailDefaultsStatus.unavailable && !emailDefaultsStatus.configured && (
-          <div className="mt-4 rounded-lg border border-gray-200 bg-gray-50 p-3 text-sm text-gray-700" role="status">
-            Share for deliberation defaults are not fully configured in Admin. Built-in wording is shown and can be edited before previewing.
-          </div>
-        )}
+        {sourceUnavailable && <p role="status" className="mt-4 text-sm text-amber-900">Sharing is paused while the brief or session is unavailable. Your edits are retained.</p>}
+        {recovery && <p role="status" className="mt-4 text-sm text-amber-900">Reconcile the original email before creating another preview. Retry uses the original recipients and wording.</p>}
+        {defaultsLoading && <p role="status" className="mt-3 text-sm text-gray-600">Loading current defaults…</p>}
+        {<p className="mt-3 text-sm text-gray-600">Wording source: {composeSource === 'personal' ? 'your personal default' : composeSource === 'shared' ? 'shared defaults (built-in fallback where needed)' : 'built-in defaults'}.</p>}
+        {!defaultsLoading && preferenceMessage && !editorOpen && <p role="status" className="mt-3 text-sm text-gray-800">{preferenceMessage}</p>}
+        {discarding && <div className="mt-4 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-950" role="alert">
+          <p>{discarding === 'reload' ? 'Discard your unsaved default wording and reload?' : discarding === 'reopen' ? 'Discard retained edits and start a fresh email?' : 'Discard your unsaved email edits?'}</p>
+          <div className="mt-3 flex gap-3"><Button type="button" variant="secondary" disabled={preparing || sending || preferenceBusy} onClick={() => setDiscarding(false)}>Keep editing</Button>
+          <Button type="button" variant="secondary" disabled={preparing || sending || preferenceBusy} onClick={discardAndClose}>{discarding === 'reload' ? 'Discard default edits and reload' : discarding === 'reopen' ? 'Discard edits and start fresh' : 'Discard edits and close'}</Button></div>
+        </div>}
 
         <div className="mt-4 rounded-lg border border-gray-200 bg-gray-50 p-3 text-sm text-gray-800" data-testid="composer-session-slot">
           <span className="font-medium">{deliberationSessionLine(session)}</span>
@@ -746,7 +869,7 @@ export default function PreSiteDistributionPanel({
               <Button variant="link" size="sm"
                 type="button"
                 onClick={() => setRecipientPickerTarget('to')}
-                disabled={preparing || sending}
+                disabled={preparing || sending || preferenceBusy || actionsPaused || Boolean(recovery)}
                 className="text-xs font-medium text-blue-700 hover:text-blue-900 disabled:opacity-50"
               >
                 Add from directory
@@ -758,7 +881,7 @@ export default function PreSiteDistributionPanel({
               value={form.to}
               onChange={(event) => edit({ to: event.target.value })}
               placeholder="One or more known addresses, separated by commas or new lines"
-              disabled={preparing || sending}
+              disabled={preparing || sending || preferenceBusy || actionsPaused || Boolean(recovery)}
               className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
             />
           </div>
@@ -768,7 +891,7 @@ export default function PreSiteDistributionPanel({
               <Button variant="link" size="sm"
                 type="button"
                 onClick={() => setRecipientPickerTarget('cc')}
-                disabled={preparing || sending}
+                disabled={preparing || sending || preferenceBusy || actionsPaused || Boolean(recovery)}
                 className="text-xs font-medium text-blue-700 hover:text-blue-900 disabled:opacity-50"
               >
                 Add from directory
@@ -780,7 +903,7 @@ export default function PreSiteDistributionPanel({
               value={form.cc}
               onChange={(event) => edit({ cc: event.target.value })}
               placeholder="Optional"
-              disabled={preparing || sending}
+              disabled={preparing || sending || preferenceBusy || actionsPaused || Boolean(recovery)}
               className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
             />
           </div>
@@ -791,7 +914,7 @@ export default function PreSiteDistributionPanel({
             id="distribution-subject"
             value={form.subject}
             onChange={(event) => edit({ subject: event.target.value })}
-            disabled={preparing || sending}
+            disabled={preparing || sending || preferenceBusy || actionsPaused || Boolean(recovery)}
             className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
           />
         </div>
@@ -802,10 +925,14 @@ export default function PreSiteDistributionPanel({
             rows={5}
             value={form.bodyText}
             onChange={(event) => edit({ bodyText: event.target.value })}
-            disabled={preparing || sending}
+            disabled={preparing || sending || preferenceBusy || actionsPaused || Boolean(recovery)}
             className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
           />
         </div>
+        <DistributionWordingDefault open={editorOpen} onOpen={setEditorOpen} template={editor} onChange={setEditor}
+          data={defaultsData} busy={preferenceBusy || defaultsLoading} blocked={preparing || sending || preferenceUncertain || actionsPaused}
+          message={preferenceMessage} onSave={() => mutatePreference('PUT')} onClear={() => mutatePreference('DELETE')}
+          onReload={() => { if (editorDirty) setDiscarding('reload'); else readDefaults(); }} />
         {needsLock && (
           <p className="mt-4 text-sm text-gray-600" data-testid="composer-lock-note">
             Creating the preview locks this exact Word version as the working document and turns off regeneration.
@@ -814,7 +941,7 @@ export default function PreSiteDistributionPanel({
         <Button variant="primary" size="sm"
           type="button"
           onClick={() => prepare()}
-          disabled={preparing || sending || !form.to.trim() || !form.subject.trim() || !form.bodyText.trim()}
+          disabled={preparing || sending || preferenceBusy || defaultsLoading || actionsPaused || Boolean(recovery) || !form.to.trim() || !form.subject.trim() || !form.bodyText.trim()}
           className="mt-4 rounded-lg px-4 py-2 text-sm font-medium disabled:opacity-50"
         >
           {preparing
@@ -851,7 +978,7 @@ export default function PreSiteDistributionPanel({
             <Button variant="primary" size="sm"
               type="button"
               onClick={() => prepare({ acknowledge: true })}
-              disabled={preparing || sending}
+              disabled={preparing || sending || preferenceBusy || actionsPaused || Boolean(recovery)}
               className="mt-3 rounded-lg px-4 py-2 text-sm font-medium disabled:opacity-50"
             >
               I reviewed the changes above — share anyway
@@ -928,7 +1055,7 @@ export default function PreSiteDistributionPanel({
                     type="checkbox"
                     checked={confirmed}
                     onChange={(event) => setConfirmed(event.target.checked)}
-                    disabled={preparing || sending}
+                    disabled={preparing || sending || preferenceBusy || authPaused || (actionsPaused && !recovery)}
                     className="mt-0.5"
                   />
                   I reviewed the recipients, message, and briefing page link shown above.
@@ -936,7 +1063,7 @@ export default function PreSiteDistributionPanel({
                 <Button variant="primary" size="sm"
                   type="button"
                   onClick={send}
-                  disabled={!confirmed || preparing || sending}
+                  disabled={!confirmed || preparing || sending || preferenceBusy || authPaused || (actionsPaused && !recovery)}
                   className="mt-3 rounded-lg px-4 py-2 text-sm font-medium disabled:opacity-50"
                 >
                   {sending ? 'Sending…' : 'Send email'}
@@ -967,7 +1094,7 @@ export default function PreSiteDistributionPanel({
         />
       )}
       {composer === 'dialog' && (
-        <ComposerDialog onClose={onCloseComposer} busy={preparing || sending} escapeDisabled={recipientPickerTarget !== null}>
+        <ComposerDialog onClose={closeComposer} busy={preparing || sending || preferenceBusy} escapeDisabled={recipientPickerTarget !== null}>
           {composerBody}
         </ComposerDialog>
       )}

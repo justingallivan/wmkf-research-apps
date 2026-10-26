@@ -5,7 +5,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Card } from '../Layout';
-import PreSiteDistributionPanel from './PreSiteDistributionPanel';
+import DistributionSenderPanel from './DistributionSenderPanel';
 import useSiteVisitContext from './useSiteVisitContext';
 import ResearchPresentationFollowUp from './ResearchPresentationFollowUp';
 import OverflowMenu from './OverflowMenu';
@@ -300,6 +300,8 @@ export default function StaffDeliberationsTab({
 
   // Shared composer/dialog state.
   const [composerOpen, setComposerOpen] = useState(false);
+  const [composeOpenVersion, setComposeOpenVersion] = useState(0);
+  const [distributionRetention, setDistributionRetention] = useState({});
   const [latestSendFailure, setLatestSendFailure] = useState(null);
   // Primitive values so an unchanged history report never re-renders the tab.
   const [latestSentAt, setLatestSentAt] = useState(null);
@@ -758,19 +760,6 @@ export default function StaffDeliberationsTab({
   const briefRegenerationPending = briefPendingArtifact?.operationStatus
     === REQUEST_DOCUMENT_OPERATION_STATUS.GENERATING
     && briefPendingArtifact.leaseActive !== false;
-  // A regeneration can start (or be discovered, via the periodic/mount
-  // status fetch) while the composer is already open from an earlier click;
-  // force it closed rather than leave a stale, still-sendable dialog open
-  // over a source that just became unsafe to send. This is a genuine
-  // one-way "close and stay closed until the user reopens it" transition
-  // (not derivable purely during render, since `composerOpen` must not
-  // silently reopen once the regeneration finishes) — a legitimate use of
-  // an effect; eslint's generic set-state-in-effect warning is expected
-  // here (its own disable directive is reported unused by a different
-  // underlying check, so none is added).
-  useEffect(() => {
-    if (briefRegenerationPending && composerOpen) setComposerOpen(false);
-  }, [briefRegenerationPending, composerOpen]);
   const briefShared = briefArtifact?.lifecycleState === REQUEST_DOCUMENT_LIFECYCLE_STATE.REVIEW;
   const briefDraftReady = briefArtifact?.lifecycleState === REQUEST_DOCUMENT_LIFECYCLE_STATE.DRAFT;
   const briefDownloadUrl = downloadUrlFor(briefReadyFile);
@@ -794,6 +783,15 @@ export default function StaffDeliberationsTab({
   // display cap cannot regress the stage (S466; keyed to the brief per plan
   // §3.5 since distribution's source is the brief).
   const everSent = currentSourceEverSent;
+
+  const [distributionSource, setDistributionSource] = useState(briefArtifact?.artifactId);
+  if (distributionSource !== briefArtifact?.artifactId) {
+    setDistributionSource(briefArtifact?.artifactId);
+    setCurrentSourceEverSent(false);
+    setLatestSendFailure(null);
+    setLatestSentAt(null);
+    setLatestSentRecipients(0);
+  }
 
   const onDistributionHistory = useCallback((historyInfo) => {
     setCurrentSourceEverSent(historyInfo?.currentSourceEverSent === true);
@@ -1181,6 +1179,7 @@ export default function StaffDeliberationsTab({
   const secondaryClass = 'rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-800 hover:bg-gray-50 disabled:opacity-50';
   const openComposer = () => {
     setError(null);
+    setComposeOpenVersion(value => value + 1);
     setComposerOpen(true);
   };
   const due = preparation?.due === true;
@@ -1818,16 +1817,12 @@ export default function StaffDeliberationsTab({
       </section>
 
 
-      {showDistributionPanel && (
-        <PreSiteDistributionPanel
-          // Codex adversarial review finding 3 (2026-09-16 round 2): the
-          // panel's own history-load effect only re-runs on a `requestId`
-          // change, never on `sourceArtifact` alone, so a guarded
-          // regeneration's successor artifact id must be part of this key —
-          // forcing a full remount (a fresh history load from scratch for
-          // the new source) rather than silently keeping the predecessor's
-          // cached "already sent" state.
-          key={`distribution-${requestId}:${briefArtifact?.artifactId || ''}`}
+      {(showDistributionPanel || composerOpen || Object.values(distributionRetention).some(Boolean)) && (
+        <DistributionSenderPanel
+          key={`distribution-${requestId}`}
+          composeOpenVersion={composeOpenVersion}
+          onRetentionChange={setDistributionRetention}
+          sourceUnavailable={!showDistributionPanel || briefRegenerationPending || briefShareBlocked}
           requestId={requestId}
           requestNumber={requestNumber}
           sourceArtifact={briefArtifact}
@@ -1842,7 +1837,7 @@ export default function StaffDeliberationsTab({
           onCloseComposer={() => setComposerOpen(false)}
           beforePrepare={briefDraftReady ? lockBriefForShare : null}
           needsLock={briefDraftReady}
-          record={briefShared}
+          record={showDistributionPanel && briefShared}
           beforeHistory={materialsCardInPanel ? materialsCard : null}
         />
       )}
