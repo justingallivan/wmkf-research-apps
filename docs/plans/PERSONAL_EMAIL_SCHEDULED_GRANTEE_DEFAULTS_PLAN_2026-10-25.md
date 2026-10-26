@@ -3,7 +3,7 @@ title: Personal defaults for scheduled grantee reminders
 domain: workbench
 kind: plan
 status: active
-summary: "Slice 5 bounded proposal: exact-owner future reminder defaults, creation/handoff integration and independent editor; no runtime implementation or live writes. Claude review: READY WITH NAMED CHANGES; handoff failure policy awaiting owner decision."
+summary: "Slice 5 bounded proposal: exact-owner future reminder defaults, creation/handoff integration and independent editor; no runtime implementation or live writes. Owner chose hold-until-repaired for reassignment failures. Revised contract addresses N1–N7; independent rereview pending."
 owner: product-engineering
 related:
   - docs/plans/PERSONAL_EMAIL_DEFAULTS_INVENTORY_2026-09-24.md
@@ -18,9 +18,9 @@ related:
 
 [PLANNED — NOT IMPLEMENTED.] Justin authorized flow review, a bounded plan and
 independent Claude review before coding. Claude reviewed draft `0ba91394d` and
-returned **READY WITH NAMED CHANGES**; the required changes and pending owner
-decision are in §9. Sections 3–8 preserve the reviewed draft proposal, not an
-approved implementation contract. Codex owns this plan on
+returned **READY WITH NAMED CHANGES**. Justin then chose **hold reassigned
+reminders until repaired**, not shared-wording fallback. This revision incorporates
+that choice and N1–N7; independent rereview is pending (§9). Codex owns this plan on
 `codex/scheduled-grantee-defaults-plan` in the existing isolated worktree.
 Baseline: `c7c3ce6e106ea0e9b6c390cfb49351af36377840` (main including the
 reviewed distribution release and its documentation receipt). Claude's other
@@ -35,6 +35,8 @@ Changing defaults alone must leave every existing message, edit, approval,
 recipient, schedule, signature, version and transport receipt unchanged.
 This does not add email types, scheduling controls, a review-posture matrix,
 new notification mail, a global nav entry, or calendar/J27 functionality.
+The owner-selected hold requires a bounded delivery guard and one attention reason
+in existing ledger fields; it is the sole additional engine behavior in this slice.
 
 ## 2. Verified current flow
 
@@ -50,7 +52,7 @@ new notification mail, a global nav entry, or calendar/J27 functionality.
 | Handoff | `reassignScheduledEmail`: exact just-read version; different PD; scheduled/failed/sending; both transport fields null; no live lease. Atomic reset clears edits/approval, increments version/recipient generation, preserves scheduled time |
 | Inbox/API | `pages/scheduled-emails.js` + `pages/api/scheduled-emails/{index,[id]}.js`: profile-authenticated, mapped system-user-owned list/actions; bounded literal row subject/body edits; PATCH version fence; no editable actor/recipients/signature/schedule |
 | Preview/send | `scheduled-email-service.js:projectScheduledEmail/renderScheduledEmailPreview/deliverScheduledEmail`: stored wording plus stored signature; visibly placeholder preview URL; real URL minted only when creating recipient activity; row lease/approval/source/recipient guards, correlation/readback and no-resend intent fence |
-| Other consumers | Digest, attention UI, reconciliation, finalization and retention consume the existing row state, not reusable wording; keep those paths unchanged |
+| Other consumers | Digest, attention UI, reconciliation, finalization and retention consume the existing row state, not reusable wording; preserve their transport/receipt semantics; the proposed hold adds shared attention classification only |
 
 [VERIFIED via adapter/identity source.] Preferences already live in Dataverse
 `wmkf_appuserpreferences`. `user-preference.listByOwnerAndKey` enumerates complete
@@ -80,9 +82,13 @@ Proposed family bounds follow the existing scheduled row editing bounds:
   `{{dueDate}}` (including `COB {{dueDate}}`) to preserve the reminder's named,
   award-specific, deadline-bearing intent. `{{signature}}` is optional and stripped
   by the existing draft renderer; the real saved signature is always appended once.
-- Reject unsupported/malformed mustache syntax. New personal templates use
-  mustache; retain legacy bracket aliases in the existing shared renderer.
-  Do not reinterpret ordinary bracket prose in personal wording as a new token.
+- Allow exactly `{{granteeName}}`, `{{proposalTitle}}`, `{{dueDate}}`,
+  `{{signature}}` in the body. Reject unknown tokens and unmatched or extra brace
+  delimiters, including triple braces. Subject rejects any brace. Explicitly reject
+  `[Name]`, `[title]`, `COB [date]`, `[Program Director signature]` in personal
+  templates: the reused renderer would otherwise replace these literals. Ordinary
+  bracket prose remains literal. Preserve legacy alias support for shared copy;
+  do not run the personal token validator against shared fallback.
 - Preserve plain-text escaping, server-owned link/button, automation notice,
   separate PD signature, current day-14 deadline and PI surname behavior.
   Do not seed/rewrite Admin copy or import rendered row edits as raw defaults.
@@ -96,9 +102,11 @@ context tokens without retroactively rejecting an existing edited row.
 
 [PLANNED.] New `/api/scheduled-emails/email-preferences` GET/PUT/DELETE, using
 `requireAuth` for the same staff self-service infrastructure category as the
-scheduled inbox, not a new app grant. Fail closed for applicant, bypassed,
-missing-profile or invalid session actor identities. Inside trusted DAL context,
-resolve the authenticated session profile with the existing mapping and require
+scheduled inbox, not a new app grant. Explicitly return 403 for
+`session.authBypassed` or applicant sessions after `requireAuth`, including in
+production; neither can reach preference access. Then require a GUID session actor
+and linked profile. Inside trusted DAL context, resolve the authenticated session
+profile with the existing mapping (catch lookup exceptions as sanitized 503) and require
 its system-user GUID to equal `actorRefFromSession(session)` case-insensitively.
 Mismatch/unavailable identity returns sanitized 403/503 and no preference access.
 This avoids editing another person's defaults through a legacy remap without
@@ -112,8 +120,10 @@ responses; state-changing Origin protection remains in `requireAuth`.
 A family service `lib/services/scheduled-grantee-reminder-personalization.js` owns:
 - Complete strict own-key reads: configured, absent, duplicates, encrypted,
   invalid, identity_unavailable or unavailable; never use first row or `{}` fallback.
-- Shared reads via strict settings (without emitting operational notifications
-  merely because someone opens the editor). Return shared status independently.
+- Shared reads directly via `getSettingStrict`, never `readRequiredEmailDefaults`
+  (which emits operational alerts). Return shared status independently. Shared
+  prefill may fail the stricter personal validator; expose field errors, not an
+  implicit Admin rewrite or a claim that the prefill was saved.
 - GET DTO: exact `ownerSystemId`, own state/raw pair, shared state/raw pair,
   effective pair/source if available, `canSave`, `canClear`; no message DTO/token.
 - Save: validate pair, enumerate, reject duplicates with 409, update one or create
@@ -130,46 +140,130 @@ Do not claim uniqueness, cross-tab serialization or atomic multi-row Clear:
 concurrent creates can produce duplicates, detected on subsequent strict reads;
 last successful writer can win. UI success confirms a readback at that time only.
 
-## 5. Background integration, failures and concurrency
+## 5. Background integration, owner-selected hold and concurrency
 
-[PLANNED.] Add a strict family reader accepting the server-resolved current PD
-system-user GUID directly. No reverse profile lookup, session actor, caller ID,
-admin impersonation or remap in cron. It uses the same exact key and validator as
-the editor; lookup is after current PD resolution and before rendering/persistence.
-Use a per-run Map of in-flight promises keyed by lowercase GUID so concurrent
-workers share one snapshot (including failures); a later cron run retries freshly.
+[PLANNED; hold policy OWNER-DECIDED 2026-10-25.] A strict family reader accepts
+only the server-resolved current PD GUID. No reverse profile lookup, caller ID or
+identity remap in cron. Resolve after current PD and before render/create/handoff.
+Cache normalized result promises, including failures, by lowercase GUID for the
+run; store the promise before awaiting. A later run retries freshly.
 
-Only confirmed absence uses the already-required shared Admin pair. Duplicate,
-encrypted, malformed, unavailable or unknown personal state skips creation/handoff
-for that row, increments `preferenceFailed`, and adds a bounded request-number
-failure reason. Never quietly send shared wording after an unreadable personal
-copy. Configured invalid rendering also skips before a ledger write. Shared
-configuration remains an existing batch prerequisite, even when personal wording
-exists; do not widen this slice into redesigning that historical behavior.
+Only confirmed absence uses the required shared Admin pair. Duplicate, encrypted,
+invalid, unavailable or unknown own state pauses new creation/handoff for that PD.
+No silent shared fallback. Invalid rendered personal content also skips before a
+new draft write. Preserve the existing shared-config batch prerequisite. Do not
+apply stricter personal token grammar to existing shared copy.
 
-Keep the smallest producer change: resolve/render the proposed draft then pass it
-to the existing create-or-get and handoff operations. No ledger query/helper/schema
-change is needed. An existing same-owner row may still incur a defaults read while
-scanning; a failed read skips this producer attempt but does not mutate that row.
-The batch must still run its independent due-delivery, digest, reconciliation and
-finalization passes for existing rows. Existing delivery reads frozen content and
-must not consult personal defaults again. An invalid new default must not block
-or rewrite an already-created scheduled message.
+Keep the existing `preferenceFailed` count per affected row. Emit a distinct
+`personal reminder default <status> for current PD` reason, separate from posture
+failures. Group wording failures once per PD per run with bounded affected request
+numbers (up to the existing scan size), without adding a new summary top-level
+field. Existing logger emits the grouped summary. No new notification emails.
+New-row failures do not abort digest, due-delivery, reconciliation or finalization.
 
-The store remains authoritative for races:
-- Repeat scan / default change / Save racing cron: the winning INSERT freezes its
-  resolved pair; later ON CONFLICT leaves it unchanged. A concurrent preference
-  change applies only to a later new-row/handoff resolution, not to frozen rows.
-- Two workers/runs: unique source row avoids two messages; existing version,
-  transport and lease fences make losing handoff updates no-ops. No new lock promise.
-- PD handoff: use the newly resolved PD's raw pair, render for current facts, and
-  pass the just-read version. Preserve source schedule; clear old approval/edits
-  only through the existing atomic SQL transition. Failed preference lookup leaves
-  the previous row untouched; existing delivery semantics are not expanded here.
-- Activity exists, send intent exists, live lease, sent/stopped or changed version:
-  no new wording overwrite; retain existing recovery and recipient generation.
-- No default generation enters activity correlation, send proof, digest receipt,
-  attention state, review posture or retention decisions.
+Creation remains render → existing create-or-get → existing handoff. A failed
+lookup leaves existing frozen content untouched. Same-owner rows continue to send
+stored content even if their owner's default later becomes unreadable. A changed
+request PD is different: the former PD's stored message MUST NOT be newly sent
+while handoff is deferred. This is enforced at delivery, not just in the producer.
+
+### 5.1 Delivery guard (automatic AND manual Send now)
+
+Add a server-side current-request-PD read, using the existing grant-request DAL,
+to `deliverScheduledEmail`. Never read personal wording at send time. Validate
+both GUIDs and compare case-insensitively; missing/unreadable/invalid current PD
+means unknown ownership, not permission to use the stored sender.
+
+After the existing send lease and source-eligibility checks, but before token
+minting, activity creation or sending, require the current PD to equal the row's
+stored `pd_systemuser_id`. Recheck immediately before `recordSendRequested` after
+all intervening awaits. This applies to cron and forced sends; `force` can bypass
+approval/schedule as today, never current-PD ownership.
+
+On mismatch/unknown ownership:
+1. Permit only read-only stored-activity or exact current-generation correlation
+   lookup, to detect transport already accepted. Do not readdress/create/mint/send.
+2. If an existing activity is proven accepted, persist any recovered activity ID,
+   record sent and finalize through the existing lease-fenced path. This records
+   history; it does not authorize a new send. Failed/ambiguous lookup cannot prove
+   acceptance and must hold. A recovered unaccepted activity ID must be persisted
+   before releasing the lease so producer reassignment cannot treat it as pristine.
+3. Otherwise, unless existing missing/forbidden activity classification applies
+   (precedence below), record `scheduled_email_pd_handoff_held` using the existing
+   lease-fenced failure operation: status failed, lease released, hold reason
+   persisted; subject/body/signature/recipients/schedule/edits/approval/activity
+   identity/generation remain untouched. On persistence failure, return no success;
+   the last safe lease/receipt remains authoritative. Never call SendEmail.
+4. Return a distinct `{held:true, reason:'pd_handoff_held', message}` result after
+   confirmed hold persistence. The action route maps that to 409 with the held
+   message, not sent feedback, an uncertain-send notice or a generic retry claim.
+   Cron does not count a held attempt as sent. It may record the distinct reason
+   in existing `failures`; no new counters or summary shape are required.
+
+If send intent already exists, preserve the existing read-only reconciliation
+lane and no-resend rule: reconcile acceptance, never reset/rebuild/re-send it.
+The new ownership hold must not replace an unconfirmed marker or reopen transport.
+A saved unaccepted activity without intent is also held on PD mismatch: the old
+B5 policy of sending that activity as created applies only when ownership still
+matches. It cannot be automatically rebuilt for the new PD; manual reconciliation
+or stopping the old message is required. No new reset/delete/send-by-hand action
+is added. Missing/forbidden activity classifications take precedence over the new hold:
+retain their existing persisted codes, no-send action rules and read-only recovery
+lanes instead of replacing them with `pd_handoff_held`. Any later ordinary send
+restored by those lanes still passes both current-PD guards. Other ambiguous
+activity reads during a mismatch are held without asserting acceptance; retain
+activity ID and a bounded explanation. A failed read never permits transport.
+
+A current-PD read cannot atomically lock a Dataverse request and Postgres row.
+Reassignment after the final successful PD read and before the transport intent
+is persisted remains a bounded cross-system race. State and test this limit;
+never claim absolute atomicity. The guard closes persistent known-mismatch and
+unknown-ownership sends and does not widen existing send uncertainty.
+
+### 5.2 Hold visibility, recovery and action rules
+
+Use the existing `last_error_code` column: add `PD_HANDOFF_HELD` to the store error
+constant and `pd_handoff_held` to the shared attention reason/copy mapping. No new
+status/column/migration. Project the reason through the existing DTO; put the row
+in Needs attention in the digest and show **Held — PD reassignment needs repair**
+in the inbox. Copy explains that no new send will occur while ownership differs
+or cannot be checked. Do not promise that editing defaults alone repairs an
+already-created old-PD activity.
+
+For this reason only: edit/approve disabled, Stop available, and **Retry send**
+may perform the existing explicit Send now action. It must pass the fresh ownership
+guards again and remains held if mismatch/unknown. If the request has returned to
+that stored PD, a deliberate retry can send the same frozen message, with the
+existing force/approval semantics clearly disclosed in the confirmation. This is
+an intentional exception to the shared helper's stop-only attention rule, not an
+exception for unconfirmed/missing/forbidden activity reasons. Add exact route/UI
+parity tests; preserve those other attention branches.
+
+Normal due queries keep ownership-held rows eligible for another ownership check
+under existing schedule/approval/lease rules; do not exclude them as if missing
+activities. Unapproved rows remain unapproved; they need explicit retry or a
+successful producer handoff. A successful eligible handoff resets the held error
+using the existing version-fenced transition, including new PD wording/signature,
+recipients/posture, cleared edits/approval and incremented generation. It does not
+send immediately or bypass the new PD's review requirements. With a saved activity
+or intent, no automatic handoff reset: preserve receipts and offer existing manual
+recovery/Stop guidance. A defaults Save/Clear itself never clears a message hold.
+
+### 5.3 Race and complement requirements
+
+- Winning INSERT freezes its resolved pair; repeat scans/default Save never alter
+  same-owner stored content. No cross-tab preference locking promise.
+- Two runs compete through the existing unique source key, version, lease and
+  transport predicates. Failed new-PD preference reads cannot cause former-PD
+  delivery because both due and forced delivery perform the ownership check.
+- Live lease/version drift/sent/stopped/activity/intent refuses producer rebuild.
+  A losing hold persistence or receipt write is not reported successful.
+- Preference repair → later cron rebuilds pristine eligible row under new PD;
+  old-PD edits/approval are reset only by that existing atomic transition and
+  original schedule is preserved. No sent/uncertain transport reset or cleanup.
+- Add no preference generation to activity correlation, leases, signatures,
+  digest receipts, review posture or retention. Only one additional attention
+  reason describes the no-new-send hold.
 
 ## 6. UI boundary and stale work
 
@@ -187,22 +281,35 @@ No "use this message as my default" or "apply to this message" action.
 Selecting another message must not reset unsaved reusable wording or cause another
 preference GET. Collapsing the disclosure retains edits. Explicit Reload and Clear
 warn before discarding dirty raw default edits; cancellation preserves them.
-Clear confirmation never implies a message action. Page navigation/Back/reload
+Clear confirmation never implies a message action. Page departure/Back/reload
 warn when editor edits or pending/unconfirmed mutation results would be lost.
+Same-pathname shallow query changes on `/scheduled-emails` are explicitly exempt:
+message selection must update the URL without a prompt or discarded defaults.
+Handle cancelled true departures without an unhandled router promise.
 Use a small scoped guard with the existing proven Pages-router behavior; do not
 extract/refactor the distribution component or its recovery contract in this slice.
 
 Independent preference request generations plus mounted/actor-scope checks guard
 success, error and finally after every await. Stable scope uses authenticated
 session actor/profile, not selected message ID/version or a transient profile
-loading phase. Hide/disable while identity is loading, retain edits for the same
-confirmed actor, clear/remount on a real actor change; ignore old reads/writes.
+loading phase. Disable (optionally visually hide without unmounting) during
+transient identity loading; retain mounted edits for the same confirmed actor.
+Clear/remount only on a real actor change; ignore old reads/writes.
 Late load never overwrites typing. Busy blocks duplicate preference actions;
 unknown mutation latches until strict Reload. Navigation during a pending mutation
 warns it may already have persisted; do not claim cancellation rolls it back.
 The editor can be independently disabled during a row action without rebasing it.
 Any necessary page-boundary wiring stays limited to protecting this new editor;
 existing row-selection/discard behavior is not silently redesigned.
+
+For broken own defaults, explain that new reminders/reassignment rebuilds are
+paused until repaired. When exact identity and enumeration permit it, allow
+Clear (including duplicates) or corrected Save; Save still refuses duplicates.
+Unavailable enumeration needs Retry and never claims Clear succeeded. Show
+field-specific validation errors. Shared prefill is not guaranteed save-valid.
+Explain that already-frozen same-owner messages continue; reassigned messages
+are held by the independent delivery guard, and saved old-PD activities need
+manual resolution. No live mutation occurs on editor open.
 
 ## 7. Planned tests and verification
 
@@ -216,24 +323,40 @@ existing row-selection/discard behavior is not silently redesigned.
    exact Save readback, failed create/update/readback, partial Clear and confirmed
    absence, other-owner/key exclusion with actual foreign rows present.
 3. Route: unauthenticated/applicant/bypass/inactive, missing/invalid actor,
-   profile-map mismatch, no caller identity, methods/query/body/size, private
+   profile-map mismatch, explicit production bypass/applicant refusal and
+   PUT/DELETE Origin rejection; no caller identity, methods/query/body/size, private
    no-store, mutation confirmation vs refresh failure; no ledger/transport calls.
    Generic keyed/list GET and single/batch POST/DELETE cannot bypass new key.
 4. Cron: absent vs configured current-PD defaults at INSERT and eligible handoff;
    failure before any new draft write; same-owner stored row unchanged after
-   defaults change; four simultaneous same-PD requests share one in-flight read;
+   defaults change; four simultaneous same-PD workers reach a deliberately blocked
+   snapshot and share one read (assert before releasing; never wait for four reader
+   calls); failure snapshot shared too;
    different PDs isolated; later run refreshes; personal failures do not abort
    existing due sends/digests/reconciliation/finalization; retain shared-config gate.
 5. Store/transport regressions: competing INSERTs, version/lease/transport/sent/stopped
    handoff fences, preserved schedule, reset edits/approval only on eligible handoff,
-   no send-time defaults read; exact frozen row used by preview and recipient activity.
+   exact frozen row used by preview and recipient activity. Treat no send-time
+   defaults lookup as a structural contract, not an absent-dependency spy.
    Reuse existing isolated Postgres integration harness; never the shared live DB.
 6. UI: empty inbox availability, raw source/error states, explicit future-only actions;
    message selection/concurrent row completion leaves default edits intact; defaults
    responses leave current row edits/selection/version/approval intact; late read,
    unmount, transient loading vs real actor switch, busy/uncertain latch and Reload;
    cancelling discard/navigation retains edits, confirmed discard only affects editor.
-   Real-router fixture browser coverage for navigation/Back and pending result warning.
+   Real-router fixture browser coverage for navigation/Back and pending result warning,
+   plus dirty-default message selection with no prompt, retained edits and changed URL.
+7. Ownership hold: actually due old-PD row with broken new-PD preference never sends,
+   mints or creates; cover missing/read-failed/invalid PD and mixed-case equality,
+   cron and forced send; PD changes during recipient/activity awaits; recheck before
+   intent; accepted activity readback vs unaccepted/missing/forbidden/correlation
+   failure; preserve already-requested no-resend reconciliation. Successful repair
+   rebuilds pristine row with new wording and approval reset, preserves schedule;
+   activity/intent prevents automatic reset. Lost lease or failed hold persistence
+   returns no success. Hold reason appears in projection/digest/page/routes; only
+   deliberate guarded Retry send or Stop is allowed, never uncertain-transport retry.
+   Approval-required held row is not silently approved by a cron recheck; version,
+   concurrency and existing missing/forbidden/unconfirmed complements remain covered.
 
 Implementation verification: scoped Jest suites (`grantee-deliverable-reminders-cron`,
 `scheduled-email-routes`, `scheduled-emails-page`, scheduled service/current-recipient,
@@ -261,73 +384,46 @@ or release is authorized by acceptance of this planning task.
   inventory tables remain historical. Implementation/release claims wait for proof.
 - Symbol fan-out: new preference key must have dedicated reader/writer, cron consumer,
   UI source states, generic privacy/reserved guards and tests. Existing ledger fields,
-  workflow enum and dispatch states get no new values.
+  workflow enum and ledger statuses get no new values. The new persisted
+  `scheduled_email_pd_handoff_held` error is a new attention reason: trace raw and
+  projected names through the store constant, shared maps/actions, page label,
+  digest classification, action route and due-send/reconciliation selectors.
+  Unknown error codes must not bypass the independent fresh ownership guard.
 
-## 9. Independent review result and next boundary
+## 9. Review history, owner decision and next boundary
 
 [VERIFIED via ordinary OAuth Claude review of `0ba91394dd4f3b421e1c2603fb164515d769943a`.]
-Verdict: **READY WITH NAMED CHANGES**. Verbatim evidence:
+Initial verdict: **READY WITH NAMED CHANGES**. Verbatim historical report:
 `docs/audits/SCHEDULED_GRANTEE_DEFAULTS_PLAN_CLAUDE_REVIEW_2026-10-25.md`.
-No implementation/release authorization follows from that verdict.
 
-### Required draft revisions (not yet an accepted replacement contract)
+[OWNER-DECIDED via explicit reply 2026-10-25.] Justin chose **hold the reassigned
+reminder until repaired**, including an explicit send hold in the revised plan.
+No shared fallback or acceptance of former-PD sending was selected.
 
-- **N1 — owner decision pending.** Under the reviewed draft's strict failure
-  policy, a persistent incoming-PD default error prevents handoff, but the existing
-  due-send pass can still send the former PD's stored message. This is a lasting
-  failure case, not merely the existing narrow reassignment race. Root verified
-  the path: cron returns before create-or-get/handoff; `deliverScheduledEmail`
-  and `claimScheduledEmailSend` do not check the request's current PD for cron
-  delivery. Neither safe holding nor fallback is implemented by this plan.
-  Ask Justin to choose **hold reassigned reminders until repaired** (recommended;
-  requires an explicit send guard in a revised plan) or **rebuild using shared
-  wording under the new PD with a visible warning**. Do not implicitly accept
-  former-PD sending. Define transport-pristine vs activity/intent recovery and
-  concurrency consequences before approving either alternative.
-- **N1/N7 — diagnosis and repair.** Distinguish wording failures from review
-  posture failures while preserving the existing summary shape. Group bounded
-  affected request numbers per broken PD per run; keep row failure accounting
-  explicit. Editor notices must truthfully explain the chosen pause/fallback.
-  Clear can offer repair when identity is verified, but cannot claim success or
-  delete unknown rows when enumeration is unavailable; retry/readback rules hold.
-  Update the cron header's narrow-race claim when the chosen behavior is built.
-- **N2 — aliases/grammar.** Explicitly reject `[Name]`, `[title]`, `COB [date]`,
-  `[Program Director signature]` in personal templates, because the reused renderer
-  unconditionally replaces them. Keep them supported for existing shared copy.
-  Define exact allowed mustache tokens, reject malformed/unmatched delimiters,
-  and check rendered expansion bounds; no new renderer/extraction.
-- **N3 — selection/loading.** Same-path shallow message-query routing must bypass
-  the editor's departure warning; selecting a message cannot discard defaults or
-  leave an unhandled rejected `router.replace`. Test changed URL, retained text
-  and no prompt in a real-router fixture. Disable/hide without unmounting during
-  transient loading for the same actor. Root confirmed installed Next's router
-  emits `routeChangeStart` outside its `isQueryUpdating` branch; selection needs
-  explicit coverage, not an assumed exemption.
-- **N4 — auth order.** Explicit 403 for auth bypass/applicant before the actor,
-  profile and mapping checks; mapping inside DAL context, exceptions sanitized
-  to 503. Cover production bypass and Origin mismatch on PUT/DELETE. Never
-  interpret a missing actor as permission to use a mapped identity.
-- **N5 — prefill.** Shared raw copy is a starting point, not guaranteed to satisfy
-  the stricter personal validator. Show field-specific errors; do not mutate
-  Admin copy or falsely label the prefill saved personal wording.
-- **N6 — discriminating tests.** Block the preference promise while all four row
-  workers are in flight; assert one reader call before release (not a barrier
-  waiting for four reader calls, which would deadlock a correct cache). Cover
-  shared failure snapshot and fresh next-run read. Foreign rows must be present
-  in Clear fixtures. Describe no-send-time-defaults as a structural contract plus
-  frozen-content assertions, not an absent-dependency spy. Cover the chosen N1
-  outcome with an actually due old-PD row and both transport/lease complements.
+| Initial finding | Revision disposition |
+| --- | --- |
+| N1 persistent handoff failure | §5 now requires independent current-PD delivery guards for cron/forced sends, persisted hold, accepted-activity reconciliation, no intent reset, truthful UI and repair boundaries |
+| N1/N7 diagnostics | §5 groups request-number failures per PD with distinct wording reason and unchanged counter shape; §6 distinguishes own-default repair from activity recovery |
+| N2 renderer aliases/grammar | §3 rejects the four substituted bracket strings, defines mustache grammar and bounds; shared legacy rendering remains unchanged |
+| N3 navigation/loading | §6 exempts shallow message query changes and retains mounted same-actor edits; §7 requires real-router selection/URL/no-prompt proof |
+| N4 auth | §4 explicitly refuses bypass/applicant before actor/profile/mapping checks, handles DAL-scoped mapping throws as 503; route tests include Origin and production bypass |
+| N5 prefill | §4/6 says shared prefill need not pass personal validation and requires field errors without Admin writes |
+| N6 tests | §7 includes blocked-promise concurrency, actual foreign Clear fixtures, frozen-content assertions and the due old-PD complement matrix |
 
-### Verification performed by Codex for planning
+These are plan changes only. They require independent rereview, especially the
+new delivery/hold semantics and the bounded cross-system race, before a claim of
+readiness. No application code, migrations or database/environment state changed.
 
-[VERIFIED via local mocked baseline tests.] Six current suites / 127 tests passed:
-cron reminders, scheduled routes/page/service/current recipients and grantee
-renderer. These characterize existing behavior; no tests for the proposed feature
-have been written or run. No Postgres integration or live data probe was run.
-Doc currency/facts/symbol references/build-claim freshness with sequential paired
-self-tests, docs catalog and secret scan passed for the draft and review receipt.
+### Verification for planning
 
-Next action: resolve N1 with Justin, revise the bounded contract for the chosen
-behavior and the named technical corrections, then obtain independent review of
-that revised contract before coding. Claude's separate checkout and database
-work remain untouched. No implementation or release is part of this task.
+[VERIFIED via local mocked baseline tests at the initial draft.] Six current
+suites / 127 tests passed: cron reminders, scheduled routes/page/service/current
+recipients and grantee renderer. No proposed feature tests have been written.
+No Postgres integration or live data probe was run. Documentation gates and paired
+self-tests passed for the initial draft and review receipt; this revision must
+pass those gates after rereview is recorded.
+
+Next: independent read-only OAuth Claude review of this exact revised plan,
+record findings verbatim, and present readiness and any remaining issues to Justin.
+Do not implement or release in this task. Keep Claude's other checkout and database
+work untouched.
