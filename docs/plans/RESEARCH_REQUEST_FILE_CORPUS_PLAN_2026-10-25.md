@@ -204,8 +204,8 @@ opened.
    (form headings, review prompts, report section titles). Regular expressions
    over normalized extracted text (case, whitespace and line breaks
    collapsed) identify the template, and therefore the type. Required for the
-   opaque names in era 2 (and for era 1 if it is unparked). [Owner suggestion 2026-10-25; the templates themselves are
-   [ASSUMED] until the pilot opens documents.]
+   opaque names in era 2 (and for era 1 if it is unparked). [Owner suggestion 2026-10-25; first signatures built from the
+   pilot, section 2c.]
 3. **Model classification** only for what neither rules nor signatures decide.
 
 Every row records how it was classified (`rule:<id>`, `template:<id>`, `model`) so
@@ -353,6 +353,55 @@ this sample only.
   enough that the model is better spent on what remains after template
   signatures than on the whole pilot.
 
+### 2c. Template signatures — first cut, 2026-10-25 (tier 2)
+
+[VERIFIED via `lib/services/request-file-corpus/template-signatures.js`, applied
+offline by `scripts/report-request-file-template-coverage.mjs` to the pilot
+text; unit tests in `tests/unit/request-file-corpus-template-signatures.test.js`.]
+Signatures match the first 600 normalized characters of a document (the
+opening names the template). Read signatures cover staff documents (Phase I
+Summary and Rationale, staff Phase I/II Review, Tracking Overview, grant
+monitoring reports, memoranda), referee reviews, GOapply forms and proposal
+headings, and grantee report forms. Type-only signatures need a specific
+template phrase: dated letters with a salutation, address blocks under 300
+characters, email printouts, budget and other-funding forms, cover pages,
+institutional priority forms, financial and budget reallocation forms,
+grantee information sheets, audited financial statements and board rosters
+(not when the board is named as the applicant).
+
+**Combining the tiers** (`resolveClassification`): the filename result stands,
+except that content decides an `uncertain` file and a Read signature overrides
+a Type-only filename label, so neither tier can silently keep a document out of
+the reading set.
+
+| Pilot cohort | Filename-`uncertain` with text | Decided by a signature | Filename-typed with text | Signature matched | Same type |
+|---|---|---|---|---|---|
+| 1995 | 60 | 54 | 0 | – | – |
+| 2005 | 66 | 62 | 0 | – | – |
+| 2012 | 28 | 28 | 0 | – | – |
+| 2017 | 89 | 86 | 23 | 14 | 11 |
+| 2020 | 40 | 35 | 87 | 46 | 37 |
+| 2025 on | 2 | 0 | 31 | 19 | 18 |
+
+- **In-sample only.** The signatures were written from the same pilot text
+  they are measured on, so these rates are an upper bound. A held-out sample
+  from 2018–2021 (none of 2018, 2019 or 2021 was in the pilot) is the next
+  check before the index build relies on them.
+- **No Type-only signature contradicted a Read filename label** after one fix
+  (a proposal opening "Applicant Institution: Board of Trustees of …" briefly
+  matched the board-roster signature). The 13 remaining disagreements are
+  budget form vs budget spreadsheet (7, same material), proposal documents that
+  open with "Abstract" or "Project Summary" (3; the filename type stands), two
+  no-cost extension emails (the filename type stands), and one scanned referee
+  review filed as "References" (both Read).
+- **Interim and final grantee reports share one form** (every copy carries a
+  "Final Report Date:" field), so content alone types it as interim; a filename
+  rule that says final stands.
+- **Undecided after both tiers:** 20 of 285 filename-uncertain pilot documents,
+  mostly letters without a salutation in the opening, 1995 proposal control
+  sheets (era 1, parked), institutional brochures and news printouts. These go
+  to the model.
+
 ### 3. One preferred text copy
 
 When a document exists in several formats, mark one as the text source: `txt`
@@ -429,7 +478,8 @@ notes promotion governance is under-specified; define it in that plan.
    the owner's OneDrive Shuttle folder (owner-approved for the pilot). Results
    come back to the owner before any scale-up; the full run needs a further
    approval.
-   Done 2026-10-25; results in section 2b.
+   Done 2026-10-25; results in section 2b. First template signatures built
+   from it (section 2c); a held-out 2018–2021 sample is next.
 3. **Index build** (metadata, from a fresh listing), newest era first (era 1
    parked, decision 6), using the
    rules from step 1 and what the pilot learned.
