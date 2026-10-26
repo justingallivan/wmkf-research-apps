@@ -104,9 +104,15 @@ export function useReviewerThankYouDefaults({ profileId, profileStatus, loading 
       const result = await requestEnvelope(ENDPOINT, { method: clear ? 'DELETE' : 'PUT', body: clear ? {} : { template: submitted } });
       if (!fresh(op)) return;
       if (!result.ok || result.data?.ok !== true) {
-        if (result.data?.reason === 'preference_unavailable') {
+        const reason = result.data?.reason;
+        const preWriteRefusal = result.data?.ok === false
+          && ((result.status === 503 && ['preference_unavailable', 'identity_unavailable'].includes(reason))
+            || (result.status === 403 && reason === 'identity_mismatch'));
+        if (preWriteRefusal) {
           setUncertain(false); setData(previous => ({ ...previous, canSave: false, canClear: false }));
-          setNotice('Your saved defaults could not be read. Nothing was changed. Reload defaults before another change.'); return;
+          setNotice(reason === 'preference_unavailable'
+            ? 'Your saved defaults could not be read. Nothing was changed. Reload defaults before another change.'
+            : 'Your default wording was not changed. Your profile identity could not be verified. Reload defaults before another change.'); return;
         }
         if ([400, 409].includes(result.status)) {
           setUncertain(false); setErrors(result.data?.errors || {});

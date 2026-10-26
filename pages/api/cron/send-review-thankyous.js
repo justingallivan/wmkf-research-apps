@@ -3,7 +3,8 @@
  *
  * Daily. Emails every reviewer whose review was RECEIVED
  * (`wmkf_reviewreceivedat` set) but who has not yet been thanked
- * (`wmkf_thankyousentat` null) the seeded 'thankyou' template, with a courtesy
+ * (`wmkf_thankyousentat` null), using the sending PD's saved default or shared
+ * Admin wording, with a courtesy
  * DOCX copy of their own submitted review attached as real file bytes.
  *
  * Fire-once + at-most-once: the thank-you marker `wmkf_thankyousentat` is claimed

@@ -138,3 +138,17 @@ test('duplicate status allows explicit Clear but not Save; shared outage still w
   fetch.mockResolvedValueOnce(response(dto({ configured: true, ownStatus: 'configured', own: pair, source: 'personal', shared: null, sharedStatus: 'unavailable', canClear: true })));
   fireEvent.click(screen.getByText('Reload defaults')); await screen.findByText(/Shared thank-you wording is unavailable/); expect(screen.getByText('Save as my default')).toBeEnabled();
 });
+
+
+test.each([['identity_unavailable', 503], ['identity_mismatch', 403]])('pre-write %s refusal keeps draft and requires Reload without claiming possible save', async (reason, status) => {
+  render(<Harness />); await open(); edit(); fetch.mockResolvedValueOnce(response({ ok: false, reason }, status));
+  fireEvent.click(screen.getByText('Save as my default')); await screen.findByText(/Your default wording was not changed/);
+  expect(screen.getByLabelText('Default subject')).toHaveValue('Personal subject'); expect(screen.getByText('Save as my default')).toBeDisabled();
+  window.confirm.mockReturnValue(false); expect(() => mockRouter.events.emit('routeChangeStart', '/', {})).toThrow();
+  expect(window.confirm).toHaveBeenLastCalledWith('Discard your unsaved default wording?');
+});
+test('contradictory failure receipt cannot claim nothing changed or remove uncertainty', async () => {
+  render(<Harness />); await open(); edit(); fetch.mockResolvedValueOnce(response({ ok: true, reason: 'identity_unavailable' }, 503));
+  fireEvent.click(screen.getByText('Save as my default')); await screen.findByText(/The change could not be confirmed/);
+  expect(screen.getByText('Save as my default')).toBeDisabled(); expect(screen.queryByText(/Your default wording was not changed/)).toBeNull();
+});
