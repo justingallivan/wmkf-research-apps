@@ -111,7 +111,7 @@ tests passed; independent follow-up review PASS WITH NONBLOCKING NOTES. Proof an
 
 ## Slice 8 plan — automated reviewer thank-you defaults
 
-[BRANCH-BUILT 2026-10-26; verification/code review in progress; not released.] Justin selected this next while Duncan/
+[BRANCH-BUILT 2026-10-26; verification passed; Claude review passed with nonblocking notes; not released.] Justin selected this next while Duncan/
 Connor decisions remain separate. Proposed separate exact-owner raw pair and
 Profile Settings disclosure; shared copy inherits only on confirmed absence.
 Pure rendering and the required DOCX complete before the at-most-once claim;
@@ -119,7 +119,7 @@ legacy manual templates/transport remain unchanged. Claude rereview READY TO
 IMPLEMENT at `8af5b8381`, R1–R5 closed. Justin confirmed on 2026-10-26 that final rendered-copy safety refusals apply to
 both personal and inherited Admin wording before claiming, with problem reporting.
 Owner authorized implementation. New exact-owner route/editor and pre-claim
-safety are implemented; tests/gates and independent code review in progress.
+safety are implemented; tests/gates passed and independent Claude code review passed with nonblocking notes.
 No release authorization, schema change or live operation.
 Plan: `docs/plans/PERSONAL_EMAIL_REVIEWER_THANKYOU_DEFAULTS_PLAN_2026-10-26.md`.
 Review: `docs/audits/REVIEWER_THANKYOU_DEFAULTS_PLAN_CLAUDE_REREVIEW_2026-10-26.md`.

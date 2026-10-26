@@ -3,7 +3,7 @@ title: Personal defaults for automated reviewer thank-you emails
 domain: reviewers
 kind: plan
 status: active
-summary: "Slice 8 branch-built; implementation verification and independent Claude code review in progress, not released. Owner authorized implementation and approved rendered safety holds for both sources; separate exact-owner editor, pre-claim preparation and planned tests. No live writes or schema changes."
+summary: "Slice 8 branch-built; implementation verified and independent Claude code review passed with nonblocking notes, not released. Owner authorized implementation and approved rendered safety holds for both sources; separate exact-owner editor, pre-claim preparation and planned tests. No live writes or schema changes."
 owner: product-engineering
 related:
   - docs/plans/PERSONAL_EMAIL_DEFAULTS_INVENTORY_2026-09-24.md
@@ -67,7 +67,7 @@ only for overlapping automatic If-Match claimers, not arbitrary manual delivery.
 
 ## 3. Proposed product contract
 
-[PLANNED.]
+[REVIEWED CONTRACT; implemented on branch, not released.]
 
 - Own automatic subject/body pair → shared Admin copy only on confirmed absence.
   Invalid/duplicate/encrypted/unreadable own defaults pause that PD's unclaimed
@@ -91,7 +91,7 @@ only for overlapping automatic If-Match claimers, not arbitrary manual delivery.
 
 ### Validation and rendering
 
-[PLANNED.] Subject: trimmed, 1–300 JavaScript string code units, single line; optional exact
+[REVIEWED CONTRACT; implemented on branch, not released.] Subject: trimmed, 1–300 JavaScript string code units, single line; optional exact
 `{{proposalTitle}}`, no other brace tokens. Message: trimmed, 1–20000 JavaScript string code units;
 optional exact `{{greeting}}`, `{{proposalTitle}}`, `{{signature}}`. Literal copy
 is valid; tokens are not mandatory. When used, greeting/title/signature values
@@ -146,7 +146,7 @@ marker stripping, server notice, sender identity and attachment builder unchange
 
 ## 4. Proposed persistence and exact-owner API
 
-[PLANNED.] New `/api/reviewer-thankyou-email-preferences` (outside the app-gated
+[REVIEWED CONTRACT; implemented on branch, not released.] New `/api/reviewer-thankyou-email-preferences` (outside the app-gated
 review-manager directory), GET/PUT/DELETE.
 Staff self-service settings only: requireAuth with explicit bypass/applicant
 refusal, positive linked profile, authenticated actor GUID, and server profile-map
@@ -197,7 +197,7 @@ strict future reads pause for explicit repair rather than select an arbitrary ro
 
 ## 5. Proposed sweep integration and concurrency
 
-[PLANNED.] Keep current serial loop and existing source/sender/recipient loaders,
+[REVIEWED CONTRACT; implemented on branch, not released.] Keep current serial loop and existing source/sender/recipient loaders,
 ETag claim, batch cap, dryRun and at-most-once transport semantics.
 
 1. Existing required shared-config read and test-request skip remain first.
@@ -265,7 +265,7 @@ Any newly observed directly relevant unsafe race must be reported before coding.
 
 ## 6. Proposed client lifecycle and discard protection
 
-[PLANNED.] Family-owned component beside the existing Reviewer Emails controls;
+[REVIEWED CONTRACT; implemented on branch, not released.] Family-owned component beside the existing Reviewer Emails controls;
 no generic editor/shared-hook extraction. The existing generic EmailWordingDefault
 and scheduled hook do not meet this entire contract as-is (generic editor lacks
 confirmed readback barriers; scheduled hook hardcodes its page exemption).
@@ -306,7 +306,7 @@ setting's request-PD-resolved signature. No unrelated Profile Settings behavior 
 
 ## 7. Bounded files, planned tests and completion gates
 
-[PLANNED.] Runtime edits: new family config validator, personalization service,
+[REVIEWED CONTRACT; implemented on branch, not released.] Runtime edits: new family config validator, personalization service,
 preference route, Profile Settings component plus its navigation guard; existing
 preference registry/generic guards, Profile Settings mount, legacy help copy,
 thank-you sweep and its cron source header. Do not edit shared renderer/token
@@ -354,7 +354,7 @@ Claude implementation review is required before a separate deliberate release.
 
 ## 8. Contract-reconcile Mode A / review handoff
 
-[VERIFIED source / PLANNED extension.] Caller cron→source context→shared/own
+[VERIFIED branch source; not released.] Caller cron→source context→shared/own
 preference→preparation→conditional marker→transport→Maintenance accounted above;
 client request/auth→exact owner persistence→status DTO→independent editor also
 explicit. Partial success, async snapshots, helper differences, durable surfaces,
@@ -410,9 +410,11 @@ rendered safety checks. No remaining product-policy choice in this plan.
 Implementation was subsequently authorized on 2026-10-26; release remains a
 separate decision after independent code review.
 
-Bounded sweep Mode A: slice 8 is now branch-built, with verification/code review in progress; not released.
+Bounded sweep Mode A: slice 8 is now branch-built, with verification passed; Claude review passed with nonblocking notes; not released.
 Current TODO/inventory, source, Atlas, route matrix and counts distinguish this
 new branch implementation from deployed behavior. Historical
 review reports retained verbatim, other slices/corpus work excluded. Doc/fact/
 symbol/build/catalog and secret gates+self-tests run sequentially before closeout.
 Owner: Codex; plan branch above; next action: finish verification and independent implementation review. No production or database state was touched.
+
+Implementation and test evidence: [build receipt](../audits/REVIEWER_THANKYOU_DEFAULTS_BUILD_2026-10-26.md). Claude rereview passed with nonblocking notes on `2a882dac2`; draft PR #533, not released.

@@ -3,7 +3,7 @@ title: Automatic reviewer thank-you defaults — implementation verification
 domain: reviewers
 kind: audit
 status: active
-summary: "Branch implementation e4c55148f: 364 mocked tests and six fixture Chromium cases passed; fresh production build, types/lint and scoped gates passed. Independent Claude code review pending; not released."
+summary: "Branch implementation 2a882dac2: 367 mocked tests and six fixture Chromium cases passed; fresh production build, types/lint and scoped gates passed. Independent Claude code review passed with nonblocking notes; not released."
 owner: product-engineering
 related:
   - docs/plans/PERSONAL_EMAIL_REVIEWER_THANKYOU_DEFAULTS_PLAN_2026-10-26.md
@@ -14,11 +14,11 @@ related:
 # Implementation verification — 2026-10-26
 
 [VERIFIED via source, mocked tests and fixture-only production-mode Chromium.]
-Runtime fingerprint `e4c55148f7bd08f59b6011de6e7d9519dd159430`, branch
+Runtime fingerprint `2a882dac2f55a6de19704d4839063a9e511f08e7`, branch
 `codex/reviewer-thankyou-defaults`. Justin authorized implementation and independent
 Claude code review; he separately confirmed both inherited Admin and personal copy
 must be held before the claim when final rendered safety checks fail. No release
-is authorized by this task. Independent ordinary OAuth code review is in progress.
+is authorized by this task. Independent ordinary OAuth code review passed with nonblocking notes.
 
 Integrated main `5e004b041` includes Claude's corpus index work. Git comparison of
 lib/db, lib/services/request-file-corpus and scripts/load-request-file-corpus.mjs
@@ -42,7 +42,7 @@ Claude's other checkout and database work remain untouched.
 
 ## Verification actually run
 
-- **16 suites / 364 tests passed** on the integrated runtime: 13 focused suites / 308
+- **16 suites / 367 tests passed** on the integrated runtime: 13 focused suites / 311
   tests plus three caller/census suites / 56 tests. Includes unchanged legacy email
   templates, signature/invitation characterization, post-send bookkeeping and the
   reviewer-engagement contract with real DAL context but mocked transport/stores.
@@ -57,7 +57,7 @@ Claude's other checkout and database work remain untouched.
   Existing test act/log warnings do not affect assertions.
 - Source gates and self-tests passed sequentially: API inventory, Atlas, DAL,
   Dynamics context, route/service boundary, lifecycle auth, GUID trust and enum
-  parity. Final doc/secret gates run before the verification closeout commit.
+  parity. Final doc/secret gate results are recorded in the closeout below.
   API count 316 is derived; requireAppAccess endpoint count remains 196.
 
 **Discriminating red/green proof:** the new shared-empty-body regression was run
@@ -117,3 +117,20 @@ receipts remain uncertain. Three additional editor tests pass. Note2's two seede
 copy headers now describe own/shared defaults. Notes3–5 retain the reviewed
 claimFailed-only ETag policy, deliberate interaction-local hook dependency/lifecycle
 warnings and capped/simple diagnostic scans. None changes transport or persistence.
+
+## Final rereview and closeout
+
+[VERIFIED via independent Claude report and root-run checks.] Claude rereviewed
+`2a882dac2` including direct test inspection: **PASS WITH NONBLOCKING NOTES**, no
+blocking findings. Both initial source notes are closed. Verbatim receipt:
+[implementation rereview](REVIEWER_THANKYOU_DEFAULTS_IMPLEMENTATION_CLAUDE_REREVIEW_2026-10-26.md).
+Remaining notes describe evidence limits: preference-refusal Maintenance status,
+existing exact-owner adapter filtering, route reason strings, stronger overlapping
+pair assertions and additional navigation permutations. These do not invalidate
+the reviewed safety contract; source inspection supports them where tests do not.
+The controlled ETag winner is simulated, not a live concurrency probe.
+
+Final run at that target: 367 tests, six fixture Chromium cases against a fresh
+production build, types and lint passed (0 errors / 192 warnings). Scoped source
+gates/self-tests passed sequentially. Draft [PR #533](https://github.com/justingallivan/wmkf-research-apps/pull/533).
+Documentation currency, fact consistency and symbol-reference gates/self-tests, docs catalog, secret scan/self-test and whitespace checks passed. No runtime or test edits follow the reviewed target. Not released.
