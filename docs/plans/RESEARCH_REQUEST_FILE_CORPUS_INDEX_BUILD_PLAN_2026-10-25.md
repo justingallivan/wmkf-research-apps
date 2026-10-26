@@ -15,7 +15,7 @@ related:
 
 # Research request file corpus — index build (rollout step 3)
 
-[APPROVED by the owner 2026-10-25; built on branch `claude/request-corpus-index`, not merged, migration not applied, no load run. Parent plan:
+[APPROVED by the owner 2026-10-25; built on branch `claude/request-corpus-index`, not merged; migration 090 applied from the branch; no load run yet. Parent plan:
 `docs/plans/RESEARCH_REQUEST_FILE_CORPUS_PLAN_2026-10-25.md`, rollout step 3.]
 
 ## Decisions needed from the owner
@@ -45,6 +45,11 @@ related:
    `089_manual_presentation_video_pairs.sql`) and a scan of every local and
    `origin` branch (none has a migration numbered 090 or higher)]. Recheck both
    just before the branch merges: another session can claim 090 first.
+   **Applied 2026-10-25 before merge**, by the owner running
+   `scripts/apply-migrations.js` from branch `claude/request-corpus-index` at
+   `4ab2124d2` against the shared app database (1 applied, 88 skipped). A
+   tracker row for 090 before this branch merges is this application, not a
+   stray.
 
 ## Scope
 

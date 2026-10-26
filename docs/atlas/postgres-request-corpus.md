@@ -3,7 +3,7 @@ title: "Atlas: Research request file corpus index"
 domain: postgres
 kind: state-page
 status: source-built
-summary: "Migration 090 adds request_corpus_runs, request_corpus_requests and request_corpus_files: a derived, rebuildable metadata index of SharePoint files for Research requests with meeting years from 2018, filled by an owner-run loader. Branch-built 2026-10-25; not applied or loaded. No route reads it; admin use only."
+summary: "Migration 090 adds request_corpus_runs, request_corpus_requests and request_corpus_files: a derived, rebuildable metadata index of SharePoint files for Research requests with meeting years from 2018, filled by an owner-run loader. Branch-built 2026-10-25; migration applied to the shared app database from the branch (not merged); not loaded. No route reads it; admin use only."
 canonical: true
 cataloged: 2026-10-25
 owner: product-engineering
@@ -19,7 +19,9 @@ related:
 # Research request file corpus index
 
 [VERIFIED via source and recording-client unit tests, 2026-10-25; branch
-`claude/request-corpus-index`. Not applied to any database; no load has run.]
+`claude/request-corpus-index`. Migration 090 applied to the shared app database
+from that branch on 2026-10-25 by the owner (`scripts/apply-migrations.js`: 1
+applied, 88 skipped); not merged; no load has run.]
 Migration 090 creates three tables. They are derived state: SharePoint owns the
 files, Dataverse owns the requests, and every row can be rebuilt by listing
 again. No API route, page or worker reads them; the corpus is an admin
