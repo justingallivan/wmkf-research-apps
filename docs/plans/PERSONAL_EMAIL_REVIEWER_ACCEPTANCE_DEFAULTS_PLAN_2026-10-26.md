@@ -3,13 +3,19 @@ title: Personal reviewer acceptance-confirmation defaults — bounded plan
 domain: reviewers
 kind: plan
 status: active
-summary: "Slice 9 planning only: exact-owner PD defaults, shared non-PD fallback, combined discard guard and recoverable pre-claim preparation. Owner policies resolved; Claude READY TO IMPLEMENT on5fc27b570 after required corrections closed. No coding or release authorized."
+summary: "Slice 9 branch implementation authorized 2026-10-26; reviewed owner policies preserved. Exact-owner defaults, combined discard guard and recoverable preclaim preparation built; verification and independent code review in progress. Not released."
 owner: product-engineering
 related:
   - docs/plans/PERSONAL_EMAIL_DEFAULTS_INVENTORY_2026-09-24.md
   - docs/atlas/postgres-infra-tables.md
   - docs/audits/REVIEWER_THANKYOU_DEFAULTS_RELEASE_2026-10-26.md
 ---
+
+[CURRENT 2026-10-26.] Justin authorized implementing this reviewed contract,
+planned tests and independent Claude code review before release. Implementation
+is branch-built and under verification; no release authorized. The source baseline
+and review history below describe pre-implementation evidence. Build receipt:
+`docs/audits/REVIEWER_ACCEPTANCE_DEFAULTS_BUILD_2026-10-26.md`.
 
 # Scope and evidence
 
@@ -20,7 +26,8 @@ reviewer accepts. Existing persistence: Dataverse `wmkf_appuserpreferences` for
 copy and Postgres `reviewer_acceptance_jobs.steps` for dispatch progress. Prior
 findings: independent Claude review of `fc3097adb` found R1–R7 required
 corrections; dispositions and two owner choices are recorded below. This is a proposed contract, not
-built behavior. Justin authorized planning and Claude review, not coding.
+built behavior. At the source baseline, Justin had authorized planning and Claude review;
+implementation authorization is recorded in the current status above.
 
 Current caller→persistence→consumer trace:
 - `pages/api/external/review/[token]/respond.js` delegates to
@@ -428,4 +435,5 @@ review READY TO IMPLEMENT at `5fc27b570`; required findings closed. Final receip
 `docs/audits/REVIEWER_ACCEPTANCE_DEFAULTS_PLAN_CLAUDE_FINAL_2026-10-26.md`.
 The post-review input-error clarification preserves the existing wrapper contract
 and addresses the reviewer's nonblocking note. No runtime or test edits made.
-Implementation and release authorization: pending.
+Implementation authorized 2026-10-26; independent code review in progress.
+Release authorization: pending.

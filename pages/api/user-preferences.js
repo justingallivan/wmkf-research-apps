@@ -35,6 +35,7 @@ const RESERVED_WRITE_KEYS = new Set([
   PREFERENCE_KEYS.DELIBERATION_SHARE_TEMPLATE,
   PREFERENCE_KEYS.SCHEDULED_GRANTEE_REMINDER_TEMPLATE,
   PREFERENCE_KEYS.REVIEWER_AUTOMATIC_THANKYOU_TEMPLATE,
+  PREFERENCE_KEYS.REVIEWER_AUTOMATIC_ACCEPTANCE_TEMPLATE,
 ]);
 
 // These personal copies are read through their app-gated endpoint using the
@@ -50,13 +51,15 @@ const PRIVATE_REMINDER_KEYS = new Set([
   PREFERENCE_KEYS.DELIBERATION_SHARE_TEMPLATE,
   PREFERENCE_KEYS.SCHEDULED_GRANTEE_REMINDER_TEMPLATE,
   PREFERENCE_KEYS.REVIEWER_AUTOMATIC_THANKYOU_TEMPLATE,
+  PREFERENCE_KEYS.REVIEWER_AUTOMATIC_ACCEPTANCE_TEMPLATE,
 ]);
 
-// These two families also reject casing/whitespace aliases, independently of
+// These families also reject casing/whitespace aliases, independently of
 // the preference store's string-comparison rules. Other keys keep their contract.
 const CANONICAL_PRIVATE_COPY_KEYS = new Set([
   PREFERENCE_KEYS.SCHEDULED_GRANTEE_REMINDER_TEMPLATE,
   PREFERENCE_KEYS.REVIEWER_AUTOMATIC_THANKYOU_TEMPLATE,
+  PREFERENCE_KEYS.REVIEWER_AUTOMATIC_ACCEPTANCE_TEMPLATE,
 ]);
 function canonicalPrivateCopyKey(key) {
   const normalized = typeof key === 'string' ? key.trim().toLowerCase() : null;

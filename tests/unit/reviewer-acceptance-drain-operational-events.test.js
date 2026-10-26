@@ -19,6 +19,7 @@ jest.mock('../../lib/services/operational-event-service', () => ({
   },
 }));
 
+jest.mock('../../lib/services/alert-service', () => ({ __esModule: true, default: { autoResolve: jest.fn(async () => 1) } }));
 import { processReviewerAcceptanceJob } from '../../lib/services/reviewer-acceptance-drain';
 import OperationalEventService from '../../lib/services/operational-event-service';
 
@@ -90,7 +91,9 @@ function deps(currentSuggestion = acceptedSuggestion()) {
     autoLinkAccount: jest.fn(async () => ({ skipped: 'no_exact_target' })),
     alertAffiliation: jest.fn(async () => ({})),
     resolveAffiliation: jest.fn(async () => ({})),
-    sendAcceptanceEmail: jest.fn(async () => ({ sent: true })),
+    prepareAcceptanceEmail: jest.fn(async input => ({ ok: true, ...input })),
+    readConfirmationRequest: jest.fn(async () => ({ akoya_requestid: REQUEST_ID })),
+    sendPreparedAcceptanceEmail: jest.fn(async () => ({ sent: true })),
     notify: jest.fn(async () => ({ id: 1 })),
     quota: jest.fn(async () => ({})),
     deleteLateHonorarium: jest.fn(async () => ({})),

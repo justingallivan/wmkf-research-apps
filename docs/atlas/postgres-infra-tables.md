@@ -65,6 +65,18 @@ absence alone inherits shared wording. Generic preference reads/writes hide/refu
 this key. No schema or uniqueness constraint added; release verification did
 not write live preferences. Proof: `docs/audits/SCHEDULED_GRANTEE_DEFAULTS_RELEASE_2026-10-25.md`.
 
+**Automatic reviewer acceptance-confirmation defaults (branch-built 2026-10-26, not released):**
+`reviewer_automatic_acceptance_template` is an independent exact-owner raw pair.
+The staff self-service route verifies session/profile identity; generic exact and
+case/trim aliases are private/reserved. Strict Save/Clear readback and duplicate
+repair use existing preference rows. The current sending PD's configured pair
+wins; absence alone inherits Admin wording; non-PD fallback uses only shared copy.
+No schema change. The acceptance drain prepares before its lease-guarded email
+claim, retries refusals within its existing finite attempt policy, records job-
+bound preparation alerts/events, and never auto-resends a claimed email. Alert
+settlement and external-cancellation limits are in the build receipt:
+`docs/audits/REVIEWER_ACCEPTANCE_DEFAULTS_BUILD_2026-10-26.md`.
+
 **Automatic reviewer thank-you defaults (released PR #533, 2026-10-26):**
 `reviewer_automatic_thankyou_template` is a separate exact-owner raw subject/body
 pair in existing Dataverse preferences, not `reviewer_email_templates.thankyou`.

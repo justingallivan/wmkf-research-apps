@@ -251,3 +251,15 @@ describe.each(['reviewer_automatic_thankyou_template', 'REVIEWER_AUTOMATIC_THANK
     expect(DatabaseService.setUserPreference).not.toHaveBeenCalled(); expect(DatabaseService.setUserPreferences).not.toHaveBeenCalled(); expect(DatabaseService.deleteUserPreference).not.toHaveBeenCalled();
   });
 });
+
+describe.each(['reviewer_automatic_acceptance_template', 'REVIEWER_AUTOMATIC_ACCEPTANCE_TEMPLATE', ' \tReviewer_Automatic_Acceptance_Template\n'])('automatic acceptance private key %p', key => {
+  test('actual list/keyed rows cannot leak', async () => {
+    DatabaseService.getUserPreferences.mockResolvedValueOnce({ [key]: 'private copy', safe: 'visible' });
+    const list = mockRes(); await handler({ method: 'GET', query: {} }, list); expect(list.body.preferences).toEqual({ safe: 'visible' });
+    const keyed = mockRes(); await handler({ method: 'GET', query: { key } }, keyed); expect(keyed.statusCode).toBe(403);
+  });
+  test.each([['POST', { key, value: '{}' }], ['POST', { preferences: { [key]: '{}' } }], ['DELETE', { key }], ['DELETE', { keys: [key] }]])('refuses %s mutation %p', async (method, body) => {
+    const res = mockRes(); await handler({ method, body }, res); expect(res.statusCode).toBe(403);
+    expect(DatabaseService.setUserPreference).not.toHaveBeenCalled(); expect(DatabaseService.setUserPreferences).not.toHaveBeenCalled(); expect(DatabaseService.deleteUserPreference).not.toHaveBeenCalled();
+  });
+});

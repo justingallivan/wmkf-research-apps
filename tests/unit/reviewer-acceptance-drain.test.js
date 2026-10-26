@@ -2,10 +2,16 @@
  * @jest-environment node
  */
 
+jest.mock('../../lib/services/operational-event-service', () => ({ __esModule: true, default: { markRecovered: jest.fn(async () => 1), markSuperseded: jest.fn(async () => 1) } }));
+jest.mock('../../lib/services/alert-service', () => ({ __esModule: true, default: { autoResolve: jest.fn(async () => 1) } }));
 import {
   processReviewerAcceptanceJob,
   drainReviewerAcceptanceJobs,
 } from '../../lib/services/reviewer-acceptance-drain';
+import AlertService from '../../lib/services/alert-service';
+import OperationalEventService from '../../lib/services/operational-event-service';
+import { DynamicsService } from '../../lib/services/dynamics-service';
+import { sendPreparedAcceptanceConfirmationEmail } from '../../lib/services/reviewer-acceptance-email';
 import { REVIEW_STATUS_MAP } from '../../shared/config/reviewerLifecycle';
 
 const SUGGESTION_ID = '11111111-1111-4111-8111-111111111111';
@@ -55,6 +61,7 @@ function job({ isAcceptRepeat = false, optedOut = false, status = 'queued', step
     status,
     attempts: 0,
     suggestion_id: SUGGESTION_ID,
+    request_id: REQUEST_ID,
     created_at: createdAt || new Date().toISOString(),
     accepted_at: acceptedAt,
     steps,
@@ -95,7 +102,9 @@ function deps(currentSuggestion = acceptedSuggestion()) {
     autoLinkAccount: jest.fn(async () => ({ skipped: 'no_exact_target' })),
     alertAffiliation: jest.fn(async () => ({})),
     resolveAffiliation: jest.fn(async () => ({ resolvedCount: 0 })),
-    sendAcceptanceEmail: jest.fn(async () => ({ sent: true })),
+    prepareAcceptanceEmail: jest.fn(async input => ({ ok: true, ...input })),
+    readConfirmationRequest: jest.fn(async () => request()),
+    sendPreparedAcceptanceEmail: jest.fn(async () => ({ sent: true })),
     notify: jest.fn(async () => ({ id: 1 })),
     quota: jest.fn(async () => ({ notified: false })),
     deleteLateHonorarium: jest.fn(async () => ({ deleted: true })),
@@ -143,7 +152,7 @@ describe('processReviewerAcceptanceJob', () => {
     expect(d.alertAffiliation).toHaveBeenCalledWith(expect.objectContaining({ reviewerAffiliation: 'Reviewer Org' }));
     expect(d.autoLinkAccount.mock.invocationCallOrder[0])
       .toBeLessThan(d.alertAffiliation.mock.invocationCallOrder[0]);
-    expect(d.sendAcceptanceEmail).toHaveBeenCalled();
+    expect(d.sendPreparedAcceptanceEmail).toHaveBeenCalled();
     expect(d.quota).toHaveBeenCalledWith({ requestId: REQUEST_ID, actingUserSystemId: null });
     expect(d.jobs.mergeReviewerAcceptanceJobStep).toHaveBeenCalledWith(77, expect.any(String), 'acceptance_confirmation', expect.objectContaining({ claimedAt: expect.any(String) }));
     expect(d.jobs.completeReviewerAcceptanceJob).toHaveBeenCalledWith(77, expect.any(String));
@@ -159,7 +168,7 @@ describe('processReviewerAcceptanceJob', () => {
 
     await processReviewerAcceptanceJob(job(), d);
 
-    expect(d.sendAcceptanceEmail).toHaveBeenCalledWith(expect.objectContaining({
+    expect(d.sendPreparedAcceptanceEmail).toHaveBeenCalledWith(expect.objectContaining({
       suggestion: expect.objectContaining({
         wmkf_revieweremail: 'confirmed@current.edu',
       }),
@@ -177,7 +186,7 @@ describe('processReviewerAcceptanceJob', () => {
     expect(d.captureOrcid).toHaveBeenCalledWith(expect.objectContaining({
       bindingEventAt: '2026-07-01T10:00:00.000Z',
     }));
-    expect(d.sendAcceptanceEmail).not.toHaveBeenCalled();
+    expect(d.sendPreparedAcceptanceEmail).not.toHaveBeenCalled();
     expect(d.quota).not.toHaveBeenCalled();
     expect(d.jobs.completeReviewerAcceptanceJob).toHaveBeenCalled();
   });
@@ -218,7 +227,7 @@ describe('processReviewerAcceptanceJob', () => {
     expect(d.syncNameTitle).toHaveBeenCalledWith(expect.objectContaining({
       contactId: 'contact-optout',
     }));
-    expect(d.sendAcceptanceEmail).toHaveBeenCalled();
+    expect(d.sendPreparedAcceptanceEmail).toHaveBeenCalled();
     expect(d.jobs.completeReviewerAcceptanceJob).toHaveBeenCalled();
   });
 
@@ -242,7 +251,7 @@ describe('processReviewerAcceptanceJob', () => {
       }),
     }));
     expect(d.syncNameTitle).toHaveBeenCalledWith(expect.objectContaining({ contactId: null }));
-    expect(d.sendAcceptanceEmail).toHaveBeenCalled();
+    expect(d.sendPreparedAcceptanceEmail).toHaveBeenCalled();
     expect(d.jobs.completeReviewerAcceptanceJob).not.toHaveBeenCalled();
   });
 
@@ -276,7 +285,7 @@ describe('processReviewerAcceptanceJob', () => {
     });
     expect(d.ensureHonorarium).not.toHaveBeenCalled();
     expect(d.ensureAcceptedContact).not.toHaveBeenCalled();
-    expect(d.sendAcceptanceEmail).not.toHaveBeenCalled();
+    expect(d.sendPreparedAcceptanceEmail).not.toHaveBeenCalled();
     expect(d.quota).not.toHaveBeenCalled();
   });
 
@@ -298,7 +307,7 @@ describe('processReviewerAcceptanceJob', () => {
       { suggestions: d.suggestions },
     );
     expect(result.status).toBe('cancelled');
-    expect(d.sendAcceptanceEmail).not.toHaveBeenCalled();
+    expect(d.sendPreparedAcceptanceEmail).not.toHaveBeenCalled();
     expect(d.quota).not.toHaveBeenCalled();
     expect(d.jobs.completeReviewerAcceptanceJob).not.toHaveBeenCalled();
   });
@@ -332,7 +341,7 @@ describe('processReviewerAcceptanceJob', () => {
       { suggestions: d.suggestions },
     );
     expect(result.status).toBe('cancelled');
-    expect(d.sendAcceptanceEmail).not.toHaveBeenCalled();
+    expect(d.sendPreparedAcceptanceEmail).not.toHaveBeenCalled();
     expect(d.quota).not.toHaveBeenCalled();
   });
 
@@ -357,7 +366,7 @@ describe('processReviewerAcceptanceJob', () => {
 
     expect(d.jobs.cancelReviewerAcceptanceJob).not.toHaveBeenCalled();
     expect(d.ensureHonorarium).not.toHaveBeenCalled();
-    expect(d.sendAcceptanceEmail).not.toHaveBeenCalled();
+    expect(d.sendPreparedAcceptanceEmail).not.toHaveBeenCalled();
     expect(d.jobs.completeReviewerAcceptanceJob).not.toHaveBeenCalled();
   });
 
@@ -368,7 +377,7 @@ describe('processReviewerAcceptanceJob', () => {
     expect(result.status).toBe('completed');
     expect(d.jobs.cancelReviewerAcceptanceJob).not.toHaveBeenCalled();
     expect(d.ensureHonorarium).toHaveBeenCalled();
-    expect(d.sendAcceptanceEmail).toHaveBeenCalled();
+    expect(d.sendPreparedAcceptanceEmail).toHaveBeenCalled();
     expect(d.jobs.completeReviewerAcceptanceJob).toHaveBeenCalledWith(77, expect.any(String));
   });
 
@@ -383,7 +392,7 @@ describe('processReviewerAcceptanceJob', () => {
       { leaseToken: expect.any(String) },
     );
     expect(d.ensureHonorarium).not.toHaveBeenCalled();
-    expect(d.sendAcceptanceEmail).not.toHaveBeenCalled();
+    expect(d.sendPreparedAcceptanceEmail).not.toHaveBeenCalled();
     expect(d.jobs.completeReviewerAcceptanceJob).not.toHaveBeenCalled();
   });
 
@@ -399,7 +408,7 @@ describe('processReviewerAcceptanceJob', () => {
       { leaseToken: expect.any(String) },
     );
     expect(d.ensureHonorarium).not.toHaveBeenCalled();
-    expect(d.sendAcceptanceEmail).not.toHaveBeenCalled();
+    expect(d.sendPreparedAcceptanceEmail).not.toHaveBeenCalled();
     expect(d.jobs.completeReviewerAcceptanceJob).not.toHaveBeenCalled();
   });
 
@@ -416,7 +425,7 @@ describe('processReviewerAcceptanceJob', () => {
     expect(d.captureOrcid).toHaveBeenCalled();
     expect(d.captureIdentity).toHaveBeenCalled();
     expect(d.syncNameTitle).toHaveBeenCalled();
-    expect(d.sendAcceptanceEmail).toHaveBeenCalled();
+    expect(d.sendPreparedAcceptanceEmail).toHaveBeenCalled();
     expect(d.quota).toHaveBeenCalled();
     expect(d.jobs.completeReviewerAcceptanceJob).not.toHaveBeenCalled();
   });
@@ -515,7 +524,7 @@ describe('processReviewerAcceptanceJob', () => {
     expect(d.ensureHonorarium).not.toHaveBeenCalled();
     expect(d.captureIdentity).not.toHaveBeenCalled();
     expect(d.syncNameTitle).not.toHaveBeenCalled();
-    expect(d.sendAcceptanceEmail).not.toHaveBeenCalled();
+    expect(d.sendPreparedAcceptanceEmail).not.toHaveBeenCalled();
     expect(d.quota).not.toHaveBeenCalled();
     expect(d.jobs.completeReviewerAcceptanceJob).not.toHaveBeenCalled();
   });
@@ -537,7 +546,7 @@ describe('processReviewerAcceptanceJob', () => {
       type: 'honorarium_capture_failed',
       autoResolveKey: `honorarium_capture_failed:${SUGGESTION_ID}`,
     }));
-    expect(d.sendAcceptanceEmail).toHaveBeenCalled();
+    expect(d.sendPreparedAcceptanceEmail).toHaveBeenCalled();
     expect(d.jobs.completeReviewerAcceptanceJob).not.toHaveBeenCalled();
   });
 
@@ -554,7 +563,7 @@ describe('processReviewerAcceptanceJob', () => {
       message: expect.stringContaining('address_capture_failed'),
       retryable: true,
     });
-    expect(d.sendAcceptanceEmail).toHaveBeenCalled();
+    expect(d.sendPreparedAcceptanceEmail).toHaveBeenCalled();
     expect(d.jobs.completeReviewerAcceptanceJob).not.toHaveBeenCalled();
   });
 
@@ -567,7 +576,7 @@ describe('processReviewerAcceptanceJob', () => {
       retryable: true,
     });
 
-    expect(d.sendAcceptanceEmail).not.toHaveBeenCalled();
+    expect(d.sendPreparedAcceptanceEmail).not.toHaveBeenCalled();
     expect(d.quota).not.toHaveBeenCalled();
     expect(d.jobs.completeReviewerAcceptanceJob).not.toHaveBeenCalled();
   });
@@ -715,7 +724,7 @@ describe('drainReviewerAcceptanceJobs', () => {
 describe('processReviewerAcceptanceJob — Test Request isolation (Stage 1b)', () => {
   function followUps(d) {
     return [d.ensureHonorarium, d.ensureAcceptedContact, d.captureOrcid, d.captureIdentity,
-      d.syncNameTitle, d.autoLinkAccount, d.sendAcceptanceEmail];
+      d.syncNameTitle, d.autoLinkAccount, d.sendPreparedAcceptanceEmail];
   }
 
   it('cancels every follow-up (Contact, identity, honorarium/BILL, email) for a test request', async () => {
@@ -819,4 +828,86 @@ describe('drainReviewerAcceptanceJobs — switch pause', () => {
     expect(d.jobs.releaseReviewerAcceptanceJobLease).toHaveBeenCalledTimes(1);
     expect(d.jobs.recordReviewerAcceptanceJobFailure).not.toHaveBeenCalled();
   });
+});
+
+// New preparation/claim contract. Stores remain fixture-only here; SQL races have a separate scratch-DB suite.
+describe('acceptance confirmation preparation and recovery', () => {
+  it('refusal leaves claim/sent absent, continues quota, and repaired retry sends once', async () => {
+    const d = deps(), j = job(); let steps = {};
+    d.jobs.mergeReviewerAcceptanceJobStep.mockImplementation(async (_id, _lease, key, patch) => { steps = { ...steps, [key]: { ...steps[key], ...patch } }; return { ...j, steps }; });
+    d.prepareAcceptanceEmail.mockResolvedValueOnce({ ok: false, reason: 'preference_unavailable' });
+    await expect(processReviewerAcceptanceJob(j, d)).rejects.toThrow('followup_retry_required');
+    expect(steps.acceptance_confirmation).not.toHaveProperty('claimedAt'); expect(steps.acceptance_confirmation).not.toHaveProperty('sentAt');
+    expect(d.sendPreparedAcceptanceEmail).not.toHaveBeenCalled(); expect(d.quota).toHaveBeenCalled(); expect(d.jobs.completeReviewerAcceptanceJob).not.toHaveBeenCalled();
+    expect(d.notify).toHaveBeenCalledWith(expect.objectContaining({ autoResolveKey: `acceptance-confirmation-preparation:${j.id}`, operationalEvent: expect.any(Object) }));
+    await processReviewerAcceptanceJob({ ...j, steps }, d); expect(d.sendPreparedAcceptanceEmail).toHaveBeenCalledTimes(1); expect(steps.acceptance_confirmation.sentAt).toEqual(expect.any(String));
+    await processReviewerAcceptanceJob({ ...j, steps }, d); expect(d.sendPreparedAcceptanceEmail).toHaveBeenCalledTimes(1);
+  });
+  it.each(['request', 'read', 'null'])('fresh request %s refuses without payload fallback', async mode => {
+    const d = deps(); if (mode === 'request') d.readConfirmationRequest.mockResolvedValue(request({ akoya_requestid: LIVE_REQUEST_ID }));
+    else if (mode === 'read') d.readConfirmationRequest.mockRejectedValue(new Error('offline')); else d.readConfirmationRequest.mockResolvedValue(null);
+    await expect(processReviewerAcceptanceJob(job(), d)).rejects.toThrow('followup_retry_required'); expect(d.prepareAcceptanceEmail).not.toHaveBeenCalled(); expect(d.sendPreparedAcceptanceEmail).not.toHaveBeenCalled();
+  });
+  it.each(['wmkf_revieweremail', 'wmkf_reviewduedateoverride', '_wmkf_request_value', 'wmkf_responsereceivedat'])('preclaim concurrent %s change retries without consuming claim', async field => {
+    const d = deps(); d.suggestions.getForAcceptanceDrain.mockResolvedValueOnce(acceptedSuggestion()).mockResolvedValueOnce(acceptedSuggestion()).mockResolvedValueOnce(acceptedSuggestion()).mockResolvedValueOnce(acceptedSuggestion({ [field]: 'changed' }));
+    await expect(processReviewerAcceptanceJob(job(), d)).rejects.toThrow('suggestion_changed');
+    expect(d.prepareAcceptanceEmail).toHaveBeenCalled(); expect(d.sendPreparedAcceptanceEmail).not.toHaveBeenCalled();
+    expect(d.jobs.mergeReviewerAcceptanceJobStep.mock.calls.some(call => call[3].claimedAt)).toBe(false);
+  });
+  it.each(['withdrawn', 'released'])('preclaim %s reuses exact cleanup and cancels without send', async status => {
+    const d = deps(); const changed = status === 'released' ? { wmkf_reviewstatus: REVIEW_STATUS_MAP.released } : { wmkf_declined: true, wmkf_accepted: false };
+    d.suggestions.getForAcceptanceDrain.mockResolvedValueOnce(acceptedSuggestion()).mockResolvedValueOnce(acceptedSuggestion()).mockResolvedValueOnce(acceptedSuggestion()).mockResolvedValueOnce(acceptedSuggestion(changed));
+    expect((await processReviewerAcceptanceJob(job(), d)).status).toBe('cancelled'); expect(d.sendPreparedAcceptanceEmail).not.toHaveBeenCalled();
+    expect(status === 'released' ? d.cancelLateReleasedHonorarium : d.deleteLateHonorarium).toHaveBeenCalled();
+  });
+  it('same-request PD reassignment selects fresh request snapshot, not payload', async () => {
+    const d = deps(); d.readConfirmationRequest.mockResolvedValue(request({ _wmkf_programdirector_value: REVIEWER_ID }));
+    await processReviewerAcceptanceJob(job(), d);
+    expect(d.prepareAcceptanceEmail).toHaveBeenCalledWith(expect.objectContaining({ request: expect.objectContaining({ _wmkf_programdirector_value: REVIEWER_ID }) }));
+  });
+  it('lost lease before claim cannot dispatch prepared mail', async () => {
+    const d = deps(); d.jobs.mergeReviewerAcceptanceJobStep.mockImplementation(async (_id, _lease, _step, patch) => patch.claimedAt ? null : {});
+    await expect(processReviewerAcceptanceJob(job(), d)).rejects.toMatchObject({ code: 'reviewer_acceptance_lease_lost' }); expect(d.sendPreparedAcceptanceEmail).not.toHaveBeenCalled();
+  });
+  it.each(['throw', 'undefined', 'lost-record'])('postclaim %s never becomes an automatic resend', async mode => {
+    const d = deps(), j = job(); let steps = {};
+    d.jobs.mergeReviewerAcceptanceJobStep.mockImplementation(async (_id, _lease, key, patch) => { if (mode === 'lost-record' && patch.sentAt) return null; steps = { ...steps, [key]: { ...steps[key], ...patch } }; return { ...j, steps }; });
+    if (mode === 'throw') d.sendPreparedAcceptanceEmail.mockRejectedValue(new Error('uncertain')); if (mode === 'undefined') d.sendPreparedAcceptanceEmail.mockResolvedValue(undefined);
+    try { await processReviewerAcceptanceJob(j, d); } catch (e) { expect(e.code).toBe('reviewer_acceptance_lease_lost'); }
+    expect(steps.acceptance_confirmation.claimedAt).toEqual(expect.any(String)); await processReviewerAcceptanceJob({ ...j, steps }, d); expect(d.sendPreparedAcceptanceEmail).toHaveBeenCalledTimes(1);
+  });
+  it.each(['exhausted', 'terminal-sibling'])('fresh outer failure row emits manual-send alert for %s, never for claimed/repeat rows', async mode => {
+    const d = deps(), j = job(); d.jobs.claimReviewerAcceptanceJobs.mockResolvedValue([j]); d.prepareAcceptanceEmail.mockResolvedValue({ ok: false, reason: 'defaults_unavailable' });
+    if (mode === 'terminal-sibling') d.captureOrcid.mockRejectedValue(Object.assign(new Error('terminal'), { retryable: false }));
+    d.jobs.recordReviewerAcceptanceJobFailure.mockResolvedValue({ ...j, status: 'failed', steps: {} });
+    expect((await drainReviewerAcceptanceJobs({ deps: d })).failed).toBe(1); expect(d.notify).toHaveBeenCalledWith(expect.objectContaining({ autoResolveKey: `acceptance-confirmation-preparation:${j.id}:terminal`, message: expect.stringContaining('still accepted') }));
+    d.notify.mockClear(); d.jobs.recordReviewerAcceptanceJobFailure.mockResolvedValue({ ...j, status: 'failed', steps: { acceptance_confirmation: { claimedAt: 'already' } } });
+    await drainReviewerAcceptanceJobs({ deps: d }); expect(d.notify.mock.calls.some(([n]) => n.autoResolveKey?.endsWith(':terminal'))).toBe(false);
+  });
+  it('leftover legacy injection fails loudly before any preparation', async () => {
+    const d = deps(); d.sendAcceptanceEmail = jest.fn(); await expect(processReviewerAcceptanceJob(job(), d)).rejects.toThrow('seams'); expect(d.prepareAcceptanceEmail).not.toHaveBeenCalled();
+  });
+});
+
+test('nonempty unreadable encrypted token refuses before claim rather than silently removing withdrawal link', async () => {
+  const d = deps(), j = job(); j.payload.reviewerPortalTokenEncrypted = 'invalid-ciphertext';
+  await expect(processReviewerAcceptanceJob(j, d)).rejects.toThrow('withdrawal_token_unavailable'); expect(d.prepareAcceptanceEmail).not.toHaveBeenCalled(); expect(d.sendPreparedAcceptanceEmail).not.toHaveBeenCalled();
+});
+test('real prepared helper converts Dynamics emailId receipt and the drain records sentAt', async () => {
+  const d = deps(); const send = jest.spyOn(DynamicsService, 'createAndSendEmail').mockResolvedValue({ emailId: 'fixture-email' });
+  d.prepareAcceptanceEmail.mockResolvedValue({ ok: true, message: { subject: 'Real prepared subject', body: 'Body', to: 'reviewer@example.org', from: 'pd@example.org' } });
+  d.sendPreparedAcceptanceEmail = sendPreparedAcceptanceConfirmationEmail;
+  await processReviewerAcceptanceJob(job(), d); expect(send).toHaveBeenCalledTimes(1);
+  expect(d.jobs.mergeReviewerAcceptanceJobStep).toHaveBeenCalledWith(77, expect.any(String), 'acceptance_confirmation', expect.objectContaining({ sentAt: expect.any(String), result: { sent: true, emailId: 'fixture-email' } })); send.mockRestore();
+});
+test('outer drain cancellation supersedes events BEFORE alert resolution, without closing another job key', async () => {
+  const d = deps(acceptedSuggestion({ wmkf_declined: true, wmkf_accepted: false })), j = job(); d.jobs.claimReviewerAcceptanceJobs.mockResolvedValue([j]);
+  const states = new Map([[`acceptance-confirmation-preparation:${j.id}`, 'open'], ['acceptance-confirmation-preparation:other', 'open']]);
+  OperationalEventService.markSuperseded.mockImplementation(async key => { if (states.get(key) === 'open') states.set(key, 'superseded'); });
+  AlertService.autoResolve.mockImplementation(async key => { if (states.get(key) === 'open') states.set(key, 'recovered'); });
+  expect((await drainReviewerAcceptanceJobs({ deps: d })).cancelled).toBe(1); expect(states.get(`acceptance-confirmation-preparation:${j.id}`)).toBe('superseded'); expect(states.get('acceptance-confirmation-preparation:other')).toBe('open');
+  OperationalEventService.markSuperseded.mockImplementation(async () => 1); AlertService.autoResolve.mockImplementation(async () => 1);
+});
+test('external cancellation not observed by this drain does not claim to settle its preparation alert', async () => {
+  const d = deps(); AlertService.autoResolve.mockClear(); expect((await drainReviewerAcceptanceJobs({ deps: d })).claimed).toBe(0); expect(AlertService.autoResolve).not.toHaveBeenCalled();
 });

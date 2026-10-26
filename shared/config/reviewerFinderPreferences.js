@@ -36,6 +36,7 @@ export const PREFERENCE_KEYS = {
   // standalone Reviewer Finder still uses) so the two shapes never collide.
   EMAIL_TEMPLATES: 'reviewer_email_templates',
   // Separate from the retained manual/legacy thankyou map.
+  REVIEWER_AUTOMATIC_ACCEPTANCE_TEMPLATE: 'reviewer_automatic_acceptance_template',
   REVIEWER_AUTOMATIC_THANKYOU_TEMPLATE: 'reviewer_automatic_thankyou_template',
   // Per-user reviewer-finder PROMPT overrides (S222), keyed by prompt name:
   //   { 'reviewer-finder.analyze': { body, basePromptId, baseVersion, updatedAt },
