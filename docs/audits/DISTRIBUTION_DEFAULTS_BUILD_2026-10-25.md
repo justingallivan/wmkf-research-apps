@@ -3,7 +3,7 @@ title: Deliberation-distribution personal defaults — build verification
 domain: workbench
 kind: audit
 status: active
-summary: "Branch implementation verified at 1215cfd7d: 426 focused tests, production build, four real-router fixture browser cases and independent Claude review chain passed. Discard warnings preserved; not released."
+summary: "Branch implementation verified at 1215cfd7d: 426 focused tests, production build, four real-router fixture browser cases and independent Claude review chain passed. Discard warnings preserved; released through PR #529 with Production verification in the release receipt."
 owner: product-engineering
 related:
   - docs/plans/PERSONAL_EMAIL_DISTRIBUTION_DEFAULTS_PLAN_2026-10-25.md
@@ -20,9 +20,11 @@ Runtime fingerprint: `1215cfd7d4151f5df628e0795b16c178b8a6af37` on
 `codex/distribution-email-defaults-plan`, isolated worktree
 `/Users/gallivan/.codex/worktrees/session-start-2030/WMKF_Apps`.
 The following receipt/test-assertion commit changes no runtime code. This is
-implemented and independently reviewed branch work; it is **not released**.
+implemented and independently reviewed work, **released through PR #529** as
+`7f2a6e9c8bfa3332cb1d8f4ae662779f4e606764`. Production proof and rollback:
+`docs/audits/DISTRIBUTION_DEFAULTS_RELEASE_2026-10-25.md`.
 
-No live preference or shared-setting write, migration, seed, email, deployment,
+During implementation, no live preference or shared-setting write, migration, seed, email, deployment,
 or database probe was performed. Claude's separate checkout and database work
 were not modified. Dependencies were copied locally from the existing installation
 so the build used this worktree, without installing into Claude's checkout.
@@ -80,7 +82,7 @@ The key is in both generic preference privacy and reserved-write sets.
   GUID boundary, lifecycle auth, status enum parity, documentation currency,
   symbol references, build-claim freshness and secret scan. Docs catalog, agent
   invariants, types and whitespace checks passed. This is scoped local evidence;
-  full GitHub CI has not run because this branch was not pushed.
+  the subsequent full GitHub CI passed before release; see the release receipt.
 
 ## Independent review chain
 
@@ -108,7 +110,8 @@ key guard sets were updated. Enum/key fan-out was searched and generic GET/
 POST/DELETE exclusions are tested. Complement branches reject/fallback/retain
 recovery, rather than assuming success.
 
-Sweep mode A: changed fact is slice 7 branch implementation and independent
+Historical implementation-phase sweep (superseded for release state by the release receipt):
+Sweep mode A: changed fact was slice 7 branch implementation and independent
 verification, **not Production state**. Source and test/browser/build results
 establish that fact; the plan, TODO, inventory, route matrix, Atlas and service
 catalog are the in-scope durable restatements. The new route updates generated
@@ -128,6 +131,6 @@ Browser beforeunload may be suppressed. Existing preference uniqueness and atomi
 multi-row Clear are not introduced; duplicates remain repairable. Live tenant
 permissions and live preference/send acceptance were not probed.
 
-Release requires a separate owner instruction, integration with current main,
-applicable CI and deliberate promotion/verification under the release strategy.
-Do not overwrite or absorb unrelated Claude database work to release this slice.
+The owner subsequently authorized release. Integration, full CI, deliberate merge
+and Production verification are recorded in the release receipt. Claude's separate
+checkout and database work were not modified.
