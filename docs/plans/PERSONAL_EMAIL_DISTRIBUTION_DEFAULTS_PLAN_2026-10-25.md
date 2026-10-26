@@ -3,7 +3,7 @@ title: Personal defaults for deliberation-distribution emails
 domain: workbench
 kind: plan
 status: active
-summary: "Reviewed slice 7 contract; owner authorized implementation 2026-10-25. Branch implementation and verification in progress; discard warnings preserved. Not released."
+summary: "Reviewed slice 7 contract, implemented on branch: 426 tests, production build, four fixture browser cases and final Claude check passed. Discard warnings preserved; not released."
 owner: product-engineering
 related:
   - docs/plans/PERSONAL_EMAIL_DEFAULTS_TODO_2026-09-20.md
@@ -13,35 +13,41 @@ related:
   - docs/APPLICATION_STATE_ATLAS.md
 ---
 
-# Personal defaults for deliberation-distribution emails — draft
+# Personal defaults for deliberation-distribution emails — accepted contract
 
 ## Status and boundary
 
-[BRANCH IMPLEMENTATION IN PROGRESS — owner authorized coding 2026-10-25.]
+[BRANCH IMPLEMENTED AND INDEPENDENTLY REVIEWED — 2026-10-25; NOT RELEASED.]
 This is inventory slice 7, on `codex/distribution-email-defaults-plan`.
-The contract below was independently reviewed READY TO IMPLEMENT (§9).
-Runtime and tests are now being implemented in this isolated worktree; verification
-and independent implementation review remain required before release.
-No live preference writes, schema probes, migrations, seeds, sends, environment
-changes or deployments are part of this task. Claude's separate database work and
-checkout remain untouched. Non-empty messages, fresh ordinary reopen and warning
-before voluntary discard remain owner requirements. Background source changes
-retain edits. Live preference contents and tenant permissions remain unprobed.
+The owner authorized coding after the plan review. Final runtime fingerprint
+`1215cfd7d4151f5df628e0795b16c178b8a6af37` passed 426 focused tests,
+Production-mode build, four fixture-backed real-router browser cases, types,
+relevant gates and the independent Claude review chain. Evidence and limits:
+`docs/audits/DISTRIBUTION_DEFAULTS_BUILD_2026-10-25.md`.
+Non-empty messages, fresh ordinary reopen and warning before voluntary discard
+remain owner requirements; background source changes retain edits.
 
-Sections describing the pre-implementation baseline and historical plan reviews
-retain their dated evidence. Acceptance criteria below remain the implementation
-contract; they are not automatically proof that every case passes.
+No live preference write, shared-setting seed, schema probe, migration, email,
+environment file edit or deployment occurred. Claude's separate database work
+and checkout remain untouched. Live tenant preference permissions remain
+unprobed. Release requires a separate owner instruction and deliberate promotion.
+
+This document preserves the accepted contract and dated pre-implementation
+baseline. Normative criteria below are not Production claims. The build audit,
+not historical planning statements or baseline test counts, owns current branch
+verification. Plan-review receipts in §9 remain historical evidence; the final
+implementation receipt is linked from the build audit.
 
 ## 1. Job and audience
 
-[PLANNED.] Staff with the existing `reviewers` app access can save their own
+[ACCEPTED PRODUCT PURPOSE; branch proof is in the build audit.] Staff with the existing `reviewers` app access can save their own
 reusable subject and introductory message for **Share for the deliberation
 session**. A new email starts with that sender's wording, remains editable for
 one send, and still requires the existing frozen preview and explicit confirmation.
 This is an Operate surface: preserve the established desktop density, dialog,
 recipient picker, control hierarchy and wording pattern. No terminology redesign.
 
-## 2. Current flow and evidence
+## 2. Pre-implementation baseline and evidence
 
 [VERIFIED via source inspection at the branch base and the baseline test command
 in §7.] File references below name the logical regions inspected; future code
@@ -61,16 +67,18 @@ must be re-read rather than trusting these as immutable line offsets.
 | Usable sibling precedent | Agenda personalization uses exact session system-user identity, strict owner/key enumeration, validated raw pairs, Save readback and duplicate-aware Clear. Its editor keeps future wording independent from one-send form. Its optional body and session-date token rules differ from this family. | `pages/api/meeting-tracker/agenda-email-preferences.js`; `lib/services/meeting-tracker/agenda-personalization.js`; `shared/components/meeting-tracker/AgendaWordingDefault.js` |
 
 [VERIFIED via bounded symbol/caller search.] Existing registry, distribution
-leaves, panel and relevant routes contain no distribution-specific personal key
-or preference route. New names below are proposed, not installed infrastructure.
+leaves, panel and relevant routes contained no distribution-specific personal key
+or preference route at the dated planning baseline. The branch implementation
+now installs the family names specified below; current proof is in the build audit.
 Some Atlas/route-matrix entries retain older deployment descriptions; this plan
 uses current source for flow claims and does not broaden into their historical
 status reconciliation.
 
-## 3. Product contract — owner choices recorded, review before coding
+## 3. Accepted product contract
 
-All items here are [PLANNED], not implemented behavior. Items 2 and 6 include
-explicit owner decisions; the remaining implementation proposals await review.
+[ACCEPTED REQUIREMENTS.] Items 2 and 6 include explicit owner decisions. The
+reviewed requirements below govern implementation; the build audit records the
+actual branch verification and limits. They do not assert Production behavior.
 
 1. **Save only subject and message.** A personal pair belongs to the actual
    authenticated sender, applies across requests, and is distinct from agenda,
@@ -173,25 +181,26 @@ explicit owner decisions; the remaining implementation proposals await review.
    exact preview. To/Cc remain one-send staff choices validated by the server;
    they are not immutable server-selected recipients and are never defaults.
 
-## 4. Bounded implementation outline — not authorization
+## 4. Bounded implementation contract
 
-[PLANNED.] Build one family rather than a suite-wide preference abstraction.
+[ACCEPTED REQUIREMENTS; branch evidence in the build audit.] One family, without
+a suite-wide preference abstraction.
 
 ### A. Personal contract and exact-owner API
 
-- Proposed key: `PREFERENCE_KEYS.DELIBERATION_SHARE_TEMPLATE` with storage value
+- Key: `PREFERENCE_KEYS.DELIBERATION_SHARE_TEMPLATE` with storage value
   `deliberation_share_template`, JSON `{ subject, body }`. Add it to both
   `RESERVED_WRITE_KEYS` and `PRIVATE_REMINDER_KEYS` in `pages/api/user-preferences.js`.
   Test single-key and all-key GET plus generic POST/DELETE denial. No profile
   remapping, localStorage fallback, caller-selected key or sender selector.
-- Proposed route: `/api/workbench/pre-site-visit/distribution/email-preferences`
+- Route: `/api/workbench/pre-site-visit/distribution/email-preferences`
   with GET / PUT `{ template }` / DELETE `{}`. Require the existing `reviewers`
   app gate, session-derived GUID owner (`actorRefFromSession`), `withDalContext`,
   exact query/body validation and `Cache-Control: private, no-store`. No tracker
   schema flag borrowed from the agenda family. No request ID is needed to manage
   a sender-wide template. Missing Dynamics identity disables preference access;
   existing prepare/send identity guards continue to apply independently.
-- Proposed family service: `lib/services/pre-site-visit/distribution-personalization.js`.
+- Family service: `lib/services/pre-site-visit/distribution-personalization.js`.
   Use the existing DAL's complete `listByOwnerAndKey`, create/update/remove.
   GET distinguishes zero, one valid, malformed/encrypted and duplicate rows;
   read failure is never absence. For PUT enumerate afresh, reject duplicates,
@@ -199,14 +208,14 @@ explicit owner decisions; the remaining implementation proposals await review.
   For DELETE enumerate/remove only that owner/key, then verify no rows remain.
   A partial Clear or lost response is unconfirmed and requires reload; do not
   automatically retry a possibly committed create. No schema uniqueness claim.
-- Proposed validator beside `shared/config/deliberationShareEmail.js`: strings
+- Family validator beside `shared/config/deliberationShareEmail.js`: strings
   only, exact pair shape, raw/resolved subject bounds and no CR/LF, nonblank
   message ≤20,000, subject-only exact `{{requestNumber}}`. Retain existing literal
   one-send text semantics; do not impose unrelated token policies on Admin or
   other families. Parser cap 256 KB covers two bounded Unicode/JSON-escaped
   fields; test the worst-size payload and reject larger input before writes.
 - Read the shared composer pair through the existing strict setting read/fallback
-  semantics without treating the seven-field aggregate as pair status. Proposed
+  semantics without treating the seven-field aggregate as pair status. The
   response includes raw own/shared/effective pair, `ownStatus`, per-field shared
   status, `source`, `configured`, `canSave` and `canClear`. Define these explicitly:
   `configured` only means one validated saved row; duplicate/malformed rows get
@@ -267,7 +276,8 @@ explicit owner decisions; the remaining implementation proposals await review.
 
 ### D. Explicit client lifecycle ownership
 
-All changes here are [PLANNED]; existing server/store/send contracts stay intact.
+[ACCEPTED REQUIREMENTS.] Existing server/store/send contracts stay intact; the
+build audit records the implemented lifecycle and concurrency verification.
 
 **Owner and open signal.** `StaffDeliberationsTab` owns a monotonically increasing
 `composeOpenVersion`, advanced by every Share/Resend/open action. The panel consumes
@@ -365,18 +375,18 @@ After any actual owner/request unmount or interrupted mutation, the next editor
 open performs that strict read; it never assumes a previous abort rolled back.
 No cross-actor draft stash, session storage or localStorage is introduced.
 
-## 5. Expected file surface
+## 5. Reviewed file surface
 
-[PLANNED; final implementation review may narrow it further.]
+[VERIFIED via branch diff and the linked build audit.]
 
 | Surface | Expected change |
 | --- | --- |
 | `shared/config/reviewerFinderPreferences.js`, `deliberationShareEmail.js` | One reserved key; family raw-pair validator |
-| Proposed family service and preference route | Exact-owner GET/Save/Clear and effective raw defaults |
+| Family service and preference route | Exact-owner GET/Save/Clear and effective raw defaults |
 | `pages/api/user-preferences.js` | Both privacy/validation bypass guards |
-| `PreSiteDistributionPanel.js`, proposed default editor | Panel-owned draft/mutation/recovery state, raw defaults and guarded close |
+| `PreSiteDistributionPanel.js`, `DistributionWordingDefault.js`, sender wrapper | Panel-owned draft/mutation/recovery state, raw defaults and guarded close |
 | `StaffDeliberationsTab.js` | Explicit open version, retention callback, retained paused panel and source refresh |
-| Proposed family-local navigation hook; `pages/workbench/[requestId].js` | Board-pattern guard inside panel; expected navigation-cancellation catch in `selectTab` only |
+| Family-local navigation hook; `pages/workbench/[requestId].js` | Board-pattern guard inside panel; expected navigation-cancellation catch in `selectTab` only |
 | Focused tests | Contract, identity/isolation, mutations, UI, races and frozen-send compatibility |
 | Route matrix, Atlas, service catalog and personal-default inventory/TODO | Add the new surface only when implemented; no claim that the route exists now |
 
@@ -386,9 +396,10 @@ implementation needs to change those contracts or schema, stop and revise scope
 before coding them. Root instructions, other email families, calendar updates,
 J27 decisions and Claude's database surfaces are outside this slice.
 
-## 6. Contract-reconcile audits and remaining risks
+## 6. Planning audits and accepted risks
 
-[VERIFIED baseline; PLANNED acceptance rules.]
+[HISTORICAL baseline audit and accepted requirements; current implementation
+audits and evidence are in the build audit.]
 
 - **Whole flow:** caller → editable compose → authenticated prepare → retained
   attempt/snapshots → fixed preview → exact send → history/UI traced in §2.
@@ -425,7 +436,7 @@ and `workbench-pre-site-visit-distribution-send-route` under `tests/unit/`, usin
 `npm test -- --runInBand` with those explicit files. Mocked dependencies only;
 this proves existing behavior, not planned personal defaults or live delivery.
 
-[PLANNED acceptance matrix.]
+[ACCEPTANCE CRITERIA; current proof and limits are in the build audit.]
 
 | Invariant | Discriminating tests |
 | --- | --- |
@@ -439,7 +450,7 @@ this proves existing behavior, not planned personal defaults or live delivery.
 | Content/transport authority | Generated session/link/bundle/expiry survives arbitrary wording; To/Cc one-send; HTML escaping; existing stale-refusal new-preview scenario remains recoverable after added proof history read (extend fixture); accepted-send tests remain green |
 | Desktop interaction | Keyboard disclosure/labels/focus, busy/validation/notices, desktop density plus zoom/narrow regression; preserve existing dialog |
 
-Execution after independent plan review and coding authorization: (1) strict key/service/API + tests; (2) independent
+Historical execution sequence accepted after plan review: (1) strict key/service/API + tests; (2) independent
 editor and initialization + race tests; (3) compatibility regression and source
 review; (4) bounded visual inspection and independent implementation review.
 Run scoped lint/types and affected API-route, route-lifecycle, DAL/context,
@@ -448,7 +459,7 @@ Confirm relevant CI jobs and a Production-mode build before Tier 2 promotion.
 Live preferences/seeds/sends and release require separate task authorization;
 prefer fixture/browser mocks for concurrency evidence.
 
-## 8. Bounded planning sweep / recommendation evidence
+## 8. Historical bounded planning sweep / recommendation evidence
 
 Sweep mode B, domain: distribution personal-default readiness, source-only.
 Authoritative sources: §2 current source and §7 baseline tests. Persisted/live
@@ -468,12 +479,12 @@ plan and a TODO pointer only. No existing implementation is relabeled shipped.
 | Independent future-default editor | Agenda and shared editor patterns exist | Source examined; no distribution editor/route found in bounded search; no new UI rendered | VERIFIED precedent; UX PLANNED |
 | Refresh ordinary reopen | Parent keeps panel mounted on Close | Parent/panel lifecycle inspected; fresh reopen is owner-confirmed planned behavior, not current behavior | Owner decision recorded; implementation PLANNED |
 
-Verdict: **INDEPENDENTLY REVIEWED — READY TO IMPLEMENT, NOT CODING AUTHORIZATION.**
+Historical planning verdict: **INDEPENDENTLY REVIEWED — READY TO IMPLEMENT, NOT CODING AUTHORIZATION.**
 Owner choices remain unchanged. Review findings have concrete proposed
 contracts in §§3–4D and acceptance cases in §7, accepted by the final independent
-review; none are implemented. Live
-permission proof, visual validation and independent implementation review remain
-future obligations.
+review at that checkpoint. The later authorized branch implementation and
+verification supersede this planning-only status; live permission proof and
+release remain separate, as recorded in the build audit.
 
 ## 9. Independent review disposition — 2026-10-25
 

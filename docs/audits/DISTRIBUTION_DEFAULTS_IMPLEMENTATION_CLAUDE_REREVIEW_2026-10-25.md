@@ -3,7 +3,7 @@ title: Claude re-review of distribution-defaults implementation
 domain: workbench
 kind: audit
 status: active
-summary: "Read-only OAuth review of 80826ff16 passed with no blockers; remaining busy-discard, combined warning and coverage findings were fixed for final delta review."
+summary: "Historical OAuth checkpoint 80826ff16 passed with no blockers; remaining findings were subsequently fixed and independently rechecked. See the build audit for current branch verification."
 owner: product-engineering
 related:
   - docs/plans/PERSONAL_EMAIL_DISTRIBUTION_DEFAULTS_PLAN_2026-10-25.md
@@ -34,8 +34,10 @@ metered review product, no other checkout or database work.
   existing mounted/envelope fence. Three new busy-discard/teardown tests fail
   against 80826ff16 and pass with the final delta (root regression experiment).
 
-These final changes require their own independent delta review; this receipt
-records the reviewed checkpoint, not release authorization.
+These changes subsequently received the delta review below the review chain;
+the last required D1 finding was fixed and independently passed at 1215cfd7d.
+See `docs/audits/DISTRIBUTION_DEFAULTS_BUILD_2026-10-25.md` for current
+branch verification. This historical receipt does not authorize release.
 
 ## Verbatim re-review
 

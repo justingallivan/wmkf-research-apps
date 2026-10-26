@@ -333,6 +333,7 @@ test('a start-fresh prompt cannot hide the frozen retry after a send becomes unc
   sendResult = deferred(); fireEvent.click(screen.getByRole('button', { name: 'Send email' }));
   await act(async () => sendResult.reject(new Error('uncertain send')));
   fireEvent.click(screen.getByRole('button', { name: 'Discard edits and start fresh' }));
+  expect(screen.queryByRole('button', { name: 'Discard edits and start fresh' })).toBeNull();
   expect(screen.getByRole('heading', { name: 'Email preview' })).toBeInTheDocument(); expect(screen.getByLabelText('Message')).toHaveValue('Dirty one-send message');
   expect(screen.getByRole('button', { name: 'Send email' })).toBeInTheDocument(); expect(screen.getByLabelText('Subject')).toBeDisabled();
   expect(calls('email-preferences')).toHaveLength(1);

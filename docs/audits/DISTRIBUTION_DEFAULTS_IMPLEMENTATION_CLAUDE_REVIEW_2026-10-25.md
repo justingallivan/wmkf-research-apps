@@ -3,7 +3,7 @@ title: Claude review of distribution-defaults implementation
 domain: workbench
 kind: audit
 status: active
-summary: "Read-only OAuth review of a5f3b6548 returned NEEDS CHANGES: GUID case mismatch, plus retention tests and smaller UX/error-handling findings. Revised implementation awaits re-review."
+summary: "Historical first OAuth review of a5f3b6548 returned NEEDS CHANGES. Findings were fixed and independently rechecked; current branch verdict is in the build audit."
 owner: product-engineering
 related:
   - docs/plans/PERSONAL_EMAIL_DISTRIBUTION_DEFAULTS_PLAN_2026-10-25.md
@@ -30,8 +30,10 @@ Root verification is recorded separately from the reviewer's reported tests.
 | L4 — broad success fallback | Unexpected mutation exceptions return unconfirmed 503. Only the independent refresh may return confirmed-write success with a refresh warning. PUT and DELETE throw regressions added. |
 | L5 — editor repair UX | Confirmed mutation with refresh failure includes Reload instruction. Reload discard is inline with Keep editing/Escape. Known validation/duplicate refusal is distinct from uncertainty; duplicates allow Clear. |
 
-All dispositions require the revised independent review; this receipt does not
-mark the implementation ready or authorize release.
+These checkpoint dispositions were subsequently re-reviewed. Current branch
+verification and the final review chain are recorded in
+`docs/audits/DISTRIBUTION_DEFAULTS_BUILD_2026-10-25.md`. This historical
+receipt does not authorize release.
 
 ## Verbatim first report
 

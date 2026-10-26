@@ -83,14 +83,16 @@ Evidence: `docs/audits/MEETING_AGENDA_DEFAULTS_BUILD_2026-10-24.md`.
 
 ## Slice 7 implementation — deliberation-distribution defaults
 
-[BRANCH IMPLEMENTATION — owner authorized coding 2026-10-25; not released.]
+[BRANCH IMPLEMENTED AND INDEPENDENTLY REVIEWED — 2026-10-25; NOT RELEASED.]
 Contract: `docs/plans/PERSONAL_EMAIL_DISTRIBUTION_DEFAULTS_PLAN_2026-10-25.md`.
-Independent plan review returned READY TO IMPLEMENT on `7baa3ad99`.
-The dedicated exact-sender preference route, future-only editor, fresh ordinary
-reopen, guarded discard and retained frozen-send recovery are implemented in
-this worktree. Verification and independent implementation review are in progress;
-no live preference writes, sends, schema operations or release have occurred.
-The non-empty message and discard-warning requirements remain unchanged.
+Build proof: `docs/audits/DISTRIBUTION_DEFAULTS_BUILD_2026-10-25.md`.
+Own-sender raw subject/non-empty message defaults, future-only Save/Clear,
+fresh ordinary reopen and guarded discard are implemented. Source pauses retain
+edits; frozen uncertain sends retain exact retry state. All implementation-review
+findings were fixed and independently rechecked; final runtime 1215cfd7d passed
+426 focused tests, Production-mode build and four fixture browser navigation cases.
+No live preference write, send, schema operation or release occurred. Claude's
+database work remains untouched. Deliberate release requires a separate instruction.
 
 ## Existing pre-discussion calendar events — Duncan walkthrough pending 2026-10-25
 
