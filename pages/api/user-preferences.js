@@ -34,6 +34,7 @@ const RESERVED_WRITE_KEYS = new Set([
   PREFERENCE_KEYS.MEETING_AGENDA_TEMPLATE,
   PREFERENCE_KEYS.DELIBERATION_SHARE_TEMPLATE,
   PREFERENCE_KEYS.SCHEDULED_GRANTEE_REMINDER_TEMPLATE,
+  PREFERENCE_KEYS.REVIEWER_AUTOMATIC_THANKYOU_TEMPLATE,
 ]);
 
 // These personal copies are read through their app-gated endpoint using the
@@ -48,13 +49,18 @@ const PRIVATE_REMINDER_KEYS = new Set([
   PREFERENCE_KEYS.MEETING_AGENDA_TEMPLATE,
   PREFERENCE_KEYS.DELIBERATION_SHARE_TEMPLATE,
   PREFERENCE_KEYS.SCHEDULED_GRANTEE_REMINDER_TEMPLATE,
+  PREFERENCE_KEYS.REVIEWER_AUTOMATIC_THANKYOU_TEMPLATE,
 ]);
 
-// This family's canonical guard also rejects casing/whitespace aliases, independently of
+// These two families also reject casing/whitespace aliases, independently of
 // the preference store's string-comparison rules. Other keys keep their contract.
-function canonicalScheduledReminderKey(key) {
-  return typeof key === 'string' && key.trim().toLowerCase() === PREFERENCE_KEYS.SCHEDULED_GRANTEE_REMINDER_TEMPLATE
-    ? PREFERENCE_KEYS.SCHEDULED_GRANTEE_REMINDER_TEMPLATE : key;
+const CANONICAL_PRIVATE_COPY_KEYS = new Set([
+  PREFERENCE_KEYS.SCHEDULED_GRANTEE_REMINDER_TEMPLATE,
+  PREFERENCE_KEYS.REVIEWER_AUTOMATIC_THANKYOU_TEMPLATE,
+]);
+function canonicalPrivateCopyKey(key) {
+  const normalized = typeof key === 'string' ? key.trim().toLowerCase() : null;
+  return CANONICAL_PRIVATE_COPY_KEYS.has(normalized) ? normalized : key;
 }
 
 const INVITATION_TEMPLATE_SAVE_ERROR = 'Invitation templates must include {{externalLink}} in the subject or body.';
@@ -118,7 +124,7 @@ async function handleGet(req, res, profileId) {
     const { key } = req.query;
 
     if (key) {
-      if (PRIVATE_REMINDER_KEYS.has(canonicalScheduledReminderKey(key))) return res.status(403).json({ error: 'Use its dedicated email preferences endpoint.' });
+      if (PRIVATE_REMINDER_KEYS.has(canonicalPrivateCopyKey(key))) return res.status(403).json({ error: 'Use its dedicated email preferences endpoint.' });
       if (key === PREFERENCE_KEYS.EMAIL_TEMPLATES) {
         try {
           const value = await DatabaseService.getReviewerEmailTemplatesStrict(profileId);
@@ -140,7 +146,7 @@ async function handleGet(req, res, profileId) {
 
     const preferences = { ...await DatabaseService.getUserPreferences(profileId, false) };
     for (const privateKey of Object.keys(preferences)) {
-      if (PRIVATE_REMINDER_KEYS.has(canonicalScheduledReminderKey(privateKey))) delete preferences[privateKey];
+      if (PRIVATE_REMINDER_KEYS.has(canonicalPrivateCopyKey(privateKey))) delete preferences[privateKey];
     }
     const encryptedKeys = DatabaseService.ENCRYPTED_PREFERENCE_KEYS;
 
@@ -164,7 +170,7 @@ async function handlePost(req, res, profileId) {
 
     // Reject reserved keys (dedicated gated write path only).
     const attemptedKeys = key !== undefined ? [key] : (preferences && typeof preferences === 'object' ? Object.keys(preferences) : []);
-    const reservedHit = attemptedKeys.find((k) => RESERVED_WRITE_KEYS.has(canonicalScheduledReminderKey(k)));
+    const reservedHit = attemptedKeys.find((k) => RESERVED_WRITE_KEYS.has(canonicalPrivateCopyKey(k)));
     if (reservedHit) {
       return res.status(403).json({ error: `Preference key "${reservedHit}" cannot be written through this endpoint; use its dedicated route.` });
     }
@@ -218,7 +224,7 @@ async function handleDelete(req, res, profileId) {
 
     // Reject reserved keys (dedicated gated write path only).
     const attemptedKeys = key ? [key] : (Array.isArray(keys) ? keys : []);
-    const reservedHit = attemptedKeys.find((k) => RESERVED_WRITE_KEYS.has(canonicalScheduledReminderKey(k)));
+    const reservedHit = attemptedKeys.find((k) => RESERVED_WRITE_KEYS.has(canonicalPrivateCopyKey(k)));
     if (reservedHit) {
       return res.status(403).json({ error: `Preference key "${reservedHit}" cannot be deleted through this endpoint; use its dedicated route.` });
     }

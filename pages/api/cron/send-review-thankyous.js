@@ -3,14 +3,16 @@
  *
  * Daily. Emails every reviewer whose review was RECEIVED
  * (`wmkf_reviewreceivedat` set) but who has not yet been thanked
- * (`wmkf_thankyousentat` null) the seeded 'thankyou' template, with a courtesy
+ * (`wmkf_thankyousentat` null), using the sending PD's saved default or shared
+ * Admin wording, with a courtesy
  * DOCX copy of their own submitted review attached as real file bytes.
  *
  * Fire-once + at-most-once: the thank-you marker `wmkf_thankyousentat` is claimed
- * via an If-Match conditional write BEFORE the send, so a concurrent run, a manual
- * thank-you, or a post-send retry can never double-thank. A send failure after a
- * successful claim is logged, not retried. The attachment is non-fatal (the
- * thank-you still ships without the DOCX).
+ * via an If-Match conditional write BEFORE the send. Overlapping automatic
+ * sweeps have one claim winner; callable legacy manual sends are separate. A
+ * send failure after a successful claim is logged, not retried. Default lookup,
+ * rendered-copy safety and the required DOCX all complete before the claim;
+ * preparation failure leaves the marker untouched for later repair.
  *
  * Manually triggerable:
  *   ?maxBatch=N   Cap claims/sends per run (default 200).

@@ -20,6 +20,7 @@ import {
   serializeEmailSignaturePreference,
 } from '../shared/config/reviewerFinderPreferences';
 import EmailTemplatesModal from '../shared/components/reviewers/EmailTemplatesModal';
+import ReviewerThankYouDefault, { useReviewerThankYouDefaults } from '../shared/components/reviewers/ReviewerThankYouDefault';
 import { TEMPLATE_TYPE_LABELS, TEMPLATE_TYPES } from '../shared/components/reviewers/email-template-store';
 
 // Preset colors for avatar selection
@@ -93,8 +94,10 @@ export default function ProfileSettings() {
   // have current first-party staff send actions).
   // Edited in the shared EmailTemplatesModal, which loads/saves via the same
   // preference key the Workbench tab uses — so this is a second entry point to the
-  // ONE editor, not a separate copy. Defaults are seeded by the modal itself.
+  // ONE legacy editor. Automatic thank-you defaults have their own independent controller.
   const [showReviewerTemplates, setShowReviewerTemplates] = useState(false);
+  // Keep the family controller mounted above the loading early return.
+  const thankYouDefaults = useReviewerThankYouDefaults({ profileId: currentProfile?.id, profileStatus: status, loading: isLoading });
 
   useEffect(() => {
     if (status !== 'ready') return;
@@ -241,6 +244,7 @@ export default function ProfileSettings() {
       return;
     }
 
+    if (String(profile.id) === String(currentProfile?.id) && !thankYouDefaults.confirmContextChange()) return;
     try {
       await archiveProfile(profile.id);
     } catch (err) {
@@ -589,7 +593,7 @@ export default function ProfileSettings() {
             <p className="text-sm text-gray-600 mb-4">
               Your reviewer templates start from the Admin defaults. Invitation and materials
               templates saved here are used when you send those emails from Workbench.
-              Your saved Email Signature fills the{' '}
+              For these legacy templates, your saved Email Signature fills the{' '}
               <code className="text-xs">{'{{signature}}'}</code> placeholder.
             </p>
             <ul className="text-sm text-gray-600 mb-4 flex flex-wrap gap-x-4 gap-y-1">
@@ -599,13 +603,14 @@ export default function ProfileSettings() {
             </ul>
             <p className="text-sm text-gray-600 mb-4">
               Follow-up reminder and Thank-you personal templates remain available for compatibility;
-              current staff send actions do not use them. Automatic reviewer thank-yous use the Admin default.
+              current staff send actions do not use them. Automatic thank-you wording is configured separately below.
             </p>
             <div className="flex justify-end">
               <Button variant="primary" size="sm" type="button" onClick={() => setShowReviewerTemplates(true)}>
                 Edit reviewer email templates
               </Button>
             </div>
+            <ReviewerThankYouDefault controller={thankYouDefaults} />
           </Card>
         )}
 
@@ -729,7 +734,7 @@ export default function ProfileSettings() {
                   <div className="flex items-center gap-2">
                     {currentProfile?.id !== profile.id && (
                       <button
-                        onClick={() => selectProfile(profile.id)}
+                        onClick={() => { if (thankYouDefaults.confirmContextChange()) selectProfile(profile.id); }}
                         className="text-sm text-indigo-600 hover:text-indigo-800 font-medium"
                       >
                         Switch
