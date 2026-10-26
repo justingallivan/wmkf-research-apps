@@ -127,8 +127,13 @@ and current-profile Archive prompt ONCE when either editor has dirty or pending/
 uncertain mutation state. A combined confirmContextChange first asks once, then
 resets both controllers only on confirmation; cancellation resets neither.
 Cleaning/collapsing one editor must not remove the other editor's Back guard.
-Noncurrent Archive remains independent. A clean pending GET alone does
-not need a discard warning. Auth loading retains draft, disables mutation and
+Controllers expose guard state and a resetWithoutPrompt operation; page-owned
+confirmation resets both without calling either controller's old prompting
+confirmContextChange. Migrate its unit/integration callers deliberately.
+Noncurrent Archive remains independent. Acceptance clean pending GET alone does
+not warn. Preserve the released thank-you controller's current clean-read warning
+semantics in this slice (its busy state still contributes); do not silently change
+that existing behavior while composing the guard. Auth loading retains draft, disables mutation and
 invalidates old completions; actual actor change clears private state. Epoch,
 operation and mounted guards cover every post-await write and finally; old actor
 cannot clear new actor busy state. Validate owner/profile and DTO status/flags.
@@ -148,10 +153,16 @@ deps.sendAcceptanceEmail callers/tests (including operational-events and
 notification-trust-model pushup suites), migrate to the new seams, and reject a
 leftover legacy send injection loudly before any default preparation can run.
 Mocks must return explicit {sent:true}; undefined/malformed transport receipts
-are uncertain, no sentAt, claimedAt retained and no automatic resend. The public
-sendAcceptanceConfirmationEmail wrapper may still return {sent:true} after the
-real transport resolves as its current contract; distinguish that wrapper from
-the drain's injected transport result.
+are uncertain, no sentAt, claimedAt retained and no automatic resend. The REAL sendPreparedAcceptanceConfirmationEmail must await
+DynamicsService.createAndSendEmail (which resolves {emailId}, not {sent:true})
+and adapt successful resolution to {sent:true, emailId: receipt?.emailId}. It must
+not merely return the raw Dynamics result. Its failure throws for classification.
+Only the drain's injected/adapter-level transport result needs the explicit
+sent:true check. The existing public sendAcceptanceConfirmationEmail wrapper
+prepares then awaits this helper and preserves its existing {sent:true} return
+shape for direct callers. Add a test using the real send-prepared helper, mocked
+Dynamics resolving {emailId}, and the drain: verify claimedAt then sentAt, no
+uncertain alert. An injected undefined/malformed receipt remains uncertain.
 Only the drain owns the durable one-time claim. Helper extraction must preserve
 recipient, sender, due-date override/ICS, signature, regarding and noFallback.
 Preparation has no transport or email-step claim write.
@@ -161,7 +172,9 @@ request binding, confirmed recipient, due-date override and accepted-state check
 Record the request GUID checked for test-request isolation in this job pass. Read
 the current request through grant-request.getById using this fresh suggestion
 request GUID; require equality with that isolation-checked GUID, job.request_id
-(which must be nonnull/valid) and any payload request identity. Refuse missing/invalid/mismatched
+(which must be nonnull/valid) and any payload request identity. Compare with the
+isolation-checked GUID only when isolation is enabled; retain the existing switch
+and test-state gates. Refuse missing/invalid/mismatched
 identity or read failure before claim; do not fall back to stale payload request.
 Use a small explicit projection: akoya_requestid, akoya_requestnum, akoya_title,
 _wmkf_programdirector_value, wmkf_reviewduedate. Use this fresh request only for
@@ -177,7 +190,10 @@ late-honorarium cleanup and operational-event supersession; do not copy a weaker
 boolean-only check. No claim of
 an atomic transaction across Dataverse reassignment and Postgres email dispatch:
 request/PD/signature are a bounded preparation snapshot; a change after preparation
-is not covered by a cross-system lock.
+is not covered by a cross-system lock. Existing resolveSignatureForRequest
+independently re-reads request/PD and swallows failures; its signature fallback
+and potential race with the prepared sending PD remain unchanged. Do not claim
+the signature is transactionally bound to that sender snapshot.
 
 Resolve sender exactly once in preparation. For enabled PD attribution, require
 valid matching systemuser GUID and freeze that identity, mailbox and entire selected
@@ -192,11 +208,18 @@ from the lookup is a preparation refusal.
 refusals before claim. Do not downgrade to shared wording or the generic mailbox
 on a transient/unreadable lookup. Retain shared generic fallback for no assigned
 PD, a confirmed disabled PD or a confirmed PD without a mailbox. Missing/null
-lookup result for an assigned PD is unreadable identity, so retry; malformed or
+lookup result for an assigned PD is unreadable identity, so retry; a deleted PD
+may throw 404 and now also retries to exhaustion rather than taking the historical
+generic fallback. This is a named residual of the owner-approved O2 policy. Malformed or
 mismatching GUID refuses. Validate the assigned GUID before the DAL lookup.
 
 Preserve required shared-default prerequisite for both branches, as in the
-thank-you slice; personal copy does not mask broken mandatory Admin configuration.
+thank-you slice; personal copy does not mask broken mandatory Admin configuration. Blank/missing
+Admin defaults previously returned skipped and the drain falsely completed them;
+they now retry, then fail if not repaired. Authored multiline shared subjects also
+newly refuse, since existing readRequiredEmailDefaults only checks nonblank copy.
+Document these intentional behavior changes rather than claiming shared-send
+behavior is completely unchanged.
 Resolve signature, due date/ICS and encrypted-token withdrawal URL before claiming.
 Check for a missing encrypted token BEFORE decrypt; missing token retains
 historical no-link behavior. Nonempty-token decryption/build exceptions
@@ -231,22 +254,44 @@ A reviewer repeat may collide and reopen status but does not reset attempts,
 steps or payload; it is not a supported recovery mechanism. After exhaustion
 the automatic confirmation is lost unless staff intervene manually; the terminal
 alert must say “confirmation not sent; send by hand.” No requeue tool or DB repair
-is in this slice. Eight 300-second retries with the two-minute cron cadence give
-roughly 35–40 minutes from first refusal to exhaustion; previous sibling failures
-can shorten it. Document this finite window prominently; no indefinite automatic
+is in this slice. Eight total attempts mean seven retry gaps. Theoretical minimum is 35 minutes
+(7 × 300 seconds); with a two-minute cron cadence the nominal first-refusal-to-
+exhaustion window is about 42 minutes (7 × 6 minutes), longer for slow passes or
+backlog (default five jobs per drain). Prior consumed attempts can shorten it.
+This is not a guaranteed repair deadline. Document this finite window prominently; no indefinite automatic
 repair promise. Existing
 claimed jobs never become retryable emails. Use a job-bound preparation alert key acceptance-confirmation-preparation:<jobId>
 with IDs/reason in metadata (at most one active alert per affected job), not a
 PD-wide key that one successful sibling can incorrectly resolve. A distinct
 :terminal key guarantees a terminal manual-send warning despite earlier alert
-deduplication. Keep tokens/raw copy out of metadata. On a confirmed send,
-AlertService.autoResolve both preparation keys; on withdrawal/release cancellation,
-auto-resolve them with a superseded note and mark any corresponding operational
-events superseded. Do not settle on mere job completion after a post-claim
-uncertain/failed send. Terminal sibling failure still dominates retryReasons:
+deduplication. Use warning severity plus explicit operationalEvent opt-in in
+NotificationService.notify, with matching recovery key; otherwise there is no
+durable operational event to settle. Keep tokens/raw copy out of metadata.
+After the email claim commits, autoResolve the nonterminal preparation key:
+preparation recovered; any later dispatch failure has its separate existing
+failed/uncertain alert. A confirmed send may resolve both preparation keys.
+Do not use mere job completion to assert dispatch success after an uncertain send.
+
+For cancellation observed by this drain, settle ONCE in the outer-loop
+processed.status === cancelled branch, covering all process cancellation exits
+and avoiding duplicate cleanup hooks. For both new keys, first call
+OperationalEventService.markSuperseded(key, {note}), THEN AlertService.autoResolve(key).
+autoResolve takes no note and propagates markRecovered only to open events;
+reversing the order falsely records recovery. Best-effort failures do not change
+job outcome. Cancellations performed outside this drain (respond-service or
+terminal-transition cancelling unlocked jobs) are not claimed/seen again, so may
+leave a stale preparation alert/event. This is an explicit scope limit; do not
+claim all cancellation alerts are automatically settled and do not expand this
+slice into external cancellation writers. Terminal sibling failure still dominates retryReasons:
 if preparation was refused in that pass, the confirmation is not sent and will
-not automatically recover. Alert that manual-send outcome when recording terminal
-job failure. A successfully prepared email may still send before that existing
+not automatically recover. Emit the manual-send :terminal alert in the OUTER drain catch only after
+recordReviewerAcceptanceJobFailure returns a fresh updated row, when
+updated.status === failed, the updated payload is not isAcceptRepeat, and
+updated.steps.acceptance_confirmation has neither claimedAt nor sentAt. Use
+this returned row, not the stale claimed job, and a nonthrowing notifier. This
+single hook covers exhaustion and an immediate terminal sibling failure, including
+failure before preparation itself was reached. Do not emit a manual-send alert
+for a claimed/uncertain send, since a manual duplicate would be unsafe. A successfully prepared email may still send before that existing
 terminal-sibling decision, as today. Preserve this ordering; do not retry unrelated
 terminal honorarium/contact work or imply that confirmation is guaranteed.
 Expose per-job retry reason through existing errors/retriedJobIds. Do not falsely
@@ -273,7 +318,8 @@ Tests must include:
    definite vs ambiguous writes, confirmed refresh failure, strict Reload recovery,
    Clear and Switch/current Archive guards. Real Pages Router fixture-browser:
    load, collapse, cancel/confirm discard, Back cancel, pending write cancel/confirm,
-   clean pending GET navigation; BOTH editors dirty, one becomes clean while the
+   acceptance-only clean pending GET navigation (preserve thank-you's existing
+   clean-read warning); BOTH editors dirty, one becomes clean while the
    other stays dirty then Back still prompts once; acceptance-only dirty Switch/
    current Archive cancellation, confirming context change resets both. No network
    writes to real stores.
@@ -297,8 +343,17 @@ Tests must include:
    Post-claim failures/uncertain/lost recording stay non-retryable for email.
 6. Cron/Maintenance truthful retried vs failed outcomes; job-bound alert dedupe,
    terminal warning, recovery and cancellation supersession without closing another
-   job's failure. Migrate all old drain injected-send tests; leftover injection fails
-   loudly and transport undefined is uncertain.
+   job's failure; cancellation order must leave durable events superseded rather
+   than recovered. Tests cover external-cancellation stale-alert limit explicitly
+   without asserting nonexistent automatic settlement. Migrate all old drain
+   injected-send tests; leftover injection fails loudly and transport undefined
+   is uncertain. Inject all four new seams in shared deps helpers, or derive
+   readConfirmationSuggestion from injected suggestions. Include the intentionally
+   real-sender trust-model case at notification-trust-model-pushup.test.js:1118:
+   blank shared copy now expects followup_retry_required rather than completed,
+   with real preparation and mocked DAL readers. Do not force this real-path case
+   to inject the transport-only seam. Repeat-acceptance injections at :1012/:1358
+   never call transport; do not cite them as undefined-receipt coverage.
    Regression red against prior claim-before-preparation source, then green.
    No real cron invocation, tenant mutation, or outbound email as test evidence.
 
@@ -336,7 +391,11 @@ R3 explicit test seams, R4 fresh suggestion and binding/recheck, R7 terminal sib
 and job-bound alert lifecycle, R8 three privacy sets/naming/missing token corrected.
 R5 internal plain-text helper added; O1 owner approved subject-value normalization.
 R6 owner approved pre-claim retries on PD lookup errors; O2 resolved. These revisions have not yet had
-an independent rereview. Initial verbatim report is retained in
+an independent final closure review. Rereview at `1aef57b70` returned READY WITH
+NAMED CHANGES: real transport receipt adapter, accurate retry timing, terminal
+alert placement, truthful event settlement and real-path test migration corrected
+above. Its low-priority signature/isolation/deleted-PD and clean-GET clarifications
+are also incorporated. Initial verbatim report is retained in
 `docs/audits/REVIEWER_ACCEPTANCE_DEFAULTS_PLAN_CLAUDE_REVIEW_2026-10-26.md`.
 
 [VERIFIED via root-run mocked baseline.] Four existing suites / 63 tests passed:
