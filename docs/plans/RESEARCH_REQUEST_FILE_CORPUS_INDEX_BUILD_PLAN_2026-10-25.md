@@ -3,7 +3,7 @@ title: Research request file corpus — index build (rollout step 3)
 kind: plan
 domain: dataverse
 status: active
-summary: "Approved: build the metadata index of SharePoint files for Research requests with a meeting year from 2018, in Postgres, from a fresh strict listing, classified by the filename rules; no text, no route, no model. Visibility decided (no per-request rule; admin exercise). Migration 090 free as of 2026-10-25. Owner-run local loader decided. Built on a branch; not merged or applied."
+summary: "Approved: build the metadata index of SharePoint files for Research requests with a meeting year from 2018, in Postgres, from a fresh strict listing, classified by the filename rules; no text, no route, no model. Visibility decided (no per-request rule; admin exercise). Migration 090 free as of 2026-10-25. Owner-run local loader decided. Built on a branch; migration 090 applied from the branch; first full load run 2026-10-26 (3,852 requests, 38,340 files, 2 known errors); not merged."
 owner: product-engineering
 related:
   - docs/plans/RESEARCH_REQUEST_FILE_CORPUS_PLAN_2026-10-25.md
@@ -15,7 +15,7 @@ related:
 
 # Research request file corpus — index build (rollout step 3)
 
-[APPROVED by the owner 2026-10-25; built on branch `claude/request-corpus-index`, not merged; migration 090 applied from the branch; no load run yet. Parent plan:
+[APPROVED by the owner 2026-10-25; built on branch `claude/request-corpus-index`, not merged; migration 090 applied from the branch; first full load completed 2026-10-26 (see "First Production load"). Parent plan:
 `docs/plans/RESEARCH_REQUEST_FILE_CORPUS_PLAN_2026-10-25.md`, rollout step 3.]
 
 ## Decisions needed from the owner
@@ -141,3 +141,26 @@ Any later surface is admin-only (decision 1).
   newest first.
 - Expect the two known inventory listing errors (request 1001703's document
   location and one archive folder) to reappear as recorded errors.
+
+## First Production load (2026-10-26)
+
+Owner-run from branch `claude/request-corpus-index` against the shared app
+database; output pasted into the session [VERIFIED via the loader's printed
+whole-run summary, which `finishRun` recomputes from stored rows].
+
+- `--plan`: 3,854 Research requests with meeting years 2018–2026 (2026: 447,
+  6 test; 2025: 296, 1 test; 2024: 400; 2023: 406; 2022: 430; 2021: 494;
+  2020: 483; 2019: 491; 2018: 407).
+- Trial `--limit=25` (newest cycle): run `3f23ff55-6664-476d-a330-426603d526bf`,
+  25 requests, 326 files, 0 errors; label counts inspected and judged sane.
+- Full load: run `5631c55d-1b92-498f-9e93-e625dd1bfd16`
+  (`filename-rules:bf050083cdd6`), about 85 minutes: 3,841 listed, 38,315
+  files, 13 errors. Eleven were transient Dataverse timeouts among 2018–2019
+  requests; one `--resume` of the same run retried them.
+- Whole run after the resume: **3,852 requests listed, 38,340 files, 2
+  errors** — the two expected inventory errors: request 992853 (its
+  `RequestArchive3` folder returns 404) and request 994366 (its document
+  location points at request 1001703's library, which the Graph allowlist
+  refuses). Both are Dynamics/SharePoint data problems, not loader faults.
+- The provisional inventory counted 38,316 files for the same years; the load
+  is within normal snapshot drift of it.
