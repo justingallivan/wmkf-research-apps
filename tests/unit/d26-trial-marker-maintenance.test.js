@@ -46,7 +46,7 @@ test('generic PATCH remains refused with the ordinary factory create option enab
   expect(fetch).not.toHaveBeenCalled();
 });
 
-test.each(['1003220', '1003223', '1003224'])('specific maintenance method ETag-patches only the marker for %s', async requestNumber => {
+test.each(['1001931', '1003220', '1003223', '1003224'])('specific maintenance method ETag-patches only the marker for %s', async requestNumber => {
   fetch.mockImplementation(async (url, options) => {
     if (options.method === 'PATCH') return response(204);
     if (String(url).includes('?$select=akoya_requestnum')) {
