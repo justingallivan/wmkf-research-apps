@@ -59,8 +59,8 @@ De-duplicated on `request_id` and Graph item id, the four runs hold 9,001
 requests and 60,369 files (60,237 excluding test requests); two requests appear
 in both of the last two runs. Migrated requests carry
 a 2023 `createdon` (3,401 of 3,405 in 2016–2023), so history must be windowed by
-`wmkf_meetingdate`. Requests with no meeting date were not covered by the
-history runs.
+`wmkf_meetingdate`. Requests with no meeting date, and those with a meeting
+date before 1990, were not covered by the history runs; decision 4 counts them.
 
 ### Four eras
 
@@ -327,6 +327,15 @@ notes promotion governance is under-specified; define it in that plan.
    owner-approved exception.
 4. **History gaps:** count pre-1990 Research requests and Research requests with
    no meeting date (read-only), then decide whether to include them.
+   Counted 2026-10-25 [VERIFIED via `scripts/probe-research-history-gaps.mjs`,
+   Production read run by the owner; aggregates only]:
+   - **Meeting date before 1990:** 357 requests, none test (MR 171, S&E 186);
+     meeting years 1974–1989, 312 of them 1983–1989; all `createdon` 2023;
+     statuses mostly Closed (187) and declined/denied (136).
+   - **No meeting date:** 46 requests, none test (MR 31, S&E 15); all `createdon`
+     2023; statuses mostly Denied (23) and Phase I Ineligible (9), 2 Pending.
+   Together 403 requests, about 4% of the 9,001 inventoried. Their file counts
+   are unknown until they are listed. Whether to include them is still open.
 5. **Reading scope:** read science proposal documents, reviews, interim and
    final reports, and staff writeups. Budgets, biosketches and administrative
    documents (no-cost extensions, budget reallocations, emails) are typed but
