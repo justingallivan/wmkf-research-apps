@@ -37,6 +37,7 @@ describe('proposal and report forms are Read', () => {
     ['Medical Research Program Phase I Application Meeting Date December 2025 Applicant Institution', 'compiled-phase-i-application'],
     ['W. M. Keck Foundation – Phase II Proposal – Abstract Example University Cells', 'phase-ii-proposal-abstract'],
     ['PROJECT DESCRIPTION Context: an example', 'project-description-heading'],
+    ['An Example Title for a Proposal Example Investigator Abstract: The goal of this project', 'project-summary-heading'],
     ['Interim Progress Report - Research Program 4049000.00000000', 'interim-progress-report-form'],
     ['Grantee Organization/Institution Name: Example University Project Description/Title: Example Grant Award Date: June 2017 Final Report Date:', 'grantee-narrative-report-form'],
   ])('%#', (text, expected) => {
@@ -56,6 +57,10 @@ describe('Type-only signatures need a specific template phrase', () => {
     ['EXAMPLE UNIVERSITY Consolidated Financial Statements June 30, 2019 and 2018', 'audited-financial-statements'],
     ['Board of Trustees Example University System', 'board-roster'],
     ['GRANTEE INFORMATION SHEET Organization: Example University Grant Number: 950000', 'grantee-information-sheet'],
+    ['Science and Engineering Research Phase I Application Cover Page Applicant Institution: Example University Abstract: text', 'research-cover-page'],
+    ['BIOGRAPHICAL SKETCH NAME Example, Person POSITION TITLE Professor', 'biographical-sketch'],
+    ['AUDITED FINANCIAL STATEMENTS EXAMPLE HOSPITAL FOUNDATION December 31, 2017', 'audited-financial-statements'],
+    ['The Corporation of Example University 2018-2019 meets three times per year', 'board-roster'],
   ])('%#', (text, expected) => {
     expect(template(text)).toBe(expected);
     expect(classifyByContent(text).priority).toBe('type-only');
@@ -63,6 +68,10 @@ describe('Type-only signatures need a specific template phrase', () => {
 
   test('a board named as the applicant does not make a proposal a board roster', () => {
     expect(template('Applicant Institution: Board of Trustees of Example University Project Objectives /Aims Improve')).not.toBe('board-roster');
+  });
+
+  test('a memorandum of understanding is not a staff memo', () => {
+    expect(template('Example Project References Example Person - Programme Officer, Memorandum of Understanding signed')).not.toBe('memorandum');
   });
 
   test('a dated staff note without a salutation is not a letter', () => {

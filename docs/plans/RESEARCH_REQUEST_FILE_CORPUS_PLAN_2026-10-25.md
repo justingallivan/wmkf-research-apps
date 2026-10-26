@@ -246,8 +246,8 @@ CSVs; 60,237 non-test files; unit tests in
 | Era | Files | Read | Already legible | Type-only | Deferred (PowerPoint) | Uncertain (of which opaque names) |
 |---|---|---|---|---|---|---|
 | 1 (parked) | 21,921 | 633 | 0 | 800 | 0 | 20,488 (19,326) |
-| 2 | 18,721 | 3,460 | 0 | 9,196 | 19 | 6,046 (3,323) |
-| 3 | 16,902 | 6,411 | 0 | 8,264 | 25 | 2,202 (297) |
+| 2 | 18,721 | 3,550 | 0 | 9,106 | 19 | 6,046 (3,323) |
+| 3 | 16,902 | 6,416 | 0 | 8,259 | 25 | 2,202 (297) |
 | 4 | 2,693 | 898 | 314 | 1,456 | 25 | 0 |
 
 After the second Codex review: a name mixing proposal and administrative words
@@ -258,8 +258,10 @@ status word beside "IRS". Tax determination letters themselves stay Type-only
 
 After the content pilot (owner decisions 2026-10-25, section 2b): names with
 "Phase I/II Review" are `staff-review` (`phase-review`; 75 files); "References"
-and reviewer lists are Type-only `referee-list` (1,616 files), unless the name
-also signals proposal text; archive-dated `<year>_<JUN|DEC>_<institution>_<n>_References.pdf`
+and reviewer lists are Type-only `referee-list` (1,521 files), unless the name
+also signals proposal text or says "review" (a fix after the held-out sample,
+section 2c: 95 files named `… Referee Review (<name>).pdf` had been labelled
+referee lists); archive-dated `<year>_<JUN|DEC>_<institution>_<n>_References.pdf`
 names go to `uncertain` (`archive-references`; 105 files), because the pilot
 found a scanned referee review behind one. The table above reflects these
 rules. The table uses the eras as recut at 2018; the bullets below were
@@ -275,7 +277,7 @@ they say otherwise.
   252 "Phase I rationale" documents, 63 site visit memos and write-ups
   (`SV memo …`, `… site visit WU`), 224 other write-ups, and office visit
   memos. They are Read (`staff-review`, `site-visit-report`, `staff-writeup`).
-- **Reviews by name:** 727 files across eras 1–4 match the referee `review` rule
+- **Reviews by name:** 822 files across eras 1–4 match the referee `review` rule
   and 75 the staff `phase-review` rule.
 - **Vocabulary additions found while building rules:** `compiled-proposal` (a
   Phase II package or staff version, Read), `institutional-info` (fact sheets,
@@ -380,13 +382,11 @@ the reading set.
 | 2005 | 66 | 62 | 0 | – | – |
 | 2012 | 28 | 28 | 0 | – | – |
 | 2017 | 89 | 86 | 23 | 14 | 11 |
-| 2020 | 40 | 35 | 87 | 46 | 37 |
-| 2025 on | 2 | 0 | 31 | 19 | 18 |
+| 2020 | 40 | 35 | 87 | 52 | 38 |
+| 2025 on | 2 | 0 | 31 | 21 | 19 |
 
-- **In-sample only.** The signatures were written from the same pilot text
-  they are measured on, so these rates are an upper bound. A held-out sample
-  from 2018–2021 (none of 2018, 2019 or 2021 was in the pilot) is the next
-  check before the index build relies on them.
+- **In-sample.** The table above is measured on the text the signatures were
+  written from (after the held-out fixes below), so it is an upper bound.
 - **No Type-only signature contradicted a Read filename label** after one fix
   (a proposal opening "Applicant Institution: Board of Trustees of …" briefly
   matched the board-roster signature). The 13 remaining disagreements are
@@ -401,6 +401,36 @@ the reading set.
   mostly letters without a salutation in the opening, 1995 proposal control
   sheets (era 1, parked), institutional brochures and news printouts. These go
   to the model.
+
+**Held-out check, 2018–2021** [VERIFIED via a second owner-approved,
+owner-run pilot: 30 non-test requests, 10 each with a meeting year of 2018,
+2019 and 2021, even stride; 450 files processed, 439 extracted or attempted;
+output in `Research/Shuttle/request-file-pilot-2018-2021-2026-10-25/`]:
+
+- **Before any change**, the signatures decided 87 of 142 filename-`uncertain`
+  documents with text (61%), against 93% in-sample. The misses were mostly one
+  template not seen in the first pilot (the pre-2022 "Medical Research / Science
+  and Engineering Research Phase I Application Cover Page"), proposal summaries
+  that open with the title before "Abstract", and institutional brochures,
+  facts pages, annual reports and differently worded audited statements.
+- **It exposed a filename bug that excluded Read documents.** Files named
+  `JUN_2019_<institution>_<n>_Referee Review (<name>).pdf` matched the
+  `referee-list` rule (Type-only) on the word "referee". Content signatures
+  overrode four of them back to `external-review`; a fifth was a `.msg`, which
+  content cannot reach. Across the inventory 95 files had this label; the rule
+  now skips names containing "review".
+- **After adding six signatures** (the older cover page; summaries after a
+  title; biographical sketches; more audited-statement and board wordings) and
+  excluding "memorandum of understanding" from the memo signature, 121 of 142
+  are decided (85%, now in-sample). The remaining 21 are mostly institutional
+  brochures and annual reports, which go to the model.
+- **No Type-only signature overrode a Read filename label** in either sample.
+  Disagreements are all between two Read types or two Type-only types, apart
+  from old cover pages the `goapply-phase-ii-proposal` filename rule sends to
+  Read (the filename stands, so they are extracted unnecessarily, not lost).
+- Extraction matched the first pilot: legacy `.doc` (86) and `.xlsx`/`.xls`
+  (56) all converted; 46 of 178 PDFs had no text layer (about a quarter, as
+  before); 2 PDFs failed to download or parse.
 
 ### 3. One preferred text copy
 
@@ -479,7 +509,7 @@ notes promotion governance is under-specified; define it in that plan.
    come back to the owner before any scale-up; the full run needs a further
    approval.
    Done 2026-10-25; results in section 2b. First template signatures built
-   from it (section 2c); a held-out 2018–2021 sample is next.
+   from it and checked against a held-out 2018–2021 sample (section 2c).
 3. **Index build** (metadata, from a fresh listing), newest era first (era 1
    parked, decision 6), using the
    rules from step 1 and what the pilot learned.

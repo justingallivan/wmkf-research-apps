@@ -43,6 +43,7 @@ describe('Read documents', () => {
     ['Bibliography.pdf', 'bibliography'],
     ['References Cited.docx', 'bibliography'],
     ['review-1003000-Example Reviewer.docx', 'external-review'],
+    ['JUN_2019_Example University_998000_Referee Review (Example).pdf', 'external-review'],
     ['Example University - Phase II Review.doc', 'staff-review'],
     ['J24 SE Example University Phase II Review.doc', 'staff-review'],
     ['Federal Agency Reviews (optional).pdf', 'agency-reviews'],
