@@ -380,6 +380,7 @@ If you're touching a service or utility, read its header before this catalog. If
 
 ### Other
 
+- **`request-file-corpus/filename-rules.js`** — **[Offline only; not wired into any route or worker.]** Pure tier-1 classifier for the Research request file corpus: subfolder + filename → document type, reading priority (`read` / `already-legible` / `type-only` / `uncertain`) and rule id, plus `phaseOf`. Opaque names stay `uncertain`; Type-only rules fire only on specific phrases. Measured by `scripts/report-request-file-rule-coverage.mjs`. Plan: `docs/plans/RESEARCH_REQUEST_FILE_CORPUS_PLAN_2026-10-25.md`.
 - **`irs-bmf-service.js`** — IRS Business Master File 501(c)(3) lookup for EIN verification. Used by `/api/irs/verify-ein` (PowerAutomate-callable via `IRS_VERIFY_SECRET`).
 - **`dataverse-export/`** (subdirectory) — Dataverse Bulk Export (Track B) services. Deterministic QuerySpec→FetchXML translation, paging, trust-bounded Excel emission. See `docs/DATAVERSE_POWER_TOOLS_TRACK_B_BUILD_PLAN.md`.
 
