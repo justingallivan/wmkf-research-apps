@@ -40,8 +40,11 @@ describe('Read documents', () => {
     ['Application2.html', 'application-form'],
     ['Research Phase II Proposal_2025-01-01T00-00-00Z.pdf', 'compiled-proposal'],
     ['Example University_MR_Phase_II_staff_version.pdf', 'compiled-proposal'],
-    ['Keck References.docx', 'bibliography'],
-    ['Example University - Phase II Review.doc', 'external-review'],
+    ['Bibliography.pdf', 'bibliography'],
+    ['References Cited.docx', 'bibliography'],
+    ['review-1003000-Example Reviewer.docx', 'external-review'],
+    ['Example University - Phase II Review.doc', 'staff-review'],
+    ['J24 SE Example University Phase II Review.doc', 'staff-review'],
     ['Federal Agency Reviews (optional).pdf', 'agency-reviews'],
     ['Example University - Phase I Rationale (SE - J24).docx', 'staff-review'],
     ['SV memo D23 MR Ph2 Example.docx', 'site-visit-report'],
@@ -71,6 +74,9 @@ describe('Type-only labels need a specific phrase', () => {
     ['IRS Determination Letter.pdf', 'status-letter'],
     ['No Cost Extension Request.pdf', 'no-cost-extension'],
     ['Grant Award Letter.pdf', 'correspondence'],
+    ['Keck References.docx', 'referee-list'],
+    ['List of Potential Reviewers.docx', 'referee-list'],
+    ['Example-reviewers.docx', 'referee-list'],
   ])('%s → %s', (name, expected) => {
     expect(type(name)).toBe(expected);
     expect(priorityOf(expected)).toBe('type-only');
@@ -80,6 +86,14 @@ describe('Type-only labels need a specific phrase', () => {
     expect(priorityOf(type('Example University Annual Report 2019.pdf'))).toBe('uncertain');
     expect(priorityOf(type('Signed letter.pdf'))).toBe('uncertain');
     expect(type('Research on IRS signaling.pdf')).toBe('uncertain');
+  });
+
+  test('references that may carry proposal text or a referee review are not excluded', () => {
+    expect(type('Project Narrative and References.docx')).toBe('project-description');
+    expect(priorityOf(type('Example_Phase1_Proposal_References.docx'))).toBe('read');
+    const archive = classifyByFilename({ name: '2017_JUN_Example University_989000_References.pdf' });
+    expect(archive.type).toBe('uncertain');
+    expect(archive.ruleId).toBe('archive-references');
   });
 
   test('a name mixing proposal and administrative words is not excluded', () => {

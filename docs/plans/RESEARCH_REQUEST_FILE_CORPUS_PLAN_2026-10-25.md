@@ -3,7 +3,7 @@ title: Research request file corpus — derived legible layer
 kind: plan
 domain: dataverse
 status: active
-summary: "Build a derived, rebuildable index (and extracted text) over the SharePoint files attached to Research requests, 1990–present, without moving or renaming originals, so staff can browse and AI/portfolio/outcome analyses can run. Based on the 2026-10-25 read-only inventory of 9,001 requests and 60,369 files (de-duplicated across runs); index starts in Postgres and settled fields are promoted to Dataverse as the durable record (owner decision 2026-10-25); owner approved a past-weighted content pilot (~55 requests) focused on science proposals, reviews, grant reports and staff writeups, with visibility governed by the app's request restrictions; inventory counts are provisional pending a strict re-listing. The content pilot (55 requests, 449 files) found legacy .doc converts through Graph, about a quarter of PDFs need OCR, and the 1995–2012 archives hold staff and grant-management documents with strong first-line templates rather than proposals."
+summary: "Build a derived, rebuildable index (and extracted text) over the SharePoint files attached to Research requests, 1990–present, without moving or renaming originals, so staff can browse and AI/portfolio/outcome analyses can run. Based on the 2026-10-25 read-only inventory of 9,001 requests and 60,369 files (de-duplicated across runs); index starts in Postgres and settled fields are promoted to Dataverse as the durable record (owner decision 2026-10-25); owner approved a past-weighted content pilot (~55 requests) focused on science proposals, reviews, grant reports and staff writeups, with visibility governed by the app's request restrictions; inventory counts are provisional pending a strict re-listing. The content pilot (55 requests, 449 files) found legacy .doc converts through Graph, about a quarter of PDFs need OCR, and the 1995–2012 archives hold staff and grant-management documents with strong first-line templates rather than proposals; era 1 is parked until the proposals can be imported from microfiche (owner, 2026-10-25)."
 owner: product-engineering
 related:
   - scripts/probe-request-file-inventory.mjs
@@ -68,7 +68,7 @@ date before 1990, were not covered by the history runs; decision 4 counts them.
 | Era | Meeting years | Library | Shape |
 |---|---|---|---|
 | 1 | 1990–2015 | `RequestArchive1` (1990–2004), `RequestArchive2` (2004–2015), some `RequestArchive3` from 2014 | Flat folders; 92% legacy `.doc`; 15,837 files named only `<number>.doc` |
-| 2 | 2016–2021 | `RequestArchive3`; `akoya_request` from 2018 | Flat; old form exports (`Application<n>.html`), legacy `.doc` (reviews stored as files, e.g. `<institution> - Phase II Review.doc`), interim/final reports mixed in |
+| 2 | 2016–2021 | `RequestArchive3`; `akoya_request` from 2018 | Flat; old form exports (`Application<n>.html`), legacy `.doc` (staff reviews stored as files, e.g. `<institution> - Phase II Review.doc`), interim/final reports mixed in |
 | 3 | 2022 – Jun 2026 cycle | `akoya_request` | Mostly flat GOapply names (`projectdescription.pdf`, `application cover page.docx`); `Phase I`/`Phase II` folders appear inconsistently from 2025 (Jun 2026 cycle: 1,879 of 2,108 files still in the root); staff-made subfolders (`Phase II/<institution> Reviews`, `Relevant Papers`) |
 | 4 | Dec 2026 cycle onward (requests created 2026) | `akoya_request` | Consistent `Phase I` / `Phase II` / `Site Visit - …` / `Artifacts/…` structure; app-generated files well named |
 
@@ -126,6 +126,9 @@ A short, human-legible list, applied across all eras. Draft:
   `institutional-info`, `ai-material`, `uncertain`.
 - **Added from rule building (section 2a):** `compiled-proposal`,
   `institutional-info`, `ai-material`.
+- **Added after the content pilot (section 2b):** `referee-list` (an
+  applicant's suggested referees, filed as "References"; Type-only, owner
+  2026-10-25). `bibliography` now means a literature list only.
 
 Each file also gets a **phase** (`concept`, `phase-i`, `phase-ii`, `site-visit`,
 `post-award`, `unknown`) and an **era**.
@@ -138,7 +141,7 @@ text is extracted only for the documents the analyses need to read:
 | **Read** | Science proposal documents (`compiled-proposal`, `project-summary`, `project-description`, `application-form` narrative sections, `graphical-abstract`, `bibliography`); reviews (`external-review`, `staff-review`, `agency-reviews`, `site-visit-report`); `interim-report`, `final-report`; `staff-writeup`; `site-visit-slides` (PDF) | Classify and extract text |
 | **Already legible** | `site-visit-transcript`, `site-visit-summary`, `staff-discussion-transcript`, `staff-discussion-summary` | Classify; these are recent, app-generated `.txt` (with `.vtt`/`.json` copies), so no conversion work |
 | **Deferred** | Any `.pptx`/`.ppt`, whatever its type | Typed, not read this round [DECIDED by owner 2026-10-25]; revisit later |
-| **Type only** | `budget`, `budget-spreadsheet`, `financial-narrative`, `financial-report`, `biosketches`, `cover-page`, `governing-board`, `status-letter`, `other-funding`, `institutional-priority`, `no-cost-extension`, `budget-reallocation`, `correspondence`, `institutional-info`, `ai-material`, other administrative types, `media` | Classify so they can be filtered out; no text extraction |
+| **Type only** | `budget`, `budget-spreadsheet`, `financial-narrative`, `financial-report`, `biosketches`, `cover-page`, `governing-board`, `status-letter`, `other-funding`, `institutional-priority`, `no-cost-extension`, `budget-reallocation`, `correspondence`, `institutional-info`, `ai-material`, `referee-list`, other administrative types, `media` | Classify so they can be filtered out; no text extraction |
 
 Staff writeups from before AkoyaGO have no recognizable name. The working
 hypothesis is that they sit among era 1–2 documents (e.g. `Final Report Write
@@ -196,9 +199,9 @@ CSVs; 60,237 non-test files; unit tests in
 
 | Era | Files | Read | Already legible | Type-only | Deferred (PowerPoint) | Uncertain (of which opaque names) |
 |---|---|---|---|---|---|---|
-| 1 | 18,181 | 503 | 0 | 449 | 0 | 17,229 (16,354) |
-| 2 | 22,461 | 4,745 | 0 | 8,485 | 19 | 9,212 (6,295) |
-| 3 | 16,902 | 6,957 | 0 | 7,710 | 25 | 2,210 (297) |
+| 1 | 18,181 | 429 | 0 | 451 | 0 | 17,301 (16,354) |
+| 2 | 22,461 | 3,664 | 0 | 9,545 | 19 | 9,233 (6,295) |
+| 3 | 16,902 | 6,411 | 0 | 8,264 | 25 | 2,202 (297) |
 | 4 | 2,693 | 898 | 314 | 1,456 | 25 | 0 |
 
 After the second Codex review: a name mixing proposal and administrative words
@@ -206,6 +209,14 @@ After the second Codex review: a name mixing proposal and administrative words
 18 files), and the tax-status rule needs a letter, determination, exempt or
 status word beside "IRS". Tax determination letters themselves stay Type-only
 (owner: ignorable).
+
+After the content pilot (owner decisions 2026-10-25, section 2b): names with
+"Phase I/II Review" are `staff-review` (`phase-review`; 75 files); "References"
+and reviewer lists are Type-only `referee-list` (1,616 files), unless the name
+also signals proposal text; archive-dated `<year>_<JUN|DEC>_<institution>_<n>_References.pdf`
+names go to `uncertain` (`archive-references`; 105 files), because the pilot
+found a scanned referee review behind one. The table above reflects these
+rules.
 
 - **Opaque names are larger than the inventory summary showed.** Era 2 holds
   4,148 `.doc` files named with hyphenated GUIDs in addition to 1,688
@@ -216,7 +227,8 @@ status word beside "IRS". Tax determination letters themselves stay Type-only
   252 "Phase I rationale" documents, 63 site visit memos and write-ups
   (`SV memo …`, `… site visit WU`), 224 other write-ups, and office visit
   memos. They are Read (`staff-review`, `site-visit-report`, `staff-writeup`).
-- **Reviews by name:** 980 files across eras 1–4 match the review rule.
+- **Reviews by name:** 727 files across eras 1–4 match the referee `review` rule
+  and 75 the staff `phase-review` rule.
 - **Vocabulary additions found while building rules:** `compiled-proposal` (a
   Phase II package or staff version, Read), `institutional-info` (fact sheets,
   audited financials, treasurer's reports; Type-only) and `ai-material`
@@ -264,13 +276,13 @@ this sample only.
 - **"Phase II Review" names staff writeups in the older files.** In the sample,
   documents headed `Phase II Review` (2005, 2017) are staff reviews with the
   requested amount and budget, not external referee reviews (those are headed
-  `REFEREE REVIEW`). The filename rule that maps such names to `external-review`
-  (about 64 inventory filenames contain "Phase I(I) Review") needs a content check
-  before it is trusted; both types are Read, so nothing is excluded meanwhile.
+  `REFEREE REVIEW`). Owner decision: keep the two distinct. Filenames with
+  "Phase I/II Review" are now `staff-review`; at the template tier the
+  headings `REFEREE REVIEW` and `PHASE I/II REVIEW` separate them by content.
 - **"References" files are referee lists, not bibliographies.** In 2020 the
   files the `bibliography` rule matched are lists of suggested referees (names,
-  titles, addresses), and one 2017 match is a referee review. The type needs
-  renaming, and whether a referee list is Read or Type-only is an owner call.
+  titles, addresses), and one 2017 match is a referee review. Owner decision:
+  referee lists are labelled only (`referee-list`, Type-only).
 - **Type-only labels held in a spot check.** Type-only files were checked by
   their first lines (up to six per type and cohort), and the 14 over 20,000
   characters were searched for proposal terms; none was a proposal, review,
@@ -279,6 +291,10 @@ this sample only.
 - **An unflagged test request.** One sampled recent request has placeholder
   content ("blahblahblah", applicant "W M Keck Foundation") but no
   `wmkf_istestrequest` flag, so the flag alone does not exclude all test data.
+  The owner approved setting the flag, but the Dataverse client refuses
+  test-flag writes to existing requests outside a fixed five-request D26
+  allowlist (`lib/dataverse/client.js`), so it is not set yet; the corpus can
+  keep its own exclusion list meanwhile.
 - **No model pass yet.** Templates and filename rules explain the sample well
   enough that the model is better spent on what remains after template
   signatures than on the whole pilot.
@@ -359,7 +375,9 @@ notes promotion governance is under-specified; define it in that plan.
    the owner's OneDrive Shuttle folder (owner-approved for the pilot). Results
    come back to the owner before any scale-up; the full run needs a further
    approval.
-3. **Index build** (metadata, from a fresh listing), newest era first, using the
+   Done 2026-10-25; results in section 2b.
+3. **Index build** (metadata, from a fresh listing), newest era first (era 1
+   parked, decision 6), using the
    rules from step 1 and what the pilot learned.
 4. **Text extraction at scale** for Read-priority types, after approval.
 5. **Staff browsing surface** and the first analyses.
@@ -394,12 +412,18 @@ notes promotion governance is under-specified; define it in that plan.
    - **No meeting date:** 46 requests, none test (MR 31, S&E 15); all `createdon`
      2023; statuses mostly Denied (23) and Phase I Ineligible (9), 2 Pending.
    Together 403 requests, about 4% of the 9,001 inventoried. Their file counts
-   are unknown until they are listed. Whether to include them is still open.
+   are unknown until they are listed. Tabled by the owner 2026-10-25.
 5. **Reading scope:** read science proposal documents, reviews, interim and
    final reports, and staff writeups. Budgets, biosketches and administrative
    documents (no-cost extensions, budget reallocations, emails) are typed but
    not read. Site Visit transcripts and summaries and staff discussion
    summaries are already legible (section 1, reading priority).
+6. **Era 1 parked:** the 1995–2012 sample held Foundation documents, not
+   proposals (section 2b). The owner believes the proposals survive on
+   microfiche and could be imported, so era 1 waits for that better source
+   before any further work. Era 1 is defined as meeting years 1990–2015; the
+   parking is applied to the whole era pending owner confirmation of the edges
+   (the sample covered 1995, 2005 and 2012).
 
 ## Likely future direction (not decided)
 
