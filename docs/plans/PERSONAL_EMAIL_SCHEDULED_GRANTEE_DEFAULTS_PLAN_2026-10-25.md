@@ -3,7 +3,7 @@ title: Personal defaults for scheduled grantee reminders
 domain: workbench
 kind: plan
 status: active
-summary: "Slice 5 bounded proposal: exact-owner future reminder defaults, creation/handoff integration and independent editor; no runtime implementation or live writes. Independent Claude review pending."
+summary: "Slice 5 bounded proposal: exact-owner future reminder defaults, creation/handoff integration and independent editor; no runtime implementation or live writes. Claude review: READY WITH NAMED CHANGES; handoff failure policy awaiting owner decision."
 owner: product-engineering
 related:
   - docs/plans/PERSONAL_EMAIL_DEFAULTS_INVENTORY_2026-09-24.md
@@ -17,7 +17,10 @@ related:
 ## 1. Status, ownership and scope
 
 [PLANNED — NOT IMPLEMENTED.] Justin authorized flow review, a bounded plan and
-independent Claude review before coding. Codex owns this plan on
+independent Claude review before coding. Claude reviewed draft `0ba91394d` and
+returned **READY WITH NAMED CHANGES**; the required changes and pending owner
+decision are in §9. Sections 3–8 preserve the reviewed draft proposal, not an
+approved implementation contract. Codex owns this plan on
 `codex/scheduled-grantee-defaults-plan` in the existing isolated worktree.
 Baseline: `c7c3ce6e106ea0e9b6c390cfb49351af36377840` (main including the
 reviewed distribution release and its documentation receipt). Claude's other
@@ -260,15 +263,71 @@ or release is authorized by acceptance of this planning task.
   UI source states, generic privacy/reserved guards and tests. Existing ledger fields,
   workflow enum and dispatch states get no new values.
 
-## 9. Independent review gate and next boundary
+## 9. Independent review result and next boundary
 
-[PLANNED.] Commit this draft to fingerprint it, then run an independent read-only
-Claude Code review using its existing interactive OAuth subscription on the host.
-No project/provider API-key authentication, metered review product or additional
-agent delegation. Reviewer must inspect actual callers/store/consumer complements
-and return findings plus READY TO IMPLEMENT / READY WITH NAMED CHANGES / NEEDS REWORK.
-Preserve the report verbatim in a dated audit receipt. Findings stay open until
-verified and addressed; review does not authorize release or implementation.
+[VERIFIED via ordinary OAuth Claude review of `0ba91394dd4f3b421e1c2603fb164515d769943a`.]
+Verdict: **READY WITH NAMED CHANGES**. Verbatim evidence:
+`docs/audits/SCHEDULED_GRANTEE_DEFAULTS_PLAN_CLAUDE_REVIEW_2026-10-25.md`.
+No implementation/release authorization follows from that verdict.
 
-After review, present the plan and any required changes to Justin. Do not code in
-this task. Keep Claude's database work and the main checkout untouched.
+### Required draft revisions (not yet an accepted replacement contract)
+
+- **N1 — owner decision pending.** Under the reviewed draft's strict failure
+  policy, a persistent incoming-PD default error prevents handoff, but the existing
+  due-send pass can still send the former PD's stored message. This is a lasting
+  failure case, not merely the existing narrow reassignment race. Root verified
+  the path: cron returns before create-or-get/handoff; `deliverScheduledEmail`
+  and `claimScheduledEmailSend` do not check the request's current PD for cron
+  delivery. Neither safe holding nor fallback is implemented by this plan.
+  Ask Justin to choose **hold reassigned reminders until repaired** (recommended;
+  requires an explicit send guard in a revised plan) or **rebuild using shared
+  wording under the new PD with a visible warning**. Do not implicitly accept
+  former-PD sending. Define transport-pristine vs activity/intent recovery and
+  concurrency consequences before approving either alternative.
+- **N1/N7 — diagnosis and repair.** Distinguish wording failures from review
+  posture failures while preserving the existing summary shape. Group bounded
+  affected request numbers per broken PD per run; keep row failure accounting
+  explicit. Editor notices must truthfully explain the chosen pause/fallback.
+  Clear can offer repair when identity is verified, but cannot claim success or
+  delete unknown rows when enumeration is unavailable; retry/readback rules hold.
+  Update the cron header's narrow-race claim when the chosen behavior is built.
+- **N2 — aliases/grammar.** Explicitly reject `[Name]`, `[title]`, `COB [date]`,
+  `[Program Director signature]` in personal templates, because the reused renderer
+  unconditionally replaces them. Keep them supported for existing shared copy.
+  Define exact allowed mustache tokens, reject malformed/unmatched delimiters,
+  and check rendered expansion bounds; no new renderer/extraction.
+- **N3 — selection/loading.** Same-path shallow message-query routing must bypass
+  the editor's departure warning; selecting a message cannot discard defaults or
+  leave an unhandled rejected `router.replace`. Test changed URL, retained text
+  and no prompt in a real-router fixture. Disable/hide without unmounting during
+  transient loading for the same actor. Root confirmed installed Next's router
+  emits `routeChangeStart` outside its `isQueryUpdating` branch; selection needs
+  explicit coverage, not an assumed exemption.
+- **N4 — auth order.** Explicit 403 for auth bypass/applicant before the actor,
+  profile and mapping checks; mapping inside DAL context, exceptions sanitized
+  to 503. Cover production bypass and Origin mismatch on PUT/DELETE. Never
+  interpret a missing actor as permission to use a mapped identity.
+- **N5 — prefill.** Shared raw copy is a starting point, not guaranteed to satisfy
+  the stricter personal validator. Show field-specific errors; do not mutate
+  Admin copy or falsely label the prefill saved personal wording.
+- **N6 — discriminating tests.** Block the preference promise while all four row
+  workers are in flight; assert one reader call before release (not a barrier
+  waiting for four reader calls, which would deadlock a correct cache). Cover
+  shared failure snapshot and fresh next-run read. Foreign rows must be present
+  in Clear fixtures. Describe no-send-time-defaults as a structural contract plus
+  frozen-content assertions, not an absent-dependency spy. Cover the chosen N1
+  outcome with an actually due old-PD row and both transport/lease complements.
+
+### Verification performed by Codex for planning
+
+[VERIFIED via local mocked baseline tests.] Six current suites / 127 tests passed:
+cron reminders, scheduled routes/page/service/current recipients and grantee
+renderer. These characterize existing behavior; no tests for the proposed feature
+have been written or run. No Postgres integration or live data probe was run.
+Doc currency/facts/symbol references/build-claim freshness with sequential paired
+self-tests, docs catalog and secret scan passed for the draft and review receipt.
+
+Next action: resolve N1 with Justin, revise the bounded contract for the chosen
+behavior and the named technical corrections, then obtain independent review of
+that revised contract before coding. Claude's separate checkout and database
+work remain untouched. No implementation or release is part of this task.
