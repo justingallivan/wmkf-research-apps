@@ -874,6 +874,7 @@ describe('acceptance confirmation preparation and recovery', () => {
     d.jobs.mergeReviewerAcceptanceJobStep.mockImplementation(async (_id, _lease, key, patch) => { if (mode === 'lost-record' && patch.sentAt) return null; steps = { ...steps, [key]: { ...steps[key], ...patch } }; return { ...j, steps }; });
     if (mode === 'throw') d.sendPreparedAcceptanceEmail.mockRejectedValue(new Error('uncertain')); if (mode === 'undefined') d.sendPreparedAcceptanceEmail.mockResolvedValue(undefined);
     try { await processReviewerAcceptanceJob(j, d); } catch (e) { expect(e.code).toBe('reviewer_acceptance_lease_lost'); }
+    if (mode === 'undefined') expect(d.notify).toHaveBeenCalledWith(expect.objectContaining({ type: 'reviewer_acceptance_confirmation_failed', metadata: expect.objectContaining({ outcome: 'uncertain' }) }));
     expect(steps.acceptance_confirmation.claimedAt).toEqual(expect.any(String)); await processReviewerAcceptanceJob({ ...j, steps }, d); expect(d.sendPreparedAcceptanceEmail).toHaveBeenCalledTimes(1);
   });
   it.each(['exhausted', 'terminal-sibling'])('fresh outer failure row emits manual-send alert for %s, never for claimed/repeat rows', async mode => {
@@ -898,7 +899,13 @@ test('real prepared helper converts Dynamics emailId receipt and the drain recor
   d.prepareAcceptanceEmail.mockResolvedValue({ ok: true, message: { subject: 'Real prepared subject', body: 'Body', to: 'reviewer@example.org', from: 'pd@example.org' } });
   d.sendPreparedAcceptanceEmail = sendPreparedAcceptanceConfirmationEmail;
   await processReviewerAcceptanceJob(job(), d); expect(send).toHaveBeenCalledTimes(1);
-  expect(d.jobs.mergeReviewerAcceptanceJobStep).toHaveBeenCalledWith(77, expect.any(String), 'acceptance_confirmation', expect.objectContaining({ sentAt: expect.any(String), result: { sent: true, emailId: 'fixture-email' } })); send.mockRestore();
+  expect(d.jobs.mergeReviewerAcceptanceJobStep).toHaveBeenCalledWith(77, expect.any(String), 'acceptance_confirmation', expect.objectContaining({ sentAt: expect.any(String), result: { sent: true, emailId: 'fixture-email' } }));
+  const calls = d.jobs.mergeReviewerAcceptanceJobStep.mock.calls;
+  const claimIndex = calls.findIndex(call => call[3].claimedAt), sentIndex = calls.findIndex(call => call[3].sentAt);
+  expect(claimIndex).toBeGreaterThanOrEqual(0); expect(sentIndex).toBeGreaterThan(claimIndex);
+  expect(d.jobs.mergeReviewerAcceptanceJobStep.mock.invocationCallOrder[claimIndex]).toBeLessThan(send.mock.invocationCallOrder[0]);
+  expect(send.mock.invocationCallOrder[0]).toBeLessThan(d.jobs.mergeReviewerAcceptanceJobStep.mock.invocationCallOrder[sentIndex]);
+  expect(d.notify.mock.calls.some(([n]) => n.type === 'reviewer_acceptance_confirmation_failed')).toBe(false); send.mockRestore();
 });
 test('outer drain cancellation supersedes events BEFORE alert resolution, without closing another job key', async () => {
   const d = deps(acceptedSuggestion({ wmkf_declined: true, wmkf_accepted: false })), j = job(); d.jobs.claimReviewerAcceptanceJobs.mockResolvedValue([j]);
@@ -910,4 +917,25 @@ test('outer drain cancellation supersedes events BEFORE alert resolution, withou
 });
 test('external cancellation not observed by this drain does not claim to settle its preparation alert', async () => {
   const d = deps(); AlertService.autoResolve.mockClear(); expect((await drainReviewerAcceptanceJobs({ deps: d })).claimed).toBe(0); expect(AlertService.autoResolve).not.toHaveBeenCalled();
+});
+
+test('terminal repeat-acceptance failure with no claim cannot recommend a manual duplicate confirmation', async () => {
+  const d = deps(), j = job({ isAcceptRepeat: true }); d.jobs.claimReviewerAcceptanceJobs.mockResolvedValue([j]);
+  d.captureOrcid.mockRejectedValue(Object.assign(new Error('terminal sibling'), { retryable: false }));
+  d.jobs.recordReviewerAcceptanceJobFailure.mockResolvedValue({ ...j, status: 'failed', payload: JSON.stringify(j.payload) });
+  expect((await drainReviewerAcceptanceJobs({ deps: d })).failed).toBe(1);
+  expect(d.prepareAcceptanceEmail).not.toHaveBeenCalled(); expect(d.notify.mock.calls.some(([n]) => n.autoResolveKey?.endsWith(':terminal'))).toBe(false);
+});
+test.each(['fresh timestamp', 'payload request', 'isolation request'])('%s binding refusal occurs before preparation/claim', async mode => {
+  const d = deps(), j = job();
+  if (mode === 'fresh timestamp') d.suggestions.getForAcceptanceDrain.mockResolvedValueOnce(acceptedSuggestion()).mockResolvedValueOnce(acceptedSuggestion()).mockResolvedValueOnce(acceptedSuggestion({ wmkf_responsereceivedat: '2026-07-02T10:00:00Z' }));
+  if (mode === 'payload request') j.payload.request.akoya_requestid = LIVE_REQUEST_ID;
+  if (mode === 'isolation request') {
+    d.isolationEnabled = () => true; d.resolveTestState = jest.fn(async () => ({ kind: 'ordinary' }));
+    d.suggestions.getForAcceptanceDrain.mockResolvedValueOnce(acceptedSuggestion({ _wmkf_request_value: LIVE_REQUEST_ID })).mockResolvedValue(acceptedSuggestion());
+  }
+  await expect(processReviewerAcceptanceJob(j, d)).rejects.toThrow(mode === 'fresh timestamp' ? 'accepted_timestamp_changed' : 'request_identity_mismatch');
+  expect(d.readConfirmationRequest).not.toHaveBeenCalled(); expect(d.prepareAcceptanceEmail).not.toHaveBeenCalled(); expect(d.sendPreparedAcceptanceEmail).not.toHaveBeenCalled();
+  expect(d.jobs.mergeReviewerAcceptanceJobStep.mock.calls.some(call => call[3].claimedAt)).toBe(false);
+  if (mode === 'isolation request') expect(d.resolveTestState).toHaveBeenCalledWith(LIVE_REQUEST_ID);
 });

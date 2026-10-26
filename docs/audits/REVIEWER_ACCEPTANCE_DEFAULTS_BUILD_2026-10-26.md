@@ -12,6 +12,8 @@ related:
 # Implementation evidence — 2026-10-26
 
 Owner: Codex; branch codex/reviewer-acceptance-defaults, isolated existing worktree.
+Implementation target `2ff4e861e42c5225e2def34ca85d38fc9c6e6060`, draft
+[PR #534](https://github.com/justingallivan/wmkf-research-apps/pull/534).
 User authorized the reviewed implementation/tests and ordinary independent Claude
 code review; no release. Main's committed corpus/database/report changes were
 merged unchanged. No other checkout or database touched. Existing schema and
@@ -63,7 +65,8 @@ three real scratch-Postgres cases passed, including replacement-lease overlap
 and finite-attempt exhaustion. Fifteen Chromium cases passed against a fresh
 production build (nine acceptance, six existing thank-you). Desktop screenshot
 inspected. All APIs/external traffic were intercepted in browser fixtures.
-Types passed; lint 0 errors / 195 warnings (three new hook warnings). Scoped
+Final rerun on the committed target also passed all three scratch-Postgres and
+15 Chromium cases with a fresh production build. Types passed; lint 0 errors / 195 warnings (three new hook warnings). Scoped
 API/Atlas/DAL/context/route-service/lifecycle/GUID/status gates and their self-tests
 passed sequentially; migration manifest passed read-only. API count is 317,
 requireAppAccess count unchanged. Final doc/secret checks run before closeout.
@@ -77,3 +80,19 @@ experimental code remains. No live database or transport was involved.
 Ordinary OAuth Claude independent source/test review pending; exact code target
 and verbatim receipt will be recorded before completion. Mocked tests are distinct from scratch
 Postgres and fixture-only browser results. No live inbox/tenant acceptance claimed.
+
+## Initial independent review and bounded corrections
+
+Claude PASS WITH NONBLOCKING NOTES at 2ff4e861e, no blocking finding. Verbatim:
+`docs/audits/REVIEWER_ACCEPTANCE_DEFAULTS_IMPLEMENTATION_CLAUDE_REVIEW_2026-10-26.md`.
+Six additional tests close N1's planned test gaps; existing real-helper and unknown-
+receipt tests now explicitly assert claim→transport→sent ordering/no uncertain
+alert and the uncertain outcome respectively. N5's wrong family header corrected.
+No runtime behavior change. Targeted rereview pending.
+
+Retained nonblocking notes: body-preservation proof uses the public HTML output;
+a terminal job can leave both preparation and terminal alerts open; a confirmed
+context change during an uncertain write can prompt again until Reload, as the
+existing thank-you behavior does. Placeholder cascading predates this slice.
+The zero-claim external-cancellation test documents a scope limit rather than
+proving automatic alert settlement (none is claimed).

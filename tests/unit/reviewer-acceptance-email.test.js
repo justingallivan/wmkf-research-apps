@@ -288,3 +288,13 @@ test('expanded subject limit is inclusive; personal token-only body without avai
   const args = input(); args.request.akoya_title = 'x'.repeat(2000); expect((await prepareAcceptanceConfirmationEmail(args)).ok).toBe(true); args.request.akoya_title += 'x'; expect((await prepareAcceptanceConfirmationEmail(args)).reason).toBe('rendered_copy_invalid');
   ownReviewerAcceptanceTemplate.mockResolvedValue({ status: 'configured', template: { subject: 'Subject', body: '{{withdrawUrl}}' } }); expect((await prepareAcceptanceConfirmationEmail(args)).reason).toBe('rendered_copy_invalid');
 });
+test('invalid assigned PD GUID refuses before any lookup or personal read', async () => {
+  const lookup = pdLookup(), args = input(); args.request._wmkf_programdirector_value = 'invalid-pd-guid';
+  expect(await prepareAcceptanceConfirmationEmail(args)).toEqual({ ok: false, reason: 'sender_identity_invalid' }); expect(lookup).not.toHaveBeenCalled(); expect(ownReviewerAcceptanceTemplate).not.toHaveBeenCalled();
+});
+test('no assigned PD uses shared generic fallback even when an actual personal default is available', async () => {
+  const lookup = pdLookup(), args = input(); delete args.request._wmkf_programdirector_value;
+  ownReviewerAcceptanceTemplate.mockResolvedValue({ status: 'configured', template: { subject: 'Private personal subject', body: 'Private personal message' } });
+  const prepared = await prepareAcceptanceConfirmationEmail(args); expect(prepared.message).toMatchObject({ from: 'fallback@wmkeck.org', actingUserSystemId: undefined }); expect(prepared.message.subject).not.toContain('Private'); expect(prepared.message.body).not.toContain('Private');
+  expect(lookup).not.toHaveBeenCalled(); expect(ownReviewerAcceptanceTemplate).not.toHaveBeenCalled();
+});
