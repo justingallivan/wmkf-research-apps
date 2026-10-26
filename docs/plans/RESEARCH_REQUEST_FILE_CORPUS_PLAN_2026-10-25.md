@@ -3,7 +3,7 @@ title: Research request file corpus — derived legible layer
 kind: plan
 domain: dataverse
 status: active
-summary: "Build a derived, rebuildable index (and extracted text) over the SharePoint files attached to Research requests, 1990–present, without moving or renaming originals, so staff can browse and AI/portfolio/outcome analyses can run. Based on the 2026-10-25 read-only inventory of 9,001 requests and 60,369 files (de-duplicated across runs); index starts in Postgres and settled fields are promoted to Dataverse as the durable record (owner decision 2026-10-25); owner approved a past-weighted content pilot (~55 requests) focused on science proposals, reviews, grant reports and staff writeups, with visibility governed by the app's request restrictions; inventory counts are provisional pending a strict re-listing. The content pilot (55 requests, 449 files) found legacy .doc converts through Graph, about a quarter of PDFs need OCR, and the 1995–2012 archives hold staff and grant-management documents with strong first-line templates rather than proposals. Owner decision 2026-10-25: the corpus starts at the 2018 meeting year, where proposals become identifiable for 94–100% of requests with files; meeting years before 2018 (5,149 requests) are parked, with the evidence and revisit triggers recorded in the plan, until the proposals can be imported from microfiche."
+summary: "Build a derived, rebuildable index (and extracted text) over the SharePoint files attached to Research requests, 1990–present, without moving or renaming originals, so staff can browse and AI/portfolio/outcome analyses can run. Based on the 2026-10-25 read-only inventory of 9,001 requests and 60,369 files (de-duplicated across runs); index starts in Postgres and settled fields are promoted to Dataverse as the durable record (owner decision 2026-10-25); owner approved a past-weighted content pilot (~55 requests) focused on science proposals, reviews, grant reports and staff writeups, with no per-request visibility rule (admin exercise, owner 2026-10-25); inventory counts are provisional pending a strict re-listing. The content pilot (55 requests, 449 files) found legacy .doc converts through Graph, about a quarter of PDFs need OCR, and the 1995–2012 archives hold staff and grant-management documents with strong first-line templates rather than proposals. Owner decision 2026-10-25: the corpus starts at the 2018 meeting year, where proposals become identifiable for 94–100% of requests with files; meeting years before 2018 (5,149 requests) are parked, with the evidence and revisit triggers recorded in the plan, until the proposals can be imported from microfiche."
 owner: product-engineering
 related:
   - scripts/probe-request-file-inventory.mjs
@@ -21,7 +21,8 @@ related:
 [ACTIVE; owner direction and decisions 2026-10-25; nothing built beyond the inventory script.] Make the files attached to Research
 requests simple to find and usable for later analysis: AI over full text,
 portfolio statistics, linking proposal content to reviews and outcomes, and
-staff browsing.
+browsing by admins (an admin exercise, not a staff feature; owner
+2026-10-25).
 
 The owner chose a **derived layer**: originals stay exactly where GOapply,
 AkoyaGO and the migrations put them. Nothing in SharePoint is renamed, moved or
@@ -515,7 +516,7 @@ notes promotion governance is under-specified; define it in that plan.
    rules from step 1 and what the pilot learned. Draft build plan, awaiting owner
    approval: `docs/plans/RESEARCH_REQUEST_FILE_CORPUS_INDEX_BUILD_PLAN_2026-10-25.md`.
 4. **Text extraction at scale** for Read-priority types, after approval.
-5. **Staff browsing surface** and the first analyses.
+5. **Admin browsing surface** and the first analyses (admin-only, decision 3).
 6. **Keeping current:** a scheduled re-listing for new and changed files.
 7. **Promote settled fields to Dataverse** under its own reviewed plan.
 
@@ -537,6 +538,10 @@ notes promotion governance is under-specified; define it in that plan.
    a denied request and for access revocation are required before any consumer
    is enabled. The pilot's local output in the owner's Shuttle folder is the one
    owner-approved exception.
+   **Superseded 2026-10-25:** the app has no per-request read rule to honour
+   (the index build plan records what was inspected), and the owner ruled there
+   are no request restrictions: the corpus is an admin exercise, not a staff
+   feature. Any surface is admin-only; test requests stay excluded.
 4. **History gaps:** count pre-1990 Research requests and Research requests with
    no meeting date (read-only), then decide whether to include them.
    Counted 2026-10-25 [VERIFIED via `scripts/probe-research-history-gaps.mjs`,

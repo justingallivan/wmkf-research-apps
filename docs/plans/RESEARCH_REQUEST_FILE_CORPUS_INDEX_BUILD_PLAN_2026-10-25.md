@@ -3,7 +3,7 @@ title: Research request file corpus — index build (rollout step 3)
 kind: plan
 domain: dataverse
 status: draft
-summary: "Draft for owner approval: build the metadata index of SharePoint files for Research requests with a meeting year from 2018, in Postgres, from a fresh strict listing, classified by the filename rules; no text, no route, no model. Owner decisions needed: how visibility is defined (the app has no per-request read check today; this blocks step 5, not this step), where the first load runs, and the migration number."
+summary: "Draft for owner approval: build the metadata index of SharePoint files for Research requests with a meeting year from 2018, in Postgres, from a fresh strict listing, classified by the filename rules; no text, no route, no model. Visibility decided (no per-request rule; admin exercise). Owner decisions still needed: where the first load runs and the migration number."
 owner: product-engineering
 related:
   - docs/plans/RESEARCH_REQUEST_FILE_CORPUS_PLAN_2026-10-25.md
@@ -20,42 +20,17 @@ related:
 
 ## Decisions needed from the owner
 
-1. **Visibility rule (blocks step 5, browsing; not this step).** Owner decision 3
-   says the app's Dynamics request restrictions decide who sees a request's
-   files. What the app checks today, from the code inspected 2026-10-25:
-   - access is granted **per app**: route shells call
-     `requireAppAccess(<app key>)`, with keys in `shared/config/appRegistry.js`;
-   - `dynamics_restrictions` rows restrict **tables and fields** for Dynamics
-     Explorer, not individual requests (`lib/services/dynamics/restrictions.js`;
-     the rows are read in `lib/services/dynamics-explorer/explorer-store.js`);
-   - test requests are isolated by `wmkf_istestrequest`
-     (`lib/services/test-requests/isolation.js`);
-   - the app reads Dataverse as its own service principal; the caller header
-     (`MSCRMCallerID`) is used to attribute writes
-     (`lib/services/dynamics-service.js:100-110`, `lib/utils/actor-ref.js`).
-
-   A search of `lib/`, `pages/` and `shared/` for a per-request read check
-   (`canViewRequest`, `canAccessRequest`, `assertRequestAccess`,
-   `requestVisibility`, `isRequestVisible`, `scopeRequests`) found only
-   test-request visibility helpers. So there is no per-request rule to inherit
-   yet. Options:
-   - **(a) Read as the user.** Before showing a request's files, read that
-     `akoya_request` from Dataverse as the signed-in staff member and deny if
-     Dataverse refuses. This follows AkoyaGO security roles exactly. It is a new
-     read path; the staff member's systemuser id is already on the session
-     (`session.user.dynamicsSystemuserId`, `lib/utils/actor-ref.js`), but
-     whether the app user may read on another user's behalf is [ASSUMED;
-     unprobed].
-   - **(b) An app key**, for example `request-corpus`, granted to named staff.
-     Simplest. It is no broader than SharePoint today, where the akoyaGO site's
-     Members hold Edit [per the IT capture in
-     `docs/DATAVERSE_SHAREPOINT_FILE_MODEL.md`; the archive libraries'
-     permissions were not captured].
-   - **(c) Both.**
-
-   Recommendation: (b) for the first browsing surface, keeping test isolation;
-   add (a) if some requests must be hidden from staff who hold the app. Step 3
-   adds no route, so approving this step does not depend on this decision.
+1. **Visibility — DECIDED by the owner 2026-10-25: no per-request rule.** The
+   app has no per-request read check (code inspected 2026-10-25: access is per
+   app via `requireAppAccess`; `dynamics_restrictions` restricts tables and
+   fields for Dynamics Explorer, `lib/services/dynamics/restrictions.js`; the
+   app reads Dataverse as its own service principal; a search of `lib/`,
+   `pages/` and `shared/` for `canViewRequest`, `canAccessRequest`,
+   `assertRequestAccess`, `requestVisibility`, `isRequestVisible` and
+   `scopeRequests` found only test-request visibility helpers). The owner
+   ruled there are no request restrictions to honour: the corpus is an admin
+   exercise, not a staff feature. Any later surface is admin-only, and test
+   requests stay excluded. This supersedes the parent plan's decision 3.
 2. **Where the first load runs.** Recommendation: an owner-run local script,
    the same pattern as the inventory and the pilots (Production Dataverse reads
    need `DATAVERSE_ALLOW_PROD_READS=yes`). Which database the local
@@ -98,7 +73,7 @@ quality, template id, source version); it is not created now.
 
 **Sensitivity.** Filenames can name people (applicants, referees). The rows
 hold what SharePoint already shows staff, and in step 3 no route reads them.
-The step 5 security review starts from this.
+Any later surface is admin-only (decision 1).
 
 ## Load and rerun rules
 
