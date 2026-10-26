@@ -124,11 +124,12 @@ Implementation/review: `docs/audits/REVIEWER_THANKYOU_DEFAULTS_BUILD_2026-10-26.
 [BRANCH-BUILT, not released, 2026-10-26.] Justin authorized implementation after flow review, a bounded plan and independent
 Claude plan review before coding. Exact-owner personal wording for PD attribution;
 existing non-PD fallback keeps Admin wording. Pre-claim preparation/refusal recovery
-and discard warnings are explicit. Implementation and planned tests are in progress; no schema changes or live operations.
+and discard warnings are explicit. Implementation and planned tests passed:421 focused tests,3 scratch-Postgres cases,15 fixture browser cases. Independent code review PASS at0ac9ce254; no schema changes or live operations.
 Plan: `docs/plans/PERSONAL_EMAIL_REVIEWER_ACCEPTANCE_DEFAULTS_PLAN_2026-10-26.md`.
 Claude final review: READY TO IMPLEMENT at `5fc27b570`. Required findings closed;
 both owner choices resolved (subject-value CR/LF normalization, preclaim retry on
-PD lookup failure). Implementation authorized; verification and independent code review in progress; no release authorized.
+PD lookup failure). Implementation authorized, verified and independently code-reviewed; no release authorized.
+Build/code-review receipt: `docs/audits/REVIEWER_ACCEPTANCE_DEFAULTS_BUILD_2026-10-26.md`.
 Receipt: `docs/audits/REVIEWER_ACCEPTANCE_DEFAULTS_PLAN_CLAUDE_FINAL_2026-10-26.md`.
 
 ## Existing pre-discussion calendar events — Duncan walkthrough pending 2026-10-25

@@ -3,7 +3,7 @@ title: Reviewer acceptance defaults — implementation verification
 domain: reviewers
 kind: audit
 status: active
-summary: "Branch implementation under verification and independent code review; exact-owner defaults, combined discard warnings and recoverable preclaim preparation. Not released; no live database/email operation."
+summary: "Branch implementation verified; independent Claude code review PASS with retained nonblocking limits; exact-owner defaults, combined discard warnings and recoverable preclaim preparation. Not released; no live database/email operation."
 owner: product-engineering
 related:
   - docs/plans/PERSONAL_EMAIL_REVIEWER_ACCEPTANCE_DEFAULTS_PLAN_2026-10-26.md
@@ -60,7 +60,7 @@ owns Back/route/unload; thank-you clean-read warning behavior is retained.
 
 ## Verification and review
 
-[VERIFIED via root-run checks.] 18 focused suites / 415 mocked tests passed;
+[VERIFIED via root-run checks.] 18 focused suites / 421 mocked tests passed;
 three real scratch-Postgres cases passed, including replacement-lease overlap
 and finite-attempt exhaustion. Fifteen Chromium cases passed against a fresh
 production build (nine acceptance, six existing thank-you). Desktop screenshot
@@ -69,7 +69,7 @@ Final rerun on the committed target also passed all three scratch-Postgres and
 15 Chromium cases with a fresh production build. Types passed; lint 0 errors / 195 warnings (three new hook warnings). Scoped
 API/Atlas/DAL/context/route-service/lifecycle/GUID/status gates and their self-tests
 passed sequentially; migration manifest passed read-only. API count is 317,
-requireAppAccess count unchanged. Final doc/secret checks run before closeout.
+requireAppAccess count unchanged. Final doc/secret gates and self-tests passed before closeout.
 
 Discriminating regression: actual prior sender source from a9e9b4de6 failed the
 O2 lookup-refusal test; actual prior drain source failed the preclaim refusal/
@@ -77,8 +77,9 @@ repair test by completing rather than leaving recovery retryable. Both source
 files were restored byte-for-byte in finally; both tests then passed. No
 experimental code remains. No live database or transport was involved.
 
-Ordinary OAuth Claude independent source/test review pending; exact code target
-and verbatim receipt will be recorded before completion. Mocked tests are distinct from scratch
+Ordinary OAuth Claude initial whole-flow code review PASS WITH NONBLOCKING NOTES
+at 2ff4e861e; targeted follow-up PASS at
+`0ac9ce254e859cb1f005395a66c264a59703896f`. Verbatim receipts linked below. Mocked tests are distinct from scratch
 Postgres and fixture-only browser results. No live inbox/tenant acceptance claimed.
 
 ## Initial independent review and bounded corrections
@@ -88,7 +89,7 @@ Claude PASS WITH NONBLOCKING NOTES at 2ff4e861e, no blocking finding. Verbatim:
 Six additional tests close N1's planned test gaps; existing real-helper and unknown-
 receipt tests now explicitly assert claim→transport→sent ordering/no uncertain
 alert and the uncertain outcome respectively. N5's wrong family header corrected.
-No runtime behavior change. Targeted rereview pending.
+No runtime behavior change. Targeted rereview PASS, all N1 and N5 closed.
 
 Retained nonblocking notes: body-preservation proof uses the public HTML output;
 a terminal job can leave both preparation and terminal alerts open; a confirmed
@@ -96,3 +97,25 @@ context change during an uncertain write can prompt again until Reload, as the
 existing thank-you behavior does. Placeholder cascading predates this slice.
 The zero-claim external-cancellation test documents a scope limit rather than
 proving automatic alert settlement (none is claimed).
+
+## Final closeout
+
+[VERIFIED via source, root-run tests/gates and independent Claude receipts.]
+Final source/test target `0ac9ce254`; 421 tests / 18 suites and types passed.
+Original runtime target 2ff4e861e passed all three real PG16 and fifteen Chromium
+cases against a fresh production build; the only runtime delta is a header
+comment (verified by git diff). No runtime/test change after final review.
+The test-owned codex-acceptance-defaults-pg container/schema was removed; the
+pre-existing database container remains untouched. No shared DB or tenant write.
+
+Final independent report:
+`docs/audits/REVIEWER_ACCEPTANCE_DEFAULTS_IMPLEMENTATION_CLAUDE_REREVIEW_2026-10-26.md`.
+Code review does not replace final CI/release approval. Draft PR #534, not merged
+or deployed to Production. Preview/CI status is available on the PR.
+
+Contract-reconcile Mode B: caller/persistence/consumer, partial success and
+post-await scope guards, helper preservation, durable doc surfaces, key/status
+fan-out and complements are covered above and in the independent reviews.
+Schema/manifest changes N/A; migrations were not applied outside the owned test
+schema. Bounded sweep updated current route/Atlas/service/count/slice records;
+historical plan and initial review receipts remain explicitly historical.

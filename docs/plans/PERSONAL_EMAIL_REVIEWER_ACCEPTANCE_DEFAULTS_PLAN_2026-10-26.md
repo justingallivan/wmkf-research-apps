@@ -3,7 +3,7 @@ title: Personal reviewer acceptance-confirmation defaults — bounded plan
 domain: reviewers
 kind: plan
 status: active
-summary: "Slice 9 branch implementation authorized 2026-10-26; reviewed owner policies preserved. Exact-owner defaults, combined discard guard and recoverable preclaim preparation built; verification and independent code review in progress. Not released."
+summary: "Slice 9 branch implementation authorized 2026-10-26; reviewed owner policies preserved. Exact-owner defaults, combined discard guard and recoverable preclaim preparation built; verification passed and independent Claude code review PASS, with retained nonblocking limits. Not released."
 owner: product-engineering
 related:
   - docs/plans/PERSONAL_EMAIL_DEFAULTS_INVENTORY_2026-09-24.md
@@ -13,7 +13,7 @@ related:
 
 [CURRENT 2026-10-26.] Justin authorized implementing this reviewed contract,
 planned tests and independent Claude code review before release. Implementation
-is branch-built and under verification; no release authorized. The source baseline
+is branch-built and verified; independent code review PASS at 0ac9ce254; no release authorized. The source baseline
 and review history below describe pre-implementation evidence. Build receipt:
 `docs/audits/REVIEWER_ACCEPTANCE_DEFAULTS_BUILD_2026-10-26.md`.
 
@@ -434,6 +434,6 @@ Owner choices O1/O2 resolved 2026-10-26 as recorded above. Independent Claude
 review READY TO IMPLEMENT at `5fc27b570`; required findings closed. Final receipt:
 `docs/audits/REVIEWER_ACCEPTANCE_DEFAULTS_PLAN_CLAUDE_FINAL_2026-10-26.md`.
 The post-review input-error clarification preserves the existing wrapper contract
-and addresses the reviewer's nonblocking note. No runtime or test edits made.
-Implementation authorized 2026-10-26; independent code review in progress.
+and addresses the reviewer's nonblocking note. At the plan-review stage, no runtime or test edits had been made.
+Implementation authorized 2026-10-26; independent code review PASS at 0ac9ce254.
 Release authorization: pending.
