@@ -3,7 +3,7 @@ title: Personal reviewer acceptance-confirmation defaults — bounded plan
 domain: reviewers
 kind: plan
 status: active
-summary: "Slice 9 planning only: exact-owner defaults for PD-attributed acceptance confirmations, shared wording for the existing non-PD fallback, and recoverable preparation before the email claim. Independent Claude review pending; no implementation or release authorized."
+summary: "Slice 9 planning only: exact-owner defaults for PD-attributed acceptance confirmations, shared wording for the existing non-PD fallback, and recoverable preparation before the email claim. Initial Claude review READY WITH NAMED CHANGES; source-backed corrections incorporated, two owner policy choices pending. No implementation or release authorized."
 owner: product-engineering
 related:
   - docs/plans/PERSONAL_EMAIL_DEFAULTS_INVENTORY_2026-09-24.md
@@ -18,7 +18,8 @@ Change surface: one personal raw subject/body pair for automated reviewer accept
 confirmations. Entry: Profile Settings; consumer: acceptance-job drain after the
 reviewer accepts. Existing persistence: Dataverse `wmkf_appuserpreferences` for
 copy and Postgres `reviewer_acceptance_jobs.steps` for dispatch progress. Prior
-findings: none from an independent review yet. This is a proposed contract, not
+findings: independent Claude review of `fc3097adb` found R1–R7 required
+corrections; dispositions and two owner choices are recorded below. This is a proposed contract, not
 built behavior. Justin authorized planning and Claude review, not coding.
 
 Current caller→persistence→consumer trace:
@@ -56,7 +57,7 @@ existing source contract; tenant contents were not inspected.
 
 ## 1. Owner and raw wording
 
-Add `REVIEWER_ACCEPTANCE_TEMPLATE` = `reviewer_acceptance_template` as an independent
+Add `REVIEWER_AUTOMATIC_ACCEPTANCE_TEMPLATE` = `reviewer_automatic_acceptance_template` as an independent
 exact-owner preference, with exactly `{subject, body}` raw strings. No legacy
 reviewer_email_templates migration or mutation. Use existing complete exact-owner
 listing, duplicate refusal, strict Save readback and Clear-confirmed-absence
@@ -75,6 +76,7 @@ stray braces, retired {{requestNumber}} and renderer-supported legacy aliases
 Explain that explicitly in editor help. {{withdrawUrl}} always comes from the
 server's decrypted portal token; authors cannot change token minting/binding.
 When absent in the body, retain the existing automatic withdrawal paragraph.
+If no server token exists, {{withdrawUrl}} expands to empty; editor help says so.
 No new required token or secure-link token family.
 
 Shared Admin grammar stays compatible, including literal unknown tokens and
@@ -83,7 +85,16 @@ checks apply to either source: nonblank single-line subject ≤2000; nonblank
 business body ≤100000 code units, checked before the automatic withdrawal
 paragraph so a link alone cannot disguise empty authored copy; also cap the
 final text including appended paragraph at 100000. Render plain text to HTML
-with the existing escaping helper. Do not inspect HTML length as business length.
+with the existing escaping helper. Add an internal plain-text rendering step
+returning business text and final text; public renderAcceptanceConfirmationEmail
+continues returning exactly {subject, body}. Do not inspect HTML length as business length.
+
+Owner choice O1 pending: normalize CR/LF in subject placeholder VALUES to spaces
+(recommended; preserve body text and reject authored multiline subjects), or
+refuse data-caused unsafe subjects immediately terminal with an explicit manual-
+send alert. Do not silently choose or implement before the owner answers. Oversize/
+empty output remains a preparation refusal. The finalized policy and tests must
+distinguish raw authored copy failures from substituted context failures.
 
 ## 2. Staff self-service route and editor
 
@@ -96,7 +107,7 @@ exactly {}; private no-store, 256kb parser, 405/Allow handling. Response echoes
 normalized ownerSystemId and authenticatedProfileId; do not leak raw failures.
 
 Reuse the family contract rather than generic user-preferences: reserve/private
-block the new key including case/trim aliases in keyed/list/single/batch reads
+block the new key in ALL THREE reserved/private/canonical-alias sets, including case/trim aliases in keyed/list/single/batch reads
 and mutations. Complete enumeration refuses capped results. Save refuses multiple
 rows; Clear deletes only the current exact-owner/key rows and confirms absence.
 Confirmed mutation followed by unavailable refresh is truthful refreshUnavailable;
@@ -105,9 +116,16 @@ is never described as possibly saved. No change in generic unrelated preferences
 
 Independent disclosure under Profile Settings Reviewer Emails, controller called
 above isLoading early return. Collapse/reopen retains unsaved wording; explicit
-Reload fetches fresh defaults and warns before discarding edits. Navigation,
-Back, unload, Switch and current-profile Archive warn on dirty or pending/uncertain
-mutation; noncurrent Archive remains independent. A clean pending GET alone does
+Reload fetches fresh defaults and warns before discarding edits. One PAGE-LEVEL navigation guard must combine the existing thank-you and new
+acceptance controllers: one beforePopState slot, one beforeunload/route-events
+owner, and one aggregate dirty/pending/confirmed-refresh status. Remove the
+thank-you controller-owned guard invocation and pass its guard state to the page;
+do not mount a second independent Back hook. Navigation, Back, unload, Switch
+and current-profile Archive prompt ONCE when either editor has dirty or pending/
+uncertain mutation state. A combined confirmContextChange first asks once, then
+resets both controllers only on confirmation; cancellation resets neither.
+Cleaning/collapsing one editor must not remove the other editor's Back guard.
+Noncurrent Archive remains independent. A clean pending GET alone does
 not need a discard warning. Auth loading retains draft, disables mutation and
 invalidates old completions; actual actor change clears private state. Epoch,
 operation and mounted guards cover every post-await write and finally; old actor
@@ -122,20 +140,39 @@ No live send preview or test send button.
 Split sender orchestration into `prepareAcceptanceConfirmationEmail` and a
 transport-only `sendPreparedAcceptanceConfirmationEmail`; keep the existing
 `sendAcceptanceConfirmationEmail` wrapper for its current direct contract tests.
+New drain dependency seams: prepareAcceptanceEmail, sendPreparedAcceptanceEmail,
+readConfirmationRequest and readConfirmationSuggestion. Enumerate all old
+deps.sendAcceptanceEmail callers/tests (including operational-events and
+notification-trust-model pushup suites), migrate to the new seams, and reject a
+leftover legacy send injection loudly before any default preparation can run.
+Mocks must return explicit {sent:true}; undefined/malformed transport receipts
+are uncertain, no sentAt, claimedAt retained and no automatic resend. The public
+sendAcceptanceConfirmationEmail wrapper may still return {sent:true} after the
+real transport resolves as its current contract; distinguish that wrapper from
+the drain's injected transport result.
 Only the drain owns the durable one-time claim. Helper extraction must preserve
 recipient, sender, due-date override/ICS, signature, regarding and noFallback.
 Preparation has no transport or email-step claim write.
 
-Before email preparation, read the current request through grant-request.getById,
-using the authoritative current suggestion request GUID; require consistency with
-job.request_id and any payload request identity. Refuse missing/invalid/mismatched
+Before email preparation, read a FRESH post-honorarium suggestion and use it for
+request binding, confirmed recipient, due-date override and accepted-state checks.
+Record the request GUID checked for test-request isolation in this job pass. Read
+the current request through grant-request.getById using this fresh suggestion
+request GUID; require equality with that isolation-checked GUID, job.request_id
+(which must be nonnull/valid) and any payload request identity. Refuse missing/invalid/mismatched
 identity or read failure before claim; do not fall back to stale payload request.
 Use a small explicit projection: akoya_requestid, akoya_requestnum, akoya_title,
 _wmkf_programdirector_value, wmkf_reviewduedate. Use this fresh request only for
 confirmation preparation; leave honorarium/contact and other follow-up snapshot
 contracts untouched. Read current suggestion again immediately before the email
-claim and retain accepted/timestamp/not-released/not-withdrawn checks. On changed
-state use the existing cancellation/retry policy rather than sending. No claim of
+claim. Compare request GUID, wmkf_revieweremail, wmkf_reviewduedateoverride, accepted/
+declined/review-status and response timestamp against the prepared suggestion
+snapshot. Any changed email/date/request/timestamp means retry without claiming.
+A suggestion moved to a different request refuses; a PD change on the SAME
+request before preparation selects the new PD's copy. For released/withdrawn
+state, reuse the exact existing post-honorarium cancellation blocks, including
+late-honorarium cleanup and operational-event supersession; do not copy a weaker
+boolean-only check. No claim of
 an atomic transaction across Dataverse reassignment and Postgres email dispatch:
 request/PD/signature are a bounded preparation snapshot; a change after preparation
 is not covered by a cross-system lock.
@@ -146,14 +183,19 @@ raw pair together. Confirmed own absence alone inherits shared copy; configured
 selects personal; duplicate/encrypted/invalid/unavailable or unknown state refuses
 before claim, without switching to another sender or shared copy. On the existing
 non-PD fallback branch (no usable PD sender), never read a personal preference;
-use Admin wording and preserve NOTIFICATION_EMAIL_FROM behavior. Sender lookup
-failure can still take this historical fallback branch; personal-read failure
-cannot. An identity mismatch from the lookup is a preparation refusal.
+use Admin wording and preserve NOTIFICATION_EMAIL_FROM behavior. Personal-read failure cannot take the generic fallback. An identity mismatch
+from the lookup is a preparation refusal.
+
+Owner choice O2 pending: lookup throws should become retryable pre-claim refusal
+(recommended), or retain historical generic-mailbox fallback on lookup errors.
+The no-PD/disabled/no-mailbox fallback remains shared in either choice. Do not
+implement the exception policy before the owner answers.
 
 Preserve required shared-default prerequisite for both branches, as in the
 thank-you slice; personal copy does not mask broken mandatory Admin configuration.
 Resolve signature, due date/ICS and encrypted-token withdrawal URL before claiming.
-Missing token retains historical no-link behavior; decryption/build exceptions
+Check for a missing encrypted token BEFORE decrypt; missing token retains
+historical no-link behavior. Nonempty-token decryption/build exceptions
 refuse before claim. Do not log the decrypted token, full wording or secure URL.
 All required inputs, final subject/body and attachments freeze in one prepared
 object. Transport consumes it without reads, rendering or selecting new defaults.
@@ -180,17 +222,36 @@ complete this job as successful while confirmation preparation is refused.
 Use existing job retry scheduling (300 seconds for this tail; eight total attempts,
 including other failures), not a new queue/table/status. Repair before exhaustion
 allows a new preparation on the next drain with fresh owner/copy; exhaustion
-leaves an explicit failed job for existing staff repair/requeue. Document this
-finite window prominently; no indefinite automatic repair promise. Existing
-claimed jobs never become retryable emails. Deduplicate configuration alerts by
-PD/reason (fallback by shared key/reason); keep tokens/raw copy out of metadata.
+leaves an explicit failed job. There is NO existing staff requeue route/tool.
+A reviewer repeat may collide and reopen status but does not reset attempts,
+steps or payload; it is not a supported recovery mechanism. After exhaustion
+the automatic confirmation is lost unless staff intervene manually; the terminal
+alert must say “confirmation not sent; send by hand.” No requeue tool or DB repair
+is in this slice. Eight 300-second retries with the two-minute cron cadence give
+roughly 35–40 minutes from first refusal to exhaustion; previous sibling failures
+can shorten it. Document this finite window prominently; no indefinite automatic
+repair promise. Existing
+claimed jobs never become retryable emails. Use a job-bound preparation alert key acceptance-confirmation-preparation:<jobId>
+with IDs/reason in metadata (at most one active alert per affected job), not a
+PD-wide key that one successful sibling can incorrectly resolve. A distinct
+:terminal key guarantees a terminal manual-send warning despite earlier alert
+deduplication. Keep tokens/raw copy out of metadata. On a confirmed send,
+AlertService.autoResolve both preparation keys; on withdrawal/release cancellation,
+auto-resolve them with a superseded note and mark any corresponding operational
+events superseded. Do not settle on mere job completion after a post-claim
+uncertain/failed send. Terminal sibling failure still dominates retryReasons:
+if preparation was refused in that pass, the confirmation is not sent and will
+not automatically recover. Alert that manual-send outcome when recording terminal
+job failure. A successfully prepared email may still send before that existing
+terminal-sibling decision, as today. Preserve this ordering; do not retry unrelated
+terminal honorarium/contact work or imply that confirmation is guaranteed.
 Expose per-job retry reason through existing errors/retriedJobIds. Do not falsely
 claim retried jobs make the whole Maintenance run failed; test actual behavior.
 
 # Bounded changes and verification [PLANNED]
 
 Runtime files: one family config validator, personalization service, preference
-route, Profile Settings disclosure/controller and discard hook; key and generic
+route, Profile Settings disclosure/controller and ONE combined page guard replacing its thank-you-only hookup; key and generic
 reserved/private sets; acceptance sender and email-step drain regions only. New
 request read uses existing DAL API. No SQL/schema/lease rewrite, migration,
 honorarium/BILL/contact behavior change, token authority change, generic renderer
@@ -208,21 +269,28 @@ Tests must include:
    definite vs ambiguous writes, confirmed refresh failure, strict Reload recovery,
    Clear and Switch/current Archive guards. Real Pages Router fixture-browser:
    load, collapse, cancel/confirm discard, Back cancel, pending write cancel/confirm,
-   clean pending GET navigation; no network writes to real stores.
+   clean pending GET navigation; BOTH editors dirty, one becomes clean while the
+   other stays dirty then Back still prompts once; acceptance-only dirty Switch/
+   current Archive cancellation, confirming context change resets both. No network
+   writes to real stores.
 4. Existing acceptance email renderer/placeholder/greeting golden cases; PD own,
    confirmed absence/shared, all own refusal statuses before claim, non-PD fallback
    with an own row present but reader uncalled, shared prerequisite, due override
    and ICS, server token append/explicit placeholder, confirmed recipient and
    signature/escaping. Rendered empty/multiline/oversized both-source refusals.
 5. Real drain orchestration: first prep refused, no claim/no send/no false sentAt,
-   retry then repair and single confirmed send; bounded exhaustion; already-claimed
+   retry then repair and single confirmed send; bounded exhaustion with manual-send alert and terminal sibling failure; already-claimed
    skip; repeat acceptance skip; withdrawal/release/timestamp changes after prep;
-   fresh request reassignment before preparation uses new PD pair; read failures
-   do not use payload snapshot. Current-PD pair frozen during concurrent edits;
+   fresh PD reassignment on the same request before preparation uses new PD pair; read failures
+   do not use payload snapshot. Fresh/post-honorarium and preclaim request/recipient/due/timestamp differences
+   retry without claim; correct withdrawal cleanup. Current-PD pair frozen during concurrent edits;
    overlapping leased workers (lost lease before claim → zero sends; winner → one
    unmixed subject/body with actual lease-token checks in scratch-Postgres tests).
    Post-claim failures/uncertain/lost recording stay non-retryable for email.
-6. Cron/Maintenance truthful retried vs failed outcomes and deduplicated alerts.
+6. Cron/Maintenance truthful retried vs failed outcomes; job-bound alert dedupe,
+   terminal warning, recovery and cancellation supersession without closing another
+   job's failure. Migrate all old drain injected-send tests; leftover injection fails
+   loudly and transport undefined is uncertain.
    Regression red against prior claim-before-preparation source, then green.
    No real cron invocation, tenant mutation, or outbound email as test evidence.
 
@@ -252,4 +320,21 @@ DB. Branch runtime work uses deliberate independent review and owner release.
    sender. No new job terminal status; typed refusal reasons reach retry and
    alerts/tests. Unknown source/status refuses rather than sends.
 
-Independent review verdict: pending. Owner implementation decision: pending.
+## Initial independent review and dispositions
+
+[VERIFIED via host ordinary OAuth Claude, read-only.] Target fc3097adb:
+READY WITH NAMED CHANGES. R1 finite recovery corrected, R2 single page-level guard,
+R3 explicit test seams, R4 fresh suggestion and binding/recheck, R7 terminal siblings
+and job-bound alert lifecycle, R8 three privacy sets/naming/missing token corrected.
+R5 internal plain-text helper added; subject policy O1 pending owner choice.
+R6 sender lookup policy O2 pending owner choice. These revisions have not yet had
+an independent rereview. Initial verbatim report is retained in
+`docs/audits/REVIEWER_ACCEPTANCE_DEFAULTS_PLAN_CLAUDE_REVIEW_2026-10-26.md`.
+
+[VERIFIED via root-run mocked baseline.] Four existing suites / 63 tests passed:
+acceptance email, drain, job service and placeholder callers. This characterizes
+current code; it does not test this unbuilt plan. Doc currency/facts/symbol/build-
+claim gates/self-tests, docs catalog, API/Atlas gates/self-tests and secret scan/
+self-test passed during planning. Runtime files and Claude's DB work untouched.
+
+Owner choices O1/O2: pending. Implementation and release authorization: pending.

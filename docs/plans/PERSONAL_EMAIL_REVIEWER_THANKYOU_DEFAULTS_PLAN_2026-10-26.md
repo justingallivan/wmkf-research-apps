@@ -3,7 +3,7 @@ title: Personal defaults for automated reviewer thank-you emails
 domain: reviewers
 kind: plan
 status: active
-summary: "Slice 8 branch-built; implementation verified and independent Claude code review passed with nonblocking notes, not released. Owner authorized implementation and approved rendered safety holds for both sources; separate exact-owner editor, pre-claim preparation and planned tests. No live writes or schema changes."
+summary: "Historical implementation plan; slice 8 released PR533 (a9e9b4de6) 2026-10-26; implementation verified and independent Claude code review passed with nonblocking notes, not released. Owner authorized implementation and approved rendered safety holds for both sources; separate exact-owner editor, pre-claim preparation and planned tests. No live writes or schema changes."
 owner: product-engineering
 related:
   - docs/plans/PERSONAL_EMAIL_DEFAULTS_INVENTORY_2026-09-24.md
@@ -13,6 +13,12 @@ related:
 ---
 
 # Automated reviewer thank-you defaults — bounded plan
+
+[CURRENT RELEASE VERIFIED 2026-10-26.] PR #533 merged after full CI; Production
+READY. [Release verification](../audits/REVIEWER_THANKYOU_DEFAULTS_RELEASE_2026-10-26.md).
+The body below is the reviewed pre-release contract and decision history;
+its branch-only/not-authorized labels describe those historical stages.
+
 
 ## 1. Status, scope and ownership
 

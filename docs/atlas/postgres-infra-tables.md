@@ -65,7 +65,7 @@ absence alone inherits shared wording. Generic preference reads/writes hide/refu
 this key. No schema or uniqueness constraint added; release verification did
 not write live preferences. Proof: `docs/audits/SCHEDULED_GRANTEE_DEFAULTS_RELEASE_2026-10-25.md`.
 
-**Automatic reviewer thank-you defaults (branch-built 2026-10-26, not released):**
+**Automatic reviewer thank-you defaults (released PR #533, 2026-10-26):**
 `reviewer_automatic_thankyou_template` is a separate exact-owner raw subject/body
 pair in existing Dataverse preferences, not `reviewer_email_templates.thankyou`.
 The dedicated staff self-service route verifies session GUID/profile equality,
