@@ -52,7 +52,7 @@ export function isSendUnconfirmed(row) {
 
 /**
  * A3: `unconfirmed` (via isSendUnconfirmed), `activity_missing`,
- * `activity_forbidden`, or null when the row needs no attention.
+ * `activity_forbidden`, `pd_handoff_held`, or null when no attention is needed.
  */
 export function scheduledEmailAttentionReason(row) {
   if (isSendUnconfirmed(row)) return SCHEDULED_EMAIL_ATTENTION.UNCONFIRMED;

@@ -132,7 +132,9 @@ export default async function handler(req, res) {
         console.error('[scheduled-email/send-now] failed:', error.message);
         const uncertain = error.emailOutcome === 'uncertain';
         return res.status(uncertain ? 202 : 502).json({
-          error: uncertain
+          error: error.acceptanceProven
+            ? 'Dynamics accepted this message, but its delivery record could not be completed. Reconcile its history before sending another message.'
+            : uncertain
             ? 'Dynamics may have accepted the message, but the result could not be confirmed.'
             : 'The message could not be sent. It remains available for retry.',
           outcome: uncertain ? 'uncertain' : 'failed',

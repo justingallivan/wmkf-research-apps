@@ -3,6 +3,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import {
+  projectScheduledEmail,
   deliverScheduledEmail,
   groupDigestRowsByPd,
   renderScheduledEmailPreview,
@@ -825,4 +826,27 @@ describe('current PD hold', () => {
     deps.recordSendRequested.mockImplementation(async row => { current = OTHER_PD; return { ...row, send_requested_at: 'intent' }; });
     expect((await deliverScheduledEmail(message().id, {}, deps)).sent).toBe(true); expect(reads).toBe(2); expect(deps.sendEmail).toHaveBeenCalledTimes(1);
   });
+  test('first ownership guard holds an existing unaccepted activity without intent and preserves its identity', async () => {
+    const base = message({ dynamics_email_id: 'ffffffff-ffff-4fff-8fff-ffffffffffff', recipient_generation: 5 });
+    const d = prepare(base); d.getEmailActivity.mockResolvedValue({ activityid: base.dynamics_email_id, statuscode: 1 });
+    const out = await deliverScheduledEmail(base.id, {}, d);
+    expect(out).toMatchObject({ held: true, message: { hasActivity: true, recipientGeneration: 5 } });
+    expect(d.recordEmailActivity).not.toHaveBeenCalled(); expect(d.createEmailActivity).not.toHaveBeenCalled(); expect(d.sendEmail).not.toHaveBeenCalled(); expect(d.recordSendRequested).not.toHaveBeenCalled(); expect(d.readCurrentRecipients).not.toHaveBeenCalled();
+  });
+  test('accepted activity receipt persistence failure never sends; a later retry only reconciles the same activity', async () => {
+    const base = message({ dynamics_email_id: 'ffffffff-ffff-4fff-8fff-ffffffffffff' }), d = prepare(base);
+    d.getEmailActivity.mockResolvedValue({ activityid: base.dynamics_email_id, statuscode: 7 });
+    d.recordSent.mockResolvedValueOnce(null);
+    await expect(deliverScheduledEmail(base.id, {}, d)).rejects.toMatchObject({ code: 'scheduled_email_pd_handoff_held', acceptanceProven: true, emailOutcome: 'uncertain', retryable: false });
+    expect((await deliverScheduledEmail(base.id, {}, d)).sent).toBe(true);
+    expect(d.sendEmail).not.toHaveBeenCalled(); expect(d.createEmailActivity).not.toHaveBeenCalled();
+  });
+
+});
+
+test('ownership-held row projects and groups under Needs attention, never approval/upcoming', () => {
+  const row = digestRow({ status: 'failed', last_error_code: 'scheduled_email_pd_handoff_held', approval_required: true });
+  expect(projectScheduledEmail(row).attentionReason).toBe('pd_handoff_held');
+  const [group] = groupDigestRowsByPd([row]);
+  expect(group.needsAttention).toEqual([row]); expect(group.approvalPending).toEqual([]); expect(group.upcoming).toEqual([]); expect(group.sentFyi).toEqual([]);
 });

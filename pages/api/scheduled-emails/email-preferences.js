@@ -18,7 +18,7 @@ export default async function handler(req, res) {
   const body = req.body;
   const keys = body && typeof body === 'object' ? Object.keys(body) : [];
   if (Object.keys(req.query || {}).length || (req.method === 'GET'
-    ? body != null && (typeof body !== 'object' || Array.isArray(body) || keys.length > 0)
+    ? body != null && body !== '' && (typeof body !== 'object' || Array.isArray(body) || keys.length > 0)
     : !body || typeof body !== 'object' || Array.isArray(body) || (req.method === 'PUT' ? keys.length !== 1 || keys[0] !== 'template' : keys.length !== 0))) {
     return res.status(400).json({ ok: false, reason: 'validation' });
   }

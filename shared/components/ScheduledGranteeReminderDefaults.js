@@ -17,6 +17,7 @@ export function ScheduledReminderWordingEditor({ owner, active, disabled = false
   const [baseline, setBaseline] = useState(EMPTY);
   const [busy, setBusy] = useState(false);
   const [uncertain, setUncertain] = useState(false);
+  const [confirmedReload, setConfirmedReload] = useState(false);
   const [notice, setNotice] = useState(null);
   const [errors, setErrors] = useState({});
   const seq = useRef(0);
@@ -26,7 +27,7 @@ export function ScheduledReminderWordingEditor({ owner, active, disabled = false
   useLayoutEffect(() => { current.current = { active }; }, [active]);
   useLayoutEffect(() => { mounted.current = true; return () => { mounted.current = false; }; }, []);
   const dirty = !same(template, baseline);
-  useScheduledDefaultsUnsavedChanges(dirty || busy || uncertain, busy || uncertain);
+  useScheduledDefaultsUnsavedChanges(dirty || busy || uncertain, busy || uncertain, confirmedReload);
   const validResponse = next => {
     if (next?.ok !== true || typeof next.ownerSystemId !== 'string' || next.ownerSystemId.toLowerCase() !== owner
       || !['configured', 'absent', 'duplicates', 'encrypted', 'invalid', 'identity_unavailable', 'unavailable'].includes(next.ownStatus)
@@ -36,7 +37,10 @@ export function ScheduledReminderWordingEditor({ owner, active, disabled = false
   };
   const accept = next => {
     const pair = next.own || next.shared || EMPTY;
-    setData(next); setTemplate(pair); setBaseline(pair); setUncertain(previous => next.ownStatus === 'unavailable' ? previous : false); setErrors({});
+    setData(next); setTemplate(pair); setBaseline(pair);
+    const unavailable = ['unavailable', 'identity_unavailable'].includes(next.ownStatus);
+    setUncertain(previous => unavailable ? previous : false);
+    setConfirmedReload(previous => unavailable ? previous : false); setErrors({});
   };
   const read = async () => {
     if (!current.current.active || inFlight.current || disabled) return;
@@ -65,11 +69,17 @@ export function ScheduledReminderWordingEditor({ owner, active, disabled = false
     if (!clear && !checked.valid) { setErrors(checked.errors); return; }
     const submitted = clear ? null : checked.value;
     const generation = ++seq.current;
-    inFlight.current = true; setBusy(true); setUncertain(true); setNotice('A change is pending and may already be saved. Reload if its result cannot be confirmed.'); setErrors({});
+    inFlight.current = true; setBusy(true); setUncertain(true); setConfirmedReload(false); setNotice('A change is pending and may already be saved. Reload if its result cannot be confirmed.'); setErrors({});
     try {
       const envelope = await requestEnvelope(ENDPOINT, { method: clear ? 'DELETE' : 'PUT', body: clear ? {} : { template: submitted } });
       if (!mounted.current || generation !== seq.current || !current.current.active) return;
       if (!envelope.ok || envelope.data?.ok !== true) {
+        if (envelope.data?.reason === 'preference_unavailable') {
+          setUncertain(false);
+          setData(previous => ({ ...previous, canSave: false, canClear: false }));
+          setNotice('Your saved defaults could not be read. Nothing was changed. Reload defaults before another change.');
+          return;
+        }
         if (envelope.status === 400 || envelope.status === 409) {
           setUncertain(false);
           setErrors(envelope.data?.errors || {});
@@ -80,7 +90,7 @@ export function ScheduledReminderWordingEditor({ owner, active, disabled = false
       }
       if (envelope.data.refreshUnavailable) {
         const next = clear ? data?.shared || EMPTY : submitted;
-        setTemplate(next); setBaseline(next); setData(null); setUncertain(true);
+        setTemplate(next); setBaseline(next); setData(null); setUncertain(true); setConfirmedReload(true);
         setNotice('Your change was confirmed, but refreshed defaults are unavailable. Existing messages are unchanged. Reload before another change.');
         return;
       }
@@ -104,6 +114,7 @@ export function ScheduledReminderWordingEditor({ owner, active, disabled = false
       <p className="text-xs text-gray-600">Subject is literal. Message requires {'{{granteeName}}'}, {'{{proposalTitle}}'} and {'{{dueDate}}'}. Your saved signature and secure link are added automatically. Shared wording is a starting point and may need changes before it can be saved as your default.</p>
       {busy && <p role="status">Working…</p>}
       {data && <p className="text-sm text-gray-600">Source: {data.source === 'personal' ? 'your saved default' : data.source === 'shared' ? 'shared wording' : 'unavailable'}.</p>}
+      {data?.sharedStatus && data.sharedStatus !== 'available' && <p role="alert" className="text-sm text-amber-800">Shared reminder wording is unavailable. New scheduling still requires valid shared wording; contact an administrator. Your saved wording and existing messages are unchanged.</p>}
       {paused && <p role="alert" className="text-sm text-amber-800">New reminders and reassignment rebuilds for your grants are paused until this default can be read or repaired. {data.ownStatus === 'duplicates' ? 'Clear the duplicate defaults before saving.' : 'Reload, Clear or save corrected wording when available.'} Already-frozen same-owner messages continue. Reassigned messages are held independently; saved old-PD activities need manual resolution.</p>}
       <label className="block text-sm font-medium" htmlFor="scheduled-default-subject">Default subject</label>
       <input id="scheduled-default-subject" value={template.subject} disabled={blocked || !data || uncertain} maxLength={300} onChange={event => setTemplate({ ...template, subject: event.target.value })} className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm" />

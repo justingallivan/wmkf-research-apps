@@ -1,9 +1,12 @@
-import { useEffect } from 'react';
+import { useEffect, useLayoutEffect, useRef } from 'react';
 import { useRouter } from 'next/router';
 
 /** Guard only future wording, not selected-row routing or distribution recovery. */
-export default function useScheduledDefaultsUnsavedChanges(dirty, pending) {
+export default function useScheduledDefaultsUnsavedChanges(dirty, pending, confirmedReload = false) {
   const router = useRouter();
+  const events = router.events;
+  const routerRef = useRef(router);
+  useLayoutEffect(() => { routerRef.current = router; }, [router]);
   useEffect(() => {
     if (!dirty) return undefined;
     let approved = null;
@@ -12,7 +15,9 @@ export default function useScheduledDefaultsUnsavedChanges(dirty, pending) {
       if (options?.shallow && new URL(url, window.location.href).pathname === '/scheduled-emails') return true;
       const target = key(url);
       if (approved === target) return true;
-      if (!window.confirm(pending
+      if (!window.confirm(confirmedReload
+        ? 'Your default wording change was confirmed, but refreshed data is unavailable. Leaving loses local edits and results. Leave and reload defaults before another change?'
+        : pending
         ? 'A default wording change is pending or unconfirmed and may already be saved. Leaving loses local edits and results. Leave and reload defaults before another change?'
         : 'Discard your unsaved default wording?')) return false;
       approved = target;
@@ -22,12 +27,17 @@ export default function useScheduledDefaultsUnsavedChanges(dirty, pending) {
     const beforeRoute = (url, options) => {
       if (allow(url, options)) return;
       const error = Object.assign(new Error('Unsaved scheduled reminder defaults'), { cancelled: true });
-      router.events.emit('routeChangeError', error, url, options);
+      events.emit('routeChangeError', error, url, options);
       throw error;
     };
-    const currentState = window.history.state;
-    const currentUrl = window.location.href;
-    router.beforePopState(({ as, options }) => {
+    let currentState = window.history.state;
+    let currentUrl = window.location.href;
+    const captureHistory = () => { currentState = window.history.state; currentUrl = window.location.href; };
+    const completed = () => { reset(); captureHistory(); };
+    // Next changes history synchronously after beforeHistoryChange, then awaits
+    // rendering before routeChangeComplete. Capture before a fast Back can win.
+    const changingHistory = () => queueMicrotask(captureHistory);
+    routerRef.current.beforePopState(({ as, options }) => {
       reset();
       if (allow(as, options)) return true;
       window.history.pushState(currentState, '', currentUrl);
@@ -35,15 +45,17 @@ export default function useScheduledDefaultsUnsavedChanges(dirty, pending) {
     });
     const unload = event => { event.preventDefault(); event.returnValue = ''; };
     window.addEventListener('beforeunload', unload);
-    router.events.on('routeChangeStart', beforeRoute);
-    router.events.on('routeChangeComplete', reset);
-    router.events.on('routeChangeError', reset);
+    events.on('beforeHistoryChange', changingHistory);
+    events.on('routeChangeStart', beforeRoute);
+    events.on('routeChangeComplete', completed);
+    events.on('routeChangeError', reset);
     return () => {
       window.removeEventListener('beforeunload', unload);
-      router.events.off('routeChangeStart', beforeRoute);
-      router.events.off('routeChangeComplete', reset);
-      router.events.off('routeChangeError', reset);
-      router.beforePopState(() => true);
+      events.off('beforeHistoryChange', changingHistory);
+      events.off('routeChangeStart', beforeRoute);
+      events.off('routeChangeComplete', completed);
+      events.off('routeChangeError', reset);
+      routerRef.current.beforePopState(() => true);
     };
-  }, [dirty, pending, router]);
+  }, [dirty, pending, confirmedReload, events]);
 }

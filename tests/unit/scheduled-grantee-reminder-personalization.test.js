@@ -73,3 +73,9 @@ test('partial Clear and failed absence readback are not success', async () => {
   deps.listByOwnerAndKey.mockResolvedValueOnce([]).mockRejectedValueOnce(new Error('capped'));
   expect((await clear(OWNER, deps)).reason).toBe('persistence_unconfirmed');
 });
+
+test.each([save, clear])('an initial enumeration failure is unavailable with no mutation attempted', async action => {
+  deps.listByOwnerAndKey.mockRejectedValue(new Error('offline'));
+  const result = action === save ? await save(OWNER, pair, deps) : await clear(OWNER, deps);
+  expect(result).toEqual({ ok: false, reason: 'preference_unavailable' }); expect(deps.create).not.toHaveBeenCalled(); expect(deps.update).not.toHaveBeenCalled(); expect(deps.remove).not.toHaveBeenCalled();
+});

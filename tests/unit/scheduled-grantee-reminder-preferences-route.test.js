@@ -35,3 +35,17 @@ test.each(['PUT', 'DELETE'])('unconfirmed %s mutation never succeeds or refreshe
 test('validation/duplicate responses are distinct from uncertainty', async () => { save.mockResolvedValueOnce({ ok: false, reason: 'validation', errors: { body: 'required' } }); expect((await call('PUT', { template: pair })).statusCode).toBe(400); save.mockResolvedValueOnce({ ok: false, reason: 'duplicates' }); expect((await call('PUT', { template: pair })).statusCode).toBe(409); });
 test.each(['throw', 'unavailable'])('confirmed mutation survives %s independent refresh', async kind => { if (kind === 'throw') get.mockRejectedValueOnce(new Error('lost')); else get.mockResolvedValueOnce({ ownStatus: 'unavailable' }); const res = await call('PUT', { template: pair }); expect(res.statusCode).toBe(200); expect(res._data).toEqual({ ok: true, refreshUnavailable: true }); });
 test('parser accepts bounded escaped content within 256kb', () => expect(config.api.bodyParser.sizeLimit).toBe('256kb'));
+
+test('bodyless GET passes through Next real parser and reaches exact-owner service', async () => {
+  const { Readable } = require('node:stream');
+  const { parseBody } = require('next/dist/server/api-utils/node/parse-body');
+  const req = Readable.from([]); req.headers = {}; req.method = 'GET'; req.query = {};
+  req.body = await parseBody(req, config.api.bodyParser.sizeLimit);
+  expect(req.body).toBe('');
+  const res = createMockRes(); await handler(req, res);
+  expect(res.statusCode).toBe(200); expect(get).toHaveBeenCalledWith(OWNER.toUpperCase());
+});
+test.each([undefined, '', {}])('GET accepts only empty transport body %p', async body => {
+  const req = createMockReq({ method: 'GET', query: {} }); req.body = body;
+  const res = createMockRes(); await handler(req, res); expect(res.statusCode).toBe(200); expect(get).toHaveBeenCalled();
+});

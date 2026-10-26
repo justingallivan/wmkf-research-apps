@@ -175,3 +175,38 @@ test('duplicate state exposes Clear repair while Save is disabled', async () => 
   expect(screen.getByText('Save as my default')).toBeDisabled(); expect(screen.getByText('Clear my default')).toBeEnabled();
   expect(screen.getByRole('alert')).toHaveTextContent('paused');
 });
+
+test('cancel Back after shallow selection restores the latest URL/history rather than the initial one', () => {
+  render(<Guard />); window.history.replaceState({ message: 'm2' }, '', '/scheduled-emails?message=m2');
+  act(() => mockRouter.events.emit('routeChangeComplete', '/scheduled-emails?message=m2', { shallow: true }));
+  window.history.replaceState({}, '', '/workbench'); window.confirm.mockReturnValue(false);
+  const pop = mockRouter.beforePopState.mock.calls[0][0]; expect(pop({ as: '/workbench', options: {} })).toBe(false);
+  expect(window.location.search).toBe('?message=m2'); expect(window.history.state).toEqual({ message: 'm2' });
+});
+test('confirmed save with failed refresh has a truthful departure warning', async () => {
+  render(<ScheduledReminderWordingEditor owner={OWNER} active />); await open();
+  global.fetch.mockResolvedValueOnce(response({ ok: true, refreshUnavailable: true })); fireEvent.click(screen.getByText('Save as my default')); await screen.findByText(/change was confirmed/);
+  window.confirm.mockReturnValue(false); expect(() => mockRouter.events.emit('routeChangeStart', '/workbench', {})).toThrow();
+  expect(window.confirm.mock.calls[0][0]).toContain('was confirmed'); expect(window.confirm.mock.calls[0][0]).not.toContain('pending or unconfirmed');
+});
+test('known pre-write read failure says nothing changed and requires Reload without uncertain-write wording', async () => {
+  render(<ScheduledReminderWordingEditor owner={OWNER} active />); await open();
+  global.fetch.mockResolvedValueOnce({ ok: false, status: 503, json: async () => ({ ok: false, reason: 'preference_unavailable' }) });
+  fireEvent.click(screen.getByText('Save as my default')); await screen.findByText(/Nothing was changed/);
+  expect(screen.getByText('Save as my default')).toBeDisabled(); expect(screen.queryByText(/could not be confirmed and may/)).toBeNull();
+});
+test('independent shared configuration failure is visible even with a valid personal pair', async () => {
+  global.fetch.mockResolvedValueOnce(response(dto({ ownStatus: 'configured', own: pair, source: 'personal', shared: null, sharedStatus: 'unavailable', canClear: true })));
+  render(<ScheduledReminderWordingEditor owner={OWNER} active />); await open();
+  expect(screen.getByRole('alert')).toHaveTextContent('New scheduling still requires valid shared wording'); expect(screen.getByLabelText('Default subject')).toHaveValue(pair.subject);
+});
+
+test('history snapshot updates after shallow history change even before route completion', async () => {
+  render(<Guard />);
+  act(() => mockRouter.events.emit('beforeHistoryChange', '/scheduled-emails?message=m2', { shallow: true }));
+  window.history.replaceState({ message: 'm2' }, '', '/scheduled-emails?message=m2');
+  await act(async () => { await Promise.resolve(); });
+  window.history.replaceState({}, '', '/workbench'); window.confirm.mockReturnValue(false);
+  const pop = mockRouter.beforePopState.mock.calls[0][0]; expect(pop({ as: '/workbench', options: {} })).toBe(false);
+  expect(window.location.search).toBe('?message=m2'); expect(window.history.state).toEqual({ message: 'm2' });
+});

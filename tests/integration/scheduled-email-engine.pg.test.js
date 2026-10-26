@@ -724,4 +724,14 @@ describeIf('scheduled email engine Parts A and B (live Postgres, migrations 036 
     } finally { mockPg.client = primary; await alternate.end(); }
   });
 
+  test('accepted saved activity with unavailable receipt storage remains a no-send hold, then reconciles', async () => {
+    const row = await seed({ set: { dynamics_email_id: ACTIVITY } });
+    const d = deps({ readCurrentPd: jest.fn(async () => PD_B), getEmailActivity: jest.fn(async () => ({ activityid: ACTIVITY, statuscode: 7 })) });
+    d.recordSent = jest.fn().mockRejectedValueOnce(new Error('receipt write unavailable')).mockImplementation(store.recordScheduledEmailSent);
+    await expect(service.deliverScheduledEmail(row.id, {}, d)).rejects.toMatchObject({ acceptanceProven: true, emailOutcome: 'uncertain', retryable: false });
+    const held = await read(row.id); expect(held.last_error_code).toBe('scheduled_email_pd_handoff_held'); expect(held.last_error_message).toContain('Dynamics accepted'); expect(held.dynamics_email_id).toBe(ACTIVITY); expect(held.send_requested_at).toBeNull();
+    expect((await service.deliverScheduledEmail(row.id, {}, d)).sent).toBe(true);
+    expect((await read(row.id)).status).toBe('sent'); expect(d.sendEmail).not.toHaveBeenCalled(); expect(d.createEmailActivity).not.toHaveBeenCalled();
+  });
+
 });

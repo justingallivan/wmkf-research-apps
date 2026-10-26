@@ -199,3 +199,9 @@ test.each(['edit', 'approve'])('ownership hold refuses %s while Stop remains ava
   const res = mockRes(); await actionHandler({ method: 'PATCH', query: { id: ID }, body: { action, version: 2, subject: 'a', bodyText: 'long enough message' } }, res);
   expect(res.statusCode).toBe(409); expect(store.updateScheduledEmailDraft).not.toHaveBeenCalled(); expect(store.approveScheduledEmail).not.toHaveBeenCalled();
 });
+
+test('accepted receipt persistence failure is truthful, uncertain-local-state feedback with no blind retry', async () => {
+  deliverScheduledEmail.mockRejectedValue(Object.assign(new Error('receipt unavailable'), { emailOutcome: 'uncertain', acceptanceProven: true, retryable: false }));
+  const res = mockRes(); await actionHandler({ method: 'PATCH', query: { id: ID }, body: { action: 'send_now', version: 2 } }, res);
+  expect(res.statusCode).toBe(202); expect(res.body).toMatchObject({ outcome: 'uncertain', retryable: false }); expect(res.body.error).toContain('Dynamics accepted this message');
+});

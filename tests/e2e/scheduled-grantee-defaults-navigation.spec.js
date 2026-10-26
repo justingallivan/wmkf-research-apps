@@ -83,3 +83,14 @@ test('pending default write warns that it may already be saved, without losing t
   await expect(page.getByLabel('Default subject', { exact: true })).toHaveValue('Retained future default'); release();
   await expect(page.getByText('Saved for future reminders. Existing messages are unchanged.', { exact: true })).toBeVisible();
 });
+
+test('select then cancel router Back restores the latest message URL and retains default edits', async ({ page, context, baseURL }) => {
+  await setup(context, baseURL); await page.goto(`${baseURL}/scheduled-emails?prior=1`);
+  await page.evaluate(() => window.next.router.push('/scheduled-emails?message=m1', undefined, { shallow: false }));
+  await edit(page); await page.getByText('Recipient 2', { exact: true }).click(); await expect(page).toHaveURL(/message=m2/);
+  let prompts = 0; page.on('dialog', async dialog => { prompts++; expect(dialog.message()).toContain('unsaved default wording'); await dialog.dismiss(); });
+  await page.evaluate(() => window.history.back()); await expect.poll(() => prompts).toBe(1);
+  await expect(page).toHaveURL(`${baseURL}/scheduled-emails?message=m2`);
+  await expect(page.getByLabel('Default subject', { exact: true })).toHaveValue('Retained future default');
+  await expect(page.getByLabel('Subject', { exact: true })).toHaveValue('Stored row 2');
+});

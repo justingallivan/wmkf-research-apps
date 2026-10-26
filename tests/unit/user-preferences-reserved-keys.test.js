@@ -217,3 +217,24 @@ test.each([['preference_invalid', 409], ['preference_unavailable', 503]])('stric
   const res = mockRes(); await handler({ method: 'GET', query: { key: EMAIL_TEMPLATES } }, res);
   expect(res.statusCode).toBe(status); expect(res.body).not.toHaveProperty('value');
 });
+
+describe('scheduled reminder key casing aliases', () => {
+  const alias = PREFERENCE_KEYS.SCHEDULED_GRANTEE_REMINDER_TEMPLATE.toUpperCase();
+  test('keyed and list GET cannot disclose an actual alias row', async () => {
+    DatabaseService.getUserPreferences.mockResolvedValueOnce({ [alias]: 'private copy', safe: 'visible' });
+    const list = mockRes(); await handler({ method: 'GET', query: {} }, list);
+    expect(list.body.preferences).toEqual({ safe: 'visible' });
+    const keyed = mockRes(); await handler({ method: 'GET', query: { key: alias } }, keyed); expect(keyed.statusCode).toBe(403);
+  });
+  test.each([['POST', { key: alias, value: '{}' }], ['POST', { preferences: { [alias]: '{}' } }], ['DELETE', { key: alias }], ['DELETE', { keys: [alias] }]])('%s refuses alias mutation %p', async (method, body) => {
+    const res = mockRes(); await handler({ method, body }, res); expect(res.statusCode).toBe(403);
+    expect(DatabaseService.setUserPreference).not.toHaveBeenCalled(); expect(DatabaseService.setUserPreferences).not.toHaveBeenCalled(); expect(DatabaseService.deleteUserPreference).not.toHaveBeenCalled();
+  });
+});
+
+test.each([' scheduled_grantee_reminder_template ', '\tSCHEDULED_GRANTEE_REMINDER_TEMPLATE\n'])('scheduled reminder whitespace/casing alias %p cannot bypass privacy or mutations', async key => {
+  DatabaseService.getUserPreferences.mockResolvedValueOnce({ [key]: 'private copy', safe: 'visible' });
+  const list = mockRes(); await handler({ method: 'GET', query: {} }, list); expect(list.body.preferences).toEqual({ safe: 'visible' });
+  const post = mockRes(); await handler({ method: 'POST', body: { key, value: '{}' } }, post); expect(post.statusCode).toBe(403);
+  const del = mockRes(); await handler({ method: 'DELETE', body: { key } }, del); expect(del.statusCode).toBe(403);
+});
