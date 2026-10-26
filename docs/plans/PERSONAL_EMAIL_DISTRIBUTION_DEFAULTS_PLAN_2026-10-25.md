@@ -3,7 +3,7 @@ title: Personal defaults for deliberation-distribution emails
 domain: workbench
 kind: plan
 status: active
-summary: "Reviewed slice 7 contract, implemented on branch: 426 tests, production build, four fixture browser cases and final Claude check passed. Discard warnings preserved; not released."
+summary: "Reviewed slice 7 contract, implemented on branch: 426 tests, production build, four fixture browser cases and final Claude check passed. Discard warnings preserved; Production release PR #529 verified."
 owner: product-engineering
 related:
   - docs/plans/PERSONAL_EMAIL_DEFAULTS_TODO_2026-09-20.md
@@ -17,7 +17,7 @@ related:
 
 ## Status and boundary
 
-[BRANCH IMPLEMENTED AND INDEPENDENTLY REVIEWED — 2026-10-25; NOT RELEASED.]
+[VERIFIED via PR #529 / `7f2a6e9c8`, Production READY and signed-in smoke — 2026-10-25.]
 This is inventory slice 7, on `codex/distribution-email-defaults-plan`.
 The owner authorized coding after the plan review. Final runtime fingerprint
 `1215cfd7d4151f5df628e0795b16c178b8a6af37` passed 426 focused tests,
@@ -27,10 +27,11 @@ relevant gates and the independent Claude review chain. Evidence and limits:
 Non-empty messages, fresh ordinary reopen and warning before voluntary discard
 remain owner requirements; background source changes retain edits.
 
-No live preference write, shared-setting seed, schema probe, migration, email,
-environment file edit or deployment occurred. Claude's separate database work
-and checkout remain untouched. Live tenant preference permissions remain
-unprobed. Release requires a separate owner instruction and deliberate promotion.
+The owner authorized release; full CI and Production read-only composer smoke
+passed. No live preference write, shared-setting seed, schema probe, migration,
+email or environment file edit occurred. Claude's separate database work and
+checkout remain untouched. Live Save/Clear and send acceptance remain unprobed.
+Release proof: `docs/audits/DISTRIBUTION_DEFAULTS_RELEASE_2026-10-25.md`.
 
 This document preserves the accepted contract and dated pre-implementation
 baseline. Normative criteria below are not Production claims. The build audit,

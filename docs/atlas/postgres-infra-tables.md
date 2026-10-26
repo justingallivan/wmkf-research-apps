@@ -47,7 +47,7 @@ from identity, duplicate/encrypted-row and enumeration failures. Family edits
 re-read the raw map plus shared copy and preserve sibling fields/inheritance.
 No storage, schema or identity mapping change; generic other-key reads unchanged.
 
-**Distribution personal defaults (branch implementation, 2026-10-25; not deployed):**
+**Distribution personal defaults (Production verified, PR #529 / `7f2a6e9c8`, 2026-10-25):**
 `lib/services/pre-site-visit/distribution-personalization.js` uses the DAL's complete
 exact-owner/key enumeration in existing Dataverse `wmkf_appuserpreferences`, key
 `deliberation_share_template`. Its dedicated reviewers-gated preference route

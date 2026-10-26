@@ -83,7 +83,7 @@ Evidence: `docs/audits/MEETING_AGENDA_DEFAULTS_BUILD_2026-10-24.md`.
 
 ## Slice 7 implementation — deliberation-distribution defaults
 
-[BRANCH IMPLEMENTED AND INDEPENDENTLY REVIEWED — 2026-10-25; NOT RELEASED.]
+[VERIFIED via PR #529 / `7f2a6e9c8`, Production READY and signed-in smoke — 2026-10-25.]
 Contract: `docs/plans/PERSONAL_EMAIL_DISTRIBUTION_DEFAULTS_PLAN_2026-10-25.md`.
 Build proof: `docs/audits/DISTRIBUTION_DEFAULTS_BUILD_2026-10-25.md`.
 Own-sender raw subject/non-empty message defaults, future-only Save/Clear,
@@ -91,8 +91,9 @@ fresh ordinary reopen and guarded discard are implemented. Source pauses retain
 edits; frozen uncertain sends retain exact retry state. All implementation-review
 findings were fixed and independently rechecked; final runtime 1215cfd7d passed
 426 focused tests, Production-mode build and four fixture browser navigation cases.
-No live preference write, send, schema operation or release occurred. Claude's
-database work remains untouched. Deliberate release requires a separate instruction.
+Released after explicit owner authorization and full CI. Production defaults load,
+discard cancellation and fresh reopen passed without preference writes or sends.
+Claude's database work remains untouched. Release proof: `docs/audits/DISTRIBUTION_DEFAULTS_RELEASE_2026-10-25.md`.
 
 ## Existing pre-discussion calendar events — Duncan walkthrough pending 2026-10-25
 
