@@ -15,6 +15,7 @@ import {
   saveRequestListing,
   saveRequestError,
   finishRun,
+  startRun,
   reclassify,
 } from '../../lib/services/request-file-corpus/index-store.js';
 
@@ -49,6 +50,20 @@ describe('listRequestFiles', () => {
     expect(result.files.map((f) => [f.itemId, f.subfolder, f.extension, f.driveId])).toEqual([
       ['a', '', 'pdf', 'drive-1'], ['b', 'Phase II', 'docx', 'drive-1'],
     ]);
+  });
+
+  test('a file reached through overlapping tracked folders is returned once, from the outer folder', async () => {
+    const graph = fakeGraph({});
+    graph.listFiles = jest.fn(async (library, folder) => (folder === 'Req/1003000'
+      ? [{ id: 'a', name: 'Review.docx', folder: 'Req/1003000/Phase II' }]
+      : [{ id: 'a', name: 'Review.docx', folder: 'Req/1003000/Phase II' }]));
+    const getBuckets = async () => [
+      { library: 'akoya_request', folder: 'Req/1003000/Phase II', source: 'tracked' },
+      { library: 'akoya_request', folder: 'Req/1003000', source: 'tracked' },
+    ];
+    const result = await listRequestFiles({ requestId: REQUEST_ID, requestNum: '1003000' }, { graph, getBuckets, sleep: noSleep });
+    expect(result.files).toHaveLength(1);
+    expect(result.files[0].subfolder).toBe('Phase II');
   });
 
   test('a missing archive folder is an empty bucket, not an error', async () => {
@@ -177,6 +192,29 @@ describe('saveRequestListing', () => {
     const client = recordingClient();
     await saveRequestListing(client, { request: { ...request, isTest: true }, files: [], runId: RUN_ID, rulesVersion: 'v1' });
     expect(client.calls[1].params[6]).toBe(true);
+  });
+});
+
+describe('startRun', () => {
+  const scope = { from: 2018, to: 2026, limit: null };
+  const storedClient = (row) => ({ calls: [], query: jest.fn(async function (text, params) { this.calls.push({ text, params }); return { rows: text.startsWith('SELECT') ? (row ? [row] : []) : [] }; }) });
+
+  test('a new run inserts without overwriting an existing one', async () => {
+    const client = recordingClient();
+    await startRun(client, { runId: RUN_ID, scope, rulesVersion: 'v1' });
+    expect(client.calls[0].text).toMatch(/^INSERT INTO request_corpus_runs .* VALUES \(\$1, \$2::jsonb, \$3\)$/);
+  });
+
+  test('a resume must match the stored scope and rules version', async () => {
+    const ok = storedClient({ scope, rules_version: 'v1' });
+    await startRun(ok, { runId: RUN_ID, scope, rulesVersion: 'v1', resume: true });
+    expect(ok.calls.at(-1).text).toMatch(/^UPDATE request_corpus_runs SET status = 'running'/);
+    await expect(startRun(storedClient({ scope, rules_version: 'v0' }), { runId: RUN_ID, scope, rulesVersion: 'v1', resume: true }))
+      .rejects.toThrow(/filename rules are now v1/);
+    await expect(startRun(storedClient({ scope, rules_version: 'v1' }), { runId: RUN_ID, scope: { ...scope, limit: 25 }, rulesVersion: 'v1', resume: true }))
+      .rejects.toThrow(/same --from, --to and --limit/);
+    await expect(startRun(storedClient(null), { runId: RUN_ID, scope, rulesVersion: 'v1', resume: true }))
+      .rejects.toThrow(/does not exist/);
   });
 });
 

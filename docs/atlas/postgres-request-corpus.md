@@ -65,7 +65,9 @@ lock so one load runs at a time.
 The listing (`listing.js`) uses `getRequestSharePointBuckets` with
 `requireCompleteResults` and `requireResolvedParents`; truncation, depth limits
 and any bucket error fail the whole request; a missing archive folder counts as
-an empty bucket.
+an empty bucket; a file reached through overlapping tracked folders is kept
+once, with the path from the outer folder. `--resume` stops unless the run's
+stored scope and filename-rules version match.
 
 ## Readers
 

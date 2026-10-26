@@ -14,11 +14,12 @@
  * --plan reads Dataverse only and prints request counts per meeting year; it
  * does not touch Graph or Postgres. A load lists each request newest meeting
  * year first and saves it in its own transaction; a listing error keeps that
- * request's existing rows. --resume reuses a run id and skips requests already
- * listed in it; run totals are recomputed from the stored rows, and the
- * same-run duplicate-file check reads stored rows too. --reclassify recomputes labels from stored names after the
- * filename rules change, without listing SharePoint. One load at a time
- * (Postgres advisory lock).
+ * request's existing rows. --resume reuses a run id (it stops unless --from,
+ * --to, --limit and the filename rules match the run) and skips requests
+ * already listed in it; run totals are recomputed from the stored rows, and
+ * the same-run duplicate-file check reads stored rows too. --reclassify
+ * recomputes labels from stored names after the filename rules change,
+ * without listing SharePoint. One load at a time (Postgres advisory lock).
  */
 
 import fs from 'fs';
@@ -102,7 +103,7 @@ const runId = RESUME || crypto.randomUUID();
 let status = 'failed';
 let totals = null;
 try {
-  await store.startRun(client, { runId, scope: { from: FROM, to: TO, limit: LIMIT }, rulesVersion: RULES_VERSION });
+  await store.startRun(client, { runId, scope: { from: FROM, to: TO, limit: LIMIT }, rulesVersion: RULES_VERSION, resume: Boolean(RESUME) });
   const done = RESUME ? await store.listedInRun(client, runId) : new Set();
   console.log(`Run ${runId} (${RULES_VERSION})${done.size ? `; resuming, ${done.size} requests already listed` : ''}.`);
   const started = Date.now();
