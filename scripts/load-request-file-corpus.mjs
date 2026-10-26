@@ -15,7 +15,8 @@
  * does not touch Graph or Postgres. A load lists each request newest meeting
  * year first and saves it in its own transaction; a listing error keeps that
  * request's existing rows. --resume reuses a run id and skips requests already
- * listed in it. --reclassify recomputes labels from stored names after the
+ * listed in it; run totals are recomputed from the stored rows, and the
+ * same-run duplicate-file check reads stored rows too. --reclassify recomputes labels from stored names after the
  * filename rules change, without listing SharePoint. One load at a time
  * (Postgres advisory lock).
  */
@@ -98,16 +99,17 @@ if (PLAN) { console.log('Plan only: nothing listed or written.'); process.exit(0
 const work = LIMIT ? requests.slice(0, LIMIT) : requests;
 const client = await connect();
 const runId = RESUME || crypto.randomUUID();
-const counts = { requestsOk: 0, requestsError: 0, filesSeen: 0 };
-const errors = [];
-const owner = new Map(); // drive|item -> request id, within this run
 let status = 'failed';
+let totals = null;
 try {
   await store.startRun(client, { runId, scope: { from: FROM, to: TO, limit: LIMIT }, rulesVersion: RULES_VERSION });
   const done = RESUME ? await store.listedInRun(client, runId) : new Set();
   console.log(`Run ${runId} (${RULES_VERSION})${done.size ? `; resuming, ${done.size} requests already listed` : ''}.`);
   const started = Date.now();
   let n = 0;
+  let listed = 0;
+  let files = 0;
+  let failed = 0;
   for (const r of work) {
     n += 1;
     if (done.has(r.akoya_requestid)) continue;
@@ -123,26 +125,23 @@ try {
     const listing = await listRequestFiles({ requestId: request.requestId, requestNum: request.requestNum });
     let failure = listing.error;
     if (!failure) {
-      const clash = listing.files.find((f) => owner.has(`${f.driveId}|${f.itemId}`) && owner.get(`${f.driveId}|${f.itemId}`) !== request.requestId);
-      if (clash) failure = `file ${clash.itemId} also listed under request ${owner.get(`${clash.driveId}|${clash.itemId}`)} in this run`;
+      const saved = await store.saveRequestListing(client, { request, files: listing.files, runId, rulesVersion: RULES_VERSION });
+      failure = saved.conflict;
+      if (!failure) { listed += 1; files += listing.files.length; }
     }
     if (failure) {
       await store.saveRequestError(client, { request, error: failure, runId });
-      counts.requestsError += 1;
-      errors.push({ requestNum: String(request.requestNum), error: failure.slice(0, 300) });
-    } else {
-      for (const f of listing.files) owner.set(`${f.driveId}|${f.itemId}`, request.requestId);
-      await store.saveRequestListing(client, { request, files: listing.files, runId, rulesVersion: RULES_VERSION });
-      counts.requestsOk += 1;
-      counts.filesSeen += listing.files.length;
+      failed += 1;
     }
-    if (n % 25 === 0) console.log(`  ${n}/${work.length} requests, ${counts.filesSeen} files, ${counts.requestsError} errors (${Math.round((Date.now() - started) / 1000)}s)`);
+    if (n % 25 === 0) console.log(`  ${n}/${work.length} requests: ${listed} listed, ${files} files, ${failed} errors this invocation (${Math.round((Date.now() - started) / 1000)}s)`);
   }
   status = 'completed';
 } finally {
-  await store.finishRun(client, { runId, status, counts, errors }).catch((e) => console.error(`Could not finish run row: ${e.message}`));
+  totals = await store.finishRun(client, { runId, status }).catch((e) => { console.error(`Could not finish run row: ${e.message}`); return null; });
   await client.end();
 }
-console.log(`\nRun ${runId} ${status}: ${counts.requestsOk} requests listed, ${counts.filesSeen} files, ${counts.requestsError} errors.`);
-for (const e of errors.slice(0, 20)) console.log(`  ${e.requestNum}: ${e.error}`);
-if (errors.length > 20) console.log(`  … ${errors.length - 20} more in request_corpus_runs.errors`);
+if (totals) {
+  console.log(`\nRun ${runId} ${status} (whole run): ${totals.requests_ok} requests listed, ${totals.files_seen} files, ${totals.requests_error} errors.`);
+  for (const e of totals.errors.slice(0, 20)) console.log(`  ${e.requestNum}: ${e.error}`);
+  if (totals.errors.length > 20) console.log(`  … ${totals.errors.length - 20} more in request_corpus_runs.errors`);
+}

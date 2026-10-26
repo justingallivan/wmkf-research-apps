@@ -14,6 +14,7 @@ import {
   classifyFile,
   saveRequestListing,
   saveRequestError,
+  finishRun,
   reclassify,
 } from '../../lib/services/request-file-corpus/index-store.js';
 
@@ -114,13 +115,14 @@ describe('eraOf and classifyFile', () => {
   });
 });
 
-function recordingClient({ failOn } = {}) {
+function recordingClient({ failOn, clashRows = [] } = {}) {
   const calls = [];
   return {
     calls,
     query: jest.fn(async (text, params) => {
       calls.push({ text: text.replace(/\s+/g, ' ').trim(), params });
       if (failOn && text.includes(failOn)) throw new Error('boom');
+      if (text.includes('JOIN unnest')) return { rows: clashRows, rowCount: clashRows.length };
       return { rows: [], rowCount: 2 };
     }),
   };
@@ -134,6 +136,10 @@ describe('saveRequestListing', () => {
     const result = await saveRequestListing(client, { request, files: [file('a', 'ProjectDescription.pdf'), file('b', 'Budget.xlsx')], runId: RUN_ID, rulesVersion: 'v1' });
     const texts = client.calls.map((c) => c.text);
     expect(texts[0]).toBe('BEGIN');
+    expect(texts[1]).toMatch(/^SELECT f.item_id, f.request_id FROM request_corpus_files f JOIN unnest.* WHERE f.last_run_id = \$3 AND f.request_id <> \$4/);
+    expect(client.calls[1].params.slice(2)).toEqual([RUN_ID, REQUEST_ID]);
+    client.calls.splice(1, 1);
+    texts.splice(1, 1);
     expect(texts[1]).toMatch(/^INSERT INTO request_corpus_requests .* file_count = CASE WHEN EXCLUDED.listing_status = 'ok' THEN EXCLUDED.file_count ELSE request_corpus_requests.file_count END/);
     expect(client.calls[1].params.slice(7, 11)).toEqual([4, 'ok', null, 2]);
     expect(texts[2]).toMatch(/^INSERT INTO request_corpus_files .* ON CONFLICT \(drive_id, item_id\) DO UPDATE SET request_id = EXCLUDED.request_id.* removed_at = NULL/);
@@ -143,13 +149,21 @@ describe('saveRequestListing', () => {
     expect(client.calls[3].params).toEqual([REQUEST_ID, RUN_ID]);
     expect(texts[4]).toBe('COMMIT');
     expect(texts.some((t) => /DELETE/i.test(t))).toBe(false);
-    expect(result).toEqual({ removed: 2 });
+    expect(result).toEqual({ removed: 2, conflict: null });
   });
 
   test('a successful empty listing still marks earlier files removed', async () => {
     const client = recordingClient();
     await saveRequestListing(client, { request, files: [], runId: RUN_ID, rulesVersion: 'v1' });
     expect(client.calls.map((c) => c.text.split(' ')[0])).toEqual(['BEGIN', 'INSERT', 'UPDATE', 'COMMIT']);
+  });
+
+  test('a file already saved under another request in this run is a conflict, not a move', async () => {
+    const other = '99999999-8888-4777-8666-555555555555';
+    const client = recordingClient({ clashRows: [{ item_id: 'a', request_id: other }] });
+    const result = await saveRequestListing(client, { request, files: [file('a', 'x.pdf')], runId: RUN_ID, rulesVersion: 'v1' });
+    expect(result).toEqual({ conflict: `file a is already listed under request ${other} in this run` });
+    expect(client.calls.map((c) => c.text.split(' ')[0])).toEqual(['BEGIN', 'SELECT', 'ROLLBACK']);
   });
 
   test('a failure inside the transaction rolls back and rethrows', async () => {
@@ -163,6 +177,18 @@ describe('saveRequestListing', () => {
     const client = recordingClient();
     await saveRequestListing(client, { request: { ...request, isTest: true }, files: [], runId: RUN_ID, rulesVersion: 'v1' });
     expect(client.calls[1].params[6]).toBe(true);
+  });
+});
+
+describe('finishRun', () => {
+  test('recomputes whole-run totals from stored rows, so a resume reports the whole run', async () => {
+    const client = recordingClient();
+    await finishRun(client, { runId: RUN_ID, status: 'completed' });
+    const { text, params } = client.calls[0];
+    expect(params).toEqual([RUN_ID, 'completed']);
+    expect(text).toMatch(/requests_ok = \(SELECT COUNT\(\*\) FROM request_corpus_requests WHERE last_run_id = \$1 AND listing_status = 'ok'\)/);
+    expect(text).toMatch(/files_seen = \(SELECT COUNT\(\*\) FROM request_corpus_files WHERE last_run_id = \$1 AND removed_at IS NULL\)/);
+    expect(text).toMatch(/errors = COALESCE\(\(SELECT jsonb_agg/);
   });
 });
 

@@ -53,8 +53,12 @@ lock so one load runs at a time.
   request's rows not seen in this run. Rows are never deleted.
 - `saveRequestError` records a listing error on the request row and leaves its
   file rows and stored file count as they were.
-- A file listed under two requests in one run is recorded as an error on the
-  second request, not reassigned.
+- A file already saved under another request in the same run (checked
+  against stored rows inside the transaction, so it holds across `--resume`)
+  rolls back and is recorded as an error on the second request, not
+  reassigned.
+- `finishRun` recomputes the run's totals and error list from the rows the run
+  last wrote, so a resumed run reports the whole run.
 - `reclassify` recomputes `doc_type`, `priority`, `classified_by`, `phase` and
   `rules_version` from the stored name and subfolder.
 
