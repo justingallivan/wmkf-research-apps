@@ -175,6 +175,17 @@ whole-run summary, which `finishRun` recomputes from stored rows].
   standard folder, so both locations are covered. Request 992853's error is a
   Dynamics pointer to a `RequestArchive3` folder that does not exist
   [ASSUMED to be one of those leftover pointers].
+- For that cleanup, `scripts/report-request-file-multi-library.mjs` (offline,
+  over the 2026-10-25 inventory CSVs, all meeting years; no filenames printed)
+  found **36 non-test Research requests with files in two libraries**, all
+  `RequestArchive3` + `akoya_request`, every one reached through a Dynamics
+  document location, all with meeting years 2018–2021 (34 Closed). The archive
+  holds the application record (median 49 files); the `Request` library holds
+  1–12 files each, 230 in all, modified 2024–2026 and classified by filename
+  as grant-management documents (83 final reports, 54 financial reports, 43
+  interim reports, 21 no-cost extensions, 11 budget reallocations, 14 staff
+  writeups). Six requests share a filename across the two libraries. The CSV
+  went to the owner's Shuttle folder for the colleague.
 - The full load connected through the pooled `POSTGRES_URL`; only one loader
   ran at a time, so the lock weakness the final review found did not bite.
   The loader now requires the direct connection.
