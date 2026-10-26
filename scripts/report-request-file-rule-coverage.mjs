@@ -63,7 +63,7 @@ const shapeOf = (name, requestNum) => name.toLowerCase()
   .replace(/[0-9a-f]{32}/g, '{guid}')
   .replace(/\d+/g, '#');
 
-const BUCKETS = ['read', 'already-legible', 'type-only', 'uncertain'];
+const BUCKETS = ['read', 'already-legible', 'type-only', 'uncertain', 'deferred'];
 const byEra = {};
 const out = OUT ? ['era,request_num,item_id,subfolder,name,type,priority,rule_id,phase'] : null;
 const esc = (v) => `"${String(v ?? '').replace(/"/g, '""')}"`;

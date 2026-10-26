@@ -79,6 +79,13 @@ describe('Type-only labels need a specific phrase', () => {
   test('generic words alone do not produce a Type-only label', () => {
     expect(priorityOf(type('Example University Annual Report 2019.pdf'))).toBe('uncertain');
     expect(priorityOf(type('Signed letter.pdf'))).toBe('uncertain');
+    expect(type('Research on IRS signaling.pdf')).toBe('uncertain');
+  });
+
+  test('a name mixing proposal and administrative words is not excluded', () => {
+    const result = classifyByFilename({ name: 'Project Budget and Scientific Proposal.pdf' });
+    expect(result.type).toBe('uncertain');
+    expect(result.ruleId).toBe('mixed-purpose');
   });
 });
 
@@ -86,10 +93,22 @@ describe('app-generated Site Visit artifacts', () => {
   test.each([
     ['1003000-staff-discussion-summary-1-1-v1.txt', 'Site Visit - Staff Discussion Summary', 'staff-discussion-summary'],
     ['1003000-presentation-transcript-ends-1h2m3s.txt', 'Site Visit - Presentation Transcript', 'site-visit-transcript'],
-    ['1003000 Site Visit Presentation.pptx', 'Site Visit - Slides', 'site-visit-slides'],
+    ['1003000 Site Visit Presentation.pdf', 'Site Visit - Slides', 'site-visit-slides'],
     ['1003000 initial assessment 1a-2b.docx', 'Artifacts/Initial Assessment', 'staff-writeup'],
   ])('%s → %s', (name, subfolder, expected) => {
     expect(type(name, subfolder)).toBe(expected);
+  });
+});
+
+describe('PowerPoint is deferred this round', () => {
+  test('slides keep their type but are not read', () => {
+    expect(classifyByFilename({ name: '1003000 Site Visit Presentation.pptx', subfolder: 'Site Visit - Slides' }))
+      .toEqual({ type: 'site-visit-slides', priority: 'deferred', ruleId: 'sv-slides' });
+    expect(classifyByFilename({ name: 'Example Site Visit Presentation FINAL.pptx' }).priority).toBe('deferred');
+  });
+
+  test('PDF slides are read', () => {
+    expect(classifyByFilename({ name: '1003000 Site Visit Presentation.pdf', subfolder: 'Site Visit - Slides' }).priority).toBe('read');
   });
 });
 

@@ -134,8 +134,9 @@ text is extracted only for the documents the analyses need to read:
 
 | Priority | Types | Treatment |
 |---|---|---|
-| **Read** | Science proposal documents (`compiled-proposal`, `project-summary`, `project-description`, `application-form` narrative sections, `graphical-abstract`, `bibliography`); reviews (`external-review`, `staff-review`, `agency-reviews`, `site-visit-report`); `interim-report`, `final-report`; `staff-writeup` | Classify and extract text |
-| **Already legible** | `site-visit-transcript`, `site-visit-summary`, `staff-discussion-transcript`, `staff-discussion-summary`, `site-visit-slides` | Classify; these are recent, app-generated and text already, so no conversion work |
+| **Read** | Science proposal documents (`compiled-proposal`, `project-summary`, `project-description`, `application-form` narrative sections, `graphical-abstract`, `bibliography`); reviews (`external-review`, `staff-review`, `agency-reviews`, `site-visit-report`); `interim-report`, `final-report`; `staff-writeup`; `site-visit-slides` (PDF) | Classify and extract text |
+| **Already legible** | `site-visit-transcript`, `site-visit-summary`, `staff-discussion-transcript`, `staff-discussion-summary` | Classify; these are recent, app-generated `.txt` (with `.vtt`/`.json` copies), so no conversion work |
+| **Deferred** | Any `.pptx`/`.ppt`, whatever its type | Typed, not read this round [DECIDED by owner 2026-10-25]; revisit later |
 | **Type only** | `budget`, `budget-spreadsheet`, `financial-narrative`, `financial-report`, `biosketches`, `cover-page`, `governing-board`, `status-letter`, `other-funding`, `institutional-priority`, `no-cost-extension`, `budget-reallocation`, `correspondence`, `institutional-info`, `ai-material`, other administrative types, `media` | Classify so they can be filtered out; no text extraction |
 
 Staff writeups from before AkoyaGO have no recognizable name. The working
@@ -192,12 +193,18 @@ by `scripts/report-request-file-rule-coverage.mjs` to the provisional inventory
 CSVs; 60,237 non-test files; unit tests in
 `tests/unit/request-file-corpus-filename-rules.test.js`.]
 
-| Era | Files | Read | Already legible | Type-only | Uncertain (of which opaque names) |
-|---|---|---|---|---|---|
-| 1 | 18,181 | 503 | 0 | 449 | 17,229 (16,354) |
-| 2 | 22,461 | 4,745 | 1 | 8,527 | 9,188 (6,295) |
-| 3 | 16,902 | 6,958 | 0 | 7,714 | 2,230 (297) |
-| 4 | 2,693 | 873 | 364 | 1,456 | 0 |
+| Era | Files | Read | Already legible | Type-only | Deferred (PowerPoint) | Uncertain (of which opaque names) |
+|---|---|---|---|---|---|---|
+| 1 | 18,181 | 503 | 0 | 449 | 0 | 17,229 (16,354) |
+| 2 | 22,461 | 4,745 | 0 | 8,485 | 19 | 9,212 (6,295) |
+| 3 | 16,902 | 6,957 | 0 | 7,710 | 25 | 2,210 (297) |
+| 4 | 2,693 | 898 | 314 | 1,456 | 25 | 0 |
+
+After the second Codex review: a name mixing proposal and administrative words
+(e.g. a combined proposal-and-budget package) is `uncertain` (`mixed-purpose`;
+18 files), and the tax-status rule needs a letter, determination, exempt or
+status word beside "IRS". Tax determination letters themselves stay Type-only
+(owner: ignorable).
 
 - **Opaque names are larger than the inventory summary showed.** Era 2 holds
   4,148 `.doc` files named with hyphenated GUIDs in addition to 1,688
@@ -214,7 +221,7 @@ CSVs; 60,237 non-test files; unit tests in
   audited financials, treasurer's reports; Type-only) and `ai-material`
   (app-made AI inputs; Type-only, applied only after Read rules so a copied
   proposal stays Read).
-- **Remaining non-opaque uncertain** (875 / 2,893 / 1,933 in eras 1–3) is a long
+- **Remaining non-opaque uncertain** (875 / 2,917 / 1,913 in eras 1–3) is a long
   tail of institution-specific names. More rules have diminishing returns;
   those documents go to template signatures and the model.
 - These counts are a rule-quality signal, not a final classification: the pilot
@@ -230,7 +237,7 @@ Other copies stay indexed but are not extracted again.
 ### 4. Text extraction
 
 - PDF and DOCX: existing `pdf-parse` and `mammoth` (`lib/utils/file-loader.js`).
-- Legacy `.doc`, `.html`, `.xls`, `.pptx`: convert through Graph's
+- Legacy `.doc`, `.html`, `.xls`: convert through Graph's
   PDF conversion (`GraphService.downloadFileAsPdf`) and then parse.
   [ASSUMED: Microsoft documents `.doc`/`.html`/`.xls` as convertible; probe a
   small sample of each before relying on it.]
