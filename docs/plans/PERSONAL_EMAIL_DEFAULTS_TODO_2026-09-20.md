@@ -104,9 +104,9 @@ current-PD delivery guards prevent new sends under mismatched/unknown ownership.
 No schema, shared default, environment or live business-record operation occurred.
 Contract: `docs/plans/PERSONAL_EMAIL_SCHEDULED_GRANTEE_DEFAULTS_PLAN_2026-10-25.md`.
 383 Jest tests, 33 scratch-Postgres tests and six browser cases passed. PR #531
-remains unreleased. The build receipt records the pre-existing correlation-only
-acceptance recovery risk and all nonblocking review notes:
-`docs/audits/SCHEDULED_GRANTEE_DEFAULTS_BUILD_2026-10-25.md`.
+remains unreleased. N1 recovery follow-up implemented at `17f1969d2`:47 SQL / 125 unit
+tests passed; independent follow-up review PASS WITH NONBLOCKING NOTES. Proof and retained limits:
+`docs/audits/SCHEDULED_GRANTEE_RECOVERY_GAP_FIX_2026-10-25.md`.
 
 ## Existing pre-discussion calendar events — Duncan walkthrough pending 2026-10-25
 

@@ -19,7 +19,11 @@ related:
 
 The grantee abstract reminder baseline workflow is shipped. A separate slice 5
 branch extension (2026-10-25, not deployed) adds personal wording at creation/handoff,
-current-PD delivery holds and lower-priority due rechecks for held rows; see
+current-PD delivery holds and lower-priority due rechecks for held rows. Recovery
+follow-up 17f1969d2 durably freezes correlation before lookup/create, independently
+blocks generation-changing and send actions, and reconciles accepted history
+read-only; unresolved results require manual history review/Stop. No schema change.
+Proof: `docs/audits/SCHEDULED_GRANTEE_RECOVERY_GAP_FIX_2026-10-25.md`. See
 `docs/plans/PERSONAL_EMAIL_SCHEDULED_GRANTEE_DEFAULTS_PLAN_2026-10-25.md`.
 The following describes the deployed baseline, not that branch extension. Before an ordinary send,
 `scheduled-email-service.js` re-reads the current Liaison and the assigned PD's

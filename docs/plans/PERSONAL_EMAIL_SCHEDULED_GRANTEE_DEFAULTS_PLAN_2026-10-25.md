@@ -3,7 +3,7 @@ title: Personal defaults for scheduled grantee reminders
 domain: workbench
 kind: plan
 status: active
-summary: "Slice 5 branch-built and locally verified at 7a84a274a; Claude implementation rereview PASS WITH NONBLOCKING NOTES. Exact-owner defaults, reassignment hold and discard warnings implemented; 383 tests, 33 scratch-Postgres and six browser cases passed. Pre-existing correlation-only recovery risk retained in build receipt. Not released."
+summary: "Slice 5 branch-built and locally verified at 7a84a274a; Claude implementation rereview PASS WITH NONBLOCKING NOTES. Exact-owner defaults, reassignment hold and discard warnings implemented; 383 tests, 33 scratch-Postgres and six browser cases passed. N1 correlation recovery follow-up implemented at 17f1969d2 with 47 SQL / 125 unit tests; independent follow-up review PASS WITH NONBLOCKING NOTES. Not released."
 owner: product-engineering
 related:
   - docs/plans/PERSONAL_EMAIL_DEFAULTS_INVENTORY_2026-09-24.md
@@ -527,8 +527,10 @@ The owner subsequently authorized implementation. The branch now implements the
 reviewed contract. At `7a84a274a`, 383 Jest tests, 33 disposable local Postgres
 tests, six fixture browser cases, types/build/lint and relevant gates passed.
 Independent Claude rereview returned PASS WITH NONBLOCKING NOTES, closing all
-seven initial findings. The build receipt records the pre-existing correlation-only
-accepted-activity persistence risk and other nonblocking notes. Pre-write read
+seven initial findings. The owner then authorized fixing N1: pre-lookup durable
+correlation freeze, SQL reassignment/recipient/action guards and read-only recovery
+are implemented at `17f1969d2`; 47 SQL/125 unit tests pass, follow-up review PASS WITH NONBLOCKING NOTES.
+Proof: `docs/audits/SCHEDULED_GRANTEE_RECOVERY_GAP_FIX_2026-10-25.md`. Pre-write read
 failure now returns `preference_unavailable`; known acceptance/receipt failure uses
 `acceptanceProven`; casing/whitespace aliases of the new private key are guarded.
 These refinements preserve the reviewed discard-warning and reassignment-hold contract. Release remains a separate deliberate action. No migration, environment

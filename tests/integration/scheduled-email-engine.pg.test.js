@@ -849,4 +849,25 @@ describeIf('scheduled email engine Parts A and B (live Postgres, migrations 036 
     expect(await read(row.id)).toMatchObject({ last_error_code: RECOVERY, recipient_generation: 0, cc_recipients: [], approval_required: false });
   });
 
+  test.each([false, true])('recovery identity is saved before receipt failure (fallback failure=%s), then safely reconciles', async fallbackFails => {
+    const row = await seed(); const claim = await store.claimScheduledEmailSend(row.id);
+    await store.freezeScheduledEmailCorrelation(claim);
+    await mockPg.client.query("UPDATE scheduled_email_messages SET locked_until=NOW()-interval '1 minute' WHERE id=$1", [row.id]);
+    const d = deps({ findEmailByCorrelation: jest.fn(async () => [{ activityid: ACTIVITY, statuscode: 7 }]),
+      getEmailActivity: jest.fn(async () => ({ activityid: ACTIVITY, statuscode: 7 })),
+      recordSent: jest.fn().mockRejectedValueOnce(new Error('receipt unavailable')).mockImplementation(store.recordScheduledEmailSent) });
+    if (fallbackFails) d.recordFailure = jest.fn(async () => { throw new Error('fallback unavailable'); });
+    expect((await service.reconcileScheduledEmailCandidate(await read(row.id), d)).unresolved).toBe(true);
+    let saved = await read(row.id);
+    expect(saved.dynamics_email_id).toBe(ACTIVITY);
+    expect(saved.last_error_code).toBe(fallbackFails ? null : RECOVERY);
+    expect(await store.reassignScheduledEmail(handoffInput(saved))).toBeNull();
+    if (fallbackFails) {
+      await mockPg.client.query("UPDATE scheduled_email_messages SET locked_until=NOW()-interval '1 minute' WHERE id=$1", [row.id]);
+      expect((await service.deliverScheduledEmail(row.id, {}, d)).sent).toBe(true);
+    } else expect((await service.reconcileScheduledEmailCandidate(saved, d)).sent).toBe(true);
+    saved = await read(row.id); expect(saved).toMatchObject({ status: 'sent', dynamics_email_id: ACTIVITY, recipient_generation: 0, pd_systemuser_id: PD_A });
+    expect(d.sendEmail).not.toHaveBeenCalled(); expect(d.createEmailActivity).not.toHaveBeenCalled();
+  });
+
 });

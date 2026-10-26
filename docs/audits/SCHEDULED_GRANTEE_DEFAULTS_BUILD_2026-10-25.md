@@ -3,7 +3,7 @@ title: Scheduled grantee reminder defaults — implementation verification
 domain: workbench
 kind: audit
 status: active
-summary: "Branch implementation at 7a84a274a: 383 tests, 33 scratch-Postgres tests and six fixture browser cases passed. Independent Claude rereview PASS WITH NONBLOCKING NOTES; all hosted checks passed. Not released."
+summary: "Historical initial implementation at 7a84a274a: 383 tests, 33 scratch-Postgres tests and six fixture browser cases passed. Independent Claude rereview PASS WITH NONBLOCKING NOTES; all hosted checks passed. Not released."
 owner: product-engineering
 related:
   - docs/plans/PERSONAL_EMAIL_SCHEDULED_GRANTEE_DEFAULTS_PLAN_2026-10-25.md
@@ -11,7 +11,11 @@ related:
   - docs/API_ROUTE_SECURITY_MATRIX.md
 ---
 
-# Implementation and verification — 2026-10-25
+# Initial implementation and verification — 2026-10-25
+
+This receipt describes historical fingerprint `7a84a274a`. The owner-authorized
+N1 follow-up is now implemented at `17f1969d2`; current proof and independent
+review status: `docs/audits/SCHEDULED_GRANTEE_RECOVERY_GAP_FIX_2026-10-25.md`.
 
 [VERIFIED via source, local mocked tests, disposable local Postgres and fixture-only
 Chromium.] Runtime fingerprint: `7a84a274ab33cb8033248c9c6466ed80e125f6ad` on
@@ -137,15 +141,13 @@ an existing cron prerequisite. Other preference keys retain their existing behav
 
 ### Retained nonblocking review notes / release considerations
 
-[VERIFIED via independent source trace; not reproduced.] An existing narrow recovery
-exposure remains: Dynamics acceptance found only by correlation, followed by failure
-to persist the activity identity, can leave no stored ID or send intent. Subsequent
-handoff/re-addressing can change the correlation generation and permit another send.
-The stored-ID receipt-failure test does not prove this correlation-only case safe.
-Claude classified it as nonblocking and pre-existing; do not interpret the general
-no-blind-retry language above as covering that case. Follow-up: add a discriminating
-correlation-only failure test and a durable manual-recovery fence before relying on
-this path. This implementation has not been released.
+[HISTORICAL at `7a84a274a`.] N1 identified correlation-only accepted activity plus
+failed identity storage permitting a later generation rewrite and duplicate send.
+The owner subsequently authorized correction. At `17f1969d2`, this case was
+reproduced against the prior runtime and fixed with a pre-lookup durable freeze,
+SQL mutation guards and read-only recovery; 47 scratch-Postgres and 125 focused
+unit tests pass. Current independent review/verification is recorded in
+`docs/audits/SCHEDULED_GRANTEE_RECOVERY_GAP_FIX_2026-10-25.md`. The original verbatim review remains unchanged.
 
 The remaining rereview notes are generic hold/Retry wording for acceptance repair
 (safe but imprecise), missing explicit array/nonempty-object GET negative cases
