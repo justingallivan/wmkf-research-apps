@@ -11,10 +11,10 @@ import path from 'node:path';
 import { parseEnv } from 'node:util';
 import { randomUUID, createHash } from 'node:crypto';
 import { pathToFileURL } from 'node:url';
+import { isGuid } from '../lib/utils/guid.js';
 
 export const CYCLE = 'J00';
 export const EDIT_MARKER = 'REHEARSAL EDIT VERIFIED';
-const GUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const DV = 'https://wmkf.crm.dynamics.com';
 const GRAPH = 'https://graph.microsoft.com/v1.0';
 const hash = data => createHash('sha256').update(data).digest('hex');
@@ -26,7 +26,7 @@ export function testRequestOnly(request, id) {
 }
 export function validatePlan(p) {
   check(p?.version === 1 && p.cycle === CYCLE && p.dataverse === DV, 'Invalid rehearsal plan');
-  for (const id of [p.requestId, p.actorId, p.runId, p.sourceDocumentId]) check(GUID.test(id), 'Invalid plan identity');
+  for (const id of [p.requestId, p.actorId, p.runId, p.sourceDocumentId]) check(isGuid(id), 'Invalid plan identity');
   check(/^\d{1,20}$/.test(p.requestNumber), 'Invalid test request number');
   check(p.requestFolder === `${p.requestNumber}_${p.requestId.replaceAll('-', '').toUpperCase()}`, 'Unexpected test request folder');
   check(p.boardFolder === `Board Materials/WMKF-Archive-Rehearsal-${p.runId}`, 'Unexpected source folder');
@@ -149,7 +149,7 @@ async function runtime(envFile, p, requiresWrite = false) {
   return { G: graph.GraphService, requests, docs, buckets, model, archive, source, reader, config, fence };
 }
 async function resolveTargets(r, requestId, actorId) {
-  check(GUID.test(requestId) && GUID.test(actorId), 'Explicit request/actor GUIDs required');
+  check(isGuid(requestId) && isGuid(actorId), 'Explicit request/actor GUIDs required');
   const request = await r.requests.getById(requestId, { select: 'akoya_requestid,akoya_requestnum,wmkf_istestrequest,wmkf_testcreationrunid' });
   check(testRequestOnly(request, requestId), 'STOP: request is not explicitly marked as a test');
   const actor = await r.config.eligibleStaff(actorId, { admin: true });
@@ -199,7 +199,8 @@ export async function resolvePlanIds(r, a) {
   check(Boolean(a['--actor-id']) !== Boolean(a['--actor-name']), 'Supply exactly one actor GUID or full name');
   const odata = await import('../lib/dataverse/core/odata.js');
   const uniqueId = (result, field) => {
-    check(!result.capped && !result.hasMore && result.records?.length === 1 && GUID.test(result.records[0][field]), 'Identity lookup must return exactly one record');
+    check(!result.capped && !result.hasMore && result.records?.length === 1, `Identity lookup for ${field} must return exactly one record (received ${result.records?.length ?? 'unknown'}; incomplete=${Boolean(result.capped || result.hasMore)})`);
+    check(isGuid(result.records[0][field]), `Identity lookup for ${field} returned an invalid Dataverse GUID`);
     return result.records[0][field].toLowerCase();
   };
   let requestId = a['--request-id'], actorId = a['--actor-id'];
@@ -212,7 +213,7 @@ export async function resolvePlanIds(r, a) {
     const users = r.users || await import('../lib/dataverse/adapters/system-user.js');
     actorId = uniqueId(await users.queryUsers({ select: 'systemuserid', filter: odata.and([odata.eq('fullname', a['--actor-name']), odata.eqRaw('isdisabled', false)]), top: 2 }), 'systemuserid');
   }
-  check(GUID.test(requestId) && GUID.test(actorId), 'Valid request and actor identities required');
+  check(isGuid(requestId) && isGuid(actorId), 'Valid request and actor identities required');
   return { requestId: requestId.toLowerCase(), actorId: actorId.toLowerCase() };
 }
 

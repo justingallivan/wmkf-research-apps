@@ -166,3 +166,17 @@ test('planning context survives awaits through real Dataverse query adapters', a
     if (previousUrl === undefined) delete process.env.DYNAMICS_URL; else process.env.DYNAMICS_URL = previousUrl;
   }
 });
+
+
+test('identity and plan validation accept Dataverse GUIDs outside UUID version 1-5', async () => {
+  const dataverseId = '4bfb6e40-678f-f111-8076-7ced8d3d15a6';
+  const r = { requests: { queryRequests: async () => ({ records: [{ akoya_requestid: dataverseId }] }) },
+    users: { queryUsers: async () => ({ records: [{ systemuserid: actorId }] }) } };
+  assert.deepEqual(await resolvePlanIds(r, { '--request-number': '1003220', '--actor-name': 'Justin Gallivan' }), { requestId: dataverseId, actorId });
+  const p = { ...plan, requestId: dataverseId, requestNumber: '1003220', requestFolder: `1003220_${dataverseId.replaceAll('-', '').toUpperCase()}`,
+    archiveFolder: `1003220_${dataverseId.replaceAll('-', '').toUpperCase()}/Board Milestones/J00`,
+    filename: `1003220 - Archive Rehearsal ${runId} - Writeup.docx`, archiveFilename: `J00 - 1003220 - Archive Rehearsal ${runId} - Writeup.docx`, archiveKey: `board-writeup:J00:${dataverseId}` };
+  assert.equal(validatePlan(p), p);
+  r.requests.queryRequests = async () => ({ records: [{ akoya_requestid: "not-a-guid')" }] });
+  await assert.rejects(resolvePlanIds(r, { '--request-number': '1003220', '--actor-name': 'Justin Gallivan' }), /invalid Dataverse GUID/);
+});
