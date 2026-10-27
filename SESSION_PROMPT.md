@@ -1,8 +1,23 @@
-# Session 644 Prompt: Build the J27 decision calendar/matrix
+# Session 645 Prompt: Build the J27 decision calendar/matrix
 
 **Branch:** this handoff lives on `claude/j27-ai-materials-names` (pushed
 2026-10-26; **no PR opened**). Owner chose to keep the handoff on the feature branch.
 `main` still carries the Session 643 prompt. Check out the feature branch to resume.
+
+## Session 644 Summary (startup + coordination only, 2026-10-27)
+
+No code or plan work. `/start` ran all 40 `check:*` gates plus self-tests
+(70 runs), all green; branch 18 ahead / 0 behind `origin/main`.
+`/agent-coordination` [VERIFIED via `~/.codex/sessions` rollout log]: a Codex
+session (started 2026-10-26 15:42) shares **this checkout**
+(`/Users/gallivan/Code/WMKF_Apps`, on this branch). It has only done read-only
+work: Board writeup CSO-stage questions and the Beth daily-reminder reply. It
+was told Claude was idle. Proposed split, **not yet confirmed by the owner**:
+Claude keeps this checkout and branch for J27 docs. Codex does any edits in its
+own worktree off `origin/main` and never checks out, switches, stashes or
+resets in this directory. Before resuming, re-check for a live Codex session in
+this checkout (`git worktree list`, newest `~/.codex/sessions` rollout `cwd`).
+Everything below is the unchanged S643 handoff; its next items remain open.
 
 ## Session 643 Summary
 
