@@ -150,12 +150,24 @@ hood.
 ### Automated proposal input contract
 
 The current proposal source for Initial Assessment and Workbench Field Primer
-request mode remains the one exact active request file:
+request mode remains one exact active request file, under either accepted name:
 
-`AI Materials/ProposalNarrative_{Request#}.pdf`
+`AI Materials/ProposalNarrative_{Request#}.pdf` (D26 flows) or
+`AI Materials/Project-Narrative_{Request#}.pdf` (J27 flows)
+
+**[OWNER DECISION 2026-10-26; BUILT ON BRANCH `claude/j27-ai-materials-names`,
+NOT YET RELEASED]** The J27 flows name their `AI Materials` files
+`{Type}_{Request#}` (Connor). The apps accept `Project-Narrative_{Request#}.pdf`
+and `Bibliography_{Request#}.pdf` alongside the D26 names
+(`lib/utils/proposal-document-names.js` `acceptedProposalNarrativeFilenames` /
+`acceptedProposalBibliographyFilenames`). Exactly one accepted name per purpose
+may be present; both present fails closed. The `.pdf` extension is `[ASSUMED]`
+until a real J27 folder confirms it. See
+`docs/POWER_AUTOMATE_PROPOSAL_FILE_CONTRACT.md`.
 
 The file must be under the request's Dynamics-associated `akoya_request`
-SharePoint folder. An archive-only match, multiple active exact matches, a raw
+SharePoint folder. An archive-only match, multiple active exact matches, both
+accepted names present, a raw
 application export, `Reviewer Materials/Proposal_{Request#}.pdf`, or
 `Phase I/ProjectDescription.pdf` does not satisfy the contract; default
 automation fails before the model and before result persistence. Reviewer
@@ -177,7 +189,7 @@ applies to new generations and explicit regenerations rather than silently
 invalidating an existing primer.
 
 **[OWNER DECISION 2026-08-17; PRE-SITE NARRATIVE-ONLY; REVIEWER FINDER CUTOVER
-PLANNED.]** Power Automate keeps two exact files:
+PLANNED; J27 NAMES ADDED 2026-10-26 ABOVE.]** Power Automate keeps two exact files:
 `AI Materials/ProposalNarrative_{Request#}.pdf` and
 `AI Materials/ProposalBibliography_{Request#}.pdf`. Do not combine them into a
 third canonical PDF. Pre-Site, Initial Assessment, and Field Primer supply and

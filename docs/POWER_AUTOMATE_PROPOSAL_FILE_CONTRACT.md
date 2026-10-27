@@ -6,7 +6,7 @@ status: active
 summary: "Required SharePoint folders and exact proposal PDF filenames for Power Automate."
 canonical: true
 owner: product-engineering
-last_verified: 2026-08-17
+last_verified: 2026-10-26
 related:
   - docs/REVIEWER_MATERIALS_FOLDER_SPEC.md
   - docs/DATAVERSE_SHAREPOINT_FILE_MODEL.md
@@ -37,12 +37,35 @@ AI Materials/ProposalNarrative_1002379.pdf
 AI Materials/ProposalBibliography_1002379.pdf
 ```
 
+### J27 names (owner decision 2026-10-26)
+
+For J27, GOApply places the applicant's documents in a `Submission-Documents`
+subfolder, and the J27 flows put the documents below in `AI Materials`, named
+`{Type}_{Request#}` (Connor, email 2026-10-26). Rather than renaming them, the
+apps accept the J27 narrative and bibliography names as alternatives to the
+names above:
+
+| Purpose | D26 name | J27 name |
+|---|---|---|
+| Narrative | `ProposalNarrative_{Request#}.pdf` | `Project-Narrative_{Request#}.pdf` |
+| Bibliography | `ProposalBibliography_{Request#}.pdf` | `Bibliography_{Request#}.pdf` |
+
+Exactly one of the two names may be present for each purpose; if both are
+present, generation fails closed. The `.pdf` extension is `[ASSUMED]` until a
+real J27 `AI Materials` folder confirms it. Connor's other J27 `AI Materials`
+files (`Graphical-Abstract_`, `Biosketches_`, `Other-Support_`,
+`Collaboration-Letters_`, `PhaseI-Cover-Page_`, `Abstract_`,
+`Graphical-Abstract-Page_`) are not app inputs today. The J27 staff and
+reviewer copies are still to be specified.
+
 ## File purposes
 
 - `Proposal_{Request#}.pdf`: the complete reviewer-facing proposal package,
   including all materials reviewers should receive.
-- `ProposalNarrative_{Request#}.pdf`: the project narrative only.
-- `ProposalBibliography_{Request#}.pdf`: the bibliography or references only.
+- `ProposalNarrative_{Request#}.pdf` (J27: `Project-Narrative_{Request#}.pdf`):
+  the project narrative only.
+- `ProposalBibliography_{Request#}.pdf` (J27: `Bibliography_{Request#}.pdf`):
+  the bibliography or references only.
 
 ## Required rules
 

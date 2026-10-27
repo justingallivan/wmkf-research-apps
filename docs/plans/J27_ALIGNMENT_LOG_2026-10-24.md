@@ -106,6 +106,30 @@ error.
 
 Questions 1–3 unblock building; question 3 decides how the run is triggered.
 
+**Connor's answer (email to Justin, 2026-10-26), partial:**
+
+- GOApply puts the applicant's documents in a `Submission-Documents`
+  subfolder of the request folder.
+- The J27 flows put these files in `AI Materials`, named `{Type}_{Request#}`:
+  `Graphical-Abstract_`, `Project-Narrative_`, `Bibliography_`,
+  `Biosketches_`, `Other-Support_`, `Collaboration-Letters_`, and a second
+  group `PhaseI-Cover-Page_`, `Abstract_`, `Graphical-Abstract-Page_`.
+- He asked us to say which files the AI analysis needs and what the combined
+  copies for distribution (the staff version) should contain.
+
+**Owner decision 2026-10-26:** change the apps rather than ask Connor to rename. They
+accept `Project-Narrative_{n}.pdf` and `Bibliography_{n}.pdf` as alternatives
+to the D26 names, and fail closed if both are present. Built on branch
+`claude/j27-ai-materials-names`; not yet released. The `.pdf` extension is
+assumed until a real J27 folder confirms it.
+
+This answers questions 1 and 2: both files are produced, and the bibliography
+is its own upload. Still open: 3 (timing and ready signal), 4 (changes after
+submission), 5 in part (the Workbench Proposal tab has no J27 entry yet), 6
+(the reviewer copy and anything off limits). Also open: the contents and
+order of the combined staff/distribution copy, and what the second group of
+files is for.
+
 ## December readiness (proposed for the meeting to confirm)
 
 Justin agreed with this assessment on 2026-10-24; colleagues may correct it at
