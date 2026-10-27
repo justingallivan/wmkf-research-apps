@@ -150,6 +150,49 @@ is its own upload. Still open: 5 in part (the Workbench Proposal tab has no J27 
 order of the combined staff/distribution copy, and what the second group of
 files is for.
 
+## J27 proposal state model (proposed by Justin 2026-10-26; pending Connor and Sarah)
+
+About 300 proposals arrive Dec 7; staff pare them to the 20–25 the Program
+Chairs approve for peer review on Feb 24 (timeline workbook). Each proposal
+gets a lead PD after the Dec 8 AI pass.
+
+**Staff states, owned by the apps** (replace the D26 triage patch, see X2):
+
+| State | Meaning |
+|---|---|
+| Submitted | Every proposal on arrival. |
+| Triaged | Out: not looked at again unless something extraordinary happens. Logged, and removed from the default view. |
+| Under consideration | Still in contention during the Jan 13–Feb 3 PD sessions (replaces "Save for now"). |
+| Recommend to Program Chairs | Last staff state, decided by Feb 3. |
+
+The ~50 left after Jan 13–14 PD triage go to the Program Chairs and
+interested Board members (First Cut spreadsheet, Jan 14). The lead PD writes a
+1-page writeup for each recommended proposal by Feb 10. The writeups are exported to a
+SharePoint folder for leadership to assemble the Diligent Book (Feb 12),
+reusing the existing President-approval model. **This writeup and export
+infrastructure is the critical build** (Justin).
+
+**After the Chairs meeting, AkoyaGO is the source of truth.** Staff do not
+move proposals past Recommend to Program Chairs. The Grants Manager records
+the Chairs' decision in AkoyaGO as the Phase I → Phase II transition, keeping
+the Phase II values so historical Power Automate flows run, and the apps read it.
+Proposed mapping (directionally agreed; who sets what is to be confirmed with
+Connor and Sarah):
+
+| Chairs outcome | `wmkf_phaseistatus` | `akoya_requeststatus` | Apps show |
+|---|---|---|---|
+| Approved for peer review | `Invited` (100000003) | `Phase II Pending` | Selected for external review |
+| Not approved | `Not Invited` (100000002) | `Phase I Declined`? | Not selected |
+
+If confirmed, existing readers keep working: Reviewer Finder keys on
+`Phase II Pending` with empty Phase II status
+(`lib/services/reviewer-finder/my-proposals-service.js:124`) and the
+grantee-title cron on Phase I `Invited`
+(`lib/services/cron/generate-grantee-titles-service.js:34,72`), which would
+also answer register Q9. Open: whether any value is set before the Chairs
+meeting (e.g. `Recommended Invite`, which would recreate X2's double record),
+and whether Triaged proposals ever get `Phase I Declined` (decline notes, J-1).
+
 ## December readiness (proposed for the meeting to confirm)
 
 Justin agreed with this assessment on 2026-10-24; colleagues may correct it at
