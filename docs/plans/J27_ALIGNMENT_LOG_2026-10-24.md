@@ -213,6 +213,20 @@ and whether Triaged proposals ever get `Phase I Declined` (decline notes, J-1).
   were used before. No Board/Chairs sharing surface was found in the app
   (grep 2026-10-26); possibly SharePoint link sharing. To confirm with Connor.
 
+**Offramp and oral presentations (Justin 2026-10-26):**
+
+- The Grants Manager records the Mar 25 PD offramp outcome in AkoyaGO; the
+  apps read it rather than holding an offramp state.
+- "Invited to oral presentation" may be derived from AkoyaGO Phase II Status
+  (to confirm with Connor and Sarah). Note: `wmkf_phaseiistatus` has no
+  `Invited` option (probe 2026-10-26); candidates are reusing `Recommended` /
+  `Not Recommended`, or adding an option.
+- Duncan schedules the oral presentations from that output, so it must
+  connect to the parked Duncan scheduling walkthrough.
+- Needed artifact: a flowchart and calendar that name, for each step, who sets
+  which AkoyaGO field and value, possibly appended to the J27/D27 timeline
+  workbook.
+
 ## December readiness (proposed for the meeting to confirm)
 
 Justin agreed with this assessment on 2026-10-24; colleagues may correct it at
