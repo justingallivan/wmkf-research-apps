@@ -218,3 +218,19 @@ test('reports material-status uncertainty while retaining unrelated proposal fil
   expect(result.errors).toEqual([{ library: ACTIVE.library, folder: ROOT }]);
   expect(result.slots[0]).toMatchObject({ found: true, name: proposal.name });
 });
+
+test('J27 GOApply names fill the AI Materials slots; both D26 and J27 names present fails closed', async () => {
+  getRequestSharePointBuckets.mockResolvedValue([ACTIVE]);
+  listFiles.mockResolvedValue([
+    { name: 'Project-Narrative_1002379.pdf', folder: `${ROOT}/AI Materials`, mimeType: 'application/pdf' },
+    { name: 'Bibliography_1002379.pdf', folder: `${ROOT}/AI Materials`, mimeType: 'application/pdf' },
+    { name: 'ProposalBibliography_1002379.pdf', folder: `${ROOT}/AI Materials`, mimeType: 'application/pdf' },
+  ]);
+
+  const result = await listProposalDocuments(REQUEST_ID, REQUEST_NUMBER, 'J27');
+
+  expect(result.aiMaterials).toEqual([
+    expect.objectContaining({ key: 'proposalNarrative', found: true, name: 'Project-Narrative_1002379.pdf', filename: 'Project-Narrative_1002379.pdf' }),
+    expect.objectContaining({ key: 'proposalBibliography', found: false, filename: 'ProposalBibliography_1002379.pdf' }),
+  ]);
+});

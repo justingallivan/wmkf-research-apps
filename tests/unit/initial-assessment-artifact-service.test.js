@@ -558,7 +558,7 @@ it('fails closed before persistence or AI when the AI proposal narrative is abse
   await expect(generateInitialAssessment({ requestId: REQUEST_ID })).rejects.toMatchObject({
     httpStatus: 409,
     message:
-      'No usable AI proposal narrative was found at AI Materials/ProposalNarrative_1003001.pdf.',
+      'No usable AI proposal narrative was found at AI Materials/ProposalNarrative_1003001.pdf or AI Materials/Project-Narrative_1003001.pdf.',
   });
   expect(requestDocumentAdapter.create).not.toHaveBeenCalled();
   expect(executePrompt).not.toHaveBeenCalled();
