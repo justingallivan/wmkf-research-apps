@@ -111,7 +111,7 @@ function args(argv) {
   const [phase, ...rest] = argv, out = { phase };
   check(['plan', 'seed', 'archive', 'verify'].includes(phase), 'Choose plan, seed, archive or verify. No default execution.');
   for (let i = 0; i < rest.length; i += 2) {
-    check(['--request-id', '--actor-id', '--env-file', '--out', '--plan', '--approve'].includes(rest[i]) && rest[i + 1] && !rest[i + 1].startsWith('--'), 'Invalid argument');
+    check(['--request-id', '--request-number', '--actor-id', '--actor-name', '--env-file', '--out', '--plan', '--approve'].includes(rest[i]) && rest[i + 1] && !rest[i + 1].startsWith('--'), 'Invalid argument');
     check(!out[rest[i]], 'Duplicate argument'); out[rest[i]] = rest[i + 1];
   }
   return out;
@@ -191,15 +191,38 @@ async function uploadSession(r, drive, folderId, name) {
   return { uploadUrl: session.uploadUrl };
 }
 
+export async function resolvePlanIds(r, a) {
+  check(Boolean(a['--request-id']) !== Boolean(a['--request-number']), 'Supply exactly one request GUID or number');
+  check(Boolean(a['--actor-id']) !== Boolean(a['--actor-name']), 'Supply exactly one actor GUID or full name');
+  const odata = await import('../lib/dataverse/core/odata.js');
+  const uniqueId = (result, field) => {
+    check(!result.capped && !result.hasMore && result.records?.length === 1 && GUID.test(result.records[0][field]), 'Identity lookup must return exactly one record');
+    return result.records[0][field].toLowerCase();
+  };
+  let requestId = a['--request-id'], actorId = a['--actor-id'];
+  if (!requestId) {
+    check(/^\d{1,20}$/.test(a['--request-number']), 'Numeric request number required');
+    requestId = uniqueId(await r.requests.queryRequests({ select: 'akoya_requestid', filter: odata.eq('akoya_requestnum', a['--request-number']), top: 2 }), 'akoya_requestid');
+  }
+  if (!actorId) {
+    check(a['--actor-name'].trim().length > 0 && a['--actor-name'].length <= 150, 'Exact full staff name required');
+    const users = r.users || await import('../lib/dataverse/adapters/system-user.js');
+    actorId = uniqueId(await users.queryUsers({ select: 'systemuserid', filter: odata.and([odata.eq('fullname', a['--actor-name']), odata.eqRaw('isdisabled', false)]), top: 2 }), 'systemuserid');
+  }
+  check(GUID.test(requestId) && GUID.test(actorId), 'Valid request and actor identities required');
+  return { requestId: requestId.toLowerCase(), actorId: actorId.toLowerCase() };
+}
+
 export async function main(argv = process.argv.slice(2)) {
   const a = args(argv);
   if (a.phase === 'plan') {
     check(path.isAbsolute(a['--out'] || '') && path.isAbsolute(a['--env-file'] || ''), 'Absolute --out and --env-file required');
     const r = await runtime(a['--env-file']);
     try {
-      const t = await resolveTargets(r, a['--request-id'], a['--actor-id']);
+      const ids = await resolvePlanIds(r, a);
+      const t = await resolveTargets(r, ids.requestId, ids.actorId);
       const runId = randomUUID(), requestId = t.request.akoya_requestid.toLowerCase();
-      const p = validatePlan({ version: 1, dataverse: DV, cycle: CYCLE, runId, requestId, requestNumber: String(t.request.akoya_requestnum), actorId: a['--actor-id'].toLowerCase(),
+      const p = validatePlan({ version: 1, dataverse: DV, cycle: CYCLE, runId, requestId, requestNumber: String(t.request.akoya_requestnum), actorId: ids.actorId,
         sourceDocumentId: randomUUID(), envFile: a['--env-file'], requestFolder: t.bucket.folder,
         siteId: t.siteId, driveId: t.driveId, requestFolderId: t.rootId, board: t.board,
         boardFolder: `Board Materials/WMKF-Archive-Rehearsal-${runId}`,

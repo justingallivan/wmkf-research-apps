@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
-import { installFetchFence, validatePlan, testRequestOnly, planDigest, scopedChildren } from '../../scripts/rehearse-board-archive.mjs';
+import { installFetchFence, validatePlan, testRequestOnly, planDigest, scopedChildren, resolvePlanIds } from '../../scripts/rehearse-board-archive.mjs';
 
 const requestId = randomUUID(), sourceId = randomUUID(), runId = randomUUID(), actorId = randomUUID();
 const filename = `000000 - Archive Rehearsal ${runId} - Writeup.docx`;
@@ -104,4 +104,22 @@ test('real startArchive accepts raw Graph file facets, rejects extra files, and 
   reset(); listing['@odata.nextLink'] = 'https://graph.microsoft.com/next';
   await assert.rejects(startArchive('J00', { profileId: 'fictional-admin', systemUserId: actorId }, revision, deps), /Incomplete/);
   assert.equal(state.archiveStartedAt, undefined);
+});
+
+
+test('read-only identity lookup resolves exact request number and staff name, refusing ambiguity', async () => {
+  const queries = [];
+  const r = { requests: { queryRequests: async query => { queries.push(query); return { records: [{ akoya_requestid: requestId }] }; } },
+    users: { queryUsers: async query => { queries.push(query); return { records: [{ systemuserid: actorId }] }; } } };
+  const args = { '--request-number': '1003220', '--actor-name': 'Justin Gallivan' };
+  assert.deepEqual(await resolvePlanIds(r, args), { requestId, actorId });
+  assert.equal(queries[0].filter, "akoya_requestnum eq '1003220'");
+  assert.equal(queries[1].filter, "fullname eq 'Justin Gallivan' and isdisabled eq false");
+  assert.ok(queries.every(query => query.top === 2));
+  r.requests.queryRequests = async () => ({ records: [{ akoya_requestid: requestId }, { akoya_requestid: randomUUID() }] });
+  await assert.rejects(resolvePlanIds(r, args), /exactly one/);
+  await assert.rejects(resolvePlanIds(r, { ...args, '--request-id': requestId }), /exactly one request/);
+  r.requests.queryRequests = async () => ({ records: [{ akoya_requestid: requestId }] });
+  r.users.queryUsers = async () => ({ capped: true, records: [{ systemuserid: actorId }] });
+  await assert.rejects(resolvePlanIds(r, args), /exactly one/);
 });

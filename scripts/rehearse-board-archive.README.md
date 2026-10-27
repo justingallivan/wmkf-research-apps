@@ -13,7 +13,9 @@ The production archival setting/schema work is separate from this rehearsal.
 ## Review targets first
 
 The owner supplies an existing test-request GUID and an enabled administrator's
-Dataverse system-user GUID. `plan` verifies the affirmative test marker and exact
+Dataverse system-user GUID. Alternatively use `--request-number 1003220` and
+`--actor-name "Justin Gallivan"`; each lookup must return exactly one record,
+and full test-marker/admin verification still follows. `plan` verifies the affirmative test marker and exact
 Dynamics-tracked request folder. It resolves the registered SharePoint targets
 and prints/saves the complete plan and SHA-256 approval digest. It makes no live
 writes. Production Dataverse/Postgres reads remain owner-run.
