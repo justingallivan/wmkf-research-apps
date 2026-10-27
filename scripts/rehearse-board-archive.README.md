@@ -31,7 +31,10 @@ DATAVERSE_ALLOW_PROD_READS=yes node --import ./scripts/lib/use-extensionless.mjs
 
 The credential file is read, never modified or copied. Only app Graph/Dataverse
 credentials, actor-readiness and Postgres connection settings needed for admin
-verification are used. No agent/model credentials are used. Do not paste secrets.
+verification are used. Read-only planning does not require the explicit-actor
+readiness flag. Seed/archive require `REQUEST_DOCUMENT_EXPLICIT_ACTOR_SCHEMA_READY=on`
+in the credential file or the owner's command environment, after schema verification.
+No agent/model credentials are used. Do not paste secrets.
 
 **Stop and show Justin the saved plan before seed.** It identifies:
 

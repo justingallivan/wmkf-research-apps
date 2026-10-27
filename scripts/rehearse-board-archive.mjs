@@ -119,7 +119,11 @@ function args(argv) {
 function save(file, data, exclusive = false) {
   fs.writeFileSync(file, `${JSON.stringify(data, null, 2)}\n`, { flag: exclusive ? 'wx' : 'w', mode: 0o600 });
 }
-async function runtime(envFile, p) {
+export function actorSchemaSetting(value, requiresWrite) {
+  if (requiresWrite) check(value === 'on', 'Explicit-actor schema must be verified and enabled before rehearsal writes');
+  return value === 'on' ? 'on' : 'off';
+}
+async function runtime(envFile, p, requiresWrite = false) {
   check(!process.env.VERCEL_ENV, 'Run only from an owner local terminal, never a deployed worker');
   const env = parseEnv(fs.readFileSync(envFile, 'utf8'));
   // App credentials only, never model/agent credentials. Never modify the env file.
@@ -130,8 +134,8 @@ async function runtime(envFile, p) {
   check(process.env.DATAVERSE_ALLOW_PROD_READS === 'yes', 'Owner must explicitly permit production reads');
   process.env.DATAVERSE_TARGET_INTERLOCK = 'on';
   process.env.BOARD_WRITEUP_SCHEMA_READY = 'on';
-  check(env.REQUEST_DOCUMENT_EXPLICIT_ACTOR_SCHEMA_READY === 'on', 'Explicit-actor schema must already be enabled in the owner credential file');
-  process.env.REQUEST_DOCUMENT_EXPLICIT_ACTOR_SCHEMA_READY = 'on';
+  process.env.REQUEST_DOCUMENT_EXPLICIT_ACTOR_SCHEMA_READY = actorSchemaSetting(
+    process.env.REQUEST_DOCUMENT_EXPLICIT_ACTOR_SCHEMA_READY ?? env.REQUEST_DOCUMENT_EXPLICIT_ACTOR_SCHEMA_READY, requiresWrite);
   process.env.SHAREPOINT_SITE_URL = 'https://appriver3651007194.sharepoint.com/sites/akoyaGO';
   for (const key of ['POSTGRES_URL', 'POSTGRES_URL_NON_POOLING']) if (env[key]) process.env[key] = env[key];
   const fence = installFetchFence({ tenant: env.DYNAMICS_TENANT_ID, requestId: p?.requestId, sourceId: p?.sourceDocumentId, sourceKey: p?.sourceKey, archiveKey: p?.archiveKey });
@@ -246,7 +250,7 @@ export async function main(argv = process.argv.slice(2)) {
     const receipt = fs.existsSync(receiptFile) ? JSON.parse(fs.readFileSync(receiptFile, 'utf8')) : { digest: planDigest(p) };
     check(receipt.digest === planDigest(p), 'Plan changed since receipt');
     check(!receipt[`${a.phase}Started`], 'Phase already attempted. Inspect retained receipt; never blindly retry.');
-    r = await runtime(p.envFile, p);
+    r = await runtime(p.envFile, p, ['seed', 'archive'].includes(a.phase));
     const t = await resolveTargets(r, p.requestId, p.actorId);
     check(String(t.request.akoya_requestnum) === p.requestNumber && t.bucket.folder === p.requestFolder && t.siteId === p.siteId && t.driveId === p.driveId && t.rootId === p.requestFolderId && JSON.stringify(t.board) === JSON.stringify(p.board), 'Approved targets changed');
     const { TYPE, OP, LIFE } = { TYPE: r.model.REQUEST_DOCUMENT_ARTIFACT_TYPE, OP: r.model.REQUEST_DOCUMENT_OPERATION_STATUS, LIFE: r.model.REQUEST_DOCUMENT_LIFECYCLE_STATE };

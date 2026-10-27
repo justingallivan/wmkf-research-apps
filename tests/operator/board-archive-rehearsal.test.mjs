@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
-import { installFetchFence, validatePlan, testRequestOnly, planDigest, scopedChildren, resolvePlanIds } from '../../scripts/rehearse-board-archive.mjs';
+import { installFetchFence, validatePlan, testRequestOnly, planDigest, scopedChildren, resolvePlanIds, actorSchemaSetting } from '../../scripts/rehearse-board-archive.mjs';
 
 const requestId = randomUUID(), sourceId = randomUUID(), runId = randomUUID(), actorId = randomUUID();
 const filename = `000000 - Archive Rehearsal ${runId} - Writeup.docx`;
@@ -122,4 +122,14 @@ test('read-only identity lookup resolves exact request number and staff name, re
   r.requests.queryRequests = async () => ({ records: [{ akoya_requestid: requestId }] });
   r.users.queryUsers = async () => ({ capped: true, records: [{ systemuserid: actorId }] });
   await assert.rejects(resolvePlanIds(r, args), /exactly one/);
+});
+
+
+test('read-only planning tolerates absent actor flag; writes still fail closed', () => {
+  for (const value of [undefined, '', 'off', 'true']) {
+    assert.equal(actorSchemaSetting(value, false), 'off');
+    assert.throws(() => actorSchemaSetting(value, true), /before rehearsal writes/);
+  }
+  assert.equal(actorSchemaSetting('on', false), 'on');
+  assert.equal(actorSchemaSetting('on', true), 'on');
 });
