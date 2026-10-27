@@ -362,9 +362,9 @@ rather than giving a day. Every date is a proposal for Justin to adjust.
 | Thu Jan 14 | Materials trigger | What tells Connor's flow to build `Reviewer Materials/Proposal_{n}.pdf` at the ~50 stage | Connor, Justin | Reviewer materials for the First Cut |
 | Thu Jan 14 | Sharing | How Program Chairs and Board members get proposals (magic links or SharePoint sharing) | Connor | First Cut and Diligent sharing |
 | Wed Feb 3 | Pre-Chairs value | Is any Phase I value (e.g. `Recommended Invite`) set before the Chairs meeting? This would recreate X2's double record | Connor, Sarah | Phase I Status consumers |
+| Before the reviewer-invitation build starts | Bibliographies | Is Reviewer Finder reading bibliographies for reviewer leads (register J27-065) in scope for Feb 24? | Justin | That Reviewer Finder change |
 | Wed Feb 24 | Post-Chairs mapping | Confirm the Chairs-outcome values and who sets them (proposed: Grants Manager) | Connor, Sarah | Invitation send guard; Reviewer Finder opening; ranking and briefing carryover; grantee-title cron (register Q9) |
 | Wed Feb 24 | C5 | Who sets `akoya_programid` (MR or S&E) on each recommended proposal, and when; whether staff want running MR/S&E counts per stage | CSO with Connor and Sarah | Ranking, Meeting Tracker briefing, applicant contacts, grantee deliverables, grantee-title cron |
-| Before the reviewer-invitation build starts | Bibliographies | Is Reviewer Finder reading bibliographies for reviewer leads (register J27-065) in scope for Feb 24? | Justin | That Reviewer Finder change |
 | Thu Mar 25 | Offramp | Which AkoyaGO field and value record the PD offramp outcome | Connor, Sarah | Apps reading the offramp |
 | Before oral presentations Apr 19 | Oral invites | AkoyaGO value for "invited to oral presentation" (tentative: Phase II `Pending Committee Review`) | Connor, Sarah | Duncan's scheduling |
 | Before oral presentations Apr 19 | Scheduling | How Duncan schedules oral presentations from that output | Duncan | Scheduling walkthrough (parked) |
@@ -377,7 +377,10 @@ Atlas. **Proposed** means it is directionally agreed but not confirmed.
 **Open** means no answer yet. D26 practice is not treated as a J27 decision.
 Owner semantics (Atlas, 2026-10-26): the phase picklists hold staff
 recommendations; `akoya_requeststatus` changes only at the Board's final
-decision.
+decision. To confirm: the Feb 24 rows below set `Phase II Pending` before the
+Board, as D26 practice does (all 23 D26 Advancing proposals are `Phase II
+Pending`, probe 2026-10-26), so "only at the Board" may mean only the final
+values (`Approved`, `Phase II Declined`).
 
 | Step | Who | Field or place | Value | Status |
 |---|---|---|---|---|
