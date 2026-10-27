@@ -19,7 +19,7 @@ from the provisional J27/D27 timeline (owned outside this repo; see T5):
 | Thu Jan 14 | "First Cut" spreadsheet to Program Committee: ~50 summaries, personalized by expertise | J-2 |
 | Feb 10–12 | One-page writeups; Program Chairs book in Diligent (20–25 semi-finalists) | Existing writeup tools (not checked) |
 | Wed Feb 24 | Program Chairs meeting; reviewer invitations | D4 settings; materials email on acceptance |
-| Mar 17 | Reviews due | T3 filing switch before this |
+| Mar 17 | Reviews due | Calendar-driven review filing (D11) live before Feb 24 invitations |
 | Apr 19 – May 7 | Oral presentations / staff evaluations over Zoom (no site visits) | Not yet checked against Meeting Tracker / Staff Deliberations |
 | May 12–13 | Ranking meetings | Proposal Ranking |
 | Thu May 27 | Board books mailed | |
@@ -37,13 +37,14 @@ J27/D27 timeline PDF and workbook (OneDrive, New Cycle Development/timelines).
 |---|---|---|---|---|
 | D1 | 2026-10-24 | **Calendar authority is the Grants Manager role** (currently Sarah), with the **Program Coordinator role** (currently Duncan) as fallback. Authority attaches to the role, not the person: reassigning the role in Admin staffing moves the responsibility with no code or settings change. Authority means maintaining and confirming cycle dates used by the apps; the dates themselves stay in the operations Grant Cycle record. **Narrowed 2026-10-27 by D10:** only the Board date stays there; app anchor dates live in the apps cycle record. | Justin | Rollover plan §3.1, §7 |
 | D2 | 2026-10-24 | **Reviewer reminders stay manual for J27.** PDs send reminders themselves, as in D26; the automatic reminder schedule stays off. | Justin | Register Q10 |
-| D3 | 2026-10-24 | **Review filing switches from D26 to J27 once; it never has to handle both.** All D26 reviews are in, so no late D26 reviews will overlap with J27 reviews. Who makes the switch and when is task T3. | Justin | Register Q15 |
+| D3 | 2026-10-24 | **Review filing switches from D26 to J27 once; it never has to handle both.** All D26 reviews are in, so no late D26 reviews will overlap with J27 reviews. Who makes the switch and when is task T3. **Relaxed 2026-10-27 by D11:** filing follows each cycle's calendar window, so overlap is harmless and no switch is needed. | Justin | Register Q15 |
 | D4 | 2026-10-24 | **Reviewer campaign settings are handled centrally, not per PD.** The review deadline, respond-by days and reviewer quota become cycle-wide values maintained centrally (under D1), replacing the per-request campaign settings PDs set today. Changing one reviewer's deadline stays a PD action. Email wording is not affected: PDs keep personal wording built on centrally seeded defaults (slice 2). **Refined 2026-10-27 by D9.** | Justin | Rollover plan Slice 1 |
 | D5 | 2026-10-24 | **Volume of the Dec 8 AI pass is not a concern.** A less sophisticated model will likely be used, and applications arrive over several days (heaviest near the deadline); at about 2 minutes each, 300 can be processed overnight. | Justin | Timeline Dec 8 |
 | D7 | 2026-10-27 | **Either calendar role can edit at any time** (answers A1). The Grants Manager and Program Coordinator roles both hold edit rights all the time; the fallback is not limited to an unassigned Grants Manager role. The calendar shows who last edited each value and when. | Justin | D1; A1 |
 | D8 | 2026-10-27 | **One person can change any calendar date; no second approver** (answers A3). Responsibility defaults to the Grants Manager role (Sarah); the Program Coordinator edits when necessary, using the access D7 grants. | Justin | D1; D7; A3 |
 | D9 | 2026-10-27 | **Refines D4: anchor dates are central; PDs adjust response periods and quota** (answers A4). Cycle anchor dates, including the review deadline, are set centrally by the calendar owner (D7, D8); there is no per-proposal deadline override. The response period and reviewer quota have central defaults: a PD may change the response period for a proposal and for an individual invitation, and the quota for a proposal. A PD may extend one reviewer's due date when that reviewer asks (existing per-reviewer extension, `lib/services/reviewer-due-extension.js`). Today's per-request Campaign settings (`CampaignConfigModal`) are the clunky precedent; the PD controls built for D9 must be much simpler, and their design goes through Impeccable before it is built. | Justin | D4; A4 |
 | D10 | 2026-10-27 | **Cycle dates are split by owner, one editable copy each** (answers C3; narrows D1). The Board date stays in the operations Grant Cycle record (`wmkf_grantcycle`), owned by Connor's process; the apps read it and never copy it. The apps' anchor dates (review deadline, invitation start and similar) live in the existing apps cycle record (`wmkf_appgrantcycle`), edited in the app under D7/D8; no operations schema change. Creating future operations rows (D27) stays with Connor's process and is not needed for J27. | Justin | D1; C3; foundations audit §2 |
+| D11 | 2026-10-27 | **Review filing follows each cycle's calendar window, not a Vercel setting** (replaces T3; relaxes D3). A completed review files automatically when its own cycle's window is open: from that cycle's invitation start date (apps cycle record, D10) to its Board date (operations record, D10). Overlapping cycles each file to their own cycle; Sarah and Duncan change the dates in the app and no redeploy is needed. Today a single Production setting, `REVIEW_DOCX_SHAREPOINT_CYCLE`, limits the sweep to one cycle (`lib/services/review-documents/individual-file-service.js:1006`; `lib/dataverse/adapters/reviewer-suggestion.js:1536-1551`), so this is a build, folded into the November central-settings work and due before the first J27 invitation (Feb 24). A review arriving after the Board date is not filed automatically; operator backfill remains. | Justin | D3; T3 |
 | D6 | 2026-10-24 | **Expertise matching is rebuilt to run inline.** Each proposal is matched automatically as part of the intake AI pass, instead of a person running the Expertise app on demand. The current app is an early version based on the CSO's draft Claude project and needs improvement. | Justin | R-3 |
 
 ## To confirm at the meeting
@@ -303,8 +304,8 @@ triage meetings.
 
 **Needed by Feb 24 (reviewer invitations):** central reviewer settings (D4),
 the automatic materials email on reviewer acceptance, and Reviewer Finder
-using bibliographies if it is in scope. Task T3 must be done before reviews
-come back on Mar 17.
+using bibliographies if it is in scope, and calendar-driven review filing
+(D11, replacing task T3).
 
 **Scheduled for November 2026 (Justin, 2026-10-24):** central reviewer
 settings per D4 (rollover plan Slice 1), unblocked: the reviewer deadline email
@@ -317,7 +318,7 @@ A5 (the J27 central values) is needed from Sarah before it can ship.
 |---|---|---|---|
 | T1 | Record D1 in the rollover plan and work queue. | Claude | Done 2026-10-24 |
 | T2 | Record D2 in the J27 register (Q10) and reviewer engagement spec. | Claude | Done 2026-10-24 |
-| T3 | Switch automatic review-document filing from D26 to J27 (one Production setting, `REVIEW_DOCX_SHAREPOINT_CYCLE`, plus redeploy) after confirming D26 filing is complete and before the first J27 review comes back in 2027. | To assign at meeting | Open; date to agree (see D3) |
+| T3 | Switch automatic review-document filing from D26 to J27 (one Production setting, `REVIEW_DOCX_SHAREPOINT_CYCLE`, plus redeploy) after confirming D26 filing is complete and before the first J27 review comes back in 2027. | — | Replaced 2026-10-27 by D11 (calendar-driven filing window; no manual switch) |
 | T4 | Record the December readiness list in this log. | Claude | Done 2026-10-24 |
 | T5 | Correct weekday-label errors in the J27/D27 timeline workbook (mostly the D27 page, including the D27 Board meeting days). Not blocking for J27: the J27 dates are correct apart from two labels. | Timeline owner | Emailed with a suggested fix prompt 2026-10-24; awaiting reply |
 
@@ -339,7 +340,6 @@ rather than giving a day. Every date is a proposal for Justin to adjust.
 | Decide by | Item | Decision needed | Who decides | Blocked until decided |
 |---|---|---|---|---|
 | Wed Oct 28 meeting | A5 | J27 central values: review deadline, plus default days to respond and default reviewer quota (D9) | Sarah | Central reviewer settings cannot ship (D4, November) |
-| Wed Oct 28 meeting | T3 | Who switches review filing from D26 to J27, and when (must be before Mar 17) | Meeting | Assignment only |
 | Before the November central-settings build starts | A2 | Who is notified about a missing or conflicting cycle date | Sarah, Connor | Readiness notices |
 | Before the Dec 8 AI-pass build starts | R1 | Is the day-one list right, and how fast must December triage be? | Sarah, Duncan | What is built by Dec 7 versus early January |
 | Before the Dec 8 AI-pass build starts | R2 | Who starts and watches the AI pass; which steps Power Automate triggers and which scheduled jobs run | Justin, Connor | The per-proposal trigger for R-3 |
