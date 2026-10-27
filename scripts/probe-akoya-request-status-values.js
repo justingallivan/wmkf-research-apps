@@ -1,10 +1,12 @@
 #!/usr/bin/env node
 /**
- * READ-ONLY probe: every distinct akoya_requeststatus value with its row
- * count, overall and for requests created on or after a cutoff date.
- * akoya_requeststatus is a free-text String, not a picklist, so the live
- * distribution is the only list of values. Feeds J27 alignment log C4
- * (the arrival status of new J27 proposals).
+ * READ-ONLY probe of the three akoya_request status fields:
+ *   akoya_requeststatus (Request Status), wmkf_phaseistatus (Phase I Status),
+ *   wmkf_phaseiistatus (Phase II Status).
+ * For each, prints the attribute type from metadata and, for picklists, the
+ * full option list. Then prints every distinct akoya_requeststatus value with
+ * its row count, overall and for requests created on or after a cutoff date.
+ * Feeds J27 alignment log C4 (the arrival status of new J27 proposals).
  *
  * Usage (owner-run; production Dataverse read):
  *   node scripts/probe-akoya-request-status-values.js [--since=2025-01-01]
@@ -51,6 +53,36 @@ async function getToken() {
   return (await res.json()).access_token;
 }
 
+const STATUS_FIELDS = ['akoya_requeststatus', 'wmkf_phaseistatus', 'wmkf_phaseiistatus'];
+
+async function dvGet(token, urlPath) {
+  const r = await fetch(`${process.env.DYNAMICS_URL}/api/data/v9.2${urlPath}`, {
+    headers: {
+      Authorization: `Bearer ${token}`, Accept: 'application/json',
+      'OData-MaxVersion': '4.0', 'OData-Version': '4.0',
+    },
+  });
+  if (!r.ok) throw new Error(`Dataverse ${r.status} for ${urlPath.split('?')[0]}`);
+  return r.json();
+}
+
+async function printFieldMetadata(token, field) {
+  const base = `/EntityDefinitions(LogicalName='akoya_request')/Attributes(LogicalName='${field}')`;
+  const attr = await dvGet(token, `${base}?$select=LogicalName,AttributeType`);
+  console.log(`── ${field}: ${attr.AttributeType} ──`);
+  if (attr.AttributeType === 'Picklist') {
+    const pick = await dvGet(
+      token,
+      `${base}/Microsoft.Dynamics.CRM.PicklistAttributeMetadata?$select=LogicalName&$expand=OptionSet($select=Options)`,
+    );
+    for (const o of pick.OptionSet?.Options || []) {
+      const label = o.Label?.UserLocalizedLabel?.Label ?? '(no label)';
+      console.log(`  ${o.Value} = ${label}`);
+    }
+  }
+  console.log();
+}
+
 async function statusDistribution(token, filterXml) {
   const fetchXml =
     `<fetch aggregate="true"><entity name="akoya_request">` +
@@ -83,6 +115,7 @@ function print(title, rows) {
 
 (async () => {
   const token = await getToken();
+  for (const field of STATUS_FIELDS) await printFieldMetadata(token, field);
   print('akoya_requeststatus, all requests', await statusDistribution(token, ''));
   print(
     `akoya_requeststatus, created on or after ${since}`,
