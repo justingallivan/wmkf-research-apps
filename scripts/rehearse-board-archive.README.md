@@ -42,7 +42,7 @@ No agent/model credentials are used. Do not paste secrets.
 - Source: Research / Board Materials / `WMKF-Archive-Rehearsal-<run UUID>`.
   This is a sibling of cycle folders, never inside D26.
 - Destination: the verified test request's `Board Milestones/J00` folder.
-- Filename: `J00 - <test number> - Archive Rehearsal <run UUID> - Writeup.docx`.
+- Filename: `J00 - <test number> - Archive Rehearsal - Writeup.docx`.
 - Source row: the plan's newly generated `sourceDocumentId` and `sourceKey`.
 - Archive row: generation key `board-writeup:J00:<test request GUID>`.
 - Local files: plan, adjacent `.receipt.json`, and transient `.lock`.

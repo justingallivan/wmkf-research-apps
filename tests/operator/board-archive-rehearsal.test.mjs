@@ -4,7 +4,7 @@ import { randomUUID } from 'node:crypto';
 import { installFetchFence, validatePlan, testRequestOnly, planDigest, scopedChildren, resolvePlanIds, actorSchemaSetting, withRehearsalContext } from '../../scripts/rehearse-board-archive.mjs';
 
 const requestId = randomUUID(), sourceId = randomUUID(), runId = randomUUID(), actorId = randomUUID();
-const filename = `000000 - Archive Rehearsal ${runId} - Writeup.docx`;
+const filename = `000000 - Archive Rehearsal - Writeup.docx`;
 const plan = { version: 1, cycle: 'J00', dataverse: 'https://wmkf.crm.dynamics.com', requestId, sourceDocumentId: sourceId, runId, actorId, requestNumber: '000000', requestFolder: `000000_${requestId.replaceAll('-', '').toUpperCase()}`,
   boardFolder: `Board Materials/WMKF-Archive-Rehearsal-${runId}`, archiveFolder: `000000_${requestId.replaceAll('-', '').toUpperCase()}/Board Milestones/J00`, filename, archiveFilename: `J00 - ${filename}`,
   sourceKey: `board-rehearsal-source:${runId}`, archiveKey: `board-writeup:J00:${requestId}`, email: 'BLOCK ALL', journal: 'LOCAL FILE ONLY', envFile: '/private/tmp/fictional-env' };
@@ -175,7 +175,7 @@ test('identity and plan validation accept Dataverse GUIDs outside UUID version 1
   assert.deepEqual(await resolvePlanIds(r, { '--request-number': '1003220', '--actor-name': 'Justin Gallivan' }), { requestId: dataverseId, actorId });
   const p = { ...plan, requestId: dataverseId, requestNumber: '1003220', requestFolder: `1003220_${dataverseId.replaceAll('-', '').toUpperCase()}`,
     archiveFolder: `1003220_${dataverseId.replaceAll('-', '').toUpperCase()}/Board Milestones/J00`,
-    filename: `1003220 - Archive Rehearsal ${runId} - Writeup.docx`, archiveFilename: `J00 - 1003220 - Archive Rehearsal ${runId} - Writeup.docx`, archiveKey: `board-writeup:J00:${dataverseId}` };
+    filename: `1003220 - Archive Rehearsal - Writeup.docx`, archiveFilename: `J00 - 1003220 - Archive Rehearsal - Writeup.docx`, archiveKey: `board-writeup:J00:${dataverseId}` };
   assert.equal(validatePlan(p), p);
   r.requests.queryRequests = async () => ({ records: [{ akoya_requestid: "not-a-guid')" }] });
   await assert.rejects(resolvePlanIds(r, { '--request-number': '1003220', '--actor-name': 'Justin Gallivan' }), /invalid Dataverse GUID/);
@@ -254,6 +254,10 @@ test('complete read-only plan runs through real adapters and SDK with simulated 
     assert.equal(result.requestId, fixtureId); assert.equal(result.actorId, actorId);
     assert.equal(result.archiveFolder, `${folder}/Board Milestones/J00`);
     assert.equal(result.email, 'BLOCK ALL'); assert.equal(result.journal, 'LOCAL FILE ONLY');
+    assert.equal(result.filename, '1003220 - Archive Rehearsal - Writeup.docx');
+    assert.equal(result.archiveFilename, 'J00 - 1003220 - Archive Rehearsal - Writeup.docx');
+    assert.ok(!result.filename.includes(result.runId));
+    assert.ok(result.boardFolder.includes(result.runId));
     assert.equal(fs.existsSync(`${output}.receipt.json`), false);
     assert.ok(observed.some(([, pathname]) => pathname === '/sql'));
     assert.ok(observed.every(([origin, pathname, method]) => method === 'GET' || pathname === '/sql' || origin === 'https://login.microsoftonline.com'));

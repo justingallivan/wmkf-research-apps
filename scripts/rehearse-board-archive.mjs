@@ -31,7 +31,7 @@ export function validatePlan(p) {
   check(p.requestFolder === `${p.requestNumber}_${p.requestId.replaceAll('-', '').toUpperCase()}`, 'Unexpected test request folder');
   check(p.boardFolder === `Board Materials/WMKF-Archive-Rehearsal-${p.runId}`, 'Unexpected source folder');
   check(p.archiveFolder === `${p.requestFolder}/Board Milestones/${CYCLE}`, 'Unexpected archive folder');
-  check(p.filename === `${p.requestNumber} - Archive Rehearsal ${p.runId} - Writeup.docx`, 'Unexpected fixture filename');
+  check(p.filename === `${p.requestNumber} - Archive Rehearsal - Writeup.docx`, 'Unexpected fixture filename');
   check(p.archiveFilename === `${CYCLE} - ${p.filename}`, 'Unexpected archive filename');
   check(p.sourceKey === `board-rehearsal-source:${p.runId}` && p.archiveKey === `board-writeup:${CYCLE}:${p.requestId}`, 'Unexpected registry keys');
   check(p.email === 'BLOCK ALL' && p.journal === 'LOCAL FILE ONLY', 'Unsafe rehearsal policy');
@@ -253,8 +253,8 @@ async function run(argv) {
         siteId: t.siteId, driveId: t.driveId, requestFolderId: t.rootId, board: t.board,
         boardFolder: `Board Materials/WMKF-Archive-Rehearsal-${runId}`,
         archiveFolder: `${t.bucket.folder}/Board Milestones/${CYCLE}`,
-        filename: `${t.request.akoya_requestnum} - Archive Rehearsal ${runId} - Writeup.docx`,
-        archiveFilename: `${CYCLE} - ${t.request.akoya_requestnum} - Archive Rehearsal ${runId} - Writeup.docx`,
+        filename: `${t.request.akoya_requestnum} - Archive Rehearsal - Writeup.docx`,
+        archiveFilename: `${CYCLE} - ${t.request.akoya_requestnum} - Archive Rehearsal - Writeup.docx`,
         sourceKey: `board-rehearsal-source:${runId}`, archiveKey: `board-writeup:${CYCLE}:${requestId}`, email: 'BLOCK ALL', journal: 'LOCAL FILE ONLY' });
       check((await r.docs.findByGenerationKey(p.archiveKey)).records.length === 0, 'A prior J00 archive exists for this test request; choose another test request');
       save(a['--out'], p, true);
@@ -330,7 +330,7 @@ async function run(argv) {
       const { emptyState } = await import('../lib/services/board-writeups/store.js');
       const state = emptyState(); let revision = 0;
       const actor = { profileId: t.actor.profileId, systemUserId: p.actorId };
-      state.releases[p.requestId] = { requestId: p.requestId, releasedAt: receipt.seedStarted, source: { number: p.requestNumber, institution: `Archive Rehearsal ${p.runId}`, filename: p.filename, documentId: p.sourceDocumentId, versionId: receipt.originalVersionId }, hash: receipt.originalHash,
+      state.releases[p.requestId] = { requestId: p.requestId, releasedAt: receipt.seedStarted, source: { number: p.requestNumber, institution: 'Archive Rehearsal', filename: p.filename, documentId: p.sourceDocumentId, versionId: receipt.originalVersionId }, hash: receipt.originalHash,
         destination: { driveId: p.board.driveId, itemId: receipt.sourceItemId, siteId: p.board.siteId } };
       const localSave = () => { receipt.state = state; receipt.revision = revision; save(receiptFile, receipt); };
       const deps = {
