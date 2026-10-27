@@ -180,3 +180,87 @@ test('identity and plan validation accept Dataverse GUIDs outside UUID version 1
   r.requests.queryRequests = async () => ({ records: [{ akoya_requestid: "not-a-guid')" }] });
   await assert.rejects(resolvePlanIds(r, { '--request-number': '1003220', '--actor-name': 'Justin Gallivan' }), /invalid Dataverse GUID/);
 });
+
+
+test('database fence permits only the two existing admin SELECTs on the exact configured connection', async () => {
+  const endpoint = 'https://api.fixture.neon.tech/sql', connectionString = 'postgresql://fixture:fixture-password@fixture.neon.tech/fixture';
+  let sent = 0;
+  const fence = installFetchFence({ tenant: 'fixture', database: { endpoint, connectionString }, network: async () => { sent++; return new Response('{}'); } });
+  const send = (query, params = [], url = endpoint, connection = connectionString) => fetch(url, { method: 'POST', headers: { 'Neon-Connection-String': connection }, body: JSON.stringify({ query, params }) });
+  const profiles = 'SELECT id, azure_email, is_active FROM user_profiles ORDER BY CASE WHEN is_active = true THEN 0 ELSE 1 END, id';
+  const admin = "SELECT p.id,p.is_active,EXISTS(SELECT 1 FROM dynamics_user_roles r WHERE r.user_profile_id=p.id AND r.role='superuser') AS superuser FROM user_profiles p WHERE p.id=$1";
+  try {
+    await send(profiles); await send(admin, ['99']);
+    for (const query of ['SELECT 1', profiles + '; DELETE FROM user_profiles', 'INSERT INTO emails VALUES (1)', 'UPDATE board_writeup_runs SET state=null', 'DELETE FROM user_profiles', 'SELECT * FROM board_writeup_runs']) await assert.rejects(send(query));
+    await assert.rejects(send(admin, ["99; DELETE"]));
+    await assert.rejects(send(admin, []));
+    await assert.rejects(send(profiles, [], 'https://other.neon.tech/sql'));
+    await assert.rejects(send(profiles, [], endpoint, connectionString + '-different'));
+    await assert.rejects(fetch(endpoint, { method: 'POST', headers: { 'Neon-Connection-String': connectionString }, body: JSON.stringify({ queries: [{ query: profiles, params: [] }] }) }));
+    fence.enableWrites();
+    await assert.rejects(send('DELETE FROM user_profiles'));
+    assert.equal(sent, 2);
+  } finally { fence.restore(); }
+});
+
+test('complete read-only plan runs through real adapters and SDK with simulated Dataverse, database and Graph', async () => {
+  const fs = await import('node:fs'), os = await import('node:os'), path = await import('node:path');
+  const { main } = await import('../../scripts/rehearse-board-archive.mjs');
+  const { RESEARCH_BOARD_MATERIALS_TARGET: board } = await import('../../lib/services/sharepoint-target-registry.js');
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'board-plan-offline-'));
+  const envFile = path.join(dir, 'fixture.env'), output = path.join(dir, 'plan.json');
+  const fixtureId = '4bfb6e40-678f-f111-8076-7ced8d3d15a6', parentId = randomUUID();
+  const folder = `1003220_${fixtureId.replaceAll('-', '').toUpperCase()}`;
+  const request = { akoya_requestid: fixtureId, akoya_requestnum: '1003220', wmkf_istestrequest: true, wmkf_testcreationrunid: null };
+  const user = { systemuserid: actorId, fullname: 'Justin Gallivan', internalemailaddress: 'fixture@wmkeck.org', isdisabled: false };
+  fs.writeFileSync(envFile, 'DYNAMICS_TENANT_ID=fixture-tenant\nDYNAMICS_CLIENT_ID=fixture-client\nDYNAMICS_CLIENT_SECRET=offline-fixture-secret\nPOSTGRES_URL=postgresql://fixture:fixture-password@ep-fixture-pooler.us-east-1.aws.neon.tech/fixture\n');
+  const previousEnv = { ...process.env }, previousFetch = globalThis.fetch, previousLog = console.log;
+  const observed = [];
+  const response = body => new Response(JSON.stringify(body), { headers: { 'content-type': 'application/json' } });
+  globalThis.fetch = async (input, init = {}) => {
+    const url = new URL(input), method = init.method || 'GET'; observed.push([url.origin, url.pathname, method]);
+    if (url.hostname === 'login.microsoftonline.com') return response({ access_token: 'offline-fixture-token', expires_in: 3600 });
+    if (url.pathname === '/sql') {
+      const body = JSON.parse(init.body);
+      if (body.query.includes('azure_email')) return response({ fields: [{ name: 'id', dataTypeID: 23 }, { name: 'azure_email', dataTypeID: 25 }, { name: 'is_active', dataTypeID: 16 }], rows: [['99', 'fixture@wmkeck.org', 't']], command: 'SELECT', rowCount: 1 });
+      return response({ fields: [{ name: 'id', dataTypeID: 23 }, { name: 'is_active', dataTypeID: 16 }, { name: 'superuser', dataTypeID: 16 }], rows: [['99', 't', 't']], command: 'SELECT', rowCount: 1 });
+    }
+    assert.equal(method, 'GET', 'no live-write operation may reach the simulated transport');
+    if (url.origin === 'https://wmkf.crm.dynamics.com') {
+      if (url.pathname.endsWith('/akoya_requests')) return response({ value: [request] });
+      if (url.pathname.includes('/akoya_requests(')) return response(request);
+      if (url.pathname.endsWith('/systemusers')) return response({ value: [user] });
+      if (url.pathname.includes('/systemusers(')) return response(user);
+      if (url.pathname.endsWith('/sharepointdocumentlocations')) return response({ value: url.searchParams.get('$select').includes('_parentsiteorlocation_value')
+        ? [{ name: 'fixture request', relativeurl: folder, _parentsiteorlocation_value: parentId }]
+        : [{ sharepointdocumentlocationid: parentId, relativeurl: 'akoya_request' }] });
+      if (url.pathname.endsWith('/wmkf_requestdocuments')) return response({ value: [] });
+    }
+    if (url.origin === 'https://graph.microsoft.com') {
+      if (url.pathname.includes('/sites/appriver3651007194.sharepoint.com:')) return response({ id: 'fixture-site' });
+      if (url.pathname.endsWith('/sites/fixture-site/drives')) return response({ value: [{ id: 'fixture-drive', name: 'Request', webUrl: 'https://appriver3651007194.sharepoint.com/sites/akoyaGO/akoya_request' }] });
+      if (decodeURIComponent(url.pathname).endsWith(`/root:/${folder}`)) return response({ id: 'fixture-folder', folder: {} });
+      if (url.pathname.endsWith(`/items/${board.folderId}`)) return response({ id: board.folderId, webUrl: board.webUrl, folder: {}, parentReference: { driveId: board.driveId } });
+    }
+    throw new Error(`Unexpected offline request: ${url.origin}${url.pathname}`);
+  };
+  console.log = () => {};
+  try {
+    delete process.env.VERCEL_ENV;
+    delete process.env.REQUEST_DOCUMENT_EXPLICIT_ACTOR_SCHEMA_READY;
+    process.env.DATAVERSE_ALLOW_PROD_READS = 'yes';
+    await main(['plan', '--request-number', '1003220', '--actor-name', 'Justin Gallivan', '--env-file', envFile, '--out', output]);
+    const result = JSON.parse(fs.readFileSync(output, 'utf8'));
+    assert.equal(result.requestId, fixtureId); assert.equal(result.actorId, actorId);
+    assert.equal(result.archiveFolder, `${folder}/Board Milestones/J00`);
+    assert.equal(result.email, 'BLOCK ALL'); assert.equal(result.journal, 'LOCAL FILE ONLY');
+    assert.equal(fs.existsSync(`${output}.receipt.json`), false);
+    assert.ok(observed.some(([, pathname]) => pathname === '/sql'));
+    assert.ok(observed.every(([origin, pathname, method]) => method === 'GET' || pathname === '/sql' || origin === 'https://login.microsoftonline.com'));
+  } finally {
+    globalThis.fetch = previousFetch; console.log = previousLog;
+    for (const key of Object.keys(process.env)) if (!(key in previousEnv)) delete process.env[key];
+    Object.assign(process.env, previousEnv);
+    fs.rmSync(dir, { recursive: true });
+  }
+});

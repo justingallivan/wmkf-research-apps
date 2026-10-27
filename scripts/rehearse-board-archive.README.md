@@ -67,7 +67,9 @@ with the same current-day write acknowledgement. It invokes the real
 reader. The production default still rejects test requests; only this script
 injects exact marked-test eligibility and local journal dependencies.
 
-The fetch fence rejects all unplanned mutations, mail/SendEmail/sendMail and batch
+The fetch fence permits only the two existing administrator-verification SELECT
+queries on the exact configured app database connection; other SQL and SQL batches
+are blocked. It rejects all unplanned mutations, mail/SendEmail/sendMail and batch
 APIs. It admits only scoped, create-only Graph operations and the two planned
 registry identities. Signed upload URLs are single-use and never persisted.
 No worker or notification dispatcher is called. This prevents this runner from

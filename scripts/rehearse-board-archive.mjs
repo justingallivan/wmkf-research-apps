@@ -43,7 +43,7 @@ export function validatePlan(p) {
  * A wrapper may admit ONE exact Graph folder/upload operation, never mail.
  * No signed upload/download URL is printed or written to disk.
  */
-export function installFetchFence({ tenant, requestId, sourceId, sourceKey, archiveKey, network = globalThis.fetch }) {
+export function installFetchFence({ tenant, requestId, sourceId, sourceKey, archiveKey, database = null, network = globalThis.fetch }) {
   const permits = new Map(), uploads = new Set(), downloads = new Set(), items = new Set();
   let writesEnabled = false;
   const block = () => { throw new Error('Rehearsal network fence: operation blocked (all email is blocked)'); };
@@ -68,6 +68,15 @@ export function installFetchFence({ tenant, requestId, sourceId, sourceKey, arch
     if (method === 'POST' && url.href === `https://login.microsoftonline.com/${tenant}/oauth2/v2.0/token`) {
       const scope = new URLSearchParams(String(init.body)).get('scope');
       allowed = [`${DV}/.default`, 'https://graph.microsoft.com/.default'].includes(scope);
+    } else if (database && method === 'POST' && url.href === database.endpoint) {
+      const body = JSON.parse(String(init.body));
+      const query = typeof body.query === 'string' ? body.query.trim().replace(/\s+/g, ' ') : '';
+      const profiles = 'SELECT id, azure_email, is_active FROM user_profiles ORDER BY CASE WHEN is_active = true THEN 0 ELSE 1 END, id';
+      const admin = "SELECT p.id,p.is_active,EXISTS(SELECT 1 FROM dynamics_user_roles r WHERE r.user_profile_id=p.id AND r.role='superuser') AS superuser FROM user_profiles p WHERE p.id=$1";
+      allowed = new Headers(init.headers).get('neon-connection-string') === database.connectionString
+        && Object.keys(body).sort().join(',') === 'params,query' && Array.isArray(body.params)
+        && ((query === profiles && body.params.length === 0)
+          || (query === admin && body.params.length === 1 && /^[1-9]\d*$/.test(String(body.params[0]))));
     } else if (writesEnabled && method === 'POST' && permits.has(url.href)) {
       allowed = permits.get(url.href) === String(init.body); permits.delete(url.href);
     } else if (writesEnabled && method === 'PUT' && uploads.has(url.href)) {
@@ -138,7 +147,13 @@ async function runtime(envFile, p, requiresWrite = false) {
     process.env.REQUEST_DOCUMENT_EXPLICIT_ACTOR_SCHEMA_READY ?? env.REQUEST_DOCUMENT_EXPLICIT_ACTOR_SCHEMA_READY, requiresWrite);
   process.env.SHAREPOINT_SITE_URL = 'https://appriver3651007194.sharepoint.com/sites/akoyaGO';
   for (const key of ['POSTGRES_URL', 'POSTGRES_URL_NON_POOLING']) if (env[key]) process.env[key] = env[key];
-  const fence = installFetchFence({ tenant: env.DYNAMICS_TENANT_ID, requestId: p?.requestId, sourceId: p?.sourceDocumentId, sourceKey: p?.sourceKey, archiveKey: p?.archiveKey });
+  check(env.POSTGRES_URL, 'Owner app database connection required for administrator verification');
+  const { neonConfig } = await import('@neondatabase/serverless');
+  const databaseUrl = new URL(env.POSTGRES_URL);
+  const endpoint = typeof neonConfig.fetchEndpoint === 'function'
+    ? neonConfig.fetchEndpoint(databaseUrl.hostname, databaseUrl.port || 5432) : neonConfig.fetchEndpoint;
+  const database = { endpoint: new URL(endpoint).href, connectionString: env.POSTGRES_URL };
+  const fence = installFetchFence({ database, tenant: env.DYNAMICS_TENANT_ID, requestId: p?.requestId, sourceId: p?.sourceDocumentId, sourceKey: p?.sourceKey, archiveKey: p?.archiveKey });
   const [graph, requests, docs, buckets, model, archive, source, reader, config] = await Promise.all([
     import('../lib/services/graph-service.js'), import('../lib/dataverse/adapters/grant-request.js'),
     import('../lib/dataverse/adapters/request-document.js'), import('../lib/utils/sharepoint-buckets.js'),
