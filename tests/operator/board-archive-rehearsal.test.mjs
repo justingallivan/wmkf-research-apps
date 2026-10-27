@@ -1,13 +1,43 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
-import { installFetchFence, validatePlan, testRequestOnly, planDigest, scopedChildren, resolvePlanIds, actorSchemaSetting, withRehearsalContext } from '../../scripts/rehearse-board-archive.mjs';
+import { installFetchFence, validatePlan, testRequestOnly, planDigest, scopedChildren, resolvePlanIds, actorSchemaSetting, withRehearsalContext, verifyWorker } from '../../scripts/rehearse-board-archive.mjs';
 
 const requestId = randomUUID(), sourceId = randomUUID(), runId = randomUUID(), actorId = randomUUID();
 const filename = `000000 - Archive Rehearsal - Writeup.docx`;
 const plan = { version: 1, cycle: 'J00', dataverse: 'https://wmkf.crm.dynamics.com', requestId, sourceDocumentId: sourceId, runId, actorId, requestNumber: '000000', requestFolder: `000000_${requestId.replaceAll('-', '').toUpperCase()}`,
   boardFolder: `Board Materials/WMKF-Archive-Rehearsal-${runId}`, archiveFolder: `000000_${requestId.replaceAll('-', '').toUpperCase()}/Board Milestones/J00`, filename, archiveFilename: `J00 - ${filename}`,
   sourceKey: `board-rehearsal-source:${runId}`, archiveKey: `board-writeup:J00:${requestId}`, email: 'BLOCK ALL', journal: 'LOCAL FILE ONLY', envFile: '/private/tmp/fictional-env' };
+
+test('local worker dispatches only the existing test copy, suppresses completion mail, and preserves old receipt', async () => {
+  const id = '4bfb6e40-678f-f111-8076-7ced8d3d15a6', folder = `1003220_${id.replaceAll('-', '').toUpperCase()}`;
+  const p = { ...plan, requestId: id, requestNumber: '1003220', requestFolder: folder, driveId: 'test-drive',
+    archiveFolder: `${folder}/Board Milestones/J00`, filename: '1003220 - Archive Rehearsal - Writeup.docx',
+    archiveFilename: 'J00 - 1003220 - Archive Rehearsal - Writeup.docx', archiveKey: `board-writeup:J00:${id}` };
+  const at = '2026-10-27T21:00:00Z';
+  const receipt = { digest: planDigest(p), archiveComplete: true, verifiedAt: at,
+    state: { releases: { [id]: { releasedAt: at } }, archives: { [id]: { archivedAt: at, registryId: 'existing-row', destination: { itemId: 'existing-copy', driveId: p.driveId }, uploadStartedAt: at, filename: p.archiveFilename, folder: { folderPath: p.archiveFolder } } }, archiveStartedAt: at, archiveCompletedAt: at, events: [] } };
+  const before = JSON.stringify(receipt), mode = process.env.RESEARCH_LEADERSHIP_DIGEST_MODE;
+  const saved = []; let calls = 0;
+  const r = { fence: { item: (drive, item) => { assert.equal(drive, p.driveId); assert.equal(item, 'existing-copy'); } },
+    archive: { archiveOne: async (cycle, request, d) => {
+      calls++; assert.equal(cycle, 'J00'); assert.equal(request, id);
+      await assert.rejects(d.readCycle('D26')); await assert.rejects(d.getRequest(randomUUID()));
+      for (const method of ['ensureFolder', 'session', 'put', 'createDocument']) await assert.rejects(d[method]());
+      await d.mutateCycle(cycle, state => { assert.equal(state.archives[id].state, 'queued'); assert.equal(state.archives[id].archivedAt, null); state.archives[id].archivedAt = at; state.archiveCompletedAt = at; });
+    } } };
+  const result = await verifyWorker(p, receipt, r, value => saved.push(structuredClone(value)));
+  assert.equal(calls, 1); assert.equal(result.result, 'PASS');
+  assert.deepEqual(result.suppressedNotices, ['complete']); assert.equal(saved.at(-1).result, 'PASS');
+  assert.equal(JSON.stringify(receipt), before); assert.equal(process.env.RESEARCH_LEADERSHIP_DIGEST_MODE, mode);
+  const foreign = structuredClone(receipt); foreign.state.archives[randomUUID()] = {};
+  await assert.rejects(verifyWorker(p, foreign, r, () => {}), /Unexpected request/);
+  const incomplete = structuredClone(receipt); incomplete.archiveComplete = false;
+  await assert.rejects(verifyWorker(p, incomplete, r, () => {}), /Verified completed/);
+  r.archive.archiveOne = async () => {};
+  await assert.rejects(verifyWorker(p, receipt, r, () => {}), /Worker did not complete/);
+  assert.equal(process.env.RESEARCH_LEADERSHIP_DIGEST_MODE, mode);
+});
 
 test('manifest rejects D26, real-file names, alternate hosts, and email policy changes', () => {
   assert.equal(validatePlan(plan), plan);

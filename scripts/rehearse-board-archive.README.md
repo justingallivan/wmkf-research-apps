@@ -72,7 +72,7 @@ queries on the exact configured app database connection; other SQL and SQL batch
 are blocked. It rejects all unplanned mutations, mail/SendEmail/sendMail and batch
 APIs. It admits only scoped, create-only Graph operations and the two planned
 registry identities. Signed upload URLs are single-use and never persisted.
-No worker or notification dispatcher is called. This prevents this runner from
+The ordinary phases call no worker or notification dispatcher. This prevents this runner from
 sending mail; it does not pause unrelated production notifications.
 
 Every write phase is one-shot. Failure retains receipts and artifacts for manual
@@ -115,3 +115,17 @@ Offline checks:
 node --import ./scripts/lib/use-extensionless.mjs --test tests/operator/board-archive-rehearsal.test.mjs
 npx jest tests/unit/board-writeup-workflow.test.js --runInBand
 ```
+
+## Local worker resumption check
+
+`worker-verify --plan ABSOLUTE_COMPLETED_PLAN --approve EXACT_DIGEST --out
+ABSOLUTE_NEW_RECEIPT` is restricted to test request 1003220. It requires a
+completed, verified rehearsal receipt and leaves that receipt intact. It clones
+the journal locally, queues verification of the existing archive destination,
+and invokes `runBoardWorkflow` with only J00 and that request. The real
+`archiveOne` verifies the existing file and registry record before marking the
+local job complete. Folder creation, uploads and registry creation are forbidden;
+the fetch fence remains in read-only mode. Notification intents are recorded
+locally without calling notification services. No production settings, journal,
+worker endpoint or scheduler is touched. This proves local worker dispatch and
+resumption, not a new worker upload or execution inside Vercel.

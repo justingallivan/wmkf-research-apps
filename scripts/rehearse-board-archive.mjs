@@ -1,4 +1,4 @@
-/** Bounded operator rehearsal. No worker, mail, production cycle journal or cleanup.
+/** Bounded operator rehearsal. No deployed worker, mail, production journal or cleanup.
  * Run with: node --import ./scripts/lib/use-extensionless.mjs scripts/rehearse-board-archive.mjs
  * plan --request-id GUID --actor-id GUID --env-file ABS_PATH --out ABS_PATH
  * seed|archive|verify --plan ABS_PATH [--approve PLAN_SHA256]
@@ -118,7 +118,7 @@ export function installFetchFence({ tenant, requestId, sourceId, sourceKey, arch
 
 function args(argv) {
   const [phase, ...rest] = argv, out = { phase };
-  check(['plan', 'seed', 'archive', 'verify', 'diagnose-upload', 'compare-upload', 'seed-after-comparison'].includes(phase), 'Choose plan, seed, archive, verify, diagnose-upload or compare-upload. No default execution.');
+  check(['plan', 'seed', 'archive', 'verify', 'worker-verify', 'diagnose-upload', 'compare-upload', 'seed-after-comparison'].includes(phase), 'Choose an explicit rehearsal phase. No default execution.');
   for (let i = 0; i < rest.length; i += 2) {
     check(['--request-id', '--request-number', '--actor-id', '--actor-name', '--env-file', '--out', '--plan', '--approve'].includes(rest[i]) && rest[i + 1] && !rest[i + 1].startsWith('--'), 'Invalid argument');
     check(!out[rest[i]], 'Duplicate argument'); out[rest[i]] = rest[i + 1];
@@ -247,6 +247,57 @@ export async function withRehearsalContext(work) {
 export async function main(argv = process.argv.slice(2)) {
   return withRehearsalContext(() => run(argv));
 }
+
+/** Resume an existing verified copy using worker dispatch, with local state only.
+ * No upload, registry create, production journal, release or notification service.
+ */
+export async function verifyWorker(p, receipt, r, persist) {
+  validatePlan(p);
+  check(p.requestNumber === '1003220' && p.requestId === '4bfb6e40-678f-f111-8076-7ced8d3d15a6', 'Worker rehearsal is restricted to 1003220');
+  check(receipt.digest === planDigest(p) && receipt.archiveComplete && receipt.verifiedAt && receipt.state?.archiveCompletedAt, 'Verified completed rehearsal required');
+  const state = structuredClone(receipt.state);
+  check(Object.keys(state.archives).join() === p.requestId && Object.keys(state.releases).join() === p.requestId, 'Unexpected request in local journal');
+  const item = state.archives[p.requestId];
+  check(item.archivedAt && item.registryId && item.destination?.itemId && item.uploadStartedAt && !item.error && !item.lease && item.filename === p.archiveFilename && item.folder?.folderPath === p.archiveFolder && item.destination.driveId === p.driveId, 'Verified archive receipt required');
+  // Keep the committed destination and upload intent: never upload a second copy.
+  item.state = 'queued'; item.archivedAt = null;
+  state.archiveCompletedAt = null;
+  state.firstEventAt ||= receipt.verifiedAt;
+  state.handoffBackfilledAt = receipt.verifiedAt;
+  let revision = 0, dispatched = 0;
+  const suppressedNotices = [];
+  const scope = cycle => check(cycle === CYCLE, 'Wrong worker cycle');
+  const forbidden = async () => { throw new Error('Unexpected worker operation'); };
+  const deps = {
+    assertWrite: () => validatePlan(p), schemaReady: () => true,
+    getCycle: async cycle => { scope(cycle); return { value: { cycle: CYCLE, active: true, rosterConfirmed: true, requestIds: [p.requestId] } }; },
+    boardActor: async () => ({ ...await r.config.eligibleStaff(p.actorId, { admin: true }), canArchive: true, canRelease: false }),
+    readCycle: async cycle => { scope(cycle); return { state: structuredClone(state), revision }; },
+    mutateCycle: async (cycle, fn) => { scope(cycle); const next = structuredClone(state); const result = fn(next, revision); check(!result?.then, 'Async mutation refused'); Object.assign(state, next); revision++; persist({ state, revision, dispatched, suppressedNotices }); return result; },
+    getRequest: async id => { check(id === p.requestId, 'Wrong worker request'); const row = await r.requests.getById(id, { select: 'akoya_requestid,wmkf_istestrequest' }); check(testRequestOnly(row, p.requestId), 'Test marker changed'); return row; },
+    requestEligible: row => testRequestOnly(row, p.requestId),
+    ensureFolder: forbidden, session: forbidden, put: forbidden, createDocument: forbidden,
+  };
+  r.fence.item(p.driveId, item.destination.itemId);
+  const { runBoardWorkflow } = await import('../lib/services/board-writeups/worker.js');
+  const keys = ['BOARD_WRITEUPS_ENABLED', 'RESEARCH_LEADERSHIP_DIGEST_MODE'];
+  const previous = keys.map(key => process.env[key]);
+  try {
+    process.env.BOARD_WRITEUPS_ENABLED = 'on'; process.env.RESEARCH_LEADERSHIP_DIGEST_MODE = 'board-release';
+    const result = await runBoardWorkflow({ ...deps, listCycles: async () => [CYCLE],
+      earliestHandoff: forbidden, deliverRelease: forbidden, reconcile: forbidden, eligibleStaff: forbidden,
+      reconcileNotices: async cycle => scope(cycle),
+      deliverNotice: async (cycle, intent) => { scope(cycle); suppressedNotices.push(intent.kind); },
+      archiveOne: async (cycle, id, budget) => { scope(cycle); check(id === p.requestId && dispatched++ === 0, 'Wrong worker dispatch'); await r.archive.archiveOne(cycle, id, { ...deps, ...budget }); },
+    });
+    check(result.enabled && result.results.length === 0 && dispatched === 1 && state.archives[p.requestId].archivedAt && state.archiveCompletedAt, 'Worker did not complete; inspect new local receipt');
+    persist({ result: 'PASS', state, revision, dispatched, suppressedNotices });
+    return { result: 'PASS', dispatched, suppressedNotices, registryId: item.registryId,
+      limits: 'Local worker resumption of an existing copy only; no new upload, production journal, Vercel execution or email delivery.' };
+  } finally {
+    keys.forEach((key, i) => { if (previous[i] === undefined) delete process.env[key]; else process.env[key] = previous[i]; });
+  }
+}
 async function run(argv) {
   const a = args(argv);
   if (a.phase === 'plan') {
@@ -283,6 +334,14 @@ async function run(argv) {
     r = await runtime(p.envFile, p, ['seed', 'archive', 'diagnose-upload', 'compare-upload', 'seed-after-comparison'].includes(a.phase));
     const t = await resolveTargets(r, p.requestId, p.actorId);
     check(String(t.request.akoya_requestnum) === p.requestNumber && t.bucket.folder === p.requestFolder && t.siteId === p.siteId && t.driveId === p.driveId && t.rootId === p.requestFolderId && JSON.stringify(t.board) === JSON.stringify(p.board), 'Approved targets changed');
+    if (a.phase === 'worker-verify') {
+      check(path.isAbsolute(a['--out'] || '') && a['--out'] !== a['--plan'] && a['--out'] !== receiptFile, 'Separate absolute output required');
+      const output = a['--out'];
+      save(output, { startedAt: new Date().toISOString(), planDigest: planDigest(p), email: 'BLOCK ALL', cloudWrites: 'BLOCK ALL', journal: 'LOCAL FILE ONLY' }, true);
+      const result = await verifyWorker(p, receipt, r, progress => save(output, { ...progress, planDigest: planDigest(p), email: 'BLOCK ALL', cloudWrites: 'BLOCK ALL', journal: 'LOCAL FILE ONLY' }));
+      console.log(JSON.stringify(result, null, 2));
+      return;
+    }
     const { TYPE, OP, LIFE } = { TYPE: r.model.REQUEST_DOCUMENT_ARTIFACT_TYPE, OP: r.model.REQUEST_DOCUMENT_OPERATION_STATUS, LIFE: r.model.REQUEST_DOCUMENT_LIFECYCLE_STATE };
     const { hashGovernedDocxContent } = await import('../lib/services/documents/governed-docx-hash.js');
     if (['seed', 'archive', 'diagnose-upload', 'compare-upload', 'seed-after-comparison'].includes(a.phase)) {
