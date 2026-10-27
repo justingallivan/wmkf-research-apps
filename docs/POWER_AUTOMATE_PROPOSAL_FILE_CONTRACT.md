@@ -51,8 +51,9 @@ names above:
 | Bibliography | `ProposalBibliography_{Request#}.pdf` | `Bibliography_{Request#}.pdf` |
 
 Exactly one of the two names may be present for each purpose; if both are
-present, generation fails closed. The `.pdf` extension is `[ASSUMED]` until a
-real J27 `AI Materials` folder confirms it. Connor's other J27 `AI Materials`
+present, generation fails closed. Connor confirmed 2026-10-26 that all J27
+files are PDFs except `Graphical-Abstract_{Request#}`, which is an image
+(format not specified). Connor's other J27 `AI Materials`
 files (`Graphical-Abstract_`, `Biosketches_`, `Other-Support_`,
 `Collaboration-Letters_`, `PhaseI-Cover-Page_`, `Abstract_`,
 `Graphical-Abstract-Page_`) are not app inputs today. The J27 staff and

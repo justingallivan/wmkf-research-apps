@@ -120,8 +120,9 @@ Questions 1–3 unblock building; question 3 decides how the run is triggered.
 **Owner decision 2026-10-26:** change the apps rather than ask Connor to rename. They
 accept `Project-Narrative_{n}.pdf` and `Bibliography_{n}.pdf` as alternatives
 to the D26 names, and fail closed if both are present. Built on branch
-`claude/j27-ai-materials-names`; not yet released. The `.pdf` extension is
-assumed until a real J27 folder confirms it.
+`claude/j27-ai-materials-names`; not yet released. Connor confirmed
+(2026-10-26, follow-up) that all files are PDFs except the graphical abstract,
+which is an image.
 
 This answers questions 1 and 2: both files are produced, and the bibliography
 is its own upload. Still open: 3 (timing and ready signal), 4 (changes after

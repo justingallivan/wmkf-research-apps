@@ -161,8 +161,8 @@ NOT YET RELEASED]** The J27 flows name their `AI Materials` files
 and `Bibliography_{Request#}.pdf` alongside the D26 names
 (`lib/utils/proposal-document-names.js` `acceptedProposalNarrativeFilenames` /
 `acceptedProposalBibliographyFilenames`). Exactly one accepted name per purpose
-may be present; both present fails closed. The `.pdf` extension is `[ASSUMED]`
-until a real J27 folder confirms it. See
+may be present; both present fails closed. Connor confirmed 2026-10-26 that
+the J27 files are PDFs, except the graphical abstract, which is an image. See
 `docs/POWER_AUTOMATE_PROPOSAL_FILE_CONTRACT.md`.
 
 The file must be under the request's Dynamics-associated `akoya_request`
