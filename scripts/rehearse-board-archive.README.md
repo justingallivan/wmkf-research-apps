@@ -95,6 +95,12 @@ JSON and headers. It keeps a separate attempt/result marker and preserves both
 failed attempts. No upload bytes, registry writes, reset or further replay is
 allowed by this phase. A matching request format is not proof of a provider cause.
 
+After a successful zero-byte comparison only, `seed-after-comparison` may finish
+seeding in the **same approved folder**. It requires the retained HTTP 400 attempt,
+accepted comparison, no uploaded item/registry row, a freshly verified empty
+folder and a regenerated fixture matching the original governed hash. It records
+its own one-shot attempt without clearing seed or diagnostic history.
+
 ## What a PASS means
 
 The archived file preserves a real saved Word edit, differs from the original,

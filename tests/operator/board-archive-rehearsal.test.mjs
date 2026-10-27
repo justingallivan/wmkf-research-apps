@@ -292,6 +292,12 @@ test('complete planning and zero-byte upload diagnosis use real adapters with si
     const comparisonCount = observed.length;
     await assert.rejects(main(['compare-upload', '--plan', output, '--approve', planDigest(result)]), /already attempted/);
     assert.equal(observed.length, comparisonCount);
+    await assert.rejects(main(['seed-after-comparison', '--plan', output, '--approve', planDigest(result)]), /Continuation requires/);
+    compared.uploadComparison = { status: 'session-accepted', fileBytesSent: 0 };
+    compared.sourceItemId = 'existing-file-must-not-be-touched';
+    fs.writeFileSync(receiptFile, JSON.stringify(compared));
+    await assert.rejects(main(['seed-after-comparison', '--plan', output, '--approve', planDigest(result)]), /Continuation requires/);
+    assert.equal(JSON.parse(fs.readFileSync(receiptFile, 'utf8'))['seed-after-comparisonStarted'], undefined);
   } finally {
     globalThis.fetch = previousFetch; console.log = previousLog;
     for (const key of Object.keys(process.env)) if (!(key in previousEnv)) delete process.env[key];

@@ -118,7 +118,7 @@ export function installFetchFence({ tenant, requestId, sourceId, sourceKey, arch
 
 function args(argv) {
   const [phase, ...rest] = argv, out = { phase };
-  check(['plan', 'seed', 'archive', 'verify', 'diagnose-upload', 'compare-upload'].includes(phase), 'Choose plan, seed, archive, verify, diagnose-upload or compare-upload. No default execution.');
+  check(['plan', 'seed', 'archive', 'verify', 'diagnose-upload', 'compare-upload', 'seed-after-comparison'].includes(phase), 'Choose plan, seed, archive, verify, diagnose-upload or compare-upload. No default execution.');
   for (let i = 0; i < rest.length; i += 2) {
     check(['--request-id', '--request-number', '--actor-id', '--actor-name', '--env-file', '--out', '--plan', '--approve'].includes(rest[i]) && rest[i + 1] && !rest[i + 1].startsWith('--'), 'Invalid argument');
     check(!out[rest[i]], 'Duplicate argument'); out[rest[i]] = rest[i + 1];
@@ -280,12 +280,12 @@ async function run(argv) {
     const receipt = fs.existsSync(receiptFile) ? JSON.parse(fs.readFileSync(receiptFile, 'utf8')) : { digest: planDigest(p) };
     check(receipt.digest === planDigest(p), 'Plan changed since receipt');
     check(!receipt[`${a.phase}Started`], 'Phase already attempted. Inspect retained receipt; never blindly retry.');
-    r = await runtime(p.envFile, p, ['seed', 'archive', 'diagnose-upload', 'compare-upload'].includes(a.phase));
+    r = await runtime(p.envFile, p, ['seed', 'archive', 'diagnose-upload', 'compare-upload', 'seed-after-comparison'].includes(a.phase));
     const t = await resolveTargets(r, p.requestId, p.actorId);
     check(String(t.request.akoya_requestnum) === p.requestNumber && t.bucket.folder === p.requestFolder && t.siteId === p.siteId && t.driveId === p.driveId && t.rootId === p.requestFolderId && JSON.stringify(t.board) === JSON.stringify(p.board), 'Approved targets changed');
     const { TYPE, OP, LIFE } = { TYPE: r.model.REQUEST_DOCUMENT_ARTIFACT_TYPE, OP: r.model.REQUEST_DOCUMENT_OPERATION_STATUS, LIFE: r.model.REQUEST_DOCUMENT_LIFECYCLE_STATE };
     const { hashGovernedDocxContent } = await import('../lib/services/documents/governed-docx-hash.js');
-    if (['seed', 'archive', 'diagnose-upload', 'compare-upload'].includes(a.phase)) {
+    if (['seed', 'archive', 'diagnose-upload', 'compare-upload', 'seed-after-comparison'].includes(a.phase)) {
       const { assertDataverseOperationAllowed } = await import('../lib/dataverse/core/interlock.js');
       assertDataverseOperationAllowed({ url: `${DV}/api/data/v9.2/wmkf_requestdocuments`, method: 'POST', callerLabel: 'isolated-board-archive-rehearsal' });
     }
@@ -312,16 +312,30 @@ async function run(argv) {
       } finally { save(receiptFile, receipt); }
       return;
     }
-    if (a.phase === 'seed') {
-      check(!receipt.seedStarted, 'Seed already attempted');
+    if (a.phase === 'seed' || a.phase === 'seed-after-comparison') {
+      const continuing = a.phase === 'seed-after-comparison';
+      let folder;
+      if (continuing) {
+        check(receipt.seedStarted && receipt.sourceFolderId && receipt.originalHash && !receipt.sourceItemId && !receipt.seedComplete
+          && receipt.uploadDiagnostic?.status === 400 && receipt.uploadDiagnostic.fileBytesSent === 0
+          && receipt.uploadComparison?.status === 'session-accepted' && receipt.uploadComparison.fileBytesSent === 0,
+          'Continuation requires the retained failed seed and successful zero-byte comparison');
+        folder = await graphCall(r, `${GRAPH}/drives/${encodeURIComponent(p.board.driveId)}/items/${encodeURIComponent(p.board.folderId)}:/${encodeURIComponent(`WMKF-Archive-Rehearsal-${p.runId}`)}`);
+        check(folder?.id === receipt.sourceFolderId && folder.folder && folder.parentReference?.id === p.board.folderId, 'Continuation folder differs');
+        const children = scopedChildren(await graphCall(r, `${GRAPH}/drives/${encodeURIComponent(p.board.driveId)}/items/${encodeURIComponent(folder.id)}/children?$top=50`), folder.id);
+        check(children.items.length === 0, 'Continuation refuses any existing file');
+      } else check(!receipt.seedStarted, 'Seed already attempted');
       check((await r.docs.findByGenerationKey(p.sourceKey)).records.length === 0 && (await r.docs.findByGenerationKey(p.archiveKey)).records.length === 0, 'Registry collision');
-      receipt.seedStarted = new Date().toISOString(); save(receiptFile, receipt);
+      receipt[`${a.phase}Started`] = new Date().toISOString(); save(receiptFile, receipt);
       r.fence.enableWrites();
-      const folder = await childFolder(r, p.board.driveId, p.board.folderId, `WMKF-Archive-Rehearsal-${p.runId}`, true);
+      if (!continuing) folder = await childFolder(r, p.board.driveId, p.board.folderId, `WMKF-Archive-Rehearsal-${p.runId}`, true);
       receipt.sourceFolderId = folder.id; save(receiptFile, receipt);
       const { Document, Packer, Paragraph } = await import('docx');
       const bytes = await Packer.toBuffer(new Document({ sections: [{ children: [new Paragraph('FICTIONAL ARCHIVAL REHEARSAL — NO PROPOSAL DATA'), new Paragraph(`Run ${p.runId}`), new Paragraph('Original rehearsal text.')] }] }));
-      receipt.originalHash = await hashGovernedDocxContent(bytes); save(receiptFile, receipt);
+      const generatedHash = await hashGovernedDocxContent(bytes);
+      if (continuing) check(generatedHash === receipt.originalHash, 'Regenerated fictional fixture differs');
+      else receipt.originalHash = generatedHash;
+      save(receiptFile, receipt);
       const session = await uploadSession(r, p.board.driveId, folder.id, p.filename);
       const item = (await r.G.putUploadSessionChunk(session.uploadUrl, { start: 0, bytes, total: bytes.length })).item;
       check(item?.id, 'Upload outcome unknown; stop and inspect');
