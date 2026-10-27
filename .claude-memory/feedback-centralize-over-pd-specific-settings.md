@@ -1,18 +1,18 @@
 ---
 name: feedback-centralize-over-pd-specific-settings
-description: Owner direction (2026-10-24) — handle reviewer/cycle settings centrally; PD-specific per-request campaign settings were "a clunky distraction" and should not be extended.
+description: Owner direction (2026-10-24, refined 2026-10-27 D9) — reviewer anchor dates are central; PDs may adjust only response period and quota over central defaults.
 metadata:
   type: feedback
   status: active
   scope: reviewer-campaign-settings
-  last_verified: 2026-10-24 (S639)
+  last_verified: 2026-10-27 (S645)
 ---
 
 ## Recall Rule
 Read before adding or extending any per-request or per-PD setting for reviewer campaigns (deadlines, respond-by days, reviewer quota, invitation defaults) or similar workflow parameters.
 
-Do: resolve the value from one central, cycle-level source maintained by the calendar authority (Grants Manager role, Program Coordinator fallback; see `docs/plans/J27_ALIGNMENT_LOG_2026-10-24.md` D1/D4). Keep individual-reviewer exceptions (e.g. one reviewer's deadline extension) as explicit PD actions.
-Do not: add new PD-facing per-request configuration screens, or treat the existing `CampaignConfigModal` per-request values as the target design.
+Do: resolve the value from one central, cycle-level source maintained by the calendar authority (Grants Manager role by default, Program Coordinator may also edit; see `docs/plans/J27_ALIGNMENT_LOG_2026-10-24.md` D1/D4/D7/D8/D9). Under D9 (owner, 2026-10-27), anchor dates such as the review deadline are central only; the response period and reviewer quota are central defaults a PD may change (response period per proposal and per invitation, quota per proposal). Keep one reviewer's due-date extension as an explicit PD action.
+Do not: add per-proposal overrides of anchor dates, or add PD-facing settings beyond the D9 set without asking.
 Not in scope: email wording. Per-user email customization layered over centrally seeded Admin defaults is the intended design (owner, 2026-10-24; personal email defaults slices 2–3). Do not centralize or remove personal wording under this rule.
 
 **Why:** owner, 2026-10-24: "I want to move as much of this to be centrally handled as possible. The PD-specific campaign settings were a clunky distraction."
