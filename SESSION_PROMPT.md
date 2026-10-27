@@ -1,8 +1,39 @@
-# Session 645 Prompt: Build the J27 decision calendar/matrix
+# Session 645 Prompt: J27 decision matrix; Board archival readiness
 
-**Branch:** this handoff lives on `claude/j27-ai-materials-names` (pushed
-2026-10-26; **no PR opened**). Owner chose to keep the handoff on the feature branch.
-`main` still carries the Session 643 prompt. Check out the feature branch to resume.
+**Main handoff integration, 2026-10-27:** preserves the newer Claude handoff
+from `bb79a05e6:SESSION_PROMPT.md` and adds the Board readiness record below.
+J27 runtime and detailed decision work remain on `claude/j27-ai-materials-names`;
+no J27 or rehearsal runtime code is included in this documentation-only landing.
+The J27 source/path references below describe that branch; use its owning
+checkout to resume without switching or resetting another agent's worktree.
+
+## Board archival readiness — completed 2026-10-27 (Codex)
+
+[VERIFIED via exact owner schema output, Vercel reads, signed-in setup and
+isolated receipts.] Production archival schema/readiness is provisioned;
+D26 has 23 confirmed requests, active setup, materials deadline 2026-11-02 and
+Board end 2026-12-10. At the last read, zero released and no archival started.
+The fictional 1003220/J00 round trip preserved a Word edit, registered the
+readable copy and opened correctly from native AkoyaGO. A separate local worker
+resumed verification of that existing copy with one dispatch and a locally
+captured completion notice; cloud writes stayed blocked. No rehearsal emails
+or D26 file changes. Actual queued archival inside Vercel with the production
+journal and live notification delivery remain unproved.
+
+- Evidence: `docs/audits/BOARD_ARCHIVE_REHEARSAL_2026-10-27.md`; current state:
+  `docs/atlas/postgres-board-writeup-runs.md`.
+- Runner, tests and trusted test hooks remain ONLY on
+  `codex/board-archive-rehearsal` (`c55c36568`, worker check `03030b750`).
+  They are not required for production archival and are not merged here.
+- Existing failed attempts, receipts and untracked local output are retained
+  on the original Mac; no cleanup/reset/overwrite is authorized. Portable
+  sanitized evidence is in the audit; no credential file is copied.
+- Operational sequence only: Beth releases, editing finishes, administrator or
+  Grants Manager reconciles and explicitly confirms archival, then verifies
+  the production results. No batch or email is authorized by this handoff.
+- Readiness setup/date/roster reminders are DONE. No additional archival
+  development is queued. This docs integration preserves J27's newer next
+  steps below; it does not approve proposed runtime builds.
 
 ## Session 644 Summary (startup + coordination only, 2026-10-27)
 
