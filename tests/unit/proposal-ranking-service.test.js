@@ -1,3 +1,7 @@
+jest.mock('../../lib/services/proposal-ranking/workflow-service.js', () => {
+  const actual = jest.requireActual('../../lib/services/proposal-ranking/workflow-service.js');
+  return { ...actual, mutateWorkflow: jest.fn(actual.mutateWorkflow) };
+});
 jest.mock('../../lib/services/proposal-ranking/test-policy.js', () => ({
   ...jest.requireActual('../../lib/services/proposal-ranking/test-policy.js'),
   getRankingTestPolicy: jest.fn(() => ({ requested: false, enabled: false })),
@@ -12,6 +16,7 @@ jest.mock('../../lib/dataverse/adapters/proposal-ranking.js', () => ({
   patchRound: jest.fn(),
   patchRoundAndList: jest.fn(),
   findCycleCoordinator: jest.fn(),
+  listSavedRankingCycles: jest.fn(),
   findRoundByCreationOperation: jest.fn(),
   makeOpenOperations: jest.fn(),
   createRoundAndLists: jest.fn(),
@@ -40,7 +45,7 @@ jest.mock('../../lib/services/proposal-ranking/preview-service.js', () => ({
 import {
   readRound, readAssessmentRound, readAssessmentRows, commitAssessmentChanges, listRoundRows, patchRound, patchRoundAndList, findCycleCoordinator,
   findRoundByCreationOperation, makeOpenOperations, createRoundAndLists,
-  cancelRoundChangeset,
+  cancelRoundChangeset, listSavedRankingCycles,
 } from '../../lib/dataverse/adapters/proposal-ranking.js';
 import { readEnabledProposalRankingStaff, listEnabledProposalRankingStaff } from '../../lib/dataverse/adapters/proposal-ranking-source.js';
 import { buildProposalRankingPreview } from '../../lib/services/proposal-ranking/preview-service.js';
@@ -49,6 +54,7 @@ import { listAllGrantsForAdmin } from '../../lib/services/app-access-service.js'
 import { readDefaultFacilitator, readDefaultFacilitators, saveDefaultFacilitator, saveDefaultFacilitators } from '../../lib/services/proposal-ranking/config.js';
 import { handleProposalRankingAction, handleProposalRankingGet } from '../../lib/services/proposal-ranking/service.js';
 import { handleProposalRankingAdminSettings } from '../../lib/services/proposal-ranking/service.js';
+import * as rankingWorkflowService from '../../lib/services/proposal-ranking/workflow-service.js';
 import { makeInitialWorkflowRecords, readWorkflowRound } from '../../lib/services/proposal-ranking/workflow-service.js';
 
 const facilitatorId = '11111111-1111-4111-8111-111111111111';
@@ -813,4 +819,56 @@ describe('dedicated ranking rehearsal scope', () => {
     await expect(handleProposalRankingGet({ roundId: round.wmkf_proposalrankingroundid, profileId: 1 })).rejects.toMatchObject({ status: 503 });
     expect(readRound).not.toHaveBeenCalled();
   });
+});
+
+
+describe('saved-cycle discovery', () => {
+  beforeEach(() => { setupRound(); jest.clearAllMocks(); getRankingTestPolicy.mockReturnValue({ requested: false, enabled: false }); });
+
+test('saved-cycle discovery retains old cycles without returning round contents', async () => {
+  listSavedRankingCycles.mockResolvedValue(['D20', 'J27', 'D20']);
+  await expect(handleProposalRankingAction({ action: 'cycles', body: { action: 'cycles' }, profileId: 'profile' }))
+    .resolves.toEqual({ cycles: ['D20', 'J27'] });
+  expect(listRoundRows).not.toHaveBeenCalled();
+  listSavedRankingCycles.mockResolvedValue(['broken']);
+  await expect(handleProposalRankingAction({ action: 'cycles', body: { action: 'cycles' }, profileId: 'profile' }))
+    .rejects.toMatchObject({ code: 'dependency_unavailable' });
+});
+
+
+test('cycle discovery rejects caller-supplied selectors or authority', async () => {
+  await expect(handleProposalRankingAction({ action: 'cycles', body: { action: 'cycles', isSuperuser: true }, profileId: 'profile' }))
+    .rejects.toMatchObject({ code: 'invalid_request' });
+  expect(listSavedRankingCycles).not.toHaveBeenCalled();
+});
+
+test('cycle discovery remains confined to rehearsal mode and rejects disabled policy', async () => {
+  try {
+    getRankingTestPolicy.mockReturnValue({ requested: true, enabled: true });
+    await expect(handleProposalRankingAction({ action: 'cycles', body: { action: 'cycles' }, profileId: 'profile' }))
+      .resolves.toEqual({ cycles: ['D97'] });
+    expect(listSavedRankingCycles).not.toHaveBeenCalled();
+    getRankingTestPolicy.mockReturnValue({ requested: true, enabled: false });
+    await expect(handleProposalRankingAction({ action: 'cycles', body: { action: 'cycles' }, profileId: 'profile' }))
+      .rejects.toMatchObject({ code: 'test_mode_unavailable' });
+  } finally { getRankingTestPolicy.mockReturnValue({ requested: false, enabled: false }); }
+});
+
+});
+
+
+test('lock dispatch derives attribution from the authenticated profile', async () => {
+  setupRound();
+  jest.clearAllMocks();
+  const snapshot = { ...JSON.parse(round.wmkf_snapshotjson), version: 2 };
+  round.wmkf_snapshotjson = JSON.stringify(snapshot);
+  round.wmkf_workflowjson = JSON.stringify(makeInitialWorkflowRecords(snapshot, round.wmkf_proposalrankingroundid, facilitatorId, 'open', '2026-10-27').workflow);
+  resolveProfileToSystemUser.mockResolvedValue({ systemuserid: facilitatorId, fullname: 'Server Admin' });
+  const mutation = rankingWorkflowService.mutateWorkflow.mockResolvedValueOnce({ confirmed: true });
+  const body = { action: 'lockMeeting', roundId: round.wmkf_proposalrankingroundid, operationId: '55555555-5555-4555-8555-555555555555' };
+  try {
+    await handleProposalRankingAction({ action: 'lockMeeting', body, profileId: 'authenticated-profile', isSuperuser: true });
+    expect(mutation).toHaveBeenCalledWith({ body, actor: facilitatorId, actorName: 'Server Admin', isSuperuser: true });
+    expect(resolveProfileToSystemUser).toHaveBeenLastCalledWith('authenticated-profile');
+  } finally { mutation.mockImplementation(jest.requireActual('../../lib/services/proposal-ranking/workflow-service.js').mutateWorkflow); }
 });

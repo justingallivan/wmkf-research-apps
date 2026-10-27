@@ -18,6 +18,56 @@ not independent SSO/app-grant or production authenticated-route acceptance. A se
 reveal and full browser restart passed; final state is private preparation for all four. See
 `docs/audits/PROPOSAL_RANKING_V2_SANDBOX_REHEARSAL_2026-10-13.md` for limits.
 
+## Branch extension — meeting lock/unlock and saved cycles, 2026-10-27
+
+[VERIFIED via source and focused tests on `codex/session-645-start`; not deployed.]
+This extension supplements the production v2 contract without changing legacy v1
+behavior, table schemas or the existing route's app-grant requirement.
+
+- `POST {action: "cycles"}` is read-only and returns `{cycles: string[]}` containing
+  distinct valid saved cycle codes whose coordinator has a round pointer. No
+  ranking contents or private assessments are included. Dedicated rehearsal mode
+  returns only its configured test cycle. The client merges these with the nearby
+  calendar choices, retaining old cycles indefinitely in the selector while their
+  saved coordinator pointers exist. A failed discovery is shown explicitly.
+- `lockMeeting` and `unlockMeeting` use the existing v2 mutation envelope:
+  `roundId`, UUID `operationId`, `roundEtag`, `policyRevision`,
+  `preparationVersion`, `revealId`, and server `confirmationFingerprint`.
+  Both require an active, unsuperseded, revealed group and either captured
+  facilitator membership or the authenticated superuser role. Ordinary PDs and
+  observers receive no confirmation and are denied by the server.
+- The public workflow adds `meetingLock: null | {locked: boolean,
+  actorSystemUserId: string, actorName?: string, at: string}`. Existing missing metadata means unlocked;
+  malformed metadata fails closed. Stage stays `revealed`, and the round stays
+  `active`, so existing read/history/workbook paths work while locked.
+- A lock blocks every ordinary workflow mutation (`409 meeting_locked`), including
+  collective edits, resets, preparation reopening and restarts. Current ETag and
+  confirmation checks serialize it against in-flight edits. Unlock restores the
+  prior edit rules; it does not broaden a superuser observer's other permissions.
+- Each lock/unlock atomically persists the metadata, a bounded administration-log
+  event (`meeting-locked`/`meeting-unlocked`, actor/time/operation), and immutable
+  operation receipt. Lock also archives the exact saved collective revision in
+  History. Identical confirmed retries never apply the transition twice.
+  Reopening private preparation after unlock clears group-only lock metadata.
+
+The permission exception here is narrow: nonparticipant superusers retain observer
+privacy and receive only lock/unlock confirmations after reveal. Other observer
+mutation denial remains unchanged. Historical candidate sections below retain
+their dated pre-extension permissions and deployment boundaries.
+
+Verification boundary: ranking tests, types, scoped lint, and relevant policy
+checks passed locally; the isolated fictional browser rehearsal exercised actual
+lock/confirm/unlock controls at mobile and desktop sizes. Claude Opus 5.5 reviewed
+the diff through the owner's OAuth subscription, requested the non-roster actor
+name fix, and approved the follow-up. The Webpack production build passed; the
+default Turbopack build cannot follow this worktree's shared dependency symlink.
+No live data write, production lock, schema operation or deployment was performed.
+The source-to-persistence-to-consumer trace covers the existing authenticated route,
+version dispatcher, reducer, conditional changeset, receipt/history and UI. New
+schema/migration, provider execution, and partial batch success audits are N/A.
+The documentation sweep is bounded to the branch extension in this API contract,
+ranking Atlas and guide; historical deployment/candidate receipts remain historical.
+
 ## 1. Historical revision-3 route — October 13 main baseline
 
 `/api/proposal-ranking` accepts authenticated `GET` and `POST` requests. Every
@@ -458,7 +508,9 @@ authenticated actor's private preparation; `progress` contains readiness only;
 collective content is present only after reveal. History, supplements, operation
 replay, and error `current` use explicit privacy projections; observers
 (including nonparticipant superusers) get the snapshot and readiness before reveal and
-the revealed group view after it, never `own` or confirmations. Observer round and history reads end
+the revealed group view after it, never `own`. In the October 27 branch extension,
+nonparticipant superusers receive only lock/unlock confirmations after reveal;
+ordinary observers receive no confirmations. Observer round and history reads end
 with a round ETag check and rebuild from the current round (bounded retries, then
 `stale_scope`), so a reopen committed mid-read cannot return revealed work. For v1, every participant
 including a facilitator-as-PD receives their own list. Before publication, even

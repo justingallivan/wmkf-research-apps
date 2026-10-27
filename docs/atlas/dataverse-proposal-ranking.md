@@ -12,6 +12,36 @@ The assessment/reveal/reset workflow was **deployed to the dedicated test Previe
 Implementation stages and proposed durable contracts are in
 `docs/plans/PROPOSAL_RANKING_IMPLEMENTATION_PLAN_2026-10-13.md`; sandbox provisioning is recorded below; Production provisioning is not claimed.
 
+## Meeting locks and saved-cycle retrieval — branch implementation, 2026-10-27
+
+[VERIFIED via source and focused tests on `codex/session-645-start`; not deployed.]
+The additive v2 contract uses existing fields only. `wmkf_workflowjson.meetingLock`
+stores `{locked, actorSystemUserId, actorName?, at}`. Missing metadata on existing rounds means
+unlocked; malformed metadata fails closed. Captured facilitators and superusers
+with the explicit app grant may lock/unlock a revealed group through confirmed,
+round-ETag-fenced transactions. The locked flag blocks every other workflow
+mutation, including resets/restarts, without changing the round's active state or
+revealed stage. Viewing/history/workbook remain available. Superusers outside the
+roster retain observer privacy and gain no other write permission.
+
+Each successful lock/unlock appends a bounded `meeting-locked`/`meeting-unlocked`
+event with actor/time/operation to `wmkf_administrationlogjson` and creates an
+immutable `o:<UUID>` receipt in the same changeset. Lock additionally creates a
+collective `h:<ordinal>` archive. A confirmed retry does not duplicate events or
+reapply a later-superseded lock. Reopening private preparation after an unlock
+clears group-only lock metadata while preserving the administration log.
+
+The read-only `cycles` action lists only cycle codes from coordinator rows with a
+saved-round pointer. The UI merges them with nearby calendar choices; it does not
+use live proposal eligibility to rediscover a past round. Dedicated rehearsal
+mode returns only its named test cycle. Incomplete reads or invalid cycle codes
+fail explicitly; the UI warns when discovery fails. Existing previous/superseded
+run links and private projections remain in force. No table/column, schema
+provisioning, backfill, deletion, live lock or backup-policy change is part of this
+implementation. Source: `service.js`, `workflow-service.js`, `workflow.js` and
+`lib/dataverse/adapters/proposal-ranking.js`; user instructions:
+`docs/guides/PROPOSAL_RANKING_LISTS.md`.
+
 ## D26 release candidate — local branch source, not deployed
 
 [VERIFIED via local branch source, `codex/d26-ranking-release` at `9fe92f0ed`,
@@ -131,7 +161,7 @@ In the October 13 main baseline, before publication each PD sees their own order
 and the single facilitator sees all. The D26 candidate's current own-only privacy
 contract supersedes this behavior; its two captured facilitators see readiness but
 not other participants' unrevealed orders. Each program publishes independently. In v1 a nonparticipant superuser gets administration
-metadata only. In the D26 v2 candidate, Proposal Ranking grant holders who are neither roster participants nor captured facilitators are read-only observers (owner decision 2026-10-15): before reveal they see the source snapshot and readiness only; after reveal they see the named assessments and collective view, history, workbook and sentiment (sentiment still needs Meeting Tracker readership); every mutation is refused. Main still permits exceptional excusal before generation and retains
+metadata only. In the D26 v2 candidate, Proposal Ranking grant holders who are neither roster participants nor captured facilitators are read-only observers (owner decision 2026-10-15): before reveal they see the source snapshot and readiness only; after reveal they see the named assessments and collective view, history, workbook and sentiment (sentiment still needs Meeting Tracker readership); ordinary observer mutations are refused; the branch-only lock/unlock exception is described above. Main still permits exceptional excusal before generation and retains
 excluded submissions; the new all-PDs-ready design does not carry that bypass forward.
 
 The UI serializes saves, keeps the latest queued order and visible unsaved/conflict

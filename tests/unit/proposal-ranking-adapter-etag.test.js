@@ -13,6 +13,7 @@ import { executeChangeset } from '../../lib/services/dynamics/changeset.js';
 import { processAnnotations } from '../../lib/services/dynamics/annotations.js';
 import {
   findCycleCoordinator,
+  listSavedRankingCycles,
   listRoundRows,
   patchRoundAndList,
   readRound,
@@ -44,4 +45,18 @@ test('ranking adapter restores the ETag shape removed by DynamicsService annotat
   await patchRoundAndList(round, list, { wmkf_lastoperationkind: 'save' }, { wmkf_version: 2 });
   const operations = executeChangeset.mock.calls[0][1];
   expect(operations.map((operation) => operation.ifMatch)).toEqual([ETAG, ETAG]);
+});
+
+
+test('saved-cycle discovery reads only coordinator fields and refuses incomplete pagination', async () => {
+  DynamicsService.queryAllRecords.mockResolvedValue({ records: [
+    { wmkf_cyclecode: 'D20', wmkf_activeroundid: ROUND_ID },
+    { wmkf_cyclecode: 'J20', wmkf_activeroundid: null },
+  ] });
+  expect(await listSavedRankingCycles()).toEqual(['D20']);
+  expect(DynamicsService.queryAllRecords).toHaveBeenCalledWith(expect.any(String), {
+    select: 'wmkf_cyclecode,wmkf_activeroundid',
+  });
+  DynamicsService.queryAllRecords.mockResolvedValue({ records: [], capped: true });
+  await expect(listSavedRankingCycles()).rejects.toThrow(/complete Dataverse result/);
 });

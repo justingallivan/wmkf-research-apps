@@ -53,7 +53,7 @@ function Rehearsal() {
       <AssessmentWorkflow
         key={key}
         initial={view}
-        cycleOptions={[{ code: 'J27', label: 'J27 · Fictional' }]}
+        cycleOptions={[{ code: 'J27', label: 'J27 · Fictional' }, { code: 'D20', label: 'D20 · Fictional past cycle' }]}
         onCycleChange={() => {}}
       />
     </>

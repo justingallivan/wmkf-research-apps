@@ -2,7 +2,7 @@ import AssessmentWorkflow from './AssessmentWorkflow';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Button, Card, PageHeader } from '../Layout';
 import { conventionalCycles, cycleCodeToLabel, resolveWorkingCycle } from '../../../lib/utils/cycle-code';
-import { createOperationId, loadProposalRanking, sendProposalRankingAction } from './client';
+import { createOperationId, loadProposalRanking, loadSavedRankingCycles, sendProposalRankingAction } from './client';
 import { amountLabel, buildCumulativeTotals, errorMessage, formatMoney, formatScore, moveProposal, PROGRAMS, reviewerScoreIndicator } from './model';
 
 const EMPTY_CAPABILITIES = {
@@ -304,7 +304,21 @@ function ProgramPanel({ response, program, isFacilitator, localOrders, remoteOrd
 }
 
 export default function ProposalRankingApp({ rehearsalCycle = null }) {
-  const options = useMemo(() => rehearsalCycle ? [{ code: rehearsalCycle, label: `${rehearsalCycle} · Ranking rehearsal` }] : cycleOptions(), [rehearsalCycle]);
+  const [savedCycles, setSavedCycles] = useState([]);
+  const [cycleListError, setCycleListError] = useState('');
+  useEffect(() => {
+    if (rehearsalCycle) return;
+    const controller = new AbortController();
+    loadSavedRankingCycles({ signal: controller.signal }).then(cycles => {
+      if (!controller.signal.aborted) setSavedCycles(cycles);
+    }).catch(() => {
+      if (!controller.signal.aborted) setCycleListError('Past cycles could not be loaded. Reload the page to try again.');
+    });
+    return () => controller.abort();
+  }, [rehearsalCycle]);
+  const options = useMemo(() => rehearsalCycle ? [{ code: rehearsalCycle, label: `${rehearsalCycle} · Ranking rehearsal` }] : [...new Set([...cycleOptions().map(option => option.code), ...savedCycles])]
+    .sort((a, b) => Number(b.slice(1)) - Number(a.slice(1)) || (a[0] === 'D' ? -1 : 1))
+    .map(code => ({ code, label: `${code} · ${cycleCodeToLabel(code)}` })), [rehearsalCycle, savedCycles]);
   const [cycleCode, setCycleCode] = useState(() => rehearsalCycle || resolveWorkingCycle(conventionalCycles()) || options[0]?.code || '');
   const [selectedProgram, setSelectedProgram] = useState('se');
   const [response, setResponse] = useState(null);
@@ -784,7 +798,7 @@ export default function ProposalRankingApp({ rehearsalCycle = null }) {
   const currentProposalById = new Map((currentProposalData?.proposals || []).map((proposal) => [proposal.requestId, proposal]));
   const preview = activeResponse?.preview;
 
-  if (activeResponse?.workflowVersion === 2) return <AssessmentWorkflow key={`${activeResponse.roundId}:${activeResponse.viewer.systemUserId}`} initial={activeResponse} cycleOptions={options} onCycleChange={changeCycle}/>;
+  if (activeResponse?.workflowVersion === 2) return <AssessmentWorkflow key={`${activeResponse.roundId}:${activeResponse.viewer.systemUserId}`} initial={activeResponse} cycleOptions={options} cycleListError={cycleListError} onCycleChange={changeCycle}/>;
 
   return <div className="mx-auto max-w-7xl px-4 pb-10">
     <PageHeader title="Proposal Ranking" subtitle="Prepare private PD rankings and facilitate the funding-cycle discussion." icon="▤">
@@ -799,6 +813,7 @@ export default function ProposalRankingApp({ rehearsalCycle = null }) {
     </PageHeader>
 
     <div className="space-y-4">
+      {cycleListError && <StatusBanner kind="warning">{cycleListError}</StatusBanner>}
       {error && <StatusBanner kind="error">{error}</StatusBanner>}
       {operationNotice && <StatusBanner>{operationNotice}</StatusBanner>}
       {pendingOpen && <StatusBanner kind="warning">Opening may have completed. Resolve this attempt before opening another round. <Button type="button" variant="outline" size="sm" disabled={actionBusy} onClick={() => runAction(pendingOpen)}>Resolve opening attempt</Button></StatusBanner>}
