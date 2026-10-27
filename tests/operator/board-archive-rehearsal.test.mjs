@@ -227,6 +227,8 @@ test('complete planning and zero-byte upload diagnosis use real adapters with si
     }
     if (url.origin === 'https://graph.microsoft.com' && url.pathname.endsWith('/createUploadSession')) {
       assert.equal(method, 'POST');
+      assert.equal(new Headers(init.headers).has('accept'), false);
+      assert.equal(Object.keys(JSON.parse(init.body).item).join(','), '@microsoft.graph.conflictBehavior,name');
       return new Response(JSON.stringify({ error: { code: 'invalidRequest', message: 'Offline provider detail https://example.com/signed-secret' } }), { status: 400, headers: { 'content-type': 'application/json' } });
     }
     assert.equal(method, 'GET', 'no unplanned live-write operation may reach the simulated transport');
@@ -282,6 +284,14 @@ test('complete planning and zero-byte upload diagnosis use real adapters with si
     const callCount = observed.length;
     await assert.rejects(main(['diagnose-upload', '--plan', output, '--approve', planDigest(result)]), /already attempted/);
     assert.equal(observed.length, callCount);
+    await assert.rejects(main(['compare-upload', '--plan', output, '--approve', planDigest(result)]), /400; invalidRequest/);
+    const compared = JSON.parse(fs.readFileSync(receiptFile, 'utf8'));
+    assert.equal(compared.uploadDiagnostic.status, 400);
+    assert.equal(compared.uploadComparison.fileBytesSent, 0);
+    assert.ok(compared['compare-uploadStarted']);
+    const comparisonCount = observed.length;
+    await assert.rejects(main(['compare-upload', '--plan', output, '--approve', planDigest(result)]), /already attempted/);
+    assert.equal(observed.length, comparisonCount);
   } finally {
     globalThis.fetch = previousFetch; console.log = previousLog;
     for (const key of Object.keys(process.env)) if (!(key in previousEnv)) delete process.env[key];

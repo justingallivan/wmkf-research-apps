@@ -89,6 +89,12 @@ the exact retained folder, refuses any existing child, sends **zero file bytes**
 creates no registry rows and cannot rerun or unlock seed. Session URLs remain
 unlogged and unpersisted. Do not delete or reset the failed-seed receipt.
 
+After a retained `400 invalidRequest` diagnostic, `compare-upload` permits one
+additional zero-byte comparison using the earlier transport's annotation-first
+JSON and headers. It keeps a separate attempt/result marker and preserves both
+failed attempts. No upload bytes, registry writes, reset or further replay is
+allowed by this phase. A matching request format is not proof of a provider cause.
+
 ## What a PASS means
 
 The archived file preserves a real saved Word edit, differs from the original,
