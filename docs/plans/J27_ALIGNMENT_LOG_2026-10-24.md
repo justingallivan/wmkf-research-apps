@@ -193,6 +193,26 @@ also answer register Q9. Open: whether any value is set before the Chairs
 meeting (e.g. `Recommended Invite`, which would recreate X2's double record),
 and whether Triaged proposals ever get `Phase I Declined` (decline notes, J-1).
 
+**Reviewers and reviewer materials (Justin 2026-10-26):**
+
+- PDs may search for and shortlist reviewers once a proposal reaches
+  Recommend to Program Chairs (the Chairs usually follow staff), but no
+  invitation goes out before the Feb 24 Chairs meeting. PDs wait until the
+  Grants Manager's AkoyaGO change shows the Chairs' approval. Gap: invitation
+  sending has no request-status check today (grep 2026-10-26 of
+  `lib/services/reviewer-engagement/` and `lib/services/reviewer-finder/`
+  found status reads only in the contact-history display and honorarium
+  closeout), so J27 needs a server-side send guard keyed on the AkoyaGO
+  approval, mirrored in the UI.
+- Reviewer materials need not be built for all 300 (Connor). Justin will ask
+  Connor to generate `Reviewer Materials/Proposal_{n}.pdf` earlier, around the
+  ~50 First Cut stage. The trigger signal is to be agreed. If it is an app staff
+  state, that state must live on the request in Dataverse, where a flow can
+  see it.
+- Sharing with Program Chairs and Board members: Justin recalls magic links
+  were used before. No Board/Chairs sharing surface was found in the app
+  (grep 2026-10-26); possibly SharePoint link sharing. To confirm with Connor.
+
 ## December readiness (proposed for the meeting to confirm)
 
 Justin agreed with this assessment on 2026-10-24; colleagues may correct it at
