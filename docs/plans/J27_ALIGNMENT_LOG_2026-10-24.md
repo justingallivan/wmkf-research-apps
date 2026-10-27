@@ -40,13 +40,14 @@ J27/D27 timeline PDF and workbook (OneDrive, New Cycle Development/timelines).
 | D3 | 2026-10-24 | **Review filing switches from D26 to J27 once; it never has to handle both.** All D26 reviews are in, so no late D26 reviews will overlap with J27 reviews. Who makes the switch and when is task T3. | Justin | Register Q15 |
 | D4 | 2026-10-24 | **Reviewer campaign settings are handled centrally, not per PD.** The review deadline, respond-by days and reviewer quota become cycle-wide values maintained centrally (under D1), replacing the per-request campaign settings PDs set today. Changing one reviewer's deadline stays a PD action. Email wording is not affected: PDs keep personal wording built on centrally seeded defaults (slice 2). | Justin | Rollover plan Slice 1 |
 | D5 | 2026-10-24 | **Volume of the Dec 8 AI pass is not a concern.** A less sophisticated model will likely be used, and applications arrive over several days (heaviest near the deadline); at about 2 minutes each, 300 can be processed overnight. | Justin | Timeline Dec 8 |
+| D7 | 2026-10-27 | **Either calendar role can edit at any time** (answers A1). The Grants Manager and Program Coordinator roles both hold edit rights all the time; the fallback is not limited to an unassigned Grants Manager role. The calendar shows who last edited each value and when. | Justin | D1; A1 |
 | D6 | 2026-10-24 | **Expertise matching is rebuilt to run inline.** Each proposal is matched automatically as part of the intake AI pass, instead of a person running the Expertise app on demand. The current app is an early version based on the CSO's draft Claude project and needs improvement. | Justin | R-3 |
 
 ## To confirm at the meeting
 
 | # | Question | Who | Why it matters | Source |
 |---|---|---|---|---|
-| A1 | What does "fallback" mean in practice: Duncan may also edit at any time, or only when the Grants Manager role is unassigned? | Sarah, Duncan, Justin | Decides whether the app grants both roles edit rights or switches to Duncan only when Sarah's role is empty. | D1 |
+| A1 | **Answered 2026-10-27 (Justin): either role can edit at any time; show who last edited and when (D7).** What does "fallback" mean in practice: Duncan may also edit at any time, or only when the Grants Manager role is unassigned? | Sarah, Duncan, Justin | Decides whether the app grants both roles edit rights or switches to Duncan only when Sarah's role is empty. | D1 |
 | A2 | Who is notified when a cycle is missing a date or has conflicting records? Proposed: Grants Manager and Systems Specialist. | Sarah, Connor | Readiness notices need named roles; there is no fallback to individuals. | Rollover plan §3.5, §7 |
 | A3 | May the calendar owner publish any date change directly, or do some changes (board date, review deadline) need a second person? | Sarah, Justin | Decides whether a confirmation step is built. | Rollover plan §7 |
 | A4 | Under D4, is there ever a reason one proposal needs a different reviewer quota or review deadline than the rest of the cycle? If so, who may set that exception? | Sarah, Duncan | Decides whether any per-request override survives, and whether it belongs to the PD or the calendar owner. | D4 |
@@ -334,7 +335,6 @@ rather than giving a day. Every date is a proposal for Justin to adjust.
 
 | Decide by | Item | Decision needed | Who decides | Blocked until decided |
 |---|---|---|---|---|
-| Wed Oct 28 meeting | A1 | Does "fallback" let Duncan edit at any time, or only when the Grants Manager role is empty? | Sarah, Duncan, Justin | Calendar edit rights in central reviewer settings (D4, November) |
 | Wed Oct 28 meeting | A3 | Can the calendar owner publish any date change, or do some need a second person? | Sarah, Justin | Whether the November build includes a confirmation step |
 | Wed Oct 28 meeting | A5 | J27 central values: review deadline, days to respond, reviewer quota | Sarah | Central reviewer settings cannot ship (D4, November) |
 | Wed Oct 28 meeting | C3 | How the D27 operations cycle row is created; whether operations keep only the Board date or other milestones too | Connor, Sarah | Which single place the apps read cycle dates from |
