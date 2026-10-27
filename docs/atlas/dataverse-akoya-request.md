@@ -198,6 +198,10 @@ WMKF status / flags (the long tail):
   Request Withdrawn · 682090001 Deferred. `wmkf_phaseiistatus` (Picklist): 100000002 Phase II Pending Committee
   Review · 100000004 Recommended · 100000005 Not Recommended · 100000003 Approved · 100000001 Phase II Declined ·
   100000000 Phase II Deferred · 707510001 Phase II Request Below Minimum · 707510002 Phase II Withdrawn.
+  **Semantics (owner 2026-10-26):** the phase picklists record the staff recommendation for that stage;
+  `akoya_requeststatus` changes only at the Board's final decision. Example: on 2026-10-26 staff marked 8 of
+  the 23 D26 Advancing proposals `Not Recommended` (15 `Recommended`); all 23 stayed `Phase II Pending`
+  [VERIFIED via `scripts/probe-d26-phase-statuses.js`, owner-run].
 - `wmkf_readyforreview`, `wmkf_galreadyforreview`, `wmkf_pcgoverifycomplete` (Picklist)
 - `wmkf_vendorverified` (Picklist), `wmkf_rationalesummarycompleted`
 - `wmkf_groupexempt`, `wmkf_organizationisgovernmententity`, `wmkf_california`, `wmkf_caftb`, etc. — eligibility booleans
