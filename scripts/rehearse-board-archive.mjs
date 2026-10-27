@@ -139,14 +139,13 @@ async function runtime(envFile, p, requiresWrite = false) {
   process.env.SHAREPOINT_SITE_URL = 'https://appriver3651007194.sharepoint.com/sites/akoyaGO';
   for (const key of ['POSTGRES_URL', 'POSTGRES_URL_NON_POOLING']) if (env[key]) process.env[key] = env[key];
   const fence = installFetchFence({ tenant: env.DYNAMICS_TENANT_ID, requestId: p?.requestId, sourceId: p?.sourceDocumentId, sourceKey: p?.sourceKey, archiveKey: p?.archiveKey });
-  const [graph, requests, docs, buckets, context, model, archive, source, reader, config] = await Promise.all([
+  const [graph, requests, docs, buckets, model, archive, source, reader, config] = await Promise.all([
     import('../lib/services/graph-service.js'), import('../lib/dataverse/adapters/grant-request.js'),
     import('../lib/dataverse/adapters/request-document.js'), import('../lib/utils/sharepoint-buckets.js'),
-    import('../lib/services/dynamics-context.js'), import('../shared/config/requestDocument.js'),
+    import('../shared/config/requestDocument.js'),
     import('../lib/services/board-writeups/archive.js'), import('../lib/services/board-writeups/source.js'),
     import('../lib/services/board-writeups/reader.js'), import('../lib/services/board-writeups/config.js'),
   ]);
-  context.enterDynamicsBypassForScript('isolated-board-archive-rehearsal');
   return { G: graph.GraphService, requests, docs, buckets, model, archive, source, reader, config, fence };
 }
 async function resolveTargets(r, requestId, actorId) {
@@ -217,7 +216,14 @@ export async function resolvePlanIds(r, a) {
   return { requestId: requestId.toLowerCase(), actorId: actorId.toLowerCase() };
 }
 
+export async function withRehearsalContext(work) {
+  const { bypassDynamicsRestrictions } = await import('../lib/services/dynamics-context.js');
+  return bypassDynamicsRestrictions('isolated-board-archive-rehearsal', work);
+}
 export async function main(argv = process.argv.slice(2)) {
+  return withRehearsalContext(() => run(argv));
+}
+async function run(argv) {
   const a = args(argv);
   if (a.phase === 'plan') {
     check(path.isAbsolute(a['--out'] || '') && path.isAbsolute(a['--env-file'] || ''), 'Absolute --out and --env-file required');

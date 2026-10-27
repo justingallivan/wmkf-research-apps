@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
-import { installFetchFence, validatePlan, testRequestOnly, planDigest, scopedChildren, resolvePlanIds, actorSchemaSetting } from '../../scripts/rehearse-board-archive.mjs';
+import { installFetchFence, validatePlan, testRequestOnly, planDigest, scopedChildren, resolvePlanIds, actorSchemaSetting, withRehearsalContext } from '../../scripts/rehearse-board-archive.mjs';
 
 const requestId = randomUUID(), sourceId = randomUUID(), runId = randomUUID(), actorId = randomUUID();
 const filename = `000000 - Archive Rehearsal ${runId} - Writeup.docx`;
@@ -132,4 +132,37 @@ test('read-only planning tolerates absent actor flag; writes still fail closed',
   }
   assert.equal(actorSchemaSetting('on', false), 'on');
   assert.equal(actorSchemaSetting('on', true), 'on');
+});
+
+
+test('planning context survives awaits through real Dataverse query adapters', async () => {
+  const { DynamicsService } = await import('../../lib/services/dynamics-service.js');
+  const requests = await import('../../lib/dataverse/adapters/grant-request.js');
+  const users = await import('../../lib/dataverse/adapters/system-user.js');
+  const { getDynamicsContext } = await import('../../lib/services/dynamics-context.js');
+  const previousFetch = globalThis.fetch, previousToken = DynamicsService.getAccessToken;
+  const previousUrl = process.env.DYNAMICS_URL;
+  process.env.DYNAMICS_URL = 'https://wmkf.crm.dynamics.com';
+  let reads = 0;
+  DynamicsService.getAccessToken = async () => 'offline-fixture-token';
+  globalThis.fetch = async (url, init = {}) => {
+    assert.ok(!init.method || init.method === 'GET');
+    const pathname = new URL(url).pathname;
+    assert.ok(pathname.endsWith('/akoya_requests') || pathname.endsWith('/systemusers'));
+    reads++;
+    return new Response(JSON.stringify({ value: pathname.endsWith('/akoya_requests') ? [{ akoya_requestid: requestId }] : [{ systemuserid: actorId }] }), { headers: { 'content-type': 'application/json' } });
+  };
+  try {
+    const before = getDynamicsContext();
+    await withRehearsalContext(async () => {
+      await new Promise(resolve => setImmediate(resolve));
+      assert.equal(getDynamicsContext().requestId, 'isolated-board-archive-rehearsal');
+      assert.deepEqual(await resolvePlanIds({ requests, users }, { '--request-number': '1003220', '--actor-name': 'Justin Gallivan' }), { requestId, actorId });
+    });
+    assert.equal(reads, 2);
+    assert.equal(getDynamicsContext(), before);
+  } finally {
+    globalThis.fetch = previousFetch; DynamicsService.getAccessToken = previousToken;
+    if (previousUrl === undefined) delete process.env.DYNAMICS_URL; else process.env.DYNAMICS_URL = previousUrl;
+  }
 });
