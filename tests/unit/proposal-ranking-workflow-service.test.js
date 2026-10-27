@@ -491,7 +491,6 @@ test('history is newest-first across numeric boundaries even when storage sorts 
 
 jest.mock('../../lib/services/post-presentation-materials/discussion-sentiment-reader.js',()=>({getDeliberationSentiments:jest.fn(),hasMeetingTrackerAccess:jest.fn()}));
 import {getDeliberationSentiments,hasMeetingTrackerAccess} from '../../lib/services/post-presentation-materials/discussion-sentiment-reader';
-import {readWorkflowSupplement} from '../../lib/services/proposal-ranking/workflow-service';
 function installReveal(count=2){
   const proposals=Array.from({length:count},(_,i)=>({requestId:`request-${i}`,programKey:'mr',score:{mean:3}}));
   const order=proposals.map((p)=>p.requestId);
