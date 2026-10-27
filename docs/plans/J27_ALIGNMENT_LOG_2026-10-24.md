@@ -229,6 +229,16 @@ and whether Triaged proposals ever get `Phase I Declined` (decline notes, J-1).
   which AkoyaGO field and value, possibly appended to the J27/D27 timeline
   workbook.
 
+**Apr–Jun (Justin 2026-10-26):** questions to PIs happen outside the apps.
+Oral presentations and staff evaluations are this cycle's site visits and
+staff deliberations, and ranking is unchanged from D26. Dependency: ranking
+and briefing select by `akoya_requeststatus = 'Phase II Pending'`
+(`lib/dataverse/adapters/proposal-ranking-source.js`,
+`lib/services/meeting-tracker/program-briefing-service.js`), and ranking also
+by the two Research program IDs (`proposal-ranking-source.js:95`). They carry
+over only if the post-Chairs mapping keeps `Phase II Pending` and J27
+proposals carry an MR/S&E program (C5).
+
 ## December readiness (proposed for the meeting to confirm)
 
 Justin agreed with this assessment on 2026-10-24; colleagues may correct it at
