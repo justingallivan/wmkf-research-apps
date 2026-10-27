@@ -56,7 +56,7 @@ J27/D27 timeline PDF and workbook (OneDrive, New Cycle Development/timelines).
 | C2 | **Partly answered 2026-10-26 (Justin):** a placeholder meeting date is believed to be set on submission (open: confirm its value); date moves are handled by a Power Automate flow. The apps derive the cycle only from the month and year (`lib/utils/cycle-code.js` `meetingDateToCycleCode`: June → J, December → D, any other month → no cycle), so the placeholder must fall in June 2027. When the board meeting date on a Grant Cycle record changes, do linked requests' dates update, and by what mechanism? | Connor | The apps currently derive the cycle from each request's meeting date. | Foundations audit §2 |
 | C3 | **Open; to the team meeting Wed 2026-10-28** on calendar ownership (Grants Manager or Program Coordinator to own and update it, consistent with D1). When and how is the next operations cycle row (D27) created, and does operations maintain only the board date or other milestones too? | Connor, Sarah | D27 has no operations row yet; the apps should read dates from one place. | Foundations audit §2 |
 | C4 | What request status do J27 proposals carry when they arrive from GOApply (expected `Phase I Pending`)? | Connor | The Workbench list and triage depend on that exact label. | Register Q8, J27-064 |
-| C5 | Applicants no longer choose S&E or MR. How is the program recorded on the request, who assigns it, and when? | Connor, Sarah, Duncan | Apps that filter or assign by program will find it empty at intake. | Timeline Dec 7 |
+| C5 | **Owner assigned 2026-10-26:** when and how the program is set is the CSO's decision, in consultation with Connor and Sarah (see "MR vs S&E" below). Applicants no longer choose S&E or MR. How is the program recorded on the request, who assigns it, and when? | Connor, Sarah, Duncan | Apps that filter or assign by program will find it empty at intake. | Timeline Dec 7 |
 | R1 | Is the day-one list below right, and how quickly do staff need to triage in December? | Sarah, Duncan | Sets what must be built in the next six weeks versus early January. | December readiness below |
 | X1 | For inline expertise matching (D6): who maintains the roster of staff, consultants and Board members and their expertise; should the suggested PD be written to the request or only shown for staff to accept; and can the CSO's current Claude project prompt be shared as the starting point? | CSO, Sarah, Duncan | Defines what the rebuilt matcher reads, produces and who trusts it. | D6 |
 | R2 | Who starts and watches the Dec 8 AI pass, and what happens to proposals that arrive after it runs? Which steps are triggered by Power Automate (e.g. when a proposal file lands) and which by the apps' scheduled background jobs? | Justin, Connor | Volume is not a concern (D5), but the run needs an owner and an agreed trigger for each step. | Timeline Dec 8 |
@@ -238,6 +238,36 @@ and briefing select by `akoya_requeststatus = 'Phase II Pending'`
 by the two Research program IDs (`proposal-ranking-source.js:95`). They carry
 over only if the post-Chairs mapping keeps `Phase II Pending` and J27
 proposals carry an MR/S&E program (C5).
+
+### MR vs S&E (raised 2026-10-26; decision owner: CSO with Connor and Sarah)
+
+Every J27 proposal must end up in Medical Research or Science and
+Engineering Research (committee structure), but applicants no longer choose.
+Justin expects an initial guess during the intake AI read and suspects the
+split should be tracked for portfolio balance. PD assignment is
+program-agnostic this cycle (PDs handled both programs).
+
+- **Where it lives:** `akoya_programid` (the 23 D26 proposals carry MR or
+  S&E there; probe 2026-10-26). The Workbench Grant Program selector uses the
+  coarser `wmkf_grantprogram`
+  (`lib/services/workbench/program-scope-service.js`).
+- **What depends on it** (filter on the two IDs in
+  `shared/config/researchPrograms.js`; grep 2026-10-26): ranking
+  (`lib/dataverse/adapters/proposal-ranking-source.js`,
+  `lib/services/proposal-ranking/research-funding.js`), Meeting Tracker
+  program briefing (`lib/services/meeting-tracker/program-briefing-service.js`),
+  site-visit applicant contacts and request liaison
+  (`lib/services/site-visit/applicant-contacts.js`,
+  `lib/services/contacts/request-liaison.js`), grantee deliverables awardees
+  and cycle export, and the grantee-title cron. A proposal with no program, or
+  a third program, drops out of all of them. None is needed before the
+  semi-finalist stage, so the latest safe point is the Feb 24 Chairs meeting.
+- **Questions for the decision owner:** (1) who sets it and when (intake AI
+  guess, PD triage, or Recommend to Program Chairs); (2) whether the AI guess
+  is stored as a separate suggestion and confirmed by a person into
+  `akoya_programid`, rather than written there directly (same pattern as the
+  suggested PD, X1/F3); (3) whether staff want running MR/S&E counts per stage
+  for portfolio balance.
 
 ## December readiness (proposed for the meeting to confirm)
 
