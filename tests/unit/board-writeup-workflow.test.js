@@ -314,3 +314,14 @@ test('active cycle save requires President and succeeds after assignment', async
   president = true;
   await expect(saveCycle(actor, value, 'etag', '', deps)).resolves.toMatchObject({ value });
 });
+
+test('production archive still rejects marked test requests before any file operation', async () => {
+  const { state, d } = fixture();
+  state.archiveStartedAt = d.now(); state.archiveActor = actor;
+  state.archives[ID] = { state: 'queued', uploadStartedAt: null };
+  state.releases[ID] = { source, releasedAt: d.now() };
+  await archiveOne('D26', ID, { ...d, getRequest: async () => ({ akoya_requestid: ID, _wmkf_grantprogram_value: PROGRAM_ID, wmkf_meetingdate: '2026-12-01', wmkf_istestrequest: true, wmkf_testcreationrunid: null }) });
+  expect(state.archives[ID].error).toBe('board_archive_request_changed');
+  expect(d.put).not.toHaveBeenCalled();
+  expect(d.session).not.toHaveBeenCalled();
+});
