@@ -3,12 +3,13 @@ title: "Atlas: Research Board writeup runs"
 domain: postgres
 kind: state-page
 status: source-built
-summary: "Board workflow deployed; cycle setup remains owner-controlled. Phase II candidate filter is deployed; the production journal migration is applied. President batch email merged in PR #503; deployment unverified. Central staffing deployed in PR #507; President eligibility refinement deployed in PR #508; signed-in readback confirmed the wider President choices and restricted CSO/Grants Manager choices."
+summary: "Production Board archival schema and readiness flag verified 2026-10-27; D26 active with 23 confirmed proposals and no releases or archives. One isolated test-request archive and native Akoya document access passed; local worker resumption passed without cloud writes or email. Real D26 archival and President batch email acceptance remain unproved."
 canonical: true
 cataloged: 2026-10-16
 owner: product-engineering
 related:
   - docs/plans/RESEARCH_WRITEUP_RELEASE_AND_BOARD_ARCHIVE_PLAN_2026-10-16.md
+  - docs/audits/BOARD_ARCHIVE_REHEARSAL_2026-10-27.md
   - lib/db/migrations/085_board_writeup_runs.sql
   - lib/services/board-writeups/store.js
   - pages/api/workbench/board-writeups.js
@@ -18,8 +19,59 @@ related:
 
 # Research Board writeup runs
 
-[VERIFIED via source and isolated PostgreSQL tests] Migration 085 creates `board_writeup_runs`, keyed by Research program GUID and meeting-date cycle code. The row contains a monotonic revision and version-1 JSON journal. Settings and human identities remain in Dataverse; SharePoint owns file bytes; `wmkf_requestdocument` owns archived references. Runtime deployed at merge `0e39ad951`; production redeployment `dpl_3AHPWmAYw5B1aMeUzvuPS4Ce44kM` was Ready on 2026-10-18 PT. The missing journal caused the initial production cycle-save failure. [VERIFIED via production schema probe and `scripts/apply-migrations.js`, 2026-10-18 PT] Migration 085 was the only pending migration and is now applied (1 applied, 83 skipped). Tracker readback and an insert/row-lock transaction followed by rollback verified the journal. No cycle settings were changed by the repair. Historical preflight on 2026-10-16 also found Board Writeup option 100000014 absent; this Postgres repair does not establish Dataverse archival schema readiness.
+## Current production state — verified 2026-10-27
 
+[VERIFIED via owner-run schema preflights, Vercel deployment/configuration reads,
+signed-in production setup and API readback, 2026-10-27] The `Board Writeup`
+artifact option `100000014`, `wmkf_initiatedat` and both explicit-actor
+relationships are exact in production. `BOARD_WRITEUP_SCHEMA_READY` is literal
+`on`. Redeployment `dpl_EWuXB8WrnksMdCx8WS48vUjNYK3Z`, from existing `main`
+commit `80b1cd737`, is Ready on the production aliases. This enables archival;
+it does not start a batch or authorize copying unfinished documents.
+
+[VERIFIED via signed-in production setup and API journal readback, 2026-10-27]
+D26 is active with 23 selected, confirmed request identities, materials deadline
+`2026-11-02` and Board end date `2026-12-10`. Shared assignments are Allison
+Keller (President), Beth Pruitt (CSO), Sarah Hibler (Grants Manager) and Justin
+Gallivan (cycle admin recipient). At journal revision `189`, `configPending`
+was false and all 23 release receipts and archive entries were null. No real
+D26 release or archive is claimed by the test evidence below.
+
+[VERIFIED via production worker logs, 2026-10-27] Hourly Board-worker requests
+at 16:00–21:00 UTC returned HTTP 200; the six-hour log scan found no warnings
+or errors. This proves scheduled invocation, not successful release, archival,
+or email delivery.
+
+[VERIFIED via isolated live rehearsal receipts and native signed-in AkoyaGO
+Documents readback, 2026-10-27] Marked test request `1003220`, cycle `J00`, run
+`014a60d7-a0fe-4ad7-8303-db22ce7f31a1` passed the real archive services,
+SharePoint readback, Dataverse registration and Board-reference reader. The
+President-edit stand-in and archived file have the same governed-content hash,
+`gdc1:Amn1Fmcyyp3rPGyZRrlSuQUYEOx9b9q4fqCAJscjuqQ`, distinct from the original
+fixture. Native AkoyaGO Documents → Board Milestones → J00 opened the readable
+archive in view-only Word with the edit marker present. A separate local
+`runBoardWorkflow`/`archiveOne` resumption verified the existing copy with one
+dispatch, local journal state and a locally suppressed completion notice;
+cloud writes were blocked. Neither exercise proves production journal writes,
+a deployed worker upload, a real D26 batch or email delivery. See the
+[bounded rehearsal evidence and remaining limits](../audits/BOARD_ARCHIVE_REHEARSAL_2026-10-27.md).
+
+## Journal contract and migration
+
+[VERIFIED via source and isolated PostgreSQL tests] Migration 085 creates
+`board_writeup_runs`, keyed by Research program GUID and meeting-date cycle
+code. The row contains a monotonic revision and version-1 JSON journal.
+Settings and human identities remain in Dataverse; SharePoint owns file bytes;
+`wmkf_requestdocument` owns archived references.
+
+Historical deployment receipt: runtime merged as `0e39ad951`; production
+redeployment `dpl_3AHPWmAYw5B1aMeUzvuPS4Ce44kM` was Ready on 2026-10-18 PT.
+The initial cycle-save failure was caused by the missing journal. The owner-run
+migration applied migration 085 (1 applied, 83 skipped); tracker readback and an
+insert/row-lock transaction followed by rollback verified it. That repair did
+not change cycle settings. The October 16 metadata preflight found the Board
+artifact option absent; the October 27 schema evidence above supersedes that
+historical absence.
 The bounded journal is an implementation refinement of the plan's logical release/archive/email ledgers: one row lock serializes all those receipts with archive-start and configuration intent. Request IDs and email notice keys are unique object keys within that cycle. `mutateCycle` requires a synchronous callback, holds `SELECT FOR UPDATE`, commits before external calls, and rolls back exceptions. Limits: 100 expected requests, 2 MB journal, 5,000 audit events. There is no automatic deletion; operational capacity alerts require administrator attention and historical receipts must be retained.
 
 ## Stored state and ownership
@@ -34,15 +86,15 @@ The bounded journal is an implementation refinement of the plan's logical releas
 
 ## Staff-discussion cleanup reminder (deployed 2026-10-18)
 
-[VERIFIED via source and isolated tests] The configured cycle admin receives a daily email, with no cc, at 9 a.m. Pacific starting seven calendar days after `boardEnds`. The existing Board worker and active-cycle/feature gates apply; missing dates or inactive cycles do not send. `emails[cleanup:YYYY-MM-DD]` reuses the lease, correlation and accepted-send protocol; missed days do not cause catch-up bursts. Board archival does not stop these separate reminders. The branch-built `/board-cycle-setup` page exposes **Mark cleanup complete** to administrators when due, preserves the original completion actor/time on repeat requests, and stops future notices. The sender checks completion again before dispatch; an email already handed to the provider may still arrive.
+[VERIFIED via source and isolated tests] The configured cycle admin receives a daily email, with no cc, at 9 a.m. Pacific starting seven calendar days after `boardEnds`. The existing Board worker and active-cycle/feature gates apply; missing dates or inactive cycles do not send. `emails[cleanup:YYYY-MM-DD]` reuses the lease, correlation and accepted-send protocol; missed days do not cause catch-up bursts. Board archival does not stop these separate reminders. The deployed `/board-cycle-setup` page exposes **Mark cleanup complete** to administrators when due, preserves the original completion actor/time on repeat requests, and stops future notices. The sender checks completion again before dispatch; an email already handed to the provider may still arrive.
 
-No discussion content or proposal details are read for the cleanup email. Recipient eligibility is checked at dispatch. Completion is a staff attestation, not verification of deletion or a cleanup engine. Tests cover scheduling across DST, duplicate invocations, stale dates, recipient/configuration changes, completion during preparation, uncertain sends, authorization, worker dispatch, and UI cycle switching. Live email delivery and configured Board dates/recipient have not been verified by this build; Board activation remains separate.
+No discussion content or proposal details are read for the cleanup email. Recipient eligibility is checked at dispatch. Completion is a staff attestation, not verification of deletion or a cleanup engine. Tests cover scheduling across DST, duplicate invocations, stale dates, recipient/configuration changes, completion during preparation, uncertain sends, authorization, worker dispatch, and UI cycle switching. Live cleanup-email delivery remains unproved. The current D26 dates, recipient and activation are verified in the production-state section above; with the saved December 10 Board end date, cleanup reminders become due December 17, 2026.
 
-[VERIFIED via local checks, 2026-10-18] 63 tests passed across `board-cleanup-reminder`, `board-writeup-workflow`, `board-writeup-ui` and `board-writeup-routes-disabled`. Types, scoped ESLint, production Turbopack build and relevant route/Atlas/security/document gates passed (gate/self-test pairs sequential). Claude Opus 5.5 approved commit `82a53fb2f` with no High/Medium findings and two Low findings, now addressed; see the [review record and dispositions](../audits/board-cleanup-opus-review-2026-10-18.md). The build emitted four dynamic-filesystem tracing warnings outside the changed files. No live email or production data mutation was performed.
+Historical cleanup-build verification: [VERIFIED via local checks, 2026-10-18] 63 tests passed across `board-cleanup-reminder`, `board-writeup-workflow`, `board-writeup-ui` and `board-writeup-routes-disabled`. Types, scoped ESLint, production Turbopack build and relevant route/Atlas/security/document gates passed (gate/self-test pairs sequential). Claude Opus 5.5 approved commit `82a53fb2f` with no High/Medium findings and two Low findings, now addressed; see the [review record and dispositions](../audits/board-cleanup-opus-review-2026-10-18.md). The build emitted four dynamic-filesystem tracing warnings outside the changed files. No live email or production data mutation was performed.
 
-## President release-batch email (merged PR #503; deployment unverified)
+## President release-batch email (deployed; live acceptance unproved)
 
-[VERIFIED via Git commit `ae4c980b1`] PR #503 is merged. Production deployment and live email acceptance have not been verified for this change.
+[VERIFIED via Git ancestry and Ready production deployment, 2026-10-27] PR #503 commit `ae4c980b1` is an ancestor of deployed `main` commit `80b1cd737`. The batch-email code is therefore deployed. No completed real release batch or President-email acceptance has been demonstrated; deployment is not mailbox-permission or delivery evidence.
 
 [VERIFIED via source and focused tests] Owner requested one email per completed release batch, from the CSO, on 2026-10-18. `release-batches.js` resolves batch completion from persisted release receipts. `notifications.js` emits `president:<batchId>` through the existing activity correlation, lease and create/send-intent protocol. The normal worker dispatches it after delivery, independently of the 9 a.m. reminder hour. A batch contains only newly queued approvals; duplicate clicks or already-released selections create no additional batch. Preflight-rejected rows do not join the batch. Failed, held or unknown copy states delay its email until recovered, explicitly cancelled, or superseded by a fresh CSO approval. Cancelled/superseded entries are omitted; a later fresh approval belongs to its own batch. Empty-success batches never email.
 
@@ -52,9 +104,9 @@ An uncertain create/send retains its receipt and never blindly creates or sends 
 
 ## Services and consumers
 
-`lib/services/board-writeups/model.js` validates closed input contracts; `config.js` owns exact settings and staff roles; `source.js` resolves ordinary Research sources and fences bytes by version/ETag; `service.js` approves/delivers; `archive.js` reconciles/freezes/archives; `recovery.js` requires explicit evidence for held copies; `release-batches.js` validates batch completion and cycle-folder links; `notifications.js` owns durable mail; `worker.js` drains bounded work; `reader.js` projects Ready Board references to the Proposal tab. [VERIFIED via branch source, not deployed] `/board-writeups` is the CSO dashboard, viewable by the configured CSO, enabled superusers and the assigned Grants Manager. Only the CSO can release; non-CSO payloads continue to omit draft links. `/board-cycle-setup` owns dates, the cycle admin recipient, proposal roster, activation, interrupted-save reconciliation, recovery, archival and the superuser-only cleanup acknowledgement. Navigation links the two pages; cleanup reminders target setup. Both pages retain reviewers app access and server-derived Board capability checks.
+`lib/services/board-writeups/model.js` validates closed input contracts; `config.js` owns exact settings and staff roles; `source.js` resolves ordinary Research sources and fences bytes by version/ETag; `service.js` approves/delivers; `archive.js` reconciles/freezes/archives; `recovery.js` requires explicit evidence for held copies; `release-batches.js` validates batch completion and cycle-folder links; `notifications.js` owns durable mail; `worker.js` drains bounded work; `reader.js` projects Ready Board references to the Proposal tab. [VERIFIED via main source and signed-in production setup, 2026-10-27] `/board-writeups` is the CSO dashboard, viewable by the configured CSO, enabled superusers and the assigned Grants Manager. Only the CSO can release; non-CSO payloads continue to omit draft links. `/board-cycle-setup` owns dates, the cycle admin recipient, proposal roster, activation, interrupted-save reconciliation, recovery, archival and the superuser-only cleanup acknowledgement. Navigation links the two pages; cleanup reminders target setup. Both pages retain reviewers app access and server-derived Board capability checks.
 
-Dataverse settings keys: `board_writeups.president` (deployed via PR #501, merge `0b0b4e94c`; assignment remained pending at the 2026-10-18 signed-in check), `board_writeups.cso`, `board_writeups.grants_manager`, `board_writeups.program_coordinator`, `board_writeups.systems_specialist`, `board_writeups.cycle.<cycle>`. Program Coordinator and Systems Specialist (added 2026-10-21) are the central record of who holds those roles for other app surfaces to read via `getRole('programCoordinator')` / `getRole('systemsSpecialist')`; any active staff member may hold them, they grant no permission, and Board cycle activation does not require them (`BOARD_ACTIVATION_ROLES`). President is an explicit staff assignment required when saving an active cycle; it grants no release/archive permission. The merged batch notification uses this assignment as its recipient. The Board UI and release reminders use “the President.” Admin recipient is independent of authorization. [VERIFIED via branch source, not deployed] `saveRole`, `saveCycle` and `resumeConfig` require an enabled, identity-bound superuser or the existing configured Grants Manager with reviewers app access. The setup GET permits the same scoped manager access. These scoped permissions include assigning shared roles and changing cycle settings; they confer no general Admin access. The CSO alone releases. Staff-discussion cleanup completion remains superuser-only. An unassigned caller cannot bootstrap authority by assigning itself Grants Manager.
+Dataverse settings keys: `board_writeups.president` (deployed via PR #501, merge `0b0b4e94c`; Allison Keller confirmed in production setup on 2026-10-27), `board_writeups.cso`, `board_writeups.grants_manager`, `board_writeups.program_coordinator`, `board_writeups.systems_specialist`, `board_writeups.cycle.<cycle>`. Program Coordinator and Systems Specialist (added 2026-10-21) are the central record of who holds those roles for other app surfaces to read via `getRole('programCoordinator')` / `getRole('systemsSpecialist')`; any active staff member may hold them, they grant no permission, and Board cycle activation does not require them (`BOARD_ACTIVATION_ROLES`). President is an explicit staff assignment required when saving an active cycle; it grants no release/archive permission. The merged batch notification uses this assignment as its recipient. The Board UI and release reminders use “the President.” Admin recipient is independent of authorization. [VERIFIED via main source and signed-in production setup, 2026-10-27] `saveRole`, `saveCycle` and `resumeConfig` require an enabled, identity-bound superuser or the existing configured Grants Manager with reviewers app access. The setup GET permits the same scoped manager access. These scoped permissions include assigning shared roles and changing cycle settings; they confer no general Admin access. The CSO alone releases. Staff-discussion cleanup completion remains superuser-only. An unassigned caller cannot bootstrap authority by assigning itself Grants Manager.
 
 ### Central staffing first release (deployed PR #507)
 
@@ -68,17 +120,58 @@ Staffing configuration is intentionally independent of `BOARD_WRITEUPS_ENABLED`;
 
 ## Rollout and verification limits
 
-`BOARD_WRITEUPS_ENABLED=on` and a production deployment targeting registered production Dataverse are required for Graph writes. The worker additionally requires `RESEARCH_LEADERSHIP_DIGEST_MODE=board-release`; the old leadership digest only runs in `legacy` (the unset default). `paused` and unknown modes stop both. Turning off the Board flag while retaining `board-release` never restarts old Allison mail. `BOARD_WRITEUP_SCHEMA_READY=on` is a separate archival prerequisite after exact metadata readback using `scripts/extend-requestdocument-artifacttype-board-writeup.mjs` (dry-run default). [VERIFIED via Vercel CLI readback and Ready redeployment, 2026-10-18 PT] Production now has `BOARD_WRITEUPS_ENABLED=on`, `RESEARCH_LEADERSHIP_DIGEST_MODE=board-release`, and `NOTIFICATION_EMAIL_FROM=alerts@wmkeck.org` as readable Config variables. This activation did not alter schema; schema readiness is not claimed by the deployment check.
+`BOARD_WRITEUPS_ENABLED=on` and a production deployment targeting registered
+production Dataverse are required for normal runtime Graph writes. The worker
+additionally requires `RESEARCH_LEADERSHIP_DIGEST_MODE=board-release`; the old
+leadership digest only runs in `legacy` (the unset default). `paused` and unknown
+modes stop both. Turning off the Board flag while retaining `board-release`
+never restarts old Allison mail. `BOARD_WRITEUP_SCHEMA_READY=on` is the separate
+archive and historical-reference readiness prerequisite, now verified in
+production after exact metadata readback. The Board-work switches and
+`NOTIFICATION_EMAIL_FROM=alerts@wmkeck.org` were activated on 2026-10-18; the
+schema flag was enabled and redeployed on 2026-10-27.
 
-The current implementation rejects all nonproduction file writes; an explicitly registered synthetic test destination remains a rollout prerequisite. The approved root resolves, but D26 child folder does not yet exist. No real files or emails were created during implementation. A bounded fictional DOCX transport rehearsal passed on 2026-10-17 using two isolated live SharePoint folders (see `docs/audits/research-board-docx-rehearsal-2026-10-17.md`): outgoing readback, Word-for-web edit, archive readback and duplicate-name refusal. This did not exercise the workflow services or Dataverse registry. Deployed credentials, clock-triggered mail and staff rehearsal remain unproved. Existing PD group-review mail is unchanged. Read-only recipient preflight on 2026-10-16 returned only Allison Keller and Beth Pruitt. Recheck and drain old leadership digests before cutover; never clear their shared PD-mail allowlist.
+Normal runtime still rejects test requests and nonproduction file writes.
+The bounded operator rehearsal admits only its explicitly marked test request
+through trusted dependency overrides, fixed approved targets, a local receipt
+and a deny-by-default network fence. It does not create a production cycle
+setting or journal, change normal test exclusions, run the deployed worker or
+send emails. All fictional files and registry receipts are retained. The older
+October 17 transport-only rehearsal remains historical evidence of outgoing
+copy, Word editing, archive readback and duplicate-name refusal; the October 27
+service/registration/native-reader proof supersedes its former limitation to
+transport alone.
 
-Tests: `tests/unit/board-writeup-workflow.test.js`, CSO cases in `tests/unit/pre-site-writeup-visibility.test.js`, and opt-in localhost-only `tests/integration/board-writeup-postgres.test.js`. Production build passed using webpack; Turbopack rejects the worktree's external dependency symlink.
+Remaining acceptance limits: no real D26 CSO release, President batch-email
+acceptance or real D26 post-Board archival has been exercised. The deployed
+hourly worker is observed running, but its actual upload/archive behavior is
+not proved by HTTP 200 logs or the isolated local existing-copy resumption.
+Post-Board confirmation, completion and cleanup email delivery remain
+unproved. Existing PD group-review mail is unchanged. Production archival must
+still follow release completion, discrepancy review and explicit administrator
+or Grants Manager confirmation that editing is finished. Future single-phase
+proposal-selection rules remain undecided.
 
-**OPEN owner setup:** Justin must enter the D26 materials deadline for the President, and staff must confirm all 23 request identities. [VERIFIED via signed-in production UI, 2026-10-18 PT] Board end date is saved as 2026-12-10; materials deadline remains blank, zero of 23 requests are selected, and the cycle is inactive. The earlier missing President assignment is resolved: signed-in Staffing readback on 2026-10-19 showed Allison Keller selected. The older cycle-date/roster observations above were not re-probed during the staffing verification. Keep the date reminder in handoffs until Justin explicitly reports completion. Future single-phase selection rules remain undecided.
+Tests: `tests/unit/board-writeup-workflow.test.js`, CSO cases in
+`tests/unit/pre-site-writeup-visibility.test.js`, opt-in localhost-only
+`tests/integration/board-writeup-postgres.test.js`, and offline operator tests
+in `tests/operator/board-archive-rehearsal.test.mjs`. The operator suite covers
+its exact-target and email/network fences, real adapter planning and local
+worker dispatch; it does not substitute for live D26 acceptance.
 
-Read-only source preflight: request 1002988 resolved its current group-review source, a present Graph version, a 961,267-byte valid DOCX semantic hash, and exactly one resolved Dynamics request-document bucket. This proves reads and source selection, not upload round-trip or archival writes. The original candidate query lacked a pipeline-status filter. PR #499 (merge `a4cf97239`) restricts new candidates to ordinary Research requests in the selected cycle with `akoya_requeststatus=Phase II Pending`, at both query and row-filter boundaries; production deployment `dpl_ADXz1nWhMaH2gHnMhcqVAbCNr2kp` is Ready and signed-in UI verification showed exactly 23 candidates. Existing saved selections remain visible for explicit owner review/removal. [VERIFIED via `scripts/probe-board-cycle-candidates.js`, 2026-10-18 PT] Owner-approved, ETag-fenced corrections marked legacy test requests 1003223 and 1003224 as tests, preserving their null run IDs. Readback found exactly 23 ordinary Phase II Pending D26 candidates. The roster still requires staff confirmation; no cycle selection or activation was changed.
+Historical candidate/source evidence (2026-10-18): request `1002988` resolved
+its current group-review source, a present Graph version, a 961,267-byte valid
+DOCX semantic hash and one Dynamics request-document bucket. PR #499 (merge
+`a4cf97239`) restricted new candidates to ordinary Research requests in the
+selected cycle with `akoya_requeststatus=Phase II Pending`, at query and row
+boundaries; signed-in production verification showed 23 candidates. Existing
+saved selections remain visible for explicit owner review/removal. The
+owner-approved ETag-fenced corrections marked legacy test requests `1003223`
+and `1003224` as tests, preserving null run IDs. Those probes did not save a
+cycle roster or activate it; the current 23-confirmed active D26 configuration
+is established separately by the October 27 production readback above.
 
-## Operator exceptions (required before activation)
+## Operator exceptions
 
 Do not delete receipts or clear intent merely because a file/setting/activity is absent in one read. First pause Research mode, let active workers finish or their leases expire, preserve the relevant journal revision and provider evidence, and investigate the exact operation. Resume only after its outcome is established.
 

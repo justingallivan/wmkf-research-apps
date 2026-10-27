@@ -10,6 +10,18 @@ The chronological archive after the `Legacy chronological session log` divider c
 
 ---
 
+## October 2026 — Board archival provisioned and isolated round trip verified (Session 643)
+
+**Milestone:** Closed archival schema/setup prerequisites and proved edited-file preservation on marked test request 1003220.
+**Sessions:** Session 643; owner-approved isolated production targets and email-blocked rehearsals.
+**Ship state:**
+- Board Writeup 100000014 and actor schema exact; archival readiness flag enabled, existing main source redeployed Ready (`dpl_EWuXB8WrnksMdCx8WS48vUjNYK3Z`).
+- D26 setup read back active with 23 confirmed requests, dates and staff assignments; no D26 writes/releases/archives performed by these tests.
+- Real archive services/registry preserved the Word edit; native AkoyaGO opened the readable request-folder copy. Local worker resumed one existing-copy job with all cloud writes blocked and completion notice captured locally.
+- Rehearsal code remains on `codex/board-archive-rehearsal`; no deployed test infrastructure. Actual queued archival inside Vercel with the production journal and live email delivery remain unproved.
+**Why it matters:** staff can proceed with the ordinary release/edit/explicit archive-confirmation process, with bounded evidence and retained test receipts.
+**Pointers:** `docs/audits/BOARD_ARCHIVE_REHEARSAL_2026-10-27.md`; `docs/atlas/postgres-board-writeup-runs.md`; `804f33b54`, `dbf428772`, `03030b750`.
+
 ## October 2026 — Research request file corpus index built and loaded (Session 642, Claude)
 
 **Milestone:** A derived Postgres index of every SharePoint file on Research requests with meeting years 2018–2026, labelled by document type.
