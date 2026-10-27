@@ -219,8 +219,10 @@ and whether Triaged proposals ever get `Phase I Declined` (decline notes, J-1).
   apps read it rather than holding an offramp state.
 - "Invited to oral presentation" may be derived from AkoyaGO Phase II Status
   (to confirm with Connor and Sarah). Note: `wmkf_phaseiistatus` has no
-  `Invited` option (probe 2026-10-26); candidates are reusing `Recommended` /
-  `Not Recommended`, or adding an option.
+  `Invited` option (probe 2026-10-26). Justin's tentative view: `Phase II
+  Pending Committee Review` (100000002) is likely the right state; to be
+  clarified. Other candidates: reusing `Recommended` / `Not Recommended`, or
+  adding an option.
 - Duncan schedules the oral presentations from that output, so it must
   connect to the parked Duncan scheduling walkthrough.
 - Needed artifact: a flowchart and calendar that name, for each step, who sets
