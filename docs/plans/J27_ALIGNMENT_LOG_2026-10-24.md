@@ -52,9 +52,9 @@ J27/D27 timeline PDF and workbook (OneDrive, New Cycle Development/timelines).
 | A4 | Under D4, is there ever a reason one proposal needs a different reviewer quota or review deadline than the rest of the cycle? If so, who may set that exception? | Sarah, Duncan | Decides whether any per-request override survives, and whether it belongs to the PD or the calendar owner. | D4 |
 | A5 | What are the J27 central values: review deadline, days a reviewer has to respond, and reviewer quota? | Sarah | These replace the values PDs entered per request. | D4 |
 | B1 | **Partly answered 2026-10-26; see B1 detail.** **Priority — confirm first.** The AI input files are already decided (owner, 2026-08-17): `AI Materials/ProposalNarrative_{n}.pdf` and `AI Materials/ProposalBibliography_{n}.pdf`, produced by Power Automate. Confirm the flows produce both for J27's single submission, when, and what else lands in the request folder. The Dec 8 pass, including expertise matching, reads the narrative file. | Connor | Initial Assessment, expertise matching, reviewer materials and proposal lookup all depend on it. | Register Q5 |
-| C1 | Is GOApply opportunity 001024 the J27 Research form? What are its real open window and submission cutoff, and when does it get its J27 cycle link? | Connor | Confirms which records intake comes from. | Foundations audit §3 |
-| C2 | When the board meeting date on a Grant Cycle record changes, do linked requests' dates update, and by what mechanism? | Connor | The apps currently derive the cycle from each request's meeting date. | Foundations audit §2 |
-| C3 | When and how is the next operations cycle row (D27) created, and does operations maintain only the board date or other milestones too? | Connor, Sarah | D27 has no operations row yet; the apps should read dates from one place. | Foundations audit §2 |
+| C1 | **Answered 2026-10-26 (Justin): yes, 001024 is the Research form; no app concern** (no app code keys on the opportunity; grep 2026-10-26). Is GOApply opportunity 001024 the J27 Research form? What are its real open window and submission cutoff, and when does it get its J27 cycle link? | Connor | Confirms which records intake comes from. | Foundations audit §3 |
+| C2 | **Partly answered 2026-10-26 (Justin):** a placeholder meeting date is believed to be set on submission (open: confirm its value); date moves are handled by a Power Automate flow. The apps derive the cycle only from the month and year (`lib/utils/cycle-code.js` `meetingDateToCycleCode`: June → J, December → D, any other month → no cycle), so the placeholder must fall in June 2027. When the board meeting date on a Grant Cycle record changes, do linked requests' dates update, and by what mechanism? | Connor | The apps currently derive the cycle from each request's meeting date. | Foundations audit §2 |
+| C3 | **Open; to the team meeting Wed 2026-10-28** on calendar ownership (Grants Manager or Program Coordinator to own and update it, consistent with D1). When and how is the next operations cycle row (D27) created, and does operations maintain only the board date or other milestones too? | Connor, Sarah | D27 has no operations row yet; the apps should read dates from one place. | Foundations audit §2 |
 | C4 | What request status do J27 proposals carry when they arrive from GOApply (expected `Phase I Pending`)? | Connor | The Workbench list and triage depend on that exact label. | Register Q8, J27-064 |
 | C5 | Applicants no longer choose S&E or MR. How is the program recorded on the request, who assigns it, and when? | Connor, Sarah, Duncan | Apps that filter or assign by program will find it empty at intake. | Timeline Dec 7 |
 | R1 | Is the day-one list below right, and how quickly do staff need to triage in December? | Sarah, Duncan | Sets what must be built in the next six weeks versus early January. | December readiness below |
@@ -124,9 +124,27 @@ to the D26 names, and fail closed if both are present. Built on branch
 (2026-10-26, follow-up) that all files are PDFs except the graphical abstract,
 which is an image.
 
+**Question 3 answered (Justin, 2026-10-26):** the flow sets
+`wmkf_phistaffversioncompleteflag` on the request when the files are ready.
+The field exists on `akoya_request` (Atlas `dataverse-akoya-request.md`), but
+no app code reads it yet; its type and exact semantics (set after the
+`AI Materials` copies, cleared on resubmission?) are unconfirmed. This makes a
+per-proposal trigger possible for the Dec 8 pass (R2).
+
+**Question 4 answered (Justin, 2026-10-26):** file names never change after
+submission. Content changes are rare and surgical; there is no procedure for
+clearing and resetting `wmkf_phistaffversioncompleteflag`, so the flag cannot
+signal a replacement. Proposed (not yet decided): generate once when the flag
+is set, and handle a replaced file with a staff-initiated regenerate rather
+than an automatic rerun.
+
+**Question 6 (2026-10-26):** Justin will ask Connor to generate
+`Reviewer Materials/Proposal_{n}.pdf` for J27 and expects he will. Contents,
+order, whether it differs from the staff version, and anything off limits to
+reviewers or the AI (register Q21) remain open.
+
 This answers questions 1 and 2: both files are produced, and the bibliography
-is its own upload. Still open: 3 (timing and ready signal), 4 (changes after
-submission), 5 in part (the Workbench Proposal tab has no J27 entry yet), 6
+is its own upload. Still open: 5 in part (the Workbench Proposal tab has no J27 entry yet), 6
 (the reviewer copy and anything off limits). Also open: the contents and
 order of the combined staff/distribution copy, and what the second group of
 files is for.
