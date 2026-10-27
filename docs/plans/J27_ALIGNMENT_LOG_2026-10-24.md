@@ -227,7 +227,8 @@ and whether Triaged proposals ever get `Phase I Declined` (decline notes, J-1).
   connect to the parked Duncan scheduling walkthrough.
 - Needed artifact: a flowchart and calendar that name, for each step, who sets
   which AkoyaGO field and value, possibly appended to the J27/D27 timeline
-  workbook.
+  workbook. Drafted 2026-10-27: see "Decision calendar" and "Who sets which
+  AkoyaGO field" below.
 
 **Apr–Jun (Justin 2026-10-26):** questions to PIs happen outside the apps.
 Oral presentations and staff evaluations are this cycle's site visits and
@@ -315,3 +316,84 @@ A5 (the J27 central values) is needed from Sarah before it can ship.
 | T3 | Switch automatic review-document filing from D26 to J27 (one Production setting, `REVIEW_DOCX_SHAREPOINT_CYCLE`, plus redeploy) after confirming D26 filing is complete and before the first J27 review comes back in 2027. | To assign at meeting | Open; date to agree (see D3) |
 | T4 | Record the December readiness list in this log. | Claude | Done 2026-10-24 |
 | T5 | Correct weekday-label errors in the J27/D27 timeline workbook (mostly the D27 page, including the D27 Board meeting days). Not blocking for J27: the J27 dates are correct apart from two labels. | Timeline owner | Emailed with a suggested fix prompt 2026-10-24; awaiting reply |
+
+## Decision calendar (drafted 2026-10-27; dates proposed)
+
+Every open decision in this log as of 2026-10-27, ordered by when it must be
+decided. Owners are the people this log or Justin has already named; "Not
+assigned" means nobody has been named yet. Code checks still owed are not
+decisions and are not listed: R-4 (PD advance to `Phase II Pending`), J-1 and
+J-2, the existing writeup tools, and Meeting Tracker / Staff Deliberations for
+oral presentations.
+
+**How decide-by dates are set.** A decision is due when the app behavior it
+shapes must be live, minus the time to build that behavior. Where nothing is
+built, the date is the timeline step itself. Build lead times are not
+estimated here, so build-dependent rows say "before the … build starts"
+rather than giving a day. Every date is a proposal for Justin to adjust.
+
+| Decide by | Item | Decision needed | Who decides | Blocked until decided |
+|---|---|---|---|---|
+| Wed Oct 28 meeting | A1 | Does "fallback" let Duncan edit at any time, or only when the Grants Manager role is empty? | Sarah, Duncan, Justin | Calendar edit rights in central reviewer settings (D4, November) |
+| Wed Oct 28 meeting | A3 | Can the calendar owner publish any date change, or do some need a second person? | Sarah, Justin | Whether the November build includes a confirmation step |
+| Wed Oct 28 meeting | A5 | J27 central values: review deadline, days to respond, reviewer quota | Sarah | Central reviewer settings cannot ship (D4, November) |
+| Wed Oct 28 meeting | C3 | How the D27 operations cycle row is created; whether operations keep only the Board date or other milestones too | Connor, Sarah | Which single place the apps read cycle dates from |
+| Wed Oct 28 meeting | T3 | Who switches review filing from D26 to J27, and when (must be before Mar 17) | Meeting | Assignment only |
+| Before the November central-settings build starts | A2 | Who is notified about a missing or conflicting cycle date | Sarah, Connor | Readiness notices |
+| Before the November central-settings build starts | A4 | Does any per-proposal quota or deadline exception survive D4, and who may set it? | Sarah, Duncan | Whether a per-request override is built |
+| Before the Dec 8 AI-pass build starts | R1 | Is the day-one list right, and how fast must December triage be? | Sarah, Duncan | What is built by Dec 7 versus early January |
+| Before the Dec 8 AI-pass build starts | R2 | Who starts and watches the AI pass; which steps Power Automate triggers and which scheduled jobs run | Justin, Connor | The per-proposal trigger for R-3 |
+| Before the Dec 8 AI-pass build starts | B1 Q3 | Type and exact meaning of `wmkf_phistaffversioncompleteflag` (set after the `AI Materials` copies?) | Connor | Using the flag as the AI-pass trigger |
+| Before the Dec 8 AI-pass build starts | B1 Q4 | Confirm "generate once; staff regenerate by hand" for replaced files | Justin | AI-pass rerun behavior |
+| Before the Dec 8 AI-pass build starts | X1 | Who maintains the expertise roster; is the suggested PD written to the request or only shown; can the CSO's Claude project prompt be shared? | CSO, Sarah, Duncan | Inline expertise matcher (D6) |
+| Before the Dec 8 AI-pass build starts | F1 | What triage flags are and who may see them | Sarah, Duncan, CSO | Flag step of the AI pass; Jan 6 decline notes |
+| Before the Dec 8 AI-pass build starts | C5 (part) | Whether the AI guesses MR or S&E at intake, and whether the guess is stored as a suggestion that a person confirms | CSO with Connor and Sarah | Shape of the AI-pass output |
+| Before the Dec 7 list build starts | C4 | Request status J27 proposals carry on arrival (expected `Phase I Pending`) | Connor | R-1: the Workbench list filter |
+| Before the Dec 7 list build starts | C2 | The placeholder `wmkf_meetingdate` value (must fall in June 2027); whether requests follow a moved Grant Cycle date, and how | Connor | The apps' cycle code for every J27 request |
+| Before the Dec 7 list build starts | State model | Staff states (Submitted, Triaged, Under consideration, Recommend to Program Chairs) and whether they live on the request in Dataverse | Justin with Connor and Sarah | List states; the reviewer-materials trigger (a flow can only see Dataverse) |
+| Before triage starts Dec 9 | X2 | Is J27 triage a display aid only, or does it write the staff recommendation to Phase I Status? | Justin, Sarah, Duncan | Whether the apps get a new Phase I Status write path |
+| Before triage starts Dec 9 | F2 | Suggested PD, matches and flags as sortable list columns, or on each request's page only? | Sarah, Duncan | R-1/R-2 list shape |
+| Before triage starts Dec 9 | F3 | Where proposals without a confirmed PD appear | Sarah, Duncan | The "nothing gets lost" rule |
+| Before staff release Dec 9 | B1 Q5 | Which `AI Materials` files the Workbench Proposal tab shows for J27 | Not assigned | The Proposal tab's J27 entry |
+| Before staff release Dec 9 | B1 staff copy | Contents and order of the combined staff/distribution copy; what the second file group (`PhaseI-Cover-Page_`, `Abstract_`, `Graphical-Abstract-Page_`) is for | Not assigned (Connor asked us) | Connor's staff-version flow |
+| Before the writeup build starts | Writeup export | Scope of the 1-page writeup and Diligent Book export (writeups due Feb 10, Book Feb 12) | Justin | The build Justin called critical |
+| Wed Jan 6 | Declines | Do Triaged proposals get `Phase I Declined`, when, and who sets it? | Connor, Sarah | J-1 decline notes |
+| Thu Jan 14 | B1 Q6 | Reviewer copy contents and order; anything off limits to reviewers or the AI (register Q21) | Connor | Reviewer materials |
+| Thu Jan 14 | Materials trigger | What tells Connor's flow to build `Reviewer Materials/Proposal_{n}.pdf` at the ~50 stage | Connor, Justin | Reviewer materials for the First Cut |
+| Thu Jan 14 | Sharing | How Program Chairs and Board members get proposals (magic links or SharePoint sharing) | Connor | First Cut and Diligent sharing |
+| Wed Feb 3 | Pre-Chairs value | Is any Phase I value (e.g. `Recommended Invite`) set before the Chairs meeting? This would recreate X2's double record | Connor, Sarah | Phase I Status consumers |
+| Wed Feb 24 | Post-Chairs mapping | Confirm the Chairs-outcome values and who sets them (proposed: Grants Manager) | Connor, Sarah | Invitation send guard; Reviewer Finder opening; ranking and briefing carryover; grantee-title cron (register Q9) |
+| Wed Feb 24 | C5 | Who sets `akoya_programid` (MR or S&E) on each recommended proposal, and when; whether staff want running MR/S&E counts per stage | CSO with Connor and Sarah | Ranking, Meeting Tracker briefing, applicant contacts, grantee deliverables, grantee-title cron |
+| Before the reviewer-invitation build starts | Bibliographies | Is Reviewer Finder reading bibliographies for reviewer leads (register J27-065) in scope for Feb 24? | Justin | That Reviewer Finder change |
+| Thu Mar 25 | Offramp | Which AkoyaGO field and value record the PD offramp outcome | Connor, Sarah | Apps reading the offramp |
+| Before oral presentations Apr 19 | Oral invites | AkoyaGO value for "invited to oral presentation" (tentative: Phase II `Pending Committee Review`) | Connor, Sarah | Duncan's scheduling |
+| Before oral presentations Apr 19 | Scheduling | How Duncan schedules oral presentations from that output | Duncan | Scheduling walkthrough (parked) |
+| No deadline | T5 | Weekday-label fixes in the timeline workbook | Timeline owner | Nothing (J27 dates are correct) |
+
+## Who sets which AkoyaGO field (drafted 2026-10-27)
+
+Status: **Decided** means an owner answer is recorded in this log or the
+Atlas. **Proposed** means it is directionally agreed but not confirmed.
+**Open** means no answer yet. D26 practice is not treated as a J27 decision.
+Owner semantics (Atlas, 2026-10-26): the phase picklists hold staff
+recommendations; `akoya_requeststatus` changes only at the Board's final
+decision.
+
+| Step | Who | Field or place | Value | Status |
+|---|---|---|---|---|
+| Dec 7 submission | GOApply | `Submission-Documents` folder | Applicant's documents | Decided (Connor) |
+| Dec 7 submission | Power Automate | `AI Materials` folder | J27 file set; apps read `Project-Narrative_{n}.pdf`, `Bibliography_{n}.pdf` | Decided (Connor); app change on this branch, unreleased |
+| Files ready | Power Automate | `wmkf_phistaffversioncompleteflag` | Set when the files are ready | Decided that the flow sets it; type and meaning open (B1 Q3) |
+| Dec 7 submission | GOApply or flow | `akoya_requeststatus` | Expected `Phase I Pending` | Open (C4) |
+| Dec 7 submission | GOApply or flow | `wmkf_meetingdate` | Placeholder in June 2027 | Open (C2) |
+| Intake to Feb 24 | Not decided | `akoya_programid` | Medical Research or Science and Engineering | Open (C5) |
+| Dec 9 – Feb 3 | PDs, in the apps | Staff state (location not decided) | Submitted, Triaged, Under consideration, Recommend to Program Chairs | Proposed (state model) |
+| Dec 9 – Feb 3 | Not decided | `wmkf_triagestatus` / `wmkf_phaseistatus` | Whether triage writes either | Open (X2; pre-Chairs value) |
+| By Jan 6 | Not decided | `akoya_requeststatus` | `Phase I Declined` for Triaged? | Open |
+| ~Jan 14 | Power Automate | `Reviewer Materials/Proposal_{n}.pdf` | Built for the ~50 | Proposed (Justin to ask Connor); trigger open |
+| Feb 24, approved | Grants Manager | `wmkf_phaseistatus` + `akoya_requeststatus` | `Invited` (100000003) + `Phase II Pending` | Proposed |
+| Feb 24, not approved | Grants Manager | `wmkf_phaseistatus` + `akoya_requeststatus` | `Not Invited` (100000002) + `Phase I Declined`? | Proposed; request status open |
+| Mar 25 offramp | Grants Manager | Not decided | Not decided | Open |
+| Oral-presentation invite | Not decided | `wmkf_phaseiistatus` | Tentative: `Phase II Pending Committee Review` (100000002); there is no `Invited` option | Open |
+| May 12–13 ranking | Apps read | `akoya_requeststatus` + `akoya_programid` | `Phase II Pending` + an MR or S&E program | Carries over only if the Feb 24 mapping and C5 hold |
+| Jun 9–10 Board | Not recorded here | `akoya_requeststatus` | Board decision | Decided semantics; who sets it not recorded |
