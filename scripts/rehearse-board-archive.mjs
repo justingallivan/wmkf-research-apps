@@ -118,7 +118,7 @@ export function installFetchFence({ tenant, requestId, sourceId, sourceKey, arch
 
 function args(argv) {
   const [phase, ...rest] = argv, out = { phase };
-  check(['plan', 'seed', 'archive', 'verify'].includes(phase), 'Choose plan, seed, archive or verify. No default execution.');
+  check(['plan', 'seed', 'archive', 'verify', 'diagnose-upload'].includes(phase), 'Choose plan, seed, archive, verify or diagnose-upload. No default execution.');
   for (let i = 0; i < rest.length; i += 2) {
     check(['--request-id', '--request-number', '--actor-id', '--actor-name', '--env-file', '--out', '--plan', '--approve'].includes(rest[i]) && rest[i + 1] && !rest[i + 1].startsWith('--'), 'Invalid argument');
     check(!out[rest[i]], 'Duplicate argument'); out[rest[i]] = rest[i + 1];
@@ -189,7 +189,12 @@ async function graphCall(r, url, method = 'GET', body) {
   if (method !== 'GET') r.fence.permit(url, body);
   const response = await fetch(url, { method, headers: { ...r.G.buildHeaders(await r.G.getAccessToken()), 'Content-Type': 'application/json' }, ...(body ? { body: JSON.stringify(body) } : {}), signal: AbortSignal.timeout(30000) });
   if (response.status === 404 && method === 'GET') return null;
-  check(response.ok, `Graph operation refused (${response.status})`);
+  if (!response.ok) {
+    const provider = await response.json().catch(() => null);
+    const code = /^[a-z0-9_.-]{1,100}$/i.test(provider?.error?.code || '') ? provider.error.code : 'unknown';
+    const detail = String(provider?.error?.message || 'No provider detail').replace(/https?:\/\/\S+/gi, '[URL redacted]').replace(/[\x00-\x1f]/g, ' ').slice(0, 500);
+    throw Object.assign(new Error(`Graph operation refused (${response.status}; ${code}): ${detail}`), { status: response.status, code });
+  }
   return response.json();
 }
 async function childFolder(r, drive, parentId, name, createOnly = false) {
@@ -272,14 +277,33 @@ async function run(argv) {
     const receipt = fs.existsSync(receiptFile) ? JSON.parse(fs.readFileSync(receiptFile, 'utf8')) : { digest: planDigest(p) };
     check(receipt.digest === planDigest(p), 'Plan changed since receipt');
     check(!receipt[`${a.phase}Started`], 'Phase already attempted. Inspect retained receipt; never blindly retry.');
-    r = await runtime(p.envFile, p, ['seed', 'archive'].includes(a.phase));
+    r = await runtime(p.envFile, p, ['seed', 'archive', 'diagnose-upload'].includes(a.phase));
     const t = await resolveTargets(r, p.requestId, p.actorId);
     check(String(t.request.akoya_requestnum) === p.requestNumber && t.bucket.folder === p.requestFolder && t.siteId === p.siteId && t.driveId === p.driveId && t.rootId === p.requestFolderId && JSON.stringify(t.board) === JSON.stringify(p.board), 'Approved targets changed');
     const { TYPE, OP, LIFE } = { TYPE: r.model.REQUEST_DOCUMENT_ARTIFACT_TYPE, OP: r.model.REQUEST_DOCUMENT_OPERATION_STATUS, LIFE: r.model.REQUEST_DOCUMENT_LIFECYCLE_STATE };
     const { hashGovernedDocxContent } = await import('../lib/services/documents/governed-docx-hash.js');
-    if (a.phase === 'seed' || a.phase === 'archive') {
+    if (['seed', 'archive', 'diagnose-upload'].includes(a.phase)) {
       const { assertDataverseOperationAllowed } = await import('../lib/dataverse/core/interlock.js');
       assertDataverseOperationAllowed({ url: `${DV}/api/data/v9.2/wmkf_requestdocuments`, method: 'POST', callerLabel: 'isolated-board-archive-rehearsal' });
+    }
+    if (a.phase === 'diagnose-upload') {
+      check(receipt.seedStarted && receipt.sourceFolderId && receipt.originalHash && !receipt.sourceItemId && !receipt.seedComplete && !receipt.archiveStarted,
+        'Diagnostic requires the retained pre-upload failed seed; no existing file can be retried');
+      const isolated = await graphCall(r, `${GRAPH}/drives/${encodeURIComponent(p.board.driveId)}/items/${encodeURIComponent(p.board.folderId)}:/${encodeURIComponent(`WMKF-Archive-Rehearsal-${p.runId}`)}`);
+      check(isolated?.id === receipt.sourceFolderId && isolated.folder && isolated.parentReference?.id === p.board.folderId, 'Diagnostic source folder differs');
+      const listing = scopedChildren(await graphCall(r, `${GRAPH}/drives/${encodeURIComponent(p.board.driveId)}/items/${encodeURIComponent(isolated.id)}/children?$top=50`), isolated.id);
+      check(listing.items.length === 0, 'Diagnostic source folder is not empty; stop and inspect');
+      receipt['diagnose-uploadStarted'] = new Date().toISOString(); save(receiptFile, receipt);
+      r.fence.enableWrites();
+      try {
+        await uploadSession(r, p.board.driveId, isolated.id, p.filename);
+        receipt.uploadDiagnostic = { status: 'session-accepted', fileBytesSent: 0 };
+        console.log('Upload session accepted. No file bytes sent; no registry rows created. Keep the failed-seed receipt.');
+      } catch (error) {
+        receipt.uploadDiagnostic = { status: error.status || null, code: error.code || null, message: error.message, fileBytesSent: 0 };
+        throw error;
+      } finally { save(receiptFile, receipt); }
+      return;
     }
     if (a.phase === 'seed') {
       check(!receipt.seedStarted, 'Seed already attempted');

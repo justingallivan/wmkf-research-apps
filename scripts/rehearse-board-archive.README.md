@@ -79,6 +79,16 @@ Every write phase is one-shot. Failure retains receipts and artifacts for manual
 inspection, with no blind retry, overwrite, delete or automatic cleanup. A
 read-only `verify --plan ABSOLUTE_PLAN_FILE` can repeat after a completed archive.
 
+## A failed upload-session request
+
+For the specific retained seed that created a folder but failed before sending
+any bytes, `diagnose-upload --plan ABSOLUTE_PLAN_FILE --approve EXACT_DIGEST`
+performs one scoped session-creation request and records the provider's error.
+It requires the same owner write acknowledgement and actor readiness. It verifies
+the exact retained folder, refuses any existing child, sends **zero file bytes**,
+creates no registry rows and cannot rerun or unlock seed. Session URLs remain
+unlogged and unpersisted. Do not delete or reset the failed-seed receipt.
+
 ## What a PASS means
 
 The archived file preserves a real saved Word edit, differs from the original,

@@ -203,7 +203,7 @@ test('database fence permits only the two existing admin SELECTs on the exact co
   } finally { fence.restore(); }
 });
 
-test('complete read-only plan runs through real adapters and SDK with simulated Dataverse, database and Graph', async () => {
+test('complete planning and zero-byte upload diagnosis use real adapters with simulated providers', async () => {
   const fs = await import('node:fs'), os = await import('node:os'), path = await import('node:path');
   const { main } = await import('../../scripts/rehearse-board-archive.mjs');
   const { RESEARCH_BOARD_MATERIALS_TARGET: board } = await import('../../lib/services/sharepoint-target-registry.js');
@@ -225,7 +225,11 @@ test('complete read-only plan runs through real adapters and SDK with simulated 
       if (body.query.includes('azure_email')) return response({ fields: [{ name: 'id', dataTypeID: 23 }, { name: 'azure_email', dataTypeID: 25 }, { name: 'is_active', dataTypeID: 16 }], rows: [['99', 'fixture@wmkeck.org', 't']], command: 'SELECT', rowCount: 1 });
       return response({ fields: [{ name: 'id', dataTypeID: 23 }, { name: 'is_active', dataTypeID: 16 }, { name: 'superuser', dataTypeID: 16 }], rows: [['99', 't', 't']], command: 'SELECT', rowCount: 1 });
     }
-    assert.equal(method, 'GET', 'no live-write operation may reach the simulated transport');
+    if (url.origin === 'https://graph.microsoft.com' && url.pathname.endsWith('/createUploadSession')) {
+      assert.equal(method, 'POST');
+      return new Response(JSON.stringify({ error: { code: 'invalidRequest', message: 'Offline provider detail https://example.com/signed-secret' } }), { status: 400, headers: { 'content-type': 'application/json' } });
+    }
+    assert.equal(method, 'GET', 'no unplanned live-write operation may reach the simulated transport');
     if (url.origin === 'https://wmkf.crm.dynamics.com') {
       if (url.pathname.endsWith('/akoya_requests')) return response({ value: [request] });
       if (url.pathname.includes('/akoya_requests(')) return response(request);
@@ -240,6 +244,8 @@ test('complete read-only plan runs through real adapters and SDK with simulated 
       if (url.pathname.includes('/sites/appriver3651007194.sharepoint.com:')) return response({ id: 'fixture-site' });
       if (url.pathname.endsWith('/sites/fixture-site/drives')) return response({ value: [{ id: 'fixture-drive', name: 'Request', webUrl: 'https://appriver3651007194.sharepoint.com/sites/akoyaGO/akoya_request' }] });
       if (decodeURIComponent(url.pathname).endsWith(`/root:/${folder}`)) return response({ id: 'fixture-folder', folder: {} });
+      if (decodeURIComponent(url.pathname).includes(`/items/${board.folderId}:/WMKF-Archive-Rehearsal-`)) return response({ id: 'fixture-source-folder', folder: {}, parentReference: { id: board.folderId } });
+      if (url.pathname.endsWith('/items/fixture-source-folder/children')) return response({ value: [] });
       if (url.pathname.endsWith(`/items/${board.folderId}`)) return response({ id: board.folderId, webUrl: board.webUrl, folder: {}, parentReference: { driveId: board.driveId } });
     }
     throw new Error(`Unexpected offline request: ${url.origin}${url.pathname}`);
@@ -261,6 +267,21 @@ test('complete read-only plan runs through real adapters and SDK with simulated 
     assert.equal(fs.existsSync(`${output}.receipt.json`), false);
     assert.ok(observed.some(([, pathname]) => pathname === '/sql'));
     assert.ok(observed.every(([origin, pathname, method]) => method === 'GET' || pathname === '/sql' || origin === 'https://login.microsoftonline.com'));
+    const receiptFile = `${output}.receipt.json`;
+    fs.writeFileSync(receiptFile, JSON.stringify({ digest: planDigest(result), seedStarted: '2026-10-27T18:55:18.842Z', sourceFolderId: 'fixture-source-folder', originalHash: 'fixture-hash' }));
+    process.env.REQUEST_DOCUMENT_EXPLICIT_ACTOR_SCHEMA_READY = 'on';
+    process.env.DATAVERSE_PROD_WRITE_ACK = `board-archive-rehearsal ${new Date().toISOString().slice(0, 10)}`;
+    await assert.rejects(main(['diagnose-upload', '--plan', output, '--approve', planDigest(result)]), /400; invalidRequest.*Offline provider detail \[URL redacted\]/);
+    const receipt = JSON.parse(fs.readFileSync(receiptFile, 'utf8'));
+    assert.equal(receipt.uploadDiagnostic.status, 400);
+    assert.equal(receipt.uploadDiagnostic.fileBytesSent, 0);
+    assert.equal(receipt.seedStarted, '2026-10-27T18:55:18.842Z');
+    assert.equal(receipt.seedComplete, undefined);
+    assert.ok(!receipt.uploadDiagnostic.message.includes('signed-secret'));
+    assert.ok(observed.every(([origin, pathname, method]) => method === 'GET' || pathname === '/sql' || origin === 'https://login.microsoftonline.com' || pathname.endsWith('/createUploadSession')));
+    const callCount = observed.length;
+    await assert.rejects(main(['diagnose-upload', '--plan', output, '--approve', planDigest(result)]), /already attempted/);
+    assert.equal(observed.length, callCount);
   } finally {
     globalThis.fetch = previousFetch; console.log = previousLog;
     for (const key of Object.keys(process.env)) if (!(key in previousEnv)) delete process.env[key];
