@@ -10,10 +10,11 @@
  * Triage values are from the Atlas: Advancing 100000000, Set aside 100000001.
  *
  * Usage (owner-run; production Dataverse read):
- *   node scripts/probe-d26-phase-statuses.js
+ *   node scripts/probe-d26-phase-statuses.js [--phase2="Not Recommended"]
+ *   --phase2 keeps only rows whose Phase II status label matches exactly.
  *
  * Only the OAuth token call is a POST; every Dataverse call is a GET.
- * Prints request number, program and status labels only.
+ * Prints request number, institution, program and status labels only.
  */
 
 const fs = require('fs');
@@ -41,7 +42,11 @@ const FILTER = [
 const SELECT = [
   'akoya_requestnum', 'akoya_requeststatus', 'wmkf_triagestatus',
   'wmkf_phaseistatus', 'wmkf_phaseiistatus', '_akoya_programid_value',
+  '_akoya_applicantid_value',
 ].join(',');
+
+const phase2Arg = process.argv.find((a) => a.startsWith('--phase2='));
+const phase2Only = phase2Arg ? phase2Arg.slice('--phase2='.length) : null;
 
 async function getToken() {
   const res = await fetch(`https://login.microsoftonline.com/${process.env.DYNAMICS_TENANT_ID}/oauth2/v2.0/token`, {
@@ -81,13 +86,19 @@ function tally(rows, field) {
     },
   });
   if (!r.ok) throw new Error(`Dataverse ${r.status}`);
-  const rows = (await r.json()).value || [];
+  const allRows = (await r.json()).value || [];
+  const rows = phase2Only
+    ? allRows.filter((row) => label(row, 'wmkf_phaseiistatus').trim() === phase2Only)
+    : allRows;
 
-  console.log(`D26 proposals under consideration: ${rows.length}\n`);
-  console.log('request   program                          request status     triage      Phase I status              Phase II status');
+  console.log(`D26 proposals under consideration: ${allRows.length}`);
+  if (phase2Only) console.log(`Phase II status "${phase2Only}": ${rows.length}`);
+  console.log();
+  console.log('request   institution                              program                          request status     triage      Phase I status              Phase II status');
   for (const row of rows) {
     console.log([
       String(row.akoya_requestnum).padEnd(9),
+      label(row, '_akoya_applicantid_value').slice(0, 40).padEnd(40),
       label(row, '_akoya_programid_value').slice(0, 32).padEnd(32),
       label(row, 'akoya_requeststatus').padEnd(18),
       label(row, 'wmkf_triagestatus').padEnd(11),
