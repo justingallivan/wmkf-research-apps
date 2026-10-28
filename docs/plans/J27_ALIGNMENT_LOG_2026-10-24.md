@@ -191,7 +191,10 @@ Default list (carried from 2026-09-06): every state except Triaged and the
 terminal state, with visible counts for those. Open: how Invited for Peer
 Review and the terminal state relate to the AkoyaGO values the Grants Manager
 records after the Chairs meeting (below): separate app states, or the same
-fact read from AkoyaGO.
+fact read from AkoyaGO. **To consult Connor and Sarah (Justin, 2026-10-27):**
+reconcile these states with existing AkoyaGO fields and workflows. The app may
+show its own labels while AkoyaGO logs a different value with the same
+meaning; the aim is one recorded fact per decision, not two.
 
 The ~50 left after Jan 13–14 PD triage go to the Program Chairs and
 interested Board members (First Cut spreadsheet, Jan 14). The lead PD writes a
@@ -374,7 +377,7 @@ rather than giving a day. Every date is a proposal for Justin to adjust.
 | Before the Nov 15 delivery (decide in early November) | Default cycle | Planning item (2026-10-27): one calendar-driven rule for which cycle each app opens on, replacing env cycle pins, `'D26'` literals and today-based month flips; task rules only where an app needs one (e.g. Board writeups, Awardees). Includes the three Board-date stores (operations record, request meeting dates, Board writeups `boardEnds`). Evidence: `docs/audits/cycle-settings-audit-2026-10-27.md` | Justin | Every app's landing cycle Dec 7 – Feb 24; R-1 list |
 | Before the Nov 15 delivery (decide in early November) | C4 | Request status J27 proposals carry on arrival (expected `Phase I Pending`) | Connor | R-1: the Workbench list filter |
 | Before the Nov 15 delivery (decide in early November) | C2 | The placeholder `wmkf_meetingdate` value (must fall in June 2027); whether requests follow a moved Grant Cycle date, and how | Connor | The apps' cycle code for every J27 request |
-| Before the Nov 15 delivery (decide in early November) | State model | Staff states (Submitted, Triaged, Under consideration, Recommend to Program Chairs) and whether they live on the request in Dataverse | Justin with Connor and Sarah | List states; the reviewer-materials trigger (a flow can only see Dataverse) |
+| Wed Oct 28 meeting (Connor, Sarah) | State model | Staff states (Submitted, Triaged, Under consideration, Recommend to Program Chairs) and whether they live on the request in Dataverse | Justin with Connor and Sarah | List states; the reviewer-materials trigger (a flow can only see Dataverse) |
 | Before the Nov 15 delivery (decide in early November) | X2 | Is J27 triage a display aid only, or does it write the staff recommendation to Phase I Status? | Justin, Sarah, Duncan | Whether the apps get a new Phase I Status write path |
 | Before the Nov 15 delivery (decide in early November) | F2 | Suggested PD, matches and flags as sortable list columns, or on each request's page only? | Sarah, Duncan | R-1/R-2 list shape |
 | Before the Nov 15 delivery (decide in early November) | B1 Q5 | Which `AI Materials` files the Workbench Proposal tab shows for J27 | Not assigned | The Proposal tab's J27 entry |
