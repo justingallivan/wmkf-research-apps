@@ -72,6 +72,7 @@ J27/D27 timeline PDF and workbook (OneDrive, New Cycle Development/timelines).
 | D36 | 2026-10-28 | **Offramp: shown in the app, formal status set in Dataverse.** The app logs the offramp outcome for display; staff set the formal status on the back end. Which AkoyaGO field holds it is not recorded. | Meeting 2026-10-28 | Offramp |
 | D37 | 2026-10-28 | **Connor's flows run the intake AI steps on submit** (answers R2 in part). On submission, Power Automate creates the WMKF short title (**2026-10-28, Justin:** written to `wmkf_wmkfprojectdescription` using the existing `grantee-title.generate` prompt or an edited version; see T13), keywords, lay abstract, initial PD assignment (D16), clerical check, fitness flag and expertise. Expertise mechanics need more discussion (T8). Open: which Dec 8 outputs, if any, remain app jobs (for example the Initial Assessment), and how the fitness flag relates to Flagged for concerns (D38). | Meeting 2026-10-28 | R2; R-3; D14 |
 | D38 | 2026-10-28 | **"Flagged for triage" is renamed "Flagged for concerns."** A prompt will be written to set it. What triggers the flag is still open (F1). | Meeting 2026-10-28 | D17; F1 |
+| D39 | 2026-10-28 | **Every J27 proposal's Phase I Status ends somewhere other than Pending** (Connor, meeting; confirms the post-Chairs mapping values). Phase I is going away in practice, but for history each proposal reaches a terminal Phase I value. Approved by the Chairs: the Grants Manager sets `wmkf_phaseistatus` `Invited` (100000003) together with `akoya_requeststatus` `Phase II Pending`, both in Dataverse; the app writes neither (D31, D35). Not approved by the Chairs: `Not Invited` (100000002), also set in Dataverse. Triaged: keeps `Recommended Do Not Invite` (D31) as its final value. Option values [VERIFIED via `docs/atlas/dataverse-akoya-request.md:193-196`]. Open: proposals left in Under consideration that are never recommended to the Chairs have no terminal value yet. | Meeting 2026-10-28 (Connor); Justin | D31; D35; post-Chairs mapping |
 | D6 | 2026-10-24 | **Expertise matching is rebuilt to run inline.** Each proposal is matched automatically as part of the intake AI pass, instead of a person running the Expertise app on demand. The current app is an early version based on the CSO's draft Claude project and needs improvement. | Justin | R-3 |
 
 ## To confirm at the meeting
@@ -256,7 +257,8 @@ grantee-title cron on Phase I `Invited`
 (`lib/services/cron/generate-grantee-titles-service.js:34,72`), which would
 also answer register Q9. **2026-10-28:** the Grants Manager records the outcome (D35); no
 `Recommended Invite` is set before the Chairs meeting (D31); declines are set on
-the Dataverse back end (D32). The mapping values above remain as proposed.
+the Dataverse back end (D32). The Phase I values above are decided (D39); the
+not-approved request status follows D32.
 
 **Reviewers and reviewer materials (Justin 2026-10-26):**
 
@@ -476,8 +478,8 @@ values (`Approved`, `Phase II Declined`).
 | Dec 9 – Feb 3 | Apps, when staff mark Triaged | `wmkf_phaseistatus` | `Recommended Do Not Invite` (707510006); no other pre-Chairs value | Decided 2026-10-28 (D31); not built |
 | By Jan 6 | Staff, on the Dataverse back end | `akoya_requeststatus` | Decline status | Decided 2026-10-28 (D32); value and timing not recorded |
 | ~Jan 14 | Power Automate | `Reviewer Materials` folder | The staff version, renamed (D33) | Contents decided 2026-10-28; file name and trigger open |
-| Feb 24, approved | Grants Manager | `wmkf_phaseistatus` + `akoya_requeststatus` | `Invited` (100000003) + `Phase II Pending` | Owner decided 2026-10-28 (D35); values proposed |
-| Feb 24, not approved | Grants Manager | `wmkf_phaseistatus` + `akoya_requeststatus` | `Not Invited` (100000002) + decline status (D32) | Owner decided 2026-10-28 (D35); values proposed |
+| Feb 24, approved | Grants Manager | `wmkf_phaseistatus` + `akoya_requeststatus` | `Invited` (100000003) + `Phase II Pending` | Decided 2026-10-28 (D35, D39) |
+| Feb 24, not approved | Grants Manager | `wmkf_phaseistatus` + `akoya_requeststatus` | `Not Invited` (100000002) + decline status (D32) | Phase I value decided 2026-10-28 (D39); request status value not recorded (D32) |
 | Mar 25 offramp | Staff (formal); apps (display log) | Not recorded | Not recorded | Decided 2026-10-28 (D36); field open |
 | Oral-presentation invite | Not decided | `wmkf_phaseiistatus` | Tentative: `Phase II Pending Committee Review` (100000002); there is no `Invited` option | Open |
 | May 12–13 ranking | Apps read | `akoya_requeststatus` + `akoya_programid` | `Phase II Pending` + an MR or S&E program | Carries over only if the Feb 24 mapping and C5 hold |
