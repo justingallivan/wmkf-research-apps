@@ -16,6 +16,11 @@ export async function loadProposalRanking({ cycleCode, roundId, signal }) {
   return data;
 }
 
+export async function loadSavedRankingCycles({ signal } = {}) {
+  const result = await sendProposalRankingAction({ action: 'cycles' }, { signal });
+  return result.cycles;
+}
+
 const PRIVATE_ACTIONS = new Set([
   'saveAssessment', 'buildCombined', 'confirmCombined', 'ready', 'reopenOwn', 'resetProgram',
 ]);

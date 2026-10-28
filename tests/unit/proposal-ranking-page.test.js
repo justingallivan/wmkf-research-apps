@@ -1,5 +1,6 @@
 import React from 'react';
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { loadSavedRankingCycles } from '../../shared/components/proposal-ranking/client';
 import ProposalRankingApp from '../../shared/components/proposal-ranking/ProposalRankingApp';
 import { amountLabel, buildCumulativeTotals, formatMoney, formatScore, moveProposal, reviewerScoreIndicator } from '../../shared/components/proposal-ranking/model';
 import { conventionalCycles, resolveWorkingCycle } from '../../lib/utils/cycle-code';
@@ -9,6 +10,7 @@ const mockSend = jest.fn();
 
 jest.mock('../../shared/components/proposal-ranking/client', () => ({
   createOperationId: () => '2f43c138-f64b-47a3-8be1-c90a3ef27622',
+  loadSavedRankingCycles: jest.fn(async () => []),
   loadProposalRanking: (...args) => mockLoad(...args),
   sendProposalRankingAction: (...args) => mockSend(...args),
 }));
@@ -410,4 +412,15 @@ describe('amountLabel', () => {
     expect(amountLabel({ amountMinorUnits: 100 })).toEqual({ label: 'Requested', note: null });
     expect(amountLabel({ amountSource: null, amountMinorUnits: null })).toEqual({ label: 'Amount', note: null });
   });
+});
+
+
+test('saved cycles outside the calendar window remain selectable and load their saved round', async () => {
+  loadSavedRankingCycles.mockResolvedValueOnce(['D20']);
+  mockLoad.mockResolvedValue(roundResponse());
+  render(<ProposalRankingApp />);
+  await screen.findByRole('option', { name: 'D20 · December 2020' });
+  await waitFor(() => expect(screen.getByRole('combobox', { name: 'Funding cycle' }).disabled).toBe(false));
+  fireEvent.change(screen.getByRole('combobox', { name: 'Funding cycle' }), { target: { value: 'D20' } });
+  await waitFor(() => expect(mockLoad).toHaveBeenCalledWith(expect.objectContaining({ cycleCode: 'D20' })));
 });

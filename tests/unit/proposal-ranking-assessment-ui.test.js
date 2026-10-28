@@ -666,3 +666,47 @@ test('cards label invited amounts and note a requested-amount fallback', () => {
   expect(screen.getAllByText('Requested')).toHaveLength(2);
   expect(screen.getAllByText('No invited amount; showing requested amount.')).toHaveLength(1);
 });
+
+
+test.each([{ isFacilitator: true }, { isObserver: true, isSuperuser: true }])('locked meeting is read-only and unlockable by an authorized manager: %j', async viewer => {
+  const initial = revealedView({ ...viewer, systemUserId: 'alice' });
+  initial.workflow.meetingLock = { locked: true, actorSystemUserId: 'alice', at: '2026-10-27T12:00:00Z' };
+  initial.confirmations = { unlockMeeting: { fingerprint: 'unlock-fp', message: 'Unlock this meeting?' } };
+  render(<AssessmentWorkflow initial={initial} cycleOptions={[{ code: 'D20', label: 'D20 · December 2020' }, { code: 'J27', label: 'J27' }]} onCycleChange={() => {}} />);
+  expect(screen.getByText('Meeting locked')).toBeTruthy();
+  expect(screen.queryByText('Round controls')).toBeNull();
+  expect(screen.getByRole('button', { name: 'Export workbook' }).disabled).toBe(false);
+  fireEvent.click(screen.getByRole('button', { name: 'Unlock meeting' }));
+  expect(screen.getByRole('dialog')).toBeTruthy();
+  const unlocked = JSON.parse(JSON.stringify(initial));
+  unlocked.workflow.meetingLock.locked = false;
+  sendProposalRankingAction.mockResolvedValue(unlocked);
+  fireEvent.click(screen.getAllByRole('button', { name: 'Unlock meeting' }).at(-1));
+  await waitFor(() => expect(sendProposalRankingAction).toHaveBeenCalledWith(expect.objectContaining({ action: 'unlockMeeting', confirmationFingerprint: 'unlock-fp' }), expect.any(Object)));
+  expect(screen.getByRole('option', { name: 'D20 · December 2020' })).toBeTruthy();
+});
+
+test('ordinary PD sees locked status without unlock or reorder controls', () => {
+  const initial = revealedView({ isRosterParticipant: true, systemUserId: 'bob' });
+  initial.workflow.meetingLock = { locked: true, actorSystemUserId: 'alice', at: '2026-10-27T12:00:00Z' };
+  initial.confirmations = {};
+  render(<AssessmentWorkflow initial={initial} cycleOptions={[]} onCycleChange={() => {}} />);
+  expect(screen.getByText('Meeting locked')).toBeTruthy();
+  expect(screen.queryByRole('button', { name: 'Unlock meeting' })).toBeNull();
+  expect(screen.queryByRole('button', { name: /Move .* up/ })).toBeNull();
+});
+
+
+test('lock attribution names a nonparticipant superuser and never displays an internal ID', () => {
+  const actorId = '44444444-4444-4444-8444-444444444444';
+  const initial = revealedView({ isObserver: true, isSuperuser: true, systemUserId: actorId });
+  initial.workflow.meetingLock = { locked: true, actorSystemUserId: actorId, actorName: 'Charlie Admin', at: '2026-10-27T12:00:00Z' };
+  const { unmount } = render(<AssessmentWorkflow initial={initial} cycleOptions={[]} onCycleChange={() => {}} />);
+  expect(screen.getByText(/Locked by Charlie Admin/)).toBeTruthy();
+  expect(document.body.textContent).not.toContain(actorId);
+  unmount();
+  delete initial.workflow.meetingLock.actorName;
+  render(<AssessmentWorkflow initial={initial} cycleOptions={[]} onCycleChange={() => {}} />);
+  expect(screen.getByText(/Locked by a facilitator or administrator/)).toBeTruthy();
+  expect(document.body.textContent).not.toContain(actorId);
+});
