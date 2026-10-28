@@ -31,7 +31,7 @@ This work covers cycle identity, discovery, defaults, settings, job scope and ro
 
 ## 2. Evidence and current gaps
 
-Source mechanisms below were verified on 2026-10-21. Current production details are labeled separately; the bounded evidence and remaining external questions are in `docs/audits/cycle-foundations-2026-10-21.md`. Sources are relative to the repository root.
+**Superseding inventory (2026-10-27):** `docs/audits/cycle-settings-audit-2026-10-27.md` lists every cycle identity, default and date source across the suite (74 rows, source-only), including per-app settings; use it in place of this partial table for the default-cycle redesign. Source mechanisms below were verified on 2026-10-21. Current production details are labeled separately; the bounded evidence and remaining external questions are in `docs/audits/cycle-foundations-2026-10-21.md`. Sources are relative to the repository root.
 
 | Surface | Source and mechanism | Consequence |
 |---|---|---|
