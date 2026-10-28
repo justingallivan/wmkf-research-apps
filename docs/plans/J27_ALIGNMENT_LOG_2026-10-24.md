@@ -145,7 +145,11 @@ submission. Content changes are rare and surgical; there is no procedure for
 clearing and resetting `wmkf_phistaffversioncompleteflag`, so the flag cannot
 signal a replacement. Proposed (not yet decided): generate once when the flag
 is set, and handle a replaced file with a staff-initiated regenerate rather
-than an automatic rerun.
+than an automatic rerun. **Update 2026-10-27 (Justin):** replacements usually come from a formatting
+issue (Connor, possibly through Duncan) or an applicant request (Duncan, as
+applicant liaison). Whatever is built must reprocess whether the trigger comes
+from Connor on the back end or Duncan in the app; to settle with Connor and
+Duncan.
 
 **Question 6 (2026-10-26):** Justin will ask Connor to generate
 `Reviewer Materials/Proposal_{n}.pdf` for J27 and expects he will. Contents,
@@ -345,7 +349,7 @@ rather than giving a day. Every date is a proposal for Justin to adjust.
 | Wed Oct 28 meeting | A5 | J27 central values: review deadline, plus default days to respond and default reviewer quota (D9) | Sarah | Central reviewer settings cannot ship (D4, November) |
 | Before the Nov 15 delivery (decide in early November) | R2 | Which intake AI steps Connor's flows run (he intends compliance, keywords, tentative lead PD, possibly Board/consultant expertise) and which an app job runs; trigger and who watches failures. Prompts are shared either way (D14) | Justin, Connor | R-3 build scope for Nov 15; D6/X1/F1 |
 | Wed Oct 28 meeting (Connor) | B1 Q3 | Type and exact meaning of `wmkf_phistaffversioncompleteflag` (set after the `AI Materials` copies?) | Connor | Using the flag as the AI-pass trigger |
-| Before the Nov 15 delivery (decide in early November) | B1 Q4 | Confirm "generate once; staff regenerate by hand" for replaced files | Justin | AI-pass rerun behavior |
+| Wed Oct 28 meeting (Connor, Duncan) | B1 Q4 | Reprocessing workflow when a submitted file is replaced: triggered either by Connor on the back end (usually a formatting fix) or by Duncan in the app (an applicant request; Duncan is the applicant liaison), possibly with Connor working through Duncan | Justin with Connor and Duncan | AI-pass rerun behavior |
 | Before the Nov 15 delivery (decide in early November) | X1 | Who maintains the expertise roster; is the suggested PD written to the request or only shown; can the CSO's Claude project prompt be shared? | CSO, Sarah, Duncan | Inline expertise matcher (D6) |
 | Before the Nov 15 delivery (decide in early November) | F1 | What triage flags are and who may see them | Sarah, Duncan, CSO | Flag step of the AI pass; Jan 6 decline notes |
 | Before the Nov 15 delivery (decide in early November) | C5 (part) | Whether the AI guesses MR or S&E at intake, and whether the guess is stored as a suggestion that a person confirms | CSO with Connor and Sarah | Shape of the AI-pass output |

@@ -34,7 +34,7 @@
 - Test Request Factory safety vs fidelity / rehearsal venue: feedback-factory-safe-not-full-fidelity.md; feedback-question-the-rehearsal-venue.md
 - Reviewer product decisions: ../docs/agent-wiki/topics/reviewer-identity.md (Durable Memory); feedback-prioritize-contact-recall-over-identity-precision.md
 - Audits / review / test evidence: ../docs/agent-wiki/topics/dev-environment.md (Durable Memory)
-- Tone / user context: feedback-no-performative-contrition.md; feedback-user-facing-error-copy-voice.md
+- Tone / user context: feedback-no-performative-contrition.md; feedback-user-facing-error-copy-voice.md; item codes in owner/colleague text: feedback-no-item-codes-in-owner-facing-text.md
 - Legacy labels / interim trims on surfaces with a decided target: feedback-skip-legacy-fixes-that-the-target-state-removes.md
 - Search / schema language: feedback-grep-general-codebase-terms.md; feedback-human-legibility-schema-principle.md; feedback-staff-ui-never-shows-internal-ids.md; feedback-staff-ui-desktop-first.md
 
