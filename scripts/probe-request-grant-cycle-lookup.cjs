@@ -138,6 +138,21 @@ async function main() {
     return out;
   });
 
+  await section('research_phase_i_pending', async () => {
+    const programs = [...RESEARCH_PROGRAM_IDS].map(id => `_akoya_programid_value eq ${id}`).join(' or ');
+    const filter = encodeURIComponent(`akoya_requeststatus eq 'Phase I Pending' and (${programs})`);
+    const rows = await all(`/akoya_requests?$select=akoya_requestnum,_wmkf_grantcycle_value,_akoya_programid_value,wmkf_meetingdate,akoya_submitdate,createdon,modifiedon,wmkf_istestrequest,wmkf_phaseistatus,wmkf_triagestatus&$filter=${filter}`);
+    const fv = (r, k) => r[`${k}@OData.Community.Display.V1.FormattedValue`] ?? null;
+    return rows.map(r => ({
+      requestNumber: r.akoya_requestnum,
+      program: fv(r, '_akoya_programid_value'),
+      lookupCycle: r._wmkf_grantcycle_value ? (cycles.get(r._wmkf_grantcycle_value)?.wmkf_cyclecode || 'unknown-cycle-row') : null,
+      meetingDate: r.wmkf_meetingdate, meetingDateCycle: meetingDateToCycleCode(r.wmkf_meetingdate),
+      submitDate: r.akoya_submitdate, createdOn: r.createdon, modifiedOn: r.modifiedon,
+      testRequest: r.wmkf_istestrequest, phaseIStatus: fv(r, 'wmkf_phaseistatus'), triageStatus: fv(r, 'wmkf_triagestatus'),
+    })).sort((a, b) => String(a.createdOn).localeCompare(String(b.createdOn)));
+  });
+
   await section('opportunities', async () => {
     const entity = await get("/EntityDefinitions(LogicalName='akoya_akoyaapply')?$select=PrimaryIdAttribute,PrimaryNameAttribute");
     const rows = await all(`/akoya_akoyaapplies?$select=${entity.PrimaryIdAttribute},${entity.PrimaryNameAttribute},_wmkf_grantcycle_value,statecode`);
