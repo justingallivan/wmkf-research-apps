@@ -82,20 +82,20 @@ J27/D27 timeline PDF and workbook (OneDrive, New Cycle Development/timelines).
 | A2 | **Answered 2026-10-27 (Justin), D12:** route by who can fix it; daily digest per role plus in-app panel. Who is notified when a cycle is missing a date or has conflicting records? Proposed: Grants Manager and Systems Specialist. | Sarah, Connor | Readiness notices need named roles; there is no fallback to individuals. | Rollover plan §3.5, §7 |
 | A3 | **Answered 2026-10-27 (Justin): one person can change any date; Grants Manager by default, Program Coordinator when necessary (D8).** May the calendar owner publish any date change directly, or do some changes (board date, review deadline) need a second person? | Sarah, Justin | Decides whether a confirmation step is built. | Rollover plan §7 |
 | A4 | **Answered 2026-10-27 (Justin), D9:** no per-proposal deadline override; PDs may change the response period (per proposal and per invitation) and the quota (per proposal), and extend one reviewer's due date on request. Under D4, is there ever a reason one proposal needs a different reviewer quota or review deadline than the rest of the cycle? If so, who may set that exception? | Sarah, Duncan | Decides whether any per-request override survives, and whether it belongs to the PD or the calendar owner. | D4 |
-| A5 | What are the J27 central values: review deadline, days a reviewer has to respond, and reviewer quota? (Under D9 the last two are defaults PDs may change.) | Sarah | These replace the values PDs entered per request. | D4 |
-| B1 | **Partly answered 2026-10-26; see B1 detail.** **Priority — confirm first.** The AI input files are already decided (owner, 2026-08-17): `AI Materials/ProposalNarrative_{n}.pdf` and `AI Materials/ProposalBibliography_{n}.pdf`, produced by Power Automate. Confirm the flows produce both for J27's single submission, when, and what else lands in the request folder. The Dec 8 pass, including expertise matching, reads the narrative file. | Connor | Initial Assessment, expertise matching, reviewer materials and proposal lookup all depend on it. | Register Q5 |
+| A5 | **2026-10-28 (D28): not set at the meeting; the Grants Manager enters them in the calendar once built.** What are the J27 central values: review deadline, days a reviewer has to respond, and reviewer quota? (Under D9 the last two are defaults PDs may change.) | Sarah | These replace the values PDs entered per request. | D4 |
+| B1 | **Partly answered 2026-10-26; Q3, Q4, Q6 and the staff version answered 2026-10-28 (D22, D25, D26, D33); see B1 detail.** **Priority — confirm first.** The AI input files are already decided (owner, 2026-08-17): `AI Materials/ProposalNarrative_{n}.pdf` and `AI Materials/ProposalBibliography_{n}.pdf`, produced by Power Automate. Confirm the flows produce both for J27's single submission, when, and what else lands in the request folder. The Dec 8 pass, including expertise matching, reads the narrative file. | Connor | Initial Assessment, expertise matching, reviewer materials and proposal lookup all depend on it. | Register Q5 |
 | C1 | **Answered 2026-10-26 (Justin): yes, 001024 is the Research form; no app concern** (no app code keys on the opportunity; grep 2026-10-26). Is GOApply opportunity 001024 the J27 Research form? What are its real open window and submission cutoff, and when does it get its J27 cycle link? | Connor | Confirms which records intake comes from. | Foundations audit §3 |
-| C2 | **Partly answered 2026-10-26 (Justin):** a placeholder meeting date is believed to be set on submission (open: confirm its value); date moves are handled by a Power Automate flow. The apps derive the cycle only from the month and year (`lib/utils/cycle-code.js` `meetingDateToCycleCode`: June → J, December → D, any other month → no cycle), so the placeholder must fall in June 2027. When the board meeting date on a Grant Cycle record changes, do linked requests' dates update, and by what mechanism? | Connor | The apps currently derive the cycle from each request's meeting date. | Foundations audit §2 |
+| C2 | **2026-10-28: revisit with Connor (T10).** **Partly answered 2026-10-26 (Justin):** a placeholder meeting date is believed to be set on submission (open: confirm its value); date moves are handled by a Power Automate flow. The apps derive the cycle only from the month and year (`lib/utils/cycle-code.js` `meetingDateToCycleCode`: June → J, December → D, any other month → no cycle), so the placeholder must fall in June 2027. When the board meeting date on a Grant Cycle record changes, do linked requests' dates update, and by what mechanism? | Connor | The apps currently derive the cycle from each request's meeting date. | Foundations audit §2 |
 | C3 | **Answered 2026-10-27 (Justin), D10:** Board date in operations, app anchor dates in the apps cycle record; D27 row creation stays with Connor (ask when; not needed for J27). Originally: **to the team meeting Wed 2026-10-28** on calendar ownership (Grants Manager or Program Coordinator to own and update it, consistent with D1). When and how is the next operations cycle row (D27) created, and does operations maintain only the board date or other milestones too? | Connor, Sarah | D27 has no operations row yet; the apps should read dates from one place. | Foundations audit §2 |
-| C4 | What request status do J27 proposals carry when they arrive from GOApply (expected `Phase I Pending`)? | Connor | The Workbench list and triage depend on that exact label. | Register Q8, J27-064 |
+| C4 | **Answered 2026-10-28 (D27): `Phase I Pending`.** What request status do J27 proposals carry when they arrive from GOApply (expected `Phase I Pending`)? | Connor | The Workbench list and triage depend on that exact label. | Register Q8, J27-064 |
 | C5 | **Owner assigned 2026-10-26:** when and how the program is set is the CSO's decision, in consultation with Connor and Sarah (see "MR vs S&E" below). Applicants no longer choose S&E or MR. How is the program recorded on the request, who assigns it, and when? | Connor, Sarah, Duncan | Apps that filter or assign by program will find it empty at intake. | Timeline Dec 7 |
 | R1 | **Answered 2026-10-27 (Justin), D13:** full December scope delivered by Nov 15; R-4 dropped. Is the day-one list below right, and how quickly do staff need to triage in December? | Sarah, Duncan | Sets what must be built in the next six weeks versus early January. | December readiness below |
-| X1 | **Partly answered 2026-10-27 (Justin), D15:** one roster, editable in the app; which existing roster (app Postgres or Connor's Dataverse) becomes it is for Connor. For inline expertise matching (D6): who maintains the roster of staff, consultants and Board members and their expertise; should the suggested PD be written to the request or only shown for staff to accept; and can the CSO's current Claude project prompt be shared as the starting point? | CSO, Sarah, Duncan | Defines what the rebuilt matcher reads, produces and who trusts it. | D6 |
-| R2 | **Update 2026-10-27 (Justin's understanding; to confirm with Connor):** Connor intends to run AI analyses in Power Automate for compliance, keyword extraction and a tentative lead PD, and possibly Board and consultant expertise. Who runs which step (Connor's flows or an app job) is open; prompts are shared either way (D14). This overlaps R-3, D6, X1 and F1. Who starts and watches the Dec 8 AI pass, and what happens to proposals that arrive after it runs? Which steps are triggered by Power Automate (e.g. when a proposal file lands) and which by the apps' scheduled background jobs? | Justin, Connor | Volume is not a concern (D5), but the run needs an owner and an agreed trigger for each step. | Timeline Dec 8 |
-| F1 | **2026-10-27 (Justin): needs a discussion with the CSO.** Shape decided in D17: the AI sets "Flagged for triage" with a rationale for potentially weak applications; a person decides. What triggers a flag and its prompts are for the meeting. What are "triage flags"? Candidates: eligibility (e.g. more than three proposals from one institution), fit with Keck guidelines, or "likely decline" feeding the Jan 6 decline notes. Who may see them? Note: the current Initial Assessment deliberately makes no recommendations, so flags are a new kind of output. | Sarah, Duncan, CSO | Defines the flag step of the Dec 8 pass and the January decline notes. | Timeline Dec 8, Jan 6 |
+| X1 | **2026-10-28: compare the two rosters (T8); D16 settles the suggested-PD question.** **Partly answered 2026-10-27 (Justin), D15:** one roster, editable in the app; which existing roster (app Postgres or Connor's Dataverse) becomes it is for Connor. For inline expertise matching (D6): who maintains the roster of staff, consultants and Board members and their expertise; should the suggested PD be written to the request or only shown for staff to accept; and can the CSO's current Claude project prompt be shared as the starting point? | CSO, Sarah, Duncan | Defines what the rebuilt matcher reads, produces and who trusts it. | D6 |
+| R2 | **Answered in part 2026-10-28 (D37): Connor's flows run the intake AI steps on submit; which outputs remain app jobs is open.** **Update 2026-10-27 (Justin's understanding; to confirm with Connor):** Connor intends to run AI analyses in Power Automate for compliance, keyword extraction and a tentative lead PD, and possibly Board and consultant expertise. Who runs which step (Connor's flows or an app job) is open; prompts are shared either way (D14). This overlaps R-3, D6, X1 and F1. Who starts and watches the Dec 8 AI pass, and what happens to proposals that arrive after it runs? Which steps are triggered by Power Automate (e.g. when a proposal file lands) and which by the apps' scheduled background jobs? | Justin, Connor | Volume is not a concern (D5), but the run needs an owner and an agreed trigger for each step. | Timeline Dec 8 |
+| F1 | **2026-10-28 (D38): renamed Flagged for concerns; a prompt will set it; criteria still open.** **2026-10-27 (Justin): needs a discussion with the CSO.** Shape decided in D17: the AI sets "Flagged for triage" with a rationale for potentially weak applications; a person decides. What triggers a flag and its prompts are for the meeting. What are "triage flags"? Candidates: eligibility (e.g. more than three proposals from one institution), fit with Keck guidelines, or "likely decline" feeding the Jan 6 decline notes. Who may see them? Note: the current Initial Assessment deliberately makes no recommendations, so flags are a new kind of output. | Sarah, Duncan, CSO | Defines the flag step of the Dec 8 pass and the January decline notes. | Timeline Dec 8, Jan 6 |
 | F2 | **Answered 2026-10-27 (Justin), D19:** short list plus proposal-page detail, bulk state changes, Impeccable design first. On Dec 9, should the suggested PD, expertise matches and flags appear as sortable columns in the triage list (so each PD can filter to their own), or only on each request's page? | Sarah, Duncan | Decides the shape of the R-1/R-2 list. | R-1, R-2 |
 | F3 | **Moot 2026-10-27 (D16):** the lead-PD pick is written to the request, so every proposal has a PD; mis-assignments are corrected in AkoyaGO. If the suggested PD is not written to the request (X1), where do proposals without a confirmed PD appear so nothing is lost? | Sarah, Duncan | The "nothing gets lost" rule for triage. | X1, register J27-062 |
-| X2 | **Raised 2026-10-26; not expected to be answered right away.** Triage record vs Phase I Status. Background (Justin): `wmkf_triagestatus` was a D26 patch for the last two-submission cycle (Phase I proposal, then Phase II if invited); staff use it in discussions, it has no AkoyaGO counterpart, and it also kept Workbench lists uncluttered. Open issues: (1) Phase I Status already carries staff recommendations (`Recommended Invite` / `Recommended Do Not Invite`), so J27 could have two records of one decision with nothing keeping them in step; (2) the values do not map one to one (no Phase I value for Save for now; no triage value for Scored / Not Scored); (3) Phase I Status is set in Dynamics by an unconfirmed owner, and an app write would be a new write path; (4) Phase I Status has consumers: the grantee-title cron keys on `Invited` (`lib/services/cron/generate-grantee-titles-service.js:34,72`), plus Expertise Finder, the Dataverse export and Dynamics Explorer; flows and reports outside the repo are unknown; (5) who sets Phase I `Invited` in J27 (Program Committee at Jan 13–14, Board, or staff) is register Q9. | Justin, Sarah, Duncan | Decides whether J27 triage is a working/display aid only, or writes the staff recommendation to Phase I Status. | Probe 2026-10-26; Atlas status semantics |
+| X2 | **Answered 2026-10-28 (D31): only Triaged writes Phase I Status (`Recommended Do Not Invite`); other staff states stay app-only.** **Raised 2026-10-26; not expected to be answered right away.** Triage record vs Phase I Status. Background (Justin): `wmkf_triagestatus` was a D26 patch for the last two-submission cycle (Phase I proposal, then Phase II if invited); staff use it in discussions, it has no AkoyaGO counterpart, and it also kept Workbench lists uncluttered. Open issues: (1) Phase I Status already carries staff recommendations (`Recommended Invite` / `Recommended Do Not Invite`), so J27 could have two records of one decision with nothing keeping them in step; (2) the values do not map one to one (no Phase I value for Save for now; no triage value for Scored / Not Scored); (3) Phase I Status is set in Dynamics by an unconfirmed owner, and an app write would be a new write path; (4) Phase I Status has consumers: the grantee-title cron keys on `Invited` (`lib/services/cron/generate-grantee-titles-service.js:34,72`), plus Expertise Finder, the Dataverse export and Dynamics Explorer; flows and reports outside the repo are unknown; (5) who sets Phase I `Invited` in J27 (Program Committee at Jan 13–14, Board, or staff) is register Q9. | Justin, Sarah, Duncan | Decides whether J27 triage is a working/display aid only, or writes the staff recommendation to Phase I Status. | Probe 2026-10-26; Atlas status semantics |
 
 ### B1 detail: questions for Connor
 
@@ -180,6 +180,10 @@ Duncan.
 order, whether it differs from the staff version, and anything off limits to
 reviewers or the AI (register Q21) remain open.
 
+**2026-10-28 (meeting):** question 3 is replaced by a new flag (D25),
+question 4 by Connor's flows (D26), question 6 and the staff version by D22 and
+D33. The paragraphs below are kept as history.
+
 This answers questions 1 and 2: both files are produced, and the bibliography
 is its own upload. Still open: 5 decided 2026-10-27 (D20; the J27 entry is still to build), 6
 (the reviewer copy and anything off limits). Also open: the contents and
@@ -213,7 +217,10 @@ database access and set nothing; staff record outcomes.
 | Not invited (working name) | Staff, after the Chairs meeting | Terminal: not invited for peer review and no longer under consideration. |
 
 Default list (carried from 2026-09-06): every state except Triaged and the
-terminal state, with visible counts for those. Open: how Invited for Peer
+terminal state, with visible counts for those. **Settled 2026-10-28 (D31):**
+Triaged writes Phase I `Recommended Do Not Invite`; the other staff states stay
+in the app; Invited for Peer Review is read from the Grants Manager's
+`Phase II Pending` in Dataverse. Earlier text, kept as history: Open: how Invited for Peer
 Review and the terminal state relate to the AkoyaGO values the Grants Manager
 records after the Chairs meeting (below): separate app states, or the same
 fact read from AkoyaGO. **To consult Connor and Sarah (Justin, 2026-10-27):**
@@ -247,9 +254,9 @@ If confirmed, existing readers keep working: Reviewer Finder keys on
 (`lib/services/reviewer-finder/my-proposals-service.js:124`) and the
 grantee-title cron on Phase I `Invited`
 (`lib/services/cron/generate-grantee-titles-service.js:34,72`), which would
-also answer register Q9. Open: whether any value is set before the Chairs
-meeting (e.g. `Recommended Invite`, which would recreate X2's double record),
-and whether Triaged proposals ever get `Phase I Declined` (decline notes, J-1).
+also answer register Q9. **2026-10-28:** the Grants Manager records the outcome (D35); no
+`Recommended Invite` is set before the Chairs meeting (D31); declines are set on
+the Dataverse back end (D32). The mapping values above remain as proposed.
 
 **Reviewers and reviewer materials (Justin 2026-10-26):**
 
@@ -267,14 +274,17 @@ and whether Triaged proposals ever get `Phase I Declined` (decline notes, J-1).
   ~50 First Cut stage. The trigger signal is to be agreed. If it is an app staff
   state, that state must live on the request in Dataverse, where a flow can
   see it.
-- Sharing with Program Chairs and Board members: Justin recalls magic links
+- Sharing with Program Chairs and Board members: **magic links (D34,
+  2026-10-28); mechanism to design.** Earlier note: Justin recalls magic links
   were used before. No Board/Chairs sharing surface was found in the app
   (grep 2026-10-26); possibly SharePoint link sharing. To confirm with Connor.
 
 **Offramp and oral presentations (Justin 2026-10-26):**
 
-- The Grants Manager records the Mar 25 PD offramp outcome in AkoyaGO; the
-  apps read it rather than holding an offramp state.
+- **Revised 2026-10-28 (D36):** the app logs the Mar 25 offramp outcome for
+  display; staff set the formal status in Dataverse (field not recorded).
+  Earlier: the Grants Manager records the outcome in AkoyaGO and the apps read
+  it rather than holding an offramp state.
 - "Invited to oral presentation" may be derived from AkoyaGO Phase II Status
   (to confirm with Connor and Sarah). Note: `wmkf_phaseiistatus` has no
   `Invited` option (probe 2026-10-26). Justin's tentative view: `Phase II
@@ -456,17 +466,18 @@ values (`Approved`, `Phase II Declined`).
 |---|---|---|---|---|
 | Dec 7 submission | GOApply | `Submission-Documents` folder | Applicant's documents | Decided (Connor) |
 | Dec 7 submission | Power Automate | `AI Materials` folder | J27 file set; apps read `Project-Narrative_{n}.pdf`, `Bibliography_{n}.pdf` | Decided (Connor); app change on this branch, unreleased |
-| Files ready | Power Automate | `wmkf_phistaffversioncompleteflag` | Set when the files are ready | Decided that the flow sets it; type and meaning open (B1 Q3) |
-| Dec 7 submission | GOApply or flow | `akoya_requeststatus` | Expected `Phase I Pending` | Open (C4) |
-| Dec 7 submission | GOApply or flow | `wmkf_meetingdate` | Placeholder in June 2027 | Open (C2) |
+| Files ready | Power Automate | New flag (D25; name not yet known) | Set when the files are ready | Decided 2026-10-28; name and type open (Connor) |
+| Dec 7 submission | GOApply or flow | `akoya_requeststatus` | `Phase I Pending` | Decided 2026-10-28 (D27) |
+| Dec 7 submission | GOApply or flow | `wmkf_meetingdate` | Placeholder in June 2027 | Open (C2; T10) |
 | Intake to Feb 24 | Not decided | `akoya_programid` | Medical Research or Science and Engineering | Open (C5) |
-| Dec 9 – Feb 3 | PDs, in the apps | Staff state (location not decided) | Submitted, Triaged, Under consideration, Recommend to Program Chairs | Proposed (state model) |
-| Dec 9 – Feb 3 | Not decided | `wmkf_triagestatus` / `wmkf_phaseistatus` | Whether triage writes either | Open (X2; pre-Chairs value) |
-| By Jan 6 | Not decided | `akoya_requeststatus` | `Phase I Declined` for Triaged? | Open |
-| ~Jan 14 | Power Automate | `Reviewer Materials/Proposal_{n}.pdf` | Built for the ~50 | Proposed (Justin to ask Connor); trigger open |
-| Feb 24, approved | Grants Manager | `wmkf_phaseistatus` + `akoya_requeststatus` | `Invited` (100000003) + `Phase II Pending` | Proposed |
-| Feb 24, not approved | Grants Manager | `wmkf_phaseistatus` + `akoya_requeststatus` | `Not Invited` (100000002) + `Phase I Declined`? | Proposed; request status open |
-| Mar 25 offramp | Grants Manager | Not decided | Not decided | Open |
+| Intake | Not decided (Connor builds the field) | New "program at submission" field | MR or S&E as assigned at intake; never changes | Decided 2026-10-28 (D30); field not created |
+| Dec 9 – Feb 3 | PDs, in the apps | Staff state (in the app) | Submitted, Flagged for concerns, Triaged, Under consideration, Recommend to Program Chairs | Decided 2026-10-28 (D31, D38); storage location not decided |
+| Dec 9 – Feb 3 | Apps, when staff mark Triaged | `wmkf_phaseistatus` | `Recommended Do Not Invite` (707510006); no other pre-Chairs value | Decided 2026-10-28 (D31); not built |
+| By Jan 6 | Staff, on the Dataverse back end | `akoya_requeststatus` | Decline status | Decided 2026-10-28 (D32); value and timing not recorded |
+| ~Jan 14 | Power Automate | `Reviewer Materials` folder | The staff version, renamed (D33) | Contents decided 2026-10-28; file name and trigger open |
+| Feb 24, approved | Grants Manager | `wmkf_phaseistatus` + `akoya_requeststatus` | `Invited` (100000003) + `Phase II Pending` | Owner decided 2026-10-28 (D35); values proposed |
+| Feb 24, not approved | Grants Manager | `wmkf_phaseistatus` + `akoya_requeststatus` | `Not Invited` (100000002) + decline status (D32) | Owner decided 2026-10-28 (D35); values proposed |
+| Mar 25 offramp | Staff (formal); apps (display log) | Not recorded | Not recorded | Decided 2026-10-28 (D36); field open |
 | Oral-presentation invite | Not decided | `wmkf_phaseiistatus` | Tentative: `Phase II Pending Committee Review` (100000002); there is no `Invited` option | Open |
 | May 12–13 ranking | Apps read | `akoya_requeststatus` + `akoya_programid` | `Phase II Pending` + an MR or S&E program | Carries over only if the Feb 24 mapping and C5 hold |
 | Jun 9–10 Board | Not recorded here | `akoya_requeststatus` | Board decision | Decided semantics; who sets it not recorded |
