@@ -166,7 +166,11 @@ This answers questions 1 and 2: both files are produced, and the bibliography
 is its own upload. Still open: 5 decided 2026-10-27 (D20; the J27 entry is still to build), 6
 (the reviewer copy and anything off limits). Also open: the contents and
 order of the combined staff/distribution copy, and what the second group of
-files is for.
+files is for. **2026-10-27 (Justin):** both are meeting discussion points; the D26 staff
+version is not the model, since J27 submissions carry more. Budget: J27 asks
+for no full budget at submission; some budget information arrives (believed
+stored in Dataverse, not a spreadsheet), and fuller budget information comes
+if a proposal goes out for review.
 
 ## J27 proposal state model (proposed by Justin 2026-10-26; pending Connor and Sarah)
 
@@ -376,6 +380,8 @@ rather than giving a day. Every date is a proposal for Justin to adjust.
 |---|---|---|---|---|
 | Wed Oct 28 meeting | A5 | J27 central values: review deadline, plus default days to respond and default reviewer quota (D9) | Sarah | Central reviewer settings cannot ship (D4, November) |
 | Before the Nov 15 delivery (decide in early November) | R2 | Which intake AI steps Connor's flows run (he intends compliance, keywords, tentative lead PD, possibly Board/consultant expertise) and which an app job runs; trigger and who watches failures. Prompts are shared either way (D14) | Justin, Connor | R-3 build scope for Nov 15; D6/X1/F1 |
+| Wed Oct 28 meeting (discussion) | Staff version | Contents and order of the combined staff version; whether Connor's second file group (PhaseI Cover Page, Abstract, Graphical Abstract Page) is its front matter. J27 submissions carry more than D26 Phase I did, so the D26 staff version is not the model | Justin, Sarah, Duncan; Connor builds | Connor's staff-version flow; the Proposal tab (D20) |
+| Wed Oct 28 meeting (discussion; no resolution needed yet) | Budget | J27 does not ask for a full budget at submission (budgets are hard to prepare and most proposals will not be invited). Some budget information arrives at submission and, Justin believes, is stored in Dataverse rather than as a spreadsheet; fuller budget information is requested if a proposal goes out for review. Where each lands and which apps show it | Justin, Connor, Sarah | Proposal tab budget slot; anything that reads budgets |
 | Wed Oct 28 meeting (Connor) | B1 Q3 | Type and exact meaning of `wmkf_phistaffversioncompleteflag` (set after the `AI Materials` copies?) | Connor | Using the flag as the AI-pass trigger |
 | Wed Oct 28 meeting (Connor, Duncan) | B1 Q4 | Reprocessing workflow when a submitted file is replaced: triggered either by Connor on the back end (usually a formatting fix) or by Duncan in the app (an applicant request; Duncan is the applicant liaison), possibly with Connor working through Duncan | Justin with Connor and Duncan | AI-pass rerun behavior |
 | Before the Nov 15 delivery (decide in early November) | X1 | Who maintains the expertise roster; is the suggested PD written to the request or only shown; can the CSO's Claude project prompt be shared? | CSO, Sarah, Duncan | Inline expertise matcher (D6) |
@@ -385,8 +391,7 @@ rather than giving a day. Every date is a proposal for Justin to adjust.
 | Wed Oct 28 meeting (Connor) | C4 | Request status J27 proposals carry on arrival (expected `Phase I Pending`) | Connor | R-1: the Workbench list filter |
 | Wed Oct 28 meeting (Connor) | C2 | The placeholder `wmkf_meetingdate` value (must fall in June 2027); whether requests follow a moved Grant Cycle date, and how | Connor | The apps' cycle code for every J27 request |
 | Wed Oct 28 meeting (Connor, Sarah) | State model | Staff states (Submitted, Triaged, Under consideration, Recommend to Program Chairs) and whether they live on the request in Dataverse | Justin with Connor and Sarah | List states; the reviewer-materials trigger (a flow can only see Dataverse) |
-| Before the Nov 15 delivery (decide in early November) | X2 | Is J27 triage a display aid only, or does it write the staff recommendation to Phase I Status? | Justin, Sarah, Duncan | Whether the apps get a new Phase I Status write path |
-| Before the Nov 15 delivery (decide in early November) | B1 staff copy | Contents and order of the combined staff/distribution copy; what the second file group (`PhaseI-Cover-Page_`, `Abstract_`, `Graphical-Abstract-Page_`) is for | Not assigned (Connor asked us) | Connor's staff-version flow |
+| Wed Oct 28 meeting (Connor, Sarah; part of the state reconciliation) | X2 | Is J27 triage a display aid only, or does it write the staff recommendation to Phase I Status? | Justin, Sarah, Duncan | Whether the apps get a new Phase I Status write path |
 | Before the writeup build starts | Writeup export | Scope of the 1-page writeup and Diligent Book export (writeups due Feb 10, Book Feb 12) | Justin | The build Justin called critical |
 | Wed Jan 6 | Declines | Do Triaged proposals get `Phase I Declined`, when, and who sets it? | Connor, Sarah | J-1 decline notes |
 | Thu Jan 14 | B1 Q6 | Reviewer copy contents and order; anything off limits to reviewers or the AI (register Q21) | Connor | Reviewer materials |
