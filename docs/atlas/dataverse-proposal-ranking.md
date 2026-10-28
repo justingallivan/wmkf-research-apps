@@ -1,20 +1,23 @@
 # Proposal Ranking — D26 production release and storage history
 
-**Released to production 2026-10-15 (Session 609)**: D26 v2 round `49279ac7-3ab9-41d8-b2d6-5aaf4085e642` is open; see the receipt in `../plans/PROPOSAL_RANKING_D26_RELEASE_2026-10-14.md`. Candidate and branch statements below are dated pre-release history. Production wave33 fields `wmkf_workflowjson` (65,536) and `wmkf_assessmentjson` (524,288) were applied and read back 2026-10-15.
+**Current production state, verified 2026-10-27:** v2 ranking is released;
+D26 round `49279ac7-3ab9-41d8-b2d6-5aaf4085e642` is locked. PR #536
+(`379cf81485`) released meeting locks and cycle discovery; PR #537 (`0a4702cac`)
+fixed discovery's required Dataverse filter. The production alias resolves to
+Ready deployment `dpl_Hx4bL2cxJNMqisPVB75gWQ5wZT2d` for the fix.
 
-Current local candidate: `codex/d26-ranking-release` at `9fe92f0ed`; no production
-promotion or D26 live ranking write. See the first section for candidate storage,
-facilitation and verification. The remaining sections preserve dated source and live
-state history. The October 13 main comparison below is historical, not current branch
-behavior. Current product authority: revision 5 of
+The original v2 release was 2026-10-15 (Session 609); see
+`../plans/PROPOSAL_RANKING_D26_RELEASE_2026-10-14.md`. Production wave33 fields
+`wmkf_workflowjson` (65,536) and `wmkf_assessmentjson` (524,288) were applied and
+read back then. The remaining candidate, October 13 main and dedicated-Preview
+sections below preserve explicitly historical evidence, not current promotion
+prerequisites. Product design: revision 5 of
 `docs/plans/PROPOSAL_RANKING_DESIGN_2026-10-07.md` (agreed October 13).
-The assessment/reveal/reset workflow was **deployed to the dedicated test Preview from `codex/proposal-ranking-v2`; not Production**. This dated deployment statement does not establish the D26 candidate's deployment.
-Implementation stages and proposed durable contracts are in
-`docs/plans/PROPOSAL_RANKING_IMPLEMENTATION_PLAN_2026-10-13.md`; sandbox provisioning is recorded below; Production provisioning is not claimed.
 
-## Meeting locks and saved-cycle retrieval — branch implementation, 2026-10-27
+## Meeting locks and saved-cycle retrieval — production, 2026-10-27
 
-[VERIFIED via source and focused tests on `codex/session-645-start`; not deployed.]
+[VERIFIED via merged source, green release CI, successful production deployment
+and signed-in production lock/read/export/cycle-switch checks, 2026-10-27.]
 The additive v2 contract uses existing fields only. `wmkf_workflowjson.meetingLock`
 stores `{locked, actorSystemUserId, actorName?, at}`. Missing metadata on existing rounds means
 unlocked; malformed metadata fails closed. Captured facilitators and superusers
@@ -32,17 +35,30 @@ reapply a later-superseded lock. Reopening private preparation after an unlock
 clears group-only lock metadata while preserving the administration log.
 
 The read-only `cycles` action lists only cycle codes from coordinator rows with a
-saved-round pointer. The UI merges them with nearby calendar choices; it does not
+saved-round pointer, with `wmkf_activeroundid ne null` applied at the Dataverse
+reader boundary. The unfiltered first release failed the shared paginated
+reader's safety guard; PR #537 fixes it without bypassing that guard. The UI merges them with nearby calendar choices; it does not
 use live proposal eligibility to rediscover a past round. Dedicated rehearsal
 mode returns only its named test cycle. Incomplete reads or invalid cycle codes
 fail explicitly; the UI warns when discovery fails. Existing previous/superseded
 run links and private projections remain in force. No table/column, schema
-provisioning, backfill, deletion, live lock or backup-policy change is part of this
-implementation. Source: `service.js`, `workflow-service.js`, `workflow.js` and
+provisioning, backfill, deletion or backup-policy change was needed. Source: `service.js`, `workflow-service.js`, `workflow.js` and
 `lib/dataverse/adapters/proposal-ranking.js`; user instructions:
 `docs/guides/PROPOSAL_RANKING_LISTS.md`.
 
-## D26 release candidate — local branch source, not deployed
+### Signed-in D26 operational receipt
+
+[VERIFIED 2026-10-27 via the authenticated production UI and downloaded XLSX.]
+The owner authorized the D26 lock, recorded under Justin Gallivan at 17:20:08
+Pacific. Reload retained it; workbook export was a valid XLSX with 23 group
+proposal rows and 92 individual-assessment rows. After the #537 deployment,
+cycle discovery showed no warning, J27's empty proposal pool loaded and switching
+back restored D26. Lock text/actor/time and all 23 proposal IDs in order matched
+the pre-fix baseline; export remained enabled. New-deployment ranking GET/POST
+requests returned 200. No unlock, re-ranking, restart, archive or retention-policy
+change was performed. The workbook remained local, outside Git.
+
+## Historical D26 release candidate — pre-release checkpoint, 2026-10-15
 
 [VERIFIED via local branch source, `codex/d26-ranking-release` at `9fe92f0ed`,
 2026-10-15] The compatible D26 candidate adds no table or Dataverse attribute for
@@ -161,7 +177,7 @@ In the October 13 main baseline, before publication each PD sees their own order
 and the single facilitator sees all. The D26 candidate's current own-only privacy
 contract supersedes this behavior; its two captured facilitators see readiness but
 not other participants' unrevealed orders. Each program publishes independently. In v1 a nonparticipant superuser gets administration
-metadata only. In the D26 v2 candidate, Proposal Ranking grant holders who are neither roster participants nor captured facilitators are read-only observers (owner decision 2026-10-15): before reveal they see the source snapshot and readiness only; after reveal they see the named assessments and collective view, history, workbook and sentiment (sentiment still needs Meeting Tracker readership); ordinary observer mutations are refused; the branch-only lock/unlock exception is described above. Main still permits exceptional excusal before generation and retains
+metadata only. In the D26 v2 candidate, Proposal Ranking grant holders who are neither roster participants nor captured facilitators are read-only observers (owner decision 2026-10-15): before reveal they see the source snapshot and readiness only; after reveal they see the named assessments and collective view, history, workbook and sentiment (sentiment still needs Meeting Tracker readership); ordinary observer mutations are refused; the current production lock/unlock exception is described above. Main still permits exceptional excusal before generation and retains
 excluded submissions; the new all-PDs-ready design does not carry that bypass forward.
 
 The UI serializes saves, keeps the latest queued order and visible unsaved/conflict
@@ -170,7 +186,7 @@ from individual submissions. Main has no A/B/C separators, confidence collection
 individual combined ranking, ready/reopen/single-reveal flow, funding history,
 sentiment enrichment, or ranking workbook export (bounded source search in the audit).
 
-## Paused branch, not main
+## Historical paused branch, not main
 
 [VERIFIED via local source at `0d161d60f`] The branch adds a combined **meeting** list
 only after the program meetings are published, a funding-history reader, a local
@@ -185,7 +201,7 @@ labelled never funded by the Foundation; unavailable/provisional coverage stays 
 ready to merge as the revised workflow. Branch role/delete behavior is not deployed
 by the documentation comparison; no dry-run erase is authorized here.
 
-## Version-2 branch persistence and consumers
+## Historical version-2 Preview persistence and consumers — October 13/14
 
 [VERIFIED via branch source and dedicated sandbox deployment `d1b206185`; not Production]
 `research-funding.js` returns `researchFunding.totalAmountMinorUnits`, its existing
@@ -223,7 +239,7 @@ It requires Meeting Tracker access or superuser authority, caps requests at 50, 
 rechecks source/prompt currentness. Only group-discussion cards should consume it;
 private preparation and the agreed workbook do not. No ranking AI call is needed.
 
-## Trial and release follow-up
+## Historical trial and release follow-up — October 13/14
 
 Historical owner requirement: trial PD rankings must not carry into colleague use;
 preserve source reviewer scores and restore Beth as default before handoff. The
@@ -248,7 +264,7 @@ existing readiness. Both are enabled in the dedicated Preview; Production is unc
 by the historical waiting-state smoke. Only the authorized sandbox schema, default facilitator and retained synthetic ranking
 state changed in this follow-up. No Production change, branch cleanup or merge occurred; dedicated Preview deployment is recorded below.
 
-## Dedicated authenticated test Preview — deployed to dedicated Preview; partial acceptance
+## Historical dedicated authenticated test Preview — partial acceptance, October 13/14
 
 [VERIFIED via deployment receipt and hosted browser] Source `d1b206185` is deployed
 in dedicated READY Preview `dpl_GCjqpVkTNncxSC2kRzByGLbbspyq` at
