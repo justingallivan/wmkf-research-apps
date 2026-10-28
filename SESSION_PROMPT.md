@@ -1,5 +1,11 @@
 # Session 646 Prompt: Codex ranking work complete; J27 remains with Claude
 
+> **Latest Claude handoff (Session 647, 2026-10-28) is on branch
+> `claude/j27-ai-materials-names`:** `git show origin/claude/j27-ai-materials-names:SESSION_PROMPT.md`.
+> Session 646 recorded the Oct 28 J27 meeting (alignment log D22–D42) and added
+> `scripts/probe-request-grant-cycle-lookup.cjs` here on `main`. The Codex
+> handoff below remains current for ranking and Board archival.
+
 ## Session 645 Summary (Codex, 2026-10-27 Pacific)
 
 [VERIFIED via merged PRs, successful Vercel production deployments and signed-in
