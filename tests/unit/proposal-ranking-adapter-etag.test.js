@@ -8,6 +8,10 @@ jest.mock('../../lib/services/dynamics/changeset.js', () => ({
   executeChangeset: jest.fn(async (_service, operations) => operations),
 }));
 
+jest.mock('../../lib/services/dynamics/http.js', () => ({ fetchWithTimeout: jest.fn() }));
+import { queryAllRecords } from '../../lib/services/dynamics/read-ops.js';
+import { fetchWithTimeout } from '../../lib/services/dynamics/http.js';
+
 import { DynamicsService } from '../../lib/services/dynamics-service.js';
 import { executeChangeset } from '../../lib/services/dynamics/changeset.js';
 import { processAnnotations } from '../../lib/services/dynamics/annotations.js';
@@ -56,7 +60,40 @@ test('saved-cycle discovery reads only coordinator fields and refuses incomplete
   expect(await listSavedRankingCycles()).toEqual(['D20']);
   expect(DynamicsService.queryAllRecords).toHaveBeenCalledWith(expect.any(String), {
     select: 'wmkf_cyclecode,wmkf_activeroundid',
+    filter: 'wmkf_activeroundid ne null',
   });
   DynamicsService.queryAllRecords.mockResolvedValue({ records: [], capped: true });
   await expect(listSavedRankingCycles()).rejects.toThrow(/complete Dataverse result/);
+});
+
+
+test('saved-cycle discovery satisfies the real paginated reader filter requirement without writing', async () => {
+  const originalUrl = process.env.DYNAMICS_URL;
+  process.env.DYNAMICS_URL = 'https://ranking.example.invalid';
+  const svc = {
+    resolveLogicalName: jest.fn(() => 'wmkf_proposalrankingcycle'),
+    checkRestriction: jest.fn(),
+    getAccessToken: jest.fn(async () => 'fixture-token'),
+    processAnnotations: row => row,
+  };
+  const nextLink = 'https://ranking.example.invalid/api/data/v9.2/wmkf_proposalrankingcycles?page=2';
+  fetchWithTimeout.mockResolvedValueOnce({ ok: true, json: async () => ({
+    value: [{ wmkf_cyclecode: 'D20', wmkf_activeroundid: ROUND_ID }],
+    '@odata.nextLink': nextLink,
+  }) }).mockResolvedValueOnce({ ok: true, json: async () => ({
+    value: [{ wmkf_cyclecode: 'D26', wmkf_activeroundid: ROUND_ID }],
+  }) });
+  DynamicsService.queryAllRecords.mockImplementationOnce((entity, options) => queryAllRecords(svc, entity, options));
+  try {
+    await expect(listSavedRankingCycles()).resolves.toEqual(['D20', 'D26']);
+    const request = new URL(fetchWithTimeout.mock.calls[0][0]);
+    expect(request.searchParams.get('$filter')).toBe('wmkf_activeroundid ne null');
+    expect(request.searchParams.get('$select')).toBe('wmkf_cyclecode,wmkf_activeroundid');
+    expect(fetchWithTimeout.mock.calls[1][0]).toBe(nextLink);
+    expect(svc.checkRestriction).toHaveBeenCalledWith('wmkf_proposalrankingcycle', 'wmkf_cyclecode,wmkf_activeroundid', undefined);
+    expect(executeChangeset).not.toHaveBeenCalled();
+  } finally {
+    if (originalUrl === undefined) delete process.env.DYNAMICS_URL;
+    else process.env.DYNAMICS_URL = originalUrl;
+  }
 });
