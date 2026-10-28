@@ -1,122 +1,125 @@
-# Session 646 Prompt: Codex ranking work complete; J27 remains with Claude
+# Session 647 Prompt: Manage review released; Claude work remains separate
 
-## Session 645 Summary (Codex, 2026-10-27 Pacific)
+## Session 646 Summary (Codex, 2026-10-28 Pacific)
 
-[VERIFIED via merged PRs, successful Vercel production deployments and signed-in
-production checks.] Ranking meeting locks and saved-cycle access are released.
-The owner ended Codex work to avoid overlap with Claude: let Claude finish the
-J27 planning and implementation. No J27 UI or state-model code was changed here.
+[VERIFIED via PR #539, GitHub deployment status, source and signed-in production
+navigation.] The responsible-PD dashboard now exposes **Manage review** beside
+**Edit in Word**. The link opens that proposal's Final Writeup tab in the same
+browser tab, where the existing **Send to leadership** confirmation is available
+to the lead PD or a superuser during group review. Opening the link changes no
+writeup stage and sends no email.
 
 ### What Was Completed
 
-1. **Ranking lock/unlock — DONE, production.** PR #536 merged as `379cf81485`.
-   Captured facilitators and superusers with app access may lock/unlock after
-   reveal. All other workflow mutations, including resets/restarts, are blocked
-   while locked. Existing Dataverse workflow JSON, audit log, history and atomic
-   receipts retain actor/time and final collective work; no schema change.
-2. **D26 meeting locked — DONE, owner-authorized production action.** The signed-in
-   UI records Justin Gallivan at **2026-10-27 17:20:08 Pacific**. Reload preserved
-   the lock. Workbook download was a valid XLSX with 23 group rows and 92
-   individual-assessment rows. It remains in the owner's Downloads folder; no
-   workbook, private data or credentials were committed.
-3. **Past-cycle loading incident — FIXED, production.** PR #537 merged as
-   `0a4702cac`. The original coordinator read lacked the shared paginated
-   reader's required filter; runtime logs proved that failure. Filtering on
-   `wmkf_activeroundid ne null` fixes discovery without bypassing the guard.
-   A real-reader/mocked-HTTP regression test fails without the fix and passes
-   with it, including pagination and read-only behavior.
-4. **Production verification — DONE.** Deployment
-   `dpl_Hx4bL2cxJNMqisPVB75gWQ5wZT2d` is Ready on the production aliases at
-   `0a4702cac`. Signed-in cycle discovery no longer shows the error; J27 loads
-   its empty pool and switching back restores D26. The original D26 lock text,
-   actor/time and all 23 proposal IDs in order match the pre-fix baseline.
-   Export remains enabled; new-deployment ranking GET/POST requests returned 200.
-5. **Independent reviews — DONE.** Claude Opus 5.5 reviewed both runtime changes
-   through the owner's OAuth/subscription session. The first review required a
-   non-roster actor-display fix; the follow-up approved. The cycle-filter fix
-   was also approved. No agent API-key fallback or Ultrareview was used.
+1. **Navigation gap — FIXED, production.** Beth's screenshots showed her own
+   writeups in Group review with only a Word link. Source tracing found the
+   leadership handoff already available in the proposal's Final Writeup tab;
+   the dashboard offered no direct path there. `RowAction` now uses the existing
+   `fullRequestHref` for Manage review. PD self-review exclusion and transition
+   authorization are unchanged; no role-specific bypass was introduced.
+2. **Release — DONE, owner-authorized.** Commit `fd2be654b` merged in
+   [PR #539](https://github.com/justingallivan/wmkf-research-apps/pull/539)
+   as `123caccc0`. Production deployment `DAm9NfE4cJcDF6hokNYdJtb7zpt1`
+   completed successfully (GitHub production deployment `7396078642`). Its URL:
+   `https://wmkfresearchapps-odq09frvm-justin-gallivans-projects.vercel.app`.
+3. **Production smoke — PASSED, read-only.** Signed in at
+   `https://applications.wmkeck.org`, expanded Your writeups, saw Manage review
+   beside Edit in Word, and followed it to request `1002852` with
+   `tab=final-writeup&n=1002852`. The Final Writeup tab loaded its existing
+   leadership-review state. Beth's own signed-in session was not tested; no
+   writeup transition, Board release, notification or document edit was performed.
+4. **Isolation — maintained.** Work was done in this chat's managed worktree.
+   Claude's checkout, branch and WIP were not edited, switched, staged or stashed.
 
-### Commits / Releases
+### Commits and Documentation Destination
 
-- `1f34948ca` — ranking lock/unlock and past-cycle access.
-- `0caaf9dd8` — duplicate test import found by full CI lint; fixed before merge.
-- `379cf81485` — PR #536 merge and production release.
-- `e91abaa16` — filter saved ranking cycles before the paginated Dataverse read.
-- `0a4702cac` — PR #537 merge and production fix.
+- `fd2be654b` — Expose review management for responsible PD writeups.
+- `123caccc0` — PR #539 merge, deployed to production.
+- Runtime branch: `codex/session-646-isolated` (merged).
+- Owner-approved handoff destination: separate docs-only PR on
+  `codex/session-646-handoff`, based on released main `123caccc0`.
+  Preparing this handoff does not authorize another merge/deployment.
 
 ## Next Items
 
 ### Verified Open
 
-No further Codex ranking build is queued. Resume only on a new owner request.
+No further Codex implementation is queued. Wait for a new owner request.
+Beth can refresh Final writeups, expand Your writeups, select Manage review,
+then confirm Send to leadership when she decides the writeup is ready.
+This is a user action, not authorization for an agent to advance her proposals.
 
 ### Owner Decision / Handoff Needed
 
-**J27 belongs to Claude.** Owner direction at stop: let Claude finish to avoid
-parallel work on the same decisions. The latest inspected owner branch was
-`claude/j27-ai-materials-names` at `f4f426c1a`; its alignment log includes D13–D17
-and supersedes older September triage/advance assumptions. Recheck that branch
-and get an explicit ownership handoff before Codex edits J27 plans or runtime.
-Do not copy that branch's unmerged runtime merely to update documentation.
+**Claude's work stays Claude-owned.** The prior handoff records J27 alignment,
+AI Materials and intake on `claude/j27-ai-materials-names`, with
+`docs/plans/J27_ALIGNMENT_LOG_2026-10-24.md` as its owner-plan pointer.
+Its recorded inspected commit `f4f426c1a` is historical, not a current branch-tip
+claim. Current Claude WIP was not audited this session. Obtain an explicit
+handoff and recheck source before Codex edits those surfaces.
 
 ### Parked
 
-- Research request corpus follow-up remains Claude-owned and requires its own
-  owner authorization; see its plan and the preceding handoff snapshot.
-- Reviewer-save recovery follow-up was unconfirmed in the preceding handoff;
-  no new authorization was given here. Do not auto-resume it.
+- Research request corpus: prior handoff records Claude ownership and a separate
+  authorization boundary; plan pointer
+  `docs/plans/RESEARCH_REQUEST_FILE_CORPUS_PLAN_2026-10-25.md`.
+- Reviewer-save recovery: no new authorization this session; do not auto-resume.
 
 ### Verify Before Acting
 
-- Do not unlock, reset, restart, replace or archive D26 as a test. Its current
-  production lock is deliberate. Real lock enforcement requires the released
-  code; old code does not enforce the additive JSON flag after rollback.
-- Board archival is separate from ranking finalization. Preserve its retained
-  rehearsal receipts/output and prior safety constraints; no D26 archival,
-  release, deletion or notification is authorized by this handoff.
-- The older handoff is retrievable exactly with
-  `git show 0a4702cac:SESSION_PROMPT.md`. It preserves the Board archival record,
-  unresolved J27 owner decisions, corpus scope and previous safety constraints.
-  Its proposed next steps must be rechecked against Claude's newer work.
+- Preserve the deliberately locked D26 ranking meeting. Do not unlock, reset,
+  restart, replace or archive it as a test. This session did not re-probe its lock.
+- Board archival remains separate from ranking finalization. No archival,
+  deletion, release or notification is authorized by this handoff. Preserve
+  retained rehearsal receipts and prior constraints; see
+  `docs/audits/BOARD_ARCHIVE_REHEARSAL_2026-10-27.md`.
+- Prior complete handoff: `git show 5cb7d90af:SESSION_PROMPT.md` (retrieval
+  verified). Earlier Board/corpus and safety history:
+  `git show 0a4702cac:SESSION_PROMPT.md`. These are historical records whose
+  proposed tasks require fresh evidence and owner direction.
 
 ### Do Not Reopen Without New Decision
 
-Ranking locks, actor attribution, saved-cycle discovery and the D26 lock/export
-checks are DONE. Do not carry them forward as unbuilt work.
+Manage review navigation is released. Ranking locks, actor attribution,
+saved-cycle discovery and D26 lock/export checks were recorded complete in
+Session 645; do not treat them as an unbuilt worklist.
 
 ## Concurrent Workstreams
 
 | Owner / workstream | Resume boundary |
 |---|---|
-| Claude — J27 alignment, AI Materials and intake decisions | Owning branch `claude/j27-ai-materials-names`; `docs/plans/J27_ALIGNMENT_LOG_2026-10-24.md`; latest inspected `f4f426c1a`; ongoing, Codex yielded |
-| Codex — ranking locks / saved-cycle access | Runtime merged in #536/#537; no open runtime WIP |
-| Codex — this handoff | Docs-only branch `codex/session-645-handoff`, based on released main `0a4702cac`; prepared as a separate PR, not permission to merge or deploy it |
-| Claude — research request corpus | `docs/plans/RESEARCH_REQUEST_FILE_CORPUS_PLAN_2026-10-25.md`; next scope owner-gated |
-| Board archival readiness / rehearsal | Prior handoff snapshot and `docs/audits/BOARD_ARCHIVE_REHEARSAL_2026-10-27.md`; no new archival development or live action queued |
+| Claude — J27 / AI Materials / intake | Prior owner-plan pointer above; current WIP uninspected; explicit handoff required |
+| Claude — research corpus | Prior corpus plan; separate owner authorization required |
+| Codex — Manage review | Runtime merged in #539; no runtime WIP |
+| Codex — session handoff | Docs-only `codex/session-646-handoff`; separate PR |
+| Board archival | Prior rehearsal record; no live action authorized |
 
 ## Key Files Reference
 
 | File | Purpose |
 |---|---|
-| `lib/services/proposal-ranking/workflow-service.js` | Authorization, lock metadata/audit, round-fenced writes and privacy |
-| `lib/services/proposal-ranking/workflow.js` | Pure lock/unlock transitions and mutation blocking |
-| `lib/dataverse/adapters/proposal-ranking.js` | Filtered saved-cycle reads and conditional persistence |
-| `shared/components/proposal-ranking/AssessmentWorkflow.js` | Lock status, confirmations and read-only view |
-| `docs/guides/PROPOSAL_RANKING_LISTS.md` | Staff instructions and storage/retrieval limits |
-| `docs/atlas/dataverse-proposal-ranking.md` | Production storage and release evidence |
+| `shared/components/final-writeups/FinalWriteupsViews.js` | Dashboard row actions, including Manage review |
+| `tests/unit/final-writeups-views.test.js` | Dual PD/leadership navigation regression |
+| `shared/components/workbench/FinalWriteupTab.js` | Existing leadership handoff and confirmation |
+| `lib/services/final-writeup/transition-service.js` | Existing authorized, fenced leadership transition |
 
 ## Testing and Closeout
 
-- All PR checks passed before each merge, including canonical production builds.
-  #536: 25,936 tests plus 152 Postgres integration tests passed (298 skipped in
-  the main suite). The final focused ranking run for #537: 25 suites / 295 tests.
-- Types, changed-file lint and sequential DAL/OData/GUID gate/self-tests passed
-  for the filter fix; the earlier feature also passed the broader scoped gates.
-- Production checks used the signed-in app. The only ranking mutation performed
-  was the explicitly authorized D26 lock; no unlock or re-ranking occurred.
-- Milestone determination: entry required and added to `DEVELOPMENT_LOG.md` for
-  production ranking finalization and retained-cycle access.
-- `CLAUDE.md` and memory files were unchanged. The claim-evidence pilot report
-  was attempted normally and outside the sandbox; both reported local state
-  unavailable. No observation row was added because eligibility could not be established.
-- Claude's original checkout and its tracked/untracked WIP were left untouched.
+- Focused dashboard, Final Writeup tab, leadership transition and route suites:
+  4 suites / 124 tests passed. TypeScript passed; changed-file lint passed with
+  two pre-existing test-harness warnings. Existing tests also emit React act warnings.
+- All #539 PR checks passed, including full Jest, Postgres integration, production
+  build, security/code analysis and preview deployment. The automated
+  `claude-review` check passed; no separate manual model review is claimed.
+- Startup check scripts and self-tests ran sequentially and exited successfully.
+  Factory-ledger verification skipped because ledger URLs were unconfigured.
+- Milestone determination: no DEVELOPMENT_LOG entry required for this contained
+  navigation fix to an existing capability. Session details are retained here
+  and in the release commit/PR.
+- CLAUDE.md and memory files unchanged. The claim-evidence report was attempted
+  inside and outside the sandbox; both reported local state unavailable. No pilot
+  observation row was added because session eligibility could not be established.
+- Bounded sweep: source/test plus merged-PR/deployment evidence supports the new
+  navigation claim; existing Word-action descriptions still agree, and the
+  older “only action” smoke is explicitly dated historical evidence. No schema,
+  route, identity, acknowledgement or persistence contract changed.
