@@ -99,7 +99,7 @@ async function main() {
   await section('requests', async () => {
     const filter = encodeURIComponent(`wmkf_meetingdate ge ${SINCE}T00:00:00Z or createdon ge ${SINCE}T00:00:00Z`);
     const rows = await all(`/akoya_requests?$select=akoya_requestnum,_wmkf_grantcycle_value,wmkf_meetingdate,akoya_requeststatus,_akoya_programid_value,createdon,wmkf_istestrequest&$filter=${filter}`);
-    const out = { scanned: rows.length, withLookup: 0, withMeetingDateCycle: 0, agreement: {}, mismatchSamples: {}, byStatus: {}, byCreatedMonth: {}, research: { byLookupCode: {}, byMeetingDateCycle: {}, d26j27: {} } };
+    const out = { scanned: rows.length, withLookup: 0, withMeetingDateCycle: 0, agreement: {}, mismatchSamples: {}, byStatus: {}, byCreatedMonth: {}, byCreatedMonthProgram: {}, missingByProgramStatus: {}, research: { byLookupCode: {}, byMeetingDateCycle: {}, d26j27: {} } };
     for (const r of rows) {
       if (r.wmkf_istestrequest === true) { bump(out, 'skippedTest'); continue; }
       const lookupId = r._wmkf_grantcycle_value || null;
@@ -121,6 +121,12 @@ async function main() {
         const m = (out.byCreatedMonth[month] ||= { total: 0, withLookup: 0 });
         m.total++; if (lookupId) m.withLookup++;
       }
+      const program = r['_akoya_programid_value@OData.Community.Display.V1.FormattedValue'] || (r._akoya_programid_value ? 'unnamed program' : '(no program)');
+      if (month >= '2026-01') {
+        const mp = ((out.byCreatedMonthProgram[month] ||= {})[program] ||= { total: 0, withLookup: 0 });
+        mp.total++; if (lookupId) mp.withLookup++;
+      }
+      if (!lookupId) bump(out.missingByProgramStatus, `${program} | ${status}`);
       if (RESEARCH_PROGRAM_IDS.has(r._akoya_programid_value)) {
         bump(out.research.byLookupCode, lookupCode || 'no lookup');
         bump(out.research.byMeetingDateCycle, dateCode || 'none');
