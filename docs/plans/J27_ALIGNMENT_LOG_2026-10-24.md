@@ -344,7 +344,7 @@ rather than giving a day. Every date is a proposal for Justin to adjust.
 |---|---|---|---|---|
 | Wed Oct 28 meeting | A5 | J27 central values: review deadline, plus default days to respond and default reviewer quota (D9) | Sarah | Central reviewer settings cannot ship (D4, November) |
 | Before the Nov 15 delivery (decide in early November) | R2 | Which intake AI steps Connor's flows run (he intends compliance, keywords, tentative lead PD, possibly Board/consultant expertise) and which an app job runs; trigger and who watches failures. Prompts are shared either way (D14) | Justin, Connor | R-3 build scope for Nov 15; D6/X1/F1 |
-| Before the Nov 15 delivery (decide in early November) | B1 Q3 | Type and exact meaning of `wmkf_phistaffversioncompleteflag` (set after the `AI Materials` copies?) | Connor | Using the flag as the AI-pass trigger |
+| Wed Oct 28 meeting (Connor) | B1 Q3 | Type and exact meaning of `wmkf_phistaffversioncompleteflag` (set after the `AI Materials` copies?) | Connor | Using the flag as the AI-pass trigger |
 | Before the Nov 15 delivery (decide in early November) | B1 Q4 | Confirm "generate once; staff regenerate by hand" for replaced files | Justin | AI-pass rerun behavior |
 | Before the Nov 15 delivery (decide in early November) | X1 | Who maintains the expertise roster; is the suggested PD written to the request or only shown; can the CSO's Claude project prompt be shared? | CSO, Sarah, Duncan | Inline expertise matcher (D6) |
 | Before the Nov 15 delivery (decide in early November) | F1 | What triage flags are and who may see them | Sarah, Duncan, CSO | Flag step of the AI pass; Jan 6 decline notes |
