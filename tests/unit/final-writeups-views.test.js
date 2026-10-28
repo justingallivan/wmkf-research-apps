@@ -172,6 +172,24 @@ test('dashboard search filters the active view without adding controls other tha
   expect(screen.getByRole('group', { name: 'Review queue' }).querySelectorAll('button')).toHaveLength(3);
 });
 
+test('a dual PD and leadership viewer can reach review management for their own writeup without self-review', async () => {
+  const data = dashboard();
+  data.viewer.personas = ['program-director', 'leadership'];
+  data.viewer.personaLensesEnabled = true;
+  const own = data.queues.stewardship[0];
+  own.fullRequestHref = `/workbench/${own.requestId}?tab=final-writeup&n=${own.requestNumber}`;
+  global.fetch.mockResolvedValueOnce(response(data));
+  renderPanel();
+
+  const manage = await screen.findByRole('link', { name: 'Manage review' });
+  expect(manage).toHaveAttribute('href', own.fullRequestHref);
+  expect(manage).not.toHaveAttribute('target');
+  expect(screen.getByRole('link', { name: 'Edit in Word' }))
+    .toHaveAttribute('href', own.document.url);
+  expect(screen.getAllByRole('link', { name: 'Open review' })).toHaveLength(1);
+  expect(screen.queryByRole('button', { name: 'Mark reviewed' })).not.toBeInTheDocument();
+});
+
 test('a search that matches only a "Your writeups" row still counts as a shown match', async () => {
   global.fetch.mockResolvedValueOnce(response(dashboard()));
   renderPanel();

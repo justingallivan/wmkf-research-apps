@@ -123,15 +123,24 @@ function RowAction({ row }) {
   const classes = 'inline-flex min-h-11 items-center justify-center gap-2 rounded-lg px-4 py-2.5 text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2';
   if (row.relationship === 'responsible-pd') {
     return (
-      <a
-        href={row.document.url}
-        target="_blank"
-        rel="noopener noreferrer"
-        className={`${classes} bg-gray-900 text-white hover:bg-gray-800`}
-      >
-        {row.primaryAction.label}
-        <ArrowIcon />
-      </a>
+      <div className="flex flex-wrap items-center gap-3">
+        <Link
+          href={row.fullRequestHref}
+          className={`${classes} border border-gray-300 bg-white text-gray-900 hover:border-gray-400 hover:bg-gray-50`}
+        >
+          Manage review
+          <ArrowIcon />
+        </Link>
+        <a
+          href={row.document.url}
+          target="_blank"
+          rel="noopener noreferrer"
+          className={`${classes} bg-gray-900 text-white hover:bg-gray-800`}
+        >
+          {row.primaryAction.label}
+          <ArrowIcon />
+        </a>
+      </div>
     );
   }
   return (
