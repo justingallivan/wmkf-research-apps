@@ -1,194 +1,122 @@
-# Session 645 Prompt: J27 decision matrix; Board archival readiness
+# Session 646 Prompt: Codex ranking work complete; J27 remains with Claude
 
-**Main handoff integration, 2026-10-27:** preserves the newer Claude handoff
-from `bb79a05e6:SESSION_PROMPT.md` and adds the Board readiness record below.
-J27 runtime and detailed decision work remain on `claude/j27-ai-materials-names`;
-no J27 or rehearsal runtime code is included in this documentation-only landing.
-The J27 source/path references below describe that branch; use its owning
-checkout to resume without switching or resetting another agent's worktree.
+## Session 645 Summary (Codex, 2026-10-27 Pacific)
 
-## Board archival readiness — completed 2026-10-27 (Codex)
-
-[VERIFIED via exact owner schema output, Vercel reads, signed-in setup and
-isolated receipts.] Production archival schema/readiness is provisioned;
-D26 has 23 confirmed requests, active setup, materials deadline 2026-11-02 and
-Board end 2026-12-10. At the last read, zero released and no archival started.
-The fictional 1003220/J00 round trip preserved a Word edit, registered the
-readable copy and opened correctly from native AkoyaGO. A separate local worker
-resumed verification of that existing copy with one dispatch and a locally
-captured completion notice; cloud writes stayed blocked. No rehearsal emails
-or D26 file changes. Actual queued archival inside Vercel with the production
-journal and live notification delivery remain unproved.
-
-- Evidence: `docs/audits/BOARD_ARCHIVE_REHEARSAL_2026-10-27.md`; current state:
-  `docs/atlas/postgres-board-writeup-runs.md`.
-- Runner, tests and trusted test hooks remain ONLY on
-  `codex/board-archive-rehearsal` (`c55c36568`, worker check `03030b750`).
-  They are not required for production archival and are not merged here.
-- Existing failed attempts, receipts and untracked local output are retained
-  on the original Mac; no cleanup/reset/overwrite is authorized. Portable
-  sanitized evidence is in the audit; no credential file is copied.
-- Operational sequence only: Beth releases, editing finishes, administrator or
-  Grants Manager reconciles and explicitly confirms archival, then verifies
-  the production results. No batch or email is authorized by this handoff.
-- Readiness setup/date/roster reminders are DONE. No additional archival
-  development is queued. This docs integration preserves J27's newer next
-  steps below; it does not approve proposed runtime builds.
-
-## Session 644 Summary (startup + coordination only, 2026-10-27)
-
-No code or plan work. `/start` ran all 40 `check:*` gates plus self-tests
-(70 runs), all green; branch 18 ahead / 0 behind `origin/main`.
-`/agent-coordination` [VERIFIED via `~/.codex/sessions` rollout log]: a Codex
-session (started 2026-10-26 15:42) shares **this checkout**
-(`/Users/gallivan/Code/WMKF_Apps`, on this branch). It has only done read-only
-work: Board writeup CSO-stage questions and the Beth daily-reminder reply. It
-was told Claude was idle. Proposed split, **not yet confirmed by the owner**:
-Claude keeps this checkout and branch for J27 docs. Codex does any edits in its
-own worktree off `origin/main` and never checks out, switches, stashes or
-resets in this directory. Before resuming, re-check for a live Codex session in
-this checkout (`git worktree list`, newest `~/.codex/sessions` rollout `cwd`).
-Everything below is the unchanged S643 handoff; its next items remain open.
-
-## Session 643 Summary
-
-[VERIFIED via commits on the branch and owner-run probe output, 2026-10-26.]
-Justin relayed Connor's answers on J27 proposal files. The apps were changed
-to accept the J27 file names. The alignment log was then worked through one
-question at a time, and the full J27 timeline (Dec 7 submission → Jun 9–10
-Board) was walked into a proposed proposal state model. Nothing was released to
-production.
+[VERIFIED via merged PRs, successful Vercel production deployments and signed-in
+production checks.] Ranking meeting locks and saved-cycle access are released.
+The owner ended Codex work to avoid overlap with Claude: let Claude finish the
+J27 planning and implementation. No J27 UI or state-model code was changed here.
 
 ### What Was Completed
 
-1. **J27 AI Materials names accepted (runtime, unreleased).** Governed readers
-   (Initial Assessment, Field Primer, Pre-Site, review panel, cycle dossier)
-   and the Workbench Proposal-tab AI slots accept either
-   `ProposalNarrative_{n}.pdf` / `ProposalBibliography_{n}.pdf` (D26) or
-   `Project-Narrative_{n}.pdf` / `Bibliography_{n}.pdf` (J27). Both present
-   fails closed. New helpers `acceptedProposalNarrativeFilenames` /
-   `acceptedProposalBibliographyFilenames` in
-   `lib/utils/proposal-document-names.js`. Connor confirmed all J27 files are
-   PDFs except the graphical abstract (an image). 17 suites / 557 tests passed.
-   Types, lint, doc gates and a self-run `/contract-reconcile` found no defects.
-   Remaining risks: both-present shows "not found" without a reason, and the
-   Test Request factory refuses J27-named sources (`SOURCE_DOCUMENT_MISMATCH`).
-2. **Read-only probes (owner-run):**
-   - `scripts/probe-akoya-request-status-values.js` confirmed `akoya_requeststatus`
-     is a String and listed the Phase I and Phase II picklist options.
-   - `scripts/probe-d26-phase-statuses.js` covered the 23 D26 Advancing proposals:
-     all Phase I `Invited` / `Phase II Pending`. Staff set Phase II `Recommended`
-     on 15 and `Not Recommended` on 8 on 2026-10-26.
-   - Owner semantics: the phase picklists hold staff recommendations; Request
-     Status changes only at the Board decision. Recorded in the Atlas.
-3. **Alignment log** (`docs/plans/J27_ALIGNMENT_LOG_2026-10-24.md`):
-   - B1 answers: `Submission-Documents` folder, the J27 file list,
-     `wmkf_phistaffversioncompleteflag` as the ready signal, generate once and
-     regenerate by hand (proposed).
-   - C1 answered. C2 partly answered (placeholder date; moves handled by a flow).
-     C3 goes to the Oct 28 meeting. C5's owner is the CSO with Connor and Sarah.
-   - New items: X2 (triage field vs Phase I Status), a **proposed J27 state model**
-     (Submitted / Triaged / Under consideration / Recommend to Program Chairs;
-     after the Chairs meeting the apps read AkoyaGO), reviewer search versus
-     the invitation gate, reviewer materials at about the 50-proposal stage,
-     offramp and oral-presentation signals, and an MR vs S&E section.
-4. **Docs reconciled** for the J27 names: Power Automate contract, file model,
-   reviewer materials folder spec, Atlas, register (Q5, Q23, J27-038, J27-082),
-   service catalog, and memory `project-j27-doc-capture-evolution.md`.
+1. **Ranking lock/unlock — DONE, production.** PR #536 merged as `379cf81485`.
+   Captured facilitators and superusers with app access may lock/unlock after
+   reveal. All other workflow mutations, including resets/restarts, are blocked
+   while locked. Existing Dataverse workflow JSON, audit log, history and atomic
+   receipts retain actor/time and final collective work; no schema change.
+2. **D26 meeting locked — DONE, owner-authorized production action.** The signed-in
+   UI records Justin Gallivan at **2026-10-27 17:20:08 Pacific**. Reload preserved
+   the lock. Workbook download was a valid XLSX with 23 group rows and 92
+   individual-assessment rows. It remains in the owner's Downloads folder; no
+   workbook, private data or credentials were committed.
+3. **Past-cycle loading incident — FIXED, production.** PR #537 merged as
+   `0a4702cac`. The original coordinator read lacked the shared paginated
+   reader's required filter; runtime logs proved that failure. Filtering on
+   `wmkf_activeroundid ne null` fixes discovery without bypassing the guard.
+   A real-reader/mocked-HTTP regression test fails without the fix and passes
+   with it, including pagination and read-only behavior.
+4. **Production verification — DONE.** Deployment
+   `dpl_Hx4bL2cxJNMqisPVB75gWQ5wZT2d` is Ready on the production aliases at
+   `0a4702cac`. Signed-in cycle discovery no longer shows the error; J27 loads
+   its empty pool and switching back restores D26. The original D26 lock text,
+   actor/time and all 23 proposal IDs in order match the pre-fix baseline.
+   Export remains enabled; new-deployment ranking GET/POST requests returned 200.
+5. **Independent reviews — DONE.** Claude Opus 5.5 reviewed both runtime changes
+   through the owner's OAuth/subscription session. The first review required a
+   non-roster actor-display fix; the follow-up approved. The cycle-filter fix
+   was also approved. No agent API-key fallback or Ultrareview was used.
 
-### Commits (branch `claude/j27-ai-materials-names`)
-- `62d7af5b6` resolver accepts J27 names · `facedc948`, `7773dfe55`, `b5bc02ae3` doc reconciliation and extension confirmation
-- `6e889a1d9`, `6b4602de0`, `d9c4a7024`, `5b28dc4dd` probes
-- `6b598ae8b`, `b48574a47` Atlas status option sets and semantics
-- `140a31c8b` … `5fe5af17f` alignment-log state model, reviewers, offramp, Apr–Jun stages, MR vs S&E
+### Commits / Releases
+
+- `1f34948ca` — ranking lock/unlock and past-cycle access.
+- `0caaf9dd8` — duplicate test import found by full CI lint; fixed before merge.
+- `379cf81485` — PR #536 merge and production release.
+- `e91abaa16` — filter saved ranking cycles before the paginated Dataverse read.
+- `0a4702cac` — PR #537 merge and production fix.
 
 ## Next Items
 
 ### Verified Open
 
-1. **Decision calendar/matrix for unresolved J27 items (owner's action item).**
-   Evidence: the alignment log's open rows and the 2026-10-26 sections.
-   Build a who/what/when matrix covering every unresolved item. The owner also
-   suggested possibly appending a flowchart that names who sets which AkoyaGO
-   field and value to the J27/D27 timeline workbook. Owners named so far:
-   - Connor: B1 Q6 reviewer copy contents, order and trigger; magic links; C4 arrival status; C2 placeholder value
-   - Connor and Sarah: post-Chairs and offramp AkoyaGO values (tentative: Phase II `Pending Committee Review` for oral-presentation invitees)
-   - CSO with Connor and Sarah: MR vs S&E (C5)
-   - Wed 2026-10-28 team meeting: calendar ownership (A1, A3, A5, C3)
-   - Justin, Sarah, Duncan: X2
-   - Duncan: scheduling and oral-presentation invites
-2. **PR for the branch.** Evidence: pushed, no PR. This is Tier 1 runtime work
-   (governed AI input), so it needs an independent review and deliberate
-   promotion. Optionally split the docs-only commits so they can land on `main` first.
+No further Codex ranking build is queued. Resume only on a new owner request.
 
-### Owner Decision Needed
+### Owner Decision / Handoff Needed
 
-1. The J27 state-model values in AkoyaGO. Evidence: the alignment log's "J27
-   proposal state model" section. Justin will discuss with Connor and Sarah.
-2. Prior S643 items remain: the Duncan scheduling walkthrough, the remaining
-   Connor/J27 answers, and the next substantive project.
-   Evidence: `git show 80b1cd737:SESSION_PROMPT.md`.
+**J27 belongs to Claude.** Owner direction at stop: let Claude finish to avoid
+parallel work on the same decisions. The latest inspected owner branch was
+`claude/j27-ai-materials-names` at `f4f426c1a`; its alignment log includes D13–D17
+and supersedes older September triage/advance assumptions. Recheck that branch
+and get an explicit ownership handoff before Codex edits J27 plans or runtime.
+Do not copy that branch's unmerged runtime merely to update documentation.
 
 ### Parked
 
-1. Research request file corpus next steps (step 4 extraction, model pass,
-   admin browsing page) need owner approval. Database operations are owner-run.
-   Evidence: `docs/plans/RESEARCH_REQUEST_FILE_CORPUS_PLAN_2026-10-25.md`.
-2. The reviewer-save recovery follow-up is unconfirmed ("small ball"). Don't auto-resume it.
+- Research request corpus follow-up remains Claude-owned and requires its own
+  owner authorization; see its plan and the preceding handoff snapshot.
+- Reviewer-save recovery follow-up was unconfirmed in the preceding handoff;
+  no new authorization was given here. Do not auto-resume it.
 
 ### Verify Before Acting
 
-1. Build items implied by the state model are **proposed, not authorized**:
-   - J27 list states stored on the request in Dataverse
-   - invitation send guard keyed on AkoyaGO approval
-   - Reviewer Finder opening at Recommend to Program Chairs
-   - 1-page writeup and Diligent Book export (the owner called this the critical build)
-   - inline AI pass on the ready flag
-
-   Confirm scope with the owner before building any of them.
+- Do not unlock, reset, restart, replace or archive D26 as a test. Its current
+  production lock is deliberate. Real lock enforcement requires the released
+  code; old code does not enforce the additive JSON flag after rollback.
+- Board archival is separate from ranking finalization. Preserve its retained
+  rehearsal receipts/output and prior safety constraints; no D26 archival,
+  release, deletion or notification is authorized by this handoff.
+- The older handoff is retrievable exactly with
+  `git show 0a4702cac:SESSION_PROMPT.md`. It preserves the Board archival record,
+  unresolved J27 owner decisions, corpus scope and previous safety constraints.
+  Its proposed next steps must be rechecked against Claude's newer work.
 
 ### Do Not Reopen Without New Decision
 
-1. Accept-both naming (apps change, not Connor), owner 2026-10-26.
-2. C1: GOApply opportunity 001024 is the Research form, and no app concern.
+Ranking locks, actor attribution, saved-cycle discovery and the D26 lock/export
+checks are DONE. Do not carry them forward as unbuilt work.
 
-## Constraints
+## Concurrent Workstreams
 
-- Production Dataverse and Postgres reads are owner-run with `!`.
-- Do not reset, stash or clean untracked `output/` or `.impeccable/critique/`
-  files, or the `backup/local-main-slice2-plan-drafts-2026-10-25` branch.
-- Older context: `git show 80b1cd737:SESSION_PROMPT.md` (S643 prompt, which
-  includes the Codex S642 release summary and the corpus workstream).
+| Owner / workstream | Resume boundary |
+|---|---|
+| Claude — J27 alignment, AI Materials and intake decisions | Owning branch `claude/j27-ai-materials-names`; `docs/plans/J27_ALIGNMENT_LOG_2026-10-24.md`; latest inspected `f4f426c1a`; ongoing, Codex yielded |
+| Codex — ranking locks / saved-cycle access | Runtime merged in #536/#537; no open runtime WIP |
+| Codex — this handoff | Docs-only branch `codex/session-645-handoff`, based on released main `0a4702cac`; prepared as a separate PR, not permission to merge or deploy it |
+| Claude — research request corpus | `docs/plans/RESEARCH_REQUEST_FILE_CORPUS_PLAN_2026-10-25.md`; next scope owner-gated |
+| Board archival readiness / rehearsal | Prior handoff snapshot and `docs/audits/BOARD_ARCHIVE_REHEARSAL_2026-10-27.md`; no new archival development or live action queued |
 
 ## Key Files Reference
 
 | File | Purpose |
-|------|---------|
-| `docs/plans/J27_ALIGNMENT_LOG_2026-10-24.md` | Decisions, open items, proposed J27 state model |
-| `lib/utils/proposal-document-names.js` | Accepted AI Materials names |
-| `lib/services/workbench-proposal-documents.js` | Governed reader and Proposal-tab listing |
-| `docs/POWER_AUTOMATE_PROPOSAL_FILE_CONTRACT.md` | File spec for Connor, with J27 names |
-| `docs/atlas/dataverse-akoya-request.md` | Status field types, option sets, semantics |
-| `scripts/probe-akoya-request-status-values.js`, `scripts/probe-d26-phase-statuses.js` | Owner-run read-only probes |
-
-## Concurrent Workstreams
-
-| Workstream | Resume boundary |
 |---|---|
-| J27 alignment | This branch; alignment log; decision matrix next |
-| Personal email defaults / reviewer recovery | Released S642 (Codex); see `git show 80b1cd737:SESSION_PROMPT.md` |
-| Research request file corpus | Claude-owned; loaded 2026-10-26; next steps need owner approval |
+| `lib/services/proposal-ranking/workflow-service.js` | Authorization, lock metadata/audit, round-fenced writes and privacy |
+| `lib/services/proposal-ranking/workflow.js` | Pure lock/unlock transitions and mutation blocking |
+| `lib/dataverse/adapters/proposal-ranking.js` | Filtered saved-cycle reads and conditional persistence |
+| `shared/components/proposal-ranking/AssessmentWorkflow.js` | Lock status, confirmations and read-only view |
+| `docs/guides/PROPOSAL_RANKING_LISTS.md` | Staff instructions and storage/retrieval limits |
+| `docs/atlas/dataverse-proposal-ranking.md` | Production storage and release evidence |
 
-## Testing
+## Testing and Closeout
 
-```bash
-npx jest tests/unit/workbench-proposal-text.test.js tests/unit/workbench-proposal-document-listing.test.js
-npm run check:types
-```
-
-## Verification and Closeout
-
-Milestone determination: no DEVELOPMENT_LOG entry. Nothing shipped to
-production; the runtime change is on an unmerged branch. No CLAUDE.md change.
-The claim-evidence report recorded no eligible plan/design edit, so no
-observation row was added.
+- All PR checks passed before each merge, including canonical production builds.
+  #536: 25,936 tests plus 152 Postgres integration tests passed (298 skipped in
+  the main suite). The final focused ranking run for #537: 25 suites / 295 tests.
+- Types, changed-file lint and sequential DAL/OData/GUID gate/self-tests passed
+  for the filter fix; the earlier feature also passed the broader scoped gates.
+- Production checks used the signed-in app. The only ranking mutation performed
+  was the explicitly authorized D26 lock; no unlock or re-ranking occurred.
+- Milestone determination: entry required and added to `DEVELOPMENT_LOG.md` for
+  production ranking finalization and retained-cycle access.
+- `CLAUDE.md` and memory files were unchanged. The claim-evidence pilot report
+  was attempted normally and outside the sandbox; both reported local state
+  unavailable. No observation row was added because eligibility could not be established.
+- Claude's original checkout and its tracked/untracked WIP were left untouched.

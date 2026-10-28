@@ -41,7 +41,8 @@ These bars are discussion starting points, not budget cutoffs. Confidence, fundi
 
 ## Locking a finished meeting and reopening a past cycle
 
-[VERIFIED via branch source and focused tests, 2026-10-27; not yet deployed.]
+[VERIFIED via production releases #536/#537 and signed-in production checks,
+2026-10-27; operational evidence in `docs/atlas/dataverse-proposal-ranking.md`.]
 After the group reveal, either captured facilitator or a superuser with Proposal
 Ranking access can select **Lock meeting** and confirm. The saved group order and
 section dividers become read-only for everyone. Resets, reopening preparation and
@@ -72,5 +73,6 @@ the selected cycle's active revealed round; a superseded run remains viewable in
 History but does not gain workbook export through this change.
 
 This describes application retention and retrieval, not a verified Dataverse
-backup policy or immutable legal archive. No live records, locks or retention
-settings were changed by implementing this feature.
+backup policy or immutable legal archive. The owner-authorized D26 production
+lock and successful view/export checks are recorded in the Atlas; no ranking
+order or retention setting was changed.

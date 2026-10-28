@@ -1,32 +1,32 @@
 # Proposal Ranking API — D26 production contract and historical contracts
 
-**Released to production 2026-10-15 (Session 609)**: D26 v2 round `49279ac7-3ab9-41d8-b2d6-5aaf4085e642` is open; see the receipt in `PROPOSAL_RANKING_D26_RELEASE_2026-10-14.md`. Candidate and branch statements below are dated pre-release history. §8 plus the observer and concurrent-save changes merged in PRs #485 and #489 are the production contract.
+**Current production contract, verified 2026-10-27:** D26 v2 ranking was released
+2026-10-15 (Session 609), followed by observer/concurrent-save changes in
+PRs #485/#489. PR #536 (`379cf81485`) added meeting locks and cycle discovery;
+PR #537 (`0a4702cac`) fixed the discovery filter. Production fix deployment
+`dpl_Hx4bL2cxJNMqisPVB75gWQ5wZT2d` is Ready. The D26 round
+`49279ac7-3ab9-41d8-b2d6-5aaf4085e642` was locked with explicit owner approval;
+signed-in read/export and subsequent cycle switching retained that lock.
 
-Updated 2026-10-15. **The D26 branch API is §8**. Its reviewed baseline was
-source-verified at `9fe92f0ed` on `codex/d26-ranking-release`; a later baseline
-at `e091dd82f` reached dedicated test Preview. The single-Ready simplification
-described there is subsequent branch work. Production has not received this D26 release.
-Sections 1–5 preserve the **historical revision-3 API** verified on main at
-`b3219f4aa` before D26 integration. Section 6 preserves the earlier Preview v2
-contract. Do not use either historical section as the current D26 privacy or
-facilitation contract. Revision 5 product authority is
-`docs/plans/PROPOSAL_RANKING_DESIGN_2026-10-07.md`. The paused branch `0d161d60f`
-differs from the October 13 main baseline (§7).
-Deployment facts are dated receipts in `docs/atlas/dataverse-proposal-ranking.md`;
-the October 13 saved service and browser rehearsals exercised four trusted personas,
-not independent SSO/app-grant or production authenticated-route acceptance. A second
-reveal and full browser restart passed; final state is private preparation for all four. See
-`docs/audits/PROPOSAL_RANKING_V2_SANDBOX_REHEARSAL_2026-10-13.md` for limits.
+The current extension is below. Sections 1–7 preserve dated legacy/Preview
+contracts; §8 records the D26 implementation baseline and its historical
+acceptance receipts. Neither older candidate promotion notes nor the October 13
+sandbox state describe current production readiness. Release evidence lives in
+`docs/atlas/dataverse-proposal-ranking.md` and
+`PROPOSAL_RANKING_D26_RELEASE_2026-10-14.md`.
 
-## Branch extension — meeting lock/unlock and saved cycles, 2026-10-27
+## Production extension — meeting lock/unlock and saved cycles, 2026-10-27
 
-[VERIFIED via source and focused tests on `codex/session-645-start`; not deployed.]
+[VERIFIED via source, release CI, Vercel deployment and signed-in production
+checks, 2026-10-27.]
 This extension supplements the production v2 contract without changing legacy v1
 behavior, table schemas or the existing route's app-grant requirement.
 
 - `POST {action: "cycles"}` is read-only and returns `{cycles: string[]}` containing
   distinct valid saved cycle codes whose coordinator has a round pointer. No
-  ranking contents or private assessments are included. Dedicated rehearsal mode
+  ranking contents or private assessments are included. The Dataverse query
+  filters `wmkf_activeroundid ne null` before pagination; omitting that filter
+  caused the production failure corrected by #537. Dedicated rehearsal mode
   returns only its configured test cycle. The client merges these with the nearby
   calendar choices, retaining old cycles indefinitely in the selector while their
   saved coordinator pointers exist. A failed discovery is shown explicitly.
@@ -55,18 +55,25 @@ privacy and receive only lock/unlock confirmations after reveal. Other observer
 mutation denial remains unchanged. Historical candidate sections below retain
 their dated pre-extension permissions and deployment boundaries.
 
-Verification boundary: ranking tests, types, scoped lint, and relevant policy
-checks passed locally; the isolated fictional browser rehearsal exercised actual
-lock/confirm/unlock controls at mobile and desktop sizes. Claude Opus 5.5 reviewed
-the diff through the owner's OAuth subscription, requested the non-roster actor
-name fix, and approved the follow-up. The Webpack production build passed; the
-default Turbopack build cannot follow this worktree's shared dependency symlink.
-No live data write, production lock, schema operation or deployment was performed.
-The source-to-persistence-to-consumer trace covers the existing authenticated route,
-version dispatcher, reducer, conditional changeset, receipt/history and UI. New
-schema/migration, provider execution, and partial batch success audits are N/A.
-The documentation sweep is bounded to the branch extension in this API contract,
-ranking Atlas and guide; historical deployment/candidate receipts remain historical.
+Verification boundary: the first candidate passed focused tests, types and scoped
+checks; full CI then caught a duplicate test import, corrected before #536 merged.
+Both release PRs passed all CI checks, including the canonical production build;
+#536's full run passed 25,936 tests plus 152 Postgres integration tests. The final
+#537 focused run passed 25 suites / 295 tests, including a real paginated reader
+with mocked HTTP. Removing the filter reproduced the production error in that
+regression test; restoring it passed. Claude Opus 5.5 approved both changes through
+the owner's OAuth subscription after the actor-display fix.
+
+The owner-authorized D26 production lock persisted after reload; the downloaded
+workbook had 23 group rows and 92 individual assessments. On the #537 production
+deployment, cycle loading no longer showed the warning; switching to J27 and back
+preserved D26's exact lock actor/time and proposal order. Export remained enabled
+and ranking requests returned 200. No unlock, re-ranking or schema operation was
+performed. The source-to-persistence-to-consumer trace covers the authenticated
+route, dispatcher, reducer, conditional changeset, receipt/history and UI. New
+schema/migration, provider execution and partial-batch audits are N/A.
+The documentation sweep is bounded to this production extension, ranking Atlas,
+guide and handoff; historical receipts below remain historical.
 
 ## 1. Historical revision-3 route — October 13 main baseline
 
@@ -508,7 +515,7 @@ authenticated actor's private preparation; `progress` contains readiness only;
 collective content is present only after reveal. History, supplements, operation
 replay, and error `current` use explicit privacy projections; observers
 (including nonparticipant superusers) get the snapshot and readiness before reveal and
-the revealed group view after it, never `own`. In the October 27 branch extension,
+the revealed group view after it, never `own`. In the October 27 production extension,
 nonparticipant superusers receive only lock/unlock confirmations after reveal;
 ordinary observers receive no confirmations. Observer round and history reads end
 with a round ETag check and rebuild from the current round (bounded retries, then

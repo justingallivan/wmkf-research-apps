@@ -10,6 +10,18 @@ The chronological archive after the `Legacy chronological session log` divider c
 
 ---
 
+## October 2026 — Ranking finalization locks and retained-cycle access released (Session 645)
+
+**Milestone:** Staff can preserve a finished ranking meeting while retaining viewing and workbook export.
+**Sessions:** Session 645 (Codex); owner-authorized release/lock, Claude Opus OAuth reviews and production checks.
+**Ship state:**
+- PR #536 (`379cf81485`) ships facilitator/superuser lock/unlock, server mutation guards, attribution, retained history and saved-cycle selection; no schema change.
+- D26 locked by Justin Gallivan at 2026-10-27 17:20:08 Pacific; reload/export verified 23 group proposals and 92 individual assessments.
+- PR #537 (`0a4702cac`) fixes the missing Dataverse saved-cycle filter; real-reader regression test proves the failure and fix, without writes.
+- Both release CIs green; fix deployment `dpl_Hx4bL2cxJNMqisPVB75gWQ5wZT2d` Ready; signed-in cycle switching preserves D26's exact lock and proposal order.
+**Why it matters:** a completed meeting is protected from accidental changes and remains retrievable as cycles advance.
+**Pointers:** `docs/atlas/dataverse-proposal-ranking.md`; `docs/plans/PROPOSAL_RANKING_API_CONTRACT.md`; `docs/guides/PROPOSAL_RANKING_LISTS.md`; `1f34948ca`, `e91abaa16`.
+
 ## October 2026 — Board archival provisioned and isolated round trip verified (Session 643)
 
 **Milestone:** Closed archival schema/setup prerequisites and proved edited-file preservation on marked test request 1003220.
