@@ -89,10 +89,15 @@ The smallest thing that lets the calendar roles enter and see dates:
    appears as an Admin section for superusers and as a standalone
    `/cycle-calendar` page in the Tools menu for everyone else, the way
    Staffing does [VERIFIED via `shared/components/Layout.js:133`;
-   `pages/staffing.js`]. The panel lists the recent cycles (columns = cycles,
-   rows = dates) with each date's display name from metadata, its value or
-   "Not set", and "last changed by X on Y". Editing a date saves that one
-   column; clearing it saves null.
+   `pages/staffing.js`]. Layout (owner, 2026-10-28): a **cycle dropdown**
+   (recent modern-code rows; default the nearest upcoming one), then the
+   chosen cycle's dates as a list, each with its display name from metadata,
+   its value or "Not set", and "Changed by X, <date>". Editors get an **Edit**
+   control per date that opens the browser's date picker (native
+   `<input type="date">`, as in
+   `shared/components/reviewers/ReviewerDueDateEditor.js`) with Save,
+   Cancel and Clear date. Saving writes that one column; clearing writes
+   null. Non-editors see the same list without edit controls.
 3. **Access.** View: **any signed-in staff member** (owner, 2026-10-28),
    read-only for non-editors; not tied to Reviewer app access, because the
    Program Coordinator role may be held "without Reviewer app access"
