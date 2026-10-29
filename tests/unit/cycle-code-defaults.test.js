@@ -2,6 +2,7 @@ import {
   conventionalCycles,
   resolveLastDecidedCycle,
   resolveWorkingCycle,
+  resolveLandingCycle,
 } from '../../lib/utils/cycle-code';
 
 const SEP_8_2026 = new Date('2026-09-08T22:00:00-07:00'); // late evening Pacific = 2026-09-09 UTC
@@ -69,5 +70,25 @@ describe('resolveLastDecidedCycle (the most recent past meeting)', () => {
   test('working and last-decided cycles never coincide for the same day and list', () => {
     const list = conventionalCycles(SEP_8_2026);
     expect(resolveWorkingCycle(list, SEP_8_2026)).not.toBe(resolveLastDecidedCycle(list, SEP_8_2026));
+  });
+});
+
+describe('resolveLandingCycle (Grants Manager landing cycle, else the working cycle)', () => {
+  const cycles = [{ code: 'D26', meetingDate: '2026-12-10T00:00:00Z' }, { code: 'J27', meetingDate: '2027-06-10T00:00:00Z' }];
+  const today = new Date('2026-11-01T12:00:00Z');
+
+  test('a listed landing cycle wins over the date rule', () => {
+    expect(resolveLandingCycle(cycles, 'J27', today)).toBe('J27');
+    expect(resolveLandingCycle(['D26', 'J27'], 'j27 ', today)).toBe('J27');
+  });
+
+  test('unset, malformed or unlisted landing codes leave the date rule unchanged', () => {
+    for (const landing of [null, undefined, '', 'June 2027', 'Sept2019', 'J28']) {
+      expect(resolveLandingCycle(cycles, landing, today)).toBe(resolveWorkingCycle(cycles, today));
+    }
+  });
+
+  test('an empty list stays null even with a landing code', () => {
+    expect(resolveLandingCycle([], 'J27', today)).toBeNull();
   });
 });
