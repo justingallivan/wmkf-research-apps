@@ -118,10 +118,12 @@ small per-cycle record of app dates, edited on the same calendar page beside the
 eleven Dynamics dates, so Sarah sees one calendar. It records who changed each
 date. A documented divergence from D43's single home, chosen by the owner.
 
-- Staff recommendation deadline (Feb 3; the D40 "still Under consideration" warning)
-- Proposal release to reviewers (the "we will send the full proposal by" date in the
-  invitation and release emails; typed today in the Admin reviewer defaults, each PD's
-  saved preference and the release form)
+- Staff recommendation deadline (Feb 3; the D40 "still Under consideration" warning).
+  Added together with the triage list that reads it, never as an unread field.
+
+Proposal release to reviewers is **not** a date for J27 (D46): reviewers get the
+materials as soon as they accept. The release-date fields in the Admin defaults,
+the PD preference and the Reviewer Finder record go away with materials-on-acceptance.
 
 The January triage meetings are on the J27 timeline but no app feature, built or
 planned, reads their dates, so they get no field (corrected 2026-10-29).
