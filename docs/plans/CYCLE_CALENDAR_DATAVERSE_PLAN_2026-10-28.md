@@ -160,7 +160,13 @@ with `scripts/probe-audit-history-shape.cjs`, owner-run, structure only
 
 Parsing rule (`latestChanges`): entries that change no tracked column are
 ignored; a tracked change missing `createdon` or the formatted user name, or a
-paged collection, marks the cycle's history unavailable. Unavailable history
+paged collection, marks the cycle's history unavailable. A date is attributed
+only when its newest audited value (a clear counts as "Not set") equals the
+value displayed; otherwise that date shows no "changed by". This covers an
+edit landing between the row read and the history read (Codex re-review,
+2026-10-28; judged unlikely, accepted because the check is cheap) and dates
+changed while auditing was off or by a path that writes no history. Row-ETag
+re-checks and retries were judged not worth the complexity. Unavailable history
 (that, a failed read, or a revoked audit privilege) never shows a per-date
 claim: the panel shows the row's `modifiedon` / `modifiedby` labelled "last
 change to this cycle (any date)". Tests use a fixture built from the captured

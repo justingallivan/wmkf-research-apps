@@ -83,7 +83,7 @@ describe('latestChanges', () => {
       AUDIT_ENABLED_ENTRY,
     ]);
     expect(complete).toBe(true);
-    expect(changes.get('wmkf_researchreviewsduedate')).toEqual({ changedAt: '2026-10-30T10:00:00Z', changedBy: 'Sarah Hibler' });
+    expect(changes.get('wmkf_researchreviewsduedate')).toEqual({ changedAt: '2026-10-30T10:00:00Z', changedBy: 'Sarah Hibler', value: null });
     expect(changes.has('wmkf_name')).toBe(false);
     expect(changes.has('wmkf_researchproposalduedate')).toBe(false);
   });
@@ -131,11 +131,39 @@ describe('loadCalendar', () => {
     expect(result.cycles.every(c => c.historyAvailable === false)).toBe(true);
     expect(result.cycles[0].dates[0]).toMatchObject({ changedBy: null, changedAt: null });
   });
+  test.each([
+    ['history newer than the displayed value (edit between the two reads)', '2026-12-07T00:00:00Z', '2026-12-09T00:00:00Z'],
+    ['displayed value changed outside auditing', '2026-12-10T00:00:00Z', '2026-12-07T00:00:00Z'],
+    ['date shown but latest audit cleared it', '2026-12-07T00:00:00Z', null],
+    ['audited value unreadable', '2026-12-07T00:00:00Z', 'not a date'],
+  ])('no attribution when %s', async (_name, shown, audited) => {
+    const d = deps({
+      listModernCycles: jest.fn().mockResolvedValue([row('J27', '2027-06-10', { wmkf_researchproposalduedate: shown })]),
+      getChangeHistory: jest.fn().mockResolvedValue({
+        details: [attributeDetail({ createdon: '2026-10-30T10:00:00Z', user: 'Duncan Spore',
+          ...(audited === null ? { oldValue: { wmkf_researchproposalduedate: '2026-12-07T00:00:00Z' } } : { newValue: { wmkf_researchproposalduedate: audited } }) })],
+        moreRecords: false,
+      }),
+    });
+    const result = await loadCalendar(actor, d);
+    expect(result.cycles[0].dates[0]).toMatchObject({ changedBy: null, changedAt: null });
+  });
+  test('a cleared date shown as Not set is attributed to whoever cleared it', async () => {
+    const d = deps({
+      listModernCycles: jest.fn().mockResolvedValue([row('J27', '2027-06-10')]),
+      getChangeHistory: jest.fn().mockResolvedValue({
+        details: [attributeDetail({ createdon: '2026-10-30T10:00:00Z', user: 'Sarah Hibler', oldValue: { wmkf_researchproposalduedate: '2026-12-07T00:00:00Z' } })],
+        moreRecords: false,
+      }),
+    });
+    const result = await loadCalendar(actor, d);
+    expect(result.cycles[0].dates[0]).toMatchObject({ value: null, changedBy: 'Sarah Hibler' });
+  });
   test('complete history attributes each date', async () => {
     const d = deps({ getChangeHistory: jest.fn().mockResolvedValue({
       details: [AUDIT_ENABLED_ENTRY, attributeDetail({ createdon: '2026-10-30T10:00:00Z', user: 'Sarah Hibler', newValue: { wmkf_researchproposalduedate: '2026-12-07T00:00:00Z' } })],
       moreRecords: false,
-    }) });
+    }), listModernCycles: jest.fn().mockResolvedValue([row('D26', '2026-12-10', { wmkf_researchproposalduedate: '2026-12-07T00:00:00Z' })]) });
     const result = await loadCalendar(actor, d);
     expect(result.cycles[0].historyAvailable).toBe(true);
     expect(result.cycles[0].dates[0]).toMatchObject({ column: 'wmkf_researchproposalduedate', changedBy: 'Sarah Hibler', changedAt: '2026-10-30T10:00:00Z' });
