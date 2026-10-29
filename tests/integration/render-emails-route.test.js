@@ -67,7 +67,8 @@ describe('render-emails — co-PI list renders as a grammatical serial list', ()
         return { wmkf_name: 'Dr. Rev Iewer', wmkf_emailaddress: 'rev@example.org' };
       }
       if (set === 'akoya_requests') {
-        return { akoya_requestid: REQUEST_ID, akoya_title: 'A Proposal', _wmkf_projectleader_value_formatted: 'Dr. Lead PI' };
+        // A stored review due date: an invitation render then needs no calendar read (D48).
+        return { akoya_requestid: REQUEST_ID, akoya_title: 'A Proposal', _wmkf_projectleader_value_formatted: 'Dr. Lead PI', wmkf_reviewduedate: '2027-03-10' };
       }
       return null;
     });

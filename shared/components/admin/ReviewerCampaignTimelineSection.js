@@ -8,7 +8,6 @@ export default function ReviewerCampaignTimelineSection() {
     cycleLabel: '',
     respondOffsetDays: 7,
     proposalReleaseDate: '',
-    reviewDueDate: '',
     desiredCount: 4,
   });
   const [isDefault, setIsDefault] = useState(false);
@@ -28,7 +27,6 @@ export default function ReviewerCampaignTimelineSection() {
         cycleLabel: data.timeline?.cycleLabel || '',
         respondOffsetDays: data.timeline?.respondOffsetDays == null ? '' : data.timeline.respondOffsetDays,
         proposalReleaseDate: data.timeline?.proposalReleaseDate || '',
-        reviewDueDate: data.timeline?.reviewDueDate || '',
         desiredCount: data.timeline?.desiredCount == null ? '' : data.timeline.desiredCount,
       });
       setIsDefault(!!data.isDefault);
@@ -144,15 +142,6 @@ export default function ReviewerCampaignTimelineSection() {
             type="date"
             value={timeline.proposalReleaseDate}
             onChange={(e) => update('proposalReleaseDate', e.target.value)}
-            className="mt-1 w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500"
-          />
-        </label>
-        <label className="text-xs text-gray-600">
-          Reviews due
-          <input
-            type="date"
-            value={timeline.reviewDueDate}
-            onChange={(e) => update('reviewDueDate', e.target.value)}
             className="mt-1 w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500"
           />
         </label>

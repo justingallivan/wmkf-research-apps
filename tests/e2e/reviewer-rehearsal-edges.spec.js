@@ -115,7 +115,8 @@ async function sendInvitation(page, reviewerName) {
   await page.getByRole('button', { name: /reviewer campaign timeline/i }).click();
   await page.getByLabel('Days to respond').fill('7');
   await page.getByLabel('Proposals released to reviewers').fill('2099-07-15');
-  await page.getByLabel('Reviews due').fill('2099-07-22');
+  // D48: the review due date is the server's, shown read-only.
+  await expect(page.getByText('From the cycle calendar', { exact: true })).toBeVisible();
   page.once('dialog', (dialog) => dialog.accept());
   await page.getByRole('button', { name: 'Send 1 invitation' }).click();
 }
@@ -145,19 +146,19 @@ test.describe('private reviewer rehearsal edge fixtures', () => {
     await expect(page.getByText('Campaign settings', { exact: true })).toBeVisible();
     await expect(page.getByLabel('Days to respond')).toHaveValue('7');
     await page.getByLabel('Days to respond').fill('10');
-    await page.getByLabel('Review due date').fill('2099-08-15');
+    // D48: read-only, from the cycle calendar; no input to edit.
+    await expect(page.getByText('July 22, 2099')).toBeVisible();
+    await expect(page.getByLabel('Review due date')).toHaveCount(0);
     await page.getByLabel('Reviewer quota').fill('4');
     await page.getByRole('button', { name: 'Save', exact: true }).click();
     await expect(page.getByText('Campaign settings', { exact: true })).toBeHidden();
-    expect(fixture.state.campaignConfig).toMatchObject({ respondOffsetDays: 10, reviewDueDate: '2099-08-15', desiredCount: 4 });
+    expect(fixture.state.campaignConfig).toMatchObject({ respondOffsetDays: 10, reviewDueDate: '2099-07-22', desiredCount: 4 });
 
     await page.getByRole('button', { name: /campaign settings/i }).click();
     await expect(page.getByLabel('Days to respond')).toHaveValue('10');
-    await expect(page.getByLabel('Review due date')).toHaveValue('2099-08-15');
     await page.reload();
     await page.getByRole('button', { name: /campaign settings/i }).click();
     await expect(page.getByLabel('Days to respond')).toHaveValue('10');
-    await expect(page.getByLabel('Review due date')).toHaveValue('2099-08-15');
     await expect(page.getByLabel('Reviewer quota')).toHaveValue('4');
     expect(fixture.state.calls.filter((call) => call.pathname === '/api/review-manager/campaign-config' && call.method === 'GET').length).toBeGreaterThanOrEqual(3);
     expect(fixture.state.violations).toEqual([]);
@@ -260,7 +261,6 @@ test.describe('private reviewer rehearsal edge fixtures', () => {
     await page.getByRole('button', { name: /reviewer campaign timeline/i }).click();
     await page.getByLabel('Days to respond').fill('7');
     await page.getByLabel('Proposals released to reviewers').fill('2099-07-15');
-    await page.getByLabel('Reviews due').fill('2099-07-22');
     page.once('dialog', (dialog) => dialog.dismiss());
     await page.getByRole('button', { name: 'Send 1 invitation' }).click();
     await expect(page.getByRole('button', { name: 'Send 1 invitation' })).toBeVisible();

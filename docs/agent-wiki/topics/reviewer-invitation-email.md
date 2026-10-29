@@ -105,11 +105,16 @@ staff-guarded `/api/review-manager/send-emails`; no cron sends materials);
 `email-generator.js:496`; and no server-side mirror of this validation exists.
 
 **Standing hazard — the warning must name the EXTENSION, never "edit the due date".**
-Request campaign config is seeded *set only if unset*
-(`send-emails-service.js`: `if (dueDate != null && reqRec.wmkf_reviewduedate == null)`),
-and seeding is skipped entirely for `allowResend`. So on any wave after the first, a
-due-date edit in the invite modal changes only THAT email's copy while the request,
-portal, reminder sweep, and token math keep the original date. The per-reviewer
+**Superseded in part (2026-10-29, D48; PR 2 of `docs/plans/REVIEWER_INVITATION_CALENDAR_BUILD_PLAN_2026-10-29.md`, branch `claude/review-due-date-from-calendar`, not yet deployed):** the request's
+`wmkf_reviewduedate` is no longer seeded from the browser after send. Before an
+invitation is dispatched, `lib/services/review-due-date-service.js`
+`ensureRequestReviewDueDate` fills a blank date from the cycle calendar's Reviews Due
+Date (cycle from the request's meeting date), ETag-conditionally; a stored date never
+moves. Render fills `{{reviewDue}}` server-side and the invite modal shows the date
+read-only, so there is no due-date edit left to diverge. Historical behavior: request
+campaign config was seeded *set only if unset* after delivery, so a later due-date edit
+in the invite modal changed only that email's copy while the request, portal, reminder
+sweep, and token math kept the original date. The per-reviewer
 override (`wmkf_reviewduedateoverride`) is the only authoritative remedy — it is what
 `resolveEffectiveReviewDueDate` (`lib/external/reviewer-due-date.js`) reads everywhere.
 Codex adversarial review caught an earlier version of the warning string walking a PD
@@ -288,10 +293,12 @@ On the UI branch, `ReviewerManagePanel` passes `proposal?.proposalId` as `reques
   Institution — empty lines dropped, composed in `lib/utils/email-generator.js`) and
   the full `{{proposalAbstract}}`. Co-PI names come from the `wmkf_apprequestperson`
   junction (`fetchCoPIs`); PI is `_wmkf_projectleader_value_formatted` ONLY (never the
-  applicant org). Timeline tokens are client-substituted from the existing campaign
-  system; the modal blocks a send only when the review due date is not after the proposal release date; response-deadline conditions do not block Send. It loads timing in this order:
+  applicant org). Respond-by and proposal-delivery tokens are client-substituted from
+  the existing campaign system; `{{reviewDue}}` is server-filled from the request date or
+  the cycle calendar (D48); the modal blocks a send only when the review due date is not after the proposal release date; response-deadline conditions do not block Send. It loads timing in this order:
   built-in fallback, per-user sticky `reviewer_invite_timing`, admin cycle defaults,
-  then request campaign config. The redesigned seed is init data, not a runtime
+  then request campaign config (response days and release copy only; the due date
+  comes from the render response). The redesigned seed is init data, not a runtime
   fallback: promotion must deliberately rebaseline the admin default, and existing
   per-PD subject/body overrides remain intact until reset or edited.
 

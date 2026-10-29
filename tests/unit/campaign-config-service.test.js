@@ -87,8 +87,8 @@ describe('saveCampaignConfig', () => {
 
   test('null clears a column', async () => {
     getById.mockResolvedValueOnce(record());
-    await saveCampaignConfig({ requestId: REQ, config: { reviewDueDate: null }, actingUserSystemId: null });
-    expect(updateById).toHaveBeenCalledWith(REQ, { wmkf_reviewduedate: null }, { actingUserSystemId: null });
+    await saveCampaignConfig({ requestId: REQ, config: { respondOffsetDays: null }, actingUserSystemId: null });
+    expect(updateById).toHaveBeenCalledWith(REQ, { wmkf_respondoffsetdays: null }, { actingUserSystemId: null });
   });
 
   test('rejects unknown/read-only field with 400 BEFORE any Dataverse read', async () => {
@@ -109,9 +109,16 @@ describe('saveCampaignConfig', () => {
     await expect(
       saveCampaignConfig({ requestId: REQ, config: { respondReminderEnabled: 'yes' }, actingUserSystemId: null }),
     ).rejects.toMatchObject({ httpStatus: 400, message: 'respondReminderEnabled must be a boolean' });
-    await expect(
-      saveCampaignConfig({ requestId: REQ, config: { reviewDueDate: '2026-13-40' }, actingUserSystemId: null }),
-    ).rejects.toMatchObject({ httpStatus: 400, message: 'reviewDueDate must be a YYYY-MM-DD date or null' });
+  });
+
+  test('the review due date is read-only: any write is refused with 400 before any Dataverse read (D48)', async () => {
+    for (const reviewDueDate of ['2027-03-10', null]) {
+      await expect(
+        saveCampaignConfig({ requestId: REQ, config: { reviewDueDate }, actingUserSystemId: null }),
+      ).rejects.toMatchObject({ httpStatus: 400, message: 'Unknown or read-only config field: reviewDueDate' });
+    }
+    expect(getById).not.toHaveBeenCalled();
+    expect(updateById).not.toHaveBeenCalled();
   });
 
   test('rejects an empty effective patch with 400', async () => {

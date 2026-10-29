@@ -15,6 +15,12 @@ import ProfileContext from '../../context/ProfileContext';
 // ─── Email Modal ────────────────────────────────────────────────────────────
 
 const EMAIL_FIELDS_STORAGE_KEY = 'review_manager_email_fields';
+
+function formatYmd(ymd) {
+  const [y, m, d] = String(ymd || '').split('-').map(Number);
+  if (!y || !m || !d) return '';
+  return new Date(y, m - 1, d).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
+}
 const ATTACHMENTS_STORAGE_KEY = 'review_manager_attachments';
 
 // Bounded per-render network timeout for /api/review-manager/render-emails.
@@ -463,13 +469,10 @@ export default function ReleaseMaterialsModal({ isOpen, onClose, reviewers, prop
     try {
       const saved = localStorage.getItem(EMAIL_FIELDS_STORAGE_KEY);
       if (saved) {
-        const parsed = JSON.parse(saved);
-        setEmailFields(prev => ({
-          ...prev,
-          ...parsed,
-          // A stale saved blank must not hide the request's campaign date.
-          reviewDueDate: parsed.reviewDueDate || prev.reviewDueDate || settings.reviewDueDate || '',
-        }));
+        // A browser-saved review due date is ignored (D48): emails use the
+        // request's stored date, which this modal shows read-only.
+        const { reviewDueDate: _ignoredSavedDueDate, ...parsed } = JSON.parse(saved);
+        setEmailFields(prev => ({ ...prev, ...parsed }));
       }
     } catch (e) { /* ignore */ }
     try {
@@ -494,7 +497,8 @@ export default function ReleaseMaterialsModal({ isOpen, onClose, reviewers, prop
     // Browser-local scratch only. Wording defaults have their own editor.
     const epoch = modalSessionRef.current;
     try {
-      localStorage.setItem(EMAIL_FIELDS_STORAGE_KEY, JSON.stringify(emailFields));
+      const { reviewDueDate: _requestDueDate, ...savedFields } = emailFields;
+      localStorage.setItem(EMAIL_FIELDS_STORAGE_KEY, JSON.stringify(savedFields));
       localStorage.setItem(ATTACHMENTS_STORAGE_KEY, JSON.stringify(attachmentsByType));
     } catch (e) {
       if (mountedRef.current && modalSessionRef.current === epoch) setError('Local email settings could not be saved in this browser.');
@@ -593,7 +597,6 @@ export default function ReleaseMaterialsModal({ isOpen, onClose, reviewers, prop
     const snapshotTemplate = currentTemplate;
     const snapshotSettings = {
       signature: settings.signature || '',
-      reviewDueDate: emailFields.reviewDueDate || settings.reviewDueDate || '',
       customFields: {
         proposalSendDate: emailFields.proposalSendDate || '',
         // honorarium intentionally omitted — render-emails injects the
@@ -913,13 +916,12 @@ export default function ReleaseMaterialsModal({ isOpen, onClose, reviewers, prop
                 <p className="text-xs font-medium text-gray-600 mb-1">Email Fields (used in placeholders)</p>
                 <div className="grid grid-cols-2 gap-2">
                   <div>
-                    <label className="block text-xs text-gray-500 mb-0.5">Review Due Date</label>
-                    <input disabled={defaultWordingBusy}
-                      type="date"
-                      aria-label="Review due date" value={emailFields.reviewDueDate}
-                      onChange={e => setEmailFields(prev => ({ ...prev, reviewDueDate: e.target.value }))}
-                      className="w-full px-2 py-1 border border-gray-300 rounded text-sm focus:ring-1 focus:ring-gray-400 focus:outline-none"
-                    />
+                    <p className="block text-xs text-gray-500 mb-0.5">Review Due Date</p>
+                    {/* Read-only (D48): the request's stored date, from the cycle
+                        calendar; one reviewer's extension wins in that reviewer's email. */}
+                    <p className="px-2 py-1 text-sm text-gray-900" data-testid="materials-review-due-date">
+                      {formatYmd(settings.reviewDueDate) || 'Not set'}
+                    </p>
                   </div>
                   <div>
                     <label className="block text-xs text-gray-500 mb-0.5">Proposal Send Date</label>

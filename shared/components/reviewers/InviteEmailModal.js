@@ -13,12 +13,15 @@ import EmailDialog from '../EmailDialog';
  *   (templateType:'invitation' → sets invited+emailSentAt, no status bump;
  *   skips already-invited unless allowResend).
  *
- * Review-process timeline: respond-by, proposal-delivery, and review-due values
- * appear in the invitation body. They are interpolated CLIENT-SIDE here (not via
+ * Review-process timeline: respond-by and proposal-delivery values appear in the
+ * invitation body. They are interpolated CLIENT-SIDE here (not via
  * render-emails) so a blank date drops its line instead of leaking a literal
  * {{token}} into a real email, and so editing a draft doesn't require re-fetching
  * the preview. Load order is built-in defaults → per-user sticky values →
  * admin cycle defaults → request campaign config; more specific values win.
+ * The review due date is NOT client-side (D48): render-emails fills
+ * {{reviewDue}} from the request date or the cycle calendar and returns it; the
+ * modal shows it read-only and send-emails stores it before dispatch.
  *
  * Props:
  *   - requestId   : current akoya_request GUID; used to load request campaign settings
@@ -87,8 +90,10 @@ function normalizeOffsetInput(value) {
 }
 
 // Resolve each client-side timing token to its display string. respond-by comes
-// from the offset (today + N days); the other two are fixed dates. These are NOT
-// server placeholders — render-emails leaves them literal and we substitute here.
+// from the offset (today + N days); proposal delivery is a fixed date. These are
+// NOT server placeholders — render-emails leaves them literal and we substitute
+// here. {{reviewDue}} is server-filled (D48); its entry only covers a body the
+// server left unfilled, using the same server-returned date.
 function timingTokenValues(timing) {
   return {
     '{{respondBy}}': formatDate(addDaysToTodayYmd(timing.respondOffsetDays)),
@@ -307,7 +312,6 @@ export default function InviteEmailModal({ requestId = null, candidates = [], se
           // `respondByDate` date — ignore it; respondOffsetDays falls back to default 7).
           if (parsed.respondOffsetDays != null && parsed.respondOffsetDays !== '') nextTiming.respondOffsetDays = parsed.respondOffsetDays;
           if (typeof parsed.proposalSendDate === 'string') nextTiming.proposalSendDate = parsed.proposalSendDate;
-          if (typeof parsed.reviewDueDate === 'string') nextTiming.reviewDueDate = parsed.reviewDueDate;
         }
       } catch { /* sticky defaults are best-effort */ }
       try {
@@ -317,7 +321,6 @@ export default function InviteEmailModal({ requestId = null, candidates = [], se
           const d = data.timeline;
           nextTiming.respondOffsetDays = d.respondOffsetDays == null ? '' : d.respondOffsetDays;
           nextTiming.proposalSendDate = d.proposalReleaseDate || '';
-          nextTiming.reviewDueDate = d.reviewDueDate || '';
         }
       } catch { /* admin cycle defaults are best-effort for preview hydration */ }
       if (requestId) {
@@ -327,7 +330,6 @@ export default function InviteEmailModal({ requestId = null, candidates = [], se
           if (envelope.ok && data?.config) {
             const c = data.config;
             if (c.respondOffsetDays != null) nextTiming.respondOffsetDays = c.respondOffsetDays;
-            if (c.reviewDueDate) nextTiming.reviewDueDate = c.reviewDueDate;
           }
         } catch { /* request campaign config is best-effort for preview hydration */ }
       }
@@ -418,6 +420,11 @@ export default function InviteEmailModal({ requestId = null, candidates = [], se
           throw failure;
         }
         setRawDrafts(data.drafts || []);
+        // The review due date is the server's (request date, else the cycle
+        // calendar's Reviews Due Date; D48). Shown read-only; the body already
+        // carries it.
+        const serverDueDate = (data.drafts || []).find((d) => d.reviewDueDate)?.reviewDueDate || '';
+        setTiming((t) => ({ ...t, reviewDueDate: serverDueDate }));
       } catch (e) {
         if (gen !== renderGenRef.current || !mountedRef.current) return;
         // A timeout or unmount abort surfaces as AbortError, which — like any
@@ -714,7 +721,10 @@ export default function InviteEmailModal({ requestId = null, candidates = [], se
     try {
       await requestEnvelope('/api/user-preferences', {
         method: 'POST',
-        body: { key: PREFERENCE_KEYS.INVITE_TIMING, value: JSON.stringify(timing) },
+        body: {
+          key: PREFERENCE_KEYS.INVITE_TIMING,
+          value: JSON.stringify({ respondOffsetDays: timing.respondOffsetDays, proposalSendDate: timing.proposalSendDate }),
+        },
         tolerantBody: true,
       });
     } catch { /* sticky save is best-effort */ }
@@ -761,10 +771,10 @@ export default function InviteEmailModal({ requestId = null, candidates = [], se
           // Reviewer-engagement Phase 1: persist the per-request campaign config on the
           // FIRST invite-batch send. Discrete values the Phase-3 cron / Phase-4 sweep
           // need; the server writes them to the request only if it has none yet (never
-          // clobbers a later edit). reviewDueDate is YYYY-MM-DD or null.
+          // clobbers a later edit). The review due date is not sent: the server
+          // stores the cycle calendar's date before dispatch (D48).
           campaignConfig: {
             respondOffsetDays: timing.respondOffsetDays === '' ? null : Number(timing.respondOffsetDays),
-            reviewDueDate: timing.reviewDueDate || null,
           },
           // Staff acknowledged THESE specific quick-check addresses in the preview
           // above (which named them). Recipient-specific, not a batch boolean: the server only
@@ -882,15 +892,14 @@ export default function InviteEmailModal({ requestId = null, candidates = [], se
                           onChange={(e) => setTiming((t) => ({ ...t, proposalSendDate: e.target.value }))}
                           className="mt-1 w-full text-sm border border-gray-300 rounded px-2 py-1" />
                       </label>
-                      <label className="text-xs text-gray-600">
+                      <div className="text-xs text-gray-600">
                         Reviews due
-                        <input disabled={defaultWordingBusy} type="date" value={timing.reviewDueDate}
-                          onChange={(e) => setTiming((t) => ({ ...t, reviewDueDate: e.target.value }))}
-                          className="mt-1 w-full text-sm border border-gray-300 rounded px-2 py-1" />
-                      </label>
+                        <p className="mt-1 text-sm text-gray-900 py-1">{formatDate(timing.reviewDueDate) || 'Not set'}</p>
+                        <p className="text-gray-500">From the cycle calendar</p>
+                      </div>
                     </div>
                     <p className="text-xs text-gray-600 mt-2">
-                      Days to respond and reviews due are request-level campaign settings when saved. Proposal release is email-only copy for this invitation. A blank field omits its line.
+                      Days to respond is a request-level campaign setting when saved. The review due date comes from the cycle calendar and is saved on the proposal with its first invitation. Proposal release is email-only copy for this invitation. A blank field omits its line.
                     </p>
                   </div>
                 )}

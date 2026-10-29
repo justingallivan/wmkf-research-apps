@@ -70,7 +70,9 @@ beforeEach(() => {
     if (String(url).startsWith('/api/review-manager/campaign-config')) {
       return mockJson({ config: { respondOffsetDays: 7, reviewDueDate: '2099-08-24' } });
     }
-    if (url === '/api/review-manager/render-emails') return mockJson({ drafts: [draft] });
+    // The server returns the review due date it rendered (D48): request date,
+    // else the cycle calendar's. Admin, request-config and browser dates are ignored.
+    if (url === '/api/review-manager/render-emails') return mockJson({ drafts: [{ ...draft, reviewDueDate: '2099-08-24' }] });
     if (url === '/api/review-manager/send-emails') return { ok: true, body: { getReader: () => ({ read: jest.fn() }) } };
     throw new Error(`Unexpected fetch: ${url}`);
   });
@@ -117,9 +119,10 @@ describe('ReviewerInvitePanel invitation capture rehearsal', () => {
     fireEvent.click(screen.getByRole('button', { name: /send invitation \(1\)/i }));
 
     await screen.findByDisplayValue('Invitation');
-    expect(screen.queryByLabelText('Reviews due')).not.toBeInTheDocument();
+    expect(screen.queryByText('From the cycle calendar')).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: /reviewer campaign timeline/i }));
-    await waitFor(() => expect(screen.getByLabelText('Reviews due')).toHaveValue('2099-08-24'));
+    expect(await screen.findByText('From the cycle calendar')).toBeInTheDocument();
+    expect(screen.getAllByText('August 24, 2099').length).toBeGreaterThan(0);
     expect(screen.getByLabelText('Days to respond')).toHaveValue(7);
     expect(screen.getByLabelText('Proposals released to reviewers')).toHaveValue('2099-08-10');
     // Reviewer-engagement Phase 1: respond-by is now a "days to respond" offset, not a
@@ -128,7 +131,6 @@ describe('ReviewerInvitePanel invitation capture rehearsal', () => {
     // durable contract. Proposal-delivery and review-due stay fixed dates.
     fireEvent.change(screen.getByLabelText('Days to respond'), { target: { value: '10' } });
     fireEvent.change(screen.getByLabelText('Proposals released to reviewers'), { target: { value: '2099-08-10' } });
-    fireEvent.change(screen.getByLabelText('Reviews due'), { target: { value: '2099-08-24' } });
     const sendButton = await screen.findByRole('button', { name: /send 1 invitation/i });
     await waitFor(() => expect(sendButton).toBeEnabled());
     fireEvent.click(sendButton);
@@ -154,8 +156,9 @@ describe('ReviewerInvitePanel invitation capture rehearsal', () => {
       allowResend: false,
       drafts: [{ suggestionId: 'S1', subject: 'Invitation' }],
       // Phase 1: the panel sends the per-request campaign config alongside the drafts.
-      campaignConfig: { respondOffsetDays: 10, reviewDueDate: '2099-08-24' },
+      campaignConfig: { respondOffsetDays: 10 },
     });
+    expect(JSON.parse(sendCall[1].body).campaignConfig).not.toHaveProperty('reviewDueDate');
     expect(JSON.parse(sendCall[1].body).drafts[0].body).toContain('August 10, 2099');
     expect(JSON.parse(sendCall[1].body).drafts[0].body).toContain('August 24, 2099');
     expect(JSON.parse(sendCall[1].body).drafts[0].body).toContain('https://reviews.wmkeck.org/external/review/token.value');

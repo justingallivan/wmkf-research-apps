@@ -412,7 +412,21 @@ Dataverse writes). Separate PRs, each with focused unit tests:
    released materials (risk 3). Codex found and the PR fixed cross-cycle scan
    starvation and unreported undated cycles.
    The shared calendar reader moves to PR 2.
-2. Due date from the calendar on the server (A, C).
+2. **Built on branch `claude/review-due-date-from-calendar` (not yet merged):** due date
+   from the calendar on the server (A) and the due-date part of C.
+   `lib/services/review-due-date-service.js` (the shared reader for this date,
+   `getCycleDatesByCode` in the adapter, `CYCLE_CALENDAR_MEANINGS` in
+   `shared/config/cycleCalendar.js`); render fills `{{reviewDue}}` /
+   `{{reviewDueDate}}` / `{{reviewDeadline}}` from the request date or the calendar and
+   refuses an invitation preview with no date; send stores the date with `If-Match`
+   before dispatch (new skip reason `review_due_date_unavailable`) and no longer takes
+   the browser's date; the invite modal, Campaign settings and the materials modal show
+   the date read-only (Campaign settings route refuses a write); the browser-saved
+   materials date and the Admin "Reviews due" default are gone. **Left for PR 4** (they
+   travel with the new wording): the proposal-release date fields and
+   `{{proposalDelivery}}`, and the Reviewer Finder record's `proposalSendDate` /
+   `commitDate` custom fields; the Reviewer Finder `reviewDeadline` is no longer read
+   for email text but still feeds the draft fingerprint.
 3. Board setup from the calendar (E).
 4. Materials on acceptance (B) + wording.
 

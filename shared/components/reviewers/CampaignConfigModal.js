@@ -21,12 +21,19 @@
 import { useState, useEffect, useRef } from 'react';
 import { requestEnvelope } from '../../utils/api-request';
 
+function formatReviewDueDate(ymd) {
+  if (!ymd) return 'Not set yet';
+  const [y, m, d] = String(ymd).split('-').map(Number);
+  if (!y || !m || !d) return 'Not set yet';
+  return new Date(y, m - 1, d).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
+}
+
 export default function CampaignConfigModal({ requestId, onClose, onSaved }) {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState(null);
   const [respondOffsetDays, setRespondOffsetDays] = useState('');
-  const [reviewDueDate, setReviewDueDate] = useState('');
+  const [reviewDueDate, setReviewDueDate] = useState(''); // read-only display (D48)
   const [desiredCount, setDesiredCount] = useState('');
 
   // Guards post-await setState on the save path if the modal unmounts mid-request.
@@ -59,7 +66,7 @@ export default function CampaignConfigModal({ requestId, onClose, onSaved }) {
         if (cancelled) return;
         const c = data.config || {};
         setRespondOffsetDays(c.respondOffsetDays == null ? '' : c.respondOffsetDays);
-        setReviewDueDate(c.reviewDueDate || (defaults && defaults.reviewDueDate) || '');
+        setReviewDueDate(c.reviewDueDate || '');
         setDesiredCount(c.desiredCount == null
           ? (defaults && defaults.desiredCount != null ? defaults.desiredCount : '')
           : c.desiredCount);
@@ -76,10 +83,11 @@ export default function CampaignConfigModal({ requestId, onClose, onSaved }) {
     setSaving(true);
     setError(null);
     // Send only fields the user set. Empty string = "leave/clear": offset clears to
-    // null (cron treats null as unset); due date clears to null. The server validates.
+    // null (cron treats null as unset). The review due date is not editable here
+    // (D48): it comes from the cycle calendar with the first invitation, and a
+    // change for one reviewer is an extension. The server validates.
     const config = {
       respondOffsetDays: respondOffsetDays === '' ? null : Math.max(0, Math.floor(Number(respondOffsetDays))),
-      reviewDueDate: reviewDueDate === '' ? null : reviewDueDate,
       desiredCount: desiredCount === '' ? null : Math.max(0, Math.floor(Number(desiredCount))),
     };
     try {
@@ -124,17 +132,15 @@ export default function CampaignConfigModal({ requestId, onClose, onSaved }) {
                   Each reviewer’s respond-by date = when their invitation was sent + this many days.
                 </span>
               </label>
-              <label className="block text-xs text-gray-600">
+              <div className="block text-xs text-gray-600">
                 Review due date
-                <input
-                  type="date" value={reviewDueDate}
-                  onChange={(e) => setReviewDueDate(e.target.value)}
-                  className="mt-1 w-full text-sm border border-gray-300 rounded px-2 py-1"
-                />
+                <p className="mt-1 text-sm text-gray-900">{formatReviewDueDate(reviewDueDate)}</p>
                 <span className="block text-[11px] text-gray-400 mt-1">
-                  Fixed deadline for completed reviews. Edits apply going forward.
+                  {reviewDueDate
+                    ? 'Saved from the cycle calendar with the first invitation. To give one reviewer more time, grant an extension from Track Reviewers.'
+                    : 'Set from the cycle calendar’s Reviews Due Date when the first invitation is sent.'}
                 </span>
-              </label>
+              </div>
               <label className="block text-xs text-gray-600">
                 Reviewer quota
                 <input

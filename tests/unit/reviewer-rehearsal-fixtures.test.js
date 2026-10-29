@@ -417,11 +417,18 @@ describe('review rehearsal fixture boundary and state', () => {
     expect(JSON.parse((await invoke(`/api/review-manager/campaign-config?requestId=${REQUEST_ID}`)).response.body).config.respondOffsetDays).toBe(7);
     const saved = await invoke('/api/review-manager/campaign-config', 'POST', {
       requestId: REQUEST_ID,
-      config: { respondOffsetDays: 10, reviewDueDate: null, desiredCount: 4 },
+      config: { respondOffsetDays: 10, desiredCount: 4 },
     });
-    expect(JSON.parse(saved.response.body).config).toMatchObject({ respondOffsetDays: 10, reviewDueDate: null, desiredCount: 4 });
+    expect(JSON.parse(saved.response.body).config).toMatchObject({ respondOffsetDays: 10, reviewDueDate: '2099-07-22', desiredCount: 4 });
     expect(JSON.parse((await invoke(`/api/review-manager/campaign-config?requestId=${REQUEST_ID}`)).response.body).config)
-      .toMatchObject({ respondOffsetDays: 10, reviewDueDate: null, desiredCount: 4 });
+      .toMatchObject({ respondOffsetDays: 10, reviewDueDate: '2099-07-22', desiredCount: 4 });
+    // D48: the review due date is read-only on this route, as on the real one.
+    const dueDateEdit = await invoke('/api/review-manager/campaign-config', 'POST', {
+      requestId: REQUEST_ID,
+      config: { reviewDueDate: '2099-08-01' },
+    });
+    expect(dueDateEdit.response.status).toBe(400);
+    expect(JSON.parse(dueDateEdit.response.body).error).toBe('Unknown or read-only config field: reviewDueDate');
     const invalid = await invoke('/api/review-manager/campaign-config', 'POST', {
       requestId: REQUEST_ID,
       config: { quotaNotifiedAt: '2099-07-22T00:00:00Z' },
@@ -444,7 +451,8 @@ describe('review rehearsal fixture boundary and state', () => {
     });
     const draft = JSON.parse(rendered.response.body).drafts[0];
     expect(draft.subject).toBe('Custom subject for Dr. Accepted Reviewer');
-    expect(draft.body).toContain('Edited materials for Synthetic reviewer rehearsal are due 2099-08-15.');
+    // D48: the composer's reviewDueDate (2099-08-15) is ignored; the request's stored date renders.
+    expect(draft.body).toContain('Edited materials for Synthetic reviewer rehearsal are due 2099-07-22.');
     expect(draft.body).toContain(`http://localhost:3110/external/review/${'pd-reviewer-rehearsal-token'}`);
     expect(draft.body).toContain('{{unknownField}}');
     expect(draft.candidateEmail).toBe('reviewer.capture@example.test');
