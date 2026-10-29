@@ -95,6 +95,8 @@ Unchanged shared templates may be referenced by identity/version after validatio
 
 ### 3.3 Screens: preserve explicit choice, make defaults task-aware
 
+> **Superseded in part (2026-10-29):** first-entry defaults now follow one landing cycle the Grants Manager sets in the cycle calendar (alignment log D29), not per-task rules, and the "never edit an unnamed global current cycle" row below no longer holds. Explicit URL cycles still win and open pages never switch. See `docs/plans/LANDING_CYCLE_PLAN_2026-10-29.md`.
+
 [PLANNED] Explicit valid cycle URLs always win; preserve selection through navigation and in-flight work. Each app shows the full cycle label. Do not silently switch an open page at midnight or after a board meeting. Offer a notice/link if another cycle becomes a better default. Keep historical access and empty-cycle views available.
 
 | Task | Proposed first-entry behavior when no cycle is selected |
