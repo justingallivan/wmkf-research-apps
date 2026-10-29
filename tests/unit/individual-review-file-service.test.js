@@ -904,6 +904,22 @@ test('a cycle with waiting reviews but no Board date is reported, and other cycl
   expect(isActionableReviewDocxStatus('missing_board_date')).toBe(true);
 });
 
+test('with no upcoming Board date, a recent undated cycle with waiting reviews is still named', async () => {
+  listBoardDates.mockResolvedValue([
+    { wmkf_cyclecode: 'J26', wmkf_meetingdate: '2026-06-11T00:00:00Z' },
+    { wmkf_cyclecode: 'D99', wmkf_meetingdate: null },
+  ]);
+  suggestion.findReviewDocxFilingCandidates.mockResolvedValue({
+    records: [{ wmkf_appreviewersuggestionid: SUGGESTION_ID }], capped: false,
+  });
+
+  const result = await sweepMissingIndividualReviewFiles();
+
+  expect(result).toMatchObject({ status: 'no_filing_cycle', counts: { missing_board_date: 1, no_filing_cycle: 1 } });
+  expect(result.results[0]).toMatchObject({ status: 'missing_board_date', cycleCode: 'D99' });
+  expect(graph.getSiteId).not.toHaveBeenCalled();
+});
+
 test('a calendar read failure files nothing and records the anomaly', async () => {
   listBoardDates.mockRejectedValue(new Error('Grant cycle Board dates read failed (503).'));
   const result = await sweepMissingIndividualReviewFiles();
