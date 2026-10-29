@@ -66,6 +66,26 @@ the Cycle Dossier and the ranking cutoff are D26-only by design; single-phase,
 no-site-visit and file-name differences are about the *kind* of cycle, not its
 dates, and need a separate decision.
 
+## 2a. Added by the date-consumer audit (2026-10-29)
+
+`docs/audits/date-consumers-audit-2026-10-29.md` found more homes for the same
+dates; each is now in scope:
+
+- **Per-send and browser-saved due dates.** The release form's due date
+  (including a value saved in the PD's browser) beats the request date in
+  materials emails. Remove these so every email reads the same resolved date as
+  links and reminders.
+- **Extensions need a per-request due date.** With D9 removing per-request anchor
+  dates, extensions use the calendar due date as their base; per-reviewer
+  overrides stay.
+- **Reviewer Finder cycle record dates.** Besides the review deadline, its custom
+  fields hold proposal send, proposal due and commit (respond-by) dates used in
+  legacy email text. Retire them; templates read the calendar.
+- **Board date in three stores** (calendar, each request's meeting date, Board
+  setup end date). Ask Connor whether request meeting dates follow a Board-date
+  change; add a mismatch check to the readiness notice.
+- **`inviteStartDate` in Admin is never read.** Remove it.
+
 ## 3. Blank dates
 
 Today a Vercel pin is always set. A calendar date can be blank. For every
