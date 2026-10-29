@@ -70,7 +70,7 @@ function DateRow({ entry, cycle, canEdit, savingAvailable, busy, recording, attr
         <p id={labelId} className="font-medium text-gray-900">{entry.label}</p>
         <p className={entry.value ? 'text-gray-800' : 'text-gray-500'}>{formatDate(entry.value)}</p>
         {attribution && !recording && <p className="text-sm text-gray-600">{attribution}</p>}
-        {recording && <p role="status" className="text-sm text-gray-500">Recording who made this change…</p>}
+        {recording && <p role="status" className="text-sm text-gray-500">Date saved. Waiting for change history…</p>}
         {attributionPending && !attribution && <p role="status" className="text-sm text-gray-500">Date saved. Who made this change is still pending. Reload calendar to check again.</p>}
       </div>
       {canEdit && !editing && <Button variant="outline" disabled={Boolean(busy) || !savingAvailable} onClick={() => { setMessage(null); setDraft(entry.value || ''); setEditEtag(cycle.etag); setEditing(true); }}>Edit<span className="sr-only"> {entry.label}</span></Button>}

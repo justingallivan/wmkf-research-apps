@@ -108,7 +108,7 @@ test('an unknown URL cycle falls back to the server default', async () => {
   expect((await screen.findByLabelText('Grant cycle')).value).toBe('D26');
 });
 
-test('after a save the row shows "Recording…" until a re-check finds the attribution', async () => {
+test('after a save the row confirms the date saved while waiting for change history', async () => {
   const withDate = (changedBy) => ({ ...snapshot(), cycles: [cycle('D26', 'December 2026', 'W/"2"', {
     dates: CYCLE_CALENDAR_DATE_COLUMNS.map(({ column, label }) => (column === 'wmkf_researchproposalduedate'
       ? { column, label, value: '2026-12-07', changedAt: changedBy ? '2026-10-29T04:00:00Z' : null, changedBy }
@@ -125,11 +125,11 @@ test('after a save the row shows "Recording…" until a re-check finds the attri
   fireEvent.change(screen.getByLabelText('Proposal Due'), { target: { value: '2026-12-07' } });
   jest.useFakeTimers();
   fireEvent.click(screen.getByRole('button', { name: 'Save' }));
-  expect(await screen.findByText('Recording who made this change…')).toBeTruthy();
+  expect(await screen.findByText('Date saved. Waiting for change history…')).toBeTruthy();
   await act(async () => { jest.advanceTimersByTime(2100); });
   jest.useRealTimers();
   expect(await screen.findByText('Changed by Justin Gallivan, Oct 28, 2026')).toBeTruthy();
-  expect(screen.queryByText('Recording who made this change…')).toBeNull();
+  expect(screen.queryByText('Date saved. Waiting for change history…')).toBeNull();
   expect(gets).toBe(2);
 });
 
@@ -194,10 +194,10 @@ test('a matching J27 audit entry arriving after the original retry window appear
   });
   await saveLeadershipDate();
   for (const delay of [2000, 4000, 8000]) await act(async () => { jest.advanceTimersByTime(delay); });
-  expect(screen.getByText('Recording who made this change…')).toBeTruthy();
+  expect(screen.getByText('Date saved. Waiting for change history…')).toBeTruthy();
   await act(async () => { jest.advanceTimersByTime(15000); });
   expect(screen.getByText('Changed by Grants Manager, Oct 29, 2026')).toBeTruthy();
-  expect(screen.queryByText('Recording who made this change…')).toBeNull();
+  expect(screen.queryByText('Date saved. Waiting for change history…')).toBeNull();
   expect(gets).toBe(5);
 });
 
@@ -206,7 +206,7 @@ test('exhausted attribution retries explain the saved date and stop fetching', a
   await saveLeadershipDate();
   for (const delay of [2000, 4000, 8000, 15000, 30000, 60000]) await act(async () => { jest.advanceTimersByTime(delay); });
   expect(screen.getByText('Date saved. Who made this change is still pending. Reload calendar to check again.')).toBeTruthy();
-  expect(screen.queryByText('Recording who made this change…')).toBeNull();
+  expect(screen.queryByText('Date saved. Waiting for change history…')).toBeNull();
   const calls = global.fetch.mock.calls.length;
   await act(async () => { jest.advanceTimersByTime(300000); });
   expect(global.fetch).toHaveBeenCalledTimes(calls);
@@ -226,7 +226,7 @@ test('a failed attribution re-check retries and recovers on the next matching re
   });
   await saveLeadershipDate();
   await act(async () => { jest.advanceTimersByTime(2000); });
-  expect(screen.getByText('Recording who made this change…')).toBeTruthy();
+  expect(screen.getByText('Date saved. Waiting for change history…')).toBeTruthy();
   await act(async () => { jest.advanceTimersByTime(4000); });
   expect(screen.getByText('Changed by Grants Manager, Oct 29, 2026')).toBeTruthy();
 });
