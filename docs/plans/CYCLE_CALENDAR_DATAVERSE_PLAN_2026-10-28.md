@@ -199,11 +199,14 @@ fallback would record the app, not Sarah or Duncan. So:
   sending feature that requires the flag, `docs/CREDENTIALS_RUNBOOK.md:137`).
 - The flag is documented `true` in Production [VERIFIED via
   `docs/CREDENTIALS_RUNBOOK.md:205`, last verified S466; not re-checked this
-  session]. Whether the Grants Manager and Program Coordinator users hold
-  write privilege on `wmkf_grantcycle` is [ASSUMED]; impersonated writes run
-  under the intersection of the app's and the user's privileges
-  (`write-core.js:62`), so the sandbox rehearsal and the first production
-  save prove it.
+  session]. Write privilege [VERIFIED 2026-10-28 via owner-run read-only
+  `scripts/probe-grant-cycle-write-privileges.cjs`,
+  `docs/audits/grant-cycle-write-privileges-2026-10-28-evidence.json`]: the
+  app user, the assigned Grants Manager, the assigned Program Coordinator and
+  the owner each hold `prvReadwmkf_GrantCycle` and `prvWritewmkf_GrantCycle`
+  at Global depth through their security roles. Impersonated writes run under
+  the intersection of the app's and the user's privileges
+  (`write-core.js:62`), which here includes Write.
 
 **Fallback if A or B cannot be met:** the app writes its own change record
 with each save (cycle, column, old value, new value, staff member, time) and
@@ -231,11 +234,16 @@ an explicit owner decision to merge. This plan, the probe and its evidence
 are docs (Tier 0).
 
 **Merge condition (owner, 2026-10-28: "I don't want to rely on hope as a
-strategy"):** before the branch merges, the sandbox rehearsal must edit a date
-through the calendar as a role-holding staff member, then read the change
-history back and confirm it names that person and the right date and column,
-and that a cleared date is attributed too. A passing unit fixture alone does
-not satisfy this.
+strategy"):** before the branch merges, a real edit must be read back with
+correct attribution. **Venue (owner decision 2026-10-28):** the sandbox cannot
+prove Production privileges or Production attribution (different users, an
+app user with System Administrator, no cycle rows, table auditing off) and
+would need four sandbox-only workarounds, so the proof is a **controlled
+Production test** instead: the branch runs locally against Production with a
+dated write acknowledgement passed to that one process; the owner, signed in
+as themselves, sets one J27 date, confirms "changed by", clears it and
+confirms again. J27's audit history keeps those two entries. A passing unit
+fixture alone does not satisfy this.
 
 Before the sandbox rehearsal:
 
