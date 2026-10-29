@@ -1,6 +1,6 @@
 /** @jest-environment jsdom */
 
-import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import PromptTemplatesSection, {
   ExecutorBudgetEditor,
   OutputBudgetLine,
@@ -662,4 +662,33 @@ describe('prompt publish (PublishForm, D1 fix)', () => {
     // (shared/utils/api-request.js deriveErrorMessage, owner decision (3)).
     expect(screen.getByText('Request failed (502)')).toBeInTheDocument();
   });
+});
+
+
+test('execution budgets start collapsed after prompt groups with readable workflow titles and retained draft', async () => {
+  render(<PromptTemplatesSection />);
+  const summary = await screen.findByText('Execution budgets (6)');
+  const disclosure = summary.closest('details');
+  expect(disclosure).not.toHaveAttribute('open');
+  const promptGroup = screen.getByText('Pre-flight (1)', { selector: 'summary' }).closest('details');
+  expect(promptGroup.compareDocumentPosition(disclosure) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  fireEvent.click(summary);
+  expect(disclosure).toHaveAttribute('open');
+  for (const label of ['Pre-flight (1)', 'Reviews and evaluations (3)', 'Meetings and briefings (2)']) {
+    expect(within(disclosure).getByRole('heading', { name: label })).toBeInTheDocument();
+  }
+  expect(within(disclosure).getAllByRole('heading', { level: 4 })).toHaveLength(6);
+  for (const name of Object.keys(budgetConfig().budgets).filter(name => name !== 'initial-assessment.generate')) {
+    expect(within(disclosure).getByText(name, { selector: 'code' })).toBeInTheDocument();
+  }
+  const input = within(disclosure).getByLabelText(/Maximum output tokens/);
+  fireEvent.change(input, { target: { value: '40000' } });
+  fireEvent.click(summary);
+  expect(disclosure).not.toHaveAttribute('open');
+  expect(summary).toHaveTextContent('Unpublished changes');
+  fireEvent.click(summary);
+  expect(input).toHaveValue(40000);
+  fireEvent.change(screen.getByLabelText('Search prompts'), { target: { value: 'no matches' } });
+  expect(summary).toBeVisible();
+  expect(input).toHaveValue(40000);
 });
