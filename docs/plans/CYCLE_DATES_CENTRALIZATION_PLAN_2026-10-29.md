@@ -134,7 +134,7 @@ planned, reads their dates, so they get no field (corrected 2026-10-29).
 |---|---|
 | Nov 15 | App-side dates on the calendar page |
 | Before Feb 3 | Staff recommendation deadline filled in (D40 warning reads it) |
-| Before Feb 24 | Shared reader; reviewer dates from the calendar; emails read Reviews Due Date; per-request anchor dates stop; review filing by window (replaces the Vercel switch) |
+| Before Feb 24 | **One reviewer-invitation build (owner, 2026-10-29):** materials on acceptance (D46; work queue item 6) together with the review due date from the calendar — shared reader; invitation and stored due date from Reviews Due; per-send and browser-saved due dates removed; extensions based on the calendar date; Reviewer Finder record dates retired. Separately: review filing by window (replaces the Vercel switch) |
 | Before April | Confirm J27 research presentations trigger prep; prep by calendar after the cohort diff |
 | Before J27 Board prep | Board setup dates default from the calendar |
 | After Dec 10 | Retire the grantee-title job (T13, verify first) |
