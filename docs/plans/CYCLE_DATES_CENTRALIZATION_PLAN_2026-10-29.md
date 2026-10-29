@@ -39,13 +39,13 @@ from the calendar or retired.
 
 | What a person does today | Where | Replaced by | Owner decision needed |
 |---|---|---|---|
-| Switch review filing to the new cycle | Vercel `REVIEW_DOCX_SHAREPOINT_CYCLE` (one exact code) [VERIFIED via `lib/services/review-documents/individual-file-service.js:1005-1034`; `lib/dataverse/adapters/reviewer-suggestion.js:1536-1555`] | File each completed review whose cycle's window is open (D11): from invitation start to that cycle's Board date, by Pacific day. Several cycles at once | Which column is "invitation start" (§5); optionally drop the start bound (§7) |
-| Add the new cycle to Staff Deliberations prep | Vercel `STAFF_DELIBERATIONS_AUTO_PREPARE_CYCLE_CODES` [VERIFIED via `lib/services/pre-site-visit/preparation-config.js:48-51`; re-checked per receipt at `preparation-worker.js:202-204`] | Cycles whose Board date is upcoming, from the calendar, after the old/new cohort diff the rollover plan §3.4 requires | Whether J27 (oral presentations, no site visits) uses Staff Deliberations at all |
-| Type the cycle's invitation start, release date and review due date | Admin → Workflows → Reviewer timeline defaults, one app-wide key `reviewer.campaign_timeline_defaults` [VERIFIED via `lib/services/reviewer-campaign-timeline.js:1-27`] | Dates read per cycle from the calendar for the request's own cycle. The panel keeps only the two numbers (response days, reviewer quota) as central defaults (D9) | Column for "proposal release to reviewers" (§5) |
-| Type the review deadline and proposal send date into the cycle record | Reviewer Finder cycle record (`wmkf_appgrantcycle`): `reviewDeadline`, custom field `proposalSendDate` used by the invitation email [VERIFIED via `lib/services/grant-cycles-dataverse.js:76-90`; `lib/utils/email-generator.js:443-448`] | Emails read the calendar's Reviews Due Date; the record keeps only the template, attachments and wording | None for the deadline (already planned in rollover §3.2); a column for the send date (§5) |
+| Switch review filing to the new cycle | Vercel `REVIEW_DOCX_SHAREPOINT_CYCLE` (one exact code) [VERIFIED via `lib/services/review-documents/individual-file-service.js:1005-1034`; `lib/dataverse/adapters/reviewer-suggestion.js:1536-1555`] | File each completed review whose cycle's window is open (D11): from invitation start to that cycle's Board date, by Pacific day. Several cycles at once | Drop the start bound (recommended; §7) |
+| Add the new cycle to Staff Deliberations prep | Vercel `STAFF_DELIBERATIONS_AUTO_PREPARE_CYCLE_CODES` [VERIFIED via `lib/services/pre-site-visit/preparation-config.js:48-51`; re-checked per receipt at `preparation-worker.js:202-204`] | Cycles whose Board date is upcoming, from the calendar, after the old/new cohort diff the rollover plan §3.4 requires | None: Staff Deliberations is a stage in every cycle (owner, 2026-10-21 vocabulary; `docs/plans/review/PROPOSAL_WORKFLOW_VOCABULARY_2026-10-19.md`). Check before April: prep starts from a site-visit event in Dynamics; confirm J27's Zoom research presentations are recorded the same way |
+| Type the cycle's invitation start, release date and review due date | Admin → Workflows → Reviewer timeline defaults, one app-wide key `reviewer.campaign_timeline_defaults` [VERIFIED via `lib/services/reviewer-campaign-timeline.js:1-27`] | Dates read per cycle from the calendar for the request's own cycle. The panel keeps only the two numbers (response days, reviewer quota) as central defaults (D9) | None (§5) |
+| Type the review deadline and proposal send date into the cycle record | Reviewer Finder cycle record (`wmkf_appgrantcycle`): `reviewDeadline`, custom field `proposalSendDate` used by the invitation email [VERIFIED via `lib/services/grant-cycles-dataverse.js:76-90`; `lib/utils/email-generator.js:443-448`] | Emails read the calendar's Reviews Due Date; the record keeps only the template, attachments and wording | None (§5) |
 | A due date saved on each request at first send, then winning over the central value | `akoya_request.wmkf_reviewduedate`, written once from the invitation form [VERIFIED via `lib/services/review-manager/send-emails-service.js:1205-1247`] | The request reads the calendar date; no per-request anchor date (D9). One reviewer's extension stays a PD action | Confirm D9 applies to existing per-request due dates (keep as-is for D26; none for J27) |
 | A PD's last-used invitation dates re-applied to the next cycle | Per-user `reviewer_invite_timing` preference (audit RV2) [NOT-READ: `shared/components/reviewers/InviteEmailModal.js` — read in the build] | Stop carrying dates across cycles; keep only the response period if the PD changed it | None |
-| Type the Board materials deadline and Board end date | Board cycle setup page, per cycle (`materialsDue`, `boardEnds`) [VERIFIED via `lib/services/board-writeups/model.js:38-48`]; archive and reminders key off `boardEnds` [VERIFIED via `board-writeups/worker.js:49`; `notifications.js:19-20`] | New setups start with the calendar's Board date and materials date filled in. An activated setup is never rewritten by a calendar edit (rollover §3.2) | Which column is "materials due" (§5) |
+| Type the Board materials deadline and Board end date | Board cycle setup page, per cycle (`materialsDue`, `boardEnds`) [VERIFIED via `lib/services/board-writeups/model.js:38-48`]; archive and reminders key off `boardEnds` [VERIFIED via `board-writeups/worker.js:49`; `notifications.js:19-20`] | New setups start with the calendar's Board date and materials date filled in. An activated setup is never rewritten by a calendar edit (rollover §3.2) | None (§5) |
 | Grantee short-title job runs by calendar month | `vercel.json` schedule, months Apr–Jun and Oct–Dec (audit G3) | Retire: Connor's flows now write the short title (D37, T13), after the D26 Board and a check that nothing else depends on it | None (T13 already decided) |
 | Pick which cycle each app opens on | Each app's own rule | Done: the landing cycle (PR #547) | None |
 
@@ -82,20 +82,21 @@ landing cycle's safeguards: bounded deadline, Pacific-day comparisons, an
 explicit "missing" result rather than a guess. Every consumer above uses it, so
 the column-to-meaning map lives in one place (`shared/config/cycleCalendar.js`).
 
-## 5. Dates with no column yet
+## 5. Which column holds which date
 
-Proposed mappings for existing columns, pending the owner's timeline decision
-(Sarah, Beth, Duncan; Connor for field meaning):
+Owner, 2026-10-29:
 
-| App needs | Proposed column | Confidence |
-|---|---|---|
-| Review due date | Reviews Due Date | High (rollover §3.2 already names it) |
-| Board date | Board Meeting Date | Already used |
-| Reviewer invitation start | Chairs Semi-Finalist Meeting Date (invitations go out at the Chairs meeting, Feb 24) | Medium |
-| Board materials due | Board Mailing Date | Low: may mean the books mailing, not the writeup deadline |
+| App needs | Calendar column |
+|---|---|
+| Review due date | Reviews Due Date |
+| Board date | Board Meeting Date |
+| Reviewer invitation start | Chairs Semi-Finalist Meeting Date (invitations go out at the Chairs meeting) |
+| Board materials due | Board Mailing Date (materials go out then, on paper or by email) |
 
-Missing, to request from Connor as Grant Cycle columns (D43 home; app-side
-storage only as a documented fallback):
+Dates with no Grant Cycle column **stay in the apps** (owner, 2026-10-29): one
+small per-cycle record of app dates, edited on the same calendar page beside the
+eleven Dynamics dates, so Sarah sees one calendar. It records who changed each
+date. A documented divergence from D43's single home, chosen by the owner.
 
 - Staff recommendation deadline (Feb 3; D40 warning)
 - Triage meetings (Jan 6 AI triage; Jan 13–14 PD triage)
@@ -105,17 +106,24 @@ storage only as a documented fallback):
 
 | By | Item |
 |---|---|
-| Nov 15 | Owner decides column meanings; Connor adds the missing columns |
-| Before Feb 3 | Staff recommendation deadline column in place (D40 warning reads it) |
+| Nov 15 | App-side dates on the calendar page |
+| Before Feb 3 | Staff recommendation deadline filled in (D40 warning reads it) |
 | Before Feb 24 | Shared reader; reviewer dates from the calendar; emails read Reviews Due Date; per-request anchor dates stop; review filing by window (replaces the Vercel switch) |
-| Before April | Staff Deliberations decision for J27; prep by calendar after the cohort diff |
+| Before April | Confirm J27 research presentations trigger prep; prep by calendar after the cohort diff |
 | Before J27 Board prep | Board setup dates default from the calendar |
 | After Dec 10 | Retire the grantee-title job (T13, verify first) |
 
 ## 7. Owner decisions
 
-1. Column meanings (§5), including whether Board Mailing Date is the materials deadline.
-2. Ask Connor for the three missing columns, or keep them in the apps.
-3. Review filing window: keep D11's start bound (invitation start), or file any completed review until the Board date. Reviews exist only after invitations, so the start bound changes nothing in practice; dropping it removes one dependency. D11 stands unless changed.
-4. Whether J27 uses Staff Deliberations.
-5. Per-request due dates already saved on D26 requests stay as they are.
+Decided 2026-10-29: column meanings (§5); missing dates stay in the apps (§5);
+Staff Deliberations is a stage in every cycle (§2).
+
+Open:
+
+1. **Review filing window (recommended: drop the start bound).** D11 files a
+   review from invitation start to the Board date. Under the blank-date rule (§3)
+   a blank invitation start would stop filing altogether, while the bound protects
+   nothing: reviews exist only after invitations. Proposed: file any completed
+   review until its cycle's Board date; after that, operator backfill as today.
+   Changes D11 when approved.
+2. Per-request due dates already saved on D26 requests stay as they are.
