@@ -50,6 +50,7 @@ export default function PromptTemplatesSection() {
   const [executorBudgetError, setExecutorBudgetError] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [search, setSearch] = useState('');
   const loadGeneration = useRef(0);
 
   const load = () => {
@@ -100,11 +101,36 @@ export default function PromptTemplatesSection() {
   if (error && !prompts) return <div className="text-red-600 text-sm">{error}</div>;
   if (!prompts || prompts.length === 0) return <div className="text-gray-500 text-sm">No prompts found.</div>;
 
+  const references = prompts.filter(prompt => getAdminPromptDescription(prompt.name).usage === 'reference');
+  const otherPrompts = prompts.filter(prompt => getAdminPromptDescription(prompt.name).usage !== 'reference');
+  const terms = search.toLowerCase().trim().split(/\s+/).filter(Boolean);
+  const matchingNames = new Set(prompts.filter(prompt => {
+    const { title, description, usedBy } = getAdminPromptDescription(prompt.name);
+    const text = [prompt.name, title, description, usedBy].join(' ').toLowerCase();
+    return terms.every(term => text.includes(term));
+  }).map(prompt => prompt.name));
+  const referenceMatches = references.filter(prompt => matchingNames.has(prompt.name)).length;
+
   return (
     <>
       <p className="text-xs text-gray-500 mb-4">
         Edit and publish a new version of a stored prompt. Publishing creates a new immutable version and makes it current. Reviewer-finder prompts are validated against their output parse contract before save.
       </p>
+      <div className="mb-4">
+        <label className="block text-sm font-medium text-gray-700" htmlFor="prompt-search">Search prompts</label>
+        <div className="mt-1 flex items-center gap-3">
+          <input
+            id="prompt-search"
+            type="search"
+            value={search}
+            onChange={event => setSearch(event.target.value)}
+            placeholder="Search titles, descriptions, technical keys or Used by"
+            className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-gray-500"
+          />
+          {search && <button type="button" onClick={() => setSearch('')} className="shrink-0 text-sm text-gray-600 underline">Clear search</button>}
+        </div>
+        <p role="status" className="mt-1 text-xs text-gray-500">{matchingNames.size} of {prompts.length} prompts</p>
+      </div>
       <div className="space-y-6">
         {executorBudgetError && (
           <div className={`text-xs px-3 py-2 rounded border ${TONE.red}`}>
@@ -117,15 +143,38 @@ export default function PromptTemplatesSection() {
             onPublished={setExecutorBudgetConfig}
           />
         ) : null}
-        {prompts.map((p) => (
-          <PromptPanel
-            key={p.name}
-            prompt={p}
-            modelCatalog={modelCatalog}
-            executorBudgetConfig={executorBudgetConfig}
-            onPublished={load}
-          />
+        {matchingNames.size === 0 && <p className="text-sm text-gray-600">No prompts match your search.</p>}
+        {/* Hide rather than unmount cards so filtering cannot discard unsaved edits. */}
+        {otherPrompts.map((p) => (
+          <div key={p.name} hidden={!matchingNames.has(p.name)}>
+            <PromptPanel
+              prompt={p}
+              modelCatalog={modelCatalog}
+              executorBudgetConfig={executorBudgetConfig}
+              onPublished={load}
+            />
+          </div>
         ))}
+        {references.length > 0 && (
+          <details hidden={referenceMatches === 0} open={terms.length > 0 || undefined} className="rounded-lg border border-gray-200">
+            <summary className="cursor-pointer rounded-lg bg-gray-50 p-4 text-sm font-semibold text-gray-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gray-500">
+              Legacy app prompts — stored reference ({referenceMatches})
+            </summary>
+            <div className="space-y-6 p-4">
+              <p className="text-sm text-gray-600">These stored prompts are kept for reference. The current application routes use code templates instead.</p>
+              {references.map((p) => (
+                <div key={p.name} hidden={!matchingNames.has(p.name)}>
+                  <PromptPanel
+                    prompt={p}
+                    modelCatalog={modelCatalog}
+                    executorBudgetConfig={executorBudgetConfig}
+                    onPublished={load}
+                  />
+                </div>
+              ))}
+            </div>
+          </details>
+        )}
       </div>
     </>
   );
