@@ -54,7 +54,10 @@ function DateRow({ entry, cycle, canEdit, savingAvailable, busy, recording, onSa
     setMessage(null);
     const outcome = await onSave(entry.column, value, editEtag);
     if (outcome.ok) { setEditing(false); setMessage({ text: value ? 'Date saved.' : 'Date cleared.', success: true }); }
-    else setMessage({ text: outcome.error, success: false });
+    else if (outcome.code === 'calendar_conflict') {
+      setEditing(false); setEditEtag(null);
+      setMessage({ text: 'Someone changed this cycle since you opened it. The latest dates are shown; edit again if you still need to.', success: false });
+    } else setMessage({ text: outcome.error, success: false });
   }
 
   const attribution = entry.changedBy
@@ -154,7 +157,8 @@ export default function CycleCalendarPanel() {
       }
       return { ok: true };
     } catch (e) {
-      return { ok: false, error: e.message };
+      if (e.code === 'calendar_conflict' && current === generation.current) reloadCalendar();
+      return { ok: false, error: e.message, code: e.code };
     } finally {
       if (current === generation.current) setBusy(null);
     }

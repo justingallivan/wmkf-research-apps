@@ -58,13 +58,13 @@ test('clearing a set date sends null', async () => {
 
 test('a refused save shows the server message and keeps the editor open', async () => {
   global.fetch = jest.fn(async (_url, options) => options?.method === 'POST'
-    ? response({ error: 'This cycle changed since you opened it. Reload to see the latest dates.', code: 'calendar_conflict' }, 409)
+    ? response({ error: 'Saving is temporarily unavailable.', code: 'calendar_unavailable' }, 503)
     : response(snapshot()));
   render(<CycleCalendarPanel />);
   fireEvent.click(await screen.findByRole('button', { name: 'Edit Proposal Due' }));
   fireEvent.change(screen.getByLabelText('Proposal Due'), { target: { value: '2026-12-07' } });
   fireEvent.click(screen.getByRole('button', { name: 'Save' }));
-  expect(await screen.findByRole('alert')).toHaveTextContent('This cycle changed since you opened it');
+  expect(await screen.findByRole('alert')).toHaveTextContent('Saving is temporarily unavailable.');
   expect(screen.getByLabelText('Proposal Due')).toBeTruthy();
 });
 
@@ -134,22 +134,31 @@ test('after a save the row shows "Recording…" until a re-check finds the attri
 });
 
 test('a draft keeps the version it was opened on, so a background refresh cannot bypass the conflict check', async () => {
-  let gets = 0;
+  let gets = 0, posts = 0;
   global.fetch = jest.fn(async (_url, options) => {
-    if (options?.method === 'POST') return response({ error: 'This cycle changed since you opened it. Reload to see the latest dates.', code: 'calendar_conflict' }, 409);
+    if (options?.method === 'POST') return ++posts > 1 ? response(snapshot()) : response({ error: 'This cycle changed since you opened it. Reload to see the latest dates.', code: 'calendar_conflict' }, 409);
     gets += 1;
-    // Second read: someone else changed the row, so its version moved on.
-    const changed = CYCLE_CALENDAR_DATE_COLUMNS.map(({ column, label }) => ({ column, label, value: column === 'wmkf_boardmailingdate' ? '2027-05-27' : null, changedAt: null, changedBy: null }));
-    return response(gets === 1 ? snapshot() : { ...snapshot(), cycles: [cycle('D26', 'December 2026', 'W/"9"', { dates: changed }), cycle('J27', 'June 2027', 'W/"7"')] });
+    // Second read advances the version; the conflict's automatic third read brings the latest date.
+    const changed = CYCLE_CALENDAR_DATE_COLUMNS.map(({ column, label }) => ({ column, label, value: column === 'wmkf_boardmailingdate' ? (gets === 2 ? '2027-05-26' : '2027-05-27') : null, changedAt: null, changedBy: null }));
+    return response(gets === 1 ? snapshot() : { ...snapshot(), cycles: [cycle('D26', 'December 2026', gets === 2 ? 'W/"8"' : 'W/"9"', { dates: changed }), cycle('J27', 'June 2027', 'W/"7"')] });
   });
   render(<CycleCalendarPanel />);
   fireEvent.click(await screen.findByRole('button', { name: 'Edit Proposal Due' }));
   fireEvent.change(screen.getByLabelText('Proposal Due'), { target: { value: '2026-12-07' } });
   fireEvent.click(screen.getByRole('button', { name: 'Reload calendar' }));
-  expect(await screen.findByText('Thu, May 27, 2027')).toBeTruthy(); // the refreshed version is rendered
+  expect(await screen.findByText('Wed, May 26, 2027')).toBeTruthy(); // the refreshed version is rendered
   expect(screen.getByLabelText('Proposal Due').value).toBe('2026-12-07'); // draft survives the refresh
   fireEvent.click(screen.getByRole('button', { name: 'Save' }));
-  expect(await screen.findByRole('alert')).toHaveTextContent('This cycle changed since you opened it');
+  expect(await screen.findByRole('alert')).toHaveTextContent('Someone changed this cycle since you opened it. The latest dates are shown; edit again if you still need to.');
+  expect(screen.queryByLabelText('Proposal Due')).toBeNull();
+  expect(await screen.findByText('Thu, May 27, 2027')).toBeTruthy();
+  expect(gets).toBe(3);
   const post = global.fetch.mock.calls.find(([, o]) => o?.method === 'POST');
   expect(JSON.parse(post[1].body).etag).toBe('W/"1"');
+  fireEvent.click(screen.getByRole('button', { name: 'Edit Proposal Due' }));
+  fireEvent.change(screen.getByLabelText('Proposal Due'), { target: { value: '2026-12-07' } });
+  fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+  expect(await screen.findByText('Date saved.')).toBeTruthy();
+  const retry = global.fetch.mock.calls.filter(([, o]) => o?.method === 'POST')[1];
+  expect(JSON.parse(retry[1].body).etag).toBe('W/"9"');
 });
