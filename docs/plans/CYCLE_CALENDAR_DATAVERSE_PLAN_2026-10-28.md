@@ -3,7 +3,7 @@ title: Cycle calendar on the operations Grant Cycle table — plan
 domain: platform
 kind: plan
 status: proposed
-summary: "Owner decision 2026-10-28 (alignment log D43): the operations Grant Cycle table (wmkf_grantcycle) is the authoritative home for the cycle milestone dates it carries, edited from an app Admin calendar by the Grants Manager / Program Coordinator roles, with per-date who/when tracking. Prototype scope, edit tracking, Tier 2 controls and open questions; nothing built."
+summary: "Owner decision 2026-10-28 (alignment log D43): the operations Grant Cycle table (wmkf_grantcycle) is the authoritative home for the cycle milestone dates it carries, edited from an app calendar (Admin section + standalone page) by the Grants Manager / Program Coordinator roles, viewable by all staff, with per-date who/when tracking via Dataverse audit history. Prototype scope, edit tracking, Tier 2 controls and open questions; contract-reconcile reviewed 2026-10-28; nothing built."
 canonical: false
 owner: product-engineering
 related:
@@ -18,14 +18,16 @@ related:
 # Cycle calendar on the operations Grant Cycle table
 
 Status: **proposed; nothing built.** Decision record: alignment log D43
-(2026-10-28), which supersedes the date split in D10. Run `/contract-reconcile`
-on this plan before the prototype branch starts.
+(2026-10-28), which supersedes the date split in D10. `/contract-reconcile`
+plan review done 2026-10-28: ready with the named changes now folded into
+§3, §4 and §6.
 
 ## 1. Decision
 
 The operations Grant Cycle table (`wmkf_grantcycle`) is the authoritative home
 for every cycle milestone date it carries. The apps read those dates and also
-**edit them** from one Admin calendar, so staff manage the cycle's milestone
+**edit them** from one app calendar (an Admin section for superusers and a
+standalone `/cycle-calendar` page for staff; §3), so staff manage the cycle's milestone
 dates in one place (owner, 2026-10-28: chosen over editing in Dynamics, for
 consistency with using the apps to manage multiple milestone dates). There is
 one editable copy of each date. `wmkf_appgrantcycle` keeps its non-date role
@@ -68,26 +70,50 @@ evidence `docs/audits/grant-cycle-dates-2026-10-28-evidence.json`]
 
 The smallest thing that lets the calendar roles enter and see dates:
 
-1. **Read adapter.** A new DAL adapter, proposed as
-   `lib/dataverse/adapters/grant-cycle.js` [NOT-READ: lib/dataverse/adapters/grant-cycle.js — proposed new file; does not exist],
+1. **Adapter.** A new DAL adapter for the operations table, e.g.
+   `lib/dataverse/adapters/operations-grant-cycle.js` [NOT-READ: lib/dataverse/adapters/operations-grant-cycle.js — proposed new file],
    with named operations: list rows with a modern `J`/`D` two-digit code
-   (`^[JD]\d{2}$`), get one row by code, update the date columns of one row.
-   Writes run under `withDalContext` and pass the Dataverse target interlock
-   like every other write. `check:dataverse-access-layer` requires this shape.
-2. **Admin calendar section.** One section in the Admin panel listing the
-   recent cycles (columns = cycles, rows = dates) with each date's display
-   name from metadata, its value or "Not set", and "last changed by X on Y".
-   Editing a date saves that one column.
-3. **Access.** View: anyone with Admin access to the section. Edit: a system
+   (`^[JD]\d{2}$`), get one row by code (with its ETag), update the date
+   columns of one row. **Not** `grant-cycle.js`: that file already exists and
+   is the adapter for the apps table `wmkf_appgrantcycles` [VERIFIED via
+   `lib/dataverse/adapters/grant-cycle.js:2,12`]. Register `wmkf_grantcycles`
+   in `lib/dataverse/core/entity-registry.js` (today it lists only
+   `wmkf_appgrantcycles`, line 45). Writes run under `withDalContext`; the
+   target interlock allows production-app writes to the production target
+   [VERIFIED via `lib/dataverse/core/interlock.js:336-338`]. A service module
+   sits between the route and the adapter (`check:route-service-boundary`).
+2. **One calendar panel, two places** (owner, 2026-10-28; Staffing
+   precedent). The Admin panel is superuser-only [VERIFIED via
+   `shared/components/Layout.js:137-139`; Admin routes use `requireSuperuser`,
+   e.g. `pages/api/admin/email-defaults.js:41`], so the same panel component
+   appears as an Admin section for superusers and as a standalone
+   `/cycle-calendar` page in the Tools menu for everyone else, the way
+   Staffing does [VERIFIED via `shared/components/Layout.js:133`;
+   `pages/staffing.js`]. The panel lists the recent cycles (columns = cycles,
+   rows = dates) with each date's display name from metadata, its value or
+   "Not set", and "last changed by X on Y". Editing a date saves that one
+   column; clearing it saves null.
+3. **Access.** View: **any signed-in staff member** (owner, 2026-10-28),
+   read-only for non-editors; not tied to Reviewer app access, because the
+   Program Coordinator role may be held "without Reviewer app access"
+   [VERIFIED via `lib/services/board-writeups/model.js:10-11`]. Edit: a system
    administrator or the user assigned to the Grants Manager or Program
-   Coordinator role (D7, D8), checked server-side on every save. Precedent:
-   `pages/api/admin/board-writeup-cycles.js` (administrator or assigned
-   Grants Manager). Reassigning the role moves the right with no code change
-   (D1). New route rows go in `docs/API_ROUTE_SECURITY_MATRIX.md`.
-4. **Concurrency.** Save with the row's ETag (`If-Match`); a stale save is
-   refused with "this cycle changed since you opened it" rather than
-   overwriting another editor's change.
-5. **No consumers yet.** The prototype only stores and shows dates. Readers
+   Coordinator role (D7, D8; role keys `board_writeups.grants_manager`,
+   `board_writeups.program_coordinator`, model.js:7), checked server-side on
+   every save. Precedent for the role check:
+   `lib/services/board-writeups/config.js:58` (`canArchive` = superuser or
+   assigned Grants Manager). Reassigning the role moves the right with no code
+   change (D1). The page shows the edit controls only when the server reports
+   the caller may edit (UI mirrors the server guard).
+4. **Concurrency.** Save with the row's ETag: `updateRecord` already accepts
+   `ifMatch` and surfaces a changed row as status 412 [VERIFIED via
+   `lib/services/dynamics/write-core.js:165-205`]; the panel shows "this
+   cycle changed since you opened it; reload" instead of overwriting.
+5. **Input.** Cycle chosen by code, validated against `^[JD]\d{2}$`; row id
+   GUID-validated before it reaches a Dataverse selector
+   (`check:trust-boundary-guid`); only the eleven date columns are writable
+   (allowlist); values must be `YYYY-MM-DD` or null.
+6. **No consumers yet.** The prototype only stores and shows dates. Readers
    (default cycle, filing window, Feb 3 warning, readiness notices) come in
    later slices, each reading through the same adapter.
 
@@ -104,9 +130,18 @@ Row-level `modifiedby` / `modifiedon` cannot answer this per date: one save to
 any column overwrites them for the whole row. Two mechanisms do:
 
 **A. Dataverse audit history (preferred).** Field-level audit records every
-column change with the user and time, for app saves and Dynamics edits alike,
-and the app reads it per row (`RetrieveRecordChangeHistory` / the `audits`
-table). [VERIFIED 2026-10-28 probe] Organization auditing is **on** and all
+column change with the user and time, for app saves and Dynamics edits alike.
+The app reads it **per row** with `RetrieveRecordChangeHistory` (a handful of
+cycle rows, so per-row reads are cheap). That per-record read returned 200
+for this app on `akoya_request` and `contact`; the bulk `/audits` query is
+403 because the app lacks `ReadAuditSummary` [VERIFIED via
+`docs/DATAVERSE_POWER_TOOLS_DESIGN.md:79`;
+`docs/REVIEWER_ORCID_BACKPROPAGATION_DESIGN.md:237`]. Not yet tested on
+`wmkf_grantcycle`: extend `scripts/probe-grant-cycle-dates.cjs` to read one
+row's change history after the first edit. The audit privilege can be
+revoked independently of normal reads, so if the history read fails the
+panel shows the row's `modifiedon` / `modifiedby` labelled "last change to
+this cycle (any date)" rather than a per-date claim. [VERIFIED 2026-10-28 probe] Organization auditing is **on** and all
 fourteen columns are flagged for auditing, but auditing on the
 `wmkf_grantcycle` **table was off**. **Turned on 2026-10-28 (Pacific)** with
 owner-run `scripts/enable-grant-cycle-audit.cjs --apply`: before `false`,
@@ -122,11 +157,24 @@ own identity) when Dataverse returns 403 [VERIFIED via
 `lib/services/dynamics/write-core.js:78-79,103-104`]. For calendar saves that
 fallback would record the app, not Sarah or Duncan. So:
 
-- Calendar saves must **require** impersonation: no silent fallback; a 403
-  is shown as "you do not have permission to change this date in Dataverse".
-- Before building, confirm the flag is on in Production [ASSUMED, not
-  checked] and that the Grants Manager and Program Coordinator users hold
-  write privilege on `wmkf_grantcycle` in Dataverse [ASSUMED, not checked].
+- Calendar saves call `updateRecord(..., { ifMatch, actingUserSystemId,
+  noFallback: true })` [VERIFIED option set via
+  `lib/services/dynamics/write-core.js:177`; precedent
+  `lib/services/reviewer-due-extension.js:294`]; a 403 is shown as "you do
+  not have permission to change this date in Dataverse".
+- `noFallback` alone is not enough: when the flag is not `'true'` or the
+  caller has no Dataverse user id, no impersonation header is sent at all and
+  the write lands as the app [VERIFIED via `write-core.js:77-80`]. The save
+  service therefore **refuses** unless `DYNAMICS_IMPERSONATION_ENABLED ===
+  'true'` and the session carries `dynamicsSystemuserId` (precedent: a
+  sending feature that requires the flag, `docs/CREDENTIALS_RUNBOOK.md:137`).
+- The flag is documented `true` in Production [VERIFIED via
+  `docs/CREDENTIALS_RUNBOOK.md:205`, last verified S466; not re-checked this
+  session]. Whether the Grants Manager and Program Coordinator users hold
+  write privilege on `wmkf_grantcycle` is [ASSUMED]; impersonated writes run
+  under the intersection of the app's and the user's privileges
+  (`write-core.js:62`), so the sandbox rehearsal and the first production
+  save prove it.
 
 **Fallback if A or B cannot be met:** the app writes its own change record
 with each save (cycle, column, old value, new value, staff member, time) and
@@ -159,6 +207,17 @@ Before the sandbox rehearsal:
   to the live columns (add the eleven dates; drop `wmkf_CycleName`) and
   apply it to the sandbox; a reviewed commit.
 - Add an Atlas page for `wmkf_grantcycle` once runtime code reads it.
+
+Surfaces the build must update, each with its gate: route rows in
+`docs/API_ROUTE_SECURITY_MATRIX.md` (`check:api-routes`); route namespace
+lifecycle map (`check:route-lifecycle-auth`); route counts in
+`CANONICAL_COUNTS` (`check:fact-consistency`); adapter-only Dataverse access
+(`check:dataverse-access-layer`); service between route and adapter
+(`check:route-service-boundary`); GUID validation
+(`check:trust-boundary-guid`); OData escaping of the cycle code
+(`check:odata-escape`); Atlas (`check:atlas`); service catalog entry; unit
+tests for the role check, the impersonation refusal, the 412 path, the
+column allowlist and the null-date display.
 
 ## 7. Open questions
 
