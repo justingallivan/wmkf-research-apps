@@ -17,7 +17,7 @@ related:
 
 # Cycle calendar on the operations Grant Cycle table
 
-Status: **proposed; nothing built.** Decision record: alignment log D43
+Status: **proposed; slice 1 (adapter, service, route, tests) source-built on branch `claude/cycle-calendar`, not deployed.** Decision record: alignment log D43
 (2026-10-28), which supersedes the date split in D10. `/contract-reconcile`
 plan review done 2026-10-28: ready with the named changes now folded into
 §3, §4 and §6.
@@ -71,14 +71,13 @@ evidence `docs/audits/grant-cycle-dates-2026-10-28-evidence.json`]
 The smallest thing that lets the calendar roles enter and see dates:
 
 1. **Adapter.** A new DAL adapter for the operations table, e.g.
-   `lib/dataverse/adapters/operations-grant-cycle.js` [NOT-READ: lib/dataverse/adapters/operations-grant-cycle.js — proposed new file],
+   `lib/dataverse/adapters/operations-grant-cycle.js` [RECHECKED after lib/dataverse/adapters/operations-grant-cycle.js change: built on branch `claude/cycle-calendar`],
    with named operations: list rows with a modern `J`/`D` two-digit code
    (`^[JD]\d{2}$`), get one row by code (with its ETag), update the date
    columns of one row. **Not** `grant-cycle.js`: that file already exists and
    is the adapter for the apps table `wmkf_appgrantcycles` [VERIFIED via
    `lib/dataverse/adapters/grant-cycle.js:2,12`]. Register `wmkf_grantcycles`
-   in `lib/dataverse/core/entity-registry.js` (today it lists only
-   `wmkf_appgrantcycles`, line 45). Writes run under `withDalContext`; the
+   in `lib/dataverse/core/entity-registry.js` [RECHECKED after lib/dataverse/core/entity-registry.js change: registered on branch `claude/cycle-calendar`]. Writes run under `withDalContext`; the
    target interlock allows production-app writes to the production target
    [VERIFIED via `lib/dataverse/core/interlock.js:336-338`]. A service module
    sits between the route and the adapter (`check:route-service-boundary`).

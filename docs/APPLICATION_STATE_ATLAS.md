@@ -64,6 +64,7 @@ The canonical reference for the live state of the application's data layer.
 | `wmkf_potentialreviewers` (custom WMKF entity) | 4,427 | canonical reusable reviewer-person record; also carries the bibliometric fields (affiliation/h-index/citations/scholar/orcid/etc.) folded in from the dropped sidecar (S213) | [dataverse-wmkf-potentialreviewers.md](atlas/dataverse-wmkf-potentialreviewers.md) |
 | `wmkf_apppublication` | — | **DROPPED S213** (was 0 rows, no callers) — went down with the appresearcher collapse | (page section removed) |
 | `wmkf_appgrantcycle` | 10 | Dataverse-primary post-W3 (2026-05-12); full 11-attr schema deployed; consumed by reviewer-finder/grant-cycles + review-manager render/send-emails + maintenance-service blob-cleanup | same page |
+| `wmkf_grantcycle` (operations Grant Cycle) | 143 (2026-10-28 probe) | Connor's rows; D43 home for cycle milestone dates; cycle calendar adapter/service/route source-built on branch `claude/cycle-calendar`, not deployed | [dataverse-wmkf-grantcycle.md](atlas/dataverse-wmkf-grantcycle.md) |
 | `wmkf_appproposalsearch` | 0 | DEPLOYED (S185), entity set is the unconventional `wmkf_appproposalsearchs`; verified S188 audit re-sweep 2026-05-25 | same page |
 | `wmkf_app_z_publication_author` | n/a | NOT DEPLOYED | same page |
 | `wmkf_apprequestperson` | 5,561 | active junction (S139); awaiting Connor PA dual-write | [dataverse-wmkf-apprequestperson.md](atlas/dataverse-wmkf-apprequestperson.md) |
