@@ -16,6 +16,7 @@ import {
   mutateWorkflow,
   readWorkflowHistory,
   WORKFLOW_ACTIONS,
+  readWorkflowSupplement,
 } from '../../lib/services/proposal-ranking/workflow-service';
 
 const alice = '11111111-1111-4111-8111-111111111111';
@@ -490,7 +491,6 @@ test('history is newest-first across numeric boundaries even when storage sorts 
 
 jest.mock('../../lib/services/post-presentation-materials/discussion-sentiment-reader.js',()=>({getDeliberationSentiments:jest.fn(),hasMeetingTrackerAccess:jest.fn()}));
 import {getDeliberationSentiments,hasMeetingTrackerAccess} from '../../lib/services/post-presentation-materials/discussion-sentiment-reader';
-import {readWorkflowSupplement} from '../../lib/services/proposal-ranking/workflow-service';
 function installReveal(count=2){
   const proposals=Array.from({length:count},(_,i)=>({requestId:`request-${i}`,programKey:'mr',score:{mean:3}}));
   const order=proposals.map((p)=>p.requestId);
@@ -576,4 +576,106 @@ test('two PDs saving from the same loaded round retain distinct private assessme
   expect(lastCommit.updates).toHaveLength(1);
   expect(lastCommit.updates[0].row.wmkf_participantsystemuserid).toBe(bob);
   expect(requestEnvelope).toHaveBeenCalledTimes(3);
+});
+
+
+async function revealMeeting() {
+  await prepare(alice);
+  await prepare(bob);
+  await send('reveal');
+}
+async function lockAs(action, actor, isSuperuser = false) {
+  const view = await readWorkflowRound({ roundId, actor, isSuperuser });
+  const body = { action, roundId, operationId: `operation-${++serial}`,
+    roundEtag: view.round.etag, policyRevision: view.round.policyRevision,
+    preparationVersion: view.workflow.preparationVersion, revealId: view.workflow.revealId,
+    confirmationFingerprint: view.confirmations[action]?.fingerprint };
+  return { body, result: await mutateWorkflow({ body, actor, isSuperuser, actorName: actor === charlie ? 'Charlie Admin' : null }) };
+}
+
+test('lock preserves the final collective and blocks every ordinary write, while workbook stays available', async () => {
+  await revealMeeting();
+  await send('editCollective', bob, { listVersion: 1, order: ['s', 'm'], boundaries: [1, 2] });
+  const locked = await lockAs('lockMeeting', alice);
+  expect(locked.result.workflow.meetingLock).toMatchObject({ locked: true, actorSystemUserId: alice });
+  const stored = JSON.parse(rounds[roundId].wmkf_administrationlogjson);
+  expect(stored).toEqual([expect.objectContaining({ type: 'meeting-locked', actorSystemUserId: alice })]);
+  expect((await readWorkflowHistory({ roundId, actor: bob })).entries[0].collective.order).toEqual(['s', 'm']);
+  expect(locked.result.confirmations).toEqual({ unlockMeeting: expect.any(Object) });
+  const before = commitAssessmentChanges.mock.calls.length;
+  for (const action of WORKFLOW_ACTIONS.filter(a => !['unlockMeeting', 'lockMeeting'].includes(a))) {
+    await expect(send(action, alice)).rejects.toMatchObject({ code: 'meeting_locked' });
+  }
+  expect(commitAssessmentChanges).toHaveBeenCalledTimes(before);
+  const view = await readWorkflowRound({ roundId, actor: bob });
+  const workbook = await readWorkflowSupplement({ body: { action: 'exportWorkbook', roundId,
+    roundEtag: view.round.etag, revealId: view.workflow.revealId,
+    preparationVersion: view.workflow.preparationVersion, listVersion: view.collective.version }, actor: bob });
+  expect(workbook.filename).toContain('J27');
+  expect(workbook.base64.length).toBeGreaterThan(100);
+  // Replaying a confirmed lock must not lock again or duplicate its event.
+  await mutateWorkflow({ body: locked.body, actor: alice });
+  expect(commitAssessmentChanges).toHaveBeenCalledTimes(before);
+  const unlocked = await lockAs('unlockMeeting', alice);
+  expect(unlocked.result.workflow.meetingLock.locked).toBe(false);
+  expect(unlocked.result.collective.order).toEqual(['s', 'm']);
+  await send('editCollective', bob, { listVersion: 2, order: ['m', 's'], boundaries: [0, 1] });
+  await send('reopenPreparation');
+  expect((await readWorkflowRound({ roundId, actor: alice })).workflow.meetingLock).toBeNull();
+});
+
+test('nonparticipant superuser can lock and unlock but cannot perform unrelated writes', async () => {
+  await revealMeeting();
+  await expect(lockAs('lockMeeting', bob)).rejects.toMatchObject({ code: 'access_denied' });
+  await expect(lockAs('lockMeeting', charlie)).rejects.toMatchObject({ code: 'access_denied' });
+  const locked = await lockAs('lockMeeting', charlie, true);
+  expect(locked.result.viewer.isObserver).toBe(true);
+  expect(locked.result.workflow.meetingLock.actorName).toBe('Charlie Admin');
+  expect(JSON.parse(rounds[roundId].wmkf_administrationlogjson)[0].actorName).toBe('Charlie Admin');
+  expect(locked.result.own).toBeNull();
+  expect(locked.result.confirmations).toEqual({ unlockMeeting: expect.any(Object) });
+  await lockAs('unlockMeeting', charlie, true);
+  const view = await readWorkflowRound({ roundId, actor: charlie, isSuperuser: true });
+  await expect(mutateWorkflow({ body: { action: 'resetCollective', roundId, operationId: 'no-admin-reset' }, actor: charlie, isSuperuser: true }))
+    .rejects.toMatchObject({ code: 'access_denied' });
+  expect(view.confirmations).toEqual({ lockMeeting: expect.any(Object) });
+});
+
+test('lock needs a revealed group; stale edits and lock races cannot overwrite the finalization', async () => {
+  await expect(lockAs('lockMeeting', alice)).rejects.toMatchObject({ code: 'confirmation_stale' });
+  await revealMeeting();
+  const stale = await readWorkflowRound({ roundId, actor: bob });
+  await lockAs('lockMeeting', alice);
+  await expect(mutateWorkflow({ body: { action: 'editCollective', roundId, operationId: 'stale-edit',
+    roundEtag: stale.round.etag, policyRevision: stale.round.policyRevision,
+    preparationVersion: stale.workflow.preparationVersion, revealId: stale.workflow.revealId,
+    listVersion: 1, order: ['s', 'm'], boundaries: [1, 2] }, actor: bob }))
+    .rejects.toMatchObject({ code: 'stale_scope' });
+  // ETag fencing must reject a concurrent write between load and commit.
+  await lockAs('unlockMeeting', alice);
+  commitAssessmentChanges.mockRejectedValueOnce(Object.assign(new Error('race'), { status: 412 }));
+  await expect(lockAs('lockMeeting', alice)).rejects.toMatchObject({ code: 'conflict' });
+  expect((await readWorkflowRound({ roundId, actor: alice })).workflow.meetingLock.locked).toBe(false);
+});
+
+test('malformed persisted locks fail closed', async () => {
+  await revealMeeting();
+  const workflow = JSON.parse(rounds[roundId].wmkf_workflowjson);
+  workflow.meetingLock = { locked: 'false', at: 'bad', actorSystemUserId: alice };
+  rounds[roundId].wmkf_workflowjson = JSON.stringify(workflow);
+  await expect(readWorkflowRound({ roundId, actor: alice })).rejects.toMatchObject({ code: 'dependency_unavailable' });
+});
+
+
+test('a captured second facilitator and a nonfacilitator roster superuser may both manage locks', async () => {
+  const workflow = JSON.parse(rounds[roundId].wmkf_workflowjson);
+  workflow.facilitation = { version: 1, systemUserIds: [alice, charlie], source: 'set', settingRevision: 'r1' };
+  rounds[roundId].wmkf_workflowjson = JSON.stringify(workflow);
+  await revealMeeting();
+  await lockAs('lockMeeting', charlie);
+  await lockAs('unlockMeeting', bob, true);
+  await lockAs('lockMeeting', bob, true);
+  await lockAs('unlockMeeting', charlie);
+  expect(JSON.parse(rounds[roundId].wmkf_administrationlogjson).map(event => event.actorSystemUserId))
+    .toEqual([charlie, bob, bob, charlie]);
 });

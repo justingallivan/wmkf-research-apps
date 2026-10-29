@@ -558,6 +558,7 @@ export function AssessmentList({
 export default function AssessmentWorkflow({
   initial,
   cycleOptions,
+  cycleListError = '',
   onCycleChange,
 }) {
   const [view, setView] = useState(initial);
@@ -881,12 +882,15 @@ export default function AssessmentWorkflow({
   const saved = collective || view.own?.[program];
   const assessment = (!collective && privateSave.draft) || draft || saved;
   const active = view.round.state === 'active';
+  const locked = view.workflow.meetingLock?.locked === true;
+  const canManageLock = active && (view.viewer.isFacilitator || view.viewer.isSuperuser) && view.workflow.stage === 'revealed';
   const combinedOutdated = own?.co &&
     (own.co.sourceVersions?.se !== own.se.version ||
       own.co.sourceVersions?.mr !== own.mr.version);
   const outdated = program === 'co' && combinedOutdated;
   const editable =
     active &&
+    !locked &&
     !view.viewer.isObserver &&
     !exclusiveBusy &&
     !privateSave.blocked &&
@@ -1106,6 +1110,21 @@ export default function AssessmentWorkflow({
           </span>}
         </div>
       </header>
+      {cycleListError && <p role="alert" className="my-3 text-sm text-amber-900">{cycleListError}</p>}
+      {active && view.workflow.stage === 'revealed' && (
+        <section aria-label="Meeting lock" className="my-4 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-gray-300 bg-gray-50 p-4">
+          <div>
+            <p className="font-semibold">{locked ? 'Meeting locked' : 'Meeting open for changes'}</p>
+            <p className="mt-1 text-sm text-gray-700">{locked ? 'Rankings and dividers are read-only. Viewing and workbook download remain available.' : 'Lock the meeting once the group ranking is final.'}</p>
+            {view.workflow.meetingLock && <p className="mt-1 text-sm text-gray-600">
+              {locked ? 'Locked' : 'Unlocked'} by {view.workflow.meetingLock.actorName || view.round.snapshot.roster.find(person => person.systemUserId === view.workflow.meetingLock.actorSystemUserId)?.name || 'a facilitator or administrator'} · {new Date(view.workflow.meetingLock.at).toLocaleString()}
+            </p>}
+          </div>
+          {canManageLock && <Button variant="outline" disabled={busy || Boolean(pending)} onClick={() => confirm(locked ? 'unlockMeeting' : 'lockMeeting')}>
+            {locked ? 'Unlock meeting' : 'Lock meeting'}
+          </Button>}
+        </section>
+      )}
       {isObserver && (
         <p role="note" className="mt-3 rounded-lg border border-gray-200 bg-gray-50 p-3 text-sm text-gray-700">
           You are following this round. Assessments and the group order are read-only, and this page updates on its own.
@@ -1443,7 +1462,7 @@ export default function AssessmentWorkflow({
           </div>}
         </>
       )}
-      {view.viewer.isFacilitator && active && (
+      {view.viewer.isFacilitator && active && !locked && (
         <details className="mt-8 border-t pt-4">
           <summary className="cursor-pointer font-medium">
             Round controls
@@ -1503,6 +1522,8 @@ export default function AssessmentWorkflow({
               {pending
                 ? 'Check and retry change'
                 : {
+                    lockMeeting: 'Lock meeting',
+                    unlockMeeting: 'Unlock meeting',
                     resetProgram: 'Reset program preparation',
                     buildCombined: 'Build combined list',
                     reveal: 'Reveal group starting order',

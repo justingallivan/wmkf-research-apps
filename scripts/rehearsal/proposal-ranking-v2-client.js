@@ -110,6 +110,7 @@ let archives = [];
 const confirmations = () =>
   Object.fromEntries(
     [
+      ...(state.stage === 'revealed' && actor === 'pd-0' ? [state.meetingLock?.locked ? 'unlockMeeting' : 'lockMeeting'] : []),
       'buildCombined',
       'reveal',
       'resetCollective',
@@ -121,7 +122,9 @@ const confirmations = () =>
       key,
       {
         fingerprint: String(revision),
-        message: key.startsWith('resetProgram')
+        message: key === 'lockMeeting' ? 'Lock this fictional meeting? Viewing and workbook download remain available.'
+          : key === 'unlockMeeting' ? 'Unlock this fictional meeting for changes?'
+          : key.startsWith('resetProgram')
           ? 'Restore this program’s reviewer order and starting thirds, clearing confidence?'
           : key === 'restartWalkthrough'
             ? 'Start a new rehearsal from the same fictional proposals?'
@@ -156,6 +159,7 @@ export function currentView() {
       stage: state.stage,
       preparationVersion: state.preparationVersion,
       revealId: state.revealId,
+      meetingLock: state.meetingLock || null,
     },
     own: state.participants[actor],
     facilitatorLists: actor === 'pd-0' ? state.participants : null,
