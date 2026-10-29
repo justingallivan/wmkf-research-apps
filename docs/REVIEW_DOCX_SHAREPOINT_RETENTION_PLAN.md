@@ -30,8 +30,9 @@ related:
 path, guarded repair service, and D26 backfill were fast-forwarded to `main` at
 `3ba2a6ad` and reached Ready Production deployment
 `dpl_22wUzC1cCi4nhKTSFQftfaycucSh` on 2026-09-03 PDT. Production now has exact
-`REVIEW_DOCX_SHAREPOINT_WRITE=on` and `REVIEW_DOCX_SHAREPOINT_CYCLE=D26`, and
-the hourly route is active in Ready activation-proof deployment
+`REVIEW_DOCX_SHAREPOINT_WRITE=on` and `REVIEW_DOCX_SHAREPOINT_CYCLE=D26` (cycle
+pin superseded 2026-10-29, D44, PR #551: the cron files every cycle until its
+calendar Board date), and the hourly route is active in Ready activation-proof deployment
 `dpl_E6VKW5Wi8zDTfU1ZRhNsbH9yg9oM`. The exact
 owner-approved manifest
 `outputs/review-docx-backfill/review-docx-D26-2026-09-04T01-18-31-489Z.json`
