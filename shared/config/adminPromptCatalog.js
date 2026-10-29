@@ -1,0 +1,262 @@
+/**
+ * Reviewed display metadata for Admin → AI → Prompts.
+ * Purpose/caller evidence: docs/audits/prompt-descriptions-and-callers-2026-10-29.md.
+ * These labels do not control execution, publication, or access. Caller status
+ * describes source usage, not recent execution or Production feature activation.
+ * Publication state always comes from the live prompt row, never this catalog.
+ * Add new names after checking their prompt content and actual callers; unknown
+ * stored names remain visible through the explicit fallback below.
+ */
+export const ADMIN_PROMPT_CATALOG = Object.freeze({
+  "cycle-dossier.entry": {
+    title: "Cycle Dossier briefing entry",
+    description: "Writes a private scientific briefing from a proposal, prior AI context, and retrieved literature evidence, with field background and references.",
+    usedBy: "Cycle Dossier → briefing entry generation",
+    usage: "application",
+  },
+  "cycle-dossier.research-plan": {
+    title: "Cycle Dossier literature search plan",
+    description: "Creates up to three focused literature-search queries from the proposal for the app to run.",
+    usedBy: "Cycle Dossier → research stage before entry writing",
+    usage: "application",
+  },
+  "executor.echo-parity": {
+    title: "Executor echo and cache diagnostic",
+    description: "Copies a request number and supplied test text into a small JSON response so a developer can compare repeated Executor output and observe cache use.",
+    usedBy: "Developer smoke tests.",
+    usage: "diagnostic",
+  },
+  "expense-reporter.extract-document": {
+    title: "Extract expenses from receipt text",
+    description: "Extracts expense information from the text of an uploaded receipt or invoice.",
+    usedBy: "Expense Reporter → receipt and invoice documents",
+    usage: "application",
+  },
+  "expense-reporter.extract-image": {
+    title: "Extract expenses from a receipt image",
+    description: "Reads a receipt or invoice image and extracts its expense information.",
+    usedBy: "Expense Reporter → receipt and invoice images",
+    usage: "application",
+  },
+  "expertise-finder.match": {
+    title: "Match a proposal to the internal expertise roster",
+    description: "Compares a proposal with the supplied internal reviewer roster, explains suitable matches, and identifies expertise gaps.",
+    usedBy: "Expertise Finder → single-proposal and batch matching",
+    usage: "application",
+  },
+  "field-primer.generate": {
+    title: "Research field primer",
+    description: "Explains the proposal’s research field for a non-specialist: methods, subareas, frontiers, communities, venues, experts, and where the proposal fits. It does not evaluate the proposal or recommend reviewers.",
+    usedBy: "Workbench → Proposal → Field Primer; standalone generation",
+    usage: "application",
+  },
+  "funding-gap.analyze": {
+    title: "Federal funding landscape report",
+    description: "Uses proposal details and funding records already retrieved by the app to write a report on funding patterns and potential gaps.",
+    usedBy: "Funding Gap Analyzer → report stage",
+    usage: "application",
+  },
+  "funding-gap.extract": {
+    title: "Extract proposal details for funding searches",
+    description: "Extracts the investigator, institution, research topics, and search terms needed for the app’s federal funding lookup.",
+    usedBy: "Funding Gap Analyzer → initial extraction stage",
+    usage: "application",
+  },
+  "grantee-abstract.generate": {
+    title: "Rewrite the grantee abstract in Foundation style",
+    description: "Rewrites the applicant’s abstract in Foundation house style. The Awardee workflow saves the returned draft for staff review.",
+    usedBy: "Workbench → Awardee → generate abstract",
+    usage: "application",
+  },
+  "grantee-title.generate": {
+    title: "Board Summary project objective",
+    description: "Turns the applicant’s title and abstract into one short, plain-language project-objective line for trustees.",
+    usedBy: "Scheduled grantee-title generation → missing edited project descriptions",
+    usage: "application",
+  },
+  "initial-assessment.generate": {
+    title: "Initial Assessment narrative draft",
+    description: "Drafts Summary, Significance and Impact, Research Plan, and Team Expertise from the proposal. Foundation Opportunity remains for staff judgment.",
+    usedBy: "Workbench → Initial Assessment generation",
+    usage: "application",
+  },
+  "literature-analyzer.compare": {
+    title: "Compare research papers",
+    description: "Compares the methods or findings across the supplied paper summaries.",
+    usedBy: "Literature Analyzer → optional comparison stage",
+    usage: "application",
+  },
+  "literature-analyzer.extract-paper": {
+    title: "Extract information from one research paper",
+    description: "Reads an attached research-paper PDF and extracts structured information for a literature review.",
+    usedBy: "Literature Analyzer → per-paper extraction",
+    usage: "application",
+  },
+  "literature-analyzer.synthesize": {
+    title: "Synthesize a literature review",
+    description: "Combines extracted paper summaries into a review of shared themes, patterns, and relationships, optionally focused on a topic.",
+    usedBy: "Literature Analyzer → synthesis stage",
+    usage: "application",
+  },
+  "meeting-transcript.fragment-review": {
+    title: "Review possible speaker-split errors",
+    description: "Classifies one-word interruptions as sentence fragments, interjections, or uncertain. Flags likely speaker-split errors for review; this pass does not rewrite the transcript or assign identities.",
+    usedBy: "Meeting transcription → speaker review",
+    usage: "application",
+  },
+  "meeting-transcript.presentation-summary": {
+    title: "Site Visit presentation summary",
+    description: "Summarizes the applicants’ presentation and discussion with staff from the presentation transcript, with slide text when available. The caller holds a draft for staff review.",
+    usedBy: "Meeting Tracker → presentation summary draft; meeting preparation worker",
+    usage: "application",
+  },
+  "meeting-transcript.speaker-alignment": {
+    title: "Match transcript speakers to Zoom names",
+    description: "Checks anonymous transcription speaker IDs against sampled speech and Zoom caption names, returning evidence-based identity suggestions that code verifies.",
+    usedBy: "Meeting transcription → Zoom speaker alignment",
+    usage: "application",
+  },
+  "meeting-transcript.staff-discussion-sentiment": {
+    title: "Staff discussion reception and uncertainty",
+    description: "Records enthusiasm, reception, supporting and concerning points, disagreements, and uncertainties from staff-only discussion, backed by transcript quotations. It describes staff reactions rather than independently judging the proposal.",
+    usedBy: "Meeting Tracker → staff discussion sentiment analysis",
+    usage: "application",
+  },
+  "meeting-transcript.staff-discussion-summary": {
+    title: "Staff-only Site Visit discussion summary",
+    description: "Summarizes the internal staff discussion after applicants leave. Keeps that discussion separate from the applicants’ presentation summary.",
+    usedBy: "Meeting Tracker → staff discussion summary draft",
+    usage: "application",
+  },
+  "multi-perspective.initial-analysis": {
+    title: "Extract and assess a research concept",
+    description: "Reads the uploaded concept PDF and produces the initial concept analysis against the supplied Foundation funding guidelines.",
+    usedBy: "Multi-Perspective Evaluator → initial stage",
+    usage: "application",
+  },
+  "multi-perspective.integrator": {
+    title: "Combine the three concept evaluations",
+    description: "Combines the optimist, skeptic, and neutral assessments into an integrated recommendation, identifying agreement and resolving disagreements.",
+    usedBy: "Multi-Perspective Evaluator → integration stage",
+    usage: "application",
+  },
+  "multi-perspective.neutral": {
+    title: "Balanced research concept assessment",
+    description: "Produces a realistic, probability-weighted assessment using the concept analysis, supplied literature, and evaluation framework.",
+    usedBy: "Multi-Perspective Evaluator → neutral perspective",
+    usage: "application",
+  },
+  "multi-perspective.optimist": {
+    title: "Strongest case for a research concept",
+    description: "Builds the strongest fair case in favor of the concept using the supplied analysis, literature, and framework.",
+    usedBy: "Multi-Perspective Evaluator → optimist perspective",
+    usage: "application",
+  },
+  "multi-perspective.proposal-summary": {
+    title: "Plain-language concept summary",
+    description: "Explains what the researchers propose and the possible impact using the initial analysis and supplied literature.",
+    usedBy: "Multi-Perspective Evaluator → proposal summary stage",
+    usage: "application",
+  },
+  "multi-perspective.skeptic": {
+    title: "Risks and weaknesses of a research concept",
+    description: "Identifies weaknesses, missing evidence, and potential failure modes while assessing the concept fairly.",
+    usedBy: "Multi-Perspective Evaluator → skeptic perspective",
+    usage: "application",
+  },
+  "peer-review-summarizer.analyze": {
+    title: "Summarize uploaded peer reviews",
+    description: "Combines uploaded review documents into a narrative summary and a separate list of reviewers’ questions and concerns.",
+    usedBy: "Peer Review Summarizer → main analysis",
+    usage: "application",
+  },
+  "peer-review-summarizer.questions": {
+    title: "Recover questions from uploaded reviews",
+    description: "Extracts reviewer questions and concerns when the main analysis produces no usable questions section or fewer than 50 characters of questions.",
+    usedBy: "Peer Review Summarizer → conditional fallback pass",
+    usage: "application",
+  },
+  "phase-i.checkin": {
+    title: "Phase I application and budget checks",
+    description: "Instructions for required-section checks, budget rules and arithmetic, keyword tags, a technical summary, and advisory funding-priority fit.",
+    usedBy: "No application currently connected.",
+    usage: "unconnected",
+  },
+  "phase-i.summary": {
+    title: "Phase I proposal summary",
+    description: "Writes a structured Phase I summary for the chosen length and audience; the Executor saves it to the request’s AI summary field.",
+    usedBy: "Phase I Dynamics → stored-prompt summarization option; developer tests",
+    usage: "application",
+  },
+  "phase-ii.extract-structured": {
+    title: "Legacy Phase II proposal metadata extraction",
+    description: "Stored instructions for extracting investigator, institution, funding, methods, and other proposal metadata. Current upload routes use code templates instead of this row.",
+    usedBy: "No application reads this stored row. The corresponding Phase II tools use code templates.",
+    usage: "reference",
+  },
+  "phase-ii.qa": {
+    title: "Legacy Phase II proposal Q&A",
+    description: "Stored context template for answering questions about a proposal and summary. The current Q&A route builds its system prompt from code instead.",
+    usedBy: "No application reads this stored row. The corresponding Phase II tools use code templates.",
+    usage: "reference",
+  },
+  "phase-ii.refine": {
+    title: "Legacy Phase II writeup refinement",
+    description: "Stored instructions for revising a writeup using staff feedback. The current refinement route uses its own inline template instead.",
+    usedBy: "No application reads this stored row. The corresponding Phase II tools use code templates.",
+    usage: "reference",
+  },
+  "phase-ii.summarize": {
+    title: "Legacy Phase II two-part writeup",
+    description: "Stored instructions for a short overview followed by a detailed proposal writeup. Current upload routes generate that prompt from code instead.",
+    usedBy: "No application reads this stored row. The corresponding Phase II tools use code templates.",
+    usage: "reference",
+  },
+  "pre-site-visit.proposal-core.generate": {
+    title: "Pre-Site Visit proposal narrative sections",
+    description: "Drafts eight proposal-derived sections, from executive summary through methodology and personnel, using the narrative plus authoritative request context and personnel roster. Other writeup sections are populated elsewhere.",
+    usedBy: "Workbench → Pre-Site Visit writeup generation",
+    usage: "application",
+  },
+  "review-panel.chair": {
+    title: "Synthesize AI panel reviews",
+    description: "Combines the AI reviewers’ seat reports into a panel summary: ratings, consensus, disagreements, strengths, concerns, questions, and recommendation.",
+    usedBy: "Review Panel → chair stage; page and Workbench tab",
+    usage: "application",
+  },
+  "review-panel.seat": {
+    title: "Independent AI reviewer report",
+    description: "Uses the proposal narrative and configured review questions to produce one AI reviewer’s structured report. The worker runs it for each configured panel seat.",
+    usedBy: "Review Panel → reviewer-seat stage; page and Workbench tab",
+    usage: "application",
+  },
+  "review-synthesis.generate": {
+    title: "Synthesize submitted human peer reviews",
+    description: "Combines submitted reviewers’ ratings and written answers into a structured synthesis for staff and Program Directors. This is separate from the AI-generated Review Panel.",
+    usedBy: "Workbench → Reviews; automatic review synthesis",
+    usage: "application",
+  },
+  "reviewer-finder.analyze": {
+    title: "Analyze a proposal for reviewer discovery",
+    description: "Extracts scientific search context and proposes initial expert reviewers. Reviewer Finder uses both; Workbench enrichment reuses the scientific context and ignores the suggestions.",
+    usedBy: "Reviewer Finder → proposal analysis; Workbench → enrich recommended reviewers",
+    usage: "application",
+  },
+  "reviewer-finder.score-candidates": {
+    title: "Score discovered reviewer candidates",
+    description: "Scores the relevance of already-discovered candidates to the proposal and explains their fit, in batches of ten. Candidates have already been found by the app’s database searches.",
+    usedBy: "Reviewer Finder → discovered-candidate reasoning",
+    usage: "application",
+  },
+});
+
+const UNCATALOGED_PROMPT = Object.freeze({
+  title: 'Description not cataloged',
+  description: 'This stored prompt has not yet been described in the application catalog.',
+  usedBy: 'Not yet cataloged.',
+  usage: 'uncataloged',
+});
+
+export function getAdminPromptDescription(name) {
+  return Object.hasOwn(ADMIN_PROMPT_CATALOG, name) ? ADMIN_PROMPT_CATALOG[name] : UNCATALOGED_PROMPT;
+}

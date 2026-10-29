@@ -15,8 +15,17 @@ import { requestEnvelope } from '../../utils/api-request';
 import { ExecutorBudgetEditor } from './ExecutorBudgetEditor';
 import { TONE, fmtTs, fmtInt, ROW_DEFAULT_MAX_TOKENS } from './prompt-editor-utils';
 import PublishForm from './PromptPublishForm';
+import { getAdminPromptDescription } from '../../config/adminPromptCatalog';
 
 export { ExecutorBudgetEditor };
+
+const USAGE_BADGES = {
+  application: { label: 'Application caller', tone: 'green' },
+  reference: { label: 'Stored reference', tone: 'amber' },
+  diagnostic: { label: 'Developer diagnostic', tone: 'gray' },
+  unconnected: { label: 'No application caller', tone: 'gray' },
+  uncataloged: { label: 'Not cataloged', tone: 'gray' },
+};
 
 const STATUS_COPY = {
   completed:             { tone: 'green', text: 'Published — new version is now current.' },
@@ -126,18 +135,26 @@ function PromptPanel({ prompt, modelCatalog, executorBudgetConfig, onPublished }
   const [expanded, setExpanded] = useState(false);
   const [outcome, setOutcome] = useState(null);
   const dataverseFields = buildPromptDataverseFields(prompt);
+  const description = getAdminPromptDescription(prompt.name);
+  const usage = USAGE_BADGES[description.usage];
   return (
-    <div className="border rounded-lg overflow-hidden">
-      <div className="p-4 bg-gray-50 border-b flex items-baseline justify-between gap-3">
-        <div>
-          <div className="font-medium text-gray-900">
-            <code>{prompt.name}</code>
+    <article aria-label={description.title} className="border rounded-lg overflow-hidden">
+      <div className="p-4 bg-gray-50 border-b flex flex-wrap items-start justify-between gap-3">
+        <div className="min-w-0 flex-1">
+          <div className="flex flex-wrap items-center gap-2">
+            <h3 className="font-medium text-gray-900">{description.title}</h3>
+            <span className={`px-2 py-0.5 rounded border text-xs ${TONE[usage.tone]}`}>
+              {usage.label}
+            </span>
             {!prompt.hasCurrent && (
-              <span className="ml-2 px-1.5 py-0.5 rounded bg-amber-100 text-amber-800 text-[10px] align-middle">
+              <span className="px-2 py-0.5 rounded border bg-amber-50 text-amber-800 border-amber-200 text-xs">
                 draft — no published version
               </span>
             )}
           </div>
+          <p className="mt-2 max-w-3xl text-sm text-gray-700">{description.description}</p>
+          <p className="mt-1 text-sm text-gray-600"><span className="font-medium">Used by:</span> {description.usedBy}</p>
+          <p className="mt-2 mb-1 text-xs text-gray-500"><code className="break-all">{prompt.name}</code></p>
           <div className="text-xs text-gray-500">
             {prompt.hasCurrent ? 'current version' : 'latest version'} <strong>v{prompt.version ?? '?'}</strong> · {(prompt.body || '').length} chars
           </div>
@@ -151,7 +168,7 @@ function PromptPanel({ prompt, modelCatalog, executorBudgetConfig, onPublished }
             executorBudgetConfig={executorBudgetConfig}
           />
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex shrink-0 items-center gap-2">
           <DataverseFieldInfoButton items={dataverseFields} />
           {prompt.hasCurrent ? (
             <button
@@ -181,7 +198,7 @@ function PromptPanel({ prompt, modelCatalog, executorBudgetConfig, onPublished }
         />
       )}
       {outcome && <OutcomeBanner outcome={outcome} onDismiss={() => setOutcome(null)} />}
-    </div>
+    </article>
   );
 }
 
