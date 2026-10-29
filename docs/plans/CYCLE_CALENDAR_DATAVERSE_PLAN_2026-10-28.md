@@ -302,6 +302,6 @@ column allowlist and the null-date display.
 | Question | Who | Blocks |
 |---|---|---|
 | Which timeline step each new date column represents (TBD; staff deciding) | Sarah, Beth, Duncan; Connor for field meaning | Consumers only; the prototype shows display names |
-| Dates the apps use with no column yet: reviewer invitation start (opens the D11 filing window), the Feb 3 staff-recommendation deadline (D40), the Jan triage meetings. Add a column, derive from another date, or keep app-side? | Justin with Connor | D11 filing window; D40 warning |
+| Dates the apps use with no column yet: reviewer invitation start (**2026-10-29:** now the Chairs Semi-Finalist Meeting Date; D44 dropped it from the filing window), the Feb 3 staff-recommendation deadline (D40), the Jan triage meetings. Add a column, derive from another date, or keep app-side? | Justin with Connor | D11 filing window; D40 warning |
 | Impersonation flag in Production; calendar users' write privilege on the table | Justin / Connor | §4 B |
 | Whether the calendar edits the Board date too, given requests carry their own meeting date and Board writeups keep `boardEnds` | Justin | Board-date reconciliation (default-cycle plan) |
