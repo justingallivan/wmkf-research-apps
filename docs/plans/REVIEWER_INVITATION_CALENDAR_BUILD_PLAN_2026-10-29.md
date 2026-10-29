@@ -384,12 +384,12 @@ claim. Re-review the amended plan before building.
 ## 6. Owner decisions
 
 1. Calendar date is copied at first invitation and then fixed (§3.1), rather
-   than read live. **Proposed.**
+   than read live. **Decided (owner, 2026-10-29; D48).**
 2. One acceptance email that carries the materials, instead of two emails.
    **Proposed.**
-3. Reviewers withdraw by emailing the PD after accepting. **Proposed.**
+3. Reviewers withdraw by emailing the PD after accepting. **Decided (D48).**
 4. Invitations refused when Reviews Due is blank or the proposal PDF is missing.
-   **Proposed.**
+   **Decided (D48).**
 5. Final wording of the three emails (drafted at build for approval).
 
 ## 7. Build order and tests
