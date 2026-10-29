@@ -20,7 +20,7 @@ function deps(overrides = {}) {
   return {
     listModernCycles: jest.fn().mockResolvedValue([row('D26', '2026-12-10'), row('J27', '2027-06-10'), row('J15', '2015-06-10'), row('D2026', '2026-12-10')]),
     updateCycleDates: jest.fn().mockResolvedValue(undefined),
-    getChangeHistory: jest.fn().mockResolvedValue([]),
+    getChangeHistory: jest.fn().mockResolvedValue({ details: [], moreRecords: false }),
     eligibleStaff: jest.fn().mockResolvedValue({ systemUserId: SARAH, profileId: 7, isSuperuser: false }),
     getRole: jest.fn(async role => ({ value: role === 'grantsManager' ? { systemUserId: SARAH } : { systemUserId: OTHER } })),
     impersonationEnabled: () => true,
@@ -56,16 +56,51 @@ describe('canEditCalendar', () => {
   });
 });
 
+// Keys mirror a real RetrieveRecordChangeHistory response captured by
+// scripts/probe-audit-history-shape.cjs (2026-10-28, structure only); values are synthetic.
+const FV = '@OData.Community.Display.V1.FormattedValue';
+function attributeDetail({ createdon, user, newValue = {}, oldValue = {} }) {
+  return {
+    '@odata.type': '#Microsoft.Dynamics.CRM.AttributeAuditDetail',
+    AuditRecord: {
+      '@odata.type': '#Microsoft.Dynamics.CRM.audit', auditid: 'a', action: 2, [`action${FV}`]: 'Update', operation: 2,
+      [`operation${FV}`]: 'Update', attributemask: '1', objecttypecode: 'wmkf_grantcycle', _objectid_value: J27_ID,
+      _userid_value: SARAH, ...(user ? { [`_userid_value${FV}`]: user } : {}), ...(createdon ? { createdon, [`createdon${FV}`]: 'x' } : {}),
+      transactionid: 't', versionnumber: 1,
+    },
+    DeletedAttributes: {}, InvalidNewValueAttributes: [], LocLabelLanguageCode: 0, NewValue: newValue, OldValue: oldValue,
+  };
+}
+// The J27 row's only entry before any edit: no @odata.type and no value sides.
+const AUDIT_ENABLED_ENTRY = { AuditRecord: { createdon: '2026-10-29T02:00:00Z', [`_userid_value${FV}`]: 'App' } };
+
 describe('latestChanges', () => {
   test('keeps the newest change per column and sees cleared dates in OldValue', () => {
-    const changes = latestChanges([
-      { AuditRecord: { createdon: '2026-10-29T10:00:00Z', '_userid_value@OData.Community.Display.V1.FormattedValue': 'Duncan Spore' }, NewValue: { wmkf_researchreviewsduedate: '2027-03-17T00:00:00Z' }, OldValue: {} },
-      { AuditRecord: { createdon: '2026-10-30T10:00:00Z', '_userid_value@OData.Community.Display.V1.FormattedValue': 'Sarah Hibler' }, NewValue: {}, OldValue: { wmkf_researchreviewsduedate: '2027-03-17T00:00:00Z' } },
-      { AuditRecord: { createdon: '2026-10-31T10:00:00Z' }, NewValue: { wmkf_name: 'x', 'wmkf_researchproposalduedate@OData.Community.Display.V1.FormattedValue': '12/7/2026' }, OldValue: {} },
+    const { changes, complete } = latestChanges([
+      attributeDetail({ createdon: '2026-10-29T10:00:00Z', user: 'Duncan Spore', newValue: { wmkf_researchreviewsduedate: '2027-03-17T00:00:00Z', [`wmkf_researchreviewsduedate${FV}`]: '3/17/2027' } }),
+      attributeDetail({ createdon: '2026-10-30T10:00:00Z', user: 'Sarah Hibler', oldValue: { wmkf_researchreviewsduedate: '2027-03-17T00:00:00Z' } }),
+      attributeDetail({ createdon: '2026-10-31T10:00:00Z', user: 'Connor Noda', newValue: { wmkf_name: 'x', [`wmkf_researchproposalduedate${FV}`]: '12/7/2026' } }),
+      AUDIT_ENABLED_ENTRY,
     ]);
+    expect(complete).toBe(true);
     expect(changes.get('wmkf_researchreviewsduedate')).toEqual({ changedAt: '2026-10-30T10:00:00Z', changedBy: 'Sarah Hibler' });
     expect(changes.has('wmkf_name')).toBe(false);
     expect(changes.has('wmkf_researchproposalduedate')).toBe(false);
+  });
+  test('the audit-enabled entry alone is complete history with no changes', () => {
+    const { changes, complete } = latestChanges([AUDIT_ENABLED_ENTRY]);
+    expect(complete).toBe(true);
+    expect(changes.size).toBe(0);
+  });
+  test.each([
+    ['missing AuditRecord', { NewValue: { wmkf_researchreviewsduedate: '2027-03-17T00:00:00Z' } }],
+    ['missing createdon', attributeDetail({ user: 'Sarah Hibler', newValue: { wmkf_researchreviewsduedate: '2027-03-17T00:00:00Z' } })],
+    ['missing user name', attributeDetail({ createdon: '2026-10-30T10:00:00Z', newValue: { wmkf_researchreviewsduedate: '2027-03-17T00:00:00Z' } })],
+  ])('a tracked change with %s makes history incomplete', (_name, detail) => {
+    expect(latestChanges([detail]).complete).toBe(false);
+  });
+  test('a paged collection is incomplete', () => {
+    expect(latestChanges([], { moreRecords: true }).complete).toBe(false);
   });
 });
 
@@ -86,6 +121,24 @@ describe('loadCalendar', () => {
     const result = await loadCalendar(actor, d);
     expect(result.cycles.every(c => c.historyAvailable === false)).toBe(true);
     expect(result.cycles[0].dates[0]).toMatchObject({ changedBy: null, changedAt: null });
+  });
+  test('incomplete history makes no per-date claims even for parsable entries', async () => {
+    const d = deps({ getChangeHistory: jest.fn().mockResolvedValue({
+      details: [attributeDetail({ createdon: '2026-10-30T10:00:00Z', user: 'Sarah Hibler', newValue: { wmkf_researchproposalduedate: '2026-12-07T00:00:00Z' } })],
+      moreRecords: true,
+    }) });
+    const result = await loadCalendar(actor, d);
+    expect(result.cycles.every(c => c.historyAvailable === false)).toBe(true);
+    expect(result.cycles[0].dates[0]).toMatchObject({ changedBy: null, changedAt: null });
+  });
+  test('complete history attributes each date', async () => {
+    const d = deps({ getChangeHistory: jest.fn().mockResolvedValue({
+      details: [AUDIT_ENABLED_ENTRY, attributeDetail({ createdon: '2026-10-30T10:00:00Z', user: 'Sarah Hibler', newValue: { wmkf_researchproposalduedate: '2026-12-07T00:00:00Z' } })],
+      moreRecords: false,
+    }) });
+    const result = await loadCalendar(actor, d);
+    expect(result.cycles[0].historyAvailable).toBe(true);
+    expect(result.cycles[0].dates[0]).toMatchObject({ column: 'wmkf_researchproposalduedate', changedBy: 'Sarah Hibler', changedAt: '2026-10-30T10:00:00Z' });
   });
   test('date values are taken as calendar dates, never shifted by time zone', async () => {
     const d = deps({ listModernCycles: jest.fn().mockResolvedValue([row('J27', '2027-06-10', { wmkf_researchproposalduedate: '2026-12-07T00:00:00Z' })]) });

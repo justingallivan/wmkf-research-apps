@@ -1,0 +1,295 @@
+{
+  "capturedAt": "2026-10-29T03:05:20.725Z",
+  "target": "https://wmkf.crm.dynamics.com",
+  "externalMethods": [
+    "OAuth token POST",
+    "Dataverse GET"
+  ],
+  "targets": {
+    "akoya_request (most recently modified)": {
+      "retrieveRecordChangeHistory": {
+        "status": 200,
+        "responseKeys": [
+          "@odata.context",
+          "AuditDetailCollection"
+        ],
+        "collectionKeys": [
+          "AuditDetails",
+          "MoreRecords",
+          "PagingCookie",
+          "TotalRecordCount"
+        ],
+        "detailCount": 12,
+        "distinctShapes": [
+          {
+            "count": 1,
+            "odataType": "#Microsoft.Dynamics.CRM.AttributeAuditDetail",
+            "topLevelKeys": [
+              "@odata.type",
+              "AuditRecord",
+              "DeletedAttributes",
+              "InvalidNewValueAttributes",
+              "LocLabelLanguageCode",
+              "NewValue",
+              "OldValue"
+            ],
+            "auditRecordPresent": true,
+            "auditRecordKeys": [
+              "@odata.type",
+              "_objectid_value",
+              "_objectid_value@OData.Community.Display.V1.FormattedValue",
+              "_userid_value",
+              "_userid_value@OData.Community.Display.V1.FormattedValue",
+              "action",
+              "action@OData.Community.Display.V1.FormattedValue",
+              "attributemask",
+              "auditid",
+              "createdon",
+              "createdon@OData.Community.Display.V1.FormattedValue",
+              "objecttypecode",
+              "objecttypecode@OData.Community.Display.V1.FormattedValue",
+              "operation",
+              "operation@OData.Community.Display.V1.FormattedValue",
+              "transactionid",
+              "versionnumber",
+              "versionnumber@OData.Community.Display.V1.FormattedValue"
+            ],
+            "hasCreatedOn": true,
+            "hasUserId": true,
+            "hasUserIdFormatted": true,
+            "hasCallingUserId": false,
+            "newValueKeyCount": 7,
+            "oldValueKeyCount": 1,
+            "newValueHasAnnotations": true
+          },
+          {
+            "count": 7,
+            "odataType": "#Microsoft.Dynamics.CRM.AttributeAuditDetail",
+            "topLevelKeys": [
+              "@odata.type",
+              "AuditRecord",
+              "DeletedAttributes",
+              "InvalidNewValueAttributes",
+              "LocLabelLanguageCode",
+              "NewValue",
+              "OldValue"
+            ],
+            "auditRecordPresent": true,
+            "auditRecordKeys": [
+              "@odata.type",
+              "_objectid_value",
+              "_objectid_value@OData.Community.Display.V1.FormattedValue",
+              "_userid_value",
+              "_userid_value@OData.Community.Display.V1.FormattedValue",
+              "action",
+              "action@OData.Community.Display.V1.FormattedValue",
+              "attributemask",
+              "auditid",
+              "createdon",
+              "createdon@OData.Community.Display.V1.FormattedValue",
+              "objecttypecode",
+              "objecttypecode@OData.Community.Display.V1.FormattedValue",
+              "operation",
+              "operation@OData.Community.Display.V1.FormattedValue",
+              "transactionid",
+              "versionnumber",
+              "versionnumber@OData.Community.Display.V1.FormattedValue"
+            ],
+            "hasCreatedOn": true,
+            "hasUserId": true,
+            "hasUserIdFormatted": true,
+            "hasCallingUserId": false,
+            "newValueKeyCount": 1,
+            "oldValueKeyCount": 0,
+            "newValueHasAnnotations": true
+          },
+          {
+            "count": 2,
+            "odataType": "#Microsoft.Dynamics.CRM.AttributeAuditDetail",
+            "topLevelKeys": [
+              "@odata.type",
+              "AuditRecord",
+              "DeletedAttributes",
+              "InvalidNewValueAttributes",
+              "LocLabelLanguageCode",
+              "NewValue",
+              "OldValue"
+            ],
+            "auditRecordPresent": true,
+            "auditRecordKeys": [
+              "@odata.type",
+              "_objectid_value",
+              "_objectid_value@OData.Community.Display.V1.FormattedValue",
+              "_userid_value",
+              "_userid_value@OData.Community.Display.V1.FormattedValue",
+              "action",
+              "action@OData.Community.Display.V1.FormattedValue",
+              "attributemask",
+              "auditid",
+              "createdon",
+              "createdon@OData.Community.Display.V1.FormattedValue",
+              "objecttypecode",
+              "objecttypecode@OData.Community.Display.V1.FormattedValue",
+              "operation",
+              "operation@OData.Community.Display.V1.FormattedValue",
+              "transactionid",
+              "versionnumber",
+              "versionnumber@OData.Community.Display.V1.FormattedValue"
+            ],
+            "hasCreatedOn": true,
+            "hasUserId": true,
+            "hasUserIdFormatted": true,
+            "hasCallingUserId": false,
+            "newValueKeyCount": 1,
+            "oldValueKeyCount": 1,
+            "newValueHasAnnotations": true
+          },
+          {
+            "count": 1,
+            "odataType": "#Microsoft.Dynamics.CRM.AttributeAuditDetail",
+            "topLevelKeys": [
+              "@odata.type",
+              "AuditRecord",
+              "DeletedAttributes",
+              "InvalidNewValueAttributes",
+              "LocLabelLanguageCode",
+              "NewValue",
+              "OldValue"
+            ],
+            "auditRecordPresent": true,
+            "auditRecordKeys": [
+              "@odata.type",
+              "_objectid_value",
+              "_objectid_value@OData.Community.Display.V1.FormattedValue",
+              "_userid_value",
+              "_userid_value@OData.Community.Display.V1.FormattedValue",
+              "action",
+              "action@OData.Community.Display.V1.FormattedValue",
+              "attributemask",
+              "auditid",
+              "createdon",
+              "createdon@OData.Community.Display.V1.FormattedValue",
+              "objecttypecode",
+              "objecttypecode@OData.Community.Display.V1.FormattedValue",
+              "operation",
+              "operation@OData.Community.Display.V1.FormattedValue",
+              "transactionid",
+              "versionnumber",
+              "versionnumber@OData.Community.Display.V1.FormattedValue"
+            ],
+            "hasCreatedOn": true,
+            "hasUserId": true,
+            "hasUserIdFormatted": true,
+            "hasCallingUserId": false,
+            "newValueKeyCount": 11,
+            "oldValueKeyCount": 1,
+            "newValueHasAnnotations": true
+          },
+          {
+            "count": 1,
+            "odataType": "#Microsoft.Dynamics.CRM.AttributeAuditDetail",
+            "topLevelKeys": [
+              "@odata.type",
+              "AuditRecord",
+              "DeletedAttributes",
+              "InvalidNewValueAttributes",
+              "LocLabelLanguageCode",
+              "NewValue",
+              "OldValue"
+            ],
+            "auditRecordPresent": true,
+            "auditRecordKeys": [
+              "@odata.type",
+              "_objectid_value",
+              "_objectid_value@OData.Community.Display.V1.FormattedValue",
+              "_userid_value",
+              "_userid_value@OData.Community.Display.V1.FormattedValue",
+              "action",
+              "action@OData.Community.Display.V1.FormattedValue",
+              "attributemask",
+              "auditid",
+              "createdon",
+              "createdon@OData.Community.Display.V1.FormattedValue",
+              "objecttypecode",
+              "objecttypecode@OData.Community.Display.V1.FormattedValue",
+              "operation",
+              "operation@OData.Community.Display.V1.FormattedValue",
+              "transactionid",
+              "versionnumber",
+              "versionnumber@OData.Community.Display.V1.FormattedValue"
+            ],
+            "hasCreatedOn": true,
+            "hasUserId": true,
+            "hasUserIdFormatted": true,
+            "hasCallingUserId": false,
+            "newValueKeyCount": 49,
+            "oldValueKeyCount": 0,
+            "newValueHasAnnotations": true
+          }
+        ]
+      },
+      "auditsByObject": {
+        "status": 403,
+        "rowCount": null,
+        "rowKeys": null
+      }
+    },
+    "wmkf_grantcycle J27": {
+      "retrieveRecordChangeHistory": {
+        "status": 200,
+        "responseKeys": [
+          "@odata.context",
+          "AuditDetailCollection"
+        ],
+        "collectionKeys": [
+          "AuditDetails",
+          "MoreRecords",
+          "PagingCookie",
+          "TotalRecordCount"
+        ],
+        "detailCount": 1,
+        "distinctShapes": [
+          {
+            "count": 1,
+            "odataType": null,
+            "topLevelKeys": [
+              "AuditRecord"
+            ],
+            "auditRecordPresent": true,
+            "auditRecordKeys": [
+              "@odata.type",
+              "_objectid_value",
+              "_userid_value",
+              "_userid_value@OData.Community.Display.V1.FormattedValue",
+              "action",
+              "action@OData.Community.Display.V1.FormattedValue",
+              "auditid",
+              "createdon",
+              "createdon@OData.Community.Display.V1.FormattedValue",
+              "objecttypecode",
+              "objecttypecode@OData.Community.Display.V1.FormattedValue",
+              "operation",
+              "operation@OData.Community.Display.V1.FormattedValue",
+              "transactionid",
+              "versionnumber",
+              "versionnumber@OData.Community.Display.V1.FormattedValue"
+            ],
+            "hasCreatedOn": true,
+            "hasUserId": true,
+            "hasUserIdFormatted": true,
+            "hasCallingUserId": false,
+            "newValueKeyCount": null,
+            "oldValueKeyCount": null,
+            "newValueHasAnnotations": false
+          }
+        ]
+      },
+      "auditsByObject": {
+        "status": 403,
+        "rowCount": null,
+        "rowKeys": null
+      }
+    }
+  },
+  "dataverseGetCalls": 6
+}

@@ -32,6 +32,10 @@ milestone dates through the cycle calendar. Not the apps table
   but not in live metadata.
 - Auditing: organization on; every column flagged; **table auditing turned on
   2026-10-28** (`scripts/enable-grant-cycle-audit.cjs`, alignment log T14).
+  This app can read per-row history with `RetrieveRecordChangeHistory`
+  (200; entries carry `AuditRecord.createdon` and the formatted user); the
+  `/audits` table filtered to one object is 403
+  (`docs/audits/audit-history-shape-2026-10-28-evidence.json`).
 - Linked from `akoya_request.wmkf_grantcycle` and `akoya_akoyaapply.wmkf_grantcycle`;
   the activated `WMKF_Set Grant Cycle from Opportunity` process sets the
   request lookup (T10).

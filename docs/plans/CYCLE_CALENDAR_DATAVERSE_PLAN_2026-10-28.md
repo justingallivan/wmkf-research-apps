@@ -140,12 +140,31 @@ cycle rows, so per-row reads are cheap). That per-record read returned 200
 for this app on `akoya_request` and `contact`; the bulk `/audits` query is
 403 because the app lacks `ReadAuditSummary` [VERIFIED via
 `docs/DATAVERSE_POWER_TOOLS_DESIGN.md:79`;
-`docs/REVIEWER_ORCID_BACKPROPAGATION_DESIGN.md:237`]. Not yet tested on
-`wmkf_grantcycle`: extend `scripts/probe-grant-cycle-dates.cjs` to read one
-row's change history after the first edit. The audit privilege can be
-revoked independently of normal reads, so if the history read fails the
-panel shows the row's `modifiedon` / `modifiedby` labelled "last change to
-this cycle (any date)" rather than a per-date claim. [VERIFIED 2026-10-28 probe] Organization auditing is **on** and all
+`docs/REVIEWER_ORCID_BACKPROPAGATION_DESIGN.md:237`]. **Response contract verified 2026-10-28** (Codex adversarial review claimed
+Web API AuditDetail entries omit `AuditRecord`; tested rather than assumed)
+with `scripts/probe-audit-history-shape.cjs`, owner-run, structure only
+(`docs/audits/audit-history-shape-2026-10-28-evidence.json`):
+
+- On a recently modified `akoya_request`, `RetrieveRecordChangeHistory`
+  returned 200 with 12 `AttributeAuditDetail` entries; **every** one carried
+  `AuditRecord` with `createdon`, `_userid_value` and its formatted name. The
+  Codex claim does not hold for this org.
+- On the J27 `wmkf_grantcycle` row it returned 200 with one entry that has no
+  type and no value sides (recorded when auditing was enabled); it changes no
+  tracked column and is ignored.
+- The collection carries `MoreRecords` / `PagingCookie`. A paged result is
+  treated as **incomplete**, not guessed at.
+- The fallback route is **closed**: `/audits` filtered to one object is 403
+  for this app on both rows. `RetrieveRecordChangeHistory` is the only audit
+  read available.
+
+Parsing rule (`latestChanges`): entries that change no tracked column are
+ignored; a tracked change missing `createdon` or the formatted user name, or a
+paged collection, marks the cycle's history unavailable. Unavailable history
+(that, a failed read, or a revoked audit privilege) never shows a per-date
+claim: the panel shows the row's `modifiedon` / `modifiedby` labelled "last
+change to this cycle (any date)". Tests use a fixture built from the captured
+structure. [VERIFIED 2026-10-28 probe] Organization auditing is **on** and all
 fourteen columns are flagged for auditing, but auditing on the
 `wmkf_grantcycle` **table was off**. **Turned on 2026-10-28 (Pacific)** with
 owner-run `scripts/enable-grant-cycle-audit.cjs --apply`: before `false`,
@@ -204,6 +223,13 @@ This is a new write path to a Dataverse table, so it is **Tier 2** under
 characterization tests, a sandbox rehearsal (Mode C), recorded rollback, and
 an explicit owner decision to merge. This plan, the probe and its evidence
 are docs (Tier 0).
+
+**Merge condition (owner, 2026-10-28: "I don't want to rely on hope as a
+strategy"):** before the branch merges, the sandbox rehearsal must edit a date
+through the calendar as a role-holding staff member, then read the change
+history back and confirm it names that person and the right date and column,
+and that a cleared date is attributed too. A passing unit fixture alone does
+not satisfy this.
 
 Before the sandbox rehearsal:
 
