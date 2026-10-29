@@ -1,173 +1,135 @@
-# Session 649 Prompt: J27 — plan the reviewer-invitation build; Workbench list before Dec 11
+# Session 650 Prompt: Shared prompt library — review the plan and agree the publication contract
 
-**Branch:** `main` (both landing-cycle PRs merged). Prior handoff, exact:
-`git show 442c7c009:SESSION_PROMPT.md` (Session 647: cycle calendar shipped, D43).
+**Handoff destination:** `main`, docs-only, owner-confirmed 2026-10-29.
+**Feature/planning branch retained:** `codex/shared-prompt-library-plan`, PR #553
+open; do not merge it without the owner's authorization for that PR.
 
-## Session 648 Summary (Claude, 2026-10-29)
+Prior complete handoff (Claude's J27/cycle workstream), retrievable exactly:
+`git show 006b87565:SESSION_PROMPT.md`. This compact handoff preserves that
+workstream by reference; it does not replace its owner decisions or turn old
+carryover into a newly verified worklist.
 
-The cycle calendar now decides which cycle every app opens on, automatically, and
-an audit of every business date showed what the calendar does not yet drive.
+## Session 649 Summary (Codex, 2026-10-29)
 
 ### What Was Completed
 
-1. **Landing cycle shipped (PR #547, `6c9a1013b`; PR #550, `aefaebdf7`; both
-   deployed to Production per Vercel commit status).** Apps open on the cycle with
-   the next Board meeting (operations Grant Cycle Board date) and switch at the
-   start of the Pacific day after it: J27 from 12:00 am Fri Dec 11, 2026 (D45,
-   amends D29). Workbench/Meeting Tracker, Program Briefing, Proposal Ranking,
-   Expertise Finder and Board pages follow it when the cycle is in their list; a
-   URL cycle wins; open pages never switch; reads are deadline-bounded. Board pages
-   follow it only once that cycle has a Board setup (else nearest upcoming dated
-   setup by Pacific day). Calendar box: "Automatic: …", next switch date, optional
-   override. Reviews: contract-reconcile; Codex gpt-6.1-terra (plan) and
-   gpt-6.1-sol (plan, PR, two fix rounds) — all findings fixed.
-2. **Codex now works on `gpt-6.1-sol`.** Root cause of "model not supported": the
-   review plugin's background broker still ran Codex 0.156.1 after the npm upgrade
-   to 0.165.0; the owner killed it. Stale brokers from Oct 8/15 sessions remain
-   (harmless; owner may kill).
-3. **Calendar attribution proven for non-superusers in Production**: the Grants
-   Manager's 8 saves and a second editor's 1 are each recorded under their own
-   names (`docs/plans/CYCLE_CALENDAR_DATAVERSE_PLAN_2026-10-28.md`).
-4. **Decisions:** D44 review filing has no start bound (files until the Board
-   date); D45 automatic landing cycle; D46 J27 reviewers get materials on
-   acceptance, no proposal-release date. Column meanings: invitation start = Chairs
-   Semi-Finalist Meeting; Board materials due = Board Mailing Date. Dates with no
-   Grant Cycle column stay app-side (only the Feb 3 deadline remains). J27 Reviews
-   Due is Mar 10, 2027 (calendar; old timeline said Mar 17).
-5. **Plans and audit:** `docs/plans/LANDING_CYCLE_PLAN_2026-10-29.md`;
-   `docs/plans/CYCLE_DATES_CENTRALIZATION_PLAN_2026-10-29.md`;
-   `docs/audits/date-consumers-audit-2026-10-29.md` (Claude + independent Codex,
-   compared; two Claude errors corrected).
-6. **Guide for Sarah and Duncan** (Claude doc, rewritten plain):
-   https://claude.ai/artifact/96BYj2iYny5aW1LmTLwDYJ
-7. Housekeeping: Codex calendar worktree removed (merged, clean); route matrix,
-   Atlas and catalog markers updated to deployed; main checkout `npm ci` restored a
-   missing dependency.
+1. **[MERGED; verified via GitHub] Admin prompt-page improvements.** PR #545
+   added descriptive titles, explanations, Used by and caller-classification
+   labels with technical keys retained. PR #546 added search and collapsed
+   legacy references; PR #548 added counted workflow sections using **Pre-flight**.
+   PR #549 moved execution budgets beneath prompts, initially collapsed, with
+   Pre-flight / Reviews and evaluations / Meetings and briefings headings and
+   catalog-backed titles. Existing budget payloads, draft retention, validation,
+   versioning and conflict recovery were preserved. Latest merge: `ebf010f8f`.
+   All PR #549 checks passed before its owner-authorized merge. The user had
+   previously reported seeing the prompt descriptions in Production; no fresh
+   authenticated Production rendering/deployment check was performed at closeout.
+2. **[OWNER DIRECTION] Shared Dataverse library.** Justin and successors should
+   create/edit prompts in Admin; Connor continues LLM-assisted backend authoring
+   and uses Admin for small edits. Both need shared discovery and grouping
+   without code/deployment for each new prompt. Today's titles/groups still live
+   in the source catalog; no runtime migration has been implemented.
+3. **[VERIFIED via owner-authorized read-only Production probe] Live schema.**
+   40 names / 59 rows / 39 current; no descriptive/grouping columns and no
+   alternate key on prompt versions. One name, `phase-i.checkin`, has no current
+   row and null status: do not assume it is a valid Draft. The existing settings
+   table supports a uniquely keyed group configuration; `prompt-library.groups`
+   was absent. Snapshot observed 2026-10-29T23:22:42Z. No prompt bodies,
+   credentials, variable values, or output-schema content are in the evidence.
+4. **[PROPOSED; BRANCH ONLY] PR #553 contains implementation plan, shareable
+   publication contract for Connor, schema evidence, and reproducible probe.**
+   Commit `e35918ba2`. Six optional native metadata columns plus settings-backed
+   group labels/order; complete paging; Needs organization fallback; catalog-only
+   edits; Admin creation/drafts/first publication; shared audited publisher.
+   Independent contract review corrected out-of-order reserved drafts, stale
+   metadata baselines, and pending/final audit representation. Final source check
+   reuses the existing atomic Dataverse changeset seam for the lifecycle flip;
+   Postgres audit/response uncertainty still needs readback recovery. No schema,
+   data, runtime library, Power Automate integration or model execution changed.
 
-### Commits
+### Commits / PRs
 
-`main`: plan `813935bb8`…`cde648ce0` (on branch, merged); PR #547 merge
-`6c9a1013b`; PR #550 merge `aefaebdf7`; docs `f396c8cc7`, `b0ce91fd5`,
-`99d8ad9ae`, `988aadec8`, `91dca2e06`, `174233434`, `d6aba6cb6`, `bb3816ef3`,
-`eeefeb567`, `bcc5ec4dd`, `ba03ccd62`, `6574dbc3b`, `ce8c4ba3e`; session close:
-this commit.
+- `88136c3b7` — merge PR #545, descriptive prompt catalog/cards.
+- `1da6d5673` — merge PR #546, search and collapsed stored references.
+- `b84d343ce` — merge PR #548, workflow grouping.
+- `e04470c65` — budget organization feature commit; PR #549 merged as `ebf010f8f`.
+- `e35918ba2` — shared-library plan/probe/evidence, pushed; PR #553 open.
+- This docs-only closeout commit is separate from the retained planning branch.
 
 ## Next Items
 
 ### Verified Open
 
-1. **Plan the one reviewer-invitation build (owner, 2026-10-29), before Feb 24.**
-   Materials on acceptance (D46; work queue item 6) together with the review due
-   date from the calendar (audit risk 1): shared calendar reader; invitation and
-   stored request due date from Reviews Due; remove per-send and browser-saved due
-   dates; extensions based on the calendar date; Reviewer Finder record dates
-   retired; new invitation and acceptance email wording. Evidence:
-   `docs/CURRENT_WORK_QUEUE.md` item 6; centralization plan §2a, §6; audit §7.
-   Plan-first, contract-reconcile, Codex review.
-2. **Workbench list shows J27 Phase I Pending (Nov 15 list, R-1).** Needed so staff
-   see J27 proposals, and so the Dec 11 automatic switch reaches Workbench,
-   Meeting Tracker and Program Briefing (they only list cycles with visible
-   proposals). First confirm with Connor the status J27 proposals arrive with.
-   Evidence: `shared/config/workbenchVisibility.js`; audit W3.
-3. **J27 proposal file slots** (Workbench Proposal tab inherits D26's map) before
-   Dec 7. Evidence: `shared/config/workbenchProposalDocuments.js`; audit W7.
-4. **Rest of date centralization** (plan §2, §6): review filing by window replacing
-   `REVIEW_DOCX_SHAREPOINT_CYCLE` (D44); Staff Deliberations prep by calendar after
-   the old/new cohort diff, and check J27 Zoom presentations trigger prep (before
-   April); Board setup dates default from the calendar; show on the calendar when a
-   manual override holds the landing cycle; remove Admin `inviteStartDate`.
-5. **Dec 8 scope decision** (carried): does the apps' Initial Assessment run for
-   J27; Connor's fitness flag vs "Flagged for concerns" (D38, F1); expertise
-   matching (T8). Sets the Nov 15 scope.
+1. **Review PR #553's shared-library proposal before implementation.**
+   Evidence: https://github.com/justingallivan/wmkf-research-apps/pull/553
+   The implementation and publication-contract documents are on that branch,
+   not yet on main. Next build needs explicit owner direction, additive schema
+   provisioning, sandbox write/attribution/concurrency rehearsal and deliberate
+   Production promotion. Do not treat the read-only planning permission as
+   authorization for schema/data writes or paid model tests.
 
 ### Owner Decision Needed
 
-1. **Ask Connor:** when a Board date moves, do request meeting dates follow? (Board
-   date lives in three stores; audit §4.) And the status J27 proposals arrive with.
-2. **Sarah:** fill the Chairs Semi-Finalist Meeting Date before Feb 24 (invitation
-   start). Stopgap if the reviewer build slips: Admin reviewer default review due
-   date = 2027-03-10.
-3. Per-request due dates already saved on D26 requests stay as they are (proposed).
-4. Whether the calendar should edit the Board date (read-only today).
-5. Carried: triage-flag criteria (CSO; D38, F1), expertise roster (T8), intake
-   prompts (T9/T7), MR/S&E assignment (CSO), Connor's program-at-submission field
-   (D30) and files-ready flag (D25), Chairs-writeup review time (T12).
+1. **Agree publication coordination with Connor.** Proposed default: backend
+   draft authoring remains possible, but publication uses the shared publisher.
+   A server lock cannot coordinate arbitrary direct published Dataverse writes.
+   If direct publication must remain a normal route, revise the coordination
+   design before build. No agreement or message to Connor has been recorded.
 
-### Parked
+### Parked / Not Included
 
-1. Research request file corpus (owner-gated):
-   `docs/plans/RESEARCH_REQUEST_FILE_CORPUS_PLAN_2026-10-25.md`.
-2. Reviewer-save recovery follow-up; T6 prompts readable to all staff.
-3. Workflow vocabulary rename in the apps (approved Oct 21; mid-cycle hold):
-   `docs/plans/review/PROPOSAL_WORKFLOW_VOCABULARY_2026-10-19.md`.
+- Power Automate execution adapter, trigger/flow creation, unattended publishing
+  authentication, new general-purpose direct field-write authoring, and model
+  Test actions are separate scope. Sharing the library does not imply any of
+  them exists. Current flow definitions were not probed in this planning task.
 
 ### Verify Before Acting
 
-1. Retiring the grantee-title cron (T13): only after the D26 Board meeting and the
-   destructive-carryover check.
-2. Board archival: operational only; D26 ranking stays locked.
-3. Stale Codex brokers (pids from Oct 8/15 under `~/.claude/plugins/data/codex-openai-codex/state/`):
-   owner-run kill only; confirm no live Claude session uses that state dir.
-
-### Do Not Reopen Without New Decision
-
-1. D1–D46 as recorded through 2026-10-29; automatic landing cycle (D45); calendar
-   page keeps its own default (nearest Board date); Staff Deliberations name kept.
-2. Accept-both J27 file naming; 001024 is the Research form; 1003373 is Connor's.
-3. Site-visit materials and reviewer reminder crons are unscheduled by decision.
-
-## Constraints
-
-- Production Dataverse/Postgres reads are owner-run with `!`; Production writes
-  need the owner plus a dated `DATAVERSE_PROD_WRITE_ACK` passed to the one process.
-- Pass `DYNAMICS_SANDBOX_URL` inline only; setting it in `.env.local` repoints four
-  runtime services to the sandbox.
-- Plain item names, not log codes, with Justin and colleagues; no technical terms
-  in anything for Sarah and Duncan.
-- Add a calendar date only together with the feature that reads it.
-- Merging a PR needs the owner's OK for that PR (an earlier OK doesn't carry).
-- Codex: `gpt-6.1-sol` default; if a review fails on "model not supported", check
-  for a stale broker before switching models (don't pass `--model` without the
-  owner's OK).
-- Leave untracked `output/`, `.impeccable/critique/`, the
-  `backup/local-main-slice2-plan-drafts-2026-10-25` branch, and the
-  `.codex/hooks.json` / `.github/hooks/impeccable.json` modifications (owner
-  unknown) alone.
-- Codex rescue delegations whose brief mentions a review need
-  `[INTENTIONAL-RESCUE: …]` plus the CODEX RESCUE HANDOFF preface (hook).
+- The 2026-10-29 snapshot establishes prompt/settings metadata only. Verify
+  sandbox parity, numeric limits, actual write roles, actor attribution and new
+  columns before implementation. Dataverse `queryRecords` clamps inventory
+  queries to 100 rows; complete paging is a build requirement, not shipped here.
+- Preserve all unknown WIP. Untracked Impeccable critique in the prompt worktree
+  was intentionally left alone, per the previous handoff. No memory or root
+  instruction changes were needed.
 
 ## Concurrent Workstreams
 
-| Workstream | Resume boundary |
+| Owner / workstream | Latest recorded resume boundary |
 |---|---|
-| J27 alignment / cycle dates (Claude) | `main`; next: reviewer-invitation build plan; Workbench list |
-| Admin prompts grouping (Codex) | Merged PRs #548/#549 |
-| Ranking (Codex) | Done; PRs #536/#537 |
-| Board archival (Codex) | Readiness done; rehearsal runtime only on `codex/board-archive-rehearsal` |
-| Research request corpus (Claude) | Owner-gated |
+| Codex / shared prompt library | PR #553, `codex/shared-prompt-library-plan`, `e35918ba2`; proposed only |
+| Codex / prompt UI organization | PRs #545/#546/#548/#549 merged; no further UI work requested |
+| Claude / J27 alignment and cycle dates | Owning plans and decisions remain in `docs/CURRENT_WORK_QUEUE.md` and `docs/plans/J27_ALIGNMENT_LOG_2026-10-24.md`; exact prior handoff at `006b87565`; main has newer review-filing work in PR #551, so reread current source/plans before resuming |
+| Codex / Ranking | Prior handoff records PRs #536/#537 done; not reopened |
+| Codex / Board archival | Prior handoff records readiness done and rehearsal runtime on `codex/board-archive-rehearsal`; not revalidated here |
+| Claude / Research request corpus | Prior handoff records owner-gated; no new authorization |
 
-## Key Files Reference
+## Constraints
 
-| File | Purpose |
-|------|---------|
-| `docs/plans/CYCLE_DATES_CENTRALIZATION_PLAN_2026-10-29.md` | One home per cycle date; order to Feb 24 |
-| `docs/audits/date-consumers-audit-2026-10-29.md` | Every business date, its homes and consumers |
-| `docs/plans/LANDING_CYCLE_PLAN_2026-10-29.md` | Landing cycle design and build record |
-| `lib/services/landing-cycle-service.js` | Automatic rule, override, Board default |
-| `shared/components/landing-cycle/` | Calendar control and client hooks |
-| `docs/plans/J27_ALIGNMENT_LOG_2026-10-24.md` | Decisions D1–D46 |
-| `scripts/probe-grant-cycle-history-entries.cjs` | Read-only calendar history probe (owner-run) |
-
-## Testing
-
-```bash
-npx jest tests/unit/landing-cycle-*.test.js tests/unit/board-page-landing-cycle.test.js tests/unit/expertise-finder-landing-cycle.test.js
-npm run check:api-routes && npm run check:atlas && npm run check:j27-register
-```
+- Merge authorization is per PR. #553 remains open and unmerged.
+- Production read permissions from this chat were task/session scoped; the next
+  session must follow the owner's current access instructions. Production writes
+  need separate explicit authorization and the normal interlocks.
+- Never treat a new prompt, declared caller, or run-source label as proof of an
+  active Power Automate flow. No automatic execution is part of catalog editing.
+- Preserve the previous handoff's parked/destructive-work constraints. Review
+  current queue/owning plans and live callers before any retirement or deletion.
+- Leave the user's main checkout untouched. The stop handoff used an isolated
+  docs-only checkout; the prompt planning branch is preserved.
 
 ## Verification and Closeout
 
-Milestone determination: DEVELOPMENT_LOG entry added ("Landing cycle: every app
-opens on the next Board cycle and rolls over by itself", Session 648). No CLAUDE.md
-change. Claim-evidence pilot: one recorded event for session key
-`77c85ca295d49e75`; row added.
+- Budget layout: 75 focused tests across six suites passed, types passed, lint
+  had zero errors and one existing loading-effect warning. Actual-component
+  static previews inspected on desktop and at 390px; no horizontal overflow.
+  Client interactions were unit-tested, not exercised in authenticated Production.
+- Plan/probe: Production metadata GETs succeeded; probe syntax/lint passed.
+  Doc currency, symbol refs, canonical pointers and fact-consistency gates and
+  sequential self-tests passed; docs catalog and diff checks passed. Independent
+  review confirmed corrections; this is not implementation verification.
+- Milestone determination: no new DEVELOPMENT_LOG entry required for this
+  closeout. Prompt UI organization is an incremental admin refinement; the shared
+  library architecture is proposed, not shipped. Existing calendar/landing-cycle
+  milestones remain in that log.
+- Claim-evidence pilot report was attempted with `--current` but local session
+  state was unavailable. No session key or zero-advisory observation was invented.
