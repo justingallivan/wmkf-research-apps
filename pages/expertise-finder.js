@@ -7,6 +7,7 @@ import RosterContactField from '../shared/components/expertise-finder/RosterCont
 import { conventionalCycles, resolveWorkingCycle, cycleCodeToLabel } from '../lib/utils/cycle-code.js';
 import { buildRosterSubmitPayload } from '../shared/utils/roster-contact-link.js';
 import { requestEnvelope } from '../shared/utils/api-request';
+import { useLandingCycleDefault } from '../shared/components/landing-cycle/useLandingCycleDefault';
 import TestRequestBadge from '../shared/components/TestRequestBadge';
 
 // ─── Tab Component ───
@@ -667,8 +668,18 @@ export function RosterForm({ initialData, onChange, onSubmit, onCancel, saving, 
 // ─── Batch Tab ───
 
 function BatchTab() {
-  // Opens on the working cycle (the upcoming board meeting), like the Workbench.
-  const [cycleCode, setCycleCode] = useState(() => resolveWorkingCycle(conventionalCycles()));
+  // Opens on the Grants Manager's landing cycle when set, otherwise the working cycle (the
+  // upcoming board meeting), like the Workbench. The default settles once per mount; an
+  // explicit choice wins, and loading waits until one of the two has happened.
+  const landing = useLandingCycleDefault();
+  const [chosenCycle, setChosenCycle] = useState(null);
+  const [ruleCycle] = useState(() => resolveWorkingCycle(conventionalCycles()));
+  // Only a code the picker below offers (2020 through next year) can be the default.
+  const landingYear = landing.code ? 2000 + Number(landing.code.slice(1)) : null;
+  const landingListed = landingYear && landingYear >= 2020 && landingYear <= new Date().getUTCFullYear() + 1 ? landing.code : null;
+  const cycleCode = chosenCycle || landingListed || ruleCycle;
+  const setCycleCode = setChosenCycle;
+  const cycleReady = landing.settled || chosenCycle !== null;
   const [program, setProgram] = useState('SE');
   const [proposals, setProposals] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -845,7 +856,7 @@ function BatchTab() {
               <option value="MR">MR - Medical Research</option>
             </select>
           </div>
-          <Button onClick={loadProposals} disabled={loading}>
+          <Button onClick={loadProposals} disabled={loading || !cycleReady}>
             {loading ? 'Loading...' : 'Load Proposals'}
           </Button>
         </div>

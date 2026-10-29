@@ -11,6 +11,10 @@ import { render, screen, fireEvent, waitFor, within } from '@testing-library/rea
 import ExpertiseFinderPage from '../../pages/expertise-finder';
 import { conventionalCycles, resolveWorkingCycle } from '../../lib/utils/cycle-code.js';
 
+// The landing-cycle default is covered by landing-cycle tests; settle it at once with no code here.
+jest.mock('../../shared/components/landing-cycle/useLandingCycleDefault', () => ({
+  useLandingCycleDefault: () => ({ settled: true, code: null }),
+}));
 jest.mock('../../shared/components/Layout', () => ({
   __esModule: true,
   default: ({ children }) => <div>{children}</div>,

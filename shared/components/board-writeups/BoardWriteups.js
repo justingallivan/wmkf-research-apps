@@ -12,7 +12,7 @@ async function api(url, body, signal) {
   if (!result.ok) throw Object.assign(new Error(result.data?.error || 'The operation could not be completed.'), { code: result.data?.code });
   return result.data;
 }
-export default function BoardWriteups({ initialCycle = 'D26', mode = 'dashboard' }) {
+export default function BoardWriteups({ initialCycle, mode = 'dashboard' }) {
   const isSetup = mode === 'setup';
   const [cycleInput, setCycleInput] = useState(initialCycle), [loading, setLoading] = useState(true);
   const [loadFailed, setLoadFailed] = useState(false), [reload, setReload] = useState(0);

@@ -14,6 +14,7 @@
  *   /api/admin/maintenance (MaintenanceSection, operations:jobs) -> { jobs: [] }
  *   /api/admin/models (ModelConfigSection, ai:models) -> { apps: [] }
  *   /api/cycle-calendar (CycleCalendarPanel, workflows:cycle-calendar) -> empty calendar
+ *   /api/landing-cycle?view=editor (LandingCyclePanel, workflows:cycle-calendar) -> unset
  * Views are rendered one at a time (AdminDashboard is not rendered here).
  */
 import AppAccessContext from '../../shared/context/AppAccessContext';
@@ -29,6 +30,7 @@ const jsonResponse = (status, body) => ({
 
 const MINIMAL_BODIES = {
   '/api/cycle-calendar': { canEdit: false, savingAvailable: true, defaultCycleCode: null, cycles: [] },
+  '/api/landing-cycle': { landingCycleCode: null, storedValue: null, status: 'unset', setBy: null, setAt: null, revision: null, canEdit: false, cycles: [] },
   '/api/admin/maintenance': { jobs: [] },
   '/api/admin/models': { apps: [] },
   '/api/workbench/staffing': { staff: [], roles: { president: {}, cso: {}, grantsManager: {}, programCoordinator: {}, systemsSpecialist: {} } },
@@ -74,7 +76,7 @@ const EXPECTED_FETCHES = {
   'workflows:review-form': [
     '/api/admin/review-questions',
   ],
-  'workflows:cycle-calendar': ['/api/cycle-calendar'],
+  'workflows:cycle-calendar': ['/api/cycle-calendar', '/api/landing-cycle?view=editor'],
   'workflows:proposal-ranking': [
     '/api/app-access',
   ],
@@ -155,7 +157,7 @@ const EXPECTED_HEADINGS = {
   'workflows:review-form': [
     'External review form',
   ],
-  'workflows:cycle-calendar': [],
+  'workflows:cycle-calendar': ['Landing cycle'],
   'workflows:proposal-ranking': [
     'Proposal Ranking facilitators',
   ],

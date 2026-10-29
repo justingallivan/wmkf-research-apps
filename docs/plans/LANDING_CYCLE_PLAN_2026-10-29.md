@@ -2,8 +2,8 @@
 title: Landing cycle — one setting the Grants Manager controls — plan
 domain: platform
 kind: plan
-status: proposed
-summary: "Contract-reconcile reviewed 2026-10-29; Codex adversarial review 2026-10-29 (gpt-6.1-terra; needs rework, six findings) and re-review (gpt-6.1-sol; ready with two named changes); all findings verified and folded in. Owner decisions 2026-10-29: the cycle every app opens on (the landing cycle, alignment log D29) is one app setting edited on the cycle calendar page by the calendar's editors, and every app in the cycle-settings audit that picks a default cycle follows it. An explicit cycle in the URL still wins; with the setting unset, today's rules apply unchanged. Design, per-app behavior, open questions; nothing built."
+status: active
+summary: "Contract-reconcile reviewed 2026-10-29; Codex adversarial review 2026-10-29 (gpt-6.1-terra; needs rework, six findings) and re-review (gpt-6.1-sol; ready with two named changes); all findings verified and folded in. Owner decisions 2026-10-29: the cycle every app opens on (the landing cycle, alignment log D29) is one app setting edited on the cycle calendar page by the calendar's editors, and every app in the cycle-settings audit that picks a default cycle follows it. An explicit cycle in the URL still wins; with the setting unset, today's rules apply unchanged. Design, per-app behavior, open questions. Built on branch claude/landing-cycle 2026-10-29 (not deployed; see §7)."
 canonical: false
 owner: product-engineering
 related:
@@ -67,7 +67,7 @@ Deliberations, Initial Assessments, Awardees tab) take the shell's cycle.
   until Sarah sets a value.
 - **One server reader, `getLandingCycle()`, used by every consumer**,
   re-validates on each read: the pattern (an unclassifiable code thrown into
-  `resolveWorkingCycle` fails the page, `lib/utils/cycle-code.js:105-109`) and
+  `resolveWorkingCycle` fails the page, `lib/utils/cycle-code.js:105-109`; RECHECKED after this branch added `resolveLandingCycle` at :136) and
   that a Grant Cycle row with that code still exists (`listModernCycles`).
   The row can be edited outside the app or the Grant Cycle row removed later.
   An invalid or orphaned value is treated as unset, and the calendar control
@@ -78,7 +78,7 @@ Deliberations, Initial Assessments, Awardees tab) take the shell's cycle.
   [VERIFIED via `lib/services/dataverse-settings-service.js:87-89`] and the
   client only cancels when `timeoutMs` or `signal` is supplied
   [VERIFIED via `lib/dataverse/client.js:340-349`]; `listModernCycles` pages
-  through every J/D row [VERIFIED via `lib/dataverse/adapters/operations-grant-cycle.js:45-50`].
+  through every J/D row [VERIFIED via `lib/dataverse/adapters/operations-grant-cycle.js:48-53`; RECHECKED after this branch added `findCycleByCode`].
   The Workbench waits for its cycle list before rendering
   [VERIFIED via `shared/components/workbench/WorkbenchShell.js:103-110`].
   So `getLandingCycle()` has one short total deadline (about 1.5 s) covering
@@ -91,7 +91,7 @@ Deliberations, Initial Assessments, Awardees tab) take the shell's cycle.
   failure to editors.
 - A save is refused unless the code matches the pattern and a Grant Cycle row
   with that code exists (read through `listModernCycles`,
-  `lib/dataverse/adapters/operations-grant-cycle.js:45`).
+  `lib/dataverse/adapters/operations-grant-cycle.js:48`; RECHECKED after this branch's adapter change).
 - Who/when: show "Set by <name>, <date>" from `listSettingsWithMetaStrict`
   (`updatedByName`, `updatedAt`) [VERIFIED via
   `lib/services/dataverse-settings-service.js:124-143`]; the writer takes the
@@ -129,7 +129,7 @@ Deliberations, Initial Assessments, Awardees tab) take the shell's cycle.
 - One resolver in `lib/utils/cycle-code.js`, for example
   `resolveLandingCycle(cycles, landingCode, today)`: the landing cycle if set
   and present in this app's list; otherwise today's `resolveWorkingCycle`
-  [VERIFIED current rule via `lib/utils/cycle-code.js:122-128`]. Where an app
+  [VERIFIED current rule via `lib/utils/cycle-code.js:122-128`; RECHECKED after this branch's change, unchanged]. Where an app
   carries a cycle in the URL (Workbench, Meeting Tracker, Board pages), the URL
   still wins; Proposal Ranking and Expertise Finder have no URL cycle (audit
   R1, E1).
@@ -211,3 +211,31 @@ Deliberations, Initial Assessments, Awardees tab) take the shell's cycle.
   Workbench-list build is live, then check on Production that the Workbench,
   Meeting Tracker, Program Briefing, Proposal Ranking, Expertise Finder and
   Board pages each open on the expected cycle. Rollback: clear the setting.
+
+## 7. Build status
+
+**[SOURCE-BUILT ON BRANCH `claude/landing-cycle`; NOT DEPLOYED, 2026-10-29]**
+
+- Setting, reader, editor view, save and Board default:
+  `lib/services/landing-cycle-service.js`; exact-code lookup
+  `findCycleByCode` in `lib/dataverse/adapters/operations-grant-cycle.js`;
+  `getSettingStrict(key, { timeoutMs })` in the settings services.
+- Route `pages/api/landing-cycle.js` (matrix row added).
+- Resolver `resolveLandingCycle` in `lib/utils/cycle-code.js`; wired into the
+  Workbench dashboard service (also Meeting Tracker / Discussion Sentiment)
+  and Program Briefing.
+- Client: `shared/components/landing-cycle/useLandingCycleDefault.js`
+  (one-shot, 2.5 s client wait) in Proposal Ranking and Expertise Finder;
+  `useBoardPageCycle.js` on both Board pages (the `'D26'` literal and the
+  `BoardWriteups` `'D26'` prop default are gone); `LandingCyclePanel.js` on
+  `/cycle-calendar` and Admin → Workflows.
+- Tests: `tests/unit/landing-cycle-{service,route,hook}.test.js`,
+  `expertise-finder-landing-cycle.test.js`, landing cases in
+  `cycle-code-defaults`, `workbench-dashboard-service` and
+  `program-briefing-service` tests.
+- Citation recheck after this branch's code edits:
+  - [RECHECKED after lib/dataverse/adapters/operations-grant-cycle.js change: `listModernCycles` now at :48 (paging :48-53), `findCycleByCode` added at :61; citations above updated]
+  - [RECHECKED after lib/utils/cycle-code.js change: `normalizeCycles` :105-109 and `resolveWorkingCycle` :122-128 unchanged; `resolveLandingCycle` added at :136]
+- Not yet done: Codex review of the PR; the rollout prerequisite (Workbench
+  list shows Phase I Pending) and the Production check in §6.
+

@@ -2,6 +2,7 @@ import AssessmentWorkflow from './AssessmentWorkflow';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Button, Card, PageHeader } from '../Layout';
 import { conventionalCycles, cycleCodeToLabel, resolveWorkingCycle } from '../../../lib/utils/cycle-code';
+import { useLandingCycleDefault } from '../landing-cycle/useLandingCycleDefault';
 import { createOperationId, loadProposalRanking, loadSavedRankingCycles, sendProposalRankingAction } from './client';
 import { amountLabel, buildCumulativeTotals, errorMessage, formatMoney, formatScore, moveProposal, PROGRAMS, reviewerScoreIndicator } from './model';
 
@@ -319,7 +320,15 @@ export default function ProposalRankingApp({ rehearsalCycle = null }) {
   const options = useMemo(() => rehearsalCycle ? [{ code: rehearsalCycle, label: `${rehearsalCycle} · Ranking rehearsal` }] : [...new Set([...cycleOptions().map(option => option.code), ...savedCycles])]
     .sort((a, b) => Number(b.slice(1)) - Number(a.slice(1)) || (a[0] === 'D' ? -1 : 1))
     .map(code => ({ code, label: `${code} · ${cycleCodeToLabel(code)}` })), [rehearsalCycle, savedCycles]);
-  const [cycleCode, setCycleCode] = useState(() => rehearsalCycle || resolveWorkingCycle(conventionalCycles()) || options[0]?.code || '');
+  // Landing cycle (docs/plans/LANDING_CYCLE_PLAN_2026-10-29.md): settled once per mount; an explicit
+  // choice or the rehearsal cycle wins, and nothing loads until the default is settled or chosen.
+  const landing = useLandingCycleDefault({ skip: Boolean(rehearsalCycle) });
+  const [chosenCycle, setChosenCycle] = useState(null);
+  const [ruleCycle] = useState(() => resolveWorkingCycle(conventionalCycles()));
+  // Checked against the fixed conventional list, not the saved cycles that load later, so the default never moves.
+  const landingListed = landing.code && cycleOptions().some(option => option.code === landing.code) ? landing.code : null;
+  const cycleCode = chosenCycle || rehearsalCycle || landingListed || ruleCycle || options[0]?.code || '';
+  const cycleReady = landing.settled || chosenCycle !== null;
   const [selectedProgram, setSelectedProgram] = useState('se');
   const [response, setResponse] = useState(null);
   const responseRef = useRef(null);
@@ -504,6 +513,7 @@ export default function ProposalRankingApp({ rehearsalCycle = null }) {
   }, []);
 
   useEffect(() => {
+    if (!cycleReady) return undefined;
     const scope = ++scopeRef.current;
     const scopeKey = `${cycleCode}:${selectedProgram}`;
     scopeKeyRef.current = scopeKey;
@@ -524,7 +534,7 @@ export default function ProposalRankingApp({ rehearsalCycle = null }) {
       }
     })();
     return () => { active = false; };
-  }, [cycleCode, selectedProgram, applyResponse]);
+  }, [cycleCode, cycleReady, selectedProgram, applyResponse]);
 
   const runAction = useCallback(async (action, { preserveError = false, operationId = action.operationId } = {}) => {
     const scope = scopeRef.current;
@@ -614,7 +624,7 @@ export default function ProposalRankingApp({ rehearsalCycle = null }) {
 
   const changeCycle = useCallback((nextCycle) => {
     if (nextCycle === cycleCode || !invalidateVisibleScope()) return;
-    setCycleCode(nextCycle);
+    setChosenCycle(nextCycle);
     setSelectedProgram('se');
   }, [cycleCode, invalidateVisibleScope]);
 
