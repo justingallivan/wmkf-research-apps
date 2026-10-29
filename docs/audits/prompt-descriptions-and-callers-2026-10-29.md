@@ -3,7 +3,7 @@ title: Prompt descriptions and current callers audit
 domain: platform
 kind: audit
 status: active
-summary: "Read-only inventory of 40 Production prompt names with proposed human-readable descriptions, source callers, and distinctions between application prompts, stored references, drafts, and diagnostics."
+summary: "Forty-name prompt audit and source-built Admin card descriptions, caller labels, and status badges, preserving technical keys and independent live publication state."
 owner: product-engineering
 last_verified: 2026-10-29
 related:
@@ -13,7 +13,17 @@ related:
 
 # Prompt descriptions and current callers audit
 
-The Admin prompt editor can show useful descriptions without changing the machine keys or prompt instructions. It should also say where a prompt is used and whether the stored row actually controls an application path.
+[VERIFIED via `shared/components/admin/PromptTemplatesSection.js` and `shared/config/adminPromptCatalog.js`] This branch now renders the audited descriptive titles, explanations, Used by labels, and caller-status badges on Admin prompt cards. Technical keys remain visible underneath. This is source-built UI behavior; Production deployment is not established by this report.
+
+The display catalog covers the 40 audited keys. Live publication state remains independent: a current stored reference can still be edited, and any name without a current row retains the draft badge and View action. The check-in prompt is labeled “No application caller” rather than permanently labeled a draft in metadata; its actual current/draft state comes from the live row. Unknown names, including inherited object-property names, get an explicit “Not cataloged” display fallback and retain their technical key. Ordinary unknown prompts retain the existing editing path.
+
+The catalog is presentation-only. It changes no prompt key, instruction, model, Dataverse row, API response, access rule, or publication payload. Technical source references are retained in the audit table below.
+
+Implementation verification: 60 focused tests pass across the prompt descriptions/catalog, current-list, publication, model-token, and Executor-budget suites. Tests cover the 40-name audit-to-catalog match, independent caller/publication status, uncataloged names, and publication addressed by the original key. Type checking, prompt-injection tagging, and documentation gates passed with applicable self-tests run sequentially; ESLint reported no errors and the existing load-effect warning. A local browser preview rendered the actual card component with synthetic data; authenticated Production rendering was not exercised. An independent read-only implementation review found no actionable issues.
+
+## Historical audit snapshot before UI enrichment
+
+The remaining inventory, findings, proposed design, and audit verification record the read-only audit completed before the owner authorized UI implementation. They describe that dated starting point rather than the page after the implementation above.
 
 [VERIFIED via the read-only Production inventory and source searches described below] The inventory contains **40 distinct names across 59 versions**: **34 with application callers, four stored Phase II references without a current application reader, one draft-only name, and one developer diagnostic**. Of the 40 names, 39 have a sole current row; `phase-i.checkin` has none. A current row is a publication flag, not evidence of application use.
 
@@ -26,7 +36,7 @@ The Admin prompt editor can show useful descriptions without changing the machin
 - Source search domain: `lib`, `pages`, `shared`, `scripts`, `tests`, and `.github`. Literal names, constant-based dispatch, dynamic perspective-name construction, resolver calls, and caller/worker chains were checked. An application caller means a path present in this source snapshot; it does not assert recent execution, an enabled Production feature flag, or access for every staff member. External consumers such as Power Automate were not audited.
 - `listPrompts` represents a name by its current row, or by its latest non-current row when it has no current version. The current live inventory is below the reader's per-query cap. Evidence: [inventory service](../../lib/services/admin/prompts-list-service.js), [prompt adapter](../../lib/dataverse/adapters/ai-prompt.js), [API route](../../pages/api/admin/prompts/index.js).
 
-## Findings
+## Findings before UI enrichment
 
 1. **The page exposes implementation keys without purpose or callers.** [VERIFIED via `PromptTemplatesSection.js` `PromptPanel`, and `prompts-list-service.js` `mapRow`] Cards display the technical name, version, size, timestamps, and budget. The response has no dedicated display-title, description, usage-status, or caller fields. The `wmkf_ai_notes` column is not selected or returned by this list path.
 2. **Publication and use need separate labels.** [VERIFIED via live rows and the caller matrix] All four `phase-ii.*` rows are current but the corresponding routes use code-generated or inline templates. `phase-i.checkin` is draft-only and no invocation was found. `executor.echo-parity` has a developer test caller, not an application caller in the searched source. None should be removed merely on the basis of this audit.
@@ -81,7 +91,7 @@ All descriptions below are proposed UI copy based on the fetched prompt content,
 | `reviewer-finder.analyze` | **Analyze a proposal for reviewer discovery**. Extracts scientific search context and proposes initial expert reviewers. Reviewer Finder uses both; Workbench enrichment reuses the scientific context and ignores the suggestions. | Reviewer Finder → proposal analysis; Workbench → enrich recommended reviewers | Application caller; v2 current | [lib/services/claude-reviewer-service.js:236](../../lib/services/claude-reviewer-service.js#L236)<br>[pages/api/reviewer-finder/analyze.js:172](../../pages/api/reviewer-finder/analyze.js#L172)<br>[lib/services/workbench/enrich-recommended-service.js:622](../../lib/services/workbench/enrich-recommended-service.js#L622)<br>[lib/services/reviewer-prompt-composer.js:114](../../lib/services/reviewer-prompt-composer.js#L114) |
 | `reviewer-finder.score-candidates` | **Score discovered reviewer candidates**. Scores the relevance of already-discovered candidates to the proposal and explains their fit, in batches of ten. It does not perform the database search itself. | Reviewer Finder → discovered-candidate reasoning | Application caller; v1 current | [lib/services/claude-reviewer-service.js:733](../../lib/services/claude-reviewer-service.js#L733)<br>[pages/api/reviewer-finder/discover.js:569](../../pages/api/reviewer-finder/discover.js#L569) |
 
-## Suggested presentation
+## Accepted presentation proposal at audit time
 
 [PLANNED] Give each card a descriptive title, one sentence explaining its task, and a **Used by** line in product language. Keep the technical key visible as a secondary identifier so staff can relate it to source and support conversations. Put exact service/route references behind a “Technical callers” disclosure.
 
@@ -103,7 +113,7 @@ Use separate badges for **Application caller**, **Stored reference**, **Draft on
 
 This recommendation is a source-supported design proposal, not a built or tested implementation. Editing descriptions directly in Admin would be a separate metadata-ownership decision; existing notes and versioned prompt publication should not be repurposed silently.
 
-## Recommendation evidence
+## Recommendation evidence at audit time
 
 | Proposal | Current prerequisite and evidence | Disconfirming check | Status |
 |---|---|---|---|
