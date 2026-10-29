@@ -3,7 +3,7 @@ title: Landing cycle — one setting the Grants Manager controls — plan
 domain: platform
 kind: plan
 status: proposed
-summary: "Contract-reconcile reviewed 2026-10-29; Codex adversarial review 2026-10-29 (gpt-6.1-terra; needs rework, six findings, all verified and folded in). Owner decisions 2026-10-29: the cycle every app opens on (the landing cycle, alignment log D29) is one app setting edited on the cycle calendar page by the calendar's editors, and every app in the cycle-settings audit that picks a default cycle follows it. An explicit cycle in the URL still wins; with the setting unset, today's rules apply unchanged. Design, per-app behavior, open questions; nothing built."
+summary: "Contract-reconcile reviewed 2026-10-29; Codex adversarial review 2026-10-29 (gpt-6.1-terra; needs rework, six findings) and re-review (gpt-6.1-sol; ready with two named changes); all findings verified and folded in. Owner decisions 2026-10-29: the cycle every app opens on (the landing cycle, alignment log D29) is one app setting edited on the cycle calendar page by the calendar's editors, and every app in the cycle-settings audit that picks a default cycle follows it. An explicit cycle in the URL still wins; with the setting unset, today's rules apply unchanged. Design, per-app behavior, open questions; nothing built."
 canonical: false
 owner: product-engineering
 related:
@@ -73,6 +73,22 @@ Deliberations, Initial Assessments, Awardees tab) take the shell's cycle.
   An invalid or orphaned value is treated as unset, and the calendar control
   shows it to editors ("The saved landing cycle J27 is not in the Grant Cycle
   table; apps are using their own rules").
+- **The reader is bounded (gpt-6.1-sol review).** Neither dependency has a
+  deadline today: `getSettingStrict` passes no timeout
+  [VERIFIED via `lib/services/dataverse-settings-service.js:87-89`] and the
+  client only cancels when `timeoutMs` or `signal` is supplied
+  [VERIFIED via `lib/dataverse/client.js:340-349`]; `listModernCycles` pages
+  through every J/D row [VERIFIED via `lib/dataverse/adapters/operations-grant-cycle.js:45-50`].
+  The Workbench waits for its cycle list before rendering
+  [VERIFIED via `shared/components/workbench/WorkbenchShell.js:103-110`].
+  So `getLandingCycle()` has one short total deadline (about 1.5 s) covering
+  both reads, passed down as `timeoutMs`/`signal`; the existence check is a
+  new exact-code query (`$top=1` on `wmkf_cyclecode`), not the full list; it is
+  skipped when the value is unset or malformed. A timeout or error from either
+  read means "unset" for that request, logged with a reason code
+  (`landing_setting_timeout`, `landing_setting_error`, `landing_cycle_missing`,
+  `landing_validation_error`). The calendar control alone may report the
+  failure to editors.
 - A save is refused unless the code matches the pattern and a Grant Cycle row
   with that code exists (read through `listModernCycles`,
   `lib/dataverse/adapters/operations-grant-cycle.js:45`).
@@ -125,10 +141,16 @@ Deliberations, Initial Assessments, Awardees tab) take the shell's cycle.
   read failure falls back to today's rule** (`getSettingStrict` throws on an
   outage, `dataverse-settings-service.js:80-85`); it never fails the page.
 - Client-only apps (Proposal Ranking, Expertise Finder) and the Board pages
-  get it from a read endpoint (any signed-in staff). **They choose their cycle
-  only after that read settles** (success, failure or a short timeout falls
-  back to today's rule), and they ignore a late reply once the user has
-  changed the picker, so no page switches after it has loaded data.
+  get it from a read endpoint (any signed-in staff). **Initialization is a
+  one-shot decision per mount (gpt-6.1-sol review):** the first of success,
+  failure, client timeout or an explicit user choice settles the default for
+  that mount; every later completion is ignored by a settled/generation guard,
+  whether or not the user touched the picker. Data loads and actions wait until
+  it settles. Proposal Ranking's explicit `rehearsalCycle` still wins
+  [VERIFIED via `shared/components/proposal-ranking/ProposalRankingApp.js:322`].
+  This matters because Ranking reloads whenever its cycle changes
+  (`ProposalRankingApp.js:506-527`) and Expertise Finder loads proposals
+  separately from its selector (`pages/expertise-finder.js:693-705`).
 - Board pages: candidates are the cycles with a Board setup
   (`board-writeups/config.js:36-42`, codes only) **whose setup has a valid
   `boardEnds`**; an inactive setup may have none
@@ -181,7 +203,10 @@ Deliberations, Initial Assessments, Awardees tab) take the shell's cycle.
 - Tests added from the Codex review: orphaned and externally edited values
   (valid pattern, no Grant Cycle row); Board setup with null `boardEnds`;
   Board date at the UTC/Pacific evening boundary; settings save refused for a
-  non-editor and for applicant/bypass sessions.
+  non-editor and for applicant/bypass sessions. From the gpt-6.1-sol review:
+  hanging settings read, hanging and failing existence check, dashboard still
+  loads with today's default; client timeout followed by a late success with no
+  picker interaction is ignored; unmount/remount starts a fresh decision.
 - Rollout: deploy dormant. Prerequisite before Sarah sets J27: the
   Workbench-list build is live, then check on Production that the Workbench,
   Meeting Tracker, Program Briefing, Proposal Ranking, Expertise Finder and
