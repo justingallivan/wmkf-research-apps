@@ -208,23 +208,30 @@ Admin `inviteStartDate` has no reader outside its form, validation and tests
 
 ### 3.3 Materials on acceptance
 
-- **New step in the acceptance job**, after the acceptance email claim:
-  `release_materials`, claimed once like `acceptance_confirmation`. It:
-  1. checks the proposal PDF is present (the materials preflight's check,
-     `materials-preflight-service.js:53-63`);
-  2. writes `wmkf_materialssentat` and status `materials_sent` through the
-     existing lifecycle writer (ETag-conditional);
-  3. **re-mints the reviewer's link** with the accepted expiry
-     (`mintAndStore`, as manual release does at `send-emails-service.js:996-1001`
-     and the reminder sweep does). A link cannot be extended in place: expiry
-     is signed into the link and verification checks both the signed and the
-     stored expiry (`token-lifecycle.js:164-171`) [VERIFIED by read]. The
-     invitation link stops working; the acceptance email carries the new one,
-     and the accepted screen says to use the link in that email;
-  4. sends **one** email: the acceptance confirmation becomes "Thank you for
-     agreeing to review. The proposal and review form are at your link; your
-     review is due {{reviewDueDate}}", with the cycle's review template and
-     additional attachments the materials email carries today.
+- **New step in the acceptance job**, `release_materials`, which replaces the
+  `acceptance_confirmation` email. The one authoritative sequence:
+  1. check the proposal PDF is present (the materials preflight's check,
+     `materials-preflight-service.js:53-63`); if not, see "Proposal missing";
+  2. take the shared release claim (insert the per-engagement row, below);
+  3. **re-mint the reviewer's link** with the accepted expiry (`mintAndStore`,
+     as manual release does at `send-emails-service.js:996-1001` and the
+     reminder sweep does); row → `link_minted`. A link cannot be extended in
+     place: expiry is signed into the link and verification checks both the
+     signed and the stored expiry (`token-lifecycle.js:164-171`)
+     [VERIFIED by read]. The invitation link stops working; the email carries
+     the new one, and the accepted screen says to use the link in that email;
+  4. send **one** email: "Thank you for agreeing to review. The proposal and
+     review form are at your link; your review is due {{reviewDueDate}}", with
+     the cycle's review template and additional attachments the materials
+     email carries today;
+  5. on confirmed delivery, row → `sent` (durable before any Dataverse write);
+  6. `recordDeliveredEmail` writes `wmkf_materialssentat` and status
+     `materials_sent` (`record-email-outcome.js:65-67`); row → `recorded`.
+  **Neither materials-sent marker is written before confirmed delivery.**
+  Manual release refuses either marker (`send-emails-service.js:623-634`) and
+  the portal locks decline at `materials_sent` (`respond-service.js:227-232`),
+  so an early marker would be a false receipt. Tests: a mint failure and a
+  dispatch failure each leave both markers unset.
 - **One step, not two.** The materials step replaces the
   `acceptance_confirmation` step's email rather than following it, so a
   reviewer gets exactly one email.
@@ -359,7 +366,9 @@ Codex adversarial review (gpt-6.1-sol, 2026-10-29): needs-attention, three
 high findings, all accepted and folded into §3.1 and §3.3: the due date must be
 saved, conditionally, before invitations go out; a claimed release must be
 recoverable at every boundary; automatic and manual release need one shared
-claim. Re-review the amended plan before building.
+claim. Re-review (same day): one high finding, a leftover step that wrote the
+materials-sent markers before minting and sending; §3.3 now has one sequence
+with the markers written only after confirmed delivery. Accepted.
 
 ## 5. Risks
 
