@@ -827,11 +827,12 @@ test('filing cycles are those whose Board date is today or later by Pacific day,
     { wmkf_cyclecode: 'J26', wmkf_meetingdate: '2026-06-11T00:00:00Z' },
     { wmkf_cyclecode: 'D27', wmkf_meetingdate: null },
     { wmkf_cyclecode: 'D19', wmkf_meetingdate: null },
+    { wmkf_cyclecode: 'J25', wmkf_meetingdate: null },
     { wmkf_cyclecode: 'March 2019', wmkf_meetingdate: '2019-03-01T00:00:00Z' },
   ]);
   // 11:30 pm Pacific on the D26 Board day is 07:30 UTC the next day.
   const onBoardDay = await resolveReviewFilingCycles({ now: new Date('2026-12-11T07:30:00Z'), readBoardDates });
-  expect(onBoardDay).toEqual({ cycleCodes: ['D26', 'J27'], withoutBoardDate: ['D27'] });
+  expect(onBoardDay).toEqual({ cycleCodes: ['D26', 'J27'], withoutBoardDate: ['D27', 'J25'] });
   const dayAfter = await resolveReviewFilingCycles({ now: new Date('2026-12-11T08:30:00Z'), readBoardDates });
   expect(dayAfter.cycleCodes).toEqual(['J27']);
 });
@@ -857,6 +858,50 @@ test('the sweep discovers each filing cycle and checks each row against its own 
   // Found under J27 but stamped D26: re-checked against J27, so it is not filed.
   expect(result.results[0]).toMatchObject({ suggestionId: SECOND_SUGGESTION_ID, status: 'wrong_cycle' });
   expect(graph.uploadFile).not.toHaveBeenCalled();
+});
+
+test('cycles take turns for scan slots, so one cycle\'s stuck rows cannot starve another', async () => {
+  listBoardDates.mockResolvedValue([
+    { wmkf_cyclecode: 'D26', wmkf_meetingdate: '2099-12-10T00:00:00Z' },
+    { wmkf_cyclecode: 'J27', wmkf_meetingdate: '2100-06-10T00:00:00Z' },
+  ]);
+  const partial = { wmkf_reviewsharepointfolder: 'folder', wmkf_reviewfilename: null };
+  const stuck = Array.from({ length: 3 }, (_, i) => ({
+    wmkf_appreviewersuggestionid: `00000000-0000-4000-8000-00000000000${i}`, ...partial,
+  }));
+  suggestion.findReviewDocxFilingCandidates.mockImplementation(async ({ cycleCode }) => ({
+    records: cycleCode === 'D26' ? stuck : [{ wmkf_appreviewersuggestionid: SECOND_SUGGESTION_ID, ...partial }],
+    capped: false,
+  }));
+  suggestion.getByIdWithSelect.mockResolvedValue(null);
+
+  const result = await sweepMissingIndividualReviewFiles({ scanCap: 2, attemptCap: 1 });
+
+  expect(result.candidateCount).toBe(4);
+  expect(result.results.map((r) => r.suggestionId)).toEqual([stuck[0].wmkf_appreviewersuggestionid, SECOND_SUGGESTION_ID]);
+});
+
+test('a cycle with waiting reviews but no Board date is reported, and other cycles still file', async () => {
+  listBoardDates.mockResolvedValue([
+    { wmkf_cyclecode: 'D26', wmkf_meetingdate: null },
+    { wmkf_cyclecode: 'J99', wmkf_meetingdate: '2099-06-10T00:00:00Z' },
+    { wmkf_cyclecode: 'D99', wmkf_meetingdate: null },
+  ]);
+  suggestion.findReviewDocxFilingCandidates.mockImplementation(async ({ cycleCode }) => ({
+    records: cycleCode === 'D26' ? [{ wmkf_appreviewersuggestionid: SUGGESTION_ID }] : [],
+    capped: false,
+  }));
+
+  const result = await sweepMissingIndividualReviewFiles();
+
+  expect(result.cycleCodes).toEqual(['J99']);
+  expect(result.cyclesWithoutBoardDate).toEqual(['D26', 'D99']);
+  expect(result.counts).toEqual({ missing_board_date: 1 });
+  expect(result.results[0]).toMatchObject({ status: 'missing_board_date', cycleCode: 'D26' });
+  expect(recordEvent).toHaveBeenCalledWith(expect.objectContaining({
+    stage: 'missing_board_date', dedupeKey: 'review-docx-filing:D26:missing_board_date',
+  }));
+  expect(isActionableReviewDocxStatus('missing_board_date')).toBe(true);
 });
 
 test('a calendar read failure files nothing and records the anomaly', async () => {
