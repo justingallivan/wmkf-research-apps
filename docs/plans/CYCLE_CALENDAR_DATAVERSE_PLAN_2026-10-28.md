@@ -246,6 +246,16 @@ as themselves, sets one J27 date, confirms "changed by", clears it and
 confirms again. J27's audit history keeps those two entries. A passing unit
 fixture alone does not satisfy this.
 
+**Non-superuser attribution — confirmed in Production 2026-10-29** [VERIFIED via
+owner-run read-only `scripts/probe-grant-cycle-history-entries.cjs --cycle J27`,
+2026-10-29]: the Grants Manager made 8 date changes and a second assigned editor 1,
+through the deployed calendar; every `AttributeAuditDetail` entry names the
+acting person (none the app user), the history is complete (`MoreRecords: false`,
+13 entries incl. the audit-start entry), and the clear-then-set and
+correct-a-date sequences record old and new values as the parser expects. This
+closes the open item that the first non-superuser save would prove impersonated
+attribution.
+
 **Controlled Production test — passed 2026-10-28 (Pacific)** [VERIFIED via
 owner click-through on the branch running locally against Production, then
 owner-run read-only `scripts/probe-grant-cycle-history-entries.cjs --cycle J27`]:
