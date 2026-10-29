@@ -48,7 +48,7 @@ store. Seven dates have two or more independent homes that can disagree.
 
 | Date | Homes | What actually drives behavior | Risk |
 |---|---|---|---|
-| **Review due date** | (1) calendar Reviews Due; (2) Admin reviewer defaults `reviewDueDate` (one app-wide value); (3) PD preference `reviewer_invite_timing`; (4) request `akoya_request.wmkf_reviewduedate`; (5) per-reviewer extension `wmkf_reviewduedateoverride`; (6) Reviewer Finder cycle record `wmkf_reviewreturndeadline`; (7) the release form's value, including one saved in the PD's browser | Links, reminders, portal, overdue flag, acceptance email + calendar invite, extensions: extension (5) else request (4) [VERIFIED `lib/external/reviewer-due-date.js`]. Request (4) is written once, at first send, only if blank [VERIFIED `send-emails-service.js:1236-1237`], from the form, pre-filled by (2) or (3). Materials emails: the per-send/form value beats (4) [VERIFIED `render-emails-service.js:334-337`; `ReleaseMaterialsModal.js:466-471`] | **Highest.** J27 invitations on Feb 24 store whatever (2)/(3) show, permanently per request. A stale date shortens or lengthens link lifetimes (due + 2 days, else 90) [VERIFIED `reviewer-token-ttl.js:19-40`], flags everyone overdue, and blocks extensions that don't beat it. Emails and the portal can show different dates |
+| **Review due date** | (1) calendar Reviews Due; (2) Admin reviewer defaults `reviewDueDate` (one app-wide value); (3) PD preference `reviewer_invite_timing`; (4) request `akoya_request.wmkf_reviewduedate`; (5) per-reviewer extension `wmkf_reviewduedateoverride`; (6) Reviewer Finder cycle record `wmkf_reviewreturndeadline`; (7) the release form's value, including one saved in the PD's browser | Links, reminders, portal, overdue flag, acceptance email + calendar invite, extensions: extension (5) else request (4) [VERIFIED `lib/external/reviewer-due-date.js`]. Request (4) is written once, at first send, only if blank [VERIFIED `send-emails-service.js:1236-1237`], from the form, pre-filled by (2) or (3). Materials emails: the per-send/form value beats (4) [VERIFIED `render-emails-service.js:334-337`; `ReleaseMaterialsModal.js:466-471`] | **Highest.** J27 invitations on Feb 24 store whatever (2)/(3) show, permanently per request. A stale date shifts link lifetimes: not-yet-accepted reviewers due + 2 days, accepted reviewers due + 90 days, no usable future date now + 90 [VERIFIED `reviewer-token-ttl.js:33-40`], flags everyone overdue, and blocks extensions that don't beat it. Emails and the portal can show different dates |
 | **Board date** | (1) calendar `wmkf_meetingdate`; (2) each request's `akoya_request.wmkf_meetingdate`; (3) Board setup `boardEnds`; (4) the June/December convention in `cycle-code.js` | (1) landing cycle only. (2) cycle membership for Board, prep and filing; stale-invite expiry (daily 09:00 sweep, grace 0) [VERIFIED `vercel.json`]; honorarium fiscal year (refuses without it) [VERIFIED `honorarium-onboard-orchestrator.js:147-172`]; fallback default cycle. (3) Board archive at 09:00 Pacific after it, cleanup at +7 days, Board pages' default [VERIFIED by trace] | **High.** A moved Board meeting changes (1) but not (2) or (3). Whether Connor's process keeps (2) in step with (1) is unknown |
 | **Board materials due** | (1) calendar Board Mailing; (2) Board setup `materialsDue` | (2): shown in the progress email and setup screen; required to activate; no reminder | Medium. (1) is unread |
 | **Proposal release to reviewers** | (1) Admin `proposalReleaseDate`; (2) PD preference `proposalSendDate`; (3) Reviewer Finder record custom field `proposalSendDate` | Email text only ("we will send the full proposal by") | Medium. Three homes, two template tokens |
@@ -62,7 +62,7 @@ Site-visit / research-presentation times (Dynamics activity) drive Staff
 Deliberations prep start, the final-writeup group-review gate and materials
 dates. Materials `due_at` / `closes_at` are computed once at send (visit start
 minus N business days; end + 7) and never recomputed if the visit moves.
-Deliverable reminders run 12 days after the invitation. `akoya_decisiondate`,
+Grantee deliverables have no stored due date, but the invitation and reminder emails promise "COB" 14 days after the invitation (`lib/external/grantee-invite-email.js:61-66`) and the reminder is scheduled 12 days after it [VERIFIED; corrected 2026-10-29 by the Codex comparison, §8]. `akoya_decisiondate`,
 grant begin/end, submit/payment/posting dates, the AI-policy effective date and
 withdrawal dates are historical or display-only for this purpose. No env var or
 runtime code literal holds a business date. The only business-calendar cron is
@@ -84,3 +84,46 @@ the grantee-title job (months Apr–Jun, Oct–Dec).
 | 5 | Reviewer Finder cycle record holds review deadline, proposal send, proposal due and commit dates | Retire its date fields; templates read the calendar; the record keeps template, attachments and wording | Before Feb 24 |
 | 6 | Dead or unread date fields that look live (`inviteStartDate`, calendar columns with no use) | Remove `inviteStartDate` from Admin; label unused calendar columns as reference-only | Low priority |
 | 7 | Materials due/close dates not recomputed when a visit moves | Owner decision whether this matters (reminder is manual) | Note only |
+
+## 8. Independent Codex audit — comparison (2026-10-29)
+
+Codex (`gpt-6.1-sol`, read-only task, same scope, no access to these findings)
+audited the suite independently. Every Codex-only or disputed claim below was
+re-read in source.
+
+**Both found:** only the Board date is read from the calendar (landing cycle);
+the eleven other columns have no reader; the review due date has many homes and
+is frozen per request at first send; emails resolve the due date differently
+from the portal and reminders (per-send / browser values first); the Board date
+lives in the calendar, each request and the Board setup; `inviteStartDate` is
+never read; the Reviewer Finder record's custom date fields; the Vercel cycle
+pins; the reviewer and materials reminder crons are unscheduled by decision.
+
+**Codex found, Claude missed (all VERIFIED):**
+
+| Finding | Evidence | Effect |
+|---|---|---|
+| Grantee deliverable deadline is promised as invitation + 14 days in emails | `lib/external/grantee-invite-email.js:61-66` | Corrects §5 ("no due date") |
+| Accepted reviewers' links run to due + 90 days, not-yet-accepted to due + 2 | `lib/external/reviewer-token-ttl.js:33-40` | Corrects §4 wording |
+| After a successful review upload the stored link expiry is set to now + 7 days (absolute; can shorten a longer window) | `lib/external/token-lifecycle.js:166-192` | New reviewer-access date |
+| Briefing and presentation links expire a fixed 60 days after issue | `deliberation-briefing/briefing-link-service.js:86-90`; `post-presentation-materials/presentation-link-service.js:49-51` | Not calendar-tied; a long gap between issue and meeting could expire a link |
+| Grantee portal links last 30 days | `lib/external/grantee-token-lifecycle.js:25` | Not calendar-tied |
+| Deliberation session start time drives computed per-slot agenda times, not only display | `meeting-tracker/agenda-service.js:225-226` | Event date, not cycle |
+| A manual landing-cycle override stops the automatic rollover until cleared | `landing-cycle-service.js` | Design consequence worth showing on the calendar |
+| Signed link expiry and the stored expiry field both constrain access | `token-lifecycle.js` (Codex citation; mint path read, constraint not re-traced) | PLAUSIBLE |
+
+**Claude found, Codex did not report:** honorarium creation refuses a request
+with no meeting date (`honorarium-onboard-orchestrator.js:147-172`); extensions
+refuse when the request has no stored due date (`reviewer-due-extension.js:169`);
+the grantee-title job's month schedule; the Staff Deliberations cycle list.
+
+**Disagreements:** one, resolved for Codex (grantee deadline). An earlier
+Claude-side agent claim about the materials reminder cron was already refuted
+(§6); Codex independently reached the same conclusion from the handler header.
+
+**Effect on the risk ranking:** unchanged at the top (review due date, Board
+date). Added for the centralization plan: show on the calendar when a manual
+override is holding the landing cycle; note that link lifetimes derive from the
+request due date, so fixing that date (risk 1) also fixes link expiry for links
+issued afterwards; existing links keep their signed expiry.
+
