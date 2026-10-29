@@ -366,3 +366,9 @@ before trying it (`admin-view-coverage` covers first render only).
   Coverage now supplies the application access context, a minimal shared-role response,
   and pins both editor fetches and all headings at `people:staffing`. This is an intentional
   feature change after the decomposition, not a relaxation of its pure-move acceptance.
+
+- 2026-10-28: **Cycle calendar view (D43, branch `claude/cycle-calendar`), characterization update.**
+  New Workflows view `cycle-calendar` renders the shared `CycleCalendarPanel` (also on
+  `/cycle-calendar` for staff). Coverage pins its single `/api/cycle-calendar` fetch and, with
+  a minimal empty-calendar response, no headings. Intentional feature addition, not a
+  relaxation of the decomposition's pure-move acceptance.

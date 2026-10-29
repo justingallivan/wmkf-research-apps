@@ -17,7 +17,7 @@ related:
 
 # Cycle calendar on the operations Grant Cycle table
 
-Status: **proposed; slice 1 (adapter, service, route, tests) source-built on branch `claude/cycle-calendar`, not deployed.** Decision record: alignment log D43
+Status: **proposed; slices 1–2 source-built on branch `claude/cycle-calendar`, not deployed:** adapter, service, route (`pages/api/cycle-calendar.js`), panel (`shared/components/cycle-calendar/CycleCalendarPanel.js`) on `/cycle-calendar` (Tools menu, all staff) and Admin → Workflows → Cycle calendar, with unit/UI tests. Remaining: schema-as-code parity, sandbox rehearsal (merge condition, §6).** Decision record: alignment log D43
 (2026-10-28), which supersedes the date split in D10. `/contract-reconcile`
 plan review done 2026-10-28: ready with the named changes now folded into
 §3, §4 and §6.

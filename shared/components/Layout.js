@@ -132,6 +132,8 @@ export default function Layout({
     if (boardAccess) tools.push({ name: 'Board writeups', href: '/board-writeups' });
     if (staffingAccess) tools.push({ name: 'Staffing', href: isSuperuser ? '/admin?workspace=people&view=staffing' : '/staffing' });
     if (boardSetupAccess) tools.push({ name: 'Board cycle setup', href: '/board-cycle-setup' });
+    // Every signed-in staff member may view; the API decides who may edit.
+    if (currentProfile?.id) tools.push({ name: 'Cycle calendar', href: '/cycle-calendar' });
 
     const trailing = [{ name: 'Guide', href: '/guide' }];
     if (isSuperuser) {
@@ -139,7 +141,7 @@ export default function Layout({
     }
 
     return { primaryItems: primary, toolItems: tools, trailingItems: trailing };
-  }, [hasAccess, isSuperuser, alertCount, boardAccess, boardSetupAccess, staffingAccess]);
+  }, [hasAccess, isSuperuser, alertCount, boardAccess, boardSetupAccess, staffingAccess, currentProfile?.id]);
 
   const toolsCurrent = toolItems.some(item => isCurrentPath(pathname, item.href));
   const mainWidthClass = MAIN_WIDTH_CLASSES[maxWidth] || SHELL_WIDTH_CLASS;
