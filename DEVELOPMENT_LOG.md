@@ -10,6 +10,17 @@ The chronological archive after the `Legacy chronological session log` divider c
 
 ---
 
+## October 2026 — Cycle calendar: grant-cycle milestone dates edited in Dataverse with per-date attribution (Session 647, Claude)
+
+**Milestone:** The operations Grant Cycle table (`wmkf_grantcycle`) became the home for cycle milestone dates (D43), edited from a new staff calendar.
+**Sessions:** Session 647 (Claude); four Codex adversarial review rounds; owner-run probes and a controlled Production test.
+**Ship state:**
+- PR #542 (`e8fdcaa07`) deployed: `/cycle-calendar` (Tools, all staff) and Admin → Workflows; superuser / Grants Manager / Program Coordinator edit; saves impersonated with no fallback, ETag-bound drafts, per-date "changed by" from `RetrieveRecordChangeHistory`.
+- Production table auditing enabled on `wmkf_grantcycle`; editors' Global Write verified read-only; owner set and cleared a J27 date in Production, both attributed to the owner.
+- PR #541 (`41e188eb9`) earlier: governed AI Materials reads accept both D26 and J27 file names.
+**Why it matters:** staff manage milestone dates in one place that Connor's flows and the apps both read, with an audit trail per date; downstream cycle defaults can now key off it.
+**Pointers:** `docs/plans/CYCLE_CALENDAR_DATAVERSE_PLAN_2026-10-28.md`; `docs/atlas/dataverse-wmkf-grantcycle.md`; alignment log D43/T14; `docs/audits/*-2026-10-28-evidence.json`.
+
 ## October 2026 — Ranking finalization locks and retained-cycle access released (Session 645)
 
 **Milestone:** Staff can preserve a finished ranking meeting while retaining viewing and workbook export.

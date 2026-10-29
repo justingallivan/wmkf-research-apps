@@ -1,134 +1,144 @@
-# Session 647 Prompt: J27 — decide what the apps build for Dec 8
+# Session 648 Prompt: J27 — cycle calendar live; decide Dec 8 scope and wire date consumers
 
-**Branch:** this handoff lives on `claude/j27-ai-materials-names` (owner choice,
-S643/S646; pushed; **no PR**). `main` carries a short banner pointing here.
-Prior handoffs, exact: this branch `git show 50fd2ed3b:SESSION_PROMPT.md`
-(S645 J27 decisions D7–D21, meeting materials); `main`
-`git show 69129dbf9:SESSION_PROMPT.md` (Codex S645: ranking locks, D26 lock,
-Board archival constraints).
+**Branch:** `main`. Both feature branches from this session are merged
+(`claude/j27-ai-materials-names` → PR #541, `claude/cycle-calendar` → PR #542).
+Prior handoff, exact: `git show ee9b60154:SESSION_PROMPT.md` (Session 646 J27
+meeting answers D22–D42, grant-cycle lookup probe).
 
-## Session 646 Summary (Claude, 2026-10-28)
+## Session 647 Summary (Claude, 2026-10-28)
 
-Docs, decisions and read-only production probes. No runtime code changed and
-nothing was released. The Oct 28 J27 meeting (Justin, Sarah, Duncan, Connor)
-happened; its answers were recorded and the urgent follow-ups mostly cleared.
+Shipped two production changes and made one decision that shapes every app's
+cycle handling.
 
 ### What Was Completed
 
-1. **Startup.** Pulled 272 commits on `main`; all 70 `check:*` runs green.
-   Owner's Oct 21 local edit of `docs/plans/review/PROPOSAL_WORKFLOW_VOCABULARY_2026-10-19.pptx`
-   was backed up to the session scratchpad (gone after this session) and the
-   file restored to upstream; two untracked `commit-times*.txt` deleted (owner).
-2. **Meeting answers recorded** from the decision-calendar artifact
-   (`https://claude.ai/artifact/9Jymc35yQXy82pdmBwc2QB`, `answers` collection,
-   23 rows) into `docs/plans/J27_ALIGNMENT_LOG_2026-10-24.md` as **D22–D42** and
-   tasks **T8–T13**. Highlights:
-   - Arrival status `Phase I Pending`; staff version contents/order; reviewers
-     get the staff version in `Reviewer Materials`; magic links for Chairs/Board.
-   - Only **Triaged** writes AkoyaGO: Phase I Status `Recommended Do Not Invite`.
-     Other staff states stay app-side. The Grants Manager sets Phase I `Invited`
-     + `Phase II Pending` (approved) or `Not Invited` (not approved) **in
-     Dataverse**; the app writes neither (D31, D35, D39). Connor: nothing
-     important triggers on Phase I Status changes (D42).
-   - Staff states live in a **new field on the request** (D41), not the D26
-     `wmkf_triagestatus`.
-   - "Flagged for triage" renamed **"Flagged for concerns"** (D38).
-   - Triage list flags proposals still Under consideration from Feb 3 (D40).
-   - Connor's flows run on submit: short title (into `wmkf_wmkfprojectdescription`,
-     existing `grantee-title.generate` prompt or edited), keywords, lay abstract,
-     initial PD, clerical check, fitness flag, expertise (D37). Grantee-title
-     cron becomes a no-op for J27; retire after the D26 Board (T13).
-   - Either calendar role edits at any time (D7/D8 stand); central reviewer
-     values entered later by the Grants Manager (D28).
-   - **Placeholder meeting date resolved (T10):** use the request's
-     `wmkf_grantcycle` lookup (set at submission, owner-confirmed), meeting
-     date as fallback.
-3. **Reconciled** the log's older sections, register Q2/Q5/Q8/Q9/Q21/Q22, and
-   memory `project-grant-phasing-evolution.md` with the meeting decisions.
-4. **Grant-cycle lookup probe** (`scripts/probe-request-grant-cycle-lookup.cjs`,
-   on `main`, owner-run 3×). Lookup agrees with meeting-date cycle on all but
-   one of ~3,400 requests (1003373: J27 lookup, J26 date); post-Aug coverage drop
-   is the discretionary programs (no Board cycle), not SoCal; 001024 → J27.
-   Five Research `Phase I Pending` strays lack it: 1002797, 1002822 believed
-   deactivated test requests (probe does not filter `statecode`); Connor is
-   reviewing 1000211, 1001975, 1002162.
+1. **Startup.** Every `check:*` gate and self-test green; fast-forwarded the J27 branch.
+2. **PR #541 merged and deployed** (`41e188eb9`): governed AI Materials reads
+   accept either the D26 names or Connor's J27 names (`Project-Narrative_N.pdf`,
+   `Bibliography_N.pdf`); both present fails closed. Codex review clean.
+3. **Decision D43** (alignment log): Connor added eleven milestone date columns
+   to the operations Grant Cycle table (`wmkf_grantcycle`). It is now the
+   authoritative home for the cycle dates it carries, **edited from the apps**
+   (owner chose app editing over Dynamics), with per-date who/when tracking.
+   Supersedes the D10 split. Rows are created when the GOApply portal opens (no
+   D27 row expected for a while).
+4. **Production table auditing enabled** on `wmkf_grantcycle`
+   (`scripts/enable-grant-cycle-audit.cjs`, owner-run; T14). Justin emailed
+   Connor.
+5. **Cycle calendar shipped — PR #542** (`e8fdcaa07`, deployed):
+   - `/cycle-calendar` (Tools menu, any signed-in staff) and Admin → Workflows
+     → Cycle calendar. Cycle dropdown (kept in `?cycle=`; default = nearest
+     upcoming Board date, so **D26 until Dec 10** — owner kept this), Board date
+     read-only, eleven dates, per-date Edit with the native date picker.
+   - Edit: superuser or assigned Grants Manager / Program Coordinator (no
+     Reviewer app access needed). Saves impersonate with no fallback and are
+     refused unless `DYNAMICS_IMPERSONATION_ENABLED=true` (owner confirmed it in
+     Vercel Production and made it non-sensitive).
+   - "Changed by" from per-row `RetrieveRecordChangeHistory`, shown only when
+     the newest audited value equals the shown value; "Recording who made this
+     change…" re-checks after a save (audit entries lag the write by seconds).
+   - Drafts are bound to the row ETag they were opened on; a conflict closes the
+     editor, refreshes and asks to edit again.
+6. **Evidence** (all under `docs/audits/`, structure/role-level only):
+   table columns + audit settings; audit-history shape (`AuditRecord` present,
+   `/audits` by object is 403 — `RetrieveRecordChangeHistory` is the only audit
+   read open to the app); editors' privileges (app user, Grants Manager,
+   Program Coordinator, owner all Global Read/Write).
+7. **Controlled Production test** (owner chose this over the sandbox, which
+   could not prove Production privileges/attribution): owner set and cleared
+   J27 Proposal Due; both audit entries record Justin Gallivan. J27 is back to
+   all null; its audit history keeps those two test entries.
+8. **Sandbox schema parity:** the eleven columns were added to the sandbox
+   (`orgd9e66399`) via wave0 spec; sandbox has no J/D rows and table auditing
+   off (not needed after the venue change).
+9. **Reviews:** Codex adversarial reviews ×4 (audit-contract claim refuted with
+   evidence; value-match attribution guard; ETag draft binding; conflict
+   recovery — the last fix written by Codex at owner request, reviewed and
+   mutation-checked by Claude). Full gates (69) and full Jest (26,025) green.
 
 ### Commits
 
-Branch `claude/j27-ai-materials-names`: `7b5dd3255` meeting answers;
-`9666ed2c6` reconcile log/register/memory; `0686fcef0` short-title field +
-cron task; `f72ae36d1` Phase I terminal values; `b85e6ea90` Under
-consideration safeguard; `6bae97dad`, `f56595cca`, `567f9ca1e` grant-cycle
-lookup findings; `e179e6b87` staff-state field + Phase I trigger check.
-`main`: `dc74305cc`, `1fcacf889`, `939a21157` probe script.
+`main`: `e68d17d14` D43 docs + probe; `631bf23da` audit enable; `b277e327d`,
+`daaf44015` plan review/layout; PR #542 merge `e8fdcaa07` (branch commits
+`ea58e26db` … `9073f4ba8`); PR #541 merge `41e188eb9`. Session close: this
+commit (handoff, dev log, pilot row).
 
 ## Next Items
 
 ### Verified Open
 
-1. **Decide what the apps build for Dec 8** (owner deferred to a later talk).
-   Evidence: alignment log D37, R-3, D13. With Connor's flows producing the
-   intake outputs, settle: does the apps' Initial Assessment still run; how
-   Connor's "fitness flag" relates to Flagged for concerns (D38, F1); which
-   side does expertise matching (T8). This sets the Nov 15 build scope.
-2. **PR for this branch.** Evidence: 57 commits ahead / 12 behind `origin/main`;
-   the AI Materials name change (`62d7af5b6`, `b5bc02ae3`,
-   `lib/utils/proposal-document-names.js`) is Tier 1, unreleased, needs
-   independent review, and must ship before Dec 7. Docs-only commits could land
-   first.
-3. **Default-cycle plan** (D29, T10). Evidence: `docs/audits/cycle-settings-audit-2026-10-27.md`.
-   One calendar-driven rule; read `wmkf_grantcycle` lookup first, meeting date
-   fallback; three Board-date stores to reconcile.
-4. **Builds decided, not built** (target Nov 15; confirm scope/order first):
-   calendar editing + central values, filing window (D11), readiness digest
-   (D12), Proposal tab J27 entry with D22 order (D20), triage list (D19, D40;
-   Impeccable first), staff-state field (D41), Triaged → Phase I write (D31),
-   Chairs writeup (D21, T11), `wmkf_grantcycle` reader.
+1. **Tell Sarah and Duncan the calendar is live.** Evidence: PR #542 deployed;
+   page `/cycle-calendar`. Load it once on production first (no save needed).
+   Sarah's first real save is the first proof that impersonation records a
+   non-superuser (privileges verified; expect it to work).
+2. **Decide what the apps build for Dec 8** (carried from S646; owner deferred).
+   Evidence: alignment log D37, R-3, D13. Does the apps' Initial Assessment
+   still run; how Connor's fitness flag relates to Flagged for concerns (D38,
+   F1); who does expertise matching (T8). Sets the Nov 15 scope.
+3. **Wire consumers of the calendar dates** (D29, D11, D40, D12; not built).
+   Evidence: `docs/plans/CYCLE_CALENDAR_DATAVERSE_PLAN_2026-10-28.md` §3.6,
+   `docs/audits/cycle-settings-audit-2026-10-27.md`. Default-cycle rule
+   (lookup first, meeting date fallback; Sarah-controlled landing cycle),
+   review filing window, Feb 3 Under-consideration warning, readiness digest.
+   Read through `lib/dataverse/adapters/operations-grant-cycle.js`.
+4. **Other Nov 15 builds, decided not built** (confirm scope/order first):
+   Workbench list incl. Phase I Pending (R-1), J27 Proposal tab (D20/D22),
+   triage list (D19/D40; Impeccable first), staff-state field (D41), Triaged →
+   Phase I write (D31), Chairs writeup (D21/T11), central reviewer defaults
+   (response period, quota — not dates).
 
 ### Owner Decision Needed
 
-1. Triage-flag criteria and prompt (CSO; D38, F1). Expertise roster choice and
-   mechanics (T8). Intake AI prompts (T9) and staff prompt debate (T7) before Dec 8.
-2. Who assigns MR/S&E and when (CSO); Connor creates the "program at
-   submission" field (D30) and the new files-ready flag (D25).
-3. Leadership: timeline update for Chairs writeup review time (T12).
+1. **Which timeline step each new date column represents** (TBD; Sarah, Beth,
+   Duncan editing the timeline). Missing columns the apps use: reviewer
+   invitation start (filing window), Feb 3 staff deadline, Jan triage
+   meetings — add a column, derive, or keep app-side (Justin with Connor).
+2. Whether the calendar should edit the Board date (now read-only).
+3. Carried: triage-flag criteria (CSO; D38, F1), expertise roster (T8), intake
+   prompts (T9/T7), MR/S&E assignment (CSO), Connor's program-at-submission
+   field (D30) and files-ready flag (D25), Chairs-writeup review time (T12).
 
 ### Parked
 
-1. Research request file corpus (owner approval; DB ops owner-run). Evidence:
+1. Research request file corpus (owner-gated). Evidence:
    `docs/plans/RESEARCH_REQUEST_FILE_CORPUS_PLAN_2026-10-25.md`.
-2. Reviewer-save recovery follow-up; don't auto-resume.
-3. T6: prompts readable to all staff.
+2. Reviewer-save recovery follow-up; T6 prompts readable to all staff.
 
 ### Verify Before Acting
 
 1. Retiring the grantee-title cron (T13): only after the D26 Board meeting and
-   the destructive-carryover check (callers, `vercel.json`, route matrix, Atlas).
-2. Board archival: operational only; no batch or email authorized. D26 ranking
-   meeting is deliberately locked — do not unlock/reset/archive as a test.
-3. Calendar artifact rows were left as the owner set them; republish only from
-   a fresh `read`.
+   the destructive-carryover check.
+2. Board archival: operational only; D26 ranking stays locked.
+3. Decision-calendar artifact rows: republish only from a fresh `read`.
 
 ### Do Not Reopen Without New Decision
 
-1. D1–D42 as recorded through 2026-10-28; placeholder meeting date (T10).
-2. Accept-both J27 file naming (2026-10-26); 001024 is the Research form.
+1. D1–D43 as recorded through 2026-10-28; calendar default stays nearest Board
+   date; calendar venue proof done in Production (sandbox rehearsal
+   superseded).
+2. Accept-both J27 file naming; 001024 is the Research form; 1003373 is Connor's.
 
 ## Constraints
 
-- Production Dataverse/Postgres reads are owner-run with `!`.
+- Production Dataverse/Postgres reads are owner-run with `!`; Production
+  writes need the owner plus a dated `DATAVERSE_PROD_WRITE_ACK` passed to the one
+  process.
+- Pass `DYNAMICS_SANDBOX_URL` inline only; setting it in `.env.local` repoints
+  four runtime services to the sandbox.
 - Plain item names, not log codes, with Justin and colleagues.
-- Do not reset/stash/clean untracked `output/`, `.impeccable/critique/`, or the
-  `backup/local-main-slice2-plan-drafts-2026-10-25` branch. `.codex/hooks.json`
-  and `.github/hooks/impeccable.json` modifications (owner unknown): leave alone.
-- A fresh worktree needs `.agents/skills -> ../.claude/skills` for `check:agent-wiki`.
+- Leave untracked `output/`, `.impeccable/critique/`, the
+  `backup/local-main-slice2-plan-drafts-2026-10-25` branch, and the
+  `.codex/hooks.json` / `.github/hooks/impeccable.json` modifications (owner
+  unknown) alone.
+- Codex rescue delegations whose brief mentions a review need
+  `[INTENTIONAL-RESCUE: …]` plus the CODEX RESCUE HANDOFF preface (hook).
 
 ## Concurrent Workstreams
 
 | Workstream | Resume boundary |
 |---|---|
-| J27 alignment (Claude) | This branch; next: Dec 8 app scope |
-| Ranking (Codex) | Done; PRs #536/#537. Codex also merged #539 (review management for responsible PD writeups) during S646 — not reviewed here |
+| J27 alignment / cycle calendar (Claude) | `main`; next: Dec 8 scope, date consumers |
+| Ranking (Codex) | Done; PRs #536/#537 |
 | Board archival (Codex) | Readiness done; rehearsal runtime only on `codex/board-archive-rehearsal` |
 | Research request corpus (Claude) | Owner-gated |
 
@@ -136,21 +146,24 @@ lookup findings; `e179e6b87` staff-state field + Phase I trigger check.
 
 | File | Purpose |
 |------|---------|
-| `docs/plans/J27_ALIGNMENT_LOG_2026-10-24.md` | Decisions D1–D42, tasks, state model, decision calendar, AkoyaGO field matrix |
-| `docs/J27_TRANSITION_REGISTER.md` | Register; Q2/Q5/Q8/Q9/Q21/Q22 updated 2026-10-28 |
-| `scripts/probe-request-grant-cycle-lookup.cjs` (`main`) | Read-only grant-cycle lookup probe |
-| `docs/audits/cycle-settings-audit-2026-10-27.md` | Cycle identity/default/date sources |
-| `lib/utils/proposal-document-names.js` | Accepted AI Materials names (branch change) |
+| `docs/plans/CYCLE_CALENDAR_DATAVERSE_PLAN_2026-10-28.md` | Calendar plan, evidence, Production test, rollback |
+| `docs/atlas/dataverse-wmkf-grantcycle.md` | Operations Grant Cycle table (Atlas) |
+| `lib/services/cycle-calendar-service.js` | Calendar read/save, attribution rules |
+| `lib/dataverse/adapters/operations-grant-cycle.js` | Adapter (list, PATCH with ETag, change history) |
+| `shared/components/cycle-calendar/CycleCalendarPanel.js` | Calendar UI |
+| `docs/plans/J27_ALIGNMENT_LOG_2026-10-24.md` | Decisions D1–D43, tasks T1–T14 |
+| `scripts/probe-grant-cycle-dates.cjs`, `probe-audit-history-shape.cjs`, `probe-grant-cycle-write-privileges.cjs`, `probe-grant-cycle-history-entries.cjs` | Read-only probes (owner-run) |
 
 ## Testing
 
 ```bash
-npx jest tests/unit/workbench-proposal-text.test.js tests/unit/workbench-proposal-document-listing.test.js
-npm run check:j27-register && npm run check:doc-symbol-refs
+npx jest tests/unit/cycle-calendar-service.test.js tests/unit/cycle-calendar-route.test.js tests/unit/cycle-calendar-ui.test.js tests/unit/admin-view-coverage.test.js
+npm run check:api-routes && npm run check:atlas && npm run check:j27-register
 ```
 
 ## Verification and Closeout
 
-Milestone determination: no DEVELOPMENT_LOG entry; decisions, docs and
-read-only probes only, nothing shipped. No CLAUDE.md change. Claim-evidence
-report: no eligible plan/design edit events, so no observation row.
+Milestone determination: DEVELOPMENT_LOG entry added ("Cycle calendar:
+grant-cycle milestone dates edited in Dataverse with per-date attribution",
+Session 647). No CLAUDE.md change. Claim-evidence pilot: zero recorded events
+for session key `9d3ce97f506403a1`; zero-advisory row added.
