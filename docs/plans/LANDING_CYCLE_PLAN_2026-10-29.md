@@ -65,6 +65,11 @@ Deliberations, Initial Assessments, Awardees tab) take the shell's cycle.
   [VERIFIED via `lib/services/dataverse-settings-service.js:11-17,202-211`].
 - **Unset means today's rules, unchanged.** Shipping the build changes nothing
   until Sarah sets a value.
+- **Every read re-validates the stored value** (pattern only; no extra
+  Dataverse read): the row can be edited outside the app, and an
+  unclassifiable code thrown into `resolveWorkingCycle` fails the page
+  (`normalizeCycles` throws, `lib/utils/cycle-code.js:105-109`). An invalid
+  stored value is treated as unset.
 - A save is refused unless the code matches the pattern and a Grant Cycle row
   with that code exists (read through `listModernCycles`,
   `lib/dataverse/adapters/operations-grant-cycle.js:45`).
