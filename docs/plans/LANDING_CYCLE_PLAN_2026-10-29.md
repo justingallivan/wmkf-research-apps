@@ -3,7 +3,7 @@ title: Landing cycle — one setting the Grants Manager controls — plan
 domain: platform
 kind: plan
 status: active
-summary: "Contract-reconcile reviewed 2026-10-29; Codex adversarial review 2026-10-29 (gpt-6.1-terra; needs rework, six findings) and re-review (gpt-6.1-sol; ready with two named changes); all findings verified and folded in. Owner decisions 2026-10-29: the cycle every app opens on (the landing cycle, alignment log D29) is one app setting edited on the cycle calendar page by the calendar's editors, and every app in the cycle-settings audit that picks a default cycle follows it. An explicit cycle in the URL still wins; with the setting unset, today's rules apply unchanged. Design, per-app behavior, open questions. Merged to main 2026-10-29 (PR #547, 6c9a1013b); the setting is unset (see §7)."
+summary: "Contract-reconcile reviewed 2026-10-29; Codex adversarial review 2026-10-29 (gpt-6.1-terra; needs rework, six findings) and re-review (gpt-6.1-sol; ready with two named changes); all findings verified and folded in. Owner decisions 2026-10-29: the cycle every app opens on (the landing cycle, alignment log D29) is one app setting edited on the cycle calendar page by the calendar's editors, and every app in the cycle-settings audit that picks a default cycle follows it. An explicit cycle in the URL still wins. D45 (2026-10-29) made it automatic — the cycle with the next Board meeting, switching the Pacific day after — with the setting as an optional override. Design, per-app behavior, open questions. Merged to main 2026-10-29 (PR #547, 6c9a1013b); the setting is unset (see §7)."
 canonical: false
 owner: product-engineering
 related:
@@ -16,6 +16,12 @@ related:
 # Landing cycle — one setting the Grants Manager controls
 
 ## 1. Decisions
+
+- **D45 (2026-10-29) supersedes the manual default below:** the landing cycle is
+  automatic — the cycle with the next Board meeting (operations Grant Cycle Board
+  date), switching at the start of the Pacific day after that meeting (J27 from
+  Dec 11, 2026). The setting is now an optional override; empty = automatic.
+  §7 records the build.
 
 - **D29 (2026-10-28):** each app's landing cycle is cued from a value Sarah sets
   in the calendar, not from env pins, `'D26'` literals or month flips.
@@ -64,7 +70,7 @@ Deliberations, Initial Assessments, Awardees tab) take the shell's cycle.
   `setSettingIfUnchanged` and the editor as actor
   [VERIFIED via `lib/services/dataverse-settings-service.js:11-17,202-211`].
 - **Unset means today's rules, unchanged.** Shipping the build changes nothing
-  until Sarah sets a value.
+  until Sarah sets a value. **[Superseded by D45: unset now means automatic.]**
 - **One server reader, `getLandingCycle()`, used by every consumer**,
   re-validates on each read: the pattern (an unclassifiable code thrown into
   `resolveWorkingCycle` fails the page, `lib/utils/cycle-code.js:105-109`; RECHECKED after this branch added `resolveLandingCycle` at :136) and
@@ -240,4 +246,12 @@ Deliberations, Initial Assessments, Awardees tab) take the shell's cycle.
 - Codex re-review (gpt-6.1-sol, 2026-10-29): one medium finding, fixed — leaving `skip` (a Board URL cycle removed via the Tools menu link) or re-entering `wait` kept the old settled state, re-creating the fallback/remount race and an early `#discussion-cleanup` redirect. The hook's decision is now bound to its options (`view`/`skip`/`wait`) and discarded in the same render when they change; tests cover URL-cycle removal on both Board pages, URL-cycle arrival mid-read, wait re-entry, switching back to an earlier option set, and the redirect (5 of 18 fail against the previous hook).
 - Not yet done: the rollout prerequisite (Workbench
   list shows Phase I Pending) and the Production check in §6.
+- **Automatic default (D45), branch `claude/landing-cycle-automatic`, 2026-10-29:**
+  `automaticLandingCycle` in `lib/services/landing-cycle-service.js` picks the
+  earliest cycle whose Board date is today or later by the Pacific day (else the
+  latest); `getLandingCycle` uses it when there is no valid override (absent,
+  empty, malformed, orphaned or unreadable), reading Board dates through the new
+  bounded adapter read `listBoardDates`. The editor view adds `automatic`
+  (`code`, `boardDate`, `switchesOn`) and status `automatic`; the calendar box
+  shows "Automatic: …", the next switch date, and "Automatic" as a choice.
 

@@ -30,7 +30,7 @@ const jsonResponse = (status, body) => ({
 
 const MINIMAL_BODIES = {
   '/api/cycle-calendar': { canEdit: false, savingAvailable: true, defaultCycleCode: null, cycles: [] },
-  '/api/landing-cycle': { landingCycleCode: null, storedValue: null, status: 'unset', setBy: null, setAt: null, revision: null, canEdit: false, cycles: [] },
+  '/api/landing-cycle': { landingCycleCode: null, automatic: null, storedValue: null, status: 'automatic', setBy: null, setAt: null, revision: null, canEdit: false, cycles: [] },
   '/api/admin/maintenance': { jobs: [] },
   '/api/admin/models': { apps: [] },
   '/api/workbench/staffing': { staff: [], roles: { president: {}, cso: {}, grantsManager: {}, programCoordinator: {}, systemsSpecialist: {} } },

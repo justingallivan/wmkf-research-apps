@@ -31,7 +31,7 @@ Cycle table, edited from the apps' calendar. Owner guidance that bounds it:
 adjust only the response period and quota).
 
 **What stays human (cannot be removed):** Connor's process creates each cycle's
-row; the Grants Manager fills its dates and sets the landing cycle on the
+row; the Grants Manager fills its dates (the landing cycle now switches by itself, D45) on the
 calendar; staff confirm the Board roster. Everything else below is either read
 from the calendar or retired.
 
@@ -47,7 +47,7 @@ from the calendar or retired.
 | A PD's last-used invitation dates re-applied to the next cycle | Per-user `reviewer_invite_timing` preference (audit RV2) [NOT-READ: `shared/components/reviewers/InviteEmailModal.js` — read in the build] | Stop carrying dates across cycles; keep only the response period if the PD changed it | None |
 | Type the Board materials deadline and Board end date | Board cycle setup page, per cycle (`materialsDue`, `boardEnds`) [VERIFIED via `lib/services/board-writeups/model.js:38-48`]; archive and reminders key off `boardEnds` [VERIFIED via `board-writeups/worker.js:49`; `notifications.js:19-20`] | New setups start with the calendar's Board date and materials date filled in. An activated setup is never rewritten by a calendar edit (rollover §3.2) | None (§5) |
 | Grantee short-title job runs by calendar month | `vercel.json` schedule, months Apr–Jun and Oct–Dec (audit G3) | Retire: Connor's flows now write the short title (D37, T13), after the D26 Board and a check that nothing else depends on it | None (T13 already decided) |
-| Pick which cycle each app opens on | Each app's own rule | Done: the landing cycle (PR #547) | None |
+| Pick which cycle each app opens on | Each app's own rule | Done: the landing cycle (PR #547), automatic from Board dates (D45) | None |
 
 Coverage check (2026-10-29): grep of `lib pages shared` for env names containing
 CYCLE, DEADLINE, MEETING or _DATE finds only the two Vercel rows above, the

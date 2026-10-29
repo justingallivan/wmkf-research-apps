@@ -1,7 +1,8 @@
 /**
- * Landing cycle control (D29; docs/plans/LANDING_CYCLE_PLAN_2026-10-29.md):
- * shows the cycle every app opens on, who set it and when; calendar editors
- * choose a cycle or "Not set". Shown above the cycle calendar on
+ * Landing cycle control (D29, D45; docs/plans/LANDING_CYCLE_PLAN_2026-10-29.md):
+ * shows the cycle every app opens on — automatic (the cycle with the next Board
+ * meeting) unless overridden — and who last changed it; calendar editors choose
+ * a cycle or "Automatic". Shown above the cycle calendar on
  * /cycle-calendar and in Admin → Workflows; /api/landing-cycle decides who may edit.
  */
 import { useEffect, useRef, useState } from 'react';
@@ -15,6 +16,12 @@ function formatWhen(value) {
   const parsed = new Date(value);
   if (Number.isNaN(parsed.getTime())) return '';
   return new Intl.DateTimeFormat('en-US', { timeZone: 'America/Los_Angeles', month: 'short', day: 'numeric', year: 'numeric' }).format(parsed);
+}
+
+function formatDay(value) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value || '')) return '';
+  return new Intl.DateTimeFormat('en-US', { timeZone: 'UTC', weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' })
+    .format(new Date(`${value}T00:00:00Z`));
 }
 
 async function request(body, signal) {
@@ -68,7 +75,7 @@ export default function LandingCyclePanel() {
       if (!mounted.current) return;
       setData(next);
       setEditing(false);
-      setMessage({ text: cycleCode ? `Apps now open on ${cycleCode} where they can.` : 'Landing cycle cleared. Each app uses its own date rule.', success: true });
+      setMessage({ text: cycleCode ? `Apps now open on ${cycleCode} where they can.` : 'Back to automatic: apps open on the cycle with the next Board meeting.', success: true });
     } catch (saveError) {
       if (!mounted.current) return;
       if (saveError.code === 'landing_conflict') {
@@ -89,26 +96,30 @@ export default function LandingCyclePanel() {
     <div className="flex flex-wrap items-start justify-between gap-3">
       <div>
         <h2 id="landing-cycle-heading" className="text-lg font-semibold text-gray-900">Landing cycle</h2>
-        <p className="mt-1 text-sm text-gray-600">The cycle apps open on. Apps with no proposals in this cycle yet stay on their current cycle, and a cycle chosen in a link still wins.</p>
+        <p className="mt-1 text-sm text-gray-600">The cycle apps open on. Automatic picks the cycle with the next Board meeting and switches the day after that meeting. Apps with no proposals in that cycle yet stay where they are, and a cycle chosen in a link still wins.</p>
         <p className={`mt-3 ${data.landingCycleCode ? 'font-medium text-gray-900' : 'text-gray-500'}`}>
-          {data.landingCycleCode ? cycleLabel(data, data.landingCycleCode) : 'Not set — each app uses its own date rule'}
+          {data.status === 'active'
+            ? `${cycleLabel(data, data.landingCycleCode)} (chosen)`
+            : data.landingCycleCode ? `Automatic: ${cycleLabel(data, data.landingCycleCode)}` : 'Automatic: no cycle has a Board date yet'}
         </p>
+        {data.status !== 'active' && data.automatic?.switchesOn && <p className="text-sm text-gray-600">Switches to the next cycle on {formatDay(data.automatic.switchesOn)}.</p>}
+        {data.status === 'active' && data.automatic?.code && <p className="text-sm text-gray-600">Automatic would be {cycleLabel(data, data.automatic.code)}.</p>}
         {setLine && <p className="text-sm text-gray-600">{setLine}</p>}
         {(data.status === 'missing' || data.status === 'invalid') && <p role="alert" className="mt-2 text-sm text-amber-800">
-          The saved landing cycle {data.storedValue} is not in the Grant Cycle table, so apps are using their own rules. Choose a cycle or clear it.
+          The saved landing cycle {data.storedValue} is not in the Grant Cycle table, so apps are using the automatic cycle. Choose a cycle or switch back to Automatic.
         </p>}
       </div>
-      {data.canEdit && !editing && <Button variant="outline" disabled={saving} onClick={() => { setMessage(null); setDraft(data.landingCycleCode || ''); setEditRevision(data.revision); setEditing(true); }}>Edit<span className="sr-only"> landing cycle</span></Button>}
+      {data.canEdit && !editing && <Button variant="outline" disabled={saving} onClick={() => { setMessage(null); setDraft(data.status === 'active' ? data.landingCycleCode : ''); setEditRevision(data.revision); setEditing(true); }}>Edit<span className="sr-only"> landing cycle</span></Button>}
     </div>
     {editing && <div className="mt-3 max-w-sm rounded-lg border border-gray-200 bg-gray-50 p-3">
       <label className="block text-sm font-medium text-gray-700">Landing cycle
         <select className={selectClass} value={draft} disabled={saving} onChange={event => setDraft(event.target.value)}>
-          <option value="">Not set — use each app's date rule</option>
+          <option value="">Automatic — the cycle with the next Board meeting</option>
           {data.cycles.map(cycle => <option key={cycle.code} value={cycle.code}>{cycleLabel(data, cycle.code)}</option>)}
         </select>
       </label>
       <div className="mt-3 flex flex-wrap gap-2">
-        <Button disabled={saving || (draft === (data.landingCycleCode || '') && ['active', 'unset'].includes(data.status))} onClick={() => save(draft || null)}>Save</Button>
+        <Button disabled={saving || (draft === (data.status === 'active' ? data.landingCycleCode : '') && ['active', 'automatic'].includes(data.status))} onClick={() => save(draft || null)}>Save</Button>
         <Button variant="outline" disabled={saving} onClick={() => { setEditing(false); setMessage(null); }}>Cancel</Button>
       </div>
       {saving && <p role="status" className="mt-2 text-sm">Saving…</p>}
