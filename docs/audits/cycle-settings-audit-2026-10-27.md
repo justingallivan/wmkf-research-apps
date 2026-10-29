@@ -76,7 +76,7 @@ Admin/UI edit only (no deploy), but NOT cycle-keyed so each rollover overwrites 
 
 ### 1.3 Items that would show the wrong cycle (or pre-fill the wrong dates) Dec 7 - Feb 24 if nothing changes
 
-(D26 Board Dec 10; J27 proposals arrive Dec 7; reviewer invitations ~Feb 24; reviews due ~Mar 17 per docs/plans/J27_ALIGNMENT_LOG_2026-10-24.md:12-22. The Feb 24 milestone is from that doc, not from code.)
+(D26 Board Dec 10; J27 proposals arrive Dec 7; reviewer invitations ~Feb 24; reviews due ~Mar 17 per docs/plans/J27_ALIGNMENT_LOG_2026-10-24.md:12-22. [Historical as of 2026-10-27: the cycle calendar now holds Reviews Due = 2027-03-10.] The Feb 24 milestone is from that doc, not from code.)
 
 1. Expertise batch (`pages/expertise-finder.js:671`): month flip, so it opens on D26 until Dec 31 UTC. J27 expertise matching is planned Dec 8; staff must change the picker by hand for three weeks.
 2. Proposal Ranking (`ProposalRankingApp.js:308`): month flip, D26 through Dec 31, then J27. Acceptable for ranking, but it differs from Workbench's Dec 11 flip.

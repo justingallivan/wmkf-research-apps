@@ -19,7 +19,7 @@ from the provisional J27/D27 timeline (owned outside this repo; see T5):
 | Thu Jan 14 | "First Cut" spreadsheet to Program Committee: ~50 summaries, personalized by expertise | J-2 |
 | Feb 10–12 | One-page writeups; Program Chairs book in Diligent (20–25 semi-finalists) | Existing writeup tools (not checked) |
 | Wed Feb 24 | Program Chairs meeting; reviewer invitations | D4 settings; materials email on acceptance |
-| Mar 17 | Reviews due | Calendar-driven review filing (D11) live before Feb 24 invitations |
+| Wed Mar 10 | Reviews due (**2026-10-29:** was Mar 17 in the provisional timeline; the cycle calendar's Reviews Due Date, entered by the Grants Manager, is authoritative) | Calendar-driven review filing (D11, D44) live before Feb 24 invitations |
 | Apr 19 – May 7 | Oral presentations / staff evaluations over Zoom (no site visits) | Not yet checked against Meeting Tracker / Staff Deliberations |
 | May 12–13 | Ranking meetings | Proposal Ranking |
 | Thu May 27 | Board books mailed | |
