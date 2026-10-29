@@ -13,7 +13,7 @@ test('early draft release requires warning and submits the version shown, with q
     return response(url.includes('?') ? data : { canRelease: true, canArchive: false, isSuperuser: false });
   });
   jest.spyOn(window, 'confirm').mockReturnValue(true);
-  render(<BoardWriteups />);
+  render(<BoardWriteups initialCycle="D26" />);
   fireEvent.click(await screen.findByLabelText('Select 1002988'));
   fireEvent.click(screen.getByText('Release selected to the President'));
   await waitFor(() => expect(calls).toHaveLength(1));
@@ -30,7 +30,7 @@ test('a late response from the previous cycle cannot replace the new cycle', asy
     if (url.includes('D26')) return old;
     return response({ ...data, rows: [{ ...row, source: { ...row.source, number: 'NEW123' } }] });
   });
-  render(<BoardWriteups />);
+  render(<BoardWriteups initialCycle="D26" />);
   await waitFor(() => expect(global.fetch).toHaveBeenCalledWith(expect.stringContaining('cycle=D26'), expect.anything()));
   fireEvent.change(screen.getByLabelText('Cycle'), { target: { value: 'J27' } });
   fireEvent.click(screen.getByText('Open cycle'));
@@ -42,7 +42,7 @@ test('a late response from the previous cycle cannot replace the new cycle', asy
 
 test('disabled response shows no release or setup controls and makes no further requests', async () => {
   global.fetch = jest.fn(async () => ({ ok: false, status: 404, json: async () => ({ error: 'Board writeups are disabled.', code: 'board_disabled' }) }));
-  render(<BoardWriteups />);
+  render(<BoardWriteups initialCycle="D26" />);
   expect(await screen.findByText('Board writeups are disabled.')).toBeTruthy();
   expect(screen.queryByText('Release selected to the President')).toBeNull();
   expect(screen.queryByText('Admin: cycle setup and roles')).toBeNull();
@@ -59,7 +59,7 @@ test('admin can mark cleanup complete and sees the saved completion state', asyn
     return response(url.includes('?') ? board() : { canRelease: true, canArchive: true, isSuperuser: true });
   });
   jest.spyOn(window, 'confirm').mockReturnValue(true);
-  render(<BoardWriteups mode="setup" />);
+  render(<BoardWriteups initialCycle="D26" mode="setup" />);
   fireEvent.click(await screen.findByText('Mark cleanup complete'));
   await waitFor(() => expect(posts).toEqual([{ action: 'completeCleanup', cycle: 'D26' }]));
   expect(await screen.findByText(/Cleanup marked complete by Admin/)).toBeTruthy();
@@ -70,7 +70,7 @@ test('non-admin cannot see cleanup completion control even when cleanup is due',
   global.fetch = jest.fn(async url => response(url.includes('?')
     ? { ...data, cleanup: { dueDate: '2026-12-08', canComplete: false } }
     : { canRelease: true, canArchive: false, isSuperuser: false }));
-  render(<BoardWriteups />);
+  render(<BoardWriteups initialCycle="D26" />);
   await screen.findByText('1002988');
   expect(screen.queryByText('Mark cleanup complete')).toBeNull();
 });
@@ -85,7 +85,7 @@ test('late cleanup completion response does not update a newly selected cycle', 
     return response({ ...data, isSuperuser: true, cleanup: { dueDate: url.includes('J27') ? '2027-06-08' : '2026-12-08', canComplete: !url.includes('J27') } });
   });
   jest.spyOn(window, 'confirm').mockReturnValue(true);
-  render(<BoardWriteups mode="setup" />);
+  render(<BoardWriteups initialCycle="D26" mode="setup" />);
   fireEvent.click(await screen.findByText('Mark cleanup complete'));
   fireEvent.change(screen.getByLabelText('Cycle'), { target: { value: 'J27' } });
   fireEvent.click(screen.getByText('Open cycle'));
@@ -104,7 +104,7 @@ test('failed setup save shows an error beside Save setup and preserves entered d
     if (url.startsWith('/api/admin/')) return response({ cycle: { value: null, revision: null }, roles: { president: { value: null, revision: null }, cso: { value: null }, grantsManager: { value: null } }, staff: [], candidates: [] });
     return response(url.includes('?') ? data : { canRelease: true, canArchive: true, isSuperuser: true });
   });
-  render(<BoardWriteups mode="setup" />);
+  render(<BoardWriteups initialCycle="D26" mode="setup" />);
   const save = await screen.findByText('Save setup');
   expect(screen.getByRole('region', { name: 'Cycle setup' })).toBeTruthy();
   fireEvent.change(screen.getByLabelText('Board meeting end date'), { target: { value: '2026-12-10' } });
@@ -130,7 +130,7 @@ test('cycle setup shows shared assignments and links to the central editor', asy
   global.fetch = jest.fn(async url => response(url.startsWith('/api/admin/')
     ? { cycle: { value: null }, roles: { president: { value: { systemUserId: ID } }, cso: {}, grantsManager: {} }, staff: [{ systemUserId: ID, name: 'Example Staff' }], candidates: [] }
     : url.includes('?') ? { ...data, isSuperuser: true, canArchive: true } : { isSuperuser: true, canManageSetup: true, canArchive: true }));
-  render(<BoardWriteups mode="setup" />);
+  render(<BoardWriteups initialCycle="D26" mode="setup" />);
   expect(await screen.findByText('Example Staff')).toBeTruthy();
   expect(screen.queryByLabelText('President')).toBeNull();
   expect(screen.getByText('Manage shared roles in Staffing').getAttribute('href')).toBe('/admin?workspace=people&view=staffing');
@@ -142,7 +142,7 @@ test.each([
 ])('%s can view dashboard without setup requests or release/maintenance controls', async (_role, permissions) => {
   const urls = [];
   global.fetch = jest.fn(async url => { urls.push(url); return response(url.includes('?') ? { ...data, ...permissions, cleanup: { canComplete: true } } : permissions); });
-  render(<BoardWriteups />);
+  render(<BoardWriteups initialCycle="D26" />);
   await screen.findByText('1002988');
   expect(screen.getByText('Cycle setup & maintenance').getAttribute('href')).toBe('/board-cycle-setup?cycle=D26');
   expect(screen.queryByText('Release selected to the President')).toBeNull();
@@ -154,7 +154,7 @@ test.each([
 
 test('empty inactive cycle explains setup without zero denominator or empty headers', async () => {
   global.fetch = jest.fn(async url => response(url.includes('?') ? { ...data, config: { active: false }, progress: { expected: 0, released: 0 }, rows: [] } : { canRelease: true }));
-  render(<BoardWriteups />);
+  render(<BoardWriteups initialCycle="D26" />);
   await screen.findByText('This cycle isn’t ready for release yet');
   expect(screen.queryByRole('table')).toBeNull();
   expect(screen.queryByText(/0 of 0/)).toBeNull();
@@ -165,7 +165,7 @@ test('empty inactive cycle explains setup without zero denominator or empty head
 test('only missing cycle is treated as setup needed; real read errors remain errors', async () => {
   let code = 'board_cycle_unconfigured';
   global.fetch = jest.fn(async url => url.includes('?') ? { ok: false, status: 404, json: async () => ({ code, error: 'Read failed' }) } : response({ canArchive: true }));
-  render(<BoardWriteups />);
+  render(<BoardWriteups initialCycle="D26" />);
   await screen.findByText('Complete cycle setup');
   code = 'board_settings_corrupt';
   fireEvent.click(screen.getByText('Refresh status'));
@@ -180,7 +180,7 @@ test('Grants Manager can open setup before a cycle exists; dashboard remains sep
     if (url.includes('?')) return { ok: false, status: 404, json: async () => ({ code: 'board_cycle_unconfigured' }) };
     return response({ canArchive: true, canRelease: false, isSuperuser: false });
   });
-  render(<BoardWriteups mode="setup" />);
+  render(<BoardWriteups initialCycle="D26" mode="setup" />);
   await screen.findByText('Save setup');
   expect(screen.getByText('Manage shared roles in Staffing').getAttribute('href')).toBe('/staffing');
   expect(screen.queryByRole('table')).toBeNull();
@@ -189,7 +189,7 @@ test('Grants Manager can open setup before a cycle exists; dashboard remains sep
 
 test('CSO without setup authority cannot load settings on setup page', async () => {
   global.fetch = jest.fn(async () => response({ canRelease: true, canArchive: false }));
-  render(<BoardWriteups mode="setup" />);
+  render(<BoardWriteups initialCycle="D26" mode="setup" />);
   await screen.findByRole('alert');
   expect(global.fetch).toHaveBeenCalledTimes(1);
   expect(screen.queryByText('Save setup')).toBeNull();
@@ -197,7 +197,7 @@ test('CSO without setup authority cannot load settings on setup page', async () 
 
 test('cycle input waits for valid submission and retains loaded data while typing', async () => {
   global.fetch = jest.fn(async url => response(url.includes('?') ? data : { canRelease: true }));
-  render(<BoardWriteups />);
+  render(<BoardWriteups initialCycle="D26" />);
   await screen.findByText('1002988');
   fireEvent.change(screen.getByLabelText('Cycle'), { target: { value: 'J' } });
   expect(screen.getByText('1002988')).toBeTruthy();
@@ -211,7 +211,7 @@ test('refresh and cycle switching require confirmation before discarding unsaved
     ? response({ cycle: { value: null, revision: null }, roles: { president: {}, cso: {}, grantsManager: {} }, staff: [], candidates: [] })
     : response(url.includes('?') ? data : { canArchive: true, isSuperuser: true }));
   jest.spyOn(window, 'confirm').mockReturnValue(false);
-  render(<BoardWriteups mode="setup" />);
+  render(<BoardWriteups initialCycle="D26" mode="setup" />);
   fireEvent.change(await screen.findByLabelText('Board meeting end date'), { target: { value: '2026-12-10' } });
   fireEvent.click(screen.getByText('Refresh status'));
   expect(window.confirm).toHaveBeenCalledWith('Discard your unsaved cycle setup changes?');
@@ -237,7 +237,7 @@ test('Select all proposals includes search-hidden candidates, preserves prior se
     if (url.startsWith('/api/admin/')) return response({ cycle: { value, revision: 'one' }, roles: { president: {}, cso: {}, grantsManager: {} }, staff: [], candidates: [{ requestId: ID, number: '1002988', institution: 'Institute' }, { requestId: second, number: '1003000', institution: 'Other Institute' }] });
     return response(url.includes('?') ? data : { canArchive: true, isSuperuser: true });
   });
-  render(<BoardWriteups mode="setup" />);
+  render(<BoardWriteups initialCycle="D26" mode="setup" />);
   const selectAll = await screen.findByRole('button', { name: 'Select all proposals' });
   fireEvent.change(screen.getByLabelText('Find proposal'), { target: { value: '1002988' } });
   expect(screen.queryByLabelText('1003000 — Other Institute')).toBeNull();

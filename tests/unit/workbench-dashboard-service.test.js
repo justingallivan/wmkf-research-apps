@@ -9,6 +9,8 @@
  */
 
 const queryAllRequests = jest.fn();
+const getLandingCycle = jest.fn(async () => ({ code: null, reason: null }));
+jest.mock('../../lib/services/landing-cycle-service.js', () => ({ getLandingCycle: (...a) => getLandingCycle(...a) }));
 jest.mock('../../lib/services/workbench/program-scope-service.js', () => ({
   resolveWorkbenchProgramScope: jest.fn(async () => ({
     programs: [{ programId: '94cab30b-958f-ee11-8179-000d3a341e8f', name: 'Research' }],
@@ -327,4 +329,33 @@ test('Stage 1d: on mode badges test rows but excludes them from rollup totals', 
   }));
   expect(body.proposals).toEqual([expect.objectContaining({ isTestRequest: true })]);
   expect(body.rollup).toEqual({ total: 0, stages: { find: 0, invite: 0, awaiting: 0, review: 0, done: 0 } });
+});
+
+describe('landing cycle (docs/plans/LANDING_CYCLE_PLAN_2026-10-29.md)', () => {
+  beforeEach(() => {
+    queryAllRequests.mockResolvedValue({
+      records: [
+        { wmkf_meetingdate: '2026-06-04', _wmkf_programdirector_value: 'pd-1' },
+        { wmkf_meetingdate: '2026-12-11', _wmkf_programdirector_value: 'pd-2' },
+      ],
+      capped: false,
+    });
+  });
+
+  test('a listed landing cycle becomes the default; lastDecided is unchanged', async () => {
+    getLandingCycle.mockResolvedValueOnce({ code: 'J26', reason: null });
+    const body = await loadDashboard(args());
+    expect(body.defaultCycleCode).toBe('J26');
+    expect(body.lastDecidedCycleCode).toBe('J26');
+  });
+
+  test('a landing cycle with no visible requests leaves the date rule in place', async () => {
+    getLandingCycle.mockResolvedValueOnce({ code: 'J27', reason: null });
+    await expect(loadDashboard(args())).resolves.toMatchObject({ defaultCycleCode: 'D26' });
+  });
+
+  test('Meeting Tracker selection shares the same default', async () => {
+    getLandingCycle.mockResolvedValueOnce({ code: 'J26', reason: null });
+    await expect(loadMeetingTrackerSelection(args())).resolves.toMatchObject({ defaultCycleCode: 'J26' });
+  });
 });

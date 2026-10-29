@@ -112,3 +112,22 @@ test('excerpts preserve edited prose and mark truncation without inventing a sum
   expect(body.groups[0].proposals[0].discussionSummary.status).toBe('missing');
   expect(deps.readText).not.toHaveBeenCalled();
 });
+
+describe('landing cycle (docs/plans/LANDING_CYCLE_PLAN_2026-10-29.md)', () => {
+  beforeEach(() => {
+    deps.queryRequests.mockResolvedValue({ records: [request(1), { ...request(2), wmkf_meetingdate: '2026-06-03T00:00:00Z' }] });
+  });
+
+  test('a listed landing cycle becomes the cycle-list default', async () => {
+    deps.getLandingCycle = jest.fn(async () => ({ code: 'J26', reason: null }));
+    await expect(load({ profileId: 7 })).resolves.toMatchObject({ defaultCycleCode: 'J26' });
+  });
+
+  test('an unlisted landing cycle keeps the date rule, and a chosen cycle never reads the setting', async () => {
+    deps.getLandingCycle = jest.fn(async () => ({ code: 'J27', reason: null }));
+    await expect(load({ profileId: 7 })).resolves.toMatchObject({ defaultCycleCode: 'D26' });
+    deps.getLandingCycle.mockClear();
+    await load({ cycleCode: 'D26', profileId: 7 }).catch(() => {});
+    expect(deps.getLandingCycle).not.toHaveBeenCalled();
+  });
+});

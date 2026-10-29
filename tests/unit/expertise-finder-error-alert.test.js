@@ -18,6 +18,10 @@
  */
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 
+// The landing-cycle default is covered by landing-cycle tests; settle it at once with no code here.
+jest.mock('../../shared/components/landing-cycle/useLandingCycleDefault', () => ({
+  useLandingCycleDefault: () => ({ settled: true, code: null }),
+}));
 jest.mock('../../shared/components/Layout', () => ({
   __esModule: true,
   default: ({ children }) => <div>{children}</div>,
