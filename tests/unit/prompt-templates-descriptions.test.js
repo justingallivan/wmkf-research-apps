@@ -42,6 +42,7 @@ test('keeps application use, stored reference and live publication state separat
   const active = await screen.findByRole('article', { name: 'Synthesize submitted human peer reviews' });
   expect(within(active).getByText('Application caller')).toBeInTheDocument();
   expect(within(active).getByText(/submitted reviewers’ ratings/)).toBeInTheDocument();
+  fireEvent.click(screen.getByText(/Legacy app prompts — stored reference/));
   const reference = screen.getByRole('article', { name: 'Legacy Phase II proposal Q&A' });
   expect(within(reference).getByText('Stored reference')).toBeInTheDocument();
   expect(within(reference).getByText(/current version/)).toHaveTextContent('v1');
@@ -75,4 +76,41 @@ test('publishing a descriptively titled prompt still addresses its original tech
   const [, options] = global.fetch.mock.calls.find(([, opts]) => opts?.method === 'PUT');
   expect(JSON.parse(options.body)).toMatchObject({ body: 'Updated prompt body.', expectedVersion: 1 });
   expect(JSON.parse(options.body)).not.toHaveProperty('title');
+});
+
+
+test('collapses only audited stored references and preserves their drafts when toggled', async () => {
+  serve([
+    prompt('phase-ii.qa'), prompt('phase-ii.summarize'), prompt('phase-ii.refine'), prompt('phase-ii.extract-structured'),
+    prompt('review-synthesis.generate'), prompt('executor.echo-parity'), prompt('phase-i.checkin', false), prompt('phase-ii.new-prompt'),
+  ]);
+  render(<PromptTemplatesSection />);
+  const summary = await screen.findByText('Legacy app prompts — stored reference (4)');
+  const disclosure = summary.closest('details');
+  expect(disclosure).not.toHaveAttribute('open');
+  expect(screen.getByRole('article', { name: 'Legacy Phase II proposal Q&A' })).not.toBeVisible();
+  expect(screen.getByRole('article', { name: 'Synthesize submitted human peer reviews' })).toBeVisible();
+  expect(screen.getByRole('article', { name: 'Executor echo and cache diagnostic' })).toBeVisible();
+  expect(screen.getByRole('article', { name: 'Phase I application and budget checks' })).toBeVisible();
+  expect(screen.getByText('phase-ii.new-prompt')).toBeVisible();
+
+  fireEvent.click(summary);
+  expect(disclosure).toHaveAttribute('open');
+  expect(within(disclosure).getAllByRole('article')).toHaveLength(4);
+  const reference = screen.getByRole('article', { name: 'Legacy Phase II proposal Q&A' });
+  expect(reference).toBeVisible();
+  expect(within(reference).getByText('phase-ii.qa')).toBeVisible();
+  fireEvent.click(within(reference).getByRole('button', { name: 'Edit & publish' }));
+  fireEvent.change(within(reference).getByLabelText(/^Prompt body/), { target: { value: 'Unsaved reference draft.' } });
+  fireEvent.click(summary);
+  expect(reference).not.toBeVisible();
+  fireEvent.click(summary);
+  expect(within(reference).getByLabelText(/^Prompt body/)).toHaveValue('Unsaved reference draft.');
+});
+
+test('omits an empty legacy-reference group', async () => {
+  serve([prompt('executor.echo-parity')]);
+  render(<PromptTemplatesSection />);
+  await screen.findByText('executor.echo-parity');
+  expect(screen.queryByText(/Legacy app prompts — stored reference/)).not.toBeInTheDocument();
 });

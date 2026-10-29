@@ -100,6 +100,9 @@ export default function PromptTemplatesSection() {
   if (error && !prompts) return <div className="text-red-600 text-sm">{error}</div>;
   if (!prompts || prompts.length === 0) return <div className="text-gray-500 text-sm">No prompts found.</div>;
 
+  const references = prompts.filter(prompt => getAdminPromptDescription(prompt.name).usage === 'reference');
+  const otherPrompts = prompts.filter(prompt => getAdminPromptDescription(prompt.name).usage !== 'reference');
+
   return (
     <>
       <p className="text-xs text-gray-500 mb-4">
@@ -117,7 +120,7 @@ export default function PromptTemplatesSection() {
             onPublished={setExecutorBudgetConfig}
           />
         ) : null}
-        {prompts.map((p) => (
+        {otherPrompts.map((p) => (
           <PromptPanel
             key={p.name}
             prompt={p}
@@ -126,6 +129,25 @@ export default function PromptTemplatesSection() {
             onPublished={load}
           />
         ))}
+        {references.length > 0 && (
+          <details className="rounded-lg border border-gray-200">
+            <summary className="cursor-pointer rounded-lg bg-gray-50 p-4 text-sm font-semibold text-gray-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gray-500">
+              Legacy app prompts — stored reference ({references.length})
+            </summary>
+            <div className="space-y-6 p-4">
+              <p className="text-sm text-gray-600">These stored prompts are kept for reference. The current application routes use code templates instead.</p>
+              {references.map((p) => (
+                <PromptPanel
+                  key={p.name}
+                  prompt={p}
+                  modelCatalog={modelCatalog}
+                  executorBudgetConfig={executorBudgetConfig}
+                  onPublished={load}
+                />
+              ))}
+            </div>
+          </details>
+        )}
       </div>
     </>
   );
