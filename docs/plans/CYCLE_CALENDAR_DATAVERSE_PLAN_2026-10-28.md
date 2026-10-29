@@ -108,9 +108,10 @@ column change with the user and time, for app saves and Dynamics edits alike,
 and the app reads it per row (`RetrieveRecordChangeHistory` / the `audits`
 table). [VERIFIED 2026-10-28 probe] Organization auditing is **on** and all
 fourteen columns are flagged for auditing, but auditing on the
-`wmkf_grantcycle` **table is off**, so nothing is recorded today. Turning it
-on is a table setting, not code: a task for Connor (T14). History starts from
-the moment it is turned on.
+`wmkf_grantcycle` **table was off**. **Turned on 2026-10-28 (Pacific)** with
+owner-run `scripts/enable-grant-cycle-audit.cjs --apply`: before `false`,
+after `true` (T14; Justin informing Connor). History starts from that moment;
+no earlier edits are recorded.
 
 **B. Correct attribution of app saves.** Audit history names whoever
 Dataverse thinks made the change. App writes carry the staff member's
@@ -165,6 +166,5 @@ Before the sandbox rehearsal:
 |---|---|---|
 | Which timeline step each new date column represents (TBD; staff deciding) | Sarah, Beth, Duncan; Connor for field meaning | Consumers only; the prototype shows display names |
 | Dates the apps use with no column yet: reviewer invitation start (opens the D11 filing window), the Feb 3 staff-recommendation deadline (D40), the Jan triage meetings. Add a column, derive from another date, or keep app-side? | Justin with Connor | D11 filing window; D40 warning |
-| Turn on auditing for the `wmkf_grantcycle` table (T14) | Connor | §4 A |
 | Impersonation flag in Production; calendar users' write privilege on the table | Justin / Connor | §4 B |
 | Whether the calendar edits the Board date too, given requests carry their own meeting date and Board writeups keep `boardEnds` | Justin | Board-date reconciliation (default-cycle plan) |
