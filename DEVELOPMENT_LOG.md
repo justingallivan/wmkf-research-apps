@@ -10,6 +10,18 @@ The chronological archive after the `Legacy chronological session log` divider c
 
 ---
 
+## October 2026 — Landing cycle: every app opens on the next Board cycle and rolls over by itself (Session 648, Claude)
+
+**Milestone:** One rule now decides which cycle the apps open on: the cycle with the next Board meeting (operations Grant Cycle Board date), switching at the start of the Pacific day after that meeting (D29, D45). J27 takes over at 12:00 am Pacific Fri Dec 11, 2026.
+**Sessions:** Session 648 (Claude); contract-reconcile plan review; Codex adversarial reviews on gpt-6.1-terra and gpt-6.1-sol (plan, PR, two fix rounds).
+**Ship state:**
+- PR #547 (`6c9a1013b`) and PR #550 (`aefaebdf7`) deployed: Workbench/Meeting Tracker, Program Briefing, Proposal Ranking, Expertise Finder and Board pages follow it when the cycle is in their list; a link's cycle wins; open pages never switch; reads are bounded and never block a page; the Board pages' `'D26'` literal is gone.
+- Calendar box shows the automatic cycle and next switch date; the Grants Manager can override and return to Automatic.
+- Non-superuser calendar attribution confirmed in Production (Grants Manager and a second editor).
+- Business-date consumer audit (Claude + independent Codex): only the Board date is read from the calendar; the review due date has seven homes. Decisions D44 (filing has no start bound) and D46 (J27 materials on acceptance, not yet built).
+**Why it matters:** nobody changes a setting at rollover for the default cycle; the audit sets the order for the remaining date centralization before the Feb 24 J27 invitations.
+**Pointers:** `docs/plans/LANDING_CYCLE_PLAN_2026-10-29.md`; `docs/plans/CYCLE_DATES_CENTRALIZATION_PLAN_2026-10-29.md`; `docs/audits/date-consumers-audit-2026-10-29.md`; alignment log D44–D46.
+
 ## October 2026 — Cycle calendar: grant-cycle milestone dates edited in Dataverse with per-date attribution (Session 647, Claude)
 
 **Milestone:** The operations Grant Cycle table (`wmkf_grantcycle`) became the home for cycle milestone dates (D43), edited from a new staff calendar.

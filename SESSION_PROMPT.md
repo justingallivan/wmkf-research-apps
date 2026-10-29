@@ -1,131 +1,134 @@
-# Session 648 Prompt: J27 — cycle calendar live; decide Dec 8 scope and wire date consumers
+# Session 649 Prompt: J27 — plan the reviewer-invitation build; Workbench list before Dec 11
 
-**Branch:** `main`. Both feature branches from this session are merged
-(`claude/j27-ai-materials-names` → PR #541, `claude/cycle-calendar` → PR #542).
-Prior handoff, exact: `git show ee9b60154:SESSION_PROMPT.md` (Session 646 J27
-meeting answers D22–D42, grant-cycle lookup probe).
+**Branch:** `main` (both landing-cycle PRs merged). Prior handoff, exact:
+`git show 442c7c009:SESSION_PROMPT.md` (Session 647: cycle calendar shipped, D43).
 
-## Session 647 Summary (Claude, 2026-10-28)
+## Session 648 Summary (Claude, 2026-10-29)
 
-Shipped two production changes and made one decision that shapes every app's
-cycle handling.
+The cycle calendar now decides which cycle every app opens on, automatically, and
+an audit of every business date showed what the calendar does not yet drive.
 
 ### What Was Completed
 
-1. **Startup.** Every `check:*` gate and self-test green; fast-forwarded the J27 branch.
-2. **PR #541 merged and deployed** (`41e188eb9`): governed AI Materials reads
-   accept either the D26 names or Connor's J27 names (`Project-Narrative_N.pdf`,
-   `Bibliography_N.pdf`); both present fails closed. Codex review clean.
-3. **Decision D43** (alignment log): Connor added eleven milestone date columns
-   to the operations Grant Cycle table (`wmkf_grantcycle`). It is now the
-   authoritative home for the cycle dates it carries, **edited from the apps**
-   (owner chose app editing over Dynamics), with per-date who/when tracking.
-   Supersedes the D10 split. Rows are created when the GOApply portal opens (no
-   D27 row expected for a while).
-4. **Production table auditing enabled** on `wmkf_grantcycle`
-   (`scripts/enable-grant-cycle-audit.cjs`, owner-run; T14). Justin emailed
-   Connor.
-5. **Cycle calendar shipped — PR #542** (`e8fdcaa07`, deployed):
-   - `/cycle-calendar` (Tools menu, any signed-in staff) and Admin → Workflows
-     → Cycle calendar. Cycle dropdown (kept in `?cycle=`; default = nearest
-     upcoming Board date, so **D26 until Dec 10** — owner kept this), Board date
-     read-only, eleven dates, per-date Edit with the native date picker.
-   - Edit: superuser or assigned Grants Manager / Program Coordinator (no
-     Reviewer app access needed). Saves impersonate with no fallback and are
-     refused unless `DYNAMICS_IMPERSONATION_ENABLED=true` (owner confirmed it in
-     Vercel Production and made it non-sensitive).
-   - "Changed by" from per-row `RetrieveRecordChangeHistory`, shown only when
-     the newest audited value equals the shown value; "Recording who made this
-     change…" re-checks after a save (audit entries lag the write by seconds).
-   - Drafts are bound to the row ETag they were opened on; a conflict closes the
-     editor, refreshes and asks to edit again.
-6. **Evidence** (all under `docs/audits/`, structure/role-level only):
-   table columns + audit settings; audit-history shape (`AuditRecord` present,
-   `/audits` by object is 403 — `RetrieveRecordChangeHistory` is the only audit
-   read open to the app); editors' privileges (app user, Grants Manager,
-   Program Coordinator, owner all Global Read/Write).
-7. **Controlled Production test** (owner chose this over the sandbox, which
-   could not prove Production privileges/attribution): owner set and cleared
-   J27 Proposal Due; both audit entries record Justin Gallivan. J27 is back to
-   all null; its audit history keeps those two test entries.
-8. **Sandbox schema parity:** the eleven columns were added to the sandbox
-   (`orgd9e66399`) via wave0 spec; sandbox has no J/D rows and table auditing
-   off (not needed after the venue change).
-9. **Reviews:** Codex adversarial reviews ×4 (audit-contract claim refuted with
-   evidence; value-match attribution guard; ETag draft binding; conflict
-   recovery — the last fix written by Codex at owner request, reviewed and
-   mutation-checked by Claude). Full gates (69) and full Jest (26,025) green.
+1. **Landing cycle shipped (PR #547, `6c9a1013b`; PR #550, `aefaebdf7`; both
+   deployed to Production per Vercel commit status).** Apps open on the cycle with
+   the next Board meeting (operations Grant Cycle Board date) and switch at the
+   start of the Pacific day after it: J27 from 12:00 am Fri Dec 11, 2026 (D45,
+   amends D29). Workbench/Meeting Tracker, Program Briefing, Proposal Ranking,
+   Expertise Finder and Board pages follow it when the cycle is in their list; a
+   URL cycle wins; open pages never switch; reads are deadline-bounded. Board pages
+   follow it only once that cycle has a Board setup (else nearest upcoming dated
+   setup by Pacific day). Calendar box: "Automatic: …", next switch date, optional
+   override. Reviews: contract-reconcile; Codex gpt-6.1-terra (plan) and
+   gpt-6.1-sol (plan, PR, two fix rounds) — all findings fixed.
+2. **Codex now works on `gpt-6.1-sol`.** Root cause of "model not supported": the
+   review plugin's background broker still ran Codex 0.156.1 after the npm upgrade
+   to 0.165.0; the owner killed it. Stale brokers from Oct 8/15 sessions remain
+   (harmless; owner may kill).
+3. **Calendar attribution proven for non-superusers in Production**: the Grants
+   Manager's 8 saves and a second editor's 1 are each recorded under their own
+   names (`docs/plans/CYCLE_CALENDAR_DATAVERSE_PLAN_2026-10-28.md`).
+4. **Decisions:** D44 review filing has no start bound (files until the Board
+   date); D45 automatic landing cycle; D46 J27 reviewers get materials on
+   acceptance, no proposal-release date. Column meanings: invitation start = Chairs
+   Semi-Finalist Meeting; Board materials due = Board Mailing Date. Dates with no
+   Grant Cycle column stay app-side (only the Feb 3 deadline remains). J27 Reviews
+   Due is Mar 10, 2027 (calendar; old timeline said Mar 17).
+5. **Plans and audit:** `docs/plans/LANDING_CYCLE_PLAN_2026-10-29.md`;
+   `docs/plans/CYCLE_DATES_CENTRALIZATION_PLAN_2026-10-29.md`;
+   `docs/audits/date-consumers-audit-2026-10-29.md` (Claude + independent Codex,
+   compared; two Claude errors corrected).
+6. **Guide for Sarah and Duncan** (Claude doc, rewritten plain):
+   https://claude.ai/artifact/96BYj2iYny5aW1LmTLwDYJ
+7. Housekeeping: Codex calendar worktree removed (merged, clean); route matrix,
+   Atlas and catalog markers updated to deployed; main checkout `npm ci` restored a
+   missing dependency.
 
 ### Commits
 
-`main`: `e68d17d14` D43 docs + probe; `631bf23da` audit enable; `b277e327d`,
-`daaf44015` plan review/layout; PR #542 merge `e8fdcaa07` (branch commits
-`ea58e26db` … `9073f4ba8`); PR #541 merge `41e188eb9`. Session close: this
-commit (handoff, dev log, pilot row).
+`main`: plan `813935bb8`…`cde648ce0` (on branch, merged); PR #547 merge
+`6c9a1013b`; PR #550 merge `aefaebdf7`; docs `f396c8cc7`, `b0ce91fd5`,
+`99d8ad9ae`, `988aadec8`, `91dca2e06`, `174233434`, `d6aba6cb6`, `bb3816ef3`,
+`eeefeb567`, `bcc5ec4dd`, `ba03ccd62`, `6574dbc3b`, `ce8c4ba3e`; session close:
+this commit.
 
 ## Next Items
 
 ### Verified Open
 
-1. **Tell Sarah and Duncan the calendar is live.** Evidence: PR #542 deployed;
-   page `/cycle-calendar`. Load it once on production first (no save needed).
-   Sarah's first real save is the first proof that impersonation records a
-   non-superuser (privileges verified; expect it to work).
-2. **Decide what the apps build for Dec 8** (carried from S646; owner deferred).
-   Evidence: alignment log D37, R-3, D13. Does the apps' Initial Assessment
-   still run; how Connor's fitness flag relates to Flagged for concerns (D38,
-   F1); who does expertise matching (T8). Sets the Nov 15 scope.
-3. **Wire consumers of the calendar dates** (D29, D11, D40, D12; not built).
-   Evidence: `docs/plans/CYCLE_CALENDAR_DATAVERSE_PLAN_2026-10-28.md` §3.6,
-   `docs/audits/cycle-settings-audit-2026-10-27.md`. Default-cycle rule
-   (lookup first, meeting date fallback; Sarah-controlled landing cycle),
-   review filing window, Feb 3 Under-consideration warning, readiness digest.
-   Read through `lib/dataverse/adapters/operations-grant-cycle.js`.
-4. **Other Nov 15 builds, decided not built** (confirm scope/order first):
-   Workbench list incl. Phase I Pending (R-1), J27 Proposal tab (D20/D22),
-   triage list (D19/D40; Impeccable first), staff-state field (D41), Triaged →
-   Phase I write (D31), Chairs writeup (D21/T11), central reviewer defaults
-   (response period, quota — not dates).
+1. **Plan the one reviewer-invitation build (owner, 2026-10-29), before Feb 24.**
+   Materials on acceptance (D46; work queue item 6) together with the review due
+   date from the calendar (audit risk 1): shared calendar reader; invitation and
+   stored request due date from Reviews Due; remove per-send and browser-saved due
+   dates; extensions based on the calendar date; Reviewer Finder record dates
+   retired; new invitation and acceptance email wording. Evidence:
+   `docs/CURRENT_WORK_QUEUE.md` item 6; centralization plan §2a, §6; audit §7.
+   Plan-first, contract-reconcile, Codex review.
+2. **Workbench list shows J27 Phase I Pending (Nov 15 list, R-1).** Needed so staff
+   see J27 proposals, and so the Dec 11 automatic switch reaches Workbench,
+   Meeting Tracker and Program Briefing (they only list cycles with visible
+   proposals). First confirm with Connor the status J27 proposals arrive with.
+   Evidence: `shared/config/workbenchVisibility.js`; audit W3.
+3. **J27 proposal file slots** (Workbench Proposal tab inherits D26's map) before
+   Dec 7. Evidence: `shared/config/workbenchProposalDocuments.js`; audit W7.
+4. **Rest of date centralization** (plan §2, §6): review filing by window replacing
+   `REVIEW_DOCX_SHAREPOINT_CYCLE` (D44); Staff Deliberations prep by calendar after
+   the old/new cohort diff, and check J27 Zoom presentations trigger prep (before
+   April); Board setup dates default from the calendar; show on the calendar when a
+   manual override holds the landing cycle; remove Admin `inviteStartDate`.
+5. **Dec 8 scope decision** (carried): does the apps' Initial Assessment run for
+   J27; Connor's fitness flag vs "Flagged for concerns" (D38, F1); expertise
+   matching (T8). Sets the Nov 15 scope.
 
 ### Owner Decision Needed
 
-1. **Which timeline step each new date column represents** (TBD; Sarah, Beth,
-   Duncan editing the timeline). Missing columns the apps use: reviewer
-   invitation start (filing window), Feb 3 staff deadline, Jan triage
-   meetings — add a column, derive, or keep app-side (Justin with Connor).
-2. Whether the calendar should edit the Board date (now read-only).
-3. Carried: triage-flag criteria (CSO; D38, F1), expertise roster (T8), intake
-   prompts (T9/T7), MR/S&E assignment (CSO), Connor's program-at-submission
-   field (D30) and files-ready flag (D25), Chairs-writeup review time (T12).
+1. **Ask Connor:** when a Board date moves, do request meeting dates follow? (Board
+   date lives in three stores; audit §4.) And the status J27 proposals arrive with.
+2. **Sarah:** fill the Chairs Semi-Finalist Meeting Date before Feb 24 (invitation
+   start). Stopgap if the reviewer build slips: Admin reviewer default review due
+   date = 2027-03-10.
+3. Per-request due dates already saved on D26 requests stay as they are (proposed).
+4. Whether the calendar should edit the Board date (read-only today).
+5. Carried: triage-flag criteria (CSO; D38, F1), expertise roster (T8), intake
+   prompts (T9/T7), MR/S&E assignment (CSO), Connor's program-at-submission field
+   (D30) and files-ready flag (D25), Chairs-writeup review time (T12).
 
 ### Parked
 
-1. Research request file corpus (owner-gated). Evidence:
+1. Research request file corpus (owner-gated):
    `docs/plans/RESEARCH_REQUEST_FILE_CORPUS_PLAN_2026-10-25.md`.
 2. Reviewer-save recovery follow-up; T6 prompts readable to all staff.
+3. Workflow vocabulary rename in the apps (approved Oct 21; mid-cycle hold):
+   `docs/plans/review/PROPOSAL_WORKFLOW_VOCABULARY_2026-10-19.md`.
 
 ### Verify Before Acting
 
-1. Retiring the grantee-title cron (T13): only after the D26 Board meeting and
-   the destructive-carryover check.
+1. Retiring the grantee-title cron (T13): only after the D26 Board meeting and the
+   destructive-carryover check.
 2. Board archival: operational only; D26 ranking stays locked.
-3. Decision-calendar artifact rows: republish only from a fresh `read`.
+3. Stale Codex brokers (pids from Oct 8/15 under `~/.claude/plugins/data/codex-openai-codex/state/`):
+   owner-run kill only; confirm no live Claude session uses that state dir.
 
 ### Do Not Reopen Without New Decision
 
-1. D1–D43 as recorded through 2026-10-28; calendar default stays nearest Board
-   date; calendar venue proof done in Production (sandbox rehearsal
-   superseded).
+1. D1–D46 as recorded through 2026-10-29; automatic landing cycle (D45); calendar
+   page keeps its own default (nearest Board date); Staff Deliberations name kept.
 2. Accept-both J27 file naming; 001024 is the Research form; 1003373 is Connor's.
+3. Site-visit materials and reviewer reminder crons are unscheduled by decision.
 
 ## Constraints
 
-- Production Dataverse/Postgres reads are owner-run with `!`; Production
-  writes need the owner plus a dated `DATAVERSE_PROD_WRITE_ACK` passed to the one
-  process.
-- Pass `DYNAMICS_SANDBOX_URL` inline only; setting it in `.env.local` repoints
-  four runtime services to the sandbox.
-- Plain item names, not log codes, with Justin and colleagues.
+- Production Dataverse/Postgres reads are owner-run with `!`; Production writes
+  need the owner plus a dated `DATAVERSE_PROD_WRITE_ACK` passed to the one process.
+- Pass `DYNAMICS_SANDBOX_URL` inline only; setting it in `.env.local` repoints four
+  runtime services to the sandbox.
+- Plain item names, not log codes, with Justin and colleagues; no technical terms
+  in anything for Sarah and Duncan.
+- Add a calendar date only together with the feature that reads it.
+- Merging a PR needs the owner's OK for that PR (an earlier OK doesn't carry).
+- Codex: `gpt-6.1-sol` default; if a review fails on "model not supported", check
+  for a stale broker before switching models (don't pass `--model` without the
+  owner's OK).
 - Leave untracked `output/`, `.impeccable/critique/`, the
   `backup/local-main-slice2-plan-drafts-2026-10-25` branch, and the
   `.codex/hooks.json` / `.github/hooks/impeccable.json` modifications (owner
@@ -137,7 +140,8 @@ commit (handoff, dev log, pilot row).
 
 | Workstream | Resume boundary |
 |---|---|
-| J27 alignment / cycle calendar (Claude) | `main`; next: Dec 8 scope, date consumers |
+| J27 alignment / cycle dates (Claude) | `main`; next: reviewer-invitation build plan; Workbench list |
+| Admin prompts grouping (Codex) | Merged PRs #548/#549 |
 | Ranking (Codex) | Done; PRs #536/#537 |
 | Board archival (Codex) | Readiness done; rehearsal runtime only on `codex/board-archive-rehearsal` |
 | Research request corpus (Claude) | Owner-gated |
@@ -146,24 +150,24 @@ commit (handoff, dev log, pilot row).
 
 | File | Purpose |
 |------|---------|
-| `docs/plans/CYCLE_CALENDAR_DATAVERSE_PLAN_2026-10-28.md` | Calendar plan, evidence, Production test, rollback |
-| `docs/atlas/dataverse-wmkf-grantcycle.md` | Operations Grant Cycle table (Atlas) |
-| `lib/services/cycle-calendar-service.js` | Calendar read/save, attribution rules |
-| `lib/dataverse/adapters/operations-grant-cycle.js` | Adapter (list, PATCH with ETag, change history) |
-| `shared/components/cycle-calendar/CycleCalendarPanel.js` | Calendar UI |
-| `docs/plans/J27_ALIGNMENT_LOG_2026-10-24.md` | Decisions D1–D43, tasks T1–T14 |
-| `scripts/probe-grant-cycle-dates.cjs`, `probe-audit-history-shape.cjs`, `probe-grant-cycle-write-privileges.cjs`, `probe-grant-cycle-history-entries.cjs` | Read-only probes (owner-run) |
+| `docs/plans/CYCLE_DATES_CENTRALIZATION_PLAN_2026-10-29.md` | One home per cycle date; order to Feb 24 |
+| `docs/audits/date-consumers-audit-2026-10-29.md` | Every business date, its homes and consumers |
+| `docs/plans/LANDING_CYCLE_PLAN_2026-10-29.md` | Landing cycle design and build record |
+| `lib/services/landing-cycle-service.js` | Automatic rule, override, Board default |
+| `shared/components/landing-cycle/` | Calendar control and client hooks |
+| `docs/plans/J27_ALIGNMENT_LOG_2026-10-24.md` | Decisions D1–D46 |
+| `scripts/probe-grant-cycle-history-entries.cjs` | Read-only calendar history probe (owner-run) |
 
 ## Testing
 
 ```bash
-npx jest tests/unit/cycle-calendar-service.test.js tests/unit/cycle-calendar-route.test.js tests/unit/cycle-calendar-ui.test.js tests/unit/admin-view-coverage.test.js
+npx jest tests/unit/landing-cycle-*.test.js tests/unit/board-page-landing-cycle.test.js tests/unit/expertise-finder-landing-cycle.test.js
 npm run check:api-routes && npm run check:atlas && npm run check:j27-register
 ```
 
 ## Verification and Closeout
 
-Milestone determination: DEVELOPMENT_LOG entry added ("Cycle calendar:
-grant-cycle milestone dates edited in Dataverse with per-date attribution",
-Session 647). No CLAUDE.md change. Claim-evidence pilot: zero recorded events
-for session key `9d3ce97f506403a1`; zero-advisory row added.
+Milestone determination: DEVELOPMENT_LOG entry added ("Landing cycle: every app
+opens on the next Board cycle and rolls over by itself", Session 648). No CLAUDE.md
+change. Claim-evidence pilot: one recorded event for session key
+`77c85ca295d49e75`; row added.
