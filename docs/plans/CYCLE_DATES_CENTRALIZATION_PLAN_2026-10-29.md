@@ -45,7 +45,7 @@ from the calendar or retired.
 | Type the review deadline and proposal send date into the cycle record | Reviewer Finder cycle record (`wmkf_appgrantcycle`): `reviewDeadline`, custom field `proposalSendDate` used by the invitation email [VERIFIED via `lib/services/grant-cycles-dataverse.js:76-90`; `lib/utils/email-generator.js:443-448`] | Emails read the calendar's Reviews Due Date; the record keeps only the template, attachments and wording | None (§5) |
 | A due date saved on each request at first send, then winning over the central value | `akoya_request.wmkf_reviewduedate`, written once from the invitation form [VERIFIED via `lib/services/review-manager/send-emails-service.js:1205-1247`] | The request reads the calendar date; no per-request anchor date (D9). One reviewer's extension stays a PD action | Confirm D9 applies to existing per-request due dates (keep as-is for D26; none for J27) |
 | A PD's last-used invitation dates re-applied to the next cycle | Per-user `reviewer_invite_timing` preference (audit RV2) [NOT-READ: `shared/components/reviewers/InviteEmailModal.js` — read in the build] | Stop carrying dates across cycles; keep only the response period if the PD changed it | None |
-| Type the Board materials deadline and Board end date | Board cycle setup page, per cycle (`materialsDue`, `boardEnds`) [VERIFIED via `lib/services/board-writeups/model.js:38-48`]; archive and reminders key off `boardEnds` [VERIFIED via `board-writeups/worker.js:49`; `notifications.js:19-20`] | New setups start with the calendar's Board date and materials date filled in. An activated setup is never rewritten by a calendar edit (rollover §3.2) | None (§5) |
+| Type the Board materials deadline and Board end date | Board cycle setup page, per cycle (`materialsDue`, `boardEnds`) [VERIFIED via `lib/services/board-writeups/model.js:38-48`]; archive and reminders key off `boardEnds` [VERIFIED via `board-writeups/worker.js:49`; `notifications.js:19-20`] | Read from the calendar; the typed fields go away (D47). Board date = Dynamics Board Meeting Date, the decision date (second day of the two-day meeting), so archive starts the morning after it; materials due = Board Mailing Date. Blank date: archive does nothing and the setup names the missing date | None (§5) |
 | Grantee short-title job runs by calendar month | `vercel.json` schedule, months Apr–Jun and Oct–Dec (audit G3) | Retire: Connor's flows now write the short title (D37, T13), after the D26 Board and a check that nothing else depends on it | None (T13 already decided) |
 | Pick which cycle each app opens on | Each app's own rule | Done: the landing cycle (PR #547), automatic from Board dates (D45) | None |
 
@@ -82,8 +82,11 @@ dates; each is now in scope:
   fields hold proposal send, proposal due and commit (respond-by) dates used in
   legacy email text. Retire them; templates read the calendar.
 - **Board date in three stores** (calendar, each request's meeting date, Board
-  setup end date). Ask Connor whether request meeting dates follow a Board-date
-  change; add a mismatch check to the readiness notice.
+  setup end date). The Board setup copy goes away (D47: the Dynamics Board
+  Meeting Date is the ground truth; the landing cycle's Board-page rule, which
+  reads the setup's `boardEnds`, moves to it too). Ask Connor whether request
+  meeting dates follow a Board-date change; add a mismatch check to the
+  readiness notice.
 - **`inviteStartDate` in Admin is never read.** Remove it.
 
 ## 3. Blank dates
@@ -135,8 +138,8 @@ planned, reads their dates, so they get no field (corrected 2026-10-29).
 | Nov 15 | App-side dates on the calendar page |
 | Before Feb 3 | Staff recommendation deadline filled in (D40 warning reads it) |
 | Before Feb 24 | **One reviewer-invitation build (owner, 2026-10-29):** materials on acceptance (D46; work queue item 6) together with the review due date from the calendar — shared reader; invitation and stored due date from Reviews Due; per-send and browser-saved due dates removed; extensions based on the calendar date; Reviewer Finder record dates retired. Separately: review filing by window (replaces the Vercel switch) |
+| Before Feb 24 | Board setup reads its dates from the calendar (D47), on the shared reader |
 | Before April | Confirm J27 research presentations trigger prep; prep by calendar after the cohort diff |
-| Before J27 Board prep | Board setup dates default from the calendar |
 | After Dec 10 | Retire the grantee-title job (T13, verify first) |
 
 ## 7. Owner decisions
@@ -145,5 +148,8 @@ Decided 2026-10-29 (alignment log D44): column meanings (§5); missing dates sta
 in the apps (§5); Staff Deliberations is a stage in every cycle (§2); review
 filing has no start bound — a completed review files until its cycle's Board
 date, then operator backfill (amends D11).
+
+Decided 2026-10-29 (D47): the Board setup reads the Board Meeting Date (decision
+date, second day of the meeting) and Board Mailing Date from the calendar.
 
 Open: per-request due dates already saved on D26 requests stay as they are.
