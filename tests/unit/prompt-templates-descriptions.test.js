@@ -1,6 +1,7 @@
 /** @jest-environment jsdom */
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import PromptTemplatesSection from '../../shared/components/admin/PromptTemplatesSection';
+import { ADMIN_PROMPT_CATALOG } from '../../shared/config/adminPromptCatalog';
 
 jest.mock('../../shared/components/admin/DataverseFieldInfoButton', () => function FieldInfo() {
   return <span data-testid="field-info" />;
@@ -25,9 +26,17 @@ function serve(prompts) {
   });
 }
 
+async function renderOpenWorkflows() {
+  render(<PromptTemplatesSection />);
+  await screen.findByLabelText('Search prompts');
+  for (const summary of document.querySelectorAll('details > summary')) {
+    if (!summary.textContent.startsWith('Legacy app prompts')) fireEvent.click(summary);
+  }
+}
+
 test('shows an audited title, explanation, Used by label and technical key together', async () => {
   serve([prompt('executor.echo-parity')]);
-  render(<PromptTemplatesSection />);
+  await renderOpenWorkflows();
   const card = await screen.findByRole('article', { name: 'Executor echo and cache diagnostic' });
   expect(within(card).getByRole('heading', { level: 3 })).toHaveTextContent('Executor echo and cache diagnostic');
   expect(within(card).getByText(/Copies a request number and supplied test text/)).toBeInTheDocument();
@@ -38,7 +47,7 @@ test('shows an audited title, explanation, Used by label and technical key toget
 
 test('keeps application use, stored reference and live publication state separate', async () => {
   serve([prompt('review-synthesis.generate'), prompt('phase-ii.qa'), prompt('phase-i.checkin', false)]);
-  render(<PromptTemplatesSection />);
+  await renderOpenWorkflows();
   const active = await screen.findByRole('article', { name: 'Synthesize submitted human peer reviews' });
   expect(within(active).getByText('Application caller')).toBeInTheDocument();
   expect(within(active).getByText(/submitted reviewers’ ratings/)).toBeInTheDocument();
@@ -55,7 +64,7 @@ test('keeps application use, stored reference and live publication state separat
 
 test.each(['new.prompt', 'constructor', '__proto__'])('keeps an uncataloged name %s visible', async name => {
   serve([prompt(name)]);
-  render(<PromptTemplatesSection />);
+  await renderOpenWorkflows();
   const card = await screen.findByRole('article', { name: 'Description not cataloged' });
   expect(within(card).getByText(name)).toBeInTheDocument();
   expect(within(card).getByText('Not cataloged')).toBeInTheDocument();
@@ -68,7 +77,7 @@ test.each(['new.prompt', 'constructor', '__proto__'])('keeps an uncataloged name
 
 test('publishing a descriptively titled prompt still addresses its original technical key', async () => {
   serve([prompt('executor.echo-parity')]);
-  render(<PromptTemplatesSection />);
+  await renderOpenWorkflows();
   fireEvent.click(await screen.findByRole('button', { name: 'Edit & publish' }));
   fireEvent.change(screen.getByLabelText(/^Prompt body/), { target: { value: 'Updated prompt body.' } });
   fireEvent.click(screen.getByRole('button', { name: 'Publish v2' }));
@@ -84,7 +93,7 @@ test('collapses only audited stored references and preserves their drafts when t
     prompt('phase-ii.qa'), prompt('phase-ii.summarize'), prompt('phase-ii.refine'), prompt('phase-ii.extract-structured'),
     prompt('review-synthesis.generate'), prompt('executor.echo-parity'), prompt('phase-i.checkin', false), prompt('phase-ii.new-prompt'),
   ]);
-  render(<PromptTemplatesSection />);
+  await renderOpenWorkflows();
   const summary = await screen.findByText('Legacy app prompts — stored reference (4)');
   const disclosure = summary.closest('details');
   expect(disclosure).not.toHaveAttribute('open');
@@ -110,7 +119,7 @@ test('collapses only audited stored references and preserves their drafts when t
 
 test('omits an empty legacy-reference group', async () => {
   serve([prompt('executor.echo-parity')]);
-  render(<PromptTemplatesSection />);
+  await renderOpenWorkflows();
   await screen.findByText('executor.echo-parity');
   expect(screen.queryByText(/Legacy app prompts — stored reference/)).not.toBeInTheDocument();
 });
@@ -122,7 +131,7 @@ test.each([
   ['Awardee', 'Rewrite the grantee abstract in Foundation style'],
 ])('searches technical keys, titles, explanations and Used by without case sensitivity: %s', async (query, title) => {
   serve([prompt('executor.echo-parity'), prompt('expense-reporter.extract-document'), prompt('grantee-abstract.generate')]);
-  render(<PromptTemplatesSection />);
+  await renderOpenWorkflows();
   fireEvent.change(await screen.findByLabelText('Search prompts'), { target: { value: query } });
   expect(screen.getByRole('article', { name: title })).toBeVisible();
   expect(screen.getByText('1 of 3 prompts')).toBeInTheDocument();
@@ -132,7 +141,7 @@ test.each([
 
 test('search reveals matching legacy references and clearing restores the collapsed group', async () => {
   serve([prompt('executor.echo-parity'), prompt('phase-ii.qa'), prompt('phase-ii.refine')]);
-  render(<PromptTemplatesSection />);
+  await renderOpenWorkflows();
   const input = await screen.findByLabelText('Search prompts');
   fireEvent.change(input, { target: { value: '  LEGACY   Q&A ' } });
   const summary = screen.getByText('Legacy app prompts — stored reference (1)');
@@ -147,7 +156,7 @@ test('search reveals matching legacy references and clearing restores the collap
 
 test('search preserves an unsaved editor and shows an actionable empty result', async () => {
   serve([prompt('executor.echo-parity'), prompt('new.prompt')]);
-  render(<PromptTemplatesSection />);
+  await renderOpenWorkflows();
   const input = await screen.findByLabelText('Search prompts');
   const card = screen.getByRole('article', { name: 'Executor echo and cache diagnostic' });
   fireEvent.click(within(card).getByRole('button', { name: 'Edit & publish' }));
@@ -159,6 +168,92 @@ test('search preserves an unsaved editor and shows an actionable empty result', 
   fireEvent.change(input, { target: { value: 'new.prompt' } });
   expect(screen.getByText('new.prompt')).toBeVisible();
   fireEvent.click(screen.getByRole('button', { name: 'Clear search' }));
+  fireEvent.click(screen.getByText('Diagnostics and drafts (1)'));
   expect(within(card).getByLabelText(/^Prompt body/)).toHaveValue('Keep this unsaved draft.');
   expect(global.fetch.mock.calls.every(([, options]) => options?.method !== 'PUT')).toBe(true);
+});
+
+
+test('shows workflow counts in collapsed sections, including Pre-flight, with distinct review subgroups', async () => {
+  serve([
+    prompt('phase-i.summary'), prompt('initial-assessment.generate'), prompt('pre-site-visit.proposal-core.generate'), prompt('field-primer.generate'),
+    prompt('review-synthesis.generate'), prompt('review-panel.chair'), prompt('multi-perspective.optimist'),
+  ]);
+  render(<PromptTemplatesSection />);
+  const preflight = await screen.findByText('Pre-flight (4)');
+  const reviews = screen.getByText('Reviews and evaluations (3)');
+  expect(preflight.closest('details')).not.toHaveAttribute('open');
+  expect(reviews.closest('details')).not.toHaveAttribute('open');
+  expect(screen.queryByText(/Proposal preparation/)).not.toBeInTheDocument();
+  expect(screen.queryByText(/Reviewer selection/)).not.toBeInTheDocument();
+  fireEvent.click(preflight);
+  expect(within(preflight.closest('details')).getAllByRole('article')).toHaveLength(4);
+  fireEvent.click(reviews);
+  expect(screen.getByRole('region', { name: 'Human peer reviews' })).toBeVisible();
+  expect(screen.getByRole('region', { name: 'AI Review Panel' })).toBeVisible();
+  expect(screen.getByRole('region', { name: 'Multi-Perspective Evaluator' })).toBeVisible();
+});
+
+test('searches workflow and subgroup labels, expands matching groups, and hides empty groups', async () => {
+  serve([prompt('phase-i.summary'), prompt('initial-assessment.generate'), prompt('review-panel.seat'), prompt('review-synthesis.generate')]);
+  render(<PromptTemplatesSection />);
+  const input = await screen.findByLabelText('Search prompts');
+  fireEvent.change(input, { target: { value: 'Pre-flight' } });
+  expect(screen.getByText('Pre-flight (2)').closest('details')).toHaveAttribute('open');
+  expect(screen.getByText('2 of 4 prompts')).toBeInTheDocument();
+  expect(screen.getByText('Reviews and evaluations (0)')).not.toBeVisible();
+  fireEvent.change(input, { target: { value: 'Human peer reviews' } });
+  expect(screen.getByRole('article', { name: 'Synthesize submitted human peer reviews' })).toBeVisible();
+  expect(screen.getByText('AI Review Panel (0)').closest('section')).not.toBeVisible();
+  expect(screen.getByText('Reviews and evaluations (1)').closest('details')).toHaveAttribute('open');
+  expect(screen.getByText('1 of 4 prompts')).toBeInTheDocument();
+});
+
+
+test('all audited prompts appear once across the proposed workflow groups and their subgroups', async () => {
+  serve(Object.keys(ADMIN_PROMPT_CATALOG).map(name => prompt(name, name !== 'phase-i.checkin')));
+  render(<PromptTemplatesSection />);
+  await screen.findByLabelText('Search prompts');
+  for (const label of [
+    'Pre-flight (4)', 'Reviewer selection (3)', 'Reviews and evaluations (11)',
+    'Meetings and briefings (7)', 'Awardee content (2)', 'Research and office tools (7)',
+    'Diagnostics and drafts (2)', 'Legacy app prompts — stored reference (4)',
+  ]) expect(screen.getByText(label)).toBeInTheDocument();
+  expect(screen.getAllByRole('article', { hidden: true })).toHaveLength(40);
+  fireEvent.click(screen.getByText('Reviews and evaluations (11)'));
+  expect(within(screen.getByRole('region', { name: 'Human peer reviews' })).getAllByRole('article')).toHaveLength(3);
+  expect(within(screen.getByRole('region', { name: 'AI Review Panel' })).getAllByRole('article')).toHaveLength(2);
+  expect(within(screen.getByRole('region', { name: 'Multi-Perspective Evaluator' })).getAllByRole('article')).toHaveLength(6);
+});
+
+test('workflow disclosures expand independently and preserve an unsaved draft when collapsed', async () => {
+  serve([prompt('phase-i.summary'), prompt('reviewer-finder.analyze')]);
+  render(<PromptTemplatesSection />);
+  const preflight = await screen.findByText('Pre-flight (1)');
+  const reviewers = screen.getByText('Reviewer selection (1)');
+  fireEvent.click(preflight);
+  expect(reviewers.closest('details')).not.toHaveAttribute('open');
+  const card = screen.getByRole('article', { name: 'Phase I proposal summary' });
+  fireEvent.click(within(card).getByRole('button', { name: 'Edit & publish' }));
+  fireEvent.change(within(card).getByLabelText(/^Prompt body/), { target: { value: 'Retain this workflow draft.' } });
+  fireEvent.click(preflight);
+  expect(card).not.toBeVisible();
+  fireEvent.click(reviewers);
+  expect(preflight.closest('details')).not.toHaveAttribute('open');
+  fireEvent.click(preflight);
+  expect(within(card).getByLabelText(/^Prompt body/)).toHaveValue('Retain this workflow draft.');
+});
+
+
+test('a new search reopens matching workflow sections after a manual collapse', async () => {
+  serve([prompt('phase-i.summary'), prompt('initial-assessment.generate')]);
+  render(<PromptTemplatesSection />);
+  const input = await screen.findByLabelText('Search prompts');
+  fireEvent.change(input, { target: { value: 'Pre-flight' } });
+  const summary = screen.getByText('Pre-flight (2)');
+  fireEvent.click(summary);
+  expect(summary.closest('details')).not.toHaveAttribute('open');
+  fireEvent.change(input, { target: { value: 'Initial Assessment' } });
+  expect(screen.getByText('Pre-flight (1)').closest('details')).toHaveAttribute('open');
+  expect(screen.getByRole('article', { name: 'Initial Assessment narrative draft' })).toBeVisible();
 });

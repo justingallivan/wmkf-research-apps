@@ -15,7 +15,7 @@ import { requestEnvelope } from '../../utils/api-request';
 import { ExecutorBudgetEditor } from './ExecutorBudgetEditor';
 import { TONE, fmtTs, fmtInt, ROW_DEFAULT_MAX_TOKENS } from './prompt-editor-utils';
 import PublishForm from './PromptPublishForm';
-import { getAdminPromptDescription } from '../../config/adminPromptCatalog';
+import { ADMIN_PROMPT_GROUPS, getAdminPromptDescription } from '../../config/adminPromptCatalog';
 
 export { ExecutorBudgetEditor };
 
@@ -51,6 +51,7 @@ export default function PromptTemplatesSection() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [search, setSearch] = useState('');
+  const [expandedGroups, setExpandedGroups] = useState({});
   const loadGeneration = useRef(0);
 
   const load = () => {
@@ -101,15 +102,29 @@ export default function PromptTemplatesSection() {
   if (error && !prompts) return <div className="text-red-600 text-sm">{error}</div>;
   if (!prompts || prompts.length === 0) return <div className="text-gray-500 text-sm">No prompts found.</div>;
 
-  const references = prompts.filter(prompt => getAdminPromptDescription(prompt.name).usage === 'reference');
-  const otherPrompts = prompts.filter(prompt => getAdminPromptDescription(prompt.name).usage !== 'reference');
+  const groups = ADMIN_PROMPT_GROUPS.map(group => ({
+    ...group, prompts: prompts.filter(prompt => getAdminPromptDescription(prompt.name).group === group.id),
+  })).filter(group => group.prompts.length > 0);
   const terms = search.toLowerCase().trim().split(/\s+/).filter(Boolean);
   const matchingNames = new Set(prompts.filter(prompt => {
-    const { title, description, usedBy } = getAdminPromptDescription(prompt.name);
-    const text = [prompt.name, title, description, usedBy].join(' ').toLowerCase();
+    const { title, description, usedBy, group: groupId, section: sectionId } = getAdminPromptDescription(prompt.name);
+    const group = ADMIN_PROMPT_GROUPS.find(candidate => candidate.id === groupId);
+    const section = group?.sections?.find(candidate => candidate.id === sectionId);
+    const text = [prompt.name, title, description, usedBy, group?.label, section?.label].join(' ').toLowerCase();
     return terms.every(term => text.includes(term));
   }).map(prompt => prompt.name));
-  const referenceMatches = references.filter(prompt => matchingNames.has(prompt.name)).length;
+  const matchCount = list => list.filter(prompt => matchingNames.has(prompt.name)).length;
+  // Keep every editor mounted while searching or collapsing a workflow section.
+  const renderPrompt = prompt => (
+    <div key={prompt.name} hidden={!matchingNames.has(prompt.name)}>
+      <PromptPanel
+        prompt={prompt}
+        modelCatalog={modelCatalog}
+        executorBudgetConfig={executorBudgetConfig}
+        onPublished={load}
+      />
+    </div>
+  );
 
   return (
     <>
@@ -123,11 +138,15 @@ export default function PromptTemplatesSection() {
             id="prompt-search"
             type="search"
             value={search}
-            onChange={event => setSearch(event.target.value)}
+            onChange={event => {
+              const value = event.target.value;
+              setSearch(value);
+              setExpandedGroups(value.trim() ? Object.fromEntries(ADMIN_PROMPT_GROUPS.map(group => [group.id, true])) : {});
+            }}
             placeholder="Search titles, descriptions, technical keys or Used by"
             className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-gray-500"
           />
-          {search && <button type="button" onClick={() => setSearch('')} className="shrink-0 text-sm text-gray-600 underline">Clear search</button>}
+          {search && <button type="button" onClick={() => { setSearch(''); setExpandedGroups({}); }} className="shrink-0 text-sm text-gray-600 underline">Clear search</button>}
         </div>
         <p role="status" className="mt-1 text-xs text-gray-500">{matchingNames.size} of {prompts.length} prompts</p>
       </div>
@@ -144,37 +163,28 @@ export default function PromptTemplatesSection() {
           />
         ) : null}
         {matchingNames.size === 0 && <p className="text-sm text-gray-600">No prompts match your search.</p>}
-        {/* Hide rather than unmount cards so filtering cannot discard unsaved edits. */}
-        {otherPrompts.map((p) => (
-          <div key={p.name} hidden={!matchingNames.has(p.name)}>
-            <PromptPanel
-              prompt={p}
-              modelCatalog={modelCatalog}
-              executorBudgetConfig={executorBudgetConfig}
-              onPublished={load}
-            />
-          </div>
-        ))}
-        {references.length > 0 && (
-          <details hidden={referenceMatches === 0} open={terms.length > 0 || undefined} className="rounded-lg border border-gray-200">
-            <summary className="cursor-pointer rounded-lg bg-gray-50 p-4 text-sm font-semibold text-gray-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gray-500">
-              Legacy app prompts — stored reference ({referenceMatches})
+        {groups.map(group => (
+          <details key={group.id} hidden={matchCount(group.prompts) === 0} open={expandedGroups[group.id] || undefined} className="rounded-lg border border-gray-200">
+            <summary onClick={event => {
+              event.preventDefault();
+              setExpandedGroups(current => ({ ...current, [group.id]: !current[group.id] }));
+            }} className="cursor-pointer rounded-lg bg-gray-50 p-4 text-sm font-semibold text-gray-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gray-500">
+              {group.label} ({matchCount(group.prompts)})
             </summary>
             <div className="space-y-6 p-4">
-              <p className="text-sm text-gray-600">These stored prompts are kept for reference. The current application routes use code templates instead.</p>
-              {references.map((p) => (
-                <div key={p.name} hidden={!matchingNames.has(p.name)}>
-                  <PromptPanel
-                    prompt={p}
-                    modelCatalog={modelCatalog}
-                    executorBudgetConfig={executorBudgetConfig}
-                    onPublished={load}
-                  />
-                </div>
-              ))}
+              {group.id === 'reference' && <p className="text-sm text-gray-600">These stored prompts are kept for reference. The current application routes use code templates instead.</p>}
+              {group.sections ? group.sections.map(section => {
+                const sectionPrompts = group.prompts.filter(prompt => getAdminPromptDescription(prompt.name).section === section.id);
+                return (
+                  <section key={section.id} aria-label={section.label} hidden={matchCount(sectionPrompts) === 0} className="space-y-4">
+                    <h3 className="text-sm font-semibold text-gray-700">{section.label} ({matchCount(sectionPrompts)})</h3>
+                    {sectionPrompts.map(renderPrompt)}
+                  </section>
+                );
+              }) : group.prompts.map(renderPrompt)}
             </div>
           </details>
-        )}
+        ))}
       </div>
     </>
   );
