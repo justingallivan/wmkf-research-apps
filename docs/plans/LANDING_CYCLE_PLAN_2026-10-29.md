@@ -230,12 +230,13 @@ Deliberations, Initial Assessments, Awardees tab) take the shell's cycle.
   `BoardWriteups` `'D26'` prop default are gone); `LandingCyclePanel.js` on
   `/cycle-calendar` and Admin → Workflows.
 - Tests: `tests/unit/landing-cycle-{service,route,hook}.test.js`,
-  `expertise-finder-landing-cycle.test.js`, landing cases in
+  `expertise-finder-landing-cycle.test.js`, `board-page-landing-cycle.test.js`, landing cases in
   `cycle-code-defaults`, `workbench-dashboard-service` and
   `program-briefing-service` tests.
 - Citation recheck after this branch's code edits:
   - [RECHECKED after lib/dataverse/adapters/operations-grant-cycle.js change: `listModernCycles` now at :48 (paging :48-53), `findCycleByCode` added at :61; citations above updated]
   - [RECHECKED after lib/utils/cycle-code.js change: `normalizeCycles` :105-109 and `resolveWorkingCycle` :122-128 unchanged; `resolveLandingCycle` added at :136]
-- Not yet done: Codex review of the PR; the rollout prerequisite (Workbench
+- Codex PR review (gpt-6.1-sol, 2026-10-29): one high finding, fixed — Board pages passed `skip` while the router was not ready, so the hook started settled and the Board view mounted on the fallback, then remounted when the default arrived. The hook now has a `wait` option (unsettled, no request) used until the router is ready; regression test mutation-checked.
+- Not yet done: the rollout prerequisite (Workbench
   list shows Phase I Pending) and the Production check in §6.
 

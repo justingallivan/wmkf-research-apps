@@ -13,13 +13,16 @@ const CODE = /^[JD]\d{2}$/;
  * later completion is ignored. Callers keep the user's explicit choice ahead of
  * `code` and hold data loads until `settled` (or the user has chosen).
  *
- * @param {{ view?: 'board' | null, skip?: boolean, timeoutMs?: number }} options
+ * @param {{ view?: 'board' | null, skip?: boolean, wait?: boolean, timeoutMs?: number }} options
  *   `view: 'board'` asks for the Board pages' default; `skip` settles at once
- *   with no code (e.g. an explicit URL or rehearsal cycle).
+ *   with no code (e.g. an explicit URL or rehearsal cycle); `wait` holds the
+ *   hook unsettled with no request (e.g. until the router is ready), so a
+ *   caller never renders on a fallback that a later reply would replace.
  */
-export function useLandingCycleDefault({ view = null, skip = false, timeoutMs = LANDING_CLIENT_TIMEOUT_MS } = {}) {
-  const [state, setState] = useState(() => ({ settled: skip, code: null }));
+export function useLandingCycleDefault({ view = null, skip = false, wait = false, timeoutMs = LANDING_CLIENT_TIMEOUT_MS } = {}) {
+  const [state, setState] = useState(() => ({ settled: skip && !wait, code: null }));
   useEffect(() => {
+    if (wait) return undefined;
     if (skip) {
       setState((current) => (current.settled ? current : { settled: true, code: null }));
       return undefined;
@@ -46,6 +49,6 @@ export function useLandingCycleDefault({ view = null, skip = false, timeoutMs = 
       clearTimeout(timer);
       controller.abort();
     };
-  }, [skip, timeoutMs, view]);
+  }, [skip, wait, timeoutMs, view]);
   return state;
 }

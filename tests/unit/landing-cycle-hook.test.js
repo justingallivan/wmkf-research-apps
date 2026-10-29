@@ -73,3 +73,17 @@ test('unmount aborts the read, and a remount starts a fresh decision', async () 
   await act(async () => { reply({ landingCycleCode: 'J27' }); });
   await waitFor(() => expect(second.result.current).toEqual({ settled: true, code: 'J27' }));
 });
+
+test('wait holds the hook unsettled with no request, then a single read settles it', async () => {
+  global.fetch = jest.fn();
+  const { result, rerender } = renderHook(({ wait }) => useLandingCycleDefault({ view: 'board', wait }), { initialProps: { wait: true } });
+  expect(result.current).toEqual({ settled: false, code: null });
+  expect(global.fetch).not.toHaveBeenCalled();
+  const reply = deferredFetch();
+  rerender({ wait: false });
+  // Still unsettled after the router becomes ready: the caller must not render a fallback yet.
+  expect(result.current).toEqual({ settled: false, code: null });
+  expect(global.fetch).toHaveBeenCalledTimes(1);
+  await act(async () => { reply({ cycleCode: 'J27' }); });
+  await waitFor(() => expect(result.current).toEqual({ settled: true, code: 'J27' }));
+});

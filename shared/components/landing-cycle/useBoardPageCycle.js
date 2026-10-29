@@ -10,7 +10,9 @@ import { useLandingCycleDefault } from './useLandingCycleDefault';
  */
 export function useBoardPageCycle(router) {
   const urlCycle = typeof router.query.cycle === 'string' && /^[JD]\d{2}$/.test(router.query.cycle) ? router.query.cycle : null;
-  const landing = useLandingCycleDefault({ view: 'board', skip: !router.isReady || Boolean(urlCycle) });
+  // Wait (not skip) until the router is ready: a skipped hook starts settled, which would
+  // mount the Board view on the fallback and remount it when the real default arrives.
+  const landing = useLandingCycleDefault({ view: 'board', wait: !router.isReady, skip: Boolean(urlCycle) });
   if (!router.isReady) return null;
   if (urlCycle) return urlCycle;
   if (!landing.settled) return null;
