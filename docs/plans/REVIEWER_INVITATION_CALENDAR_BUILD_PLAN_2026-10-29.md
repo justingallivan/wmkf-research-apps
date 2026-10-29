@@ -162,6 +162,15 @@ Admin `inviteStartDate` has no reader outside its form, validation and tests
 - **Existing values win** (as today, :1237): D26 requests keep their saved
   dates (plan §7 open item, proposed). A J27 request has none, so it gets the
   calendar date.
+- **Saved before any invitation goes out (Codex review).** Today the date is
+  written after delivery, from a request copy read earlier, and a failed write
+  is only logged (`send-emails-service.js:1195-1243`) [VERIFIED by read]. New
+  order for an invitation send: read the request with its ETag; if
+  `wmkf_reviewduedate` is blank, write the calendar date with `If-Match`; on a
+  412 re-read and take the date that won; if the write cannot be confirmed,
+  send nothing and say why. The resolved date is in the draft fingerprint, so a
+  draft previewed with a different date is stale and must be re-previewed.
+  Tests: two first waves at once; a failed initialization sends nothing.
 - **Blank Reviews Due:** invitations for that cycle are refused with "Set the
   Reviews Due Date on the cycle calendar first" (§3 blank-date rule). No
   fallback to Admin defaults.
@@ -218,15 +227,24 @@ Admin `inviteStartDate` has no reader outside its form, validation and tests
      additional attachments the materials email carries today.
 - **One step, not two.** The materials step replaces the
   `acceptance_confirmation` step's email rather than following it, so a
-  reviewer gets exactly one email. Order inside the step: claim → re-mint →
-  send → on confirmed send, record `wmkf_materialssentat` / `materials_sent`
-  through `recordDeliveredEmail`. The claim is at-most-once, as today
-  (`reviewer-acceptance-drain.js:504-506,546-552`: claimed before send, no
-  automatic resend after a failure, admins alerted) [VERIFIED by read].
-- **Send fails:** materials are not recorded as sent, so the manual release
-  button (one-time, gated on `wmkf_materialssentat`) is still available and
-  re-mints and sends. The invitation link is already dead after the re-mint,
-  so the alert tells staff to use manual release.
+  reviewer gets exactly one email.
+- **One shared release record (Codex review).** Automatic and manual release
+  both go through a new Postgres table, one row per reviewer engagement
+  (unique on the suggestion id), with states `claimed` → `link_minted` →
+  `sent` → `recorded`, plus `uncertain` and `failed`. Whoever inserts the row
+  first owns the release; the other path refuses with "materials are already
+  being sent". This replaces relying on the job's step claim (which other
+  paths cannot see) and on the post-send `wmkf_materialssentat` check (which
+  manual release reads before it sends, `send-emails-service.js:605-632`).
+- **Each boundary is recorded and recoverable.** After a confirmed send, retries
+  only finish the bookkeeping (stamp `wmkf_materialssentat` / `materials_sent`
+  through `recordDeliveredEmail`), never resend. A row left at `claimed` or
+  `link_minted` past its lease, or an `uncertain` send, is not completed as
+  recovered: staff get an alert and a "Send materials again" action that
+  re-mints and sends under the same row. Today the job skips any claimed step
+  and can complete (`reviewer-acceptance-drain.js:503-506,939-947`) [per Codex,
+  re-read at build]; the new step must not. Tests: stop after each boundary;
+  manual and automatic release at the same moment.
 - **Proposal missing at acceptance:** today's acceptance email goes out
   unchanged, materials are held for manual release, and the lead PD gets one
   alert.
@@ -325,7 +343,8 @@ steps, Dataverse settings (`reviewer.campaign_timeline_defaults`,
   `{{proposalDelivery}}`, `materialsDue`/`boardEnds`, and
   `REVIEW_DOCX_SHAREPOINT_CYCLE`; the new job step name in every reader of
   job `steps`.
-- Durable surfaces: Atlas pages for the request due-date writer, the acceptance
+- Durable surfaces: new migration for the release table (next free number on
+  `main` at build time; manifest), Atlas pages for the request due-date writer, the acceptance
   jobs table (new step), Board setup settings; route matrix row for
   `/api/external/review/[token]/proposal`; `docs/CREDENTIALS_RUNBOOK.md`
   (env removed); service catalog entry for the shared reader; the J27
@@ -335,6 +354,12 @@ steps, Dataverse settings (`reviewer.campaign_timeline_defaults`,
   (`send-emails-service.js:402-421`). Add it to the readiness notice.
 
 Verdict: ready with the named changes above, which are now in §3.
+
+Codex adversarial review (gpt-6.1-sol, 2026-10-29): needs-attention, three
+high findings, all accepted and folded into §3.1 and §3.3: the due date must be
+saved, conditionally, before invitations go out; a claimed release must be
+recoverable at every boundary; automatic and manual release need one shared
+claim. Re-review the amended plan before building.
 
 ## 5. Risks
 
