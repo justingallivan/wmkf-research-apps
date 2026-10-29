@@ -9,6 +9,38 @@ Prior complete handoff (Claude's J27/cycle workstream), retrievable exactly:
 workstream by reference; it does not replace its owner decisions or turn old
 carryover into a newly verified worklist.
 
+## Session 649 Summary (Claude, 2026-10-29) — J27 reviewer invitations and cycle dates
+
+Runs alongside Codex's Session 649 below; both are on `main`.
+
+1. **[DEPLOYED; Vercel commit status] PR #551, merge `caf318983`.**
+   - Review filing files every cycle until its calendar Board date (D44); the
+     `REVIEW_DOCX_SHAREPOINT_CYCLE` pin is no longer read. **Owner to-do:** delete
+     that variable from every Vercel environment.
+   - The proposal PDF is downloadable only after materials are released or a
+     review is submitted (closes a pre-accept download gap).
+   - The calendar box says a chosen cycle stops automatic switching; the unused
+     Admin "invitations begin" date is removed.
+   - Owner confirmed J25–J27 have Board dates; D27 has no row yet, by design.
+2. **[OPEN, DO NOT MERGE AS IS] PR #552, branch
+   `claude/review-due-date-from-calendar`.** Invitations take the review due
+   date from the cycle calendar and save it before sending (D48); Codex approved.
+   **Must change first:** it derives the cycle from the request's meeting date.
+   Owner, 2026-10-29: nothing in the apps should read the request meeting date.
+   It must read the request's Grant Cycle link (`akoya_request.wmkf_grantcycle`,
+   alignment log T10) and that row's Reviews Due Date, with no meeting-date
+   fallback (to confirm: blank link refuses the invitation). Per the T10 probe,
+   12 J27 requests have the link but no meeting date.
+3. **Decisions:** D47 (the Board setup reads Board and mailing dates from the
+   calendar; the Board date is the decision day, the meeting's second day); D48
+   (promised due date stays fixed; withdrawal after accepting goes through the
+   PD; invitations refused without the due date or the proposal PDF).
+4. **Plan:** `docs/plans/REVIEWER_INVITATION_CALENDAR_BUILD_PLAN_2026-10-29.md`,
+   with a contract check and two Codex reviews (findings folded in). PR 1 is done
+   and PR 2 is open; PR 3 (the Board setup reads the calendar) and PR 4
+   (materials on acceptance plus new email wording) remain. Still open: one
+   combined acceptance-and-materials email (proposed).
+
 ## Session 649 Summary (Codex, 2026-10-29)
 
 ### What Was Completed
@@ -60,6 +92,25 @@ carryover into a newly verified worklist.
 
 ### Verified Open
 
+**Claude workstream (J27):**
+
+- **Fix PR #552 to use the request's Grant Cycle link, then
+   merge with the owner's OK.** See the Claude summary item 2.
+- **New (owner, 2026-10-29): stop reading the request meeting
+   date anywhere in the apps.** Today about 79 runtime files read
+   `akoya_request.wmkf_meetingdate`, and about 50 call `meetingDateToCycleCode`
+   (Workbench cycle filters, reviewer emails and attachments, filing fallback,
+   Meeting Tracker and more). No app code reads `wmkf_grantcycle` yet. Plan the
+   move to the Grant Cycle link (cycle membership) and the calendar row (dates)
+   as its own piece, after the reviewer build: plan first, contract check, Codex
+   review. Owner to confirm: no meeting-date fallback at all. Tracked as work
+   queue item 6a.
+- **Remaining reviewer build:** PR 3 (Board setup from the
+   calendar, D47) and PR 4 (materials on acceptance and new wording, D46/D48),
+   before Feb 24. Other carried J27 items: `git show 006b87565:SESSION_PROMPT.md`.
+
+**Codex workstream (prompt library):**
+
 1. **Review PR #553's shared-library proposal before implementation.**
    Evidence: https://github.com/justingallivan/wmkf-research-apps/pull/553
    The implementation and publication-contract documents are on that branch,
@@ -99,7 +150,7 @@ carryover into a newly verified worklist.
 |---|---|
 | Codex / shared prompt library | PR #553, `codex/shared-prompt-library-plan`, `e35918ba2`; proposed only |
 | Codex / prompt UI organization | PRs #545/#546/#548/#549 merged; no further UI work requested |
-| Claude / J27 alignment and cycle dates | Owning plans and decisions remain in `docs/CURRENT_WORK_QUEUE.md` and `docs/plans/J27_ALIGNMENT_LOG_2026-10-24.md`; exact prior handoff at `006b87565`; main has newer review-filing work in PR #551, so reread current source/plans before resuming |
+| Claude / J27 alignment and cycle dates | PR #551 deployed; PR #552 open (fix the cycle source first); plan `docs/plans/REVIEWER_INVITATION_CALENDAR_BUILD_PLAN_2026-10-29.md`; decisions through D48 in `docs/plans/J27_ALIGNMENT_LOG_2026-10-24.md`; older carried items at `git show 006b87565:SESSION_PROMPT.md` |
 | Codex / Ranking | Prior handoff records PRs #536/#537 done; not reopened |
 | Codex / Board archival | Prior handoff records readiness done and rehearsal runtime on `codex/board-archive-rehearsal`; not revalidated here |
 | Claude / Research request corpus | Prior handoff records owner-gated; no new authorization |
