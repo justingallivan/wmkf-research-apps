@@ -1,7 +1,8 @@
 /**
  * Dedicated automatic/repair sweep for retained individual-review DOCX files.
- * Inert unless REVIEW_DOCX_SHAREPOINT_WRITE is literal `on` and an exact cycle
- * is configured. Submission and thank-you paths remain independent.
+ * Inert unless REVIEW_DOCX_SHAREPOINT_WRITE is literal `on`. Files reviews for
+ * every cycle whose calendar Board Meeting Date is today or later (Pacific day,
+ * D44). Submission and thank-you paths remain independent.
  */
 
 import { verifyCronSecret } from '../../../lib/utils/cron-auth';

@@ -33,7 +33,8 @@ test('shows the automatic cycle and when it switches, and lets an editor choose 
   expect(post[0]).toBe('/api/landing-cycle');
   expect(JSON.parse(post[1].body)).toEqual({ cycleCode: 'J27', revision: 'W/"1"' });
   expect(screen.getByText('J27 · June 2027 (chosen)')).toBeInTheDocument();
-  expect(screen.getByText('Automatic would be D26 · December 2026.')).toBeInTheDocument();
+  expect(screen.getByText('Apps stay on J27 until you switch back to Automatic; they do not switch on their own.')).toBeInTheDocument();
+  expect(screen.getByText('Automatic would be D26 · December 2026, switching to the next cycle on Fri, Dec 11, 2026.')).toBeInTheDocument();
   expect(screen.getByText(/Set by Grants Manager/)).toBeInTheDocument();
 });
 

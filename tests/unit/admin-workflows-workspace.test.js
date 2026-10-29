@@ -158,7 +158,7 @@ makeSectionSuite({
   saveButtonLabel: 'Save',
   getFixture: { timeline: { cycleLabel: 'D26' }, isDefault: false, malformed: false },
   getRenderedText: 'Current-cycle defaults for reviewer invitation copy.',
-  saveBody: { timeline: { cycleLabel: 'D26', inviteStartDate: '', respondOffsetDays: null, proposalReleaseDate: '', reviewDueDate: '', desiredCount: null } },
+  saveBody: { timeline: { cycleLabel: 'D26', respondOffsetDays: null, proposalReleaseDate: '', reviewDueDate: '', desiredCount: null } },
   putFixture: { timeline: { cycleLabel: 'D26' }, isDefault: false, malformed: false },
   postSaveRenderedText: 'Saved',
 });

@@ -103,7 +103,8 @@ export default function LandingCyclePanel() {
             : data.landingCycleCode ? `Automatic: ${cycleLabel(data, data.landingCycleCode)}` : 'Automatic: no cycle has a Board date yet'}
         </p>
         {data.status !== 'active' && data.automatic?.switchesOn && <p className="text-sm text-gray-600">Switches to the next cycle on {formatDay(data.automatic.switchesOn)}.</p>}
-        {data.status === 'active' && data.automatic?.code && <p className="text-sm text-gray-600">Automatic would be {cycleLabel(data, data.automatic.code)}.</p>}
+        {data.status === 'active' && <p className="text-sm text-amber-800">Apps stay on {data.landingCycleCode} until you switch back to Automatic; they do not switch on their own.</p>}
+        {data.status === 'active' && data.automatic?.code && <p className="text-sm text-gray-600">Automatic would be {cycleLabel(data, data.automatic.code)}{data.automatic.switchesOn ? `, switching to the next cycle on ${formatDay(data.automatic.switchesOn)}` : ''}.</p>}
         {setLine && <p className="text-sm text-gray-600">{setLine}</p>}
         {(data.status === 'missing' || data.status === 'invalid') && <p role="alert" className="mt-2 text-sm text-amber-800">
           The saved landing cycle {data.storedValue} is not in the Grant Cycle table, so apps are using the automatic cycle. Choose a cycle or switch back to Automatic.

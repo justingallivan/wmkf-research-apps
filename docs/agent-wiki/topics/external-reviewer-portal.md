@@ -225,6 +225,13 @@ Playwright E2E harness, and the live prod automation that an accept triggers.
   lets staff keep the portal, reminders, calendar, and future token mints aligned
   when they use it; the existing per-send composer date remains ephemeral and
   can still diverge from stored deadline state. Response timing remains separate.
+- **The proposal streams only after materials are released (2026-10-29).**
+  An invitation link carries `download_proposal` from the start, so the ops
+  claim alone let a not-yet-accepted invitee stream the PDF given a file id.
+  `pages/api/external/review/[token]/proposal.js` now also requires the
+  engagement view `stage2b` or `submitted` (the same rule the context route
+  uses to list files), else 403 `materials_not_released`. Pinned in
+  `tests/integration/external-review-routes.test.js`.
 - **The proposal opens inline in a second window, not as a download (2026-08-13).**
   `MaterialsView`'s FilesCard button is labeled **View** and carries
   `target="_blank" rel="noopener noreferrer"`, and

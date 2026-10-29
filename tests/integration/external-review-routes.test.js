@@ -567,6 +567,28 @@ describe('/api/external/review/[token]/proposal', () => {
     expect(GraphService.downloadFile).not.toHaveBeenCalled();
   });
 
+  it.each([
+    ['invited, not yet answered', { wmkf_accepted: false, wmkf_reviewstatus: null }],
+    ['accepted, materials not yet released', { wmkf_accepted: true, wmkf_reviewstatus: null }],
+    ['declined', { wmkf_accepted: false, wmkf_declined: true, wmkf_reviewstatus: null }],
+  ])('403s before materials are released (%s), with a valid link and an allowed file', async (_label, state) => {
+    verifySuggestionToken.mockResolvedValue({
+      ...verifiedSuggestion,
+      suggestion: { ...verifiedSuggestion.suggestion, ...state },
+    });
+    const req = createMockReq({
+      method: 'GET',
+      query: { token: 'good-token', fileId: 'allowed-file', library: 'akoya_request' },
+    });
+    const res = createMockRes();
+
+    await handler(req, res);
+
+    expect(res.status).toHaveBeenCalledWith(403);
+    expect(res.json).toHaveBeenCalledWith({ ok: false, reason: 'materials_not_released' });
+    expect(GraphService.downloadFile).not.toHaveBeenCalled();
+  });
+
   it('403s when the verified token has a missing/malformed ops array', async () => {
     verifySuggestionToken.mockResolvedValue({
       ...verifiedSuggestion,

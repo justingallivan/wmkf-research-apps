@@ -71,6 +71,11 @@ jest.mock('../../lib/dataverse/core/interlock', () => ({
   resolveInterlockMode: () => process.env.DATAVERSE_TARGET_INTERLOCK || 'off',
 }));
 
+const listBoardDates = jest.fn();
+jest.mock('../../lib/dataverse/adapters/operations-grant-cycle', () => ({
+  listBoardDates: (...args) => listBoardDates(...args),
+}));
+
 const recordEvent = jest.fn();
 jest.mock('../../lib/services/operational-event-service', () => ({
   __esModule: true,
@@ -93,6 +98,7 @@ const {
   planIndividualReviewFileCandidate,
   preflightReviewDocxWrite,
   resolveReviewDocxTarget,
+  resolveReviewFilingCycles,
   sweepMissingIndividualReviewFiles,
 } = require('../../lib/services/review-documents/individual-file-service');
 
@@ -160,10 +166,15 @@ beforeEach(() => {
     VERCEL_ENV: 'production',
     DATAVERSE_TARGET_INTERLOCK: 'on',
     REVIEW_DOCX_SHAREPOINT_WRITE: 'on',
-    REVIEW_DOCX_SHAREPOINT_CYCLE: 'D26',
     SHAREPOINT_SITE_URL: 'https://appriver3651007194.sharepoint.com/sites/akoyaGO',
     DYNAMICS_URL: 'https://wmkf.crm.dynamics.com',
   };
+  // D26 is the one filing cycle: its Board date is far enough ahead that the
+  // real clock never passes it during the suite.
+  listBoardDates.mockResolvedValue([
+    { wmkf_cyclecode: 'D26', wmkf_meetingdate: '2099-12-10T00:00:00Z' },
+    { wmkf_cyclecode: 'J26', wmkf_meetingdate: '2026-06-11T00:00:00Z' },
+  ]);
   suggestion.getByIdWithSelect.mockResolvedValue(baseRow());
   getRequestById.mockResolvedValue({
     akoya_requestid: REQUEST_ID,
@@ -799,14 +810,70 @@ test('disabled sweep performs no Dataverse candidate read and no Graph call', as
   expect(graph.uploadFile).not.toHaveBeenCalled();
 });
 
-test('malformed automatic cycle fails before target or candidate discovery and records the anomaly', async () => {
-  const result = await sweepMissingIndividualReviewFiles({ cycleCode: 'December 2026' });
+test('malformed explicit cycles fail before target or candidate discovery and record the anomaly', async () => {
+  const result = await sweepMissingIndividualReviewFiles({ cycleCodes: ['December 2026'] });
   expect(result).toMatchObject({ status: 'invalid_cycle', counts: { invalid_cycle: 1 } });
   expect(recordEvent).toHaveBeenCalledWith(expect.objectContaining({
     eventType: 'review_docx_filing_failed', stage: 'invalid_cycle',
   }));
   expect(suggestion.findReviewDocxFilingCandidates).not.toHaveBeenCalled();
   expect(graph.getSiteId).not.toHaveBeenCalled();
+});
+
+test('filing cycles are those whose Board date is today or later by Pacific day, nearest first', async () => {
+  const readBoardDates = jest.fn().mockResolvedValue([
+    { wmkf_cyclecode: 'J27', wmkf_meetingdate: '2027-06-10T00:00:00Z' },
+    { wmkf_cyclecode: 'D26', wmkf_meetingdate: '2026-12-10T00:00:00Z' },
+    { wmkf_cyclecode: 'J26', wmkf_meetingdate: '2026-06-11T00:00:00Z' },
+    { wmkf_cyclecode: 'D27', wmkf_meetingdate: null },
+    { wmkf_cyclecode: 'D19', wmkf_meetingdate: null },
+    { wmkf_cyclecode: 'March 2019', wmkf_meetingdate: '2019-03-01T00:00:00Z' },
+  ]);
+  // 11:30 pm Pacific on the D26 Board day is 07:30 UTC the next day.
+  const onBoardDay = await resolveReviewFilingCycles({ now: new Date('2026-12-11T07:30:00Z'), readBoardDates });
+  expect(onBoardDay).toEqual({ cycleCodes: ['D26', 'J27'], withoutBoardDate: ['D27'] });
+  const dayAfter = await resolveReviewFilingCycles({ now: new Date('2026-12-11T08:30:00Z'), readBoardDates });
+  expect(dayAfter.cycleCodes).toEqual(['J27']);
+});
+
+test('the sweep discovers each filing cycle and checks each row against its own cycle', async () => {
+  listBoardDates.mockResolvedValue([
+    { wmkf_cyclecode: 'D26', wmkf_meetingdate: '2099-12-10T00:00:00Z' },
+    { wmkf_cyclecode: 'J27', wmkf_meetingdate: '2100-06-10T00:00:00Z' },
+  ]);
+  suggestion.findReviewDocxFilingCandidates.mockImplementation(async ({ cycleCode }) => ({
+    records: cycleCode === 'J27' ? [{ wmkf_appreviewersuggestionid: SECOND_SUGGESTION_ID }] : [],
+    capped: false,
+  }));
+  fetchAnswersBySuggestion.mockResolvedValueOnce({ [SECOND_SUGGESTION_ID]: ANSWERS });
+  suggestion.getByIdWithSelect.mockResolvedValue(baseRow({
+    wmkf_appreviewersuggestionid: SECOND_SUGGESTION_ID, wmkf_grantcyclecode: 'D26',
+  }));
+
+  const result = await sweepMissingIndividualReviewFiles({ scanCap: 10, attemptCap: 1 });
+
+  expect(result.cycleCodes).toEqual(['D26', 'J27']);
+  expect(suggestion.findReviewDocxFilingCandidates.mock.calls.map(([arg]) => arg.cycleCode)).toEqual(['D26', 'J27']);
+  // Found under J27 but stamped D26: re-checked against J27, so it is not filed.
+  expect(result.results[0]).toMatchObject({ suggestionId: SECOND_SUGGESTION_ID, status: 'wrong_cycle' });
+  expect(graph.uploadFile).not.toHaveBeenCalled();
+});
+
+test('a calendar read failure files nothing and records the anomaly', async () => {
+  listBoardDates.mockRejectedValue(new Error('Grant cycle Board dates read failed (503).'));
+  const result = await sweepMissingIndividualReviewFiles();
+  expect(result).toMatchObject({ status: 'calendar_unavailable', counts: { calendar_unavailable: 1 } });
+  expect(recordEvent).toHaveBeenCalledWith(expect.objectContaining({ stage: 'calendar_unavailable' }));
+  expect(suggestion.findReviewDocxFilingCandidates).not.toHaveBeenCalled();
+  expect(graph.getSiteId).not.toHaveBeenCalled();
+});
+
+test('no upcoming Board date files nothing and records the anomaly', async () => {
+  listBoardDates.mockResolvedValue([{ wmkf_cyclecode: 'J26', wmkf_meetingdate: '2026-06-11T00:00:00Z' }]);
+  const result = await sweepMissingIndividualReviewFiles();
+  expect(result).toMatchObject({ status: 'no_filing_cycle', cycleCodes: [], counts: { no_filing_cycle: 1 } });
+  expect(recordEvent).toHaveBeenCalledWith(expect.objectContaining({ stage: 'no_filing_cycle' }));
+  expect(suggestion.findReviewDocxFilingCandidates).not.toHaveBeenCalled();
 });
 
 test('target preflight fails closed before upload outside Production', async () => {
