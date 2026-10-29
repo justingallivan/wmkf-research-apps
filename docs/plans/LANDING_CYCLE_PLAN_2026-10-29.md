@@ -3,7 +3,7 @@ title: Landing cycle — one setting the Grants Manager controls — plan
 domain: platform
 kind: plan
 status: active
-summary: "Contract-reconcile reviewed 2026-10-29; Codex adversarial review 2026-10-29 (gpt-6.1-terra; needs rework, six findings) and re-review (gpt-6.1-sol; ready with two named changes); all findings verified and folded in. Owner decisions 2026-10-29: the cycle every app opens on (the landing cycle, alignment log D29) is one app setting edited on the cycle calendar page by the calendar's editors, and every app in the cycle-settings audit that picks a default cycle follows it. An explicit cycle in the URL still wins; with the setting unset, today's rules apply unchanged. Design, per-app behavior, open questions. Built on branch claude/landing-cycle 2026-10-29 (not deployed; see §7)."
+summary: "Contract-reconcile reviewed 2026-10-29; Codex adversarial review 2026-10-29 (gpt-6.1-terra; needs rework, six findings) and re-review (gpt-6.1-sol; ready with two named changes); all findings verified and folded in. Owner decisions 2026-10-29: the cycle every app opens on (the landing cycle, alignment log D29) is one app setting edited on the cycle calendar page by the calendar's editors, and every app in the cycle-settings audit that picks a default cycle follows it. An explicit cycle in the URL still wins; with the setting unset, today's rules apply unchanged. Design, per-app behavior, open questions. Merged to main 2026-10-29 (PR #547, 6c9a1013b); the setting is unset (see §7)."
 canonical: false
 owner: product-engineering
 related:
@@ -214,7 +214,7 @@ Deliberations, Initial Assessments, Awardees tab) take the shell's cycle.
 
 ## 7. Build status
 
-**[SOURCE-BUILT ON BRANCH `claude/landing-cycle`; NOT DEPLOYED, 2026-10-29]**
+**[MERGED TO `main` 2026-10-29 (`6c9a1013b`, PR #547); Production auto-deploy not yet verified]**
 
 - Setting, reader, editor view, save and Board default:
   `lib/services/landing-cycle-service.js`; exact-code lookup
