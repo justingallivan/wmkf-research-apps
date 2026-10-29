@@ -114,3 +114,51 @@ test('omits an empty legacy-reference group', async () => {
   await screen.findByText('executor.echo-parity');
   expect(screen.queryByText(/Legacy app prompts — stored reference/)).not.toBeInTheDocument();
 });
+
+test.each([
+  ['ECHO-PAR', 'Executor echo and cache diagnostic'],
+  ['receipt text', 'Extract expenses from receipt text'],
+  ['cache use', 'Executor echo and cache diagnostic'],
+  ['Awardee', 'Rewrite the grantee abstract in Foundation style'],
+])('searches technical keys, titles, explanations and Used by without case sensitivity: %s', async (query, title) => {
+  serve([prompt('executor.echo-parity'), prompt('expense-reporter.extract-document'), prompt('grantee-abstract.generate')]);
+  render(<PromptTemplatesSection />);
+  fireEvent.change(await screen.findByLabelText('Search prompts'), { target: { value: query } });
+  expect(screen.getByRole('article', { name: title })).toBeVisible();
+  expect(screen.getByText('1 of 3 prompts')).toBeInTheDocument();
+  const visibleCards = screen.getAllByRole('article').filter(card => !card.closest('[hidden]'));
+  expect(visibleCards).toHaveLength(1);
+});
+
+test('search reveals matching legacy references and clearing restores the collapsed group', async () => {
+  serve([prompt('executor.echo-parity'), prompt('phase-ii.qa'), prompt('phase-ii.refine')]);
+  render(<PromptTemplatesSection />);
+  const input = await screen.findByLabelText('Search prompts');
+  fireEvent.change(input, { target: { value: '  LEGACY   Q&A ' } });
+  const summary = screen.getByText('Legacy app prompts — stored reference (1)');
+  expect(summary.closest('details')).toHaveAttribute('open');
+  expect(screen.getByRole('article', { name: 'Legacy Phase II proposal Q&A' })).toBeVisible();
+  expect(screen.getByText('phase-ii.refine')).not.toBeVisible();
+  fireEvent.click(screen.getByRole('button', { name: 'Clear search' }));
+  expect(input).toHaveValue('');
+  expect(screen.getByText('3 of 3 prompts')).toBeInTheDocument();
+  expect(summary.closest('details')).not.toHaveAttribute('open');
+});
+
+test('search preserves an unsaved editor and shows an actionable empty result', async () => {
+  serve([prompt('executor.echo-parity'), prompt('new.prompt')]);
+  render(<PromptTemplatesSection />);
+  const input = await screen.findByLabelText('Search prompts');
+  const card = screen.getByRole('article', { name: 'Executor echo and cache diagnostic' });
+  fireEvent.click(within(card).getByRole('button', { name: 'Edit & publish' }));
+  fireEvent.change(within(card).getByLabelText(/^Prompt body/), { target: { value: 'Keep this unsaved draft.' } });
+  fireEvent.change(input, { target: { value: 'no-such-prompt' } });
+  expect(screen.getByText('No prompts match your search.')).toBeVisible();
+  expect(card).not.toBeVisible();
+  expect(screen.getByText('0 of 2 prompts')).toBeInTheDocument();
+  fireEvent.change(input, { target: { value: 'new.prompt' } });
+  expect(screen.getByText('new.prompt')).toBeVisible();
+  fireEvent.click(screen.getByRole('button', { name: 'Clear search' }));
+  expect(within(card).getByLabelText(/^Prompt body/)).toHaveValue('Keep this unsaved draft.');
+  expect(global.fetch.mock.calls.every(([, options]) => options?.method !== 'PUT')).toBe(true);
+});
