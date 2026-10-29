@@ -1,7 +1,7 @@
 {
   "name": "wmkf_grantcycle",
   "kind": "new-entity",
-  "_comment": "Production-parity foundation (Session 538): generated from read-only production metadata so the sandbox can be brought to schema parity. Covers tables and columns that exist in production but had no schema file.",
+  "_comment": "Production-parity foundation (Session 538): generated from read-only production metadata so the sandbox can be brought to schema parity. Covers tables and columns that exist in production but had no schema file. 2026-10-28 (D43): eleven milestone date columns added and wmkf_CycleName removed to match live production metadata (scripts/probe-grant-cycle-dates.cjs; docs/audits/grant-cycle-dates-2026-10-28-evidence.json).",
   "schemaName": "wmkf_GrantCycle",
   "displayName": "Grant Cycle",
   "displayCollectionName": "Grant Cycles",
@@ -21,17 +21,87 @@
       "maxLength": 100
     },
     {
-      "type": "String",
-      "schemaName": "wmkf_CycleName",
-      "displayName": "Cycle Name",
-      "description": "Formal name of cycle",
-      "maxLength": 100
-    },
-    {
       "type": "DateTime",
       "schemaName": "wmkf_MeetingDate",
       "displayName": "Meeting Date",
       "requiredLevel": "ApplicationRequired",
+      "format": "DateOnly",
+      "behavior": "TimeZoneIndependent"
+    },
+    {
+      "type": "DateTime",
+      "schemaName": "wmkf_ResearchProposalDueDate",
+      "displayName": "Proposal Due",
+      "format": "DateOnly",
+      "behavior": "TimeZoneIndependent"
+    },
+    {
+      "type": "DateTime",
+      "schemaName": "wmkf_ResearchLeadershipSemiFinalistEmailDate",
+      "displayName": "Leadership Semi-Finalist Email Date",
+      "format": "DateOnly",
+      "behavior": "TimeZoneIndependent"
+    },
+    {
+      "type": "DateTime",
+      "schemaName": "wmkf_ResearchLeadershipSemiFinalistMeetingDate",
+      "displayName": "Leadership Semi-Finalist Meeting Date",
+      "format": "DateOnly",
+      "behavior": "TimeZoneIndependent"
+    },
+    {
+      "type": "DateTime",
+      "schemaName": "wmkf_ResearchChairsSemiFinalistEmailDate",
+      "displayName": "Chairs' Semi-Finalist Email Date",
+      "format": "DateOnly",
+      "behavior": "TimeZoneIndependent"
+    },
+    {
+      "type": "DateTime",
+      "schemaName": "wmkf_ResearchChairsSemiFinalistMeetingDate",
+      "displayName": "Chairs Semi-Finalist Meeting Date",
+      "format": "DateOnly",
+      "behavior": "TimeZoneIndependent"
+    },
+    {
+      "type": "DateTime",
+      "schemaName": "wmkf_ResearchReviewsDueDate",
+      "displayName": "Reviews Due Date",
+      "format": "DateOnly",
+      "behavior": "TimeZoneIndependent"
+    },
+    {
+      "type": "DateTime",
+      "schemaName": "wmkf_ResearchOfframpMeetingDate",
+      "displayName": "Offramp Meeting Date",
+      "format": "DateOnly",
+      "behavior": "TimeZoneIndependent"
+    },
+    {
+      "type": "DateTime",
+      "schemaName": "wmkf_ResearchLeadershipFinalistEmailDate",
+      "displayName": "Leadership Finalist Email Date",
+      "format": "DateOnly",
+      "behavior": "TimeZoneIndependent"
+    },
+    {
+      "type": "DateTime",
+      "schemaName": "wmkf_ResearchChairsFinalistEmailDate",
+      "displayName": "Chairs' Finalist Email Date",
+      "format": "DateOnly",
+      "behavior": "TimeZoneIndependent"
+    },
+    {
+      "type": "DateTime",
+      "schemaName": "wmkf_ResearchBudgetDueDate",
+      "displayName": "Budget Due Date",
+      "format": "DateOnly",
+      "behavior": "TimeZoneIndependent"
+    },
+    {
+      "type": "DateTime",
+      "schemaName": "wmkf_BoardMailingDate",
+      "displayName": "Board Mailing Date",
       "format": "DateOnly",
       "behavior": "TimeZoneIndependent"
     }

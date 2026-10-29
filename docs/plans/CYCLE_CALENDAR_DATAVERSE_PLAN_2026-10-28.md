@@ -239,9 +239,17 @@ not satisfy this.
 
 Before the sandbox rehearsal:
 
-- Update `lib/dataverse/schema/wave0-prod-parity-foundation/01_wmkf_grantcycle.json`
-  to the live columns (add the eleven dates; drop `wmkf_CycleName`) and
-  apply it to the sandbox; a reviewed commit.
+- ~~Update `lib/dataverse/schema/wave0-prod-parity-foundation/01_wmkf_grantcycle.json`
+  to the live columns and apply it to the sandbox.~~ **Done 2026-10-28 on the
+  branch:** eleven dates added, `wmkf_CycleName` removed from the spec. The
+  sandbox (`orgd9e66399`, `DYNAMICS_SANDBOX_URL` passed inline only — setting
+  it in `.env.local` repoints runtime services) dry run showed exactly the
+  eleven column creations; `--execute` created them; a rerun creates nothing.
+- Sandbox state found 2026-10-28 [VERIFIED via read-only sandbox query]:
+  organization auditing on, **`wmkf_grantcycle` table auditing off**, and
+  **no J/D cycle rows**. The rehearsal therefore needs (a) table auditing
+  turned on in the sandbox and (b) a sandbox test cycle row, created by the
+  rehearsal setup (the calendar itself never creates rows).
 - Add an Atlas page for `wmkf_grantcycle` once runtime code reads it.
 
 Surfaces the build must update, each with its gate: route rows in
