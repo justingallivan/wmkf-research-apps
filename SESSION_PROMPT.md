@@ -170,6 +170,19 @@ Runs alongside Codex's Session 649 below; both are on `main`.
 
 ## Verification and Closeout
 
+- **Claude (J27 workstream):**
+  - Testing: the full Jest suite passed on PR #551's final commit (26,109) and on
+    PR #552's final commit (26,130); Playwright passed (full suite 76 before the
+    #552 fingerprint bump, the two affected specs 19 after it).
+  - Checks: all repository checks were run at session close (see the closeout
+    commit).
+  - Milestone: DEVELOPMENT_LOG entry added, "Review filing follows each cycle's
+    Board date; no Vercel switch at rollover" (Session 649, Claude).
+  - Claim-evidence pilot: zero-advisory row added for session key
+    `40cf7724568cddae`.
+  - No CLAUDE.md change. The Playwright Chromium browser was installed locally
+    (`npx playwright install chromium`).
+
 - Budget layout: 75 focused tests across six suites passed, types passed, lint
   had zero errors and one existing loading-effect warning. Actual-component
   static previews inspected on desktop and at 390px; no horizontal overflow.
