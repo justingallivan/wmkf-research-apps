@@ -165,18 +165,32 @@ Admin `inviteStartDate` has no reader outside its form, validation and tests
 - **Blank Reviews Due:** invitations for that cycle are refused with "Set the
   Reviews Due Date on the cycle calendar first" (§3 blank-date rule). No
   fallback to Admin defaults.
-- **Request's cycle:** its stamped grant cycle code, else
-  `meetingDateToCycleCode(wmkf_meetingdate)` (the filing rule's resolution,
-  `individual-file-service.js:224-230`).
+- **Request's cycle is derived on the server** from the request's own Board
+  meeting date, `meetingDateToCycleCode(akoya_request.wmkf_meetingdate)` (the
+  filing rule's fallback, `individual-file-service.js:224-230`). Any client
+  value is ignored: the suggestion's `wmkf_grantcyclecode` is stamped from a
+  caller-supplied code at suggestion creation
+  (`reviewer-suggestion.js:537,819,863,972,1160`) [VERIFIED by grep], so it
+  must not select whose date applies. A blank meeting date refuses the send.
+  Ask Connor whether J27 requests carry their meeting date when they arrive.
 - **Campaign settings editor:** stops editing the due date (shows it read-only
   with "from the cycle calendar"); keeps response days and reviewer quota (D9).
+  Its save route rejects a due date server-side, not only in the form
+  (`feedback-ui-gates-must-mirror-server-guards`).
 
 ### 3.2 Emails read the resolved date
 
-- `{{reviewDue}}`, `{{reviewDueDate}}` and `{{reviewDeadline}}` are all filled
-  **on the server** with `resolveEffectiveReviewDueDate(override, request date)`;
-  for a first invitation before the request date exists, the calendar date the
-  send is about to store.
+- Today the invitation form substitutes `{{reviewDue}}` into the body in the
+  browser before preview and send (`InviteEmailModal.js:89-98,114,460`: "These
+  are NOT server placeholders") [VERIFIED by read]. Change: the server's render
+  step fills `{{reviewDue}}`, `{{reviewDueDate}}` and `{{reviewDeadline}}` with
+  `resolveEffectiveReviewDueDate(override, request date)`, or, for a first
+  invitation before the request date exists, the calendar date the send will
+  store. The browser stops substituting `{{reviewDue}}` and shows the date
+  read-only. The draft fingerprint includes the resolved date, so a calendar
+  change between preview and send makes the draft stale instead of sending a
+  date that differs from the stored one. (A PD can still hand-edit the body
+  text, as today.)
 - Remove: the form's due-date field and the `reviewer_invite_timing` due and
   release dates (response days stay); the release form's due date and its
   browser-storage copy; `settings.reviewDueDate` and `cycle.review_deadline` in
@@ -191,16 +205,38 @@ Admin `inviteStartDate` has no reader outside its form, validation and tests
      `materials-preflight-service.js:53-63`);
   2. writes `wmkf_materialssentat` and status `materials_sent` through the
      existing lifecycle writer (ETag-conditional);
-  3. extends the reviewer's existing link to the accepted expiry **without
-     re-minting**, so the link in their hand keeps working (the invitation link
-     already allows `download_proposal`);
+  3. **re-mints the reviewer's link** with the accepted expiry
+     (`mintAndStore`, as manual release does at `send-emails-service.js:996-1001`
+     and the reminder sweep does). A link cannot be extended in place: expiry
+     is signed into the link and verification checks both the signed and the
+     stored expiry (`token-lifecycle.js:164-171`) [VERIFIED by read]. The
+     invitation link stops working; the acceptance email carries the new one,
+     and the accepted screen says to use the link in that email;
   4. sends **one** email: the acceptance confirmation becomes "Thank you for
      agreeing to review. The proposal and review form are at your link; your
      review is due {{reviewDueDate}}", with the cycle's review template and
      additional attachments the materials email carries today.
-- **Proposal missing:** the step holds (retries on the job's schedule), the
-  reviewer sees today's accepted screen, and the lead PD gets one alert. The
-  manual release button stays as the fallback and for these held cases.
+- **One step, not two.** The materials step replaces the
+  `acceptance_confirmation` step's email rather than following it, so a
+  reviewer gets exactly one email. Order inside the step: claim → re-mint →
+  send → on confirmed send, record `wmkf_materialssentat` / `materials_sent`
+  through `recordDeliveredEmail`. The claim is at-most-once, as today
+  (`reviewer-acceptance-drain.js:504-506,546-552`: claimed before send, no
+  automatic resend after a failure, admins alerted) [VERIFIED by read].
+- **Send fails:** materials are not recorded as sent, so the manual release
+  button (one-time, gated on `wmkf_materialssentat`) is still available and
+  re-mints and sends. The invitation link is already dead after the re-mint,
+  so the alert tells staff to use manual release.
+- **Proposal missing at acceptance:** today's acceptance email goes out
+  unchanged, materials are held for manual release, and the lead PD gets one
+  alert.
+- **Withdraw link:** today's acceptance email carries a decline link built from
+  the reviewer's invitation link (`reviewer-acceptance-drain.js:533-535`). It is
+  removed from the combined email (dead after the re-mint, and decline is locked
+  at `materials_sent`, `respond-service.js:227`). Withdrawal after acceptance
+  goes through the PD, as it does today after manual release.
+- **Between accepting and the job (about 2 minutes):** the accepted screen says
+  the proposal link is on its way by email.
 - **Sender:** the acceptance email's existing sender rule (PD, else the
   notification address; `reviewer-acceptance-email.js:98-116`).
 - **Applies to every acceptance after deploy** (no per-cycle switch, per
@@ -247,8 +283,10 @@ listed for the PDs to update (read-only probe; owner-run in Production).
 
 - The Board setup shows Board date and materials date read-only from the
   calendar, with "Not set" and the column name when blank; `materialsDue` and
-  `boardEnds` leave the stored setup (validation accepts old rows and ignores
-  them).
+  `boardEnds` leave the stored setup. `validateCycle` checks the exact key list
+  (`model.js:38`), so removing the keys would make every saved setup invalid:
+  the read path strips the two legacy keys before validation, and the next save
+  writes the new shape.
 - Archive, reminders and the materials-before-Board check read the calendar
   dates. Activation requires both calendar dates.
 - **Archive timing must not move on a failed read:** if the calendar read fails,
@@ -264,24 +302,61 @@ listed for the PDs to update (read-only probe; owner-run in Production).
   switch back to Automatic. Automatic would switch to {next} on {date}."
 - Remove `inviteStartDate` (§3.5).
 
-## 4. Risks
+## 4. Contract review (2026-10-29, Mode A)
+
+Surface: invitation send, render, acceptance job, manual release, campaign
+settings, review-filing cron, Board setup and worker, landing cycle, external
+proposal download. Persistence: `akoya_request.wmkf_reviewduedate`,
+suggestion lifecycle and token fields, Postgres `reviewer_acceptance_jobs`
+steps, Dataverse settings (`reviewer.campaign_timeline_defaults`,
+`board_writeups.cycle.*`, email templates), user preference
+`reviewer_invite_timing`, browser storage `review_manager_email_fields`.
+
+- Whole-flow: cycle for the due date and for the materials attachments both come
+  from `meetingDateToCycleCode(request.wmkf_meetingdate)`; the materials send
+  already does this (`send-emails-service.js:405-409`) [VERIFIED by read]; June
+  → J, December → D (`lib/utils/cycle-code.js:24-33`).
+- Partial success: the combined email's order and fallback are named in §3.3.
+- Async: the job re-reads suggestion and request before claiming
+  (`reviewer-acceptance-drain.js:514-545`); the new step keeps those re-reads.
+- Symbol fan-out to do at build: every reader of `reviewer_invite_timing`,
+  `review_manager_email_fields`, `reviewer.campaign_timeline_defaults` fields,
+  `wmkf_reviewreturndeadline`, the cycle record's date custom fields,
+  `{{proposalDelivery}}`, `materialsDue`/`boardEnds`, and
+  `REVIEW_DOCX_SHAREPOINT_CYCLE`; the new job step name in every reader of
+  job `steps`.
+- Durable surfaces: Atlas pages for the request due-date writer, the acceptance
+  jobs table (new step), Board setup settings; route matrix row for
+  `/api/external/review/[token]/proposal`; `docs/CREDENTIALS_RUNBOOK.md`
+  (env removed); service catalog entry for the shared reader; the J27
+  `docs/J27_TRANSITION_REGISTER.md` rows for review filing and invitation dates.
+- **Readiness:** the J27 Reviewer Finder cycle record must exist before Feb 24,
+  because the combined email takes its review template and attachments from it
+  (`send-emails-service.js:402-421`). Add it to the readiness notice.
+
+Verdict: ready with the named changes above, which are now in §3.
+
+## 5. Risks
 
 1. **Withdraw window disappears** (§2.2). Mitigated by wording; owner confirms.
 2. **Materials auto-sent to a reviewer with an unresolved address or COI
    concern.** The step applies the materials path's address-confidence and
    test-request checks; COI is screened at invitation and acknowledged at
    accept, as today.
-3. **Pre-accept PDF access** [UNCONFIRMED]: `proposal.js` checks the token's
-   operation and file membership but not acceptance (`proposal.js:53-66`); the
-   portal hides files before release. Verify at build whether an invitation
-   link can stream the PDF before accept; if so, require accepted and COI-acked.
+3. **Pre-accept PDF access:** neither `verifySuggestionToken` (expiry,
+   revocation, exclusion only; `verify-suggestion-token.js:175-197`) nor
+   `proposal.js:53-66` (operation and file membership) checks acceptance
+   [VERIFIED by read]. An invited, not-yet-accepted reviewer holding a valid
+   link and a file id could stream the PDF; the portal only hides the list
+   before release. **Fix in this build (PR 1):** `proposal.js` requires
+   accepted, COI acknowledged and materials released.
 4. **Board archive on a calendar edit:** a moved Board date moves the archive.
    Intended (D47); the readiness notice should flag a request-meeting-date
    mismatch (Connor question open).
 5. **D26 continuity:** D26 requests keep stored due dates; D26 filing continues
    until Dec 10 by calendar; D26's Board setup reads the same date it typed.
 
-## 5. Owner decisions
+## 6. Owner decisions
 
 1. Calendar date is copied at first invitation and then fixed (§3.1), rather
    than read live. **Proposed.**
@@ -292,12 +367,13 @@ listed for the PDs to update (read-only probe; owner-run in Production).
    **Proposed.**
 5. Final wording of the three emails (drafted at build for approval).
 
-## 6. Build order and tests
+## 7. Build order and tests
 
 Branch `claude/reviewer-invitation-calendar`; Tier 2 (reviewer emails and
 Dataverse writes). Separate PRs, each with focused unit tests:
 
-1. Shared calendar reader + review filing by Board date (D) + calendar page (F).
+1. Shared calendar reader + review filing by Board date (D) + calendar page (F)
+   + proposal download requires acceptance (risk 3).
 2. Due date from the calendar on the server (A, C).
 3. Board setup from the calendar (E).
 4. Materials on acceptance (B) + wording.
