@@ -46,11 +46,13 @@ function DateRow({ entry, cycle, canEdit, savingAvailable, busy, recording, onSa
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(entry.value || '');
   const [message, setMessage] = useState(null);
+  // The row version the editor opened; a background refresh must not move a draft onto a newer version.
+  const [editEtag, setEditEtag] = useState(null);
   const saving = busy === entry.column;
 
   async function save(value) {
     setMessage(null);
-    const outcome = await onSave(entry.column, value);
+    const outcome = await onSave(entry.column, value, editEtag);
     if (outcome.ok) { setEditing(false); setMessage({ text: value ? 'Date saved.' : 'Date cleared.', success: true }); }
     else setMessage({ text: outcome.error, success: false });
   }
@@ -67,7 +69,7 @@ function DateRow({ entry, cycle, canEdit, savingAvailable, busy, recording, onSa
         {attribution && !recording && <p className="text-sm text-gray-600">{attribution}</p>}
         {recording && <p role="status" className="text-sm text-gray-500">Recording who made this change…</p>}
       </div>
-      {canEdit && !editing && <Button variant="outline" disabled={Boolean(busy) || !savingAvailable} onClick={() => { setMessage(null); setDraft(entry.value || ''); setEditing(true); }}>Edit<span className="sr-only"> {entry.label}</span></Button>}
+      {canEdit && !editing && <Button variant="outline" disabled={Boolean(busy) || !savingAvailable} onClick={() => { setMessage(null); setDraft(entry.value || ''); setEditEtag(cycle.etag); setEditing(true); }}>Edit<span className="sr-only"> {entry.label}</span></Button>}
     </div>
     {editing && <div className="mt-3 max-w-sm rounded-lg border border-gray-200 bg-gray-50 p-3">
       <label className="block text-sm font-medium text-gray-700">{entry.label}
@@ -138,12 +140,13 @@ export default function CycleCalendarPanel() {
     }
   }
 
-  async function saveDate(cycle, column, value) {
+  async function saveDate(cycle, column, value, etag) {
     if (busy) return { ok: false, error: 'Another date is saving.' };
+    if (!etag) return { ok: false, error: 'Reload the calendar before saving.' };
     const current = generation.current;
     setBusy(column);
     try {
-      const fresh = await request({ cycleCode: cycle.code, column, value, etag: cycle.etag });
+      const fresh = await request({ cycleCode: cycle.code, column, value, etag });
       if (current === generation.current) {
         dataStamp.current += 1;
         setData(fresh);
@@ -180,7 +183,7 @@ export default function CycleCalendarPanel() {
     {!cycle.historyAvailable && <p className="mt-4 text-sm text-gray-600">Who changed each date is not available right now.{cycle.rowModifiedAt ? ` Last change to this cycle (any date): ${formatWhen(cycle.rowModifiedAt)}${cycle.rowModifiedBy ? ` by ${cycle.rowModifiedBy}` : ''}.` : ''}</p>}
     <div className="mt-4 rounded-lg bg-gray-50 p-3 text-sm text-gray-700"><span className="font-medium">{cycle.board.label}:</span> {formatDate(cycle.board.value)} <span className="text-gray-500">(set by operations)</span></div>
     <ul className="mt-2 divide-y divide-gray-100">
-      {cycle.dates.map(entry => <DateRow key={`${cycle.code}-${entry.column}`} entry={entry} cycle={cycle} canEdit={data.canEdit} savingAvailable={data.savingAvailable} busy={busy} recording={pending?.code === cycle.code && pending?.column === entry.column} onSave={(column, value) => saveDate(cycle, column, value)} />)}
+      {cycle.dates.map(entry => <DateRow key={`${cycle.code}-${entry.column}`} entry={entry} cycle={cycle} canEdit={data.canEdit} savingAvailable={data.savingAvailable} busy={busy} recording={pending?.code === cycle.code && pending?.column === entry.column} onSave={(column, value, etag) => saveDate(cycle, column, value, etag)} />)}
     </ul>
     <div className="mt-4"><Button variant="link" disabled={Boolean(busy)} onClick={reloadCalendar}>Reload calendar</Button></div>
   </section>;
