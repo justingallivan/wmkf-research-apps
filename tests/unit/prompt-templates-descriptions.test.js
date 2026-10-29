@@ -180,8 +180,8 @@ test('shows workflow counts in collapsed sections, including Pre-flight, with di
     prompt('review-synthesis.generate'), prompt('review-panel.chair'), prompt('multi-perspective.optimist'),
   ]);
   render(<PromptTemplatesSection />);
-  const preflight = await screen.findByText('Pre-flight (4)');
-  const reviews = screen.getByText('Reviews and evaluations (3)');
+  const preflight = await screen.findByText('Pre-flight (4)', { selector: 'summary' });
+  const reviews = screen.getByText('Reviews and evaluations (3)', { selector: 'summary' });
   expect(preflight.closest('details')).not.toHaveAttribute('open');
   expect(reviews.closest('details')).not.toHaveAttribute('open');
   expect(screen.queryByText(/Proposal preparation/)).not.toBeInTheDocument();
@@ -199,13 +199,13 @@ test('searches workflow and subgroup labels, expands matching groups, and hides 
   render(<PromptTemplatesSection />);
   const input = await screen.findByLabelText('Search prompts');
   fireEvent.change(input, { target: { value: 'Pre-flight' } });
-  expect(screen.getByText('Pre-flight (2)').closest('details')).toHaveAttribute('open');
+  expect(screen.getByText('Pre-flight (2)', { selector: 'summary' }).closest('details')).toHaveAttribute('open');
   expect(screen.getByText('2 of 4 prompts')).toBeInTheDocument();
-  expect(screen.getByText('Reviews and evaluations (0)')).not.toBeVisible();
+  expect(screen.getByText('Reviews and evaluations (0)', { selector: 'summary' })).not.toBeVisible();
   fireEvent.change(input, { target: { value: 'Human peer reviews' } });
   expect(screen.getByRole('article', { name: 'Synthesize submitted human peer reviews' })).toBeVisible();
   expect(screen.getByText('AI Review Panel (0)').closest('section')).not.toBeVisible();
-  expect(screen.getByText('Reviews and evaluations (1)').closest('details')).toHaveAttribute('open');
+  expect(screen.getByText('Reviews and evaluations (1)', { selector: 'summary' }).closest('details')).toHaveAttribute('open');
   expect(screen.getByText('1 of 4 prompts')).toBeInTheDocument();
 });
 
@@ -220,7 +220,7 @@ test('all audited prompts appear once across the proposed workflow groups and th
     'Diagnostics and drafts (2)', 'Legacy app prompts — stored reference (4)',
   ]) expect(screen.getByText(label)).toBeInTheDocument();
   expect(screen.getAllByRole('article', { hidden: true })).toHaveLength(40);
-  fireEvent.click(screen.getByText('Reviews and evaluations (11)'));
+  fireEvent.click(screen.getByText('Reviews and evaluations (11)', { selector: 'summary' }));
   expect(within(screen.getByRole('region', { name: 'Human peer reviews' })).getAllByRole('article')).toHaveLength(3);
   expect(within(screen.getByRole('region', { name: 'AI Review Panel' })).getAllByRole('article')).toHaveLength(2);
   expect(within(screen.getByRole('region', { name: 'Multi-Perspective Evaluator' })).getAllByRole('article')).toHaveLength(6);
@@ -229,7 +229,7 @@ test('all audited prompts appear once across the proposed workflow groups and th
 test('workflow disclosures expand independently and preserve an unsaved draft when collapsed', async () => {
   serve([prompt('phase-i.summary'), prompt('reviewer-finder.analyze')]);
   render(<PromptTemplatesSection />);
-  const preflight = await screen.findByText('Pre-flight (1)');
+  const preflight = await screen.findByText('Pre-flight (1)', { selector: 'summary' });
   const reviewers = screen.getByText('Reviewer selection (1)');
   fireEvent.click(preflight);
   expect(reviewers.closest('details')).not.toHaveAttribute('open');
@@ -250,10 +250,10 @@ test('a new search reopens matching workflow sections after a manual collapse', 
   render(<PromptTemplatesSection />);
   const input = await screen.findByLabelText('Search prompts');
   fireEvent.change(input, { target: { value: 'Pre-flight' } });
-  const summary = screen.getByText('Pre-flight (2)');
+  const summary = screen.getByText('Pre-flight (2)', { selector: 'summary' });
   fireEvent.click(summary);
   expect(summary.closest('details')).not.toHaveAttribute('open');
   fireEvent.change(input, { target: { value: 'Initial Assessment' } });
-  expect(screen.getByText('Pre-flight (1)').closest('details')).toHaveAttribute('open');
+  expect(screen.getByText('Pre-flight (1)', { selector: 'summary' }).closest('details')).toHaveAttribute('open');
   expect(screen.getByRole('article', { name: 'Initial Assessment narrative draft' })).toBeVisible();
 });

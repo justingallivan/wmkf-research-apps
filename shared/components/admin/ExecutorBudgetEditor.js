@@ -3,6 +3,13 @@ import { useRef, useState } from 'react';
 import DataverseFieldInfoButton from './DataverseFieldInfoButton';
 import { requestEnvelope } from '../../utils/api-request';
 import { TONE, newRequestId, fmtTs, fmtInt } from './prompt-editor-utils';
+import { getAdminPromptDescription } from '../../config/adminPromptCatalog';
+
+const BUDGET_GROUPS = [
+  { label: 'Pre-flight', names: ['pre-site-visit.proposal-core.generate'] },
+  { label: 'Reviews and evaluations', names: ['review-panel.seat', 'review-panel.chair', 'review-synthesis.generate'] },
+  { label: 'Meetings and briefings', names: ['field-primer.generate', 'cycle-dossier.entry'] },
+];
 
 const EXECUTOR_BUDGET_EDITABLE_FIELDS = {
   'pre-site-visit.proposal-core.generate': ['maxTokensOverride', 'timeoutMsOverride'],
@@ -168,10 +175,16 @@ export function ExecutorBudgetEditor({ config, onPublished }) {
   };
   const staleDraft = baseRevision !== configRevision(currentConfig);
   return (
-    <div className="border border-gray-300 rounded-lg overflow-hidden">
+    <details className="border border-gray-300 rounded-lg">
+      <summary className="cursor-pointer rounded-lg bg-gray-50 p-4 text-sm font-semibold text-gray-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gray-500">
+        Execution budgets ({BUDGET_GROUPS.reduce((count, group) => count + group.names.length, 0)})
+        {' '}<span className="ml-2 text-xs font-normal text-gray-500">{currentConfig.source === 'dataverse' ? `v${currentConfig.version}` : 'Code fallback'}</span>
+        {(!unchanged || staleDraft) && <span className="ml-2 text-xs font-normal text-amber-800">Unpublished changes</span>}
+        {(currentConfig.storageWarnings || []).length > 0 && <span className="ml-2 text-xs font-normal text-amber-800">Needs attention</span>}
+      </summary>
       <div className="p-4 bg-gray-50 border-b flex items-start justify-between gap-3">
         <div>
-          <div className="font-medium text-gray-900">Executor output budgets</div>
+          <div className="font-medium text-gray-900">Execution budgets</div>
           <div className="text-xs text-gray-500 mt-0.5">
             {currentConfig.source === 'dataverse'
               ? <>Current immutable revision <strong>v{currentConfig.version}</strong> · published {fmtTs(currentConfig.publishedAt)}{currentConfig.updatedByName ? <> by {currentConfig.updatedByName}</> : null}</>
@@ -188,54 +201,30 @@ export function ExecutorBudgetEditor({ config, onPublished }) {
         }]} />
       </div>
       <div className="p-4 space-y-4">
-        {standingNames.map(([name, tokensLabel, timeoutLabel]) => (
-          <div key={name}>
-            <div className="text-sm font-medium text-gray-800"><code>{name}</code></div>
-            <div className="grid sm:grid-cols-2 gap-3 mt-2">
-              <BudgetNumberField
-                label={tokensLabel}
-                value={values[name]?.maxTokensOverride}
-                limits={limits[name]?.maxTokensOverride}
-                onChange={(value) => setBudgetValue(name, 'maxTokensOverride', value)}
-              />
-              <BudgetNumberField
-                label={timeoutLabel}
-                value={values[name]?.timeoutMsOverride}
-                limits={limits[name]?.timeoutMsOverride}
-                onChange={(value) => setBudgetValue(name, 'timeoutMsOverride', value)}
-              />
-            </div>
-          </div>
-        ))}
-        <div>
-          <div className="text-sm font-medium text-gray-800"><code>{retryName}</code></div>
-          <div className="grid sm:grid-cols-2 gap-3 mt-2">
-            <BudgetNumberField
-              label="Retry floor (tokens)"
-              value={retry.floor}
-              limits={limits[retryName]?.floor}
-              onChange={(value) => setBudgetValue(retryName, 'floor', value)}
-            />
-            <BudgetNumberField
-              label="Retry ceiling (tokens)"
-              value={retry.ceiling}
-              limits={limits[retryName]?.ceiling}
-              onChange={(value) => setBudgetValue(retryName, 'ceiling', value)}
-            />
-          </div>
-        </div>
-        {timeoutNames.map(([name, label]) => (
-          <div key={name}>
-            <div className="text-sm font-medium text-gray-800"><code>{name}</code></div>
-            <div className="grid sm:grid-cols-2 gap-3 mt-2">
-              <BudgetNumberField
-                label={label}
-                value={values[name]?.timeoutMsOverride}
-                limits={limits[name]?.timeoutMsOverride}
-                onChange={(value) => setBudgetValue(name, 'timeoutMsOverride', value)}
-              />
-            </div>
-          </div>
+        <p className="text-sm text-gray-600">Set output-token limits and timeouts for these workflows. Publish all budget changes together as one revision.</p>
+        {BUDGET_GROUPS.map(group => (
+          <section key={group.label} aria-label={`${group.label} execution budgets`} className="space-y-4 border-t border-gray-200 pt-4">
+            <h3 className="text-sm font-semibold text-gray-900">{group.label} ({group.names.length})</h3>
+            {group.names.map(name => {
+              const standing = standingNames.find(([key]) => key === name);
+              const timeout = timeoutNames.find(([key]) => key === name);
+              return (
+                <div key={name}>
+                  <h4 className="text-sm font-medium text-gray-800">{getAdminPromptDescription(name).title}</h4>
+                  <p className="mt-1 text-xs text-gray-500"><code className="break-all">{name}</code></p>
+                  <div className="grid sm:grid-cols-2 gap-3 mt-2">
+                    {standing ? <>
+                      <BudgetNumberField label={standing[1]} value={values[name]?.maxTokensOverride} limits={limits[name]?.maxTokensOverride} onChange={value => setBudgetValue(name, 'maxTokensOverride', value)} />
+                      <BudgetNumberField label={standing[2]} value={values[name]?.timeoutMsOverride} limits={limits[name]?.timeoutMsOverride} onChange={value => setBudgetValue(name, 'timeoutMsOverride', value)} />
+                    </> : name === retryName ? <>
+                      <BudgetNumberField label="Retry floor (tokens)" value={retry.floor} limits={limits[name]?.floor} onChange={value => setBudgetValue(name, 'floor', value)} />
+                      <BudgetNumberField label="Retry ceiling (tokens)" value={retry.ceiling} limits={limits[name]?.ceiling} onChange={value => setBudgetValue(name, 'ceiling', value)} />
+                    </> : timeout ? <BudgetNumberField label={timeout[1]} value={values[name]?.timeoutMsOverride} limits={limits[name]?.timeoutMsOverride} onChange={value => setBudgetValue(name, 'timeoutMsOverride', value)} /> : null}
+                  </div>
+                </div>
+              );
+            })}
+          </section>
         ))}
         {!valid && (
           <div className={`text-xs px-3 py-2 rounded border ${TONE.red}`}>
@@ -289,7 +278,7 @@ export function ExecutorBudgetEditor({ config, onPublished }) {
           </button>
         </div>
       </div>
-    </div>
+    </details>
   );
 }
 
@@ -306,7 +295,7 @@ function BudgetNumberField({ label, value, limits, onChange }) {
         onChange={(event) => onChange(event.target.value)}
         className="mt-1 w-full px-2 py-1.5 border border-gray-300 rounded text-sm"
       />
-      <div className="mt-1 text-[10px] text-gray-400">
+      <div className="mt-1 text-xs text-gray-500">
         Safety range: {fmtInt(limits?.min)}–{fmtInt(limits?.max)}
       </div>
     </label>

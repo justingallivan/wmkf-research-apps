@@ -151,17 +151,6 @@ export default function PromptTemplatesSection() {
         <p role="status" className="mt-1 text-xs text-gray-500">{matchingNames.size} of {prompts.length} prompts</p>
       </div>
       <div className="space-y-6">
-        {executorBudgetError && (
-          <div className={`text-xs px-3 py-2 rounded border ${TONE.red}`}>
-            {executorBudgetError}. Prompt editing remains available.
-          </div>
-        )}
-        {executorBudgetConfig ? (
-          <ExecutorBudgetEditor
-            config={executorBudgetConfig}
-            onPublished={setExecutorBudgetConfig}
-          />
-        ) : null}
         {matchingNames.size === 0 && <p className="text-sm text-gray-600">No prompts match your search.</p>}
         {groups.map(group => (
           <details key={group.id} hidden={matchCount(group.prompts) === 0} open={expandedGroups[group.id] || undefined} className="rounded-lg border border-gray-200">
@@ -185,6 +174,17 @@ export default function PromptTemplatesSection() {
             </div>
           </details>
         ))}
+        {executorBudgetError && (
+          <div className={`text-xs px-3 py-2 rounded border ${TONE.red}`}>
+            {executorBudgetError}. Prompt editing remains available.
+          </div>
+        )}
+        {executorBudgetConfig ? (
+          <ExecutorBudgetEditor
+            config={executorBudgetConfig}
+            onPublished={setExecutorBudgetConfig}
+          />
+        ) : null}
       </div>
     </>
   );
