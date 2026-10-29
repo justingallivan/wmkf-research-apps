@@ -1,6 +1,9 @@
 import React from 'react';
-import { render, screen, fireEvent, waitFor, within } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor, within, act } from '@testing-library/react';
 import CycleCalendarPanel from '../../shared/components/cycle-calendar/CycleCalendarPanel';
+
+const mockRouter = { pathname: '/cycle-calendar', query: {}, replace: jest.fn() };
+jest.mock('next/router', () => ({ useRouter: () => mockRouter }));
 import { CYCLE_CALENDAR_DATE_COLUMNS } from '../../shared/config/cycleCalendar';
 
 const response = (body, status = 200) => ({ ok: status < 400, status, json: async () => body });
@@ -16,7 +19,8 @@ function cycle(code, name, etag, overrides = {}) {
 function snapshot({ canEdit = true, savingAvailable = true, j27 = {} } = {}) {
   return { canEdit, savingAvailable, defaultCycleCode: 'D26', cycles: [cycle('D26', 'December 2026', 'W/"1"'), cycle('J27', 'June 2027', 'W/"7"', j27)] };
 }
-afterEach(() => jest.restoreAllMocks());
+beforeEach(() => { mockRouter.query = {}; mockRouter.replace.mockClear(); });
+afterEach(() => { jest.restoreAllMocks(); jest.useRealTimers(); });
 
 test('non-editors see dates and attribution without edit controls', async () => {
   const dates = CYCLE_CALENDAR_DATE_COLUMNS.map(({ column, label }, i) => ({ column, label, value: i === 0 ? '2026-12-07' : null, changedAt: i === 0 ? '2026-10-29T17:00:00Z' : null, changedBy: i === 0 ? 'Sarah Hibler' : null }));
@@ -85,4 +89,46 @@ test('Board date is shown read-only', async () => {
   const board = await screen.findByText('Board Meeting Date:');
   expect(within(board.parentElement).getByText('Thu, Dec 10, 2026')).toBeTruthy();
   expect(screen.queryByRole('button', { name: 'Edit Board Meeting Date' })).toBeNull();
+});
+
+test('the cycle in the URL survives a reload and choosing a cycle writes it to the URL', async () => {
+  mockRouter.query = { cycle: 'J27' };
+  global.fetch = jest.fn(async () => response(snapshot()));
+  render(<CycleCalendarPanel />);
+  expect((await screen.findByLabelText('Grant cycle')).value).toBe('J27');
+  fireEvent.change(screen.getByLabelText('Grant cycle'), { target: { value: 'D26' } });
+  expect(screen.getByLabelText('Grant cycle').value).toBe('D26');
+  expect(mockRouter.replace).toHaveBeenCalledWith({ pathname: '/cycle-calendar', query: { cycle: 'D26' } }, undefined, { shallow: true, scroll: false });
+});
+
+test('an unknown URL cycle falls back to the server default', async () => {
+  mockRouter.query = { cycle: 'D99' };
+  global.fetch = jest.fn(async () => response(snapshot()));
+  render(<CycleCalendarPanel />);
+  expect((await screen.findByLabelText('Grant cycle')).value).toBe('D26');
+});
+
+test('after a save the row shows "Recording…" until a re-check finds the attribution', async () => {
+  const withDate = (changedBy) => ({ ...snapshot(), cycles: [cycle('D26', 'December 2026', 'W/"2"', {
+    dates: CYCLE_CALENDAR_DATE_COLUMNS.map(({ column, label }) => (column === 'wmkf_researchproposalduedate'
+      ? { column, label, value: '2026-12-07', changedAt: changedBy ? '2026-10-29T04:00:00Z' : null, changedBy }
+      : { column, label, value: null, changedAt: null, changedBy: null })),
+  })] });
+  let gets = 0;
+  global.fetch = jest.fn(async (_url, options) => {
+    if (options?.method === 'POST') return response(withDate(null)); // audit entry not readable yet
+    gets += 1;
+    return response(gets === 1 ? snapshot() : withDate('Justin Gallivan'));
+  });
+  render(<CycleCalendarPanel />);
+  fireEvent.click(await screen.findByRole('button', { name: 'Edit Proposal Due' }));
+  fireEvent.change(screen.getByLabelText('Proposal Due'), { target: { value: '2026-12-07' } });
+  jest.useFakeTimers();
+  fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+  expect(await screen.findByText('Recording who made this change…')).toBeTruthy();
+  await act(async () => { jest.advanceTimersByTime(2100); });
+  jest.useRealTimers();
+  expect(await screen.findByText('Changed by Justin Gallivan, Oct 28, 2026')).toBeTruthy();
+  expect(screen.queryByText('Recording who made this change…')).toBeNull();
+  expect(gets).toBe(2);
 });

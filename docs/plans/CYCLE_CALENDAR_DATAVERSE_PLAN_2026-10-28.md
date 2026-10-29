@@ -245,6 +245,22 @@ as themselves, sets one J27 date, confirms "changed by", clears it and
 confirms again. J27's audit history keeps those two entries. A passing unit
 fixture alone does not satisfy this.
 
+**Controlled Production test — passed 2026-10-28 (Pacific)** [VERIFIED via
+owner click-through on the branch running locally against Production, then
+owner-run read-only `scripts/probe-grant-cycle-history-entries.cjs --cycle J27`]:
+the owner set J27 Proposal Due to 2026-12-07 at 03:56:58Z and cleared it at
+03:58:46Z (UTC). Both audit entries are `AttributeAuditDetail`, `Update`,
+user **Justin Gallivan** (impersonation recorded the person, not the app); the
+clear records the old value in `OldValue` with no `NewValue` column, as the
+parser expects. Fed those exact entries, `loadCalendar` attributes the cleared
+date to the owner, and the page showed "Changed by Justin Gallivan, Oct 28,
+2026". J27 is back to all eleven dates null. The test found two UI issues,
+both fixed on the branch: (1) the save response reads history before Dataverse
+makes the new audit entry readable, so the panel now shows "Recording who made
+this change…" and re-checks at 2, 4 and 8 seconds; (2) a reload reset the
+dropdown to the default cycle, so the chosen cycle is now kept in the URL
+(`?cycle=`).
+
 Before the sandbox rehearsal:
 
 - ~~Update `lib/dataverse/schema/wave0-prod-parity-foundation/01_wmkf_grantcycle.json`
