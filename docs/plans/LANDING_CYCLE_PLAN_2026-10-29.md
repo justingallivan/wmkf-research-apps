@@ -246,7 +246,7 @@ Deliberations, Initial Assessments, Awardees tab) take the shell's cycle.
 - Codex re-review (gpt-6.1-sol, 2026-10-29): one medium finding, fixed — leaving `skip` (a Board URL cycle removed via the Tools menu link) or re-entering `wait` kept the old settled state, re-creating the fallback/remount race and an early `#discussion-cleanup` redirect. The hook's decision is now bound to its options (`view`/`skip`/`wait`) and discarded in the same render when they change; tests cover URL-cycle removal on both Board pages, URL-cycle arrival mid-read, wait re-entry, switching back to an earlier option set, and the redirect (5 of 18 fail against the previous hook).
 - Not yet done: the rollout prerequisite (Workbench
   list shows Phase I Pending) and the Production check in §6.
-- **Automatic default (D45), branch `claude/landing-cycle-automatic`, 2026-10-29:**
+- **Automatic default (D45), merged to `main` 2026-10-29 (PR #550, `aefaebdf7`):**
   `automaticLandingCycle` in `lib/services/landing-cycle-service.js` picks the
   earliest cycle whose Board date is today or later by the Pacific day (else the
   latest); `getLandingCycle` uses it when there is no valid override (absent,
