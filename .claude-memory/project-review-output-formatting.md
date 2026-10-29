@@ -143,7 +143,8 @@ reconciliation matched all expected identities, destinations, semantic hashes,
 and unique SharePoint items. A fresh post-write survey has zero eligible missing
 files, zero reconcile candidates, zero blockers, and only the visible Request
 `1003223` test exclusion. Wave 5 is now active with exact Production
-`REVIEW_DOCX_SHAREPOINT_WRITE=on` and `REVIEW_DOCX_SHAREPOINT_CYCLE=D26` in
+`REVIEW_DOCX_SHAREPOINT_WRITE=on` and `REVIEW_DOCX_SHAREPOINT_CYCLE=D26` (pin retired 2026-10-29, D44: the cron now
+files every cycle until its calendar Board date) in
 Ready activation-proof deployment `dpl_E6VKW5Wi8zDTfU1ZRhNsbH9yg9oM`. The
 first authenticated enabled run attempted no filing, made no SharePoint document
 or Dataverse pointer mutation, and surfaced only known test Request `1003223` as

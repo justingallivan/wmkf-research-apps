@@ -17,6 +17,7 @@ import { getRequestSharePointBuckets } from '../../../../../lib/utils/sharepoint
 import { withDalContext } from '../../../../../lib/dataverse/core/context';
 import { isReviewerProposalFile } from '../../../../../lib/external/reviewer-materials';
 import { checkRateLimit, recordTokenOutcome } from '../../../../../lib/external/rate-limit';
+import { computeEngagementState } from '../../../../../lib/external/review-engagement-state';
 
 export default async function handler(req, res) {
   if (req.method !== 'GET') {
@@ -52,6 +53,16 @@ export default async function handler(req, res) {
     // able to stream files, even if the row/hash/expiry checks above passed.
     if (!tokenHasOp(verified, 'download_proposal')) {
       return res.status(403).json({ ok: false, reason: 'op_not_permitted' });
+    }
+
+    // Proposal bytes follow the same rule as the portal's file list
+    // (context-service): only once materials are released, or after a review
+    // was submitted. An invitation link carries `download_proposal` from the
+    // start, so the op claim alone would let a not-yet-accepted invitee read the
+    // proposal.
+    const { view } = computeEngagementState(verified.suggestion);
+    if (view !== 'stage2b' && view !== 'submitted') {
+      return res.status(403).json({ ok: false, reason: 'materials_not_released' });
     }
 
     const { request } = verified;

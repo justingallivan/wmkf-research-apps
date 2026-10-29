@@ -263,8 +263,11 @@ ETag-conditionally commit the existing suggestion folder/filename pointers.
 There are no generated or suggestion-GUID intermediate folders in the current
 target; existing legacy pointers remain recognized. It is not part of submission
 or thank-you transport. Exact Production `REVIEW_DOCX_SHAREPOINT_WRITE=on` and
-`REVIEW_DOCX_SHAREPOINT_CYCLE=D26` are active in Ready activation-proof
-deployment `dpl_E6VKW5Wi8zDTfU1ZRhNsbH9yg9oM`. The guarded local
+`REVIEW_DOCX_SHAREPOINT_CYCLE=D26` were activated in Ready activation-proof
+deployment `dpl_E6VKW5Wi8zDTfU1ZRhNsbH9yg9oM` (history). **Current
+(2026-10-29, D44, branch `claude/review-filing-by-board-date`):** the cycle pin
+is retired; the hourly cron files every cycle whose calendar Board Meeting Date
+is today or later (Pacific day). The guarded local
 backfill produced a clean full-cycle D26 schema-v2 manifest with 23 eligible
 rows plus one visible owner-confirmed test exclusion. The owner selected Request
 `1002874` / Agnes Karasik for the one-file proof and separately approved its

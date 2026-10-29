@@ -41,7 +41,6 @@ describe('reviewer campaign timeline defaults', () => {
     expect(parsed).toEqual({
       timeline: {
         cycleLabel: 'D26',
-        inviteStartDate: '2026-06-17',
         respondOffsetDays: null,
         proposalReleaseDate: '2026-07-08',
         reviewDueDate: '2026-07-22',
@@ -120,7 +119,6 @@ describe('reviewer campaign timeline defaults', () => {
       REVIEWER_CAMPAIGN_TIMELINE_KEY,
       JSON.stringify({
         cycleLabel: 'D26',
-        inviteStartDate: '2026-06-17',
         respondOffsetDays: 10,
         proposalReleaseDate: '',
         reviewDueDate: '2026-07-22',

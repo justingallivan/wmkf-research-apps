@@ -408,8 +408,11 @@ Write (verified 2026-05-07; +Phase 3 ingestion S210):
 - `lib/services/review-upload.js` `writeReviewFiles` — shared staff/self-token file receipt sink; the same guard authorizes the pre-upload row, its ETag protects the later parent PATCH/changeset, and every attempt uploads into a unique `attempt_<uuid>` SharePoint subfolder whose exact path is persisted by the winner. A lost race cleans up only the losing attempt and excludes any item id visible in the winning persisted folder before deletion. After commit, the legacy `extendForPostSubmissionWindow` helper sets the stored token expiry to `now + 7 days` by default, an absolute assignment that can shorten a later stored expiry and does not alter the signed JWT expiry. This does not grant editing permission: the shared receipt guard rejects any later upload once the review is received.
 - `pages/api/external/review/[token]/submit.js` — canonical structured external receipt sink; the verifier row (or the supported fresh missing-ETag fallback) passes the same shared guard and its ETag protects the atomic parent/answer changeset. The fallback selects `wmkf_reviewstatus`, so it cannot acquire a terminal row's fresh ETag blindly.
 - `pages/api/external/review/[token]/context.js` — best-effort `wmkf_proposalfirstaccessed` stamp on first reviewer access (non-fatal on failure)
-- `pages/api/cron/file-review-docx.js` — Production-active dedicated exact-cycle
-  retention/repair sweep. It discovers exact-stamped rows newest-first, re-reads
+- `pages/api/cron/file-review-docx.js` — Production-active dedicated
+  retention/repair sweep. **2026-10-29 (D44, branch
+  `claude/review-filing-by-board-date`, not yet deployed):** it files every cycle
+  whose operations Grant Cycle Board Meeting Date is today or later (Pacific
+  day) instead of one exact env cycle; per cycle it discovers exact-stamped rows newest-first, re-reads
   the row and ETag through
   `individual-file-service.js`, writes only the two existing pointer fields
   after create-only SharePoint reconciliation, and is not part of submission or

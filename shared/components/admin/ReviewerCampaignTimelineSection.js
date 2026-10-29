@@ -6,7 +6,6 @@ export default function ReviewerCampaignTimelineSection() {
   const [saving, setSaving] = useState(false);
   const [timeline, setTimeline] = useState({
     cycleLabel: '',
-    inviteStartDate: '',
     respondOffsetDays: 7,
     proposalReleaseDate: '',
     reviewDueDate: '',
@@ -27,7 +26,6 @@ export default function ReviewerCampaignTimelineSection() {
       const data = envelope.data;
       setTimeline({
         cycleLabel: data.timeline?.cycleLabel || '',
-        inviteStartDate: data.timeline?.inviteStartDate || '',
         respondOffsetDays: data.timeline?.respondOffsetDays == null ? '' : data.timeline.respondOffsetDays,
         proposalReleaseDate: data.timeline?.proposalReleaseDate || '',
         reviewDueDate: data.timeline?.reviewDueDate || '',
@@ -113,15 +111,6 @@ export default function ReviewerCampaignTimelineSection() {
             onChange={(e) => update('cycleLabel', e.target.value)}
             className="mt-1 w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500"
             placeholder="D26"
-          />
-        </label>
-        <label className="text-xs text-gray-600">
-          Reviewer invitations begin
-          <input
-            type="date"
-            value={timeline.inviteStartDate}
-            onChange={(e) => update('inviteStartDate', e.target.value)}
-            className="mt-1 w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500"
           />
         </label>
         <label className="text-xs text-gray-600">

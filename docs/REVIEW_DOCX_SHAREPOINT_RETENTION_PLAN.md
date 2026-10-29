@@ -30,8 +30,9 @@ related:
 path, guarded repair service, and D26 backfill were fast-forwarded to `main` at
 `3ba2a6ad` and reached Ready Production deployment
 `dpl_22wUzC1cCi4nhKTSFQftfaycucSh` on 2026-09-03 PDT. Production now has exact
-`REVIEW_DOCX_SHAREPOINT_WRITE=on` and `REVIEW_DOCX_SHAREPOINT_CYCLE=D26`, and
-the hourly route is active in Ready activation-proof deployment
+`REVIEW_DOCX_SHAREPOINT_WRITE=on` and `REVIEW_DOCX_SHAREPOINT_CYCLE=D26` (cycle
+pin superseded 2026-10-29, D44, PR #551: the cron files every cycle until its
+calendar Board date), and the hourly route is active in Ready activation-proof deployment
 `dpl_E6VKW5Wi8zDTfU1ZRhNsbH9yg9oM`. The exact
 owner-approved manifest
 `outputs/review-docx-backfill/review-docx-D26-2026-09-04T01-18-31-489Z.json`
@@ -510,6 +511,9 @@ environment contract before deployment. The automatic cron also requires one
 exact valid cycle code and discovers only suggestions carrying that exact cycle
 stamp. This prevents activation from unexpectedly filing older historical
 cohorts; advancing the automatic cycle is a deliberate configuration change.
+**Superseded 2026-10-29 (D44; branch `claude/review-filing-by-board-date`):**
+the automatic cron files every cycle whose calendar Board Meeting Date is today
+or later (Pacific day); past cycles still need the operator backfill.
 The operator backfill continues to use its explicit `--cycle` manifest and may
 apply the request-meeting-date fallback during per-row validation.
 
