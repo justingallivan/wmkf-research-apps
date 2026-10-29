@@ -124,8 +124,11 @@ placing another file beside the proposal does not make it reviewer-visible.
   capitalization and extension. Filename matching is case-sensitive.
 - **AI input folder spelling:** exactly `AI Materials` (one space).
 - **AI input filenames:** exactly `ProposalNarrative_{Request#}.pdf` and
-  `ProposalBibliography_{Request#}.pdf`, including capitalization and
-  extension. Filename matching is case-sensitive.
+  `ProposalBibliography_{Request#}.pdf`, or the J27 names
+  `Project-Narrative_{Request#}.pdf` and `Bibliography_{Request#}.pdf`
+  (accepted from 2026-10-26; one name per purpose, both present fails closed;
+  see `docs/POWER_AUTOMATE_PROPOSAL_FILE_CONTRACT.md`), including
+  capitalization and extension. Filename matching is case-sensitive.
 - **Location:** both folders are directly inside
   `akoya_request/{requestNumber}_{requestGuid}/`.
 - **Missing exact proposal file:** the reviewer-facing app shows no download.

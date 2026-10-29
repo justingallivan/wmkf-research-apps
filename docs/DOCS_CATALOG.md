@@ -143,7 +143,7 @@ related:
 
 | File | Kind | Status | Canonical | Summary | Cataloged |
 |---|---|---|---|---|---|
-| [POWER_AUTOMATE_PROPOSAL_FILE_CONTRACT.md](POWER_AUTOMATE_PROPOSAL_FILE_CONTRACT.md) | spec | active | yes | Required SharePoint folders and exact proposal PDF filenames for Power Automate. | 2026-08-17 |
+| [POWER_AUTOMATE_PROPOSAL_FILE_CONTRACT.md](POWER_AUTOMATE_PROPOSAL_FILE_CONTRACT.md) | spec | active | yes | Required SharePoint folders and exact proposal PDF filenames for Power Automate. | 2026-10-26 |
 
 ## email
 
