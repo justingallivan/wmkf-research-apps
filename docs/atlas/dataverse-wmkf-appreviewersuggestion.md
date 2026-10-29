@@ -409,8 +409,7 @@ Write (verified 2026-05-07; +Phase 3 ingestion S210):
 - `pages/api/external/review/[token]/submit.js` — canonical structured external receipt sink; the verifier row (or the supported fresh missing-ETag fallback) passes the same shared guard and its ETag protects the atomic parent/answer changeset. The fallback selects `wmkf_reviewstatus`, so it cannot acquire a terminal row's fresh ETag blindly.
 - `pages/api/external/review/[token]/context.js` — best-effort `wmkf_proposalfirstaccessed` stamp on first reviewer access (non-fatal on failure)
 - `pages/api/cron/file-review-docx.js` — Production-active dedicated
-  retention/repair sweep. **2026-10-29 (D44, branch
-  `claude/review-filing-by-board-date`, not yet deployed):** it files every cycle
+  retention/repair sweep. **2026-10-29 (D44, PR #551, merge `caf318983`, Production-deployed 2026-10-29):** it files every cycle
   whose operations Grant Cycle Board Meeting Date is today or later (Pacific
   day) instead of one exact env cycle; per cycle it discovers exact-stamped rows newest-first, re-reads
   the row and ETag through

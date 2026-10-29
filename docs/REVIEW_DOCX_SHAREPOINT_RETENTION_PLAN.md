@@ -511,7 +511,7 @@ environment contract before deployment. The automatic cron also requires one
 exact valid cycle code and discovers only suggestions carrying that exact cycle
 stamp. This prevents activation from unexpectedly filing older historical
 cohorts; advancing the automatic cycle is a deliberate configuration change.
-**Superseded 2026-10-29 (D44; branch `claude/review-filing-by-board-date`):**
+**Superseded 2026-10-29 (D44; PR #551, merge `caf318983`, Production-deployed 2026-10-29):**
 the automatic cron files every cycle whose calendar Board Meeting Date is today
 or later (Pacific day); past cycles still need the operator backfill.
 The operator backfill continues to use its explicit `--cycle` manifest and may

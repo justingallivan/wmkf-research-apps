@@ -39,7 +39,7 @@ from the calendar or retired.
 
 | What a person does today | Where | Replaced by | Owner decision needed |
 |---|---|---|---|
-| Switch review filing to the new cycle | Vercel `REVIEW_DOCX_SHAREPOINT_CYCLE` (one exact code) [VERIFIED via `lib/services/review-documents/individual-file-service.js:1005-1034`; `lib/dataverse/adapters/reviewer-suggestion.js:1536-1555`] | File each completed review until its cycle's Board date, by Pacific day (D11 as amended by D44). Several cycles at once | None |
+| Switch review filing to the new cycle | Vercel `REVIEW_DOCX_SHAREPOINT_CYCLE` (one exact code) [VERIFIED via `lib/services/review-documents/individual-file-service.js:1005-1034`; `lib/dataverse/adapters/reviewer-suggestion.js:1536-1555`] | **Done (PR #551, merge `caf318983`, Production-deployed 2026-10-29):** files each completed review until its cycle's Board date, by Pacific day (D11 as amended by D44). Several cycles at once | None |
 | Add the new cycle to Staff Deliberations prep | Vercel `STAFF_DELIBERATIONS_AUTO_PREPARE_CYCLE_CODES` [VERIFIED via `lib/services/pre-site-visit/preparation-config.js:48-51`; re-checked per receipt at `preparation-worker.js:202-204`] | Cycles whose Board date is upcoming, from the calendar, after the old/new cohort diff the rollover plan §3.4 requires | None: Staff Deliberations is a stage in every cycle (owner, 2026-10-21 vocabulary; `docs/plans/review/PROPOSAL_WORKFLOW_VOCABULARY_2026-10-19.md`). Check before April: prep starts from a site-visit event in Dynamics; confirm J27's Zoom research presentations are recorded the same way |
 | Type the cycle's invitation start, release date and review due date | Admin → Workflows → Reviewer timeline defaults, one app-wide key `reviewer.campaign_timeline_defaults` [VERIFIED via `lib/services/reviewer-campaign-timeline.js:1-27`] | Dates read per cycle from the calendar for the request's own cycle. The panel keeps only the two numbers (response days, reviewer quota) as central defaults (D9) | None (§5) |
 | Type the review deadline and proposal send date into the cycle record | Reviewer Finder cycle record (`wmkf_appgrantcycle`): `reviewDeadline`, custom field `proposalSendDate` used by the invitation email [VERIFIED via `lib/services/grant-cycles-dataverse.js:76-90`; `lib/utils/email-generator.js:443-448`] | Emails read the calendar's Reviews Due Date; the record keeps only the template, attachments and wording | None (§5) |
@@ -87,7 +87,7 @@ dates; each is now in scope:
   reads the setup's `boardEnds`, moves to it too). Ask Connor whether request
   meeting dates follow a Board-date change; add a mismatch check to the
   readiness notice.
-- **`inviteStartDate` in Admin is never read.** Remove it.
+- **`inviteStartDate` in Admin was never read.** Removed (PR #551, merge `caf318983`, Production-deployed 2026-10-29).
 
 ## 3. Blank dates
 
@@ -137,7 +137,7 @@ planned, reads their dates, so they get no field (corrected 2026-10-29).
 |---|---|
 | Nov 15 | App-side dates on the calendar page |
 | Before Feb 3 | Staff recommendation deadline filled in (D40 warning reads it) |
-| Before Feb 24 | **One reviewer-invitation build (owner, 2026-10-29):** materials on acceptance (D46; work queue item 6) together with the review due date from the calendar — shared reader; invitation and stored due date from Reviews Due; per-send and browser-saved due dates removed; extensions based on the calendar date; Reviewer Finder record dates retired; review filing by Board date (replaces the Vercel switch). Build plan: `docs/plans/REVIEWER_INVITATION_CALENDAR_BUILD_PLAN_2026-10-29.md` |
+| Before Feb 24 | **One reviewer-invitation build (owner, 2026-10-29):** materials on acceptance (D46; work queue item 6) together with the review due date from the calendar — shared reader; invitation and stored due date from Reviews Due; per-send and browser-saved due dates removed; extensions based on the calendar date; Reviewer Finder record dates retired; review filing by Board date (replaces the Vercel switch; **done**, PR #551, merge `caf318983`, Production-deployed 2026-10-29). Build plan: `docs/plans/REVIEWER_INVITATION_CALENDAR_BUILD_PLAN_2026-10-29.md` |
 | Before Feb 24 | Board setup reads its dates from the calendar (D47), on the shared reader |
 | Before April | Confirm J27 research presentations trigger prep; prep by calendar after the cohort diff |
 | After Dec 10 | Retire the grantee-title job (T13, verify first) |

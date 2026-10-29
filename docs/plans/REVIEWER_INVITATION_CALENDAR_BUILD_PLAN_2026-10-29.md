@@ -2,7 +2,7 @@
 title: Reviewer invitation build — materials on acceptance, calendar due date, review filing and Board dates
 domain: reviewers
 kind: plan
-status: proposed
+status: in-progress
 summary: "One build before the Feb 24, 2027 J27 invitations (owner, 2026-10-29): the review due date comes from the cycle calendar's Reviews Due Date; reviewers get materials as soon as they accept (D46); per-send, browser-saved and Reviewer Finder record dates go away; review filing follows each cycle's Board date (D44) instead of a Vercel switch; the Board setup reads its dates from the calendar (D47); small calendar-page fixes. Traced from source 2026-10-29; nothing built."
 canonical: false
 owner: product-engineering
@@ -406,8 +406,12 @@ with the markers written only after confirmed delivery. Accepted.
 Branch `claude/reviewer-invitation-calendar`; Tier 2 (reviewer emails and
 Dataverse writes). Separate PRs, each with focused unit tests:
 
-1. Shared calendar reader + review filing by Board date (D) + calendar page (F)
-   + proposal download requires acceptance (risk 3).
+1. **Done (PR #551, merge `caf318983`, Production-deployed 2026-10-29):** review filing by Board date (D), using the
+   adapter's existing `listBoardDates` rather than the shared reader; calendar
+   page note and `inviteStartDate` removal (F); proposal download requires
+   released materials (risk 3). Codex found and the PR fixed cross-cycle scan
+   starvation and unreported undated cycles.
+   The shared calendar reader moves to PR 2.
 2. Due date from the calendar on the server (A, C).
 3. Board setup from the calendar (E).
 4. Materials on acceptance (B) + wording.
