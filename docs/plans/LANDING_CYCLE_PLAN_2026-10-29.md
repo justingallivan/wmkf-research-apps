@@ -237,6 +237,7 @@ Deliberations, Initial Assessments, Awardees tab) take the shell's cycle.
   - [RECHECKED after lib/dataverse/adapters/operations-grant-cycle.js change: `listModernCycles` now at :48 (paging :48-53), `findCycleByCode` added at :61; citations above updated]
   - [RECHECKED after lib/utils/cycle-code.js change: `normalizeCycles` :105-109 and `resolveWorkingCycle` :122-128 unchanged; `resolveLandingCycle` added at :136]
 - Codex PR review (gpt-6.1-sol, 2026-10-29): one high finding, fixed — Board pages passed `skip` while the router was not ready, so the hook started settled and the Board view mounted on the fallback, then remounted when the default arrived. The hook now has a `wait` option (unsettled, no request) used until the router is ready; regression test mutation-checked.
+- Codex re-review (gpt-6.1-sol, 2026-10-29): one medium finding, fixed — leaving `skip` (a Board URL cycle removed via the Tools menu link) or re-entering `wait` kept the old settled state, re-creating the fallback/remount race and an early `#discussion-cleanup` redirect. The hook's decision is now bound to its options (`view`/`skip`/`wait`) and discarded in the same render when they change; tests cover URL-cycle removal on both Board pages, URL-cycle arrival mid-read, wait re-entry, switching back to an earlier option set, and the redirect (5 of 18 fail against the previous hook).
 - Not yet done: the rollout prerequisite (Workbench
   list shows Phase I Pending) and the Production check in §6.
 

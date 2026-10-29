@@ -62,3 +62,45 @@ test('a valid URL cycle wins with no default request', () => {
   expect(global.fetch).not.toHaveBeenCalled();
   expect(mounts).toEqual(['dashboard:D26']);
 });
+
+test.each([
+  ['writeups', BoardWriteupsPage, 'dashboard'],
+  ['setup', BoardCycleSetupPage, 'setup'],
+])('%s page: removing the URL cycle (Tools menu link) shows no fallback view before the default arrives', async (_name, Page, mode) => {
+  routerState = { isReady: true, query: { cycle: 'D26' }, replace: jest.fn() };
+  global.fetch = jest.fn();
+  const view = render(<Page />);
+  expect(screen.getByText('Board view D26')).toBeInTheDocument();
+  const reply = deferredFetch();
+  routerState = { isReady: true, query: {}, replace: jest.fn() };
+  view.rerender(<Page />);
+  expect(screen.queryByText(/Board view/)).toBeNull();
+  await act(async () => { reply({ cycleCode: 'J27' }); });
+  await waitFor(() => expect(screen.getByText('Board view J27')).toBeInTheDocument());
+  expect(mounts).toEqual([`${mode}:D26`, `${mode}:J27`]);
+});
+
+test('a URL cycle arriving while the default is pending wins, and the late reply changes nothing', async () => {
+  routerState = { isReady: true, query: {}, replace: jest.fn() };
+  const reply = deferredFetch();
+  const view = render(<BoardWriteupsPage />);
+  routerState = { isReady: true, query: { cycle: 'D26' }, replace: jest.fn() };
+  view.rerender(<BoardWriteupsPage />);
+  expect(screen.getByText('Board view D26')).toBeInTheDocument();
+  await act(async () => { reply({ cycleCode: 'J27' }); });
+  expect(screen.getByText('Board view D26')).toBeInTheDocument();
+  expect(mounts).toEqual(['dashboard:D26']);
+});
+
+test('the discussion-cleanup redirect waits for the resolved cycle', async () => {
+  window.history.replaceState(null, '', '/board-writeups#discussion-cleanup');
+  const replace = jest.fn();
+  routerState = { isReady: true, query: {}, replace };
+  const reply = deferredFetch();
+  render(<BoardWriteupsPage />);
+  expect(replace).not.toHaveBeenCalled();
+  await act(async () => { reply({ cycleCode: 'J27' }); });
+  await waitFor(() => expect(replace).toHaveBeenCalledWith('/board-cycle-setup?cycle=J27#discussion-cleanup'));
+  expect(replace).toHaveBeenCalledTimes(1);
+  window.history.replaceState(null, '', '/');
+});

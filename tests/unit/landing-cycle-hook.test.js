@@ -87,3 +87,41 @@ test('wait holds the hook unsettled with no request, then a single read settles 
   await act(async () => { reply({ cycleCode: 'J27' }); });
   await waitFor(() => expect(result.current).toEqual({ settled: true, code: 'J27' }));
 });
+
+test('leaving skip reports unsettled in the same render until the fresh read settles', async () => {
+  global.fetch = jest.fn();
+  const { result, rerender } = renderHook(({ skip }) => useLandingCycleDefault({ view: 'board', skip }), { initialProps: { skip: true } });
+  expect(result.current).toEqual({ settled: true, code: null });
+  const reply = deferredFetch();
+  rerender({ skip: false });
+  expect(result.current).toEqual({ settled: false, code: null });
+  await act(async () => { reply({ cycleCode: 'J27' }); });
+  await waitFor(() => expect(result.current).toEqual({ settled: true, code: 'J27' }));
+});
+
+test('re-entering wait drops back to unsettled, and releasing it starts a fresh read', async () => {
+  let reply = deferredFetch();
+  const { result, rerender } = renderHook(({ wait }) => useLandingCycleDefault({ view: 'board', wait }), { initialProps: { wait: false } });
+  await act(async () => { reply({ cycleCode: 'D26' }); });
+  await waitFor(() => expect(result.current).toEqual({ settled: true, code: 'D26' }));
+  rerender({ wait: true });
+  expect(result.current).toEqual({ settled: false, code: null });
+  reply = deferredFetch();
+  rerender({ wait: false });
+  expect(result.current).toEqual({ settled: false, code: null });
+  await act(async () => { reply({ cycleCode: 'J27' }); });
+  await waitFor(() => expect(result.current).toEqual({ settled: true, code: 'J27' }));
+});
+
+test('switching options away and back never reuses the earlier answer while a fresh read is pending', async () => {
+  let reply = deferredFetch();
+  const { result, rerender } = renderHook(({ skip }) => useLandingCycleDefault({ view: 'board', skip }), { initialProps: { skip: false } });
+  await act(async () => { reply({ cycleCode: 'D26' }); });
+  await waitFor(() => expect(result.current).toEqual({ settled: true, code: 'D26' }));
+  rerender({ skip: true });
+  reply = deferredFetch();
+  rerender({ skip: false });
+  expect(result.current).toEqual({ settled: false, code: null });
+  await act(async () => { reply({ cycleCode: 'J27' }); });
+  await waitFor(() => expect(result.current).toEqual({ settled: true, code: 'J27' }));
+});
