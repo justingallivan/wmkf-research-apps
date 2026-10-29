@@ -17,7 +17,7 @@ related:
 
 # Cycle calendar on the operations Grant Cycle table
 
-Status: **proposed; slices 1–2 source-built on branch `claude/cycle-calendar`, not deployed:** adapter, service, route (`pages/api/cycle-calendar.js`), panel (`shared/components/cycle-calendar/CycleCalendarPanel.js`) on `/cycle-calendar` (Tools menu, all staff) and Admin → Workflows → Cycle calendar, with unit/UI tests. Remaining: schema-as-code parity, sandbox rehearsal (merge condition, §6).** Decision record: alignment log D43
+Status: **proposed; slices 1–2 source-built on branch `claude/cycle-calendar`, not deployed:** adapter, service, route (`pages/api/cycle-calendar.js`), panel (`shared/components/cycle-calendar/CycleCalendarPanel.js`) on `/cycle-calendar` (Tools menu, all staff) and Admin → Workflows → Cycle calendar, with unit/UI tests; schema-as-code at live parity; **controlled Production test passed 2026-10-28** (§6). Remaining: final independent review, PR, owner merge.** Decision record: alignment log D43
 (2026-10-28), which supersedes the date split in D10. `/contract-reconcile`
 plan review done 2026-10-28: ready with the named changes now folded into
 §3, §4 and §6.
@@ -229,8 +229,9 @@ needed.
 
 This is a new write path to a Dataverse table, so it is **Tier 2** under
 `docs/CAMPAIGN_RELEASE_AND_DATAVERSE_TEST_STRATEGY.md`: its own branch,
-characterization tests, a sandbox rehearsal (Mode C), recorded rollback, and
-an explicit owner decision to merge. This plan, the probe and its evidence
+characterization tests, an integrated rehearsal (here a controlled Production
+test, Mode D, by owner decision below), recorded rollback, and an explicit
+owner decision to merge. This plan, the probe and its evidence
 are docs (Tier 0).
 
 **Merge condition (owner, 2026-10-28: "I don't want to rely on hope as a
@@ -261,7 +262,7 @@ this change…" and re-checks at 2, 4 and 8 seconds; (2) a reload reset the
 dropdown to the default cycle, so the chosen cycle is now kept in the URL
 (`?cycle=`).
 
-Before the sandbox rehearsal:
+Schema and sandbox:
 
 - ~~Update `lib/dataverse/schema/wave0-prod-parity-foundation/01_wmkf_grantcycle.json`
   to the live columns and apply it to the sandbox.~~ **Done 2026-10-28 on the
@@ -271,10 +272,19 @@ Before the sandbox rehearsal:
   eleven column creations; `--execute` created them; a rerun creates nothing.
 - Sandbox state found 2026-10-28 [VERIFIED via read-only sandbox query]:
   organization auditing on, **`wmkf_grantcycle` table auditing off**, and
-  **no J/D cycle rows**. The rehearsal therefore needs (a) table auditing
-  turned on in the sandbox and (b) a sandbox test cycle row, created by the
-  rehearsal setup (the calendar itself never creates rows).
-- Add an Atlas page for `wmkf_grantcycle` once runtime code reads it.
+  **no J/D cycle rows**. These were prerequisites for a sandbox rehearsal;
+  **superseded** by the owner's choice of a controlled Production test, so
+  neither was done.
+- Atlas page for `wmkf_grantcycle`: added (`docs/atlas/dataverse-wmkf-grantcycle.md`).
+
+**Rollback.** Revert the merge commit. The feature adds a route, a page, an
+Admin view, a Tools link, an adapter and a service; it has no migration, no
+Production schema change and no data-model change, so reverting removes it
+cleanly. Independent of the revert and left in place: Production table
+auditing on `wmkf_grantcycle` (enabled 2026-10-28; turn off with the same
+metadata update if ever needed) and the eleven columns added to the sandbox.
+Dates saved through the calendar stay in Connor's table, as they would if
+entered in Dynamics.
 
 Surfaces the build must update, each with its gate: route rows in
 `docs/API_ROUTE_SECURITY_MATRIX.md` (`check:api-routes`); route namespace
