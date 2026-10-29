@@ -162,3 +162,91 @@ test('a draft keeps the version it was opened on, so a background refresh cannot
   const retry = global.fetch.mock.calls.filter(([, o]) => o?.method === 'POST')[1];
   expect(JSON.parse(retry[1].body).etag).toBe('W/"9"');
 });
+
+// Reproduces the 2026-10-29 J27 report: the date saved before its audit
+// attribution became readable. Values mirror the probe; identity is role-only.
+function delayedLeadershipDate(changedBy = null) {
+  const dates = CYCLE_CALENDAR_DATE_COLUMNS.map(({ column, label }) => ({
+    column, label,
+    value: column === 'wmkf_researchleadershipsemifinalistemaildate' ? '2026-03-01' : null,
+    changedBy: column === 'wmkf_researchleadershipsemifinalistemaildate' ? changedBy : null,
+    changedAt: column === 'wmkf_researchleadershipsemifinalistemaildate' && changedBy ? '2026-10-29T16:16:53.243Z' : null,
+  }));
+  return snapshot({ j27: { dates } });
+}
+
+async function saveLeadershipDate() {
+  mockRouter.query = { cycle: 'J27' };
+  render(<CycleCalendarPanel />);
+  fireEvent.click(await screen.findByRole('button', { name: 'Edit Leadership Semi-Finalist Email Date' }));
+  fireEvent.change(screen.getByLabelText('Leadership Semi-Finalist Email Date'), { target: { value: '2026-03-01' } });
+  jest.useFakeTimers();
+  fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+  await act(async () => {});
+}
+
+test('a matching J27 audit entry arriving after the original retry window appears automatically', async () => {
+  let gets = 0;
+  global.fetch = jest.fn(async (_url, options) => {
+    if (options?.method === 'POST') return response(delayedLeadershipDate());
+    gets += 1;
+    return response(gets === 1 ? snapshot() : delayedLeadershipDate(gets >= 5 ? 'Grants Manager' : null));
+  });
+  await saveLeadershipDate();
+  for (const delay of [2000, 4000, 8000]) await act(async () => { jest.advanceTimersByTime(delay); });
+  expect(screen.getByText('Recording who made this change…')).toBeTruthy();
+  await act(async () => { jest.advanceTimersByTime(15000); });
+  expect(screen.getByText('Changed by Grants Manager, Oct 29, 2026')).toBeTruthy();
+  expect(screen.queryByText('Recording who made this change…')).toBeNull();
+  expect(gets).toBe(5);
+});
+
+test('exhausted attribution retries explain the saved date and stop fetching', async () => {
+  global.fetch = jest.fn(async (_url, options) => response(options?.method === 'POST' || global.fetch.mock.calls.length > 1 ? delayedLeadershipDate() : snapshot()));
+  await saveLeadershipDate();
+  for (const delay of [2000, 4000, 8000, 15000, 30000, 60000]) await act(async () => { jest.advanceTimersByTime(delay); });
+  expect(screen.getByText('Date saved. Who made this change is still pending. Reload calendar to check again.')).toBeTruthy();
+  expect(screen.queryByText('Recording who made this change…')).toBeNull();
+  const calls = global.fetch.mock.calls.length;
+  await act(async () => { jest.advanceTimersByTime(300000); });
+  expect(global.fetch).toHaveBeenCalledTimes(calls);
+  fireEvent.click(screen.getByRole('button', { name: 'Reload calendar' }));
+  await act(async () => {});
+  expect(screen.queryByText('Date saved. Who made this change is still pending. Reload calendar to check again.')).toBeNull();
+});
+
+
+test('a failed attribution re-check retries and recovers on the next matching response', async () => {
+  let gets = 0;
+  global.fetch = jest.fn(async (_url, options) => {
+    if (options?.method === 'POST') return response(delayedLeadershipDate());
+    gets += 1;
+    if (gets === 2) throw new Error('Temporary network error');
+    return response(gets === 1 ? snapshot() : delayedLeadershipDate('Grants Manager'));
+  });
+  await saveLeadershipDate();
+  await act(async () => { jest.advanceTimersByTime(2000); });
+  expect(screen.getByText('Recording who made this change…')).toBeTruthy();
+  await act(async () => { jest.advanceTimersByTime(4000); });
+  expect(screen.getByText('Changed by Grants Manager, Oct 29, 2026')).toBeTruthy();
+});
+
+test('a slow attribution response cannot overwrite a manual reload or restart retries', async () => {
+  let resolveSlow;
+  let gets = 0;
+  global.fetch = jest.fn(async (_url, options) => {
+    if (options?.method === 'POST') return response(delayedLeadershipDate());
+    gets += 1;
+    if (gets === 2) return new Promise(resolve => { resolveSlow = resolve; });
+    return response(gets === 1 ? snapshot() : delayedLeadershipDate('Grants Manager'));
+  });
+  await saveLeadershipDate();
+  await act(async () => { jest.advanceTimersByTime(2000); });
+  fireEvent.click(screen.getByRole('button', { name: 'Reload calendar' }));
+  await act(async () => {});
+  expect(screen.getByText('Changed by Grants Manager, Oct 29, 2026')).toBeTruthy();
+  await act(async () => { resolveSlow(response(delayedLeadershipDate())); });
+  await act(async () => { jest.advanceTimersByTime(300000); });
+  expect(screen.getByText('Changed by Grants Manager, Oct 29, 2026')).toBeTruthy();
+  expect(gets).toBe(3);
+});

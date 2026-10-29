@@ -225,3 +225,26 @@ describe('saveDate', () => {
     expect(d.updateCycleDates).not.toHaveBeenCalled();
   });
 });
+
+
+test('the observed J27 Leadership email audit shape matches the saved date', async () => {
+  const column = 'wmkf_researchleadershipsemifinalistemaildate';
+  const detail = {
+    '@odata.type': '#Microsoft.Dynamics.CRM.AttributeAuditDetail',
+    AuditRecord: { createdon: '2026-10-29T16:16:53.243Z', [`_userid_value${FV}`]: 'Grants Manager' },
+    NewValue: {
+      '@odata.type': '#Microsoft.Dynamics.CRM.wmkf_grantcycle',
+      [column]: '2026-03-01T00:00:00Z', [`${column}${FV}`]: '3/1/2026',
+    },
+    OldValue: { '@odata.type': '#Microsoft.Dynamics.CRM.wmkf_grantcycle' },
+    DeletedAttributes: { Count: 0, Keys: [], Values: [] }, InvalidNewValueAttributes: [],
+  };
+  const result = await loadCalendar(actor, deps({
+    listModernCycles: jest.fn().mockResolvedValue([row('J27', '2027-06-10', { [column]: '2026-03-01T00:00:00Z' })]),
+    getChangeHistory: jest.fn().mockResolvedValue({ details: [detail, AUDIT_ENABLED_ENTRY], moreRecords: false }),
+  }));
+  expect(result.cycles[0].historyAvailable).toBe(true);
+  expect(result.cycles[0].dates.find(entry => entry.column === column)).toMatchObject({
+    value: '2026-03-01', changedBy: 'Grants Manager', changedAt: '2026-10-29T16:16:53.243Z',
+  });
+});
