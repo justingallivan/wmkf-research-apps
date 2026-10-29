@@ -137,7 +137,10 @@ sequence.
   exists in operations; D27 does not yet. Calendar role decided 2026-10-24:
   Grants Manager, Program Coordinator fallback; 2026-10-27: either role edits at
   any time, with last editor and time shown; readiness notices route by
-  role (log D12). Intended Research
+  role (log D12). 2026-10-28 (log D43): the operations `wmkf_grantcycle`
+  table, now carrying eleven milestone date columns, is the authoritative home
+  for cycle dates, edited from an app Admin calendar; prototype plan
+  `docs/plans/CYCLE_CALENDAR_DATAVERSE_PLAN_2026-10-28.md` (not built). Intended Research
   opportunity/publication and date propagation remain unresolved; meeting log: `docs/plans/J27_ALIGNMENT_LOG_2026-10-24.md`.
   Slice 1 (central reviewer campaign settings, owner decision D4) is scheduled
   for November 2026; its slice 2 dependency shipped as PR #521.

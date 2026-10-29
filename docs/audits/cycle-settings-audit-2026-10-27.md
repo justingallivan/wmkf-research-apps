@@ -20,6 +20,8 @@ Deliberations env cycle list). Line numbers are as of branch
 
 # Cycle identity, defaults and dates: source inventory (read-only audit)
 
+> **Historical snapshot; superseded in part 2026-10-28.** Row A4 lists the operations `wmkf_grantcycle` columns as of this audit. Connor has since added eleven milestone date columns, and the owner made that table the authoritative, app-edited home for cycle dates (alignment log D43; `docs/plans/CYCLE_CALENDAR_DATAVERSE_PLAN_2026-10-28.md`; evidence `docs/audits/grant-cycle-dates-2026-10-28-evidence.json`). The "not read at runtime" finding still holds. Rows below are left as recorded.
+
 Audit date 2026-10-27, branch `claude/j27-ai-materials-names`. Source-only: nothing was run against Dataverse, Postgres, Vercel or production. Live values (Vercel env, stored settings rows, Dataverse rows) are therefore [ASSUMED] / unverified unless stated; mechanics are read from source.
 
 Evidence labels: [VERIFIED via path:line] = I read the line. [INFERRED] = follows from verified code but I did not read every hop, or depends on live data.

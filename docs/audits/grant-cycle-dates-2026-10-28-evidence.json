@@ -1,0 +1,230 @@
+{
+  "capturedAt": "2026-10-29T01:54:12.057Z",
+  "target": "https://wmkf.crm.dynamics.com",
+  "externalMethods": [
+    "OAuth token POST",
+    "Dataverse GET"
+  ],
+  "errors": [],
+  "audit": {
+    "organization": true,
+    "table": false
+  },
+  "customAttributes": [
+    {
+      "logicalName": "wmkf_boardmailingdate",
+      "schemaName": "wmkf_BoardMailingDate",
+      "displayName": "Board Mailing Date",
+      "type": "DateTime",
+      "required": "None",
+      "writable": true,
+      "auditEnabled": true,
+      "dateFormat": "DateOnly",
+      "dateBehavior": "TimeZoneIndependent"
+    },
+    {
+      "logicalName": "wmkf_cyclecode",
+      "schemaName": "wmkf_CycleCode",
+      "displayName": "Cycle Code",
+      "type": "String",
+      "required": "ApplicationRequired",
+      "writable": true,
+      "auditEnabled": true,
+      "dateFormat": null,
+      "dateBehavior": null
+    },
+    {
+      "logicalName": "wmkf_meetingdate",
+      "schemaName": "wmkf_MeetingDate",
+      "displayName": "Board Meeting Date",
+      "type": "DateTime",
+      "required": "ApplicationRequired",
+      "writable": true,
+      "auditEnabled": true,
+      "dateFormat": "DateOnly",
+      "dateBehavior": "TimeZoneIndependent"
+    },
+    {
+      "logicalName": "wmkf_name",
+      "schemaName": "wmkf_Name",
+      "displayName": "Name",
+      "type": "String",
+      "required": "None",
+      "writable": true,
+      "auditEnabled": true,
+      "dateFormat": null,
+      "dateBehavior": null
+    },
+    {
+      "logicalName": "wmkf_researchbudgetduedate",
+      "schemaName": "wmkf_ResearchBudgetDueDate",
+      "displayName": "Budget Due Date",
+      "type": "DateTime",
+      "required": "None",
+      "writable": true,
+      "auditEnabled": true,
+      "dateFormat": "DateOnly",
+      "dateBehavior": "TimeZoneIndependent"
+    },
+    {
+      "logicalName": "wmkf_researchchairsfinalistemaildate",
+      "schemaName": "wmkf_ResearchChairsFinalistEmailDate",
+      "displayName": "Chairs' Finalist Email Date",
+      "type": "DateTime",
+      "required": "None",
+      "writable": true,
+      "auditEnabled": true,
+      "dateFormat": "DateOnly",
+      "dateBehavior": "TimeZoneIndependent"
+    },
+    {
+      "logicalName": "wmkf_researchchairssemifinalistemaildate",
+      "schemaName": "wmkf_ResearchChairsSemiFinalistEmailDate",
+      "displayName": "Chairs' Semi-Finalist Email Date",
+      "type": "DateTime",
+      "required": "None",
+      "writable": true,
+      "auditEnabled": true,
+      "dateFormat": "DateOnly",
+      "dateBehavior": "TimeZoneIndependent"
+    },
+    {
+      "logicalName": "wmkf_researchchairssemifinalistmeetingdate",
+      "schemaName": "wmkf_ResearchChairsSemiFinalistMeetingDate",
+      "displayName": "Chairs Semi-Finalist Meeting Date",
+      "type": "DateTime",
+      "required": "None",
+      "writable": true,
+      "auditEnabled": true,
+      "dateFormat": "DateOnly",
+      "dateBehavior": "TimeZoneIndependent"
+    },
+    {
+      "logicalName": "wmkf_researchleadershipfinalistemaildate",
+      "schemaName": "wmkf_ResearchLeadershipFinalistEmailDate",
+      "displayName": "Leadership Finalist Email Date",
+      "type": "DateTime",
+      "required": "None",
+      "writable": true,
+      "auditEnabled": true,
+      "dateFormat": "DateOnly",
+      "dateBehavior": "TimeZoneIndependent"
+    },
+    {
+      "logicalName": "wmkf_researchleadershipsemifinalistemaildate",
+      "schemaName": "wmkf_ResearchLeadershipSemiFinalistEmailDate",
+      "displayName": "Leadership Semi-Finalist Email Date",
+      "type": "DateTime",
+      "required": "None",
+      "writable": true,
+      "auditEnabled": true,
+      "dateFormat": "DateOnly",
+      "dateBehavior": "TimeZoneIndependent"
+    },
+    {
+      "logicalName": "wmkf_researchleadershipsemifinalistmeetingdate",
+      "schemaName": "wmkf_ResearchLeadershipSemiFinalistMeetingDate",
+      "displayName": "Leadership Semi-Finalist Meeting Date",
+      "type": "DateTime",
+      "required": "None",
+      "writable": true,
+      "auditEnabled": true,
+      "dateFormat": "DateOnly",
+      "dateBehavior": "TimeZoneIndependent"
+    },
+    {
+      "logicalName": "wmkf_researchofframpmeetingdate",
+      "schemaName": "wmkf_ResearchOfframpMeetingDate",
+      "displayName": "Offramp Meeting Date",
+      "type": "DateTime",
+      "required": "None",
+      "writable": true,
+      "auditEnabled": true,
+      "dateFormat": "DateOnly",
+      "dateBehavior": "TimeZoneIndependent"
+    },
+    {
+      "logicalName": "wmkf_researchproposalduedate",
+      "schemaName": "wmkf_ResearchProposalDueDate",
+      "displayName": "Proposal Due",
+      "type": "DateTime",
+      "required": "None",
+      "writable": true,
+      "auditEnabled": true,
+      "dateFormat": "DateOnly",
+      "dateBehavior": "TimeZoneIndependent"
+    },
+    {
+      "logicalName": "wmkf_researchreviewsduedate",
+      "schemaName": "wmkf_ResearchReviewsDueDate",
+      "displayName": "Reviews Due Date",
+      "type": "DateTime",
+      "required": "None",
+      "writable": true,
+      "auditEnabled": true,
+      "dateFormat": "DateOnly",
+      "dateBehavior": "TimeZoneIndependent"
+    }
+  ],
+  "totalRows": 143,
+  "recentRows": [
+    {
+      "state": 0,
+      "createdOn": "2026-08-06T16:42:08Z",
+      "modifiedOn": "2026-08-06T22:55:10Z",
+      "wmkf_boardmailingdate": null,
+      "wmkf_cyclecode": "D26",
+      "wmkf_meetingdate": "2026-12-10T00:00:00Z",
+      "wmkf_name": "December 2026",
+      "wmkf_researchbudgetduedate": null,
+      "wmkf_researchchairsfinalistemaildate": null,
+      "wmkf_researchchairssemifinalistemaildate": null,
+      "wmkf_researchchairssemifinalistmeetingdate": null,
+      "wmkf_researchleadershipfinalistemaildate": null,
+      "wmkf_researchleadershipsemifinalistemaildate": null,
+      "wmkf_researchleadershipsemifinalistmeetingdate": null,
+      "wmkf_researchofframpmeetingdate": null,
+      "wmkf_researchproposalduedate": null,
+      "wmkf_researchreviewsduedate": null
+    },
+    {
+      "state": 0,
+      "createdOn": "2026-08-06T16:42:08Z",
+      "modifiedOn": "2026-10-08T18:15:49Z",
+      "wmkf_boardmailingdate": null,
+      "wmkf_cyclecode": "J26",
+      "wmkf_meetingdate": "2026-06-10T00:00:00Z",
+      "wmkf_name": "June 2026",
+      "wmkf_researchbudgetduedate": null,
+      "wmkf_researchchairsfinalistemaildate": null,
+      "wmkf_researchchairssemifinalistemaildate": null,
+      "wmkf_researchchairssemifinalistmeetingdate": null,
+      "wmkf_researchleadershipfinalistemaildate": null,
+      "wmkf_researchleadershipsemifinalistemaildate": null,
+      "wmkf_researchleadershipsemifinalistmeetingdate": null,
+      "wmkf_researchofframpmeetingdate": null,
+      "wmkf_researchproposalduedate": null,
+      "wmkf_researchreviewsduedate": null
+    },
+    {
+      "state": 0,
+      "createdOn": "2026-09-30T21:34:05Z",
+      "modifiedOn": "2026-09-30T21:34:05Z",
+      "wmkf_boardmailingdate": null,
+      "wmkf_cyclecode": "J27",
+      "wmkf_meetingdate": "2027-06-10T00:00:00Z",
+      "wmkf_name": "June 2027",
+      "wmkf_researchbudgetduedate": null,
+      "wmkf_researchchairsfinalistemaildate": null,
+      "wmkf_researchchairssemifinalistemaildate": null,
+      "wmkf_researchchairssemifinalistmeetingdate": null,
+      "wmkf_researchleadershipfinalistemaildate": null,
+      "wmkf_researchleadershipsemifinalistemaildate": null,
+      "wmkf_researchleadershipsemifinalistmeetingdate": null,
+      "wmkf_researchofframpmeetingdate": null,
+      "wmkf_researchproposalduedate": null,
+      "wmkf_researchreviewsduedate": null
+    }
+  ],
+  "dataverseGetCalls": 5
+}
