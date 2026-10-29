@@ -1,0 +1,135 @@
+{
+  "capturedAt": "2026-10-29T03:50:58.436Z",
+  "target": "https://wmkf.crm.dynamics.com",
+  "externalMethods": [
+    "OAuth token POST",
+    "Dataverse GET"
+  ],
+  "subjects": [
+    {
+      "subject": "app user (WhoAmI)",
+      "assigned": true,
+      "disabled": false,
+      "accessMode": 4,
+      "totalPrivileges": 14407,
+      "grantCyclePrivileges": [
+        {
+          "privilege": "prvAppendTowmkf_GrantCycle",
+          "depth": "Global"
+        },
+        {
+          "privilege": "prvAppendwmkf_GrantCycle",
+          "depth": "Global"
+        },
+        {
+          "privilege": "prvCreatewmkf_GrantCycle",
+          "depth": "Global"
+        },
+        {
+          "privilege": "prvDeletewmkf_GrantCycle",
+          "depth": "Global"
+        },
+        {
+          "privilege": "prvReadwmkf_GrantCycle",
+          "depth": "Global"
+        },
+        {
+          "privilege": "prvWritewmkf_GrantCycle",
+          "depth": "Global"
+        }
+      ],
+      "canRead": true,
+      "canWrite": true
+    },
+    {
+      "subject": "grantsManager (assigned)",
+      "assigned": true,
+      "disabled": false,
+      "accessMode": 0,
+      "totalPrivileges": 14529,
+      "grantCyclePrivileges": [
+        {
+          "privilege": "prvAppendTowmkf_GrantCycle",
+          "depth": "Global"
+        },
+        {
+          "privilege": "prvAppendwmkf_GrantCycle",
+          "depth": "Global"
+        },
+        {
+          "privilege": "prvCreatewmkf_GrantCycle",
+          "depth": "Global"
+        },
+        {
+          "privilege": "prvDeletewmkf_GrantCycle",
+          "depth": "Global"
+        },
+        {
+          "privilege": "prvReadwmkf_GrantCycle",
+          "depth": "Global"
+        },
+        {
+          "privilege": "prvWritewmkf_GrantCycle",
+          "depth": "Global"
+        }
+      ],
+      "canRead": true,
+      "canWrite": true
+    },
+    {
+      "subject": "programCoordinator (assigned)",
+      "assigned": true,
+      "disabled": false,
+      "accessMode": 0,
+      "totalPrivileges": 901,
+      "grantCyclePrivileges": [
+        {
+          "privilege": "prvAppendTowmkf_GrantCycle",
+          "depth": "Global"
+        },
+        {
+          "privilege": "prvAppendwmkf_GrantCycle",
+          "depth": "Global"
+        },
+        {
+          "privilege": "prvReadwmkf_GrantCycle",
+          "depth": "Global"
+        },
+        {
+          "privilege": "prvWritewmkf_GrantCycle",
+          "depth": "Global"
+        }
+      ],
+      "canRead": true,
+      "canWrite": true
+    },
+    {
+      "subject": "additional staff member (--also-email)",
+      "assigned": true,
+      "disabled": false,
+      "accessMode": 0,
+      "totalPrivileges": 785,
+      "grantCyclePrivileges": [
+        {
+          "privilege": "prvAppendTowmkf_GrantCycle",
+          "depth": "Global"
+        },
+        {
+          "privilege": "prvAppendwmkf_GrantCycle",
+          "depth": "Global"
+        },
+        {
+          "privilege": "prvReadwmkf_GrantCycle",
+          "depth": "Global"
+        },
+        {
+          "privilege": "prvWritewmkf_GrantCycle",
+          "depth": "Global"
+        }
+      ],
+      "canRead": true,
+      "canWrite": true
+    }
+  ],
+  "dataverseGetCalls": 12
+}

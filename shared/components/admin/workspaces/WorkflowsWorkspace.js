@@ -11,6 +11,7 @@ import ReviewerCampaignTimelineSection from '../ReviewerCampaignTimelineSection'
 import HonorariumAmountSection from '../HonorariumAmountSection';
 import ReviewerTimeBudgetSection from '../ReviewerTimeBudgetSection';
 import ReviewerReleaseAttachmentsSection from '../ReviewerReleaseAttachmentsSection';
+import CycleCalendarPanel from '../../cycle-calendar/CycleCalendarPanel';
 import {
   appSystemSettingField,
   appSystemSettingPattern,
@@ -109,6 +110,8 @@ const EMAIL_DEFAULTS_DATAVERSE_FIELDS = [
 
 export function WorkflowsWorkspace({ view }) {
   switch (view) {
+    case 'cycle-calendar':
+      return <CycleCalendarPanel />;
     case 'proposal-ranking':
       return (
         <AdminEditorPanel

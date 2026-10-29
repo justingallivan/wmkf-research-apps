@@ -36,6 +36,7 @@ export const ADMIN_WORKSPACES = Object.freeze([
     defaultView: 'external-review',
     views: [
       { key: 'external-review', label: 'External review' },
+      { key: 'cycle-calendar', label: 'Cycle calendar' },
       { key: 'review-form', label: 'Review form' },
       { key: 'proposal-ranking', label: 'Proposal Ranking' },
       { key: 'final-writeups', label: 'Final Writeups' },

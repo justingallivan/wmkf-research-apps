@@ -130,6 +130,20 @@ fields, and sandbox/prod assumptions. The Atlas adjudicates live data state.
 
 ## Operating Notes
 
+- **Audit history and the operations Grant Cycle table (2026-10-28, D43 cycle
+  calendar).** For downstream apps reading who changed a record:
+  `RetrieveRecordChangeHistory` (per record, GET) is the only audit read open
+  to this app — `/audits` filtered to one object is **403**, as is the bulk
+  aggregate. Entries carry `AuditRecord.createdon` and the formatted
+  `_userid_value`; a cleared column appears only in `OldValue`; results can
+  page (`MoreRecords`). A new audit entry becomes readable **a few seconds
+  after the write**, so a read straight after a save will not see it.
+  Impersonated writes (`MSCRMCallerID`, `noFallback`) are recorded under the
+  staff member. `wmkf_grantcycle` dates are DateOnly / TimeZoneIndependent
+  (`YYYY-MM-DDT00:00:00Z`): never time-zone convert them. Evidence:
+  `docs/audits/audit-history-shape-2026-10-28-evidence.json`,
+  `docs/plans/CYCLE_CALENDAR_DATAVERSE_PLAN_2026-10-28.md` §4 and §6; Atlas
+  `docs/atlas/dataverse-wmkf-grantcycle.md`.
 - **Expertise roster Contact links are reference-only** **[PRODUCTION-LIVE
   2026-09-14; Postgres migration 050 applied and read back].** The roster keeps its
   Postgres `id` as the durable attendee identity and may hold one optional
