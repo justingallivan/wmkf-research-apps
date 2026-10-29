@@ -98,9 +98,13 @@ small per-cycle record of app dates, edited on the same calendar page beside the
 eleven Dynamics dates, so Sarah sees one calendar. It records who changed each
 date. A documented divergence from D43's single home, chosen by the owner.
 
-- Staff recommendation deadline (Feb 3; D40 warning)
-- Triage meetings (Jan 6 AI triage; Jan 13–14 PD triage)
-- Proposal release to reviewers (feeds the invitation email's send date)
+- Staff recommendation deadline (Feb 3; the D40 "still Under consideration" warning)
+- Proposal release to reviewers (the "we will send the full proposal by" date in the
+  invitation and release emails; typed today in the Admin reviewer defaults, each PD's
+  saved preference and the release form)
+
+The January triage meetings are on the J27 timeline but no app feature, built or
+planned, reads their dates, so they get no field (corrected 2026-10-29).
 
 ## 6. Order by deadline
 
