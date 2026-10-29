@@ -36,7 +36,8 @@ function baseArgs() {
 
 // Golden hash for baseArgs() above — the canonical fixture every other case
 // in this file is diffed against.
-const BASE_HASH = 'e11cba6940f5fc3345d936ad4662029ab3b39c57beac9b5230837e714a26face';
+// Re-pinned 2026-10-29 for the D48 version bump (v1→v2 for non-invitations).
+const BASE_HASH = 'ec72d4a4f9f025617e35f13e22ae8a5e89e4239f97318f6e9e328af3338e6180';
 
 describe('fingerprintDraft golden hashes', () => {
   test('base fixture hashes to the pinned golden value', () => {
@@ -49,10 +50,10 @@ describe('fingerprintDraft golden hashes', () => {
     expect(fingerprintDraft(buildDraftFingerprintInputs(args))).toBe(BASE_HASH);
   });
 
-  test('only invitation fingerprints use v2 and bind the normalized request Program Director', () => {
+  test('only invitation fingerprints use v3 and bind the normalized request Program Director', () => {
     const invite = { ...baseArgs(), templateType: 'invitation' };
     const first = buildDraftFingerprintInputs(invite);
-    expect(first.v).toBe(2);
+    expect(first.v).toBe(3);
     expect(first.request.programDirectorId).toBe('pd-a');
 
     invite.request._wmkf_programdirector_value = 'pd-b';
@@ -60,7 +61,7 @@ describe('fingerprintDraft golden hashes', () => {
       .not.toBe(fingerprintDraft(first));
 
     const materials = buildDraftFingerprintInputs(baseArgs());
-    expect(materials.v).toBe(1);
+    expect(materials.v).toBe(2);
     expect(materials.request).not.toHaveProperty('programDirectorId');
     expect(fingerprintDraft(materials)).toBe(BASE_HASH);
   });
@@ -89,7 +90,7 @@ describe('fingerprintDraft golden hashes', () => {
     args.person.wmkf_primaryaffiliation = null;
     args.person.wmkf_organizationname = null;
     const hash = fingerprintDraft(buildDraftFingerprintInputs(args));
-    expect(hash).toBe('3bc3e8d3af313165f023e93e11d76a2519b48749bd3a22a59aaccb506633a106');
+    expect(hash).toBe('1ab98d4c1a40ac6aefa8c44f5e297dcc08e6b9acb6f3725dedfe71dfbd36f725');
     expect(hash).not.toBe(BASE_HASH);
   });
 
@@ -98,23 +99,23 @@ describe('fingerprintDraft golden hashes', () => {
   // field proving each flips the hash") plus the co-PI *order* sensitivity
   // case (order is part of the body — the plan documents this explicitly).
   test.each([
-    ['templateType (invitation v2)', (a) => { a.templateType = 'invitation'; }, '4778746ef4ce8a7774ed9473b1b66747af2fc1460aacc707c2d27affd1d19e22'],
-    ['suggestionId (a different GUID)', (a) => { a.suggestionId = '33333333-3333-4333-8333-333333333333'; }, 'b454ccfd09b01964f0d1654447ecc17128d7bde3510b0467fd12568b32a5b654'],
-    ['candidate.name', (a) => { a.person.wmkf_name = 'Dr. Other Name'; }, '9bf6544f5e3cdba822a1c5ded5592244f827d32140c687b20e86e65e564d1838'],
-    ['candidate.affiliation', (a) => { a.person.wmkf_primaryaffiliation = 'Uni B'; }, '5a193e49a6b8874d5514e662df434e75202b74a4cca171183cddfd2a66261498'],
-    ['proposal.title', (a) => { a.request.akoya_title = 'Different title'; }, '49e0ea176bccee0a61cc43376a54e3d14154bb978b03ca5c061929828b87369c'],
-    ['proposal.abstract', (a) => { a.request.wmkf_abstract = 'Different abstract'; }, '9226edfae124b34c8a81f72919b16cb1b224c6158d571f0057cdcd19b0ffce0c'],
-    ['proposal.authors', (a) => { a.request._wmkf_projectleader_value_formatted = 'Dr. Other PI'; }, 'a37d5134462211770cf88ce3f149c5aee2521cc93fbc31d63343c9d1ec9efde5'],
-    ['proposal.institution', (a) => { a.request._akoya_applicantid_value_formatted = 'Org B'; }, '0dd4b7115f405a69e01e0fe3d69da9fe5cc720eb891f25634655fbd687be1337'],
-    ['proposal.coInvestigators (membership)', (a) => { a.coPINames = ['Dr. Alex Co']; }, '40ef06db702fc0a85f165a8eac1ccb85f916efac527d5b5f10d7f7c2762e6236'],
-    ['proposal.coInvestigators (order only, same membership)', (a) => { a.coPINames = ['Dr. Bea Co', 'Dr. Alex Co']; }, 'aa5fee701a734466660ddb005b61d872927d1d9ca26d4a80f468cb7acebbaad1'],
-    ['engagement.reviewDueDateOverride', (a) => { a.suggestion = { wmkf_reviewduedateoverride: '2099-03-01' }; }, '00b7072b317770b4bf441aa175a18ec2894d3e641d38e580bfa4d07d3daf5eeb'],
-    ['request.reviewDueDate', (a) => { a.request.wmkf_reviewduedate = '2099-04-01'; }, '656efb94c140e7b270d14795a2e8afe3d3eab1ab8ae5ea19c91e21845f74fbf5'],
-    ['request.meetingDate', (a) => { a.request.wmkf_meetingdate = '2099-07-01'; }, 'fe66186139c51ddba538c9c4f0831fbd6799fc4ab9b2b6ce86c4155d7e232c4f'],
-    ['cycle.programName', (a) => { a.cycle.program_name = 'Different Program'; }, '794e06ab683228f9091f1e0af172ae7fe1ab0336bbe0c7c03f729b3862e87c3b'],
-    ['cycle.reviewDeadline', (a) => { a.cycle.review_deadline = '2099-05-01'; }, '10a68ffe8a9f692e35f58267ed8dddf56ddfe05221ba08982ef9ab577a717986'],
-    ['cycle.customFields', (a) => { a.cycle.custom_fields = { foo: 'baz' }; }, '1020108177dc6940a24838006f365d83abe785851f74705e3f348ec4da091260'],
-    ['honorariumAmount', (a) => { a.honorariumAmount = 999; }, 'cd96769bee2189cccf0d2000878fb43eac67d75e11637a41f9ee356cf14f2dbc'],
+    ['templateType (invitation v3)', (a) => { a.templateType = 'invitation'; }, 'b97d939b34b382f6329bc4a4a65d2fd84c2f6ed635cc34342ac106b4af182c38'],
+    ['suggestionId (a different GUID)', (a) => { a.suggestionId = '33333333-3333-4333-8333-333333333333'; }, '81106b0e073c4066aff5e593f9b7f99d9deca8143f3fab4bc7929eebb519064d'],
+    ['candidate.name', (a) => { a.person.wmkf_name = 'Dr. Other Name'; }, '02fac203d9512887b780fab55296eedc64dcd87faaaf53c1e19dcfcbdf3c722b'],
+    ['candidate.affiliation', (a) => { a.person.wmkf_primaryaffiliation = 'Uni B'; }, '33f3ce7e0bcbc4cc6b5dc6de04201eca6ee397554b80d8f07daab62b2b7ae819'],
+    ['proposal.title', (a) => { a.request.akoya_title = 'Different title'; }, '146a570b6f9156683e107c276c35ca749bb8a187f035b053551e214902e5ea31'],
+    ['proposal.abstract', (a) => { a.request.wmkf_abstract = 'Different abstract'; }, 'c3a3aeaa3c68eb864ee4ff5d8a6576e458721b0e438f15c541a3e735f16ca022'],
+    ['proposal.authors', (a) => { a.request._wmkf_projectleader_value_formatted = 'Dr. Other PI'; }, '848315855cbdebcd8ea6a8f020b39769a9cea4ebcb1da3817b01cf4b7c8d6146'],
+    ['proposal.institution', (a) => { a.request._akoya_applicantid_value_formatted = 'Org B'; }, '72e2bc00a3af6387f0600bd4a4d0e66c5e908271d63ecfb35037a37b578419da'],
+    ['proposal.coInvestigators (membership)', (a) => { a.coPINames = ['Dr. Alex Co']; }, '02c50726a484ef4a851bc08eff59dc6bfe596377f7ab6c210ee2ee97f37cdfb6'],
+    ['proposal.coInvestigators (order only, same membership)', (a) => { a.coPINames = ['Dr. Bea Co', 'Dr. Alex Co']; }, '4488a0d5172094a6fa94cfc982c76d9baa388a13f2b31ee79cb88e93b165a667'],
+    ['engagement.reviewDueDateOverride', (a) => { a.suggestion = { wmkf_reviewduedateoverride: '2099-03-01' }; }, '5ce815ee30b991f87c67791e26815944c3ad91ead92f73dd460608c65c9c8e1d'],
+    ['request.reviewDueDate', (a) => { a.request.wmkf_reviewduedate = '2099-04-01'; }, '7c13922b44e9842198d8b8329ba07362e61d9c0184103ffe8270381f64e7d6e1'],
+    ['request.meetingDate', (a) => { a.request.wmkf_meetingdate = '2099-07-01'; }, 'd662ace4a1c0e08e2069a8226b214af490e141483af750f57bb94066a2d34211'],
+    ['cycle.programName', (a) => { a.cycle.program_name = 'Different Program'; }, 'fe5c5505d2662080950fa4856ba5c5e4c95dd6b32ed1a27323960f7f32d6422c'],
+    ['cycle.reviewDeadline', (a) => { a.cycle.review_deadline = '2099-05-01'; }, '7250b11d4ddf9ffffbf991d802a164aada1a6f2637e5cdec542aa09cb8328066'],
+    ['cycle.customFields', (a) => { a.cycle.custom_fields = { foo: 'baz' }; }, '3cb071eed0185799d1011f19c3d66746553c2a602cd0f876dcff836d8c82b34f'],
+    ['honorariumAmount', (a) => { a.honorariumAmount = 999; }, '2a1833e0f88629ba232db3127b95a669deccbfb778d412713eacbe35d522e3af'],
   ])('changing %s alone flips the hash away from the base golden value', (label, mutate, goldenForMutation) => {
     const args = baseArgs();
     mutate(args);
@@ -196,4 +197,14 @@ describe('exclusions (Stage 6D accepted contract)', () => {
     const b = fingerprintDraft(buildDraftFingerprintInputs({ ...baseArgs(), honorariumAmount: null }));
     expect(a).toBe(b);
   });
+});
+
+test('D48: a fingerprint computed under the previous contract versions never matches the current one', () => {
+  // A preview rendered before deploy carried v2 (invitation) / v1 (others) and
+  // could embed a composer due date; send must refuse it as stale.
+  for (const templateType of ['invitation', 'materials']) {
+    const current = buildDraftFingerprintInputs({ ...baseArgs(), templateType });
+    const previous = { ...current, v: templateType === 'invitation' ? 2 : 1 };
+    expect(fingerprintDraft(previous)).not.toBe(fingerprintDraft(current));
+  }
 });

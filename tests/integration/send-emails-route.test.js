@@ -812,6 +812,32 @@ describe('send-emails — review due date from the cycle calendar (D48)', () => 
   });
 });
 
+describe('send-emails — previews rendered before the D48 deploy are refused', () => {
+  const { buildDraftFingerprintInputs, fingerprintDraft } = require('../../lib/services/review-manager/draft-fingerprint');
+  // The old invitation contract (fingerprint v2) let the composer put its own
+  // due date into the body; such a preview must be re-rendered, never sent.
+  const oldPreview = (templateType) => {
+    const inputs = buildDraftFingerprintInputs({
+      templateType,
+      suggestionId: SUG_1,
+      suggestion: SUGGESTIONS[SUG_1],
+      person: PERSON,
+      request: REQUEST,
+      coPINames: [],
+      cycle: {},
+      honorariumAmount: 250,
+    });
+    return { ...draft(), body: `${draft().body}\nReview due by August 5, 2099`, draftFingerprint: fingerprintDraft({ ...inputs, v: templateType === 'invitation' ? 2 : 1 }) };
+  };
+
+  test.each([false, true])('an old-contract invitation preview is skipped draft_stale (allowResend %s)', async (allowResend) => {
+    if (allowResend) SUGGESTIONS = { [SUG_1]: baseSuggestion({ wmkf_invited: true }) };
+    const res = await run({ drafts: [oldPreview('invitation')], templateType: 'invitation', allowResend });
+    expect(resultOf(res).skipped.map((x) => x.reason)).toEqual(['draft_stale']);
+    expect(createAndSendEmail).not.toHaveBeenCalled();
+  });
+});
+
 describe('send-emails — reviewer quota (wmkf_desiredcount) seed on first invite', () => {
   const CONFIG = { respondOffsetDays: 7 };
   const invite = (over = {}) => ({ drafts: [draft()], templateType: 'invitation', campaignConfig: CONFIG, ...over });

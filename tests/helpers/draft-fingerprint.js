@@ -92,7 +92,7 @@ function buildFingerprintInputsFromFixture({
 
   const isInvitation = templateType === 'invitation';
   return {
-    v: isInvitation ? 2 : 1,
+    v: isInvitation ? 3 : 2, // D48 bump, mirrors production (2026-10-29)
     templateType: templateType ?? null,
     suggestionId: String(suggestionId || '').toLowerCase(),
     candidate: {
