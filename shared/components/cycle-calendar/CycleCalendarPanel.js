@@ -10,7 +10,7 @@ import { Button } from '../Layout';
 import { requestEnvelope } from '../../utils/api-request';
 
 /** Re-checks after a save, until Dataverse makes the new audit entry readable. */
-const ATTRIBUTION_RECHECK_MS = [2000, 4000, 8000];
+const ATTRIBUTION_RECHECK_MS = [2000, 4000, 8000, 15000, 30000, 60000];
 
 function attributed(data, code, column, value) {
   const entry = data?.cycles?.find(c => c.code === code)?.dates?.find(d => d.column === column);
@@ -42,7 +42,7 @@ async function request(body, signal) {
   return result.data;
 }
 
-function DateRow({ entry, cycle, canEdit, savingAvailable, busy, recording, onSave }) {
+function DateRow({ entry, cycle, canEdit, savingAvailable, busy, recording, attributionPending, onSave }) {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(entry.value || '');
   const [message, setMessage] = useState(null);
@@ -71,6 +71,7 @@ function DateRow({ entry, cycle, canEdit, savingAvailable, busy, recording, onSa
         <p className={entry.value ? 'text-gray-800' : 'text-gray-500'}>{formatDate(entry.value)}</p>
         {attribution && !recording && <p className="text-sm text-gray-600">{attribution}</p>}
         {recording && <p role="status" className="text-sm text-gray-500">Recording who made this change…</p>}
+        {attributionPending && !attribution && <p role="status" className="text-sm text-gray-500">Date saved. Who made this change is still pending. Reload calendar to check again.</p>}
       </div>
       {canEdit && !editing && <Button variant="outline" disabled={Boolean(busy) || !savingAvailable} onClick={() => { setMessage(null); setDraft(entry.value || ''); setEditEtag(cycle.etag); setEditing(true); }}>Edit<span className="sr-only"> {entry.label}</span></Button>}
     </div>
@@ -114,7 +115,7 @@ export default function CycleCalendarPanel() {
   }, [reload]);
 
   // After a save, re-read until the saved date carries its "changed by" (audit entries
-  // become readable a few seconds after the write). Gives up quietly after the last try.
+  // may lag the write). After bounded retries, keep a visible reload instruction.
   useEffect(() => {
     if (!pending) return undefined;
     const delay = ATTRIBUTION_RECHECK_MS[pending.attempt];
@@ -122,14 +123,16 @@ export default function CycleCalendarPanel() {
     const controller = new AbortController(), current = generation.current;
     const timer = setTimeout(() => {
       const stamp = dataStamp.current;
+      const advance = () => setPending(old => old === pending ? { ...pending, attempt: pending.attempt + 1 } : old);
       request(null, controller.signal).then(value => {
-        if (generation.current !== current || dataStamp.current !== stamp || !Array.isArray(value?.cycles)) return;
+        if (controller.signal.aborted || generation.current !== current) return;
+        if (dataStamp.current !== stamp || !Array.isArray(value?.cycles)) { advance(); return; }
         dataStamp.current += 1;
         setData(value);
-        setPending(old => (old !== pending ? old
-          : attributed(value, pending.code, pending.column, pending.value) || pending.attempt + 1 >= ATTRIBUTION_RECHECK_MS.length ? null
-            : { ...pending, attempt: pending.attempt + 1 }));
-      }).catch(() => { if (!controller.signal.aborted) setPending(old => (old === pending ? null : old)); });
+        setPending(old => old !== pending ? old
+          : attributed(value, pending.code, pending.column, pending.value) ? null
+            : { ...pending, attempt: pending.attempt + 1 });
+      }).catch(() => { if (!controller.signal.aborted && generation.current === current) advance(); });
     }, delay);
     return () => { clearTimeout(timer); controller.abort(); };
   }, [pending]);
@@ -187,7 +190,7 @@ export default function CycleCalendarPanel() {
     {!cycle.historyAvailable && <p className="mt-4 text-sm text-gray-600">Who changed each date is not available right now.{cycle.rowModifiedAt ? ` Last change to this cycle (any date): ${formatWhen(cycle.rowModifiedAt)}${cycle.rowModifiedBy ? ` by ${cycle.rowModifiedBy}` : ''}.` : ''}</p>}
     <div className="mt-4 rounded-lg bg-gray-50 p-3 text-sm text-gray-700"><span className="font-medium">{cycle.board.label}:</span> {formatDate(cycle.board.value)} <span className="text-gray-500">(set by operations)</span></div>
     <ul className="mt-2 divide-y divide-gray-100">
-      {cycle.dates.map(entry => <DateRow key={`${cycle.code}-${entry.column}`} entry={entry} cycle={cycle} canEdit={data.canEdit} savingAvailable={data.savingAvailable} busy={busy} recording={pending?.code === cycle.code && pending?.column === entry.column} onSave={(column, value, etag) => saveDate(cycle, column, value, etag)} />)}
+      {cycle.dates.map(entry => <DateRow key={`${cycle.code}-${entry.column}`} entry={entry} cycle={cycle} canEdit={data.canEdit} savingAvailable={data.savingAvailable} busy={busy} recording={pending?.code === cycle.code && pending?.column === entry.column && pending.attempt < ATTRIBUTION_RECHECK_MS.length} attributionPending={pending?.code === cycle.code && pending?.column === entry.column && pending.attempt >= ATTRIBUTION_RECHECK_MS.length} onSave={(column, value, etag) => saveDate(cycle, column, value, etag)} />)}
     </ul>
     <div className="mt-4"><Button variant="link" disabled={Boolean(busy)} onClick={reloadCalendar}>Reload calendar</Button></div>
   </section>;
