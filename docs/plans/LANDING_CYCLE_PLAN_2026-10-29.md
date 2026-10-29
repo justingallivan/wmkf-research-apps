@@ -220,7 +220,7 @@ Deliberations, Initial Assessments, Awardees tab) take the shell's cycle.
 
 ## 7. Build status
 
-**[MERGED TO `main` 2026-10-29 (`6c9a1013b`, PR #547); Production auto-deploy not yet verified]**
+**[MERGED TO `main` 2026-10-29 (`6c9a1013b`, PR #547); Production deploy completed per Vercel commit status, 2026-10-29]**
 
 - Setting, reader, editor view, save and Board default:
   `lib/services/landing-cycle-service.js`; exact-code lookup
