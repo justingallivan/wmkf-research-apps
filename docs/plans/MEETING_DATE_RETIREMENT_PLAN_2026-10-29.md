@@ -252,7 +252,14 @@ a contract check and a Codex review; none merges without the owner.
    Factory clones carry no link, so they show no cycle on converted screens.
 3. **Checks, dates shown and cleanup:** the "has a cycle" gates, displays,
    reviewer-search labels (enrichment cache version bump) and pass-through
-   removals (§3.4, §3.6).
+   removals (§3.4, §3.6). **[BUILT on branch `claude/meeting-date-displays-cleanup`, stacked on
+   step 2, not merged, 2026-10-30]** "Has a cycle" gates use the link; Workbench
+   Overview and the Staff Deliberations writeup show the linked cycle's calendar
+   Board date (snapshot field and month-year format kept); candidate cards label
+   prior requests by linked cycle (enrichment cache v5); past-grant recency uses
+   fiscal year and decision date only; unread pass-through fields and unused
+   selects removed. Still open: the §8 count of past Research grants with
+   neither a fiscal year nor a decision date (those abort the writeup, as before).
 4. **Invitation closing and honoraria:** stale-invite expiry and the
    honorarium write (§3.5).
 5. **Test Request Factory** (§3.7); no ledger migration (§7 Q7).
