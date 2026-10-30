@@ -127,6 +127,8 @@ test('editable status (Invited) → editable:true, view:edit', async () => {
   expect(res.body.editable).toBe(true);
   expect(res.body.view).toBe('edit');
   expect(res.body.request.requestNumber).toBeUndefined();
+  // The request meeting date is not sent; no grantee screen reads it.
+  expect(res.body.request).not.toHaveProperty('meetingDate');
   expect(res.body.deliverable.hasImage).toBe(false);
   expect(res.body.deliverable.abstractHtml.trim()).toBe('<p>formatted</p>');
   // raw SharePoint ref must NOT leak to the external client

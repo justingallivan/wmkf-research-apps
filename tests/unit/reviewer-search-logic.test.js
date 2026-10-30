@@ -455,7 +455,8 @@ describe('Dataverse contact evidence survives a bounded roster round-trip', () =
           requestNumber: index === 1 ? '1002278' : `10022${index}`,
           title: index === 1 ? 'Deciphering the role of the secretome in aging' : `Request ${index}`,
           fiscalYear: index === 1 ? 'June 2026' : 'March 2026',
-          meetingDate: index === 1 ? '2026-06-04' : '2026-03-01',
+          cycleLabel: index === 1 ? 'June 2026' : null,
+          meetingDate: 'must-not-survive',
           createdon: 'must-not-survive',
           reviewerSlot: index,
         })),
@@ -465,7 +466,7 @@ describe('Dataverse contact evidence survives a bounded roster round-trip', () =
     const pruned = pruneDataverseContactEvidence(raw);
     expect(pruned.priorRequestContext).toMatchObject({ complete: true, totalCount: 4 });
     expect(pruned.priorRequestContext.requests[0])
-      .toMatchObject({ requestNumber: '1002278', fiscalYear: 'June 2026' });
+      .toMatchObject({ requestNumber: '1002278', fiscalYear: 'June 2026', cycleLabel: 'June 2026' });
     expect(pruned.priorRequestContext.requests).toHaveLength(3);
     expect(JSON.stringify(pruned)).not.toContain('must-not-survive');
     expect(JSON.stringify(pruned)).not.toContain('reviewerSlot');
@@ -493,7 +494,7 @@ describe('Dataverse contact evidence survives a bounded roster round-trip', () =
         requestNumber: '1002278',
         title: null,
         fiscalYear: null,
-        meetingDate: null,
+        cycleLabel: null,
       }],
     });
   });
@@ -1325,9 +1326,16 @@ describe('hasValidApplicantEnrichmentCache', () => {
     // institution" reasoning / stale mismatch flags). The S400 bump to 4 must
     // force them through a fresh enrichment — this pins the LITERAL version so
     // a future constant change is a conscious decision, not an accident.
-    expect(APPLICANT_ENRICHMENT_CACHE_VERSION).toBe(4);
+    expect(APPLICANT_ENRICHMENT_CACHE_VERSION).toBe(5);
     expect(hasValidApplicantEnrichmentCache([
       { ...canonical, applicantEnrichmentCacheVersion: 3 },
+    ], proposalKey, expected)).toBe(false);
+  });
+
+  test('version-4 rows with meeting-date prior-request labels re-enrich (literal pin)', () => {
+    // v5: prior-request labels come from the linked Grant Cycle (`cycleLabel`).
+    expect(hasValidApplicantEnrichmentCache([
+      { ...canonical, applicantEnrichmentCacheVersion: 4 },
     ], proposalKey, expected)).toBe(false);
   });
 

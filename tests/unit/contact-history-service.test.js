@@ -83,7 +83,9 @@ test('a June meeting date without a Grant Cycle link has no cycle', async () => 
 
   const out = await getContactHistory({ contactId: CONTACT_ID });
 
-  expect(out.rows[0]).toMatchObject({ meetingDate: '2026-06-15', cycleCode: null, cycleLabel: null });
+  expect(out.rows[0]).toMatchObject({ cycleCode: null, cycleLabel: null });
+  // The meeting date orders rows but is not returned; no screen reads it (§3.6).
+  expect(out.rows[0]).not.toHaveProperty('meetingDate');
 });
 
 test('same request with pi AND copi junction rows stays as two distinct rows', async () => {
@@ -128,7 +130,6 @@ test('rows sort newest-first by meeting date with missing-meta (null date) rows 
   expect(out.rows[1]).toMatchObject({
     requestNumber: null,
     title: null,
-    meetingDate: null,
     cycleCode: null,
     cycleLabel: null,
     requestStatus: null,
@@ -180,4 +181,21 @@ test('adapter failure propagates untyped (shell owns the 500 mapping)', async ()
   queryAllPersons.mockRejectedValue(new Error('Dataverse unavailable'));
 
   await expect(getContactHistory({ contactId: CONTACT_ID })).rejects.toThrow('Dataverse unavailable');
+});
+
+test('two dated rows sort newest meeting date first', async () => {
+  queryAllPersons.mockResolvedValue({
+    records: [
+      { _wmkf_request_value: REQ_B, wmkf_role: 100000000, wmkf_authorposition: 0 },
+      { _wmkf_request_value: REQ_A, wmkf_role: 100000000, wmkf_authorposition: 0 },
+    ],
+  });
+  queryRequests.mockResolvedValue({ records: [
+    meta(REQ_B, { wmkf_meetingdate: '2024-02-01' }),
+    meta(REQ_A, { wmkf_meetingdate: '2026-06-15' }),
+  ] });
+
+  const out = await getContactHistory({ contactId: CONTACT_ID });
+
+  expect(out.rows.map((r) => r.requestId)).toEqual([REQ_A, REQ_B]);
 });

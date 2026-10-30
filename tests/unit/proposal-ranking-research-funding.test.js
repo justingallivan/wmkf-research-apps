@@ -60,3 +60,11 @@ test('zero qualifying awards differs from unavailable or provisional coverage', 
   expect(summarizeResearchFunding([grant, excluded], { wmkf_countofprogramgrants: 2, wmkf_sumofprogramgrants: 600 }, currencies).totalAmountMinorUnits).toBe(10000);
   expect(summarizeResearchFunding([grant], account, new Map()).totalAmountMinorUnits).toBeNull();
 });
+test('award year: fiscal year, then decision date; a meeting date alone gives no year (unavailable)', () => {
+  expect(summarizeResearchFunding([{ ...grant, akoya_fiscalyear: null, wmkf_meetingdate: '2019-12-01' }], account, currencies).latestAwardYear).toBe(2021);
+  expect(summarizeResearchFunding(
+    [{ ...grant, akoya_fiscalyear: null, akoya_decisiondate: null, wmkf_meetingdate: '2019-12-01' }],
+    account,
+    currencies,
+  )).toEqual({ status: 'unavailable', latestAwardYear: null, qualifyingGrantCount: null, totalAmountMinorUnits: null });
+});

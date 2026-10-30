@@ -1,15 +1,6 @@
-const MONTHS = [
-  'January', 'February', 'March', 'April', 'May', 'June',
-  'July', 'August', 'September', 'October', 'November', 'December',
-];
-
+// The linked Grant Cycle's label ("December 2026"), else the fiscal year.
 export function priorRequestCycleLabel(request) {
-  const meetingDate = typeof request?.meetingDate === 'string' ? request.meetingDate.trim() : '';
-  const match = /^(\d{4})-(\d{2})(?:-\d{2})?/.exec(meetingDate);
-  if (match) {
-    const month = Number(match[2]);
-    if (month >= 1 && month <= 12) return `${MONTHS[month - 1]} ${match[1]}`;
-  }
+  if (typeof request?.cycleLabel === 'string' && request.cycleLabel.trim()) return request.cycleLabel.trim();
   return typeof request?.fiscalYear === 'string' && request.fiscalYear.trim()
     ? request.fiscalYear.trim()
     : null;

@@ -32,7 +32,7 @@ Identity / linkage:
 
 Suggestion content:
 - `wmkf_suggestionlabel` (String, primary name attr)
-- `wmkf_grantcyclecode` (String, e.g. `J26`) — stamped at save time from the request's Grant Cycle link (`linkedCycleCode`; the Reviewer Finder save read the code from the wrong level and stamped null from 2026-09-08 until meeting-date retirement build step 2, 2026-10-30); no write path accepts it from a client. `my-candidates` shows the request's linked cycle only, never the stored value. Existing stamped values are not backfilled (owner, 2026-10-29)
+- `wmkf_grantcyclecode` (String, e.g. `J26`) — stamped at save time from the request's Grant Cycle link (`linkedCycleCode`; the Reviewer Finder save read the code from the wrong level and stamped null from 2026-09-08 until meeting-date retirement build step 2, 2026-10-30); no write path accepts it from a client. `my-candidates` no longer returns cycle fields (no screen read them; meeting-date retirement step 3). Existing stamped values are not backfilled (owner, 2026-10-29)
 - `wmkf_programarea` (String)
 - `wmkf_relevancescore` (Double, MinValue 0, MaxValue 100, Precision 4) — stores the 0-100 composite `relevanceScore` used for ranking. The save adapter clamps writes to `[0,100]`; the one-time metadata widen artifact is `scripts/widen-relevancescore-max.mjs`.
 - `wmkf_matchreason` (Memo)

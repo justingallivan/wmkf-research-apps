@@ -24,8 +24,9 @@ const money = (n) => (typeof n === 'number' && Number.isFinite(n) ? USD.format(n
 
 // wmkf_meetingdate is DateOnly: it parses as UTC midnight, so format in UTC
 // or viewers west of UTC see the day before.
+// The linked Grant Cycle's calendar Board date; no cycle or no date is "Not set".
 function formatMeetingDate(iso) {
-  if (!iso) return '—';
+  if (!iso) return 'Not set';
   const d = new Date(iso);
   return Number.isNaN(d.getTime())
     ? '—'

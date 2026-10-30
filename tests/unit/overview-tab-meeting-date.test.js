@@ -1,8 +1,8 @@
 /**
  * @jest-environment jsdom
  *
- * OverviewTab — Board Meeting renders the DateOnly wmkf_meetingdate on its own
- * calendar day. The value parses as UTC midnight, so formatting in the
+ * OverviewTab — Board Meeting renders the linked Grant Cycle's DateOnly
+ * calendar Board date (resolve-request `meetingDate`) on its own calendar day. The value parses as UTC midnight, so formatting in the
  * viewer's zone showed the day before for anyone west of UTC (Request 1003302:
  * 12/11/2026 displayed as Dec 10). TZ is pinned to Pacific so the test
  * discriminates in a UTC CI process.
@@ -33,4 +33,11 @@ test.each([
   global.fetch = jest.fn().mockRejectedValue(new Error('offline'));
   render(<OverviewTab context={ctx(value)} requestId="r1" />);
   expect(await screen.findByText(expected)).toBeInTheDocument();
+});
+
+test('no linked cycle or no calendar Board date renders "Not set"', async () => {
+  global.fetch = jest.fn().mockRejectedValue(new Error('offline'));
+  render(<OverviewTab context={ctx(null)} requestId="r1" />);
+  const label = await screen.findByText('Board Meeting');
+  expect(label.nextSibling).toHaveTextContent('Not set');
 });

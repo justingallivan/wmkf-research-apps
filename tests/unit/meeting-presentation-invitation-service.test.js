@@ -1,12 +1,13 @@
 /** @jest-environment node */
 jest.mock('../../lib/services/meeting-tracker-transcription/service.js',()=>({getMeetingTranscriptionOverview:jest.fn(),getMeetingCorrectionDraft:jest.fn()}));
-import { prepareInvitation,actOnInvitation,getInvitation,cleanupInvitations } from '../../lib/services/meeting-coordination/invitation-service';
+import { prepareInvitation,actOnInvitation,getInvitation,cleanupInvitations,INVITATION_DEPENDENCIES } from '../../lib/services/meeting-coordination/invitation-service';
+import { DynamicsService } from '../../lib/services/dynamics-service';
 const requestId='11111111-1111-4111-8111-111111111111',actor='22222222-2222-4222-8222-222222222222',visitId='33333333-3333-4333-8333-333333333333',emailId='44444444-4444-4444-8444-444444444444';
 const now=new Date('2030-01-01T00:00:00Z');let previous;
 beforeEach(()=>{previous=process.env.MEETING_PRESENTATION_INVITATION_ACCESS;process.env.MEETING_PRESENTATION_INVITATION_ACCESS='on';});
 afterEach(()=>{if(previous===undefined)delete process.env.MEETING_PRESENTATION_INVITATION_ACCESS;else process.env.MEETING_PRESENTATION_INVITATION_ACCESS=previous;});
 function fixture(){let saved=null,message=null;const staff={profileId:7,systemUserId:actor,email:'pc@wmkeck.org',name:'Coordinator'};
- const d={impersonationEnabled:()=>true,authorize:jest.fn(async()=>staff),request:jest.fn(async()=>({akoya_requestid:requestId,akoya_requestnum:'1001',akoya_title:'Research',wmkf_meetingdate:'2030-12-01',akoya_requeststatus:100000001,wmkf_triagestatus:100000000})),
+ const d={impersonationEnabled:()=>true,authorize:jest.fn(async()=>staff),request:jest.fn(async()=>({akoya_requestid:requestId,akoya_requestnum:'1001',akoya_title:'Research',wmkf_GrantCycle:{wmkf_cyclecode:'D30'},akoya_requeststatus:100000001,wmkf_triagestatus:100000000})),
  logistics:jest.fn(async()=>({siteVisit:{activityId:visitId,etag:'v1',startIso:'2030-02-01T18:00:00Z',endIso:'2030-02-01T19:00:00Z',timeZone:'America/Los_Angeles',locationOrLink:'https://zoom.test/meeting',requiredAttendees:[{kind:'staff',profileId:8}],optionalAttendees:[{kind:'roster',rosterId:9}]}})),directory:jest.fn(async()=>({})),resolve:jest.fn(async refs=>refs.map(ref=>({email:ref.kind==='staff'?'staff@wmkeck.org':'consultant@example.org',name:'Selected person'}))),signature:jest.fn(async()=>'<Coordinator>'),assertEmailAllowed:jest.fn(),now:()=>now,
  createEmail:jest.fn(async input=>{message={activityid:emailId,subcategory:input.correlationKey,statuscode:1,subject:input.subject,description:input.body,email_activity_parties:[{participationtypemask:1,addressused:input.from},...(input.to||[]).map(addressused=>({participationtypemask:2,addressused})),...(input.cc||[]).map(addressused=>({participationtypemask:3,addressused}))]};return emailId;}),sendEmail:jest.fn(async()=>{message.statuscode=3;}),getEmail:jest.fn(async()=>message),findEmail:jest.fn(async()=>message?[message]:[]),
  store:{create:jest.fn(async input=>{saved={id:input.id,request_id:input.requestId,site_visit_id:input.siteVisitId,actor_profile_id:input.profileId,acting_user_system_id:input.actingUserSystemId,from_email:input.fromEmail,source_hash:input.sourceHash,email_hash:input.emailHash,envelope_hash:input.envelopeHash,snapshot:input.snapshot,subject:input.subject,body_text:input.bodyText,body_html:input.bodyHtml,to_recipients:input.to,cc_recipients:input.cc,version:1,state:'prepared',preview_expires_at:new Date(now.getTime()+900000)};return {...saved};}),get:jest.fn(async(id,request)=>saved?.id===id&&saved?.request_id===request?{...saved}:null),latest:jest.fn(async()=>saved?{...saved}:null),
@@ -93,4 +94,26 @@ test('native cancellation resolves an edited uncertain draft without sending it'
 });
 test('retention safely skips an unapplied schema but surfaces other database failures',async()=>{
  const f=fixture();f.d.store.cleanup.mockRejectedValueOnce({code:'42P01'}).mockRejectedValueOnce(new Error('offline'));expect(await cleanupInvitations(f.d)).toMatchObject({skipped:'schema_not_ready'});await expect(cleanupInvitations(f.d)).rejects.toThrow('offline');
+});
+
+test('the request read carries the Grant Cycle expand and no meeting date',async()=>{
+ const restriction=jest.spyOn(DynamicsService,'checkRestriction').mockImplementation(()=>{});
+ const getRecord=jest.spyOn(DynamicsService,'getRecord').mockResolvedValue({akoya_requestid:requestId});
+ try{
+  await INVITATION_DEPENDENCIES.request(requestId);
+  const [,id,options]=getRecord.mock.calls[0];
+  expect(id).toBe(requestId);expect(options.expand).toBe('wmkf_GrantCycle($select=wmkf_cyclecode)');expect(options.select).not.toContain('wmkf_meetingdate');
+  expect(restriction).toHaveBeenCalledWith('wmkf_grantcycle','wmkf_grantcycleid,wmkf_cyclecode');
+ }finally{restriction.mockRestore();getRecord.mockRestore();}
+});
+
+test('the frozen snapshot holds the linked cycle code; a December meeting date with no link is refused',async()=>{
+ const f=fixture();await prepared(f);expect(f.row().snapshot.request.cycle).toBe('D30');
+ const g=fixture();const row=await g.d.request();g.d.request.mockResolvedValue({...row,wmkf_meetingdate:'2030-12-01',wmkf_GrantCycle:null});
+ await expect(prepared(g)).rejects.toMatchObject({code:'presentation_invitation_request_changed'});expect(g.d.store.create).not.toHaveBeenCalled();
+});
+
+test('a changed Grant Cycle link stales a prepared preview before any email creation',async()=>{
+ const f=fixture(),row=await prepared(f);const current=await f.d.request();f.d.request.mockResolvedValue({...current,wmkf_GrantCycle:{wmkf_cyclecode:'J31'}});
+ await expect(actOnInvitation(action(row),f.d)).rejects.toMatchObject({code:'presentation_invitation_preview_stale'});expect(f.d.createEmail).not.toHaveBeenCalled();
 });

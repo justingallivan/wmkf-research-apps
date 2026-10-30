@@ -48,7 +48,7 @@ const DEFAULT_TEXT = {
 
 const request = () => ({
   akoya_requestid: REQUEST_ID, akoya_requestnum: '1003222', akoya_title: 'The Secret History of Our Sun',
-  wmkf_meetingdate: '2026-12-11', akoya_requeststatus: 100000001, wmkf_triagestatus: 100000000,
+  wmkf_GrantCycle: { wmkf_cyclecode: 'D26' }, akoya_requeststatus: 100000001, wmkf_triagestatus: 100000000,
   _akoya_applicantid_value_formatted: 'Franklin Cat University',
 });
 // Wed 2026-10-07 09:00 PDT → due Mon 2026-10-05, closes 2026-10-14T19:00Z + 7d.
@@ -277,6 +277,14 @@ test('create refusals: no visit, already open, no recipient email, not schedulab
   await expect(createMaterialsCollection({ requestId: REQUEST_ID, actorId: ACTOR, profileId: 7, fromEmail: 'pc@wmkeck.org' }, deps({ resolveRecipients: jest.fn(async () => ({ pi: { email: null }, liaison: { email: null } })) })))
     .rejects.toMatchObject({ code: 'site_visit_materials_recipients_required' });
   await expect(createMaterialsCollection({ requestId: REQUEST_ID, actorId: ACTOR, profileId: 7, fromEmail: 'pc@wmkeck.org' }, deps({ getRequest: jest.fn(async () => ({ ...request(), wmkf_triagestatus: 100000001, akoya_requeststatus: 1 })) })))
+    .rejects.toMatchObject({ code: 'site_visit_materials_request_not_schedulable' });
+  // A December meeting date without a Grant Cycle link is no cycle: create and its preview refuse.
+  const unlinked = () => deps({ getRequest: jest.fn(async () => ({ ...request(), wmkf_meetingdate: '2026-12-11', wmkf_GrantCycle: null })) });
+  const unlinkedCreate = unlinked();
+  await expect(createMaterialsCollection({ requestId: REQUEST_ID, actorId: ACTOR, profileId: 7, fromEmail: 'pc@wmkeck.org' }, unlinkedCreate))
+    .rejects.toMatchObject({ code: 'site_visit_materials_request_not_schedulable' });
+  expect(unlinkedCreate.insertCollection).not.toHaveBeenCalled();
+  await expect(previewMaterialsEmail({ requestId: REQUEST_ID, action: 'create', actorId: ACTOR, profileId: 7, fromEmail: 'pc@wmkeck.org' }, unlinked()))
     .rejects.toMatchObject({ code: 'site_visit_materials_request_not_schedulable' });
   await expect(createMaterialsCollection({ requestId: REQUEST_ID, actorId: 'nope', fromEmail: 'pc@wmkeck.org' }, deps()))
     .rejects.toMatchObject({ code: 'site_visit_materials_actor_required' });
@@ -639,6 +647,23 @@ test('projectCollection reports a past closes_at as closed even while the row st
   const row = { id: 'c', request_id: REQUEST_ID, site_visit_activity_id: VISIT_ID, status: 'open', due_at: '2026-10-05T19:00:00Z', closes_at: '2026-10-14T19:00:00Z', checklist: [], contacts: {}, created_at: NOW };
   expect(projectCollection(row, { now: new Date('2026-10-15T00:00:00Z') }).state).toBe('closed');
   expect(projectCollection(row, { now: new Date('2026-10-10T00:00:00Z') }).state).toBe('received');
+});
+
+test('the default request read carries the Grant Cycle expand and no meeting date', async () => {
+  const { DynamicsService } = require('../../lib/services/dynamics-service');
+  const { DEFAULT_DEPENDENCIES } = require('../../lib/services/site-visit-materials/collection-service');
+  const restriction = jest.spyOn(DynamicsService, 'checkRestriction').mockImplementation(() => {});
+  try {
+    mockGetById.mockResolvedValue(request());
+    await DEFAULT_DEPENDENCIES.getRequest(REQUEST_ID);
+    const [id, options] = mockGetById.mock.calls.at(-1);
+    expect(id).toBe(REQUEST_ID);
+    expect(options).toMatchObject({ expand: 'wmkf_GrantCycle($select=wmkf_cyclecode)' });
+    expect(options.select).not.toContain('wmkf_meetingdate');
+    expect(restriction).toHaveBeenCalledWith('wmkf_grantcycle', 'wmkf_grantcycleid,wmkf_cyclecode');
+  } finally {
+    restriction.mockRestore();
+  }
 });
 
 test('the signature token uses the sending PC preference, with the PC name as fallback', async () => {

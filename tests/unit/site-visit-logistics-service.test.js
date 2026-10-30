@@ -16,6 +16,7 @@ import {
 import { createHash } from 'node:crypto';
 import { PARTY_NAVIGATION_PROPERTY } from '../../lib/dataverse/adapters/site-visit';
 import { TRIAGE_STATUS } from '../../shared/config/triageStatus';
+import { DynamicsService } from '../../lib/services/dynamics-service';
 
 const REQUEST_ID = '11111111-1111-4111-8111-111111111111';
 const ACTIVITY_ID = '22222222-2222-4222-8222-222222222222';
@@ -66,7 +67,7 @@ function dependencies(overrides = {}) {
     schemaReady: jest.fn(() => true),
     getRequestIdentity: jest.fn(async () => ({
       akoya_requestid: REQUEST_ID, akoya_requestnum: '1003222', akoya_title: 'Quantum dots for imaging',
-      wmkf_meetingdate: '2026-12-11T00:00:00Z', _akoya_applicantid_value_formatted: 'Example University',
+      _akoya_applicantid_value_formatted: 'Example University',
       wmkf_GrantCycle: { wmkf_cyclecode: 'D26' },
       _wmkf_grantprogram_value_formatted: 'Research Program',
     })),
@@ -74,7 +75,7 @@ function dependencies(overrides = {}) {
       akoya_requestid: REQUEST_ID,
       akoya_requeststatus: 'Phase II Pending',
       wmkf_triagestatus: null,
-      wmkf_meetingdate: '2026-12-11T00:00:00Z',
+      wmkf_GrantCycle: { wmkf_cyclecode: 'D26' },
     })),
     getArtifactStatus: jest.fn(async () => ({
       currentArtifact: {
@@ -357,6 +358,24 @@ describe('staff feed binds the transcript derivatives to the current boundary', 
   });
 });
 
+test('the schedulability and header request reads carry the Grant Cycle expand and no meeting date', async () => {
+  const restriction = jest.spyOn(DynamicsService, 'checkRestriction').mockImplementation(() => {});
+  const getRecord = jest.spyOn(DynamicsService, 'getRecord').mockResolvedValue({ akoya_requestid: REQUEST_ID });
+  try {
+    await SITE_VISIT_LOGISTICS_DEPENDENCIES.getRequest(REQUEST_ID);
+    await SITE_VISIT_LOGISTICS_DEPENDENCIES.getRequestIdentity(REQUEST_ID);
+    for (const [, id, options] of getRecord.mock.calls) {
+      expect(id).toBe(REQUEST_ID);
+      expect(options.expand).toBe('wmkf_GrantCycle($select=wmkf_cyclecode)');
+      expect(options.select).not.toContain('wmkf_meetingdate');
+    }
+    expect(getRecord).toHaveBeenCalledTimes(2);
+    expect(restriction).toHaveBeenCalledWith('wmkf_grantcycle', 'wmkf_grantcycleid,wmkf_cyclecode');
+  } finally {
+    jest.restoreAllMocks();
+  }
+});
+
 test('a failed applicant-contact read leaves the tracker visit usable and reports unavailable suggestions', async () => {
   const result = await getSiteVisitLogistics({ requestId: REQUEST_ID, includeApplicantAttendees: true }, dependencies({
     resolveApplicantContacts: jest.fn(async () => { throw new Error('Dataverse unavailable'); }),
@@ -540,13 +559,14 @@ describe('request-schedulable gate (tracker slice 0)', () => {
     })]);
   });
 
-  test('missing wmkf_meetingdate is refused with no write', async () => {
+  test('a December meeting date with no Grant Cycle link is refused with no write', async () => {
     const deps = dependencies({
       getRequest: jest.fn(async () => ({
         akoya_requestid: REQUEST_ID,
         akoya_requeststatus: 'Phase II Pending',
         wmkf_triagestatus: null,
-        wmkf_meetingdate: null,
+        wmkf_meetingdate: '2026-12-11T00:00:00Z',
+        wmkf_GrantCycle: null,
       })),
     });
     await expect(saveSiteVisitLogistics(input, { actingUserSystemId: ACTOR_ID }, deps))
@@ -562,7 +582,7 @@ describe('request-schedulable gate (tracker slice 0)', () => {
         akoya_requestid: REQUEST_ID,
         akoya_requeststatus: 'Phase II Pending',
         wmkf_triagestatus: TRIAGE_STATUS.SET_ASIDE,
-        wmkf_meetingdate: '2026-12-11T00:00:00Z',
+        wmkf_GrantCycle: { wmkf_cyclecode: 'D26' },
       })),
     });
     await expect(saveSiteVisitLogistics(input, { actingUserSystemId: ACTOR_ID }, deps))
@@ -578,7 +598,7 @@ describe('request-schedulable gate (tracker slice 0)', () => {
         akoya_requestid: REQUEST_ID,
         akoya_requeststatus: 'Phase I Pending',
         wmkf_triagestatus: null,
-        wmkf_meetingdate: '2026-12-11T00:00:00Z',
+        wmkf_GrantCycle: { wmkf_cyclecode: 'D26' },
       })),
     });
     await expect(saveSiteVisitLogistics(input, { actingUserSystemId: ACTOR_ID }, deps))
@@ -591,7 +611,7 @@ describe('request-schedulable gate (tracker slice 0)', () => {
       getRequest: jest.fn(async () => ({
         akoya_requestid: REQUEST_ID,
         akoya_requeststatus: 'Phase II Pending',
-        wmkf_meetingdate: '2026-12-11T00:00:00Z',
+        wmkf_GrantCycle: { wmkf_cyclecode: 'D26' },
       })),
     });
     const result = await saveSiteVisitLogistics(input, { actingUserSystemId: ACTOR_ID }, deps);
@@ -605,7 +625,7 @@ describe('request-schedulable gate (tracker slice 0)', () => {
         akoya_requestid: REQUEST_ID,
         akoya_requeststatus: 'Phase II Pending',
         wmkf_triagestatus: TRIAGE_STATUS.SET_ASIDE,
-        wmkf_meetingdate: '2026-12-11T00:00:00Z',
+        wmkf_GrantCycle: { wmkf_cyclecode: 'D26' },
       })),
       getArtifactStatus: jest.fn(async () => undefined),
     });
@@ -621,7 +641,7 @@ describe('request-schedulable gate (tracker slice 0)', () => {
         akoya_requestid: REQUEST_ID,
         akoya_requeststatus: 'Phase I Pending',
         wmkf_triagestatus: TRIAGE_STATUS.ADVANCING,
-        wmkf_meetingdate: '2026-12-11T00:00:00Z',
+        wmkf_GrantCycle: { wmkf_cyclecode: 'D26' },
       })),
     });
     const result = await saveSiteVisitLogistics(input, { actingUserSystemId: ACTOR_ID }, deps);

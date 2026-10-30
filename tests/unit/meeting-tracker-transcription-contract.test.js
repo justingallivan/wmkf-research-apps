@@ -1,4 +1,5 @@
 import crypto from 'node:crypto';
+import { DynamicsService } from '../../lib/services/dynamics-service.js';
 import { getMeetingTranscriptionCandidates, loadMeetingTranscriptionBinding } from '../../lib/services/meeting-tracker-transcription/binding.js';
 import {
   buildMeetingTranscriptFiles, buildMeetingTranscriptManifest,
@@ -247,11 +248,39 @@ describe('Meeting Tracker generated transcript bundle', () => {
 test('binding accepts canonical Dataverse request and Site Visit IDs with non-RFC GUID nibbles', async () => {
   const result = await loadMeetingTranscriptionBinding(REQUEST, VISIT, {
     getRequest: async () => ({ akoya_requestid: REQUEST, akoya_requeststatus: 'Phase II Pending',
-      wmkf_triagestatus: null, wmkf_meetingdate: '2026-12-11' }),
+      wmkf_triagestatus: null, wmkf_GrantCycle: { wmkf_cyclecode: 'D26' } }),
     findActiveByRequest: async () => ({ records: [{ activityid: VISIT, _regardingobjectid_value: REQUEST }] }),
   });
   expect(result.requestId).toBe(REQUEST);
   expect(result.siteVisitActivityId).toBe(VISIT);
+});
+
+test('binding refuses a request with a December meeting date but no Grant Cycle link', async () => {
+  await expect(loadMeetingTranscriptionBinding(REQUEST, VISIT, {
+    getRequest: async () => ({ akoya_requestid: REQUEST, akoya_requeststatus: 'Phase II Pending',
+      wmkf_triagestatus: null, wmkf_meetingdate: '2026-12-11', wmkf_GrantCycle: null }),
+    findActiveByRequest: async () => ({ records: [{ activityid: VISIT, _regardingobjectid_value: REQUEST }] }),
+  })).rejects.toMatchObject({ code: 'meeting_transcription_request_ineligible', httpStatus: 404 });
+});
+
+test('the default binding request read carries the Grant Cycle expand and no meeting date', async () => {
+  const restriction = jest.spyOn(DynamicsService, 'checkRestriction').mockImplementation(() => {});
+  const getRecord = jest.spyOn(DynamicsService, 'getRecord').mockResolvedValue({ akoya_requestid: REQUEST,
+    akoya_requeststatus: 'Phase II Pending', wmkf_triagestatus: null, wmkf_GrantCycle: { wmkf_cyclecode: 'D26' } });
+  try {
+    const result = await loadMeetingTranscriptionBinding(REQUEST, VISIT, {
+      findActiveByRequest: async () => ({ records: [{ activityid: VISIT, _regardingobjectid_value: REQUEST }] }),
+    });
+    expect(result.requestId).toBe(REQUEST);
+    const [, id, options] = getRecord.mock.calls[0];
+    expect(id).toBe(REQUEST);
+    expect(options.expand).toBe('wmkf_GrantCycle($select=wmkf_cyclecode)');
+    expect(options.select).not.toContain('wmkf_meetingdate');
+    expect(restriction).toHaveBeenCalledWith('wmkf_grantcycle', 'wmkf_grantcycleid,wmkf_cyclecode');
+  } finally {
+    restriction.mockRestore();
+    getRecord.mockRestore();
+  }
 });
 
 test('speaker candidates include the saved organizer and reject email-only directory names', async () => {

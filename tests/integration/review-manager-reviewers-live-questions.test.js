@@ -217,7 +217,6 @@ test('GET success returns the full proposal + reviewer envelope', async () => {
       programArea: 'Area A',
       grantCycleCode: 'J26',
       cycleLabel: 'June 2026',
-      meetingDate: null,
       reviewDeadline: '2026-09-09',
       reviewSynthesis: null,
       reviewSynthesisState: {

@@ -167,7 +167,6 @@ describe('happy-path envelope (full pin)', () => {
       success: true,
       requestId: VALID_GUID,
       requestNumber: '1002788',
-      cycleCode: null,
       recommended: [{
         slot: 1,
         potentialReviewerId: 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb',

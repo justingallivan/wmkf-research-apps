@@ -35,7 +35,7 @@ function dependencies() {
     schemaReady: () => true,
     impersonationEnabled:()=>true,
     getCoordinator:async()=>({systemUserId:ACTOR_ID,profileId:7,email:'pd@example.org',name:'Coordinator',revision:'1'}),
-    getRequest: jest.fn(async () => ({ akoya_requestid: REQUEST_ID, akoya_requestnum: '1003222', akoya_title: 'Proposal', wmkf_meetingdate: '2026-12-11', akoya_requeststatus: 100000001, wmkf_triagestatus: 100000000 })),
+    getRequest: jest.fn(async () => ({ akoya_requestid: REQUEST_ID, akoya_requestnum: '1003222', akoya_title: 'Proposal', wmkf_GrantCycle: { wmkf_cyclecode: 'D26' }, akoya_requeststatus: 100000001, wmkf_triagestatus: 100000000 })),
     getOpenCollection: jest.fn(async () => ROW),
     findActiveSiteVisit: jest.fn(async () => VISIT),
     resolveRecipients: jest.fn(async () => CONTACTS),

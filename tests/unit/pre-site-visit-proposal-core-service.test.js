@@ -1,3 +1,12 @@
+jest.mock('../../lib/dataverse/adapters/grant-request', () => ({
+  ...jest.requireActual('../../lib/dataverse/adapters/grant-request'),
+  getById: jest.fn(),
+}));
+jest.mock('../../lib/dataverse/adapters/operations-grant-cycle', () => ({
+  ...jest.requireActual('../../lib/dataverse/adapters/operations-grant-cycle'),
+  getCycleDatesById: jest.fn(),
+}));
+
 import {
   abbreviateState,
   formatMeetingDate,
@@ -5,10 +14,16 @@ import {
   loadPreSiteVisitInputs,
   prepareGeneratedCore,
   promptContext,
+  readRequestWithBoardDate,
 } from '../../lib/services/pre-site-visit/proposal-core-service';
+import { buildPreSiteVisitInputSnapshot } from '../../lib/services/pre-site-visit/artifact-model';
+import * as grantRequestAdapter from '../../lib/dataverse/adapters/grant-request';
+import { getCycleDatesById } from '../../lib/dataverse/adapters/operations-grant-cycle';
+import { DynamicsService } from '../../lib/services/dynamics-service';
 import { REQUIRED_SYSTEM_ASSERTIONS } from '../../shared/config/prompts/pre-site-visit-proposal-core';
 
 const REQUEST_ID = '11111111-1111-4111-8111-111111111111';
+const CYCLE_ID = '66666666-6666-4666-8666-666666666666';
 
 function requestFixture(overrides = {}) {
   return {
@@ -21,8 +36,11 @@ function requestFixture(overrides = {}) {
     _wmkf_projectleader_value_formatted: 'Dr. Ada Principal',
     _akoya_programid_value_formatted: 'Medical Research',
     _wmkf_programdirector_value_formatted: 'Pat Director',
-    wmkf_meetingdate: '2026-12-01',
-    wmkf_GrantCycle: { wmkf_cyclecode: 'D26' },
+    // The request's own meeting date is never read; the D26 calendar Board
+    // date (2026-12-10) on the linked cycle is.
+    wmkf_meetingdate: '2026-12-11',
+    _wmkf_grantcycle_value: CYCLE_ID,
+    wmkf_GrantCycle: { wmkf_cyclecode: 'D26', wmkf_meetingdate: '2026-12-10T00:00:00Z' },
     akoya_request: 900000,
     wmkf_invitedamount: 1000000,
     akoya_expenses: 3500000,
@@ -141,12 +159,99 @@ test('loads authoritative Dataverse fields and the exact Proposal Narrative', as
   expect(deps.getProgramGrants).toHaveBeenCalledWith('22222222-2222-4222-8222-222222222222');
 });
 
-test('a December meeting date without a linked Grant Cycle has no cycle code; the meeting-date field is unchanged', async () => {
-  const deps = dependencies({ getRequest: jest.fn().mockResolvedValue(requestFixture({ wmkf_GrantCycle: null })) });
+test('a December meeting date without a linked Grant Cycle has no cycle code and no meeting-date line', async () => {
+  const deps = dependencies({
+    getRequest: jest.fn().mockResolvedValue(requestFixture({ _wmkf_grantcycle_value: null, wmkf_GrantCycle: null })),
+  });
   const result = await loadPreSiteVisitInputs({ requestId: REQUEST_ID }, deps);
 
   expect(result.context.cycleCode).toBeNull();
-  expect(result.context.documentFields.meetingDate).toBe('December 2026');
+  expect(result.context.documentFields.meetingDate).toBeNull();
+});
+
+test('a historical (non-J/D) link or a cycle with no calendar Board date leaves the meeting-date line blank', async () => {
+  for (const wmkf_GrantCycle of [
+    { wmkf_cyclecode: '2016-12', wmkf_meetingdate: '2016-12-08T00:00:00Z' },
+    { wmkf_cyclecode: 'D26', wmkf_meetingdate: null },
+  ]) {
+    const deps = dependencies({ getRequest: jest.fn().mockResolvedValue(requestFixture({ wmkf_GrantCycle })) });
+    const result = await loadPreSiteVisitInputs({ requestId: REQUEST_ID }, deps);
+    expect(result.context.documentFields.meetingDate).toBeNull();
+  }
+});
+
+test('D26: the calendar Board date (Dec 10) prints the same month-year as the stored request date (Dec 11), so the snapshot line is unchanged', async () => {
+  expect(formatMeetingDate('2026-12-10T00:00:00Z')).toBe(formatMeetingDate('2026-12-11'));
+  expect(formatMeetingDate('2026-12-10')).toBe('December 2026');
+
+  const result = await loadPreSiteVisitInputs({ requestId: REQUEST_ID }, dependencies());
+  // The value an existing D26 draft snapshot holds, built from the request date.
+  const before = buildPreSiteVisitInputSnapshot({
+    ...result,
+    context: {
+      ...result.context,
+      documentFields: { ...result.context.documentFields, meetingDate: formatMeetingDate('2026-12-11') },
+    },
+  });
+  expect(buildPreSiteVisitInputSnapshot(result)).toEqual(before);
+  expect(buildPreSiteVisitInputSnapshot(result).request.meetingDate).toBe('December 2026');
+});
+
+describe('readRequestWithBoardDate (the production getRequest)', () => {
+  beforeEach(() => {
+    jest.spyOn(DynamicsService, 'checkRestriction').mockImplementation(() => {});
+    grantRequestAdapter.getById.mockReset();
+    getCycleDatesById.mockReset();
+  });
+  afterEach(() => jest.restoreAllMocks());
+
+  test('reads the request with the cycle link and the linked row\'s calendar Board date by id', async () => {
+    grantRequestAdapter.getById.mockResolvedValue({
+      akoya_requestid: REQUEST_ID,
+      wmkf_meetingdate: '2026-12-11',
+      _wmkf_grantcycle_value: CYCLE_ID,
+      wmkf_GrantCycle: { wmkf_cyclecode: 'D26' },
+    });
+    getCycleDatesById.mockResolvedValue({ wmkf_grantcycleid: CYCLE_ID, wmkf_cyclecode: 'D26', wmkf_meetingdate: '2026-12-10T00:00:00Z' });
+
+    const request = await readRequestWithBoardDate(REQUEST_ID);
+
+    const [, options] = grantRequestAdapter.getById.mock.calls[0];
+    expect(options.expand).toBe('wmkf_GrantCycle($select=wmkf_cyclecode)');
+    expect(options.select.split(',')).toContain('_wmkf_grantcycle_value');
+    expect(options.select.split(',')).not.toContain('wmkf_meetingdate');
+    expect(getCycleDatesById).toHaveBeenCalledWith(CYCLE_ID);
+    expect(request.wmkf_GrantCycle).toEqual({ wmkf_cyclecode: 'D26', wmkf_meetingdate: '2026-12-10T00:00:00Z' });
+  });
+
+  test('a June meeting date with no link, or a historical link, reads no calendar row', async () => {
+    for (const row of [
+      { akoya_requestid: REQUEST_ID, wmkf_meetingdate: '2026-06-04', _wmkf_grantcycle_value: null, wmkf_GrantCycle: null },
+      { akoya_requestid: REQUEST_ID, _wmkf_grantcycle_value: CYCLE_ID, wmkf_GrantCycle: { wmkf_cyclecode: '2016-12' } },
+    ]) {
+      grantRequestAdapter.getById.mockResolvedValueOnce(row);
+      await expect(readRequestWithBoardDate(REQUEST_ID)).resolves.toEqual(row);
+    }
+    expect(getCycleDatesById).not.toHaveBeenCalled();
+  });
+
+  test('a cycle row missing from the calendar leaves no Board date; a failed calendar read throws', async () => {
+    const row = { akoya_requestid: REQUEST_ID, _wmkf_grantcycle_value: CYCLE_ID, wmkf_GrantCycle: { wmkf_cyclecode: 'D26' } };
+    grantRequestAdapter.getById.mockResolvedValue(row);
+    getCycleDatesById.mockResolvedValueOnce(null);
+    expect((await readRequestWithBoardDate(REQUEST_ID)).wmkf_GrantCycle.wmkf_meetingdate).toBeNull();
+
+    getCycleDatesById.mockRejectedValueOnce(new Error('Grant cycle dates read failed (503).'));
+    await expect(readRequestWithBoardDate(REQUEST_ID)).rejects.toThrow('503');
+  });
+
+  test('a restriction on the Grant Cycle table refuses before any read', async () => {
+    DynamicsService.checkRestriction.mockImplementation((table) => {
+      if (table === 'wmkf_grantcycle') throw new Error('restricted');
+    });
+    await expect(readRequestWithBoardDate(REQUEST_ID)).rejects.toThrow('restricted');
+    expect(grantRequestAdapter.getById).not.toHaveBeenCalled();
+  });
 });
 
 test('institutional funding history is excluded from the prompt context', () => {
@@ -310,10 +415,10 @@ test('fails closed when the program-grant query was capped', async () => {
     .rejects.toMatchObject({ code: 'pre_site_visit_funding_history_unavailable', httpStatus: 409 });
 });
 
-test('fails closed when a program grant has neither a decision date nor a meeting date', async () => {
+test('fails closed when a program grant has neither a decision date nor a fiscal year, even with a meeting date', async () => {
   const warnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {});
   const rows = programGrantRows();
-  rows[3] = { ...rows[3], akoya_decisiondate: null, wmkf_meetingdate: null };
+  rows[3] = { ...rows[3], akoya_decisiondate: null, akoya_fiscalyear: null, wmkf_meetingdate: '2013-06-01' };
   const deps = dependencies({
     getProgramGrants: jest.fn().mockResolvedValue({ records: rows, capped: false }),
   });
@@ -354,16 +459,30 @@ test('omits the second sentence when the institution has program grants but none
     .toBe('Applicant U has received 8 awards totaling $9.15 million from WMKF.');
 });
 
-test('picks the newest grant by meeting date when its decision date is missing', async () => {
+test('picks the newest grant by its fiscal-year label when its decision date is missing', async () => {
   const rows = programGrantRows();
   rows[7] = {
     ...rows[7],
     akoya_decisiondate: null,
-    akoya_fiscalyear: null,
-    wmkf_meetingdate: '2026-06-01',
+    akoya_fiscalyear: 'June 2026',
+    wmkf_meetingdate: null,
   };
   const deps = dependencies({
     getProgramGrants: jest.fn().mockResolvedValue({ records: rows.reverse(), capped: false }),
+  });
+
+  const result = await loadPreSiteVisitInputs({ requestId: REQUEST_ID }, deps);
+
+  expect(result.context.documentFields.institutionalFundingHistory).toBe(
+    'Applicant U has received 8 awards totaling $9.15 million from WMKF. The most recent grant was awarded in June 2026 to develop chemical tools to restore the function of defective proteins.',
+  );
+});
+
+test('"awarded in" uses the decision date when the newest grant has no fiscal year, never the meeting date', async () => {
+  const rows = programGrantRows();
+  rows[7] = { ...rows[7], akoya_fiscalyear: null, akoya_decisiondate: '2026-06-11T00:00:00Z', wmkf_meetingdate: '2025-12-01' };
+  const deps = dependencies({
+    getProgramGrants: jest.fn().mockResolvedValue({ records: rows, capped: false }),
   });
 
   const result = await loadPreSiteVisitInputs({ requestId: REQUEST_ID }, deps);

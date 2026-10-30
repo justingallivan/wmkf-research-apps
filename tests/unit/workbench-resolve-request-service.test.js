@@ -19,6 +19,12 @@ jest.mock('../../lib/services/proposal-participants', () => ({
   fetchCoPIs: (...a) => fetchCoPIs(...a),
 }));
 
+const getCycleDatesById = jest.fn();
+jest.mock('../../lib/dataverse/adapters/operations-grant-cycle', () => ({
+  ...jest.requireActual('../../lib/dataverse/adapters/operations-grant-cycle'),
+  getCycleDatesById: (...a) => getCycleDatesById(...a),
+}));
+
 import { resolveWorkbenchRequest } from '../../lib/services/workbench/resolve-request-service';
 import { ServiceHttpError } from '../../lib/services/service-http-error';
 import { STATUS_CLASS } from '../../lib/services/dataverse-export/constants';
@@ -27,11 +33,12 @@ import { DynamicsService } from '../../lib/services/dynamics-service';
 const EXPAND = 'wmkf_GrantCycle($select=wmkf_cyclecode)';
 
 const REQ = '11111111-1111-1111-1111-111111111111';
+const CYCLE_ID = '22222222-2222-4222-8222-222222222222';
 const RECORD = {
   akoya_requestid: REQ,
   akoya_requestnum: '1002794',
   akoya_title: 'A Study',
-  wmkf_meetingdate: '2026-06-01',
+  _wmkf_grantcycle_value: CYCLE_ID,
   wmkf_GrantCycle: { wmkf_cyclecode: 'J26' },
   akoya_requeststatus: 'Some Unmapped Status',
 };
@@ -42,6 +49,7 @@ beforeEach(() => {
   getById.mockResolvedValue(RECORD);
   findByRequestNumber.mockResolvedValue({ records: [RECORD] });
   fetchCoPIs.mockResolvedValue([]);
+  getCycleDatesById.mockResolvedValue({ wmkf_grantcycleid: CYCLE_ID, wmkf_cyclecode: 'J26', wmkf_meetingdate: '2026-06-04' });
   // The link helpers check the wmkf_grantcycle restriction (covered in grant-cycle-link.test.js).
   jest.spyOn(DynamicsService, 'checkRestriction').mockImplementation(() => {});
 });
@@ -53,16 +61,38 @@ test('GUID path: adapter getById, DTO projected', async () => {
   expect(getById).toHaveBeenCalledWith(REQ, expect.objectContaining({
     select: expect.stringContaining('wmkf_ai_fieldprimer'), expand: EXPAND,
   }));
-  expect(getById.mock.calls[0][1].select).toContain('wmkf_meetingdate');
+  expect(getById.mock.calls[0][1].select).toContain('_wmkf_grantcycle_value');
+  expect(getById.mock.calls[0][1].select).not.toContain('wmkf_meetingdate');
   expect(findByRequestNumber).not.toHaveBeenCalled();
   expect(body.requestId).toBe(REQ);
-  expect(body).toMatchObject({ cycleCode: 'J26', cycleLabel: 'June 2026', meetingDate: '2026-06-01' });
+  // meetingDate is the linked cycle's calendar Board date, not the request's own date.
+  expect(getCycleDatesById).toHaveBeenCalledWith(CYCLE_ID);
+  expect(body).toMatchObject({ cycleCode: 'J26', cycleLabel: 'June 2026', meetingDate: '2026-06-04' });
 });
 
-test('a June meeting date with no Grant Cycle link has no cycle', async () => {
-  getById.mockResolvedValue({ ...RECORD, wmkf_GrantCycle: null });
+test('a June meeting date with no Grant Cycle link has no cycle and no Board date', async () => {
+  getById.mockResolvedValue({ ...RECORD, wmkf_meetingdate: '2026-06-01', _wmkf_grantcycle_value: null, wmkf_GrantCycle: null });
   const body = await resolveWorkbenchRequest({ requestId: REQ, requestNumber: '' });
-  expect(body).toMatchObject({ cycleCode: null, cycleLabel: null, meetingDate: '2026-06-01' });
+  expect(body).toMatchObject({ cycleCode: null, cycleLabel: null, meetingDate: null });
+  expect(getCycleDatesById).not.toHaveBeenCalled();
+});
+
+test('a historical (non-J/D) link has no cycle and no Board date', async () => {
+  getById.mockResolvedValue({ ...RECORD, wmkf_GrantCycle: { wmkf_cyclecode: '2014-1' } });
+  const body = await resolveWorkbenchRequest({ requestId: REQ, requestNumber: '' });
+  expect(body).toMatchObject({ cycleCode: null, meetingDate: null });
+  expect(getCycleDatesById).not.toHaveBeenCalled();
+});
+
+test('a calendar row with no Board date, a missing row, or a failed calendar read degrades to no Board date', async () => {
+  getCycleDatesById.mockResolvedValueOnce({ wmkf_grantcycleid: CYCLE_ID, wmkf_cyclecode: 'J26', wmkf_meetingdate: null });
+  expect((await resolveWorkbenchRequest({ requestId: REQ, requestNumber: '' })).meetingDate).toBeNull();
+  getCycleDatesById.mockResolvedValueOnce(null);
+  expect((await resolveWorkbenchRequest({ requestId: REQ, requestNumber: '' })).meetingDate).toBeNull();
+  getCycleDatesById.mockRejectedValueOnce(new Error('calendar down'));
+  const body = await resolveWorkbenchRequest({ requestId: REQ, requestNumber: '' });
+  expect(body.meetingDate).toBeNull();
+  expect(body.cycleCode).toBe('J26');
 });
 
 test('number path: findByRequestNumber with top 1', async () => {

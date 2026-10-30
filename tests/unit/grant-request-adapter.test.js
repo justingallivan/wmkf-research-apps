@@ -203,7 +203,7 @@ describe('grant-request.findByPotentialReviewerSlots', () => {
 
     await expect(grantRequest.findByPotentialReviewerSlots(GUID_B)).resolves.toBe(result);
     expect(q).toHaveBeenCalledWith('akoya_requests', {
-      select: 'akoya_requestid,akoya_requestnum,akoya_title,akoya_fiscalyear,wmkf_meetingdate',
+      select: 'akoya_requestid,akoya_requestnum,akoya_title,akoya_fiscalyear',
       filter: [1, 2, 3, 4, 5]
         .map((slot) => `_wmkf_potentialreviewer${slot}_value eq ${GUID_B}`)
         .join(' or '),

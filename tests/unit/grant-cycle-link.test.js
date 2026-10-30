@@ -20,7 +20,7 @@ import {
   listModernCycles,
   listBoardDatesOrNone,
 } from '../../lib/dataverse/adapters/operations-grant-cycle';
-import { getById, aggregateLinkedCycles, findByIds, findByRequestNumber } from '../../lib/dataverse/adapters/grant-request';
+import { getById, aggregateLinkedCycles, findByIds, findByRequestNumber, findByPotentialReviewerSlots } from '../../lib/dataverse/adapters/grant-request';
 
 jest.mock('../../lib/dataverse/core/interlock', () => ({
   assertDataverseOperationAllowed: jest.fn(),
@@ -224,6 +224,7 @@ describe('grant-request list reads forward expand', () => {
   test.each([
     ['findByIds', () => findByIds([REQUEST_ID], { select: ['akoya_requestid'], expand: linkedCycleExpand() })],
     ['findByRequestNumber', () => findByRequestNumber('1002912', { select: ['akoya_requestid'], expand: linkedCycleExpand() })],
+    ['findByPotentialReviewerSlots', () => findByPotentialReviewerSlots(CYCLE_ID, { expand: linkedCycleExpand() })],
   ])('%s', async (_name, read) => {
     await open(read);
     expect(new URL(fetchMock.mock.calls[0][0]).searchParams.get('$expand')).toBe('wmkf_GrantCycle($select=wmkf_cyclecode)');
