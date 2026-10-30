@@ -29,7 +29,7 @@ describe('grant-request.SELECT_PROFILES', () => {
     expect(grantRequest.SELECT_PROFILES).toEqual({
       ID_ONLY: ['akoya_requestid'],
       IDENTITY: ['akoya_requestid', 'akoya_requestnum'],
-      DOCUMENT_SCOPE: ['akoya_requestid', 'akoya_requestnum', 'wmkf_meetingdate'],
+      DOCUMENT_SCOPE: ['akoya_requestid', 'akoya_requestnum'],
     });
   });
   test('is frozen (a shared const, never mutated by a caller)', () => {
@@ -57,7 +57,7 @@ describe('grant-request.getById (characterization)', () => {
     const g = jest.spyOn(DynamicsService, 'getRecord').mockResolvedValue({});
     await grantRequest.getById(GUID_A, { select: grantRequest.SELECT_PROFILES.DOCUMENT_SCOPE });
     expect(g).toHaveBeenCalledWith('akoya_requests', GUID_A, {
-      select: 'akoya_requestid,akoya_requestnum,wmkf_meetingdate',
+      select: 'akoya_requestid,akoya_requestnum',
     });
   });
 

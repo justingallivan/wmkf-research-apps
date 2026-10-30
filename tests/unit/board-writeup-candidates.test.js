@@ -51,7 +51,7 @@ test('the single-request read carries the linked-cycle expand that ordinary() re
   const getRecord = jest.spyOn(DynamicsService, 'getRecord').mockResolvedValue(null);
   await sourceDependencies.getRequest('11111111-1111-4111-8111-111111111111');
   expect(getRecord).toHaveBeenCalledWith('akoya_requests', '11111111-1111-4111-8111-111111111111', expect.objectContaining({
-    select: expect.stringContaining('wmkf_meetingdate'),
+    select: expect.not.stringContaining('wmkf_meetingdate'),
     expand: 'wmkf_GrantCycle($select=wmkf_cyclecode)',
   }));
 });

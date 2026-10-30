@@ -96,7 +96,7 @@ test('golden path: streams the requested file with proxied headers (full envelop
   await handler(reqOf(query()), res);
   expect(res.statusCode).toBe(200);
   expect(DynamicsService.getRecord).toHaveBeenCalledWith('akoya_requests', REQUEST_ID, {
-    select: 'akoya_requestid,akoya_requestnum,wmkf_meetingdate',
+    select: 'akoya_requestid,akoya_requestnum',
     expand: 'wmkf_GrantCycle($select=wmkf_cyclecode)',
   });
   expect(res.headers).toEqual({

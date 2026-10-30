@@ -81,7 +81,7 @@ test('golden path: resolves scope from the record, not the raw query param', asy
   await handler(reqOf({ requestId: REQUEST_ID }), res);
   expect(res.statusCode).toBe(200);
   expect(DynamicsService.getRecord).toHaveBeenCalledWith('akoya_requests', REQUEST_ID, {
-    select: 'akoya_requestid,akoya_requestnum,wmkf_meetingdate',
+    select: 'akoya_requestid,akoya_requestnum',
     expand: 'wmkf_GrantCycle($select=wmkf_cyclecode)',
   });
   expect(listProposalDocuments).toHaveBeenCalledWith(REQUEST_ID, '1002794', 'J26');

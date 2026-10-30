@@ -54,7 +54,6 @@ const REQUEST_SELECT = [
   '_akoya_applicantid_value',
   '_wmkf_projectleader_value',
   '_wmkf_grantprogram_value',
-  'wmkf_meetingdate',
 ].join(',');
 
 beforeEach(() => {
