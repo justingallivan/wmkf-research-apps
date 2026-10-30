@@ -189,6 +189,7 @@ related:
 | [AUDIT_S154_MEMORY.md](AUDIT_S154_MEMORY.md) | audit | historical |  | Date: 2026-05-14 Scope: Every file under .claude-memory/ (1 index + 11 feedback + 51 project + 1 user = 64 files). All read in full. Claims... | 2026-07-02 |
 | [BACKEND_AUTOMATION_PLAN.md](BACKEND_AUTOMATION_PLAN.md) | plan | active |  | Active PowerAutomate roadmap: Vercel prompt-storage and Executor foundations shipped; PA-owned automation and remaining execution extensions are still planned. | 2026-07-02 |
 | [CONNOR_CONTACT_MERGE_AND_REVIEWER_LINKING.md](CONNOR_CONTACT_MERGE_AND_REVIEWER_LINKING.md) | history | active |  | Date: 2026-06-25 (S289). Author: Justin + Claude. Status: discussion / questions. | 2026-07-02 |
+| [CONNOR_DATA_CLEANUP_QUESTIONS.md](CONNOR_DATA_CLEANUP_QUESTIONS.md) | plan | active |  | Running list of Dynamics data-cleanup questions for Connor: fields to fill in or correct so the apps read records correctly. Started 2026-10-29. |  |
 | [PROPOSAL_CONTEXT_EXTRACTION_PLAN.md](PROPOSAL_CONTEXT_EXTRACTION_PLAN.md) | plan | active |  | Created: 2026-04-17 (Session 103) Status: Planning — relevant to single-phase cycle (two cycles out). | 2026-07-02 |
 
 ## grantee-deliverables

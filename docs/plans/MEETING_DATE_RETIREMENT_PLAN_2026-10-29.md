@@ -13,6 +13,7 @@ related:
   - docs/plans/CYCLE_DATES_CENTRALIZATION_PLAN_2026-10-29.md
   - docs/audits/date-consumers-audit-2026-10-29.md
   - docs/atlas/dataverse-akoya-request.md
+  - docs/CONNOR_DATA_CLEANUP_QUESTIONS.md
 ---
 
 # Stop reading the request meeting date (work queue 6a)
@@ -243,10 +244,13 @@ Proposed PRs, each with focused tests and a Codex review:
    `reviewer-suggestion.js:537`]. The service reads `coiContext.cycleCode`, but
    `loadCoiContext` nests it at `requestContext.cycleCode`, so every new
    suggestion from Reviewer Finder is created with `wmkf_grantcyclecode` null
-   (since `f766b004d`). The unit test mocks the wrong shape
+   (since `f766b004d`, 2026-09-08). The unit test mocks the wrong shape
    (`tests/unit/save-candidates-service.test.js:1118`). Review filing still works
-   because it falls back to the request (`individual-file-service.js:230-236`).
-   Fix in PR 1 with the link-based code.
+   only for rows another write later stamps: the hourly filing job discovers
+   suggestions by stamped code alone (`reviewer-suggestion.js:1530-1555`
+   [VERIFIED]); the per-row fallback (`individual-file-service.js:230-236`) and
+   the operator backfill cover the rest. D26 impact: none (all 221 D26
+   suggestions stamped, §7 Q6). Fix in PR 1 with the link-based code.
 2. **My-candidates PD scope reads fields the adapter does not return** [VERIFIED
    via `my-candidates-service.js:231-233`, `reviewer-suggestion.js:1798-1804`]:
    it reads `request.cycleCode` / `cycleLabel`, the adapter returns
@@ -254,28 +258,80 @@ Proposed PRs, each with focused tests and a Codex review:
 
 ## 7. Decisions for the owner
 
-1. **No fallback everywhere?** A request with no Grant Cycle link has no cycle on
-   every surface (confirmed for invitations only).
-2. **Discretionary requests** (§4.1): accept that they leave June/December
-   cycles and are refused by the "has a meeting date" gates (presentation
-   invitations, transcription, site-visit logistics and materials), or should
-   those gates accept discretionary requests some other way?
-3. **Displays:** the Workbench "Board Meeting" date and the pre-site-visit
-   writeup's meeting date become the linked cycle's Board date (the decision day,
-   D47), or blank when there is no link? Historical award recency (§3.5) uses the
-   decision date and fiscal year only?
-4. **Stale invitation expiry** keys on the linked cycle's Board date?
-5. **Honorarium requests:** set the Grant Cycle link instead of copying the
-   meeting date, and take `akoya_fiscalyear` from the calendar Board date? Does
-   AkoyaGO or any flow need `wmkf_meetingdate` on honorarium requests?
-6. **Stored cycle codes:** keep codes already written from meeting dates (no
-   backfill)?
-7. **Test Request Factory:** copy the link to clones, and drop the
-   meeting-date copy and the `correct_meeting_date` step?
+1. **No fallback everywhere?** **Decided (owner, 2026-10-29): yes.** Every
+   surface uses only the link; a request without one shows as "No cycle". The
+   older-years probe (§8) runs before the screens that list past cycles
+   (awardees, cycle export, search, funding history) switch; a gap there is fixed
+   in Dynamics data, not with app fallback code. **Probe done 2026-10-29
+   (owner-authorized, read-only, counts only):** Research link coverage is
+   54–69% (2005–2009), 69–91% (2010–2014), 97–100% (2015 on). Every Research
+   request whose link differs from its meeting-date cycle (2016–2020) has an
+   off-month meeting date (Jan, Jul, Aug and so on) that yields no cycle today,
+   so the link adds a cycle rather than contradicting one. A meeting-date
+   fallback would place only about 140 Research requests (mostly 2010–2014)
+   with a June/December date and no link. Owner, 2026-10-29: keep link-only and
+   ask Connor to fill those links (`docs/CONNOR_DATA_CLEANUP_QUESTIONS.md` DC1;
+   low priority).
+2. **Discretionary requests** (§4.1). **Decided (owner, 2026-10-29):** the apps
+   are not used for discretionary requests, so their leaving June/December cycles
+   and the link gates refusing them is acceptable. SoCal follows the Research
+   cycles.
+3. **Displays.** **Decided (owner, 2026-10-29):** the Workbench Overview "Board
+   Meeting" field shows the linked cycle's calendar Board date (D47 decision day),
+   or "Not set" with no link or no calendar date; the Staff Deliberations writeup
+   prints that date's month and year; candidate cards show the linked cycle's
+   label. Build constraint: keep the writeup snapshot field `meetingDate` and the
+   `formatMeetingDate` month-year format [VERIFIED via
+   `proposal-core-service.js:119-128,352`, `artifact-model.js:229`] so live D26
+   drafts (Board meeting still ahead) do not change fingerprint; test it.
+   Historical award recency (§3.5). **Decided (owner, 2026-10-29):** past grants
+   use only their own fiscal-year label and decision date (writeup "awarded in"
+   and Proposal Ranking: fiscal year, then decision date; most-recent-grant
+   ordering: decision date, then the fiscal-year label as a date); no meeting
+   date; a grant with neither shows no year. The §8 probe also counts past
+   Research grants with neither field.
+4. **Stale invitation expiry.** **Decided (owner, 2026-10-29):** the daily sweep
+   (`vercel.json:100-101`), the per-row recheck (`expire-invitation.js`) and the
+   "Recorded by automated cycle close" label all use the linked cycle's calendar
+   Board date (today's behavior within a day: D26 requests carry Dec 11 and the
+   calendar Board date is recorded as Dec 10, so closing may come one day
+   earlier); no link or no Board date
+   means never auto-closed, as with a missing meeting date today.
+5. **Honorarium requests.** **Decided (owner, 2026-10-29):** going forward, new
+   honorarium rows set the Grant Cycle link from the parent's link and write
+   `wmkf_meetingdate` and `akoya_fiscalyear` from the linked cycle's calendar
+   Board date; a parent with no link creates no honorarium and alerts, as today.
+   Existing honorarium rows are not changed (staff are working them now).
+   Evidence, owner-authorized read-only Production read 2026-10-29: GoApply-made
+   honorarium #1002764 carries the link (June 2026), meeting date 2026-06-04 and
+   fiscal year "June 2026"; the nine newest app-made honoraria (#1003263–#1003274,
+   Aug 2026) carry no link, meeting date 2026-12-11 and "December 2026". The
+   D26 calendar Board date is recorded as Dec 10 (D45 landing switch) [not
+   re-read], so the stored day may move one day earlier; the fiscal year does
+   not change.
+6. **Stored cycle codes.** **Decided (owner, 2026-10-29): no backfill.** Codes
+   already written from meeting dates stay. Evidence, owner-authorized read-only
+   Production count 2026-10-29: 564 requests link to D26; all 221 selected,
+   non-excluded suggestions on them carry `wmkf_grantcyclecode = D26`; none is
+   blank, so the hourly review-filing job (which discovers only stamped rows,
+   `reviewer-suggestion.js:1530-1555` [VERIFIED]) misses nothing despite bug 1.
+   Bug 1 is still fixed in PR 1 so J27 does not depend on a later fill-in.
+7. **Test Request Factory.** **Decided (owner, 2026-10-29):** clones set the
+   Grant Cycle link; the operator picks a cycle (default: the source's linked
+   cycle) instead of a meeting date; clones still get `wmkf_meetingdate`, from
+   that cycle's calendar Board date, so the sandbox correction step and the
+   ledger column `test_request_runs.meeting_date` stay (no migration; record the
+   chosen cycle in the run plan). Production adds `wmkf_grantcycles` to the write
+   fence's `REQUEST_BIND_SETS` as a reviewed change. Prerequisite: confirm the
+   sandbox has matching Grant Cycle rows (sandbox read) [ASSUMED unknown].
 8. **In or out of scope:** Dynamics Explorer prompt and `get_entity`; the
    request-file corpus index; the user CSV export column; one-off scripts.
 
 ## 8. Data needed (owner-run, read-only)
+
+**Done 2026-10-29** for link coverage by year and program (§7 Q1). Still open:
+the count of past Research grants with neither a fiscal year nor a decision
+date (§7 Q3).
 
 Extend `scripts/probe-request-grant-cycle-lookup.cjs` to count requests by
 (link present, meeting date present, program, decision year), including before
