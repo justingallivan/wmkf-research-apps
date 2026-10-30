@@ -95,7 +95,7 @@ test('golden path: no cycleCode returns the distinct cycles for the PD', async (
   expect(res._data).toEqual({
     success: true,
     programDirector: { systemuserid: 'pd-1', fullName: 'Dr. PD' },
-    cycles: [{ code: 'J26', year: 2026, month: 6, count: 1, latestMeetingDate: '2026-06-15' }],
+    cycles: [{ code: 'J26', year: 2026, month: 6, count: 1}],
   });
 });
 
@@ -141,8 +141,6 @@ test('golden path: cycleCode returns the proposals-in-cycle DTO with reviewer co
       reviewerAccepted: 1,
       reviewerDeclined: 0,
       reviewerHeld: 0,
-      meetingDate: '2026-06-15',
-      meetingDateFormatted: null,
       abstract: null,
       requestStatus: 'Phase II Pending',
       phaseIIStatus: null,

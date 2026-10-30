@@ -13,19 +13,12 @@
 const { RECORDED } = require('../../scripts/check-request-meeting-date-reads.js');
 
 describe('request-meeting-date-reads RECORDED (ratchet pin)', () => {
-  it('is exactly the recorded set (2026-10-30 after batch 1: 26 files, 9 pending readers)', () => {
+  it('is exactly the recorded set (2026-10-30 after batch 2: 19 files, no pending readers)', () => {
     expect(RECORDED).toEqual({
       'lib/bill/honorarium-onboard-orchestrator.js': [3, 'request-write'],
       'lib/dataverse/adapters/operations-grant-cycle.js': [2, 'grant-cycle-column'],
-      'lib/dataverse/adapters/reviewer-suggestion.js': [4, 'pending-reader'],
       'lib/services/dataverse-export/constants.js': [1, 'export-column'],
-      'lib/services/final-writeup/dashboard-service.js': [3, 'pending-reader'],
       'lib/services/meeting-tracker/program-briefing-service.js': [1, 'grant-cycle-column'],
-      'lib/services/review-documents/individual-file-service.js': [2, 'pending-reader'],
-      'lib/services/review-manager/reviewers-service.js': [2, 'pending-reader'],
-      'lib/services/reviewer-finder/contact-history-service.js': [2, 'pending-reader'],
-      'lib/services/reviewer-finder/my-proposals-service.js': [7, 'pending-reader'],
-      'lib/services/reviewer-request-context.js': [2, 'pending-reader'],
       'lib/services/test-requests/admin-preview-service.js': [6, 'factory'],
       'lib/services/test-requests/admin-run-service.js': [1, 'factory'],
       'lib/services/test-requests/basic-clone-steps.js': [7, 'factory'],
@@ -35,8 +28,8 @@ describe('request-meeting-date-reads RECORDED (ratchet pin)', () => {
       'lib/services/test-requests/run-runner.js': [1, 'factory'],
       'lib/services/test-requests/sandbox-clone.js': [6, 'factory'],
       'lib/services/test-requests/source-bundle.js': [1, 'factory'],
-      'lib/services/workbench/dashboard-service.js': [5, 'pending-reader'],
-      'lib/services/workbench/grantee-deliverables/awardees-service.js': [3, 'pending-reader'],
+      'lib/services/workbench/dashboard-service.js': [1, 'grant-cycle-column'],
+      'lib/services/workbench/grantee-deliverables/awardees-service.js': [1, 'grant-cycle-column'],
       'lib/utils/cycle-code.js': [6, 'helper-definition'],
       'shared/components/workbench/OverviewTab.js': [1, 'grant-cycle-column'],
       'shared/config/cycleCalendar.js': [1, 'grant-cycle-column'],

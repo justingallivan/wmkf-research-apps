@@ -19,7 +19,9 @@ require('./../lib/dataverse/client').loadEnvLocal();
 
   const { DynamicsService } = await import('../lib/services/dynamics-service.js');
   const { bypassDynamicsRestrictions } = await import('../lib/services/dynamics-context.js');
-  const { meetingDateToCycleCode, cycleCodeToOdataFilter } = await import('../lib/utils/cycle-code.js');
+  const { parseCycleCode } = await import('../lib/utils/cycle-code.js');
+  const { LINKED_CYCLE_ID_FIELD, linkedCycleCode, linkedCycleExpand, linkedCycleFilter } =
+    await import('../lib/dataverse/adapters/operations-grant-cycle.js');
 
   return bypassDynamicsRestrictions('smoke', async () => {
 
@@ -42,15 +44,17 @@ require('./../lib/dataverse/client').loadEnvLocal();
   console.log(`PD: ${pd.fullName} (${pd.systemuserid})\n`);
 
   if (!cycleCode) {
-    const filter = `_wmkf_programdirector_value eq ${pd.systemuserid} and wmkf_meetingdate ne null`;
+    // A request's cycle is its Grant Cycle link (meeting-date retirement), as in the service.
+    const filter = `_wmkf_programdirector_value eq ${pd.systemuserid} and ${LINKED_CYCLE_ID_FIELD} ne null`;
     const { records } = await DynamicsService.queryAllRecords('akoya_requests', {
-      select: 'akoya_requestid,wmkf_meetingdate',
+      select: 'akoya_requestid',
+      expand: linkedCycleExpand(),
       filter,
-      orderby: 'wmkf_meetingdate desc',
+      orderby: 'akoya_requestnum desc',
     });
     const seen = new Map();
     for (const r of records) {
-      const code = meetingDateToCycleCode(r.wmkf_meetingdate);
+      const code = linkedCycleCode(r);
       if (!code) continue;
       seen.set(code, (seen.get(code) || 0) + 1);
     }
@@ -67,11 +71,11 @@ require('./../lib/dataverse/client').loadEnvLocal();
     return;
   }
 
-  const cycleFilter = cycleCodeToOdataFilter(cycleCode);
-  if (!cycleFilter) {
+  if (!parseCycleCode(cycleCode)) {
     console.error(`Invalid cycle code: ${cycleCode}`);
     process.exit(1);
   }
+  const cycleFilter = linkedCycleFilter(cycleCode.trim().toUpperCase());
   const status = process.argv[4] === 'all' ? 'all' : 'actionable';
   const statusFilter = status === 'actionable'
     ? `akoya_requeststatus eq 'Phase II Pending' and wmkf_phaseiistatus eq null`
@@ -82,7 +86,6 @@ require('./../lib/dataverse/client').loadEnvLocal();
     select: [
       'akoya_requestid',
       'akoya_requestnum',
-      'wmkf_meetingdate',
       'akoya_requeststatus',
       '_akoya_applicantid_value',
       '_wmkf_projectleader_value',
@@ -93,7 +96,7 @@ require('./../lib/dataverse/client').loadEnvLocal();
       '_wmkf_potentialreviewer5_value',
     ].join(','),
     filter,
-    orderby: 'wmkf_meetingdate asc',
+    orderby: 'akoya_requestnum asc',
   });
   console.log(`${cycleCode.toUpperCase()} proposals (${records.length}):\n`);
   for (const r of records) {

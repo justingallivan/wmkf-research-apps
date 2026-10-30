@@ -128,10 +128,10 @@ test('cycle-list mode: lists organization-wide eligible cycles with honest activ
   expect(body.lastDecidedCycleCode).toBe('J26');
   expect(body.programDirector).toEqual({ systemuserid: 'pd-1', fullName: 'Dr. PD One' });
   expect(queryAllRequests).toHaveBeenCalledWith({
-    select: 'akoya_requestid,wmkf_meetingdate,akoya_requeststatus,_wmkf_grantprogram_value,_wmkf_programdirector_value,wmkf_triagestatus',
+    select: 'akoya_requestid,akoya_requeststatus,_wmkf_grantprogram_value,_wmkf_programdirector_value,wmkf_triagestatus',
     expand: 'wmkf_GrantCycle($select=wmkf_cyclecode)',
     filter: "_wmkf_grantcycle_value ne null and (_akoya_programid_value eq 8dcab30b-958f-ee11-8179-000d3a341e8f or _akoya_programid_value eq 94cab30b-958f-ee11-8179-000d3a341e8f) and (akoya_requeststatus eq 'Phase II Pending' or wmkf_triagestatus eq 100000000 or wmkf_triagestatus eq 100000001)",
-    orderby: 'wmkf_meetingdate desc',
+    orderby: 'akoya_requestnum desc',
   });
   expect(listBoardDates).toHaveBeenCalledTimes(1);
 });
@@ -285,7 +285,8 @@ test('proposal mode: superuser gets canManage on rows they do not lead; rollup s
   expect(body.rollup).toEqual({ total: 1, stages: { find: 1, invite: 0, awaiting: 0, review: 0, done: 0 } });
   expect(body.cycleCode).toBe('D26');
   expect(body.scope).toBe('all');
-  expect(body.proposals[0]).toMatchObject({ cycleCode: 'D26', cycleLabel: 'December 2026', meetingDate: '2026-12-11' });
+  expect(body.proposals[0]).toMatchObject({ cycleCode: 'D26', cycleLabel: 'December 2026' });
+  expect(body.proposals[0]).not.toHaveProperty('meetingDate');
   expect(queryAllRequests).toHaveBeenCalledWith(expect.objectContaining({
     expand: 'wmkf_GrantCycle($select=wmkf_cyclecode)',
     filter: expect.stringMatching(/^\(wmkf_GrantCycle\/wmkf_cyclecode eq 'D26'\) and /),
@@ -298,7 +299,7 @@ test('proposal mode: a lowercase code is normalized and a December meeting date 
   });
   const body = await loadDashboard(args({ cycleCode: 'd26', scope: 'all' }));
   expect(queryAllRequests.mock.calls[0][0].filter).toContain("(wmkf_GrantCycle/wmkf_cyclecode eq 'D26')");
-  expect(body.proposals[0]).toMatchObject({ cycleCode: null, cycleLabel: null, meetingDate: '2026-12-11' });
+  expect(body.proposals[0]).toMatchObject({ cycleCode: null, cycleLabel: null });
 });
 
 test('proposal mode: non-lead non-superuser rows project canManage false', async () => {

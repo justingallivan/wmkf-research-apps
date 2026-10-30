@@ -190,7 +190,10 @@ It never accepts or resolves a name.
    helper (25 per call) before calling `grantRequestAdapter.findByIds`;
    `findByIds` does not chunk for its caller.
 5. Sort by meeting date descending, then fiscal year/request number fallback;
-   retain three summaries and the bounded deduplicated count.
+   retain three summaries and the bounded deduplicated count. **Superseded
+   2026-10-30** (meeting-date retirement step 3): the sort uses the linked
+   Grant Cycle (`cycleSortKey` in `lib/services/reviewer-contact-reconciliation.js`),
+   and the request meeting date is no longer read.
 6. Give this optional presentation work a short explicit budget (target three
    seconds) using a `Promise.race` whose history promise returns data rather
    than mutating the candidate. Assign the evidence only if history wins. A

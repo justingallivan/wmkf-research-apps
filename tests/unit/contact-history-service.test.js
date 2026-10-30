@@ -72,7 +72,7 @@ test('junction + projectleader rows for the same request/role merge into one row
   expect(out.contactId).toBe(CONTACT_ID);
   expect(out.rows[0]).toMatchObject({ cycleCode: 'J26', cycleLabel: 'June 2026' });
   expect(queryRequests.mock.calls[0][0].expand).toBe('wmkf_GrantCycle($select=wmkf_cyclecode)');
-  expect(queryRequests.mock.calls[0][0].select.split(',')).toContain('wmkf_meetingdate');
+  expect(queryRequests.mock.calls[0][0].select.split(',')).not.toContain('wmkf_meetingdate');
 });
 
 test('a June meeting date without a Grant Cycle link has no cycle', async () => {
@@ -114,15 +114,15 @@ test('non-PI/co-PI junction roles (e.g. Senior Personnel) are excluded', async (
   expect(out.counts).toEqual({ pi: 0, copi: 0, total: 0 });
 });
 
-test('rows sort newest-first by meeting date with missing-meta (null date) rows last', async () => {
+test('rows sort newest linked cycle first with missing-meta (no cycle) rows last', async () => {
   queryAllPersons.mockResolvedValue({
     records: [
       { _wmkf_request_value: REQ_A, wmkf_role: 100000000, wmkf_authorposition: 0 },
       { _wmkf_request_value: REQ_B, wmkf_role: 100000000, wmkf_authorposition: 0 },
     ],
   });
-  // REQ_B has meta (older date resolvable); REQ_A meta missing → null meetingDate → last.
-  queryRequests.mockResolvedValue({ records: [meta(REQ_B, { wmkf_meetingdate: '2024-02-01' })] });
+  // REQ_B has meta with a linked cycle; REQ_A meta missing → no cycle → last.
+  queryRequests.mockResolvedValue({ records: [meta(REQ_B, { wmkf_GrantCycle: { wmkf_cyclecode: 'D23' } })] });
 
   const out = await getContactHistory({ contactId: CONTACT_ID });
 
@@ -183,16 +183,17 @@ test('adapter failure propagates untyped (shell owns the 500 mapping)', async ()
   await expect(getContactHistory({ contactId: CONTACT_ID })).rejects.toThrow('Dataverse unavailable');
 });
 
-test('two dated rows sort newest meeting date first', async () => {
+test('two linked rows sort newest cycle first, ignoring the request meeting date', async () => {
   queryAllPersons.mockResolvedValue({
     records: [
       { _wmkf_request_value: REQ_B, wmkf_role: 100000000, wmkf_authorposition: 0 },
       { _wmkf_request_value: REQ_A, wmkf_role: 100000000, wmkf_authorposition: 0 },
     ],
   });
+  // Meeting dates point the other way; only the linked cycle orders the rows.
   queryRequests.mockResolvedValue({ records: [
-    meta(REQ_B, { wmkf_meetingdate: '2024-02-01' }),
-    meta(REQ_A, { wmkf_meetingdate: '2026-06-15' }),
+    meta(REQ_B, { wmkf_meetingdate: '2026-06-15', wmkf_GrantCycle: { wmkf_cyclecode: 'D23' } }),
+    meta(REQ_A, { wmkf_meetingdate: '2024-02-01', wmkf_GrantCycle: { wmkf_cyclecode: 'J26' } }),
   ] });
 
   const out = await getContactHistory({ contactId: CONTACT_ID });

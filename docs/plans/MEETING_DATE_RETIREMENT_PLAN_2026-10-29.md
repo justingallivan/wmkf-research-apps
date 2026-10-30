@@ -3,7 +3,7 @@ title: Stop reading the request meeting date — inventory and plan
 domain: cycles
 kind: plan
 status: draft
-summary: "Owner, 2026-10-29: no app reads akoya_request.wmkf_meetingdate; a request's cycle comes from its Grant Cycle link (wmkf_grantcycle) and cycle dates from that linked calendar row, with no meeting-date fallback. Whole-repo inventory (106 runtime files, 69 scripts, plus indirect readers through helpers), grouped by what each read is for, the behavior changes, two existing bugs found, a central-helper strategy, and the owner decisions. Built: PR #552 (reviewer email path), steps 1-3 (sandbox rows; PRs #554 and #555 deployed 2026-10-30); step 5 (Test Request Factory; PR #556 deployed 2026-10-30); step 4 (invitation closing and honoraria) on branch claude/invite-expiry-honorarium-cycle-link (PR #557), not merged; step 6 (Dynamics Explorer, current-use scripts, ratchet gate) stacked on it (PR #558), not merged; reader batch 1 (19 unused selects removed) stacked on step 6, not merged; 9 app readers remain, recorded by the gate."
+summary: "Owner, 2026-10-29: no app reads akoya_request.wmkf_meetingdate; a request's cycle comes from its Grant Cycle link (wmkf_grantcycle) and cycle dates from that linked calendar row, with no meeting-date fallback. Whole-repo inventory (106 runtime files, 69 scripts, plus indirect readers through helpers), grouped by what each read is for, the behavior changes, two existing bugs found, a central-helper strategy, and the owner decisions. Built: PR #552 (reviewer email path), steps 1-3 (sandbox rows; PRs #554 and #555 deployed 2026-10-30); step 5 (Test Request Factory; PR #556 deployed 2026-10-30); step 4 (invitation closing and honoraria) on branch claude/invite-expiry-honorarium-cycle-link (PR #557), not merged; step 6 (Dynamics Explorer, current-use scripts, ratchet gate) stacked on it (PR #558), not merged; reader batch 1 (19 unused selects, PR #559) and batch 2 (the last 9 readers) stacked on step 6, not merged; after batch 2 no app code reads the request meeting date, and the gate records only the calendar column, the honorarium write, the Factory, the helpers, the Explorer fallback and the export column."
 canonical: false
 owner: product-engineering
 related:
@@ -370,6 +370,22 @@ a contract check and a Codex review; none merges without the owner.
      screens (Review Manager request level, My Candidates sort via `findByPD`,
      individual review files, contact history, Reviewer Finder request
      context).
+   - **Reader batch 2** (branch `claude/meeting-date-readers-batch2`, stacked
+     on batch 1; not merged) converts those nine. The Workbench and Final
+     Writeup dashboards, awardees and the My Proposals cycle list sort cycles
+     in code already, so their query order becomes request number (paging
+     only). The My Proposals in-cycle list orders by request number (one cycle
+     shares its dates). The My Candidates proposal picker and contact history
+     order by linked cycle, newest first, then request number, with requests
+     that have no cycle last. Unread values were removed: My Proposals
+     `latestMeetingDate`, `meetingDate`, `meetingDateFormatted`; the Workbench
+     dashboard's per-request `meetingDate`; the Review Manager and adapter
+     request-level `meetingDate`; the Reviewer Finder request context
+     `meetingDate`. The individual review file source fingerprint no longer
+     includes the request meeting date, so a review-file backfill or repair
+     manifest built before deploy is refused at execute and must be rebuilt.
+     The My Candidates and My Proposals smoke scripts moved to the link. The
+     gate now records 19 files, none a pending reader.
 
 ## 5a. Contract check (2026-10-29, `/contract-reconcile` review mode)
 

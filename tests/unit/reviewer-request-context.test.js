@@ -116,7 +116,7 @@ describe('reviewer request context', () => {
     expect(getRecord).toHaveBeenCalledWith('akoya_requests', REQUEST_ID, expect.objectContaining({
       select: expect.stringContaining('akoya_requestid'),
     }));
-    expect(getRecord.mock.calls[0][2].select.split(',')).toContain('wmkf_meetingdate');
+    expect(getRecord.mock.calls[0][2].select.split(',')).not.toContain('wmkf_meetingdate');
     expect(getRecord.mock.calls[0][2].expand).toBe('wmkf_GrantCycle($select=wmkf_cyclecode)');
     expect(fetchCoPIs).toHaveBeenCalledWith(REQUEST_ID);
     expect(context).toMatchObject({
@@ -126,14 +126,13 @@ describe('reviewer request context', () => {
       principalInvestigator: 'Dr. PI',
       coInvestigators: 'Dr. Co A',
       abstract: 'Request abstract',
-      meetingDate: '2026-12-03',
       cycleCode: 'D26',
     });
   });
 
-  test('a request without a meeting date projects a null cycle code (never a guess)', () => {
+  test('a request without a Grant Cycle link projects a null cycle code (never a guess)', () => {
     const context = projectReviewerRequestContext({ akoya_requestid: REQUEST_ID, akoya_title: 'T' });
-    expect(context).toMatchObject({ meetingDate: null, cycleCode: null });
+    expect(context).toMatchObject({ cycleCode: null });
   });
 
   test('a December meeting date without a Grant Cycle link projects no cycle', () => {
@@ -142,7 +141,8 @@ describe('reviewer request context', () => {
       akoya_title: 'T',
       wmkf_meetingdate: '2026-12-03',
     });
-    expect(context).toMatchObject({ meetingDate: '2026-12-03', cycleCode: null });
+    expect(context).toMatchObject({ cycleCode: null });
+    expect(context).not.toHaveProperty('meetingDate');
   });
 
   test('applicant account fetch failure warns and falls back to formatted institution names', async () => {
