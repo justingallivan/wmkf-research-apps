@@ -3,7 +3,7 @@ title: Stop reading the request meeting date — inventory and plan
 domain: cycles
 kind: plan
 status: draft
-summary: "Owner, 2026-10-29: no app reads akoya_request.wmkf_meetingdate; a request's cycle comes from its Grant Cycle link (wmkf_grantcycle) and cycle dates from that linked calendar row, with no meeting-date fallback. Whole-repo inventory (106 runtime files, 69 scripts, plus indirect readers through helpers), grouped by what each read is for, the behavior changes, two existing bugs found, a central-helper strategy, and the owner decisions. Built: PR #552 (reviewer email path), steps 1-3 (sandbox rows; PRs #554 and #555 deployed 2026-10-30); step 5 (Test Request Factory; PR #556 deployed 2026-10-30); step 4 (invitation closing and honoraria) on branch claude/invite-expiry-honorarium-cycle-link (PR #557), not merged; step 6 (Dynamics Explorer, current-use scripts, ratchet gate) stacked on it, not merged; 28 app readers remain, recorded by the gate for follow-up PRs."
+summary: "Owner, 2026-10-29: no app reads akoya_request.wmkf_meetingdate; a request's cycle comes from its Grant Cycle link (wmkf_grantcycle) and cycle dates from that linked calendar row, with no meeting-date fallback. Whole-repo inventory (106 runtime files, 69 scripts, plus indirect readers through helpers), grouped by what each read is for, the behavior changes, two existing bugs found, a central-helper strategy, and the owner decisions. Built: PR #552 (reviewer email path), steps 1-3 (sandbox rows; PRs #554 and #555 deployed 2026-10-30); step 5 (Test Request Factory; PR #556 deployed 2026-10-30); step 4 (invitation closing and honoraria) on branch claude/invite-expiry-honorarium-cycle-link (PR #557), not merged; step 6 (Dynamics Explorer, current-use scripts, ratchet gate) stacked on it (PR #558), not merged; reader batch 1 (19 unused selects removed) stacked on step 6, not merged; 9 app readers remain, recorded by the gate."
 canonical: false
 owner: product-engineering
 related:
@@ -358,6 +358,18 @@ a contract check and a Codex review; none merges without the owner.
      meeting-date sorts that need a new order; values passed to screens).
      Whether Dataverse can sort requests by the linked cycle's Board date is
      unverified.
+   - **Reader batch 1** (branch `claude/meeting-date-readers-batch1`, stacked
+     on step 6; not merged): 19 files dropped an unused request meeting-date
+     select. Each was traced to its consumers first: none reads the field,
+     hashes or stores the raw request row, or returns it to a screen (the
+     Initial Assessment, Pre-RP brief, Board writeup and post-presentation
+     snapshots all take explicit fields). The Meeting Tracker briefing keeps
+     only its calendar Board-date read. The gate now records 26 files, 9 of
+     them pending readers: the five sorts (Workbench dashboard, Final Writeup
+     dashboard, awardees, two in My Proposals) and the values passed on to
+     screens (Review Manager request level, My Candidates sort via `findByPD`,
+     individual review files, contact history, Reviewer Finder request
+     context).
 
 ## 5a. Contract check (2026-10-29, `/contract-reconcile` review mode)
 

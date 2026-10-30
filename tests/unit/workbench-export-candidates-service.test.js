@@ -75,7 +75,8 @@ test('golden path: authoritative meta + dated filename', async () => {
   expect(getById).toHaveBeenCalledWith(REQ, expect.objectContaining({
     expand: 'wmkf_GrantCycle($select=wmkf_cyclecode)',
   }));
-  expect(getById.mock.calls[0][1].select.split(',')).toContain('wmkf_meetingdate');
+  // The request meeting date is not read (meeting-date retirement); the cycle is the link.
+  expect(getById.mock.calls[0][1].select.split(',')).not.toContain('wmkf_meetingdate');
   expect(buffer).toEqual(Buffer.from('xlsx-bytes'));
   expect(filename).toMatch(/^reviewer-candidates-1002794-\d{4}-\d{2}-\d{2}\.xlsx$/);
 });
