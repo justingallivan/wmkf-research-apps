@@ -3,7 +3,7 @@ title: Reviewer invitation build — materials on acceptance, calendar due date,
 domain: reviewers
 kind: plan
 status: in-progress
-summary: "One build before the Feb 24, 2027 J27 invitations (owner, 2026-10-29): the review due date comes from the cycle calendar's Reviews Due Date; reviewers get materials as soon as they accept (D46); per-send, browser-saved and Reviewer Finder record dates go away; review filing follows each cycle's Board date (D44) instead of a Vercel switch; the Board setup reads its dates from the calendar (D47); small calendar-page fixes. Traced from source 2026-10-29. PR 1 (#551) and PR 2 (#552, due date and cycle config from the request's Grant Cycle link) are deployed; PR 3 and PR 4 remain."
+summary: "One build before the Feb 24, 2027 J27 invitations (owner, 2026-10-29): the review due date comes from the cycle calendar's Reviews Due Date; reviewers get materials as soon as they accept (D46); per-send, browser-saved and Reviewer Finder record dates go away; review filing follows each cycle's Board date (D44) instead of a Vercel switch; the Board setup reads its dates from the calendar (D47); small calendar-page fixes. Traced from source 2026-10-29. PR 1 (#551) and PR 2 (#552, due date and cycle config from the request's Grant Cycle link) are deployed; PR 3 (#561, Board setup from the calendar) is open, not merged; PR 4 remains."
 canonical: false
 owner: product-engineering
 related:
@@ -438,7 +438,14 @@ Dataverse writes). Separate PRs, each with focused unit tests:
    fingerprint binds the Grant Cycle id instead of the meeting date. The reviewer
    email path no longer reads `akoya_request.wmkf_meetingdate`; other app reads
    stay with the meeting-date removal plan (work queue item 6a).
-3. Board setup from the calendar (E).
+3. **Built on branch `claude/board-setup-calendar`, PR #561, not merged:** Board setup from the calendar (E).
+   `getBoardSetupDatesByCode` in the adapter (one exact-code row: Board
+   Meeting Date and Board Mailing Date, meaning `boardMailing` in
+   `CYCLE_CALENDAR_MEANINGS`) and `lib/services/board-writeups/calendar.js`;
+   activation also refuses a mailing date after the Board date; notices
+   re-read the calendar before sending and stop if a date moved. Before
+   merge, owner-run Production reads: D26 calendar Board date = 2026-12-10,
+   D26 Board Mailing Date set, no pending D26 setup save.
 4. Materials on acceptance (B) + wording.
 
 Gates: `check:api-routes`, `check:atlas`, `check:j27-register`,

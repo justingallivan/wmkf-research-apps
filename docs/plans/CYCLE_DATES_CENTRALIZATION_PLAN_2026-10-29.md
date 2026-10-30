@@ -86,7 +86,7 @@ dates; each is now in scope:
   Meeting Date is the ground truth; the landing cycle's Board-page rule, which
   reads the setup's `boardEnds`, moves to it too). Ask Connor whether request
   meeting dates follow a Board-date change; add a mismatch check to the
-  readiness notice.
+  readiness notice. Board setup from the calendar: built on branch `claude/board-setup-calendar`, PR #561, not merged.
 - **`inviteStartDate` in Admin was never read.** Removed (PR #551, merge `caf318983`, Production-deployed 2026-10-29).
 
 ## 3. Blank dates
