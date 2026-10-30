@@ -3,10 +3,10 @@ title: Shared Prompt Library Implementation Plan
 domain: ai-platform
 kind: plan
 status: proposed
-summary: Shared prompt library plan with offline definition/wire schemas and fingerprint foundation; Dataverse publication and clients remain unbuilt.
+summary: Shared prompt library with local JS contracts and compiled SDK lifecycle/persistence/guard evaluators; production rule composition, registered publication and clients remain pending.
 canonical: false
 cataloged: 2026-10-29
-last_verified: 2026-10-29
+last_verified: 2026-10-30
 owner: product-engineering
 related:
   - docs/atlas/dataverse-wmkf-ai-run-and-prompt.md
@@ -52,10 +52,11 @@ restrictions now cover 39 audited names, all locally passing with reviewed model
 `phase-i.checkin` remains held for a common execution definition. Initial
 Assessment version capture and Pre-Site native schema are reconciled locally. Shared
 pinned budget checks, the unused atomic budget adapter and an unwired transaction
-reference core exist. Compiled .NET SDK transport, canonical primitives and
-a source-hashed sandbox rehearsal packet now exist; the complete publisher,
-full validator parity and tenant proof remain pending. See
-[SDK milestone](SHARED_PROMPT_SDK_MILESTONE_2026-10-30.md). An offline Pre-Site transition planner and separately
+reference core exist. Compiled .NET SDK lifecycle/persistence, wire contracts, authorization/write-guard
+evaluators and a source-hashed sandbox rehearsal packet now exist. Production
+format/budget/catalog rules, registered entry, full parity and tenant proof remain
+pending. See [publisher milestone](SHARED_PROMPT_PUBLISHER_MILESTONE_2026-10-30.md)
+and [SDK checkpoint](SHARED_PROMPT_SDK_MILESTONE_2026-10-30.md). An offline Pre-Site transition planner and separately
 backportable runtime pause guard prepare the coordinated release; see
 [transaction milestone](SHARED_PROMPT_TRANSACTION_MILESTONE_2026-10-30.md). Remaining holds and
 .NET/tenant/cutover proof are tracked in
@@ -614,7 +615,8 @@ supports the required Custom API, synchronous transactional service calls,
 row-version checks, unique keys and OAuth clients. **[UNKNOWN]** Tenant deployment
 privileges/tooling, actual role/impersonation behavior,
 null-version draft shape and fault/concurrency behavior require the named sandbox
-spike. No .NET project or Dataverse publication solution is supplied by this PR.
+spike. The .NET project now compiles locally; a deployable Dataverse publication solution
+and production rule composition are not supplied.
 See the feasibility report and linked technical preflight for evidence,
 falsification tests, approved ownership/access and review status.
 
@@ -646,7 +648,8 @@ unknown network outcomes resolve by receipt. Async client generation fences,
 policy parity and full raw-field reader/writer fan-out gate writer enablement.
 Shared helper audit: one server operation, two clients, preserved auth differences.
 Durable-surface audit: new solution/tables/guards/roles require Atlas, security,
-catalog and rollout reconciliation during build; this PR ships none of them.
+catalog and rollout reconciliation during build; this PR contains local SDK evaluators and proposed persistence, but provisions
+none of the tenant solution/tables/guards/roles.
 
 Sweep Mode A: changed authoring/publication direction. Searched current plans,
 SESSION_PROMPT, Atlas/wiki/memory, runtime/scripts/tests for the named shared-library

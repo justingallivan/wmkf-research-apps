@@ -74,7 +74,7 @@ actual shipped templates, extracted source rules, limits and model policies.
 
 | Invariant | Enforcement | Verification |
 |---|---|---|
-| No live writes/provider calls in this milestone | No route wiring or live SDK port; offline extraction and fake-port tests | Import/fan-out inspection and scoped unit tests |
+| No live writes/provider calls in this milestone | No route wiring or live SDK deployment; offline extraction and fake-SDK tests | Import/fan-out inspection and scoped unit tests |
 | Preserve exact editable content | No normalization/writeback | CRLF/astral/unchanged-input tests |
 | Unsupported placeholder names never disappear | Scan paired double braces and reject unmatched grammar | Unicode/dotted/ASCII golden vectors |
 | Preserve per-name parser contracts | Extract complete rule tables; body vs combined checks | Real shipped templates and removed-label/placeholder negatives |
@@ -122,7 +122,9 @@ cutover, read paging/status, real clients, solution/plugin/guards and sandbox
 proof. Policy deployment must disable/drain old writers and reject unsupported
 artifact stamps at the Dataverse boundary; CAS alone is not policy freshness. The .NET8 harness now matches existing canonical/fingerprint goldens; complete
 .NET validation, actual Framework runtime parity and tenant transactions remain
-unproved. See `dataverse/prompt-publication/README.md`.
+unproved. See `dataverse/prompt-publication/README.md` and the publisher milestone.
+Production format/budget/catalog rule composition and registered entry remain
+pending; the only `IPublicationRules` implementation is a test stub.
 New helpers do not replace existing runtime validators or callers.
 
 
@@ -133,7 +135,8 @@ complete version inventory, draft/current/catalog preconditions, high-water
 allocation, conditional activation and same-transaction immutable receipt. A
 post-fault lookup resolves a racing committed receipt without retrying writes.
 The complete .NET publisher and transaction/guard/role proof remain mandatory;
-compiled transport primitives and offline golden checks now exist in
+compiled lifecycle/persistence, authorization/write-guard evaluators and wire
+parity checks now exist in
 `dataverse/prompt-publication/`.
 
 `pre-site-transition.js` and `scripts/prepare-pre-site-prompt-transition.cjs`

@@ -17,14 +17,16 @@ public sealed class TransactionSdk
     private readonly IPluginExecutionContext context;
     private readonly IOrganizationService service;
     private readonly Guid organization;
+    private readonly PublicationWriteAuthority? writeAuthority;
     public Guid OrganizationId => organization;
     public Guid InitiatingUserId { get; }
     public Guid EffectiveUserId { get; }
     private static void Reject(string code) => throw new InvalidOperationException(code);
     // expectedOrganizationId MUST be server-owned release configuration, never
     // an input parameter. Factory is the platform-provided service factory.
-    public TransactionSdk(IPluginExecutionContext context, IOrganizationServiceFactory factory, Guid expectedOrganizationId)
+    public TransactionSdk(IPluginExecutionContext context, IOrganizationServiceFactory factory, Guid expectedOrganizationId, PublicationWriteAuthority? writeAuthority = null)
     {
+        this.writeAuthority = writeAuthority;
         this.context = context ?? throw new ArgumentNullException(nameof(context));
         organization = expectedOrganizationId;
         InitiatingUserId = context.InitiatingUserId;
@@ -33,7 +35,7 @@ public sealed class TransactionSdk
         if (factory == null) Reject("sdk_service_factory_required");
         service = factory!.CreateOrganizationService(EffectiveUserId) ?? throw new InvalidOperationException("sdk_service_missing");
     }
-    private void AssertContext()
+    public void AssertContext()
     {
         if (organization == Guid.Empty || context.OrganizationId != organization
             || InitiatingUserId == Guid.Empty || EffectiveUserId == Guid.Empty
@@ -65,7 +67,7 @@ public sealed class TransactionSdk
     public Guid CreateOnly(Entity entity)
     {
         AssertContext(); Name(entity.LogicalName);
-        var id = service.Create(entity);
+        var id = writeAuthority == null ? service.Create(entity) : writeAuthority.Write(context,"Create",entity,()=>service.Create(entity));
         if (id == Guid.Empty) Reject("invalid_sdk_create_result");
         return id;
     }
@@ -76,7 +78,9 @@ public sealed class TransactionSdk
         if (changes.RowVersion != null) Reject("caller_row_version_not_allowed");
         var target = new Entity(changes.LogicalName, changes.Id) { RowVersion = RowVersion(originalEtag) };
         foreach (var pair in changes.Attributes) { Name(pair.Key); target.Attributes.Add(pair.Key, pair.Value); }
-        service.Execute(new UpdateRequest { Target = target, ConcurrencyBehavior = ConcurrencyBehavior.IfRowVersionMatches });
+        var request = new UpdateRequest { Target = target, ConcurrencyBehavior = ConcurrencyBehavior.IfRowVersionMatches };
+        if(writeAuthority == null) service.Execute(request);
+        else writeAuthority.Write(context,"Update",target,()=>service.Execute(request));
     }
     public Entity ReadById(string table, Guid id, params string[] fields)
     {

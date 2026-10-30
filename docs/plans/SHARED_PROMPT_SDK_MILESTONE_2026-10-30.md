@@ -3,7 +3,7 @@ title: Shared Prompt SDK and Sandbox Rehearsal Preparation
 domain: ai-platform
 kind: implementation-record
 status: active
-summary: Compiled SDK transport and canonical primitives plus an offline rehearsal packet; full publisher, guards and tenant rehearsal remain pending.
+summary: Historical SDK transport checkpoint at ab19098f7; subsequent lifecycle/authorization work is recorded in the publisher milestone and remains local only.
 canonical: false
 cataloged: 2026-10-30
 owner: product-engineering
@@ -13,6 +13,10 @@ related:
 ---
 
 # SDK milestone and rehearsal preparation
+
+Historical checkpoint at `ab19098f7`. The subsequent compiled lifecycle and guard
+composition is recorded in [publisher milestone](SHARED_PROMPT_PUBLISHER_MILESTONE_2026-10-30.md);
+production rules and registered entry remain pending.
 
 [PARTIAL / LOCAL ONLY] Source is in `dataverse/prompt-publication`. No registered
 IPlugin/Custom API, live client authentication, roles, schema or tenant writes.

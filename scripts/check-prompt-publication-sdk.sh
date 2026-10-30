@@ -6,6 +6,7 @@ sdk_command=${PR553_DOTNET:-dotnet}
 export DOTNET_CLI_HOME="${TMPDIR:-/tmp}/wmkf-prompt-sdk-cli"
 export NUGET_PACKAGES="${PR553_NUGET_CACHE:-${TMPDIR:-/tmp}/wmkf-prompt-sdk-nuget}"
 export DOTNET_CLI_TELEMETRY_OPTOUT=1
+node "$repo_root/scripts/build-prompt-publication-wire-vectors.cjs" --check
 cd "$repo_root/dataverse/prompt-publication"
 "$sdk_command" restore Checks/Checks.csproj --locked-mode --configfile NuGet.Config
 "$sdk_command" build Transport/Transport.csproj --no-restore --configuration Release

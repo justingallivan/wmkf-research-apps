@@ -4,13 +4,16 @@ const fs=require('node:fs'),path=require('node:path'),crypto=require('node:crypt
 const parser=require('@babel/parser');
 const root=path.resolve(__dirname,'..');
 const files=[
- 'scripts/build-prompt-publication-rehearsal.cjs','scripts/check-prompt-publication-sdk.sh',
+ 'scripts/build-prompt-publication-rehearsal.cjs','scripts/check-prompt-publication-sdk.sh','scripts/build-prompt-publication-wire-vectors.cjs',
  'dataverse/prompt-publication/global.json','dataverse/prompt-publication/NuGet.Config',
  'dataverse/prompt-publication/Transport/Transport.csproj','dataverse/prompt-publication/Transport/packages.lock.json',
  'dataverse/prompt-publication/Transport/CanonicalJson.cs','dataverse/prompt-publication/Transport/TransactionSdk.cs',
+ 'dataverse/prompt-publication/Transport/PublicationWire.cs','dataverse/prompt-publication/Transport/PublisherAuthorization.cs',
+ 'dataverse/prompt-publication/Transport/PublicationWriteGuard.cs','dataverse/prompt-publication/Transport/PublicationPublisher.cs','dataverse/prompt-publication/Transport/PublicationSdkStore.cs',
+ 'dataverse/prompt-publication/Checks/PublisherChecks.cs',
  'dataverse/prompt-publication/Transport/PromptRows.cs','dataverse/prompt-publication/Transport/PromptSchemaPreflight.cs',
  'dataverse/prompt-publication/Checks/Checks.csproj','dataverse/prompt-publication/Checks/packages.lock.json','dataverse/prompt-publication/Checks/Program.cs',
- 'dataverse/prompt-publication/rehearsal/cases.json','tests/fixtures/prompt-publication/fingerprints-v1.json','tests/fixtures/prompt-publication/sdk-numbers-v1.json',
+ 'dataverse/prompt-publication/rehearsal/cases.json','tests/fixtures/prompt-publication/fingerprints-v1.json','tests/fixtures/prompt-publication/sdk-numbers-v1.json','tests/fixtures/prompt-publication/wire-sdk-v1.json',
  'lib/dataverse/core/target-registry.js','lib/prompt-publication/policy-v1.json','lib/prompt-publication/transaction-core.js',
 ];
 const digest=v=>crypto.createHash('sha256').update(v).digest('hex');

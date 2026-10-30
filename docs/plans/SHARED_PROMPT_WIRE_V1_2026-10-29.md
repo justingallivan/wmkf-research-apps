@@ -187,8 +187,9 @@ Generate/check explicitly with `scripts/build-prompt-publication-vectors.cjs`;
 never refresh goldens at runtime or silently before tests. JavaScript tests and
 an independent Python canonicalizer/hash check verify these vectors locally;
 The .NET8 SDK harness now runs these primitive canonical/snapshot/request
-fingerprint goldens. Complete .NET request/receipt/definition validation and
-actual .NET Framework runtime/tenant parity remain unproved; see the SDK milestone.
+fingerprint goldens. Compiled .NET request/receipt contracts now match a JS-oracle structural matrix
+and shared fingerprint vectors. Complete .NET definition/budget/catalog rules and
+actual Framework runtime/tenant parity remain pending; see the publisher milestone.
 
 ## Historical schema/hash milestone review (commit 1187caf17)
 

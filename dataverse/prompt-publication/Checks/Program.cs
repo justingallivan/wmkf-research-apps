@@ -54,6 +54,7 @@ internal static class Program
             }
             SdkChecks();
             MetadataChecks();
+            count += PublisherChecks.Run(fixture,args[0]);
             Console.WriteLine($"SDK/canonical checks passed: {count}. No tenant connection."); return 0;
         }
         catch (Exception error) { Console.Error.WriteLine(error); return 1; }

@@ -17,3 +17,7 @@ test('execute-like CLI options reject before any write',()=>{
  const spy=jest.spyOn(fs,'writeFileSync').mockImplementation(()=>{throw new Error('unexpected write');});
  try{expect(()=>main(['--execute'])).toThrow('no live execution mode');expect(spy).not.toHaveBeenCalled();}finally{spy.mockRestore();}
 });
+
+test('SDK wire parity vectors stay bound to the JS validator',()=>{
+ require('node:child_process').execFileSync(process.execPath,[path.resolve(__dirname,'../../scripts/build-prompt-publication-wire-vectors.cjs'),'--check']);
+});
