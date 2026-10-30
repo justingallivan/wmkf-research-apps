@@ -40,8 +40,8 @@ Admin-only first-release publication proposal.
 
 This document is a plan, not an implementation or schema deployment. The retained
 schema probe was read-only. This revision checks Microsoft platform documentation
-and repository source; it performs no tenant provisioning, live writes, or model
-execution. The linked historical AI-run form was read separately; it did not
+and repository source and includes a subsequent owner-authorized read-only
+example probe; it performs no tenant provisioning, live writes or model execution. The linked historical AI-run form was read separately; it did not
 establish the originating flow definition or prompt format.
 
 ## Verified baseline
@@ -386,11 +386,15 @@ could bypass publication validation. Final policy schema, JS/.NET golden vectors
 size/freshness behavior and role/guard manifest remain engineering gates, not
 implemented behavior. Runtime guards remain necessary when policy/budgets change later.
 
-Connor's existing free-text/Power Automate definitions have not been inspected.
-Do not equate shared storage with Executor compatibility or force-convert them.
+A subsequent owner-authorized read-only probe inspected Connor-attributed
+`phase-i.checkin`: native-budget-PDF intent, undeclared template placeholders
+and human-readable output instructions rather than valid JSON Schema. See the
+[technical preflight](SHARED_PROMPT_PUBLICATION_PREFLIGHT_2026-10-29.md) for exact
+evidence and its unverified flow binding. Do not equate shared storage with
+Executor compatibility or force-convert this format.
 Both routes can organize any prompt. Publication initially accepts only explicitly
-supported definition contracts; representative Connor definitions and any needed
-external-flow validation profile must be agreed before enabling that route.
+supported definition contracts; an external-flow profile preserving this example
+and its actual caller contract must be specified before enabling its publication.
 Unknown contracts stay visible/editable as drafts and cannot accidentally become
 active. Broadening providers or building a Power Automate Executor is separate
 scope, not a hidden prerequisite to library discovery.
@@ -523,8 +527,8 @@ human publication access is Connor and existing Admin superusers; actual mapped
 identities and Dataverse roles still need authorized verification. This is not
 a role grant or evidence Connor has deployed the operation.
 
-Before implementation: obtain a representative Connor definition and finalize
-validation-policy schema/parity and solution tooling. These are technical/release gates,
+Before implementation: verify the discovered example's actual flow/input/model
+contract, and finalize validation-policy schema/parity and solution tooling. These are technical/release gates,
 not a requirement for Connor to accept Admin publication. No message to Connor,
 schema change, Production write or model test is authorized by this PR.
 

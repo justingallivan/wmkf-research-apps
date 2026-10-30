@@ -21,12 +21,15 @@ for Production implementation/deployment.** A shared Dataverse Custom API Action
 is practical at the documented platform level. It can be called by both Admin's
 server and Connor's tools without requiring Connor to use Admin. This assessment
 is based on Microsoft documentation and repository inspection on 2026-10-29;
-no new tenant metadata probe, schema write, plug-in registration, identity grant,
-sandbox execution or model call was performed.
+the initial assessment performed no tenant probe, schema write, plug-in
+registration, identity grant, sandbox execution or model call. The later
+authorized read-only example probe is recorded separately in the technical
+preflight and does not establish deployed publication behavior.
 
 Owner direction: future prompts share the existing table and group field;
-versioned publication is accessible through both routes. Existing Power Automate
-flows/definitions have not been inspected. The user-supplied historical AI-run
+versioned publication is accessible through both routes. At the initial assessment, existing Power Automate
+flows/definitions had not been inspected; the subsequent authorized discovery
+result is recorded in the linked technical preflight. The user-supplied historical AI-run
 form was accessible read-only but did not identify its source prompt/flow.
 Do not infer universal Executor compatibility or tenant deployment readiness.
 
@@ -127,7 +130,7 @@ active row, generated publication time or latest policy.
   impersonation fallback is acceptable.
 - Agree nullable draft storage, legacy head high-water initialization, explicit
   recovery for corrupt states, and seed/raw-writer cutover under writer freeze.
-- Agree representative Connor definitions and versioned shared validation-policy
+- Verify the discovered example's actual flow/model/input contract and versioned shared validation-policy
   distribution with JS/.NET parity, model/budget freshness and unknown-policy
   rejection. Do not assume every Power Automate definition is an Executor prompt.
 - Only then authorize Production additive provisioning/cutover separately. The

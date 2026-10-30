@@ -174,9 +174,12 @@ gates. Unknown definitions or policy revisions fail closed for publication while
 remaining discoverable and editable as drafts. Catalog organization remains
 available for unsupported definitions.
 
-Connor's old free-text prompt/Power Automate format has not been inspected.
-Agree representative definitions and any external-flow validation profile before
-claiming that every backend definition can publish. Do not require adopting the
+The read-only probe found Connor-attributed `phase-i.checkin`, with a native PDF
+input intent and human-readable output instructions instead of machine JSON
+Schema. Its actual Power Automate binding/model assembly is still unverified;
+see the technical preflight. Define an explicit external-flow validation profile
+before claiming this format can publish. Do not label it corrupt merely because
+it differs from Executor JSON. Do not require adopting the
 Vercel Executor merely to join the library. New general-purpose Admin authoring
 initially supports caller-supplied inputs and returned text/JSON (`target.kind:
 none`); preserve existing advanced definitions. New providers/direct field-write
@@ -201,5 +204,6 @@ silently rewired. No flow definition or caller migration was tested by this plan
 - Prove transactional context, uniqueness, head/draft/current conditional writes,
   replay, lost-response recovery, raw/bulk write denial and trusted attribution.
 - Verify nullable draft versions and legacy state/head initialization.
-- Agree representative Connor definitions and shared validation-policy transport.
+- Verify the discovered Connor example's actual flow/model/input assembly and
+  specify its external-flow profile plus shared validation-policy transport.
 - Explicitly authorize Production provisioning/cutover separately.

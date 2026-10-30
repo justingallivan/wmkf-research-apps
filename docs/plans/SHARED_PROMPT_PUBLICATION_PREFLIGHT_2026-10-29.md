@@ -23,10 +23,11 @@ Admin and Connor's coding tools use the same publication operation; Connor
 need not open Admin. This establishes scope, not provisioned roles or Connor's
 confirmed deployment availability. No message was sent to him.
 
-**[VERIFIED via source/test commands]** This pass used the PR branch at
+**[VERIFIED via source/test commands]** The initial offline pass used the PR branch at
 `1bda7149c`, current repository code and the retained Production metadata snapshot
-observed `2026-10-29T23:22:42.446Z`. No live tenant request/write, provisioning,
-provider request or model execution was performed. No runtime code changed.
+observed `2026-10-29T23:22:42.446Z`. That initial pass made no live tenant request/write, provisioning,
+provider request or model execution. A subsequent explicitly authorized read-only
+probe is recorded in the live-example section below. No runtime code changed.
 Microsoft documentation was consulted for platform semantics. CodeGraph was
 used first; uncovered exact source regions were then read directly.
 
@@ -229,9 +230,10 @@ extractability of current JS checks. Required vectors include undeclared/missing
 variables in either template, reviewer labels, A7 markers, empty/oversize strings,
 unknown output/source/target kinds, native structured-output compatibility,
 unknown/retired model and token ceilings, budget changes, category/group values,
-and unsupported profile. Do not invent an external-flow profile from the AI-run
-output. Connor's representative definition is still needed; unknown profiles
-remain visible/editable drafts and cannot publish accidentally.
+and unsupported profile. Do not invent an external-flow profile from the AI-run output. The subsequent
+live example below supplies an authored definition, but its actual flow binding,
+model selection and PDF assembly remain unverified. Unknown profiles stay
+visible/editable drafts and cannot publish accidentally.
 
 ## Baseline verification and remaining acceptance
 
@@ -253,10 +255,10 @@ Connor owns confirming a supported build/deploy machine and solution packaging.
 | Head/receipt/policy fence and two-client envelope specified | Simultaneous first/later/case-variant publication; stale draft/metadata/policy |
 | Validation dependencies and parity corpus requirements enumerated | JS/.NET parity; all-or-none rollback after each write boundary |
 | Caller/seed/fallback migration requirements identified | Lost response + later publish + replay; direct/bulk/head/receipt bypass denial |
-| Connor example and tooling availability still UNKNOWN | Representative backend draft → discover → backend publish → app read; inverse Admin route |
+| Connor authored example found below; actual flow wiring/tooling UNKNOWN | Representative backend draft → discover → backend publish → app read; inverse Admin route |
 
-Remaining owner input: a representative Connor prompt definition/location, when
-available. Remaining engineering prerequisites: concrete policy schema/vectors,
+A Connor-attributed authored example is now available below; its actual flow
+binding/model/input assembly still needs verification. Remaining engineering prerequisites: concrete policy schema/vectors,
 solution/role manifest and build/deploy tooling. No further product choice about
 using Admin is outstanding. Do not treat this preflight as permission to install
 tools, provision schema, grant access or write Production.
@@ -283,3 +285,68 @@ check passed. Searches found no remaining live claim in this proposal set that
 solution ownership is undecided or that Admin-only publishing is required.
 Verdict: pre-rehearsal SOURCE CHECKS COMPLETE for this bounded pass; deployed
 roles/tooling/custom rules, .NET parity and tenant fault behavior remain UNKNOWN.
+
+
+## Subsequent owner-authorized read-only example discovery
+
+**[VERIFIED via `scripts/probe-shared-prompt-authoring-example.cjs`, Production,
+2026-10-30T02:14–02:20Z (October 29 PT)]** Sanitized retained evidence:
+[evidence/shared-prompt-authoring-example-2026-10-29.json](evidence/shared-prompt-authoring-example-2026-10-29.json).
+The owner explicitly authorized a database probe to find an example, possibly
+inside Power Automate. Dataverse calls were GET only; OAuth token exchange was
+the only POST. No flow/model execution, mutation, role change or schema action.
+Raw flow definitions, provider headers/connection values, applicant output and
+prompt bodies are not retained in this evidence.
+
+**Found authored example:** `phase-i.checkin`, row
+`ee2927ec-9741-f111-88b5-000d3a306b0f`. Its creator/modifier match the owner of
+the user-linked AI run (the earlier browser form identified that owner as Connor
+Noda). This is attributable authored content, not proof of which flow consumes
+it or which exact prompt produced the linked run.
+
+| Stored part | Observed format / implication |
+|---|---|
+| System prompt | 7,937 characters; role/input/task/output/rules sections for clerical checks, budget checks, keyword tags, technical summary and advisory priorities fit |
+| User template | 158 characters; `{{proposal_text}}` and `{{budget_pdf}}` |
+| System placeholder | `{{output_schema}}` interpolated into output instructions |
+| Input intent | Extracted proposal text plus native budget PDF visual inspection; not just two plain-text input variables |
+| Output field | 2,216 characters of human-readable JSON-shaped example, including alternatives such as number-or-null; not parseable JSON or a machine JSON Schema. This is a different authored format, not automatic evidence of corruption |
+| Variable declarations | Absent |
+| Lifecycle/model | Stored v1, noncurrent, null status and null model; max tokens 4096, temperature 0.3. No automatic Draft conversion/publication |
+
+The linked run `402fdf35-9b45-f111-88b5-000d3a306d45` was created
+2026-05-01T20:20:39Z, labeled PowerAutomate Auto with model
+`claude-sonnet-4-5`, but its prompt GUID and prompt version are null. The record
+form's display name is not the creation date. Similar task/output structure is
+not sufficient to link that run to this prompt row.
+
+**Flow access boundary:** 123 category-5 workflow definitions visible to the
+application identity were paged completely; all 123 had parseable clientdata.
+The broad discovery terms matched 21 generic records, but none of the raw
+visible definitions matched `wmkf_ai_`, `anthropic`, `claude` or
+`clerical_checks`. No originating prompt-execution flow was identified. This
+does not rule out personal/non-solution flows, another environment, inaccessible
+child flows, dynamic configuration or a different connector. Do not describe it
+as a complete Power Automate inventory or proof that no flow exists.
+
+**Plan implication:** the representative-definition discovery prerequisite is
+PARTIALLY satisfied. Library discovery/editing must preserve this format. Before
+publication of this definition, define an explicit external-flow contract/profile
+that preserves human output instructions and native-document intent; do not
+force valid Executor JSON, fabricate declarations/model, flatten the PDF to text
+or relax Executor validation globally. Actual flow input assembly, model source,
+outputs/caller binding and active-version lookup remain UNKNOWN. Inspect them
+or confirm them with Connor before claiming end-to-end compatibility. This is
+not authorization to migrate/activate the legacy row.
+
+Probe validation: Node syntax check and ESLint passed; sanitized output reviewed.
+The summary probe was rerun to confirm the visible-definition boundary.
+Independent read-only review found that raw-flow term matching needed to precede
+JSON-wrapper inspection; this was corrected, rerun and rechecked. The probe
+now emits its own raw-term matches and recognized-definition count, covering
+unrecognized/unparseable wrappers without retaining their text. All 123 visible
+definitions were recognized in the final run, with zero specific raw-term matches.
+No full prompt/flow dump was committed. All 15 relevant documentation/secret checks and paired self-tests passed
+sequentially for the retained evidence and reconciled plan changes; syntax,
+ESLint and diff whitespace checks passed. No new runtime implementation was
+introduced or tested by this read-only discovery.
