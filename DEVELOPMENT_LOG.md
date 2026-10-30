@@ -10,6 +10,17 @@ The chronological archive after the `Legacy chronological session log` divider c
 
 ---
 
+## October 2026 — The apps take each request's cycle from its Grant Cycle link (Session 651, Claude)
+
+**Milestone:** Every app screen and service outside the Test Request Factory reads a request's cycle from `akoya_request.wmkf_grantcycle`, never the meeting date; Board dates shown to staff come from the linked cycle's calendar row.
+**Sessions:** Session 651 (Claude); three Codex reviews; owner-authorized sandbox reads and one read-only Production count.
+**Ship state:**
+- PR #554 (`fe749f063`): link helpers with explicit Grant Cycle restriction checks; all filters, membership sites (each traced to a read carrying the expand), cycle lists; Reviewer Finder saves stamp the cycle again.
+- PR #555 (`701a58bea`): "has a cycle" gates, Overview and Staff Deliberations Board dates from the calendar, candidate-card labels (cache v5), past-grant dates without the meeting date, unused fields removed.
+- No link (or a historical link) = no cycle; Factory clones lack the link until step 5.
+**Why it matters:** One cycle source across the apps before J27; older gaps are fixed as Dynamics data, not code.
+**Pointers:** `docs/plans/MEETING_DATE_RETIREMENT_PLAN_2026-10-29.md` (steps 2–3; step 5 decision); `lib/dataverse/adapters/operations-grant-cycle.js`.
+
 ## October 2026 — Reviewer invitations take the cycle and due date from the Grant Cycle link (Session 650, Claude)
 
 **Milestone:** Before a proposal's first reviewer invitation, the apps save the Reviews Due Date from the request's linked Grant Cycle calendar row (D48), and the reviewer email path reads the cycle only from that link: the first app reader of `akoya_request.wmkf_grantcycle`.

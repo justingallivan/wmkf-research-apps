@@ -243,17 +243,18 @@ a contract check and a Codex review; none merges without the owner.
 2. **Cycle lookup and Research screens:** the shared helpers (with explicit
    restriction checks, §5b), the request adapter's expand support, the Research
    filters, cycle membership, cycle lists and default cycle, plus the two bugs
-   in §6. **[BUILT on branch `claude/cycle-lookup-research-screens`, not
-   merged, 2026-10-30]** Helpers in `lib/dataverse/adapters/operations-grant-cycle.js`
+   in §6. **[DEPLOYED 2026-10-30; PR #554, merge `fe749f063`; Vercel commit
+   status success]** Helpers in `lib/dataverse/adapters/operations-grant-cycle.js`
    (`linkedCycleFilter`, `noLinkedCycleFilter`, `linkedCycleExpand`,
    `linkedCycleCode`, `listBoardDatesOrNone`); every non-Factory filter and
    membership site converted and traced to a read carrying the expand; both
-   §6 bugs fixed. Deployment-order hazard for the owner: until step 5, new
-   Factory clones carry no link, so they show no cycle on converted screens.
+   §6 bugs fixed. Accepted by the owner (no Factory rehearsals for a few
+   days): until step 5, Factory test requests (existing Production ones
+   included) carry no link and show no cycle on converted screens.
 3. **Checks, dates shown and cleanup:** the "has a cycle" gates, displays,
    reviewer-search labels (enrichment cache version bump) and pass-through
-   removals (§3.4, §3.6). **[BUILT on branch `claude/meeting-date-displays-cleanup`, stacked on
-   step 2, not merged, 2026-10-30]** "Has a cycle" gates use the link; Workbench
+   removals (§3.4, §3.6). **[DEPLOYED 2026-10-30; PR #555, merge
+   `701a58bea`; Vercel commit status success]** "Has a cycle" gates use the link; Workbench
    Overview and the Staff Deliberations writeup show the linked cycle's calendar
    Board date (snapshot field and month-year format kept); candidate cards label
    prior requests by linked cycle (enrichment cache v5); past-grant recency uses
@@ -262,7 +263,13 @@ a contract check and a Codex review; none merges without the owner.
    neither a fiscal year nor a decision date.
 4. **Invitation closing and honoraria:** stale-invite expiry and the
    honorarium write (§3.5).
-5. **Test Request Factory** (§3.7); no ledger migration (§7 Q7).
+5. **Test Request Factory** (§3.7); no ledger migration (§7 Q7). **Decided
+   (owner, 2026-10-30): real cycles only** — a Production clone links to an
+   existing real Grant Cycle row (default: the source request's linked cycle);
+   no test cycle rows are added to the Production calendar. Sandbox clones may
+   use the sandbox test rows D97/D99. Must land before the next Factory
+   rehearsal; remove the Pre-Site reader's meeting-date fallback
+   (`lib/services/test-requests/presite-sandbox-deps.js`) in the same change.
 6. **Dynamics Explorer, scripts and the guard check** (§3.8–3.9) as decided.
 
 ## 5a. Contract check (2026-10-29, `/contract-reconcile` review mode)
@@ -437,6 +444,8 @@ honorarium and Factory paths.
    chosen cycle in the run plan). Production adds `wmkf_grantcycles` to the write
    fence's `REQUEST_BIND_SETS` as a reviewed change. Prerequisite: confirm the
    sandbox has matching Grant Cycle rows (sandbox read) [ASSUMED unknown].
+   **Update 2026-10-30:** sandbox rows J26, D26, J27, D97, D99 exist (step 1);
+   Production clones use real cycles only (owner; see §5 step 5).
 8. **In or out of scope** (asked one at a time):
    - **8a Dynamics Explorer.** **Decided (owner, 2026-10-29): in scope, last
      PR.** The prompt tells the model to use the Grant Cycle link first and fall
