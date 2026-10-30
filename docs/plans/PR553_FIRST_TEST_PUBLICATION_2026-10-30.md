@@ -40,9 +40,9 @@ inventory remains qualified by the application principal's visibility.
 | Publisher/API/package | No matching visible registration | Disabled publisher/API bootstrap after Windows/operator checks |
 | Groups and budget control | Neither key returned | Review exact seeds before guard activation |
 | Existing data | Two current Published prompt rows returned | Preserve both; use a new synthetic key |
-| Solution | `wmkfResearchReviewAppSuite` exists, WMKF publisher | Confirm solution choice; do not create a competing publisher |
+| Solution | `wmkfResearchReviewAppSuite` exists, WMKF publisher | Owner selected this solution; preserve its publisher |
 | App caller roles | Includes System Administrator and System Customizer | Not proof of Connor permissions or delegated/effective intersection |
-| Windows parity | Offline bundle generated, not executed on Windows | Connor or supplied Windows session runs it |
+| Windows parity | Offline bundle generated, not executed on Windows | No Windows access available yet; execution pending |
 
 ## What Codex can do and still owns
 
@@ -66,27 +66,32 @@ transaction/guard prerequisites and old-writer safety still apply. A successful
 first test would not complete the race/rollback/bypass or two-client release
 rehearsal.
 
-## Inputs/actions needed from Justin or Connor
+## Owner decisions and remaining inputs
 
-1. Confirm use of existing solution `wmkfResearchReviewAppSuite`, or Connor names
-   another existing/approved solution. Its publisher is `WMKF_Publisher`, prefix
-   `wmkf`; the resulting registered package name must be checked before creation.
-2. Provide a Windows operator/session. The bundle requires Framework 4.8 and
+[OWNER CONFIRMED, 2026-10-30] Use the existing Research Review App Suite solution
+(`wmkfResearchReviewAppSuite`) and its `WMKF_Publisher` publisher, prefix `wmkf`.
+The resulting registered package name still must be checked before creation.
+Windows access is not available yet. This blocks Windows execution evidence and
+the subsequent registration/publication steps, but does not block local schema,
+bound-package tooling or publication/readback command preparation. No substitute
+runtime is accepted as actual Windows Framework proof.
+
+1. When Windows access becomes available, provide an operator/session. The bundle requires Framework 4.8 and
    `sn.exe` from supported developer tools. Run the included `Run-WindowsChecks.ps1`
    and return `windows-check-result.json` plus the complete console output.
    Verify the supplied ZIP SHA256 before running it; internal manifest hashes
    detect drift but are not an independent authenticity signature.
    Do not install the package while running this offline check. Windows execution
    remains unverified until results are received.
-3. Confirm the first human operator and their test-environment connection. Connor
+2. Confirm the first human operator and their test-environment connection. Connor
    maintains the operation; initial access remains Connor and existing Admin
    superusers. The probe found enabled Connor Noda and Justin Gallivan records.
    Codex can resolve candidate IDs read-only, but names/roles alone
    do not authorize impersonation or establish the final approved actor binding.
-4. Identify an approved secure key handoff/backup destination under Connor's
+3. Identify an approved secure key handoff/backup destination under Connor's
    control. The new key remains protected locally; it is not in this bundle,
    Git, the review prompt or package. No need to send passwords/API keys in chat.
-5. Before guard activation, Connor identifies any test flows/scripts that write
+4. Before guard activation, Connor identifies any test flows/scripts that write
    prompts, group settings or budget settings and arranges a quiet test window.
    Codex inventories repo writers; external flows cannot be assumed inactive.
 

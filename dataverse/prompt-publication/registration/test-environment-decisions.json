@@ -1,0 +1,18 @@
+{
+  "decisionVersion": 1,
+  "status": "OWNER_SELECTED_PREPARATION_ONLY",
+  "decidedOn": "2026-10-30",
+  "targetHost": "orgd9e66399.crm.dynamics.com",
+  "solutionUniqueName": "wmkfResearchReviewAppSuite",
+  "publisherUniqueName": "WMKF_Publisher",
+  "publisherPrefix": "wmkf",
+  "windowsAccess": "not-available-yet",
+  "windowsExecutionVerified": false,
+  "deploymentAuthorized": false,
+  "liveWritesAuthorized": false,
+  "remainingOwnerInputs": [
+    "first human operator",
+    "secure signing-key transfer and backup destination",
+    "quiet test-writer window before guard activation"
+  ]
+}
