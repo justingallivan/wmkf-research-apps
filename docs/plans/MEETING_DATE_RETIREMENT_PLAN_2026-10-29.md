@@ -333,7 +333,11 @@ a contract check and a Codex review; none merges without the owner.
      the link (navigation filter or `$expand`), falls back to the request
      meeting date only when the link is blank and says so in the answer, and
      takes Board-meeting dates from the calendar. `get_entity` returns the link
-     instead of the meeting date. PR #553 touches neither file.
+     instead of the meeting date. PR #553 touches neither file. The Explorer's
+     restriction guard (`restriction-guard.js`) now also checks `$filter`
+     navigation paths against restrictions on the related table, so a user
+     restricted from `wmkf_grantcycle` (table or `wmkf_cyclecode`) cannot
+     learn cycle membership through the recommended filter (Codex review).
    - **Scripts** (§7 Q8d) now use the link: Staff Deliberations drafts and
      preflight, the deliberations cohort review, the Proposal Ranking access
      script (roster hash carries the linked code), the reminder-liveness audit

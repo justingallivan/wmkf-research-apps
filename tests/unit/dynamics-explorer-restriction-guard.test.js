@@ -75,6 +75,29 @@ describe('checkRestriction (Stage 0 characterization)', () => {
     expect(result).toBeNull();
   });
 
+  describe('$filter navigation paths into a restricted related table (meeting-date retirement step 6)', () => {
+    const cycleFilter = { table_name: 'akoya_request', filter: "wmkf_GrantCycle/wmkf_cyclecode eq 'D26'" };
+
+    test.each(['query_records', 'count_records'])('%s: a table-level restriction on wmkf_grantcycle blocks the cycle filter', (tool) => {
+      expect(checkRestriction(tool, cycleFilter, [{ table_name: 'wmkf_grantcycle', field_name: null }]))
+        .toBe('Table "wmkf_grantcycle" is restricted (referenced via $filter "wmkf_GrantCycle/wmkf_cyclecode")');
+    });
+
+    test.each(['query_records', 'count_records'])('%s: a field restriction on wmkf_grantcycle.wmkf_cyclecode blocks the cycle filter', (tool) => {
+      expect(checkRestriction(tool, cycleFilter, [{ table_name: 'wmkf_grantcycle', field_name: 'wmkf_cyclecode' }]))
+        .toBe('Field "wmkf_cyclecode" is restricted (referenced via $filter "wmkf_GrantCycle/wmkf_cyclecode")');
+    });
+
+    test('a field restriction on a different related column does not block', () => {
+      expect(checkRestriction('query_records', cycleFilter, [{ table_name: 'wmkf_grantcycle', field_name: 'wmkf_name' }])).toBeNull();
+    });
+
+    test('a navigation path to an unrestricted table does not block', () => {
+      const input = { table_name: 'akoya_request', filter: "wmkf_GrantProgram/wmkf_name eq 'Research'" };
+      expect(checkRestriction('query_records', input, [{ table_name: 'wmkf_grantcycle', field_name: null }])).toBeNull();
+    });
+  });
+
   test('no restrictions configured: always null', () => {
     expect(checkRestriction('query_records', { table_name: 'x' }, [])).toBeNull();
   });
