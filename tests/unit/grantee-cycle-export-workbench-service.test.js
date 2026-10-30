@@ -24,6 +24,7 @@ jest.mock('../../lib/services/grantee-document-html', () => ({
 
 import { exportGranteeCycle } from '../../lib/services/workbench/grantee-deliverables/cycle-export-service';
 import { ServiceHttpError } from '../../lib/services/service-http-error';
+import { DynamicsService } from '../../lib/services/dynamics-service';
 
 beforeEach(() => {
   delete process.env.TEST_REQUEST_ISOLATION;
@@ -33,6 +34,15 @@ beforeEach(() => {
     { akoya_requestid: 'b', akoya_requestnum: '1002' },
   ], totalCount: 2, capped: false });
   assembleGranteeDocument.mockResolvedValue({ institution: 'X' });
+  // The link helpers check the wmkf_grantcycle restriction (covered in grant-cycle-link.test.js).
+  jest.spyOn(DynamicsService, 'checkRestriction').mockImplementation(() => {});
+});
+
+test('filters on the Grant Cycle link, never a meeting-date window', async () => {
+  await exportGranteeCycle({ cycleCode: 'j26' });
+  const { filter } = queryAllRequests.mock.calls[0][0];
+  expect(filter.startsWith("wmkf_GrantCycle/wmkf_cyclecode eq 'J26' and akoya_requeststatus eq ")).toBe(true);
+  expect(filter).not.toContain('wmkf_meetingdate');
 });
 
 afterEach(() => { delete process.env.TEST_REQUEST_ISOLATION; });

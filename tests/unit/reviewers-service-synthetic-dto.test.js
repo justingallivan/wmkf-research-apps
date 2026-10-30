@@ -30,9 +30,18 @@ jest.mock('../../lib/dataverse/adapters/reviewer-suggestion', () => ({
   HONORARIUM_ELIGIBILITY_BY_VALUE: {},
 }));
 const getRequestById = jest.fn();
+// Grant Cycle link helpers: real strings and the real row reader, without the
+// restriction context the adapter-mocked service never establishes.
+jest.mock('../../lib/dataverse/adapters/operations-grant-cycle', () => ({
+  linkedCycleExpand: () => 'wmkf_GrantCycle($select=wmkf_cyclecode)',
+  linkedCycleCode: (row) => {
+    const code = row?.wmkf_GrantCycle?.wmkf_cyclecode;
+    return typeof code === 'string' && /^[JD]\d{2}$/.test(code) ? code : null;
+  },
+}));
 jest.mock('../../lib/dataverse/adapters/grant-request', () => ({
   getById: (...a) => getRequestById(...a),
-  findByRequestNumber: jest.fn(async () => ({ records: [] })),
+  queryRequests: jest.fn(async () => ({ records: [] })),
 }));
 const queryReviewers = jest.fn(async () => ({ records: [] }));
 jest.mock('../../lib/dataverse/adapters/potential-reviewer', () => ({

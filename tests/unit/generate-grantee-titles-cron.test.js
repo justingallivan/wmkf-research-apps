@@ -14,7 +14,7 @@ jest.mock('../../lib/services/dynamics-context', () => ({
 jest.mock('../../lib/services/model-override-loader', () => ({ loadModelOverrides: jest.fn(async () => {}) }));
 jest.mock('../../lib/services/grantee-title-service', () => ({ generateGranteeTitle: jest.fn() }));
 jest.mock('../../lib/services/dynamics-service', () => ({
-  DynamicsService: { queryAllRecords: jest.fn(), getRecord: jest.fn(), updateRecord: jest.fn() },
+  DynamicsService: { queryAllRecords: jest.fn(), getRecord: jest.fn(), updateRecord: jest.fn(), checkRestriction: jest.fn() },
 }));
 jest.mock('../../shared/config/granteeResearchPrograms', () => ({
   GRANTEE_RESEARCH_PROGRAM_IDS: ['prog-a', 'prog-b'],
@@ -64,7 +64,8 @@ test('predicate filters on cycle + Invited + research programs + empty descripti
   DynamicsService.queryAllRecords.mockResolvedValue({ records: [], capped: false });
   await handler(req(), makeRes());
   const { filter } = DynamicsService.queryAllRecords.mock.calls[0][1];
-  expect(filter).toContain('wmkf_meetingdate ge 2026-06-01');         // J26 window
+  expect(filter).toContain("wmkf_GrantCycle/wmkf_cyclecode eq 'J26'"); // J26 link
+  expect(filter).not.toContain('wmkf_meetingdate');
   expect(filter).toContain('wmkf_phaseistatus eq 100000003');          // Invited
   expect(filter).toContain('wmkf_wmkfprojectdescription eq null');     // write-when-empty
   expect(filter).toContain('_akoya_programid_value eq prog-a');        // research only

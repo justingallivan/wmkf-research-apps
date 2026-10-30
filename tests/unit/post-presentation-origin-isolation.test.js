@@ -83,7 +83,7 @@ function dependencies(overrides = {}) {
     schemaReady: () => true,
     requestAllowed: () => true,
     getRequest: async () => ({
-      akoya_requestid: REQUEST_ID, akoya_requestnum: '1003220', wmkf_meetingdate: '2026-12-10T00:00:00Z',
+      akoya_requestid: REQUEST_ID, akoya_requestnum: '1003220', wmkf_meetingdate: '2026-12-10T00:00:00Z', wmkf_GrantCycle: { wmkf_cyclecode: 'D26' },
     }),
     findActiveSiteVisit: async () => ({ records: [{ activityid: VISIT_ID, _regardingobjectid_value: REQUEST_ID }] }),
     findDocuments: async () => ({ records: [] }),

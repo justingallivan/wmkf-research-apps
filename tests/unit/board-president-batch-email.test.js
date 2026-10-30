@@ -31,7 +31,7 @@ function fixture() {
     sourceFor: jest.fn(async (_cycle, id) => ({ source: { documentId: id, eTag: 'one', versionId: '1', number: id === A ? '1001' : '1002', institution: 'Institute', filename: `${id} - Writeup.docx` } })),
     getRole: jest.fn(async role => ({ value: { systemUserId: role === 'president' ? PRESIDENT : CSO } })),
     eligibleStaff: jest.fn(async id => { if (![CSO, PRESIDENT].includes(id)) throw new Error('ineligible'); return { systemUserId: id, profileId: id === CSO ? actor.profileId : 'president-profile', email: id === CSO ? 'cso@wmkeck.org' : 'president@wmkeck.org', name: 'Example CSO' }; }),
-    getRequest: jest.fn(async id => ({ akoya_requestid: id, akoya_requestnum: id === A ? '1001' : '1002', _akoya_applicantid_value_formatted: 'Institute <&>', _wmkf_grantprogram_value: PROGRAM_ID, wmkf_meetingdate: '2026-12-01', wmkf_istestrequest: false, wmkf_testcreationrunid: null })),
+    getRequest: jest.fn(async id => ({ akoya_requestid: id, akoya_requestnum: id === A ? '1001' : '1002', _akoya_applicantid_value_formatted: 'Institute <&>', _wmkf_grantprogram_value: PROGRAM_ID, wmkf_meetingdate: '2026-12-01', wmkf_GrantCycle: { wmkf_cyclecode: 'D26' }, wmkf_istestrequest: false, wmkf_testcreationrunid: null })),
     boardFolder: jest.fn(async () => folder),
     approvedBytes: async () => ({ buffer: Buffer.from('doc'), hash: 'hash' }),
     session: async () => ({ uploadUrl: 'upload', folder }), put: jest.fn(async () => ({ item: { id: 'copied' } })),

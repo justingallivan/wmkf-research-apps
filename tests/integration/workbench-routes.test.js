@@ -16,13 +16,11 @@ import {
 
 import { DynamicsService } from '../../lib/services/dynamics-service';
 import { resolveByEmail } from '../../lib/services/program-director-resolver';
-import { cycleCodeToOdataFilter } from '../../lib/utils/cycle-code';
 
-// Exact OData fragments the dashboard builds (S261 triage switch). The cycle range
-// is derived from the same helper so the assertions pin STRUCTURE/grouping, not
-// the date-format details — a regression that dropped the cycle filter or changed
-// the parenthesization would fail these.
-const D26_CYCLE = cycleCodeToOdataFilter('D26');
+// Exact OData fragments the dashboard builds (S261 triage switch). The cycle is
+// the request's Grant Cycle link; a regression that dropped the cycle filter or
+// changed the parenthesization would fail these.
+const D26_CYCLE = "wmkf_GrantCycle/wmkf_cyclecode eq 'D26'";
 const TRIAGE_BASE = "akoya_requeststatus eq 'Phase II Pending' or wmkf_triagestatus eq 100000000";
 const HIDE_SET_ASIDE = '(wmkf_triagestatus eq null or wmkf_triagestatus ne 100000001)';
 const PD_FILTER = '_wmkf_programdirector_value eq pd-1';
@@ -32,7 +30,13 @@ jest.mock('../../lib/services/dynamics-service', () => ({
     queryAllRecords: jest.fn(() => Promise.resolve({ records: [] })),
     queryRecords: jest.fn(() => Promise.resolve({ records: [] })),
     getRecord: jest.fn(),
+    checkRestriction: jest.fn(),
   },
+}));
+
+jest.mock('../../lib/dataverse/adapters/operations-grant-cycle.js', () => ({
+  ...jest.requireActual('../../lib/dataverse/adapters/operations-grant-cycle.js'),
+  listBoardDatesOrNone: jest.fn(async () => []),
 }));
 
 jest.mock('../../lib/services/dynamics-context', () => ({
@@ -82,14 +86,14 @@ describe('/api/workbench/dashboard', () => {
     expect(res.status).toHaveBeenCalledWith(403);
   });
 
-  it('cycle-list mode: cycles derive from the PD\'s meeting-dated proposals; default = latest', async () => {
+  it('cycle-list mode: cycles derive from the PD\'s linked proposals; default = latest', async () => {
     mockAuthenticatedUser(1, ['reviewers'], { dynamicsSystemuserId: 'pd-1' });
-    // Derived purely from meeting dates (S261: no hardcoded D26 anchor). The PD has
+    // Derived purely from Grant Cycle links (S261: no hardcoded D26 anchor). The PD has
     // a Dec-2026 (D26) and a June-2026 (J26) proposal; latest (D26) is the default.
     DynamicsService.queryAllRecords.mockResolvedValueOnce({
       records: [
-        { akoya_requestid: 'rd', wmkf_meetingdate: '2026-12-11' },
-        { akoya_requestid: 'rj', wmkf_meetingdate: '2026-06-04' },
+        { akoya_requestid: 'rd', wmkf_meetingdate: '2026-12-11', wmkf_GrantCycle: { wmkf_cyclecode: 'D26' } },
+        { akoya_requestid: 'rj', wmkf_meetingdate: '2026-06-04', wmkf_GrantCycle: { wmkf_cyclecode: 'J26' } },
       ],
     });
     const res = createMockRes();
@@ -103,7 +107,7 @@ describe('/api/workbench/dashboard', () => {
   it('cycle-list mode: a PD with no D26 proposals gets NO synthetic D26 anchor (allowlist retired)', async () => {
     mockAuthenticatedUser(1, ['reviewers']);
     DynamicsService.queryAllRecords.mockResolvedValueOnce({
-      records: [{ akoya_requestid: 'rj', wmkf_meetingdate: '2026-06-04' }], // only J26
+      records: [{ akoya_requestid: 'rj', wmkf_meetingdate: '2026-06-04', wmkf_GrantCycle: { wmkf_cyclecode: 'J26' } }], // only J26
     });
     const res = createMockRes();
     await handler(createMockReq({ method: 'GET' }), res);
@@ -123,7 +127,7 @@ describe('/api/workbench/dashboard', () => {
           records: [{
             akoya_requestid: 'r-adv',
             akoya_requestnum: '1002836',
-            wmkf_meetingdate: '2026-12-11',
+            wmkf_meetingdate: '2026-12-11', wmkf_GrantCycle: { wmkf_cyclecode: 'D26' },
             akoya_requeststatus: 'Phase I Pending',
             wmkf_triagestatus: 100000000, // Advancing
             _wmkf_programdirector_value: 'pd-1',
@@ -165,7 +169,7 @@ describe('/api/workbench/dashboard', () => {
           records: [{
             akoya_requestid: 'r-aside',
             akoya_requestnum: '1002999',
-            wmkf_meetingdate: '2026-12-11',
+            wmkf_meetingdate: '2026-12-11', wmkf_GrantCycle: { wmkf_cyclecode: 'D26' },
             akoya_requeststatus: 'Phase I Pending',
             wmkf_triagestatus: 100000001, // Set aside
           }],
@@ -265,7 +269,7 @@ describe('/api/workbench/resolve-request', () => {
         akoya_requestid: 'guid-1',
         akoya_requestnum: '1002836',
         akoya_title: 'Test',
-        wmkf_meetingdate: '2026-12-11',
+        wmkf_meetingdate: '2026-12-11', wmkf_GrantCycle: { wmkf_cyclecode: 'D26' },
         akoya_requeststatus: 'Phase I Pending',
       }],
     });

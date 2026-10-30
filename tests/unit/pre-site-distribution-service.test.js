@@ -3340,6 +3340,7 @@ describe('producer-to-prepare contract: the real roster projection through prepa
         _wmkf_programdirector_value_formatted: 'Dr. PD',
         wmkf_abstract: 'A test abstract.',
         wmkf_meetingdate: '2026-12-01',
+        wmkf_GrantCycle: { wmkf_cyclecode: 'D26' },
       }),
       getAccount: async () => null,
       // The real getWriteupRoster projection — only ITS OWN adapter calls

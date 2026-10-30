@@ -74,6 +74,12 @@ jest.mock('../../lib/dataverse/core/interlock', () => ({
 const listBoardDates = jest.fn();
 jest.mock('../../lib/dataverse/adapters/operations-grant-cycle', () => ({
   listBoardDates: (...args) => listBoardDates(...args),
+  // Real strings and the real row reader, without a restriction context.
+  linkedCycleExpand: () => 'wmkf_GrantCycle($select=wmkf_cyclecode)',
+  linkedCycleCode: (row) => {
+    const code = row?.wmkf_GrantCycle?.wmkf_cyclecode;
+    return typeof code === 'string' && /^[JD]\d{2}$/.test(code) ? code : null;
+  },
 }));
 
 const recordEvent = jest.fn();
@@ -182,6 +188,7 @@ beforeEach(() => {
     akoya_title: 'Proposal',
     wmkf_organizationname: 'University',
     wmkf_meetingdate: '2026-12-03T00:00:00Z',
+    wmkf_GrantCycle: { wmkf_cyclecode: 'D26' },
   });
   getReviewerById.mockResolvedValue({ wmkf_potentialreviewersid: REVIEWER_ID, wmkf_name: 'Reviewer' });
   fetchAnswersBySuggestion.mockResolvedValue({ [SUGGESTION_ID]: ANSWERS });
@@ -254,10 +261,10 @@ test.each([
 });
 
 test.each([
-  ['no_cycle', null, '2026-11-03T00:00:00Z'],
-  ['wrong_cycle', 'J26', '2026-12-03T00:00:00Z'],
-  ['eligible', null, '2026-12-03T00:00:00Z'],
-])('classifies cycle resolution as %s', async (status, stampedCycle, meetingDate) => {
+  ['no_cycle', 'an unstamped row on a December-meeting request with no link', null, null],
+  ['wrong_cycle', 'a stamped J26 row on a D26-linked request', 'J26', 'D26'],
+  ['eligible', 'an unstamped row on a D26-linked request', null, 'D26'],
+])('classifies cycle resolution as %s (%s)', async (status, _label, stampedCycle, linkedCycle) => {
   suggestion.getByIdWithSelect.mockResolvedValueOnce(baseRow({
     wmkf_grantcyclecode: stampedCycle,
   }));
@@ -266,10 +273,14 @@ test.each([
     akoya_requestnum: '1002903',
     akoya_title: 'Proposal',
     wmkf_organizationname: 'University',
-    wmkf_meetingdate: meetingDate,
+    wmkf_meetingdate: '2026-12-03T00:00:00Z',
+    ...(linkedCycle ? { wmkf_GrantCycle: { wmkf_cyclecode: linkedCycle } } : {}),
   });
   await expect(inspectIndividualReviewFileCandidate(SUGGESTION_ID, { cycleCode: 'D26' }))
     .resolves.toMatchObject({ status });
+  expect(getRequestById).toHaveBeenCalledWith(REQUEST_ID, expect.objectContaining({
+    expand: 'wmkf_GrantCycle($select=wmkf_cyclecode)',
+  }));
 });
 
 test('keeps unresolved reviewer identity ahead of cycle classification', async () => {
@@ -482,6 +493,7 @@ test('manifest source drift fails before render, Graph access, or pointer mutati
     akoya_title: 'Changed after review',
     wmkf_organizationname: 'University',
     wmkf_meetingdate: '2026-12-03T00:00:00Z',
+    wmkf_GrantCycle: { wmkf_cyclecode: 'D26' },
   });
   const result = await ensureIndividualReviewFile(SUGGESTION_ID, {
     cycleCode: 'D26',
@@ -555,6 +567,7 @@ test('manifest-bound already-filed state is semantically verified without upload
     akoya_title: 'Proposal',
     wmkf_organizationname: 'University',
     wmkf_meetingdate: '2026-12-03T00:00:00Z',
+    wmkf_GrantCycle: { wmkf_cyclecode: 'D26' },
   });
   getReviewerById.mockResolvedValue({ wmkf_potentialreviewersid: REVIEWER_ID, wmkf_name: 'Reviewer' });
   fetchAnswersBySuggestion.mockResolvedValue({ [SUGGESTION_ID]: ANSWERS });

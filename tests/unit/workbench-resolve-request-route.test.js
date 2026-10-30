@@ -9,7 +9,7 @@
  */
 jest.mock('../../lib/utils/auth', () => ({ requireAppAccess: jest.fn() }));
 jest.mock('../../lib/services/dynamics-service', () => ({
-  DynamicsService: { getRecord: jest.fn(), queryRecords: jest.fn() },
+  DynamicsService: { getRecord: jest.fn(), queryRecords: jest.fn(), checkRestriction: jest.fn() },
 }));
 jest.mock('../../lib/services/dynamics-context', () => ({
   bypassDynamicsRestrictions: (_label, fn) => fn(),
@@ -60,6 +60,7 @@ const RECORD = {
   akoya_requestnum: '1002794',
   akoya_title: 'A Study',
   wmkf_meetingdate: '2026-06-01',
+  wmkf_GrantCycle: { wmkf_cyclecode: 'J26' },
   akoya_requeststatus: 'Active',
   wmkf_organizationname: 'N/A',
   _akoya_applicantid_value_formatted: 'Example University',
@@ -97,7 +98,11 @@ test('golden path by GUID: resolves and returns the expected DTO shape (full env
   const res = mockRes();
   await handler(reqOf({ requestId: REQUEST_ID }), res);
   expect(res.statusCode).toBe(200);
-  expect(DynamicsService.getRecord).toHaveBeenCalledWith('akoya_requests', REQUEST_ID, { select: SELECT });
+  expect(DynamicsService.getRecord).toHaveBeenCalledWith('akoya_requests', REQUEST_ID, {
+    select: SELECT,
+    expand: 'wmkf_GrantCycle($select=wmkf_cyclecode)',
+  });
+  expect(DynamicsService.checkRestriction).toHaveBeenCalledWith('wmkf_grantcycle', 'wmkf_grantcycleid,wmkf_cyclecode');
   const expectedStatusClass = classifyStatus('Active')?.class || STATUS_CLASS.UNCLASSIFIED;
   expect(res.body).toEqual({
     success: true,
@@ -138,9 +143,11 @@ test('golden path by requestNumber: queries by exact number match', async () => 
   expect(DynamicsService.queryRecords).toHaveBeenCalledWith('akoya_requests', {
     select: SELECT,
     filter: "akoya_requestnum eq '1002794'",
+    expand: 'wmkf_GrantCycle($select=wmkf_cyclecode)',
     top: 1,
   });
   expect(res.body.requestId).toBe(REQUEST_ID);
+  expect(res.body.cycleCode).toBe('J26');
 });
 
 test('request not found by GUID → 404, no CoPI lookup attempted', async () => {

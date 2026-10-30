@@ -19,10 +19,11 @@ const getRecord = jest.fn(async () => ({
   akoya_requestid: '11111111-1111-1111-1111-111111111111',
   akoya_title: 'Manual add proposal',
   wmkf_meetingdate: '2026-06-01',
+  wmkf_GrantCycle: { wmkf_cyclecode: 'J26' },
   _wmkf_programareaserved_value_formatted: 'Science',
 }));
 jest.mock('../../lib/services/dynamics-service', () => ({
-  DynamicsService: { getRecord: (...a) => getRecord(...a) },
+  DynamicsService: { getRecord: (...a) => getRecord(...a), checkRestriction: jest.fn() },
 }));
 
 const PR = '11111111-2222-3333-4444-555555555555';
@@ -62,7 +63,6 @@ jest.mock('../../lib/dataverse/adapters/reviewer-suggestion', () => ({
   ensureStaffManualCandidate: (...a) => ensureStaffManualCandidate(...a),
 }));
 
-jest.mock('../../lib/utils/cycle-code', () => ({ meetingDateToCycleCode: () => 'J26' }));
 
 import handler from '../../pages/api/workbench/manual-reviewer';
 import { requireAppAccess } from '../../lib/utils/auth';
@@ -91,6 +91,7 @@ beforeEach(() => {
     akoya_requestid: REQ,
     akoya_title: 'Manual add proposal',
     wmkf_meetingdate: '2026-06-01',
+    wmkf_GrantCycle: { wmkf_cyclecode: 'J26' },
     _wmkf_programareaserved_value_formatted: 'Science',
   });
   createReviewer.mockResolvedValue({ id: PR, created: true });

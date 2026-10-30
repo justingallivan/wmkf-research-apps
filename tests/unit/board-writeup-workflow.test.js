@@ -119,7 +119,7 @@ test('uncertain email send never blindly resends and later acceptance reconciles
   let status = 1;
   const send = jest.fn(async () => { throw new Error('response lost'); });
   const deps = { ...d, getRole: async () => ({ value: { systemUserId: ID } }), eligibleStaff: async () => ({ email: 'test@wmkeck.org' }),
-    getRequest: async () => ({ akoya_requestid: ID, akoya_requestnum: '123', _akoya_applicantid_value_formatted: 'Institute', _wmkf_grantprogram_value: PROGRAM_ID, wmkf_meetingdate: '2026-12-01', wmkf_istestrequest: false, wmkf_testcreationrunid: null }),
+    getRequest: async () => ({ akoya_requestid: ID, akoya_requestnum: '123', _akoya_applicantid_value_formatted: 'Institute', _wmkf_grantprogram_value: PROGRAM_ID, wmkf_meetingdate: '2026-12-01', wmkf_GrantCycle: { wmkf_cyclecode: 'D26' }, wmkf_istestrequest: false, wmkf_testcreationrunid: null }),
     create: jest.fn(async () => 'email-id'), get: async () => ({ activityid: 'email-id', statuscode: status }), find: async () => [], send, alert: jest.fn() };
   const intent = { key: 'release:2026-10-16', kind: 'release' };
   try {
@@ -143,7 +143,7 @@ test('archive registry failure resumes the known copy without another upload', a
   state.releases[ID] = { requestId: ID, source, hash: 'working-hash', releasedAt: d.now(), destination: { itemId: 'board-item', driveId: 'board-drive' } };
   state.archives[ID] = { state: 'queued', source: { ...source, driveId: 'board-drive', itemId: 'board-item' }, uploadStartedAt: null, lease: null };
   let registry = null, refuse = true;
-  const deps = { ...d, getRequest: async () => ({ akoya_requestid: ID, akoya_requestnum: '123', _wmkf_grantprogram_value: PROGRAM_ID, wmkf_meetingdate: '2026-12-01', wmkf_istestrequest: false, wmkf_testcreationrunid: null }),
+  const deps = { ...d, getRequest: async () => ({ akoya_requestid: ID, akoya_requestnum: '123', _wmkf_grantprogram_value: PROGRAM_ID, wmkf_meetingdate: '2026-12-01', wmkf_GrantCycle: { wmkf_cyclecode: 'D26' }, wmkf_istestrequest: false, wmkf_testcreationrunid: null }),
     buckets: async () => [{ source: 'dynamics', library: 'akoya_request', folder: 'request-folder' }], site: async () => 'site', drive: async () => 'archive-drive', ensureFolder: async () => ({ id: 'folder' }),
     findDocument: async () => ({ records: registry ? [registry] : [] }),
     createDocument: jest.fn(async payload => { if (refuse) throw new Error('registry unavailable'); registry = { wmkf_requestdocumentid: 'registry-id', _wmkf_request_value: ID, wmkf_artifacttype: payload.wmkf_artifacttype, wmkf_operationstatus: payload.wmkf_operationstatus, wmkf_sharepointitemid: payload.wmkf_sharepointitemid, wmkf_sharepointdriveid: payload.wmkf_sharepointdriveid }; }) };
@@ -180,7 +180,7 @@ test('definite settings refusal clears intent; uncertain conditional write remai
 
 test('unknown source lifecycle is refused without falling back to another document', async () => {
   const getDocuments = jest.fn(async () => ({ records: [{ wmkf_requestdocumentid: ID, _wmkf_request_value: ID, wmkf_artifacttype: TYPE.FINAL_WRITEUP, wmkf_cyclecode: 'D26', wmkf_operationstatus: OP.READY, wmkf_lifecyclestate: 999, wmkf_contenttype: FINAL_WRITEUP_CONTRACT.contentType, wmkf_sharepointdriveid: 'drive', wmkf_sharepointitemid: 'file' }] }));
-  await expect(sourceFor('D26', ID, { getDocuments, getRequest: async () => ({ akoya_requestid: ID, _wmkf_grantprogram_value: PROGRAM_ID, wmkf_meetingdate: '2026-12-01', wmkf_istestrequest: false, wmkf_testcreationrunid: null, _wmkf_currentfinalwriteup_value: ID, _wmkf_currentpresitevisit_value: '22222222-2222-4222-8222-222222222222' }) })).rejects.toThrow();
+  await expect(sourceFor('D26', ID, { getDocuments, getRequest: async () => ({ akoya_requestid: ID, _wmkf_grantprogram_value: PROGRAM_ID, wmkf_meetingdate: '2026-12-01', wmkf_GrantCycle: { wmkf_cyclecode: 'D26' }, wmkf_istestrequest: false, wmkf_testcreationrunid: null, _wmkf_currentfinalwriteup_value: ID, _wmkf_currentpresitevisit_value: '22222222-2222-4222-8222-222222222222' }) })).rejects.toThrow();
   expect(getDocuments).toHaveBeenCalledTimes(1); expect(getDocuments).toHaveBeenCalledWith([ID]);
 });
 test('historical Board reader excludes working, foreign-request and unsafe-link rows', async () => {
@@ -218,7 +218,7 @@ test('archive records a definite refusal and can retry the same confirmed source
   state.releases[ID] = { source, releasedAt: d.now() };
   state.archives[ID] = { state: 'queued', source, uploadStartedAt: null };
   d.put.mockRejectedValue(Object.assign(new Error('conflict'), { status: 409 }));
-  const deps = { ...d, getRequest: async () => ({ _wmkf_grantprogram_value: PROGRAM_ID, wmkf_meetingdate: '2026-12-01', wmkf_istestrequest: false, wmkf_testcreationrunid: null }), buckets: async () => [{ source: 'dynamics', library: 'akoya_request', folder: 'request' }], site: async () => 'site', drive: async () => 'drive', ensureFolder: async () => ({ id: 'folder' }) };
+  const deps = { ...d, getRequest: async () => ({ _wmkf_grantprogram_value: PROGRAM_ID, wmkf_meetingdate: '2026-12-01', wmkf_GrantCycle: { wmkf_cyclecode: 'D26' }, wmkf_istestrequest: false, wmkf_testcreationrunid: null }), buckets: async () => [{ source: 'dynamics', library: 'akoya_request', folder: 'request' }], site: async () => 'site', drive: async () => 'drive', ensureFolder: async () => ({ id: 'folder' }) };
   await archiveOne('D26', ID, deps);
   expect(state.archives[ID].uploadRefusal.status).toBe(409);
   await recover('D26', actor, { operation: 'archive', action: 'retry', requestId: ID, reason: 'The conflicting unrelated file has been resolved' }, deps);
@@ -254,7 +254,7 @@ test('completion notice sends with unavailable removed-roster details redacted',
   const create = jest.fn(async () => 'email-id'), send = jest.fn();
   try {
     await deliverNotice('D26', { key: `complete:${d.now()}`, kind: 'complete' }, { ...d,
-      getRequest: async id => { if (id === removed) throw new Error('not found'); return { _wmkf_grantprogram_value: PROGRAM_ID, wmkf_meetingdate: '2026-12-01', wmkf_istestrequest: false, wmkf_testcreationrunid: null }; },
+      getRequest: async id => { if (id === removed) throw new Error('not found'); return { _wmkf_grantprogram_value: PROGRAM_ID, wmkf_meetingdate: '2026-12-01', wmkf_GrantCycle: { wmkf_cyclecode: 'D26' }, wmkf_istestrequest: false, wmkf_testcreationrunid: null }; },
       getRole: async () => ({ value: { systemUserId: ID } }), eligibleStaff: async () => ({ email: 'test@wmkeck.org' }), create, send,
       get: async () => ({ activityid: 'email-id', statuscode: 1 }), alert: jest.fn() });
     expect(send).toHaveBeenCalledTimes(1); expect(create.mock.calls[0][0].body).toContain('Proposal details unavailable');
@@ -275,7 +275,7 @@ test.each([
   const mutateCycle = jest.fn(), create = jest.fn(), send = jest.fn();
   await expect(deliverNotice('D26', { key: 'release:2026-10-16', kind: 'release' }, {
     ...d, mutateCycle, create, send,
-    getRequest: async () => ({ akoya_requestid: ID, _wmkf_grantprogram_value: PROGRAM_ID, wmkf_meetingdate: '2026-12-01', ...markers }),
+    getRequest: async () => ({ akoya_requestid: ID, _wmkf_grantprogram_value: PROGRAM_ID, wmkf_meetingdate: '2026-12-01', wmkf_GrantCycle: { wmkf_cyclecode: 'D26' }, ...markers }),
   })).rejects.toMatchObject({ code: 'board_notice_request_ineligible' });
   expect(mutateCycle).not.toHaveBeenCalled();
   expect(create).not.toHaveBeenCalled();

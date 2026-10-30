@@ -32,9 +32,18 @@ jest.mock('../../lib/dataverse/adapters/reviewer-suggestion', () => ({
   },
 }));
 const getRequestById = jest.fn();
+// Grant Cycle link helpers: real strings and the real row reader, without the
+// restriction context the adapter-mocked service never establishes.
+jest.mock('../../lib/dataverse/adapters/operations-grant-cycle', () => ({
+  linkedCycleExpand: () => 'wmkf_GrantCycle($select=wmkf_cyclecode)',
+  linkedCycleCode: (row) => {
+    const code = row?.wmkf_GrantCycle?.wmkf_cyclecode;
+    return typeof code === 'string' && /^[JD]\d{2}$/.test(code) ? code : null;
+  },
+}));
 jest.mock('../../lib/dataverse/adapters/grant-request', () => ({
   getById: (...a) => getRequestById(...a),
-  findByRequestNumber: jest.fn(async () => ({ records: [] })),
+  queryRequests: jest.fn(async () => ({ records: [] })),
 }));
 const queryReviewers = jest.fn(async () => ({ records: [] }));
 jest.mock('../../lib/dataverse/adapters/potential-reviewer', () => ({
@@ -527,7 +536,7 @@ describe('getReviewers', () => {
           requestNumber: 'R-1001',
           title: 'T',
           reviewDeadline: '2026-09-09',
-          meetingCycleCode: null,
+          cycleCode: 'D26',
         },
       },
       suggestions: [{
@@ -542,6 +551,29 @@ describe('getReviewers', () => {
     const out = await getReviewers({ azureEmail: 'pd@wmkeck.org' });
 
     expect(out.proposals[0].reviewDeadline).toBe('2026-09-09');
+    expect(out.proposals[0]).toMatchObject({ grantCycleCode: 'D26', cycleLabel: 'December 2026' });
+  });
+
+  test.each([
+    ['a linked request carries the linked cycle', { wmkf_GrantCycle: { wmkf_cyclecode: 'D26' } }, 'D26', 'December 2026'],
+    ['a December meeting date without a link has no cycle', {}, null, null],
+  ])('single-proposal scope: %s', async (_label, link, code, label) => {
+    getRequestById.mockResolvedValueOnce({
+      akoya_requestid: REQ,
+      _wmkf_grantprogram_value: '11111111-1111-4111-8111-111111111111',
+      akoya_requestnum: 'R-1001',
+      akoya_title: 'T',
+      wmkf_meetingdate: '2026-12-10T00:00:00Z',
+      ...link,
+    });
+    findByRequest.mockResolvedValueOnce([]);
+
+    const out = await getReviewers({ proposalId: REQ, azureEmail: 'pd@wmkeck.org' });
+
+    expect(getRequestById).toHaveBeenCalledWith(REQ, expect.objectContaining({
+      expand: 'wmkf_GrantCycle($select=wmkf_cyclecode)',
+    }));
+    expect(out.proposals[0]).toMatchObject({ grantCycleCode: code, cycleLabel: label });
   });
 
   test('chunk boundary: 26 distinct person ids yield EXACTLY 2 total queryReviewers calls (merged read), first call gets ids 0-24 in order, second gets id 25, and every call select includes both former person-only and researcher-only fields', async () => {

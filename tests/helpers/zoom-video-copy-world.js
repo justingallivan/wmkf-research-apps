@@ -465,7 +465,7 @@ export function makeWorld({ size = 25, copyState = 'queued' } = {}) {
   };
 
   w.materialDeps = {
-    getRequest: async () => ({ akoya_requestid: REQ, akoya_requestnum: '1001', wmkf_meetingdate: '2026-12-10T00:00:00Z' }),
+    getRequest: async () => ({ akoya_requestid: REQ, akoya_requestnum: '1001', wmkf_meetingdate: '2026-12-10T00:00:00Z', wmkf_GrantCycle: { wmkf_cyclecode: 'D26' } }),
     findActiveSiteVisit: async () => ({
       records: w.visit === 'none' ? [] : [
         { activityid: VISIT, _regardingobjectid_value: REQ },

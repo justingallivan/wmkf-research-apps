@@ -11,6 +11,15 @@ jest.mock('../../lib/dataverse/adapters/grant-request', () => ({
   queryAllRequests: jest.fn(),
   queryRequests: jest.fn(),
 }));
+// Grant Cycle link helpers: real strings and the real row reader, without the
+// restriction context the adapter-mocked service never establishes.
+jest.mock('../../lib/dataverse/adapters/operations-grant-cycle', () => ({
+  linkedCycleExpand: () => 'wmkf_GrantCycle($select=wmkf_cyclecode)',
+  linkedCycleCode: (row) => {
+    const code = row?.wmkf_GrantCycle?.wmkf_cyclecode;
+    return typeof code === 'string' && /^[JD]\d{2}$/.test(code) ? code : null;
+  },
+}));
 jest.mock('../../lib/dataverse/adapters/app-request-person', () => ({
   __esModule: true,
   queryAllPersons: jest.fn(),
@@ -30,6 +39,7 @@ function meta(id, over = {}) {
     akoya_requestnum: `REQ-${id.slice(0, 1)}`,
     akoya_title: `Title ${id.slice(0, 1)}`,
     wmkf_meetingdate: '2026-06-15',
+    wmkf_GrantCycle: { wmkf_cyclecode: 'J26' },
     akoya_requeststatus: 'Phase II Pending',
     ...over,
   };
@@ -60,6 +70,20 @@ test('junction + projectleader rows for the same request/role merge into one row
   });
   expect(out.counts).toEqual({ pi: 1, copi: 0, total: 1 });
   expect(out.contactId).toBe(CONTACT_ID);
+  expect(out.rows[0]).toMatchObject({ cycleCode: 'J26', cycleLabel: 'June 2026' });
+  expect(queryRequests.mock.calls[0][0].expand).toBe('wmkf_GrantCycle($select=wmkf_cyclecode)');
+  expect(queryRequests.mock.calls[0][0].select.split(',')).toContain('wmkf_meetingdate');
+});
+
+test('a June meeting date without a Grant Cycle link has no cycle', async () => {
+  queryAllPersons.mockResolvedValue({
+    records: [{ _wmkf_request_value: REQ_A, wmkf_role: 100000000, wmkf_authorposition: 0 }],
+  });
+  queryRequests.mockResolvedValue({ records: [meta(REQ_A, { wmkf_GrantCycle: null })] });
+
+  const out = await getContactHistory({ contactId: CONTACT_ID });
+
+  expect(out.rows[0]).toMatchObject({ meetingDate: '2026-06-15', cycleCode: null, cycleLabel: null });
 });
 
 test('same request with pi AND copi junction rows stays as two distinct rows', async () => {

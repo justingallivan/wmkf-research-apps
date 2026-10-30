@@ -1,6 +1,7 @@
 /** @jest-environment node */
 jest.mock('../../lib/dataverse/adapters/grant-request.js', () => ({ getById: jest.fn(), queryAllRequests: jest.fn() }));
 import { getById } from '../../lib/dataverse/adapters/grant-request.js';
+import { DynamicsService } from '../../lib/services/dynamics-service.js';
 import { drainStaffDeliberationsPreparations, getPreparationForRequest, requestPreparationRetry, runFactoryTestStaffDeliberationsPreparation } from '../../lib/services/pre-site-visit/preparation-worker.js';
 import { readPreparationConfig } from '../../lib/services/pre-site-visit/preparation-config.js';
 import { REQUEST_DOCUMENT_LIFECYCLE_STATE as L, REQUEST_DOCUMENT_OPERATION_STATUS as O } from '../../shared/config/requestDocument.js';
@@ -45,6 +46,7 @@ function harness({ currentArtifact = null, generatedArtifact = null } = {}) {
       akoya_requestid: REQUEST,
       akoya_requeststatus: 'Phase II Pending',
       wmkf_meetingdate: '2026-12-10T00:00:00Z',
+      wmkf_GrantCycle: { wmkf_cyclecode: 'D26' },
       _wmkf_grantprogram_value: PROGRAM,
       _wmkf_programdirector_value: LEAD_PD,
     }], capped: false }),
@@ -60,6 +62,7 @@ function harness({ currentArtifact = null, generatedArtifact = null } = {}) {
       akoya_requestid: REQUEST,
       akoya_requeststatus: 'Phase II Pending',
       wmkf_meetingdate: '2026-12-10T00:00:00Z',
+      wmkf_GrantCycle: { wmkf_cyclecode: 'D26' },
       _wmkf_grantprogram_value: PROGRAM,
       _wmkf_programdirector_value: LEAD_PD,
     }),
@@ -83,6 +86,14 @@ function harness({ currentArtifact = null, generatedArtifact = null } = {}) {
   };
   return { dependencies, receipt };
 }
+
+// Cycle filters and expands check the wmkf_grantcycle restriction; runtime callers hold a Dynamics context.
+beforeEach(() => {
+  jest.spyOn(DynamicsService, 'checkRestriction').mockImplementation(() => {});
+});
+afterEach(() => {
+  jest.restoreAllMocks();
+});
 
 it('stays disabled without entering the request scan when production automation is off', async () => {
   const { dependencies } = harness();
@@ -119,6 +130,26 @@ it('uses canonical OData escaping for allowlisted string statuses', async () => 
   await drainStaffDeliberationsPreparations(dependencies);
   expect(dependencies.queryRequests.mock.calls[0][0].filter)
     .toContain("akoya_requeststatus eq 'Phase II O''Pending'");
+});
+
+it('scans requests by their linked Grant Cycle and reads the link with every request row', async () => {
+  const { dependencies } = harness();
+  await drainStaffDeliberationsPreparations(dependencies);
+  const query = dependencies.queryRequests.mock.calls[0][0];
+  expect(query.filter).toContain("wmkf_GrantCycle/wmkf_cyclecode eq 'D26'");
+  expect(query.filter).not.toContain('wmkf_meetingdate');
+  expect(query.expand).toBe('wmkf_GrantCycle($select=wmkf_cyclecode)');
+  expect(dependencies.upsertReceipt).toHaveBeenCalled();
+});
+
+it('skips a request with a December meeting date but no linked Grant Cycle', async () => {
+  const { dependencies } = harness();
+  const [row] = (await dependencies.queryRequests()).records;
+  dependencies.queryRequests.mockResolvedValue({ records: [{ ...row, wmkf_GrantCycle: null }], capped: false });
+  dependencies.getRequest.mockResolvedValue({ ...row, wmkf_GrantCycle: null });
+  await drainStaffDeliberationsPreparations(dependencies);
+  expect(dependencies.upsertReceipt).not.toHaveBeenCalled();
+  expect(dependencies.generate).not.toHaveBeenCalled();
 });
 
 it('uses missing-only generation and promotes its returned current Word identity', async () => {
@@ -365,6 +396,7 @@ it('selects the trusted lead-PD identity for authorization on the default servic
     akoya_requestid: REQUEST,
     akoya_requeststatus: 'Phase II Pending',
     wmkf_meetingdate: '2026-12-10T00:00:00Z',
+    wmkf_GrantCycle: { wmkf_cyclecode: 'D26' },
     _wmkf_grantprogram_value: PROGRAM,
     _wmkf_programdirector_value: LEAD_PD,
   });
@@ -381,6 +413,7 @@ it('selects the trusted lead-PD identity for authorization on the default servic
   await requestPreparationRetry(REQUEST, dependencies, { callerSystemId: LEAD_PD });
   expect(getById).toHaveBeenCalledWith(REQUEST, expect.objectContaining({
     select: expect.arrayContaining(['_wmkf_programdirector_value']),
+    expand: 'wmkf_GrantCycle($select=wmkf_cyclecode)',
   }));
 });
 
@@ -397,6 +430,7 @@ const testRequestRow = {
   akoya_requestid: REQUEST,
   akoya_requeststatus: 'Phase II Pending',
   wmkf_meetingdate: '2026-12-10T00:00:00Z',
+  wmkf_GrantCycle: { wmkf_cyclecode: 'D26' },
   _wmkf_grantprogram_value: PROGRAM,
   wmkf_istestrequest: true,
   wmkf_testcreationrunid: FACTORY_RUN,

@@ -16,6 +16,7 @@ function requestFixture(overrides = {}) {
     _wmkf_programdirector_value_formatted: 'Pat Director',
     wmkf_abstract: 'This project studies a phenomenon of interest.',
     wmkf_meetingdate: '2026-12-01',
+    wmkf_GrantCycle: { wmkf_cyclecode: 'D26' },
     ...overrides,
   };
 }
@@ -147,12 +148,12 @@ describe('loadPreRpBriefInputs', () => {
     expect(dependencies.getWriteupRoster).not.toHaveBeenCalled();
   });
 
-  it('fails closed when the request has no meeting-date cycle', async () => {
+  it('fails closed when the request has no linked Grant Cycle, even with a December meeting date', async () => {
     const dependencies = dependenciesFixture({
-      getRequest: jest.fn(async () => requestFixture({ wmkf_meetingdate: null })),
+      getRequest: jest.fn(async () => requestFixture({ wmkf_GrantCycle: null })),
     });
     await expect(loadPreRpBriefInputs({ requestId: REQUEST_ID }, dependencies))
-      .rejects.toThrow(/meeting-date cycle/);
+      .rejects.toThrow(/June or December Grant Cycle/);
   });
 
   it('fails closed on an invalid requestId before any read', async () => {

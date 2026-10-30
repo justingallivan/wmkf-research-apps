@@ -27,7 +27,7 @@ jest.mock('../../lib/services/program-director-resolver', () => ({
 jest.mock('../../lib/dataverse/adapters/grant-request', () => ({
   __esModule: true,
   getById: jest.fn(),
-  findByRequestNumber: jest.fn(),
+  queryRequests: jest.fn(),
 }));
 jest.mock('../../lib/dataverse/adapters/account', () => ({
   __esModule: true,
@@ -74,6 +74,7 @@ jest.mock('../../lib/services/reviewer-finder/remove-candidate-service', () => (
 }));
 
 const { requireAppAccess } = require('../../lib/utils/auth');
+const { DynamicsService } = require('../../lib/services/dynamics-service');
 const { resolveByEmail } = require('../../lib/services/program-director-resolver');
 const grantRequestAdapter = require('../../lib/dataverse/adapters/grant-request');
 const suggestionAdapter = require('../../lib/dataverse/adapters/reviewer-suggestion');
@@ -102,6 +103,9 @@ beforeAll(() => {
 
 beforeEach(() => {
   jest.clearAllMocks();
+  // The request read expands its linked Grant Cycle, which checks the Grant
+  // Cycle restriction; stand in for an authenticated Dynamics context.
+  jest.spyOn(DynamicsService, 'checkRestriction').mockImplementation(() => {});
   requireAppAccess.mockResolvedValue({
     session: { user: { azureEmail: 'pd@example.org', dynamicsSystemuserId: 'u-1' } },
   });
@@ -140,6 +144,7 @@ describe('GET', () => {
       akoya_requestnum: 'R-1',
       akoya_title: 'A Proposal',
       wmkf_meetingdate: '2026-06-15',
+      wmkf_GrantCycle: { wmkf_cyclecode: 'J26' },
       wmkf_abstract: 'Abstract text',
       _akoya_applicantid_value: null,
       _wmkf_projectleader_value: null,
@@ -172,6 +177,11 @@ describe('GET', () => {
       proposalId: REQUEST_ID,
       proposalTitle: 'A Proposal',
       requestNumber: 'R-1',
+      grantCycleCode: 'J26',
+      grantCycleLabel: 'June 2026',
+    }));
+    expect(grantRequestAdapter.getById).toHaveBeenCalledWith(REQUEST_ID, expect.objectContaining({
+      expand: 'wmkf_GrantCycle($select=wmkf_cyclecode)',
     }));
     expect(res.body.proposals[0].candidates).toEqual([expect.objectContaining({
       suggestionId: SUGGESTION_ID,
@@ -185,6 +195,37 @@ describe('GET', () => {
       accepted: false,
       declined: false,
     })]);
+  });
+
+  test('a June meeting date with no Grant Cycle link has no cycle', async () => {
+    grantRequestAdapter.getById.mockResolvedValue({
+      akoya_requestid: REQUEST_ID,
+      akoya_requestnum: 'R-1',
+      akoya_title: 'A Proposal',
+      wmkf_meetingdate: '2026-06-15',
+      wmkf_GrantCycle: null,
+    });
+    suggestionAdapter.findByRequest.mockResolvedValue([{
+      wmkf_appreviewersuggestionid: SUGGESTION_ID,
+      _wmkf_request_value: REQUEST_ID,
+      _wmkf_potentialreviewer_value: PERSON_ID,
+      wmkf_selected: true,
+      wmkf_grantcyclecode: 'J26',
+    }]);
+    potentialReviewerAdapter.queryReviewers.mockResolvedValue({
+      records: [{ wmkf_potentialreviewersid: PERSON_ID, wmkf_name: 'Dr X' }],
+    });
+
+    const req = { method: 'GET', query: { requestId: REQUEST_ID }, body: {} };
+    const res = mockRes();
+    await handler(req, res);
+
+    expect(res.statusCode).toBe(200);
+    expect(res.body.proposals[0]).toEqual(expect.objectContaining({
+      grantCycleCode: null,
+      grantCycleLabel: null,
+      meetingDate: '2026-06-15',
+    }));
   });
 
   test('domain error: requestId not a valid GUID → 400', async () => {

@@ -23,7 +23,7 @@
 import { verifyCronSecret } from '../../../lib/utils/cron-auth';
 import { withDalContext } from '../../../lib/dataverse/core/context';
 import { loadModelOverrides } from '../../../lib/services/model-override-loader';
-import { cycleCodeToOdataFilter, resolveWorkingCycle, conventionalCycles } from '../../../lib/utils/cycle-code';
+import { parseCycleCode, resolveWorkingCycle, conventionalCycles } from '../../../lib/utils/cycle-code';
 import { GRANTEE_RESEARCH_PROGRAM_IDS } from '../../../shared/config/granteeResearchPrograms';
 import { ServiceHttpError } from '../../../lib/services/service-http-error';
 import { runGranteeTitleGeneration } from '../../../lib/services/cron/generate-grantee-titles-service';
@@ -38,11 +38,10 @@ export default async function handler(req, res) {
   const cycleCode = (typeof req.query?.cycleCode === 'string' && req.query.cycleCode.trim())
     // No user and no cycle list here: EXPLICIT FALLBACK POLICY — the working
     // cycle of the June/December convention (`conventionalCycles`), not of the
-    // cycles that exist. The window filter below returns zero rows for a cycle
+    // cycles that exist. The service's cycle filter returns zero rows for a cycle
     // with no requests, which is the correct no-op; `?cycleCode=` overrides.
     || resolveWorkingCycle(conventionalCycles(new Date()), new Date());
-  const cycleFilter = cycleCodeToOdataFilter(cycleCode, 'wmkf_meetingdate');
-  if (!cycleFilter) {
+  if (!parseCycleCode(cycleCode)) {
     return res.status(400).json({ error: `Invalid cycleCode "${cycleCode}" (expected e.g. J26 / D26).` });
   }
   if (!GRANTEE_RESEARCH_PROGRAM_IDS.length) {
@@ -55,7 +54,7 @@ export default async function handler(req, res) {
 
   return withDalContext('grantee-titles-cron', async () => {
     try {
-      const summary = await runGranteeTitleGeneration({ cycleCode, cycleFilter });
+      const summary = await runGranteeTitleGeneration({ cycleCode });
       return res.status(200).json(summary);
     } catch (err) {
       if (err instanceof ServiceHttpError) {

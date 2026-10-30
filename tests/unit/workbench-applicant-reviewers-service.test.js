@@ -13,6 +13,16 @@ jest.mock('../../lib/dataverse/adapters/grant-request.js', () => ({
   getById: (...a) => getById(...a),
 }));
 
+// Grant Cycle link helpers: real strings and the real row reader, without the
+// restriction context the adapter-mocked service never establishes.
+jest.mock('../../lib/dataverse/adapters/operations-grant-cycle.js', () => ({
+  linkedCycleExpand: () => 'wmkf_GrantCycle($select=wmkf_cyclecode)',
+  linkedCycleCode: (row) => {
+    const code = row?.wmkf_GrantCycle?.wmkf_cyclecode;
+    return typeof code === 'string' && /^[JD]\d{2}$/.test(code) ? code : null;
+  },
+}));
+
 const ensureApplicantRecommended = jest.fn();
 jest.mock('../../lib/dataverse/adapters/reviewer-suggestion', () => ({
   ensureApplicantRecommended: (...a) => ensureApplicantRecommended(...a),
@@ -210,6 +220,7 @@ test('response slot ordering is preserved even when a later slot resolves first'
 test('passes acting user + request-derived label/cycle/programArea to the adapter', async () => {
   getById.mockResolvedValue(baseRequest({
     wmkf_meetingdate: '2026-06-01',
+    wmkf_GrantCycle: { wmkf_cyclecode: 'J26' },
     _wmkf_programareaserved_value_formatted: 'Science',
     _wmkf_potentialreviewer1_value: P1,
     _wmkf_potentialreviewer1_value_formatted: 'Dr. One',
@@ -223,4 +234,19 @@ test('passes acting user + request-derived label/cycle/programArea to the adapte
     programArea: 'Science',
     matchReason: 'Recommended by applicant (legacy reviewer slot).',
   }, { actingUserSystemId: 'u-1', allowInactiveOrdinary: true });
+  expect(getById).toHaveBeenCalledWith(REQ, expect.objectContaining({
+    expand: 'wmkf_GrantCycle($select=wmkf_cyclecode)',
+  }));
+  expect(getById.mock.calls[0][1].select.split(',')).toContain('wmkf_meetingdate');
+});
+
+test('a June meeting date without a Grant Cycle link stamps no cycle', async () => {
+  getById.mockResolvedValue(baseRequest({
+    wmkf_meetingdate: '2026-06-01',
+    _wmkf_potentialreviewer1_value: P1,
+    _wmkf_potentialreviewer1_value_formatted: 'Dr. One',
+  }));
+  const body = await ingestApplicantReviewers(args);
+  expect(body.cycleCode).toBeNull();
+  expect(ensureApplicantRecommended.mock.calls[0][0].grantCycleCode).toBeNull();
 });

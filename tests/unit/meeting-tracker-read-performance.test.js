@@ -37,6 +37,7 @@ jest.mock('../../lib/services/reviewer-rollup', () => ({
 import { fetchReviewerRollup } from '../../lib/services/reviewer-rollup';
 import { loadDashboard, loadMeetingTrackerSelection } from '../../lib/services/workbench/dashboard-service';
 import { loadMeetingTrackerDashboard } from '../../lib/services/meeting-tracker/dashboard-service';
+import { DynamicsService } from '../../lib/services/dynamics-service';
 
 const REQUEST_ID = '11111111-1111-4111-8111-111111111111';
 const counts = {
@@ -49,6 +50,7 @@ function sourceRow() {
     akoya_requestid: REQUEST_ID,
     akoya_requestnum: '1002836',
     wmkf_meetingdate: '2026-12-11',
+    wmkf_GrantCycle: { wmkf_cyclecode: 'D26' },
     akoya_requeststatus: 'Advancing',
     wmkf_triagestatus: 100000000,
     _wmkf_programdirector_value: 'pd-1',
@@ -86,6 +88,8 @@ beforeEach(() => {
   queryAllRequests.mockResolvedValue({ records: [sourceRow()], capped: false });
   queryRequestBatch.mockResolvedValue({ records: [] });
   fetchReviewerRollup.mockResolvedValue({ [REQUEST_ID]: counts });
+  // The Workbench cycle link helpers check the wmkf_grantcycle restriction (covered in grant-cycle-link.test.js).
+  jest.spyOn(DynamicsService, 'checkRestriction').mockImplementation(() => {});
 });
 
 test('the complete Tracker path keeps legacy rollup but schedule reads skip it with matching eligibility', async () => {

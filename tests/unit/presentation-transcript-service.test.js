@@ -79,7 +79,7 @@ beforeEach(() => {
   deps = {
     schemaReady: jest.fn(() => true), requestAllowed: jest.fn(() => true),
     loadBinding: jest.fn(async () => ({ requestId: REQUEST_ID, siteVisitActivityId: VISIT_ID })),
-    getRequest: jest.fn(async () => ({ akoya_requestid: REQUEST_ID, akoya_requestnum: '1002912', wmkf_meetingdate: '2026-12-04' })),
+    getRequest: jest.fn(async () => ({ akoya_requestid: REQUEST_ID, akoya_requestnum: '1002912', wmkf_meetingdate: '2026-12-04', wmkf_GrantCycle: { wmkf_cyclecode: 'D26' } })),
     findActiveSiteVisit: jest.fn(async () => ({ records: [{ activityid: VISIT_ID, _regardingobjectid_value: REQUEST_ID }] })),
     findDocuments: jest.fn(async () => ({ records: state.rows })),
     findByGenerationKey: jest.fn(async () => ({ records: state.byKey })),

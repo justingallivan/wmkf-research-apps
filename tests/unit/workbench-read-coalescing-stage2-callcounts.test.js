@@ -114,11 +114,20 @@ jest.mock('../../lib/dataverse/adapters/reviewer-suggestion', () => ({
 }));
 
 const getRequestById = jest.fn();
-const findByRequestNumber = jest.fn(async () => ({ records: [] }));
+const queryRequests = jest.fn(async () => ({ records: [] }));
+// Grant Cycle link helpers: real strings and the real row reader, without the
+// restriction context the adapter-mocked service never establishes.
+jest.mock('../../lib/dataverse/adapters/operations-grant-cycle', () => ({
+  linkedCycleExpand: () => 'wmkf_GrantCycle($select=wmkf_cyclecode)',
+  linkedCycleCode: (row) => {
+    const code = row?.wmkf_GrantCycle?.wmkf_cyclecode;
+    return typeof code === 'string' && /^[JD]\d{2}$/.test(code) ? code : null;
+  },
+}));
 jest.mock('../../lib/dataverse/adapters/grant-request', () => ({
   __esModule: true,
   getById: (...a) => getRequestById(...a),
-  findByRequestNumber: (...a) => findByRequestNumber(...a),
+  queryRequests: (...a) => queryRequests(...a),
 }));
 
 const queryAccounts = jest.fn(async () => ({ records: [] }));
@@ -185,7 +194,7 @@ beforeEach(() => {
     return { records: ids.map((id) => PERSON_DB[id]).filter(Boolean) };
   });
   aggregateReviewHistory.mockResolvedValue({});
-  findByRequestNumber.mockResolvedValue({ records: [] });
+  queryRequests.mockResolvedValue({ records: [] });
   queryAccounts.mockResolvedValue({ records: [] });
   findRemovedByRequest.mockResolvedValue([]);
 });

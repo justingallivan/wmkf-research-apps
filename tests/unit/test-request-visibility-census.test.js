@@ -51,7 +51,8 @@ const AGGREGATE_CALLERS = {
   'lib/services/dynamics-explorer/tool-executor.js': 'exclude',
   'lib/services/dynamics-service.js': 'primitive',
   'lib/services/dynamics/read-ops.js': 'primitive',
-  // Cycle/status filter options are navigation and include test requests.
+  // Cycle/status filter options (aggregateLinkedCycles, aggregateStatusesByGrantProgram)
+  // are navigation and include test requests.
   'lib/services/workbench/request-search-service.js': 'navigation',
   'pages/api/dataverse-export/preview.js': 'exclude',
   'pages/api/dataverse-export/run.js': 'exclude',
@@ -153,7 +154,7 @@ test('published transcript download is current-artifact and request/visit bound'
 });
 
 test('every aggregate/count caller is classified', () => {
-  const pattern = /aggregateRequests\(|aggregateMeetingDateCycles\(|aggregateStatusesByGrantProgram\(|aggregateRecords\(|countRecords\(|fetchXmlAggregateCount\(/;
+  const pattern = /aggregateRequests\(|aggregateLinkedCycles\(|aggregateStatusesByGrantProgram\(|aggregateRecords\(|countRecords\(|fetchXmlAggregateCount\(/;
   const files = [path.join(ROOT, 'lib/services'), path.join(ROOT, 'pages/api')]
     .flatMap(walk)
     .filter((file) => file.endsWith('.js') && pattern.test(fs.readFileSync(file, 'utf8')))

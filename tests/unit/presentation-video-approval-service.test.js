@@ -74,7 +74,7 @@ function world({ splits = [splitRow()], docs = [transcriptRow(), recordingRow()]
   const deps = {
     store,
     schemaReady: () => true, requestAllowed: () => true,
-    getRequest: jest.fn(async () => ({ akoya_requestid: REQUEST_ID, akoya_requestnum: '1002912', wmkf_meetingdate: '2026-12-04' })),
+    getRequest: jest.fn(async () => ({ akoya_requestid: REQUEST_ID, akoya_requestnum: '1002912', wmkf_meetingdate: '2026-12-04', wmkf_GrantCycle: { wmkf_cyclecode: 'D26' } })),
     findActiveSiteVisit: jest.fn(async () => ({ records: [{ activityid: 'dddddddd-dddd-4ddd-8ddd-dddddddddddd', _regardingobjectid_value: REQUEST_ID }] })),
     findDocuments: jest.fn(async () => ({ records: documents.map(d => ({ ...d })) })),
     findDocumentsWithMeetingTranscriptBundle: jest.fn(async () => ({ records: documents.filter(d => d.wmkf_artifacttype === 100000006).map(d => ({ ...d })) })),

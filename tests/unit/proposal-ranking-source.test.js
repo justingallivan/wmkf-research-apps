@@ -2,6 +2,7 @@ jest.mock('../../lib/services/dynamics-service.js', () => ({
   DynamicsService: {
     queryAllRecords: jest.fn(),
     getRecord: jest.fn(),
+    checkRestriction: jest.fn(),
   },
 }));
 jest.mock('../../lib/dataverse/adapters/review-answer.js', () => ({
@@ -33,7 +34,7 @@ test('reads Dataverse currency precision and active staff using their verified r
         akoya_title: 'Proposal',
         akoya_request: 123.45,
         wmkf_organizationname: 'Institute',
-        wmkf_meetingdate: '2026-06-15T00:00:00Z',
+        wmkf_meetingdate: '2026-06-15T00:00:00Z', wmkf_GrantCycle: { wmkf_cyclecode: 'J26' },
         akoya_requeststatus: 'Phase II Pending',
         wmkf_istestrequest: null,
         wmkf_testcreationrunid: null,
@@ -94,7 +95,7 @@ test('maps only the verified applicant-account East and West options; unknown or
     { akoya_requestid: '99999999-9999-4999-8999-999999999999' },
   ].map((row) => ({
     akoya_requestnum: '1001', akoya_title: 'Proposal', akoya_request: null,
-    wmkf_organizationname: 'Cached fallback should not be used', wmkf_meetingdate: '2026-06-15T00:00:00Z',
+    wmkf_organizationname: 'Cached fallback should not be used', wmkf_meetingdate: '2026-06-15T00:00:00Z', wmkf_GrantCycle: { wmkf_cyclecode: 'J26' },
     akoya_requeststatus: 'Phase II Pending', wmkf_istestrequest: null,
     wmkf_testcreationrunid: null, _akoya_programid_value: RESEARCH_PROGRAM_IDS[0],
     _wmkf_programdirector_value: null, _transactioncurrencyid_value: null, ...row,
@@ -121,6 +122,8 @@ test('maps only the verified applicant-account East and West options; unknown or
   ]);
   expect(DynamicsService.queryAllRecords).toHaveBeenCalledWith('akoya_requests', expect.objectContaining({
     select: expect.stringContaining('_akoya_applicantid_value'),
+    filter: expect.stringContaining("wmkf_GrantCycle/wmkf_cyclecode eq 'J26'"),
+    expand: 'wmkf_GrantCycle($select=wmkf_cyclecode)',
   }));
   expect(DynamicsService.queryAllRecords).toHaveBeenCalledWith('accounts', expect.objectContaining({
     select: 'accountid,name,wmkf_eastwest',
@@ -165,7 +168,7 @@ test('December 2026 trial excludes request numbers at or above the cutoff before
     akoya_title: 'Proposal',
     akoya_request: null,
     wmkf_organizationname: 'Institute',
-    wmkf_meetingdate: '2026-12-15T00:00:00Z',
+    wmkf_meetingdate: '2026-12-15T00:00:00Z', wmkf_GrantCycle: { wmkf_cyclecode: 'D26' },
     akoya_requeststatus: 'Phase II Pending',
     wmkf_istestrequest: null,
     wmkf_testcreationrunid: null,
@@ -200,7 +203,7 @@ test('December 2026 trial fails clearly for a malformed request number before do
   DynamicsService.queryAllRecords.mockResolvedValue({ records: [{
     akoya_requestid: REQUEST_ID,
     akoya_requestnum: 'D26-unknown',
-    wmkf_meetingdate: '2026-12-15T00:00:00Z',
+    wmkf_meetingdate: '2026-12-15T00:00:00Z', wmkf_GrantCycle: { wmkf_cyclecode: 'D26' },
   }] });
 
   await expect(readProposalRankingSource('D26', {
@@ -223,7 +226,7 @@ test.each([
         akoya_requestnum: '1001',
         akoya_title: 'Proposal',
         ...amounts,
-        wmkf_meetingdate: '2026-06-15T00:00:00Z',
+        wmkf_meetingdate: '2026-06-15T00:00:00Z', wmkf_GrantCycle: { wmkf_cyclecode: 'J26' },
         akoya_requeststatus: 'Phase II Pending',
         _akoya_programid_value: RESEARCH_PROGRAM_IDS[0],
         _wmkf_programdirector_value: LEAD_ID,

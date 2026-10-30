@@ -15,7 +15,6 @@ import * as pr from '../../lib/dataverse/adapters/potential-reviewer.js';
 import * as researcher from '../../lib/dataverse/adapters/researcher.js';
 import * as suggestion from '../../lib/dataverse/adapters/reviewer-suggestion.js';
 import { selectFields } from '../../lib/dataverse/core/entity-registry.js';
-import { cycleCodeToOdataFilter } from '../../lib/utils/cycle-code.js';
 
 afterEach(() => jest.restoreAllMocks());
 
@@ -217,6 +216,9 @@ describe('reviewer-suggestion.findByRequest complete-read mode', () => {
 });
 
 describe('reviewer-suggestion.findByPD (characterization)', () => {
+  // The Grant Cycle link helpers check restrictions; this suite pins query shape only.
+  beforeEach(() => jest.spyOn(DynamicsService, 'checkRestriction').mockImplementation(() => {}));
+
   test('golden: two-step (akoya_requests → suggestions) with selected+notExcluded filter', async () => {
     const qAll = jest.spyOn(DynamicsService, 'queryAllRecords').mockResolvedValue({
       records: [{ akoya_requestid: GUID_A, akoya_requestnum: 'REQ-1' }],
@@ -231,6 +233,7 @@ describe('reviewer-suggestion.findByPD (characterization)', () => {
     expect(qAll).toHaveBeenCalledTimes(1);
     expect(qAll.mock.calls[0][0]).toBe('akoya_requests');
     expect(qAll.mock.calls[0][1].select).toBe(PD_REQUEST_SELECT);
+    expect(qAll.mock.calls[0][1].expand).toBe('wmkf_GrantCycle($select=wmkf_cyclecode)');
     expect(qAll.mock.calls[0][1].filter).toBe(`_wmkf_programdirector_value eq ${PD_ID}`);
 
     // Step 2: suggestions for those requests, selected + not-excluded.
@@ -275,13 +278,26 @@ describe('reviewer-suggestion.findByPD (characterization)', () => {
     );
   });
 
-  test('edge: cycleCode J26 appends the June-2026 wmkf_meetingdate window to the request filter', async () => {
+  test('edge: cycleCode J26 appends the Grant Cycle link filter to the request filter', async () => {
     const qAll = jest.spyOn(DynamicsService, 'queryAllRecords').mockResolvedValue({ records: [] });
-    await suggestion.findByPD(PD_ID, { cycleCode: 'J26' });
+    await suggestion.findByPD(PD_ID, { cycleCode: 'j26' });
     expect(qAll.mock.calls[0][1].filter).toBe(
-      `_wmkf_programdirector_value eq ${PD_ID} and ` +
-        'wmkf_meetingdate ge 2026-06-01T00:00:00Z and wmkf_meetingdate lt 2026-07-01T00:00:00Z',
+      `_wmkf_programdirector_value eq ${PD_ID} and wmkf_GrantCycle/wmkf_cyclecode eq 'J26'`,
     );
+  });
+
+  test('cycleCode comes from the linked Grant Cycle row; a December meeting date without a link has no cycle', async () => {
+    jest.spyOn(DynamicsService, 'queryAllRecords').mockResolvedValue({
+      records: [
+        { akoya_requestid: GUID_A, akoya_requestnum: 'REQ-1', wmkf_meetingdate: '2026-12-10T00:00:00Z', wmkf_GrantCycle: { wmkf_cyclecode: 'D26' } },
+        { akoya_requestid: GUID_B, akoya_requestnum: 'REQ-2', wmkf_meetingdate: '2026-12-10T00:00:00Z' },
+      ],
+    });
+    jest.spyOn(DynamicsService, 'queryRecords').mockResolvedValue({ records: [] });
+    const out = await suggestion.findByPD(PD_ID);
+    expect(out.requestById[GUID_A].cycleCode).toBe('D26');
+    expect(out.requestById[GUID_B].cycleCode).toBeNull();
+    expect(out.requestById[GUID_B].meetingDate).toBe('2026-12-10T00:00:00Z');
   });
 
   test('chunk boundary: 26 distinct requests chunk the suggestion OR-chain at 25 per query, first call gets requests 0-24 in order, second gets request 25', async () => {
@@ -309,6 +325,9 @@ describe('reviewer-suggestion.findByPD (characterization)', () => {
 });
 
 describe('reviewer-suggestion.findAcceptedByPD (characterization)', () => {
+  // The Grant Cycle link helpers check restrictions; this suite pins query shape only.
+  beforeEach(() => jest.spyOn(DynamicsService, 'checkRestriction').mockImplementation(() => {}));
+
   test('golden: adds wmkf_accepted eq true to the selected+notExcluded filter', async () => {
     jest.spyOn(DynamicsService, 'queryAllRecords').mockResolvedValue({
       records: [{
@@ -367,6 +386,9 @@ describe('reviewer-suggestion.findAcceptedByPD (characterization)', () => {
 });
 
 describe('reviewer-suggestion.findAcceptedByCycle', () => {
+  // The Grant Cycle link helpers check restrictions; this suite pins query shape only.
+  beforeEach(() => jest.spyOn(DynamicsService, 'checkRestriction').mockImplementation(() => {}));
+
   test('queries accepted reviewers across the cycle without a lead-PD filter', async () => {
     const qAll = jest.spyOn(DynamicsService, 'queryAllRecords').mockResolvedValue({
       records: [{ akoya_requestid: GUID_A, akoya_requestnum: 'REQ-1' }],
@@ -376,7 +398,8 @@ describe('reviewer-suggestion.findAcceptedByCycle', () => {
     await suggestion.findAcceptedByCycle('D26');
 
     expect(qAll.mock.calls[0][1].select).toBe(PD_ACCEPTED_REQUEST_SELECT);
-    expect(qAll.mock.calls[0][1].filter).toBe(cycleCodeToOdataFilter('D26', 'wmkf_meetingdate'));
+    expect(qAll.mock.calls[0][1].expand).toBe('wmkf_GrantCycle($select=wmkf_cyclecode)');
+    expect(qAll.mock.calls[0][1].filter).toBe("wmkf_GrantCycle/wmkf_cyclecode eq 'D26'");
     expect(qAll.mock.calls[0][1].filter).not.toContain('_wmkf_programdirector_value');
     expect(q.mock.calls[0][1].filter).toBe(
       `(_wmkf_request_value eq ${GUID_A}) and wmkf_selected eq true and wmkf_accepted eq true and ` +
@@ -387,6 +410,25 @@ describe('reviewer-suggestion.findAcceptedByCycle', () => {
   test('missing cycle returns empty without querying all request history', async () => {
     const qAll = jest.spyOn(DynamicsService, 'queryAllRecords').mockResolvedValue({ records: [] });
     await expect(suggestion.findAcceptedByCycle()).resolves.toEqual({ suggestions: [], requestById: {} });
+    expect(qAll).not.toHaveBeenCalled();
+  });
+
+  test('accepted rows carry the linked cycle code; a June meeting date without a link has no cycle', async () => {
+    jest.spyOn(DynamicsService, 'queryAllRecords').mockResolvedValue({
+      records: [
+        { akoya_requestid: GUID_A, akoya_requestnum: 'REQ-1', wmkf_meetingdate: '2026-06-11T00:00:00Z', wmkf_GrantCycle: { wmkf_cyclecode: 'J26' } },
+        { akoya_requestid: GUID_B, akoya_requestnum: 'REQ-2', wmkf_meetingdate: '2026-06-11T00:00:00Z' },
+      ],
+    });
+    jest.spyOn(DynamicsService, 'queryRecords').mockResolvedValue({ records: [] });
+    const out = await suggestion.findAcceptedByCycle('J26');
+    expect(out.requestById[GUID_A].cycleCode).toBe('J26');
+    expect(out.requestById[GUID_B].cycleCode).toBeNull();
+  });
+
+  test('an invalid cycle code is refused before any query', async () => {
+    const qAll = jest.spyOn(DynamicsService, 'queryAllRecords').mockResolvedValue({ records: [] });
+    await expect(suggestion.findAcceptedByCycle('X26')).rejects.toThrow("invalid cycleCode 'X26'");
     expect(qAll).not.toHaveBeenCalled();
   });
 });

@@ -61,6 +61,7 @@ import * as requestDocumentAdapter from '../../lib/dataverse/adapters/request-do
 import { executePrompt } from '../../lib/services/execute-prompt.js';
 import { GraphService } from '../../lib/services/graph-service.js';
 import { getAiProposalNarrativeText } from '../../lib/services/workbench-proposal-documents.js';
+import { DynamicsService } from '../../lib/services/dynamics-service.js';
 import {
   buildInitialAssessmentIdentity,
   generateInitialAssessment,
@@ -84,6 +85,7 @@ const request = {
   akoya_requestnum: '9009009',
   akoya_title: 'Synthetic Fixture Rehearsal Request',
   wmkf_meetingdate: '2026-06-15',
+  wmkf_GrantCycle: { wmkf_cyclecode: 'J26' },
   wmkf_organizationname: 'N/A',
   _akoya_applicantid_value_formatted: 'Synthetic University',
   _wmkf_currentinitialassessment_value: ARTIFACT_ID,
@@ -92,6 +94,9 @@ const request = {
 
 beforeEach(() => {
   jest.clearAllMocks();
+  // The request read expands its linked Grant Cycle, which checks the Grant
+  // Cycle restriction; stand in for an authenticated Dynamics context.
+  jest.spyOn(DynamicsService, 'checkRestriction').mockImplementation(() => {});
   grantRequestAdapter.getById.mockResolvedValue(request);
   getAiProposalNarrativeText.mockResolvedValue({
     filename: SYNTHETIC_PROPOSAL_FILENAME,

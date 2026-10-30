@@ -16,13 +16,13 @@
  * lib/services/workbench/grantee-deliverables/awardees-service.js.
  *
  * AUTH: requireAppAccess('reviewers'). No client GUIDs reach a selector
- * (cycleCode builds a date filter; program GUIDs are server config; PD id is
+ * (cycleCode builds a Grant Cycle link filter; program GUIDs are server config; PD id is
  * server-resolved).
  */
 
 import { requireAppAccess } from '../../../../lib/utils/auth';
 import { withDalContext } from '../../../../lib/dataverse/core/context';
-import { cycleCodeToOdataFilter } from '../../../../lib/utils/cycle-code';
+import { parseCycleCode } from '../../../../lib/utils/cycle-code';
 import { GRANTEE_RESEARCH_PROGRAM_IDS } from '../../../../shared/config/granteeResearchPrograms';
 import { ServiceHttpError } from '../../../../lib/services/service-http-error';
 import { listGranteeAwardees, listGranteeAwardeeCycles } from '../../../../lib/services/workbench/grantee-deliverables/awardees-service';
@@ -38,8 +38,7 @@ export default async function handler(req, res) {
 
   const cycleCode = typeof req.query?.cycleCode === 'string' ? req.query.cycleCode.trim() : '';
   const cycleListMode = cycleCode === '';
-  const cycleFilter = cycleListMode ? null : cycleCodeToOdataFilter(cycleCode, 'wmkf_meetingdate');
-  if (!cycleListMode && !cycleFilter) {
+  if (!cycleListMode && !parseCycleCode(cycleCode)) {
     return res.status(400).json({ error: 'cycleCode must be a valid cycle (e.g. J26 or D26)' });
   }
   if (!GRANTEE_RESEARCH_PROGRAM_IDS.length) {
