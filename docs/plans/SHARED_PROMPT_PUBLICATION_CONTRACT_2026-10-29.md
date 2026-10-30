@@ -24,6 +24,14 @@ a deployed operation, or permission for schema/data writes or model execution.
 See the [implementation plan](SHARED_PROMPT_LIBRARY_PLAN_2026-10-29.md) and
 [feasibility assessment](SHARED_PROMPT_PUBLICATION_FEASIBILITY_2026-10-29.md).
 
+**[OWNER DECIDED]** Connor maintains the Dataverse operation/solution. Initial
+human publishers are Connor and existing Admin superusers. Actual Dataverse
+roles/mappings require verification and deliberate provisioning; app-role
+changes and Dataverse-role changes must be coordinated explicitly.
+
+See the [technical preflight](SHARED_PROMPT_PUBLICATION_PREFLIGHT_2026-10-29.md)
+for source findings, client envelope, validation-policy fence and rehearsal cases.
+
 ## One library, two authoring routes
 
 Dataverse `wmkf_ai_prompt` stores prompt content. `wmkf_ai_promptname` is the
@@ -60,8 +68,10 @@ names. Neither client rewrites unfamiliar definitions to fit its own runtime.
 | Retired | false | `682090002` | Original version | Explicit recovery only |
 
 Version is `wmkf_promptversion` (no `_ai_` infix). Draft identity is its GUID,
-not a reserved published number. Null draft versions require schema verification;
-if incompatible, stop and review an additive draft-storage adjustment. Do not
+not a reserved published number. The retained schema marks version
+ApplicationRequired; Microsoft documents that
+this alone does not reject null through API clients. Tenant custom-rule and
+numeric-range behavior still needs rehearsal; if incompatible, stop and review an additive draft-storage adjustment. Do not
 silently use a sentinel or revert to version reservation. Do not automatically
 convert legacy noncurrent/null-status rows into drafts.
 
@@ -149,6 +159,13 @@ remain replayable, but new shared publication truth lives in Dataverse.
 
 ## Validation and execution
 
+A generated versioned policy artifact is the recommended shared rule source.
+Policy and Executor-budget activation must share a Dataverse conditional control
+row with fresh publications; snapshot checks without that fence are insufficient.
+Both JS/.NET use golden vectors; details and adjacent budget-writer scope are
+in the technical preflight. This design is not yet implemented or parity-tested.
+
+
 Publish validates the complete supported definition without making a model call.
 Dataverse must enforce the shared lifecycle/definition rules for both clients;
 Admin-only checks are insufficient. JS/.NET parity fixtures and the availability
@@ -179,7 +196,8 @@ silently rewired. No flow definition or caller migration was tested by this plan
 
 ## Pre-implementation gates
 
-- Confirm solution owner/support, authorized sandbox deployment and both roles.
+- Connor owns solution maintenance; verify his tooling, authorized sandbox deployment
+  and actual mapped publisher roles.
 - Prove transactional context, uniqueness, head/draft/current conditional writes,
   replay, lost-response recovery, raw/bulk write denial and trusted attribution.
 - Verify nullable draft versions and legacy state/head initialization.

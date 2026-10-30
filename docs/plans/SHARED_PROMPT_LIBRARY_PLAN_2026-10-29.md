@@ -250,8 +250,9 @@ metadata organization remains available without silently rewriting content.
 
 **Save draft** persists an explicit noncurrent Draft in the same table, identified
 by its GUID and ETag. Drafts have no published version number: use null for
-`wmkf_promptversion`, subject to verifying that the deployed requiredness and
-numeric constraints permit it. If null is not allowed, stop and agree an additive
+`wmkf_promptversion`, supported by Microsoft's documented ApplicationRequired
+API semantics, subject to verifying tenant custom rules and numeric constraints
+in sandbox. If null is not allowed, stop and agree an additive
 draft-storage adjustment; do not silently reserve published numbers or use an
 undocumented sentinel. Draft updates keep the same GUID. Incomplete content can
 be saved after structural/key/size validation; publication validates the complete
@@ -377,13 +378,13 @@ monitor and document that operational boundary.
 The Dataverse operation is authoritative for shared lifecycle and definition
 validation; Admin cannot be the only validator. Preserve current application
 model/output ceilings, input/output contracts and A7 checks. Do not make the
-plug-in call Vercel or a model to validate. Before implementation, define a
-versioned validation contract and parity fixtures for .NET and JS, including
-how reviewed model capabilities and current durable execution budgets are
-available at publication. An immutable Dataverse validation-policy snapshot
-with a fenced policy revision is a candidate, not yet provisioned or approved;
-prove freshness/invalidation and unknown-policy fail-closed behavior before
-choosing it. Runtime guards remain necessary when policy/budgets change later.
+plug-in call Vercel or a model to validate. The [technical preflight](SHARED_PROMPT_PUBLICATION_PREFLIGHT_2026-10-29.md)
+recommends a generated immutable policy artifact plus one Dataverse control-row
+fence shared by publication, policy activation and Executor-budget activation.
+That includes adapting the adjacent budget writer; otherwise new budget revisions
+could bypass publication validation. Final policy schema, JS/.NET golden vectors,
+size/freshness behavior and role/guard manifest remain engineering gates, not
+implemented behavior. Runtime guards remain necessary when policy/budgets change later.
 
 Connor's existing free-text/Power Automate definitions have not been inspected.
 Do not equate shared storage with Executor compatibility or force-convert them.
@@ -429,7 +430,8 @@ rewired or claimed verified by this plan.
 
 ## Implementation slices and release gates
 
-1. **Sandbox feasibility gate.** Agree Dataverse solution ownership/support,
+1. **Sandbox feasibility gate.** Connor owns Dataverse solution maintenance; verify
+   his support/build/deploy arrangements,
    obtain separately authorized sandbox provisioning, and prove Custom API
    transaction context, two caller identities, execute privileges, conditional
    head writes (including first publication), atomic rollback, unique receipt
@@ -510,13 +512,19 @@ former reserved-draft/Postgres-lock/Admin-first proposal.
 **[VERIFIED via Microsoft documentation and repository inspection]** The platform
 supports the required Custom API, synchronous transactional service calls,
 row-version checks, unique keys and OAuth clients. **[UNKNOWN]** Tenant deployment
-privileges/tooling, solution support ownership, actual role/impersonation behavior,
+privileges/tooling, actual role/impersonation behavior,
 null-version draft shape and fault/concurrency behavior require the named sandbox
 spike. No .NET project or Dataverse publication solution is supplied by this PR.
-See the feasibility report for evidence, falsification tests and review status.
+See the feasibility report and linked technical preflight for evidence,
+falsification tests, approved ownership/access and review status.
 
-Before implementation: agree solution ownership, representative Connor definition
-format, and validation-policy transport/parity. These are technical/release gates,
+**[OWNER DECIDED]** Connor maintains the Dataverse operation/solution. Initial
+human publication access is Connor and existing Admin superusers; actual mapped
+identities and Dataverse roles still need authorized verification. This is not
+a role grant or evidence Connor has deployed the operation.
+
+Before implementation: obtain a representative Connor definition and finalize
+validation-policy schema/parity and solution tooling. These are technical/release gates,
 not a requirement for Connor to accept Admin publication. No message to Connor,
 schema change, Production write or model test is authorized by this PR.
 

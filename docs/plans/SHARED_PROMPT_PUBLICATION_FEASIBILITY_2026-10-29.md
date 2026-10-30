@@ -41,7 +41,7 @@ Do not infer universal Executor compatibility or tenant deployment readiness.
 | Reader identity | [Dataverse string filtering](https://learn.microsoft.com/en-us/power-apps/developer/data-platform/webapi/query/filter-rows) is case insensitive. Head identity must match reader equivalence; canonical lowercase ASCII keys, direct-alias rejection and legacy collision audit prevent separate heads for the same reader identity. Unsupported collation cases block cutover pending explicit mapping. | VERIFIED platform; mapping/races NOT TESTED |
 | Client authentication | [OAuth](https://learn.microsoft.com/en-us/power-apps/developer/data-platform/authenticate-oauth): delegated user access through Entra/MSAL is supported. Existing/new registration consent and roles still require tenant verification. | VERIFIED platform; tool/roles NOT TESTED |
 | Authorization and actor | [Custom API security](https://learn.microsoft.com/en-us/power-apps/developer/data-platform/custom-api): use an existing execution privilege; arbitrary new privileges cannot simply be invented. `IsPrivate` is discoverability, not security. [Plug-in identity](https://learn.microsoft.com/en-us/power-apps/developer/data-platform/impersonate-a-user) and [Web API impersonation](https://learn.microsoft.com/en-us/power-apps/developer/data-platform/webapi/impersonate-another-user-web-api) support caller contexts subject to privileges. | VERIFIED platform; exact role/attribution NOT TESTED |
-| Deployment/support | [Custom API solution authoring](https://learn.microsoft.com/en-us/power-apps/developer/data-platform/custom-api) supports solution components; [plug-in authoring](https://learn.microsoft.com/en-us/power-apps/developer/data-platform/write-plug-in) requires .NET plug-in code. Versioned source/solution, managed deployment and operational ownership are additional work. | VERIFIED requirement; owner/toolchain UNKNOWN |
+| Deployment/support | [Custom API solution authoring](https://learn.microsoft.com/en-us/power-apps/developer/data-platform/custom-api) supports solution components; [plug-in authoring](https://learn.microsoft.com/en-us/power-apps/developer/data-platform/write-plug-in) requires .NET plug-in code. Versioned source/solution, managed deployment and operational ownership are additional work. | VERIFIED requirement; owner Connor DECIDED; toolchain UNKNOWN |
 
 ## Repository prerequisites and disconfirming checks
 
@@ -50,7 +50,7 @@ Do not infer universal Executor compatibility or tenant deployment readiness.
 | Move publication authority to Dataverse | Admin currently uses `lib/services/admin/prompts-publish-service.js`; adapter `lib/dataverse/adapters/ai-prompt.js` reads/writes current/version rows | Read publisher and adapter: fresh publication creates then clears prior, not one transaction; first publication currently requires a current row | Attempt two first publications against the proposed head guard; exactly one expected-state winner, no orphaned current rows | PLANNED; platform-feasible |
 | Use synchronous SDK transaction | `lib/services/dynamics/changeset.js` proves an existing app-side atomic batch seam, but is not a server plug-in or cross-client authority | Read source; do not equate an HTTP/parser throw with proven rollback (lost response is unknown) | Inject failure after head/draft/prior writes and before receipt commit; independently read rows and prove all rolled back | NOT TESTED in tenant |
 | Keep existing readers compatible | `ai-prompt.js` `getCurrentForExecutor` filters current, rejects zero/duplicates, does not require Published status | Read complete adapter; raw `wmkf_ai_iscurrent`, `wmkf_promptversion`, status, seed and publication searches identify fan-out scope | Add status guard; enumerate every raw reader/writer, projection, cache and fallback before cutover | PARTIAL; migration required |
-| Assign version on publication | Existing numeric `wmkf_promptversion`; retained 2026-10-29 schema snapshot has existing rows/history and no alternate key | Existing read-only snapshot retained unchanged; no new live requiredness/write test | Save/reload a null-version draft, prove non-execution; if schema rejects it stop for additive adjustment | UNKNOWN tenant compatibility |
+| Assign version on publication | Existing numeric `wmkf_promptversion`; retained 2026-10-29 schema snapshot has existing rows/history and no alternate key | Existing read-only snapshot retained unchanged; no new live requiredness/write test | Save/reload a null-version draft, prove non-execution; if schema rejects it stop for additive adjustment | PARTIAL: platform supports API null; tenant NOT TESTED |
 | Support Connor's independent command | Authenticated Dataverse endpoint with trusted actor, same policy/receipt as Admin | Official OAuth/Custom API documentation, no credential or role mutation | Publish from actual delegated Connor identity, deny an unauthorized user and prove initiating/effective actor; no Admin cookie | PLANNED; NOT TESTED |
 | Keep complete shared validation | Existing publisher uses JS model/output/template/budget checks and `loadAvailableModels` | Read logical validation region and existing Executor contract | Corpus parity in JS/.NET, stale/unknown policy and budget update races; no Vercel call inside transaction | NEEDS DESIGN before build |
 
@@ -74,7 +74,7 @@ a seventh prompt column stores the draft metadata baseline durably.
 Prompt content remains in the existing table. Dataverse guards protect lifecycle,
 content immutability, heads/receipts and direct draft invariants. This is additional
 schema/solution work compared with the prior six-column proposal. Table names,
-roles and solution owner are not yet chosen/provisioned. Postgres audit is legacy
+roles are not yet provisioned; Connor is the owner-confirmed solution maintainer. Postgres audit is legacy
 history/optional mirror, not a required shared publication dependency.
 
 The head+CAS composition is a design inference from documented primitives, not a
@@ -116,8 +116,9 @@ active row, generated publication time or latest policy.
 
 ## Required sandbox acceptance, ownership and release boundary
 
-- Name a maintainer for versioned .NET/solution source, deployment and incident
-  recovery. Verify tooling and actual sandbox deployment privileges before build.
+- Connor is the owner-confirmed maintainer; initial human publishers are Connor
+  and existing Admin superusers. Verify tooling, mapped identities and actual
+  sandbox deployment privileges before build.
 - Prove transaction context and rollback at every write boundary, unique-key
   activation, simultaneous first/later publications, stale head/draft/current,
   duplicate UUID retry and lost response after commit followed by later publish.
@@ -162,7 +163,10 @@ findings: case-sensitive head identity mismatched Dataverse reader identity;
 stale app-only authority remained; draft baseline/catalog audit storage was
 underspecified; replay fingerprint omitted complete request identity. All four
 were corrected and independently rechecked with no residual blocker from those
-findings. Sandbox/role/draft-schema/policy prerequisites remain open.
+findings. Sandbox/role/draft-schema/policy prerequisites remain open; see the subsequent
+[technical preflight](SHARED_PROMPT_PUBLICATION_PREFLIGHT_2026-10-29.md) for
+approved ownership/access, ApplicationRequired semantics, source findings and
+307 passing baseline tests.
 
 Final targeted searches found zero remaining live superseded instructions in
 the proposal documents; references to former app-only/reserved-draft behavior
