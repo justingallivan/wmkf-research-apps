@@ -258,7 +258,8 @@ Verified by the author before the Codex review:
 - **Saved fingerprints and hashes that include the meeting date** (each fails
   closed; none silently sends stale content):
   - Staff Deliberations writeup snapshot: unchanged if the month-year format is
-    kept (§7 Q3) [VERIFIED].
+    kept (§7 Q3) [VERIFIED] for the meeting-date line; the funding-history text
+   can still change (§5b item 4).
   - Initial Assessment generation key: holds the cycle code, identical from
     the link for D26 [VERIFIED via `initial-assessment/artifact-service.js:84-107`].
   - **Presentation invitation previews** (`meeting-coordination/invitation-service.js:25,30,106`
@@ -279,6 +280,42 @@ Verified by the author before the Codex review:
   §7 Q7); `REQUEST_BIND_SETS` gains `wmkf_grantcycles`.
 - Not re-verified by the author (agent-reported): the per-file select lists and
   line numbers in §3. Each PR re-verifies its own files.
+
+## 5b. Codex plan review (2026-10-29) — verdict "needs attention"; all four verified
+
+1. **Restriction checks do not cover the linked table** [VERIFIED via
+   `lib/services/dynamics/restrictions.js:55-88`]: a field restriction on an
+   expanded table is enforced only when it is the parent table, and navigation
+   filters are not checked; the calendar adapter's raw reads (`getCycleDatesById`,
+   `listBoardDates`, `findCycleByCode`) skip `checkRestriction` (the first added
+   by PR #552). A table-level block on `wmkf_grantcycle` does catch an expand
+   (the navigation name contains the table name). **Required:** the shared cycle
+   helper calls the restriction check for `wmkf_grantcycle` /
+   `wmkf_cyclecode` explicitly before any filter, expand or batch read, with
+   negative tests for table- and field-restricted callers on each path.
+2. **`grant-request.getById` drops `expand`** [VERIFIED via
+   `grant-request.js:91-97`]. **Required:** PR 1 either adds expand support to
+   the adapter or every `getById` caller selects `_wmkf_grantcycle_value` and
+   resolves the code; tests go through the real adapter, not mocked expanded
+   rows.
+3. **Cached reviewer enrichment** [VERIFIED via `reviewer-search-logic.js:31-33`,
+   `enrich-recommended-service.js:411`]: roster candidates persist prior-request
+   `meetingDate` and are reused while `APPLICANT_ENRICHMENT_CACHE_VERSION`
+   matches. **Required:** bump the version with the producer change so cached
+   rows refresh to the linked-cycle label.
+4. **Staff Deliberations writeup fingerprint** [VERIFIED via
+   `pre-site-visit/artifact-model.js:234`]: the snapshot also holds the funding
+   history text; Q3 (no meeting-date fallback for past grants) can change it when
+   a past grant lacks a fiscal year or decision date, even though the
+   meeting-date line stays the same. §5a's "unchanged" applies to that line only.
+   **Required:** count live D26 drafts whose funding history used the
+   meeting-date fallback, test missing-date cases, and define how a changed
+   snapshot is handled (re-generate, or hold Q3's past-grant change until after
+   the D26 Board meeting).
+
+Also from the review: remove `wmkf_meetingdate` from a select list only after
+every consumer of that select has moved, including later-PR gates, expiry,
+honorarium and Factory paths.
 
 ## 6. Existing bugs found
 
@@ -326,7 +363,8 @@ Verified by the author before the Codex review:
    label. Build constraint: keep the writeup snapshot field `meetingDate` and the
    `formatMeetingDate` month-year format [VERIFIED via
    `proposal-core-service.js:119-128,352`, `artifact-model.js:229`] so live D26
-   drafts (Board meeting still ahead) do not change fingerprint; test it.
+   drafts (Board meeting still ahead) do not change fingerprint for that line;
+   test it. The funding-history text can still change (§5b item 4).
    Historical award recency (§3.5). **Decided (owner, 2026-10-29):** past grants
    use only their own fiscal-year label and decision date (writeup "awarded in"
    and Proposal Ranking: fiscal year, then decision date; most-recent-grant
