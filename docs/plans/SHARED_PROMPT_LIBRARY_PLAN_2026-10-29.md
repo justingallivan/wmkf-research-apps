@@ -48,10 +48,12 @@ execution by a future flow remains that flow's integration acceptance task.
 This document governs the implementation; no schema has been deployed. The offline definition/wire/fingerprint foundation is implemented in
 `lib/prompt-publication/` with portable fixtures and unit tests. It is not wired to
 live routes or the existing budget/prompt publishers. Complete structural validation exists; consumer-specific
-restrictions/defaults now cover ten audited names (eight locally passing). Shared
+restrictions now cover 39 audited names, all locally passing with reviewed models;
+`phase-i.checkin` remains held for a common execution definition. Initial
+Assessment version capture and Pre-Site native schema are reconciled locally. Shared
 pinned budget checks and the unused atomic adapter exist; remaining holds and
 .NET/tenant/cutover proof are tracked in
-[consumer/budget integration](SHARED_PROMPT_CONSUMERS_BUDGETS_2026-10-29.md). See that
+[consumer compatibility](SHARED_PROMPT_CONSUMER_COMPATIBILITY_2026-10-30.md). See that
 directory's README and
 [local implementation record](SHARED_PROMPT_LOCAL_FOUNDATION_2026-10-29.md) for
 invariants and remaining local milestones. The retained

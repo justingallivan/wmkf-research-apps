@@ -2,8 +2,8 @@
 title: Shared Prompt Consumer and Budget Integration Milestone
 domain: ai-platform
 kind: implementation-record
-status: active
-summary: Local per-consumer contracts and shared pinned budget checks with strict atomic transport; live route cutover and tenant proof remain blocked.
+status: historical
+summary: Historical revision3 consumer and budget milestone; superseded for consumer compatibility by the October30 record.
 canonical: false
 cataloged: 2026-10-29
 owner: product-engineering
@@ -14,7 +14,11 @@ related:
 
 # PR553 consumer and budget milestone
 
-**[PARTIAL implementation, NOT deployed]** Ten consumer definitions are audited
+**Historical checkpoint at commit `0b6971c37`, policy revision3.** Current consumer
+status is in [the October30 milestone](SHARED_PROMPT_CONSUMER_COMPATIBILITY_2026-10-30.md).
+The holds and counts below describe that earlier checkpoint.
+
+**[PARTIAL implementation at that checkpoint, NOT deployed]** Ten consumer definitions are audited
 and captured from tracked source; eight can pass local publication validation.
 Two audited names and thirty other known names remain held. No live row was read
 or changed. The new budget adapter is not imported by a route or existing budget

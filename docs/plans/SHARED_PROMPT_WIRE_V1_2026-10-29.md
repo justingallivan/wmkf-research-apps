@@ -18,9 +18,10 @@ related:
 `lib/prompt-publication/{json-contract,definition-schema,publication-contract,fingerprint}.js`.
 Both future clients use these contracts; .NET must match the portable vectors
 before writer enablement. No route, live database/schema or client wiring has changed. The subsequent
-budget milestone adds an unused strict changeset adapter. The [consumer/budget milestone](SHARED_PROMPT_CONSUMERS_BUDGETS_2026-10-29.md)
-now audits ten names (eight locally passing, two held) and adds the unused
-strict budget adapter. Thirty legacy names remain pending.
+budget milestone adds an unused strict changeset adapter. The [consumer compatibility milestone](SHARED_PROMPT_CONSUMER_COMPATIBILITY_2026-10-30.md)
+audits 39 names; `phase-i.checkin` stays held for a common definition. The unused
+strict budget adapter remains unwired. Initial Assessment and Pre-Site changes
+are local runtime changes that require deliberate coordinated promotion.
 
 ## Invariants and boundary
 
@@ -52,8 +53,9 @@ prototype-reserved names reject at variable/output/schema/JSON-path sinks.
 Source/target/guard/parse/native/retention grammar implements the normative format
 v1. Unknown nested extensions remain visible in storage but reject publication,
 never silently drop. Supported source kinds are override/dynamics/sharepoint;
-Override defaults must be strings; object/array/numeric/null defaults reject
-rather than rely on implicit runtime stringification. Dynamics table is only akoya_request. SharePoint glob and optional pdf_to_text
+Generic override defaults must be strings; object/array/null defaults reject.
+Exact audited consumer memos may retain their existing finite scalar numeric or
+boolean defaults; altered memos still reject. Dynamics table is only akoya_request. SharePoint glob and optional pdf_to_text
 remain declarative. Types, booleans, bounds and paired A7 classifications validate.
 Output names are unique. Duplicate write destinations and mixed direct/path
 writes to the same field reject; distinct paths in the same memo remain valid.
@@ -71,15 +73,19 @@ required. Exact audited pass-through root consumers retain their actual output
 semantics instead of requiring a new named wrapper. Unsupported native numeric/string bounds and array constraints reject
 (minItems only 0/1). No external refs, executable patterns or recursive schemas.
 This narrower reviewed subset preserves definitions for explicit reconciliation,
-not automatic schema rewriting. Provider behavior is not proved by offline tests.
+not automatic schema rewriting. Nonnative guidance schemas additionally accept nullable type arrays and recursive
+typed additionalProperties for existing record consumers. These do not widen the
+native provider subset. Provider behavior is not proved by offline tests.
 Provider constraints checked against [Anthropic's structured-output documentation](https://platform.claude.com/docs/en/build-with-claude/structured-outputs).
 
 Model values must already be canonical: lowercase tier or exact reviewed ID.
 New definitions require an explicit finite temperature in [0,1] and positive
-integer tokens within pinned model ceiling. Null model defaults/template-only exceptions remain blocked pending extraction;
+integer tokens within pinned model ceiling. Null model defaults remain blocked;
+template-only exceptions are registered only for the fourteen audited tool rows,
+with exact body/system and variable contracts and absent output memos;
 audited Executor consumers may preserve null temperature, while first publication
-still requires an explicit value. Artifact revision 3 includes source/transport
-hashes, ten named contracts, budget registry and a pending consumer-key union from tracked observed names plus source
+still requires an explicit value. Artifact revision 4 includes source/transport
+hashes, 39 named contracts, budget registry and a pending consumer-key union from tracked observed names plus source
 catalog names. This is a temporary fail-closed audit hold, not metadata-based
 permission or a new execution profile. Removing a hold needs actual consumer
 checks/defaults and reviewed artifact update, not changing an editorial label.

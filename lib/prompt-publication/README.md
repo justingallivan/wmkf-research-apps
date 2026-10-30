@@ -14,16 +14,18 @@ ASCII case folding. Declaration names are ASCII;
 reviewer placeholders must stay in the body, while the pre-site template contract
 uses combined system/body placeholders. `definition-schema.js` additionally checks canonical key
 identity, exact fields, serialized memos, variable/source/output grammar,
-validation/native schemas, model ceilings and temperature. Named checks now preserve ten audited source contracts; eight can pass locally.
-Initial Assessment and Pre-Site stay held for specific compatibility issues, as
-do thirty unaudited legacy names. See
-`docs/plans/SHARED_PROMPT_CONSUMERS_BUDGETS_2026-10-29.md`.
+validation/native schemas, model ceilings and temperature. Named checks now preserve 39 audited source contracts; all can pass local
+validation with explicit reviewed models. `phase-i.checkin` remains held until
+its draft has a common execution definition. Initial Assessment captures active
+version identity and executes the captured snapshot; Pre-Site native schema
+retains local length validation. See
+`docs/plans/SHARED_PROMPT_CONSUMER_COMPATIBILITY_2026-10-30.md`.
 
 `resolvePinnedModel` uses exact reviewed IDs or case-insensitive tier names,
 resolving tiers to the artifact's explicit tracked fallback snapshot. It accepts
 only explicitly extracted dated IDs, not arbitrary prefix matches. No per-name
-null-model defaults have been registered yet, so null fails closed. The later
-consumer audit must supply defaults before affected definitions can publish.
+null-model defaults have been registered yet, so null fails closed. Affected rows need explicit reviewed models or a separately reviewed
+default contract before publication.
 `validateModelBudget` checks the pinned model ceiling only, not registered app
 budgets or any concurrent-state guarantee. `matchesPolicy` compares new-request
 version/hash only; it must run **after** authorized completed-receipt replay in
@@ -42,7 +44,7 @@ policy change, not a startup/runtime refresh. The envelope hash is SHA-256 over
 UTF-8 `JSON.stringify(policy)` with recursively sorted object keys and preserved
 array order. The artifact uses ASCII property names; its exact bytes and
 hash must be included in .NET golden tests before claiming cross-language parity.
-Revision 3 pins schema/transport source digests, named consumer contracts and
+Revision 4 pins schema/transport source digests, named consumer contracts and
 the existing budget registry. Control policy identity is last-writer provenance,
 not an activation row; old provenance never resets the original CAS revision.
 `--check` is required after schema changes; regenerate only as a reviewed policy
@@ -115,8 +117,7 @@ must retain the existing durable replay path and handle unknown outcomes. All
 new adapter reads/writes use the same target, not the legacy settings client's
 sandbox preference. Nothing invokes this adapter from a live route yet.
 
-Remaining mandatory work: thirty legacy consumer audits, the two named held
-consumer reconciliations, explicit governed models, one-target read/replay/writer
+Remaining mandatory work: the `phase-i.checkin` draft definition, explicit governed models, one-target read/replay/writer
 cutover, read paging/status, real clients, solution/plugin/guards and sandbox
 proof. Policy deployment must disable/drain old writers and reject unsupported
 artifact stamps at the Dataverse boundary; CAS alone is not policy freshness. No .NET parity or tenant transaction behavior is proved.

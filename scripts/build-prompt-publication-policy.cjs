@@ -60,10 +60,10 @@ budgetRegistry.secondarySeatCeiling = Math.min(...Object.values(budgetRegistry.s
 if (!Number.isSafeInteger(budgetRegistry.secondarySeatCeiling) || budgetRegistry.secondarySeatCeiling <= 0) throw new Error('Missing reviewed secondary-seat ceiling');
 const pendingConsumerNames = [...new Set([...Object.keys(ADMIN_PROMPT_CATALOG), ...observed.promptRows.map(r => r.name)])].filter(name => !Object.hasOwn(consumerContracts, name) || consumerContracts[name].blockedReason !== null).sort();
 if (pendingConsumerNames.some(name => typeof name !== 'string')) throw new Error('Invalid pending consumer key');
-const schemaSourceHashes = Object.fromEntries(['json-contract.js', 'definition-schema.js', 'publication-contract.js', 'fingerprint.js', 'consumer-contract.js', 'budget-coordination.js'].map(file => [file, crypto.createHash('sha256').update(fs.readFileSync(path.join(root, 'lib/prompt-publication', file))).digest('hex')]));
+const schemaSourceHashes = Object.fromEntries(['template-policy.js', 'json-contract.js', 'definition-schema.js', 'publication-contract.js', 'fingerprint.js', 'consumer-contract.js', 'budget-coordination.js'].map(file => [file, crypto.createHash('sha256').update(fs.readFileSync(path.join(root, 'lib/prompt-publication', file))).digest('hex')]));
 const budgetTransportHashes = Object.fromEntries(['lib/dataverse/adapters/prompt-budget.js', 'lib/dataverse/core/changeset.js', 'lib/dataverse/core/entity-registry.js', 'lib/services/dynamics/changeset.js', 'scripts/prompt-publication-source-contracts.cjs'].map(file => [file, crypto.createHash('sha256').update(fs.readFileSync(path.join(root, file))).digest('hex')]));
 const policy = {
-  policyVersion: 3, definitionFormatVersion: 1,
+  policyVersion: 4, definitionFormatVersion: 1,
   scope: 'consumer-budget-foundation',
   limits: { templateUtf16: 65536, nameUtf16: 850 },
   placeholder: { token: '\\{\\{[ \\t\\r\\n\\f\\v]*([A-Za-z0-9_]+)[ \\t\\r\\n\\f\\v]*\\}\\}', name: '[A-Za-z0-9_]+', matchMode: 'full-string' },
@@ -72,7 +72,7 @@ const policy = {
   templateContracts: templates.PROMPT_TEMPLATE_CONTRACTS,
   tiers: TIER_FALLBACK_IDS, models,
   // Empty until each existing null-model consumer's actual default is extracted.
-  defaultsByName: {}, templateOnlyByName: {}, pendingConsumerNames, schemaSourceHashes, consumerContracts, budgetRegistry, budgetTransportHashes,
+  defaultsByName: {}, templateOnlyByName: Object.fromEntries(Object.entries(consumerContracts).filter(([, c]) => c.templateOnly).map(([name]) => [name, true])), pendingConsumerNames, schemaSourceHashes, consumerContracts, budgetRegistry, budgetTransportHashes,
 };
 function canonical(value) {
   if (Array.isArray(value)) return value.map(canonical);

@@ -29,9 +29,9 @@ This validation used source, public primary documentation, offline tests and
 explicit algorithm counterexamples. No new tenant read, live write, model call
 or provider request. Existing schema/example evidence stays dated and unchanged.
 Offline structural definition/wire schemas and hashes now exist in
-`lib/prompt-publication/`; consumer checks now cover ten audited names, with eight locally passing and two
-held. Budget checks/unused atomic adapter exist; live operation behavior remains
-PLANNED. See the consumer/budget milestone record. See `docs/plans/SHARED_PROMPT_WIRE_V1_2026-10-29.md`. The findings below
+`lib/prompt-publication/`; consumer checks now cover 39 audited names, locally passing with reviewed models;
+`phase-i.checkin` stays held pending a common execution definition. Budget checks/unused atomic adapter exist; live operation behavior remains
+PLANNED. See `docs/plans/SHARED_PROMPT_CONSUMER_COMPATIBILITY_2026-10-30.md`. See `docs/plans/SHARED_PROMPT_WIRE_V1_2026-10-29.md`. The findings below
 record the pre-implementation plan review, not approval of later implementation.
 
 ## Findings disposition

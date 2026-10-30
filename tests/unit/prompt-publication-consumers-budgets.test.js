@@ -13,7 +13,7 @@ const state = () => ({ schemaVersion: 1, currentVersion: 1, latestRevision: 1, b
 const codes = r => r.errors.map(e => e.code);
 function definition(name) {
   const c = policy.consumerContracts[name], spec = JSON.parse(c.outputJson);
-  return { name, systemPrompt: c.systemIncludes.join('\n'), body: c.body || JSON.parse(c.variablesJson).variables.map(v => '{{'+v.name+'}}').join('\n'), variables: c.variablesJson, outputSchema: c.outputJson, model: spec.generationMode === 'native-json-schema' ? 'claude-sonnet-5' : 'sonnet', temperature: null, maxTokens: 8000 };
+  return { name, systemPrompt: c.systemExact ?? c.systemIncludes.join('\n'), body: c.body || JSON.parse(c.variablesJson).variables.map(v => '{{'+v.name+'}}').join('\n'), variables: c.variablesJson, outputSchema: c.outputJson, model: spec?.generationMode === 'native-json-schema' ? 'claude-sonnet-5' : 'sonnet', temperature: null, maxTokens: c.rowMaxTokens || 8000 };
 }
 const modify = (d, field, change) => { const value = JSON.parse(d[field]); change(value); return { ...d, [field]: JSON.stringify(value) }; };
 function transport(currentControl = control(), currentState = state(), models = {}) {
@@ -50,8 +50,10 @@ describe('source-derived named consumer checks', () => {
     const d = definition(name);
     expect(codes(validateDefinition(modify(d, 'variables', s => { s.variables[0].untrusted = false; })))).toContain('consumer_memo_mismatch');
     expect(codes(validateDefinition(modify(d, 'variables', s => { s.variables[0].source = { kind: 'dynamics', field: 'name' }; })))).toContain('consumer_memo_mismatch');
-    expect(codes(validateDefinition(modify(d, 'outputSchema', s => { s.outputs[0].target = { kind: 'akoya_request', field: 'name' }; })))).toContain('consumer_memo_mismatch');
-    expect(codes(validateDefinition({ ...d, outputSchema: null }))).toContain('consumer_memo_mismatch');
+    if (d.outputSchema !== null) {
+      expect(codes(validateDefinition(modify(d, 'outputSchema', s => { s.outputs[0].target = { kind: 'akoya_request', field: 'name' }; })))).toContain('consumer_memo_mismatch');
+      expect(codes(validateDefinition({ ...d, outputSchema: null }))).toContain('consumer_memo_mismatch');
+    } else expect(codes(validateDefinition({ ...d, outputSchema: '{}' }))).toContain('consumer_memo_mismatch');
   });
   test('source property order preserved where current Pre-Site reader requires it', () => {
     const d = definition('pre-site-visit.proposal-core.generate');
@@ -77,10 +79,12 @@ describe('source-derived named consumer checks', () => {
     expect(validateDefinition(d).valid).toBe(true);
     expect(codes(validateDefinition(modify(d, 'outputSchema', s => { s.validationSchema.fields.synthesis.fields.consensus.default = ['unchecked']; })))).toContain('invalid_schema_default');
   });
-  test('publication cannot bypass the known holds by editorial classification', () => {
-    const d = definition('initial-assessment.generate'), r = requestFor(d);
-    expect(codes(validateFreshPublication(r.request, r.snapshot, { state: state(), control: control() }))).toContain('consumer_version_pinned');
-    expect(codes(validateDefinition(definition('pre-site-visit.proposal-core.generate')))).toContain('consumer_native_schema_unverified');
+  test('both reconciled consumers pass fresh checks with a trusted budget fence', () => {
+    for (const name of ['initial-assessment.generate', 'pre-site-visit.proposal-core.generate']) {
+      const d = definition(name), r = requestFor(d);
+      expect(validateFreshPublication(r.request, r.snapshot, { state: state(), control: control() }).valid).toBe(true);
+    }
+    expect(policy.pendingConsumerNames).toEqual(['phase-i.checkin']);
   });
 });
 describe('pinned budget validation and ORIGINAL control preparation', () => {
@@ -185,4 +189,38 @@ test('older control provenance does not force reseed; new plans still stamp curr
   const d=definition('review-synthesis.generate'), r=requestFor(d);
   expect(validateFreshPublication(r.request,r.snapshot,{state:state(),control:prior}).valid).toBe(true);
   expect(codes(validateFreshPublication({...r.request,policyRevision:2,policyArtifactHash:'a'.repeat(64)},r.snapshot,{state:state(),control:prior}))).toContain('policy_changed');
+});
+
+
+test.each(['expense-reporter-dynamics','expertise-finder-dynamics','funding-gap-dynamics','literature-analyzer-dynamics','multi-perspective-dynamics'])('template-only %s matches independent module exports and rejects execution memo injection', leaf => {
+  for (const row of require('../../shared/config/prompts/' + leaf).TOOL_PROMPT_ROWS) {
+    const c = policy.consumerContracts[row.promptName];
+    expect(c.variablesJson).toBe(JSON.stringify(row.variables));
+    expect(c.body).toBe(row.body); expect(c.systemExact).toBe(row.systemPrompt);
+    const d = definition(row.promptName);
+    expect(validateDefinition(d).valid).toBe(true);
+    expect(codes(validateDefinition({ ...d, body: d.body + 'changed' }))).toContain('consumer_body_mismatch');
+    expect(codes(validateDefinition({ ...d, outputSchema: '{"outputs":[]}' }))).toContain('consumer_memo_mismatch');
+  }
+});
+test.each(['grantee-title','grantee-abstract','meeting-speaker-alignment','meeting-fragment-review'])('new Executor leaf %s matches independent exports', leaf => {
+  const m = require('../../shared/config/prompts/' + leaf);
+  const c = Object.values(policy.consumerContracts).find(c => c.source === 'shared/config/prompts/' + leaf + '.js');
+  expect(c.variablesJson).toBe(JSON.stringify(m.PROMPT_VARIABLES));
+  expect(c.outputJson).toBe(JSON.stringify(m.PROMPT_OUTPUT_SCHEMA));
+});
+test('numeric defaults and legacy unused slots are restricted to exact audited names/memos', () => {
+  const d = definition('phase-i.summary');
+  expect(validateDefinition(d).valid).toBe(true);
+  expect(codes(validateDefinition({ ...d, name: 'pa.numeric-default' }))).toContain('invalid_default');
+  const r = definition('reviewer-finder.analyze');
+  expect(validateDefinition(r).valid).toBe(true);
+  expect(codes(validateDefinition(modify(r, 'variables', s => { s.variables.push({name:'unreviewed',source:{kind:'override'}}); })))).toContain('consumer_memo_mismatch');
+});
+
+test('Initial Assessment publication rejects memo property ordering its reader rejects', () => {
+  const d = definition('initial-assessment.generate');
+  const s = JSON.parse(d.variables);
+  s.variables = s.variables.map(v => Object.fromEntries(Object.entries(v).reverse()));
+  expect(codes(validateDefinition({ ...d, variables: JSON.stringify(s) }))).toContain('consumer_memo_mismatch');
 });
