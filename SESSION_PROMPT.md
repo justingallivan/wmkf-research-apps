@@ -41,11 +41,16 @@ writes, no Production access).
    candidate cards label prior requests by linked cycle (enrichment cache v5);
    past-grant recency uses fiscal year and decision date only; unread
    pass-through fields and unused selects removed.
-4. **Sandbox reads (owner-authorized, read-only, 2026-10-30):** link filter
+4. **[VERIFIED via owner-authorized read-only Production count, 2026-10-30]
+   Plan §8:** of 2,945 program grants (955 Research), none lacks both a
+   decision date and a readable fiscal year (22 lack a decision date; all have
+   a fiscal year), so #555's past-grant date rule leaves no current grant
+   undated. Recorded in the plan §8 on the #555 branch and on the PR.
+5. **Sandbox reads (owner-authorized, read-only, 2026-10-30):** link filter
    counts D26 12 / D97 12 / D99 1; expand shape on list and single reads;
    link-entity aggregate (also with a program condition, 6 = 6); the No-cycle
    filter partitions linked and unlinked requests exactly.
-5. **Owner-attention items before merge** are listed in each PR body. The main
+6. **Owner-attention items before merge** are listed in each PR body. The main
    ones: Factory clones carry no link until step 5 (they show "No cycle" and
    cycle-gated flows refuse them, except the Factory's own Pre-Site reader,
    which derives the clone's cycle and Board date from its meeting date until
@@ -139,10 +144,6 @@ writes, no Production access).
 
 ### Owner Decision Needed
 
-- **Run the plan §8 count before deploying #555** (owner-run, read-only
-  Production): past Research grants with neither a fiscal year nor a decision
-  date. Such a grant stops Staff Deliberations writeup generation (fail closed,
-  as before #555), and the meeting date no longer counts as a date.
 - **Deploy timing for #554:** until step 5, new Factory clones have no Grant
   Cycle link and show no cycle on converted screens.
 - None open for the prompt library; publication coordination with Connor was
