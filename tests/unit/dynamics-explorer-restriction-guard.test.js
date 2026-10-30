@@ -88,6 +88,15 @@ describe('checkRestriction (Stage 0 characterization)', () => {
         .toBe('Field "wmkf_cyclecode" is restricted (referenced via $filter "wmkf_GrantCycle/wmkf_cyclecode")');
     });
 
+    test.each([
+      ['two-level path from a suggestion', "wmkf_Request/wmkf_GrantCycle/wmkf_cyclecode eq 'D26'"],
+      ['lambda variable path', "wmkf_akoya_request_reviewedproposal/any(r: r/wmkf_GrantCycle/wmkf_cyclecode eq 'D26')"],
+    ])('%s: table and field restrictions both block', (_label, filter) => {
+      const input = { table_name: 'x', filter };
+      expect(checkRestriction('query_records', input, [{ table_name: 'wmkf_grantcycle', field_name: null }])).toMatch(/^Table "wmkf_grantcycle" is restricted/);
+      expect(checkRestriction('query_records', input, [{ table_name: 'wmkf_grantcycle', field_name: 'wmkf_cyclecode' }])).toMatch(/^Field "wmkf_cyclecode" is restricted/);
+    });
+
     test('a field restriction on a different related column does not block', () => {
       expect(checkRestriction('query_records', cycleFilter, [{ table_name: 'wmkf_grantcycle', field_name: 'wmkf_name' }])).toBeNull();
     });

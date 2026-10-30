@@ -129,7 +129,7 @@ npm run check:memory-health                                                    #
 npm run check:types                                                            # type check over the repo (no self-test)
 ```
 
-**This list is the full set as of 2026-10-04. Before running, `grep '"check:' package.json` — if a `check:*` script exists that is NOT above (and is not a `:self-test` of one already listed), run it too and add it here.** That keeps the list from silently going stale as gates are added. Skip silently only if NONE of these scripts is defined (not every project has them); do not skip a gate that IS defined.
+**This list is the full set as of 2026-10-30. Before running, `grep '"check:' package.json` — if a `check:*` script exists that is NOT above (and is not a `:self-test` of one already listed), run it too and add it here.** That keeps the list from silently going stale as gates are added. Skip silently only if NONE of these scripts is defined (not every project has them); do not skip a gate that IS defined.
 
 **Router notice:** if `check:memory-router` prints the routine-audit notice
 (router at/over the 8 KiB trigger), surface it in the Step 4 summary and
