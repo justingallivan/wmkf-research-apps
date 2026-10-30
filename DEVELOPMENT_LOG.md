@@ -10,6 +10,18 @@ The chronological archive after the `Legacy chronological session log` divider c
 
 ---
 
+## October 2026 — Review filing follows each cycle's Board date; no Vercel switch at rollover (Session 649, Claude)
+
+**Milestone:** Completed reviews now file to SharePoint automatically for every cycle up to and including its calendar Board date (D44), replacing the single-cycle `REVIEW_DOCX_SHAREPOINT_CYCLE` pin. D26 files through Dec 10; J27 after that, with no setting change.
+**Sessions:** Session 649 (Claude); contract-reconcile plan review; Codex adversarial reviews of the plan (two rounds) and the PR (three rounds).
+**Ship state:**
+- PR #551 (`caf318983`) deployed. Cycles take turns for scan slots; a calendar read failure, no upcoming Board date, or a recent cycle with waiting reviews and no Board date files nothing and raises an actionable event.
+- The external proposal download now requires released materials (closed a pre-accept access gap).
+- The calendar box says a chosen cycle stops automatic switching; the unused Admin invitation-start date was removed.
+- Decisions D47 (the Board setup reads the calendar) and D48 (fixed promised due date, withdrawal via the PD, invitations need the due date and the PDF). PR #552 (due date from the calendar) is open and on hold: owner direction to derive a request's cycle from its Grant Cycle link, not its meeting date (work queue 6a).
+**Why it matters:** one fewer manual per-cycle setting before the Feb 24 J27 invitations; the reviewer-invitation build plan is reviewed and ready for PRs 3–4.
+**Pointers:** `docs/plans/REVIEWER_INVITATION_CALENDAR_BUILD_PLAN_2026-10-29.md`; alignment log D44, D47, D48, T10; PRs #551, #552.
+
 ## October 2026 — Landing cycle: every app opens on the next Board cycle and rolls over by itself (Session 648, Claude)
 
 **Milestone:** One rule now decides which cycle the apps open on: the cycle with the next Board meeting (operations Grant Cycle Board date), switching at the start of the Pacific day after that meeting (D29, D45). J27 takes over at 12:00 am Pacific Fri Dec 11, 2026.
