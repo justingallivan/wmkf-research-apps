@@ -145,8 +145,8 @@ fields, and sandbox/prod assumptions. The Atlas adjudicates live data state.
   link. Before reusing such a script, or quoting its old output as current,
   check which source it uses: `rg -n "wmkf_meetingdate|meetingDateToCycleCode|cycleCodeToOdataFilter" scripts`.
   `scripts/probe-request-grant-cycle-lookup.cjs` compares link and date on
-  purpose. Coverage numbers: the plan's §7 Q1. Step 6 (branch
-  `claude/meeting-date-guard-explorer-scripts`, not merged) moved the
+  purpose. Coverage numbers: the plan's §7 Q1. Step 6 (PR #558,
+  deployed 2026-10-30) moved the
   current-use scripts to the link: Staff Deliberations drafts
   (`generate-pre-site-drafts-cycle.mjs`) and preflight
   (`probe-pre-site-generation-preflight.mjs`), the deliberations cohort review,
@@ -155,11 +155,12 @@ fields, and sandbox/prod assumptions. The Atlas adjudicates live data state.
   by link, then their suggestions by request id). The My Candidates and My
   Proposals smoke scripts move with those services.
 - **App code may not add request meeting-date reads
-  (`check:request-meeting-date-reads`, step 6, not merged).** The gate records
+  (`check:request-meeting-date-reads`, step 6, PR #558, deployed 2026-10-30).** The gate records
   every `lib/`, `pages/`, `shared/` file that mentions `wmkf_meetingdate` or
   calls the old helpers, with its count; a new file or a higher count fails,
-  and a lower count fails until the record is lowered. Readers still to convert
-  are kind `pending-reader`; remove each record as its reader converts.
+  and a lower count fails until the record is lowered. Reader batches 1-2 (PRs #559,
+  #560) converted every app reader, so no record is kind `pending-reader`; a
+  new reader fails the gate.
 - **Factory test requests and the Grant Cycle link (step 5, PR #556, deployed
   2026-10-30).** A clone is in a
   cycle only if the Factory bound `wmkf_GrantCycle` when it created it: the

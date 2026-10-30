@@ -2,8 +2,8 @@
 title: Stop reading the request meeting date — inventory and plan
 domain: cycles
 kind: plan
-status: draft
-summary: "Owner, 2026-10-29: no app reads akoya_request.wmkf_meetingdate; a request's cycle comes from its Grant Cycle link (wmkf_grantcycle) and cycle dates from that linked calendar row, with no meeting-date fallback. Whole-repo inventory (106 runtime files, 69 scripts, plus indirect readers through helpers), grouped by what each read is for, the behavior changes, two existing bugs found, a central-helper strategy, and the owner decisions. Built: PR #552 (reviewer email path), steps 1-3 (sandbox rows; PRs #554 and #555 deployed 2026-10-30); step 5 (Test Request Factory; PR #556 deployed 2026-10-30); step 4 (invitation closing and honoraria) on branch claude/invite-expiry-honorarium-cycle-link (PR #557), not merged; step 6 (Dynamics Explorer, current-use scripts, ratchet gate) stacked on it (PR #558), not merged; reader batch 1 (19 unused selects, PR #559) and batch 2 (the last 9 readers) stacked on step 6, not merged; after batch 2 no app code reads the request meeting date, and the gate records only the calendar column, the honorarium write, the Factory, the helpers, the Explorer fallback and the export column."
+status: active
+summary: "Owner, 2026-10-29: no app reads akoya_request.wmkf_meetingdate; a request's cycle comes from its Grant Cycle link (wmkf_grantcycle) and cycle dates from that linked calendar row, with no meeting-date fallback. Whole-repo inventory (106 runtime files, 69 scripts, plus indirect readers through helpers), grouped by what each read is for, the behavior changes, two existing bugs found, a central-helper strategy, and the owner decisions. Built: PR #552 (reviewer email path), steps 1-3 (sandbox rows; PRs #554 and #555 deployed 2026-10-30); step 5 (Test Request Factory; PR #556), step 4 (invitation closing and honoraria; PR #557), step 6 (Dynamics Explorer, current-use scripts, ratchet gate; PR #558) and reader batches 1-2 (PRs #559, #560) all deployed 2026-10-30. No app code reads the request meeting date, and the gate records only the calendar column, the honorarium write, the Factory, the helpers, the Explorer fallback and the export column."
 canonical: false
 owner: product-engineering
 related:
@@ -135,13 +135,13 @@ pre-site visit (`proposal-core-service.js:340`), post-presentation materials
   via `isPastCutoff`; the Review Manager's "Recorded by automated cycle close"
   label (`reviewer-activity-history.js:275`, from `reviewers-service.js:381`)
   must use the same date. Replacement: the linked row's Board date (§7 Q4).
-  **[Built in step 4, branch only]**
+  **[Built in step 4; deployed 2026-10-30, PR #557]**
 - **Honorarium onboarding (a write):** `lib/bill/honorarium-onboard-orchestrator.js:144-172,898`
   requires the parent's meeting date, derives `akoya_fiscalyear` ("June 2026")
   from it, and copies `wmkf_meetingdate` onto the new honorarium request. The
   value arrives from `verify-suggestion-token.js:67` → acceptance job payload
   (`respond-service.js:430`) → drain. Change the orchestrator before the token
-  select (§7 Q5). **[Built in step 4, branch only]**
+  select (§7 Q5). **[Built in step 4; deployed 2026-10-30, PR #557]**
 - **Historical award recency** (other, older requests): `funding-history.js:134`,
   `proposal-core-service.js:279-280`, `research-funding.js:36`,
   `proposal-ranking-source.js:63` use the meeting date as a fallback after the
@@ -185,15 +185,15 @@ ledger migration and an unchanged bundle; the create-body digest changes.*
 
 `shared/config/prompts/dynamics-explorer.js:55,541,648` teaches the model to
 slice by `wmkf_meetingdate`; `dynamics-explorer/tools/get-entity.js:31` selects it
-(§7 Q8). **[Built in step 6, branch only]**
+(§7 Q8). **[Built in step 6; deployed 2026-10-30, PR #558]**
 
 ### 3.9 Scripts
 
 Operator scripts that use the helpers (backfills, pre-site drafts, ranking
 access, smoke tests) follow the helper change. One-off probes and historical
 backfills stay as written; `probe-request-grant-cycle-lookup.cjs` compares link
-and date on purpose and stays. **[Current-use scripts built in step 6,
-branch only]**
+and date on purpose and stays. **[Current-use scripts built in step 6;
+deployed 2026-10-30, PR #558]**
 
 ## 4. Behavior changes to expect
 
@@ -267,8 +267,8 @@ a contract check and a Codex review; none merges without the owner.
    selects removed. The §8 count (2026-10-30) found no program grant with
    neither a fiscal year nor a decision date.
 4. **Invitation closing and honoraria:** stale-invite expiry and the
-   honorarium write (§3.5). **[BUILT on branch `claude/invite-expiry-honorarium-cycle-link`;
-   not merged, not deployed, no Dataverse read or write]** A new helper pair in
+   honorarium write (§3.5). **[DEPLOYED 2026-10-30; PR #557, merge `84ba3bf84`; Vercel
+   commit status success; no Dataverse read or write during the build]** A new helper pair in
    `lib/dataverse/adapters/operations-grant-cycle.js` (`linkedCycleBoardDateExpand`,
    `linkedCycleBoardDate`) expands the linked row's code and Board date, checks the
    restriction on that table (Board date included), and returns no date for a
@@ -299,8 +299,9 @@ a contract check and a Codex review; none merges without the owner.
    use the sandbox test rows D97/D99. Must land before the next Factory
    rehearsal; remove the Pre-Site reader's meeting-date fallback
    (`lib/services/test-requests/presite-sandbox-deps.js`) in the same change.
-   **[BUILT on branch `claude/factory-grant-cycle-link`, 2026-10-30; not merged,
-   not deployed, no sandbox or Production write]** The admin form's source
+   **[DEPLOYED 2026-10-30; PR #556, merge `a1f9d0035`; Vercel commit
+   status success; no sandbox or Production write. The sandbox-rule check below
+   was waived by the owner 2026-10-30: the rule exists only in the sandbox.]** The admin form's source
    lookup returns the destination calendar's J/D rows (read through the target
    client) and the source's linked code as the default; Confirm takes a cycle
    code, the server resolves that row in the destination and the clone binds
@@ -320,8 +321,8 @@ a contract check and a Codex review; none merges without the owner.
    that rewrites the meeting date on create also touches the link (readback
    reports "grant cycle mismatch" if so).
 6. **Dynamics Explorer, scripts and the guard check** (§3.8–3.9) as decided.
-   **[BUILT on branch `claude/meeting-date-guard-explorer-scripts`, stacked on
-   step 4; not merged, no Dataverse read or write]**
+   **[DEPLOYED 2026-10-30; PR #558, merge `fd0333864`; Vercel commit
+   status success; no Dataverse read or write during the build]**
    - **Scope found larger than planned (2026-10-30).** The inventory at build
      time found about 30 app readers still selecting, sorting by or passing on
      the request meeting date (beyond the Factory, the honorarium write, the
@@ -358,8 +359,7 @@ a contract check and a Codex review; none merges without the owner.
      meeting-date sorts that need a new order; values passed to screens).
      Whether Dataverse can sort requests by the linked cycle's Board date is
      unverified.
-   - **Reader batch 1** (branch `claude/meeting-date-readers-batch1`, stacked
-     on step 6; not merged): 19 files dropped an unused request meeting-date
+   - **Reader batch 1** (PR #559, merge `95bde8874`, deployed 2026-10-30): 19 files dropped an unused request meeting-date
      select. Each was traced to its consumers first: none reads the field,
      hashes or stores the raw request row, or returns it to a screen (the
      Initial Assessment, Pre-RP brief, Board writeup and post-presentation
@@ -370,8 +370,7 @@ a contract check and a Codex review; none merges without the owner.
      screens (Review Manager request level, My Candidates sort via `findByPD`,
      individual review files, contact history, Reviewer Finder request
      context).
-   - **Reader batch 2** (branch `claude/meeting-date-readers-batch2`, stacked
-     on batch 1; not merged) converts those nine. The Workbench and Final
+   - **Reader batch 2** (PR #560, merge `4906e7793`, deployed 2026-10-30) converts those nine. The Workbench and Final
      Writeup dashboards, awardees and the My Proposals cycle list sort cycles
      in code already, so their query order becomes request number (paging
      only). The My Proposals in-cycle list orders by request number (one cycle

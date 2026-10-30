@@ -10,6 +10,18 @@ The chronological archive after the `Legacy chronological session log` divider c
 
 ---
 
+## October 2026 — No app reads the request meeting date (Session 652, Claude)
+
+**Milestone:** The meeting-date retirement is complete: Factory clones, invitation closing, honoraria, Dynamics Explorer, current-use scripts and every remaining app reader take a request's cycle from its Grant Cycle link, and a CI gate stops new request meeting-date reads.
+**Sessions:** Session 652 (Claude); Codex adversarial review on each PR (two findings fixed); owner-authorized merges.
+**Ship state:**
+- PR #556 (`a1f9d0035`): Factory clones link to an operator-chosen real Grant Cycle; meeting date and fiscal year come from its Board date.
+- PR #557 (`84ba3bf84`): stale invitations close on the linked cycle's Board date (D26: Dec 10); new honoraria link to the parent's cycle.
+- PR #558 (`fd0333864`): Explorer prompt and restriction guard for `$filter` navigation paths; scripts; `check:request-meeting-date-reads`.
+- PRs #559/#560 (`95bde8874`, `4906e7793`): the last 28 app readers converted or removed.
+**Why it matters:** One cycle source across apps, scripts and Explorer before J27, held by a gate rather than by convention.
+**Pointers:** `docs/plans/MEETING_DATE_RETIREMENT_PLAN_2026-10-29.md` (steps 4–6, reader batches); `scripts/check-request-meeting-date-reads.js`.
+
 ## October 2026 — The apps take each request's cycle from its Grant Cycle link (Session 651, Claude)
 
 **Milestone:** Every app screen and service outside the Test Request Factory reads a request's cycle from `akoya_request.wmkf_grantcycle`, never the meeting date; Board dates shown to staff come from the linked cycle's calendar row.
