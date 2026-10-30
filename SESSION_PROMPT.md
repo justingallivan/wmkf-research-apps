@@ -1,63 +1,59 @@
-# Session 650 Prompt: Shared prompt library — review PR #553 before the sandbox build
+# Session 652 Prompt: Meeting-date retirement — owner review of PRs #554 and #555
 
-**Handoff destination:** `main`, docs-only, owner-confirmed 2026-10-29.
-**Feature/planning branch retained:** `codex/shared-prompt-library-plan`, PR #553
-open; do not merge it without the owner's authorization for that PR.
+**Handoff destination:** `main`, docs-only (handoff and work queue only).
+**Feature branches retained, not merged:** `claude/cycle-lookup-research-screens`
+(PR #554) and `claude/meeting-date-displays-cleanup` (PR #555, stacked on #554);
+`codex/shared-prompt-library-plan` (PR #553). Merge authorization is per PR.
 
-Prior complete handoff (Claude's J27/cycle workstream), retrievable exactly:
-`git show 006b87565:SESSION_PROMPT.md`. This compact handoff preserves that
-workstream by reference; it does not replace its owner decisions or turn old
-carryover into a newly verified worklist.
+Earlier handoffs, retrievable exactly: Claude Session 650 and Codex Session 649
+`git show 930387f26:SESSION_PROMPT.md`; Claude's older J27/cycle workstream
+`git show 006b87565:SESSION_PROMPT.md`.
 
-## Session 650 Summary (Claude, 2026-10-29) — meeting-date retirement planned; PR #552 shipped
+## Session 651 Summary (Claude, 2026-10-29 → 10-30) — meeting-date retirement steps 2 and 3 built
 
-Runs alongside Codex's work below; the next Claude session is **651**. Claude's
-Session 649 handoff, exact: `git show 4d63eb048:SESSION_PROMPT.md`.
+Next Claude session is **652**. The owner was away for most of the session and
+authorized: autonomous work with Codex reviews, PRs left open (no merge),
+starting step 3 on a stacked branch, and **sandbox reads only** (no sandbox
+writes, no Production access).
 
-1. **[DEPLOYED; Vercel commit status] PR #552, merge `54070863f`.** Reviewer
-   invitations take the cycle from the request's Grant Cycle link
-   (`akoya_request.wmkf_grantcycle`) and the review due date from that linked
-   calendar row, saved on the request before the first invitation is sent (D48).
-   No meeting-date fallback; a request with no link and no saved due date is
-   refused (owner-confirmed). Render and send also pick the cycle configuration
-   (template, attachments, program name) from the link, and the draft
-   fingerprint binds the Grant Cycle id: the reviewer email path no longer reads
-   the meeting date. Codex re-review approved; CI green. Docs marked deployed in
-   `6428398d8`.
-2. **[PLANNED; on main via merge `8dd123543`, 2026-10-29] Stop
-   reading the request meeting date across the apps (work queue 6a).** Plan
-   `docs/plans/MEETING_DATE_RETIREMENT_PLAN_2026-10-29.md`: whole-repo inventory
-   (106 runtime files, 69 scripts, plus indirect readers traced through
-   helpers), owner decisions for every question (§7), contract check (§5a) and
-   Codex plan review with four verified findings folded in (§5b). Six named
-   build steps; **step 1, sandbox setup, is done** (owner-approved sandbox
-   writes, `scripts/seed-sandbox-grant-cycles.cjs`, verified by re-read: sandbox
-   cycles J26, D26, J27 copied from the Production calendar plus test-only D97,
-   D99; 25 sandbox requests linked).
-3. **Owner decisions (2026-10-29), recorded in the plan §7:** link-only
-   everywhere with no meeting-date fallback (older gaps are fixed as Dynamics
-   data, not code); discretionary requests out of scope; displays use the linked
-   cycle's calendar Board date; past grants use fiscal year and decision date
-   only; stale invitations close against the linked Board date; new honorarium
-   requests get the link and calendar-sourced dates (existing ones untouched);
-   no backfill of stored cycle codes; Test Request Factory clones carry the
-   link; Dynamics Explorer uses the link first with a stated fallback; corpus
-   index and Bulk Export column out of scope; finished scripts left as written
-   with a wiki caveat.
-4. **Read-only Production probes (owner-authorized, counts only):** honorarium
-   rows (GoApply's carry the link, app-made ones do not); D26 suggestions (all
-   221 carry D26, so the review-filing job misses nothing); link coverage by year
-   (Research 97–100% since 2015; about 140 older Research requests with a
-   June/December date lack the link); D26 calendar Board date verified as
-   2026-12-10.
-5. **Two existing bugs found** (plan §6): Reviewer Finder saves never stamp the
-   cycle code (field read from the wrong level, since `f766b004d`); the PD-scope
-   candidate list reads fields the adapter does not return. Neither affects D26
-   data; both are fixed in the cycle-lookup build step.
-6. **New docs (now on main):** `docs/CONNOR_DATA_CLEANUP_QUESTIONS.md`
-   (data cleanup asks for Connor, low priority); wiki Operating Note in
-   `docs/agent-wiki/topics/dataverse-dynamics.md` on scripts that still derive
-   cycles from the meeting date, pointer in `scripts/README.md`; corpus plan note.
+1. **[MERGED to main] Handoff fixes and the plan branch.** Corrected the stale
+   "Connor publication decision needed" item (`561cb177e`; the decision is
+   recorded on PR #553's branch). Merged the meeting-date retirement plan branch
+   directly (owner OK; docs plus the sandbox seed script, no runtime change):
+   `8dd123543`.
+2. **[OPEN PR #554, CI green, Codex-clean] Step 2: cycle lookup and Research
+   screens.** Every non-Factory app path takes a request's cycle from its Grant
+   Cycle link. Helpers in `lib/dataverse/adapters/operations-grant-cycle.js`
+   (`linkedCycleFilter`, `noLinkedCycleFilter`, `linkedCycleExpand`,
+   `linkedCycleCode`, `listBoardDatesOrNone`), each with an explicit
+   `wmkf_grantcycle` restriction check (plan §5b item 1); request adapter reads
+   forward `expand`; `aggregateLinkedCycles` replaces the meeting-date aggregate.
+   All 39 membership call sites traced to a production read carrying the expand
+   (the trace caught transcript/summary, Initial Assessment lineage, site-visit
+   transition, request-number and id-list reads). Both plan §6 bugs fixed.
+   Proposal Ranking scripts moved with the code (syntax-checked only; they target
+   Production). Codex: one P2 (Factory Pre-Site recipe reader) fixed in
+   `20a1365b3`; re-review clean.
+3. **[OPEN PR #555, stacked on #554, CI green, Codex-clean] Step 3: checks,
+   dates shown, cleanup.** "Has a meeting date" gates use the link; Workbench
+   Overview and the Staff Deliberations writeup show the linked cycle's calendar
+   Board date (writeup snapshot field and month-year format kept; D26 pinned);
+   candidate cards label prior requests by linked cycle (enrichment cache v5);
+   past-grant recency uses fiscal year and decision date only; unread
+   pass-through fields and unused selects removed.
+4. **Sandbox reads (owner-authorized, read-only, 2026-10-30):** link filter
+   counts D26 12 / D97 12 / D99 1; expand shape on list and single reads;
+   link-entity aggregate (also with a program condition, 6 = 6); the No-cycle
+   filter partitions linked and unlinked requests exactly.
+5. **Owner-attention items before merge** are listed in each PR body. The main
+   ones: Factory clones carry no link until step 5 (they show "No cycle" and
+   cycle-gated flows refuse them, except the Factory's own Pre-Site reader,
+   which derives the clone's cycle and Board date from its meeting date until
+   step 5); unlinked requests (about 140 older Research, Discretionary) leave
+   cycle views and cycle-gated flows; Overview D26 date shows Dec 10 (calendar)
+   instead of Dec 11; presentation invitation previews prepared in the 15
+   minutes before deploy go stale once; refusal copy now says "June or December
+   Grant Cycle".
 
 ## Session 649 Summary (Codex, 2026-10-29)
 
@@ -116,14 +112,16 @@ Session 649 handoff, exact: `git show 4d63eb048:SESSION_PROMPT.md`.
 
 **Claude workstream (J27 and cycle dates):**
 
-- **Build the meeting-date retirement, next step "cycle lookup and Research
-  screens"** (plan §5 build step 2): shared cycle helpers with explicit
-  restriction checks for `wmkf_grantcycle` (§5b item 1), expand support in
-  `grant-request.getById` (§5b item 2), Research filters, cycle lists and default
-  cycle, and the two bugs in §6. Own branch, focused tests, contract check,
-  Codex review; merge only with the owner's OK. Steps 3–6 follow in the plan's
-  order. Evidence: `docs/plans/MEETING_DATE_RETIREMENT_PLAN_2026-10-29.md` on
-  main (plan branch `77307fba6` merged directly as `8dd123543`, owner-approved).
+- **Owner review of PR #554, then PR #555.** Evidence: the two PRs (CI green,
+  Codex-clean). Merge #554 first; #555 retargets to `main` automatically only
+  if #554's branch is deleted on merge, otherwise retarget it by hand. Each PR
+  body lists its owner-attention items.
+- **Meeting-date retirement steps 4–6** (invitation closing and honoraria; Test
+  Request Factory; Dynamics Explorer, scripts and guard) in the plan's order,
+  each on its own branch with Codex review. **Not started; needs the owner's
+  go-ahead** (this session's authorization covered steps 2 and 3 only). Step 5
+  removes the Factory Pre-Site reader's meeting-date fallback
+  (`lib/services/test-requests/presite-sandbox-deps.js`).
 - **Remaining reviewer build:** Board setup reads the calendar (D47) and
   materials on acceptance with new wording (D46/D48), before Feb 24. Plan:
   `docs/plans/REVIEWER_INVITATION_CALENDAR_BUILD_PLAN_2026-10-29.md`. Other
@@ -141,6 +139,12 @@ Session 649 handoff, exact: `git show 4d63eb048:SESSION_PROMPT.md`.
 
 ### Owner Decision Needed
 
+- **Run the plan §8 count before deploying #555** (owner-run, read-only
+  Production): past Research grants with neither a fiscal year nor a decision
+  date. Such a grant stops Staff Deliberations writeup generation (fail closed,
+  as before #555), and the meeting date no longer counts as a date.
+- **Deploy timing for #554:** until step 5, new Factory clones have no Grant
+  Cycle link and show no cycle on converted screens.
 - None open for the prompt library; publication coordination with Connor was
   decided 2026-10-29 (recorded on the PR #553 branch).
 
@@ -158,8 +162,15 @@ Session 649 handoff, exact: `git show 4d63eb048:SESSION_PROMPT.md`.
   columns before implementation. Dataverse `queryRecords` clamps inventory
   queries to 100 rows; complete paging is a build requirement, not shipped here.
 - Preserve all unknown WIP. Untracked Impeccable critique in the prompt worktree
-  was intentionally left alone, per the previous handoff. No memory or root
-  instruction changes were needed.
+  was intentionally left alone, per the previous handoff.
+- **Owner's main checkout WIP (not this session's):** `.codex/hooks.json` and
+  `.github/hooks/impeccable.json` point at a newer Impeccable launcher
+  (likely a tool update); untracked `.impeccable/critique/…` and `output/`.
+  The owner has not said whether to commit them; left untouched.
+- **Worktree `/Users/gallivan/Code/WMKF_Apps-cycle-lookup`** holds both
+  meeting-date branches. It has a `node_modules` symlink and **a copy of
+  `.env.local` (gitignored)**; delete the worktree (`git worktree remove`) once
+  #554/#555 are merged so no credentials copy lingers.
 
 ## Concurrent Workstreams
 
@@ -167,14 +178,14 @@ Session 649 handoff, exact: `git show 4d63eb048:SESSION_PROMPT.md`.
 |---|---|
 | Codex / shared prompt library | PR #553, `codex/shared-prompt-library-plan`, `1187caf17`; publication route decided, unmerged |
 | Codex / prompt UI organization | PRs #545/#546/#548/#549 merged; no further UI work requested |
-| Claude / J27 alignment and cycle dates | PRs #551 and #552 deployed; meeting-date retirement plan on main (`8dd123543`; sandbox setup done, next: cycle lookup and Research screens); reviewer plan `docs/plans/REVIEWER_INVITATION_CALENDAR_BUILD_PLAN_2026-10-29.md`; decisions through D48 in `docs/plans/J27_ALIGNMENT_LOG_2026-10-24.md`; older carried items at `git show 006b87565:SESSION_PROMPT.md` |
+| Claude / J27 alignment and cycle dates | PRs #551 and #552 deployed; meeting-date retirement plan on main (`8dd123543`); step 2 PR #554 and step 3 PR #555 (stacked) open, unmerged; steps 4–6 not started; reviewer plan `docs/plans/REVIEWER_INVITATION_CALENDAR_BUILD_PLAN_2026-10-29.md`; decisions through D48 in `docs/plans/J27_ALIGNMENT_LOG_2026-10-24.md`; older carried items at `git show 006b87565:SESSION_PROMPT.md` |
 | Codex / Ranking | Prior handoff records PRs #536/#537 done; not reopened |
 | Codex / Board archival | Prior handoff records readiness done and rehearsal runtime on `codex/board-archive-rehearsal`; not revalidated here |
 | Claude / Research request corpus | Prior handoff records owner-gated; no new authorization |
 
 ## Constraints
 
-- Merge authorization is per PR. #553 remains open and unmerged.
+- Merge authorization is per PR. #553, #554 and #555 remain open and unmerged.
 - Production read permissions from this chat were task/session scoped; the next
   session must follow the owner's current access instructions. Production writes
   need separate explicit authorization and the normal interlocks.
@@ -182,10 +193,23 @@ Session 649 handoff, exact: `git show 4d63eb048:SESSION_PROMPT.md`.
   active Power Automate flow. No automatic execution is part of catalog editing.
 - Preserve the previous handoff's parked/destructive-work constraints. Review
   current queue/owning plans and live callers before any retirement or deletion.
-- Leave the user's main checkout untouched. The stop handoff used an isolated
-  docs-only checkout; the prompt planning branch is preserved.
+- Sandbox reads only were authorized for the meeting-date build this session;
+  sandbox writes and any Production access need fresh authorization.
 
 ## Verification and Closeout
+
+- **Claude (Session 651):**
+  - Session start: all 40 `check:*` gates and self-tests green on main.
+  - #554 and #555: full unit and integration suites (26,265 and 26,286 passed),
+    every `check:*` gate with sequential self-tests, lint clean; CI green on
+    both. `check:agent-invariants` and `check:agent-wiki` fail only inside the
+    worktree (per-machine links); both pass in the main checkout.
+  - Milestone: no DEVELOPMENT_LOG entry. Nothing shipped to Production; the
+    retirement build is in open PRs.
+  - Claim-evidence pilot: report found no eligible plan/design edit for this
+    session key; no row added.
+  - No CLAUDE.md change. Memory changes travel with the PR branches
+    (`akoya-temporal-axis-encodings.md`, `project-akoya-request-pd-fields.md`).
 
 - **Claude (Session 650):**
   - PR #552 final: focused tests 304 and the reviewer/email/cycle suites (9,412)
