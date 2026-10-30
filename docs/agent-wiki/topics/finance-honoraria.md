@@ -255,6 +255,22 @@ There are no orphan portal-era honoraria or mismatches. The 87 historical
 GoApply-origin honoraria remain outside this portal-link guarantee. Re-run
 `node scripts/probe-honorarium-link-population.js` before quoting a later count.
 
+### Honorarium Grant Cycle link (meeting-date retirement step 4; branch only)
+
+**[SOURCE-BUILT ON BRANCH `claude/invite-expiry-honorarium-cycle-link`; NOT
+DEPLOYED]** New honoraria join the parent proposal's Grant Cycle (owner,
+2026-10-29, `docs/plans/MEETING_DATE_RETIREMENT_PLAN_2026-10-29.md` §7 Q5). The
+orchestrator re-reads the parent's link at create time (`readParentGrantCycle`;
+the acceptance-job `request` snapshot no longer supplies a date, so jobs queued
+before deploy still resolve), binds `wmkf_GrantCycle`, and writes
+`wmkf_meetingdate` and `akoya_fiscalyear` ("December 2026") from the linked
+row's calendar Board date. A parent with no cycle (no link or a historical code)
+or no Board date throws `honorarium_no_grant_cycle`: the drain alerts
+(`honorarium_onboard_failed`) and retries, and the accept still succeeds, as
+with the old `honorarium_no_meeting_date`. Existing honoraria are unchanged; the
+app-made ones from 2026 carry no link (`docs/CONNOR_DATA_CLEANUP_QUESTIONS.md`
+DC5, parked).
+
 ## Standard Probe
 
 ```bash

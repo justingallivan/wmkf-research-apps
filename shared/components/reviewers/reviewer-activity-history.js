@@ -51,8 +51,9 @@
  * an event's provenance.
  *
  * Attribution is evidence-based rather than actor-name based. The reviewer DTO
- * carries the token-revocation marker and the trusted request meeting date: a
- * revoked row, missing meeting date, or pre-meeting stamp is staff-recorded;
+ * carries the token-revocation marker and, as `meetingDate`, the trusted linked
+ * cycle's calendar Board date (the date the stale-invite sweep closes on): a
+ * revoked row, missing date, or pre-meeting stamp is staff-recorded;
  * only a dated post-meeting stamp on a non-revoked row is an automated close.
  */
 

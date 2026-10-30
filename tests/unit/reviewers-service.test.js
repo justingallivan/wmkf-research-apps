@@ -36,9 +36,16 @@ const getRequestById = jest.fn();
 // restriction context the adapter-mocked service never establishes.
 jest.mock('../../lib/dataverse/adapters/operations-grant-cycle', () => ({
   linkedCycleExpand: () => 'wmkf_GrantCycle($select=wmkf_cyclecode)',
+  linkedCycleBoardDateExpand: () => 'wmkf_GrantCycle($select=wmkf_cyclecode,wmkf_meetingdate)',
   linkedCycleCode: (row) => {
     const code = row?.wmkf_GrantCycle?.wmkf_cyclecode;
     return typeof code === 'string' && /^[JD]\d{2}$/.test(code) ? code : null;
+  },
+  linkedCycleBoardDate: (row) => {
+    const cycle = row?.wmkf_GrantCycle;
+    return typeof cycle?.wmkf_cyclecode === 'string' && /^[JD]\d{2}$/.test(cycle.wmkf_cyclecode)
+      && typeof cycle.wmkf_meetingdate === 'string' && cycle.wmkf_meetingdate.trim() !== ''
+      ? cycle.wmkf_meetingdate : null;
   },
 }));
 jest.mock('../../lib/dataverse/adapters/grant-request', () => ({
@@ -352,7 +359,9 @@ describe('getReviewers', () => {
       _wmkf_grantprogram_value: '11111111-1111-4111-8111-111111111111',
       akoya_requestnum: 'R-1001',
       akoya_title: 'T',
-      wmkf_meetingdate: '2026-09-10T00:00:00Z',
+      // The no-response attribution date is the linked cycle's Board date.
+      wmkf_meetingdate: '2026-09-11T00:00:00Z',
+      wmkf_GrantCycle: { wmkf_cyclecode: 'D26', wmkf_meetingdate: '2026-09-10T00:00:00Z' },
       wmkf_reviewduedate: '2026-09-09',
     });
     findByRequest.mockResolvedValueOnce([
@@ -571,7 +580,7 @@ describe('getReviewers', () => {
     const out = await getReviewers({ proposalId: REQ, azureEmail: 'pd@wmkeck.org' });
 
     expect(getRequestById).toHaveBeenCalledWith(REQ, expect.objectContaining({
-      expand: 'wmkf_GrantCycle($select=wmkf_cyclecode)',
+      expand: 'wmkf_GrantCycle($select=wmkf_cyclecode,wmkf_meetingdate)',
     }));
     expect(out.proposals[0]).toMatchObject({ grantCycleCode: code, cycleLabel: label });
   });
