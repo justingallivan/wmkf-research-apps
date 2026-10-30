@@ -37,7 +37,7 @@ async function main() {
   const grantRequestAdapter = await import('../lib/dataverse/adapters/grant-request.js');
   const siteVisitAdapter = await import('../lib/dataverse/adapters/site-visit.js');
   const { withDalContext } = await import('../lib/dataverse/core/context.js');
-  const { cycleCodeToOdataFilter } = await import('../lib/utils/cycle-code.js');
+  const { linkedCycleFilter } = await import('../lib/dataverse/adapters/operations-grant-cycle.js');
   const { buildVisibilityFilter } = await import('../shared/config/workbenchVisibility.js');
   const { readScheduledPreparationStateStatusPairs } = await import('../shared/config/siteVisit.js');
   const { withTestRequestIsolationSelect, withOrdinaryTestRequestODataFilter } = await import('../lib/services/test-requests/isolation.js');
@@ -55,12 +55,12 @@ async function main() {
 
   const scanCycle = async (cycleCode) => {
     const filter = withOrdinaryTestRequestODataFilter(
-      [cycleCodeToOdataFilter(cycleCode), buildVisibilityFilter(false)].map((c) => `(${c})`).join(' and '),
+      [linkedCycleFilter(cycleCode), buildVisibilityFilter(false)].map((c) => `(${c})`).join(' and '),
       isolationEnv,
     );
     const result = await grantRequestAdapter.queryAllRequests({
       select: withTestRequestIsolationSelect([
-        'akoya_requestid', 'akoya_requestnum', 'akoya_requeststatus', 'wmkf_meetingdate',
+        'akoya_requestid', 'akoya_requestnum', 'akoya_requeststatus',
         '_wmkf_grantprogram_value', '_wmkf_currentpresitevisit_value',
       ], isolationEnv),
       filter,

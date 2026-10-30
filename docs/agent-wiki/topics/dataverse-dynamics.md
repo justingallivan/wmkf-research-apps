@@ -145,9 +145,23 @@ fields, and sandbox/prod assumptions. The Atlas adjudicates live data state.
   link. Before reusing such a script, or quoting its old output as current,
   check which source it uses: `rg -n "wmkf_meetingdate|meetingDateToCycleCode|cycleCodeToOdataFilter" scripts`.
   `scripts/probe-request-grant-cycle-lookup.cjs` compares link and date on
-  purpose. Coverage numbers: the plan's §7 Q1.
-- **Factory test requests and the Grant Cycle link (step 5, branch
-  `claude/factory-grant-cycle-link`, 2026-10-30; not merged).** A clone is in a
+  purpose. Coverage numbers: the plan's §7 Q1. Step 6 (branch
+  `claude/meeting-date-guard-explorer-scripts`, not merged) moved the
+  current-use scripts to the link: Staff Deliberations drafts
+  (`generate-pre-site-drafts-cycle.mjs`) and preflight
+  (`probe-pre-site-generation-preflight.mjs`), the deliberations cohort review,
+  the Proposal Ranking access script (its roster hash now carries the linked
+  code), the reminder-liveness audit and the honorarium backfill (cycle requests
+  by link, then their suggestions by request id). The My Candidates and My
+  Proposals smoke scripts move with those services.
+- **App code may not add request meeting-date reads
+  (`check:request-meeting-date-reads`, step 6, not merged).** The gate records
+  every `lib/`, `pages/`, `shared/` file that mentions `wmkf_meetingdate` or
+  calls the old helpers, with its count; a new file or a higher count fails,
+  and a lower count fails until the record is lowered. Readers still to convert
+  are kind `pending-reader`; remove each record as its reader converts.
+- **Factory test requests and the Grant Cycle link (step 5, PR #556, deployed
+  2026-10-30).** A clone is in a
   cycle only if the Factory bound `wmkf_GrantCycle` when it created it: the
   admin form's operator picks a row from the destination calendar (Production:
   real cycles only; sandbox: J26/D26/J27 plus test rows D97/D99), and the clone

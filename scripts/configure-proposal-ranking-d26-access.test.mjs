@@ -48,7 +48,7 @@ test('roster fingerprint binds request identities, participant mappings, and fac
   const requests = [{
     akoya_requestid: 'request-guid',
     akoya_requestnum: '1001000',
-    wmkf_meetingdate: '2026-12-01T00:00:00Z',
+    wmkf_GrantCycle: { wmkf_cyclecode: 'D26' },
     _akoya_programid_value: 'program-guid',
     _wmkf_programdirector_value: 'user-guid',
   }];

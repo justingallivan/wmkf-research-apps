@@ -42,7 +42,7 @@ if (process.env.DATAVERSE_ALLOW_PROD_READS !== 'yes') {
 const { DynamicsService } = await import('../lib/services/dynamics-service.js');
 const { enterDynamicsBypassForScript } = await import('../lib/services/dynamics-context.js');
 const { withDalContext } = await import('../lib/dataverse/core/context.js');
-const { cycleCodeToOdataFilter } = await import('../lib/utils/cycle-code.js');
+const { linkedCycleFilter } = await import('../lib/dataverse/adapters/operations-grant-cycle.js');
 const { buildVisibilityFilter } = await import('../shared/config/workbenchVisibility.js');
 const { getPreSiteVisitArtifactStatus } = await import('../lib/services/pre-site-visit/artifact-service.js');
 const { loadPreSiteVisitInputs } = await import('../lib/services/pre-site-visit/proposal-core-service.js');
@@ -54,8 +54,9 @@ const LIFECYCLE = Object.fromEntries(Object.entries(REQUEST_DOCUMENT_LIFECYCLE_S
 const OPERATION = Object.fromEntries(Object.entries(REQUEST_DOCUMENT_OPERATION_STATUS).map(([k, v]) => [v, k]));
 
 async function main() {
-  const cycleFilter = cycleCodeToOdataFilter(cycle);
-  if (!cycleFilter) throw new Error(`Unknown cycle code ${cycle}`);
+  // The requests linked to this Grant Cycle (meeting-date retirement step 6);
+  // throws on a non-J/D code.
+  const cycleFilter = linkedCycleFilter(cycle);
   const { records } = await DynamicsService.queryAllRecords('akoya_requests', {
     select: 'akoya_requestid,akoya_requestnum,wmkf_triagestatus,akoya_requeststatus,_wmkf_programdirector_value',
     filter: `${cycleFilter} and ${buildVisibilityFilter(false)}`,

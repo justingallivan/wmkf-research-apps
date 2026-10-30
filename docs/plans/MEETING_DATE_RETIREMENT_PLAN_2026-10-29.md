@@ -3,7 +3,7 @@ title: Stop reading the request meeting date — inventory and plan
 domain: cycles
 kind: plan
 status: draft
-summary: "Owner, 2026-10-29: no app reads akoya_request.wmkf_meetingdate; a request's cycle comes from its Grant Cycle link (wmkf_grantcycle) and cycle dates from that linked calendar row, with no meeting-date fallback. Whole-repo inventory (106 runtime files, 69 scripts, plus indirect readers through helpers), grouped by what each read is for, the behavior changes, two existing bugs found, a central-helper strategy, and the owner decisions. Built: PR #552 (reviewer email path), steps 1-3 (sandbox rows; PRs #554 and #555 deployed 2026-10-30); step 5 (Test Request Factory; PR #556 deployed 2026-10-30); step 4 (invitation closing and honoraria) on branch claude/invite-expiry-honorarium-cycle-link, not merged."
+summary: "Owner, 2026-10-29: no app reads akoya_request.wmkf_meetingdate; a request's cycle comes from its Grant Cycle link (wmkf_grantcycle) and cycle dates from that linked calendar row, with no meeting-date fallback. Whole-repo inventory (106 runtime files, 69 scripts, plus indirect readers through helpers), grouped by what each read is for, the behavior changes, two existing bugs found, a central-helper strategy, and the owner decisions. Built: PR #552 (reviewer email path), steps 1-3 (sandbox rows; PRs #554 and #555 deployed 2026-10-30); step 5 (Test Request Factory; PR #556 deployed 2026-10-30); step 4 (invitation closing and honoraria) on branch claude/invite-expiry-honorarium-cycle-link (PR #557), not merged; step 6 (Dynamics Explorer, current-use scripts, ratchet gate) stacked on it, not merged; 28 app readers remain, recorded by the gate for follow-up PRs."
 canonical: false
 owner: product-engineering
 related:
@@ -185,14 +185,15 @@ ledger migration and an unchanged bundle; the create-body digest changes.*
 
 `shared/config/prompts/dynamics-explorer.js:55,541,648` teaches the model to
 slice by `wmkf_meetingdate`; `dynamics-explorer/tools/get-entity.js:31` selects it
-(§7 Q8).
+(§7 Q8). **[Built in step 6, branch only]**
 
 ### 3.9 Scripts
 
 Operator scripts that use the helpers (backfills, pre-site drafts, ranking
 access, smoke tests) follow the helper change. One-off probes and historical
 backfills stay as written; `probe-request-grant-cycle-lookup.cjs` compares link
-and date on purpose and stays.
+and date on purpose and stays. **[Current-use scripts built in step 6,
+branch only]**
 
 ## 4. Behavior changes to expect
 
@@ -319,6 +320,40 @@ a contract check and a Codex review; none merges without the owner.
    that rewrites the meeting date on create also touches the link (readback
    reports "grant cycle mismatch" if so).
 6. **Dynamics Explorer, scripts and the guard check** (§3.8–3.9) as decided.
+   **[BUILT on branch `claude/meeting-date-guard-explorer-scripts`, stacked on
+   step 4; not merged, no Dataverse read or write]**
+   - **Scope found larger than planned (2026-10-30).** The inventory at build
+     time found about 30 app readers still selecting, sorting by or passing on
+     the request meeting date (beyond the Factory, the honorarium write, the
+     calendar column and the Explorer). Owner, 2026-10-30: build the guard as a
+     ratchet now and convert the readers in follow-up PRs.
+   - **Dynamics Explorer** (`shared/config/prompts/dynamics-explorer.js`,
+     `tools/get-entity.js`): the prompt documents the `wmkf_grantcycle` table
+     and the request's `_wmkf_grantcycle_value` link, tells the model a cycle is
+     the link (navigation filter or `$expand`), falls back to the request
+     meeting date only when the link is blank and says so in the answer, and
+     takes Board-meeting dates from the calendar. `get_entity` returns the link
+     instead of the meeting date. PR #553 touches neither file.
+   - **Scripts** (§7 Q8d) now use the link: Staff Deliberations drafts and
+     preflight, the deliberations cohort review, the Proposal Ranking access
+     script (roster hash carries the linked code), the reminder-liveness audit
+     (meeting date dropped from its read), and the honorarium backfill (the
+     cycle's requests by link, then their suggestions by request id; a
+     two-level navigation filter was not assumed to work). The My Candidates and
+     My Proposals smoke scripts move with those services.
+   - **Gate** `check:request-meeting-date-reads` (+ self-test, recorded-set
+     pin test, CI, `/start`): per-file counts of `wmkf_meetingdate` mentions and
+     old-helper calls under `lib/`, `pages/`, `shared/` must match the recorded
+     map; new files or higher counts fail, lower counts fail until the record is
+     lowered. 44 files recorded on 2026-10-30, 28 of kind `pending-reader`; the
+     rest are the calendar column, the honorarium write, the Factory, the
+     helpers' definition, the Explorer fallback and the Bulk Export column
+     (§7 Q8c).
+   - **Remaining, follow-up PRs:** the 28 pending readers (unused selects,
+     including ones inside fingerprinted snapshots that need care; five
+     meeting-date sorts that need a new order; values passed to screens).
+     Whether Dataverse can sort requests by the linked cycle's Board date is
+     unverified.
 
 ## 5a. Contract check (2026-10-29, `/contract-reconcile` review mode)
 

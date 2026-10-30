@@ -17,6 +17,7 @@ import {
   TERMINAL_NON_AWARD_STATUSES,
   PER_PROGRAM_ANNOTATION,
 } from '../../../lib/services/dataverse-export/constants.js';
+import { CYCLE_CALENDAR_BOARD_DATE, CYCLE_CALENDAR_DATE_COLUMNS } from '../cycleCalendar.js';
 
 /**
  * Annotated schema: per-table field metadata, types, semantic descriptions,
@@ -52,7 +53,8 @@ export const TABLE_ANNOTATIONS = {
       akoya_recommendedamount: 'currency — staff-recommended grant amount',
       wmkf_invitedamount: 'currency — invited amount for Phase II',
       // Dates
-      wmkf_meetingdate: 'datetime — board meeting date',
+      _wmkf_grantcycle_value: "lookup → wmkf_grantcycle — the request's Grant Cycle (code like D26 = December 2026, J27 = June 2027); a request's cycle is this link. Filter: wmkf_GrantCycle/wmkf_cyclecode eq 'D26'. Read the code: $expand=wmkf_GrantCycle($select=wmkf_cyclecode)",
+      wmkf_meetingdate: 'datetime — meeting date stored on the request; NOT its cycle. Use only when _wmkf_grantcycle_value is blank, and say so in the answer',
       akoya_decisiondate: 'datetime — board decision date',
       akoya_begindate: 'datetime — grant start / begin date',
       akoya_enddate: 'datetime — grant end date',
@@ -280,6 +282,18 @@ export const TABLE_ANNOTATIONS = {
       wmkf_organizationname: 'string — organization',
       wmkf_areaofexpertise: 'string — area of expertise',
       wmkf_potentialreviewersid: 'guid — primary key',
+    },
+    rules: [],
+  },
+  wmkf_grantcycle: {
+    description: 'Grant Cycle calendar: one row per cycle. Modern codes are J or D plus two digits (J27 = June 2027, D26 = December 2026); older rows use historical codes. Requests link here through _wmkf_grantcycle_value. Board meeting and other cycle dates come from this table, not from requests.',
+    entitySet: 'wmkf_grantcycles',
+    fields: {
+      wmkf_cyclecode: 'string — cycle code (J27, D26; older rows historical)',
+      wmkf_name: 'string — cycle name',
+      [CYCLE_CALENDAR_BOARD_DATE.column]: `date — ${CYCLE_CALENDAR_BOARD_DATE.label}`,
+      ...Object.fromEntries(CYCLE_CALENDAR_DATE_COLUMNS.map(({ column, label }) => [column, `date — ${label} (often blank)`])),
+      wmkf_grantcycleid: 'guid — primary key',
     },
     rules: [],
   },
@@ -538,7 +552,8 @@ function buildDomainGuardrails() {
   return `DOMAIN GUARDRAILS (probe-verified — trust over surface guesses):
 - CONTACT ROLES, do not conflate: the institution's Primary Contact (account _primarycontactid_value) is its FOUNDATION LIAISON / grant steward (the President's office for large gifts) and, for Research programs, the Liaison of record. The Request's _akoya_primarycontactid_value ("Request Primary Contact (copy)") is the Primary Contact copied onto that Request; it can be stale, so for Research never present it as the current Liaison. A Primary Contact (either one) is NOT the principal investigator. The PI is _wmkf_projectleader_value. _wmkf_researchleader_value is the institution's senior research officer (e.g. VP for Research), also NOT the PI. Never present the primary contact (or research leader) as the researcher/PI.
 - PI IS PROGRAM-CONDITIONAL: _wmkf_projectleader_value (the PI) is populated almost only for research programs (${piBearing.join(', ')}); non-research/discretionary grants have no PI concept and leave it empty. A null project leader on a non-research grant means "no PI for this grant type" — NOT missing data. Do not confabulate "no PI found" or read an empty PI as the researcher being absent.
-- createdon IS NOT A BUSINESS DATE: ${ERA_CUTOVER_DATE} is a one-time bulk data-migration date (~22.5K rows imported that day), not a business event. NEVER slice business history ("grants over time", "since when") on createdon — use akoya_decisiondate, akoya_submitdate, wmkf_meetingdate, or akoya_loireceived. createdon is record-creation provenance only.
+- createdon IS NOT A BUSINESS DATE: ${ERA_CUTOVER_DATE} is a one-time bulk data-migration date (~22.5K rows imported that day), not a business event. NEVER slice business history ("grants over time", "since when") on createdon — use akoya_decisiondate, akoya_submitdate, the Grant Cycle link, or akoya_loireceived. createdon is record-creation provenance only.
+- CYCLES COME FROM THE LINK: a request's cycle ("D26", "the June 2027 cycle") is its Grant Cycle link: filter wmkf_GrantCycle/wmkf_cyclecode eq 'D26', or $expand=wmkf_GrantCycle($select=wmkf_cyclecode). Only when the link is blank, fall back to the request's wmkf_meetingdate (June/December month and year) and say in the answer that those requests have no Grant Cycle link and were placed by meeting date. Board meeting and other cycle dates come from wmkf_grantcycle, not from requests.
 - STATUS CLASSES: terminal NO-AWARD statuses (declines, ineligibilities, and equivalents) are exactly [${TERMINAL_NON_AWARD_STATUSES.join(', ')}]. "Active"/"Approved"/"Closed" are decided AWARDS. The "Pending" family ("Phase I Pending", "Phase II Pending", "Concept Pending", "Pending") is undecided/in-flight. Use these sets for "declined"/"awarded"/"in progress" questions instead of guessing status strings.`;
 }
 
@@ -645,7 +660,8 @@ Dates:
 - "Phase I submitted"/"LOI date" → akoya_loireceived
 - "Phase II submitted"/"submitted" → akoya_submitdate
 - "concept call" → wmkf_conceptcalldate
-- "board meeting" → wmkf_meetingdate
+- "board meeting" → the cycle's Board Meeting Date: wmkf_grantcycle.wmkf_meetingdate for the request's linked cycle (request wmkf_meetingdate only when the link is blank; say so)
+- "cycle"/"D26"/"June 2027 cycle" → Grant Cycle link (wmkf_GrantCycle/wmkf_cyclecode)
 - "decision date" → akoya_decisiondate
 - "grant start"/"begin date" → akoya_begindate
 - "grant end"/"end date" → akoya_enddate
@@ -677,6 +693,7 @@ email (5,000+) email activities
 annotation (5,000+) notes/attachments
 wmkf_potentialreviewers (3,184) reviewers
 systemuser (215) Keck staff — linked to requests via program director/coordinator
+wmkf_grantcycle (143) Grant Cycle calendar — a request's cycle and the cycle's dates (Board meeting)
 Lookup: wmkf_grantprogram(11), wmkf_type(8), wmkf_bbstatus(88), wmkf_donors(116), wmkf_supporttype(41), wmkf_programlevel2(29), akoya_program(24), akoya_phase(62), akoya_goapplystatustracking(3,407), activitypointer(5,000+)
 
 DOCUMENTS: Proposal documents (PDFs, concept papers, bios) are stored in SharePoint, linked to CRM requests.

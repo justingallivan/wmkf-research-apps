@@ -82,7 +82,7 @@ async function main() {
   const requestById = {};
   for (const requestId of requestIds) {
     const response = await client.get(
-      `/akoya_requests(${requestId})?$select=akoya_requestid,akoya_requestnum,wmkf_meetingdate,wmkf_reviewduedate&$expand=wmkf_GrantCycle($select=wmkf_cyclecode)`,
+      `/akoya_requests(${requestId})?$select=akoya_requestid,akoya_requestnum,wmkf_reviewduedate&$expand=wmkf_GrantCycle($select=wmkf_cyclecode)`,
     );
     if (response.ok && response.body?.akoya_requestid) {
       requestById[requestId] = response.body;

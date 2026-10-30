@@ -11,7 +11,7 @@
  * so once the pipeline is built this script mints the missing records for them.
  *
  * SCOPE — a cycle is REQUIRED (`--cycle J26`). The backfill only touches reviewers
- * whose proposal's meeting date falls in that cycle, so it can never sweep in
+ * whose proposal links to that Grant Cycle, so it can never sweep in
  * reviewers who accepted in an unrelated/older cycle and mint unintended payments
  * (Codex S274 P1). The opt-out predicate uses the `eq null or ne true` form so the
  * common null-means-not-opted-out rows are INCLUDED, not silently dropped (Dataverse
@@ -107,7 +107,7 @@ const SUGGESTION_SELECT = [
 // produces the same "Reviewer honorarium — <proposal title> (#num)" it does in the
 // portal path; the live token verifier (lib/external/verify-suggestion-token.js)
 // selects it too. Without it, backfilled honoraria fall back to a generic title.
-const REQUEST_SELECT = ['akoya_requestid', 'akoya_requestnum', 'akoya_title', 'wmkf_meetingdate'].join(',');
+const REQUEST_SELECT = ['akoya_requestid', 'akoya_requestnum', 'akoya_title'].join(',');
 const REVIEWER_SELECT = [
   'wmkf_potentialreviewersid', 'wmkf_name', 'wmkf_emailaddress',
   'wmkf_firstname', 'wmkf_lastname', 'wmkf_orcid', 'wmkf_identitystatus',
@@ -124,14 +124,15 @@ const { enterDynamicsBypassForScript } = await import('../lib/services/dynamics-
 const { ensureHonorariumOnboarding } = await import('../lib/bill/honorarium-onboard-orchestrator.js');
 const { honorariumDiscriminatorsConfigured } = await import('../lib/bill/honorarium-discriminators.js');
 const { notExcludedFilter } = await import('../lib/dataverse/adapters/reviewer-suggestion.js');
-const { cycleCodeToOdataFilter, cycleCodeToLabel } = await import('../lib/utils/cycle-code.js');
+const { cycleCodeToLabel } = await import('../lib/utils/cycle-code.js');
+const { linkedCycleFilter } = await import('../lib/dataverse/adapters/operations-grant-cycle.js');
+const { CYCLE_CODE_PATTERN } = await import('../shared/config/cycleCalendar.js');
 const { missingRequiredAddressFields, validateAddress } = await import('../lib/external/required-address.js');
 
-// Scope the backfill to one cycle by filtering on the suggestion's request
-// meeting date (single-valued nav property). Validated up front — an unparseable
-// cycle yields null and we refuse to run.
-const CYCLE_FILTER = cycleCodeToOdataFilter(CYCLE, 'wmkf_Request/wmkf_meetingdate');
-if (!CYCLE_FILTER) {
+// Scope the backfill to one cycle: the requests linked to that Grant Cycle
+// (meeting-date retirement step 6), then their suggestions by request id.
+// Validated up front — an invalid cycle code refuses to run.
+if (!CYCLE_CODE_PATTERN.test(CYCLE || '')) {
   console.error(`--cycle '${CYCLE}' is not a valid cycle code (expected J## or D##, e.g. J26).`);
   process.exit(2);
 }
@@ -188,8 +189,16 @@ async function main() {
   // the field is null — a bare `ne true` would silently drop the common
   // null-means-not-opted-out reviewers (Codex S274 P2; same trap notExcludedFilter
   // documents).
-  const filter = [
-    `(${CYCLE_FILTER})`,
+  const cycleRequests = await DynamicsService.queryAllRecords('akoya_requests', {
+    select: 'akoya_requestid',
+    filter: linkedCycleFilter(CYCLE),
+  });
+  if (cycleRequests.capped || cycleRequests.hasMore) {
+    console.error(`Request scan for ${CYCLE} was capped; refusing to run on a partial cycle.`);
+    process.exit(1);
+  }
+  const requestIds = cycleRequests.records.map((r) => r.akoya_requestid).filter(Boolean);
+  const eligibility = [
     'wmkf_accepted eq true',
     '(wmkf_honorariumoptout eq null or wmkf_honorariumoptout ne true)',
     '_wmkf_honorariumrequest_value eq null',
@@ -197,10 +206,15 @@ async function main() {
     notExcludedFilter(),
   ].join(' and ');
 
-  const { records: candidates } = await DynamicsService.queryAllRecords(ENTITY_SET, {
-    select: SUGGESTION_SELECT,
-    filter,
-  });
+  const candidates = [];
+  for (let i = 0; i < requestIds.length; i += 25) {
+    const byRequest = requestIds.slice(i, i + 25).map((id) => `_wmkf_request_value eq ${id}`).join(' or ');
+    const { records } = await DynamicsService.queryAllRecords(ENTITY_SET, {
+      select: SUGGESTION_SELECT,
+      filter: `(${byRequest}) and ${eligibility}`,
+    });
+    candidates.push(...records);
+  }
 
   console.log(`Eligible (accepted, not opted out, no honorarium linked): ${candidates.length}\n`);
   if (candidates.length === 0) {
