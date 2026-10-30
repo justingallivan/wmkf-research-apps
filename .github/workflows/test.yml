@@ -86,6 +86,8 @@ jobs:
       - run: npm run check:reviewer-engagement-boundary:self-test
       - run: npm run check:script-suggestion-writers
       - run: npm run check:script-suggestion-writers:self-test
+      - run: npm run check:request-meeting-date-reads
+      - run: npm run check:request-meeting-date-reads:self-test
       - run: npm run check:route-lifecycle-auth
       - run: npm run check:route-lifecycle-auth:self-test
       - run: npm run check:secret-scan

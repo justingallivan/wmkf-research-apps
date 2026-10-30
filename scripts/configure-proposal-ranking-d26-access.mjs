@@ -27,7 +27,7 @@ const PAGE_LIMIT = 100;
 const GUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const LINKED_CYCLE_EXPAND = 'wmkf_GrantCycle($select=wmkf_cyclecode)';
 const REQUEST_SELECT = [
-  'akoya_requestid', 'akoya_requestnum', 'wmkf_meetingdate', 'akoya_requeststatus',
+  'akoya_requestid', 'akoya_requestnum', 'akoya_requeststatus',
   'wmkf_istestrequest', 'wmkf_testcreationrunid', '_akoya_programid_value',
   '_wmkf_programdirector_value',
 ].join(',');
@@ -133,7 +133,7 @@ export function rosterFingerprint(rows, participants, facilitator) {
   const canonical = rows.map((row) => [
     String(row.akoya_requestid || '').toLowerCase(),
     String(row.akoya_requestnum || ''),
-    String(row.wmkf_meetingdate || ''),
+    String(row.wmkf_GrantCycle?.wmkf_cyclecode || ''),
     String(row._akoya_programid_value || '').toLowerCase(),
     String(row._wmkf_programdirector_value || '').toLowerCase(),
   ]).sort((a, b) => JSON.stringify(a).localeCompare(JSON.stringify(b)));

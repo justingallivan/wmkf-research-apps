@@ -62,7 +62,7 @@ if (EXECUTE && !process.env.DATAVERSE_PROD_WRITE_ACK) {
 const { DynamicsService } = await import('../lib/services/dynamics-service.js');
 const { enterDynamicsBypassForScript } = await import('../lib/services/dynamics-context.js');
 const { withDalContext } = await import('../lib/dataverse/core/context.js');
-const { cycleCodeToOdataFilter } = await import('../lib/utils/cycle-code.js');
+const { linkedCycleFilter } = await import('../lib/dataverse/adapters/operations-grant-cycle.js');
 const { buildVisibilityFilter } = await import('../shared/config/workbenchVisibility.js');
 const { generatePreSiteVisitArtifact, getPreSiteVisitArtifactStatus } = await import('../lib/services/pre-site-visit/artifact-service.js');
 const { REQUEST_DOCUMENT_LIFECYCLE_STATE, REQUEST_DOCUMENT_OPERATION_STATUS } = await import('../shared/config/requestDocument.js');
@@ -84,8 +84,9 @@ function describe(artifact) {
 }
 
 async function main() {
-  const cycleFilter = cycleCodeToOdataFilter(cycle);
-  if (!cycleFilter) throw new Error(`Unknown cycle code ${cycle}`);
+  // The requests linked to this Grant Cycle (meeting-date retirement step 6);
+  // throws on a non-J/D code.
+  const cycleFilter = linkedCycleFilter(cycle);
   const { records } = await DynamicsService.queryAllRecords('akoya_requests', {
     select: 'akoya_requestid,akoya_requestnum',
     filter: `${cycleFilter} and ${buildVisibilityFilter(false)}`,

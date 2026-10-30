@@ -116,6 +116,7 @@ npm run check:route-lifecycle-auth && npm run check:route-lifecycle-auth:self-te
 npm run check:route-service-boundary && npm run check:route-service-boundary:self-test # pages/api routes reaching Dataverse adapters/dynamics-service directly (LAW mode since Route→Service Stage 7; no baseline)
 npm run check:reviewer-engagement-boundary && npm run check:reviewer-engagement-boundary:self-test # lib/pages/shared/modules binding a reviewer-suggestion generic writer outside reviewer-engagement/ (LAW mode since Reviewer Lifecycle Stage 7; recorded-importer map: stale entries fail, growth requires a deliberate edit to tests/unit/reviewer-engagement-boundary-recorded-set.test.js)
 npm run check:script-suggestion-writers && npm run check:script-suggestion-writers:self-test # scripts/ files writing wmkf_appreviewersuggestions outside adapter named ops must be in the tracked RECORDED_SCRIPT_WRITERS set (D5; growth pinned by tests/unit/script-suggestion-writers-recorded-set.test.js)
+npm run check:request-meeting-date-reads && npm run check:request-meeting-date-reads:self-test # no new akoya_request meeting-date reads or meeting-date helper calls in lib/pages/shared (ratchet; recorded set pinned by tests/unit/request-meeting-date-reads-recorded-set.test.js)
 npm run check:request-document-writers && npm run check:request-document-writers:self-test # request-document writer boundaries
 npm run check:secret-scan && npm run check:secret-scan:self-test              # no real secret-shaped values in tracked files (GHAS-free push protection)
 npm run check:scaffolding-tokens && npm run check:scaffolding-tokens:self-test  # no leaked tool-call scaffolding tags (bare-line </content>/</invoke>/antml:*) in tracked files
@@ -128,7 +129,7 @@ npm run check:memory-health                                                    #
 npm run check:types                                                            # type check over the repo (no self-test)
 ```
 
-**This list is the full set as of 2026-10-04. Before running, `grep '"check:' package.json` — if a `check:*` script exists that is NOT above (and is not a `:self-test` of one already listed), run it too and add it here.** That keeps the list from silently going stale as gates are added. Skip silently only if NONE of these scripts is defined (not every project has them); do not skip a gate that IS defined.
+**This list is the full set as of 2026-10-30. Before running, `grep '"check:' package.json` — if a `check:*` script exists that is NOT above (and is not a `:self-test` of one already listed), run it too and add it here.** That keeps the list from silently going stale as gates are added. Skip silently only if NONE of these scripts is defined (not every project has them); do not skip a gate that IS defined.
 
 **Router notice:** if `check:memory-router` prints the routine-audit notice
 (router at/over the 8 KiB trigger), surface it in the Step 4 summary and
