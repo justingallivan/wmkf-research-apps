@@ -577,6 +577,18 @@ strict parent-library check covers that case. Writing into request folders
 goes through the governed SharePoint path (target registry, interlock) and
 needs its own design before it is built.
 
+## Meeting-date reads (owner, 2026-10-29)
+
+The apps are moving off `akoya_request.wmkf_meetingdate`
+(`docs/plans/MEETING_DATE_RETIREMENT_PLAN_2026-10-29.md`). The corpus is left
+out of that migration (owner decision 8b): it is offline, rebuildable and not an
+app screen. When corpus work resumes, move it off the meeting date: choose the
+population and era by the fiscal-year label's year, and the single-phase era 4
+by the Grant Cycle link (J27 or later). Research link coverage in the active
+meeting years (2018 on) is 97–100% (read-only counts, 2026-10-29); the 46
+Research requests with no meeting date (decision 4) are also in
+`docs/CONNOR_DATA_CLEANUP_QUESTIONS.md` DC4.
+
 ## Not in scope
 
 Renaming, moving, deleting or re-permissioning any existing SharePoint file; changing

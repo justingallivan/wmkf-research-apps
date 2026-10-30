@@ -9,6 +9,12 @@ their historical `.env.local` parser and client-credentials token request from
 parser behavior; each probe keeps its own Dataverse GET, pagination, error, and
 reporting behavior.
 
+Some finished one-off scripts and probes find a request's cycle from its
+meeting date (`wmkf_meetingdate`), which the apps no longer use for that. Their
+results can differ from the apps'; see "Scripts that find a request's cycle
+from its meeting date" in `docs/agent-wiki/topics/dataverse-dynamics.md`
+before reusing one.
+
 ## Database Setup & Migrations
 
 | Script | Description |

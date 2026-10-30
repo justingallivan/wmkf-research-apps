@@ -130,6 +130,22 @@ fields, and sandbox/prod assumptions. The Atlas adjudicates live data state.
 
 ## Operating Notes
 
+- **Scripts that find a request's cycle from its meeting date may be out of
+  date (owner, 2026-10-29).** The apps are moving to read a request's cycle
+  only from its Grant Cycle link (`akoya_request.wmkf_grantcycle`) and cycle
+  dates from that linked calendar row, with no meeting-date fallback
+  (`docs/plans/MEETING_DATE_RETIREMENT_PLAN_2026-10-29.md`; status there).
+  Scripts still in use move with the app code. Finished one-offs and probes
+  are left as written, as a record of what was run, so they may still derive
+  cycles from `wmkf_meetingdate` (`meetingDateToCycleCode`,
+  `cycleCodeToOdataFilter`, or their own month logic). For those, cycle
+  membership can differ from the apps': the link places requests the
+  meeting date cannot (off-month dates, e.g. July 2017 → J18), and about 140
+  older Research requests (mostly 2010–2014) have a June/December date but no
+  link. Before reusing such a script, or quoting its old output as current,
+  check which source it uses: `rg -n "wmkf_meetingdate|meetingDateToCycleCode|cycleCodeToOdataFilter" scripts`.
+  `scripts/probe-request-grant-cycle-lookup.cjs` compares link and date on
+  purpose. Coverage numbers: the plan's §7 Q1.
 - **Audit history and the operations Grant Cycle table (2026-10-28, D43 cycle
   calendar).** For downstream apps reading who changed a record:
   `RetrieveRecordChangeHistory` (per record, GET) is the only audit read open

@@ -324,8 +324,33 @@ Proposed PRs, each with focused tests and a Codex review:
    chosen cycle in the run plan). Production adds `wmkf_grantcycles` to the write
    fence's `REQUEST_BIND_SETS` as a reviewed change. Prerequisite: confirm the
    sandbox has matching Grant Cycle rows (sandbox read) [ASSUMED unknown].
-8. **In or out of scope:** Dynamics Explorer prompt and `get_entity`; the
-   request-file corpus index; the user CSV export column; one-off scripts.
+8. **In or out of scope** (asked one at a time):
+   - **8a Dynamics Explorer.** **Decided (owner, 2026-10-29): in scope, last
+     PR.** The prompt tells the model to use the Grant Cycle link first and fall
+     back to the request meeting date only when the link is blank, saying so in
+     its answer (a staff Q&A tool, not an app screen, so link-only in the apps
+     still holds); Board-date questions use the cycle calendar; `get_entity`
+     drops the meeting date from its default fields. Coordinate with Codex on
+     where prompt edits land (PR #553, shared prompt library).
+   - **8b Request-file corpus index.** **Decided (owner, 2026-10-29): out of
+     this migration.** Offline, rebuildable admin index, no app reader
+     [VERIFIED via `git grep`]; when corpus work resumes it moves to the
+     fiscal-year label (population and era) and the link (era 4). Recorded in
+     `docs/plans/RESEARCH_REQUEST_FILE_CORPUS_PLAN_2026-10-25.md`.
+   - **8c Dataverse Bulk Export "Meeting date" column.** **Decided (owner,
+     2026-10-29): out of scope.** The column copies the stored value; the
+     export never uses it to choose or group requests [VERIFIED via `git grep`
+     of `lib/services/dataverse-export`]; current users unknown (per-person
+     grant, no run log).
+   - **8d Scripts.** **Decided (owner, 2026-10-29):** scripts still used for
+     current work (Staff Deliberations drafts and preflight, Proposal Ranking
+     access, deliberations cohort review, reminder-liveness audit, honorarium
+     backfill, smoke tests) move with the app code they mirror. Finished
+     one-offs and probes stay as written; the caveat is logged in
+     `docs/agent-wiki/topics/dataverse-dynamics.md` (Operating Notes) with a
+     pointer in `scripts/README.md`. The old helpers stay in
+     `lib/utils/cycle-code.js` for scripts only; the guard check refuses them
+     under `lib/`, `pages/` and `shared/`.
 
 ## 8. Data needed (owner-run, read-only)
 
