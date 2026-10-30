@@ -230,12 +230,55 @@ and date on purpose and stays.
 
 Proposed PRs, each with focused tests and a Codex review:
 
+0. Sandbox Grant Cycle rows and request links (§5a), with owner approval for
+   the sandbox writes.
 1. Helpers, adapters and the Research surfaces (filters, membership, cycle lists,
    default cycle), plus the two bugs in §6.
 2. Gates, displays and pass-through removals (§3.4, §3.6), after Q2–Q3.
 3. Stale-invite expiry and the honorarium write (§3.5), after Q4–Q5.
 4. Test Request Factory (§3.7), after Q7, with its ledger migration.
 5. Explorer, corpus and scripts (§3.8–3.9) as decided; then the gate.
+
+## 5a. Contract check (2026-10-29, `/contract-reconcile` review mode)
+
+Verified by the author before the Codex review:
+
+- **Navigation property** [VERIFIED via sandbox metadata read, 2026-10-29]:
+  `akoya_request.wmkf_grantcycle` → `wmkf_grantcycle`, relationship
+  `wmkf_grantcycle_akoya_request`, navigation property `wmkf_GrantCycle`. Filter
+  `wmkf_GrantCycle/wmkf_cyclecode eq 'J27'`; bind `wmkf_GrantCycle@odata.bind`.
+  `queryRecords` already supports `$expand` and runs it through the restriction
+  check [VERIFIED via `lib/services/dynamics/read-ops.js:56-77`].
+- **Sandbox has no Grant Cycle rows and no linked requests** [VERIFIED via
+  sandbox read, 2026-10-29: `wmkf_grantcycles` empty]. After the migration
+  nothing cycle-dependent can be rehearsed in the sandbox, Factory or otherwise,
+  until the sandbox has J/D cycle rows and linked requests. **New PR 0:**
+  create the sandbox cycle rows (sandbox write; owner approval) and decide how
+  sandbox requests get links. It precedes every other PR.
+- **Saved fingerprints and hashes that include the meeting date** (each fails
+  closed; none silently sends stale content):
+  - Staff Deliberations writeup snapshot: unchanged if the month-year format is
+    kept (§7 Q3) [VERIFIED].
+  - Initial Assessment generation key: holds the cycle code, identical from
+    the link for D26 [VERIFIED via `initial-assessment/artifact-service.js:84-107`].
+  - **Presentation invitation previews** (`meeting-coordination/invitation-service.js:25,30,106`
+    [VERIFIED]): the frozen snapshot hashes the raw meeting date as `cycle`;
+    any change to that value makes every prepared-but-unsent preview stale
+    ("Prepare a fresh preview"). Replace it with the linked cycle code and
+    deploy when no previews are waiting, or tell coordinators to re-prepare.
+  - Review-filing operator backfill and repair plans
+    (`individual-file-service.js:270,329`; `backfill-service.js:339`;
+    `repair-service.js:258` [VERIFIED]): a plan saved before the deploy is
+    refused after it; re-plan.
+- **Date-day difference:** D26 requests carry 2026-12-11; the calendar Board
+  date is recorded as 2026-12-10 (D45) [not re-read]. Anything that keys a day
+  (stale-invite closing, honorarium and Factory dates) moves one day earlier;
+  month-year displays do not change.
+- **Production write fence** [VERIFIED via `production-write-fence.js:52-56`]:
+  `REQUEST_COLUMNS` keeps `wmkf_meetingdate` (the Factory still writes it,
+  §7 Q7); `REQUEST_BIND_SETS` gains `wmkf_grantcycles`.
+- Not re-verified by the author (agent-reported): the per-file select lists and
+  line numbers in §3. Each PR re-verifies its own files.
 
 ## 6. Existing bugs found
 
