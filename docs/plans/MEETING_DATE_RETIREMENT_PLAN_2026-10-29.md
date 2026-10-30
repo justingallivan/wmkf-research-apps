@@ -283,7 +283,9 @@ a contract check and a Codex review; none merges without the owner.
    resolve), binds `wmkf_GrantCycle`, and writes `wmkf_meetingdate` and
    `akoya_fiscalyear` from the Board date; no cycle or no Board date throws
    `honorarium_no_grant_cycle` (alert and retry, as the old
-   `honorarium_no_meeting_date` did); a failed read propagates the same way.
+   `honorarium_no_meeting_date` did), unless the honorarium already exists
+   (a retry after a create whose suggestion link failed), which is then linked
+   and onboarded; a failed read propagates.
    `wmkf_meetingdate` left the reviewer token's request select
    (`verify-suggestion-token.js`), which nothing else read. Existing honoraria
    are unchanged. Consequence: D26 invitations close on Dec 10 (calendar)

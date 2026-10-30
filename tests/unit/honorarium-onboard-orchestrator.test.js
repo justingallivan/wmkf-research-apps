@@ -202,6 +202,19 @@ describe('ensureHonorariumOnboarding', () => {
     expect(deps.suggestions.setHonorariumRequest).not.toHaveBeenCalled();
   });
 
+  it('retry after a create whose junction PATCH failed: an existing honorarium is linked and onboarded even when the parent now has no cycle', async () => {
+    const deps = makeDeps({
+      readParentCycle: jest.fn().mockResolvedValue({ akoya_requestid: 'req-1', _wmkf_grantcycle_value: null, wmkf_GrantCycle: null }),
+      requests: { getById: jest.fn().mockResolvedValue({ akoya_requestid: `det-${SUGGESTION_ID}` }) },
+    });
+    const out = await ensureHonorariumOnboarding(baseArgs(), deps);
+    expect(deps.requests.getById).toHaveBeenCalledWith(`det-${SUGGESTION_ID}`, { select: 'akoya_requestid' });
+    expect(deps.requests.create).not.toHaveBeenCalled();
+    expect(deps.suggestions.setHonorariumRequest).toHaveBeenCalledWith(SUGGESTION_ID, `det-${SUGGESTION_ID}`);
+    expect(deps.onboard).toHaveBeenCalledWith(expect.objectContaining({ honorariumRequestId: `det-${SUGGESTION_ID}` }));
+    expect(out).toMatchObject({ honorariumRequestId: `det-${SUGGESTION_ID}`, created: false });
+  });
+
   it('a failed parent read propagates and does NOT create', async () => {
     const deps = makeDeps({ readParentCycle: jest.fn().mockRejectedValue(new Error('Get record failed (503)')) });
     await expect(ensureHonorariumOnboarding(baseArgs(), deps)).rejects.toThrow('Get record failed (503)');
