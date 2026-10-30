@@ -105,7 +105,7 @@ staff-guarded `/api/review-manager/send-emails`; no cron sends materials);
 `email-generator.js:496`; and no server-side mirror of this validation exists.
 
 **Standing hazard — the warning must name the EXTENSION, never "edit the due date".**
-**Superseded in part (2026-10-29, D48; PR 2 of `docs/plans/REVIEWER_INVITATION_CALENDAR_BUILD_PLAN_2026-10-29.md`, branch `claude/review-due-date-from-calendar`, not yet deployed):** the request's
+**Superseded in part (2026-10-29, D48; PR 2 of `docs/plans/REVIEWER_INVITATION_CALENDAR_BUILD_PLAN_2026-10-29.md`, PR #552, merge `54070863f`, deployed to Production 2026-10-29 per Vercel commit status):** the request's
 `wmkf_reviewduedate` is no longer seeded from the browser after send. Before an
 invitation is dispatched, `lib/services/review-due-date-service.js`
 `ensureRequestReviewDueDate` fills a blank date from the cycle calendar's Reviews Due

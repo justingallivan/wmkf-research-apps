@@ -3,7 +3,7 @@ title: Reviewer invitation build — materials on acceptance, calendar due date,
 domain: reviewers
 kind: plan
 status: in-progress
-summary: "One build before the Feb 24, 2027 J27 invitations (owner, 2026-10-29): the review due date comes from the cycle calendar's Reviews Due Date; reviewers get materials as soon as they accept (D46); per-send, browser-saved and Reviewer Finder record dates go away; review filing follows each cycle's Board date (D44) instead of a Vercel switch; the Board setup reads its dates from the calendar (D47); small calendar-page fixes. Traced from source 2026-10-29; nothing built."
+summary: "One build before the Feb 24, 2027 J27 invitations (owner, 2026-10-29): the review due date comes from the cycle calendar's Reviews Due Date; reviewers get materials as soon as they accept (D46); per-send, browser-saved and Reviewer Finder record dates go away; review filing follows each cycle's Board date (D44) instead of a Vercel switch; the Board setup reads its dates from the calendar (D47); small calendar-page fixes. Traced from source 2026-10-29. PR 1 (#551) and PR 2 (#552, due date and cycle config from the request's Grant Cycle link) are deployed; PR 3 and PR 4 remain."
 canonical: false
 owner: product-engineering
 related:
@@ -416,7 +416,7 @@ Dataverse writes). Separate PRs, each with focused unit tests:
    released materials (risk 3). Codex found and the PR fixed cross-cycle scan
    starvation and unreported undated cycles.
    The shared calendar reader moves to PR 2.
-2. **Built on branch `claude/review-due-date-from-calendar` (not yet merged):** due date
+2. **Done (PR #552, merge `54070863f`, deployed to Production 2026-10-29 per Vercel commit status):** due date
    from the calendar on the server (A) and the due-date part of C.
    `lib/services/review-due-date-service.js` (the shared reader for this date,
    `getCycleDatesById` in the adapter, reading the row the request's Grant Cycle
