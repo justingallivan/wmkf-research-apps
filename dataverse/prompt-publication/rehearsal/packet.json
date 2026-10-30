@@ -1,0 +1,148 @@
+{
+  "packetVersion": 1,
+  "status": "PREPARED_NOT_REHEARSED",
+  "deploymentAuthorized": false,
+  "liveWritesAuthorized": false,
+  "policyRevision": 5,
+  "policyArtifactHash": "50bcb07a28fd786b1000e6527bd1b06c34170e0088ede2bc35228ebba1f76c5b",
+  "sourceHashes": {
+    "scripts/build-prompt-publication-rehearsal.cjs": "0ee00b7b6dd4516e15821ee1ef046aa365d5c3d41ef3443da18c4bc6850f52e9",
+    "scripts/check-prompt-publication-sdk.sh": "0a443a9dd4d3e5af8859c4a4d9eaf5ca2c750353eedb8d8f1ffdea59ffcd53b3",
+    "dataverse/prompt-publication/global.json": "5e3412a9b7d65042d1a5595588da15034929a2584cae283cab3a3e95599f9cbb",
+    "dataverse/prompt-publication/NuGet.Config": "33aa39ee926a9e2651ae39549df08dddc8e43d11896cf14d0465bc869d56b4c2",
+    "dataverse/prompt-publication/Transport/Transport.csproj": "75aa8ef8565d16392741300b339e123afd1f6f4f0a859d3bd08f87871e1589e2",
+    "dataverse/prompt-publication/Transport/packages.lock.json": "99ff0585be9685cca435c8a73cb4aeca95eb6978960dc3d3eb614ab4b460c0fd",
+    "dataverse/prompt-publication/Transport/CanonicalJson.cs": "01b71f1245628b39f30833f881e21102787c0d96c243844ab66ece8eff441fbc",
+    "dataverse/prompt-publication/Transport/TransactionSdk.cs": "b54933caf6fff430ef7004f131383a06e6ff7a46462eab776fa63802ba44103c",
+    "dataverse/prompt-publication/Transport/PromptRows.cs": "ace0153980d1b9fc8221c6eab743d16bfa76fec6185197fd00921f521431d337",
+    "dataverse/prompt-publication/Transport/PromptSchemaPreflight.cs": "52c003e757e43accbf6d2db5fb691930c2fa765d7845458ed052fbaa70947365",
+    "dataverse/prompt-publication/Checks/Checks.csproj": "18a246c596ef5d9c3e2d1a177c0895170754d95db122f8be38e7a9aa0690b813",
+    "dataverse/prompt-publication/Checks/packages.lock.json": "4ac5bca2ed381d0aca48eabef001198cb06a8ce54cb5e0b6d159d464524dd21c",
+    "dataverse/prompt-publication/Checks/Program.cs": "a4defa6c0cfc01042f2f3ebe4914e0b27565fecadf0410469d768e91a6949c64",
+    "dataverse/prompt-publication/rehearsal/cases.json": "708b839dfbd50bc43e9e67b99128967205cfcd1f5ce9796fb1494127291cb963",
+    "tests/fixtures/prompt-publication/fingerprints-v1.json": "76f7b988ddfa1f1df7d0303e698e1b1f28b2a28919130453c63942eab760e5b0",
+    "tests/fixtures/prompt-publication/sdk-numbers-v1.json": "aaaefb2dabf34cb49b6152d95276dfdddba267afc3c3d2d89b99e90f314c3611",
+    "lib/dataverse/core/target-registry.js": "7a868f64a2c836c4fb90e6ede8ffa359938d15637c1348eac61b7b535d4fa89d",
+    "lib/prompt-publication/policy-v1.json": "36e88fd6dac92aaec96866cc8605d24757c8204bd37752ebebe06a904250dc87",
+    "lib/prompt-publication/transaction-core.js": "a17af7c4d180747e89c7deeb7da2b577fb5ba3ebb42a8738879725f6ef5e2b1b"
+  },
+  "sourceDigest": "fc5b95a77077b26c07e71a66ff394fdf563595fc32a654bef5af2c96b75d2b0a",
+  "cases": {
+    "caseVersion": 1,
+    "deploymentAuthorized": false,
+    "liveWritesAuthorized": false,
+    "targetClass": "sandbox-only",
+    "requiredTargetHost": "orgd9e66399.crm.dynamics.com",
+    "expectedOrganizationId": null,
+    "customApiUniqueName": null,
+    "headTable": null,
+    "receiptTable": null,
+    "cases": [
+      {
+        "id": "identity-and-schema",
+        "phase": "read-only",
+        "prove": "Approved sandbox host AND independently matched organization; published metadata, all definition/catalog/baseline columns, concurrency, OrganizationOwned head/receipt tables and Active required unique keys."
+      },
+      {
+        "id": "roles-and-bypass",
+        "phase": "read-only",
+        "prove": "Connor and existing Admin superusers mapped; effective/initiating users and app principal known; prove organization-wide Read for ALL prompt versions/drafts and required head/receipt/settings rows so security filtering cannot masquerade as complete history; platform bypass privileges inventoried. No implied permission grant."
+      },
+      {
+        "id": "denied-publisher",
+        "phase": "approved-writes-only",
+        "prove": "Unauthorized or unmapped identity denied before writes, including auth-off Admin and app attribution fallback."
+      },
+      {
+        "id": "transaction-required",
+        "phase": "approved-writes-only",
+        "prove": "Actual Custom API is synchronous and IsInTransaction; nontransaction invocation fails before mutation."
+      },
+      {
+        "id": "null-version-draft",
+        "phase": "approved-writes-only",
+        "prove": "New Draft/noncurrent/version null works under actual tenant rules; no sentinel/reserved published number."
+      },
+      {
+        "id": "fresh-first-and-later",
+        "phase": "approved-writes-only",
+        "prove": "Exactly one current Published row, history preserved, head revision/high-water correct and receipt atomic for first and later publication."
+      },
+      {
+        "id": "first-publication-race",
+        "phase": "approved-writes-only",
+        "prove": "Two callers race create-only head under Active unique key; one expected-state winner and no orphan current row."
+      },
+      {
+        "id": "same-head-race",
+        "phase": "approved-writes-only",
+        "prove": "Original head row-version CAS rejects stale second request; new version exceeds retired/reserved history."
+      },
+      {
+        "id": "same-uuid-race",
+        "phase": "approved-writes-only",
+        "prove": "Same actor tuple and exact request return one immutable original receipt; post-conflict outer lookup resolves racing winner."
+      },
+      {
+        "id": "replay-after-upgrade",
+        "phase": "approved-writes-only",
+        "prove": "Authorized historical receipt replay precedes current policy/head checks; old fresh request rejected."
+      },
+      {
+        "id": "changed-uuid-binding",
+        "phase": "approved-writes-only",
+        "prove": "Same UUID with altered draft/ETag/key/snapshot/baseline/policy/organization/initiating/effective identity rejected."
+      },
+      {
+        "id": "fault-after-every-write",
+        "phase": "approved-writes-only",
+        "prove": "Failure after budget/head/draft/prior/head-final/receipt mutation rolls ALL state back; never catch and continue a faulted transaction."
+      },
+      {
+        "id": "unknown-commit",
+        "phase": "approved-writes-only",
+        "prove": "Lost commit response resolved using original actor and UUID; unavailable lookup remains unknown, no new UUID or blind retry."
+      },
+      {
+        "id": "budget-model-both-orders",
+        "phase": "approved-writes-only",
+        "prove": "Budget raise and model lower race in BOTH orders; original coordination CAS protects saved pair and secondary provider cap."
+      },
+      {
+        "id": "draft-current-catalog-stale",
+        "phase": "approved-writes-only",
+        "prove": "Stale draft/current ETag and persisted draft baseline, changed current metadata, missing baseline and mismatched head all refuse atomically."
+      },
+      {
+        "id": "catalog-group-race",
+        "phase": "approved-writes-only",
+        "prove": "Strict live group/section validation; referenced group/section removal races cannot leave invalid newly assigned metadata."
+      },
+      {
+        "id": "raw-write-guards",
+        "phase": "approved-writes-only",
+        "prove": "Create/Update/Delete/Upsert and applicable bulk paths cannot alter Published content/lifecycle/head/receipt outside trusted operation; direct Draft and audited metadata-only paths remain supported."
+      },
+      {
+        "id": "paging-and-corruption",
+        "phase": "approved-writes-only",
+        "prove": "All pages read; no current/status filter hides Draft/current duplicates, duplicate versions, aliases or reserved history; malformed/capped reads refuse."
+      },
+      {
+        "id": "net48-format-and-fingerprints",
+        "phase": "offline-and-sandbox",
+        "prove": "Actual Framework runtime executes the built Checks.exe against shared fingerprints and sdk-numbers-v1.json (17-significant-digit mantissas, half-even boundaries, normal/subnormal limits and underflow), plus canonical/request/receipt AND complete format/template/model/budget vectors. Current local net8 primitive checks alone are insufficient."
+      },
+      {
+        "id": "pre-site-paused-transition",
+        "phase": "approved-writes-only",
+        "prove": "Reviewed pause-only old-reader backport, automation-first stop, all instances drained, new reader plus exact reviewed schema and same-UUID receipt, reader preflight, approved canary, blocked queue review and original-actor recovery."
+      },
+      {
+        "id": "exact-fixture-cleanup",
+        "phase": "separate-cleanup-approval",
+        "prove": "Record exact created fixture IDs and before-state; only approved cleanup of those fixtures, never delete history/receipts or reset counters as rollback."
+      }
+    ]
+  }
+}

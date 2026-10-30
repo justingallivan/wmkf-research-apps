@@ -14,6 +14,11 @@ related:
 
 # Shared Dataverse publication feasibility
 
+Historical platform assessment dated 2026-10-29. The later local SDK transport
+now compiles and primitive fingerprints run offline; see
+[SDK milestone](SHARED_PROMPT_SDK_MILESTONE_2026-10-30.md). The operation/guards,
+full format parity and tenant composition below remain unproved.
+
 ## Verdict and evidence boundary
 
 **READY TO START LOCAL FOUNDATION IMPLEMENTATION; not ready to deploy or

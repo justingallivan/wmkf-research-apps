@@ -14,6 +14,11 @@ related:
 
 # Transaction core and Pre-Site transition milestone
 
+Historical checkpoint at commit `1c3848c8a`, before the local SDK toolchain and
+compiled transport existed. See [SDK milestone](SHARED_PROMPT_SDK_MILESTONE_2026-10-30.md)
+for current compilation/primitive-parity evidence; the complete SDK port and
+tenant proof remain pending.
+
 [PARTIAL / local implementation] Implemented a server-only JavaScript transaction
 reference core against an explicit trusted server port. This is not a Dataverse
 transaction implementation or a substitute for Connor's .NET plug-in. No route

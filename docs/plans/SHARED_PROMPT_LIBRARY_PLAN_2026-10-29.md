@@ -52,7 +52,10 @@ restrictions now cover 39 audited names, all locally passing with reviewed model
 `phase-i.checkin` remains held for a common execution definition. Initial
 Assessment version capture and Pre-Site native schema are reconciled locally. Shared
 pinned budget checks, the unused atomic budget adapter and an unwired transaction
-reference core exist. An offline Pre-Site transition planner and separately
+reference core exist. Compiled .NET SDK transport, canonical primitives and
+a source-hashed sandbox rehearsal packet now exist; the complete publisher,
+full validator parity and tenant proof remain pending. See
+[SDK milestone](SHARED_PROMPT_SDK_MILESTONE_2026-10-30.md). An offline Pre-Site transition planner and separately
 backportable runtime pause guard prepare the coordinated release; see
 [transaction milestone](SHARED_PROMPT_TRANSACTION_MILESTONE_2026-10-30.md). Remaining holds and
 .NET/tenant/cutover proof are tracked in

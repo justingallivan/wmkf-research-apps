@@ -186,7 +186,9 @@ receipt. The later revision exceeds JavaScript safe integer range as a string.
 Generate/check explicitly with `scripts/build-prompt-publication-vectors.cjs`;
 never refresh goldens at runtime or silently before tests. JavaScript tests and
 an independent Python canonicalizer/hash check verify these vectors locally;
-.NET execution/parity remains unproved until its implementation runs them.
+The .NET8 SDK harness now runs these primitive canonical/snapshot/request
+fingerprint goldens. Complete .NET request/receipt/definition validation and
+actual .NET Framework runtime/tenant parity remain unproved; see the SDK milestone.
 
 ## Historical schema/hash milestone review (commit 1187caf17)
 

@@ -120,7 +120,9 @@ sandbox preference. Nothing invokes this adapter from a live route yet.
 Remaining mandatory work: the `phase-i.checkin` draft definition, explicit governed models, one-target read/replay/writer
 cutover, read paging/status, real clients, solution/plugin/guards and sandbox
 proof. Policy deployment must disable/drain old writers and reject unsupported
-artifact stamps at the Dataverse boundary; CAS alone is not policy freshness. No .NET parity or tenant transaction behavior is proved.
+artifact stamps at the Dataverse boundary; CAS alone is not policy freshness. The .NET8 harness now matches existing canonical/fingerprint goldens; complete
+.NET validation, actual Framework runtime parity and tenant transactions remain
+unproved. See `dataverse/prompt-publication/README.md`.
 New helpers do not replace existing runtime validators or callers.
 
 
@@ -130,7 +132,9 @@ or tenant proof. It covers authorization/replay ordering, budget-before-head CAS
 complete version inventory, draft/current/catalog preconditions, high-water
 allocation, conditional activation and same-transaction immutable receipt. A
 post-fault lookup resolves a racing committed receipt without retrying writes.
-The .NET implementation and transaction/guard/role proof remain mandatory.
+The complete .NET publisher and transaction/guard/role proof remain mandatory;
+compiled transport primitives and offline golden checks now exist in
+`dataverse/prompt-publication/`.
 
 `pre-site-transition.js` and `scripts/prepare-pre-site-prompt-transition.cjs`
 prepare a private offline artifact only for the exact reviewed old schema delta.
