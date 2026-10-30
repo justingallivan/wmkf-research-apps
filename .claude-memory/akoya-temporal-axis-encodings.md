@@ -7,29 +7,31 @@ metadata:
   originSessionId: 8050fbb7-13c6-444b-b802-c9bc7a61a3ce
   status: active
   scope: dataverse
-  last_verified: 2026-10-22
+  last_verified: 2026-10-30
 ---
 
-**Verification scope:** source and checked-in dated evidence were checked on 2026-10-22. Population figures below remain 2026-05-18 probe snapshots; no live Dataverse query was run.
+**Verification scope:** source and checked-in dated evidence were checked on 2026-10-22; the cycle-source rules below were rechecked against source on 2026-10-30 (meeting-date retirement build step 2). Population figures below remain 2026-05-18 probe snapshots; no live Dataverse query was run.
 
 ## Recall Rule
 
 Read this when: building any cohorting/cycle-filter or temporal-axis UI over `akoya_request` (e.g. Dataverse Bulk Export, Reviewer Finder cycle filters).
 
 Do:
-- Treat `wmkf_meetingdate` as the canonical board-cycle date; compile Jxx/Dxx filters to a meeting-date range via `cycleCodeToOdataFilter` where the convention fits, and preserve a raw-date path for off-month meetings.
-- Treat Jxx/Dxx as the twice-yearly June/December convention, not a schema invariant. `meetingDateToCycleCode` returns `null` outside those months; never coerce or silently drop an off-month/null-cycle row. Surface it explicitly where the consumer supports that path, and verify the specific consumer before claiming an `UNCLASSIFIED` sentinel is implemented.
+- A request's cycle is the Grant Cycle row it links to (`akoya_request.wmkf_grantcycle`), never its meeting date (owner, 2026-10-29; `docs/plans/MEETING_DATE_RETIREMENT_PLAN_2026-10-29.md`). In app code use `lib/dataverse/adapters/operations-grant-cycle.js`: `linkedCycleFilter(code)` for "in cycle X", `noLinkedCycleFilter()` for "No cycle", `linkedCycleExpand()` on the read, `linkedCycleCode(row)` for membership. Every read whose rows reach `linkedCycleCode` must carry the expand, or the row silently has no cycle. No meeting-date fallback; a gap is fixed in Dynamics data.
+- No link, or a link to a historical (non-J/D) row, means no cycle; never coerce it into a cycle. Surface it explicitly where the consumer supports that path. `meetingDateToCycleCode` / `cycleCodeToOdataFilter` remain in `lib/utils/cycle-code.js` for scripts and the Test Request Factory only (Factory moves in build step 5).
 - In Workbench, use the shell-supplied cycle for Final Writeups and Initial Assessments. Final Writeups has an explicit selector and a manual newest-cycle fallback when no usable rows are available; that fallback does not automatically select a cycle. Awardees shares the shell cycle and offers last-decided as an alternative (`shared/components/workbench/WorkbenchShell.js:77-147,297-329`; `shared/components/workbench/InitialAssessmentsPanel.js:21-56`; `shared/components/final-writeups/FinalWriteupsViews.js:552-578,633-694,805-814`).
-- Verify callers (e.g. `my-proposals.js`, `reviewer-suggestion.js findByPD`) before relying on existing cycle filters.
+- Use `wmkf_meetingdate` only as a date (display, ordering) until the later retirement steps move those too; Board dates come from the cycle calendar (`listBoardDates`).
 
 Do not:
-- Expose `akoya_fiscalyear` as a separate filter axis (it's just month+year of `wmkf_meetingdate`). The last two runtime readers that did — Expertise Finder's proposals query and request search's unknown-label fallback — were moved onto `cycleCodeToOdataFilter` / a 400 on 2026-09-08 (S499). The one write path that stored a client-supplied cycle code on suggestion rows (`save-candidates`) now derives it from the request's meeting date (same day).
+- Expose `akoya_fiscalyear` as a separate filter axis (it's just month+year of `wmkf_meetingdate`). Expertise Finder's proposals query and request search use the link filter; an unknown cycle label is a 400. `save-candidates` stamps suggestion rows with the linked code (the read was broken from 2026-09-08 until build step 2 fixed it).
 - Treat `Jxx`/`Dxx` as a schema invariant: it is a June/December convention and other months return null. Whether a view drops or separately exposes those rows depends on that consumer; check it.
 - Conflate `wmkf_meetingdate` (board-cycle) with `akoya_decisiondate` (approval-stamp/business-history axis).
 
-Ground truth: `lib/utils/cycle-code.js`; `scripts/probe-akoya-meetingdate-by-type.js` + evidence `docs/atlas/evidence/akoya-meetingdate-by-type-2026-05-18.txt`; build-plan §9. Related: [[dataverse-export-floor-scoping]].
+Ground truth: `lib/dataverse/adapters/operations-grant-cycle.js` (link helpers), `lib/utils/cycle-code.js` (code parsing and default-cycle rules); `scripts/probe-akoya-meetingdate-by-type.js` + evidence `docs/atlas/evidence/akoya-meetingdate-by-type-2026-05-18.txt`; build-plan §9. Related: [[dataverse-export-floor-scoping]].
 
 **Default cycle and Workbench propagation (owner decision 2026-09-08, S499; source checked 2026-10-22).** The historical owner rule chose a program's working cycle by default, with a last-decided alternative where appropriate, independently of the caller's assignments. The dashboard cycle-list response supplies `defaultCycleCode` and `lastDecidedCycleCode`; WorkbenchShell loads it, uses an explicit URL cycle when present, otherwise applies `defaultCycleCode` and records the resolved cycle in the URL. It passes the selected shell cycle into Final Writeups, Initial Assessments, and Awardees. Awardees offers last-decided as a user-selectable alternative; do not describe it as automatically receiving the last-decided cycle.
+
+Since build step 2 of the meeting-date retirement (2026-10-30), the Workbench dashboard, Awardees and program-briefing cycle lists hold the linked codes present in that surface's requests, each dated by the calendar Board date (`listBoardDatesOrNone`); when the calendar read fails the list still loads and the default resolves by month.
 
 Initial Assessments consumes the shell cycle. Final Writeups has an explicit cycle selector and a manual newest-cycle fallback for its empty/no-row state; it does not automatically walk cycles to choose one. Do not reuse earlier implementation notes that Final Writeups or Initial Assessments independently select an artifact-row cycle.
 

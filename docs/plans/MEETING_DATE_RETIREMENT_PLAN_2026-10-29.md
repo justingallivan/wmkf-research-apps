@@ -243,7 +243,13 @@ a contract check and a Codex review; none merges without the owner.
 2. **Cycle lookup and Research screens:** the shared helpers (with explicit
    restriction checks, §5b), the request adapter's expand support, the Research
    filters, cycle membership, cycle lists and default cycle, plus the two bugs
-   in §6.
+   in §6. **[BUILT on branch `claude/cycle-lookup-research-screens`, not
+   merged, 2026-10-30]** Helpers in `lib/dataverse/adapters/operations-grant-cycle.js`
+   (`linkedCycleFilter`, `noLinkedCycleFilter`, `linkedCycleExpand`,
+   `linkedCycleCode`, `listBoardDatesOrNone`); every non-Factory filter and
+   membership site converted and traced to a read carrying the expand; both
+   §6 bugs fixed. Deployment-order hazard for the owner: until step 5, new
+   Factory clones carry no link, so they show no cycle on converted screens.
 3. **Checks, dates shown and cleanup:** the "has a cycle" gates, displays,
    reviewer-search labels (enrichment cache version bump) and pass-through
    removals (§3.4, §3.6).
