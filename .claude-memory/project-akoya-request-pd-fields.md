@@ -14,7 +14,7 @@ Read this when: you need to filter `akoya_request` rows by program director, sec
 
 Do:
 - Filter on `_wmkf_programdirector_value` for "proposals I'm responsible for" — this is the lead PD that assigns reviewers.
-- Derive cycle code from `wmkf_meetingdate` (June → `J{YY}`, December → `D{YY}`).
+- Take the cycle from the request's Grant Cycle link, never the meeting date (meeting-date retirement step 2): filter with `linkedCycleFilter(code)` and read with `linkedCycleExpand()` / `linkedCycleCode(row)` from `lib/dataverse/adapters/operations-grant-cycle.js`. See [[akoya-temporal-axis-encodings]].
 
 Do not:
 - Use `ownerid` as the program director — it's a service account (`# BCO akoyaGO Integration`).
@@ -29,7 +29,7 @@ Ground truth: validated against prod request 1002379 (St. Jude / Christoph Gorgu
 
 **Program Coordinator:** `wmkf_programcoordinator` — Lookup → `systemuser`. Operational support, not the reviewer-assignment owner.
 
-**Meeting Date:** `wmkf_meetingdate` — DateTime. Drives cycle code derivation (June → `J{YY}`, December → `D{YY}`).
+**Meeting Date:** `wmkf_meetingdate` — DateTime. No longer the cycle source in app code; the Grant Cycle link `wmkf_grantcycle` is (owner, 2026-10-29).
 
 **`ownerid` is NOT the program director.** On real prod data (request 1002379), `ownerid` was `# BCO akoyaGO Integration` (a service account from the import pipeline). Always filter on `_wmkf_programdirector_value`.
 
@@ -38,8 +38,7 @@ Ground truth: validated against prod request 1002379 (St. Jude / Christoph Gorgu
 **Filter pattern for "my proposals in cycle Jxx":**
 ```
 _wmkf_programdirector_value eq {systemuserId}
-  and wmkf_meetingdate ge '2026-06-01'
-  and wmkf_meetingdate lt '2026-07-01'
+  and wmkf_GrantCycle/wmkf_cyclecode eq 'J26'
 ```
 
 **Sample request used to validate this:** 1002379 (St. Jude / Christoph Gorgulla; PD = Justin Gallivan; Meeting Date 2026-06-04 → J26).
