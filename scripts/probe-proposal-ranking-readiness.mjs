@@ -17,7 +17,7 @@ import { classifyTarget, resolveInterlockMode } from '../lib/dataverse/core/inte
 import { SANDBOX_HOSTS } from '../lib/dataverse/core/target-registry.js';
 import { RESEARCH_PROGRAM_IDS } from '../shared/config/researchPrograms.js';
 import { PHASE_II_PENDING } from '../shared/config/workbenchVisibility.js';
-import { meetingDateToCycleCode } from '../lib/utils/cycle-code.js';
+import { linkedCycleCode } from '../lib/dataverse/adapters/operations-grant-cycle.js';
 import { applyProposalRankingTrialCutoff } from '../lib/services/proposal-ranking/trial-cutoff.js';
 import cycleSchema from '../lib/dataverse/schema/wave32-proposal-ranking/wmkf_proposalrankingcycle.json' with { type: 'json' };
 import roundSchema from '../lib/dataverse/schema/wave32-proposal-ranking/wmkf_proposalrankinground.json' with { type: 'json' };
@@ -212,7 +212,7 @@ async function inspectSource(client) {
   const programFilter = RESEARCH_PROGRAM_IDS.map((id) => `_akoya_programid_value eq ${id}`).join(' or ');
   const filter = `(${programFilter}) and akoya_requeststatus eq '${PHASE_II_PENDING}' and ((wmkf_istestrequest eq false or wmkf_istestrequest eq null) and wmkf_testcreationrunid eq null)`;
   const requests = await pages(client,
-    `akoya_requests?$select=${SOURCE_SELECTS.akoya_requests}&$filter=${encodeURIComponent(filter)}&$orderby=wmkf_meetingdate asc`);
+    `akoya_requests?$select=${SOURCE_SELECTS.akoya_requests}&$expand=${encodeURIComponent('wmkf_GrantCycle($select=wmkf_cyclecode)')}&$filter=${encodeURIComponent(filter)}&$orderby=wmkf_meetingdate asc`);
   if (!requests.ok || requests.capped) {
     return { selects, requestScan: { available: requests.ok, status: requests.status, errorCode: requests.errorCode, capped: requests.capped }, activeSystemUserCount: null, cycles: {} };
   }
@@ -220,7 +220,7 @@ async function inspectSource(client) {
   const activeStaff = await pages(client, 'systemusers?$select=systemuserid&$filter=isdisabled eq false');
   const grouped = new Map();
   for (const row of trialRequests) {
-    const cycle = meetingDateToCycleCode(row.wmkf_meetingdate);
+    const cycle = linkedCycleCode(row);
     if (!cycle) continue;
     const group = grouped.get(cycle) || { eligibleProposalCount: 0, se: 0, mr: 0, missingLead: 0, missingAmount: 0, missingCurrency: 0 };
     group.eligibleProposalCount += 1;

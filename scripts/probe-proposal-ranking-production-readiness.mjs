@@ -18,7 +18,7 @@ import { PRODUCTION_HOSTS } from '../lib/dataverse/core/target-registry.js';
 import { RESEARCH_PROGRAM_IDS } from '../shared/config/researchPrograms.js';
 import { PHASE_II_PENDING } from '../shared/config/workbenchVisibility.js';
 import { TEST_REQUEST_ORDINARY_OData_FILTER } from '../lib/services/test-requests/isolation.js';
-import { meetingDateToCycleCode } from '../lib/utils/cycle-code.js';
+import { linkedCycleCode } from '../lib/dataverse/adapters/operations-grant-cycle.js';
 import { applyProposalRankingTrialCutoff } from '../lib/services/proposal-ranking/trial-cutoff.js';
 import cycleSchema from '../lib/dataverse/schema/wave32-proposal-ranking/wmkf_proposalrankingcycle.json' with { type: 'json' };
 import roundSchema from '../lib/dataverse/schema/wave32-proposal-ranking/wmkf_proposalrankinground.json' with { type: 'json' };
@@ -225,7 +225,7 @@ async function inspectTable(client, spec) {
 async function scanEligibleSource(client, resourceOrigin) {
   const programFilter = RESEARCH_PROGRAM_IDS.map((id) => `_akoya_programid_value eq ${id}`).join(' or ');
   const filter = `(${programFilter}) and akoya_requeststatus eq '${PHASE_II_PENDING}' and ${TEST_REQUEST_ORDINARY_OData_FILTER}`;
-  const initialPath = `${API_PATH}?$select=akoya_requestnum,wmkf_meetingdate,_akoya_programid_value&$filter=${encodeURIComponent(filter)}&$orderby=wmkf_meetingdate asc`;
+  const initialPath = `${API_PATH}?$select=akoya_requestnum,wmkf_meetingdate,_akoya_programid_value&$expand=${encodeURIComponent('wmkf_GrantCycle($select=wmkf_cyclecode)')}&$filter=${encodeURIComponent(filter)}&$orderby=wmkf_meetingdate asc`;
   let nextUrl = new URL(initialPath, resourceOrigin).href;
   const records = [];
   let pageCount = 0;
@@ -256,7 +256,8 @@ async function scanEligibleSource(client, resourceOrigin) {
   const byCycle = {};
   let unmappedMeetingDateCount = 0;
   for (const row of trialRecords) {
-    const cycleCode = meetingDateToCycleCode(row.wmkf_meetingdate);
+    // Cycle from the Grant Cycle link; the report key keeps its historical name.
+    const cycleCode = linkedCycleCode(row);
     const programId = String(row._akoya_programid_value || '').toLowerCase();
     const programKey = programId === RESEARCH_PROGRAM_IDS[0] ? 'se' : programId === RESEARCH_PROGRAM_IDS[1] ? 'mr' : null;
     if (!cycleCode || !programKey) {

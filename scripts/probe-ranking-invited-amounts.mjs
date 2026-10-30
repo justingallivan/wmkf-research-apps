@@ -30,13 +30,13 @@ if (!cycleCode) { console.error('Give --cycle=<code>, e.g. --cycle=D26'); proces
 const { DynamicsService } = await import('../lib/services/dynamics-service.js');
 const { bypassDynamicsRestrictions } = await import('../lib/services/dynamics-context.js');
 const { TEST_REQUEST_ISOLATION_FIELDS } = await import('../lib/services/test-requests/isolation.js');
-const { cycleCodeToOdataFilter } = await import('../lib/utils/cycle-code.js');
+const { parseCycleCode } = await import('../lib/utils/cycle-code.js');
+const { linkedCycleFilter, linkedCycleExpand } = await import('../lib/dataverse/adapters/operations-grant-cycle.js');
 const { RESEARCH_PROGRAM_IDS } = await import('../shared/config/researchPrograms.js');
 const { PHASE_II_PENDING } = await import('../shared/config/workbenchVisibility.js');
 const { applyProposalRankingTrialCutoff } = await import('../lib/services/proposal-ranking/trial-cutoff.js');
 
-const cycleFilter = cycleCodeToOdataFilter(cycleCode, 'wmkf_meetingdate');
-if (!cycleFilter) { console.error(`Not a valid funding cycle: ${cycleCode}`); process.exit(2); }
+if (!parseCycleCode(cycleCode)) { console.error(`Not a valid funding cycle: ${cycleCode}`); process.exit(2); }
 const programFilter = `(${RESEARCH_PROGRAM_IDS.map((id) => `_akoya_programid_value eq ${id}`).join(' or ')})`;
 const money = (v) => (v == null ? '(blank)' : `$${Number(v).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`);
 
@@ -44,7 +44,8 @@ await bypassDynamicsRestrictions('probe-ranking-invited-amounts', async () => {
   console.log(`host: ${new URL(process.env.DYNAMICS_URL).host}`);
   const result = await DynamicsService.queryAllRecords('akoya_requests', {
     select: `akoya_requestid,akoya_requestnum,akoya_title,akoya_request,wmkf_invitedamount,akoya_requeststatus,_akoya_programid_value,${TEST_REQUEST_ISOLATION_FIELDS.marker},${TEST_REQUEST_ISOLATION_FIELDS.runId}`,
-    filter: `${cycleFilter} and ${programFilter}`,
+    expand: linkedCycleExpand(),
+    filter: `${linkedCycleFilter(cycleCode.trim().toUpperCase())} and ${programFilter}`,
     orderby: 'akoya_requestnum asc,akoya_requestid asc',
   });
   if (result.capped) { console.error('Request scan was capped; results would be incomplete.'); process.exit(1); }

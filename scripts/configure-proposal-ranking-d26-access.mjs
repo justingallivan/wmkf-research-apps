@@ -9,7 +9,6 @@ import { RESEARCH_PROGRAM_IDS } from '../shared/config/researchPrograms.js';
 import { PHASE_II_PENDING } from '../shared/config/workbenchVisibility.js';
 import { TEST_REQUEST_ORDINARY_OData_FILTER } from '../lib/services/test-requests/isolation.js';
 import { applyProposalRankingTrialCutoff } from '../lib/services/proposal-ranking/trial-cutoff.js';
-import { cycleCodeToOdataFilter } from '../lib/utils/cycle-code.js';
 import { classifyDeployment, classifyTarget, resolveInterlockMode } from '../lib/dataverse/core/interlock.js';
 import { PRODUCTION_HOSTS } from '../lib/dataverse/core/target-registry.js';
 import { enterDynamicsBypassForScript } from '../lib/services/dynamics-context.js';
@@ -26,6 +25,7 @@ const FACILITATOR_NAME = 'Beth Pruitt';
 const APP_KEY = 'proposal-ranking';
 const PAGE_LIMIT = 100;
 const GUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const LINKED_CYCLE_EXPAND = 'wmkf_GrantCycle($select=wmkf_cyclecode)';
 const REQUEST_SELECT = [
   'akoya_requestid', 'akoya_requestnum', 'wmkf_meetingdate', 'akoya_requeststatus',
   'wmkf_istestrequest', 'wmkf_testcreationrunid', '_akoya_programid_value',
@@ -149,10 +149,11 @@ export function rosterFingerprint(rows, participants, facilitator) {
 }
 
 async function buildPlan(client, resourceUrl) {
-  const cycleFilter = cycleCodeToOdataFilter('D26', 'wmkf_meetingdate');
+  // The request's cycle is its Grant Cycle link; the trial cutoff reads the linked code.
+  const cycleFilter = "wmkf_GrantCycle/wmkf_cyclecode eq 'D26'";
   const programFilter = RESEARCH_PROGRAM_IDS.map((id) => `_akoya_programid_value eq ${id}`).join(' or ');
   const filter = `(${cycleFilter}) and (${programFilter}) and akoya_requeststatus eq '${PHASE_II_PENDING}' and ${TEST_REQUEST_ORDINARY_OData_FILTER}`;
-  const path = `/api/data/v9.2/akoya_requests?$select=${REQUEST_SELECT}&$filter=${encodeURIComponent(filter)}&$orderby=akoya_requestnum asc,akoya_requestid asc`;
+  const path = `/api/data/v9.2/akoya_requests?$select=${REQUEST_SELECT}&$expand=${encodeURIComponent(LINKED_CYCLE_EXPAND)}&$filter=${encodeURIComponent(filter)}&$orderby=akoya_requestnum asc,akoya_requestid asc`;
   const scanned = await getCollection(client, resourceUrl, path);
   const { requests, excludedRequestCount } = applyProposalRankingTrialCutoff(scanned);
   if (requests.some((row) => row.akoya_requeststatus !== PHASE_II_PENDING)) fail('unexpected_request_status');
