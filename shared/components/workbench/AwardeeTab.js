@@ -24,8 +24,8 @@ import EmailAddressSummary from '../EmailAddressSummary';
  * S412): "Copy website HTML" fetches the single-award fragment and copies it to
  * the clipboard; "Cycle export" opens the combined printable HTML page for this
  * request's whole board cycle — a wider scope than the per-award copy beside it.
- * The cycle code comes from the resolve-request `context` (meeting date →
- * J{YY}/D{YY}); the link is hidden when the request has no June/December cycle.
+ * The cycle code comes from the resolve-request `context` (the request's
+ * Grant Cycle link); the link is hidden when the request has no June/December cycle.
  *
  * The post-Submitted lifecycle transitions (Staff Review / Revision Requested /
  * Complete / Closed No Response) still have NO writer and are not offered here.

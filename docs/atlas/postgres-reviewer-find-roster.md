@@ -108,7 +108,7 @@ accepted, review-received, or completed.
 The pruned `candidate.contactEnrichment.dataverseContactEvidence` may also
 carry `priorRequestContext` for an exact receipt-bound reviewer match. It keeps
 only `complete`, an authoritative `totalCount` when complete, and at most three
-request `{requestId, requestNumber, title, fiscalYear, meetingDate}` summaries.
+request `{requestId, requestNumber, title, fiscalYear, cycleLabel}` summaries (`cycleLabel` is the linked Grant Cycle's label, e.g. "June 2026"; it replaced `meetingDate` with `APPLICANT_ENRICHMENT_CACHE_VERSION` 5, meeting-date retirement step 3).
 Raw suggestion rows, reviewer-slot numbers, ETags, and the Potential Reviewer
 person GUID are stripped. This display context is not consumed by roster
 status, selectability, promotion, address readiness, or invitation policy.

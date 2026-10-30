@@ -95,7 +95,7 @@ The UI must display the actual request number/title/cycle. It must not infer
 | Both canonical suggestion links and legacy five-slot links are considered. | reviewer-suggestion/grant-request adapters + reconciliation helper | suggestion-only and legacy-only fixtures |
 | Current request #1002874 is excluded, so current activity can never explain itself as prior use. | history helper | current + older fixture returns only older request |
 | Duplicate links from the two representations collapse by request GUID. | history helper | same request in both sources renders once |
-| Business timing comes from `wmkf_meetingdate`, then `akoya_fiscalyear`; request-number digits and `createdon` are not treated as the year. | history projection | #1002278 fixture renders June 2026, never 2022 |
+| Business timing comes from `wmkf_meetingdate`, then `akoya_fiscalyear`; request-number digits and `createdon` are not treated as the year. **Superseded 2026-10-30** (meeting-date retirement step 3): the linked Grant Cycle's label, then `akoya_fiscalyear`. | history projection | #1002278 fixture renders June 2026, never 2022 |
 | Optional history delay/failure cannot discard enriched results or block the card action. | reconciliation service | timeout and rejected-read tests preserve candidate/action |
 | Browser state is bounded and server-owned; the person ID remains private. | evidence prune helper | at most three summaries; raw rows/IDs/ETags stripped |
 | Context renders independently of the existing-record warning tone. | CandidateCard | combined conflict plus structural/repair-warning fixture both retain context |
