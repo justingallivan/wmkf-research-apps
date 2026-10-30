@@ -126,3 +126,6 @@ smoke-results-*.txt
 # stray agent run logs at repo root
 /*.log
 /.swc
+
+# Retained signing keys are local only
+.local-signing/

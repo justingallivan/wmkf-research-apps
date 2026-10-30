@@ -1,14 +1,22 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
+    <EnableSourceControlManagerQueries>false</EnableSourceControlManagerQueries>
+    <IncludeSourceRevisionInInformationalVersion>false</IncludeSourceRevisionInInformationalVersion>
     <TargetFrameworks>net48;net8.0</TargetFrameworks>
     <LangVersion>12</LangVersion>
     <Nullable>enable</Nullable>
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
     <RestorePackagesWithLockFile>true</RestorePackagesWithLockFile>
+    <SignAssembly Condition="'$(PR553SigningKeyFile)' != ''">true</SignAssembly>
+    <AssemblyOriginatorKeyFile Condition="'$(PR553SigningKeyFile)' != ''">$(PR553SigningKeyFile)</AssemblyOriginatorKeyFile>
+    <PublicSign>false</PublicSign><DelaySign>false</DelaySign>
+    <AssemblyVersion>1.0.0.0</AssemblyVersion><FileVersion>1.0.0.0</FileVersion>
+    <Deterministic>true</Deterministic>
     <AssemblyName>Wmkf.PromptPublication.Transport</AssemblyName>
     <RootNamespace>Wmkf.PromptPublication</RootNamespace>
   </PropertyGroup>
   <ItemGroup>
+    <AssemblyMetadata Include="PromptPublication.SourcePacketSha256" Value="$(PR553SourcePacketHash)" Condition="'$(PR553SourcePacketHash)' != ''"/>
     <EmbeddedResource Include="../registration/bindings.json" LogicalName="Wmkf.PromptPublication.ReleaseBindings.json"/>
     <EmbeddedResource Include="../../../lib/prompt-publication/policy-v1.json" LogicalName="Wmkf.PromptPublication.Policy.v1.json"/>
     <PackageReference Include="Newtonsoft.Json" Version="13.0.3"/>

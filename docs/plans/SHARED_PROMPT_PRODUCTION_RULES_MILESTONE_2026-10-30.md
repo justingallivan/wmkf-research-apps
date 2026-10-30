@@ -2,8 +2,8 @@
 title: Shared Prompt Production Rules and Plug-in Wiring Milestone
 domain: ai-platform
 kind: implementation-record
-status: active
-summary: Production .NET validation and IPlugin composition compile locally with disabled packaged bindings; registration, packaging, clients and tenant proof remain pending.
+status: historical
+summary: Historical production-rules checkpoint before the signed-package milestone; retains its original local evidence and remaining-work boundary.
 canonical: false
 cataloged: 2026-10-30
 owner: product-engineering
@@ -14,6 +14,10 @@ related:
 ---
 
 # Production rules and registration source
+
+Historical checkpoint at ad8e48e06. Current packaging state and remaining
+registration work are recorded in
+[the package milestone](SHARED_PROMPT_PACKAGE_MILESTONE_2026-10-30.md).
 
 [VERIFIED via local source/build/tests; NOT DEPLOYED] Production implementation of
 `IPublicationRules` now exists, together with stateless `IPlugin` publisher and

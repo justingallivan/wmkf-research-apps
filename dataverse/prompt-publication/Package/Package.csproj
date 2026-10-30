@@ -1,0 +1,20 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <EnableSourceControlManagerQueries>false</EnableSourceControlManagerQueries>
+    <IncludeSourceRevisionInInformationalVersion>false</IncludeSourceRevisionInInformationalVersion>
+    <TargetFramework>net8.0</TargetFramework><RestorePackagesWithLockFile>true</RestorePackagesWithLockFile>
+    <PackageId>WMKF.PromptPublication</PackageId><Version>1.0.0</Version>
+    <Authors>WMKF</Authors><Description>Disabled PR553 Dataverse prompt publication preparation package.</Description>
+    <IncludeBuildOutput>false</IncludeBuildOutput><SuppressDependenciesWhenPacking>true</SuppressDependenciesWhenPacking>
+    <NoPackageAnalysis>true</NoPackageAnalysis><PackageReadmeFile>README.md</PackageReadmeFile>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+  </PropertyGroup>
+  <ItemGroup>
+    <None Include="$(PR553PackageInput)/Wmkf.PromptPublication.Transport.dll" Pack="true" PackagePath="lib/net48/"/>
+    <None Include="$(PR553PackageInput)/Newtonsoft.Json.dll" Pack="true" PackagePath="lib/net48/"/>
+    <None Include="README.md" Pack="true" PackagePath="/"/>
+  </ItemGroup>
+  <Target Name="RequirePreparedInput" BeforeTargets="GenerateNuspec">
+    <Error Condition="'$(PR553PackageInput)' == '' Or !Exists('$(PR553PackageInput)/Wmkf.PromptPublication.Transport.dll') Or !Exists('$(PR553PackageInput)/Newtonsoft.Json.dll')" Text="Explicit prepared net48 package input is required."/>
+  </Target>
+</Project>

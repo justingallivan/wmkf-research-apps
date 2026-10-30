@@ -55,7 +55,9 @@ pinned budget checks, the unused atomic budget adapter and an unwired transactio
 reference core exist. Compiled .NET SDK lifecycle/persistence, wire contracts, authorization/write-guard
 evaluators and a source-hashed sandbox rehearsal packet now exist. Production
 format/budget/catalog rules, stateless IPlugin entries and a disabled packaged-binding
-registration manifest now compile locally. Signing/solution import, actual registration,
+registration manifest now compile locally. A signed disabled dependent-assembly
+preparation package and offline registration plan now exist; see
+[package milestone](SHARED_PROMPT_PACKAGE_MILESTONE_2026-10-30.md). Solution import, actual registration,
 Framework/tenant proof and writer/client cutover remain pending. See
 [production rules milestone](SHARED_PROMPT_PRODUCTION_RULES_MILESTONE_2026-10-30.md)
 and the historical [publisher checkpoint](SHARED_PROMPT_PUBLISHER_MILESTONE_2026-10-30.md)

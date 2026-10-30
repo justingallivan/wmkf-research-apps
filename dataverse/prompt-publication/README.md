@@ -9,9 +9,12 @@ are not switched. Connor remains the operation/solution maintainer.
 Transport targets .NET Framework 4.8 for the eventual plug-in and net8.0 for local
 macOS checks of the same source. Dependencies are pinned in NuGet lockfiles and
 restore uses only the explicit public NuGet feed. No project/provider API key is
-used. Build outputs stay ignored; signing/plug-in packaging is still pending. The
+used. Build outputs and private signing material stay ignored. A signed, disabled
+dependent-assembly preparation package now builds locally. The
 net48 library depends on Newtonsoft.Json: use the supported dependent-assembly
-plug-in package model, not a lone DLL upload. No such package is built here.
+plug-in package model, not a lone DLL upload. The offline inspector verifies its two strong-name signatures, exact archive
+contents, embedded disabled bindings and signed source-packet hash. This is not
+a certificate-signed NuGet archive or a registered solution.
 
 ```
 PR553_DOTNET=/absolute/path/to/dotnet PR553_NUGET_CACHE=/private/tmp/pr553-nuget bash scripts/check-prompt-publication-sdk.sh
@@ -64,8 +67,8 @@ team-aware effective privilege depth, but actual tenant access/intersection and
 parent/permit propagation must still be rehearsed. See
 `docs/plans/SHARED_PROMPT_PRODUCTION_RULES_MILESTONE_2026-10-30.md` for production
 composition, temporary raw-write restrictions and the disabled packaged bindings.
-The IPlugin source and prepared registration manifest exist; a signed dependent
-package/deployable solution and actual registration do not. Settings guards also
+The IPlugin source, prepared registration manifest and signed disabled dependent
+package exist; a deployable managed solution and actual registration remain pending. Settings guards also
 deny the old budget/group writers: freeze/migrate them before guard activation.
 The build emits `Checks/bin/Release/net48/Checks.exe` for the actual Windows
 Framework runtime. Run it with the absolute shared fingerprint fixture path;
@@ -75,3 +78,23 @@ limits and underflow. It currently passes on net8 only. A Framework mismatch
 blocks release and requires a correctly rounded parser; do not waive it because
 the simpler original fingerprints pass. 535 JS-oracle definition acceptance cases run locally. Full actual Framework
 and tenant behavior remain separate gates.
+
+
+## Signed package and registration preparation
+
+The new signing key is retained locally for Connor; secure transfer to Connor
+remains pending. Only its public identity is tracked in
+`registration/signing-identity.json`. Keep the same key, package name/version and
+assembly identity during the disabled bootstrap and bound rebuild. Never commit
+or include the private key in the package, a review prompt or a handoff document.
+
+```
+PR553_DOTNET=/absolute/path/to/dotnet PR553_NUGET_CACHE=/private/tmp/pr553-nuget node scripts/build-prompt-publication-package.cjs --key /absolute/private/key.snk --out /absolute/new/output-directory
+PR553_DOTNET=/absolute/path/to/dotnet node scripts/prepare-prompt-publication-registration.cjs --package-dir /absolute/new/output-directory
+```
+
+These commands have no execute/deploy mode. The first creates the disabled
+package and an independently recomputed preparation receipt; the second checks
+that receipt and emits an unapproved registration plan with unresolved tenant
+identities. See `docs/plans/SHARED_PROMPT_PACKAGE_MILESTONE_2026-10-30.md` for
+verification, custody and actual Windows/tenant gates.

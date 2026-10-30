@@ -4,6 +4,9 @@ const fs=require('node:fs'),path=require('node:path'),crypto=require('node:crypt
 const parser=require('@babel/parser');
 const root=path.resolve(__dirname,'..');
 const files=[
+ 'scripts/build-prompt-publication-package.cjs','scripts/prepare-prompt-publication-registration.cjs',
+ 'dataverse/prompt-publication/PackagingTool/PackagingTool.csproj','dataverse/prompt-publication/PackagingTool/packages.lock.json','dataverse/prompt-publication/PackagingTool/Program.cs','dataverse/prompt-publication/PackagingTool/SelfTests.cs','dataverse/prompt-publication/PackagingTool/StrongNames.cs',
+ 'dataverse/prompt-publication/Package/Package.csproj','dataverse/prompt-publication/Package/packages.lock.json','dataverse/prompt-publication/Package/README.md','dataverse/prompt-publication/registration/signing-identity.json',
  'scripts/build-prompt-publication-rehearsal.cjs','scripts/check-prompt-publication-sdk.sh','scripts/build-prompt-publication-wire-vectors.cjs','scripts/build-prompt-publication-definition-vectors.cjs',
  'dataverse/prompt-publication/global.json','dataverse/prompt-publication/NuGet.Config',
  'dataverse/prompt-publication/Transport/Transport.csproj','dataverse/prompt-publication/Transport/packages.lock.json',

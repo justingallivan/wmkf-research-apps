@@ -125,7 +125,8 @@ artifact stamps at the Dataverse boundary; CAS alone is not policy freshness. Th
 unproved. See `dataverse/prompt-publication/README.md` and the publisher milestone.
 Production .NET format/budget/catalog rules and stateless IPlugin entry source
 now exist with disabled packaged release bindings and a prepared registration
-manifest; actual registration, packaging and Framework/tenant proof remain pending.
+manifest. A signed disabled dependent-assembly preparation package now exists;
+actual registration, managed solution and Framework/tenant proof remain pending.
 New helpers do not replace existing runtime validators or callers.
 
 

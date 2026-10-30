@@ -1,0 +1,13 @@
+{
+  "identityVersion": 1,
+  "assemblyName": "Wmkf.PromptPublication.Transport",
+  "assemblyVersion": "1.0.0.0",
+  "packageId": "WMKF.PromptPublication",
+  "packageVersion": "1.0.0",
+  "publicKeyToken": "e1c3ac684f7d4e11",
+  "publicKeySha256": "5300ed32f2de9e08f15c6853102d2c7fae64115ad1199e8f36a8cb2ed6b425ed",
+  "keyOwner": "Connor",
+  "custody": "created-locally-awaiting-secure-transfer",
+  "assemblySigning": "full-strong-name",
+  "nugetCertificateSignature": "none"
+}
