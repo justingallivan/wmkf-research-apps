@@ -171,7 +171,7 @@ export default function TestRequestFactoryRunPanel({
         <div className="space-y-2">
           <p className="text-sm leading-6 text-gray-700">
             {run.status === 'prepared'
-              ? `Writes to ${envName(run)} Dataverse and SharePoint: creates the test Request, sets its meeting date, makes its document folder and copies its documents.`
+              ? `Writes to ${envName(run)} Dataverse and SharePoint: creates the test Request in its Grant Cycle, sets its meeting date, makes its document folder and copies its documents.`
               : `The remaining steps write to ${envName(run)} Dataverse and SharePoint.`}
           </p>
           <div className="flex flex-col gap-2 sm:flex-row sm:items-center">

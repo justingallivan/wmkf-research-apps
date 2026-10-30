@@ -210,6 +210,7 @@ function requestReadback(overrides = {}) {
     akoya_fiscalyear: FISCAL_YEAR,
     akoya_requesttype: REQUEST_TYPE,
     wmkf_meetingdate: MEETING_DATE,
+    wmkf_GrantCycle: { wmkf_cyclecode: 'J26' },
     wmkf_istestrequest: true,
     wmkf_testcreationrunid: RUN_ID,
     wmkf_respondreminderenabled: false,
@@ -246,6 +247,7 @@ function fakeClient({ requestRow } = {}) {
     baseUrl: SANDBOX_BASE_URL,
     get: jest.fn(async (requestPath) => {
       if (requestPath.includes('EntityDefinitions')) {
+        if (requestPath.includes('ManyToOneRelationships') && requestPath.includes("'wmkf_grantcycle'")) return { ok: true, status: 200, body: { value: [{ ReferencedEntity: 'wmkf_grantcycle', ReferencingEntityNavigationPropertyName: 'wmkf_GrantCycle' }] } };
         if (requestPath.includes('ManyToOneRelationships')) return { ok: true, status: 200, body: { value: [{ ReferencedEntity: 'account' }] } };
         if (requestPath.includes('PicklistAttributeMetadata')) {
           return { ok: true, status: 200, body: { OptionSet: { Options: [{ Value: REQUEST_TYPE, Label: { UserLocalizedLabel: { Label: 'Grant' } } }] } } };
@@ -257,7 +259,7 @@ function fakeClient({ requestRow } = {}) {
           body: {
             value: [
               'akoya_requestid', 'akoya_applicantid', 'akoya_title', 'akoya_purpose', 'wmkf_abstract', 'akoya_request',
-              'akoya_fiscalyear', 'akoya_requesttype', 'wmkf_meetingdate', 'wmkf_istestrequest',
+              'akoya_fiscalyear', 'akoya_requesttype', 'wmkf_meetingdate', 'wmkf_grantcycle', 'wmkf_istestrequest',
               'wmkf_testcreationrunid', 'wmkf_respondreminderenabled', 'wmkf_reviewduereminderenabled',
             ].map((field) => ({ LogicalName: field, AttributeType: 'String', IsValidForCreate: true, RequiredLevel: { Value: 'None' } })),
           },

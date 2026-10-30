@@ -83,6 +83,7 @@ const PROGRAM_ID = '77777777-7777-4777-8777-777777777777';
 const PI_ID = '88888888-8888-4888-8888-888888888888';
 const LIAISON_ID = '99999999-9999-4999-8999-999999999999';
 const RL_ID = '15151515-1515-4151-8151-151515151515';
+const GRANT_CYCLE_ID = '16161616-1616-4161-8161-161616161616';
 const SOURCE_ID = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
 const BASE_FIELDS = [
   'akoya_requestid', 'akoya_title', 'akoya_purpose', 'wmkf_abstract', 'akoya_request', 'akoya_fiscalyear',
@@ -109,6 +110,9 @@ function metadata(production) {
     ...(field === 'wmkf_abstract' ? { maxLength: production ? 5000 : 2000 } : {}),
   }]));
   fields.akoya_applicantid = { createable: true, requiredLevel: 'None', type: 'Lookup', lookupTarget: 'accounts' };
+  fields.wmkf_grantcycle = {
+    createable: true, requiredLevel: 'None', type: 'Lookup', lookupEntity: 'wmkf_grantcycle', navigationProperty: 'wmkf_GrantCycle',
+  };
   if (production) {
     fields.akoya_requeststatus = { createable: true, requiredLevel: 'None', type: 'String', maxLength: 100 };
     const lookup = (lookupEntity, navigationProperty) => ({
@@ -179,8 +183,11 @@ describe('buildCloneManifest ids', () => {
       ...base,
       programDirector: { systemuserid: PD_ID },
       cast: { piContactId: PI_ID, liaisonContactId: LIAISON_ID, researchLeaderContactId: RL_ID },
+      grantCycleId: GRANT_CYCLE_ID, cycleCode: 'D26',
       ids,
     });
+    expect(manifest.values).toMatchObject({ grantCycleId: GRANT_CYCLE_ID, cycleCode: 'D26' });
+    expect(manifest.createBody['wmkf_GrantCycle@odata.bind']).toBe(`/wmkf_grantcycles(${GRANT_CYCLE_ID})`);
     expect(manifest.createBody.akoya_requestid).toBe(ids.requestId);
     expect(manifest.createBody[TEST_REQUEST_FIXED_FIELDS.runId]).toBe(ids.runId);
   });
@@ -190,7 +197,7 @@ describe('buildCloneManifest ids', () => {
     const manifest = buildCloneManifest(preflight('production'), {
       ...base, bundle: bundleFor(abstract),
       programDirector: { systemuserid: PD_ID },
-      cast: { piContactId: PI_ID, liaisonContactId: LIAISON_ID, researchLeaderContactId: RL_ID }, ids,
+      cast: { piContactId: PI_ID, liaisonContactId: LIAISON_ID, researchLeaderContactId: RL_ID }, grantCycleId: GRANT_CYCLE_ID, cycleCode: 'D26', ids,
     });
     expect(manifest.bundle.version).toBe(5);
     expect(manifest.bundle.abstract).toBe(abstract);

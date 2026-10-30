@@ -7,6 +7,15 @@ import {
 } from './test-request-factory-ui';
 
 const NUMBER_PATTERN = /^\d{1,10}$/;
+
+// A calendar Board date (`YYYY-MM-DD`) shown as "December 10, 2026", and its fiscal year
+// ("December 2026", the rule the server applies), read in UTC so the day never shifts.
+function formatBoardDate(value) {
+  return new Date(`${value}T00:00:00Z`).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric', timeZone: 'UTC' });
+}
+function fiscalYearOf(value) {
+  return new Date(`${value}T00:00:00Z`).toLocaleDateString('en-US', { month: 'long', year: 'numeric', timeZone: 'UTC' });
+}
 const KEY_UNAVAILABLE = "This browser can't create the safe request key a new Request needs, so nothing was started. Use a current browser and try again.";
 
 function mintKey() {
@@ -45,7 +54,7 @@ export default function TestRequestFactoryIntake({
   const [looking, setLooking] = useState(false);
   const [lookupError, setLookupError] = useState('');
   const [draft, setDraft] = useState(null);
-  const [form, setForm] = useState({ label: '', fiscalYear: '', meetingDate: '', typed: '' });
+  const [form, setForm] = useState({ label: '', cycleCode: '', typed: '' });
   const [confirming, setConfirming] = useState(false);
   const [confirmError, setConfirmError] = useState('');
   const [reserved, setReserved] = useState(null);
@@ -119,7 +128,7 @@ export default function TestRequestFactoryIntake({
     setKeyMissing(false);
     setConfirmError('');
     setLookupError('');
-    setForm({ label: '', fiscalYear: '', meetingDate: '', typed: '' });
+    setForm({ label: '', cycleCode: '', typed: '' });
     setElapsed(0);
     setStoppedNotice('');
     setLooking(true);
@@ -140,8 +149,7 @@ export default function TestRequestFactoryIntake({
       setDraft(body);
       setForm({
         label: `Test clone of Request ${body.summary?.requestNumber ?? trimmedNumber}`,
-        fiscalYear: body.defaults?.fiscalYear ?? '',
-        meetingDate: body.defaults?.meetingDate ?? '',
+        cycleCode: body.defaults?.cycleCode ?? '',
         typed: '',
       });
     } catch (error) {
@@ -172,10 +180,13 @@ export default function TestRequestFactoryIntake({
     setConfirmError('');
     setLookupError('');
     setStoppedNotice('');
-    setForm({ label: '', fiscalYear: '', meetingDate: '', typed: '' });
+    setForm({ label: '', cycleCode: '', typed: '' });
   }
 
   const summary = draft?.summary || null;
+  // Cycles the server can resolve: a row with no Board date is refused at Confirm, so it is not offered.
+  const cycleOptions = Array.isArray(draft?.cycles) ? draft.cycles.filter((cycle) => cycle.boardDate) : [];
+  const chosenCycle = cycleOptions.find((cycle) => cycle.cycleCode === form.cycleCode) || null;
   const lookupPrimary = !draft && !hasSelection;
   const label = form.label.trim();
   const confirmReason = (() => {
@@ -184,7 +195,8 @@ export default function TestRequestFactoryIntake({
     if (confirming) return 'Reserving the run…';
     if (!label) return 'Enter a test label.';
     if (label.length > LIMITS.labelMax) return `Keep the test label to ${LIMITS.labelMax} characters or fewer.`;
-    if (!form.fiscalYear.trim() || !form.meetingDate.trim()) return 'Enter both the fiscal year and the meeting date.';
+    if (!cycleOptions.length) return 'No Grant Cycle with a Board date is available. Add one in the cycle calendar first.';
+    if (!chosenCycle) return 'Choose a Grant Cycle.';
     if (summary && form.typed !== summary.requestNumber) return `Type Request number ${summary.requestNumber} exactly to confirm.`;
     return '';
   })();
@@ -204,16 +216,15 @@ export default function TestRequestFactoryIntake({
           idempotencyKey: keyRef.current, // the same key on every retry of this draft
           confirmSourceRequestNumber: form.typed,
           testLabel: label,
-          fiscalYear: form.fiscalYear.trim(),
-          meetingDate: form.meetingDate.trim(),
+          cycleCode: chosenCycle.cycleCode,
         },
         fallbackMessage: 'The run could not be reserved.',
       });
       if (!mountedRef.current) return;
-      const sent = { label, fiscalYear: form.fiscalYear.trim(), meetingDate: form.meetingDate.trim() };
+      // The run stores the cycle's Board date as its meeting date, so a different date means a different cycle.
       const day = (value) => String(value ?? '').slice(0, 10);
       const differs = reply.created === false
-        && (reply.run.testLabel !== sent.label || reply.run.fiscalYear !== sent.fiscalYear || day(reply.run.meetingDate) !== day(sent.meetingDate));
+        && (reply.run.testLabel !== label || day(reply.run.meetingDate) !== chosenCycle.boardDate);
       const selected = onReserved ? onReserved(reply.run, token) : true;
       setReserved({ run: reply.run, differs, selected: selected !== false });
     } catch (error) {
@@ -303,8 +314,7 @@ export default function TestRequestFactoryIntake({
               {draft.source?.title || 'Title unavailable'} · {draft.source?.applicant || 'Applicant unavailable'}
             </p>
             <dl className="mt-2 grid gap-x-8 gap-y-1 text-sm sm:grid-cols-2">
-              <div className="flex gap-2"><dt className="text-gray-600">Fiscal year</dt><dd className="font-semibold text-gray-950">{summary.fiscalYear || 'Not set'}</dd></div>
-              <div className="flex gap-2"><dt className="text-gray-600">Meeting date</dt><dd className="font-semibold text-gray-950">{summary.meetingDate || 'Not set'}</dd></div>
+              <div className="flex gap-2"><dt className="text-gray-600">Grant Cycle</dt><dd className="font-semibold text-gray-950">{draft.source?.cycleCode || 'No cycle'}</dd></div>
             </dl>
           </div>
           <div className={TABLE_WRAP}>
@@ -337,21 +347,22 @@ export default function TestRequestFactoryIntake({
                 Test label
                 <input ref={labelInputRef} value={form.label} onChange={(event) => update('label', event.target.value)} maxLength={LIMITS.labelMax} required className={INPUT} />
               </label>
-              <div>
+              <div className="lg:col-span-2">
                 <label className="block text-sm font-semibold text-gray-800">
-                  Fiscal year
-                  <input value={form.fiscalYear} onChange={(event) => update('fiscalYear', event.target.value)} maxLength={LIMITS.cycleFieldMax} required aria-describedby="factory-fy-hint" className={INPUT} />
+                  Grant Cycle
+                  <select value={form.cycleCode} onChange={(event) => update('cycleCode', event.target.value)} required aria-describedby="factory-cycle-hint" className={INPUT}>
+                    <option value="">Choose a cycle</option>
+                    {cycleOptions.map((cycle) => (
+                      <option key={cycle.cycleCode} value={cycle.cycleCode}>{`${cycle.cycleCode} · Board meeting ${formatBoardDate(cycle.boardDate)}`}</option>
+                    ))}
+                  </select>
                 </label>
-                {form.fiscalYear === '' ? (
-                  <p id="factory-fy-hint" className="mt-1 text-sm text-gray-600">
-                    {draft.defaults?.fiscalYear ? `For example: ${draft.defaults.fiscalYear}` : "Use the same form as the source Request's fiscal year."}
-                  </p>
-                ) : <span id="factory-fy-hint" />}
+                <p id="factory-cycle-hint" className="mt-1 text-sm text-gray-600">
+                  {chosenCycle
+                    ? `The test Request joins ${chosenCycle.cycleCode}, with meeting date ${formatBoardDate(chosenCycle.boardDate)} and fiscal year ${fiscalYearOf(chosenCycle.boardDate)}.`
+                    : "The test Request joins the cycle you choose and takes that cycle's Board meeting date and fiscal year."}
+                </p>
               </div>
-              <label className="block text-sm font-semibold text-gray-800">
-                Meeting date
-                <input type="date" value={form.meetingDate} onChange={(event) => update('meetingDate', event.target.value)} required className={INPUT} />
-              </label>
             </div>
             <label className="block max-w-md text-sm font-semibold text-gray-800">
               {`Type Request number ${summary.requestNumber} to confirm`}

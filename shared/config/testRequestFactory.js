@@ -56,7 +56,7 @@ export const CHANGE_STATUSES = Object.freeze({
 });
 
 /** Cycle fields are short strings on the server (32 characters). */
-export const LIMITS = Object.freeze({ labelMax: 120, cycleFieldMax: 32, requestNumberMax: 10 });
+export const LIMITS = Object.freeze({ labelMax: 120, requestNumberMax: 10 });
 
 /** Human labels for the document kinds in a source summary. Unknown kind: the raw kind. */
 export const DOCUMENT_KIND_LABELS = Object.freeze({

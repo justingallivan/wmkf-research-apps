@@ -18,6 +18,7 @@ import { PROPOSAL_CORE_KEYS } from '../../shared/config/prompts/pre-site-visit-p
 import { PRODUCTION_HOSTS } from '../../lib/dataverse/core/target-registry.js';
 import { MANAGED_LEDGER_HOSTS } from '../../lib/db/ledger-registry.js';
 import { TEST_REQUEST_FIXED_FIELDS } from '../../lib/services/test-requests/policy.js';
+import { cloneCycleFromCalendarRow } from '../../lib/services/test-requests/sandbox-clone.js';
 
 const MANAGED = MANAGED_LEDGER_HOSTS[0];
 const SANDBOX_LEDGER = `postgresql://role:pw@${MANAGED}/ledger?sslmode=require`;
@@ -29,6 +30,9 @@ const PROGRAM_ID = '77777777-7777-4777-8777-777777777777';
 const PI_ID = '88888888-8888-4888-8888-888888888888';
 const LIAISON_ID = '99999999-9999-4999-8999-999999999999';
 const RL_ID = '15151515-1515-4151-8151-151515151515';
+const GRANT_CYCLE_ID = '16161616-1616-4161-8161-161616161616';
+// The destination calendar the fake cycle reads serve: D26 has a Board date, D27 does not.
+const DESTINATION_CYCLES = [{ cycleCode: 'D26', boardDate: '2026-12-01' }, { cycleCode: 'D27', boardDate: null }];
 const SOURCE_ID = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
 const SITE_ID = 'appriver3651007194.sharepoint.com,48930e19-0000-4000-8000-000000000000,11111111-1111-4111-8111-111111111111';
 const DRIVE_ID = 'b!GQ6TSC-650adweD3-KAAAAAAAAAAAA';
@@ -130,6 +134,9 @@ function metadata(production) {
     ...(field === 'wmkf_abstract' ? { maxLength: 30000 } : {}),
   }]));
   fields.akoya_applicantid = { createable: true, requiredLevel: 'None', type: 'Lookup', lookupTarget: 'accounts' };
+  fields.wmkf_grantcycle = {
+    createable: true, requiredLevel: 'None', type: 'Lookup', lookupEntity: 'wmkf_grantcycle', navigationProperty: 'wmkf_GrantCycle',
+  };
   if (production) {
     const lookup = (lookupEntity, navigationProperty) => ({
       createable: true, requiredLevel: 'None', type: 'Lookup', lookupEntity, navigationProperty,
@@ -195,6 +202,12 @@ function harness({ deployment = 'preview', env = {}, preflightTarget = null, dep
     recheckStatusChange: jest.fn(async () => ({ sequence: 1, ok: true })),
     readLiveOptions: jest.fn(async (_client, field) => [{ value: 1, label: `option of ${field}` }]),
     readCurrentStatus: jest.fn(async () => ({ phase1: 100000001, phase2: null })),
+    listGrantCycles: jest.fn(async () => DESTINATION_CYCLES),
+    resolveGrantCycle: jest.fn(async (_client, cycleCode) => {
+      const row = DESTINATION_CYCLES.find((cycle) => cycle.cycleCode === cycleCode);
+      if (!row) throw new Error(`Expected one Grant Cycle ${cycleCode}; found 0.`);
+      return cloneCycleFromCalendarRow({ grantCycleId: GRANT_CYCLE_ID, ...row });
+    }),
   };
   const fullEnv = {
     TEST_REQUEST_FACTORY_FORM: 'on',
@@ -216,7 +229,9 @@ function harness({ deployment = 'preview', env = {}, preflightTarget = null, dep
     runPreflight: async () => preflightFor(preflightTarget ?? (production ? 'production' : 'sandbox')),
     now: () => clock.t,
     exportBundle: async ({ exportedAt }) => bundleAt(exportedAt),
-    readSourceDisplay: async () => ({ title: 'Source title', applicant: 'Live University' }),
+    readSourceDisplay: async () => ({ title: 'Source title', applicant: 'Live University', cycleCode: 'D26' }),
+    listGrantCycles: spies.listGrantCycles,
+    resolveGrantCycle: spies.resolveGrantCycle,
     readCast: spies.readCast,
     resolveProgramDirector: spies.resolveProgramDirector,
     advanceRun: spies.advanceRun,
@@ -230,7 +245,7 @@ function harness({ deployment = 'preview', env = {}, preflightTarget = null, dep
   const target = production ? 'production' : 'sandbox';
   const exportDraft = async () => (await service.exportSource({ profileId: PROFILE, sourceRequestNumber: '9000001' })).draftId;
   const confirmArgs = (draftId, extra = {}) => ({
-    profileId: PROFILE, actorEmail: 'pd@wmkeck.org', draftId, idempotencyKey: KEY, confirmSourceRequestNumber: '9000001', testLabel: 'Factory proof', ...extra,
+    profileId: PROFILE, actorEmail: 'pd@wmkeck.org', draftId, idempotencyKey: KEY, confirmSourceRequestNumber: '9000001', testLabel: 'Factory proof', cycleCode: 'D26', ...extra,
   });
   const confirm = async (extra = {}, draftId = null) => service.confirmRun(confirmArgs(draftId ?? await exportDraft(), extra));
   const seedRun = (runId, overrides = {}) => {
@@ -266,7 +281,10 @@ describe('target and ledger selection', () => {
       await h.confirm();
       expect(h.dbUrls[0].url).toBe(expectedUrl);
       expect(h.dbUrls[0].url).toContain(expectedDb);
-      expect(h.createClientCalls.map((c) => c.resourceUrl)).toEqual([expectedHost]);
+      // Export reads the destination calendar, Confirm resolves the cycle and writes: both on the target host.
+      expect(h.createClientCalls.map((c) => c.resourceUrl)).toEqual([expectedHost, expectedHost]);
+      expect(h.spies.listGrantCycles.mock.calls[0][0].baseUrl).toBe(`${expectedHost}/api/data/v9.2`);
+      expect(h.spies.resolveGrantCycle.mock.calls[0][0].baseUrl).toBe(`${expectedHost}/api/data/v9.2`);
       expect(h.dbUrls[0].options.pool).toEqual({ max: 2, idleTimeoutMillis: 10_000, connectionTimeoutMillis: 5_000 });
     }
   });
@@ -354,8 +372,12 @@ describe('Confirm: sandbox and production reservations', () => {
     const manifest = JSON.parse(h.blobs.objects.get(runPathname('production', runId, 'manifest')).text);
     expect(manifest.createBody.akoya_requestid).toBe(requestId);
     expect(manifest.createBody[TEST_REQUEST_FIXED_FIELDS.runId]).toBe(runId);
-    expect(manifest.values).toMatchObject({ programDirectorId: PD_ID, piContactId: PI_ID });
-    expect(h.createClientCalls.map((c) => c.resourceUrl)).toEqual([PRODUCTION_URL]);
+    expect(manifest.values).toMatchObject({
+      programDirectorId: PD_ID, piContactId: PI_ID, grantCycleId: GRANT_CYCLE_ID, cycleCode: 'D26', meetingDate: '2026-12-01', fiscalYear: 'December 2026',
+    });
+    expect(manifest.createBody['wmkf_GrantCycle@odata.bind']).toBe(`/wmkf_grantcycles(${GRANT_CYCLE_ID})`);
+    expect(manifest.createBody.wmkf_meetingdate).toBe('2026-12-01');
+    expect(h.createClientCalls.map((c) => c.resourceUrl)).toEqual([PRODUCTION_URL, PRODUCTION_URL]);
   });
 
   test.each([2, 3, 4])('new Confirm refuses a v%d draft before writing run artifacts', async (version) => {
@@ -694,6 +716,9 @@ describe('exportSource / readArtifacts / recheck', () => {
         if (path.startsWith(`/sharepointdocumentlocations(${PARENT_ID})`)) {
           return ok({ sharepointdocumentlocationid: PARENT_ID, relativeurl: 'akoya_request' });
         }
+        if (path.startsWith('/wmkf_grantcycles?')) {
+          return ok({ value: [{ wmkf_grantcycleid: GRANT_CYCLE_ID, wmkf_cyclecode: 'D99', wmkf_meetingdate: '2099-12-03T00:00:00Z' }] });
+        }
         throw new Error(`unexpected Dataverse read ${path}`);
       },
     });
@@ -732,9 +757,13 @@ describe('exportSource / readArtifacts / recheck', () => {
     expect(draft.documents).toHaveLength(1);
     // The bundle projection stores the folder relative to its bucket.
     expect(draft.documents[0]).toMatchObject({ name: 'ProjectDescription.pdf', library: 'akoya_request', folder: 'Phase I' });
-    // Every Dataverse read, including both location reads, went to the production client.
-    expect(gets.length).toBeGreaterThanOrEqual(4);
-    expect(gets.every((g) => g.resourceUrl === PRODUCTION_URL)).toBe(true);
+    // Every source read, including both location reads, went to the production client; the
+    // cycle picker's calendar read went to the destination (sandbox) client.
+    const sourceGets = gets.filter((g) => !g.path.startsWith('/wmkf_grantcycles?'));
+    expect(sourceGets.length).toBeGreaterThanOrEqual(4);
+    expect(sourceGets.every((g) => g.resourceUrl === PRODUCTION_URL)).toBe(true);
+    expect(gets.filter((g) => g.path.startsWith('/wmkf_grantcycles?')).map((g) => g.resourceUrl)).toEqual([SANDBOX_URL]);
+    expect(result.cycles).toEqual([{ cycleCode: 'D99', boardDate: '2099-12-03' }]);
     expect(gets.some((g) => g.path.startsWith('/sharepointdocumentlocations?') && g.path.includes(SOURCE_ID))).toBe(true);
     expect(gets.some((g) => g.path.startsWith(`/sharepointdocumentlocations(${PARENT_ID})`))).toBe(true);
     // The dynamics bucket was listed; the archive probes were tried and their misses accepted.
@@ -745,9 +774,10 @@ describe('exportSource / readArtifacts / recheck', () => {
   test('export stores the bundle under a minted draft path and never returns bundle text', async () => {
     const h = harness({ deployment: 'preview' });
     const result = await h.service.exportSource({ profileId: PROFILE, sourceRequestNumber: '9000001' });
-    expect(Object.keys(result).sort()).toEqual(['defaults', 'draftId', 'source', 'summary']);
-    expect(result.source).toEqual({ title: 'Source title', applicant: 'Live University' });
-    expect(result.defaults).toEqual({ fiscalYear: 'December 2026', meetingDate: '2026-12-01' });
+    expect(Object.keys(result).sort()).toEqual(['cycles', 'defaults', 'draftId', 'source', 'summary']);
+    expect(result.source).toEqual({ title: 'Source title', applicant: 'Live University', cycleCode: 'D26' });
+    expect(result.cycles).toEqual(DESTINATION_CYCLES);
+    expect(result.defaults).toEqual({ cycleCode: 'D26' });
     expect(JSON.stringify(result)).not.toContain('Synthetic purpose');
     expect(h.blobs.objects.has(draftPathname('sandbox', h.actorId, result.draftId))).toBe(true);
     expect(await code(h.service.exportSource({ profileId: PROFILE, sourceRequestNumber: '12ab' }))).toBe('factory_invalid_input');
@@ -796,6 +826,9 @@ describe('cooperative deadlines (slice 2)', () => {
         }
         if (path.startsWith(`/sharepointdocumentlocations(${PARENT_ID})`)) {
           return ok({ sharepointdocumentlocationid: PARENT_ID, relativeurl: 'akoya_request' });
+        }
+        if (path.startsWith('/wmkf_grantcycles?')) {
+          return ok({ value: [{ wmkf_grantcycleid: GRANT_CYCLE_ID, wmkf_cyclecode: 'D99', wmkf_meetingdate: '2099-12-03T00:00:00Z' }] });
         }
         throw new Error(`unexpected Dataverse read ${path}`);
       },
@@ -1299,7 +1332,7 @@ describe('slice 3 server contract', () => {
     expect([linked.httpStatus, linked.code]).toEqual([409, 'factory_source_ambiguous']);
   });
 
-  test('0.2 a source with no usable cycle and no admin-supplied cycle is 400 factory_invalid_input with the form copy', async () => {
+  test('0.2 a source with no linked cycle has no default; Confirm needs a destination cycle with a Board date', async () => {
     const noCycle = (exportedAt) => buildSourceBundle({
       sourceRow: {
         akoya_requestid: SOURCE_ID, akoya_requestnum: '9000001', akoya_requesttype: 100000000, akoya_purpose: 'Synthetic purpose',
@@ -1310,15 +1343,46 @@ describe('slice 3 server contract', () => {
       exportedAt: new Date(exportedAt),
       applicantAbstract: null,
     });
-    const h = harness({ deployment: 'preview', deps: { exportBundle: async ({ exportedAt }) => noCycle(exportedAt) } });
+    const h = harness({
+      deployment: 'preview',
+      deps: {
+        exportBundle: async ({ exportedAt }) => noCycle(exportedAt),
+        readSourceDisplay: async () => ({ title: 'Source title', applicant: 'Live University', cycleCode: null }),
+      },
+    });
     const exported = await h.service.exportSource({ profileId: PROFILE, sourceRequestNumber: '9000001' });
-    expect(exported.defaults).toEqual({ fiscalYear: null, meetingDate: null });
-    const error = await h.service.confirmRun(h.confirmArgs(exported.draftId)).catch((e) => e);
-    expect([error.httpStatus, error.code]).toEqual([400, 'factory_invalid_input']);
-    expect(error.message).toBe('A valid fiscal year and meeting date are required for this source.');
+    expect(exported.source.cycleCode).toBeNull();
+    expect(exported.defaults).toEqual({ cycleCode: null });
+    for (const cycleCode of ['D27', 'J99']) {
+      const error = await h.service.confirmRun(h.confirmArgs(exported.draftId, { cycleCode })).catch((e) => e);
+      expect([error.httpStatus, error.code]).toEqual([400, 'factory_invalid_input']);
+      expect(error.message).toBe('That Grant Cycle could not be read, or it has no Board date. Choose another or try again.');
+    }
     expect(h.ledger.rows.size).toBe(0);
-    const ok = await h.service.confirmRun(h.confirmArgs(exported.draftId, { fiscalYear: 'December 2026', meetingDate: '2026-12-01' }));
+    // The source's own (blank) fiscal year and meeting date play no part: both come from the chosen cycle.
+    const ok = await h.service.confirmRun(h.confirmArgs(exported.draftId, { cycleCode: 'D26' }));
     expect(ok.created).toBe(true);
+    expect(ok.run).toMatchObject({ fiscalYear: 'December 2026' });
+    expect(String(ok.run.meetingDate).slice(0, 10)).toBe('2026-12-01');
+  });
+
+  test('0.2b the default is the source cycle only when the destination calendar has it with a Board date', async () => {
+    for (const [sourceCode, expected] of [['D26', 'D26'], ['D27', null], ['J27', null]]) {
+      const h = harness({
+        deployment: 'preview',
+        deps: { readSourceDisplay: async () => ({ title: 'Source title', applicant: 'Live University', cycleCode: sourceCode }) },
+      });
+      const exported = await h.service.exportSource({ profileId: PROFILE, sourceRequestNumber: '9000001' });
+      expect(exported.source.cycleCode).toBe(sourceCode);
+      expect(exported.defaults).toEqual({ cycleCode: expected });
+    }
+  });
+
+  test('0.2c an unreadable destination calendar refuses the lookup before any draft write', async () => {
+    const h = harness({ deployment: 'preview', deps: { listGrantCycles: async () => { throw new Error('503'); } } });
+    const error = await h.service.exportSource({ profileId: PROFILE, sourceRequestNumber: '9000001' }).catch((e) => e);
+    expect([error.httpStatus, error.code]).toEqual([503, 'factory_cycles_unavailable']);
+    expect(h.blobs.calls.put).toHaveLength(0);
   });
 
   test('0.3 listRuns reports formEnabled and target, and still answers with the switch off', async () => {
@@ -1548,7 +1612,7 @@ describe('S1: source display read', () => {
   test('exportSource returns the display title and applicant beside the summary, never in the stored bundle', async () => {
     const h = display();
     const result = await h.service.exportSource({ profileId: PROFILE, sourceRequestNumber: '9000001' });
-    expect(result.source).toEqual({ title: 'Source title', applicant: 'Live University' });
+    expect(result.source).toEqual({ title: 'Source title', applicant: 'Live University', cycleCode: 'D26' });
     const stored = [...h.blobs.objects.values()][0].text;
     expect(stored).not.toContain('Live University');
   });
@@ -1556,7 +1620,8 @@ describe('S1: source display read', () => {
   test('a failed display read returns nulls and the lookup still succeeds', async () => {
     const h = display({ readSourceDisplay: async () => { throw new Error('boom'); } });
     const result = await h.service.exportSource({ profileId: PROFILE, sourceRequestNumber: '9000001' });
-    expect(result.source).toEqual({ title: null, applicant: null });
+    expect(result.source).toEqual({ title: null, applicant: null, cycleCode: null });
+    expect(result.defaults).toEqual({ cycleCode: null });
     expect(result.draftId).toBeTruthy();
   });
 
@@ -1568,15 +1633,24 @@ describe('S1: source display read', () => {
         baseUrl: resourceUrl,
         async get(path, headers) {
           gets.push({ resourceUrl, path, headers });
-          return { ok: true, status: 200, body: { akoya_title: 'A title', '_akoya_applicantid_value@OData.Community.Display.V1.FormattedValue': 'Some University' } };
+          return {
+            ok: true,
+            status: 200,
+            body: {
+              akoya_title: 'A title',
+              '_akoya_applicantid_value@OData.Community.Display.V1.FormattedValue': 'Some University',
+              wmkf_GrantCycle: { wmkf_cyclecode: 'D26' },
+            },
+          };
         },
       }),
     });
     const result = await h.service.exportSource({ profileId: PROFILE, sourceRequestNumber: '9000001' });
-    expect(result.source).toEqual({ title: 'A title', applicant: 'Some University' });
+    expect(result.source).toEqual({ title: 'A title', applicant: 'Some University', cycleCode: 'D26' });
     expect(gets).toHaveLength(1);
     expect(gets[0].resourceUrl).toBe(PRODUCTION_URL);
     expect(gets[0].path).toContain(`/akoya_requests(${SOURCE_ID})`);
+    expect(gets[0].path).toContain('$expand=wmkf_GrantCycle($select=wmkf_cyclecode)');
     expect(gets[0].headers.Prefer).toContain('include-annotations');
   });
 
@@ -1584,7 +1658,19 @@ describe('S1: source display read', () => {
     for (const get of [async () => ({ ok: false, status: 500, body: {} }), async () => { throw new Error('x'); }]) {
       const h = display({ readSourceDisplay: undefined, createClient: ({ resourceUrl }) => ({ baseUrl: resourceUrl, get }) });
       const result = await h.service.exportSource({ profileId: PROFILE, sourceRequestNumber: '9000001' });
-      expect(result.source).toEqual({ title: null, applicant: null });
+      expect(result.source).toEqual({ title: null, applicant: null, cycleCode: null });
     }
+  });
+
+  test('the default read gives no cycle for a historical (non-J/D) link', async () => {
+    const h = display({
+      readSourceDisplay: undefined,
+      createClient: ({ resourceUrl }) => ({
+        baseUrl: resourceUrl,
+        get: async () => ({ ok: true, status: 200, body: { akoya_title: 'A title', wmkf_GrantCycle: { wmkf_cyclecode: 'FY2019' } } }),
+      }),
+    });
+    const result = await h.service.exportSource({ profileId: PROFILE, sourceRequestNumber: '9000001' });
+    expect(result.source.cycleCode).toBeNull();
   });
 });

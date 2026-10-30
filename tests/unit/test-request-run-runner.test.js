@@ -395,6 +395,7 @@ describe('advanceRun: production runs write only through the fence (MVP slice 2)
           if (requestPath.includes("'wmkf_projectleader'")) return ok({ value: [{ ReferencedEntity: 'contact', ReferencingEntityNavigationPropertyName: 'wmkf_ProjectLeader' }] });
           if (requestPath.includes("'wmkf_researchleader'")) return ok({ value: [{ ReferencedEntity: 'contact', ReferencingEntityNavigationPropertyName: 'wmkf_ResearchLeader' }] });
           if (requestPath.includes("'akoya_primarycontactid'")) return ok({ value: [{ ReferencedEntity: 'contact', ReferencingEntityNavigationPropertyName: 'akoya_primarycontactid' }] });
+          if (requestPath.includes("'wmkf_grantcycle'")) return ok({ value: [{ ReferencedEntity: 'wmkf_grantcycle', ReferencingEntityNavigationPropertyName: 'wmkf_GrantCycle' }] });
           return ok({ value: [{ ReferencedEntity: 'account' }] });
         }
         if (requestPath.includes('PicklistAttributeMetadata')) {
@@ -939,6 +940,7 @@ describe('advanceRun: create_request resume rules', () => {
   const preflightClient = () => ({
     async get(requestPath) {
       if (requestPath.includes('EntityDefinitions')) {
+        if (requestPath.includes('ManyToOneRelationships') && requestPath.includes("'wmkf_grantcycle'")) return ok({ value: [{ ReferencedEntity: 'wmkf_grantcycle', ReferencingEntityNavigationPropertyName: 'wmkf_GrantCycle' }] });
         if (requestPath.includes('ManyToOneRelationships')) return ok({ value: [{ ReferencedEntity: 'account' }] });
         if (requestPath.includes('PicklistAttributeMetadata')) {
           return ok({ OptionSet: { Options: [{ Value: 100000000, Label: { UserLocalizedLabel: { Label: 'Grant' } } }] } });
@@ -948,7 +950,7 @@ describe('advanceRun: create_request resume rules', () => {
         return ok({
           value: [
             'akoya_requestid', 'akoya_applicantid', 'akoya_title', 'akoya_purpose', 'akoya_request',
-            'akoya_fiscalyear', 'akoya_requesttype', 'wmkf_meetingdate', 'wmkf_abstract', 'wmkf_istestrequest',
+            'akoya_fiscalyear', 'akoya_requesttype', 'wmkf_meetingdate', 'wmkf_grantcycle', 'wmkf_abstract', 'wmkf_istestrequest',
             'wmkf_testcreationrunid', 'wmkf_respondreminderenabled', 'wmkf_reviewduereminderenabled',
           ].map((field) => ({ LogicalName: field, AttributeType: 'String', IsValidForCreate: true, RequiredLevel: { Value: 'None' } })),
         });

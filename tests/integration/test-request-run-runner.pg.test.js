@@ -55,6 +55,7 @@ async function assertLedgerSchemaCurrent(db, migrationSql) {
     throw new Error(`Throwaway ledger schema is stale (${missing.join(', ')}); drop test_request_run_reviewer_assignments, test_request_run_resources, test_request_runs and test_request_receipt_ok(jsonb), then rerun.`);
   }
 }
+const GRANT_CYCLE_ID = '16161616-1616-4161-8161-161616161616';
 const ORG_ID = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
 const APP_USER_ID = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb';
 const DV_SITE_ID = 'cccccccc-cccc-4ccc-8ccc-cccccccccccc';
@@ -80,7 +81,7 @@ function httpError(status, message) { return Object.assign(new Error(message), {
 const ATTRIBUTE_TYPES = {
   akoya_requestid: 'Uniqueidentifier', akoya_applicantid: 'Lookup', akoya_title: 'String', akoya_purpose: 'Memo',
   wmkf_abstract: 'Memo',
-  akoya_request: 'Money', akoya_fiscalyear: 'String', akoya_requesttype: 'Picklist', wmkf_meetingdate: 'DateOnly',
+  akoya_request: 'Money', akoya_fiscalyear: 'String', akoya_requesttype: 'Picklist', wmkf_meetingdate: 'DateOnly', wmkf_grantcycle: 'Lookup',
   wmkf_istestrequest: 'Boolean', wmkf_testcreationrunid: 'String', wmkf_respondreminderenabled: 'Boolean',
   wmkf_reviewduereminderenabled: 'Boolean',
 };
@@ -124,6 +125,7 @@ function makeWorld(log) {
   async function get(requestPath) {
     const decoded = decodeURIComponent(requestPath);
     if (decoded.startsWith("/EntityDefinitions(LogicalName='akoya_request')")) {
+      if (decoded.includes('ManyToOneRelationships') && decoded.includes("'wmkf_grantcycle'")) return ok({ value: [{ ReferencedEntity: 'wmkf_grantcycle', ReferencingEntityNavigationPropertyName: 'wmkf_GrantCycle' }] });
       if (decoded.includes('ManyToOneRelationships')) return ok({ value: [{ ReferencedEntity: 'account' }] });
       if (decoded.includes('PicklistAttributeMetadata')) return ok({ OptionSet: { Options: [{ Value: GRANT, Label: { UserLocalizedLabel: { Label: 'Grant' } } }] } });
       if (decoded.includes('MoneyAttributeMetadata')) return ok({ MinValue: 0, MaxValue: 1e12 });
@@ -197,6 +199,9 @@ function makeWorld(log) {
       akoya_requeststatus: null, wmkf_phaseiistatus: null, akoya_recommendedamount: null, akoya_originalgrantamount: null,
       akoya_submissionaccepted: false,
       _akoya_applicantid_value: body['akoya_applicantid@odata.bind'].match(/\(([^)]+)\)/)[1],
+      // The Grant Cycle link: the bound row id, and the expanded code a $expand read returns.
+      _wmkf_grantcycle_value: body['wmkf_GrantCycle@odata.bind']?.match(/\(([^)]+)\)/)[1] ?? null,
+      wmkf_GrantCycle: body['wmkf_GrantCycle@odata.bind'] === `/wmkf_grantcycles(${GRANT_CYCLE_ID})` ? { wmkf_cyclecode: 'D26' } : null,
       _createdby_value: APP_USER_ID, _ownerid_value: APP_USER_ID, versionnumber: 7000,
     };
     state.requests.set(id, row);
@@ -359,6 +364,7 @@ describeIf('slice 5b runner against the live run ledger', () => {
     const source = bundle.source.request;
     const manifest = buildCloneManifest(preflight, {
       source, fiscalYear: source.akoya_fiscalyear, meetingDate: source.wmkf_meetingdate, testLabel: 'Runner proof', bundle, recipe,
+      grantCycleId: GRANT_CYCLE_ID, cycleCode: 'D26',
     });
     const idempotencyKey = `runner-${crypto.randomBytes(4).toString('hex')}`;
     const { run } = await ledger.reserveRun({ actorId: cliActorId('runner-proof'), idempotencyKey, plan: reservePlan(manifest, bundle) });

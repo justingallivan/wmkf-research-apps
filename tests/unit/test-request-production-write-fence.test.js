@@ -85,6 +85,7 @@ describe('fenceProductionClient', () => {
       wmkf_testcreationrunid: LOC, wmkf_respondreminderenabled: false, wmkf_reviewduereminderenabled: false,
       akoya_requeststatus: 'Phase II Pending', 'wmkf_ProgramDirector@odata.bind': `/systemusers(${LOC})`,
       'wmkf_GrantProgram@odata.bind': `/wmkf_grantprograms(${LOC})`,
+      'wmkf_GrantCycle@odata.bind': `/wmkf_grantcycles(${LOC})`,
     }, {}, {});
     await fenced.post('/sharepointdocumentlocations', {
       sharepointdocumentlocationid: LOC, name: 'Documents on Default Site 1', relativeurl: FOLDER, servicetype: 0, locationtype: 0,

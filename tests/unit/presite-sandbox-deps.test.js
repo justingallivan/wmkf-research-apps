@@ -422,7 +422,7 @@ describe('createPresiteAiRunDeps', () => {
   });
 });
 
-describe('createPresiteInputDeps getRequest cycle (until Factory build step 5)', () => {
+describe('createPresiteInputDeps getRequest cycle (the clone\'s Grant Cycle link only)', () => {
   const REQUEST_ID = '55555555-5555-4555-8555-555555555555';
   const depsFor = (body) => {
     const get = jest.fn(async () => ({ ok: true, status: 200, body }));
@@ -436,22 +436,24 @@ describe('createPresiteInputDeps getRequest cycle (until Factory build step 5)',
     return { deps, get };
   };
 
-  it('requests the Grant Cycle expand and keeps a linked cycle', async () => {
-    const { deps, get } = depsFor({ akoya_requestid: REQUEST_ID, wmkf_meetingdate: '2026-12-11', wmkf_GrantCycle: { wmkf_cyclecode: 'D97' } });
+  it('expands the linked sandbox row with its Board date and returns it as read; the request meeting date is not selected', async () => {
+    const linked = { wmkf_cyclecode: 'D97', wmkf_meetingdate: '2097-12-05T00:00:00Z' };
+    const { deps, get } = depsFor({ akoya_requestid: REQUEST_ID, wmkf_GrantCycle: linked });
     const request = await withDalContext('presite-sandbox-deps-test', () => deps.getRequest(REQUEST_ID));
     const url = new URL(get.mock.calls[0][0], SANDBOX_URL);
-    expect(url.searchParams.get('$expand')).toBe('wmkf_GrantCycle($select=wmkf_cyclecode)');
-    expect(request.wmkf_GrantCycle).toEqual({ wmkf_cyclecode: 'D97', wmkf_meetingdate: '2026-12-11' });
+    expect(url.searchParams.get('$expand')).toBe('wmkf_GrantCycle($select=wmkf_cyclecode,wmkf_meetingdate)');
+    expect(url.searchParams.get('$select').split(',')).not.toContain('wmkf_meetingdate');
+    expect(request.wmkf_GrantCycle).toEqual(linked);
   });
 
-  it('derives an unlinked clone cycle from its meeting date', async () => {
+  it('leaves an unlinked clone without a cycle, whatever its meeting date (no fallback)', async () => {
     const { deps } = depsFor({ akoya_requestid: REQUEST_ID, wmkf_meetingdate: '2026-12-11', wmkf_GrantCycle: null });
     const request = await withDalContext('presite-sandbox-deps-test', () => deps.getRequest(REQUEST_ID));
-    expect(request.wmkf_GrantCycle).toEqual({ wmkf_cyclecode: 'D26', wmkf_meetingdate: '2026-12-11' });
+    expect(request.wmkf_GrantCycle).toBeNull();
   });
 
-  it('leaves an off-month unlinked clone without a cycle', async () => {
-    const { deps } = depsFor({ akoya_requestid: REQUEST_ID, wmkf_meetingdate: '2026-03-11', wmkf_GrantCycle: null });
+  it('leaves a clone linked to a historical (non-J/D) row without a cycle', async () => {
+    const { deps } = depsFor({ akoya_requestid: REQUEST_ID, wmkf_GrantCycle: { wmkf_cyclecode: 'FY2019', wmkf_meetingdate: null } });
     const request = await withDalContext('presite-sandbox-deps-test', () => deps.getRequest(REQUEST_ID));
     expect(request.wmkf_GrantCycle).toBeNull();
   });

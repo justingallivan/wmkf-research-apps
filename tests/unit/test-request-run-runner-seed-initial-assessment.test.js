@@ -131,7 +131,7 @@ const DESTINATION_REQUEST = {
   akoya_requestid: REQUEST_ID,
   akoya_requestnum: '9009009',
   akoya_title: 'Synthetic Fixture Rehearsal',
-  wmkf_meetingdate: '2026-06-15',
+  wmkf_GrantCycle: { wmkf_cyclecode: 'J26' },
   '_akoya_applicantid_value@OData.Community.Display.V1.FormattedValue': 'Synthetic University',
 };
 
@@ -157,6 +157,7 @@ function fakeClient() {
     get: jest.fn(async (requestPath) => {
       if (requestPath.startsWith(`/akoya_requests(${REQUEST_ID})`)) return { ok: true, status: 200, body: DESTINATION_REQUEST };
       if (requestPath.includes('EntityDefinitions')) {
+        if (requestPath.includes('ManyToOneRelationships') && requestPath.includes("'wmkf_grantcycle'")) return { ok: true, status: 200, body: { value: [{ ReferencedEntity: 'wmkf_grantcycle', ReferencingEntityNavigationPropertyName: 'wmkf_GrantCycle' }] } };
         if (requestPath.includes('ManyToOneRelationships')) return { ok: true, status: 200, body: { value: [{ ReferencedEntity: 'account' }] } };
         if (requestPath.includes('PicklistAttributeMetadata')) {
           return { ok: true, status: 200, body: { OptionSet: { Options: [{ Value: 100000000, Label: { UserLocalizedLabel: { Label: 'Grant' } } }] } } };
@@ -168,7 +169,7 @@ function fakeClient() {
           body: {
             value: [
               'akoya_requestid', 'akoya_applicantid', 'akoya_title', 'akoya_purpose', 'wmkf_abstract', 'akoya_request',
-              'akoya_fiscalyear', 'akoya_requesttype', 'wmkf_meetingdate', 'wmkf_istestrequest',
+              'akoya_fiscalyear', 'akoya_requesttype', 'wmkf_meetingdate', 'wmkf_grantcycle', 'wmkf_istestrequest',
               'wmkf_testcreationrunid', 'wmkf_respondreminderenabled', 'wmkf_reviewduereminderenabled',
             ].map((field) => ({ LogicalName: field, AttributeType: 'String', IsValidForCreate: true, RequiredLevel: { Value: 'None' } })),
           },
@@ -305,7 +306,7 @@ function identityFor() {
     requestNumber: DESTINATION_REQUEST.akoya_requestnum,
     title: DESTINATION_REQUEST.akoya_title,
     institution: 'Synthetic University',
-    cycleCode: 'J26', // DESTINATION_REQUEST.wmkf_meetingdate is 2026-06-15 (June -> J26)
+    cycleCode: 'J26', // DESTINATION_REQUEST links to J26
     proposalFilename: SYNTHETIC_PROPOSAL_FILENAME,
     proposalText: SYNTHETIC_PROPOSAL_TEXT,
   });

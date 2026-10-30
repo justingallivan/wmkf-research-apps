@@ -107,7 +107,10 @@ const selectRun = async (label) => {
   await waitFor(() => expect(screen.queryByText('Loading resources…')).toBeNull());
 };
 
-async function lookup(server, number = '1001000', response = { status: 200, body: { draftId: DRAFT_ID, summary: SUMMARY, defaults: { fiscalYear: 'December 2026', meetingDate: '2026-12-01' } } }) {
+// The destination calendar the lookup returns: D27 has no Board date, so the picker leaves it out.
+const CYCLES = [{ cycleCode: 'D26', boardDate: '2026-12-01' }, { cycleCode: 'J27', boardDate: '2027-06-03' }, { cycleCode: 'D27', boardDate: null }];
+
+async function lookup(server, number = '1001000', response = { status: 200, body: { draftId: DRAFT_ID, summary: SUMMARY, source: { cycleCode: 'D26' }, cycles: CYCLES, defaults: { cycleCode: 'D26' } } }) {
   server.on('POST', `${BASE}/source`, response);
   fireEvent.change(screen.getByLabelText('Source Request number'), { target: { value: number } });
   fireEvent.click(screen.getByRole('button', { name: 'Look up source' }));
@@ -167,7 +170,9 @@ describe('source lookup', () => {
     expect(screen.getByText('ProjectDescription.pdf')).toBeTruthy();
     expect(screen.getByText('2.0 KB')).toBeTruthy();
     expect(server.bodies('POST', `${BASE}/source`)).toEqual([{ sourceRequestNumber: '1001000' }]);
-    expect(screen.getByLabelText('Fiscal year').value).toBe('December 2026');
+    expect(screen.getByLabelText('Grant Cycle').value).toBe('D26');
+    expect([...screen.getByLabelText('Grant Cycle').options].map((o) => o.value)).toEqual(['', 'D26', 'J27']);
+    expect(screen.getByText('The test Request joins D26, with meeting date December 1, 2026 and fiscal year December 2026.')).toBeTruthy();
   });
 
   test('the number must be 1 to 10 digits, and the button says so', async () => {
@@ -210,7 +215,7 @@ describe('source lookup', () => {
 describe('confirm', () => {
   const reserved = (extra = {}) => ({ status: 201, body: { run: makeRun({ testLabel: 'My test', ...extra }), created: true } });
 
-  test('stays disabled, with the reason, until label, both cycle fields and the exact typed number are present', async () => {
+  test('stays disabled, with the reason, until label, a Grant Cycle and the exact typed number are present', async () => {
     const server = makeServer();
     await renderSection(server, []);
     await lookup(server);
@@ -225,16 +230,16 @@ describe('confirm', () => {
     expect(reasonOf()).toBe('Type Request number 1001000 exactly to confirm.');
     fireEvent.change(screen.getByLabelText(/Type Request number/), { target: { value: '1001000 ' } });
     expect(confirmButton().disabled).toBe(true);
-    fireEvent.change(screen.getByLabelText('Fiscal year'), { target: { value: '' } });
+    fireEvent.change(screen.getByLabelText('Grant Cycle'), { target: { value: '' } });
     fireEvent.change(screen.getByLabelText(/Type Request number/), { target: { value: '1001000' } });
-    expect(reasonOf()).toBe('Enter both the fiscal year and the meeting date.');
-    fireEvent.change(screen.getByLabelText('Fiscal year'), { target: { value: 'December 2026' } });
+    expect(reasonOf()).toBe('Choose a Grant Cycle.');
+    fireEvent.change(screen.getByLabelText('Grant Cycle'), { target: { value: 'J27' } });
     expect(confirmButton().disabled).toBe(false);
     expect(screen.getByText(/Confirm reserves the run and creates nothing in Dataverse yet/)).toBeTruthy();
     expect(server.count('POST', BASE)).toBe(0);
   });
 
-  test('sends draftId, the key, the typed number, the label and both cycle values; 201 selects the run', async () => {
+  test('sends draftId, the key, the typed number, the label and the cycle code; 201 selects the run', async () => {
     const server = makeServer();
     server.on('GET', `${BASE}/${RUN_A}`, runBody(makeRun({ testLabel: 'My test' })));
     await renderSection(server, []);
@@ -245,7 +250,7 @@ describe('confirm', () => {
     fireEvent.click(confirmButton());
     await screen.findByRole('heading', { name: 'My test' });
     expect(server.bodies('POST', BASE)).toEqual([{
-      draftId: DRAFT_ID, idempotencyKey: 'key-1', confirmSourceRequestNumber: '1001000', testLabel: 'My test', fiscalYear: 'December 2026', meetingDate: '2026-12-01',
+      draftId: DRAFT_ID, idempotencyKey: 'key-1', confirmSourceRequestNumber: '1001000', testLabel: 'My test', cycleCode: 'D26',
     }]);
     expect(screen.getByText('Nothing has been created in Dataverse yet. Start it from the run panel below.')).toBeTruthy();
   });
@@ -308,21 +313,32 @@ describe('confirm', () => {
     expect(confirmButton().disabled).toBe(false);
   });
 
-  test('a source with no cycle: both fields start empty and the body never carries null', async () => {
+  test('a source with no cycle: no cycle is chosen, the source says "No cycle", and the body carries the cycle picked', async () => {
     const server = makeServer();
     server.on('GET', `${BASE}/${RUN_A}`, runBody(makeRun({ testLabel: 'My test' })));
     await renderSection(server, []);
-    await lookup(server, '1001000', { status: 200, body: { draftId: DRAFT_ID, summary: { ...SUMMARY, fiscalYear: null, meetingDate: null }, defaults: { fiscalYear: null, meetingDate: null } } });
+    await lookup(server, '1001000', { status: 200, body: { draftId: DRAFT_ID, summary: SUMMARY, source: { cycleCode: null }, cycles: CYCLES, defaults: { cycleCode: null } } });
     await screen.findByLabelText('Test label');
-    expect(screen.getByLabelText('Fiscal year').value).toBe('');
+    expect(screen.getByText('No cycle')).toBeTruthy();
+    expect(screen.getByLabelText('Grant Cycle').value).toBe('');
     fillConfirm();
     expect(confirmButton().disabled).toBe(true);
-    fireEvent.change(screen.getByLabelText('Fiscal year'), { target: { value: 'June 2027' } });
-    fireEvent.change(screen.getByLabelText('Meeting date'), { target: { value: '2027-06-04' } });
+    fireEvent.change(screen.getByLabelText('Grant Cycle'), { target: { value: 'J27' } });
     server.on('POST', BASE, reserved());
     fireEvent.click(confirmButton());
     await screen.findByRole('heading', { name: 'My test' });
-    expect(server.bodies('POST', BASE)[0]).toMatchObject({ fiscalYear: 'June 2027', meetingDate: '2027-06-04' });
+    expect(server.bodies('POST', BASE)[0]).toMatchObject({ cycleCode: 'J27' });
+  });
+
+  test('a destination calendar with no cycle that has a Board date keeps Confirm disabled and says why', async () => {
+    const server = makeServer();
+    await renderSection(server, []);
+    await lookup(server, '1001000', { status: 200, body: { draftId: DRAFT_ID, summary: SUMMARY, cycles: [{ cycleCode: 'D27', boardDate: null }], defaults: { cycleCode: null } } });
+    await screen.findByLabelText('Test label');
+    fillConfirm();
+    expect(confirmButton().disabled).toBe(true);
+    expect(document.getElementById(confirmButton().getAttribute('aria-describedby')).textContent)
+      .toBe('No Grant Cycle with a Board date is available. Add one in the cycle calendar first.');
   });
 });
 
@@ -519,7 +535,7 @@ describe('write reasons and reserved values', () => {
       { status: 200, body: { run: makeRun({ testLabel: 'My test', fiscalYear: 'December 2026', meetingDate: '2026-12-01' }), created: false } });
     fireEvent.click(confirmButton());
     await screen.findByRole('alert');
-    fireEvent.change(screen.getByLabelText('Meeting date'), { target: { value: '2026-12-15' } });
+    fireEvent.change(screen.getByLabelText('Grant Cycle'), { target: { value: 'J27' } });
     fireEvent.click(confirmButton());
     await screen.findByText(/meeting 2026-12-01, 1 document\)/);
     expect(screen.getByText('This run was already reserved by an earlier attempt, with the values shown here, not the ones you just entered. To use different values, choose Create another.')).toBeTruthy();
@@ -698,7 +714,7 @@ describe('write target and consequence', () => {
     await selectRun('Run A');
     expect(screen.getByRole('button', { name: label })).toBeTruthy();
     const line = status === 'prepared'
-      ? `Writes to ${where} Dataverse and SharePoint: creates the test Request, sets its meeting date, makes its document folder and copies its documents.`
+      ? `Writes to ${where} Dataverse and SharePoint: creates the test Request in its Grant Cycle, sets its meeting date, makes its document folder and copies its documents.`
       : `The remaining steps write to ${where} Dataverse and SharePoint.`;
     expect(screen.getByText(line)).toBeTruthy();
   });
@@ -725,16 +741,16 @@ describe('source identity', () => {
     await renderSection(server, []);
     await lookup(server, '1001000', {
       status: 200,
-      body: { draftId: DRAFT_ID, summary: SUMMARY, source: { title: 'Gene editing study', applicant: 'Live University' }, defaults: { fiscalYear: 'December 2026', meetingDate: '2026-12-01' } },
+      body: { draftId: DRAFT_ID, summary: SUMMARY, source: { title: 'Gene editing study', applicant: 'Live University', cycleCode: 'D26' }, cycles: CYCLES, defaults: { cycleCode: 'D26' } },
     });
     await screen.findByRole('heading', { name: 'Source Request 1001000' });
     expect(screen.getByText('Gene editing study · Live University')).toBeTruthy();
     expect(screen.getByText('Project Description', { selector: 'td' })).toBeTruthy();
     expect(screen.getByLabelText('Test label').value).toBe('Test clone of Request 1001000');
-    // The fiscal year is pre-filled, so its hint shows only once the field is empty.
-    expect(screen.queryByText('For example: December 2026')).toBeNull();
-    fireEvent.change(screen.getByLabelText('Fiscal year'), { target: { value: '' } });
-    expect(screen.getByText('For example: December 2026')).toBeTruthy();
+    // The source's own linked cycle sits beside its identity; with no cycle chosen the hint says what a cycle sets.
+    expect(screen.getByText('D26', { selector: 'dd' })).toBeTruthy();
+    fireEvent.change(screen.getByLabelText('Grant Cycle'), { target: { value: '' } });
+    expect(screen.getByText("The test Request joins the cycle you choose and takes that cycle's Board meeting date and fiscal year.")).toBeTruthy();
   });
 
   test('falls back to "Title unavailable" and "Applicant unavailable", and shows an unknown kind raw', async () => {
@@ -742,11 +758,11 @@ describe('source identity', () => {
     await renderSection(server, []);
     await lookup(server, '1001000', {
       status: 200,
-      body: { draftId: DRAFT_ID, summary: { ...SUMMARY, documents: [{ kind: 'somethingNew', name: 'X.pdf', size: 1, sha256Prefix: 'aa' }] }, source: { title: null, applicant: null }, defaults: { fiscalYear: null, meetingDate: null } },
+      body: { draftId: DRAFT_ID, summary: { ...SUMMARY, documents: [{ kind: 'somethingNew', name: 'X.pdf', size: 1, sha256Prefix: 'aa' }] }, source: { title: null, applicant: null, cycleCode: null }, cycles: CYCLES, defaults: { cycleCode: null } },
     });
     await screen.findByText('Title unavailable · Applicant unavailable');
     expect(screen.getByText('somethingNew', { selector: 'td' })).toBeTruthy();
-    expect(screen.queryByText(/^For example:/)).toBeNull();
+    expect(screen.getByText('No cycle')).toBeTruthy();
   });
 });
 

@@ -33,6 +33,7 @@ const PROGRAM_ID = '77777777-7777-4777-8777-777777777777';
 const PI_ID = '88888888-8888-4888-8888-888888888888';
 const LIAISON_ID = '99999999-9999-4999-8999-999999999999';
 const RESEARCH_LEADER_ID = '15151515-1515-4151-8151-151515151515';
+const GRANT_CYCLE_ID = '16161616-1616-4161-8161-161616161616';
 
 const BASE_FIELDS = [
   'akoya_requestid', 'akoya_title', 'akoya_purpose', 'akoya_request', 'akoya_fiscalyear',
@@ -58,6 +59,9 @@ function metadata({ production = true, overrides = {} } = {}) {
     ...(field === 'akoya_purpose' ? { maxLength: 100000 } : {}),
   }]));
   fields.akoya_applicantid = { createable: true, requiredLevel: 'None', type: 'Lookup', lookupTarget: 'accounts' };
+  fields.wmkf_grantcycle = {
+    createable: true, requiredLevel: 'None', type: 'Lookup', lookupEntity: 'wmkf_grantcycle', navigationProperty: 'wmkf_GrantCycle',
+  };
   if (production) {
     fields.akoya_requeststatus = { createable: true, requiredLevel: 'None', type: 'String', maxLength: 100 };
     fields.wmkf_programdirector = {
@@ -179,13 +183,44 @@ function productionManifest(overrides = {}) {
     recipe: 'basic',
     values: {
       requestId: REQUEST_ID, runId: RUN_ID, meetingDate: '2026-12-01', programDirectorId: PD_ID, grantProgramId: PROGRAM_ID,
-      piContactId: PI_ID, liaisonContactId: LIAISON_ID, researchLeaderContactId: RESEARCH_LEADER_ID,
+      piContactId: PI_ID, liaisonContactId: LIAISON_ID, researchLeaderContactId: RESEARCH_LEADER_ID, grantCycleId: GRANT_CYCLE_ID,
     },
     createBody: { akoya_requeststatus: 'Phase II Pending' },
     expectedAppUserId: APP_USER_ID,
     ...overrides,
   };
 }
+
+describe('policy: Grant Cycle link (meeting-date retirement step 5)', () => {
+  test('binds the chosen Grant Cycle through the metadata navigation property and keeps the meeting date', () => {
+    const result = compileTestRequestDraft(draftInput({ grantCycleId: GRANT_CYCLE_ID.toUpperCase(), production }));
+    expect(result.blockers).toEqual([]);
+    expect(result.createBody['wmkf_GrantCycle@odata.bind']).toBe(`/wmkf_grantcycles(${GRANT_CYCLE_ID})`);
+    expect(result.createBody.wmkf_meetingdate).toBe('2026-12-01');
+  });
+
+  test('omits the bind when no Grant Cycle is supplied (the CLI path)', () => {
+    const result = compileTestRequestDraft(draftInput());
+    expect(result.blockers).toEqual([]);
+    expect(Object.keys(result.createBody).some((key) => key.toLowerCase().startsWith('wmkf_grantcycle'))).toBe(false);
+  });
+
+  test('refuses a non-GUID Grant Cycle and a lookup that does not target wmkf_grantcycle', () => {
+    expect(compileTestRequestDraft(draftInput({ grantCycleId: 'D26' })).blockers.map((b) => b.code)).toContain('INPUT_INVALID');
+    const md = metadata();
+    md.fields.wmkf_grantcycle = { ...md.fields.wmkf_grantcycle, lookupEntity: 'wmkf_appgrantcycle' };
+    const result = compileTestRequestDraft(draftInput({ metadata: md, grantCycleId: GRANT_CYCLE_ID }));
+    expect(result.blockers.map((b) => b.code)).toContain('LOOKUP_TARGET_UNKNOWN');
+    expect(result.createBody).toBeNull();
+  });
+
+  test('an application-required Grant Cycle is satisfied by the bind, and blocks without one', () => {
+    const md = metadata();
+    md.fields.wmkf_grantcycle = { ...md.fields.wmkf_grantcycle, requiredLevel: 'ApplicationRequired' };
+    expect(compileTestRequestDraft(draftInput({ metadata: md, grantCycleId: GRANT_CYCLE_ID })).blockers).toEqual([]);
+    expect(compileTestRequestDraft(draftInput({ metadata: md })).blockers.map((b) => b.code)).toContain('REQUIRED_UNSUPPLIED');
+  });
+});
 
 describe('manifest target', () => {
   test('buildCloneManifest refuses a production target without a bundle, a program director, or with a non-basic recipe', () => {
@@ -224,6 +259,21 @@ describe('manifest target', () => {
   ])('validateCloneManifest refuses a production manifest with %s', (_label, change) => {
     const manifest = productionManifest({ values: { ...productionManifest().values, ...change } });
     expect(() => validateCloneManifest(manifest)).toThrow(/three different cast contacts/);
+  });
+
+  test('buildCloneManifest refuses a production target with no Grant Cycle (real cycles only)', () => {
+    const preflight = { targetEnvironment: 'production', grantProgram: { grantprogramid: PROGRAM_ID } };
+    const base = {
+      bundle: {}, programDirector: { systemuserid: PD_ID },
+      cast: { piContactId: PI_ID, liaisonContactId: LIAISON_ID, researchLeaderContactId: RESEARCH_LEADER_ID },
+    };
+    expect(() => buildCloneManifest(preflight, base)).toThrow(/requires a Grant Cycle/);
+    expect(() => buildCloneManifest(preflight, { ...base, grantCycleId: 'D26' })).toThrow(/requires a Grant Cycle/);
+  });
+
+  test('validateCloneManifest still accepts a pre-step-5 production manifest with no Grant Cycle as far as the cast (CLI --inspect)', () => {
+    const manifest = productionManifest({ values: { ...productionManifest().values, grantCycleId: undefined } });
+    expect(() => validateCloneManifest(manifest)).not.toThrow(/Grant Cycle/);
   });
 
   test('validateCloneManifest refuses a sandbox manifest that carries a cast contact', () => {
@@ -320,8 +370,16 @@ describe('verifyCloneRequestReadback on a production target', () => {
       _akoya_applicantid_value: ORG_ID, _createdby_value: APP_USER_ID, _ownerid_value: APP_USER_ID, wmkf_istestrequest: true,
       wmkf_testcreationrunid: RUN_ID, wmkf_respondreminderenabled: false, wmkf_reviewduereminderenabled: false,
       akoya_requeststatus: 'Concept Pending', _wmkf_programdirector_value: APP_USER_ID, _wmkf_grantprogram_value: null,
+      _wmkf_grantcycle_value: GRANT_CYCLE_ID.toUpperCase(),
     });
     expect(failures).toEqual(['request status mismatch', 'program director mismatch', 'grant program mismatch']);
+  });
+
+  test('flags a Grant Cycle link that is missing or points at another row', () => {
+    const manifest = productionManifest({ createBody: {}, expectedOrganization: { accountid: ORG_ID } });
+    expect(verifyCloneRequestReadback(manifest, { _wmkf_grantcycle_value: GRANT_CYCLE_ID })).not.toContain('grant cycle mismatch');
+    expect(verifyCloneRequestReadback(manifest, { _wmkf_grantcycle_value: null })).toContain('grant cycle mismatch');
+    expect(verifyCloneRequestReadback(manifest, { _wmkf_grantcycle_value: PD_ID })).toContain('grant cycle mismatch');
   });
 });
 
@@ -352,7 +410,7 @@ describe('assertRunTarget (checked before every lease)', () => {
 describe('CLI --target', () => {
   const reserve = (...extra) => [
     'node', 'x', '--reserve', '--source-request-number=1003222', '--bundle=/a/b.json', '--manifest-out=/a/m.json',
-    '--idempotency-key=k1', '--target=production', ...extra,
+    '--idempotency-key=k1', '--target=production', '--cycle=D26', ...extra,
   ];
   test('production reserve requires --director and the basic recipe', () => {
     expect(() => parseArgs(reserve())).toThrow(/--director/);
@@ -382,6 +440,18 @@ describe('CLI --target', () => {
     expect(() => parseArgs(['node', 'x', `--run-recheck=${runId}`])).toThrow(/only with --target=production/);
     expect(() => parseArgs(['node', 'x', '--run-recheck=nope', '--target=production'])).toThrow(/run ID GUID/);
     expect(() => parseArgs(['node', 'x', `--run-recheck=${runId}`, `--run-inspect=${runId}`, '--target=production'])).toThrow(/Choose exactly one/);
+  });
+
+  test('--cycle: required to reserve, a J/D code, never with --fiscal-year or --meeting-date, and only with --prepare or --reserve', () => {
+    const bare = ['node', 'x', '--reserve', '--source-request-number=1', '--bundle=/a', '--manifest-out=/m', '--idempotency-key=k'];
+    expect(() => parseArgs(bare)).toThrow(/--reserve requires --cycle/);
+    expect(parseArgs([...bare, '--cycle=D97']).cycle).toBe('D97');
+    expect(() => parseArgs([...bare, '--cycle=d97'])).toThrow(/J or D and two digits/);
+    expect(() => parseArgs([...bare, '--cycle=D97', '--meeting-date=2097-12-01'])).toThrow(/omit --fiscal-year and --meeting-date/);
+    const prepare = ['node', 'x', '--prepare=/m.json', '--source-request-number=1'];
+    expect(parseArgs(prepare).cycle).toBeNull();
+    expect(parseArgs([...prepare, '--cycle=D99']).cycle).toBe('D99');
+    expect(() => parseArgs(['node', 'x', '--cycle=D99'])).toThrow(/valid only with --prepare or --reserve/);
   });
 
   test('--director is refused outside a production reserve, and unknown targets are refused', () => {

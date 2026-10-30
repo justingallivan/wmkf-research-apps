@@ -23,7 +23,7 @@ const RUN_ID = '11111111-1111-4111-8111-111111111111';
 const DRAFT_ID = '22222222-2222-4222-8222-222222222222';
 const PROFILE = 7;
 const CONFIRM_BODY = {
-  draftId: DRAFT_ID, idempotencyKey: 'key-1', confirmSourceRequestNumber: '9000001', testLabel: 'Factory proof',
+  draftId: DRAFT_ID, idempotencyKey: 'key-1', confirmSourceRequestNumber: '9000001', testLabel: 'Factory proof', cycleCode: 'D26',
 };
 
 function mockRes() {
@@ -266,8 +266,13 @@ describe('runs POST (Confirm)', () => {
     ['testLabel blank', { ...CONFIRM_BODY, testLabel: '   ' }],
     ['testLabel over 120', { ...CONFIRM_BODY, testLabel: 'x'.repeat(121) }],
     ['testLabel wrong type', { ...CONFIRM_BODY, testLabel: 5 }],
-    ['fiscalYear over 32', { ...CONFIRM_BODY, fiscalYear: 'y'.repeat(33) }],
-    ['meetingDate wrong type', { ...CONFIRM_BODY, meetingDate: 20261201 }],
+    ['cycleCode lower case', { ...CONFIRM_BODY, cycleCode: 'd26' }],
+    ['cycleCode not J or D', { ...CONFIRM_BODY, cycleCode: 'X26' }],
+    ['cycleCode a row GUID', { ...CONFIRM_BODY, cycleCode: DRAFT_ID }],
+    ['cycleCode wrong type', { ...CONFIRM_BODY, cycleCode: 26 }],
+    // The cycle decides the meeting date and fiscal year; the browser can no longer send either.
+    ['a fiscalYear key', { ...CONFIRM_BODY, fiscalYear: 'December 2026' }],
+    ['a meetingDate key', { ...CONFIRM_BODY, meetingDate: '2026-12-01' }],
     ['array body', [CONFIRM_BODY]],
     ['absent body', undefined],
   ])('%s is 400 and the service is not called', async (_label, body) => {
@@ -278,14 +283,12 @@ describe('runs POST (Confirm)', () => {
   });
 
   test('actorEmail comes from the session, never the body; fields are picked by name', async () => {
-    await run({ ...CONFIRM_BODY, fiscalYear: 'December 2026', meetingDate: '2026-12-01' });
+    await run({ ...CONFIRM_BODY });
     expect(getSession).toHaveBeenCalledTimes(1);
     expect(service.confirmRun).toHaveBeenCalledWith({
       profileId: PROFILE,
       actorEmail: 'staff@wmkeck.org',
       ...CONFIRM_BODY,
-      fiscalYear: 'December 2026',
-      meetingDate: '2026-12-01',
     });
   });
 

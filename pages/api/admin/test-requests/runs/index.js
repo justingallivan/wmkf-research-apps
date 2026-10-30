@@ -10,12 +10,11 @@
 import { withDalContext } from '../../../../../lib/dataverse/core/context';
 import { createAdminRunService } from '../../../../../lib/services/test-requests/admin-run-service';
 import {
-  hasOnlyKeys, invalidInput, isExactGuid, isIdempotencyKey, isOptionalCycleField, isRequestNumber, isTestLabel, sendError,
+  hasOnlyKeys, invalidInput, isCycleCode, isExactGuid, isIdempotencyKey, isRequestNumber, isTestLabel, sendError,
 } from '../../../../../lib/services/test-requests/admin-run-route-helpers';
 import { getSession, requireSuperuser } from '../../../../../lib/utils/auth';
 
-const REQUIRED_POST_KEYS = Object.freeze(['draftId', 'idempotencyKey', 'confirmSourceRequestNumber', 'testLabel']);
-const OPTIONAL_POST_KEYS = Object.freeze(['fiscalYear', 'meetingDate']);
+const REQUIRED_POST_KEYS = Object.freeze(['draftId', 'idempotencyKey', 'confirmSourceRequestNumber', 'testLabel', 'cycleCode']);
 
 export const config = { api: { bodyParser: { sizeLimit: '32kb' } } };
 
@@ -40,14 +39,13 @@ export default async function handler(req, res) {
   }
 
   const body = req.body;
-  if (!hasOnlyKeys(body, REQUIRED_POST_KEYS, OPTIONAL_POST_KEYS)
+  if (!hasOnlyKeys(body, REQUIRED_POST_KEYS)
       || !isExactGuid(body.draftId)
       || !isIdempotencyKey(body.idempotencyKey)
       || !isRequestNumber(body.confirmSourceRequestNumber)
       || !isTestLabel(body.testLabel)
-      || !isOptionalCycleField(body.fiscalYear)
-      || !isOptionalCycleField(body.meetingDate)) {
-    return invalidInput(res, 'The body must contain draftId, idempotencyKey, confirmSourceRequestNumber and testLabel; fiscalYear and meetingDate are optional short strings.');
+      || !isCycleCode(body.cycleCode)) {
+    return invalidInput(res, 'The body must contain draftId, idempotencyKey, confirmSourceRequestNumber, testLabel and a cycleCode (J or D and two digits).');
   }
 
   return withDalContext('admin-test-request-runs-confirm', async () => {
@@ -60,8 +58,7 @@ export default async function handler(req, res) {
         idempotencyKey: body.idempotencyKey,
         confirmSourceRequestNumber: body.confirmSourceRequestNumber,
         testLabel: body.testLabel,
-        fiscalYear: body.fiscalYear,
-        meetingDate: body.meetingDate,
+        cycleCode: body.cycleCode,
       });
       return res.status(result.created ? 201 : 200).json(result);
     } catch (error) {

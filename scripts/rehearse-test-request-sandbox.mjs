@@ -68,6 +68,7 @@ import {
   READBACK_FIELDS,
   SANDBOX_URL,
   TARGET_URLS,
+  resolveDestinationGrantCycle,
   resolveProgramDirector,
   targetEnvironmentOf,
   targetHostOf,
@@ -197,6 +198,7 @@ export function parseArgs(argv) {
     bypassGoverify: false,
     fiscalYear: null,
     meetingDate: null,
+    cycle: null,
     sourceRequestNumber: null,
     bundle: null,
     testLabel: null,
@@ -241,6 +243,7 @@ export function parseArgs(argv) {
     else if (arg.startsWith('--receipt=')) parsed.receipt = arg.slice('--receipt='.length);
     else if (arg.startsWith('--fiscal-year=')) parsed.fiscalYear = arg.slice('--fiscal-year='.length);
     else if (arg.startsWith('--meeting-date=')) parsed.meetingDate = arg.slice('--meeting-date='.length);
+    else if (arg.startsWith('--cycle=')) parsed.cycle = arg.slice('--cycle='.length);
     else if (arg.startsWith('--source-request-number=')) parsed.sourceRequestNumber = arg.slice('--source-request-number='.length);
     else if (arg.startsWith('--test-label=')) parsed.testLabel = arg.slice('--test-label='.length);
     else if (arg === '--bypass-goverify') parsed.bypassGoverify = true;
@@ -336,8 +339,14 @@ export function parseArgs(argv) {
   if ((parsed.prepare || parsed.reserve) && (!parsed.sourceRequestNumber || !/^\d{1,10}$/.test(parsed.sourceRequestNumber))) {
     throw new Error('--prepare/--reserve require a bounded numeric --source-request-number (with --bundle it must match the bundle source).');
   }
-  if (!parsed.prepare && !parsed.reserve && (parsed.fiscalYear !== null || parsed.meetingDate !== null || parsed.sourceRequestNumber !== null || parsed.testLabel !== null)) {
-    throw new Error('--source-request-number, --fiscal-year, --meeting-date, and --test-label are valid only with --prepare or --reserve.');
+  if (!parsed.prepare && !parsed.reserve && (parsed.fiscalYear !== null || parsed.meetingDate !== null || parsed.cycle !== null || parsed.sourceRequestNumber !== null || parsed.testLabel !== null)) {
+    throw new Error('--source-request-number, --fiscal-year, --meeting-date, --cycle, and --test-label are valid only with --prepare or --reserve.');
+  }
+  // The clone's Grant Cycle link (meeting-date retirement step 5): the cycle's
+  // Board date sets the meeting date and fiscal year, so neither is also given.
+  // A ledger run reads its clone's cycle from the link, so --reserve needs one.
+  if (parsed.cycle !== null && (parsed.fiscalYear !== null || parsed.meetingDate !== null)) {
+    throw new Error('--cycle sets the meeting date and fiscal year; omit --fiscal-year and --meeting-date.');
   }
   if (!parsed.prepare && !parsed.reserve && !parsed.advance && parsed.bundle !== null) {
     throw new Error('--bundle is valid only with --prepare, --reserve, or --advance.');
@@ -419,6 +428,10 @@ export function parseArgs(argv) {
   if (parsed.advance && (!Number.isInteger(parsed.steps) || parsed.steps < 1)) {
     throw new Error('--steps must be a positive integer.');
   }
+  if (parsed.reserve && parsed.cycle === null) {
+    throw new Error('--reserve requires --cycle=<J or D and two digits>, a Grant Cycle row in the target calendar.');
+  }
+  if (parsed.cycle !== null && !/^[JD]\d{2}$/.test(parsed.cycle)) throw new Error('--cycle must be J or D and two digits.');
   for (const value of [parsed.prepare, parsed.execute, parsed.inspect, parsed.receipt, parsed.bundle, parsed.manifestOut, parsed.manifest].filter(Boolean)) {
     if (!path.isAbsolute(value)) throw new Error('Manifest, receipt, and bundle paths must be absolute.');
   }
@@ -427,14 +440,15 @@ export function parseArgs(argv) {
 
 function printHelp() {
   console.log('Read-only: node --env-file=/absolute/.env.local scripts/rehearse-test-request-sandbox.mjs');
-  console.log('Prepare:  ... --prepare=/absolute/new-manifest.json --source-request-number=<actual-grant-request-number> [--fiscal-year=...] [--meeting-date=...]');
+  console.log('Prepare:  ... --prepare=/absolute/new-manifest.json --source-request-number=<actual-grant-request-number> [--cycle=D97 | --fiscal-year=... --meeting-date=...]');
   console.log('Prepare from a production source bundle (with file copy): ... --prepare=/absolute/new-manifest.json --bundle=/absolute/source-bundle.json --source-request-number=<authorized-source-number>');
   console.log('Inspect a bundle run with its receipt (read-only, verifies copied items by stable ID): ... --inspect=/absolute/manifest.json --receipt=/absolute/receipt.json');
   console.log('Replace the source-number placeholder with an actual sandbox Grant Request number.');
   console.log('Execute:  ... --execute=/absolute/manifest.json --receipt=/absolute/new-receipt.json');
   console.log('Execute with one-create sandbox bypass: ... --execute=... --receipt=... --bypass-goverify');
   console.log('Inspect:  ... --inspect=/absolute/manifest.json');
-  console.log('Reserve a ledger-driven bundle run: ... --reserve --bundle=/absolute/source-bundle.json --source-request-number=<authorized-source-number> --manifest-out=/absolute/new-manifest.json --idempotency-key=<key> [--actor=<id>] [--recipe=basic|initial_assessment|reviews]');
+  console.log('Reserve a ledger-driven bundle run: ... --reserve --bundle=/absolute/source-bundle.json --source-request-number=<authorized-source-number> --manifest-out=/absolute/new-manifest.json --idempotency-key=<key> --cycle=<code> [--actor=<id>] [--recipe=basic|initial_assessment|reviews]');
+  console.log('  --cycle: a Grant Cycle code in the target calendar (sandbox test rows D97/D99; production real cycles only). The clone links to it and takes its meeting date and fiscal year from its Board date.');
   console.log('  --recipe: basic (default), initial_assessment, or reviews; a same idempotency key reserved under a different recipe is a conflict, not a return of the first run.');
   console.log('  --reviewer-address=<sourcePersonGuid>=<address> (repeatable): valid only with --reserve --recipe=reviews. Each names one source reviewer and the throwaway address its synthetic reviewer will use; an address that already names an owned synthetic person bound to the same source reviewer reuses it (reused: true), otherwise a fresh destination GUID is preallocated. A reviewer with no flag takes its synthetic bundle address, else TEST_REQUEST_DEFAULT_REVIEWER_ADDRESS plus-tagged per source reviewer (<local>+<12 hex of sha256(source GUID)>@<domain>); with neither the reservation refuses. Reservation refuses zero assignments, a malformed address, or two assignments naming the same source reviewer or the same (case-insensitive) address.');
   console.log('  --idempotency-key: 1-200 printable ASCII characters, no spaces; the ledger stores only its SHA-256.');
@@ -921,7 +935,7 @@ export async function runReserve(client, args, ledgerUrl) {
   if (source.akoya_requesttype !== preflight.grantOption.value) {
     throw new Error('Source Request must be a Grant Request matching the live Grant option.');
   }
-  const cycle = resolveCloneCycle(source, args);
+  const cycle = await resolveDestinationGrantCycle(client, args.cycle);
   // The cloning admin is the clone's program director (owner, S546),
   // resolved from their sign-in on the target, never a supplied GUID.
   const target = args.target ?? 'sandbox';
@@ -1453,7 +1467,7 @@ async function main() {
     if (source.akoya_requesttype !== preflight.grantOption.value) {
       throw new Error('Source Request must be a Grant Request matching the live Grant option.');
     }
-    const cycle = resolveCloneCycle(source, args);
+    const cycle = args.cycle !== null ? await resolveDestinationGrantCycle(client, args.cycle) : resolveCloneCycle(source, args);
     const manifest = buildCloneManifest(preflight, { ...cycle, source, testLabel: args.testLabel, bundle });
     writeNewJson(args.prepare, manifest);
     console.log(JSON.stringify({

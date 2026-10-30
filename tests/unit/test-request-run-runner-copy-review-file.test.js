@@ -221,6 +221,7 @@ function preflightClient() {
         return ok({ akoya_requestid: REQUEST_ID, akoya_requestnum: '1000400', wmkf_meetingdate: '2026-12-01' });
       }
       if (requestPath.includes('EntityDefinitions')) {
+        if (requestPath.includes('ManyToOneRelationships') && requestPath.includes("'wmkf_grantcycle'")) return ok({ value: [{ ReferencedEntity: 'wmkf_grantcycle', ReferencingEntityNavigationPropertyName: 'wmkf_GrantCycle' }] });
         if (requestPath.includes('ManyToOneRelationships')) return ok({ value: [{ ReferencedEntity: 'account' }] });
         if (requestPath.includes('PicklistAttributeMetadata')) return ok({ OptionSet: { Options: [{ Value: 100000000, Label: { UserLocalizedLabel: { Label: 'Grant' } } }] } });
         if (requestPath.includes('MoneyAttributeMetadata')) return ok({ MinValue: 0, MaxValue: 1 });
@@ -228,7 +229,7 @@ function preflightClient() {
         return ok({
           value: [
             'akoya_requestid', 'akoya_applicantid', 'akoya_title', 'akoya_purpose', 'wmkf_abstract', 'akoya_request',
-            'akoya_fiscalyear', 'akoya_requesttype', 'wmkf_meetingdate', 'wmkf_istestrequest',
+            'akoya_fiscalyear', 'akoya_requesttype', 'wmkf_meetingdate', 'wmkf_grantcycle', 'wmkf_istestrequest',
             'wmkf_testcreationrunid', 'wmkf_respondreminderenabled', 'wmkf_reviewduereminderenabled',
           ].map((field) => ({ LogicalName: field, AttributeType: 'String', IsValidForCreate: true, RequiredLevel: { Value: 'None' } })),
         });
