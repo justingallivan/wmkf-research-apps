@@ -13,6 +13,8 @@ import {
   linkedCycleFilter,
   linkedCycleExpand,
   linkedCycleCode,
+  linkedCycleBoardDate,
+  linkedCycleBoardDateExpand,
   noLinkedCycleFilter,
   getCycleDatesById,
   listBoardDates,
@@ -82,6 +84,43 @@ describe('linkedCycleFilter / linkedCycleExpand', () => {
   test('fail closed outside a restriction context', () => {
     expect(() => linkedCycleFilter('D26')).toThrow('Restrictions not initialized');
     expect(() => linkedCycleExpand()).toThrow('Restrictions not initialized');
+  });
+});
+
+describe('linkedCycleBoardDateExpand / linkedCycleBoardDate (meeting-date retirement step 4)', () => {
+  const BOARD_DATE_BLOCK = [{ table_name: 'wmkf_grantcycle', field_name: 'wmkf_meetingdate' }];
+
+  test('expands the linked code and calendar Board date', () => {
+    expect(open(() => linkedCycleBoardDateExpand())).toBe('wmkf_GrantCycle($select=wmkf_cyclecode,wmkf_meetingdate)');
+  });
+
+  test.each([
+    ['table', TABLE_BLOCK],
+    ['code field', FIELD_BLOCK],
+    ['Board date field', BOARD_DATE_BLOCK],
+  ])('%s restriction blocks the expand', (_kind, restrictions) => {
+    expect(() => restricted(restrictions, () => linkedCycleBoardDateExpand())).toThrow('Access denied');
+  });
+
+  test('fails closed outside a restriction context', () => {
+    expect(() => linkedCycleBoardDateExpand()).toThrow('Restrictions not initialized');
+  });
+
+  test('reads the Board date of a modern linked cycle', () => {
+    expect(linkedCycleBoardDate({ wmkf_GrantCycle: { wmkf_cyclecode: 'D26', wmkf_meetingdate: '2026-12-10' } })).toBe('2026-12-10');
+  });
+
+  test.each([
+    ['no link', { wmkf_GrantCycle: null }],
+    ['not expanded', { _wmkf_grantcycle_value: CYCLE_ID }],
+    ['historical code', { wmkf_GrantCycle: { wmkf_cyclecode: '2014-D', wmkf_meetingdate: '2014-12-04' } }],
+    ['no Board date', { wmkf_GrantCycle: { wmkf_cyclecode: 'D27', wmkf_meetingdate: null } }],
+    ['blank Board date', { wmkf_GrantCycle: { wmkf_cyclecode: 'D27', wmkf_meetingdate: ' ' } }],
+    // The request's own meeting date is never read.
+    ['request meeting date only', { wmkf_meetingdate: '2026-12-11', wmkf_GrantCycle: null }],
+    ['no row', null],
+  ])('%s → null', (_label, row) => {
+    expect(linkedCycleBoardDate(row)).toBeNull();
   });
 });
 

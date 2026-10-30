@@ -44,9 +44,16 @@ milestone dates through the cycle calendar. Not the apps table
 
 | Path | Operation | Status |
 |---|---|---|
-| `lib/dataverse/adapters/operations-grant-cycle.js` | list J/D rows with dates + ETag; PATCH one date column (`If-Match`, impersonated, no fallback); per-row `RetrieveRecordChangeHistory` | [SOURCE-BUILT ON BRANCH `claude/cycle-calendar`; NOT DEPLOYED, 2026-10-28] |
-| `lib/services/cycle-calendar-service.js` ← `pages/api/cycle-calendar.js` | staff read; Grants Manager / Program Coordinator / superuser save | same |
+| `lib/dataverse/adapters/operations-grant-cycle.js` | list J/D rows with dates + ETag; PATCH one date column (`If-Match`, impersonated, no fallback); per-row `RetrieveRecordChangeHistory`; Board-date and by-id reads; the request link helpers below | calendar deployed (PR #542); link helpers deployed (PR #554, 2026-10-30) |
+| `lib/services/cycle-calendar-service.js` ← `pages/api/cycle-calendar.js` | staff read; Grants Manager / Program Coordinator / superuser save | deployed (PR #542) |
+| Request reads through the link (`linkedCycleFilter`, `noLinkedCycleFilter`, `linkedCycleExpand`, `linkedCycleCode`) | a request's cycle is the code of the row its `wmkf_grantcycle` lookup points to, read by `$expand` or navigation filter; each helper checks the restriction on this table first | deployed (meeting-date retirement steps 2, 3 and 5; PRs #554, #555, #556) |
+| `linkedCycleBoardDateExpand` / `linkedCycleBoardDate` ← stale-invite sweep and recheck, Review Manager no-response label, honorarium create | the linked row's code and Board date; no cycle or no Board date gives no date | [SOURCE-BUILT ON BRANCH `claude/invite-expiry-honorarium-cycle-link`; NOT DEPLOYED] (meeting-date retirement step 4) |
+| Honorarium create (`lib/bill/honorarium-onboard-orchestrator.js`) | binds `wmkf_GrantCycle` on the new honorarium `akoya_request` to the parent's linked row | same branch, not deployed |
+| Test Request Factory (`lib/services/test-requests/`) | lists destination J/D rows; binds the clone's `wmkf_GrantCycle` | deployed (PR #556, 2026-10-30) |
 
-No other runtime code reads this table (cycle-settings audit 2026-10-27, row
-A4). Request cycle identity still derives from `wmkf_meetingdate` in
-`lib/utils/cycle-code.js`; the lookup-first rule (T10) is planned, not built.
+Request cycle identity comes from the link, with no meeting-date fallback
+(owner, 2026-10-29; `docs/plans/MEETING_DATE_RETIREMENT_PLAN_2026-10-29.md`).
+`lib/utils/cycle-code.js` still holds the meeting-date conversions
+(`meetingDateToCycleCode`, `cycleCodeToOdataFilter`); no runtime code under
+`lib/`, `pages/` or `shared/` calls them, and the remaining callers are scripts
+(step 6) [VERIFIED 2026-10-30 via `git ls-files | xargs grep`].

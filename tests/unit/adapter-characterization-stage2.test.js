@@ -398,7 +398,7 @@ describe('reviewer-suggestion.findAcceptedByCycle', () => {
     await suggestion.findAcceptedByCycle('D26');
 
     expect(qAll.mock.calls[0][1].select).toBe(PD_ACCEPTED_REQUEST_SELECT);
-    expect(qAll.mock.calls[0][1].expand).toBe('wmkf_GrantCycle($select=wmkf_cyclecode)');
+    expect(qAll.mock.calls[0][1].expand).toBe('wmkf_GrantCycle($select=wmkf_cyclecode,wmkf_meetingdate)');
     expect(qAll.mock.calls[0][1].filter).toBe("wmkf_GrantCycle/wmkf_cyclecode eq 'D26'");
     expect(qAll.mock.calls[0][1].filter).not.toContain('_wmkf_programdirector_value');
     expect(q.mock.calls[0][1].filter).toBe(
@@ -416,7 +416,7 @@ describe('reviewer-suggestion.findAcceptedByCycle', () => {
   test('accepted rows carry the linked cycle code; a June meeting date without a link has no cycle', async () => {
     jest.spyOn(DynamicsService, 'queryAllRecords').mockResolvedValue({
       records: [
-        { akoya_requestid: GUID_A, akoya_requestnum: 'REQ-1', wmkf_meetingdate: '2026-06-11T00:00:00Z', wmkf_GrantCycle: { wmkf_cyclecode: 'J26' } },
+        { akoya_requestid: GUID_A, akoya_requestnum: 'REQ-1', wmkf_meetingdate: '2026-06-11T00:00:00Z', wmkf_GrantCycle: { wmkf_cyclecode: 'J26', wmkf_meetingdate: '2026-06-04' } },
         { akoya_requestid: GUID_B, akoya_requestnum: 'REQ-2', wmkf_meetingdate: '2026-06-11T00:00:00Z' },
       ],
     });
@@ -424,6 +424,9 @@ describe('reviewer-suggestion.findAcceptedByCycle', () => {
     const out = await suggestion.findAcceptedByCycle('J26');
     expect(out.requestById[GUID_A].cycleCode).toBe('J26');
     expect(out.requestById[GUID_B].cycleCode).toBeNull();
+    // The cycle-close date is the linked row's Board date, never the request's own.
+    expect(out.requestById[GUID_A].cycleBoardDate).toBe('2026-06-04');
+    expect(out.requestById[GUID_B].cycleBoardDate).toBeNull();
   });
 
   test('an invalid cycle code is refused before any query', async () => {

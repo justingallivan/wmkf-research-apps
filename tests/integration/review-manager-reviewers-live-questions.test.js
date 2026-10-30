@@ -201,7 +201,7 @@ test('GET success returns the full proposal + reviewer envelope', async () => {
 
   expect(res.statusCode).toBe(200);
   expect(DynamicsService.getRecord).toHaveBeenCalledWith('akoya_requests', REQUEST_ID, expect.objectContaining({
-    expand: 'wmkf_GrantCycle($select=wmkf_cyclecode)',
+    expand: 'wmkf_GrantCycle($select=wmkf_cyclecode,wmkf_meetingdate)',
   }));
   expect(res._data).toEqual({
     success: true,

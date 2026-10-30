@@ -11,6 +11,12 @@ const ETAG = 'W/"fresh-42"';
 const OLD_DATE = '2020-02-01';
 const NOW = new Date('2026-09-04T12:00:00.000Z');
 
+// A parent request read with the linked cycle's code and calendar Board date
+// (meeting-date retirement step 4): the sweep closes on the Board date.
+function parentRow(requestId, boardDate, cycleCode = 'D26') {
+  return { akoya_requestid: requestId, wmkf_GrantCycle: { wmkf_cyclecode: cycleCode, wmkf_meetingdate: boardDate } };
+}
+
 function pending(overrides = {}) {
   return {
     wmkf_appreviewersuggestionid: SUGGESTION_ID,
@@ -39,9 +45,11 @@ beforeEach(() => {
   jest.useFakeTimers().setSystemTime(NOW);
   scanSpy = jest.spyOn(DynamicsService, 'queryAllRecords').mockResolvedValue({ records: [pending()] });
   parentSpy = jest.spyOn(DynamicsService, 'queryRecords').mockResolvedValue({
-    records: [{ akoya_requestid: REQUEST_ID, wmkf_meetingdate: OLD_DATE }],
+    records: [parentRow(REQUEST_ID, OLD_DATE)],
   });
   readSpy = jest.spyOn(DynamicsService, 'getRecord').mockResolvedValue(pending());
+  // The cycle restriction check itself is covered in grant-cycle-link.test.js.
+  jest.spyOn(DynamicsService, 'checkRestriction').mockImplementation(() => {});
   updateSpy = jest.spyOn(DynamicsService, 'updateRecord').mockResolvedValue({});
 });
 afterEach(() => {
@@ -67,7 +75,10 @@ describe('sweepStaleInvites', () => {
     ]));
     expect(parentSpy).toHaveBeenCalledTimes(2);
     expect(parentSpy).toHaveBeenLastCalledWith('akoya_requests', {
-      select: 'akoya_requestid,wmkf_meetingdate', filter: `akoya_requestid eq ${REQUEST_ID}`, top: 1,
+      select: 'akoya_requestid',
+      expand: 'wmkf_GrantCycle($select=wmkf_cyclecode,wmkf_meetingdate)',
+      filter: `akoya_requestid eq ${REQUEST_ID}`,
+      top: 1,
     });
     expect(updateSpy).toHaveBeenCalledTimes(1);
     expect(updateSpy).toHaveBeenCalledWith('wmkf_appreviewersuggestions', SUGGESTION_ID, {
@@ -136,8 +147,8 @@ describe('sweepStaleInvites', () => {
   it.each([null, OTHER_ID])('skips changed parent %p even when a stale date is available', async (requestId) => {
     readSpy.mockResolvedValue(pending({ _wmkf_request_value: requestId }));
     parentSpy.mockResolvedValue({ records: [
-      { akoya_requestid: REQUEST_ID, wmkf_meetingdate: OLD_DATE },
-      { akoya_requestid: OTHER_ID, wmkf_meetingdate: OLD_DATE },
+      parentRow(REQUEST_ID, OLD_DATE),
+      parentRow(OTHER_ID, OLD_DATE),
     ] });
     expect(await sweepStaleInvites()).toMatchObject({ swept: 0, skipped: 1, errors: [] });
     expect(updateSpy).not.toHaveBeenCalled();
@@ -145,20 +156,42 @@ describe('sweepStaleInvites', () => {
 
   it.each([
     ['missing parent', []],
-    ['different parent', [{ akoya_requestid: OTHER_ID, wmkf_meetingdate: OLD_DATE }]],
-    ['missing date', [{ akoya_requestid: REQUEST_ID, wmkf_meetingdate: null }]],
-    ['invalid date', [{ akoya_requestid: REQUEST_ID, wmkf_meetingdate: 'not-a-date' }]],
-    ['future date', [{ akoya_requestid: REQUEST_ID, wmkf_meetingdate: '2030-01-01' }]],
-    ['cutoff date', [{ akoya_requestid: REQUEST_ID, wmkf_meetingdate: NOW.toISOString() }]],
+    ['different parent', [parentRow(OTHER_ID, OLD_DATE)]],
+    ['missing date', [parentRow(REQUEST_ID, null)]],
+    ['invalid date', [parentRow(REQUEST_ID, 'not-a-date')]],
+    ['future date', [parentRow(REQUEST_ID, '2030-01-01')]],
+    ['cutoff date', [parentRow(REQUEST_ID, NOW.toISOString())]],
+    ['no linked cycle', [{ akoya_requestid: REQUEST_ID, wmkf_GrantCycle: null }]],
+    ['historical cycle', [parentRow(REQUEST_ID, OLD_DATE, '2014-D')]],
+    ['request meeting date only', [{ akoya_requestid: REQUEST_ID, wmkf_meetingdate: OLD_DATE, wmkf_GrantCycle: null }]],
   ])('rechecks parent evidence and skips %s after discovery', async (_name, records) => {
-    parentSpy.mockResolvedValueOnce({ records: [{ akoya_requestid: REQUEST_ID, wmkf_meetingdate: OLD_DATE }] })
+    parentSpy.mockResolvedValueOnce({ records: [parentRow(REQUEST_ID, OLD_DATE)] })
       .mockResolvedValueOnce({ records });
     expect(await sweepStaleInvites()).toMatchObject({ eligible: 1, swept: 0, skipped: 1, errors: [] });
     expect(updateSpy).not.toHaveBeenCalled();
   });
 
-  it('leaves discovery rows with invalid or absent meeting dates ineligible', async () => {
-    parentSpy.mockResolvedValue({ records: [{ akoya_requestid: REQUEST_ID, wmkf_meetingdate: 'not-a-date' }] });
+  it.each([
+    ['no linked cycle', { akoya_requestid: REQUEST_ID, wmkf_meetingdate: OLD_DATE, wmkf_GrantCycle: null }],
+    ['a cycle with no Board date', parentRow(REQUEST_ID, null, 'D27')],
+  ])('never discovers a parent with %s, even when its own meeting date is past', async (_name, row) => {
+    parentSpy.mockResolvedValue({ records: [row] });
+    expect(await sweepStaleInvites()).toMatchObject({ eligible: 0, swept: 0 });
+    expect(readSpy).not.toHaveBeenCalled();
+    expect(updateSpy).not.toHaveBeenCalled();
+  });
+
+  it('closes on the linked cycle Board date, not the request meeting date', async () => {
+    // D26: calendar Board date Dec 10, request meeting date Dec 11 (plan §7 Q4).
+    jest.setSystemTime(new Date('2026-12-10T12:00:00.000Z'));
+    parentSpy.mockResolvedValue({ records: [
+      { ...parentRow(REQUEST_ID, '2026-12-10'), wmkf_meetingdate: '2026-12-11' },
+    ] });
+    expect(await sweepStaleInvites()).toMatchObject({ eligible: 1, swept: 1 });
+  });
+
+  it('leaves discovery rows with invalid or absent Board dates ineligible', async () => {
+    parentSpy.mockResolvedValue({ records: [parentRow(REQUEST_ID, 'not-a-date')] });
     expect(await sweepStaleInvites()).toEqual({ scanned: 1, eligible: 0, swept: 0, skipped: 0, errors: [], dryRun: false });
     expect(readSpy).not.toHaveBeenCalled();
     expect(updateSpy).not.toHaveBeenCalled();
@@ -183,7 +216,7 @@ describe('sweepStaleInvites', () => {
     readSpy.mockImplementation(async (_entity, id) => pending({ wmkf_appreviewersuggestionid: id }));
     const failure = Object.assign(new Error('x'.repeat(300)), details);
     if (stage === 'read') readSpy.mockRejectedValueOnce(failure);
-    if (stage === 'parent') parentSpy.mockResolvedValueOnce({ records: [{ akoya_requestid: REQUEST_ID, wmkf_meetingdate: OLD_DATE }] }).mockRejectedValueOnce(failure);
+    if (stage === 'parent') parentSpy.mockResolvedValueOnce({ records: [parentRow(REQUEST_ID, OLD_DATE)] }).mockRejectedValueOnce(failure);
     if (stage === 'write') updateSpy.mockRejectedValueOnce(failure);
 
     expect(await sweepStaleInvites()).toEqual({
@@ -221,7 +254,7 @@ describe('sweepStaleInvites', () => {
   });
 
   it('retains grace-day cutoff semantics during the fresh parent check', async () => {
-    parentSpy.mockResolvedValue({ records: [{ akoya_requestid: REQUEST_ID, wmkf_meetingdate: '2026-09-03' }] });
+    parentSpy.mockResolvedValue({ records: [parentRow(REQUEST_ID, '2026-09-03')] });
     expect(await sweepStaleInvites({ graceDays: 2 })).toMatchObject({ eligible: 0, swept: 0 });
     expect(updateSpy).not.toHaveBeenCalled();
   });

@@ -183,9 +183,16 @@ const queryRequests = jest.fn(async () => ({ records: [] }));
 // restriction context the adapter-mocked service never establishes.
 jest.mock('../../lib/dataverse/adapters/operations-grant-cycle', () => ({
   linkedCycleExpand: () => 'wmkf_GrantCycle($select=wmkf_cyclecode)',
+  linkedCycleBoardDateExpand: () => 'wmkf_GrantCycle($select=wmkf_cyclecode,wmkf_meetingdate)',
   linkedCycleCode: (row) => {
     const code = row?.wmkf_GrantCycle?.wmkf_cyclecode;
     return typeof code === 'string' && /^[JD]\d{2}$/.test(code) ? code : null;
+  },
+  linkedCycleBoardDate: (row) => {
+    const cycle = row?.wmkf_GrantCycle;
+    return typeof cycle?.wmkf_cyclecode === 'string' && /^[JD]\d{2}$/.test(cycle.wmkf_cyclecode)
+      && typeof cycle.wmkf_meetingdate === 'string' && cycle.wmkf_meetingdate.trim() !== ''
+      ? cycle.wmkf_meetingdate : null;
   },
 }));
 jest.mock('../../lib/dataverse/adapters/grant-request', () => ({
@@ -295,7 +302,7 @@ describe('getReviewers — characterization', () => {
       akoya_requestnum: 'R-2001',
       akoya_title: 'Catalytic Water Splitting Mechanisms',
       wmkf_meetingdate: '2026-06-15',
-      wmkf_GrantCycle: { wmkf_cyclecode: 'J26' },
+      wmkf_GrantCycle: { wmkf_cyclecode: 'J26', wmkf_meetingdate: '2026-06-04' },
       wmkf_reviewduedate: '2026-09-01',
       wmkf_abstract: 'Investigating novel catalysts for water splitting.',
       wmkf_organizationname: 'Acme Research Institute',
@@ -482,7 +489,7 @@ describe('getReviewers — characterization', () => {
               reviewStatus: 'review_received',
               responseType: 'accepted',
               lifecycleValid: true,
-              meetingDate: '2026-06-15',
+              meetingDate: '2026-06-04',
               emailSentAt: '2026-06-20T09:00:00Z',
               respondReminderSentAt: null,
               responseReceivedAt: '2026-06-22T14:30:00Z',
@@ -537,7 +544,7 @@ describe('getReviewers — characterization', () => {
               reviewStatus: 'materials_sent',
               responseType: 'accepted',
               lifecycleValid: true,
-              meetingDate: '2026-06-15',
+              meetingDate: '2026-06-04',
               emailSentAt: '2026-06-20T09:05:00Z',
               respondReminderSentAt: '2026-07-01T00:00:00Z',
               responseReceivedAt: '2026-06-23T10:00:00Z',
@@ -589,7 +596,7 @@ describe('getReviewers — characterization', () => {
               reviewStatus: 'accepted',
               responseType: 'accepted',
               lifecycleValid: true,
-              meetingDate: '2026-06-15',
+              meetingDate: '2026-06-04',
               emailSentAt: null,
               respondReminderSentAt: null,
               responseReceivedAt: null,

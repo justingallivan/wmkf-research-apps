@@ -107,7 +107,8 @@ evidence dated 2026-07-02]`
 | `akoya_recommendedamount` | admin amount | already set before S314; still set |
 | `wmkf_request_type` | `682090001` (Individual) | already set before S314; does **not** auto-default |
 | `akoya_requesttype` | `100000001` (Scholarship) | implementation sets; bare create auto-defaults to WRONG value `100000000` |
-| `wmkf_meetingdate` | parent proposal's meeting date | implementation sets when parent date exists; guard/alert when missing |
+| `wmkf_meetingdate` | parent proposal's Grant Cycle Board date (the parent's own meeting date before meeting-date retirement step 4) | implementation sets from the parent's linked calendar row; guard/alert when the parent has no cycle or no Board date |
+| `wmkf_grantcycle` | parent proposal's Grant Cycle link | implementation binds `wmkf_GrantCycle` (meeting-date retirement step 4, owner 2026-10-29); GoApply honoraria carry it |
 | `akoya_fiscalyear` | derived — see §5 | implementation derives; minimal create does **not** auto-derive |
 | `wmkf_respondreminderenabled` | `false` | implementation forces off; bare create auto-defaults `true` (GoApply rows are off) |
 | `wmkf_reviewduereminderenabled` | `false` | implementation forces off; bare create auto-defaults `true` |
@@ -200,6 +201,13 @@ Amy's `wmkf_meetingdate = 2026-06-04` → `"June 2026"`. `[VERIFIED]`
 Edge case: if the parent request has **no** meeting date, we can derive neither
 `wmkf_meetingdate` nor `akoya_fiscalyear` — the create should guard/alert rather
 than write a malformed row (do not silently omit).
+
+**Superseded by meeting-date retirement step 4** (owner, 2026-10-29;
+`docs/plans/MEETING_DATE_RETIREMENT_PLAN_2026-10-29.md` §7 Q5): the date is the
+parent's linked Grant Cycle calendar Board date, re-read at create time, and the
+honorarium also links to that cycle. A parent with no cycle or no Board date
+throws `honorarium_no_grant_cycle` (alert, accept still succeeds). The month-year
+format is unchanged. Existing honoraria are not changed.
 
 ---
 

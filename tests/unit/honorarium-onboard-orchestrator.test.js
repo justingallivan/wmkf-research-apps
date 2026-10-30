@@ -21,6 +21,13 @@ const {
 } = require('../../lib/bill/honorarium-onboard-orchestrator');
 
 const SUGGESTION_ID = 'sug-1111';
+const CYCLE_ID = '26262626-2626-4262-8262-262626262626';
+// The parent's Grant Cycle link (meeting-date retirement step 4): J26, Board date June 4.
+const PARENT_CYCLE = {
+  akoya_requestid: 'req-1',
+  _wmkf_grantcycle_value: CYCLE_ID,
+  wmkf_GrantCycle: { wmkf_cyclecode: 'J26', wmkf_meetingdate: '2026-06-04' },
+};
 
 function restoreEnv(key, prev) {
   if (prev === undefined) delete process.env[key];
@@ -30,7 +37,7 @@ function restoreEnv(key, prev) {
 function baseArgs(overrides = {}) {
   return {
     suggestion: { wmkf_appreviewersuggestionid: SUGGESTION_ID, _wmkf_honorariumrequest_value: null, ...overrides.suggestion },
-    request: { akoya_requestid: 'req-1', akoya_requestnum: 'REQ-001', wmkf_meetingdate: '2026-06-04T00:00:00Z', ...overrides.request },
+    request: { akoya_requestid: 'req-1', akoya_requestnum: 'REQ-001', ...overrides.request },
     reviewer: { wmkf_potentialreviewersid: 'pr-1', wmkf_name: 'Jane Q. Reviewer', wmkf_emailaddress: 'jane@uni.edu', _wmkf_contact_value: 'contact-1', ...overrides.reviewer },
     body: { address: { line1: '1 Lab Rd', city: 'Sci City', state: 'CA', postalCode: '90001', country: 'US', phone: '+1 555 0100' }, ...overrides.body },
   };
@@ -73,6 +80,7 @@ function makeDeps(overrides = {}) {
     getAmount: overrides.getAmount || jest.fn().mockResolvedValue(250),
     backProp: overrides.backProp || jest.fn().mockResolvedValue({ action: 'noop' }),
     deriveGuid: overrides.deriveGuid || jest.fn((name) => `det-${name}`),
+    readParentCycle: overrides.readParentCycle || jest.fn().mockResolvedValue(PARENT_CYCLE),
     deriveContactGuid: overrides.deriveContactGuid || jest.fn(() => 'contact-new'),
     notify: overrides.notify || jest.fn().mockResolvedValue({ id: 'alert-1' }),
     ...(overrides.isDeferred ? { isDeferred: overrides.isDeferred } : {}),
@@ -97,8 +105,10 @@ describe('ensureHonorariumOnboarding', () => {
     // Both request-type fields: native Akoya "Scholarship" + wmkf "Individual".
     expect(createArg.akoya_requesttype).toBe(100000001);
     expect(createArg.wmkf_request_type).toBe(682090001);
-    expect(createArg.wmkf_meetingdate).toBe('2026-06-04T00:00:00Z');
-    // Fiscal year derived from the parent proposal's meeting date (UTC).
+    // Linked to the parent's Grant Cycle; meeting date and fiscal year from its Board date.
+    expect(deps.readParentCycle).toHaveBeenCalledWith('req-1');
+    expect(createArg['wmkf_GrantCycle@odata.bind']).toBe(`/wmkf_grantcycles(${CYCLE_ID})`);
+    expect(createArg.wmkf_meetingdate).toBe('2026-06-04');
     expect(createArg.akoya_fiscalyear).toBe('June 2026');
     // Reminder flags forced off (bare create would default them true).
     expect(createArg.wmkf_respondreminderenabled).toBe(false);
@@ -177,12 +187,59 @@ describe('ensureHonorariumOnboarding', () => {
     }));
   });
 
-  it('parent request has no meeting date → throws (no malformed row) and does NOT create', async () => {
-    const deps = makeDeps();
-    const args = baseArgs({ request: { wmkf_meetingdate: null } });
-    await expect(ensureHonorariumOnboarding(args, deps)).rejects.toMatchObject({ code: 'honorarium_no_meeting_date' });
+  it.each([
+    ['no link', { akoya_requestid: 'req-1', _wmkf_grantcycle_value: null, wmkf_GrantCycle: null }],
+    ['a historical cycle', { ...PARENT_CYCLE, wmkf_GrantCycle: { wmkf_cyclecode: '2014-D', wmkf_meetingdate: '2014-12-04' } }],
+    ['a cycle with no Board date', { ...PARENT_CYCLE, wmkf_GrantCycle: { wmkf_cyclecode: 'D27', wmkf_meetingdate: null } }],
+    ['a non-GUID link id', { ...PARENT_CYCLE, _wmkf_grantcycle_value: 'J26' }],
+    ['no parent row', null],
+  ])('parent with %s → throws (no malformed row) and does NOT create', async (_name, parent) => {
+    const deps = makeDeps({ readParentCycle: jest.fn().mockResolvedValue(parent) });
+    // The parent's own meeting date (an old job snapshot) is never used.
+    const args = baseArgs({ request: { wmkf_meetingdate: '2026-06-04T00:00:00Z' } });
+    await expect(ensureHonorariumOnboarding(args, deps)).rejects.toMatchObject({ code: 'honorarium_no_grant_cycle' });
     expect(deps.requests.create).not.toHaveBeenCalled();
     expect(deps.suggestions.setHonorariumRequest).not.toHaveBeenCalled();
+  });
+
+  it('retry after a create whose junction PATCH failed: an existing honorarium is linked and onboarded even when the parent now has no cycle', async () => {
+    const deps = makeDeps({
+      readParentCycle: jest.fn().mockResolvedValue({ akoya_requestid: 'req-1', _wmkf_grantcycle_value: null, wmkf_GrantCycle: null }),
+      requests: { getById: jest.fn().mockResolvedValue({ akoya_requestid: `det-${SUGGESTION_ID}` }) },
+    });
+    const out = await ensureHonorariumOnboarding(baseArgs(), deps);
+    expect(deps.requests.getById).toHaveBeenCalledWith(`det-${SUGGESTION_ID}`, { select: 'akoya_requestid' });
+    expect(deps.requests.create).not.toHaveBeenCalled();
+    expect(deps.suggestions.setHonorariumRequest).toHaveBeenCalledWith(SUGGESTION_ID, `det-${SUGGESTION_ID}`);
+    expect(deps.onboard).toHaveBeenCalledWith(expect.objectContaining({ honorariumRequestId: `det-${SUGGESTION_ID}` }));
+    expect(out).toMatchObject({ honorariumRequestId: `det-${SUGGESTION_ID}`, created: false });
+  });
+
+  it('a failed parent read propagates and does NOT create', async () => {
+    const deps = makeDeps({ readParentCycle: jest.fn().mockRejectedValue(new Error('Get record failed (503)')) });
+    await expect(ensureHonorariumOnboarding(baseArgs(), deps)).rejects.toThrow('Get record failed (503)');
+    expect(deps.requests.create).not.toHaveBeenCalled();
+  });
+
+  it('falls back to the suggestion parent id when the job snapshot has no request id', async () => {
+    const deps = makeDeps();
+    const args = baseArgs({ suggestion: { _wmkf_request_value: 'req-1' } });
+    args.request = null;
+    await ensureHonorariumOnboarding(args, deps);
+    expect(deps.readParentCycle).toHaveBeenCalledWith('req-1');
+    expect(deps.requests.create).toHaveBeenCalledTimes(1);
+  });
+
+  it('writes the D26 calendar Board date (Dec 10), not the request meeting date (Dec 11)', async () => {
+    const deps = makeDeps({ readParentCycle: jest.fn().mockResolvedValue({
+      ...PARENT_CYCLE,
+      wmkf_meetingdate: '2026-12-11',
+      wmkf_GrantCycle: { wmkf_cyclecode: 'D26', wmkf_meetingdate: '2026-12-10' },
+    }) });
+    await ensureHonorariumOnboarding(baseArgs({ request: { wmkf_meetingdate: '2026-12-11' } }), deps);
+    const createArg = deps.requests.create.mock.calls[0][0];
+    expect(createArg.wmkf_meetingdate).toBe('2026-12-10');
+    expect(createArg.akoya_fiscalyear).toBe('December 2026');
   });
 
   it('binds transactioncurrencyid when HONORARIUM_CURRENCY_ID is configured', async () => {

@@ -34,6 +34,13 @@ jest.mock('../../lib/dataverse/adapters/grant-request.js', () => ({
   queryRequests: (...a) => queryRequests(...a),
 }));
 
+// Grant Cycle helpers: the real row reader, a fixed expand string, and no
+// restriction context (covered in grant-cycle-link.test.js).
+jest.mock('../../lib/dataverse/adapters/operations-grant-cycle.js', () => ({
+  linkedCycleBoardDateExpand: () => 'wmkf_GrantCycle($select=wmkf_cyclecode,wmkf_meetingdate)',
+  linkedCycleBoardDate: jest.requireActual('../../lib/dataverse/adapters/operations-grant-cycle.js').linkedCycleBoardDate,
+}));
+
 const { sweepStaleInvites } = require('../../lib/services/reviewer-suggestion-sweep.js');
 
 const NOW = new Date('2026-09-06T12:00:00.000Z');
@@ -74,7 +81,7 @@ describe('sweepStaleInvites delegates the per-row expire body to expireInvitatio
     queryRequests.mockResolvedValue({
       records: ['R1', 'R2', 'R3', 'R4', 'R5'].map((id) => ({
         akoya_requestid: id,
-        wmkf_meetingdate: PAST_MEETING_DATE,
+        wmkf_GrantCycle: { wmkf_cyclecode: 'D26', wmkf_meetingdate: PAST_MEETING_DATE },
       })),
     });
 

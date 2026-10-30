@@ -3,7 +3,7 @@ title: Stop reading the request meeting date — inventory and plan
 domain: cycles
 kind: plan
 status: draft
-summary: "Owner, 2026-10-29: no app reads akoya_request.wmkf_meetingdate; a request's cycle comes from its Grant Cycle link (wmkf_grantcycle) and cycle dates from that linked calendar row, with no meeting-date fallback. Whole-repo inventory (106 runtime files, 69 scripts, plus indirect readers through helpers), grouped by what each read is for, the behavior changes, two existing bugs found, a central-helper strategy, and the owner decisions. Built: PR #552 (reviewer email path), steps 1-3 (sandbox rows; PRs #554 and #555 deployed 2026-10-30); step 5 (Test Request Factory) on branch claude/factory-grant-cycle-link, not merged."
+summary: "Owner, 2026-10-29: no app reads akoya_request.wmkf_meetingdate; a request's cycle comes from its Grant Cycle link (wmkf_grantcycle) and cycle dates from that linked calendar row, with no meeting-date fallback. Whole-repo inventory (106 runtime files, 69 scripts, plus indirect readers through helpers), grouped by what each read is for, the behavior changes, two existing bugs found, a central-helper strategy, and the owner decisions. Built: PR #552 (reviewer email path), steps 1-3 (sandbox rows; PRs #554 and #555 deployed 2026-10-30); step 5 (Test Request Factory; PR #556 deployed 2026-10-30); step 4 (invitation closing and honoraria) on branch claude/invite-expiry-honorarium-cycle-link, not merged."
 canonical: false
 owner: product-engineering
 related:
@@ -135,12 +135,13 @@ pre-site visit (`proposal-core-service.js:340`), post-presentation materials
   via `isPastCutoff`; the Review Manager's "Recorded by automated cycle close"
   label (`reviewer-activity-history.js:275`, from `reviewers-service.js:381`)
   must use the same date. Replacement: the linked row's Board date (§7 Q4).
+  **[Built in step 4, branch only]**
 - **Honorarium onboarding (a write):** `lib/bill/honorarium-onboard-orchestrator.js:144-172,898`
   requires the parent's meeting date, derives `akoya_fiscalyear` ("June 2026")
   from it, and copies `wmkf_meetingdate` onto the new honorarium request. The
   value arrives from `verify-suggestion-token.js:67` → acceptance job payload
   (`respond-service.js:430`) → drain. Change the orchestrator before the token
-  select (§7 Q5).
+  select (§7 Q5). **[Built in step 4, branch only]**
 - **Historical award recency** (other, older requests): `funding-history.js:134`,
   `proposal-core-service.js:279-280`, `research-funding.js:36`,
   `proposal-ranking-source.js:63` use the meeting date as a fallback after the
@@ -265,7 +266,31 @@ a contract check and a Codex review; none merges without the owner.
    selects removed. The §8 count (2026-10-30) found no program grant with
    neither a fiscal year nor a decision date.
 4. **Invitation closing and honoraria:** stale-invite expiry and the
-   honorarium write (§3.5).
+   honorarium write (§3.5). **[BUILT on branch `claude/invite-expiry-honorarium-cycle-link`;
+   not merged, not deployed, no Dataverse read or write]** A new helper pair in
+   `lib/dataverse/adapters/operations-grant-cycle.js` (`linkedCycleBoardDateExpand`,
+   `linkedCycleBoardDate`) expands the linked row's code and Board date, checks the
+   restriction on that table (Board date included), and returns no date for a
+   request with no cycle (no link, or a historical code) or a row with no Board
+   date. The daily sweep's discovery (`reviewer-suggestion-sweep.js`) and the
+   per-row recheck (`expire-invitation.js`) close on that date; no cycle or no
+   Board date means never auto-closed. The Review Manager's no-response label
+   gets the same date: `findAccepted` and the single-request read carry
+   `cycleBoardDate`, and `reviewers-service.js` puts it on each row as
+   `meetingDate` (request-level `meetingDate` and Reviewer Finder's My Candidates
+   sort are unchanged; step 6). The honorarium orchestrator re-reads the parent's
+   link (not the acceptance-job snapshot, so jobs queued before deploy still
+   resolve), binds `wmkf_GrantCycle`, and writes `wmkf_meetingdate` and
+   `akoya_fiscalyear` from the Board date; no cycle or no Board date throws
+   `honorarium_no_grant_cycle` (alert and retry, as the old
+   `honorarium_no_meeting_date` did), unless the honorarium already exists
+   (a retry after a create whose suggestion link failed), which is then linked
+   and onboarded; a failed read propagates.
+   `wmkf_meetingdate` left the reviewer token's request select
+   (`verify-suggestion-token.js`), which nothing else read. Existing honoraria
+   are unchanged. Consequence: D26 invitations close on Dec 10 (calendar)
+   instead of Dec 11, and new D26 honoraria carry meeting date Dec 10;
+   fiscal year is unchanged.
 5. **Test Request Factory** (§3.7); no ledger migration (§7 Q7). **Decided
    (owner, 2026-10-30): real cycles only** — a Production clone links to an
    existing real Grant Cycle row (default: the source request's linked cycle);

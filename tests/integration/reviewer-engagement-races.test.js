@@ -200,9 +200,13 @@ function assertSent(events, count = 1) {
 }
 
 describe('F2 stale invitation discovery versus newer state', () => {
+  // The sweep closes on the parent's linked Grant Cycle Board date
+  // (meeting-date retirement step 4); the fixture embeds the expanded row.
+  const linkedCycle = (boardDate) => ({ wmkf_GrantCycle: { wmkf_cyclecode: 'D19', wmkf_meetingdate: boardDate } });
+
   function seedStale() {
     transport.seed(SET, pending());
-    transport.patch(REQUESTS, REQUEST, { wmkf_meetingdate: '2020-02-01' });
+    transport.patch(REQUESTS, REQUEST, linkedCycle('2020-02-01'));
   }
 
   test('F2 regression: real acceptance after discovery survives fresh eligibility revalidation', async () => {
@@ -304,7 +308,7 @@ describe('F2 stale invitation discovery versus newer state', () => {
     seedStale();
     // Both requests are expired, so the negative assertion proves binding,
     // not an incidental missing/future meeting date on the new request.
-    transport.seed(REQUESTS, { akoya_requestid: OTHER, wmkf_meetingdate: '2020-02-01' });
+    transport.seed(REQUESTS, { akoya_requestid: OTHER, ...linkedCycle('2020-02-01') });
     const pause = transport.pauseNext((request) => request.entitySet === REQUESTS && request.method === 'GET');
     const sweep = trusted(() => sweepStaleInvites());
     await pause.reached;
@@ -317,7 +321,7 @@ describe('F2 stale invitation discovery versus newer state', () => {
 
   test('F2 regression: reparenting after fresh authorization cannot land an expiry on the new request', async () => {
     seedStale();
-    transport.seed(REQUESTS, { akoya_requestid: OTHER, wmkf_meetingdate: '2020-02-01' });
+    transport.seed(REQUESTS, { akoya_requestid: OTHER, ...linkedCycle('2020-02-01') });
     const pause = transport.pauseNext((request) => request.method === 'PATCH');
     const sweep = trusted(() => sweepStaleInvites());
     const write = await pause.reached;
@@ -334,7 +338,7 @@ describe('F2 stale invitation discovery versus newer state', () => {
     const sweep = trusted(() => sweepStaleInvites());
     await pause.reached;
     try {
-      if (change === 'rescheduled') transport.patch(REQUESTS, REQUEST, { wmkf_meetingdate: '2099-02-01' });
+      if (change === 'rescheduled') transport.patch(REQUESTS, REQUEST, linkedCycle('2099-02-01'));
       else await trusted(() => DynamicsService.deleteRecord(REQUESTS, REQUEST));
     } finally { pause.release(); }
     expect(await sweep).toMatchObject({ eligible: 1, swept: 0, skipped: 1, errors: [] });
@@ -348,12 +352,12 @@ describe('F2 stale invitation discovery versus newer state', () => {
     const sweep = trusted(() => sweepStaleInvites());
     const write = await pause.reached;
     const suggestionVersion = transport.get(SET, ID)._etag;
-    transport.patch(REQUESTS, REQUEST, { wmkf_meetingdate: '2099-02-01' });
+    transport.patch(REQUESTS, REQUEST, linkedCycle('2099-02-01'));
     pause.release();
     expect(await sweep).toMatchObject({ swept: 1, skipped: 0, errors: [] });
     expect(write.headers['If-Match']).toBe(suggestionVersion);
     expect(write.status).toBe(204);
-    expect(transport.get(REQUESTS, REQUEST).wmkf_meetingdate).toBe('2099-02-01');
+    expect(transport.get(REQUESTS, REQUEST).wmkf_GrantCycle.wmkf_meetingdate).toBe('2099-02-01');
     expect(transport.get(SET, ID).wmkf_responsetype).toBe(RESPONSE_TYPE_MAP.no_response);
   });
 
@@ -369,10 +373,10 @@ describe('F2 stale invitation discovery versus newer state', () => {
     expect(transport.get(SET, ID)).toEqual(expired);
   });
 
-  test('dry-run detects eligible invitation without writing; missing meeting date stays ineligible', async () => {
+  test('dry-run detects eligible invitation without writing; a parent with no linked cycle stays ineligible', async () => {
     seedStale();
     expect(await trusted(() => sweepStaleInvites({ dryRun: true }))).toMatchObject({ eligible: 1, swept: 0, dryRun: true });
-    transport.patch(REQUESTS, REQUEST, { wmkf_meetingdate: null });
+    transport.patch(REQUESTS, REQUEST, { wmkf_GrantCycle: null });
     expect(await trusted(() => sweepStaleInvites())).toMatchObject({ scanned: 1, eligible: 0, swept: 0 });
     expect(writes()).toEqual([]);
     expect(transport.get(SET, ID).wmkf_responsetype).toBeNull();

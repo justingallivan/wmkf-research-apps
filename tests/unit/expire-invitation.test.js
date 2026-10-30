@@ -25,6 +25,13 @@ jest.mock('../../lib/dataverse/adapters/grant-request.js', () => ({
   queryRequests: (...a) => queryRequests(...a),
 }));
 
+// Grant Cycle helpers: the real row reader, a fixed expand string, and no
+// restriction context (covered in grant-cycle-link.test.js).
+jest.mock('../../lib/dataverse/adapters/operations-grant-cycle.js', () => ({
+  linkedCycleBoardDateExpand: () => 'wmkf_GrantCycle($select=wmkf_cyclecode,wmkf_meetingdate)',
+  linkedCycleBoardDate: jest.requireActual('../../lib/dataverse/adapters/operations-grant-cycle.js').linkedCycleBoardDate,
+}));
+
 const { expireInvitation } = require('../../lib/services/reviewer-engagement/expire-invitation.js');
 const { isPastCutoff } = require('../../lib/utils/past-cutoff.js');
 
@@ -69,7 +76,7 @@ beforeEach(() => {
   isExcluded.mockReturnValue(false);
   getByIdWithSelect.mockResolvedValue(pendingRow());
   queryRequests.mockResolvedValue({
-    records: [{ akoya_requestid: REQUEST_ID, wmkf_meetingdate: OLD_MEETING_DATE }],
+    records: [{ akoya_requestid: REQUEST_ID, wmkf_GrantCycle: { wmkf_cyclecode: 'D26', wmkf_meetingdate: OLD_MEETING_DATE } }],
   });
   expireInvitationResponse.mockResolvedValue({});
 });
@@ -128,7 +135,7 @@ describe('expireInvitation', () => {
 
   it('skips when the revalidated parent meeting date is not past cutoff', async () => {
     queryRequests.mockResolvedValue({
-      records: [{ akoya_requestid: REQUEST_ID, wmkf_meetingdate: FUTURE_MEETING_DATE }],
+      records: [{ akoya_requestid: REQUEST_ID, wmkf_GrantCycle: { wmkf_cyclecode: 'D26', wmkf_meetingdate: FUTURE_MEETING_DATE } }],
     });
     const result = await expireInvitation({
       suggestion: suggestion(),
@@ -138,6 +145,32 @@ describe('expireInvitation', () => {
     });
     expect(result).toEqual({ outcome: 'skipped' });
     expect(expireInvitationResponse).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ['no linked cycle', { akoya_requestid: REQUEST_ID, wmkf_meetingdate: OLD_MEETING_DATE, wmkf_GrantCycle: null }],
+    ['a historical cycle', { akoya_requestid: REQUEST_ID, wmkf_GrantCycle: { wmkf_cyclecode: '2014-D', wmkf_meetingdate: OLD_MEETING_DATE } }],
+    ['a cycle with no Board date', { akoya_requestid: REQUEST_ID, wmkf_GrantCycle: { wmkf_cyclecode: 'D27', wmkf_meetingdate: null } }],
+  ])('skips when the revalidated parent has %s, even with a past meeting date of its own', async (_name, row) => {
+    queryRequests.mockResolvedValue({ records: [row] });
+    const result = await expireInvitation({
+      suggestion: suggestion(),
+      cutoffIso: CUTOFF_ISO,
+      nowIso: NOW_ISO,
+      actingUserSystemId: 'staff-1',
+    });
+    expect(result).toEqual({ outcome: 'skipped' });
+    expect(expireInvitationResponse).not.toHaveBeenCalled();
+  });
+
+  it('rechecks the parent through the linked cycle expand, not the request meeting date', async () => {
+    await expireInvitation({ suggestion: suggestion(), cutoffIso: CUTOFF_ISO, nowIso: NOW_ISO, actingUserSystemId: null });
+    expect(queryRequests).toHaveBeenCalledWith({
+      select: 'akoya_requestid',
+      expand: 'wmkf_GrantCycle($select=wmkf_cyclecode,wmkf_meetingdate)',
+      filter: `akoya_requestid eq ${REQUEST_ID}`,
+      top: 1,
+    });
   });
 
   it('sweeps: calls expireInvitationResponse with the suggestion id, nowIso, and options', async () => {
