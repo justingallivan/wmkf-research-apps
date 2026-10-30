@@ -3,7 +3,7 @@ title: Shared Prompt Local Foundation Milestone
 domain: ai-platform
 kind: implementation-record
 status: active
-summary: Offline template and pinned-model policy primitives implemented and tested; full definition schemas, clients and Dataverse publication remain unbuilt.
+summary: Historical first implementation milestone and Fable review; subsequent structural schema/wire/fingerprint work is recorded in the linked v1 contract.
 canonical: false
 cataloged: 2026-10-29
 owner: product-engineering
@@ -14,7 +14,10 @@ related:
 
 # PR553 local implementation: template and model-policy milestone
 
-**[PARTIAL]** Local foundation has started, not finished. The implemented boundary
+**[HISTORICAL first milestone, commit 564c305a4]** The subsequent
+[definition/wire/fingerprint milestone](SHARED_PROMPT_WIRE_V1_2026-10-29.md) now
+extends this work. The remainder records the first milestone at its review point.
+Local foundation had started, not finished. The implemented boundary
 is `lib/prompt-publication/README.md`. Nothing is wired to live routes or writers.
 No deployment, schema provisioning, tenant read/write or provider/model execution
 was performed. Claude development-agent review used verified subscription OAuth,
@@ -80,7 +83,7 @@ only. Consumers: unit tests; no live callers. Prior findings: Fable F1–F3 abov
 | Doc reconciliation | Main plan/format/plan-review record now label this partial foundation. Dated probe evidence stays historical. No built/deployed publication claim |
 | Symbol fan-out | No persisted enum/status/column introduced. New fixed error codes consumed by tests only; template/model fixture cases cover supported and rejected branches |
 
-**[PLANNED next]** Complete full definition/source/output and consumer contracts,
+**[Historical next-step handoff at first milestone]** Complete full definition/source/output and consumer contracts,
 transport byte bound/malformed-Unicode rejection, request/receipt schema and
 fingerprint vectors. Then continue the plan's local readers, mocked clients,
 solution/plugin and budget coordination. Sandbox transaction/role/uniqueness/

@@ -73,9 +73,9 @@ describe('frozen reviewed model policy', () => {
     else expect(actual).toMatchObject(vector.expected);
   });
   test('exact hash/version only', () => {
-    expect(matchesPolicy({ policyVersion: 1, policyArtifactHash: POLICY_ARTIFACT.hash })).toBe(true);
-    expect(matchesPolicy({ policyVersion: '1', policyArtifactHash: POLICY_ARTIFACT.hash })).toBe(false);
-    expect(matchesPolicy({ policyVersion: 1, policyArtifactHash: 'stale' })).toBe(false);
+    expect(matchesPolicy({ policyVersion: POLICY_ARTIFACT.policy.policyVersion, policyArtifactHash: POLICY_ARTIFACT.hash })).toBe(true);
+    expect(matchesPolicy({ policyVersion: String(POLICY_ARTIFACT.policy.policyVersion), policyArtifactHash: POLICY_ARTIFACT.hash })).toBe(false);
+    expect(matchesPolicy({ policyVersion: POLICY_ARTIFACT.policy.policyVersion, policyArtifactHash: 'stale' })).toBe(false);
   });
   test.each(Object.entries(POLICY_ARTIFACT.policy.tiers))('tier %s is frozen at %s', (tier, concrete) => {
     expect(resolvePinnedModel(tier.toUpperCase()).resolvedId).toBe(concrete);

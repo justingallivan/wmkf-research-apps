@@ -1,8 +1,10 @@
 # PR553 local foundation
 
-This directory is **not wired to a route, command or Dataverse writer**. Its first
-milestone supplies only template and model-policy primitives. A valid template
-or model result is never permission to publish or a complete v1 definition check.
+This directory is **not wired to a route, command or Dataverse writer**. It supplies template/model primitives, complete structural definition validation,
+versioned request/receipt schemas and publication hashes. Schema success is never
+permission to publish, proof of existing-consumer compatibility, or a committed write.
+The executable wire specification is
+`docs/plans/SHARED_PROMPT_WIRE_V1_2026-10-29.md`.
 
 `template-policy.js` is synchronous and browser-safe. It reads only the checked-in
 `policy-v1.json`; no live model discovery, service import or persistence occurs.
@@ -10,8 +12,10 @@ or model result is never permission to publish or a complete v1 definition check
 path/code errors. It preserves body/system strings. Names with surrounding whitespace are rejected, and registered-name lookups use
 ASCII case folding. Declaration names are ASCII;
 reviewer placeholders must stay in the body, while the pre-site template contract
-uses combined system/body placeholders. It does not yet validate canonical key
-identity or unknown definition fields: the full definition schema must do that.
+uses combined system/body placeholders. `definition-schema.js` additionally checks canonical key
+identity, exact fields, serialized memos, variable/source/output grammar,
+validation/native schemas, model ceilings and temperature. It rejects known
+consumer keys pending their complete audit, rather than weaken their requirements.
 
 `resolvePinnedModel` uses exact reviewed IDs or case-insensitive tier names,
 resolving tiers to the artifact's explicit tracked fallback snapshot. It accepts
@@ -34,8 +38,11 @@ Generation extracts literal rule/model data from tracked source using its AST.
 `--check` detects source drift without rewriting. Regeneration is a reviewed
 policy change, not a startup/runtime refresh. The envelope hash is SHA-256 over
 UTF-8 `JSON.stringify(policy)` with recursively sorted object keys and preserved
-array order. This initial artifact uses ASCII property names; its exact bytes and
+array order. The artifact uses ASCII property names; its exact bytes and
 hash must be included in .NET golden tests before claiming cross-language parity.
+Revision 2 also pins schema/hash source digests and pending consumer keys.
+`--check` is required after schema changes; regenerate only as a reviewed policy
+update, then explicitly refresh fingerprint vectors if the identity changed.
 The envelope is trusted packaged code, not caller-supplied policy. It is deeply
 frozen when loaded. No runtime network lookup can alter it.
 
@@ -69,14 +76,29 @@ actual shipped templates, extracted source rules, limits and model policies.
 | No null-default exemption | Empty default registry fails closed | Null/default negative tests |
 | No content in errors | Fixed paths/codes only | Sensitive fixture actually present in rejected template |
 
-Whole-flow trace: local caller/test → complete template DTO → pure validator →
-structured result → caller/test. Persistence, routes, UI state, async writes,
-partial batch success and durable schema changes are N/A for this milestone.
-The new helpers do not replace or change any existing validator/caller. Unknown
-models reject; unknown template names get generic validation only, not a claim
-that an existing application's consumer requirements have been met. Policy hash
-comparison is fail-closed. Full definition/source/output schemas, whole-DTO UTF-8
-transport limit, consumer-specific restrictions/defaults, request/receipt schema,
-publication fingerprint vectors, read paging/status, both clients, solution
-manifest/plugin and budget coordination remain subsequent local work. No .NET
-parity or tenant transaction behavior has been verified.
+Whole-flow trace: local caller/test → bounded complete DTO → structural schema →
+canonical preimage/hash → validated request/receipt → caller/test. Persistence,
+routes, UI state, async writes, partial batch success and live durable schema
+changes remain N/A. `json-contract.js` provides strict duplicate-key parsing,
+Unicode/number/object inspection and tagged canonicalization with a 1MiB UTF8
+DTO cap. Never generic-parse incoming text before duplicate-key checks.
+
+`publication-contract.js` validates exact versioned requests, baselines, snapshots
+and receipts. `fingerprint.js` is SERVER ONLY (node:crypto): hashSnapshot binds
+complete raw definition/catalog, publicationFingerprint binds complete request
+and separately trusted actor/organization, verifyReceiptBinding checks historical
+request equality, and validateFreshPublication checks fresh content/hash/policy.
+Use historical replay after authorization and durable lookup BEFORE fresh checks.
+Neither a matching hash nor valid receipt shape authenticates a supplied receipt.
+
+Portable fingerprint vectors live in
+`tests/fixtures/prompt-publication/fingerprints-v1.json`. Reproduce/check with
+`node scripts/build-prompt-publication-vectors.cjs --check` and independently with
+`python3 scripts/check-prompt-publication-vectors.py`. Canonical tags/numeric bits/
+Unicode escaping are specified in the wire document; this hash algorithm differs
+from the policy envelope hash. No .NET parity is claimed from Python success.
+
+Remaining mandatory work: complete consumer-specific restrictions/defaults and
+registered-budget integration, read paging/status, real clients, solution/plugin
+and budget coordination. No .NET parity or tenant transaction behavior is proved.
+New helpers do not replace existing runtime validators or callers.

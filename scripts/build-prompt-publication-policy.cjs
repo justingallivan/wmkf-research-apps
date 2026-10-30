@@ -12,6 +12,9 @@ function literal(node) {
     case 'StringLiteral': case 'NumericLiteral': case 'BooleanLiteral': return node.value;
     case 'NullLiteral': return null;
     case 'RegExpLiteral': return { source: node.pattern, flags: node.flags };
+    case 'CallExpression':
+      if (node.callee.type !== 'MemberExpression' || node.callee.object.name !== 'Object' || node.callee.property.name !== 'freeze' || node.arguments.length !== 1) throw new Error('Nonliteral call');
+      return literal(node.arguments[0]);
     case 'ArrayExpression': return node.elements.map(literal);
     case 'ObjectExpression': return Object.fromEntries(node.properties.map(p => {
       if (p.type !== 'ObjectProperty' || p.computed || p.method) throw new Error('Nonliteral policy property');
@@ -47,9 +50,14 @@ for (const id of Object.values(TIER_FALLBACK_IDS)) {
   if (base === id || !Object.hasOwn(models, base)) throw new Error(`Unreviewed tier: ${id}`);
   models[id] = models[base];
 }
+const { ADMIN_PROMPT_CATALOG } = extract('shared/config/adminPromptCatalog.js', ['ADMIN_PROMPT_CATALOG']);
+const observed = JSON.parse(fs.readFileSync(path.join(root, 'docs/plans/evidence/shared-prompt-library-schema-2026-10-29.json'), 'utf8'));
+const pendingConsumerNames = [...new Set([...Object.keys(ADMIN_PROMPT_CATALOG), ...observed.promptRows.map(r => r.name)])].sort();
+if (pendingConsumerNames.some(name => typeof name !== 'string')) throw new Error('Invalid pending consumer key');
+const schemaSourceHashes = Object.fromEntries(['json-contract.js', 'definition-schema.js', 'publication-contract.js', 'fingerprint.js'].map(file => [file, crypto.createHash('sha256').update(fs.readFileSync(path.join(root, 'lib/prompt-publication', file))).digest('hex')]));
 const policy = {
-  policyVersion: 1, definitionFormatVersion: 1,
-  scope: 'template-and-model-foundation',
+  policyVersion: 2, definitionFormatVersion: 1,
+  scope: 'definition-contract-foundation',
   limits: { templateUtf16: 65536, nameUtf16: 850 },
   placeholder: { token: '\\{\\{[ \\t\\r\\n\\f\\v]*([A-Za-z0-9_]+)[ \\t\\r\\n\\f\\v]*\\}\\}', name: '[A-Za-z0-9_]+', matchMode: 'full-string' },
   forbiddenPatterns: templates.A7_FORBIDDEN_PATTERNS,
@@ -57,7 +65,7 @@ const policy = {
   templateContracts: templates.PROMPT_TEMPLATE_CONTRACTS,
   tiers: TIER_FALLBACK_IDS, models,
   // Empty until each existing null-model consumer's actual default is extracted.
-  defaultsByName: {},
+  defaultsByName: {}, templateOnlyByName: {}, pendingConsumerNames, schemaSourceHashes,
 };
 function canonical(value) {
   if (Array.isArray(value)) return value.map(canonical);

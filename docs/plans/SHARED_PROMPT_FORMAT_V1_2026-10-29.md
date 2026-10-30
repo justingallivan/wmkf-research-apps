@@ -16,8 +16,11 @@ related:
 # Shared prompt definition format v1
 
 **[PARTIAL implementation; normative complete contract]** The offline
-`lib/prompt-publication/` foundation implements template and pinned-model
-primitives only, not complete definition validation or publication. This defines the
+`lib/prompt-publication/` implements complete structural definition validation,
+wire schemas and fingerprint primitives. Consumer restrictions/defaults and live
+publication remain incomplete. The executable
+[wire specification](SHARED_PROMPT_WIRE_V1_2026-10-29.md) pins memo encoding,
+transport/canonicalization and stricter reviewed schema subsets. This defines the
 shared stored-definition validator; it does not describe a deployed API or
 promise every runtime supports every accepted definition. `definitionFormatVersion`
 is 1. Wire contract version and reviewed policy-artifact version/hash are separate
@@ -47,8 +50,8 @@ before publication. No arbitrary executable code or caller-supplied validator.
 
 JSON memo fields retain the verified 1,000,000-character per-column storage cap;
 draft/save transport must also enforce one bounded whole-DTO UTF-8 byte limit
-consistent with its API route and Function limits. The executable schema will
-pin that transport limit during the first local slice, before any client ships;
+consistent with its API route and Function limits. The local schema pins a 1,048,576-byte serialized DTO limit, depth 32 and 50,000
+value nodes, with malformed Unicode/unsafe numbers rejected before hashing;
 no claim that every theoretical maximum-sized combination fits a request.
 
 **[VERIFIED existing-source difference]** `prompt-validators.js:26` defaults to

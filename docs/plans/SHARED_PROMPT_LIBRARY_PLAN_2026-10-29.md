@@ -3,7 +3,7 @@ title: Shared Prompt Library Implementation Plan
 domain: ai-platform
 kind: plan
 status: proposed
-summary: Shared prompt library plan with an initial offline template/model-policy foundation; Dataverse publication and clients remain unbuilt.
+summary: Shared prompt library plan with offline definition/wire schemas and fingerprint foundation; Dataverse publication and clients remain unbuilt.
 canonical: false
 cataloged: 2026-10-29
 last_verified: 2026-10-29
@@ -45,10 +45,10 @@ Locating the historical Power Automate flow is NOT a prerequisite for building,
 rehearsing or releasing the library and its two publication clients. Actual
 execution by a future flow remains that flow's integration acceptance task.
 
-This document governs the implementation; no schema has been deployed. The initial
-offline template/model-policy foundation is implemented in
+This document governs the implementation; no schema has been deployed. The offline definition/wire/fingerprint foundation is implemented in
 `lib/prompt-publication/` with portable fixtures and unit tests. It is not wired to
-any route or writer and is not the complete definition validator. See that
+any route or writer. Complete structural validation exists; consumer-specific
+restrictions/defaults, budget integration and .NET/tenant proof remain required. See that
 directory's README and
 [local implementation record](SHARED_PROMPT_LOCAL_FOUNDATION_2026-10-29.md) for
 invariants and remaining local milestones. The retained

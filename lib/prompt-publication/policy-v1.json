@@ -1,6 +1,6 @@
 {
   "hashAlgorithm": "sha256-canonical-json-utf8-v1",
-  "hash": "96257d50032e149748b0b1b451c7dd7bf93a7cbc7cdd1ac5308491e943d215e0",
+  "hash": "cc5def0076a89e6ab9fa912c96de13c8b2bf31c19524223baf2ddc1075540bae",
   "policy": {
     "defaultsByName": {},
     "definitionFormatVersion": 1,
@@ -314,12 +314,54 @@
         "zeroDataRetentionEligible": null
       }
     },
+    "pendingConsumerNames": [
+      "cycle-dossier.entry",
+      "cycle-dossier.research-plan",
+      "executor.echo-parity",
+      "expense-reporter.extract-document",
+      "expense-reporter.extract-image",
+      "expertise-finder.match",
+      "field-primer.generate",
+      "funding-gap.analyze",
+      "funding-gap.extract",
+      "grantee-abstract.generate",
+      "grantee-title.generate",
+      "initial-assessment.generate",
+      "literature-analyzer.compare",
+      "literature-analyzer.extract-paper",
+      "literature-analyzer.synthesize",
+      "meeting-transcript.fragment-review",
+      "meeting-transcript.presentation-summary",
+      "meeting-transcript.speaker-alignment",
+      "meeting-transcript.staff-discussion-sentiment",
+      "meeting-transcript.staff-discussion-summary",
+      "multi-perspective.initial-analysis",
+      "multi-perspective.integrator",
+      "multi-perspective.neutral",
+      "multi-perspective.optimist",
+      "multi-perspective.proposal-summary",
+      "multi-perspective.skeptic",
+      "peer-review-summarizer.analyze",
+      "peer-review-summarizer.questions",
+      "phase-i.checkin",
+      "phase-i.summary",
+      "phase-ii.extract-structured",
+      "phase-ii.qa",
+      "phase-ii.refine",
+      "phase-ii.summarize",
+      "pre-site-visit.proposal-core.generate",
+      "review-panel.chair",
+      "review-panel.seat",
+      "review-synthesis.generate",
+      "reviewer-finder.analyze",
+      "reviewer-finder.score-candidates"
+    ],
     "placeholder": {
       "matchMode": "full-string",
       "name": "[A-Za-z0-9_]+",
       "token": "\\{\\{[ \\t\\r\\n\\f\\v]*([A-Za-z0-9_]+)[ \\t\\r\\n\\f\\v]*\\}\\}"
     },
-    "policyVersion": 1,
+    "policyVersion": 2,
     "reviewerContracts": {
       "reviewer-finder.analyze": {
         "requiredLabels": [
@@ -351,7 +393,13 @@
         ]
       }
     },
-    "scope": "template-and-model-foundation",
+    "schemaSourceHashes": {
+      "definition-schema.js": "144b424ce14bfdf80a5d00b97caff54fe6a287eb02ff4db791e920a6b3d29e30",
+      "fingerprint.js": "8ccc5a15b040acaed9768462cd491bc671c886f6f3689f976b1b32403bf225ba",
+      "json-contract.js": "b6456c0d1982907120e026ff5a530b5bdefaf1d3d2f95e8d50ec9b3fb7e325be",
+      "publication-contract.js": "fc1932550700a9ba86a9bc08854bded18b3f6e95a539a5e414674ea4b5cf4a27"
+    },
+    "scope": "definition-contract-foundation",
     "templateContracts": {
       "pre-site-visit.proposal-core.generate": {
         "requiredPlaceholders": [
@@ -360,6 +408,7 @@
         ]
       }
     },
+    "templateOnlyByName": {},
     "tiers": {
       "fable": "claude-fable-5-1",
       "haiku": "claude-haiku-4-5-20251001",

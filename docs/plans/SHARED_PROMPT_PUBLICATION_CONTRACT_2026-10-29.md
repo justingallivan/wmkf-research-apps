@@ -14,11 +14,13 @@ related:
 
 # Shared prompt authoring and publication contract
 
-**[OWNER DIRECTION, 2026-10-29; not implemented]** Future prompts share the existing
+**[OWNER DIRECTION, 2026-10-29; publication operation not implemented]** Future prompts share the existing
 Dataverse prompt table, and Connor supplies the proposed group field. Admin and
 Connor's coding tools both preserve versions and explicitly activate a version.
 **Connor does not have to open Admin to publish.** The detailed technical contract
-below remains proposed for implementation. Justin confirms Connor's agreement
+below remains proposed for the live operation. The
+[local wire v1 specification](SHARED_PROMPT_WIRE_V1_2026-10-29.md) now has
+executable structural schemas and hashes; it does not authorize or perform writes. Justin confirms Connor's agreement
 to use the existing app prompt format in future PA flows; this does not imply
 a deployed operation or permission for schema/data writes or model execution.
 

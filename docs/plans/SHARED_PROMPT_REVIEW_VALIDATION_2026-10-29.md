@@ -28,8 +28,9 @@ publication clients and current/history readers. Prior findings: Fable review of
 This validation used source, public primary documentation, offline tests and
 explicit algorithm counterexamples. No new tenant read, live write, model call
 or provider request. Existing schema/example evidence stays dated and unchanged.
-The initial offline template/model primitives now exist in `lib/prompt-publication/`;
-full definition schema and operation behavior remain PLANNED. The findings below
+Offline structural definition/wire schemas and hashes now exist in
+`lib/prompt-publication/`; consumer-specific checks and operation behavior remain
+PLANNED. See `docs/plans/SHARED_PROMPT_WIRE_V1_2026-10-29.md`. The findings below
 record the pre-implementation plan review, not approval of later implementation.
 
 ## Findings disposition
