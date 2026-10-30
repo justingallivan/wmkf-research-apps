@@ -16,8 +16,8 @@ related:
 
 ## Verdict and evidence boundary
 
-**READY WITH NAMED GATES for a separately authorized sandbox spike; not approved
-for Production implementation/deployment.** A shared Dataverse Custom API Action
+**READY TO START LOCAL FOUNDATION IMPLEMENTATION; not ready to deploy or
+enable new writers.** A shared Dataverse Custom API Action
 is practical at the documented platform level. It can be called by both Admin's
 server and Connor's tools without requiring Connor to use Admin. This assessment
 is based on Microsoft documentation and repository inspection on 2026-10-29;
@@ -41,7 +41,7 @@ feature support or tenant deployment readiness from this agreement.
 | Capability | Primary source and bounded conclusion | Status |
 |---|---|---|
 | Shared server operation | [Custom APIs](https://learn.microsoft.com/en-us/power-apps/developer/data-platform/custom-api): code and Power Automate can call an Action with plug-in main-operation logic. Use a mutating Action, not a Function/event-only endpoint. | VERIFIED, documented capability |
-| Atomic work | [Database transactions](https://learn.microsoft.com/en-us/power-apps/developer/data-platform/scalable-customization-design/database-transactions): synchronous in-context organization-service requests participate in the transaction; same-org Web API calls do not preserve that context. [Microsoft Custom API example](https://www.microsoft.com/en-us/power-platform/blog/2026/10/26/custom-apis-just-landed-in-the-dataverse-mcp-server-agents-just-got-smarter/) explicitly describes one transaction and rollback. Require `IsInTransaction` and prove the deployed message's behavior. | VERIFIED platform; tenant NOT TESTED |
+| Atomic work | [Database transactions](https://learn.microsoft.com/en-us/power-apps/developer/data-platform/scalable-customization-design/database-transactions) documents synchronous in-context SDK participation. [Custom API](https://learn.microsoft.com/en-us/power-apps/developer/data-platform/custom-api) documents the plug-in-backed message. The exact registration's IsInTransaction and all-or-none rollback MUST be demonstrated; a blog example is not platform/tenant proof. | DOCUMENTED general primitives; exact Custom API transaction behavior ASSUMED until sandbox |
 | Concurrency | [Optimistic concurrency](https://learn.microsoft.com/en-us/power-apps/developer/data-platform/optimistic-concurrency): SDK conditional updates use `IfRowVersionMatches`. A transaction alone is insufficient to serialize simultaneous first publications; use a unique per-key head plus conditional revision update. | VERIFIED primitive; proposed composition NOT TESTED |
 | Unique identity/receipts | [Alternate keys](https://learn.microsoft.com/en-us/power-apps/maker/common-data-service/define-alternate-keys-reference-records): uniqueness excludes null keys; indexes must be Active; size limited to 900 bytes. Required bounded digest/request keys avoid the existing 850-character name-size issue. Compare original names to reject digest collisions. | VERIFIED constraints; new tables NOT PROVISIONED |
 | Reader identity | [Dataverse string filtering](https://learn.microsoft.com/en-us/power-apps/developer/data-platform/webapi/query/filter-rows) is case insensitive. Head identity must match reader equivalence; canonical lowercase ASCII keys, direct-alias rejection and legacy collision audit prevent separate heads for the same reader identity. Unsupported collation cases block cutover pending explicit mapping. | VERIFIED platform; mapping/races NOT TESTED |
@@ -58,7 +58,7 @@ feature support or tenant deployment readiness from this agreement.
 | Keep existing readers compatible | `ai-prompt.js` `getCurrentForExecutor` filters current, rejects zero/duplicates, does not require Published status | Read complete adapter; raw `wmkf_ai_iscurrent`, `wmkf_promptversion`, status, seed and publication searches identify fan-out scope | Add status guard; enumerate every raw reader/writer, projection, cache and fallback before cutover | PARTIAL; migration required |
 | Assign version on publication | Existing numeric `wmkf_promptversion`; retained 2026-10-29 schema snapshot has existing rows/history and no alternate key | Existing read-only snapshot retained unchanged; no new live requiredness/write test | Save/reload a null-version draft, prove non-execution; if schema rejects it stop for additive adjustment | PARTIAL: platform supports API null; tenant NOT TESTED |
 | Support Connor's independent command | Authenticated Dataverse endpoint with trusted actor, same policy/receipt as Admin | Official OAuth/Custom API documentation, no credential or role mutation | Publish from actual delegated Connor identity, deny an unauthorized user and prove initiating/effective actor; no Admin cookie | PLANNED; NOT TESTED |
-| Separate shared lifecycle and common-format checks | Existing publisher uses JS model/output/template/budget checks and `loadAvailableModels` | Read logical validation region and existing Executor contract | Both clients must pass shared rules plus common app-format checks; parity in JS/.NET, unknown-format rejection and budget races; no flow-discovery dependency | NEEDS DESIGN before build |
+| Separate shared lifecycle and common-format checks | Existing publisher uses JS model/output/template/budget checks and `loadAvailableModels` | Read logical validation region and existing Executor contract | Both clients must pass shared rules plus common app-format checks; parity in JS/.NET, unknown-format rejection and budget races; no flow-discovery dependency | Normative v1 defined; executable schema/artifact/parity are first LOCAL implementation deliverables |
 
 Repository inspection used CodeGraph first; it returned unrelated symbols for
 these named files, so exact source was read directly. `git ls-files '*.csproj'
@@ -75,7 +75,8 @@ head revision → shared-state plus common-format validation → version assignm
 conditional lifecycle writes → receipt in same transaction → both clients receive
 receipt/current separately → apps/flows resolve sole current Published row.
 
-Two new small tables (head and receipts) provide shared coordination/audit;
+Two new OrganizationOwned tables (head and receipts), with explicit approved-publisher
+Org Read and guarded mutations, provide shared coordination/audit;
 a seventh prompt column stores the draft metadata baseline durably.
 Prompt content remains in the existing table. Dataverse guards protect lifecycle,
 content immutability, heads/receipts and direct draft invariants. This is additional
@@ -92,11 +93,11 @@ A content hash and request fingerprint are distinct. The versioned canonical
 request fingerprint binds operation, canonical/original key, authenticated actor,
 draft GUID/ETag, expected head revision and active GUID/version/ETag, metadata
 baseline, complete staged content/catalog hash, and submitted wire-contract,
-definition-format and policy versions. Store both hashes in the receipt. Reusing a UUID with ANY changed
+definition-format and pinned policy-artifact version/hash. Store both hashes in the receipt. Reusing a UUID with ANY changed
 request field is rejected, even for identical text in a different draft. An
 unchanged successful replay returns its original receipt before checking newer
-state or policy; authorization is still required. A fresh request must use the
-currently accepted policy. Never rebuild the replay fingerprint from today's
+state or policy; authorization is still required. A fresh request must match the installed immutable
+policy-artifact version/hash; replacing it disables/drains both routes first. Never rebuild the replay fingerprint from today's
 active row, generated publication time or latest policy.
 
 ## Seven contract audits
@@ -106,7 +107,7 @@ active row, generated publication time or latest policy.
 2. Partial success: new operation is one transaction; timeout resolves by unique
    receipt, never a fabricated failure or blind resend. Legacy torn states block.
 3. Async/stale state: expected head/current/draft plus metadata baseline; replay
-   before freshness; UI generation/abort guards and cache semantics are build gates.
+   before freshness and repeated receipt lookup after head conflict; UI generation/abort guards and cache semantics are build gates.
 4. Helper semantics: one Dataverse authority, two clients; Admin session guard
    and delegated backend identity remain distinct; no .NET helper yet exists.
 5. Durable surfaces: new Dataverse tables/solution/roles/guards need schema/Atlas,
@@ -124,7 +125,8 @@ active row, generated publication time or latest policy.
 
 - Connor is the owner-confirmed maintainer; initial human publishers are Connor
   and existing Admin superusers. Verify tooling, mapped identities and actual
-  sandbox deployment privileges before build.
+  sandbox deployment privileges before import/deployment, not before local
+  schema/validator/mock source work.
 - Prove transaction context and rollback at every write boundary, unique-key
   activation, simultaneous first/later publications, stale head/draft/current,
   duplicate UUID retry and lost response after commit followed by later publish.
@@ -133,10 +135,12 @@ active row, generated publication time or latest policy.
   impersonation fallback is acceptable.
 - Agree nullable draft storage, legacy head high-water initialization, explicit
   recovery for corrupt states, and seed/raw-writer cutover under writer freeze.
-- Finalize the agreed common app-format validation policy, JS/.NET parity,
+- Implement the normative format v1 as a pinned artifact and prove JS/.NET parity,
   model/budget freshness and unknown-format/policy rejection. Keep shared
   lifecycle rules distinct from definition checks; both are mandatory in the
-  publication transaction. Flow-specific execution remains separately verified.
+  publication transaction. Retain scoped budget coordination before writer
+  enablement; no mutable policy-activation service. Flow-specific execution
+  remains separately verified.
 - Use a new common-format fixture to rehearse both publication clients. Finding
   the old Power Automate flow, publishing its legacy definition unchanged, or
   migrating it is not a prerequisite for library construction or release.
@@ -183,3 +187,30 @@ the proposal documents; references to former app-only/reserved-draft behavior
 are explicitly historical or prohibited alternatives. Verdict: RECONCILED for
 the bounded changed target; tenant feasibility remains UNKNOWN until the named
 sandbox spike. No current runtime/governance behavior was relabeled as shipped.
+
+
+## Validated review and local-first boundary
+
+See the normative [format v1](SHARED_PROMPT_FORMAT_V1_2026-10-29.md) and
+[Fable findings validation](SHARED_PROMPT_REVIEW_VALIDATION_2026-10-29.md).
+Ownership, required keys/index activation, bypass-privilege inventory and
+post-conflict receipt lookup are explicit. Snapshot/modeled counterexamples
+support removing live mutable-policy administration in favor of a deployment-
+pinned artifact, while retaining a narrower token-budget consistency CAS before
+writer enablement. Actual runtime caps do not prove stored-state consistency.
+
+Author the executable contract, pure validators, golden vectors, reader tests,
+client mocks and reusable plug-in source NOW. Compile/import when Connor's
+tooling/access is available; use the same source for the sandbox proof. A failed
+platform proof blocks affected deployment/enablement, not unrelated local work.
+A separately authorized complete live-row compatibility scan gates cutover.
+No remaining product/owner decision blocks this foundation slice.
+
+**[PLANNED budget-policy parity]** The budget publisher must replace its current
+dynamic tier/model resolution with the SAME pinned tier/default/capability
+artifact used by prompt publication. Coordination alone cannot protect a pair
+validated against different model ceilings. Policy deployment disables and drains
+governed budget writes as well as both prompt publication routes, then revalidates
+all governed active budget/model pairs against the new artifact before re-enabling
+writers. Reject incompatible pairs for explicit remediation. Shared golden cases
+cover differing dynamic versus pinned tier ceilings and policy upgrades.

@@ -124,6 +124,10 @@ this inventory against latest main and check other repositories/Connor's tools.
   ordinary draft authors. Caller-context SDK needs the required head/receipt
   and prompt read/create/write/lookup privileges; synchronous guards reject raw
   privileged writes even when CRUD privilege exists. No general Delete grant.
+  Head/receipt tables are OrganizationOwned, with explicit organization-level
+  read for approved publishers and no user/team assignment dependency. Mutations
+  remain guard-restricted and replay remains actor-bound. Nonempty identity/UUID
+  guards and Active unique indexes are mandatory before enablement.
   Final role names/privilege names derive from deployed schema, never invented.
 - The app principal needs the compatible privilege intersection for impersonated
   calls but is not an additional human publisher; reject direct unimpersonated
@@ -136,7 +140,11 @@ this inventory against latest main and check other repositories/Connor's tools.
   remains until the Dataverse grant is revoked. Do not claim automatic sync.
   An automated role-sync service is not included; release runbook owns the
   paired change and checks it before handoff. Privileged platform bypass remains
-  outside the ordinary author guarantee.
+  outside the ordinary author guarantee. Inventory actual holders of
+  `prvBypassCustomBusinessLogic` and `prvBypassCustomPlugins`, including Connor
+  and the app principal; do not assume their roles from their responsibilities.
+  Microsoft documents merged individual/bulk pipelines, but verify actual
+  registrations without duplicate guard execution in sandbox.
 
 ## Proposed client protocol (both routes)
 
@@ -151,7 +159,7 @@ canonical JSON request inside the typed Action parameters if necessary.
 | `expectedHeadRevision` | Required expected state, including explicit initialization revision |
 | `expectedCurrent` | Explicit null for first publication, otherwise exact ID/version/ETag |
 | `metadataBaseline`, `snapshotHash` | Match durable staged baseline and complete saved definition/catalog |
-| `policyRevision` | Explicit current accepted immutable policy revision; never caller-owned rules |
+| `policyRevision`, `policyArtifactHash` | Exact version/hash of reviewed artifact packaged with the operation; no caller-owned rules or mutable activation service |
 
 No actor ID, arbitrary target URL, fields-to-PATCH, provider credentials, force
 bypass or execution-budget override is accepted. Request fingerprint covers the
@@ -161,7 +169,10 @@ number serialization need shared golden vectors before JS/.NET release.
 
 Response distinguishes immutable `receipt` (which publication this UUID did)
 from refreshed `current` state (what is active now). A stale/conflict response
-preserves drafts. Concurrent winner/unknown timeout use read-receipt + unchanged
+preserves drafts. A retried UUID with head/receipt conflict MUST recheck the
+receipt after conflict, because a winner can commit after the initial lookup.
+Unknown/unavailable lookup stays unknown, not a fresh-edit conflict or new UUID.
+Concurrent winner/unknown timeout use read-receipt + unchanged
 UUID retry, never automatic merge or another publication. Typed failures include
 unauthorized/unsupported contract, draft changed, active/head changed, metadata
 changed, policy changed, corrupt lifecycle and request-ID reuse; these are
@@ -189,75 +200,60 @@ no lifecycle-only commit or editorial category/group bypass. Explicit format
 version joins the request fingerprint and receipt. Unsupported legacy text
 stays visible; format acceptance does not prove runtime feature support.
 
-## Common-format validation policy: technical recommendation
+## Pinned policy and scoped budget coordination
 
-**[VERIFIED source dependency]** Current JS publication uses prompt template/
-reviewer parse checks, reviewed capability+pricing registries, tier resolution,
-output-schema checks and durable Executor budgets. Model resolution may consult
-an external model list; it cannot simply run inside the Dataverse transaction.
-Current budget publication creates a new uniquely keyed immutable settings
-revision after checking models (`publishExecutorBudgetConfig`). That does not
-itself synchronize with a new Custom API publication transaction.
+The normative [format v1](SHARED_PROMPT_FORMAT_V1_2026-10-29.md) resolves the
+previous cap/null-model/temperature/ASCII/enum ambiguities and requires exact
+per-name constraints in the artifact. The
+[validated Fable review](SHARED_PROMPT_REVIEW_VALIDATION_2026-10-29.md) records
+source evidence, counterexamples and what was accepted/refuted.
 
-**[PLANNED, not implemented]** Generate a versioned declarative validation-policy
-artifact from reviewed source: the supported common app-format version, template/parse
-requirements, A7 prohibitions, per-field limits, concrete reviewed model
-capabilities and an explicit tier→concrete mapping. Ship identical artifact/hash
-and golden fixtures for JS feedback and .NET authoritative checks. Store immutable
-policy revisions in existing settings; a conditional control row identifies the
-accepted revision and latest budget revision. Size must fit the verified settings
-limit; split bounded immutable chunks or fail publication if over limit, never
-truncate. No secret/provider credential or prompt body belongs in policy.
+**[VERIFIED existing source]** JS publication uses template/reviewer parse checks,
+reviewed capability+pricing registries, dynamic tier resolution, output-schema
+checks and durable Executor budgets. Current budget publication validates models
+before creating a new uniquely keyed settings revision; no cross-writer
+coordination currently exists. Runtime caps server-owned overrides, throws for
+oversized row budgets and enforces strict retry floors; it does not make a
+racing persisted budget/model pair consistent.
 
-Every fresh prompt publication and policy activation conditionally updates the
-SAME control row inside its transaction before reading current policy/budgets;
-then it acquires the per-key head. Use that lock order consistently. Every
-successful prompt publication advances control even if the model is unchanged.
-Guard lifecycle and policy/control/budget activation against direct bypass.
+**[PLANNED simplification]** Generate ONE reviewed immutable artifact and package
+it with JS and .NET: format version/hash, per-name template/parser constraints,
+explicit tier→concrete/default mapping and reviewed capabilities/ceilings. No
+provider call inside the operation. No mutable policy activation, policy-revision
+settings rows or global policy-write fence in v1. Fresh requests must match the
+installed artifact; policy replacement requires server-side disabling of both
+publication routes and draining in-flight work before deploy/re-enable. Replay
+of completed old receipts does not revalidate against today's artifact.
 
-For the existing JS budget writer, use **snapshot-bound conditional commit**:
-read control revision/policy FIRST, then read all governed active prompt models
-and full budget history and run `assertModelCeilings`. Bind the validation result
-to that exact control revision and exact prompt ID/version/model/ETag snapshot.
-Commit the new immutable budget revision plus conditional control advance in ONE
-Dataverse changeset with the original control ETag. If any prompt publication or
-policy/budget activation occurred since the initial read, CAS fails and the
-whole changeset rolls back. Re-read/revalidate under a NEW request only after
-explicit conflict handling; do not acquire a fresh control ETag after validation.
-Unchanged request retries first check their immutable budget receipt/history.
-Every input-changing writer must participate in this fence before it is trusted.
+**[PLANNED retained protection]** One settings coordination row remains for
+REGISTERED TOKEN-GOVERNED budgets, not all prompts. Those model publications
+conditionally acquire it before reading budgets, then acquire their per-name
+head. Timeout-only and unregistered generic/PA names take only their head.
+Budget membership is the reviewed artifact registry, never an editorial label
+or client flag. Do not let direct writes bypass the budget/row guards.
 
-This is the alternative to moving budget validation into another Custom API;
-it keeps the existing JS budget validator but explicitly fences the snapshot it
-validated. The batch adapter must require actual actor/header and no-fallback
-transport (the current `executeChangeset` signature does not yet expose a
-noFallback option), trusted DAL and target interlock. No unrelated helper's
-fallback behavior is changed globally. Preserve current budget JSON schema,
-registered membership, UI, request IDs and runtime semantics.
+The JS budget writer captures ORIGINAL coordination revision/ETag before reading
+all governed active models/history and validating. It commits the immutable
+revision plus ORIGINAL-revision CAS in one strict-actor/no-fallback changeset.
+Never reread a fresh ETag after validation to make a stale result commit. A stale
+second commit aborts in either budget-up/model-down order. Preserve budget UI,
+JSON schema, request IDs, history and runtime caps. Strict transport needs the
+localized noFallback extension already identified; do not globally change
+unrelated write-helper semantics.
 
-Rehearse both orderings of **budget raise versus prompt model-ceiling reduction**:
-only the first expected-control commit wins; the other must conflict without a
-new budget/prompt row. Also test unrelated prompt publishes (conservative global
-conflicts are acceptable at this low write volume), direct bypass and policy
-changes. Atomic budget creation/control advance WITHOUT binding the prevalidation
-snapshot is insufficient.
+Implement this budget adaptation after the first local contract/validator/mock
+slice, but before enabling new governed publishers. No need to finish it before
+writing foundation source. Actual transaction/lock/rollback behavior remains a
+sandbox gate. The reproducible offline script tests the actual runtime guard and
+modeled alternatives, not Dataverse isolation. A one-time equality read of a
+mutable policy row is not accepted as proof of commit-time freshness.
 
-This design reuses settings, not another prompt library. It is a recommended
-technical design with explicit adjacent writer work, not a claim of implemented
-parity. Model-list changes do not silently alter the accepted publication policy;
-activate a reviewed new policy explicitly. Runtime tier/model/budget guards remain
-necessary because invocation-time configuration can change after publication.
-
-Before build, materialize schema and parity vectors for this policy and prove
-extractability of current JS checks. Required vectors include undeclared/missing
-variables in either template, reviewer labels, A7 markers, empty/oversize strings,
-unknown output/source/target kinds, native structured-output compatibility,
-unknown/retired model and token ceilings, budget changes, category/group values,
-and unsupported format version. No external-flow profile is needed to build
-this release: Connor will adopt the common app format. The historical example
-remains visible/preserved; its unknown flow/model/PDF assembly is only a blocker
-to claiming that particular legacy integration works. Use a new common-format
-fixture for two-client publication rehearsal without invoking a flow or model.
+The first foundation deliverables are executable v1 schema/artifact and golden
+vectors, pure validator extraction, reader/paging/structural-error tests, both
+clients' mocked transport and reusable plug-in source. Local .NET tooling is
+needed for compilation, not for JS/schema/mocks. Use that same operation for the
+sandbox spike rather than another throwaway implementation. Keep all live
+writes disabled pending full proof and authorized rollout.
 
 ## Baseline verification and remaining acceptance
 
@@ -276,14 +272,16 @@ Connor owns confirming a supported build/deploy machine and solution packaging.
 |---|---|
 | Connor ownership/access scope decided; source cutover inventory recorded | Verify actual publisher roles, unauthorized identity denial and no app fallback |
 | Draft-null behavior supported by platform documentation | Save/read/update null-version draft under tenant rules; prove non-execution |
-| Head/receipt/policy fence and two-client envelope specified | Simultaneous first/later/case-variant publication; stale draft/metadata/policy |
-| Validation dependencies and parity corpus requirements enumerated | JS/.NET parity; all-or-none rollback after each write boundary |
+| OrganizationOwned head/receipt, pinned policy and scoped budget fence specified | Simultaneous first/later/case-variant publication; stale draft/metadata/policy |
+| Normative format v1 and artifact/parity acceptance defined; executable artifacts are first local deliverables | JS/.NET parity; all-or-none rollback after each write boundary |
 | Caller/seed/fallback migration requirements identified | Lost response + later publish + replay; direct/bulk/head/receipt bypass denial |
 | Common format agreed; tooling still UNKNOWN; historical flow not a prerequisite | New common-format backend draft → discover → backend publish → app read; inverse Admin route; no PA execution |
 
-The historical example below is not a build dependency. Remaining engineering
-prerequisites are common app-format policy schema/vectors,
-solution/role manifest and build/deploy tooling. No further product choice about
+The historical example below is not a build dependency. Local implementation
+can start now using the format v1 contract and validated review disposition.
+Executable artifact/schema/vectors and solution manifests are first-slice work;
+tooling, roles, transaction proof and full cohort validation gate compile/import/
+writer enablement as applicable, not independent local coding. No further product choice about
 using Admin is outstanding. Do not treat this preflight as permission to install
 tools, provision schema, grant access or write Production.
 
@@ -296,20 +294,16 @@ Existing runtime/Atlas/memory descriptions are still descriptions of the old
 implementation, not evidence this design is deployed. Concurrent main handoff
 files remain outside this branch's edit ownership.
 
-Independent read-only review (`/root/review_pr553`) verified the inspected source
-findings and snapshot counts. Its one finding required binding budget activation
-to the exact prevalidated model/control snapshot. The snapshot-bound conditional
-commit above corrected it; bounded recheck found no residual blocker from that
-finding. This is not proof of Dataverse transaction behavior.
+The earlier independent preflight review identified stale budget/model
+prevalidation; original-snapshot CAS remains required. The later Fable review
+and source/offline validation are now reconciled in the dedicated validated-
+review document. Its policy simplification uses a deployment-pinned artifact;
+it does not replace commit-time freshness with an unfenced mutable-policy read.
 
-Documentation currency, fact consistency, canonical pointers, symbol refs,
-build-claim freshness, docs catalog, secret-scan and scaffolding checks plus all
-available paired self-tests passed sequentially (15 commands). Diff whitespace
-check passed. Searches found no remaining live claim in this proposal set that
-solution ownership is undecided or that Admin-only publishing is required.
-Verdict: pre-rehearsal SOURCE CHECKS COMPLETE for this bounded pass; deployed
-roles/tooling/custom rules, .NET parity and tenant fault behavior remain UNKNOWN.
-
+Earlier 15 documentation checks/self-tests passed within their recorded scope;
+this revision reruns relevant gates. No old review receipt is approval of
+unimplemented behavior. Current verdict: READY for local foundation; roles,
+actual solution/transaction behavior and .NET parity gate writer enablement.
 
 ## Subsequent owner-authorized read-only example discovery
 
@@ -397,3 +391,12 @@ request, fingerprint and receipt; editorial metadata cannot select weaker rules.
 All 15 documentation gates and available paired self-tests passed sequentially,
 plus whitespace checks, for this docs-only revision. No new live probe or runtime
 test was run; retained evidence and current runtime behavior are unchanged.
+
+**[PLANNED budget-policy parity]** The budget publisher must replace its current
+dynamic tier/model resolution with the SAME pinned tier/default/capability
+artifact used by prompt publication. Coordination alone cannot protect a pair
+validated against different model ceilings. Policy deployment disables and drains
+governed budget writes as well as both prompt publication routes, then revalidates
+all governed active budget/model pairs against the new artifact before re-enabling
+writers. Reject incompatible pairs for explicit remediation. Shared golden cases
+cover differing dynamic versus pinned tier ceilings and policy upgrades.

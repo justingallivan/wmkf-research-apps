@@ -30,8 +30,11 @@ human publishers are Connor and existing Admin superusers. Actual Dataverse
 roles/mappings require verification and deliberate provisioning; app-role
 changes and Dataverse-role changes must be coordinated explicitly.
 
-See the [technical preflight](SHARED_PROMPT_PUBLICATION_PREFLIGHT_2026-10-29.md)
-for source findings, client envelope, validation-policy fence and rehearsal cases.
+The normative [format v1 contract](SHARED_PROMPT_FORMAT_V1_2026-10-29.md) and
+[validated review](SHARED_PROMPT_REVIEW_VALIDATION_2026-10-29.md) define the local
+foundation and deployment gates. See the [technical preflight](SHARED_PROMPT_PUBLICATION_PREFLIGHT_2026-10-29.md)
+for source findings, client envelope, pinned policy, scoped budget coordination
+and rehearsal cases.
 
 **[OWNER CONFIRMED, per Justin]** Both routes use the existing app prompt
 format stored in Dataverse; Connor will adopt it in future Power Automate flows.
@@ -105,14 +108,17 @@ release. Unattended service-principal tooling is separate scope.
    column (current GUID/ETag, catalog snapshot and head revision); it is cleared
    atomically at publication. A changed definition gets a new UUID.
 2. Server derives initiating/effective actor from execution context and verifies
-   privilege, target environment and supported validation-policy revision. Caller
+   privilege and target environment. Caller
    labels/actor IDs cannot authorize writes. Admin must prove actor mapping and
    fail closed rather than silently attribute privileged writes to the app.
 3. Check prior receipt BEFORE checking current freshness. Same authorized
    actor/key/operation/fingerprint returns the original receipt even if another
    version is now active. Changed reuse is a conflict. Fresh active state is
    returned separately, never confused with the historical publication result.
-4. In one Dataverse transaction, conditionally advance the unique per-key head,
+4. For a fresh publication, verify the exact installed policy-artifact version/hash.
+   In one Dataverse transaction, acquire the budget coordination CAS first when
+   the key has a registered token budget; then conditionally advance the unique
+   per-key head,
    reread and validate shared state AND the supported definition format, assign
    the next version, conditionally promote the
    exact draft, clear the previous current flag, advance the head and create the
@@ -121,15 +127,22 @@ release. Unattended service-principal tooling is separate scope.
    head fence, not an unprotected absence check.
 5. A receipt contains request/fingerprint versions, policy revision, actor,
    key/draft/prior/new IDs, snapshot hash, expected-state evidence, assigned
-   version, definition-format version and actual publication time. Receipt creation commits with the
+   version, definition-format version, pinned artifact hash and actual publication time. Receipt creation commits with the
    publication, not in a later Vercel/Postgres write.
 6. A timeout means unknown. Query/retry the same UUID; never blindly publish with
    a fresh UUID. A concurrent duplicate receipt aborts the losing transaction;
-   an outer retry retrieves the winner. Existing corrupt lifecycle states block
+   an outer retry retrieves the winner. A retried UUID that encounters head/
+   receipt conflict MUST reread its receipt before surfacing an edit conflict:
+   the initial lookup may have preceded the winner's commit. Unknown/unavailable
+   reads remain unknown; retain UUID/draft without inventing a new publication.
+   Existing corrupt lifecycle states block
    publication and require explicit recovery; never choose/delete a winner.
 
 The head is a concurrency resource, not a second independent active authority.
 Its active lookup and the existing current flags must agree in every commit.
+Head and receipt tables are OrganizationOwned with explicit Org Read for approved
+publishers and guarded mutations. Actor-bound retry still applies. Guard required
+nonempty keys/UUIDs; do not enable writers before unique indexes are Active.
 Head identity uses the lowercase ASCII canonical key, not case-sensitive raw
 bytes: Dataverse string filters are case insensitive. New case-equivalent aliases
 are rejected by direct-write guards and publication. Preserve original legacy
@@ -142,7 +155,7 @@ A content hash and request fingerprint are distinct. The versioned canonical
 request fingerprint binds operation, canonical/original key, authenticated actor,
 draft GUID/ETag, expected head revision and active GUID/version/ETag, metadata
 baseline, complete staged content/catalog hash, and submitted wire-contract,
-definition-format and policy versions. Store both hashes in the receipt. Reusing a UUID with ANY changed
+definition-format and pinned policy-artifact version/hash. Store both hashes in the receipt. Reusing a UUID with ANY changed
 request field is rejected, even for identical text in a different draft. An
 unchanged successful replay returns its original receipt before checking newer
 state or policy; authorization is still required. A fresh request must use the
@@ -160,7 +173,10 @@ not just individual Create/Update. No client-controlled bypass flag is allowed.
 
 These protections must be deployed before claiming a common publication contract.
 Privileged administrators disabling/bypassing plug-ins are an operational
-exception outside the guarantee. Existing legacy seed/upsert/force publishers
+exception outside the guarantee. Inventory actual holders of both Dataverse
+bypass privileges before writer enablement, including maintainer/app identities;
+do not infer their grants. Verify merged individual/bulk guard coverage without
+executing the same guard twice. Existing legacy seed/upsert/force publishers
 must be inventoried and migrated or disabled under coordinated cutover; never
 silently leave a second publisher active. Existing historical Postgres receipts
 remain replayable, but new shared publication truth lives in Dataverse.
@@ -189,11 +205,21 @@ retain their actual requirements; not every prompt needs native JSON Schema.
 Registered application budgets remain checked for their governed prompt keys;
 a new PA prompt need not join the app's code-owned budget registry to publish.
 
-A generated versioned format-policy artifact is the recommended common rule
-source. Policy and Executor-budget activation must share a Dataverse conditional
-control row with fresh publications. Both JS/.NET use golden vectors; details
-and adjacent budget-writer scope are in the technical preflight. This design is
-not yet implemented or parity-tested. Publication makes no model call.
+Package one immutable reviewed format-policy artifact with both JS and the .NET
+operation; exact version/hash and frozen tier/default-model mapping are checked
+and recorded. No mutable policy-activation settings/control row in v1. Policy
+replacement disables BOTH publication routes server-side and drains in-flight
+operations before deployment/re-enable. Old successful receipts replay under
+their original fingerprint; new mismatched clients cannot publish.
+
+Retain a budget-only coordination CAS for registered token-governed prompt keys
+and the existing JS budget publisher. Bind its commit to the ORIGINAL control
+revision captured before validating the exact model/history snapshot. New PA/
+generic names and timeout-only keys do not take this guard. Runtime caps remain
+necessary but do not establish stored budget/model consistency. Implement/test
+this after foundation mocks and before enabling new governed writers. The
+validated review records the counterexamples; no platform correctness is claimed
+until sandbox proof. Publication makes no model call.
 
 ## Execution and legacy compatibility
 
@@ -225,15 +251,27 @@ A future flow needs its own end-to-end execution acceptance before being called
 working, but the library and both publication clients can be built/rehearsed
 using a new common-format fixture with no PA flow or model execution.
 
-## Pre-implementation gates
+## Local implementation and deployment gates
 
-- Connor owns solution maintenance; verify his tooling, authorized sandbox deployment
-  and actual mapped publisher roles.
+- Start local schema/artifact/golden vectors, pure validation, reader tests,
+  client mocks and reusable plug-in source now. Use the normative format v1.
+- Connor owns solution maintenance; tooling gates .NET compilation/import;
+  authorized sandbox deployment and actual mapped roles gate tenant proof.
 - Prove transactional context, uniqueness, head/draft/current conditional writes,
   replay, lost-response recovery, raw/bulk write denial and trusted attribution.
 - Verify nullable draft versions and legacy state/head initialization.
-- Finalize common app-format policy/schema and JS/.NET parity fixtures; preserve
-  existing application checks and scope budgets to governed prompt keys.
+- Prove JS/.NET parity before enabling writers; run the authorized complete
+  current-row validator audit before cutover. Preserve application checks and
+  the scoped budget consistency guard; there is no live mutable policy service.
 - Use a new common-format test prompt for both-client publication rehearsal;
   historical-flow discovery/migration and future PA execution are separate work.
 - Explicitly authorize Production provisioning/cutover separately.
+
+**[PLANNED budget-policy parity]** The budget publisher must replace its current
+dynamic tier/model resolution with the SAME pinned tier/default/capability
+artifact used by prompt publication. Coordination alone cannot protect a pair
+validated against different model ceilings. Policy deployment disables and drains
+governed budget writes as well as both prompt publication routes, then revalidates
+all governed active budget/model pairs against the new artifact before re-enabling
+writers. Reject incompatible pairs for explicit remediation. Shared golden cases
+cover differing dynamic versus pinned tier ceilings and policy upgrades.

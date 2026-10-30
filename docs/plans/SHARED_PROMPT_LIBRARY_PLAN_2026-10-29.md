@@ -284,8 +284,8 @@ No Admin cookie, profile-ID argument, or Vercel-only lock is required by Connor.
 
 The bounded platform assessment and sources are in
 [publication feasibility](SHARED_PROMPT_PUBLICATION_FEASIBILITY_2026-10-29.md).
-**Platform capability is verified; tenant deployment, permissions and race/fault
-behavior are not tested.** This adds a Dataverse solution/plug-in deployment to
+**The Custom API/SDK primitives are documented; exact transaction context,
+tenant deployment, permissions and race/fault behavior remain untested.** This adds a Dataverse solution/plug-in deployment to
 the feature and is not merely six extra columns.
 
 #### Coordination and durable state
@@ -293,7 +293,10 @@ the feature and is not merely six extra columns.
 Use two small additive Dataverse tables (logical names finalized during schema
 review): one **publication head** per technical key, and append-only
 **publication receipts** (also used for catalog-change audit). Prompt content stays exclusively in `wmkf_ai_prompt`;
-workflow definitions stay in the existing settings table.
+workflow definitions stay in the existing settings table. Both new operational
+tables are **OrganizationOwned**, chosen before creation, with explicit Org Read
+for approved publishers and guard-restricted mutations. This does not grant all
+staff access or allow another actor to reuse a receipt UUID.
 
 - Head: a required unique bounded identity (proposed SHA-256 hex of the
   lowercase ASCII canonical technical key, with canonical and original keys
@@ -324,7 +327,7 @@ workflow definitions stay in the existing settings table.
   exact prompt key, actor from execution context, draft ID, expected head/current
   and draft versions/ETags, effective-snapshot hash, prior/new IDs, assigned
   published version, actual timestamp, definition-format version and
-  validation-policy revision. It stores
+  pinned policy-artifact version/hash. It stores
   hashes/identifiers, not another content library. Metadata-only operations use
   the same append-only store with a distinct operation kind, before/after values
   for the six allowed catalog fields, and execution-context correlation ID; a
@@ -351,8 +354,11 @@ workflow definitions stay in the existing settings table.
    refresh of current state is returned separately from that historical receipt.
 3. Require `IsInTransaction`; fail before mutation otherwise. Use only
    `IOrganizationService` in the plug-in, never same-org HTTP, nested batch
-   transaction requests, Vercel/Postgres calls, or model calls. Atomically fence
-   the head, validate expected state, and validate the complete stored draft.
+   transaction requests, Vercel/Postgres calls, or model calls. For registered
+   token-governed prompts, first acquire the budget coordination CAS and read
+   current budgets; then acquire the per-name head CAS. Other prompts take only
+   the head CAS. Validate expected state and the complete draft using the exact
+   deployment-pinned policy-artifact version/hash.
    A stale catalog baseline requires explicit refresh/reapply; neither route
    silently replaces newer labels. Metadata-only direct saves use ETags, a strict
    column allowlist and transactional catalog audit; a concurrent catalog edit
@@ -368,7 +374,11 @@ workflow definitions stay in the existing settings table.
 5. Return the committed receipt and refreshed active state. A transport timeout
    is unknown, not failure: lookup/retry the same UUID, never invent a new one.
    If concurrent identical requests race on receipt uniqueness, the losing
-   transaction aborts; an outer retry reads the winning receipt. No durable
+   transaction aborts; an outer retry reads the winning receipt. A head/receipt
+   conflict on a reused UUID must trigger another receipt lookup BEFORE showing
+   an edit conflict: the winner may have committed after the first lookup. An
+   unavailable/unknown receipt read is not proof of failure; retain the UUID and
+   draft without resending as a new publication. No durable
    partial lifecycle is a valid new-operation outcome. Existing legacy partial
    states require explicit recovery; never guess a winner or delete a row.
 
@@ -380,7 +390,12 @@ name/version/status/current constraints on direct creates too. Guard permissions
 and parent execution context must prove an authorized publication message, not a
 client-supplied bypass flag or message-name assertion alone. Environment admins
 who disable/bypass plug-ins are outside the supported concurrency guarantee;
-monitor and document that operational boundary.
+monitor and document that operational boundary. Before writer enablement,
+inventory actual roles/identities (including Connor and the app principal) with
+`prvBypassCustomBusinessLogic` or `prvBypassCustomPlugins`; no holdings are assumed.
+Require nonempty head identity/receipt UUID in code and Active unique indexes;
+ApplicationRequired alone does not enforce either. Test individual/bulk/upsert
+paths without duplicating merged pipeline handlers.
 
 #### Shared publication rules and execution-format validation
 
@@ -414,14 +429,35 @@ every source/target/input feature. Runtime still enforces its own supported
 operations, data boundaries and output writes. PA triggers, document assembly,
 model invocation and result handling stay in the future flow.
 
-The [technical preflight](SHARED_PROMPT_PUBLICATION_PREFLIGHT_2026-10-29.md)
-recommends a generated immutable format-policy artifact plus one Dataverse
-control-row fence shared by publication, policy activation and Executor-budget
-activation. That includes adapting the adjacent budget writer; otherwise new
-budget revisions could bypass publication validation. JS/.NET parity fixtures,
-policy size/freshness and role/guard manifests remain engineering gates, not
-implemented behavior. No Vercel, Postgres or model call occurs inside the
-publication transaction. Runtime guards remain necessary after policy changes.
+The normative [format v1 contract](SHARED_PROMPT_FORMAT_V1_2026-10-29.md)
+defines the previously ambiguous cap/null-model/temperature/enum/regex behavior.
+The first local slice turns it into executable schema and shared golden vectors,
+including name-specific parser contracts and preserved application variants.
+Before enabling new writers, run the extracted validator read-only over the
+complete current cohort under separately authorized access; incompatible rows
+remain intact for explicit remediation, never silently rewritten.
+
+Policy is an immutable artifact packaged with both JS and the .NET operation,
+with explicit tier mapping, default model and version/hash. No mutable policy
+activation settings or policy-only global fence in v1. Replacing it disables
+both publication routes server-side and drains all in-flight operations before
+deployment/re-enable. Successful old receipt replay stays valid; new clients
+must match the installed artifact. Never substitute a one-time read of a mutable
+policy row for commit-time freshness.
+
+Retain a budget-scoped coordination CAS only for registered token-governed prompt
+keys; timeout-only and new generic/PA prompts do not acquire it. The existing
+JS budget writer captures its ORIGINAL coordination revision before reading all
+models/history and validating, then creates the budget revision plus conditional
+control advance in one strict-actor/no-fallback changeset. Token-governed model
+publication uses the same guard before its head CAS. This preserves the planned
+stored budget/model consistency guarantee; the runtime cap alone does not.
+Implement this after the first local schema/mock slice but BEFORE enabling new
+writers. Details and counterexamples are in the
+[validated Fable review](SHARED_PROMPT_REVIEW_VALIDATION_2026-10-29.md).
+
+No Vercel, Postgres, provider-list or model call occurs inside the publication
+transaction. Runtime guards remain necessary at later invocation.
 
 **Legacy example boundary:** the read-only probe found Connor-attributed
 `phase-i.checkin` with native-budget-PDF intent, undeclared placeholders and
@@ -436,7 +472,7 @@ A content hash and request fingerprint are distinct. The versioned canonical
 request fingerprint binds operation, canonical/original key, authenticated actor,
 draft GUID/ETag, expected head revision and active GUID/version/ETag, metadata
 baseline, complete staged content/catalog hash, and submitted wire-contract,
-definition-format and policy versions. Store both hashes in the receipt. Reusing a UUID with ANY changed
+definition-format and pinned policy-artifact version/hash. Store both hashes in the receipt. Reusing a UUID with ANY changed
 request field is rejected, even for identical text in a different draft. An
 unchanged successful replay returns its original receipt before checking newer
 state or policy; authorization is still required. A fresh request must use the
@@ -467,43 +503,47 @@ rewired or claimed verified by this plan.
 
 ## Implementation slices and release gates
 
-1. **Sandbox feasibility gate.** Connor owns Dataverse solution maintenance; verify
-   his support/build/deploy arrangements,
-   obtain separately authorized sandbox provisioning, and prove Custom API
-   transaction context, two caller identities, execute privileges, conditional
-   head writes (including first publication), atomic rollback, unique receipt
-   races and lost-response recovery. No production deployment at this step.
-   A failed spike blocks implementation of this architecture; do not fall back
-   silently to an Admin-only publisher.
-2. **Additive schema and enforcement.** Provision six metadata columns plus draft-baseline column,
-   head/receipt tables with Active unique keys and optimistic concurrency,
-   draft version-null compatibility, synchronous write guards, catalog audit,
-   versioned validation policy and managed solution components. Final names,
-   limits, roles and policy transport need review before provisioning. Keep
-   writers disabled until legacy seed/raw-writer and invalid-state audits pass.
-3. **Read path, catalog and Admin.** Page complete inventory/history; cover every
-   projection and status consumer. Seed groups conditionally and backfill blank
-   metadata only with exact IDs/ETags, audited readback and resumable receipts;
-   refuse conflicting nonblank values. Render shared groups/metadata, search,
-   draft/history/conflict states, Needs organization, group management and
-   metadata-only editing. Budgets use the same catalog without changing budget
-   authority, placement, payloads or draft retention.
-4. **Two publication clients.** Admin saves/stages drafts and calls the Custom
-   API through an adapter and guarded transport. Ship Connor's delegated-OAuth
-   validate/save/publish/receipt command and import/export format in the SAME
-   release. No Admin interaction is required for Connor. Use shared parity
-   fixtures and server validation for the agreed common app format; dry-run
-   performs no model call. Preserve
-   legacy audit replay and dirty/stale client-state guards.
-5. **Rehearsal and deliberate promotion.** Use a new common-format test prompt,
-   not the legacy row or a running PA flow. Prove direct backend draft → Admin
-   discovery → backend publication → Admin/app active read, and Admin publication
-   → backend read. Test same-name/cross-name races, first publish, auth denial,
-   raw/bulk bypasses, stale metadata/policy, rollback and lost responses. Then
-   explicitly authorize Production additive provisioning/backfill and controlled
-   writer freeze, initialize/verify heads, deploy compatible readers/guards and
-   switch BOTH clients before enabling publication. Verify authenticated UI and
-   caller attribution. No live writes are authorized by this plan update.
+1. **Local foundation — start now.** Implement versioned request/definition/
+   receipt schemas from the format v1 contract, fingerprint golden vectors, pure
+   shared validator/artifact extraction, organization-owned solution manifests,
+   read-path/status/paging corrections under tests and both clients against
+   mocked transport. Author the reusable plug-in operation source and fake-
+   organization-service tests. No .NET toolchain, tenant access or historical
+   PA flow is required to begin JS/contracts/mocks. Compile .NET when Connor's
+   supported tooling is available; do not write a separate throwaway spike.
+2. **Authorized sandbox deployment/proof.** Connor owns solution maintenance and
+   tooling/import arrangements. Import that SAME operation source, prove exact
+   Custom API IsInTransaction/rollback, null-version draft behavior, both actual
+   identities/privileges, head/receipt uniqueness/CAS, parent/bulk guards, strict
+   impersonation and lost-response recovery. A failed proof blocks deploying or
+   enabling the affected writer architecture, not independent local coding.
+3. **Schema/enforcement and compatibility gate.** Provision the six descriptive
+   columns plus draft baseline, OrganizationOwned heads/receipts with Active
+   unique keys, required-key guards and managed solution. Preserve old receipts;
+   audit existing states/seeds/raw writers and bypass privileges. Run authorized
+   content-free current-row validation before cutover, resolve incompatibilities
+   explicitly and keep new writers disabled until all relevant gates pass.
+4. **Catalog/read/UI slice.** Complete inventory/history paging and projection/
+   structural-error fan-out, explicit drafts/history/conflicts and Needs
+   organization. Conditionally seed groups/backfill blank metadata with exact
+   IDs/ETags and resumable readback; refuse conflicting nonblank values. Add
+   search, metadata editor and group manager here, not as foundation blockers.
+   Budget presentation uses shared metadata without changing its authority/UI
+   placement or registered membership. This remains part of the full feature.
+5. **Two real clients and budget consistency.** Wire Admin and Connor's delegated-
+   OAuth validate/save/publish/receipt command to the same guarded Action, pinned
+   format artifact, retained dirty drafts and original receipts. Implement the
+   scoped budget CAS and strict original-snapshot budget changeset before any
+   new governed writer is enabled; test budget-up/model-down in both orders.
+   No silent Admin-only substitution; dry-run invokes no model.
+6. **Full rehearsal and deliberate promotion.** Use a new common-format prompt,
+   never auto-activate the legacy row. Prove both-client discovery/publication/
+   active read, first/later/case races, auth and bypass denial, metadata/artifact
+   conflicts, budget coordination, rollback and response-loss recovery. Only
+   then explicitly authorize Production additive provisioning/backfill and
+   controlled writer freeze, head initialization, reader/guard rollout and both
+   clients' enablement. Verify authenticated UI/attribution. No live writes are
+   authorized by this planning revision or by local implementation readiness.
 
 Retain current code catalog solely as the migration input and temporary,
 explicitly identified compatibility fallback before cutover. Remove it as the
@@ -566,8 +606,10 @@ human publication access is Connor and existing Admin superusers; actual mapped
 identities and Dataverse roles still need authorized verification. This is not
 a role grant or evidence Connor has deployed the operation.
 
-Before implementation: finalize the common app format's versioned validation
-policy/schema, parity fixtures and solution tooling. Connor's format agreement
+Local foundation implementation can begin now against the normative format v1
+and validated review disposition. Executable schema/artifact/golden fixtures are
+its first deliverables. Tooling/import access and exact platform behavior gate
+compilation/deployment/proof as applicable; they do not block local source work. Connor's format agreement
 is owner-confirmed; locating/adapting a historical flow is not a build or library
 release gate. Future-flow execution verification is a separate integration task. These are technical/release gates,
 not a requirement for Connor to accept Admin publication. No message to Connor,
@@ -584,7 +626,7 @@ Contract-reconcile scope: Admin/button and coding command → authenticated
 Dataverse Action → synchronous validation/head CAS/draft+prior updates/receipt
 → both clients and current-row consumers. New operations are one atomic unit;
 unknown network outcomes resolve by receipt. Async client generation fences,
-policy parity and full raw-field reader/writer fan-out are implementation gates.
+policy parity and full raw-field reader/writer fan-out gate writer enablement.
 Shared helper audit: one server operation, two clients, preserved auth differences.
 Durable-surface audit: new solution/tables/guards/roles require Atlas, security,
 catalog and rollout reconciliation during build; this PR ships none of them.
@@ -597,3 +639,12 @@ statements remain descriptions of today's implementation, not this proposal.
 The current main handoff is owned alongside Claude's work; it is not overwritten
 from this older planning branch. PR description and this report carry the new
 resume boundary. Final gate/review evidence is recorded in the feasibility report.
+
+**[PLANNED budget-policy parity]** The budget publisher must replace its current
+dynamic tier/model resolution with the SAME pinned tier/default/capability
+artifact used by prompt publication. Coordination alone cannot protect a pair
+validated against different model ceilings. Policy deployment disables and drains
+governed budget writes as well as both prompt publication routes, then revalidates
+all governed active budget/model pairs against the new artifact before re-enabling
+writers. Reject incompatible pairs for explicit remediation. Shared golden cases
+cover differing dynamic versus pinned tier ceilings and policy upgrades.
