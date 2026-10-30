@@ -177,12 +177,13 @@ describe('GET', () => {
       proposalId: REQUEST_ID,
       proposalTitle: 'A Proposal',
       requestNumber: 'R-1',
-      grantCycleCode: 'J26',
-      grantCycleLabel: 'June 2026',
     }));
-    expect(grantRequestAdapter.getById).toHaveBeenCalledWith(REQUEST_ID, expect.objectContaining({
-      expand: 'wmkf_GrantCycle($select=wmkf_cyclecode)',
-    }));
+    // No screen reads a cycle or meeting date from this response (meeting-date
+    // retirement plan §3.6); the request read no longer expands the cycle.
+    for (const key of ['grantCycleCode', 'grantCycleLabel', 'meetingDate']) {
+      expect(res.body.proposals[0]).not.toHaveProperty(key);
+    }
+    expect(grantRequestAdapter.getById.mock.calls[0][1]).not.toHaveProperty('expand');
     expect(res.body.proposals[0].candidates).toEqual([expect.objectContaining({
       suggestionId: SUGGESTION_ID,
       potentialReviewerId: PERSON_ID,
@@ -195,37 +196,6 @@ describe('GET', () => {
       accepted: false,
       declined: false,
     })]);
-  });
-
-  test('a June meeting date with no Grant Cycle link has no cycle', async () => {
-    grantRequestAdapter.getById.mockResolvedValue({
-      akoya_requestid: REQUEST_ID,
-      akoya_requestnum: 'R-1',
-      akoya_title: 'A Proposal',
-      wmkf_meetingdate: '2026-06-15',
-      wmkf_GrantCycle: null,
-    });
-    suggestionAdapter.findByRequest.mockResolvedValue([{
-      wmkf_appreviewersuggestionid: SUGGESTION_ID,
-      _wmkf_request_value: REQUEST_ID,
-      _wmkf_potentialreviewer_value: PERSON_ID,
-      wmkf_selected: true,
-      wmkf_grantcyclecode: 'J26',
-    }]);
-    potentialReviewerAdapter.queryReviewers.mockResolvedValue({
-      records: [{ wmkf_potentialreviewersid: PERSON_ID, wmkf_name: 'Dr X' }],
-    });
-
-    const req = { method: 'GET', query: { requestId: REQUEST_ID }, body: {} };
-    const res = mockRes();
-    await handler(req, res);
-
-    expect(res.statusCode).toBe(200);
-    expect(res.body.proposals[0]).toEqual(expect.objectContaining({
-      grantCycleCode: null,
-      grantCycleLabel: null,
-      meetingDate: '2026-06-15',
-    }));
   });
 
   test('domain error: requestId not a valid GUID → 400', async () => {

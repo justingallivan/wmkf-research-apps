@@ -19,7 +19,9 @@ import { INSTITUTION_STAGE2_PRESENTATION_VERSION } from './institution-stage2-pr
 // v4 (S400): verdict copy overhaul — version-3 rows carry the pre-fix vague
 // "contradict the listed institution" reasoning (or a stale mismatch flag the
 // success path now reconciles) and must re-enrich rather than replay it.
-export const APPLICANT_ENRICHMENT_CACHE_VERSION = 4;
+// v5: prior-request labels come from the linked Grant Cycle (`cycleLabel`), not
+// the request meeting date; version-4 rows carry `meetingDate` and must refresh.
+export const APPLICANT_ENRICHMENT_CACHE_VERSION = 5;
 
 function pruneInstitutionPresentation(value) {
   if (!value || value.version !== INSTITUTION_STAGE2_PRESENTATION_VERSION) return null;
@@ -243,7 +245,7 @@ export function pruneDataverseContactEvidence(evidence) {
           requestNumber: boundedText(request?.requestNumber, 80),
           title: boundedText(request?.title, 500),
           fiscalYear: boundedText(request?.fiscalYear, 120),
-          meetingDate: boundedText(request?.meetingDate, 40),
+          cycleLabel: boundedText(request?.cycleLabel, 40),
         }];
       })
     : [];

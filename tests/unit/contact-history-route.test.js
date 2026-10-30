@@ -144,7 +144,6 @@ test('happy-path response envelope is pinned exactly (full shape)', async () => 
       requestId: REQUEST_ID,
       requestNumber: 'REQ-1',
       title: 'A Proposal',
-      meetingDate: '2026-06-15',
       cycleCode: 'J26',
       cycleLabel: 'June 2026',
       requestStatus: 'Phase II Pending',

@@ -157,7 +157,6 @@ export default async function handler(req, res) {
       ok: true,
       request: {
         title: request.akoya_title || null,
-        meetingDate: request.wmkf_meetingdate || null,
       },
       deliverable: {
         // The grantee edits the formatted abstract; once submitted, the approved

@@ -11,10 +11,17 @@ import {
   createStaffVerifiedState,
 } from '../../lib/utils/reviewer-address-trust';
 import { createServerIdentityDecisionReceipt } from '../../lib/services/reviewer-candidate-attestation';
+import { DynamicsService } from '../../lib/services/dynamics-service';
 
 const ORCID = '0000-0002-1825-0097';
 const CURRENT_REQUEST_ID = '11111111-1111-1111-1111-111111111111';
 const PRIOR_REQUEST_ID = '22222222-2222-2222-2222-222222222222';
+const EXPAND = 'wmkf_GrantCycle($select=wmkf_cyclecode)';
+const link = (code) => ({ wmkf_GrantCycle: { wmkf_cyclecode: code } });
+
+// The prior-request read checks the wmkf_grantcycle restriction (covered in grant-cycle-link.test.js).
+beforeEach(() => { jest.spyOn(DynamicsService, 'checkRestriction').mockImplementation(() => {}); });
+afterEach(() => { jest.restoreAllMocks(); });
 
 function candidate(name, enrichment = {}) {
   const row = {
@@ -46,26 +53,32 @@ function exactOrcidOutcome() {
 
 test('legacy request slots provide prior context when suggestion history is empty', async () => {
   const findRequestsByIds = jest.fn();
-  const result = await loadPriorRequestContext(
-    '33333333-3333-3333-3333-333333333333',
-    CURRENT_REQUEST_ID,
-    {
-      findSuggestionLinks: jest.fn(async () => ({ records: [], hasMore: false })),
-      findLegacyRequests: jest.fn(async () => ({
+  const findLegacyRequests = jest.fn(async () => ({
         records: [{
           akoya_requestid: PRIOR_REQUEST_ID,
           akoya_requestnum: '1002278',
           akoya_title: 'Deciphering the role of the secretome in aging',
           akoya_fiscalyear: 'June 2026',
           wmkf_meetingdate: '2026-06-04',
+          wmkf_GrantCycle: { wmkf_cyclecode: 'J26' },
           createdon: 'do-not-project',
           _wmkf_potentialreviewer4_value: 'do-not-project',
         }],
         hasMore: false,
-      })),
+      }));
+  const result = await loadPriorRequestContext(
+    '33333333-3333-3333-3333-333333333333',
+    CURRENT_REQUEST_ID,
+    {
+      findSuggestionLinks: jest.fn(async () => ({ records: [], hasMore: false })),
+      findLegacyRequests,
       findRequestsByIds,
     },
   );
+
+  expect(findLegacyRequests).toHaveBeenCalledWith(expect.any(String), expect.objectContaining({
+    expand: 'wmkf_GrantCycle($select=wmkf_cyclecode)',
+  }));
 
   expect(findRequestsByIds).not.toHaveBeenCalled();
   expect(result).toEqual({
@@ -76,9 +89,12 @@ test('legacy request slots provide prior context when suggestion history is empt
       requestNumber: '1002278',
       title: 'Deciphering the role of the secretome in aging',
       fiscalYear: 'June 2026',
-      meetingDate: '2026-06-04',
+      // The legacy slot read carries the Grant Cycle expand; the meeting date
+      // is never projected.
+      cycleLabel: 'June 2026',
     }],
   });
+  expect(JSON.stringify(result)).not.toContain('2026-06-04');
   expect(JSON.stringify(result)).not.toContain('potentialreviewer4');
   expect(JSON.stringify(result)).not.toContain('createdon');
 });
@@ -92,10 +108,11 @@ test('suggestion and legacy links exclude the current request, dedupe, sort, and
     '66666666-6666-6666-6666-666666666666',
   ];
   const records = [
-    { akoya_requestid: ids[0], akoya_requestnum: '1002278', akoya_fiscalyear: 'June 2026', wmkf_meetingdate: '2026-06-04' },
-    { akoya_requestid: ids[2], akoya_requestnum: '1002400', akoya_fiscalyear: 'September 2026', wmkf_meetingdate: '2026-09-10' },
-    { akoya_requestid: ids[3], akoya_requestnum: '1002100', akoya_fiscalyear: 'March 2026', wmkf_meetingdate: '2026-03-12' },
-    { akoya_requestid: ids[4], akoya_requestnum: '1001900', akoya_fiscalyear: 'December 2025', wmkf_meetingdate: '2025-12-01' },
+    { akoya_requestid: ids[0], akoya_requestnum: '1002278', akoya_fiscalyear: 'June 2026', ...link('J26') },
+    { akoya_requestid: ids[2], akoya_requestnum: '1002400', akoya_fiscalyear: 'December 2026', ...link('D26') },
+    // A June meeting date with no link is no cycle: it sorts after every linked row.
+    { akoya_requestid: ids[3], akoya_requestnum: '1002500', akoya_fiscalyear: 'June 2027', wmkf_meetingdate: '2027-06-03', wmkf_GrantCycle: null },
+    { akoya_requestid: ids[4], akoya_requestnum: '1001900', akoya_fiscalyear: 'December 2025', ...link('D25') },
   ];
   const findRequestsByIds = jest.fn(async (requestIds) => ({
     records: records.filter((row) => requestIds.includes(row.akoya_requestid)),
@@ -117,11 +134,15 @@ test('suggestion and legacy links exclude the current request, dedupe, sort, and
 
   expect(findRequestsByIds).toHaveBeenCalledWith(
     [PRIOR_REQUEST_ID, ids[2], ids[3], ids[4]],
-    expect.objectContaining({ top: 4 }),
+    expect.objectContaining({ top: 4, expand: EXPAND }),
   );
+  expect(findRequestsByIds.mock.calls[0][1].select).not.toContain('wmkf_meetingdate');
+  expect(DynamicsService.checkRestriction).toHaveBeenCalledWith('wmkf_grantcycle', 'wmkf_grantcycleid,wmkf_cyclecode');
   expect(result.complete).toBe(true);
   expect(result.totalCount).toBe(4);
-  expect(result.requests.map((row) => row.requestNumber)).toEqual(['1002400', '1002278', '1002100']);
+  expect(result.requests.map((row) => row.requestNumber)).toEqual(['1002400', '1002278', '1001900']);
+  expect(result.requests.map((row) => row.cycleLabel)).toEqual(['December 2026', 'June 2026', 'December 2025']);
+  expect(result.requests[0]).not.toHaveProperty('cycleSortKey');
   expect(JSON.stringify(result)).not.toContain(CURRENT_REQUEST_ID);
 });
 
@@ -177,35 +198,39 @@ test('a capped source count marks history partial even when Dataverse omits a ne
   expect(result.requests).toHaveLength(3);
 });
 
-test('a valid meeting date sorts ahead of an undated row before fiscal-year fallback', async () => {
+test('a linked cycle sorts ahead of an unlinked row before fiscal-year fallback', async () => {
+  const records = [
+    { akoya_requestid: 'linked-request', akoya_requestnum: '1002000', akoya_fiscalyear: null, ...link('J26') },
+    {
+      akoya_requestid: 'unlinked-request', akoya_requestnum: '1003000', akoya_fiscalyear: 'June 2027',
+      wmkf_meetingdate: '2027-06-03', wmkf_GrantCycle: null,
+    },
+    { akoya_requestid: 'historical-request', akoya_requestnum: '1001000', akoya_fiscalyear: 'June 2012', ...link('2012-1') },
+  ];
   const result = await loadPriorRequestContext(
     '33333333-3333-3333-3333-333333333333',
     CURRENT_REQUEST_ID,
     {
-      findSuggestionLinks: jest.fn(async () => ({ records: [], hasMore: false })),
-      findLegacyRequests: jest.fn(async () => ({
-        records: [
-          {
-            akoya_requestid: 'dated-request',
-            akoya_requestnum: '1002000',
-            akoya_fiscalyear: null,
-            wmkf_meetingdate: '2026-06-04',
-          },
-          {
-            akoya_requestid: 'undated-request',
-            akoya_requestnum: '1003000',
-            akoya_fiscalyear: 'June 2027',
-            wmkf_meetingdate: null,
-          },
-        ],
+      findSuggestionLinks: jest.fn(async () => ({
+        records: records.map((row) => ({ _wmkf_request_value: row.akoya_requestid })),
         hasMore: false,
       })),
-      findRequestsByIds: jest.fn(),
+      findLegacyRequests: jest.fn(async () => ({ records: [], hasMore: false })),
+      findRequestsByIds: jest.fn(async () => ({ records, hasMore: false })),
     },
   );
 
-  expect(result.requests.map((row) => row.requestId))
-    .toEqual(['dated-request', 'undated-request']);
+  expect(result.requests.map((row) => [row.requestId, row.cycleLabel]))
+    .toEqual([['linked-request', 'June 2026'], ['unlinked-request', null], ['historical-request', null]]);
+});
+
+test('a restriction refusal on the cycle table rejects before any history read', async () => {
+  DynamicsService.checkRestriction.mockImplementation(() => { throw new Error('restricted'); });
+  const findSuggestionLinks = jest.fn();
+  await expect(loadPriorRequestContext('33333333-3333-3333-3333-333333333333', CURRENT_REQUEST_ID, {
+    findSuggestionLinks, findLegacyRequests: jest.fn(), findRequestsByIds: jest.fn(),
+  })).rejects.toThrow('restricted');
+  expect(findSuggestionLinks).not.toHaveBeenCalled();
 });
 
 test('both history sources failing omits context instead of asserting zero history', async () => {
@@ -381,7 +406,7 @@ test('exact trusted reconciliation attaches prior request context without exposi
       requestNumber: '1002278',
       title: 'Deciphering the role of the secretome in aging',
       fiscalYear: 'June 2026',
-      meetingDate: '2026-06-04',
+      cycleLabel: 'June 2026',
     }],
   }));
   const rows = [candidate('Trusted Researcher', {

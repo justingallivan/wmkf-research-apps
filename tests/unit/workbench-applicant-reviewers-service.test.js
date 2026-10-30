@@ -237,7 +237,7 @@ test('passes acting user + request-derived label/cycle/programArea to the adapte
   expect(getById).toHaveBeenCalledWith(REQ, expect.objectContaining({
     expand: 'wmkf_GrantCycle($select=wmkf_cyclecode)',
   }));
-  expect(getById.mock.calls[0][1].select.split(',')).toContain('wmkf_meetingdate');
+  expect(getById.mock.calls[0][1].select.split(',')).not.toContain('wmkf_meetingdate');
 });
 
 test('a June meeting date without a Grant Cycle link stamps no cycle', async () => {
@@ -247,6 +247,7 @@ test('a June meeting date without a Grant Cycle link stamps no cycle', async () 
     _wmkf_potentialreviewer1_value_formatted: 'Dr. One',
   }));
   const body = await ingestApplicantReviewers(args);
-  expect(body.cycleCode).toBeNull();
+  // The response carries no cycle code; no screen reads one (§3.6).
+  expect(body).not.toHaveProperty('cycleCode');
   expect(ensureApplicantRecommended.mock.calls[0][0].grantCycleCode).toBeNull();
 });

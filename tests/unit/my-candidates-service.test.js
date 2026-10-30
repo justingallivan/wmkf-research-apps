@@ -12,15 +12,6 @@
 jest.mock('../../lib/services/program-director-resolver', () => ({
   resolveByEmail: jest.fn(),
 }));
-// Grant Cycle link helpers: real strings and the real row reader, without the
-// restriction context the adapter-mocked service never establishes.
-jest.mock('../../lib/dataverse/adapters/operations-grant-cycle', () => ({
-  linkedCycleExpand: () => 'wmkf_GrantCycle($select=wmkf_cyclecode)',
-  linkedCycleCode: (row) => {
-    const code = row?.wmkf_GrantCycle?.wmkf_cyclecode;
-    return typeof code === 'string' && /^[JD]\d{2}$/.test(code) ? code : null;
-  },
-}));
 jest.mock('../../lib/dataverse/adapters/grant-request', () => ({
   __esModule: true,
   getById: jest.fn(),
@@ -158,43 +149,20 @@ describe('getMyCandidates', () => {
       requestReviewDeadline: '2026-09-01',
       effectiveReviewDeadline: '2026-09-15',
     });
-    expect(out.proposals[0]).toMatchObject({ grantCycleCode: 'J26', grantCycleLabel: 'June 2026' });
-    expect(grantRequestAdapter.getById).toHaveBeenCalledWith(REQUEST_ID, expect.objectContaining({
-      expand: 'wmkf_GrantCycle($select=wmkf_cyclecode)',
-    }));
+    // No screen reads a cycle or meeting date from this response
+    // (docs/plans/MEETING_DATE_RETIREMENT_PLAN_2026-10-29.md §3.6).
+    for (const key of ['grantCycleCode', 'grantCycleLabel', 'meetingDate']) {
+      expect(out.proposals[0]).not.toHaveProperty(key);
+    }
+    const [, options] = grantRequestAdapter.getById.mock.calls[0];
+    expect(options).not.toHaveProperty('expand');
+    expect(options.select).not.toContain('wmkf_meetingdate');
     expect(resolveByEmail).not.toHaveBeenCalled(); // explicit request skips PD scope
   });
 
-  test.each([
-    ['the linked code wins over a disagreeing stored code', '2026-06-15', 'J26', 'J99', 'J26'],
-    ['a June meeting date with no link shows no cycle, never the stored code', '2026-06-15', null, 'J26', null],
-    ['no link and no meeting date shows no cycle, never the stored code', null, null, 'D25', null],
-    ['no link and no stored code is null, never a guess', null, null, null, null],
-  ])('grantCycleCode: %s', async (_label, meetingDate, linkedCode, storedCode, expected) => {
-    grantRequestAdapter.getById.mockResolvedValue({
-      akoya_requestid: REQUEST_ID, akoya_requestnum: 'R-1', akoya_title: 'A Proposal',
-      ...(meetingDate ? { wmkf_meetingdate: meetingDate } : {}),
-      ...(linkedCode ? { wmkf_GrantCycle: { wmkf_cyclecode: linkedCode } } : {}),
-    });
-    suggestionAdapter.findByRequest.mockResolvedValue([{
-      wmkf_appreviewersuggestionid: SUGGESTION_ID,
-      _wmkf_request_value: REQUEST_ID,
-      _wmkf_potentialreviewer_value: PERSON_ID,
-      wmkf_grantcyclecode: storedCode,
-    }]);
-    potentialReviewerAdapter.queryReviewers.mockResolvedValue({
-      records: [{ wmkf_potentialreviewersid: PERSON_ID, wmkf_name: 'Dr X' }],
-    });
-
-    const out = await getMyCandidates({ requestId: REQUEST_ID, azureEmail: EMAIL });
-
-    expect(out.proposals[0].grantCycleCode).toBe(expected);
-  });
-
-  test('requestNumber scope reads the request with the Grant Cycle expand', async () => {
+  test('requestNumber scope reads the request without cycle fields', async () => {
     grantRequestAdapter.queryRequests.mockResolvedValue({ records: [{
       akoya_requestid: REQUEST_ID, akoya_requestnum: 'R-1', akoya_title: 'A Proposal',
-      wmkf_meetingdate: '2026-12-10', wmkf_GrantCycle: { wmkf_cyclecode: 'D26' },
     }] });
     suggestionAdapter.findByRequest.mockResolvedValue([{
       wmkf_appreviewersuggestionid: SUGGESTION_ID,
@@ -207,16 +175,15 @@ describe('getMyCandidates', () => {
 
     const out = await getMyCandidates({ requestNumber: 'R-1', azureEmail: EMAIL });
 
-    expect(grantRequestAdapter.queryRequests).toHaveBeenCalledWith(expect.objectContaining({
-      filter: "akoya_requestnum eq 'R-1'",
-      expand: 'wmkf_GrantCycle($select=wmkf_cyclecode)',
-      top: 1,
-    }));
-    expect(grantRequestAdapter.queryRequests.mock.calls[0][0].select.split(',')).toContain('wmkf_meetingdate');
-    expect(out.proposals[0]).toMatchObject({ grantCycleCode: 'D26', grantCycleLabel: 'December 2026' });
+    const [query] = grantRequestAdapter.queryRequests.mock.calls[0];
+    expect(query).toMatchObject({ filter: "akoya_requestnum eq 'R-1'", top: 1 });
+    expect(query).not.toHaveProperty('expand');
+    expect(query.select.split(',')).not.toContain('wmkf_meetingdate');
+    expect(out.proposals[0]).toMatchObject({ proposalId: REQUEST_ID, requestNumber: 'R-1' });
+    expect(out.proposals[0]).not.toHaveProperty('grantCycleCode');
   });
 
-  test('PD scope reads the cycle code findByPD projects (bug: it once read a field the adapter never returned)', async () => {
+  test('PD scope returns no cycle fields', async () => {
     resolveByEmail.mockResolvedValue({ systemuserid: 'pd-1' });
     suggestionAdapter.findByPD.mockResolvedValue({
       suggestions: [{
@@ -236,7 +203,9 @@ describe('getMyCandidates', () => {
     const out = await getMyCandidates({ azureEmail: EMAIL, cycleCode: 'D26' });
 
     expect(suggestionAdapter.findByPD).toHaveBeenCalledWith('pd-1', { cycleCode: 'D26' });
-    expect(out.proposals[0]).toMatchObject({ grantCycleCode: 'D26', grantCycleLabel: 'December 2026' });
+    for (const key of ['grantCycleCode', 'grantCycleLabel', 'meetingDate']) {
+      expect(out.proposals[0]).not.toHaveProperty(key);
+    }
   });
 
   test('single-request scope with only REMOVED rows builds a proposal shell carrying removedCandidates', async () => {
@@ -303,10 +272,7 @@ describe('getMyCandidates', () => {
       id: SUGGESTION_ID,
       proposalHash: SUGGESTION_ID,
       title: 'New',
-      cycleCode: 'J26',
-      cycleLabel: 'June 2026',
       requestNumber: 'R-2',
-      meetingDate: '2026-06-15',
     });
   });
 

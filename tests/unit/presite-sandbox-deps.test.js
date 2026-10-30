@@ -441,13 +441,13 @@ describe('createPresiteInputDeps getRequest cycle (until Factory build step 5)',
     const request = await withDalContext('presite-sandbox-deps-test', () => deps.getRequest(REQUEST_ID));
     const url = new URL(get.mock.calls[0][0], SANDBOX_URL);
     expect(url.searchParams.get('$expand')).toBe('wmkf_GrantCycle($select=wmkf_cyclecode)');
-    expect(request.wmkf_GrantCycle).toEqual({ wmkf_cyclecode: 'D97' });
+    expect(request.wmkf_GrantCycle).toEqual({ wmkf_cyclecode: 'D97', wmkf_meetingdate: '2026-12-11' });
   });
 
   it('derives an unlinked clone cycle from its meeting date', async () => {
     const { deps } = depsFor({ akoya_requestid: REQUEST_ID, wmkf_meetingdate: '2026-12-11', wmkf_GrantCycle: null });
     const request = await withDalContext('presite-sandbox-deps-test', () => deps.getRequest(REQUEST_ID));
-    expect(request.wmkf_GrantCycle).toEqual({ wmkf_cyclecode: 'D26' });
+    expect(request.wmkf_GrantCycle).toEqual({ wmkf_cyclecode: 'D26', wmkf_meetingdate: '2026-12-11' });
   });
 
   it('leaves an off-month unlinked clone without a cycle', async () => {

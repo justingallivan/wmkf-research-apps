@@ -23,7 +23,7 @@ test('loadProgramGrants fetches every matching row with the rollup predicate and
   const queryAllRequests = jest.fn().mockResolvedValue({ records: rows, capped: false });
   await expect(loadProgramGrants(APPLICANT_ID, { queryAllRequests })).resolves.toEqual({ records: rows, capped: false });
   expect(queryAllRequests).toHaveBeenCalledWith({
-    select: 'akoya_requestid,akoya_requestnum,akoya_fiscalyear,akoya_decisiondate,wmkf_meetingdate,akoya_grant,_wmkf_grantprogram_value,wmkf_wmkfprojectdescription',
+    select: 'akoya_requestid,akoya_requestnum,akoya_fiscalyear,akoya_decisiondate,akoya_grant,_wmkf_grantprogram_value,wmkf_wmkfprojectdescription',
     filter: programGrantFilter(APPLICANT_ID),
   });
   queryAllRequests.mockResolvedValue({ records: rows, capped: true });
@@ -47,15 +47,19 @@ test('reconcileProgramGrantRollups accepts agreement and rejects count or sum dr
   expect(reconcileProgramGrantRollups({ records: [], rollupCount: 0, rollupSum: 250000 })).toMatchObject({ ok: false, reason: expect.stringContaining('zero live rows') });
 });
 
-test('recency prefers the decision date, falls back to the meeting date, and fails on neither', () => {
-  expect(programGrantRecencyDate({ akoya_decisiondate: '2026-06-11T00:00:00Z', wmkf_meetingdate: '2020-01-01' }))
+test('recency prefers the decision date, falls back to the fiscal-year label, never the meeting date, and fails on neither', () => {
+  expect(programGrantRecencyDate({ akoya_decisiondate: '2026-06-11T00:00:00Z', akoya_fiscalyear: 'June 2020' }))
     .toBe(Date.parse('2026-06-11T00:00:00Z'));
-  expect(programGrantRecencyDate({ akoya_decisiondate: null, wmkf_meetingdate: '2020-12-01' })).toBe(Date.parse('2020-12-01'));
-  expect(programGrantRecencyDate({ akoya_decisiondate: 'garbage', wmkf_meetingdate: null })).toBeNull();
+  expect(programGrantRecencyDate({ akoya_decisiondate: null, akoya_fiscalyear: 'December 2020' })).toBe(Date.UTC(2020, 11, 1));
+  expect(programGrantRecencyDate({ akoya_decisiondate: 'garbage', akoya_fiscalyear: 'june 2020' })).toBe(Date.UTC(2020, 5, 1));
+  // Meeting date alone, or an unreadable fiscal-year label, is no recency date.
+  expect(programGrantRecencyDate({ akoya_decisiondate: null, wmkf_meetingdate: '2020-12-01' })).toBeNull();
+  expect(programGrantRecencyDate({ akoya_decisiondate: null, akoya_fiscalyear: '2025' })).toBeNull();
+  expect(programGrantRecencyDate({ akoya_decisiondate: 'garbage', akoya_fiscalyear: null })).toBeNull();
   expect(programGrantRecencyDate({})).toBeNull();
 
   const older = { akoya_requestnum: '1', akoya_decisiondate: '2019-06-01' };
-  const newestUndecided = { akoya_requestnum: '2', akoya_decisiondate: null, wmkf_meetingdate: '2026-06-01' };
+  const newestUndecided = { akoya_requestnum: '2', akoya_decisiondate: null, akoya_fiscalyear: 'June 2026' };
   // a server-side `akoya_decisiondate desc` would have returned `older`; code-side recency does not
   expect(selectMostRecentProgramGrant([older, newestUndecided])).toBe(newestUndecided);
   expect(selectMostRecentProgramGrant([])).toBeNull();
@@ -70,6 +74,8 @@ test('recency prefers the decision date, falls back to the meeting date, and fai
   expect(selectMostRecentProgramGrant([noNumA, noNumB])).toBe(noNumB);
   expect(selectMostRecentProgramGrant([noNumB, noNumA])).toBe(noNumB);
   expect(() => selectMostRecentProgramGrant([older, { akoya_requestnum: '3' }])).toThrow(/1001|3.*ambiguous|ambiguous/);
+  expect(() => selectMostRecentProgramGrant([older, { akoya_requestnum: '4', wmkf_meetingdate: '2026-06-01' }]))
+    .toThrow(/neither a decision date nor a fiscal year/);
 });
 
 test.each([

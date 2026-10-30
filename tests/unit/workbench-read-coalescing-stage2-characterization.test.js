@@ -438,7 +438,6 @@ describe('getReviewers — characterization', () => {
           programArea: 'Physical Sciences',
           grantCycleCode: 'J26',
           cycleLabel: expect.any(String),
-          meetingDate: '2026-06-15',
           reviewDeadline: '2026-09-01',
           reviewSynthesis: {
             consensus: ['Strong methodology'],
@@ -667,7 +666,6 @@ describe('getReviewers — characterization', () => {
           programArea: null,
           grantCycleCode: null,
           cycleLabel: null,
-          meetingDate: null,
           reviewDeadline: null,
           reviewSynthesis: null,
           noResponseHistory: [],
@@ -826,9 +824,6 @@ describe('getMyCandidates — characterization', () => {
           proposalInstitution: 'Acme University',
           requestNumber: 'R-3001',
           programArea: 'Engineering',
-          grantCycleCode: 'D26',
-          grantCycleLabel: expect.any(String),
-          meetingDate: '2026-12-10',
           reviewDeadline: '2027-02-15',
           summaryBlobUrl: 'https://blob.core.windows.net/summaries/req-c1.pdf',
           candidates: [

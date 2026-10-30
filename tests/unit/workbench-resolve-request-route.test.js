@@ -9,7 +9,10 @@
  */
 jest.mock('../../lib/utils/auth', () => ({ requireAppAccess: jest.fn() }));
 jest.mock('../../lib/services/dynamics-service', () => ({
-  DynamicsService: { getRecord: jest.fn(), queryRecords: jest.fn(), checkRestriction: jest.fn() },
+  DynamicsService: {
+    getRecord: jest.fn(), queryRecords: jest.fn(), checkRestriction: jest.fn(),
+    getAccessToken: jest.fn(async () => 'token'), buildHeaders: jest.fn(() => ({})),
+  },
 }));
 jest.mock('../../lib/services/dynamics-context', () => ({
   bypassDynamicsRestrictions: (_label, fn) => fn(),
@@ -25,12 +28,13 @@ import handler from '../../pages/api/workbench/resolve-request';
 import { classifyStatus, STATUS_CLASS } from '../../lib/services/dataverse-export/constants';
 
 const REQUEST_ID = '11111111-1111-1111-1111-111111111111';
+const CYCLE_ID = '22222222-2222-4222-8222-222222222222';
 
 const SELECT = [
   'akoya_requestid',
   'akoya_requestnum',
   'akoya_title',
-  'wmkf_meetingdate',
+  '_wmkf_grantcycle_value',
   'akoya_requeststatus',
   'wmkf_organizationname',
   '_akoya_applicantid_value',
@@ -59,7 +63,7 @@ const RECORD = {
   akoya_requestid: REQUEST_ID,
   akoya_requestnum: '1002794',
   akoya_title: 'A Study',
-  wmkf_meetingdate: '2026-06-01',
+  _wmkf_grantcycle_value: CYCLE_ID,
   wmkf_GrantCycle: { wmkf_cyclecode: 'J26' },
   akoya_requeststatus: 'Active',
   wmkf_organizationname: 'N/A',
@@ -67,11 +71,24 @@ const RECORD = {
   _wmkf_projectleader_value_formatted: 'Dr. Ada Lovelace',
 };
 
+let originalDynamicsUrl;
 beforeEach(() => {
   requireAppAccess.mockReset().mockResolvedValue({ profileId: 'p', session: { user: {} } });
   DynamicsService.getRecord.mockReset().mockResolvedValue(RECORD);
   DynamicsService.queryRecords.mockReset().mockResolvedValue({ records: [RECORD] });
   fetchCoPIs.mockReset().mockResolvedValue([]);
+  // The linked cycle's calendar row (getCycleDatesById reads it with fetch).
+  originalDynamicsUrl = process.env.DYNAMICS_URL;
+  process.env.DYNAMICS_URL = 'https://example.crm.dynamics.com';
+  jest.spyOn(global, 'fetch').mockResolvedValue({
+    ok: true, status: 200, json: async () => ({ wmkf_grantcycleid: CYCLE_ID, wmkf_cyclecode: 'J26', wmkf_meetingdate: '2026-06-04' }),
+  });
+});
+
+afterEach(() => {
+  jest.restoreAllMocks();
+  if (originalDynamicsUrl === undefined) delete process.env.DYNAMICS_URL;
+  else process.env.DYNAMICS_URL = originalDynamicsUrl;
 });
 
 test('non-GET → 405', async () => {
@@ -103,6 +120,7 @@ test('golden path by GUID: resolves and returns the expected DTO shape (full env
     expand: 'wmkf_GrantCycle($select=wmkf_cyclecode)',
   });
   expect(DynamicsService.checkRestriction).toHaveBeenCalledWith('wmkf_grantcycle', 'wmkf_grantcycleid,wmkf_cyclecode');
+  expect(global.fetch.mock.calls[0][0]).toContain(`/wmkf_grantcycles(${CYCLE_ID})?`);
   const expectedStatusClass = classifyStatus('Active')?.class || STATUS_CLASS.UNCLASSIFIED;
   expect(res.body).toEqual({
     success: true,
@@ -111,7 +129,8 @@ test('golden path by GUID: resolves and returns the expected DTO shape (full env
     title: 'A Study',
     cycleCode: 'J26',
     cycleLabel: 'June 2026',
-    meetingDate: '2026-06-01',
+    // The linked cycle's calendar Board date, not the request's meeting date.
+    meetingDate: '2026-06-04',
     requestStatus: 'Active',
     statusClass: expectedStatusClass,
     institution: 'Example University',

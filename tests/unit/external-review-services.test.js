@@ -186,6 +186,8 @@ describe('buildReviewContext', () => {
       reviewer,
     });
     expect(generated.submission.filename).toBeNull();
+    // The request meeting date is not sent; no reviewer screen reads it.
+    expect(generated.proposal).not.toHaveProperty('meetingDate');
 
     const uploaded = await buildReviewContext({
       suggestion: baseSuggestion({
