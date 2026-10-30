@@ -52,9 +52,18 @@ internal static class Program
                 if(vector["error"]!=null)Reject(()=>CanonicalJson.Preimage(json),vector["error"]!.Value<string>()!);
                 else Check(CanonicalJson.Preimage(json)==vector["preimage"]!.Value<string>(),"binary64 boundary vector: "+json);
             }
+            var definitionVectors=JObject.Parse(File.ReadAllText(Path.Combine(Path.GetDirectoryName(args[0])!,"definitions-sdk-v1.json")));
+            var rules=new DefinitionRules();
+            var rejectionCodes=((JArray)definitionVectors["rejectionCodes"]!).Select(v=>v.Value<string>()).ToArray();
+            foreach(var vector in (JArray)definitionVectors["vectors"]!)
+            {
+                var accepted=true;string? code=null;try{rules.Validate(vector["json"]!.Value<string>()!);}catch(Exception e) when(e is InvalidOperationException || e is FormatException){accepted=false;code=e.Message;Check(rejectionCodes.Contains(code),"unexpected definition error/crash: "+e);}
+                Check(accepted==vector["valid"]!.Value<bool>(),"definition parity "+vector["label"]+" code="+code);
+            }
             SdkChecks();
             MetadataChecks();
             count += PublisherChecks.Run(fixture,args[0]);
+            count += ProductionChecks.Run(fixture,args[0]);
             Console.WriteLine($"SDK/canonical checks passed: {count}. No tenant connection."); return 0;
         }
         catch (Exception error) { Console.Error.WriteLine(error); return 1; }

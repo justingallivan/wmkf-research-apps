@@ -3,7 +3,7 @@ title: Shared Prompt Library Implementation Plan
 domain: ai-platform
 kind: plan
 status: proposed
-summary: Shared prompt library with local JS contracts and compiled SDK lifecycle/persistence/guard evaluators; production rule composition, registered publication and clients remain pending.
+summary: Shared prompt library with local JS contracts and compiled SDK lifecycle/persistence/guard evaluators; production rule and IPlugin composition now compile locally; registration and clients remain pending.
 canonical: false
 cataloged: 2026-10-29
 last_verified: 2026-10-30
@@ -54,8 +54,11 @@ Assessment version capture and Pre-Site native schema are reconciled locally. Sh
 pinned budget checks, the unused atomic budget adapter and an unwired transaction
 reference core exist. Compiled .NET SDK lifecycle/persistence, wire contracts, authorization/write-guard
 evaluators and a source-hashed sandbox rehearsal packet now exist. Production
-format/budget/catalog rules, registered entry, full parity and tenant proof remain
-pending. See [publisher milestone](SHARED_PROMPT_PUBLISHER_MILESTONE_2026-10-30.md)
+format/budget/catalog rules, stateless IPlugin entries and a disabled packaged-binding
+registration manifest now compile locally. Signing/solution import, actual registration,
+Framework/tenant proof and writer/client cutover remain pending. See
+[production rules milestone](SHARED_PROMPT_PRODUCTION_RULES_MILESTONE_2026-10-30.md)
+and the historical [publisher checkpoint](SHARED_PROMPT_PUBLISHER_MILESTONE_2026-10-30.md)
 and [SDK checkpoint](SHARED_PROMPT_SDK_MILESTONE_2026-10-30.md). An offline Pre-Site transition planner and separately
 backportable runtime pause guard prepare the coordinated release; see
 [transaction milestone](SHARED_PROMPT_TRANSACTION_MILESTONE_2026-10-30.md). Remaining holds and
@@ -616,7 +619,7 @@ row-version checks, unique keys and OAuth clients. **[UNKNOWN]** Tenant deployme
 privileges/tooling, actual role/impersonation behavior,
 null-version draft shape and fault/concurrency behavior require the named sandbox
 spike. The .NET project now compiles locally; a deployable Dataverse publication solution
-and production rule composition are not supplied.
+is not supplied; production rules and IPlugin composition now compile locally.
 See the feasibility report and linked technical preflight for evidence,
 falsification tests, approved ownership/access and review status.
 

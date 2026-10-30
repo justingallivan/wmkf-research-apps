@@ -6,35 +6,48 @@
   "policyRevision": 5,
   "policyArtifactHash": "50bcb07a28fd786b1000e6527bd1b06c34170e0088ede2bc35228ebba1f76c5b",
   "sourceHashes": {
-    "scripts/build-prompt-publication-rehearsal.cjs": "b904e6da0c47014b53f7d24827a7e35f01c313519106169dc5a34bacce650a6d",
-    "scripts/check-prompt-publication-sdk.sh": "f59f58702c20d3152761005633a301d02f65d28360866e38e89fbccafe8f5cc6",
+    "scripts/build-prompt-publication-rehearsal.cjs": "d5df7e35105c2045dc9807f6d26fc0474ee1806244246187cd09e585756e6dfe",
+    "scripts/check-prompt-publication-sdk.sh": "a3fb5ad6a5fdc9fa3ee8a5221da6a2ea9ebf4a403f574fbd93fedc88b9ef4732",
     "scripts/build-prompt-publication-wire-vectors.cjs": "02d70b9c8c1a844297ba1fd4abdef77b023f94370a813aaee832dc28fe019649",
+    "scripts/build-prompt-publication-definition-vectors.cjs": "9e60fcf3d7951810de642d9256547ca3655e898bbe9efc8ed1179874ad0e52ad",
     "dataverse/prompt-publication/global.json": "5e3412a9b7d65042d1a5595588da15034929a2584cae283cab3a3e95599f9cbb",
     "dataverse/prompt-publication/NuGet.Config": "33aa39ee926a9e2651ae39549df08dddc8e43d11896cf14d0465bc869d56b4c2",
-    "dataverse/prompt-publication/Transport/Transport.csproj": "75aa8ef8565d16392741300b339e123afd1f6f4f0a859d3bd08f87871e1589e2",
+    "dataverse/prompt-publication/Transport/Transport.csproj": "6c7c048c23f887593b42c0078f596184f907d007a284646e8f495cdf762a8725",
     "dataverse/prompt-publication/Transport/packages.lock.json": "99ff0585be9685cca435c8a73cb4aeca95eb6978960dc3d3eb614ab4b460c0fd",
     "dataverse/prompt-publication/Transport/CanonicalJson.cs": "01b71f1245628b39f30833f881e21102787c0d96c243844ab66ece8eff441fbc",
     "dataverse/prompt-publication/Transport/TransactionSdk.cs": "7acec84f757c165d4d47a4c5aa3c73bfe8d37b8a2d500b87a506c126ee63535a",
+    "dataverse/prompt-publication/Transport/PinnedPolicy.cs": "83c52ab9e3ea9fa2dbc9f043ddf6c59370cf4d6cd0a401d39e7f9bab89334789",
+    "dataverse/prompt-publication/Transport/DefinitionRules.cs": "893676a3fa13eceb0ac775d70358dad438fd0dd630828947c34c43d0db9743a8",
+    "dataverse/prompt-publication/Transport/BudgetRules.cs": "733653d8c451619206b1b3b6ba94243be62717a1dc0625c01b5ffa22c6f26c3e",
+    "dataverse/prompt-publication/Transport/ProductionPublicationRules.cs": "96f1187be0179a1f526958ee33bfa9ce1dfa3dbc5bb9aa10afc6a7894f4909ab",
+    "dataverse/prompt-publication/Transport/PublicationSchema.cs": "5f4f9c33723b8534d3b8ff7edb0a939f8a3534d73ee13efb542a156b1ef14294",
+    "dataverse/prompt-publication/Transport/SettingsWriteGuard.cs": "064c158eeea8b55592800fbfa050899c9b7ac0d84d161a6d956eb0db08d62f50",
+    "dataverse/prompt-publication/Transport/ReleaseBindings.cs": "675fa26011d2d73a254e9362431904325b3dabf8e7ead734a4d72f796aeb6eb7",
+    "dataverse/prompt-publication/Transport/Plugins.cs": "9e9e97cc4c5c3dc647f4d52bb3a462624186e095bc53d260c2671f49be42255e",
+    "dataverse/prompt-publication/registration/bindings.json": "08a089cc02dc8e6143832e294a7b1cf75275f62fe783afa2fc2d088f09529fb2",
+    "dataverse/prompt-publication/registration/manifest.json": "0a4f617679f56af203bece1b6c67ea8eb6cdbfa70eece13c25f8dbabacb988c7",
+    "dataverse/prompt-publication/Checks/ProductionChecks.cs": "30da3f6ab62685f2f01bbe8019044408fef0c349b27fc2f88944b71449c7e23c",
     "dataverse/prompt-publication/Transport/PublicationWire.cs": "4dd3ceef2e9ad8bdb1d5576f2eb242ec42564c88936a713cd615b51b7667d51f",
-    "dataverse/prompt-publication/Transport/PublisherAuthorization.cs": "c72d844d88d43d51c43ffc6dbc0c45d7fe956b50e494e3386d2c95d04c0ab26f",
+    "dataverse/prompt-publication/Transport/PublisherAuthorization.cs": "182def4a3f9a0d3e830fa2a6dc67c6dc2637726fda4baf25c27bf230b8fd3ec4",
     "dataverse/prompt-publication/Transport/PublicationWriteGuard.cs": "becb504dfffa7b5a3c54675daa0fdf0fbddd62348767b8723769353f8018944d",
-    "dataverse/prompt-publication/Transport/PublicationPublisher.cs": "c586c160722400e489bc83a8d7f36d20701df8db334c45de4ddba1ed8dc629cd",
+    "dataverse/prompt-publication/Transport/PublicationPublisher.cs": "0ae749f4d4f03996b50562f56b3969bc3b634c8f53c8b1d3c36e265d28ebec4f",
     "dataverse/prompt-publication/Transport/PublicationSdkStore.cs": "628da37753879b9472d622ceee27f7b46c9cc6c079420269973edf426e17fddb",
-    "dataverse/prompt-publication/Checks/PublisherChecks.cs": "bd9504067258ac027fe7f0bf5117682f70db13bb43f3c8a75a23deee45e82738",
+    "dataverse/prompt-publication/Checks/PublisherChecks.cs": "8e1be853e2f39a69dc47859c46dd6600b880d86c058f965a6406f4bfd9a21ec9",
     "dataverse/prompt-publication/Transport/PromptRows.cs": "ace0153980d1b9fc8221c6eab743d16bfa76fec6185197fd00921f521431d337",
     "dataverse/prompt-publication/Transport/PromptSchemaPreflight.cs": "52c003e757e43accbf6d2db5fb691930c2fa765d7845458ed052fbaa70947365",
     "dataverse/prompt-publication/Checks/Checks.csproj": "18a246c596ef5d9c3e2d1a177c0895170754d95db122f8be38e7a9aa0690b813",
     "dataverse/prompt-publication/Checks/packages.lock.json": "4ac5bca2ed381d0aca48eabef001198cb06a8ce54cb5e0b6d159d464524dd21c",
-    "dataverse/prompt-publication/Checks/Program.cs": "450b41ea26b23ca9c77cc5626789535344955bf5c9a75f2fb5bf4d60258aefce",
-    "dataverse/prompt-publication/rehearsal/cases.json": "708b839dfbd50bc43e9e67b99128967205cfcd1f5ce9796fb1494127291cb963",
+    "dataverse/prompt-publication/Checks/Program.cs": "149024033a949c4a51900a18889fbaa13a969d931d438ef3fe26478f24cebfb2",
+    "dataverse/prompt-publication/rehearsal/cases.json": "4c0b2e7401f16655f3dff62799c3e85eff7671ae24fed50c9611ea54b86397d7",
     "tests/fixtures/prompt-publication/fingerprints-v1.json": "76f7b988ddfa1f1df7d0303e698e1b1f28b2a28919130453c63942eab760e5b0",
     "tests/fixtures/prompt-publication/sdk-numbers-v1.json": "aaaefb2dabf34cb49b6152d95276dfdddba267afc3c3d2d89b99e90f314c3611",
     "tests/fixtures/prompt-publication/wire-sdk-v1.json": "9bcb3f26b9473bd2cdc14240ea1a56b0c4f3a25784a27193c6ea388a57d9e9a0",
+    "tests/fixtures/prompt-publication/definitions-sdk-v1.json": "8b7af0a9e5bb476ff1b9158b34e5f84c614c28c5acafd600b362001cf90cc377",
     "lib/dataverse/core/target-registry.js": "7a868f64a2c836c4fb90e6ede8ffa359938d15637c1348eac61b7b535d4fa89d",
     "lib/prompt-publication/policy-v1.json": "36e88fd6dac92aaec96866cc8605d24757c8204bd37752ebebe06a904250dc87",
     "lib/prompt-publication/transaction-core.js": "a17af7c4d180747e89c7deeb7da2b577fb5ba3ebb42a8738879725f6ef5e2b1b"
   },
-  "sourceDigest": "f4562752e369235c020e0eee3b20a4fdb35b35ed8dc5eac4d82e9c8fc5e37483",
+  "sourceDigest": "bea47fd2d05ce507d7fc79e2b043e68ffe713beb86a3581bd57feefb4772ed0b",
   "cases": {
     "caseVersion": 1,
     "deploymentAuthorized": false,
@@ -54,7 +67,7 @@
       {
         "id": "roles-and-bypass",
         "phase": "read-only",
-        "prove": "Connor and existing Admin superusers mapped; effective/initiating users and app principal known; prove organization-wide Read for ALL prompt versions/drafts and required head/receipt/settings rows so security filtering cannot masquerade as complete history; platform bypass privileges inventoried. No implied permission grant."
+        "prove": "Connor and existing Admin superusers mapped; effective/initiating users and app principal known; prove organization-wide Read for ALL prompt versions/drafts and required head/receipt/settings rows so security filtering cannot masquerade as complete history; platform bypass privileges inventoried. No implied permission grant. Verify both effective and initiating principal Global Read on settings/history, not only effective-user grants."
       },
       {
         "id": "denied-publisher",
@@ -119,17 +132,17 @@
       {
         "id": "draft-current-catalog-stale",
         "phase": "approved-writes-only",
-        "prove": "Stale draft/current ETag and persisted draft baseline, changed current metadata, missing baseline and mismatched head all refuse atomically."
+        "prove": "Stale draft/current ETag and persisted draft baseline, changed current metadata, missing baseline and mismatched head all refuse atomically. Verify same-value catalog CAS readback advances RowVersion and mismatched/no-advance outcomes abort."
       },
       {
         "id": "catalog-group-race",
         "phase": "approved-writes-only",
-        "prove": "Strict live group/section validation; referenced group/section removal races cannot leave invalid newly assigned metadata."
+        "prove": "Strict live group/section validation; referenced group/section removal races cannot leave invalid newly assigned metadata. Verify same-value catalog CAS readback advances RowVersion and mismatched/no-advance outcomes abort."
       },
       {
         "id": "raw-write-guards",
         "phase": "approved-writes-only",
-        "prove": "Create/Update/Delete/Upsert and applicable bulk paths cannot alter Published content/lifecycle/head/receipt outside trusted operation; direct Draft and audited metadata-only paths remain supported."
+        "prove": "Create/Update/Delete/Upsert and applicable bulk paths cannot alter Published content/lifecycle/head/receipt outside trusted operation; direct Draft and audited metadata-only paths remain supported. Settings alternate/bulk paths must reach individual guards without blocking unrelated setting writes; otherwise stop enablement."
       },
       {
         "id": "paging-and-corruption",

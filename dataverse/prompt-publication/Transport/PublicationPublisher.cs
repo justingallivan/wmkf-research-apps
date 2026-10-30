@@ -97,7 +97,7 @@ public static class PublicationPublisher
         PublicationWire.Require(PublicationWire.Equal(draft["metadataBaseline"],r["metadataBaseline"]),"draft_baseline_reconciliation_required");
         // Shared identity/hash/catalog requirements cannot be weakened by a format rule.
         PublicationWire.Require(PublicationWire.Text(snapshot["definition"]!["name"])==key&&CanonicalJson.Hash("wmkf.prompt.snapshot.v1",PublicationWire.Json(snapshot))==PublicationWire.Text(r["snapshotHash"]),"snapshot_hash_mismatch");
-        if(PublicationWire.Null(r["expectedCurrent"]))PublicationWire.Require(new[]{"title","description","groupKey","usedBy","usageCategory"}.All(k=>!string.IsNullOrWhiteSpace(PublicationWire.Text(snapshot["catalog"]![k])))&&!PublicationWire.Null(snapshot["definition"]!["temperature"]),"new_catalog_incomplete");
+        if(PublicationWire.Null(r["expectedCurrent"]))PublicationWire.Require(new[]{"title","description","groupKey","usedBy","usageCategory"}.All(k=>PublicationWire.Text(snapshot["catalog"]![k]) is string text&&DefinitionRules.JsTrim(text).Length>0)&&!PublicationWire.Null(snapshot["definition"]!["temperature"]),"new_catalog_incomplete");
         rules.ValidateFresh((JObject)r.DeepClone(),(JObject)snapshot.DeepClone(),budget==null?null:(JObject)budget.DeepClone());
         rules.ValidateCatalogAssignments((JObject)snapshot["catalog"]!.DeepClone(),(JObject)r["metadataBaseline"]!["catalog"]!.DeepClone(),PublicationWire.Null(r["expectedCurrent"]));
         store.AssertTransaction();var version=head["highWaterVersion"]!.Value<int>()+1;var utc=DateTime.UtcNow;utc=new DateTime(utc.Ticks-utc.Ticks%TimeSpan.TicksPerMillisecond,DateTimeKind.Utc);

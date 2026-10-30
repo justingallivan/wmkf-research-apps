@@ -50,7 +50,7 @@ public sealed class PublisherAuthorization
             &&user.Attributes.TryGetValue("accessmode",out var mode)&&mode is OptionSetValue option&&option.Value==0,"publisher_human_required");
         // Resolve each Read privilege from THAT published table's metadata;
         // arbitrary configuration strings cannot substitute unrelated grants.
-        foreach(var table in new[]{PromptRows.Table,PublicationSdkStore.HeadTable,PublicationSdkStore.ReceiptTable})
+        foreach(var table in new[]{PromptRows.Table,PublicationSdkStore.HeadTable,PublicationSdkStore.ReceiptTable,ProductionPublicationRules.Settings})
         {
             var metadata=((RetrieveEntityResponse)service.Execute(new RetrieveEntityRequest{LogicalName=table,EntityFilters=EntityFilters.Entity|EntityFilters.Privileges,RetrieveAsIfPublished=false})).EntityMetadata;
             PublicationWire.Require(metadata!=null&&metadata.LogicalName==table&&metadata.Privileges!=null,"publisher_privilege_metadata_required");
@@ -63,6 +63,7 @@ public sealed class PublisherAuthorization
                 Privilege(context.UserId,executePrivilege,false,create[0].PrivilegeId);
             }
             Privilege(context.UserId,reads[0].Name,true,reads[0].PrivilegeId);
+            if(context.InitiatingUserId!=context.UserId)Privilege(context.InitiatingUserId,reads[0].Name,true,reads[0].PrivilegeId);
         }
         AssertContext();return PublicationWire.Actor(context.OrganizationId,context.InitiatingUserId,context.UserId);
     }

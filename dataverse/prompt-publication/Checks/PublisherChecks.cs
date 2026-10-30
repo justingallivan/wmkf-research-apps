@@ -88,7 +88,7 @@ internal static class PublisherChecks
         }
         GuardChecks();return count;
     }
-    private static (PublicationSdkStore store,MemorySdk memory,TestRules rules) Session(JObject request,JObject snapshot)
+    internal static (PublicationSdkStore store,MemorySdk memory,TestRules rules) Session(JObject request,JObject snapshot)
     {
         var context=Context();var memory=new MemorySdk(context);var authority=new PublicationWriteAuthority(Org,"wmkf_PublishPrompt",Extension);memory.Authority=authority;
         var factory=new ServiceFactory(memory);var authorization=new PublisherAuthorization(context,factory,Org,new[]{User},"prvCreateReceipt");
@@ -146,11 +146,12 @@ internal sealed class ServiceFactory(IOrganizationService service):IOrganization
 {public IOrganizationService CreateOrganizationService(Guid? id){if(id==null)throw new Exception("SYSTEM forbidden");return service;}}
 internal sealed class MemorySdk(IPluginExecutionContext context):IOrganizationService
 {
+    public IPluginExecutionContext Context=>context;public Action<EntityMetadata,string>? ConfigureMetadata;public Action<IPluginExecutionContext,Entity,Entity?>? GuardHook;
     public readonly Dictionary<Guid,Entity> Rows=new();public readonly List<string> Calls=new();public PublicationWriteAuthority? Authority;public int Mutations,Guards,LastFaultCount;private long rowVersion=1000;
     private readonly Dictionary<string,Guid> privilegeIds=new();
     private Guid PrivilegeId(string name){if(!privilegeIds.TryGetValue(name,out var id))privilegeIds[name]=id=Guid.NewGuid();return id;}
     public void SetNextVersion(long version)=>rowVersion=version;
-    public bool Disabled,Application,MissingDisabled,WrongMetadata,WrongPrivilege,ExecuteBindingMismatch;public int AccessMode;public bool GlobalRead=true,ExecutePrivilege=true;public string? Fault;
+    public bool Disabled,Application,MissingDisabled,WrongMetadata,WrongPrivilege,ExecuteBindingMismatch;public bool KeepCatalogVersion;public int AccessMode;public bool GlobalRead=true,ExecutePrivilege=true;public string? Fault;
     public static IPluginExecutionContext Child(IPluginExecutionContext parent,string message,string table)
     {
         var child=DispatchProxy.Create<IPluginExecutionContext,ContextProxy>();var v=((ContextProxy)child).Values;
@@ -158,7 +159,8 @@ internal sealed class MemorySdk(IPluginExecutionContext context):IOrganizationSe
     }
     private void Call(string code){Calls.Add(code);if(Fault==code){LastFaultCount=Calls.Count;throw new InvalidOperationException(code);}}
     private void Guard(string message,Entity entity)
-    {PublicationWriteGuard.Assert(Child(context,message,entity.LogicalName),entity,Rows.TryGetValue(entity.Id,out var old)?old:null,PublicationSdkStore.HeadTable,PublicationSdkStore.ReceiptTable,Authority);Guards++;}
+    {var child=Child(context,message,entity.LogicalName);var old=Rows.TryGetValue(entity.Id,out var prior)?prior:null;
+        if(GuardHook!=null)GuardHook(child,entity,old);else if(entity.LogicalName==ProductionPublicationRules.Settings)SettingsWriteGuard.Assert(child,entity,old,Authority!);else PublicationWriteGuard.Assert(child,entity,old,PublicationSdkStore.HeadTable,PublicationSdkStore.ReceiptTable,Authority);Guards++;}
     public Guid Create(Entity entity)
     {
         var label=entity.LogicalName==PublicationSdkStore.HeadTable?"head-create":"receipt";Call(label);Guard("Create",entity);
@@ -179,18 +181,19 @@ internal sealed class MemorySdk(IPluginExecutionContext context):IOrganizationSe
     }
     public OrganizationResponse Execute(OrganizationRequest request)
     {
+        if(request is WhoAmIRequest){Call("whoami");var who=new WhoAmIResponse();who.Results["OrganizationId"]=context.OrganizationId;who.Results["UserId"]=context.UserId;return who;}
         if(request is RetrieveEntityRequest retrieve)
         {
             Call("metadata");var metadata=new EntityMetadata{LogicalName=WrongMetadata?"wrong_table":retrieve.LogicalName};
             var list=new List<SecurityPrivilegeMetadata>{SecurityMetadata("prvRead"+retrieve.LogicalName,PrivilegeType.Read)};
             if(retrieve.LogicalName==PublicationSdkStore.ReceiptTable)list.Add(SecurityMetadata(ExecuteBindingMismatch?"prvUnrelatedCreate":"prvCreateReceipt",PrivilegeType.Create));
-            typeof(EntityMetadata).GetProperty("Privileges")!.SetValue(metadata,list.ToArray());var reply=new RetrieveEntityResponse();reply.Results["EntityMetadata"]=metadata;return reply;
+            typeof(EntityMetadata).GetProperty("Privileges")!.SetValue(metadata,list.ToArray());ConfigureMetadata?.Invoke(metadata,retrieve.LogicalName);var reply=new RetrieveEntityResponse();reply.Results["EntityMetadata"]=metadata;return reply;
         }
         if(request.RequestName=="RetrieveUserPrivilegeByPrivilegeName")
         {Call("authorization");var response=new OrganizationResponse();var name=(string)request["PrivilegeName"];response.Results["RolePrivileges"]=name=="prvCreateReceipt"&&!ExecutePrivilege?Array.Empty<RolePrivilege>():new[]{new RolePrivilege{PrivilegeId=WrongPrivilege?Guid.NewGuid():PrivilegeId(name),Depth=GlobalRead?PrivilegeDepth.Global:PrivilegeDepth.Basic}};return response;}
-        var update=(UpdateRequest)request;var entity=update.Target;var current=Rows[entity.Id];var label=entity.LogicalName==PromptRows.Table?(entity.Attributes.Count==1?"previous-clear":"promotion"):entity.Attributes.Count==1?"head-fence":"head-finish";
+        var update=(UpdateRequest)request;var entity=update.Target;var current=Rows[entity.Id];var label=entity.LogicalName==ProductionPublicationRules.Settings?(current.GetAttributeValue<string>(ProductionPublicationRules.Key)==ProductionPublicationRules.BudgetControl?"budget-fence":"catalog-fence"):entity.LogicalName==PromptRows.Table?(entity.Attributes.Count==1?"previous-clear":"promotion"):entity.Attributes.Count==1?"head-fence":"head-finish";
         Call(label);Guard("Update",entity);if(update.ConcurrencyBehavior!=ConcurrencyBehavior.IfRowVersionMatches||current.RowVersion!=entity.RowVersion)throw new InvalidOperationException("CAS fault");
-        foreach(var a in entity.Attributes)current[a.Key]=a.Value;current.RowVersion=(++rowVersion).ToString();Mutations++;return new UpdateResponse();
+        foreach(var a in entity.Attributes)current[a.Key]=a.Value;if(!(KeepCatalogVersion&&label=="catalog-fence"))current.RowVersion=(++rowVersion).ToString();Mutations++;return new UpdateResponse();
     }
     public Entity Retrieve(string name,Guid id,ColumnSet columns)
     {
@@ -199,7 +202,7 @@ internal sealed class MemorySdk(IPluginExecutionContext context):IOrganizationSe
     }
     public EntityCollection RetrieveMultiple(QueryBase request)
     {
-        Call("query");var q=(QueryExpression)request;var selected=Rows.Values.Where(r=>r.LogicalName==q.EntityName&&q.Criteria.Conditions.All(c=>string.Equals(r.GetAttributeValue<string>(c.AttributeName),(string)c.Values[0],StringComparison.OrdinalIgnoreCase))).Select(r=>Retrieve(q.EntityName,r.Id,q.ColumnSet)).ToList();return new EntityCollection(selected){MoreRecords=false};
+        Call("query");var q=(QueryExpression)request;var selected=Rows.Values.Where(r=>r.LogicalName==q.EntityName&&q.Criteria.Conditions.All(c=>c.Operator==ConditionOperator.BeginsWith?r.GetAttributeValue<string>(c.AttributeName)?.StartsWith((string)c.Values[0],StringComparison.OrdinalIgnoreCase)==true:string.Equals(r.GetAttributeValue<string>(c.AttributeName),(string)c.Values[0],StringComparison.OrdinalIgnoreCase))).Select(r=>Retrieve(q.EntityName,r.Id,q.ColumnSet)).ToList();return new EntityCollection(selected){MoreRecords=false};
     }
     public void Update(Entity entity)=>throw new Exception("unconditional update");public void Delete(string name,Guid id)=>throw new Exception("delete");public void Associate(string name,Guid id,Relationship r,EntityReferenceCollection e)=>throw new Exception("associate");public void Disassociate(string name,Guid id,Relationship r,EntityReferenceCollection e)=>throw new Exception("disassociate");
 }

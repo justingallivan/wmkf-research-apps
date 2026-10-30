@@ -9,6 +9,8 @@
     <RootNamespace>Wmkf.PromptPublication</RootNamespace>
   </PropertyGroup>
   <ItemGroup>
+    <EmbeddedResource Include="../registration/bindings.json" LogicalName="Wmkf.PromptPublication.ReleaseBindings.json"/>
+    <EmbeddedResource Include="../../../lib/prompt-publication/policy-v1.json" LogicalName="Wmkf.PromptPublication.Policy.v1.json"/>
     <PackageReference Include="Newtonsoft.Json" Version="13.0.3"/>
   </ItemGroup>
   <ItemGroup Condition="'$(TargetFramework)' == 'net48'">

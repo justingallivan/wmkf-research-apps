@@ -3,7 +3,7 @@ title: Shared Prompt SDK Publisher and Authorization Milestone
 domain: ai-platform
 kind: implementation-record
 status: active
-summary: Compiled publication lifecycle, real SDK persistence and fail-closed authorization/write-guard evaluators; production rule composition and registered entry remain pending.
+summary: Historical lifecycle/authorization checkpoint at 36a846dc5; production rules and IPlugin composition are recorded in the subsequent local-only milestone.
 canonical: false
 cataloged: 2026-10-30
 owner: product-engineering
@@ -13,6 +13,9 @@ related:
 ---
 
 # SDK publisher lifecycle and authorization
+
+Historical checkpoint at `36a846dc5`. See [production rules milestone](SHARED_PROMPT_PRODUCTION_RULES_MILESTONE_2026-10-30.md)
+for subsequent production rules/IPlugin source. No tenant registration is claimed.
 
 [PARTIAL / LOCAL ONLY] The SDK source now includes the synchronous publication
 state machine, real SDK head/receipt persistence and authorization/write-guard

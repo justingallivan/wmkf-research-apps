@@ -21,3 +21,17 @@ test('execute-like CLI options reject before any write',()=>{
 test('SDK wire parity vectors stay bound to the JS validator',()=>{
  require('node:child_process').execFileSync(process.execPath,[path.resolve(__dirname,'../../scripts/build-prompt-publication-wire-vectors.cjs'),'--check']);
 });
+
+test('production definition oracle stays bound to the JS validator',()=>{
+ require('node:child_process').execFileSync(process.execPath,[path.resolve(__dirname,'../../scripts/build-prompt-publication-definition-vectors.cjs'),'--check']);
+});
+test('registration preparation cannot acquire live authority or alter the trust stages',()=>{
+ const {assertRegistrationPreparation}=require('../../scripts/build-prompt-publication-rehearsal.cjs');
+ const manifest=require('../../dataverse/prompt-publication/registration/manifest.json'),bindings=require('../../dataverse/prompt-publication/registration/bindings.json');
+ expect(()=>assertRegistrationPreparation(manifest,bindings)).not.toThrow();
+ for(const field of ['enabled','organizationId','publisherExtensionId','executePrivilege','publisherIds','initiatingPrincipalIds'])expect(()=>assertRegistrationPreparation(manifest,{...bindings,[field]:field==='enabled'?true:field.endsWith('Ids')?['10000000-0000-4000-8000-000000000001']:'live'})).toThrow('no live authority');
+ expect(()=>assertRegistrationPreparation({...manifest,liveWritesAuthorized:true},bindings)).toThrow('no live authority');
+ expect(()=>assertRegistrationPreparation({...manifest,customApi:{...manifest.customApi,stage:40}},bindings)).toThrow('main/guard boundaries');
+ expect(()=>assertRegistrationPreparation({...manifest,guard:{...manifest.guard,runAs:'SYSTEM'}},bindings)).toThrow('main/guard boundaries');
+ expect(()=>assertRegistrationPreparation({...manifest,guard:{...manifest.guard,denyIfSupportedExceptTables:[]}},bindings)).toThrow('unrelated writers');
+});

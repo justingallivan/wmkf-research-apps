@@ -1,0 +1,99 @@
+{
+  "manifestVersion": 1,
+  "status": "PREPARED_NOT_REGISTERED",
+  "deploymentAuthorized": false,
+  "liveWritesAuthorized": false,
+  "bindings": "bindings.json",
+  "customApi": {
+    "uniqueName": "wmkf_PublishPrompt",
+    "bindingType": "Global",
+    "isFunction": false,
+    "isPrivate": false,
+    "allowedCustomProcessingStepType": "None",
+    "isCustomizable": false,
+    "pluginType": "Wmkf.PromptPublication.PublishPromptPlugin",
+    "stage": 30,
+    "mode": "Synchronous",
+    "runAs": "CallingUser",
+    "executePrivilege": "resolve-exact-receipt-Create-privilege-before-registration",
+    "request": {
+      "name": "RequestJson",
+      "type": "String",
+      "required": true
+    },
+    "response": {
+      "name": "ResultJson",
+      "type": "String"
+    }
+  },
+  "guard": {
+    "pluginType": "Wmkf.PromptPublication.PromptPublicationGuardPlugin",
+    "stage": 20,
+    "mode": "Synchronous",
+    "runAs": "CallingUser",
+    "filteringAttributes": null,
+    "preimageAlias": "publication",
+    "messages": [
+      "Create",
+      "Update",
+      "Delete"
+    ],
+    "denyIfSupported": [
+      "Upsert",
+      "CreateMultiple",
+      "UpdateMultiple",
+      "UpsertMultiple",
+      "DeleteMultiple",
+      "SetState",
+      "Assign"
+    ],
+    "tables": {
+      "wmkf_ai_prompt": [
+        "wmkf_ai_promptname",
+        "wmkf_promptversion",
+        "wmkf_ai_promptstatus",
+        "wmkf_ai_iscurrent"
+      ],
+      "wmkf_promptpublicationhead": [
+        "wmkf_keyhash",
+        "wmkf_promptkey",
+        "wmkf_originalkey",
+        "wmkf_revision",
+        "wmkf_highwaterversion",
+        "wmkf_currentprompt",
+        "wmkf_currentversion"
+      ],
+      "wmkf_promptpublicationreceipt": [
+        "wmkf_requestid",
+        "wmkf_payload"
+      ],
+      "wmkf_appsystemsetting": [
+        "wmkf_settingkey",
+        "wmkf_settingvalue"
+      ]
+    },
+    "denyIfSupportedExceptTables": [
+      "wmkf_appsystemsetting"
+    ],
+    "settingsAlternateCoverage": "For settings, register individual Create/Update/Delete guards and prove every supported alternate/bulk path reaches them. Do not install blanket alternate-message denials that block unrelated settings. If any protected path bypasses individual guards, stop enablement and implement a scoped handler."
+  },
+  "requiredProof": [
+    "populate-reviewed-packaged-bindings-and-sign-dependent-assembly-package",
+    "exact-main-operation-OwningExtension-and-transaction",
+    "calling-user-impersonation-and-approved-initiating-principal",
+    "merged-individual-bulk-coverage-without-double-guard-execution",
+    "complete-null-bearing-preimages-and-permit-propagation",
+    "organization-owned-active-unique-keys-and-restrict-delete-lookup",
+    "freeze-old-prompt-budget-catalog-writers-before-guard-enable",
+    "same-UUID-replay-after-rollback-or-response-loss",
+    "actual-Windows-Framework-parity-and-tenant-rehearsal",
+    "groups-same-value-CAS-readback-advances-versionnumber"
+  ],
+  "bindingBootstrap": [
+    "Register the disabled publisher/API only, with guards deferred; no main-operation constructor configuration.",
+    "Observe actual main-operation OwningExtension and transaction context; do not invent or assume its GUID/type.",
+    "Rebuild the reviewed signed package with actual bindings, update assembly, and reverify extension identity.",
+    "Provision/seed approved schema, roles, group catalog and budget control before guard installation.",
+    "Freeze old prompt/budget/catalog writers, install proven guard coverage, then separately approve enabling sandbox publication."
+  ]
+}

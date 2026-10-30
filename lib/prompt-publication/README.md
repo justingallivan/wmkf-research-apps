@@ -118,13 +118,14 @@ new adapter reads/writes use the same target, not the legacy settings client's
 sandbox preference. Nothing invokes this adapter from a live route yet.
 
 Remaining mandatory work: the `phase-i.checkin` draft definition, explicit governed models, one-target read/replay/writer
-cutover, read paging/status, real clients, solution/plugin/guards and sandbox
+cutover, read paging/status, real clients, signed solution/registration and sandbox
 proof. Policy deployment must disable/drain old writers and reject unsupported
 artifact stamps at the Dataverse boundary; CAS alone is not policy freshness. The .NET8 harness now matches existing canonical/fingerprint goldens; complete
 .NET validation, actual Framework runtime parity and tenant transactions remain
 unproved. See `dataverse/prompt-publication/README.md` and the publisher milestone.
-Production format/budget/catalog rule composition and registered entry remain
-pending; the only `IPublicationRules` implementation is a test stub.
+Production .NET format/budget/catalog rules and stateless IPlugin entry source
+now exist with disabled packaged release bindings and a prepared registration
+manifest; actual registration, packaging and Framework/tenant proof remain pending.
 New helpers do not replace existing runtime validators or callers.
 
 
@@ -134,9 +135,9 @@ or tenant proof. It covers authorization/replay ordering, budget-before-head CAS
 complete version inventory, draft/current/catalog preconditions, high-water
 allocation, conditional activation and same-transaction immutable receipt. A
 post-fault lookup resolves a racing committed receipt without retrying writes.
-The complete .NET publisher and transaction/guard/role proof remain mandatory;
-compiled lifecycle/persistence, authorization/write-guard evaluators and wire
-parity checks now exist in
+Actual Framework/transaction/guard/role proof remains mandatory;
+compiled production validation, IPlugin composition, lifecycle/persistence and
+authorization/write guards now exist in
 `dataverse/prompt-publication/`.
 
 `pre-site-transition.js` and `scripts/prepare-pre-site-prompt-transition.cjs`

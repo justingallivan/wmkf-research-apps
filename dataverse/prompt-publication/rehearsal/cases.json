@@ -9,26 +9,110 @@
   "headTable": null,
   "receiptTable": null,
   "cases": [
-    {"id":"identity-and-schema","phase":"read-only","prove":"Approved sandbox host AND independently matched organization; published metadata, all definition/catalog/baseline columns, concurrency, OrganizationOwned head/receipt tables and Active required unique keys."},
-    {"id":"roles-and-bypass","phase":"read-only","prove":"Connor and existing Admin superusers mapped; effective/initiating users and app principal known; prove organization-wide Read for ALL prompt versions/drafts and required head/receipt/settings rows so security filtering cannot masquerade as complete history; platform bypass privileges inventoried. No implied permission grant."},
-    {"id":"denied-publisher","phase":"approved-writes-only","prove":"Unauthorized or unmapped identity denied before writes, including auth-off Admin and app attribution fallback."},
-    {"id":"transaction-required","phase":"approved-writes-only","prove":"Actual Custom API is synchronous and IsInTransaction; nontransaction invocation fails before mutation."},
-    {"id":"null-version-draft","phase":"approved-writes-only","prove":"New Draft/noncurrent/version null works under actual tenant rules; no sentinel/reserved published number."},
-    {"id":"fresh-first-and-later","phase":"approved-writes-only","prove":"Exactly one current Published row, history preserved, head revision/high-water correct and receipt atomic for first and later publication."},
-    {"id":"first-publication-race","phase":"approved-writes-only","prove":"Two callers race create-only head under Active unique key; one expected-state winner and no orphan current row."},
-    {"id":"same-head-race","phase":"approved-writes-only","prove":"Original head row-version CAS rejects stale second request; new version exceeds retired/reserved history."},
-    {"id":"same-uuid-race","phase":"approved-writes-only","prove":"Same actor tuple and exact request return one immutable original receipt; post-conflict outer lookup resolves racing winner."},
-    {"id":"replay-after-upgrade","phase":"approved-writes-only","prove":"Authorized historical receipt replay precedes current policy/head checks; old fresh request rejected."},
-    {"id":"changed-uuid-binding","phase":"approved-writes-only","prove":"Same UUID with altered draft/ETag/key/snapshot/baseline/policy/organization/initiating/effective identity rejected."},
-    {"id":"fault-after-every-write","phase":"approved-writes-only","prove":"Failure after budget/head/draft/prior/head-final/receipt mutation rolls ALL state back; never catch and continue a faulted transaction."},
-    {"id":"unknown-commit","phase":"approved-writes-only","prove":"Lost commit response resolved using original actor and UUID; unavailable lookup remains unknown, no new UUID or blind retry."},
-    {"id":"budget-model-both-orders","phase":"approved-writes-only","prove":"Budget raise and model lower race in BOTH orders; original coordination CAS protects saved pair and secondary provider cap."},
-    {"id":"draft-current-catalog-stale","phase":"approved-writes-only","prove":"Stale draft/current ETag and persisted draft baseline, changed current metadata, missing baseline and mismatched head all refuse atomically."},
-    {"id":"catalog-group-race","phase":"approved-writes-only","prove":"Strict live group/section validation; referenced group/section removal races cannot leave invalid newly assigned metadata."},
-    {"id":"raw-write-guards","phase":"approved-writes-only","prove":"Create/Update/Delete/Upsert and applicable bulk paths cannot alter Published content/lifecycle/head/receipt outside trusted operation; direct Draft and audited metadata-only paths remain supported."},
-    {"id":"paging-and-corruption","phase":"approved-writes-only","prove":"All pages read; no current/status filter hides Draft/current duplicates, duplicate versions, aliases or reserved history; malformed/capped reads refuse."},
-    {"id":"net48-format-and-fingerprints","phase":"offline-and-sandbox","prove":"Actual Framework runtime executes the built Checks.exe against shared fingerprints and sdk-numbers-v1.json (17-significant-digit mantissas, half-even boundaries, normal/subnormal limits and underflow), plus canonical/request/receipt AND complete format/template/model/budget vectors. Current local net8 primitive checks alone are insufficient."},
-    {"id":"pre-site-paused-transition","phase":"approved-writes-only","prove":"Reviewed pause-only old-reader backport, automation-first stop, all instances drained, new reader plus exact reviewed schema and same-UUID receipt, reader preflight, approved canary, blocked queue review and original-actor recovery."},
-    {"id":"exact-fixture-cleanup","phase":"separate-cleanup-approval","prove":"Record exact created fixture IDs and before-state; only approved cleanup of those fixtures, never delete history/receipts or reset counters as rollback."}
+    {
+      "id": "identity-and-schema",
+      "phase": "read-only",
+      "prove": "Approved sandbox host AND independently matched organization; published metadata, all definition/catalog/baseline columns, concurrency, OrganizationOwned head/receipt tables and Active required unique keys."
+    },
+    {
+      "id": "roles-and-bypass",
+      "phase": "read-only",
+      "prove": "Connor and existing Admin superusers mapped; effective/initiating users and app principal known; prove organization-wide Read for ALL prompt versions/drafts and required head/receipt/settings rows so security filtering cannot masquerade as complete history; platform bypass privileges inventoried. No implied permission grant. Verify both effective and initiating principal Global Read on settings/history, not only effective-user grants."
+    },
+    {
+      "id": "denied-publisher",
+      "phase": "approved-writes-only",
+      "prove": "Unauthorized or unmapped identity denied before writes, including auth-off Admin and app attribution fallback."
+    },
+    {
+      "id": "transaction-required",
+      "phase": "approved-writes-only",
+      "prove": "Actual Custom API is synchronous and IsInTransaction; nontransaction invocation fails before mutation."
+    },
+    {
+      "id": "null-version-draft",
+      "phase": "approved-writes-only",
+      "prove": "New Draft/noncurrent/version null works under actual tenant rules; no sentinel/reserved published number."
+    },
+    {
+      "id": "fresh-first-and-later",
+      "phase": "approved-writes-only",
+      "prove": "Exactly one current Published row, history preserved, head revision/high-water correct and receipt atomic for first and later publication."
+    },
+    {
+      "id": "first-publication-race",
+      "phase": "approved-writes-only",
+      "prove": "Two callers race create-only head under Active unique key; one expected-state winner and no orphan current row."
+    },
+    {
+      "id": "same-head-race",
+      "phase": "approved-writes-only",
+      "prove": "Original head row-version CAS rejects stale second request; new version exceeds retired/reserved history."
+    },
+    {
+      "id": "same-uuid-race",
+      "phase": "approved-writes-only",
+      "prove": "Same actor tuple and exact request return one immutable original receipt; post-conflict outer lookup resolves racing winner."
+    },
+    {
+      "id": "replay-after-upgrade",
+      "phase": "approved-writes-only",
+      "prove": "Authorized historical receipt replay precedes current policy/head checks; old fresh request rejected."
+    },
+    {
+      "id": "changed-uuid-binding",
+      "phase": "approved-writes-only",
+      "prove": "Same UUID with altered draft/ETag/key/snapshot/baseline/policy/organization/initiating/effective identity rejected."
+    },
+    {
+      "id": "fault-after-every-write",
+      "phase": "approved-writes-only",
+      "prove": "Failure after budget/head/draft/prior/head-final/receipt mutation rolls ALL state back; never catch and continue a faulted transaction."
+    },
+    {
+      "id": "unknown-commit",
+      "phase": "approved-writes-only",
+      "prove": "Lost commit response resolved using original actor and UUID; unavailable lookup remains unknown, no new UUID or blind retry."
+    },
+    {
+      "id": "budget-model-both-orders",
+      "phase": "approved-writes-only",
+      "prove": "Budget raise and model lower race in BOTH orders; original coordination CAS protects saved pair and secondary provider cap."
+    },
+    {
+      "id": "draft-current-catalog-stale",
+      "phase": "approved-writes-only",
+      "prove": "Stale draft/current ETag and persisted draft baseline, changed current metadata, missing baseline and mismatched head all refuse atomically. Verify same-value catalog CAS readback advances RowVersion and mismatched/no-advance outcomes abort."
+    },
+    {
+      "id": "catalog-group-race",
+      "phase": "approved-writes-only",
+      "prove": "Strict live group/section validation; referenced group/section removal races cannot leave invalid newly assigned metadata. Verify same-value catalog CAS readback advances RowVersion and mismatched/no-advance outcomes abort."
+    },
+    {
+      "id": "raw-write-guards",
+      "phase": "approved-writes-only",
+      "prove": "Create/Update/Delete/Upsert and applicable bulk paths cannot alter Published content/lifecycle/head/receipt outside trusted operation; direct Draft and audited metadata-only paths remain supported. Settings alternate/bulk paths must reach individual guards without blocking unrelated setting writes; otherwise stop enablement."
+    },
+    {
+      "id": "paging-and-corruption",
+      "phase": "approved-writes-only",
+      "prove": "All pages read; no current/status filter hides Draft/current duplicates, duplicate versions, aliases or reserved history; malformed/capped reads refuse."
+    },
+    {
+      "id": "net48-format-and-fingerprints",
+      "phase": "offline-and-sandbox",
+      "prove": "Actual Framework runtime executes the built Checks.exe against shared fingerprints and sdk-numbers-v1.json (17-significant-digit mantissas, half-even boundaries, normal/subnormal limits and underflow), plus canonical/request/receipt AND complete format/template/model/budget vectors. Current local net8 primitive checks alone are insufficient."
+    },
+    {
+      "id": "pre-site-paused-transition",
+      "phase": "approved-writes-only",
+      "prove": "Reviewed pause-only old-reader backport, automation-first stop, all instances drained, new reader plus exact reviewed schema and same-UUID receipt, reader preflight, approved canary, blocked queue review and original-actor recovery."
+    },
+    {
+      "id": "exact-fixture-cleanup",
+      "phase": "separate-cleanup-approval",
+      "prove": "Record exact created fixture IDs and before-state; only approved cleanup of those fixtures, never delete history/receipts or reset counters as rollback."
+    }
   ]
 }
