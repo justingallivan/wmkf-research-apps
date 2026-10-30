@@ -82,14 +82,14 @@ test('cycle-list mode dedupes linked Grant Cycle codes with counts, newest first
     filter: '_wmkf_programdirector_value eq pd-1 and _wmkf_grantcycle_value ne null',
     expand: 'wmkf_GrantCycle($select=wmkf_cyclecode)',
   });
-  expect(queryAllRequests.mock.calls[0][0].select.split(',')).toContain('wmkf_meetingdate');
+  expect(queryAllRequests.mock.calls[0][0].select.split(',')).not.toContain('wmkf_meetingdate');
 
   expect(out).toEqual({
     success: true,
     programDirector: { systemuserid: 'pd-1', fullName: 'Dr. PD' },
     cycles: [
-      { code: 'J26', year: 2026, month: 6, count: 2, latestMeetingDate: '2026-06-15' },
-      { code: 'D25', year: 2025, month: 12, count: 1, latestMeetingDate: '2025-12-10' },
+      { code: 'J26', year: 2026, month: 6, count: 2},
+      { code: 'D25', year: 2025, month: 12, count: 1},
     ],
   });
 });

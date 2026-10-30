@@ -297,6 +297,23 @@ test('keeps unresolved reviewer identity ahead of cycle classification', async (
   })).resolves.toMatchObject({ status: 'unresolved_relationship' });
 });
 
+test('the source fingerprint does not depend on the request meeting date', async () => {
+  process.env.REVIEW_DOCX_SHAREPOINT_WRITE = '';
+  const target = await resolveReviewDocxTarget();
+  const first = await planIndividualReviewFileCandidate(SUGGESTION_ID, { cycleCode: 'D26', target });
+  getRequestById.mockResolvedValue({
+    akoya_requestid: REQUEST_ID,
+    akoya_requestnum: '1002903',
+    akoya_title: 'Proposal',
+    wmkf_organizationname: 'University',
+    wmkf_meetingdate: '2030-06-01T00:00:00Z',
+    wmkf_GrantCycle: { wmkf_cyclecode: 'D26' },
+  });
+  const second = await planIndividualReviewFileCandidate(SUGGESTION_ID, { cycleCode: 'D26', target });
+  expect(second.sourceFingerprint).toBe(first.sourceFingerprint);
+  expect(getRequestById.mock.calls[0][1].select).not.toContain('wmkf_meetingdate');
+});
+
 test('uses one shared actionable-status contract', () => {
   expect(isActionableReviewDocxStatus('content_conflict')).toBe(true);
   expect(isActionableReviewDocxStatus('partial_pointer')).toBe(true);
@@ -356,7 +373,8 @@ test('read-only planning renders and hashes without requiring the write flag', a
     item: null,
   });
   expect(result.sourceFingerprint).toMatch(/^[a-f0-9]{64}$/);
-  expect(result.sourceFingerprint).toBe('cac45d58c3c69fb8ebc9e170b4615fa2762c97f5b29abd25b4441f5355e1ad52');
+  // Changed with meeting-date retirement (the request meeting date left the source).
+  expect(result.sourceFingerprint).toBe('2412bf64b8a1af5ffd796daa848fd1d00892aec9359bd31c5c8b92a7be944f9d');
   expect(result).not.toHaveProperty('answers');
   expect(graph.uploadFile).not.toHaveBeenCalled();
   expect(suggestion.patchReviewReceipt).not.toHaveBeenCalled();

@@ -572,10 +572,10 @@ describe('cycle scoping (Slice 6A)', () => {
     expect(result.queues.open.every((row) => row.cycleCode === 'J26')).toBe(true);
     expect(scopedFilters(fixture.dependencies)).toHaveLength(1);
     expect(fixture.dependencies.queryAllRequests).toHaveBeenCalledWith({
-      select: 'akoya_requestid,akoya_requestnum,wmkf_meetingdate',
+      select: 'akoya_requestid,akoya_requestnum',
       filter: '_wmkf_currentfinalwriteup_value ne null',
       expand: 'wmkf_GrantCycle($select=wmkf_cyclecode)',
-      orderby: 'wmkf_meetingdate desc',
+      orderby: 'akoya_requestnum desc',
     });
     expect(JSON.stringify(result.cycles)).not.toMatch(/count/i);
   });

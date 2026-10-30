@@ -16,8 +16,9 @@ require('./../lib/dataverse/client').loadEnvLocal();
 
   const { DynamicsService } = await import('../lib/services/dynamics-service.js');
   const { bypassDynamicsRestrictions } = await import('../lib/services/dynamics-context.js');
-  const { meetingDateToCycleCode, cycleCodeToOdataFilter, cycleCodeToLabel } =
-    await import('../lib/utils/cycle-code.js');
+  const { cycleCodeToLabel } = await import('../lib/utils/cycle-code.js');
+  const { linkedCycleCode, linkedCycleExpand, linkedCycleFilter } =
+    await import('../lib/dataverse/adapters/operations-grant-cycle.js');
   return bypassDynamicsRestrictions('smoke', async () => {
 
   // Resolve PD
@@ -34,9 +35,11 @@ require('./../lib/dataverse/client').loadEnvLocal();
 
   // Step 1: requests where I'm lead PD
   const reqFilters = [`_wmkf_programdirector_value eq ${pd.systemuserid}`];
-  if (cycleCode) reqFilters.push(cycleCodeToOdataFilter(cycleCode, 'wmkf_meetingdate'));
+  // A request's cycle is its Grant Cycle link (meeting-date retirement), as in the service.
+  if (cycleCode) reqFilters.push(linkedCycleFilter(String(cycleCode).trim().toUpperCase()));
   const { records: requests } = await DynamicsService.queryRecords('akoya_requests', {
-    select: 'akoya_requestid,akoya_requestnum,akoya_title,wmkf_meetingdate,_wmkf_programareaserved_value',
+    select: 'akoya_requestid,akoya_requestnum,akoya_title,_wmkf_programareaserved_value',
+    expand: linkedCycleExpand(),
     filter: reqFilters.join(' and '),
     top: 500,
   });
@@ -63,7 +66,7 @@ require('./../lib/dataverse/client').loadEnvLocal();
   console.log('');
   for (const [rid, sgs] of Object.entries(byReq)) {
     const r = reqById[rid];
-    const cc = meetingDateToCycleCode(r.wmkf_meetingdate);
+    const cc = linkedCycleCode(r);
     console.log(`• ${r.akoya_title || '(no title)'} — request ${r.akoya_requestnum} — ${cc} (${cycleCodeToLabel(cc) || 'no cycle'})`);
     for (const s of sgs) {
       const lc = [

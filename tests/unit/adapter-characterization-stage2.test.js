@@ -35,11 +35,11 @@ const PD_ID = 'cccccccc-cccc-cccc-cccc-cccccccccccc';
 // just filters). Both PD projections carry the reviewer-return deadline;
 // findAcceptedByPD additionally carries wmkf_organizationname.
 const PD_REQUEST_SELECT =
-  'akoya_requestid,akoya_requestnum,akoya_title,wmkf_meetingdate,wmkf_reviewduedate,wmkf_abstract,' +
+  'akoya_requestid,akoya_requestnum,akoya_title,wmkf_reviewduedate,wmkf_abstract,' +
   '_akoya_applicantid_value,_wmkf_projectleader_value,_wmkf_grantprogram_value,' +
   '_wmkf_programareaserved_value';
 const PD_ACCEPTED_REQUEST_SELECT =
-  'akoya_requestid,akoya_requestnum,akoya_title,wmkf_meetingdate,wmkf_reviewduedate,wmkf_abstract,' +
+  'akoya_requestid,akoya_requestnum,akoya_title,wmkf_reviewduedate,wmkf_abstract,' +
   'wmkf_organizationname,_akoya_applicantid_value,_wmkf_projectleader_value,' +
   '_wmkf_grantprogram_value,_wmkf_programareaserved_value';
 const SUGGESTION_SELECT = selectFields('wmkf_appreviewersuggestions').join(',');
@@ -297,7 +297,8 @@ describe('reviewer-suggestion.findByPD (characterization)', () => {
     const out = await suggestion.findByPD(PD_ID);
     expect(out.requestById[GUID_A].cycleCode).toBe('D26');
     expect(out.requestById[GUID_B].cycleCode).toBeNull();
-    expect(out.requestById[GUID_B].meetingDate).toBe('2026-12-10T00:00:00Z');
+    // The request meeting date is no longer read or passed on.
+    expect(out.requestById[GUID_B]).not.toHaveProperty('meetingDate');
   });
 
   test('chunk boundary: 26 distinct requests chunk the suggestion OR-chain at 25 per query, first call gets requests 0-24 in order, second gets request 25', async () => {
