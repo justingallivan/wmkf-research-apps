@@ -286,7 +286,13 @@ a contract check and a Codex review; none merges without the owner.
    removed. The sandbox CLI gains `--cycle` (required for `--reserve`).
    Consequences: runs reserved before the deploy, and every existing Factory
    test request, stay unlinked, so the IA and review steps refuse them; the
-   correction step and `test_request_runs.meeting_date` are unchanged.
+   correction step and `test_request_runs.meeting_date` are unchanged. Not
+   moved: the read-only Factory preview (`admin-preview-service.js`,
+   `TestRequestPreviewSection.js`) still shows and reads the source's meeting
+   date; it converts or is allowlisted in step 6. Unverified until a sandbox
+   clone runs (needs a sandbox write authorization): whether the sandbox rule
+   that rewrites the meeting date on create also touches the link (readback
+   reports "grant cycle mismatch" if so).
 6. **Dynamics Explorer, scripts and the guard check** (§3.8–3.9) as decided.
 
 ## 5a. Contract check (2026-10-29, `/contract-reconcile` review mode)

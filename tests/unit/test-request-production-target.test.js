@@ -271,9 +271,9 @@ describe('manifest target', () => {
     expect(() => buildCloneManifest(preflight, { ...base, grantCycleId: 'D26' })).toThrow(/requires a Grant Cycle/);
   });
 
-  test('validateCloneManifest refuses a production manifest with no Grant Cycle', () => {
+  test('validateCloneManifest still accepts a pre-step-5 production manifest with no Grant Cycle as far as the cast (CLI --inspect)', () => {
     const manifest = productionManifest({ values: { ...productionManifest().values, grantCycleId: undefined } });
-    expect(() => validateCloneManifest(manifest)).toThrow(/must link a Grant Cycle/);
+    expect(() => validateCloneManifest(manifest)).not.toThrow(/Grant Cycle/);
   });
 
   test('validateCloneManifest refuses a sandbox manifest that carries a cast contact', () => {
