@@ -6,6 +6,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const crypto = require('node:crypto');
 const parser = require('@babel/parser');
+const { extractConsumerContracts, extractBudgetRegistry } = require('./prompt-publication-source-contracts.cjs');
 const root = path.resolve(__dirname, '..');
 function literal(node) {
   switch (node.type) {
@@ -52,12 +53,18 @@ for (const id of Object.values(TIER_FALLBACK_IDS)) {
 }
 const { ADMIN_PROMPT_CATALOG } = extract('shared/config/adminPromptCatalog.js', ['ADMIN_PROMPT_CATALOG']);
 const observed = JSON.parse(fs.readFileSync(path.join(root, 'docs/plans/evidence/shared-prompt-library-schema-2026-10-29.json'), 'utf8'));
-const pendingConsumerNames = [...new Set([...Object.keys(ADMIN_PROMPT_CATALOG), ...observed.promptRows.map(r => r.name)])].sort();
+const consumerContracts = extractConsumerContracts();
+const budgetRegistry = extractBudgetRegistry();
+budgetRegistry.secondarySeatModels = Object.fromEntries(Object.entries(MODEL_CAPABILITIES).filter(([id, c]) => c.provider === 'openai' && Object.hasOwn(MODEL_PRICING, id)).map(([id, c]) => [id, c.maxOutputTokens]));
+budgetRegistry.secondarySeatCeiling = Math.min(...Object.values(budgetRegistry.secondarySeatModels));
+if (!Number.isSafeInteger(budgetRegistry.secondarySeatCeiling) || budgetRegistry.secondarySeatCeiling <= 0) throw new Error('Missing reviewed secondary-seat ceiling');
+const pendingConsumerNames = [...new Set([...Object.keys(ADMIN_PROMPT_CATALOG), ...observed.promptRows.map(r => r.name)])].filter(name => !Object.hasOwn(consumerContracts, name) || consumerContracts[name].blockedReason !== null).sort();
 if (pendingConsumerNames.some(name => typeof name !== 'string')) throw new Error('Invalid pending consumer key');
-const schemaSourceHashes = Object.fromEntries(['json-contract.js', 'definition-schema.js', 'publication-contract.js', 'fingerprint.js'].map(file => [file, crypto.createHash('sha256').update(fs.readFileSync(path.join(root, 'lib/prompt-publication', file))).digest('hex')]));
+const schemaSourceHashes = Object.fromEntries(['json-contract.js', 'definition-schema.js', 'publication-contract.js', 'fingerprint.js', 'consumer-contract.js', 'budget-coordination.js'].map(file => [file, crypto.createHash('sha256').update(fs.readFileSync(path.join(root, 'lib/prompt-publication', file))).digest('hex')]));
+const budgetTransportHashes = Object.fromEntries(['lib/dataverse/adapters/prompt-budget.js', 'lib/dataverse/core/changeset.js', 'lib/dataverse/core/entity-registry.js', 'lib/services/dynamics/changeset.js', 'scripts/prompt-publication-source-contracts.cjs'].map(file => [file, crypto.createHash('sha256').update(fs.readFileSync(path.join(root, file))).digest('hex')]));
 const policy = {
-  policyVersion: 2, definitionFormatVersion: 1,
-  scope: 'definition-contract-foundation',
+  policyVersion: 3, definitionFormatVersion: 1,
+  scope: 'consumer-budget-foundation',
   limits: { templateUtf16: 65536, nameUtf16: 850 },
   placeholder: { token: '\\{\\{[ \\t\\r\\n\\f\\v]*([A-Za-z0-9_]+)[ \\t\\r\\n\\f\\v]*\\}\\}', name: '[A-Za-z0-9_]+', matchMode: 'full-string' },
   forbiddenPatterns: templates.A7_FORBIDDEN_PATTERNS,
@@ -65,7 +72,7 @@ const policy = {
   templateContracts: templates.PROMPT_TEMPLATE_CONTRACTS,
   tiers: TIER_FALLBACK_IDS, models,
   // Empty until each existing null-model consumer's actual default is extracted.
-  defaultsByName: {}, templateOnlyByName: {}, pendingConsumerNames, schemaSourceHashes,
+  defaultsByName: {}, templateOnlyByName: {}, pendingConsumerNames, schemaSourceHashes, consumerContracts, budgetRegistry, budgetTransportHashes,
 };
 function canonical(value) {
   if (Array.isArray(value)) return value.map(canonical);

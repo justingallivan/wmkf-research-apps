@@ -17,8 +17,10 @@ related:
 **[VERIFIED via source and local tests; NOT deployed]** Implementation:
 `lib/prompt-publication/{json-contract,definition-schema,publication-contract,fingerprint}.js`.
 Both future clients use these contracts; .NET must match the portable vectors
-before writer enablement. No route, database/schema, transaction or client wiring
-has changed. Existing app prompts remain blocked pending consumer-contract audit.
+before writer enablement. No route, live database/schema or client wiring has changed. The subsequent
+budget milestone adds an unused strict changeset adapter. The [consumer/budget milestone](SHARED_PROMPT_CONSUMERS_BUDGETS_2026-10-29.md)
+now audits ten names (eight locally passing, two held) and adds the unused
+strict budget adapter. Thirty legacy names remain pending.
 
 ## Invariants and boundary
 
@@ -59,13 +61,14 @@ Raw mode has one output, and raw schemas that runtime
 would ignore reject. JSON output schema roots match named output objects.
 
 The existing seven-node declarative validationSchema grammar is checked
-recursively. Invalid bounds/defaults/children reject. Aggregate defaults and
+recursively. Invalid bounds/defaults/children reject. Nonempty aggregate defaults and
 new arbitrary regex patterns require consumer review because runtime defaults
-bypass child checks and regex semantics cannot be safely invented by a port.
+bypass child checks (empty arrays have no children) and regex semantics cannot be safely invented by a port.
 Native JSON Schema uses a conservative subset: basic single types, object
 properties/required/additionalProperties, array items, scalar enums and text
-annotations. Objects must be closed; native output names must be declared and
-required. Unsupported native numeric/string bounds and array constraints reject
+annotations. Objects must be closed; generic native output names must be declared and
+required. Exact audited pass-through root consumers retain their actual output
+semantics instead of requiring a new named wrapper. Unsupported native numeric/string bounds and array constraints reject
 (minItems only 0/1). No external refs, executable patterns or recursive schemas.
 This narrower reviewed subset preserves definitions for explicit reconciliation,
 not automatic schema rewriting. Provider behavior is not proved by offline tests.
@@ -73,15 +76,17 @@ Provider constraints checked against [Anthropic's structured-output documentatio
 
 Model values must already be canonical: lowercase tier or exact reviewed ID.
 New definitions require an explicit finite temperature in [0,1] and positive
-integer tokens within pinned model ceiling. Consumer-specific null model/
-temperature and template-only exceptions remain empty/blocked pending source
-extraction. Artifact revision 2 includes source hashes for all four schema/hash
-modules and a pending consumer-key union from tracked observed names plus source
+integer tokens within pinned model ceiling. Null model defaults/template-only exceptions remain blocked pending extraction;
+audited Executor consumers may preserve null temperature, while first publication
+still requires an explicit value. Artifact revision 3 includes source/transport
+hashes, ten named contracts, budget registry and a pending consumer-key union from tracked observed names plus source
 catalog names. This is a temporary fail-closed audit hold, not metadata-based
 permission or a new execution profile. Removing a hold needs actual consumer
 checks/defaults and reviewed artifact update, not changing an editorial label.
-Registered budget checks and their shared coordination still require live state
-in the future operation; this module does not claim that guarantee.
+Fresh governed checks now require separate server budget/control state and return
+an internal budgetFence. The future operation must conditionally consume it; the
+unused budget adapter prepares/commits the matching original-revision control
+changeset. This is not yet a live stored-state guarantee.
 
 ## Bounded JSON and canonical preimages
 
@@ -175,7 +180,7 @@ never refresh goldens at runtime or silently before tests. JavaScript tests and
 an independent Python canonicalizer/hash check verify these vectors locally;
 .NET execution/parity remains unproved until its implementation runs them.
 
-## Review and whole-flow verification record
+## Historical schema/hash milestone review (commit 1187caf17)
 
 Contract-reconcile Mode B. Change surface: offline definition/wire/hash modules;
 entry points: local tests and explicit fixture scripts. Persistence: versioned
@@ -222,5 +227,5 @@ claim was inferred from that review. Review made no deployment recommendation.
 Final local verification: six suites / 318 tests passed, TypeScript, ESLint,
 script syntax, artifact/golden drift checks, independent Python verification and
 whitespace checks passed. All 19 relevant policy/document/security gate commands
-passed, including sequential paired self-tests. Current revision-2 policy hash:
+passed, including sequential paired self-tests. That milestone's revision-2 policy hash:
 `cc5def0076a89e6ab9fa912c96de13c8b2bf31c19524223baf2ddc1075540bae`.

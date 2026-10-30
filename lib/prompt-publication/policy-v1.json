@@ -1,7 +1,324 @@
 {
   "hashAlgorithm": "sha256-canonical-json-utf8-v1",
-  "hash": "cc5def0076a89e6ab9fa912c96de13c8b2bf31c19524223baf2ddc1075540bae",
+  "hash": "7aad6cb304185b2a9eb64b573b82770224d000b085f43e2b43695eebff2d21db",
   "policy": {
+    "budgetRegistry": {
+      "defaults": {
+        "cycle-dossier.entry": {
+          "kind": "timeout",
+          "timeoutMsOverride": 200000
+        },
+        "field-primer.generate": {
+          "kind": "timeout",
+          "timeoutMsOverride": 240000
+        },
+        "initial-assessment.generate": {
+          "kind": "standing",
+          "maxTokensOverride": 12000,
+          "timeoutMsOverride": 120000
+        },
+        "meeting-transcript.presentation-summary": {
+          "kind": "standing",
+          "maxTokensOverride": 16000,
+          "timeoutMsOverride": 240000
+        },
+        "meeting-transcript.staff-discussion-sentiment": {
+          "kind": "standing",
+          "maxTokensOverride": 16000,
+          "timeoutMsOverride": 240000
+        },
+        "meeting-transcript.staff-discussion-summary": {
+          "kind": "standing",
+          "maxTokensOverride": 16000,
+          "timeoutMsOverride": 240000
+        },
+        "pre-site-visit.proposal-core.generate": {
+          "kind": "standing",
+          "maxTokensOverride": 32768,
+          "timeoutMsOverride": 240000
+        },
+        "review-panel.chair": {
+          "kind": "standing",
+          "maxTokensOverride": 12000,
+          "timeoutMsOverride": 200000
+        },
+        "review-panel.seat": {
+          "kind": "standing",
+          "maxTokensOverride": 16000,
+          "timeoutMsOverride": 200000
+        },
+        "review-synthesis.generate": {
+          "ceiling": 32000,
+          "floor": 16000,
+          "kind": "retry"
+        }
+      },
+      "limits": {
+        "cycle-dossier.entry": {
+          "timeoutMsOverride": {
+            "max": 220000,
+            "min": 60000
+          }
+        },
+        "field-primer.generate": {
+          "timeoutMsOverride": {
+            "max": 240000,
+            "min": 60000
+          }
+        },
+        "initial-assessment.generate": {
+          "maxTokensOverride": {
+            "max": 32000,
+            "min": 4096
+          },
+          "timeoutMsOverride": {
+            "max": 240000,
+            "min": 60000
+          }
+        },
+        "meeting-transcript.presentation-summary": {
+          "maxTokensOverride": {
+            "max": 32000,
+            "min": 4096
+          },
+          "timeoutMsOverride": {
+            "max": 240000,
+            "min": 60000
+          }
+        },
+        "meeting-transcript.staff-discussion-sentiment": {
+          "maxTokensOverride": {
+            "max": 32000,
+            "min": 4096
+          },
+          "timeoutMsOverride": {
+            "max": 240000,
+            "min": 60000
+          }
+        },
+        "meeting-transcript.staff-discussion-summary": {
+          "maxTokensOverride": {
+            "max": 32000,
+            "min": 4096
+          },
+          "timeoutMsOverride": {
+            "max": 240000,
+            "min": 60000
+          }
+        },
+        "pre-site-visit.proposal-core.generate": {
+          "maxTokensOverride": {
+            "max": 128000,
+            "min": 4096
+          },
+          "timeoutMsOverride": {
+            "max": 240000,
+            "min": 60000
+          }
+        },
+        "review-panel.chair": {
+          "maxTokensOverride": {
+            "max": 16000,
+            "min": 4000
+          },
+          "timeoutMsOverride": {
+            "max": 220000,
+            "min": 60000
+          }
+        },
+        "review-panel.seat": {
+          "maxTokensOverride": {
+            "max": 16000,
+            "min": 4000
+          },
+          "timeoutMsOverride": {
+            "max": 220000,
+            "min": 60000
+          }
+        },
+        "review-synthesis.generate": {
+          "ceiling": {
+            "max": 128000,
+            "min": 4096
+          },
+          "floor": {
+            "max": 128000,
+            "min": 4096
+          }
+        }
+      },
+      "schemaVersion": 1,
+      "secondarySeatCeiling": 128000,
+      "secondarySeatModels": {
+        "gpt-5.6-sol": 128000
+      },
+      "settingPrefix": "executor.budgets.v"
+    },
+    "budgetTransportHashes": {
+      "lib/dataverse/adapters/prompt-budget.js": "ed6b5fe22a7c0b2d612615c2bbe2c5ba50f7e5cf16e000145ec37fc04abf4ff1",
+      "lib/dataverse/core/changeset.js": "aeb7618f5919c785b9b5db843654eddb492d54d667cdf414459003eec2c833ac",
+      "lib/dataverse/core/entity-registry.js": "c2697f45a0135ddf6e46ea7049d0856cd6a50587f280e952e31142b89aeb3c54",
+      "lib/services/dynamics/changeset.js": "afcb11a863096f0dc38be74990c295d8f4115c4b8b7968d480d6372c5f29a3a7",
+      "scripts/prompt-publication-source-contracts.cjs": "3cc610647c5669199d3e054c03e3ef8833fe037e4ec0c14b932354cfc68a4a6d"
+    },
+    "consumerContracts": {
+      "cycle-dossier.entry": {
+        "allowNullTemperature": true,
+        "blockedReason": null,
+        "body": null,
+        "consumer": "lib/services/cycle-dossier-generation.js",
+        "consumerHash": "ed48f129de32278b8c5d4c69123dc1a6048ef4a93e3383e39de2f470e02be09d",
+        "orderedMemos": false,
+        "outputJson": "{\"parseMode\":\"json\",\"jsonSchema\":{\"type\":\"object\",\"required\":[\"projectAtAGlance\",\"whyItMatters\",\"fieldAroundIt\",\"backgroundForOutsideField\",\"references\"]},\"validationSchema\":{\"type\":\"object\",\"fields\":{\"projectAtAGlance\":{\"type\":\"string\",\"maxLength\":10000},\"whyItMatters\":{\"type\":\"string\",\"maxLength\":10000},\"fieldAroundIt\":{\"type\":\"string\",\"maxLength\":10000},\"backgroundForOutsideField\":{\"type\":\"string\",\"maxLength\":10000},\"references\":{\"type\":\"array\",\"maxItems\":20,\"of\":{\"type\":\"object\",\"fields\":{\"sourceId\":{\"type\":\"string\",\"maxLength\":1000},\"title\":{\"type\":\"string\",\"maxLength\":500,\"required\":false},\"url\":{\"type\":\"string\",\"maxLength\":1000,\"required\":false},\"retrievedAt\":{\"type\":\"string\",\"maxLength\":100,\"required\":false}}}}}},\"outputs\":[{\"name\":\"entry\",\"target\":{\"kind\":\"none\"}}]}",
+        "rootPassThrough": true,
+        "rowMaxTokens": 16000,
+        "source": "shared/config/prompts/cycle-dossier-entry.js",
+        "sourceHash": "4b246a97b50f4d9972d851b4f31de368d4397b99dd870c95e651cbd342d62be9",
+        "systemIncludes": [],
+        "variablesJson": "{\"variables\":[{\"name\":\"proposal_narrative\",\"required\":true,\"placement\":\"user\",\"source\":{\"kind\":\"override\"},\"dataClass\":\"proposal_source\",\"maxChars\":100000,\"untrusted\":true},{\"name\":\"prior_ai_context\",\"required\":true,\"placement\":\"user\",\"source\":{\"kind\":\"override\"},\"dataClass\":\"prior_ai_output\",\"maxChars\":60000,\"untrusted\":true},{\"name\":\"research_evidence\",\"required\":true,\"placement\":\"user\",\"source\":{\"kind\":\"override\"},\"dataClass\":\"external_research\",\"maxChars\":60000,\"untrusted\":true},{\"name\":\"research_coverage\",\"required\":true,\"placement\":\"user\",\"source\":{\"kind\":\"override\"},\"dataClass\":\"external_research\",\"maxChars\":6000,\"untrusted\":true}]}"
+      },
+      "cycle-dossier.research-plan": {
+        "allowNullTemperature": true,
+        "blockedReason": null,
+        "body": null,
+        "consumer": "lib/services/cycle-dossier-generation.js",
+        "consumerHash": "ed48f129de32278b8c5d4c69123dc1a6048ef4a93e3383e39de2f470e02be09d",
+        "orderedMemos": false,
+        "outputJson": "{\"parseMode\":\"json\",\"jsonSchema\":{\"type\":\"object\",\"required\":[\"queries\"],\"properties\":{\"queries\":{\"type\":\"array\",\"items\":{\"type\":\"object\"}}}},\"validationSchema\":{\"type\":\"object\",\"fields\":{\"queries\":{\"type\":\"array\",\"maxItems\":3,\"of\":{\"type\":\"object\",\"fields\":{\"query\":{\"type\":\"string\",\"maxLength\":240},\"reason\":{\"type\":\"string\",\"maxLength\":500}}}}}},\"outputs\":[{\"name\":\"researchPlan\",\"target\":{\"kind\":\"none\"}}]}",
+        "rootPassThrough": true,
+        "rowMaxTokens": 16000,
+        "source": "shared/config/prompts/cycle-dossier-research-plan.js",
+        "sourceHash": "a2742d791e164737176ce4f4c785060abe39651d58bb265619d8e70f53b1fc70",
+        "systemIncludes": [],
+        "variablesJson": "{\"variables\":[{\"name\":\"proposal_narrative\",\"required\":true,\"placement\":\"user\",\"source\":{\"kind\":\"override\"},\"dataClass\":\"proposal_source\",\"maxChars\":100000,\"untrusted\":true}]}"
+      },
+      "initial-assessment.generate": {
+        "allowNullTemperature": true,
+        "blockedReason": "consumer_version_pinned",
+        "body": null,
+        "consumer": "lib/services/initial-assessment/artifact-service.js",
+        "consumerHash": "51216fbc1d51cffb650c80bd5f967edc5e0d32608f25bb0127c2a52188f6f47f",
+        "orderedMemos": false,
+        "outputJson": "{\"outputs\":[{\"name\":\"assessment\",\"type\":\"object\",\"target\":{\"kind\":\"none\"}}],\"parseMode\":\"json\",\"jsonSchema\":{\"type\":\"object\",\"additionalProperties\":false,\"required\":[\"summary\",\"significance_impact\",\"research_plan\",\"team_expertise\"],\"properties\":{\"summary\":{\"type\":\"string\"},\"significance_impact\":{\"type\":\"string\"},\"research_plan\":{\"type\":\"string\"},\"team_expertise\":{\"type\":\"string\"}}},\"rawOutputRetention\":\"hash\"}",
+        "rootPassThrough": true,
+        "rowMaxTokens": null,
+        "source": "shared/config/prompts/initial-assessment.js",
+        "sourceHash": "d39a174a74b61972ba4d56d3e690b29d04bec5bbdc30ebd3e034eb67de121b21",
+        "systemIncludes": [],
+        "variablesJson": "{\"variables\":[{\"name\":\"proposal_text\",\"source\":{\"kind\":\"override\"},\"required\":true,\"cacheable\":true,\"placement\":\"user\",\"dataClass\":\"proposal_text\",\"maxChars\":100000,\"untrusted\":true}]}"
+      },
+      "meeting-transcript.presentation-summary": {
+        "allowNullTemperature": true,
+        "blockedReason": null,
+        "body": null,
+        "consumer": "lib/services/post-presentation-materials/transcript-summary-service.js",
+        "consumerHash": "bb02ae86c0773b7464d7fe0148ff06efb9b84c8bd9eb5bf3d3579b4b368ab603",
+        "orderedMemos": false,
+        "outputJson": "{\"outputs\":[{\"name\":\"summary\",\"type\":\"string\",\"target\":{\"kind\":\"none\"}}],\"parseMode\":\"raw\",\"rawOutputRetention\":\"none\"}",
+        "rootPassThrough": true,
+        "rowMaxTokens": null,
+        "source": "shared/config/prompts/meeting-presentation-summary.js",
+        "sourceHash": "edfca5c513ae2190caac6aad85bb5584e6d28e6989c8d5feb49c87bca2337cfc",
+        "systemIncludes": [],
+        "variablesJson": "{\"variables\":[{\"name\":\"presentation_transcript\",\"source\":{\"kind\":\"override\"},\"required\":true,\"cacheable\":false,\"placement\":\"user\",\"dataClass\":\"meeting_transcript\",\"maxChars\":400000,\"untrusted\":true},{\"name\":\"presentation_slides\",\"source\":{\"kind\":\"override\"},\"required\":false,\"cacheable\":false,\"placement\":\"user\",\"dataClass\":\"applicant_material\",\"maxChars\":60000,\"untrusted\":true}]}"
+      },
+      "meeting-transcript.staff-discussion-sentiment": {
+        "allowNullTemperature": true,
+        "blockedReason": null,
+        "body": null,
+        "consumer": "lib/services/post-presentation-materials/discussion-sentiment-service.js",
+        "consumerHash": "93e256b10adb3531d570fc3f4b309650782b5f47a8f89188994f16d042b4284e",
+        "orderedMemos": false,
+        "outputJson": "{\"generationMode\":\"native-json-schema\",\"outputs\":[{\"name\":\"sentiment\",\"type\":\"object\",\"target\":{\"kind\":\"none\"}}],\"parseMode\":\"json\",\"jsonSchema\":{\"type\":\"object\",\"additionalProperties\":false,\"required\":[\"schemaVersion\",\"enthusiasm\",\"reception\",\"headline\",\"supportPoints\",\"concernPoints\",\"disagreements\",\"uncertainties\"],\"properties\":{\"schemaVersion\":{\"type\":\"integer\",\"enum\":[1]},\"enthusiasm\":{\"type\":\"string\",\"enum\":[\"high\",\"moderate\",\"low\",\"unclear\"]},\"reception\":{\"type\":\"string\",\"enum\":[\"positive\",\"mixed\",\"negative\",\"unclear\"]},\"headline\":{\"type\":\"string\"},\"supportPoints\":{\"type\":\"array\",\"items\":{\"type\":\"object\",\"additionalProperties\":false,\"required\":[\"time\",\"quote\"],\"properties\":{\"time\":{\"type\":\"string\"},\"quote\":{\"type\":\"string\"}}}},\"concernPoints\":{\"type\":\"array\",\"items\":{\"type\":\"object\",\"additionalProperties\":false,\"required\":[\"time\",\"quote\"],\"properties\":{\"time\":{\"type\":\"string\"},\"quote\":{\"type\":\"string\"}}}},\"disagreements\":{\"type\":\"array\",\"items\":{\"type\":\"object\",\"additionalProperties\":false,\"required\":[\"topic\",\"sides\"],\"properties\":{\"topic\":{\"type\":\"string\"},\"sides\":{\"type\":\"array\",\"items\":{\"type\":\"object\",\"additionalProperties\":false,\"required\":[\"time\",\"quote\"],\"properties\":{\"time\":{\"type\":\"string\"},\"quote\":{\"type\":\"string\"}}}}}}},\"uncertainties\":{\"type\":\"array\",\"items\":{\"type\":\"object\",\"additionalProperties\":false,\"required\":[\"topic\",\"evidence\"],\"properties\":{\"topic\":{\"type\":\"string\"},\"evidence\":{\"type\":\"array\",\"items\":{\"type\":\"object\",\"additionalProperties\":false,\"required\":[\"time\",\"quote\"],\"properties\":{\"time\":{\"type\":\"string\"},\"quote\":{\"type\":\"string\"}}}}}}}}},\"rawOutputRetention\":\"none\"}",
+        "rootPassThrough": true,
+        "rowMaxTokens": null,
+        "source": "shared/config/prompts/meeting-staff-discussion-sentiment.js",
+        "sourceHash": "8668140df5762feabaa4233b3c553d1053cc34ca7679188dab6c9a87cff271b9",
+        "systemIncludes": [],
+        "variablesJson": "{\"variables\":[{\"name\":\"discussion_transcript\",\"source\":{\"kind\":\"override\"},\"required\":true,\"cacheable\":false,\"placement\":\"user\",\"dataClass\":\"meeting_transcript\",\"maxChars\":400000,\"untrusted\":true}]}"
+      },
+      "meeting-transcript.staff-discussion-summary": {
+        "allowNullTemperature": true,
+        "blockedReason": null,
+        "body": null,
+        "consumer": "lib/services/post-presentation-materials/transcript-summary-service.js",
+        "consumerHash": "bb02ae86c0773b7464d7fe0148ff06efb9b84c8bd9eb5bf3d3579b4b368ab603",
+        "orderedMemos": false,
+        "outputJson": "{\"outputs\":[{\"name\":\"summary\",\"type\":\"string\",\"target\":{\"kind\":\"none\"}}],\"parseMode\":\"raw\",\"rawOutputRetention\":\"none\"}",
+        "rootPassThrough": true,
+        "rowMaxTokens": null,
+        "source": "shared/config/prompts/meeting-staff-discussion-summary.js",
+        "sourceHash": "70df5aed2017696a91fb020074b44163f1f43c8839b2b7a7a1f3de156ba438af",
+        "systemIncludes": [],
+        "variablesJson": "{\"variables\":[{\"name\":\"discussion_transcript\",\"source\":{\"kind\":\"override\"},\"required\":true,\"cacheable\":false,\"placement\":\"user\",\"dataClass\":\"meeting_transcript\",\"maxChars\":400000,\"untrusted\":true}]}"
+      },
+      "pre-site-visit.proposal-core.generate": {
+        "allowNullTemperature": true,
+        "blockedReason": "consumer_native_schema_unverified",
+        "body": "Authoritative Dataverse request context (structured JSON):\n\n{{request_context_json}}\n\nProject Narrative:\n\n{{proposal_text}}\n\nCreate the eight proposal-core sections now. Return only the required JSON object.",
+        "consumer": "lib/services/pre-site-visit/artifact-model.js",
+        "consumerHash": "c89d250615497d19ed1c54be28995179df6f39d79a1857dd8101ce34beeb0180",
+        "orderedMemos": true,
+        "outputJson": "{\"generationMode\":\"native-json-schema\",\"outputs\":[{\"name\":\"proposalCore\",\"type\":\"object\",\"target\":{\"kind\":\"none\"}}],\"parseMode\":\"json\",\"jsonSchema\":{\"type\":\"object\",\"required\":[\"proposalCore\"],\"additionalProperties\":false,\"properties\":{\"proposalCore\":{\"type\":\"object\",\"required\":[\"executiveSummary\",\"impactOverview\",\"methodologyOverview\",\"personnelOverview\",\"keckFundingRationale\",\"backgroundAndImpact\",\"detailedMethodology\",\"personnelDetails\"],\"additionalProperties\":false,\"properties\":{\"executiveSummary\":{\"type\":\"string\",\"maxLength\":30000},\"impactOverview\":{\"type\":\"string\",\"maxLength\":30000},\"methodologyOverview\":{\"type\":\"string\",\"maxLength\":30000},\"personnelOverview\":{\"type\":\"string\",\"maxLength\":30000},\"keckFundingRationale\":{\"type\":\"string\",\"maxLength\":30000},\"backgroundAndImpact\":{\"type\":\"string\",\"maxLength\":30000},\"detailedMethodology\":{\"type\":\"string\",\"maxLength\":30000},\"personnelDetails\":{\"type\":\"string\",\"maxLength\":30000}}}}},\"validationSchema\":{\"type\":\"object\",\"fields\":{\"proposalCore\":{\"type\":\"object\",\"fields\":{\"executiveSummary\":{\"type\":\"string\",\"maxLength\":30000},\"impactOverview\":{\"type\":\"string\",\"maxLength\":30000},\"methodologyOverview\":{\"type\":\"string\",\"maxLength\":30000},\"personnelOverview\":{\"type\":\"string\",\"maxLength\":30000},\"keckFundingRationale\":{\"type\":\"string\",\"maxLength\":30000},\"backgroundAndImpact\":{\"type\":\"string\",\"maxLength\":30000},\"detailedMethodology\":{\"type\":\"string\",\"maxLength\":30000},\"personnelDetails\":{\"type\":\"string\",\"maxLength\":30000}}}}},\"rawOutputRetention\":\"full\"}",
+        "rootPassThrough": true,
+        "rowMaxTokens": null,
+        "source": "shared/config/prompts/pre-site-visit-proposal-core.js",
+        "sourceHash": "fa87a85ef221fa2956901e5d0e7938a103538cd019f6990f3b05e368fd8821cc",
+        "systemIncludes": [
+          "Use every personnel name and role exactly as supplied in the request context.",
+          "The applicant institution is not automatically the affiliation of every investigator.",
+          "Do not include academic degrees or degree credentials in personnelOverview or personnelDetails",
+          "Use only the abbreviations PI and co-PI in the generated prose.",
+          "backgroundAndImpact and detailedMethodology should normally fit together on one Word page."
+        ],
+        "variablesJson": "{\"variables\":[{\"name\":\"request_context_json\",\"source\":{\"kind\":\"override\"},\"required\":true,\"cacheable\":false,\"placement\":\"user\",\"dataClass\":\"crm_record_text\",\"maxChars\":25000,\"untrusted\":true},{\"name\":\"proposal_text\",\"source\":{\"kind\":\"override\"},\"required\":true,\"cacheable\":true,\"placement\":\"user\",\"dataClass\":\"proposal_text\",\"maxChars\":100000,\"untrusted\":true}]}"
+      },
+      "review-panel.chair": {
+        "allowNullTemperature": true,
+        "blockedReason": null,
+        "body": null,
+        "consumer": "lib/services/review-panel-generation.js",
+        "consumerHash": "c446200f2128284de3137a0582a95ffa97004808465a462912ebc82141d88b69",
+        "orderedMemos": false,
+        "outputJson": "{\"parseMode\":\"json\",\"jsonSchema\":{\"type\":\"object\",\"required\":[\"ratingMatrix\",\"consensus\",\"disagreements\",\"keyStrengths\",\"keyConcerns\",\"questionsForPI\",\"resolvableVsFundamental\",\"panelRecommendation\",\"confidenceNote\"]},\"validationSchema\":{\"type\":\"object\",\"fields\":{\"ratingMatrix\":{\"type\":\"record\",\"of\":{\"type\":\"string\",\"maxLength\":2000},\"maxEntries\":20},\"consensus\":{\"type\":\"array\",\"maxItems\":20,\"of\":{\"type\":\"string\",\"maxLength\":2000}},\"disagreements\":{\"type\":\"array\",\"maxItems\":20,\"of\":{\"type\":\"object\",\"fields\":{\"topic\":{\"type\":\"string\",\"maxLength\":500},\"positions\":{\"type\":\"record\",\"of\":{\"type\":\"string\",\"maxLength\":2000},\"maxEntries\":20},\"significance\":{\"type\":\"string\",\"maxLength\":2000}}}},\"keyStrengths\":{\"type\":\"array\",\"maxItems\":20,\"of\":{\"type\":\"string\",\"maxLength\":2000}},\"keyConcerns\":{\"type\":\"array\",\"maxItems\":20,\"of\":{\"type\":\"string\",\"maxLength\":2000}},\"questionsForPI\":{\"type\":\"array\",\"maxItems\":20,\"of\":{\"type\":\"string\",\"maxLength\":2000}},\"resolvableVsFundamental\":{\"type\":\"string\",\"maxLength\":4000},\"panelRecommendation\":{\"type\":\"string\",\"maxLength\":4000},\"confidenceNote\":{\"type\":\"string\",\"maxLength\":2000}}},\"outputs\":[{\"name\":\"synthesis\",\"target\":{\"kind\":\"none\"}}]}",
+        "rootPassThrough": true,
+        "rowMaxTokens": 16000,
+        "source": "shared/config/prompts/review-panel-chair.js",
+        "sourceHash": "0530af2ab6d5e6a3e0da40517c4489876b8576ce2fbeabaecfdf54b64ae443ca",
+        "systemIncludes": [],
+        "variablesJson": "{\"variables\":[{\"name\":\"proposal_narrative\",\"required\":true,\"placement\":\"user\",\"source\":{\"kind\":\"override\"},\"dataClass\":\"proposal_text\",\"maxChars\":100000,\"untrusted\":true},{\"name\":\"seat_reviews\",\"required\":true,\"placement\":\"user\",\"source\":{\"kind\":\"override\"},\"dataClass\":\"llm_output\",\"maxChars\":400000,\"untrusted\":true}]}"
+      },
+      "review-panel.seat": {
+        "allowNullTemperature": true,
+        "blockedReason": null,
+        "body": null,
+        "consumer": "lib/services/review-panel-generation.js",
+        "consumerHash": "c446200f2128284de3137a0582a95ffa97004808465a462912ebc82141d88b69",
+        "orderedMemos": false,
+        "outputJson": "{\"parseMode\":\"json\",\"outputs\":[{\"name\":\"review\",\"target\":{\"kind\":\"none\"}}]}",
+        "rootPassThrough": true,
+        "rowMaxTokens": 16000,
+        "source": "shared/config/prompts/review-panel-seat.js",
+        "sourceHash": "a8c674f82e05f4a9b1753fe4a15c8784b5806903783b620ca7f966e7360f9f50",
+        "systemIncludes": [],
+        "variablesJson": "{\"variables\":[{\"name\":\"proposal_narrative\",\"required\":true,\"placement\":\"user\",\"source\":{\"kind\":\"override\"},\"dataClass\":\"proposal_text\",\"maxChars\":100000,\"untrusted\":true},{\"name\":\"review_questions\",\"required\":true,\"placement\":\"user\",\"source\":{\"kind\":\"override\"}}]}"
+      },
+      "review-synthesis.generate": {
+        "allowNullTemperature": true,
+        "blockedReason": null,
+        "body": null,
+        "consumer": "lib/services/review-manager/synthesize-reviews-service.js",
+        "consumerHash": "c7931d295d6557c9036fc58a1d9ec30d703b165c6fac68b61550c2f54c8b44bb",
+        "orderedMemos": false,
+        "outputJson": "{\"generationMode\":\"native-json-schema\",\"outputs\":[{\"name\":\"synthesis\",\"type\":\"object\",\"target\":{\"kind\":\"akoya_request\",\"field\":\"wmkf_reviewsynthesisjson\"},\"guard\":\"always-overwrite\"}],\"parseMode\":\"json\",\"jsonSchema\":{\"type\":\"object\",\"required\":[\"synthesis\"],\"additionalProperties\":false,\"properties\":{\"synthesis\":{\"type\":\"object\",\"required\":[\"consensus\",\"disagreements\",\"keyConcerns\",\"ratingSummaries\",\"overall\",\"writeupThemes\"],\"additionalProperties\":false,\"properties\":{\"consensus\":{\"type\":\"array\",\"items\":{\"type\":\"string\"}},\"disagreements\":{\"type\":\"array\",\"items\":{\"type\":\"string\"}},\"keyConcerns\":{\"type\":\"array\",\"items\":{\"type\":\"string\"}},\"ratingSummaries\":{\"type\":\"array\",\"items\":{\"type\":\"object\",\"required\":[\"questionKey\",\"questionText\",\"summary\"],\"additionalProperties\":false,\"properties\":{\"questionKey\":{\"type\":\"string\"},\"questionText\":{\"type\":\"string\"},\"summary\":{\"type\":\"string\"}}}},\"overall\":{\"type\":\"string\"},\"writeupThemes\":{\"type\":\"string\"}}}}},\"validationSchema\":{\"type\":\"object\",\"fields\":{\"synthesis\":{\"type\":\"object\",\"fields\":{\"consensus\":{\"type\":\"array\",\"of\":{\"type\":\"string\",\"maxLength\":500},\"maxItems\":25,\"required\":false,\"default\":[]},\"disagreements\":{\"type\":\"array\",\"of\":{\"type\":\"string\",\"maxLength\":500},\"maxItems\":25,\"required\":false,\"default\":[]},\"keyConcerns\":{\"type\":\"array\",\"of\":{\"type\":\"string\",\"maxLength\":500},\"maxItems\":25,\"required\":false,\"default\":[]},\"ratingSummaries\":{\"type\":\"array\",\"maxItems\":25,\"required\":false,\"default\":[],\"of\":{\"type\":\"object\",\"fields\":{\"questionKey\":{\"type\":\"string\",\"maxLength\":100},\"questionText\":{\"type\":\"string\",\"maxLength\":500},\"summary\":{\"type\":\"string\",\"maxLength\":1000}}}},\"overall\":{\"type\":\"string\",\"maxLength\":3000,\"required\":false,\"default\":\"\"},\"writeupThemes\":{\"type\":\"string\",\"maxLength\":2000,\"required\":false,\"default\":\"\"}}}}},\"rawOutputRetention\":\"hash\"}",
+        "rootPassThrough": false,
+        "rowMaxTokens": null,
+        "source": "shared/config/prompts/review-synthesis.js",
+        "sourceHash": "646dcb8d2a905751997bf33ca4851350e258b94f14a396556a8d7d64deba63ee",
+        "systemIncludes": [],
+        "variablesJson": "{\"variables\":[{\"name\":\"reviews_digest\",\"source\":{\"kind\":\"override\"},\"required\":true,\"cacheable\":false,\"placement\":\"user\",\"dataClass\":\"review_text\",\"maxChars\":60000,\"untrusted\":true}]}"
+      }
+    },
     "defaultsByName": {},
     "definitionFormatVersion": 1,
     "forbiddenPatterns": [
@@ -315,8 +632,6 @@
       }
     },
     "pendingConsumerNames": [
-      "cycle-dossier.entry",
-      "cycle-dossier.research-plan",
       "executor.echo-parity",
       "expense-reporter.extract-document",
       "expense-reporter.extract-image",
@@ -331,10 +646,7 @@
       "literature-analyzer.extract-paper",
       "literature-analyzer.synthesize",
       "meeting-transcript.fragment-review",
-      "meeting-transcript.presentation-summary",
       "meeting-transcript.speaker-alignment",
-      "meeting-transcript.staff-discussion-sentiment",
-      "meeting-transcript.staff-discussion-summary",
       "multi-perspective.initial-analysis",
       "multi-perspective.integrator",
       "multi-perspective.neutral",
@@ -350,9 +662,6 @@
       "phase-ii.refine",
       "phase-ii.summarize",
       "pre-site-visit.proposal-core.generate",
-      "review-panel.chair",
-      "review-panel.seat",
-      "review-synthesis.generate",
       "reviewer-finder.analyze",
       "reviewer-finder.score-candidates"
     ],
@@ -361,7 +670,7 @@
       "name": "[A-Za-z0-9_]+",
       "token": "\\{\\{[ \\t\\r\\n\\f\\v]*([A-Za-z0-9_]+)[ \\t\\r\\n\\f\\v]*\\}\\}"
     },
-    "policyVersion": 2,
+    "policyVersion": 3,
     "reviewerContracts": {
       "reviewer-finder.analyze": {
         "requiredLabels": [
@@ -394,12 +703,14 @@
       }
     },
     "schemaSourceHashes": {
-      "definition-schema.js": "144b424ce14bfdf80a5d00b97caff54fe6a287eb02ff4db791e920a6b3d29e30",
-      "fingerprint.js": "8ccc5a15b040acaed9768462cd491bc671c886f6f3689f976b1b32403bf225ba",
+      "budget-coordination.js": "31e565d9a0c2f57208516d54c9a011343ea2167bdcac87d4755286fa2f0b7cfe",
+      "consumer-contract.js": "56561e4d31e9e1f0596602a41601dcdf87cdc0db357a572dc637319e7df5302d",
+      "definition-schema.js": "81b217f056d41c1e6d94c67887b5f7a07aa2efed14b8d4954cf97de18942feb9",
+      "fingerprint.js": "7953609e7ec5f70be7736a974c388d5cab79db560d7c2c17ccd8d14953a6e810",
       "json-contract.js": "b6456c0d1982907120e026ff5a530b5bdefaf1d3d2f95e8d50ec9b3fb7e325be",
       "publication-contract.js": "fc1932550700a9ba86a9bc08854bded18b3f6e95a539a5e414674ea4b5cf4a27"
     },
-    "scope": "definition-contract-foundation",
+    "scope": "consumer-budget-foundation",
     "templateContracts": {
       "pre-site-visit.proposal-core.generate": {
         "requiredPlaceholders": [

@@ -1,6 +1,6 @@
 # PR553 local foundation
 
-This directory is **not wired to a route, command or Dataverse writer**. It supplies template/model primitives, complete structural definition validation,
+This directory is **not wired to live publication routes or the existing budget writer**. It supplies template/model primitives, complete structural definition validation,
 versioned request/receipt schemas and publication hashes. Schema success is never
 permission to publish, proof of existing-consumer compatibility, or a committed write.
 The executable wire specification is
@@ -14,8 +14,10 @@ ASCII case folding. Declaration names are ASCII;
 reviewer placeholders must stay in the body, while the pre-site template contract
 uses combined system/body placeholders. `definition-schema.js` additionally checks canonical key
 identity, exact fields, serialized memos, variable/source/output grammar,
-validation/native schemas, model ceilings and temperature. It rejects known
-consumer keys pending their complete audit, rather than weaken their requirements.
+validation/native schemas, model ceilings and temperature. Named checks now preserve ten audited source contracts; eight can pass locally.
+Initial Assessment and Pre-Site stay held for specific compatibility issues, as
+do thirty unaudited legacy names. See
+`docs/plans/SHARED_PROMPT_CONSUMERS_BUDGETS_2026-10-29.md`.
 
 `resolvePinnedModel` uses exact reviewed IDs or case-insensitive tier names,
 resolving tiers to the artifact's explicit tracked fallback snapshot. It accepts
@@ -40,7 +42,9 @@ policy change, not a startup/runtime refresh. The envelope hash is SHA-256 over
 UTF-8 `JSON.stringify(policy)` with recursively sorted object keys and preserved
 array order. The artifact uses ASCII property names; its exact bytes and
 hash must be included in .NET golden tests before claiming cross-language parity.
-Revision 2 also pins schema/hash source digests and pending consumer keys.
+Revision 3 pins schema/transport source digests, named consumer contracts and
+the existing budget registry. Control policy identity is last-writer provenance,
+not an activation row; old provenance never resets the original CAS revision.
 `--check` is required after schema changes; regenerate only as a reviewed policy
 update, then explicitly refresh fingerprint vectors if the identity changed.
 The envelope is trusted packaged code, not caller-supplied policy. It is deeply
@@ -77,9 +81,9 @@ actual shipped templates, extracted source rules, limits and model policies.
 | No content in errors | Fixed paths/codes only | Sensitive fixture actually present in rejected template |
 
 Whole-flow trace: local caller/test → bounded complete DTO → structural schema →
-canonical preimage/hash → validated request/receipt → caller/test. Persistence,
-routes, UI state, async writes, partial batch success and live durable schema
-changes remain N/A. `json-contract.js` provides strict duplicate-key parsing,
+canonical preimage/hash → validated request/receipt → caller/test. Routes/UI wiring and live schema changes remain absent. The unused budget
+preparation/adapter adds strict reads and one atomic-write seam, tested offline;
+actual tenant rollback and actor behavior remain deployment gates. `json-contract.js` provides strict duplicate-key parsing,
 Unicode/number/object inspection and tagged canonicalization with a 1MiB UTF8
 DTO cap. Never generic-parse incoming text before duplicate-key checks.
 
@@ -98,7 +102,22 @@ Portable fingerprint vectors live in
 Unicode escaping are specified in the wire document; this hash algorithm differs
 from the policy envelope hash. No .NET parity is claimed from Python success.
 
-Remaining mandatory work: complete consumer-specific restrictions/defaults and
-registered-budget integration, read paging/status, real clients, solution/plugin
-and budget coordination. No .NET parity or tenant transaction behavior is proved.
+`budget-coordination.js` uses pinned models and the closed registry in both
+directions. Fresh governed prompt validation requires server budget state and
+returns a CAS fence; timeout/generic names cannot select that exemption through
+metadata. Budget preparation captures original control before any history/model
+read, freezes copies, and preserves the existing immutable envelope/history.
+`lib/dataverse/adapters/prompt-budget.js` accepts only a real prepared plan under
+trusted DAL context, performs control-first conditional update plus immutable
+revision create in ONE changeset, and requires strict actor/noFallback transport.
+It does not perform request-ID replay or automatic retries; route integration
+must retain the existing durable replay path and handle unknown outcomes. All
+new adapter reads/writes use the same target, not the legacy settings client's
+sandbox preference. Nothing invokes this adapter from a live route yet.
+
+Remaining mandatory work: thirty legacy consumer audits, the two named held
+consumer reconciliations, explicit governed models, one-target read/replay/writer
+cutover, read paging/status, real clients, solution/plugin/guards and sandbox
+proof. Policy deployment must disable/drain old writers and reject unsupported
+artifact stamps at the Dataverse boundary; CAS alone is not policy freshness. No .NET parity or tenant transaction behavior is proved.
 New helpers do not replace existing runtime validators or callers.
