@@ -37,7 +37,7 @@ inventory remains qualified by the application principal's visibility.
 | Existing prompt/settings tables | Both have concurrency; settings key Active | Preserve tables and existing rows |
 | Prompt additions | Six metadata fields plus draft baseline absent | Prepare/review additive solution changes below |
 | New head/receipt tables | Not in returned metadata | Create OrganizationOwned tables, keys and lookup protections |
-| Publisher/API/package | No matching visible registration | Disabled publisher/API bootstrap after Windows/operator checks |
+| Publisher/API/package | No matching visible registration | Additive schema and receipt Create privilege first; disabled API after Windows/operator checks |
 | Groups and budget control | Neither key returned | Review exact seeds before guard activation |
 | Existing data | Two current Published prompt rows returned | Preserve both; use a new synthetic key |
 | Solution | `wmkfResearchReviewAppSuite` exists, WMKF publisher | Owner selected this solution; preserve its publisher |
@@ -46,19 +46,21 @@ inventory remains qualified by the application principal's visibility.
 
 ## What Codex can do and still owns
 
-Completed now: live read-only inventory, reusable restricted probe, validated
-synthetic snapshot proposal and offline Windows bundle. Existing signed package
-and source packet remain unchanged. The new seven-column/two-table shape is
-implemented in SDK checks, but has not been provisioned in this environment.
+Completed locally: read-only inventory; additive schema request planner; a
+validated synthetic snapshot; bound-disabled package build/inspection; a
+content-free unbound bootstrap trace; request/recovery/readback contracts and an
+offline request-state command. Schema and operation remain unprovisioned.
+Current implementation and verification are recorded in
+[the schema/client milestone](PR553_SCHEMA_AND_FIRST_CLIENT_MILESTONE_2026-10-30.md).
 
-Remaining implementation is ours to prepare, not a request for Connor to write
-it: concrete additive schema/role/registration changes under the chosen solution;
-a reviewed bound-release build/inspector (the preparation builder correctly
-rejects actual bindings); a minimal delegated publication/readback command that
-captures real IDs/ETags and retains the same UUID on uncertain outcomes; and
-context evidence for the disabled main-operation bootstrap. The disabled template
-rejects before SDK calls, so it cannot itself attest actual OwningExtension or
-transaction context. Do not invent those values from the plug-in type ID.
+Remaining implementation is ours, not a request for Connor to write it: approved
+metadata execution/readback, actual identity/privilege/context binding and later
+enablement tooling, plus live delegated transport and draft creation. The local
+client port is unwired. Its offline command prepares a request from observed
+IDs/ETags but cannot authenticate or publish. The disabled/null template can
+trace actual context before its original denial without SDK calls; actual
+OwningExtension, transaction and trace availability remain unverified until the
+approved tenant session. Do not invent values from a plug-in type ID.
 
 The full Admin UI, all-consumer cutover and a Pre-Site publication are not needed
 for this single synthetic test. Actual authorization, schema, active keys,
@@ -96,8 +98,10 @@ runtime is accepted as actual Windows Framework proof.
    Codex inventories repo writers; external flows cannot be assumed inactive.
 
 These are prerequisites and concrete operator choices, not blanket approval for
-unreviewed changes. The next live mutation should be a reviewed disabled bootstrap
-with an exact change list, then bound rebuild/schema/guard preparation.
+unreviewed changes. The next live mutation should be reviewed additive schema preparation without
+guards. Resolve the actual receipt Create privilege before registering the
+disabled publisher/API; then observe context, rebuild bound-disabled, seed and
+freeze old writers before guards. Windows/operator gates still apply.
 
 ## Proposed additive schema checklist
 
@@ -150,42 +154,17 @@ After the applicable reviewed preparation and Windows proof:
 
 ## Verification boundary
 
-Contract-reconcile: local CLI → fixed-host GET → sanitized local evidence → owner
-handoff; offline bundle → hash checks/Framework executable/strong-name checks →
-result file. No live publication client or new runtime route is introduced.
-Inventory partial failures are explicit; no UI async state or batch writes.
-Bounded Sweep Mode A keeps the signed-package milestone unchanged as historical
-local evidence and this report as the dated live prerequisite inventory. It
-neither edits deployed Atlas ownership nor treats local checks as tenant proof.
-[VERIFIED via local tests] SDK checks remain 1,478 passing; the new boundary
-suite passes 13 tests, including a real conflicting shell-principal setup.
-All seven scoped JavaScript suites pass 408 tests.
-ESLint, packet checks, payload hashes and 21 relevant sequential gate/self-test
-commands pass. The Windows bundle has 28 payload files and excludes private
-keys/env files; actual Windows execution remains unverified.
+The dated read-only evidence above remains unchanged as an observation of the
+test environment. Local implementation has advanced; use the current
+[schema/client milestone](PR553_SCHEMA_AND_FIRST_CLIENT_MILESTONE_2026-10-30.md)
+for source, review, test counts and the replacement Windows artifact.
 
-Bundle: `dataverse/prompt-publication/artifacts/windows-handoff-02.zip` (local,
-ignored). ZIP SHA256:
-`50c889ef115569f108289fbb83e522abba5a9180df0707af4ae64fe82651d73a`.
-Extract into a fresh folder on Windows, check this hash against the ZIP before
-execution, and run `./Run-WindowsChecks.ps1` from a developer PowerShell with
-`sn.exe` available. The runner records the package-source commit separately from
-hashes of the preparation tooling. It does not connect to Dataverse.
+The earlier `windows-handoff-02.zip` is superseded: it omitted a registration
+manifest and used a fixture layout that would fail part of the check harness.
+Use only the corrected replacement. Windows tools are unchanged, but actual
+Framework execution is still pending. Portable net8 execution validates the
+copied bundle layout, not Windows semantics.
 
-Initial Fable review used OAuth session
-`7e691559-d03d-46a7-9944-87ed37476cc0`, model `claude-fable-5-1` only.
-Concrete fixes make explicit credential files authoritative, distinguish fixed
-failure reasons, preserve Windows native error output, build checks into a fresh
-output directory and reject extra Windows payload files. Direct source/packet
-inspection refuted the reported missing human-candidate query (present in working
-and staged source) and Checks/fixture provenance gap (all pinned in the packet
-whose exact bytes match HEAD). The targeted correction review accepted all fixes and both refutations, inspected
-the corrected 28-file handoff and found no remaining bounded-scope concern.
-Both reviews used only Fable via subscription OAuth with no permission denials.
-The tracked evidence is byte-identical to the final rerun, and local manifest
-hash verification covers the copied runner too. Windows execution remains open.
-
-Bounded reconciliation: the signed-package record remains true as local artifact
-evidence; this report adds dated live test metadata and explicitly open operator/
-Windows/registration gates. No live runtime ownership or production readiness
-claim changed.
+Contract-reconcile traces local preparation through future authenticated port,
+receipt and readback; no live client, schema writer or deployment is claimed.
+Current runtime/Atlas ownership and production state remain unchanged.

@@ -125,8 +125,10 @@ internal static class ProductionChecks
         {var copy=new Entity(row.LogicalName,row.Id){RowVersion=row.RowVersion};foreach(var a in row.Attributes)copy[a.Key]=a.Value;if(copy.LogicalName==PromptRows.Table)copy["wmkf_ai_groupkey"]="old-group";later.memory.Rows[copy.Id]=copy;}
         Check(PublicationPublisher.Publish(PublicationWire.Json(nextRequest),later.store,later.rules)["receipt"]!["published"]!["version"]!.Value<int>()==2,"unchanged baseline assignment preserves missing legacy group membership");
     }
-    private sealed class Services(IPluginExecutionContext context,IOrganizationServiceFactory factory):IServiceProvider
-    {public object? GetService(Type type)=>type==typeof(IPluginExecutionContext)?context:type==typeof(IOrganizationServiceFactory)?factory:null;}
+    private sealed class TraceSink:ITracingService
+    {public string? Message;public int Calls;public void Trace(string format,params object[] args){Message=string.Format(System.Globalization.CultureInfo.InvariantCulture,format,args);Calls++;}}
+    private sealed class Services(IPluginExecutionContext context,IOrganizationServiceFactory factory,ITracingService? tracing=null):IServiceProvider
+    {public object? GetService(Type type)=>type==typeof(IPluginExecutionContext)?context:type==typeof(IOrganizationServiceFactory)?factory:type==typeof(ITracingService)?tracing:null;}
     private static JObject Binding(MemorySdk memory,bool enabled=true)=>new(){["bindingVersion"]=1,["enabled"]=enabled,["organizationId"]=memory.Context.OrganizationId.ToString(),["publisherExtensionId"]=memory.Context.OwningExtension.Id.ToString(),["publisherIds"]=new JArray(memory.Context.UserId.ToString()),["initiatingPrincipalIds"]=new JArray(memory.Context.InitiatingUserId.ToString()),["executePrivilege"]="prvCreateReceipt"};
     private static void Parameters(IPluginExecutionContext context,JObject request)
     {var v=((ContextProxy)context).Values;v["InputParameters"]=new ParameterCollection{[ReleaseBindings.RequestParameter]=PublicationWire.Json(request)};v["OutputParameters"]=new ParameterCollection();}
@@ -134,7 +136,15 @@ internal static class ProductionChecks
     {
         var s=Session(request,snapshot);var context=s.memory.Context;Parameters(context,request);var factory=new ServiceFactory(s.memory);var provider=new Services(context,factory);
         Deny(()=>new PublishPromptPlugin().Execute(provider),"release_bindings_incomplete");Check(s.memory.Calls.Count==0,"packaged disabled template fails before SDK calls");
+        var trace=new TraceSink();context.InputParameters[ReleaseBindings.RequestParameter]="DO_NOT_TRACE_PROMPT_CONTENT";
+        Deny(()=>new PublishPromptPlugin().Execute(new Services(context,factory,trace)),"release_bindings_incomplete");
+        Check(trace.Calls==1&&trace.Message!.StartsWith("PR553_BOOTSTRAP_CONTEXT ",StringComparison.Ordinal)&&!trace.Message.Contains("DO_NOT_TRACE_PROMPT_CONTENT"),"bootstrap emits only content-free context");
+        var observed=CanonicalJson.Parse(trace.Message!.Substring("PR553_BOOTSTRAP_CONTEXT ".Length));
+        Check(observed["organizationId"]!.Value<string>()==context.OrganizationId.ToString()&&observed["extensionId"]!.Value<string>()==context.OwningExtension.Id.ToString()&&observed["extensionLogicalName"]!.Value<string>()==context.OwningExtension.LogicalName&&observed["isInTransaction"]!.Value<bool>()&&observed["stage"]!.Value<int>()==30,"bootstrap context reflects actual trusted SDK context");
+        Check(s.memory.Calls.Count==0&&s.memory.Mutations==0,"bootstrap observation cannot obtain SDK service or mutate");Parameters(context,request);
         var binding=Binding(s.memory);var bindings=ReleaseBindings.Parse(PublicationWire.Json(binding));
+        Check(!bindings.IsUnboundPreparation,"bound enabled bindings never activate bootstrap observation");
+        var boundDisabled=(JObject)binding.DeepClone();boundDisabled["enabled"]=false;Check(!ReleaseBindings.Parse(PublicationWire.Json(boundDisabled)).IsUnboundPreparation,"bound disabled replay path never activates bootstrap observation");
         s.memory.GuardHook=(child,target,preimage)=>
         {
             var v=((ContextProxy)child).Values;v["InputParameters"]=new ParameterCollection{["Target"]=target};v["PreEntityImages"]=new EntityImageCollection();

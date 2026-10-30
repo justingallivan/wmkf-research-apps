@@ -148,3 +148,11 @@ live row identities. See
 `docs/plans/SHARED_PROMPT_TRANSACTION_MILESTONE_2026-10-30.md` and
 `docs/plans/PRE_SITE_PROMPT_READER_TRANSITION_2026-10-30.md` for the port boundary,
 separate backportable pause guard and coordinated transition gates.
+
+
+`first-publication-client.js` is an unwired synthetic-test client port. The offline
+`prepare-prompt-first-publication.cjs` command retains original request/UUID state
+from a real observed draft, and the port tests auth-before-replay, one POST then
+receipt recovery, and independent snapshot/head readback. No live HTTP/OAuth
+adapter or draft creation is supplied. See
+`docs/plans/PR553_SCHEMA_AND_FIRST_CLIENT_MILESTONE_2026-10-30.md`.

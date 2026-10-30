@@ -58,15 +58,15 @@ async function main() {
     return response.json();
   }
   async function all(relative) {
-    const rows = []; let next = relative;
-    while (next) { const data = await get(next); rows.push(...(data.value || [])); next = data['@odata.nextLink']; }
+    const rows = []; const seen = new Set(); let next = relative;
+    while (next) { if (seen.has(next)) throw new Error('Metadata paging cycle'); seen.add(next); const data = await get(next); if (!Array.isArray(data.value)) throw new Error('Incomplete metadata inventory'); rows.push(...data.value); next = data['@odata.nextLink']; }
     return rows;
   }
   async function entity(name) {
     const prefix = `EntityDefinitions(LogicalName='${name}')`;
     const [definition, attrs, keys, strings, memos, picklists] = await Promise.all([
       get(`${prefix}?$select=LogicalName,SchemaName,EntitySetName,PrimaryIdAttribute,PrimaryNameAttribute,DisplayName,IsOptimisticConcurrencyEnabled`),
-      all(`${prefix}/Attributes?$select=LogicalName,SchemaName,AttributeType,IsCustomAttribute,IsValidForCreate,IsValidForUpdate,RequiredLevel,DisplayName`),
+      all(`${prefix}/Attributes?$select=LogicalName,SchemaName,AttributeType,IsCustomAttribute,IsValidForRead,IsValidForCreate,IsValidForUpdate,RequiredLevel,DisplayName`),
       all(`${prefix}/Keys?$select=LogicalName,KeyAttributes,EntityKeyIndexStatus`),
       all(`${prefix}/Attributes/Microsoft.Dynamics.CRM.StringAttributeMetadata?$select=LogicalName,MaxLength`),
       all(`${prefix}/Attributes/Microsoft.Dynamics.CRM.MemoAttributeMetadata?$select=LogicalName,MaxLength`),
@@ -74,10 +74,10 @@ async function main() {
     ]);
     const lengths = new Map([...strings, ...memos].map(attr => [attr.LogicalName, attr.MaxLength]));
     return {
-      logicalName: definition.LogicalName, schemaName: definition.SchemaName, entitySet: definition.EntitySetName,
+      metadataReadComplete: true, logicalName: definition.LogicalName, schemaName: definition.SchemaName, entitySet: definition.EntitySetName,
       primaryId: definition.PrimaryIdAttribute, primaryName: definition.PrimaryNameAttribute, label: label(definition.DisplayName), optimisticConcurrency: definition.IsOptimisticConcurrencyEnabled,
       keys: keys.map(key => ({ name: key.LogicalName, fields: key.KeyAttributes, status: key.EntityKeyIndexStatus })),
-      attributes: attrs.map(attr => ({ name: attr.LogicalName, schemaName: attr.SchemaName, type: attr.AttributeType, custom: attr.IsCustomAttribute, create: attr.IsValidForCreate, update: attr.IsValidForUpdate, required: attr.RequiredLevel?.Value, label: label(attr.DisplayName), ...(lengths.has(attr.LogicalName) ? { maxLength: lengths.get(attr.LogicalName) } : {}) })).sort((a,b) => a.name.localeCompare(b.name)),
+      attributes: attrs.map(attr => ({ name: attr.LogicalName, schemaName: attr.SchemaName, type: attr.AttributeType, custom: attr.IsCustomAttribute, read: attr.IsValidForRead, create: attr.IsValidForCreate, update: attr.IsValidForUpdate, required: attr.RequiredLevel?.Value, label: label(attr.DisplayName), ...(lengths.has(attr.LogicalName) ? { maxLength: lengths.get(attr.LogicalName) } : {}) })).sort((a,b) => a.name.localeCompare(b.name)),
       choices: picklists.map(attr => ({ name: attr.LogicalName, options: (attr.OptionSet?.Options || []).map(item => ({ value: item.Value, label: label(item.Label) })) })),
     };
   }
@@ -87,7 +87,7 @@ async function main() {
   ]);
   const groupSettings = await all(`${settings.entitySet}?$select=wmkf_settingkey&$filter=wmkf_settingkey eq 'prompt-library.groups'`);
   const rows = await all(`${prompt.entitySet}?$select=wmkf_ai_promptname,wmkf_promptversion,wmkf_ai_iscurrent,wmkf_ai_promptstatus&$orderby=wmkf_ai_promptname asc`);
-  const snapshot = { observedAt: new Date().toISOString(), targetHost: target.hostname, targetClass: production ? 'production' : 'sandbox', readOnly: true, entities: [prompt, settings], customEntityCount: customEntities.length,
+  const snapshot = { reportVersion: 2, observedAt: new Date().toISOString(), targetHost: target.hostname, targetClass: production ? 'production' : 'sandbox', readOnly: true, entities: [prompt, settings], customEntityCount: customEntities.length,
     candidateCatalogEntities: customEntities.filter(item => /prompt|catalog|group/i.test(item.LogicalName)).map(item => ({ name:item.LogicalName, entitySet:item.EntitySetName, label:label(item.DisplayName) })),
     groupCatalogKey: { key: 'prompt-library.groups', exists: groupSettings.length > 0 },
     promptRows: rows.map(row => ({ name: row.wmkf_ai_promptname, version:row.wmkf_promptversion, current:row.wmkf_ai_iscurrent, status:row.wmkf_ai_promptstatus })), requests };

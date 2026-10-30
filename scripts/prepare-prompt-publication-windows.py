@@ -5,9 +5,11 @@ root = pathlib.Path(__file__).resolve().parents[1]
 p = argparse.ArgumentParser(description=__doc__)
 p.add_argument('--out', required=True, type=pathlib.Path)
 p.add_argument('--package-dir', required=True, type=pathlib.Path)
+p.add_argument('--bindings', type=pathlib.Path, help='Explicit reviewed disabled bindings for a bound-disabled package')
 a = p.parse_args()
 if not a.out.is_absolute() or a.out.exists() or not a.package_dir.is_absolute():
     p.error('Use a new absolute output directory and absolute package directory')
+if a.bindings and (not a.bindings.is_absolute() or not a.bindings.is_file()): p.error('Bindings must be an absolute existing file')
 sdk = root / 'dataverse/prompt-publication'
 dotnet = os.environ.get('PR553_DOTNET', 'dotnet')
 subprocess.run(['node', str(root/'scripts/build-prompt-publication-rehearsal.cjs'), '--check'], check=True, cwd=root)
@@ -18,7 +20,9 @@ for project, extra in [('PackagingTool/PackagingTool.csproj',[]),('Checks/Checks
     subprocess.run([dotnet,'build',str(sdk/project),'--no-restore','--no-incremental','--configuration','Release']+extra,check=True,cwd=root,env=env)
 pkg = a.package_dir/'WMKF.PromptPublication.1.0.0.nupkg'
 receipt = a.package_dir/'preparation-receipt.json'
-subprocess.run([dotnet, str(sdk/'PackagingTool/bin/Release/net8.0/PackagingTool.dll'), 'verify-receipt', str(root), str(pkg), str(receipt)], check=True)
+verify_args=['verify-bound-disabled',str(root),str(pkg),str(a.bindings),str(receipt)] if a.bindings else ['verify-receipt',str(root),str(pkg),str(receipt)]
+subprocess.run([dotnet,str(sdk/'PackagingTool/bin/Release/net8.0/PackagingTool.dll')]+verify_args,check=True)
+if a.bindings: copy_bindings=a.bindings.read_bytes()
 a.out.mkdir(parents=True)
 def copy(source, relative):
     dest=a.out/relative
@@ -27,15 +31,20 @@ def copy(source, relative):
 for source in pathlib.Path(build_temp.name).iterdir():
     if source.is_file() and source.suffix in ('.exe', '.dll', '.config'): copy(source, 'checks/'+source.name)
 for name in ['fingerprints-v1.json','sdk-numbers-v1.json','definitions-sdk-v1.json','wire-sdk-v1.json']:
-    copy(root/'tests/fixtures/prompt-publication'/name, 'fixtures/'+name)
+    copy(root/'tests/fixtures/prompt-publication'/name, 'tests/fixtures/prompt-publication/'+name)
 copy(sdk/'registration/Run-WindowsChecks.ps1', 'Run-WindowsChecks.ps1')
+copy(sdk/'registration/manifest.json', 'dataverse/prompt-publication/registration/manifest.json')
 copy(pkg, pkg.name)
 copy(receipt, receipt.name)
+if a.bindings: (a.out/'disabled-bindings.json').write_bytes(copy_bindings)
 with zipfile.ZipFile(pkg) as archive:
     for name in ['Wmkf.PromptPublication.Transport.dll','Newtonsoft.Json.dll']:
         target=a.out/'signed'/name
         target.parent.mkdir(exist_ok=True)
         target.write_bytes(archive.read('lib/net48/'+name))
+copied_verify=['verify-bound-disabled',str(root),str(a.out/pkg.name),str(a.out/'disabled-bindings.json'),str(a.out/receipt.name)] if a.bindings else ['verify-receipt',str(root),str(a.out/pkg.name),str(a.out/receipt.name)]
+subprocess.run([dotnet,str(sdk/'PackagingTool/bin/Release/net8.0/PackagingTool.dll')]+copied_verify,check=True)
+subprocess.run([dotnet,'run','--framework','net8.0','--project',str(sdk/'Checks/Checks.csproj'),'--no-restore','--configuration','Release','--',str(a.out/'tests/fixtures/prompt-publication/fingerprints-v1.json')],check=True,cwd=root,env=env)
 r=json.loads(receipt.read_text())
 packet = (sdk/'rehearsal/packet.json').read_bytes()
 subprocess.run(['node',str(root/'scripts/build-prompt-publication-rehearsal.cjs'),'--check'],check=True,cwd=root)

@@ -21,6 +21,7 @@ public sealed class ReleaseBindings
     }
     public static ReleaseBindings Packaged()
     {using var stream=typeof(ReleaseBindings).Assembly.GetManifestResourceStream("Wmkf.PromptPublication.ReleaseBindings.json")??throw new InvalidOperationException("release_bindings_missing");using var reader=new StreamReader(stream);return Parse(reader.ReadToEnd());}
+    public bool IsUnboundPreparation=>!Enabled&&PublicationWire.Null(data["organizationId"])&&PublicationWire.Null(data["publisherExtensionId"])&&PublicationWire.Null(data["executePrivilege"])&&((JArray)data["publisherIds"]!).Count==0&&((JArray)data["initiatingPrincipalIds"]!).Count==0;
     public bool Enabled=>data["enabled"]!.Value<bool>();
     public Guid Organization=>Guid.Parse(PublicationWire.Text(data["organizationId"])!);
     public Guid Extension=>Guid.Parse(PublicationWire.Text(data["publisherExtensionId"])!);

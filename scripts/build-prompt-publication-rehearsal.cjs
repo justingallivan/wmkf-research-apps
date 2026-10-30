@@ -4,6 +4,8 @@ const fs=require('node:fs'),path=require('node:path'),crypto=require('node:crypt
 const parser=require('@babel/parser');
 const root=path.resolve(__dirname,'..');
 const files=[
+ 'scripts/probe-shared-prompt-library-schema.js','dataverse/prompt-publication/registration/test-environment-decisions.json',
+ 'dataverse/prompt-publication/registration/schema-v1.json','scripts/prepare-prompt-publication-schema.cjs','scripts/prepare-prompt-first-publication.cjs','lib/prompt-publication/first-publication-client.js',
  'scripts/build-prompt-publication-package.cjs','scripts/prepare-prompt-publication-registration.cjs',
  'dataverse/prompt-publication/PackagingTool/PackagingTool.csproj','dataverse/prompt-publication/PackagingTool/packages.lock.json','dataverse/prompt-publication/PackagingTool/Program.cs','dataverse/prompt-publication/PackagingTool/SelfTests.cs','dataverse/prompt-publication/PackagingTool/StrongNames.cs',
  'dataverse/prompt-publication/Package/Package.csproj','dataverse/prompt-publication/Package/packages.lock.json','dataverse/prompt-publication/Package/README.md','dataverse/prompt-publication/registration/signing-identity.json',

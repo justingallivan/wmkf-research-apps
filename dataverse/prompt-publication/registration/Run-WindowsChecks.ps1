@@ -3,6 +3,8 @@
 param([string]$StrongNameTool = 'sn.exe')
 $ErrorActionPreference = 'Stop'
 $root = $PSScriptRoot
+$target = Join-Path $root 'windows-check-result.json'
+if (Test-Path -LiteralPath $target) { throw 'Result exists; retain it and use a fresh extraction for another run' }
 $manifest = Get-Content -LiteralPath (Join-Path $root 'handoff-manifest.json') -Raw | ConvertFrom-Json
 foreach ($entry in $manifest.files) {
     if ($entry.path -match '(^/|\\|(^|/)\.\.(/|$)|:)') { throw 'Invalid manifest path' }
@@ -18,7 +20,7 @@ $release = Get-ItemProperty -LiteralPath 'HKLM:\SOFTWARE\Microsoft\NET Framework
 if ($release.Release -lt 528040) { throw '.NET Framework 4.8 or higher is required' }
 $sn = Get-Command $StrongNameTool -ErrorAction Stop
 $checks = Join-Path $root 'checks/Checks.exe'
-$fixture = Join-Path $root 'fixtures/fingerprints-v1.json'
+$fixture = Join-Path $root 'tests/fixtures/prompt-publication/fingerprints-v1.json'
 $savedPreference = $ErrorActionPreference
 try {
     $ErrorActionPreference = 'Continue'

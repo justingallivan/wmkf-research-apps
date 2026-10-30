@@ -96,5 +96,14 @@ PR553_DOTNET=/absolute/path/to/dotnet node scripts/prepare-prompt-publication-re
 These commands have no execute/deploy mode. The first creates the disabled
 package and an independently recomputed preparation receipt; the second checks
 that receipt and emits an unapproved registration plan with unresolved tenant
-identities. See `docs/plans/SHARED_PROMPT_PACKAGE_MILESTONE_2026-10-30.md` for
-verification, custody and actual Windows/tenant gates.
+identities. The builder also accepts `--bindings /absolute/disabled-bindings.json`
+for a structurally validated test-only bound-disabled package, without changing
+the tracked template. It rejects enabled builds. Neither the input file nor an
+artifact receipt proves actual tenant identities or privileges.
+
+Additive schema/receipt privilege must exist before API bootstrap. The unbound
+disabled main can trace content-free context before denial; guards stay deferred.
+Current implementation, corrected Windows bundle layout and remaining client
+transport/Framework/tenant gates are recorded in
+`docs/plans/PR553_SCHEMA_AND_FIRST_CLIENT_MILESTONE_2026-10-30.md`. The earlier
+signed-package checkpoint remains historical evidence.

@@ -18,7 +18,15 @@ public static class PluginInvocation
     private static T Service<T>(IServiceProvider provider) where T:class=>provider.GetService(typeof(T)) as T??throw new InvalidPluginExecutionException("plugin_service_missing");
     public static void Publish(IServiceProvider provider,ReleaseBindings bindings)
     {
-        var c=Service<IPluginExecutionContext>(provider);bindings.AssertBound(c,true);
+        var c=Service<IPluginExecutionContext>(provider);
+        // Only the exact disabled/null preparation can report content-free
+        // bootstrap context. It still rejects below before obtaining an SDK service.
+        if(bindings.IsUnboundPreparation&&provider.GetService(typeof(ITracingService)) is ITracingService trace)
+        {
+            var observed=new JObject{["observationVersion"]=1,["organizationId"]=c.OrganizationId.ToString(),["effectiveUserId"]=c.UserId.ToString(),["initiatingUserId"]=c.InitiatingUserId.ToString(),["stage"]=c.Stage,["mode"]=c.Mode,["isInTransaction"]=c.IsInTransaction,["messageName"]=c.MessageName,["extensionId"]=c.OwningExtension?.Id.ToString(),["extensionLogicalName"]=c.OwningExtension?.LogicalName,["correlationId"]=c.CorrelationId.ToString()};
+            trace.Trace("PR553_BOOTSTRAP_CONTEXT {0}",PublicationWire.Json(observed));
+        }
+        bindings.AssertBound(c,true);
         PublicationWire.Require(c.InputParameters.Count==1&&c.InputParameters.TryGetValue(ReleaseBindings.RequestParameter,out var value)&&value is string,"invalid_plugin_request");
         var factory=Service<IOrganizationServiceFactory>(provider);var authority=new PublicationWriteAuthority(bindings.Organization,ReleaseBindings.ApiMessage,bindings.Extension);
         var sdk=new TransactionSdk(c,factory,bindings.Organization,authority);var service=factory.CreateOrganizationService(c.UserId)??throw new InvalidPluginExecutionException("sdk_service_missing");

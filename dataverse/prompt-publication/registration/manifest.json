@@ -15,7 +15,7 @@
     "stage": 30,
     "mode": "Synchronous",
     "runAs": "CallingUser",
-    "executePrivilege": "resolve-exact-receipt-Create-privilege-before-registration",
+    "executePrivilege": null,
     "request": {
       "name": "RequestJson",
       "type": "String",
@@ -90,10 +90,11 @@
     "groups-same-value-CAS-readback-advances-versionnumber"
   ],
   "bindingBootstrap": [
+    "Provision approved additive schema and Active keys without guards first; resolve the exact receipt Create privilege before Custom API registration.",
     "Register the disabled publisher/API only, with guards deferred; no main-operation constructor configuration.",
-    "Observe actual main-operation OwningExtension and transaction context; do not invent or assume its GUID/type.",
+    "Observe content-free PR553_BOOTSTRAP_CONTEXT from the unbound disabled publisher denial; no request/prompt content or SDK writes. Prove actual OwningExtension and transaction context, not an inferred plugin type GUID.",
     "Rebuild the reviewed signed package with actual bindings, update assembly, and reverify extension identity.",
-    "Provision/seed approved schema, roles, group catalog and budget control before guard installation.",
+    "Seed approved group/budget control records and finalize roles before guard installation; schema/receipt privilege already exist from the pre-bootstrap phase.",
     "Freeze old prompt/budget/catalog writers, install proven guard coverage, then separately approve enabling sandbox publication."
   ]
 }

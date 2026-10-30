@@ -1,0 +1,39 @@
+{
+  "schemaVersion": 1,
+  "status": "REVIEW_SPEC_NOT_PROVISIONED",
+  "existingPrompt": {
+    "logicalName": "wmkf_ai_prompt",
+    "attributes": [
+      {"name":"wmkf_ai_displaytitle","type":"String","maxLength":200,"label":"Display title"},
+      {"name":"wmkf_ai_description","type":"Memo","maxLength":4000,"label":"Description"},
+      {"name":"wmkf_ai_groupkey","type":"String","maxLength":80,"label":"Group key"},
+      {"name":"wmkf_ai_sectionkey","type":"String","maxLength":80,"label":"Section key"},
+      {"name":"wmkf_ai_usedby","type":"Memo","maxLength":4000,"label":"Used by"},
+      {"name":"wmkf_ai_usagecategory","type":"String","maxLength":40,"label":"Usage category"},
+      {"name":"wmkf_ai_draftbaseline","type":"Memo","maxLength":16000,"label":"Draft metadata baseline"}
+    ]
+  },
+  "newTables": [
+    {
+      "name":"wmkf_promptpublicationhead","label":"Prompt publication head","pluralLabel":"Prompt publication heads","primaryName":"wmkf_promptkey","ownership":"OrganizationOwned",
+      "attributes":[
+        {"name":"wmkf_keyhash","type":"String","maxLength":64,"label":"Key hash"},
+        {"name":"wmkf_promptkey","type":"String","maxLength":850,"label":"Prompt key"},
+        {"name":"wmkf_originalkey","type":"String","maxLength":850,"label":"Original prompt key"},
+        {"name":"wmkf_revision","type":"String","maxLength":19,"label":"Head revision"},
+        {"name":"wmkf_highwaterversion","type":"Integer","minValue":0,"maxValue":2147483647,"label":"Highest reserved version"},
+        {"name":"wmkf_currentversion","type":"Integer","minValue":1,"maxValue":2147483647,"label":"Active version"}
+      ],
+      "uniqueKey":{"name":"wmkf_promptpublicationhead_keyhash","attributes":["wmkf_keyhash"]}
+    },
+    {
+      "name":"wmkf_promptpublicationreceipt","label":"Prompt publication receipt","pluralLabel":"Prompt publication receipts","primaryName":"wmkf_requestid","ownership":"OrganizationOwned",
+      "attributes":[
+        {"name":"wmkf_requestid","type":"String","maxLength":36,"label":"Publication request ID"},
+        {"name":"wmkf_payload","type":"Memo","maxLength":65536,"label":"Publication receipt"}
+      ],
+      "uniqueKey":{"name":"wmkf_promptpublicationreceipt_requestid","attributes":["wmkf_requestid"]}
+    }
+  ],
+  "relationship":{"name":"wmkf_promptpublicationhead_currentprompt","referencedEntity":"wmkf_ai_prompt","referencedAttribute":"wmkf_ai_promptid","referencingEntity":"wmkf_promptpublicationhead","attribute":"wmkf_currentprompt","label":"Active prompt","deleteBehavior":"Restrict"}
+}

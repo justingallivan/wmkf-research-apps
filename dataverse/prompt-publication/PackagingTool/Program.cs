@@ -33,7 +33,7 @@ internal static class Program
         {var a=r.GetCustomAttribute(handle);if(a.Constructor.Kind!=HandleKind.MemberReference)continue;var ctor=r.GetMemberReference((MemberReferenceHandle)a.Constructor);if(ctor.Parent.Kind!=HandleKind.TypeReference)continue;var t=r.GetTypeReference((TypeReferenceHandle)ctor.Parent);if(r.GetString(t.Namespace)!="System.Reflection"||r.GetString(t.Name)!="AssemblyMetadataAttribute")continue;var blob=r.GetBlobReader(a.Value);Require(blob.ReadUInt16()==1,"invalid_source_attribute");var key=blob.ReadSerializedString();var value=blob.ReadSerializedString();if(key=="PromptPublication.SourcePacketSha256")values.Add(value??"");}
         Require(values.Count==1,"signed_source_binding_missing");return values[0];
     }
-    internal static JsonObject Inspect(string root,string package)
+    internal static JsonObject Inspect(string root,string package,string? bindingsFile=null)
     {
         var sourcePacketHash=SourcePacket(root);var identity=JsonNode.Parse(File.ReadAllText(Path.Combine(root,"dataverse/prompt-publication/registration/signing-identity.json")))!;
         Require(new FileInfo(package).Length<=33554432,"package_too_large");var packageBytes=File.ReadAllBytes(package);Require(packageBytes.Length<=33554432,"package_too_large");using var archive=new ZipArchive(new MemoryStream(packageBytes),ZipArchiveMode.Read);Require(archive.Entries.Count<=10&&archive.Entries.Select(e=>e.FullName).Distinct(StringComparer.Ordinal).Count()==archive.Entries.Count,"duplicate_or_excess_package_entries");
@@ -61,14 +61,25 @@ internal static class Program
             else Require(name=="Newtonsoft.Json"&&a.Version==new Version(13,0,0,0)&&Token(key)=="30ad4fe6b2a6aeed"&&Sha(bytes)=="e1e27af7b07eeedf5ce71a9255f0422816a6fc5849a483c6714e1b472044fa9d","dependency_identity_mismatch");
         }
         var resources=Resources(plugin!);Require(resources.Count==2,"unexpected_embedded_resource");var bindings=resources["Wmkf.PromptPublication.ReleaseBindings.json"];var policy=resources["Wmkf.PromptPublication.Policy.v1.json"];
-        var expectedBindings=File.ReadAllBytes(Path.Combine(root,"dataverse/prompt-publication/registration/bindings.json"));
+        var expectedBindings=File.ReadAllBytes(bindingsFile??Path.Combine(root,"dataverse/prompt-publication/registration/bindings.json"));
         var expectedPolicy=File.ReadAllBytes(Path.Combine(root,"lib/prompt-publication/policy-v1.json"));
         Require(Sha(bindings)==Sha(expectedBindings)&&Sha(policy)==Sha(expectedPolicy),"embedded_source_mismatch");
-        var b=JsonNode.Parse(bindings)!;Require(b["enabled"]!.GetValue<bool>()==false&&b["organizationId"]==null&&b["publisherExtensionId"]==null&&b["executePrivilege"]==null&&b["publisherIds"]!.AsArray().Count==0&&b["initiatingPrincipalIds"]!.AsArray().Count==0,"package_must_remain_disabled_unbound");
+        var b=JsonNode.Parse(bindings)!;if(bindingsFile!=null)ValidateBoundDisabled(bindings);else Require(b["enabled"]!.GetValue<bool>()==false&&b["organizationId"]==null&&b["publisherExtensionId"]==null&&b["executePrivilege"]==null&&b["publisherIds"]!.AsArray().Count==0&&b["initiatingPrincipalIds"]!.AsArray().Count==0,"package_must_remain_disabled_unbound");
         var artifact=JsonNode.Parse(policy)!;
-        return new JsonObject{["receiptVersion"]=1,["status"]="SIGNED_PREPARATION_VERIFIED_NOT_REGISTERED",["deploymentAuthorized"]=false,["liveWritesAuthorized"]=false,["packageId"]=Text(identity,"packageId"),["packageVersion"]=Text(identity,"packageVersion"),["packageSha256"]=Sha(packageBytes),["assemblySigning"]="full-strong-name-cryptographically-verified",["nugetCertificateSignature"]="none",["publicKeyToken"]=Text(identity,"publicKeyToken"),["publicKeySha256"]=Text(identity,"publicKeySha256"),["assemblyHashes"]=hashes,["policyArtifactHash"]=artifact["hash"]!.DeepClone(),["bindingsSha256"]=Sha(bindings),["registrationManifestSha256"]=Sha(File.ReadAllBytes(Path.Combine(root,"dataverse/prompt-publication/registration/manifest.json"))),["sourcePacketSha256"]=sourcePacketHash};
+        return new JsonObject{["receiptVersion"]=1,["status"]=bindingsFile==null?"SIGNED_PREPARATION_VERIFIED_NOT_REGISTERED":"BOUND_DISABLED_VERIFIED_NOT_REGISTERED",["deploymentAuthorized"]=false,["liveWritesAuthorized"]=false,["packageId"]=Text(identity,"packageId"),["packageVersion"]=Text(identity,"packageVersion"),["packageSha256"]=Sha(packageBytes),["assemblySigning"]="full-strong-name-cryptographically-verified",["nugetCertificateSignature"]="none",["publicKeyToken"]=Text(identity,"publicKeyToken"),["publicKeySha256"]=Text(identity,"publicKeySha256"),["assemblyHashes"]=hashes,["policyArtifactHash"]=artifact["hash"]!.DeepClone(),["bindingsSha256"]=Sha(bindings),["registrationManifestSha256"]=Sha(File.ReadAllBytes(Path.Combine(root,"dataverse/prompt-publication/registration/manifest.json"))),["sourcePacketSha256"]=sourcePacketHash};
+    }
+    internal static void ValidateBoundDisabled(byte[] raw)
+    {
+        Require(raw.Length<=16384,"release_bindings_too_large");var b=JsonNode.Parse(raw)!.AsObject();
+        var fields=new[]{"bindingVersion","enabled","organizationId","publisherExtensionId","publisherIds","initiatingPrincipalIds","executePrivilege"};
+        Require(b.Count==fields.Length&&fields.All(b.ContainsKey)&&b["bindingVersion"]!.GetValue<int>()==1&&b["enabled"]!.GetValue<bool>()==false,"invalid_bound_disabled_shape");
+        bool GuidValue(JsonNode? node)=>node is JsonValue value&&value.TryGetValue<string>(out var text)&&Guid.TryParseExact(text,"D",out var g)&&g!=Guid.Empty&&g.ToString()==text;
+        Require(b["organizationId"]!.GetValue<string>()=="3d52a072-b138-ef11-8e4b-000d3a106422"&&GuidValue(b["publisherExtensionId"]),"bound_test_identity_required");
+        foreach(var name in new[]{"publisherIds","initiatingPrincipalIds"}){Require(b[name] is JsonArray,"invalid_bound_identity_list");var a=b[name]!.AsArray();Require(a.Count<=100&&a.All(GuidValue)&&a.Select(n=>n!.GetValue<string>()).Distinct(StringComparer.Ordinal).Count()==a.Count,"invalid_bound_identity_list");}
+        Require(b["publisherIds"]!.AsArray().Count>0&&b["executePrivilege"] is JsonValue privilege&&privilege.TryGetValue<string>(out var p)&&System.Text.RegularExpressions.Regex.IsMatch(p,@"\Aprv[A-Za-z0-9_]+\z"),"bound_actor_privilege_required");
     }
     internal static void VerifyReceipt(string root,string package,string receipt)=>Require(JsonNode.DeepEquals(Inspect(root,package),JsonNode.Parse(File.ReadAllText(receipt))),"package_receipt_drift");
+    internal static void VerifyBoundReceipt(string root,string package,string bindings,string receipt)=>Require(JsonNode.DeepEquals(Inspect(root,package,bindings),JsonNode.Parse(File.ReadAllText(receipt))),"package_receipt_drift");
     public static int Main(string[] args)
     {
         try
@@ -77,6 +88,9 @@ internal static class Program
             if(args.Length==3&&args[0]=="self-test"){Console.WriteLine($"Packaging self-tests passed: {PackageTests.Run(args[1],args[2])}. No tenant connection.");return 0;}
             if(args.Length==3&&args[0]=="inspect"){Console.WriteLine(Inspect(args[1],args[2]).ToJsonString(new(){WriteIndented=true}));return 0;}
             if(args.Length==4&&args[0]=="verify-receipt"){VerifyReceipt(args[1],args[2],args[3]);Console.WriteLine("Signed package and preparation receipt verified; no tenant connection.");return 0;}
+            if(args.Length==2&&args[0]=="validate-bound-disabled"){ValidateBoundDisabled(File.ReadAllBytes(args[1]));Console.WriteLine("Bound-disabled shape checked; platform bindings/permissions not attested.");return 0;}
+            if(args.Length==4&&args[0]=="inspect-bound-disabled"){Console.WriteLine(Inspect(args[1],args[2],args[3]).ToJsonString(new(){WriteIndented=true}));return 0;}
+            if(args.Length==5&&args[0]=="verify-bound-disabled"){VerifyBoundReceipt(args[1],args[2],args[3],args[4]);Console.WriteLine("Bound-disabled artifact receipt verified; no tenant connection.");return 0;}
             throw new InvalidDataException("unsupported_packaging_command");
         }
         catch(Exception error){Console.Error.WriteLine(error.Message);return 1;}

@@ -2,7 +2,7 @@
 title: Shared Prompt Signed Package and Registration Preparation
 kind: implementation-record
 domain: ai-platform
-status: active
+status: historical
 summary: Signed disabled dependent-assembly package and offline registration plan exist; key handoff, Windows execution, solution construction and tenant registration remain pending.
 canonical: false
 cataloged: 2026-10-30
@@ -13,6 +13,10 @@ related:
 ---
 
 # Signed package and registration preparation
+
+Historical checkpoint at 617ad8150. Current bootstrap order, bound-disabled
+inspection and corrected Windows handoff supersede this checkpoint; see
+[the schema/client milestone](PR553_SCHEMA_AND_FIRST_CLIENT_MILESTONE_2026-10-30.md).
 
 [VERIFIED via local build and offline inspector] A dependent-assembly NuGet
 package contains only the net48 publication assembly and approved Newtonsoft.Json

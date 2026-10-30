@@ -44,6 +44,22 @@ internal static partial class PackageTests
                 var key=Path.Combine(temp,"private","test.snk");var identity=Path.Combine(temp,"test-identity.json");CreateKey(key,identity);
                 Check((File.GetUnixFileMode(key)&(UnixFileMode)0x3f)==0,"key_permissions_private");Deny(()=>CreateKey(key,Path.Combine(temp,"other.json")),"signing_output_must_be_new");
             }
+            var bound=new JsonObject{["bindingVersion"]=1,["enabled"]=false,["organizationId"]="3d52a072-b138-ef11-8e4b-000d3a106422",["publisherExtensionId"]="10000000-0000-4000-8000-000000000021",["publisherIds"]=new JsonArray("10000000-0000-4000-8000-000000000022"),["initiatingPrincipalIds"]=new JsonArray(),["executePrivilege"]="prvCreateTestReceipt"};
+            byte[] Bytes(JsonObject value)=>System.Text.Encoding.UTF8.GetBytes(value.ToJsonString());
+            Program.ValidateBoundDisabled(Bytes(bound));Check(true,"bound_disabled_positive");
+            foreach(var scenario in new[]{"enabled","organization","extension","empty-publishers","duplicate","unknown-field","privilege","uppercase"})
+            {
+                var value=(JsonObject)bound.DeepClone();var code="invalid_bound_disabled_shape";
+                if(scenario=="enabled")value["enabled"]=true;
+                if(scenario=="organization"){value["organizationId"]="10000000-0000-4000-8000-000000000001";code="bound_test_identity_required";}
+                if(scenario=="extension"){value["publisherExtensionId"]="00000000-0000-0000-0000-000000000000";code="bound_test_identity_required";}
+                if(scenario=="empty-publishers"){value["publisherIds"]=new JsonArray();code="bound_actor_privilege_required";}
+                if(scenario=="duplicate"){value["publisherIds"]!.AsArray().Add(value["publisherIds"]![0]!.DeepClone());code="invalid_bound_identity_list";}
+                if(scenario=="unknown-field")value["bypass"]=true;
+                if(scenario=="privilege"){value["executePrivilege"]="prvCreateTestReceipt\n";code="bound_actor_privilege_required";}
+                if(scenario=="uppercase"){value["publisherIds"]=new JsonArray("10000000-0000-4000-8000-0000000000AA");code="invalid_bound_identity_list";}
+                Deny(()=>Program.ValidateBoundDisabled(Bytes(value)),code);
+            }
             return count;
         }
         finally{Directory.Delete(temp,true);}
