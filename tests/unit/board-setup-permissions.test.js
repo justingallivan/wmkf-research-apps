@@ -6,7 +6,7 @@ const ID = '11111111-1111-4111-8111-111111111111';
 const OTHER = '22222222-2222-4222-8222-222222222222';
 const actor = { systemUserId: ID, profileId: 'staff' };
 function setup({ admin = false, manager = ID, active = true, app = true } = {}) {
-  let cycle = { version: 1, cycle: 'D26', programId: PROGRAM_ID, active: false, rosterConfirmed: false, requestIds: [], materialsDue: null, boardEnds: null, adminId: null };
+  let cycle = { version: 1, cycle: 'D26', programId: PROGRAM_ID, active: false, rosterConfirmed: false, requestIds: [], adminId: null };
   const state = emptyState(); let rev = 'old';
   const d = {
     getUser: async () => ({ isdisabled: false, internalemailaddress: 'staff@wmkeck.org' }),
@@ -15,16 +15,17 @@ function setup({ admin = false, manager = ID, active = true, app = true } = {}) 
     getSettingStrict: async key => ({ found: true, revision: key.includes('.cycle.') ? rev : 'role', value: JSON.stringify(key.includes('.cycle.') ? cycle : { version: 1, systemUserId: key === 'board_writeups.grants_manager' ? manager : OTHER }) }),
     setSettingIfUnchanged: jest.fn(async (key, value, revision) => { if (key.includes('.cycle.')) { expect(revision).toBe(rev); cycle = JSON.parse(value); rev = 'new'; } }),
     mutateCycle: async (_cycle, fn) => fn(state), readCycle: async () => ({ state }),
+    cycleDates: jest.fn(async () => ({ materialsDue: '2027-06-01', boardEnds: '2027-06-10' })),
   };
   return { d, cycle, state };
 }
 test.each([['system admin', { admin: true, manager: OTHER }], ['assigned Grants Manager', {}]])('%s can save roles, cycle and resume a pending save', async (_name, options) => {
   const { d, cycle, state } = setup(options);
   await saveRole(actor, 'president', { version: 1, systemUserId: OTHER }, 'role', d);
-  await saveCycle(actor, { ...cycle, boardEnds: '2026-12-10' }, 'old', '', d);
+  await saveCycle(actor, { ...cycle, requestIds: [OTHER] }, 'old', '', d);
   expect(d.setSettingIfUnchanged).toHaveBeenCalledTimes(2);
   expect(state.configHistory).toHaveLength(1);
-  state.configIntent = { id: 'pending', value: { ...cycle, boardEnds: '2026-12-11' }, expectedRevision: 'new', actorId: ID };
+  state.configIntent = { id: 'pending', value: { ...cycle, requestIds: [ID] }, expectedRevision: 'new', actorId: ID };
   await resumeConfig('D26', actor, d);
   expect(state.configIntent).toBeNull();
   expect(d.setSettingIfUnchanged).toHaveBeenCalledTimes(3);
@@ -93,7 +94,7 @@ test.each(['president', 'cso', 'grantsManager'])('activation validates Workbench
   cycle.cycle = 'J27';
   const getSetting = d.getSettingStrict;
   d.getSettingStrict = async key => key.includes('.cycle.') ? getSetting(key) : ({ found: true, revision: 'role', value: JSON.stringify({ version: 1, systemUserId: key === { president: 'board_writeups.president', cso: 'board_writeups.cso', grantsManager: 'board_writeups.grants_manager' }[role] ? OTHER : ID }) });
-  const save = saveCycle(actor, { ...cycle, active: true, rosterConfirmed: true, requestIds: [OTHER], materialsDue: '2027-06-01', boardEnds: '2027-06-10', adminId: ID }, 'old', '', d);
+  const save = saveCycle(actor, { ...cycle, active: true, rosterConfirmed: true, requestIds: [OTHER], adminId: ID }, 'old', '', d);
   if (role === 'president') await expect(save).resolves.toMatchObject({ value: { active: true } });
   else { await expect(save).rejects.toMatchObject({ code: 'board_staff_app_access' }); expect(d.setSettingIfUnchanged).not.toHaveBeenCalled(); }
 });
@@ -110,7 +111,7 @@ test('unassigned Program Coordinator and Systems Specialist do not block activat
   d.listAppKeysForUser = jest.fn(async () => ['reviewers']);
   const getSetting = d.getSettingStrict;
   d.getSettingStrict = async key => ['board_writeups.program_coordinator', 'board_writeups.systems_specialist'].includes(key) ? { found: false } : getSetting(key);
-  await expect(saveCycle(actor, { ...cycle, active: true, rosterConfirmed: true, requestIds: [OTHER], materialsDue: '2027-06-01', boardEnds: '2027-06-10', adminId: ID }, 'old', '', d)).resolves.toMatchObject({ value: { active: true } });
+  await expect(saveCycle(actor, { ...cycle, active: true, rosterConfirmed: true, requestIds: [OTHER], adminId: ID }, 'old', '', d)).resolves.toMatchObject({ value: { active: true } });
 });
 test('directory includes President-only staff and marks operational eligibility', async () => {
   const { d } = presidentWithoutWorkbench();
@@ -121,4 +122,39 @@ test('directory includes President-only staff and marks operational eligibility'
     expect.objectContaining({ systemUserId: ID, canUseWorkbench: true }),
     expect.objectContaining({ systemUserId: OTHER, canUseWorkbench: false }),
   ]);
+});
+
+describe('Board dates from the cycle calendar (D47)', () => {
+  const activate = cycle => ({ ...cycle, cycle: 'J27', active: true, rosterConfirmed: true, requestIds: [OTHER], adminId: ID });
+  test('activation reads the calendar and names each missing date', async () => {
+    const { d, cycle } = presidentWithoutWorkbench();
+    cycle.cycle = 'J27';
+    d.listAppKeysForUser = jest.fn(async () => ['reviewers']);
+    d.cycleDates.mockResolvedValue({ materialsDue: null, boardEnds: null });
+    await expect(saveCycle(actor, activate(cycle), 'old', '', d)).rejects.toMatchObject({ code: 'board_calendar_dates_missing', message: expect.stringContaining('Board Meeting Date and Board Mailing Date') });
+    expect(d.cycleDates).toHaveBeenCalledWith('J27');
+    d.cycleDates.mockResolvedValue({ materialsDue: '2027-06-11', boardEnds: '2027-06-10' });
+    await expect(saveCycle(actor, activate(cycle), 'old', '', d)).rejects.toMatchObject({ code: 'board_dates_out_of_order' });
+    d.cycleDates.mockRejectedValue(Object.assign(new Error('x'), { code: 'board_calendar_unavailable', httpStatus: 503 }));
+    await expect(saveCycle(actor, activate(cycle), 'old', '', d)).rejects.toMatchObject({ code: 'board_calendar_unavailable' });
+    expect(d.setSettingIfUnchanged).not.toHaveBeenCalled();
+  });
+  test('an inactive save does not need the calendar', async () => {
+    const { d, cycle } = setup();
+    await saveCycle(actor, { ...cycle, requestIds: [OTHER] }, 'old', '', d);
+    expect(d.cycleDates).not.toHaveBeenCalled();
+  });
+  test('typed dates are refused on save', async () => {
+    const { d, cycle } = setup();
+    await expect(saveCycle(actor, { ...cycle, boardEnds: '2026-12-10' }, 'old', '', d)).rejects.toMatchObject({ code: 'board_fields_invalid' });
+  });
+  test('a setup saved with typed dates still reads, and its pending save reconciles', async () => {
+    const { d, cycle, state } = setup();
+    const legacy = { ...cycle, materialsDue: '2026-11-01', boardEnds: '2026-12-10' };
+    d.getSettingStrict = async key => ({ found: true, revision: key.includes('.cycle.') ? 'old' : 'role', value: JSON.stringify(key.includes('.cycle.') ? legacy : { version: 1, systemUserId: ID }) });
+    state.configIntent = { id: 'pending', value: legacy, expectedRevision: 'older', actorId: ID };
+    await expect(resumeConfig('D26', actor, d)).resolves.toMatchObject({ value: cycle });
+    expect(state.configIntent).toBeNull();
+    expect(d.setSettingIfUnchanged).not.toHaveBeenCalled();
+  });
 });

@@ -3,7 +3,7 @@ import { render, screen, fireEvent, waitFor, act } from '@testing-library/react'
 import BoardWriteups from '../../shared/components/board-writeups/BoardWriteups';
 const ID = '11111111-1111-4111-8111-111111111111';
 const row = { requestId: ID, source: { number: '1002988', institution: 'Institute', documentId: ID, eTag: 'one', versionId: '1', earlyDraft: true, stage: 'Drafting' } };
-const data = { config: { active: true, rosterConfirmed: true, materialsDue: '2026-11-01' }, progress: { released: 0, expected: 23 }, rows: [row], events: [], canRelease: true, canArchive: false };
+const data = { config: { active: true, rosterConfirmed: true }, dates: { materialsDue: '2026-11-01', boardEnds: '2026-12-10', unavailable: false }, progress: { released: 0, expected: 23 }, rows: [row], events: [], canRelease: true, canArchive: false };
 const response = body => ({ ok: true, status: 200, json: async () => body });
 afterEach(() => jest.restoreAllMocks());
 test('early draft release requires warning and submits the version shown, with queued result', async () => {
@@ -95,7 +95,7 @@ test('late cleanup completion response does not update a newly selected cycle', 
   expect(screen.getByText(/June 8, 2027/)).toBeTruthy();
 });
 
-test('failed setup save shows an error beside Save setup and preserves entered dates', async () => {
+test('failed setup save shows an error beside Save setup and preserves entries', async () => {
   let refuse = true;
   global.fetch = jest.fn(async (url, options) => {
     if (options.method === 'POST') return refuse
@@ -107,7 +107,7 @@ test('failed setup save shows an error beside Save setup and preserves entered d
   render(<BoardWriteups initialCycle="D26" mode="setup" />);
   const save = await screen.findByText('Save setup');
   expect(screen.getByRole('region', { name: 'Cycle setup' })).toBeTruthy();
-  fireEvent.change(screen.getByLabelText('Board meeting end date'), { target: { value: '2026-12-10' } });
+  fireEvent.click(screen.getByLabelText('Staff has confirmed this expected proposal list'));
   fireEvent.click(save);
   const alert = await screen.findByRole('alert');
   expect(alert.textContent).toContain('Setup could not be saved');
@@ -115,7 +115,7 @@ test('failed setup save shows an error beside Save setup and preserves entered d
   expect(alert.className).toContain('bg-red-50');
   expect(save.nextElementSibling).toBe(alert);
   expect(document.activeElement).toBe(alert);
-  expect(screen.getByLabelText('Board meeting end date').value).toBe('2026-12-10');
+  expect(screen.getByLabelText('Staff has confirmed this expected proposal list').checked).toBe(true);
   expect(screen.getByText('Unsaved cycle changes')).toBeTruthy();
   refuse = false;
   fireEvent.click(save);
@@ -212,26 +212,26 @@ test('refresh and cycle switching require confirmation before discarding unsaved
     : response(url.includes('?') ? data : { canArchive: true, isSuperuser: true }));
   jest.spyOn(window, 'confirm').mockReturnValue(false);
   render(<BoardWriteups initialCycle="D26" mode="setup" />);
-  fireEvent.change(await screen.findByLabelText('Board meeting end date'), { target: { value: '2026-12-10' } });
+  fireEvent.click(await screen.findByLabelText('Staff has confirmed this expected proposal list'));
   fireEvent.click(screen.getByText('Refresh status'));
   expect(window.confirm).toHaveBeenCalledWith('Discard your unsaved cycle setup changes?');
-  expect(screen.getByLabelText('Board meeting end date').value).toBe('2026-12-10');
+  expect(screen.getByLabelText('Staff has confirmed this expected proposal list').checked).toBe(true);
   expect(global.fetch).toHaveBeenCalledTimes(3);
   fireEvent.change(screen.getByLabelText('Cycle'), { target: { value: 'J27' } });
   fireEvent.click(screen.getByText('Open cycle'));
   expect(global.fetch).toHaveBeenCalledTimes(3);
-  expect(screen.getByLabelText('Board meeting end date').value).toBe('2026-12-10');
+  expect(screen.getByLabelText('Staff has confirmed this expected proposal list').checked).toBe(true);
   window.confirm.mockReturnValue(true);
   fireEvent.click(screen.getByText('Refresh status'));
   await waitFor(() => expect(global.fetch).toHaveBeenCalledTimes(6));
-  expect((await screen.findByLabelText('Board meeting end date')).value).toBe('');
+  expect((await screen.findByLabelText('Staff has confirmed this expected proposal list')).checked).toBe(false);
 });
 
 test('Select all proposals includes search-hidden candidates, preserves prior selections, and leaves confirmation and activation unchanged', async () => {
   const second = '22222222-2222-4222-8222-222222222222';
   const previous = '33333333-3333-4333-8333-333333333333';
   const posts = [];
-  const value = { version: 1, cycle: 'D26', programId: 'c247b11a-a7cb-ee11-9078-000d3a341e8f', requestIds: [ID, previous], rosterConfirmed: false, active: false, materialsDue: null, boardEnds: null, adminId: null };
+  const value = { version: 1, cycle: 'D26', programId: 'c247b11a-a7cb-ee11-9078-000d3a341e8f', requestIds: [ID, previous], rosterConfirmed: false, active: false, adminId: null };
   global.fetch = jest.fn(async (url, options) => {
     if (options.method === 'POST') { const body = JSON.parse(options.body); posts.push(body); return response({ value: body.value, revision: 'saved' }); }
     if (url.startsWith('/api/admin/')) return response({ cycle: { value, revision: 'one' }, roles: { president: {}, cso: {}, grantsManager: {} }, staff: [], candidates: [{ requestId: ID, number: '1002988', institution: 'Institute' }, { requestId: second, number: '1003000', institution: 'Other Institute' }] });
@@ -252,4 +252,22 @@ test('Select all proposals includes search-hidden candidates, preserves prior se
   fireEvent.click(screen.getByRole('button', { name: 'Save setup' }));
   await waitFor(() => expect(posts).toHaveLength(1));
   expect(posts[0].value.requestIds).toEqual([ID, previous, second]);
+});
+
+test('setup shows the Board dates read-only from the cycle calendar', async () => {
+  const setupResponse = dates => response({ cycle: { value: null, revision: null }, dates, roles: { president: {}, cso: {}, grantsManager: {} }, staff: [], candidates: [] });
+  global.fetch = jest.fn(async url => url.startsWith('/api/admin/')
+    ? setupResponse({ materialsDue: '2026-11-30', boardEnds: null, unavailable: false })
+    : response(url.includes('?') ? data : { canArchive: true, isSuperuser: true }));
+  const { unmount } = render(<BoardWriteups initialCycle="D26" mode="setup" />);
+  const dates = await screen.findByRole('region', { name: 'Cycle dates' });
+  expect(dates.textContent).toContain('November 30, 2026');
+  expect(dates.textContent).toContain('Not set — add the Board Meeting Date on the cycle calendar');
+  expect(dates.querySelector('input')).toBeNull();
+  unmount();
+  global.fetch = jest.fn(async url => url.startsWith('/api/admin/')
+    ? setupResponse({ materialsDue: null, boardEnds: null, unavailable: true })
+    : response(url.includes('?') ? data : { canArchive: true, isSuperuser: true }));
+  render(<BoardWriteups initialCycle="D26" mode="setup" />);
+  expect((await screen.findByRole('region', { name: 'Cycle dates' })).textContent).toContain('Calendar unavailable');
 });

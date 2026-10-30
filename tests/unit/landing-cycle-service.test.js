@@ -185,24 +185,28 @@ describe('saveLandingCycle', () => {
 });
 
 describe('resolveBoardDefaultCycle', () => {
-  const setups = (entries) => jest.fn(async (prefix) => (prefix === LANDING_CYCLE_KEY ? {} : Object.fromEntries(
-    entries.map(([code, boardEnds]) => [`board_writeups.cycle.${code}`, { value: JSON.stringify({ cycle: code, boardEnds }) }]),
-  )));
+  // D47: Board setups no longer carry dates; each entry's date is its calendar Board date.
+  const setups = (entries) => ({
+    listSettingsWithMetaStrict: jest.fn(async (prefix) => (prefix === LANDING_CYCLE_KEY ? {} : Object.fromEntries(
+      entries.map(([code]) => [`board_writeups.cycle.${code}`, { value: JSON.stringify({ cycle: code }) }]),
+    ))),
+    listBoardDates: jest.fn(async () => entries.map(([code, date]) => ({ wmkf_cyclecode: code, wmkf_meetingdate: date ? `${date}T00:00:00Z` : null }))),
+  });
 
   test('the landing cycle wins when it has a dated Board setup', async () => {
-    const d = deps({ listSettingsWithMetaStrict: setups([['D26', '2026-12-10'], ['J27', '2027-06-10']]) });
+    const d = deps({ ...setups([['D26', '2026-12-10'], ['J27', '2027-06-10']]) });
     await expect(resolveBoardDefaultCycle(d)).resolves.toBe('J27');
   });
 
   test('without a setup for the landing cycle, the nearest upcoming dated setup wins (D26 through Board day)', async () => {
-    const d = deps({ listSettingsWithMetaStrict: setups([['D26', '2026-12-10']]) });
+    const d = deps({ ...setups([['D26', '2026-12-10']]) });
     await expect(resolveBoardDefaultCycle(d)).resolves.toBe('D26');
   });
 
-  test('an inactive setup with no end date is not a candidate', async () => {
+  test('a setup whose cycle has no calendar Board date is not a candidate', async () => {
     const d = deps({
       getSettingStrict: jest.fn(async () => ({ found: false, value: null, revision: null })),
-      listSettingsWithMetaStrict: setups([['D26', '2026-12-10'], ['J27', null]]),
+      ...setups([['D26', '2026-12-10'], ['J27', null]]),
     });
     await expect(resolveBoardDefaultCycle(d)).resolves.toBe('D26');
   });
@@ -211,7 +215,7 @@ describe('resolveBoardDefaultCycle', () => {
     // 2026-12-11T05:00Z is still Dec 10 in Los Angeles: D26's Board day has not passed.
     const d = deps({
       getSettingStrict: jest.fn(async () => ({ found: false, value: null, revision: null })),
-      listSettingsWithMetaStrict: setups([['D26', '2026-12-10'], ['J27', '2027-06-10']]),
+      ...setups([['D26', '2026-12-10'], ['J27', '2027-06-10']]),
       now: () => new Date('2026-12-11T05:00:00Z'),
     });
     await expect(resolveBoardDefaultCycle(d)).resolves.toBe('D26');
@@ -222,15 +226,31 @@ describe('resolveBoardDefaultCycle', () => {
   test('when every dated setup is past, the latest one wins', async () => {
     const d = deps({
       getSettingStrict: jest.fn(async () => ({ found: false, value: null, revision: null })),
-      listSettingsWithMetaStrict: setups([['J26', '2026-06-10'], ['D26', '2026-12-10']]),
+      ...setups([['J26', '2026-06-10'], ['D26', '2026-12-10']]),
       now: () => new Date('2027-01-15T18:00:00Z'),
     });
     await expect(resolveBoardDefaultCycle(d)).resolves.toBe('D26');
   });
 
   test('no dated setups, or a failed setup read, falls back to the conventional rule', async () => {
-    await expect(resolveBoardDefaultCycle(deps({ listSettingsWithMetaStrict: setups([]) }))).resolves.toBe('D26');
+    await expect(resolveBoardDefaultCycle(deps({ ...setups([]) }))).resolves.toBe('D26');
     const broken = jest.fn(async (prefix) => { if (prefix !== LANDING_CYCLE_KEY) throw new Error('down'); return {}; });
     await expect(resolveBoardDefaultCycle(deps({ listSettingsWithMetaStrict: broken }))).resolves.toBe('D26');
+  });
+
+  test('a setup still holding a typed end date is not a candidate without a calendar Board date', async () => {
+    const d = deps({
+      getSettingStrict: jest.fn(async () => ({ found: false, value: null, revision: null })),
+      listSettingsWithMetaStrict: jest.fn(async (prefix) => (prefix === LANDING_CYCLE_KEY ? {} : {
+        'board_writeups.cycle.J27': { value: JSON.stringify({ cycle: 'J27', boardEnds: '2026-11-15' }) },
+      })),
+      listBoardDates: jest.fn(async () => [{ wmkf_cyclecode: 'J27', wmkf_meetingdate: null }]),
+    });
+    await expect(resolveBoardDefaultCycle(d)).resolves.toBe('D26');
+  });
+
+  test('a failed calendar read falls back to the conventional rule', async () => {
+    const d = deps({ ...setups([['J27', '2027-06-10']]), listBoardDates: jest.fn(async () => { throw new Error('500'); }) });
+    await expect(resolveBoardDefaultCycle(d)).resolves.toBe('D26');
   });
 });

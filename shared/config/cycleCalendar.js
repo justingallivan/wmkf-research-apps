@@ -31,6 +31,7 @@ export const CYCLE_CALENDAR_BOARD_DATE = Object.freeze({ column: 'wmkf_meetingda
  */
 export const CYCLE_CALENDAR_MEANINGS = Object.freeze({
   reviewsDue: 'wmkf_researchreviewsduedate',
+  boardMailing: 'wmkf_boardmailingdate',
 });
 
 export const CYCLE_CALENDAR_EDITABLE = Object.freeze(new Set(CYCLE_CALENDAR_DATE_COLUMNS.map(({ column }) => column)));
