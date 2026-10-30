@@ -146,6 +146,15 @@ fields, and sandbox/prod assumptions. The Atlas adjudicates live data state.
   check which source it uses: `rg -n "wmkf_meetingdate|meetingDateToCycleCode|cycleCodeToOdataFilter" scripts`.
   `scripts/probe-request-grant-cycle-lookup.cjs` compares link and date on
   purpose. Coverage numbers: the plan's §7 Q1.
+- **Factory test requests and the Grant Cycle link (step 5, branch
+  `claude/factory-grant-cycle-link`, 2026-10-30; not merged).** A clone is in a
+  cycle only if the Factory bound `wmkf_GrantCycle` when it created it: the
+  admin form's operator picks a row from the destination calendar (Production:
+  real cycles only; sandbox: J26/D26/J27 plus test rows D97/D99), and the clone
+  takes its meeting date and fiscal year from that row's Board date. Test
+  requests made before step 5 carry no link, show "No cycle", and the IA and
+  review recipe steps refuse them; re-create rather than patch them. The CLI
+  needs `--cycle=<code>` for `--reserve`.
 - **Audit history and the operations Grant Cycle table (2026-10-28, D43 cycle
   calendar).** For downstream apps reading who changed a record:
   `RetrieveRecordChangeHistory` (per record, GET) is the only audit read open

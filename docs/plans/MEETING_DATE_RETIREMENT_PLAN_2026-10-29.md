@@ -3,7 +3,7 @@ title: Stop reading the request meeting date — inventory and plan
 domain: cycles
 kind: plan
 status: draft
-summary: "Owner, 2026-10-29: no app reads akoya_request.wmkf_meetingdate; a request's cycle comes from its Grant Cycle link (wmkf_grantcycle) and cycle dates from that linked calendar row, with no meeting-date fallback. Whole-repo inventory (106 runtime files, 69 scripts, plus indirect readers through helpers), grouped by what each read is for, the behavior changes, two existing bugs found, a central-helper strategy, and the owner decisions needed before building. Nothing built; PR #552 already moved the reviewer email path."
+summary: "Owner, 2026-10-29: no app reads akoya_request.wmkf_meetingdate; a request's cycle comes from its Grant Cycle link (wmkf_grantcycle) and cycle dates from that linked calendar row, with no meeting-date fallback. Whole-repo inventory (106 runtime files, 69 scripts, plus indirect readers through helpers), grouped by what each read is for, the behavior changes, two existing bugs found, a central-helper strategy, and the owner decisions. Built: PR #552 (reviewer email path), steps 1-3 (sandbox rows; PRs #554 and #555 deployed 2026-10-30); step 5 (Test Request Factory) on branch claude/factory-grant-cycle-link, not merged."
 canonical: false
 owner: product-engineering
 related:
@@ -177,6 +177,9 @@ Grant Cycle link today. Moving the Factory needs the link on clones
 `REQUEST_BIND_SETS`, matching sandbox cycle rows), a new ledger migration, and
 changed bundle digests (§7 Q7).
 
+*Inventory as of 2026-10-29. Step 5 (§5) moves these reads to the link with no
+ledger migration and an unchanged bundle; the create-body digest changes.*
+
 ### 3.8 Dynamics Explorer
 
 `shared/config/prompts/dynamics-explorer.js:55,541,648` teaches the model to
@@ -270,6 +273,20 @@ a contract check and a Codex review; none merges without the owner.
    use the sandbox test rows D97/D99. Must land before the next Factory
    rehearsal; remove the Pre-Site reader's meeting-date fallback
    (`lib/services/test-requests/presite-sandbox-deps.js`) in the same change.
+   **[BUILT on branch `claude/factory-grant-cycle-link`, 2026-10-30; not merged,
+   not deployed, no sandbox or Production write]** The admin form's source
+   lookup returns the destination calendar's J/D rows (read through the target
+   client) and the source's linked code as the default; Confirm takes a cycle
+   code, the server resolves that row in the destination and the clone binds
+   `wmkf_GrantCycle`, with its meeting date and fiscal year from the row's Board
+   date (§7 Q7 update). The write fence admits `wmkf_grantcycles`; readback
+   checks the link; a Production manifest must carry one. The runner's
+   Initial Assessment identity, review-suggestion cycle code, cast binding and
+   the sandbox Pre-Site reader read the clone's link; the Pre-Site fallback is
+   removed. The sandbox CLI gains `--cycle` (required for `--reserve`).
+   Consequences: runs reserved before the deploy, and every existing Factory
+   test request, stay unlinked, so the IA and review steps refuse them; the
+   correction step and `test_request_runs.meeting_date` are unchanged.
 6. **Dynamics Explorer, scripts and the guard check** (§3.8–3.9) as decided.
 
 ## 5a. Contract check (2026-10-29, `/contract-reconcile` review mode)
@@ -446,6 +463,16 @@ honorarium and Factory paths.
    sandbox has matching Grant Cycle rows (sandbox read) [ASSUMED unknown].
    **Update 2026-10-30:** sandbox rows J26, D26, J27, D97, D99 exist (step 1);
    Production clones use real cycles only (owner; see §5 step 5).
+   **Decided (owner, 2026-10-30, before the step 5 build):** (a) the clone's
+   fiscal year also comes from the chosen cycle's Board date ("December 2026"),
+   so the form asks only for the cycle; (b) the picker offers every J/D row in
+   the destination calendar (rows with no Board date are not offered and are
+   refused); (c) the admin path moves, and the sandbox CLI gets `--cycle` only
+   where needed to keep working (its `--reserve` path can target Production
+   and runs the IA, Reviews and Pre-Site recipes, which now read the link);
+   `scripts/setup-ranking-test-proposals.mjs` stays as written. The chosen
+   cycle is recorded in the run's manifest and create-body digest, not a
+   ledger column.
 8. **In or out of scope** (asked one at a time):
    - **8a Dynamics Explorer.** **Decided (owner, 2026-10-29): in scope, last
      PR.** The prompt tells the model to use the Grant Cycle link first and fall
