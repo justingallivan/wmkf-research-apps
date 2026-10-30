@@ -13,12 +13,14 @@ import {
   linkedCycleFilter,
   linkedCycleExpand,
   linkedCycleCode,
+  noLinkedCycleFilter,
   getCycleDatesById,
   listBoardDates,
   findCycleByCode,
   listModernCycles,
+  listBoardDatesOrNone,
 } from '../../lib/dataverse/adapters/operations-grant-cycle';
-import { getById, aggregateLinkedCycles } from '../../lib/dataverse/adapters/grant-request';
+import { getById, aggregateLinkedCycles, findByIds, findByRequestNumber } from '../../lib/dataverse/adapters/grant-request';
 
 jest.mock('../../lib/dataverse/core/interlock', () => ({
   assertDataverseOperationAllowed: jest.fn(),
@@ -58,6 +60,10 @@ describe('linkedCycleFilter / linkedCycleExpand', () => {
   test('build the navigation filter and expand for a modern code', () => {
     expect(open(() => linkedCycleFilter('J27'))).toBe("wmkf_GrantCycle/wmkf_cyclecode eq 'J27'");
     expect(open(() => linkedCycleExpand())).toBe('wmkf_GrantCycle($select=wmkf_cyclecode)');
+    // Sandbox read 2026-10-30: partitions requests with linkedCycleCode null.
+    expect(open(() => noLinkedCycleFilter())).toBe(
+      "(_wmkf_grantcycle_value eq null or not (startswith(wmkf_GrantCycle/wmkf_cyclecode,'J') or startswith(wmkf_GrantCycle/wmkf_cyclecode,'D')))",
+    );
   });
 
   test.each(['j27', 'X27', 'J2', '', null, undefined, "J27' or 1 eq 1"])('filter refuses a non-modern code %p', (code) => {
@@ -68,6 +74,7 @@ describe('linkedCycleFilter / linkedCycleExpand', () => {
     ['table', TABLE_BLOCK],
     ['field', FIELD_BLOCK],
   ])('%s restriction on wmkf_grantcycle blocks the filter and the expand', (_kind, restrictions) => {
+    expect(() => restricted(restrictions, () => noLinkedCycleFilter())).toThrow('Access denied');
     expect(() => restricted(restrictions, () => linkedCycleFilter('D26'))).toThrow('Access denied');
     expect(() => restricted(restrictions, () => linkedCycleExpand())).toThrow('Access denied');
   });
@@ -188,5 +195,45 @@ describe('grant-request.aggregateLinkedCycles', () => {
     await expect(open(() => aggregateLinkedCycles({ grantProgramIds: ['nope'] }))).rejects.toThrow('valid program IDs');
     await expect(aggregateLinkedCycles({ grantProgramIds: [PROGRAM_ID] })).rejects.toThrow('Restrictions not initialized');
     expect(fetchMock).not.toHaveBeenCalled();
+  });
+});
+
+describe('listBoardDatesOrNone', () => {
+  test('returns the Board dates when the calendar reads', async () => {
+    fetchMock.mockResolvedValue({ ok: true, status: 200, json: async () => ({ value: [{ wmkf_cyclecode: 'D26', wmkf_meetingdate: '2026-12-10' }] }) });
+    await expect(open(() => listBoardDatesOrNone())).resolves.toEqual([{ wmkf_cyclecode: 'D26', wmkf_meetingdate: '2026-12-10' }]);
+  });
+
+  test('returns no dates when the calendar read fails', async () => {
+    const warn = jest.spyOn(console, 'warn').mockImplementation(() => {});
+    fetchMock.mockResolvedValue({ ok: false, status: 503, json: async () => ({}) });
+    await expect(open(() => listBoardDatesOrNone())).resolves.toEqual([]);
+    expect(warn).toHaveBeenCalled();
+  });
+
+  test.each([
+    ['table', TABLE_BLOCK],
+    ['field', FIELD_BLOCK],
+  ])('%s restriction still throws', async (_kind, restrictions) => {
+    await expect(restricted(restrictions, () => listBoardDatesOrNone())).rejects.toThrow('Access denied');
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+});
+
+describe('grant-request list reads forward expand', () => {
+  test.each([
+    ['findByIds', () => findByIds([REQUEST_ID], { select: ['akoya_requestid'], expand: linkedCycleExpand() })],
+    ['findByRequestNumber', () => findByRequestNumber('1002912', { select: ['akoya_requestid'], expand: linkedCycleExpand() })],
+  ])('%s', async (_name, read) => {
+    await open(read);
+    expect(new URL(fetchMock.mock.calls[0][0]).searchParams.get('$expand')).toBe('wmkf_GrantCycle($select=wmkf_cyclecode)');
+  });
+
+  test.each([
+    ['findByIds', () => findByIds([REQUEST_ID], { select: ['akoya_requestid'] })],
+    ['findByRequestNumber', () => findByRequestNumber('1002912', { select: ['akoya_requestid'] })],
+  ])('%s without expand sends none', async (_name, read) => {
+    await open(read);
+    expect(new URL(fetchMock.mock.calls[0][0]).searchParams.has('$expand')).toBe(false);
   });
 });
