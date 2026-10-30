@@ -10,6 +10,17 @@ The chronological archive after the `Legacy chronological session log` divider c
 
 ---
 
+## October 2026 — Reviewer invitations take the cycle and due date from the Grant Cycle link (Session 650, Claude)
+
+**Milestone:** Before a proposal's first reviewer invitation, the apps save the Reviews Due Date from the request's linked Grant Cycle calendar row (D48), and the reviewer email path reads the cycle only from that link: the first app reader of `akoya_request.wmkf_grantcycle`.
+**Sessions:** Session 650 (Claude); contract-reconcile; Codex adversarial re-review (approved).
+**Ship state:**
+- PR #552 (`54070863f`) deployed. No link and no saved due date refuses the invitation (owner-confirmed); no meeting-date fallback.
+- Cycle configuration (template, attachments, program name) and the draft fingerprint also follow the link.
+- Owner decided the whole-app move off the request meeting date (work queue 6a); plan reviewed, sandbox cycle rows and links set up.
+**Why it matters:** J27 invitations (Feb 24) promise the calendar's Mar 10 date even for requests with no meeting date, and the apps now have one cycle source to converge on.
+**Pointers:** `docs/plans/REVIEWER_INVITATION_CALENDAR_BUILD_PLAN_2026-10-29.md`; `docs/plans/MEETING_DATE_RETIREMENT_PLAN_2026-10-29.md` (branch `claude/meeting-date-retirement-plan`); alignment log T10, D48.
+
 ## October 2026 — Review filing follows each cycle's Board date; no Vercel switch at rollover (Session 649, Claude)
 
 **Milestone:** Completed reviews now file to SharePoint automatically for every cycle up to and including its calendar Board date (D44), replacing the single-cycle `REVIEW_DOCX_SHAREPOINT_CYCLE` pin. D26 files through Dec 10; J27 after that, with no setting change.

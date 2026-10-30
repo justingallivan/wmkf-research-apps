@@ -9,37 +9,55 @@ Prior complete handoff (Claude's J27/cycle workstream), retrievable exactly:
 workstream by reference; it does not replace its owner decisions or turn old
 carryover into a newly verified worklist.
 
-## Session 649 Summary (Claude, 2026-10-29) — J27 reviewer invitations and cycle dates
+## Session 650 Summary (Claude, 2026-10-29) — meeting-date retirement planned; PR #552 shipped
 
-Runs alongside Codex's Session 649 below; both are on `main`.
+Runs alongside Codex's work below; the next Claude session is **651**. Claude's
+Session 649 handoff, exact: `git show 4d63eb048:SESSION_PROMPT.md`.
 
-1. **[DEPLOYED; Vercel commit status] PR #551, merge `caf318983`.**
-   - Review filing files every cycle until its calendar Board date (D44); the
-     `REVIEW_DOCX_SHAREPOINT_CYCLE` pin is no longer read. **Owner to-do:** delete
-     that variable from every Vercel environment.
-   - The proposal PDF is downloadable only after materials are released or a
-     review is submitted (closes a pre-accept download gap).
-   - The calendar box says a chosen cycle stops automatic switching; the unused
-     Admin "invitations begin" date is removed.
-   - Owner confirmed J25–J27 have Board dates; D27 has no row yet, by design.
-2. **[OPEN, DO NOT MERGE AS IS] PR #552, branch
-   `claude/review-due-date-from-calendar`.** Invitations take the review due
-   date from the cycle calendar and save it before sending (D48); Codex approved.
-   **Must change first:** it derives the cycle from the request's meeting date.
-   Owner, 2026-10-29: nothing in the apps should read the request meeting date.
-   It must read the request's Grant Cycle link (`akoya_request.wmkf_grantcycle`,
-   alignment log T10) and that row's Reviews Due Date, with no meeting-date
-   fallback (to confirm: blank link refuses the invitation). Per the T10 probe,
-   12 J27 requests have the link but no meeting date.
-3. **Decisions:** D47 (the Board setup reads Board and mailing dates from the
-   calendar; the Board date is the decision day, the meeting's second day); D48
-   (promised due date stays fixed; withdrawal after accepting goes through the
-   PD; invitations refused without the due date or the proposal PDF).
-4. **Plan:** `docs/plans/REVIEWER_INVITATION_CALENDAR_BUILD_PLAN_2026-10-29.md`,
-   with a contract check and two Codex reviews (findings folded in). PR 1 is done
-   and PR 2 is open; PR 3 (the Board setup reads the calendar) and PR 4
-   (materials on acceptance plus new email wording) remain. Still open: one
-   combined acceptance-and-materials email (proposed).
+1. **[DEPLOYED; Vercel commit status] PR #552, merge `54070863f`.** Reviewer
+   invitations take the cycle from the request's Grant Cycle link
+   (`akoya_request.wmkf_grantcycle`) and the review due date from that linked
+   calendar row, saved on the request before the first invitation is sent (D48).
+   No meeting-date fallback; a request with no link and no saved due date is
+   refused (owner-confirmed). Render and send also pick the cycle configuration
+   (template, attachments, program name) from the link, and the draft
+   fingerprint binds the Grant Cycle id: the reviewer email path no longer reads
+   the meeting date. Codex re-review approved; CI green. Docs marked deployed in
+   `6428398d8`.
+2. **[PLANNED; branch `claude/meeting-date-retirement-plan`, not on main] Stop
+   reading the request meeting date across the apps (work queue 6a).** Plan
+   `docs/plans/MEETING_DATE_RETIREMENT_PLAN_2026-10-29.md`: whole-repo inventory
+   (106 runtime files, 69 scripts, plus indirect readers traced through
+   helpers), owner decisions for every question (§7), contract check (§5a) and
+   Codex plan review with four verified findings folded in (§5b). Six named
+   build steps; **step 1, sandbox setup, is done** (owner-approved sandbox
+   writes, `scripts/seed-sandbox-grant-cycles.cjs`, verified by re-read: sandbox
+   cycles J26, D26, J27 copied from the Production calendar plus test-only D97,
+   D99; 25 sandbox requests linked).
+3. **Owner decisions (2026-10-29), recorded in the plan §7:** link-only
+   everywhere with no meeting-date fallback (older gaps are fixed as Dynamics
+   data, not code); discretionary requests out of scope; displays use the linked
+   cycle's calendar Board date; past grants use fiscal year and decision date
+   only; stale invitations close against the linked Board date; new honorarium
+   requests get the link and calendar-sourced dates (existing ones untouched);
+   no backfill of stored cycle codes; Test Request Factory clones carry the
+   link; Dynamics Explorer uses the link first with a stated fallback; corpus
+   index and Bulk Export column out of scope; finished scripts left as written
+   with a wiki caveat.
+4. **Read-only Production probes (owner-authorized, counts only):** honorarium
+   rows (GoApply's carry the link, app-made ones do not); D26 suggestions (all
+   221 carry D26, so the review-filing job misses nothing); link coverage by year
+   (Research 97–100% since 2015; about 140 older Research requests with a
+   June/December date lack the link); D26 calendar Board date verified as
+   2026-12-10.
+5. **Two existing bugs found** (plan §6): Reviewer Finder saves never stamp the
+   cycle code (field read from the wrong level, since `f766b004d`); the PD-scope
+   candidate list reads fields the adapter does not return. Neither affects D26
+   data; both are fixed in the cycle-lookup build step.
+6. **New docs on the plan branch:** `docs/CONNOR_DATA_CLEANUP_QUESTIONS.md`
+   (data cleanup asks for Connor, low priority); wiki Operating Note in
+   `docs/agent-wiki/topics/dataverse-dynamics.md` on scripts that still derive
+   cycles from the meeting date, pointer in `scripts/README.md`; corpus plan note.
 
 ## Session 649 Summary (Codex, 2026-10-29)
 
@@ -92,22 +110,23 @@ Runs alongside Codex's Session 649 below; both are on `main`.
 
 ### Verified Open
 
-**Claude workstream (J27):**
+**Claude workstream (J27 and cycle dates):**
 
-- **Fix PR #552 to use the request's Grant Cycle link, then
-   merge with the owner's OK.** See the Claude summary item 2.
-- **New (owner, 2026-10-29): stop reading the request meeting
-   date anywhere in the apps.** Today about 79 runtime files read
-   `akoya_request.wmkf_meetingdate`, and about 50 call `meetingDateToCycleCode`
-   (Workbench cycle filters, reviewer emails and attachments, filing fallback,
-   Meeting Tracker and more). No app code reads `wmkf_grantcycle` yet. Plan the
-   move to the Grant Cycle link (cycle membership) and the calendar row (dates)
-   as its own piece, after the reviewer build: plan first, contract check, Codex
-   review. Owner to confirm: no meeting-date fallback at all. Tracked as work
-   queue item 6a.
-- **Remaining reviewer build:** PR 3 (Board setup from the
-   calendar, D47) and PR 4 (materials on acceptance and new wording, D46/D48),
-   before Feb 24. Other carried J27 items: `git show 006b87565:SESSION_PROMPT.md`.
+- **Build the meeting-date retirement, next step "cycle lookup and Research
+  screens"** (plan §5 build step 2): shared cycle helpers with explicit
+  restriction checks for `wmkf_grantcycle` (§5b item 1), expand support in
+  `grant-request.getById` (§5b item 2), Research filters, cycle lists and default
+  cycle, and the two bugs in §6. Own branch, focused tests, contract check,
+  Codex review; merge only with the owner's OK. Steps 3–6 follow in the plan's
+  order. Evidence: plan branch `claude/meeting-date-retirement-plan`, latest
+  `77307fba6`.
+- **Land the plan branch on main** (docs, the Connor list, the wiki note and the
+  sandbox setup script; no app runtime change): ask the owner whether to merge
+  it directly or through a pull request.
+- **Remaining reviewer build:** Board setup reads the calendar (D47) and
+  materials on acceptance with new wording (D46/D48), before Feb 24. Plan:
+  `docs/plans/REVIEWER_INVITATION_CALENDAR_BUILD_PLAN_2026-10-29.md`. Other
+  carried J27 items: `git show 006b87565:SESSION_PROMPT.md`.
 
 **Codex workstream (prompt library):**
 
@@ -150,7 +169,7 @@ Runs alongside Codex's Session 649 below; both are on `main`.
 |---|---|
 | Codex / shared prompt library | PR #553, `codex/shared-prompt-library-plan`, `e35918ba2`; proposed only |
 | Codex / prompt UI organization | PRs #545/#546/#548/#549 merged; no further UI work requested |
-| Claude / J27 alignment and cycle dates | PR #551 deployed; PR #552 open (fix the cycle source first); plan `docs/plans/REVIEWER_INVITATION_CALENDAR_BUILD_PLAN_2026-10-29.md`; decisions through D48 in `docs/plans/J27_ALIGNMENT_LOG_2026-10-24.md`; older carried items at `git show 006b87565:SESSION_PROMPT.md` |
+| Claude / J27 alignment and cycle dates | PRs #551 and #552 deployed; meeting-date retirement planned on `claude/meeting-date-retirement-plan` (sandbox setup done, next: cycle lookup and Research screens); reviewer plan `docs/plans/REVIEWER_INVITATION_CALENDAR_BUILD_PLAN_2026-10-29.md`; decisions through D48 in `docs/plans/J27_ALIGNMENT_LOG_2026-10-24.md`; older carried items at `git show 006b87565:SESSION_PROMPT.md` |
 | Codex / Ranking | Prior handoff records PRs #536/#537 done; not reopened |
 | Codex / Board archival | Prior handoff records readiness done and rehearsal runtime on `codex/board-archive-rehearsal`; not revalidated here |
 | Claude / Research request corpus | Prior handoff records owner-gated; no new authorization |
@@ -170,18 +189,23 @@ Runs alongside Codex's Session 649 below; both are on `main`.
 
 ## Verification and Closeout
 
-- **Claude (J27 workstream):**
-  - Testing: the full Jest suite passed on PR #551's final commit (26,109) and on
-    PR #552's final commit (26,130); Playwright passed (full suite 76 before the
-    #552 fingerprint bump, the two affected specs 19 after it).
-  - Checks: all repository checks were run at session close (see the closeout
-    commit).
-  - Milestone: DEVELOPMENT_LOG entry added, "Review filing follows each cycle's
-    Board date; no Vercel switch at rollover" (Session 649, Claude).
-  - Claim-evidence pilot: zero-advisory row added for session key
-    `40cf7724568cddae`.
-  - No CLAUDE.md change. The Playwright Chromium browser was installed locally
-    (`npx playwright install chromium`).
+- **Claude (Session 650):**
+  - PR #552 final: focused tests 304 and the reviewer/email/cycle suites (9,412)
+    passed; 11 relevant gates with sequential self-tests passed; CI green
+    (Jest, Playwright, CodeQL and the rest) before merge.
+  - Plan branch: doc gates (agent-wiki, docs-catalog, doc-currency,
+    doc-symbol-refs, fact-consistency) and `check:dataverse-access-layer` with
+    self-tests passed at `77307fba6`.
+  - `check:agent-invariants` fails in fresh worktrees only because the local
+    `.claude-memory` and `.agents/skills` links are not created there; not a repo
+    defect.
+  - Milestone: DEVELOPMENT_LOG entry added, "Reviewer invitations take the cycle
+    and due date from the Grant Cycle link" (Session 650, Claude).
+  - Claim-evidence pilot: report found no eligible plan/design edit for this
+    session key; no row added.
+  - No CLAUDE.md change. One memory file updated:
+    `.claude-memory/feedback-no-item-codes-in-owner-facing-text.md` (no "PR 0/1"
+    labels for build steps).
 
 - Budget layout: 75 focused tests across six suites passed, types passed, lint
   had zero errors and one existing loading-effect warning. Actual-component
