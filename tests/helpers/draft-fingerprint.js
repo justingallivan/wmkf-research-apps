@@ -111,7 +111,7 @@ function buildFingerprintInputsFromFixture({
     },
     request: {
       reviewDueDate: request?.wmkf_reviewduedate ?? null,
-      meetingDate: request?.wmkf_meetingdate ?? null,
+      grantCycleId: String(request?._wmkf_grantcycle_value || '').trim().toLowerCase() || null,
       ...(isInvitation ? {
         programDirectorId: String(request?._wmkf_programdirector_value || '').trim().toLowerCase() || null,
       } : {}),

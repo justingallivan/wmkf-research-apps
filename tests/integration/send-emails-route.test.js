@@ -98,8 +98,8 @@ jest.mock('../../lib/services/settings-service', () => ({
   }),
 }));
 jest.mock('../../lib/services/grant-cycles-dataverse', () => ({ findByShortCode: jest.fn(async () => CYCLE_CONFIG) }));
-jest.mock('../../lib/utils/cycle-code', () => ({ meetingDateToCycleCode: jest.fn(() => CYCLE_CODE) }));
-// Cycle calendar row for the D48 due-date step (real review-due-date-service).
+// The request's linked Grant Cycle row: its code picks the cycle config and its
+// Reviews Due Date feeds the D48 due-date step (real review-due-date-service).
 let CALENDAR_ROW;
 const J27_CYCLE_ID = '27272727-2727-4727-8727-272727272727';
 const getCycleDatesById = jest.fn(async () => CALENDAR_ROW);
@@ -158,7 +158,6 @@ let SUGGESTIONS;
 let PERSON;
 let REQUEST;
 let SYSTEMUSER;
-let CYCLE_CODE;     // meetingDateToCycleCode() → this
 let CYCLE_CONFIG;   // findByShortCode() → this (cycle materials live here)
 let ORIGINAL_REVIEWER_EMAIL_DELIVERY_MODE;
 let ORIGINAL_VERCEL_ENV;
@@ -192,7 +191,7 @@ function basePerson(over = {}) {
 }
 // A cycle config carrying one private proposal-material attachment.
 const MATERIALS_CYCLE = {
-  shortCode: 'CYC',
+  shortCode: 'J27',
   additionalAttachments: [{ pathname: 'cycle-materials/proposal.pdf', filename: 'proposal.pdf' }],
 };
 
@@ -225,8 +224,7 @@ beforeEach(() => {
     internalemailaddress: 'pd@wmkeck.org',
     isdisabled: false,
   };
-  CYCLE_CODE = null;       // default: no cycle / no materials
-  CYCLE_CONFIG = null;
+  CYCLE_CONFIG = null;     // default: no cycle config / no materials
   if (ORIGINAL_REVIEWER_EMAIL_DELIVERY_MODE === undefined) delete process.env.REVIEWER_EMAIL_DELIVERY_MODE;
   else process.env.REVIEWER_EMAIL_DELIVERY_MODE = ORIGINAL_REVIEWER_EMAIL_DELIVERY_MODE;
   if (ORIGINAL_VERCEL_ENV === undefined) delete process.env.VERCEL_ENV;
@@ -684,12 +682,20 @@ describe('send-emails — capture delivery mode', () => {
 });
 
 describe('send-emails — materials strip gate (recipientMayReceiveAttachments, end-to-end)', () => {
-  beforeEach(() => { CYCLE_CODE = 'CYC'; CYCLE_CONFIG = MATERIALS_CYCLE; });
+  beforeEach(() => { CYCLE_CONFIG = MATERIALS_CYCLE; });
 
   test('materials send to an ACCEPTED reviewer carries the proposal material', async () => {
     SUGGESTIONS = { [SUG_1]: baseSuggestion({ wmkf_accepted: true }) };
     await run({ drafts: [draft()], templateType: 'materials' });
     expect(filenamesSent()).toContain('proposal.pdf');
+  });
+
+  test('the cycle config follows the Grant Cycle link: no link, no cycle material (meeting date ignored)', async () => {
+    SUGGESTIONS = { [SUG_1]: baseSuggestion({ wmkf_accepted: true }) };
+    REQUEST = { ...REQUEST, _wmkf_grantcycle_value: null };
+    const res = await run({ drafts: [draft()], templateType: 'materials' });
+    expect(resultOf(res).stats).toMatchObject({ sent: 1 });
+    expect(filenamesSent()).not.toContain('proposal.pdf');
   });
 
   test('materials send to a NON-accepted reviewer is SKIPPED not_accepted (Release accepted-only gate, §3.A)', async () => {
@@ -765,7 +771,6 @@ describe('send-emails — Phase 1 campaign-config persistence (first invite)', (
 describe('send-emails — review due date from the cycle calendar (D48)', () => {
   beforeEach(() => {
     REQUEST = { ...REQUEST, wmkf_reviewduedate: null, wmkf_respondoffsetdays: 5 };
-    CYCLE_CODE = 'J27';
   });
   const invite = (over = {}) => ({
     drafts: [draft()], templateType: 'invitation', campaignConfig: { respondOffsetDays: 7, reviewDueDate: '2099-01-01' }, ...over,
@@ -1144,7 +1149,6 @@ describe('send-emails — mid-stream failure sequence (real send-time exception,
   });
 
   test('an ambiguous send-time exception for a non-invitation recipient fires email_unconfirmed', async () => {
-    CYCLE_CODE = null;
     CYCLE_CONFIG = null;
     SUGGESTIONS = { [SUG_1]: baseSuggestion({ wmkf_appreviewersuggestionid: SUG_1, wmkf_accepted: true }) };
     createAndSendEmail.mockImplementationOnce(async () => { throw new Error('transient Dynamics failure'); });

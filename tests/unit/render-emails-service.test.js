@@ -22,8 +22,13 @@ const getRequestById = jest.fn();
 jest.mock('../../lib/dataverse/adapters/grant-request', () => ({
   getById: (...a) => getRequestById(...a),
 }));
+const findByShortCode = jest.fn(async () => null);
 jest.mock('../../lib/services/grant-cycles-dataverse', () => ({
-  findByShortCode: jest.fn(async () => null),
+  findByShortCode: (...a) => findByShortCode(...a),
+}));
+const getCycleDatesById = jest.fn(async () => null);
+jest.mock('../../lib/dataverse/adapters/operations-grant-cycle', () => ({
+  getCycleDatesById: (...a) => getCycleDatesById(...a),
 }));
 jest.mock('../../lib/services/proposal-participants', () => ({
   fetchCoPIs: jest.fn(async () => []),
@@ -85,7 +90,7 @@ const request = {
   akoya_requestnum: 'R-1001',
   akoya_title: 'Proposal T',
   wmkf_reviewduedate: null,
-  wmkf_meetingdate: null,
+  _wmkf_grantcycle_value: null,
 };
 
 const TEMPLATE = { subject: 'Review request', body: 'Hello reviewer' };
@@ -510,6 +515,24 @@ test('a disabled assigned PD never supplies an invitation From address', async (
   getSender.mockResolvedValue({ isdisabled: true, internalemailaddress: 'disabled@example.org' });
   const out = await renderEmails({ suggestionIds: [SUG1], template: TEMPLATE, templateType: 'invitation', settings: {}, fromEmail: 'actor@example.org' });
   expect(out.drafts[0].from).toBeNull();
+});
+
+test('cycle config comes from the Grant Cycle row the request links to, never its meeting date', async () => {
+  const cycleId = '27272727-2727-4727-8727-272727272727';
+  findById.mockResolvedValueOnce(suggestion());
+  getReviewerByIdWithSelect.mockResolvedValueOnce(person());
+  // December 2026 would map to D26; the link names J27 and wins.
+  getRequestById.mockResolvedValueOnce({ ...request, _wmkf_grantcycle_value: cycleId, wmkf_meetingdate: '2026-12-10T00:00:00Z' });
+  getCycleDatesById.mockResolvedValueOnce({ wmkf_cyclecode: 'J27' });
+  findByShortCode.mockImplementation(async (code) => (code === 'J27' ? { shortCode: 'J27', programName: 'J27 Research' } : null));
+
+  const out = await renderEmails({ suggestionIds: [SUG1], template: { subject: 'S', body: 'Program: {{programName}}' }, templateType: 'followup', settings: {} });
+
+  expect(getCycleDatesById).toHaveBeenCalledWith(cycleId);
+  expect(findByShortCode).toHaveBeenCalledWith('J27');
+  expect(findByShortCode).not.toHaveBeenCalledWith('D26');
+  expect(out.drafts[0].body).toBe('Program: J27 Research');
+  findByShortCode.mockImplementation(async () => null);
 });
 
 describe('invitation review due date from the cycle calendar (D48)', () => {

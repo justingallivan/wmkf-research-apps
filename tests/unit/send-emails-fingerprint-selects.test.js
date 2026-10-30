@@ -82,6 +82,7 @@ jest.mock('../../lib/services/honorarium-config', () => ({
 const loadCycleConfigs = jest.fn(async () => ({}));
 jest.mock('../../lib/services/review-manager/cycle-config-loader', () => ({
   loadCycleConfigs: (...a) => loadCycleConfigs(...a),
+  cycleCodesByGrantCycleId: jest.fn(async () => ({})),
 }));
 
 const { sendEmails } = require('../../lib/services/review-manager/send-emails-service');
@@ -118,7 +119,7 @@ beforeEach(() => {
   REQUEST = {
     akoya_requestid: REQUEST_ID,
     akoya_requestnum: 'R-1001',
-    wmkf_meetingdate: null,
+    _wmkf_grantcycle_value: null,
     _wmkf_programdirector_value: 'pd-1',
     akoya_title: 'Title',
     wmkf_abstract: 'Abstract',
@@ -171,6 +172,7 @@ test('send-time request select includes every fingerprinted request field', asyn
     '_wmkf_projectleader_value',
     'wmkf_organizationname',
     '_akoya_applicantid_value',
+    '_wmkf_grantcycle_value',
   ]) {
     expect(selected.has(field)).toBe(true);
   }

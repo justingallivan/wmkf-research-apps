@@ -83,7 +83,6 @@ const findByShortCode = jest.fn(async () => CYCLE);
 jest.mock('../../lib/services/grant-cycles-dataverse', () => ({
   findByShortCode: (...a) => findByShortCode(...a),
 }));
-jest.mock('../../lib/utils/cycle-code', () => ({ meetingDateToCycleCode: jest.fn(() => CYCLE_CODE) }));
 jest.mock('../../lib/utils/public-blob-fetch', () => ({ fetchPublicBlob: jest.fn(), isPublicBlobUrl: jest.fn(() => false) }));
 jest.mock('../../lib/utils/uploaded-blob', () => ({ readUploadedBlobBuffer: jest.fn(async () => Buffer.from('PDF')) }));
 jest.mock('../../lib/utils/cycle-material-ref', () => ({
@@ -131,7 +130,6 @@ let SUGGESTIONS;
 let PERSONS;
 let REQUEST;
 let REQUEST_TWO;
-let CYCLE_CODE;
 let CYCLE;
 
 function suggestion(id, over = {}) {
@@ -174,17 +172,16 @@ beforeEach(() => {
   REQUEST = {
     akoya_requestid: REQUEST_ID,
     akoya_requestnum: 'REQ-001',
-    wmkf_meetingdate: null,
+    _wmkf_grantcycle_value: null,
     _wmkf_programdirector_value: 'pd-1',
   };
   REQUEST_TWO = {
     akoya_requestid: REQUEST_ID_2,
     akoya_requestnum: 'REQ-002',
-    wmkf_meetingdate: null,
+    _wmkf_grantcycle_value: null,
     _wmkf_programdirector_value: 'pd-2',
   };
   getRequestById.mockImplementation(async (id) => id === REQUEST_ID_2 ? REQUEST_TWO : REQUEST);
-  CYCLE_CODE = null;
   CYCLE = null;
   delete process.env.REVIEWER_EMAIL_DELIVERY_MODE;
   mintAndStore.mockResolvedValue({ jwt: TOKEN });

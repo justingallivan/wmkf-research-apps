@@ -341,9 +341,10 @@ steps, Dataverse settings (`reviewer.campaign_timeline_defaults`,
 `reviewer_invite_timing`, browser storage `review_manager_email_fields`.
 
 - Whole-flow: cycle for the due date and for the materials attachments both come
-  from `meetingDateToCycleCode(request.wmkf_meetingdate)`; the materials send
-  already does this (`send-emails-service.js:405-409`) [VERIFIED by read]; June
-  → J, December → D (`lib/utils/cycle-code.js:24-33`).
+  from the request's Grant Cycle link (`_wmkf_grantcycle_value` → the linked row's
+  code; `cycle-config-loader.js` `cycleCodesByGrantCycleId`), changed on PR 2's
+  branch 2026-10-29 (owner). Earlier text: both came from
+  `meetingDateToCycleCode(request.wmkf_meetingdate)`.
 - Partial success: the combined email's order and fallback are named in §3.3.
 - Async: the job re-reads suggestion and request before claiming
   (`reviewer-acceptance-drain.js:514-545`); the new step keeps those re-reads.
@@ -430,12 +431,13 @@ Dataverse writes). Separate PRs, each with focused unit tests:
    travel with the new wording): the proposal-release date fields and
    `{{proposalDelivery}}`, and the Reviewer Finder record's `proposalSendDate` /
    `commitDate` custom fields; the Reviewer Finder `reviewDeadline` is no longer read
-   for email text but still feeds the draft fingerprint. **Not changed here:** render
-   and send still pick the cycle configuration (review template, attachments, program
-   name) from the request meeting date (code that predates this PR). A J27 request
-   with a Grant Cycle link but no meeting date gets its due date but an empty cycle
-   configuration. That move belongs to the meeting-date removal plan (work queue
-   item 6a).
+   for email text but still feeds the draft fingerprint. **Also moved to the Grant
+   Cycle link (owner, 2026-10-29):** render and send pick the cycle configuration
+   (review template, attachments, program name) from the linked row's code
+   (`cycleCodesByGrantCycleId`; June/December codes only), and the draft
+   fingerprint binds the Grant Cycle id instead of the meeting date. The reviewer
+   email path no longer reads `akoya_request.wmkf_meetingdate`; other app reads
+   stay with the meeting-date removal plan (work queue item 6a).
 3. Board setup from the calendar (E).
 4. Materials on acceptance (B) + wording.
 

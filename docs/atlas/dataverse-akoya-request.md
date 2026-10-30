@@ -288,7 +288,7 @@ All user-driven writes use `MSCRMCallerID` (impersonation contract per `docs/DYN
 |---|---|---|
 | historical `reviewer_suggestions.request_number` (table dropped by migration 018) | `akoya_request.akoya_requestnum` | former natural join key |
 | historical `proposal_searches.request_number` (table dropped by migration 018) | same | former join; table was empty |
-| `grant_cycles.short_code` | derives from `akoya_request.wmkf_meetingdate` via `cycle-code.js` | not stored on request |
+| `grant_cycles.short_code` | derives from `akoya_request.wmkf_meetingdate` via `cycle-code.js`; the reviewer email path (render/send) reads the linked Grant Cycle row's code instead (`_wmkf_grantcycle_value`; branch `claude/review-due-date-from-calendar`, owner 2026-10-29) | not stored on request |
 
 ## Polymorphism & era distribution (live-probed 2026-05-15)
 

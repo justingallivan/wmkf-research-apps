@@ -42,9 +42,11 @@ describe('getCalendarReviewsDue', () => {
     await expect(getCalendarReviewsDue(J27_CYCLE_ID, deps())).resolves.toEqual({ ok: true, date: '2027-03-10' });
   });
   test('blank date, missing row and read failure are distinct refusals', async () => {
-    await expect(getCalendarReviewsDue(J27_CYCLE_ID, deps({ readCycleDates: jest.fn(async () => ({ wmkf_researchreviewsduedate: null })) })))
+    await expect(getCalendarReviewsDue(J27_CYCLE_ID, deps({ readCycleDates: jest.fn(async () => ({ wmkf_cyclecode: 'J27', wmkf_researchreviewsduedate: null })) })))
       .resolves.toEqual({ ok: false, reason: 'reviews_due_missing' });
     await expect(getCalendarReviewsDue(J27_CYCLE_ID, deps({ readCycleDates: jest.fn(async () => null) })))
+      .resolves.toEqual({ ok: false, reason: 'cycle_missing' });
+    await expect(getCalendarReviewsDue(J27_CYCLE_ID, deps({ readCycleDates: jest.fn(async () => ({ wmkf_cyclecode: '2024S', wmkf_researchreviewsduedate: '2024-08-01' })) })))
       .resolves.toEqual({ ok: false, reason: 'cycle_missing' });
     await expect(getCalendarReviewsDue(J27_CYCLE_ID, deps({ readCycleDates: jest.fn(async () => { throw new Error('503'); }) })))
       .resolves.toEqual({ ok: false, reason: 'calendar_unavailable' });
@@ -117,7 +119,7 @@ describe('ensureRequestReviewDueDate', () => {
     expect(d.writeRequest).not.toHaveBeenCalled();
   });
   test('a blank calendar date refuses with no write', async () => {
-    const d = deps({ readCycleDates: jest.fn(async () => ({ wmkf_researchreviewsduedate: null })) });
+    const d = deps({ readCycleDates: jest.fn(async () => ({ wmkf_cyclecode: 'J27', wmkf_researchreviewsduedate: null })) });
     await expect(ensureRequestReviewDueDate(REQUEST, {}, d)).resolves.toEqual({ ok: false, reason: 'reviews_due_missing' });
     expect(d.writeRequest).not.toHaveBeenCalled();
   });

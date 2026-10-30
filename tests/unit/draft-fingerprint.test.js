@@ -26,7 +26,7 @@ function baseArgs() {
       _akoya_applicantid_value_formatted: 'Org A',
       wmkf_organizationname: 'N/A',
       wmkf_reviewduedate: '2099-01-01',
-      wmkf_meetingdate: '2099-06-01',
+      _wmkf_grantcycle_value: '27272727-2727-4727-8727-272727272727',
     },
     coPINames: ['Dr. Alex Co', 'Dr. Bea Co'],
     cycle: { program_name: 'Program', review_deadline: '2099-02-01', custom_fields: { foo: 'bar' } },
@@ -37,7 +37,7 @@ function baseArgs() {
 // Golden hash for baseArgs() above — the canonical fixture every other case
 // in this file is diffed against.
 // Re-pinned 2026-10-29 for the D48 version bump (v1→v2 for non-invitations).
-const BASE_HASH = 'ec72d4a4f9f025617e35f13e22ae8a5e89e4239f97318f6e9e328af3338e6180';
+const BASE_HASH = '6e6046357042f13def542f18bd63e91b70aec23a848a095f1a0bbc5ceeb731dd';
 
 describe('fingerprintDraft golden hashes', () => {
   test('base fixture hashes to the pinned golden value', () => {
@@ -47,6 +47,12 @@ describe('fingerprintDraft golden hashes', () => {
   test('request.wmkf_organizationname is not a body input: changing it leaves the hash at the golden value', () => {
     const args = baseArgs();
     args.request.wmkf_organizationname = 'Some Other Org';
+    expect(fingerprintDraft(buildDraftFingerprintInputs(args))).toBe(BASE_HASH);
+  });
+
+  test('the request meeting date is not an input: the Grant Cycle link names the cycle (owner, 2026-10-29)', () => {
+    const args = baseArgs();
+    args.request.wmkf_meetingdate = '2099-12-01';
     expect(fingerprintDraft(buildDraftFingerprintInputs(args))).toBe(BASE_HASH);
   });
 
@@ -90,7 +96,7 @@ describe('fingerprintDraft golden hashes', () => {
     args.person.wmkf_primaryaffiliation = null;
     args.person.wmkf_organizationname = null;
     const hash = fingerprintDraft(buildDraftFingerprintInputs(args));
-    expect(hash).toBe('1ab98d4c1a40ac6aefa8c44f5e297dcc08e6b9acb6f3725dedfe71dfbd36f725');
+    expect(hash).toBe('8a38843ee62f43d2ba3246e4875857c292eb0a610879e49c1e47ca1c1351fcfe');
     expect(hash).not.toBe(BASE_HASH);
   });
 
@@ -99,23 +105,23 @@ describe('fingerprintDraft golden hashes', () => {
   // field proving each flips the hash") plus the co-PI *order* sensitivity
   // case (order is part of the body — the plan documents this explicitly).
   test.each([
-    ['templateType (invitation v3)', (a) => { a.templateType = 'invitation'; }, 'b97d939b34b382f6329bc4a4a65d2fd84c2f6ed635cc34342ac106b4af182c38'],
-    ['suggestionId (a different GUID)', (a) => { a.suggestionId = '33333333-3333-4333-8333-333333333333'; }, '81106b0e073c4066aff5e593f9b7f99d9deca8143f3fab4bc7929eebb519064d'],
-    ['candidate.name', (a) => { a.person.wmkf_name = 'Dr. Other Name'; }, '02fac203d9512887b780fab55296eedc64dcd87faaaf53c1e19dcfcbdf3c722b'],
-    ['candidate.affiliation', (a) => { a.person.wmkf_primaryaffiliation = 'Uni B'; }, '33f3ce7e0bcbc4cc6b5dc6de04201eca6ee397554b80d8f07daab62b2b7ae819'],
-    ['proposal.title', (a) => { a.request.akoya_title = 'Different title'; }, '146a570b6f9156683e107c276c35ca749bb8a187f035b053551e214902e5ea31'],
-    ['proposal.abstract', (a) => { a.request.wmkf_abstract = 'Different abstract'; }, 'c3a3aeaa3c68eb864ee4ff5d8a6576e458721b0e438f15c541a3e735f16ca022'],
-    ['proposal.authors', (a) => { a.request._wmkf_projectleader_value_formatted = 'Dr. Other PI'; }, '848315855cbdebcd8ea6a8f020b39769a9cea4ebcb1da3817b01cf4b7c8d6146'],
-    ['proposal.institution', (a) => { a.request._akoya_applicantid_value_formatted = 'Org B'; }, '72e2bc00a3af6387f0600bd4a4d0e66c5e908271d63ecfb35037a37b578419da'],
-    ['proposal.coInvestigators (membership)', (a) => { a.coPINames = ['Dr. Alex Co']; }, '02c50726a484ef4a851bc08eff59dc6bfe596377f7ab6c210ee2ee97f37cdfb6'],
-    ['proposal.coInvestigators (order only, same membership)', (a) => { a.coPINames = ['Dr. Bea Co', 'Dr. Alex Co']; }, '4488a0d5172094a6fa94cfc982c76d9baa388a13f2b31ee79cb88e93b165a667'],
-    ['engagement.reviewDueDateOverride', (a) => { a.suggestion = { wmkf_reviewduedateoverride: '2099-03-01' }; }, '5ce815ee30b991f87c67791e26815944c3ad91ead92f73dd460608c65c9c8e1d'],
-    ['request.reviewDueDate', (a) => { a.request.wmkf_reviewduedate = '2099-04-01'; }, '7c13922b44e9842198d8b8329ba07362e61d9c0184103ffe8270381f64e7d6e1'],
-    ['request.meetingDate', (a) => { a.request.wmkf_meetingdate = '2099-07-01'; }, 'd662ace4a1c0e08e2069a8226b214af490e141483af750f57bb94066a2d34211'],
-    ['cycle.programName', (a) => { a.cycle.program_name = 'Different Program'; }, 'fe5c5505d2662080950fa4856ba5c5e4c95dd6b32ed1a27323960f7f32d6422c'],
-    ['cycle.reviewDeadline', (a) => { a.cycle.review_deadline = '2099-05-01'; }, '7250b11d4ddf9ffffbf991d802a164aada1a6f2637e5cdec542aa09cb8328066'],
-    ['cycle.customFields', (a) => { a.cycle.custom_fields = { foo: 'baz' }; }, '3cb071eed0185799d1011f19c3d66746553c2a602cd0f876dcff836d8c82b34f'],
-    ['honorariumAmount', (a) => { a.honorariumAmount = 999; }, '2a1833e0f88629ba232db3127b95a669deccbfb778d412713eacbe35d522e3af'],
+    ['templateType (invitation v3)', (a) => { a.templateType = 'invitation'; }, '9fcf671f349340e37809b698eace8549c82cf60985667d9ac37076c7bbda37d6'],
+    ['suggestionId (a different GUID)', (a) => { a.suggestionId = '33333333-3333-4333-8333-333333333333'; }, 'a51b4746a7b5264259a659137b62ace3b61c42b12fb522ee75190cc9d4c289b4'],
+    ['candidate.name', (a) => { a.person.wmkf_name = 'Dr. Other Name'; }, 'a4a0745081a9af4fa1484122778413f53e17705fec16f1b1d7d74cae58710c09'],
+    ['candidate.affiliation', (a) => { a.person.wmkf_primaryaffiliation = 'Uni B'; }, '893c76ecb8897499ad01752bf6e649628cbb55774d8756dd5b0d536c6d0a3335'],
+    ['proposal.title', (a) => { a.request.akoya_title = 'Different title'; }, '4aebfea6738a8e3350825cfddcc1ed035e32c999b1f8940c522ca45489cad7d8'],
+    ['proposal.abstract', (a) => { a.request.wmkf_abstract = 'Different abstract'; }, 'b9082e97b05f738e4a11b4a7f2e0d2b725cd8022d03e73bec700d484be5a846e'],
+    ['proposal.authors', (a) => { a.request._wmkf_projectleader_value_formatted = 'Dr. Other PI'; }, 'd88717c62811e436f1d921dd8ad621b4cc1eaa244b0c7fac961c6f6b421cb7f4'],
+    ['proposal.institution', (a) => { a.request._akoya_applicantid_value_formatted = 'Org B'; }, 'd08635e2f6c328dbc711ca2f6b0bc3fde2b0a202b8735abb307124a39c951050'],
+    ['proposal.coInvestigators (membership)', (a) => { a.coPINames = ['Dr. Alex Co']; }, '9c172d5e4f925bdf460d3c2984ce2dd614420984a014070be6a6ab22e7b4ba7c'],
+    ['proposal.coInvestigators (order only, same membership)', (a) => { a.coPINames = ['Dr. Bea Co', 'Dr. Alex Co']; }, '1e0d9b02d57b36e584827a8241a66ed8151655f206d88e67f238fad85d2495e5'],
+    ['engagement.reviewDueDateOverride', (a) => { a.suggestion = { wmkf_reviewduedateoverride: '2099-03-01' }; }, '63b3e6bd6539ce4199851705d41cbae4babd18067ec1d7edec21d54542b54133'],
+    ['request.reviewDueDate', (a) => { a.request.wmkf_reviewduedate = '2099-04-01'; }, '0425ce1b221465ca444bd9549fcec2da216448e21c53e983cb07c8fc64fc7970'],
+    ['request.grantCycleId', (a) => { a.request._wmkf_grantcycle_value = '26262626-2626-4626-8626-262626262626'; }, '2125c90d1c961c36c5ee92f6e2f87cd2674fb182f3c033d9f7614a24769a8097'],
+    ['cycle.programName', (a) => { a.cycle.program_name = 'Different Program'; }, 'b03cd77074dc506b994fd8d3799c57326794ab6cbdaf37752bfe5f719ded5306'],
+    ['cycle.reviewDeadline', (a) => { a.cycle.review_deadline = '2099-05-01'; }, '96b513107aaf83458fed9f7fcbf783d9627ba21cef55756103495d9609fe6c4f'],
+    ['cycle.customFields', (a) => { a.cycle.custom_fields = { foo: 'baz' }; }, 'a344166133db98c20863426a1a00a38cbf902a9291f442695c94d4bbd0ee11a8'],
+    ['honorariumAmount', (a) => { a.honorariumAmount = 999; }, '6f3744065a401a78788d2badf8489f847d0d0a10c12a3bed460f21cbcda618cb'],
   ])('changing %s alone flips the hash away from the base golden value', (label, mutate, goldenForMutation) => {
     const args = baseArgs();
     mutate(args);
