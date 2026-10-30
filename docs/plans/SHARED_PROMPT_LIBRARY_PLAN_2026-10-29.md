@@ -51,7 +51,10 @@ live routes or the existing budget/prompt publishers. Complete structural valida
 restrictions now cover 39 audited names, all locally passing with reviewed models;
 `phase-i.checkin` remains held for a common execution definition. Initial
 Assessment version capture and Pre-Site native schema are reconciled locally. Shared
-pinned budget checks and the unused atomic adapter exist; remaining holds and
+pinned budget checks, the unused atomic budget adapter and an unwired transaction
+reference core exist. An offline Pre-Site transition planner and separately
+backportable runtime pause guard prepare the coordinated release; see
+[transaction milestone](SHARED_PROMPT_TRANSACTION_MILESTONE_2026-10-30.md). Remaining holds and
 .NET/tenant/cutover proof are tracked in
 [consumer compatibility](SHARED_PROMPT_CONSUMER_COMPATIBILITY_2026-10-30.md). See that
 directory's README and

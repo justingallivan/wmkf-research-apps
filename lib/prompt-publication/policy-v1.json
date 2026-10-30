@@ -1,6 +1,6 @@
 {
   "hashAlgorithm": "sha256-canonical-json-utf8-v1",
-  "hash": "868ccaed99306d5ef0a9b1eabf634738590ad3fba9a97b67d3ddcbfc1cb9af60",
+  "hash": "50bcb07a28fd786b1000e6527bd1b06c34170e0088ede2bc35228ebba1f76c5b",
   "policy": {
     "budgetRegistry": {
       "defaults": {
@@ -1151,7 +1151,7 @@
       "name": "[A-Za-z0-9_]+",
       "token": "\\{\\{[ \\t\\r\\n\\f\\v]*([A-Za-z0-9_]+)[ \\t\\r\\n\\f\\v]*\\}\\}"
     },
-    "policyVersion": 4,
+    "policyVersion": 5,
     "reviewerContracts": {
       "reviewer-finder.analyze": {
         "requiredLabels": [
@@ -1189,8 +1189,10 @@
       "definition-schema.js": "b54d4017b033def2f8e19fb796c59dc96475586c541b9e761938f9552ec7cdd7",
       "fingerprint.js": "7953609e7ec5f70be7736a974c388d5cab79db560d7c2c17ccd8d14953a6e810",
       "json-contract.js": "b6456c0d1982907120e026ff5a530b5bdefaf1d3d2f95e8d50ec9b3fb7e325be",
-      "publication-contract.js": "fc1932550700a9ba86a9bc08854bded18b3f6e95a539a5e414674ea4b5cf4a27",
-      "template-policy.js": "9fe9bf8bb835abae4688b6dd1b65842ec7224dd763925e90ea18ec84fb032e53"
+      "pre-site-transition.js": "b35c35b80d3764b52d0a76b7edfd63936159fade7114b877240efff317668d21",
+      "publication-contract.js": "6668909317a0730a9f76197c53d84d72c07749461be8d75216cc3999924a42eb",
+      "template-policy.js": "9fe9bf8bb835abae4688b6dd1b65842ec7224dd763925e90ea18ec84fb032e53",
+      "transaction-core.js": "a17af7c4d180747e89c7deeb7da2b577fb5ba3ebb42a8738879725f6ef5e2b1b"
     },
     "scope": "consumer-budget-foundation",
     "templateContracts": {

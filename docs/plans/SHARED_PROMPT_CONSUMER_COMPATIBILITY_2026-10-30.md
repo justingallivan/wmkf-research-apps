@@ -14,6 +14,10 @@ related:
 
 # PR553 consumer compatibility milestone
 
+Historical checkpoint at commit `f7d9a711b`, policy revision4. Consumer contracts
+remain applicable; subsequent transaction/transition work is tracked in
+[the next milestone](SHARED_PROMPT_TRANSACTION_MILESTONE_2026-10-30.md).
+
 [PARTIAL / local only] Policy revision 4 captures 39 of the 40 known prompt names.
 The remaining `phase-i.checkin` is an observed draft without a common execution
 contract or application caller; publication remains held pending its explicit

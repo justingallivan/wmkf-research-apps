@@ -44,7 +44,7 @@ policy change, not a startup/runtime refresh. The envelope hash is SHA-256 over
 UTF-8 `JSON.stringify(policy)` with recursively sorted object keys and preserved
 array order. The artifact uses ASCII property names; its exact bytes and
 hash must be included in .NET golden tests before claiming cross-language parity.
-Revision 4 pins schema/transport source digests, named consumer contracts and
+Revision 5 pins schema/transport source digests, named consumer contracts and
 the existing budget registry. Control policy identity is last-writer provenance,
 not an activation row; old provenance never resets the original CAS revision.
 `--check` is required after schema changes; regenerate only as a reviewed policy
@@ -74,7 +74,7 @@ actual shipped templates, extracted source rules, limits and model policies.
 
 | Invariant | Enforcement | Verification |
 |---|---|---|
-| No live writes/provider calls | Pure module and offline AST extractor; no route wiring | Import/dependency inspection and unit tests |
+| No live writes/provider calls in this milestone | No route wiring or live SDK port; offline extraction and fake-port tests | Import/fan-out inspection and scoped unit tests |
 | Preserve exact editable content | No normalization/writeback | CRLF/astral/unchanged-input tests |
 | Unsupported placeholder names never disappear | Scan paired double braces and reject unmatched grammar | Unicode/dotted/ASCII golden vectors |
 | Preserve per-name parser contracts | Extract complete rule tables; body vs combined checks | Real shipped templates and removed-label/placeholder negatives |
@@ -122,3 +122,20 @@ cutover, read paging/status, real clients, solution/plugin/guards and sandbox
 proof. Policy deployment must disable/drain old writers and reject unsupported
 artifact stamps at the Dataverse boundary; CAS alone is not policy freshness. No .NET parity or tenant transaction behavior is proved.
 New helpers do not replace existing runtime validators or callers.
+
+
+`transaction-core.js` is an unwired server-only reference implementation of the
+publication protocol against a trusted transaction port. It is not an SDK adapter
+or tenant proof. It covers authorization/replay ordering, budget-before-head CAS,
+complete version inventory, draft/current/catalog preconditions, high-water
+allocation, conditional activation and same-transaction immutable receipt. A
+post-fault lookup resolves a racing committed receipt without retrying writes.
+The .NET implementation and transaction/guard/role proof remain mandatory.
+
+`pre-site-transition.js` and `scripts/prepare-pre-site-prompt-transition.cjs`
+prepare a private offline artifact only for the exact reviewed old schema delta.
+They never read or write Dataverse, pick a model, authorize deployment or bind
+live row identities. See
+`docs/plans/SHARED_PROMPT_TRANSACTION_MILESTONE_2026-10-30.md` and
+`docs/plans/PRE_SITE_PROMPT_READER_TRANSITION_2026-10-30.md` for the port boundary,
+separate backportable pause guard and coordinated transition gates.

@@ -84,7 +84,7 @@ integer tokens within pinned model ceiling. Null model defaults remain blocked;
 template-only exceptions are registered only for the fourteen audited tool rows,
 with exact body/system and variable contracts and absent output memos;
 audited Executor consumers may preserve null temperature, while first publication
-still requires an explicit value. Artifact revision 4 includes source/transport
+still requires an explicit value. Artifact revision 5 includes source/transport
 hashes, 39 named contracts, budget registry and a pending consumer-key union from tracked observed names plus source
 catalog names. This is a temporary fail-closed audit hold, not metadata-based
 permission or a new execution profile. Removing a hold needs actual consumer
@@ -173,8 +173,10 @@ receipt came from Dataverse or committed. The operation must first authorize,
 read the durable receipt, and return it before policy/freshness validation.
 `validateFreshPublication` then checks definition, snapshot identity/hash,
 installed policy and new-name catalog completeness for fresh requests only.
-Authorization, live catalog/budget/model/head/draft consistency and transactional
-writes are mandatory later layers, not replaced by local schema success.
+The unwired `transaction-core.js` now checks the server-port head/draft/current/
+catalog/inventory and coordinates lifecycle/receipt writes. The port must supply
+real authorization, strict target/actor enforcement and atomic SDK transactions;
+no Dataverse implementation or tenant guarantee is inferred from local tests.
 
 ## Portable evidence
 

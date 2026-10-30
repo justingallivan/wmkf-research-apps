@@ -285,6 +285,7 @@ Automated BILL onboarding is disabled unless `BILL_ENABLED=true`; the current no
 
 | Variable | Purpose | Default |
 |----------|---------|---------|
+| `PRE_SITE_PROMPT_TRANSITION_PAUSE` | Server-only, non-secret pause for the coordinated Pre-Site prompt/reader transition. Checked before artifact generation and Executor dispatch, with a second resolved-row check; no caller bypass. | **Local source only (2026-10-30); this milestone does not configure or deploy it. Live values were not probed.** Unset/empty/literal `off` preserves operation; `on` or any invalid nonempty value returns 503 `pre_site_prompt_transition_paused`. Redeploy/restart is required for deployed env changes; drain older instances separately. See [transition runbook](plans/PRE_SITE_PROMPT_READER_TRANSITION_2026-10-30.md). |
 | `PROMPT_RESOLVER_STRICT` | Disable bundled-prompt fallback in `lib/services/prompt-resolver.js` | unset (fallback enabled) |
 | `WAVE1_BACKEND_SETTINGS` | Dispatch flag for settings backend. Default Dataverse since Wave 1 closeout 2026-05-12; setting to `postgres` fails loudly (table dropped). | `dataverse` (implicit) |
 | `WAVE1_BACKEND_APP_ACCESS` | Dispatch flag for app-access backend. Default Dataverse since 2026-05-12. | `dataverse` (implicit) |

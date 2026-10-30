@@ -69,8 +69,8 @@
       "input": {
         "contractVersion": 1,
         "definitionFormatVersion": 1,
-        "policyRevision": 4,
-        "policyArtifactHash": "868ccaed99306d5ef0a9b1eabf634738590ad3fba9a97b67d3ddcbfc1cb9af60",
+        "policyRevision": 5,
+        "policyArtifactHash": "50bcb07a28fd786b1000e6527bd1b06c34170e0088ede2bc35228ebba1f76c5b",
         "requestId": "10000000-0000-4000-8000-000000000004",
         "operation": "publish",
         "promptKey": "pa.summary",
@@ -98,15 +98,15 @@
         "initiatingUserId": "10000000-0000-4000-8000-000000000002",
         "effectiveUserId": "10000000-0000-4000-8000-000000000003"
       },
-      "hash": "dd889adecf05e646fff7e28879a08a3f970164d9c8583011c9c82725e853acca",
-      "preimage": "wmkf.prompt.publication.v1\n[\"o\",[[\"actor\",[\"o\",[[\"effectiveUserId\",[\"s\",\"10000000-0000-4000-8000-000000000003\"]],[\"initiatingUserId\",[\"s\",\"10000000-0000-4000-8000-000000000002\"]],[\"organizationId\",[\"s\",\"10000000-0000-4000-8000-000000000001\"]]]]],[\"canonicalKey\",[\"s\",\"pa.summary\"]],[\"fingerprintVersion\",[\"n\",\"3ff0000000000000\"]],[\"request\",[\"o\",[[\"contractVersion\",[\"n\",\"3ff0000000000000\"]],[\"definitionFormatVersion\",[\"n\",\"3ff0000000000000\"]],[\"draftEtag\",[\"s\",\"W/\\\"12\\\"\"]],[\"draftId\",[\"s\",\"10000000-0000-4000-8000-000000000005\"]],[\"expectedCurrent\",[\"null\"]],[\"expectedHeadRevision\",[\"s\",\"0\"]],[\"metadataBaseline\",[\"o\",[[\"catalog\",[\"o\",[[\"description\",[\"null\"]],[\"groupKey\",[\"null\"]],[\"sectionKey\",[\"null\"]],[\"title\",[\"null\"]],[\"usageCategory\",[\"null\"]],[\"usedBy\",[\"null\"]]]]],[\"current\",[\"null\"]],[\"headRevision\",[\"s\",\"0\"]],[\"schemaVersion\",[\"n\",\"3ff0000000000000\"]]]]],[\"operation\",[\"s\",\"publish\"]],[\"policyArtifactHash\",[\"s\",\"868ccaed99306d5ef0a9b1eabf634738590ad3fba9a97b67d3ddcbfc1cb9af60\"]],[\"policyRevision\",[\"n\",\"4010000000000000\"]],[\"promptKey\",[\"s\",\"pa.summary\"]],[\"requestId\",[\"s\",\"10000000-0000-4000-8000-000000000004\"]],[\"snapshotHash\",[\"s\",\"44f64fa7cd6d6841b111dbc0446069a4f52225fa2d33b76d5f4b92cca36f8392\"]]]]]]]"
+      "hash": "d47163fa8aa6e6943800272485700ef9699a003d4581a4b6a8a4e8640b09c494",
+      "preimage": "wmkf.prompt.publication.v1\n[\"o\",[[\"actor\",[\"o\",[[\"effectiveUserId\",[\"s\",\"10000000-0000-4000-8000-000000000003\"]],[\"initiatingUserId\",[\"s\",\"10000000-0000-4000-8000-000000000002\"]],[\"organizationId\",[\"s\",\"10000000-0000-4000-8000-000000000001\"]]]]],[\"canonicalKey\",[\"s\",\"pa.summary\"]],[\"fingerprintVersion\",[\"n\",\"3ff0000000000000\"]],[\"request\",[\"o\",[[\"contractVersion\",[\"n\",\"3ff0000000000000\"]],[\"definitionFormatVersion\",[\"n\",\"3ff0000000000000\"]],[\"draftEtag\",[\"s\",\"W/\\\"12\\\"\"]],[\"draftId\",[\"s\",\"10000000-0000-4000-8000-000000000005\"]],[\"expectedCurrent\",[\"null\"]],[\"expectedHeadRevision\",[\"s\",\"0\"]],[\"metadataBaseline\",[\"o\",[[\"catalog\",[\"o\",[[\"description\",[\"null\"]],[\"groupKey\",[\"null\"]],[\"sectionKey\",[\"null\"]],[\"title\",[\"null\"]],[\"usageCategory\",[\"null\"]],[\"usedBy\",[\"null\"]]]]],[\"current\",[\"null\"]],[\"headRevision\",[\"s\",\"0\"]],[\"schemaVersion\",[\"n\",\"3ff0000000000000\"]]]]],[\"operation\",[\"s\",\"publish\"]],[\"policyArtifactHash\",[\"s\",\"50bcb07a28fd786b1000e6527bd1b06c34170e0088ede2bc35228ebba1f76c5b\"]],[\"policyRevision\",[\"n\",\"4014000000000000\"]],[\"promptKey\",[\"s\",\"pa.summary\"]],[\"requestId\",[\"s\",\"10000000-0000-4000-8000-000000000004\"]],[\"snapshotHash\",[\"s\",\"44f64fa7cd6d6841b111dbc0446069a4f52225fa2d33b76d5f4b92cca36f8392\"]]]]]]]"
     },
     {
       "input": {
         "contractVersion": 1,
         "definitionFormatVersion": 1,
-        "policyRevision": 4,
-        "policyArtifactHash": "868ccaed99306d5ef0a9b1eabf634738590ad3fba9a97b67d3ddcbfc1cb9af60",
+        "policyRevision": 5,
+        "policyArtifactHash": "50bcb07a28fd786b1000e6527bd1b06c34170e0088ede2bc35228ebba1f76c5b",
         "requestId": "10000000-0000-4000-8000-000000000007",
         "operation": "publish",
         "promptKey": "pa.summary",
@@ -141,8 +141,8 @@
         "initiatingUserId": "10000000-0000-4000-8000-000000000002",
         "effectiveUserId": "10000000-0000-4000-8000-000000000003"
       },
-      "hash": "7010f726cacefb49dda924f4ffef56f735c00d238552fb996edfb6c6adec3512",
-      "preimage": "wmkf.prompt.publication.v1\n[\"o\",[[\"actor\",[\"o\",[[\"effectiveUserId\",[\"s\",\"10000000-0000-4000-8000-000000000003\"]],[\"initiatingUserId\",[\"s\",\"10000000-0000-4000-8000-000000000002\"]],[\"organizationId\",[\"s\",\"10000000-0000-4000-8000-000000000001\"]]]]],[\"canonicalKey\",[\"s\",\"pa.summary\"]],[\"fingerprintVersion\",[\"n\",\"3ff0000000000000\"]],[\"request\",[\"o\",[[\"contractVersion\",[\"n\",\"3ff0000000000000\"]],[\"definitionFormatVersion\",[\"n\",\"3ff0000000000000\"]],[\"draftEtag\",[\"s\",\"W/\\\"12\\\"\"]],[\"draftId\",[\"s\",\"10000000-0000-4000-8000-000000000005\"]],[\"expectedCurrent\",[\"o\",[[\"etag\",[\"s\",\"W/\\\"99\\\"\"]],[\"id\",[\"s\",\"10000000-0000-4000-8000-000000000008\"]],[\"version\",[\"n\",\"401c000000000000\"]]]]],[\"expectedHeadRevision\",[\"s\",\"9007199254740993\"]],[\"metadataBaseline\",[\"o\",[[\"catalog\",[\"o\",[[\"description\",[\"null\"]],[\"groupKey\",[\"null\"]],[\"sectionKey\",[\"null\"]],[\"title\",[\"s\",\"Prior\"]],[\"usageCategory\",[\"null\"]],[\"usedBy\",[\"null\"]]]]],[\"current\",[\"o\",[[\"etag\",[\"s\",\"W/\\\"99\\\"\"]],[\"id\",[\"s\",\"10000000-0000-4000-8000-000000000008\"]]]]],[\"headRevision\",[\"s\",\"9007199254740993\"]],[\"schemaVersion\",[\"n\",\"3ff0000000000000\"]]]]],[\"operation\",[\"s\",\"publish\"]],[\"policyArtifactHash\",[\"s\",\"868ccaed99306d5ef0a9b1eabf634738590ad3fba9a97b67d3ddcbfc1cb9af60\"]],[\"policyRevision\",[\"n\",\"4010000000000000\"]],[\"promptKey\",[\"s\",\"pa.summary\"]],[\"requestId\",[\"s\",\"10000000-0000-4000-8000-000000000007\"]],[\"snapshotHash\",[\"s\",\"44f64fa7cd6d6841b111dbc0446069a4f52225fa2d33b76d5f4b92cca36f8392\"]]]]]]]"
+      "hash": "c56012f63edfca8e8639432c0f0ae53f89b8e1f69611eb19e99be375a28e9a8f",
+      "preimage": "wmkf.prompt.publication.v1\n[\"o\",[[\"actor\",[\"o\",[[\"effectiveUserId\",[\"s\",\"10000000-0000-4000-8000-000000000003\"]],[\"initiatingUserId\",[\"s\",\"10000000-0000-4000-8000-000000000002\"]],[\"organizationId\",[\"s\",\"10000000-0000-4000-8000-000000000001\"]]]]],[\"canonicalKey\",[\"s\",\"pa.summary\"]],[\"fingerprintVersion\",[\"n\",\"3ff0000000000000\"]],[\"request\",[\"o\",[[\"contractVersion\",[\"n\",\"3ff0000000000000\"]],[\"definitionFormatVersion\",[\"n\",\"3ff0000000000000\"]],[\"draftEtag\",[\"s\",\"W/\\\"12\\\"\"]],[\"draftId\",[\"s\",\"10000000-0000-4000-8000-000000000005\"]],[\"expectedCurrent\",[\"o\",[[\"etag\",[\"s\",\"W/\\\"99\\\"\"]],[\"id\",[\"s\",\"10000000-0000-4000-8000-000000000008\"]],[\"version\",[\"n\",\"401c000000000000\"]]]]],[\"expectedHeadRevision\",[\"s\",\"9007199254740993\"]],[\"metadataBaseline\",[\"o\",[[\"catalog\",[\"o\",[[\"description\",[\"null\"]],[\"groupKey\",[\"null\"]],[\"sectionKey\",[\"null\"]],[\"title\",[\"s\",\"Prior\"]],[\"usageCategory\",[\"null\"]],[\"usedBy\",[\"null\"]]]]],[\"current\",[\"o\",[[\"etag\",[\"s\",\"W/\\\"99\\\"\"]],[\"id\",[\"s\",\"10000000-0000-4000-8000-000000000008\"]]]]],[\"headRevision\",[\"s\",\"9007199254740993\"]],[\"schemaVersion\",[\"n\",\"3ff0000000000000\"]]]]],[\"operation\",[\"s\",\"publish\"]],[\"policyArtifactHash\",[\"s\",\"50bcb07a28fd786b1000e6527bd1b06c34170e0088ede2bc35228ebba1f76c5b\"]],[\"policyRevision\",[\"n\",\"4014000000000000\"]],[\"promptKey\",[\"s\",\"pa.summary\"]],[\"requestId\",[\"s\",\"10000000-0000-4000-8000-000000000007\"]],[\"snapshotHash\",[\"s\",\"44f64fa7cd6d6841b111dbc0446069a4f52225fa2d33b76d5f4b92cca36f8392\"]]]]]]]"
     }
   ],
   "receipt": {
@@ -151,8 +151,8 @@
     "request": {
       "contractVersion": 1,
       "definitionFormatVersion": 1,
-      "policyRevision": 4,
-      "policyArtifactHash": "868ccaed99306d5ef0a9b1eabf634738590ad3fba9a97b67d3ddcbfc1cb9af60",
+      "policyRevision": 5,
+      "policyArtifactHash": "50bcb07a28fd786b1000e6527bd1b06c34170e0088ede2bc35228ebba1f76c5b",
       "requestId": "10000000-0000-4000-8000-000000000004",
       "operation": "publish",
       "promptKey": "pa.summary",
@@ -180,7 +180,7 @@
       "initiatingUserId": "10000000-0000-4000-8000-000000000002",
       "effectiveUserId": "10000000-0000-4000-8000-000000000003"
     },
-    "requestFingerprint": "dd889adecf05e646fff7e28879a08a3f970164d9c8583011c9c82725e853acca",
+    "requestFingerprint": "d47163fa8aa6e6943800272485700ef9699a003d4581a4b6a8a4e8640b09c494",
     "published": {
       "id": "10000000-0000-4000-8000-000000000005",
       "version": 1,
