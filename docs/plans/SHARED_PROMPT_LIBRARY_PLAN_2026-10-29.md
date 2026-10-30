@@ -24,15 +24,25 @@ with coding tools against Dataverse and use Admin for small changes. Both see
 the same library, including prompts with no application-code registration.
 
 **[PLANNED]** Dataverse owns prompt content, descriptive metadata, workflow labels,
-ordering, and assignments. The app owns validation, permissions, and rendering.
+ordering, assignments and shared publication enforcement. Dataverse owns common
+validation/privileges; Admin adds session permissions, validation feedback and
+rendering.
 Creating or classifying a prompt requires no deployment. Creating a prompt does
 not create a Power Automate flow, grant execution permission, or wire an app caller.
 No Power Automate execution bridge is included in this work. Existing application
 consumers, model/provider policy, and execution budgets remain separate contracts.
 
-This document is a plan, not an implementation or schema deployment. The only
-external actions for this task were read-only metadata/inventory requests and
-their OAuth token exchange. No prompt body or model execution was inspected.
+**[OWNER DIRECTION, 2026-10-29]** Future prompts belong on the existing prompt
+table; Connor will populate the proposed group field. Both authoring routes
+preserve versions and explicitly activate a version. Connor must be able to
+publish from his coding tools without opening Admin. This supersedes the
+Admin-only first-release publication proposal.
+
+This document is a plan, not an implementation or schema deployment. The retained
+schema probe was read-only. This revision checks Microsoft platform documentation
+and repository source; it performs no tenant provisioning, live writes, or model
+execution. The linked historical AI-run form was read separately; it did not
+establish the originating flow definition or prompt format.
 
 ## Verified baseline
 
@@ -52,7 +62,7 @@ variable values, credentials, or model output.
 | Status | Draft `682090000`, Published `682090001`, Retired `682090002` | Current flag and status are distinct, and must be validated together |
 | Other fields | `wmkf_ai_notes`: Memo 1,000,000; last-test/preflight dates; temperature; max tokens; rollback-from Integer | Do not repurpose Notes or assume rollback-from is a lookup; no test/preflight dates may be stamped without actual checks |
 | Descriptive metadata | No title, description, workflow group/subgroup, Used by, or usage-category column on this table | Dedicated additive columns are needed for the proposed row-level authoring contract |
-| Concurrency | Optimistic concurrency enabled; no alternate keys | ETags are available; duplicate-name/version and first-publish safety need application enforcement |
+| Concurrency | Optimistic concurrency enabled; no alternate keys | ETags are available; duplicate-name/version and first-publish safety are not schema-enforced today |
 | Inventory | 59 rows, 40 distinct names, 39 current; `phase-i.checkin` has no current row and its sole row has null status; no duplicate-current names in this snapshot | The existing no-current/null-status name needs explicit recovery; zero duplicates today is not a concurrency guarantee |
 | `wmkf_appsystemsetting` | Key String 255, value Memo 100,000; active unique key on `wmkf_settingkey`; concurrency enabled | Suitable existing home for small shared workflow-group configuration |
 | Proposed setting key | `prompt-library.groups` absent | It must be seeded deliberately, not assumed available |
@@ -89,9 +99,9 @@ current flow definitions/identities.
   expose two current rows after failure. Do not describe it as transactional.
   However, `lib/services/dynamics/changeset.js` already provides atomic Dataverse
   changesets with per-operation If-Match guards, trusted context and actor
-  support. Reuse that existing seam for the target lifecycle flip; an old SQL
-  migration comment claiming Dataverse has no batch transactions is not current
-  evidence of platform capability.
+  support. That is an existing app-side capability, not the target shared
+  publisher: the proposed plug-in uses in-context SDK operations instead. An old
+  SQL comment denying batch transactions is not current platform evidence.
 - The current publisher carries temperature forward but cannot edit it; the
   existing form does not expose variable-declaration editing. New creation needs
   explicit valid values for both, not invented inheritance from a nonexistent row.
@@ -134,20 +144,39 @@ qualification. Model/provider eligibility and runtime allowlists stay in code.
 using the current row ID + expected ETag; it may change only these six metadata
 columns, not content, current flag, status, model, or version. This allows
 classification of an unfamiliar backend prompt even if its content/model cannot
-be published by the Vercel publisher. A new draft starts with the latest current catalog
+be published under a supported validation profile. A new draft starts with the latest current catalog
 metadata. Publication uses
 the explicitly reconciled staged metadata, never a silent merge of newer labels. Old
 published content is immutable;
 current-row catalog metadata is explicitly mutable and is not a promise of
 historical descriptions. Store catalog-change before/after values, actor,
-request ID and target row in the operational audit. Record the draft's current-row
-metadata baseline ETag in its operation intent.
+request ID and target row in the Dataverse operational receipt store. Record the
+draft's current-row metadata baseline ETag (explicit null for a new name) in its
+staged definition.
 A changed baseline blocks publication until the editor explicitly refreshes and
 reapplies its catalog choices to a new staged snapshot. Backend drafts with no
 recorded baseline require that reconciliation when opened for publication.
 Require publish's expected ETag as well as expected version, so an intervening
 catalog edit is not lost.
 Seed scripts must preserve metadata rather than restore catalog-code defaults.
+The Dataverse write guards enforce this metadata-only allowlist for direct tools
+as well as Admin; catalog-change audit belongs in Dataverse so neither route
+depends on a Vercel-only audit write.
+
+### Draft baseline — additional authoring column
+
+**[PLANNED]** Add a dedicated optional Memo column, proposed
+`wmkf_ai_draftbaseline`, bounded by the app to 16,000 characters. It stores
+schema-versioned draft-only JSON: baseline current GUID/ETag (explicit null for
+first publication), baseline catalog values for the six editable fields, and
+expected head revision. Both clients round-trip it in draft projections; the
+publication operation checks it against current state and never treats it as
+actor authority. Save it with the draft under ETag, update only after explicit
+refresh/reapply, and clear it on successful publication in the same transaction.
+Backend drafts missing it remain saveable but need explicit reconciliation
+before publish. It is not Notes, prompt variables, or a client-only/localStorage
+value. This is a seventh prompt column beyond the six descriptive fields;
+provisioning, projection fan-out and limits are part of the sandbox schema gate.
 
 ### Workflow catalog — existing settings table
 
@@ -219,132 +248,229 @@ definitions, but automatic flow wiring and a new generic execution API are not
 implied. Unsupported providers/contracts remain visible with an explanation;
 metadata organization remains available without silently rewriting content.
 
-**Save draft** persists an explicit noncurrent Draft in the same table. Incomplete
-content can be saved after structural/key/size validation; full model/template/
-output validation is required for Publish. Use valid required numeric/model
-values or explicit defaults when saving drafts (verify numeric schema ranges in
-implementation preflight). Draft writes use ETags and return a durable row ID.
-A page reload shows a current version and its pending drafts separately; never
-substitute a draft for the executable version. Draft updates do not repeatedly
-allocate version numbers. A reserved draft may publish only if its version is
-greater than the current version; an older draft must be explicitly rebased to
-a newly reserved version. Publication never moves the current version backward. Dirty
-client edits survive failed saves; navigation
-warns about unsaved changes. Do not repurpose noncurrent Published/Retired rows
-as editable drafts, including the existing `phase-i.checkin` without inspecting
-its actual lifecycle state first.
+**Save draft** persists an explicit noncurrent Draft in the same table, identified
+by its GUID and ETag. Drafts have no published version number: use null for
+`wmkf_promptversion`, subject to verifying that the deployed requiredness and
+numeric constraints permit it. If null is not allowed, stop and agree an additive
+draft-storage adjustment; do not silently reserve published numbers or use an
+undocumented sentinel. Draft updates keep the same GUID. Incomplete content can
+be saved after structural/key/size validation; publication validates the complete
+definition. New numeric/model defaults require schema-range verification.
 
-### Publication invariants and concurrency
+A reload shows active content and pending drafts separately. Dirty edits survive
+failed saves and stale loads; navigation warns about unsaved edits. Historical
+Published/Retired rows are never reused as drafts. The legacy null-status
+`phase-i.checkin` row needs explicit lifecycle inspection/recovery, not automatic
+conversion. A rollback copies historical content into a new draft and publishes
+a new higher version after review.
 
-Use one shared governed publication service for Admin and backend tooling;
-extend the existing service rather than maintaining two validation protocols.
-Public APIs stay superuser/session authenticated. Backend authoring may create
-noncurrent drafts directly under its Dataverse role, but **publication goes
-through the shared publisher**. In the first release Connor can import a draft
-and publish in Admin. A CLI must use the authenticated supported import/publish
-entry, not fabricate a NextAuth cookie, pass a profile ID, or create a second
-raw-Dataverse publisher. Unattended service-principal publication requires a
-separately reviewed authenticated entry point; no new machine credential is
-included here. Ordinary backend row creation remains discoverable, but bypass
-publication is outside the guaranteed contract.
+### Shared Dataverse publication operation
 
-- Serialize governed draft creation/version reservation, metadata edits, and
-  publication per target-host + normalized prompt name using a server-side
-  Postgres lock with a dedicated connection, bounded wait and cleanup in finally.
-  Allocate positive version `max(all rows)+1` under that lock. Initial draft v1;
-  later drafts reserve higher versions. Gaps are allowed. Enumerate all rows,
-  not current-version+1 or a truncated 50-row history. Direct backend drafts must
-  use a unique positive version; collisions are surfaced and repaired explicitly.
-- Use the existing append-only audit store for intent/outcome, with operation,
-  draft ID, version, expected current ID/ETag, metadata baseline ETag, full
-  effective-snapshot fingerprint, catalog changes, and trusted actor. Keep its two append-only phases, pending/final. The pending intent records
-  every planned row ID, expected ETag and before/after lifecycle/fingerprint
-  before the first mutation; recovery derives progress by exact Dataverse
-  readback, not by inventing intermediate phase rows. Draft creates reserve a
-  server-generated GUID before writing intent and create that exact ID (verify
-  primary-ID create capability in sandbox). A new schema migration will extend
-  operation/status coverage and intent constraints; assign its number from current main during build.
-  Audit failure before a write blocks that operation. No new Postgres content
-  library is introduced: this remains an operational audit/coordination store.
-- Publish an already staged Draft row with full validation. Persist the pending
-  audit first; recheck draft/current ETags, expected version, and exact snapshot
-  under the lock; require draft version greater than current and unchanged
-  metadata baseline. Promote the same reserved row, stamp Published/current/time,
-  and clear the prior current flag in ONE existing `executeChangeset` call with
-  per-row If-Match preconditions. Add a prompt-adapter operation so the service
-  does not construct ungoverned transport calls. With no prior current, promote
-  the first draft conditionally under the same per-name lock. Never change the
-  published content in place. A repeat request with the same fingerprint returns
-  its receipt; a changed payload with that request ID is rejected.
-- These Dataverse updates plus Postgres audit are **not cross-store atomic**.
-  Record the complete durable operation intent/IDs before its first change.
-  Before another publish, reconcile a pending operation by rereading exact rows,
-  lifecycle states and fingerprints to infer which planned writes took effect. A
-  partial/unknown result is never rendered as clean success. The target
-  Dataverse changeset prevents a committed half-flip between draft promotion
-  and prior retirement; a transport timeout can still leave its commit outcome
-  unknown, and final Postgres audit can fail after commit. Sandbox tests must
-  prove embedded 412 rollback and lost-response recovery. Pre-existing torn
-  states or bypass writes can still produce duplicate/zero-current states; stop
-  execution through existing typed failures, preserve the draft and show recovery
-  actions. Do not auto-delete,
-  guess a winner, or silently roll back another writer's publication.
-- Existing two-current torn-state recovery must be updated for staged-draft
-  publication and tested alongside old audit receipts. Bump/version fingerprint
-  contracts explicitly; old receipts remain replayable under their original
-  fingerprint version, and no old publication is resent as a fresh mutation.
-- The lock coordinates participating writers only. Arbitrary direct published
-  Dataverse writes cannot be made safe by a Vercel lock. If Connor needs those
-  writes to remain a normal publication route, this proposal must change before
-  build to a Dataverse-enforced coordination design. Do not claim a guarantee
-  across writers that do not participate.
+**[PLANNED; owner-approved direction]** Implement a synchronous Dataverse Custom
+API Action backed by a .NET plug-in. Admin's server and Connor's authenticated
+coding-tool command call the SAME operation. Direct Dataverse draft authoring
+remains supported. Manually setting current/status/version or modifying published
+content is not a supported publication route; synchronous Dataverse write guards
+must reject those bypasses, including legacy seed/upsert writers after cutover.
+No Admin cookie, profile-ID argument, or Vercel-only lock is required by Connor.
 
-The publication contract for Connor is a separate shareable document linked
-below. It is proposed coordination guidance, not evidence he has accepted it.
+The bounded platform assessment and sources are in
+[publication feasibility](SHARED_PROMPT_PUBLICATION_FEASIBILITY_2026-10-29.md).
+**Platform capability is verified; tenant deployment, permissions and race/fault
+behavior are not tested.** This adds a Dataverse solution/plug-in deployment to
+the feature and is not merely six extra columns.
+
+#### Coordination and durable state
+
+Use two small additive Dataverse tables (logical names finalized during schema
+review): one **publication head** per technical key, and append-only
+**publication receipts** (also used for catalog-change audit). Prompt content stays exclusively in `wmkf_ai_prompt`;
+workflow definitions stay in the existing settings table.
+
+- Head: a required unique bounded identity (proposed SHA-256 hex of the
+  lowercase ASCII canonical technical key, with canonical and original keys
+  retained and compared to reject a hash collision), active prompt lookup, last published version and revision. Do not
+  make a unique key directly on the existing 850-character name: Dataverse key
+  size is limited. New keys must already be lowercase ASCII under the conservative grammar;
+  guards reject case-equivalent aliases at direct draft creation and publication.
+  Existing key spelling stays unchanged, but all reader-equivalent names must
+  share one canonical head. Audit legacy case/whitespace/Unicode/collation
+  equivalences before seeding heads; unsupported keys block that name's cutover
+  for explicit mapping, never silently get a second head or a rename. Microsoft
+  documents case-insensitive Dataverse string filtering; raw exact-byte hashing
+  would therefore be unsafe. Prove canonical identity equals actual reader
+  equivalence in sandbox, including case-variant first-publication races.
+- Initialize one head from each unambiguous legacy name under a controlled
+  writer freeze; its high-water version covers ALL historical published/retired
+  versions and any legacy reserved numbers. Repair ambiguous lifecycle/version
+  states before enabling publication. New-name head creation is create-only
+  under an Active unique key; concurrent initialization rejects one transaction,
+  which retries the same request after rereading. No read-then-create guarantee.
+- Every publication must conditionally update the head using the caller's
+  expected head revision and the SDK row version (`IfRowVersionMatches`). This
+  fences first publication (expected active null) as well as later publication.
+  After winning the conditional head write, reread and validate the draft,
+  active rows and complete version inventory inside the same transaction;
+  recheck all caller expectations. No unconditional head update or max+1 alone.
+- Receipt: required unique request UUID, operation/fingerprint contract version,
+  exact prompt key, actor from execution context, draft ID, expected head/current
+  and draft versions/ETags, effective-snapshot hash, prior/new IDs, assigned
+  published version, actual timestamp, and validation-policy revision. It stores
+  hashes/identifiers, not another content library. Metadata-only operations use
+  the same append-only store with a distinct operation kind, before/after values
+  for the six allowed catalog fields, and execution-context correlation ID; a
+  direct PATCH need not spoof a publish UUID. Receipt creation and lifecycle
+  writes commit in the SAME Dataverse transaction. Restrict receipt/head writes
+  to the trusted operation. Retain receipts/history without automatic expiry in
+  this release; page reads, monitor capacity and use content-free receipts.
+
+#### Operation protocol
+
+1. Authenticate/authorize the caller in Dataverse. Admin additionally retains its
+   superuser/session guard, trusted DAL context, target/write interlock and
+   server-derived actor mapping. Connor uses delegated Entra OAuth under his
+   authorized Dataverse identity through a supported command/Web API call; no
+   new unattended application identity is included. Record initiating/effective
+   identities; never trust a payload actor. Prove Admin impersonation and reject
+   silent fallback to app attribution for privileged publication.
+2. Require request UUID, draft GUID/ETag, expected head revision, expected active
+   GUID/version/ETag (explicit null for first publication), metadata baseline,
+   and exact staged snapshot fingerprint. Replay checks precede fresh-write
+   preconditions: same authorized actor/name/operation/hash returns the original
+   receipt even if current has advanced; changed reuse is rejected. A client
+   refresh of current state is returned separately from that historical receipt.
+3. Require `IsInTransaction`; fail before mutation otherwise. Use only
+   `IOrganizationService` in the plug-in, never same-org HTTP, nested batch
+   transaction requests, Vercel/Postgres calls, or model calls. Atomically fence
+   the head, validate expected state, and validate the complete stored draft.
+   A stale catalog baseline requires explicit refresh/reapply; neither route
+   silently replaces newer labels. Metadata-only direct saves use ETags, a strict
+   column allowlist and transactional catalog audit; a concurrent catalog edit
+   must make the publication's draft/current conditional update fail.
+4. Assign `head.highWaterVersion + 1` only at publication (first = 1 where no
+   history exists). Promote that exact Draft row with a conditional row-version
+   update, set Published/current and actual publication time, and conditionally
+   clear the previous current flag. Advance head lookup/high-water/revision and
+   create the unique receipt in the same transaction. Prior content stays
+   immutable; prior Published status remains Published with current false.
+   An SDK concurrency/validation/unique-key failure aborts the WHOLE operation;
+   do not catch and continue a faulted transaction.
+5. Return the committed receipt and refreshed active state. A transport timeout
+   is unknown, not failure: lookup/retry the same UUID, never invent a new one.
+   If concurrent identical requests race on receipt uniqueness, the losing
+   transaction aborts; an outer retry reads the winning receipt. No durable
+   partial lifecycle is a valid new-operation outcome. Existing legacy partial
+   states require explicit recovery; never guess a winner or delete a row.
+
+The head fences all publication participants; synchronous Create/Update/Delete
+and applicable bulk-message guards on prompt/head/receipt tables must close raw
+write bypasses. Published content, name, version and lifecycle fields are
+protected; audited catalog-only edits remain allowed. Validate draft
+name/version/status/current constraints on direct creates too. Guard permissions
+and parent execution context must prove an authorized publication message, not a
+client-supplied bypass flag or message-name assertion alone. Environment admins
+who disable/bypass plug-ins are outside the supported concurrency guarantee;
+monitor and document that operational boundary.
+
+#### Validation and compatibility
+
+The Dataverse operation is authoritative for shared lifecycle and definition
+validation; Admin cannot be the only validator. Preserve current application
+model/output ceilings, input/output contracts and A7 checks. Do not make the
+plug-in call Vercel or a model to validate. Before implementation, define a
+versioned validation contract and parity fixtures for .NET and JS, including
+how reviewed model capabilities and current durable execution budgets are
+available at publication. An immutable Dataverse validation-policy snapshot
+with a fenced policy revision is a candidate, not yet provisioned or approved;
+prove freshness/invalidation and unknown-policy fail-closed behavior before
+choosing it. Runtime guards remain necessary when policy/budgets change later.
+
+Connor's existing free-text/Power Automate definitions have not been inspected.
+Do not equate shared storage with Executor compatibility or force-convert them.
+Both routes can organize any prompt. Publication initially accepts only explicitly
+supported definition contracts; representative Connor definitions and any needed
+external-flow validation profile must be agreed before enabling that route.
+Unknown contracts stay visible/editable as drafts and cannot accidentally become
+active. Broadening providers or building a Power Automate Executor is separate
+scope, not a hidden prerequisite to library discovery.
+
+A content hash and request fingerprint are distinct. The versioned canonical
+request fingerprint binds operation, canonical/original key, authenticated actor,
+draft GUID/ETag, expected head revision and active GUID/version/ETag, metadata
+baseline, complete staged content/catalog hash, and submitted contract/policy
+revision. Store both hashes in the receipt. Reusing a UUID with ANY changed
+request field is rejected, even for identical text in a different draft. An
+unchanged successful replay returns its original receipt before checking newer
+state or policy; authorization is still required. A fresh request must use the
+currently accepted policy. Never rebuild the replay fingerprint from today's
+active row, generated publication time or latest policy.
+
+#### Existing audit and reader compatibility
+
+The new Dataverse receipt is publication truth for BOTH routes. Existing
+Postgres `prompt_publish_audit` pending/final receipts remain readable/replayable
+under their original fingerprint versions; never resend an old receipt as a
+new mutation. Admin may keep a correlated operational mirror, but a failed
+Postgres mirror cannot roll back a committed Dataverse publication or make
+Connor depend on Vercel/Postgres. Receipt readback recovers lost responses.
+
+Keep `wmkf_ai_iscurrent` as the compatibility marker for existing readers;
+update it atomically with head. The head is the publication concurrency
+resource, not an independent competing active authority. Admin readers compare
+head to sole-current rows and surface mismatches. Apps and future adapted
+Power Automate callers resolve exact key + sole current Published row, reject
+zero/duplicates/invalid lifecycle, and record exact prompt GUID/version. Today
+Executor selects current without status: update that guard at cutover and audit
+ALL direct readers, projections, cached resolvers and fallback semantics.
+Read-only callers must not create heads. Existing resolver caches may briefly
+serve an older immutable version; document their TTL/invalidation and do not
+promise instantaneous cross-client activation. Existing flows are not silently
+rewired or claimed verified by this plan.
 
 ## Implementation slices and release gates
 
-1. **Additive schema + contracts.** Connor provisions the six optional columns
-   in sandbox; verify types/lengths/create-update privileges, numeric required
-   field ranges, ETags, and actor attribution. Add DTO validation, explicit
-   catalog-edit allowlist, pending-intent/locking audit migration and tests.
-   Review the full shared publication contract before any publishing rollout.
-2. **Read path + catalog migration.** Page inventory/history completely. Add
-   metadata to every Admin/history/draft/publisher/seed projection as needed;
-   keep Executor projection unchanged. Build settings read/edit endpoints with
-   server auth/DAL context and conflict handling. Prepare dry-run import from
-   current `adminPromptCatalog.js`, exact row IDs/ETags, no body or lifecycle
-   edits; backfill blank metadata only, refuse conflicting nonblank values.
-   Catalog-details changes and backfill are audited/resumable per row. No-op
-   reruns prove exact readback, not a second overwrite. Seed group configuration
-   conditionally, never replace an already edited catalog.
-3. **Admin shared library.** Render settings-driven workflow labels and row
-   metadata, Needs organization, lifecycle/conflict warnings, metadata editor,
-   group manager and search. Verify app/backend-created rows appear without
-   source edits; do not require an entry in the former code catalog. Resolve
-   budget labels/grouping from that same data and preserve its lower collapsed
-   placement, draft state and existing publication contract.
-4. **Creation/drafts/publication.** Add create/save-draft/publish-first support,
-   advanced input declarations, complete-payload validation and the serialized,
-   audited shared service above, reusing the existing atomic Dataverse changeset
-   for promotion/prior retirement. Wire later content revisions to staged drafts;
-   preserve current prompts during all editing and failure cases. Provide an
-   import/export shape and dry-run validation for Connor. Do not offer a model
-   Test action in this slice; it would consume credits and needs separate scope.
-5. **Rehearsal and deliberate promotion.** In sandbox, round-trip backend draft
-   → Admin discovery → metadata organization → publish → backend current read;
-   Admin creation → backend discovery; concurrent writers; crash/retry; auth
-   denial; unsupported definitions; settings outages. Only after that, provision
-   Production additive schema, authorize migration, verify full backfill/readback,
-   deploy compatible readers then enable writers, and inspect authenticated UI.
-   Production schema/data writes are not authorized by this planning request.
+1. **Sandbox feasibility gate.** Agree Dataverse solution ownership/support,
+   obtain separately authorized sandbox provisioning, and prove Custom API
+   transaction context, two caller identities, execute privileges, conditional
+   head writes (including first publication), atomic rollback, unique receipt
+   races and lost-response recovery. No production deployment at this step.
+   A failed spike blocks implementation of this architecture; do not fall back
+   silently to an Admin-only publisher.
+2. **Additive schema and enforcement.** Provision six metadata columns plus draft-baseline column,
+   head/receipt tables with Active unique keys and optimistic concurrency,
+   draft version-null compatibility, synchronous write guards, catalog audit,
+   versioned validation policy and managed solution components. Final names,
+   limits, roles and policy transport need review before provisioning. Keep
+   writers disabled until legacy seed/raw-writer and invalid-state audits pass.
+3. **Read path, catalog and Admin.** Page complete inventory/history; cover every
+   projection and status consumer. Seed groups conditionally and backfill blank
+   metadata only with exact IDs/ETags, audited readback and resumable receipts;
+   refuse conflicting nonblank values. Render shared groups/metadata, search,
+   draft/history/conflict states, Needs organization, group management and
+   metadata-only editing. Budgets use the same catalog without changing budget
+   authority, placement, payloads or draft retention.
+4. **Two publication clients.** Admin saves/stages drafts and calls the Custom
+   API through an adapter and guarded transport. Ship Connor's delegated-OAuth
+   validate/save/publish/receipt command and import/export format in the SAME
+   release. No Admin interaction is required for Connor. Use shared parity
+   fixtures and server validation; dry-run performs no model call. Preserve
+   legacy audit replay and dirty/stale client-state guards.
+5. **Rehearsal and deliberate promotion.** Prove direct backend draft → Admin
+   discovery → backend publication → Admin/app active read, and Admin publication
+   → backend read. Test same-name/cross-name races, first publish, auth denial,
+   raw/bulk bypasses, stale metadata/policy, rollback and lost responses. Then
+   explicitly authorize Production additive provisioning/backfill and controlled
+   writer freeze, initialize/verify heads, deploy compatible readers/guards and
+   switch BOTH clients before enabling publication. Verify authenticated UI and
+   caller attribution. No live writes are authorized by this plan update.
 
 Retain current code catalog solely as the migration input and temporary,
 explicitly identified compatibility fallback before cutover. Remove it as the
 runtime authority only after every live UI consumer (including budgets) reads
 Dataverse and verified migration is complete. Rollback disables new writes and
-keeps the new columns/data; code rollback must not resume stale metadata cloning
-or legacy upsert seeds. No destructive schema rollback or prompt deletion.
+keeps the new columns/data; code rollback must not resume stale metadata cloning,
+legacy upsert seeds or the old uncoordinated publisher; keep writers disabled
+until both routes again share the enforced publication operation. No destructive schema rollback or prompt deletion.
 
 ### Required tests and durable reconciliation
 
@@ -354,58 +480,67 @@ or legacy upsert seeds. No destructive schema rollback or prompt deletion.
 - Schema/metadata: missing columns during rollout, exact per-field limits,
   unknown group/section/category handling, allowed metadata-only mutations,
   migrations preserving body/model/variables/output/status/version/current flags.
-- Publish: duplicate technical keys and reserved versions, first-publish races,
-  out-of-order reserved drafts (v3 before v2), stale metadata baselines,
-  concurrent metadata/content edits, idempotency with changed payload, connection
-  loss/lock cleanup, atomic rollback on either conditional lifecycle update, lost changeset
-  responses, failure before/after changeset commit/audit finalization,
-  repeat recovery, and unsupported model/output/injection-boundary contracts.
-  Current/retired content cannot be edited as a draft. New drafts never execute.
-- Trust: superuser UI and API guards, server-derived actor, no arbitrary field
-  PATCH, no provider keys or execution-budget overrides accepted from clients,
-  no automatic LLM execution, no unreviewed Power Automate auth expansion.
+- Publish: two simultaneous first publications, active-version races across both
+  clients, repeated/different UUID payloads, same-UUID concurrency, null draft
+  versions, metadata-baseline conflicts, head/flag mismatch, policy changes,
+  draft/current row-version failures, guard/bulk bypass attempts, receipt failure
+  and transaction rollback, lost response then later unrelated publication,
+  legacy audit replay and old corrupt states. A new publication returns success
+  only with a committed matching Dataverse receipt; drafts never execute.
+- Trust: superuser Admin guard, delegated backend identity, actual/effective
+  actor, role-denied API call, no app-attribution fallback, no client-controlled
+  bypass/actor/target, protected head/receipt/lifecycle writes, unknown definition
+  or validation policy rejected, no provider call or execution-budget override.
 - Run targeted unit/service/adapter tests, types, lint, canonical build, relevant
   gates and their self-tests sequentially. Register new route methods in
   `docs/API_ROUTE_SECURITY_MATRIX.md`; update `docs/SERVICE_AND_UTILITY_CATALOG.md`,
-  both relevant Atlas pages (Dataverse prompt/settings and Postgres audit),
+  relevant Atlas pages (prompt/settings, new Dataverse head/receipt/catalog audit
+  and unchanged legacy Postgres publication audit),
   migration manifest, docs catalog and any canonical counts. Reconcile the
   Executor contract and prompt-governance memories when implementation changes
   their facts. Do not mark target behavior shipped in those surfaces now.
 
-## Review disposition / decision needed before build
+## Review disposition / implementation gates
 
-**[PLANNED]** Recommended implementation order is shared catalog/read visibility
-first, then creation/publication; deliver one completed shared-library feature,
-not an indefinite catalog-only milestone. No generalized workflow engine or
-Power Automate execution adapter is required to achieve this objective.
+**[OWNER DIRECTION, 2026-10-29]** Both Admin and Connor's coding tools publish
+through a shared Dataverse operation; Admin is not mandatory for Connor. Drafts
+use GUIDs, and published numbers are assigned at activation. This replaces the
+former reserved-draft/Postgres-lock/Admin-first proposal.
 
-The remaining product/coordination decision is whether Connor accepts the shared
-publisher for publication (direct Dataverse drafts remain allowed). The live
-schema verification is complete for the scoped prompt/settings fields; write
-permissions, new-field provisioning, and sandbox fault rehearsal are explicit
-implementation gates rather than facts claimed by this plan.
+**[VERIFIED via Microsoft documentation and repository inspection]** The platform
+supports the required Custom API, synchronous transactional service calls,
+row-version checks, unique keys and OAuth clients. **[UNKNOWN]** Tenant deployment
+privileges/tooling, solution support ownership, actual role/impersonation behavior,
+null-version draft shape and fault/concurrency behavior require the named sandbox
+spike. No .NET project or Dataverse publication solution is supplied by this PR.
+See the feasibility report for evidence, falsification tests and review status.
 
+Before implementation: agree solution ownership, representative Connor definition
+format, and validation-policy transport/parity. These are technical/release gates,
+not a requirement for Connor to accept Admin publication. No message to Connor,
+schema change, Production write or model test is authorized by this PR.
 
-## Plan review record
+## Review record and bounded reconciliation
 
-**[VERIFIED via independent read-only contract review,
-`/root/review_shared_library_plan`, 2026-10-29]** Live-schema claims matched the
-retained evidence. Three findings were corrected and rechecked: prevent
-out-of-order draft publication from moving the current version backward; reject
-stale catalog-metadata baselines and require explicit reconciliation; and keep
-pending/final audit phases with a complete pending intent rather than promising
-unrepresentable intermediate event rows. No remaining blocker from those
-findings. A subsequent source check found the existing atomic changeset seam;
-the plan now reuses it for the lifecycle flip while retaining pending/final
-audit intent and cross-store recovery. Inventory paging also accounts for the
-transport's effective 100-row clamp, not just the adapter's requested 200. This review verifies the proposal, not implemented behavior.
+The earlier 2026-10-29 review corrected the FORMER app-only proposal's stale
+metadata, reserved-version and pending/final audit design. That review is
+historical evidence, not approval of this replacement Dataverse architecture.
+The retained schema evidence remains dated and unchanged.
 
-Contract-reconcile scope: entry points are Admin and backend authoring; durable
-state is Dataverse prompt/settings plus existing operational Postgres audit;
-consumers are prompt inventory/history, budget presentation, and existing
-runtime resolvers. Partial-success, concurrency, stale-state, full projection
-fan-out and rollback requirements are specified above. Runtime changes,
-Dataverse schema/write rehearsal and provider execution are not performed by
-this plan. Bounded documentation sweep: existing catalog/publisher statements
-remain current until implementation; no historical documents or governance
-memories are relabeled as shipped.
+Contract-reconcile scope: Admin/button and coding command → authenticated
+Dataverse Action → synchronous validation/head CAS/draft+prior updates/receipt
+→ both clients and current-row consumers. New operations are one atomic unit;
+unknown network outcomes resolve by receipt. Async client generation fences,
+policy parity and full raw-field reader/writer fan-out are implementation gates.
+Shared helper audit: one server operation, two clients, preserved auth differences.
+Durable-surface audit: new solution/tables/guards/roles require Atlas, security,
+catalog and rollout reconciliation during build; this PR ships none of them.
+
+Sweep Mode A: changed authoring/publication direction. Searched current plans,
+SESSION_PROMPT, Atlas/wiki/memory, runtime/scripts/tests for the named shared-library
+proposal and publication restrictions. The two proposal documents carried the
+superseded target and are rewritten together; existing runtime/Atlas/governance
+statements remain descriptions of today's implementation, not this proposal.
+The current main handoff is owned alongside Claude's work; it is not overwritten
+from this older planning branch. PR description and this report carry the new
+resume boundary. Final gate/review evidence is recorded in the feasibility report.
