@@ -399,11 +399,13 @@ with the markers written only after confirmed delivery. Accepted.
 1. Calendar date is copied at first invitation and then fixed (§3.1), rather
    than read live. **Decided (owner, 2026-10-29; D48).**
 2. One acceptance email that carries the materials, instead of two emails.
-   **Proposed.**
+   **Decided (owner, 2026-10-30; D49).**
 3. Reviewers withdraw by emailing the PD after accepting. **Decided (D48).**
 4. Invitations refused when Reviews Due is blank or the proposal PDF is missing.
    **Decided (D48).**
-5. Final wording of the three emails (drafted at build for approval).
+5. Final wording of the three emails: drafted in the PR for the owner's
+   review there (owner, 2026-10-30; D49); live text changes only with a
+   later owner-approved rebaseline (`--force-keys`).
 
 ## 7. Build order and tests
 
