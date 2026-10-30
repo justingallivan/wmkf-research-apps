@@ -231,8 +231,15 @@ and date on purpose and stays.
 Build steps, in order. Each becomes its own pull request with focused tests,
 a contract check and a Codex review; none merges without the owner.
 
-1. **Sandbox setup:** J/D Grant Cycle rows in the sandbox and links on sandbox
-   requests (§5a), with owner approval for the sandbox writes.
+1. **Sandbox setup — done 2026-10-29** (owner-approved sandbox writes;
+   `scripts/seed-sandbox-grant-cycles.cjs`). Created sandbox rows J26, D26, J27
+   (dates copied from the Production calendar by a read-only read) and test-only
+   D97, D99 (Board dates matching the sandbox test requests); linked 25 sandbox
+   requests (D26: 12, D97: 12, D99: 1). Verified by re-read: 5 rows, 25 links,
+   every linked request's meeting date unchanged and consistent with its link.
+   Open for the Factory step: Production test requests may also use made-up
+   far-future cycles, which under link-only would need rows in the real
+   calendar.
 2. **Cycle lookup and Research screens:** the shared helpers (with explicit
    restriction checks, §5b), the request adapter's expand support, the Research
    filters, cycle membership, cycle lists and default cycle, plus the two bugs
@@ -278,7 +285,7 @@ Verified by the author before the Codex review:
     `repair-service.js:258` [VERIFIED]): a plan saved before the deploy is
     refused after it; re-plan.
 - **Date-day difference:** D26 requests carry 2026-12-11; the calendar Board
-  date is recorded as 2026-12-10 (D45) [not re-read]. Anything that keys a day
+  date is 2026-12-10 [VERIFIED via Production calendar read, 2026-10-29]. Anything that keys a day
   (stale-invite closing, honorarium and Factory dates) moves one day earlier;
   month-year displays do not change.
 - **Production write fence** [VERIFIED via `production-write-fence.js:52-56`]:
@@ -387,8 +394,8 @@ honorarium and Factory paths.
    (`vercel.json:100-101`), the per-row recheck (`expire-invitation.js`) and the
    "Recorded by automated cycle close" label all use the linked cycle's calendar
    Board date (today's behavior within a day: D26 requests carry Dec 11 and the
-   calendar Board date is recorded as Dec 10, so closing may come one day
-   earlier); no link or no Board date
+   calendar Board date is Dec 10 [VERIFIED 2026-10-29], so closing comes one
+   day earlier); no link or no Board date
    means never auto-closed, as with a missing meeting date today.
 5. **Honorarium requests.** **Decided (owner, 2026-10-29):** going forward, new
    honorarium rows set the Grant Cycle link from the parent's link and write
@@ -399,8 +406,8 @@ honorarium and Factory paths.
    honorarium #1002764 carries the link (June 2026), meeting date 2026-06-04 and
    fiscal year "June 2026"; the nine newest app-made honoraria (#1003263–#1003274,
    Aug 2026) carry no link, meeting date 2026-12-11 and "December 2026". The
-   D26 calendar Board date is recorded as Dec 10 (D45 landing switch) [not
-   re-read], so the stored day may move one day earlier; the fiscal year does
+   D26 calendar Board date is Dec 10 [VERIFIED via Production calendar read,
+   2026-10-29], so the stored day moves one day earlier; the fiscal year does
    not change.
 6. **Stored cycle codes.** **Decided (owner, 2026-10-29): no backfill.** Codes
    already written from meeting dates stay. Evidence, owner-authorized read-only
