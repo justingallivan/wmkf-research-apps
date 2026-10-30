@@ -130,8 +130,9 @@ WMKF AI writeback fields (canonical: `docs/DYNAMICS_AI_FIELDS_SPEC_v3_cn.md` —
   **Writer (2026-10-29, D48; PR 2 of `docs/plans/REVIEWER_INVITATION_CALENDAR_BUILD_PLAN_2026-10-29.md`, branch `claude/review-due-date-from-calendar`, not yet deployed):** only
   `lib/services/review-due-date-service.js` `ensureRequestReviewDueDate`, called by
   `send-emails-service.js` before an invitation is dispatched: a blank date is filled from
-  the operations Grant Cycle `wmkf_researchreviewsduedate` for the cycle of this request's
-  `wmkf_meetingdate`, with `If-Match`; a 412 re-reads and keeps the winner; a stored date is
+  the `wmkf_researchreviewsduedate` of the operations Grant Cycle row this request links to
+  (`_wmkf_grantcycle_value`; the first app reader of that lookup; a blank link refuses, with no
+  meeting-date fallback, owner 2026-10-29), with `If-Match`; a 412 re-reads and keeps the winner; a stored date is
   never changed. The campaign-config route no longer writes it (read-only there). Before this
   branch deploys, the first invitation send wrote the browser's date after delivery.
 - `wmkf_respondreminderenabled` (Boolean, default true) / `wmkf_respondreminderleaddays` (Integer ≥0) — respond-by reminder toggle + lead.

@@ -10,9 +10,14 @@ const {
   REVIEW_DUE_DATE_PROBLEMS,
 } = require('../../lib/services/review-due-date-service');
 
+const J27_CYCLE_ID = '27272727-2727-4727-8727-272727272727';
+
+// The meeting date deliberately names a different cycle (December 2026 = D26):
+// the cycle must come from the Grant Cycle link alone (T10; owner 2026-10-29).
 const REQUEST = {
   akoya_requestid: '11111111-1111-4111-8111-111111111111',
-  wmkf_meetingdate: '2027-06-10T00:00:00Z',
+  _wmkf_grantcycle_value: J27_CYCLE_ID,
+  wmkf_meetingdate: '2026-12-10T00:00:00Z',
   wmkf_reviewduedate: null,
   _etag: 'W/"7"',
 };
@@ -27,21 +32,21 @@ function deps(over = {}) {
 }
 
 test('every refusal reason has staff-facing copy', () => {
-  for (const reason of ['no_meeting_date', 'cycle_missing', 'reviews_due_missing', 'calendar_unavailable', 'save_failed']) {
+  for (const reason of ['no_grant_cycle', 'cycle_missing', 'reviews_due_missing', 'calendar_unavailable', 'save_failed']) {
     expect(REVIEW_DUE_DATE_PROBLEMS[reason]).toEqual(expect.any(String));
   }
 });
 
 describe('getCalendarReviewsDue', () => {
   test('reads the Reviews Due Date as a calendar date', async () => {
-    await expect(getCalendarReviewsDue('J27', deps())).resolves.toEqual({ ok: true, date: '2027-03-10' });
+    await expect(getCalendarReviewsDue(J27_CYCLE_ID, deps())).resolves.toEqual({ ok: true, date: '2027-03-10' });
   });
   test('blank date, missing row and read failure are distinct refusals', async () => {
-    await expect(getCalendarReviewsDue('J27', deps({ readCycleDates: jest.fn(async () => ({ wmkf_researchreviewsduedate: null })) })))
+    await expect(getCalendarReviewsDue(J27_CYCLE_ID, deps({ readCycleDates: jest.fn(async () => ({ wmkf_researchreviewsduedate: null })) })))
       .resolves.toEqual({ ok: false, reason: 'reviews_due_missing' });
-    await expect(getCalendarReviewsDue('J27', deps({ readCycleDates: jest.fn(async () => null) })))
+    await expect(getCalendarReviewsDue(J27_CYCLE_ID, deps({ readCycleDates: jest.fn(async () => null) })))
       .resolves.toEqual({ ok: false, reason: 'cycle_missing' });
-    await expect(getCalendarReviewsDue('J27', deps({ readCycleDates: jest.fn(async () => { throw new Error('503'); }) })))
+    await expect(getCalendarReviewsDue(J27_CYCLE_ID, deps({ readCycleDates: jest.fn(async () => { throw new Error('503'); }) })))
       .resolves.toEqual({ ok: false, reason: 'calendar_unavailable' });
   });
 });
@@ -53,15 +58,22 @@ describe('resolveRequestReviewDueDate', () => {
       .resolves.toEqual({ ok: true, date: '2027-02-01', source: 'request' });
     expect(d.readCycleDates).not.toHaveBeenCalled();
   });
-  test('the cycle comes from the request meeting date', async () => {
+  test('the cycle is the Grant Cycle row the request links to, not its meeting date', async () => {
     const d = deps();
     await expect(resolveRequestReviewDueDate(REQUEST, d)).resolves.toEqual({ ok: true, date: '2027-03-10', source: 'calendar' });
-    expect(d.readCycleDates).toHaveBeenCalledWith('J27', expect.any(Object));
+    expect(d.readCycleDates).toHaveBeenCalledTimes(1);
+    expect(d.readCycleDates).toHaveBeenCalledWith(J27_CYCLE_ID, expect.any(Object));
   });
-  test('no meeting date refuses without reading the calendar', async () => {
+  test('no Grant Cycle link refuses even when a meeting date would name a cycle', async () => {
     const d = deps();
-    await expect(resolveRequestReviewDueDate({ ...REQUEST, wmkf_meetingdate: null }, d))
-      .resolves.toEqual({ ok: false, reason: 'no_meeting_date' });
+    await expect(resolveRequestReviewDueDate({ ...REQUEST, _wmkf_grantcycle_value: null, wmkf_meetingdate: '2027-06-10T00:00:00Z' }, d))
+      .resolves.toEqual({ ok: false, reason: 'no_grant_cycle' });
+    expect(d.readCycleDates).not.toHaveBeenCalled();
+  });
+  test('a stored date still wins for a request with no Grant Cycle link', async () => {
+    const d = deps();
+    await expect(resolveRequestReviewDueDate({ ...REQUEST, _wmkf_grantcycle_value: null, wmkf_reviewduedate: '2027-02-01' }, d))
+      .resolves.toEqual({ ok: true, date: '2027-02-01', source: 'request' });
     expect(d.readCycleDates).not.toHaveBeenCalled();
   });
 });
@@ -97,6 +109,12 @@ describe('ensureRequestReviewDueDate', () => {
     const noEtag = deps();
     await expect(ensureRequestReviewDueDate({ ...REQUEST, _etag: undefined }, {}, noEtag)).resolves.toEqual({ ok: false, reason: 'save_failed' });
     expect(noEtag.writeRequest).not.toHaveBeenCalled();
+  });
+  test('no Grant Cycle link refuses with no write', async () => {
+    const d = deps();
+    await expect(ensureRequestReviewDueDate({ ...REQUEST, _wmkf_grantcycle_value: undefined }, {}, d))
+      .resolves.toEqual({ ok: false, reason: 'no_grant_cycle' });
+    expect(d.writeRequest).not.toHaveBeenCalled();
   });
   test('a blank calendar date refuses with no write', async () => {
     const d = deps({ readCycleDates: jest.fn(async () => ({ wmkf_researchreviewsduedate: null })) });

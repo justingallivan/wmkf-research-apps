@@ -174,14 +174,17 @@ Admin `inviteStartDate` has no reader outside its form, validation and tests
 - **Blank Reviews Due:** invitations for that cycle are refused with "Set the
   Reviews Due Date on the cycle calendar first" (§3 blank-date rule). No
   fallback to Admin defaults.
-- **Request's cycle is derived on the server** from the request's own Board
-  meeting date, `meetingDateToCycleCode(akoya_request.wmkf_meetingdate)` (the
-  filing rule's fallback, `individual-file-service.js:224-230`). Any client
-  value is ignored: the suggestion's `wmkf_grantcyclecode` is stamped from a
-  caller-supplied code at suggestion creation
-  (`reviewer-suggestion.js:537,819,863,972,1160`) [VERIFIED by grep], so it
-  must not select whose date applies. A blank meeting date refuses the send.
-  Ask Connor whether J27 requests carry their meeting date when they arrive.
+- **Request's cycle is read on the server** from the request's own Grant Cycle
+  link, `akoya_request.wmkf_grantcycle` (alignment log T10), and the date from
+  that linked calendar row. **Changed 2026-10-29 (owner):** apps stop reading the
+  request meeting date, with no meeting-date fallback; a request with no Grant
+  Cycle link refuses the invitation (owner-confirmed). The T10 probe found 12 J27
+  requests with the link and no meeting date. Any client value is ignored: the
+  suggestion's `wmkf_grantcyclecode` is stamped from a caller-supplied code at
+  suggestion creation (`reviewer-suggestion.js:537,819,863,972,1160`) [VERIFIED
+  by grep], so it must not select whose date applies. Earlier text: the cycle
+  came from `meetingDateToCycleCode(akoya_request.wmkf_meetingdate)` and a blank
+  meeting date refused the send.
 - **Campaign settings editor:** stops editing the due date (shows it read-only
   with "from the cycle calendar"); keeps response days and reviewer quota (D9).
   Its save route rejects a due date server-side, not only in the form
@@ -415,8 +418,9 @@ Dataverse writes). Separate PRs, each with focused unit tests:
 2. **Built on branch `claude/review-due-date-from-calendar` (not yet merged):** due date
    from the calendar on the server (A) and the due-date part of C.
    `lib/services/review-due-date-service.js` (the shared reader for this date,
-   `getCycleDatesByCode` in the adapter, `CYCLE_CALENDAR_MEANINGS` in
-   `shared/config/cycleCalendar.js`); render fills `{{reviewDue}}` /
+   `getCycleDatesById` in the adapter, reading the row the request's Grant Cycle
+   link names, `CYCLE_CALENDAR_MEANINGS` in `shared/config/cycleCalendar.js`; no
+   link refuses, no meeting-date fallback); render fills `{{reviewDue}}` /
    `{{reviewDueDate}}` / `{{reviewDeadline}}` from the request date or the calendar and
    refuses an invitation preview with no date; send stores the date with `If-Match`
    before dispatch (new skip reason `review_due_date_unavailable`) and no longer takes
@@ -426,7 +430,12 @@ Dataverse writes). Separate PRs, each with focused unit tests:
    travel with the new wording): the proposal-release date fields and
    `{{proposalDelivery}}`, and the Reviewer Finder record's `proposalSendDate` /
    `commitDate` custom fields; the Reviewer Finder `reviewDeadline` is no longer read
-   for email text but still feeds the draft fingerprint.
+   for email text but still feeds the draft fingerprint. **Not changed here:** render
+   and send still pick the cycle configuration (review template, attachments, program
+   name) from the request meeting date (code that predates this PR). A J27 request
+   with a Grant Cycle link but no meeting date gets its due date but an empty cycle
+   configuration. That move belongs to the meeting-date removal plan (work queue
+   item 6a).
 3. Board setup from the calendar (E).
 4. Materials on acceptance (B) + wording.
 

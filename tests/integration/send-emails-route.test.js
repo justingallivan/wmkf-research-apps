@@ -101,9 +101,10 @@ jest.mock('../../lib/services/grant-cycles-dataverse', () => ({ findByShortCode:
 jest.mock('../../lib/utils/cycle-code', () => ({ meetingDateToCycleCode: jest.fn(() => CYCLE_CODE) }));
 // Cycle calendar row for the D48 due-date step (real review-due-date-service).
 let CALENDAR_ROW;
-const getCycleDatesByCode = jest.fn(async () => CALENDAR_ROW);
+const J27_CYCLE_ID = '27272727-2727-4727-8727-272727272727';
+const getCycleDatesById = jest.fn(async () => CALENDAR_ROW);
 jest.mock('../../lib/dataverse/adapters/operations-grant-cycle', () => ({
-  getCycleDatesByCode: (...a) => getCycleDatesByCode(...a),
+  getCycleDatesById: (...a) => getCycleDatesById(...a),
 }));
 jest.mock('../../lib/utils/public-blob-fetch', () => ({ fetchPublicBlob: jest.fn(), isPublicBlobUrl: jest.fn(() => false) }));
 // Private cycle-materials path: a 'cycle-materials/…' pathname is read from the blob
@@ -212,6 +213,7 @@ beforeEach(() => {
     akoya_requestid: 'req-1',
     akoya_requestnum: 'REQ-001',
     wmkf_meetingdate: '2026-07-01',
+    _wmkf_grantcycle_value: J27_CYCLE_ID,
     wmkf_reviewduedate: '2026-09-09',
     _wmkf_programdirector_value: 'pd-1',
     _etag: 'W/"r1"',
@@ -772,7 +774,7 @@ describe('send-emails — review due date from the cycle calendar (D48)', () => 
   test('a first invitation stores the calendar date, conditionally, before the email is sent', async () => {
     const res = await run(invite());
     expect(resultOf(res).stats).toMatchObject({ sent: 1 });
-    expect(getCycleDatesByCode).toHaveBeenCalledWith('J27', expect.any(Object));
+    expect(getCycleDatesById).toHaveBeenCalledWith(J27_CYCLE_ID, expect.any(Object));
     expect(updateRecord).toHaveBeenCalledTimes(1);
     expect(updateRecord).toHaveBeenCalledWith('akoya_requests', 'req-1',
       { wmkf_reviewduedate: '2027-03-10' }, expect.objectContaining({ ifMatch: 'W/"r1"' }));
@@ -785,6 +787,18 @@ describe('send-emails — review due date from the cycle calendar (D48)', () => 
     const r = resultOf(res);
     expect(r.stats).toMatchObject({ sent: 0 });
     expect(r.skipped.map((x) => x.reason)).toEqual(['review_due_date_unavailable']);
+    expect(createAndSendEmail).not.toHaveBeenCalled();
+    expect(updateRecord).not.toHaveBeenCalled();
+  });
+
+  test('no Grant Cycle link sends nothing and writes nothing, with no meeting-date fallback', async () => {
+    // The meeting-date mapping still names J27 here; the link alone decides.
+    REQUEST = { ...REQUEST, _wmkf_grantcycle_value: null };
+    const res = await run(invite());
+    const r = resultOf(res);
+    expect(r.stats).toMatchObject({ sent: 0 });
+    expect(r.skipped.map((x) => x.reason)).toEqual(['review_due_date_unavailable']);
+    expect(getCycleDatesById).not.toHaveBeenCalled();
     expect(createAndSendEmail).not.toHaveBeenCalled();
     expect(updateRecord).not.toHaveBeenCalled();
   });

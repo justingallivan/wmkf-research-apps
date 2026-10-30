@@ -109,7 +109,8 @@ staff-guarded `/api/review-manager/send-emails`; no cron sends materials);
 `wmkf_reviewduedate` is no longer seeded from the browser after send. Before an
 invitation is dispatched, `lib/services/review-due-date-service.js`
 `ensureRequestReviewDueDate` fills a blank date from the cycle calendar's Reviews Due
-Date (cycle from the request's meeting date), ETag-conditionally; a stored date never
+Date (the Grant Cycle row the request links to, `akoya_request.wmkf_grantcycle`; no link
+refuses; never the meeting date), ETag-conditionally; a stored date never
 moves. Render fills `{{reviewDue}}` server-side and the invite modal shows the date
 read-only, so there is no due-date edit left to diverge. Historical behavior: request
 campaign config was seeded *set only if unset* after delivery, so a later due-date edit
