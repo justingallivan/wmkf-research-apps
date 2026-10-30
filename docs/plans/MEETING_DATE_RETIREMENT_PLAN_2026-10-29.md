@@ -308,10 +308,15 @@ Verified by the author before the Codex review:
    history text; Q3 (no meeting-date fallback for past grants) can change it when
    a past grant lacks a fiscal year or decision date, even though the
    meeting-date line stays the same. §5a's "unchanged" applies to that line only.
-   **Required:** count live D26 drafts whose funding history used the
-   meeting-date fallback, test missing-date cases, and define how a changed
-   snapshot is handled (re-generate, or hold Q3's past-grant change until after
-   the D26 Board meeting).
+   **Resolved (owner, 2026-10-29): no hold, no count.** Nothing compares a
+   stored draft fingerprint with current data (only the record adapter reads
+   `wmkf_inputfingerprint`; regeneration reuses the stored value) and the
+   auto-prepare worker runs once per site visit and reuses a document already
+   in Review [VERIFIED via `git grep inputfingerprint`,
+   `pre-site-visit/artifact-service.js:145-162,253-258`,
+   `preparation-worker.js:362-376`]. D26 drafts are with the CSO for final
+   review, then go to the President outside the apps; no one regenerates them.
+   Still test the missing-date cases for new drafts.
 
 Also from the review: remove `wmkf_meetingdate` from a select list only after
 every consumer of that select has moved, including later-PR gates, expiry,
@@ -364,7 +369,8 @@ honorarium and Factory paths.
    `formatMeetingDate` month-year format [VERIFIED via
    `proposal-core-service.js:119-128,352`, `artifact-model.js:229`] so live D26
    drafts (Board meeting still ahead) do not change fingerprint for that line;
-   test it. The funding-history text can still change (§5b item 4).
+   test it. The funding-history text can change only for a draft generated
+   after the deploy (§5b item 4); D26 drafts are final.
    Historical award recency (§3.5). **Decided (owner, 2026-10-29):** past grants
    use only their own fiscal-year label and decision date (writeup "awarded in"
    and Proposal Ranking: fiscal year, then decision date; most-recent-grant
