@@ -159,7 +159,9 @@ test('worker withholds archive start and every notice when the calendar cannot b
   state.firstEventAt = state.handoffBackfilledAt = '2026-10-01T16:00:00Z';
   state.releases[ID] = { releasedAt: state.firstEventAt, state: 'released' };
   const deliverNotice = jest.fn(), reconcile = jest.fn(), reconcileNotices = jest.fn();
-  const cycleDates = jest.fn(async () => { throw Object.assign(new Error('down'), { code: 'board_calendar_unavailable' }); });
+  const { cycleDates: readDates } = jest.requireActual('../../lib/services/board-writeups/calendar');
+  // A stalled read must expire and let release/archive work continue.
+  const cycleDates = jest.fn(cycle => readDates(cycle, { read: () => new Promise(() => {}), timeoutMs: 20 }));
   const deps = { ...d, cycleDates, now: () => Date.parse('2026-12-02T17:00:00Z'), listCycles: async () => ['D26'], deliverNotice, reconcile, reconcileNotices };
   try {
     const run = await runBoardWorkflow(deps);

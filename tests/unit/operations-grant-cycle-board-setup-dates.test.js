@@ -56,3 +56,9 @@ test('a failed read is board_calendar_unavailable; the view helper reports it in
   await expect(cycleDatesOrError('D26', { cycleDates: cycle => cycleDates(cycle, { read }) })).resolves.toEqual({ boardEnds: null, materialsDue: null, unavailable: true });
   await expect(cycleDates('nope', { read })).rejects.toMatchObject({ code: 'board_cycle_invalid' });
 });
+
+test('a read that never settles (token or body) expires as board_calendar_unavailable', async () => {
+  const read = jest.fn(() => new Promise(() => {}));
+  await expect(cycleDates('D26', { read, timeoutMs: 20 })).rejects.toMatchObject({ code: 'board_calendar_unavailable' });
+  await expect(cycleDatesOrError('D26', { cycleDates: cycle => cycleDates(cycle, { read, timeoutMs: 20 }) })).resolves.toMatchObject({ unavailable: true });
+});
