@@ -104,6 +104,10 @@ test('configuration change or revoked recipient prevents send', async () => {
   await deliverNotice('D26', { key: 'cleanup:2026-12-08', kind: 'cleanup' }, moved.d);
   expect(moved.d.create).toHaveBeenCalledTimes(1); expect(moved.d.send).not.toHaveBeenCalled();
   expect(moved.state.emails['cleanup:2026-12-08'].error).toBe('board_notice_configuration_changed');
+  // A retry reads the moved date twice; it must still compare against the date the draft was written from.
+  await deliverNotice('D26', { key: 'cleanup:2026-12-08', kind: 'cleanup' }, moved.d);
+  expect(moved.d.send).not.toHaveBeenCalled();
+  expect(moved.state.emails['cleanup:2026-12-08']).toMatchObject({ dates: DATES, error: 'board_notice_configuration_changed' });
   const next = fixture(); next.d.eligibleStaff.mockRejectedValue(new Error('disabled admin'));
   await expect(deliverNotice('D26', { key: 'cleanup:2026-12-08', kind: 'cleanup' }, next.d)).rejects.toThrow('disabled admin');
   expect(next.d.create).not.toHaveBeenCalled();
@@ -175,4 +179,12 @@ test('dashboard reports an unreadable calendar rather than a missing date', asyn
   expect(view.dates).toEqual({ boardEnds: null, materialsDue: null, unavailable: true });
   expect(view.cleanup).toMatchObject({ dueDate: null, due: false });
   await expect(completeCleanup('D26', actor, d)).rejects.toMatchObject({ code: 'board_calendar_unavailable' });
+});
+
+test('an unsent draft written before calendar dates is never sent', async () => {
+  const { state, d } = fixture();
+  state.emails['cleanup:2026-12-08'] = { subject: 'old', body: 'typed date', to: ['admin@wmkeck.org'], cc: [], from: 'system@wmkeck.org', kind: 'cleanup', createStartedAt: '2026-12-08T16:00:00Z', sendStartedAt: null, activityId: 'email-id', acceptedAt: null };
+  await deliverNotice('D26', { key: 'cleanup:2026-12-08', kind: 'cleanup' }, d);
+  expect(d.send).not.toHaveBeenCalled();
+  expect(state.emails['cleanup:2026-12-08'].error).toBe('board_notice_configuration_changed');
 });

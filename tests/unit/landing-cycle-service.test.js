@@ -4,6 +4,7 @@
  */
 import {
   LANDING_CYCLE_KEY,
+  LANDING_READ_DEADLINE_MS,
   automaticLandingCycle,
   getLandingCycle,
   loadLandingCycleEditor,
@@ -247,6 +248,13 @@ describe('resolveBoardDefaultCycle', () => {
       listBoardDates: jest.fn(async () => [{ wmkf_cyclecode: 'J27', wmkf_meetingdate: null }]),
     });
     await expect(resolveBoardDefaultCycle(d)).resolves.toBe('D26');
+  });
+
+  test('a calendar read that never settles falls back within the deadline', async () => {
+    const d = deps({ ...setups([['J27', '2027-06-10']]), listBoardDates: jest.fn(() => new Promise(() => {})) });
+    const started = Date.now();
+    await expect(resolveBoardDefaultCycle(d)).resolves.toBe('D26');
+    expect(Date.now() - started).toBeLessThan(LANDING_READ_DEADLINE_MS + 1000);
   });
 
   test('a failed calendar read falls back to the conventional rule', async () => {
