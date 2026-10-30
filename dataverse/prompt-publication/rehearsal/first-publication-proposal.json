@@ -1,0 +1,44 @@
+{
+  "status": "PROPOSED_NOT_CREATED",
+  "targetHost": "orgd9e66399.crm.dynamics.com",
+  "organizationId": "3d52a072-b138-ef11-8e4b-000d3a106422",
+  "snapshot": {
+    "definitionFormatVersion": 1,
+    "definition": {
+      "name": "pr553.rehearsal.publication",
+      "systemPrompt": "",
+      "body": "PR553 publication and readback rehearsal. No model execution is requested.",
+      "variables": null,
+      "outputSchema": "{\"parseMode\":\"raw\",\"outputs\":[{\"name\":\"answer\",\"target\":{\"kind\":\"none\"}}]}",
+      "model": "sonnet",
+      "maxTokens": 1000,
+      "temperature": 0.2
+    },
+    "catalog": {
+      "title": "PR553 publication rehearsal",
+      "description": "Synthetic test-only prompt. No application or flow consumes it.",
+      "groupKey": "pr553-test",
+      "sectionKey": null,
+      "usedBy": "Offline publication/readback rehearsal only",
+      "usageCategory": "declared"
+    }
+  },
+  "snapshotHash": "60a4528486db3c867333e6612ddc878a5f9be048f26cb5845fe5b55a49110aef",
+  "proposedGroupCatalog": {
+    "schemaVersion": 1,
+    "groups": [
+      {
+        "key": "pr553-test",
+        "label": "PR553 Test",
+        "order": 10,
+        "sections": []
+      }
+    ]
+  },
+  "request": null,
+  "draftId": null,
+  "requestId": null,
+  "expectedHeadRevision": "0",
+  "deploymentAuthorized": false,
+  "liveWritesAuthorized": false
+}

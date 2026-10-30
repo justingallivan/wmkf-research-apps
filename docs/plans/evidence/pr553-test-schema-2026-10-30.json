@@ -1,0 +1,1109 @@
+{
+  "observedAt": "2026-10-30T22:08:26.363Z",
+  "targetHost": "orgd9e66399.crm.dynamics.com",
+  "targetClass": "sandbox",
+  "readOnly": true,
+  "entities": [
+    {
+      "logicalName": "wmkf_ai_prompt",
+      "schemaName": "wmkf_ai_prompt",
+      "entitySet": "wmkf_ai_prompts",
+      "primaryId": "wmkf_ai_promptid",
+      "primaryName": "wmkf_ai_promptname",
+      "label": "AI Prompt",
+      "optimisticConcurrency": true,
+      "keys": [],
+      "attributes": [
+        {
+          "name": "createdby",
+          "schemaName": "CreatedBy",
+          "type": "Lookup",
+          "custom": false,
+          "create": false,
+          "update": false,
+          "required": "None",
+          "label": "Created By"
+        },
+        {
+          "name": "createdbyname",
+          "schemaName": "CreatedByName",
+          "type": "String",
+          "custom": false,
+          "create": false,
+          "update": false,
+          "required": "None",
+          "label": null,
+          "maxLength": 100
+        },
+        {
+          "name": "createdbyyominame",
+          "schemaName": "CreatedByYomiName",
+          "type": "String",
+          "custom": false,
+          "create": false,
+          "update": false,
+          "required": "SystemRequired",
+          "label": null,
+          "maxLength": 100
+        },
+        {
+          "name": "createdon",
+          "schemaName": "CreatedOn",
+          "type": "DateTime",
+          "custom": false,
+          "create": false,
+          "update": false,
+          "required": "None",
+          "label": "Created On"
+        },
+        {
+          "name": "createdonbehalfby",
+          "schemaName": "CreatedOnBehalfBy",
+          "type": "Lookup",
+          "custom": false,
+          "create": false,
+          "update": false,
+          "required": "None",
+          "label": "Created By (Delegate)"
+        },
+        {
+          "name": "createdonbehalfbyname",
+          "schemaName": "CreatedOnBehalfByName",
+          "type": "String",
+          "custom": false,
+          "create": false,
+          "update": false,
+          "required": "None",
+          "label": null,
+          "maxLength": 100
+        },
+        {
+          "name": "createdonbehalfbyyominame",
+          "schemaName": "CreatedOnBehalfByYomiName",
+          "type": "String",
+          "custom": false,
+          "create": false,
+          "update": false,
+          "required": "SystemRequired",
+          "label": null,
+          "maxLength": 100
+        },
+        {
+          "name": "importsequencenumber",
+          "schemaName": "ImportSequenceNumber",
+          "type": "Integer",
+          "custom": false,
+          "create": true,
+          "update": false,
+          "required": "None",
+          "label": "Import Sequence Number"
+        },
+        {
+          "name": "modifiedby",
+          "schemaName": "ModifiedBy",
+          "type": "Lookup",
+          "custom": false,
+          "create": false,
+          "update": false,
+          "required": "None",
+          "label": "Modified By"
+        },
+        {
+          "name": "modifiedbyname",
+          "schemaName": "ModifiedByName",
+          "type": "String",
+          "custom": false,
+          "create": false,
+          "update": false,
+          "required": "None",
+          "label": null,
+          "maxLength": 100
+        },
+        {
+          "name": "modifiedbyyominame",
+          "schemaName": "ModifiedByYomiName",
+          "type": "String",
+          "custom": false,
+          "create": false,
+          "update": false,
+          "required": "SystemRequired",
+          "label": null,
+          "maxLength": 100
+        },
+        {
+          "name": "modifiedon",
+          "schemaName": "ModifiedOn",
+          "type": "DateTime",
+          "custom": false,
+          "create": false,
+          "update": false,
+          "required": "None",
+          "label": "Modified On"
+        },
+        {
+          "name": "modifiedonbehalfby",
+          "schemaName": "ModifiedOnBehalfBy",
+          "type": "Lookup",
+          "custom": false,
+          "create": false,
+          "update": false,
+          "required": "None",
+          "label": "Modified By (Delegate)"
+        },
+        {
+          "name": "modifiedonbehalfbyname",
+          "schemaName": "ModifiedOnBehalfByName",
+          "type": "String",
+          "custom": false,
+          "create": false,
+          "update": false,
+          "required": "None",
+          "label": null,
+          "maxLength": 100
+        },
+        {
+          "name": "modifiedonbehalfbyyominame",
+          "schemaName": "ModifiedOnBehalfByYomiName",
+          "type": "String",
+          "custom": false,
+          "create": false,
+          "update": false,
+          "required": "SystemRequired",
+          "label": null,
+          "maxLength": 100
+        },
+        {
+          "name": "overriddencreatedon",
+          "schemaName": "OverriddenCreatedOn",
+          "type": "DateTime",
+          "custom": false,
+          "create": true,
+          "update": false,
+          "required": "None",
+          "label": "Record Created On"
+        },
+        {
+          "name": "ownerid",
+          "schemaName": "OwnerId",
+          "type": "Owner",
+          "custom": false,
+          "create": true,
+          "update": true,
+          "required": "SystemRequired",
+          "label": "Owner"
+        },
+        {
+          "name": "owneridname",
+          "schemaName": "OwnerIdName",
+          "type": "String",
+          "custom": false,
+          "create": false,
+          "update": false,
+          "required": "SystemRequired",
+          "label": null,
+          "maxLength": 100
+        },
+        {
+          "name": "owneridtype",
+          "schemaName": "OwnerIdType",
+          "type": "EntityName",
+          "custom": false,
+          "create": true,
+          "update": true,
+          "required": "SystemRequired",
+          "label": null
+        },
+        {
+          "name": "owneridyominame",
+          "schemaName": "OwnerIdYomiName",
+          "type": "String",
+          "custom": false,
+          "create": false,
+          "update": false,
+          "required": "SystemRequired",
+          "label": null,
+          "maxLength": 100
+        },
+        {
+          "name": "owningbusinessunit",
+          "schemaName": "OwningBusinessUnit",
+          "type": "Lookup",
+          "custom": false,
+          "create": false,
+          "update": false,
+          "required": "None",
+          "label": "Owning Business Unit"
+        },
+        {
+          "name": "owningbusinessunitname",
+          "schemaName": "OwningBusinessUnitName",
+          "type": "String",
+          "custom": false,
+          "create": false,
+          "update": false,
+          "required": "SystemRequired",
+          "label": null,
+          "maxLength": 100
+        },
+        {
+          "name": "owningteam",
+          "schemaName": "OwningTeam",
+          "type": "Lookup",
+          "custom": false,
+          "create": false,
+          "update": false,
+          "required": "None",
+          "label": "Owning Team"
+        },
+        {
+          "name": "owninguser",
+          "schemaName": "OwningUser",
+          "type": "Lookup",
+          "custom": false,
+          "create": false,
+          "update": false,
+          "required": "None",
+          "label": "Owning User"
+        },
+        {
+          "name": "statecode",
+          "schemaName": "statecode",
+          "type": "State",
+          "custom": false,
+          "create": false,
+          "update": true,
+          "required": "SystemRequired",
+          "label": "Status"
+        },
+        {
+          "name": "statecodename",
+          "schemaName": "statecodeName",
+          "type": "Virtual",
+          "custom": false,
+          "create": false,
+          "update": false,
+          "required": "None",
+          "label": null
+        },
+        {
+          "name": "statuscode",
+          "schemaName": "statuscode",
+          "type": "Status",
+          "custom": false,
+          "create": true,
+          "update": true,
+          "required": "None",
+          "label": "Status Reason"
+        },
+        {
+          "name": "statuscodename",
+          "schemaName": "statuscodeName",
+          "type": "Virtual",
+          "custom": false,
+          "create": false,
+          "update": false,
+          "required": "None",
+          "label": null
+        },
+        {
+          "name": "timezoneruleversionnumber",
+          "schemaName": "TimeZoneRuleVersionNumber",
+          "type": "Integer",
+          "custom": false,
+          "create": true,
+          "update": true,
+          "required": "None",
+          "label": "Time Zone Rule Version Number"
+        },
+        {
+          "name": "utcconversiontimezonecode",
+          "schemaName": "UTCConversionTimeZoneCode",
+          "type": "Integer",
+          "custom": false,
+          "create": true,
+          "update": true,
+          "required": "None",
+          "label": "UTC Conversion Time Zone Code"
+        },
+        {
+          "name": "versionnumber",
+          "schemaName": "VersionNumber",
+          "type": "BigInt",
+          "custom": false,
+          "create": false,
+          "update": false,
+          "required": "None",
+          "label": "Version Number"
+        },
+        {
+          "name": "wmkf_ai_iscurrent",
+          "schemaName": "wmkf_ai_IsCurrent",
+          "type": "Boolean",
+          "custom": true,
+          "create": true,
+          "update": true,
+          "required": "ApplicationRequired",
+          "label": "Current"
+        },
+        {
+          "name": "wmkf_ai_iscurrentname",
+          "schemaName": "wmkf_ai_iscurrentName",
+          "type": "Virtual",
+          "custom": true,
+          "create": false,
+          "update": false,
+          "required": "None",
+          "label": null
+        },
+        {
+          "name": "wmkf_ai_lasttestdatetime",
+          "schemaName": "wmkf_ai_LastTestDateTime",
+          "type": "DateTime",
+          "custom": true,
+          "create": true,
+          "update": true,
+          "required": "None",
+          "label": "Last Test DateTime"
+        },
+        {
+          "name": "wmkf_ai_maxtokens",
+          "schemaName": "wmkf_ai_MaxTokens",
+          "type": "Integer",
+          "custom": true,
+          "create": true,
+          "update": true,
+          "required": "ApplicationRequired",
+          "label": "Max Tokens"
+        },
+        {
+          "name": "wmkf_ai_model",
+          "schemaName": "wmkf_ai_Model",
+          "type": "String",
+          "custom": true,
+          "create": true,
+          "update": true,
+          "required": "ApplicationRequired",
+          "label": "AI Model",
+          "maxLength": 100
+        },
+        {
+          "name": "wmkf_ai_notes",
+          "schemaName": "wmkf_ai_Notes",
+          "type": "Memo",
+          "custom": true,
+          "create": true,
+          "update": true,
+          "required": "None",
+          "label": "Notes",
+          "maxLength": 1000000
+        },
+        {
+          "name": "wmkf_ai_preflightpasseddatetime",
+          "schemaName": "wmkf_ai_PreflightPassedDateTime",
+          "type": "DateTime",
+          "custom": true,
+          "create": true,
+          "update": true,
+          "required": "None",
+          "label": "Preflight Passed DateTime"
+        },
+        {
+          "name": "wmkf_ai_promptbody",
+          "schemaName": "wmkf_ai_PromptBody",
+          "type": "Memo",
+          "custom": true,
+          "create": true,
+          "update": true,
+          "required": "None",
+          "label": "Prompt Body",
+          "maxLength": 1000000
+        },
+        {
+          "name": "wmkf_ai_promptid",
+          "schemaName": "wmkf_ai_promptId",
+          "type": "Uniqueidentifier",
+          "custom": false,
+          "create": true,
+          "update": false,
+          "required": "SystemRequired",
+          "label": "AI Prompt"
+        },
+        {
+          "name": "wmkf_ai_promptname",
+          "schemaName": "wmkf_ai_PromptName",
+          "type": "String",
+          "custom": true,
+          "create": true,
+          "update": true,
+          "required": "None",
+          "label": "Prompt Name",
+          "maxLength": 850
+        },
+        {
+          "name": "wmkf_ai_promptoutputschema",
+          "schemaName": "wmkf_ai_PromptOutputSchema",
+          "type": "Memo",
+          "custom": true,
+          "create": true,
+          "update": true,
+          "required": "None",
+          "label": "Output Schema",
+          "maxLength": 1000000
+        },
+        {
+          "name": "wmkf_ai_promptstatus",
+          "schemaName": "wmkf_ai_PromptStatus",
+          "type": "Picklist",
+          "custom": true,
+          "create": true,
+          "update": true,
+          "required": "ApplicationRequired",
+          "label": "Prompt Status"
+        },
+        {
+          "name": "wmkf_ai_promptstatusname",
+          "schemaName": "wmkf_ai_promptstatusName",
+          "type": "Virtual",
+          "custom": true,
+          "create": false,
+          "update": false,
+          "required": "None",
+          "label": null
+        },
+        {
+          "name": "wmkf_ai_promptvariables",
+          "schemaName": "wmkf_ai_PromptVariables",
+          "type": "Memo",
+          "custom": true,
+          "create": true,
+          "update": true,
+          "required": "None",
+          "label": "Variables",
+          "maxLength": 1000000
+        },
+        {
+          "name": "wmkf_ai_publisheddatetime",
+          "schemaName": "wmkf_ai_PublishedDateTime",
+          "type": "DateTime",
+          "custom": true,
+          "create": true,
+          "update": true,
+          "required": "None",
+          "label": "Published On"
+        },
+        {
+          "name": "wmkf_ai_rollbackfrom",
+          "schemaName": "wmkf_ai_RollbackFrom",
+          "type": "Integer",
+          "custom": true,
+          "create": true,
+          "update": true,
+          "required": "None",
+          "label": "Rollback from Version"
+        },
+        {
+          "name": "wmkf_ai_systemprompt",
+          "schemaName": "wmkf_ai_SystemPrompt",
+          "type": "Memo",
+          "custom": true,
+          "create": true,
+          "update": true,
+          "required": "None",
+          "label": "System Prompt",
+          "maxLength": 1000000
+        },
+        {
+          "name": "wmkf_ai_temperature",
+          "schemaName": "wmkf_ai_Temperature",
+          "type": "Decimal",
+          "custom": true,
+          "create": true,
+          "update": true,
+          "required": "ApplicationRequired",
+          "label": "Temperature"
+        },
+        {
+          "name": "wmkf_promptversion",
+          "schemaName": "wmkf_PromptVersion",
+          "type": "Integer",
+          "custom": true,
+          "create": true,
+          "update": true,
+          "required": "ApplicationRequired",
+          "label": "Prompt Version "
+        }
+      ],
+      "choices": [
+        {
+          "name": "wmkf_ai_promptstatus",
+          "options": [
+            {
+              "value": 682090000,
+              "label": "Draft"
+            },
+            {
+              "value": 682090001,
+              "label": "Published"
+            },
+            {
+              "value": 682090002,
+              "label": "Retired"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "logicalName": "wmkf_appsystemsetting",
+      "schemaName": "wmkf_AppSystemSetting",
+      "entitySet": "wmkf_appsystemsettings",
+      "primaryId": "wmkf_appsystemsettingid",
+      "primaryName": "wmkf_settingkey",
+      "label": "App System Setting",
+      "optimisticConcurrency": true,
+      "keys": [
+        {
+          "name": "wmkf_settingkey",
+          "fields": [
+            "wmkf_settingkey"
+          ],
+          "status": "Active"
+        }
+      ],
+      "attributes": [
+        {
+          "name": "createdby",
+          "schemaName": "CreatedBy",
+          "type": "Lookup",
+          "custom": false,
+          "create": false,
+          "update": false,
+          "required": "None",
+          "label": "Created By"
+        },
+        {
+          "name": "createdbyname",
+          "schemaName": "CreatedByName",
+          "type": "String",
+          "custom": false,
+          "create": false,
+          "update": false,
+          "required": "None",
+          "label": null,
+          "maxLength": 100
+        },
+        {
+          "name": "createdbyyominame",
+          "schemaName": "CreatedByYomiName",
+          "type": "String",
+          "custom": false,
+          "create": false,
+          "update": false,
+          "required": "SystemRequired",
+          "label": null,
+          "maxLength": 100
+        },
+        {
+          "name": "createdon",
+          "schemaName": "CreatedOn",
+          "type": "DateTime",
+          "custom": false,
+          "create": false,
+          "update": false,
+          "required": "None",
+          "label": "Created On"
+        },
+        {
+          "name": "createdonbehalfby",
+          "schemaName": "CreatedOnBehalfBy",
+          "type": "Lookup",
+          "custom": false,
+          "create": false,
+          "update": false,
+          "required": "None",
+          "label": "Created By (Delegate)"
+        },
+        {
+          "name": "createdonbehalfbyname",
+          "schemaName": "CreatedOnBehalfByName",
+          "type": "String",
+          "custom": false,
+          "create": false,
+          "update": false,
+          "required": "None",
+          "label": null,
+          "maxLength": 100
+        },
+        {
+          "name": "createdonbehalfbyyominame",
+          "schemaName": "CreatedOnBehalfByYomiName",
+          "type": "String",
+          "custom": false,
+          "create": false,
+          "update": false,
+          "required": "SystemRequired",
+          "label": null,
+          "maxLength": 100
+        },
+        {
+          "name": "importsequencenumber",
+          "schemaName": "ImportSequenceNumber",
+          "type": "Integer",
+          "custom": false,
+          "create": true,
+          "update": false,
+          "required": "None",
+          "label": "Import Sequence Number"
+        },
+        {
+          "name": "modifiedby",
+          "schemaName": "ModifiedBy",
+          "type": "Lookup",
+          "custom": false,
+          "create": false,
+          "update": false,
+          "required": "None",
+          "label": "Modified By"
+        },
+        {
+          "name": "modifiedbyname",
+          "schemaName": "ModifiedByName",
+          "type": "String",
+          "custom": false,
+          "create": false,
+          "update": false,
+          "required": "None",
+          "label": null,
+          "maxLength": 100
+        },
+        {
+          "name": "modifiedbyyominame",
+          "schemaName": "ModifiedByYomiName",
+          "type": "String",
+          "custom": false,
+          "create": false,
+          "update": false,
+          "required": "SystemRequired",
+          "label": null,
+          "maxLength": 100
+        },
+        {
+          "name": "modifiedon",
+          "schemaName": "ModifiedOn",
+          "type": "DateTime",
+          "custom": false,
+          "create": false,
+          "update": false,
+          "required": "None",
+          "label": "Modified On"
+        },
+        {
+          "name": "modifiedonbehalfby",
+          "schemaName": "ModifiedOnBehalfBy",
+          "type": "Lookup",
+          "custom": false,
+          "create": false,
+          "update": false,
+          "required": "None",
+          "label": "Modified By (Delegate)"
+        },
+        {
+          "name": "modifiedonbehalfbyname",
+          "schemaName": "ModifiedOnBehalfByName",
+          "type": "String",
+          "custom": false,
+          "create": false,
+          "update": false,
+          "required": "None",
+          "label": null,
+          "maxLength": 100
+        },
+        {
+          "name": "modifiedonbehalfbyyominame",
+          "schemaName": "ModifiedOnBehalfByYomiName",
+          "type": "String",
+          "custom": false,
+          "create": false,
+          "update": false,
+          "required": "SystemRequired",
+          "label": null,
+          "maxLength": 100
+        },
+        {
+          "name": "organizationid",
+          "schemaName": "OrganizationId",
+          "type": "Lookup",
+          "custom": false,
+          "create": false,
+          "update": false,
+          "required": "None",
+          "label": "Organization Id"
+        },
+        {
+          "name": "organizationidname",
+          "schemaName": "OrganizationIdName",
+          "type": "String",
+          "custom": false,
+          "create": false,
+          "update": false,
+          "required": "SystemRequired",
+          "label": null,
+          "maxLength": 100
+        },
+        {
+          "name": "overriddencreatedon",
+          "schemaName": "OverriddenCreatedOn",
+          "type": "DateTime",
+          "custom": false,
+          "create": true,
+          "update": false,
+          "required": "None",
+          "label": "Record Created On"
+        },
+        {
+          "name": "statecode",
+          "schemaName": "statecode",
+          "type": "State",
+          "custom": false,
+          "create": false,
+          "update": true,
+          "required": "SystemRequired",
+          "label": "Status"
+        },
+        {
+          "name": "statecodename",
+          "schemaName": "statecodeName",
+          "type": "Virtual",
+          "custom": false,
+          "create": false,
+          "update": false,
+          "required": "None",
+          "label": null
+        },
+        {
+          "name": "statuscode",
+          "schemaName": "statuscode",
+          "type": "Status",
+          "custom": false,
+          "create": true,
+          "update": true,
+          "required": "None",
+          "label": "Status Reason"
+        },
+        {
+          "name": "statuscodename",
+          "schemaName": "statuscodeName",
+          "type": "Virtual",
+          "custom": false,
+          "create": false,
+          "update": false,
+          "required": "None",
+          "label": null
+        },
+        {
+          "name": "timezoneruleversionnumber",
+          "schemaName": "TimeZoneRuleVersionNumber",
+          "type": "Integer",
+          "custom": false,
+          "create": true,
+          "update": true,
+          "required": "None",
+          "label": "Time Zone Rule Version Number"
+        },
+        {
+          "name": "utcconversiontimezonecode",
+          "schemaName": "UTCConversionTimeZoneCode",
+          "type": "Integer",
+          "custom": false,
+          "create": true,
+          "update": true,
+          "required": "None",
+          "label": "UTC Conversion Time Zone Code"
+        },
+        {
+          "name": "versionnumber",
+          "schemaName": "VersionNumber",
+          "type": "BigInt",
+          "custom": false,
+          "create": false,
+          "update": false,
+          "required": "None",
+          "label": "Version Number"
+        },
+        {
+          "name": "wmkf_appsystemsettingid",
+          "schemaName": "wmkf_AppSystemSettingId",
+          "type": "Uniqueidentifier",
+          "custom": false,
+          "create": true,
+          "update": false,
+          "required": "SystemRequired",
+          "label": "App System Setting"
+        },
+        {
+          "name": "wmkf_settingkey",
+          "schemaName": "wmkf_SettingKey",
+          "type": "String",
+          "custom": true,
+          "create": true,
+          "update": true,
+          "required": "ApplicationRequired",
+          "label": "Setting Key",
+          "maxLength": 255
+        },
+        {
+          "name": "wmkf_settingvalue",
+          "schemaName": "wmkf_SettingValue",
+          "type": "Memo",
+          "custom": true,
+          "create": true,
+          "update": true,
+          "required": "None",
+          "label": "Setting Value",
+          "maxLength": 100000
+        },
+        {
+          "name": "wmkf_updatedby",
+          "schemaName": "wmkf_UpdatedBy",
+          "type": "Lookup",
+          "custom": true,
+          "create": true,
+          "update": true,
+          "required": "None",
+          "label": "Updated By"
+        },
+        {
+          "name": "wmkf_updatedbyname",
+          "schemaName": "wmkf_UpdatedByName",
+          "type": "String",
+          "custom": true,
+          "create": false,
+          "update": false,
+          "required": "None",
+          "label": null,
+          "maxLength": 200
+        },
+        {
+          "name": "wmkf_updatedbyyominame",
+          "schemaName": "wmkf_UpdatedByYomiName",
+          "type": "String",
+          "custom": true,
+          "create": false,
+          "update": false,
+          "required": "None",
+          "label": null,
+          "maxLength": 200
+        }
+      ],
+      "choices": []
+    }
+  ],
+  "customEntityCount": 1710,
+  "candidateCatalogEntities": [
+    {
+      "name": "agentprompt",
+      "entitySet": "agentprompts",
+      "label": "Agent Prompt"
+    },
+    {
+      "name": "akoya_fundgroup",
+      "entitySet": "akoya_fundgroups",
+      "label": "Fund Group"
+    },
+    {
+      "name": "akoya_reviewgroup",
+      "entitySet": "akoya_reviewgroups",
+      "label": "Review Group"
+    },
+    {
+      "name": "akoya_reviewgroupapplications",
+      "entitySet": "akoya_reviewgroupapplicationses",
+      "label": "Review Group Applications"
+    },
+    {
+      "name": "catalog",
+      "entitySet": "catalogs",
+      "label": "Catalog"
+    },
+    {
+      "name": "catalogassignment",
+      "entitySet": "catalogassignments",
+      "label": "Catalog Assignment"
+    },
+    {
+      "name": "flowgroup",
+      "entitySet": "flowgroups",
+      "label": "Flow Group"
+    },
+    {
+      "name": "flowmachinegroup",
+      "entitySet": "flowmachinegroups",
+      "label": "Flow Machine Group"
+    },
+    {
+      "name": "internalcatalogassignment",
+      "entitySet": "internalcatalogassignments",
+      "label": "Internal Catalog Assignment"
+    },
+    {
+      "name": "mcpprompt",
+      "entitySet": "mcpprompts",
+      "label": "MCPPrompt"
+    },
+    {
+      "name": "msdyn_agentgroup",
+      "entitySet": "msdyn_agentgroups",
+      "label": "Agent Group"
+    },
+    {
+      "name": "msdyn_agentgrouplanguage",
+      "entitySet": "msdyn_agentgrouplanguages",
+      "label": "Agent Group Language"
+    },
+    {
+      "name": "msdyn_agentgroupmatchingcriteria",
+      "entitySet": "msdyn_agentgroupmatchingcriterias",
+      "label": "Agent Group Matching Criteria"
+    },
+    {
+      "name": "msdyn_agentgroupmembership",
+      "entitySet": "msdyn_agentgroupmemberships",
+      "label": "Agent Group Membership"
+    },
+    {
+      "name": "msdyn_agentgroupregion",
+      "entitySet": "msdyn_agentgroupregions",
+      "label": "Agent Group Region"
+    },
+    {
+      "name": "msdyn_aimodelcatalog",
+      "entitySet": "msdyn_aimodelcatalogs",
+      "label": "AI Model Catalog"
+    },
+    {
+      "name": "msdyn_ccuserprompt",
+      "entitySet": "msdyn_ccuserprompts",
+      "label": "CC User Prompt"
+    },
+    {
+      "name": "msdyn_copilotstarterprompt",
+      "entitySet": "msdyn_copilotstarterprompts",
+      "label": "Copilot Starter Prompt"
+    },
+    {
+      "name": "msdyn_emailtemplatelanguagegroup",
+      "entitySet": "msdyn_emailtemplatelanguagegroups",
+      "label": "Email Template Language Group"
+    },
+    {
+      "name": "msdyn_emailtemplatelanguagegroupitem",
+      "entitySet": "msdyn_emailtemplatelanguagegroupitems",
+      "label": "Email Template Language Group Item"
+    },
+    {
+      "name": "msdyn_evalprompt",
+      "entitySet": "msdyn_evalprompts",
+      "label": "Eval Prompt"
+    },
+    {
+      "name": "msdyn_intentgroupcondition",
+      "entitySet": "msdyn_intentgroupconditions",
+      "label": "Intent Group Condition"
+    },
+    {
+      "name": "msdyn_organizationprompt",
+      "entitySet": "msdyn_organizationprompts",
+      "label": "Organization Prompt"
+    },
+    {
+      "name": "msdyn_prioritizedactioncatalogue",
+      "entitySet": "msdyn_prioritizedactioncatalogues",
+      "label": "Prioritized Action Catalogue"
+    },
+    {
+      "name": "msdyn_queueusergroupmembership",
+      "entitySet": "msdyn_queueusergroupmemberships",
+      "label": "Queue User Group Membership"
+    },
+    {
+      "name": "msdyn_rawactioncatalogue",
+      "entitySet": "msdyn_rawactioncatalogues",
+      "label": "rawactioncatalogue"
+    },
+    {
+      "name": "msdyn_segmentcatalogue",
+      "entitySet": "msdyn_segmentcatalogues",
+      "label": "SegmentsUtil"
+    },
+    {
+      "name": "msdynmkt_catalogeventstatusconfiguration",
+      "entitySet": "msdynmkt_catalogeventstatusconfigurations",
+      "label": "CatalogEventStatusConfiguration"
+    },
+    {
+      "name": "mspcat_catalogsubmissionfiles",
+      "entitySet": "mspcat_catalogsubmissionfileses",
+      "label": "Catalog Submission Files"
+    },
+    {
+      "name": "resourcegroupdatasource",
+      "entitySet": "resourcegroupdatasources",
+      "label": "resource group data source"
+    },
+    {
+      "name": "virtualresourcegroupresource",
+      "entitySet": "virtualresourcegroupresources",
+      "label": "Virtual Resource Group Resource"
+    },
+    {
+      "name": "wmkf_ai_prompt",
+      "entitySet": "wmkf_ai_prompts",
+      "label": "AI Prompt"
+    },
+    {
+      "name": "msdyn_promptmessagelocale",
+      "entitySet": "msdyn_promptmessagelocales",
+      "label": "promptmessagelocale"
+    },
+    {
+      "name": "msdyn_promptmessagetemplate",
+      "entitySet": "msdyn_promptmessagetemplates",
+      "label": "promptmessagetemplate"
+    }
+  ],
+  "groupCatalogKey": {
+    "key": "prompt-library.groups",
+    "exists": false
+  },
+  "promptRows": [
+    {
+      "name": "meeting-transcript.staff-discussion-sentiment",
+      "version": 1,
+      "current": true,
+      "status": 682090001
+    },
+    {
+      "name": "pre-site-visit.proposal-core.generate",
+      "version": 1,
+      "current": true,
+      "status": 682090001
+    }
+  ],
+  "requests": [
+    "/api/data/v9.2/EntityDefinitions(LogicalName='wmkf_ai_prompt')?$select=LogicalName,SchemaName,EntitySetName,PrimaryIdAttribute,PrimaryNameAttribute,DisplayName,IsOptimisticConcurrencyEnabled",
+    "/api/data/v9.2/EntityDefinitions(LogicalName='wmkf_ai_prompt')/Attributes?$select=LogicalName,SchemaName,AttributeType,IsCustomAttribute,IsValidForCreate,IsValidForUpdate,RequiredLevel,DisplayName",
+    "/api/data/v9.2/EntityDefinitions(LogicalName='wmkf_ai_prompt')/Keys?$select=LogicalName,KeyAttributes,EntityKeyIndexStatus",
+    "/api/data/v9.2/EntityDefinitions(LogicalName='wmkf_ai_prompt')/Attributes/Microsoft.Dynamics.CRM.StringAttributeMetadata?$select=LogicalName,MaxLength",
+    "/api/data/v9.2/EntityDefinitions(LogicalName='wmkf_ai_prompt')/Attributes/Microsoft.Dynamics.CRM.MemoAttributeMetadata?$select=LogicalName,MaxLength",
+    "/api/data/v9.2/EntityDefinitions(LogicalName='wmkf_ai_prompt')/Attributes/Microsoft.Dynamics.CRM.PicklistAttributeMetadata?$select=LogicalName&$expand=OptionSet",
+    "/api/data/v9.2/EntityDefinitions(LogicalName='wmkf_appsystemsetting')?$select=LogicalName,SchemaName,EntitySetName,PrimaryIdAttribute,PrimaryNameAttribute,DisplayName,IsOptimisticConcurrencyEnabled",
+    "/api/data/v9.2/EntityDefinitions(LogicalName='wmkf_appsystemsetting')/Attributes?$select=LogicalName,SchemaName,AttributeType,IsCustomAttribute,IsValidForCreate,IsValidForUpdate,RequiredLevel,DisplayName",
+    "/api/data/v9.2/EntityDefinitions(LogicalName='wmkf_appsystemsetting')/Keys?$select=LogicalName,KeyAttributes,EntityKeyIndexStatus",
+    "/api/data/v9.2/EntityDefinitions(LogicalName='wmkf_appsystemsetting')/Attributes/Microsoft.Dynamics.CRM.StringAttributeMetadata?$select=LogicalName,MaxLength",
+    "/api/data/v9.2/EntityDefinitions(LogicalName='wmkf_appsystemsetting')/Attributes/Microsoft.Dynamics.CRM.MemoAttributeMetadata?$select=LogicalName,MaxLength",
+    "/api/data/v9.2/EntityDefinitions(LogicalName='wmkf_appsystemsetting')/Attributes/Microsoft.Dynamics.CRM.PicklistAttributeMetadata?$select=LogicalName&$expand=OptionSet",
+    "/api/data/v9.2/EntityDefinitions?$select=LogicalName,EntitySetName,DisplayName&$filter=IsCustomEntity%20eq%20true",
+    "/api/data/v9.2/wmkf_appsystemsettings?$select=wmkf_settingkey&$filter=wmkf_settingkey%20eq%20%27prompt-library.groups%27",
+    "/api/data/v9.2/wmkf_ai_prompts?$select=wmkf_ai_promptname,wmkf_promptversion,wmkf_ai_iscurrent,wmkf_ai_promptstatus&$orderby=wmkf_ai_promptname%20asc"
+  ]
+}

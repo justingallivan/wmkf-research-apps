@@ -1,0 +1,703 @@
+{
+  "reportVersion": 1,
+  "observedAt": "2026-10-30T22:16:57.278Z",
+  "host": "orgd9e66399.crm.dynamics.com",
+  "readOnly": true,
+  "authentication": "existing-application-credentials-not-Connor-delegated",
+  "credentialSource": "explicit-env-file-only",
+  "identity": {
+    "organizationId": "3d52a072-b138-ef11-8e4b-000d3a106422",
+    "userId": "79913eac-7f3e-f111-88b4-6045bd015cb0",
+    "businessUnitId": "c8836c09-cf7a-ee11-8179-00224802aaea"
+  },
+  "organization": {
+    "@odata.etag": "W/\"60401823\"",
+    "organizationid": "3d52a072-b138-ef11-8e4b-000d3a106422",
+    "name": "unq3d52a072b138ef118e4b000d3a106"
+  },
+  "inventory": {
+    "solutions": {
+      "status": "read-complete",
+      "rows": [
+        {
+          "@odata.etag": "W/\"4344251\"",
+          "solutionid": "00000001-0000-0000-0001-00000000009b",
+          "uniquename": "Cr3a08d",
+          "_publisherid_value": "00000001-0000-0000-0000-00000000005a",
+          "ismanaged": false,
+          "version": "1.0.0.0",
+          "friendlyname": "Common Data Services Default Solution"
+        },
+        {
+          "@odata.etag": "W/\"4344254\"",
+          "solutionid": "fd140aaf-4df4-11dd-bd17-0019b9312238",
+          "uniquename": "Default",
+          "_publisherid_value": "d21aab71-79e7-11dd-8874-00188b01e34f",
+          "ismanaged": false,
+          "version": "1.0",
+          "friendlyname": "Default Solution"
+        },
+        {
+          "@odata.etag": "W/\"21467131\"",
+          "solutionid": "c1a72310-1145-ef11-8409-0022480abf3c",
+          "uniquename": "SarahsSolution",
+          "_publisherid_value": "d21aab71-79e7-11dd-8874-00188b01e34f",
+          "ismanaged": false,
+          "version": "1.0.0.0",
+          "friendlyname": "Sarah's Solution"
+        },
+        {
+          "@odata.etag": "W/\"21467253\"",
+          "solutionid": "451a9d9c-1145-ef11-8409-0022480abf3c",
+          "uniquename": "WMKF",
+          "_publisherid_value": "698f608d-1145-ef11-840a-000d3a32c1ae",
+          "ismanaged": false,
+          "version": "1.0.0.0",
+          "friendlyname": "W. M. Keck Foundation"
+        },
+        {
+          "@odata.etag": "W/\"58349389\"",
+          "solutionid": "aa9fa2b8-4023-4565-882f-005682b03735",
+          "uniquename": "msdyn_OmnichannelTeamsPatch",
+          "_publisherid_value": "856938d4-5341-40fe-b80c-c77e1dae7004",
+          "ismanaged": true,
+          "version": "1.5.27.21",
+          "friendlyname": "Omnichannel - Teams Patch"
+        },
+        {
+          "@odata.etag": "W/\"60195434\"",
+          "solutionid": "9ea9d8dd-422e-44a4-a237-070d02869fcd",
+          "uniquename": "msdyn_OmnichannelCCaaSVoiceAPI",
+          "_publisherid_value": "856938d4-5341-40fe-b80c-c77e1dae7004",
+          "ismanaged": true,
+          "version": "1.10.0.26092504",
+          "friendlyname": "Omnichannel CCaaS Voice API"
+        },
+        {
+          "@odata.etag": "W/\"60195435\"",
+          "solutionid": "d5474381-8b09-4cb9-be86-08fcdb91fef9",
+          "uniquename": "ScenariosAndChannels",
+          "_publisherid_value": "856938d4-5341-40fe-b80c-c77e1dae7004",
+          "ismanaged": true,
+          "version": "9.2.1.695",
+          "friendlyname": "Scenarios and Channels"
+        },
+        {
+          "@odata.etag": "W/\"55139053\"",
+          "solutionid": "168fe266-b85c-4479-8cb6-28ec0dd8297a",
+          "uniquename": "OmnichannelPrimeOutboundAnchor",
+          "_publisherid_value": "856938d4-5341-40fe-b80c-c77e1dae7004",
+          "ismanaged": true,
+          "version": "1.5.27.30",
+          "friendlyname": "Omnichannel – Outbound for Dynamics 365 Applications"
+        },
+        {
+          "@odata.etag": "W/\"60195436\"",
+          "solutionid": "344f3137-0ce0-4d1f-8c2b-388b7af23a4d",
+          "uniquename": "msdyn_OmnichannelSharedCommunicationBase",
+          "_publisherid_value": "856938d4-5341-40fe-b80c-c77e1dae7004",
+          "ismanaged": true,
+          "version": "1.10.0.19",
+          "friendlyname": "Omnichannel Shared CommunicationBase"
+        },
+        {
+          "@odata.etag": "W/\"60195437\"",
+          "solutionid": "492f5892-0d7f-4aa7-8d3f-39c8b9b85d81",
+          "uniquename": "msdyn_OmnichannelSporch__Public",
+          "_publisherid_value": "856938d4-5341-40fe-b80c-c77e1dae7004",
+          "ismanaged": true,
+          "version": "1.10.0.16",
+          "friendlyname": "Omnichannel Speech Orchestrator platform application in public clouds"
+        },
+        {
+          "@odata.etag": "W/\"58349391\"",
+          "solutionid": "9d9ad5bd-309e-4fa0-9012-4562f79b7d35",
+          "uniquename": "OmnichannelTeams",
+          "_publisherid_value": "856938d4-5341-40fe-b80c-c77e1dae7004",
+          "ismanaged": true,
+          "version": "1.5.0.117",
+          "friendlyname": "Omnichannel - Teams"
+        },
+        {
+          "@odata.etag": "W/\"60195438\"",
+          "solutionid": "2069e94f-2195-4cd2-9738-4f92c2305502",
+          "uniquename": "msdyn_OmnichannelVoiceRuntime__Public",
+          "_publisherid_value": "856938d4-5341-40fe-b80c-c77e1dae7004",
+          "ismanaged": true,
+          "version": "1.10.0.24",
+          "friendlyname": "Omnichannel Voice platform applications in public clouds"
+        },
+        {
+          "@odata.etag": "W/\"60195439\"",
+          "solutionid": "392381ed-931a-45fc-9232-5642cbad89a4",
+          "uniquename": "msdyn_OmnichannelMessagingBase",
+          "_publisherid_value": "856938d4-5341-40fe-b80c-c77e1dae7004",
+          "ismanaged": true,
+          "version": "1.10.0.58",
+          "friendlyname": "OmnichannelMessagingBase"
+        },
+        {
+          "@odata.etag": "W/\"56909149\"",
+          "solutionid": "67242cb8-be54-4bf5-92f0-5e442cc621bd",
+          "uniquename": "OmnichannelChat",
+          "_publisherid_value": "856938d4-5341-40fe-b80c-c77e1dae7004",
+          "ismanaged": true,
+          "version": "1.10.0.117",
+          "friendlyname": "Omnichannel – Chat"
+        },
+        {
+          "@odata.etag": "W/\"45362071\"",
+          "solutionid": "af2de928-a73e-f111-88b4-6045bd01523e",
+          "uniquename": "wmkfResearchReviewAppSuite",
+          "_publisherid_value": "698f608d-1145-ef11-840a-000d3a32c1ae",
+          "ismanaged": false,
+          "version": "1.0.0.0",
+          "friendlyname": "Research Review App Suite"
+        },
+        {
+          "@odata.etag": "W/\"58411168\"",
+          "solutionid": "e462461f-cbd7-47c8-a022-60c20da20743",
+          "uniquename": "OmnichannelPrimeFacebookAnchor",
+          "_publisherid_value": "856938d4-5341-40fe-b80c-c77e1dae7004",
+          "ismanaged": true,
+          "version": "1.5.27.146",
+          "friendlyname": "Omnichannel – Facebook for Dynamics 365 Applications"
+        },
+        {
+          "@odata.etag": "W/\"60195440\"",
+          "solutionid": "05243de4-dac8-4739-9158-6ccde5ed2b26",
+          "uniquename": "OmnichannelEngagementHubPreview",
+          "_publisherid_value": "856938d4-5341-40fe-b80c-c77e1dae7004",
+          "ismanaged": true,
+          "version": "1.5.0.5",
+          "friendlyname": "Omnichannel for Customer Service"
+        },
+        {
+          "@odata.etag": "W/\"59280757\"",
+          "solutionid": "56105e10-a320-4a64-86c8-707aac6a72a9",
+          "uniquename": "OmnichannelPrimeSMSAnchor",
+          "_publisherid_value": "856938d4-5341-40fe-b80c-c77e1dae7004",
+          "ismanaged": true,
+          "version": "1.5.27.274",
+          "friendlyname": "Omnichannel – SMS for Dynamics 365 Applications"
+        },
+        {
+          "@odata.etag": "W/\"54833931\"",
+          "solutionid": "d78552d3-a8fa-47aa-9046-7227173f5f0f",
+          "uniquename": "msdyn_OmnichannelMCPServerPESTools",
+          "_publisherid_value": "856938d4-5341-40fe-b80c-c77e1dae7004",
+          "ismanaged": true,
+          "version": "1.10.0.4",
+          "friendlyname": "Omnichannel MCP Server Proactive Engagement Tools"
+        },
+        {
+          "@odata.etag": "W/\"57661606\"",
+          "solutionid": "dcf61731-050c-429e-96c8-72f5943f7e59",
+          "uniquename": "msdyn_OmnichannelSocialChannelsPatch",
+          "_publisherid_value": "856938d4-5341-40fe-b80c-c77e1dae7004",
+          "ismanaged": true,
+          "version": "1.5.27.79",
+          "friendlyname": "Omnichannel - SocialChannels Patch"
+        },
+        {
+          "@odata.etag": "W/\"60195441\"",
+          "solutionid": "c0d444d9-87b1-4196-bb65-737bc7bd10ef",
+          "uniquename": "msdyn_CCASentimentAI",
+          "_publisherid_value": "856938d4-5341-40fe-b80c-c77e1dae7004",
+          "ismanaged": true,
+          "version": "1.2.24038.1",
+          "friendlyname": "CCA Customer Service Sentiment Analysis"
+        },
+        {
+          "@odata.etag": "W/\"55139055\"",
+          "solutionid": "036d203a-d630-4f66-8dba-7e027a0b3708",
+          "uniquename": "OmnichannelOutbound",
+          "_publisherid_value": "856938d4-5341-40fe-b80c-c77e1dae7004",
+          "ismanaged": true,
+          "version": "1.10.0.16",
+          "friendlyname": "Omnichannel – Outbound"
+        },
+        {
+          "@odata.etag": "W/\"60195443\"",
+          "solutionid": "d6aa2043-be2b-4148-835a-834ad4fef7be",
+          "uniquename": "msdyn_OmnichannelEngagementHubPatch",
+          "_publisherid_value": "856938d4-5341-40fe-b80c-c77e1dae7004",
+          "ismanaged": true,
+          "version": "1.5.27.6",
+          "friendlyname": "Omnichannel for Customer Service Patch"
+        },
+        {
+          "@odata.etag": "W/\"59280761\"",
+          "solutionid": "f1051a77-ce1f-4260-acf3-841b87f9bb26",
+          "uniquename": "msdyn_OmnichannelSMSPatch",
+          "_publisherid_value": "856938d4-5341-40fe-b80c-c77e1dae7004",
+          "ismanaged": true,
+          "version": "1.5.27.28",
+          "friendlyname": "Omnichannel - SMS Patch"
+        },
+        {
+          "@odata.etag": "W/\"54833932\"",
+          "solutionid": "12d3d2ab-7dda-4b44-b324-8ab73d9570b8",
+          "uniquename": "msdyn_OmnichannelPESPermissions__Public",
+          "_publisherid_value": "856938d4-5341-40fe-b80c-c77e1dae7004",
+          "ismanaged": true,
+          "version": "1.10.0.260737",
+          "friendlyname": "Omnichannel PES Permissions Public"
+        },
+        {
+          "@odata.etag": "W/\"4344568\"",
+          "solutionid": "3fbe3f79-b721-4180-a68e-8ecc3d75a92d",
+          "uniquename": "msdyn_ContextualHelp",
+          "_publisherid_value": "856938d4-5341-40fe-b80c-c77e1dae7004",
+          "ismanaged": true,
+          "version": "1.0.0.22",
+          "friendlyname": "Contextual Help"
+        },
+        {
+          "@odata.etag": "W/\"60195444\"",
+          "solutionid": "e902c651-0f74-47f8-bead-8fd1c4721355",
+          "uniquename": "msdyn_OmnichannelCCAIPermissions__Public",
+          "_publisherid_value": "856938d4-5341-40fe-b80c-c77e1dae7004",
+          "ismanaged": true,
+          "version": "1.10.0.6",
+          "friendlyname": "Omnichannel CCAI permissions and application users in public clouds"
+        },
+        {
+          "@odata.etag": "W/\"54833933\"",
+          "solutionid": "4d4241a3-0916-4314-aee9-9086878124e2",
+          "uniquename": "msdyn_OmnichannelCCaaSPESApi",
+          "_publisherid_value": "856938d4-5341-40fe-b80c-c77e1dae7004",
+          "ismanaged": true,
+          "version": "1.10.0.26073102",
+          "friendlyname": "Omnichannel CCaaS Proactive Engagement API"
+        },
+        {
+          "@odata.etag": "W/\"60195445\"",
+          "solutionid": "5811d537-d35a-4cf4-bfa8-976d293b8c8b",
+          "uniquename": "msdyn_OmnichannelEngagementHubDeprecation",
+          "_publisherid_value": "856938d4-5341-40fe-b80c-c77e1dae7004",
+          "ismanaged": true,
+          "version": "1.10.0.0",
+          "friendlyname": "Omnichannel for Customer Service Deprecation"
+        },
+        {
+          "@odata.etag": "W/\"58349398\"",
+          "solutionid": "61e44d7a-f5b5-4704-a690-9a43e29405c5",
+          "uniquename": "OmnichannelPrimeTeams",
+          "_publisherid_value": "856938d4-5341-40fe-b80c-c77e1dae7004",
+          "ismanaged": true,
+          "version": "1.5.27.141",
+          "friendlyname": "Omnichannel – Teams for Dynamics 365 Applications"
+        },
+        {
+          "@odata.etag": "W/\"4344604\"",
+          "solutionid": "9b5d1f1f-ceaa-437e-8162-9c9ca598339e",
+          "uniquename": "msdyn_ContextualHelpAnchor",
+          "_publisherid_value": "856938d4-5341-40fe-b80c-c77e1dae7004",
+          "ismanaged": true,
+          "version": "1.0.0.22",
+          "friendlyname": "Contextual Help Base"
+        },
+        {
+          "@odata.etag": "W/\"60195446\"",
+          "solutionid": "7026125e-7a14-45c5-bf75-a1ed3608bca1",
+          "uniquename": "OmnichannelTelephony",
+          "_publisherid_value": "856938d4-5341-40fe-b80c-c77e1dae7004",
+          "ismanaged": true,
+          "version": "1.10.0.312",
+          "friendlyname": "Omnichannel - Telephony"
+        },
+        {
+          "@odata.etag": "W/\"59280763\"",
+          "solutionid": "82ed86de-e7d2-4198-98e3-a542595936fd",
+          "uniquename": "OmnichannelSMS",
+          "_publisherid_value": "856938d4-5341-40fe-b80c-c77e1dae7004",
+          "ismanaged": true,
+          "version": "1.5.0.70",
+          "friendlyname": "Omnichannel – SMS"
+        },
+        {
+          "@odata.etag": "W/\"54833934\"",
+          "solutionid": "6d9dd1b7-eda6-4e12-9d40-a65e361322d4",
+          "uniquename": "msdyn_OmnichannelProactiveEngagement",
+          "_publisherid_value": "856938d4-5341-40fe-b80c-c77e1dae7004",
+          "ismanaged": true,
+          "version": "1.10.0.26073163",
+          "friendlyname": "Omnichannel Proactive Engagement"
+        },
+        {
+          "@odata.etag": "W/\"60195448\"",
+          "solutionid": "76c1e404-31d3-480a-a7e3-a856f9c717e1",
+          "uniquename": "msdyn_OmnichannelAAAPermissions__Public",
+          "_publisherid_value": "856938d4-5341-40fe-b80c-c77e1dae7004",
+          "ismanaged": true,
+          "version": "1.10.0.3",
+          "friendlyname": "Omnichannel Authentication & Antifraud Agent API Permissions Public"
+        },
+        {
+          "@odata.etag": "W/\"4344628\"",
+          "solutionid": "04588534-1d42-4844-b72e-aa4b10dbaaf6",
+          "uniquename": "msdynce_CRMHub",
+          "_publisherid_value": "856938d4-5341-40fe-b80c-c77e1dae7004",
+          "ismanaged": true,
+          "version": "9.0.22025.10001",
+          "friendlyname": "Crm Hub"
+        },
+        {
+          "@odata.etag": "W/\"54833935\"",
+          "solutionid": "83dd0f97-51cf-4fa7-bb27-ab81d900a109",
+          "uniquename": "msdyn_OmnichannelPrimeProactiveAIAnchor",
+          "_publisherid_value": "856938d4-5341-40fe-b80c-c77e1dae7004",
+          "ismanaged": true,
+          "version": "1.5.27.52928491",
+          "friendlyname": "Omnichannel – Proactive Engagement for Dynamics 365 Applications"
+        },
+        {
+          "@odata.etag": "W/\"20647703\"",
+          "solutionid": "e4565db1-52ba-46ac-ad74-b77f672777a5",
+          "uniquename": "Akoyanet",
+          "_publisherid_value": "387ae0b3-8ec3-482e-91a3-1601747d0b1a",
+          "ismanaged": true,
+          "version": "2024.6.27.3",
+          "friendlyname": "akoyaGO"
+        },
+        {
+          "@odata.etag": "W/\"60195449\"",
+          "solutionid": "47e18fb1-c815-4f4b-bdf1-b9a8d9a3aada",
+          "uniquename": "OmnichannelConfiguration",
+          "_publisherid_value": "856938d4-5341-40fe-b80c-c77e1dae7004",
+          "ismanaged": true,
+          "version": "1.10.0.6",
+          "friendlyname": "OmnichannelConfiguration"
+        },
+        {
+          "@odata.etag": "W/\"58411175\"",
+          "solutionid": "cc516dc7-3748-4d8c-a4d9-c178218bf714",
+          "uniquename": "msdyn_OmnichannelFacebookPatch",
+          "_publisherid_value": "856938d4-5341-40fe-b80c-c77e1dae7004",
+          "ismanaged": true,
+          "version": "1.5.27.26",
+          "friendlyname": "Omnichannel - Facebook Patch"
+        },
+        {
+          "@odata.etag": "W/\"57661610\"",
+          "solutionid": "f0c3e559-eeeb-43da-be40-c5aca3b59d60",
+          "uniquename": "OmnichannelPrimeSocialChannelsAnchor",
+          "_publisherid_value": "856938d4-5341-40fe-b80c-c77e1dae7004",
+          "ismanaged": true,
+          "version": "1.5.27.224",
+          "friendlyname": "Omnichannel – SocialChannels for Dynamics 365 Applications"
+        },
+        {
+          "@odata.etag": "W/\"54833936\"",
+          "solutionid": "56de848c-c497-466f-b5aa-cbfeb0138055",
+          "uniquename": "DynamicsMKT_SendOptimization",
+          "_publisherid_value": "d8cb9b0e-aeef-4d76-abe3-1cdc052882aa",
+          "ismanaged": true,
+          "version": "1.1.61220.60",
+          "friendlyname": "Dynamics Marketing Send Optimization"
+        },
+        {
+          "@odata.etag": "W/\"60195451\"",
+          "solutionid": "ce94fbaf-33c5-4813-b9b0-d54fd22f2af1",
+          "uniquename": "msdyn_ConversationSummarizationAIRealtime",
+          "_publisherid_value": "856938d4-5341-40fe-b80c-c77e1dae7004",
+          "ismanaged": true,
+          "version": "1.2.24038.1",
+          "friendlyname": "Customer Service AI Conversation Summarization Realtime"
+        },
+        {
+          "@odata.etag": "W/\"60195452\"",
+          "solutionid": "67c400bd-fe03-4e2b-9d2e-df09539721e2",
+          "uniquename": "OmnichannelPrimeTelephony",
+          "_publisherid_value": "856938d4-5341-40fe-b80c-c77e1dae7004",
+          "ismanaged": true,
+          "version": "1.5.27.829",
+          "friendlyname": "Omnichannel – Telephony for Dynamics 365 Applications"
+        },
+        {
+          "@odata.etag": "W/\"60195453\"",
+          "solutionid": "e9827341-820f-432e-b8aa-e223c26609e4",
+          "uniquename": "msdyn_UnifiedRoutingForCS",
+          "_publisherid_value": "856938d4-5341-40fe-b80c-c77e1dae7004",
+          "ismanaged": true,
+          "version": "9.1.0.48",
+          "friendlyname": "Unified Routing For Customer Service"
+        },
+        {
+          "@odata.etag": "W/\"58411180\"",
+          "solutionid": "5474d75f-a4d3-45f9-a3dd-e6f05f1f9f76",
+          "uniquename": "OmnichannelFacebook",
+          "_publisherid_value": "856938d4-5341-40fe-b80c-c77e1dae7004",
+          "ismanaged": true,
+          "version": "1.5.0.15",
+          "friendlyname": "Omnichannel – Facebook"
+        },
+        {
+          "@odata.etag": "W/\"60195455\"",
+          "solutionid": "36e424a7-206f-41b6-ba20-e9784be0940d",
+          "uniquename": "OmnichannelCommunicationBase",
+          "_publisherid_value": "856938d4-5341-40fe-b80c-c77e1dae7004",
+          "ismanaged": true,
+          "version": "1.10.0.106",
+          "friendlyname": "Omnichannel - CommunicationBase"
+        },
+        {
+          "@odata.etag": "W/\"59280770\"",
+          "solutionid": "12708bcf-f92a-49cc-9b9a-eb753ff6fb93",
+          "uniquename": "msdyn_OmnichannelSharedSMS",
+          "_publisherid_value": "856938d4-5341-40fe-b80c-c77e1dae7004",
+          "ismanaged": true,
+          "version": "1.10.0.2",
+          "friendlyname": "Omnichannel Shared SMS"
+        },
+        {
+          "@odata.etag": "W/\"60195457\"",
+          "solutionid": "4cf0023f-cb4e-4d0a-993a-ef2e3022a3ce",
+          "uniquename": "msdyn_OmnichannelAuthenticationAntifraudAgent",
+          "_publisherid_value": "856938d4-5341-40fe-b80c-c77e1dae7004",
+          "ismanaged": true,
+          "version": "1.10.0.115",
+          "friendlyname": "Omnichannel CCaaS Authentication Antifraud Agent"
+        },
+        {
+          "@odata.etag": "W/\"57661613\"",
+          "solutionid": "0534f843-adc5-4fbd-ac3c-f073b7d205a6",
+          "uniquename": "OmnichannelSocialChannels",
+          "_publisherid_value": "856938d4-5341-40fe-b80c-c77e1dae7004",
+          "ismanaged": true,
+          "version": "1.5.0.494",
+          "friendlyname": "Omnichannel – SocialChannels"
+        },
+        {
+          "@odata.etag": "W/\"60195458\"",
+          "solutionid": "af8a5b87-c38c-4bfc-a2d1-f10e203a23be",
+          "uniquename": "msdyn_OmnichannelMessagingApplicationUsers__Public",
+          "_publisherid_value": "856938d4-5341-40fe-b80c-c77e1dae7004",
+          "ismanaged": true,
+          "version": "1.10.0.8",
+          "friendlyname": "Omnichannel Messaging platform applications in public clouds"
+        },
+        {
+          "@odata.etag": "W/\"44161400\"",
+          "solutionid": "d27cf7ef-03b4-4c7d-8a0e-f323891147c9",
+          "uniquename": "msdyn_PowerAppsCheckerAnchor",
+          "_publisherid_value": "856938d4-5341-40fe-b80c-c77e1dae7004",
+          "ismanaged": true,
+          "version": "2.2.3321.1",
+          "friendlyname": "Power Apps Checker Base"
+        },
+        {
+          "@odata.etag": "W/\"44161401\"",
+          "solutionid": "81542201-e3de-4512-908a-fb9b9fe54de6",
+          "uniquename": "msdyn_PowerAppsChecker",
+          "_publisherid_value": "856938d4-5341-40fe-b80c-c77e1dae7004",
+          "ismanaged": true,
+          "version": "2.2.3321.1",
+          "friendlyname": "Power Apps Checker"
+        },
+        {
+          "@odata.etag": "W/\"56909163\"",
+          "solutionid": "f95ba07c-91c5-4802-aacb-fe1a59a237d8",
+          "uniquename": "OmnichannelPrimeChatAnchor",
+          "_publisherid_value": "856938d4-5341-40fe-b80c-c77e1dae7004",
+          "ismanaged": true,
+          "version": "1.5.27.256",
+          "friendlyname": "Omnichannel – Chat package for Dynamics 365 Applications"
+        }
+      ]
+    },
+    "publishers": {
+      "status": "read-complete",
+      "rows": [
+        {
+          "@odata.etag": "W/\"4765357\"",
+          "uniquename": "Cr0a061",
+          "publisherid": "00000001-0000-0000-0000-00000000005a",
+          "friendlyname": "CDS Default Publisher",
+          "customizationprefix": "wmkf"
+        },
+        {
+          "@odata.etag": "W/\"21467231\"",
+          "uniquename": "WMKF_Publisher",
+          "publisherid": "698f608d-1145-ef11-840a-000d3a32c1ae",
+          "friendlyname": "WMKF",
+          "customizationprefix": "wmkf"
+        },
+        {
+          "@odata.etag": "W/\"60544914\"",
+          "uniquename": "MicrosoftCorporation",
+          "publisherid": "d21aab70-79e7-11dd-8874-00188b01e34f",
+          "friendlyname": "MicrosoftCorporation",
+          "customizationprefix": ""
+        },
+        {
+          "@odata.etag": "W/\"4765354\"",
+          "uniquename": "DefaultPublisherwmkf",
+          "publisherid": "d21aab71-79e7-11dd-8874-00188b01e34f",
+          "friendlyname": "Default Publisher for wmkf",
+          "customizationprefix": "wmkf"
+        },
+        {
+          "@odata.etag": "W/\"4226573\"",
+          "uniquename": "microsoftfirstparty",
+          "publisherid": "d21aab72-79e7-11dd-8874-00188b01e34f",
+          "friendlyname": "Microsoft First Party",
+          "customizationprefix": ""
+        },
+        {
+          "@odata.etag": "W/\"20645932\"",
+          "uniquename": "bromelkampcompanyllcaccounting",
+          "publisherid": "387ae0b3-8ec3-482e-91a3-1601747d0b1a",
+          "friendlyname": "akoyaGO Publisher",
+          "customizationprefix": "akoya"
+        },
+        {
+          "@odata.etag": "W/\"56407671\"",
+          "uniquename": "DynamicsMKT",
+          "publisherid": "d8cb9b0e-aeef-4d76-abe3-1cdc052882aa",
+          "friendlyname": "Dynamics Marketing",
+          "customizationprefix": "msdynmkt"
+        },
+        {
+          "@odata.etag": "W/\"60540484\"",
+          "uniquename": "dynamics365customerengagement",
+          "publisherid": "02571246-faf1-41e8-9931-4b8fdc48a0e8",
+          "friendlyname": "Dynamics 365",
+          "customizationprefix": "msdynce"
+        },
+        {
+          "@odata.etag": "W/\"4226576\"",
+          "uniquename": "PowerCat",
+          "publisherid": "ee920a25-9715-4260-9f5e-4d71da1814df",
+          "friendlyname": "PowerCat",
+          "customizationprefix": "cat"
+        },
+        {
+          "@odata.etag": "W/\"60418480\"",
+          "uniquename": "adxstudio",
+          "publisherid": "192599ec-d6dc-421f-a9f9-89aa64785206",
+          "friendlyname": "Microsoft",
+          "customizationprefix": "adx"
+        },
+        {
+          "@odata.etag": "W/\"60418270\"",
+          "uniquename": "microsoftdynamicslabs",
+          "publisherid": "d5673ef3-0257-4f04-bdfa-b15137c5fd4e",
+          "friendlyname": "Microsoft",
+          "customizationprefix": "msa"
+        },
+        {
+          "@odata.etag": "W/\"60518776\"",
+          "uniquename": "QMSAnchor",
+          "publisherid": "f2062d2f-5999-4890-abfd-b199c2380b16",
+          "friendlyname": "Dynamics 365",
+          "customizationprefix": "msdyn"
+        },
+        {
+          "@odata.etag": "W/\"60545138\"",
+          "uniquename": "microsoftdynamics",
+          "publisherid": "856938d4-5341-40fe-b80c-c77e1dae7004",
+          "friendlyname": "Dynamics 365",
+          "customizationprefix": "msdyn"
+        },
+        {
+          "@odata.etag": "W/\"48818738\"",
+          "uniquename": "microsoftformspro",
+          "publisherid": "2e0412da-95c4-4b2f-b605-e5f945fd10b2",
+          "friendlyname": "Dynamics 365 Customer Voice Production Application User",
+          "customizationprefix": "msfp"
+        }
+      ]
+    },
+    "packages": {
+      "status": "read-complete",
+      "rows": []
+    },
+    "assemblies": {
+      "status": "read-complete",
+      "rows": []
+    },
+    "api": {
+      "status": "read-complete",
+      "rows": []
+    },
+    "requiredTables": {
+      "status": "read-complete",
+      "rows": []
+    },
+    "humanCandidates": {
+      "status": "read-complete",
+      "rows": [
+        {
+          "@odata.etag": "W/\"47424620\"",
+          "ownerid": "e642f92d-3d99-ee11-be37-000d3a341fd9",
+          "fullname": "Connor Noda",
+          "isdisabled": false,
+          "systemuserid": "e642f92d-3d99-ee11-be37-000d3a341fd9",
+          "accessmode": 0
+        },
+        {
+          "@odata.etag": "W/\"56366343\"",
+          "ownerid": "29b0de0d-4ff7-ee11-a1fd-000d3a3621c7",
+          "fullname": "Justin Gallivan",
+          "isdisabled": false,
+          "systemuserid": "29b0de0d-4ff7-ee11-a1fd-000d3a3621c7",
+          "accessmode": 0
+        }
+      ]
+    },
+    "callerRoles": {
+      "status": "read-complete",
+      "rows": [
+        {
+          "@odata.etag": "W/\"45403867\"",
+          "roleid": "8af69b2d-fac4-ee11-9079-000d3a310f67",
+          "name": "WMKF Custom Entities"
+        },
+        {
+          "@odata.etag": "W/\"10733545\"",
+          "roleid": "25c6c130-0a5b-ed11-9562-000d3a343ab0",
+          "name": "akoyaGO Customizer"
+        },
+        {
+          "@odata.etag": "W/\"48954110\"",
+          "roleid": "cc836c09-cf7a-ee11-8179-00224802aaea",
+          "name": "System Administrator"
+        },
+        {
+          "@odata.etag": "W/\"60354740\"",
+          "roleid": "1d886c09-cf7a-ee11-8179-00224802aaea",
+          "name": "System Customizer"
+        },
+        {
+          "@odata.etag": "W/\"59188673\"",
+          "roleid": "f739acd0-9fc2-f111-aaad-70a8a59af221",
+          "name": "WMKF Proposal Ranking Application User"
+        }
+      ]
+    },
+    "settingsKeys": {
+      "status": "read-complete",
+      "rows": []
+    }
+  },
+  "requests": [
+    "/api/data/v9.2/WhoAmI",
+    "/api/data/v9.2/organizations?$select=organizationid,name",
+    "/api/data/v9.2/solutions?$select=solutionid,uniquename,friendlyname,version,ismanaged,_publisherid_value&$filter=isvisible%20eq%20true",
+    "/api/data/v9.2/publishers?$select=publisherid,uniquename,friendlyname,customizationprefix",
+    "/api/data/v9.2/pluginpackages?$select=pluginpackageid,name,version&$filter=contains(name,%27PromptPublication%27)",
+    "/api/data/v9.2/pluginassemblies?$select=pluginassemblyid,name,version,publickeytoken&$filter=contains(name,%27PromptPublication%27)",
+    "/api/data/v9.2/customapis?$select=customapiid,uniquename,isfunction,bindingtype,executeprivilegename,_plugintypeid_value&$filter=uniquename%20eq%20%27wmkf_PublishPrompt%27",
+    "/api/data/v9.2/EntityDefinitions?$select=LogicalName,EntitySetName,OwnershipType,IsOptimisticConcurrencyEnabled&$filter=LogicalName%20eq%20%27wmkf_promptpublicationhead%27%20or%20LogicalName%20eq%20%27wmkf_promptpublicationreceipt%27",
+    "/api/data/v9.2/systemusers?$select=systemuserid,fullname,isdisabled,accessmode&$filter=startswith(fullname,%27Connor%27)%20or%20fullname%20eq%20%27Justin%20Gallivan%27",
+    "/api/data/v9.2/systemusers(79913eac-7f3e-f111-88b4-6045bd015cb0)/systemuserroles_association?$select=roleid,name",
+    "/api/data/v9.2/wmkf_appsystemsettings?$select=wmkf_settingkey&$filter=wmkf_settingkey%20eq%20%27prompt-library.groups%27%20or%20wmkf_settingkey%20eq%20%27prompt-library.budget-coordination%27"
+  ],
+  "limitations": [
+    "Visibility is that of this application principal; human access and complete effective privilege depth are not attested.",
+    "Empty readable inventory is not proof that hidden registrations do not exist.",
+    "No writer freeze, registration, schema mutation, model execution or publication attempted."
+  ]
+}
