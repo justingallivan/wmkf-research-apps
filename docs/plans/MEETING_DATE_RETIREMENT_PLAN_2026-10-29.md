@@ -228,16 +228,22 @@ and date on purpose and stays.
   `wmkf_meetingdate` and new `meetingDateToCycleCode` calls outside an allowlist
   (calendar, probes), so the class does not come back.
 
-Proposed PRs, each with focused tests and a Codex review:
+Build steps, in order. Each becomes its own pull request with focused tests,
+a contract check and a Codex review; none merges without the owner.
 
-0. Sandbox Grant Cycle rows and request links (§5a), with owner approval for
-   the sandbox writes.
-1. Helpers, adapters and the Research surfaces (filters, membership, cycle lists,
-   default cycle), plus the two bugs in §6.
-2. Gates, displays and pass-through removals (§3.4, §3.6), after Q2–Q3.
-3. Stale-invite expiry and the honorarium write (§3.5), after Q4–Q5.
-4. Test Request Factory (§3.7), after Q7, with its ledger migration.
-5. Explorer, corpus and scripts (§3.8–3.9) as decided; then the gate.
+1. **Sandbox setup:** J/D Grant Cycle rows in the sandbox and links on sandbox
+   requests (§5a), with owner approval for the sandbox writes.
+2. **Cycle lookup and Research screens:** the shared helpers (with explicit
+   restriction checks, §5b), the request adapter's expand support, the Research
+   filters, cycle membership, cycle lists and default cycle, plus the two bugs
+   in §6.
+3. **Checks, dates shown and cleanup:** the "has a cycle" gates, displays,
+   reviewer-search labels (enrichment cache version bump) and pass-through
+   removals (§3.4, §3.6).
+4. **Invitation closing and honoraria:** stale-invite expiry and the
+   honorarium write (§3.5).
+5. **Test Request Factory** (§3.7); no ledger migration (§7 Q7).
+6. **Dynamics Explorer, scripts and the guard check** (§3.8–3.9) as decided.
 
 ## 5a. Contract check (2026-10-29, `/contract-reconcile` review mode)
 
@@ -252,9 +258,9 @@ Verified by the author before the Codex review:
 - **Sandbox has no Grant Cycle rows and no linked requests** [VERIFIED via
   sandbox read, 2026-10-29: `wmkf_grantcycles` empty]. After the migration
   nothing cycle-dependent can be rehearsed in the sandbox, Factory or otherwise,
-  until the sandbox has J/D cycle rows and linked requests. **New PR 0:**
+  until the sandbox has J/D cycle rows and linked requests. **New first build step (sandbox setup):**
   create the sandbox cycle rows (sandbox write; owner approval) and decide how
-  sandbox requests get links. It precedes every other PR.
+  sandbox requests get links. It precedes every other step.
 - **Saved fingerprints and hashes that include the meeting date** (each fails
   closed; none silently sends stale content):
   - Staff Deliberations writeup snapshot: unchanged if the month-year format is
@@ -294,7 +300,7 @@ Verified by the author before the Codex review:
    `wmkf_cyclecode` explicitly before any filter, expand or batch read, with
    negative tests for table- and field-restricted callers on each path.
 2. **`grant-request.getById` drops `expand`** [VERIFIED via
-   `grant-request.js:91-97`]. **Required:** PR 1 either adds expand support to
+   `grant-request.js:91-97`]. **Required:** the cycle lookup step either adds expand support to
    the adapter or every `getById` caller selects `_wmkf_grantcycle_value` and
    resolves the code; tests go through the real adapter, not mocked expanded
    rows.
@@ -335,7 +341,7 @@ honorarium and Factory paths.
    suggestions by stamped code alone (`reviewer-suggestion.js:1530-1555`
    [VERIFIED]); the per-row fallback (`individual-file-service.js:230-236`) and
    the operator backfill cover the rest. D26 impact: none (all 221 D26
-   suggestions stamped, §7 Q6). Fix in PR 1 with the link-based code.
+   suggestions stamped, §7 Q6). Fix in the cycle lookup step with the link-based code.
 2. **My-candidates PD scope reads fields the adapter does not return** [VERIFIED
    via `my-candidates-service.js:231-233`, `reviewer-suggestion.js:1798-1804`]:
    it reads `request.cycleCode` / `cycleLabel`, the adapter returns
@@ -402,7 +408,7 @@ honorarium and Factory paths.
    non-excluded suggestions on them carry `wmkf_grantcyclecode = D26`; none is
    blank, so the hourly review-filing job (which discovers only stamped rows,
    `reviewer-suggestion.js:1530-1555` [VERIFIED]) misses nothing despite bug 1.
-   Bug 1 is still fixed in PR 1 so J27 does not depend on a later fill-in.
+   Bug 1 is still fixed in the cycle lookup step so J27 does not depend on a later fill-in.
 7. **Test Request Factory.** **Decided (owner, 2026-10-29):** clones set the
    Grant Cycle link; the operator picks a cycle (default: the source's linked
    cycle) instead of a meeting date; clones still get `wmkf_meetingdate`, from
