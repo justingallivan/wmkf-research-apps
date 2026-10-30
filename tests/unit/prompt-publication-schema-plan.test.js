@@ -54,3 +54,9 @@ test('narrowed table probe and incomplete or filtered prompt attributes cannot i
  const s=clone(schema);s.entities[0].metadataReadComplete=false;expect(()=>prepare(s,registration)).toThrow('incomplete_prompt_inventory');
  const f=clone(schema);f.requests=f.requests.filter(value=>!value.includes('/Attributes?'));expect(()=>prepare(f,registration)).toThrow('prompt_inventory_scope_mismatch');
 });
+
+
+test('missing logical-name projection or malformed returned table cannot imply absence',()=>{
+ const r=clone(registration);r.requests=r.requests.map(value=>value.includes('EntityDefinitions?')?value.replace('LogicalName,',''):value);expect(()=>prepare(schema,r)).toThrow('new_table_inventory_scope_mismatch');
+ const bad=clone(registration);bad.inventory.requiredTables.rows=[{EntitySetName:'existing_table'}];expect(()=>prepare(schema,bad)).toThrow('incomplete_new_table_metadata');
+});

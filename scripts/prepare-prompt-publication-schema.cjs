@@ -37,11 +37,12 @@ function prepare(schema, registration) {
     else if (found.length !== 1 || !compatible(found[0], field)) blockers.push({ code: 'existing_attribute_conflict', field: field.name });
     else unchanged.push(field.name);
   }
-  const covers = (report, pathname, filter) => Array.isArray(report.requests) && report.requests.some(value => { const url = new URL(value, `https://${decisions.targetHost}`); return url.origin === `https://${decisions.targetHost}` && url.pathname === pathname && url.searchParams.get('$filter') === filter; });
+  const covers = (report, pathname, filter) => Array.isArray(report.requests) && report.requests.some(value => { const url = new URL(value, `https://${decisions.targetHost}`); return url.origin === `https://${decisions.targetHost}` && url.pathname === pathname && url.searchParams.get('$filter') === filter && (url.searchParams.get('$select') || '').split(',').includes('LogicalName'); });
   const tableFilter = "LogicalName eq 'wmkf_promptpublicationhead' or LogicalName eq 'wmkf_promptpublicationreceipt'";
   requireValue(covers(registration,'/api/data/v9.2/EntityDefinitions',tableFilter),'new_table_inventory_scope_mismatch');
   requireValue(covers(schema,"/api/data/v9.2/EntityDefinitions(LogicalName='wmkf_ai_prompt')/Attributes",null),'prompt_inventory_scope_mismatch');
   const knownTables = read('requiredTables');
+  requireValue(knownTables.every(row => spec.newTables.some(table => table.name === row.LogicalName)) && new Set(knownTables.map(row=>row.LogicalName)).size === knownTables.length,'incomplete_new_table_metadata');
   for (const table of spec.newTables) {
     if (knownTables.some(actual => actual.LogicalName === table.name)) {
       // Presence alone never attests attributes, lookup/key state or ownership.

@@ -9,7 +9,7 @@
     "scripts/probe-shared-prompt-library-schema.js": "32c283d3870ed141ceeeed757ad159f1e8fc0cc70603a97e9e503595642acf11",
     "dataverse/prompt-publication/registration/test-environment-decisions.json": "0ecb729177eb2ca7f0486a2628922cfe4a33165cef6e2a2da6b8f7a35eccf614",
     "dataverse/prompt-publication/registration/schema-v1.json": "8ee36ddef9eef9c185c22bb04a237267018bcfa2bd2f8d77d35c34dbd7e76201",
-    "scripts/prepare-prompt-publication-schema.cjs": "d7fde6cac70cd17bbab3004af76c1a502ff48ad600174265f50066ff7b7d5d4d",
+    "scripts/prepare-prompt-publication-schema.cjs": "e678c16ac5aabae6aa9deb4e1655a82afca6fa85b38bac06988f2e030e9ba99e",
     "scripts/prepare-prompt-first-publication.cjs": "b6381b6b1e83abf5a7498a2e679c830d20a6ac43d5e0e0eceb7b57a942cc01cc",
     "lib/prompt-publication/first-publication-client.js": "97d88c63e44e4d0467d28072e58cf9ce8e3b285a31b689aa67d0574722535ae0",
     "scripts/build-prompt-publication-package.cjs": "e88c21c21fdca114595feb5bb0338312b42109e75570b802ce1ae49d5e447d27",
@@ -64,7 +64,7 @@
     "lib/prompt-publication/policy-v1.json": "36e88fd6dac92aaec96866cc8605d24757c8204bd37752ebebe06a904250dc87",
     "lib/prompt-publication/transaction-core.js": "a17af7c4d180747e89c7deeb7da2b577fb5ba3ebb42a8738879725f6ef5e2b1b"
   },
-  "sourceDigest": "419d6f437188bd8c8cb8ae6e8cde3f183d665ebd8b8107807432cd7c6147b1c9",
+  "sourceDigest": "fb346993e907eedfbe7c880536a03b05deb447f705d061540dd4619958a602e3",
   "cases": {
     "caseVersion": 1,
     "deploymentAuthorized": false,
