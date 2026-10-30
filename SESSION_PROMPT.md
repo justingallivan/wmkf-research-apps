@@ -1,4 +1,4 @@
-# Session 650 Prompt: Shared prompt library — review the plan and agree the publication contract
+# Session 650 Prompt: Shared prompt library — review PR #553 before the sandbox build
 
 **Handoff destination:** `main`, docs-only, owner-confirmed 2026-10-29.
 **Feature/planning branch retained:** `codex/shared-prompt-library-plan`, PR #553
@@ -86,16 +86,19 @@ Session 649 handoff, exact: `git show 4d63eb048:SESSION_PROMPT.md`.
    table supports a uniquely keyed group configuration; `prompt-library.groups`
    was absent. Snapshot observed 2026-10-29T23:22:42Z. No prompt bodies,
    credentials, variable values, or output-schema content are in the evidence.
-4. **[PROPOSED; BRANCH ONLY] PR #553 contains implementation plan, shareable
-   publication contract for Connor, schema evidence, and reproducible probe.**
-   Commit `e35918ba2`. Six optional native metadata columns plus settings-backed
-   group labels/order; complete paging; Needs organization fallback; catalog-only
-   edits; Admin creation/drafts/first publication; shared audited publisher.
-   Independent contract review corrected out-of-order reserved drafts, stale
-   metadata baselines, and pending/final audit representation. Final source check
-   reuses the existing atomic Dataverse changeset seam for the lifecycle flip;
-   Postgres audit/response uncertainty still needs readback recovery. No schema,
-   data, runtime library, Power Automate integration or model execution changed.
+4. **[PROPOSED; BRANCH ONLY] PR #553: plan, publication contract for Connor,
+   schema evidence, probe, and local publication-contract source.** Head
+   `1187caf17` (first commit `e35918ba2`). **[OWNER DECIDED, recorded in the
+   PR's plan "Review disposition"]** Admin and Connor's coding tools both
+   publish through one shared Dataverse operation (a Custom API backed by a
+   .NET plug-in); **Connor does not need Admin**. Drafts use GUIDs; published
+   version numbers are assigned at activation. This replaced the earlier
+   Admin-first / reserved-draft / Postgres-lock proposal. Connor maintains the
+   Dataverse operation; initial publishers are Connor and existing Admin
+   superusers. Connor's agreement to the common prompt format is
+   owner-confirmed. Local source (`lib/prompt-publication/`, fixtures, tests)
+   is on the branch only. No schema, data, Dataverse solution, Power Automate
+   integration or model execution changed.
 
 ### Commits / PRs
 
@@ -103,7 +106,8 @@ Session 649 handoff, exact: `git show 4d63eb048:SESSION_PROMPT.md`.
 - `1da6d5673` — merge PR #546, search and collapsed stored references.
 - `b84d343ce` — merge PR #548, workflow grouping.
 - `e04470c65` — budget organization feature commit; PR #549 merged as `ebf010f8f`.
-- `e35918ba2` — shared-library plan/probe/evidence, pushed; PR #553 open.
+- `e35918ba2`..`1187caf17` — shared-library plan, publication decisions,
+  format/contract source and fixtures, pushed; PR #553 open.
 - This docs-only closeout commit is separate from the retained planning branch.
 
 ## Next Items
@@ -130,21 +134,18 @@ Session 649 handoff, exact: `git show 4d63eb048:SESSION_PROMPT.md`.
 
 **Codex workstream (prompt library):**
 
-1. **Review PR #553's shared-library proposal before implementation.**
-   Evidence: https://github.com/justingallivan/wmkf-research-apps/pull/553
-   The implementation and publication-contract documents are on that branch,
-   not yet on main. Next build needs explicit owner direction, additive schema
-   provisioning, sandbox write/attribution/concurrency rehearsal and deliberate
-   Production promotion. Do not treat the read-only planning permission as
-   authorization for schema/data writes or paid model tests.
+1. **Review PR #553 and continue its local foundation.** Evidence:
+   https://github.com/justingallivan/wmkf-research-apps/pull/553 (head
+   `1187caf17`). The publication route is settled (see Session 649 item 4);
+   do not reopen it. Still gated on separate explicit owner authorization:
+   merging #553, any message to Connor, schema provisioning, sandbox
+   deployment of the Dataverse operation and its write/attribution/concurrency
+   rehearsal, Production promotion, and paid model tests.
 
 ### Owner Decision Needed
 
-1. **Agree publication coordination with Connor.** Proposed default: backend
-   draft authoring remains possible, but publication uses the shared publisher.
-   A server lock cannot coordinate arbitrary direct published Dataverse writes.
-   If direct publication must remain a normal route, revise the coordination
-   design before build. No agreement or message to Connor has been recorded.
+- None open for the prompt library; publication coordination with Connor was
+  decided 2026-10-29 (recorded on the PR #553 branch).
 
 ### Parked / Not Included
 
@@ -167,7 +168,7 @@ Session 649 handoff, exact: `git show 4d63eb048:SESSION_PROMPT.md`.
 
 | Owner / workstream | Latest recorded resume boundary |
 |---|---|
-| Codex / shared prompt library | PR #553, `codex/shared-prompt-library-plan`, `e35918ba2`; proposed only |
+| Codex / shared prompt library | PR #553, `codex/shared-prompt-library-plan`, `1187caf17`; publication route decided, unmerged |
 | Codex / prompt UI organization | PRs #545/#546/#548/#549 merged; no further UI work requested |
 | Claude / J27 alignment and cycle dates | PRs #551 and #552 deployed; meeting-date retirement planned on `claude/meeting-date-retirement-plan` (sandbox setup done, next: cycle lookup and Research screens); reviewer plan `docs/plans/REVIEWER_INVITATION_CALENDAR_BUILD_PLAN_2026-10-29.md`; decisions through D48 in `docs/plans/J27_ALIGNMENT_LOG_2026-10-24.md`; older carried items at `git show 006b87565:SESSION_PROMPT.md` |
 | Codex / Ranking | Prior handoff records PRs #536/#537 done; not reopened |
