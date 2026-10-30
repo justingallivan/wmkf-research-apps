@@ -64,7 +64,7 @@ function suggestionRow(id, overrides = {}) {
 function fakeClient({ request = {}, person = {}, suggestions = [], post = null } = {}) {
   const table = new Map(suggestions.map((s) => [s.wmkf_appreviewersuggestionid.toLowerCase(), { ...s }]));
   const requestRow = {
-    akoya_requestid: REQUEST_ID, wmkf_istestrequest: true, wmkf_testcreationrunid: RUN_ID, wmkf_meetingdate: '2026-12-03', ...request,
+    akoya_requestid: REQUEST_ID, wmkf_istestrequest: true, wmkf_testcreationrunid: RUN_ID, wmkf_GrantCycle: { wmkf_cyclecode: 'D26' }, ...request,
   };
   const personRow = { wmkf_potentialreviewersid: PERSON_ID, statecode: 0, wmkf_issyntheticreviewer: true, ...person };
   const posts = [];
@@ -143,8 +143,14 @@ describe('runCastBinding', () => {
     expect(() => assertLedgerReceipt(resumed.rows[0].readback, 'readback')).not.toThrow();
   });
 
-  test('omits the grant cycle code when the meeting date is not a June or December cycle', async () => {
-    const client = fakeClient({ request: { wmkf_meetingdate: '2026-03-01' } });
+  test('omits the grant cycle code when the Request has no modern Grant Cycle link', async () => {
+    const client = fakeClient({ request: { wmkf_GrantCycle: null } });
+    await runCastBinding({ client, ledger: memoryLedger(), runId: RUN_ID });
+    expect(client.posts[0].body).not.toHaveProperty('wmkf_grantcyclecode');
+  });
+
+  test('omits the grant cycle code for a link to a historical (non-J/D) cycle row', async () => {
+    const client = fakeClient({ request: { wmkf_GrantCycle: { wmkf_cyclecode: 'FY2019' } } });
     await runCastBinding({ client, ledger: memoryLedger(), runId: RUN_ID });
     expect(client.posts[0].body).not.toHaveProperty('wmkf_grantcyclecode');
   });
@@ -289,7 +295,7 @@ describe('runCastBinding', () => {
 
 describe('the fence admits the runner body and nothing shaped otherwise', () => {
   const fence = { bindingId: BINDING_ID, personId: PERSON_ID, destinationRequestId: REQUEST_ID, sourceRequestId: SOURCE_ID, label: CAST_SUGGESTION_LABEL };
-  const body = buildCastSuggestionBody({ bindingId: BINDING_ID, personId: PERSON_ID, requestId: REQUEST_ID, meetingDate: '2026-06-04' });
+  const body = buildCastSuggestionBody({ bindingId: BINDING_ID, personId: PERSON_ID, requestId: REQUEST_ID, cycleCode: 'J26' });
 
   test('admits the runner body', async () => {
     const client = fakeClient();

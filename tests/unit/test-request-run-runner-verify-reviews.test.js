@@ -32,7 +32,6 @@ import { bypassDynamicsRestrictions } from '../../lib/services/dynamics-context.
 import { hashGovernedDocxContent, GOVERNED_DOCX_HASH_PREFIX } from '../../lib/services/documents/governed-docx-hash.js';
 import { renderInitialAssessmentDocx } from '../../lib/services/initial-assessment/template.js';
 import { SYNTHETIC_GENERATED } from '../../lib/services/test-requests/fixtures/initial-assessment-synthetic.js';
-import { meetingDateToCycleCode } from '../../lib/utils/cycle-code.js';
 
 function governedHashToHex(hash) {
   return Buffer.from(hash.slice(GOVERNED_DOCX_HASH_PREFIX.length), 'base64url').toString('hex');
@@ -106,7 +105,7 @@ const FISCAL_YEAR = 'December 2026';
 const PURPOSE = 'Synthetic purpose';
 const AMOUNT = 5000;
 const REQUEST_TYPE = 100000000;
-const GRANT_CYCLE_CODE = meetingDateToCycleCode(MEETING_DATE)?.toUpperCase();
+const GRANT_CYCLE_CODE = 'J26'; // the destination Request's linked cycle
 
 const BASIC_ITEM_ID = '01DEFGHIJKLMNOPQRSTUVWXYZ234567ABC';
 const BASIC_FILENAME = `ProposalNarrative_${REQUEST_NUMBER}.pdf`;
@@ -228,6 +227,7 @@ function requestReadback(overrides = {}) {
   return {
     akoya_requestid: REQUEST_ID, akoya_requestnum: REQUEST_NUMBER, akoya_title: TITLE, akoya_purpose: PURPOSE,
     akoya_request: AMOUNT, akoya_fiscalyear: FISCAL_YEAR, akoya_requesttype: REQUEST_TYPE, wmkf_meetingdate: MEETING_DATE,
+    wmkf_GrantCycle: { wmkf_cyclecode: GRANT_CYCLE_CODE },
     wmkf_istestrequest: true, wmkf_testcreationrunid: RUN_ID, wmkf_respondreminderenabled: false, wmkf_reviewduereminderenabled: false,
     wmkf_phaseiistatus: null, akoya_recommendedamount: null, akoya_originalgrantamount: null, akoya_submissionaccepted: false,
     _akoya_applicantid_value: ORG_ID,
@@ -252,6 +252,7 @@ function fakeClient({ requestRow } = {}) {
     baseUrl: SANDBOX_BASE_URL,
     get: jest.fn(async (requestPath) => {
       if (requestPath.includes('EntityDefinitions')) {
+        if (requestPath.includes('ManyToOneRelationships') && requestPath.includes("'wmkf_grantcycle'")) return { ok: true, status: 200, body: { value: [{ ReferencedEntity: 'wmkf_grantcycle', ReferencingEntityNavigationPropertyName: 'wmkf_GrantCycle' }] } };
         if (requestPath.includes('ManyToOneRelationships')) return { ok: true, status: 200, body: { value: [{ ReferencedEntity: 'account' }] } };
         if (requestPath.includes('PicklistAttributeMetadata')) {
           return { ok: true, status: 200, body: { OptionSet: { Options: [{ Value: REQUEST_TYPE, Label: { UserLocalizedLabel: { Label: 'Grant' } } }] } } };
@@ -263,7 +264,7 @@ function fakeClient({ requestRow } = {}) {
           body: {
             value: [
               'akoya_requestid', 'akoya_applicantid', 'akoya_title', 'akoya_purpose', 'wmkf_abstract', 'akoya_request',
-              'akoya_fiscalyear', 'akoya_requesttype', 'wmkf_meetingdate', 'wmkf_istestrequest',
+              'akoya_fiscalyear', 'akoya_requesttype', 'wmkf_meetingdate', 'wmkf_grantcycle', 'wmkf_istestrequest',
               'wmkf_testcreationrunid', 'wmkf_respondreminderenabled', 'wmkf_reviewduereminderenabled',
             ].map((field) => ({ LogicalName: field, AttributeType: 'String', IsValidForCreate: true, RequiredLevel: { Value: 'None' } })),
           },
@@ -1226,7 +1227,7 @@ describe('stepVerifyReviews', () => {
     expect(result.run.needsAttentionReason).toBe('reviews_verification_failed');
   });
 
-  it('mutation: wmkf_grantcyclecode does not match the destination meeting date fails reviews_verification_failed', async () => {
+  it('mutation: wmkf_grantcyclecode does not match the destination Grant Cycle link fails reviews_verification_failed', async () => {
     const bundle = buildBundle({ reviewForm: 'received_no_file' });
     const bundleReviewer = bundle.reviewers[0];
     mockDataverse({

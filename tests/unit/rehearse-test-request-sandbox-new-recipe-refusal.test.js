@@ -23,6 +23,7 @@ function reserveArgv(recipe) {
     '--bundle=/absolute/does-not-need-to-exist/bundle.json',
     `--manifest-out=/absolute/does-not-need-to-exist/manifest-${recipe}.json`,
     '--idempotency-key=test-key-1',
+    '--cycle=D97',
     `--recipe=${recipe}`,
   ];
 }
