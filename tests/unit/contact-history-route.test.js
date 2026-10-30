@@ -16,7 +16,7 @@ jest.mock('../../lib/services/dynamics-context', () => ({
   bypassDynamicsRestrictions: jest.fn((_label, fn) => fn()),
 }));
 jest.mock('../../lib/services/dynamics-service', () => ({
-  DynamicsService: { queryAllRecords: jest.fn(), queryRecords: jest.fn() },
+  DynamicsService: { queryAllRecords: jest.fn(), queryRecords: jest.fn(), checkRestriction: jest.fn() },
 }));
 
 const { DynamicsService } = require('../../lib/services/dynamics-service');
@@ -49,6 +49,7 @@ test('golden path: junction PI row + projectleader-fallback PI row on the same r
       akoya_requestnum: 'REQ-1',
       akoya_title: 'A Proposal',
       wmkf_meetingdate: '2026-06-15',
+      wmkf_GrantCycle: { wmkf_cyclecode: 'J26' },
       akoya_requeststatus: 'Phase II Pending',
     }],
   });
@@ -127,6 +128,7 @@ test('happy-path response envelope is pinned exactly (full shape)', async () => 
       akoya_requestnum: 'REQ-1',
       akoya_title: 'A Proposal',
       wmkf_meetingdate: '2026-06-15',
+      wmkf_GrantCycle: { wmkf_cyclecode: 'J26' },
       akoya_requeststatus: 'Phase II Pending',
     }],
   });
@@ -143,8 +145,8 @@ test('happy-path response envelope is pinned exactly (full shape)', async () => 
       requestNumber: 'REQ-1',
       title: 'A Proposal',
       meetingDate: '2026-06-15',
-      cycleCode: expect.any(String),
-      cycleLabel: expect.any(String),
+      cycleCode: 'J26',
+      cycleLabel: 'June 2026',
       requestStatus: 'Phase II Pending',
       role: 'pi',
       position: 0,

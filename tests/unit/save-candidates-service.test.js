@@ -1115,14 +1115,15 @@ test('attested trusted-ORCID address change updates the exact stable person atom
 });
 
 test.each([
-  ['a request with a meeting date', { cycleCode: 'D26' }, 'D26'],
-  ['a request without a meeting date', { cycleCode: null }, null],
-])('stamps the cycle code derived from %s and ignores a client-supplied one', async (_label, contextCycle, expected) => {
+  ['a request linked to a Grant Cycle', { cycleCode: 'D26' }, 'D26'],
+  ['a request without a Grant Cycle link', { cycleCode: null }, null],
+])('stamps the cycle code from %s and ignores a client-supplied one', async (_label, requestContext, expected) => {
+  // Real loadCoiContext shape: the cycle code is nested in requestContext.
   loadCoiContext.mockResolvedValueOnce({
+    requestContext,
     applicantInstitutionContext: { state: 'complete', names: ['Applicant University'] },
     piResolution: { state: 'ok', reason: null },
     institutionEntries: [{ identity: 'Applicant University', display: 'Applicant University' }],
-    ...contextCycle,
   });
 
   const out = await saveCandidates({

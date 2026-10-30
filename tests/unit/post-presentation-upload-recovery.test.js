@@ -30,6 +30,7 @@ function dependencies(row = intent(), overrides = {}) {
     getRequest: jest.fn(async () => ({
       akoya_requestid: REQUEST_ID, akoya_requestnum: '1003220',
       wmkf_meetingdate: '2026-12-10T00:00:00Z',
+      wmkf_GrantCycle: { wmkf_cyclecode: 'D26' },
     })),
     findActiveSiteVisit: jest.fn(async () => ({ records: [{
       activityid: VISIT_ID, _regardingobjectid_value: REQUEST_ID,

@@ -22,6 +22,7 @@ jest.mock('../../lib/services/dynamics-service', () => ({
     getRecord: jest.fn(),
     queryRecords: jest.fn(),
     queryAllRecords: jest.fn(),
+    checkRestriction: jest.fn(),
   },
 }));
 jest.mock('../../lib/dataverse/adapters/reviewer-suggestion', () => ({

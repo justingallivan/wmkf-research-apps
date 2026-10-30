@@ -21,7 +21,7 @@ const STAGING_LEASE = '44444444-4444-4444-8444-444444444444';
 const COORDINATOR_ID = '55555555-5555-4555-8555-555555555555';
 const PDF = Buffer.from('%PDF-1.7\n%âãÏÓ\n1 0 obj');
 const ZIP = Buffer.concat([Buffer.from([0x50, 0x4b, 0x03, 0x04]), Buffer.alloc(64, 1)]);
-const REQUEST = { akoya_requestid: REQUEST_ID, akoya_requestnum: '1003222', akoya_title: 'Neural dust', wmkf_meetingdate: '2026-12-08T00:00:00Z', _akoya_applicantid_value_formatted: 'Caltech' };
+const REQUEST = { akoya_requestid: REQUEST_ID, akoya_requestnum: '1003222', akoya_title: 'Neural dust', wmkf_meetingdate: '2026-12-08T00:00:00Z', wmkf_GrantCycle: { wmkf_cyclecode: 'D26' }, _akoya_applicantid_value_formatted: 'Caltech' };
 const ROW_PDF = { wmkf_requestdocumentid: 'aaaaaaaa-0000-4000-8000-000000000001', _wmkf_request_value: REQUEST_ID, wmkf_artifacttype: REQUEST_DOCUMENT_ARTIFACT_TYPE.APPLICANT_SLIDES, wmkf_operationstatus: REQUEST_DOCUMENT_OPERATION_STATUS.READY, wmkf_lifecyclestate: REQUEST_DOCUMENT_LIFECYCLE_STATE.DRAFT, wmkf_sharepointitemid: 'item-0', wmkf_filename: '1003222 Site Visit Presentation.pdf', modifiedon: '2026-11-20T10:00:00Z' };
 
 function collection(overrides = {}) {
@@ -203,6 +203,12 @@ test('finalize validates, scans, uploads under the canonical name with replace, 
   });
   expect(d.releaseSlotLease).toHaveBeenCalledWith({ collectionId: COLLECTION_ID, slotKey: 'presentation_pdf', leaseToken: 'slot-lease' });
   expect(result).toMatchObject({ ok: true, slot: 'presentation_pdf', filename: '1003222 Site Visit Presentation.pdf', receivedAt: '2026-11-21T09:00:00Z' });
+});
+
+test('finalize records no cycle code for a December meeting date without a linked Grant Cycle', async () => {
+  const d = deps({ getRequest: jest.fn(async () => ({ ...REQUEST, wmkf_GrantCycle: null })) });
+  await finalizeMaterialUpload(finalizeArgs('presentation_pdf', { filename: 'Our Deck v3.pdf', buffer: PDF }), d);
+  expect(d.createDocument.mock.calls[0][0].wmkf_cyclecode).toBeNull();
 });
 
 test('finalize refuses: waived slot, oversize, wrong bytes, infected scan, no active bucket; nothing uploaded', async () => {

@@ -25,6 +25,7 @@ jest.mock('../../lib/services/workbench-proposal-documents', () => ({
 
 import { downloadProposalDocument } from '../../lib/services/workbench/download-proposal-document-service';
 import { ServiceHttpError } from '../../lib/services/service-http-error';
+import { DynamicsService } from '../../lib/services/dynamics-service';
 
 const REQ = '11111111-1111-1111-1111-111111111111';
 const FOLDER = '1002794_X/Phase I';
@@ -35,7 +36,11 @@ const args = (over = {}) => ({ requestId: REQ, library: 'Documents', folder: FOL
 
 beforeEach(() => {
   jest.clearAllMocks();
-  getById.mockResolvedValue({ akoya_requestid: REQ, akoya_requestnum: '1002794', wmkf_meetingdate: '2026-06-01' });
+  getById.mockResolvedValue({
+    akoya_requestid: REQ, akoya_requestnum: '1002794', wmkf_meetingdate: '2026-06-01', wmkf_GrantCycle: { wmkf_cyclecode: 'J26' },
+  });
+  // The link helpers check the wmkf_grantcycle restriction (covered in grant-cycle-link.test.js).
+  jest.spyOn(DynamicsService, 'checkRestriction').mockImplementation(() => {});
   listProposalDocuments.mockResolvedValue({
     slots: [
       { found: true, library: 'Documents', folder: FOLDER, name: 'proposal.pdf' },
@@ -63,6 +68,18 @@ test('request not found → 404, no listing/download attempted', async () => {
   expect(err.httpStatus).toBe(404);
   expect(err.message).toBe(`No request found for ${REQ}`);
   expect(listProposalDocuments).not.toHaveBeenCalled();
+});
+
+test('scope comes from the Grant Cycle link (read with the expand), never the meeting date', async () => {
+  await downloadProposalDocument(args());
+  expect(getById).toHaveBeenCalledWith(REQ, {
+    select: 'akoya_requestid,akoya_requestnum,wmkf_meetingdate',
+    expand: 'wmkf_GrantCycle($select=wmkf_cyclecode)',
+  });
+  expect(listProposalDocuments).toHaveBeenLastCalledWith(REQ, '1002794', 'J26');
+  getById.mockResolvedValue({ akoya_requestid: REQ, akoya_requestnum: '1002794', wmkf_meetingdate: '2026-06-01' });
+  await downloadProposalDocument(args());
+  expect(listProposalDocuments).toHaveBeenLastCalledWith(REQ, '1002794', null);
 });
 
 test('membership: Reviewer Materials + Phase I/II + AI Materials + otherDocuments allowed; unlisted or found:false → 403 pre-download', async () => {

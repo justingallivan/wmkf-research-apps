@@ -4,9 +4,10 @@
  * Read-only, org-open Research request discovery for Workbench users.
  *
  *   GET ?mode=options
- *     → June/December meeting cycles and live Research request-status options
+ *     → June/December cycles from each request's Grant Cycle link, and live
+ *       Research request-status options
  *
- *   GET ?q=<text>&cycle=<meeting-month-year>&status=<request-status>&offset=<0..75>
+ *   GET ?q=<text>&cycle=<cycle-label>&status=<request-status>&offset=<0..75>
  *     → bounded active/historical Research results (numeric q uses exact lookup)
  */
 

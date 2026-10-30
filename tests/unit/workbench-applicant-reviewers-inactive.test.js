@@ -3,6 +3,15 @@
 // Exercise the real ingestion, capability, suggestion adapter and repair
 // hydrator together; mock only Dataverse transport and unrelated extraction.
 jest.mock('../../lib/dataverse/adapters/grant-request.js', () => ({ getById: jest.fn() }));
+// Grant Cycle link helpers: real strings and the real row reader, without the
+// restriction context this transport-mocked suite never establishes.
+jest.mock('../../lib/dataverse/adapters/operations-grant-cycle.js', () => ({
+  linkedCycleExpand: () => 'wmkf_GrantCycle($select=wmkf_cyclecode)',
+  linkedCycleCode: (row) => {
+    const code = row?.wmkf_GrantCycle?.wmkf_cyclecode;
+    return typeof code === 'string' && /^[JD]\d{2}$/.test(code) ? code : null;
+  },
+}));
 jest.mock('../../lib/dataverse/adapters/potential-reviewer.js', () => ({
   getById: jest.fn(),
   findByEmailCandidates: jest.fn(),

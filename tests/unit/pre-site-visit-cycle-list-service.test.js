@@ -1,6 +1,6 @@
 /** @jest-environment node */
 
-jest.mock('../../lib/services/dynamics-service.js', () => ({ DynamicsService: { queryAllRecords: jest.fn() } }));
+jest.mock('../../lib/services/dynamics-service.js', () => ({ DynamicsService: { queryAllRecords: jest.fn(), checkRestriction: jest.fn() } }));
 jest.mock('../../lib/utils/final-writeup-readiness.js', () => ({ isFinalWriteupSchemaReady: () => true }));
 jest.mock('../../lib/dataverse/adapters/request-document.js', () => ({ findByRequests: jest.fn() }));
 jest.mock('../../lib/dataverse/adapters/grant-request.js', () => ({ queryAllRequests: jest.fn() }));
@@ -117,7 +117,9 @@ it('uses an active server-resolved program plus the selected cycle and lead-PD f
   await list({ scope: 'my', callerSystemId: PD_A });
   expect(resolveWorkbenchProgramScope).toHaveBeenCalledWith({ callerSystemId: PD_A, programId: PROGRAM });
   const query = grantRequestAdapter.queryAllRequests.mock.calls[0][0];
-  expect(query.filter).toContain('wmkf_meetingdate ge 2026-12-01T00:00:00Z');
+  expect(query.filter).toContain("wmkf_GrantCycle/wmkf_cyclecode eq 'D26'");
+  expect(query.filter).not.toContain('wmkf_meetingdate');
+  expect(query.expand).toBe('wmkf_GrantCycle($select=wmkf_cyclecode)');
   expect(query.filter).toContain(`_wmkf_grantprogram_value eq ${PROGRAM}`);
   expect(query.filter).toContain(buildVisibilityFilter(false));
   expect(query.filter).toContain(`_wmkf_programdirector_value eq ${PD_A}`);
@@ -353,7 +355,7 @@ it('reports due as waiting only for requests active automation would scan', asyn
   const saved = Object.fromEntries(Object.keys(env).map((key) => [key, process.env[key]]));
   Object.assign(process.env, env);
   try {
-    const eligible = { akoya_requeststatus: 'Phase II Pending', wmkf_meetingdate: '2026-12-10T00:00:00Z', wmkf_istestrequest: false, wmkf_testcreationrunid: null };
+    const eligible = { akoya_requeststatus: 'Phase II Pending', wmkf_meetingdate: '2026-12-10T00:00:00Z', wmkf_GrantCycle: { wmkf_cyclecode: 'D26' }, wmkf_istestrequest: false, wmkf_testcreationrunid: null };
     grantRequestAdapter.queryAllRequests.mockResolvedValue({ records: [req(R1, eligible), req(R2, eligible)], capped: false });
     siteVisitAdapter.findSummariesByRequests.mockResolvedValue({ records: [
       { _regardingobjectid_value: R1, activityid: 'v1', statecode: 1, statuscode: 2, scheduledend: '2026-12-01T18:00:00Z' },
@@ -363,6 +365,11 @@ it('reports due as waiting only for requests active automation would scan', asyn
     const byNumber = Object.fromEntries(result.artifacts.map((row) => [row.requestNumber, row.preparation]));
     expect(byNumber['1002959']).toMatchObject({ due: true, state: 'due', automationActive: true });
     expect(byNumber['1003001']).toMatchObject({ due: true, state: 'disabled', automationActive: true });
+
+    // A December meeting date without a Grant Cycle link is outside the cycle allowlist.
+    grantRequestAdapter.queryAllRequests.mockResolvedValue({ records: [req(R1, { ...eligible, wmkf_GrantCycle: null }), req(R2, eligible)], capped: false });
+    const unlinked = await list();
+    expect(unlinked.artifacts.find((row) => row.requestNumber === '1002959').preparation).toMatchObject({ due: true, state: 'disabled' });
   } finally {
     for (const [key, value] of Object.entries(saved)) {
       if (value === undefined) delete process.env[key];

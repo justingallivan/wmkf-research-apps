@@ -17,7 +17,7 @@
 
 import { requireAppAccess } from '../../../../lib/utils/auth';
 import { withDalContext } from '../../../../lib/dataverse/core/context';
-import { cycleCodeToOdataFilter } from '../../../../lib/utils/cycle-code';
+import { parseCycleCode } from '../../../../lib/utils/cycle-code';
 import { GRANTEE_RESEARCH_PROGRAM_IDS } from '../../../../shared/config/granteeResearchPrograms';
 import { ServiceHttpError } from '../../../../lib/services/service-http-error';
 import { exportGranteeCycle } from '../../../../lib/services/workbench/grantee-deliverables/cycle-export-service';
@@ -32,8 +32,7 @@ export default async function handler(req, res) {
   if (!access) return;
 
   const cycleCode = typeof req.query?.cycleCode === 'string' ? req.query.cycleCode.trim() : '';
-  const cycleFilter = cycleCodeToOdataFilter(cycleCode, 'wmkf_meetingdate');
-  if (!cycleFilter) {
+  if (!parseCycleCode(cycleCode)) {
     return res.status(400).json({ error: 'cycleCode must be a valid cycle (e.g. J26 or D26)' });
   }
   if (!GRANTEE_RESEARCH_PROGRAM_IDS.length) {

@@ -421,3 +421,38 @@ describe('createPresiteAiRunDeps', () => {
       .toThrow(/refusing non-sandbox Dataverse host/);
   });
 });
+
+describe('createPresiteInputDeps getRequest cycle (until Factory build step 5)', () => {
+  const REQUEST_ID = '55555555-5555-4555-8555-555555555555';
+  const depsFor = (body) => {
+    const get = jest.fn(async () => ({ ok: true, status: 200, body }));
+    createClient.mockReturnValue({ get });
+    const deps = createPresiteInputDeps({
+      resourceUrl: SANDBOX_URL,
+      graph: { downloadFile: async () => ({ buffer: Buffer.from('x') }) },
+      findProposalNarrativeLocation: async () => null,
+      personnel: { principalInvestigator: 'Dr. PI Name', coPrincipalInvestigators: [] },
+    });
+    return { deps, get };
+  };
+
+  it('requests the Grant Cycle expand and keeps a linked cycle', async () => {
+    const { deps, get } = depsFor({ akoya_requestid: REQUEST_ID, wmkf_meetingdate: '2026-12-11', wmkf_GrantCycle: { wmkf_cyclecode: 'D97' } });
+    const request = await withDalContext('presite-sandbox-deps-test', () => deps.getRequest(REQUEST_ID));
+    const url = new URL(get.mock.calls[0][0], SANDBOX_URL);
+    expect(url.searchParams.get('$expand')).toBe('wmkf_GrantCycle($select=wmkf_cyclecode)');
+    expect(request.wmkf_GrantCycle).toEqual({ wmkf_cyclecode: 'D97' });
+  });
+
+  it('derives an unlinked clone cycle from its meeting date', async () => {
+    const { deps } = depsFor({ akoya_requestid: REQUEST_ID, wmkf_meetingdate: '2026-12-11', wmkf_GrantCycle: null });
+    const request = await withDalContext('presite-sandbox-deps-test', () => deps.getRequest(REQUEST_ID));
+    expect(request.wmkf_GrantCycle).toEqual({ wmkf_cyclecode: 'D26' });
+  });
+
+  it('leaves an off-month unlinked clone without a cycle', async () => {
+    const { deps } = depsFor({ akoya_requestid: REQUEST_ID, wmkf_meetingdate: '2026-03-11', wmkf_GrantCycle: null });
+    const request = await withDalContext('presite-sandbox-deps-test', () => deps.getRequest(REQUEST_ID));
+    expect(request.wmkf_GrantCycle).toBeNull();
+  });
+});

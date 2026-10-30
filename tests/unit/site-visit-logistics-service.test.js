@@ -10,7 +10,6 @@ import {
   REQUEST_DOCUMENT_OPERATION_STATUS,
 } from '../../shared/config/requestDocument';
 import { SITE_VISIT_FORMAT } from '../../shared/config/siteVisit';
-import { meetingDateToCycleCode, cycleCodeToLabel } from '../../lib/utils/cycle-code';
 import {
   presentationTranscriptGenerationKey, staffDiscussionTranscriptGenerationKey, staffDiscussionSummaryBindingFingerprint, transcriptSummaryBindingFingerprint,
 } from '../../lib/services/post-presentation-materials/presentation-transcript-binding';
@@ -68,6 +67,7 @@ function dependencies(overrides = {}) {
     getRequestIdentity: jest.fn(async () => ({
       akoya_requestid: REQUEST_ID, akoya_requestnum: '1003222', akoya_title: 'Quantum dots for imaging',
       wmkf_meetingdate: '2026-12-11T00:00:00Z', _akoya_applicantid_value_formatted: 'Example University',
+      wmkf_GrantCycle: { wmkf_cyclecode: 'D26' },
       _wmkf_grantprogram_value_formatted: 'Research Program',
     })),
     getRequest: jest.fn(async () => ({
@@ -370,12 +370,19 @@ test('the Meeting Tracker opt-in adds the request identity for the page header (
   const deps = dependencies();
   const result = await getSiteVisitLogistics({ requestId: REQUEST_ID, includeRequestIdentity: true }, deps);
   expect(deps.getRequestIdentity).toHaveBeenCalledWith(REQUEST_ID);
-  const cycleCode = meetingDateToCycleCode('2026-12-11T00:00:00Z');
   expect(result.request).toEqual({
     shareStatus: 'Review',
     requestNumber: '1003222', title: 'Quantum dots for imaging', institution: 'Example University',
-    grantProgram: 'Research Program', cycleLabel: cycleCode ? cycleCodeToLabel(cycleCode) : null,
+    grantProgram: 'Research Program', cycleLabel: 'December 2026',
   });
+});
+
+test('the request identity shows no cycle label for a December meeting date without a linked Grant Cycle', async () => {
+  const deps = dependencies();
+  const row = await deps.getRequestIdentity();
+  deps.getRequestIdentity.mockResolvedValue({ ...row, wmkf_GrantCycle: null });
+  const result = await getSiteVisitLogistics({ requestId: REQUEST_ID, includeRequestIdentity: true }, deps);
+  expect(result.request.cycleLabel).toBeNull();
 });
 
 test.each([

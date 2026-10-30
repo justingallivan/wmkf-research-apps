@@ -14,7 +14,7 @@ jest.mock('../../lib/services/dynamics-context', () => ({
   bypassDynamicsRestrictions: jest.fn((_label, fn) => fn()),
 }));
 jest.mock('../../lib/services/dynamics-service', () => ({
-  DynamicsService: { queryAllRecords: jest.fn() },
+  DynamicsService: { queryAllRecords: jest.fn(), checkRestriction: jest.fn() },
 }));
 jest.mock('../../lib/services/program-director-resolver', () => ({
   resolveByEmail: jest.fn(),
@@ -84,7 +84,7 @@ test('failure path: invalid cycleCode → 400', async () => {
 test('golden path: no cycleCode returns the distinct cycles for the PD', async () => {
   resolveByEmail.mockResolvedValue(PD);
   DynamicsService.queryAllRecords.mockResolvedValue({
-    records: [{ akoya_requestid: 'r1', wmkf_meetingdate: '2026-06-15' }],
+    records: [{ akoya_requestid: 'r1', wmkf_meetingdate: '2026-06-15', wmkf_GrantCycle: { wmkf_cyclecode: 'J26' } }],
   });
 
   const req = createMockReq({ method: 'GET', query: {} });

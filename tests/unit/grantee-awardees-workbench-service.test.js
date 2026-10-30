@@ -14,6 +14,12 @@ jest.mock('../../lib/dataverse/adapters/grant-request.js', () => ({
   queryAllRequests: (...a) => queryAllRequests(...a),
 }));
 
+const listBoardDates = jest.fn();
+jest.mock('../../lib/dataverse/adapters/operations-grant-cycle.js', () => ({
+  ...jest.requireActual('../../lib/dataverse/adapters/operations-grant-cycle.js'),
+  listBoardDatesOrNone: (...a) => listBoardDates(...a),
+}));
+
 const resolveByEmail = jest.fn();
 jest.mock('../../lib/services/program-director-resolver', () => ({
   resolveByEmail: (...a) => resolveByEmail(...a),
@@ -33,6 +39,7 @@ jest.mock('../../lib/dataverse/adapters/account.js', () => ({
 import { listGranteeAwardees, listGranteeAwardeeCycles } from '../../lib/services/workbench/grantee-deliverables/awardees-service';
 import { GRANTEE_DELIVERABLE_STATUS } from '../../shared/config/granteeDeliverableStatus';
 import { RESEARCH_PROGRAM_IDS } from '../../shared/config/researchPrograms';
+import { DynamicsService } from '../../lib/services/dynamics-service';
 
 const NO_LIAISON = { _akoya_programid_value: null, _akoya_applicantid_value: null, _akoya_primarycontactid_value: null };
 
@@ -42,6 +49,12 @@ beforeEach(() => {
   resolveByEmail.mockResolvedValue({ systemuserid: 'pd-me', fullName: 'Justin Gallivan' });
   queryAllRequests.mockResolvedValue({ records: [], totalCount: 0, capped: false });
   getDeliverableForRequest.mockResolvedValue(null);
+  listBoardDates.mockResolvedValue([
+    { wmkf_cyclecode: 'J26', wmkf_meetingdate: '2026-06-04' },
+    { wmkf_cyclecode: 'D26', wmkf_meetingdate: '2026-12-11' },
+  ]);
+  // The link helpers check the wmkf_grantcycle restriction (covered in grant-cycle-link.test.js).
+  jest.spyOn(DynamicsService, 'checkRestriction').mockImplementation(() => {});
 });
 
 afterEach(() => { delete process.env.TEST_REQUEST_ISOLATION; });
@@ -164,21 +177,24 @@ test.each([
   expect(getDeliverableForRequest).not.toHaveBeenCalled();
 });
 
-test('cycle-list mode groups the eligibility population by meeting-date cycle and resolves calendar defaults from it', async () => {
+test('cycle-list mode groups the eligibility population by linked cycle and resolves calendar defaults from it', async () => {
   queryAllRequests.mockResolvedValue({ records: [
-    { akoya_requestid: 'a', wmkf_meetingdate: '2026-12-11' },
-    { akoya_requestid: 'b', wmkf_meetingdate: '2026-06-04' },
-    { akoya_requestid: 'c', wmkf_meetingdate: '2026-06-04' },
-    { akoya_requestid: 'd', wmkf_meetingdate: '2026-03-15' }, // off-month: counted, never coded
+    { akoya_requestid: 'a', wmkf_meetingdate: '2026-12-14', wmkf_GrantCycle: { wmkf_cyclecode: 'D26' } },
+    { akoya_requestid: 'b', wmkf_meetingdate: '2026-06-04', wmkf_GrantCycle: { wmkf_cyclecode: 'J26' } },
+    { akoya_requestid: 'c', wmkf_meetingdate: '2026-07-15', wmkf_GrantCycle: { wmkf_cyclecode: 'J26' } }, // off-month date, linked: J26
+    { akoya_requestid: 'd', wmkf_meetingdate: '2016-03-15', wmkf_GrantCycle: { wmkf_cyclecode: 'R16' } }, // historical link: counted, never coded
   ], capped: false });
   const body = await listGranteeAwardeeCycles({ today: new Date('2026-09-08T12:00:00Z') });
-  const { filter } = queryAllRequests.mock.calls[0][0];
+  const { filter, expand } = queryAllRequests.mock.calls[0][0];
+  expect(expand).toBe('wmkf_GrantCycle($select=wmkf_cyclecode)');
+  expect(filter).toContain('_wmkf_grantcycle_value ne null');
   // Same population as the row query: Active + PI present + research programs; no cycle window, no PD clause.
   expect(filter).toContain("akoya_requeststatus eq 'Active'");
   expect(filter).toContain('_wmkf_projectleader_value ne null');
   expect(filter).toContain('_akoya_programid_value eq');
   expect(filter).not.toContain('_wmkf_programdirector_value');
-  expect(filter).not.toContain('wmkf_meetingdate ge');
+  expect(filter).not.toContain('wmkf_meetingdate');
+  // meetingDate is the calendar Board date, not a request's meeting date.
   expect(body).toEqual({
     cycles: [
       { code: 'D26', label: 'December 2026', meetingDate: '2026-12-11', count: 1 },
@@ -188,6 +204,24 @@ test('cycle-list mode groups the eligibility population by meeting-date cycle an
     lastDecidedCycleCode: 'J26',
     uncycledCount: 1,
   });
+});
+
+test('cycle-list mode: a cycle the calendar has no date for is listed code-only', async () => {
+  listBoardDates.mockResolvedValue([]);
+  queryAllRequests.mockResolvedValue({ records: [
+    { akoya_requestid: 'a', wmkf_meetingdate: '2026-12-11', wmkf_GrantCycle: { wmkf_cyclecode: 'D26' } },
+    { akoya_requestid: 'b', wmkf_meetingdate: '2026-06-04', wmkf_GrantCycle: { wmkf_cyclecode: 'J26' } },
+  ], capped: false });
+  const body = await listGranteeAwardeeCycles({ today: new Date('2026-09-08T12:00:00Z') });
+  expect(body.cycles.map((c) => [c.code, c.meetingDate])).toEqual([['D26', null], ['J26', null]]);
+  expect(body).toMatchObject({ defaultCycleCode: 'D26', lastDecidedCycleCode: 'J26' });
+});
+
+test('row mode filters on the Grant Cycle link, normalizing the code', async () => {
+  await listGranteeAwardees({ cycleCode: 'd26', showAll: true, azureEmail: null });
+  const { filter } = queryAllRequests.mock.calls[0][0];
+  expect(filter.startsWith("wmkf_GrantCycle/wmkf_cyclecode eq 'D26' and ")).toBe(true);
+  expect(filter).not.toContain('wmkf_meetingdate');
 });
 
 test('cycle-list mode fails closed with a typed 503 on a capped scan', async () => {
@@ -200,7 +234,8 @@ test('the cycle-list predicate and the row predicate share the eligibility claus
   await listGranteeAwardeeCycles();
   await listGranteeAwardees({ cycleCode: 'J26', showAll: true, azureEmail: null });
   const [cycleFilter, rowFilter] = queryAllRequests.mock.calls.map(([a]) => a.filter);
-  const eligibility = cycleFilter.replace('wmkf_meetingdate ne null and ', '');
+  const eligibility = cycleFilter.replace('_wmkf_grantcycle_value ne null and ', '');
+  expect(eligibility).not.toBe(cycleFilter);
   expect(rowFilter).toContain(eligibility);
 });
 

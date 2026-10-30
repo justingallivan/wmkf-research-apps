@@ -5,9 +5,10 @@
  */
 
 const fetchWithTimeout = jest.fn();
+const checkRestriction = jest.fn();
 jest.mock('../../lib/services/dynamics/http.js', () => ({ fetchWithTimeout: (...a) => fetchWithTimeout(...a) }));
 jest.mock('../../lib/services/dynamics-service.js', () => ({
-  DynamicsService: { getAccessToken: jest.fn(async () => 'token'), buildHeaders: jest.fn(() => ({})) },
+  DynamicsService: { getAccessToken: jest.fn(async () => 'token'), buildHeaders: jest.fn(() => ({})), checkRestriction: (...a) => checkRestriction(...a) },
 }));
 
 const { getCycleDatesById } = require('../../lib/dataverse/adapters/operations-grant-cycle');
@@ -26,6 +27,7 @@ test('reads the one row by id with the caller deadline', async () => {
   expect(url).toContain(`(${ID})?`);
   expect(decodeURIComponent(url)).toContain('wmkf_researchreviewsduedate');
   expect(timeoutMs).toBe(1234);
+  expect(checkRestriction).toHaveBeenCalledWith('wmkf_grantcycle', expect.stringContaining('wmkf_cyclecode'));
 });
 
 test('a missing row is null; any other failure throws', async () => {

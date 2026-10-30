@@ -18,12 +18,17 @@ jest.mock('../../lib/services/workbench-proposal-documents', () => ({
 
 import { listWorkbenchProposalDocuments } from '../../lib/services/workbench/proposal-documents-service';
 import { ServiceHttpError } from '../../lib/services/service-http-error';
+import { DynamicsService } from '../../lib/services/dynamics-service';
 
 const REQ = '11111111-1111-1111-1111-111111111111';
 
 beforeEach(() => {
   jest.clearAllMocks();
-  getById.mockResolvedValue({ akoya_requestid: REQ, akoya_requestnum: '1002794', wmkf_meetingdate: '2026-06-01' });
+  getById.mockResolvedValue({
+    akoya_requestid: REQ, akoya_requestnum: '1002794', wmkf_meetingdate: '2026-06-01', wmkf_GrantCycle: { wmkf_cyclecode: 'J26' },
+  });
+  // The link helpers check the wmkf_grantcycle restriction (covered in grant-cycle-link.test.js).
+  jest.spyOn(DynamicsService, 'checkRestriction').mockImplementation(() => {});
   listProposalDocuments.mockResolvedValue({
     slots: [], reviewerMaterials: [], aiMaterials: [], otherDocuments: [], libraries: ['Documents'], errors: [],
   });
@@ -40,7 +45,10 @@ test('unresolvable request → ServiceHttpError 404; no listing attempted', asyn
 
 test('derives scope from the resolved record (id/number/cycle) and spreads the result', async () => {
   const body = await listWorkbenchProposalDocuments({ requestId: REQ });
-  expect(getById).toHaveBeenCalledWith(REQ, { select: 'akoya_requestid,akoya_requestnum,wmkf_meetingdate' });
+  expect(getById).toHaveBeenCalledWith(REQ, {
+    select: 'akoya_requestid,akoya_requestnum,wmkf_meetingdate',
+    expand: 'wmkf_GrantCycle($select=wmkf_cyclecode)',
+  });
   expect(listProposalDocuments).toHaveBeenCalledWith(REQ, '1002794', 'J26');
   expect(body).toEqual({
     success: true,
@@ -54,8 +62,8 @@ test('derives scope from the resolved record (id/number/cycle) and spreads the r
   });
 });
 
-test('null meeting date → null cycle code passed through', async () => {
-  getById.mockResolvedValue({ akoya_requestid: REQ, akoya_requestnum: '1002794', wmkf_meetingdate: null });
+test('no Grant Cycle link → null cycle code passed through, even with a June meeting date', async () => {
+  getById.mockResolvedValue({ akoya_requestid: REQ, akoya_requestnum: '1002794', wmkf_meetingdate: '2026-06-01' });
   await listWorkbenchProposalDocuments({ requestId: REQ });
   expect(listProposalDocuments).toHaveBeenCalledWith(REQ, '1002794', null);
 });

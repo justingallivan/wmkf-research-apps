@@ -2,9 +2,9 @@ import { applyProposalRankingTrialCutoff } from '../../lib/services/proposal-ran
 
 test('applies the numeric request cutoff only to December 2026', () => {
   const rows = [
-    { akoya_requestnum: '1003219', wmkf_meetingdate: '2026-12-10T00:00:00Z' },
-    { akoya_requestnum: '1003220', wmkf_meetingdate: '2026-12-10T00:00:00Z' },
-    { akoya_requestnum: '1003221', wmkf_meetingdate: '2026-06-10T00:00:00Z' },
+    { akoya_requestnum: '1003219', wmkf_meetingdate: '2026-12-10T00:00:00Z', wmkf_GrantCycle: { wmkf_cyclecode: 'D26' } },
+    { akoya_requestnum: '1003220', wmkf_meetingdate: '2026-12-10T00:00:00Z', wmkf_GrantCycle: { wmkf_cyclecode: 'D26' } },
+    { akoya_requestnum: '1003221', wmkf_meetingdate: '2026-06-10T00:00:00Z', wmkf_GrantCycle: { wmkf_cyclecode: 'J26' } },
   ];
 
   expect(applyProposalRankingTrialCutoff(rows)).toEqual({
@@ -13,12 +13,19 @@ test('applies the numeric request cutoff only to December 2026', () => {
   });
 });
 
+test('a December 2026 meeting date without a linked Grant Cycle is not in the trial', () => {
+  const rows = [{ akoya_requestnum: '1003220', wmkf_meetingdate: '2026-12-10T00:00:00Z', wmkf_GrantCycle: null }];
+
+  expect(applyProposalRankingTrialCutoff(rows)).toEqual({ requests: rows, excludedRequestCount: 0 });
+});
+
 test.each([undefined, null, '', 'D26-1', '9007199254740992'])(
   'fails closed for a malformed December 2026 request number: %s',
   (akoya_requestnum) => {
     expect(() => applyProposalRankingTrialCutoff([{
       akoya_requestnum,
       wmkf_meetingdate: '2026-12-10T00:00:00Z',
+      wmkf_GrantCycle: { wmkf_cyclecode: 'D26' },
     }])).toThrow('December 2026 Proposal Ranking trial encountered a missing or malformed request number.');
   },
 );

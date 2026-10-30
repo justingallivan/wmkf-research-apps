@@ -24,6 +24,7 @@ jest.mock('../../lib/services/dynamics-service', () => ({
     getRecord: jest.fn(),
     queryRecords: jest.fn(),
     queryAllRecords: jest.fn(),
+    checkRestriction: jest.fn(),
   },
 }));
 jest.mock('../../lib/dataverse/adapters/reviewer-suggestion', () => {
@@ -142,7 +143,9 @@ test('GET success returns the full proposal + reviewer envelope', async () => {
     akoya_requestnum: '1002788',
     akoya_title: 'Full Envelope Test Request',
     wmkf_abstract: 'An abstract.',
+    // Linked to J26 with no meeting date: the link alone carries the cycle.
     wmkf_meetingdate: null,
+    wmkf_GrantCycle: { wmkf_cyclecode: 'J26' },
     wmkf_reviewduedate: '2026-09-09',
     wmkf_organizationname: 'Test University',
     _akoya_applicantid_value_formatted: 'Applicant Name',
@@ -197,6 +200,9 @@ test('GET success returns the full proposal + reviewer envelope', async () => {
   await handler(req, res);
 
   expect(res.statusCode).toBe(200);
+  expect(DynamicsService.getRecord).toHaveBeenCalledWith('akoya_requests', REQUEST_ID, expect.objectContaining({
+    expand: 'wmkf_GrantCycle($select=wmkf_cyclecode)',
+  }));
   expect(res._data).toEqual({
     success: true,
     totalReviewers: 1,
@@ -209,8 +215,8 @@ test('GET success returns the full proposal + reviewer envelope', async () => {
       proposalInstitution: 'Applicant Name',
       requestNumber: '1002788',
       programArea: 'Area A',
-      grantCycleCode: null,
-      cycleLabel: null,
+      grantCycleCode: 'J26',
+      cycleLabel: 'June 2026',
       meetingDate: null,
       reviewDeadline: '2026-09-09',
       reviewSynthesis: null,

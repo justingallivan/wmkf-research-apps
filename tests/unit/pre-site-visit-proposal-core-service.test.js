@@ -22,6 +22,7 @@ function requestFixture(overrides = {}) {
     _akoya_programid_value_formatted: 'Medical Research',
     _wmkf_programdirector_value_formatted: 'Pat Director',
     wmkf_meetingdate: '2026-12-01',
+    wmkf_GrantCycle: { wmkf_cyclecode: 'D26' },
     akoya_request: 900000,
     wmkf_invitedamount: 1000000,
     akoya_expenses: 3500000,
@@ -118,6 +119,7 @@ test('loads authoritative Dataverse fields and the exact Proposal Narrative', as
   expect(result.context).toMatchObject({
     requestNumber: '1002379',
     projectTitle: 'A test project',
+    cycleCode: 'D26',
     applicantInstitution: 'Applicant U',
     projectPeriod: { startDate: '2027-01-01', endDate: '2029-12-31' },
     personnel: [
@@ -137,6 +139,14 @@ test('loads authoritative Dataverse fields and the exact Proposal Narrative', as
     },
   });
   expect(deps.getProgramGrants).toHaveBeenCalledWith('22222222-2222-4222-8222-222222222222');
+});
+
+test('a December meeting date without a linked Grant Cycle has no cycle code; the meeting-date field is unchanged', async () => {
+  const deps = dependencies({ getRequest: jest.fn().mockResolvedValue(requestFixture({ wmkf_GrantCycle: null })) });
+  const result = await loadPreSiteVisitInputs({ requestId: REQUEST_ID }, deps);
+
+  expect(result.context.cycleCode).toBeNull();
+  expect(result.context.documentFields.meetingDate).toBe('December 2026');
 });
 
 test('institutional funding history is excluded from the prompt context', () => {

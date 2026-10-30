@@ -34,7 +34,7 @@ jest.mock('../../lib/dataverse/adapters/system-user', () => ({
   getByIdWithSelect: jest.fn(async (id) => ({ systemuserid: id, fullname: `PD ${id}`, internalemailaddress: `${id}@wmkeck.org`, isdisabled: false })),
 }));
 jest.mock('../../lib/services/dynamics-service', () => ({
-  DynamicsService: { createAndSendEmail: jest.fn(async () => ({ emailId: 'e1' })) },
+  DynamicsService: { createAndSendEmail: jest.fn(async () => ({ emailId: 'e1' })), checkRestriction: jest.fn() },
 }));
 jest.mock('../../lib/services/email-defaults', () => ({
   readRequiredEmailDefaults: jest.fn(async () => ({
@@ -99,7 +99,7 @@ beforeEach(() => {
 });
 
 describe('runGranteeTitleGeneration', () => {
-  const args = { cycleCode: 'J26', cycleFilter: 'wmkf_meetingdate ge 2026-06-01 and wmkf_meetingdate lt 2026-07-01' };
+  const args = { cycleCode: 'J26' };
 
   it('503 ServiceHttpError with { error, cycleCode } body on a query failure', async () => {
     grantRequestAdapter.queryAllRequests.mockRejectedValue(new Error('down'));

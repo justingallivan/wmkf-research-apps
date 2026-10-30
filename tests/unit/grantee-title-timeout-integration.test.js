@@ -37,6 +37,7 @@ jest.mock('../../lib/services/model-resolver.js', () => ({
 import * as grantRequestAdapter from '../../lib/dataverse/adapters/grant-request.js';
 import { fetchCurrentPrompt } from '../../lib/services/prompt-store.js';
 import { runGranteeTitleGeneration } from '../../lib/services/cron/generate-grantee-titles-service.js';
+import { DynamicsService } from '../../lib/services/dynamics-service.js';
 
 const row = {
   akoya_requestid: 'request-1',
@@ -64,7 +65,7 @@ const promptRow = {
   wmkf_ai_temperature: 0.1,
 };
 
-const args = { cycleCode: 'J26', cycleFilter: 'cycle filter' };
+const args = { cycleCode: 'J26' };
 const originalClaudeKey = process.env.CLAUDE_API_KEY;
 
 beforeEach(() => {
@@ -75,6 +76,8 @@ beforeEach(() => {
   grantRequestAdapter.queryAllRequests.mockResolvedValue({ records: [row], totalCount: 1 });
   grantRequestAdapter.getById.mockResolvedValue({ wmkf_wmkfprojectdescription: null, _etag: 'etag-1' });
   grantRequestAdapter.updateById.mockResolvedValue({});
+  // The cycle link filter checks the wmkf_grantcycle restriction (covered in grant-cycle-link.test.js).
+  jest.spyOn(DynamicsService, 'checkRestriction').mockImplementation(() => {});
 });
 
 afterEach(() => {

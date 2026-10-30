@@ -15,6 +15,17 @@ jest.mock('../../lib/dataverse/adapters/grant-request', () => ({
   __esModule: true,
   queryAllRequests: jest.fn(),
 }));
+// Grant Cycle link helpers: real strings and the real row reader, without the
+// restriction context the adapter-mocked service never establishes.
+jest.mock('../../lib/dataverse/adapters/operations-grant-cycle', () => ({
+  LINKED_CYCLE_ID_FIELD: '_wmkf_grantcycle_value',
+  linkedCycleFilter: (code) => `wmkf_GrantCycle/wmkf_cyclecode eq '${code}'`,
+  linkedCycleExpand: () => 'wmkf_GrantCycle($select=wmkf_cyclecode)',
+  linkedCycleCode: (row) => {
+    const code = row?.wmkf_GrantCycle?.wmkf_cyclecode;
+    return typeof code === 'string' && /^[JD]\d{2}$/.test(code) ? code : null;
+  },
+}));
 jest.mock('../../lib/dataverse/adapters/reviewer-suggestion', () => ({
   __esModule: true,
   queryAllSuggestions: jest.fn(),
@@ -53,16 +64,25 @@ test('400 MyProposalsError on an invalid cycleCode', async () => {
   expect(err.message).toBe('Invalid cycleCode: not-a-cycle');
 });
 
-test('cycle-list mode dedupes meeting dates into cycle codes with counts, newest first', async () => {
+test('cycle-list mode dedupes linked Grant Cycle codes with counts, newest first', async () => {
   queryAllRequests.mockResolvedValue({
     records: [
-      { akoya_requestid: 'r1', wmkf_meetingdate: '2026-06-15' },
-      { akoya_requestid: 'r2', wmkf_meetingdate: '2026-06-20' },
-      { akoya_requestid: 'r3', wmkf_meetingdate: '2025-12-10' },
+      { akoya_requestid: 'r1', wmkf_meetingdate: '2026-06-15', wmkf_GrantCycle: { wmkf_cyclecode: 'J26' } },
+      { akoya_requestid: 'r2', wmkf_meetingdate: '2026-06-20', wmkf_GrantCycle: { wmkf_cyclecode: 'J26' } },
+      { akoya_requestid: 'r3', wmkf_meetingdate: '2025-12-10', wmkf_GrantCycle: { wmkf_cyclecode: 'D25' } },
+      // A June meeting date with no link (or a historical non-J/D link) is in no cycle.
+      { akoya_requestid: 'r4', wmkf_meetingdate: '2024-06-12' },
+      { akoya_requestid: 'r5', wmkf_meetingdate: '2023-06-12', wmkf_GrantCycle: { wmkf_cyclecode: '2023' } },
     ],
   });
 
   const out = await getMyProposals({ azureEmail: EMAIL });
+
+  expect(queryAllRequests.mock.calls[0][0]).toMatchObject({
+    filter: '_wmkf_programdirector_value eq pd-1 and _wmkf_grantcycle_value ne null',
+    expand: 'wmkf_GrantCycle($select=wmkf_cyclecode)',
+  });
+  expect(queryAllRequests.mock.calls[0][0].select.split(',')).toContain('wmkf_meetingdate');
 
   expect(out).toEqual({
     success: true,
@@ -77,7 +97,10 @@ test('cycle-list mode dedupes meeting dates into cycle codes with counts, newest
 test('actionable (default) status requires Phase II Pending AND null wmkf_phaseiistatus in the filter', async () => {
   await getMyProposals({ azureEmail: EMAIL, cycleCode: 'J26' });
   const { filter } = queryAllRequests.mock.calls[0][0];
-  expect(filter).toContain(`akoya_requeststatus eq 'Phase II Pending' and wmkf_phaseiistatus eq null`);
+  expect(filter).toBe(
+    "_wmkf_programdirector_value eq pd-1 and wmkf_GrantCycle/wmkf_cyclecode eq 'J26' and "
+      + "akoya_requeststatus eq 'Phase II Pending' and wmkf_phaseiistatus eq null",
+  );
 });
 
 test("status='all' drops only the phaseiistatus clause; unknown statuses fall back to actionable", async () => {

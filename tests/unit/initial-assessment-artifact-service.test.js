@@ -56,6 +56,7 @@ import { executePrompt } from '../../lib/services/execute-prompt.js';
 import { getExecutorBudget } from '../../lib/services/executor-budget-service.js';
 import { GraphService } from '../../lib/services/graph-service.js';
 import { getAiProposalNarrativeText } from '../../lib/services/workbench-proposal-documents.js';
+import { DynamicsService } from '../../lib/services/dynamics-service.js';
 import { getRequestSharePointBuckets } from '../../lib/utils/sharepoint-buckets.js';
 import { renderInitialAssessmentDocx } from '../../lib/services/initial-assessment/template.js';
 import {
@@ -136,6 +137,7 @@ const request = {
   akoya_requestnum: '1003001',
   akoya_title: 'Mechanisms of Discovery',
   wmkf_meetingdate: '2026-06-15',
+  wmkf_GrantCycle: { wmkf_cyclecode: 'J26' },
   wmkf_organizationname: 'N/A',
   _akoya_applicantid_value_formatted: 'Example University',
   _wmkf_currentinitialassessment_value: null,
@@ -215,6 +217,9 @@ let defaultRegistryUpdate;
 
 beforeEach(() => {
   jest.clearAllMocks();
+  // The request read expands its linked Grant Cycle, which checks the Grant
+  // Cycle restriction; stand in for an authenticated Dynamics context.
+  jest.spyOn(DynamicsService, 'checkRestriction').mockImplementation(() => {});
   request._wmkf_currentinitialassessment_value = null;
   request._etag = 'W/"request-1"';
   currentRegistryRow = null;
@@ -534,6 +539,9 @@ it('returns a Ready row without rerunning AI or overwriting SharePoint', async (
   const result = await generateInitialAssessment({ requestId: REQUEST_ID });
 
   expect(getAiProposalNarrativeText).toHaveBeenCalledWith(REQUEST_ID, '1003001');
+  expect(grantRequestAdapter.getById).toHaveBeenCalledWith(REQUEST_ID, expect.objectContaining({
+    expand: 'wmkf_GrantCycle($select=wmkf_cyclecode)',
+  }));
   expect(result.reused).toBe(true);
   expect(result.artifact.operationStatus).toBe(REQUEST_DOCUMENT_OPERATION_STATUS.READY);
   expect(executePrompt).not.toHaveBeenCalled();
@@ -563,6 +571,18 @@ it('fails closed before persistence or AI when the AI proposal narrative is abse
   expect(requestDocumentAdapter.create).not.toHaveBeenCalled();
   expect(executePrompt).not.toHaveBeenCalled();
   expect(GraphService.uploadFile).not.toHaveBeenCalled();
+});
+
+it('refuses generation before AI or persistence when a June meeting date has no linked Grant Cycle', async () => {
+  grantRequestAdapter.getById.mockResolvedValue({ ...request, wmkf_GrantCycle: null });
+
+  await expect(generateInitialAssessment({ requestId: REQUEST_ID })).rejects.toMatchObject({
+    httpStatus: 409,
+    message: 'The request must have a request number, title, institution, and a June or December Grant Cycle before generation.',
+  });
+  expect(getAiProposalNarrativeText).not.toHaveBeenCalled();
+  expect(requestDocumentAdapter.create).not.toHaveBeenCalled();
+  expect(executePrompt).not.toHaveBeenCalled();
 });
 
 it('atomically reactivates an exact superseded Ready artifact when inputs revert', async () => {

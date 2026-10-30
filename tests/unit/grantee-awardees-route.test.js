@@ -4,7 +4,11 @@
  * @jest-environment node
  */
 jest.mock('../../lib/utils/auth', () => ({ requireAppAccess: jest.fn() }));
-jest.mock('../../lib/services/dynamics-service', () => ({ DynamicsService: { queryAllRecords: jest.fn() } }));
+jest.mock('../../lib/services/dynamics-service', () => ({ DynamicsService: { queryAllRecords: jest.fn(), checkRestriction: jest.fn() } }));
+jest.mock('../../lib/dataverse/adapters/operations-grant-cycle.js', () => ({
+  ...jest.requireActual('../../lib/dataverse/adapters/operations-grant-cycle.js'),
+  listBoardDatesOrNone: jest.fn(async () => [{ wmkf_cyclecode: 'J26', wmkf_meetingdate: '2026-06-04' }]),
+}));
 jest.mock('../../lib/services/grantee-deliverable-record', () => ({ getDeliverableForRequest: jest.fn() }));
 jest.mock('../../lib/services/program-director-resolver', () => ({ resolveByEmail: jest.fn() }));
 jest.mock('../../lib/services/dynamics-context', () => ({
@@ -100,7 +104,8 @@ test('builds the eligibility filter: Active + research program GUIDs + PI presen
   const { filter, orderby } = DynamicsService.queryAllRecords.mock.calls[0][1];
   expect(filter).toContain("akoya_requeststatus eq 'Active'");
   expect(filter).toContain('_wmkf_projectleader_value ne null');
-  expect(filter).toContain('wmkf_meetingdate ge 2026-06-01');
+  expect(filter).toContain("wmkf_GrantCycle/wmkf_cyclecode eq 'J26'");
+  expect(filter).not.toContain('wmkf_meetingdate');
   for (const id of GRANTEE_RESEARCH_PROGRAM_IDS) {
     expect(filter).toContain(`_akoya_programid_value eq ${id}`);
   }
@@ -108,6 +113,13 @@ test('builds the eligibility filter: Active + research program GUIDs + PI presen
   // default scope = mine → PD clause present, using the server-resolved systemuserid
   expect(filter).toContain('_wmkf_programdirector_value eq pd-me');
   expect(res.body.scope).toBe('mine');
+});
+
+test('a lowercase cycleCode is accepted and normalized for the link filter', async () => {
+  const res = mockRes();
+  await handler({ method: 'GET', query: { cycleCode: 'j26', scope: 'all' }, headers: {} }, res);
+  expect(res.statusCode).toBe(200);
+  expect(DynamicsService.queryAllRecords.mock.calls[0][1].filter).toContain("wmkf_GrantCycle/wmkf_cyclecode eq 'J26'");
 });
 
 test('scope=all omits the PD clause and lists everyone', async () => {
@@ -166,7 +178,9 @@ test('maps records to awardees with formatted PI/liaison names + deliverable sta
 });
 
 test('no cycleCode → cycle-list mode over the eligibility population (200, no PD clause)', async () => {
-  DynamicsService.queryAllRecords.mockResolvedValue({ records: [{ akoya_requestid: 'a', wmkf_meetingdate: '2026-06-04' }], capped: false });
+  DynamicsService.queryAllRecords.mockResolvedValue({ records: [
+    { akoya_requestid: 'a', wmkf_meetingdate: '2026-06-04', wmkf_GrantCycle: { wmkf_cyclecode: 'J26' } },
+  ], capped: false });
   const res = mockRes();
   await handler({ method: 'GET', query: {}, headers: {} }, res);
   expect(res.statusCode).toBe(200);
@@ -175,6 +189,8 @@ test('no cycleCode → cycle-list mode over the eligibility population (200, no 
   expect(res.body).toHaveProperty('defaultCycleCode');
   const { filter } = DynamicsService.queryAllRecords.mock.calls[0][1];
   expect(filter).toContain("akoya_requeststatus eq 'Active'");
+  expect(filter).toContain('_wmkf_grantcycle_value ne null');
   expect(filter).not.toContain('_wmkf_programdirector_value');
+  expect(DynamicsService.queryAllRecords.mock.calls[0][1].expand).toBe('wmkf_GrantCycle($select=wmkf_cyclecode)');
   expect(resolveByEmail).not.toHaveBeenCalled();
 });

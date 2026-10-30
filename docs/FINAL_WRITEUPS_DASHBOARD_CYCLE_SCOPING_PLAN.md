@@ -166,6 +166,11 @@ grantRequestAdapter.queryAllRequests({
   request number from the scan (GUID when the number is null), raised during cycle discovery
   before any scoped read, matching the fail-loud posture of `lifecycleStage`
   (`dashboard-service.js:167-179`). Rows must never vanish silently from every view. **[PLANNED]**
+  **Superseded 2026-10-30** by the meeting-date retirement
+  (`docs/plans/MEETING_DATE_RETIREMENT_PLAN_2026-10-29.md`, build step 2): a request's cycle is
+  its Grant Cycle link; `none` selects requests with no link or a link to a historical (non-J/D)
+  row, every real code uses the link filter, and the off-month 500 is removed because such a
+  row now lists under No cycle instead of vanishing.
 - Whether any null-date or off-month rows exist in Production is **[ASSUMED none]** and
   unverifiable from the repo; the build handles both branches and the tests pin both.
 

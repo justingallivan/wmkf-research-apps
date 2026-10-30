@@ -37,7 +37,7 @@ require('./../lib/dataverse/client').loadEnvLocal();
 
   for (const [rid, sgs] of Object.entries(byReq)) {
     const r = requestById[rid];
-    console.log(`\n• ${r.title || '(no title)'} — request ${r.requestNumber} — ${r.meetingCycleCode || 'no cycle'}`);
+    console.log(`\n• ${r.title || '(no title)'} — request ${r.requestNumber} — ${r.cycleCode || 'no cycle'}`);
     for (const s of sgs) {
       const status = typeof s.wmkf_reviewstatus === 'number' ? `code=${s.wmkf_reviewstatus}` : '(none)';
       const lc = [

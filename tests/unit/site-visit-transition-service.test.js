@@ -125,6 +125,7 @@ function createAutomaticHarness({ requestPatch = {}, rowPatch = {}, eventPatch =
     _wmkf_currentpresitevisit_value: ARTIFACT_ID,
     _wmkf_grantprogram_value: AUTO_CONFIG.programIds[0],
     wmkf_meetingdate: '2026-12-10T00:00:00Z',
+    wmkf_GrantCycle: { wmkf_cyclecode: 'D26' },
     akoya_requeststatus: 'Phase II Pending',
     _etag: 'request-etag-1',
     ...requestPatch,

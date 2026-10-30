@@ -15,7 +15,7 @@ const REGISTRY_ID = '33333333-3333-4333-8333-333333333333';
 
 function baseDeps(overrides = {}) {
   return {
-    getRequest: jest.fn(async () => ({ akoya_requestid: REQUEST_ID, akoya_requestnum: '1002379', wmkf_meetingdate: '2026-06-04' })),
+    getRequest: jest.fn(async () => ({ akoya_requestid: REQUEST_ID, akoya_requestnum: '1002379', wmkf_meetingdate: '2026-06-04', wmkf_GrantCycle: { wmkf_cyclecode: 'J26' } })),
     getSharePointBuckets: jest.fn(async () => ([{ library: 'akoya_request', folder: 'Requests/1002379', source: 'dynamics' }])),
     ensureFolderPath: jest.fn(async () => {}),
     uploadFile: jest.fn(async () => ({ id: 'item-1', driveId: 'drive-1', name: 'Consultant Feedback-1002379-Jane Doe-2026-09-01.pdf', size: 5, webUrl: null, versionId: 'v1', eTag: 'etag-1' })),
@@ -113,10 +113,18 @@ describe('finalizeAttachmentUpload — happy paths', () => {
     }));
   });
 
-  test('the registry payload carries wmkf_cyclecode derived from the request meeting date', async () => {
+  test('the registry payload carries wmkf_cyclecode from the request\'s linked Grant Cycle', async () => {
     const deps = baseDeps();
     await finalizeAttachmentUpload({ requestId: REQUEST_ID, actorProfileId: 7, file: file(), stagingId: STAGING_ID, entryId: 9 }, deps);
-    expect(deps.createDocument.mock.calls[0][0].wmkf_cyclecode).toBe('J26'); // 2026-06-04 → June cycle
+    expect(deps.createDocument.mock.calls[0][0].wmkf_cyclecode).toBe('J26');
+  });
+
+  test('a June meeting date without a linked Grant Cycle records no cycle code', async () => {
+    const deps = baseDeps({
+      getRequest: jest.fn(async () => ({ akoya_requestid: REQUEST_ID, akoya_requestnum: '1002379', wmkf_meetingdate: '2026-06-04', wmkf_GrantCycle: null })),
+    });
+    await finalizeAttachmentUpload({ requestId: REQUEST_ID, actorProfileId: 7, file: file(), stagingId: STAGING_ID, entryId: 9 }, deps);
+    expect(deps.createDocument.mock.calls[0][0].wmkf_cyclecode).toBeNull();
   });
 
   test('binds an existing entry (updateFeedbackEntry)', async () => {

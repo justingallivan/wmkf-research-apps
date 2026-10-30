@@ -17,10 +17,19 @@
 jest.mock('../../lib/services/program-director-resolver', () => ({
   resolveByEmail: jest.fn(),
 }));
+// Grant Cycle link helpers: real strings and the real row reader, without the
+// restriction context the adapter-mocked service never establishes.
+jest.mock('../../lib/dataverse/adapters/operations-grant-cycle', () => ({
+  linkedCycleExpand: () => 'wmkf_GrantCycle($select=wmkf_cyclecode)',
+  linkedCycleCode: (row) => {
+    const code = row?.wmkf_GrantCycle?.wmkf_cyclecode;
+    return typeof code === 'string' && /^[JD]\d{2}$/.test(code) ? code : null;
+  },
+}));
 jest.mock('../../lib/dataverse/adapters/grant-request', () => ({
   __esModule: true,
   getById: jest.fn(),
-  findByRequestNumber: jest.fn(),
+  queryRequests: jest.fn(),
 }));
 jest.mock('../../lib/dataverse/adapters/account', () => ({
   __esModule: true,

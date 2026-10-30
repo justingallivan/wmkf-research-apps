@@ -9,7 +9,7 @@
  */
 jest.mock('../../lib/utils/auth', () => ({ requireAppAccess: jest.fn() }));
 jest.mock('../../lib/services/dynamics-service', () => ({
-  DynamicsService: { queryAllRecords: jest.fn() },
+  DynamicsService: { queryAllRecords: jest.fn(), checkRestriction: jest.fn() },
 }));
 jest.mock('../../lib/services/dynamics-context', () => ({
   bypassDynamicsRestrictions: (labelOrFn, maybeFn) => {
@@ -59,7 +59,7 @@ describe('GET /api/expertise-finder/proposals (grant-request adapter contract)',
         '_akoya_programid_value', '_akoya_applicantid_value', '_wmkf_projectleader_value',
         '_wmkf_programdirector_value',
       ].join(','),
-      filter: 'wmkf_meetingdate ge 2025-12-01T00:00:00Z and wmkf_meetingdate lt 2026-01-01T00:00:00Z and wmkf_request_type eq 100000001',
+      filter: "wmkf_GrantCycle/wmkf_cyclecode eq 'D25' and wmkf_request_type eq 100000001",
       orderby: 'akoya_requestnum asc',
     });
     expect(res.body).toEqual({

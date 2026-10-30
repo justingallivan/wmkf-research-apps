@@ -9,7 +9,7 @@
  */
 jest.mock('../../lib/utils/auth', () => ({ requireAppAccess: jest.fn() }));
 jest.mock('../../lib/services/dynamics-service', () => ({
-  DynamicsService: { getRecord: jest.fn() },
+  DynamicsService: { getRecord: jest.fn(), checkRestriction: jest.fn() },
 }));
 jest.mock('../../lib/services/dynamics-context', () => ({
   bypassDynamicsRestrictions: (_label, fn) => fn(),
@@ -40,6 +40,7 @@ beforeEach(() => {
     akoya_requestid: REQUEST_ID,
     akoya_requestnum: '1002794',
     wmkf_meetingdate: '2026-06-01',
+    wmkf_GrantCycle: { wmkf_cyclecode: 'J26' },
   });
   listProposalDocuments.mockReset().mockResolvedValue({
     slots: [{ found: true, library: 'Documents', folder: 'x', name: 'proposal.pdf' }],
@@ -81,6 +82,7 @@ test('golden path: resolves scope from the record, not the raw query param', asy
   expect(res.statusCode).toBe(200);
   expect(DynamicsService.getRecord).toHaveBeenCalledWith('akoya_requests', REQUEST_ID, {
     select: 'akoya_requestid,akoya_requestnum,wmkf_meetingdate',
+    expand: 'wmkf_GrantCycle($select=wmkf_cyclecode)',
   });
   expect(listProposalDocuments).toHaveBeenCalledWith(REQUEST_ID, '1002794', 'J26');
   expect(res.body).toEqual({

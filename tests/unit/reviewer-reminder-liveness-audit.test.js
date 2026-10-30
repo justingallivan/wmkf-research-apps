@@ -9,6 +9,7 @@ const {
 
 const NOW = Date.parse('2026-09-01T12:00:00Z');
 const REQUEST_ID = '11111111-1111-4111-8111-111111111111';
+const UNLINKED_ID = '22222222-2222-4222-8222-222222222222';
 
 function row(id, over = {}) {
   return {
@@ -27,11 +28,20 @@ test('audit report applies cycle scope and counts eligible and blocked outcomes'
       row('eligible'),
       row('invalid', { wmkf_externaltokenexpires: null }),
       row('other-cycle', { _wmkf_request_value: 'other' }),
+      row('unlinked', { _wmkf_request_value: UNLINKED_ID }),
     ],
     requestById: {
       [REQUEST_ID]: {
         akoya_requestid: REQUEST_ID,
         akoya_requestnum: '1001',
+        wmkf_meetingdate: '2026-12-01',
+        wmkf_GrantCycle: { wmkf_cyclecode: 'D26' },
+        wmkf_reviewduedate: '2026-09-09',
+      },
+      // December meeting date but no Grant Cycle link: in no cycle.
+      [UNLINKED_ID]: {
+        akoya_requestid: UNLINKED_ID,
+        akoya_requestnum: '1003',
         wmkf_meetingdate: '2026-12-01',
         wmkf_reviewduedate: '2026-09-09',
       },
@@ -39,6 +49,7 @@ test('audit report applies cycle scope and counts eligible and blocked outcomes'
         akoya_requestid: 'other',
         akoya_requestnum: '1002',
         wmkf_meetingdate: '2027-06-01',
+        wmkf_GrantCycle: { wmkf_cyclecode: 'J27' },
         wmkf_reviewduedate: '2027-05-01',
       },
     },

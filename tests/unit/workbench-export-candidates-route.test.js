@@ -9,7 +9,7 @@
  */
 jest.mock('../../lib/utils/auth', () => ({ requireAppAccess: jest.fn() }));
 jest.mock('../../lib/services/dynamics-service', () => ({
-  DynamicsService: { getRecord: jest.fn() },
+  DynamicsService: { getRecord: jest.fn(), checkRestriction: jest.fn() },
 }));
 jest.mock('../../lib/services/dynamics-context', () => ({
   bypassDynamicsRestrictions: (_label, fn) => fn(),
@@ -67,6 +67,7 @@ beforeEach(() => {
     _akoya_applicantid_value_formatted: 'Example University',
     _wmkf_projectleader_value_formatted: 'Dr. Ada Lovelace',
     wmkf_meetingdate: '2026-06-01',
+    wmkf_GrantCycle: { wmkf_cyclecode: 'J26' },
   });
   buildReviewerCandidateWorkbook.mockReset().mockResolvedValue(Buffer.from('xlsx-bytes'));
 });
@@ -111,7 +112,10 @@ test('golden path: builds the workbook from the authoritatively-fetched request 
   const res = mockRes();
   await handler(reqOf(body()), res);
   expect(res.statusCode).toBe(200);
-  expect(DynamicsService.getRecord).toHaveBeenCalledWith('akoya_requests', REQUEST_ID, { select: REQUEST_SELECT });
+  expect(DynamicsService.getRecord).toHaveBeenCalledWith('akoya_requests', REQUEST_ID, {
+    select: REQUEST_SELECT,
+    expand: 'wmkf_GrantCycle($select=wmkf_cyclecode)',
+  });
   expect(buildReviewerCandidateWorkbook).toHaveBeenCalledWith({
     meta: expect.objectContaining({
       requestNumber: '1002794',

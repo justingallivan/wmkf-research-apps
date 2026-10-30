@@ -48,13 +48,31 @@ test('uses only the newest visible Workbench cycle for the PD default', async ()
   ]);
   dependencies.queryAssignedRequests.mockResolvedValue({
     records: [
-      { _wmkf_grantprogram_value: SOCAL, wmkf_meetingdate: '2026-06-04' },
-      { _wmkf_grantprogram_value: RESEARCH, wmkf_meetingdate: '2026-12-11' },
+      { _wmkf_grantprogram_value: SOCAL, wmkf_meetingdate: '2026-06-04', wmkf_GrantCycle: { wmkf_cyclecode: 'J26' } },
+      { _wmkf_grantprogram_value: RESEARCH, wmkf_meetingdate: '2026-12-11', wmkf_GrantCycle: { wmkf_cyclecode: 'D26' } },
     ],
   });
   await expect(resolveWorkbenchProgramScope({ callerSystemId: PD, dependencies })).resolves.toMatchObject({
     programId: RESEARCH,
     defaultProgramId: RESEARCH,
+  });
+});
+
+test('the newest cycle is the newest Grant Cycle link, never a meeting date', async () => {
+  const dependencies = deps([
+    { wmkf_grantprogramid: RESEARCH, wmkf_name: 'Research' },
+    { wmkf_grantprogramid: SOCAL, wmkf_name: 'Southern California' },
+  ]);
+  dependencies.queryAssignedRequests.mockResolvedValue({
+    records: [
+      { _wmkf_grantprogram_value: SOCAL, wmkf_meetingdate: '2026-06-04', wmkf_GrantCycle: { wmkf_cyclecode: 'J26' } },
+      // A later December meeting date with no link has no cycle and cannot be newest.
+      { _wmkf_grantprogram_value: RESEARCH, wmkf_meetingdate: '2026-12-11' },
+    ],
+  });
+  await expect(resolveWorkbenchProgramScope({ callerSystemId: PD, dependencies })).resolves.toMatchObject({
+    programId: SOCAL,
+    defaultProgramId: SOCAL,
   });
 });
 

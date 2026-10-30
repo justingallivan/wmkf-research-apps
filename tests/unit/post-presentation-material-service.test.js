@@ -174,6 +174,7 @@ function deps(overrides = {}) {
       akoya_requestid: REQUEST_ID,
       akoya_requestnum: '1003220',
       wmkf_meetingdate: '2026-12-10T00:00:00Z',
+      wmkf_GrantCycle: { wmkf_cyclecode: 'D26' },
     })),
     findActiveSiteVisit: jest.fn(async () => ({ records: [{
       activityid: VISIT_ID,
@@ -257,7 +258,7 @@ test('meeting transcript preparation freezes the exact real SharePoint destinati
 test('supervised publication prepares only the pinned test folder and rejects wrong request, visit, or host', async () => {
   await withSupervisedTestEnv(async () => {
     const d = deps({
-      getRequest: jest.fn(async () => ({ akoya_requestid: SUPERVISED_REQUEST_ID, akoya_requestnum: '1000334', wmkf_meetingdate: '2026-12-10T00:00:00Z' })),
+      getRequest: jest.fn(async () => ({ akoya_requestid: SUPERVISED_REQUEST_ID, akoya_requestnum: '1000334', wmkf_meetingdate: '2026-12-10T00:00:00Z', wmkf_GrantCycle: { wmkf_cyclecode: 'D26' } })),
       findActiveSiteVisit: jest.fn(async () => ({ records: [{ activityid: SUPERVISED_VISIT_ID,
         _regardingobjectid_value: SUPERVISED_REQUEST_ID }] })),
       getSharePointBuckets: jest.fn(async () => ([{ source: 'dynamics', library: 'akoya_request', folder: '1000334' }])),
@@ -288,7 +289,7 @@ test('supervised publication prepares only the pinned test folder and rejects wr
 test('supervised publication refuses a newly present current transcript before acquiring a slot or writing', async () => {
   await withSupervisedTestEnv(async () => {
     const d = deps({
-      getRequest: jest.fn(async () => ({ akoya_requestid: SUPERVISED_REQUEST_ID, akoya_requestnum: '1000334', wmkf_meetingdate: '2026-12-10T00:00:00Z' })),
+      getRequest: jest.fn(async () => ({ akoya_requestid: SUPERVISED_REQUEST_ID, akoya_requestnum: '1000334', wmkf_meetingdate: '2026-12-10T00:00:00Z', wmkf_GrantCycle: { wmkf_cyclecode: 'D26' } })),
       findActiveSiteVisit: jest.fn(async () => ({ records: [{ activityid: SUPERVISED_VISIT_ID,
         _regardingobjectid_value: SUPERVISED_REQUEST_ID }] })),
       findDocuments: jest.fn(async () => ({ records: [transcript(OLD_ID, 1, { _wmkf_request_value: SUPERVISED_REQUEST_ID })] })),
@@ -655,6 +656,17 @@ test('GET fails closed on readiness/access and requires exactly one active visit
   await expect(getPresentationMaterials({ requestId: REQUEST_ID }, deps({
     findActiveSiteVisit: jest.fn(async () => ({ records: [] })),
   }))).rejects.toMatchObject({ code: 'post_presentation_site_visit_required' });
+});
+
+test('GET refuses a request with a December meeting date but no linked Grant Cycle', async () => {
+  await expect(getPresentationMaterials({ requestId: REQUEST_ID }, deps({
+    getRequest: jest.fn(async () => ({
+      akoya_requestid: REQUEST_ID,
+      akoya_requestnum: '1003220',
+      wmkf_meetingdate: '2026-12-10T00:00:00Z',
+      wmkf_GrantCycle: null,
+    })),
+  }))).rejects.toMatchObject({ code: 'post_presentation_cycle_required' });
 });
 
 test('GET exposes an expired finalizer for recovery but not a live finalizer', async () => {

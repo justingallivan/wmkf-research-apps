@@ -53,6 +53,7 @@ jest.mock('../../lib/services/cycle-dossier-store.js', () => ({
 }));
 
 import * as requests from '../../lib/dataverse/adapters/grant-request.js';
+import { DynamicsService } from '../../lib/services/dynamics-service.js';
 import * as generation from '../../lib/services/cycle-dossier-generation.js';
 import { resolveDossierDestination } from '../../lib/services/cycle-dossier-sharepoint.js';
 import * as storage from '../../lib/services/cycle-dossier-storage.js';
@@ -83,6 +84,8 @@ function runRow(overrides = {}) {
 
 beforeEach(() => {
   jest.clearAllMocks();
+  // The roster filter checks the wmkf_grantcycle restriction; runtime callers hold a Dynamics context.
+  jest.spyOn(DynamicsService, 'checkRestriction').mockImplementation(() => {});
   process.env.CYCLE_DOSSIER_ENABLED = 'true';
   process.env.CYCLE_DOSSIER_REQUEST_ALLOWLIST = `${ID},${ID2}`;
   store.assertDossierActor.mockResolvedValue({ profileId: 7 });
@@ -110,7 +113,7 @@ test('roster is scoped server-side to the Workbench default program with no call
   expect(result.preview.id).toBe(PREVIEW);
   expect(resolveWorkbenchProgramScope).toHaveBeenCalledWith({});
   expect(requests.queryAllRequests).toHaveBeenCalledWith(expect.objectContaining({
-    filter: expect.stringMatching(/^wmkf_meetingdate ge .* and _wmkf_grantprogram_value eq 94cab30b-958f-ee11-8179-000d3a341e8f and \(akoya_requeststatus eq 'Phase II Pending'/),
+    filter: expect.stringMatching(/^wmkf_GrantCycle\/wmkf_cyclecode eq 'D26' and _wmkf_grantprogram_value eq 94cab30b-958f-ee11-8179-000d3a341e8f and \(akoya_requeststatus eq 'Phase II Pending'/),
   }));
 });
 

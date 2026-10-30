@@ -7,9 +7,11 @@ jest.mock('../../lib/services/post-presentation-materials/discussion-sentiment-r
 import { loadProgramBriefing, summaryExcerpt } from '../../lib/services/meeting-tracker/program-briefing-service.js';
 import { RESEARCH_PROGRAM_IDS } from '../../shared/config/researchPrograms.js';
 import { REQUEST_DOCUMENT_ARTIFACT_TYPE as TYPE, REQUEST_DOCUMENT_OPERATION_STATUS as OP } from '../../shared/config/requestDocument.js';
+import { DynamicsService } from '../../lib/services/dynamics-service.js';
 
 const id = (n) => `${String(n).padStart(8, '0')}-1111-4111-8111-111111111111`;
-const request = (n, program = 0) => ({ akoya_requestid: id(n), akoya_requestnum: String(1000 + n), akoya_title: `Proposal ${n}`, _akoya_programid_value: RESEARCH_PROGRAM_IDS[program], _akoya_applicantid_value_formatted: `Institution ${n}`, wmkf_meetingdate: '2026-12-03T00:00:00Z' });
+const request = (n, program = 0) => ({ akoya_requestid: id(n), akoya_requestnum: String(1000 + n), akoya_title: `Proposal ${n}`, _akoya_programid_value: RESEARCH_PROGRAM_IDS[program], _akoya_applicantid_value_formatted: `Institution ${n}`, wmkf_meetingdate: '2026-12-03T00:00:00Z', wmkf_GrantCycle: { wmkf_cyclecode: 'D26' } });
+const J26 = { wmkf_meetingdate: '2026-06-03T00:00:00Z', wmkf_GrantCycle: { wmkf_cyclecode: 'J26' } };
 const document = (n, type = TYPE.TRANSCRIPT_SUMMARY) => ({ _wmkf_request_value: id(n), wmkf_requestdocumentid: id(n + type), wmkf_artifacttype: type, wmkf_operationstatus: OP.READY, wmkf_sharepointdriveid: 'drive', wmkf_sharepointitemid: 'item', createdon: '2026-10-19T00:00:00Z' });
 let deps;
 beforeEach(() => {
@@ -19,8 +21,11 @@ beforeEach(() => {
     findDocuments: jest.fn(async () => ({ records: [document(1), document(1, TYPE.STAFF_DISCUSSION_SUMMARY), document(2)], capped: false })),
     readText: jest.fn(async () => ({ ok: true, text: 'What was presented\n\nA novel approach to imaging.\n\nQuestions and answers\nMore detail.', item: { stale: false, publishedAt: '2026-10-19' } })),
     readSentiments: jest.fn(async () => ({ [id(1)]: { status: 'current', sentiment: { headline: 'Support with reservations.' } }, [id(2)]: { status: 'none', sentiment: null } })),
+    listBoardDates: jest.fn(async () => [{ wmkf_cyclecode: 'J26', wmkf_meetingdate: '2026-06-04' }, { wmkf_cyclecode: 'D26', wmkf_meetingdate: '2026-12-10' }]),
     now: () => new Date('2026-10-19T12:00:00Z'),
   };
+  // The link helpers check the wmkf_grantcycle restriction (covered in grant-cycle-link.test.js).
+  jest.spyOn(DynamicsService, 'checkRestriction').mockImplementation(() => {});
 });
 const load = (args = { cycleCode: 'D26', profileId: 7 }) => loadProgramBriefing(args, deps);
 
@@ -33,12 +38,26 @@ test('groups by canonical lookup, keeps missing proposals, and reads summaries t
   expect(deps.readText).toHaveBeenCalledWith({ requestId: id(1), documentId: document(1).wmkf_requestdocumentid });
   expect(deps.queryRequests.mock.calls[0][0].filter).toContain('_akoya_programid_value');
   expect(deps.queryRequests.mock.calls[0][0].filter).toContain('Phase II Pending');
+  expect(deps.queryRequests.mock.calls[0][0].filter).toContain("(wmkf_GrantCycle/wmkf_cyclecode eq 'D26')");
+  expect(deps.queryRequests.mock.calls[0][0].filter).not.toContain('wmkf_meetingdate');
+  expect(deps.queryRequests.mock.calls[0][0].expand).toBe('wmkf_GrantCycle($select=wmkf_cyclecode)');
+  expect(deps.listBoardDates).not.toHaveBeenCalled();
 });
 
 test('catalog uses the working-cycle calendar and does not read documents or sentiments', async () => {
-  deps.queryRequests.mockResolvedValue({ records: [request(1), { ...request(2), wmkf_meetingdate: '2026-06-03T00:00:00Z' }] });
-  expect(await load({ profileId: 7 })).toMatchObject({ defaultCycleCode: 'D26', cycles: [{ code: 'D26' }, { code: 'J26' }] });
+  deps.queryRequests.mockResolvedValue({ records: [request(1), { ...request(2), ...J26 }] });
+  expect(await load({ profileId: 7 })).toMatchObject({
+    defaultCycleCode: 'D26',
+    cycles: [{ code: 'D26', meetingDate: '2026-12-10' }, { code: 'J26', meetingDate: '2026-06-04' }],
+  });
+  expect(deps.queryRequests.mock.calls[0][0].filter).toContain('(_wmkf_grantcycle_value ne null)');
   expect(deps.findDocuments).not.toHaveBeenCalled(); expect(deps.readSentiments).not.toHaveBeenCalled();
+});
+
+test('catalog: a June meeting date with no link has no cycle; a calendar gap lists the cycle code-only', async () => {
+  deps.listBoardDates.mockResolvedValue([]);
+  deps.queryRequests.mockResolvedValue({ records: [request(1), { ...request(2), wmkf_meetingdate: '2026-06-03T00:00:00Z', wmkf_GrantCycle: null }] });
+  expect(await load({ profileId: 7 })).toMatchObject({ defaultCycleCode: 'D26', cycles: [{ code: 'D26', meetingDate: null }] });
 });
 
 test.each([{ capped: true }, { hasMore: true }, { records: null }])('incomplete membership refuses a printable success: %j', async (extra) => {
@@ -46,7 +65,7 @@ test.each([{ capped: true }, { hasMore: true }, { records: null }])('incomplete 
   await expect(load()).rejects.toMatchObject({ httpStatus: 503, body: { code: 'briefing_membership_incomplete' } });
 });
 
-test.each([{ _akoya_programid_value: id(40) }, { akoya_requestid: 'bad' }, { wmkf_meetingdate: '2026-06-01' }])('unclassifiable/out-of-scope membership fails closed: %j', async (extra) => {
+test.each([{ _akoya_programid_value: id(40) }, { akoya_requestid: 'bad' }, { wmkf_GrantCycle: { wmkf_cyclecode: 'J26' } }, { wmkf_GrantCycle: null }])('unclassifiable/out-of-scope membership fails closed: %j', async (extra) => {
   deps.queryRequests.mockResolvedValue({ records: [{ ...request(1), ...extra }] });
   await expect(load()).rejects.toMatchObject({ httpStatus: 503 });
 });
@@ -115,7 +134,7 @@ test('excerpts preserve edited prose and mark truncation without inventing a sum
 
 describe('landing cycle (docs/plans/LANDING_CYCLE_PLAN_2026-10-29.md)', () => {
   beforeEach(() => {
-    deps.queryRequests.mockResolvedValue({ records: [request(1), { ...request(2), wmkf_meetingdate: '2026-06-03T00:00:00Z' }] });
+    deps.queryRequests.mockResolvedValue({ records: [request(1), { ...request(2), ...J26 }] });
   });
 
   test('a listed landing cycle becomes the cycle-list default', async () => {

@@ -29,6 +29,7 @@ import {
   validateDossierEnvironment,
 } from '../../lib/services/cycle-dossier-rollout.js';
 import { list } from '@vercel/blob';
+import { DynamicsService } from '../../lib/services/dynamics-service.js';
 
 const migrationText = `
 CREATE TABLE IF NOT EXISTS cycle_dossiers (id uuid);
@@ -42,7 +43,13 @@ const syntheticDossierBlobToken = ['vercel', 'blob', 'rw', 'storealpha', 'secret
 const wrongDossierBlobToken = ['vercel', 'blob', 'rw', 'shared', 'secret'].join('_');
 const malformedDossierBlobToken = ['invalid', 'blob', 'token'].join('_');
 
+beforeEach(() => {
+  // The roster filter checks the wmkf_grantcycle restriction; runtime callers hold a Dynamics context.
+  jest.spyOn(DynamicsService, 'checkRestriction').mockImplementation(() => {});
+});
+
 afterEach(() => {
+  jest.restoreAllMocks();
   delete process.env.CYCLE_DOSSIER_ENABLED;
   delete process.env.CYCLE_DOSSIER_OPERATOR_STOP;
   delete process.env.CYCLE_DOSSIER_REQUEST_ALLOWLIST;
@@ -76,7 +83,7 @@ test('default roster uses the server-owned program scope plus the Workbench visi
     { requestId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', requestNumber: 'D26-001' },
   ]);
   expect(resolveScope).toHaveBeenCalledWith({});
-  const expectedFilter = `wmkf_meetingdate ge 2026-12-01T00:00:00Z and wmkf_meetingdate lt 2027-01-01T00:00:00Z and _wmkf_grantprogram_value eq ${programId} and (akoya_requeststatus eq 'Phase II Pending' or wmkf_triagestatus eq 100000000) and (wmkf_triagestatus eq null or wmkf_triagestatus ne 100000001)`;
+  const expectedFilter = `wmkf_GrantCycle/wmkf_cyclecode eq 'D26' and _wmkf_grantprogram_value eq ${programId} and (akoya_requeststatus eq 'Phase II Pending' or wmkf_triagestatus eq 100000000) and (wmkf_triagestatus eq null or wmkf_triagestatus ne 100000001)`;
   expect(queryAllRequests).toHaveBeenCalledWith(expect.objectContaining({ filter: expectedFilter }));
   // The service and the preflight must load the same list.
   expect(buildDossierRosterFilter(programId)).toBe(expectedFilter);

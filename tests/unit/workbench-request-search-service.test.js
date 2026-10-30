@@ -7,7 +7,7 @@ const findByIds = jest.fn();
 const queryRequests = jest.fn();
 const findByRequestNumber = jest.fn();
 const aggregateRequests = jest.fn();
-const aggregateMeetingDateCycles = jest.fn();
+const aggregateLinkedCycles = jest.fn();
 const aggregateStatusesByGrantProgram = jest.fn();
 const searchDirectoryByName = jest.fn();
 jest.mock('../../lib/services/workbench/program-scope-service.js', () => ({
@@ -25,7 +25,7 @@ jest.mock('../../lib/dataverse/adapters/grant-request.js', () => ({
   queryRequests: (...args) => queryRequests(...args),
   findByRequestNumber: (...args) => findByRequestNumber(...args),
   aggregateRequests: (...args) => aggregateRequests(...args),
-  aggregateMeetingDateCycles: (...args) => aggregateMeetingDateCycles(...args),
+  aggregateLinkedCycles: (...args) => aggregateLinkedCycles(...args),
   aggregateStatusesByGrantProgram: (...args) => aggregateStatusesByGrantProgram(...args),
 }));
 jest.mock('../../lib/dataverse/adapters/contact.js', () => ({
@@ -43,6 +43,9 @@ import {
   REQUEST_SEARCH_SELECT,
 } from '../../lib/services/workbench/request-search-service';
 import { ServiceHttpError } from '../../lib/services/service-http-error';
+import { DynamicsService } from '../../lib/services/dynamics-service';
+
+const EXPAND = 'wmkf_GrantCycle($select=wmkf_cyclecode)';
 
 const RESEARCH_FILTER = '(_akoya_programid_value eq 8dcab30b-958f-ee11-8179-000d3a341e8f or _akoya_programid_value eq 94cab30b-958f-ee11-8179-000d3a341e8f)';
 const PROGRAM_IDS = ['8dcab30b-958f-ee11-8179-000d3a341e8f', '94cab30b-958f-ee11-8179-000d3a341e8f'];
@@ -53,6 +56,7 @@ const requestRow = (id, over = {}) => ({
   akoya_title: `Title ${id}`,
   akoya_fiscalyear: 'December 2026',
   wmkf_meetingdate: '2026-12-10',
+  wmkf_GrantCycle: { wmkf_cyclecode: 'D26' },
   akoya_requeststatus: 'Phase II Pending',
   wmkf_organizationname: 'Example University',
   _wmkf_projectleader_value_formatted: 'Dr. Example',
@@ -67,7 +71,9 @@ beforeEach(() => {
   delete process.env.TEST_REQUEST_ISOLATION;
   jest.clearAllMocks();
   aggregateRequests.mockResolvedValue({ results: [] });
-  aggregateMeetingDateCycles.mockResolvedValue([]);
+  aggregateLinkedCycles.mockResolvedValue([]);
+  // The link helpers check the wmkf_grantcycle restriction (covered in grant-cycle-link.test.js).
+  jest.spyOn(DynamicsService, 'checkRestriction').mockImplementation(() => {});
   aggregateStatusesByGrantProgram.mockResolvedValue({ results: [] });
   searchDirectoryByName.mockResolvedValue([]);
   searchRequests.mockResolvedValue({ results: [], totalCount: 0 });
@@ -79,12 +85,11 @@ beforeEach(() => {
 afterEach(() => { delete process.env.TEST_REQUEST_ISOLATION; });
 
 test('loads grouped live cycles/statuses and sorts them for the filters', async () => {
-  aggregateMeetingDateCycles.mockResolvedValueOnce([
-    { year: 2026, month: 6 },
-    { year: 2025, month: 12 },
-    { year: 2026, month: 12 },
-    { year: 2026, month: 6 },
-    { year: 2025, month: 3 },
+  aggregateLinkedCycles.mockResolvedValueOnce([
+    { cyclecode: 'J26', count: 4 },
+    { cyclecode: 'D25', count: 3 },
+    { cyclecode: 'D26', count: 2 },
+    { cyclecode: 'R16', count: 9 }, // historical linked code: not offered
   ]);
   aggregateStatusesByGrantProgram.mockResolvedValueOnce({
       results: [
@@ -107,14 +112,14 @@ test('loads grouped live cycles/statuses and sorts them for the filters', async 
     ],
     statuses: ['Active', 'Phase II Pending'],
   });
-  expect(aggregateMeetingDateCycles).toHaveBeenCalledWith({ grantProgramIds: [PROGRAM_IDS[1]] });
+  expect(aggregateLinkedCycles).toHaveBeenCalledWith({ grantProgramIds: [PROGRAM_IDS[1]] });
   expect(aggregateStatusesByGrantProgram).toHaveBeenCalledWith(PROGRAM_IDS[1]);
 });
 
 test('Stage 1d: search options include test requests in both modes', async () => {
   process.env.TEST_REQUEST_ISOLATION = 'on';
   await loadRequestSearchOptions();
-  expect(aggregateMeetingDateCycles).toHaveBeenLastCalledWith({ grantProgramIds: [PROGRAM_IDS[1]] });
+  expect(aggregateLinkedCycles).toHaveBeenLastCalledWith({ grantProgramIds: [PROGRAM_IDS[1]] });
   expect(aggregateStatusesByGrantProgram).toHaveBeenLastCalledWith(PROGRAM_IDS[1]);
 });
 
@@ -123,23 +128,33 @@ test('propagates a rejected guarded aggregate without returning partial options'
   await expect(loadRequestSearchOptions()).rejects.toThrow('Access denied');
 });
 
-test('propagates incomplete meeting-date aggregates instead of returning only statuses', async () => {
-  aggregateMeetingDateCycles.mockRejectedValueOnce(new Error('Incomplete cycle options'));
+test('propagates incomplete linked-cycle aggregates instead of returning only statuses', async () => {
+  aggregateLinkedCycles.mockRejectedValueOnce(new Error('Incomplete cycle options'));
   await expect(loadRequestSearchOptions()).rejects.toThrow('Incomplete cycle options');
 });
 
 test.each([
-  ['2026-06-04', 'June 2026', 'wmkf_meetingdate ge 2026-06-01T00:00:00Z and wmkf_meetingdate lt 2026-07-01T00:00:00Z'],
-  ['2025-03-01', 'March 2025 (off-cycle)', 'wmkf_meetingdate ge 2025-03-01T00:00:00Z and wmkf_meetingdate lt 2025-04-01T00:00:00Z'],
-  [null, 'Unclassified (no meeting date)', 'wmkf_meetingdate eq null'],
-])('filters and labels by meeting date %s even when fiscal year disagrees', async (meetingDate, cycle, filter) => {
+  [{ wmkf_cyclecode: 'J26' }, '2026-06-04', 'June 2026', "wmkf_GrantCycle/wmkf_cyclecode eq 'J26'"],
+  // An off-month meeting date is irrelevant: the link decides.
+  [{ wmkf_cyclecode: 'D25' }, '2025-03-01', 'December 2025', "wmkf_GrantCycle/wmkf_cyclecode eq 'D25'"],
+  // A June meeting date with no link has no cycle.
+  [null, '2026-06-04', 'No cycle', "(_wmkf_grantcycle_value eq null or not (startswith(wmkf_GrantCycle/wmkf_cyclecode,'J') or startswith(wmkf_GrantCycle/wmkf_cyclecode,'D')))"],
+  // A link to a historical (non-J/D) row is also no cycle, and the No cycle filter finds it.
+  [{ wmkf_cyclecode: 'R16' }, '2016-06-02', 'No cycle', "(_wmkf_grantcycle_value eq null or not (startswith(wmkf_GrantCycle/wmkf_cyclecode,'J') or startswith(wmkf_GrantCycle/wmkf_cyclecode,'D')))"],
+])('filters and labels by the Grant Cycle link %j even when meeting date and fiscal year disagree', async (link, meetingDate, cycle, filter) => {
   queryRequests.mockResolvedValueOnce({ records: [requestRow('11111111-1111-1111-1111-111111111111', {
+    wmkf_GrantCycle: link,
     wmkf_meetingdate: meetingDate,
     akoya_fiscalyear: 'December 2017',
   })], totalCount: 1 });
   const result = await searchWorkbenchRequests({ cycle });
-  expect(queryRequests).toHaveBeenCalledWith(expect.objectContaining({ filter: `${RESEARCH_FILTER} and ${filter}` }));
+  expect(queryRequests).toHaveBeenCalledWith(expect.objectContaining({ filter: `${RESEARCH_FILTER} and ${filter}`, expand: EXPAND }));
   expect(result.results[0].cycleLabel).toBe(cycle);
+});
+
+test.each(['March 2025 (off-cycle)', 'Unclassified (no meeting date)', 'june 2026'])('a retired or non-listed cycle label %p is a 400', async (cycle) => {
+  await expect(searchWorkbenchRequests({ cycle })).rejects.toMatchObject({ httpStatus: 400 });
+  expect(queryRequests).not.toHaveBeenCalled();
 });
 
 test('a cycle label outside the offered list is a 400, never a fiscal-year string match', async () => {
@@ -181,8 +196,9 @@ test('text search applies escaped server filters, hydrates rows, and preserves r
   });
   expect(findByIds).toHaveBeenCalledWith([second, first], {
     select: REQUEST_SEARCH_SELECT,
+    expand: EXPAND,
     top: 2,
-    filter: `${RESEARCH_FILTER} and wmkf_meetingdate ge 2026-12-01T00:00:00Z and wmkf_meetingdate lt 2027-01-01T00:00:00Z and akoya_requeststatus eq 'Director''s Review'`,
+    filter: `${RESEARCH_FILTER} and wmkf_GrantCycle/wmkf_cyclecode eq 'D26' and akoya_requeststatus eq 'Director''s Review'`,
   });
   expect(body.results.map((row) => row.requestId)).toEqual([second, first]);
   expect(body.results[1]).toMatchObject({
@@ -224,6 +240,7 @@ test('deduplicates search hits and reports indexed requests that cannot be hydra
 
   expect(findByIds).toHaveBeenCalledWith([available, stale], {
     select: REQUEST_SEARCH_SELECT,
+    expand: EXPAND,
     top: 2,
     filter: RESEARCH_FILTER,
   });
@@ -250,11 +267,13 @@ test('text search hydrates bounded chunks and pages the stable ranked hit set', 
   });
   expect(findByIds).toHaveBeenNthCalledWith(1, ids.slice(0, 50), {
     select: REQUEST_SEARCH_SELECT,
+    expand: EXPAND,
     top: 50,
     filter: RESEARCH_FILTER,
   });
   expect(findByIds).toHaveBeenNthCalledWith(2, ids.slice(50), {
     select: REQUEST_SEARCH_SELECT,
+    expand: EXPAND,
     top: 34,
     filter: RESEARCH_FILTER,
   });
@@ -292,7 +311,8 @@ test('unions true project-leader name matches ahead of indexed request-text matc
   expect(searchDirectoryByName).toHaveBeenCalledWith('Cynthia Reinhart-King', { top: 26 });
   expect(queryRequests).toHaveBeenCalledWith({
     select: REQUEST_SEARCH_SELECT,
-    filter: "(_wmkf_projectleader_value eq 33333333-3333-3333-3333-333333333333) and (_akoya_programid_value eq 8dcab30b-958f-ee11-8179-000d3a341e8f or _akoya_programid_value eq 94cab30b-958f-ee11-8179-000d3a341e8f) and wmkf_meetingdate ge 2020-06-01T00:00:00Z and wmkf_meetingdate lt 2020-07-01T00:00:00Z and akoya_requeststatus eq 'Closed'",
+    expand: EXPAND,
+    filter: "(_wmkf_projectleader_value eq 33333333-3333-3333-3333-333333333333) and (_akoya_programid_value eq 8dcab30b-958f-ee11-8179-000d3a341e8f or _akoya_programid_value eq 94cab30b-958f-ee11-8179-000d3a341e8f) and wmkf_GrantCycle/wmkf_cyclecode eq 'J20' and akoya_requeststatus eq 'Closed'",
     orderby: REQUEST_SEARCH_PROJECT_LEADER_ORDER,
     top: 100,
   });
@@ -459,7 +479,8 @@ test('filter-only search stays bounded and reports the 100-result ceiling honest
 
   expect(queryRequests).toHaveBeenCalledWith({
     select: REQUEST_SEARCH_SELECT,
-    filter: "(_akoya_programid_value eq 8dcab30b-958f-ee11-8179-000d3a341e8f or _akoya_programid_value eq 94cab30b-958f-ee11-8179-000d3a341e8f) and wmkf_meetingdate ge 2026-06-01T00:00:00Z and wmkf_meetingdate lt 2026-07-01T00:00:00Z",
+    expand: EXPAND,
+    filter: "(_akoya_programid_value eq 8dcab30b-958f-ee11-8179-000d3a341e8f or _akoya_programid_value eq 94cab30b-958f-ee11-8179-000d3a341e8f) and wmkf_GrantCycle/wmkf_cyclecode eq 'J26'",
     orderby: 'akoya_requestnum desc',
     top: 100,
   });
@@ -556,7 +577,7 @@ test('acknowledges an outside exact request even when Research cycle and status 
   });
 
   expect(queryRequests).toHaveBeenCalledWith(expect.objectContaining({
-    filter: `${RESEARCH_FILTER} and wmkf_meetingdate ge 2026-12-01T00:00:00Z and wmkf_meetingdate lt 2027-01-01T00:00:00Z and akoya_requeststatus eq 'Closed' and akoya_requestnum eq '${requestNumber}'`,
+    filter: `${RESEARCH_FILTER} and wmkf_GrantCycle/wmkf_cyclecode eq 'D26' and akoya_requeststatus eq 'Closed' and akoya_requestnum eq '${requestNumber}'`,
   }));
   expect(body.outsideProgramRequest).toEqual({ requestNumber, program: 'Community Grants' });
   expect(findByRequestNumber).toHaveBeenCalledTimes(1);

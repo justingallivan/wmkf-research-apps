@@ -36,7 +36,7 @@ const getRecord = jest.fn(async () => ({
   // No populated reviewer slots — keeps the test focused on the excluded path.
 }));
 jest.mock('../../lib/services/dynamics-service', () => ({
-  DynamicsService: { getRecord: (...a) => getRecord(...a) },
+  DynamicsService: { getRecord: (...a) => getRecord(...a), checkRestriction: jest.fn() },
 }));
 
 // No slots populated, so ensureApplicantRecommended is never invoked by default; mock the
@@ -46,7 +46,6 @@ jest.mock('../../lib/dataverse/adapters/reviewer-suggestion', () => ({
   ensureApplicantRecommended: (...a) => ensureApplicantRecommended(...a),
 }));
 
-jest.mock('../../lib/utils/cycle-code', () => ({ meetingDateToCycleCode: () => null }));
 
 const extractExcludedReviewers = jest.fn(async () => ({
   names: [{ name: 'Mya Breitbart', affiliation: null }],

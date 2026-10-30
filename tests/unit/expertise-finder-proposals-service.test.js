@@ -8,6 +8,10 @@
 jest.mock('../../lib/dataverse/adapters/grant-request.js', () => ({
   queryAllRequests: jest.fn(),
 }));
+// Grant Cycle link filter: the real string, without a restriction context.
+jest.mock('../../lib/dataverse/adapters/operations-grant-cycle.js', () => ({
+  linkedCycleFilter: (code) => `wmkf_GrantCycle/wmkf_cyclecode eq '${code}'`,
+}));
 
 import * as grantRequestAdapter from '../../lib/dataverse/adapters/grant-request.js';
 import { queryProposals } from '../../lib/services/expertise-finder/proposals-service';
@@ -33,7 +37,7 @@ describe('queryProposals', () => {
     grantRequestAdapter.queryAllRequests.mockResolvedValueOnce({ records: [record()] });
     const r = await queryProposals({ cycleCode: 'D25' });
     expect(grantRequestAdapter.queryAllRequests).toHaveBeenCalledWith(expect.objectContaining({
-      filter: 'wmkf_meetingdate ge 2025-12-01T00:00:00Z and wmkf_meetingdate lt 2026-01-01T00:00:00Z and wmkf_request_type eq 100000001',
+      filter: "wmkf_GrantCycle/wmkf_cyclecode eq 'D25' and wmkf_request_type eq 100000001",
       orderby: 'akoya_requestnum asc',
     }));
     expect(r).toEqual({

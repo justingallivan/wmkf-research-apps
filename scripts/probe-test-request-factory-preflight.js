@@ -61,7 +61,7 @@ const SOURCES = Object.freeze([
 const FANOUT = Object.freeze([
   ['OData visibility filter', 'shared/config/workbenchVisibility.js', 'buildVisibilityFilter'],
   ['row-level direct-ID eligibility', 'shared/config/workbenchVisibility.js', 'isVisibleRequestRow'],
-  ['FetchXML meeting-date aggregation', 'lib/dataverse/adapters/grant-request.js', 'aggregateMeetingDateCycles'],
+  ['FetchXML linked-cycle aggregation', 'lib/dataverse/adapters/grant-request.js', 'aggregateLinkedCycles'],
   ['Dataverse Search request search', 'lib/services/workbench/request-search-service.js', 'searchRequests'],
   ['direct-ID request lookup', 'lib/services/workbench/request-search-service.js', 'grantRequestAdapter.findByIds'],
   ['materials collection eligibility', 'lib/services/site-visit-materials/collection-service.js', 'isVisibleRequestRow'],

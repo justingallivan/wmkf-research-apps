@@ -12,6 +12,16 @@ jest.mock('../../lib/dataverse/adapters/grant-request', () => ({
   getById: (...a) => getRequestById(...a),
 }));
 
+// Grant Cycle link helpers: real strings and the real row reader, without the
+// restriction context the adapter-mocked service never establishes.
+jest.mock('../../lib/dataverse/adapters/operations-grant-cycle', () => ({
+  linkedCycleExpand: () => 'wmkf_GrantCycle($select=wmkf_cyclecode)',
+  linkedCycleCode: (row) => {
+    const code = row?.wmkf_GrantCycle?.wmkf_cyclecode;
+    return typeof code === 'string' && /^[JD]\d{2}$/.test(code) ? code : null;
+  },
+}));
+
 const PR = '11111111-2222-3333-4444-555555555555';
 const CONTACT = '22222222-3333-4444-5555-666666666666';
 const createReviewer = jest.fn();
@@ -78,6 +88,7 @@ beforeEach(() => {
     akoya_requestid: REQ,
     akoya_title: 'Manual add proposal',
     wmkf_meetingdate: '2026-06-01',
+    wmkf_GrantCycle: { wmkf_cyclecode: 'J26' },
     _wmkf_programareaserved_value_formatted: 'Science',
   });
   createReviewer.mockResolvedValue({ id: PR, created: true });
@@ -209,6 +220,24 @@ test('setContactLink structured conflict is translated; untyped errors propagate
   err = await addManualReviewer(args({ email: 'ada@crm.edu' })).catch((e) => e);
   expect(err).not.toBeInstanceOf(ServiceHttpError);
   expect(err.message).toBe('network down');
+});
+
+test('the suggestion is stamped with the linked Grant Cycle code read with the expand', async () => {
+  await addManualReviewer(args());
+  expect(getRequestById).toHaveBeenCalledWith(REQ, expect.objectContaining({
+    expand: 'wmkf_GrantCycle($select=wmkf_cyclecode)',
+  }));
+  expect(ensureStaffManualCandidate.mock.calls[0][0].grantCycleCode).toBe('J26');
+});
+
+test('a June meeting date without a Grant Cycle link stamps no cycle', async () => {
+  getRequestById.mockResolvedValue({
+    akoya_requestid: REQ,
+    akoya_title: 'Manual add proposal',
+    wmkf_meetingdate: '2026-06-01',
+  });
+  await addManualReviewer(args());
+  expect(ensureStaffManualCandidate.mock.calls[0][0].grantCycleCode).toBeNull();
 });
 
 test('referral: match reason + dual source tokens + provenanceKind in the DTO', async () => {

@@ -7,7 +7,7 @@
  * @jest-environment node
  */
 jest.mock('../../lib/utils/auth', () => ({ requireAppAccess: jest.fn() }));
-jest.mock('../../lib/services/dynamics-service', () => ({ DynamicsService: { queryAllRecords: jest.fn() } }));
+jest.mock('../../lib/services/dynamics-service', () => ({ DynamicsService: { queryAllRecords: jest.fn(), checkRestriction: jest.fn() } }));
 jest.mock('../../lib/services/dynamics-context', () => ({
   bypassDynamicsRestrictions: (l, fn) => Promise.resolve().then(() => (typeof l === 'function' ? l() : fn())),
 }));

@@ -12,10 +12,19 @@
 jest.mock('../../lib/services/program-director-resolver', () => ({
   resolveByEmail: jest.fn(),
 }));
+// Grant Cycle link helpers: real strings and the real row reader, without the
+// restriction context the adapter-mocked service never establishes.
+jest.mock('../../lib/dataverse/adapters/operations-grant-cycle', () => ({
+  linkedCycleExpand: () => 'wmkf_GrantCycle($select=wmkf_cyclecode)',
+  linkedCycleCode: (row) => {
+    const code = row?.wmkf_GrantCycle?.wmkf_cyclecode;
+    return typeof code === 'string' && /^[JD]\d{2}$/.test(code) ? code : null;
+  },
+}));
 jest.mock('../../lib/dataverse/adapters/grant-request', () => ({
   __esModule: true,
   getById: jest.fn(),
-  findByRequestNumber: jest.fn(),
+  queryRequests: jest.fn(),
 }));
 jest.mock('../../lib/dataverse/adapters/account', () => ({
   __esModule: true,
@@ -114,6 +123,7 @@ describe('getMyCandidates', () => {
       akoya_title: 'A Proposal',
       wmkf_meetingdate: '2026-06-15',
       wmkf_reviewduedate: '2026-09-01',
+      wmkf_GrantCycle: { wmkf_cyclecode: 'J26' },
     });
     suggestionAdapter.findByRequest.mockResolvedValue([{
       wmkf_appreviewersuggestionid: SUGGESTION_ID,
@@ -148,18 +158,23 @@ describe('getMyCandidates', () => {
       requestReviewDeadline: '2026-09-01',
       effectiveReviewDeadline: '2026-09-15',
     });
+    expect(out.proposals[0]).toMatchObject({ grantCycleCode: 'J26', grantCycleLabel: 'June 2026' });
+    expect(grantRequestAdapter.getById).toHaveBeenCalledWith(REQUEST_ID, expect.objectContaining({
+      expand: 'wmkf_GrantCycle($select=wmkf_cyclecode)',
+    }));
     expect(resolveByEmail).not.toHaveBeenCalled(); // explicit request skips PD scope
   });
 
   test.each([
-    ['meeting-date-derived code wins over a disagreeing stored code', '2026-06-15', 'J99', 'J26'],
-    ['an off-month meeting date shows no cycle, never the stored code', '2026-03-01', 'J99', null],
-    ['stored code fills in only when the request has no meeting date', null, 'D25', 'D25'],
-    ['no meeting date and no stored code is null, never a guess', null, null, null],
-  ])('grantCycleCode: %s', async (_label, meetingDate, storedCode, expected) => {
+    ['the linked code wins over a disagreeing stored code', '2026-06-15', 'J26', 'J99', 'J26'],
+    ['a June meeting date with no link shows no cycle, never the stored code', '2026-06-15', null, 'J26', null],
+    ['no link and no meeting date shows no cycle, never the stored code', null, null, 'D25', null],
+    ['no link and no stored code is null, never a guess', null, null, null, null],
+  ])('grantCycleCode: %s', async (_label, meetingDate, linkedCode, storedCode, expected) => {
     grantRequestAdapter.getById.mockResolvedValue({
       akoya_requestid: REQUEST_ID, akoya_requestnum: 'R-1', akoya_title: 'A Proposal',
       ...(meetingDate ? { wmkf_meetingdate: meetingDate } : {}),
+      ...(linkedCode ? { wmkf_GrantCycle: { wmkf_cyclecode: linkedCode } } : {}),
     });
     suggestionAdapter.findByRequest.mockResolvedValue([{
       wmkf_appreviewersuggestionid: SUGGESTION_ID,
@@ -174,6 +189,54 @@ describe('getMyCandidates', () => {
     const out = await getMyCandidates({ requestId: REQUEST_ID, azureEmail: EMAIL });
 
     expect(out.proposals[0].grantCycleCode).toBe(expected);
+  });
+
+  test('requestNumber scope reads the request with the Grant Cycle expand', async () => {
+    grantRequestAdapter.queryRequests.mockResolvedValue({ records: [{
+      akoya_requestid: REQUEST_ID, akoya_requestnum: 'R-1', akoya_title: 'A Proposal',
+      wmkf_meetingdate: '2026-12-10', wmkf_GrantCycle: { wmkf_cyclecode: 'D26' },
+    }] });
+    suggestionAdapter.findByRequest.mockResolvedValue([{
+      wmkf_appreviewersuggestionid: SUGGESTION_ID,
+      _wmkf_request_value: REQUEST_ID,
+      _wmkf_potentialreviewer_value: PERSON_ID,
+    }]);
+    potentialReviewerAdapter.queryReviewers.mockResolvedValue({
+      records: [{ wmkf_potentialreviewersid: PERSON_ID, wmkf_name: 'Dr X' }],
+    });
+
+    const out = await getMyCandidates({ requestNumber: 'R-1', azureEmail: EMAIL });
+
+    expect(grantRequestAdapter.queryRequests).toHaveBeenCalledWith(expect.objectContaining({
+      filter: "akoya_requestnum eq 'R-1'",
+      expand: 'wmkf_GrantCycle($select=wmkf_cyclecode)',
+      top: 1,
+    }));
+    expect(grantRequestAdapter.queryRequests.mock.calls[0][0].select.split(',')).toContain('wmkf_meetingdate');
+    expect(out.proposals[0]).toMatchObject({ grantCycleCode: 'D26', grantCycleLabel: 'December 2026' });
+  });
+
+  test('PD scope reads the cycle code findByPD projects (bug: it once read a field the adapter never returned)', async () => {
+    resolveByEmail.mockResolvedValue({ systemuserid: 'pd-1' });
+    suggestionAdapter.findByPD.mockResolvedValue({
+      suggestions: [{
+        wmkf_appreviewersuggestionid: SUGGESTION_ID,
+        _wmkf_request_value: REQUEST_ID,
+        _wmkf_potentialreviewer_value: PERSON_ID,
+        wmkf_grantcyclecode: 'J99',
+      }],
+      requestById: {
+        [REQUEST_ID]: { requestId: REQUEST_ID, requestNumber: 'R-1', title: 'A Proposal', meetingDate: '2026-12-10', cycleCode: 'D26' },
+      },
+    });
+    potentialReviewerAdapter.queryReviewers.mockResolvedValue({
+      records: [{ wmkf_potentialreviewersid: PERSON_ID, wmkf_name: 'Dr X' }],
+    });
+
+    const out = await getMyCandidates({ azureEmail: EMAIL, cycleCode: 'D26' });
+
+    expect(suggestionAdapter.findByPD).toHaveBeenCalledWith('pd-1', { cycleCode: 'D26' });
+    expect(out.proposals[0]).toMatchObject({ grantCycleCode: 'D26', grantCycleLabel: 'December 2026' });
   });
 
   test('single-request scope with only REMOVED rows builds a proposal shell carrying removedCandidates', async () => {
@@ -227,8 +290,8 @@ describe('getMyCandidates', () => {
     resolveByEmail.mockResolvedValue({ systemuserid: 'pd-1' });
     suggestionAdapter.findByPD.mockResolvedValue({
       requestById: {
-        [REQUEST_ID]: { requestId: REQUEST_ID, title: 'Old', requestNumber: 'R-1', cycleCode: 'D25', cycleLabel: 'Dec 2025', meetingDate: '2025-12-01' },
-        [SUGGESTION_ID]: { requestId: SUGGESTION_ID, title: 'New', requestNumber: 'R-2', cycleCode: 'J26', cycleLabel: 'Jun 2026', meetingDate: '2026-06-15' },
+        [REQUEST_ID]: { requestId: REQUEST_ID, title: 'Old', requestNumber: 'R-1', cycleCode: 'D25', meetingDate: '2025-12-01' },
+        [SUGGESTION_ID]: { requestId: SUGGESTION_ID, title: 'New', requestNumber: 'R-2', cycleCode: 'J26', meetingDate: '2026-06-15' },
       },
     });
 
@@ -241,7 +304,7 @@ describe('getMyCandidates', () => {
       proposalHash: SUGGESTION_ID,
       title: 'New',
       cycleCode: 'J26',
-      cycleLabel: 'Jun 2026',
+      cycleLabel: 'June 2026',
       requestNumber: 'R-2',
       meetingDate: '2026-06-15',
     });
