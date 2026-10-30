@@ -15,7 +15,9 @@ related:
 
 # Shared prompt definition format v1
 
-**[PLANNED, normative for the foundation implementation]** This defines the
+**[PARTIAL implementation; normative complete contract]** The offline
+`lib/prompt-publication/` foundation implements template and pinned-model
+primitives only, not complete definition validation or publication. This defines the
 shared stored-definition validator; it does not describe a deployed API or
 promise every runtime supports every accepted definition. `definitionFormatVersion`
 is 1. Wire contract version and reviewed policy-artifact version/hash are separate

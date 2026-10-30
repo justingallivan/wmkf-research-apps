@@ -3,7 +3,7 @@ title: Shared Prompt Library Implementation Plan
 domain: ai-platform
 kind: plan
 status: proposed
-summary: Read-only live Dataverse schema verification and implementation plan for shared prompt discovery, catalog metadata, Admin creation, and governed backend publication.
+summary: Shared prompt library plan with an initial offline template/model-policy foundation; Dataverse publication and clients remain unbuilt.
 canonical: false
 cataloged: 2026-10-29
 last_verified: 2026-10-29
@@ -45,7 +45,13 @@ Locating the historical Power Automate flow is NOT a prerequisite for building,
 rehearsing or releasing the library and its two publication clients. Actual
 execution by a future flow remains that flow's integration acceptance task.
 
-This document is a plan, not an implementation or schema deployment. The retained
+This document governs the implementation; no schema has been deployed. The initial
+offline template/model-policy foundation is implemented in
+`lib/prompt-publication/` with portable fixtures and unit tests. It is not wired to
+any route or writer and is not the complete definition validator. See that
+directory's README and
+[local implementation record](SHARED_PROMPT_LOCAL_FOUNDATION_2026-10-29.md) for
+invariants and remaining local milestones. The retained
 schema probe was read-only. This revision checks Microsoft platform documentation
 and repository source and includes a subsequent owner-authorized read-only
 example probe; it performs no tenant provisioning, live writes or model execution. The linked historical AI-run form was read separately; it did not

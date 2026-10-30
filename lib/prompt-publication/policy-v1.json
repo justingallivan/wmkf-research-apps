@@ -1,0 +1,370 @@
+{
+  "hashAlgorithm": "sha256-canonical-json-utf8-v1",
+  "hash": "96257d50032e149748b0b1b451c7dd7bf93a7cbc7cdd1ac5308491e943d215e0",
+  "policy": {
+    "defaultsByName": {},
+    "definitionFormatVersion": 1,
+    "forbiddenPatterns": [
+      {
+        "flags": "i",
+        "source": "WMKF-UNTRUSTED-CONTENT"
+      },
+      {
+        "flags": "i",
+        "source": "UNTRUSTED CONTENT RULES:"
+      },
+      {
+        "flags": "i",
+        "source": "\\[\\[\\s*\\/?\\s*WMKF-"
+      }
+    ],
+    "limits": {
+      "nameUtf16": 850,
+      "templateUtf16": 65536
+    },
+    "models": {
+      "claude-fable-5": {
+        "dataRetentionClass": "covered_model_30d",
+        "defaultEffort": "high",
+        "family": "fable",
+        "maxInputTokens": 1000000,
+        "maxOutputTokens": 128000,
+        "provider": "anthropic",
+        "refusalSemantics": "http_200_stop_reason_refusal",
+        "requiresRefusalHandling": true,
+        "reviewedAt": "2026-06-25",
+        "source": "https://platform.claude.com/docs/en/about-claude/models/introducing-claude-fable-5-and-claude-mythos-5",
+        "supportsEffort": true,
+        "supportsStructuredOutput": true,
+        "supportsTemperature": false,
+        "thinkingMode": "adaptive_always_on",
+        "zeroDataRetentionEligible": false
+      },
+      "claude-fable-5-1": {
+        "dataRetentionClass": "covered_model_30d",
+        "defaultEffort": "high",
+        "family": "fable",
+        "maxInputTokens": 1000000,
+        "maxOutputTokens": 128000,
+        "provider": "anthropic",
+        "refusalSemantics": "http_200_stop_reason_refusal",
+        "requiresRefusalHandling": true,
+        "reviewedAt": "2026-09-12",
+        "source": "https://platform.claude.com/docs/en/about-claude/models/introducing-claude-fable-5-and-claude-mythos-5",
+        "supportsEffort": true,
+        "supportsStructuredOutput": true,
+        "supportsTemperature": false,
+        "thinkingMode": "adaptive_always_on",
+        "zeroDataRetentionEligible": false
+      },
+      "claude-haiku-4-5": {
+        "dataRetentionClass": "standard",
+        "defaultEffort": null,
+        "family": "haiku",
+        "maxInputTokens": 200000,
+        "maxOutputTokens": 64000,
+        "provider": "anthropic",
+        "refusalSemantics": "standard_stop_reason",
+        "requiresRefusalHandling": false,
+        "reviewedAt": "2026-06-25",
+        "source": "https://platform.claude.com/docs/en/about-claude/models/overview",
+        "supportsEffort": false,
+        "supportsStructuredOutput": true,
+        "supportsTemperature": true,
+        "thinkingMode": "none",
+        "zeroDataRetentionEligible": null
+      },
+      "claude-haiku-4-5-20251001": {
+        "dataRetentionClass": "standard",
+        "defaultEffort": null,
+        "family": "haiku",
+        "maxInputTokens": 200000,
+        "maxOutputTokens": 64000,
+        "provider": "anthropic",
+        "refusalSemantics": "standard_stop_reason",
+        "requiresRefusalHandling": false,
+        "reviewedAt": "2026-06-25",
+        "source": "https://platform.claude.com/docs/en/about-claude/models/overview",
+        "supportsEffort": false,
+        "supportsStructuredOutput": true,
+        "supportsTemperature": true,
+        "thinkingMode": "none",
+        "zeroDataRetentionEligible": null
+      },
+      "claude-haiku-5-5": {
+        "dataRetentionClass": "standard",
+        "defaultEffort": "medium",
+        "family": "haiku",
+        "maxInputTokens": 1000000,
+        "maxOutputTokens": 128000,
+        "provider": "anthropic",
+        "refusalSemantics": "http_200_stop_reason_refusal",
+        "requiresRefusalHandling": true,
+        "reviewedAt": "2026-10-12",
+        "source": "https://platform.claude.com/docs/en/models/haiku-5-5/whats-new-haiku-5-5",
+        "supportsEffort": true,
+        "supportsStructuredOutput": true,
+        "supportsTemperature": false,
+        "thinkingMode": "adaptive_default_on",
+        "zeroDataRetentionEligible": null
+      },
+      "claude-mythos-5": {
+        "dataRetentionClass": "covered_model_30d",
+        "defaultEffort": "high",
+        "family": "mythos",
+        "maxInputTokens": 1000000,
+        "maxOutputTokens": 128000,
+        "provider": "anthropic",
+        "refusalSemantics": "none",
+        "requiresRefusalHandling": false,
+        "reviewedAt": "2026-06-25",
+        "source": "https://platform.claude.com/docs/en/about-claude/models/introducing-claude-fable-5-and-claude-mythos-5",
+        "supportsEffort": true,
+        "supportsStructuredOutput": true,
+        "supportsTemperature": false,
+        "thinkingMode": "adaptive_always_on",
+        "zeroDataRetentionEligible": false
+      },
+      "claude-opus-4-5": {
+        "dataRetentionClass": "standard",
+        "defaultEffort": "high",
+        "family": "opus",
+        "maxInputTokens": 200000,
+        "maxOutputTokens": 64000,
+        "provider": "anthropic",
+        "refusalSemantics": "standard_stop_reason",
+        "requiresRefusalHandling": false,
+        "reviewedAt": "2026-06-25",
+        "source": "https://platform.claude.com/docs/en/build-with-claude/effort",
+        "supportsEffort": true,
+        "supportsStructuredOutput": true,
+        "supportsTemperature": true,
+        "thinkingMode": "adaptive_optional",
+        "zeroDataRetentionEligible": null
+      },
+      "claude-opus-4-6": {
+        "dataRetentionClass": "standard",
+        "defaultEffort": "high",
+        "family": "opus",
+        "maxInputTokens": 1000000,
+        "maxOutputTokens": 128000,
+        "provider": "anthropic",
+        "refusalSemantics": "standard_stop_reason",
+        "requiresRefusalHandling": false,
+        "reviewedAt": "2026-06-25",
+        "source": "https://platform.claude.com/docs/en/build-with-claude/effort",
+        "supportsEffort": true,
+        "supportsStructuredOutput": true,
+        "supportsTemperature": true,
+        "thinkingMode": "adaptive_optional",
+        "zeroDataRetentionEligible": null
+      },
+      "claude-opus-4-7": {
+        "dataRetentionClass": "standard",
+        "defaultEffort": "high",
+        "family": "opus",
+        "maxInputTokens": 1000000,
+        "maxOutputTokens": 128000,
+        "provider": "anthropic",
+        "refusalSemantics": "standard_stop_reason",
+        "requiresRefusalHandling": false,
+        "reviewedAt": "2026-06-25",
+        "source": "https://platform.claude.com/docs/en/about-claude/models/migration-guide",
+        "supportsEffort": true,
+        "supportsStructuredOutput": true,
+        "supportsTemperature": false,
+        "thinkingMode": "adaptive_optional",
+        "zeroDataRetentionEligible": null
+      },
+      "claude-opus-4-8": {
+        "dataRetentionClass": "standard",
+        "defaultEffort": "high",
+        "family": "opus",
+        "maxInputTokens": 1000000,
+        "maxOutputTokens": 128000,
+        "provider": "anthropic",
+        "refusalSemantics": "standard_stop_reason",
+        "requiresRefusalHandling": false,
+        "reviewedAt": "2026-06-25",
+        "source": "https://platform.claude.com/docs/en/about-claude/models/overview",
+        "supportsEffort": true,
+        "supportsStructuredOutput": true,
+        "supportsTemperature": false,
+        "thinkingMode": "adaptive_default_high_effort",
+        "zeroDataRetentionEligible": null
+      },
+      "claude-opus-5": {
+        "dataRetentionClass": "standard",
+        "defaultEffort": "high",
+        "family": "opus",
+        "maxInputTokens": 1000000,
+        "maxOutputTokens": 128000,
+        "provider": "anthropic",
+        "refusalSemantics": "http_200_stop_reason_refusal",
+        "requiresRefusalHandling": true,
+        "reviewedAt": "2026-08-23",
+        "source": "https://platform.claude.com/docs/en/about-claude/models/whats-new-opus-5",
+        "supportsEffort": true,
+        "supportsStructuredOutput": true,
+        "supportsTemperature": false,
+        "thinkingMode": "adaptive_default_on",
+        "zeroDataRetentionEligible": null
+      },
+      "claude-opus-5-5": {
+        "dataRetentionClass": "standard",
+        "defaultEffort": "medium",
+        "family": "opus",
+        "maxInputTokens": 1000000,
+        "maxOutputTokens": 128000,
+        "provider": "anthropic",
+        "refusalSemantics": "http_200_stop_reason_refusal",
+        "requiresRefusalHandling": true,
+        "retentionSource": "https://platform.claude.com/docs/en/manage-claude/api-and-data-retention",
+        "reviewedAt": "2026-10-02",
+        "source": "https://platform.claude.com/docs/en/models/opus-5-5/whats-new-opus-5-5",
+        "supportsEffort": true,
+        "supportsStructuredOutput": true,
+        "supportsTemperature": false,
+        "thinkingMode": "adaptive_always_on",
+        "zeroDataRetentionEligible": null
+      },
+      "claude-sonnet-4": {
+        "dataRetentionClass": "standard",
+        "defaultEffort": null,
+        "family": "sonnet",
+        "maxInputTokens": 200000,
+        "maxOutputTokens": 64000,
+        "provider": "anthropic",
+        "refusalSemantics": "standard_stop_reason",
+        "requiresRefusalHandling": false,
+        "reviewedAt": "2026-06-25",
+        "source": "https://platform.claude.com/docs/en/about-claude/models/overview",
+        "supportsEffort": false,
+        "supportsStructuredOutput": false,
+        "supportsTemperature": true,
+        "thinkingMode": "none",
+        "zeroDataRetentionEligible": null
+      },
+      "claude-sonnet-4-5": {
+        "dataRetentionClass": "standard",
+        "defaultEffort": null,
+        "family": "sonnet",
+        "maxInputTokens": 200000,
+        "maxOutputTokens": 64000,
+        "provider": "anthropic",
+        "refusalSemantics": "standard_stop_reason",
+        "requiresRefusalHandling": false,
+        "reviewedAt": "2026-06-25",
+        "source": "https://platform.claude.com/docs/en/about-claude/models/migration-guide",
+        "supportsEffort": false,
+        "supportsStructuredOutput": true,
+        "supportsTemperature": true,
+        "thinkingMode": "none",
+        "zeroDataRetentionEligible": null
+      },
+      "claude-sonnet-4-6": {
+        "dataRetentionClass": "standard",
+        "defaultEffort": "high",
+        "family": "sonnet",
+        "maxInputTokens": 1000000,
+        "maxOutputTokens": 128000,
+        "provider": "anthropic",
+        "refusalSemantics": "standard_stop_reason",
+        "requiresRefusalHandling": false,
+        "reviewedAt": "2026-06-25",
+        "source": "https://platform.claude.com/docs/en/about-claude/models/overview",
+        "supportsEffort": true,
+        "supportsStructuredOutput": true,
+        "supportsTemperature": true,
+        "thinkingMode": "adaptive_optional",
+        "zeroDataRetentionEligible": null
+      },
+      "claude-sonnet-5": {
+        "dataRetentionClass": "standard",
+        "defaultEffort": "high",
+        "family": "sonnet",
+        "maxInputTokens": 1000000,
+        "maxOutputTokens": 128000,
+        "provider": "anthropic",
+        "refusalSemantics": "standard_stop_reason",
+        "requiresRefusalHandling": false,
+        "reviewedAt": "2026-07-04",
+        "source": "https://platform.claude.com/docs/en/about-claude/models/overview",
+        "supportsEffort": true,
+        "supportsStructuredOutput": true,
+        "supportsTemperature": false,
+        "thinkingMode": "adaptive_default_on",
+        "zeroDataRetentionEligible": null
+      },
+      "claude-sonnet-5-5": {
+        "dataRetentionClass": "standard",
+        "defaultEffort": "high",
+        "family": "sonnet",
+        "maxInputTokens": 1000000,
+        "maxOutputTokens": 128000,
+        "provider": "anthropic",
+        "refusalSemantics": "http_200_stop_reason_refusal",
+        "requiresRefusalHandling": true,
+        "reviewedAt": "2026-10-12",
+        "source": "https://platform.claude.com/docs/en/models/sonnet-5-5/whats-new-sonnet-5-5",
+        "supportsEffort": true,
+        "supportsStructuredOutput": true,
+        "supportsTemperature": false,
+        "thinkingMode": "adaptive_default_on",
+        "zeroDataRetentionEligible": null
+      }
+    },
+    "placeholder": {
+      "matchMode": "full-string",
+      "name": "[A-Za-z0-9_]+",
+      "token": "\\{\\{[ \\t\\r\\n\\f\\v]*([A-Za-z0-9_]+)[ \\t\\r\\n\\f\\v]*\\}\\}"
+    },
+    "policyVersion": 1,
+    "reviewerContracts": {
+      "reviewer-finder.analyze": {
+        "requiredLabels": [
+          "PRIMARY_RESEARCH_AREA:",
+          "SECONDARY_AREAS:",
+          "KEY_METHODOLOGIES:",
+          "KEYWORDS:",
+          "REVIEWER:",
+          "NAME:",
+          "INSTITUTION:",
+          "EXPERTISE:",
+          "SENIORITY:",
+          "REASONING:",
+          "SOURCE:"
+        ],
+        "requiredPlaceholders": [
+          "proposal_text"
+        ]
+      },
+      "reviewer-finder.score-candidates": {
+        "requiredLabels": [
+          "RELEVANT:",
+          "REASONING:",
+          "SENIORITY:"
+        ],
+        "requiredPlaceholders": [
+          "proposal_summary",
+          "candidates_list"
+        ]
+      }
+    },
+    "scope": "template-and-model-foundation",
+    "templateContracts": {
+      "pre-site-visit.proposal-core.generate": {
+        "requiredPlaceholders": [
+          "request_context_json",
+          "proposal_text"
+        ]
+      }
+    },
+    "tiers": {
+      "fable": "claude-fable-5-1",
+      "haiku": "claude-haiku-4-5-20251001",
+      "opus": "claude-opus-5",
+      "sonnet": "claude-sonnet-5"
+    }
+  }
+}
