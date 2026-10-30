@@ -170,4 +170,50 @@ provider contract or deployed Atlas ownership changed.
 Bounded Sweep Mode A covers bootstrap order, bound-disabled inspection and current
 handoff/client state. The earlier package record is historical. Current SDK
 README and first-test runbook point here and retain Windows/tenant/auth gates.
-Final review/test/artifact evidence follows after Fable correction review.
+Repeated source/consumer/bootstrap searches find no live stale restatement of
+these bounded facts in the current SDK README or first-test runbook; the old
+package checkpoint is explicitly historical. No deployed-state fact changed.
+
+## Final local verification and review
+
+[VERIFIED via local commands] Transport/Checks compile for Framework 4.8 and net8
+with zero warnings/errors. The net8 harness passes 1,484 checks; nine scoped
+JavaScript suites pass 439 tests. Packaging passes 22 checks, including disabled
+bound-shape negatives. A full synthetic bound-disabled build verifies; the normal
+inspector rejects it and mismatched binding bytes reject. Both normal and
+synthetic-bound Windows bundles verify their copied payload and pass 1,484
+portable checks against the isolated copied layout. The old flat layout actually
+reproduces the missing-manifest failure. No actual Windows run is claimed.
+Policy/golden/Python fingerprints, ESLint, packet checks, whitespace and 29
+sequential relevant repository gate/self-test commands pass.
+
+Fable OAuth session `1c81380a-7021-4301-8986-a954f81e1b25`, actual model only
+`claude-fable-5-1`, reviewed and verified all seven concrete corrections. The final
+narrow check closed the LogicalName projection/row-integrity residual. No helper
+model, metered product or permission denial was used/reported. The late Windows
+result-file check is retained as detection, not an atomic concurrency guarantee.
+Server error classification uses a closed code list and never emits raw exception
+text. Schema evidence was rerun read-only with v2 completeness markers; table
+creation now has explicit per-column dependencies. Actual metadata acceptance,
+trace capture, Windows parity, identities/privileges and enablement remain gates.
+
+Current unbound disabled package:
+`dataverse/prompt-publication/artifacts/preparation-12/WMKF.PromptPublication.1.0.0.nupkg`.
+The adjacent preparation receipt, schema review requests and all-unapproved
+registration preparation record the exact local inputs. Synthetic bound artifacts
+are test-only and must not be registered or handed off as real bindings.
+
+Replacement Windows ZIP:
+`dataverse/prompt-publication/artifacts/windows-handoff-04.zip`.
+It contains 29 payload files and no private signing key or environment file.
+Earlier handoff ZIPs are superseded. Verify ZIP SHA256 before running it; return
+`windows-check-result.json` and complete console output. The tools Connor needs
+are unchanged. This bundle tests Framework/signatures, not tenant publication.
+
+
+Artifact evidence:
+
+- Package-source commit: `ac43bf6901c1ec060cc692e1380edb770b0469dd`.
+- Source-packet SHA256: `135bbfbcde7b108e9c765b76ced3a6fddd645269562e64fe68fdc1ee065e5eea`.
+- Package SHA256: `3710f7b441535fe08d5755ed3c685cf2e32076b2a8c15bef8ce3f33ac8337b6b`.
+- Replacement ZIP SHA256: `058ca680c1b05955b3a0aec71434d2ebd943dfa2bf4700347d473ff6b4e3ef64`.
