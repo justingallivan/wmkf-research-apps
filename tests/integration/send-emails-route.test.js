@@ -98,7 +98,14 @@ jest.mock('../../lib/services/settings-service', () => ({
   }),
 }));
 jest.mock('../../lib/services/grant-cycles-dataverse', () => ({ findByShortCode: jest.fn(async () => CYCLE_CONFIG) }));
-jest.mock('../../lib/utils/cycle-code', () => ({ meetingDateToCycleCode: jest.fn(() => CYCLE_CODE) }));
+// The request's linked Grant Cycle row: its code picks the cycle config and its
+// Reviews Due Date feeds the D48 due-date step (real review-due-date-service).
+let CALENDAR_ROW;
+const J27_CYCLE_ID = '27272727-2727-4727-8727-272727272727';
+const getCycleDatesById = jest.fn(async () => CALENDAR_ROW);
+jest.mock('../../lib/dataverse/adapters/operations-grant-cycle', () => ({
+  getCycleDatesById: (...a) => getCycleDatesById(...a),
+}));
 jest.mock('../../lib/utils/public-blob-fetch', () => ({ fetchPublicBlob: jest.fn(), isPublicBlobUrl: jest.fn(() => false) }));
 // Private cycle-materials path: a 'cycle-materials/…' pathname is read from the blob
 // store, producing a real material attachment — this is how the materials tests below
@@ -151,7 +158,6 @@ let SUGGESTIONS;
 let PERSON;
 let REQUEST;
 let SYSTEMUSER;
-let CYCLE_CODE;     // meetingDateToCycleCode() → this
 let CYCLE_CONFIG;   // findByShortCode() → this (cycle materials live here)
 let ORIGINAL_REVIEWER_EMAIL_DELIVERY_MODE;
 let ORIGINAL_VERCEL_ENV;
@@ -185,7 +191,7 @@ function basePerson(over = {}) {
 }
 // A cycle config carrying one private proposal-material attachment.
 const MATERIALS_CYCLE = {
-  shortCode: 'CYC',
+  shortCode: 'J27',
   additionalAttachments: [{ pathname: 'cycle-materials/proposal.pdf', filename: 'proposal.pdf' }],
 };
 
@@ -200,20 +206,25 @@ beforeEach(() => {
   jest.clearAllMocks();
   SUGGESTIONS = { [SUG_1]: baseSuggestion() };
   PERSON = basePerson();
+  // A stored review due date is the common case (every invitation after the
+  // first); the D48 tests below clear it to exercise the first-invitation fill.
   REQUEST = {
     akoya_requestid: 'req-1',
     akoya_requestnum: 'REQ-001',
     wmkf_meetingdate: '2026-07-01',
+    _wmkf_grantcycle_value: J27_CYCLE_ID,
+    wmkf_reviewduedate: '2026-09-09',
     _wmkf_programdirector_value: 'pd-1',
+    _etag: 'W/"r1"',
   };
+  CALENDAR_ROW = { wmkf_cyclecode: 'J27', wmkf_researchreviewsduedate: '2027-03-10' };
   SYSTEMUSER = {
     systemuserid: 'pd-1',
     fullname: 'Dr. Program Director',
     internalemailaddress: 'pd@wmkeck.org',
     isdisabled: false,
   };
-  CYCLE_CODE = null;       // default: no cycle / no materials
-  CYCLE_CONFIG = null;
+  CYCLE_CONFIG = null;     // default: no cycle config / no materials
   if (ORIGINAL_REVIEWER_EMAIL_DELIVERY_MODE === undefined) delete process.env.REVIEWER_EMAIL_DELIVERY_MODE;
   else process.env.REVIEWER_EMAIL_DELIVERY_MODE = ORIGINAL_REVIEWER_EMAIL_DELIVERY_MODE;
   if (ORIGINAL_VERCEL_ENV === undefined) delete process.env.VERCEL_ENV;
@@ -263,7 +274,11 @@ function autoStampDraft(d, templateType) {
     suggestionId: d.suggestionId,
     suggestion: SUGGESTIONS[d.suggestionId],
     person: PERSON,
-    request: REQUEST,
+    // An invitation preview renders with the date the first send will store
+    // (the calendar's, when the request has none yet), as render-emails does.
+    request: templateType === 'invitation' && !REQUEST.wmkf_reviewduedate
+      ? { ...REQUEST, wmkf_reviewduedate: CALENDAR_ROW?.wmkf_researchreviewsduedate ?? null }
+      : REQUEST,
     coPINames: [],
     cycle: {},
     honorariumAmount: 250,
@@ -667,12 +682,20 @@ describe('send-emails — capture delivery mode', () => {
 });
 
 describe('send-emails — materials strip gate (recipientMayReceiveAttachments, end-to-end)', () => {
-  beforeEach(() => { CYCLE_CODE = 'CYC'; CYCLE_CONFIG = MATERIALS_CYCLE; });
+  beforeEach(() => { CYCLE_CONFIG = MATERIALS_CYCLE; });
 
   test('materials send to an ACCEPTED reviewer carries the proposal material', async () => {
     SUGGESTIONS = { [SUG_1]: baseSuggestion({ wmkf_accepted: true }) };
     await run({ drafts: [draft()], templateType: 'materials' });
     expect(filenamesSent()).toContain('proposal.pdf');
+  });
+
+  test('the cycle config follows the Grant Cycle link: no link, no cycle material (meeting date ignored)', async () => {
+    SUGGESTIONS = { [SUG_1]: baseSuggestion({ wmkf_accepted: true }) };
+    REQUEST = { ...REQUEST, _wmkf_grantcycle_value: null };
+    const res = await run({ drafts: [draft()], templateType: 'materials' });
+    expect(resultOf(res).stats).toMatchObject({ sent: 1 });
+    expect(filenamesSent()).not.toContain('proposal.pdf');
   });
 
   test('materials send to a NON-accepted reviewer is SKIPPED not_accepted (Release accepted-only gate, §3.A)', async () => {
@@ -709,35 +732,20 @@ describe('send-emails — partial-success batch', () => {
 });
 
 describe('send-emails — Phase 1 campaign-config persistence (first invite)', () => {
-  const CONFIG = { respondOffsetDays: 7, reviewDueDate: '2026-08-01' };
+  // The client's reviewDueDate is ignored (D48); only the offset seeds post-send.
+  const CONFIG = { respondOffsetDays: 7, reviewDueDate: '2099-01-01' };
   const invite = (over = {}) => ({ drafts: [draft()], templateType: 'invitation', campaignConfig: CONFIG, ...over });
 
-  test('first invite with no existing config writes BOTH columns once', async () => {
+  test('first invite with no existing offset writes the offset once and never the client due date', async () => {
     const res = await run(invite());
     expect(resultOf(res).stats).toMatchObject({ sent: 1 });
-    expect(updateRecord).toHaveBeenCalledTimes(1);
-    expect(updateRecord).toHaveBeenCalledWith('akoya_requests', 'req-1',
-      { wmkf_respondoffsetdays: 7, wmkf_reviewduedate: '2026-08-01' }, expect.any(Object));
-  });
-
-  test('pre-set offset is NOT clobbered; only the unset due date is written', async () => {
-    REQUEST = { ...REQUEST, wmkf_respondoffsetdays: 5 }; // due date still unset
-    await run(invite());
-    expect(updateRecord).toHaveBeenCalledTimes(1);
-    expect(updateRecord).toHaveBeenCalledWith('akoya_requests', 'req-1',
-      { wmkf_reviewduedate: '2026-08-01' }, expect.any(Object));
-  });
-
-  test('pre-set due date is NOT clobbered; only the unset offset is written (Codex finding #1a)', async () => {
-    REQUEST = { ...REQUEST, wmkf_reviewduedate: '2026-09-09' };
-    await run(invite());
     expect(updateRecord).toHaveBeenCalledTimes(1);
     expect(updateRecord).toHaveBeenCalledWith('akoya_requests', 'req-1',
       { wmkf_respondoffsetdays: 7 }, expect.any(Object));
   });
 
   test('fully configured request → no write at all', async () => {
-    REQUEST = { ...REQUEST, wmkf_respondoffsetdays: 5, wmkf_reviewduedate: '2026-09-09' };
+    REQUEST = { ...REQUEST, wmkf_respondoffsetdays: 5 };
     await run(invite());
     expect(updateRecord).not.toHaveBeenCalled();
   });
@@ -760,43 +768,129 @@ describe('send-emails — Phase 1 campaign-config persistence (first invite)', (
   });
 });
 
+describe('send-emails — review due date from the cycle calendar (D48)', () => {
+  beforeEach(() => {
+    REQUEST = { ...REQUEST, wmkf_reviewduedate: null, wmkf_respondoffsetdays: 5 };
+  });
+  const invite = (over = {}) => ({
+    drafts: [draft()], templateType: 'invitation', campaignConfig: { respondOffsetDays: 7, reviewDueDate: '2099-01-01' }, ...over,
+  });
+
+  test('a first invitation stores the calendar date, conditionally, before the email is sent', async () => {
+    const res = await run(invite());
+    expect(resultOf(res).stats).toMatchObject({ sent: 1 });
+    expect(getCycleDatesById).toHaveBeenCalledWith(J27_CYCLE_ID, expect.any(Object));
+    expect(updateRecord).toHaveBeenCalledTimes(1);
+    expect(updateRecord).toHaveBeenCalledWith('akoya_requests', 'req-1',
+      { wmkf_reviewduedate: '2027-03-10' }, expect.objectContaining({ ifMatch: 'W/"r1"' }));
+    expect(updateRecord.mock.invocationCallOrder[0]).toBeLessThan(createAndSendEmail.mock.invocationCallOrder[0]);
+  });
+
+  test('a blank calendar date sends nothing and writes nothing', async () => {
+    CALENDAR_ROW = { wmkf_cyclecode: 'J27', wmkf_researchreviewsduedate: null };
+    const res = await run(invite());
+    const r = resultOf(res);
+    expect(r.stats).toMatchObject({ sent: 0 });
+    expect(r.skipped.map((x) => x.reason)).toEqual(['review_due_date_unavailable']);
+    expect(createAndSendEmail).not.toHaveBeenCalled();
+    expect(updateRecord).not.toHaveBeenCalled();
+  });
+
+  test('no Grant Cycle link sends nothing and writes nothing, with no meeting-date fallback', async () => {
+    // The meeting-date mapping still names J27 here; the link alone decides.
+    REQUEST = { ...REQUEST, _wmkf_grantcycle_value: null };
+    const res = await run(invite());
+    const r = resultOf(res);
+    expect(r.stats).toMatchObject({ sent: 0 });
+    expect(r.skipped.map((x) => x.reason)).toEqual(['review_due_date_unavailable']);
+    expect(getCycleDatesById).not.toHaveBeenCalled();
+    expect(createAndSendEmail).not.toHaveBeenCalled();
+    expect(updateRecord).not.toHaveBeenCalled();
+  });
+
+  test('a failed date write sends nothing', async () => {
+    updateRecord.mockRejectedValueOnce(Object.assign(new Error('server error'), { status: 500 }));
+    const res = await run(invite());
+    expect(resultOf(res).skipped.map((x) => x.reason)).toEqual(['review_due_date_unavailable']);
+    expect(createAndSendEmail).not.toHaveBeenCalled();
+  });
+
+  test('a concurrent first send that stored a date first wins (412 → re-read)', async () => {
+    updateRecord.mockRejectedValueOnce(Object.assign(new Error('precondition failed'), { status: 412 }));
+    const winner = { ...REQUEST, wmkf_reviewduedate: '2027-03-03' };
+    const original = getRecord.getMockImplementation();
+    getRecord.mockImplementation(async (entity, id, opts) => (
+      entity === 'akoya_requests' && opts?.select === 'akoya_requestid,wmkf_reviewduedate' ? winner : original(entity, id, opts)
+    ));
+    let res;
+    try { res = await run(invite()); } finally { getRecord.mockImplementation(original); }
+    // The draft was previewed against the calendar date, so the winning
+    // different date makes it stale rather than sending a mismatched email.
+    expect(resultOf(res).skipped.map((x) => x.reason)).toEqual(['draft_stale']);
+    expect(createAndSendEmail).not.toHaveBeenCalled();
+  });
+});
+
+describe('send-emails — previews rendered before the D48 deploy are refused', () => {
+  const { buildDraftFingerprintInputs, fingerprintDraft } = require('../../lib/services/review-manager/draft-fingerprint');
+  // The old invitation contract (fingerprint v2) let the composer put its own
+  // due date into the body; such a preview must be re-rendered, never sent.
+  const oldPreview = (templateType) => {
+    const inputs = buildDraftFingerprintInputs({
+      templateType,
+      suggestionId: SUG_1,
+      suggestion: SUGGESTIONS[SUG_1],
+      person: PERSON,
+      request: REQUEST,
+      coPINames: [],
+      cycle: {},
+      honorariumAmount: 250,
+    });
+    return { ...draft(), body: `${draft().body}\nReview due by August 5, 2099`, draftFingerprint: fingerprintDraft({ ...inputs, v: templateType === 'invitation' ? 2 : 1 }) };
+  };
+
+  test.each([false, true])('an old-contract invitation preview is skipped draft_stale (allowResend %s)', async (allowResend) => {
+    if (allowResend) SUGGESTIONS = { [SUG_1]: baseSuggestion({ wmkf_invited: true }) };
+    const res = await run({ drafts: [oldPreview('invitation')], templateType: 'invitation', allowResend });
+    expect(resultOf(res).skipped.map((x) => x.reason)).toEqual(['draft_stale']);
+    expect(createAndSendEmail).not.toHaveBeenCalled();
+  });
+});
+
 describe('send-emails — reviewer quota (wmkf_desiredcount) seed on first invite', () => {
-  const CONFIG = { respondOffsetDays: 7, reviewDueDate: '2026-08-01' };
+  const CONFIG = { respondOffsetDays: 7 };
   const invite = (over = {}) => ({ drafts: [draft()], templateType: 'invitation', campaignConfig: CONFIG, ...over });
 
-  test('unset wmkf_desiredcount + admin default 4 → writes wmkf_desiredcount 4 alongside the timing columns', async () => {
+  test('unset wmkf_desiredcount + admin default 4 → writes wmkf_desiredcount 4 alongside the offset', async () => {
     getReviewerCampaignTimeline.mockResolvedValueOnce({ timeline: { desiredCount: 4 } });
     await run(invite());
     expect(updateRecord).toHaveBeenCalledTimes(1);
     expect(updateRecord).toHaveBeenCalledWith('akoya_requests', 'req-1',
-      { wmkf_respondoffsetdays: 7, wmkf_reviewduedate: '2026-08-01', wmkf_desiredcount: 4 }, expect.any(Object));
+      { wmkf_respondoffsetdays: 7, wmkf_desiredcount: 4 }, expect.any(Object));
   });
 
-  test('already-set wmkf_desiredcount is never overwritten (sibling timing columns still seed)', async () => {
+  test('already-set wmkf_desiredcount is never overwritten (the offset still seeds)', async () => {
     getReviewerCampaignTimeline.mockResolvedValueOnce({ timeline: { desiredCount: 4 } });
     REQUEST = { ...REQUEST, wmkf_desiredcount: 2 };
     await run(invite());
     expect(updateRecord).toHaveBeenCalledTimes(1);
     expect(updateRecord).toHaveBeenCalledWith('akoya_requests', 'req-1',
-      { wmkf_respondoffsetdays: 7, wmkf_reviewduedate: '2026-08-01' }, expect.any(Object));
+      { wmkf_respondoffsetdays: 7 }, expect.any(Object));
   });
 
   test('request fetch $selects wmkf_desiredcount — the never-overwrite guard is blind without it', async () => {
-    // Guards the select at send-emails-service.js ~L213: if the column is dropped from
-    // the projection, reqRec.wmkf_desiredcount is undefined and the seed would clobber
-    // a quota the PD already set via the campaign settings modal.
     getReviewerCampaignTimeline.mockResolvedValueOnce({ timeline: { desiredCount: 4 } });
     await run(invite());
     const reqFetch = getRecord.mock.calls.find(([entity, , opts]) => entity === 'akoya_requests' && opts?.select);
     expect(reqFetch?.[2]?.select).toContain('wmkf_desiredcount');
   });
 
-  test('admin default null → no wmkf_desiredcount write (timing columns still seed)', async () => {
+  test('admin default null → no wmkf_desiredcount write (the offset still seeds)', async () => {
     getReviewerCampaignTimeline.mockResolvedValueOnce({ timeline: { desiredCount: null } });
     await run(invite());
     expect(updateRecord).toHaveBeenCalledTimes(1);
     expect(updateRecord).toHaveBeenCalledWith('akoya_requests', 'req-1',
-      { wmkf_respondoffsetdays: 7, wmkf_reviewduedate: '2026-08-01' }, expect.any(Object));
+      { wmkf_respondoffsetdays: 7 }, expect.any(Object));
   });
 
   test('timeline read throws → send still succeeds; quota seed is skipped, not the whole batch', async () => {
@@ -805,7 +899,7 @@ describe('send-emails — reviewer quota (wmkf_desiredcount) seed on first invit
     expect(resultOf(res).stats).toMatchObject({ sent: 1 });
     expect(updateRecord).toHaveBeenCalledTimes(1);
     expect(updateRecord).toHaveBeenCalledWith('akoya_requests', 'req-1',
-      { wmkf_respondoffsetdays: 7, wmkf_reviewduedate: '2026-08-01' }, expect.any(Object));
+      { wmkf_respondoffsetdays: 7 }, expect.any(Object));
   });
 });
 
@@ -1055,7 +1149,6 @@ describe('send-emails — mid-stream failure sequence (real send-time exception,
   });
 
   test('an ambiguous send-time exception for a non-invitation recipient fires email_unconfirmed', async () => {
-    CYCLE_CODE = null;
     CYCLE_CONFIG = null;
     SUGGESTIONS = { [SUG_1]: baseSuggestion({ wmkf_appreviewersuggestionid: SUG_1, wmkf_accepted: true }) };
     createAndSendEmail.mockImplementationOnce(async () => { throw new Error('transient Dynamics failure'); });

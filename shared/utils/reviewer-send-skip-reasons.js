@@ -40,6 +40,7 @@ export const SEND_SKIP_REASON = {
   invalid_secure_link: 'invalid_secure_link',
   draft_stale: 'draft_stale',
   draft_fingerprint_missing: 'draft_fingerprint_missing',
+  review_due_date_unavailable: 'review_due_date_unavailable',
 };
 
 export const SEND_SKIP_REASON_LABEL = {
@@ -63,4 +64,6 @@ export const SEND_SKIP_REASON_LABEL = {
     + 'Nothing was sent to this reviewer — reopen the preview to render a fresh draft.',
   draft_fingerprint_missing: 'This draft was rendered before the current version of the app. '
     + 'Nothing was sent — reopen the preview to render it again.',
+  review_due_date_unavailable: 'The review due date could not be confirmed from the cycle calendar and saved on the proposal. '
+    + 'Nothing was sent to this reviewer — check the Reviews Due Date on the cycle calendar and try again.',
 };

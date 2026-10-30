@@ -78,7 +78,7 @@ test('save POST: exact body bytes/headers; non-2xx unparseable body falls back t
   expect(sentOpts.headers).toEqual({ 'Content-Type': 'application/json' });
   expect(JSON.parse(sentOpts.body)).toEqual({
     requestId: REQUEST_ID,
-    config: { respondOffsetDays: 5, reviewDueDate: '2026-08-01', desiredCount: 4 },
+    config: { respondOffsetDays: 5, desiredCount: 4 },
   });
 });
 

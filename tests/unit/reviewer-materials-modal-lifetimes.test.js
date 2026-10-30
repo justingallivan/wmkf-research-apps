@@ -865,8 +865,8 @@ describe('send completion handshake (real parent onRefresh/selection)', () => {
 // nodes (no htmlFor/id), so getByLabelText can't find the due-date field;
 // reviewDueDateInput() walks from the label text to its sibling <input>
 // instead.
-function reviewDueDateInput() {
-  return screen.getByText('Review Due Date').nextElementSibling;
+function reviewDueDateDisplay() {
+  return screen.getByTestId('materials-review-due-date');
 }
 
 describe('settings identity (signature / review deadline)', () => {
@@ -890,7 +890,7 @@ describe('settings identity (signature / review deadline)', () => {
     expect(renderCalls().length).toBe(1);
   });
 
-  test('a deadline change after a completed preview invalidates back to compose and the next preview carries the new deadline', async () => {
+  test('a deadline change after a completed preview invalidates back to compose; the next preview sends no composer due date', async () => {
     renderEmailsBehavior = () => mockJson({ drafts: [draftFor(REVIEWER_A)] });
     const { rerender } = renderPanel({ proposal: PROPOSAL, reviewers: [REVIEWER_A] });
     openReleaseModal(1);
@@ -910,34 +910,26 @@ describe('settings identity (signature / review deadline)', () => {
     await waitFor(() => expect(renderCalls().length).toBe(2));
     const [, init] = renderCalls()[1];
     const payload = JSON.parse(init.body);
-    expect(payload.settings.reviewDueDate).toBe('2026-09-30');
+    // D48: the composer no longer sends a due date; the server reads the
+    // request's stored date. The modal shows that date read-only.
+    expect(payload.settings).not.toHaveProperty('reviewDueDate');
   });
 
-  test('a customized due date survives a deadline change and is preserved for the next preview', async () => {
-    renderEmailsBehavior = () => mockJson({ drafts: [draftFor(REVIEWER_A)] });
-    const { rerender } = renderPanel({ proposal: PROPOSAL, reviewers: [REVIEWER_A] });
-    openReleaseModal(1);
-
-    fireEvent.change(reviewDueDateInput(), { target: { value: '2026-10-15' } });
-
-    await preview(1);
-    await screen.findByRole('button', { name: /send 1 email/i });
-
-    const PROPOSAL_NEW_DEADLINE = { ...PROPOSAL, reviewDeadline: '2026-09-30' };
-    rerender(
-      <ReviewerManagePanel proposal={PROPOSAL_NEW_DEADLINE} reviewers={[REVIEWER_A]} settings={{ signature: 'PD' }} />,
-    );
-
-    // Back in compose (deadline changed), the customized value must survive
-    // — the follow rule only moves the field when it still held the PRIOR
-    // default (or was empty), and this field was explicitly customized.
-    expect(reviewDueDateInput().value).toBe('2026-10-15');
-
-    await preview(1);
-    await waitFor(() => expect(renderCalls().length).toBe(2));
-    const [, init] = renderCalls()[1];
-    const payload = JSON.parse(init.body);
-    expect(payload.settings.reviewDueDate).toBe('2026-10-15');
+  test('the review due date is read-only: no input, and a browser-saved date is ignored (D48)', async () => {
+    window.localStorage.setItem('review_manager_email_fields', JSON.stringify({ reviewDueDate: '2026-10-15', proposalSendDate: '2026-09-01' }));
+    try {
+      renderEmailsBehavior = () => mockJson({ drafts: [draftFor(REVIEWER_A)] });
+      renderPanel({ proposal: PROPOSAL, reviewers: [REVIEWER_A] });
+      openReleaseModal(1);
+      expect(screen.queryByLabelText('Review due date')).toBeNull();
+      // The request's stored date (PROPOSAL.reviewDeadline), not the browser's.
+      expect(reviewDueDateDisplay().textContent).toBe('July 22, 2026');
+      await preview(1);
+      await waitFor(() => expect(renderCalls().length).toBe(1));
+      expect(JSON.parse(renderCalls()[0][1].body).settings).not.toHaveProperty('reviewDueDate');
+    } finally {
+      window.localStorage.removeItem('review_manager_email_fields');
+    }
   });
 
   test('a fresh settings/proposal object with the SAME values does not invalidate a pending preview', async () => {
@@ -1026,10 +1018,10 @@ describe('settings identity (signature / review deadline)', () => {
     expect(screen.getByRole('button', { name: /preview 0 email/i })).toBeTruthy();
   });
 
-  test('a null proposal reviewDeadline (host reviewers-fetch failure) leaves the due date field controlled and empty, not "null"', async () => {
+  test('a null proposal reviewDeadline (host reviewers-fetch failure) shows "Not set", not "null"', async () => {
     const { rerender } = renderPanel({ proposal: PROPOSAL, reviewers: [REVIEWER_A], settings: { signature: 'PD' } });
     openReleaseModal(1);
-    expect(reviewDueDateInput().value).toBe(PROPOSAL.reviewDeadline);
+    expect(reviewDueDateDisplay().textContent).not.toBe('Not set');
 
     // ReviewersTab nulls `proposal` on a reviewers-fetch failure and its panel
     // proposal then carries reviewDeadline: null. The follow rule must
@@ -1037,8 +1029,7 @@ describe('settings identity (signature / review deadline)', () => {
     rerender(
       <ReviewerManagePanel proposal={{ ...PROPOSAL, reviewDeadline: null }} reviewers={[REVIEWER_A]} settings={{ signature: 'PD' }} />,
     );
-    expect(reviewDueDateInput().value).toBe('');
-    expect(reviewDueDateInput().value).not.toBe('null');
+    expect(reviewDueDateDisplay().textContent).toBe('Not set');
   });
 });
 

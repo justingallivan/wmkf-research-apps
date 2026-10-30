@@ -26,7 +26,7 @@ function baseArgs() {
       _akoya_applicantid_value_formatted: 'Org A',
       wmkf_organizationname: 'N/A',
       wmkf_reviewduedate: '2099-01-01',
-      wmkf_meetingdate: '2099-06-01',
+      _wmkf_grantcycle_value: '27272727-2727-4727-8727-272727272727',
     },
     coPINames: ['Dr. Alex Co', 'Dr. Bea Co'],
     cycle: { program_name: 'Program', review_deadline: '2099-02-01', custom_fields: { foo: 'bar' } },
@@ -36,7 +36,8 @@ function baseArgs() {
 
 // Golden hash for baseArgs() above — the canonical fixture every other case
 // in this file is diffed against.
-const BASE_HASH = 'e11cba6940f5fc3345d936ad4662029ab3b39c57beac9b5230837e714a26face';
+// Re-pinned 2026-10-29 for the D48 version bump (v1→v2 for non-invitations).
+const BASE_HASH = '6e6046357042f13def542f18bd63e91b70aec23a848a095f1a0bbc5ceeb731dd';
 
 describe('fingerprintDraft golden hashes', () => {
   test('base fixture hashes to the pinned golden value', () => {
@@ -49,10 +50,16 @@ describe('fingerprintDraft golden hashes', () => {
     expect(fingerprintDraft(buildDraftFingerprintInputs(args))).toBe(BASE_HASH);
   });
 
-  test('only invitation fingerprints use v2 and bind the normalized request Program Director', () => {
+  test('the request meeting date is not an input: the Grant Cycle link names the cycle (owner, 2026-10-29)', () => {
+    const args = baseArgs();
+    args.request.wmkf_meetingdate = '2099-12-01';
+    expect(fingerprintDraft(buildDraftFingerprintInputs(args))).toBe(BASE_HASH);
+  });
+
+  test('only invitation fingerprints use v3 and bind the normalized request Program Director', () => {
     const invite = { ...baseArgs(), templateType: 'invitation' };
     const first = buildDraftFingerprintInputs(invite);
-    expect(first.v).toBe(2);
+    expect(first.v).toBe(3);
     expect(first.request.programDirectorId).toBe('pd-a');
 
     invite.request._wmkf_programdirector_value = 'pd-b';
@@ -60,7 +67,7 @@ describe('fingerprintDraft golden hashes', () => {
       .not.toBe(fingerprintDraft(first));
 
     const materials = buildDraftFingerprintInputs(baseArgs());
-    expect(materials.v).toBe(1);
+    expect(materials.v).toBe(2);
     expect(materials.request).not.toHaveProperty('programDirectorId');
     expect(fingerprintDraft(materials)).toBe(BASE_HASH);
   });
@@ -89,7 +96,7 @@ describe('fingerprintDraft golden hashes', () => {
     args.person.wmkf_primaryaffiliation = null;
     args.person.wmkf_organizationname = null;
     const hash = fingerprintDraft(buildDraftFingerprintInputs(args));
-    expect(hash).toBe('3bc3e8d3af313165f023e93e11d76a2519b48749bd3a22a59aaccb506633a106');
+    expect(hash).toBe('8a38843ee62f43d2ba3246e4875857c292eb0a610879e49c1e47ca1c1351fcfe');
     expect(hash).not.toBe(BASE_HASH);
   });
 
@@ -98,23 +105,23 @@ describe('fingerprintDraft golden hashes', () => {
   // field proving each flips the hash") plus the co-PI *order* sensitivity
   // case (order is part of the body — the plan documents this explicitly).
   test.each([
-    ['templateType (invitation v2)', (a) => { a.templateType = 'invitation'; }, '4778746ef4ce8a7774ed9473b1b66747af2fc1460aacc707c2d27affd1d19e22'],
-    ['suggestionId (a different GUID)', (a) => { a.suggestionId = '33333333-3333-4333-8333-333333333333'; }, 'b454ccfd09b01964f0d1654447ecc17128d7bde3510b0467fd12568b32a5b654'],
-    ['candidate.name', (a) => { a.person.wmkf_name = 'Dr. Other Name'; }, '9bf6544f5e3cdba822a1c5ded5592244f827d32140c687b20e86e65e564d1838'],
-    ['candidate.affiliation', (a) => { a.person.wmkf_primaryaffiliation = 'Uni B'; }, '5a193e49a6b8874d5514e662df434e75202b74a4cca171183cddfd2a66261498'],
-    ['proposal.title', (a) => { a.request.akoya_title = 'Different title'; }, '49e0ea176bccee0a61cc43376a54e3d14154bb978b03ca5c061929828b87369c'],
-    ['proposal.abstract', (a) => { a.request.wmkf_abstract = 'Different abstract'; }, '9226edfae124b34c8a81f72919b16cb1b224c6158d571f0057cdcd19b0ffce0c'],
-    ['proposal.authors', (a) => { a.request._wmkf_projectleader_value_formatted = 'Dr. Other PI'; }, 'a37d5134462211770cf88ce3f149c5aee2521cc93fbc31d63343c9d1ec9efde5'],
-    ['proposal.institution', (a) => { a.request._akoya_applicantid_value_formatted = 'Org B'; }, '0dd4b7115f405a69e01e0fe3d69da9fe5cc720eb891f25634655fbd687be1337'],
-    ['proposal.coInvestigators (membership)', (a) => { a.coPINames = ['Dr. Alex Co']; }, '40ef06db702fc0a85f165a8eac1ccb85f916efac527d5b5f10d7f7c2762e6236'],
-    ['proposal.coInvestigators (order only, same membership)', (a) => { a.coPINames = ['Dr. Bea Co', 'Dr. Alex Co']; }, 'aa5fee701a734466660ddb005b61d872927d1d9ca26d4a80f468cb7acebbaad1'],
-    ['engagement.reviewDueDateOverride', (a) => { a.suggestion = { wmkf_reviewduedateoverride: '2099-03-01' }; }, '00b7072b317770b4bf441aa175a18ec2894d3e641d38e580bfa4d07d3daf5eeb'],
-    ['request.reviewDueDate', (a) => { a.request.wmkf_reviewduedate = '2099-04-01'; }, '656efb94c140e7b270d14795a2e8afe3d3eab1ab8ae5ea19c91e21845f74fbf5'],
-    ['request.meetingDate', (a) => { a.request.wmkf_meetingdate = '2099-07-01'; }, 'fe66186139c51ddba538c9c4f0831fbd6799fc4ab9b2b6ce86c4155d7e232c4f'],
-    ['cycle.programName', (a) => { a.cycle.program_name = 'Different Program'; }, '794e06ab683228f9091f1e0af172ae7fe1ab0336bbe0c7c03f729b3862e87c3b'],
-    ['cycle.reviewDeadline', (a) => { a.cycle.review_deadline = '2099-05-01'; }, '10a68ffe8a9f692e35f58267ed8dddf56ddfe05221ba08982ef9ab577a717986'],
-    ['cycle.customFields', (a) => { a.cycle.custom_fields = { foo: 'baz' }; }, '1020108177dc6940a24838006f365d83abe785851f74705e3f348ec4da091260'],
-    ['honorariumAmount', (a) => { a.honorariumAmount = 999; }, 'cd96769bee2189cccf0d2000878fb43eac67d75e11637a41f9ee356cf14f2dbc'],
+    ['templateType (invitation v3)', (a) => { a.templateType = 'invitation'; }, '9fcf671f349340e37809b698eace8549c82cf60985667d9ac37076c7bbda37d6'],
+    ['suggestionId (a different GUID)', (a) => { a.suggestionId = '33333333-3333-4333-8333-333333333333'; }, 'a51b4746a7b5264259a659137b62ace3b61c42b12fb522ee75190cc9d4c289b4'],
+    ['candidate.name', (a) => { a.person.wmkf_name = 'Dr. Other Name'; }, 'a4a0745081a9af4fa1484122778413f53e17705fec16f1b1d7d74cae58710c09'],
+    ['candidate.affiliation', (a) => { a.person.wmkf_primaryaffiliation = 'Uni B'; }, '893c76ecb8897499ad01752bf6e649628cbb55774d8756dd5b0d536c6d0a3335'],
+    ['proposal.title', (a) => { a.request.akoya_title = 'Different title'; }, '4aebfea6738a8e3350825cfddcc1ed035e32c999b1f8940c522ca45489cad7d8'],
+    ['proposal.abstract', (a) => { a.request.wmkf_abstract = 'Different abstract'; }, 'b9082e97b05f738e4a11b4a7f2e0d2b725cd8022d03e73bec700d484be5a846e'],
+    ['proposal.authors', (a) => { a.request._wmkf_projectleader_value_formatted = 'Dr. Other PI'; }, 'd88717c62811e436f1d921dd8ad621b4cc1eaa244b0c7fac961c6f6b421cb7f4'],
+    ['proposal.institution', (a) => { a.request._akoya_applicantid_value_formatted = 'Org B'; }, 'd08635e2f6c328dbc711ca2f6b0bc3fde2b0a202b8735abb307124a39c951050'],
+    ['proposal.coInvestigators (membership)', (a) => { a.coPINames = ['Dr. Alex Co']; }, '9c172d5e4f925bdf460d3c2984ce2dd614420984a014070be6a6ab22e7b4ba7c'],
+    ['proposal.coInvestigators (order only, same membership)', (a) => { a.coPINames = ['Dr. Bea Co', 'Dr. Alex Co']; }, '1e0d9b02d57b36e584827a8241a66ed8151655f206d88e67f238fad85d2495e5'],
+    ['engagement.reviewDueDateOverride', (a) => { a.suggestion = { wmkf_reviewduedateoverride: '2099-03-01' }; }, '63b3e6bd6539ce4199851705d41cbae4babd18067ec1d7edec21d54542b54133'],
+    ['request.reviewDueDate', (a) => { a.request.wmkf_reviewduedate = '2099-04-01'; }, '0425ce1b221465ca444bd9549fcec2da216448e21c53e983cb07c8fc64fc7970'],
+    ['request.grantCycleId', (a) => { a.request._wmkf_grantcycle_value = '26262626-2626-4626-8626-262626262626'; }, '2125c90d1c961c36c5ee92f6e2f87cd2674fb182f3c033d9f7614a24769a8097'],
+    ['cycle.programName', (a) => { a.cycle.program_name = 'Different Program'; }, 'b03cd77074dc506b994fd8d3799c57326794ab6cbdaf37752bfe5f719ded5306'],
+    ['cycle.reviewDeadline', (a) => { a.cycle.review_deadline = '2099-05-01'; }, '96b513107aaf83458fed9f7fcbf783d9627ba21cef55756103495d9609fe6c4f'],
+    ['cycle.customFields', (a) => { a.cycle.custom_fields = { foo: 'baz' }; }, 'a344166133db98c20863426a1a00a38cbf902a9291f442695c94d4bbd0ee11a8'],
+    ['honorariumAmount', (a) => { a.honorariumAmount = 999; }, '6f3744065a401a78788d2badf8489f847d0d0a10c12a3bed460f21cbcda618cb'],
   ])('changing %s alone flips the hash away from the base golden value', (label, mutate, goldenForMutation) => {
     const args = baseArgs();
     mutate(args);
@@ -196,4 +203,14 @@ describe('exclusions (Stage 6D accepted contract)', () => {
     const b = fingerprintDraft(buildDraftFingerprintInputs({ ...baseArgs(), honorariumAmount: null }));
     expect(a).toBe(b);
   });
+});
+
+test('D48: a fingerprint computed under the previous contract versions never matches the current one', () => {
+  // A preview rendered before deploy carried v2 (invitation) / v1 (others) and
+  // could embed a composer due date; send must refuse it as stale.
+  for (const templateType of ['invitation', 'materials']) {
+    const current = buildDraftFingerprintInputs({ ...baseArgs(), templateType });
+    const previous = { ...current, v: templateType === 'invitation' ? 2 : 1 };
+    expect(fingerprintDraft(previous)).not.toBe(fingerprintDraft(current));
+  }
 });

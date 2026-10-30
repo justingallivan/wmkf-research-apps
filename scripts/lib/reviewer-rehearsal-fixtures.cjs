@@ -183,10 +183,11 @@ function fillSyntheticTemplate(template, recipient, { origin, signature = 'Progr
     piInstitution: 'Example University',
     proposalDetails: 'Synthetic details for private rehearsal.',
     reviewDueDate: reviewDueDate || '',
+    reviewDue: reviewDueDate || '',
     signature,
     externalLink: link,
   };
-  const replace = (value) => String(value || '').replace(/\{\{(greeting|recipientName|proposalTitle|piName|piInstitution|proposalDetails|reviewDueDate|signature|externalLink)\}\}/g, (match, key) => values[key] ?? match);
+  const replace = (value) => String(value || '').replace(/\{\{(greeting|recipientName|proposalTitle|piName|piInstitution|proposalDetails|reviewDueDate|reviewDue|signature|externalLink)\}\}/g, (match, key) => values[key] ?? match);
   return { subject: replace(template?.subject), body: replace(template?.body) };
 }
 
@@ -558,7 +559,8 @@ function installMocks(context, { baseUrl, buildId = null, scenario = SCENARIOS.B
       return respond(route, 200, { requestId: REQUEST_ID, config: { ...state.campaignConfig } });
     }
     if (key === 'POST /api/review-manager/campaign-config') {
-      const writable = new Set(['respondOffsetDays', 'reviewDueDate', 'respondReminderEnabled', 'respondReminderLeadDays', 'reviewDueReminderEnabled', 'reviewDueReminderLeadDays', 'desiredCount']);
+      // D48: the review due date is read-only here, as on the real route.
+      const writable = new Set(['respondOffsetDays', 'respondReminderEnabled', 'respondReminderLeadDays', 'reviewDueReminderEnabled', 'reviewDueReminderLeadDays', 'desiredCount']);
       const config = body.config;
       if (body.requestId !== REQUEST_ID || !config || typeof config !== 'object' || Array.isArray(config) || Object.keys(config).length === 0) {
         return respond(route, 400, { error: 'config must contain at least one editable field' });
@@ -570,10 +572,6 @@ function installMocks(context, { baseUrl, buildId = null, scenario = SCENARIOS.B
             && (!Number.isInteger(value) || value < 0)) return respond(route, 400, { error: `${name} must be a non-negative integer` });
         if (['respondReminderEnabled', 'reviewDueReminderEnabled'].includes(name) && typeof value !== 'boolean') {
           return respond(route, 400, { error: `${name} must be a boolean` });
-        }
-        if (name === 'reviewDueDate' && value !== null && (typeof value !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(value)
-            || !Number.isFinite(Date.parse(value)) || new Date(`${value}T00:00:00Z`).toISOString().slice(0, 10) !== value)) {
-          return respond(route, 400, { error: 'reviewDueDate must be a YYYY-MM-DD date or null' });
         }
       }
       state.campaignConfig = { ...state.campaignConfig, ...(body.config || {}) };
@@ -664,15 +662,17 @@ function installMocks(context, { baseUrl, buildId = null, scenario = SCENARIOS.B
           || state.reviewerRows.find((row) => row.suggestionId === suggestionId)
       })).filter((item) => item.recipient);
       if (resolved.length === 0) return respond(route, 404, { error: 'No reviewers found for the provided IDs' });
-      const reviewDueDate = Object.prototype.hasOwnProperty.call(body.settings || {}, 'reviewDueDate')
-        ? body.settings.reviewDueDate
-        : state.campaignConfig.reviewDueDate;
+      // D48: the server renders the request's stored due date; a composer
+      // value is ignored. (The calendar fill for a request with no date is
+      // covered by unit and route tests, not this fixture.)
+      const reviewDueDate = state.campaignConfig.reviewDueDate;
       const drafts = resolved.map(({ suggestionId, recipient }) => {
         const rendered = fillSyntheticTemplate(selectedTemplate, recipient, { origin, signature, reviewDueDate });
         return {
         suggestionId, candidateName: recipient.name, candidateEmail: recipient.email,
         subject: rendered.subject,
         body: rendered.body,
+        reviewDueDate,
         emailConfidence: { level: 'high', reason: 'confirmed_identity' },
       };
       });

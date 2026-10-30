@@ -52,7 +52,7 @@ describe('CampaignConfigModal — reviewer quota (desiredCount)', () => {
       const body = JSON.parse(postCall[1].body);
       expect(body).toEqual({
         requestId: REQUEST_ID,
-        config: { respondOffsetDays: 5, reviewDueDate: '2026-08-01', desiredCount: 6 },
+        config: { respondOffsetDays: 5, desiredCount: 6 },
       });
     });
   });
@@ -75,14 +75,15 @@ describe('CampaignConfigModal — reviewer quota (desiredCount)', () => {
 });
 
 describe('CampaignConfigModal — admin default prefill', () => {
-  test('null request-level reviewDueDate and desiredCount prefill from admin defaults', async () => {
+  test('null request-level desiredCount prefills from admin defaults; an admin due date is never shown (D48)', async () => {
     mockGet(
       { respondOffsetDays: 5, reviewDueDate: null, desiredCount: null },
       { reviewDueDate: '2026-09-01', desiredCount: 8 },
     );
     render(<CampaignConfigModal requestId={REQUEST_ID} onClose={jest.fn()} />);
     await waitFor(() => expect(screen.getByDisplayValue('8')).toBeInTheDocument());
-    expect(screen.getByDisplayValue('2026-09-01')).toBeInTheDocument();
+    expect(screen.getByText('Not set yet')).toBeInTheDocument();
+    expect(screen.queryByText('September 1, 2026')).not.toBeInTheDocument();
   });
 
   test('non-null request-level values win over admin defaults', async () => {
@@ -92,9 +93,10 @@ describe('CampaignConfigModal — admin default prefill', () => {
     );
     render(<CampaignConfigModal requestId={REQUEST_ID} onClose={jest.fn()} />);
     await waitFor(() => expect(screen.getByDisplayValue('6')).toBeInTheDocument());
-    expect(screen.getByDisplayValue('2026-08-01')).toBeInTheDocument();
+    // The stored request date is shown read-only, with no date input to edit.
+    expect(screen.getByText('August 1, 2026')).toBeInTheDocument();
+    expect(screen.queryByDisplayValue('2026-08-01')).not.toBeInTheDocument();
     expect(screen.queryByDisplayValue('8')).not.toBeInTheDocument();
-    expect(screen.queryByDisplayValue('2026-09-01')).not.toBeInTheDocument();
   });
 
   test('admin defaults fetch failure leaves reviewDueDate and desiredCount empty', async () => {
@@ -108,8 +110,7 @@ describe('CampaignConfigModal — admin default prefill', () => {
     expect(screen.queryByDisplayValue('2026-09-01')).not.toBeInTheDocument();
     // Both the quota and review-due-date inputs should be blank.
     const quotaInput = screen.getByLabelText(/reviewer quota/i);
-    const dueDateInput = screen.getByLabelText(/review due date/i);
     expect(quotaInput).toHaveValue(null);
-    expect(dueDateInput.value).toBe('');
+    expect(screen.getByText('Not set yet')).toBeInTheDocument();
   });
 });

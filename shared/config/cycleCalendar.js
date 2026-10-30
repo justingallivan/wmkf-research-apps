@@ -25,6 +25,14 @@ export const CYCLE_CALENDAR_DATE_COLUMNS = Object.freeze([
 
 export const CYCLE_CALENDAR_BOARD_DATE = Object.freeze({ column: 'wmkf_meetingdate', label: 'Board Meeting Date' });
 
+/**
+ * What each app need reads from the calendar (owner, 2026-10-29; centralization
+ * plan §5). Add a meaning only together with the feature that reads it.
+ */
+export const CYCLE_CALENDAR_MEANINGS = Object.freeze({
+  reviewsDue: 'wmkf_researchreviewsduedate',
+});
+
 export const CYCLE_CALENDAR_EDITABLE = Object.freeze(new Set(CYCLE_CALENDAR_DATE_COLUMNS.map(({ column }) => column)));
 
 /** Modern cycle codes only; the table also holds historical March/September and four-digit-year codes. */

@@ -58,6 +58,13 @@ jest.mock('../../lib/dataverse/adapters/system-user', () => ({
   getByIdWithSelect: (...a) => getSystemUserById(...a),
 }));
 const updateRequestById = jest.fn(async () => {});
+// The calendar due-date step is stubbed to pass the request's stored date
+// through, so the fixtures' fingerprints are unchanged; send-emails-service.test.js
+// exercises the real D48 rules in its own describe block.
+const mockEnsureRequestReviewDueDate = jest.fn(async (req) => ({ ok: true, date: req?.wmkf_reviewduedate ?? null, source: 'request' }));
+jest.mock('../../lib/services/review-due-date-service', () => ({
+  ensureRequestReviewDueDate: (...a) => mockEnsureRequestReviewDueDate(...a),
+}));
 jest.mock('../../lib/dataverse/adapters/grant-request', () => ({
   getById: jest.fn(async () => REQUEST),
   updateById: (...a) => updateRequestById(...a),

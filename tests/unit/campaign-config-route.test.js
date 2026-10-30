@@ -30,9 +30,10 @@ import handler from '../../pages/api/review-manager/campaign-config';
 const GUID = '55555555-5555-5555-5555-555555555555';
 const READ_SELECT = [
   'akoya_requestid',
-  'wmkf_respondoffsetdays', 'wmkf_reviewduedate', 'wmkf_respondreminderenabled',
+  'wmkf_respondoffsetdays', 'wmkf_respondreminderenabled',
   'wmkf_respondreminderleaddays', 'wmkf_reviewduereminderenabled', 'wmkf_reviewduereminderleaddays',
   'wmkf_desiredcount',
+  'wmkf_reviewduedate',
   'wmkf_quotanotifiedat',
 ].join(',');
 

@@ -746,7 +746,8 @@ describe('F4 post-send bookkeeping races through the real adapter', () => {
 
   test('invitation stamping remains inline before email_sent and never enters post-loop bookkeeping', async () => {
     transport.seed(SET, pending({ wmkf_invited: false, wmkf_emailsentat: null }));
-    transport.patch(REQUESTS, REQUEST, { _wmkf_programdirector_value: OTHER });
+    // A stored review due date, so the D48 pre-dispatch step needs no calendar read or write.
+    transport.patch(REQUESTS, REQUEST, { _wmkf_programdirector_value: OTHER, wmkf_reviewduedate: '2099-07-22' });
     transport.seed('systemusers', { systemuserid: OTHER, fullname: 'Program Director',
       internalemailaddress: 'pd@example.org', isdisabled: false });
     const pause = transport.pauseNext((request) => request.method === 'PATCH' && request.body?.wmkf_invited === true);

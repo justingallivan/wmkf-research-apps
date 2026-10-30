@@ -22,8 +22,13 @@ const getRequestById = jest.fn();
 jest.mock('../../lib/dataverse/adapters/grant-request', () => ({
   getById: (...a) => getRequestById(...a),
 }));
+const findByShortCode = jest.fn(async () => null);
 jest.mock('../../lib/services/grant-cycles-dataverse', () => ({
-  findByShortCode: jest.fn(async () => null),
+  findByShortCode: (...a) => findByShortCode(...a),
+}));
+const getCycleDatesById = jest.fn(async () => null);
+jest.mock('../../lib/dataverse/adapters/operations-grant-cycle', () => ({
+  getCycleDatesById: (...a) => getCycleDatesById(...a),
 }));
 jest.mock('../../lib/services/proposal-participants', () => ({
   fetchCoPIs: jest.fn(async () => []),
@@ -38,6 +43,15 @@ const buildSendTimeExternalUrlPlaceholder = jest.fn(() => (
 jest.mock('../../lib/external/token-lifecycle', () => ({
   mintAndStore: (...a) => mintAndStore(...a),
   buildSendTimeExternalUrlPlaceholder: (...a) => buildSendTimeExternalUrlPlaceholder(...a),
+}));
+
+// The calendar due-date read is stubbed to pass the request's own date
+// through, so older tests keep their fixtures; the tests near the end of this
+// file exercise the real invitation rules.
+const resolveRequestReviewDueDate = jest.fn(async (req) => ({ ok: true, date: req?.wmkf_reviewduedate ?? null, source: 'request' }));
+jest.mock('../../lib/services/review-due-date-service', () => ({
+  ...jest.requireActual('../../lib/services/review-due-date-service'),
+  resolveRequestReviewDueDate: (...a) => resolveRequestReviewDueDate(...a),
 }));
 
 const SUG1 = '22222222-2222-4222-8222-222222222222';
@@ -76,7 +90,7 @@ const request = {
   akoya_requestnum: 'R-1001',
   akoya_title: 'Proposal T',
   wmkf_reviewduedate: null,
-  wmkf_meetingdate: null,
+  _wmkf_grantcycle_value: null,
 };
 
 const TEMPLATE = { subject: 'Review request', body: 'Hello reviewer' };
@@ -204,7 +218,7 @@ test('render never mints; a placeholder template receives the non-live send-time
   expect(out.stats.ready).toBe(2);
 });
 
-test('per-reviewer due-date override wins over composer and request dates', async () => {
+test('per-reviewer due-date override wins over the request date; a composer date is ignored', async () => {
   findById.mockResolvedValueOnce(suggestion({ wmkf_reviewduedateoverride: '2099-09-15' }));
   getReviewerByIdWithSelect.mockResolvedValueOnce(person());
   getRequestById.mockResolvedValueOnce({ ...request, wmkf_reviewduedate: '2099-09-01' });
@@ -501,4 +515,88 @@ test('a disabled assigned PD never supplies an invitation From address', async (
   getSender.mockResolvedValue({ isdisabled: true, internalemailaddress: 'disabled@example.org' });
   const out = await renderEmails({ suggestionIds: [SUG1], template: TEMPLATE, templateType: 'invitation', settings: {}, fromEmail: 'actor@example.org' });
   expect(out.drafts[0].from).toBeNull();
+});
+
+test('cycle config comes from the Grant Cycle row the request links to, never its meeting date', async () => {
+  const cycleId = '27272727-2727-4727-8727-272727272727';
+  findById.mockResolvedValueOnce(suggestion());
+  getReviewerByIdWithSelect.mockResolvedValueOnce(person());
+  // December 2026 would map to D26; the link names J27 and wins.
+  getRequestById.mockResolvedValueOnce({ ...request, _wmkf_grantcycle_value: cycleId, wmkf_meetingdate: '2026-12-10T00:00:00Z' });
+  getCycleDatesById.mockResolvedValueOnce({ wmkf_cyclecode: 'J27' });
+  findByShortCode.mockImplementation(async (code) => (code === 'J27' ? { shortCode: 'J27', programName: 'J27 Research' } : null));
+
+  const out = await renderEmails({ suggestionIds: [SUG1], template: { subject: 'S', body: 'Program: {{programName}}' }, templateType: 'followup', settings: {} });
+
+  expect(getCycleDatesById).toHaveBeenCalledWith(cycleId);
+  expect(findByShortCode).toHaveBeenCalledWith('J27');
+  expect(findByShortCode).not.toHaveBeenCalledWith('D26');
+  expect(out.drafts[0].body).toBe('Program: J27 Research');
+  findByShortCode.mockImplementation(async () => null);
+});
+
+describe('invitation review due date from the cycle calendar (D48)', () => {
+  test('before the first invitation, the calendar date fills {{reviewDue}} and {{reviewDueDate}} and is returned', async () => {
+    findById.mockResolvedValueOnce(suggestion());
+    getReviewerByIdWithSelect.mockResolvedValueOnce(person());
+    getRequestById.mockResolvedValueOnce({ ...request, wmkf_reviewduedate: null });
+    resolveRequestReviewDueDate.mockResolvedValueOnce({ ok: true, date: '2027-03-10', source: 'calendar' });
+
+    const out = await renderEmails({
+      suggestionIds: [SUG1],
+      template: { subject: 'Invitation', body: 'Due by {{reviewDue}} ({{reviewDueDate}}, {{reviewDeadline}})' },
+      settings: { reviewDueDate: '2099-01-01' },
+      templateType: 'invitation',
+      actingUserSystemId: null,
+    });
+
+    expect(out.drafts[0].body).toBe('Due by March 10, 2027 (March 10, 2027, March 10, 2027)');
+    expect(out.drafts[0].reviewDueDate).toBe('2027-03-10');
+    // The fingerprint is computed as if the date were already stored, which is
+    // what the send service sees after storing it.
+    expect(out.drafts[0].draftFingerprint).toBe(fingerprintDraft(buildDraftFingerprintInputs({
+      templateType: 'invitation',
+      suggestionId: SUG1,
+      suggestion: suggestion(),
+      person: person(),
+      request: { ...request, wmkf_reviewduedate: '2027-03-10' },
+      coPINames: [],
+      cycle: {},
+      honorariumAmount: 500,
+    })));
+  });
+
+  test('a blank calendar date refuses the invitation preview with a staff-facing reason', async () => {
+    findById.mockResolvedValueOnce(suggestion());
+    getReviewerByIdWithSelect.mockResolvedValueOnce(person());
+    getRequestById.mockResolvedValueOnce({ ...request, wmkf_reviewduedate: null });
+    resolveRequestReviewDueDate.mockResolvedValueOnce({ ok: false, reason: 'reviews_due_missing' });
+
+    await expect(renderEmails({
+      suggestionIds: [SUG1],
+      template: { subject: 'Invitation', body: 'Due by {{reviewDue}}' },
+      templateType: 'invitation',
+      actingUserSystemId: null,
+    })).rejects.toMatchObject({
+      name: 'RenderEmailsError',
+      message: 'Set the Reviews Due Date on the cycle calendar first.',
+    });
+  });
+
+  test('non-invitation renders never read the calendar', async () => {
+    findById.mockResolvedValueOnce(suggestion({ wmkf_accepted: true }));
+    getReviewerByIdWithSelect.mockResolvedValueOnce(person());
+    getRequestById.mockResolvedValueOnce({ ...request, wmkf_reviewduedate: '2027-03-10' });
+
+    const out = await renderEmails({
+      suggestionIds: [SUG1],
+      template: { subject: 'Materials', body: 'Due {{reviewDueDate}}' },
+      settings: { reviewDueDate: '2099-01-01' },
+      templateType: 'materials',
+      actingUserSystemId: null,
+    });
+
+    expect(resolveRequestReviewDueDate).not.toHaveBeenCalled();
+    expect(out.drafts[0].body).toBe('Due March 10, 2027');
+  });
 });

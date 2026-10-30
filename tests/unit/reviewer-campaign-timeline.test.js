@@ -43,7 +43,6 @@ describe('reviewer campaign timeline defaults', () => {
         cycleLabel: 'D26',
         respondOffsetDays: null,
         proposalReleaseDate: '2026-07-08',
-        reviewDueDate: '2026-07-22',
         desiredCount: 10,
       },
       isDefault: false,
@@ -78,8 +77,8 @@ describe('reviewer campaign timeline defaults', () => {
   });
 
   test('write validation rejects impossible dates and bad offsets', () => {
-    expect(() => normalizeTimeline({ reviewDueDate: '2026-02-31' }))
-      .toThrow('reviewDueDate must be a YYYY-MM-DD date or blank');
+    expect(() => normalizeTimeline({ proposalReleaseDate: '2026-02-31' }))
+      .toThrow('proposalReleaseDate must be a YYYY-MM-DD date or blank');
     expect(() => normalizeTimeline({ respondOffsetDays: -1 }))
       .toThrow('respondOffsetDays must be a non-negative integer or blank');
   });
@@ -95,14 +94,16 @@ describe('reviewer campaign timeline defaults', () => {
   });
 
   test('get reads the Dataverse setting key', async () => {
-    mockGetSetting.mockResolvedValueOnce(JSON.stringify({ reviewDueDate: '2026-07-22' }));
+    mockGetSetting.mockResolvedValueOnce(JSON.stringify({ proposalReleaseDate: '2026-07-22', reviewDueDate: '2026-07-29' }));
     const out = await getReviewerCampaignTimeline();
     expect(mockGetSetting).toHaveBeenCalledWith(REVIEWER_CAMPAIGN_TIMELINE_KEY);
     expect(out).toMatchObject({
       key: REVIEWER_CAMPAIGN_TIMELINE_KEY,
       isDefault: false,
-      timeline: { reviewDueDate: '2026-07-22' },
+      timeline: { proposalReleaseDate: '2026-07-22' },
     });
+    // D48: a legacy stored review due date is dropped, never served.
+    expect(out.timeline).not.toHaveProperty('reviewDueDate');
   });
 
   test('set writes normalized JSON with the updater profile id', async () => {
@@ -121,7 +122,6 @@ describe('reviewer campaign timeline defaults', () => {
         cycleLabel: 'D26',
         respondOffsetDays: 10,
         proposalReleaseDate: '',
-        reviewDueDate: '2026-07-22',
         desiredCount: 5,
       }),
       42,
