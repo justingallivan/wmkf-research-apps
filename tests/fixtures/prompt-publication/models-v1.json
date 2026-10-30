@@ -1,0 +1,127 @@
+[
+  {
+    "id": "tier-uppercase",
+    "op": "resolve",
+    "model": "SONNET",
+    "expected": {
+      "valid": true,
+      "resolvedId": "claude-sonnet-5",
+      "kind": "tier"
+    }
+  },
+  {
+    "id": "tier-kelvin",
+    "op": "resolve",
+    "model": "haiKu",
+    "expected": {
+      "valid": false,
+      "code": "unreviewed_model"
+    }
+  },
+  {
+    "id": "default-unregistered",
+    "op": "resolve",
+    "model": null,
+    "expected": {
+      "valid": false,
+      "code": "model_default_not_registered"
+    }
+  },
+  {
+    "id": "native-tier",
+    "op": "resolve",
+    "model": "sonnet",
+    "options": {
+      "native": true
+    },
+    "expected": {
+      "valid": false,
+      "code": "native_requires_concrete_model"
+    }
+  },
+  {
+    "id": "native-unsupported",
+    "op": "resolve",
+    "model": "claude-sonnet-4",
+    "options": {
+      "native": true
+    },
+    "expected": {
+      "valid": false,
+      "code": "native_unsupported"
+    }
+  },
+  {
+    "id": "explicit-dated-alias",
+    "op": "resolve",
+    "model": "claude-haiku-4-5-20251001",
+    "expected": {
+      "valid": true,
+      "resolvedId": "claude-haiku-4-5-20251001",
+      "kind": "concrete"
+    }
+  },
+  {
+    "id": "unknown-dated-alias",
+    "op": "resolve",
+    "model": "claude-haiku-4-5-20990101",
+    "expected": {
+      "valid": false,
+      "code": "unreviewed_model"
+    }
+  },
+  {
+    "id": "budget-ceiling",
+    "op": "budget",
+    "input": {
+      "model": "sonnet",
+      "maxTokens": 128000
+    },
+    "expected": {
+      "valid": true,
+      "maxTokens": 128000
+    }
+  },
+  {
+    "id": "budget-over",
+    "op": "budget",
+    "input": {
+      "model": "sonnet",
+      "maxTokens": 128001
+    },
+    "expected": {
+      "valid": false,
+      "code": "model_output_limit_exceeded"
+    }
+  },
+  {
+    "id": "budget-no-coercion",
+    "op": "budget",
+    "input": {
+      "model": "sonnet",
+      "maxTokens": "100"
+    },
+    "expected": {
+      "valid": false,
+      "code": "invalid_max_tokens"
+    }
+  },
+  {
+    "id": "policy-stale-hash",
+    "op": "match",
+    "input": {
+      "policyVersion": 1,
+      "policyArtifactHash": "old-artifact"
+    },
+    "expected": false
+  },
+  {
+    "id": "policy-version-no-coercion",
+    "op": "match",
+    "input": {
+      "policyVersion": "1",
+      "policyArtifactHash": "placeholder"
+    },
+    "expected": false
+  }
+]

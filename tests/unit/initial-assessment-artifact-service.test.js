@@ -1,3 +1,8 @@
+/** @jest-environment node */
+jest.mock('../../lib/services/prompt-store.js', () => ({ fetchCurrentPrompt: jest.fn() }));
+jest.mock('../../lib/services/prompt-model-resolution.js', () => ({ resolvePromptModel: jest.fn(async () => ({ model: 'claude-sonnet-5' })) }));
+import { fetchCurrentPrompt } from '../../lib/services/prompt-store.js';
+import { INITIAL_ASSESSMENT_PROMPT_VARIABLES, INITIAL_ASSESSMENT_PROMPT_OUTPUT_SCHEMA } from '../../shared/config/prompts/initial-assessment.js';
 /**
  * @jest-environment node
  */
@@ -215,6 +220,14 @@ let defaultRegistryUpdate;
 
 beforeEach(() => {
   jest.clearAllMocks();
+  fetchCurrentPrompt.mockResolvedValue({
+    wmkf_ai_promptname: 'initial-assessment.generate',
+    wmkf_ai_promptid: '66666666-6666-6666-6666-666666666666',
+    wmkf_promptversion: 2, wmkf_ai_model: 'sonnet',
+    wmkf_ai_systemprompt: '', wmkf_ai_promptbody: '{{proposal_text}}',
+    wmkf_ai_promptvariables: JSON.stringify(INITIAL_ASSESSMENT_PROMPT_VARIABLES),
+    wmkf_ai_promptoutputschema: JSON.stringify(INITIAL_ASSESSMENT_PROMPT_OUTPUT_SCHEMA),
+  });
   request._wmkf_currentinitialassessment_value = null;
   request._etag = 'W/"request-1"';
   currentRegistryRow = null;
@@ -740,7 +753,7 @@ it('threads the admin-tunable standing budget into the Executor call', async () 
   expect(getExecutorBudget.mock.invocationCallOrder[0]).toBeLessThan(executePrompt.mock.invocationCallOrder[0]);
 });
 
-it('fails closed with a specific code when the published prompt version differs from the producer contract', async () => {
+it('fails closed with a specific code when execution differs from the captured prompt version', async () => {
   const runId = '55555555-5555-5555-5555-555555555555';
   executePrompt.mockResolvedValueOnce({
     parsed: { summary: 's', significance_impact: 'i', research_plan: 'r', team_expertise: 't' },
@@ -2234,4 +2247,40 @@ it('derives staff-wide dashboard cycles from the artifact registry, not PD-scope
     ],
     defaultCycleCode: 'J27',
   });
+});
+
+
+it('captures a newly published version for identity and execution before any paid call', async () => {
+  const oldPrompt = await fetchCurrentPrompt();
+  const active = { ...oldPrompt, wmkf_promptversion: 3 };
+  fetchCurrentPrompt.mockClear().mockResolvedValueOnce(active);
+  executePrompt.mockImplementationOnce(async ({ promptSnapshot }) => {
+    // Simulate a concurrent republish after capture: execution must stay on v3.
+    active.wmkf_promptversion = 4;
+    return { parsed: generated, blocked: false, meta: {
+      promptName: promptSnapshot.wmkf_ai_promptname,
+      promptId: promptSnapshot.wmkf_ai_promptid,
+      promptVersion: promptSnapshot.wmkf_promptversion,
+    } };
+  });
+  await generateInitialAssessment({ requestId: REQUEST_ID });
+  expect(fetchCurrentPrompt).toHaveBeenCalledTimes(1);
+  expect(executePrompt).toHaveBeenCalledWith(expect.objectContaining({ promptSnapshot: expect.objectContaining({ wmkf_promptversion: 3, wmkf_ai_model: 'claude-sonnet-5' }) }));
+  expect(requestDocumentAdapter.create).toHaveBeenCalledWith(expect.objectContaining({ wmkf_promptversion: 3 }), expect.any(Object));
+});
+
+it('rejects incompatible prompt memos before creating a claim or making a paid call', async () => {
+  fetchCurrentPrompt.mockResolvedValueOnce({ wmkf_promptversion: 3, wmkf_ai_promptvariables: '{}' });
+  await expect(generateInitialAssessment({ requestId: REQUEST_ID })).rejects.toMatchObject({ httpStatus: 409 });
+  expect(requestDocumentAdapter.create).not.toHaveBeenCalled();
+  expect(executePrompt).not.toHaveBeenCalled();
+});
+
+it('prompt version changes generation identity while preserving the proposal fingerprint', () => {
+  const base = { requestId: REQUEST_ID, requestNumber: '123', title: 'Title', institution: 'University', cycleCode: 'J27', proposalFilename: 'proposal.pdf', proposalText: 'Text' };
+  const v2 = buildInitialAssessmentIdentity({ ...base, promptVersion: 2 });
+  const v3 = buildInitialAssessmentIdentity({ ...base, promptVersion: 3 });
+  expect(v3.generationKey).not.toBe(v2.generationKey);
+  expect(v3.inputFingerprint).toBe(v2.inputFingerprint);
+  expect(buildInitialAssessmentIdentity(base)).toEqual(v2);
 });

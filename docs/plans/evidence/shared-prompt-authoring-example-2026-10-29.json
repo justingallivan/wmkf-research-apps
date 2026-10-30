@@ -1,0 +1,104 @@
+{
+  "observedAt": "2026-10-30T02:20:21.134Z",
+  "promptObservedAt": "2026-10-30T02:15:45.110Z",
+  "target": "wmkf.crm.dynamics.com",
+  "readOnly": true,
+  "authorization": "Owner explicitly authorized read-only database discovery of a representative Connor prompt; no writes/model calls authorized.",
+  "linkedRun": {
+    "id": "402fdf35-9b45-f111-88b5-000d3a306d45",
+    "model": "claude-sonnet-4-5",
+    "version": null,
+    "promptId": null,
+    "runSource": 682090000,
+    "createdOn": "2026-05-01T20:20:39Z"
+  },
+  "prompt": {
+    "id": "ee2927ec-9741-f111-88b5-000d3a306b0f",
+    "name": "phase-i.checkin",
+    "version": 1,
+    "current": false,
+    "status": null,
+    "model": null,
+    "maxTokens": 4096,
+    "temperature": 0.3,
+    "system": {
+      "chars": 7937,
+      "sha256": "66d8b5c73333f9dda27944fe3fdc6f0af6f60c520747aea06b817dee5ce67a7d",
+      "placeholders": [
+        "{{output_schema}}"
+      ],
+      "expressionCount": 0,
+      "hasJsonInstruction": true,
+      "hasClericalChecks": false
+    },
+    "body": {
+      "chars": 158,
+      "sha256": "e1a4fb8a6605c5d1bdac82a674ff46d8faf7ac266539607b92caab3e434ef4c8",
+      "placeholders": [
+        "{{proposal_text}}",
+        "{{budget_pdf}}"
+      ],
+      "expressionCount": 0,
+      "hasJsonInstruction": false,
+      "hasClericalChecks": false
+    },
+    "variables": {
+      "present": false
+    },
+    "outputSchema": {
+      "present": true,
+      "validJson": false,
+      "chars": 2216
+    }
+  },
+  "promptAttribution": {
+    "id": "ee2927ec-9741-f111-88b5-000d3a306b0f",
+    "name": "phase-i.checkin",
+    "version": 1,
+    "current": false,
+    "status": null,
+    "model": null,
+    "createdByLinkedRunOwner": true,
+    "modifiedByLinkedRunOwner": true
+  },
+  "flowInventory": {
+    "totalVisible": 123,
+    "withClientdata": 123,
+    "parseableClientdata": 123,
+    "definitionFound": 123,
+    "matched": 21,
+    "specificTermMatches": 0
+  },
+  "specificFlowTerms": [
+    "wmkf_ai_",
+    "anthropic",
+    "claude",
+    "clerical_checks"
+  ],
+  "specificFlowMatches": [],
+  "candidateWMKFTables": [
+    {
+      "name": "wmkf_ai_prompt",
+      "entitySet": "wmkf_ai_prompts",
+      "label": "AI Prompt"
+    },
+    {
+      "name": "wmkf_ai_run",
+      "entitySet": "wmkf_ai_runs",
+      "label": "AI Run"
+    },
+    {
+      "name": "wmkf_appsystemsetting",
+      "entitySet": "wmkf_appsystemsettings",
+      "label": "App System Setting"
+    }
+  ],
+  "requests": [
+    "/api/data/v9.2/wmkf_ai_runs(402fdf35-9b45-f111-88b5-000d3a306d45)?$select=wmkf_ai_runid,wmkf_ai_model,wmkf_ai_promptversion,wmkf_ai_runsource,_wmkf_ai_prompt_value,_ownerid_value,createdon",
+    "/api/data/v9.2/wmkf_ai_prompts?$select=wmkf_ai_promptid,wmkf_ai_promptname,wmkf_promptversion,wmkf_ai_iscurrent,wmkf_ai_promptstatus,wmkf_ai_model,_createdby_value,_modifiedby_value,createdon,modifiedon",
+    "/api/data/v9.2/workflows?$select=workflowid,name,category,type,statecode,modifiedon,clientdata,_ownerid_value&$filter=category%20eq%205",
+    "/api/data/v9.2/EntityDefinitions?$select=LogicalName,EntitySetName,PrimaryNameAttribute,DisplayName&$filter=IsCustomEntity%20eq%20true",
+    "/api/data/v9.2/wmkf_ai_prompts(ee2927ec-9741-f111-88b5-000d3a306b0f)?$select=wmkf_ai_promptid,wmkf_ai_promptname,wmkf_promptversion,wmkf_ai_iscurrent,wmkf_ai_promptstatus,wmkf_ai_systemprompt,wmkf_ai_promptbody,wmkf_ai_promptvariables,wmkf_ai_promptoutputschema,wmkf_ai_model,wmkf_ai_maxtokens,wmkf_ai_temperature"
+  ],
+  "boundary": "Application-identity-visible workflow metadata in one Dataverse environment only; no full Power Automate tenant inventory or flow execution proof. Prompt text inspected in memory/console with bounded redaction, not retained here. No provider headers, connection values, credentials, raw definitions or applicant output retained."
+}

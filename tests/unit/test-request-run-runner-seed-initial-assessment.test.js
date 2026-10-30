@@ -1,3 +1,5 @@
+/** @jest-environment node */
+import { INITIAL_ASSESSMENT_PROMPT_VARIABLES, INITIAL_ASSESSMENT_PROMPT_OUTPUT_SCHEMA } from '../../shared/config/prompts/initial-assessment.js';
 /**
  * Test Request Factory slice 6b, Stage B, item D — the `seed_initial_assessment`
  * step body (lib/services/test-requests/run-runner.js `stepSeedInitialAssessment`).
@@ -56,7 +58,9 @@ const ENV_KEYS = [
 ];
 let savedEnv;
 
+let activePromptVersion = 2;
 beforeEach(() => {
+  activePromptVersion = 2;
   savedEnv = {};
   for (const key of ENV_KEYS) savedEnv[key] = process.env[key];
   delete process.env.VERCEL_ENV;
@@ -155,6 +159,13 @@ function fakeClient() {
   return {
     baseUrl: SANDBOX_BASE_URL,
     get: jest.fn(async (requestPath) => {
+      if (requestPath.startsWith('/wmkf_ai_prompts?')) return { ok: true, status: 200, body: { value: [{
+        wmkf_ai_promptname: 'initial-assessment.generate', wmkf_ai_promptid: '99999999-9999-4999-8999-999999999999',
+        wmkf_promptversion: activePromptVersion,
+        wmkf_ai_promptvariables: JSON.stringify(INITIAL_ASSESSMENT_PROMPT_VARIABLES),
+        wmkf_ai_promptoutputschema: JSON.stringify(INITIAL_ASSESSMENT_PROMPT_OUTPUT_SCHEMA),
+      }] } };
+
       if (requestPath.startsWith(`/akoya_requests(${REQUEST_ID})`)) return { ok: true, status: 200, body: DESTINATION_REQUEST };
       if (requestPath.includes('EntityDefinitions')) {
         if (requestPath.includes('ManyToOneRelationships')) return { ok: true, status: 200, body: { value: [{ ReferencedEntity: 'account' }] } };
@@ -308,6 +319,7 @@ function identityFor() {
     cycleCode: 'J26', // DESTINATION_REQUEST.wmkf_meetingdate is 2026-06-15 (June -> J26)
     proposalFilename: SYNTHETIC_PROPOSAL_FILENAME,
     proposalText: SYNTHETIC_PROPOSAL_TEXT,
+    promptVersion: activePromptVersion,
   });
 }
 
@@ -323,7 +335,8 @@ async function run(deps, initialResources = []) {
 }
 
 describe('stepSeedInitialAssessment — happy path', () => {
-  it('creates, renders, patches, uploads and commits the Ready lineage, then advances (never markReady)', async () => {
+  it.each([2, 3])('creates, renders, patches and commits at active prompt version %i without a provider call', async version => {
+    activePromptVersion = version;
     const { generationKey } = identityFor();
     const state = { row: null, request: { akoya_requestid: REQUEST_ID, _wmkf_currentinitialassessment_value: null, '@odata.etag': 'W/"request-1"' } };
 
@@ -408,6 +421,9 @@ describe('stepSeedInitialAssessment — happy path', () => {
       if (marker) markerOrder.push(marker);
       seenKeys = new Set(Object.keys(r.readback));
     }
+    expect(last.readback.promptVersion).toBe(version);
+    const create = fetch.mock.calls.find(([url, init]) => init?.method === 'POST' && String(url).includes('wmkf_requestdocuments'));
+    expect(JSON.parse(create[1].body).wmkf_promptversion).toBe(version);
     expect(markerOrder).toEqual(['registryCreateAttemptedAt', 'registryPatchAttemptedAt', 'graphFolderAttemptedAt', 'uploadAttemptedAt', 'changesetAttemptedAt']);
   });
 });
@@ -1090,4 +1106,14 @@ describe('stepSeedInitialAssessment — trusted DAL context is required (Stage C
     expect(result.outcome).toBe('needs_attention');
     expect(result.errorMessage).toContain('no trusted Dataverse context');
   });
+});
+
+
+it('refuses to resume synthetic generation after the captured prompt changes', async () => {
+  const oldKey = identityFor().generationKey;
+  activePromptVersion = 3;
+  const { result } = await run({}, [{ resourceId: 1, step: 'seed_initial_assessment', resourceKind: 'dataverse_request_document', readback: { generationKey: oldKey, promptVersion: 2 } }]);
+  expect(result.outcome).toBe('needs_attention');
+  expect(result.run.needsAttentionReason).toBe('ia_pointer_mismatch');
+  expect(fetch.mock.calls.some(([, init]) => ['POST', 'PATCH'].includes(init?.method))).toBe(false);
 });

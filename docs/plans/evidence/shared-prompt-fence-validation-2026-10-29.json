@@ -1,0 +1,43 @@
+{
+  "readOnlyOffline": true,
+  "source": "lib/services/execute-prompt.js",
+  "function": "resolveMaxTokensForCall",
+  "checks": [
+    {
+      "name": "check-then-write-budget-model-race",
+      "savedPairCompatible": false,
+      "providerOverrideAfterActualRuntimeGuard": 32000,
+      "conclusion": "Provider ceiling protected, saved-pair consistency NOT protected; override is capped, not always rejected."
+    },
+    {
+      "name": "actual-runtime-row-budget",
+      "conclusion": "Oversized stored row budget without override is rejected."
+    },
+    {
+      "name": "actual-runtime-strict-retry-floor",
+      "conclusion": "Capped retry at the prior-attempt floor is rejected."
+    },
+    {
+      "name": "mutable-policy-equality-read",
+      "checkedPolicy": "p1",
+      "policyAtLaterCommit": "p2",
+      "conclusion": "Read-time equality alone does not prove commit-time freshness."
+    },
+    {
+      "name": "modeled-budget-CAS-budget-first",
+      "secondCanCommit": false,
+      "savedPairCompatible": true,
+      "conclusion": "Original-revision CAS rejects the stale second commit; platform implementation still untested."
+    },
+    {
+      "name": "modeled-budget-CAS-model-first",
+      "secondCanCommit": false,
+      "savedPairCompatible": true,
+      "conclusion": "Original-revision CAS rejects the stale second commit; platform implementation still untested."
+    },
+    {
+      "name": "modeled-deployment-pinned-policy",
+      "conclusion": "Exact version+artifact hash pin rejects stale/unknown policy; safe replacement requires disabled writers and drained in-flight calls. No mutable policy activation is offered."
+    }
+  ]
+}

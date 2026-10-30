@@ -114,7 +114,7 @@ test('keeps layout targets separate from the 30,000-character sink ceiling', () 
   for (const [field, targetChars] of Object.entries(targets)) {
     expect(PRE_SITE_VISIT_CONTENT_POLICY.sections[field].targetChars).toBe(targetChars);
     expect(PROMPT_OUTPUT_SCHEMA.jsonSchema.properties.proposalCore.properties[field].maxLength)
-      .toBe(PRE_SITE_VISIT_CONTENT_POLICY.sinkMaxChars);
+      .toBeUndefined();
     expect(PROMPT_OUTPUT_SCHEMA.validationSchema.fields.proposalCore.fields[field].maxLength)
       .toBe(PRE_SITE_VISIT_CONTENT_POLICY.sinkMaxChars);
   }

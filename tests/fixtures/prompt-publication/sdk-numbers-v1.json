@@ -1,0 +1,62 @@
+{
+  "vectorVersion": 1,
+  "source": "lib/prompt-publication/json-contract.js",
+  "vectors": [
+    {
+      "json": "0.10000000000000001",
+      "preimage": "[\"n\",\"3fb999999999999a\"]"
+    },
+    {
+      "json": "0.84551240822557006",
+      "preimage": "[\"n\",\"3feb0e7009b61ce0\"]"
+    },
+    {
+      "json": "1.00000000000000011102230246251565404236316680908203125",
+      "preimage": "[\"n\",\"3ff0000000000000\"]"
+    },
+    {
+      "json": "0.500000000000000055511151231257827021181583404541015625",
+      "preimage": "[\"n\",\"3fe0000000000000\"]"
+    },
+    {
+      "json": "5e-324",
+      "preimage": "[\"n\",\"0000000000000001\"]"
+    },
+    {
+      "json": "1e-323",
+      "preimage": "[\"n\",\"0000000000000002\"]"
+    },
+    {
+      "json": "2.2250738585072014e-308",
+      "preimage": "[\"n\",\"0010000000000000\"]"
+    },
+    {
+      "json": "2.225073858507201e-308",
+      "preimage": "[\"n\",\"000fffffffffffff\"]"
+    },
+    {
+      "json": "1e-999",
+      "preimage": "[\"n\",\"0000000000000000\"]"
+    },
+    {
+      "json": "-1e-999",
+      "error": "unsupported_number"
+    },
+    {
+      "json": "9007199254740991",
+      "preimage": "[\"n\",\"433fffffffffffff\"]"
+    },
+    {
+      "json": "9007199254740991.5",
+      "error": "unsupported_number"
+    },
+    {
+      "json": "-0",
+      "error": "unsupported_number"
+    },
+    {
+      "json": "1e309",
+      "error": "unsupported_number"
+    }
+  ]
+}

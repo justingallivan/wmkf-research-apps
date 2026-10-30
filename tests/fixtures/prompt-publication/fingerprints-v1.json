@@ -1,0 +1,192 @@
+{
+  "canonicalizationVersion": 1,
+  "canonical": [
+    {
+      "input": null,
+      "preimage": "[\"null\"]"
+    },
+    {
+      "input": true,
+      "preimage": "[\"b\",true]"
+    },
+    {
+      "input": 0,
+      "preimage": "[\"n\",\"0000000000000000\"]"
+    },
+    {
+      "input": 0.7,
+      "preimage": "[\"n\",\"3fe6666666666666\"]"
+    },
+    {
+      "input": {
+        "b": 0.5,
+        "a": "é\r\n😀"
+      },
+      "preimage": "[\"o\",[[\"a\",[\"s\",\"\\u00e9\\u000d\\u000a\\ud83d\\ude00\"]],[\"b\",[\"n\",\"3fe0000000000000\"]]]]"
+    },
+    {
+      "input": {
+        "2": 2,
+        "10": 1
+      },
+      "preimage": "[\"o\",[[\"10\",[\"n\",\"3ff0000000000000\"]],[\"2\",[\"n\",\"4000000000000000\"]]]]"
+    },
+    {
+      "input": [
+        "a",
+        null
+      ],
+      "preimage": "[\"a\",[[\"s\",\"a\"],[\"null\"]]]"
+    }
+  ],
+  "snapshot": {
+    "input": {
+      "definitionFormatVersion": 1,
+      "definition": {
+        "name": "pa.summary",
+        "systemPrompt": "",
+        "body": "{{x}}\r\nRésumé 😀",
+        "variables": "{ \"variables\": [{\"name\":\"x\",\"source\":{\"kind\":\"override\"}}] }",
+        "outputSchema": "{\"parseMode\":\"raw\",\"outputs\":[{\"name\":\"answer\",\"target\":{\"kind\":\"none\"}}]}",
+        "model": "sonnet",
+        "maxTokens": 1000,
+        "temperature": 0.7
+      },
+      "catalog": {
+        "title": "Summary",
+        "description": "Summarizes text",
+        "groupKey": "reviews",
+        "sectionKey": null,
+        "usedBy": "Future PA flow",
+        "usageCategory": "declared"
+      }
+    },
+    "hash": "44f64fa7cd6d6841b111dbc0446069a4f52225fa2d33b76d5f4b92cca36f8392",
+    "preimage": "wmkf.prompt.snapshot.v1\n[\"o\",[[\"catalog\",[\"o\",[[\"description\",[\"s\",\"Summarizes text\"]],[\"groupKey\",[\"s\",\"reviews\"]],[\"sectionKey\",[\"null\"]],[\"title\",[\"s\",\"Summary\"]],[\"usageCategory\",[\"s\",\"declared\"]],[\"usedBy\",[\"s\",\"Future PA flow\"]]]]],[\"definition\",[\"o\",[[\"body\",[\"s\",\"{{x}}\\u000d\\u000aR\\u00e9sum\\u00e9 \\ud83d\\ude00\"]],[\"maxTokens\",[\"n\",\"408f400000000000\"]],[\"model\",[\"s\",\"sonnet\"]],[\"name\",[\"s\",\"pa.summary\"]],[\"outputSchema\",[\"s\",\"{\\\"parseMode\\\":\\\"raw\\\",\\\"outputs\\\":[{\\\"name\\\":\\\"answer\\\",\\\"target\\\":{\\\"kind\\\":\\\"none\\\"}}]}\"]],[\"systemPrompt\",[\"s\",\"\"]],[\"temperature\",[\"n\",\"3fe6666666666666\"]],[\"variables\",[\"s\",\"{ \\\"variables\\\": [{\\\"name\\\":\\\"x\\\",\\\"source\\\":{\\\"kind\\\":\\\"override\\\"}}] }\"]]]]],[\"definitionFormatVersion\",[\"n\",\"3ff0000000000000\"]]]]"
+  },
+  "requests": [
+    {
+      "input": {
+        "contractVersion": 1,
+        "definitionFormatVersion": 1,
+        "policyRevision": 5,
+        "policyArtifactHash": "50bcb07a28fd786b1000e6527bd1b06c34170e0088ede2bc35228ebba1f76c5b",
+        "requestId": "10000000-0000-4000-8000-000000000004",
+        "operation": "publish",
+        "promptKey": "pa.summary",
+        "draftId": "10000000-0000-4000-8000-000000000005",
+        "draftEtag": "W/\"12\"",
+        "expectedHeadRevision": "0",
+        "expectedCurrent": null,
+        "metadataBaseline": {
+          "schemaVersion": 1,
+          "current": null,
+          "catalog": {
+            "title": null,
+            "description": null,
+            "groupKey": null,
+            "sectionKey": null,
+            "usedBy": null,
+            "usageCategory": null
+          },
+          "headRevision": "0"
+        },
+        "snapshotHash": "44f64fa7cd6d6841b111dbc0446069a4f52225fa2d33b76d5f4b92cca36f8392"
+      },
+      "actor": {
+        "organizationId": "10000000-0000-4000-8000-000000000001",
+        "initiatingUserId": "10000000-0000-4000-8000-000000000002",
+        "effectiveUserId": "10000000-0000-4000-8000-000000000003"
+      },
+      "hash": "d47163fa8aa6e6943800272485700ef9699a003d4581a4b6a8a4e8640b09c494",
+      "preimage": "wmkf.prompt.publication.v1\n[\"o\",[[\"actor\",[\"o\",[[\"effectiveUserId\",[\"s\",\"10000000-0000-4000-8000-000000000003\"]],[\"initiatingUserId\",[\"s\",\"10000000-0000-4000-8000-000000000002\"]],[\"organizationId\",[\"s\",\"10000000-0000-4000-8000-000000000001\"]]]]],[\"canonicalKey\",[\"s\",\"pa.summary\"]],[\"fingerprintVersion\",[\"n\",\"3ff0000000000000\"]],[\"request\",[\"o\",[[\"contractVersion\",[\"n\",\"3ff0000000000000\"]],[\"definitionFormatVersion\",[\"n\",\"3ff0000000000000\"]],[\"draftEtag\",[\"s\",\"W/\\\"12\\\"\"]],[\"draftId\",[\"s\",\"10000000-0000-4000-8000-000000000005\"]],[\"expectedCurrent\",[\"null\"]],[\"expectedHeadRevision\",[\"s\",\"0\"]],[\"metadataBaseline\",[\"o\",[[\"catalog\",[\"o\",[[\"description\",[\"null\"]],[\"groupKey\",[\"null\"]],[\"sectionKey\",[\"null\"]],[\"title\",[\"null\"]],[\"usageCategory\",[\"null\"]],[\"usedBy\",[\"null\"]]]]],[\"current\",[\"null\"]],[\"headRevision\",[\"s\",\"0\"]],[\"schemaVersion\",[\"n\",\"3ff0000000000000\"]]]]],[\"operation\",[\"s\",\"publish\"]],[\"policyArtifactHash\",[\"s\",\"50bcb07a28fd786b1000e6527bd1b06c34170e0088ede2bc35228ebba1f76c5b\"]],[\"policyRevision\",[\"n\",\"4014000000000000\"]],[\"promptKey\",[\"s\",\"pa.summary\"]],[\"requestId\",[\"s\",\"10000000-0000-4000-8000-000000000004\"]],[\"snapshotHash\",[\"s\",\"44f64fa7cd6d6841b111dbc0446069a4f52225fa2d33b76d5f4b92cca36f8392\"]]]]]]]"
+    },
+    {
+      "input": {
+        "contractVersion": 1,
+        "definitionFormatVersion": 1,
+        "policyRevision": 5,
+        "policyArtifactHash": "50bcb07a28fd786b1000e6527bd1b06c34170e0088ede2bc35228ebba1f76c5b",
+        "requestId": "10000000-0000-4000-8000-000000000007",
+        "operation": "publish",
+        "promptKey": "pa.summary",
+        "draftId": "10000000-0000-4000-8000-000000000005",
+        "draftEtag": "W/\"12\"",
+        "expectedHeadRevision": "9007199254740993",
+        "expectedCurrent": {
+          "id": "10000000-0000-4000-8000-000000000008",
+          "version": 7,
+          "etag": "W/\"99\""
+        },
+        "metadataBaseline": {
+          "schemaVersion": 1,
+          "current": {
+            "id": "10000000-0000-4000-8000-000000000008",
+            "etag": "W/\"99\""
+          },
+          "headRevision": "9007199254740993",
+          "catalog": {
+            "title": "Prior",
+            "description": null,
+            "groupKey": null,
+            "sectionKey": null,
+            "usedBy": null,
+            "usageCategory": null
+          }
+        },
+        "snapshotHash": "44f64fa7cd6d6841b111dbc0446069a4f52225fa2d33b76d5f4b92cca36f8392"
+      },
+      "actor": {
+        "organizationId": "10000000-0000-4000-8000-000000000001",
+        "initiatingUserId": "10000000-0000-4000-8000-000000000002",
+        "effectiveUserId": "10000000-0000-4000-8000-000000000003"
+      },
+      "hash": "c56012f63edfca8e8639432c0f0ae53f89b8e1f69611eb19e99be375a28e9a8f",
+      "preimage": "wmkf.prompt.publication.v1\n[\"o\",[[\"actor\",[\"o\",[[\"effectiveUserId\",[\"s\",\"10000000-0000-4000-8000-000000000003\"]],[\"initiatingUserId\",[\"s\",\"10000000-0000-4000-8000-000000000002\"]],[\"organizationId\",[\"s\",\"10000000-0000-4000-8000-000000000001\"]]]]],[\"canonicalKey\",[\"s\",\"pa.summary\"]],[\"fingerprintVersion\",[\"n\",\"3ff0000000000000\"]],[\"request\",[\"o\",[[\"contractVersion\",[\"n\",\"3ff0000000000000\"]],[\"definitionFormatVersion\",[\"n\",\"3ff0000000000000\"]],[\"draftEtag\",[\"s\",\"W/\\\"12\\\"\"]],[\"draftId\",[\"s\",\"10000000-0000-4000-8000-000000000005\"]],[\"expectedCurrent\",[\"o\",[[\"etag\",[\"s\",\"W/\\\"99\\\"\"]],[\"id\",[\"s\",\"10000000-0000-4000-8000-000000000008\"]],[\"version\",[\"n\",\"401c000000000000\"]]]]],[\"expectedHeadRevision\",[\"s\",\"9007199254740993\"]],[\"metadataBaseline\",[\"o\",[[\"catalog\",[\"o\",[[\"description\",[\"null\"]],[\"groupKey\",[\"null\"]],[\"sectionKey\",[\"null\"]],[\"title\",[\"s\",\"Prior\"]],[\"usageCategory\",[\"null\"]],[\"usedBy\",[\"null\"]]]]],[\"current\",[\"o\",[[\"etag\",[\"s\",\"W/\\\"99\\\"\"]],[\"id\",[\"s\",\"10000000-0000-4000-8000-000000000008\"]]]]],[\"headRevision\",[\"s\",\"9007199254740993\"]],[\"schemaVersion\",[\"n\",\"3ff0000000000000\"]]]]],[\"operation\",[\"s\",\"publish\"]],[\"policyArtifactHash\",[\"s\",\"50bcb07a28fd786b1000e6527bd1b06c34170e0088ede2bc35228ebba1f76c5b\"]],[\"policyRevision\",[\"n\",\"4014000000000000\"]],[\"promptKey\",[\"s\",\"pa.summary\"]],[\"requestId\",[\"s\",\"10000000-0000-4000-8000-000000000007\"]],[\"snapshotHash\",[\"s\",\"44f64fa7cd6d6841b111dbc0446069a4f52225fa2d33b76d5f4b92cca36f8392\"]]]]]]]"
+    }
+  ],
+  "receipt": {
+    "receiptVersion": 1,
+    "fingerprintVersion": 1,
+    "request": {
+      "contractVersion": 1,
+      "definitionFormatVersion": 1,
+      "policyRevision": 5,
+      "policyArtifactHash": "50bcb07a28fd786b1000e6527bd1b06c34170e0088ede2bc35228ebba1f76c5b",
+      "requestId": "10000000-0000-4000-8000-000000000004",
+      "operation": "publish",
+      "promptKey": "pa.summary",
+      "draftId": "10000000-0000-4000-8000-000000000005",
+      "draftEtag": "W/\"12\"",
+      "expectedHeadRevision": "0",
+      "expectedCurrent": null,
+      "metadataBaseline": {
+        "schemaVersion": 1,
+        "current": null,
+        "catalog": {
+          "title": null,
+          "description": null,
+          "groupKey": null,
+          "sectionKey": null,
+          "usedBy": null,
+          "usageCategory": null
+        },
+        "headRevision": "0"
+      },
+      "snapshotHash": "44f64fa7cd6d6841b111dbc0446069a4f52225fa2d33b76d5f4b92cca36f8392"
+    },
+    "actor": {
+      "organizationId": "10000000-0000-4000-8000-000000000001",
+      "initiatingUserId": "10000000-0000-4000-8000-000000000002",
+      "effectiveUserId": "10000000-0000-4000-8000-000000000003"
+    },
+    "requestFingerprint": "d47163fa8aa6e6943800272485700ef9699a003d4581a4b6a8a4e8640b09c494",
+    "published": {
+      "id": "10000000-0000-4000-8000-000000000005",
+      "version": 1,
+      "etag": "W/\"15\""
+    },
+    "headRevision": "1",
+    "publishedAt": "2026-10-30T00:00:00.000Z"
+  }
+}

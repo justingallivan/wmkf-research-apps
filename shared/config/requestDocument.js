@@ -74,10 +74,8 @@ export const REQUEST_DOCUMENT_LIFECYCLE_LABEL = Object.freeze({
 export const INITIAL_ASSESSMENT_CONTRACT = Object.freeze({
   artifactType: REQUEST_DOCUMENT_ARTIFACT_TYPE.INITIAL_ASSESSMENT,
   promptName: 'initial-assessment.generate',
-  // Must equal the CURRENT published wmkf_ai_prompts version for this name.
-  // The producer refuses a mismatch after the paid call (artifact-service), so
-  // a prompt republish and this constant must land together. v2 (2026-08-19)
-  // changed only the model alias sonnet→opus; text/schema are unchanged.
+  // Legacy identity fallback for existing synthetic fixtures / offline callers.
+  // Runtime generation captures the active row and supplies its version explicitly.
   promptVersion: 2,
   templateId: 'initial-assessment-standard-business-brief',
   templateVersion: '1.0.0',

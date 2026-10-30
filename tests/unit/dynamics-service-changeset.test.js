@@ -396,3 +396,24 @@ describe('executeChangeset — input validation', () => {
     expect(fetch).not.toHaveBeenCalled();
   });
 });
+
+describe('PR553 opt-in strict changeset actor', () => {
+  test('403 never retries as service principal with noFallback true', ctx(async () => {
+    mockToken(); fetch.mockImplementationOnce(() => Promise.resolve(jsonErrorResponse(403, { error: { message: 'forbidden' } })));
+    await expect(DynamicsService.executeChangeset(TWO_UPSERTS, { actingUserSystemId: ACTING_GUID, noFallback: true })).rejects.toMatchObject({ status: 403 });
+    expect(fetch.mock.calls.filter(([url]) => String(url).includes('/$batch'))).toHaveLength(1);
+    expect(lastBatchCall()[1].headers.MSCRMCallerID).toBe(ACTING_GUID);
+  }));
+  test('default legacy behavior still retries a 403 without caller header', ctx(async () => {
+    mockToken(); fetch.mockImplementationOnce(() => Promise.resolve(jsonErrorResponse(403, { error: { message: 'forbidden' } })));
+    fetch.mockImplementationOnce(() => Promise.resolve(multipartResponse([{ contentId: 1, status: 204 }, { contentId: 2, status: 204 }])));
+    await DynamicsService.executeChangeset(TWO_UPSERTS, { actingUserSystemId: ACTING_GUID });
+    const batches = fetch.mock.calls.filter(([url]) => String(url).includes('/$batch'));
+    expect(batches).toHaveLength(2); expect(batches[0][1].headers.MSCRMCallerID).toBe(ACTING_GUID); expect(batches[1][1].headers.MSCRMCallerID).toBeUndefined();
+  }));
+  test('strict actor mode rejects before batch when impersonation is disabled', ctx(async () => {
+    process.env.DYNAMICS_IMPERSONATION_ENABLED = 'false'; mockToken();
+    await expect(DynamicsService.executeChangeset(TWO_UPSERTS, { actingUserSystemId: ACTING_GUID, noFallback: true })).rejects.toThrow('strict actor attribution unavailable');
+    expect(lastBatchCall()).toBeUndefined();
+  }));
+});

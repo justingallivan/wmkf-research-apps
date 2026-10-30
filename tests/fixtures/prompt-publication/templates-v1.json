@@ -1,0 +1,351 @@
+[
+  {
+    "id": "plain",
+    "input": {
+      "name": "pa.summary",
+      "body": "Summarize this.",
+      "systemPrompt": "",
+      "declaredVariables": []
+    },
+    "codes": []
+  },
+  {
+    "id": "combined",
+    "input": {
+      "name": "pa.summary",
+      "body": "{{b}}",
+      "systemPrompt": "{{ a }}",
+      "declaredVariables": [
+        "a",
+        "b"
+      ]
+    },
+    "codes": []
+  },
+  {
+    "id": "ascii-whitespace",
+    "input": {
+      "name": "pa.summary",
+      "body": "{{\t\r\n\f\u000ba_1 }}",
+      "systemPrompt": "",
+      "declaredVariables": [
+        "a_1"
+      ]
+    },
+    "codes": []
+  },
+  {
+    "id": "unicode-name",
+    "input": {
+      "name": "pa.summary",
+      "body": "{{café}}",
+      "systemPrompt": "",
+      "declaredVariables": []
+    },
+    "codes": [
+      "unsupported_placeholder"
+    ]
+  },
+  {
+    "id": "unicode-space",
+    "input": {
+      "name": "pa.summary",
+      "body": "{{ a}}",
+      "systemPrompt": "",
+      "declaredVariables": []
+    },
+    "codes": [
+      "unsupported_placeholder"
+    ]
+  },
+  {
+    "id": "dotted-name",
+    "input": {
+      "name": "pa.summary",
+      "body": "{{a.b}}",
+      "systemPrompt": "",
+      "declaredVariables": []
+    },
+    "codes": [
+      "unsupported_placeholder"
+    ]
+  },
+  {
+    "id": "astral-name",
+    "input": {
+      "name": "pa.summary",
+      "body": "{{😀}}",
+      "systemPrompt": "",
+      "declaredVariables": []
+    },
+    "codes": [
+      "unsupported_placeholder"
+    ]
+  },
+  {
+    "id": "undeclared",
+    "input": {
+      "name": "pa.summary",
+      "body": "{{a}}",
+      "systemPrompt": "",
+      "declaredVariables": []
+    },
+    "codes": [
+      "undeclared_variable"
+    ]
+  },
+  {
+    "id": "unused",
+    "input": {
+      "name": "pa.summary",
+      "body": "Hello",
+      "systemPrompt": "",
+      "declaredVariables": [
+        "a"
+      ]
+    },
+    "codes": [
+      "unused_variable"
+    ]
+  },
+  {
+    "id": "duplicate",
+    "input": {
+      "name": "pa.summary",
+      "body": "{{a}}",
+      "systemPrompt": "",
+      "declaredVariables": [
+        "a",
+        "a"
+      ]
+    },
+    "codes": [
+      "duplicate_variable"
+    ]
+  },
+  {
+    "id": "literal-braces",
+    "input": {
+      "name": "pa.summary",
+      "body": "JSON { key: value }",
+      "systemPrompt": "",
+      "declaredVariables": []
+    },
+    "codes": []
+  },
+  {
+    "id": "sentinel",
+    "input": {
+      "name": "pa.summary",
+      "body": "WMKF-UNTRUSTED-CONTENT",
+      "systemPrompt": "",
+      "declaredVariables": []
+    },
+    "codes": [
+      "a7_marker"
+    ]
+  },
+  {
+    "id": "system-preamble",
+    "input": {
+      "name": "pa.summary",
+      "body": "Hello",
+      "systemPrompt": "UNTRUSTED CONTENT RULES:",
+      "declaredVariables": []
+    },
+    "codes": [
+      "a7_marker"
+    ]
+  },
+  {
+    "id": "marker-shape",
+    "input": {
+      "name": "pa.summary",
+      "body": "[[ / WMKF-marker]]",
+      "systemPrompt": "",
+      "declaredVariables": []
+    },
+    "codes": [
+      "a7_marker"
+    ]
+  },
+  {
+    "id": "missing-system",
+    "input": {
+      "name": "pa.summary",
+      "body": "Hello",
+      "declaredVariables": []
+    },
+    "codes": [
+      "text_required"
+    ]
+  },
+  {
+    "id": "blank",
+    "input": {
+      "name": "pa.summary",
+      "body": " \t\r\n",
+      "systemPrompt": "",
+      "declaredVariables": []
+    },
+    "codes": [
+      "body_blank"
+    ]
+  },
+  {
+    "id": "reviewer-finder.analyze-contract",
+    "input": {
+      "name": "reviewer-finder.analyze",
+      "body": "{{proposal_text}}\nPRIMARY_RESEARCH_AREA:\nSECONDARY_AREAS:\nKEY_METHODOLOGIES:\nKEYWORDS:\nREVIEWER:\nNAME:\nINSTITUTION:\nEXPERTISE:\nSENIORITY:\nREASONING:\nSOURCE:",
+      "systemPrompt": "",
+      "declaredVariables": [
+        "proposal_text"
+      ]
+    },
+    "codes": []
+  },
+  {
+    "id": "reviewer-finder.analyze-missing-label",
+    "input": {
+      "name": "reviewer-finder.analyze",
+      "body": "{{proposal_text}}\nREMOVED\nSECONDARY_AREAS:\nKEY_METHODOLOGIES:\nKEYWORDS:\nREVIEWER:\nNAME:\nINSTITUTION:\nEXPERTISE:\nSENIORITY:\nREASONING:\nSOURCE:",
+      "systemPrompt": "",
+      "declaredVariables": [
+        "proposal_text"
+      ]
+    },
+    "codes": [
+      "required_label_missing"
+    ]
+  },
+  {
+    "id": "reviewer-finder.score-candidates-contract",
+    "input": {
+      "name": "reviewer-finder.score-candidates",
+      "body": "{{proposal_summary}} {{candidates_list}}\nRELEVANT:\nREASONING:\nSENIORITY:",
+      "systemPrompt": "",
+      "declaredVariables": [
+        "proposal_summary",
+        "candidates_list"
+      ]
+    },
+    "codes": []
+  },
+  {
+    "id": "reviewer-finder.score-candidates-missing-label",
+    "input": {
+      "name": "reviewer-finder.score-candidates",
+      "body": "{{proposal_summary}} {{candidates_list}}\nREMOVED\nREASONING:\nSENIORITY:",
+      "systemPrompt": "",
+      "declaredVariables": [
+        "proposal_summary",
+        "candidates_list"
+      ]
+    },
+    "codes": [
+      "required_label_missing"
+    ]
+  },
+  {
+    "id": "pre-site-combined-contract",
+    "input": {
+      "name": "pre-site-visit.proposal-core.generate",
+      "body": "{{proposal_text}}",
+      "systemPrompt": "{{request_context_json}}",
+      "declaredVariables": [
+        "request_context_json",
+        "proposal_text"
+      ]
+    },
+    "codes": []
+  },
+  {
+    "id": "padded-contract-name",
+    "input": {
+      "name": "reviewer-finder.analyze ",
+      "body": "Hello",
+      "systemPrompt": "",
+      "declaredVariables": []
+    },
+    "codes": [
+      "invalid_name"
+    ]
+  },
+  {
+    "id": "name-trailing-newline",
+    "input": {
+      "name": "pa.summary",
+      "body": "{{a}}",
+      "systemPrompt": "",
+      "declaredVariables": [
+        "a\n"
+      ]
+    },
+    "codes": [
+      "invalid_variable_name",
+      "undeclared_variable"
+    ]
+  },
+  {
+    "id": "declarations-array-required",
+    "input": {
+      "name": "pa.summary",
+      "body": "Hello",
+      "systemPrompt": "",
+      "declaredVariables": null
+    },
+    "codes": [
+      "array_required"
+    ]
+  },
+  {
+    "id": "body-text-required",
+    "input": {
+      "name": "pa.summary",
+      "body": null,
+      "systemPrompt": "",
+      "declaredVariables": []
+    },
+    "codes": [
+      "text_required"
+    ]
+  },
+  {
+    "id": "multi-error-order",
+    "input": {
+      "name": "pa.summary",
+      "body": " ",
+      "systemPrompt": null,
+      "declaredVariables": [
+        "a"
+      ]
+    },
+    "codes": [
+      "text_required",
+      "body_blank",
+      "unused_variable"
+    ]
+  },
+  {
+    "id": "marker-nbsp",
+    "input": {
+      "name": "pa.summary",
+      "body": "[[ / WMKF-test",
+      "systemPrompt": "",
+      "declaredVariables": []
+    },
+    "codes": [
+      "a7_marker"
+    ]
+  },
+  {
+    "id": "marker-kelvin-runtime-parity",
+    "input": {
+      "name": "pa.summary",
+      "body": "WMKF-UNTRUSTED-CONTENT",
+      "systemPrompt": "",
+      "declaredVariables": []
+    },
+    "codes": []
+  }
+]

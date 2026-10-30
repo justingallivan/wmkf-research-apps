@@ -143,11 +143,10 @@ const validationStringFields = Object.fromEntries(
   }]),
 );
 
+// Provider native grammar excludes length constraints; local validation above
+// retains the sink limit independently (Anthropic structured-output subset).
 const jsonStringProperties = Object.fromEntries(
-  Object.entries(validationStringFields).map(([key, value]) => [key, {
-    type: 'string',
-    maxLength: value.maxLength,
-  }]),
+  PROPOSAL_CORE_KEYS.map((key) => [key, { type: 'string' }]),
 );
 
 /**

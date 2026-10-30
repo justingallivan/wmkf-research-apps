@@ -1,3 +1,8 @@
+/** @jest-environment node */
+jest.mock('../../lib/services/prompt-store.js', () => ({ fetchCurrentPrompt: jest.fn() }));
+jest.mock('../../lib/services/prompt-model-resolution.js', () => ({ resolvePromptModel: jest.fn(async () => ({ model: 'claude-sonnet-5' })) }));
+import { fetchCurrentPrompt } from '../../lib/services/prompt-store.js';
+import { INITIAL_ASSESSMENT_PROMPT_VARIABLES, INITIAL_ASSESSMENT_PROMPT_OUTPUT_SCHEMA } from '../../shared/config/prompts/initial-assessment.js';
 /**
  * Test Request Factory slice 6b, Stage B, item C — synthetic Initial
  * Assessment fixture contract test.
@@ -92,6 +97,14 @@ const request = {
 
 beforeEach(() => {
   jest.clearAllMocks();
+  fetchCurrentPrompt.mockResolvedValue({
+    wmkf_ai_promptname: 'initial-assessment.generate',
+    wmkf_ai_promptid: '66666666-6666-6666-6666-666666666666',
+    wmkf_promptversion: 2, wmkf_ai_model: 'sonnet',
+    wmkf_ai_systemprompt: '', wmkf_ai_promptbody: '{{proposal_text}}',
+    wmkf_ai_promptvariables: JSON.stringify(INITIAL_ASSESSMENT_PROMPT_VARIABLES),
+    wmkf_ai_promptoutputschema: JSON.stringify(INITIAL_ASSESSMENT_PROMPT_OUTPUT_SCHEMA),
+  });
   grantRequestAdapter.getById.mockResolvedValue(request);
   getAiProposalNarrativeText.mockResolvedValue({
     filename: SYNTHETIC_PROPOSAL_FILENAME,
@@ -104,7 +117,9 @@ it('SYNTHETIC_GENERATED satisfies the required-outputs contract', () => {
   expect(() => validateGenerated(SYNTHETIC_GENERATED)).not.toThrow();
 });
 
-it('a Ready row at the fixture-derived generation key is reused with zero provider calls', async () => {
+it.each([2, 3])('a synthetic Ready row at active version %i is reused with zero provider calls', async version => {
+  const prompt = await fetchCurrentPrompt();
+  fetchCurrentPrompt.mockResolvedValueOnce({ ...prompt, wmkf_promptversion: version });
   const { generationKey } = buildInitialAssessmentIdentity({
     requestId: REQUEST_ID,
     requestNumber: request.akoya_requestnum,
@@ -113,6 +128,7 @@ it('a Ready row at the fixture-derived generation key is reused with zero provid
     cycleCode: 'D26',
     proposalFilename: SYNTHETIC_PROPOSAL_FILENAME,
     proposalText: SYNTHETIC_PROPOSAL_TEXT,
+    promptVersion: version,
   });
 
   const readyRow = {
