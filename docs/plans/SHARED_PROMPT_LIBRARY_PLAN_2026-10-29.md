@@ -38,6 +38,13 @@ preserve versions and explicitly activate a version. Connor must be able to
 publish from his coding tools without opening Admin. This supersedes the
 Admin-only first-release publication proposal.
 
+**[OWNER CONFIRMED, per Justin]** Connor agrees that the existing app prompt
+format stored in Dataverse can be adopted by his future Power Automate flows.
+Use that common definition format for both authoring routes in the first release.
+Locating the historical Power Automate flow is NOT a prerequisite for building,
+rehearsing or releasing the library and its two publication clients. Actual
+execution by a future flow remains that flow's integration acceptance task.
+
 This document is a plan, not an implementation or schema deployment. The retained
 schema probe was read-only. This revision checks Microsoft platform documentation
 and repository source and includes a subsequent owner-authorized read-only
@@ -144,7 +151,7 @@ qualification. Model/provider eligibility and runtime allowlists stay in code.
 using the current row ID + expected ETag; it may change only these six metadata
 columns, not content, current flag, status, model, or version. This allows
 classification of an unfamiliar backend prompt even if its content/model cannot
-be published under a supported validation profile. A new draft starts with the latest current catalog
+be published under the supported definition-format rules. A new draft starts with the latest current catalog
 metadata. Publication uses
 the explicitly reconciled staged metadata, never a silent merge of newer labels. Old
 published content is immutable;
@@ -316,7 +323,8 @@ workflow definitions stay in the existing settings table.
 - Receipt: required unique request UUID, operation/fingerprint contract version,
   exact prompt key, actor from execution context, draft ID, expected head/current
   and draft versions/ETags, effective-snapshot hash, prior/new IDs, assigned
-  published version, actual timestamp, and validation-policy revision. It stores
+  published version, actual timestamp, definition-format version and
+  validation-policy revision. It stores
   hashes/identifiers, not another content library. Metadata-only operations use
   the same append-only store with a distinct operation kind, before/after values
   for the six allowed catalog fields, and execution-context correlation ID; a
@@ -336,7 +344,8 @@ workflow definitions stay in the existing settings table.
    silent fallback to app attribution for privileged publication.
 2. Require request UUID, draft GUID/ETag, expected head revision, expected active
    GUID/version/ETag (explicit null for first publication), metadata baseline,
-   and exact staged snapshot fingerprint. Replay checks precede fresh-write
+   explicit supported definition-format version and exact staged snapshot
+   fingerprint. Replay checks precede fresh-write
    preconditions: same authorized actor/name/operation/hash returns the original
    receipt even if current has advanced; changed reuse is rejected. A client
    refresh of current state is returned separately from that historical receipt.
@@ -373,37 +382,61 @@ client-supplied bypass flag or message-name assertion alone. Environment admins
 who disable/bypass plug-ins are outside the supported concurrency guarantee;
 monitor and document that operational boundary.
 
-#### Validation and compatibility
+#### Shared publication rules and execution-format validation
 
-The Dataverse operation is authoritative for shared lifecycle and definition
-validation; Admin cannot be the only validator. Preserve current application
-model/output ceilings, input/output contracts and A7 checks. Do not make the
-plug-in call Vercel or a model to validate. The [technical preflight](SHARED_PROMPT_PUBLICATION_PREFLIGHT_2026-10-29.md)
-recommends a generated immutable policy artifact plus one Dataverse control-row
-fence shared by publication, policy activation and Executor-budget activation.
-That includes adapting the adjacent budget writer; otherwise new budget revisions
-could bypass publication validation. Final policy schema, JS/.NET golden vectors,
-size/freshness behavior and role/guard manifest remain engineering gates, not
-implemented behavior. Runtime guards remain necessary when policy/budgets change later.
+**[PLANNED]** Keep two separate validation responsibilities, both enforced by the
+Dataverse publication operation before its transaction commits:
 
-A subsequent owner-authorized read-only probe inspected Connor-attributed
-`phase-i.checkin`: native-budget-PDF intent, undeclared template placeholders
-and human-readable output instructions rather than valid JSON Schema. See the
-[technical preflight](SHARED_PROMPT_PUBLICATION_PREFLIGHT_2026-10-29.md) for exact
-evidence and its unverified flow binding. Do not equate shared storage with
-Executor compatibility or force-convert this format.
-Both routes can organize any prompt. Publication initially accepts only explicitly
-supported definition contracts; an external-flow profile preserving this example
-and its actual caller contract must be specified before enabling its publication.
-Unknown contracts stay visible/editable as drafts and cannot accidentally become
-active. Broadening providers or building a Power Automate Executor is separate
-scope, not a hidden prerequisite to library discovery.
+| Layer | Rules | Scope |
+|---|---|---|
+| Shared publication | Trusted actor/privilege/target; stable key; Draft and Published lifecycle; expected head/current/draft state; catalog baseline; immutable history; version allocation; atomic activation/receipt; payload-bound retry | Every publication, whether initiated by Admin or Connor's tools |
+| Definition format | Validate the full stored definition under the explicitly supported format version: system/body templates, declared variables, output definitions and applicable model/token/A7 requirements | The selected supported definition format, independent of which tool authored it or which app/flow will execute it |
+
+The first release supports the EXISTING APP PROMPT FORMAT through one versioned
+format validator, including its established supported variants. Connor's future
+PA prompts use that format too. Do not build a general profile framework or a
+legacy free-text/Power-Automate-only validator for this release. A supported
+format version is fixed by server policy and included in the request fingerprint
+and receipt; unknown versions fail closed for publication. Editorial group,
+Used by and category never select a weaker validator or grant execution rights.
+Neither client can bypass the format validator by calling only the lifecycle
+operation. Metadata-only saves remain independently allowed.
+
+Preserve existing application validation and caller-specific constraints. Do not
+require every output to use native structured generation: existing raw-text,
+JSON and supported advanced definitions retain their established semantics.
+Model eligibility, token ceilings and applicable template/A7 checks are format
+checks; app-specific budget registry membership is not a condition for a new
+PA-owned prompt to join the library. Apply registered budget checks where the
+existing budget contract applies, without accepting client budget overrides.
+An accepted stored definition is not a promise that every runtime implements
+every source/target/input feature. Runtime still enforces its own supported
+operations, data boundaries and output writes. PA triggers, document assembly,
+model invocation and result handling stay in the future flow.
+
+The [technical preflight](SHARED_PROMPT_PUBLICATION_PREFLIGHT_2026-10-29.md)
+recommends a generated immutable format-policy artifact plus one Dataverse
+control-row fence shared by publication, policy activation and Executor-budget
+activation. That includes adapting the adjacent budget writer; otherwise new
+budget revisions could bypass publication validation. JS/.NET parity fixtures,
+policy size/freshness and role/guard manifests remain engineering gates, not
+implemented behavior. No Vercel, Postgres or model call occurs inside the
+publication transaction. Runtime guards remain necessary after policy changes.
+
+**Legacy example boundary:** the read-only probe found Connor-attributed
+`phase-i.checkin` with native-budget-PDF intent, undeclared placeholders and
+human-readable output instructions rather than machine JSON Schema. Keep it
+visible and preserve its content/lifecycle; do not automatically convert or
+activate it. Supporting its old format unchanged or migrating its actual flow
+is deferred work. Its historical flow/model/input wiring remains UNKNOWN, but
+that uncertainty does not block the common-format library. No new native-PDF
+Executor capability or PA execution bridge is implied by format agreement.
 
 A content hash and request fingerprint are distinct. The versioned canonical
 request fingerprint binds operation, canonical/original key, authenticated actor,
 draft GUID/ETag, expected head revision and active GUID/version/ETag, metadata
-baseline, complete staged content/catalog hash, and submitted contract/policy
-revision. Store both hashes in the receipt. Reusing a UUID with ANY changed
+baseline, complete staged content/catalog hash, and submitted wire-contract,
+definition-format and policy versions. Store both hashes in the receipt. Reusing a UUID with ANY changed
 request field is rejected, even for identical text in a different draft. An
 unchanged successful replay returns its original receipt before checking newer
 state or policy; authorization is still required. A fresh request must use the
@@ -459,9 +492,11 @@ rewired or claimed verified by this plan.
    API through an adapter and guarded transport. Ship Connor's delegated-OAuth
    validate/save/publish/receipt command and import/export format in the SAME
    release. No Admin interaction is required for Connor. Use shared parity
-   fixtures and server validation; dry-run performs no model call. Preserve
+   fixtures and server validation for the agreed common app format; dry-run
+   performs no model call. Preserve
    legacy audit replay and dirty/stale client-state guards.
-5. **Rehearsal and deliberate promotion.** Prove direct backend draft → Admin
+5. **Rehearsal and deliberate promotion.** Use a new common-format test prompt,
+   not the legacy row or a running PA flow. Prove direct backend draft → Admin
    discovery → backend publication → Admin/app active read, and Admin publication
    → backend read. Test same-name/cross-name races, first publish, auth denial,
    raw/bulk bypasses, stale metadata/policy, rollback and lost responses. Then
@@ -486,6 +521,10 @@ until both routes again share the enforced publication operation. No destructive
 - Schema/metadata: missing columns during rollout, exact per-field limits,
   unknown group/section/category handling, allowed metadata-only mutations,
   migrations preserving body/model/variables/output/status/version/current flags.
+- Validation layers: each client must satisfy both shared publication rules and
+  the common app-format validator; group/category/caller labels cannot bypass
+  checks. Unknown format versions remain unpublishable, while legacy discovery
+  and metadata organization work without locating a flow.
 - Publish: two simultaneous first publications, active-version races across both
   clients, repeated/different UUID payloads, same-UUID concurrency, null draft
   versions, metadata-baseline conflicts, head/flag mismatch, policy changes,
@@ -527,8 +566,10 @@ human publication access is Connor and existing Admin superusers; actual mapped
 identities and Dataverse roles still need authorized verification. This is not
 a role grant or evidence Connor has deployed the operation.
 
-Before implementation: verify the discovered example's actual flow/input/model
-contract, and finalize validation-policy schema/parity and solution tooling. These are technical/release gates,
+Before implementation: finalize the common app format's versioned validation
+policy/schema, parity fixtures and solution tooling. Connor's format agreement
+is owner-confirmed; locating/adapting a historical flow is not a build or library
+release gate. Future-flow execution verification is a separate integration task. These are technical/release gates,
 not a requirement for Connor to accept Admin publication. No message to Connor,
 schema change, Production write or model test is authorized by this PR.
 

@@ -18,8 +18,9 @@ related:
 Dataverse prompt table, and Connor supplies the proposed group field. Admin and
 Connor's coding tools both preserve versions and explicitly activate a version.
 **Connor does not have to open Admin to publish.** The detailed technical contract
-below is proposed for implementation; it is not evidence of Connor's acceptance,
-a deployed operation, or permission for schema/data writes or model execution.
+below remains proposed for implementation. Justin confirms Connor's agreement
+to use the existing app prompt format in future PA flows; this does not imply
+a deployed operation or permission for schema/data writes or model execution.
 
 See the [implementation plan](SHARED_PROMPT_LIBRARY_PLAN_2026-10-29.md) and
 [feasibility assessment](SHARED_PROMPT_PUBLICATION_FEASIBILITY_2026-10-29.md).
@@ -31,6 +32,11 @@ changes and Dataverse-role changes must be coordinated explicitly.
 
 See the [technical preflight](SHARED_PROMPT_PUBLICATION_PREFLIGHT_2026-10-29.md)
 for source findings, client envelope, validation-policy fence and rehearsal cases.
+
+**[OWNER CONFIRMED, per Justin]** Both routes use the existing app prompt
+format stored in Dataverse; Connor will adopt it in future Power Automate flows.
+Locating the historical flow is not a prerequisite to building, rehearsing or
+releasing the shared library. Flow execution is separate integration work.
 
 ## One library, two authoring routes
 
@@ -92,7 +98,8 @@ release. Unattended service-principal tooling is separate scope.
 
 1. Save the draft and read active state. Submit request UUID, exact draft
    GUID/ETag, expected head revision and active GUID/version/ETag (explicit null
-   for first publication), reconciled metadata baseline and snapshot fingerprint.
+   for first publication), reconciled metadata baseline, explicit supported
+   definition-format version and snapshot fingerprint.
    A draft opened without a recorded catalog baseline must explicitly refresh
    and reconcile before publication. Persist draft baseline in the proposed dedicated `wmkf_ai_draftbaseline` JSON
    column (current GUID/ETag, catalog snapshot and head revision); it is cleared
@@ -106,14 +113,15 @@ release. Unattended service-principal tooling is separate scope.
    version is now active. Changed reuse is a conflict. Fresh active state is
    returned separately, never confused with the historical publication result.
 4. In one Dataverse transaction, conditionally advance the unique per-key head,
-   reread and validate state, assign the next version, conditionally promote the
+   reread and validate shared state AND the supported definition format, assign
+   the next version, conditionally promote the
    exact draft, clear the previous current flag, advance the head and create the
    unique append-only receipt. SDK row-version checks protect head, draft and
    prior row. Failure anywhere aborts everything. First publication uses the same
    head fence, not an unprotected absence check.
 5. A receipt contains request/fingerprint versions, policy revision, actor,
    key/draft/prior/new IDs, snapshot hash, expected-state evidence, assigned
-   version and actual publication time. Receipt creation commits with the
+   version, definition-format version and actual publication time. Receipt creation commits with the
    publication, not in a later Vercel/Postgres write.
 6. A timeout means unknown. Query/retry the same UUID; never blindly publish with
    a fresh UUID. A concurrent duplicate receipt aborts the losing transaction;
@@ -133,8 +141,8 @@ plan and must be proved in sandbox before rollout.
 A content hash and request fingerprint are distinct. The versioned canonical
 request fingerprint binds operation, canonical/original key, authenticated actor,
 draft GUID/ETag, expected head revision and active GUID/version/ETag, metadata
-baseline, complete staged content/catalog hash, and submitted contract/policy
-revision. Store both hashes in the receipt. Reusing a UUID with ANY changed
+baseline, complete staged content/catalog hash, and submitted wire-contract,
+definition-format and policy versions. Store both hashes in the receipt. Reusing a UUID with ANY changed
 request field is rejected, even for identical text in a different draft. An
 unchanged successful replay returns its original receipt before checking newer
 state or policy; authorization is still required. A fresh request must use the
@@ -157,45 +165,65 @@ must be inventoried and migrated or disabled under coordinated cutover; never
 silently leave a second publisher active. Existing historical Postgres receipts
 remain replayable, but new shared publication truth lives in Dataverse.
 
-## Validation and execution
+## Two validation layers, one publication operation
 
-A generated versioned policy artifact is the recommended shared rule source.
-Policy and Executor-budget activation must share a Dataverse conditional control
-row with fresh publications; snapshot checks without that fence are insufficient.
-Both JS/.NET use golden vectors; details and adjacent budget-writer scope are
-in the technical preflight. This design is not yet implemented or parity-tested.
+**Shared publication rules** apply to every prompt and both authoring routes:
+authorization/attribution, identity, lifecycle, expected state/catalog baseline,
+immutable history, increasing published versions, atomic active-version change,
+audit receipt and request-bound retries.
 
+**Execution-format validation** checks the complete stored definition under the
+server-supported format version: templates/placeholders, variable declarations,
+output definitions and applicable model, token, A7 and caller-contract rules.
+The first release uses the EXISTING APP PROMPT FORMAT, including its established
+supported variants, for Admin and Connor's tools. This is not an extra external-
+flow format or a generalized profile system. Group, category and Used by are
+editorial; they cannot select weaker validation or authorize execution.
 
-Publish validates the complete supported definition without making a model call.
-Dataverse must enforce the shared lifecycle/definition rules for both clients;
-Admin-only checks are insufficient. JS/.NET parity fixtures and the availability
-of current reviewed model/budget policy at the operation are implementation
-gates. Unknown definitions or policy revisions fail closed for publication while
-remaining discoverable and editable as drafts. Catalog organization remains
-available for unsupported definitions.
+Both layers run in the same Dataverse publication operation before commit.
+Separating their responsibilities does not create a lifecycle-only bypass.
+The supported format version is bound into the immutable request fingerprint
+and receipt; unknown versions cannot publish. Metadata-only organization does
+not need content publication. Existing raw-text/JSON/native-structured variants
+retain their actual requirements; not every prompt needs native JSON Schema.
+Registered application budgets remain checked for their governed prompt keys;
+a new PA prompt need not join the app's code-owned budget registry to publish.
 
-The read-only probe found Connor-attributed `phase-i.checkin`, with a native PDF
-input intent and human-readable output instructions instead of machine JSON
-Schema. Its actual Power Automate binding/model assembly is still unverified;
-see the technical preflight. Define an explicit external-flow validation profile
-before claiming this format can publish. Do not label it corrupt merely because
-it differs from Executor JSON. Do not require adopting the
-Vercel Executor merely to join the library. New general-purpose Admin authoring
-initially supports caller-supplied inputs and returned text/JSON (`target.kind:
-none`); preserve existing advanced definitions. New providers/direct field-write
-mapping controls and a Power Automate Executor are separate scope.
+A generated versioned format-policy artifact is the recommended common rule
+source. Policy and Executor-budget activation must share a Dataverse conditional
+control row with fresh publications. Both JS/.NET use golden vectors; details
+and adjacent budget-writer scope are in the technical preflight. This design is
+not yet implemented or parity-tested. Publication makes no model call.
 
-Apps and adapted flows resolve exact technical key + exactly one current
-Published row, not latest-modified or a Draft. Record exact prompt GUID/version
-per execution. Missing/duplicate/invalid active state is an error; preserve
-explicitly designed existing fallback semantics during reader migration.
-Existing resolver caches can temporarily serve the prior immutable version;
-audit TTL/invalidation and avoid promising immediate global activation.
+## Execution and legacy compatibility
 
-Power Automate keeps its triggers, input gathering and output handling. Publishing
-does not execute a prompt or create a flow. A breaking input/output change needs
-caller coordination, preferably a new technical key. Existing flows are not
-silently rewired. No flow definition or caller migration was tested by this plan.
+Publication accepts a stored definition; it does not execute it, create a flow,
+or prove any caller implements every declared input/source/target feature.
+Applications retain runtime capability, security and output-write guards. Future
+PA flows own triggers, input gathering, native-document assembly where applicable,
+model invocation and result handling while adopting the common stored format.
+A new PA Executor, native-PDF support in the app Executor or new provider support
+is not included or implied.
+
+The read-only `phase-i.checkin` example uses human-readable output instructions
+and native-PDF intent rather than the complete app definition. Preserve it as
+legacy content; no automatic rewriting, Draft conversion or activation. A custom
+legacy-format publisher or migration of that historical flow is deferred and
+NOT a library build/rehearsal/release prerequisite. Its actual caller remains
+unverified; this does not block new common-format prompt authoring/publication.
+
+New general-purpose authoring initially supports caller-supplied inputs and
+returned text/JSON (`target.kind: none`); preserve existing supported advanced
+Dataverse/SharePoint/field-output definitions. New direct-write mapping controls
+are separate scope. Apps and adapted flows resolve exact key + sole current
+Published row and record exact GUID/version per execution; never select a Draft
+or latest-modified row. Preserve intentional application fallbacks and disclose
+cache behavior. Do not claim existing PA flows were rewired or tested.
+
+A breaking input/output change needs caller coordination, preferably a new key.
+A future flow needs its own end-to-end execution acceptance before being called
+working, but the library and both publication clients can be built/rehearsed
+using a new common-format fixture with no PA flow or model execution.
 
 ## Pre-implementation gates
 
@@ -204,6 +232,8 @@ silently rewired. No flow definition or caller migration was tested by this plan
 - Prove transactional context, uniqueness, head/draft/current conditional writes,
   replay, lost-response recovery, raw/bulk write denial and trusted attribution.
 - Verify nullable draft versions and legacy state/head initialization.
-- Verify the discovered Connor example's actual flow/model/input assembly and
-  specify its external-flow profile plus shared validation-policy transport.
+- Finalize common app-format policy/schema and JS/.NET parity fixtures; preserve
+  existing application checks and scope budgets to governed prompt keys.
+- Use a new common-format test prompt for both-client publication rehearsal;
+  historical-flow discovery/migration and future PA execution are separate work.
 - Explicitly authorize Production provisioning/cutover separately.

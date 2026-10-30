@@ -21,7 +21,9 @@ related:
 Initial human publication access is Connor and existing Admin superusers.
 Admin and Connor's coding tools use the same publication operation; Connor
 need not open Admin. This establishes scope, not provisioned roles or Connor's
-confirmed deployment availability. No message was sent to him.
+confirmed deployment availability. No message was sent to him by this agent. Justin subsequently confirmed Connor
+agrees to adopt the existing app prompt format in future PA flows. Locating the
+historical flow is not a library build/rehearsal/release prerequisite.
 
 **[VERIFIED via source/test commands]** The initial offline pass used the PR branch at
 `1bda7149c`, current repository code and the retained Production metadata snapshot
@@ -144,7 +146,7 @@ canonical JSON request inside the typed Action parameters if necessary.
 
 | Input | Rule |
 |---|---|
-| `contractVersion`, `requestId` | Known schema + UUID; one immutable request, persisted by client until outcome known |
+| `contractVersion`, `definitionFormatVersion`, `requestId` | Known wire schema + supported common app-format version + UUID; one immutable request, persisted by client until outcome known |
 | `promptKey`, `draftId`, `draftEtag` | Canonical key and exact saved draft; no inline partial content PATCH on publication |
 | `expectedHeadRevision` | Required expected state, including explicit initialization revision |
 | `expectedCurrent` | Explicit null for first publication, otherwise exact ID/version/ETag |
@@ -166,7 +168,28 @@ changed, policy changed, corrupt lifecycle and request-ID reuse; these are
 proposed protocol codes, not current route behavior. Map SDK faults explicitly;
 do not assume a plug-in exception becomes an HTTP 409 automatically.
 
-## Shared validation policy: technical recommendation
+## Two validation responsibilities
+
+**[OWNER CONFIRMED, per Justin]** Future PA prompts adopt the same stored format
+as app prompts. The first release needs no separate legacy PA format/profile or
+generalized validator framework. Existing app-format variants keep their actual
+requirements. Locating the old flow is not a build, rehearsal or library-release
+gate; integration of a future PA execution path remains separately accepted.
+
+- **Shared publication:** actor/privilege/target, key/lifecycle/expected state,
+  metadata baseline, immutable version history, atomic activation and receipts,
+  retries. Identical for Admin and coding tools, independent of executor.
+- **Definition format:** full stored-template, variable/output, applicable A7,
+  model/token and caller-contract checks. The first supported version is the
+  existing app format. Apply governed budget checks to registered app prompts,
+  without making registration a condition for a new PA prompt to publish.
+
+Both responsibilities remain mandatory inside the same authoritative Action;
+no lifecycle-only commit or editorial category/group bypass. Explicit format
+version joins the request fingerprint and receipt. Unsupported legacy text
+stays visible; format acceptance does not prove runtime feature support.
+
+## Common-format validation policy: technical recommendation
 
 **[VERIFIED source dependency]** Current JS publication uses prompt template/
 reviewer parse checks, reviewed capability+pricing registries, tier resolution,
@@ -177,7 +200,7 @@ revision after checking models (`publishExecutorBudgetConfig`). That does not
 itself synchronize with a new Custom API publication transaction.
 
 **[PLANNED, not implemented]** Generate a versioned declarative validation-policy
-artifact from reviewed source: supported contract profiles, template/parse
+artifact from reviewed source: the supported common app-format version, template/parse
 requirements, A7 prohibitions, per-field limits, concrete reviewed model
 capabilities and an explicit tier→concrete mapping. Ship identical artifact/hash
 and golden fixtures for JS feedback and .NET authoritative checks. Store immutable
@@ -230,10 +253,11 @@ extractability of current JS checks. Required vectors include undeclared/missing
 variables in either template, reviewer labels, A7 markers, empty/oversize strings,
 unknown output/source/target kinds, native structured-output compatibility,
 unknown/retired model and token ceilings, budget changes, category/group values,
-and unsupported profile. Do not invent an external-flow profile from the AI-run output. The subsequent
-live example below supplies an authored definition, but its actual flow binding,
-model selection and PDF assembly remain unverified. Unknown profiles stay
-visible/editable drafts and cannot publish accidentally.
+and unsupported format version. No external-flow profile is needed to build
+this release: Connor will adopt the common app format. The historical example
+remains visible/preserved; its unknown flow/model/PDF assembly is only a blocker
+to claiming that particular legacy integration works. Use a new common-format
+fixture for two-client publication rehearsal without invoking a flow or model.
 
 ## Baseline verification and remaining acceptance
 
@@ -255,10 +279,10 @@ Connor owns confirming a supported build/deploy machine and solution packaging.
 | Head/receipt/policy fence and two-client envelope specified | Simultaneous first/later/case-variant publication; stale draft/metadata/policy |
 | Validation dependencies and parity corpus requirements enumerated | JS/.NET parity; all-or-none rollback after each write boundary |
 | Caller/seed/fallback migration requirements identified | Lost response + later publish + replay; direct/bulk/head/receipt bypass denial |
-| Connor authored example found below; actual flow wiring/tooling UNKNOWN | Representative backend draft → discover → backend publish → app read; inverse Admin route |
+| Common format agreed; tooling still UNKNOWN; historical flow not a prerequisite | New common-format backend draft → discover → backend publish → app read; inverse Admin route; no PA execution |
 
-A Connor-attributed authored example is now available below; its actual flow
-binding/model/input assembly still needs verification. Remaining engineering prerequisites: concrete policy schema/vectors,
+The historical example below is not a build dependency. Remaining engineering
+prerequisites are common app-format policy schema/vectors,
 solution/role manifest and build/deploy tooling. No further product choice about
 using Admin is outstanding. Do not treat this preflight as permission to install
 tools, provision schema, grant access or write Production.
@@ -329,15 +353,16 @@ does not rule out personal/non-solution flows, another environment, inaccessible
 child flows, dynamic configuration or a different connector. Do not describe it
 as a complete Power Automate inventory or proof that no flow exists.
 
-**Plan implication:** the representative-definition discovery prerequisite is
-PARTIALLY satisfied. Library discovery/editing must preserve this format. Before
-publication of this definition, define an explicit external-flow contract/profile
-that preserves human output instructions and native-document intent; do not
-force valid Executor JSON, fabricate declarations/model, flatten the PDF to text
-or relax Executor validation globally. Actual flow input assembly, model source,
-outputs/caller binding and active-version lookup remain UNKNOWN. Inspect them
-or confirm them with Connor before claiming end-to-end compatibility. This is
-not authorization to migrate/activate the legacy row.
+**Current plan implication, after Connor's format agreement reported by Justin:**
+the example demonstrates a legacy authoring shape, not a requirement to build an
+external-flow publisher. Preserve its content/lifecycle and do not activate,
+rewrite or migrate it automatically. New Admin and backend prompts use the
+agreed existing app format; shared publication rules and format checks are
+separate mandatory responsibilities in the same Action. Finding this example's
+Power Automate flow is NOT required to build, rehearse or release the library.
+Native-PDF assembly, model selection, output handling and active lookup for an
+actual future flow require that integration's own acceptance; no PA execution
+support or legacy compatibility is claimed by library publication alone.
 
 Probe validation: Node syntax check and ESLint passed; sanitized output reviewed.
 The summary probe was rerun to confirm the visible-definition boundary.
@@ -350,3 +375,25 @@ No full prompt/flow dump was committed. All 15 relevant documentation/secret che
 sequentially for the retained evidence and reconciled plan changes; syntax,
 ESLint and diff whitespace checks passed. No new runtime implementation was
 introduced or tested by this read-only discovery.
+
+
+## Current decision reconciliation: common format, independent flow integration
+
+**[OWNER CONFIRMED, per Justin]** Connor agrees to adopt the existing app prompt
+format in future PA flows. Shared publication rules and definition-format checks
+are separate responsibilities, both mandatory before publication commits. This
+supersedes the earlier proposal to require an external-flow profile or locate
+the legacy flow before implementation. The historical probe evidence is unchanged.
+
+Bounded Sweep Mode A searched all four shared-library proposal documents,
+related docs/wiki/memory and session pointers. The current plan/contract/gates
+are rewritten together; no legacy-format profile or historical-flow discovery
+is a library build/rehearsal/release requirement. Existing current-runtime
+contracts remain unchanged. Future PA execution still needs its own integration
+acceptance; a common stored format does not implement an executor or native PDF.
+Independent read-only review (`/root/review_pr553`) found no actionable issue
+in this bounded update. Definition format version is explicit in both clients'
+request, fingerprint and receipt; editorial metadata cannot select weaker rules.
+All 15 documentation gates and available paired self-tests passed sequentially,
+plus whitespace checks, for this docs-only revision. No new live probe or runtime
+test was run; retained evidence and current runtime behavior are unchanged.

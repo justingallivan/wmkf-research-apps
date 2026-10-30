@@ -31,7 +31,10 @@ versioned publication is accessible through both routes. At the initial assessme
 flows/definitions had not been inspected; the subsequent authorized discovery
 result is recorded in the linked technical preflight. The user-supplied historical AI-run
 form was accessible read-only but did not identify its source prompt/flow.
-Do not infer universal Executor compatibility or tenant deployment readiness.
+**[OWNER CONFIRMED, per Justin]** Connor agrees to adopt the existing stored app
+prompt format in future PA flows. Library construction/rehearsal/release does
+not depend on locating the historical flow. Do not infer universal runtime
+feature support or tenant deployment readiness from this agreement.
 
 ## Platform evidence
 
@@ -55,7 +58,7 @@ Do not infer universal Executor compatibility or tenant deployment readiness.
 | Keep existing readers compatible | `ai-prompt.js` `getCurrentForExecutor` filters current, rejects zero/duplicates, does not require Published status | Read complete adapter; raw `wmkf_ai_iscurrent`, `wmkf_promptversion`, status, seed and publication searches identify fan-out scope | Add status guard; enumerate every raw reader/writer, projection, cache and fallback before cutover | PARTIAL; migration required |
 | Assign version on publication | Existing numeric `wmkf_promptversion`; retained 2026-10-29 schema snapshot has existing rows/history and no alternate key | Existing read-only snapshot retained unchanged; no new live requiredness/write test | Save/reload a null-version draft, prove non-execution; if schema rejects it stop for additive adjustment | PARTIAL: platform supports API null; tenant NOT TESTED |
 | Support Connor's independent command | Authenticated Dataverse endpoint with trusted actor, same policy/receipt as Admin | Official OAuth/Custom API documentation, no credential or role mutation | Publish from actual delegated Connor identity, deny an unauthorized user and prove initiating/effective actor; no Admin cookie | PLANNED; NOT TESTED |
-| Keep complete shared validation | Existing publisher uses JS model/output/template/budget checks and `loadAvailableModels` | Read logical validation region and existing Executor contract | Corpus parity in JS/.NET, stale/unknown policy and budget update races; no Vercel call inside transaction | NEEDS DESIGN before build |
+| Separate shared lifecycle and common-format checks | Existing publisher uses JS model/output/template/budget checks and `loadAvailableModels` | Read logical validation region and existing Executor contract | Both clients must pass shared rules plus common app-format checks; parity in JS/.NET, unknown-format rejection and budget races; no flow-discovery dependency | NEEDS DESIGN before build |
 
 Repository inspection used CodeGraph first; it returned unrelated symbols for
 these named files, so exact source was read directly. `git ls-files '*.csproj'
@@ -68,7 +71,7 @@ evidence that the proposed plug-in/API exists or is deployable by this identity.
 ## Proposed end-to-end contract
 
 Admin / Connor command → OAuth + role enforcement → shared Action → conditional
-head revision → fresh draft/current/policy validation → version assignment and
+head revision → shared-state plus common-format validation → version assignment and
 conditional lifecycle writes → receipt in same transaction → both clients receive
 receipt/current separately → apps/flows resolve sole current Published row.
 
@@ -88,8 +91,8 @@ serialization, replay and authorization are separate obligations.
 A content hash and request fingerprint are distinct. The versioned canonical
 request fingerprint binds operation, canonical/original key, authenticated actor,
 draft GUID/ETag, expected head revision and active GUID/version/ETag, metadata
-baseline, complete staged content/catalog hash, and submitted contract/policy
-revision. Store both hashes in the receipt. Reusing a UUID with ANY changed
+baseline, complete staged content/catalog hash, and submitted wire-contract,
+definition-format and policy versions. Store both hashes in the receipt. Reusing a UUID with ANY changed
 request field is rejected, even for identical text in a different draft. An
 unchanged successful replay returns its original receipt before checking newer
 state or policy; authorization is still required. A fresh request must use the
@@ -130,9 +133,13 @@ active row, generated publication time or latest policy.
   impersonation fallback is acceptable.
 - Agree nullable draft storage, legacy head high-water initialization, explicit
   recovery for corrupt states, and seed/raw-writer cutover under writer freeze.
-- Verify the discovered example's actual flow/model/input contract and versioned shared validation-policy
-  distribution with JS/.NET parity, model/budget freshness and unknown-policy
-  rejection. Do not assume every Power Automate definition is an Executor prompt.
+- Finalize the agreed common app-format validation policy, JS/.NET parity,
+  model/budget freshness and unknown-format/policy rejection. Keep shared
+  lifecycle rules distinct from definition checks; both are mandatory in the
+  publication transaction. Flow-specific execution remains separately verified.
+- Use a new common-format fixture to rehearse both publication clients. Finding
+  the old Power Automate flow, publishing its legacy definition unchanged, or
+  migrating it is not a prerequisite for library construction or release.
 - Only then authorize Production additive provisioning/cutover separately. The
   first publication release must include both clients; no Admin-only substitution.
 
