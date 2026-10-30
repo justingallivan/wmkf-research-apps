@@ -258,8 +258,8 @@ a contract check and a Codex review; none merges without the owner.
    Board date (snapshot field and month-year format kept); candidate cards label
    prior requests by linked cycle (enrichment cache v5); past-grant recency uses
    fiscal year and decision date only; unread pass-through fields and unused
-   selects removed. Still open: the §8 count of past Research grants with
-   neither a fiscal year nor a decision date (those abort the writeup, as before).
+   selects removed. The §8 count (2026-10-30) found no program grant with
+   neither a fiscal year nor a decision date.
 4. **Invitation closing and honoraria:** stale-invite expiry and the
    honorarium write (§3.5).
 5. **Test Request Factory** (§3.7); no ledger migration (§7 Q7).
@@ -467,9 +467,13 @@ honorarium and Factory paths.
 
 ## 8. Data needed (owner-run, read-only)
 
-**Done 2026-10-29** for link coverage by year and program (§7 Q1). Still open:
-the count of past Research grants with neither a fiscal year nor a decision
-date (§7 Q3).
+**Done 2026-10-29** for link coverage by year and program (§7 Q1). **Done
+2026-10-30** for §7 Q3 (owner-authorized read-only Production read, counts
+only): of 2,945 program grants (`wmkf_typeforrollup eq 'Program' and
+akoya_grant gt 0`, the writeup's population; 955 Research), **0** have neither
+a decision date nor a parseable "Month YYYY" fiscal year; 22 lack a decision
+date and all 22 carry a parseable fiscal year. Step 3's recency rule makes no
+current grant undatable.
 
 Extend `scripts/probe-request-grant-cycle-lookup.cjs` to count requests by
 (link present, meeting date present, program, decision year), including before
