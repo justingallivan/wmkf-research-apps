@@ -24,7 +24,7 @@ Session 649 handoff, exact: `git show 4d63eb048:SESSION_PROMPT.md`.
    fingerprint binds the Grant Cycle id: the reviewer email path no longer reads
    the meeting date. Codex re-review approved; CI green. Docs marked deployed in
    `6428398d8`.
-2. **[PLANNED; branch `claude/meeting-date-retirement-plan`, not on main] Stop
+2. **[PLANNED; on main via merge `8dd123543`, 2026-10-29] Stop
    reading the request meeting date across the apps (work queue 6a).** Plan
    `docs/plans/MEETING_DATE_RETIREMENT_PLAN_2026-10-29.md`: whole-repo inventory
    (106 runtime files, 69 scripts, plus indirect readers traced through
@@ -54,7 +54,7 @@ Session 649 handoff, exact: `git show 4d63eb048:SESSION_PROMPT.md`.
    cycle code (field read from the wrong level, since `f766b004d`); the PD-scope
    candidate list reads fields the adapter does not return. Neither affects D26
    data; both are fixed in the cycle-lookup build step.
-6. **New docs on the plan branch:** `docs/CONNOR_DATA_CLEANUP_QUESTIONS.md`
+6. **New docs (now on main):** `docs/CONNOR_DATA_CLEANUP_QUESTIONS.md`
    (data cleanup asks for Connor, low priority); wiki Operating Note in
    `docs/agent-wiki/topics/dataverse-dynamics.md` on scripts that still derive
    cycles from the meeting date, pointer in `scripts/README.md`; corpus plan note.
@@ -122,11 +122,8 @@ Session 649 handoff, exact: `git show 4d63eb048:SESSION_PROMPT.md`.
   `grant-request.getById` (§5b item 2), Research filters, cycle lists and default
   cycle, and the two bugs in §6. Own branch, focused tests, contract check,
   Codex review; merge only with the owner's OK. Steps 3–6 follow in the plan's
-  order. Evidence: plan branch `claude/meeting-date-retirement-plan`, latest
-  `77307fba6`.
-- **Land the plan branch on main** (docs, the Connor list, the wiki note and the
-  sandbox setup script; no app runtime change): ask the owner whether to merge
-  it directly or through a pull request.
+  order. Evidence: `docs/plans/MEETING_DATE_RETIREMENT_PLAN_2026-10-29.md` on
+  main (plan branch `77307fba6` merged directly as `8dd123543`, owner-approved).
 - **Remaining reviewer build:** Board setup reads the calendar (D47) and
   materials on acceptance with new wording (D46/D48), before Feb 24. Plan:
   `docs/plans/REVIEWER_INVITATION_CALENDAR_BUILD_PLAN_2026-10-29.md`. Other
@@ -170,7 +167,7 @@ Session 649 handoff, exact: `git show 4d63eb048:SESSION_PROMPT.md`.
 |---|---|
 | Codex / shared prompt library | PR #553, `codex/shared-prompt-library-plan`, `1187caf17`; publication route decided, unmerged |
 | Codex / prompt UI organization | PRs #545/#546/#548/#549 merged; no further UI work requested |
-| Claude / J27 alignment and cycle dates | PRs #551 and #552 deployed; meeting-date retirement planned on `claude/meeting-date-retirement-plan` (sandbox setup done, next: cycle lookup and Research screens); reviewer plan `docs/plans/REVIEWER_INVITATION_CALENDAR_BUILD_PLAN_2026-10-29.md`; decisions through D48 in `docs/plans/J27_ALIGNMENT_LOG_2026-10-24.md`; older carried items at `git show 006b87565:SESSION_PROMPT.md` |
+| Claude / J27 alignment and cycle dates | PRs #551 and #552 deployed; meeting-date retirement plan on main (`8dd123543`; sandbox setup done, next: cycle lookup and Research screens); reviewer plan `docs/plans/REVIEWER_INVITATION_CALENDAR_BUILD_PLAN_2026-10-29.md`; decisions through D48 in `docs/plans/J27_ALIGNMENT_LOG_2026-10-24.md`; older carried items at `git show 006b87565:SESSION_PROMPT.md` |
 | Codex / Ranking | Prior handoff records PRs #536/#537 done; not reopened |
 | Codex / Board archival | Prior handoff records readiness done and rehearsal runtime on `codex/board-archive-rehearsal`; not revalidated here |
 | Claude / Research request corpus | Prior handoff records owner-gated; no new authorization |
