@@ -1,0 +1,225 @@
+/**
+ * @jest-environment node
+ *
+ * D46/D49: the acceptance job's release_materials step. Each test pins one
+ * row of the build plan's state table (REVIEWER_INVITATION_CALENDAR_BUILD_PLAN
+ * §3.3 build notes): reversible checks before the claim, nothing resumed
+ * blindly, markers only after a confirmed send.
+ */
+
+jest.mock('../../lib/services/operational-event-service', () => ({ __esModule: true, default: { markRecovered: jest.fn(async () => 1), markSuperseded: jest.fn(async () => 1) } }));
+jest.mock('../../lib/services/alert-service', () => ({ __esModule: true, default: { autoResolve: jest.fn(async () => 1) } }));
+jest.mock('../../lib/utils/reviewer-invite', () => {
+  const actual = jest.requireActual('../../lib/utils/reviewer-invite');
+  return { ...actual, emailConfidence: jest.fn(person => actual.emailConfidence(person)) };
+});
+import { processReviewerAcceptanceJob } from '../../lib/services/reviewer-acceptance-drain';
+import { emailConfidence } from '../../lib/utils/reviewer-invite';
+import { REVIEW_STATUS_MAP } from '../../shared/config/reviewerLifecycle';
+
+const SUGGESTION_ID = '11111111-1111-4111-8111-111111111111';
+const REQUEST_ID = '22222222-2222-4222-8222-222222222222';
+const REVIEWER_ID = '33333333-3333-4333-8333-333333333333';
+const CYCLE_ID = '55555555-5555-4555-8555-555555555555';
+const LEASE = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb';
+const PLACEHOLDER = 'send_time_token.pending_authority.not_live';
+
+const suggestionRow = (overrides = {}) => ({
+  wmkf_appreviewersuggestionid: SUGGESTION_ID, wmkf_accepted: true, wmkf_declined: false, wmkf_honorariumoptout: true,
+  wmkf_revieweremail: 'reviewer@example.org', _wmkf_potentialreviewer_value: REVIEWER_ID, _wmkf_request_value: REQUEST_ID,
+  wmkf_reviewstatus: REVIEW_STATUS_MAP.accepted, _etag: 'W/"10"', ...overrides,
+});
+const requestRow = () => ({ akoya_requestid: REQUEST_ID, akoya_requestnum: 'REQ-001', akoya_title: 'Proposal', wmkf_reviewduedate: '2027-03-10', _wmkf_grantcycle_value: CYCLE_ID });
+const reviewerRow = (overrides = {}) => ({ wmkf_potentialreviewersid: REVIEWER_ID, wmkf_name: 'Dr. Reviewer', wmkf_emailaddress: 'reviewer@example.org', ...overrides });
+
+function job({ steps = {}, isAcceptRepeat = false } = {}) {
+  const suggestion = suggestionRow();
+  return { id: 77, lease_token: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', status: 'queued', attempts: 0,
+    suggestion_id: SUGGESTION_ID, request_id: REQUEST_ID, created_at: new Date().toISOString(), accepted_at: '2026-07-01T10:00:00.000Z', steps,
+    payload: { schemaVersion: 1, acceptedAt: '2026-07-01T10:00:00.000Z', isAcceptRepeat, optedOut: true, body: {},
+      suggestion, acceptedSuggestion: suggestion, request: requestRow(), reviewer: reviewerRow() } };
+}
+
+function deps({ suggestion = suggestionRow(), person = reviewerRow(), release = null } = {}) {
+  const store = { release };
+  const materials = {
+    get: jest.fn(async () => store.release),
+    claim: jest.fn(async () => { store.release = { suggestion_id: SUGGESTION_ID, source: 'acceptance', job_id: '77', state: 'claimed', lease_token: LEASE }; return { claimed: true, release: store.release }; }),
+    markLinkMinted: jest.fn(async () => { store.release.state = 'link_minted'; return store.release; }),
+    markSent: jest.fn(async () => { store.release.state = 'sent'; return store.release; }),
+    record: jest.fn(async () => { store.release.state = 'recorded'; return store.release; }),
+    stopRelease: jest.fn(async (_id, _lease, state) => { store.release.state = state; return store.release; }),
+    recordDelivered: jest.fn(async () => {}),
+    preflight: jest.fn(async () => ({ ok: true, fileCount: 1 })),
+    cycleCodes: jest.fn(async () => ({ [CYCLE_ID]: 'J27' })),
+    cycleConfigs: jest.fn(async () => ({ J27: { review_template_blob_url: 'https://blob/template.docx', additional_attachments: [] } })),
+    attachments: jest.fn(async () => [{ filename: 'template.docx', contentType: 'application/octet-stream', content: Buffer.from('t') }]),
+    prepare: jest.fn(async ({ attachments }) => ({ ok: true, placeholderToken: PLACEHOLDER, message: { to: 'reviewer@example.org', subject: 'Materials', body: `<p>https://x/external/review/${PLACEHOLDER}</p>`, attachments } })),
+    assertBound: jest.fn(async () => {}),
+    mint: jest.fn(async () => ({ jwt: 'minted.jwt.value' })),
+    send: jest.fn(async () => ({ sent: true })),
+  };
+  const d = {
+    switchesReady: () => true,
+    suggestions: { getForAcceptanceDrain: jest.fn(async () => suggestion) },
+    potentialReviewers: { getById: jest.fn(async () => person) },
+    ensureHonorarium: jest.fn(), ensureAcceptedContact: jest.fn(async () => ({ contactId: 'c', addressCaptureError: null })),
+    captureOrcid: jest.fn(async () => ({ persisted: true })), captureIdentity: jest.fn(async () => ({})), syncNameTitle: jest.fn(async () => ({})),
+    alertEmail: jest.fn(async () => ({})), autoLinkAccount: jest.fn(async () => ({ skipped: 'no_exact_target' })),
+    alertAffiliation: jest.fn(async () => ({})), resolveAffiliation: jest.fn(async () => ({ resolvedCount: 0 })),
+    prepareAcceptanceEmail: jest.fn(async input => ({ ok: true, ...input })),
+    readConfirmationRequest: jest.fn(async () => requestRow()),
+    sendPreparedAcceptanceEmail: jest.fn(async () => ({ sent: true })),
+    notify: jest.fn(async () => ({ id: 1 })), quota: jest.fn(async () => ({ notified: false })),
+    deleteLateHonorarium: jest.fn(), cancelLateReleasedHonorarium: jest.fn(),
+    materials,
+    jobs: { mergeReviewerAcceptanceJobStep: jest.fn(async () => ({})), completeReviewerAcceptanceJob: jest.fn(async () => ({})),
+      cancelReviewerAcceptanceJob: jest.fn(async () => ({})), recordReviewerAcceptanceJobFailure: jest.fn(async () => ({ status: 'queued' })) },
+  };
+  return { d, materials, store };
+}
+const stepPatches = d => d.jobs.mergeReviewerAcceptanceJobStep.mock.calls.filter(c => c[2] === 'release_materials').map(c => c[3]);
+const finalOutcome = d => stepPatches(d).find(p => p.completedAt)?.outcome;
+const notified = (d, type) => d.notify.mock.calls.some(([opts]) => opts.type === type);
+const materialsSent = m => m.send.mock.calls.length;
+
+test('happy path: claim, mint, one email with the minted link and cycle attachments, then the markers', async () => {
+  const { d, materials, store } = deps();
+  expect((await processReviewerAcceptanceJob(job(), d)).status).toBe('completed');
+  expect(materials.claim).toHaveBeenCalledWith({ suggestionId: SUGGESTION_ID, requestId: REQUEST_ID, source: 'acceptance', jobId: 77 });
+  expect(materials.mint).toHaveBeenCalledWith(expect.objectContaining({ suggestionId: SUGGESTION_ID, ifMatch: 'W/"10"', expiresAt: expect.any(Date) }));
+  const sent = materials.send.mock.calls[0][0].message;
+  expect(sent.body).toContain('minted.jwt.value'); expect(sent.body).not.toContain(PLACEHOLDER);
+  expect(sent.attachments).toEqual([expect.objectContaining({ filename: 'template.docx' })]);
+  expect(materials.recordDelivered).toHaveBeenCalledWith(expect.objectContaining({ suggestionId: SUGGESTION_ID, templateType: 'materials' }));
+  expect(store.release.state).toBe('recorded');
+  expect(d.sendPreparedAcceptanceEmail).not.toHaveBeenCalled();
+  expect(finalOutcome(d)).toBe('released');
+  // Order: nothing irreversible before the claim; markers only after the send.
+  const order = ['claim', 'mint', 'markLinkMinted', 'send', 'markSent', 'recordDelivered', 'record'].map(k => materials[k].mock.invocationCallOrder[0]);
+  expect([...order].sort((a, b) => a - b)).toEqual(order);
+});
+
+test.each([
+  ['no proposal PDF', m => { m.preflight.mockResolvedValue({ ok: true, fileCount: 0 }); }, 'proposal_missing'],
+  ['template keys not seeded', m => { m.prepare.mockResolvedValue({ ok: false, reason: 'materials_defaults_blank' }); }, 'materials_template_missing'],
+  ['no Grant Cycle link', m => { m.cycleCodes.mockResolvedValue({}); }, 'grant_cycle_missing'],
+  ['test request refusal', m => { m.assertBound.mockRejectedValue(new Error('test')); }, 'test_request_email_denied'],
+])('%s: materials held, today’s confirmation sent, nothing claimed or minted', async (_name, arrange, reason) => {
+  const { d, materials } = deps(); arrange(materials);
+  expect((await processReviewerAcceptanceJob(job(), d)).status).toBe('completed');
+  expect(d.sendPreparedAcceptanceEmail).toHaveBeenCalledTimes(1);
+  expect(materials.claim).not.toHaveBeenCalled(); expect(materials.mint).not.toHaveBeenCalled(); expect(materialsSent(materials)).toBe(0);
+  expect(stepPatches(d).find(p => p.completedAt)).toMatchObject({ outcome: 'held', reason });
+  expect(notified(d, 'reviewer_materials_release_held')).toBe(true);
+});
+
+test('an address conflict holds materials before any claim', async () => {
+  emailConfidence.mockReturnValueOnce({ level: 'low', action: 'blocked', code: 'address_conflict_pending' });
+  const { d, materials } = deps();
+  await processReviewerAcceptanceJob(job(), d);
+  expect(stepPatches(d).find(p => p.completedAt)).toMatchObject({ outcome: 'held', reason: 'address_conflict_pending' });
+  expect(materials.claim).not.toHaveBeenCalled(); expect(d.sendPreparedAcceptanceEmail).toHaveBeenCalledTimes(1);
+});
+
+test.each([
+  ['revoked link', { wmkf_externaltokenrevoked: true }, 'held'],
+  ['materials already sent', { wmkf_materialssentat: '2027-02-25T00:00:00Z' }, 'skipped'],
+  ['status already under review', { wmkf_reviewstatus: REVIEW_STATUS_MAP.under_review }, 'skipped'],
+])('%s: no automatic release', async (_name, overrides, outcome) => {
+  const { d, materials } = deps({ suggestion: suggestionRow(overrides) });
+  await processReviewerAcceptanceJob(job(), d);
+  expect(finalOutcome(d)).toBe(outcome);
+  expect(materials.claim).not.toHaveBeenCalled(); expect(materialsSent(materials)).toBe(0);
+  expect(d.sendPreparedAcceptanceEmail).toHaveBeenCalledTimes(outcome === 'held' ? 1 : 0);
+});
+
+test('blank review status after acceptance is eligible (accept does not set a status)', async () => {
+  const { d, materials } = deps({ suggestion: suggestionRow({ wmkf_reviewstatus: null }) });
+  await processReviewerAcceptanceJob(job(), d);
+  expect(finalOutcome(d)).toBe('released'); expect(materialsSent(materials)).toBe(1);
+});
+
+test.each([
+  ['attachments', m => { m.attachments.mockRejectedValue(new Error('blob')); }],
+  ['proposal listing', m => { m.preflight.mockResolvedValue({ ok: false, reason: 'materials_unavailable' }); }],
+  ['cycle configuration', m => { m.cycleConfigs.mockRejectedValue(new Error('dv')); }],
+  ['claim store', m => { m.claim.mockRejectedValue(new Error('pg')); }],
+])('a transient %s failure retries with nothing claimed, minted or sent', async (_name, arrange) => {
+  const { d, materials } = deps(); arrange(materials);
+  await expect(processReviewerAcceptanceJob(job(), d)).rejects.toThrow('materials_release_preparation');
+  expect(materials.mint).not.toHaveBeenCalled(); expect(materialsSent(materials)).toBe(0);
+  expect(d.sendPreparedAcceptanceEmail).not.toHaveBeenCalled();
+});
+
+test('a release owned by manual release or another job is never sent again', async () => {
+  for (const release of [{ source: 'manual', job_id: null, state: 'claimed' }, { source: 'acceptance', job_id: '12', state: 'recorded' }]) {
+    const { d, materials } = deps({ release: { suggestion_id: SUGGESTION_ID, ...release } });
+    expect((await processReviewerAcceptanceJob(job(), d)).status).toBe('completed');
+    expect(finalOutcome(d)).toBe('skipped');
+    expect(materialsSent(materials)).toBe(0); expect(d.sendPreparedAcceptanceEmail).not.toHaveBeenCalled();
+  }
+});
+
+test('a lost claim race is skipped without minting', async () => {
+  const { d, materials } = deps();
+  materials.claim.mockResolvedValue({ claimed: false, release: { source: 'manual', state: 'claimed' } });
+  await processReviewerAcceptanceJob(job(), d);
+  expect(finalOutcome(d)).toBe('skipped'); expect(materials.mint).not.toHaveBeenCalled();
+});
+
+test('retry after a confirmed send only finishes the bookkeeping', async () => {
+  const { d, materials, store } = deps({ release: { suggestion_id: SUGGESTION_ID, source: 'acceptance', job_id: '77', state: 'sent', sent_at: new Date('2027-02-25T01:00:00Z') } });
+  await processReviewerAcceptanceJob(job(), d);
+  expect(materialsSent(materials)).toBe(0); expect(materials.mint).not.toHaveBeenCalled();
+  expect(materials.recordDelivered).toHaveBeenCalledWith(expect.objectContaining({ sentAt: '2027-02-25T01:00:00.000Z' }));
+  expect(store.release.state).toBe('recorded'); expect(finalOutcome(d)).toBe('released');
+});
+
+test('a failed bookkeeping write retries and the next attempt does not resend', async () => {
+  const { d, materials, store } = deps();
+  materials.recordDelivered.mockRejectedValueOnce(new Error('412'));
+  await expect(processReviewerAcceptanceJob(job(), d)).rejects.toThrow('materials_bookkeeping_unavailable');
+  expect(store.release.state).toBe('sent');
+  await processReviewerAcceptanceJob(job(), d);
+  expect(materialsSent(materials)).toBe(1); expect(store.release.state).toBe('recorded');
+});
+
+test.each(['claimed', 'link_minted', 'uncertain', 'failed'])('an unfinished %s release of this job is never resumed: staff alert', async state => {
+  const { d, materials } = deps({ release: { suggestion_id: SUGGESTION_ID, source: 'acceptance', job_id: '77', state } });
+  expect((await processReviewerAcceptanceJob(job(), d)).status).toBe('completed');
+  expect(materials.mint).not.toHaveBeenCalled(); expect(materialsSent(materials)).toBe(0);
+  expect(finalOutcome(d)).toBe('stopped'); expect(notified(d, 'reviewer_materials_release_stopped')).toBe(true);
+});
+
+test('mint failure stops the release as failed; nothing sent or marked', async () => {
+  const { d, materials, store } = deps(); materials.mint.mockRejectedValue(new Error('412'));
+  await processReviewerAcceptanceJob(job(), d);
+  expect(store.release.state).toBe('failed'); expect(materialsSent(materials)).toBe(0);
+  expect(materials.recordDelivered).not.toHaveBeenCalled(); expect(finalOutcome(d)).toBe('stopped');
+});
+
+test.each([
+  ['a definite failure', Object.assign(new Error('400'), { status: 400 }), 'failed'],
+  ['an unconfirmed send', new Error('socket hang up'), 'uncertain'],
+])('%s stops the release without markers', async (_name, error, expected) => {
+  const { d, materials, store } = deps(); materials.send.mockRejectedValue(error);
+  await processReviewerAcceptanceJob(job(), d);
+  expect(['failed', 'uncertain']).toContain(store.release.state);
+  if (expected === 'uncertain') expect(store.release.state).toBe('uncertain');
+  expect(materials.recordDelivered).not.toHaveBeenCalled(); expect(materials.record).not.toHaveBeenCalled();
+  expect(finalOutcome(d)).toBe('stopped');
+});
+
+test('a send whose receipt cannot be kept (row taken over) alerts and writes no markers', async () => {
+  const { d, materials } = deps(); materials.markSent.mockResolvedValue(null);
+  await processReviewerAcceptanceJob(job(), d);
+  expect(materialsSent(materials)).toBe(1); expect(materials.recordDelivered).not.toHaveBeenCalled();
+  expect(stepPatches(d).find(p => p.completedAt)).toMatchObject({ outcome: 'stopped', reason: 'sent_after_release_taken_over' });
+});
+
+test('a repeat acceptance runs no materials step', async () => {
+  const { d, materials } = deps();
+  await processReviewerAcceptanceJob(job({ isAcceptRepeat: true }), d);
+  expect(materials.get).not.toHaveBeenCalled(); expect(materialsSent(materials)).toBe(0);
+});

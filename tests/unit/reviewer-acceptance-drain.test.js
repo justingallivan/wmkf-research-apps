@@ -109,6 +109,12 @@ function deps(currentSuggestion = acceptedSuggestion()) {
     quota: jest.fn(async () => ({ notified: false })),
     deleteLateHonorarium: jest.fn(async () => ({ deleted: true })),
     cancelLateReleasedHonorarium: jest.fn(async () => ({ cancelled: true })),
+    // Default: no proposal PDF, so materials are held and today's confirmation
+    // runs unchanged. Materials-release tests override this.
+    materials: {
+      get: jest.fn(async () => null),
+      preflight: jest.fn(async () => ({ ok: true, fileCount: 0 })),
+    },
     jobs: {
       mergeReviewerAcceptanceJobStep: jest.fn(async () => ({})),
       completeReviewerAcceptanceJob: jest.fn(async () => ({})),
@@ -849,7 +855,8 @@ describe('acceptance confirmation preparation and recovery', () => {
     await expect(processReviewerAcceptanceJob(job(), d)).rejects.toThrow('followup_retry_required'); expect(d.prepareAcceptanceEmail).not.toHaveBeenCalled(); expect(d.sendPreparedAcceptanceEmail).not.toHaveBeenCalled();
   });
   it.each(['wmkf_revieweremail', 'wmkf_reviewduedateoverride', '_wmkf_request_value', 'wmkf_responsereceivedat'])('preclaim concurrent %s change retries without consuming claim', async field => {
-    const d = deps(); d.suggestions.getForAcceptanceDrain.mockResolvedValueOnce(acceptedSuggestion()).mockResolvedValueOnce(acceptedSuggestion()).mockResolvedValueOnce(acceptedSuggestion()).mockResolvedValueOnce(acceptedSuggestion({ [field]: 'changed' }));
+    // Reads: job start, accept check, materials step (holds: no PDF), confirmation, confirmation recheck.
+    const d = deps(); d.suggestions.getForAcceptanceDrain.mockResolvedValueOnce(acceptedSuggestion()).mockResolvedValueOnce(acceptedSuggestion()).mockResolvedValueOnce(acceptedSuggestion()).mockResolvedValueOnce(acceptedSuggestion()).mockResolvedValueOnce(acceptedSuggestion({ [field]: 'changed' }));
     await expect(processReviewerAcceptanceJob(job(), d)).rejects.toThrow('suggestion_changed');
     expect(d.prepareAcceptanceEmail).toHaveBeenCalled(); expect(d.sendPreparedAcceptanceEmail).not.toHaveBeenCalled();
     expect(d.jobs.mergeReviewerAcceptanceJobStep.mock.calls.some(call => call[3].claimedAt)).toBe(false);

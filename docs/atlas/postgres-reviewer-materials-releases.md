@@ -38,8 +38,9 @@ build notes.
     release, or one abandoned at `claimed` / `link_minted` past its lease,
     goes back to `claimed` under a new lease and `attempts + 1`. Never touches
     `sent` or `recorded`.
-- Readers: [PLANNED] the acceptance job's `release_materials` step, the manual
-  materials send, and the recovery action. Not wired yet.
+- Readers and writers: the acceptance job's `release_materials` step
+  (`lib/services/reviewer-acceptance-drain.js`, on branch). [PLANNED] the
+  manual materials send and the staff recovery action; not wired yet.
 
 ## Columns
 

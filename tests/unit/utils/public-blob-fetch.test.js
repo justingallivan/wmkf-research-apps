@@ -78,7 +78,7 @@ const directReaders = [
   'pages/api/process-phase-i.js', 'pages/api/process.js',
   'pages/api/reviewer-finder/analyze.js',
   'lib/services/workbench/enrich-recommended-service.js',
-  'lib/services/review-manager/send-emails-service.js',
+  'lib/services/review-manager/cycle-materials-attachments.js',
   'lib/utils/uploaded-blob.js', 'pages/api/blob-proxy.js',
 ];
 it.each(directReaders)('%s uses only the public storage transport for public files', file => {

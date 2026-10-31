@@ -510,6 +510,8 @@ function makeAcceptanceDrainDeps(overrides = {}) {
     autoLinkAccount: jest.fn().mockResolvedValue({ skipped: 'no_exact_target' }),
     alertAffiliation: jest.fn().mockResolvedValue(undefined),
     quota: jest.fn().mockResolvedValue(undefined),
+    // No proposal PDF: materials are held and today's confirmation path runs (D49).
+    materials: { get: jest.fn(async () => null), preflight: jest.fn(async () => ({ ok: true, fileCount: 0 })) },
     ...overrides,
   };
 }
