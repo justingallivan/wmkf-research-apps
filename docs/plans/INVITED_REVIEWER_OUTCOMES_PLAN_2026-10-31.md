@@ -365,6 +365,15 @@ honorarium `1530402a` still exists, now `Withdrawn` with
 retained. Saving… showed and the row refreshed on its own. History shows no
 dated entry for the outcome until the Ended at field exists.
 
+**Ended at (owner decision 2026-10-31):** new nullable DateTime
+`wmkf_endedat` written beside Ended by by every outcome writer, so activity
+history dates staff-recorded outcomes. Schema file
+`02_wmkf_appreviewersuggestion_ended_at.json` in the same Wave 35 folder; the
+preflight checks both fields and the applier treats the existing Ended by as
+`exists`. Rollout repeats steps 1–2 above (preflight, dry run, `--execute`,
+preflight). Writers and history start using it in 3b, after it exists in
+Production. Rows ended before then stay undated.
+
 Both schema changes are additive and no runtime code reads or writes them
 until slice 3. Each step below is owner-run or explicitly owner-approved;
 steps 2, 3 and 5 also need that day's `DATAVERSE_PROD_WRITE_ACK`. Every
