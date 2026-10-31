@@ -1387,6 +1387,7 @@ describe('send-emails-service — send-time token authority gate (S404 Plan v4)'
       templateType: 'materials',
     });
     expect(resultOf(emitted).failed[0]).toMatchObject({ suggestionId: SUG_OK, code: 'external_link_missing' });
+    expect(resultOf(emitted).failed[0].error).toContain('{{externalLink}}');
     expect(materialsReleaseStore.claimMaterialsRelease).not.toHaveBeenCalled();
     expect(createAndSendEmail).not.toHaveBeenCalled();
   });

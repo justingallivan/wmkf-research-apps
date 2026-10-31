@@ -360,6 +360,19 @@ to a follow-up PR (owner, 2026-10-30).
   reviewer link now fails closed (`external_link_missing`) instead of sending
   unclaimed, and `markAsSent: false` is refused for materials (both UIs always
   send `true`).
+  **Open (owner decision before #562 leaves draft): a `sent` row with no
+  exit.** `recordDeliveredEmail` throws on every no-write path (reviewer
+  closed or withdrew during delivery, binding changed, ETag problems), so the
+  row stays `sent`; `reclaimMaterialsRelease` cannot touch `sent`, nothing
+  retries a manual row, and the drain re-raises "sent but not yet recorded"
+  every run (its text says "the job keeps retrying", untrue for manual rows).
+  The acceptance path has the same end state once its job gives up. Candidate
+  fixes: the recovery step gains a staff "Mark as delivered" action that moves
+  `sent` → `recorded` and resolves the alert; or the drain's stuck loop retries
+  `recordDeliveredEmail` for any `sent` row regardless of source. Local
+  auth-bypass sessions have no profile id, so a manual materials send there
+  fails closed (`materials_release_unavailable`); real sessions always carry
+  one (`requireAppAccess`).
 - **Build order** (each a stop point): migration + claim service → drain step →
   manual-path claim → recovery action (route + UI) → invitation PDF
   precondition + accepted-screen copy → wording seeds, `{{proposalDelivery}}`
