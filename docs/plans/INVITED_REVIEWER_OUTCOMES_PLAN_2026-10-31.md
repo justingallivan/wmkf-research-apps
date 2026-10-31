@@ -326,7 +326,7 @@ later materials_sent status.
 (preflight `EXACT` / `READABLE` after about two minutes of metadata lag; the
 first re-check right after the create still said `ABSENT`). Did not submit
 inserted as 100000007 (`NewOptionValue` 100000007), published, verified.
-Steps 4–5 pending. The sandbox has neither change.
+Step 4 done (owner browser check: a D26 request's Review Manager reviewer list loads normally). Step 5 pending. The sandbox has neither change.
 
 Both schema changes are additive and no runtime code reads or writes them
 until slice 3. Each step below is owner-run or explicitly owner-approved;
