@@ -62,6 +62,7 @@ const ALLOWED_UNDOCUMENTED_ENTITIES = new Set([
   'businessunits',          // scripts/apply-security-role.js — root BU resolve
   'publishers',             // scripts/apply-dataverse-schema.js — solution publisher
   'solutions',              // scripts/apply-dataverse-schema.js — solution metadata
+  'organizations',          // scripts/probe-d26-removed-audit-history.cjs — read-only org audit flag
 
   // Microsoft Graph / SharePoint platform entities (Dataverse-side mirrors):
   'sharepointdocuments',    // virtual entity, vendor doc tracking — see graph-service.js
