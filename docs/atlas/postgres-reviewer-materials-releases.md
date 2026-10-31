@@ -41,9 +41,12 @@ build notes.
   - `retakeFailedMaterialsRelease` — a normal manual send retakes a `failed`
     release (definitely not sent) the same way; `uncertain` and abandoned rows
     are not retaken.
-  - `closeSentMaterialsRelease` — staff "Mark as delivered": `sent → recorded`
-    with `error_code = staff_marked_delivered` and the staff profile, used only
-    when the reviewer row cannot take the bookkeeping.
+  - `closeSentMaterialsRelease` — `sent → recorded` without reviewer markers:
+    staff "Mark as delivered" (`error_code = staff_marked_delivered`, staff
+    profile) or the drain when the reviewer has since closed or withdrawn
+    (`reviewer_closed_after_delivery`, actor unchanged).
+  - `touchStuckMaterialsRelease` — bumps `updated_at` after the drain handles
+    a stuck row, so the bounded `listStuckMaterialsReleases` batch rotates.
 - `listStuckMaterialsReleases` — rows needing staff: `uncertain` / `failed`,
   `claimed` / `link_minted` past the lease, or `sent` unrecorded for 30
   minutes. Every acceptance-drain run (every 2 minutes) re-raises one
@@ -68,9 +71,11 @@ build notes.
   row only: tries `recordDeliveredEmail` then `recordMaterialsRelease`; when
   the reviewer row cannot take it, `closeSentMaterialsRelease`. Sends nothing.
 - Drain stuck loop (`alertStuckMaterialsReleases`): for a `sent` row of any
-  source, first retries the bookkeeping from the persisted `sent_at` (binding
-  check on the request only; the row stores no reviewer id), records the row
-  and resolves the alert; only if that fails does it raise the alert.
+  source, closes the release if the reviewer has since closed or withdrawn,
+  else retries the bookkeeping from the persisted `sent_at` (binding check on
+  the request only; the row stores no reviewer id), records the row and
+  resolves the alert; only if that fails does it raise the alert. Every row it
+  alerts on is touched so the next run starts with unhandled rows.
 - Alert key: `materialsReleaseAlertKey` in the store is the one spelling used
   by both writers.
 
@@ -86,7 +91,7 @@ build notes.
 | `actor_profile_id` | Staff profile: required for `manual`; set on a staff resend. |
 | `lease_token`, `lease_until` | Ownership of an in-flight send; cleared at `recorded` and when stopped. |
 | `attempts` | 1 on claim; +1 per staff resend. |
-| `error_code` | Short code for `uncertain` / `failed`; cleared on a confirmed send or resend. On a `recorded` row, `staff_marked_delivered` marks a staff close (reviewer markers not written). |
+| `error_code` | Short code for `uncertain` / `failed`; cleared on a confirmed send or resend. On a `recorded` row, `staff_marked_delivered` (staff) or `reviewer_closed_after_delivery` (drain) marks a close without reviewer markers. |
 | `claimed_at`, `link_minted_at`, `sent_at`, `recorded_at`, `updated_at` | Transition times. |
 
 Constraints: `sent` and `recorded` need `sent_at`; `recorded` needs
@@ -96,11 +101,11 @@ Constraints: `sent` and `recorded` need `sent_at`; `recorded` needs
 
 No cleanup job: one small row per accepted reviewer engagement, kept as the
 receipt that materials went out. A `recorded` row with `error_code =
-staff_marked_delivered` is a staff close: the email went out but the reviewer
-markers were not written. A stuck `uncertain` or abandoned row needs staff
+staff_marked_delivered` or `reviewer_closed_after_delivery` is a close: the
+email went out but the reviewer markers were not written. A stuck `uncertain` or abandoned row needs staff
 ("Send again"); a `failed` row is retaken by the next normal send; a `sent`
-row is recorded automatically by the drain, or closed by staff ("Mark as
-delivered").
+row is recorded automatically by the drain (or closed by it when the
+reviewer has closed or withdrawn), or closed by staff ("Mark as delivered").
 
 ## Tests
 

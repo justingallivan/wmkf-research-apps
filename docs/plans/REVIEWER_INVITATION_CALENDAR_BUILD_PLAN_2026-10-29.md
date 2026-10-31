@@ -365,8 +365,11 @@ to a follow-up PR (owner, 2026-10-30).
   or abandoned rows are resent only through the Release Materials "Send again"
   button (`recoverMaterialsReleaseIds`), after the delivered-marker gates. A
   `sent` row is recorded automatically by the drain's stuck loop (any source,
-  from `sent_at`, never resending); when the reviewer row cannot take it
-  (closed, withdrew, binding changed), staff "Mark as delivered"
+  from `sent_at`, never resending). A reviewer who closed or withdrew after
+  delivery is closed by the drain itself (`reviewer_closed_after_delivery`;
+  Codex round 2 found the staff action unreachable for them, since the send
+  gates refuse terminal reviewers before the claim). For other unrecordable
+  rows (binding changed, lasting ETag problems), staff "Mark as delivered"
   (`POST /api/review-manager/materials-release-delivered`) closes the release
   as `staff_marked_delivered`. Local auth-bypass sessions have no profile id,
   so a manual materials send there fails closed

@@ -74,6 +74,20 @@ suite('materials release claim (real Postgres, migration 091)', () => {
     expect(closed.recorded_at).not.toBeNull();
   });
 
+  test('the drain closes a sent release for a closed reviewer without changing the actor; touching rotates the stuck batch', async () => {
+    const { release } = await manual();
+    await releases.markMaterialsLinkMinted(SUGGESTION, release.lease_token);
+    await releases.markMaterialsSent(SUGGESTION, release.lease_token);
+    const before = (await releases.getMaterialsRelease(SUGGESTION)).updated_at;
+    await new Promise(r => setTimeout(r, 5));
+    await releases.touchStuckMaterialsRelease(SUGGESTION);
+    const touched = await releases.getMaterialsRelease(SUGGESTION);
+    expect(touched.state).toBe('sent');
+    expect(new Date(touched.updated_at).getTime()).toBeGreaterThan(new Date(before).getTime());
+    const closed = await releases.closeSentMaterialsRelease({ suggestionId: SUGGESTION, code: releases.REVIEWER_CLOSED_AFTER_DELIVERY });
+    expect(closed).toMatchObject({ state: 'recorded', error_code: 'reviewer_closed_after_delivery', actor_profile_id: staffId });
+  });
+
   test('stuck releases: stopped, abandoned past the lease, or sent but unrecorded for 30 minutes', async () => {
     const other = '33333333-3333-4333-8333-333333333333', live = '44444444-4444-4444-8444-444444444444', sent = '55555555-5555-4555-8555-555555555555';
     const { release } = await auto();

@@ -285,30 +285,35 @@ test('every drain run re-raises alerts for stuck releases, independent of any jo
   const jobs = { claimReviewerAcceptanceJobs: jest.fn(async () => []) };
   // The sent row's bookkeeping retry fails, so it still alerts.
   const findSuggestionForMaterials = jest.fn(async () => { throw new Error('dataverse down'); });
-  const result = await drainReviewerAcceptanceJobs({ deps: { jobs, notify, listStuckMaterialsReleases, findSuggestionForMaterials, switchesReady: () => true } });
+  const touchStuckMaterialsRelease = jest.fn(async () => {});
+  const result = await drainReviewerAcceptanceJobs({ deps: { jobs, notify, listStuckMaterialsReleases, findSuggestionForMaterials, touchStuckMaterialsRelease, switchesReady: () => true } });
   expect(result.materialsAlerts).toBe(2);
+  // Each handled row moves to the back of the bounded batch.
+  expect(touchStuckMaterialsRelease.mock.calls.map(([id]) => id)).toEqual([SUGGESTION_ID, '66666666-6666-4666-8666-666666666666']);
   expect(notify.mock.calls.map(([o]) => [o.type, o.autoResolveKey])).toEqual([
     ['reviewer_materials_release_stopped', `reviewer-materials-release:${SUGGESTION_ID}`],
     ['reviewer_materials_release_unrecorded', 'reviewer-materials-release:66666666-6666-4666-8666-666666666666'],
   ]);
   notify.mockRejectedValue(new Error('down'));
-  expect((await drainReviewerAcceptanceJobs({ deps: { jobs, notify, listStuckMaterialsReleases, findSuggestionForMaterials, switchesReady: () => true } })).materialsAlerts).toBe(0);
+  expect((await drainReviewerAcceptanceJobs({ deps: { jobs, notify, listStuckMaterialsReleases, findSuggestionForMaterials, touchStuckMaterialsRelease, switchesReady: () => true } })).materialsAlerts).toBe(0);
 });
 
 describe('stuck sent releases: bookkeeping is retried, never the email (any source)', () => {
   const SENT_ROW = { suggestion_id: SUGGESTION_ID, request_id: REQUEST_ID, source: 'manual', job_id: null, state: 'sent', error_code: null, sent_at: new Date('2026-10-30T10:00:00.000Z') };
-  const run = async ({ fresh = suggestionRow(), recordDelivered = jest.fn(async () => {}), record = jest.fn(async () => ({ state: 'recorded' })), get = jest.fn(async () => SENT_ROW) } = {}) => {
+  const run = async ({ fresh = suggestionRow(), recordDelivered = jest.fn(async () => {}), record = jest.fn(async () => ({ state: 'recorded' })), get = jest.fn(async () => SENT_ROW), closeSent = jest.fn(async () => ({ state: 'recorded' })) } = {}) => {
     const AlertService = require('../../lib/services/alert-service').default;
     AlertService.autoResolve.mockClear();
     const notify = jest.fn(async () => ({ id: 1 }));
+    const touch = jest.fn(async () => {});
     const jobs = { claimReviewerAcceptanceJobs: jest.fn(async () => []) };
     const result = await drainReviewerAcceptanceJobs({ deps: {
       jobs, notify, switchesReady: () => true,
       listStuckMaterialsReleases: jest.fn(async () => [SENT_ROW]),
       findSuggestionForMaterials: jest.fn(async () => fresh),
-      materials: { recordDelivered, record, get },
+      materials: { recordDelivered, record, get, closeSent },
+      touchStuckMaterialsRelease: touch,
     } });
-    return { result, notify, recordDelivered, record, AlertService };
+    return { result, notify, recordDelivered, record, closeSent, touch, AlertService };
   };
 
   test('a manual sent row is recorded from its persisted sent_at, the alert resolves, nothing is sent', async () => {
@@ -327,6 +332,18 @@ describe('stuck sent releases: bookkeeping is retried, never the email (any sour
     const { notify, record } = await run({ recordDelivered: jest.fn(async () => { throw new Error('Suggestion is closed or has an unknown review status'); }) });
     expect(record).not.toHaveBeenCalled();
     expect(notify.mock.calls[0][0]).toMatchObject({ type: 'reviewer_materials_release_unrecorded' });
+  });
+
+  test.each([
+    ['withdrew', { wmkf_reviewstatus: REVIEW_STATUS_MAP.withdrew }],
+    ['closed', { wmkf_completedat: '2026-10-30T12:00:00.000Z' }],
+  ])('a reviewer who %s after delivery: release closed automatically, no markers, no alert', async (_label, change) => {
+    const { notify, recordDelivered, closeSent, touch, AlertService } = await run({ fresh: suggestionRow(change) });
+    expect(recordDelivered).not.toHaveBeenCalled();
+    expect(closeSent).toHaveBeenCalledWith({ suggestionId: SUGGESTION_ID, code: 'reviewer_closed_after_delivery' });
+    expect(AlertService.autoResolve).toHaveBeenCalledWith(`reviewer-materials-release:${SUGGESTION_ID}`);
+    expect(notify).not.toHaveBeenCalled();
+    expect(touch).not.toHaveBeenCalled();
   });
 
   test('a row the job recorded at the same moment counts as recorded: no orphan alert', async () => {
