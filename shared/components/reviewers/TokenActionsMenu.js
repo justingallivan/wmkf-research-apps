@@ -102,14 +102,13 @@ export function TokenActionsMenu({
   const canCloseReview = Boolean(
     onCloseReview && ['review_received', 'complete'].includes(reviewer.reviewStatus),
   );
-  // Mirrors the server's isInvitedRow guard: a contacted reviewer keeps a
-  // recorded outcome and cannot be removed (INVITED_REVIEWER_OUTCOMES_PLAN).
+  // Server-computed canRemove uses softDelete's own rule (never invited, no
+  // recorded outcome), so the menu never offers a Remove the server refuses.
   const canRemove = Boolean(
     onRemove
       && reviewer.reviewStatus !== 'complete'
       && !TERMINAL_REVIEW_STATUSES.includes(reviewer.reviewStatus)
-      && reviewer.invited !== true
-      && !reviewer.emailSentAt,
+      && reviewer.canRemove === true,
   );
   const degradedTitle = 'Reviewer data could not be refreshed - retry before making changes';
   // The estimate drives the upward flip so the portalled menu never opens

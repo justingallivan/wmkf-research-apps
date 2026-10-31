@@ -158,16 +158,16 @@ describe('reviewer management actions menu', () => {
     expect(onRegenerate).toHaveBeenCalledTimes(1);
   });
   test.each([
-    ['invited flag', { invited: true }],
-    ['invitation sent time', { emailSentAt: '2026-07-01T00:00:00Z' }],
-  ])('Remove is not offered for an invited reviewer (%s)', (_name, invite) => {
-    render(<TokenActionsMenu reviewer={{ ...reviewer, reviewStatus: 'accepted', ...invite }} onRemove={jest.fn()} />);
+    ['server says not removable', { canRemove: false }],
+    ['flag absent (fail closed)', {}],
+  ])('Remove is not offered when %s', (_name, flag) => {
+    render(<TokenActionsMenu reviewer={{ ...reviewer, reviewStatus: 'accepted', ...flag }} onRemove={jest.fn()} />);
     fireEvent.click(screen.getByRole('button', { name: 'Manage Dr. Test Reviewer' }));
     expect(screen.queryByRole('button', { name: 'Remove from this request' })).not.toBeInTheDocument();
   });
 
-  test('Remove is still offered for a never-invited row', () => {
-    render(<TokenActionsMenu reviewer={{ ...reviewer, reviewStatus: 'accepted', invited: false, emailSentAt: null }} onRemove={jest.fn()} />);
+  test('Remove is still offered when the server says the row is removable', () => {
+    render(<TokenActionsMenu reviewer={{ ...reviewer, reviewStatus: 'accepted', canRemove: true }} onRemove={jest.fn()} />);
     fireEvent.click(screen.getByRole('button', { name: 'Manage Dr. Test Reviewer' }));
     expect(screen.getByRole('button', { name: 'Remove from this request' })).toBeInTheDocument();
   });

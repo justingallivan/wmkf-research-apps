@@ -124,9 +124,9 @@ const REMOVE_MENU_ITEM_H = 56;  // two two-line items — drives the upward-flip
 // Mirrors TokenActionsMenu's portalled, outside-click-closing, upward-flipping
 // pattern so the menu escapes the row's clipping/stacking context.
 function RowRemoveMenu({ candidate, disabled = false, onRemoveFromProposal, onDeletePermanently }) {
-  // Mirrors the server's isInvitedRow guard: a contacted reviewer keeps a
-  // recorded outcome and cannot be removed (INVITED_REVIEWER_OUTCOMES_PLAN).
-  const invited = candidate?.invited === true || Boolean(candidate?.emailSentAt);
+  // Server-computed with softDelete's own rule (never invited, no recorded
+  // outcome); anything else keeps its response (INVITED_REVIEWER_OUTCOMES_PLAN).
+  const invited = candidate?.canRemove !== true;
   const [open, setOpen] = useState(false);
   const [coords, setCoords] = useState(null); // { left, top } in viewport px, or null
   const btnRef = useRef(null);

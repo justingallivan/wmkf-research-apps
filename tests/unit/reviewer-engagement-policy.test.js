@@ -131,6 +131,7 @@ describe('reviewer-engagement-policy', () => {
       expect(Object.keys(reviewerEngagementPolicy).sort()).toEqual([
         'OUTCOME_GUARD_FIELDS',
         'hasRecordedOutcome',
+        'isCandidateOnlyRow',
         'isClosedEngagementRow',
         'isClosedEngagementStatus',
         'isInvitationCorrectionSourceRow',

@@ -137,3 +137,13 @@ export function hasRecordedOutcome(row) {
     || Boolean(row.wmkf_reviewreceivedat)
     || Boolean(row.wmkf_completedat);
 }
+
+/**
+ * Never invited and no recorded outcome: the only rows Remove and Restore
+ * accept. For screen eligibility flags only: an incomplete row reads as
+ * ineligible (fail closed) instead of throwing, so one bad row cannot fail a
+ * whole list. Server guards use the throwing predicates above.
+ */
+export function isCandidateOnlyRow(row) {
+  try { return !isInvitedRow(row) && !hasRecordedOutcome(row); } catch { return false; }
+}

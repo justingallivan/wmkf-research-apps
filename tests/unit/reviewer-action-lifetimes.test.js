@@ -24,6 +24,9 @@ const reviewer = {
   reviewStatus: 'materials_sent', // in TERMINAL_SOURCE_STATUSES, canTransitionToTerminal() === true
   tokenState: 'active',
   responseType: 'accepted',
+  // These tests cover the Remove request lifecycle, not eligibility; the
+  // server-computed flag (never invited, no outcome) is set so the menu offers it.
+  canRemove: true,
 };
 const otherReviewer = { ...reviewer, suggestionId: '33333333-3333-4333-8333-333333333333', name: 'Dr. Other Reviewer' };
 const proposal = { proposalId: '22222222-2222-4222-8222-222222222222', proposalTitle: 'Action lifetime test request' };

@@ -98,7 +98,7 @@ describe('ReviewerInvitePanel remove confirm wiring', () => {
   });
 
   test('never-invited candidate → ordinary dialog, no withdrawal warning', () => {
-    const fresh = { suggestionId: 'S-new', name: 'Fresh Candidate', email: 'f@example.edu', invited: false, emailSentAt: null };
+    const fresh = { suggestionId: 'S-new', name: 'Fresh Candidate', email: 'f@example.edu', invited: false, emailSentAt: null, canRemove: true };
     render(<ReviewerInvitePanel {...baseProps} candidates={[fresh]} />);
     openRemove();
     expect(confirmSpy).toHaveBeenCalledTimes(1);

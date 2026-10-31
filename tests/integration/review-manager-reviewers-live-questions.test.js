@@ -268,6 +268,7 @@ test('GET success returns the full proposal + reviewer envelope', async () => {
         meetingDate: null,
         emailSentAt: null,
         invited: true,
+        canRemove: false,
         respondReminderSentAt: null,
         responseReceivedAt: null,
         withdrawnSufficientAt: null,
