@@ -17,8 +17,9 @@
  *   (412) instead of overwriting. The written row must still belong to the
  *   original request.
  *
- * Before writing, it saves a recovery record (target, row, original values)
- * under outputs/. If the run cannot finish the restore, it prints the record
+ * Before writing, it creates a recovery record (target, row, original values)
+ * under outputs/ (exclusive create, so one run per row). A 5xx or gateway
+ * response to a write counts as an unknown outcome and keeps the record. If the run cannot finish the restore, it prints the record
  * path; `--recover` restores from it, only while the row is still on the same
  * marked test request and still holds exactly the test values. --pause waits
  * at most 10 minutes, and an --execute run refuses to start within 20 minutes
@@ -160,7 +161,15 @@ async function patchReturning(client, id, etag, values, label) {
   if (response.status === 412) {
     throw new Error(`${label}: the row changed since its version was taken (412). Nothing was overwritten.`);
   }
-  if (!response.ok) throw new Error(`${label} failed (${response.status}): ${response.text.slice(0, 400)}`);
+  if (!response.ok) {
+    // A 4xx (other than timeout/throttle) proves Dataverse refused the write;
+    // a 5xx or gateway status can arrive after the write committed.
+    const refused = response.status >= 400 && response.status < 500 && ![408, 429].includes(response.status);
+    throw Object.assign(
+      new Error(`${label} ${refused ? 'failed' : 'outcome unknown'} (${response.status}): ${response.text.slice(0, 400)}`),
+      { ambiguous: !refused },
+    );
+  }
   return response.body;
 }
 
@@ -260,14 +269,18 @@ export async function runRoundTrip({
 
   assertAwayFromUtcMidnight(now);
   const recordPath = recordPathFor(args.suggestionId);
-  if (fs.existsSync(recordPath)) {
-    throw new Error(`Refusing: an unfinished run left ${recordPath}. Run with --recover first.`);
-  }
   fs.mkdirSync(path.dirname(recordPath), { recursive: true });
-  fs.writeFileSync(recordPath, `${JSON.stringify({
-    resourceUrl, suggestionId: args.suggestionId, requestId, requestNumber: request.akoya_requestnum,
-    original, originalEtag: row['@odata.etag'], startedAt: new Date().toISOString(),
-  }, null, 2)}\n`);
+  try {
+    // Exclusive create: a second run on the same row refuses instead of
+    // sharing (and later deleting) this run's record.
+    fs.writeFileSync(recordPath, `${JSON.stringify({
+      resourceUrl, suggestionId: args.suggestionId, requestId, requestNumber: request.akoya_requestnum,
+      original, originalEtag: row['@odata.etag'], startedAt: new Date().toISOString(),
+    }, null, 2)}\n`, { flag: 'wx' });
+  } catch (error) {
+    if (error.code !== 'EEXIST') throw error;
+    throw new Error(`Refusing: another or unfinished run holds ${recordPath}. Run with --recover first.`);
+  }
   const recoveryHint = `Recovery record: ${recordPath}. Run again with --recover (and a current ACK) to restore ${describe(original)}.`;
 
   let written;

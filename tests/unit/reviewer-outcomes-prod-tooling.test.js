@@ -237,6 +237,49 @@ describe('roundtrip orchestration against a fake Dataverse', () => {
     expect(fs.existsSync(recordPathFor(ID))).toBe(false);
   });
 
+  test('a gateway error after a committed test write keeps the record for --recover', async () => {
+    let first = true;
+    const { db, client } = fakeDataverse({
+      patchHook: ({ db: state, body }) => {
+        if (!first) return null;
+        first = false;
+        Object.assign(state.row, body);
+        state.version += 1;
+        state.patches.push(body);
+        return { ok: false, status: 504, text: 'gateway timeout' };
+      },
+    });
+    await expect(run(client)).rejects.toThrow(/outcome unknown \(504\).*--recover/s);
+    expect(fs.existsSync(recordPathFor(ID))).toBe(true);
+    await recover({ client, resourceUrl: RESOURCE, suggestionId: ID });
+    expect(db.row).toMatchObject({ wmkf_endedby: null, wmkf_reviewstatus: 100000001 });
+  });
+
+  test('a refused (400) test write removes the record and changes nothing', async () => {
+    const { db, client } = fakeDataverse({ patchHook: () => ({ ok: false, status: 400, text: 'bad request' }) });
+    await expect(run(client)).rejects.toThrow('failed (400)');
+    expect(db.patches).toEqual([]);
+    expect(fs.existsSync(recordPathFor(ID))).toBe(false);
+  });
+
+  test('a concurrent second run refuses without touching the first run\'s record', async () => {
+    let secondError = null;
+    let started = false;
+    const { db, client } = fakeDataverse({
+      patchHook: async () => {
+        if (started) return null;
+        started = true;
+        // Second run reads the same, still-original row version before the first write lands.
+        secondError = await run(client).then(() => null, (error) => error);
+        return null;
+      },
+    });
+    await run(client);
+    expect(secondError?.message).toMatch('another or unfinished run');
+    expect(db.patches).toEqual([TEST, { wmkf_endedby: null, wmkf_reviewstatus: 100000001 }]);
+    expect(fs.existsSync(recordPathFor(ID))).toBe(false);
+  });
+
   test('a failing pause still restores', async () => {
     const { db, client } = fakeDataverse();
     await run(client, { pause: true, pauseFn: async () => { throw new Error('stdin closed'); } });
@@ -257,7 +300,7 @@ describe('roundtrip orchestration against a fake Dataverse', () => {
     await expect(run(client, { now: new Date('2026-10-31T23:45:00Z') })).rejects.toThrow('UTC midnight');
     fs.mkdirSync('outputs');
     fs.writeFileSync(recordPathFor(ID), '{}');
-    await expect(run(client)).rejects.toThrow('--recover first');
+    await expect(run(client)).rejects.toThrow('another or unfinished run');
     expect(db.patches).toEqual([]);
   });
 
