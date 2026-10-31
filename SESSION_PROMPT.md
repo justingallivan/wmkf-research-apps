@@ -108,7 +108,7 @@ acting. Do not convert those carryovers into authorized live actions.
 | Owner / workstream | Latest recorded boundary |
 |---|---|
 | Codex / shared prompt library | PARKED; local `9d838c4c8`, Windows09 offline check with Connor Monday; [resume archive](docs/plans/PR553_MONDAY_RESUME_2026-11-02.md) |
-| Claude / Board calendar #561 | OPEN/non-draft, head `74722761ec0c1b701b0f944e8eddc3eaba9a92a6` at stop; owner release decisions/preconditions in prior Claude handoff, not authorized here |
+| Claude / Board calendar #561 | **MERGED + DEPLOYED** on owner approval (Claude, 2026-10-30): merge `955613bdb`, Vercel Production success, all `main` CI green. Head `82039e29d` also fixed the `reviewer-engagement-census` failure that `b19a1f4dd`'s close-out script caused on `main`. All three owner-run pre-merge checks passed (D26 Board Mailing 2026-11-25 ≤ Board 2026-12-10; no pending intent or unsent draft). Unverified: D26 Board page rendering calendar dates (needs a signed-in look) |
 | Claude / materials #562 | OPEN/DRAFT, head `54a63a652d482ff64acf2651c7c4d2b56c1e953a`; prior owner wording/release steps still need verification/approval |
 | Codex / Board #563/#564 | Prior deployed milestone preserved at `b091cf5cd`; no new live work here |
 | Codex / ranking, prior archival | Prior handoffs; not revalidated |
