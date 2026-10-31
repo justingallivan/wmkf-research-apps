@@ -296,6 +296,7 @@ Methods:
   capped read for optional existing-record context; deliberately does not run
   the full merge/lifecycle projection or paginate beyond the presentation cap
 - `findById` — **THROWS on an applicant-excluded row** (action chokepoint; see Applicant disposition above)
+- `findEndedAfterAcceptanceByRequest(requestId)` — complete read of unselected Withdrew / Did not submit rows (both writers clear `wmkf_selected`/`wmkf_accepted`); `getReviewers` single-proposal scope appends them so Track Reviewers lists staff-ended reviewers (owner decision 2026-10-31). They stay out of synthesis readiness, and their terminal status keeps them out of release, reminders and work-remaining. Cross-proposal scopes do not include them.
 - `findByRequest(requestId, { selectedOnly })` — used by Review Manager request views; carries `notExcludedFilter()`
 - `findApplicantRecommendedByRequest(requestId)` — Workbench Find enrichment reader for applicant-suggested rows; filters by `_wmkf_request_value`, `wmkf_applicantdisposition=Recommended`, and `notExcludedFilter()` with **no** `wmkf_selected` constraint so unpromoted rows are enriched for PD review
 - `findByPD(systemuserid, { cycleCode, selectedOnly })` — two-step: query `akoya_requests` by lead PD then suggestions by request OR-chain (chunks of 25); carries `notExcludedFilter()`

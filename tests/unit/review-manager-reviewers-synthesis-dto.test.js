@@ -26,6 +26,7 @@ jest.mock('../../lib/services/dynamics-service', () => ({
 }));
 jest.mock('../../lib/dataverse/adapters/reviewer-suggestion', () => ({
   findByRequest: jest.fn(),
+  findEndedAfterAcceptanceByRequest: jest.fn(async () => []),
   RESPONSE_TYPE_BY_VALUE: {},
   APPLICANT_DISPOSITION_EXCLUDED: 100000001,
   RESPONSE_TYPE_MAP: {

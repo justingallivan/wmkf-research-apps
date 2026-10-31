@@ -346,7 +346,9 @@ the matrix, the pre-answer COI/Other writer, portal decline/re-accept, and
 `wmkf_endedby` in selects/DTOs (selects before the outcome predicate). 3c, the
 materials cutoff with interleaving tests. Build choice in 3a: Did not submit
 keeps `wmkf_responsereceivedat` (the acceptance time) instead of restamping it
-as the withdrawal does.
+as the withdrawal does. Owner decision (2026-10-31): staff-ended Withdrew and
+Did not submit reviewers stay visible on Track Reviewers (single proposal) as
+ended rows; previously a withdrawn reviewer vanished from Track.
 
 Both schema changes are additive and no runtime code reads or writes them
 until slice 3. Each step below is owner-run or explicitly owner-approved;

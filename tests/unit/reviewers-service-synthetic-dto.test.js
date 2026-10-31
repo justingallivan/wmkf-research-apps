@@ -11,6 +11,7 @@
 
 const updateLifecycle = jest.fn(async () => {});
 const findByRequest = jest.fn();
+const findEndedAfterAcceptanceByRequest = jest.fn();
 const findAcceptedByPD = jest.fn();
 const findAcceptedByCycle = jest.fn();
 jest.mock('../../lib/services/workbench/program-scope-service.js', () => ({
@@ -24,6 +25,7 @@ jest.mock('../../lib/services/workbench/program-scope-service.js', () => ({
 jest.mock('../../lib/dataverse/adapters/reviewer-suggestion', () => ({
   updateLifecycle: (...a) => updateLifecycle(...a),
   findByRequest: (...a) => findByRequest(...a),
+  findEndedAfterAcceptanceByRequest: async (...a) => (await findEndedAfterAcceptanceByRequest(...a)) || [],
   findAcceptedByPD: (...a) => findAcceptedByPD(...a),
   findAcceptedByCycle: (...a) => findAcceptedByCycle(...a),
   RESPONSE_TYPE_BY_VALUE: {},

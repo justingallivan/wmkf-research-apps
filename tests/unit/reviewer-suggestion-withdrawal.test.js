@@ -13,6 +13,7 @@ import {
   applyStaffReviewerWithdrawal,
   applyStaffReviewerRelease,
   applyStaffReviewerDidNotSubmit,
+  findEndedAfterAcceptanceByRequest,
   deleteLinkedHonorariumForDeclinedSuggestion,
   withdrawLinkedHonorariumForReleasedSuggestion,
   RESPONSE_TYPE_MAP,
@@ -292,5 +293,24 @@ describe('staff-recorded did not submit', () => {
 
   it('refuses without an ETag', async () => {
     await expect(applyStaffReviewerDidNotSubmit(SUGGESTION_ID, {})).rejects.toThrow('ifMatch required');
+  });
+});
+
+describe('findEndedAfterAcceptanceByRequest', () => {
+  it('reads only unselected Withdrew / Did not submit rows on the request, complete', async () => {
+    const query = jest.spyOn(DynamicsService, 'queryAllRecords').mockResolvedValue({ records: [{ id: 1 }], capped: false });
+    await expect(findEndedAfterAcceptanceByRequest(SUGGESTION_ID)).resolves.toEqual([{ id: 1 }]);
+    const [entitySet, options] = query.mock.calls[0];
+    expect(entitySet).toBe('wmkf_appreviewersuggestions');
+    expect(options.filter).toContain(`_wmkf_request_value eq ${SUGGESTION_ID} and wmkf_selected eq false`);
+    expect(options.filter).toContain('(wmkf_reviewstatus eq 100000005 or wmkf_reviewstatus eq 100000007)');
+    query.mockRestore();
+  });
+
+  it('refuses a non-GUID and a capped read', async () => {
+    await expect(findEndedAfterAcceptanceByRequest('x')).rejects.toThrow('GUID');
+    const query = jest.spyOn(DynamicsService, 'queryAllRecords').mockResolvedValue({ records: [], capped: true });
+    await expect(findEndedAfterAcceptanceByRequest(SUGGESTION_ID)).rejects.toThrow('cap');
+    query.mockRestore();
   });
 });
