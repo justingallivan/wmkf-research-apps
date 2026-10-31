@@ -1,6 +1,6 @@
 ---
 title: Invited reviewer outcomes plan
-status: decisions A–E final; third review pending
+status: decisions final; build contract written after third review
 created: 2026-10-31
 owner: Justin (decisions); Claude (Session 655)
 ---
@@ -139,6 +139,116 @@ finding spot-checked against source:
    bucket, the rollup included. Tests use archived outcome rows, not only
    enum parity.
 
+## Third independent review and build contract (2026-10-31)
+
+Codex adversarial review round 3 (verdict: needs-attention) found the design
+settled but the contract underspecified: identical stored outcomes, no full
+writer/correction matrix, no materials cutoff for revised E, and no precise
+"recorded outcome" predicate for D. Owner rules taken in response
+(2026-10-31):
+
+- **A conflict of interest is not a reliability mark**, even after accepting.
+- **A lapsed invitation has a blank "Ended by"**; neither side acted, and the
+  No Response response type already records it.
+- **Who typed the outcome is deliberately not stored.** "Ended by" records who
+  initiated; the Dataverse audit log already records the user who wrote it.
+
+The tables below supersede the per-outcome table in "Proposal (revised)".
+
+### Stored values per outcome
+
+| Outcome | Response | Review status | Reason picklist | Ended by |
+|---|---|---|---|---|
+| Reviewer declines in portal, before accepting | Declined | unchanged | reviewer's pick | Reviewer before accepting |
+| Reviewer declines in portal after accepting (pre-materials) | Declined | unchanged | reviewer's pick | Reviewer after accepting |
+| Staff: reviewer withdrew after accepting | Declined | Withdrew | staff pick, not COI | Reviewer after accepting |
+| Staff: COI after accepting | Declined | Withdrew | conflict-of-interest | staff picks Reviewer after accepting or Foundation |
+| Staff: Other after accepting | Declined | Withdrew | other + required note | staff picks |
+| Staff: did not submit | Declined | Did not submit (new) | none | Reviewer after accepting |
+| Staff: COI before answering | Declined | unchanged | conflict-of-interest | staff picks Reviewer before accepting or Foundation |
+| Staff: Other before answering | Declined | unchanged | other + required note | staff picks |
+| Enough reviews, before answering | Withdrawn – sufficient | unchanged | none | Foundation |
+| Enough reviews, after accepting | unchanged | Released | none | Foundation |
+| No response (sweep or staff release) | No Response | unchanged | none | blank |
+
+**Reliability mark** = Ended by "Reviewer after accepting" with a reason other
+than conflict-of-interest, or review status Did not submit.
+
+**Report buckets** (exactly one per row, in this order): review received or
+completed → Did not submit → Withdrew/Declined with Ended by → Released →
+Withdrawn – sufficient → No Response → accepted/held/pending. Rows with no
+"Ended by" written before this build (legacy) bucket on response and status
+alone, and never count as reliability marks.
+
+### Writer and correction matrix
+
+| Writer | Ended by |
+|---|---|
+| `applyStage2aResponse` decline | Set before/after accepting from the same fresh row whose ETag binds the write (`respond-service.js` already reads it at :221 and passes `ifMatch`); the adapter takes the value, it does not infer it |
+| `applyStage2aResponse` accept | Cleared in the same payload that clears the decline fields (`reviewer-suggestion.js:2183-2185`) |
+| `applyStaffReviewerWithdrawal` | Takes reason, note and Ended by from the staff choice (today hard-coded `other`) |
+| New did-not-submit writer | Reviewer after accepting; own adapter function, honorarium as withdrawal, job cancellation, late-honorarium compensation; never falls through to Released (`terminal-transition.js:355-373` gets an explicit branch per status) |
+| New pre-answer outcome writer (COI / Other) | Staff choice |
+| `applyStaffReviewerRelease` | Foundation |
+| `withdrawPendingInvitation` | no_longer_needed → Foundation; no_response → explicit blank |
+| `expireInvitation` (stale sweep) | Explicit blank |
+| `correctResponse` | May move a pre-materials Declined row back to Accepted (the staff mirror of portal re-accept), clearing Ended by atomically; any other correction on a row with a recorded outcome is refused |
+| `correct-status.js` → `updateLifecycle` | Refused on a row with a recorded outcome; the closed-source guard (`reviewer-suggestion.js:2026-2047`) gains the outcome predicate |
+| Restore / manual re-select (`ENGAGEMENT_STAMP_RESET`) | Refused on a row with a recorded outcome (decision D) |
+| `reviewer-merge.js` | Copies person fields, not engagement outcomes; its engagement-signal predicate and adapter projection include Ended by |
+| Remove entirely | Deletes the row (an authorized exception that permits a later re-add); the removal audit snapshot (`remove-candidate-service.js:334-363`) adds Ended by, reason and status |
+
+Propagation: `entity-registry.js`, the adapter `FIELD_SELECT` lists, the
+token-verifier select (`verify-suggestion-token.js`), the DTO mappers and the
+Dataverse export workbook.
+
+### "Recorded outcome" predicate (decision D)
+
+One server-side function. A row has a recorded outcome when any of these
+holds: Ended by is set; response is Declined, No Response or Withdrawn –
+sufficient; `wmkf_declined` is true; review status is terminal (Withdrew,
+Released, Did not submit); `wmkf_reviewreceivedat` or `wmkf_completedat` is
+set. Accepted or Held with none of these is not ended. This covers legacy
+outcomes written before the column existed.
+
+Applied at: both re-add branches that return `restore_required`
+(`reviewer-suggestion.js:1004-1012`, `:1071-1082`), applicant promotion
+(`promote-applicant-reviewer-service.js:375-387`), `restore`, and every
+Removed-list control (Restore and Reset & restore, `ReviewerInvitePanel.js:829-859`).
+Those producers return a new `reinvite_unavailable` code with a plain message
+instead of `restore_required`; consumers updated: `manual-reviewer-service.js:280-292`,
+`ReviewerFindPanel.js:416,700-706`, `ReviewersTab.js:355`,
+`ReviewerManagePanel.js:219-225`, `reviewer-institution-measurement.js:62`.
+
+**Exception:** a reviewer re-accepting their own pre-materials decline through
+the portal is not a staff re-invitation and stays allowed.
+
+### Materials cutoff for revised E
+
+The cutoff between reversible acceptance and materials release is the
+**materials release claim** (`reviewer_materials_releases`, #562), not the
+later materials_sent status.
+
+- Portal decline or re-accept: refused as "materials released, contact your
+  Program Director" when a release row exists in any state other than
+  `failed` (claimed, link_minted, sent, recorded, uncertain).
+- Automatic release: already mints with the row's ETag
+  (`reviewer-acceptance-drain.js:803-807`). A decline that commits first makes
+  the mint fail, the release is marked failed, and the drain's terminal check
+  sees Declined. A mint that commits first changes the ETag, so the decline
+  re-reads, finds the claim and is refused.
+- Manual send: today it checks acceptance (`send-emails-service.js:728-792`)
+  and later mints without `ifMatch` (`:1205`). The build re-reads after
+  its claim and mints with that ETag, so a decline in between wins and the
+  send is skipped. **This gap is live in Production today**; the window is
+  seconds.
+- Re-accept after a failed release: allowed; the next release retakes the
+  failed row (#562 behavior).
+- The PD withdrawal notice (`reviewer-withdrawal.js:96-99`) states release
+  state from the claim, not an assumption.
+- Interleaving tests for both senders: decline before mint, mint before
+  decline, decline during an uncertain send.
+
 ## Open decisions
 
 - **A. Where "Did not submit" lives.** Either (a) a new `wmkf_reviewstatus`
@@ -206,5 +316,6 @@ finding spot-checked against source:
   `countAcceptedForRequest`, rollups, reminders, the stale sweep and Track
   Reviewers buckets.
 - Every caller of `softDelete` and `deleteMyCandidates`.
-- `/contract-reconcile` Mode A and the Codex adversarial review: done
-  2026-10-31 (findings above). Re-review the revised plan before building.
+- `/contract-reconcile` Mode A and three Codex adversarial rounds: done
+  2026-10-31 (findings above). The build contract above is the reviewed
+  baseline; code review covers the rest.
