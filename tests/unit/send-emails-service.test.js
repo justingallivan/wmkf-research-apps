@@ -13,6 +13,10 @@
  */
 
 const createAndSendEmail = jest.fn(async () => ({ emailId: 'email-1' }));
+jest.mock('../../lib/external/reviewer-materials', () => ({
+  ...jest.requireActual('../../lib/external/reviewer-materials'),
+  listReviewerMaterialsWithAvailability: jest.fn(async () => ({ files: [{ name: 'proposal.pdf' }], unavailable: false })),
+}));
 jest.mock('../../lib/services/reviewer-engagement/materials-release-store',
   () => require('../helpers/materials-release-store-mock').createMaterialsReleaseStoreMock());
 jest.mock('../../lib/services/alert-service', () => ({ __esModule: true, default: { autoResolve: jest.fn(async () => {}) } }));
@@ -123,6 +127,7 @@ const { stampFingerprint } = require('../helpers/draft-fingerprint');
 const { isFirstManualInvitation } = require('../../lib/services/reviewer-first-manual-invitation-coi');
 const materialsReleaseStore = require('../../lib/services/reviewer-engagement/materials-release-store');
 const AlertService = require('../../lib/services/alert-service').default;
+const { listReviewerMaterialsWithAvailability } = require('../../lib/external/reviewer-materials');
 
 const SUG_OK = '11111111-1111-4111-8111-111111111111';
 const SUG_NO_EMAIL = '22222222-2222-4222-8222-222222222222';
@@ -1063,6 +1068,57 @@ describe('send-emails-service — shared materials release claim (D46/D49)', () 
     await run({ drafts: [followupDraft(SUG_OK)], templateType: 'followup' });
 
     expect(materialsReleaseStore.claimMaterialsRelease).not.toHaveBeenCalled();
+  });
+});
+
+describe('send-emails-service — invitation needs the proposal PDF (D48)', () => {
+  const invite = () => run({ drafts: [draft(SUG_OK)], templateType: 'invitation' });
+
+  test.each([
+    [{ files: [], unavailable: false }, 'proposal_pdf_missing'],
+    [{ files: [], unavailable: true }, 'proposal_pdf_unavailable'],
+  ])('listing %j refuses with %s before the due-date write, mint, or send', async (listing, reason) => {
+    SUGGESTIONS[SUG_OK] = suggestion(SUG_OK);
+    listReviewerMaterialsWithAvailability.mockResolvedValueOnce(listing);
+
+    const emitted = await invite();
+
+    expect(resultOf(emitted).skipped[0]).toMatchObject({ suggestionId: SUG_OK, reason });
+    expect(mockEnsureRequestReviewDueDate).not.toHaveBeenCalled();
+    expect(mintAndStore).not.toHaveBeenCalled();
+    expect(createAndSendEmail).not.toHaveBeenCalled();
+  });
+
+  test('a listing that throws is unavailable, not missing', async () => {
+    SUGGESTIONS[SUG_OK] = suggestion(SUG_OK);
+    listReviewerMaterialsWithAvailability.mockRejectedValueOnce(new Error('graph down'));
+
+    const emitted = await invite();
+
+    expect(resultOf(emitted).skipped[0]).toMatchObject({ reason: 'proposal_pdf_unavailable' });
+    expect(createAndSendEmail).not.toHaveBeenCalled();
+  });
+
+  test('a listed PDF lets the invitation through even if another folder could not be listed', async () => {
+    SUGGESTIONS[SUG_OK] = suggestion(SUG_OK);
+    listReviewerMaterialsWithAvailability.mockResolvedValueOnce({ files: [{ name: 'p.pdf' }], unavailable: true });
+
+    const emitted = await invite();
+
+    expect(resultOf(emitted).sent).toHaveLength(1);
+    expect(listReviewerMaterialsWithAvailability).toHaveBeenCalledWith(REQUEST_ID, REQUEST.akoya_requestnum);
+  });
+
+  test('the check runs once per request in a batch and never for materials sends', async () => {
+    SUGGESTIONS[SUG_OK] = suggestion(SUG_OK);
+    SUGGESTIONS[SUG_OK_2] = suggestion(SUG_OK_2);
+    await run({ drafts: [draft(SUG_OK), draft(SUG_OK_2)], templateType: 'invitation' });
+    expect(listReviewerMaterialsWithAvailability).toHaveBeenCalledTimes(1);
+
+    listReviewerMaterialsWithAvailability.mockClear();
+    SUGGESTIONS[SUG_OK] = suggestion(SUG_OK, { wmkf_accepted: true, wmkf_reviewstatus: 100000000 });
+    await run({ drafts: [draft(SUG_OK)], templateType: 'materials' });
+    expect(listReviewerMaterialsWithAvailability).not.toHaveBeenCalled();
   });
 });
 

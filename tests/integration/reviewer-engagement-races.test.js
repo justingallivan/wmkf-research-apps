@@ -7,6 +7,10 @@
  * External email/token/question/SQL dependencies and authenticated entry/role
  * lookups are replaced; the whole-batch request ownership policy is real.
  */
+jest.mock('../../lib/external/reviewer-materials', () => ({
+  ...jest.requireActual('../../lib/external/reviewer-materials'),
+  listReviewerMaterialsWithAvailability: jest.fn(async () => ({ files: [{ name: 'proposal.pdf' }], unavailable: false })),
+}));
 jest.mock('@vercel/postgres', () => ({
   sql: jest.fn(() => { throw new Error('Unexpected Postgres access in race harness'); }),
 }));

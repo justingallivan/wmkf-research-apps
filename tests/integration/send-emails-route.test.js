@@ -13,6 +13,10 @@ const mockRequireAppAccess = jest.fn(async () => ({
   profileId: 7,
 }));
 const mockGetUserRole = jest.fn(async () => 'read_write');
+jest.mock('../../lib/external/reviewer-materials', () => ({
+  ...jest.requireActual('../../lib/external/reviewer-materials'),
+  listReviewerMaterialsWithAvailability: jest.fn(async () => ({ files: [{ name: 'proposal.pdf' }], unavailable: false })),
+}));
 jest.mock('../../lib/services/reviewer-engagement/materials-release-store',
   () => require('../helpers/materials-release-store-mock').createMaterialsReleaseStoreMock());
 jest.mock('../../lib/services/alert-service', () => ({ __esModule: true, default: { autoResolve: jest.fn(async () => {}) } }));

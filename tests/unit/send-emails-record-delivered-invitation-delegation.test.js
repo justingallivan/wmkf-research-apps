@@ -17,6 +17,10 @@
  */
 
 const createAndSendEmail = jest.fn(async () => ({ emailId: 'email-1' }));
+jest.mock('../../lib/external/reviewer-materials', () => ({
+  ...jest.requireActual('../../lib/external/reviewer-materials'),
+  listReviewerMaterialsWithAvailability: jest.fn(async () => ({ files: [{ name: 'proposal.pdf' }], unavailable: false })),
+}));
 jest.mock('../../lib/services/dynamics-service', () => ({
   DynamicsService: { createAndSendEmail: (...a) => createAndSendEmail(...a) },
 }));

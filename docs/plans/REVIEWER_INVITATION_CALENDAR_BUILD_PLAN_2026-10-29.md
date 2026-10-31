@@ -272,13 +272,17 @@ Admin `inviteStartDate` has no reader outside its form, validation and tests
   then [ASSUMED — verify at build].
 - **Invitation precondition:** sending an invitation checks the proposal PDF is
   present (blocking, not today's `window.confirm`), so materials are ready when
-  invitations go out.
+  invitations go out. Built Session 654 in `send-emails-service.js`
+  (`checkInvitationProposalPdf`, once per request per batch, before the
+  due-date write): no listed reviewer PDF → `proposal_pdf_missing`; nothing
+  listed and a folder unlistable, or the listing threw →
+  `proposal_pdf_unavailable` (fail closed, staff retry).
 
 **Build notes (2026-10-30, branch `claude/reviewer-materials-on-accept`, PR
 #562, not merged).** Built on the branch: migration 091 and its store, the
 acceptance job's `release_materials` step with the new template keys, and the
-manual-path claim and staff recovery (Session 654). Still [PLANNED]: invitation PDF
-precondition and accepted-screen copy, invitation wording and
+manual-path claim, staff recovery, the invitation PDF precondition and the
+accepted-screen copy (Session 654). Still [PLANNED] (follow-up PR): invitation wording and
 `{{proposalDelivery}}` / Reviewer Finder date-field retirement. Accept does
 not set a review status [VERIFIED via rg: no `reviewStatus` write in
 `respond-service.js` or `reviewer-engagement/record-invitation.js`; writers are
@@ -376,8 +380,8 @@ to a follow-up PR (owner, 2026-10-30).
   (`materials_release_unavailable`); real sessions always carry one
   (`requireAppAccess`).
 - **Build order** (each a stop point): migration + claim service → drain step →
-  manual-path claim → recovery action (route + UI) [built through here] → invitation PDF
-  precondition + accepted-screen copy → wording seeds, `{{proposalDelivery}}`
+  manual-path claim → recovery action (route + UI) → invitation PDF
+  precondition + accepted-screen copy [built through here; #562 complete] → wording seeds, `{{proposalDelivery}}`
   and Reviewer Finder date-field retirement.
 
 ### 3.4 Wording
