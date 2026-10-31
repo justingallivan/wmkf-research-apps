@@ -32,28 +32,33 @@ async function getAll(client, path) {
   return rows;
 }
 
-function priorAnswer(details) {
-  // Walk newest-first; the removal is the change that set wmkf_selected false.
-  // The OldValue of that change (or of the latest earlier change touching the
-  // answer fields) holds what removal erased.
-  const sorted = [...details].sort((a, b) => String(b?.AuditRecord?.createdon || '').localeCompare(String(a?.AuditRecord?.createdon || '')));
-  const removal = sorted.find(d => d?.NewValue?.wmkf_selected === false);
-  if (!removal) return null;
-  // Audit records only changed fields: a removal that changed no answer field
-  // erased nothing.
-  if (!ANSWER_FIELDS.some(f => f in (removal.OldValue || {}) && removal.OldValue[f] != null && removal.OldValue[f] !== false)) {
-    return { removedOn: String(removal.AuditRecord?.createdon || '').slice(0, 10) || null, erasedNothing: true };
-  }
-  const o = removal.OldValue;
+const hasAnswer = (o) => ANSWER_FIELDS.some(f => f in (o || {}) && o[f] != null && o[f] !== false);
+const describe = (d) => {
+  const o = d.OldValue;
   return {
-    removedOn: String(removal.AuditRecord?.createdon || '').slice(0, 10) || null,
+    removedOn: String(d.AuditRecord?.createdon || '').slice(0, 10) || null,
     responseType: o.wmkf_responsetype == null ? null : (RESPONSE[o.wmkf_responsetype] || `unknown:${o.wmkf_responsetype}`),
     accepted: o.wmkf_accepted ?? null,
     declined: o.wmkf_declined ?? null,
     reviewStatus: o.wmkf_reviewstatus == null ? null : (STATUS[o.wmkf_reviewstatus] || `unknown:${o.wmkf_reviewstatus}`),
     held: Boolean(o.wmkf_heldat),
   };
+};
+
+// Every change that unselected the row AND erased an answer, excluding the
+// reviewer's own decline (which unselects but writes declined=true). Audit
+// records only changed fields, so an unselect with no answer in OldValue
+// erased nothing. Oldest first.
+function erasingRemovals(details) {
+  return [...details]
+    .filter(d => d?.NewValue?.wmkf_selected === false && d?.NewValue?.wmkf_declined !== true && hasAnswer(d.OldValue))
+    .sort((a, b) => String(a?.AuditRecord?.createdon || '').localeCompare(String(b?.AuditRecord?.createdon || '')))
+    .map(describe);
 }
+
+const label = (p) => p.reviewStatus ? `review status ${p.reviewStatus}`
+  : p.responseType ? `response ${p.responseType}`
+  : p.accepted ? 'accepted flag only' : p.declined ? 'declined flag only' : 'held only';
 
 async function main() {
   loadEnvLocal();
@@ -75,35 +80,35 @@ async function main() {
 
   const results = [];
   let historyErrors = 0;
+  let morePages = 0;
   for (const r of rows) {
     const id = r.wmkf_appreviewersuggestionid;
     const target = encodeURIComponent(JSON.stringify({ '@odata.id': `wmkf_appreviewersuggestions(${id})` }));
     const h = await client.get(`/RetrieveRecordChangeHistory(Target=@t)?@t=${target}`);
     if (!h.ok) { historyErrors += 1; if (historyErrors === 1) out.firstHistoryError = h.status; continue; }
-    const details = h.body?.AuditDetailCollection?.AuditDetails || [];
-    results.push({ entries: details.length, withdrawnSufficientStamp: Boolean(r.wmkf_withdrawnsufficientat), prior: priorAnswer(details) });
+    const coll = h.body?.AuditDetailCollection || {};
+    if (coll.MoreRecords === true) morePages += 1;
+    const details = coll.AuditDetails || [];
+    results.push({ entries: details.length, withdrawnSufficientStamp: Boolean(r.wmkf_withdrawnsufficientat), erased: erasingRemovals(details) });
   }
 
-  const tally = {};
-  for (const x of results) {
-    const p = x.prior;
-    const key = !x.entries ? 'no audit entries'
-      : !p ? 'history found, no unselect change in it'
-      : p.erasedNothing ? 'removed with no answer to erase'
-      : p.reviewStatus ? `review status ${p.reviewStatus}`
-      : p.responseType ? `response ${p.responseType}`
-      : p.accepted ? 'accepted flag only' : p.declined ? 'declined flag only' : 'no answer before removal';
-    tally[key] = (tally[key] || 0) + 1;
-  }
   out.historyRead = results.length;
   out.historyErrors = historyErrors;
-  out.priorAnswerBeforeRemoval = tally;
+  out.historiesWithMorePages = morePages;
+  out.rowsWithNoAuditEntries = results.filter(x => !x.entries).length;
+  out.rowsWithNothingErased = results.filter(x => x.entries && !x.erased.length).length;
+  out.rowsThatLostAnAnswer = results.filter(x => x.erased.length).length;
+  out.rowsErasedMoreThanOnce = results.filter(x => x.erased.length > 1).length;
+  // The answer each row held just before its FIRST erasing removal.
+  const tally = {};
+  for (const x of results.filter(x => x.erased.length)) { const k = label(x.erased[0]); tally[k] = (tally[k] || 0) + 1; }
+  out.answerLostAtFirstRemoval = tally;
   out.withdrawnSufficientStampRows = {
     total: results.filter(x => x.withdrawnSufficientStamp).length,
-    priorResponse: results.filter(x => x.withdrawnSufficientStamp).map(x => x.prior?.responseType ?? (x.entries ? 'not identified' : 'no audit')),
+    lostAnswer: results.filter(x => x.withdrawnSufficientStamp && x.erased.length).map(x => label(x.erased[0])),
   };
-  const dates = results.map(x => x.prior?.removedOn).filter(Boolean).sort();
-  out.removalDates = dates.length ? [dates[0], dates[dates.length - 1]] : null;
+  const dates = results.flatMap(x => x.erased.map(e => e.removedOn)).filter(Boolean).sort();
+  out.erasingRemovalDates = dates.length ? [dates[0], dates[dates.length - 1]] : null;
   console.log(JSON.stringify(out, null, 2));
 }
 
