@@ -55,7 +55,7 @@ invocations. Request linkage is present only when the Executor caller supplies
   `requestId`, `wmkf_ai_Request@odata.bind` (both capital — see nav-prop case
   warning above)
 - `pages/api/phase-i-dynamics/summarize.js` — Phase I summarization
-- `pages/api/grant-reporting/extract.js` — Grant Reporting writeback
+- `pages/api/grant-reporting/extract.js` — Grant Reporting extraction and goals assessment; writes a best-effort `wmkf_ai_run` audit row, not extracted values to `akoya_request` (`lib/services/grant-reporting/extract-service.js`)
 - `scripts/probe-impersonation-resmoke.js`, `scripts/probe-impersonation-as-user.js` — write sentinel rows during impersonation testing (S135). Filter `wmkf_ai_model='impersonation-resmoke'` to find them.
 - `scripts/seed-phase-i-prompt.js` — `DynamicsService.updateRecord('wmkf_ai_runs', SCRATCH_GUID, ...)` to seed the v2 prompt scratch row (the one `prompt-resolver.js` reads)
 

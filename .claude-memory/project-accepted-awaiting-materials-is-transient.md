@@ -1,48 +1,47 @@
 ---
 name: project-accepted-awaiting-materials-is-transient
-description: Owner stance (2026-09-05, dated to J27 on 2026-09-06): from the J27 cycle reviewers will receive materials immediately on acceptance, so the "accepted, awaiting materials" reviewStatus is transient; no dashboard sub-count for it; the manual release-materials modal remains the D26 path.
+description: Materials-on-acceptance is implemented via PR 562; awaiting-materials remains a transient/fallback state, not a separate dashboard project.
 metadata:
   type: project
   status: active
+last_verified: 2026-10-31 via source and Git ancestry; dated release receipts, no live probe
 ---
 
 ## Recall Rule
-Read when planning reviewer dashboard counts, the release-materials modal smoke, or the materials-on-acceptance automation.
 
-Do: treat `reviewStatus === 'accepted'` without materials as transient by design; plan the automated send before the J27 invitations go out in 2027.
-Do not: propose an "awaiting materials" sub-count or a Preview seeding exercise for the manual modal.
-Ground truth: manual path is `shared/components/reviewers/ReleaseMaterialsModal.js` plus the send-emails `materials` template; no automated send existed as of S490. Hub: `docs/agent-wiki/topics/reviewer-workbench-lifecycle.md`.
+Read when planning reviewer dashboard counts, materials delivery or acceptance
+recovery. Do not propose another materials-on-acceptance build, an awaiting-materials
+sub-count, or a synthetic manual-modal smoke as an open D26 requirement.
 
-On 2026-09-05 (Session 489) the owner said that from the next cycle onward the
-proposal materials will be in hand when reviewers accept, so materials are sent
-immediately on acceptance. The `reviewStatus === 'accepted'` (no materials yet)
-state is therefore expected to be momentary and "uninformative/vestigial".
+## Current implementation boundary
 
-**Clarified 2026-09-06 (S490):** this is an AUTOMATION to be built, not a PD
-promptness promise. Desired flow: all review materials are in hand at the time
-of the request to review; upon acceptance AND onboarding, the system sends the
-reviewer an email with a link to the review materials (the proposal) with no PD
-action. Nothing does this today [VERIFIED S490: the acceptance job/drain handles
-honorarium onboarding and bookkeeping only; materials go out solely via the
-PD-driven `ReleaseMaterialsModal` → send-emails `materials` template]. Once
-built, the manual modal becomes the exception/fallback path and its production
-smoke is no longer a gating item; the smoke that matters is the automated send.
+[VERIFIED via source/Git, 2026-10-31] PR #562 (`fcad0ad53`) implements
+`releaseMaterialsOnAcceptance` in `lib/services/reviewer-acceptance-drain.js`.
+The acceptance drain and manual Release Materials send share one durable
+`reviewer_materials_releases` claim per engagement before minting the link.
+Successful automatic delivery records the reviewer markers; preparation failures
+retry for about 15 minutes before the old confirmation/manual-release fallback
+and staff alert. Uncertain sends require the documented staff recovery, not a
+blind automatic resend. See `docs/atlas/postgres-reviewer-materials-releases.md`
+and `docs/plans/REVIEWER_INVITATION_CALENDAR_BUILD_PLAN_2026-10-29.md`.
 
-**Why:** The Session 489 production smoke of the Stage 6B surfaces could not
-exercise the release-materials modal because no active request had a reviewer
-in that state; the dashboard rollup's "accepted" bucket (invitation outcome) does
-not distinguish it from Materials Sent. The owner declined to treat either as a
-gap worth building for.
+Session657 and DEVELOPMENT_LOG record migration 091 applied and Production
+release on 2026-10-31. Those are dated operational receipts; this audit did not
+probe current configuration or prove a natural J27 acceptance delivery. PR #568
+(`166b808e2`) adds the manual-send fresh reviewer check and ETag-bound mint.
 
-**How to apply:** Do not propose a dashboard "awaiting materials" sub-count or a
-Preview seeding exercise for the release-materials smoke. The automated
-materials-on-acceptance send is the next lifecycle build (not yet planned as of
-S490); plan it before the **J27** (June 2027 cycle) reviewer invitations go out in 2027;
-owner correction 2026-09-06: D26 acceptances have already happened, so this is a
-J27 build, not a D26 one ("the proposals will arrive in December of 2026, which
-may be the confusion"). If it ships, smoke the automated send at the first J27
-acceptance. The manual-modal smoke is **effectively closed** (owner 2026-09-06): D26
-invitations have gone out and many reviews are in; the only residual D26 use is a
-replacement reviewer if someone backs out, which would exercise the modal
-naturally. Do not list it as an open D26 item. See
-[[project-workbench-consolidation-rollout]] for the Workbench lifecycle context.
+Remaining work: observe the first natural J27 acceptance delivery; separately
+scope invitation wording / `{{proposalDelivery}}` and old date-field retirement.
+Do not turn those follow-ups into a claim that automatic delivery is unbuilt.
+
+## Historical owner decisions — 2026-09-05–06
+
+The owner expected materials to be in hand by acceptance for J27 (June 2027),
+with proposals arriving in December 2026 and invitations in 2027. The temporary
+accepted-without-materials state was called uninformative/vestigial, so no new
+dashboard sub-count was wanted. The manual-modal smoke was closed as a D26
+requirement; a replacement reviewer could exercise it naturally. At that dated
+checkpoint the automatic send did not exist. The implementation above supersedes
+that old status while preserving the owner's product decision.
+
+Hub: `docs/agent-wiki/topics/reviewer-workbench-lifecycle.md`.

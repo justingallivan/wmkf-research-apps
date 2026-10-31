@@ -2,8 +2,8 @@
 title: Proposal Context Extraction Plan
 domain: general
 kind: plan
-status: active
-summary: "Created: 2026-04-17 (Session 103) Status: Planning — relevant to single-phase cycle (two cycles out)."
+status: historical
+summary: "Historical proposal for expanded structured context; existing dataExtract consumers do not establish the proposed schema or universal input contract."
 canonical: false
 cataloged: 2026-07-02
 owner: product-engineering
@@ -17,23 +17,25 @@ related:
 # Proposal Context Extraction Plan
 
 **Created:** 2026-04-17 (Session 103)
-**Status:** Planning — relevant to single-phase cycle (two cycles out)
+**Status:** Historical design proposal; implementation and architecture are not approved by this document.
+
+> **Current-state note (source-only review, 2026-10-31; no live probes):** A narrower `wmkf_ai_dataextract` surface already exists in source: Workbench reads it, the cycle-dossier snapshots it into `priorAiContext`, and the Executor can persist prompt-declared outputs to it. This does not prove the proposed A/B/C field set or the full list of downstream consumers. The successor Review Panel uses a frozen narrative-centered DTO with request identity, institution and title (`lib/services/review-panel-input.js`) and excludes the extract. The concept evaluator's eligibility flag is a separate concept-PDF flow. This plan's cycle scenario, expanded field list, token/cost arithmetic, model assumptions, and API/Dataverse implementation sequence are historical hypotheses; obtain current owner decisions and define actual consumers before expanding or reusing them.
 
 ## Motivation
 
-In the upcoming grant cycle we still have separate Phase I and Phase II submissions. Phase I runs at volume (hundreds of proposals, automated low-touch processing); Phase II runs at lower volume with higher-touch work (reviewer finding, deep dives, virtual panels).
+The original 2026-04 scenario assumed separate Phase I and Phase II submissions in the upcoming cycle.
 
-In the cycle after that, there will be **no separate Phase I/II submission** — each institution submits one proposal. All proposals get an initial Claude pass producing Phase-I-like outputs. Staff then select which proposals advance to deeper evaluation. The critical difference from the prior cycle: **no new information arrives for advanced proposals.** The deeper evaluation re-reads the same document we already processed.
+It then hypothesized a later single-package cycle with an initial AI pass and staff-selected deeper evaluation. That future-cycle premise is not a current cycle decision established here.
 
-That's an opportunity. If the initial pass captures the right structured context and stores it in Dynamics, every downstream call can read curated extracts (~1–2K tokens) instead of the full proposal (5–7K tokens of text, potentially 12–20K with PDF images). The savings compound across deeper-touch workflows — reviewer matching, multi-LLM panels, compliance screens, staff Q&A.
+The original design proposed expanding structured context in Dynamics so selected downstream calls could read curated extracts. Its token sizes and proposed universal downstream reuse are assumptions, not current measurements or requirements. The narrower existing `wmkf_ai_dataextract` field does not establish this broader architecture.
 
 ## Why this matters more than it looks at first
 
-Three amplifiers push the ROI higher than raw per-call savings suggest:
+The original proposal identified three possible ROI amplifiers. Its provider mix, call counts, model prices, and usage volumes are dated assumptions, not a current cost estimate:
 
 1. **Expensive models.** When we move deeper-touch workflows to Opus or extended-thinking models, per-token cost is 5–10× Sonnet. Context savings matter correspondingly more. A compliance screen on a 5-page PDF with images might be $0.25 under Opus; against pre-extracted context, $0.03.
 
-2. **Multi-LLM panel work.** The legacy Virtual Review Panel (retired 2026-10-04) called Claude + GPT + Gemini + Perplexity per stage. If we give each provider the full proposal, context cost is 4× per stage. If we give them pre-extracted structured context, the saving multiplies by the provider count. Panel runs are already 343 calls/year and growing.
+2. **Multi-model panel work.** The legacy Virtual Review Panel described in this estimate was retired 2026-10-04. Its successor Review Panel has a different configured-seat design and narrative-centered input contract. The old four-provider call-volume arithmetic does not describe the successor.
 
 3. **Chain depth.** Any one proposal advancing to deep-dive may hit 5–10 downstream calls (reviewer match, panel claim-verification, panel structured-review, panel devil's-advocate, panel synthesis, compliance, staff Q&A). At 7K vs. 1.5K per call × 8 calls, that's ~44K tokens saved per advancing proposal.
 
@@ -42,8 +44,9 @@ Note: this is **not a prompt-caching play** — it's a pre-extraction play. The 
 Worth knowing: Session 103's ~2,048-token Sonnet 4.6 result is a dated empirical observation,
 not current model guidance. Anthropic now documents a 1,024-token minimum for Sonnet 4.6; use
 the concrete model's current floor from [Anthropic's prompt-caching documentation](https://platform.claude.com/docs/en/build-with-claude/prompt-caching).
-The architectural point still holds: once extraction lives in Dynamics, downstream calls are
-designed to be small (~1.5K tokens of curated fields) and do not need full-proposal context.
+The original architectural hypothesis was that selected downstream calls could
+use smaller curated extracts. No universal consumer contract or current ~1.5K-token
+input size is established; each workflow must validate its own required context.
 See `docs/PROMPT_CACHING_AUDIT.md`.
 
 ## What to capture in the initial pass
@@ -110,14 +113,14 @@ Per-call input-token comparison for the same 5-page proposal:
 
 Multiplied by providers (panel = 4-way fan-out, so 3 extra providers also skip the full proposal): savings climb to ~170K tokens per advancing proposal across the panel stages alone.
 
-At Sonnet 4.6 pricing: ~$0.50 saved per advancing proposal. At Opus pricing: ~$2.50 saved. Across 100 advancing proposals/cycle and a panel model mix, we're talking $200–500/cycle in direct savings, plus meaningful latency improvements.
+The dollar savings above are historical scenario arithmetic only. They are not a current forecast; remeasure against approved workflows, actual documents, current models, and current prices before using them.
 
 ## Connection to existing plans
 
-- `docs/WORKFLOW_CHAINING_DESIGN.md` — this doc is the "ingest" side of ingest-once/chain-downstream. The extraction here is the *output* of the initial multi-output prompt; every downstream stage reads these fields as *input*.
-- `docs/PROMPT_STORAGE_DESIGN.md` — the initial-pass prompt goes in `wmkf_ai_prompt` like any other. Its structured-output schema lives in `wmkf_ai_promptoutputschema` (single row defining the full extraction shape above).
-- `docs/DYNAMICS_AI_FIELDS_SPEC_v3_cn.md` — needs extension with the field set above. Connor would add the columns and choose the `wmkf_ai_` vs `wmkf_` naming convention (same open question as the rest of the AI fields).
-- Memory: `wmkf_ai_dataextract` was deferred "until the capture shape is settled." **This is the capture shape.**
+- `docs/WORKFLOW_CHAINING_DESIGN.md` — the historical proposal linked an initial extraction output to later inputs. It does not establish that every downstream stage reads these fields; current consumers must be traced independently.
+- `docs/PROMPT_STORAGE_DESIGN.md` — the old design proposed a prompt row and structured-output schema. No current row or schema for the full A/B/C shape is established here.
+- `docs/DYNAMICS_AI_FIELDS_SPEC_v3_cn.md` — historical proposal to extend the existing AI field surface; this plan does not establish that the listed fields or columns were approved or added.
+- Memory: `wmkf_ai_dataextract` was previously deferred. This document proposed candidate fields but did not settle the contract; the capture shape remains undecided.
 
 ## Design decisions still open
 
@@ -145,7 +148,7 @@ At Sonnet 4.6 pricing: ~$0.50 saved per advancing proposal. At Opus pricing: ~$2
    - Format-specific artifacts that won't generalize across cycles
    - PI names/institution already captured by Dynamics record fields
 
-## Implementation order (when we get here)
+## Historical Suggested Implementation Order (Not Authorized)
 
 1. Connor adds the proposed fields to `akoya_request` (ideally named consistently with v3 AI fields spec)
 2. Define the JSON output schema for the extraction in `wmkf_ai_promptoutputschema`
@@ -155,7 +158,7 @@ At Sonnet 4.6 pricing: ~$0.50 saved per advancing proposal. At Opus pricing: ~$2
 6. A/B test: same proposal with full-proposal context vs. extracted-field context. Measure: output quality (blind-graded by staff), token cost, latency
 7. Roll forward once A/B validates quality
 
-## Not doing (for now)
+## Historical Deferrals (Not Current Schedule)
 
 - Not building this for the current or next grant cycle. The payoff lives in the single-phase cycle when deep-dive work happens on the same docs the initial pass processed.
 - Not retrofitting existing Phase II apps — they operate on different documents (Phase II is a separate, more detailed proposal today).

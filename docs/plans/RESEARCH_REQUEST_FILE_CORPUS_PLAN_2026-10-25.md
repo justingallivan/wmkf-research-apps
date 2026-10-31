@@ -3,7 +3,7 @@ title: Research request file corpus — derived legible layer
 kind: plan
 domain: dataverse
 status: active
-summary: "Build a derived, rebuildable index (and extracted text) over the SharePoint files attached to Research requests, 1990–present, without moving or renaming originals, so staff can browse and AI/portfolio/outcome analyses can run. Based on the 2026-10-25 read-only inventory of 9,001 requests and 60,369 files (de-duplicated across runs); index starts in Postgres and settled fields are promoted to Dataverse as the durable record (owner decision 2026-10-25); owner approved a past-weighted content pilot (~55 requests) focused on science proposals, reviews, grant reports and staff writeups, with no per-request visibility rule (admin exercise, owner 2026-10-25); inventory counts are provisional pending a strict re-listing. The content pilot (55 requests, 449 files) found legacy .doc converts through Graph, about a quarter of PDFs need OCR, and the 1995–2012 archives hold staff and grant-management documents with strong first-line templates rather than proposals. Owner decision 2026-10-25: the corpus starts at the 2018 meeting year, where proposals become identifiable for 94–100% of requests with files; meeting years before 2018 (5,149 requests) are parked, with the evidence and revisit triggers recorded in the plan, until the proposals can be imported from microfiche."
+summary: "PARTIAL: Research corpus scope is meeting years 2018 onward; the Postgres metadata index and filename classification are built and merged (migration 090; first load 3,853 requests / 38,399 files, one known listing error). Extraction at scale, OCR, admin browsing/analyses, scheduled refresh, and promotion of settled fields to Dataverse remain future work. Meeting years before 2018 are parked."
 owner: product-engineering
 related:
   - scripts/probe-request-file-inventory.mjs
@@ -18,7 +18,7 @@ related:
 
 ## Goal and boundary
 
-[ACTIVE; owner direction and decisions 2026-10-25; nothing built beyond the inventory script.] Make the files attached to Research
+[PARTIAL; current state as of 2026-10-31.] Make the files attached to Research
 requests simple to find and usable for later analysis: AI over full text,
 portfolio statistics, linking proposal content to reviews and outcomes, and
 browsing by admins (an admin exercise, not a staff feature; owner
@@ -36,6 +36,14 @@ This layer is not the governed Request Document registry (`wmkf_requestdocument`
 which tracks app-produced writeups and Site Visit artifacts with lifecycle and
 version rules. The corpus may read those files, but it never writes that registry
 or substitutes for it.
+
+**Current implementation state:** the inventory, rule coverage, content pilot,
+template-signature pass, and Postgres metadata index are built. The first index
+load completed 2026-10-26 with 3,853 requests and 38,399 files; request 992853
+was the one known listing error. This is owner-recorded build/load evidence,
+not a fresh Production readback. No app-facing corpus browser or analysis consumer was found in the source audit. Full text
+extraction (including OCR decisions), admin browsing and analyses, scheduled
+refresh, and Dataverse promotion are not built. See rollout steps 4–7 below.
 
 ## What exists — inventory of 2026-10-25
 

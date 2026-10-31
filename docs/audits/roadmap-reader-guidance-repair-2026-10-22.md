@@ -14,11 +14,14 @@ owner: product-engineering
 
 This was a bounded documentation reconciliation of the strategy, queue, roadmap
 wiki, Meeting Tracker plan, briefing-page plan, and J27 document-capture memory.
-Source on `main`, Git ancestry, and dated release receipts were checked. No live
+Source on `main`, Git ancestry, and dated release receipts were checked.
+This report preserves that checkpoint only; it is not a current backlog. The
+materials-on-acceptance build status below was superseded by PR #562 on
+2026-10-31; current boundaries are in `product-backlog-reconciliation-2026-10-31.md`. No live
 environment probe, gate, test suite, deployment, or commit was run as part of
 the delegated documentation pass; parent verification is recorded below.
 
-## Corrections
+## Corrections at the 2026-10-22 checkpoint
 
 - The queue now records the implemented Final Writeup dashboard filters, views,
   cycle scoping, and publication-version context with their separate 6A merge
@@ -83,7 +86,7 @@ the delegated documentation pass; parent verification is recorded below.
   byte Board-snapshot writes remains intact. It is separate from native
   SharePoint version restore/recycle recovery evidence.
 
-## Remaining boundaries
+## Remaining boundaries at the 2026-10-22 checkpoint
 
 - Exact 500 MB applicant-material transfer remains unverified; the owner declined
   another simultaneous-large test on 2026-10-02.

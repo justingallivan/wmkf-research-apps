@@ -1,9 +1,11 @@
 # Atlas: `reviewer_materials_releases` (Postgres — materials release claim)
 
-**Status:** [PLANNED — on branch `claude/reviewer-materials-on-accept`, not
-merged, not applied anywhere.] Migration
-`091_reviewer_materials_releases.sql`. Production `schema_migrations` must be
-checked (owner-run) before merge.
+**Status:** [PRODUCTION-DEPLOYED 2026-10-31 via PR #562 (`fcad0ad53`).]
+Migration `091_reviewer_materials_releases.sql` was applied in Production before
+merge; the owner-recorded apply receipt reported the table at zero rows then.
+That is an apply-time receipt, not a fresh row-count probe. Automatic and manual
+materials sends now share this release claim; this audit does not establish
+a natural J27 acceptance exercising the automatic path. See `DEVELOPMENT_LOG.md`'s 2026-10-31 entry.
 
 ## Purpose
 

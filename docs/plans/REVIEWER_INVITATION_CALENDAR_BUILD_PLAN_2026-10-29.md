@@ -3,7 +3,7 @@ title: Reviewer invitation build — materials on acceptance, calendar due date,
 domain: reviewers
 kind: plan
 status: in-progress
-summary: "One build before the Feb 24, 2027 J27 invitations (owner, 2026-10-29): the review due date comes from the cycle calendar's Reviews Due Date; reviewers get materials as soon as they accept (D46); per-send, browser-saved and Reviewer Finder record dates go away; review filing follows each cycle's Board date (D44) instead of a Vercel switch; the Board setup reads its dates from the calendar (D47); small calendar-page fixes. Traced from source 2026-10-29. PR 1 (#551) and PR 2 (#552, due date and cycle config from the request's Grant Cycle link) are deployed; PR 3 (#561, Board setup from the calendar) is open, not merged; PR 4 remains."
+summary: "PARTIAL / follow-ups remain. PR #551 review filing, PR #552 calendar due date and linked-cycle config, PR #561 Board setup calendar read, and PR #562 materials-on-acceptance implementation are merged and Production-deployed. The invitation wording/proposalDelivery and Reviewer Finder date retirement follow-up remains, as do the removed-candidate terminal-history decision, first-link due-date write gap, and first J27 acceptance observation. Release receipts are owner-recorded in DEVELOPMENT_LOG.md; no fresh live probe is claimed here."
 canonical: false
 owner: product-engineering
 related:
@@ -15,6 +15,30 @@ related:
 ---
 
 # Reviewer invitation build (before Feb 24, 2027)
+
+## Current implementation and release status (2026-10-31)
+
+The design and source trace below are retained as a dated baseline, not as a
+description of today's implementation. PR #551 (`caf318983`), #552
+(`54070863f`), #561 (`955613bdb`) and #562 (`fcad0ad53`) are merged and
+Production-deployed; #562 applied migration 091 and seeded the new acceptance
+email keys before merge. See `DEVELOPMENT_LOG.md`'s 2026-10-31 entries for the
+owner-recorded release receipts. The first natural J27 acceptance delivery remains unverified, and no fresh
+Production probe was made for this update.
+
+Remaining work within this plan:
+
+- Follow-up PR for invitation wording, `{{proposalDelivery}}` removal and
+  retirement of Reviewer Finder proposal-date fields. Live wording changes need
+  owner approval and rebaseline.
+- Resolve the removed-candidate terminal-history question and the first-link
+  due-date write gap recorded in `SESSION_PROMPT.md`'s current handoff.
+- Observe the automated path at the first J27 acceptance.
+
+Before the durable release claim, preparation failures retry for about 15
+minutes, then the reviewer gets today's acceptance confirmation and staff are
+alerted to release materials manually. Once the claim exists, persisted release
+state and staff recovery govern; the worker does not blindly send again.
 
 ## 1. Scope
 
@@ -32,7 +56,7 @@ Owner, 2026-10-29: plan and build these together, plan first.
 Out of scope: Staff Deliberations prep by calendar (before April), the
 grantee-title job (T13), app-side calendar dates (Feb 3 deadline).
 
-## 2. What exists today (traced 2026-10-29)
+## 2. What existed at the 2026-10-29 source-trace checkpoint
 
 Provenance: three delegated read-only source traces (due date chain; accept and
 materials release; review filing and calendar page). Lines marked
@@ -83,12 +107,12 @@ file:line citations, to be re-verified by contract-reconcile before each PR.
   fields, stages a Postgres `reviewer_acceptance_jobs` row, returns the
   `accepted-pre-materials` view. It does not change review status or token
   expiry.
-- **Acceptance job** (`pages/api/cron/drain-reviewer-acceptances.js`, every 2
+- **At the 2026-10-29 checkpoint, acceptance job** (`pages/api/cron/drain-reviewer-acceptances.js`, every 2
   minutes; `lib/services/reviewer-acceptance-drain.js`): contact promotion,
   identity, honorarium, then the acceptance email once
   (`sendAcceptanceConfirmationOnce`, claim step `acceptance_confirmation`). Leases,
   retries, step claims and a pause switch already exist.
-- **Materials release is manual** (`ReleaseMaterialsModal.js` → `send-emails` →
+- **At that checkpoint, materials release was manual** (`ReleaseMaterialsModal.js` → `send-emails` →
   `send-emails-service.js`): per reviewer; requires accepted; one time only
   (`wmkf_materialssentat`); checks token not revoked, address confidence, test
   request, request-number leak; attaches the cycle record's review template and
@@ -288,11 +312,14 @@ Admin `inviteStartDate` has no reader outside its form, validation and tests
   write. The Invite modal's manual-link "mark manually sent" control is
   unreachable today (`render-emails-service.js` always sets `manualLink: null`).
 
-**Build notes (2026-10-30, branch `claude/reviewer-materials-on-accept`, PR
-#562, not merged).** Built on the branch: migration 091 and its store, the
+**Build and release notes (2026-10-30/31, PR #562).** Shipped in PR #562:
+migration 091 and its store, the
 acceptance job's `release_materials` step with the new template keys, and the
 manual-path claim, staff recovery, the invitation PDF precondition and the
-accepted-screen copy (Session 654). Still [PLANNED] (follow-up PR): invitation wording and
+accepted-screen copy (Session 655). PR #562 (`fcad0ad53`) merged and deployed;
+Migration 091 was applied in Production before merge and the two new acceptance
+email keys were seeded (owner-recorded receipts in `SESSION_PROMPT.md` and
+`DEVELOPMENT_LOG.md`). Still [PLANNED] (follow-up PR): invitation wording and
 `{{proposalDelivery}}` / Reviewer Finder date-field retirement. Accept does
 not set a review status [VERIFIED via rg: no `reviewStatus` write in
 `respond-service.js` or `reviewer-engagement/record-invitation.js`; writers are
@@ -396,12 +423,14 @@ to a follow-up PR (owner, 2026-10-30).
 
 ### 3.4 Wording
 
-New invitation, acceptance and (fallback) materials text: no proposal-release
-promise, due date from the calendar, withdraw instructions that fit the new flow
-(the reviewer can no longer decline in the portal after accepting; they email
-the PD). Seeds updated; live keys rebaselined with `--force-keys` after the
-owner approves the text; per-PD overrides that contain `{{proposalDelivery}}`
-listed for the PDs to update (read-only probe; owner-run in Production).
+The acceptance email wording was approved and the new
+`email.reviewer_materials_acceptance.{subject,body}` keys were seeded before
+PR #562 merged. Invitation wording still needs a follow-up: remove the old
+proposal-release promise, explain the calendar due date, and include withdrawal
+instructions for the new flow (after accepting, reviewers email the PD to
+withdraw). Owner approval and `--force-keys` rebaseline are required before
+changing live invitation text. A read-only Production probe is needed to find
+per-PD overrides containing `{{proposalDelivery}}` so the PDs can update them.
 
 ### 3.5 Retired date homes
 
@@ -523,9 +552,11 @@ with the markers written only after confirmed delivery. Accepted.
 3. Reviewers withdraw by emailing the PD after accepting. **Decided (D48).**
 4. Invitations refused when Reviews Due is blank or the proposal PDF is missing.
    **Decided (D48).**
-5. Final wording of the three emails: drafted in the PR for the owner's
-   review there (owner, 2026-10-30; D49); live text changes only with a
-   later owner-approved rebaseline (`--force-keys`).
+5. Acceptance email wording: owner-approved and seeded as
+   `email.reviewer_materials_acceptance.{subject,body}` before PR #562's merge.
+   Invitation wording and the `{{proposalDelivery}}` promise remain for the
+   follow-up PR; live wording changes require owner approval and rebaseline
+   (`--force-keys`).
 
 ## 7. Build order and tests
 
@@ -560,15 +591,18 @@ Dataverse writes). Separate PRs, each with focused unit tests:
    fingerprint binds the Grant Cycle id instead of the meeting date. The reviewer
    email path no longer reads `akoya_request.wmkf_meetingdate`; other app reads
    stay with the meeting-date removal plan (work queue item 6a).
-3. **Built on branch `claude/board-setup-calendar`, PR #561, not merged:** Board setup from the calendar (E).
+3. **Done — PR #561 (`955613bdb`), Production-deployed 2026-10-31:** Board setup from the calendar (E).
    `getBoardSetupDatesByCode` in the adapter (one exact-code row: Board
    Meeting Date and Board Mailing Date, meaning `boardMailing` in
    `CYCLE_CALENDAR_MEANINGS`) and `lib/services/board-writeups/calendar.js`;
    activation also refuses a mailing date after the Board date; notices
-   re-read the calendar before sending and stop if a date moved. Before
-   merge, owner-run Production reads: D26 calendar Board date = 2026-12-10,
-   D26 Board Mailing Date set, no pending D26 setup save.
-4. Materials on acceptance (B) + wording.
+   re-read the calendar before sending and stop if a date moved. The
+   owner-recorded release receipt is in `DEVELOPMENT_LOG.md`; signed-in D26
+   Board-page rendering remained unchecked in that receipt.
+4. **Done — PR #562 (`fcad0ad53`), Production-deployed 2026-10-31:** materials
+   on acceptance, shared automatic/manual claim, fallback and staff recovery.
+   The wording/date-field retirement follow-up remains open; first J27 live
+   acceptance observation is pending.
 
 Gates: `check:api-routes`, `check:atlas`, `check:j27-register`,
 `check:dataverse-access-layer`, `check:route-service-boundary`,

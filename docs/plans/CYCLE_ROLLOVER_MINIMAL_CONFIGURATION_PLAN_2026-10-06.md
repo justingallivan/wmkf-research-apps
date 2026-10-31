@@ -1,9 +1,9 @@
 ---
-title: Overlapping Cycles with Minimal Configuration — Proposed Delivery Plan
+title: Cycle rollover — historical proposal and current readiness boundary
 domain: platform
 kind: plan
-status: proposed
-summary: "Proposed phased delivery of shared cycle context, task-specific defaults, per-cycle reviewer settings, bounded multi-cycle automation and exception-only rollover checks; source investigation complete, live contracts and implementation pending."
+status: active
+summary: "Cycle calendar, automatic landing cycle, linked-cycle review due dates, Board setup calendar reads, and request meeting-date retirement have shipped. The consolidated readiness view and daily role-routed notices remain planned. The October 2026 rollout sequence below is historical, not a current implementation plan."
 canonical: false
 owner: product-engineering
 related:
@@ -15,11 +15,29 @@ related:
   - docs/CREDENTIALS_RUNBOOK.md
 ---
 
-# Overlapping cycles with minimal configuration
+# Cycle rollover: current boundary and historical proposal
 
-**Status: [PLANNED], 2026-10-21.** Proposed delivery plan for owner review, replacing this file's October 6 investigation outline. The October 21 read-only investigation covered UI/configuration, backend services, and operations/schema/docs with three agents. No runtime, schema, environment, schedule or external-system change is authorized by this document. The source findings below are verified locally. A later bounded production read-only census verified roles, cycle rows, selected date settings and request/GOApply links; date propagation, portal behavior and deployed environment values remain unverified. See `docs/audits/cycle-foundations-2026-10-21.md`. This plan does not claim an exhaustive live-system sweep or production readiness.
+## Current implementation boundary (2026-10-31)
 
-## 1. Outcome and boundaries
+The October 2026 rollout is no longer wholly unbuilt. Merge receipts and current source show these foundations shipped: the operations Grant Cycle calendar (PR #542); automatic landing-cycle behavior (#547/#550); review filing through each linked cycle's Board date (#551); reviewer cycle/due-date reads through the request's Grant Cycle link (#552); Board setup dates read from the cycle calendar (#561); and retirement of app reads of `akoya_request.wmkf_meetingdate` through PRs #554–#560. The request-cycle contract is explicit in `lib/services/review-manager/cycle-config-loader.js:24-27,43-49`; landing-cycle resolution is in `lib/utils/cycle-code.js:130-144`. Deployment receipts and remaining work are summarized in `docs/plans/CYCLE_DATES_CENTRALIZATION_PLAN_2026-10-29.md:19-31`, `docs/CURRENT_WORK_QUEUE.md:52`, and `docs/plans/J27_ALIGNMENT_LOG_2026-10-24.md:79-85`.
+
+| Capability | Current state | Evidence / boundary |
+|---|---|---|
+| Operations cycle calendar and milestone-date authority | Shipped (PR #542; follow-up attribution #543). The operations `wmkf_grantcycle` row is the date authority for fields it carries; calendar roles edit those dates from the apps. `wmkf_appgrantcycle` retains reviewer templates, attachments and custom fields. | `docs/plans/J27_ALIGNMENT_LOG_2026-10-24.md:79`; centralization plan `:21-25`. No fresh live probe was made for this update. |
+| Landing cycle | Shipped (PRs #547/#550). The Grants Manager can select a landing cycle; otherwise the next Board date supplies the default. | `lib/utils/cycle-code.js:130-144`; alignment log `:81`. |
+| Request cycle identity | App readers use the request's Grant Cycle lookup; meeting-date fallback is retired from app code (PRs #554–#560). Older unlinked rows and data corrections remain separately tracked. | `lib/services/review-manager/cycle-config-loader.js:24-27,43-49`; `docs/CURRENT_WORK_QUEUE.md:52`. |
+| Review filing and due-date selection | Filing follows each request's linked cycle through its Board date (#551); reviewer email cycle selection and initial due date use the linked cycle (#552). Existing saved/request-specific due-date decisions remain a separate residual. | `docs/plans/J27_ALIGNMENT_LOG_2026-10-24.md:80,84`; `docs/plans/CYCLE_DATES_CENTRALIZATION_PLAN_2026-10-29.md:27-31`. |
+| Board setup dates | Shipped (PR #561): reads Board Meeting Date and Board Mailing Date from the cycle calendar; the release receipt notes signed-in D26 page rendering was not checked. | Alignment log `:83`; `DEVELOPMENT_LOG.md:25-34`. |
+| Consolidated cycle readiness | **Planned, not shipped.** One capability-specific readiness view plus daily role-routed email digests and an in-app panel are the decided delivery shape (D12). | Alignment log `:48,80,93`; the centralization plan `:27-31` lists readiness as remaining work. |
+| Other centralization residuals | App-side Feb 3 date/readiness behavior, Staff Deliberations calendar/cohort verification, grantee-title job retirement after verification, and D26 per-request due-date handling remain open. | `docs/plans/CYCLE_DATES_CENTRALIZATION_PLAN_2026-10-29.md:27-31`. |
+
+This is a source/history reconciliation, not a new live-state probe or approval to build. Do not use the dated sequence below as current instructions. The original plan's meeting-date fallback, D10 date split, singleton date proposals, unresolved role-authority questions and sequencing are superseded by the decisions and shipped changes above. The old acceptance scenarios remain historical examples, not a current acceptance contract. Current work should be scoped from the centralization plan and current owner decisions; readiness remains planned and must not be represented as delivered.
+
+## Historical proposal record (2026-10-21; retained for context, not current guidance)
+
+The following proposal replaced the October 6 investigation outline and records the sources and sequence available on October 21. Its proposed operating rules and delivery slices are historical. Later owner decisions, merge receipts and the current boundary above supersede them where they differ. No design below independently authorizes runtime, schema, environment, schedule or external-system changes.
+
+### 1. Outcome and boundaries
 
 [OWNER REQUIREMENT, 2026-10-06 and 2026-10-21] Support simultaneous grant cycles twice each year with as little manual setup as possible. A cycle nearing its board meeting must remain usable while the next receives applications. The owner's October 21 J27/D27 timeline is provisional and subject to change; it is a planning input, not a published operational calendar.
 
@@ -29,7 +47,7 @@ related:
 
 This work covers cycle identity, discovery, defaults, settings, job scope and rollover visibility. It does not build the J27 assessment/triage product, enable paused reviewer reminders, revive the applicant portal, expand Dossier pilots, approve external sends or authorize model spending. Those remain separate workstreams. Existing authorization, target interlocks, test isolation and production kill switches remain required.
 
-## 2. Evidence and current gaps
+### 2. Evidence and current gaps (snapshot at the time)
 
 **Superseding inventory (2026-10-27):** `docs/audits/cycle-settings-audit-2026-10-27.md` lists every cycle identity, default and date source across the suite (74 rows, source-only), including per-app settings; use it in place of this partial table for the default-cycle redesign. Source mechanisms below were verified on 2026-10-21. Current production details are labeled separately; the bounded evidence and remaining external questions are in `docs/audits/cycle-foundations-2026-10-21.md`. Sources are relative to the repository root.
 
@@ -51,9 +69,9 @@ This work covers cycle identity, discovery, defaults, settings, job scope and ro
 
 Existing focused evidence: `cycle-code-defaults.test.js` and `reviewer-campaign-timeline.test.js` passed, 21 tests. Pure helper probes showed J27 as the code-only default on June 7 and June 11, 2027; supplying the June 10 board date changes the June 11 default to D27. These establish current mechanics, not correctness of the proposed UX or live calendars.
 
-## 3. Proposed operating model
+### 3. Proposed operating model (historical)
 
-### 3.1 One cycle identity; existing records keep distinct responsibilities
+#### 3.1 One cycle identity; existing records keep distinct responsibilities
 
 [PLANNED] Prefer operations' `wmkf_grantcycle` as the calendar authority **after Slice 0 confirms its data contract with operations and its authority mapping to the Admin role system**. Retain `wmkf_appgrantcycle` for reviewer configuration and `board_writeups.cycle.<code>` for board workflow. Do not merge or delete tables as part of this plan. Build the smallest common read boundary that resolves these sources into explicit cycle context. **[OWNER DECISION, 2026-10-27, alignment log D10]** Dates split by owner: the Board date stays in `wmkf_grantcycle` (Connor's process; apps read, never copy); app anchor dates (review deadline, invitation start and similar) live in `wmkf_appgrantcycle`, edited in the app by the calendar roles. No operations schema change. **[OWNER DECISION, 2026-10-28, alignment log D43; supersedes the D10 split]** Connor added eleven milestone date columns to `wmkf_grantcycle` (all null as of the 2026-10-28 probe). That table is now the authoritative home for every date it carries, and the apps edit those dates from an Admin calendar by the calendar roles, with per-date who/when tracking. `wmkf_appgrantcycle` keeps reviewer configuration (template, attachments, custom fields), not dates. Plan: `docs/plans/CYCLE_CALENDAR_DATAVERSE_PLAN_2026-10-28.md`.
 
@@ -70,7 +88,7 @@ Proposed rules:
 - Do not use a single exclusive phase enum to authorize work. Intake, review follow-up, presentations and board preparation can overlap, even within one cycle. Show activity windows; authorize each action from its own data and lifecycle prerequisites.
 - Keep raw request-date and fiscal-label readers in the inventory until migrated. Updating the cycle record alone does not establish that existing request date filters have updated. Slice 0 must choose and test a propagation or lookup-query strategy before changing calendar authority.
 
-### 3.2 Minimal calendar and configuration
+#### 3.2 Minimal calendar and configuration
 
 [PLANNED] Store only dates actually consumed by our apps: submission/open-close information when available, reviewer dates, presentation windows, board/materials dates and operational closure or late-work policy. Slice 0 identifies existing fields; a later schema proposal names only missing fields needed by the first consumer. Do not create columns for every entry in the supplied timeline.
 
@@ -93,7 +111,7 @@ Apply the same rule to board materials/board-end dates: use calendar defaults fo
 
 Unchanged shared templates may be referenced by identity/version after validation; do not duplicate bytes every cycle. The previous cycle is a policy source, not a source of deadlines, rosters, tokens, receipts or operational completion flags. Store derived suggestions separately from confirmed operational values.
 
-### 3.3 Screens: preserve explicit choice, make defaults task-aware
+#### 3.3 Screens: preserve explicit choice, make defaults task-aware
 
 > **Superseded in part (2026-10-29):** first-entry defaults now follow one landing cycle the Grants Manager sets in the cycle calendar (alignment log D29), not per-task rules, and the "never edit an unnamed global current cycle" row below no longer holds. Explicit URL cycles still win and open pages never switch. See `docs/plans/LANDING_CYCLE_PLAN_2026-10-29.md`.
 
@@ -111,7 +129,7 @@ Before changing a first-entry rule, test it against the existing owner-approved 
 
 The cycle catalog must discover incoming cycles independently of reviewer eligibility. That is read-only discovery; it must not make an unadvanced request eligible for outside reviewers, scheduling or automated sends. The J27 assessment workstream still owns its actual intake list and triage behavior.
 
-### 3.4 Jobs: process eligible work in several cycles safely
+#### 3.4 Jobs: process eligible work in several cycles safely
 
 [PLANNED] Replace recurring single-cycle pins with bounded per-cycle/request eligibility only after the replacement is proven. Continue to enforce existing feature switches, program restrictions, request statuses, TEST exclusions, fences, quotas and target interlocks at scan, claim and execution time.
 
@@ -123,7 +141,7 @@ The cycle catalog must discover incoming cycles independently of reviewer eligib
 - Calendar edits affect future scheduling; preserve sent invitations, agreed request/reviewer deadlines and published artifacts. Existing deadline-edit workflows remain authoritative. Cancel/reschedule only unsent work under the affected policy and revalidate after each await/claim.
 - Reject mixed-cycle materials batches before dispatch as the smallest initial fix. Keep the current single-request UI; per-recipient attachment generation is only needed if a later bulk product explicitly requires it.
 
-### 3.5 One readiness view; exception-only notifications
+#### 3.5 One readiness view; exception-only notifications (still planned; scope retained)
 
 [PLANNED] Extend the existing Admin workflow/cycle surfaces with one consolidated view: what was derived, where dates came from, what is confirmed, missing configuration, conflicting records and remaining pilot pins. Show each affected capability separately. A missing board-packet date should not hide intake or stop reviewer follow-up.
 
@@ -131,9 +149,9 @@ Run a recurring readiness check over an explicit registry of cycle-dependent con
 
 The check reports its denominator and unsupported consumers. It must catch missing dates, conflicting lookup/date identities, stale global defaults, forgotten cycle pins, unreachable settings and incomplete/capped discovery. Unverified or unavailable data is not a green result. A proposed offline contract gate should catch new unregistered runtime cycle literals and missing policy coverage, with explicit exceptions for historical compatibility/tests/pilots; it cannot verify deployment values or external flows.
 
-## 4. Delivery slices and exit evidence
+### 4. Historical delivery slices and exit evidence
 
-All slices below are **[PLANNED]**. Implement in bounded feature branches; this plan authorizes no deployment or live write.
+At the 2026-10-21 checkpoint, the slices below were **[PLANNED]**. They are retained as a historical inventory, not a current build order. Several foundations have since shipped; see the current boundary above. The readiness capability remains planned.
 
 | Slice | Deliverable and relevant surfaces | Exit evidence |
 |---|---|---|
@@ -146,13 +164,13 @@ All slices below are **[PLANNED]**. Implement in bounded feature branches; this 
 
 Before implementation of each slice: select exact files, schema/migration needs and route authorization; run contract-reconcile and relevant fresh review. No new table or route name is committed by this outline. New routes require the security matrix; new persistence requires Atlas/migration/catalog coverage and cleanup/retention contracts. Existing databases use the migration runner, never fresh-install setup.
 
-## 5. Migration and rollback constraints
+### 5. Historical migration and rollback constraints
 
 [PLANNED] Add per-cycle resolution before replacing legacy sources. Inventory the old singleton timeline's actual applicability; a free-text cycle label alone is insufficient evidence for bulk backfill. Preview the mapping, confirm it once, then copy only verified configuration. Ambiguous existing values become named exceptions. New-cycle requests must not fall back to the legacy singleton.
 
 Use shadow/read-only resolution and cohort comparison before worker activation. Cut over consumers in small groups with known rollback versions. Remove an old pin only after its replacement handles legacy, late and concurrent-cycle work. A source rollback must not broaden a worker cohort or reactivate an email; retain kill switches and hold affected jobs on ambiguous rollback state. Data rollback is explicit per migration and cannot undo sent messages or business decisions. No deletion/drop is proposed here.
 
-## 6. Acceptance scenarios
+### 6. Historical acceptance scenarios (not a current acceptance contract)
 
 [PLANNED] Required tests use offline fixtures and mocked transports first; production acceptance is a separate owner-authorized bounded exercise.
 
@@ -170,7 +188,7 @@ Use shadow/read-only resolution and cohort comparison before worker activation. 
 
 Verification per slice: relevant unit/integration/browser tests plus type/build where runtime changes require them; affected route, Atlas, migration, status, document and J27 gates with sequential self-tests. Test both admitted and excluded populations. Current planning-doc checks do not establish this acceptance.
 
-## 7. Decisions to resolve once
+### 7. Historical decisions and questions
 
 **OWNER DECISION — calendar responsibility (2026-10-24).** Calendar authority is the **Grants Manager** role (`board_writeups.grants_manager`), with the **Program Coordinator** role (`board_writeups.program_coordinator`) as fallback. Authority binds to the role, not the assignee. **Fallback semantics decided 2026-10-27 (alignment log D7):** both roles may edit at any time, and the calendar shows who last edited each value and when. **No second approver (2026-10-27, log D8):** one person can change any date; responsibility defaults to the Grants Manager, and the Program Coordinator edits when necessary. Readiness recipients decided 2026-10-27 (log D12). These are tracked for the owner's meeting with the role holders in `docs/plans/J27_ALIGNMENT_LOG_2026-10-24.md`.
 
@@ -183,7 +201,7 @@ Verification per slice: relevant unit/integration/browser tests plus type/build 
 
 Still unresolved before the relevant cutover: board-date propagation, intended J27 Research opportunity/publication and lookup assignment, future operations-row creation (rows are created when the GOApply portal opens, owner 2026-10-28; milestone ownership decided 2026-10-28, log D43, superseding D10). Table population, lookup coverage and shared-role keys/assignments are now verified in the bounded audit. Post-award task completion and technical review-cutoff enforcement remain per-slice checks; their business separation is already decided. These are a bounded contract check, not reasons to build a second calendar or ask staff to enter everything twice.
 
-## 8. Evidence limits and reconciliation record
+### 8. Historical evidence limits and reconciliation record
 
 2026-10-21: source inventory completed; this proposal supersedes the investigation-only outline. The work queue pointer and owner feedback memory are updated in the same pass. Priority relative to other work is not changed. The subsequent bounded production census resolves role/table/link population questions. It does not establish full integration readiness; propagation, portal behavior and deployed environment values remain UNVERIFIED.
 

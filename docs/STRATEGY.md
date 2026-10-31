@@ -6,7 +6,7 @@ status: active
 summary: "Long-term product direction; current execution priority is owned by CURRENT_WORK_QUEUE.md."
 canonical: false
 cataloged: 2026-07-02
-last_verified: 2026-10-22
+last_verified: 2026-10-31
 owner: product-engineering
 related:
   - docs/SYSTEM_MODEL.md
@@ -304,13 +304,22 @@ onboarding, the post-cycle reviewer-reminders ledger, invitation-link
 strictness, and broader reviewer cleanup retain their dependency, cycle, or
 owner gates. None is an implied next step.
 
-**J27 owner-directed work, not built:** the automated materials-on-acceptance
-email. J27 proposals are expected in December 2026 and reviewer invitations
-follow in 2027. The intended send occurs after acceptance and onboarding once
-materials are ready; currently materials are sent through the PD-driven release
-modal. Plan and build before J27 reviewer invitations. Stage 6B3 hardened that
-manual modal and is not evidence of an automated send. Current scope and the
-dated owner correction are in `docs/CURRENT_WORK_QUEUE.md` item 6.
+**Materials on acceptance — implemented.** [VERIFIED via source/Git, 2026-10-31]
+PR #562 (`fcad0ad53`) wires automatic materials delivery into the acceptance
+worker and shares the durable release claim with manual delivery. Session657
+and DEVELOPMENT_LOG record migration 091 and the Production release; no live
+probe was repeated here. The manual modal remains a fallback/recovery surface.
+First natural J27 delivery observation and the separately scoped invitation
+wording/date-field follow-ups remain; queue item 6 owns those residuals.
+
+**Other product follow-ups — bounded audit, not a new priority order.** J27
+intake/triage, corpus text extraction/browsing, consolidated cycle readiness,
+calendar-event agenda updates and Chairs-specific artifacts/sharing retain
+unfinished scope. Grant Reporting integration and Literature Analyzer's future
+role remain owner decisions. Existing Bulk Export, corpus metadata indexing,
+concept eligibility and Review Panel must be accounted for before reviving old
+retrospective or staged-pipeline designs. Evidence and limits:
+`docs/audits/product-backlog-reconciliation-2026-10-31.md`.
 
 **Final writeups dashboard contract — implemented.** Cycle scoping, the three
 views, bookmarkable Program Director filtering, and publication-version context

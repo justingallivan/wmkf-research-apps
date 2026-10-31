@@ -118,9 +118,16 @@ History: dated release checkpoints (2026-07-29 → 2026-09-02), the S194–S206 
 - Reviewer Pool remains planned and optional, not a shipped Workbench-v1 deliverable.
 
 
-## Architecture (locked S195)
+## Historical architecture direction (S195; not current build instructions)
 
-**Three tiers, per-request as the spine:**
+The following preserves the S195 product framing. It is not proof that the
+listed automation or staged-pipeline contracts were built or remain approved.
+Current J27 intake decisions are in `docs/plans/J27_ALIGNMENT_LOG_2026-10-24.md`;
+source/Git boundaries are in `docs/audits/product-backlog-reconciliation-2026-10-31.md`.
+Grant Reporting integration and Literature Analyzer disposition remain owner
+decisions recorded in their separate memories.
+
+**Three tiers considered then, per-request as the spine:**
 
 - **Global / cross-cycle:** app launcher survives for Reviewer Pool, Dynamics Explorer, Dataverse Power Tools, Expense Reporter, Literature Analyzer standalone, Grant Reporting (post-award), Admin. Standalone forms of `phase-ii-writeup` / `peer-review-summarizer` / etc. stay around for ad-hoc / off-cycle / training use.
 - **Cycle-scoped:** PD landing dashboard (request queue, by cycle + scope + `isActionableForPD`). Future home of the long-list → short-list triage surface ([[project-staged-review-pipeline]]).

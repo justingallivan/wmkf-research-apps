@@ -135,7 +135,7 @@ related:
 | [PARALLEL_AGENT_WORKTREE_RUNBOOK.md](PARALLEL_AGENT_WORKTREE_RUNBOOK.md) | runbook | active |  | Coordinate isolated agent work, preserve branch commits and local artifacts before reuse or disposal, and promote changes deliberately. | 2026-07-02 |
 | [perf-log.md](perf-log.md) | history | historical |  | Dated benchmark entries appended by scripts/acceptance-w4.js and similar acceptance scripts. P95 thresholds are environmental and not gated; these... | 2026-07-02 |
 | [PROFILE_CONTEXT_REFACTOR_SUMMARY.md](PROFILE_CONTEXT_REFACTOR_SUMMARY.md) | plan | historical |  | Refactored ProfileContext.js to use useReducer with a unified session state. | 2026-07-02 |
-| [RETROSPECTIVE_ANALYSIS_PLAN.md](RETROSPECTIVE_ANALYSIS_PLAN.md) | audit | historical |  | Created: 2026-04-22 (Session 106, from Connor + Justin conversation) Status: Planning — no code yet. | 2026-07-02 |
+| [RETROSPECTIVE_ANALYSIS_PLAN.md](RETROSPECTIVE_ANALYSIS_PLAN.md) | audit | historical |  | Historical design: record export and file indexing exist; a joined document-selection, custom-prompt batch and structured-results workflow remains open. | 2026-07-02 |
 | [SERVICE_AND_UTILITY_CATALOG.md](SERVICE_AND_UTILITY_CATALOG.md) | source-of-truth | canonical | yes | If you're touching a service or utility, read its header before this catalog. If a header is sparse or stale, fix it in the same commit as your... | 2026-07-02 |
 | [WISHLIST.md](WISHLIST.md) | plan | draft |  | Working collection of ideas, observations, and future directions for the app suite. Not commitments — just things we've thought about and want to... | 2026-07-02 |
 
@@ -187,10 +187,10 @@ related:
 | [AUDIT_S154_MEMORY_CODEX.md](AUDIT_S154_MEMORY_CODEX.md) | audit | historical |  | Independent audit performed against all 64 memory files under .claude-memory/ (MEMORY.md plus 63 individual .md files). I did not read... | 2026-07-02 |
 | [AUDIT_S154_MEMORY_V2.md](AUDIT_S154_MEMORY_V2.md) | audit | historical |  | Date: 2026-05-14 Scope: Same as V1 — every file under .claude-memory/ (64 files). | 2026-07-02 |
 | [AUDIT_S154_MEMORY.md](AUDIT_S154_MEMORY.md) | audit | historical |  | Date: 2026-05-14 Scope: Every file under .claude-memory/ (1 index + 11 feedback + 51 project + 1 user = 64 files). All read in full. Claims... | 2026-07-02 |
-| [BACKEND_AUTOMATION_PLAN.md](BACKEND_AUTOMATION_PLAN.md) | plan | active |  | Active PowerAutomate roadmap: Vercel prompt-storage and Executor foundations shipped; PA-owned automation and remaining execution extensions are still planned. | 2026-07-02 |
+| [BACKEND_AUTOMATION_PLAN.md](BACKEND_AUTOMATION_PLAN.md) | plan | active |  | Executor foundations are built; Power Automate automation remains planned. Grant Reporting integration destination is undecided. | 2026-07-02 |
 | [CONNOR_CONTACT_MERGE_AND_REVIEWER_LINKING.md](CONNOR_CONTACT_MERGE_AND_REVIEWER_LINKING.md) | history | active |  | Date: 2026-06-25 (S289). Author: Justin + Claude. Status: discussion / questions. | 2026-07-02 |
 | [CONNOR_DATA_CLEANUP_QUESTIONS.md](CONNOR_DATA_CLEANUP_QUESTIONS.md) | plan | active |  | Running list of Dynamics data-cleanup questions for Connor: fields to fill in or correct so the apps read records correctly. Started 2026-10-29. |  |
-| [PROPOSAL_CONTEXT_EXTRACTION_PLAN.md](PROPOSAL_CONTEXT_EXTRACTION_PLAN.md) | plan | active |  | Created: 2026-04-17 (Session 103) Status: Planning — relevant to single-phase cycle (two cycles out). | 2026-07-02 |
+| [PROPOSAL_CONTEXT_EXTRACTION_PLAN.md](PROPOSAL_CONTEXT_EXTRACTION_PLAN.md) | plan | historical |  | Historical proposal for expanded structured context; existing dataExtract consumers do not establish the proposed schema or universal input contract. | 2026-07-02 |
 
 ## grantee-deliverables
 
@@ -271,8 +271,8 @@ related:
 | [PEER_REVIEW_EXECUTOR_MIGRATION_PLAN.md](PEER_REVIEW_EXECUTOR_MIGRATION_PLAN.md) | plan | historical |  | Historical record of the completed peer-review-summarizer Executor migration and A7 fail-closed hardening. | 2026-07-08 |
 | [PROMPT_CACHING_PLAN.md](PROMPT_CACHING_PLAN.md) | draft | historical |  | Historical April 2026 prompt-caching experiments and early plan. Superseded for current remediation status by PROMPT_CACHING_AUDIT.md. | 2026-07-02 |
 | [PROMPT_STORAGE_DESIGN.md](PROMPT_STORAGE_DESIGN.md) | plan | active |  | Current prompt-storage boundary: live current rows, Vercel Executor fetch, admin publication, and audit; broader authoring and PA execution remain unbuilt. | 2026-07-02 |
-| [STAGED_PIPELINE_IMPLEMENTATION_PLAN.md](STAGED_PIPELINE_IMPLEMENTATION_PLAN.md) | plan | active |  | 1. Fit Screener — Standalone Stage 1 tool. Upload a proposal, get pass/flag/decline-recommend result. Single Haiku call, fast and cheap. Useful... | 2026-07-02 |
-| [STAGED_REVIEW_PIPELINE.md](STAGED_REVIEW_PIPELINE.md) | history | active |  | Proposals flow through stages sequentially. Staff review is required before any proposal is declined at Stage 1. Stages 2 and 3 produce inputs for... | 2026-07-02 |
+| [STAGED_PIPELINE_IMPLEMENTATION_PLAN.md](STAGED_PIPELINE_IMPLEMENTATION_PLAN.md) | plan | historical |  | Historical staged-proposal pipeline design, not a current architecture or approved build sequence. | 2026-07-02 |
+| [STAGED_REVIEW_PIPELINE.md](STAGED_REVIEW_PIPELINE.md) | history | historical |  | Historical staged screening design; concept eligibility and successor Review Panel exist separately, not as this pipeline. | 2026-07-02 |
 | [VIRTUAL_REVIEW_PANEL.md](VIRTUAL_REVIEW_PANEL.md) | spec | historical |  | Retired 2026-10-04 (S573). Historical reference for the legacy multi-LLM Virtual Review Panel, now in _archived/; successor is the Review Panel. | 2026-07-02 |
 | [WORKFLOW_CHAINING_DESIGN.md](WORKFLOW_CHAINING_DESIGN.md) | spec | active | yes | Chaining fields and Vercel Executor persistence are live; the end-to-end Power Automate DAG remains unbuilt target architecture. | 2026-07-02 |
 
@@ -386,7 +386,7 @@ related:
 | [REVIEWER_DATA_MODEL.md](REVIEWER_DATA_MODEL.md) | source-of-truth | canonical | yes | Visual orientation for the reviewer-domain Dataverse entities and how they connect. Use this when you're not sure which entity holds which piece... | 2026-07-02 |
 | [REVIEWER_E2E_REHEARSAL_RUNBOOK.md](REVIEWER_E2E_REHEARSAL_RUNBOOK.md) | runbook | active |  | Safe reviewer invitation and return rehearsal through browser mocks, capture-mode controlled writes, or an allowlisted live smoke. | 2026-07-02 |
 | [REVIEWER_ENGAGEMENT_PLAN_INTERPRETATION.md](REVIEWER_ENGAGEMENT_PLAN_INTERPRETATION.md) | decision | active |  | ⚠️ SUPERSEDED (S277) — historical pre-implementation snapshot. Do not treat node labels as current state. | 2026-07-02 |
-| [REVIEWER_ENGAGEMENT_SPEC.md](REVIEWER_ENGAGEMENT_SPEC.md) | source-of-truth | canonical | yes | Reviewer lifecycle, campaign configuration, token TTL, quota, and reminder behavior; automatic reminder scheduling is currently paused. | 2026-07-02 |
+| [REVIEWER_ENGAGEMENT_SPEC.md](REVIEWER_ENGAGEMENT_SPEC.md) | source-of-truth | canonical | yes | Reviewer lifecycle and automatic acceptance materials delivery; the separate reminder scheduler remains paused. | 2026-07-02 |
 | [REVIEWER_FACULTY_PAGE_RECOVERY_DESIGN.md](REVIEWER_FACULTY_PAGE_RECOVERY_DESIGN.md) | spec | active |  | State labels: [VERIFIED] = read in source this session; [ASSUMED] = inference. | 2026-07-02 |
 | [REVIEWER_FIELD_AWARE_VERIFICATION_DESIGN.md](REVIEWER_FIELD_AWARE_VERIFICATION_DESIGN.md) | spec | active |  | - The verifier is gated only by the PubMed checkbox, not by field: pubMedVerificationContract(options) returns { enabled: false } iff... | 2026-07-02 |
 | [REVIEWER_FIND_BROWSER_TEST_PLAN.md](REVIEWER_FIND_BROWSER_TEST_PLAN.md) | plan | superseded |  | Layered, side-effect-controlled browser verification for Reviewer Find warm revisits and targeted refreshes. | 2026-08-02 |

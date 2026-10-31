@@ -6,7 +6,7 @@ status: canonical
 summary: Canonical priority queue separating current commitments, evidence windows, optional work, external dependencies, and parked programs.
 canonical: true
 cataloged: 2026-07-22
-last_verified: 2026-10-22
+last_verified: 2026-10-31
 owner: product-engineering
 related:
   - docs/SYSTEM_MODEL.md
@@ -27,14 +27,14 @@ live probes, and current tests own what the system does. `docs/DOCS_CATALOG.md` 
 documents; an `active` catalog status means the document remains useful, not that every task in
 it is approved backlog.
 
-## Verification scope — 2026-10-19
+## Verification scope — bounded recheck 2026-10-31
 
 The bounded code/Git audit in `docs/audits/work-queue-drift-2026-10-19.md`
 corrects the named Site Visit, Workbench, J27, Cycle Dossier and personal-email
 status claims. Other entries retain their earlier evidence dates; this is not a
 whole-backlog or live-environment verification. The 2026-10-22 targeted document
 reconciliation updated selected status entries from source, Git ancestry, and dated
-receipts only; it did not re-probe Production. Priority order is unchanged.
+receipts only; it did not re-probe Production. Priority order is unchanged. The 2026-10-31 source/Git audit corrected materials-on-acceptance, cycle-calendar and Zoom-picker status and classified the unfinished product threads below. It did not re-probe Production or recertify unrelated queue entries. Evidence and limits: `docs/audits/product-backlog-reconciliation-2026-10-31.md`.
 
 ## Current sequence
 
@@ -48,7 +48,7 @@ sequence.
 | 3 | Retain structured individual review DOCX files in SharePoint and backfill D26 | **[WAVES 1–5 COMPLETE; NATURAL FILING PROVED 2026-09-04 UTC.]** The v4 text-table templates, request-level `Reviews/Review-<request>-<reviewer name>.docx` target, guarded repair service, and exact D26 backfill are Production-proved. Exact manifest `9254df9e5e504c79007391efc85d189e89e8b8b2ff80b8e4f11990baca08f4f8` executed 22 created / zero failed; row-by-row reconciliation matched every expected identity, destination, governed hash, and unique SharePoint item. Production has exact `REVIEW_DOCX_SHAREPOINT_WRITE=on` and `REVIEW_DOCX_SHAREPOINT_CYCLE=D26` (the cycle pin is superseded 2026-10-29 by filing every cycle until its calendar Board date, D44, PR #551); activation deployment `dpl_E6VKW5Wi8zDTfU1ZRhNsbH9yg9oM` and the test-row disposition/legacy cleanup are proved. Production maintenance run `70820` then naturally processed Manuel Müller's newly received review on Request `1002959`, created `Reviews/Review-1002959-Manuel Müller.docx` (SharePoint version `1.0`, 43,498 bytes), and completed without error; Dataverse independently holds the matching complete pointer. | **Met:** backfill, activation boundary, test-row disposition, legacy cleanup, and the natural automatic create/pointer path are all proved. |
 | 4 | Final Writeup persona rollout and complete dashboards | **[PERSONA LENSES PRODUCTION-LIVE; NATURAL STAFF OBSERVATION COMPLETE 2026-09-04 PT.]** Commit `213f6c34` is live in Ready deployment `dpl_HGrbWUNPJMJunVevYLVEmtn7He6a`; the tracked source flag is true. Read-only production-data smoke verified PD, PC, Leadership, overlap, ineligible/unassigned, and superuser projections. **[OWNER-REPORTED]** President Allison Keller and Program Coordinators Duncan Spore and Sarah Hibler proved canonical Word access and acknowledgement; Duncan later found Request `1002788` in History, saw the review matrix, and opened the Word document successfully. Duncan, Allison, and Sarah initially appeared Reviewed and later Updated, consistent with publication-version freshness. No team exists or is required. | **Met:** runtime projection, representative Word access, and signed-in non-superuser History/matrix/Word observation are complete. Owner decisions 2026-09-06: **Leadership stage transition is a PD action in the Workbench** (a new lifecycle-state write from Review to Final). Planned S493 in `docs/FINAL_WRITEUP_LEADERSHIP_TRANSITION_PLAN.md` (six Codex passes; D2 owner-confirmed 2026-09-07) and **[PRODUCTION-LIVE 2026-09-07: PR #176 merged as `25dc8645`, Ready deployment `dpl_22eyAD8S4yPmx16iv3Nng2u9sw5T`, owner-run signed-in smoke passed on Request `1002788`.]** **PC backup is not a separate feature:** PCs already see every Final [VERIFIED via `dashboard-service.js:355`, PC persona returns all rows]; a retiring PD's requests transfer by changing the program director in Dataverse, which the dashboards key on. Broader supporting-material projection remains open. Dashboard filters, cycle scoping, and the retired-preview decision are tracked as item 5 below. |
 | 5 | Final writeups dashboard: cycle scoping, views, PD filter, and version context | **[RELEASED AND SIGNED-IN SMOKED 2026-09-06–07; SOURCE ON MAIN, VERIFIED BY GIT ANCESTRY 2026-10-22.]** Slice 6A–6C are implemented: cycle scoping, Needs my review / Reviewed by me / All writeups views, bookmarkable PD filtering, and current/acknowledged publication-version context. Merge `842c9f13` records 6A (deployment `dpl_2xuEv64c5NQVXEhA3rSXZRQQaWPa`); PR #175 (`44bdd240`) records the 6B/6C release (deployment `dpl_2UrsDnydRqudu95wJyLCK7A6FUFR`). The owner closed 6D/6E as unnecessary for D26. Plan and detail pointers: Slice 6 in `docs/FINAL_WRITEUP_REVIEW_IMPLEMENTATION_PLAN.md`, `docs/FINAL_WRITEUPS_DASHBOARD_CYCLE_SCOPING_PLAN.md`, and `docs/FINAL_WRITEUPS_DASHBOARD_VIEWS_AND_VERSION_PLAN.md`. The dated receipts establish the 2026-09 promotion and signed-in checks; this pass did not re-probe Production. | **Release met.** The original two-cycle capacity criterion remains an explicit verification gap; it was not re-proved by this pass. No dashboard-filter build is queued. |
-| 6 | Automated materials-on-acceptance email (reviewer lifecycle) | **[OWNER-DIRECTED 2026-09-06; NOT BUILT; PLAN-FIRST; J27 ITEM.]** **2026-10-29 (owner, D46):** J27 reviewers get materials as soon as they accept; no proposal-release date. Plan and build together with the calendar-sourced review due date (`docs/plans/CYCLE_DATES_CENTRALIZATION_PLAN_2026-10-29.md` §2a, audit risk 1) as one reviewer-invitation build before the Feb 24, 2027 invitations. Build plan (proposed, 2026-10-29): `docs/plans/REVIEWER_INVITATION_CALENDAR_BUILD_PLAN_2026-10-29.md`. Owner correction: this is for the J27 (June 2027) cycle, not D26. J27 proposals are expected in early December 2026; reviewer invitations follow in 2027. Desired flow: review materials are ready when the request to review is sent, and acceptance plus onboarding triggers a link email without PD action. **[VERIFIED via source and the S490 inspection]** No automatic send exists: the acceptance job handles onboarding/bookkeeping, while materials are sent through the PD-driven `ReleaseMaterialsModal` and `materials` template. Plan and build before J27 reviewer invitations; timing depends on the J27 calendar in `docs/J27_TRANSITION_REGISTER.md`. The plan must cover durable/idempotent send behavior, materials-ready timing, accept-before-materials handling, PD visibility/override, and the manual fallback. | **Not met:** Stage 6B3 is the manual-modal lifecycle receipt, not evidence of an automated acceptance-triggered send. Smoke the automated path only after it is built, at the first J27 acceptance. |
+| 6 | Automated materials-on-acceptance email (reviewer lifecycle) | **[IMPLEMENTED AND MERGED 2026-10-31 — PR #562, `fcad0ad53`; dated Production release recorded in Session657 / DEVELOPMENT_LOG.]** The acceptance drain now sends one materials email after onboarding, sharing the `reviewer_materials_releases` claim with manual sends (migration 091). Preparation failures retry for about 15 minutes before the acceptance-confirmation/manual-release fallback and staff alert; uncertain sends require staff recovery. Source: `lib/services/reviewer-acceptance-drain.js` and `lib/services/reviewer-engagement/materials-release-store.js`. Manual fallback remains; this is no longer an unbuilt J27 feature. Plan: `docs/plans/REVIEWER_INVITATION_CALENDAR_BUILD_PLAN_2026-10-29.md`. | **Build met; operational observation remains:** first natural J27 acceptance delivery is not proved here. Invitation wording / `{{proposalDelivery}}` and old date-field retirement remain separately scoped follow-ups; live text changes require their recorded owner-approved rebaseline. No fresh deployment or send probe in this audit. |
 | 6a | Stop reading the request meeting date; derive each request's cycle from its Grant Cycle link | **[DONE 2026-10-30; ALL BUILD STEPS DEPLOYED; J27 ITEM.]** Owner: nothing in the apps reads `akoya_request.wmkf_meetingdate`; a request's cycle comes from its Grant Cycle link `akoya_request.wmkf_grantcycle` and cycle dates from that linked calendar row, with no meeting-date fallback anywhere (owner-confirmed 2026-10-29; older gaps are fixed as Dynamics data, `docs/CONNOR_DATA_CLEANUP_QUESTIONS.md`). **[DEPLOYED]** PR #552 (`54070863f`) moved the reviewer email path to the link. Plan with whole-repo inventory, owner decisions, contract check and Codex review: `docs/plans/MEETING_DATE_RETIREMENT_PLAN_2026-10-29.md` (on main, `8dd123543`). Build step 1 (sandbox cycle rows and links) done and verified. **[DEPLOYED 2026-10-30]** Step 2 (cycle lookup and Research screens) PR #554 `fe749f063`; step 3 (checks, dates shown, cleanup) PR #555 `701a58bea`; step 5 (Test Request Factory, real cycles only) PR #556 `a1f9d0035`; step 4 (invitation closing and honoraria) PR #557 `84ba3bf84`; step 6 (Dynamics Explorer, current-use scripts, `check:request-meeting-date-reads` ratchet gate) PR #558 `fd0333864`; reader batches PR #559 `95bde8874` and PR #560 `4906e7793`. No app code reads the request meeting date; the gate records only deliberate uses. | **Met.** Follow-ups only: about 140 older unlinked Research requests (Connor DC1, low priority) and app-made 2026 honoraria without a link (DC5, parked); rebuild any review-file backfill/repair manifest made before 2026-10-30. |
 | 7 | Per-reminder audit trail for reviewer follow-up (Activity history) | **[SURFACED 2026-09-06 BY THE CODEX POLISH HANDOFF; NOT STARTED; PLAN-FIRST WITH `/contract-reconcile`; J27 ITEM (owner 2026-09-06: "can wait till J27"). Reminders stay manual for D26.]** The reviewer record stores only cumulative `reminderCount` and the latest `reminderSentAt`, so the Activity history drawer (reachable since the 2026-09-06 polish from status, token, and reminder pills) shows one dated reminder event plus "N reminders recorded in total". Build a durable per-reminder record and extend the reviewer activity API/DTO so each reminder is its own dated event. Do not read `reminderCount` as evidence of individual timestamps. Handoff: `docs/plans/REVIEWER_FOLLOW_UP_POLISH_HANDOFF_2026-09-06.md`. | **Met when:** each reminder sent appears as its own dated event in the drawer, backed by durable rows, with the existing count preserved for older reviewers. |
 | 8 | J27 single-phase transition inventory | **[VERIFIED via Git ancestry and `check:j27-register`, 2026-10-19.]** The register and tightened per-site binding gate are on `main`; the reviewed `65eb4bfee` history is included. Current gate: 79 rows, 61 ok, 0 stale, 6 unverifiable, 12 closed. The register remains the detailed source for owner questions and the separate J27 build plan. | Gate implementation and merge are complete. Six unverifiable rows and unresolved owner inputs remain explicit; a green gate does not resolve them or establish runtime readiness. |
@@ -124,7 +124,7 @@ sequence.
   Await colleague feedback and explicit implementation scope before a suite-wide rename.
 
 - **Overlapping cycles with minimal configuration (2026-10-21).**
-  [SOURCE INVESTIGATION AND BOUNDED LIVE CENSUS COMPLETE; DELIVERY PLAN PROPOSED; NOT IMPLEMENTED]
+  [PARTIAL: CALENDAR, LANDING CYCLE AND NAMED DATE CONSUMERS SHIPPED; CONSOLIDATED READINESS VIEW/NOTICES STILL PLANNED]
   Owner requested a cross-app plan after three read-only agents inventoried
   cycle selection, settings, jobs and schema. Proposed delivery: verify the
   operations calendar contract, isolate reviewer dates per cycle, make app
@@ -141,11 +141,13 @@ sequence.
   role (log D12). 2026-10-28 (log D43): the operations `wmkf_grantcycle`
   table, now carrying eleven milestone date columns, is the authoritative home
   for cycle dates, edited from an app Admin calendar; prototype plan
-  `docs/plans/CYCLE_CALENDAR_DATAVERSE_PLAN_2026-10-28.md` (source-built on branch `claude/cycle-calendar`; controlled Production test passed 2026-10-28; not deployed). Intended Research
+  `docs/plans/CYCLE_CALENDAR_DATAVERSE_PLAN_2026-10-28.md` (merged as PR #542, `e8fdcaa07`; attribution follow-up #543; dated Production release recorded in `d6aba6cb6`). Intended Research
   opportunity/publication and date propagation remain unresolved; meeting log: `docs/plans/J27_ALIGNMENT_LOG_2026-10-24.md`.
-  Slice 1 (central reviewer campaign settings, owner decision D4) is scheduled
-  for November 2026; its slice 2 dependency shipped as PR #521.
-  No runtime/live write or queue-priority change was made.
+  Central response-period/quota defaults and simpler PD controls retain the D9 scope;
+  calendar due-date sourcing and materials-on-acceptance are already implemented
+  (#552 / #562). The consolidated readiness panel and role-routed daily notices
+  remain planned. Verify remaining slice scope against current source rather than
+  replaying the original rollout. This audit made no runtime/live write or priority change.
   Historical interim safeguard: owner-reported Production preparation list
   `["D26","J27"]`, redeployed 2026-10-07 (J27-084), not read back this session.
   Coordinate implementation with J27 row 8; routine future rollover should need
@@ -223,14 +225,51 @@ sequence.
   open). Fix if needed: compare size + `publication.versionId`, which Graph's
   default item response omits, so `resolveMediaDownloadUrl` must request it
   explicitly. Detail: `docs/plans/STAGE4_BUILD_PLAN_2026-10-10.md` "Board link fix".
-- **Zoom participants in the speaker-name picker.** [IMPLEMENTED ON BRANCH —
-  NOT DEPLOYED, 2026-10-19] `codex/zoom-speaker-picker` adds a first Zoom
-  participants group from the transcript's verified occurrence, preserving request
-  contacts and manual entry. Picker suggestions remain separate from boundary
-  classification and attendance decisions. Incomplete/failed reports fall back;
-  the optional lookup has a five-second total budget including authentication.
-  Source contract, tests, review and release limits:
-  `docs/plans/ZOOM_SPEAKER_PICKER_2026-10-19.md`.
+- **Zoom participants in the speaker-name picker — implemented on main.**
+  [VERIFIED via source and Git ancestry, 2026-10-31] PR #511 (`bb7b5e04c`)
+  supplies verified-occurrence Zoom names ahead of request/manual choices, with
+  a five-second lookup budget. Source: `attendance-service.js`, transcription
+  `service.js`, and `RecordingAndTranscriptCard.js`. The branch-only backlog is
+  closed; a fresh hosted Zoom lookup / staff-acceptance check was not performed.
+  Contract and evidence limits: `docs/plans/ZOOM_SPEAKER_PICKER_2026-10-19.md`.
+
+## Product follow-ups — source-audited 2026-10-31, no priority change
+
+These are bounded findings, not new build authorization. Full evidence and
+search limits: `docs/audits/product-backlog-reconciliation-2026-10-31.md`.
+
+- **J27 intake and staff triage — partial foundations.** Existing Workbench
+  lists and Initial Assessments do not implement the new staff-state field,
+  bulk changes, flags and First Cut output. November 15 is the recorded owner
+  target, not a delivery claim. Use the alignment log for current decisions.
+- **Research document corpus — index implemented, product incomplete.**
+  `scripts/load-request-file-corpus.mjs` persists metadata/classification;
+  scaled text extraction, admin browsing/analyses, scheduled refresh and
+  Dataverse promotion remain separately approved work. Pre-2018 stays parked.
+  Plan: `docs/plans/RESEARCH_REQUEST_FILE_CORPUS_PLAN_2026-10-25.md`.
+- **Grant Reporting and Literature Analyzer — product decisions open.** Both
+  standalone apps remain implemented. Grant Reporting's future integration
+  destination and Literature Analyzer's role/reuse need owner decisions;
+  neither is an unbuilt app or authorized retirement. Read their routed memories.
+- **Interim-report evaluation — contract undecided.** Existing final-report
+  comparison and document-discovery plumbing are not a dedicated annual
+  progress evaluation or staff-field writeback. See
+  `.claude-memory/project-interim-report-automation.md`.
+- **Historical portfolio analysis — partial building blocks.** Bulk Export
+  already filters/exports request records and the corpus indexes files; neither
+  supplies the full document selection → custom-prompt batch → structured
+  model-results export workflow. The old retrospective plan is historical.
+- **Calendar agendas — Duncan walkthrough pending.** Standalone agenda email
+  exists; updating the existing organizing calendar event is not implemented.
+  Follow `docs/plans/PERSONAL_EMAIL_DEFAULTS_TODO_2026-09-20.md` before planning.
+- **Program Chairs writeup/sharing — partial foundations.** Existing Executive
+  Summary and Board exports are reusable; the Chairs-specific artifact and
+  proposal-sharing contract are not established by those features. Content,
+  staff-review timing and sharing mechanism remain in the alignment log.
+- **Eligibility/staged review — historical design, not an execution plan.**
+  Concept eligibility, successor Review Panel and Cycle Dossier research exist
+  separately; the old staged full-proposal pipeline is not implemented.
+  Re-scope from current J27 intent before any build; do not revive its old migration.
 
 ## Audit follow-ups — verified open, not silently prioritized
 - **Hard-coded late-2026 `expiresAt` dates in unit-test fixtures (2026-09-27, S546).** **[CLOSED
@@ -460,7 +499,11 @@ sequence.
   people with personal emails; its 2026-08-12–2026-08-27 tracked history is
   queued in `docs/PUBLIC_GIT_HISTORY_REMEDIATION_PLAN.md`).
 
-## Completed in this execution
+## Historical implementation and release records — not backlog
+
+The entries below preserve dated build/release sequences. Open steps inside those
+sequences describe their original checkpoint; use the current sections above and
+the owning plan for remaining work, not this historical record as a fresh queue.
 
 - Review DOCX template implementation: **[PRODUCTION-LIVE + SIGNED-IN EXPORT
   PROVED 2026-09-03]** approved individual/combined templates, strict OOXML renderer,
