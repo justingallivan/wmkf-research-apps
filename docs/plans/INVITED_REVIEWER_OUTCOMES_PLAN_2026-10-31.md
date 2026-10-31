@@ -1,6 +1,6 @@
 ---
 title: Invited reviewer outcomes plan
-status: draft — decisions A–E taken; second review pending
+status: draft — second review done; E reopened, D scope question open
 created: 2026-10-31
 owner: Justin (decisions); Claude (Session 655)
 ---
@@ -70,6 +70,31 @@ needs-attention). Accepted findings, each spot-checked against source:
 5. **The first audit probe missed earlier removals and the plan miscounted.**
    Fixed; see decision C.
 
+## Second independent review (2026-10-31)
+
+Codex adversarial review of the revised plan (verdict: needs-attention); each
+finding spot-checked against source:
+
+1. **Decision E as taken breaks re-acceptance.** Withdrew (100000005) is above
+   materials_sent (100000001), so `respond-service.js:225-231` refuses a later
+   accept as `materials_sent_locked`, and `canFlipState` turns false
+   (`review-engagement-state.js:53-55`). The accept branch does not clear
+   `wmkf_reviewstatus` (`reviewer-suggestion.js:2177-2185`). Claude found the
+   same independently. E is reopened below.
+2. **A "staff-recorded" yes/no cannot tell the outcomes apart.** A staff-
+   recorded reviewer withdrawal and a staff-ended Other would store the same
+   values. The column must record who *initiated* the ending, not who typed
+   it.
+3. **The audit probe missed erasures on already-unselected rows** (a decline
+   later erased by removal). Fixed by detecting cleared answer fields from
+   paired old/new values; a fixture reproduces the case. Rerun result
+   unchanged: 19/10 (decision C).
+4. **Decision D leaves live callers pointing at Restore.** Manual re-add
+   returns `restore_required` (`reviewer-suggestion.js:1004-1012`),
+   `manual-reviewer-service.js:289-292` tells staff to restore from Removed,
+   and "Reset & restore" (`ReviewerInvitePanel.js:829-859`) is the existing
+   way to re-invite an auto-archived decline. These are in D's scope.
+
 ## Proposal (revised)
 
 1. **Remove is for candidates only.** `softDelete` refuses a row with
@@ -99,12 +124,14 @@ needs-attention). Accepted findings, each spot-checked against source:
 
    Portal accept-then-decline also records that the reviewer had accepted
    (decision E), so it reads as a reviewer withdrawal.
-4. **Who ended it** is a new yes/no column marking a staff-recorded outcome,
-   following the `wmkf_reviewuploadedbystaff` precedent. No existing column
-   records it [VERIFIED: no actor or source column among the suggestion
-   fields in `lib/dataverse/core/entity-registry.js`]. A later acceptance
-   through the portal clears it, as that branch already clears the decline
-   fields (`reviewer-suggestion.js:2183-2185`).
+4. **Who ended it** is one new choice column, "Ended by", set by every
+   outcome writer to the initiator, not the person typing (see revised B/E):
+   Reviewer before accepting, Reviewer after accepting, or the Foundation. No
+   existing column records it [VERIFIED: no actor or source column among the
+   suggestion fields in `lib/dataverse/core/entity-registry.js`]. Every
+   writer and correction path states whether it sets or clears it; a portal
+   re-accept clears it in the same atomic payload that already clears the
+   decline fields (`reviewer-suggestion.js:2183-2185`).
 5. **Reporting** reads outcome history separately from active workload: an
    outcome query and DTO covering unselected invited rows, for the single
    proposal and cross-proposal views. One classification precedence across
@@ -126,8 +153,9 @@ needs-attention). Accepted findings, each spot-checked against source:
   type? Recommendation: decline plus marker. Needs a check of whether a
   staff/reviewer marker already exists.
   **Owner decision 2026-10-31: decline plus staff-recorded marker.**
-  The staff marker is a new column, a second schema change alongside A's
-  choice value.
+  **Superseded 2026-10-31 by the second review:** the marker becomes the
+  "Ended by" choice column (initiator), proposal item 4. Still a second
+  schema change alongside A's choice value.
 - **C. Existing removed rows.** Checked 2026-10-31 [VERIFIED via the
   owner-requested read-only Production probe
   `scripts/probe-d26-removed-audit-history.cjs`, corrected after review to
@@ -148,11 +176,17 @@ needs-attention). Accepted findings, each spot-checked against source:
   outcome somewhere durable. Recommendation: (a), the simpler of the two;
   re-inviting someone who already answered is rare.
   **Owner decision 2026-10-31: (a), refuse; re-invitation gets its own explicit path.**
-- **E. Portal accept-then-decline.** Record that the reviewer had accepted
-  (Withdrew status) so it counts as a reviewer withdrawal, keeping their
-  ability to change their mind before materials. Recommendation: write
-  Withdrew on that branch.
-  **Owner decision 2026-10-31: write Withdrew on that branch.**
+- **E. Portal accept-then-decline.** ~~Write Withdrew on that branch~~
+  (owner decision 2026-10-31, **reopened**: it would block re-acceptance,
+  second review finding 1). Revised recommendation: the branch leaves review
+  status alone and writes "Ended by = Reviewer after accepting"; a re-accept
+  clears it. Re-acceptance keeps working, and reports still count it as a
+  reviewer withdrawal. Needs owner confirmation.
+- **D scope (second review finding 4).** Refusing Restore for outcome rows
+  also changes the `restore_required` producer, the re-add remedy text and the
+  Removed list's "Reset & restore". Open question: does staff ever re-invite a
+  reviewer who declined, on the same proposal? If not, re-invitation becomes
+  unavailable with a clear message. If so, it needs a history-preserving path.
 
 ## Not in scope
 

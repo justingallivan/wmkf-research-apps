@@ -45,13 +45,17 @@ const describe = (d) => {
   };
 };
 
-// Every change that unselected the row AND erased an answer, excluding the
-// reviewer's own decline (which unselects but writes declined=true). Audit
-// records only changed fields, so an unselect with no answer in OldValue
-// erased nothing. Oldest first.
+// Every change that CLEARED an answer field (old value set, new value
+// null/false), excluding the reviewer's own response writes (which set
+// accepted or declined true). Detected from paired old/new values, not from a
+// selection change: a removal of an already-unselected declined row erases
+// the decline without touching wmkf_selected. Oldest first.
+const cleared = (d) => ANSWER_FIELDS.some(f => f in (d?.OldValue || {})
+  && d.OldValue[f] != null && d.OldValue[f] !== false
+  && (d.NewValue?.[f] == null || d.NewValue[f] === false));
 function erasingRemovals(details) {
   return [...details]
-    .filter(d => d?.NewValue?.wmkf_selected === false && d?.NewValue?.wmkf_declined !== true && hasAnswer(d.OldValue))
+    .filter(d => cleared(d) && d?.NewValue?.wmkf_declined !== true && d?.NewValue?.wmkf_accepted !== true)
     .sort((a, b) => String(a?.AuditRecord?.createdon || '').localeCompare(String(b?.AuditRecord?.createdon || '')))
     .map(describe);
 }
