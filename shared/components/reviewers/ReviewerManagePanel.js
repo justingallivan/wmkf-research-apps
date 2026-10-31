@@ -843,10 +843,11 @@ export default function ReviewerManagePanel({
       setAcceptedReleaseReviewerId(reviewer.suggestionId);
       return;
     }
-    const outcome = terminalStatus === 'withdrew'
-      ? 'withdrew after accepting'
-      : 'was released by WMKF';
-    const consequence = terminalStatus === 'withdrew'
+    const outcome = {
+      withdrew: 'withdrew after accepting',
+      did_not_submit: 'did not submit a review',
+    }[terminalStatus] || 'was released by WMKF';
+    const consequence = terminalStatus === 'withdrew' || terminalStatus === 'did_not_submit'
       ? 'This changes their response to declined, updates reviewer counts, revokes their portal link, and removes any linked honorarium request.'
       : 'This ends the engagement and revokes their portal link.';
     if (!confirm(`Confirm that ${reviewer.name || 'this reviewer'} ${outcome}?\n\n${consequence}`)) return;

@@ -12,6 +12,7 @@ import {
   applyStage2aResponse,
   applyStaffReviewerWithdrawal,
   applyStaffReviewerRelease,
+  applyStaffReviewerDidNotSubmit,
   deleteLinkedHonorariumForDeclinedSuggestion,
   withdrawLinkedHonorariumForReleasedSuggestion,
   RESPONSE_TYPE_MAP,
@@ -248,5 +249,48 @@ describe('reviewer withdrawal changeset', () => {
     );
 
     updateSpy.mockRestore();
+  });
+});
+
+describe('staff-recorded did not submit', () => {
+  const expectedBody = {
+    wmkf_selected: false,
+    wmkf_accepted: false,
+    wmkf_declined: true,
+    wmkf_responsetype: RESPONSE_TYPE_MAP.declined,
+    wmkf_declinereasonpicklist: null,
+    wmkf_declinereason: null,
+    wmkf_declinereferral: null,
+    wmkf_reviewstatus: 100000007,
+    wmkf_endedby: 100000001, // Reviewer after accepting
+    wmkf_externaltokenrevoked: true,
+  };
+
+  it('declines, sets Did not submit and Ended by, and deletes the exact honorarium in one changeset', async () => {
+    await applyStaffReviewerDidNotSubmit(SUGGESTION_ID, {
+      ifMatch: 'W/"21"',
+      actingUserSystemId: 'staff-1',
+      deleteHonorariumRequestId: HONORARIUM_ID,
+    });
+    const [operations, options] = runChangeset.mock.calls[0];
+    expect(operations).toEqual([
+      { method: 'PATCH', entitySet: 'wmkf_appreviewersuggestions', key: SUGGESTION_ID, body: expectedBody, ifMatch: 'W/"21"' },
+      { method: 'DELETE', entitySet: 'akoya_requests', key: HONORARIUM_ID },
+    ]);
+    expect(options).toEqual({ actingUserSystemId: 'staff-1' });
+    expect(REVIEW_STATUS_MAP.did_not_submit).toBe(100000007);
+  });
+
+  it('keeps the acceptance time (never writes wmkf_responsereceivedat) and is ETag-bound without an honorarium', async () => {
+    const update = jest.spyOn(DynamicsService, 'updateRecord').mockResolvedValue(undefined);
+    await applyStaffReviewerDidNotSubmit(SUGGESTION_ID, { ifMatch: 'W/"22"', actingUserSystemId: 'staff-1' });
+    expect(update).toHaveBeenCalledWith('wmkf_appreviewersuggestions', SUGGESTION_ID, expectedBody, { ifMatch: 'W/"22"', actingUserSystemId: 'staff-1' });
+    expect(update.mock.calls[0][2]).not.toHaveProperty('wmkf_responsereceivedat');
+    expect(runChangeset).not.toHaveBeenCalled();
+    update.mockRestore();
+  });
+
+  it('refuses without an ETag', async () => {
+    await expect(applyStaffReviewerDidNotSubmit(SUGGESTION_ID, {})).rejects.toThrow('ifMatch required');
   });
 });

@@ -39,6 +39,7 @@ export const REVIEW_STATUS_MAP = {
   complete: 100000004,
   withdrew: TERMINAL_REVIEW_STATUS_VALUES.withdrew,
   released: TERMINAL_REVIEW_STATUS_VALUES.released,
+  did_not_submit: TERMINAL_REVIEW_STATUS_VALUES.did_not_submit,
 };
 
 export const APPLICANT_DISPOSITION_MAP = {

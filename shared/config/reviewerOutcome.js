@@ -10,10 +10,10 @@
  *     (scripts/extend-reviewstatus-picklist-did-not-submit.mjs, which refuses
  *     unless this is the next free value in the live option set).
  *
- * Not yet read or written by runtime code: both are provisioned in Production
- * (2026-10-31) but not the sandbox, and the readers are wired in later slices. Do not add the status to
- * TERMINAL_REVIEW_STATUS_VALUES until terminal-transition.js has an explicit
- * branch for it (an unhandled terminal falls through to Released).
+ * Both are provisioned in Production (2026-10-31), not the sandbox. Did not
+ * submit is a terminal status (shared/config/reviewerStatus.js) written only by
+ * applyStaffReviewerDidNotSubmit through terminal-transition.js's explicit
+ * branch. Runtime code writes Ended by there but does not yet read it.
  */
 
 export const ENDED_BY_VALUES = Object.freeze({

@@ -3,7 +3,7 @@
  *   Preview accepted-reviewer release:
  *     { requestId, suggestionIds, terminalStatus: 'released', preview: true }
  *   Commit staff-recorded withdrawal:
- *     { requestId, suggestionIds, terminalStatus: 'withdrew' }
+ *     { requestId, suggestionIds, terminalStatus: 'withdrew' | 'did_not_submit' }
  *   Commit accepted-reviewer release:
  *     { requestId, suggestionIds, terminalStatus: 'released',
  *       releaseReason: 'sufficient_reviews_received', sendEmail, overrides,
@@ -52,7 +52,7 @@ export default async function handler(req, res) {
     return res.status(400).json({ error: 'suggestionIds must all be valid GUIDs' });
   }
   if (!isTerminalReviewStatus(terminalStatus)) {
-    return res.status(400).json({ error: 'terminalStatus must be withdrew or released' });
+    return res.status(400).json({ error: 'terminalStatus must be withdrew, released or did_not_submit' });
   }
   if (preview && terminalStatus !== 'released') {
     return res.status(400).json({ error: 'preview is only supported for released' });

@@ -249,6 +249,14 @@ export function responseEventEvidence(reviewer) {
     };
   }
 
+  if (responseType === 'declined' && reviewStatus === 'did_not_submit') {
+    return {
+      label: 'Recorded by staff: review not submitted',
+      deliveryProven: true,
+      detail: 'Recorded as declined by a Program Director because no review arrived, not by the reviewer.',
+    };
+  }
+
   if (responseType && RESPONSE_EVENT_BY_TYPE[responseType]) {
     if (responseType === 'no_response') {
       return {

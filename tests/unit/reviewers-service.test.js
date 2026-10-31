@@ -235,6 +235,8 @@ describe('patchReviewers', () => {
     [' RELEASED ', 'Terminal reviewer statuses require the dedicated transition endpoint'],
     [TERMINAL_REVIEW_STATUS_VALUES.withdrew, 'Terminal reviewer statuses require the dedicated transition endpoint'],
     [TERMINAL_REVIEW_STATUS_VALUES.released, 'Terminal reviewer statuses require the dedicated transition endpoint'],
+    ['did_not_submit', 'Terminal reviewer statuses require the dedicated transition endpoint'],
+    [TERMINAL_REVIEW_STATUS_VALUES.did_not_submit, 'Terminal reviewer statuses require the dedicated transition endpoint'],
   ];
   describe.each(['single', 'batch', 'empty-array fallback'])('%s dedicated status precheck', form => {
     test.each(dedicatedStatuses)('refuses %s before all writes with error-only service semantics', async (reviewStatus, message) => {
@@ -461,6 +463,42 @@ describe('getReviewers', () => {
     expect(history).toEqual([]);
     expect(out.totalReviewers).toBe(2);
     expect(ordinary.every((row) => Array.isArray(row.answers))).toBe(true);
+  });
+
+  test('maps Did not submit to its own status so it never counts as accepted (Production round-trip finding)', async () => {
+    getRequestById.mockResolvedValueOnce({
+      akoya_requestid: REQ,
+      _wmkf_grantprogram_value: '11111111-1111-4111-8111-111111111111',
+      akoya_requestnum: 'R-1001',
+      akoya_title: 'T',
+      wmkf_reviewduedate: '2026-09-09',
+    });
+    findByRequest.mockResolvedValueOnce([
+      {
+        // The shape the round trip produced: accepted flag still true, status Did not submit.
+        wmkf_appreviewersuggestionid: IDS[0],
+        _wmkf_request_value: REQ,
+        _wmkf_potentialreviewer_value: 'person-1',
+        wmkf_accepted: true,
+        wmkf_responsetype: 100000000,
+        wmkf_reviewstatus: TERMINAL_REVIEW_STATUS_VALUES.did_not_submit,
+      },
+      {
+        wmkf_appreviewersuggestionid: IDS[1],
+        _wmkf_request_value: REQ,
+        _wmkf_potentialreviewer_value: 'person-2',
+        wmkf_accepted: true,
+        wmkf_responsetype: 100000000,
+        wmkf_reviewstatus: null,
+      },
+    ]);
+
+    const out = await getReviewers({ proposalId: REQ, azureEmail: 'pd@wmkeck.org' });
+    const rows = out.proposals[0].reviewers;
+
+    expect(rows[0]).toMatchObject({ reviewStatus: 'did_not_submit', lifecycleValid: true });
+    // ReviewerManagePanel's "Release proposal to reviewers (N)" counts reviewStatus === 'accepted'.
+    expect(rows.filter((r) => r.reviewStatus === 'accepted').map((r) => r.suggestionId)).toEqual([IDS[1]]);
   });
 
   test('preserves an invalid lifecycle signal for unknown response and review-status options', async () => {

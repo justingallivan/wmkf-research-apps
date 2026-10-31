@@ -35,7 +35,6 @@
 
 import { REVIEW_STATUS_MAP, RESPONSE_TYPE_MAP } from '../config/reviewerLifecycle.js';
 import { TERMINAL_REVIEW_STATUS_VALUES } from '../config/reviewerStatus.js';
-import { DID_NOT_SUBMIT_REVIEW_STATUS_VALUE } from '../config/reviewerOutcome.js';
 
 // Statuses from which an invitation-response correction is still allowed.
 // `null` is included because a fresh, never-invited row carries a null
@@ -108,10 +107,8 @@ const ENDED_RESPONSE_TYPES = new Set([
   RESPONSE_TYPE_MAP.withdrawn_sufficient,
 ]);
 
-const ENDED_REVIEW_STATUSES = new Set([
-  ...Object.values(TERMINAL_REVIEW_STATUS_VALUES),
-  DID_NOT_SUBMIT_REVIEW_STATUS_VALUE,
-]);
+// Withdrew, Released and Did not submit.
+const ENDED_REVIEW_STATUSES = new Set(Object.values(TERMINAL_REVIEW_STATUS_VALUES));
 
 function requireGuardFields(row, fields) {
   const missing = fields.filter((field) => row?.[field] === undefined);

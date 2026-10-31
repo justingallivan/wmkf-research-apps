@@ -25,11 +25,11 @@ test('the Ended By spec options are exactly the runtime values', () => {
   expect(ENDED_BY_BY_VALUE[ENDED_BY_VALUES.foundation]).toBe('foundation');
 });
 
-test('Did not submit is the next review status value and is not yet terminal', () => {
-  const used = [...Object.values(REVIEW_STATUS_MAP), ...Object.values(TERMINAL_REVIEW_STATUS_VALUES)];
-  expect(DID_NOT_SUBMIT_REVIEW_STATUS_VALUE).toBe(Math.max(...used) + 1);
-  // Wired into the terminal set only with an explicit terminal-transition branch.
-  expect(Object.values(TERMINAL_REVIEW_STATUS_VALUES)).not.toContain(DID_NOT_SUBMIT_REVIEW_STATUS_VALUE);
+test('Did not submit follows the earlier review statuses and is terminal', () => {
+  const others = Object.values(REVIEW_STATUS_MAP).filter((v) => v !== DID_NOT_SUBMIT_REVIEW_STATUS_VALUE);
+  expect(DID_NOT_SUBMIT_REVIEW_STATUS_VALUE).toBe(Math.max(...others) + 1);
+  expect(TERMINAL_REVIEW_STATUS_VALUES.did_not_submit).toBe(DID_NOT_SUBMIT_REVIEW_STATUS_VALUE);
+  expect(REVIEW_STATUS_MAP.did_not_submit).toBe(DID_NOT_SUBMIT_REVIEW_STATUS_VALUE);
 });
 
 test.each([

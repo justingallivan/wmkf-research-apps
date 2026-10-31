@@ -229,6 +229,15 @@ export function TokenActionsMenu({
                 type="button"
                 disabled={degraded}
                 title={degraded ? degradedTitle : undefined}
+                onClick={() => { setOpen(false); onTransition('did_not_submit'); }}
+                className="w-full text-left px-3 py-2 hover:bg-red-50 text-red-700"
+              >
+                Record that the review was not submitted
+              </button>
+              <button
+                type="button"
+                disabled={degraded}
+                title={degraded ? degradedTitle : undefined}
                 onClick={() => { setOpen(false); onTransition('released'); }}
                 className="w-full text-left px-3 py-2 hover:bg-gray-50 text-gray-700"
               >
