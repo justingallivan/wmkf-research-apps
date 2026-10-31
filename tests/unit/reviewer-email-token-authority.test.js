@@ -124,7 +124,8 @@ let SUGGESTIONS;
 let PERSONS;
 
 function suggestion(id, over = {}) {
-  return { _wmkf_potentialreviewer_value: `person-${id}`, _wmkf_request_value: REQUEST_ID, wmkf_accepted: true, ...over };
+  // Real Dataverse reads carry an ETag; the materials send binds its mint to it.
+  return { _wmkf_potentialreviewer_value: `person-${id}`, _wmkf_request_value: REQUEST_ID, wmkf_accepted: true, _etag: 'W/"1"', ...over };
 }
 function person(id, over = {}) {
   return {
