@@ -1,153 +1,74 @@
-# Session 654 Prompt: Reviewer build — #561 awaits owner reads; #562 manual release next
+# Session 655 Prompt: CSO release mail live and verified; reviewer work remains owner-gated
 
-**Handoff destination:** `main`, docs-only. Feature work lives on two branches
-(below); nothing from this session is merged or deployed.
+## Session 654 Summary (Codex, 2026-10-30 Pacific)
 
-Earlier handoffs, retrievable exactly: Claude Session 652 with Codex Session 649
-`git show 45814e64c:SESSION_PROMPT.md`; Claude Session 651 `git show
-6a254654c:SESSION_PROMPT.md`; Claude's older J27/cycle workstream `git show
-006b87565:SESSION_PROMPT.md`.
+**Board workflow complete.** Justin will follow up if something is amiss; no new Board task or recurring monitor is open. This session owns only Board release changes and their documentation. Claude's reviewer work and the other Codex prompt-library work remain separate.
 
-## Session 653 Summary (Claude, 2026-10-30)
-
-Next Claude session is **654**. Start: all 41 `check:*` gates and self-tests
-green on `main`. No Production or sandbox reads or writes were made.
+Previous complete handoff: `git show 88992f3d6:SESSION_PROMPT.md` (Claude Session 653 / Session 654 prompt, verified retrievable). Earlier boundaries remain retrievable there; do not copy its old open-work list without rechecking current PRs.
 
 ### What Was Completed
 
-1. **[PR #561 OPEN, not merged; head `6ae3efea9`; CI green] PR 3 of the reviewer
-   build: Board setup reads its dates from the cycle calendar (D47).** Branch
-   `claude/board-setup-calendar`, worktree `../WMKF_Apps-board-calendar`.
-   - Setup no longer stores typed `materialsDue` / `boardEnds`; new adapter read
-     `getBoardSetupDatesByCode` (Board Meeting Date, Board Mailing Date) and
-     `lib/services/board-writeups/calendar.js` (one total deadline).
-   - Saving an **active** setup requires both calendar dates in order; old
-     stored keys and old pending intents are stripped on read.
-   - Worker: unreadable calendar → archive start and all notices wait (alert);
-     releases and queued archive copies continue. Notices store the dates they
-     were drafted from and refuse to send if the calendar moved.
-   - Board page default cycle uses calendar Board dates.
-   - Codex: 3 rounds; rounds 1–2 fixed (`951284330`, `8c5e05075`); round 3
-     (signature-keyed notices stay unsent after a date change) noted in the PR,
-     not changed. `/contract-reconcile` Mode B done; Atlas updated (`6ae3efea9`).
-2. **[PR #562 DRAFT; head `1dfb7b31d`] PR 4: materials on acceptance (D46/D49).**
-   Branch `claude/reviewer-materials-on-accept`, worktree `../WMKF_Apps-materials`.
-   - Owner decisions recorded (D49): one combined acceptance email; wording drafted
-     in the PR; **invitation wording + `{{proposalDelivery}}` / Reviewer Finder
-     date-field retirement split into a follow-up PR**; transient pre-claim
-     failures retry ~15 minutes, then today's confirmation + "materials held" alert.
-   - Migration **091** `reviewer_materials_releases` + store
-     `lib/services/reviewer-engagement/materials-release-store.js` (claim =
-     `INSERT … ON CONFLICT DO NOTHING RETURNING`; lease-bound steps; staff
-     reclaim; `listStuckMaterialsReleases`). No job FK (smoke script deletes jobs).
-     Atlas page `docs/atlas/postgres-reviewer-materials-releases.md`.
-   - Acceptance job step `release_materials` in
-     `lib/services/reviewer-acceptance-drain.js`: reversible checks before claim
-     (live reviewer re-read for address check, PDF, Grant Cycle config, strict
-     attachments via `review-manager/cycle-materials-attachments.js`), then
-     claim → mint (If-Match) → one email → markers via `recordDeliveredEmail`.
-     Retries act on the release row's state; every drain run re-raises a
-     deduplicated alert per stuck release. New keys
-     `email.reviewer_materials_acceptance.*` (create-only seed, Admin-editable).
-   - Codex: 2 rounds on the step, 5 high findings, all fixed (`33dd52b00`,
-     `7915f93fc`); loop stopped there. Full Jest 26,402 passed locally.
+1. **[VERIFIED via merged PR #563 and Ready production] CSO inbox copy.** `edd4a384e`, merge `487b0f849`: President release emails cc the approving CSO at the sender's eligible staff address.
+2. **[VERIFIED via merged PR #564, tests and Ready production] One email per hourly copy run.** `0cddffe4f` + `ca044deb3`, merge `ead487718`: separate Release clicks aggregate into one cycle/hourly notification. `releaseRuns[UTC-hour]` freezes approvals before copying and successful receipts after; overlap, restart, partial-success, global deadline and actor-change safeguards. Later approvals wait for a later hour; failed/held copies require recovery. Existing created/claimed legacy emails retain their original membership and are never regrouped or resent.
+3. **[VERIFIED via read-only production diagnosis and deployed fix] Dynamics Owner-party validation.** The 7 p.m. run copied all nine files but held its five email drafts because Dynamics added non-delivery Owner party 9. The validator now permits at most one Owner bound to the approving CSO, with no address or the sender address; delivery recipients/content and unknown-party/bcc checks remain strict.
+4. **[VERIFIED via production journal and exact Dynamics activities, 8:05 p.m. Pacific] All nine copied; all five legacy emails Sent.** Copy receipts span 7:00:35–7:01:27 p.m.; all five activities have `statuscode=3`, `statecode=1`, `senton` 8:01:02–8:01:13 p.m., To Allison Keller and cc Beth Pruitt. Journal revision 289 has cleared email errors. Sent/provider state does not prove inbox receipt. No manual send, worker invocation, SharePoint file write or data repair was performed by this agent.
+5. **[VERIFIED via Vercel] Deployment.** `dpl_DhoyWELzqxhdmQV37SsHbbrEeAKE` Ready on `ead487718`, serving `applications.wmkeck.org`; public Board page redirects to sign-in (final HTTP 200), initial error/fatal scan empty. Other agents held production changes during promotion; window released afterward.
+6. One-time follow-up automation deleted after verification. Folder: `https://appriver3651007194.sharepoint.com/sites/Research/Shared%20Documents/Board%20Materials/D26`.
 
-### Commits (branches only; `main` gets only this handoff)
-- #561: `d831b3048` code, `27bd54e36` docs, `951284330`, `8c5e05075` review
-  fixes, `6ae3efea9` Atlas.
-- #562: `2084a695f` D49, `c1adfcb28` / `90b20a3ec` plan notes, `1e8649fe3` /
-  `84ef1d7f0` table, `4b13470e9` step, `cdf5006bc`, `33dd52b00`, `7915f93fc` fixes, `1c69f430e`
-  15-minute fallback, `5af89da13` decision docs, `1dfb7b31d` pg test fix.
+### Commits
+
+- `edd4a384e` — Cc approving CSO on President writeup release emails (#563).
+- `0cddffe4f` — Group President writeup emails by hourly release run (#564).
+- `ca044deb3` — Accept verified CSO owner metadata on Board email activities (#564).
+- Runtime merges: `487b0f849`, `ead487718`.
 
 ## Next Items
 
 ### Verified Open
 
-1. **#562 CI.** The Postgres job failed on `1c69f430e`
-   (`reviewer-acceptance-defaults.pg.test.js`: its deps lacked the materials
-   stand-ins); fixed in `1dfb7b31d`, **not yet confirmed green**. The new
-   `reviewer-materials-release-store.pg.test.js` is in the CI list
-   (`.github/workflows/test.yml`) and has never run locally (no local Postgres).
-   Check `gh pr checks 562` first.
-2. **#562 remaining build, in order** (plan §3.3 build notes,
-   `docs/plans/REVIEWER_INVITATION_CALENDAR_BUILD_PLAN_2026-10-29.md`):
-   manual materials send takes the shared claim just before its mint
-   (`send-emails-service.js` materials path; new skip reason → status-enum
-   parity + `ReleaseMaterialsModal` labels; also resolve the "held" alert key
-   `reviewer-materials-release:<suggestionId>`) → "Send materials again" route +
-   UI (`reclaimMaterialsRelease`; route matrix row; server re-checks accepted /
-   not released) → invitation PDF precondition (server-side) → accepted-screen
-   copy ("proposal link on its way by email"). Then `/contract-reconcile` and a
-   Codex round on the manual path.
-3. **Follow-up PR (owner split):** invitation wording, `{{proposalDelivery}}` and
-   Reviewer Finder `proposalSendDate` / `commitDate` retirement.
+No Board release task remains. New hourly aggregate delivery has source/test/deployment evidence; the observed five emails were pre-existing legacy drafts. Do not claim a natural multi-click hourly aggregate was live-exercised. Real D26 post-Board archival and post-Board/cleanup emails remain unobserved.
 
-### Owner Decision Needed
+### Owner Decision Needed / Concurrent Workstreams
 
-1. **#561 merge** after three owner-run, read-only Production checks (blocking):
-   D26 calendar Board Mailing Date set and ≤ Board date (else every D26 setup
-   save is refused); D26 calendar Board Meeting Date = 2026-12-10; no pending D26
-   `configIntent` or unsent notice draft.
-2. **#562 before merge:** Production `schema_migrations` has no 091 (apply it
-   before deploy); seed the two new template keys before deploy; D26 has no open
-   invitations; J27 Reviewer Finder cycle record exists; owner reviews the draft
-   wording in the PR body.
-3. Remote branches of #556–#560 still exist; delete only with the owner's OK.
+[VERIFIED via live GitHub PR reads at closeout; implementations not re-reviewed here]
+
+| Owner / workstream | Current boundary and authority |
+|---|---|
+| Claude / Board calendar, PR #561 | Open, CI green, head `646429d93`; dates/pre-merge reads remain owner-gated in current PR body. Do not merge automatically. Check D26 calendar dates and pending drafts before promotion. |
+| Claude / materials on acceptance, PR #562 | Draft, CI green, head `54a63a652`; current PR says build complete, including manual path/recovery. Owner review, migration 091, template seeding, invitation/cycle checks and override-link preflight remain gated by current PR body. No such writes authorized by this handoff. |
+| Claude / wording follow-up | #562 explicitly leaves invitation wording, `{{proposalDelivery}}`, Reviewer Finder date-field retirement to a follow-up. Reconfirm scope with owner. |
+| Codex / shared prompt library, PR #553 | Open, head `94a795bb4`; separate owner controls schema/registration/enablement and promotion. Live test registration/enablement remains gated on Windows per owning chat. |
+| Codex / ranking and prior archival | Prior handoffs only; not revalidated or authorized here. |
+
+Owning reviewer plan: `docs/plans/REVIEWER_INVITATION_CALENDAR_BUILD_PLAN_2026-10-29.md`. Earlier rationale and decisions D47–D49 remain in the exact prior handoff and current plan; no new product decision was made for those streams.
 
 ### Verify Before Acting
 
-- #562 seed body says "A calendar reminder is attached, along with the review
-  template" unconditionally; flagged in the PR for the wording review.
-- A dismissed stuck-release alert is re-raised every drain run while the row
-  stays stuck (by design; noted in PR).
-- `check:agent-invariants` / `check:agent-wiki` fail only inside fresh worktrees
-  (per-machine links); not a repo defect.
-- **Owner's main checkout WIP (leave it):** `.codex/hooks.json`,
-  `.github/hooks/impeccable.json`, untracked `.impeccable/critique/…`, `output/`.
-- Flaky `tests/unit/workbench-integrity-service.test.js` (Session 652): did not
-  recur in this session's full runs.
+- Preserve all release and email receipts. Do not re-release the nine files or resend the five Sent activities.
+- Before reverting to pre-hourly code, pause dispatch: the old dispatcher ignores `releaseRuns` and could duplicate mail. Prefer forward fixes.
+- #561 overlaps the worker/notifications/UI and the President-email fixture. Preserve hourly grouping, Owner validation, CSO cc and Claude's calendar safeguards when combining; rerun the real merged tests. Earlier pre-merge checks covered an older #561 head, not today's head.
+- Main checkout unrelated WIP belongs to Justin/other agents: `.codex/hooks.json`, `.github/hooks/impeccable.json`, untracked `.impeccable/critique/…` and `output/`. Untouched here.
+- Additional untracked main-checkout files appeared at closeout: `scripts/close-out-d26-open-invitations.mjs` and `scripts/probe-reviewer-build-premerge.cjs`. They are not this session’s work; preserve them and establish ownership before use.
+- No worktree removal or branch deletion authorized; feature commits are pushed. Keep isolated branches/worktrees until explicitly cleaned up.
 
 ### Do Not Reopen Without New Decision
 
-- D47 (Board dates from calendar), D48 (fixed due date; withdraw via PD; PDF and
-  date required to invite), D49 (one combined email; 15-minute fallback; wording
-  split). Meeting-date retirement scope (Session 652).
-
-**Codex workstream (unchanged this session):** PR #553
-(`codex/shared-prompt-library-plan`, `1187caf17`) — publication route decided;
-merging, messaging Connor, schema, sandbox/Production steps and paid model tests
-each need separate owner authorization. Details: `git show
-45814e64c:SESSION_PROMPT.md`.
-
-## Concurrent Workstreams
-
-| Owner / workstream | Latest recorded resume boundary |
-|---|---|
-| Claude / reviewer build (J27) | #561 ready for owner reads; #562 draft at "acceptance step done", manual path next; follow-up wording PR not started |
-| Codex / shared prompt library | PR #553, `1187caf17`, unmerged |
-| Codex / Ranking, Board archival | Prior handoffs; not revalidated |
-| Claude / Research request corpus | Owner-gated; no new authorization |
+One President email per cycle/hourly run across separate release clicks, with the approving CSO cc'd. Existing created activities are immutable. No automatic overwrite/resync of released Board copies. Justin will report any further issue.
 
 ## Key Files Reference
 
 | File | Purpose |
-|------|---------|
-| `lib/services/board-writeups/calendar.js` (#561) | Board dates from the cycle calendar |
-| `lib/services/reviewer-engagement/materials-release-store.js` (#562) | Release claim table writer |
-| `lib/services/reviewer-acceptance-drain.js` (#562) | `release_materials` step + stuck-release alerts |
-| `lib/services/review-manager/cycle-materials-attachments.js` (#562) | Shared attachment fetch; strict loader |
-| `docs/plans/REVIEWER_INVITATION_CALENDAR_BUILD_PLAN_2026-10-29.md` | Build plan, state table, decisions |
-
-## Testing
-
-```bash
-cd ../WMKF_Apps-materials && npx jest tests/unit/reviewer-materials tests/unit/reviewer-acceptance
-gh pr checks 561; gh pr checks 562
-```
+|---|---|
+| `lib/services/board-writeups/hourly-releases.js` | Frozen hourly membership, cycle lease, successful receipt snapshots |
+| `lib/services/board-writeups/notifications.js` | Hourly/legacy notification compatibility, CSO cc, exact envelope/Owner validation |
+| `lib/services/board-writeups/worker.js` | Bounded copy phase and independent archive/email reconciliation |
+| `tests/unit/board-president-batch-email.test.js` | Grouping, restart, partial success, actor, legacy and envelope regressions |
+| `docs/atlas/postgres-board-writeup-runs.md` | Current state, production evidence, limits and operator cautions |
 
 ## Verification and Closeout
 
-- Milestone determination: no DEVELOPMENT_LOG entry — nothing merged or deployed.
-- Claim-evidence pilot: report found no eligible plan/design edit for this
-  session key; no row added.
-- No CLAUDE.md or memory changes.
+- 160 tests across nine Board suites passed; scoped ESLint, types, relevant Atlas/doc-currency/fact-consistency/status-enum/DAL gates and sequential self-tests passed; production build passed with existing tracing warnings.
+- All PR #563/#564 CI checks passed before merge. Independent review findings fixed and re-reviewed.
+- Milestone determination: production release capability and incident outcome shipped; DEVELOPMENT_LOG milestone entry required and included in this closeout.
+- Claim-evidence pilot report unavailable: local session state could not be read. No advisory observation row invented.
+- No CLAUDE.md or memory change needed: no new app, route, SQL migration, configuration variable or instruction convention.

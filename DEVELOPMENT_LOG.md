@@ -10,6 +10,18 @@ The chronological archive after the `Legacy chronological session log` divider c
 
 ---
 
+## October 2026 — CSO Board releases and President mail verified live (Session 654, Codex)
+
+**Milestone:** CSO release mail now groups successful copies by hourly run across Release clicks, with the CSO cc'd; the first nine real D26 copies and five existing email sends are verified.
+**Sessions:** Session 654 (Codex); independent review; owner-authorized promotion coordinated with concurrent agents.
+**Ship state:**
+- PR #563 (`487b0f849`) adds CSO cc; PR #564 (`ead487718`) ships durable hourly grouping and bounded restart/overlap/partial-success handling.
+- Fixed a real send hold: Dynamics adds Owner party 9; validation accepts only exact CSO-bound metadata while preserving delivery-recipient/content checks.
+- October 30, 7 p.m. Pacific: nine files copied; 8 p.m. retry: all five pre-existing drafts Sent to Allison, cc Beth, at 8:01:02–8:01:13. No manual send or data repair.
+- Production `dpl_DhoyWELzqxhdmQV37SsHbbrEeAKE` Ready; 160 Board tests and PR CI green. New aggregate-email behavior is deployed/tested; the observed sends retained legacy grouping.
+**Why it matters:** The CSO receives an inbox copy, and future multi-click releases generate one email per hourly run without overwriting edited files or blindly resending uncertain mail.
+**Pointers:** `docs/atlas/postgres-board-writeup-runs.md`; `lib/services/board-writeups/hourly-releases.js`; PRs #563/#564. Inbox receipt and real D26 post-Board archival remain unproved.
+
 ## October 2026 — No app reads the request meeting date (Session 652, Claude)
 
 **Milestone:** The meeting-date retirement is complete: Factory clones, invitation closing, honoraria, Dynamics Explorer, current-use scripts and every remaining app reader take a request's cycle from its Grant Cycle link, and a CI gate stops new request meeting-date reads.
