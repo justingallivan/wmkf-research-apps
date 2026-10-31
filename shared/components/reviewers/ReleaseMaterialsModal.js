@@ -61,6 +61,8 @@ export default function ReleaseMaterialsModal({ isOpen, onClose, reviewers, prop
   const [progress, setProgress] = useState({ current: 0, total: 0, message: '' });
   const [drafts, setDrafts] = useState([]); // [{ suggestionId, candidateName, candidateEmail, requestNumber, subject, body, skipped? }]
   const [sentResults, setSentResults] = useState({ sent: [], failed: [], skipped: [], unconfirmed: [] });
+  // Per-reviewer "Mark as delivered" outcome (suggestionId → 'working' | 'done' | error text).
+  const [markDelivered, setMarkDelivered] = useState({});
   const [error, setError] = useState(null);
   const [emailFields, setEmailFields] = useState({
     reviewDueDate: settings.reviewDueDate || '',
@@ -316,6 +318,7 @@ export default function ReleaseMaterialsModal({ isOpen, onClose, reviewers, prop
           setProgress({ current: 0, total: 0, message: '' });
           setDrafts([]);
           setSentResults({ sent: [], failed: [], skipped: [], unconfirmed: [] });
+          setMarkDelivered({});
           setError(null);
           setPreviewFailed(false);
           setRendering(false);
@@ -680,9 +683,13 @@ export default function ReleaseMaterialsModal({ isOpen, onClose, reviewers, prop
     ));
   };
 
-  const handleSend = async () => {
+  // `resendIds`: staff chose "Send again" for these reviewers after a stopped
+  // or abandoned materials release; only they are sent, and the server may
+  // reclaim their release (D46/D49).
+  const handleSend = async ({ resendIds = null } = {}) => {
     if (defaultWordingBusy) return;
-    const sendable = drafts.filter(d => !d.skipped && d.candidateEmail);
+    const resendSet = Array.isArray(resendIds) ? new Set(resendIds) : null;
+    const sendable = drafts.filter(d => !d.skipped && d.candidateEmail && (!resendSet || resendSet.has(d.suggestionId)));
     if (sendable.length === 0) {
       setError('No recipients with email to send to');
       return;
@@ -700,8 +707,10 @@ export default function ReleaseMaterialsModal({ isOpen, onClose, reviewers, prop
       if (!releaseAnyway) return;
     }
 
-    const ok = window.confirm(
-      `Release the proposal to ${sendable.length} reviewer${sendable.length !== 1 ? 's' : ''} now? `
+    const ok = window.confirm(resendSet
+      ? 'The earlier materials email to this reviewer may already have arrived. Send it again now? '
+        + 'The reviewer gets a new link; any earlier link stops working.'
+      : `Release the proposal to ${sendable.length} reviewer${sendable.length !== 1 ? 's' : ''} now? `
         + 'This will send the materials email through Dynamics and cannot be undone.'
     );
     if (!ok) return;
@@ -753,6 +762,7 @@ export default function ReleaseMaterialsModal({ isOpen, onClose, reviewers, prop
           templateType,
           attachmentUrls,
           markAsSent: true,
+          ...(resendSet ? { recoverMaterialsReleaseIds: Array.from(resendSet) } : {}),
         }),
       });
       if (modalSessionRef.current !== epoch) return;
@@ -861,6 +871,26 @@ export default function ReleaseMaterialsModal({ isOpen, onClose, reviewers, prop
       if (modalSessionRef.current !== epoch || finished) return;
       setError(err.message);
       setStep('preview');
+    }
+  };
+
+  const handleMarkDelivered = async (suggestionId) => {
+    const epoch = modalSessionRef.current;
+    setMarkDelivered(prev => ({ ...prev, [suggestionId]: 'working' }));
+    try {
+      const envelope = await requestEnvelope('/api/review-manager/materials-release-delivered', {
+        method: 'POST',
+        body: { suggestionId },
+        tolerantBody: true,
+      });
+      if (modalSessionRef.current !== epoch) return;
+      setMarkDelivered(prev => ({
+        ...prev,
+        [suggestionId]: envelope.ok ? 'done' : (envelope.data?.error || envelope.error?.message || 'Could not mark as delivered.'),
+      }));
+    } catch (err) {
+      if (modalSessionRef.current !== epoch) return;
+      setMarkDelivered(prev => ({ ...prev, [suggestionId]: err.message || 'Could not mark as delivered.' }));
     }
   };
 
@@ -1238,10 +1268,39 @@ export default function ReleaseMaterialsModal({ isOpen, onClose, reviewers, prop
                   </div>
                 ))}
                 {sentResults.skipped.map(s => (
-                  <div key={`sk-${s.suggestionId}`} className="flex items-center gap-2 p-2 bg-gray-50 rounded text-sm text-gray-600">
-                    <Minus aria-hidden="true" className="h-4 w-4 shrink-0" />
-                    <span className="font-medium">{s.candidateName}</span>
-                    <span className="text-xs">skipped ({SEND_SKIP_REASON_LABEL[s.reason] || s.reason || 'not sent'})</span>
+                  <div key={`sk-${s.suggestionId}`} className="p-2 bg-gray-50 rounded text-sm text-gray-600">
+                    <div className="flex items-center gap-2">
+                      <Minus aria-hidden="true" className="h-4 w-4 shrink-0" />
+                      <span className="font-medium">{s.candidateName}</span>
+                      <span className="text-xs">skipped ({SEND_SKIP_REASON_LABEL[s.reason] || s.reason || 'not sent'})</span>
+                    </div>
+                    {s.materialsRecoveryAction === 'send_again' && (
+                      <div className="ml-6 mt-1 flex items-center gap-2 text-xs">
+                        <span>The earlier send stopped and may not have arrived.</span>
+                        <Button variant="outline" size="sm" onClick={() => handleSend({ resendIds: [s.suggestionId] })}>
+                          Send again
+                        </Button>
+                      </div>
+                    )}
+                    {s.materialsRecoveryAction === 'mark_delivered' && (
+                      <div className="ml-6 mt-1 flex items-center gap-2 text-xs">
+                        {markDelivered[s.suggestionId] === 'done' ? (
+                          <span className="text-green-700">Marked as delivered.</span>
+                        ) : (
+                          <>
+                            <span>The email went out but the reviewer record was not updated.</span>
+                            <Button variant="outline" size="sm"
+                              disabled={markDelivered[s.suggestionId] === 'working'}
+                              onClick={() => handleMarkDelivered(s.suggestionId)}>
+                              Mark as delivered
+                            </Button>
+                            {markDelivered[s.suggestionId] && markDelivered[s.suggestionId] !== 'working' && (
+                              <span className="text-red-700">{markDelivered[s.suggestionId]}</span>
+                            )}
+                          </>
+                        )}
+                      </div>
+                    )}
                   </div>
                 ))}
                 {sentResults.unconfirmed.map(item => (
@@ -1290,7 +1349,7 @@ export default function ReleaseMaterialsModal({ isOpen, onClose, reviewers, prop
                 >
                   Back
                 </Button>
-                <Button onClick={handleSend} disabled={defaultWordingBusy || (degraded)} title={degraded ? 'Reviewer data could not be refreshed - retry before making changes' : undefined}>
+                <Button onClick={() => handleSend()} disabled={defaultWordingBusy || (degraded)} title={degraded ? 'Reviewer data could not be refreshed - retry before making changes' : undefined}>
                   Send {drafts.filter(d => !d.skipped).length} Email{drafts.filter(d => !d.skipped).length !== 1 ? 's' : ''}
                 </Button>
               </>

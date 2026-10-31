@@ -14,6 +14,8 @@ function createMaterialsReleaseStoreMock() {
     markMaterialsSent: jest.fn(async () => row('sent')),
     recordMaterialsRelease: jest.fn(async () => row('recorded')),
     markMaterialsReleaseStopped: jest.fn(async (id, token, state) => row(state)),
+    retakeFailedMaterialsRelease: jest.fn(async () => ({ ...row('claimed'), lease_token: 'lease-retake' })),
+    reclaimMaterialsRelease: jest.fn(async () => ({ ...row('claimed'), lease_token: 'lease-reclaim' })),
   };
 }
 

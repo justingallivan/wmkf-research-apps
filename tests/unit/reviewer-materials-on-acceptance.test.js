@@ -181,6 +181,7 @@ test('retry after a confirmed send only finishes the bookkeeping', async () => {
   expect(materialsSent(materials)).toBe(0); expect(materials.mint).not.toHaveBeenCalled();
   expect(materials.recordDelivered).toHaveBeenCalledWith(expect.objectContaining({ sentAt: '2027-02-25T01:00:00.000Z' }));
   expect(store.release.state).toBe('recorded'); expect(finalOutcome(d)).toBe('released');
+  expect(require('../../lib/services/alert-service').default.autoResolve).toHaveBeenCalledWith(`reviewer-materials-release:${SUGGESTION_ID}`);
 });
 
 test('a failed bookkeeping write retries and the next attempt does not resend', async () => {
@@ -279,17 +280,61 @@ test('every drain run re-raises alerts for stuck releases, independent of any jo
   const notify = jest.fn(async () => ({ id: 1 }));
   const listStuckMaterialsReleases = jest.fn(async () => [
     { suggestion_id: SUGGESTION_ID, job_id: 77, state: 'uncertain', error_code: 'send_unconfirmed' },
-    { suggestion_id: '66666666-6666-4666-8666-666666666666', job_id: 78, state: 'sent', error_code: null },
+    { suggestion_id: '66666666-6666-4666-8666-666666666666', request_id: REQUEST_ID, job_id: 78, state: 'sent', error_code: null, sent_at: '2026-10-30T10:00:00.000Z' },
   ]);
   const jobs = { claimReviewerAcceptanceJobs: jest.fn(async () => []) };
-  const result = await drainReviewerAcceptanceJobs({ deps: { jobs, notify, listStuckMaterialsReleases, switchesReady: () => true } });
+  // The sent row's bookkeeping retry fails, so it still alerts.
+  const findSuggestionForMaterials = jest.fn(async () => { throw new Error('dataverse down'); });
+  const result = await drainReviewerAcceptanceJobs({ deps: { jobs, notify, listStuckMaterialsReleases, findSuggestionForMaterials, switchesReady: () => true } });
   expect(result.materialsAlerts).toBe(2);
   expect(notify.mock.calls.map(([o]) => [o.type, o.autoResolveKey])).toEqual([
     ['reviewer_materials_release_stopped', `reviewer-materials-release:${SUGGESTION_ID}`],
     ['reviewer_materials_release_unrecorded', 'reviewer-materials-release:66666666-6666-4666-8666-666666666666'],
   ]);
   notify.mockRejectedValue(new Error('down'));
-  expect((await drainReviewerAcceptanceJobs({ deps: { jobs, notify, listStuckMaterialsReleases, switchesReady: () => true } })).materialsAlerts).toBe(0);
+  expect((await drainReviewerAcceptanceJobs({ deps: { jobs, notify, listStuckMaterialsReleases, findSuggestionForMaterials, switchesReady: () => true } })).materialsAlerts).toBe(0);
+});
+
+describe('stuck sent releases: bookkeeping is retried, never the email (any source)', () => {
+  const SENT_ROW = { suggestion_id: SUGGESTION_ID, request_id: REQUEST_ID, source: 'manual', job_id: null, state: 'sent', error_code: null, sent_at: new Date('2026-10-30T10:00:00.000Z') };
+  const run = async ({ fresh = suggestionRow(), recordDelivered = jest.fn(async () => {}), record = jest.fn(async () => ({ state: 'recorded' })) } = {}) => {
+    const AlertService = require('../../lib/services/alert-service').default;
+    AlertService.autoResolve.mockClear();
+    const notify = jest.fn(async () => ({ id: 1 }));
+    const jobs = { claimReviewerAcceptanceJobs: jest.fn(async () => []) };
+    const result = await drainReviewerAcceptanceJobs({ deps: {
+      jobs, notify, switchesReady: () => true,
+      listStuckMaterialsReleases: jest.fn(async () => [SENT_ROW]),
+      findSuggestionForMaterials: jest.fn(async () => fresh),
+      materials: { recordDelivered, record },
+    } });
+    return { result, notify, recordDelivered, record, AlertService };
+  };
+
+  test('a manual sent row is recorded from its persisted sent_at, the alert resolves, nothing is sent', async () => {
+    const { result, notify, recordDelivered, record, AlertService } = await run();
+    expect(recordDelivered).toHaveBeenCalledWith(expect.objectContaining({
+      suggestionId: SUGGESTION_ID, templateType: 'materials', sentAt: '2026-10-30T10:00:00.000Z',
+      originalSuggestion: { _wmkf_request_value: REQUEST_ID, _wmkf_potentialreviewer_value: REVIEWER_ID },
+    }));
+    expect(record).toHaveBeenCalledWith(SUGGESTION_ID);
+    expect(AlertService.autoResolve).toHaveBeenCalledWith(`reviewer-materials-release:${SUGGESTION_ID}`);
+    expect(notify).not.toHaveBeenCalled();
+    expect(result.materialsAlerts).toBe(0);
+  });
+
+  test('a reviewer row that cannot take the bookkeeping keeps the unrecorded alert', async () => {
+    const { notify, record } = await run({ recordDelivered: jest.fn(async () => { throw new Error('Suggestion is closed or has an unknown review status'); }) });
+    expect(record).not.toHaveBeenCalled();
+    expect(notify.mock.calls[0][0]).toMatchObject({ type: 'reviewer_materials_release_unrecorded' });
+  });
+
+  test('a suggestion now on another request is not recorded', async () => {
+    const recordDelivered = jest.fn(async () => {});
+    const { notify } = await run({ fresh: suggestionRow({ _wmkf_request_value: '99999999-9999-4999-8999-999999999999' }), recordDelivered });
+    expect(recordDelivered).not.toHaveBeenCalled();
+    expect(notify).toHaveBeenCalledTimes(1);
+  });
 });
 
 describe('15-minute fallback before the claim (owner, 2026-10-30)', () => {

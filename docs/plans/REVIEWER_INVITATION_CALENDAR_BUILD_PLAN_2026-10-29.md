@@ -277,7 +277,7 @@ Admin `inviteStartDate` has no reader outside its form, validation and tests
 **Build notes (2026-10-30, branch `claude/reviewer-materials-on-accept`, PR
 #562, not merged).** Built on the branch: migration 091 and its store, the
 acceptance job's `release_materials` step with the new template keys, and the
-manual-path claim (Session 654). Still [PLANNED]: staff recovery action, invitation PDF
+manual-path claim and staff recovery (Session 654). Still [PLANNED]: invitation PDF
 precondition and accepted-screen copy, invitation wording and
 `{{proposalDelivery}}` / Reviewer Finder date-field retirement. Accept does
 not set a review status [VERIFIED via rg: no `reviewStatus` write in
@@ -360,21 +360,20 @@ to a follow-up PR (owner, 2026-10-30).
   reviewer link now fails closed (`external_link_missing`) instead of sending
   unclaimed, and `markAsSent: false` is refused for materials (both UIs always
   send `true`).
-  **Open (owner decision before #562 leaves draft): a `sent` row with no
-  exit.** `recordDeliveredEmail` throws on every no-write path (reviewer
-  closed or withdrew during delivery, binding changed, ETag problems), so the
-  row stays `sent`; `reclaimMaterialsRelease` cannot touch `sent`, nothing
-  retries a manual row, and the drain re-raises "sent but not yet recorded"
-  every run (its text says "the job keeps retrying", untrue for manual rows).
-  The acceptance path has the same end state once its job gives up. Candidate
-  fixes: the recovery step gains a staff "Mark as delivered" action that moves
-  `sent` → `recorded` and resolves the alert; or the drain's stuck loop retries
-  `recordDeliveredEmail` for any `sent` row regardless of source. Local
-  auth-bypass sessions have no profile id, so a manual materials send there
-  fails closed (`materials_release_unavailable`); real sessions always carry
-  one (`requireAppAccess`).
+  **Recovery (owner-approved Session 654, after Codex review): built.** A
+  `failed` row (definitely unsent) is retaken by any normal send. `uncertain`
+  or abandoned rows are resent only through the Release Materials "Send again"
+  button (`recoverMaterialsReleaseIds`), after the delivered-marker gates. A
+  `sent` row is recorded automatically by the drain's stuck loop (any source,
+  from `sent_at`, never resending); when the reviewer row cannot take it
+  (closed, withdrew, binding changed), staff "Mark as delivered"
+  (`POST /api/review-manager/materials-release-delivered`) closes the release
+  as `staff_marked_delivered`. Local auth-bypass sessions have no profile id,
+  so a manual materials send there fails closed
+  (`materials_release_unavailable`); real sessions always carry one
+  (`requireAppAccess`).
 - **Build order** (each a stop point): migration + claim service → drain step →
-  manual-path claim → recovery action (route + UI) → invitation PDF
+  manual-path claim → recovery action (route + UI) [built through here] → invitation PDF
   precondition + accepted-screen copy → wording seeds, `{{proposalDelivery}}`
   and Reviewer Finder date-field retirement.
 

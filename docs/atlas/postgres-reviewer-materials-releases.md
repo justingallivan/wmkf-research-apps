@@ -38,6 +38,12 @@ build notes.
     release, or one abandoned at `claimed` / `link_minted` past its lease,
     goes back to `claimed` under a new lease and `attempts + 1`. Never touches
     `sent` or `recorded`.
+  - `retakeFailedMaterialsRelease` — a normal manual send retakes a `failed`
+    release (definitely not sent) the same way; `uncertain` and abandoned rows
+    are not retaken.
+  - `closeSentMaterialsRelease` — staff "Mark as delivered": `sent → recorded`
+    with `error_code = staff_marked_delivered` and the staff profile, used only
+    when the reviewer row cannot take the bookkeeping.
 - `listStuckMaterialsReleases` — rows needing staff: `uncertain` / `failed`,
   `claimed` / `link_minted` past the lease, or `sent` unrecorded for 30
   minutes. Every acceptance-drain run (every 2 minutes) re-raises one
@@ -51,8 +57,20 @@ build notes.
   an existing row refuses (`materials_already_sent` for `sent` / `recorded`,
   else `materials_release_in_progress`), and a claim that cannot be checked
   fails closed with nothing minted. After its own `recordDeliveredEmail` it
-  moves the row to `recorded` and resolves the release alert. [PLANNED] the
-  staff recovery action (`reclaimMaterialsRelease`); not wired yet.
+  moves the row to `recorded` and resolves the release alert. A `failed` row
+  is retaken by any normal send; `uncertain` or abandoned rows are reclaimed
+  only when the request names the reviewer in `recoverMaterialsReleaseIds`
+  (the Release Materials "Send again" button), after the delivered-marker
+  gates pass. Refusals carry `materialsRecoveryAction` (`send_again` /
+  `mark_delivered`).
+- Staff "Mark as delivered": `POST /api/review-manager/materials-release-delivered`
+  → `lib/services/reviewer-engagement/mark-materials-delivered.js`. A `sent`
+  row only: tries `recordDeliveredEmail` then `recordMaterialsRelease`; when
+  the reviewer row cannot take it, `closeSentMaterialsRelease`. Sends nothing.
+- Drain stuck loop (`alertStuckMaterialsReleases`): for a `sent` row of any
+  source, first retries the bookkeeping from the persisted `sent_at` (binding
+  check on the request only; the row stores no reviewer id), records the row
+  and resolves the alert; only if that fails does it raise the alert.
 - Alert key: `materialsReleaseAlertKey` in the store is the one spelling used
   by both writers.
 
@@ -77,9 +95,12 @@ Constraints: `sent` and `recorded` need `sent_at`; `recorded` needs
 ## Lifecycle and retention
 
 No cleanup job: one small row per accepted reviewer engagement, kept as the
-receipt that materials went out. A stuck row (`uncertain`, `failed`, or
-`claimed` / `link_minted` past its lease) needs staff action; nothing resumes
-it automatically.
+receipt that materials went out. A `recorded` row with `error_code =
+staff_marked_delivered` is a staff close: the email went out but the reviewer
+markers were not written. A stuck `uncertain` or abandoned row needs staff
+("Send again"); a `failed` row is retaken by the next normal send; a `sent`
+row is recorded automatically by the drain, or closed by staff ("Mark as
+delivered").
 
 ## Tests
 

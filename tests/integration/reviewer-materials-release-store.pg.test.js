@@ -58,6 +58,22 @@ suite('materials release claim (real Postgres, migration 091)', () => {
     expect((await releases.reclaimMaterialsRelease({ suggestionId: SUGGESTION, actorProfileId: staffId })).attempts).toBe(3);
   });
 
+  test('a normal send retakes only a failed release; staff close only a sent one', async () => {
+    const { release } = await manual();
+    expect(await releases.retakeFailedMaterialsRelease({ suggestionId: SUGGESTION, actorProfileId: staffId })).toBeNull();
+    await releases.markMaterialsReleaseStopped(SUGGESTION, release.lease_token, 'uncertain', 'send_unconfirmed');
+    expect(await releases.retakeFailedMaterialsRelease({ suggestionId: SUGGESTION, actorProfileId: staffId })).toBeNull();
+    await pool.query("UPDATE reviewer_materials_releases SET state = 'failed'");
+    const retaken = await releases.retakeFailedMaterialsRelease({ suggestionId: SUGGESTION, actorProfileId: staffId });
+    expect(retaken).toMatchObject({ state: 'claimed', attempts: 2, error_code: null });
+    expect(await releases.closeSentMaterialsRelease({ suggestionId: SUGGESTION, actorProfileId: staffId })).toBeNull();
+    await releases.markMaterialsLinkMinted(SUGGESTION, retaken.lease_token);
+    await releases.markMaterialsSent(SUGGESTION, retaken.lease_token);
+    const closed = await releases.closeSentMaterialsRelease({ suggestionId: SUGGESTION, actorProfileId: staffId });
+    expect(closed).toMatchObject({ state: 'recorded', error_code: 'staff_marked_delivered', lease_token: null });
+    expect(closed.recorded_at).not.toBeNull();
+  });
+
   test('stuck releases: stopped, abandoned past the lease, or sent but unrecorded for 30 minutes', async () => {
     const other = '33333333-3333-4333-8333-333333333333', live = '44444444-4444-4444-8444-444444444444', sent = '55555555-5555-4555-8555-555555555555';
     const { release } = await auto();
