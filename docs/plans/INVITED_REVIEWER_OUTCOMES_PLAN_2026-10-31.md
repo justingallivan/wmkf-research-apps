@@ -358,6 +358,13 @@ rows. A reviewer's own portal decline before materials still deletes. Track
 shows "Saving…" on the row while an End engagement write is in flight (one
 with an honorarium took ~20s in Production).
 
+**Production check (2026-10-31, test request 1003125, read-only lookups with
+owner OK):** row `bb5787d7` recorded Did not submit at 23:52:50 UTC; its
+honorarium `1530402a` still exists, now `Withdrawn` with
+`wmkf_datewithdrawalreceived` 23:52:50, unpaid and unauthorized; the link is
+retained. Saving… showed and the row refreshed on its own. History shows no
+dated entry for the outcome until the Ended at field exists.
+
 Both schema changes are additive and no runtime code reads or writes them
 until slice 3. Each step below is owner-run or explicitly owner-approved;
 steps 2, 3 and 5 also need that day's `DATAVERSE_PROD_WRITE_ACK`. Every
