@@ -80,13 +80,13 @@ build notes.
 |---|---|
 | `suggestion_id` | Primary key; the `wmkf_appreviewersuggestion` row. |
 | `request_id` | The request the engagement belongs to. |
-| `source` | `acceptance` (job-driven) or `manual` (staff). |
+| `source` | The original claimant: `acceptance` (job-driven) or `manual` (staff). Unchanged when staff later retake or reclaim the row; `actor_profile_id` then names the staff member. |
 | `state` | `claimed`, `link_minted`, `sent`, `recorded`, `uncertain`, `failed`. |
 | `job_id` | `reviewer_acceptance_jobs.id`; required exactly when `source = 'acceptance'`. No foreign key: the operator smoke cleanup deletes completed jobs [VERIFIED via `scripts/smoke-reviewer-binding.js:391`]; no application path deletes them. |
 | `actor_profile_id` | Staff profile: required for `manual`; set on a staff resend. |
 | `lease_token`, `lease_until` | Ownership of an in-flight send; cleared at `recorded` and when stopped. |
 | `attempts` | 1 on claim; +1 per staff resend. |
-| `error_code` | Short code for `uncertain` / `failed`; cleared on a confirmed send or resend. |
+| `error_code` | Short code for `uncertain` / `failed`; cleared on a confirmed send or resend. On a `recorded` row, `staff_marked_delivered` marks a staff close (reviewer markers not written). |
 | `claimed_at`, `link_minted_at`, `sent_at`, `recorded_at`, `updated_at` | Transition times. |
 
 Constraints: `sent` and `recorded` need `sent_at`; `recorded` needs

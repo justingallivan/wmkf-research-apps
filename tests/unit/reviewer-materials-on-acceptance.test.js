@@ -297,7 +297,7 @@ test('every drain run re-raises alerts for stuck releases, independent of any jo
 
 describe('stuck sent releases: bookkeeping is retried, never the email (any source)', () => {
   const SENT_ROW = { suggestion_id: SUGGESTION_ID, request_id: REQUEST_ID, source: 'manual', job_id: null, state: 'sent', error_code: null, sent_at: new Date('2026-10-30T10:00:00.000Z') };
-  const run = async ({ fresh = suggestionRow(), recordDelivered = jest.fn(async () => {}), record = jest.fn(async () => ({ state: 'recorded' })) } = {}) => {
+  const run = async ({ fresh = suggestionRow(), recordDelivered = jest.fn(async () => {}), record = jest.fn(async () => ({ state: 'recorded' })), get = jest.fn(async () => SENT_ROW) } = {}) => {
     const AlertService = require('../../lib/services/alert-service').default;
     AlertService.autoResolve.mockClear();
     const notify = jest.fn(async () => ({ id: 1 }));
@@ -306,7 +306,7 @@ describe('stuck sent releases: bookkeeping is retried, never the email (any sour
       jobs, notify, switchesReady: () => true,
       listStuckMaterialsReleases: jest.fn(async () => [SENT_ROW]),
       findSuggestionForMaterials: jest.fn(async () => fresh),
-      materials: { recordDelivered, record },
+      materials: { recordDelivered, record, get },
     } });
     return { result, notify, recordDelivered, record, AlertService };
   };
@@ -327,6 +327,12 @@ describe('stuck sent releases: bookkeeping is retried, never the email (any sour
     const { notify, record } = await run({ recordDelivered: jest.fn(async () => { throw new Error('Suggestion is closed or has an unknown review status'); }) });
     expect(record).not.toHaveBeenCalled();
     expect(notify.mock.calls[0][0]).toMatchObject({ type: 'reviewer_materials_release_unrecorded' });
+  });
+
+  test('a row the job recorded at the same moment counts as recorded: no orphan alert', async () => {
+    const { notify, AlertService } = await run({ record: jest.fn(async () => null), get: jest.fn(async () => ({ ...SENT_ROW, state: 'recorded' })) });
+    expect(notify).not.toHaveBeenCalled();
+    expect(AlertService.autoResolve).toHaveBeenCalled();
   });
 
   test('a suggestion now on another request is not recorded', async () => {
