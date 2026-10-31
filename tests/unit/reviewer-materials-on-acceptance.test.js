@@ -291,3 +291,37 @@ test('every drain run re-raises alerts for stuck releases, independent of any jo
   notify.mockRejectedValue(new Error('down'));
   expect((await drainReviewerAcceptanceJobs({ deps: { jobs, notify, listStuckMaterialsReleases, switchesReady: () => true } })).materialsAlerts).toBe(0);
 });
+
+describe('15-minute fallback before the claim (owner, 2026-10-30)', () => {
+  const failingAttachments = m => m.attachments.mockRejectedValue(new Error('blob store down'));
+  const stepsSince = minutes => ({ release_materials: { firstPreparationFailedAt: new Date(Date.now() - minutes * 60000).toISOString() } });
+
+  test('the first transient failure records when failures began and retries', async () => {
+    const { d, materials } = deps(); failingAttachments(materials);
+    await expect(processReviewerAcceptanceJob(job(), d)).rejects.toThrow('cycle_attachments_unavailable');
+    expect(stepPatches(d).some(p => p.firstPreparationFailedAt)).toBe(true);
+    expect(d.sendPreparedAcceptanceEmail).not.toHaveBeenCalled();
+  });
+
+  test('under 15 minutes it keeps retrying without resetting the start', async () => {
+    const { d, materials } = deps(); failingAttachments(materials);
+    await expect(processReviewerAcceptanceJob(job({ steps: stepsSince(10) }), d)).rejects.toThrow('cycle_attachments_unavailable');
+    expect(stepPatches(d).some(p => p.firstPreparationFailedAt)).toBe(false);
+    expect(d.sendPreparedAcceptanceEmail).not.toHaveBeenCalled();
+  });
+
+  test('after 15 minutes the reviewer gets today’s confirmation and staff a held alert; nothing claimed', async () => {
+    const { d, materials } = deps(); failingAttachments(materials);
+    expect((await processReviewerAcceptanceJob(job({ steps: stepsSince(16) }), d)).status).toBe('completed');
+    expect(d.sendPreparedAcceptanceEmail).toHaveBeenCalledTimes(1);
+    expect(stepPatches(d).find(p => p.completedAt)).toMatchObject({ outcome: 'held', reason: 'cycle_attachments_unavailable_after_retries' });
+    expect(notified(d, 'reviewer_materials_release_held')).toBe(true);
+    expect(materials.claim).not.toHaveBeenCalled(); expect(materialsSent(materials)).toBe(0);
+  });
+
+  test('after the claim there is no fallback: a live release still defers', async () => {
+    const { d, materials } = deps({ release: { suggestion_id: SUGGESTION_ID, source: 'acceptance', job_id: '77', state: 'link_minted', lease_until: new Date(Date.now() + 60000).toISOString() } });
+    await expect(processReviewerAcceptanceJob(job({ steps: stepsSince(30) }), d)).rejects.toThrow('release_in_progress');
+    expect(d.sendPreparedAcceptanceEmail).not.toHaveBeenCalled(); expect(materials.mint).not.toHaveBeenCalled();
+  });
+});
