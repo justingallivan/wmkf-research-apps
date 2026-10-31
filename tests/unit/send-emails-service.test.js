@@ -955,6 +955,66 @@ describe('send-emails-service — shared materials release claim (D46/D49)', () 
     expect(updateLifecycle).not.toHaveBeenCalled();
   });
 
+  test('the mint is bound to the row version re-read after the claim', async () => {
+    acceptedFresh();
+    const order = [];
+    materialsReleaseStore.claimMaterialsRelease.mockImplementationOnce(async () => { order.push('claim'); return { claimed: true, release: leaseRow('claimed') }; });
+    findById.mockImplementationOnce(async (id) => SUGGESTIONS[id]); // hydration
+    findById.mockImplementationOnce(async (id) => { order.push('recheck'); return { ...SUGGESTIONS[id], _etag: 'W/"9"' }; });
+    mintAndStore.mockImplementationOnce(async () => { order.push('mint'); return { jwt: 'new.jwt.value' }; });
+
+    const emitted = await run({ drafts: [draft(SUG_OK)], templateType: 'materials' });
+
+    expect(resultOf(emitted).sent).toHaveLength(1);
+    expect(order).toEqual(['claim', 'recheck', 'mint']);
+    expect(mintAndStore).toHaveBeenCalledWith(expect.objectContaining({ suggestionId: SUG_OK, ifMatch: 'W/"9"' }));
+  });
+
+  test.each([
+    ['declined since the batch started', { wmkf_accepted: false, wmkf_declined: true }],
+    ['link revoked by staff', { wmkf_externaltokenrevoked: true }],
+    ['moved to a terminal status', { wmkf_reviewstatus: 100000005 }],
+    ['materials recorded meanwhile', { wmkf_materialssentat: '2026-10-31T00:00:00Z' }],
+    ['review received meanwhile', { wmkf_reviewreceivedat: '2026-10-31T00:00:00Z' }],
+  ])('a reviewer %s after hydration gets nothing; the claim stops as failed', async (_name, change) => {
+    acceptedFresh();
+    findById.mockImplementationOnce(async (id) => SUGGESTIONS[id]); // hydration: still accepted
+    findById.mockImplementationOnce(async (id) => ({ ...SUGGESTIONS[id], ...change, _etag: 'W/"9"' }));
+
+    const emitted = await run({ drafts: [draft(SUG_OK)], templateType: 'materials' });
+
+    expect(resultOf(emitted).failed[0]).toMatchObject({ suggestionId: SUG_OK, code: 'materials_reviewer_changed' });
+    expect(mintAndStore).not.toHaveBeenCalled();
+    expect(createAndSendEmail).not.toHaveBeenCalled();
+    expect(materialsReleaseStore.markMaterialsReleaseStopped).toHaveBeenCalledWith(SUG_OK, 'lease-1', 'failed', 'materials_reviewer_changed');
+  });
+
+  test.each([
+    ['read fails', () => findById.mockRejectedValueOnce(new Error('dv down'))],
+    ['row has no usable ETag', () => findById.mockImplementationOnce(async (id) => ({ ...SUGGESTIONS[id], _etag: '*' }))],
+  ])('a recheck that %s fails closed before the mint', async (_name, arrange) => {
+    acceptedFresh();
+    findById.mockImplementationOnce(async (id) => SUGGESTIONS[id]);
+    arrange();
+
+    const emitted = await run({ drafts: [draft(SUG_OK)], templateType: 'materials' });
+
+    expect(resultOf(emitted).failed[0]).toMatchObject({ code: 'materials_reviewer_unavailable' });
+    expect(mintAndStore).not.toHaveBeenCalled();
+    expect(createAndSendEmail).not.toHaveBeenCalled();
+  });
+
+  test('a change that lands between the recheck and the mint loses the precondition: nothing sent', async () => {
+    acceptedFresh();
+    mintAndStore.mockRejectedValueOnce(Object.assign(new Error('Precondition Failed'), { status: 412 }));
+
+    const emitted = await run({ drafts: [draft(SUG_OK)], templateType: 'materials' });
+
+    expect(resultOf(emitted).failed[0]).toMatchObject({ code: 'materials_reviewer_changed' });
+    expect(materialsReleaseStore.markMaterialsReleaseStopped).toHaveBeenCalledWith(SUG_OK, 'lease-1', 'failed', 'materials_reviewer_changed');
+    expect(createAndSendEmail).not.toHaveBeenCalled();
+  });
+
   test('a lost lease after the mint sends nothing', async () => {
     acceptedFresh();
     materialsReleaseStore.markMaterialsLinkMinted.mockResolvedValueOnce(null);
