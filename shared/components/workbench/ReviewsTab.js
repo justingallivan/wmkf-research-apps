@@ -912,7 +912,11 @@ export default function ReviewsTab({ requestId, previewReadOnly = false }) {
   const outstanding = reviewers
     .filter(isOutstanding)
     .sort((a, b) => (b.daysSinceMaterialsSent ?? -1) - (a.daysSinceMaterialsSent ?? -1));
-  const acceptedCount = reviewers.length;
+  // Withdrew / Released / Did not submit reviewers without a review are listed
+  // on Track but are no longer accepted or pending.
+  const acceptedCount = reviewers
+    .filter((r) => r.reviewReceivedAt || !isTerminalReviewStatus(r.reviewStatus))
+    .length;
   const manualEntryReviewer = manualEntry?.requestId === requestId
     ? manualEntry.reviewer
     : null;

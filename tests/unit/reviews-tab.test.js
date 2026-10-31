@@ -189,6 +189,26 @@ test('shows an empty state when no reviewer has submitted', async () => {
   expect(screen.queryByText('Export:')).not.toBeInTheDocument();
 });
 
+test('does not call staff-ended reviewers accepted and pending', async () => {
+  fetch.mockResolvedValue({
+    ok: true,
+    json: async () => ({
+      success: true,
+      proposals: [{
+        proposalId: 'req1',
+        reviewers: [
+          { suggestionId: 'e1', name: 'Dr. Ended', reviewStatus: 'did_not_submit', responseType: 'declined' },
+          { suggestionId: 'e2', name: 'Dr. Withdrawn', reviewStatus: 'withdrew', responseType: 'declined' },
+        ],
+      }],
+    }),
+  });
+
+  render(<ReviewsTab requestId="req1" />);
+  expect(await screen.findByText(/No reviews submitted yet\./i)).toBeInTheDocument();
+  expect(screen.queryByText(/accepted and pending/i)).not.toBeInTheDocument();
+});
+
 test.each([
   ['removed', /removed from the proposal.*restore them first/i],
   ['revoked', /access was withdrawn.*reissue their link/i],
