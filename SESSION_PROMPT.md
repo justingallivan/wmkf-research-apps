@@ -1,153 +1,153 @@
-# Session 654 Prompt: Reviewer build — #561 awaits owner reads; #562 manual release next
+# Session 656 Prompt: #561 ready to merge on owner go-ahead; #562 built, awaiting wording review and release steps
 
-**Handoff destination:** `main`, docs-only. Feature work lives on two branches
-(below); nothing from this session is merged or deployed.
+**Handoff destination:** `main`, docs and operator scripts only. Reviewer feature work lives on two
+branches (below); nothing from this session was merged or deployed.
 
-Earlier handoffs, retrievable exactly: Claude Session 652 with Codex Session 649
-`git show 45814e64c:SESSION_PROMPT.md`; Claude Session 651 `git show
-6a254654c:SESSION_PROMPT.md`; Claude's older J27/cycle workstream `git show
-006b87565:SESSION_PROMPT.md`.
+Session numbering is shared: Codex used 654 for the Board release work (#563/#564), so this Claude
+session is **655**. Earlier handoffs, retrievable exactly: Codex Session 654 (Board CSO cc + hourly
+release email, live and verified) `git show b091cf5cd:SESSION_PROMPT.md`; Claude Session 653
+`git show 88992f3d6:SESSION_PROMPT.md`; Claude Session 652 with Codex 649 `git show
+45814e64c:SESSION_PROMPT.md`.
 
-## Session 653 Summary (Claude, 2026-10-30)
+## Session 655 Summary (Claude, 2026-10-30 Pacific)
 
-Next Claude session is **654**. Start: all 41 `check:*` gates and self-tests
-green on `main`. No Production or sandbox reads or writes were made.
+Start: all 41 `check:*` gates and self-tests green on `main`.
 
 ### What Was Completed
 
-1. **[PR #561 OPEN, not merged; head `6ae3efea9`; CI green] PR 3 of the reviewer
-   build: Board setup reads its dates from the cycle calendar (D47).** Branch
-   `claude/board-setup-calendar`, worktree `../WMKF_Apps-board-calendar`.
-   - Setup no longer stores typed `materialsDue` / `boardEnds`; new adapter read
-     `getBoardSetupDatesByCode` (Board Meeting Date, Board Mailing Date) and
-     `lib/services/board-writeups/calendar.js` (one total deadline).
-   - Saving an **active** setup requires both calendar dates in order; old
-     stored keys and old pending intents are stripped on read.
-   - Worker: unreadable calendar → archive start and all notices wait (alert);
-     releases and queued archive copies continue. Notices store the dates they
-     were drafted from and refuse to send if the calendar moved.
-   - Board page default cycle uses calendar Board dates.
-   - Codex: 3 rounds; rounds 1–2 fixed (`951284330`, `8c5e05075`); round 3
-     (signature-keyed notices stay unsent after a date change) noted in the PR,
-     not changed. `/contract-reconcile` Mode B done; Atlas updated (`6ae3efea9`).
-2. **[PR #562 DRAFT; head `1dfb7b31d`] PR 4: materials on acceptance (D46/D49).**
+1. **[PR #562 DRAFT, head `54a63a652`, build complete] Materials on acceptance (D46/D48/D49).**
    Branch `claude/reviewer-materials-on-accept`, worktree `../WMKF_Apps-materials`.
-   - Owner decisions recorded (D49): one combined acceptance email; wording drafted
-     in the PR; **invitation wording + `{{proposalDelivery}}` / Reviewer Finder
-     date-field retirement split into a follow-up PR**; transient pre-claim
-     failures retry ~15 minutes, then today's confirmation + "materials held" alert.
-   - Migration **091** `reviewer_materials_releases` + store
-     `lib/services/reviewer-engagement/materials-release-store.js` (claim =
-     `INSERT … ON CONFLICT DO NOTHING RETURNING`; lease-bound steps; staff
-     reclaim; `listStuckMaterialsReleases`). No job FK (smoke script deletes jobs).
-     Atlas page `docs/atlas/postgres-reviewer-materials-releases.md`.
-   - Acceptance job step `release_materials` in
-     `lib/services/reviewer-acceptance-drain.js`: reversible checks before claim
-     (live reviewer re-read for address check, PDF, Grant Cycle config, strict
-     attachments via `review-manager/cycle-materials-attachments.js`), then
-     claim → mint (If-Match) → one email → markers via `recordDeliveredEmail`.
-     Retries act on the release row's state; every drain run re-raises a
-     deduplicated alert per stuck release. New keys
-     `email.reviewer_materials_acceptance.*` (create-only seed, Admin-editable).
-   - Codex: 2 rounds on the step, 5 high findings, all fixed (`33dd52b00`,
-     `7915f93fc`); loop stopped there. Full Jest 26,402 passed locally.
+   - **Manual send claims the shared release row** (`send-emails-service.js` `claimManualMaterialsRelease`,
+     staff profile from the route) just before its mint; an existing row refuses
+     (`materials_already_sent` for sent/recorded, else new `materials_release_in_progress`); a claim
+     that cannot be checked fails closed. A materials draft without the reviewer link and
+     `markAsSent: false` for materials are now refused.
+   - **Recovery (owner-approved after Codex):** `failed` releases retaken by any normal send;
+     `uncertain`/abandoned resent only via the Release modal's **Send again**
+     (`recoverMaterialsReleaseIds`); the acceptance drain's stuck loop records `sent` rows of any
+     source from `sent_at` (never resends), closes them when the reviewer has since closed/withdrawn
+     (`reviewer_closed_after_delivery`), and rotates its bounded batch; **Mark as delivered**
+     (new `POST /api/review-manager/materials-release-delivered`, lead PD or superuser) closes the rest
+     (`staff_marked_delivered`).
+   - **D48 invitation PDF gate:** shared `review-manager/invitation-proposal-pdf.js` refuses an
+     emailed invitation, and a `regenerate-token` *first* link for a never-invited reviewer, while the
+     reviewer PDF is missing or its folder cannot be checked (`proposal_pdf_missing` /
+     `proposal_pdf_unavailable`); only a speculative archive `graph_folder_not_found` is ignored
+     (`listReviewerMaterialsWithAvailability` now returns `unavailableSources`).
+   - **Accepted-screen copy** (draft, owner review in PR): link "usually within a few minutes",
+     old link "may stop working", contact PD if nothing by the next business day.
+   - CodeQL format-string alerts fixed. Codex: 2 rounds on the manual claim/recovery, 2 on the D48
+     gate/copy, all findings fixed; final round **approved, no findings**. Full Jest 26,466 passed
+     locally; `/contract-reconcile` Mode B on the manual claim and recovery.
+2. **[PR #561 READY, head `646429d93`, CI green] Board setup from the calendar (D47).** Merged `main`
+   (#563/#564) into the branch; one test conflict resolved (kept calendar dates arg + hourly helpers);
+   full Jest 26,388 green. **All three Production checks now pass** (owner-run probe): D26 Board Mailing
+   Date set by the owner to **2026-11-25** (typed setup said 11-02; display-only effect: notices and
+   page show 11-25), Board Meeting Date 2026-12-10, no pending intent or unsent draft. **Merge awaits
+   the owner's explicit go-ahead.**
+3. **Production reads and one owner-authorized write (no other Production changes).**
+   - Owner-run `scripts/probe-reviewer-build-premerge.cjs`: #562 pre-merge state is 091 not applied,
+     template keys not seeded (both deploy-time steps), J27 Reviewer Finder cycle exists, the one PD
+     materials override keeps `{{externalLink}}`.
+   - D26 "open" invitations explained (`scripts/probe-d26-unswept-invitations.cjs`): **12** genuinely
+     unanswered and matching the stale sweep's discovery filter (it closes them at the D26 Board date
+     if each request's Grant Cycle link and Board date re-check holds [ASSUMED per row; not probed]); **2** on test requests
+     1003222/1003125 with live links → **closed as No Response by Claude on the owner's explicit OK**
+     (`scripts/close-out-d26-open-invitations.mjs --only …`, `DATAVERSE_PROD_WRITE_ACK` "D26
+     test-request invitation close-out 2026-10-31", 2 written, 0 errors, no email); **29** are staff
+     **Remove candidate** rows (`softDelete`: unselected, link revoked) — already closed, leave as-is.
+     No real D26 reviewer holds a working link. Owner: D26 reviewer cycle is over; no D26 reviewer may
+     be emailed about proposal availability. No J27 invitations have been sent.
 
-### Commits (branches only; `main` gets only this handoff)
-- #561: `d831b3048` code, `27bd54e36` docs, `951284330`, `8c5e05075` review
-  fixes, `6ae3efea9` Atlas.
-- #562: `2084a695f` D49, `c1adfcb28` / `90b20a3ec` plan notes, `1e8649fe3` /
-  `84ef1d7f0` table, `4b13470e9` step, `cdf5006bc`, `33dd52b00`, `7915f93fc` fixes, `1c69f430e`
-  15-minute fallback, `5af89da13` decision docs, `1dfb7b31d` pg test fix.
+### Commits
+
+- #562: `8e249963d` manual claim, `f93017b9a`, `a1e77c57f` recovery, `a6f7ade8a`, `753e91023` Codex
+  round 2, `236f85755` CodeQL, `a47404a75` PDF gate + copy, `e8dd078e9`, `54a63a652` Codex round.
+- #561: `646429d93` merge of `main`.
+- `main`: this handoff plus the three operator scripts above.
 
 ## Next Items
 
-### Verified Open
-
-1. **#562 CI.** The Postgres job failed on `1c69f430e`
-   (`reviewer-acceptance-defaults.pg.test.js`: its deps lacked the materials
-   stand-ins); fixed in `1dfb7b31d`, **not yet confirmed green**. The new
-   `reviewer-materials-release-store.pg.test.js` is in the CI list
-   (`.github/workflows/test.yml`) and has never run locally (no local Postgres).
-   Check `gh pr checks 562` first.
-2. **#562 remaining build, in order** (plan §3.3 build notes,
-   `docs/plans/REVIEWER_INVITATION_CALENDAR_BUILD_PLAN_2026-10-29.md`):
-   manual materials send takes the shared claim just before its mint
-   (`send-emails-service.js` materials path; new skip reason → status-enum
-   parity + `ReleaseMaterialsModal` labels; also resolve the "held" alert key
-   `reviewer-materials-release:<suggestionId>`) → "Send materials again" route +
-   UI (`reclaimMaterialsRelease`; route matrix row; server re-checks accepted /
-   not released) → invitation PDF precondition (server-side) → accepted-screen
-   copy ("proposal link on its way by email"). Then `/contract-reconcile` and a
-   Codex round on the manual path.
-3. **Follow-up PR (owner split):** invitation wording, `{{proposalDelivery}}` and
-   Reviewer Finder `proposalSendDate` / `commitDate` retirement.
-
 ### Owner Decision Needed
 
-1. **#561 merge** after three owner-run, read-only Production checks (blocking):
-   D26 calendar Board Mailing Date set and ≤ Board date (else every D26 setup
-   save is refused); D26 calendar Board Meeting Date = 2026-12-10; no pending D26
-   `configIntent` or unsent notice draft.
-2. **#562 before merge:** Production `schema_migrations` has no 091 (apply it
-   before deploy); seed the two new template keys before deploy; D26 has no open
-   invitations; J27 Reviewer Finder cycle record exists; owner reviews the draft
-   wording in the PR body.
-3. Remote branches of #556–#560 still exist; delete only with the owner's OK.
+1. **Merge #561** (Tier 2; `main` auto-deploys). Evidence: probe output this session; PR comment on
+   the merge. After deploy, confirm the D26 Board page shows calendar dates (materials 2026-11-25).
+2. **#562 release:** owner wording review in the PR (combined acceptance email; accepted screen), then
+   in order: apply migration **091** (`node scripts/apply-migrations.js`), seed the two
+   `email.reviewer_materials_acceptance.*` keys (`scripts/seed-email-defaults.mjs`, create-only),
+   then merge. Each step is a live action needing explicit OK. D26 condition is satisfied (above).
+3. **Remove-candidate history loss** (new finding, not in #562): `softDelete`
+   (`lib/dataverse/adapters/reviewer-suggestion.js:2451`) clears `wmkf_responsetype`/accepted/declined;
+   7 of the 29 D26 removed rows keep a withdrawn-sufficient timestamp without its response type
+   [ASSUMED erased by removal; audit history would confirm]. Decide whether removal should preserve
+   terminal response fields.
+4. **`regenerate-token` first link skips D48's due-date write** (it now checks the PDF). Proposed:
+   call `ensureRequestReviewDueDate` there and refuse `review_due_date_unavailable`. Owner asked for a
+   review of the central calendar; this was the one gap found. Not built.
+
+### Verified Open
+
+1. **Follow-up PR (owner split, D49):** invitation wording, `{{proposalDelivery}}`, Reviewer Finder
+   `proposalSendDate`/`commitDate` retirement. Plan §3.4–3.5. Not started.
+2. Optional UX: Invite modal has no up-front PDF warning (Release modal has a preflight).
 
 ### Verify Before Acting
 
-- #562 seed body says "A calendar reminder is attached, along with the review
-  template" unconditionally; flagged in the PR for the wording review.
-- A dismissed stuck-release alert is re-raised every drain run while the row
-  stays stuck (by design; noted in PR).
-- `check:agent-invariants` / `check:agent-wiki` fail only inside fresh worktrees
-  (per-machine links); not a repo defect.
-- **Owner's main checkout WIP (leave it):** `.codex/hooks.json`,
-  `.github/hooks/impeccable.json`, untracked `.impeccable/critique/…`, `output/`.
-- Flaky `tests/unit/workbench-integrity-service.test.js` (Session 652): did not
-  recur in this session's full runs.
+- **Codex Board constraints (live):** preserve all Board release/email receipts; do not re-release
+  the nine D26 files or resend the five Sent activities; before reverting to pre-hourly code, pause
+  dispatch. #561's merge preserved hourly grouping, Owner validation and CSO cc (tests green).
+- #562 CI: last full check was green except Jest/CodeQL still running on `54a63a652`; recheck
+  `gh pr checks 562` before leaving draft.
+- `check:agent-invariants` / `check:agent-wiki` fail only inside fresh worktrees (per-machine links).
+- Flaky `tests/unit/workbench-integrity-service.test.js` failed once in a full run, passed 3/3 alone.
+- **Owner's main checkout WIP (leave it):** `.codex/hooks.json`, `.github/hooks/impeccable.json`,
+  untracked `.impeccable/critique/…`, `output/`.
+- Remote branches of #556–#560 still exist; delete only with the owner's OK. Worktrees
+  `../WMKF_Apps-materials` and `../WMKF_Apps-board-calendar` stay until their PRs merge.
 
 ### Do Not Reopen Without New Decision
 
-- D47 (Board dates from calendar), D48 (fixed due date; withdraw via PD; PDF and
-  date required to invite), D49 (one combined email; 15-minute fallback; wording
-  split). Meeting-date retirement scope (Session 652).
-
-**Codex workstream (unchanged this session):** PR #553
-(`codex/shared-prompt-library-plan`, `1187caf17`) — publication route decided;
-merging, messaging Connor, schema, sandbox/Production steps and paid model tests
-each need separate owner authorization. Details: `git show
-45814e64c:SESSION_PROMPT.md`.
+- D47, D48 (incl. PDF and date required to invite), D49 (one combined email; 15-minute fallback;
+  wording split). Recovery design: retake failed, Send again, drain bookkeeping retry + reviewer-closed
+  close, Mark as delivered (owner, Session 655). D26: leave the 29 removed rows as-is; no D26
+  reviewer emails.
+- Codex Board: one President email per cycle/hourly run with the approving CSO cc'd.
 
 ## Concurrent Workstreams
 
 | Owner / workstream | Latest recorded resume boundary |
 |---|---|
-| Claude / reviewer build (J27) | #561 ready for owner reads; #562 draft at "acceptance step done", manual path next; follow-up wording PR not started |
-| Codex / shared prompt library | PR #553, `1187caf17`, unmerged |
-| Codex / Ranking, Board archival | Prior handoffs; not revalidated |
-| Claude / Research request corpus | Owner-gated; no new authorization |
+| Claude / reviewer build (J27) | #561 ready (owner go-ahead); #562 draft, build complete, owner wording + release steps; follow-up wording PR not started |
+| Codex / Board release (#563/#564) | Live and verified; no open task (`git show b091cf5cd:SESSION_PROMPT.md`) |
+| Codex / shared prompt library | PR #553, head `94a795bb4`, owner-gated |
+| Codex / ranking, prior archival | Prior handoffs; not revalidated |
+| Claude / research request corpus | Owner-gated; no new authorization |
 
 ## Key Files Reference
 
 | File | Purpose |
 |------|---------|
+| `lib/services/reviewer-engagement/materials-release-store.js` (#562) | Release row: claim, retake, reclaim, staff close, stuck list + rotation |
+| `lib/services/review-manager/send-emails-service.js` (#562) | Manual claim, recovery flag, D48 PDF gate |
+| `lib/services/reviewer-engagement/mark-materials-delivered.js` (#562) | Mark as delivered command |
+| `lib/services/review-manager/invitation-proposal-pdf.js` (#562) | Shared D48 PDF check |
 | `lib/services/board-writeups/calendar.js` (#561) | Board dates from the cycle calendar |
-| `lib/services/reviewer-engagement/materials-release-store.js` (#562) | Release claim table writer |
-| `lib/services/reviewer-acceptance-drain.js` (#562) | `release_materials` step + stuck-release alerts |
-| `lib/services/review-manager/cycle-materials-attachments.js` (#562) | Shared attachment fetch; strict loader |
-| `docs/plans/REVIEWER_INVITATION_CALENDAR_BUILD_PLAN_2026-10-29.md` | Build plan, state table, decisions |
+| `scripts/probe-reviewer-build-premerge.cjs` | Owner-run read-only pre-merge checks for #561/#562 |
+| `scripts/close-out-d26-open-invitations.mjs` | D26 close-out through the sweep's writer (dry run default) |
+| `scripts/probe-d26-unswept-invitations.cjs` | Read-only: why invitations miss the stale sweep |
+| `docs/plans/REVIEWER_INVITATION_CALENDAR_BUILD_PLAN_2026-10-29.md` | Build plan, decisions, build notes |
 
 ## Testing
 
 ```bash
-cd ../WMKF_Apps-materials && npx jest tests/unit/reviewer-materials tests/unit/reviewer-acceptance
+cd ../WMKF_Apps-materials && npx jest send-emails reviewer-materials materials-release regenerate-token invitation-proposal-pdf
 gh pr checks 561; gh pr checks 562
+DATAVERSE_ALLOW_PROD_READS=yes node scripts/probe-reviewer-build-premerge.cjs .env.local   # owner-run
 ```
 
 ## Verification and Closeout
 
-- Milestone determination: no DEVELOPMENT_LOG entry — nothing merged or deployed.
-- Claim-evidence pilot: report found no eligible plan/design edit for this
-  session key; no row added.
+- Milestone determination: no DEVELOPMENT_LOG entry — nothing merged or deployed by this session; the
+  two test-invitation close-outs are a data correction, not a milestone.
+- Claim-evidence pilot: report found no eligible plan/design edit for this session key; no row added.
 - No CLAUDE.md or memory changes.
