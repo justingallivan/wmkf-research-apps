@@ -347,8 +347,13 @@ Production run unless `DATAVERSE_TARGET_INTERLOCK=on` and
    previews; `--execute --pause` writes Ended by = Foundation and Did not
    submit (ETag-bound), reads them back, waits while staff check that request
    in Review Manager (how today's screens show Did not submit before slice 3),
-   then restores both original values (ETag-bound) and verifies them. It
-   refuses any row whose request is not a marked test request. Dataverse
+   then restores both original values and verifies them. The restore is bound
+   to the version the test write returned, so any other change in between
+   stops it instead of overwriting. It refuses any row whose request is not a
+   marked test request, saves a recovery record under `outputs/` before
+   writing (`--recover` restores from it while the row still holds exactly the
+   test values on the same test request), caps the pause at 10 minutes, and
+   will not start within 20 minutes of UTC midnight, when the ACK expires. Dataverse
    auditing keeps a record of both writes on that row.
 
 Rollback: deleting the new field or option is safe only while no row holds a

@@ -76,11 +76,12 @@ describe('roundtrip-reviewer-outcomes-test-row', () => {
 
   test('needs a GUID suggestion and allows --pause only with --execute', () => {
     expect(parseArgs(['node', 'x', `--suggestion=${ID}`, '--target=prod'])).toEqual(
-      { execute: false, pause: false, suggestionId: ID },
+      { execute: false, pause: false, recover: false, suggestionId: ID },
     );
     expect(() => parseArgs(['node', 'x', '--suggestion=abc'])).toThrow('GUID');
     expect(() => parseArgs(['node', 'x', `--suggestion=${ID}`, '--pause'])).toThrow('--pause');
     expect(() => parseArgs(['node', 'x', `--suggestion=${ID}`, '--force'])).toThrow('Unknown flag');
+    expect(() => parseArgs(['node', 'x', `--suggestion=${ID}`, '--execute', '--recover'])).toThrow('not both');
   });
 
   test('allows an ordinary row of a marked test request', () => {
@@ -105,5 +106,168 @@ describe('roundtrip-reviewer-outcomes-test-row', () => {
     expect(original).toEqual({ wmkf_endedby: null, wmkf_reviewstatus: 100000001 });
     expect(matches({ wmkf_endedby: null, wmkf_reviewstatus: 100000001 }, original)).toBe(true);
     expect(matches({ wmkf_endedby: ENDED_BY_VALUES.foundation, wmkf_reviewstatus: 100000001 }, original)).toBe(false);
+  });
+});
+
+describe('roundtrip orchestration against a fake Dataverse', () => {
+  const fs = require('node:fs');
+  const os = require('node:os');
+  const path = require('node:path');
+  const { runRoundTrip, recover, recordPathFor } = require('../../scripts/roundtrip-reviewer-outcomes-test-row.mjs');
+  const ID = 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee';
+  const REQ = '99999999-8888-7777-6666-555555555555';
+  const OTHER_REQ = '12345678-1234-1234-1234-123456789012';
+  const RESOURCE = 'https://wmkf.crm.dynamics.com';
+  const NOON = new Date('2026-10-31T12:00:00Z');
+  const TEST = { wmkf_endedby: ENDED_BY_VALUES.foundation, wmkf_reviewstatus: DID_NOT_SUBMIT_REVIEW_STATUS_VALUE };
+  let cwd;
+  let tmp;
+
+  beforeEach(() => {
+    cwd = process.cwd();
+    tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'roundtrip-'));
+    process.chdir(tmp);
+  });
+  afterEach(() => {
+    process.chdir(cwd);
+    fs.rmSync(tmp, { recursive: true, force: true });
+  });
+
+  function fakeDataverse({ marked = true, patchHook } = {}) {
+    const db = {
+      version: 1,
+      row: { wmkf_endedby: null, wmkf_reviewstatus: 100000001, _wmkf_request_value: REQ },
+      requests: { [REQ]: { akoya_requestnum: '1009999', wmkf_istestrequest: marked }, [OTHER_REQ]: { akoya_requestnum: '1001111', wmkf_istestrequest: false } },
+      patches: [],
+    };
+    const snapshot = () => ({ ...db.row, '@odata.etag': `W/"${db.version}"` });
+    const client = {
+      get: async (p) => {
+        if (p.startsWith('/wmkf_appreviewersuggestions(')) return { ok: true, status: 200, body: snapshot(), text: '' };
+        if (p.startsWith('/akoya_requests(')) {
+          const id = p.match(/\(([^)]+)\)/)[1];
+          return { ok: true, status: 200, body: db.requests[id], text: '' };
+        }
+        return { ok: true, status: 200, body: { OptionSet: { Options: [{ Value: DID_NOT_SUBMIT_REVIEW_STATUS_VALUE }] } }, text: '' };
+      },
+      patch: async (p, body, headers) => {
+        if (patchHook) {
+          const hooked = await patchHook({ db, body, headers });
+          if (hooked) return hooked;
+        }
+        if (headers['If-Match'] !== `W/"${db.version}"`) return { ok: false, status: 412, text: 'precondition' };
+        db.patches.push(body);
+        Object.assign(db.row, body);
+        db.version += 1;
+        return { ok: true, status: 200, body: snapshot(), text: '' };
+      },
+    };
+    return { db, client };
+  }
+
+  const run = (client, extra = {}) => runRoundTrip({
+    client, makeRestoreClient: async () => client, resourceUrl: RESOURCE, suggestionId: ID,
+    execute: true, pause: false, now: NOON, ...extra,
+  });
+
+  test('writes the test values, restores the originals and removes the recovery record', async () => {
+    const { db, client } = fakeDataverse();
+    await run(client);
+    expect(db.patches).toEqual([TEST, { wmkf_endedby: null, wmkf_reviewstatus: 100000001 }]);
+    expect(db.row).toMatchObject({ wmkf_endedby: null, wmkf_reviewstatus: 100000001 });
+    expect(fs.existsSync(recordPathFor(ID))).toBe(false);
+  });
+
+  test('preview writes nothing', async () => {
+    const { db, client } = fakeDataverse();
+    await run(client, { execute: false });
+    expect(db.patches).toEqual([]);
+  });
+
+  test('refuses an unmarked request before writing', async () => {
+    const { db, client } = fakeDataverse({ marked: false });
+    await expect(run(client)).rejects.toThrow('marked test request');
+    expect(db.patches).toEqual([]);
+  });
+
+  test('a change during the pause makes the restore stop instead of adopting the new version', async () => {
+    const { db, client } = fakeDataverse();
+    const pauseFn = async () => {
+      db.row._wmkf_request_value = OTHER_REQ; // another writer reparents the row
+      db.version += 1;
+    };
+    await expect(run(client, { pause: true, pauseFn })).rejects.toThrow(/412.*--recover/s);
+    expect(db.patches).toEqual([TEST]);
+    expect(fs.existsSync(recordPathFor(ID))).toBe(true);
+    // Recovery also refuses: the row is no longer on the recorded test request.
+    await expect(recover({ client, resourceUrl: RESOURCE, suggestionId: ID })).rejects.toThrow('recorded request');
+    expect(db.patches).toEqual([TEST]);
+  });
+
+  test('a write response without a version is never followed by a blind restore', async () => {
+    const { db, client } = fakeDataverse({
+      patchHook: ({ db: state, body }) => {
+        Object.assign(state.row, body);
+        state.version += 1;
+        state.patches.push(body);
+        return { ok: true, status: 204, body: null, text: '' };
+      },
+    });
+    await expect(run(client)).rejects.toThrow(/no row version.*--recover/s);
+    expect(db.patches).toEqual([TEST]);
+    expect(fs.existsSync(recordPathFor(ID))).toBe(true);
+  });
+
+  test('an ambiguous write keeps the record and --recover restores while the test values are still there', async () => {
+    let first = true;
+    const { db, client } = fakeDataverse({
+      patchHook: ({ db: state, body }) => {
+        if (!first) return null;
+        first = false;
+        Object.assign(state.row, body); // committed server-side, then the connection drops
+        state.version += 1;
+        state.patches.push(body);
+        throw new Error('socket hang up');
+      },
+    });
+    await expect(run(client)).rejects.toThrow(/outcome unknown.*--recover/s);
+    expect(db.patches).toEqual([TEST]);
+    await recover({ client, resourceUrl: RESOURCE, suggestionId: ID });
+    expect(db.row).toMatchObject({ wmkf_endedby: null, wmkf_reviewstatus: 100000001 });
+    expect(fs.existsSync(recordPathFor(ID))).toBe(false);
+  });
+
+  test('a failing pause still restores', async () => {
+    const { db, client } = fakeDataverse();
+    await run(client, { pause: true, pauseFn: async () => { throw new Error('stdin closed'); } });
+    expect(db.row).toMatchObject({ wmkf_endedby: null, wmkf_reviewstatus: 100000001 });
+  });
+
+  test('a 412 on the test write leaves nothing behind', async () => {
+    const { db, client } = fakeDataverse({
+      patchHook: () => ({ ok: false, status: 412, text: 'precondition' }),
+    });
+    await expect(run(client)).rejects.toThrow('412');
+    expect(db.patches).toEqual([]);
+    expect(fs.existsSync(recordPathFor(ID))).toBe(false);
+  });
+
+  test('refuses to start near UTC midnight or over an unfinished run', async () => {
+    const { db, client } = fakeDataverse();
+    await expect(run(client, { now: new Date('2026-10-31T23:45:00Z') })).rejects.toThrow('UTC midnight');
+    fs.mkdirSync('outputs');
+    fs.writeFileSync(recordPathFor(ID), '{}');
+    await expect(run(client)).rejects.toThrow('--recover first');
+    expect(db.patches).toEqual([]);
+  });
+
+  test('recovery refuses a row holding neither the test nor the original values', async () => {
+    const { db, client } = fakeDataverse();
+    fs.mkdirSync('outputs');
+    fs.writeFileSync(recordPathFor(ID), JSON.stringify({
+      resourceUrl: RESOURCE, suggestionId: ID, requestId: REQ, original: { wmkf_endedby: null, wmkf_reviewstatus: 100000000 },
+    }));
+    await expect(recover({ client, resourceUrl: RESOURCE, suggestionId: ID })).rejects.toThrow('neither');
+    expect(db.patches).toEqual([]);
   });
 });
