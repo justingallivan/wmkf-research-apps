@@ -586,6 +586,17 @@ describe('patchMyCandidates', () => {
     expect(out).toEqual({ success: true, message: 'Candidate restored' });
   });
 
+  test('restore of an invited reviewer becomes a typed 409 (decision D)', async () => {
+    suggestionAdapter.restore.mockRejectedValueOnce(Object.assign(new Error('refusing'), { code: 'reinvite_unavailable' }));
+    const err = await patchMyCandidates({
+      body: { suggestionId: SUGGESTION_ID, restore: true },
+      actingUserSystemId: SYS,
+    }).catch((e) => e);
+    expect(err).toBeInstanceOf(MyCandidatesError);
+    expect(err.httpStatus).toBe(409);
+    expect(err.body).toMatchObject({ code: 'reinvite_unavailable' });
+  });
+
   test('manual invitation: verifies the current official link and records the normal invite lifecycle with an optimistic lock', async () => {
     suggestionAdapter.findById.mockResolvedValue({
       _etag: 'W/"7"',
@@ -981,6 +992,14 @@ describe('deleteMyCandidates', () => {
       SUGGESTION_ID, { actingUserSystemId: SYS, alsoRevokeToken: true },
     );
     expect(out).toEqual({ success: true, message: 'Candidate removed' });
+  });
+
+  test('an invited reviewer refusal becomes a typed 409 the screens can show', async () => {
+    suggestionAdapter.softDelete.mockRejectedValue(Object.assign(new Error('refusing'), { code: 'invited_reviewer_not_removable' }));
+    const err = await deleteMyCandidates({ suggestionId: SUGGESTION_ID }).catch((e) => e);
+    expect(err).toBeInstanceOf(MyCandidatesError);
+    expect(err.httpStatus).toBe(409);
+    expect(err.body).toMatchObject({ code: 'invited_reviewer_not_removable', error: expect.stringMatching(/already invited/) });
   });
 
   test('missing-row softDelete failure propagates untyped (caller keeps the row; shell 500s)', async () => {

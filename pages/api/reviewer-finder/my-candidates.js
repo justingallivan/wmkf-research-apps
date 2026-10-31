@@ -202,6 +202,9 @@ async function handleDelete(req, res, access) {
     });
     return res.status(200).json(result);
   } catch (error) {
+    if (error instanceof ServiceHttpError) {
+      return res.status(error.httpStatus).json(error.body ?? { error: error.message });
+    }
     console.error('Delete candidate error:', error);
     return res.status(500).json({
       error: 'Failed to remove candidate',

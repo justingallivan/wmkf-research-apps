@@ -261,7 +261,7 @@ test('referral: match reason + dual source tokens + provenanceKind in the DTO', 
 
 test.each([
   ['promotion_required', 'recommended', 'Promote this applicant-recommended reviewer from Find.'],
-  ['restore_required', 'declined', 'Restore this previously declined reviewer from Removed.'],
+  ['reinvite_unavailable', 'declined', 'This reviewer already declined this proposal and can’t be invited to it again. Their response is in Track Reviewers.'],
   ['already_handled', 'invited', 'Open Track Reviewers to continue from the current engagement stage.'],
   ['already_handled', 'selected', 'Open Invite Reviewers to continue from the selected stage.'],
 ])('typed %s/%s result returns a remedy instead of a false Added success', async (outcome, stage, remedy) => {

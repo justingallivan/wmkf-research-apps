@@ -274,16 +274,16 @@ test('an excluded reviewer surfaces a clear inline error', async () => {
   expect(actionsOf()['s-a:0'].error).toMatch(/excluded/i);
 });
 
-test.each(['promotion_required', 'restore_required', 'already_handled'])('typed %s response renders a remedy and does not falsely navigate to Invite', async (outcome) => {
+test.each(['promotion_required', 'reinvite_unavailable', 'already_handled'])('typed %s response renders a remedy and does not falsely navigate to Invite', async (outcome) => {
   global.fetch = baseFetch(() => Promise.resolve({
     ok: true,
     json: async () => ({
       success: true,
       outcome,
       suggestionId: 's-existing',
-      stage: outcome === 'restore_required' ? 'declined' : outcome === 'already_handled' ? 'invited' : 'recommended',
-      remedy: outcome === 'restore_required'
-        ? 'Restore this previously declined reviewer from Removed.'
+      stage: outcome === 'reinvite_unavailable' ? 'declined' : outcome === 'already_handled' ? 'invited' : 'recommended',
+      remedy: outcome === 'reinvite_unavailable'
+        ? 'This reviewer already declined this proposal and can’t be invited to it again. Their response is in Track Reviewers.'
         : outcome === 'already_handled'
           ? 'Open Track Reviewers to continue from the current engagement stage.'
           : 'Promote this applicant-recommended reviewer from Find.',

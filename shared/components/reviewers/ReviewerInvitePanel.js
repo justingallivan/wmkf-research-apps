@@ -124,6 +124,9 @@ const REMOVE_MENU_ITEM_H = 56;  // two two-line items — drives the upward-flip
 // Mirrors TokenActionsMenu's portalled, outside-click-closing, upward-flipping
 // pattern so the menu escapes the row's clipping/stacking context.
 function RowRemoveMenu({ candidate, disabled = false, onRemoveFromProposal, onDeletePermanently }) {
+  // Mirrors the server's isInvitedRow guard: a contacted reviewer keeps a
+  // recorded outcome and cannot be removed (INVITED_REVIEWER_OUTCOMES_PLAN).
+  const invited = candidate?.invited === true || Boolean(candidate?.emailSentAt);
   const [open, setOpen] = useState(false);
   const [coords, setCoords] = useState(null); // { left, top } in viewport px, or null
   const btnRef = useRef(null);
@@ -184,15 +187,22 @@ function RowRemoveMenu({ candidate, disabled = false, onRemoveFromProposal, onDe
           style={{ position: 'fixed', left: coords.left, top: coords.top, width: REMOVE_MENU_WIDTH }}
           className="bg-white border border-gray-200 rounded-lg shadow-lg z-50 py-1 text-sm"
         >
-          <button
-            type="button"
-            role="menuitem"
-            onClick={() => { setOpen(false); onRemoveFromProposal(); }}
-            className="w-full text-left px-3 py-2 hover:bg-gray-50"
-          >
-            Remove from this proposal
-            <span className="block text-xs text-gray-400">Recoverable — moves to Removed below</span>
-          </button>
+          {invited ? (
+            <div role="menuitem" aria-disabled="true" className="px-3 py-2 text-gray-400">
+              Remove from this proposal
+              <span className="block text-xs">Not available: this reviewer was invited, so their response stays on record</span>
+            </div>
+          ) : (
+            <button
+              type="button"
+              role="menuitem"
+              onClick={() => { setOpen(false); onRemoveFromProposal(); }}
+              className="w-full text-left px-3 py-2 hover:bg-gray-50"
+            >
+              Remove from this proposal
+              <span className="block text-xs text-gray-400">Recoverable — moves to Removed below</span>
+            </button>
+          )}
           <button
             type="button"
             role="menuitem"
@@ -826,8 +836,8 @@ function ReviewerInvitePanelForRequest({ requestId, candidates = [], removedCand
           {showRemoved && (
             <>
               <p className="text-xs text-gray-400 mt-1.5">
-                Candidates removed from this request and reviewers who declined. Restoring starts a fresh
-                invitation.
+                Candidates removed from this request and reviewers who declined. Only candidates who were
+                never invited can be restored; an invited reviewer’s response stays on record.
               </p>
               <ul className="mt-2 divide-y divide-gray-100">
                 {removedCandidates.map((c) => (
@@ -845,19 +855,17 @@ function ReviewerInvitePanelForRequest({ requestId, candidates = [], removedCand
                     </div>
                     {canManage && (
                       <span className="flex items-center gap-3 flex-shrink-0">
-                        <button
-                          type="button"
-                          onClick={() => restoreCandidate(c)}
-                          disabled={restoringId === c.suggestionId}
-                          className="text-xs font-medium text-blue-600 hover:text-blue-800 disabled:opacity-50 whitespace-nowrap"
-                          title={c.declined
-                            ? 'Clear the prior decline and restore this reviewer for a fresh invitation'
-                            : 'Restore this candidate to the list above'}
-                        >
-                          {restoringId === c.suggestionId
-                            ? 'Restoring…'
-                            : c.declined ? 'Reset & restore' : 'Restore'}
-                        </button>
+                        {!c.wasInvited && !c.declined && (
+                          <button
+                            type="button"
+                            onClick={() => restoreCandidate(c)}
+                            disabled={restoringId === c.suggestionId}
+                            className="text-xs font-medium text-blue-600 hover:text-blue-800 disabled:opacity-50 whitespace-nowrap"
+                            title="Restore this candidate to the list above"
+                          >
+                            {restoringId === c.suggestionId ? 'Restoring…' : 'Restore'}
+                          </button>
+                        )}
                         <button
                           type="button"
                           onClick={() => setRemoveEntirelyTarget(c)}

@@ -211,11 +211,15 @@ describe('reviewer-suggestion adapter', () => {
   });
 
   test('softDelete forwards', async () => {
+    // A never-invited candidate: the only kind softDelete removes.
+    DynamicsService.getRecord.mockResolvedValueOnce({ wmkf_invited: false, wmkf_emailsentat: null, wmkf_reviewstatus: null, wmkf_completedat: null });
     await suggestionAdapter.softDelete(SUGGESTION_ID, { actingUserSystemId: ACTING });
     expect(lastCallOpts(DynamicsService.updateRecord)).toEqual({ actingUserSystemId: ACTING });
   });
 
   test('softDelete clears engagement flags and revokes token in one PATCH', async () => {
+    // A never-invited candidate: the only kind softDelete removes.
+    DynamicsService.getRecord.mockResolvedValueOnce({ wmkf_invited: false, wmkf_emailsentat: null, wmkf_reviewstatus: null, wmkf_completedat: null });
     await suggestionAdapter.softDelete(SUGGESTION_ID, { actingUserSystemId: ACTING, alsoRevokeToken: true });
 
     expect(DynamicsService.updateRecord).toHaveBeenCalledTimes(1);

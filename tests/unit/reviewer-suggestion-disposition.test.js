@@ -353,12 +353,19 @@ describe('decline-referral dismissal', () => {
   });
 });
 
+// A never-invited, unanswered row: every field the outcome guards read is
+// present (null), as a real Dataverse select returns them.
+const NEVER_INVITED = Object.freeze({
+  wmkf_invited: false, wmkf_emailsentat: null, wmkf_responsetype: null, wmkf_declined: false,
+  wmkf_reviewstatus: null, wmkf_reviewreceivedat: null, wmkf_completedat: null,
+});
+
 describe('restore scope guard (Codex S285 review High)', () => {
   test('re-selects a genuinely removed row (selected=false, disposition=null), ETag-guarded', async () => {
     DynamicsService.getRecord.mockResolvedValue({
+      ...NEVER_INVITED,
       wmkf_selected: false,
       wmkf_applicantdisposition: null,
-      wmkf_declined: false,
       _etag: 'W/"42"',
     });
     await restore(SUGGESTION_ID, { actingUserSystemId: 'SYS-1' });
@@ -372,8 +379,11 @@ describe('restore scope guard (Codex S285 review High)', () => {
     expect(patched[3]).toMatchObject({ ifMatch: 'W/"42"' });
   });
 
-  test('restores an auto-archived applicant recommendation only when it actually declined', async () => {
+  test('refuses to reset an auto-archived decline: the outcome is kept (decision D)', async () => {
     DynamicsService.getRecord.mockResolvedValue({
+      ...NEVER_INVITED,
+      wmkf_invited: true,
+      wmkf_emailsentat: '2026-07-01T00:00:00Z',
       wmkf_selected: false,
       wmkf_applicantdisposition: APPLICANT_DISPOSITION_MAP.recommended,
       wmkf_declined: true,
@@ -382,24 +392,35 @@ describe('restore scope guard (Codex S285 review High)', () => {
       _etag: 'W/"43"',
     });
 
-    await restore(SUGGESTION_ID, { actingUserSystemId: 'SYS-1' });
+    await expect(restore(SUGGESTION_ID, { actingUserSystemId: 'SYS-1' }))
+      .rejects.toMatchObject({ code: 'reinvite_unavailable' });
+    expect(DynamicsService.updateRecord).not.toHaveBeenCalled();
+  });
 
-    expect(DynamicsService.updateRecord).toHaveBeenCalledWith(
-      'wmkf_appreviewersuggestions',
-      SUGGESTION_ID,
-      expect.objectContaining({
-        wmkf_selected: true,
-        wmkf_declined: false,
-        wmkf_responsetype: null,
-        wmkf_reviewstatus: null,
-        wmkf_externaltokenrevoked: true,
-      }),
-      { actingUserSystemId: 'SYS-1', ifMatch: 'W/"43"' },
-    );
+  test.each([
+    ['invited, never answered (a legacy removal)', { wmkf_invited: true }],
+    ['invitation sent stamp only', { wmkf_emailsentat: '2026-07-01T00:00:00Z' }],
+    ['no response recorded', { wmkf_responsetype: RESPONSE_TYPE_MAP.no_response }],
+    ['no longer needed', { wmkf_responsetype: RESPONSE_TYPE_MAP.withdrawn_sufficient }],
+    ['released', { wmkf_reviewstatus: REVIEW_STATUS_MAP.released }],
+    ['review received', { wmkf_reviewreceivedat: '2026-08-01T00:00:00Z' }],
+  ])('refuses to reset a removed row that was %s', async (_name, change) => {
+    DynamicsService.getRecord.mockResolvedValue({
+      ...NEVER_INVITED, ...change, wmkf_selected: false, wmkf_applicantdisposition: null, _etag: 'W/"44"',
+    });
+    await expect(restore(SUGGESTION_ID, {})).rejects.toMatchObject({ code: 'reinvite_unavailable' });
+    expect(DynamicsService.updateRecord).not.toHaveBeenCalled();
+  });
+
+  test('fails closed when the guard read is missing a field', async () => {
+    const { wmkf_emailsentat, ...partial } = NEVER_INVITED;
+    DynamicsService.getRecord.mockResolvedValue({ ...partial, wmkf_selected: false, wmkf_applicantdisposition: null, _etag: 'W/"45"' });
+    await expect(restore(SUGGESTION_ID, {})).rejects.toThrow(/missing wmkf_emailsentat/);
+    expect(DynamicsService.updateRecord).not.toHaveBeenCalled();
   });
 
   test('refuses to restore an applicant-recommended row (must use promotion path)', async () => {
-    DynamicsService.getRecord.mockResolvedValue({ wmkf_selected: false, wmkf_applicantdisposition: APPLICANT_DISPOSITION_MAP.recommended });
+    DynamicsService.getRecord.mockResolvedValue({ ...NEVER_INVITED, wmkf_selected: false, wmkf_applicantdisposition: APPLICANT_DISPOSITION_MAP.recommended });
     await expect(restore(SUGGESTION_ID, { actingUserSystemId: 'SYS-1' })).rejects.toThrow(/non-removed|promotion/i);
     expect(DynamicsService.updateRecord).not.toHaveBeenCalled();
   });
@@ -1258,21 +1279,21 @@ describe('upsert relevance-score range guard', () => {
 // S369 adversarial findings (all confirmed against source before fixing).
 describe('closed engagements survive the other write paths', () => {
   test('softDelete refuses a terminal row instead of erasing its status', async () => {
-    DynamicsService.getRecord.mockResolvedValue({ wmkf_reviewstatus: REVIEW_STATUS_MAP.released, _etag: 'W/"9"' });
+    DynamicsService.getRecord.mockResolvedValue({ wmkf_invited: false, wmkf_emailsentat: null, wmkf_reviewstatus: REVIEW_STATUS_MAP.released, _etag: 'W/"9"' });
     await expect(suggestionAdapter.softDelete(SUGGESTION_ID))
       .rejects.toThrow(/closed review status/);
     expect(DynamicsService.updateRecord).not.toHaveBeenCalled();
   });
 
   test('softDelete refuses a Complete row instead of leaving orphaned closeout fields', async () => {
-    DynamicsService.getRecord.mockResolvedValue({ wmkf_reviewstatus: REVIEW_STATUS_MAP.complete, _etag: 'W/"10"' });
+    DynamicsService.getRecord.mockResolvedValue({ wmkf_invited: false, wmkf_emailsentat: null, wmkf_reviewstatus: REVIEW_STATUS_MAP.complete, _etag: 'W/"10"' });
     await expect(suggestionAdapter.softDelete(SUGGESTION_ID))
       .rejects.toThrow(/closed review status/);
     expect(DynamicsService.updateRecord).not.toHaveBeenCalled();
   });
 
   test('updateLifecycle refuses to reopen a Complete row', async () => {
-    DynamicsService.getRecord.mockResolvedValue({
+    DynamicsService.getRecord.mockResolvedValue({ wmkf_invited: false, wmkf_emailsentat: null,
       wmkf_applicantdisposition: null,
       wmkf_reviewstatus: REVIEW_STATUS_MAP.complete,
       wmkf_reviewreceivedat: '2026-09-04T12:00:00Z',
@@ -1286,7 +1307,7 @@ describe('closed engagements survive the other write paths', () => {
   });
 
   test('softDelete still removes a non-terminal row, bound to the fresh ETag', async () => {
-    DynamicsService.getRecord.mockResolvedValue({ wmkf_reviewstatus: REVIEW_STATUS_MAP.accepted, _etag: 'W/"9"' });
+    DynamicsService.getRecord.mockResolvedValue({ wmkf_invited: false, wmkf_emailsentat: null, wmkf_reviewstatus: REVIEW_STATUS_MAP.accepted, _etag: 'W/"9"' });
     await suggestionAdapter.softDelete(SUGGESTION_ID);
     const [, , payload, opts] = DynamicsService.updateRecord.mock.calls[0];
     expect(payload.wmkf_reviewstatus).toBeNull();
@@ -1299,7 +1320,7 @@ describe('closed engagements survive the other write paths', () => {
   // the one the Stage 2 review flagged as missing: the status alone passes
   // the old status-only guard, so only the completedat check can refuse it.
   test('D0: softDelete refuses a completion-stamped row even when its status is not closed', async () => {
-    DynamicsService.getRecord.mockResolvedValue({
+    DynamicsService.getRecord.mockResolvedValue({ wmkf_invited: false, wmkf_emailsentat: null,
       wmkf_reviewstatus: REVIEW_STATUS_MAP.accepted,
       wmkf_completedat: '2026-09-04T13:00:00Z',
       _etag: 'W/"12"',
@@ -1310,14 +1331,14 @@ describe('closed engagements survive the other write paths', () => {
   });
 
   test('D0: the guard read selects wmkf_completedat alongside wmkf_reviewstatus', async () => {
-    DynamicsService.getRecord.mockResolvedValue({ wmkf_reviewstatus: null, wmkf_completedat: null, _etag: 'W/"13"' });
+    DynamicsService.getRecord.mockResolvedValue({ wmkf_invited: false, wmkf_emailsentat: null, wmkf_reviewstatus: null, wmkf_completedat: null, _etag: 'W/"13"' });
     await suggestionAdapter.softDelete(SUGGESTION_ID);
     const [, , opts] = DynamicsService.getRecord.mock.calls[0];
     expect(opts.select.split(',')).toEqual(expect.arrayContaining(['wmkf_reviewstatus', 'wmkf_completedat']));
   });
 
   test('D0 inverse: a never-completed non-terminal row is still removed, bound to the fresh ETag', async () => {
-    DynamicsService.getRecord.mockResolvedValue({ wmkf_reviewstatus: REVIEW_STATUS_MAP.accepted, wmkf_completedat: null, _etag: 'W/"14"' });
+    DynamicsService.getRecord.mockResolvedValue({ wmkf_invited: false, wmkf_emailsentat: null, wmkf_reviewstatus: REVIEW_STATUS_MAP.accepted, wmkf_completedat: null, _etag: 'W/"14"' });
     await suggestionAdapter.softDelete(SUGGESTION_ID);
     expect(DynamicsService.updateRecord).toHaveBeenCalledTimes(1);
     expect(DynamicsService.updateRecord.mock.calls[0][3].ifMatch).toBe('W/"14"');
@@ -1326,6 +1347,22 @@ describe('closed engagements survive the other write paths', () => {
   // Without the ETag fallback the terminal guard was pure TOCTOU: the generic
   // batch PATCH supplies no ifMatch, so it could read a non-terminal row, lose
   // the race to a concurrent transition, then overwrite the new terminal status.
+  test.each([
+    ['the invited flag', { wmkf_invited: true, wmkf_emailsentat: null }],
+    ['an invitation sent time', { wmkf_invited: false, wmkf_emailsentat: '2026-07-01T00:00:00Z' }],
+  ])('softDelete refuses an invited reviewer (%s) before any write', async (_name, invite) => {
+    DynamicsService.getRecord.mockResolvedValue({ ...invite, wmkf_reviewstatus: null, wmkf_completedat: null, _etag: 'W/"15"' });
+    await expect(suggestionAdapter.softDelete(SUGGESTION_ID, { alsoRevokeToken: true }))
+      .rejects.toMatchObject({ code: 'invited_reviewer_not_removable' });
+    expect(DynamicsService.updateRecord).not.toHaveBeenCalled();
+  });
+
+  test('softDelete fails closed when the guard read omits the invite fields', async () => {
+    DynamicsService.getRecord.mockResolvedValue({ wmkf_reviewstatus: null, wmkf_completedat: null, _etag: 'W/"16"' });
+    await expect(suggestionAdapter.softDelete(SUGGESTION_ID)).rejects.toThrow(/missing wmkf_invited, wmkf_emailsentat/);
+    expect(DynamicsService.updateRecord).not.toHaveBeenCalled();
+  });
+
   test('a status write with no caller ETag binds to the guard read', async () => {
     DynamicsService.getRecord.mockResolvedValue({
       wmkf_completedat: null,

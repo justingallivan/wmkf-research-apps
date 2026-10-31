@@ -205,7 +205,7 @@ test('non-recommended row → 400; adapter applicant-excluded refusal → same 4
 });
 
 test.each([
-  ['declined', { wmkf_selected: false, wmkf_declined: true }, 'restore_required'],
+  ['declined', { wmkf_selected: false, wmkf_declined: true }, 'reinvite_unavailable'],
   ['invited', { wmkf_selected: true, wmkf_invited: true }, 'already_handled'],
 ])('%s engagement is refused before any person/contact mutation', async (_label, engagement, code) => {
   findById.mockResolvedValue({

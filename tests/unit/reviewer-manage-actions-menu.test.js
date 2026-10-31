@@ -157,6 +157,20 @@ describe('reviewer management actions menu', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Regenerate link & copy' }));
     expect(onRegenerate).toHaveBeenCalledTimes(1);
   });
+  test.each([
+    ['invited flag', { invited: true }],
+    ['invitation sent time', { emailSentAt: '2026-07-01T00:00:00Z' }],
+  ])('Remove is not offered for an invited reviewer (%s)', (_name, invite) => {
+    render(<TokenActionsMenu reviewer={{ ...reviewer, reviewStatus: 'accepted', ...invite }} onRemove={jest.fn()} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Manage Dr. Test Reviewer' }));
+    expect(screen.queryByRole('button', { name: 'Remove from this request' })).not.toBeInTheDocument();
+  });
+
+  test('Remove is still offered for a never-invited row', () => {
+    render(<TokenActionsMenu reviewer={{ ...reviewer, reviewStatus: 'accepted', invited: false, emailSentAt: null }} onRemove={jest.fn()} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Manage Dr. Test Reviewer' }));
+    expect(screen.getByRole('button', { name: 'Remove from this request' })).toBeInTheDocument();
+  });
 });
 
 describe('reviewer table geometry', () => {
@@ -407,4 +421,5 @@ describe('review-due reminder compose action', () => {
     rerender(<ReviewReminderAction requestId="P2" reviewer={{ ...reviewer, suggestionId: 'S2' }} />);
     expect(screen.queryByTestId('reminder-composer')).not.toBeInTheDocument();
   });
+
 });

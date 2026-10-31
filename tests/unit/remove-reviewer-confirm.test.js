@@ -83,24 +83,28 @@ describe('ReviewerInvitePanel remove confirm wiring', () => {
     fireEvent.click(screen.getByText('Remove from this proposal'));
   }
 
-  test('accepted candidate → confirm text carries the withdrawal warning; cancel sends nothing', () => {
-    render(<ReviewerInvitePanel {...baseProps} candidates={[accepted]} />);
-    openRemove();
-    expect(confirmSpy).toHaveBeenCalledTimes(1);
-    const text = confirmSpy.mock.calls[0][0];
-    expect(text).toContain('Remove Accepted Reviewer from this request?');
-    expect(text).toContain('Record reviewer withdrawal');
-    expect(text).toContain('on their row in Track Reviewers');
+  test.each([
+    ['accepted', accepted],
+    ['pending', pending],
+  ])('%s (invited) candidate → Remove is not offered; no confirm, nothing sent', (_name, candidate) => {
+    render(<ReviewerInvitePanel {...baseProps} candidates={[candidate]} />);
+    fireEvent.click(screen.getByTitle('Remove this candidate'));
+    const item = screen.getByText('Remove from this proposal').closest('[role="menuitem"]');
+    expect(item).toHaveAttribute('aria-disabled', 'true');
+    expect(screen.getByText(/their response stays on record/i)).toBeInTheDocument();
+    fireEvent.click(screen.getByText('Remove from this proposal'));
+    expect(confirmSpy).not.toHaveBeenCalled();
     expect(deleteCalls()).toHaveLength(0);
   });
 
-  test('pending candidate → ordinary dialog, no withdrawal warning', () => {
-    render(<ReviewerInvitePanel {...baseProps} candidates={[pending]} />);
+  test('never-invited candidate → ordinary dialog, no withdrawal warning', () => {
+    const fresh = { suggestionId: 'S-new', name: 'Fresh Candidate', email: 'f@example.edu', invited: false, emailSentAt: null };
+    render(<ReviewerInvitePanel {...baseProps} candidates={[fresh]} />);
     openRemove();
     expect(confirmSpy).toHaveBeenCalledTimes(1);
     const text = confirmSpy.mock.calls[0][0];
-    expect(text).toContain('Remove Pending Reviewer from this request?');
+    expect(text).toContain('Remove Fresh Candidate from this request?');
     expect(text).not.toContain('Record reviewer withdrawal');
-    expect(text).toContain('revokes their invitation link');
+    expect(deleteCalls()).toHaveLength(0);
   });
 });

@@ -352,7 +352,7 @@ export default function ReviewersTab({
       });
       if (rid !== currentRequestIdRef.current) return; // request changed mid-flight — drop stale result
       if (ok && data.success) {
-        if (['promotion_required', 'restore_required', 'already_handled'].includes(data.outcome)) {
+        if (['promotion_required', 'reinvite_unavailable', 'already_handled'].includes(data.outcome)) {
           setReferralActions((prev) => ({
             ...prev,
             [actionKey]: {

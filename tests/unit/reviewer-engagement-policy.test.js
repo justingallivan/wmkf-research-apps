@@ -127,11 +127,14 @@ describe('reviewer-engagement-policy', () => {
       }
     });
 
-    test('exports exactly the three predicates', () => {
+    test('exports exactly the predicates and the outcome guard field list', () => {
       expect(Object.keys(reviewerEngagementPolicy).sort()).toEqual([
+        'OUTCOME_GUARD_FIELDS',
+        'hasRecordedOutcome',
         'isClosedEngagementRow',
         'isClosedEngagementStatus',
         'isInvitationCorrectionSourceRow',
+        'isInvitedRow',
       ]);
     });
   });
@@ -148,6 +151,49 @@ describe('reviewer-engagement-policy', () => {
         expect(line).not.toMatch(/from\s+['"]lib\//);
       }
       expect(source).not.toMatch(/from\s+['"][^'"]*\/lib\/[^'"]*['"]/);
+    });
+  });
+
+  describe('invited-reviewer outcome predicates', () => {
+    const { isInvitedRow, hasRecordedOutcome, OUTCOME_GUARD_FIELDS } = reviewerEngagementPolicy;
+    const open = Object.fromEntries(OUTCOME_GUARD_FIELDS.map((f) => [f, null]));
+
+    test('isInvitedRow: flag or sent time', () => {
+      expect(isInvitedRow({ ...open, wmkf_invited: false })).toBe(false);
+      expect(isInvitedRow({ ...open, wmkf_invited: true })).toBe(true);
+      expect(isInvitedRow({ ...open, wmkf_emailsentat: '2026-07-01T00:00:00Z' })).toBe(true);
+    });
+
+    test.each([
+      ['Declined response', { wmkf_responsetype: 100000001 }],
+      ['No Response', { wmkf_responsetype: 100000002 }],
+      ['Withdrawn - sufficient', { wmkf_responsetype: 100000003 }],
+      ['declined flag', { wmkf_declined: true }],
+      ['Withdrew', { wmkf_reviewstatus: 100000005 }],
+      ['Released', { wmkf_reviewstatus: 100000006 }],
+      ['Did not submit', { wmkf_reviewstatus: 100000007 }],
+      ['review received', { wmkf_reviewreceivedat: '2026-08-01T00:00:00Z' }],
+      ['completed', { wmkf_completedat: '2026-08-02T00:00:00Z' }],
+      ['Ended By set', { wmkf_endedby: 100000002 }],
+    ])('hasRecordedOutcome: %s is an outcome', (_name, change) => {
+      expect(hasRecordedOutcome({ ...open, ...change })).toBe(true);
+    });
+
+    test.each([
+      ['untouched', {}],
+      ['Accepted', { wmkf_responsetype: 100000000, wmkf_reviewstatus: REVIEW_STATUS_MAP.accepted }],
+      ['Held', { wmkf_responsetype: 100000004 }],
+      ['materials sent', { wmkf_reviewstatus: REVIEW_STATUS_MAP.materials_sent }],
+      ['Ended By explicitly blank', { wmkf_endedby: null }],
+    ])('hasRecordedOutcome: %s is still open', (_name, change) => {
+      expect(hasRecordedOutcome({ ...open, ...change })).toBe(false);
+    });
+
+    test('both fail closed on a row missing a guarded field', () => {
+      const { wmkf_completedat, ...partial } = open;
+      expect(() => hasRecordedOutcome(partial)).toThrow(/missing wmkf_completedat/);
+      expect(() => isInvitedRow({ wmkf_invited: false })).toThrow(/missing wmkf_emailsentat/);
+      expect(() => isInvitedRow(null)).toThrow(/missing/);
     });
   });
 });

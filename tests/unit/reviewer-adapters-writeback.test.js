@@ -144,7 +144,7 @@ describe('reviewer-suggestion.setMatchReason — atomic match-reason write', () 
 describe('reviewer-suggestion.ensureStaffManualCandidate — source union + excluded wins', () => {
   test.each([
     ['unengaged applicant row', { wmkf_selected: false }, 'promotion_required', 'recommended'],
-    ['declined applicant row', { wmkf_selected: false, wmkf_declined: true }, 'restore_required', 'declined'],
+    ['declined applicant row', { wmkf_selected: false, wmkf_declined: true }, 'reinvite_unavailable', 'declined'],
     ['already-invited applicant row', { wmkf_selected: true, wmkf_invited: true }, 'already_handled', 'invited'],
   ])('%s unions provenance without selecting or resetting engagement', async (_label, engagement, outcome, stage) => {
     jest.spyOn(DynamicsService, 'queryRecords').mockResolvedValue({
@@ -229,7 +229,7 @@ describe('reviewer-suggestion.ensureStaffManualCandidate — source union + excl
   });
 
   test.each([
-    ['declined removed row', { wmkf_selected: false, wmkf_declined: true }, 'restore_required', 'declined'],
+    ['declined removed row', { wmkf_selected: false, wmkf_declined: true }, 'reinvite_unavailable', 'declined'],
     ['already-selected row', { wmkf_selected: true }, 'already_handled', 'selected'],
     ['already-invited row', { wmkf_selected: true, wmkf_invited: true }, 'already_handled', 'invited'],
   ])('re-adding a non-applicant %s returns a typed remedy without lifecycle mutation', async (_label, engagement, outcome, stage) => {
@@ -415,7 +415,7 @@ describe('reviewer-suggestion.ensureStaffManualCandidate — source union + excl
 
   test.each([
     ['unengaged winner', { wmkf_selected: false }, 'promotion_required', 'recommended'],
-    ['declined winner', { wmkf_selected: false, wmkf_declined: true }, 'restore_required', 'declined'],
+    ['declined winner', { wmkf_selected: false, wmkf_declined: true }, 'reinvite_unavailable', 'declined'],
     ['invited winner', { wmkf_selected: true, wmkf_invited: true }, 'already_handled', 'invited'],
   ])('create-conflict recovery keeps an applicant %s provenance-only', async (_label, engagement, outcome, stage) => {
     jest.spyOn(DynamicsService, 'queryRecords')
