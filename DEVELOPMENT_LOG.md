@@ -10,6 +10,18 @@ The chronological archive after the `Legacy chronological session log` divider c
 
 ---
 
+## October 2026 — Reviewers get the materials when they accept (Session 655, Claude)
+
+**Milestone:** Accepting a review invitation now emails the reviewer their proposal link, review template and calendar reminder within minutes, in one email with a newly minted link (D46/D48/D49).
+**Sessions:** Session 653 (plan), Session 655 (build, four Codex adversarial review rounds, owner wording review, owner-approved Production prep and merge).
+**Ship state:**
+- PR #562, merge `fcad0ad53`, Vercel Production success; all `main` CI green.
+- Automatic and manual materials sends both claim `reviewer_materials_releases` (migration 091, applied 2026-10-31) first, so a reviewer is never sent materials twice; uncertain sends are resent only by staff ("Send again" / "Mark as delivered").
+- Invitations and first copyable links are refused when the proposal PDF is missing.
+- New keys `email.reviewer_materials_acceptance.{subject,body}` seeded in Production; `{{attachmentsNote}}` names only what is actually attached.
+**Why it matters:** Reviewers no longer wait for staff to release materials by hand after accepting.
+**Pointers:** `lib/services/reviewer-acceptance-drain.js`; `lib/services/reviewer-acceptance-email.js`; `docs/plans/REVIEWER_INVITATION_CALENDAR_BUILD_PLAN_2026-10-29.md`; PR #562. No J27 invitations sent yet, so no live acceptance has exercised it.
+
 ## October 2026 — Board setup reads its dates from the cycle calendar (Session 655, Claude)
 
 **Milestone:** The Board writeups setup no longer stores typed dates; it reads each cycle's Board Meeting Date and Board Mailing Date from the central cycle calendar (D47).

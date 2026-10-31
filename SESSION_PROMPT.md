@@ -70,11 +70,11 @@ before resuming; do not treat a temporary path as guaranteed to survive.
 
 ### Owner Decision Needed / Other Streams
 
-The prior Claude handoff retains the owner's unresolved #561 merge decision,
-#562 wording/release approvals, removed-candidate terminal-history question and
-first-link due-date write gap. Their implementation/live preconditions were not
-revalidated here; consult the exact prior handoff and their owning plan before
-acting. Do not convert those carryovers into authorized live actions.
+#561 and #562 are merged (see Concurrent Workstreams; Claude, 2026-10-30/31).
+Still open from the prior Claude handoff: the removed-candidate terminal-history
+question and the first-link due-date write gap. Consult the exact prior handoff
+and the owning plan before acting. Do not convert those carryovers into
+authorized live actions.
 
 ### Verify Before Acting
 
@@ -109,7 +109,7 @@ acting. Do not convert those carryovers into authorized live actions.
 |---|---|
 | Codex / shared prompt library | PARKED; local `9d838c4c8`, Windows09 offline check with Connor Monday; [resume archive](docs/plans/PR553_MONDAY_RESUME_2026-11-02.md) |
 | Claude / Board calendar #561 | **MERGED + DEPLOYED** on owner approval (Claude, 2026-10-30): merge `955613bdb`, Vercel Production success, all `main` CI green. Head `82039e29d` also fixed the `reviewer-engagement-census` failure that `b19a1f4dd`'s close-out script caused on `main`. All three owner-run pre-merge checks passed (D26 Board Mailing 2026-11-25 ≤ Board 2026-12-10; no pending intent or unsent draft). Unverified: D26 Board page rendering calendar dates (needs a signed-in look) |
-| Claude / materials #562 | OPEN/DRAFT, head `54a63a652d482ff64acf2651c7c4d2b56c1e953a`; prior owner wording/release steps still need verification/approval |
+| Claude / materials #562 | **MERGED + DEPLOYED** on owner approval (Claude, 2026-10-31): merge `fcad0ad53`, Vercel Production success, all `main` CI green, head `59c31abe7` (owner wording approved; the acceptance email's attachment sentence is now `{{attachmentsNote}}`, naming only the calendar file/template actually attached). Owner-approved Production prep done first: migration 091 applied (`reviewer_materials_releases`, 0 rows, 15:49 UTC) and `email.reviewer_materials_acceptance.{subject,body}` seeded (`created=2`, 43 existing keys skipped). Open owner decisions: removed-candidate terminal history; first-link due-date write gap; follow-up PR (invitation wording, `{{proposalDelivery}}`, Reviewer Finder date retirement) |
 | Codex / Board #563/#564 | Prior deployed milestone preserved at `b091cf5cd`; no new live work here |
 | Codex / ranking, prior archival | Prior handoffs; not revalidated |
 | Claude / research request corpus | Owner-gated; no new authorization |
