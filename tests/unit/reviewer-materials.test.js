@@ -150,7 +150,7 @@ describe('listReviewerMaterials', () => {
         .mockRejectedValueOnce(new Error('archive unavailable')),
     };
     const result = await listReviewerMaterialsWithAvailability('request-id', '1002379', deps);
-    expect(result).toEqual({ files: [], unavailable: true });
+    expect(result).toEqual({ files: [], unavailable: true, unavailableSources: ['archive'] });
   });
 
   test('a matching file in one bucket does not hide an unavailable sibling bucket', async () => {
@@ -166,6 +166,7 @@ describe('listReviewerMaterials', () => {
     expect(result).toEqual({
       files: [expect.objectContaining({ id: 'proposal', name: 'Proposal_1002379.pdf' })],
       unavailable: true,
+      unavailableSources: ['archive'],
     });
   });
 
@@ -178,7 +179,7 @@ describe('listReviewerMaterials', () => {
         { id: 'wrong', name: 'Proposal_1009999.pdf', folder: 'R-1/Reviewer Materials' },
       ]),
     });
-    expect(result).toEqual({ files: [], unavailable: false });
+    expect(result).toEqual({ files: [], unavailable: false, unavailableSources: [] });
   });
 
   test('portal array contract remains fail-soft when a bucket is unavailable', async () => {

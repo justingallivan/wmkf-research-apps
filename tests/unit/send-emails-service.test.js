@@ -1075,8 +1075,10 @@ describe('send-emails-service — invitation needs the proposal PDF (D48)', () =
   const invite = () => run({ drafts: [draft(SUG_OK)], templateType: 'invitation' });
 
   test.each([
-    [{ files: [], unavailable: false }, 'proposal_pdf_missing'],
-    [{ files: [], unavailable: true }, 'proposal_pdf_unavailable'],
+    [{ files: [], unavailable: false, unavailableSources: [] }, 'proposal_pdf_missing'],
+    [{ files: [], unavailable: true, unavailableSources: ['archive'] }, 'proposal_pdf_missing'],
+    [{ files: [], unavailable: true, unavailableSources: ['dynamics'] }, 'proposal_pdf_unavailable'],
+    [{ files: [], unavailable: true, unavailableSources: ['archive', 'dynamics'] }, 'proposal_pdf_unavailable'],
   ])('listing %j refuses with %s before the due-date write, mint, or send', async (listing, reason) => {
     SUGGESTIONS[SUG_OK] = suggestion(SUG_OK);
     listReviewerMaterialsWithAvailability.mockResolvedValueOnce(listing);

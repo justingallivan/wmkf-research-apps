@@ -275,8 +275,16 @@ Admin `inviteStartDate` has no reader outside its form, validation and tests
   invitations go out. Built Session 654 in `send-emails-service.js`
   (`checkInvitationProposalPdf`, once per request per batch, before the
   due-date write): no listed reviewer PDF → `proposal_pdf_missing`; nothing
-  listed and a folder unlistable, or the listing threw →
-  `proposal_pdf_unavailable` (fail closed, staff retry).
+  listed and one of the request's Dynamics-linked folders unlistable, or the
+  listing threw → `proposal_pdf_unavailable` (fail closed, staff retry).
+  Speculative archive-folder probes 404 for most requests, so archive-only
+  failures count as missing (`listReviewerMaterialsWithAvailability` now also
+  returns `unavailableSources`). **Not gated (owner decision needed):** the
+  Review Manager `regenerate-token` route can mint a first copyable link for a
+  not-yet-invited reviewer whom staff then invite by hand; it applies neither
+  this PDF check nor D48's due-date write. The Invite modal's manual-link
+  "mark manually sent" control is unreachable today (`render-emails-service.js`
+  always sets `manualLink: null`).
 
 **Build notes (2026-10-30, branch `claude/reviewer-materials-on-accept`, PR
 #562, not merged).** Built on the branch: migration 091 and its store, the
