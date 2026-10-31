@@ -20,10 +20,11 @@ function draft(d) {
 const selection = id => ({ requestId: id, documentId: id, eTag: 'one', versionId: '1', draftConfirmed: true });
 function fixture() {
   const state = emptyState();
-  const config = { version: 1, cycle: 'D26', programId: PROGRAM_ID, active: true, rosterConfirmed: true, requestIds: [A, B], materialsDue: '2026-11-01', boardEnds: '2026-12-10', adminId: CSO };
+  const config = { version: 1, cycle: 'D26', programId: PROGRAM_ID, active: true, rosterConfirmed: true, requestIds: [A, B], adminId: CSO };
   const folder = { ...TARGET, folderId: 'cycle-folder', webUrl: `${TARGET.webUrl}/D26` };
   const d = {
     getCycle: jest.fn(async () => ({ value: config, revision: 'etag' })),
+    cycleDates: jest.fn(async () => ({ materialsDue: '2026-11-01', boardEnds: '2026-12-10' })),
     readCycle: async () => ({ state: structuredClone(state), revision: 0 }),
     mutateCycle: async (_cycle, fn) => { const next = structuredClone(state); const result = fn(next); Object.assign(state, next); return result; },
     now: () => '2026-10-18T22:00:00Z', assertWrite: jest.fn(), assertBudget: jest.fn(),
@@ -42,7 +43,7 @@ function fixture() {
   };
   return { state, config, folder, d };
 }
-const notices = (config, state) => noticeIntents(config, state, '2026-10-18T22:00:00Z').filter(x => x.kind === 'president');
+const notices = (config, state) => noticeIntents(config, state, '2026-10-18T22:00:00Z', { materialsDue: '2026-11-01', boardEnds: '2026-12-10' }).filter(x => x.kind === 'president');
 async function run(f) { return deliverHourlyReleases('D26', { ...f.d, deliverRelease: (cycle, id, budget) => deliverRelease(cycle, id, { ...f.d, ...budget }) }); }
 async function release(f, ids = [A, B]) { await queueRelease('D26', actor, ids.map(selection), f.d); await run(f); return notices(f.config, f.state)[0]; }
 const env = { ...process.env };

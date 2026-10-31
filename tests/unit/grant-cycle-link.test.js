@@ -17,6 +17,7 @@ import {
   linkedCycleBoardDateExpand,
   noLinkedCycleFilter,
   getCycleDatesById,
+  getBoardSetupDatesByCode,
   listBoardDates,
   findCycleByCode,
   listModernCycles,
@@ -143,6 +144,7 @@ describe('linkedCycleCode', () => {
 describe('calendar reads check the restriction before any request', () => {
   const reads = [
     ['getCycleDatesById', () => getCycleDatesById(CYCLE_ID)],
+    ['getBoardSetupDatesByCode', () => getBoardSetupDatesByCode('D26')],
     ['listBoardDates', () => listBoardDates()],
     ['findCycleByCode', () => findCycleByCode('D26')],
     ['listModernCycles', () => listModernCycles()],

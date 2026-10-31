@@ -7,6 +7,7 @@ import { candidates } from '../../../lib/services/board-writeups/source';
 import { reconcile, startArchive, resolveDiscrepancy } from '../../../lib/services/board-writeups/archive';
 import { recover, inspectRecovery } from '../../../lib/services/board-writeups/recovery';
 import { completeCleanup } from '../../../lib/services/board-writeups/service';
+import { cycleDates, cycleDatesOrError } from '../../../lib/services/board-writeups/calendar';
 import { cycleCode, exact, fail } from '../../../lib/services/board-writeups/model';
 export const config = { api: { bodyParser: { sizeLimit: '96kb' } }, maxDuration: 300 };
 export default async function handler(req, res) {
@@ -24,7 +25,7 @@ export default async function handler(req, res) {
         const cycle = cycleCode(req.query.cycle);
         if (req.query.action === 'inspectRecovery') return res.json(await inspectRecovery(cycle, actor, req.query.requestId, req.query.operation));
         if (req.query.action === 'reconcile') return res.json(await reconcile(cycle, actor));
-        return res.json({ staff: await staffDirectory(), cycle: await getCycle(cycle), candidates: await candidates(cycle), roles: { president: await getRole('president'), cso: await getRole('cso'), grantsManager: await getRole('grantsManager') } });
+        return res.json({ staff: await staffDirectory(), cycle: await getCycle(cycle), dates: await cycleDatesOrError(cycle, { cycleDates }), candidates: await candidates(cycle), roles: { president: await getRole('president'), cso: await getRole('cso'), grantsManager: await getRole('grantsManager') } });
       }
       const input = req.body;
       exact(input, ['action', 'cycle', 'value', 'expectedRevision', 'reason', 'role', 'resolution']);

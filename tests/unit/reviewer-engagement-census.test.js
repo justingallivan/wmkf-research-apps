@@ -124,10 +124,12 @@ const CENSUS = [
     name: 'reviewer-engagement/expire-invitation',
     // New in Stage 3E (expireInvitation, extracted from
     // reviewer-suggestion-sweep.js). Only the sweep imports it (isPastCutoff
-    // moved to lib/utils/past-cutoff.js 2026-09-06).
+    // moved to lib/utils/past-cutoff.js 2026-09-06), plus the owner-run D26
+    // close-out script (Session 655), which reuses the same per-row writer.
     pattern: /reviewer-engagement\/expire-invitation/,
     expected: [
       'lib/services/reviewer-suggestion-sweep.js',
+      'scripts/close-out-d26-open-invitations.mjs',
     ],
   },
   {

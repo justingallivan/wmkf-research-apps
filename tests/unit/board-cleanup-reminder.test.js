@@ -5,12 +5,13 @@ import { noticeIntents, deliverNotice, reconcileNotices } from '../../lib/servic
 import { runBoardWorkflow } from '../../lib/services/board-writeups/worker';
 import { completeCleanup, dashboard } from '../../lib/services/board-writeups/service';
 const ID = '11111111-1111-4111-8111-111111111111';
-const config = { version: 1, cycle: 'D26', programId: PROGRAM_ID, active: true, rosterConfirmed: true, requestIds: [ID], materialsDue: '2026-11-01', boardEnds: '2026-12-01', adminId: ID };
+const config = { version: 1, cycle: 'D26', programId: PROGRAM_ID, active: true, rosterConfirmed: true, requestIds: [ID], adminId: ID };
+const DATES = { materialsDue: '2026-11-01', boardEnds: '2026-12-01' };
 const actor = { profileId: 'admin-profile', systemUserId: ID };
 function fixture() {
   const state = emptyState();
   let now = '2026-12-08T17:00:00Z';
-  const d = { getCycle: jest.fn(async () => ({ value: config, revision: 'etag' })),
+  const d = { getCycle: jest.fn(async () => ({ value: config, revision: 'etag' })), cycleDates: jest.fn(async () => DATES),
     now: () => now, readCycle: async () => ({ state: structuredClone(state), revision: 0 }),
     mutateCycle: jest.fn(async (_cycle, fn) => fn(state)),
     boardActor: jest.fn(async () => ({ canArchive: true, isSuperuser: true, systemUserId: ID, name: 'Admin' })),
@@ -23,7 +24,7 @@ function fixture() {
 const original = { ...process.env };
 beforeEach(() => { process.env.NEXTAUTH_URL = 'https://tools.wmkeck.org'; process.env.NOTIFICATION_EMAIL_FROM = 'system@wmkeck.org'; });
 afterAll(() => { process.env = original; });
-const cleanup = (value, state, now) => noticeIntents(value, state, now).filter(x => x.kind === 'cleanup');
+const cleanup = (value, state, now, dates = DATES) => noticeIntents(value, state, now, dates).filter(x => x.kind === 'cleanup');
 
 test.each([
   ['2026-12-01', '2026-12-08T17:00:00Z', '2026-12-08'],
@@ -31,16 +32,17 @@ test.each([
   ['2027-03-07', '2027-03-14T16:00:00Z', '2027-03-14'], // spring DST
   ['2026-12-28', '2027-01-04T17:00:00Z', '2027-01-04'],
 ])('seven calendar days after %s, at 9 Pacific across DST/year boundaries', (boardEnds, now, date) => {
-  const value = { ...config, boardEnds }, state = emptyState();
-  expect(cleanupStatus(value, state, now).dueDate).toBe(date);
-  expect(cleanup(value, state, now)).toEqual([{ key: `cleanup:${date}`, kind: 'cleanup' }]);
-  expect(cleanup(value, state, Date.parse(now) - 3600000)).toEqual([]);
-  expect(cleanup(value, state, Date.parse(now) - 86400000)).toEqual([]);
+  const dates = { ...DATES, boardEnds }, state = emptyState();
+  expect(cleanupStatus(dates, state, now).dueDate).toBe(date);
+  expect(cleanup(config, state, now, dates)).toEqual([{ key: `cleanup:${date}`, kind: 'cleanup' }]);
+  expect(cleanup(config, state, Date.parse(now) - 3600000, dates)).toEqual([]);
+  expect(cleanup(config, state, Date.parse(now) - 86400000, dates)).toEqual([]);
 });
 test('inactive/missing-date/completed cycles stay quiet; archive completion does not stop cleanup', () => {
   const { state, d } = fixture();
   expect(cleanup({ ...config, active: false }, state, d.now())).toEqual([]);
-  expect(cleanup({ ...config, boardEnds: null }, state, d.now())).toEqual([]);
+  expect(cleanup(config, state, d.now(), { ...DATES, boardEnds: null })).toEqual([]);
+  expect(cleanup(config, state, d.now(), null)).toEqual([]);
   state.archiveStartedAt = '2026-12-02T18:00:00Z'; state.archiveCompletedAt = '2026-12-03T18:00:00Z';
   expect(cleanup(config, state, d.now())).toHaveLength(1);
   state.cleanupCompletedAt = d.now();
@@ -95,9 +97,17 @@ test('completion while email is being prepared prevents sending', async () => {
 });
 test('configuration change or revoked recipient prevents send', async () => {
   const { d } = fixture();
-  d.getCycle.mockResolvedValueOnce({ value: config, revision: 'etag' }).mockResolvedValue({ value: { ...config, boardEnds: '2026-12-15' }, revision: 'new' });
+  d.getCycle.mockResolvedValueOnce({ value: config, revision: 'etag' }).mockResolvedValue({ value: { ...config, adminId: null }, revision: 'new' });
   await deliverNotice('D26', { key: 'cleanup:2026-12-08', kind: 'cleanup' }, d);
   expect(d.send).not.toHaveBeenCalled();
+  const moved = fixture(); moved.d.cycleDates.mockResolvedValueOnce(DATES).mockResolvedValue({ ...DATES, boardEnds: '2026-12-15' });
+  await deliverNotice('D26', { key: 'cleanup:2026-12-08', kind: 'cleanup' }, moved.d);
+  expect(moved.d.create).toHaveBeenCalledTimes(1); expect(moved.d.send).not.toHaveBeenCalled();
+  expect(moved.state.emails['cleanup:2026-12-08'].error).toBe('board_notice_configuration_changed');
+  // A retry reads the moved date twice; it must still compare against the date the draft was written from.
+  await deliverNotice('D26', { key: 'cleanup:2026-12-08', kind: 'cleanup' }, moved.d);
+  expect(moved.d.send).not.toHaveBeenCalled();
+  expect(moved.state.emails['cleanup:2026-12-08']).toMatchObject({ dates: DATES, error: 'board_notice_configuration_changed' });
   const next = fixture(); next.d.eligibleStaff.mockRejectedValue(new Error('disabled admin'));
   await expect(deliverNotice('D26', { key: 'cleanup:2026-12-08', kind: 'cleanup' }, next.d)).rejects.toThrow('disabled admin');
   expect(next.d.create).not.toHaveBeenCalled();
@@ -139,4 +149,44 @@ test('enabled worker schedules cleanup independently of finished archival and re
     deliverNotice.mockClear(); await runBoardWorkflow(deps);
     expect(deliverNotice.mock.calls.some(([, intent]) => intent.kind === 'cleanup')).toBe(false);
   } finally { process.env = saved; }
+});
+
+test('worker withholds archive start and every notice when the calendar cannot be read', async () => {
+  const saved = { ...process.env };
+  process.env.VERCEL_ENV = 'production'; process.env.DYNAMICS_URL = 'https://wmkf.crm.dynamics.com';
+  process.env.BOARD_WRITEUPS_ENABLED = 'on'; process.env.RESEARCH_LEADERSHIP_DIGEST_MODE = 'board-release';
+  const { state, d } = fixture();
+  state.firstEventAt = state.handoffBackfilledAt = '2026-10-01T16:00:00Z';
+  state.releases[ID] = { releasedAt: state.firstEventAt, state: 'released' };
+  const deliverNotice = jest.fn(), reconcile = jest.fn(), reconcileNotices = jest.fn();
+  const { cycleDates: readDates } = jest.requireActual('../../lib/services/board-writeups/calendar');
+  // A stalled read must expire and let release/archive work continue.
+  const cycleDates = jest.fn(cycle => readDates(cycle, { read: () => new Promise(() => {}), timeoutMs: 20 }));
+  const deps = { ...d, cycleDates, now: () => Date.parse('2026-12-02T17:00:00Z'), listCycles: async () => ['D26'], deliverNotice, reconcile, reconcileNotices };
+  try {
+    const run = await runBoardWorkflow(deps);
+    expect(run.results).toContainEqual({ cycle: 'D26', status: 'calendar_unavailable', code: 'board_calendar_unavailable' });
+    expect(reconcile).not.toHaveBeenCalled(); expect(deliverNotice).not.toHaveBeenCalled();
+    expect(reconcileNotices).toHaveBeenCalledWith('D26');
+    cycleDates.mockResolvedValue(DATES);
+    await runBoardWorkflow(deps);
+    expect(reconcile).toHaveBeenCalledTimes(1);
+    expect(deliverNotice).toHaveBeenCalledWith('D26', { key: 'confirm:2026-12-02', kind: 'confirm' });
+  } finally { process.env = saved; }
+});
+test('dashboard reports an unreadable calendar rather than a missing date', async () => {
+  const { d } = fixture();
+  d.cycleDates.mockRejectedValue(Object.assign(new Error('down'), { code: 'board_calendar_unavailable' }));
+  const view = await dashboard('D26', actor, d);
+  expect(view.dates).toEqual({ boardEnds: null, materialsDue: null, unavailable: true });
+  expect(view.cleanup).toMatchObject({ dueDate: null, due: false });
+  await expect(completeCleanup('D26', actor, d)).rejects.toMatchObject({ code: 'board_calendar_unavailable' });
+});
+
+test('an unsent draft written before calendar dates is never sent', async () => {
+  const { state, d } = fixture();
+  state.emails['cleanup:2026-12-08'] = { subject: 'old', body: 'typed date', to: ['admin@wmkeck.org'], cc: [], from: 'system@wmkeck.org', kind: 'cleanup', createStartedAt: '2026-12-08T16:00:00Z', sendStartedAt: null, activityId: 'email-id', acceptedAt: null };
+  await deliverNotice('D26', { key: 'cleanup:2026-12-08', kind: 'cleanup' }, d);
+  expect(d.send).not.toHaveBeenCalled();
+  expect(state.emails['cleanup:2026-12-08'].error).toBe('board_notice_configuration_changed');
 });

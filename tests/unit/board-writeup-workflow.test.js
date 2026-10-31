@@ -13,11 +13,12 @@ import { boardMode, boardWorkEnabled } from '../../lib/services/board-writeups/m
 import { recover } from '../../lib/services/board-writeups/recovery';
 const ID = '11111111-1111-4111-8111-111111111111';
 const actor = { profileId: 'profile', systemUserId: ID };
-const value = { version: 1, cycle: 'D26', programId: PROGRAM_ID, active: true, rosterConfirmed: true, requestIds: [ID], materialsDue: '2026-11-01', boardEnds: '2026-12-01', adminId: ID };
+const value = { version: 1, cycle: 'D26', programId: PROGRAM_ID, active: true, rosterConfirmed: true, requestIds: [ID], adminId: ID };
+const DATES = { materialsDue: '2026-11-01', boardEnds: '2026-12-01' };
 const source = { number: '1002988', institution: 'Institute', filename: '1002988 - Institute - Writeup.docx', documentId: ID, driveId: 'source-drive', itemId: 'source', eTag: 'one', versionId: '1', earlyDraft: true, webUrl: 'https://example.com/private-draft' };
 function fixture() {
   const state = emptyState(); let revision = 0;
-  const d = { getCycle: async () => ({ value, revision: 'etag' }), boardActor: async () => ({ canRelease: true, canArchive: true, systemUserId: ID, isSuperuser: true }),
+  const d = { getCycle: async () => ({ value, revision: 'etag' }), cycleDates: async () => DATES, boardActor: async () => ({ canRelease: true, canArchive: true, systemUserId: ID, isSuperuser: true }),
     readCycle: async () => ({ state: structuredClone(state), revision }), mutateCycle: async (_cycle, fn) => { const next = structuredClone(state); const result = fn(next, revision); Object.assign(state, next); revision++; return result; },
     assertWrite: jest.fn(), schemaReady: () => true, sourceFor: async () => ({ source }), now: () => '2026-10-16T16:00:00Z', approvedBytes: async () => ({ buffer: Buffer.from('doc'), hash: 'hash', byteHash: 'sha' }),
     session: jest.fn(async () => ({ uploadUrl: 'upload', folder: { driveId: 'board-drive', folderId: 'folder' } })), put: jest.fn(async () => ({ item: { id: 'board-item' } })),
@@ -25,8 +26,9 @@ function fixture() {
   return { state, d };
 }
 const selection = { requestId: ID, documentId: ID, eTag: 'one', versionId: '1', draftConfirmed: true };
-test('activation requires dates and confirmed roster; duplicate identities rejected', () => {
-  expect(() => validateCycle({ ...value, boardEnds: null })).toThrow();
+test('activation requires a confirmed roster; typed dates and duplicate identities rejected', () => {
+  expect(() => validateCycle({ ...value, rosterConfirmed: false })).toThrow();
+  expect(() => validateCycle({ ...value, boardEnds: '2026-12-01' })).toThrow();
   expect(() => validateCycle({ ...value, requestIds: [ID, ID] })).toThrow();
   expect(validateCycle(value)).toEqual(value);
   expect(() => validateCycle({ ...value, extra: true })).toThrow();
@@ -36,14 +38,14 @@ test('daily scheduling uses Pacific time across DST and stops at completion', ()
   expect(pacificTime('2026-10-16T16:00:00Z').hour).toBe(9);
   expect(pacificTime('2026-12-16T17:00:00Z').hour).toBe(9);
   const state = emptyState(); state.firstEventAt = '2026-10-15T18:00:00Z';
-  expect(noticeIntents(value, state, '2026-10-16T16:00:00Z')).toContainEqual({ kind: 'release', key: 'release:2026-10-16' });
-  expect(noticeIntents(value, state, Date.parse('2026-10-16T16:00:00Z'))).toContainEqual({ kind: 'release', key: 'release:2026-10-16' });
+  expect(noticeIntents(value, state, '2026-10-16T16:00:00Z', DATES)).toContainEqual({ kind: 'release', key: 'release:2026-10-16' });
+  expect(noticeIntents(value, state, Date.parse('2026-10-16T16:00:00Z'), DATES)).toContainEqual({ kind: 'release', key: 'release:2026-10-16' });
   state.releases[ID] = { releasedAt: '2026-10-15T20:00:00Z' };
   expect(progress(value, state).complete).toBe(true);
-  expect(noticeIntents(value, state, '2026-10-16T16:00:00Z')).toEqual([]);
-  expect(noticeIntents(value, state, '2026-12-02T17:00:00Z').map(x => x.kind)).toEqual(['confirm']);
+  expect(noticeIntents(value, state, '2026-10-16T16:00:00Z', DATES)).toEqual([]);
+  expect(noticeIntents(value, state, '2026-12-02T17:00:00Z', DATES).map(x => x.kind)).toEqual(['confirm']);
   state.archiveStartedAt = '2026-12-02T16:00:00Z';
-  expect(noticeIntents(value, state, '2026-12-02T17:00:00Z')).toEqual([]);
+  expect(noticeIntents(value, state, '2026-12-02T17:00:00Z', DATES)).toEqual([]);
 });
 test('non-CSO cannot release and draft warning is enforced by service', async () => {
   const { d } = fixture();
