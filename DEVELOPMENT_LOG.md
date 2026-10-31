@@ -10,6 +10,17 @@ The chronological archive after the `Legacy chronological session log` divider c
 
 ---
 
+## October 2026 — Board setup reads its dates from the cycle calendar (Session 655, Claude)
+
+**Milestone:** The Board writeups setup no longer stores typed dates; it reads each cycle's Board Meeting Date and Board Mailing Date from the central cycle calendar (D47).
+**Sessions:** Session 653 (build, Codex review), Session 655 (merge with #563/#564, owner-run Production checks, owner-approved merge).
+**Ship state:**
+- PR #561, merge `955613bdb`, Vercel Production success; all `main` CI green.
+- Saving an active setup requires both calendar dates in order; an unreadable calendar holds archive start and notices; notices refuse to send if the calendar moved since drafting.
+- Owner set D26 Board Mailing Date 2026-11-25 (typed setup had 11-02; display-only change) before merge; Board Meeting Date 2026-12-10 unchanged, so archive/cleanup timing did not move.
+**Why it matters:** One home for Board dates: a calendar edit flows to the Board page, notices and archive timing with no second place to update.
+**Pointers:** `lib/services/board-writeups/calendar.js`; `docs/plans/REVIEWER_INVITATION_CALENDAR_BUILD_PLAN_2026-10-29.md` §3.7; PR #561. D26 Board page rendering not yet checked signed-in.
+
 ## October 2026 — CSO Board releases and President mail verified live (Session 654, Codex)
 
 **Milestone:** CSO release mail now groups successful copies by hourly run across Release clicks, with the CSO cc'd; the first nine real D26 copies and five existing email sends are verified.
