@@ -322,6 +322,12 @@ later materials_sent status.
 
 ## Production schema rollout and test (owner decision 2026-10-31: test in Production)
 
+**Status 2026-10-31:** steps 1–3 done by the owner. Ended by created
+(preflight `EXACT` / `READABLE` after about two minutes of metadata lag; the
+first re-check right after the create still said `ABSENT`). Did not submit
+inserted as 100000007 (`NewOptionValue` 100000007), published, verified.
+Steps 4–5 pending. The sandbox has neither change.
+
 Both schema changes are additive and no runtime code reads or writes them
 until slice 3. Each step below is owner-run or explicitly owner-approved;
 steps 2, 3 and 5 also need that day's `DATAVERSE_PROD_WRITE_ACK`. Every
