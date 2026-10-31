@@ -36,6 +36,7 @@
  *     process.
  */
 
+import { bundleHasApplicantAbstract } from '../lib/services/test-requests/document-profile.js';
 import crypto from 'crypto';
 import fs from 'fs';
 import os from 'os';
@@ -697,7 +698,7 @@ async function executeManifest(client, manifest, receiptPath, { bypassGoverify =
       throw new Error('Graph site or Request drive identity changed since prepare.');
     }
     const source = await fenceSource(client, manifest, preflightBefore.grantOption.value);
-    const rebuiltBody = compileBody(preflightBefore, manifest.values, source, manifest.bundle?.version === 5 ? manifest.bundle.abstract : undefined);
+    const rebuiltBody = compileBody(preflightBefore, manifest.values, source, bundleHasApplicantAbstract(manifest.bundle) ? manifest.bundle.abstract : undefined);
     if (sha256(rebuiltBody) !== manifest.createBodySha256) throw new Error('Fresh preflight does not reproduce manifest body.');
 
     await checkPreallocatedRequestAbsent(client, manifest.values.requestId);

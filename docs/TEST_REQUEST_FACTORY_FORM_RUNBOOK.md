@@ -23,6 +23,29 @@ The form is at Admin → Test Requests → "Create a test Request". It creates o
 
 Evidence labels: **[RUN]** was seen in a production or Preview run on 2026-10-02. **[SOURCE]** was read from the source that day and has not been seen live. Paths without a directory are under `lib/services/test-requests/`.
 
+## J27 document handling — branch implementation, not deployed
+
+[VERIFIED via source and offline tests, 2026-10-31] Sources linked to J27 through
+`wmkf_GrantCycle` export bundle v6 with `documentProfile: j27-ai-inputs-v1` and
+`source.cycleCode: J27`. The narrative and bibliography are both required,
+including when neither file is present. Exactly one accepted name per kind is
+allowed in AI Materials: D26 canonical names or J27's
+`Project-Narrative_{n}.pdf` / `Bibliography_{n}.pdf`. Multiple naming variants
+refuse rather than select one. Original source item/name/version/hash identities
+remain pinned; copied destinations use `ProposalNarrative_{new-n}.pdf` and
+`ProposalBibliography_{new-n}.pdf`, preserving the existing ledger grammar.
+D26 exports remain v5 and retained v2–v5 bundles retain their original semantics.
+The copy policy and database schema are unchanged.
+
+This is only the confirmed AI-input subset. It does not establish a complete
+staff/reviewer package, alter Request/phase/staff status, or make a fixture
+submitted/peer-review-ready. No new status operation, images, Submission-Documents
+copying, file-limit increase, deployment or live rehearsal is included. The
+[implementation plan](plans/TEST_REQUEST_FACTORY_J27_IMPLEMENTATION_PLAN_2026-10-31.md)
+tracks Connor's remaining decisions and the lifecycle hold. Rollback must not
+advance v6 runs under old code; inspect/preserve them and use a compatible forward
+version. Existing legacy runs are not converted.
+
 ## What it needs in Production
 
 | Thing | Value | Notes |

@@ -332,7 +332,10 @@ describe('compileBasicCloneFilePlan', () => {
   test('keeps the planner import graph pure and leaf-only', () => {
     const source = readFileSync(path.join(__dirname, '../../lib/services/test-requests/file-plan.js'), 'utf8');
     const imports = [...source.matchAll(/from\s+['"]([^'"]+)['"]/g)].map(match => match[1]);
-    expect(imports).toEqual(['../../utils/proposal-document-names.js']);
+    expect(imports).toEqual(['../../utils/proposal-document-names.js', './document-profile.js']);
+    const profile = readFileSync(path.join(__dirname, '../../lib/services/test-requests/document-profile.js'), 'utf8');
+    expect([...profile.matchAll(/from\s+['"]([^'"]+)['"]/g)].map(match => match[1])).toEqual(['../../utils/proposal-document-names.js']);
+    expect(profile).not.toMatch(/GraphService|DynamicsService|fetch\s*\(|@vercel\/blob|database-service|\brequire\s*\(|\bimport\s*\(/);
     expect(source).not.toMatch(/GraphService|DynamicsService|fetch\s*\(|@vercel\/blob|database-service|\brequire\s*\(|\bimport\s*\(/);
   });
 

@@ -769,6 +769,14 @@ describe('exportSource / readArtifacts / recheck', () => {
     // The dynamics bucket was listed; the archive probes were tried and their misses accepted.
     expect(graphCalls.listFiles.some((c) => c.library === 'akoya_request' && c.folder === '9000001_ROOT')).toBe(true);
     expect(graphCalls.listFiles.length).toBeGreaterThan(1);
+    expect(gets.find(g => g.path.startsWith('/akoya_requests?')).path)
+      .toContain('$expand=wmkf_GrantCycle($select=wmkf_cyclecode)');
+    // The same real exporter must refuse a linked J27 source without its AI
+    // pair, before saving a second draft, even when legacy files are present.
+    sourceRow.wmkf_GrantCycle = { wmkf_cyclecode: 'J27' };
+    await expect(service.exportSource({ profileId: PROFILE, sourceRequestNumber: '9000001' }))
+      .rejects.toThrow(/J27 AI inputs require exactly one/);
+    expect(blobs.objects.size).toBe(1);
   });
 
   test('export stores the bundle under a minted draft path and never returns bundle text', async () => {

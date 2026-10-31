@@ -170,6 +170,29 @@ the B4 plan forbids pointing that runner at them (cast plan, *Order* 6, §6).
 - **Switch:** `TEST_REQUEST_FACTORY_FORM=on` gates source lookup, Confirm, advance, status change and status recheck (`requireWritable`); list, detail, artifacts, Foundation recheck and status options are not gated. On in Production since 2026-10-02.
 - **Production runs through the form so far:** `20407283-c279-5e0c-b396-210ad6842482` (Request 1003308, `needs_attention`, `file_journal_unverified`, not resumable) and `a5161f47-7b02-5ad3-8f20-3f645ec3c254` (Request 1003310, `ready`, one status change).
 
+### J27 document profile — branch implementation, not deployed
+
+[VERIFIED via source and offline tests, 2026-10-31] Sources linked to J27 through
+`wmkf_GrantCycle` export bundle v6 with `documentProfile: j27-ai-inputs-v1` and
+`source.cycleCode: J27`. The narrative and bibliography are both required,
+including when neither file is present. Exactly one accepted name per kind is
+allowed in AI Materials: D26 canonical names or J27's
+`Project-Narrative_{n}.pdf` / `Bibliography_{n}.pdf`. Multiple naming variants
+refuse rather than select one. Original source item/name/version/hash identities
+remain pinned; copied destinations use `ProposalNarrative_{new-n}.pdf` and
+`ProposalBibliography_{new-n}.pdf`, preserving the existing ledger grammar.
+D26 exports remain v5 and retained v2–v5 bundles retain their original semantics.
+The copy policy and database schema are unchanged.
+
+This is only the confirmed AI-input subset. It does not establish a complete
+staff/reviewer package, alter Request/phase/staff status, or make a fixture
+submitted/peer-review-ready. No new status operation, images, Submission-Documents
+copying, file-limit increase, deployment or live rehearsal is included. The
+[implementation plan](../plans/TEST_REQUEST_FACTORY_J27_IMPLEMENTATION_PLAN_2026-10-31.md)
+tracks Connor's remaining decisions and the lifecycle hold. Rollback must not
+advance v6 runs under old code; inspect/preserve them and use a compatible forward
+version. Existing legacy runs are not converted.
+
 ### Factory artifact Blob store
 
 - **Store:** private Vercel Blob store `wmkf-factory-private` (`store_I7EbkXANJL0zeaby`), token `FACTORY_BLOB_RW_TOKEN` (Production only). The ledger holds no source text; the form keeps the source bundle and the run manifest here.

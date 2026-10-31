@@ -2,8 +2,8 @@
 title: "Test Request Factory: J27 implementation plan"
 domain: test-request-factory
 kind: plan
-status: draft
-summary: "Proposed J27 submitted and peer-review-ready test Request presets, document completeness, exact state verification, compatibility, and Connor decisions. No implementation or live actions authorized."
+status: active
+summary: "J27 AI-input document handling built and Fable-approved on branch; submitted/peer-review lifecycle presets and live rehearsals remain held for Connor."
 owner: product-engineering
 related:
   - docs/plans/J27_ALIGNMENT_LOG_2026-10-24.md
@@ -17,11 +17,12 @@ related:
 
 ## Status and authority
 
-**[PLANNED — draft for owner and Connor review, 2026-10-31.]** Justin requested
+**[PLANNED — lifecycle work awaiting owner and Connor review, 2026-10-31.]** Justin requested
 read-only research followed by this implementation plan, explicitly covering
-both newly submitted and advanced-to-peer-review starting points. This document
-does not authorize implementation, schema changes, test Request creation,
-status changes, email, provider calls, deployment, or cleanup.
+both newly submitted and advanced-to-peer-review starting points. The owner subsequently authorized the document-handling slice and a Fable build
+review. Status operations and live rehearsals remain on hold until Connor is
+available. No test Request creation, email, provider work, deployment, cleanup
+or live migration is authorized.
 
 **[VERIFIED via Git/source review]** Research used worktree
 `/private/tmp/wmkf-session-657-codex`, branch `codex/session-657-start`, base
@@ -55,7 +56,7 @@ processing, expanding the sandbox-only recipes into production, repairing old
 stopped runs, or deleting fixtures. D26 behavior and existing retained runs remain
 supported. Test file contents are not anonymized by renaming them.
 
-## Source-backed baseline
+## Research baseline — before the document implementation
 
 | Claim | Entry point / producer | Persistence | Consumer / evidence | Status |
 |---|---|---|---|---|
@@ -100,7 +101,7 @@ The requested output is a recorded answer per row before its dependent slice.
 
 | ID | Question / evidence requested | Already decided; do not reopen | Blocks |
 |---|---|---|---|
-| C1 | What exact Request Status, Phase I Status, and Phase II Status values does a freshly submitted J27 request carry? Which API-safe operation establishes that state after the create plug-in returns `Pending`? | J27 arrival Request Status is `Phase I Pending` (D27) | Submitted preset state establishment and verifier |
+| C1 | What exact Request Status, Phase I Status, and Phase II Status values does a freshly submitted J27 request carry? Which API-safe operation establishes that state after the create plug-in returns `Pending`? Is a post-create `akoya_requeststatus` PATCH by the app user permitted, and what does it trigger? | J27 arrival Request Status is `Phase I Pending` (D27) | Submitted preset state establishment and verifier |
 | C2 | For a test clone, should advancement set the phase picklist and let the current rule set Request Status, or use another explicitly bounded operation? Supply the current rule/flow behavior, atomicity, and readback expectations. | Post-Chairs approved state is Phase I `Invited` plus Request Status `Phase II Pending` (D35/D39); no second submission | Peer-review preset and partial-success/recovery design |
 | C3 | What are the exact filenames, extensions, and locations of the combined staff version and reviewer version? Confirm the reviewer version's compatibility with the apps' current `Reviewer Materials/Proposal_{n}.pdf` reader, and whether renumbering a copied package is sufficient. What input serves Reviewer Finder's narrative-plus-bibliography contract? | Staff-version contents/order decided D22; reviewers receive the staff version, renamed, in Reviewer Materials (D33); narrative and bibliography inputs remain separately retained | File profile and downstream readiness |
 | C4 | What is the minimum complete processed file set for each preset? Which documents are optional, and what is the graphical-abstract image format? Must the Factory copy `Submission-Documents` originals, or are processed files sufficient for these tests? | J27 AI names include `Project-Narrative_{n}.pdf` and `Bibliography_{n}.pdf`; all named processed files are PDFs except the graphical-abstract image | Required-document rules, supported MIME types and reviewed count/byte limits |
@@ -115,9 +116,67 @@ whether the first release must exercise the actual automatic intake AI pass.
 Connor supplies the platform contracts; Grants Manager/Program Coordinator own
 calendar values. No need to reopen the two requested starting points.
 
+## Fable review and authorized first slice — 2026-10-31
+
+**[VERIFIED via OAuth Claude Fable review]** Verdict: APPROVE WITH NAMED
+CHANGES. Both starting points and the baseline were accepted. Dispositions:
+
+1. **Receipt grammar:** confirmed J27 source aliases will be copied under the
+   existing canonical `ProposalNarrative_{new-number}.pdf` and
+   `ProposalBibliography_{new-number}.pdf` destination names. These are accepted
+   by downstream readers and the current JS/SQL receipt grammar. This slice
+   does not preserve J27 destination spellings, copy Submission-Documents, add
+   images, or widen limits. No ledger migration is needed for this choice;
+   tests must prove generated destination receipts pass the existing grammar.
+   Preserving new destination spellings later requires a forward ledger migration,
+   fingerprint and fresh-install parity, never edits to applied migrations.
+2. **Request Status writes:** a string-valued post-create Request Status PATCH
+   would be a new production fence shape; the existing integer-picklist status
+   fence cannot admit it. C1 includes app-user permission and triggered effects.
+   Design and implementation stay on hold for Connor.
+3. **Preset readiness:** retain Basic run completion as an orchestration fact;
+   the proposed later design layers exact preset readiness on verified lifecycle
+   evidence rather than adding new pre-ready step enums now. That later status
+   journal/DTO contract requires review and any necessary forward migration.
+   Existing Invited transition code predicts a draft email and GoApply tracking
+   row; no email send is intended, but these effects require fresh verification.
+   D42's reassurance about Recommended Do Not Invite does not clear Invited.
+4. **Idempotency:** later preset identity must be checked in the existing-run
+   branch of `admin-run-service.js` before its early return, or bound into key
+   derivation. A later ledger plan-digest check alone cannot enforce it. No
+   starting-state selector or lifecycle retry behavior changes in this slice.
+5. **Legacy defaults:** an absent document/preset profile on a legacy bundle
+   retains Basic/D26 semantics; an unknown explicit profile is refused. Existing
+   status receipts may inform C2, but a Request Status digest alone cannot prove
+   which raw status value or external rule produced it.
+
+**[PLANNED — authorized implementation boundary]** Recognize the two confirmed
+J27 AI-input aliases; require both narrative and bibliography for J27 exports;
+carry their original source identities through bundle/copy validation; normalize
+only copied destination filenames; test completeness, ambiguity, source integrity,
+legacy compatibility and receipt grammar. A new J27-only bundle version carries
+an explicit AI-input profile and linked source cycle. Legacy bundles retain their
+original projections and digests. Document completeness here means only the two
+AI-input PDFs, not complete staff/reviewer packages or triage/preset readiness.
+Source cycle is read through its existing Grant Cycle lookup, not meeting date.
+A J27 source missing both files must fail rather than silently become legacy.
+No new cycle/preset controls, status fields, automatic intake processing, or live
+rehearsals are included.
+
+Implementation invariants:
+
+| Invariant | Files likely touched | Verification |
+|---|---|---|
+| Legacy bundles/plans keep their original byte shape, file policy and destinations | source bundle, file planner, existing version consumers | Golden digests and legacy resume tests |
+| Linked J27 source requires exactly one narrative and bibliography; aliases never hide duplicates | discovery, exporters, source bundle | Missing-both, missing-one, duplicate aliases, wrong folder/type tests |
+| J27 inputs copy to existing canonical destination names with new Request number | file planner, bundle copy | Plan/receipt grammar and copied-file verification tests |
+| New abstract-bearing bundle retains all existing abstract fences | bundle and abstract consumers | Creation/source/final readback regression tests |
+| No lifecycle or live action is added | unchanged policy/status/fences | Diff review and Fable build review |
+
 ## Implementation sequence
 
-Every slice below is **[PLANNED]** and requires later implementation direction.
+The bounded document slice above is authorized. All remaining work below is
+**[PLANNED]** and requires later direction; lifecycle changes await Connor.
 
 ### 1. Pin contracts and inventory platform effects
 
@@ -217,7 +276,8 @@ state, cycle link, file locations and downstream intended visibility, plus the
 agreed side-effect observation. If ordinary dashboards intentionally hide test
 requests, test through the designated test-request surface; do not weaken global
 isolation to make them appear. Invitation/calendar readiness and real email
-delivery are separate claims; creating a peer-review-ready fixture sends nothing.
+delivery are separate claims. No email send is intended; existing Invited rules
+predict a draft email and a portal-tracking row, subject to fresh Connor evidence.
 
 ## Compatibility and rollback
 
@@ -234,14 +294,62 @@ semantics, clear dispatch evidence, or delete records as a rollback shortcut.
 Keep existing Basic/D26 behavior available where safe. Runtime promotion remains
 a separate deliberate action because main deploys to production.
 
+## Document slice build evidence — 2026-10-31
+
+**[VERIFIED via source and offline execution; branch only, not deployed.]**
+Implemented J27 alias discovery and ambiguity refusal; both source exporters read
+`wmkf_GrantCycle.wmkf_cyclecode` in their source lookup. Linked J27 sources require
+both exact AI PDFs before hydration and export v6 with the explicit profile and
+cycle. Stored v6 bundles and file planning recheck completeness; unknown profiles
+and legacy-version downgrades are refused. Original source metadata and hashes
+remain unchanged. Copy planning maps only destination names to the canonical
+numbered PDFs; the existing final copy verifier proves the copied bytes.
+
+All abstract-capable consumers (manifest construction, runner/CLI body rebuild,
+production source fence and destination Request readback) recognize v5 and v6.
+D26 exports stay v5; legacy golden projection/digest and runner tests pass.
+There is no status operation, new recipe/step, file policy change, migration,
+image/Submission-Documents support, or new endpoint in this slice.
+
+Verification: 70 Factory unit suites / 2,303 tests passed; types passed; touched
+source lint had zero errors and two existing unused-disable warnings; all 38
+selected gate/self-test runs passed sequentially; canonical `npm run build`
+passed. The tests include injected export → JSON reload → copy → final-file
+verification, both J27 aliases present, missing-both/missing-one, invalid
+folder/MIME, profile downgrade, exact source-byte preservation, v6 abstract drift,
+and canonical filename/folder acceptance against JS and SQL receipt grammars.
+The default Admin exporter test proves a linked J27 source containing only
+legacy Phase I files is refused before saving another draft. SQL grammar tests
+exercise the unchanged regular expressions offline; no live database test or
+schema apply was performed. Fable's initial OAuth build review found no blocking
+code defect and requested two coverage additions (unlinked/D26 alias export
+refusal and partial sandbox-preview selection refusal). Both are added; the
+focused J27 suite now passes 19 tests, including excluded raw/image fixtures and
+a JSON-reload digest check. Fable's final OAuth verdict is APPROVE; both required
+conditions are satisfied and runtime source is unchanged from its reviewed diff.
+The [review receipt](evidence/FACTORY_J27_DOCUMENT_HANDLING_REVIEW_2026-10-31.json)
+retains both verdicts, the review-diff digest, validation and unprobed limits.
+
+Discovery deliberately refuses duplicate narrative/bibliography candidates even
+across live/archive buckets. Bundle export already refused duplicate kinds; the
+non-executable sandbox preview now also refuses them before selection. This
+stricter ambiguity behavior is intentional; no source or archive is preferred.
+
+No Factory live probe, rehearsal, status write, external send, paid app-provider
+call, environment edit or deployment was performed. The live platform/field/file
+questions C1–C9 remain unresolved and lifecycle work remains held for Connor.
+
 ## Review disposition
 
 **[PLANNED — ready for contract decisions, not implementation-ready.]** Whole-flow,
 partial-success, async/stale-state, and durable compatibility risks are mapped
-above. Helper extraction is not proposed. New enum/field consumer fan-out is a
-required build audit once exact identifiers are known. Documentation changes
-in this task are confined to this new plan; existing Factory/J27 documents remain
-source/decision references, not silently updated implementation claims.
+above. The bounded implementation uses one pure document-profile helper; it validates
+only the AI-input pair/profile and recognizes abstract-bearing bundle versions.
+It does not resolve document identity, establish workflow readiness or perform
+I/O. New lifecycle enum/field consumer fan-out is a
+required build audit once exact identifiers are known. The document slice updates this plan, the Factory runbook, the artifact Atlas,
+service catalog and J27 register with explicit branch-only implementation status.
 
-The immediate next step is Connor's C1–C9 answers, followed by owner review of the
-concrete file/state contract and separately authorized implementation slices.
+The bounded document slice is source-built, offline-tested and OAuth Fable-approved.
+Connor's C1–C9 answers and owner review remain prerequisites for lifecycle
+work and separately authorized live rehearsals.

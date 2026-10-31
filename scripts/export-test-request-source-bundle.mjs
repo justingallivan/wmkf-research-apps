@@ -162,7 +162,7 @@ async function readSourceRow(client, requestNumber) {
   const filter = encodeURIComponent(`akoya_requestnum eq '${requestNumber}'`);
   const body = bodyOrThrow(
     'source Request lookup',
-    await client.get(`/akoya_requests?$select=${SOURCE_SELECT}&$filter=${filter}&$top=2`),
+    await client.get(`/akoya_requests?$select=${SOURCE_SELECT}&$expand=wmkf_GrantCycle($select=wmkf_cyclecode)&$filter=${filter}&$top=2`),
   );
   const rows = body.value || [];
   requireUniqueSourceRequest(rows, Boolean(body['@odata.nextLink']));
