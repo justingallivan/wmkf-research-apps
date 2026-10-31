@@ -275,9 +275,9 @@ Admin `inviteStartDate` has no reader outside its form, validation and tests
   invitations go out.
 
 **Build notes (2026-10-30, branch `claude/reviewer-materials-on-accept`, PR
-#562, not merged).** Built on the branch: migration 091 and its store, and the
-acceptance job's `release_materials` step with the new template keys. Still
-[PLANNED]: manual-path claim, staff recovery action, invitation PDF
+#562, not merged).** Built on the branch: migration 091 and its store, the
+acceptance job's `release_materials` step with the new template keys, and the
+manual-path claim (Session 654). Still [PLANNED]: staff recovery action, invitation PDF
 precondition and accepted-screen copy, invitation wording and
 `{{proposalDelivery}}` / Reviewer Finder date-field retirement. Accept does
 not set a review status [VERIFIED via rg: no `reviewStatus` write in
@@ -350,7 +350,16 @@ to a follow-up PR (owner, 2026-10-30).
   job lock (300 s default).
 - **Manual release** takes the same claim just before its mint
   (`send-emails-service.js`, materials path); an existing row refuses with a new
-  skip reason, "materials are already being sent".
+  skip reason, "materials are already being sent"
+  (`materials_release_in_progress`), or `materials_already_sent` when the row
+  is `sent` / `recorded`. Built Session 654: a claim that cannot be checked
+  fails closed (`materials_release_unavailable`); mint failure → `failed`;
+  dispatch throw → `uncertain` / `failed` by the existing `dispatched`
+  classifier; after `recordDeliveredEmail` the row goes to `recorded` and the
+  release alert is resolved. Two tightenings: a materials draft without the
+  reviewer link now fails closed (`external_link_missing`) instead of sending
+  unclaimed, and `markAsSent: false` is refused for materials (both UIs always
+  send `true`).
 - **Build order** (each a stop point): migration + claim service → drain step →
   manual-path claim → recovery action (route + UI) → invitation PDF
   precondition + accepted-screen copy → wording seeds, `{{proposalDelivery}}`

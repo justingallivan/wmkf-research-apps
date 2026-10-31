@@ -27,6 +27,9 @@
  */
 
 const createAndSendEmail = jest.fn(async () => ({ emailId: 'email-1' }));
+jest.mock('../../lib/services/reviewer-engagement/materials-release-store',
+  () => require('../helpers/materials-release-store-mock').createMaterialsReleaseStoreMock());
+jest.mock('../../lib/services/alert-service', () => ({ __esModule: true, default: { autoResolve: jest.fn(async () => {}) } }));
 jest.mock('../../lib/services/dynamics-service', () => ({
   DynamicsService: { createAndSendEmail: (...a) => createAndSendEmail(...a) },
 }));
@@ -153,7 +156,8 @@ const REQUEST_FULL = {
   _wmkf_programdirector_value: 'pd-1',
 };
 
-const TEMPLATE = { subject: 'Review Materials', body: 'Hello, please review {{proposalTitle}}.' };
+// Materials always carry the reviewer link (the send fails closed without it).
+const TEMPLATE = { subject: 'Review Materials', body: 'Hello, please review {{proposalTitle}}.\n{{externalLink}}' };
 
 async function send(drafts, templateType = 'materials') {
   const emitted = [];
@@ -161,6 +165,7 @@ async function send(drafts, templateType = 'materials') {
     {
       requestBody: { drafts, templateType },
       fromEmail: 'staff@wmkeck.org',
+      actorProfileId: 7,
       actingUserSystemId: 'u-1',
       authorizedProgramDirectorByRequestId: { [REQUEST_ID]: REQUEST_FULL._wmkf_programdirector_value },
     },

@@ -15,6 +15,9 @@
  */
 
 const createAndSendEmail = jest.fn(async () => ({ emailId: 'email-1' }));
+jest.mock('../../lib/services/reviewer-engagement/materials-release-store',
+  () => require('../helpers/materials-release-store-mock').createMaterialsReleaseStoreMock());
+jest.mock('../../lib/services/alert-service', () => ({ __esModule: true, default: { autoResolve: jest.fn(async () => {}) } }));
 jest.mock('../../lib/services/dynamics-service', () => ({
   DynamicsService: { createAndSendEmail: (...a) => createAndSendEmail(...a) },
 }));
@@ -168,6 +171,7 @@ async function run(requestBody) {
     {
       requestBody: stampedBody,
       fromEmail: 'staff@wmkeck.org',
+      actorProfileId: 7,
       actingUserSystemId: 'u-1',
       authorizedProgramDirectorByRequestId: { [REQUEST_ID]: REQUEST._wmkf_programdirector_value },
     },

@@ -10,6 +10,9 @@
 jest.mock('@vercel/postgres', () => ({
   sql: jest.fn(() => { throw new Error('Unexpected Postgres access in race harness'); }),
 }));
+jest.mock('../../lib/services/reviewer-engagement/materials-release-store',
+  () => require('../helpers/materials-release-store-mock').createMaterialsReleaseStoreMock());
+jest.mock('../../lib/services/alert-service', () => ({ __esModule: true, default: { autoResolve: jest.fn(async () => {}) } }));
 jest.mock('../../lib/external/token-lifecycle', () => ({
   mintAndStore: jest.fn(async () => ({ jwt: 'aaa.bbb.ccc' })),
   ensureToken: jest.fn(async () => {}),
@@ -183,6 +186,7 @@ function send(templateType = 'followup') {
   const promise = trusted(() => sendEmails({
     requestBody: { templateType, drafts: [stampedDraft] },
     fromEmail: 'staff@example.org',
+    actorProfileId: 7,
     authorizedProgramDirectorByRequestId: { [REQUEST]: transport.get(REQUESTS, REQUEST)?._wmkf_programdirector_value },
   }, (event) => events.push(event)));
   return { promise, events };

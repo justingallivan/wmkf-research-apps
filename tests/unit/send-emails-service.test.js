@@ -13,6 +13,9 @@
  */
 
 const createAndSendEmail = jest.fn(async () => ({ emailId: 'email-1' }));
+jest.mock('../../lib/services/reviewer-engagement/materials-release-store',
+  () => require('../helpers/materials-release-store-mock').createMaterialsReleaseStoreMock());
+jest.mock('../../lib/services/alert-service', () => ({ __esModule: true, default: { autoResolve: jest.fn(async () => {}) } }));
 jest.mock('../../lib/services/dynamics-service', () => ({
   DynamicsService: { createAndSendEmail: (...a) => createAndSendEmail(...a) },
 }));
@@ -118,6 +121,8 @@ const { sendEmails } = require('../../lib/services/review-manager/send-emails-se
 const { loadCycleConfigs } = require('../../lib/services/review-manager/cycle-config-loader');
 const { stampFingerprint } = require('../helpers/draft-fingerprint');
 const { isFirstManualInvitation } = require('../../lib/services/reviewer-first-manual-invitation-coi');
+const materialsReleaseStore = require('../../lib/services/reviewer-engagement/materials-release-store');
+const AlertService = require('../../lib/services/alert-service').default;
 
 const SUG_OK = '11111111-1111-4111-8111-111111111111';
 const SUG_NO_EMAIL = '22222222-2222-4222-8222-222222222222';
@@ -234,6 +239,7 @@ async function run(requestBody, {
     {
       requestBody: stampedBody,
       fromEmail: 'staff@wmkeck.org',
+      actorProfileId: 7,
       actingUserSystemId: 'u-1',
       authorizedProgramDirectorByRequestId,
     },
@@ -645,11 +651,21 @@ describe('send-emails-service — fresh post-send bookkeeping', () => {
     expect(names(emitted).slice(-2)).toEqual(['result', 'complete']);
   });
 
-  test.each(['materials', 'followup', 'thankyou'])('markAsSent:false skips all %s bookkeeping reads and writes', async (templateType) => {
+  test('markAsSent:false is refused for materials before any send (the release row needs its bookkeeping)', async () => {
+    SUGGESTIONS[SUG_OK] = suggestion(SUG_OK, { wmkf_accepted: true });
+
+    const emitted = await run({ drafts: [draft(SUG_OK)], templateType: 'materials', markAsSent: false });
+
+    expect(names(emitted)).toEqual(['error']);
+    expect(materialsReleaseStore.claimMaterialsRelease).not.toHaveBeenCalled();
+    expect(createAndSendEmail).not.toHaveBeenCalled();
+  });
+
+  test.each(['followup', 'thankyou'])('markAsSent:false skips all %s bookkeeping reads and writes', async (templateType) => {
     SUGGESTIONS[SUG_OK] = suggestion(SUG_OK, { wmkf_accepted: true });
 
     const emitted = await run({
-      drafts: [templateType === 'materials' ? draft(SUG_OK) : followupDraft(SUG_OK)],
+      drafts: [followupDraft(SUG_OK)],
       templateType, markAsSent: false,
     });
 
@@ -868,6 +884,107 @@ describe('send-emails-service — one-time materials delivery', () => {
   );
 });
 
+describe('send-emails-service — shared materials release claim (D46/D49)', () => {
+  const acceptedFresh = () => {
+    SUGGESTIONS[SUG_OK] = suggestion(SUG_OK, { wmkf_accepted: true, wmkf_reviewstatus: 100000000, wmkf_materialssentat: null });
+  };
+  const leaseRow = (state) => ({ suggestion_id: SUG_OK, state, lease_token: 'lease-1' });
+
+  test('claims before the mint, then link_minted → sent → recorded and resolves the release alert', async () => {
+    acceptedFresh();
+    const order = [];
+    materialsReleaseStore.claimMaterialsRelease.mockImplementationOnce(async () => { order.push('claim'); return { claimed: true, release: leaseRow('claimed') }; });
+    mintAndStore.mockImplementationOnce(async () => { order.push('mint'); return { jwt: 'new.jwt.value' }; });
+
+    const emitted = await run({ drafts: [draft(SUG_OK)], templateType: 'materials' });
+
+    expect(resultOf(emitted).sent).toHaveLength(1);
+    expect(order).toEqual(['claim', 'mint']);
+    expect(materialsReleaseStore.claimMaterialsRelease).toHaveBeenCalledWith({
+      suggestionId: SUG_OK, requestId: REQUEST_ID, source: 'manual', actorProfileId: 7,
+    });
+    expect(materialsReleaseStore.markMaterialsLinkMinted).toHaveBeenCalledWith(SUG_OK, 'lease-1');
+    expect(materialsReleaseStore.markMaterialsSent).toHaveBeenCalledWith(SUG_OK, 'lease-1');
+    expect(materialsReleaseStore.recordMaterialsRelease).toHaveBeenCalledWith(SUG_OK);
+    expect(AlertService.autoResolve).toHaveBeenCalledWith(`reviewer-materials-release:${SUG_OK}`);
+  });
+
+  test.each([
+    ['claimed', 'materials_release_in_progress'],
+    ['link_minted', 'materials_release_in_progress'],
+    ['uncertain', 'materials_release_in_progress'],
+    ['failed', 'materials_release_in_progress'],
+    ['sent', 'materials_already_sent'],
+    ['recorded', 'materials_already_sent'],
+  ])('an existing %s release row refuses with %s before mint or send', async (state, reason) => {
+    acceptedFresh();
+    materialsReleaseStore.claimMaterialsRelease.mockResolvedValueOnce({ claimed: false, release: leaseRow(state) });
+
+    const emitted = await run({ drafts: [draft(SUG_OK)], templateType: 'materials' });
+
+    expect(resultOf(emitted).skipped).toEqual([expect.objectContaining({ suggestionId: SUG_OK, reason })]);
+    expect(mintAndStore).not.toHaveBeenCalled();
+    expect(createAndSendEmail).not.toHaveBeenCalled();
+  });
+
+  test('a claim that cannot be checked fails closed before the mint', async () => {
+    acceptedFresh();
+    materialsReleaseStore.claimMaterialsRelease.mockRejectedValueOnce(new Error('pg down'));
+
+    const emitted = await run({ drafts: [draft(SUG_OK)], templateType: 'materials' });
+
+    expect(resultOf(emitted).failed[0]).toMatchObject({ suggestionId: SUG_OK, code: 'materials_release_unavailable' });
+    expect(mintAndStore).not.toHaveBeenCalled();
+    expect(createAndSendEmail).not.toHaveBeenCalled();
+  });
+
+  test('a mint failure stops the release as failed and leaves both materials markers unset', async () => {
+    acceptedFresh();
+    mintAndStore.mockRejectedValueOnce(new Error('mint boom'));
+
+    const emitted = await run({ drafts: [draft(SUG_OK)], templateType: 'materials' });
+
+    expect(resultOf(emitted).failed[0]).toMatchObject({ code: 'external_link_mint_failed' });
+    expect(materialsReleaseStore.markMaterialsReleaseStopped).toHaveBeenCalledWith(SUG_OK, 'lease-1', 'failed', 'external_link_mint_failed');
+    expect(materialsReleaseStore.markMaterialsLinkMinted).not.toHaveBeenCalled();
+    expect(createAndSendEmail).not.toHaveBeenCalled();
+    expect(updateLifecycle).not.toHaveBeenCalled();
+  });
+
+  test('a lost lease after the mint sends nothing', async () => {
+    acceptedFresh();
+    materialsReleaseStore.markMaterialsLinkMinted.mockResolvedValueOnce(null);
+
+    const emitted = await run({ drafts: [draft(SUG_OK)], templateType: 'materials' });
+
+    expect(resultOf(emitted).failed[0]).toMatchObject({ code: 'materials_release_lease_lost' });
+    expect(createAndSendEmail).not.toHaveBeenCalled();
+    expect(updateLifecycle).not.toHaveBeenCalled();
+  });
+
+  test.each([
+    [false, 'failed', 'materials_send_failed'],
+    [undefined, 'uncertain', 'materials_send_unconfirmed'],
+  ])('a dispatch throw (dispatched=%s) stops the release as %s and leaves both markers unset', async (dispatched, state, code) => {
+    acceptedFresh();
+    createAndSendEmail.mockRejectedValueOnce(Object.assign(new Error('send boom'), dispatched === false ? { dispatched: false } : {}));
+
+    await run({ drafts: [draft(SUG_OK)], templateType: 'materials' });
+
+    expect(materialsReleaseStore.markMaterialsReleaseStopped).toHaveBeenCalledWith(SUG_OK, 'lease-1', state, code);
+    expect(materialsReleaseStore.markMaterialsSent).not.toHaveBeenCalled();
+    expect(updateLifecycle).not.toHaveBeenCalled();
+  });
+
+  test('follow-up sends never touch the release table', async () => {
+    SUGGESTIONS[SUG_OK] = suggestion(SUG_OK, { wmkf_accepted: true });
+
+    await run({ drafts: [followupDraft(SUG_OK)], templateType: 'followup' });
+
+    expect(materialsReleaseStore.claimMaterialsRelease).not.toHaveBeenCalled();
+  });
+});
+
 describe('send-emails-service — thank-you is independent from closeout', () => {
   test.each([null, 100000003, 100000004, 100000005, 100000006, 199999999])('thank-you stamps only delivery for status %s', async (statusValue) => {
     SUGGESTIONS[SUG_OK] = suggestion(SUG_OK, { wmkf_accepted: true, wmkf_reviewstatus: statusValue });
@@ -1065,7 +1182,7 @@ describe('send-emails-service — invitation body-integrity gate', () => {
         body: 'No link here.',
         externalLinkExpected: false,
       }],
-      templateType: 'materials',
+      templateType: 'followup',
     });
     expect(createAndSendEmail).toHaveBeenCalledTimes(1);
     expect(resultOf(emitted).sent).toHaveLength(1);
@@ -1255,12 +1372,23 @@ describe('send-emails-service — send-time token authority gate (S404 Plan v4)'
     SUGGESTIONS[SUG_OK] = suggestion(SUG_OK, { wmkf_accepted: true });
     const emitted = await run({
       drafts: [{ suggestionId: SUG_OK, subject: 'S', body: 'No link here.', externalLinkExpected: false }],
-      templateType: 'materials',
+      templateType: 'followup',
     });
     expect(verifySuggestionToken).not.toHaveBeenCalled();
     expect(mintAndStore).not.toHaveBeenCalled();
     expect(createAndSendEmail).toHaveBeenCalledTimes(1);
     expect(resultOf(emitted).sent).toHaveLength(1);
+  });
+
+  test('a materials draft without the reviewer link fails closed (materials always mint under the release claim)', async () => {
+    SUGGESTIONS[SUG_OK] = suggestion(SUG_OK, { wmkf_accepted: true });
+    const emitted = await run({
+      drafts: [{ suggestionId: SUG_OK, subject: 'S', body: 'No link here.', externalLinkExpected: false }],
+      templateType: 'materials',
+    });
+    expect(resultOf(emitted).failed[0]).toMatchObject({ suggestionId: SUG_OK, code: 'external_link_missing' });
+    expect(materialsReleaseStore.claimMaterialsRelease).not.toHaveBeenCalled();
+    expect(createAndSendEmail).not.toHaveBeenCalled();
   });
 
   test('S3: externalLinkExpected:false plus a manually-introduced reviewer URL DOES call verifySuggestionToken', async () => {

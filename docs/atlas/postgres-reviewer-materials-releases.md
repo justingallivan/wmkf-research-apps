@@ -43,9 +43,18 @@ build notes.
   minutes. Every acceptance-drain run (every 2 minutes) re-raises one
   deduplicated alert per row (`reviewer-materials-release:<suggestion>`), so the
   row, not a job's retry budget, carries the staff obligation.
-- Readers and writers: the acceptance job's `release_materials` step
-  (`lib/services/reviewer-acceptance-drain.js`, on branch). [PLANNED] the
-  manual materials send and the staff recovery action; not wired yet.
+- Readers and writers (on branch): the acceptance job's `release_materials`
+  step (`lib/services/reviewer-acceptance-drain.js`), and the manual materials
+  send (`lib/services/review-manager/send-emails-service.js`,
+  `claimManualMaterialsRelease` and the helpers beside it). The manual send
+  claims as `source = 'manual'` with the staff profile just before its mint;
+  an existing row refuses (`materials_already_sent` for `sent` / `recorded`,
+  else `materials_release_in_progress`), and a claim that cannot be checked
+  fails closed with nothing minted. After its own `recordDeliveredEmail` it
+  moves the row to `recorded` and resolves the release alert. [PLANNED] the
+  staff recovery action (`reclaimMaterialsRelease`); not wired yet.
+- Alert key: `materialsReleaseAlertKey` in the store is the one spelling used
+  by both writers.
 
 ## Columns
 
