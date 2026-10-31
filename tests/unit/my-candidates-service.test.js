@@ -246,7 +246,28 @@ describe('getMyCandidates', () => {
       declined: true,
       responseType: 'declined',
       removedAt: '2026-06-01',
+      canRestore: false,
     })]);
+  });
+
+  test.each([
+    ['a never-invited candidate', {}, true],
+    ['a legacy row with only an invitation-sent stamp', { wmkf_emailsentat: '2026-06-01T00:00:00Z' }, false],
+    ['a legacy row with No Response but no invite flags', { wmkf_responsetype: 100000002 }, false],
+    ['a legacy Released row', { wmkf_reviewstatus: 100000006 }, false],
+    ['a row with a review received', { wmkf_reviewreceivedat: '2026-06-02T00:00:00Z' }, false],
+  ])('Removed list canRestore mirrors Restore for %s', async (_name, change, expected) => {
+    grantRequestAdapter.getById.mockResolvedValue({ akoya_requestid: REQUEST_ID, akoya_requestnum: 'R-1', akoya_title: 'A Proposal' });
+    suggestionAdapter.findByRequest.mockResolvedValue([]);
+    suggestionAdapter.findRemovedByRequest.mockResolvedValue([{
+      wmkf_appreviewersuggestionid: SUGGESTION_ID, _wmkf_potentialreviewer_value: PERSON_ID,
+      wmkf_invited: false, wmkf_emailsentat: null, wmkf_responsetype: null, wmkf_declined: false,
+      wmkf_reviewstatus: null, wmkf_reviewreceivedat: null, wmkf_completedat: null, modifiedon: '2026-06-01',
+      ...change,
+    }]);
+    potentialReviewerAdapter.queryReviewers.mockResolvedValue({ records: [{ wmkf_potentialreviewersid: PERSON_ID, wmkf_name: 'Dr X' }] });
+    const out = await getMyCandidates({ requestId: REQUEST_ID, azureEmail: EMAIL });
+    expect(out.proposals[0].removedCandidates[0].canRestore).toBe(expected);
   });
 
   test('PD scope with unresolvable PD returns the empty envelope with programDirector: null', async () => {

@@ -214,7 +214,8 @@ describe('ReviewerInvitePanel invitation capture rehearsal', () => {
         removedCandidates={[
           { suggestionId: 'S-DECLINED', name: 'Dr. Archived Decline', affiliation: 'Example University', wasInvited: true, declined: true, responseType: 'declined' },
           { suggestionId: 'S-INVITED', name: 'Dr. Removed Invitee', wasInvited: true, declined: false },
-          { suggestionId: 'S-NEVER', name: 'Dr. Never Invited', wasInvited: false, declined: false },
+          { suggestionId: 'S-NEVER', name: 'Dr. Never Invited', wasInvited: false, declined: false, canRestore: true },
+          { suggestionId: 'S-LEGACY', name: 'Dr. Legacy Outcome', wasInvited: false, declined: false, canRestore: false },
         ]}
       />,
     );

@@ -855,7 +855,7 @@ function ReviewerInvitePanelForRequest({ requestId, candidates = [], removedCand
                     </div>
                     {canManage && (
                       <span className="flex items-center gap-3 flex-shrink-0">
-                        {!c.wasInvited && !c.declined && (
+                        {c.canRestore === true && (
                           <button
                             type="button"
                             onClick={() => restoreCandidate(c)}
