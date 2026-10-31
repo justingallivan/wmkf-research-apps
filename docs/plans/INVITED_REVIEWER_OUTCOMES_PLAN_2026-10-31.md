@@ -319,3 +319,42 @@ later materials_sent status.
 - `/contract-reconcile` Mode A and three Codex adversarial rounds: done
   2026-10-31 (findings above). The build contract above is the reviewed
   baseline; code review covers the rest.
+
+## Production schema rollout and test (owner decision 2026-10-31: test in Production)
+
+Both schema changes are additive and no runtime code reads or writes them
+until slice 3. Each step below is owner-run or explicitly owner-approved;
+steps 2, 3 and 5 also need that day's `DATAVERSE_PROD_WRITE_ACK`. Every
+script goes through `lib/dataverse/client.js` (target interlock) and refuses a
+Production run unless `DATAVERSE_TARGET_INTERLOCK=on` and
+`DATAVERSE_ALLOW_PROD_READS=yes` (`scripts/lib/dataverse-script-target.cjs`).
+
+1. **Read-only check before.** `node scripts/preflight-reviewer-outcomes-schema.mjs --target=prod`
+   should print `ABSENT` / `RUNTIME_SELECT: UNAVAILABLE`;
+   `node scripts/extend-reviewstatus-picklist-did-not-submit.mjs --target=prod`
+   (preview by default) should list the current options and "Would add
+   100000007: Did not submit".
+2. **Ended by.** `node scripts/apply-dataverse-schema.js --target=prod --wave=35-reviewer-outcomes`
+   (dry run), then the same with `--execute`. Re-run the preflight: `EXACT` /
+   `READABLE`. A second `--execute` reports `exists`.
+3. **Did not submit.** Re-run the picklist script with `--execute`. It inserts
+   the option, publishes only `wmkf_appreviewersuggestion` (`PublishXml`) and
+   re-reads it. A second run is a no-op.
+4. **Nothing broke.** Review Manager and the reviewer list for a live request
+   still load.
+5. **Round trip on one test row.**
+   `node scripts/roundtrip-reviewer-outcomes-test-row.mjs --target=prod --suggestion=<guid>`
+   previews; `--execute --pause` writes Ended by = Foundation and Did not
+   submit (ETag-bound), reads them back, waits while staff check that request
+   in Review Manager (how today's screens show Did not submit before slice 3),
+   then restores both original values and verifies them. The restore is bound
+   to the version the test write returned, so any other change in between
+   stops it instead of overwriting. It refuses any row whose request is not a
+   marked test request, saves a recovery record under `outputs/` before
+   writing (`--recover` restores from it while the row still holds exactly the
+   test values on the same test request), caps the pause at 10 minutes, and
+   will not start within 20 minutes of UTC midnight, when the ACK expires. Dataverse
+   auditing keeps a record of both writes on that row.
+
+Rollback: deleting the new field or option is safe only while no row holds a
+value in it.

@@ -8,12 +8,27 @@
  * DO NOT run as part of a deploy. This mutates Dataverse metadata and requires
  * separate owner approval for each target environment.
  *
+ * Usage:
+ *   node scripts/extend-reviewstatus-picklist-did-not-submit.mjs --target=sandbox
+ *   node scripts/extend-reviewstatus-picklist-did-not-submit.mjs --target=sandbox --execute
+ *   node scripts/extend-reviewstatus-picklist-did-not-submit.mjs --target=prod
+ *   DATAVERSE_PROD_WRITE_ACK="did not submit option $(date -u +%F)" \
+ *     node scripts/extend-reviewstatus-picklist-did-not-submit.mjs --target=prod --execute
+ *
+ * Without --execute it only reads and prints what it would add. Production
+ * runs need DATAVERSE_TARGET_INTERLOCK=on and DATAVERSE_ALLOW_PROD_READS=yes,
+ * and --execute also needs a same-UTC-day DATAVERSE_PROD_WRITE_ACK
+ * (scripts/lib/dataverse-script-target.cjs). Every call goes through
+ * lib/dataverse/client.js, so the target interlock guards each one.
+ *
  * Safety contract:
  * - print and inspect the live option set first;
  * - refuse value/label collisions and duplicate labels at another value;
  * - require the missing declared values to be exactly the next free values;
  * - assert InsertOptionValue.NewOptionValue equals the requested value;
- * - publish, re-read, and verify both options;
+ * - publish only wmkf_appreviewersuggestion (PublishXml, not PublishAllXml,
+ *   which would also publish anyone else's pending customizations);
+ * - re-read and verify the option;
  * - a second run is a clean no-op.
  */
 
@@ -22,19 +37,16 @@ const solutionName = 'wmkfResearchReviewAppSuite';
 const desired = [
   { key: 'did_not_submit', value: DID_NOT_SUBMIT_REVIEW_STATUS_VALUE, label: 'Did not submit' },
 ];
-let baseUrl;
-let token;
-let checkUrl;
+const ENTITY = 'wmkf_appreviewersuggestion';
+const OPTIONS_PATH = `/EntityDefinitions(LogicalName='${ENTITY}')/Attributes(LogicalName='wmkf_reviewstatus')`
+  + '/Microsoft.Dynamics.CRM.PicklistAttributeMetadata?$expand=OptionSet';
 
-async function readOptions() {
-  const response = await fetch(checkUrl, {
-    headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' },
-  });
+async function readOptions(client) {
+  const response = await client.get(OPTIONS_PATH);
   if (!response.ok) {
-    throw new Error(`Review Status metadata read failed (${response.status}): ${await response.text()}`);
+    throw new Error(`Review Status metadata read failed (${response.status}): ${response.text}`);
   }
-  const body = await response.json();
-  return body.OptionSet?.Options || [];
+  return response.body?.OptionSet?.Options || [];
 }
 
 function labelOf(option) {
@@ -101,34 +113,25 @@ function assertAssignedOption(raw, option) {
   }
 }
 
-async function insertOption(option) {
-  const response = await fetch(`${baseUrl}/api/data/v9.2/InsertOptionValue`, {
-    method: 'POST',
-    headers: {
-      Authorization: `Bearer ${token}`,
-      'Content-Type': 'application/json',
-      'MSCRM.SolutionUniqueName': solutionName,
+async function insertOption(client, option) {
+  const response = await client.post('/InsertOptionValue', {
+    EntityLogicalName: ENTITY,
+    AttributeLogicalName: 'wmkf_reviewstatus',
+    Value: option.value,
+    Label: {
+      '@odata.type': 'Microsoft.Dynamics.CRM.Label',
+      LocalizedLabels: [{
+        '@odata.type': 'Microsoft.Dynamics.CRM.LocalizedLabel',
+        Label: option.label,
+        LanguageCode: 1033,
+      }],
     },
-    body: JSON.stringify({
-      EntityLogicalName: 'wmkf_appreviewersuggestion',
-      AttributeLogicalName: 'wmkf_reviewstatus',
-      Value: option.value,
-      Label: {
-        '@odata.type': 'Microsoft.Dynamics.CRM.Label',
-        LocalizedLabels: [{
-          '@odata.type': 'Microsoft.Dynamics.CRM.LocalizedLabel',
-          Label: option.label,
-          LanguageCode: 1033,
-        }],
-      },
-    }),
   });
-  const raw = await response.text();
   console.log(`InsertOptionValue ${option.key} → HTTP ${response.status}`);
-  console.log(`Response body: ${raw || '(empty)'}`);
+  console.log(`Response body: ${response.text || '(empty)'}`);
   if (!response.ok) throw new Error(`InsertOptionValue failed for ${option.key}.`);
 
-  assertAssignedOption(raw, option);
+  assertAssignedOption(response.text, option);
 }
 
 if (process.argv.includes('--self-test')) {
@@ -159,40 +162,50 @@ if (process.argv.includes('--self-test')) {
   process.exit(0);
 }
 
-const { default: fs } = await import('fs');
-const env = fs.readFileSync('.env.local', 'utf8');
-for (const line of env.split('\n')) {
-  const match = line.match(/^([A-Z_][A-Z0-9_]*)=(.*)$/);
-  if (match) {
-    process.env[match[1]] = match[2].trim().replace(/^"(.*)"$/, '$1').replace(/^'(.*)'$/, '$1');
-  }
-}
-const { DynamicsService } = await import('../lib/services/dynamics-service.js');
-baseUrl = process.env.DYNAMICS_URL;
-token = await DynamicsService.getAccessToken();
-checkUrl = `${baseUrl}/api/data/v9.2/EntityDefinitions(LogicalName='wmkf_appreviewersuggestion')/Attributes(LogicalName='wmkf_reviewstatus')/Microsoft.Dynamics.CRM.PicklistAttributeMetadata?$expand=OptionSet`;
+const execute = process.argv.includes('--execute');
+const { createRequire } = await import('node:module');
+const require = createRequire(import.meta.url);
+const { loadEnvLocal, getAccessToken, createClient } = require('../lib/dataverse/client.js');
+const { parseTargetArg, resolveTargetResource } = require('./lib/dataverse-script-target.cjs');
 
-let options = await readOptions();
+const target = parseTargetArg(process.argv);
+loadEnvLocal();
+const resourceUrl = resolveTargetResource({ target, write: execute });
+console.log(`Target: ${target} (${resourceUrl})`);
+console.log(`Mode:   ${execute ? 'EXECUTE' : 'PREVIEW (no writes)'}\n`);
+const client = createClient({
+  resourceUrl,
+  token: await getAccessToken(resourceUrl),
+  solutionUniqueName: solutionName,
+});
+
+let options = await readOptions(client);
 printOptions(options, 'Current Review Status options:');
 const missing = planMissingOptions(options);
 if (missing.length === 0) {
   console.log('\nDid not submit already exists with the declared value. No-op.');
   process.exit(0);
 }
+if (!execute) {
+  for (const wanted of missing) console.log(`\nWould add ${wanted.value}: ${wanted.label}`);
+  console.log('Preview only. Re-run with --execute to add it.');
+  process.exit(0);
+}
 
 for (const wanted of missing) {
-  await insertOption(wanted);
+  await insertOption(client, wanted);
   options = [...options, { Value: wanted.value, Label: { UserLocalizedLabel: { Label: wanted.label } } }];
 }
 
-const publish = await fetch(`${baseUrl}/api/data/v9.2/PublishAllXml`, {
-  method: 'POST',
-  headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-});
-console.log(`PublishAllXml → HTTP ${publish.status}`);
-if (!publish.ok) throw new Error(`PublishAllXml failed (${publish.status}): ${await publish.text()}`);
+const publish = await client.post(
+  '/PublishXml',
+  { ParameterXml: `<importexportxml><entities><entity>${ENTITY}</entity></entities></importexportxml>` },
+  { 'MSCRM.SolutionUniqueName': '' },
+);
+console.log(`PublishXml (${ENTITY}) → HTTP ${publish.status}`);
+if (!publish.ok) throw new Error(`PublishXml failed (${publish.status}): ${publish.text}`);
 
-const verified = await readOptions();
+const verified = await readOptions(client);
 printOptions(verified, '\nReview Status options after publish:');
 assertNoCollisions(verified);
 for (const wanted of desired) {
