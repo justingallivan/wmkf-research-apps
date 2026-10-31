@@ -351,3 +351,18 @@ describe('withdrawLinkedHonorariumForEndedSuggestion', () => {
       .rejects.toThrow('both ETags');
   });
 });
+
+describe('already-Withdrawn honorarium stays bound', () => {
+  it.each(['applyStaffReviewerWithdrawal', 'applyStaffReviewerDidNotSubmit', 'applyStaffReviewerRelease'])(
+    '%s re-asserts Withdrawn with the honorarium ETag and keeps its withdrawal date',
+    async (fn) => {
+      const writer = { applyStaffReviewerWithdrawal, applyStaffReviewerDidNotSubmit, applyStaffReviewerRelease }[fn];
+      await writer(SUGGESTION_ID, { ifMatch: 'W/"40"', cancelHonorarium: { id: HONORARIUM_ID, ifMatch: 'W/"7"', alreadyWithdrawn: true } });
+      const [operations] = runChangeset.mock.calls[0];
+      expect(operations[1]).toEqual({
+        method: 'PATCH', entitySet: 'akoya_requests', key: HONORARIUM_ID, ifMatch: 'W/"7"',
+        body: { akoya_requeststatus: 'Withdrawn' },
+      });
+    },
+  );
+});

@@ -381,9 +381,11 @@ export default function ReviewerManagePanel({
   const statusOperationsRef = useRef(new Map());
   const statusContextRef = useRef({ mounted: false, epoch: 0 });
   const [pendingStatusTokens, setPendingStatusTokens] = useState(() => new Map());
-  // Rows whose End engagement write is in flight. The write can take ~20s when
-  // an honorarium is involved, so the row says so instead of looking idle.
-  const [savingTerminalIds, setSavingTerminalIds] = useState(() => new Set());
+  // Rows whose End engagement write is in flight (suggestionId → attempt
+  // token, like pendingStatusTokens). The write can take ~20s when an
+  // honorarium is involved, so the row says so instead of looking idle. Only
+  // the attempt that set an entry may clear it.
+  const [savingTerminalTokens, setSavingTerminalTokens] = useState(() => new Map());
   // Stage 6B1: feedback-ownership registry for the token/removal/terminal
   // actions below. One entry per `${kind}:${suggestionId}` key holding the
   // latest attempt for that action+row; a newer call for the same key simply
@@ -862,7 +864,7 @@ export default function ReviewerManagePanel({
     const attempt = beginAttempt('terminal', reviewer.suggestionId);
     if (!attempt) return;
     const isCurrent = () => isAttemptCurrent(attempt);
-    setSavingTerminalIds(previous => new Set(previous).add(reviewer.suggestionId));
+    setSavingTerminalTokens(previous => new Map(previous).set(reviewer.suggestionId, attempt.token));
     // Captured at dispatch time, not read live from `proposal` later — a
     // request switch after this point must not relabel this payload.
     const requestId = attempt.requestId;
@@ -902,9 +904,9 @@ export default function ReviewerManagePanel({
         }
       }
     } finally {
-      setSavingTerminalIds(previous => {
-        if (!previous.has(reviewer.suggestionId)) return previous;
-        const next = new Set(previous);
+      setSavingTerminalTokens(previous => {
+        if (previous.get(reviewer.suggestionId) !== attempt.token) return previous;
+        const next = new Map(previous);
         next.delete(reviewer.suggestionId);
         return next;
       });
@@ -1351,7 +1353,7 @@ export default function ReviewerManagePanel({
                         <td className="px-2 py-3 align-top text-center">
                           {/* Secondary magic-link and lifecycle actions. */}
                           <div className="flex w-full items-center justify-center gap-1">
-                            {savingTerminalIds.has(r.suggestionId) && (
+                            {savingTerminalTokens.has(r.suggestionId) && (
                               <span role="status" className="text-xs text-gray-500">Saving…</span>
                             )}
                             <TokenActionsMenu

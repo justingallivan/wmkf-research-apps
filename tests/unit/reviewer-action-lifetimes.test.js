@@ -556,6 +556,31 @@ describe.each([false, true])('Stage 6B1 action lifetimes (StrictMode: %s)', (str
   });
 
   describe('terminal transition specifics', () => {
+    test('Saving shows while a terminal write is in flight and only its own attempt clears it', async () => {
+      const first = deferred();
+      const second = deferred();
+      terminalFetch.mockReturnValueOnce(first.promise).mockReturnValueOnce(second.promise);
+      renderPanel({ onRefresh: jest.fn() });
+      expect(screen.queryByText('Saving…')).toBeNull();
+      withdraw();
+      expect(screen.getByText('Saving…')).toBeInTheDocument();
+      withdraw();
+      // The superseded first attempt settling must not clear the newer attempt's indicator.
+      await act(async () => first.resolve(response({ transitioned: 1 })));
+      expect(screen.getByText('Saving…')).toBeInTheDocument();
+      await act(async () => second.resolve(response({ transitioned: 1 })));
+      expect(screen.queryByText('Saving…')).toBeNull();
+    });
+
+    test('Saving clears after a failed terminal write', async () => {
+      terminalFetch.mockResolvedValue(response({ transitioned: 0, results: [{ status: 'honorarium_paid' }] }, 409));
+      renderPanel({ onRefresh: jest.fn() });
+      withdraw();
+      await act(async () => {});
+      expect(window.alert.mock.calls.some(([m]) => /honorarium_paid/.test(m))).toBe(true);
+      expect(screen.queryByText('Saving…')).toBeNull();
+    });
+
     test('opening the release preview does not supersede a pending withdrawal or dispatch the release mutation', async () => {
       const withdrawJob = deferred();
       terminalFetch.mockImplementation((_url, options) => {

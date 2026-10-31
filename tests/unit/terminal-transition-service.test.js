@@ -361,8 +361,22 @@ test('an already Withdrawn honorarium is kept untouched and reported', async () 
 
   const result = await transitionReviewersTerminal(args({ terminalStatus: 'did_not_submit' }));
 
-  expect(applyStaffReviewerDidNotSubmit).toHaveBeenCalledWith(SUGGESTION, expect.objectContaining({ cancelHonorarium: null }));
+  // Still ETag-bound, so a concurrent reopen/authorization by Finance fails the changeset.
+  expect(applyStaffReviewerDidNotSubmit).toHaveBeenCalledWith(SUGGESTION, expect.objectContaining({
+    cancelHonorarium: { id: honorariumId, ifMatch: 'W/"3"', alreadyWithdrawn: true },
+  }));
   expect(result.results[0]).toMatchObject({ honorariumWithdrawn: false, honorariumAlreadyWithdrawn: true });
+});
+
+test('an unversioned already-Withdrawn honorarium blocks the transition', async () => {
+  const honorariumId = '44444444-4444-4444-8444-444444444444';
+  findById.mockResolvedValue(row({ _wmkf_honorariumrequest_value: honorariumId }));
+  getHonorariumCancellationState.mockResolvedValue({ akoya_requestid: honorariumId, akoya_requeststatus: 'Withdrawn' });
+
+  const result = await transitionReviewersTerminal(args());
+
+  expect(result.results).toEqual([{ suggestionId: SUGGESTION, status: 'honorarium_missing_etag' }]);
+  expect(applyStaffReviewerWithdrawal).not.toHaveBeenCalled();
 });
 
 test('a post-commit job-cancellation failure is reported without disguising the successful withdrawal', async () => {
@@ -724,8 +738,9 @@ test('release preserves an already-withdrawn linked honorarium', async () => {
 
   const result = await transitionReviewersTerminal(acceptedReleaseArgs({ sendEmail: false }));
 
+  // Kept as-is (date preserved) but still ETag-bound into the release changeset.
   expect(applyStaffReviewerRelease).toHaveBeenCalledWith(SUGGESTION, expect.objectContaining({
-    cancelHonorarium: null,
+    cancelHonorarium: { id: honorariumId, ifMatch: 'W/"12"', alreadyWithdrawn: true },
   }));
   expect(result.results[0]).toMatchObject({
     status: 'released_no_email_by_choice',
