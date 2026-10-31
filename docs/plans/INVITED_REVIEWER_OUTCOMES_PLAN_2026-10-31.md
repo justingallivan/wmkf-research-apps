@@ -1,6 +1,6 @@
 ---
 title: Invited reviewer outcomes plan
-status: draft — second review done; E reopened, D scope question open
+status: decisions A–E final; third review pending
 created: 2026-10-31
 owner: Justin (decisions); Claude (Session 655)
 ---
@@ -181,12 +181,18 @@ finding spot-checked against source:
   second review finding 1). Revised recommendation: the branch leaves review
   status alone and writes "Ended by = Reviewer after accepting"; a re-accept
   clears it. Re-acceptance keeps working, and reports still count it as a
-  reviewer withdrawal. Needs owner confirmation.
+  reviewer withdrawal.
+  **Owner decision 2026-10-31: confirmed, including the "Ended by" column
+  (Reviewer before accepting / Reviewer after accepting / Foundation).**
 - **D scope (second review finding 4).** Refusing Restore for outcome rows
   also changes the `restore_required` producer, the re-add remedy text and the
   Removed list's "Reset & restore". Open question: does staff ever re-invite a
   reviewer who declined, on the same proposal? If not, re-invitation becomes
   unavailable with a clear message. If so, it needs a history-preserving path.
+  **Owner decision 2026-10-31: staff never or almost never re-invite on the
+  same proposal. Re-invitation becomes unavailable for rows with a recorded
+  outcome: the `restore_required` producer and re-add remedy return a clear
+  message, and "Reset & restore" is removed for those rows.**
 
 ## Not in scope
 
