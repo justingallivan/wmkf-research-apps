@@ -301,9 +301,35 @@ built yet; [PLANNED]).**
   `failed` are never resumed: staff alert and "Send materials again", which
   re-mints and sends under the same row after re-checking accepted and not yet
   released on the server. The job completes; the release alert stays open.
-- **Combined email** uses the acceptance template keys and must carry the
-  reviewer's new link. A per-PD acceptance override without the link token
-  falls back to the shared template; it is never sent without the link.
+- **Combined email** uses new template keys
+  `email.reviewer_materials_acceptance.{subject,body}` (seeded create-only, so
+  no rebaseline of the old acceptance keys and no old per-PD acceptance
+  overrides apply). The link goes in `{{reviewUrl}}`; a body without it gets a
+  standard link paragraph appended, so it is never sent without the link.
+  Rendered with the send-time placeholder link; the minted link replaces it
+  after the claim. Attachments: the due-date calendar file plus the cycle's
+  review template and additional attachments.
+- **Fallback (materials held, today's acceptance email instead, lead-PD
+  alert):** proposal PDF missing or unlistable, new template keys missing,
+  address confidence `blocked`, no Grant Cycle link or no cycle
+  configuration. All are decided before the claim, so nothing is minted.
+- **Step state table** (`job.steps.release_materials`):
+
+  | Release row before the step | Step does |
+  |---|---|
+  | none | reversible checks → fallback, retry, or claim and send |
+  | ours (`acceptance`, this job), `recorded` | nothing; done |
+  | ours, `sent` | `recordDeliveredEmail` then `recorded`; never resend |
+  | ours, `claimed` / `link_minted` (live or expired lease), `uncertain`, `failed` | alert, step `stopped`; staff "Send materials again" |
+  | `manual` (any state) | step `skipped: manual_release_owns`; no acceptance email |
+  | `acceptance` from another job | treated like `manual`: never send twice |
+
+  After the claim: mint fails → `failed` (definite: nothing sent; the old
+  link may already be dead, so staff resend); send throws → `uncertain` or
+  `failed` by the existing dispatch classifier; confirmed send but
+  `markMaterialsSent` returns null (staff reclaimed the row) → alert as
+  uncertain, no bookkeeping. `MATERIALS_RELEASE_LEASE_MS` (10 min) exceeds the
+  job lock (300 s default).
 - **Manual release** takes the same claim just before its mint
   (`send-emails-service.js`, materials path); an existing row refuses with a new
   skip reason, "materials are already being sent".
