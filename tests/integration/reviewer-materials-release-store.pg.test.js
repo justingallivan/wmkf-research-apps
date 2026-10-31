@@ -58,6 +58,17 @@ suite('materials release claim (real Postgres, migration 091)', () => {
     expect((await releases.reclaimMaterialsRelease({ suggestionId: SUGGESTION, actorProfileId: staffId })).attempts).toBe(3);
   });
 
+  test('stuck releases: stopped, abandoned past the lease, or sent but unrecorded for 30 minutes', async () => {
+    const other = '33333333-3333-4333-8333-333333333333', live = '44444444-4444-4444-8444-444444444444', sent = '55555555-5555-4555-8555-555555555555';
+    const { release } = await auto();
+    await releases.markMaterialsReleaseStopped(SUGGESTION, release.lease_token, 'failed', 'send_failed');
+    await releases.claimMaterialsRelease({ suggestionId: other, requestId: REQUEST, source: 'manual', actorProfileId: staffId, leaseMs: -1000 });
+    await releases.claimMaterialsRelease({ suggestionId: live, requestId: REQUEST, source: 'manual', actorProfileId: staffId });
+    await pool.query("INSERT INTO reviewer_materials_releases (suggestion_id,request_id,source,actor_profile_id,state,sent_at) VALUES ($1,$2,'manual',$3,'sent',NOW() - INTERVAL '31 minutes')", [sent, REQUEST, staffId]);
+    const stuck = (await releases.listStuckMaterialsReleases()).map(r => r.suggestion_id).sort();
+    expect(stuck).toEqual([SUGGESTION, other, sent].sort());
+  });
+
   test('a live claim is not reclaimable, and the table refuses inconsistent rows', async () => {
     await manual();
     expect(await releases.reclaimMaterialsRelease({ suggestionId: SUGGESTION, actorProfileId: staffId })).toBeNull();

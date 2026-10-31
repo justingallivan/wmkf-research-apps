@@ -13,7 +13,7 @@ jest.mock('../../lib/utils/reviewer-invite', () => {
   const actual = jest.requireActual('../../lib/utils/reviewer-invite');
   return { ...actual, emailConfidence: jest.fn(person => actual.emailConfidence(person)) };
 });
-import { processReviewerAcceptanceJob } from '../../lib/services/reviewer-acceptance-drain';
+import { processReviewerAcceptanceJob, drainReviewerAcceptanceJobs } from '../../lib/services/reviewer-acceptance-drain';
 import { emailConfidence } from '../../lib/utils/reviewer-invite';
 import { REVIEW_STATUS_MAP } from '../../shared/config/reviewerLifecycle';
 
@@ -161,11 +161,18 @@ test('a release owned by manual release or another job is never sent again', asy
   }
 });
 
-test('a lost claim race is skipped without minting', async () => {
+test('a claim lost to manual release is skipped without minting', async () => {
   const { d, materials } = deps();
   materials.claim.mockResolvedValue({ claimed: false, release: { source: 'manual', state: 'claimed' } });
   await processReviewerAcceptanceJob(job(), d);
   expect(finalOutcome(d)).toBe('skipped'); expect(materials.mint).not.toHaveBeenCalled();
+});
+
+test('a claim lost to an earlier worker of this job is deferred while it may still be sending, never closed', async () => {
+  const { d, materials } = deps();
+  materials.claim.mockResolvedValue({ claimed: false, release: { source: 'acceptance', job_id: '77', state: 'claimed', lease_until: new Date(Date.now() + 60000).toISOString() } });
+  await expect(processReviewerAcceptanceJob(job(), d)).rejects.toThrow('release_in_progress');
+  expect(stepPatches(d).some(p => p.completedAt)).toBe(false); expect(materials.mint).not.toHaveBeenCalled();
 });
 
 test('retry after a confirmed send only finishes the bookkeeping', async () => {
@@ -266,4 +273,21 @@ test.each([
   d.suggestions.getForAcceptanceDrain.mockResolvedValueOnce(base).mockResolvedValueOnce(base).mockResolvedValueOnce(base).mockResolvedValueOnce({ ...base, ...change });
   await expect(processReviewerAcceptanceJob(job(), d)).rejects.toThrow('suggestion_changed');
   expect(materials.claim).not.toHaveBeenCalled(); expect(materials.mint).not.toHaveBeenCalled();
+});
+
+test('every drain run re-raises alerts for stuck releases, independent of any job budget', async () => {
+  const notify = jest.fn(async () => ({ id: 1 }));
+  const listStuckMaterialsReleases = jest.fn(async () => [
+    { suggestion_id: SUGGESTION_ID, job_id: 77, state: 'uncertain', error_code: 'send_unconfirmed' },
+    { suggestion_id: '66666666-6666-4666-8666-666666666666', job_id: 78, state: 'sent', error_code: null },
+  ]);
+  const jobs = { claimReviewerAcceptanceJobs: jest.fn(async () => []) };
+  const result = await drainReviewerAcceptanceJobs({ deps: { jobs, notify, listStuckMaterialsReleases, switchesReady: () => true } });
+  expect(result.materialsAlerts).toBe(2);
+  expect(notify.mock.calls.map(([o]) => [o.type, o.autoResolveKey])).toEqual([
+    ['reviewer_materials_release_stopped', `reviewer-materials-release:${SUGGESTION_ID}`],
+    ['reviewer_materials_release_unrecorded', 'reviewer-materials-release:66666666-6666-4666-8666-666666666666'],
+  ]);
+  notify.mockRejectedValue(new Error('down'));
+  expect((await drainReviewerAcceptanceJobs({ deps: { jobs, notify, listStuckMaterialsReleases, switchesReady: () => true } })).materialsAlerts).toBe(0);
 });

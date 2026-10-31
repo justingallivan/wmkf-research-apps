@@ -38,6 +38,11 @@ build notes.
     release, or one abandoned at `claimed` / `link_minted` past its lease,
     goes back to `claimed` under a new lease and `attempts + 1`. Never touches
     `sent` or `recorded`.
+- `listStuckMaterialsReleases` — rows needing staff: `uncertain` / `failed`,
+  `claimed` / `link_minted` past the lease, or `sent` unrecorded for 30
+  minutes. Every acceptance-drain run (every 2 minutes) re-raises one
+  deduplicated alert per row (`reviewer-materials-release:<suggestion>`), so the
+  row, not a job's retry budget, carries the staff obligation.
 - Readers and writers: the acceptance job's `release_materials` step
   (`lib/services/reviewer-acceptance-drain.js`, on branch). [PLANNED] the
   manual materials send and the staff recovery action; not wired yet.
