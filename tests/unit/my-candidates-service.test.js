@@ -1037,6 +1037,10 @@ describe('Stage 1D generic invitation/response corrections', () => {
     wmkf_reviewstatus: null,
     wmkf_completedat: null,
     wmkf_applicantdisposition: null,
+    wmkf_invited: false,
+    wmkf_emailsentat: null,
+    wmkf_declined: false,
+    wmkf_responsetype: null,
     _etag: 'W/"correction-1"',
     ...overrides,
   });
@@ -1143,6 +1147,33 @@ describe('Stage 1D generic invitation/response corrections', () => {
     expect(ensureToken).toHaveBeenCalledTimes(1);
     expect(suggestionAdapter.updateLifecycle.mock.invocationCallOrder[0]).toBeLessThan(ensureToken.mock.invocationCallOrder[0]);
   });
+  test.each([
+    ['clearing the invited flag', { invited: false }],
+    ['clearing the sent time', { emailSentAt: null }],
+  ])('refuses %s on a contacted reviewer (outcomes plan)', async (_name, lifecycle) => {
+    suggestionAdapter.findById.mockResolvedValue(source({ wmkf_invited: true, wmkf_emailsentat: '2026-07-01T00:00:00Z' }));
+    await expect(correct(lifecycle)).rejects.toMatchObject({ httpStatus: 409, body: { code: 'correction_erases_history' } });
+    expect(suggestionAdapter.updateLifecycle).not.toHaveBeenCalled();
+  });
+
+  test.each([
+    ['No Response to accepted', { wmkf_responsetype: 100000002 }, { accepted: true, responseType: 'accepted' }],
+    ['no longer needed to accepted', { wmkf_responsetype: 100000003 }, { accepted: true, responseType: 'accepted' }],
+    ['a decline cleared to blank', { wmkf_declined: true, wmkf_responsetype: 100000001 }, { declined: false, responseType: null }],
+  ])('refuses changing an ending answer: %s', async (_name, row, lifecycle) => {
+    suggestionAdapter.findById.mockResolvedValue(source({ wmkf_invited: true, wmkf_emailsentat: '2026-07-01T00:00:00Z', ...row }));
+    await expect(correct(lifecycle)).rejects.toMatchObject({ httpStatus: 409, body: { code: 'correction_erases_history' } });
+    expect(suggestionAdapter.updateLifecycle).not.toHaveBeenCalled();
+  });
+
+  test('allows a decline corrected to accepted', async () => {
+    suggestionAdapter.findById.mockResolvedValue(source({
+      wmkf_invited: true, wmkf_emailsentat: '2026-07-01T00:00:00Z', wmkf_declined: true, wmkf_responsetype: 100000001,
+    }));
+    await correct({ accepted: true, declined: false, responseType: 'accepted' });
+    expect(suggestionAdapter.updateLifecycle).toHaveBeenCalledTimes(1);
+  });
+
   test('case-insensitive request binding and strong ETags stay supported', async () => {
     suggestionAdapter.findById.mockResolvedValue(source({ _wmkf_request_value: 'ABCDEFAB-1111-1111-1111-111111111111', _etag: '"strong-1"' }));
     await correct({ invited: false, emailSentAt: null, responseReceivedAt: null }, { authorizedRequestId: 'abcdefab-1111-1111-1111-111111111111' });

@@ -852,8 +852,11 @@ describe('F3 generic staff correction regressions', () => {
     ['responseType', 'wmkf_responsetype', ['declined', null, 'accepted']],
     ['responseReceivedAt', 'wmkf_responsereceivedat', ['now', null, RECEIVED]],
   ];
+  // invited stays true: clearing a contacted reviewer's invited flag is now
+  // refused (correction_erases_history, outcomes plan); these tests pin the
+  // six-field mapping and race handling, not that refusal (unit-tested).
   const MIXED_CORRECTION = {
-    invited: false, accepted: true, declined: false,
+    invited: true, accepted: true, declined: false,
     emailSentAt: CORRECTION_EMAIL_AT, responseType: 'accepted', responseReceivedAt: 'now',
     name: 'Correction must not leak into the person',
   };
@@ -949,7 +952,7 @@ describe('F3 generic staff correction regressions', () => {
       ensureToken.mockImplementationOnce(async () => { stateAtToken = history(); });
       const result = await correct({ ...MIXED_CORRECTION, emailSentAt: 'now' });
       expect(result).toMatchObject({ success: true, message: 'Candidate updated', updated: {
-        suggestionId: ID, invited: false, accepted: true, declined: false, responseType: 'accepted',
+        suggestionId: ID, invited: true, accepted: true, declined: false, responseType: 'accepted',
         name: MIXED_CORRECTION.name,
       } });
       expect(result.updated.emailSentAt).toEqual(expect.any(String));
@@ -957,7 +960,7 @@ describe('F3 generic staff correction regressions', () => {
       expect(result.updated.responseReceivedAt).not.toBe('now');
       const lifecycleWrite = writes()[0];
       expect(lifecycleWrite.body).toEqual({
-        wmkf_invited: false, wmkf_accepted: true, wmkf_declined: false,
+        wmkf_invited: true, wmkf_accepted: true, wmkf_declined: false,
         wmkf_emailsentat: result.updated.emailSentAt,
         wmkf_responsetype: RESPONSE_TYPE_MAP.accepted,
         wmkf_responsereceivedat: result.updated.responseReceivedAt,
