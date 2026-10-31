@@ -71,14 +71,31 @@ the response. `softDelete`'s only caller is `deleteMyCandidates`
   option, which is clearest for reports, or (b) Withdrew plus a new
   `wmkf_declinereasonpicklist` option. Both add one Dataverse choice value in
   Production (a schema change needing approval). Recommendation: (a).
+  **Owner decision 2026-10-31: (a), a new `wmkf_reviewstatus` option.** The
+  Production schema change itself still needs its own approval when built.
 - **B. Staff-recorded COI/Other before acceptance.** Store it as a decline
   (`wmkf_responsetype` = Declined, picklist = conflict-of-interest/other, note
   in `wmkf_declinereason`) marked as staff-recorded, or as a new response
   type? Recommendation: decline plus marker. Needs a check of whether a
   staff/reviewer marker already exists.
+  **Owner decision 2026-10-31: decline plus staff-recorded marker.**
 - **C. Existing removed rows.** The 29 D26 rows lost their answers. Check
   whether Dataverse auditing kept the prior values before deciding on any
   repair. No backfill without a separate owner decision.
+  **Checked 2026-10-31** [VERIFIED via owner-requested read-only Production
+  probe `scripts/probe-d26-removed-audit-history.cjs`]: auditing is on for the
+  organization and the table, and all 29 rows' change histories were readable
+  (0 errors). Removals ran 2026-07-06 to 2026-09-02.
+  - 20 rows had no answer to erase (invited, never answered, then removed).
+  - 9 rows lost an answer, and the audit history holds it:
+    - 7 "no longer needed" (`withdrawn_sufficient`); one of these was removed
+      more than once and lost its answer at an earlier removal;
+    - 2 accepted;
+    - 1 accepted with materials sent (review status `materials_sent`).
+  Repair is possible from the audit values. The 7 can be put back exactly. For
+  the 3 accepted reviewers, the history says they accepted, not why they were
+  removed, so their outcome needs the PD's word. Proposed: repair after the
+  outcome build, using its outcomes. Not authorized yet.
 
 ## Not in scope
 
