@@ -181,6 +181,7 @@ test('a failed bookkeeping write retries and the next attempt does not resend', 
   materials.recordDelivered.mockRejectedValueOnce(new Error('412'));
   await expect(processReviewerAcceptanceJob(job(), d)).rejects.toThrow('materials_bookkeeping_unavailable');
   expect(store.release.state).toBe('sent');
+  expect(notified(d, 'reviewer_materials_release_unrecorded')).toBe(true);
   await processReviewerAcceptanceJob(job(), d);
   expect(materialsSent(materials)).toBe(1); expect(store.release.state).toBe('recorded');
 });
@@ -222,4 +223,17 @@ test('a repeat acceptance runs no materials step', async () => {
   const { d, materials } = deps();
   await processReviewerAcceptanceJob(job({ isAcceptRepeat: true }), d);
   expect(materials.get).not.toHaveBeenCalled(); expect(materialsSent(materials)).toBe(0);
+});
+
+test('the address check re-reads the reviewer; a failed read retries with nothing claimed', async () => {
+  const { d, materials } = deps();
+  d.potentialReviewers.getById.mockResolvedValueOnce(reviewerRow()).mockRejectedValueOnce(new Error('dv'));
+  await expect(processReviewerAcceptanceJob(job(), d)).rejects.toThrow('reviewer_unavailable');
+  expect(materials.claim).not.toHaveBeenCalled(); expect(materialsSent(materials)).toBe(0);
+});
+
+test('bookkeeping after a send binds to the job\u2019s suggestion snapshot', async () => {
+  const { d, materials } = deps({ release: { suggestion_id: SUGGESTION_ID, source: 'acceptance', job_id: '77', state: 'sent', sent_at: '2027-02-25T01:00:00.000Z' } });
+  await processReviewerAcceptanceJob(job(), d);
+  expect(materials.recordDelivered.mock.calls[0][0].originalSuggestion).toMatchObject({ _wmkf_request_value: REQUEST_ID, _wmkf_potentialreviewer_value: REVIEWER_ID });
 });

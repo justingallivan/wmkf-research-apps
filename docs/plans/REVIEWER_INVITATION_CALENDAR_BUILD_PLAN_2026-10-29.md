@@ -274,8 +274,18 @@ Admin `inviteStartDate` has no reader outside its form, validation and tests
   present (blocking, not today's `window.confirm`), so materials are ready when
   invitations go out.
 
-**Build notes (2026-10-30, branch `claude/reviewer-materials-on-accept`, not
-built yet; [PLANNED]).**
+**Build notes (2026-10-30, branch `claude/reviewer-materials-on-accept`, PR
+#562, not merged).** Built on the branch: migration 091 and its store, and the
+acceptance job's `release_materials` step with the new template keys. Still
+[PLANNED]: manual-path claim, staff recovery action, invitation PDF
+precondition and accepted-screen copy, invitation wording and
+`{{proposalDelivery}}` / Reviewer Finder date-field retirement. Accept does
+not set a review status [VERIFIED via rg: no `reviewStatus` write in
+`respond-service.js` or `reviewer-engagement/record-invitation.js`; writers are
+`record-email-outcome.js` and `close-review.js`], so a new acceptance is
+eligible (blank status). The address check re-reads the reviewer and retries
+on a failed read; it never trusts the job's snapshot. A lasting bookkeeping
+failure after a confirmed send alerts staff ("sent but not yet recorded").
 
 - **Release table, migration 091** (no open branch claims 091, checked
   2026-10-30 against every remote branch; Production `schema_migrations` is an
@@ -309,8 +319,10 @@ built yet; [PLANNED]).**
   Rendered with the send-time placeholder link; the minted link replaces it
   after the claim. Attachments: the due-date calendar file plus the cycle's
   review template and additional attachments.
-- **Fallback (materials held, today's acceptance email instead, lead-PD
-  alert):** proposal PDF missing or unlistable, new template keys missing,
+- **Fallback (materials held, today's acceptance email instead, staff
+  alert):** no proposal PDF (an unlistable folder retries instead), new
+  template keys not seeded, a revoked link or a status other than blank /
+  accepted,
   address confidence `blocked`, no Grant Cycle link or no cycle
   configuration. All are decided before the claim, so nothing is minted.
 - **Step state table** (`job.steps.release_materials`):
