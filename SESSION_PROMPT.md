@@ -119,7 +119,7 @@ Start: all 41 `check:*` gates and self-tests green on `main`.
 |---|---|
 | Claude / reviewer build (J27) | #561 ready (owner go-ahead); #562 draft, build complete, owner wording + release steps; follow-up wording PR not started |
 | Codex / Board release (#563/#564) | Live and verified; no open task (`git show b091cf5cd:SESSION_PROMPT.md`) |
-| Codex / shared prompt library | PR #553, head `94a795bb4`, owner-gated |
+| Codex / shared prompt library | **PARKED until Monday Nov 2 with Connor**; local branch `codex/shared-prompt-library-plan`, head `9d838c4c8` (remote older). Windows09 offline checks only; resume: [parked handoff](docs/plans/PR553_MONDAY_RESUME_2026-11-02.md). No live registration/enablement or feature promotion authorized. |
 | Codex / ranking, prior archival | Prior handoffs; not revalidated |
 | Claude / research request corpus | Owner-gated; no new authorization |
 
