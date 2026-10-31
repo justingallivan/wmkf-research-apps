@@ -1,6 +1,6 @@
 ---
 title: Invited reviewer outcomes plan
-status: draft — owner review
+status: draft — decisions A–E taken; second review pending
 created: 2026-10-31
 owner: Justin (decisions); Claude (Session 655)
 ---
@@ -147,10 +147,12 @@ needs-attention). Accepted findings, each spot-checked against source:
   again then needs an explicit path. (b) Allow them, but first copy the prior
   outcome somewhere durable. Recommendation: (a), the simpler of the two;
   re-inviting someone who already answered is rare.
+  **Owner decision 2026-10-31: (a), refuse; re-invitation gets its own explicit path.**
 - **E. Portal accept-then-decline.** Record that the reviewer had accepted
   (Withdrew status) so it counts as a reviewer withdrawal, keeping their
   ability to change their mind before materials. Recommendation: write
   Withdrew on that branch.
+  **Owner decision 2026-10-31: write Withdrew on that branch.**
 
 ## Not in scope
 
