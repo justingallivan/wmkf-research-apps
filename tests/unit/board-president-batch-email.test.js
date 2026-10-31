@@ -15,7 +15,7 @@ const actor = { profileId: 'cso-profile', systemUserId: CSO };
 function draft(d) {
   const input = d.create.mock.calls.at(-1)?.[0] || {};
   return { activityid: 'email-id', statuscode: 1, subject: input.subject, description: input.body,
-    email_activity_parties: [{ participationtypemask: 1, addressused: input.from, _partyid_value: CSO }, ...(input.to || []).map(addressused => ({ participationtypemask: 2, addressused }))] };
+    email_activity_parties: [{ participationtypemask: 1, addressused: input.from, _partyid_value: CSO }, ...(input.to || []).map(addressused => ({ participationtypemask: 2, addressused })), ...(input.cc || []).map(addressused => ({ participationtypemask: 3, addressused }))] };
 }
 const selection = id => ({ requestId: id, documentId: id, eTag: 'one', versionId: '1', draftConfirmed: true });
 function fixture() {
@@ -59,7 +59,7 @@ test('atomic batch waits for all copies, then sends once from CSO with proposal 
   await Promise.all([deliverNotice('D26', intent, f.d), deliverNotice('D26', intent, f.d)]);
   await deliverNotice('D26', intent, f.d);
   expect(f.d.create).toHaveBeenCalledTimes(1); expect(f.d.send).toHaveBeenCalledTimes(1);
-  expect(f.d.create).toHaveBeenCalledWith(expect.objectContaining({ from: 'cso@wmkeck.org', to: ['president@wmkeck.org'], cc: [], actingUserSystemId: CSO, noFallback: true }));
+  expect(f.d.create).toHaveBeenCalledWith(expect.objectContaining({ from: 'cso@wmkeck.org', to: ['president@wmkeck.org'], cc: ['cso@wmkeck.org'], actingUserSystemId: CSO, noFallback: true }));
   expect(f.d.send).toHaveBeenCalledWith('email-id', { actingUserSystemId: CSO, noFallback: true });
   const { body } = f.d.create.mock.calls[0][0];
   expect(body).toContain('1001'); expect(body).toContain('1002'); expect(body).toContain('Institute &lt;&amp;&gt;'); expect(body).toContain(f.folder.webUrl);
@@ -158,13 +158,15 @@ test('normal worker dispatches completed batches outside the daily reminder hour
 });
 
 
-test.each(['to', 'from', 'sender-identity', 'bcc', 'subject', 'body'])('modified Dynamics draft %s cannot dispatch', async change => {
+test.each(['to', 'cc', 'missing-cc', 'from', 'sender-identity', 'bcc', 'subject', 'body'])('modified Dynamics draft %s cannot dispatch', async change => {
   const f = fixture(), intent = await release(f);
   f.d.get.mockImplementation(async () => {
     const activity = draft(f.d);
     if (change === 'subject') activity.subject = 'Unapproved subject';
     if (change === 'body') activity.description = 'Unapproved content';
     if (change === 'to') activity.email_activity_parties[1].addressused = 'other@wmkeck.org';
+    if (change === 'cc') activity.email_activity_parties.find(party => party.participationtypemask === 3).addressused = 'other@wmkeck.org';
+    if (change === 'missing-cc') activity.email_activity_parties = activity.email_activity_parties.filter(party => party.participationtypemask !== 3);
     if (change === 'from') activity.email_activity_parties[0].addressused = 'other@wmkeck.org';
     if (change === 'sender-identity') activity.email_activity_parties[0]._partyid_value = PRESIDENT;
     if (change === 'bcc') activity.email_activity_parties.push({ participationtypemask: 4, addressused: 'other@wmkeck.org' });
@@ -199,4 +201,21 @@ test('President without Workbench receives the batch email with live eligibility
   expect(f.d.send).toHaveBeenCalledTimes(1);
   expect(f.d.eligibleStaff.mock.calls.filter(([id]) => id === PRESIDENT)).toEqual([[PRESIDENT, { app: false }], [PRESIDENT, { app: false }]]);
   expect(grants.mock.calls.every(([id]) => id === actor.profileId)).toBe(true);
+});
+
+
+test.each([1, 3])('legacy no-cc activity at provider status %s is preserved without recreation or resend', async statuscode => {
+  const f = fixture(), intent = await release(f);
+  await deliverNotice('D26', intent, f.d);
+  const row = f.state.emails[intent.key];
+  row.cc = []; row.acceptedAt = null; row.sendStartedAt = null;
+  const activity = { ...draft(f.d), statuscode };
+  activity.email_activity_parties = activity.email_activity_parties.filter(party => party.participationtypemask !== 3);
+  f.d.get.mockResolvedValue(activity); f.d.create.mockClear(); f.d.send.mockClear();
+  await deliverNotice('D26', intent, f.d);
+  expect(row.cc).toEqual([]);
+  expect(f.state.emails[intent.key].cc).toEqual([]);
+  expect(f.d.create).not.toHaveBeenCalled(); expect(f.d.send).not.toHaveBeenCalled();
+  if (statuscode === 1) expect(f.state.emails[intent.key].error).toBe('board_email_parties_or_content_changed');
+  else expect(f.state.emails[intent.key].acceptedAt).toBe(f.d.now());
 });
