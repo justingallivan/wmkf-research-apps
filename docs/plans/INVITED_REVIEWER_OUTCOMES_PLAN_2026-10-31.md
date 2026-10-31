@@ -326,7 +326,14 @@ later materials_sent status.
 (preflight `EXACT` / `READABLE` after about two minutes of metadata lag; the
 first re-check right after the create still said `ABSENT`). Did not submit
 inserted as 100000007 (`NewOptionValue` 100000007), published, verified.
-Step 4 done (owner browser check: a D26 request's Review Manager reviewer list loads normally). Step 5 pending. The sandbox has neither change.
+Step 4 done (owner browser check: a D26 request's Review Manager reviewer list loads normally). Step 5 done: request 1003125 (marked test request), row `b50501d3-9675-f111-ab0f-000d3a3065b8` (accepted, no status) took Ended by = Foundation and Did not submit, read back from the write response, and was restored and verified (`null`/`null`); no recovery record left. The sandbox has neither change.
+
+**Step 5 finding, a slice 3 requirement:** with Did not submit set, Track
+Reviewers showed the row as plain "Accepted" (the unknown status falls back to
+the accepted flag), Ended by appeared nowhere, and "Release proposal to
+reviewers (3)" still counted the row. Slice 3/4 must show the status, and take
+Did not submit rows out of the release count and eligibility, reminders and
+the accepted-count totals.
 
 Both schema changes are additive and no runtime code reads or writes them
 until slice 3. Each step below is owner-run or explicitly owner-approved;
