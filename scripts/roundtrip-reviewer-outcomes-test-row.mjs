@@ -19,14 +19,14 @@
  *
  * Before writing, it creates a recovery record (target, row, original values)
  * under outputs/ (exclusive create, so one run per row). A 5xx or gateway
- * response to a write counts as an unknown outcome and keeps the record. If the run cannot finish the restore, it prints the record
- * path; `--recover` restores from it, only while the row is still on the same
- * marked test request and still holds exactly the test values; if the row is
- * still at its pre-write version, the write may yet land and the record is
- * kept. --pause waits
- * at most 10 minutes, and an --execute run refuses to start within 20 minutes
- * of UTC midnight, when the day's write ACK expires. --execute and --recover
- * hold a per-row lock (outputs/…json.lock) for their whole run.
+ * response to a write counts as an unknown outcome and keeps the record. If
+ * the run cannot finish the restore, it prints the record path; `--recover`
+ * restores from it only while the row is still on the same marked test
+ * request and holds exactly the test values. If the row is still at its
+ * pre-write version, the write may yet land, so the record is kept.
+ * --execute and --recover hold a per-row lock (outputs/…json.lock) for their
+ * whole run. --pause waits at most 10 minutes, and an --execute run refuses to
+ * start within 20 minutes of UTC midnight, when the day's write ACK expires.
  *
  * Usage:
  *   node scripts/roundtrip-reviewer-outcomes-test-row.mjs --target=sandbox --suggestion=<guid>
