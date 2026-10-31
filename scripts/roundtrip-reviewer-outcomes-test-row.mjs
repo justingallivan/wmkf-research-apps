@@ -23,7 +23,8 @@
  * path; `--recover` restores from it, only while the row is still on the same
  * marked test request and still holds exactly the test values. --pause waits
  * at most 10 minutes, and an --execute run refuses to start within 20 minutes
- * of UTC midnight, when the day's write ACK expires.
+ * of UTC midnight, when the day's write ACK expires. --execute and --recover
+ * hold a per-row lock (outputs/…json.lock) for their whole run.
  *
  * Usage:
  *   node scripts/roundtrip-reviewer-outcomes-test-row.mjs --target=sandbox --suggestion=<guid>
@@ -109,6 +110,43 @@ function describe(values) {
 
 export function recordPathFor(suggestionId) {
   return path.join('outputs', `roundtrip-reviewer-outcomes-${suggestionId}.json`);
+}
+
+function processAlive(pid) {
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch (error) {
+    return error.code === 'EPERM';
+  }
+}
+
+/**
+ * One writer per row at a time: --execute and --recover both hold this lock
+ * for their whole run, so recovery can never observe (and delete the record
+ * of) a write that is still in flight. A lock left by a process that is no
+ * longer running is taken over.
+ */
+export async function withRowLock(suggestionId, fn) {
+  const lockPath = `${recordPathFor(suggestionId)}.lock`;
+  fs.mkdirSync(path.dirname(lockPath), { recursive: true });
+  const acquire = () => fs.writeFileSync(lockPath, String(process.pid), { flag: 'wx' });
+  try {
+    acquire();
+  } catch (error) {
+    if (error.code !== 'EEXIST') throw error;
+    const holder = Number.parseInt(fs.readFileSync(lockPath, 'utf8'), 10);
+    if (Number.isInteger(holder) && processAlive(holder)) {
+      throw new Error(`Refusing: another run (pid ${holder}) is working on this row.`);
+    }
+    fs.unlinkSync(lockPath);
+    acquire();
+  }
+  try {
+    return await fn();
+  } finally {
+    fs.rmSync(lockPath, { force: true });
+  }
 }
 
 export function assertAwayFromUtcMidnight(now = new Date()) {
@@ -199,7 +237,11 @@ async function readRequest(client, requestId) {
   return response.body;
 }
 
-export async function recover({ client, resourceUrl, suggestionId }) {
+export function recover(options) {
+  return withRowLock(options.suggestionId, () => recoverLocked(options));
+}
+
+async function recoverLocked({ client, resourceUrl, suggestionId }) {
   const recordPath = recordPathFor(suggestionId);
   if (!fs.existsSync(recordPath)) throw new Error(`No recovery record at ${recordPath}.`);
   const record = JSON.parse(fs.readFileSync(recordPath, 'utf8'));
@@ -242,7 +284,13 @@ async function main() {
   });
 }
 
-export async function runRoundTrip({
+export function runRoundTrip(options) {
+  return options.execute
+    ? withRowLock(options.suggestionId, () => runRoundTripLocked(options))
+    : runRoundTripLocked(options);
+}
+
+async function runRoundTripLocked({
   client, makeRestoreClient, resourceUrl, suggestionId, execute, pause,
   pauseFn = pauseForCheck, now = new Date(),
 }) {

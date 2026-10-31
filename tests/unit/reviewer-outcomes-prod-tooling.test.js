@@ -275,9 +275,41 @@ describe('roundtrip orchestration against a fake Dataverse', () => {
       },
     });
     await run(client);
-    expect(secondError?.message).toMatch('another or unfinished run');
+    expect(secondError?.message).toMatch('another run');
     expect(db.patches).toEqual([TEST, { wmkf_endedby: null, wmkf_reviewstatus: 100000001 }]);
     expect(fs.existsSync(recordPathFor(ID))).toBe(false);
+  });
+
+  test('recovery started during an in-flight test write refuses and the record survives a commit-then-504', async () => {
+    let recoverError = null;
+    let first = true;
+    const { db, client } = fakeDataverse({
+      patchHook: async ({ db: state, body }) => {
+        if (!first) return null;
+        first = false;
+        // Operator runs --recover while the write is still pending; the row still shows the originals.
+        recoverError = await recover({ client, resourceUrl: RESOURCE, suggestionId: ID }).then(() => null, (e) => e);
+        Object.assign(state.row, body);
+        state.version += 1;
+        state.patches.push(body);
+        return { ok: false, status: 504, text: 'gateway timeout' };
+      },
+    });
+    await expect(run(client)).rejects.toThrow(/outcome unknown/);
+    expect(recoverError?.message).toMatch('another run');
+    expect(fs.existsSync(recordPathFor(ID))).toBe(true);
+    await recover({ client, resourceUrl: RESOURCE, suggestionId: ID });
+    expect(db.row).toMatchObject({ wmkf_endedby: null, wmkf_reviewstatus: 100000001 });
+    expect(fs.existsSync(`${recordPathFor(ID)}.lock`)).toBe(false);
+  });
+
+  test('a lock left by a process that is no longer running is taken over', async () => {
+    const { db, client } = fakeDataverse();
+    fs.mkdirSync('outputs', { recursive: true });
+    fs.writeFileSync(`${recordPathFor(ID)}.lock`, '99999999');
+    await run(client);
+    expect(db.patches).toHaveLength(2);
+    expect(fs.existsSync(`${recordPathFor(ID)}.lock`)).toBe(false);
   });
 
   test('a failing pause still restores', async () => {
@@ -298,7 +330,7 @@ describe('roundtrip orchestration against a fake Dataverse', () => {
   test('refuses to start near UTC midnight or over an unfinished run', async () => {
     const { db, client } = fakeDataverse();
     await expect(run(client, { now: new Date('2026-10-31T23:45:00Z') })).rejects.toThrow('UTC midnight');
-    fs.mkdirSync('outputs');
+    fs.mkdirSync('outputs', { recursive: true });
     fs.writeFileSync(recordPathFor(ID), '{}');
     await expect(run(client)).rejects.toThrow('another or unfinished run');
     expect(db.patches).toEqual([]);
@@ -306,7 +338,7 @@ describe('roundtrip orchestration against a fake Dataverse', () => {
 
   test('recovery refuses a row holding neither the test nor the original values', async () => {
     const { db, client } = fakeDataverse();
-    fs.mkdirSync('outputs');
+    fs.mkdirSync('outputs', { recursive: true });
     fs.writeFileSync(recordPathFor(ID), JSON.stringify({
       resourceUrl: RESOURCE, suggestionId: ID, requestId: REQ, original: { wmkf_endedby: null, wmkf_reviewstatus: 100000000 },
     }));
