@@ -15,7 +15,7 @@ const actor = { profileId: 'cso-profile', systemUserId: CSO };
 function draft(d) {
   const input = d.create.mock.calls.at(-1)?.[0] || {};
   return { activityid: 'email-id', statuscode: 1, subject: input.subject, description: input.body,
-    email_activity_parties: [{ participationtypemask: 1, addressused: input.from, _partyid_value: CSO }, ...(input.to || []).map(addressused => ({ participationtypemask: 2, addressused })), ...(input.cc || []).map(addressused => ({ participationtypemask: 3, addressused }))] };
+    email_activity_parties: [{ participationtypemask: 1, addressused: input.from, _partyid_value: CSO }, ...(input.to || []).map(addressused => ({ participationtypemask: 2, addressused })), ...(input.cc || []).map(addressused => ({ participationtypemask: 3, addressused })), { participationtypemask: 9, _partyid_value: CSO, addressused: null }] };
 }
 const selection = id => ({ requestId: id, documentId: id, eTag: 'one', versionId: '1', draftConfirmed: true });
 function fixture() {
@@ -168,7 +168,7 @@ test('normal worker dispatches completed hourly runs outside the daily reminder 
 });
 
 
-test.each(['to', 'cc', 'missing-cc', 'from', 'sender-identity', 'bcc', 'subject', 'body'])('modified Dynamics draft %s cannot dispatch', async change => {
+test.each(['to', 'cc', 'missing-cc', 'from', 'sender-identity', 'bcc', 'subject', 'body', 'owner-identity', 'owner-address', 'duplicate-owner', 'unknown-party'])('modified Dynamics draft %s cannot dispatch', async change => {
   const f = fixture(), intent = await release(f);
   f.d.get.mockImplementation(async () => {
     const activity = draft(f.d);
@@ -179,6 +179,10 @@ test.each(['to', 'cc', 'missing-cc', 'from', 'sender-identity', 'bcc', 'subject'
     if (change === 'missing-cc') activity.email_activity_parties = activity.email_activity_parties.filter(party => party.participationtypemask !== 3);
     if (change === 'from') activity.email_activity_parties[0].addressused = 'other@wmkeck.org';
     if (change === 'sender-identity') activity.email_activity_parties[0]._partyid_value = PRESIDENT;
+    if (change === 'owner-identity') activity.email_activity_parties.find(party => party.participationtypemask === 9)._partyid_value = PRESIDENT;
+    if (change === 'owner-address') activity.email_activity_parties.find(party => party.participationtypemask === 9).addressused = 'other@wmkeck.org';
+    if (change === 'duplicate-owner') activity.email_activity_parties.push({ participationtypemask: 9, _partyid_value: CSO });
+    if (change === 'unknown-party') activity.email_activity_parties.push({ participationtypemask: 12, addressused: 'other@wmkeck.org' });
     if (change === 'bcc') activity.email_activity_parties.push({ participationtypemask: 4, addressused: 'other@wmkeck.org' });
     return activity;
   });
