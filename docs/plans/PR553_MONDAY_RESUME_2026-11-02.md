@@ -57,6 +57,11 @@ git show 9d838c4c8:docs/plans/PR553_OPERATOR_CHECKLIST_2026-10-30.md
 - It contains exactly `CLAUDE-PROMPT.txt` and the original `windows-handoff-09.zip`.
 - Loose prompt: `output/connor-windows09-offline-checks/CLAUDE-PROMPT.txt`.
 - Original Windows09 ZIP remains byte-identical inside the sendable archive.
+- [OWNER REPORTED, 2026-10-30] Justin emailed the sendable ZIP to Connor and
+  downloaded a copy. Connor receipt/execution is not independently verified.
+- [OWNER DIRECTIVE] Do not add or push Connor's ZIP to Git. This repository is
+  public (verified with GitHub repository metadata). Delivery is by the owner's
+  email/download, not a Git upload.
 - The binary and loose prompt are local/untracked. Preserve this output folder;
   they do not travel through Git automatically. Transfer the sendable archive
   explicitly if changing machines. The full prompt is preserved in this tracked
@@ -87,11 +92,12 @@ signing key belong in chat or the archive.
 
 ## Session-stop preservation
 
-At the eventual session closeout, keep the parked-task pointer in the concurrent
+At session closeout, keep the parked-task pointer in the concurrent
 workstream index and retain this document, the local feature commits and the
 sendable output archive. Preserve other agents' current handoffs and unrelated
-working changes. This parking operation is not a full session stop and does not
-approve pushing the feature. No milestone-log entry is required for this
+working changes. The parked feature remains local and is not promoted by the docs-only session
+closeout. The stop skill syncs the main documentation, not the held feature or
+Connor's ZIP. No milestone-log entry is required for this
 archival-only update: nothing new was shipped.
 
 Bounded Sweep Mode A: the material change is that this workstream is parked for
