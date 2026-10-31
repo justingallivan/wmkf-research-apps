@@ -7,44 +7,20 @@
  *
  * Classifies the manually-created field as absent, exact, or divergent and
  * proves the published entity set accepts the field in a bounded $select.
- * Never writes schema or business data.
+ * Never writes schema or business data. Reads go through
+ * lib/dataverse/client.js (target interlock); a Production run needs
+ * DATAVERSE_TARGET_INTERLOCK=on and DATAVERSE_ALLOW_PROD_READS=yes
+ * (scripts/lib/dataverse-script-target.cjs).
+ *
+ * Usage: node scripts/preflight-reviewer-outcomes-schema.mjs --target=prod|sandbox
  */
 
 import { readFileSync } from 'fs';
 import { resolve } from 'path';
+import { createRequire } from 'node:module';
 
-for (const envFile of ['.env', '.env.local']) {
-  try {
-    const content = readFileSync(resolve(process.cwd(), envFile), 'utf8');
-    for (const line of content.split('\n')) {
-      const text = line.trim();
-      if (!text || text.startsWith('#')) continue;
-      const index = text.indexOf('=');
-      if (index < 0) continue;
-      const key = text.slice(0, index).trim();
-      const value = text.slice(index + 1).trim().replace(/^["']|["']$/g, '');
-      if (!process.env[key]) process.env[key] = value;
-    }
-  } catch {}
-}
-
+const require = createRequire(import.meta.url);
 const selfTest = process.argv.includes('--self-test');
-const targetArg = process.argv.find((arg) => arg.startsWith('--target='));
-const target = targetArg?.slice('--target='.length) || null;
-if (!selfTest && !['prod', 'sandbox'].includes(target)) {
-  throw new Error('Pass --target=prod, --target=sandbox, or --self-test.');
-}
-
-const resourceUrl = target === 'prod'
-  ? process.env.DYNAMICS_URL
-  : target === 'sandbox'
-    ? process.env.DYNAMICS_SANDBOX_URL
-    : null;
-const { DYNAMICS_TENANT_ID, DYNAMICS_CLIENT_ID, DYNAMICS_CLIENT_SECRET } = process.env;
-if (!selfTest
-    && (!resourceUrl || !DYNAMICS_TENANT_ID || !DYNAMICS_CLIENT_ID || !DYNAMICS_CLIENT_SECRET)) {
-  throw new Error(`Missing Dataverse credentials for target=${target}.`);
-}
 
 const WAVE = '35-reviewer-outcomes';
 const SPEC_PATH = `lib/dataverse/schema/wave${WAVE}/01_wmkf_appreviewersuggestion_ended_by.json`;
@@ -103,33 +79,13 @@ function classifyTypedMetadata(body, attribute) {
   return { state: notes.length ? 'divergent' : 'exact', notes };
 }
 
-async function getToken() {
-  const response = await fetch(
-    `https://login.microsoftonline.com/${DYNAMICS_TENANT_ID}/oauth2/v2.0/token`,
-    {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-      body: new URLSearchParams({
-        grant_type: 'client_credentials',
-        client_id: DYNAMICS_CLIENT_ID,
-        client_secret: DYNAMICS_CLIENT_SECRET,
-        scope: `${resourceUrl}/.default`,
-      }),
-    },
-  );
-  const body = await response.json();
-  if (!response.ok || !body.access_token) throw new Error(`Token request failed (${response.status}).`);
-  return body.access_token;
-}
+let client = null;
 
-async function getJson(token, apiPath) {
-  const response = await fetch(`${resourceUrl}/api/data/v9.2${apiPath}`, {
-    headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' },
-  });
+async function getJson(_token, apiPath) {
+  const response = await client.get(apiPath);
   if (response.status === 404) return { status: 404, body: null };
-  const text = await response.text();
-  if (!response.ok) throw new Error(`Unexpected response ${response.status}: ${text.slice(0, 400)}`);
-  return { status: response.status, body: text ? JSON.parse(text) : null };
+  if (!response.ok) throw new Error(`Unexpected response ${response.status}: ${response.text.slice(0, 400)}`);
+  return { status: response.status, body: response.body };
 }
 
 async function probe(attribute, readMetadata = getJson, token = null) {
@@ -195,7 +151,14 @@ async function main() {
     return;
   }
 
-  const outcome = await probe(attribute, getJson, await getToken());
+  const { loadEnvLocal, getAccessToken, createClient } = require('../lib/dataverse/client.js');
+  const { parseTargetArg, resolveTargetResource } = require('./lib/dataverse-script-target.cjs');
+  const target = parseTargetArg(process.argv);
+  loadEnvLocal();
+  const resourceUrl = resolveTargetResource({ target, write: false });
+  console.log(`Target: ${target} (${resourceUrl})`);
+  client = createClient({ resourceUrl, token: await getAccessToken(resourceUrl) });
+  const outcome = await probe(attribute, getJson);
   console.log(`${outcome.state.toUpperCase()} ${spec.entityLogicalName}.${attribute.schemaName.toLowerCase()}`);
   console.log(`RUNTIME_SELECT: ${outcome.runtimeReadable ? 'READABLE' : 'UNAVAILABLE'}`);
   for (const note of outcome.notes) console.log(`  - ${note}`);
@@ -203,7 +166,7 @@ async function main() {
     throw new Error('ABORT: live field does not satisfy the Wave 35 runtime contract.');
   }
   if (outcome.state === 'absent') {
-    console.log(`PROCEED: node scripts/apply-dataverse-schema.js --target=${target} --wave=${WAVE} --execute`);
+    console.log(`PROCEED: node scripts/apply-dataverse-schema.js --target=${target} --wave=${WAVE} (dry run first, then --execute)`);
   } else {
     console.log('NO-OP: live metadata already matches the Wave 35 contract.');
   }

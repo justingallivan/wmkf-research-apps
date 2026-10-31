@@ -19,6 +19,9 @@
  * Design notes:
  *   - Idempotent: creation only, no updates. Reruns are safe.
  *   - Prod requires BOTH --target=prod AND --execute explicitly.
+ *   - Any prod run (dry or live) requires DATAVERSE_TARGET_INTERLOCK=on and
+ *     DATAVERSE_ALLOW_PROD_READS=yes; --execute also requires a same-UTC-day
+ *     DATAVERSE_PROD_WRITE_ACK (scripts/lib/dataverse-script-target.cjs).
  *   - Solution binding: every POST/PATCH carries MSCRM.SolutionUniqueName so
  *     new artifacts land in ResearchReviewAppSuite.
  */
@@ -26,6 +29,7 @@
 const fs = require('fs');
 const path = require('path');
 const { loadEnvLocal, getAccessToken, createClient } = require('../lib/dataverse/client');
+const { resolveTargetResource } = require('./lib/dataverse-script-target.cjs');
 const {
   ensurePublisher,
   ensureSolution,
@@ -105,20 +109,6 @@ function loadWaveSchemas(wave, { newFirst = false } = {}) {
   return specs;
 }
 
-function resourceUrl(target) {
-  if (target === 'prod') {
-    const u = process.env.DYNAMICS_URL;
-    if (!u) throw new Error('DYNAMICS_URL not set');
-    return u;
-  }
-  if (target === 'sandbox') {
-    const u = process.env.DYNAMICS_SANDBOX_URL;
-    if (!u) throw new Error('DYNAMICS_SANDBOX_URL not set');
-    return u;
-  }
-  throw new Error(`Unknown target: ${target}`);
-}
-
 function tag(created) { return created ? '✓ created' : '· exists  '; }
 
 async function applySpec(client, spec) {
@@ -169,7 +159,7 @@ async function main(argv = process.argv) {
   const args = parseArgs(argv);
   assertWaveExecutionAllowed(args);
   loadEnvLocal();
-  const resource = resourceUrl(args.target);
+  const resource = resolveTargetResource({ target: args.target, write: args.execute });
   const mode = args.execute ? 'EXECUTE' : 'DRY-RUN';
   console.log(`Target:   ${args.target} (${resource})`);
   console.log(`Wave:     ${args.wave}`);
