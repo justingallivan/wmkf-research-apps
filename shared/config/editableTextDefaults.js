@@ -103,9 +103,9 @@ export const EDITABLE_TEXT_DEFAULTS = [
   {
     key: 'email.reviewer_materials_acceptance.body',
     label: 'Reviewer acceptance with materials body',
-    description: 'Body of the one email a reviewer gets on accepting. {{reviewUrl}} is the reviewer\'s new secure link; if it is left out, a link paragraph is added. Mustache {{tokens}}, not [brackets].',
+    description: 'Body of the one email a reviewer gets on accepting. {{reviewUrl}} is the reviewer\'s new secure link; if it is left out, a link paragraph is added. {{attachmentsNote}} names only what is actually attached (calendar reminder, review template) and is empty when neither is. Mustache {{tokens}}, not [brackets].',
     multiline: true,
-    placeholders: ['{{greeting}}', '{{reviewerName}}', '{{proposalTitle}}', '{{reviewUrl}}', '{{reviewDueDate}}', '{{programDirectorName}}', '{{programDirectorEmail}}', '{{signature}}'],
+    placeholders: ['{{greeting}}', '{{reviewerName}}', '{{proposalTitle}}', '{{reviewUrl}}', '{{reviewDueDate}}', '{{attachmentsNote}}', '{{programDirectorName}}', '{{programDirectorEmail}}', '{{signature}}'],
     group: 'reviewers',
     emailKey: 'email.reviewer_materials_acceptance',
     emailLabel: 'Reviewer acceptance with materials',

@@ -12,7 +12,9 @@ jest.mock('../../lib/services/reviewer-acceptance-personalization', () => ({ own
 import { readRequiredEmailDefaults } from '../../lib/services/email-defaults.js';
 import { resolveSignatureForRequest } from '../../lib/services/email-signature.js';
 import { ownReviewerAcceptanceTemplate } from '../../lib/services/reviewer-acceptance-personalization';
-import { prepareMaterialsAcceptanceEmail, finalizeMaterialsAcceptanceMessage, MATERIALS_ACCEPTANCE_SUBJECT_KEY, MATERIALS_ACCEPTANCE_BODY_KEY } from '../../lib/services/reviewer-acceptance-email.js';
+import { prepareMaterialsAcceptanceEmail, finalizeMaterialsAcceptanceMessage, materialsAttachmentsNote, MATERIALS_ACCEPTANCE_SUBJECT_KEY, MATERIALS_ACCEPTANCE_BODY_KEY } from '../../lib/services/reviewer-acceptance-email.js';
+import { buildReviewDueIcs } from '../../lib/external/calendar-invite.js';
+import { REVIEWER_MATERIALS_ACCEPTANCE_SEED_BODY } from '../../lib/seed/email-defaults/reviewer-actions.js';
 import { loadCycleMaterialsAttachments } from '../../lib/services/review-manager/cycle-materials-attachments.js';
 
 const PLACEHOLDER = 'send_time_token.pending_authority.not_live';
@@ -40,6 +42,34 @@ test('renders the placeholder link where {{reviewUrl}} sits, the due date, and t
   expect(ownReviewerAcceptanceTemplate).not.toHaveBeenCalled();
   const final = finalizeMaterialsAcceptanceMessage(prepared, 'minted.jwt');
   expect(final.message.body).toContain('/external/review/minted.jwt'); expect(final.message.body).not.toContain(PLACEHOLDER);
+});
+
+test('the attachments sentence names only what is attached', () => {
+  expect(materialsAttachmentsNote({ hasCalendar: true, hasReviewTemplate: true })).toBe('A calendar reminder is attached, along with the review template.');
+  expect(materialsAttachmentsNote({ hasCalendar: true, hasReviewTemplate: false })).toBe('A calendar reminder is attached.');
+  expect(materialsAttachmentsNote({ hasCalendar: false, hasReviewTemplate: true })).toBe('The review template is attached.');
+  expect(materialsAttachmentsNote({ hasCalendar: false, hasReviewTemplate: false })).toBe('');
+});
+
+test('seeded body: no due date and no template claims no attachment and leaves no dangling space', async () => {
+  readRequiredEmailDefaults.mockResolvedValue(defaults(REVIEWER_MATERIALS_ACCEPTANCE_SEED_BODY));
+  buildReviewDueIcs.mockReturnValueOnce(null);
+  const prepared = await prepareMaterialsAcceptanceEmail({ ...input(), request: { ...REQUEST, wmkf_reviewduedate: null } });
+  expect(prepared.ok).toBe(true);
+  expect(prepared.message.body).toContain('We will follow up with the review due date.');
+  expect(prepared.message.body).not.toMatch(/attached/);
+  expect(prepared.message.body).not.toContain('{{attachmentsNote}}');
+  expect(prepared.message.body).not.toMatch(/due date\. </);
+  expect(prepared.message.attachments).toEqual([]);
+});
+
+test('seeded body: calendar plus template names both; calendar alone names only the calendar', async () => {
+  readRequiredEmailDefaults.mockResolvedValue(defaults(REVIEWER_MATERIALS_ACCEPTANCE_SEED_BODY));
+  const both = await prepareMaterialsAcceptanceEmail({ ...input([{ filename: 'template.docx' }]), hasReviewTemplate: true });
+  expect(both.message.body).toContain('Your review is due on March 10, 2027. A calendar reminder is attached, along with the review template.');
+  const calendarOnly = await prepareMaterialsAcceptanceEmail(input([{ filename: 'extra.pdf' }]));
+  expect(calendarOnly.message.body).toContain('A calendar reminder is attached.');
+  expect(calendarOnly.message.body).not.toContain('review template');
 });
 
 test('a body without {{reviewUrl}} still carries the link', async () => {

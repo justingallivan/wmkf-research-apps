@@ -91,6 +91,7 @@ test('happy path: claim, mint, one email with the minted link and cycle attachme
   const sent = materials.send.mock.calls[0][0].message;
   expect(sent.body).toContain('minted.jwt.value'); expect(sent.body).not.toContain(PLACEHOLDER);
   expect(sent.attachments).toEqual([expect.objectContaining({ filename: 'template.docx' })]);
+  expect(materials.prepare).toHaveBeenCalledWith(expect.objectContaining({ hasReviewTemplate: true }));
   expect(materials.recordDelivered).toHaveBeenCalledWith(expect.objectContaining({ suggestionId: SUGGESTION_ID, templateType: 'materials' }));
   expect(store.release.state).toBe('recorded');
   expect(d.sendPreparedAcceptanceEmail).not.toHaveBeenCalled();
@@ -112,6 +113,13 @@ test.each([
   expect(materials.claim).not.toHaveBeenCalled(); expect(materials.mint).not.toHaveBeenCalled(); expect(materialsSent(materials)).toBe(0);
   expect(stepPatches(d).find(p => p.completedAt)).toMatchObject({ outcome: 'held', reason });
   expect(notified(d, 'reviewer_materials_release_held')).toBe(true);
+});
+
+test('a cycle without a review template tells the email so', async () => {
+  const { d, materials } = deps();
+  materials.cycleConfigs.mockResolvedValue({ J27: { review_template_blob_url: null, additional_attachments: [] } });
+  expect((await processReviewerAcceptanceJob(job(), d)).status).toBe('completed');
+  expect(materials.prepare).toHaveBeenCalledWith(expect.objectContaining({ hasReviewTemplate: false }));
 });
 
 test('an address conflict holds materials before any claim', async () => {
