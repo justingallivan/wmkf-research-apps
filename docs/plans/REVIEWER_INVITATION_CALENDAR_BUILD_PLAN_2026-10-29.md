@@ -286,6 +286,12 @@ not set a review status [VERIFIED via rg: no `reviewStatus` write in
 eligible (blank status). The address check re-reads the reviewer and retries
 on a failed read; it never trusts the job's snapshot. A lasting bookkeeping
 failure after a confirmed send alerts staff ("sent but not yet recorded").
+Transient failures before the claim retry for up to 15 minutes; then the
+reviewer gets today's confirmation and staff a "materials held" alert (owner,
+2026-10-30). After the claim there is no fallback: the release row's state
+rules. Each stuck release keeps one deduplicated staff alert open, re-raised
+by every drain run. Invitation wording and the old date-field retirement move
+to a follow-up PR (owner, 2026-10-30).
 
 - **Release table, migration 091** (no open branch claims 091, checked
   2026-10-30 against every remote branch; Production `schema_migrations` is an
