@@ -33,8 +33,9 @@
  * explicit Dataverse select and passes it straight in.
  */
 
-import { REVIEW_STATUS_MAP } from '../config/reviewerLifecycle.js';
+import { REVIEW_STATUS_MAP, RESPONSE_TYPE_MAP } from '../config/reviewerLifecycle.js';
 import { TERMINAL_REVIEW_STATUS_VALUES } from '../config/reviewerStatus.js';
+import { DID_NOT_SUBMIT_REVIEW_STATUS_VALUE } from '../config/reviewerOutcome.js';
 
 // Statuses from which an invitation-response correction is still allowed.
 // `null` is included because a fresh, never-invited row carries a null
@@ -86,4 +87,63 @@ export function isInvitationCorrectionSourceRow(row) {
   const status = row?.wmkf_reviewstatus;
   if (status === undefined) return false;
   return INVITATION_CORRECTION_SOURCE_STATUSES.has(status);
+}
+
+// ── Invited-reviewer outcomes ───────────────────────────────────────────────
+// docs/plans/INVITED_REVIEWER_OUTCOMES_PLAN_2026-10-31.md. A reviewer we
+// contacted keeps a recorded outcome: Remove is for never-invited candidates,
+// and Restore never resets an invited row. Both predicates fail closed when a
+// field they read was not selected (undefined), because an unselected field
+// would otherwise read as empty and let the row through. `wmkf_endedby` is
+// read when present; it is not required until the column is provisioned.
+
+export const OUTCOME_GUARD_FIELDS = Object.freeze([
+  'wmkf_invited', 'wmkf_emailsentat', 'wmkf_responsetype', 'wmkf_declined',
+  'wmkf_reviewstatus', 'wmkf_reviewreceivedat', 'wmkf_completedat',
+]);
+
+const ENDED_RESPONSE_TYPES = new Set([
+  RESPONSE_TYPE_MAP.declined,
+  RESPONSE_TYPE_MAP.no_response,
+  RESPONSE_TYPE_MAP.withdrawn_sufficient,
+]);
+
+const ENDED_REVIEW_STATUSES = new Set([
+  ...Object.values(TERMINAL_REVIEW_STATUS_VALUES),
+  DID_NOT_SUBMIT_REVIEW_STATUS_VALUE,
+]);
+
+function requireGuardFields(row, fields) {
+  const missing = fields.filter((field) => row?.[field] === undefined);
+  if (missing.length) throw new Error(`reviewer outcome guard: row is missing ${missing.join(', ')}`);
+}
+
+/** True once the reviewer was contacted (a real send or a staff-recorded manual link). */
+export function isInvitedRow(row) {
+  requireGuardFields(row, ['wmkf_invited', 'wmkf_emailsentat']);
+  return row.wmkf_invited === true || Boolean(row.wmkf_emailsentat);
+}
+
+/**
+ * True when the engagement has ended or produced a review. Accepted or Held
+ * with none of these is still open. Covers rows written before Ended By.
+ */
+export function hasRecordedOutcome(row) {
+  requireGuardFields(row, OUTCOME_GUARD_FIELDS);
+  return (row.wmkf_endedby !== undefined && row.wmkf_endedby !== null)
+    || ENDED_RESPONSE_TYPES.has(row.wmkf_responsetype)
+    || row.wmkf_declined === true
+    || ENDED_REVIEW_STATUSES.has(row.wmkf_reviewstatus)
+    || Boolean(row.wmkf_reviewreceivedat)
+    || Boolean(row.wmkf_completedat);
+}
+
+/**
+ * Never invited and no recorded outcome: the only rows Remove and Restore
+ * accept. For screen eligibility flags only: an incomplete row reads as
+ * ineligible (fail closed) instead of throwing, so one bad row cannot fail a
+ * whole list. Server guards use the throwing predicates above.
+ */
+export function isCandidateOnlyRow(row) {
+  try { return !isInvitedRow(row) && !hasRecordedOutcome(row); } catch { return false; }
 }

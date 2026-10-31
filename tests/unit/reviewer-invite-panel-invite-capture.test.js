@@ -206,25 +206,25 @@ describe('ReviewerInvitePanel invitation capture rehearsal', () => {
     expect(screen.getByText('1 invitable · 1 accepted')).toBeInTheDocument();
   });
 
-  test('shows archived declines below the active proposal with an explicit reset action', () => {
+  test('shows archived declines below the active proposal with no restore or reset (decision D)', () => {
     render(
       <ReviewerInvitePanel
         requestId="REQ-1"
         candidates={[candidate]}
-        removedCandidates={[{
-          suggestionId: 'S-DECLINED',
-          name: 'Dr. Archived Decline',
-          affiliation: 'Example University',
-          wasInvited: true,
-          declined: true,
-          responseType: 'declined',
-        }]}
+        removedCandidates={[
+          { suggestionId: 'S-DECLINED', name: 'Dr. Archived Decline', affiliation: 'Example University', wasInvited: true, declined: true, responseType: 'declined' },
+          { suggestionId: 'S-INVITED', name: 'Dr. Removed Invitee', wasInvited: true, declined: false },
+          { suggestionId: 'S-NEVER', name: 'Dr. Never Invited', wasInvited: false, declined: false, canRestore: true },
+          { suggestionId: 'S-LEGACY', name: 'Dr. Legacy Outcome', wasInvited: false, declined: false, canRestore: false },
+        ]}
       />,
     );
 
     expect(screen.getByText('Dr. Archived Decline')).toBeInTheDocument();
     expect(screen.getByText('Declined')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Reset & restore' })).toBeInTheDocument();
     expect(screen.getByText(/reviewers who declined/i)).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Reset & restore' })).not.toBeInTheDocument();
+    // Only the never-invited candidate offers Restore.
+    expect(screen.getAllByRole('button', { name: 'Restore' })).toHaveLength(1);
   });
 });

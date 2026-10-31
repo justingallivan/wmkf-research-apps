@@ -246,9 +246,11 @@ it cannot become a second re-selection door for search-origin rows.
 The explicit Restore path retains its separate ETag-bound reset authority.
 Manual/referral re-add of an applicant-recommended person unions provenance
 only: it never selects or clears lifecycle fields, and returns
-`promotion_required`, `restore_required`, or `already_handled` with an
-executable Find/Invite/Removed/Track remedy. **[VERIFIED via focused source tests
-and deployed source, reconciled 2026-08-03]**
+`promotion_required`, `reinvite_unavailable` (formerly `restore_required`;
+renamed 2026-10-31 because Restore no longer resets an invited reviewer), or
+`already_handled` with an executable Find/Invite/Track remedy. **[VERIFIED via
+focused source tests and deployed source, reconciled 2026-08-03; outcome code
+updated on branch `claude/invited-reviewer-outcomes`, not yet deployed]**
 
 Find-discovered rows still receive their exact suggestion/person anchors after
 ordinary save. The read-only reconciler remains a legacy backstop: it requires

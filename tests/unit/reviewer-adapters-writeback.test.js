@@ -141,15 +141,21 @@ describe('reviewer-suggestion.setMatchReason — atomic match-reason write', () 
   });
 });
 
+// Every field the outcome guards read, as a real select returns them (null when empty).
+const GUARD_OPEN = Object.freeze({
+  wmkf_invited: false, wmkf_emailsentat: null, wmkf_responsetype: null, wmkf_declined: false,
+  wmkf_reviewstatus: null, wmkf_reviewreceivedat: null, wmkf_completedat: null,
+});
+
 describe('reviewer-suggestion.ensureStaffManualCandidate — source union + excluded wins', () => {
   test.each([
     ['unengaged applicant row', { wmkf_selected: false }, 'promotion_required', 'recommended'],
-    ['declined applicant row', { wmkf_selected: false, wmkf_declined: true }, 'restore_required', 'declined'],
+    ['declined applicant row', { wmkf_selected: false, wmkf_declined: true }, 'reinvite_unavailable', 'declined'],
     ['already-invited applicant row', { wmkf_selected: true, wmkf_invited: true }, 'already_handled', 'invited'],
   ])('%s unions provenance without selecting or resetting engagement', async (_label, engagement, outcome, stage) => {
     jest.spyOn(DynamicsService, 'queryRecords').mockResolvedValue({
       records: [{
-        wmkf_appreviewersuggestionid: 'sug-applicant',
+        ...GUARD_OPEN, wmkf_appreviewersuggestionid: 'sug-applicant',
         _etag: 'W/"applicant"',
         wmkf_sources: 'applicant',
         wmkf_applicantdisposition: 100000000,
@@ -180,7 +186,7 @@ describe('reviewer-suggestion.ensureStaffManualCandidate — source union + excl
   test('source-only applicant provenance stays unselected and preserves completed engagement', async () => {
     jest.spyOn(DynamicsService, 'queryRecords').mockResolvedValue({
       records: [{
-        wmkf_appreviewersuggestionid: 'sug-1',
+        ...GUARD_OPEN, wmkf_appreviewersuggestionid: 'sug-1',
         _etag: 'W/"1"',
         wmkf_sources: 'pubmed,applicant',
         wmkf_selected: false, // soft-deleted (the "X")
@@ -229,13 +235,50 @@ describe('reviewer-suggestion.ensureStaffManualCandidate — source union + excl
   });
 
   test.each([
-    ['declined removed row', { wmkf_selected: false, wmkf_declined: true }, 'restore_required', 'declined'],
+    ['only an invitation-sent stamp', { wmkf_emailsentat: '2026-07-02T00:00:00Z' }],
+    ['only a terminal review status', { wmkf_reviewstatus: 100000006 }],
+    ['only a No Response answer', { wmkf_responsetype: 100000002 }],
+    ['only a review received', { wmkf_reviewreceivedat: '2026-08-01T00:00:00Z' }],
+  ])('re-adding a removed legacy row with %s is protected: no reset, no reselect', async (_label, change) => {
+    jest.spyOn(DynamicsService, 'queryRecords').mockResolvedValue({
+      records: [{ ...GUARD_OPEN, wmkf_appreviewersuggestionid: 'sug-legacy', _etag: 'W/"l"', wmkf_sources: 'staff_manual',
+        wmkf_applicantdisposition: null, wmkf_selected: false, ...change }],
+    });
+    const patch = jest.spyOn(DynamicsService, 'updateRecord').mockResolvedValue(undefined);
+
+    const out = await ensureStaffManualCandidate({ potentialReviewerId: 'pr-1', requestId: 'req-1', sources: ['staff_manual'] }, { actingUserSystemId: 'u1' });
+
+    expect(out).toMatchObject({ id: 'sug-legacy', created: false, selected: false, outcome: 'reinvite_unavailable' });
+    expect(patch).toHaveBeenCalledTimes(1);
+    const [, , payload] = patch.mock.calls[0];
+    expect(payload).toEqual({ wmkf_sources: 'staff_manual' });
+  });
+
+  test('a 412 retry that finds the row now protected does not reset it', async () => {
+    const unengaged = { ...GUARD_OPEN, wmkf_appreviewersuggestionid: 'sug-r', _etag: 'W/"1"', wmkf_sources: 'staff_manual', wmkf_applicantdisposition: null, wmkf_selected: false };
+    jest.spyOn(DynamicsService, 'queryRecords')
+      .mockResolvedValueOnce({ records: [unengaged] })
+      .mockResolvedValueOnce({ records: [{ ...unengaged, _etag: 'W/"2"', wmkf_emailsentat: '2026-07-03T00:00:00Z' }] });
+    const patch = jest.spyOn(DynamicsService, 'updateRecord')
+      .mockRejectedValueOnce(Object.assign(new Error('Precondition Failed'), { status: 412 }))
+      .mockResolvedValue(undefined);
+
+    const out = await ensureStaffManualCandidate({ potentialReviewerId: 'pr-1', requestId: 'req-1', sources: ['staff_manual'] }, { actingUserSystemId: 'u1' });
+
+    expect(out).toMatchObject({ outcome: 'reinvite_unavailable', selected: false });
+    const [, , retryPayload, retryOpts] = patch.mock.calls[1];
+    expect(retryPayload).toEqual({ wmkf_sources: 'staff_manual' });
+    expect(retryOpts).toMatchObject({ ifMatch: 'W/"2"' });
+  });
+
+  test.each([
+    ['declined removed row', { wmkf_selected: false, wmkf_declined: true }, 'reinvite_unavailable', 'declined'],
     ['already-selected row', { wmkf_selected: true }, 'already_handled', 'selected'],
     ['already-invited row', { wmkf_selected: true, wmkf_invited: true }, 'already_handled', 'invited'],
   ])('re-adding a non-applicant %s returns a typed remedy without lifecycle mutation', async (_label, engagement, outcome, stage) => {
     jest.spyOn(DynamicsService, 'queryRecords').mockResolvedValue({
       records: [{
-        wmkf_appreviewersuggestionid: 'sug-live',
+        ...GUARD_OPEN, wmkf_appreviewersuggestionid: 'sug-live',
         _etag: 'W/"live"',
         wmkf_sources: 'staff_manual',
         wmkf_applicantdisposition: null,
@@ -269,7 +312,7 @@ describe('reviewer-suggestion.ensureStaffManualCandidate — source union + excl
   test('re-adding an unengaged removed non-applicant row still selects it', async () => {
     jest.spyOn(DynamicsService, 'queryRecords').mockResolvedValue({
       records: [{
-        wmkf_appreviewersuggestionid: 'sug-removed',
+        ...GUARD_OPEN, wmkf_appreviewersuggestionid: 'sug-removed',
         _etag: 'W/"removed"',
         wmkf_sources: 'pubmed',
         wmkf_selected: false,
@@ -295,7 +338,7 @@ describe('reviewer-suggestion.ensureStaffManualCandidate — source union + excl
     jest.spyOn(DynamicsService, 'queryRecords')
       .mockResolvedValueOnce({
         records: [{
-          wmkf_appreviewersuggestionid: 'sug-race',
+          ...GUARD_OPEN, wmkf_appreviewersuggestionid: 'sug-race',
           _etag: 'W/"1"',
           wmkf_sources: 'pubmed',
           wmkf_selected: false,
@@ -304,7 +347,7 @@ describe('reviewer-suggestion.ensureStaffManualCandidate — source union + excl
       })
       .mockResolvedValueOnce({
         records: [{
-          wmkf_appreviewersuggestionid: 'sug-race',
+          ...GUARD_OPEN, wmkf_appreviewersuggestionid: 'sug-race',
           _etag: 'W/"2"',
           wmkf_sources: 'pubmed,invited_elsewhere',
           wmkf_selected: true,
@@ -349,7 +392,7 @@ describe('reviewer-suggestion.ensureStaffManualCandidate — source union + excl
     jest.spyOn(DynamicsService, 'queryRecords')
       .mockResolvedValueOnce({
         records: [{
-          wmkf_appreviewersuggestionid: 'sug-applicant-race',
+          ...GUARD_OPEN, wmkf_appreviewersuggestionid: 'sug-applicant-race',
           _etag: 'W/"1"',
           wmkf_sources: 'pubmed',
           wmkf_selected: false,
@@ -358,7 +401,7 @@ describe('reviewer-suggestion.ensureStaffManualCandidate — source union + excl
       })
       .mockResolvedValueOnce({
         records: [{
-          wmkf_appreviewersuggestionid: 'sug-applicant-race',
+          ...GUARD_OPEN, wmkf_appreviewersuggestionid: 'sug-applicant-race',
           _etag: 'W/"2"',
           wmkf_sources: 'pubmed,applicant',
           wmkf_selected: false,
@@ -396,7 +439,7 @@ describe('reviewer-suggestion.ensureStaffManualCandidate — source union + excl
   test('existing excluded row is not resurrected', async () => {
     jest.spyOn(DynamicsService, 'queryRecords').mockResolvedValue({
       records: [{
-        wmkf_appreviewersuggestionid: 'sug-ex',
+        ...GUARD_OPEN, wmkf_appreviewersuggestionid: 'sug-ex',
         wmkf_sources: 'applicant',
         wmkf_selected: false,
         wmkf_applicantdisposition: APPLICANT_DISPOSITION_EXCLUDED,
@@ -415,14 +458,14 @@ describe('reviewer-suggestion.ensureStaffManualCandidate — source union + excl
 
   test.each([
     ['unengaged winner', { wmkf_selected: false }, 'promotion_required', 'recommended'],
-    ['declined winner', { wmkf_selected: false, wmkf_declined: true }, 'restore_required', 'declined'],
+    ['declined winner', { wmkf_selected: false, wmkf_declined: true }, 'reinvite_unavailable', 'declined'],
     ['invited winner', { wmkf_selected: true, wmkf_invited: true }, 'already_handled', 'invited'],
   ])('create-conflict recovery keeps an applicant %s provenance-only', async (_label, engagement, outcome, stage) => {
     jest.spyOn(DynamicsService, 'queryRecords')
       .mockResolvedValueOnce({ records: [] })
       .mockResolvedValueOnce({
         records: [{
-          wmkf_appreviewersuggestionid: 'sug-race-winner',
+          ...GUARD_OPEN, wmkf_appreviewersuggestionid: 'sug-race-winner',
           _etag: 'W/"winner"',
           wmkf_sources: 'applicant',
           wmkf_applicantdisposition: 100000000,
@@ -461,7 +504,7 @@ describe('reviewer-suggestion.ensureStaffManualCandidate — source union + excl
     jest.spyOn(DynamicsService, 'queryRecords')
       .mockResolvedValueOnce({
         records: [{
-          wmkf_appreviewersuggestionid: 'sug-app-race',
+          ...GUARD_OPEN, wmkf_appreviewersuggestionid: 'sug-app-race',
           _etag: 'W/"1"',
           wmkf_sources: 'applicant',
           wmkf_applicantdisposition: 100000000,
@@ -470,7 +513,7 @@ describe('reviewer-suggestion.ensureStaffManualCandidate — source union + excl
       })
       .mockResolvedValueOnce({
         records: [{
-          wmkf_appreviewersuggestionid: 'sug-app-race',
+          ...GUARD_OPEN, wmkf_appreviewersuggestionid: 'sug-app-race',
           _etag: 'W/"2"',
           wmkf_sources: 'applicant,updated_elsewhere',
           wmkf_applicantdisposition: 100000000,
@@ -507,7 +550,7 @@ describe('reviewer-suggestion.ensureStaffManualCandidate — source union + excl
   test('new row writes staff_manual and request/person binds', async () => {
     jest.spyOn(DynamicsService, 'queryRecords').mockResolvedValue({ records: [] });
     const create = jest.spyOn(DynamicsService, 'createRecord').mockResolvedValue({
-      wmkf_appreviewersuggestionid: 'sug-new',
+      ...GUARD_OPEN, wmkf_appreviewersuggestionid: 'sug-new',
     });
 
     const out = await ensureStaffManualCandidate({
@@ -536,7 +579,7 @@ describe('reviewer-suggestion.ensureStaffManualCandidate — source union + excl
     const query = jest.spyOn(DynamicsService, 'queryRecords')
       .mockResolvedValueOnce({ records: [] })
       .mockResolvedValueOnce({ records: [{
-        wmkf_appreviewersuggestionid: 'sug-race-winner',
+        ...GUARD_OPEN, wmkf_appreviewersuggestionid: 'sug-race-winner',
         _etag: 'W/"winner"',
         wmkf_sources: 'pubmed',
         wmkf_applicantdisposition: null,
@@ -591,7 +634,7 @@ describe('reviewer-suggestion.ensureStaffManualCandidate — source union + excl
     const query = jest.spyOn(DynamicsService, 'queryRecords')
       .mockResolvedValueOnce({ records: [] })
       .mockResolvedValueOnce({ records: [{
-        wmkf_appreviewersuggestionid: 'sug-excluded-race',
+        ...GUARD_OPEN, wmkf_appreviewersuggestionid: 'sug-excluded-race',
         wmkf_applicantdisposition: APPLICANT_DISPOSITION_EXCLUDED,
         wmkf_sources: 'applicant',
       }] });

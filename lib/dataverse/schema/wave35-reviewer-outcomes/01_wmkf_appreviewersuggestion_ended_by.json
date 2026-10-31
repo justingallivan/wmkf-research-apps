@@ -1,0 +1,21 @@
+{
+  "name": "wmkf_appreviewersuggestion-ended-by",
+  "kind": "extensions-on-existing",
+  "entityLogicalName": "wmkf_appreviewersuggestion",
+  "_comment": "Additive initiator record for an invited reviewer's outcome (docs/plans/INVITED_REVIEWER_OUTCOMES_PLAN_2026-10-31.md). Records who ended the engagement, not who typed it. Null means no one ended it (an open engagement, a lapsed invitation, or a row written before this field existed). Run scripts/preflight-reviewer-outcomes-schema.mjs before the creation-only schema applier; an exact manually-created field is an expected no-op.",
+  "attributes": [
+    {
+      "type": "Picklist",
+      "schemaName": "wmkf_EndedBy",
+      "displayName": "Ended By",
+      "description": "Who ended this reviewer engagement: the reviewer before accepting, the reviewer after accepting, or the Foundation. This records who initiated the ending, not who recorded it. Empty when no one ended it, including a lapsed invitation.",
+      "requiredLevel": "None",
+      "defaultValue": -1,
+      "options": [
+        { "value": 100000000, "label": "Reviewer before accepting" },
+        { "value": 100000001, "label": "Reviewer after accepting" },
+        { "value": 100000002, "label": "Foundation" }
+      ]
+    }
+  ]
+}

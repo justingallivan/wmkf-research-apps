@@ -38,6 +38,7 @@ if (!requestArg) {
 const GUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 const { DynamicsService } = await import('../lib/services/dynamics-service.js');
+const { OUTCOME_GUARD_FIELDS, isCandidateOnlyRow } = await import('../shared/utils/reviewer-engagement-policy.js');
 const { enterDynamicsBypassForScript } = await import('../lib/services/dynamics-context.js');
 enterDynamicsBypassForScript('restore-request-reviewers-selected');
 
@@ -71,15 +72,21 @@ try {
 console.log(`Resolved request: #${requestNum}  (GUID ${requestGuid})\n`);
 
 const { records } = await DynamicsService.queryRecords('wmkf_appreviewersuggestions', {
-  select: 'wmkf_appreviewersuggestionid,wmkf_suggestionlabel,wmkf_selected',
+  select: ['wmkf_appreviewersuggestionid', 'wmkf_suggestionlabel', 'wmkf_selected', ...OUTCOME_GUARD_FIELDS].join(','),
   filter: `_wmkf_request_value eq ${requestGuid}`,
   top: 500,
 });
 
 if (records.length === 0) { console.log('(no suggestion rows for this request)\n'); process.exit(0); }
 
-const toFix = records.filter((r) => !r.wmkf_selected);
-console.log(`Found ${records.length} row(s); ${toFix.length} with selected=false:`);
+// A reviewer we contacted, or one with a recorded outcome, is never
+// re-selected (INVITED_REVIEWER_OUTCOMES_PLAN_2026-10-31, decision D); only
+// never-invited candidates are restored. Protected rows are reported.
+const unselected = records.filter((r) => !r.wmkf_selected);
+const toFix = unselected.filter((r) => isCandidateOnlyRow(r));
+const protectedRows = unselected.filter((r) => !isCandidateOnlyRow(r));
+console.log(`Found ${records.length} row(s); ${unselected.length} with selected=false; `
+  + `${toFix.length} restorable, ${protectedRows.length} skipped (invited or recorded outcome):`);
 for (const r of records) {
   console.log(`  • ${(r.wmkf_suggestionlabel || '(no label)').padEnd(60)} selected=${!!r.wmkf_selected}`);
 }
@@ -95,7 +102,9 @@ if (!EXECUTE) {
 let ok = 0, fail = 0;
 for (const r of toFix) {
   try {
-    await DynamicsService.updateRecord('wmkf_appreviewersuggestions', r.wmkf_appreviewersuggestionid, { wmkf_selected: true });
+    if (!r._etag) throw new Error('row read carried no ETag; refusing an unconditional write');
+    await DynamicsService.updateRecord('wmkf_appreviewersuggestions', r.wmkf_appreviewersuggestionid,
+      { wmkf_selected: true }, { ifMatch: r._etag });
     console.log(`  \x1b[32mrestored\x1b[0m ${r.wmkf_suggestionlabel}`);
     ok++;
   } catch (e) {

@@ -157,6 +157,20 @@ describe('reviewer management actions menu', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Regenerate link & copy' }));
     expect(onRegenerate).toHaveBeenCalledTimes(1);
   });
+  test.each([
+    ['server says not removable', { canRemove: false }],
+    ['flag absent (fail closed)', {}],
+  ])('Remove is not offered when %s', (_name, flag) => {
+    render(<TokenActionsMenu reviewer={{ ...reviewer, reviewStatus: 'accepted', ...flag }} onRemove={jest.fn()} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Manage Dr. Test Reviewer' }));
+    expect(screen.queryByRole('button', { name: 'Remove from this request' })).not.toBeInTheDocument();
+  });
+
+  test('Remove is still offered when the server says the row is removable', () => {
+    render(<TokenActionsMenu reviewer={{ ...reviewer, reviewStatus: 'accepted', canRemove: true }} onRemove={jest.fn()} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Manage Dr. Test Reviewer' }));
+    expect(screen.getByRole('button', { name: 'Remove from this request' })).toBeInTheDocument();
+  });
 });
 
 describe('reviewer table geometry', () => {
@@ -407,4 +421,5 @@ describe('review-due reminder compose action', () => {
     rerender(<ReviewReminderAction requestId="P2" reviewer={{ ...reviewer, suggestionId: 'S2' }} />);
     expect(screen.queryByTestId('reminder-composer')).not.toBeInTheDocument();
   });
+
 });

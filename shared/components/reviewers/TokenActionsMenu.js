@@ -102,10 +102,13 @@ export function TokenActionsMenu({
   const canCloseReview = Boolean(
     onCloseReview && ['review_received', 'complete'].includes(reviewer.reviewStatus),
   );
+  // Server-computed canRemove uses softDelete's own rule (never invited, no
+  // recorded outcome), so the menu never offers a Remove the server refuses.
   const canRemove = Boolean(
     onRemove
       && reviewer.reviewStatus !== 'complete'
-      && !TERMINAL_REVIEW_STATUSES.includes(reviewer.reviewStatus),
+      && !TERMINAL_REVIEW_STATUSES.includes(reviewer.reviewStatus)
+      && reviewer.canRemove === true,
   );
   const degradedTitle = 'Reviewer data could not be refreshed - retry before making changes';
   // The estimate drives the upward flip so the portalled menu never opens

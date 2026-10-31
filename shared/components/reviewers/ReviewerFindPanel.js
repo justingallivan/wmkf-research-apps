@@ -413,7 +413,7 @@ export default function ReviewerFindPanel({
       }
       const data = await submitManualReviewer(resolution);
       if (requestIdRef.current !== submittedRequestId) return;
-      if (['promotion_required', 'restore_required', 'already_handled'].includes(data.outcome)) {
+      if (['promotion_required', 'reinvite_unavailable', 'already_handled'].includes(data.outcome)) {
         setManual(freshManual({
           remedy: {
             outcome: data.outcome,
@@ -697,17 +697,11 @@ export default function ReviewerFindPanel({
                 <button
                   type="button"
                   onClick={() => onNavigate(
-                    manual.remedy.outcome === 'restore_required' || manual.remedy.stage === 'selected'
-                      ? 'candidates'
-                      : 'track',
+                    manual.remedy.stage === 'selected' ? 'candidates' : 'track',
                   )}
                   className="ml-2 underline font-medium"
                 >
-                  {manual.remedy.outcome === 'restore_required'
-                    ? 'Open Removed'
-                    : manual.remedy.stage === 'selected'
-                      ? 'Open Invite'
-                      : 'Open Track'}
+                  {manual.remedy.stage === 'selected' ? 'Open Invite' : 'Open Track'}
                 </button>
               )}
             </div>

@@ -246,7 +246,28 @@ describe('getMyCandidates', () => {
       declined: true,
       responseType: 'declined',
       removedAt: '2026-06-01',
+      canRestore: false,
     })]);
+  });
+
+  test.each([
+    ['a never-invited candidate', {}, true],
+    ['a legacy row with only an invitation-sent stamp', { wmkf_emailsentat: '2026-06-01T00:00:00Z' }, false],
+    ['a legacy row with No Response but no invite flags', { wmkf_responsetype: 100000002 }, false],
+    ['a legacy Released row', { wmkf_reviewstatus: 100000006 }, false],
+    ['a row with a review received', { wmkf_reviewreceivedat: '2026-06-02T00:00:00Z' }, false],
+  ])('Removed list canRestore mirrors Restore for %s', async (_name, change, expected) => {
+    grantRequestAdapter.getById.mockResolvedValue({ akoya_requestid: REQUEST_ID, akoya_requestnum: 'R-1', akoya_title: 'A Proposal' });
+    suggestionAdapter.findByRequest.mockResolvedValue([]);
+    suggestionAdapter.findRemovedByRequest.mockResolvedValue([{
+      wmkf_appreviewersuggestionid: SUGGESTION_ID, _wmkf_potentialreviewer_value: PERSON_ID,
+      wmkf_invited: false, wmkf_emailsentat: null, wmkf_responsetype: null, wmkf_declined: false,
+      wmkf_reviewstatus: null, wmkf_reviewreceivedat: null, wmkf_completedat: null, modifiedon: '2026-06-01',
+      ...change,
+    }]);
+    potentialReviewerAdapter.queryReviewers.mockResolvedValue({ records: [{ wmkf_potentialreviewersid: PERSON_ID, wmkf_name: 'Dr X' }] });
+    const out = await getMyCandidates({ requestId: REQUEST_ID, azureEmail: EMAIL });
+    expect(out.proposals[0].removedCandidates[0].canRestore).toBe(expected);
   });
 
   test('PD scope with unresolvable PD returns the empty envelope with programDirector: null', async () => {
@@ -584,6 +605,17 @@ describe('patchMyCandidates', () => {
     });
     expect(suggestionAdapter.restore).toHaveBeenCalledWith(SUGGESTION_ID, { actingUserSystemId: SYS });
     expect(out).toEqual({ success: true, message: 'Candidate restored' });
+  });
+
+  test('restore of an invited reviewer becomes a typed 409 (decision D)', async () => {
+    suggestionAdapter.restore.mockRejectedValueOnce(Object.assign(new Error('refusing'), { code: 'reinvite_unavailable' }));
+    const err = await patchMyCandidates({
+      body: { suggestionId: SUGGESTION_ID, restore: true },
+      actingUserSystemId: SYS,
+    }).catch((e) => e);
+    expect(err).toBeInstanceOf(MyCandidatesError);
+    expect(err.httpStatus).toBe(409);
+    expect(err.body).toMatchObject({ code: 'reinvite_unavailable' });
   });
 
   test('manual invitation: verifies the current official link and records the normal invite lifecycle with an optimistic lock', async () => {
@@ -983,6 +1015,14 @@ describe('deleteMyCandidates', () => {
     expect(out).toEqual({ success: true, message: 'Candidate removed' });
   });
 
+  test('an invited reviewer refusal becomes a typed 409 the screens can show', async () => {
+    suggestionAdapter.softDelete.mockRejectedValue(Object.assign(new Error('refusing'), { code: 'invited_reviewer_not_removable' }));
+    const err = await deleteMyCandidates({ suggestionId: SUGGESTION_ID }).catch((e) => e);
+    expect(err).toBeInstanceOf(MyCandidatesError);
+    expect(err.httpStatus).toBe(409);
+    expect(err.body).toMatchObject({ code: 'invited_reviewer_not_removable', error: expect.stringMatching(/already invited/) });
+  });
+
   test('missing-row softDelete failure propagates untyped (caller keeps the row; shell 500s)', async () => {
     suggestionAdapter.softDelete.mockRejectedValue(new Error('row not found'));
     await expect(deleteMyCandidates({ suggestionId: SUGGESTION_ID })).rejects.toThrow('row not found');
@@ -997,6 +1037,10 @@ describe('Stage 1D generic invitation/response corrections', () => {
     wmkf_reviewstatus: null,
     wmkf_completedat: null,
     wmkf_applicantdisposition: null,
+    wmkf_invited: false,
+    wmkf_emailsentat: null,
+    wmkf_declined: false,
+    wmkf_responsetype: null,
     _etag: 'W/"correction-1"',
     ...overrides,
   });
@@ -1103,6 +1147,35 @@ describe('Stage 1D generic invitation/response corrections', () => {
     expect(ensureToken).toHaveBeenCalledTimes(1);
     expect(suggestionAdapter.updateLifecycle.mock.invocationCallOrder[0]).toBeLessThan(ensureToken.mock.invocationCallOrder[0]);
   });
+  test.each([
+    ['clearing the invited flag', { invited: false }, {}],
+    ['nulling the invited flag', { invited: null }, {}],
+    ['nulling the invited flag on a row with no sent time', { invited: null }, { wmkf_emailsentat: null }],
+    ['clearing the sent time', { emailSentAt: null }, {}],
+  ])('refuses %s on a contacted reviewer (outcomes plan)', async (_name, lifecycle, row) => {
+    suggestionAdapter.findById.mockResolvedValue(source({ wmkf_invited: true, wmkf_emailsentat: '2026-07-01T00:00:00Z', ...row }));
+    await expect(correct(lifecycle)).rejects.toMatchObject({ httpStatus: 409, body: { code: 'correction_erases_history' } });
+    expect(suggestionAdapter.updateLifecycle).not.toHaveBeenCalled();
+  });
+
+  test.each([
+    ['No Response to accepted', { wmkf_responsetype: 100000002 }, { accepted: true, responseType: 'accepted' }],
+    ['no longer needed to accepted', { wmkf_responsetype: 100000003 }, { accepted: true, responseType: 'accepted' }],
+    ['a decline cleared to blank', { wmkf_declined: true, wmkf_responsetype: 100000001 }, { declined: false, responseType: null }],
+  ])('refuses changing an ending answer: %s', async (_name, row, lifecycle) => {
+    suggestionAdapter.findById.mockResolvedValue(source({ wmkf_invited: true, wmkf_emailsentat: '2026-07-01T00:00:00Z', ...row }));
+    await expect(correct(lifecycle)).rejects.toMatchObject({ httpStatus: 409, body: { code: 'correction_erases_history' } });
+    expect(suggestionAdapter.updateLifecycle).not.toHaveBeenCalled();
+  });
+
+  test('allows a decline corrected to accepted', async () => {
+    suggestionAdapter.findById.mockResolvedValue(source({
+      wmkf_invited: true, wmkf_emailsentat: '2026-07-01T00:00:00Z', wmkf_declined: true, wmkf_responsetype: 100000001,
+    }));
+    await correct({ accepted: true, declined: false, responseType: 'accepted' });
+    expect(suggestionAdapter.updateLifecycle).toHaveBeenCalledTimes(1);
+  });
+
   test('case-insensitive request binding and strong ETags stay supported', async () => {
     suggestionAdapter.findById.mockResolvedValue(source({ _wmkf_request_value: 'ABCDEFAB-1111-1111-1111-111111111111', _etag: '"strong-1"' }));
     await correct({ invited: false, emailSentAt: null, responseReceivedAt: null }, { authorizedRequestId: 'abcdefab-1111-1111-1111-111111111111' });

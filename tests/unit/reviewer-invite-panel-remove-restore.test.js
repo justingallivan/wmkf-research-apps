@@ -27,8 +27,9 @@ const candidate = {
   invited: false,
   accepted: false,
   declined: false,
+  canRemove: true,
 };
-const removedCandidate = { suggestionId: 'S2', name: 'Dr. Test Reviewer', declined: false };
+const removedCandidate = { suggestionId: 'S2', name: 'Dr. Test Reviewer', declined: false, canRestore: true };
 
 function vipFlagsResponse() {
   return { ok: true, status: 200, json: async () => ({ pdSystemUserId: 'pd-1', flaggedPotentialReviewerIds: [] }) };

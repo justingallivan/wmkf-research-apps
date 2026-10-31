@@ -216,14 +216,12 @@ function ReferralAction({ referral, state, canManage, onAdd, onDismiss, onGoToIn
   if (status === 'remedy') {
     const target = state.outcome === 'promotion_required'
       ? 'find'
-      : state.outcome === 'restore_required' || state.stage === 'selected'
+      : state.stage === 'selected'
         ? 'candidates'
         : 'track';
     const targetLabel = target === 'find'
       ? 'Open Find'
-      : state.outcome === 'restore_required'
-        ? 'Open Removed'
-        : target === 'candidates'
+      : target === 'candidates'
           ? 'Open Invite'
           : 'Open Track';
     return (
