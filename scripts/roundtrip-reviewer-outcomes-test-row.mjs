@@ -21,7 +21,9 @@
  * under outputs/ (exclusive create, so one run per row). A 5xx or gateway
  * response to a write counts as an unknown outcome and keeps the record. If the run cannot finish the restore, it prints the record
  * path; `--recover` restores from it, only while the row is still on the same
- * marked test request and still holds exactly the test values. --pause waits
+ * marked test request and still holds exactly the test values; if the row is
+ * still at its pre-write version, the write may yet land and the record is
+ * kept. --pause waits
  * at most 10 minutes, and an --execute run refuses to start within 20 minutes
  * of UTC midnight, when the day's write ACK expires. --execute and --recover
  * hold a per-row lock (outputs/…json.lock) for their whole run.
@@ -179,7 +181,11 @@ export function planRecovery({ record, row, request }) {
     throw new Error('Refusing recovery: the row no longer belongs to the recorded request.');
   }
   if (request?.wmkf_istestrequest !== true) throw new Error('Refusing recovery: the request is not a marked test request.');
-  if (matches(row, record.original)) return 'already-restored';
+  if (matches(row, record.original)) {
+    // Same version as before the test write: that write has not landed and may
+    // still commit late (a gateway timeout does not cancel it). Keep the record.
+    return row['@odata.etag'] === record.originalEtag ? 'not-landed' : 'already-restored';
+  }
   if (!matches(row, TEST_VALUES)) {
     throw new Error(`Refusing recovery: the row holds neither the test nor the original values (${describe(originalValues(row))}).`);
   }
@@ -255,6 +261,13 @@ async function recoverLocked({ client, resourceUrl, suggestionId }) {
       await patchReturning(client, suggestionId, row['@odata.etag'], record.original, 'Recovery restore'),
       { requestId: record.requestId, values: record.original, label: 'Recovery restore' },
     );
+  }
+  if (plan === 'not-landed') {
+    console.log(
+      `The row is unchanged since before the test write, which may still land. Record kept at ${recordPath}; `
+      + 'run --recover again in a few minutes. Delete the record by hand only once you are sure the write was refused.',
+    );
+    return;
   }
   fs.unlinkSync(recordPath);
   console.log(`${plan === 'restore' ? 'Restored' : 'Already restored'} and verified: ${describe(record.original)}`);

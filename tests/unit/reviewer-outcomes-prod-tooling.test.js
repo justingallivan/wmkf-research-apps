@@ -303,6 +303,26 @@ describe('roundtrip orchestration against a fake Dataverse', () => {
     expect(fs.existsSync(`${recordPathFor(ID)}.lock`)).toBe(false);
   });
 
+  test('a write that times out before committing keeps the record until it lands, then recovery restores it', async () => {
+    let pending = null;
+    let first = true;
+    const { db, client } = fakeDataverse({
+      patchHook: ({ db: state, body }) => {
+        if (!first) return null;
+        first = false;
+        pending = () => { Object.assign(state.row, body); state.version += 1; state.patches.push(body); };
+        return { ok: false, status: 504, text: 'gateway timeout' }; // write still queued upstream
+      },
+    });
+    await expect(run(client)).rejects.toThrow(/outcome unknown/);
+    await recover({ client, resourceUrl: RESOURCE, suggestionId: ID });
+    expect(fs.existsSync(recordPathFor(ID))).toBe(true); // not landed yet: record kept
+    pending(); // the late commit
+    await recover({ client, resourceUrl: RESOURCE, suggestionId: ID });
+    expect(db.row).toMatchObject({ wmkf_endedby: null, wmkf_reviewstatus: 100000001 });
+    expect(fs.existsSync(recordPathFor(ID))).toBe(false);
+  });
+
   test('a lock left by a process that is no longer running is taken over', async () => {
     const { db, client } = fakeDataverse();
     fs.mkdirSync('outputs', { recursive: true });
