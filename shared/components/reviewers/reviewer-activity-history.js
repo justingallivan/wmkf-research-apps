@@ -181,6 +181,7 @@ const RESPONSE_EVENT_BY_TYPE = Object.freeze({
 const TERMINAL_STATUS_LABELS = Object.freeze({
   withdrew: 'Withdrew',
   released: 'Released',
+  did_not_submit: 'Did not submit',
 });
 
 /**
@@ -250,10 +251,12 @@ export function responseEventEvidence(reviewer) {
   }
 
   if (responseType === 'declined' && reviewStatus === 'did_not_submit') {
+    // applyStaffReviewerDidNotSubmit keeps wmkf_responsereceivedat, so this
+    // stamp is still the acceptance. The staff outcome itself is undated and
+    // shown by currentTerminalStatus.
     return {
-      label: 'Recorded by staff: review not submitted',
-      deliveryProven: true,
-      detail: 'Recorded as declined by a Program Director because no review arrived, not by the reviewer.',
+      ...RESPONSE_EVENT_BY_TYPE.accepted,
+      detail: 'A Program Director later recorded that the review was not submitted.',
     };
   }
 
