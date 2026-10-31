@@ -274,6 +274,44 @@ Admin `inviteStartDate` has no reader outside its form, validation and tests
   present (blocking, not today's `window.confirm`), so materials are ready when
   invitations go out.
 
+**Build notes (2026-10-30, branch `claude/reviewer-materials-on-accept`, not
+built yet; [PLANNED]).**
+
+- **Release table, migration 091** (no open branch claims 091, checked
+  2026-10-30 against every remote branch; Production `schema_migrations` is an
+  owner-run check before merge): `reviewer_materials_releases`, one row per
+  engagement, `suggestion_id` unique; `request_id`; `source` (`acceptance` |
+  `manual`); `state` (`claimed`, `link_minted`, `sent`, `recorded`,
+  `uncertain`, `failed`); `lease_token`, `lease_until`; a timestamp per
+  transition; `job_id` (acceptance) or the staff actor (manual); `error_code`;
+  `attempts`. The claim is `INSERT … ON CONFLICT (suggestion_id) DO NOTHING
+  RETURNING`: whoever inserts first owns the release.
+- **Drain step `release_materials`**, skipped on a repeat acceptance as today.
+  Everything reversible runs before the claim: fresh suggestion/request reads
+  (request select adds `_wmkf_grantcycle_value`, never the meeting date), PDF
+  check, cycle configuration from the Grant Cycle link, attachment fetch,
+  sender, address-confidence and test-request checks, render. **An attachment
+  that cannot be fetched fails the step before the claim and retries** (the
+  manual path warns and continues; with no one watching, a missing review
+  template must not reach the reviewer silently). Then claim → `mintAndStore`
+  with the accepted expiry → `link_minted` → send → `sent` → `recordDeliveredEmail`
+  (`templateType: 'materials'`) → `recorded`.
+- **Retries act on the row's state:** `recorded` skips; `sent` only records
+  (never resends); `claimed` / `link_minted` past the lease, `uncertain` or
+  `failed` are never resumed: staff alert and "Send materials again", which
+  re-mints and sends under the same row after re-checking accepted and not yet
+  released on the server. The job completes; the release alert stays open.
+- **Combined email** uses the acceptance template keys and must carry the
+  reviewer's new link. A per-PD acceptance override without the link token
+  falls back to the shared template; it is never sent without the link.
+- **Manual release** takes the same claim just before its mint
+  (`send-emails-service.js`, materials path); an existing row refuses with a new
+  skip reason, "materials are already being sent".
+- **Build order** (each a stop point): migration + claim service → drain step →
+  manual-path claim → recovery action (route + UI) → invitation PDF
+  precondition + accepted-screen copy → wording seeds, `{{proposalDelivery}}`
+  and Reviewer Finder date-field retirement.
+
 ### 3.4 Wording
 
 New invitation, acceptance and (fallback) materials text: no proposal-release
