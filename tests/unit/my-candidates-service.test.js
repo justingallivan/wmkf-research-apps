@@ -1148,10 +1148,12 @@ describe('Stage 1D generic invitation/response corrections', () => {
     expect(suggestionAdapter.updateLifecycle.mock.invocationCallOrder[0]).toBeLessThan(ensureToken.mock.invocationCallOrder[0]);
   });
   test.each([
-    ['clearing the invited flag', { invited: false }],
-    ['clearing the sent time', { emailSentAt: null }],
-  ])('refuses %s on a contacted reviewer (outcomes plan)', async (_name, lifecycle) => {
-    suggestionAdapter.findById.mockResolvedValue(source({ wmkf_invited: true, wmkf_emailsentat: '2026-07-01T00:00:00Z' }));
+    ['clearing the invited flag', { invited: false }, {}],
+    ['nulling the invited flag', { invited: null }, {}],
+    ['nulling the invited flag on a row with no sent time', { invited: null }, { wmkf_emailsentat: null }],
+    ['clearing the sent time', { emailSentAt: null }, {}],
+  ])('refuses %s on a contacted reviewer (outcomes plan)', async (_name, lifecycle, row) => {
+    suggestionAdapter.findById.mockResolvedValue(source({ wmkf_invited: true, wmkf_emailsentat: '2026-07-01T00:00:00Z', ...row }));
     await expect(correct(lifecycle)).rejects.toMatchObject({ httpStatus: 409, body: { code: 'correction_erases_history' } });
     expect(suggestionAdapter.updateLifecycle).not.toHaveBeenCalled();
   });
