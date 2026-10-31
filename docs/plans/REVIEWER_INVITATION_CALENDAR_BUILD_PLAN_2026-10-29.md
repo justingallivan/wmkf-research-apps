@@ -277,14 +277,16 @@ Admin `inviteStartDate` has no reader outside its form, validation and tests
   due-date write): no listed reviewer PDF → `proposal_pdf_missing`; nothing
   listed and one of the request's Dynamics-linked folders unlistable, or the
   listing threw → `proposal_pdf_unavailable` (fail closed, staff retry).
-  Speculative archive-folder probes 404 for most requests, so archive-only
-  failures count as missing (`listReviewerMaterialsWithAvailability` now also
-  returns `unavailableSources`). **Not gated (owner decision needed):** the
-  Review Manager `regenerate-token` route can mint a first copyable link for a
-  not-yet-invited reviewer whom staff then invite by hand; it applies neither
-  this PDF check nor D48's due-date write. The Invite modal's manual-link
-  "mark manually sent" control is unreachable today (`render-emails-service.js`
-  always sets `manualLink: null`).
+  A speculative archive folder that does not exist (`graph_folder_not_found`)
+  is ignored; any other archive or Dynamics-folder failure is "unavailable"
+  (`listReviewerMaterialsWithAvailability` returns `unavailableSources`). The
+  shared check lives in `review-manager/invitation-proposal-pdf.js` and also
+  gates `regenerate-token` when it would mint a first copyable link for a
+  never-invited, not-yet-responded reviewer (409 `proposal_pdf_missing` /
+  `proposal_pdf_unavailable`); replacement links are unaffected (Codex round,
+  Session 654). Still open: that first-link path does not apply D48's due-date
+  write. The Invite modal's manual-link "mark manually sent" control is
+  unreachable today (`render-emails-service.js` always sets `manualLink: null`).
 
 **Build notes (2026-10-30, branch `claude/reviewer-materials-on-accept`, PR
 #562, not merged).** Built on the branch: migration 091 and its store, the

@@ -36,11 +36,11 @@ export default function AcceptedConfirmationView({
 
       <div className="space-y-3 text-sm text-gray-700">
         <p>
-          We're emailing you a link to the proposal and the review form. It
-          should arrive within a few minutes. From then on, use the link in
-          that email: the link you used to reach this page stops working once
-          it is sent. If the proposal isn't ready yet, we'll email you as soon
-          as it is.
+          We'll email you a link to the proposal and the review form, usually
+          within a few minutes. Please use the link in that email from then
+          on; the link you used to reach this page may stop working. If the
+          email hasn't arrived by the next business day, please let your
+          Program Director know.
         </p>
         <p>
           If something changes — calendar conflict, conflict of interest you
