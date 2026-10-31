@@ -328,7 +328,7 @@ test.each(['external', 'staff'])('%s full submission wins an external-versus-sta
   expect(ReviewDraftService.deleteBySuggestion).toHaveBeenCalledTimes(1);
 });
 
-test.each(['withdrew', 'released'])('%s wins while a full receipt is paused; answer children roll back', async (terminalStatus) => {
+test.each(['withdrew', 'released', 'did_not_submit'])('%s wins while a full receipt is paused; answer children roll back', async (terminalStatus) => {
   const pause = transport.pauseNext((request) => request.entitySet === '$batch');
   const pending = inContext(() => submitManualReviewEntry({ suggestionId: ID, answers: ANSWERS, setVersion: VERSION }));
   const rejection = expect(pending).rejects.toMatchObject({ body: { reason: 'conflict' } });
@@ -341,11 +341,12 @@ test.each(['withdrew', 'released'])('%s wins while a full receipt is paused; ans
   expect(transport.get(SET, ID)).toEqual(winner);
   expect(winner).toMatchObject({ wmkf_reviewstatus: REVIEW_STATUS_MAP[terminalStatus], wmkf_reviewreceivedat: null, wmkf_externaltokenrevoked: true });
   expect(transport.rows(ANSWER_SET)).toEqual([]);
-  expect(Boolean(transport.get('akoya_requests', HONORARIUM))).toBe(terminalStatus !== 'withdrew');
+  // Staff-ended engagements keep the honorarium and mark it Withdrawn (owner decision 2026-10-31).
+  expect(transport.get('akoya_requests', HONORARIUM)).toMatchObject({ akoya_requeststatus: 'Withdrawn' });
   expect(ReviewDraftService.deleteBySuggestion).not.toHaveBeenCalled();
 });
 
-test.each(['withdrew', 'released'])('full receipt wins after %s authorizes its row; terminal mutation and honorarium deletion cannot land', async (terminalStatus) => {
+test.each(['withdrew', 'released', 'did_not_submit'])('full receipt wins after %s authorizes its row; terminal mutation and honorarium change cannot land', async (terminalStatus) => {
   const pause = transport.pauseNext((request) => request.method === 'GET' && request.key === ID, { stage: 'after' });
   const terminal = inContext(() => transitionReviewersTerminal(terminalArgs(terminalStatus)));
   await pause.reached;
@@ -356,7 +357,7 @@ test.each(['withdrew', 'released'])('full receipt wins after %s authorizes its r
   await expect(terminal).resolves.toMatchObject({ transitioned: 0, results: [{ suggestionId: ID, status: 'changed_skipped' }] });
   expect(transport.get(SET, ID)).toEqual(winner);
   expect(transport.rows(ANSWER_SET)).toEqual(winningAnswers);
-  expect(transport.get('akoya_requests', HONORARIUM)).not.toBeNull();
+  expect(transport.get('akoya_requests', HONORARIUM)).toMatchObject({ akoya_requeststatus: 'Pending' });
 });
 
 test('a completed review can receive its generated DOCX pointer and thank-you claim, while another receipt is rejected', async () => {

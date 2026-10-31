@@ -381,6 +381,9 @@ export default function ReviewerManagePanel({
   const statusOperationsRef = useRef(new Map());
   const statusContextRef = useRef({ mounted: false, epoch: 0 });
   const [pendingStatusTokens, setPendingStatusTokens] = useState(() => new Map());
+  // Rows whose End engagement write is in flight. The write can take ~20s when
+  // an honorarium is involved, so the row says so instead of looking idle.
+  const [savingTerminalIds, setSavingTerminalIds] = useState(() => new Set());
   // Stage 6B1: feedback-ownership registry for the token/removal/terminal
   // actions below. One entry per `${kind}:${suggestionId}` key holding the
   // latest attempt for that action+row; a newer call for the same key simply
@@ -848,7 +851,9 @@ export default function ReviewerManagePanel({
       did_not_submit: 'did not submit a review',
     }[terminalStatus] || 'was released by WMKF';
     const consequence = terminalStatus === 'withdrew' || terminalStatus === 'did_not_submit'
-      ? 'This changes their response to declined, updates reviewer counts, revokes their portal link, and removes any linked honorarium request.'
+      ? 'This changes their response to declined, updates reviewer counts, and revokes their portal link. '
+        + 'Any linked honorarium request is kept and marked Withdrawn; a paid or payment-authorized honorarium stops this change.\n\n'
+        + 'Saving can take up to half a minute.'
       : 'This ends the engagement and revokes their portal link.';
     if (!confirm(`Confirm that ${reviewer.name || 'this reviewer'} ${outcome}?\n\n${consequence}`)) return;
     // Revalidate after confirm() and before dispatch (see handleRevokeToken).
@@ -857,6 +862,7 @@ export default function ReviewerManagePanel({
     const attempt = beginAttempt('terminal', reviewer.suggestionId);
     if (!attempt) return;
     const isCurrent = () => isAttemptCurrent(attempt);
+    setSavingTerminalIds(previous => new Set(previous).add(reviewer.suggestionId));
     // Captured at dispatch time, not read live from `proposal` later — a
     // request switch after this point must not relabel this payload.
     const requestId = attempt.requestId;
@@ -896,6 +902,12 @@ export default function ReviewerManagePanel({
         }
       }
     } finally {
+      setSavingTerminalIds(previous => {
+        if (!previous.has(reviewer.suggestionId)) return previous;
+        const next = new Set(previous);
+        next.delete(reviewer.suggestionId);
+        return next;
+      });
       finishAttempt(attempt);
     }
   };
@@ -1338,7 +1350,10 @@ export default function ReviewerManagePanel({
                         </td>
                         <td className="px-2 py-3 align-top text-center">
                           {/* Secondary magic-link and lifecycle actions. */}
-                          <div className="flex w-full justify-center">
+                          <div className="flex w-full items-center justify-center gap-1">
+                            {savingTerminalIds.has(r.suggestionId) && (
+                              <span role="status" className="text-xs text-gray-500">Saving…</span>
+                            )}
                             <TokenActionsMenu
                               reviewer={r}
                               onRegenerate={() => handleRegenerateToken(r.suggestionId)}
