@@ -1,6 +1,6 @@
 ---
 name: feedback-question-the-rehearsal-venue
-description: "When a rehearsal venue's gaps (sandbox parity, missing users/prompts/automation) start dominating a slice's effort, stop and put the venue itself to the owner before patching another gap"
+description: "Default test venue is Production on marked test requests (owner, 2026-10-31); do not propose sandbox rehearsal. If any rehearsal venue's gaps start dominating effort, stop and put the venue to the owner"
 status: active
 metadata:
   type: feedback
@@ -35,3 +35,13 @@ and the agent-wiki Dataverse note on sandbox background processing. Related:
 [[feedback-factory-safe-not-full-fidelity]], [[project-preview-rehearsal-venue-limits]].
 
 S612 (2026-10-15) applied this: writeup regeneration's sandbox tooling (3,023 lines) outgrew the feature (2,569) without one real run. Splitting it off and shipping behind a superuser-only gate for one owner-run production regeneration proved the feature in a single session.
+
+**Standing default (owner, Session 655, 2026-10-31):** "Let's work in prod as
+our sandbox tests almost always seem to create more work." Test new Dataverse
+schema and reviewer-outcome behavior in Production, on marked test requests
+(`wmkf_istestrequest`), through guarded owner-run scripts (interlock on, prod
+reads, dated write ACK, ETag-bound writes, restore). Do not propose a sandbox
+rehearsal or plan sandbox schema parity as a prerequisite. Each Production
+write still needs the owner's explicit OK. Worked example: the Wave 35 rollout
+(Ended by field + Did not submit status), steps 1-5 in
+`docs/plans/INVITED_REVIEWER_OUTCOMES_PLAN_2026-10-31.md`.

@@ -335,6 +335,9 @@ reviewers (3)" still counted the row. Slice 3/4 must show the status, and take
 Did not submit rows out of the release count and eligibility, reminders and
 the accepted-count totals.
 
+**Test venue (owner, 2026-10-31):** slices 3–5 are tested in Production on
+marked test requests, not the sandbox, which will not get the Wave 35 schema.
+
 Both schema changes are additive and no runtime code reads or writes them
 until slice 3. Each step below is owner-run or explicitly owner-approved;
 steps 2, 3 and 5 also need that day's `DATAVERSE_PROD_WRITE_ACK`. Every
