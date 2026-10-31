@@ -1,143 +1,156 @@
-# Session 657 Prompt: PR553 parked for Monday Windows09 checks with Connor
+# Session 658 Prompt: J27 Factory document slice complete; await Connor
 
-**Session 656 summary — Codex, 2026-10-30 Pacific.** Documentation closeout is on
-`main`; runtime feature work remains on `codex/shared-prompt-library-plan` and is
-not merged or pushed. Connor's ZIP must never be added or pushed to Git.
+## Session 657 Summary — Codex, 2026-10-31 Pacific
 
-Prior handoffs are preserved exactly and were verified retrievable before this
-rewrite: `git show aa32a0c12:SESSION_PROMPT.md` (Claude Session655 plus Monday
-parking pointer), `git show b19a1f4dd:SESSION_PROMPT.md` (original Claude655), and
-`git show b091cf5cd:SESSION_PROMPT.md` (Codex Board release Session654).
-Historical paths, live observations and permissions are not fresh authority.
+**Destination:** this handoff and feature stay on `codex/session-657-start`, in
+`/private/tmp/wmkf-session-657-codex`. Justin explicitly requested an isolated
+worktree because Claude is working on main. Do not switch or write Claude's
+checkout, merge this branch into main, or treat a stop-time feature push as
+production promotion. The user invoked `/stop` to preserve this branch remotely.
 
-## What Was Completed
+Prior handoffs remain retrievable: `git show 6ce1ec21a:SESSION_PROMPT.md` is the
+branch's previous handoff; `git show 3703f7bbd:SESSION_PROMPT.md` is the observed
+main handoff at this stop, including Claude's newer workstreams. Both were read
+and verified retrievable. Those are dated snapshots, not fresh live authority.
 
-1. **[VERIFIED via feature Git history/milestone] Local PR553 tooling completed and reviewed.**
-   Latest feature head `9d838c4c804c6f9607737b870e12c4ac3eb91736`, worktree
-   `/private/tmp/wmkf-pr553`. It is clean and 15 commits ahead of its remote at
-   closeout. Existing schemas/settings are test-only; no live publication operation
-   or guards were registered/enabled by this work. No enabled package was built.
-   Fable subscription-OAuth review/corrections completed; recorded verification is
-   18 suites /697 tests, 25 packaging checks, 1,484 portable checks and applicable
-   gates. These are recorded feature checks, not tests rerun on main at stop.
-2. **[VERIFIED via file/ZIP hashes] Windows09 prepared and packaged with Connor's Claude prompt.**
-   The outer ZIP contains exactly the full prompt and the unchanged Windows09 ZIP.
-   The tracked [Monday archive](docs/plans/PR553_MONDAY_RESUME_2026-11-02.md)
-   preserves full instructions, original hashes, local branch references and stop
-   boundaries. Original source/SDK details are retrievable with
-   `git show 9d838c4c8:docs/plans/PR553_ACTIVATION_AND_ENABLED_PACKAGE_2026-10-30.md`.
-3. **[OWNER REPORTED] Justin emailed Connor the ZIP and downloaded it.**
-   Connor execution is not yet verified. User explicitly prohibited sending the
-   ZIP to Git. GitHub metadata confirms the repository is PUBLIC. All binary
-   handoffs remain local/untracked; documentation-only sync does not include them.
-4. **[OWNER DIRECTED] Local expansion paused until Windows results.**
-   Monday starts with offline checks only. A Windows PASS does not authorize
-   registration, uploads, guard activation, enablement, production work or a
-   feature deployment. Actual identity/bindings/quiet-window evidence and separate
-   exact-plan approvals remain required for the later test rehearsal.
+### What Was Completed
 
-### Commits and destinations
+1. **[VERIFIED via Git and startup checks] Isolated setup and start.** Created this
+   branch from `6ce1ec21a`; dependencies and required skills/memory symlinks were
+   set up. All 72 startup gate/self-test runs passed. Main's existing WIP was
+   preserved. Main advanced during this session; this branch intentionally does
+   not include that concurrent runtime work.
+2. **[VERIFIED via read-only SharePoint/journal/Dynamics reads] Board-link inquiry.**
+   The D26 Board folder contained nine released writeups. Copying finished around
+   7:01 p.m. Pacific October 30; the five recorded leadership activities were Sent
+   around 8:01 p.m., all linking to that same folder. No copy-after-email evidence
+   was found. The specific message Beth clicked and her account's visibility
+   remain unverified; Justin had requested the forwarded message. No repair,
+   permission change, copy, release or email was performed. Research library
+   listing was supplied in chat. Correct path: Research → Documents → Board
+   Materials → D26. This is not authorization to resend or re-release anything.
+3. **[VERIFIED via source/offline tests] J27 Factory research, plan and bounded build.**
+   Both newly submitted and advanced-to-peer-review starting points are planned.
+   Only document handling is implemented: confirmed J27 narrative/bibliography
+   aliases, exact pair completeness for linked J27 sources, version-6 source
+   profile, original source integrity, and canonical renamed copy destinations.
+   D26 exports remain v5; retained v2–v5 semantics and existing policy/ledger
+   grammar remain intact. No migration, new route, status operation, image/raw
+   upload support, deployment or live Factory rehearsal was performed.
+4. **[VERIFIED via review receipt] Claude Fable reviewed the plan and build through
+   subscription OAuth only, with API-key variables removed.** Initial plan
+   findings were incorporated. Build review found no blocking code defect and
+   required two tests; both were added. Final verdict: APPROVE. No Ultrareview,
+   API-authenticated agent session or substitute product was used.
+5. **[OWNER DIRECTED] Remaining Factory work is parked for Connor.** An email was
+   drafted in chat; no agent sent it, and owner sending/receipt is unverified.
+   Final question 5: “Have you created a J27 test request when testing the portal?”
+   Document questions were narrowed because D22/D33 and the readers already
+   define contents and the reviewer path. The plan records these clarifications.
 
-Feature branch only (held local, no push/promotion):
-- `bac77ba98` activation and enabled-test-package tooling; Fable corrections.
-- `9d838c4c8` Windows09 source-bound handoff and pause.
-- Earlier exact execution/recovery: `24c09a74e`; guard preparation: `994a54e25`.
-- The other unpushed feature commits remain reachable on that branch; preserve it.
+### Commits
 
-Main docs only:
-- `aa32a0c12` Monday archive and parked-task pointer.
-- This closeout: Session657 prompt and owner-reported delivery/no-Git-ZIP rule.
+- `6e58c6682` — Plan J27 Factory submitted and peer-review starting points.
+- `557c5431c` — Support J27 Factory AI-input documents with legacy-safe copies.
+- Stop documentation commit follows, on this same branch only.
 
 ## Next Items
 
-### Parked — Monday, November 2
-
-**Shared prompt publication with Connor.** Resume from the
-[Monday archive](docs/plans/PR553_MONDAY_RESUME_2026-11-02.md).
-- Supply the already-delivered bundle09 to Claude on Windows and run only its
-  offline checks. Preserve `windows-check-result.json` and complete console output;
-  transcript must be outside the extracted directory.
-- Bring results here for exact package/source-hash validation. Do not run the
-  registration or activation commands merely because offline checks pass.
-- Preserve original IDs, journals, existing prompts/settings and signing-key custody.
-- No local feature expansion until results or a new owner instruction.
-
 ### Verified Open
 
-No additional PR553 implementation is scheduled. Actual Windows proof and later
-approved live rehearsal remain outstanding. Recheck local worktree/branch/status
-before resuming; do not treat a temporary path as guaranteed to survive.
+No additional implementation is scheduled before Connor's reply. The document
+slice is source-built, offline-tested and Fable-approved; production readiness
+and live behavior are not established. Promotion needs a later deliberate owner
+decision. Check the branch and current main before preparing integration.
 
-### Owner Decision Needed / Other Streams
+### Owner / Connor Decisions Needed
 
-The prior Claude handoff retains the owner's unresolved #561 merge decision,
-#562 wording/release approvals, removed-candidate terminal-history question and
-first-link due-date write gap. Their implementation/live preconditions were not
-revalidated here; consult the exact prior handoff and their owning plan before
-acting. Do not convert those carryovers into authorized live actions.
+Use the [implementation plan](docs/plans/TEST_REQUEST_FACTORY_J27_IMPLEMENTATION_PLAN_2026-10-31.md)
+for the full C1–C9 contract/evidence table. Immediate questions:
+
+- We set the test states ourselves. Confirm whether setting Phase I `Invited`
+  derives Request Status automatically or both fields must be set explicitly;
+  confirm arrival phase-picklist values and automation effects for both presets.
+- Exact files-ready, staff-state and program-at-submission field contracts and
+  test-marker handling for relevant flows; no field names or options invented.
+- Exact combined staff PDF filename/location. Staff-package contents are already
+  decided; reviewers receive the same package at the code-enforced
+  `Reviewer Materials/Proposal_{n}.pdf` path. Do not reopen those settled points.
+- Whether Connor already created a J27 portal test request that can be inspected
+  before proposing a separate, authorized live rehearsal.
+
+### Parked
+
+- **Factory lifecycle/status presets and all live rehearsals:** owner hold until
+  Connor is available and replies. No status PATCH, new test record, provider
+  work, send, schema apply, cleanup or production promotion is authorized.
+- **PR553 / Windows09:** inherited owner-directed hold pending Connor's Windows
+  offline results, recorded in the [Monday archive](docs/plans/PR553_MONDAY_RESUME_2026-11-02.md).
+  This stream was not resumed or inspected at stop. Preserve its unpushed feature
+  work and local artifacts; do not push its branch or add Connor's ZIP to Git.
 
 ### Verify Before Acting
 
-- The latest 15 PR553 commits are LOCAL ONLY. Main documentation is remotely
-  synced at closeout; this is not a backup of the unpushed feature code. Do not
-  push that branch casually: it may trigger Preview. Preserve the worktree and
-  common Git objects; obtain a deliberate backup/promotion decision if changing
-  machines or needing remote feature access.
-- Local sendable archive:
-  `output/connor-windows09-offline-checks/Connor-Windows09-Offline-Checks.zip`.
-  It is not in Git and will not appear on another machine through a pull. The
-  owner has already handled email/download delivery. Preserve local output.
-- PR heads below were checked via GitHub at this stop, not their CI/live readiness.
-- Prior migration/seed/deletion/retirement steps need fresh preflight and explicit
-  authority; no carryover removal is authorized by this handoff.
-- Unknown main WIP belongs to its owners: `.codex/hooks.json`,
-  `.github/hooks/impeccable.json`, untracked `.impeccable/critique/…` and `output/`.
-  These were left untouched and unstaged.
+- Worktree paths are local and temporary; verify branch, commit, files and remote
+  before resuming. The Factory branch's push preserves tracked code/docs, not
+  local dependencies, environment links or external review logs.
+- Production source lookup expansion, real J27 cycle-link population, Graph MIME
+  and actual flow effects remain unprobed for this build. Unit tests do not prove
+  them. A source without a linked J27 cycle and without J27-named inputs follows
+  legacy rules; do not claim such a fixture is J27-ready.
+- Keep v6 runs on compatible code. Old code must not advance them. Preserve all
+  dispatch evidence and artifacts; never reset a stopped run to retry a write.
+- A Basic run's ready status is not proof of either proposed J27 starting state.
+- Main has newer Claude changes; use its current source/handoff when resuming
+  those streams, rather than this branch's older snapshot.
 
 ### Do Not Reopen Without New Direction
 
-- No Connor ZIP in Git, no automatic retry of uncertain registration/activation
-  writes, no invented runtime IDs/evidence, no implicit approval to enable.
-- Preserve prior Board release/email receipts; do not re-release the nine files
-  or resend the five Sent activities from the prior Board milestone.
-- Prior Claude D26 restriction remains recorded: no reviewer proposal-availability
-  emails and no clearing/removal of historical rows under this closeout.
+- No automatic reviewer/AI history generation or full GOApply fidelity expansion.
+- No re-release of Board files or resend of prior leadership activities.
+- No Connor ZIP in Git; no PR553 activation from an offline PASS alone.
+- No destructive carryover or historical-record cleanup based on a handoff.
 
 ## Concurrent Workstreams
 
-| Owner / workstream | Latest recorded boundary |
+| Owner / stream | Resume boundary |
 |---|---|
-| Codex / shared prompt library | PARKED; local `9d838c4c8`, Windows09 offline check with Connor Monday; [resume archive](docs/plans/PR553_MONDAY_RESUME_2026-11-02.md) |
-| Claude / Board calendar #561 | **MERGED + DEPLOYED** on owner approval (Claude, 2026-10-30): merge `955613bdb`, Vercel Production success, all `main` CI green. Head `82039e29d` also fixed the `reviewer-engagement-census` failure that `b19a1f4dd`'s close-out script caused on `main`. All three owner-run pre-merge checks passed (D26 Board Mailing 2026-11-25 ≤ Board 2026-12-10; no pending intent or unsent draft). Unverified: D26 Board page rendering calendar dates (needs a signed-in look) |
-| Claude / materials #562 | OPEN/DRAFT, head `54a63a652d482ff64acf2651c7c4d2b56c1e953a`; prior owner wording/release steps still need verification/approval |
-| Codex / Board #563/#564 | Prior deployed milestone preserved at `b091cf5cd`; no new live work here |
-| Codex / ranking, prior archival | Prior handoffs; not revalidated |
-| Claude / research request corpus | Owner-gated; no new authorization |
+| Codex / J27 Factory | This branch; document subset complete; lifecycle/live work held for Connor; owning plan linked above. |
+| Claude / main and invited-reviewer outcomes | Active concurrently. Observed main tip `3703f7bbd`; its handoff records #569/#570 and Production schema steps. Those live claims were not re-probed here. Resume from current main and its owning plan; no authority transferred. |
+| Claude / #561, #562, #568 | Main's observed handoff records these merged/deployed. Historical evidence only here; do not carry earlier open-merge tasks forward. |
+| Codex / PR553 | Parked per Monday archive; no new implementation, promotion or branch push in this session. |
+| Ranking, archive, research corpus | Other-owner streams; not revalidated or assigned here. |
 
-## Key Files and Resume Verification
+## Key Files
 
-- [Monday task archive and complete Claude prompt](docs/plans/PR553_MONDAY_RESUME_2026-11-02.md).
-- Feature-only detailed record:
-  `git show 9d838c4c8:docs/plans/PR553_ACTIVATION_AND_ENABLED_PACKAGE_2026-10-30.md`.
-- Feature-only operator sequence:
-  `git show 9d838c4c8:docs/plans/PR553_OPERATOR_CHECKLIST_2026-10-30.md`.
-- Other streams' owning plan:
-  `docs/plans/REVIEWER_INVITATION_CALENDAR_BUILD_PLAN_2026-10-29.md`.
+| File | Purpose |
+|---|---|
+| `docs/plans/TEST_REQUEST_FACTORY_J27_IMPLEMENTATION_PLAN_2026-10-31.md` | Scope, Fable dispositions, build evidence and Connor questions |
+| `docs/plans/evidence/FACTORY_J27_DOCUMENT_HANDLING_REVIEW_2026-10-31.json` | OAuth Fable review, final APPROVE, fingerprint and verification limits |
+| `lib/services/test-requests/document-profile.js` | Pure J27 pair/profile and abstract-version checks |
+| `lib/services/test-requests/source-bundle.js` | v6 J27 exports/read validation; legacy formats retained |
+| `lib/services/test-requests/file-plan.js` | Alias source validation and canonical copy destinations |
+| `tests/unit/test-request-j27-documents.test.js` | Export/copy integrity, completeness, downgrade and partial-selection coverage |
+| `docs/TEST_REQUEST_FACTORY_FORM_RUNBOOK.md` | Branch-only document handling and operational limits |
+| `docs/atlas/postgres-test-request-runs.md` | Artifact ownership and unchanged ledger contract |
 
-```bash
-git status --short --branch
-git -C /private/tmp/wmkf-pr553 status --short --branch
-git -C /private/tmp/wmkf-pr553 log -2 --oneline
-```
+## Verification and Closeout
 
-## Closeout Verification
+[VERIFIED via session commands] Before stop: 70 Factory unit suites / 2,303 tests
+passed. Fable's requested additions subsequently passed in the focused J27 suite
+(19 tests); the default Admin exporter suite passed 117 tests. Types, touched-file
+lint (zero errors, two existing unused-disable warnings), all 38 selected gate/
+self-test runs and canonical `npm run build` passed. Final docs/reference/fact/
+J27/secret checks passed again after the review receipt. No live Factory action
+or schema application was used for verification.
 
-- Run scoped documentation/reference/fact/secret gates sequentially with self-tests;
-  do not rerun live mutations or broaden feature work for session cleanup.
-- Claim-evidence pilot report was attempted; local state could not be read. No
-  eligible-session observation or zero-advisory row was invented.
-- Milestone determination: no DEVELOPMENT_LOG entry required. This is unmerged
-  local preparation and archival, not a newly shipped capability or production
-  cutover. No CLAUDE.md or memory changes were needed.
-- Sync only docs on main. The feature remains explicitly held; Connor's ZIP is
-  absent from the commit/push payload. No feature promotion is implied.
+The stop claim-evidence report was attempted but local state was unavailable.
+No eligible-session observation or zero-advisory row was invented. Memory router
+was not edited, and no new router-growth advisory was received.
+
+**Milestone determination:** no DEVELOPMENT_LOG entry required. This is an
+unmerged branch implementation, not a shipped production capability/cutover.
+No CLAUDE.md change is needed: no app, endpoint, schema, executable script,
+configuration or repository convention was added. Factory-specific contracts
+are documented in its plan, runbook, Atlas and catalog. Stop updates only this
+handoff and the plan's final owner clarifications; main remains with Claude.

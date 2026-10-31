@@ -103,13 +103,13 @@ The requested output is a recorded answer per row before its dependent slice.
 |---|---|---|---|
 | C1 | What exact Request Status, Phase I Status, and Phase II Status values does a freshly submitted J27 request carry? Which API-safe operation establishes that state after the create plug-in returns `Pending`? Is a post-create `akoya_requeststatus` PATCH by the app user permitted, and what does it trigger? | J27 arrival Request Status is `Phase I Pending` (D27) | Submitted preset state establishment and verifier |
 | C2 | For a test clone, should advancement set the phase picklist and let the current rule set Request Status, or use another explicitly bounded operation? Supply the current rule/flow behavior, atomicity, and readback expectations. | Post-Chairs approved state is Phase I `Invited` plus Request Status `Phase II Pending` (D35/D39); no second submission | Peer-review preset and partial-success/recovery design |
-| C3 | What are the exact filenames, extensions, and locations of the combined staff version and reviewer version? Confirm the reviewer version's compatibility with the apps' current `Reviewer Materials/Proposal_{n}.pdf` reader, and whether renumbering a copied package is sufficient. What input serves Reviewer Finder's narrative-plus-bibliography contract? | Staff-version contents/order decided D22; reviewers receive the staff version, renamed, in Reviewer Materials (D33); narrative and bibliography inputs remain separately retained | File profile and downstream readiness |
-| C4 | What is the minimum complete processed file set for each preset? Which documents are optional, and what is the graphical-abstract image format? Must the Factory copy `Submission-Documents` originals, or are processed files sufficient for these tests? | J27 AI names include `Project-Narrative_{n}.pdf` and `Bibliography_{n}.pdf`; all named processed files are PDFs except the graphical-abstract image | Required-document rules, supported MIME types and reviewed count/byte limits |
+| C3 | What is the exact filename and location of the combined J27 staff PDF? Verify the flow produces the already-established reviewer path when a representative source is available; do not reopen the app contract. | D22 defines staff contents/order; D33 says reviewers receive the same package. Code enforces `Reviewer Materials/Proposal_{n}.pdf`. AI-input names are established. | Combined staff-package discovery; later live source verification |
+| C4 | If later scope needs the graphical-abstract image, confirm its format and actual optional-file availability. Minimum fixture contents and whether to copy raw originals are owner scope choices, not unanswered document-design questions for Connor. | D22/D33 settle package contents. This slice requires only the confirmed AI-input pair and copies no raw originals or images. | Only a separately approved expansion of the copied file set |
 | C5 | What are the new files-ready field's logical name/type, exact completion semantics, and reset/replacement behavior? May a verified Factory copy set it, or must it remain unset to suppress processing? | D25 replaces the old `wmkf_phistaffversioncompleteflag` trigger; D26 assigns file reprocessing to Connor's flows | Intake triggering, suppression and truthful completeness |
 | C6 | What are the new J27 staff-state field's logical name, options, default and provisioning status? Which state is stored versus derived, and how does it interact with formal request/phase status? | D41 specifies a new field, not an extension of D26 `wmkf_triagestatus`; only Triaged writes Phase I `Recommended Do Not Invite` (D31) | Claiming the submitted fixture is ready for the new triage flow |
 | C7 | How do current create/status/file-ready flows recognize test markers? Supply evidence for sends/drafts, portal tracking, payments, AI/provider work, and file overwrites for both presets. Which effects are expected and acceptable? | Existing Factory guards remain mandatory; old D26 flow observations and D42's reassurance do not prove every J27 trigger safe | Any live rehearsal or production enablement |
 | C8 | Which fields hold J27's total requested budget, program-at-submission, and program assignment, and which must a useful fixture carry? Confirm the existing Research grant-program lookup is distinct from MR/S&E classification. | D24: total budget initially, details later in Dataverse, not a required submission spreadsheet; D30: program-at-submission immutable | Field allowlist, required metadata, fixture fidelity for triage/filter tests |
-| C9 | Identify a safe representative J27 source or approved representative file fixture, its preparation stage, and expected outputs. If only D26 sources are available, which transformations are legitimate and which must be refused? | Real contents are not anonymized; no automatic access to or publication of source material | End-to-end acceptance fixture |
+| C9 | Owner's final email wording: "Have you created a J27 test request when testing the portal?" If yes, inspect that existing test source and its preparation stage before proposing a rehearsal. Do not ask for a new request by default. | Real contents are not anonymized; no live rehearsal or new test creation is authorized. | Representative source for a later authorized rehearsal |
 
 Justin owns the acceptable side effects, chosen copy limits, and the decision
 whether the first release must exercise the actual automatic intake AI pass.
@@ -172,6 +172,19 @@ Implementation invariants:
 | J27 inputs copy to existing canonical destination names with new Request number | file planner, bundle copy | Plan/receipt grammar and copied-file verification tests |
 | New abstract-bearing bundle retains all existing abstract fences | bundle and abstract consumers | Creation/source/final readback regression tests |
 | No lifecycle or live action is added | unchanged policy/status/fences | Diff review and Fable build review |
+
+## Owner clarifications after implementation — 2026-10-31
+
+The email to Connor was drafted in chat, not sent by the agent; owner sending or
+receipt is unverified. Justin narrowed the request: we set test statuses ourselves,
+but need to know whether Dynamics derives Request Status from Phase I Status or
+whether both fields must be set explicitly. Most document questions are answered
+by D22/D33 and the existing readers. Only the combined staff PDF's exact path/name
+remains a direct document question; do not ask Connor to re-decide package contents
+or the reviewer path. C3/C4 reflect that distinction. C9 records Justin's exact
+replacement for email question 5. These clarifications do not authorize lifecycle
+implementation, production writes or live rehearsals. Owner agreed this task is
+parked until Connor replies.
 
 ## Implementation sequence
 
