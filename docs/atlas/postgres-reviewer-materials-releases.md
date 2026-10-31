@@ -18,7 +18,8 @@ build notes.
 ## Source of truth
 
 - Schema: `lib/db/migrations/091_reviewer_materials_releases.sql`. Fresh
-  installs apply it through the numbered migrations.
+  installs apply it through the numbered migrations [VERIFIED via
+  `scripts/lib/fresh-database-bootstrap.js:9-10,62` reading the manifest].
 - Writer: `lib/services/reviewer-engagement/materials-release-store.js`, the
   only write path.
   - `claimMaterialsRelease` — `INSERT … ON CONFLICT (suggestion_id) DO NOTHING
@@ -48,7 +49,7 @@ build notes.
 | `request_id` | The request the engagement belongs to. |
 | `source` | `acceptance` (job-driven) or `manual` (staff). |
 | `state` | `claimed`, `link_minted`, `sent`, `recorded`, `uncertain`, `failed`. |
-| `job_id` | `reviewer_acceptance_jobs.id`; required exactly when `source = 'acceptance'`. |
+| `job_id` | `reviewer_acceptance_jobs.id`; required exactly when `source = 'acceptance'`. No foreign key: the operator smoke cleanup deletes completed jobs [VERIFIED via `scripts/smoke-reviewer-binding.js:391`]; no application path deletes them. |
 | `actor_profile_id` | Staff profile: required for `manual`; set on a staff resend. |
 | `lease_token`, `lease_until` | Ownership of an in-flight send; cleared at `recorded` and when stopped. |
 | `attempts` | 1 on claim; +1 per staff resend. |

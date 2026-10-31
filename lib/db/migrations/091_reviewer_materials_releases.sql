@@ -7,7 +7,7 @@ CREATE TABLE IF NOT EXISTS reviewer_materials_releases (
  request_id UUID NOT NULL,
  source TEXT NOT NULL CHECK(source IN ('acceptance','manual')),
  state TEXT NOT NULL DEFAULT 'claimed' CHECK(state IN ('claimed','link_minted','sent','recorded','uncertain','failed')),
- job_id BIGINT REFERENCES reviewer_acceptance_jobs(id),
+ job_id BIGINT, -- reviewer_acceptance_jobs.id; no FK: operator smoke cleanup deletes jobs (scripts/smoke-reviewer-binding.js)
  actor_profile_id INTEGER REFERENCES user_profiles(id),
  lease_token UUID,
  lease_until TIMESTAMPTZ,
