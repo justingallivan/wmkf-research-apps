@@ -507,3 +507,27 @@ describe('undated terminal status summary', () => {
     expect(summary.key).toBe('review_reminder');
   });
 });
+
+describe('did not submit (outcomes slice 3a)', () => {
+  // applyStaffReviewerDidNotSubmit keeps responseReceivedAt as the acceptance time.
+  const reviewer = {
+    suggestionId: 'dns-1',
+    reviewStatus: 'did_not_submit',
+    responseType: 'declined',
+    responseReceivedAt: '2026-08-01T10:00:00Z',
+    materialsSentAt: '2026-08-02T10:00:00Z',
+    reminderSentAt: '2026-08-20T10:00:00Z',
+  };
+
+  it('keeps the preserved stamp labelled as the acceptance, not as the staff outcome', () => {
+    const response = buildActivityHistory(reviewer).find((e) => e.key === 'response_received');
+    expect(response).toMatchObject({ label: 'Reviewer accepted invitation', at: '2026-08-01T10:00:00Z' });
+    expect(response.label).not.toMatch(/not submitted|declined/i);
+  });
+
+  it('shows the undated terminal status as Last Action instead of the old reminder', () => {
+    const summary = latestActivitySummary(reviewer);
+    expect(summary).toMatchObject({ key: 'terminal_did_not_submit', label: 'Current status: Did not submit', dated: false });
+    expect(currentTerminalStatus(reviewer).label).toBe('Current status: Did not submit');
+  });
+});

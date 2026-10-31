@@ -9,6 +9,7 @@
 
 const updateLifecycle = jest.fn(async () => {});
 const findByRequest = jest.fn();
+const findEndedAfterAcceptanceByRequest = jest.fn();
 const findAcceptedByPD = jest.fn();
 const findAcceptedByCycle = jest.fn();
 jest.mock('../../lib/services/workbench/program-scope-service.js', () => ({
@@ -22,9 +23,10 @@ jest.mock('../../lib/services/workbench/program-scope-service.js', () => ({
 jest.mock('../../lib/dataverse/adapters/reviewer-suggestion', () => ({
   updateLifecycle: (...a) => updateLifecycle(...a),
   findByRequest: (...a) => findByRequest(...a),
+  findEndedAfterAcceptanceByRequest: async (...a) => (await findEndedAfterAcceptanceByRequest(...a)) || [],
   findAcceptedByPD: (...a) => findAcceptedByPD(...a),
   findAcceptedByCycle: (...a) => findAcceptedByCycle(...a),
-  RESPONSE_TYPE_BY_VALUE: { 100000000: 'accepted', 100000002: 'no_response' },
+  RESPONSE_TYPE_BY_VALUE: { 100000000: 'accepted', 100000001: 'declined', 100000002: 'no_response' },
   HONORARIUM_ELIGIBILITY_BY_VALUE: {
     100000000: 'eligible',
     100000001: 'not_eligible',
@@ -235,6 +237,8 @@ describe('patchReviewers', () => {
     [' RELEASED ', 'Terminal reviewer statuses require the dedicated transition endpoint'],
     [TERMINAL_REVIEW_STATUS_VALUES.withdrew, 'Terminal reviewer statuses require the dedicated transition endpoint'],
     [TERMINAL_REVIEW_STATUS_VALUES.released, 'Terminal reviewer statuses require the dedicated transition endpoint'],
+    ['did_not_submit', 'Terminal reviewer statuses require the dedicated transition endpoint'],
+    [TERMINAL_REVIEW_STATUS_VALUES.did_not_submit, 'Terminal reviewer statuses require the dedicated transition endpoint'],
   ];
   describe.each(['single', 'batch', 'empty-array fallback'])('%s dedicated status precheck', form => {
     test.each(dedicatedStatuses)('refuses %s before all writes with error-only service semantics', async (reviewStatus, message) => {
@@ -461,6 +465,74 @@ describe('getReviewers', () => {
     expect(history).toEqual([]);
     expect(out.totalReviewers).toBe(2);
     expect(ordinary.every((row) => Array.isArray(row.answers))).toBe(true);
+  });
+
+  test('lists staff-ended Withdrew and Did not submit rows on Track without counting them as accepted', async () => {
+    getRequestById.mockResolvedValueOnce({
+      akoya_requestid: REQ,
+      _wmkf_grantprogram_value: '11111111-1111-4111-8111-111111111111',
+      akoya_requestnum: 'R-1001',
+      akoya_title: 'T',
+      wmkf_reviewduedate: '2026-09-09',
+    });
+    const active = {
+      wmkf_appreviewersuggestionid: IDS[1],
+      _wmkf_request_value: REQ,
+      _wmkf_potentialreviewer_value: 'person-2',
+      wmkf_selected: true,
+      wmkf_accepted: true,
+      wmkf_responsetype: 100000000,
+      wmkf_reviewstatus: null,
+    };
+    findByRequest.mockResolvedValueOnce([active]);
+    // Exactly what applyStaffReviewerDidNotSubmit / applyStaffReviewerWithdrawal persist.
+    const ended = (id, person, status) => ({
+      wmkf_appreviewersuggestionid: id,
+      _wmkf_request_value: REQ,
+      _wmkf_potentialreviewer_value: person,
+      wmkf_selected: false,
+      wmkf_accepted: false,
+      wmkf_declined: true,
+      wmkf_responsetype: 100000001,
+      wmkf_reviewstatus: status,
+      wmkf_externaltokenrevoked: true,
+    });
+    findEndedAfterAcceptanceByRequest.mockResolvedValueOnce([
+      ended(IDS[0], 'person-1', TERMINAL_REVIEW_STATUS_VALUES.did_not_submit),
+      ended(IDS[2], 'person-3', TERMINAL_REVIEW_STATUS_VALUES.withdrew),
+    ]);
+
+    const out = await getReviewers({ proposalId: REQ, azureEmail: 'pd@wmkeck.org' });
+    const rows = out.proposals[0].reviewers;
+
+    expect(findEndedAfterAcceptanceByRequest).toHaveBeenCalledWith(REQ);
+    const byId = Object.fromEntries(rows.map((r) => [r.suggestionId, r]));
+    expect(byId[IDS[0]]).toMatchObject({ reviewStatus: 'did_not_submit', responseType: 'declined', lifecycleValid: true });
+    expect(byId[IDS[2]]).toMatchObject({ reviewStatus: 'withdrew', lifecycleValid: true });
+    // ReviewerManagePanel's "Release proposal to reviewers (N)" counts reviewStatus === 'accepted'.
+    expect(rows.filter((r) => r.reviewStatus === 'accepted').map((r) => r.suggestionId)).toEqual([IDS[1]]);
+    // Ended rows never join the synthesis readiness population.
+    expect(out.proposals[0].reviewSynthesisState.participantCount).toBe(1);
+  });
+
+  test('maps a status-only Did not submit row (the Production round-trip shape) to its own status', async () => {
+    getRequestById.mockResolvedValueOnce({
+      akoya_requestid: REQ,
+      _wmkf_grantprogram_value: '11111111-1111-4111-8111-111111111111',
+      akoya_requestnum: 'R-1001',
+      akoya_title: 'T',
+      wmkf_reviewduedate: '2026-09-09',
+    });
+    findByRequest.mockResolvedValueOnce([{
+      wmkf_appreviewersuggestionid: IDS[0],
+      _wmkf_request_value: REQ,
+      _wmkf_potentialreviewer_value: 'person-1',
+      wmkf_accepted: true,
+      wmkf_responsetype: 100000000,
+      wmkf_reviewstatus: TERMINAL_REVIEW_STATUS_VALUES.did_not_submit,
+    }]);
+    const out = await getReviewers({ proposalId: REQ, azureEmail: 'pd@wmkeck.org' });
+    expect(out.proposals[0].reviewers[0]).toMatchObject({ reviewStatus: 'did_not_submit', lifecycleValid: true });
   });
 
   test('preserves an invalid lifecycle signal for unknown response and review-status options', async () => {

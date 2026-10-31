@@ -4,6 +4,7 @@ const findById = jest.fn();
 const updateLifecycle = jest.fn();
 const applyStaffReviewerWithdrawal = jest.fn();
 const applyStaffReviewerRelease = jest.fn();
+const applyStaffReviewerDidNotSubmit = jest.fn();
 const cancelReviewerAcceptanceJobsForSuggestion = jest.fn();
 const createAndSendEmail = jest.fn();
 const getHonorariumCancellationState = jest.fn();
@@ -16,6 +17,7 @@ jest.mock('../../lib/dataverse/adapters/reviewer-suggestion', () => ({
   updateLifecycle: (...args) => updateLifecycle(...args),
   applyStaffReviewerWithdrawal: (...args) => applyStaffReviewerWithdrawal(...args),
   applyStaffReviewerRelease: (...args) => applyStaffReviewerRelease(...args),
+  applyStaffReviewerDidNotSubmit: (...args) => applyStaffReviewerDidNotSubmit(...args),
   REVIEW_STATUS_MAP: {
     accepted: 100000000,
     materials_sent: 100000001,
@@ -113,6 +115,7 @@ beforeEach(() => {
   updateLifecycle.mockResolvedValue(undefined);
   applyStaffReviewerWithdrawal.mockResolvedValue(undefined);
   applyStaffReviewerRelease.mockResolvedValue(undefined);
+  applyStaffReviewerDidNotSubmit.mockResolvedValue(undefined);
   cancelReviewerAcceptanceJobsForSuggestion.mockResolvedValue([]);
   createAndSendEmail.mockResolvedValue({ sent: true });
   getHonorariumCancellationState.mockResolvedValue(null);
@@ -355,6 +358,7 @@ test.each([
   ['completed row', { wmkf_completedat: '2026-07-22T10:00:00Z' }, 'completed'],
   ['already-withdrew row', { wmkf_reviewstatus: 100000005 }, 'already_terminal'],
   ['already-released row', { wmkf_reviewstatus: 100000006 }, 'already_terminal'],
+  ['already did-not-submit row', { wmkf_reviewstatus: 100000007 }, 'already_terminal'],
   ['out-of-range source', { wmkf_reviewstatus: 100000003 }, 'invalid_source'],
   ['missing source field', { wmkf_reviewstatus: undefined }, 'invalid_source'],
   ['missing ETag', { _etag: null }, 'missing_etag'],
@@ -365,6 +369,55 @@ test.each([
   expect(result.results).toEqual([{ suggestionId: SUGGESTION, status: expectedStatus }]);
   expect(updateLifecycle).not.toHaveBeenCalled();
   expect(applyStaffReviewerWithdrawal).not.toHaveBeenCalled();
+});
+
+describe('did not submit', () => {
+  test('uses its own writer with the fresh ETag, deletes the linked honorarium and cancels jobs', async () => {
+    const honorariumId = '44444444-4444-4444-8444-444444444444';
+    findById.mockResolvedValue(row({ _wmkf_honorariumrequest_value: honorariumId }));
+    cancelReviewerAcceptanceJobsForSuggestion.mockResolvedValue([{ id: 3 }]);
+
+    const result = await transitionReviewersTerminal(args({ terminalStatus: 'did_not_submit' }));
+
+    expect(result.results).toEqual([{
+      suggestionId: SUGGESTION,
+      status: 'transitioned',
+      terminalStatus: 'did_not_submit',
+      honorariumDeleted: true,
+      acceptanceJobsCancelled: 1,
+    }]);
+    expect(applyStaffReviewerDidNotSubmit).toHaveBeenCalledWith(SUGGESTION, {
+      actingUserSystemId: 'staff-1',
+      ifMatch: 'W/"7"',
+      deleteHonorariumRequestId: honorariumId,
+    });
+    expect(cancelReviewerAcceptanceJobsForSuggestion).toHaveBeenCalledWith(
+      SUGGESTION,
+      'program_director_recorded_reviewer_did_not_submit',
+    );
+    // Never falls through to the withdrawal or release writers.
+    expect(applyStaffReviewerWithdrawal).not.toHaveBeenCalled();
+    expect(applyStaffReviewerRelease).not.toHaveBeenCalled();
+    expect(createAndSendEmail).not.toHaveBeenCalled();
+  });
+
+  test('a review that arrived first wins (412 → changed_skipped)', async () => {
+    applyStaffReviewerDidNotSubmit.mockRejectedValue(Object.assign(new Error('Precondition Failed'), { status: 412 }));
+    const result = await transitionReviewersTerminal(args({ terminalStatus: 'did_not_submit' }));
+    expect(result).toEqual({ ok: true, transitioned: 0, results: [{ suggestionId: SUGGESTION, status: 'changed_skipped' }] });
+  });
+
+  test('refuses a row whose review already arrived', async () => {
+    findById.mockResolvedValue(row({ wmkf_reviewreceivedat: '2026-07-22T10:00:00Z' }));
+    const result = await transitionReviewersTerminal(args({ terminalStatus: 'did_not_submit' }));
+    expect(result.results).toEqual([{ suggestionId: SUGGESTION, status: 'review_received' }]);
+    expect(applyStaffReviewerDidNotSubmit).not.toHaveBeenCalled();
+  });
+});
+
+test('an unknown terminal status is refused before any read', async () => {
+  await expect(transitionReviewersTerminal(args({ terminalStatus: 'complete' }))).rejects.toThrow('did_not_submit');
+  expect(findById).not.toHaveBeenCalled();
 });
 
 test('race: concurrent ETag-guarded submission wins and terminal transition never overwrites it', async () => {

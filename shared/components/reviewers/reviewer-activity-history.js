@@ -181,6 +181,7 @@ const RESPONSE_EVENT_BY_TYPE = Object.freeze({
 const TERMINAL_STATUS_LABELS = Object.freeze({
   withdrew: 'Withdrew',
   released: 'Released',
+  did_not_submit: 'Did not submit',
 });
 
 /**
@@ -246,6 +247,16 @@ export function responseEventEvidence(reviewer) {
       // (`reviewer-suggestion.js:1832-1842`). Echoing the raw enum under a
       // staff-recorded label re-introduces the ambiguity the label just removed.
       detail: 'Recorded as declined by a Program Director, not by the reviewer.',
+    };
+  }
+
+  if (responseType === 'declined' && reviewStatus === 'did_not_submit') {
+    // applyStaffReviewerDidNotSubmit keeps wmkf_responsereceivedat, so this
+    // stamp is still the acceptance. The staff outcome itself is undated and
+    // shown by currentTerminalStatus.
+    return {
+      ...RESPONSE_EVENT_BY_TYPE.accepted,
+      detail: 'A Program Director later recorded that the review was not submitted.',
     };
   }
 

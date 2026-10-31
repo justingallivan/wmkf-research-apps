@@ -338,6 +338,18 @@ the accepted-count totals.
 **Test venue (owner, 2026-10-31):** slices 3–5 are tested in Production on
 marked test requests, not the sandbox, which will not get the Wave 35 schema.
 
+**Slice 3 split (2026-10-31):** 3a, Did not submit end to end (terminal
+status, `applyStaffReviewerDidNotSubmit`, explicit `terminal-transition.js`
+branch with a throwing `else`, Track Reviewers action, `did_not_submit` DTO
+mapping that closes the step 5 finding). 3b, Ended by on the other writers per
+the matrix, the pre-answer COI/Other writer, portal decline/re-accept, and
+`wmkf_endedby` in selects/DTOs (selects before the outcome predicate). 3c, the
+materials cutoff with interleaving tests. Build choice in 3a: Did not submit
+keeps `wmkf_responsereceivedat` (the acceptance time) instead of restamping it
+as the withdrawal does. Owner decision (2026-10-31): staff-ended Withdrew and
+Did not submit reviewers stay visible on Track Reviewers (single proposal) as
+ended rows; previously a withdrawn reviewer vanished from Track.
+
 Both schema changes are additive and no runtime code reads or writes them
 until slice 3. Each step below is owner-run or explicitly owner-approved;
 steps 2, 3 and 5 also need that day's `DATAVERSE_PROD_WRITE_ACK`. Every

@@ -21,6 +21,7 @@ export const STATUS_PIPELINE = [
   { key: 'complete', label: 'Complete', color: 'bg-green-200 text-green-900' },
   { key: 'withdrew', label: 'Withdrew', color: 'bg-red-100 text-red-800' },
   { key: 'released', label: 'Released', color: 'bg-slate-100 text-slate-700' },
+  { key: 'did_not_submit', label: 'Did not submit', color: 'bg-orange-100 text-orange-800' },
 ];
 
 export function getStatusInfo(status) {
@@ -31,7 +32,7 @@ export function getStatusInfo(status) {
 // buckets must partition every STATUS_PIPELINE key (complete coverage, no
 // overlap).
 export const MODE_STATUSES = {
-  track: ['accepted', 'materials_sent', 'under_review', 'review_received', 'complete', 'withdrew', 'released'],
+  track: ['accepted', 'materials_sent', 'under_review', 'review_received', 'complete', 'withdrew', 'released', 'did_not_submit'],
 };
 
 // Reviewers a mode still has open work for (drives the work-remaining badge).
@@ -41,7 +42,7 @@ export const MODE_WORK_REMAINING = {
   track: ['accepted', 'materials_sent', 'under_review'],
 };
 
-export const TERMINAL_REVIEW_STATUSES = ['withdrew', 'released'];
+export const TERMINAL_REVIEW_STATUSES = ['withdrew', 'released', 'did_not_submit'];
 const TERMINAL_SOURCE_STATUSES = ['accepted', 'materials_sent', 'under_review'];
 
 export function canTransitionToTerminal(reviewer) {

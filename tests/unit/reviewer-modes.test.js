@@ -23,7 +23,7 @@ const {
 
 // Mirror of REVIEW_STATUS_BY_VALUE in lib/services/review-manager/reviewers-service.js —
 // the authoritative set of statuses the GET can emit.
-const API_STATUSES = ['accepted', 'materials_sent', 'under_review', 'review_received', 'complete', 'withdrew', 'released'];
+const API_STATUSES = ['accepted', 'materials_sent', 'under_review', 'review_received', 'complete', 'withdrew', 'released', 'did_not_submit'];
 
 const rev = (reviewStatus) => ({ suggestionId: `s-${reviewStatus}-${Math.random()}`, reviewStatus });
 
@@ -71,14 +71,14 @@ describe('filterByMode', () => {
   const all = API_STATUSES.map(rev);
 
   it('returns everything for "all" / undefined / unknown mode', () => {
-    expect(filterByMode(all, 'all')).toHaveLength(7);
-    expect(filterByMode(all, undefined)).toHaveLength(7);
-    expect(filterByMode(all, 'nonsense')).toHaveLength(7);
+    expect(filterByMode(all, 'all')).toHaveLength(API_STATUSES.length);
+    expect(filterByMode(all, undefined)).toHaveLength(API_STATUSES.length);
+    expect(filterByMode(all, 'nonsense')).toHaveLength(API_STATUSES.length);
   });
 
   it('scopes to the mode bucket', () => {
     expect(filterByMode(all, 'track').map(r => r.reviewStatus))
-      .toEqual(['accepted', 'materials_sent', 'under_review', 'review_received', 'complete', 'withdrew', 'released']);
+      .toEqual(['accepted', 'materials_sent', 'under_review', 'review_received', 'complete', 'withdrew', 'released', 'did_not_submit']);
   });
 
   it('tolerates null/empty input', () => {

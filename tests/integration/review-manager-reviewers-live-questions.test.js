@@ -33,6 +33,7 @@ jest.mock('../../lib/dataverse/adapters/reviewer-suggestion', () => {
   const { RESPONSE_TYPE_MAP } = jest.requireActual('../../shared/config/reviewerLifecycle');
   return {
     findByRequest: jest.fn(),
+    findEndedAfterAcceptanceByRequest: jest.fn(async () => []),
     RESPONSE_TYPE_BY_VALUE: Object.fromEntries(Object.entries(RESPONSE_TYPE_MAP).map(([k, v]) => [v, k])),
   };
 });

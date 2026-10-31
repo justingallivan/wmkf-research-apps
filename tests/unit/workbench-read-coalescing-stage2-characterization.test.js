@@ -149,6 +149,7 @@ jest.mock('../../lib/dataverse/adapters/potential-reviewer', () => ({
 }));
 
 const findByRequest = jest.fn();
+const findEndedAfterAcceptanceByRequest = jest.fn();
 const findAcceptedByPD = jest.fn();
 const findByPD = jest.fn();
 const findRemovedByRequest = jest.fn();
@@ -157,6 +158,7 @@ const dismissDeclineReferral = jest.fn();
 jest.mock('../../lib/dataverse/adapters/reviewer-suggestion', () => ({
   __esModule: true,
   findByRequest: (...a) => findByRequest(...a),
+  findEndedAfterAcceptanceByRequest: async (...a) => (await findEndedAfterAcceptanceByRequest(...a)) || [],
   findAcceptedByPD: (...a) => findAcceptedByPD(...a),
   findByPD: (...a) => findByPD(...a),
   findRemovedByRequest: (...a) => findRemovedByRequest(...a),

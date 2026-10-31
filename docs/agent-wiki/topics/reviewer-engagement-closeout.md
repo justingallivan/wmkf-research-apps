@@ -79,7 +79,7 @@ no review status is supplied. After lead-PD/superuser authorization, the route
 passes its server-resolved Request separately from the body. The service
 freshly requires the same Request binding, a non-excluded row, no completed-at
 marker, explicit null or accepted/materials-sent/under-review/review-received
-status, and a concrete ETag. Complete/withdrew/released, missing or unknown
+status, and a concrete ETag. Complete/withdrew/released/did_not_submit, missing or unknown
 status, and missing or malformed versions fail closed. `updateLifecycle`
 independently enforces that source-state/version boundary for these six fields
 and preserves the caller's exact ETag; a stale version is never replaced with
@@ -112,7 +112,7 @@ failure before the adapter's lifecycle guard read or write. `failedIds` does
 not prove that a Dataverse HTTP write began or committed; a transport failure
 may follow a commit. Earlier saves remain applied. Route validation and
 authorization, plus the service's dedicated-target prechecks, retain error-only
-responses. Complete, withdrew, and released still require dedicated workflows.
+responses. Complete, withdrew, released and did_not_submit still require dedicated workflows.
 Existing null/empty-string status clearing on open rows remains supported,
 with closed-source protection intact; Stage 6A adds no status-validation policy.
 No rollback or automatic retry is introduced.
@@ -251,7 +251,7 @@ The "X" on an Invite Reviewers panel (`ReviewerInvitePanel`) card is a **soft-de
 <!-- source-lines: 1147-1203 -->
 **Terminal statuses and staff-withdrawal cleanup: historical Production
 release below; accepted-release expansion verified in current source.**
-`withdrew` and `released` are live in the Track pipeline, excluded from
+`withdrew`, `released` and (since 2026-10-31) `did_not_submit` are live in the Track pipeline, excluded from
 `MODE_WORK_REMAINING` and the Reviews-tab Outstanding list, and routed through
 `/api/review-manager/terminal-transition`. The service freshly reads each row,
 accepts only accepted/materials-sent/under-review rows with no
