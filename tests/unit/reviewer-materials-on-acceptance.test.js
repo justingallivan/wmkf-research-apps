@@ -186,8 +186,8 @@ test('a failed bookkeeping write retries and the next attempt does not resend', 
   expect(materialsSent(materials)).toBe(1); expect(store.release.state).toBe('recorded');
 });
 
-test.each(['claimed', 'link_minted', 'uncertain', 'failed'])('an unfinished %s release of this job is never resumed: staff alert', async state => {
-  const { d, materials } = deps({ release: { suggestion_id: SUGGESTION_ID, source: 'acceptance', job_id: '77', state } });
+test.each(['claimed', 'link_minted', 'uncertain', 'failed'])('an unfinished %s release of this job (lease expired) is never resumed: staff alert', async state => {
+  const { d, materials } = deps({ release: { suggestion_id: SUGGESTION_ID, source: 'acceptance', job_id: '77', state, lease_until: new Date(Date.now() - 1000).toISOString() } });
   expect((await processReviewerAcceptanceJob(job(), d)).status).toBe('completed');
   expect(materials.mint).not.toHaveBeenCalled(); expect(materialsSent(materials)).toBe(0);
   expect(finalOutcome(d)).toBe('stopped'); expect(notified(d, 'reviewer_materials_release_stopped')).toBe(true);
@@ -236,4 +236,34 @@ test('bookkeeping after a send binds to the job\u2019s suggestion snapshot', asy
   const { d, materials } = deps({ release: { suggestion_id: SUGGESTION_ID, source: 'acceptance', job_id: '77', state: 'sent', sent_at: '2027-02-25T01:00:00.000Z' } });
   await processReviewerAcceptanceJob(job(), d);
   expect(materials.recordDelivered.mock.calls[0][0].originalSuggestion).toMatchObject({ _wmkf_request_value: REQUEST_ID, _wmkf_potentialreviewer_value: REVIEWER_ID });
+});
+
+test.each(['claimed', 'link_minted'])('a %s release still under its lease (another worker may be sending) is deferred, not closed', async state => {
+  const { d, materials } = deps({ release: { suggestion_id: SUGGESTION_ID, source: 'acceptance', job_id: '77', state, lease_until: new Date(Date.now() + 60000).toISOString() } });
+  await expect(processReviewerAcceptanceJob(job(), d)).rejects.toThrow('release_in_progress');
+  expect(stepPatches(d).some(p => p.completedAt)).toBe(false); expect(materials.mint).not.toHaveBeenCalled();
+  expect(notified(d, 'reviewer_materials_release_stopped')).toBe(false);
+});
+
+test('a staff alert that cannot be stored keeps the step open; the retry alerts and completes', async () => {
+  const { d, materials, store } = deps(); materials.mint.mockRejectedValue(new Error('412'));
+  d.notify.mockRejectedValueOnce(new Error('alert store down'));
+  await expect(processReviewerAcceptanceJob(job(), d)).rejects.toThrow('materials_alert_unavailable');
+  expect(stepPatches(d).some(p => p.completedAt)).toBe(false);
+  store.release.lease_until = new Date(Date.now() - 1000).toISOString();
+  await processReviewerAcceptanceJob(job(), d);
+  expect(notified(d, 'reviewer_materials_release_stopped')).toBe(true); expect(finalOutcome(d)).toBe('stopped');
+  expect(materials.mint).toHaveBeenCalledTimes(1);
+});
+
+test.each([
+  ['revoked', { wmkf_externaltokenrevoked: true }],
+  ['materials sent elsewhere', { wmkf_materialssentat: '2027-02-25T00:00:00Z' }],
+])('%s during preparation: the final recheck refuses before any claim or mint', async (_name, change) => {
+  const { d, materials } = deps();
+  const base = suggestionRow();
+  // Reads: job start, accept check, step fresh read, final recheck (changed).
+  d.suggestions.getForAcceptanceDrain.mockResolvedValueOnce(base).mockResolvedValueOnce(base).mockResolvedValueOnce(base).mockResolvedValueOnce({ ...base, ...change });
+  await expect(processReviewerAcceptanceJob(job(), d)).rejects.toThrow('suggestion_changed');
+  expect(materials.claim).not.toHaveBeenCalled(); expect(materials.mint).not.toHaveBeenCalled();
 });
