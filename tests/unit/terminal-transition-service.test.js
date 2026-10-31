@@ -264,7 +264,8 @@ test('eligible staff-recorded withdrawal corrects response state with the fresh 
       suggestionId: SUGGESTION,
       status: 'transitioned',
       terminalStatus: 'withdrew',
-      honorariumDeleted: false,
+      honorariumWithdrawn: false,
+      honorariumAlreadyWithdrawn: false,
       acceptanceJobsCancelled: 0,
     }],
   });
@@ -273,7 +274,7 @@ test('eligible staff-recorded withdrawal corrects response state with the fresh 
     {
       actingUserSystemId: 'staff-1',
       ifMatch: 'W/"7"',
-      deleteHonorariumRequestId: null,
+      cancelHonorarium: null,
     },
   );
   expect(cancelReviewerAcceptanceJobsForSuggestion).toHaveBeenCalledWith(
@@ -294,7 +295,8 @@ test('accepted row with a persisted null review status transitions', async () =>
       suggestionId: SUGGESTION,
       status: 'transitioned',
       terminalStatus: 'withdrew',
-      honorariumDeleted: false,
+      honorariumWithdrawn: false,
+      honorariumAlreadyWithdrawn: false,
       acceptanceJobsCancelled: 0,
     },
   ]);
@@ -303,14 +305,17 @@ test('accepted row with a persisted null review status transitions', async () =>
     {
       actingUserSystemId: 'staff-1',
       ifMatch: 'W/"7"',
-      deleteHonorariumRequestId: null,
+      cancelHonorarium: null,
     },
   );
 });
 
-test('staff-recorded withdrawal deletes the exact linked honorarium and reports it', async () => {
+test('staff-recorded withdrawal keeps the linked honorarium and marks it Withdrawn', async () => {
   const honorariumId = '44444444-4444-4444-8444-444444444444';
   findById.mockResolvedValue(row({ _wmkf_honorariumrequest_value: honorariumId }));
+  getHonorariumCancellationState.mockResolvedValue({
+    akoya_requestid: honorariumId, akoya_requeststatus: 'Pending', akoya_paid: 0, _etag: 'W/"3"',
+  });
   cancelReviewerAcceptanceJobsForSuggestion.mockResolvedValue([{ id: 9 }]);
 
   const result = await transitionReviewersTerminal(args());
@@ -320,16 +325,58 @@ test('staff-recorded withdrawal deletes the exact linked honorarium and reports 
     {
       actingUserSystemId: 'staff-1',
       ifMatch: 'W/"7"',
-      deleteHonorariumRequestId: honorariumId,
+      cancelHonorarium: { id: honorariumId, ifMatch: 'W/"3"' },
     },
   );
   expect(result.results[0]).toMatchObject({
     suggestionId: SUGGESTION,
     status: 'transitioned',
     terminalStatus: 'withdrew',
-    honorariumDeleted: true,
+    honorariumWithdrawn: true,
     acceptanceJobsCancelled: 1,
   });
+});
+
+test.each([
+  ['withdrew', 'paid', { akoya_requeststatus: 'Pending', akoya_paid: 500, _etag: 'W/"3"' }, 'honorarium_paid'],
+  ['withdrew', 'authorized', { akoya_requeststatus: 'Pending', wmkf_authorizationtoremitpaymentflag: true, _etag: 'W/"3"' }, 'honorarium_authorized'],
+  ['did_not_submit', 'paid', { akoya_requeststatus: 'Pending', akoya_paid: 500, _etag: 'W/"3"' }, 'honorarium_paid'],
+  ['did_not_submit', 'not open', { akoya_requeststatus: 'Approved', _etag: 'W/"3"' }, 'honorarium_not_open'],
+])('%s refuses a %s honorarium before any write', async (terminalStatus, _label, honorariumRow, expected) => {
+  const honorariumId = '44444444-4444-4444-8444-444444444444';
+  findById.mockResolvedValue(row({ _wmkf_honorariumrequest_value: honorariumId }));
+  getHonorariumCancellationState.mockResolvedValue({ akoya_requestid: honorariumId, ...honorariumRow });
+
+  const result = await transitionReviewersTerminal(args({ terminalStatus }));
+
+  expect(result).toEqual({ ok: true, transitioned: 0, results: [{ suggestionId: SUGGESTION, status: expected }] });
+  expect(applyStaffReviewerWithdrawal).not.toHaveBeenCalled();
+  expect(applyStaffReviewerDidNotSubmit).not.toHaveBeenCalled();
+});
+
+test('an already Withdrawn honorarium is kept untouched and reported', async () => {
+  const honorariumId = '44444444-4444-4444-8444-444444444444';
+  findById.mockResolvedValue(row({ _wmkf_honorariumrequest_value: honorariumId }));
+  getHonorariumCancellationState.mockResolvedValue({ akoya_requestid: honorariumId, akoya_requeststatus: 'Withdrawn', _etag: 'W/"3"' });
+
+  const result = await transitionReviewersTerminal(args({ terminalStatus: 'did_not_submit' }));
+
+  // Still ETag-bound, so a concurrent reopen/authorization by Finance fails the changeset.
+  expect(applyStaffReviewerDidNotSubmit).toHaveBeenCalledWith(SUGGESTION, expect.objectContaining({
+    cancelHonorarium: { id: honorariumId, ifMatch: 'W/"3"', alreadyWithdrawn: true },
+  }));
+  expect(result.results[0]).toMatchObject({ honorariumWithdrawn: false, honorariumAlreadyWithdrawn: true });
+});
+
+test('an unversioned already-Withdrawn honorarium blocks the transition', async () => {
+  const honorariumId = '44444444-4444-4444-8444-444444444444';
+  findById.mockResolvedValue(row({ _wmkf_honorariumrequest_value: honorariumId }));
+  getHonorariumCancellationState.mockResolvedValue({ akoya_requestid: honorariumId, akoya_requeststatus: 'Withdrawn' });
+
+  const result = await transitionReviewersTerminal(args());
+
+  expect(result.results).toEqual([{ suggestionId: SUGGESTION, status: 'honorarium_missing_etag' }]);
+  expect(applyStaffReviewerWithdrawal).not.toHaveBeenCalled();
 });
 
 test('a post-commit job-cancellation failure is reported without disguising the successful withdrawal', async () => {
@@ -343,7 +390,8 @@ test('a post-commit job-cancellation failure is reported without disguising the 
     suggestionId: SUGGESTION,
     status: 'transitioned',
     terminalStatus: 'withdrew',
-    honorariumDeleted: false,
+    honorariumWithdrawn: false,
+    honorariumAlreadyWithdrawn: false,
     warning: 'acceptance_job_cancellation_failed',
   });
   expect(result.results[0]).not.toHaveProperty('acceptanceJobsCancelled');
@@ -372,9 +420,12 @@ test.each([
 });
 
 describe('did not submit', () => {
-  test('uses its own writer with the fresh ETag, deletes the linked honorarium and cancels jobs', async () => {
+  test('uses its own writer with the fresh ETag, withdraws the linked honorarium and cancels jobs', async () => {
     const honorariumId = '44444444-4444-4444-8444-444444444444';
     findById.mockResolvedValue(row({ _wmkf_honorariumrequest_value: honorariumId }));
+    getHonorariumCancellationState.mockResolvedValue({
+      akoya_requestid: honorariumId, akoya_requeststatus: 'Pending', akoya_paid: 0, _etag: 'W/"3"',
+    });
     cancelReviewerAcceptanceJobsForSuggestion.mockResolvedValue([{ id: 3 }]);
 
     const result = await transitionReviewersTerminal(args({ terminalStatus: 'did_not_submit' }));
@@ -383,13 +434,14 @@ describe('did not submit', () => {
       suggestionId: SUGGESTION,
       status: 'transitioned',
       terminalStatus: 'did_not_submit',
-      honorariumDeleted: true,
+      honorariumWithdrawn: true,
+      honorariumAlreadyWithdrawn: false,
       acceptanceJobsCancelled: 1,
     }]);
     expect(applyStaffReviewerDidNotSubmit).toHaveBeenCalledWith(SUGGESTION, {
       actingUserSystemId: 'staff-1',
       ifMatch: 'W/"7"',
-      deleteHonorariumRequestId: honorariumId,
+      cancelHonorarium: { id: honorariumId, ifMatch: 'W/"3"' },
     });
     expect(cancelReviewerAcceptanceJobsForSuggestion).toHaveBeenCalledWith(
       SUGGESTION,
@@ -400,6 +452,7 @@ describe('did not submit', () => {
     expect(applyStaffReviewerRelease).not.toHaveBeenCalled();
     expect(createAndSendEmail).not.toHaveBeenCalled();
   });
+
 
   test('a review that arrived first wins (412 → changed_skipped)', async () => {
     applyStaffReviewerDidNotSubmit.mockRejectedValue(Object.assign(new Error('Precondition Failed'), { status: 412 }));
@@ -685,8 +738,9 @@ test('release preserves an already-withdrawn linked honorarium', async () => {
 
   const result = await transitionReviewersTerminal(acceptedReleaseArgs({ sendEmail: false }));
 
+  // Kept as-is (date preserved) but still ETag-bound into the release changeset.
   expect(applyStaffReviewerRelease).toHaveBeenCalledWith(SUGGESTION, expect.objectContaining({
-    cancelHonorarium: null,
+    cancelHonorarium: { id: honorariumId, ifMatch: 'W/"12"', alreadyWithdrawn: true },
   }));
   expect(result.results[0]).toMatchObject({
     status: 'released_no_email_by_choice',

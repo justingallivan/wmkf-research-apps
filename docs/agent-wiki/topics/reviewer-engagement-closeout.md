@@ -284,7 +284,7 @@ missing-default operational alert.
 PD-recorded `withdrew` additionally performs the same lifecycle/financial
 correction as reviewer self-withdrawal: one Dataverse changeset writes
 `selected=false`, `accepted=false`, `declined=true`, declined response metadata,
-the `withdrew` audit status, and token revocation while deleting the exact linked honorarium;
+the `withdrew` audit status, and token revocation while (since 2026-10-31) marking the exact linked honorarium `Withdrawn` and keeping it — a paid/authorized/unexpected honorarium blocks the transition;
 unlocked acceptance jobs are cancelled, and a leased worker compensates after
 re-reading declined state. Derived reviewer counts therefore update without a
 separate counter write. This cleanup shipped in merge `70f51f45`, production

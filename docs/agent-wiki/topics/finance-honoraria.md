@@ -142,10 +142,14 @@ then; those values were not re-probed in this cleanup. A real honorarium `akoya_
 Reviewer portal self-withdrawal is available only before materials release and
 before any review receipt; after that the response endpoint locks changes and
 routes the reviewer to the PD. Before review receipt, a PD can separately record
-**Withdrew** in Track Reviewers, subject to the staff transition guards.
-Both remove that engagement's exact linked honorarium `akoya_request`
-automatically in the same Dataverse changeset that flips the suggestion to
-declined and revokes portal access. The reviewer/contact and suggestion history
+**Withdrew** or **Did not submit** in Track Reviewers, subject to the staff
+transition guards. The reviewer's own portal decline removes that engagement's
+exact linked honorarium `akoya_request` in the same Dataverse changeset that
+flips the suggestion to declined and revokes portal access. **Since
+2026-10-31 (owner decision) the staff-recorded endings keep the honorarium and
+mark it `Withdrawn` instead,** with the same paid/authorized/non-Pending
+refusals as the release path below, so there is a record and a paid honorarium
+is never removed. The reviewer/contact and suggestion history
 remain. The staff action also cancels unlocked acceptance jobs; the drain
 re-checks after honorarium creation and compensates for a concurrent withdrawal,
 so a late worker cannot leave or recreate an honorarium for an unfulfilled

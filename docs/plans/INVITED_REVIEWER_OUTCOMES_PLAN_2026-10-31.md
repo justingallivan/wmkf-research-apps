@@ -350,6 +350,14 @@ as the withdrawal does. Owner decision (2026-10-31): staff-ended Withdrew and
 Did not submit reviewers stay visible on Track Reviewers (single proposal) as
 ended rows; previously a withdrawn reviewer vanished from Track.
 
+**Honoraria (owner decision 2026-10-31, after the Production test):** staff-
+recorded Withdrew and Did not submit keep the linked honorarium request and
+mark it Withdrawn (the release path's rule and checks), instead of deleting
+it; the acceptance worker's late-honorarium cleanup does the same for those
+rows. A reviewer's own portal decline before materials still deletes. Track
+shows "Saving…" on the row while an End engagement write is in flight (one
+with an honorarium took ~20s in Production).
+
 Both schema changes are additive and no runtime code reads or writes them
 until slice 3. Each step below is owner-run or explicitly owner-approved;
 steps 2, 3 and 5 also need that day's `DATAVERSE_PROD_WRITE_ACK`. Every

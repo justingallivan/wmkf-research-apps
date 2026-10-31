@@ -14,6 +14,7 @@ import {
   applyStaffReviewerRelease,
   applyStaffReviewerDidNotSubmit,
   findEndedAfterAcceptanceByRequest,
+  withdrawLinkedHonorariumForEndedSuggestion,
   deleteLinkedHonorariumForDeclinedSuggestion,
   withdrawLinkedHonorariumForReleasedSuggestion,
   RESPONSE_TYPE_MAP,
@@ -92,13 +93,13 @@ describe('reviewer withdrawal changeset', () => {
     });
   });
 
-  it('atomically applies a staff withdrawal, revokes the token, and deletes only the linked honorarium', async () => {
+  it('atomically applies a staff withdrawal, revokes the token, and marks only the linked honorarium Withdrawn', async () => {
     await applyStaffReviewerWithdrawal(
       SUGGESTION_ID,
       {
         ifMatch: 'W/"19"',
         actingUserSystemId: 'staff-1',
-        deleteHonorariumRequestId: HONORARIUM_ID,
+        cancelHonorarium: { id: HONORARIUM_ID, ifMatch: 'W/"4"' },
         responseReceivedAt: '2026-07-24T20:00:00.000Z',
       },
     );
@@ -122,12 +123,25 @@ describe('reviewer withdrawal changeset', () => {
         wmkf_declinereferral: null,
       },
     });
-    expect(operations[1]).toEqual({
-      method: 'DELETE',
+    expect(operations[1]).toMatchObject({
+      method: 'PATCH',
       entitySet: 'akoya_requests',
       key: HONORARIUM_ID,
+      ifMatch: 'W/"4"',
+      body: { akoya_requeststatus: 'Withdrawn' },
     });
+    expect(operations.some((op) => op.method === 'DELETE')).toBe(false);
   });
+
+  it.each(['applyStaffReviewerWithdrawal', 'applyStaffReviewerDidNotSubmit'])(
+    '%s refuses the old delete instruction instead of silently ignoring it',
+    async (fn) => {
+      const writer = { applyStaffReviewerWithdrawal, applyStaffReviewerDidNotSubmit }[fn];
+      await expect(writer(SUGGESTION_ID, { ifMatch: 'W/"1"', deleteHonorariumRequestId: HONORARIUM_ID }))
+        .rejects.toThrow('withdrawn, not deleted');
+      expect(runChangeset).not.toHaveBeenCalled();
+    },
+  );
 
   it('applies the same ETag-guarded staff correction when no honorarium is linked', async () => {
     const updateSpy = jest.spyOn(DynamicsService, 'updateRecord').mockResolvedValue(undefined);
@@ -267,17 +281,20 @@ describe('staff-recorded did not submit', () => {
     wmkf_externaltokenrevoked: true,
   };
 
-  it('declines, sets Did not submit and Ended by, and deletes the exact honorarium in one changeset', async () => {
+  it('declines, sets Did not submit and Ended by, and marks the exact honorarium Withdrawn in one changeset', async () => {
     await applyStaffReviewerDidNotSubmit(SUGGESTION_ID, {
       ifMatch: 'W/"21"',
       actingUserSystemId: 'staff-1',
-      deleteHonorariumRequestId: HONORARIUM_ID,
+      cancelHonorarium: { id: HONORARIUM_ID, ifMatch: 'W/"5"' },
     });
     const [operations, options] = runChangeset.mock.calls[0];
-    expect(operations).toEqual([
-      { method: 'PATCH', entitySet: 'wmkf_appreviewersuggestions', key: SUGGESTION_ID, body: expectedBody, ifMatch: 'W/"21"' },
-      { method: 'DELETE', entitySet: 'akoya_requests', key: HONORARIUM_ID },
-    ]);
+    expect(operations).toHaveLength(2);
+    expect(operations[0]).toEqual({ method: 'PATCH', entitySet: 'wmkf_appreviewersuggestions', key: SUGGESTION_ID, body: expectedBody, ifMatch: 'W/"21"' });
+    expect(operations[1]).toMatchObject({
+      method: 'PATCH', entitySet: 'akoya_requests', key: HONORARIUM_ID, ifMatch: 'W/"5"',
+      body: { akoya_requeststatus: 'Withdrawn' },
+    });
+    expect(typeof operations[1].body.wmkf_datewithdrawalreceived).toBe('string');
     expect(options).toEqual({ actingUserSystemId: 'staff-1' });
     expect(REVIEW_STATUS_MAP.did_not_submit).toBe(100000007);
   });
@@ -313,4 +330,39 @@ describe('findEndedAfterAcceptanceByRequest', () => {
     await expect(findEndedAfterAcceptanceByRequest(SUGGESTION_ID)).rejects.toThrow('cap');
     query.mockRestore();
   });
+});
+
+describe('withdrawLinkedHonorariumForEndedSuggestion', () => {
+  it('re-asserts only the revoked token (status untouched) and marks the honorarium Withdrawn, both ETag-bound', async () => {
+    await withdrawLinkedHonorariumForEndedSuggestion(SUGGESTION_ID, HONORARIUM_ID, { ifMatch: 'W/"30"', honorariumIfMatch: 'W/"6"' });
+    const [operations] = runChangeset.mock.calls[0];
+    expect(operations[0]).toEqual({
+      method: 'PATCH', entitySet: 'wmkf_appreviewersuggestions', key: SUGGESTION_ID,
+      body: { wmkf_externaltokenrevoked: true }, ifMatch: 'W/"30"',
+    });
+    expect(operations[1]).toMatchObject({
+      method: 'PATCH', entitySet: 'akoya_requests', key: HONORARIUM_ID, ifMatch: 'W/"6"',
+      body: { akoya_requeststatus: 'Withdrawn' },
+    });
+  });
+
+  it('requires both ETags', async () => {
+    await expect(withdrawLinkedHonorariumForEndedSuggestion(SUGGESTION_ID, HONORARIUM_ID, { ifMatch: 'W/"30"' }))
+      .rejects.toThrow('both ETags');
+  });
+});
+
+describe('already-Withdrawn honorarium stays bound', () => {
+  it.each(['applyStaffReviewerWithdrawal', 'applyStaffReviewerDidNotSubmit', 'applyStaffReviewerRelease'])(
+    '%s re-asserts Withdrawn with the honorarium ETag and keeps its withdrawal date',
+    async (fn) => {
+      const writer = { applyStaffReviewerWithdrawal, applyStaffReviewerDidNotSubmit, applyStaffReviewerRelease }[fn];
+      await writer(SUGGESTION_ID, { ifMatch: 'W/"40"', cancelHonorarium: { id: HONORARIUM_ID, ifMatch: 'W/"7"', alreadyWithdrawn: true } });
+      const [operations] = runChangeset.mock.calls[0];
+      expect(operations[1]).toEqual({
+        method: 'PATCH', entitySet: 'akoya_requests', key: HONORARIUM_ID, ifMatch: 'W/"7"',
+        body: { akoya_requeststatus: 'Withdrawn' },
+      });
+    },
+  );
 });
