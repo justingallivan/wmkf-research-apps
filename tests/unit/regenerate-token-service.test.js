@@ -54,6 +54,10 @@ jest.mock('../../lib/services/reviewer-first-manual-invitation-coi', () => ({
   },
   screenFirstManualInvitationInstitutionCOI: jest.fn(),
 }));
+jest.mock('../../lib/services/review-manager/invitation-proposal-pdf', () => ({
+  checkInvitationProposalPdf: jest.fn(async () => 'present'),
+}));
+const { checkInvitationProposalPdf } = require('../../lib/services/review-manager/invitation-proposal-pdf');
 const SUG = '22222222-2222-4222-8222-222222222222';
 const REQ = '11111111-1111-4111-8111-111111111111';
 const ACTOR = 'su-1';
@@ -96,7 +100,7 @@ test('success: server derives expiry from request default and returns the replac
     suggestionId: SUG,
     expectedRequestId: REQ,
   });
-  expect(getRequestById).toHaveBeenCalledWith(REQ, { select: 'wmkf_reviewduedate' });
+  expect(getRequestById).toHaveBeenCalledWith(REQ, { select: 'akoya_requestid,akoya_requestnum,wmkf_reviewduedate' });
   expect(mintAndStore).toHaveBeenCalledWith({
     suggestionId: SUG,
     requestId: REQ,
@@ -279,4 +283,41 @@ test('non-404 lookup failure propagates UNTYPED (shell maps to 500 server_error)
   const err = await regenerateToken({ suggestionId: SUG, actingUserSystemId: null }).catch((e) => e);
   expect(err).not.toBeInstanceOf(RegenerateTokenError);
   expect(err.message).toBe('dataverse 503');
+});
+
+describe('D48: a first copyable invitation link needs the proposal PDF', () => {
+  const firstInvite = () => getForTokenRegeneration.mockResolvedValueOnce({
+    _wmkf_request_value: REQ, _etag: 'W/"1"', wmkf_applicantdisposition: null,
+    wmkf_accepted: false, wmkf_invited: false, wmkf_responsetype: null, wmkf_reviewduedateoverride: null,
+  });
+
+  test.each(['missing', 'unavailable'])('PDF %s: 409 with the reason, no mint', async (state) => {
+    firstInvite();
+    checkInvitationProposalPdf.mockResolvedValueOnce(state);
+    await expect(regenerateToken({ suggestionId: SUG, actingUserSystemId: ACTOR })).rejects.toMatchObject({
+      httpStatus: 409, body: expect.objectContaining({ ok: false, reason: `proposal_pdf_${state}` }),
+    });
+    expect(mintAndStore).not.toHaveBeenCalled();
+  });
+
+  test('PDF present: the first link is minted', async () => {
+    firstInvite();
+    await regenerateToken({ suggestionId: SUG, actingUserSystemId: ACTOR });
+    expect(checkInvitationProposalPdf).toHaveBeenCalledWith(expect.objectContaining({ wmkf_reviewduedate: REQUEST_DUE }));
+    expect(mintAndStore).toHaveBeenCalledTimes(1);
+  });
+
+  test.each([
+    ['an accepted reviewer', { wmkf_accepted: true }],
+    ['an already-invited reviewer', { wmkf_invited: true }],
+  ])('a replacement link for %s is not gated', async (_label, over) => {
+    getForTokenRegeneration.mockResolvedValueOnce({
+      _wmkf_request_value: REQ, _etag: 'W/"1"', wmkf_applicantdisposition: null,
+      wmkf_accepted: false, wmkf_invited: false, wmkf_responsetype: null, wmkf_reviewduedateoverride: null, ...over,
+    });
+    checkInvitationProposalPdf.mockResolvedValueOnce('missing');
+    await regenerateToken({ suggestionId: SUG, actingUserSystemId: ACTOR });
+    expect(checkInvitationProposalPdf).not.toHaveBeenCalled();
+    expect(mintAndStore).toHaveBeenCalledTimes(1);
+  });
 });

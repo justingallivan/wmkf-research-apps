@@ -630,6 +630,61 @@ describe('send completion handshake (real parent onRefresh/selection)', () => {
     expect(screen.getByText('1 sent, 1 failed')).toBeTruthy();
   });
 
+  test('a stopped release offers "Send again", which resends only that reviewer with the recover flag', async () => {
+    const first = controlledSse();
+    const second = controlledSse();
+    setup([REVIEWER_A, REVIEWER_B]);
+    let n = 0;
+    sendEmailsBehavior = () => { n += 1; return n === 1 ? first.response : second.response; };
+    renderPanel({ reviewers: [REVIEWER_A, REVIEWER_B] });
+    openReleaseModal(2);
+    await preview(2);
+    await send(2);
+    await waitFor(() => expect(sendCalls().length).toBe(1));
+    expect(JSON.parse(sendCalls()[0][1].body).recoverMaterialsReleaseIds).toBeUndefined();
+
+    first.push(sseChunk('result', {
+      sent: [{ suggestionId: REVIEWER_A.suggestionId, candidateName: REVIEWER_A.name, candidateEmail: REVIEWER_A.email }],
+      failed: [],
+      skipped: [{ suggestionId: REVIEWER_B.suggestionId, candidateName: REVIEWER_B.name, candidateEmail: REVIEWER_B.email,
+        reason: 'materials_release_in_progress', materialsRecoveryAction: 'send_again' }],
+    }) + sseChunk('complete', { message: 'done' }));
+    first.finish();
+    await act(async () => { await Promise.resolve(); await Promise.resolve(); await Promise.resolve(); });
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Send again' }));
+    await waitFor(() => expect(sendCalls().length).toBe(2));
+    const body = JSON.parse(sendCalls()[1][1].body);
+    expect(body.recoverMaterialsReleaseIds).toEqual([REVIEWER_B.suggestionId]);
+    expect(body.drafts.map(d => d.suggestionId)).toEqual([REVIEWER_B.suggestionId]);
+    expect(window.confirm).toHaveBeenLastCalledWith(expect.stringContaining('may already have arrived'));
+  });
+
+  test('a sent but unrecorded release offers "Mark as delivered", which posts to the recovery route', async () => {
+    const sse = controlledSse();
+    setup([REVIEWER_A]);
+    sendEmailsBehavior = () => sse.response;
+    const delivered = jest.fn(() => mockJson({ ok: true, reviewerRecorded: false }));
+    global.fetch = jest.fn(async (url, init) => (String(url) === '/api/review-manager/materials-release-delivered'
+      ? delivered(init) : baseFetchImpl(url, init)));
+    renderPanel({ reviewers: [REVIEWER_A] });
+    openReleaseModal(1);
+    await preview(1);
+    await send(1);
+    await waitFor(() => expect(sendCalls().length).toBe(1));
+    sse.push(sseChunk('result', {
+      sent: [], failed: [],
+      skipped: [{ suggestionId: REVIEWER_A.suggestionId, candidateName: REVIEWER_A.name, candidateEmail: REVIEWER_A.email,
+        reason: 'materials_already_sent', materialsRecoveryAction: 'mark_delivered' }],
+    }) + sseChunk('complete', { message: 'done' }));
+    sse.finish();
+    await act(async () => { await Promise.resolve(); await Promise.resolve(); await Promise.resolve(); });
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Mark as delivered' }));
+    expect(await screen.findByText('Marked as delivered.')).toBeTruthy();
+    expect(JSON.parse(delivered.mock.calls[0][0].body)).toEqual({ suggestionId: REVIEWER_A.suggestionId });
+  });
+
   test('result and complete in ONE chunk shows the final arrays', async () => {
     const sse = controlledSse();
     setup([REVIEWER_A]);

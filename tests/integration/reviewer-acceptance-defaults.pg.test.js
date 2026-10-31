@@ -31,7 +31,10 @@ suite('acceptance preparation recovery and concurrent leases (real Postgres)', (
   function deps() {
     return { jobs: store, switchesReady: () => true, isolationEnabled: () => false,
       suggestions: { getForAcceptanceDrain: jest.fn(async () => ({ ...suggestion })) },
-      potentialReviewers: { getById: jest.fn() }, ensureAcceptedContact: jest.fn(async () => ({ contactId: 'fixture' })),
+      potentialReviewers: { getById: jest.fn(async () => ({ wmkf_name: 'Reviewer' })) },
+      // No proposal PDF: materials are held and the confirmation path under test runs (D49).
+      materials: { get: jest.fn(async () => null), preflight: jest.fn(async () => ({ ok: true, fileCount: 0 })) },
+      listStuckMaterialsReleases: jest.fn(async () => []), ensureAcceptedContact: jest.fn(async () => ({ contactId: 'fixture' })),
       captureOrcid: jest.fn(async () => ({ persisted: true })), captureIdentity: jest.fn(), syncNameTitle: jest.fn(),
       alertEmail: jest.fn(), alertAffiliation: jest.fn(), resolveAffiliation: jest.fn(), autoLinkAccount: jest.fn(),
       readConfirmationRequest: jest.fn(async () => ({ akoya_requestid: REQUEST })),

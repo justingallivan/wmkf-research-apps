@@ -116,8 +116,10 @@ const CENSUS = [
     // send-emails-service.js). Not re-exported from the old module — no
     // other production caller needed it.
     pattern: /reviewer-engagement\/record-email-outcome/,
+    // D46/D49: the acceptance job records the automatic materials release.
     expected: [
       'lib/services/review-manager/send-emails-service.js',
+      'lib/services/reviewer-acceptance-drain.js',
     ],
   },
   {

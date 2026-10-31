@@ -88,6 +88,7 @@
     "087_meeting_material_preparations.sql",
     "088_meeting_presentation_invitations.sql",
     "089_manual_presentation_video_pairs.sql",
-    "090_request_corpus_index.sql"
+    "090_request_corpus_index.sql",
+    "091_reviewer_materials_releases.sql"
   ]
 }

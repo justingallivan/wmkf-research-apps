@@ -10,8 +10,16 @@
 
 const mockRequireAppAccess = jest.fn(async () => ({
   session: { user: { azureEmail: 'staff@wmkeck.org', dynamicsSystemuserId: 'u-1' } },
+  profileId: 7,
 }));
 const mockGetUserRole = jest.fn(async () => 'read_write');
+jest.mock('../../lib/external/reviewer-materials', () => ({
+  ...jest.requireActual('../../lib/external/reviewer-materials'),
+  listReviewerMaterialsWithAvailability: jest.fn(async () => ({ files: [{ name: 'proposal.pdf' }], unavailable: false })),
+}));
+jest.mock('../../lib/services/reviewer-engagement/materials-release-store',
+  () => require('../helpers/materials-release-store-mock').createMaterialsReleaseStoreMock());
+jest.mock('../../lib/services/alert-service', () => ({ __esModule: true, default: { autoResolve: jest.fn(async () => {}) } }));
 jest.mock('../../lib/utils/auth', () => ({
   requireAppAccess: (...args) => mockRequireAppAccess(...args),
   getUserRole: (...args) => mockGetUserRole(...args),
@@ -302,7 +310,7 @@ test('preauthorizes the complete draft batch and rejects before opening the send
   authorizeReviewerRequestMutation.mockRejectedValueOnce(new ServiceHttpError('foreign', { httpStatus: 403 }));
   const res = await run({ drafts: [draft(SUG_1)], templateType: 'materials' });
   expect(authorizeReviewerRequestMutation).toHaveBeenCalledWith({
-    profileId: undefined,
+    profileId: 7,
     callerSystemId: 'u-1',
     suggestionIds: [SUG_1],
   });
@@ -688,6 +696,15 @@ describe('send-emails — materials strip gate (recipientMayReceiveAttachments, 
     SUGGESTIONS = { [SUG_1]: baseSuggestion({ wmkf_accepted: true }) };
     await run({ drafts: [draft()], templateType: 'materials' });
     expect(filenamesSent()).toContain('proposal.pdf');
+  });
+
+  test('the route passes the staff profile to the shared materials release claim (manual source)', async () => {
+    SUGGESTIONS = { [SUG_1]: baseSuggestion({ wmkf_accepted: true }) };
+    const { claimMaterialsRelease } = require('../../lib/services/reviewer-engagement/materials-release-store');
+    await run({ drafts: [draft()], templateType: 'materials' });
+    expect(claimMaterialsRelease).toHaveBeenCalledWith(expect.objectContaining({
+      suggestionId: SUG_1, source: 'manual', actorProfileId: 7,
+    }));
   });
 
   test('the cycle config follows the Grant Cycle link: no link, no cycle material (meeting date ignored)', async () => {

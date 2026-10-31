@@ -1,7 +1,10 @@
 /**
  * Post-accept confirmation view — terminal screen shown after a successful
  * accept (or when the reviewer returns to a previously-accepted engagement
- * before materials have been sent).
+ * before materials have been sent). Since D46/D49 the acceptance job emails
+ * the materials link within minutes and re-mints the reviewer's link, so the
+ * copy points the reviewer to that email (draft wording; owner review in
+ * PR #562).
  */
 
 import { useEffect, useRef } from 'react';
@@ -33,17 +36,19 @@ export default function AcceptedConfirmationView({
 
       <div className="space-y-3 text-sm text-gray-700">
         <p>
-          We'll email you when the proposal materials are available. Until then,
-          you can return to this page any time using the original link.
+          We'll email you a link to the proposal and the review form, usually
+          within a few minutes. Please use the link in that email from then
+          on; the link you used to reach this page may stop working. If the
+          email hasn't arrived by the next business day, please let your
+          Program Director know.
         </p>
         <p>
           If something changes — calendar conflict, conflict of interest you
-          spotted, anything — please let us know before materials are released.
+          spotted, anything — please let us know as soon as you can.
           {showWithdrawalOption
             ? ' You can change your response below, or reach out to your Program Director'
             : ' Use the secure link in your confirmation email, or reach out to your Program Director'}
-          <ProgramDirectorContact programDirector={programDirector} />{' '}
-          rather than waiting until materials are released.
+          <ProgramDirectorContact programDirector={programDirector} />.
         </p>
       </div>
 

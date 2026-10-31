@@ -118,6 +118,7 @@ export default async function handler(req, res) {
         requestBody: req.body,
         fromEmail,
         actingUserSystemId,
+        actorProfileId: access.profileId,
         authorizedProgramDirectorByRequestId: authorization?.programDirectorByRequestId,
       }, ({ event, data }) => sendEvent(event, data))
     );

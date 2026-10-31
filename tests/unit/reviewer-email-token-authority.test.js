@@ -23,6 +23,9 @@ let mintCounter;
 // render-emails-service dependencies -----------------------------------------
 const findById = jest.fn();
 const updateLifecycle = jest.fn(async () => {});
+jest.mock('../../lib/services/reviewer-engagement/materials-release-store',
+  () => require('../helpers/materials-release-store-mock').createMaterialsReleaseStoreMock());
+jest.mock('../../lib/services/alert-service', () => ({ __esModule: true, default: { autoResolve: jest.fn(async () => {}) } }));
 jest.mock('../../lib/dataverse/adapters/reviewer-suggestion', () => ({
   findById: (...a) => findById(...a),
   updateLifecycle: (...a) => updateLifecycle(...a),
@@ -169,6 +172,7 @@ async function send(drafts) {
     {
       requestBody: { drafts, templateType: 'materials' },
       fromEmail: 'staff@wmkeck.org',
+      actorProfileId: 7,
       actingUserSystemId: 'u-1',
       authorizedProgramDirectorByRequestId: { [REQUEST_ID]: null },
     },

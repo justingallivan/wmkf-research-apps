@@ -16,6 +16,9 @@ import { mintAndStore, revoke } from '../../lib/external/token-lifecycle';
 import ReviewDraftService from '../../lib/services/review-draft-service';
 import { authorizeReviewerRequestMutation } from '../../lib/services/reviewer-request-authorization';
 
+jest.mock('../../lib/services/review-manager/invitation-proposal-pdf', () => ({
+  checkInvitationProposalPdf: jest.fn(async () => 'present'),
+}));
 jest.mock('../../lib/services/dynamics-service', () => ({
   DynamicsService: {
     getRecord: jest.fn(),
@@ -125,12 +128,12 @@ describe('/api/review-manager/regenerate-token', () => {
     expect(DynamicsService.getRecord).toHaveBeenCalledWith(
       'wmkf_appreviewersuggestions',
       SUGGESTION_ID,
-      { select: 'wmkf_appreviewersuggestionid,_wmkf_request_value,wmkf_applicantdisposition,wmkf_accepted,wmkf_reviewduedateoverride,wmkf_responsetype,wmkf_reviewstatus' },
+      { select: 'wmkf_appreviewersuggestionid,_wmkf_request_value,wmkf_applicantdisposition,wmkf_accepted,wmkf_invited,wmkf_reviewduedateoverride,wmkf_responsetype,wmkf_reviewstatus' },
     );
     expect(DynamicsService.getRecord).toHaveBeenCalledWith(
       'akoya_requests',
       REQUEST_ID,
-      { select: 'wmkf_reviewduedate' },
+      { select: 'akoya_requestid,akoya_requestnum,wmkf_reviewduedate' },
     );
     expect(mintAndStore).toHaveBeenCalledWith({
       suggestionId: SUGGESTION_ID,

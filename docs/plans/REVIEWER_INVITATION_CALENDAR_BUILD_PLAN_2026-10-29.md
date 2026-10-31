@@ -272,7 +272,127 @@ Admin `inviteStartDate` has no reader outside its form, validation and tests
   then [ASSUMED — verify at build].
 - **Invitation precondition:** sending an invitation checks the proposal PDF is
   present (blocking, not today's `window.confirm`), so materials are ready when
-  invitations go out.
+  invitations go out. Built Session 654 in `send-emails-service.js`
+  (`checkInvitationProposalPdf`, once per request per batch, before the
+  due-date write): no listed reviewer PDF → `proposal_pdf_missing`; nothing
+  listed and one of the request's Dynamics-linked folders unlistable, or the
+  listing threw → `proposal_pdf_unavailable` (fail closed, staff retry).
+  A speculative archive folder that does not exist (`graph_folder_not_found`)
+  is ignored; any other archive or Dynamics-folder failure is "unavailable"
+  (`listReviewerMaterialsWithAvailability` returns `unavailableSources`). The
+  shared check lives in `review-manager/invitation-proposal-pdf.js` and also
+  gates `regenerate-token` when it would mint a first copyable link for a
+  never-invited, not-yet-responded reviewer (409 `proposal_pdf_missing` /
+  `proposal_pdf_unavailable`); replacement links are unaffected (Codex round,
+  Session 654). Still open: that first-link path does not apply D48's due-date
+  write. The Invite modal's manual-link "mark manually sent" control is
+  unreachable today (`render-emails-service.js` always sets `manualLink: null`).
+
+**Build notes (2026-10-30, branch `claude/reviewer-materials-on-accept`, PR
+#562, not merged).** Built on the branch: migration 091 and its store, the
+acceptance job's `release_materials` step with the new template keys, and the
+manual-path claim, staff recovery, the invitation PDF precondition and the
+accepted-screen copy (Session 654). Still [PLANNED] (follow-up PR): invitation wording and
+`{{proposalDelivery}}` / Reviewer Finder date-field retirement. Accept does
+not set a review status [VERIFIED via rg: no `reviewStatus` write in
+`respond-service.js` or `reviewer-engagement/record-invitation.js`; writers are
+`record-email-outcome.js` and `close-review.js`], so a new acceptance is
+eligible (blank status). The address check re-reads the reviewer and retries
+on a failed read; it never trusts the job's snapshot. A lasting bookkeeping
+failure after a confirmed send alerts staff ("sent but not yet recorded").
+Transient failures before the claim retry for up to 15 minutes; then the
+reviewer gets today's confirmation and staff a "materials held" alert (owner,
+2026-10-30). After the claim there is no fallback: the release row's state
+rules. Each stuck release keeps one deduplicated staff alert open, re-raised
+by every drain run. Invitation wording and the old date-field retirement move
+to a follow-up PR (owner, 2026-10-30).
+
+- **Release table, migration 091** (no open branch claims 091, checked
+  2026-10-30 against every remote branch; Production `schema_migrations` is an
+  owner-run check before merge): `reviewer_materials_releases`, one row per
+  engagement, `suggestion_id` unique; `request_id`; `source` (`acceptance` |
+  `manual`); `state` (`claimed`, `link_minted`, `sent`, `recorded`,
+  `uncertain`, `failed`); `lease_token`, `lease_until`; a timestamp per
+  transition; `job_id` (acceptance) or the staff actor (manual); `error_code`;
+  `attempts`. The claim is `INSERT … ON CONFLICT (suggestion_id) DO NOTHING
+  RETURNING`: whoever inserts first owns the release.
+- **Drain step `release_materials`**, skipped on a repeat acceptance as today.
+  Everything reversible runs before the claim: fresh suggestion/request reads
+  (request select adds `_wmkf_grantcycle_value`, never the meeting date), PDF
+  check, cycle configuration from the Grant Cycle link, attachment fetch,
+  sender, address-confidence and test-request checks, render. **An attachment
+  that cannot be fetched fails the step before the claim and retries** (the
+  manual path warns and continues; with no one watching, a missing review
+  template must not reach the reviewer silently). Then claim → `mintAndStore`
+  with the accepted expiry → `link_minted` → send → `sent` → `recordDeliveredEmail`
+  (`templateType: 'materials'`) → `recorded`.
+- **Retries act on the row's state:** `recorded` skips; `sent` only records
+  (never resends); `claimed` / `link_minted` past the lease, `uncertain` or
+  `failed` are never resumed: staff alert and "Send materials again", which
+  re-mints and sends under the same row after re-checking accepted and not yet
+  released on the server. The job completes; the release alert stays open.
+- **Combined email** uses new template keys
+  `email.reviewer_materials_acceptance.{subject,body}` (seeded create-only, so
+  no rebaseline of the old acceptance keys and no old per-PD acceptance
+  overrides apply). The link goes in `{{reviewUrl}}`; a body without it gets a
+  standard link paragraph appended, so it is never sent without the link.
+  Rendered with the send-time placeholder link; the minted link replaces it
+  after the claim. Attachments: the due-date calendar file plus the cycle's
+  review template and additional attachments.
+- **Fallback (materials held, today's acceptance email instead, staff
+  alert):** no proposal PDF (an unlistable folder retries instead), new
+  template keys not seeded, a revoked link or a status other than blank /
+  accepted,
+  address confidence `blocked`, no Grant Cycle link or no cycle
+  configuration. All are decided before the claim, so nothing is minted.
+- **Step state table** (`job.steps.release_materials`):
+
+  | Release row before the step | Step does |
+  |---|---|
+  | none | reversible checks → fallback, retry, or claim and send |
+  | ours (`acceptance`, this job), `recorded` | nothing; done |
+  | ours, `sent` | `recordDeliveredEmail` then `recorded`; never resend |
+  | ours, `claimed` / `link_minted` (live or expired lease), `uncertain`, `failed` | alert, step `stopped`; staff "Send materials again" |
+  | `manual` (any state) | step `skipped: manual_release_owns`; no acceptance email |
+  | `acceptance` from another job | treated like `manual`: never send twice |
+
+  After the claim: mint fails → `failed` (definite: nothing sent; the old
+  link may already be dead, so staff resend); send throws → `uncertain` or
+  `failed` by the existing dispatch classifier; confirmed send but
+  `markMaterialsSent` returns null (staff reclaimed the row) → alert as
+  uncertain, no bookkeeping. `MATERIALS_RELEASE_LEASE_MS` (10 min) exceeds the
+  job lock (300 s default).
+- **Manual release** takes the same claim just before its mint
+  (`send-emails-service.js`, materials path); an existing row refuses with a new
+  skip reason, "materials are already being sent"
+  (`materials_release_in_progress`), or `materials_already_sent` when the row
+  is `sent` / `recorded`. Built Session 654: a claim that cannot be checked
+  fails closed (`materials_release_unavailable`); mint failure → `failed`;
+  dispatch throw → `uncertain` / `failed` by the existing `dispatched`
+  classifier; after `recordDeliveredEmail` the row goes to `recorded` and the
+  release alert is resolved. Two tightenings: a materials draft without the
+  reviewer link now fails closed (`external_link_missing`) instead of sending
+  unclaimed, and `markAsSent: false` is refused for materials (both UIs always
+  send `true`).
+  **Recovery (owner-approved Session 654, after Codex review): built.** A
+  `failed` row (definitely unsent) is retaken by any normal send. `uncertain`
+  or abandoned rows are resent only through the Release Materials "Send again"
+  button (`recoverMaterialsReleaseIds`), after the delivered-marker gates. A
+  `sent` row is recorded automatically by the drain's stuck loop (any source,
+  from `sent_at`, never resending). A reviewer who closed or withdrew after
+  delivery is closed by the drain itself (`reviewer_closed_after_delivery`;
+  Codex round 2 found the staff action unreachable for them, since the send
+  gates refuse terminal reviewers before the claim). For other unrecordable
+  rows (binding changed, lasting ETag problems), staff "Mark as delivered"
+  (`POST /api/review-manager/materials-release-delivered`) closes the release
+  as `staff_marked_delivered`. Local auth-bypass sessions have no profile id,
+  so a manual materials send there fails closed
+  (`materials_release_unavailable`); real sessions always carry one
+  (`requireAppAccess`).
+- **Build order** (each a stop point): migration + claim service → drain step →
+  manual-path claim → recovery action (route + UI) → invitation PDF
+  precondition + accepted-screen copy [built through here; #562 complete] → wording seeds, `{{proposalDelivery}}`
+  and Reviewer Finder date-field retirement.
 
 ### 3.4 Wording
 
@@ -399,11 +519,13 @@ with the markers written only after confirmed delivery. Accepted.
 1. Calendar date is copied at first invitation and then fixed (§3.1), rather
    than read live. **Decided (owner, 2026-10-29; D48).**
 2. One acceptance email that carries the materials, instead of two emails.
-   **Proposed.**
+   **Decided (owner, 2026-10-30; D49).**
 3. Reviewers withdraw by emailing the PD after accepting. **Decided (D48).**
 4. Invitations refused when Reviews Due is blank or the proposal PDF is missing.
    **Decided (D48).**
-5. Final wording of the three emails (drafted at build for approval).
+5. Final wording of the three emails: drafted in the PR for the owner's
+   review there (owner, 2026-10-30; D49); live text changes only with a
+   later owner-approved rebaseline (`--force-keys`).
 
 ## 7. Build order and tests
 
