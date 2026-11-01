@@ -57,7 +57,11 @@
  * only a dated post-meeting stamp on a non-revoked row is an automated close.
  */
 
-import { STAFF_WITHDRAWAL_DEFAULT_TEXT, STAFF_WITHDRAWAL_REASONS } from '../../utils/reviewer-staff-outcome';
+import {
+  STAFF_PENDING_OUTCOME_DEFAULT_TEXT,
+  STAFF_WITHDRAWAL_DEFAULT_TEXT,
+  STAFF_WITHDRAWAL_REASONS,
+} from '../../utils/reviewer-staff-outcome';
 
 /**
  * Event descriptors in lifecycle order. `order` breaks ties when two stamps share a
@@ -270,9 +274,10 @@ export function isSyntheticReceipt(reviewer) {
   return received !== null && received === completed;
 }
 
-// Staff withdrawal dialog (outcomes slice 3b-3a): a conflict of interest or a
-// Foundation ending is stored under the Withdrew status, so the label comes
-// from the decline reason and Ended by instead.
+// Staff-recorded endings (Track withdrawal dialog; Invite "Record outcome…"
+// ended by the Foundation): a conflict of interest or a Foundation ending is
+// stored as Withdrew or a plain Declined, so the label comes from the decline
+// reason and Ended by instead.
 function staffWithdrawalLabel(reviewer) {
   if (reviewer?.declineReason === 'conflict-of-interest') {
     return { label: 'Conflict of interest recorded by staff' };
@@ -283,7 +288,10 @@ function staffWithdrawalLabel(reviewer) {
   return { label: 'Withdrawal recorded by staff' };
 }
 
-const STAFF_DEFAULT_NOTES = new Set(Object.values(STAFF_WITHDRAWAL_DEFAULT_TEXT));
+const STAFF_DEFAULT_NOTES = new Set([
+  ...Object.values(STAFF_WITHDRAWAL_DEFAULT_TEXT),
+  ...Object.values(STAFF_PENDING_OUTCOME_DEFAULT_TEXT),
+]);
 
 function staffWithdrawalDetail(reviewer) {
   const parts = ['Recorded as declined by a Program Director, not by the reviewer.'];
@@ -311,6 +319,18 @@ export function responseEventEvidence(reviewer) {
       // was written by applyStaffReviewerWithdrawal, not by the reviewer
       // (`reviewer-suggestion.js:1832-1842`). Echoing the raw enum under a
       // staff-recorded label re-introduces the ambiguity the label just removed.
+      detail: staffWithdrawalDetail(reviewer),
+    };
+  }
+
+  // Invite Reviewers "Record outcome…" with the Foundation ending it before
+  // the reviewer answered: Declined with no review status. Raised by the
+  // reviewer, the row is deliberately the same as a portal decline (the plan
+  // does not store who typed it), so it keeps the reviewer-decline label.
+  if (responseType === 'declined' && !reviewStatus && reviewer?.endedBy === 'foundation') {
+    return {
+      ...staffWithdrawalLabel(reviewer),
+      deliveryProven: true,
       detail: staffWithdrawalDetail(reviewer),
     };
   }

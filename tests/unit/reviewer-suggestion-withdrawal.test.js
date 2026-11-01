@@ -14,6 +14,7 @@ import {
   applyStaffReviewerWithdrawal,
   applyStaffReviewerRelease,
   applyStaffReviewerDidNotSubmit,
+  applyStaffPendingOutcome,
   findEndedAfterAcceptanceByRequest,
   withdrawLinkedHonorariumForEndedSuggestion,
   deleteLinkedHonorariumForDeclinedSuggestion,
@@ -172,6 +173,55 @@ describe('reviewer withdrawal changeset', () => {
   it.each(['reviewer_before_accepting', 'nobody'])('refuses ended-by %s before writing', async (endedBy) => {
     await expect(applyStaffReviewerWithdrawal(SUGGESTION_ID, { ifMatch: 'W/"19"', endedBy })).rejects.toThrow(/endedBy/);
     expect(runChangeset).not.toHaveBeenCalled();
+  });
+
+  it('records a staff outcome before the reviewer answered: declined, link revoked, review status untouched', async () => {
+    const updateSpy = jest.spyOn(DynamicsService, 'updateRecord').mockResolvedValue(undefined);
+    await applyStaffPendingOutcome(SUGGESTION_ID, {
+      ifMatch: 'W/"30"',
+      actingUserSystemId: 'staff-3',
+      reasonPicklist: 'conflict-of-interest',
+      reasonText: 'Same department as the PI',
+      endedBy: 'foundation',
+    });
+    expect(runChangeset).not.toHaveBeenCalled();
+    const [entitySet, id, body, options] = updateSpy.mock.calls[0];
+    expect([entitySet, id, options]).toEqual(['wmkf_appreviewersuggestions', SUGGESTION_ID, { ifMatch: 'W/"30"', actingUserSystemId: 'staff-3' }]);
+    expect(body).toMatchObject({
+      wmkf_selected: false,
+      wmkf_accepted: false,
+      wmkf_declined: true,
+      wmkf_responsetype: RESPONSE_TYPE_MAP.declined,
+      wmkf_declinereasonpicklist: 100000001, // Conflict of interest
+      wmkf_declinereason: 'Same department as the PI',
+      wmkf_declinereferral: null,
+      wmkf_endedby: 100000002, // Foundation
+      wmkf_externaltokenrevoked: true,
+    });
+    expect(body).not.toHaveProperty('wmkf_reviewstatus');
+    expect(body.wmkf_endedat).toBe(body.wmkf_responsereceivedat);
+    expect(Date.parse(body.wmkf_endedat)).not.toBeNaN();
+    updateSpy.mockRestore();
+  });
+
+  it('records Reviewer before accepting for a reviewer-raised Other outcome', async () => {
+    const updateSpy = jest.spyOn(DynamicsService, 'updateRecord').mockResolvedValue(undefined);
+    await applyStaffPendingOutcome(SUGGESTION_ID, {
+      ifMatch: 'W/"31"', reasonPicklist: 'other', reasonText: 'Retired', endedBy: 'reviewer_before_accepting',
+    });
+    expect(updateSpy.mock.calls[0][2]).toMatchObject({ wmkf_declinereasonpicklist: 100000004, wmkf_endedby: 100000000 });
+    updateSpy.mockRestore();
+  });
+
+  it.each([
+    ['an after-accepting ended-by', { reasonPicklist: 'other', endedBy: 'reviewer_after_accepting' }],
+    ['a withdrawal reason', { reasonPicklist: 'too-busy', endedBy: 'foundation' }],
+    ['no ETag', { reasonPicklist: 'other', endedBy: 'foundation', ifMatch: undefined }],
+  ])('refuses %s before writing', async (_name, fields) => {
+    const updateSpy = jest.spyOn(DynamicsService, 'updateRecord').mockResolvedValue(undefined);
+    await expect(applyStaffPendingOutcome(SUGGESTION_ID, { ifMatch: 'W/"1"', reasonText: 'x', ...fields })).rejects.toThrow();
+    expect(updateSpy).not.toHaveBeenCalled();
+    updateSpy.mockRestore();
   });
 
   it.each(['applyStaffReviewerWithdrawal', 'applyStaffReviewerDidNotSubmit'])(

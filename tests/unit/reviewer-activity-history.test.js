@@ -207,6 +207,36 @@ describe('buildActivityHistory', () => {
     });
   });
 
+  describe('Record outcome before the reviewer answered', () => {
+    const responseOf = (fields) => buildActivityHistory({
+      suggestionId: 's13',
+      responseReceivedAt: '2026-10-31T12:00:00Z',
+      responseType: 'declined',
+      reviewStatus: null,
+      ...fields,
+    }).find(e => e.key === 'response_received');
+
+    it('names a Foundation-raised conflict of interest as recorded by staff', () => {
+      const response = responseOf({ declineReason: 'conflict-of-interest', endedBy: 'foundation' });
+      expect(response.label).toBe('Conflict of interest recorded by staff');
+      // The stock pre-answer note is hidden.
+      expect(response.detail).toBe('Recorded as declined by a Program Director, not by the reviewer. Raised by the Foundation.');
+    });
+
+    it('names a Foundation ending recorded as Other, with its note', () => {
+      const response = responseOf({ declineReason: 'other', endedBy: 'foundation', declineReasonText: 'Proposal withdrawn' });
+      expect(response.label).toBe('Foundation ended the engagement (recorded by staff)');
+      expect(response.detail).toMatch(/Note: Proposal withdrawn$/);
+    });
+
+    it('keeps the reviewer-decline label when the reviewer raised it (stored like a portal decline)', () => {
+      const staffRecorded = responseOf({ declineReason: 'conflict-of-interest', endedBy: 'reviewer_before_accepting' });
+      const portal = responseOf({ declineReason: 'too-busy', endedBy: 'reviewer_before_accepting' });
+      expect(staffRecorded.label).toBe(portal.label);
+      expect(portal.detail).toBe('Response: declined');
+    });
+  });
+
   it('labels automated no-response close-out without asserting a reviewer response', () => {
     const events = buildActivityHistory({
       suggestionId: 's12',

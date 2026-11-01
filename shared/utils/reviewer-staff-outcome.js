@@ -69,3 +69,48 @@ export function normalizeStaffWithdrawal(input) {
   if (!note) return { error: 'withdrawal.note is required for Other' };
   return { reasonPicklist: 'other', reasonText: note, endedBy: input.endedBy };
 }
+
+/*
+ * Staff-recorded outcome for an invited reviewer who has not answered
+ * (Invite Reviewers "Record outcome…", owner decision 2026-10-31). Saved as
+ * Declined with the reason; review status is untouched and the link is
+ * revoked.
+ *
+ *   coi   → conflict of interest; staff choose who raised it.
+ *   other → required note; staff choose who ended it.
+ */
+
+export const STAFF_PENDING_OUTCOME_KINDS = Object.freeze(['coi', 'other']);
+
+export const STAFF_PENDING_ENDED_BY_CHOICES = Object.freeze([
+  { value: 'reviewer_before_accepting', label: 'Reviewer' },
+  { value: 'foundation', label: 'Foundation' },
+]);
+
+export const STAFF_PENDING_OUTCOME_DEFAULT_TEXT = Object.freeze({
+  coi: 'Program Director recorded a conflict of interest before the reviewer answered.',
+});
+
+/**
+ * Normalize the Record outcome dialog payload into the adapter's decline
+ * fields, or return `{ error }`. Unlike normalizeStaffWithdrawal there is no
+ * pre-dialog client, so a missing payload is an error.
+ */
+export function normalizeStaffPendingOutcome(input) {
+  if (!input || typeof input !== 'object' || Array.isArray(input)) return { error: 'outcome must be an object' };
+  const { kind } = input;
+  if (!STAFF_PENDING_OUTCOME_KINDS.includes(kind)) return { error: 'outcome.kind must be coi or other' };
+  if (input.note !== undefined && input.note !== null && typeof input.note !== 'string') {
+    return { error: 'outcome.note must be text' };
+  }
+  const note = typeof input.note === 'string' ? input.note.trim() : '';
+  if (note.length > STAFF_OUTCOME_NOTE_MAX) return { error: `outcome.note must be at most ${STAFF_OUTCOME_NOTE_MAX} characters` };
+  if (!STAFF_PENDING_ENDED_BY_CHOICES.some((c) => c.value === input.endedBy)) {
+    return { error: 'outcome.endedBy must be reviewer_before_accepting or foundation' };
+  }
+  if (kind === 'coi') {
+    return { reasonPicklist: 'conflict-of-interest', reasonText: note || STAFF_PENDING_OUTCOME_DEFAULT_TEXT.coi, endedBy: input.endedBy };
+  }
+  if (!note) return { error: 'outcome.note is required for Other' };
+  return { reasonPicklist: 'other', reasonText: note, endedBy: input.endedBy };
+}

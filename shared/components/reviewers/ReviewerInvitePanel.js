@@ -40,6 +40,7 @@ import CandidateEditModal from './CandidateEditModal';
 import RemoveEntirelyModal from './RemoveEntirelyModal';
 import ReleaseEmailModal from './ReleaseEmailModal';
 import RespondReminderModal from './RespondReminderModal';
+import StaffPendingOutcomeModal from './StaffPendingOutcomeModal';
 import { buildScholarSearchUrl, isRealScholarProfileUrl } from '../../../lib/utils/scholar-url';
 import { ContactParser } from '../../../lib/utils/contact-parser';
 import { splitReferredByReason } from '../../../lib/utils/reviewer-provenance';
@@ -110,6 +111,12 @@ function candidateContactPageUrl(c) {
   return facultyPageUrl || c.website;
 }
 
+// Invited and not yet answered — the server's still-pending rule for
+// releases and Record outcome.
+function isAwaitingAnswer(c) {
+  return Boolean(c?.invited && !c.accepted && !c.declined && !c.responseType);
+}
+
 const REMOVE_MENU_WIDTH = 264; // wide enough for the permanent-delete subtitle
 const REMOVE_MENU_ITEM_H = 56;  // two two-line items — drives the upward-flip estimate
 
@@ -120,13 +127,18 @@ const REMOVE_MENU_ITEM_H = 56;  // two two-line items — drives the upward-flip
 //   • "Delete permanently…"       → opens RemoveEntirelyModal (engagement +
 //                                    honorarium + reviews; contact-delete is that
 //                                    modal's own nested opt-in)
-// Both destinations carry their own confirm, so this menu is just routing.
+//   • "Record outcome…"           → invited, not yet answered only: opens
+//                                    StaffPendingOutcomeModal (conflict of
+//                                    interest / Other, saved as Declined)
+// Every destination carries its own confirm, so this menu is just routing.
 // Mirrors TokenActionsMenu's portalled, outside-click-closing, upward-flipping
 // pattern so the menu escapes the row's clipping/stacking context.
-function RowRemoveMenu({ candidate, disabled = false, onRemoveFromProposal, onDeletePermanently }) {
+function RowRemoveMenu({ candidate, disabled = false, onRemoveFromProposal, onDeletePermanently, onRecordOutcome }) {
   // Server-computed with softDelete's own rule (never invited, no recorded
   // outcome); anything else keeps its response (INVITED_REVIEWER_OUTCOMES_PLAN).
   const invited = candidate?.canRemove !== true;
+  // Mirrors the server's still-pending rule (record-pending-outcome.js).
+  const canRecordOutcome = Boolean(onRecordOutcome) && isAwaitingAnswer(candidate);
   const [open, setOpen] = useState(false);
   const [coords, setCoords] = useState(null); // { left, top } in viewport px, or null
   const btnRef = useRef(null);
@@ -136,13 +148,13 @@ function RowRemoveMenu({ candidate, disabled = false, onRemoveFromProposal, onDe
     const btn = btnRef.current;
     if (!btn) return;
     const rect = btn.getBoundingClientRect();
-    const estHeight = 2 * REMOVE_MENU_ITEM_H + 8;
+    const estHeight = (canRecordOutcome ? 3 : 2) * REMOVE_MENU_ITEM_H + 8;
     const openUp = rect.bottom + estHeight > window.innerHeight && rect.top > estHeight;
     setCoords({
       left: Math.max(8, rect.right - REMOVE_MENU_WIDTH),
       top: openUp ? rect.top - estHeight - 4 : rect.bottom + 4,
     });
-  }, []);
+  }, [canRecordOutcome]);
 
   useEffect(() => {
     if (!open) return;
@@ -187,6 +199,17 @@ function RowRemoveMenu({ candidate, disabled = false, onRemoveFromProposal, onDe
           style={{ position: 'fixed', left: coords.left, top: coords.top, width: REMOVE_MENU_WIDTH }}
           className="bg-white border border-gray-200 rounded-lg shadow-lg z-50 py-1 text-sm"
         >
+          {canRecordOutcome && (
+            <button
+              type="button"
+              role="menuitem"
+              onClick={() => { setOpen(false); onRecordOutcome(); }}
+              className="w-full text-left px-3 py-2 hover:bg-gray-50 border-b border-gray-100"
+            >
+              Record outcome…
+              <span className="block text-xs text-gray-400">Conflict of interest or other ending, before they answer</span>
+            </button>
+          )}
           {invited ? (
             <div role="menuitem" aria-disabled="true" className="px-3 py-2 text-gray-400">
               Remove from this proposal
@@ -219,6 +242,14 @@ function RowRemoveMenu({ candidate, disabled = false, onRemoveFromProposal, onDe
   );
 }
 
+const PENDING_OUTCOME_FAILURES = Object.freeze({
+  not_pending: 'the reviewer has already answered or the invitation has ended. The list has been refreshed.',
+  changed_skipped: 'the reviewer record changed while saving. The list has been refreshed; check it and try again.',
+  wrong_request: 'this reviewer does not belong to this proposal.',
+  not_found: 'the reviewer record was not found.',
+  honorarium_linked: 'this reviewer already has an honorarium request. Ask for help before recording an outcome.',
+});
+
 function ReviewerInvitePanelForRequest({ requestId, candidates = [], removedCandidates = [], loading = false, onRefresh, settings = {}, canManage = true, repairSuggestionId = null }) {
   const [selected, setSelected] = useState(() => new Set());
   const [modal, setModal] = useState(null); // { candidates, allowResend } | null
@@ -228,6 +259,9 @@ function ReviewerInvitePanelForRequest({ requestId, candidates = [], removedCand
   const [restoringId, setRestoringId] = useState(null);
   const [showRemoved, setShowRemoved] = useState(true);
   const [removeEntirelyTarget, setRemoveEntirelyTarget] = useState(null); // candidate row | null
+  const [outcomeTargetId, setOutcomeTargetId] = useState(null); // suggestionId | null
+  const [recordingOutcome, setRecordingOutcome] = useState(false);
+  const recordingOutcomeRef = useRef(false); // same-tick double-submit guard
   const [exporting, setExporting] = useState(false);
   const [exportError, setExportError] = useState(null);
   const [nudgeTarget, setNudgeTarget] = useState(null); // active invited candidate | null
@@ -431,6 +465,45 @@ function ReviewerInvitePanelForRequest({ requestId, candidates = [], removedCand
     }
   };
 
+  // Record outcome… for an invited reviewer who has not answered. The panel is
+  // remounted per request (see the default export), so the dialog cannot
+  // outlive its request; the row must still be listed and still awaiting an
+  // answer when staff confirm, and the server re-checks both.
+  const recordPendingOutcome = async (outcome) => {
+    const row = candidates.find((c) => c.suggestionId === outcomeTargetId);
+    if (recordingOutcomeRef.current) return;
+    if (!row || !isAwaitingAnswer(row) || !canManage) {
+      setOutcomeTargetId(null);
+      return;
+    }
+    recordingOutcomeRef.current = true;
+    setRecordingOutcome(true);
+    try {
+      const envelope = await requestEnvelope('/api/review-manager/pending-outcome', {
+        method: 'POST',
+        body: { requestId, suggestionId: row.suggestionId, outcome },
+        tolerantBody: true,
+      });
+      if (!envelope.ok) {
+        const data = envelope.data;
+        const reason = PENDING_OUTCOME_FAILURES[data.status] || data.error || envelope.status;
+        alert(`Could not record the outcome: ${reason}`);
+        if (data.status === 'not_pending' || data.status === 'changed_skipped') {
+          setOutcomeTargetId(null);
+          if (onRefresh) onRefresh();
+        }
+        return;
+      }
+      setOutcomeTargetId(null);
+      if (onRefresh) onRefresh();
+    } catch (err) {
+      alert(`Network error recording the outcome: ${err.message}`);
+    } finally {
+      recordingOutcomeRef.current = false;
+      setRecordingOutcome(false);
+    }
+  };
+
   // Reverse the X: re-select a removed candidate so it returns to the list above.
   // PATCH { restore:true } → server re-selects (never un-revokes a token). Same
   // resp.ok guard as removeCandidate (fetch doesn't throw on 4xx/5xx).
@@ -455,6 +528,10 @@ function ReviewerInvitePanelForRequest({ requestId, candidates = [], removedCand
     }
   };
 
+  const outcomeTarget = outcomeTargetId
+    ? candidates.find((c) => c.suggestionId === outcomeTargetId && isAwaitingAnswer(c)) || null
+    : null;
+
   const invitable = candidates.filter(
     (c) => !c.invited && !c.accepted && !c.declined && !c.responseType && c.email
   );
@@ -476,7 +553,7 @@ function ReviewerInvitePanelForRequest({ requestId, candidates = [], removedCand
   // Still-pending = invited, no response yet (not accepted/declined, and no resolved
   // responseType — excludes already-withdrawn/no_response). The only rows the PD may
   // release (reviewer-engagement Phase 4 §3.C). Server re-guards this.
-  const selectedPending = selectedRows.filter((c) => c.invited && !c.accepted && !c.declined && !c.responseType);
+  const selectedPending = selectedRows.filter(isAwaitingAnswer);
   // A selection mixing not-yet-invited and still-pending rows disables BOTH
   // actions (owner decision 2026-08-20): each button silently acting on only
   // its own subset read as ambiguous. Staff pick one kind at a time.
@@ -670,6 +747,7 @@ function ReviewerInvitePanelForRequest({ requestId, candidates = [], removedCand
                           disabled={removingId === c.suggestionId}
                           onRemoveFromProposal={() => removeCandidate(c)}
                           onDeletePermanently={() => setRemoveEntirelyTarget(c)}
+                          onRecordOutcome={() => setOutcomeTargetId(c.suggestionId)}
                         />
                       )}
                     </span>
@@ -893,6 +971,15 @@ function ReviewerInvitePanelForRequest({ requestId, candidates = [], removedCand
           vipUnknown={modal.vipUnknown}
           onClose={() => setModal(null)}
           onSent={afterSent}
+        />
+      )}
+
+      {outcomeTarget && canManage && (
+        <StaffPendingOutcomeModal
+          reviewer={outcomeTarget}
+          saving={recordingOutcome}
+          onClose={() => { if (!recordingOutcome) setOutcomeTargetId(null); }}
+          onConfirm={recordPendingOutcome}
         />
       )}
 
