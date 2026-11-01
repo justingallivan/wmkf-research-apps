@@ -10,6 +10,18 @@ The chronological archive after the `Legacy chronological session log` divider c
 
 ---
 
+## November 2026 — Staff record how a reviewer engagement ended; invitations stop promising a release date (Session 655, Claude)
+
+**Milestone:** Program Directors can record a withdrawal, conflict of interest or other ending for accepted and not-yet-answered reviewers, and the invitation no longer promises a proposal release date now that materials go out on acceptance.
+**Sessions:** Session 655 continuation, 2026-10-31 to 2026-11-01 (Codex adversarial reviews on each PR; owner-approved Production checks and edits).
+**Ship state:**
+- #578/#579 staff ending dialogs, verified in Production on Factory test requests 1003429/1003430; #585 labels conflict/Foundation endings by reason, not "Withdrew".
+- #586 + hotfix #587: release-date field and `{{proposalDelivery}}` retired; legacy wording is stripped only on recognized lines, otherwise Send is blocked. The live invitation body and one PD override were line-edited.
+- #589: the Reviewer Finder cycle record's review deadline is no longer read, written or fingerprinted; Proposal Send Date is removed from Release Materials.
+- #584: Reviewer Finder proposal loading fixed (explicit shared Blob token).
+**Why it matters:** Ending records are now explicit and attributable without implying a reviewer was unreliable, and reviewers are told the truth about when they get the proposal.
+**Pointers:** `docs/plans/INVITED_REVIEWER_OUTCOMES_PLAN_2026-10-31.md`; `docs/plans/REVIEWER_INVITATION_CALENDAR_BUILD_PLAN_2026-10-29.md`; merges `61929f64`, `4d141859`, `c0ccde79`, `f949a5cf`, `745ec4fb`, `fdd60f49`.
+
 ## October 2026 — Reviewers get the materials when they accept (Session 655, Claude)
 
 **Milestone:** Accepting a review invitation now emails the reviewer their proposal link, review template and calendar reminder within minutes, in one email with a newly minted link (D46/D48/D49).

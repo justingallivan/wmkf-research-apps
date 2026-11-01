@@ -10,6 +10,109 @@ parking pointer), `git show b19a1f4dd:SESSION_PROMPT.md` (original Claude655), a
 `git show b091cf5cd:SESSION_PROMPT.md` (Codex Board release Session654).
 Historical paths, live observations and permissions are not fresh authority.
 
+## Claude closeout — 2026-11-01 (Session 655 continuation)
+
+The Claude invited-reviewer outcomes stream continued on `main` today while the
+Codex Session656 summary below stays current for PR553. Prior Claude detail for
+this stream is preserved at `git show 1fd66db14:SESSION_PROMPT.md`.
+
+### What Was Completed (all owner-approved, merged, Vercel Production success)
+
+1. **Track Reviewers withdrawal dialog (#578) and "Record outcome…" for invited,
+   unanswered reviewers (#579), verified in Production** on Factory test requests
+   1003429 (accepted → conflict of interest raised by Foundation) and 1003430
+   (invited → Other, ended by Foundation). Production read-back matched:
+   Declined, reason + note, Ended by Foundation, Ended at, link revoked; review
+   status Withdrew on 1003429 and blank on 1003430.
+2. **#582 `466cc9ef`**: invite-dialog campaign timeline layout fix.
+3. **#584 `2a183767`**: Reviewer Finder "Failed to load proposal from SharePoint"
+   fixed. Blob `head`/`put` now pass `BLOB_READ_WRITE_TOKEN`; Production
+   `BLOB_STORE_ID` points at the private Factory store.
+4. **#585 `c0ccde79`**: a staff-recorded conflict of interest or Foundation
+   ending now shows by its reason ("Conflict of interest" / "Ended by
+   Foundation") in the Track badge and the History status, not "Withdrew".
+5. **#586 `f949a5cf` + hotfix #587 `745ec4fb`**: the invitation no longer
+   promises a proposal release date.
+   - The invite dialog and admin defaults lose the field.
+   - `{{proposalDelivery}}` is removed automatically only on recognized
+     standalone release lines; any other line keeps it and blocks Send, so
+     custom wording never loses its link or a deadline.
+   - #587 added the live default's sentence after #586 had blocked Send for it.
+   - Codex: 6 rounds, approved.
+   - Production edits (owner-approved, ETag-bound, read back): in the live
+     `email.reviewer_invitation.body` (a custom 2026-07-25 wording, so not
+     force-rebaselined) and in Jean Kim's saved invitation, only the release
+     sentence was replaced with the approved two sentences. No saved invitation
+     still carries the token.
+6. **#588 `264d511f`** (docs) and **#589 `fdd60f49`**: the Reviewer Finder cycle
+   record's `wmkf_reviewreturndeadline` is no longer read, written, projected or
+   fingerprinted (the column stays).
+   - The Release Materials dialog loses its Proposal Send Date field; the unused
+     legacy `DEFAULT_TEMPLATE` is removed.
+   - Production read beforehand: the column was empty on all 10 cycle rows, and
+     no live or saved wording used the date tokens.
+   - Codex approved on round 1.
+7. **Factory runs** (Production, parent 1002788, recipe basic, cycle J27):
+   - run A `2827ffbd-466b-43e2-ad1a-1b938999b2b2` → 1003429;
+   - run B `333b4f11-24c4-43cc-954e-b703f94579ff` → 1003430.
+
+   Both were written to ledger database `ledger_prod` via
+   `TEST_REQUEST_LEDGER_URL`; the host label (`lib/db/ledger-registry.js`) was
+   not recorded at run time. Synthetic reviewer "TEST · Factory Reviewer"
+   (`e5003660`) is bound and invited on both requests. The private scratch
+   bundle/manifests were deleted at the owner's direction.
+8. **Earlier today:** test request 1003221 (no Factory run id, so its reviewer
+   email is refused) was moved D26 → J27 (owner-approved).
+
+### Next Items (Claude stream)
+
+**Verified open** (plan `docs/plans/INVITED_REVIEWER_OUTCOMES_PLAN_2026-10-31.md`):
+- Materials cutoff: refuse portal decline/re-accept once a
+  `reviewer_materials_releases` row exists in a state other than `failed`, with
+  interleaving tests.
+- Reporting: outcome history query/DTO, bucket precedence, rollup.
+- D26 repair of the 10 rows that lost an answer: needs a per-row manifest and
+  separate owner authorization.
+
+**Owner decisions:**
+- Disconnect the Factory store from the default `BLOB` env prefix (env change,
+  not done).
+- Removed-candidate terminal history.
+- The first-link due-date write gap in `regenerate-token`.
+- Old Claude worktrees (`../WMKF_Apps-board-calendar`, `-materials`,
+  `-manual-mint`, `-outcomes`) and merged remote branches: cleanup needs an OK.
+
+**Known gaps (not fixed):**
+- The Release dialog isn't closed on a context change.
+- `check:script-suggestion-writers` misses `createClient().patch` writes.
+- PD users can't delete honorarium requests (slow service-principal fallback).
+- D26 Board calendar render is unverified.
+- 1003221's legacy request meeting date may still show D26.
+- Find-tab applicant-referred enrichment aborts on Factory clones
+  ("Could not determine the proposal's authors/institution").
+- Invite Reviewers says "No saved candidates yet" while the Removed list has
+  rows.
+- History's "Recorded; send not confirmed" on invitations is deliberate (no
+  delivery proof).
+- The per-user Reviewer Finder preference defaults (`reviewerFinderPreferences.js`
+  `GRANT_CYCLE_SETTINGS.reviewDeadline` / `EMAIL_TEMPLATE`) were not retired.
+- Playwright cannot start its web server in a node_modules-symlinked worktree
+  (Turbopack error); CI runs e2e.
+
+**Safety, carried forward:**
+- Production reads and writes each need a specific owner OK; the auto-mode
+  classifier refuses generic approvals such as "go for it", so ask with the
+  exact action.
+- Writes need a same-day `DATAVERSE_PROD_WRITE_ACK`.
+- No reviewer proposal-availability emails for D26.
+- Never invoke native `confirm()` dialogs via browser automation; the owner
+  clicks Send/OK.
+
+Milestone: DEVELOPMENT_LOG entry added (staff-recorded reviewer endings and the
+retired proposal release date).
+
+## Codex Session 656 summary (PR553, unchanged)
+
 ## What Was Completed
 
 1. **[VERIFIED via feature Git history/milestone] Local PR553 tooling completed and reviewed.**
@@ -122,9 +225,9 @@ authorized live actions.
 |---|---|
 | Codex / shared prompt library | PARKED; local `9d838c4c8`, Windows09 offline check with Connor Monday; [resume archive](docs/plans/PR553_MONDAY_RESUME_2026-11-02.md) |
 | Claude / Board calendar #561 | **MERGED + DEPLOYED** on owner approval (Claude, 2026-10-30): merge `955613bdb`, Vercel Production success, all `main` CI green. Head `82039e29d` also fixed the `reviewer-engagement-census` failure that `b19a1f4dd`'s close-out script caused on `main`. All three owner-run pre-merge checks passed (D26 Board Mailing 2026-11-25 ≤ Board 2026-12-10; no pending intent or unsent draft). Unverified: D26 Board page rendering calendar dates (needs a signed-in look) |
-| Claude / materials #562 | **MERGED + DEPLOYED** on owner approval (Claude, 2026-10-31): merge `fcad0ad53`, Vercel Production success, all `main` CI green, head `59c31abe7` (owner wording approved; the acceptance email's attachment sentence is now `{{attachmentsNote}}`, naming only the calendar file/template actually attached). Owner-approved Production prep done first: migration 091 applied (`reviewer_materials_releases`, 0 rows, 15:49 UTC) and `email.reviewer_materials_acceptance.{subject,body}` seeded (`created=2`, 43 existing keys skipped). Open owner decisions: removed-candidate terminal history; first-link due-date write gap; follow-up PR (invitation wording, `{{proposalDelivery}}`, Reviewer Finder date retirement) |
+| Claude / materials #562 | **MERGED + DEPLOYED** on owner approval (Claude, 2026-10-31): merge `fcad0ad53`, Vercel Production success, all `main` CI green, head `59c31abe7` (owner wording approved; the acceptance email's attachment sentence is now `{{attachmentsNote}}`, naming only the calendar file/template actually attached). Owner-approved Production prep done first: migration 091 applied (`reviewer_materials_releases`, 0 rows, 15:49 UTC) and `email.reviewer_materials_acceptance.{subject,body}` seeded (`created=2`, 43 existing keys skipped). Open owner decisions: removed-candidate terminal history; first-link due-date write gap. Follow-up done 2026-11-01: invitation wording/`{{proposalDelivery}}` (#586/#587 + live edits) and Reviewer Finder cycle date retirement (#589) |
 | Claude / manual-send gap #568 | **MERGED + DEPLOYED** on owner pre-approval (Claude, 2026-10-31): merge `166b808e2`, Vercel Production success. The manual materials send rechecks the reviewer after its release claim and mints bound to that ETag (a decline mid-batch now sends nothing). Codex approved. Also fixed `main` red on `check:atlas` from the D26 audit probe (`dacb8b1c7`) |
-| Claude / invited-reviewer outcomes | **IN PROGRESS**: slices 1–2 **MERGED** as #569 (`e14a1abb1`, owner-approved 2026-10-31); branch `claude/invited-reviewer-outcomes`, worktree `../WMKF_Apps-outcomes` (continue slices 3–5 on a fresh branch off main). Plan + build contract: `docs/plans/INVITED_REVIEWER_OUTCOMES_PLAN_2026-10-31.md`. Slice 1: Wave 35 `wmkf_endedby` + Did-not-submit provisioning scripts (applied in Production 2026-10-31, see below). Slice 2: Remove/Restore/re-add/save/promotion/corrections never erase a contacted reviewer's response; `reinvite_unavailable`; server-computed `canRemove`/`canRestore`; operator scripts guarded. Codex: 5 rounds, final approve; full Jest 26,577 green. Owner confirmed decline→Accepted correction from any open status (2026-10-31). Production schema tooling MERGED as #570 (`1484b867d`, owner-approved): guarded preflight/picklist/applier (interlock on + prod reads + dated ACK for writes), picklist previews by default, one-row round trip `scripts/roundtrip-reviewer-outcomes-test-row.mjs` (marked test request only, ETag-bound restore, recovery record + `--recover`). Codex 5 rounds, approve. Owner chose to test in Production: steps 1–3 DONE 2026-10-31 (owner-run: `wmkf_endedby` EXACT/READABLE, `did_not_submit=100000007` verified; sandbox has neither); step 4 DONE (owner browser check on a D26 request); step 5 DONE (round trip on test request 1003125, restored and verified). Finding: today's Track Reviewers shows a Did-not-submit row as plain "Accepted" and still counts it for proposal release; slices 3/4 must fix (plan, step 5 finding). Slice 3a MERGED as #571 (`3fd62098e`, owner-approved 2026-10-31): Did not submit terminal status + `applyStaffReviewerDidNotSubmit` + explicit terminal-transition branch + Track action; Track (single proposal) now lists staff-ended Withdrew/DNS reviewers (owner decision); Reviews tab no longer counts ended reviewers as pending. Codex 3 rounds, approve. Staff-ended honoraria MERGED as #572 (`719e2a9bc`, owner-approved 2026-10-31): Withdrew / Did not submit keep the linked honorarium and mark it Withdrawn (release-path checks; already-Withdrawn ETag-bound; late compensation withdraws for those rows; portal declines still delete); Track shows "Saving…" during End engagement writes. Production test of #571 on 1003125 row `c45787d7` (Harry Ewing) passed but its honorarium was deleted under the old rule (save ~21s: impersonated delete refused, service-principal retry). #572 verified in Production on 1003125 row `bb5787d7`: honorarium `1530402a` kept, Withdrawn 23:52:50 UTC. 1003125 has no accepted test reviewers left. "Ended at" schema files MERGED as #573 (`32423106c`): `02_wmkf_appreviewersuggestion_ended_at.json` + preflight covering both fields; PROVISIONED in Production 2026-10-31 (owner-run; both Wave 35 fields EXACT/READABLE; not in sandbox); no runtime use yet. 3b-1 MERGED as #574 (owner-approved 2026-10-31): staff-ended writers set Ended by/at (Withdrew, DNS: Reviewer after accepting; Release: Foundation); both fields in FIELD_SELECT, reset set, reviewers DTO; history dates DNS. Sandbox reads via FIELD_SELECT now fail (accepted). 3b-2 MERGED as #576 (owner-approved 2026-10-31): portal decline before/after accepting + Ended at, re-accept clears; sweep/no-response blank; no-longer-needed Foundation; corrections normalized (complete re-accept/decline, response type key) and attributed via server-only updateLifecycle `outcome`. Codex 3 rounds, approve. 3b-3a MERGED as #578 (`61929f640`, owner-approved 2026-10-31): Track "Record reviewer withdrawal" opens one dialog (Reviewer withdrew + reason / Conflict of interest + who raised it / Other + required note + who ended it; status stays Withdrew); route re-validates via `normalizeStaffWithdrawal`, adapter allows Ended by Reviewer after accepting or Foundation only; dialog bound to its panel context; reviewers DTO adds `declineReason`/`declineReasonText` and history labels COI/Foundation endings. Codex 2 rounds, approve; not yet exercised in Production (needs an accepted reviewer on a marked test request). Known sibling gap (not fixed, out of scope): the Release dialog is not closed on context change (still revalidated by beginAttempt + server request check). "Record outcome before the reviewer answers" (was 3b-3b) MERGED as #579 (`4d1418595`, owner-approved 2026-10-31): Invite Reviewers row menu "Record outcome…" for invited, unanswered reviewers (COI with who raised it / Other with required note and who ended it); new `POST /api/review-manager/pending-outcome` → `reviewer-engagement/record-pending-outcome.js` (fresh read, request membership, still-pending, refuses linked honorarium, ETag-bound, 412 → changed_skipped) → `applyStaffPendingOutcome` (Declined, selected=false, reason + note, Ended by Reviewer before accepting | Foundation, Ended at, link revoked; review status untouched). Codex 1 round, approve. Not yet exercised in Production; one test session on a marked test request can cover this and the withdrawal dialog (needs one accepted and one invited-unanswered test reviewer; Production writes need a same-day ACK + owner OK). Next: earlier 3b scope note: (Ended by on the other writers, COI/Other pre-answer writer, portal decline/re-accept, `wmkf_endedby` selects; first settle which Dataverse org Preview/local point at), 3c (materials cutoff), 4 (Record outcome UI), 5 (reporting); testing is in Production on marked test requests, not the sandbox (owner decision 2026-10-31). D26: 10 removed rows lost an answer; repair after the build |
+| Claude / invited-reviewer outcomes | **IN PROGRESS** (2026-11-01): slices 1–3b and the two staff-ending dialogs merged (#569–#579) and verified in Production on test requests 1003429/1003430; #585 labels conflict/Foundation endings by reason. Next: materials cutoff, reporting, D26 repair (separate auth). Plan `docs/plans/INVITED_REVIEWER_OUTCOMES_PLAN_2026-10-31.md`; full prior row at `git show 1fd66db14:SESSION_PROMPT.md` |
 | Codex / Board #563/#564 | Prior deployed milestone preserved at `b091cf5cd`; no new live work here |
 | Codex / ranking, prior archival | Prior handoffs; not revalidated |
 | Claude / research request corpus | Owner-gated; no new authorization |

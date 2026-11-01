@@ -54,6 +54,15 @@ do before telling the user you can't.
   The S635 slip: an added `loadModelOverrides()` call read prod Dataverse
   settings during a "local-only" lookup test. Treat any script that loads
   repo services (model overrides, settings, adapters) as prod-touching.
+- Ask for each Production read or write by naming the exact action ("OK to read
+  every PD's saved invitation wording"). A generic reply to a multi-step list
+  ("go for it", "approved") was refused by the auto-mode classifier as a
+  Production read; it accepted the same read once the owner approved a specific
+  option. `[VERIFIED via 2026-11-01 session]` Don't work around a refusal; ask
+  again with the specific action.
+- A read can change the plan: the 2026-11-01 read showed the live invitation
+  was custom wording, so the approved full overwrite was swapped for a
+  one-sentence edit only after asking again.
 
 Related: [[feedback-verify-external-platform-claims]],
 [[feedback-cite-ground-truth]].
