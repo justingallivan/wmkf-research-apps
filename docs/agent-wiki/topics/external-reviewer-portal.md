@@ -5,6 +5,8 @@ last_verified: 2026-10-31
 stale_after_days: 60
 owner: reviewer-finder
 source_files:
+  - pages/external/briefing/[token].js
+  - pages/external/presentation/[token].js
   - pages/external/review/[token].js
   - pages/api/external/review/[token]/context.js
   - pages/api/external/review/[token]/proposal.js
@@ -59,6 +61,8 @@ canonical_docs:
   - tests/e2e/README.md
   - docs/APPLICATION_STATE_ATLAS.md
 watch_paths:
+  - pages/external/briefing/[token].js
+  - pages/external/presentation/[token].js
   - pages/external/review/**
   - pages/api/external/review/**
   - pages/api/review-manager/**
@@ -68,6 +72,7 @@ watch_paths:
   - playwright.config.js
   - .github/workflows/e2e.yml
 update_triggers:
+  - Board-facing reader page copy or visible vocabulary changes
   - external reviewer accept / decline / upload flow changes
   - review token issuance, regeneration, or revocation changes
   - reviewer-accept E2E harness or its mocks change
@@ -563,7 +568,16 @@ existing path. Do not infer eligibility from a visible staff menu alone.
   modal opens (no build-time constant); the admin panel's "Reviewer Release
   Attachments" section (superuser-gated) is the only write path.
 
-## Deliberation briefing page (third external surface, S502)
+## Proposal review packet (third external surface; S502 historical implementation record)
+
+Current Board-reader copy uses **Proposal review packet**, **Proposal discussion
+brief**, **Proposal discussion session**, **Research presentation**, and
+**Presentation materials**. The briefing reader uses **Research presentation**
+and **Presentation materials**; institution/proposal metadata and historic
+filenames remain unchanged. The page rename does not change its routes, token,
+service, authentication, or payload contracts. As of 2026-10-31, this source
+copy is on branch `codex/board-page-terminology`; check Git/PR for current
+release status. This note makes no deployment claim.
 
 `pages/external/briefing/[token].js` + `/api/external/briefing/[token]/{context,document}`
 serve a read-only per-request page (the shared Pre-Research Presentation Brief snapshot — the Pre-Site writeup before Pre-RP Brief slice 4, **[PRESENT on `main` at `bfa65bc4d`; this source check does not establish current deployment/configuration]** — plus a date-only "staff acknowledged newer inputs" notice when the send carried a drift acknowledgement; every received review with

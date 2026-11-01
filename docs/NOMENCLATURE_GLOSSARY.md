@@ -123,7 +123,7 @@ UI-copy authorization and current implementation boundary are recorded below.
 The Oct21 decision does not authorize route, storage, schema, or identifier
 migrations.
 
-### Current implementation boundary — 2026-10-31
+### Current implementation boundary — 2026-11-01
 
 Runtime adoption is partial. The Workbench display-copy slice in
 `StaffDeliberationsTab`, `StaffDeliberationsPanel`, `FinalWriteupTab`, and
@@ -132,15 +132,22 @@ evidence only; not a deployment receipt). As of 2026-10-31, the Meeting Tracker
 four-term display-copy slice is on branch `codex/meeting-tracker-terminology`:
 Site Visit → Research presentation; Deliberation session → Proposal discussion
 session; Program briefing → Discussion summaries; Discussion Sentiment →
-Post-presentation discussion sentiment. Check Git/PR and release receipts for
-current status. The two summary views also use approved post-presentation
-discussion wording for the summary/transcript content they present; this is not
-a repo-wide Staff discussion rename. Other recorded staff-discussion labels and
-runtime surfaces remain pending separate full-migration scope. Saved subjects,
-emails, and generated documents retain their existing wording and are outside
-these UI-copy slices. Preserve routes, API/service and prompt identifiers,
-schema/storage values, artifact types, deep links, saved settings, and existing
-user-authored content.
+Post-presentation discussion sentiment. PR #580 merged this slice as
+`30bc81e77` in source/Git; no deployment is inferred. As of 2026-11-01, a
+separate Board-reader display-copy slice is on branch
+`codex/board-page-terminology` in `pages/external/briefing/[token].js` and
+`pages/external/presentation/[token].js`, using Proposal review packet, Proposal
+discussion brief, Proposal discussion session, Research presentation, and
+Presentation materials. This branch scope excludes the applicant upload page,
+emails, generated documents, historic filenames, tokens/routes, and API payload
+changes. Check Git/PR and release receipts for current status. The two Meeting
+Tracker summary views also use approved post-presentation discussion wording for
+the summary/transcript content they present; this is not a repo-wide Staff
+discussion rename. Other recorded staff-discussion labels and runtime surfaces
+remain pending separate scope. Saved subjects, emails, and generated documents
+retain their existing wording and are outside these UI-copy slices. Preserve
+routes, API/service and prompt identifiers, schema/storage values, artifact
+types, deep links, saved settings, and existing user-authored content.
 
 ### Historical source inventory — October 6–7, 2026
 
@@ -190,10 +197,10 @@ anchors `#deliberations-status|briefing|writeup`; SharePoint file names such as
 "… Site Visit Presentation.pdf". Treat these as LEAVE+DOCUMENT unless the group
 explicitly chooses a migration.
 
-- **status:** canonical (approved display vocabulary); runtime adoption partial; Workbench slice merged in PR #577; Meeting Tracker slice was on `codex/meeting-tracker-terminology` as of 2026-10-31 (check Git/PR and release receipts for current status)
+- **status:** canonical (approved display vocabulary); runtime adoption partial; Workbench slice merged in PR #577 and Meeting Tracker slice merged in PR #580 (source/Git evidence only); Board-reader slice was on `codex/board-page-terminology` as of 2026-11-01 (check Git/PR and release receipts for current status)
 - **ownerAppKey:** `reviewers` (Workbench), `meeting-tracker`
 - **migrationDecision:** Apply approved display copy within separately scoped UI work; LEAVE+DOCUMENT internal identifiers and existing persisted/user-authored values.
-- **lastVerified:** 2026-10-31 via owner-approved terminology and scoped implementation record
+- **lastVerified:** 2026-11-01 via owner-approved terminology and scoped implementation records
 
 ## Concept Evaluator
 

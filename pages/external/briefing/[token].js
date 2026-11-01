@@ -1,5 +1,5 @@
 /**
- * Deliberation briefing page (docs/DELIBERATION_BRIEFING_PAGE_PLAN.md).
+ * Proposal review packet (docs/DELIBERATION_BRIEFING_PAGE_PLAN.md).
  *
  * Token-authed, not user-authed: the opaque token in the URL is verified by
  * /api/external/briefing/[token]/context on every load. Read-only. Every
@@ -19,7 +19,7 @@ const REASON_MESSAGE = {
   invalid_claim: 'This link is invalid.',
   expired: 'This link has expired. Please contact the Foundation for a current one.',
   revoked: 'This link was replaced. Please use the most recent email from the Foundation.',
-  not_found: 'This briefing is not available.',
+  not_found: 'This proposal review packet is not available.',
   rate_limited: 'Too many requests. Please wait a moment and try again.',
   server_error: 'Something went wrong on our end. Please try again shortly.',
 };
@@ -95,11 +95,11 @@ export default function BriefingPage() {
   const presentationHref = (member) => `/api/external/briefing/${encodeURIComponent(token)}/open?member=${encodeURIComponent(member)}`;
 
   if (state.status === 'loading') {
-    return <Shell title="Deliberation briefing"><p className="text-gray-600">Loading…</p></Shell>;
+    return <Shell title="Proposal review packet"><p className="text-gray-600">Loading…</p></Shell>;
   }
   if (state.status === 'error') {
     return (
-      <Shell title="Deliberation briefing">
+      <Shell title="Proposal review packet">
         <p className="text-gray-800">{REASON_MESSAGE[state.reason] || 'This link cannot be opened.'}</p>
       </Shell>
     );
@@ -111,9 +111,12 @@ export default function BriefingPage() {
     : null;
   const visitLine = data.siteVisit?.scheduledStart ? formatDate(data.siteVisit.scheduledStart) : null;
   const meetingLink = httpsOnly(data.session?.meetingLink);
+  const pageTitle = data.title && data.title !== 'Deliberation briefing'
+    ? data.title
+    : 'Proposal review packet';
 
   return (
-    <Shell title={data.title}>
+    <Shell title={pageTitle}>
       {data.proposalTitle && (
         <p className="mt-1 text-lg text-gray-700">
           {data.proposalTitle}
@@ -130,7 +133,7 @@ export default function BriefingPage() {
         <h2 className="text-sm font-semibold uppercase tracking-wide text-gray-500">Schedule</h2>
         <dl className="mt-2 space-y-1 text-sm text-gray-800">
           <div>
-            <dt className="inline font-medium">Pre-discussion:</dt>{' '}
+            <dt className="inline font-medium">Proposal discussion session:</dt>{' '}
             <dd className="inline">
               {sessionLine || 'Not yet scheduled'}
               {meetingLink && (
@@ -142,14 +145,14 @@ export default function BriefingPage() {
             </dd>
           </div>
           <div>
-            <dt className="inline font-medium">Research Presentation:</dt>{' '}
+            <dt className="inline font-medium">Research presentation:</dt>{' '}
             <dd className="inline">{visitLine || 'Not yet scheduled'}</dd>
           </div>
         </dl>
       </section>
 
       <section className="mt-6 rounded-xl border border-gray-200 bg-white p-5">
-        <h2 className="text-base font-semibold text-gray-900">Staff brief and notes</h2>
+        <h2 className="text-base font-semibold text-gray-900">Proposal discussion brief</h2>
         {data.writeup?.docx ? (
           <ul className="mt-2 space-y-1 text-sm">
             <li>
@@ -161,7 +164,7 @@ export default function BriefingPage() {
             {data.writeup.sharedAt && <li className="text-xs text-gray-500">Shared {formatDate(data.writeup.sharedAt)}. Later staff edits are not reflected here.</li>}
           </ul>
         ) : (
-          <p className="mt-2 text-sm text-gray-600">The staff brief will appear here once staff share it.</p>
+          <p className="mt-2 text-sm text-gray-600">The proposal discussion brief will appear here once staff share it.</p>
         )}
         {data.staffAcknowledgedNewerInputs?.acknowledgedAt && (
           <p className="mt-2 text-xs text-gray-500">
@@ -185,7 +188,7 @@ export default function BriefingPage() {
       </section>
 
       <section className="mt-6 rounded-xl border border-gray-200 bg-white p-5">
-        <h2 className="text-base font-semibold text-gray-900">Research presentation materials</h2>
+        <h2 className="text-base font-semibold text-gray-900">Presentation materials</h2>
         {data.presentationUnavailable && <p className="mt-2 text-sm text-gray-600" role="status">Presentation materials could not be checked. Refresh this page to try again.</p>}
         {data.materials?.length ? (
           <ul className="mt-2 space-y-1 text-sm">
@@ -204,7 +207,7 @@ export default function BriefingPage() {
             ))}
           </ul>
         ) : (
-          <p className="mt-2 text-sm text-gray-600">{data.presentationUnavailable ? 'Available applicant materials will appear here when they can be checked.' : 'No research presentation materials yet. Slides, recordings, and transcripts appear here as staff add them.'}</p>
+          <p className="mt-2 text-sm text-gray-600">{data.presentationUnavailable ? 'Available applicant materials will appear here when they can be checked.' : 'No presentation materials yet. Slides, recordings, and transcripts appear here as staff add them.'}</p>
         )}
       </section>
 
@@ -306,10 +309,10 @@ export default function BriefingPage() {
 function Shell({ title, children }) {
   return (
     <div className="min-h-screen bg-gray-50">
-      <Head><title>{title ? `${title} — Deliberation briefing` : 'Deliberation briefing'}</title></Head>
+      <Head><title>{title && title !== 'Proposal review packet' ? `${title} — Proposal review packet` : 'Proposal review packet'}</title></Head>
       <main className="mx-auto max-w-3xl px-4 py-10">
-        <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">W. M. Keck Foundation · Deliberation briefing</p>
-        <h1 className="mt-1 text-2xl font-bold text-gray-900">{title || 'Deliberation briefing'}</h1>
+        <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">W. M. Keck Foundation · Proposal review packet</p>
+        <h1 className="mt-1 text-2xl font-bold text-gray-900">{title || 'Proposal review packet'}</h1>
         {children}
       </main>
     </div>

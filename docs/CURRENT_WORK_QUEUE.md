@@ -82,8 +82,16 @@ sequence.
   `codex/meeting-tracker-terminology`: Site Visit → Research presentation;
   Deliberation session → Proposal discussion session; Program briefing →
   Discussion summaries; Discussion Sentiment → Post-presentation discussion
-  sentiment. Check Git/PR and release receipts for current merge/deployment
-  status. The two summary views also use approved post-presentation discussion
+  sentiment. PR #580 merged that Meeting Tracker slice as `30bc81e77` in
+  source/Git; this does not establish deployment. As of 2026-11-01, a separate
+  Board-reader display-copy slice is on branch `codex/board-page-terminology` in
+  `pages/external/briefing/[token].js` and `pages/external/presentation/[token].js`:
+  Proposal review packet, Proposal discussion brief, Proposal discussion session,
+  Research presentation, and Presentation materials. Check Git/PR and release
+  receipts for current merge/deployment status. This Board slice does not include
+  the applicant upload page, emails, generated documents, historic filenames,
+  tokens/routes, or API payload changes. The two Meeting Tracker summary views
+  also use approved post-presentation discussion
   wording for the discussion summary/transcript they present; this does not rename
   recording labels or every existing Staff discussion label. Remaining recorded
   staff-discussion labels await separate full-migration scope. Preserve routes,

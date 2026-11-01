@@ -33,11 +33,12 @@ test('after the visit: video first, then the formatted summary, then one Slides 
   expect(await screen.findByRole('heading', { level: 1, name: 'A proposal title' })).toBeInTheDocument();
   expect(screen.getByText('Example University · Research presentation')).toBeInTheDocument();
   await screen.findByText('Proposal');
-  const order = ['Watch the presentation', 'Summary', 'Materials', 'Proposal', 'Slides', 'Site Visit Participant Bios'].map((text) => screen.getByText(text));
+  const order = ['Watch the presentation', 'Presentation summary', 'Presentation materials', 'Proposal', 'Slides', 'Site Visit Participant Bios'].map((text) => screen.getByText(text));
   for (let i = 1; i < order.length; i += 1) {
     expect(order[i - 1].compareDocumentPosition(order[i]) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   }
-  expect(screen.getByRole('heading', { level: 2, name: 'Summary' })).toBeInTheDocument();
+  expect(screen.getByRole('heading', { level: 2, name: 'Presentation summary' })).toBeInTheDocument();
+  expect(document.title).toBe('A proposal title — Example University — Research presentation');
   expect(screen.getByText('AI-generated')).toBeInTheDocument();
   expect(await screen.findByRole('button', { name: 'View proposal' })).toBeInTheDocument();
   expect(requestJson.mock.calls.map(([url]) => url)).toContain('/api/external/presentation/presentation-token/open?member=proposal&mode=check');
@@ -53,16 +54,16 @@ test('after the visit: video first, then the formatted summary, then one Slides 
   for (const hidden of ['.pdf', '.pptx', '.docx', '.mp4', '.txt', 'MB', 'bytes', '1003222', 'Transcript Summary', 'Applicant Slides']) {
     expect(text).not.toContain(hidden);
   }
-  expect(screen.queryByText(/will be added after the site visit/)).not.toBeInTheDocument();
+  expect(screen.queryByText(/will be added after the research presentation/)).not.toBeInTheDocument();
   expect(screen.getByText('This link expires November 24, 2026.')).toBeInTheDocument();
 });
 
 test('before the visit: one quiet line where the video goes, then slides and bios', async () => {
   requestJson.mockResolvedValueOnce(context([BIOS, SLIDES_PPTX, SLIDES_PDF]));
   render(<PresentationMaterialsPage />);
-  expect(await screen.findByText('The presentation recording and summary will be added after the site visit.')).toBeInTheDocument();
+  expect(await screen.findByText('The presentation recording and summary will be added after the research presentation.')).toBeInTheDocument();
   expect(screen.queryByText('Watch the presentation')).not.toBeInTheDocument();
-  expect(screen.queryByRole('heading', { name: 'Summary' })).not.toBeInTheDocument();
+  expect(screen.queryByRole('heading', { name: 'Presentation summary' })).not.toBeInTheDocument();
   expect(screen.getByRole('button', { name: 'View slides' })).toBeInTheDocument();
   expect(screen.getByText('Site Visit Participant Bios')).toBeInTheDocument();
 });
@@ -171,8 +172,8 @@ test('PowerPoint-only slides view as a converted PDF; an unconvertible file keep
 test('a summary the server could not verify offers the file instead of text', async () => {
   requestJson.mockResolvedValueOnce(context([{ ...SUMMARY, text: null }]));
   render(<PresentationMaterialsPage />);
-  expect(await screen.findByText(/The summary could not be shown here/)).toBeInTheDocument();
-  expect(screen.getByRole('link', { name: 'Download the summary' }).getAttribute('href')).toContain('mode=download');
+  expect(await screen.findByText(/The presentation summary could not be shown here/)).toBeInTheDocument();
+  expect(screen.getByRole('link', { name: 'Download the presentation summary' }).getAttribute('href')).toContain('mode=download');
   expect(screen.queryByRole('heading', { level: 3 })).not.toBeInTheDocument();
 });
 
@@ -255,6 +256,17 @@ test('approval lookup failure is unavailable rather than a promise of future mat
     : {...context([SLIDES_PDF]),presentationUnavailable:true});
   render(<PresentationMaterialsPage />);
   await screen.findByText('Presentation materials could not be checked. Refresh this page to try again.');
-  expect(screen.queryByText('The presentation recording and summary will be added after the site visit.')).toBeNull();
+  expect(screen.queryByText('The presentation recording and summary will be added after the research presentation.')).toBeNull();
   expect(await screen.findByText('Slides')).toBeVisible();
+});
+
+// The API uses this generic title when an institution name is unavailable.
+test('uses the approved research presentation title for the no-institution fallback', async () => {
+  requestJson.mockImplementation(async url => url.includes('mode=check')
+    ? {ok:true,material:PROPOSAL}
+    : {...context([SLIDES_PDF]),title:'Research presentation materials',proposalTitle:null});
+  render(<PresentationMaterialsPage />);
+  expect(await screen.findByRole('heading',{level:1,name:'Research presentation'})).toBeInTheDocument();
+  expect(document.querySelector('title')).toHaveTextContent(/^Research presentation$/);
+  expect(screen.queryByText('Research presentation materials')).not.toBeInTheDocument();
 });
