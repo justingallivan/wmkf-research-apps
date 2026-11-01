@@ -54,3 +54,58 @@ test('long paragraphs paginate, references have link annotations, and Delta rema
   // prevents Standard Symbol's blank Delta glyph from silently losing meaning.
   expect(operators.toUpperCase()).toContain(Buffer.from('[Delta]').toString('hex').toUpperCase());
 });
+
+async function wordParts(bytes) {
+  const JSZip = (await import('jszip')).default;
+  const zip = await JSZip.loadAsync(bytes);
+  const xml = await zip.file('word/document.xml').async('string');
+  const text = [...xml.matchAll(/<w:t(?:\s[^>]*)?>([\s\S]*?)<\/w:t>/g)].map(match => match[1]).join(' ');
+  return { text, links: await zip.file('word/_rels/document.xml.rels').async('string') };
+}
+
+async function pdfText(bytes) {
+  const pdf = await PDFDocument.load(bytes);
+  return pdf.getPages().flatMap(page => page.node.Contents().asArray().flatMap(ref => {
+    const operators = inflateSync(pdf.context.lookup(ref).contents).toString();
+    return [...operators.matchAll(/<([a-f\d]+)>\s*Tj/gi)].map(match => Buffer.from(match[1], 'hex').toString('latin1'));
+  })).join(' ').replace(/\s+/g, ' ');
+}
+
+test('future renders use the approved fixed wording without rewriting source prose, titles or references', async () => {
+  const supplied = { ...entry, title: 'Custom Cycle Dossier proposal title', entry: { ...entry.entry,
+    projectAtAGlance: 'A scientific claim mentioning Cycle Dossier without rewriting source prose.',
+    references: [{ ...entry.entry.references[0], title: 'Cycle Dossier reference title' }],
+  } };
+  const before = JSON.stringify(supplied);
+  const result = await renderDossierDocuments({ title: 'D26 Scientific Dossier', entries: [supplied] });
+  for (const artifact of [result.individual[0], result.combined]) {
+    const word = await wordParts(artifact.docx);
+    const pdf = await pdfText(artifact.pdf);
+    for (const text of [word.text, pdf]) {
+      expect(text).toContain('Scientific dossier');
+      expect(text).toContain(supplied.entry.projectAtAGlance);
+      expect(text).toContain(supplied.title);
+      expect(text).toContain(supplied.entry.references[0].title);
+      expect(text).not.toContain('Cycle Dossier · generated from frozen source snapshots');
+      expect(text).not.toContain('Private Cycle Dossier briefing.');
+    }
+    expect(word.links).toContain(supplied.entry.references[0].url);
+    expect(pdf).toContain(supplied.entry.references[0].url);
+  }
+  expect((await wordParts(result.combined.docx)).text).toContain('D26 Scientific Dossier');
+  expect(JSON.stringify(supplied)).toBe(before);
+});
+
+test('fallback labels adopt Scientific dossier while incomplete records keep their original ordering', async () => {
+  const missingTitle = { ...entry, requestNumber: '', title: '' };
+  const titled = { ...entry, requestId: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb', requestNumber: '', title: 'Delta source title' };
+  const result = await renderDossierDocuments({ entries: [titled, missingTitle] });
+  const word = (await wordParts(result.combined.docx)).text;
+  const pdf = await pdfText(result.combined.pdf);
+  for (const text of [word, pdf]) {
+    expect(text).toContain('D26 Scientific dossier');
+    expect(text).toContain('Scientific dossier entry');
+    expect(text).toContain('Delta source title');
+    expect(text.indexOf('Scientific dossier entry')).toBeLessThan(text.indexOf('Delta source title'));
+  }
+});

@@ -5,7 +5,7 @@ metadata:
   node_type: memory
   type: project
   status: active
-  last_verified: 2026-11-01 via source/Git; terminology implementation branch status, no deployment claim
+  last_verified: 2026-11-01 via source/Git; PR #594 merged, B1 source work in progress, no deployment claim
   originSessionId: 42ef6bd1-176f-4e4c-8aac-52e98856079b
   modified: 2026-11-01T14:07:45-08:00
 ---
@@ -22,7 +22,7 @@ briefing and shares it with staff and select Board members → deliberation sess
 where the briefing and proposal are discussed → site visit (research presentation)
 → Draft writeup → group review → leadership review.
 
-Vocabulary was approved after colleague review on 2026-10-21, with Draft writeup replacing the proposed Post-presentation writeup. See `docs/NOMENCLATURE_GLOSSARY.md` and the approved table at `docs/plans/review/PROPOSAL_WORKFLOW_VOCABULARY_2026-10-19.md`; the deck and mockups are updated. PRs #577, #580, #581, #583, #590, #591, and #592 are source/Git receipts for bounded display-copy slices, not deployment evidence. Audit findings A1–A3 are implemented on `codex/reader-helper-terminology`; that implementation branch is not merged/live. PR #593 is the separate audit-only PR on `codex/terminology-completion-audit`. Preserve the `cycle-dossier` key/routes, persisted reason `Stopped by the Cycle Dossier operator.`, settings and prompt keys/contracts/bodies, and user content. The [2026-11-01 terminology completion audit](../docs/audits/terminology-completion-audit-2026-11-01.md) records remaining A4/B/C work and unknown live saved values, prompts, files, and deployment state; the [email preservation audit](../docs/audits/email-terminology-preservation-2026-11-01.md) records email-specific limits. No deployment is inferred.
+Vocabulary was approved after colleague review on 2026-10-21, with Draft writeup replacing the proposed Post-presentation writeup. See `docs/NOMENCLATURE_GLOSSARY.md` and the approved table at `docs/plans/review/PROPOSAL_WORKFLOW_VOCABULARY_2026-10-19.md`; the deck and mockups are updated. PRs #577, #580, #581, #583, #590, #591, and #592 merged bounded display-copy slices; PR #593 merged the audit as `d73cdc96e`, and PR #594 merged A1–A3 as `21c937783` (source/Git only, not deployment evidence). B1 dossier wording is being updated on `codex/scientific-dossier-document-wording`; check current Git/PR and release receipts before reporting its later status. Preserve the `cycle-dossier` key/routes, persisted reason `Stopped by the Cycle Dossier operator.`, settings and prompt keys/contracts/bodies, and user content. The [2026-11-01 terminology completion audit](../docs/audits/terminology-completion-audit-2026-11-01.md) records remaining A4/B work and unknown live saved values, prompts, files, and deployment state; the [email preservation audit](../docs/audits/email-terminology-preservation-2026-11-01.md) records email-specific limits. No deployment is inferred.
 
 **Why:** I misread a session dated weeks before the presentation as test residue and placed the session line under the Group review step of the Staff Deliberations stepper; both were wrong.
 
