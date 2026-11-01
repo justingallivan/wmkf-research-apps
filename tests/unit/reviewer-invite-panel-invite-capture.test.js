@@ -124,13 +124,16 @@ describe('ReviewerInvitePanel invitation capture rehearsal', () => {
     expect(await screen.findByText('From the cycle calendar')).toBeInTheDocument();
     expect(screen.getAllByText('August 24, 2099').length).toBeGreaterThan(0);
     expect(screen.getByLabelText('Days to respond')).toHaveValue(7);
-    expect(screen.getByLabelText('Proposals released to reviewers')).toHaveValue('2099-08-10');
+    // Retired: the proposal is emailed on acceptance, so a legacy admin
+    // proposalReleaseDate no longer surfaces as a field.
+    expect(screen.queryByLabelText('Proposals released to reviewers')).not.toBeInTheDocument();
+    // This test's saved wording still carries {{proposalDelivery}}.
+    expect(screen.getByText(/still mentions a proposal release date/i)).toBeInTheDocument();
     // Reviewer-engagement Phase 1: respond-by is now a "days to respond" offset, not a
     // fixed date. The respond-by date in the email is computed as today + offset, so it
     // can't be asserted as a fixed string here — the campaignConfig payload below is the
-    // durable contract. Proposal-delivery and review-due stay fixed dates.
+    // durable contract. Review-due stays a fixed date.
     fireEvent.change(screen.getByLabelText('Days to respond'), { target: { value: '10' } });
-    fireEvent.change(screen.getByLabelText('Proposals released to reviewers'), { target: { value: '2099-08-10' } });
     const sendButton = await screen.findByRole('button', { name: /send 1 invitation/i });
     await waitFor(() => expect(sendButton).toBeEnabled());
     fireEvent.click(sendButton);
@@ -159,9 +162,63 @@ describe('ReviewerInvitePanel invitation capture rehearsal', () => {
       campaignConfig: { respondOffsetDays: 10 },
     });
     expect(JSON.parse(sendCall[1].body).campaignConfig).not.toHaveProperty('reviewDueDate');
-    expect(JSON.parse(sendCall[1].body).drafts[0].body).toContain('August 10, 2099');
+    // The template's legacy proposal-release line is dropped, not filled from
+    // the retired admin date or sent as a literal token.
+    expect(JSON.parse(sendCall[1].body).drafts[0].body).not.toContain('August 10, 2099');
+    expect(JSON.parse(sendCall[1].body).drafts[0].body).not.toContain('{{proposalDelivery}}');
     expect(JSON.parse(sendCall[1].body).drafts[0].body).toContain('August 24, 2099');
     expect(JSON.parse(sendCall[1].body).drafts[0].body).toContain('https://reviews.wmkeck.org/external/review/token.value');
+  });
+
+  test('blocks sending when the retired release date shares a line with the secure link', async () => {
+    const base = global.fetch.getMockImplementation();
+    global.fetch.mockImplementation(async (url, init) => {
+      if (url === '/api/review-manager/render-emails') {
+        return mockJson({ drafts: [{
+          ...draft,
+          body: 'Respond here: https://reviews.wmkeck.org/external/review/token.value — proposals around {{proposalDelivery}}.',
+          reviewDueDate: '2099-08-24',
+        }] });
+      }
+      return base(url, init);
+    });
+    render(
+      <ReviewerInvitePanel requestId="REQ-1" candidates={[candidate]} onRefresh={jest.fn()} settings={{ signature: 'Program Director' }} />,
+    );
+    fireEvent.click(screen.getByLabelText('Select Dr. Test Reviewer'));
+    fireEvent.click(screen.getByRole('button', { name: /send invitation \(1\)/i }));
+    await screen.findByDisplayValue('Invitation');
+    expect(await screen.findByText(/can’t be removed automatically/i)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /send 1 invitation/i })).toBeDisabled();
+    // The line stays visible with its token; an unrelated edit does not lift the block.
+    const bodyBox = screen.getByDisplayValue(/proposals around \{\{proposalDelivery\}\}/i);
+    fireEvent.change(bodyBox, { target: { value: `Dear Dr. Test,\n${bodyBox.value}` } });
+    expect(screen.getByRole('button', { name: /send 1 invitation/i })).toBeDisabled();
+    // Removing the token clears it.
+    fireEvent.change(screen.getByDisplayValue(/Dear Dr\. Test/), { target: { value: 'Respond here: https://reviews.wmkeck.org/external/review/token.value' } });
+    expect(screen.getByRole('button', { name: /send 1 invitation/i })).toBeEnabled();
+    expect(global.fetch.mock.calls.some(([url]) => url === '/api/review-manager/send-emails')).toBe(false);
+  });
+
+  test('blocks sending when the retired release date is in the subject', async () => {
+    const base = global.fetch.getMockImplementation();
+    global.fetch.mockImplementation(async (url, init) => {
+      if (url === '/api/review-manager/render-emails') {
+        return mockJson({ drafts: [{ ...draft, subject: 'Invitation — proposals {{proposalDelivery}}', reviewDueDate: '2099-08-24' }] });
+      }
+      return base(url, init);
+    });
+    render(
+      <ReviewerInvitePanel requestId="REQ-1" candidates={[candidate]} onRefresh={jest.fn()} settings={{ signature: 'Program Director' }} />,
+    );
+    fireEvent.click(screen.getByLabelText('Select Dr. Test Reviewer'));
+    fireEvent.click(screen.getByRole('button', { name: /send invitation \(1\)/i }));
+    const subjectBox = await screen.findByDisplayValue('Invitation — proposals {{proposalDelivery}}');
+    expect(await screen.findByText(/can’t be removed automatically/i)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /send 1 invitation/i })).toBeDisabled();
+    fireEvent.change(subjectBox, { target: { value: 'Invitation' } });
+    expect(screen.getByRole('button', { name: /send 1 invitation/i })).toBeEnabled();
+    expect(global.fetch.mock.calls.some(([url]) => url === '/api/review-manager/send-emails')).toBe(false);
   });
 
   test('keeps declined reviewers visible but excludes them from invitation selection and counts', () => {

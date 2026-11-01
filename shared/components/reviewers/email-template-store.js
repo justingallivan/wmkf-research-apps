@@ -20,7 +20,8 @@
  * {{piInstitution}}, {{externalLink}}, {{reviewDueDate}}, {{customField:honorarium}},
  * {{signature}}, …) resolved by /api/review-manager/render-emails. The invitation
  * template ALSO uses the client-side timing tokens {{respondBy}} /
- * {{proposalDelivery}} / {{reviewDue}}, which InviteEmailModal substitutes locally.
+ * {{reviewDue}}, which InviteEmailModal substitutes locally (the retired
+ * {{proposalDelivery}} resolves blank and its line is dropped).
  */
 
 import { PREFERENCE_KEYS } from '../../config/reviewerFinderPreferences';

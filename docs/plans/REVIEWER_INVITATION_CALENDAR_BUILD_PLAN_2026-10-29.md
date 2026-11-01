@@ -3,7 +3,7 @@ title: Reviewer invitation build — materials on acceptance, calendar due date,
 domain: reviewers
 kind: plan
 status: in-progress
-summary: "PARTIAL / follow-ups remain. PR #551 review filing, PR #552 calendar due date and linked-cycle config, PR #561 Board setup calendar read, and PR #562 materials-on-acceptance implementation are merged and Production-deployed. The invitation wording/proposalDelivery and Reviewer Finder date retirement follow-up remains, as do the removed-candidate terminal-history decision, first-link due-date write gap, and first J27 acceptance observation. Release receipts are owner-recorded in DEVELOPMENT_LOG.md; no fresh live probe is claimed here."
+summary: "PARTIAL / follow-ups remain. PR #551 review filing, PR #552 calendar due date and linked-cycle config, PR #561 Board setup calendar read, and PR #562 materials-on-acceptance implementation are merged and Production-deployed. PR #586 (2026-11-01) retires the invitation's proposal-release promise, the invite-dialog field and `{{proposalDelivery}}`; the live-text rebaseline and per-PD override check await owner OK, and Reviewer Finder cycle-record date retirement remains, as do the removed-candidate terminal-history decision, first-link due-date write gap, and first J27 acceptance observation. Release receipts are owner-recorded in DEVELOPMENT_LOG.md; no fresh live probe is claimed here."
 canonical: false
 owner: product-engineering
 related:
@@ -28,9 +28,14 @@ Production probe was made for this update.
 
 Remaining work within this plan:
 
-- Follow-up PR for invitation wording, `{{proposalDelivery}}` removal and
-  retirement of Reviewer Finder proposal-date fields. Live wording changes need
-  owner approval and rebaseline.
+- Invitation wording and `{{proposalDelivery}}`: PR #586 (2026-11-01) changes
+  the seed wording (owner-approved), removes the invite-dialog and admin
+  proposal-release date, and blanks the token so legacy wording drops its line.
+  Still owner-gated: a read-only Production check for per-PD overrides that
+  still carry the token, then the `--force-keys` rebaseline of
+  `email.reviewer_invitation.body`.
+- Retirement of the Reviewer Finder cycle-record date fields (§3.5) remains a
+  separate PR.
 - Resolve the removed-candidate terminal-history question and the first-link
   due-date write gap recorded in `SESSION_PROMPT.md`'s current handoff.
 - Observe the automated path at the first J27 acceptance.
@@ -319,8 +324,8 @@ manual-path claim, staff recovery, the invitation PDF precondition and the
 accepted-screen copy (Session 655). PR #562 (`fcad0ad53`) merged and deployed;
 Migration 091 was applied in Production before merge and the two new acceptance
 email keys were seeded (owner-recorded receipts in `SESSION_PROMPT.md` and
-`DEVELOPMENT_LOG.md`). Still [PLANNED] (follow-up PR): invitation wording and
-`{{proposalDelivery}}` / Reviewer Finder date-field retirement. Accept does
+`DEVELOPMENT_LOG.md`). Invitation wording and `{{proposalDelivery}}`: PR #586 (2026-11-01). Still
+[PLANNED]: Reviewer Finder date-field retirement. Accept does
 not set a review status [VERIFIED via rg: no `reviewStatus` write in
 `respond-service.js` or `reviewer-engagement/record-invitation.js`; writers are
 `record-email-outcome.js` and `close-review.js`], so a new acceptance is
@@ -554,9 +559,9 @@ with the markers written only after confirmed delivery. Accepted.
    **Decided (D48).**
 5. Acceptance email wording: owner-approved and seeded as
    `email.reviewer_materials_acceptance.{subject,body}` before PR #562's merge.
-   Invitation wording and the `{{proposalDelivery}}` promise remain for the
-   follow-up PR; live wording changes require owner approval and rebaseline
-   (`--force-keys`).
+   Invitation wording: owner-approved 2026-11-01 and changed in the seed by
+   PR #586; the live text changes only on the owner-approved `--force-keys`
+   rebaseline.
 
 ## 7. Build order and tests
 
@@ -601,8 +606,8 @@ Dataverse writes). Separate PRs, each with focused unit tests:
    Board-page rendering remained unchecked in that receipt.
 4. **Done — PR #562 (`fcad0ad53`), Production-deployed 2026-10-31:** materials
    on acceptance, shared automatic/manual claim, fallback and staff recovery.
-   The wording/date-field retirement follow-up remains open; first J27 live
-   acceptance observation is pending.
+   Invitation wording is PR #586; the Reviewer Finder date-field retirement
+   remains open; first J27 live acceptance observation is pending.
 
 Gates: `check:api-routes`, `check:atlas`, `check:j27-register`,
 `check:dataverse-access-layer`, `check:route-service-boundary`,

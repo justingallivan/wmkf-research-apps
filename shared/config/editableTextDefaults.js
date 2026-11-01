@@ -185,7 +185,7 @@ export const EDITABLE_TEXT_DEFAULTS = [
     label: 'Reviewer invitation body',
     description: 'Default body for the reviewer invitation email. The honorarium amount is injected server-side from the admin honorarium setting via {{customField:honorarium}}; the timeline tokens are filled in when the PD sends.',
     multiline: true,
-    placeholders: ['{{greeting}}', '{{proposalTitle}}', '{{piName}}', '{{piInstitution}}', '{{proposalDetails}}', '{{proposalAbstract}}', '{{externalLink}}', '{{respondBy}}', '{{proposalDelivery}}', '{{reviewDue}}', '{{customField:honorarium}}', '{{signature}}'],
+    placeholders: ['{{greeting}}', '{{proposalTitle}}', '{{piName}}', '{{piInstitution}}', '{{proposalDetails}}', '{{proposalAbstract}}', '{{externalLink}}', '{{respondBy}}', '{{reviewDue}}', '{{customField:honorarium}}', '{{signature}}'],
     group: 'reviewers',
     emailKey: 'email.reviewer_invitation',
     emailLabel: 'Reviewer invitation',

@@ -469,9 +469,9 @@ test.describe('Program Director reviewer invitation flow', () => {
     // D48: the review due date is the server's, read-only; no input.
     await expect(page.getByText('From the cycle calendar', { exact: true })).toBeVisible();
     await expect(page.getByLabel('Reviews due')).toHaveCount(0);
-    await expect(page.getByLabel('Proposals released to reviewers')).toHaveValue('2099-07-08');
+    // Retired: the proposal is emailed on acceptance.
+    await expect(page.getByLabel('Proposals released to reviewers')).toHaveCount(0);
     await page.getByLabel('Days to respond').fill('10');
-    await page.getByLabel('Proposals released to reviewers').fill('2099-07-08');
 
     page.once('dialog', async (dialog) => {
       expect(dialog.message()).toContain('Send 1 invitation now via Dynamics?');
@@ -497,6 +497,9 @@ test.describe('Program Director reviewer invitation flow', () => {
     // string; the review-due fixed date and the secure link are.
     expect(sentBodies[0].drafts[0].body).toContain('July 22, 2099');
     expect(sentBodies[0].drafts[0].body).toContain(reviewerUrl);
+    // The legacy proposal-release line is dropped, never sent as a literal token.
+    expect(sentBodies[0].drafts[0].body).not.toContain('Proposal delivered');
+    expect(sentBodies[0].drafts[0].body).not.toContain('{{proposalDelivery}}');
 
     const reviewerPage = await context.newPage();
     await reviewerPage.goto(reviewerUrl);
