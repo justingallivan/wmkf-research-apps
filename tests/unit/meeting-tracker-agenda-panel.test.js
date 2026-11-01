@@ -432,7 +432,7 @@ test('adds tracker directory recipients without creating To/Cc conflicts', async
   await flushLoadStatus();
   fireEvent.click(screen.getByRole('button', { name: 'Send agenda…' }));
   await flushLoadStatus();
-  const composer = screen.getByRole('dialog', { name: 'Send session agenda' });
+  const composer = screen.getByRole('dialog', { name: 'Send discussion session agenda' });
   const directoryButtons = within(composer).getAllByRole('button', { name: 'Add from directory' });
   fireEvent.click(directoryButtons[0]);
   const firstDirectory = screen.getByRole('dialog', { name: /Add recipients to To/ });
@@ -465,8 +465,8 @@ test('Save/Clear default leaves current wording, recipients and preview unchange
   await flushLoadStatus(); fireEvent.click(screen.getByRole('button', { name: 'Send agenda…' })); await flushLoadStatus();
   fireEvent.change(screen.getByLabelText('Subject'), { target: { value: 'One-send subject' } });
   fireEvent.change(screen.getByLabelText('To'), { target: { value: 'one-off@example.org' } });
-  fireEvent.click(screen.getByText('Your default wording'));
-  const details = screen.getByText('Your default wording').closest('details'); details.open = true; fireEvent(details, new Event('toggle'));
+  fireEvent.click(screen.getByText('Your discussion session agenda default wording'));
+  const details = screen.getByText('Your discussion session agenda default wording').closest('details'); details.open = true; fireEvent(details, new Event('toggle'));
   await screen.findByLabelText('Default subject');
   fireEvent.change(screen.getByLabelText('Default subject'), { target: { value: 'Future {{sessionDate}}' } });
   fireEvent.click(screen.getByRole('button', { name: 'Save as my default' }));
@@ -533,7 +533,7 @@ test('a stale status read cannot replace defaults saved while it was in flight',
   });
   const view = render(<SessionAgendaPanel sessionId={SESSION_ID} session={session} slots={slots} recipients={recipients} />);
   await flushLoadStatus(); fireEvent.click(screen.getByRole('button', { name: 'Send agenda…' })); await flushLoadStatus();
-  const details = screen.getByText('Your default wording').closest('details'); details.open = true; fireEvent(details, new Event('toggle')); await screen.findByLabelText('Default subject');
+  const details = screen.getByText('Your discussion session agenda default wording').closest('details'); details.open = true; fireEvent(details, new Event('toggle')); await screen.findByLabelText('Default subject');
   view.rerender(<SessionAgendaPanel sessionId={SESSION_ID} session={{ ...session, location: 'Changed' }} slots={slots} recipients={recipients} />);
   await waitFor(() => expect(oldStatus).toBeDefined());
   fireEvent.change(screen.getByLabelText('Default subject'), { target: { value: nextDefaults.subject } });
@@ -559,7 +559,7 @@ test('actor change during Save discards the old composer and ignores the late re
   });
   const view = render(<SessionAgendaPanel sessionId={SESSION_ID} session={session} slots={slots} recipients={recipients} />);
   await flushLoadStatus(); fireEvent.click(screen.getByRole('button', { name: 'Send agenda…' })); await flushLoadStatus();
-  const details = screen.getByText('Your default wording').closest('details'); details.open = true; fireEvent(details, new Event('toggle')); await screen.findByLabelText('Default subject');
+  const details = screen.getByText('Your discussion session agenda default wording').closest('details'); details.open = true; fireEvent(details, new Event('toggle')); await screen.findByLabelText('Default subject');
   fireEvent.click(screen.getByRole('button', { name: 'Save as my default' })); await waitFor(() => expect(finish).toBeDefined());
   mockAgendaActor = 'backup@example.org'; view.rerender(<SessionAgendaPanel sessionId={SESSION_ID} session={session} slots={slots} recipients={recipients} />);
   expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
@@ -573,7 +573,7 @@ test('a briefing outage keeps sent and unresolved receipts visible without claim
     lastAgenda: prepared({ state: 'sent', transportAccepted: true, sentAt: '2026-09-10T19:00:00Z' }),
     pendingSend: prepared({ state: 'send_requested', sendRequestedAt: '2026-09-10T19:01:00Z' }) }));
   render(<SessionAgendaPanel sessionId={SESSION_ID} session={session} slots={slots} recipients={recipients} />);
-  expect(await screen.findByText(/Briefing links could not be confirmed/)).toBeInTheDocument();
+  expect(await screen.findByText(/Proposal review packet links could not be confirmed/)).toBeInTheDocument();
   expect(screen.getByText(/Agenda sent/)).toBeInTheDocument();
   expect(screen.getByRole('button', { name: 'Review unresolved send…' })).toBeEnabled();
   expect(screen.queryByText('Schedule changed since the last agenda.')).not.toBeInTheDocument();

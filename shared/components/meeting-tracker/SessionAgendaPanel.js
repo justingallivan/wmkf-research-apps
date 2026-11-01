@@ -114,12 +114,12 @@ function DirectoryDialog({ target, recipients, form, onAdd, onClose }) {
 
 function ComposerDialog({ children, busy, directoryOpen, onClose }) {
   return (
-    <EmailDialog label="Send session agenda" busy={busy || directoryOpen} onClose={onClose}>
+    <EmailDialog label="Send discussion session agenda" busy={busy || directoryOpen} onClose={onClose}>
     <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/40 p-4" role="presentation">
       <section className="my-6 w-full max-w-3xl rounded-xl bg-white p-6 shadow-xl">
         <div className="flex items-start justify-between gap-4">
           <div>
-            <h3 id="agenda-composer-title" className="text-lg font-semibold text-gray-900">Send session agenda</h3>
+            <h3 id="agenda-composer-title" className="text-lg font-semibold text-gray-900">Send discussion session agenda</h3>
             <p className="mt-1 text-sm text-gray-600">You are sending one agenda from your Dynamics mailbox to the session attendees.</p>
           </div>
           <span ><Button variant="outline" size="sm" type="button" onClick={onClose} disabled={busy} className="rounded-lg border border-gray-300 px-3 py-1.5 text-sm font-medium disabled:opacity-50">Close</Button></span>
@@ -449,7 +449,7 @@ function AgendaPanel({ sessionId, session, slots, recipients }) {
   return (
     <>
       <section className="mt-6 rounded-xl border border-gray-200 bg-white p-5 shadow-sm" aria-labelledby="agenda-email-title">
-        <h2 id="agenda-email-title" className="text-lg font-semibold text-gray-900">Agenda email</h2>
+        <h2 id="agenda-email-title" className="text-lg font-semibold text-gray-900">Discussion session agenda email</h2>
         {lastAgenda?.sentAt ? (
           <>
             <p className="mt-1 text-sm text-gray-700">Agenda sent {formatReceipt(lastAgenda.sentAt, session?.ianaTimeZone)} to {lastAgenda.recipientCount} recipient{lastAgenda.recipientCount === 1 ? '' : 's'}.</p>
@@ -463,7 +463,7 @@ function AgendaPanel({ sessionId, session, slots, recipients }) {
             A send from {formatReceipt(pendingSend.sendRequestedAt, session?.ianaTimeZone)} is unresolved. Review and retry this same send before creating another agenda.
           </p>
         )}
-        {linksUnavailable && <p role="status" className="mt-2 text-sm text-amber-800">Briefing links could not be confirmed. Previous sends remain available; try again before creating a new preview.</p>}
+        {linksUnavailable && <p role="status" className="mt-2 text-sm text-amber-800">Proposal review packet links could not be confirmed. Previous sends remain available; try again before creating a new preview.</p>}
         {loadError && <p role="alert" className="mt-2 text-sm text-red-700">{loadError} Please try again. If the problem continues, contact an administrator.</p>}
         <Button
           variant={lastAgenda?.sentAt ? 'outline' : 'primary'}

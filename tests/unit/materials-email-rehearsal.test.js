@@ -22,7 +22,7 @@ test('rehearsal transport keeps preference, preview, and send entirely in memory
   const request = createRehearsalTransport();
   const loaded = await request('/api/meeting-tracker/materials-email-preferences?kind=invitation');
   expect(loaded.data.template.body).toContain('{{checklist}}');
-  expect(loaded.data.template.subject).toBe('W.M. Keck Foundation Research Presentation Materials Request');
+  expect(loaded.data.template.subject).toBe('W.M. Keck Foundation Presentation materials request');
   const preview = await request('/api/meeting-tracker/visits/sample/materials', { method: 'POST', body: { action: 'preview', sendAction: 'create', emailTemplate: invitation } });
   expect(preview.ok).toBe(true);
   expect(preview.data.bodyText).toContain('Sample institution');

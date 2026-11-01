@@ -33,7 +33,7 @@ describe('editableTextDefaults catalog grouping metadata', () => {
     },
   );
 
-  test('site-visit invitation and reminder keys are grouped with applicant-facing mail and advertise mustache tokens only', () => {
+  test('Presentation materials invitation and reminder keys are grouped with applicant-facing mail and preserve their required tokens', () => {
     const keys = [
       'email.site_visit_materials_invite.subject',
       'email.site_visit_materials_invite.body',
@@ -42,6 +42,14 @@ describe('editableTextDefaults catalog grouping metadata', () => {
     ];
     const entries = keys.map((key) => EDITABLE_TEXT_DEFAULTS.find((entry) => entry.key === key));
     expect(entries.every(Boolean)).toBe(true);
+    expect(entries.map((entry) => entry.emailLabel)).toEqual([
+      'Presentation materials invitation', 'Presentation materials invitation',
+      'Presentation materials reminder', 'Presentation materials reminder',
+    ]);
+    expect(entries.map((entry) => entry.label)).toEqual([
+      'Presentation materials invitation subject', 'Presentation materials invitation body',
+      'Presentation materials reminder subject', 'Presentation materials reminder body',
+    ]);
     expect(entries.map((entry) => entry.group)).toEqual(['applicants', 'applicants', 'applicants', 'applicants']);
     expect(entries.map((entry) => entry.emailKey)).toEqual([
       'email.site_visit_materials_invite', 'email.site_visit_materials_invite',
@@ -61,7 +69,7 @@ describe('editableTextDefaults catalog grouping metadata', () => {
     }
   });
 
-  test('Share for deliberation compose and briefing-copy fields are paired beside the agenda defaults', () => {
+  test('Proposal review packet sharing fields are paired beside Discussion session agenda defaults', () => {
     const subject = EDITABLE_TEXT_DEFAULTS.find((entry) => entry.key === 'email.deliberation_share.subject');
     const body = EDITABLE_TEXT_DEFAULTS.find((entry) => entry.key === 'email.deliberation_share.body');
     const briefingKeys = [
@@ -73,42 +81,55 @@ describe('editableTextDefaults catalog grouping metadata', () => {
     ];
     const briefingEntries = briefingKeys.map((key) => EDITABLE_TEXT_DEFAULTS.find((entry) => entry.key === key));
     expect(subject).toMatchObject({
+      label: 'Proposal review packet sharing subject',
+      description: expect.stringContaining('blank or missing shared value retains the built-in subject'),
+    });
+    expect(body).toMatchObject({
+      label: 'Proposal review packet sharing message',
+      description: expect.stringContaining('blank or missing shared value retains the built-in message'),
+    });
+    expect(subject).toMatchObject({
       group: 'internal',
       emailKey: 'email.deliberation_share',
-      emailLabel: 'Share for deliberation',
+      emailLabel: 'Proposal review packet sharing',
       placeholders: ['{{requestNumber}}'],
       multiline: false,
     });
     expect(body).toMatchObject({
       group: 'internal',
       emailKey: 'email.deliberation_share',
-      emailLabel: 'Share for deliberation',
+      emailLabel: 'Proposal review packet sharing',
       placeholders: [],
       multiline: true,
     });
     expect(briefingEntries.every(Boolean)).toBe(true);
+    expect(briefingEntries.map((entry) => entry.label)).toEqual([
+      'Proposal review packet heading', 'Proposal review packet link text',
+      'Proposal review packet description', 'Proposal review packet expiry wording',
+      'Review bundle link text',
+    ]);
     briefingEntries.forEach((entry) => {
       expect(entry).toMatchObject({
         group: 'internal',
         emailKey: 'email.deliberation_share',
-        emailLabel: 'Share for deliberation',
+        emailLabel: 'Proposal review packet sharing',
         placeholders: [],
         multiline: false,
       });
     });
     expect(DELIBERATION_SHARE_SEED_BRIEFING_COPY).toEqual({
-      heading: 'Briefing page:',
-      linkText: 'Open the deliberation briefing',
-      description: expect.stringContaining('research presentation materials'),
+      heading: 'Proposal review packet:',
+      linkText: 'Open the proposal review packet',
+      description: expect.stringContaining('presentation materials'),
       expiryLeadIn: 'The link expires on',
       reviewBundleLinkText: 'Download all reviews (PDF)',
     });
   });
 
-  test('Share subject replaces the request token and removes fallback punctuation when no number exists', () => {
+  test('Proposal review packet subject replaces the request token and removes fallback punctuation when no number exists', () => {
     expect(renderDeliberationShareSubject(DELIBERATION_SHARE_SEED_SUBJECT, '1002912'))
-      .toBe('Site Visit materials — 1002912');
+      .toBe('Proposal review packet — 1002912');
     expect(renderDeliberationShareSubject(DELIBERATION_SHARE_SEED_SUBJECT, null))
-      .toBe('Site Visit materials');
+      .toBe('Proposal review packet');
   });
 });

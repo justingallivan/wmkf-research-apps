@@ -69,109 +69,109 @@ const defaults = [
   },
   {
     key: 'email.deliberation_share.subject',
-    label: 'Share for deliberation subject',
+    label: 'Proposal review packet sharing subject',
     description: 'Share subject copy',
     multiline: false,
     placeholders: ['{{requestNumber}}'],
     group: 'internal',
     emailKey: 'email.deliberation_share',
-    emailLabel: 'Share for deliberation',
+    emailLabel: 'Proposal review packet sharing',
     value: 'Notes for {{requestNumber}}',
     unavailable: false,
   },
   {
     key: 'email.deliberation_share.body',
-    label: 'Share for deliberation message',
+    label: 'Proposal review packet sharing message',
     description: 'Share body copy',
     multiline: true,
     placeholders: [],
     group: 'internal',
     emailKey: 'email.deliberation_share',
-    emailLabel: 'Share for deliberation',
+    emailLabel: 'Proposal review packet sharing',
     value: 'Please review the briefing page.',
     unavailable: false,
   },
   {
     key: 'email.deliberation_share.briefing_heading',
-    label: 'Share for deliberation briefing heading',
+    label: 'Proposal review packet heading',
     description: 'Briefing heading copy',
     multiline: false,
     placeholders: [],
     group: 'internal',
     emailKey: 'email.deliberation_share',
-    emailLabel: 'Share for deliberation',
+    emailLabel: 'Proposal review packet sharing',
     value: 'Briefing page:',
     unavailable: false,
   },
   {
     key: 'email.deliberation_share.briefing_link_text',
-    label: 'Share for deliberation briefing link text',
+    label: 'Proposal review packet link text',
     description: 'Briefing link text',
     multiline: false,
     placeholders: [],
     group: 'internal',
     emailKey: 'email.deliberation_share',
-    emailLabel: 'Share for deliberation',
+    emailLabel: 'Proposal review packet sharing',
     value: 'Open the deliberation briefing',
     unavailable: false,
   },
   {
     key: 'email.deliberation_share.briefing_description',
-    label: 'Share for deliberation briefing description',
+    label: 'Proposal review packet description',
     description: 'Briefing description copy',
     multiline: false,
     placeholders: [],
     group: 'internal',
     emailKey: 'email.deliberation_share',
-    emailLabel: 'Share for deliberation',
+    emailLabel: 'Proposal review packet sharing',
     value: 'the writeup and review materials, no login required.',
     unavailable: false,
   },
   {
     key: 'email.deliberation_share.briefing_expiry_lead_in',
-    label: 'Share for deliberation briefing expiry wording',
+    label: 'Proposal review packet expiry wording',
     description: 'Briefing expiry wording',
     multiline: false,
     placeholders: [],
     group: 'internal',
     emailKey: 'email.deliberation_share',
-    emailLabel: 'Share for deliberation',
+    emailLabel: 'Proposal review packet sharing',
     value: 'The link expires on',
     unavailable: false,
   },
   {
     key: 'email.deliberation_share.review_bundle_link_text',
-    label: 'Share for deliberation review bundle link text',
+    label: 'Review bundle link text',
     description: 'Review bundle link text',
     multiline: false,
     placeholders: [],
     group: 'internal',
     emailKey: 'email.deliberation_share',
-    emailLabel: 'Share for deliberation',
+    emailLabel: 'Proposal review packet sharing',
     value: 'Download all reviews (PDF)',
     unavailable: false,
   },
   {
     key: 'email.deliberation_agenda.subject',
-    label: 'Deliberation agenda subject',
+    label: 'Discussion session agenda subject',
     description: 'Agenda subject copy',
     multiline: false,
     placeholders: ['{{sessionDate}}'],
     group: 'internal',
     emailKey: 'email.deliberation_agenda',
-    emailLabel: 'Deliberation agenda',
+    emailLabel: 'Discussion session agenda',
     value: 'Agenda for {{sessionDate}}',
     unavailable: false,
   },
   {
     key: 'email.deliberation_agenda.body',
-    label: 'Deliberation agenda message',
+    label: 'Discussion session agenda opening message',
     description: 'Agenda opening message copy',
     multiline: true,
     placeholders: ['{{sessionDate}}'],
     group: 'internal',
     emailKey: 'email.deliberation_agenda',
-    emailLabel: 'Deliberation agenda',
+    emailLabel: 'Discussion session agenda',
     value: 'Opening message',
     unavailable: false,
   },
@@ -244,23 +244,23 @@ test('pairs subject and body of one email inside the same card, and does not mix
   expect(granteeCardOrder).toEqual(['Grantee invite', 'Grantee reminder']);
 });
 
-test('renders Share for deliberation as its own internal email card beside the agenda card', async () => {
+test('renders Proposal review packet sharing as its own internal email card beside the agenda card', async () => {
   render(<EmailDefaultsSection />);
-  await waitFor(() => expect(screen.getByLabelText('Share for deliberation subject')).toBeInTheDocument());
-  const shareCard = screen.getByText('Share for deliberation').closest('section');
-  expect(within(shareCard).getByLabelText('Share for deliberation subject')).toHaveValue('Notes for {{requestNumber}}');
-  expect(within(shareCard).getByLabelText('Share for deliberation message')).toHaveValue('Please review the briefing page.');
-  expect(within(shareCard).getByLabelText('Share for deliberation briefing heading')).toHaveValue('Briefing page:');
-  expect(within(shareCard).getByLabelText('Share for deliberation briefing link text')).toHaveValue('Open the deliberation briefing');
-  expect(within(shareCard).getByLabelText('Share for deliberation briefing description')).toHaveValue('the writeup and review materials, no login required.');
-  expect(within(shareCard).getByLabelText('Share for deliberation briefing expiry wording')).toHaveValue('The link expires on');
-  expect(within(shareCard).getByLabelText('Share for deliberation review bundle link text')).toHaveValue('Download all reviews (PDF)');
+  await waitFor(() => expect(screen.getByLabelText('Proposal review packet sharing subject')).toBeInTheDocument());
+  const shareCard = screen.getByText('Proposal review packet sharing').closest('section');
+  expect(within(shareCard).getByLabelText('Proposal review packet sharing subject')).toHaveValue('Notes for {{requestNumber}}');
+  expect(within(shareCard).getByLabelText('Proposal review packet sharing message')).toHaveValue('Please review the briefing page.');
+  expect(within(shareCard).getByLabelText('Proposal review packet heading')).toHaveValue('Briefing page:');
+  expect(within(shareCard).getByLabelText('Proposal review packet link text')).toHaveValue('Open the deliberation briefing');
+  expect(within(shareCard).getByLabelText('Proposal review packet description')).toHaveValue('the writeup and review materials, no login required.');
+  expect(within(shareCard).getByLabelText('Proposal review packet expiry wording')).toHaveValue('The link expires on');
+  expect(within(shareCard).getByLabelText('Review bundle link text')).toHaveValue('Download all reviews (PDF)');
   expect(within(shareCard).getByText('Briefing heading', { selector: 'label' })).toBeInTheDocument();
   expect(within(shareCard).getByText('Briefing link text', { selector: 'label' })).toBeInTheDocument();
   expect(within(shareCard).getByText('Briefing description', { selector: 'label' })).toBeInTheDocument();
   expect(within(shareCard).getByText('Briefing expiration wording', { selector: 'label' })).toBeInTheDocument();
   expect(within(shareCard).getByText('Review bundle link text', { selector: 'label' })).toBeInTheDocument();
-  expect(within(shareCard).queryByLabelText('Deliberation agenda subject')).toBeNull();
+  expect(within(shareCard).queryByLabelText('Discussion session agenda subject')).toBeNull();
 });
 
 test('shows blank and unavailable states distinctly and saves edited values', async () => {
@@ -299,10 +299,10 @@ test('a blank non-blocking key gets the milder amber Blank chip', async () => {
 test('saves only the edited field when its sibling field in the same card is available', async () => {
   render(<EmailDefaultsSection />);
 
-  await waitFor(() => expect(screen.getByLabelText('Deliberation agenda subject')).toBeInTheDocument());
+  await waitFor(() => expect(screen.getByLabelText('Discussion session agenda subject')).toBeInTheDocument());
 
-  fireEvent.change(screen.getByLabelText('Deliberation agenda subject'), { target: { value: 'New agenda subject' } });
-  const field = screen.getByLabelText('Deliberation agenda subject').closest('.space-y-2');
+  fireEvent.change(screen.getByLabelText('Discussion session agenda subject'), { target: { value: 'New agenda subject' } });
+  const field = screen.getByLabelText('Discussion session agenda subject').closest('.space-y-2');
   fireEvent.click(within(field).getByRole('button', { name: 'Save' }));
 
   await waitFor(() => expect(global.fetch).toHaveBeenCalledWith('/api/admin/email-defaults', expect.objectContaining({
@@ -318,15 +318,15 @@ test('saves only the edited field when its sibling field in the same card is ava
 
 test('dirty chip appears on edit, clears after save, and Save is disabled while clean', async () => {
   render(<EmailDefaultsSection />);
-  await waitFor(() => expect(screen.getByLabelText('Deliberation agenda subject')).toBeInTheDocument());
-  const card = screen.getByText('Deliberation agenda').closest('section');
-  const field = screen.getByLabelText('Deliberation agenda subject').closest('.space-y-2');
+  await waitFor(() => expect(screen.getByLabelText('Discussion session agenda subject')).toBeInTheDocument());
+  const card = screen.getByText('Discussion session agenda').closest('section');
+  const field = screen.getByLabelText('Discussion session agenda subject').closest('.space-y-2');
 
   expect(within(card).queryByText('Unsaved changes')).toBeNull();
   const fieldSave = within(field).getByRole('button', { name: 'Save' });
   expect(fieldSave).toBeDisabled();
 
-  fireEvent.change(screen.getByLabelText('Deliberation agenda subject'), { target: { value: 'Edited' } });
+  fireEvent.change(screen.getByLabelText('Discussion session agenda subject'), { target: { value: 'Edited' } });
   expect(within(card).getByText('Unsaved changes')).toBeInTheDocument();
   expect(within(field).getByRole('button', { name: 'Save' })).toBeEnabled();
 
@@ -337,11 +337,11 @@ test('dirty chip appears on edit, clears after save, and Save is disabled while 
 
 test('a failed PUT keeps the field dirty, shows the error, and does not advance savedValues', async () => {
   render(<EmailDefaultsSection />);
-  await waitFor(() => expect(screen.getByLabelText('Deliberation agenda subject')).toBeInTheDocument());
-  const field = screen.getByLabelText('Deliberation agenda subject').closest('.space-y-2');
-  const card = screen.getByText('Deliberation agenda').closest('section');
+  await waitFor(() => expect(screen.getByLabelText('Discussion session agenda subject')).toBeInTheDocument());
+  const field = screen.getByLabelText('Discussion session agenda subject').closest('.space-y-2');
+  const card = screen.getByText('Discussion session agenda').closest('section');
 
-  fireEvent.change(screen.getByLabelText('Deliberation agenda subject'), { target: { value: 'Edited' } });
+  fireEvent.change(screen.getByLabelText('Discussion session agenda subject'), { target: { value: 'Edited' } });
 
   global.fetch.mockImplementationOnce(async () => ({ ok: false, json: async () => ({ error: 'Save failed.' }) }));
   fireEvent.click(within(field).getByRole('button', { name: 'Save' }));
@@ -350,7 +350,7 @@ test('a failed PUT keeps the field dirty, shows the error, and does not advance 
   // savedValues did not advance: the field is still dirty, so the card chip stays and Save stays enabled.
   expect(within(card).getByText('Unsaved changes')).toBeInTheDocument();
   expect(within(field).getByRole('button', { name: 'Save' })).toBeEnabled();
-  expect(screen.getByLabelText('Deliberation agenda subject')).toHaveValue('Edited');
+  expect(screen.getByLabelText('Discussion session agenda subject')).toHaveValue('Edited');
 });
 
 // T3 matrix (Stage 3, group A) ahead of migrating both fetch sites onto
@@ -376,9 +376,9 @@ test('(e) load: a non-2xx unparseable body (502 gateway page) shows the fallback
 
 test('(c) saveKey: a network rejection shows the rejection\'s own message on the field', async () => {
   render(<EmailDefaultsSection />);
-  await waitFor(() => expect(screen.getByLabelText('Deliberation agenda subject')).toBeInTheDocument());
-  const field = screen.getByLabelText('Deliberation agenda subject').closest('.space-y-2');
-  fireEvent.change(screen.getByLabelText('Deliberation agenda subject'), { target: { value: 'Edited' } });
+  await waitFor(() => expect(screen.getByLabelText('Discussion session agenda subject')).toBeInTheDocument());
+  const field = screen.getByLabelText('Discussion session agenda subject').closest('.space-y-2');
+  fireEvent.change(screen.getByLabelText('Discussion session agenda subject'), { target: { value: 'Edited' } });
   global.fetch.mockImplementationOnce(() => Promise.reject(new Error('network down')));
   fireEvent.click(within(field).getByRole('button', { name: 'Save' }));
   expect(await within(field).findByText('network down')).toBeInTheDocument();
@@ -386,9 +386,9 @@ test('(c) saveKey: a network rejection shows the rejection\'s own message on the
 
 test('(e) saveKey: a non-2xx unparseable body (502) shows the fallback "Save failed.", never silent', async () => {
   render(<EmailDefaultsSection />);
-  await waitFor(() => expect(screen.getByLabelText('Deliberation agenda subject')).toBeInTheDocument());
-  const field = screen.getByLabelText('Deliberation agenda subject').closest('.space-y-2');
-  fireEvent.change(screen.getByLabelText('Deliberation agenda subject'), { target: { value: 'Edited' } });
+  await waitFor(() => expect(screen.getByLabelText('Discussion session agenda subject')).toBeInTheDocument());
+  const field = screen.getByLabelText('Discussion session agenda subject').closest('.space-y-2');
+  fireEvent.change(screen.getByLabelText('Discussion session agenda subject'), { target: { value: 'Edited' } });
   global.fetch.mockImplementationOnce(async () => ({ ok: false, status: 502, json: async () => { throw new SyntaxError('bad json'); } }));
   fireEvent.click(within(field).getByRole('button', { name: 'Save' }));
   expect(await within(field).findByText('Save failed.')).toBeInTheDocument();
@@ -396,31 +396,31 @@ test('(e) saveKey: a non-2xx unparseable body (502) shows the fallback "Save fai
 
 test('the Saved timestamp persists across a re-render and clears on the next edit', async () => {
   const { rerender } = render(<EmailDefaultsSection />);
-  await waitFor(() => expect(screen.getByLabelText('Deliberation agenda subject')).toBeInTheDocument());
+  await waitFor(() => expect(screen.getByLabelText('Discussion session agenda subject')).toBeInTheDocument());
 
-  fireEvent.change(screen.getByLabelText('Deliberation agenda subject'), { target: { value: 'Edited' } });
-  const field = screen.getByLabelText('Deliberation agenda subject').closest('.space-y-2');
+  fireEvent.change(screen.getByLabelText('Discussion session agenda subject'), { target: { value: 'Edited' } });
+  const field = screen.getByLabelText('Discussion session agenda subject').closest('.space-y-2');
   fireEvent.click(within(field).getByRole('button', { name: 'Save' }));
   await waitFor(() => expect(within(field).getByText(/^Saved · /)).toBeInTheDocument());
 
   rerender(<EmailDefaultsSection />);
   expect(within(field).getByText(/^Saved · /)).toBeInTheDocument();
 
-  fireEvent.change(screen.getByLabelText('Deliberation agenda subject'), { target: { value: 'Edited again' } });
+  fireEvent.change(screen.getByLabelText('Discussion session agenda subject'), { target: { value: 'Edited again' } });
   expect(within(field).queryByText(/^Saved · /)).toBeNull();
 });
 
 test('Save all changes PUTs only dirty keys, in catalog order, and reports per-field status', async () => {
   render(<EmailDefaultsSection />);
-  await waitFor(() => expect(screen.getByLabelText('Deliberation agenda subject')).toBeInTheDocument());
-  const card = screen.getByText('Deliberation agenda').closest('section');
+  await waitFor(() => expect(screen.getByLabelText('Discussion session agenda subject')).toBeInTheDocument());
+  const card = screen.getByText('Discussion session agenda').closest('section');
 
   const saveAll = within(card).getByRole('button', { name: 'Save all changes' });
   expect(saveAll).toBeDisabled();
 
   // Only the subject is edited — the body stays clean, so Save all must PUT
   // exactly the subject key and leave the clean body key alone.
-  fireEvent.change(screen.getByLabelText('Deliberation agenda subject'), { target: { value: 'New subject' } });
+  fireEvent.change(screen.getByLabelText('Discussion session agenda subject'), { target: { value: 'New subject' } });
   expect(saveAll).toBeEnabled();
 
   fireEvent.click(saveAll);
@@ -437,8 +437,8 @@ test('Save all changes PUTs only dirty keys, in catalog order, and reports per-f
 
   // Now dirty both fields, in reverse edit order, and confirm Save all still
   // PUTs them in catalog order (subject before body), not edit order.
-  fireEvent.change(screen.getByLabelText('Deliberation agenda message'), { target: { value: 'New message' } });
-  fireEvent.change(screen.getByLabelText('Deliberation agenda subject'), { target: { value: 'Newer subject' } });
+  fireEvent.change(screen.getByLabelText('Discussion session agenda opening message'), { target: { value: 'New message' } });
+  fireEvent.change(screen.getByLabelText('Discussion session agenda subject'), { target: { value: 'Newer subject' } });
   fireEvent.click(within(card).getByRole('button', { name: 'Save all changes' }));
   await waitFor(() => {
     const putCalls2 = global.fetch.mock.calls.filter(([, opts]) => opts?.method === 'PUT');
@@ -455,14 +455,14 @@ test('registers a beforeunload guard while dirty and removes it when clean', asy
   const addSpy = jest.spyOn(window, 'addEventListener');
   const removeSpy = jest.spyOn(window, 'removeEventListener');
   render(<EmailDefaultsSection />);
-  await waitFor(() => expect(screen.getByLabelText('Deliberation agenda subject')).toBeInTheDocument());
+  await waitFor(() => expect(screen.getByLabelText('Discussion session agenda subject')).toBeInTheDocument());
 
   expect(addSpy).not.toHaveBeenCalledWith('beforeunload', expect.any(Function));
 
-  fireEvent.change(screen.getByLabelText('Deliberation agenda subject'), { target: { value: 'Edited' } });
+  fireEvent.change(screen.getByLabelText('Discussion session agenda subject'), { target: { value: 'Edited' } });
   await waitFor(() => expect(addSpy).toHaveBeenCalledWith('beforeunload', expect.any(Function)));
 
-  const field = screen.getByLabelText('Deliberation agenda subject').closest('.space-y-2');
+  const field = screen.getByLabelText('Discussion session agenda subject').closest('.space-y-2');
   fireEvent.click(within(field).getByRole('button', { name: 'Save' }));
   await waitFor(() => expect(removeSpy).toHaveBeenCalledWith('beforeunload', expect.any(Function)));
 

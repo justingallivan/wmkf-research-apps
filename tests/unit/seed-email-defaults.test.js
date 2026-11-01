@@ -114,7 +114,7 @@ describe('seed-email-defaults script core', () => {
     expect(DELIBERATION_AGENDA_SEED_SUBJECT).toContain('{{sessionDate}}');
   });
 
-  test('registers the prior Workbench Share compose and briefing-section wording', async () => {
+  test('registers the current proposal review packet compose and briefing-section wording', async () => {
     const { EMAIL_DEFAULT_SEED_TEXT } = await import('../../scripts/seed-email-defaults.mjs');
     const {
       DELIBERATION_SHARE_SEED_BRIEFING_COPY,
@@ -125,7 +125,10 @@ describe('seed-email-defaults script core', () => {
     expect(EMAIL_DEFAULT_SEED_TEXT['email.deliberation_share.subject']).toBe(DELIBERATION_SHARE_SEED_SUBJECT);
     expect(EMAIL_DEFAULT_SEED_TEXT['email.deliberation_share.body']).toBe(DELIBERATION_SHARE_SEED_BODY);
     expect(DELIBERATION_SHARE_SEED_SUBJECT).toContain('{{requestNumber}}');
-    expect(DELIBERATION_SHARE_SEED_BODY).toContain('deliberation briefing page');
+    expect(DELIBERATION_SHARE_SEED_SUBJECT).toBe('Proposal review packet — {{requestNumber}}');
+    expect(DELIBERATION_SHARE_SEED_BODY).toContain('proposal review packet');
+    expect(DELIBERATION_SHARE_SEED_BODY).toContain('proposal discussion brief');
+    expect(DELIBERATION_SHARE_SEED_BODY).toContain('presentation materials');
     expect(EMAIL_DEFAULT_SEED_TEXT['email.deliberation_share.briefing_heading'])
       .toBe(DELIBERATION_SHARE_SEED_BRIEFING_COPY.heading);
     expect(EMAIL_DEFAULT_SEED_TEXT['email.deliberation_share.briefing_link_text'])
@@ -136,6 +139,10 @@ describe('seed-email-defaults script core', () => {
       .toBe(DELIBERATION_SHARE_SEED_BRIEFING_COPY.expiryLeadIn);
     expect(EMAIL_DEFAULT_SEED_TEXT['email.deliberation_share.review_bundle_link_text'])
       .toBe(DELIBERATION_SHARE_SEED_BRIEFING_COPY.reviewBundleLinkText);
+    expect(DELIBERATION_SHARE_SEED_BRIEFING_COPY).toMatchObject({
+      heading: 'Proposal review packet:',
+      linkText: 'Open the proposal review packet',
+    });
   });
 
   test('registers both site-visit email families with the Research Presentation wording', async () => {
@@ -150,12 +157,12 @@ describe('seed-email-defaults script core', () => {
     expect(EMAIL_DEFAULT_SEED_TEXT['email.site_visit_materials_invite.body']).toBe(SITE_VISIT_MATERIALS_INVITE_SEED_BODY);
     expect(EMAIL_DEFAULT_SEED_TEXT['email.site_visit_materials_reminder.subject']).toBe(SITE_VISIT_MATERIALS_REMINDER_SEED_SUBJECT);
     expect(EMAIL_DEFAULT_SEED_TEXT['email.site_visit_materials_reminder.body']).toBe(SITE_VISIT_MATERIALS_REMINDER_SEED_BODY);
-    expect(SITE_VISIT_MATERIALS_INVITE_SEED_SUBJECT).toBe('W.M. Keck Foundation Research Presentation Materials Request');
+    expect(SITE_VISIT_MATERIALS_INVITE_SEED_SUBJECT).toBe('W.M. Keck Foundation Presentation materials request');
     expect(SITE_VISIT_MATERIALS_INVITE_SEED_BODY).toContain('Dear Dr. {{piLastName}}');
     expect(SITE_VISIT_MATERIALS_INVITE_SEED_BODY).toContain('{{liaisonFullName}}');
     expect(SITE_VISIT_MATERIALS_INVITE_SEED_BODY).toContain('{{programCoordinatorName}}');
     expect(SITE_VISIT_MATERIALS_INVITE_SEED_BODY).not.toContain('No login is needed.');
-    expect(SITE_VISIT_MATERIALS_REMINDER_SEED_SUBJECT).toBe('W.M. Keck Foundation Research Presentation Materials Request');
+    expect(SITE_VISIT_MATERIALS_REMINDER_SEED_SUBJECT).toBe('W.M. Keck Foundation Presentation materials request');
     expect(SITE_VISIT_MATERIALS_REMINDER_SEED_BODY).toContain('The following {{missingItemsGrammar}} still needed');
   });
 
@@ -176,6 +183,26 @@ describe('seed-email-defaults script core', () => {
     const seedableKeys = EDITABLE_TEXT_DEFAULTS.filter((entry) => !entry.key.startsWith('stage.'));
     expect(result.filter((r) => !r.key.startsWith('stage.')).map((r) => r.action))
       .toEqual(seedableKeys.map(() => 'skip-existing'));
+    expect(setSetting).not.toHaveBeenCalled();
+  });
+
+  test('terminology seeds preserve saved legacy-default wording as well as customized copy', async () => {
+    const { seedEmailDefaults } = await import('../../scripts/seed-email-defaults.mjs');
+    const saved = {
+      'email.deliberation_share.subject': 'Site Visit materials — {{requestNumber}}',
+      'email.deliberation_share.body': 'Dear colleagues, please use my briefing notes.',
+      'email.deliberation_share.briefing_heading': 'Our Board packet:',
+      'email.deliberation_agenda.subject': 'Deliberation session agenda — {{sessionDate}}',
+      'email.deliberation_agenda.body': 'Keep this coordinator-written opening.',
+      'email.site_visit_materials_invite.subject': 'W.M. Keck Foundation Research Presentation Materials Request',
+      'email.site_visit_materials_reminder.body': 'Keep this personalized reminder.',
+    };
+    const setSetting = jest.fn();
+    const result = await seedEmailDefaults({
+      getSettingStrict: jest.fn(async key => ({found:true,value:saved[key] || 'Existing custom copy'})),
+      setSetting, dryRun:false, logger:{log:jest.fn()},
+    });
+    for (const key of Object.keys(saved)) expect(result.find(entry => entry.key === key).action).toBe('skip-existing');
     expect(setSetting).not.toHaveBeenCalled();
   });
 

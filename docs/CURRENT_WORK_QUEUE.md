@@ -83,12 +83,12 @@ sequence.
   Deliberation session → Proposal discussion session; Program briefing →
   Discussion summaries; Discussion Sentiment → Post-presentation discussion
   sentiment. PR #580 merged that Meeting Tracker slice as `30bc81e77` in
-  source/Git; this does not establish deployment. As of 2026-11-01, a separate
-  Board-reader display-copy slice is on branch `codex/board-page-terminology` in
-  `pages/external/briefing/[token].js` and `pages/external/presentation/[token].js`:
-  Proposal review packet, Proposal discussion brief, Proposal discussion session,
-  Research presentation, and Presentation materials. Check Git/PR and release
-  receipts for current merge/deployment status. This Board slice does not include
+  source/Git; this does not establish deployment. The Board-reader display-copy
+  slice merged through PR #581 as `8c0859a6f` in source/Git (no deployment claim).
+  It covers `pages/external/briefing/[token].js` and
+  `pages/external/presentation/[token].js`: Proposal review packet, Proposal
+  discussion brief, Proposal discussion session, Research presentation, and
+  Presentation materials. This Board slice does not include
   the applicant upload page, emails, generated documents, historic filenames,
   tokens/routes, or API payload changes. The two Meeting Tracker summary views
   also use approved post-presentation discussion
@@ -96,9 +96,15 @@ sequence.
   recording labels or every existing Staff discussion label. Remaining recorded
   staff-discussion labels await separate full-migration scope. Preserve routes,
   API/service names, schema/storage values, artifact types, prompt identifiers,
-  deep links, and saved settings. Existing saved subjects, emails, and generated
-  documents retain their wording; changes to those require separate scope. No
-  suite-wide technical migration is authorized. Remaining runtime surfaces await
+  deep links, and saved settings. As of 2026-11-01, a separate email-copy slice
+  is in progress on branch `codex/email-template-terminology`; check Git/PR and
+  release receipts for current status. It updates source defaults for packet-
+  sharing, agenda, and presentation-material invitation/reminder emails, plus
+  Admin metadata, preview labels, and the application-owned materials upload
+  CTA. Existing stored Admin/personal settings,
+  already-prepared email content, and generated documents remain unchanged;
+  deployed settings were not inspected and no backfill is included. No suite-wide
+  technical migration is authorized. Remaining runtime surfaces await
   separate scope. Approved names, contracts, and dated historical inventory:
   `docs/NOMENCLATURE_GLOSSARY.md` → "Deliberations workflow vocabulary"; decision
   evidence: `docs/plans/review/PROPOSAL_WORKFLOW_VOCABULARY_2026-10-19.md`.

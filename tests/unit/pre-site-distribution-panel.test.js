@@ -81,11 +81,11 @@ test('offers no attachment choice; the default message names the briefing page a
       sourceArtifact={{ artifactId: ARTIFACT_ID }}
     />,
   );
-  expect(await screen.findByRole('heading', { name: 'Send deliberation materials' })).toBeInTheDocument();
+  expect(await screen.findByRole('heading', { name: 'Send the proposal review packet' })).toBeInTheDocument();
   expect(screen.queryByRole('group', { name: 'Document attachment' })).not.toBeInTheDocument();
   expect(screen.queryByRole('radio')).not.toBeInTheDocument();
   expect(screen.getByLabelText('Message')).toHaveValue(
-    'The deliberation briefing page linked below has the Pre-Research Presentation Brief, every completed review, the proposal, and the research presentation materials.',
+    'The proposal review packet linked below has the proposal discussion brief, every completed review, the proposal, and the presentation materials.',
   );
 });
 
@@ -147,7 +147,7 @@ test('offers no material checkboxes and no calendar controls; the briefing page 
     />,
   );
 
-  expect(await screen.findByRole('heading', { name: 'Send deliberation materials' })).toBeInTheDocument();
+  expect(await screen.findByRole('heading', { name: 'Send the proposal review packet' })).toBeInTheDocument();
   // Calendar attachments have no UI (owner decision S466: unused).
   expect(screen.queryByText(/add-to-calendar/i)).not.toBeInTheDocument();
   // Material links retired (owner 2026-09-10): no "Include links to materials" group.
@@ -843,7 +843,7 @@ test('collapsed mode folds the composer behind a Send-materials-again disclosure
 
   expect(await screen.findByText('Send materials again')).toBeInTheDocument();
   expect(screen.getByText(/already been sent/)).toBeInTheDocument();
-  expect(screen.queryByRole('heading', { name: 'Send deliberation materials' })).not.toBeInTheDocument();
+  expect(screen.queryByRole('heading', { name: 'Send the proposal review packet' })).not.toBeInTheDocument();
   // The composer remains reachable inside the disclosure.
   expect(screen.getByRole('button', { name: 'Create preview' })).toBeInTheDocument();
 });
@@ -1007,7 +1007,7 @@ test('dialog mode: Add from directory opens the picker above the composer, and E
       needsLock
     />,
   );
-  const composer = await screen.findByRole('dialog', { name: 'Share for the deliberation session' });
+  const composer = await screen.findByRole('dialog', { name: 'Share the proposal review packet' });
   expect(within(composer).getByTestId('composer-lock-note')).toBeInTheDocument();
   // Close is reachable at both ends of a long dialog (owner 2026-09-10).
   expect(within(composer).getAllByRole('button', { name: 'Close' })).toHaveLength(2);
@@ -1021,7 +1021,7 @@ test('dialog mode: Add from directory opens the picker above the composer, and E
   fireEvent(picker, new Event('cancel', { cancelable: true }));
   await waitFor(() => expect(screen.queryByRole('dialog', { name: /directory|recipients/i })).not.toBeInTheDocument());
   expect(onCloseComposer).not.toHaveBeenCalled();
-  expect(screen.getByRole('dialog', { name: 'Share for the deliberation session' })).toBeInTheDocument();
+  expect(screen.getByRole('dialog', { name: 'Share the proposal review packet' })).toBeInTheDocument();
 
   fireEvent(composer, new Event('cancel', { cancelable: true }));
   expect(onCloseComposer).toHaveBeenCalledTimes(1);
@@ -1047,7 +1047,7 @@ test('the composer shows the deliberation session slot read-only, and the previe
   fireEvent.change(screen.getByLabelText('To'), { target: { value: 'staff@example.org' } });
   fireEvent.click(screen.getByRole('button', { name: 'Create preview' }));
   expect(await screen.findByText('Email preview')).toBeInTheDocument();
-  expect(screen.getByText('Pre-discussion:').parentElement).toHaveTextContent(/Sep 11, 2026.*Join link included/);
+  expect(screen.getByText('Proposal discussion session:').parentElement).toHaveTextContent(/Sep 11, 2026.*Join link included/);
 });
 
 test('with no session the slot says not yet scheduled and names the PC', async () => {
