@@ -37,7 +37,7 @@ function baseArgs() {
 // Golden hash for baseArgs() above — the canonical fixture every other case
 // in this file is diffed against.
 // Re-pinned 2026-10-29 for the D48 version bump (v1→v2 for non-invitations).
-const BASE_HASH = '6e6046357042f13def542f18bd63e91b70aec23a848a095f1a0bbc5ceeb731dd';
+const BASE_HASH = '1f1ae1ba76ad71d86568887d7cb27a842e857acfd41252fb12f0badc16748832';
 
 describe('fingerprintDraft golden hashes', () => {
   test('base fixture hashes to the pinned golden value', () => {
@@ -96,7 +96,7 @@ describe('fingerprintDraft golden hashes', () => {
     args.person.wmkf_primaryaffiliation = null;
     args.person.wmkf_organizationname = null;
     const hash = fingerprintDraft(buildDraftFingerprintInputs(args));
-    expect(hash).toBe('8a38843ee62f43d2ba3246e4875857c292eb0a610879e49c1e47ca1c1351fcfe');
+    expect(hash).toBe('b2b40d759ec58dc2d10b1650668d82067aa60a64f7d50b82a372833296a859c7');
     expect(hash).not.toBe(BASE_HASH);
   });
 
@@ -105,23 +105,22 @@ describe('fingerprintDraft golden hashes', () => {
   // field proving each flips the hash") plus the co-PI *order* sensitivity
   // case (order is part of the body — the plan documents this explicitly).
   test.each([
-    ['templateType (invitation v3)', (a) => { a.templateType = 'invitation'; }, '9fcf671f349340e37809b698eace8549c82cf60985667d9ac37076c7bbda37d6'],
-    ['suggestionId (a different GUID)', (a) => { a.suggestionId = '33333333-3333-4333-8333-333333333333'; }, 'a51b4746a7b5264259a659137b62ace3b61c42b12fb522ee75190cc9d4c289b4'],
-    ['candidate.name', (a) => { a.person.wmkf_name = 'Dr. Other Name'; }, 'a4a0745081a9af4fa1484122778413f53e17705fec16f1b1d7d74cae58710c09'],
-    ['candidate.affiliation', (a) => { a.person.wmkf_primaryaffiliation = 'Uni B'; }, '893c76ecb8897499ad01752bf6e649628cbb55774d8756dd5b0d536c6d0a3335'],
-    ['proposal.title', (a) => { a.request.akoya_title = 'Different title'; }, '4aebfea6738a8e3350825cfddcc1ed035e32c999b1f8940c522ca45489cad7d8'],
-    ['proposal.abstract', (a) => { a.request.wmkf_abstract = 'Different abstract'; }, 'b9082e97b05f738e4a11b4a7f2e0d2b725cd8022d03e73bec700d484be5a846e'],
-    ['proposal.authors', (a) => { a.request._wmkf_projectleader_value_formatted = 'Dr. Other PI'; }, 'd88717c62811e436f1d921dd8ad621b4cc1eaa244b0c7fac961c6f6b421cb7f4'],
-    ['proposal.institution', (a) => { a.request._akoya_applicantid_value_formatted = 'Org B'; }, 'd08635e2f6c328dbc711ca2f6b0bc3fde2b0a202b8735abb307124a39c951050'],
-    ['proposal.coInvestigators (membership)', (a) => { a.coPINames = ['Dr. Alex Co']; }, '9c172d5e4f925bdf460d3c2984ce2dd614420984a014070be6a6ab22e7b4ba7c'],
-    ['proposal.coInvestigators (order only, same membership)', (a) => { a.coPINames = ['Dr. Bea Co', 'Dr. Alex Co']; }, '1e0d9b02d57b36e584827a8241a66ed8151655f206d88e67f238fad85d2495e5'],
-    ['engagement.reviewDueDateOverride', (a) => { a.suggestion = { wmkf_reviewduedateoverride: '2099-03-01' }; }, '63b3e6bd6539ce4199851705d41cbae4babd18067ec1d7edec21d54542b54133'],
-    ['request.reviewDueDate', (a) => { a.request.wmkf_reviewduedate = '2099-04-01'; }, '0425ce1b221465ca444bd9549fcec2da216448e21c53e983cb07c8fc64fc7970'],
-    ['request.grantCycleId', (a) => { a.request._wmkf_grantcycle_value = '26262626-2626-4626-8626-262626262626'; }, '2125c90d1c961c36c5ee92f6e2f87cd2674fb182f3c033d9f7614a24769a8097'],
-    ['cycle.programName', (a) => { a.cycle.program_name = 'Different Program'; }, 'b03cd77074dc506b994fd8d3799c57326794ab6cbdaf37752bfe5f719ded5306'],
-    ['cycle.reviewDeadline', (a) => { a.cycle.review_deadline = '2099-05-01'; }, '96b513107aaf83458fed9f7fcbf783d9627ba21cef55756103495d9609fe6c4f'],
-    ['cycle.customFields', (a) => { a.cycle.custom_fields = { foo: 'baz' }; }, 'a344166133db98c20863426a1a00a38cbf902a9291f442695c94d4bbd0ee11a8'],
-    ['honorariumAmount', (a) => { a.honorariumAmount = 999; }, '6f3744065a401a78788d2badf8489f847d0d0a10c12a3bed460f21cbcda618cb'],
+    ['templateType (invitation v3)', (a) => { a.templateType = 'invitation'; }, 'fc868fe3cfef0a30cbc0b8db8acf3bb72bc615d1217d7fa5ffbf532dc3319672'],
+    ['suggestionId (a different GUID)', (a) => { a.suggestionId = '33333333-3333-4333-8333-333333333333'; }, '5c6c5a0cc41628e2424cedea50d2f901b275b73d6c3830dcc978bf06fea28cda'],
+    ['candidate.name', (a) => { a.person.wmkf_name = 'Dr. Other Name'; }, 'cb5ace75a426a3f835f76ffe53bd8c196ee7d6d8f314e5ee4e06b7b301efa920'],
+    ['candidate.affiliation', (a) => { a.person.wmkf_primaryaffiliation = 'Uni B'; }, '21407f7ff8b0a199ae04cf6151b435d2c76f2f393c78b199ec9c3feb55ec8b12'],
+    ['proposal.title', (a) => { a.request.akoya_title = 'Different title'; }, 'a8bea9c05d817ed75d25b1878ff506ed632c411362596b8e1e75a7f8f032164b'],
+    ['proposal.abstract', (a) => { a.request.wmkf_abstract = 'Different abstract'; }, '88ce8619680c7159007af696d2537eec5e5f6d1181cc7ae58da2363fd482b9cf'],
+    ['proposal.authors', (a) => { a.request._wmkf_projectleader_value_formatted = 'Dr. Other PI'; }, '2d09150df0591efa1c04ce53f4492386519d11c873e124e9e0974f2fea6279f7'],
+    ['proposal.institution', (a) => { a.request._akoya_applicantid_value_formatted = 'Org B'; }, '26af4c13358ebd265e31ce7b1221451ab4591620d95ac122ad7d4c902afa5ea3'],
+    ['proposal.coInvestigators (membership)', (a) => { a.coPINames = ['Dr. Alex Co']; }, '8afb0df10a984215d4ee9ac22987af1782903a1da537ead9b45dca3fa637377f'],
+    ['proposal.coInvestigators (order only, same membership)', (a) => { a.coPINames = ['Dr. Bea Co', 'Dr. Alex Co']; }, 'd86516fa65d6ef27924c3e6d51da6f2fa07043910e55a1f95c376b6d6fbd7e59'],
+    ['engagement.reviewDueDateOverride', (a) => { a.suggestion = { wmkf_reviewduedateoverride: '2099-03-01' }; }, 'a0e37d188a5de1343c55dbbdb088688774b2849f928d0651ee8fc9808b2046f4'],
+    ['request.reviewDueDate', (a) => { a.request.wmkf_reviewduedate = '2099-04-01'; }, 'ee16f62b9913dc63b4740aefb0a2d7d3532c10a8abe32908785d0985635a00ce'],
+    ['request.grantCycleId', (a) => { a.request._wmkf_grantcycle_value = '26262626-2626-4626-8626-262626262626'; }, '74004440d6a62c6159218272e579400fc3b970923dab3537090cb0178276d9c1'],
+    ['cycle.programName', (a) => { a.cycle.program_name = 'Different Program'; }, 'f2d20acc1d399afe334d1a3e192d81cb11cb4800fb41a98e98440103e38fc6f3'],
+    ['cycle.customFields', (a) => { a.cycle.custom_fields = { foo: 'baz' }; }, '9cc55ec82e9a823af19f0a4f704ba21379463ea2ccd03431ff46d780db621b50'],
+    ['honorariumAmount', (a) => { a.honorariumAmount = 999; }, '3b97f56c0a4514f8bfef02f06503da6e88fb55f3b47097f012dfe023b50eec0e'],
   ])('changing %s alone flips the hash away from the base golden value', (label, mutate, goldenForMutation) => {
     const args = baseArgs();
     mutate(args);
@@ -129,6 +128,12 @@ describe('fingerprintDraft golden hashes', () => {
     expect(hash).not.toBe(BASE_HASH);
     expect(hash).toBe(goldenForMutation);
   });
+});
+
+test('the retired cycle review deadline is not a fingerprint input (2026-11-01)', () => {
+  const args = baseArgs();
+  args.cycle.review_deadline = '2099-05-01';
+  expect(fingerprintDraft(buildDraftFingerprintInputs(args))).toBe(BASE_HASH);
 });
 
 describe('helper cross-check (tests/helpers/draft-fingerprint.js independence)', () => {

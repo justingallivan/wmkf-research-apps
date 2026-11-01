@@ -118,7 +118,6 @@ function buildFingerprintInputsFromFixture({
     },
     cycle: {
       programName: cycle?.program_name ?? null,
-      reviewDeadline: cycle?.review_deadline ?? null,
       customFields: cycle?.custom_fields ?? null,
     },
     honorariumAmount: honorariumAmount ?? null,

@@ -21,7 +21,6 @@ const SELECT_FIELDS = [
   'wmkf_displayname',
   'wmkf_shortcode',
   'wmkf_programname',
-  'wmkf_reviewreturndeadline',
   'wmkf_reviewtemplateurl',
   'wmkf_reviewtemplatefilename',
   'wmkf_additionalattachments',

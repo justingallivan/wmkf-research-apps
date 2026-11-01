@@ -3,7 +3,7 @@ title: Reviewer invitation build — materials on acceptance, calendar due date,
 domain: reviewers
 kind: plan
 status: in-progress
-summary: "PARTIAL / follow-ups remain. PR #551 review filing, PR #552 calendar due date and linked-cycle config, PR #561 Board setup calendar read, and PR #562 materials-on-acceptance implementation are merged and Production-deployed. PR #586 and hotfix #587 (2026-11-01, Production-deployed) retire the invitation's proposal-release promise, the invite-dialog field and `{{proposalDelivery}}`; the live invitation body and the one PD override carrying the token were line-edited the same day (owner-approved). Reviewer Finder cycle-record date retirement remains, as do the removed-candidate terminal-history decision, first-link due-date write gap, and first J27 acceptance observation. Release receipts are owner-recorded in DEVELOPMENT_LOG.md; no fresh live probe is claimed here."
+summary: "PARTIAL / follow-ups remain. PR #551 review filing, PR #552 calendar due date and linked-cycle config, PR #561 Board setup calendar read, and PR #562 materials-on-acceptance implementation are merged and Production-deployed. PR #586 and hotfix #587 (2026-11-01, Production-deployed) retire the invitation's proposal-release promise, the invite-dialog field and `{{proposalDelivery}}`; the live invitation body and the one PD override carrying the token were line-edited the same day (owner-approved). Reviewer Finder cycle-record date retirement is PR #589 (2026-11-01), as do the removed-candidate terminal-history decision, first-link due-date write gap, and first J27 acceptance observation. Release receipts are owner-recorded in DEVELOPMENT_LOG.md; no fresh live probe is claimed here."
 canonical: false
 owner: product-engineering
 related:
@@ -39,8 +39,14 @@ Remaining work within this plan:
   saved invitation got the same one-line edit; a read-only check found no other
   saved invitation carrying the token. The seed and live wording now differ by
   design.
-- Retirement of the Reviewer Finder cycle-record date fields (§3.5) remains a
-  separate PR.
+- Retirement of the Reviewer Finder cycle-record date fields (§3.5): PR #589
+  (2026-11-01). `wmkf_reviewreturndeadline` is no longer read, written,
+  projected or fingerprinted; the materials dialog's Proposal Send Date field
+  and the unused legacy `DEFAULT_TEMPLATE` are removed. Production read the same
+  day: the column was empty on all 10 cycle rows and no live or saved wording
+  used the date custom-field tokens. Not included: the per-user Reviewer Finder
+  preference defaults (`reviewerFinderPreferences.js` `GRANT_CYCLE_SETTINGS` /
+  `EMAIL_TEMPLATE`), a separate legacy home.
 - Resolve the removed-candidate terminal-history question and the first-link
   due-date write gap recorded in `SESSION_PROMPT.md`'s current handoff.
 - Observe the automated path at the first J27 acceptance.
@@ -102,7 +108,9 @@ file:line citations, to be re-verified by contract-reconcile before each PR.
   cycle.review_deadline` (`render-emails-service.js:333-337`) [VERIFIED by read].
 - **`{{reviewDeadline}}`** reads only the Reviewer Finder cycle record
   `wmkf_reviewreturndeadline` (`grant-cycles-dataverse.js:82`;
-  `email-generator.js:444`). Nothing else uses that date.
+  `email-generator.js:444`). Nothing else uses that date. *(Superseded
+  2026-11-01, PR #589: render feeds it the request's review due date and the
+  cycle column is no longer read.)*
 - **Extensions** (`lib/services/reviewer-due-extension.js`) use the request date
   as the base, refuse with `original_due_date_missing` when it is blank (:169),
   and write only the per-reviewer override. **No change needed** if the request
@@ -329,8 +337,8 @@ manual-path claim, staff recovery, the invitation PDF precondition and the
 accepted-screen copy (Session 655). PR #562 (`fcad0ad53`) merged and deployed;
 Migration 091 was applied in Production before merge and the two new acceptance
 email keys were seeded (owner-recorded receipts in `SESSION_PROMPT.md` and
-`DEVELOPMENT_LOG.md`). Invitation wording and `{{proposalDelivery}}`: PR #586 (2026-11-01). Still
-[PLANNED]: Reviewer Finder date-field retirement. Accept does
+`DEVELOPMENT_LOG.md`). Invitation wording and `{{proposalDelivery}}`: PR #586 (2026-11-01).
+Reviewer Finder date-field retirement: PR #589 (2026-11-01). Accept does
 not set a review status [VERIFIED via rg: no `reviewStatus` write in
 `respond-service.js` or `reviewer-engagement/record-invitation.js`; writers are
 `record-email-outcome.js` and `close-review.js`], so a new acceptance is
@@ -611,7 +619,7 @@ Dataverse writes). Separate PRs, each with focused unit tests:
 4. **Done — PR #562 (`fcad0ad53`), Production-deployed 2026-10-31:** materials
    on acceptance, shared automatic/manual claim, fallback and staff recovery.
    Invitation wording is PR #586; the Reviewer Finder date-field retirement
-   remains open; first J27 live acceptance observation is pending.
+   is PR #589; first J27 live acceptance observation is pending.
 
 Gates: `check:api-routes`, `check:atlas`, `check:j27-register`,
 `check:dataverse-access-layer`, `check:route-service-boundary`,
