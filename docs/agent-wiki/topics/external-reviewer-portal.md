@@ -1,7 +1,7 @@
 ---
 agent_wiki: topic
 status: active
-last_verified: 2026-09-01
+last_verified: 2026-10-31
 stale_after_days: 60
 owner: reviewer-finder
 source_files:
@@ -12,6 +12,11 @@ source_files:
   - pages/api/external/review/[token]/upload.js
   - pages/api/external/review/[token]/draft.js
   - pages/api/external/review/[token]/submit.js
+  - lib/services/external-review/context-service.js
+  - lib/services/external-review/respond-service.js
+  - lib/services/external-review/submit-service.js
+  - lib/services/deliberation-briefing/briefing-page-service.js
+  - lib/external/verify-briefing-token.js
   - lib/external/build-review-submission.js
   - lib/external/review-multiselect.js
   - lib/external/review-question-fetcher.js
@@ -74,6 +79,36 @@ update_triggers:
 Use this page before work on the token-authed external reviewer surface: the
 accept/decline flow, the materials/upload views, review-token lifecycle, the
 Playwright E2E harness, and the live prod automation that an accept triggers.
+
+## Source refresh — 2026-10-31
+
+[VERIFIED via source at `bfa65bc4d`] This refresh checks the route/service
+boundaries, response guards, draft cleanup, proposal access, token replacement,
+and briefing-page source described below. It does not re-probe Production,
+re-certify dated deployment receipts, or establish current environment values.
+Older rollout and probe dates in Operating Notes retain their original scope.
+
+| Entry point | Durable state and consumer | Source to read before changing behavior |
+| --- | --- | --- |
+| Reviewer context | Verified suggestion/request → engagement view and portal payload; context may stamp first access | `pages/api/external/review/[token]/context.js`, `lib/services/external-review/context-service.js`, `lib/external/review-engagement-state.js` |
+| Accept/decline | ETag-bound suggestion response; acceptance follow-up and withdrawal cleanup | `lib/services/external-review/respond-service.js`, `lib/dataverse/adapters/reviewer-suggestion.js` |
+| Review authoring | Postgres `review_drafts` autosave → sanitized final answer snapshots and parent receipt in Dataverse | `pages/api/external/review/[token]/draft.js`, `lib/services/review-draft-service.js`, `lib/services/external-review/submit-service.js` |
+| Proposal access | Token operation plus engagement gate → exact request-bound SharePoint file | `pages/api/external/review/[token]/proposal.js`, `lib/external/reviewer-materials.js` |
+| Replacement/revoke | Stored token hash/revocation on suggestion; regeneration preserves draft, explicit revoke cleans it up best-effort | `lib/services/review-manager/regenerate-token-service.js`, `pages/api/review-manager/revoke-token.js` |
+| Board/consultant briefing | Stored-digest link → sent distribution snapshot, received reviews, bounded materials | `lib/external/verify-briefing-token.js`, `lib/services/deliberation-briefing/briefing-page-service.js` |
+
+The latest response writer records `endedBy` as `reviewer_before_accepting` or
+`reviewer_after_accepting` on a new decline. A repeat decline recognizes either
+the declined flag or Declined response type and returns without re-stamping the
+ending attribution; its narrow legacy deselection repair is still allowed.
+Read `docs/plans/INVITED_REVIEWER_OUTCOMES_PLAN_2026-10-31.md` for the wider
+outcome work and rollout boundary; this wiki refresh changes no runtime code.
+
+Token replacement also checks first-manual-invitation institution COI and, for
+a never-invited/unaccepted row with no response type, requires the reviewer
+proposal PDF to be present before minting. These checks precede `mintAndStore`;
+eligible replacement links for already invited/engaged reviewers retain their
+existing path. Do not infer eligibility from a visible staff menu alone.
 
 ## Ground Rules
 
@@ -419,8 +454,8 @@ Playwright E2E harness, and the live prod automation that an accept triggers.
   end by design (owner-stated S326). Any staff-UI browser drive/E2E/manual check
   (workbench, admin) must use `https://applications.wmkeck.org`. Four S326
   browser-drive attempts were lost misreading this as a session problem. Detail:
-  `.claude-memory/project-branded-domains.md`. No genuine external reviewer
-  submission has been recorded in the current evidence set. One owner-authorized
+  `.claude-memory/project-branded-domains.md`. The historical S326 evidence set had no recorded genuine external reviewer
+  submission; that is not a current usage census. One owner-authorized
   staged production portal submission passed on 2026-07-26 and was cleaned up, so
   “zero submissions ever” is false; genuine usage remains a live-state probe.
 - **Historical smoke procedure (S308; retained as history, not a current runbook).** The
@@ -531,7 +566,7 @@ Playwright E2E harness, and the live prod automation that an accept triggers.
 ## Deliberation briefing page (third external surface, S502)
 
 `pages/external/briefing/[token].js` + `/api/external/briefing/[token]/{context,document}`
-serve a read-only per-request page (the shared Pre-Research Presentation Brief snapshot — the Pre-Site writeup before Pre-RP Brief slice 4, **[BUILT on `claude/pre-rp-brief` — not merged, not deployed]** — plus a date-only "staff acknowledged newer inputs" notice when the send carried a drift acknowledgement; every received review with
+serve a read-only per-request page (the shared Pre-Research Presentation Brief snapshot — the Pre-Site writeup before Pre-RP Brief slice 4, **[PRESENT on `main` at `bfa65bc4d`; this source check does not establish current deployment/configuration]** — plus a date-only "staff acknowledged newer inputs" notice when the send carried a drift acknowledgement; every received review with
 author and re-sanitized answers, the proposal as `Reviewer Materials/Proposal_<num>.pdf` since 2026-09-10 D20) to Board members and consultants
 who have no Dataverse login. Plan and owner decisions D13–D16:
 `docs/DELIBERATION_BRIEFING_PAGE_PLAN.md`. The brief's Referee Comments
@@ -572,8 +607,9 @@ Verifier
 `deliberation_briefing_links` (`aud:'briefing'`, digest, revocation, row expiry, request
 binding, re-run on every request). Links are minted by Share
 (`lib/services/deliberation-briefing/briefing-link-service.js`, one live row per request,
-reissue = revoke-and-replace) and everything is inert until the owner sets
-`DELIBERATION_BRIEFING_SCHEMA_READY=on` after applying migration 038. Same route order as
+reissue = revoke-and-replace) and verification fails closed unless
+`DELIBERATION_BRIEFING_SCHEMA_READY=on` (migration 038 is the schema prerequisite).
+This source refresh does not infer the live flag value or migration state. Same route order as
 the other external routes: method → rate-limit → verify → record outcome → shape.
 
 **Consultant feedback card (slices 1-2, 2026-09-14):** the context adds
