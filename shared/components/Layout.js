@@ -128,7 +128,7 @@ export default function Layout({
     const tools = accessible
       .filter(app => !PRIMARY_APP_KEYS.includes(app.key))
       .map(app => ({ name: app.name, href: app.href }));
-    if (isSuperuser) tools.push({ name: 'Cycle Dossier', href: '/cycle-dossier' });
+    if (isSuperuser) tools.push({ name: 'Scientific dossier', href: '/cycle-dossier' });
     if (boardAccess) tools.push({ name: 'Board writeups', href: '/board-writeups' });
     if (staffingAccess) tools.push({ name: 'Staffing', href: isSuperuser ? '/admin?workspace=people&view=staffing' : '/staffing' });
     if (boardSetupAccess) tools.push({ name: 'Board cycle setup', href: '/board-cycle-setup' });

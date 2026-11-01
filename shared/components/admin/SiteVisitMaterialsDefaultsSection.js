@@ -105,7 +105,7 @@ export default function SiteVisitMaterialsDefaultsSection() {
     <div className="space-y-3">
       <div className="space-y-3 border-b border-gray-200 pb-6 mb-6">
         <label className="block text-sm font-medium text-gray-700" htmlFor="materials-due-days">
-          Materials due (business days before the site visit)
+          Materials due (business days before the research presentation)
         </label>
         <input id="materials-due-days" type="number" min="1" max="30" step="1"
           value={dueDays} disabled={dueSaving} aria-describedby="materials-due-days-help"
@@ -126,7 +126,7 @@ export default function SiteVisitMaterialsDefaultsSection() {
         </div>
       </div>
       <p className="text-sm text-gray-600">
-        Largest file an applicant can upload for a site visit. The briefing page opens files up to 50 MB and lists larger ones with a note.
+        Largest file an applicant can upload for a research presentation. The proposal review packet opens files up to 50 MB and lists larger ones with a note.
         {source === 'default' ? ` Using the default of ${defaultMb} MB.` : ''}
       </p>
       {error && <p className="text-sm text-red-700" role="alert">{error}</p>}

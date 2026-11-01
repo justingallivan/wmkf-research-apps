@@ -6,7 +6,7 @@ status: canonical
 summary: Canonical priority queue separating current commitments, evidence windows, optional work, external dependencies, and parked programs.
 canonical: true
 cataloged: 2026-07-22
-last_verified: 2026-10-31
+last_verified: 2026-11-01
 owner: product-engineering
 related:
   - docs/SYSTEM_MODEL.md
@@ -96,13 +96,26 @@ sequence.
   merged through PR #590 as `4f665c6a9` in source/Git (no deployment claim):
   upload-page title/support-email subject and the Staff Deliberations materials-
   card heading use Presentation materials. As of 2026-11-01, a separate
-  recording/transcript display-copy slice is in progress on
-  `codex/recording-discussion-terminology`, using Recording and transcripts and
+  recording/transcript display-copy slice merged through PR #591 as
+  `3cf543f82` in source/Git (no deployment claim): Recording and transcripts /
   Post-presentation discussion in the scoped Recording and transcripts card,
   Preparation panel, Site Visit editor, and Research Presentation follow-up,
-  and clarifying the scheduled presentation end versus the selected last
+  with the scheduled presentation end clarified versus the selected last
   presentation turn in the recording. This does not rename every existing
-  Staff discussion label. The email-copy slice merged through PR #583
+  Staff discussion label. As of 2026-11-01, a separate Admin/app-navigation
+  terminology slice is in progress on `codex/dossier-admin-terminology`:
+  Scientific dossier replaces Cycle Dossier in the app, navigation, page, and
+  Admin timeout labels; Admin Site Visits becomes Research presentations, with
+  related recipient/material settings and default-attendee copy now describe
+  proposal discussion sessions. Admin prompt-catalog display titles,
+  descriptions, and `usedBy` labels use Scientific dossier, Presentation
+  summary, Post-presentation discussion, **Draft writeup proposal narrative
+  sections**, and **Workbench → Draft writeup generation**; prompt keys,
+  generation/input contracts, and bodies are unchanged. This copy-only slice adds no runtime
+  behavior and preserves key `cycle-dossier`, routes, the persisted audit reason
+  `Stopped by the Cycle Dossier operator.`, settings keys, and user-authored
+  content. The
+  email-copy slice merged through PR #583
   as `3c4c6ee0b` in source/Git (no deployment claim). It updates source defaults for packet-
   sharing, agenda, and presentation-material invitation/reminder emails, plus
   Admin metadata, preview labels, and the application-owned materials upload

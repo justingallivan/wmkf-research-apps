@@ -100,7 +100,7 @@ test('selects active staff, searches existing Contacts, and saves reference-only
   const confirmSpy = jest.spyOn(window, 'confirm').mockReturnValue(false);
   const linkClick = new MouseEvent('click', { bubbles: true, cancelable: true, button: 0 });
   expect(screen.getByRole('link', { name: 'Leave page' }).dispatchEvent(linkClick)).toBe(false);
-  expect(confirmSpy).toHaveBeenCalledWith('You have unsaved Site Visit recipient changes. Leave without saving?');
+  expect(confirmSpy).toHaveBeenCalledWith('You have unsaved research presentation recipient changes. Leave without saving?');
   const dirtyHistoryGuard = mockRouter.beforePopState.mock.calls.at(-1)[0];
   expect(dirtyHistoryGuard()).toBe(false);
 

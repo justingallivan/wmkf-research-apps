@@ -20,7 +20,7 @@ related:
 
 ## Decision and scope
 
-The D26 Cycle Dossier is a private superuser workflow for preparing scientific briefings from the Workbench D26 candidate set. A successful eligible request entry is reusable by any superuser; the dossier selection, run, and edition remain private to their owner. The pilot excludes Set Aside requests and retains the Workbench's server-owned cycle, eligibility, and program-director visibility rules.
+The D26 `cycle-dossier` workflow is a private superuser workflow for preparing scientific briefings from the Workbench D26 candidate set. A successful eligible request entry is reusable by any superuser; the dossier selection, run, and edition remain private to their owner. The pilot excludes Set Aside requests and retains the Workbench's server-owned cycle, eligibility, and program-director visibility rules.
 
 The roster is scoped server-side to the Workbench default program (Research) through the shared program-scope resolver; the page renders no program selector and the route accepts no program input. The prompts are research-specific, so a request tagged into the D26 cycle under another program is omitted by design rather than shown. `buildDossierRosterFilter` in `lib/services/cycle-dossier-rollout.js` is the single roster predicate used by both `loadDossierRoster` and the rollout preflight, so the preflight proves the list the pilot loads. Adding a selectable program later means a program-specific prompt family plus passing a program id into the same resolver (owner decision 2026-09-08).
 
@@ -47,6 +47,21 @@ renderDossierDocuments(manifest) renders Word and PDF directly from frozen paylo
 The six Postgres tables are documented in docs/atlas/postgres-cycle-dossiers.md. Entry revision numbers shown on cards, in the SharePoint and download filenames, and inside the documents are per request (`request_revision`, migration 046, 2026-09-12); the first pilot runs showed a table-wide counter ("Latest revision 6" on a request generated once), and files published before the migration keep the old number in their names. JSONB stores bounded previews, immutable entry revisions, one global run lease with independently checkpointed items, a durable operator stop, and private edition metadata. The dedicated private Blob store owns bytes and accepts only create-only exact pathnames with SHA-256/size verification. Retries create a new run budget while preserving prior charges. Published SharePoint copies are verified against the frozen bytes before the item is recorded: PDFs must match exactly; DOCX packages are compared by their decompressed `word/` parts, with relationship parts compared as order-independent attribute sets that ignore customXml links, because SharePoint Online rewrites `docProps/`, `customXml/`, package rels, and content types on upload, appends customXml relationships to `word/_rels/document.xml.rels`, and leaves `[trash]/NNNN.dat` packaging slots (document property promotion; observed on the first production smoke, 2026-09-12). A mismatch logs the differing part names. The item record keeps the frozen `sha256`/`size` and the observed `publishedSha256`/`publishedSize`. A failed item carries plain-language copy from `describeEntryFailure` (S509): the stage in flight (literature research, briefing, document rendering, SharePoint publishing) plus the cause when it is safe to state (transport timeout with its duration, deadline, refusal, truncation, provider HTTP status, or the dossier's own validation message); unknown errors stay generic so raw provider text never reaches the page. The tail says whether a charge is retained or saved work is kept, and that retry resumes from the checkpoint. Editions are dossier-level, not run-level: the page section is titled "Dossier editions", each card lists the request numbers it contains (`requestNumbers` in the projection), and the Progress aside says the latest edition may not come from the run shown. The roster has Include all / Exclude all. The edition PDF preview iframe needs `X-Frame-Options: SAMEORIGIN` on `/api/cycle-dossier/download` (a later `next.config.js` headers rule overriding the global DENY; found blank in production 2026-09-12).
 
 ## Branch-local implementation status
+
+**Current display-copy slice (2026-11-01):** the app/navigation/page/Admin labels
+are being updated to **Scientific dossier** on branch
+`codex/dossier-admin-terminology`; Admin Site Visits and related recipient,
+materials, and default-attendee copy now describe proposal discussion sessions.
+Admin prompt-catalog display titles, descriptions, and `usedBy` labels use
+Scientific dossier, Presentation summary, Post-presentation discussion, Draft
+writeup proposal narrative sections, and Workbench Draft writeup generation;
+prompt keys, generation/input contracts, and prompt bodies remain unchanged. The
+copy-only slice adds no runtime behavior and preserves
+the `cycle-dossier` key and routes, the persisted audit reason
+`Stopped by the Cycle Dossier operator.`, settings keys, and user content. These
+are source-copy edits in progress; no deployment is inferred. PR #591
+(`3cf543f82`) is the merged source/Git base for the earlier recording-copy
+slice, not a release receipt.
 
 **[VERIFIED 2026-09-07 via source, focused tests, and controlled setup]** The generation/document modules, guarded historical prompt support, prompt seed definitions, prompt seeder, six-table migration, setup-database fresh-install shape, API routes, worker/service/store, and UI are source-built on branch codex/cycle-dossier-pilot-build. Migration 045 is applied and verified; the private store `wmkf-cycle-dossier-private` (`store_W9WC1TLR7kpl9hty`) is connected under the custom `DOSSIER_BLOB` prefix in all environments, with the managed token authenticated in Development. Focused generation/document/Executor tests and targeted lint pass in the local checkout.
 

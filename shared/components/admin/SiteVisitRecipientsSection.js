@@ -3,7 +3,7 @@ import useAdminUnsavedChangesGuard from './useAdminUnsavedChangesGuard';
 import { requestJson } from '../../utils/api-request';
 
 const VERSION = 1;
-const UNSAVED_CHANGES_WARNING = 'You have unsaved Site Visit recipient changes. Leave without saving?';
+const UNSAVED_CHANGES_WARNING = 'You have unsaved research presentation recipient changes. Leave without saving?';
 
 function entryKey(entry) {
   if (entry?.kind === 'staff') return `staff:${entry.profileId}`;
@@ -211,7 +211,7 @@ export default function SiteVisitRecipientsSection() {
   return (
     <div className="space-y-6">
       <p className="text-sm text-gray-600">
-        Choose who is available in the Site Visit materials recipient menu. This does not add anyone
+        Choose who is available in the presentation materials recipient menu. This does not add anyone
         to an email draft automatically; the sender chooses recipients from the menu for each email.
         Checking, adding, or removing someone changes this draft only; choose Save changes to publish
         the directory. Names and email addresses remain owned by their source records and are resolved live.

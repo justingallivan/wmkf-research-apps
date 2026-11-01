@@ -148,7 +148,7 @@ describe('cycle dossier page', () => {
   it('allows a superuser through the direct page wrapper without app membership', async () => {
     jest.spyOn(global, 'fetch').mockResolvedValue(response(dossierResponse()));
     render(<CycleDossierPage />);
-    await waitFor(() => expect(screen.getByText('Cycle Dossier')).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText('Scientific dossier')).toBeInTheDocument());
     expect(screen.getByText('Superuser workspace')).toBeInTheDocument();
   });
 
@@ -165,7 +165,7 @@ describe('cycle dossier page', () => {
     await waitFor(() => expect(screen.getByText(/All dossier processing is stopped/)).toBeInTheDocument());
     expect(confirmMock).toHaveBeenCalledWith(expect.stringMatching(/Stop all/));
     const stopCall = fetchMock.mock.calls.find(([, init]) => init?.method === 'POST');
-    expect(JSON.parse(stopCall[1].body)).toMatchObject({ action: 'operator-stop', stop: true });
+    expect(JSON.parse(stopCall[1].body)).toMatchObject({ action: 'operator-stop', stop: true, reason: 'Stopped by the Cycle Dossier operator.' });
     fireEvent.click(screen.getByRole('button', { name: 'Resume processing' }));
     await waitFor(() => expect(fetchMock.mock.calls.some(([, init]) => init?.method === 'POST' && JSON.parse(init.body).stop === false)).toBe(true));
     expect(confirmMock).toHaveBeenCalledWith(expect.stringMatching(/Resume/));

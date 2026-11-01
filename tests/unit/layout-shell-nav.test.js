@@ -58,7 +58,7 @@ test('top level is Home, Workbench, Meeting Tracker, Proposal Ranking, Tools, Gu
   expect(within(menu).getAllByRole('menuitem').map(item => item.textContent)).toEqual(['Review Panel', 'Grant Reporting']);
 });
 
-test('Tools lists only apps the user can access; Cycle Dossier and Admin are superuser-only', async () => {
+test('Tools lists only apps the user can access; Scientific dossier and Admin are superuser-only', async () => {
   mockAccess = { isSuperuser: false, hasAccess: key => !['grant-reporting', 'meeting-tracker', 'proposal-ranking'].includes(key) };
   const { unmount } = render(<Layout>content</Layout>);
   await screen.findByText('content');
@@ -74,7 +74,7 @@ test('Tools lists only apps the user can access; Cycle Dossier and Admin are sup
   await screen.findByText('content');
   expect(within(mainNav()).getByText('Admin')).toBeInTheDocument();
   fireEvent.click(within(mainNav()).getByRole('button', { name: 'Tools' }));
-  expect(within(screen.getByRole('menu')).getByText('Cycle Dossier')).toBeInTheDocument();
+  expect(within(screen.getByRole('menu')).getByText('Scientific dossier')).toBeInTheDocument();
 });
 
 test('the current item is marked by path prefix; a tool page marks the Tools trigger', async () => {

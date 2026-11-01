@@ -20,7 +20,7 @@ import {
 
 const MEETING_TRACKER_DEFAULTS_DATAVERSE_FIELDS = [
   appSystemSettingField(
-    'Default deliberation attendees',
+    'Default proposal discussion session attendees',
     'meeting_tracker.default_attendees',
     'Stores only active staff profile IDs (reference map v1); names and emails are resolved live from the recipient directory.',
   ),
@@ -29,12 +29,12 @@ const SITE_VISIT_MATERIALS_DEFAULTS_DATAVERSE_FIELDS = [
   appSystemSettingField(
     'Materials due-date offset',
     'site_visit_materials.due_business_days',
-    'Whole number of business days before the site visit (1–30, default 2). New materials requests only; existing deadlines remain unchanged.',
+    'Whole number of business days before the research presentation (1–30, default 2). New materials requests only; existing deadlines remain unchanged.',
   ),
   appSystemSettingField(
     'Applicant materials upload cap',
     'site_visit_materials.upload_max_mb',
-    'Whole number of megabytes (1–500). Unset reads as the 500 MB default. The briefing page opens files up to 50 MB and lists larger ones with a note.',
+    'Whole number of megabytes (1–500). Unset reads as the 500 MB default. The proposal review packet opens files up to 50 MB and lists larger ones with a note.',
   ),
 ];
 
@@ -143,7 +143,7 @@ export function WorkflowsWorkspace({ view }) {
         <div className="space-y-6">
         <AdminEditorPanel
           id="site-visit-recipient-directory"
-          title="Site Visit recipient directory"
+          title="Research presentation recipient directory"
           description="Choose the staff, consultants, and Board members available in the materials-email recipient menu."
           scope="Global directory"
           dataverseFields={SITE_VISIT_RECIPIENT_DATAVERSE_FIELDS}
@@ -153,7 +153,7 @@ export function WorkflowsWorkspace({ view }) {
           <AdminEditorPanel
             id="meeting-tracker-default-attendees"
             title="Meeting Tracker default attendees"
-            description="Choose the staff who attend every deliberation session by default. Board members are added per session in the Meeting Tracker."
+            description="Choose the staff who attend every proposal discussion session by default. Board members are added per session in the Meeting Tracker."
             scope="Global setting"
             dataverseFields={MEETING_TRACKER_DEFAULTS_DATAVERSE_FIELDS}
           >
@@ -162,7 +162,7 @@ export function WorkflowsWorkspace({ view }) {
           <AdminEditorPanel
             id="site-visit-materials-upload-cap"
             title="Materials defaults"
-            description="Set the deadline for new site visit materials requests and the largest file applicants can upload."
+            description="Set the deadline for new presentation materials requests and the largest file applicants can upload."
             scope="Global setting"
             dataverseFields={SITE_VISIT_MATERIALS_DEFAULTS_DATAVERSE_FIELDS}
           >
