@@ -105,9 +105,9 @@ test('presents one governed transition action with concise eligibility guidance'
   render(<FinalWriteupTab requestId={REQUEST_ID} />);
 
   expect(await screen.findByRole('heading', { name: 'Group review has not started' })).toBeInTheDocument();
-  expect(screen.getByText(/same editable working writeup/i)).toBeInTheDocument();
+  expect(screen.getByText(/draft writeup/i)).toBeInTheDocument();
   expect(screen.getByRole('button', { name: 'Ready for group review' })).toBeEnabled();
-  expect(screen.queryByRole('link', { name: 'Edit working writeup in Word' })).not.toBeInTheDocument();
+  expect(screen.queryByRole('link', { name: 'Edit final writeup in Word' })).not.toBeInTheDocument();
 });
 
 test('hides the governed transition from a staff member who is not authorized', async () => {
@@ -161,7 +161,7 @@ test('confirms the irreversible handoff and then exposes only the separate Word 
       signal: expect.any(AbortSignal),
     }),
   ));
-  const open = await screen.findByRole('link', { name: 'Edit working writeup in Word' });
+  const open = await screen.findByRole('link', { name: 'Edit final writeup in Word' });
   expect(open).toHaveAttribute('href', 'https://sharepoint.test/site-visit.docx');
   expect(open).toHaveAttribute('target', '_blank');
   expect(screen.queryByRole('button', { name: 'Ready for group review' })).not.toBeInTheDocument();
@@ -175,7 +175,7 @@ test('names the Site Visit prerequisite when the initial status load reports no 
   render(<FinalWriteupTab requestId={REQUEST_ID} />);
 
   const alert = await screen.findByRole('alert');
-  expect(alert).toHaveTextContent(/Check working-writeup preparation in Staff Deliberations/);
+  expect(alert).toHaveTextContent(/Check draft writeup preparation in Staff Deliberations/);
   expect(alert).not.toHaveTextContent(/is required before Final Writeup can start/);
 });
 
@@ -193,7 +193,7 @@ test('names the Site Visit prerequisite when the server reports no source docume
   fireEvent.click(within(dialog).getByRole('button', { name: 'Ready for group review' }));
 
   const alert = await screen.findByRole('alert');
-  expect(alert).toHaveTextContent(/Check working-writeup preparation in Staff Deliberations/);
+  expect(alert).toHaveTextContent(/Check draft writeup preparation in Staff Deliberations/);
   expect(alert).not.toHaveTextContent(/is required before Final Writeup can start/);
 });
 
@@ -217,7 +217,7 @@ test('shows positive reviewer initials without a personal action for the respons
   expect(await screen.findByLabelText(/Ada Reviewer.*Reviewed/i)).toHaveTextContent('AR');
   expect(screen.getByText('Reviewed by')).toBeInTheDocument();
   expect(screen.queryByRole('button', { name: /^Mark reviewed$/ })).not.toBeInTheDocument();
-  expect(screen.getByRole('link', { name: 'Edit working writeup in Word' })).toHaveAttribute('target', '_blank');
+  expect(screen.getByRole('link', { name: 'Edit final writeup in Word' })).toHaveAttribute('target', '_blank');
 });
 
 test('lets a non-owner record review with only request and current-Final fences', async () => {
@@ -288,7 +288,7 @@ test('keeps the Word action available when acknowledgement schema is off', async
     }, 503));
   render(<FinalWriteupTab requestId={REQUEST_ID} />);
 
-  expect(await screen.findByRole('link', { name: 'Edit working writeup in Word' })).toBeInTheDocument();
+  expect(await screen.findByRole('link', { name: 'Edit final writeup in Word' })).toBeInTheDocument();
   await waitFor(() => expect(global.fetch).toHaveBeenCalledTimes(2));
   expect(screen.queryByText('Reviewed by')).not.toBeInTheDocument();
   expect(screen.queryByRole('alert')).not.toBeInTheDocument();
@@ -302,7 +302,7 @@ test('isolates acknowledgement errors and provides a bounded retry', async () =>
   render(<FinalWriteupTab requestId={REQUEST_ID} />);
 
   expect(await screen.findByText(/Reviews could not be loaded/i)).toBeInTheDocument();
-  expect(screen.getByRole('link', { name: 'Edit working writeup in Word' })).toBeInTheDocument();
+  expect(screen.getByRole('link', { name: 'Edit final writeup in Word' })).toBeInTheDocument();
   fireEvent.click(screen.getByRole('button', { name: 'Try loading reviews again' }));
   expect(await screen.findByText('Not reviewed yet')).toBeInTheDocument();
   expect(global.fetch).toHaveBeenCalledTimes(3);
@@ -338,7 +338,7 @@ test('shows schema-off state without offering an action', async () => {
   }));
   render(<FinalWriteupTab requestId={REQUEST_ID} />);
 
-  expect(await screen.findByRole('heading', { name: 'Final Writeup setup is not active' }))
+  expect(await screen.findByRole('heading', { name: 'Final writeup setup is not active' }))
     .toBeInTheDocument();
   expect(screen.queryByRole('button', { name: 'Ready for group review' })).not.toBeInTheDocument();
 });
@@ -360,9 +360,9 @@ describe('leadership review stage', () => {
     render(<FinalWriteupTab requestId={REQUEST_ID} />);
 
     expect(await screen.findByText('Leadership review')).toBeInTheDocument();
-    expect(screen.getByText('Final Writeup is with leadership')).toBeInTheDocument();
+    expect(screen.getByText('Final writeup is with leadership')).toBeInTheDocument();
     expect(screen.getByText(/Moved to leadership review .* by Justin Gallivan\./)).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: 'Edit working writeup in Word' })).toHaveAttribute(
+    expect(screen.getByRole('link', { name: 'Edit final writeup in Word' })).toHaveAttribute(
       'href',
       'https://sharepoint.test/site-visit.docx',
     );
@@ -417,7 +417,7 @@ describe('leadership review stage', () => {
     expect(JSON.parse(init.body)).toEqual({ requestId: REQUEST_ID, expectedFinalArtifactId: FINAL_ID });
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Send to leadership' })).not.toBeInTheDocument();
-    expect(screen.getByRole('link', { name: 'Edit working writeup in Word' })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Edit final writeup in Word' })).toBeInTheDocument();
     // Review tracking reloads for the new stage.
     await waitFor(() => expect(global.fetch).toHaveBeenCalledTimes(4));
     expect(global.fetch.mock.calls[3][0]).toContain('/api/workbench/final-writeup/acknowledgement?requestId=');
@@ -478,7 +478,7 @@ test('T2 fetchAcknowledgementState: network rejection is isolated to the review-
   render(<FinalWriteupTab requestId={REQUEST_ID} />);
   expect(await screen.findByText(/Reviews could not be loaded/i)).toBeInTheDocument();
   expect(screen.getByText('network down')).toBeInTheDocument();
-  expect(screen.getByRole('link', { name: 'Edit working writeup in Word' })).toBeInTheDocument();
+  expect(screen.getByRole('link', { name: 'Edit final writeup in Word' })).toBeInTheDocument();
 });
 
 test('T2 fetchAcknowledgementState: malformed 2xx body reads as a stale-Final mismatch', async () => {
@@ -487,7 +487,7 @@ test('T2 fetchAcknowledgementState: malformed 2xx body reads as a stale-Final mi
     .mockResolvedValueOnce(malformed());
   render(<FinalWriteupTab requestId={REQUEST_ID} />);
   expect(await screen.findByText(/Reviews could not be loaded/i)).toBeInTheDocument();
-  expect(screen.getByText(/current Final Writeup changed/i)).toBeInTheDocument();
+  expect(screen.getByText(/current Final writeup changed/i)).toBeInTheDocument();
 });
 
 test('T2 start(): network rejection surfaces the raw error message', async () => {
@@ -511,7 +511,7 @@ test('T2 start(): malformed 2xx body is tolerated as {} (no crash, no Edit link)
   const dialog = screen.getByRole('dialog', { name: 'Ready for group review?' });
   fireEvent.click(within(dialog).getByRole('button', { name: 'Ready for group review' }));
   await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
-  expect(screen.queryByRole('link', { name: 'Edit working writeup in Word' })).not.toBeInTheDocument();
+  expect(screen.queryByRole('link', { name: 'Edit final writeup in Word' })).not.toBeInTheDocument();
   expect(screen.queryByRole('alert')).not.toBeInTheDocument();
 });
 
@@ -527,7 +527,7 @@ test('T2 start(): a 202 response polls status until the phase leaves the review 
   const dialog = screen.getByRole('dialog', { name: 'Ready for group review?' });
   fireEvent.click(within(dialog).getByRole('button', { name: 'Ready for group review' }));
   expect(await screen.findByText(/starting group review/i)).toBeInTheDocument();
-  expect(await screen.findByRole('link', { name: 'Edit working writeup in Word' }, { timeout: 5000 })).toBeInTheDocument();
+  expect(await screen.findByRole('link', { name: 'Edit final writeup in Word' }, { timeout: 5000 })).toBeInTheDocument();
   expect(global.fetch).toHaveBeenCalledTimes(5);
 }, 10000);
 
@@ -552,7 +552,7 @@ test('T2 advance(): malformed 2xx body reads as a stale-Final mismatch', async (
   fireEvent.click(await screen.findByRole('button', { name: 'Send to leadership' }));
   const dialog = await screen.findByRole('dialog', { name: 'Send to leadership?' });
   fireEvent.click(within(dialog).getByRole('button', { name: 'Send to leadership' }));
-  expect(await screen.findByRole('alert')).toHaveTextContent(/current Final Writeup changed/i);
+  expect(await screen.findByRole('alert')).toHaveTextContent(/current Final writeup changed/i);
   expect(screen.getByText('Group review')).toBeInTheDocument();
 });
 
@@ -564,7 +564,7 @@ test('T2 markReviewed(): network rejection is isolated to the review-tracking pa
   render(<FinalWriteupTab requestId={REQUEST_ID} />);
   fireEvent.click(await screen.findByRole('button', { name: 'Mark reviewed' }));
   await waitFor(() => expect(screen.getByText('network down')).toBeInTheDocument());
-  expect(screen.getByRole('link', { name: 'Edit working writeup in Word' })).toBeInTheDocument();
+  expect(screen.getByRole('link', { name: 'Edit final writeup in Word' })).toBeInTheDocument();
 });
 
 test('T2 markReviewed(): malformed 2xx body reads as a stale-Final mismatch', async () => {
@@ -574,7 +574,7 @@ test('T2 markReviewed(): malformed 2xx body reads as a stale-Final mismatch', as
     .mockResolvedValueOnce(malformed());
   render(<FinalWriteupTab requestId={REQUEST_ID} />);
   fireEvent.click(await screen.findByRole('button', { name: 'Mark reviewed' }));
-  await waitFor(() => expect(screen.getByText(/current Final Writeup changed/i)).toBeInTheDocument());
+  await waitFor(() => expect(screen.getByText(/current Final writeup changed/i)).toBeInTheDocument());
 });
 
 

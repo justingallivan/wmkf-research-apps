@@ -100,7 +100,7 @@ function BriefingLinkCard({ link, onReissue, busy, error }) {
     <Card hover={false}>
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0">
-          <h3 className="text-base font-semibold text-gray-900">Briefing page link</h3>
+          <h3 className="text-base font-semibold text-gray-900">Proposal review packet link</h3>
           {unreadable ? (
             <p className="mt-1 text-sm text-amber-800">
               The current link can no longer be read on the server, so it cannot be copied or sent again. Issue a new link, then send the materials again.
@@ -221,7 +221,7 @@ function ComposerDialog({ onClose, busy, escapeDisabled = false, children }) {
           <div>
             <h3 id="share-composer-title" className="text-lg font-semibold text-gray-900">Share for the deliberation session</h3>
             <p className="mt-1 text-sm text-gray-600">
-              The email carries the briefing page link; the brief, every completed review, the proposal, and the site visit materials open there without a login.
+              The email carries the proposal review packet link; the brief, every completed review, the proposal, and the site visit materials open there without a login.
             </p>
           </div>
           <Button variant="outline" size="sm"
@@ -935,7 +935,7 @@ export default function PreSiteDistributionPanel({
           onReload={() => { if (editorDirty) setDiscarding('reload'); else readDefaults(); }} />
         {needsLock && (
           <p className="mt-4 text-sm text-gray-600" data-testid="composer-lock-note">
-            Creating the preview locks this exact Word version as the working document and turns off regeneration.
+            Creating the preview locks this exact Word version for sharing and turns off regeneration.
           </p>
         )}
         <Button variant="primary" size="sm"
@@ -995,7 +995,7 @@ export default function PreSiteDistributionPanel({
               <div><dt className="inline font-medium">Snapshot source:</dt> <dd className="inline">Word version {preview.sourceVersionId}; later edits are not included</dd></div>
               <div><dt className="inline font-medium">Pre-discussion:</dt> <dd className="inline">{deliberationSessionLine(preview.session).replace('Deliberation session: ', '')}{preview.session?.meetingLink ? ' · Join link included' : ''}</dd></div>
               <div>
-                <dt className="inline font-medium">Briefing page:</dt>{' '}
+                <dt className="inline font-medium">Proposal review packet:</dt>{' '}
                 <dd className="inline">
                   {preview.briefingLinkId
                     ? `Link included${briefingExpiryLabel(briefingLink?.expiresAt) ? ` — live until ${briefingExpiryLabel(briefingLink?.expiresAt)}` : ''}`
@@ -1058,7 +1058,7 @@ export default function PreSiteDistributionPanel({
                     disabled={preparing || sending || preferenceBusy || authPaused || (actionsPaused && !recovery)}
                     className="mt-0.5"
                   />
-                  I reviewed the recipients, message, and briefing page link shown above.
+                  I reviewed the recipients, message, and proposal review packet link shown above.
                 </label>
                 <Button variant="primary" size="sm"
                   type="button"
@@ -1115,7 +1115,7 @@ export default function PreSiteDistributionPanel({
           <>
             <h3 className="text-base font-semibold text-gray-900">Send deliberation materials</h3>
             <p className="mt-1 text-sm text-gray-600">
-              Create a fixed preview, review the recipients and the briefing page link, then send through Dynamics.
+              Create a fixed preview, review the recipients and the proposal review packet link, then send through Dynamics.
             </p>
             {composerBody}
           </>

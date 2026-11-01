@@ -1255,7 +1255,7 @@ test('beforeHistory renders between the briefing-link card and Email history, an
   }));
   const props = { requestId: REQUEST_ID, requestNumber: '1002379', sourceArtifact: { artifactId: ARTIFACT_ID } };
   const { rerender } = render(<PreSiteDistributionPanel {...props} beforeHistory={<div data-testid="slot">slot</div>} />);
-  const briefing = await screen.findByText('Briefing page link');
+  const briefing = await screen.findByText('Proposal review packet link');
   const history = screen.getByText(/Email history/);
   const slot = screen.getByTestId('slot');
   expect(briefing.compareDocumentPosition(slot) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
