@@ -74,6 +74,8 @@ const ENGAGEMENT_STAMP_RESET_PAYLOAD = {
   wmkf_honorariumeligibility: null,
   wmkf_withdrawnsufficientat: null,
   wmkf_proposalfirstaccessed: null,
+  wmkf_endedby: null,
+  wmkf_endedat: null,
       wmkf_reviewduedateoverride: null,
       wmkf_reviewduedateextensiongrantedat: null,
 };

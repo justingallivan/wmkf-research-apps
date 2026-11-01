@@ -496,6 +496,8 @@ describe('getReviewers', () => {
       wmkf_responsetype: 100000001,
       wmkf_reviewstatus: status,
       wmkf_externaltokenrevoked: true,
+      wmkf_endedby: 100000001,
+      wmkf_endedat: '2026-10-31T23:49:21Z',
     });
     findEndedAfterAcceptanceByRequest.mockResolvedValueOnce([
       ended(IDS[0], 'person-1', TERMINAL_REVIEW_STATUS_VALUES.did_not_submit),
@@ -509,6 +511,8 @@ describe('getReviewers', () => {
     const byId = Object.fromEntries(rows.map((r) => [r.suggestionId, r]));
     expect(byId[IDS[0]]).toMatchObject({ reviewStatus: 'did_not_submit', responseType: 'declined', lifecycleValid: true });
     expect(byId[IDS[2]]).toMatchObject({ reviewStatus: 'withdrew', lifecycleValid: true });
+    expect(byId[IDS[0]]).toMatchObject({ endedBy: 'reviewer_after_accepting', endedAt: '2026-10-31T23:49:21Z' });
+    expect(byId[IDS[1]]).toMatchObject({ endedBy: null, endedAt: null });
     // ReviewerManagePanel's "Release proposal to reviewers (N)" counts reviewStatus === 'accepted'.
     expect(rows.filter((r) => r.reviewStatus === 'accepted').map((r) => r.suggestionId)).toEqual([IDS[1]]);
     // Ended rows never join the synthesis readiness population.

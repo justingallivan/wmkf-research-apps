@@ -144,6 +144,16 @@ export const EVENT_DESCRIPTORS = [
     order: 120,
   },
   {
+    // Wave 35 Ended at: when an ending was recorded. Shown only where no other
+    // dated event already represents the ending (see ENDED_AT_COVERED_BY).
+    key: 'ended',
+    field: 'endedAt',
+    rawField: 'wmkf_endedat',
+    label: 'Engagement end recorded',
+    deliveryProven: true,
+    order: 125,
+  },
+  {
     key: 'completed',
     field: 'completedAt',
     rawField: 'wmkf_completedat',
@@ -201,6 +211,7 @@ const TERMINAL_STATUS_LABELS = Object.freeze({
 const TERMINAL_STATUS_HAS_DATED_EVENT = Object.freeze({
   withdrew: true,
   released: true,
+  did_not_submit: true,
 });
 
 function terminalStatusHasDatedEvent(reviewer) {
@@ -208,7 +219,30 @@ function terminalStatusHasDatedEvent(reviewer) {
   if (reviewer.reviewStatus === 'released') {
     return parseTime(reviewer.withdrawnSufficientAt) !== null;
   }
+  if (reviewer.reviewStatus === 'did_not_submit') {
+    // Dated only once Ended at exists; earlier rows keep the undated header.
+    return parseTime(reviewer.endedAt) !== null;
+  }
   return true;
+}
+
+// Statuses whose ending already has its own dated event, so a Wave 35
+// Ended at stamp would only duplicate it: Withdrew restamps responseReceivedAt
+// ("Withdrawal recorded by staff") and Released stamps withdrawnSufficientAt.
+const ENDED_AT_COVERED_BY = Object.freeze({
+  withdrew: 'responseReceivedAt',
+  released: 'withdrawnSufficientAt',
+});
+
+function endedEventEvidence(reviewer) {
+  if (reviewer?.reviewStatus === 'did_not_submit') {
+    return {
+      label: 'Recorded by staff: review not submitted',
+      deliveryProven: true,
+      detail: 'Recorded by a Program Director because no review arrived.',
+    };
+  }
+  return null;
 }
 
 /**
@@ -342,6 +376,8 @@ export function buildActivityHistory(reviewer) {
   const events = [];
   for (const descriptor of EVENT_DESCRIPTORS) {
     if (descriptor.key === 'review_due_extended' && !reviewer.reviewDueDateOverride) continue;
+    if (descriptor.key === 'ended'
+        && parseTime(reviewer[ENDED_AT_COVERED_BY[reviewer.reviewStatus]]) !== null) continue;
     const raw = reviewer[descriptor.field];
     const timestamp = parseTime(raw);
     if (timestamp === null) continue;
@@ -352,7 +388,8 @@ export function buildActivityHistory(reviewer) {
     const receiptEvidence = descriptor.key === 'review_received'
       ? reviewReceiptEvidence(reviewer)
       : null;
-    const evidence = responseEvidence || receiptEvidence;
+    const endedEvidence = descriptor.key === 'ended' ? endedEventEvidence(reviewer) : null;
+    const evidence = responseEvidence || receiptEvidence || endedEvidence;
     const releaseEvidence = descriptor.key === 'withdrawn_sufficient'
       && reviewer.reviewStatus === 'released'
       ? {
