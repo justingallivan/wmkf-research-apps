@@ -75,20 +75,17 @@ sequence.
   `docs/plans/PERSONAL_EMAIL_DEFAULTS_TODO_2026-09-20.md`.
 
 - **Deliberations display vocabulary — approved 2026-10-21; adoption partial.**
-  PRs #577, #580, #581, #583, #590, #591 and #592 merged bounded Workbench,
-  Meeting Tracker, Board-reader, email, applicant-materials, recording/transcript,
-  and Admin/app-navigation copy slices. PR #592 (`e08006db0`) is the current
-  merged source/Git baseline; no deployment is inferred. Audit findings A1-A3
-  are implemented on `codex/reader-helper-terminology`; that implementation
-  branch is not merged/live. PR #593 is audit-only on
-  `codex/terminology-completion-audit`.
-  A4 and generated-document/saved-name/error copy findings remain scoped in
-  `docs/audits/terminology-completion-audit-2026-11-01.md`; live saved values,
-  published prompts, and deployment state remain unknown. Preserve identifiers,
-  routes, schemas, existing user content, and historical files; no data or
-  prompt migration/backfill is authorized. Approved table and dated history:
-  `docs/plans/review/PROPOSAL_WORKFLOW_VOCABULARY_2026-10-19.md`; glossary:
-  `docs/NOMENCLATURE_GLOSSARY.md`.
+  PRs #577, #580, #581, #583, #590, #591 and #592 merged bounded display-copy
+  slices. PR #593 merged the terminology audit as `d73cdc96e`; PR #594 merged
+  A1-A3 reader/helper copy as `21c937783` (source/Git only; no deployment
+  inferred). The B1 dossier-document wording update is in progress on
+  `codex/scientific-dossier-document-wording`; check current Git/PR and release
+  receipts before updating its status. A4, B2, and C1-C2 remain open. Evidence,
+  limits, and preservation boundaries: `docs/audits/terminology-completion-audit-2026-11-01.md`.
+  Live saved values, prompts, files, and deployment state remain unknown. No data
+  migration, prompt publication, or backfill is authorized. Approved table and
+  dated history: `docs/plans/review/PROPOSAL_WORKFLOW_VOCABULARY_2026-10-19.md`;
+  glossary: `docs/NOMENCLATURE_GLOSSARY.md`.
 
 - **Staff Deliberations: group-review handoff from the writeup step
   (2026-10-06).** [STAGE 1 LIVE — PR #452, merge `40b70a145`, Production 2026-10-06]

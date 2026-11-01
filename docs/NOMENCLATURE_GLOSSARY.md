@@ -126,20 +126,17 @@ migrations.
 ### Current implementation boundary — 2026-11-01
 
 Runtime adoption is partial. PRs #577, #580, #581, #583, #590, #591 and #592
-merged the bounded Workbench, Meeting Tracker, Board-reader, email,
-applicant-materials, recording/transcript, and Admin/app-navigation display-copy
-slices. The current source/Git baseline is PR #592, merge `e08006db0`; this is
-not a deployment receipt. A1–A3 are implemented on
-`codex/reader-helper-terminology`, which is not merged or live;
-PR #593 is the separate audit-only PR on `codex/terminology-completion-audit`.
-A4 and generated-document/saved-name/error-message findings remain separately identified in the
-[2026-11-01 terminology completion audit](audits/terminology-completion-audit-2026-11-01.md).
-That audit is source/caller evidence only; live prompt/settings/file inventories
-remain unknown. Keep the approved names while preserving routes, API/service and
-prompt identifiers, schema/storage values, artifact types, deep links, saved
-settings, existing user-authored content, and historical files. No identifier,
-data, prompt-publication, or backfill migration is authorized by these copy
-slices.
+merged their bounded display-copy slices; PR #594 (`21c937783`) merged A1–A3
+reader/helper copy to source/Git. These are not deployment receipts. B1 generated
+dossier wording is being updated on `codex/scientific-dossier-document-wording`;
+check current Git/PR and release receipts before reporting its later status. A4,
+B2, and C1–C2 remain open. The
+[2026-11-01 terminology completion audit](audits/terminology-completion-audit-2026-11-01.md)
+records the exact scope and unknown live saved settings, prompts, files, and
+deployment state. Preserve approved names while keeping routes, API/service and
+prompt identifiers, schemas/storage values, artifact types, saved settings, user
+content, and historical files intact. No data, prompt-publication, or backfill
+migration is authorized.
 
 ### Historical source inventory — October 6–7, 2026
 

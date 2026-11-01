@@ -264,9 +264,12 @@ async function publishFixture({observedDocx,observedPdf}={}){
   return {GraphService,frozen};
 }
 test('publish accepts a JSONB-reordered destination through its stored hash',async()=>{
-  const {GraphService}=await publishFixture();
+  const {GraphService,frozen}=await publishFixture();
   await drainCycleDossiers();
   expect(GraphService.uploadFile).toHaveBeenCalledTimes(2);
+  expect(GraphService.uploadFile.mock.calls.map(call=>call[3])).toEqual([frozen.docx,frozen.pdf]);
+  expect(renderDossierDocuments).toHaveBeenCalledTimes(1);
+  expect(renderDossierDocuments).toHaveBeenCalledWith(expect.objectContaining({title:'D26 Scientific Dossier'}),{includeIndividual:false});
   expect(run.data.items[0].sharepoint.docx).toBeTruthy();
   expect(run.data.items[0].sharepoint.pdf).toBeTruthy();
 });
@@ -318,4 +321,18 @@ test('publish refuses a DOCX whose non-customXml relationships changed and names
   expect(run.data.items[0].error).toMatch(/differs from the frozen entry/i);
   expect(warn.mock.calls.map(c=>c.join(' ')).join('\n')).toMatch(/word\/_rels\/document\.xml\.rels/);
   warn.mockRestore();
+});
+
+
+test('a fresh render uses the approved entry title without changing publication names or paths',async()=>{
+  const {GraphService,frozen}=await publishFixture();
+  delete run.data.items[0].files;
+  renderDossierDocuments.mockResolvedValue({combined:frozen});
+  storage.storeDossierFile.mockImplementation(async(path,bytes)=>({pathname:path,sha256:storage.dossierDigest(bytes),size:bytes.length}));
+  await drainCycleDossiers();
+  expect(renderDossierDocuments.mock.calls[0][0].title).toBe('a — Scientific dossier');
+  expect(generateResearch).not.toHaveBeenCalled();expect(generateEntry).not.toHaveBeenCalled();
+  expect(GraphService.uploadFile.mock.calls.map(call=>call[2])).toEqual(['a-Scientific-Briefing-v1.docx','a-Scientific-Briefing-v1.pdf']);
+  expect(storage.storeDossierFile.mock.calls[0][0]).toMatch(/^cycle-dossier\/entries\/rev-a\//);
+  expect(run.data.items[0].status).toBe('ready');
 });
