@@ -1072,8 +1072,8 @@ const SUMMARY_KIND_UI = Object.freeze({
     query: '?kind=discussion', postBody: Object.freeze({ kind: 'discussion' }), transcriptKey: 'staffDiscussionTranscript',
     publishedKey: 'staffDiscussionSummary', acknowledgmentVersion: PAIRED_SUMMARY_ACKNOWLEDGMENT.version,
     busy: Object.freeze({ save: 'discussion-summary-save', discard: 'discussion-summary-discard', publish: 'discussion-summary-publish' }),
-    loadFailure: 'The staff discussion summary could not be loaded.',
-    readyNotice: () => 'Draft ready, made from the staff discussion transcript. Review it before publishing.',
+    loadFailure: 'The post-presentation discussion summary could not be loaded.',
+    readyNotice: () => 'Draft ready, made from the post-presentation discussion transcript. Review it before publishing.',
     publishedNotice: 'Summary published. Staff only; never included on the Board page.',
   }),
 });
@@ -1506,7 +1506,7 @@ function useTranscription(requestId, { onMaterialsChanged, summaryRefresh = REFR
     return () => { cancelled = true; };
   }, [loadCollection, requestId]);
 
-  // Site Visit C1: after a correction publish the server generates the presentation and staff discussion transcripts
+  // Site Visit C1: after a correction publish the server generates the presentation and post-presentation discussion transcripts
   // (`updating` on the current artifact). Re-read the status until it clears, for a bounded time; past the bound the
   // card gives up on "Updating…" and shows the ordinary Out of date + Regenerate.
   const serverUpdating = Boolean(collection?.currentArtifact?.presentationTranscript?.updating
@@ -1766,8 +1766,8 @@ function useTranscription(requestId, { onMaterialsChanged, summaryRefresh = REFR
       if (result.currentArtifact) setCollection((state) => (state ? { ...state, currentArtifact: result.currentArtifact } : state));
       announcePublication(result.publication || { state: 'unknown' }, false);
       if (result.publication?.state === 'published') setNotice(result.regenerationQueued === true
-        ? 'Transcript updated. The presentation and staff discussion transcripts are updating automatically. Summarize again when they finish to restore the summary.'
-        : 'Transcript updated. Generate the presentation and staff discussion transcripts, then summarize again to restore Board derivatives.');
+        ? 'Transcript updated. The presentation and post-presentation discussion transcripts are updating automatically. Summarize again when they finish to restore the summary.'
+        : 'Transcript updated. Generate the presentation and post-presentation discussion transcripts, then summarize again to restore Board derivatives.');
       setCorrectionDetail(null);
       await loadCollection();
       await onMaterialsChangedRef.current?.();
@@ -1800,7 +1800,7 @@ function useTranscription(requestId, { onMaterialsChanged, summaryRefresh = REFR
       });
       if (!isCurrent(generation)) return;
       if (result?.currentArtifact) setCollection((state) => (state ? { ...state, currentArtifact: result.currentArtifact } : state));
-      setNotice('Presentation and staff discussion transcripts generated.');
+      setNotice('Presentation and post-presentation discussion transcripts generated.');
       setConflict(false);
       await loadCollection();
       await onMaterialsChangedRef.current?.();
@@ -2534,8 +2534,8 @@ function PresentationEndEditor({ t, readOnly, editionManaged = false }) {
   const disabled = Boolean(busy) || readOnly;
   return (
     <div className="mt-5" data-testid="presentation-end-editor">
-      <h4 className="text-sm font-semibold text-gray-950">Presentation end</h4>
-      <p className="mt-1 text-xs text-gray-600">The Board link shows the transcript only up to this point. Choose the last turn of the presentation.</p>
+      <h4 className="text-sm font-semibold text-gray-950">Presentation end in recording</h4>
+      <p className="mt-1 text-xs text-gray-600">Choose the last turn of the presentation in the recording. This is a recording position, not the scheduled event end. The Board link shows the transcript only up to this point.</p>
       {proposed && Number.isSafeInteger(proposed.endMs) && proposed.endMs !== selected && (
         <div className="mt-2 flex flex-wrap items-center gap-2 text-sm text-gray-900">
           <span>Proposed: {formatTranscriptTurnTime(proposed.endMs)} — last turn by {proposedName}</span>
@@ -2551,9 +2551,9 @@ function PresentationEndEditor({ t, readOnly, editionManaged = false }) {
         </div>
       ))}
       <label className="mt-2 block text-xs font-medium text-gray-700">
-        Presentation ends after
+        Last presentation turn in recording
         <select
-          aria-label="Presentation ends after"
+          aria-label="Last presentation turn in recording"
           value={selected === null ? '' : String(selected)}
           disabled={disabled}
           onChange={(event) => setPresentationEndMs(event.target.value === '' ? null : Number(event.target.value))}
@@ -2570,8 +2570,8 @@ function PresentationEndEditor({ t, readOnly, editionManaged = false }) {
       </label>
       {chosen && (
         <div className="mt-2 space-y-2 text-xs leading-5 text-gray-700">
-          <p className="break-words"><span className="font-semibold text-gray-900">Presentation ends after:</span> {clip(chosen.text, 240)}</p>
-          {next && <p className="break-words"><span className="font-semibold text-gray-900">Staff discussion begins:</span> {clip(next.text, 240)}</p>}
+          <p className="break-words"><span className="font-semibold text-gray-900">Last presentation turn in recording:</span> {clip(chosen.text, 240)}</p>
+          {next && <p className="break-words"><span className="font-semibold text-gray-900">Post-presentation discussion begins:</span> {clip(next.text, 240)}</p>}
         </div>
       )}
       {selected === null && <p className="mt-2 text-xs text-gray-600">Not confirmed. The Board link shows no transcript.</p>}
@@ -2676,7 +2676,7 @@ function ReviewBlock({ t, editionManaged = false }) {
           <Button size="sm" variant="outline" type="button" onClick={t.saveNames} disabled={!dirty || Boolean(busy) || matchingActive}>{busy === 'speakers' ? (correction ? 'Saving…' : 'Saving names…') : (correction ? 'Save changes' : 'Save names')}</Button>
           {!(editionManaged && correction) && <Button size="sm" variant="primary" type="button" onClick={correction ? t.publishCorrection : t.publishJob} disabled={Boolean(publishBlockedReason) || Boolean(busy)}>{busy === 'publish' ? 'Publishing…' : 'Publish transcript'}</Button>}
         </div>
-        {correction && <div className="mt-2"><Notice tone="warning">{editionManaged ? 'Save and prepare materials below keeps the approved Board presentation available. Review and approve the replacement separately to update what the Board sees.' : 'Publishing this correction, including a names-only change, withholds the Board presentation transcript and summary while the presentation and staff discussion transcripts update automatically, which takes a few minutes. The summary stays out of date until you summarize again.'}</Notice></div>}
+        {correction && <div className="mt-2"><Notice tone="warning">{editionManaged ? 'Save and prepare materials below keeps the approved Board presentation available. Review and approve the replacement separately to update what the Board sees.' : 'Publishing this correction, including a names-only change, withholds the Board presentation transcript and summary while the presentation and post-presentation discussion transcripts update automatically, which takes a few minutes. The summary stays out of date until you summarize again.'}</Notice></div>}
         {publishBlockedReason && <p className="mt-2 text-xs leading-5 text-gray-600">{publishBlockedReason}</p>}
       </>}
       {conflict && <p className="mt-3 text-sm text-amber-950" role="alert">Another session changed this. Refresh to load the latest version; your edits stay in the fields.</p>}
@@ -2816,7 +2816,7 @@ const SUMMARY_BLOCK_COPY = Object.freeze({
   }),
   // Staff only: no Board eligibility copy (plan D9).
   discussion: Object.freeze({
-    title: 'Staff discussion summary', testId: 'discussion-summary-block', draftLabel: 'Discussion draft',
+    title: 'Post-presentation discussion summary', testId: 'discussion-summary-block', draftLabel: 'Discussion draft',
     materialType: REQUEST_DOCUMENT_ARTIFACT_TYPE.STAFF_DISCUSSION_SUMMARY, none: 'No discussion summary published yet.',
     published: (at) => `Published ${at}. Staff only.`,
     stale: 'The published discussion summary is from an earlier transcript version. It remains available to staff. Summarize again to replace it.',
@@ -2827,7 +2827,7 @@ const SUMMARY_BLOCK_COPY = Object.freeze({
 // One final command for the requested summary kinds. Provider acknowledgement was intentionally retired.
 function summarizeLabel(kinds) {
   return kinds.length === 2 ? 'Summarize presentation and discussion'
-    : kinds[0] === 'discussion' ? 'Summarize staff discussion' : 'Summarize presentation';
+    : kinds[0] === 'discussion' ? 'Summarize post-presentation discussion' : 'Summarize presentation';
 }
 // What a Summarize confirmation was opened for: the transcript, each target kind's load state, draft identity and
 // conflict. If any of it changes while the confirmation is open, the confirmation closes (Codex review, commit 1),
@@ -3203,7 +3203,7 @@ function Step({ number, title, state, action, summary = null, menuItems = [], te
   );
 }
 
-// A presentation or staff discussion transcript cut from the published transcript at the confirmed end.
+// A presentation or post-presentation discussion transcript cut from the published transcript at the confirmed end.
 const DERIVATIVE_STATUS = Object.freeze({
   bound: { tone: 'green', label: 'Ready' },
   stale: { tone: 'amber', label: 'Out of date' },
@@ -3499,7 +3499,7 @@ function TranscriptWorkflow({ m, t, z, requestId, transcriptInputRef, refreshTok
     : ['missing', 'stale'].includes(discussionState) ? 'discussion' : null;
   const generateButton = <Button size="sm" variant="outline" type="button" onClick={t.generatePresentationTranscript} disabled={Boolean(t.busy)}>{t.busy === 'presentation-transcript' ? 'Generating…' : 'Generate transcripts'}</Button>;
   const presentationEndText = presentationEnd
-    ? `Presentation ends at ${formatTranscriptTurnTime(presentationEnd.endMs)}${presentationEnd.confirmedAt ? ` · confirmed ${fmtDateTime(presentationEnd.confirmedAt)}` : ''}`
+    ? `Presentation ends in recording at ${formatTranscriptTurnTime(presentationEnd.endMs)}${presentationEnd.confirmedAt ? ` · confirmed ${fmtDateTime(presentationEnd.confirmedAt)}` : ''}`
     : null;
   const presentationMaterial = byType(REQUEST_DOCUMENT_ARTIFACT_TYPE.PRESENTATION_TRANSCRIPT);
   const discussionMaterial = byType(REQUEST_DOCUMENT_ARTIFACT_TYPE.STAFF_DISCUSSION_TRANSCRIPT);
@@ -3610,7 +3610,7 @@ function TranscriptWorkflow({ m, t, z, requestId, transcriptInputRef, refreshTok
         </>}
       </Step>
 
-      <Step number={2} title="Check speaker names and where the presentation ends" state={step2State} testId="step-review"
+      <Step number={2} title="Check speaker names and the presentation end in the recording" state={step2State} testId="step-review"
         summary={step2Collapsed && <p data-testid="presentation-end-line">{presentationEndText}</p>}
         menuItems={step2Collapsed ? [
           { key: 'names', label: `${t.savedDraft ? 'Continue editing names' : 'Edit speaker names'}${pendingSuffix}`, disabled: editBlocked, onSelect: t.beginEditNames },
@@ -3625,7 +3625,7 @@ function TranscriptWorkflow({ m, t, z, requestId, transcriptInputRef, refreshTok
             {newerPending && <p className="mt-1 text-xs text-gray-600">These edit the published transcript. Wait for the newer transcript before editing.</p>}
             <div className="mt-3" data-testid="presentation-end-line">
               {!presentationEnd ? <>
-                <p className="text-sm leading-6 text-gray-900">Presentation end not confirmed. The Board link shows no transcript until a program coordinator confirms where the presentation ends.</p>
+                <p className="text-sm leading-6 text-gray-900">Presentation end in recording not confirmed. The Board link shows no transcript until a program coordinator confirms the last presentation turn.</p>
                 {!t.savedDraft && <Button size="sm" variant="outline" type="button" onClick={t.beginEditNames} disabled={editBlocked} className="mt-2">{t.busy === 'create-draft' ? 'Opening…' : 'Set presentation end'}</Button>}
               </> : <>
                 <p className="text-sm leading-6 text-gray-900">{presentationEndText}</p>
@@ -3635,7 +3635,7 @@ function TranscriptWorkflow({ m, t, z, requestId, transcriptInputRef, refreshTok
           </>
             : !reviewOpen && <p className="mt-2 text-sm text-gray-700">
               {!material ? 'Waiting for a transcript from step 1.'
-                : line.kind === 'uploaded' ? 'An uploaded transcript file cannot be checked or split here. To name speakers and separate the presentation from the staff discussion, transcribe the meeting audio in step 1.'
+                : line.kind === 'uploaded' ? 'An uploaded transcript file cannot be checked or split here. To name speakers and separate the presentation from the post-presentation discussion, transcribe the meeting audio in step 1.'
                   : 'Waiting for transcript status.'}
             </p>}
       </Step>
@@ -3665,12 +3665,12 @@ function TranscriptWorkflow({ m, t, z, requestId, transcriptInputRef, refreshTok
     </section>
 
     <section className={shell} data-testid="card-staff-discussion" aria-labelledby="staff-discussion-card-title">
-      <h2 id="staff-discussion-card-title" className="text-lg font-semibold text-gray-950">Staff discussion</h2>
-      {resultsWaiting && <p className="mt-2 text-sm text-gray-700">The staff discussion transcript and summary appear here once the presentation end is checked.</p>}
+      <h2 id="staff-discussion-card-title" className="text-lg font-semibold text-gray-950">Post-presentation discussion</h2>
+      {resultsWaiting && <p className="mt-2 text-sm text-gray-700">The post-presentation discussion transcript and summary appear here once the presentation end is checked.</p>}
       {showProducts && (
         <ul className="mt-3 divide-y divide-gray-100 border-t border-gray-200">
           <SummaryBlock t={t} s={t.discussionSummary} kind="discussion" materials={materials} request={summarizeRequest} setRequest={setSummarizeRequest} requestId={requestId} />
-          <DerivativeRow state={discussionState} label="Staff discussion transcript" material={discussionMaterial} requestId={requestId} testId="discussion-transcript-row" updating={t.transcriptUpdating}
+          <DerivativeRow state={discussionState} label="Post-presentation discussion transcript" material={discussionMaterial} requestId={requestId} testId="discussion-transcript-row" updating={t.transcriptUpdating}
             action={generateAnchor === 'discussion' ? generateButton : null} needsEnd={editable && !presentationEnd} />
         </ul>
       )}
@@ -3830,7 +3830,7 @@ function BoardPageHeading({ m }) {
           ]} />}
         </div>
       </div>
-      <p className="mt-1 text-xs text-gray-600">The Board page shows applicant materials and eligible presentation items. Reviewed presentation approval controls which version is available; the full recording and staff discussion are never included. Making or copying the link sends no email.</p>
+      <p className="mt-1 text-xs text-gray-600">The Board page shows applicant materials and eligible presentation items. Reviewed presentation approval controls which version is available; the full recording and post-presentation discussion are never included. Making or copying the link sends no email.</p>
       {link && !link.url && <p className="mt-2 text-sm text-amber-800">The current link cannot be read. Issue a new link to replace it.</p>}
       {manualCopy && link?.url && <input aria-label="Presentation link for manual copy" readOnly value={link.url} onFocus={(event) => event.currentTarget.select()} className="mt-2 w-full rounded border border-gray-300 p-2 font-mono text-xs" />}
       {confirmReissue && (
@@ -3899,7 +3899,7 @@ function RecordingAndTranscriptCardForRequest({ requestId, onStatusChange, activ
   useEffect(() => {
     if (cardUnavailable) onStatusChange?.({ available: false, hasTranscript: false, board: [] });
   }, [onStatusChange, cardUnavailable]);
-  if (m.unavailable) return <section id="recording-and-transcript-card" className={shell} data-testid="recording-and-transcript-card">{heading}<p className="mt-2 text-sm text-gray-700">Recording and transcript are not available for this request.</p></section>;
+  if (m.unavailable) return <section id="recording-and-transcript-card" className={shell} data-testid="recording-and-transcript-card">{heading}<p className="mt-2 text-sm text-gray-700">Recording and transcripts are not available for this request.</p></section>;
   // One Refresh on the Recording setup card covers all four cards (they share one data set).
   const setupHeader = (
     <div className="flex flex-wrap items-center justify-between gap-2">

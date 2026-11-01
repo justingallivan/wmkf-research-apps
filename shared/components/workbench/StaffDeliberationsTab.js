@@ -54,8 +54,8 @@ function presentationEndLabel(timing) {
   const when = formatWhen(timing?.endIso, timing?.timeZone);
   if (!when) return 'Presentation not yet scheduled.';
   return timing?.availability === 'available'
-    ? `Presentation ends ${when}`
-    : `Recorded presentation end (unverified): ${when}`;
+    ? `Scheduled research presentation ends ${when}`
+    : `Scheduled research presentation end (unverified): ${when}`;
 }
 
 function sessionLine(session) {

@@ -402,7 +402,7 @@ export default function SiteVisitEditor() {
         { id: 'setup', label: 'Meeting setup', group: 'Before the meeting' },
         ...(invitationAvailable ? [{ id: 'invitations', label: 'Invitations', group: 'Before the meeting' }] : []),
         { id: 'materials', label: 'Materials collection', group: 'Before the meeting' },
-        { id: 'recordings', label: 'Transcript preparation', group: 'After the meeting' },
+        { id: 'recordings', label: 'Recording and transcripts', group: 'After the meeting' },
       ]} />}
       <div className={`min-w-0 ${!loading && visit ? 'lg:col-start-2 lg:row-start-1' : ''}`} role="tabpanel" id={`${taskPrefix}-panel-setup`} aria-labelledby={visit ? `${taskPrefix}-task-setup` : undefined} hidden={task !== 'setup'}>
         <div className="mb-6"><h2 className="text-xl font-semibold text-gray-900">Meeting setup</h2><p className="mt-2 text-sm text-gray-600">Confirm the time, location and attendees before preparing invitations.</p></div>
@@ -502,7 +502,7 @@ export default function SiteVisitEditor() {
           <SiteVisitMaterialsCard key={requestId} requestId={requestId} requestNumber={requestNumber} onStatusChange={reportMaterials} />
         </div>
         <div className={`min-w-0 ${!loading && visit ? 'lg:col-start-2 lg:row-start-1' : ''}`} ref={recordingTaskRef} role="tabpanel" id={`${taskPrefix}-panel-recordings`} aria-labelledby={`${taskPrefix}-task-recordings`} hidden={task !== 'recordings'}>
-        <div className="mb-6"><h2 className="text-xl font-semibold text-gray-900">Transcript preparation</h2><p className="mt-2 text-sm text-gray-600">Prepare the recording, check speakers and the presentation end, then review the outputs.</p></div>
+        <div className="mb-6"><h2 className="text-xl font-semibold text-gray-900">Recording and transcripts</h2><p className="mt-2 text-sm text-gray-600">Prepare the recording, check speakers and where the presentation ends in the recording, then review the outputs.</p></div>
           <RecordingAndTranscriptCard requestId={requestId} active={task === 'recordings'} onStatusChange={reportRecording} />
         </div>
       </>}

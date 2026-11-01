@@ -6,9 +6,9 @@ jest.mock('../../shared/components/Layout', () => ({ Card: ({ children }) => <di
 
 test('renders loading, unavailable, loaded-empty, Zoom, SharePoint transcript, and summary states truthfully', () => {
   const view = render(<ResearchPresentationFollowUp status="loading" />);
-  expect(screen.getByText('Loading presentation materials…')).toBeInTheDocument();
+  expect(screen.getByText('Loading recording and transcripts…')).toBeInTheDocument();
   view.rerender(<ResearchPresentationFollowUp status="unavailable" />);
-  expect(screen.getByRole('alert')).toHaveTextContent('Presentation materials could not be loaded.');
+  expect(screen.getByRole('alert')).toHaveTextContent('Recording and transcripts could not be loaded.');
   view.rerender(<ResearchPresentationFollowUp status="loaded" materials={[]} />);
   expect(screen.getByText(/appear here after the Meeting Tracker publishes them/)).toBeInTheDocument();
   expect(screen.queryByText('Not added yet')).not.toBeInTheDocument();
@@ -23,7 +23,7 @@ test('renders loading, unavailable, loaded-empty, Zoom, SharePoint transcript, a
   expect(screen.getByRole('link', { name: 'Watch full recording' })).toHaveAttribute('href', 'https://zoom.us/rec/share/x?pwd=y');
   expect(screen.getByRole('link', { name: 'Open full transcript' })).toHaveAttribute('href', 'https://tenant.sharepoint.com/transcript.pdf');
   expect(screen.getByRole('link', { name: 'Open presentation transcript' })).toHaveAttribute('href', 'https://tenant.sharepoint.com/presentation.txt');
-  expect(screen.getByRole('link', { name: 'Open staff discussion transcript' })).toHaveAttribute('href', 'https://tenant.sharepoint.com/discussion.txt');
+  expect(screen.getByRole('link', { name: 'Open post-presentation discussion transcript' })).toHaveAttribute('href', 'https://tenant.sharepoint.com/discussion.txt');
   expect(screen.getByRole('link', { name: 'Open presentation summary' })).toHaveAttribute('href', 'https://tenant.sharepoint.com/summary.docx');
   // Internal file names are not shown.
   expect(screen.queryByText('transcript.pdf')).not.toBeInTheDocument();
@@ -122,14 +122,14 @@ test('a long opening section followed by more headings stays a bounded preview (
   expect(block.textContent.length).toBeLessThan(900);
 });
 
-describe('inline staff discussion summary (paired summaries plan D8, owner decision 5)', () => {
+describe('inline post-presentation discussion summary (paired summaries plan D8, owner decision 5)', () => {
   const discussionRow = { artifactType: 100000010, filename: 'discussion.txt', backing: 'file', webUrl: 'https://tenant.sharepoint.com/discussion.txt' };
   const TEXT = 'Main points raised\nThe budget looks high.\n\nQuestions and concerns\nWho owns the follow-up?\n\nFollow-ups and decisions\nNone noted.';
 
   test('shows a staff-only note, the first section and Read more, without a redundant link', () => {
     render(<ResearchPresentationFollowUp status="loaded" materials={[discussionRow]}
       discussionSummary={{ text: TEXT, stale: false, publishedAt: '2026-10-06T15:00:00Z' }} />);
-    expect(screen.queryByRole('link', { name: /Open staff discussion summary/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: /Open post-presentation discussion summary/ })).not.toBeInTheDocument();
     expect(screen.getByText('Staff only. Never included on the Board page.')).toBeInTheDocument();
     const block = screen.getByTestId('discussion-summary-text');
     expect(block).toHaveTextContent('The budget looks high.');
@@ -154,7 +154,7 @@ describe('inline staff discussion summary (paired summaries plan D8, owner decis
   test('the link stays when the discussion summary text could not be read', () => {
     render(<ResearchPresentationFollowUp status="loaded" materials={[discussionRow]}
       discussionSummary={{ text: null, stale: false, publishedAt: '2026-10-06T15:00:00Z' }} />);
-    expect(screen.getByRole('link', { name: /Open staff discussion summary/ })).toHaveAttribute('href', discussionRow.webUrl);
+    expect(screen.getByRole('link', { name: /Open post-presentation discussion summary/ })).toHaveAttribute('href', discussionRow.webUrl);
   });
 
   test('no inline discussion block without its summary row', () => {

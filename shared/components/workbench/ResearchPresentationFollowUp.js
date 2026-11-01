@@ -13,9 +13,9 @@ const SLOTS = [
   { type: REQUEST_DOCUMENT_ARTIFACT_TYPE.RECORDING, label: 'Full recording', action: 'Watch full recording' },
   { type: REQUEST_DOCUMENT_ARTIFACT_TYPE.TRANSCRIPT, label: 'Full transcript', action: 'Open full transcript' },
   { type: REQUEST_DOCUMENT_ARTIFACT_TYPE.PRESENTATION_TRANSCRIPT, label: 'Presentation transcript', action: 'Open presentation transcript' },
-  { type: REQUEST_DOCUMENT_ARTIFACT_TYPE.STAFF_DISCUSSION_TRANSCRIPT, label: 'Staff discussion transcript', action: 'Open staff discussion transcript' },
+  { type: REQUEST_DOCUMENT_ARTIFACT_TYPE.STAFF_DISCUSSION_TRANSCRIPT, label: 'Post-presentation discussion transcript', action: 'Open post-presentation discussion transcript' },
   { type: REQUEST_DOCUMENT_ARTIFACT_TYPE.TRANSCRIPT_SUMMARY, label: 'Presentation summary', action: 'Open presentation summary' },
-  { type: REQUEST_DOCUMENT_ARTIFACT_TYPE.STAFF_DISCUSSION_SUMMARY, label: 'Staff discussion summary', action: 'Open staff discussion summary' },
+  { type: REQUEST_DOCUMENT_ARTIFACT_TYPE.STAFF_DISCUSSION_SUMMARY, label: 'Post-presentation discussion summary', action: 'Open post-presentation discussion summary' },
 ];
 
 // Each summary's sections are fixed by its prompt; until "Read more" the first one is shown,
@@ -96,16 +96,16 @@ export default function ResearchPresentationFollowUp({ requestId = null, videoPl
   ]);
   const linked = present.filter((slot) => !shownBelow.has(slot.type));
   // The approved presentation cut plays here (the server re-checks it against the approved cut);
-  // the full recording stays a link because it includes the staff discussion.
+  // the full recording stays a link because it includes the post-presentation discussion.
   const video = byType.get(REQUEST_DOCUMENT_ARTIFACT_TYPE.PRESENTATION_VIDEO);
   const showVideo = Boolean(requestId && videoPlayable && video && video.backing === 'file');
   const videoSrc = (attempt) => `/api/workbench/site-visit/presentation-video?${new URLSearchParams({ requestId, attempt: String(attempt) })}`;
   return (
     <div className="mt-3" data-testid="research-presentation-follow-up">
       <h4 className="text-sm font-semibold text-gray-900">Recording and transcripts</h4>
-      {status === 'loading' && <p className="mt-1 text-sm text-gray-600">Loading presentation materials…</p>}
+      {status === 'loading' && <p className="mt-1 text-sm text-gray-600">Loading recording and transcripts…</p>}
       {status === 'unavailable' && (
-        <p className="mt-1 text-sm text-red-800" role="alert">Presentation materials could not be loaded.</p>
+        <p className="mt-1 text-sm text-red-800" role="alert">Recording and transcripts could not be loaded.</p>
       )}
       {status === 'loaded' && present.length === 0 && (
         <p className="mt-1 text-sm text-gray-600">The recording and transcripts appear here after the Meeting Tracker publishes them.</p>
@@ -140,7 +140,7 @@ export default function ResearchPresentationFollowUp({ requestId = null, videoPl
       )}
       {status === 'loaded' && discussionSlot && discussionSummary && (
         <div className="mt-6 max-w-3xl">
-          <h4 className="text-sm font-semibold text-gray-900">Staff discussion summary</h4>
+          <h4 className="text-sm font-semibold text-gray-900">Post-presentation discussion summary</h4>
           <p className="text-xs text-gray-500">Staff only. Never included on the Board page.</p>
           <SummaryBlock summary={discussionSummary} format={DISCUSSION_SUMMARY}
             testId="discussion-summary-text" staleNote="from an earlier transcript version" />
