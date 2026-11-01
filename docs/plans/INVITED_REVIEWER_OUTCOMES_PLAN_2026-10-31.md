@@ -372,7 +372,10 @@ history dates staff-recorded outcomes. Schema file
 preflight checks both fields and the applier treats the existing Ended by as
 `exists`. Rollout repeats steps 1–2 above (preflight, dry run, `--execute`,
 preflight). Writers and history start using it in 3b, after it exists in
-Production. Rows ended before then stay undated.
+Production. Rows ended before then stay undated. **Provisioned in Production
+2026-10-31 (owner-run):** dry run showed Ended by `exists`, `--execute` created
+`wmkf_EndedAt` (~17s), preflight both `EXACT` / `READABLE` on the first
+re-check. Not in the sandbox.
 
 Both schema changes are additive and no runtime code reads or writes them
 until slice 3. Each step below is owner-run or explicitly owner-approved;
