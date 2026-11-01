@@ -5,7 +5,7 @@
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import InviteEmailModal, {
   applySubjectTiming,
-  validateInvitationTimeline,
+  applyTiming,
   invitationTimelineWarning,
 } from '../../shared/components/reviewers/InviteEmailModal';
 import { readSseStream } from '../../shared/components/reviewers/sse';
@@ -69,55 +69,23 @@ afterEach(() => {
 describe('InviteEmailModal invitation timing contract', () => {
   const today = new Date(2026, 6, 24);
 
-  test('uses the current campaign fields and accepts a chronological timeline', () => {
-    expect(validateInvitationTimeline({
-      respondOffsetDays: 7,
-      proposalSendDate: '2026-08-18',
-      reviewDueDate: '2026-09-15',
-    }, today)).toBeNull();
-  });
-
-  test('allows a late invitation whose response deadline falls after proposal release', () => {
-    // today + 7 = 2026-07-31, which is AFTER the already-fixed 07-30 release
-    // date. This is the late-cycle invite that used to disable Send with no
-    // visible reason (S422 owner decision: release needs a PD action and the
-    // date is email-only copy, so the ordering is odd but permitted).
-    expect(validateInvitationTimeline({
-      respondOffsetDays: 7,
-      proposalSendDate: '2026-07-30',
-      reviewDueDate: '2026-09-15',
-    }, today)).toBeNull();
-  });
-
-  test('still rejects a review due date on or before the proposal release date', () => {
-    expect(validateInvitationTimeline({
-      respondOffsetDays: 7,
-      proposalSendDate: '2026-08-18',
-      reviewDueDate: '2026-08-18',
-    }, today)).toMatch(/due date must be after the proposal release date/i);
-  });
-
-  test('does NOT block when reviews fall due on or before the response deadline', () => {
-    // respondBy is 07-31 and reviews are due 07-30. Untidy, not impossible —
-    // late acceptances are handled with an extension — and the condition
-    // arrives on its own as respondBy drifts, so it must never disable Send.
-    // Making this a blocking rule again fails here.
-    expect(validateInvitationTimeline({
-      respondOffsetDays: 7,
-      proposalSendDate: '2026-07-28',
-      reviewDueDate: '2026-07-30',
-    }, today)).toBeNull();
-    expect(validateInvitationTimeline({
-      respondOffsetDays: 7,
-      proposalSendDate: '',
-      reviewDueDate: '2026-07-30',
-    }, today)).toBeNull();
+  test('drops a legacy proposal-release line instead of sending the retired token', () => {
+    // Live and per-PD wording may still carry {{proposalDelivery}} until it is
+    // rebaselined; send-emails refuses any unfilled {{field}}, so the line goes.
+    const body = [
+      '1. You respond — by {{respondBy}}',
+      '2. We send the full proposal — around {{proposalDelivery}}',
+      '3. Your completed review is due — by {{reviewDue}}',
+    ].join('\n');
+    const out = applyTiming(body, { respondOffsetDays: 7, reviewDueDate: '2026-09-15' });
+    expect(out).not.toMatch(/proposalDelivery|full proposal/);
+    expect(out).toMatch(/^1\. You respond — by \S/);
+    expect(out).toMatch(/3\. Your completed review is due — by \S/);
   });
 
   test('warns, without blocking, when reviews fall due on or before the response deadline', () => {
     const warning = invitationTimelineWarning({
       respondOffsetDays: 7,
-      proposalSendDate: '2026-07-28',
       reviewDueDate: '2026-07-30',
     }, today);
     expect(warning).toMatch(/due on or before the response deadline/i);
@@ -129,13 +97,10 @@ describe('InviteEmailModal invitation timing contract', () => {
     expect(warning).not.toMatch(/edit the dates/i);
     expect(invitationTimelineWarning({
       respondOffsetDays: 7,
-      proposalSendDate: '2026-07-28',
       reviewDueDate: '2026-07-30',
     }, today)).toMatch(/due on or before the response deadline/i);
-    // Applies with no release date set too.
     expect(invitationTimelineWarning({
       respondOffsetDays: 7,
-      proposalSendDate: '',
       reviewDueDate: '2026-07-30',
     }, today)).toMatch(/due on or before the response deadline/i);
   });
@@ -143,12 +108,10 @@ describe('InviteEmailModal invitation timing contract', () => {
   test('does not warn on a chronological timeline or when the due date is unset', () => {
     expect(invitationTimelineWarning({
       respondOffsetDays: 7,
-      proposalSendDate: '2026-08-18',
       reviewDueDate: '2026-09-15',
     }, today)).toBeNull();
     expect(invitationTimelineWarning({
       respondOffsetDays: 7,
-      proposalSendDate: '2026-08-18',
       reviewDueDate: '',
     }, today)).toBeNull();
   });

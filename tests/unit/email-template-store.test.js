@@ -64,7 +64,9 @@ describe('email-template-store', () => {
     expect(REVIEWER_INVITATION_SEED_BODY).toContain('{{externalLink}}');
     expect(REVIEWER_INVITATION_SEED_BODY).toContain('If we don’t hear from you by {{respondBy}}');
     expect(REVIEWER_INVITATION_SEED_BODY).toContain('1. You respond — by {{respondBy}}');
-    expect(REVIEWER_INVITATION_SEED_BODY).toContain('2. We send the full proposal — around {{proposalDelivery}}');
+    expect(REVIEWER_INVITATION_SEED_BODY).toContain('2. As soon as you accept, we email you a secure link to the full proposal');
+    expect(REVIEWER_INVITATION_SEED_BODY).toContain('just reply to this email and we’ll release you from the review.');
+    expect(REVIEWER_INVITATION_SEED_BODY).not.toContain('{{proposalDelivery}}');
     expect(REVIEWER_INVITATION_SEED_BODY).toContain('3. Your completed review is due — by {{reviewDue}}');
     expect(REVIEWER_INVITATION_SEED_BODY).not.toMatch(/estimated time|time estimate/i);
     expect(REVIEWER_INVITATION_SEED_BODY).not.toMatch(/respond to this email/i);

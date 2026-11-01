@@ -13,8 +13,10 @@ import EmailDialog from '../EmailDialog';
  *   (templateType:'invitation' → sets invited+emailSentAt, no status bump;
  *   skips already-invited unless allowResend).
  *
- * Review-process timeline: respond-by and proposal-delivery values appear in the
- * invitation body. They are interpolated CLIENT-SIDE here (not via
+ * Review-process timeline: the respond-by value appears in the invitation body.
+ * The proposal now goes out when a reviewer accepts, so the retired
+ * {{proposalDelivery}} token resolves to blank and its line is dropped from
+ * live or per-PD wording that still carries it. They are interpolated CLIENT-SIDE here (not via
  * render-emails) so a blank date drops its line instead of leaking a literal
  * {{token}} into a real email, and so editing a draft doesn't require re-fetching
  * the preview. Load order is built-in defaults → per-user sticky values →
@@ -90,14 +92,16 @@ function normalizeOffsetInput(value) {
 }
 
 // Resolve each client-side timing token to its display string. respond-by comes
-// from the offset (today + N days); proposal delivery is a fixed date. These are
+// from the offset (today + N days). {{proposalDelivery}} is retired (the proposal
+// is emailed on acceptance) and stays blank so its line is dropped instead of
+// leaking a literal token, which send-emails would refuse. These are
 // NOT server placeholders — render-emails leaves them literal and we substitute
 // here. {{reviewDue}} is server-filled (D48); its entry only covers a body the
 // server left unfilled, using the same server-returned date.
 function timingTokenValues(timing) {
   return {
     '{{respondBy}}': formatDate(addDaysToTodayYmd(timing.respondOffsetDays)),
-    '{{proposalDelivery}}': formatDate(timing.proposalSendDate),
+    '{{proposalDelivery}}': '',
     '{{reviewDue}}': formatDate(timing.reviewDueDate),
   };
 }
@@ -106,8 +110,6 @@ function timingSummary(timing) {
   const items = [];
   const respondBy = formatDate(addDaysToTodayYmd(timing.respondOffsetDays));
   if (respondBy) items.push(`Respond by ${respondBy}`);
-  const proposalDelivery = formatDate(timing.proposalSendDate);
-  if (proposalDelivery) items.push(`Proposals ${proposalDelivery}`);
   const reviewDue = formatDate(timing.reviewDueDate);
   if (reviewDue) items.push(`Reviews due ${reviewDue}`);
   return items.join(' · ') || 'No timeline dates set';
@@ -116,7 +118,7 @@ function timingSummary(timing) {
 // Substitute the timing tokens with formatted dates. A line whose token has no
 // value is dropped entirely (so the bullet doesn't appear with a blank/leftover
 // token). The "Review timeline:" header is dropped when nothing is set at all.
-function applyTiming(body, timing) {
+export function applyTiming(body, timing) {
   const values = timingTokenValues(timing);
   const anySet = Object.values(values).some(Boolean);
   const lines = body.split('\n');
@@ -136,47 +138,7 @@ function applyTiming(body, timing) {
   return out.join('\n');
 }
 
-// The existing campaign fields remain authoritative; this only prevents an
-// invitation from presenting the configured dates in an impossible order.
-// Blank dates retain the existing behavior (their copy line is omitted).
-//
-// DELIBERATELY NOT VALIDATED — a response deadline AFTER the proposal release
-// date (owner decision 2026-08-12, S422). It reads oddly but it is not
-// impossible, and blocking it broke a real workflow: invite late in a cycle and
-// `respondBy` (today + offset) drifts past an already-fixed release date purely
-// because time passed, disabling Send with no visible reason. Three facts make
-// the block unjustifiable:
-//   1. Release is never automatic. `wmkf_materialssentat` has exactly one writer
-//      (`lib/services/review-manager/send-emails-service.js`, materials branch),
-//      reachable only through the staff-guarded /api/review-manager/send-emails
-//      route. No cron sends materials. A PD decides when proposals go out.
-//   2. `proposalSendDate` is email-only copy for this invitation, not state the
-//      system acts on — it renders as a template token in email-generator.js.
-//   3. `respondBy` is derived from TODAY, so this condition arrives on its own.
-// The resulting "we will send the proposal by <date>" / "respond by <later
-// date>" wording is accepted for this cycle and disappears next cycle, when
-// materials are in hand at invitation time. Do not reinstate the check as an
-// apparent oversight.
-//
-// Only ONE ordering still blocks: reviews due on or before proposal release.
-// That compares two FIXED dates, so if it trips somebody configured something
-// incoherent and no amount of waiting will fix it.
-//
-// THE DIVIDING LINE: never block on a condition involving `respondBy`. It is
-// computed from TODAY, so any rule that reads it will start failing on its own
-// as the calendar moves, with nothing having changed. Blocking rules compare
-// fixed dates; drifting conditions warn (see invitationTimelineWarning).
-export function validateInvitationTimeline(timing, today = new Date()) {
-  const proposalDelivery = timing.proposalSendDate || '';
-  const reviewDue = timing.reviewDueDate || '';
-
-  if (proposalDelivery && reviewDue && reviewDue <= proposalDelivery) {
-    return 'The review due date must be after the proposal release date.';
-  }
-  return null;
-}
-
-// Non-blocking counterpart. Reviews falling due on or before the response
+// Advisory timeline check. Reviews falling due on or before the response
 // deadline is untidy rather than impossible: reviewers usually accept well
 // inside the window, and a late acceptance is handled operationally by granting
 // an extension (`wmkf_reviewduedateoverride`, per-reviewer, S417). It also
@@ -231,7 +193,7 @@ export default function InviteEmailModal({ requestId = null, candidates = [], se
   const [step, setStep] = useState('preview'); // preview | sending | sent | error
   const [rawDrafts, setRawDrafts] = useState([]); // from render-emails, timing tokens still literal
   const [edits, setEdits] = useState({}); // suggestionId -> { subject?, body? } user overrides
-  const [timing, setTiming] = useState({ respondOffsetDays: 7, proposalSendDate: '', reviewDueDate: '' });
+  const [timing, setTiming] = useState({ respondOffsetDays: 7, reviewDueDate: '' });
   const [timelineOpen, setTimelineOpen] = useState(false);
   const [template, setTemplate] = useState(EMPTY_TEMPLATES.invitation); // resolved invitation template (admin default + per-PD override), loaded on open
   const [defaultWordingBusy, setDefaultWordingBusy] = useState(false);
@@ -267,7 +229,6 @@ export default function InviteEmailModal({ requestId = null, candidates = [], se
   const [verifyEvidence, setVerifyEvidence] = useState({});
   const [repairState, setRepairState] = useState({});
   const mountedRef = useRef(true);
-  const timelineError = validateInvitationTimeline(timing);
   // Advisory only — deliberately NOT part of the `disabled` condition below.
   const timelineWarning = invitationTimelineWarning(timing);
 
@@ -311,7 +272,6 @@ export default function InviteEmailModal({ requestId = null, candidates = [], se
           // Pick only the known keys (a pre-Phase-1 sticky value carries the retired
           // `respondByDate` date — ignore it; respondOffsetDays falls back to default 7).
           if (parsed.respondOffsetDays != null && parsed.respondOffsetDays !== '') nextTiming.respondOffsetDays = parsed.respondOffsetDays;
-          if (typeof parsed.proposalSendDate === 'string') nextTiming.proposalSendDate = parsed.proposalSendDate;
         }
       } catch { /* sticky defaults are best-effort */ }
       try {
@@ -320,7 +280,6 @@ export default function InviteEmailModal({ requestId = null, candidates = [], se
         if (envelope.ok && data?.timeline && data.isDefault !== true) {
           const d = data.timeline;
           nextTiming.respondOffsetDays = d.respondOffsetDays == null ? '' : d.respondOffsetDays;
-          nextTiming.proposalSendDate = d.proposalReleaseDate || '';
         }
       } catch { /* admin cycle defaults are best-effort for preview hydration */ }
       if (requestId) {
@@ -723,7 +682,7 @@ export default function InviteEmailModal({ requestId = null, candidates = [], se
         method: 'POST',
         body: {
           key: PREFERENCE_KEYS.INVITE_TIMING,
-          value: JSON.stringify({ respondOffsetDays: timing.respondOffsetDays, proposalSendDate: timing.proposalSendDate }),
+          value: JSON.stringify({ respondOffsetDays: timing.respondOffsetDays }),
         },
         tolerantBody: true,
       });
@@ -733,7 +692,6 @@ export default function InviteEmailModal({ requestId = null, candidates = [], se
   const handleSend = async () => {
     if (defaultWordingBusy) return;
     if (sendable.length === 0) { setError('No recipients with an email to send to.'); return; }
-    if (timelineError) { setError(timelineError); return; }
     if (quickCheckSendable.length > 0 && !allQuickChecksConfirmed) {
       setError('Confirm each quick-check address before sending.');
       return;
@@ -883,17 +841,11 @@ export default function InviteEmailModal({ requestId = null, candidates = [], se
                 </Button>
                 {timelineOpen && (
                   <div className="mt-3">
-                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                       <label className="text-xs text-gray-600">
                         Days to respond
                         <input disabled={defaultWordingBusy} type="number" min="0" step="1" value={timing.respondOffsetDays}
                           onChange={(e) => setTiming((t) => ({ ...t, respondOffsetDays: normalizeOffsetInput(e.target.value) }))}
-                          className="mt-1 w-full text-sm border border-gray-300 rounded px-2 py-1" />
-                      </label>
-                      <label className="text-xs text-gray-600">
-                        Proposals released to reviewers
-                        <input disabled={defaultWordingBusy} type="date" value={timing.proposalSendDate}
-                          onChange={(e) => setTiming((t) => ({ ...t, proposalSendDate: e.target.value }))}
                           className="mt-1 w-full text-sm border border-gray-300 rounded px-2 py-1" />
                       </label>
                       <div className="text-xs text-gray-600">
@@ -903,22 +855,20 @@ export default function InviteEmailModal({ requestId = null, candidates = [], se
                       </div>
                     </div>
                     <p className="text-xs text-gray-600 mt-2">
-                      Days to respond is a request-level campaign setting when saved. The review due date comes from the cycle calendar and is saved on the proposal with its first invitation. Proposal release is email-only copy for this invitation. A blank field omits its line.
+                      Days to respond is a request-level campaign setting when saved. The review due date comes from the cycle calendar and is saved on the proposal with its first invitation. The proposal is emailed to each reviewer when they accept.
                     </p>
                   </div>
                 )}
-                {/* Rendered OUTSIDE the collapsible body on purpose: this message
-                    explains why Send is disabled, and the panel is collapsed by
-                    default. Nested inside, it was absent from the DOM entirely —
-                    invisible, and never announced despite role="alert" — so a PD
-                    saw only a grayed-out button (S422). The button's `title`
-                    carries the same text but cannot be relied on: browsers
-                    suppress pointer events on disabled controls. */}
-                {timelineError ? (
-                  <p role="alert" className="text-xs text-red-700 mt-2">{timelineError}</p>
-                ) : null}
-                {!timelineError && timelineWarning ? (
+                {/* Outside the collapsible body so it shows while the panel
+                    is collapsed (the default). */}
+                {timelineWarning ? (
                   <p role="status" className="text-xs text-amber-800 mt-2">{timelineWarning}</p>
+                ) : null}
+                {rawDrafts.some((d) => String(d?.body || '').includes('{{proposalDelivery}}')) ? (
+                  <p role="status" className="text-xs text-amber-800 mt-2">
+                    Your saved wording still mentions a proposal release date. That line is left out, because
+                    the proposal is now emailed when a reviewer accepts. Update your default wording to remove it.
+                  </p>
                 ) : null}
               </div>
 
@@ -1391,11 +1341,11 @@ export default function InviteEmailModal({ requestId = null, candidates = [], se
               <Button variant="primary" size="sm"
                 type="button"
                 onClick={handleSend}
-                disabled={defaultWordingBusy || (sendable.length === 0 || !!timelineError || (quickCheckSendable.length > 0 && !allQuickChecksConfirmed))}
+                disabled={defaultWordingBusy || (sendable.length === 0 || (quickCheckSendable.length > 0 && !allQuickChecksConfirmed))}
                 className={`px-4 py-2 text-white text-sm font-medium rounded-lg disabled:opacity-40 disabled:cursor-not-allowed ${
                   quickCheckSendable.length > 0 ? 'bg-amber-600 hover:bg-amber-700' : 'bg-gray-900 hover:bg-gray-800'
                 }`}
-                title={timelineError || (quickCheckSendable.length > 0
+                title={(quickCheckSendable.length > 0
                   ? `${quickCheckSendable.length} address(es) need a quick check before sending`
                   : undefined)}
               >

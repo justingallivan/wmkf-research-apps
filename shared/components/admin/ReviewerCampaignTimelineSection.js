@@ -7,7 +7,6 @@ export default function ReviewerCampaignTimelineSection() {
   const [timeline, setTimeline] = useState({
     cycleLabel: '',
     respondOffsetDays: 7,
-    proposalReleaseDate: '',
     desiredCount: 4,
   });
   const [isDefault, setIsDefault] = useState(false);
@@ -26,7 +25,6 @@ export default function ReviewerCampaignTimelineSection() {
       setTimeline({
         cycleLabel: data.timeline?.cycleLabel || '',
         respondOffsetDays: data.timeline?.respondOffsetDays == null ? '' : data.timeline.respondOffsetDays,
-        proposalReleaseDate: data.timeline?.proposalReleaseDate || '',
         desiredCount: data.timeline?.desiredCount == null ? '' : data.timeline.desiredCount,
       });
       setIsDefault(!!data.isDefault);
@@ -135,15 +133,6 @@ export default function ReviewerCampaignTimelineSection() {
           <span className="mt-1 block text-xs text-gray-400">
             Default number of committed reviewers before the PD is notified. Seeds new campaigns&apos; settings.
           </span>
-        </label>
-        <label className="text-xs text-gray-600">
-          Proposals released to reviewers
-          <input
-            type="date"
-            value={timeline.proposalReleaseDate}
-            onChange={(e) => update('proposalReleaseDate', e.target.value)}
-            className="mt-1 w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500"
-          />
         </label>
       </div>
       <div className="flex items-center gap-2">

@@ -42,7 +42,6 @@ describe('reviewer campaign timeline defaults', () => {
       timeline: {
         cycleLabel: 'D26',
         respondOffsetDays: null,
-        proposalReleaseDate: '2026-07-08',
         desiredCount: 10,
       },
       isDefault: false,
@@ -76,9 +75,8 @@ describe('reviewer campaign timeline defaults', () => {
     });
   });
 
-  test('write validation rejects impossible dates and bad offsets', () => {
-    expect(() => normalizeTimeline({ proposalReleaseDate: '2026-02-31' }))
-      .toThrow('proposalReleaseDate must be a YYYY-MM-DD date or blank');
+  test('write validation rejects bad offsets and ignores a retired proposal release date', () => {
+    expect(normalizeTimeline({ proposalReleaseDate: '2026-02-31' })).not.toHaveProperty('proposalReleaseDate');
     expect(() => normalizeTimeline({ respondOffsetDays: -1 }))
       .toThrow('respondOffsetDays must be a non-negative integer or blank');
   });
@@ -100,10 +98,11 @@ describe('reviewer campaign timeline defaults', () => {
     expect(out).toMatchObject({
       key: REVIEWER_CAMPAIGN_TIMELINE_KEY,
       isDefault: false,
-      timeline: { proposalReleaseDate: '2026-07-22' },
     });
-    // D48: a legacy stored review due date is dropped, never served.
+    // D48: a legacy stored review due date is dropped, never served; so is the
+    // retired proposal release date.
     expect(out.timeline).not.toHaveProperty('reviewDueDate');
+    expect(out.timeline).not.toHaveProperty('proposalReleaseDate');
   });
 
   test('set writes normalized JSON with the updater profile id', async () => {
@@ -121,7 +120,6 @@ describe('reviewer campaign timeline defaults', () => {
       JSON.stringify({
         cycleLabel: 'D26',
         respondOffsetDays: 10,
-        proposalReleaseDate: '',
         desiredCount: 5,
       }),
       42,
