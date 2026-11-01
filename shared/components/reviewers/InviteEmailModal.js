@@ -119,11 +119,12 @@ function timingSummary(timing) {
 // value is dropped entirely (so the bullet doesn't appear with a blank/leftover
 // token). The "Review timeline:" header is dropped when nothing is set at all.
 // The retired token is removed automatically only on a recognized standalone
-// release line (the old seed's "We send the full proposal — around …", or
+// release line (the old seed's "We send the full proposal — around …", the
+// live default's "We expect to send the full proposal to you on …", or
 // "Proposal(s) delivered/sent/released … on …"). Any other line carrying it is
 // kept with the literal token visible, and Send stays blocked until the PD
 // edits it, so custom wording never silently loses a link or deadline.
-const RETIRED_RELEASE_LINE = /^(?:we (?:will )?send (?:you )?the full proposal|proposals?(?: (?:will be )?(?:delivered|sent|released)(?: to (?:you|reviewers))?)?)\s*(?:[—–-]\s*)?(?:around|on|by)?\s*[.:]?\s*$/i;
+const RETIRED_RELEASE_LINE = /^(?:we (?:will |expect to )?send (?:you )?the full proposal(?: to you)?|proposals?(?: (?:will be )?(?:delivered|sent|released)(?: to (?:you|reviewers))?)?)\s*(?:[—–-]\s*)?(?:around|on|by)?\s*[.:]?\s*$/i;
 
 export function isMixedLegacyReleaseLine(line) {
   if (!String(line || '').includes('{{proposalDelivery}}')) return false;
