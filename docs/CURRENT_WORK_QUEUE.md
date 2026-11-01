@@ -96,16 +96,21 @@ sequence.
   recording labels or every existing Staff discussion label. Remaining recorded
   staff-discussion labels await separate full-migration scope. Preserve routes,
   API/service names, schema/storage values, artifact types, prompt identifiers,
-  deep links, and saved settings. As of 2026-11-01, a separate email-copy slice
-  is in progress on branch `codex/email-template-terminology`; check Git/PR and
-  release receipts for current status. It updates source defaults for packet-
+  deep links, and saved settings. The email-copy slice merged through PR #583
+  as `3c4c6ee0b` in source/Git (no deployment claim). It updates source defaults for packet-
   sharing, agenda, and presentation-material invitation/reminder emails, plus
   Admin metadata, preview labels, and the application-owned materials upload
   CTA. Existing stored Admin/personal settings,
   already-prepared email content, and generated documents remain unchanged;
   deployed settings were not inspected and no backfill is included. No suite-wide
   technical migration is authorized. Remaining runtime surfaces await
-  separate scope. Approved names, contracts, and dated historical inventory:
+  separate scope. As of 2026-11-01, a separate applicant-materials display-copy
+  slice is in progress on branch `codex/presentation-materials-terminology`:
+  upload-page title/support-email subject and Staff Deliberations materials-card
+  heading → Presentation materials. It changes visible copy only; upload
+  behavior, settings, IDs, routes, tokens, and API contracts are unchanged.
+  Check Git/PR and release receipts for current status; no deployment is
+  inferred. Approved names, contracts, and dated historical inventory:
   `docs/NOMENCLATURE_GLOSSARY.md` → "Deliberations workflow vocabulary"; decision
   evidence: `docs/plans/review/PROPOSAL_WORKFLOW_VOCABULARY_2026-10-19.md`.
 

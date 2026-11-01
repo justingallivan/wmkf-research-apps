@@ -635,7 +635,7 @@ test('the support-email footer shows a mailto link to the configured address whe
   render(<MaterialsContributorPage />);
   const link = await screen.findByRole('link', { name: 'portalhelp@wmkeck.org' });
   expect(link.getAttribute('href')).toMatch(/^mailto:portalhelp@wmkeck\.org\?subject=/);
-  expect(decodeURIComponent(link.getAttribute('href'))).toContain('Site visit materials — Neural dust');
+  expect(decodeURIComponent(link.getAttribute('href'))).toContain('Presentation materials — Neural dust');
 });
 
 test('202 acceptance becomes durable queued status, keeps the prior receipt visible, and clears the staged retry', async () => {
@@ -921,11 +921,11 @@ test('late context success after token change cannot replace the new token conte
   const view = render(<MaterialsContributorPage />);
   mockRouterToken = 'new-jwt';
   view.rerender(<MaterialsContributorPage />);
-  expect(await screen.findByRole('heading', { name: 'Site visit materials · New institution' })).toBeInTheDocument();
+  expect(await screen.findByRole('heading', { name: 'Presentation materials · New institution' })).toBeInTheDocument();
   mockRouterToken = 'jwt';
   view.rerender(<MaterialsContributorPage />);
-  expect(await screen.findByRole('heading', { name: 'Site visit materials · Returned institution' })).toBeInTheDocument();
+  expect(await screen.findByRole('heading', { name: 'Presentation materials · Returned institution' })).toBeInTheDocument();
   await act(async () => { resolveOld(response(200, { ...context, institution: 'Stale institution' })); });
-  expect(screen.queryByText('Site visit materials · Stale institution')).not.toBeInTheDocument();
-  expect(screen.getByRole('heading', { name: 'Site visit materials · Returned institution' })).toBeInTheDocument();
+  expect(screen.queryByText('Presentation materials · Stale institution')).not.toBeInTheDocument();
+  expect(screen.getByRole('heading', { name: 'Presentation materials · Returned institution' })).toBeInTheDocument();
 });

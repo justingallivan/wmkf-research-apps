@@ -76,7 +76,7 @@ describe('ResearchPresentationMaterialsCard', () => {
     }));
     render(<ResearchPresentationMaterialsCard requestId={REQUEST_ID} siteVisitContext={VISIT} materialsSummary={null} />);
 
-    expect(screen.getByText('Research Presentation Materials')).toBeInTheDocument();
+    expect(screen.getByText('Presentation materials')).toBeInTheDocument();
     expect(screen.getByText('Presentation scheduled · materials not requested.')).toBeInTheDocument();
     const pdf = await screen.findByRole('link', { name: '1002903 Site Visit Presentation.pdf' });
     expect(pdf).toHaveAttribute('href', 'https://sp/slides.pdf');
