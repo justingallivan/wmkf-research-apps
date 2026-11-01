@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/router';
+import Head from 'next/head';
 import { requestJson } from '../../../shared/utils/api-request.js';
 import { arrangeMaterials, displayName, isOffice, isType } from '../../../shared/utils/presentation-page-materials.js';
 import SummaryText from '../../../shared/components/SummaryText.js';
@@ -113,7 +114,7 @@ function Materials({ token, proposal, slidesPdf, slidesOriginal, others }) {
   if (!proposal && !slides && others.length === 0) return null;
   return (
     <section className="mt-16">
-      <SectionHeading>Materials</SectionHeading>
+      <SectionHeading>Presentation materials</SectionHeading>
       <ul className="mt-4 divide-y divide-gray-200 border-y border-gray-200">
         {proposal && <ViewRow token={token} name="Proposal" file={proposal} />}
         {slidesPdf
@@ -127,14 +128,15 @@ function Materials({ token, proposal, slidesPdf, slidesOriginal, others }) {
 
 function Page({ token, data, proposal }) {
   const { video, summary, slidesPdf, slidesOriginal, others } = arrangeMaterials(data.materials);
-  const heading = data.proposalTitle || data.title;
+  const institutionTitle = data.title === 'Research presentation materials' ? null : data.title;
+  const heading = data.proposalTitle || institutionTitle || 'Research presentation';
   const expires = data.expiresAt ? new Date(data.expiresAt) : null;
   return (
     <>
       <header>
         <h1 className="text-3xl font-semibold leading-tight tracking-tight text-gray-900 text-balance sm:text-4xl sm:leading-tight">{heading}</h1>
         <p className="mt-3 text-lg text-gray-600">
-          {data.proposalTitle && data.title ? `${data.title} · Research presentation` : 'Research presentation'}
+          {data.proposalTitle && institutionTitle ? `${institutionTitle} · Research presentation` : 'Research presentation'}
         </p>
       </header>
 
@@ -142,7 +144,7 @@ function Page({ token, data, proposal }) {
 
       {!data.presentationUnavailable && !video && !summary && (
         <p className="mt-10 rounded-xl bg-gray-50 px-6 py-5 text-lg text-gray-700">
-          The presentation recording and summary will be added after the site visit.
+          The presentation recording and summary will be added after the research presentation.
         </p>
       )}
 
@@ -155,7 +157,7 @@ function Page({ token, data, proposal }) {
       {summary && (
         <section className="mt-16">
           <div className="flex flex-wrap items-center gap-3">
-            <SectionHeading>Summary</SectionHeading>
+            <SectionHeading>Presentation summary</SectionHeading>
             <span className="rounded-full bg-gray-100 px-3 py-1 text-sm font-medium text-gray-700">AI-generated</span>
           </div>
           <div className="mt-6">
@@ -163,8 +165,8 @@ function Page({ token, data, proposal }) {
               <SummaryText text={summary.text} headings={PRESENTATION_SUMMARY_HEADINGS} listHeadings={PRESENTATION_SUMMARY_LIST_HEADINGS} />
             ) : (
               <p className="text-lg text-gray-700">
-                The summary could not be shown here.{' '}
-                <a href={endpoint(token, summary, 'download')} className={LINK}>Download the summary</a>
+                The presentation summary could not be shown here.{' '}
+                <a href={endpoint(token, summary, 'download')} className={LINK}>Download the presentation summary</a>
               </p>
             )}
           </div>
@@ -187,6 +189,16 @@ export default function PresentationMaterialsPage() {
   const token = typeof router.query.token === 'string' ? router.query.token : '';
   const [state, setState] = useState({ status: 'loading' });
   const [proposal, setProposal] = useState(null);
+  const institutionTitle = state.status === 'ready' && state.data.title !== 'Research presentation materials' ? state.data.title : null;
+  const browserTitle = state.status === 'ready'
+    ? [
+      state.data.proposalTitle || institutionTitle,
+      state.data.proposalTitle && institutionTitle && institutionTitle !== state.data.proposalTitle
+        ? institutionTitle
+        : null,
+      'Research presentation',
+    ].filter(Boolean).join(' — ')
+    : 'Research presentation';
 
   useEffect(() => {
     if (!token) return undefined;
@@ -226,13 +238,16 @@ export default function PresentationMaterialsPage() {
   }, [token, state.status]);
 
   return (
-    <main className="min-h-screen bg-white px-4 py-12 text-gray-900 selection:bg-gray-200 sm:px-6 sm:py-16">
-      <div className="mx-auto max-w-3xl">
-        {state.status === 'loading' && <p className="text-lg text-gray-600">Loading…</p>}
-        {state.status === 'error' && <p className="rounded-xl bg-red-50 px-6 py-5 text-lg text-red-900">This presentation link is unavailable or has expired.</p>}
-        {state.status === 'retry' && <p className="rounded-xl bg-amber-50 px-6 py-5 text-lg text-amber-950">Presentation materials are temporarily unavailable. Try again shortly.</p>}
-        {state.status === 'ready' && <Page token={token} data={state.data} proposal={proposal} />}
-      </div>
-    </main>
+    <>
+      <Head><title>{browserTitle}</title></Head>
+      <main className="min-h-screen bg-white px-4 py-12 text-gray-900 selection:bg-gray-200 sm:px-6 sm:py-16">
+        <div className="mx-auto max-w-3xl">
+          {state.status === 'loading' && <p className="text-lg text-gray-600">Loading…</p>}
+          {state.status === 'error' && <p className="rounded-xl bg-red-50 px-6 py-5 text-lg text-red-900">This presentation link is unavailable or has expired.</p>}
+          {state.status === 'retry' && <p className="rounded-xl bg-amber-50 px-6 py-5 text-lg text-amber-950">Presentation materials are temporarily unavailable. Try again shortly.</p>}
+          {state.status === 'ready' && <Page token={token} data={state.data} proposal={proposal} />}
+        </div>
+      </main>
+    </>
   );
 }

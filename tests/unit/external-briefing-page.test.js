@@ -73,18 +73,29 @@ test('renders the placeholder states before any share, review, or schedule exist
   const pi = screen.getByText('PI:').closest('p');
   expect(institution.compareDocumentPosition(proposalTitle) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   expect(proposalTitle.compareDocumentPosition(pi) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-  expect(screen.getByText('Pre-discussion:')).toBeInTheDocument();
+  expect(screen.getByText('Proposal discussion session:')).toBeInTheDocument();
   expect(screen.queryByText('Deliberation session:')).not.toBeInTheDocument();
-  expect(screen.getByText('Research Presentation:')).toBeInTheDocument();
+  expect(screen.getByText('Research presentation:')).toBeInTheDocument();
   expect(screen.queryByText('Site visit:')).not.toBeInTheDocument();
   expect(screen.getAllByText('Not yet scheduled')).toHaveLength(2);
-  expect(screen.getByText(/No research presentation materials yet/)).toBeInTheDocument();
+  expect(screen.getByText(/No presentation materials yet/)).toBeInTheDocument();
   expect(screen.queryByText(/No site visit materials yet/)).not.toBeInTheDocument();
-  expect(screen.getByText(/The staff brief will appear here once staff share it/)).toBeInTheDocument();
+  expect(screen.getByText(/The proposal discussion brief will appear here once staff share it/)).toBeInTheDocument();
   expect(screen.getByText(/No completed reviews yet/)).toBeInTheDocument();
   expect(screen.getByText(/The proposal is not available/)).toBeInTheDocument();
   expect(screen.queryByText('Join meeting')).toBeNull();
   expect(screen.queryByText(/acknowledged newer inputs/i)).toBeNull();
+});
+
+test('maps the legacy no-institution title fallback to Proposal review packet', async () => {
+  global.fetch = jest.fn().mockResolvedValue(response({
+    ok: true, title: 'Deliberation briefing', proposalTitle: null, expiresAt: null,
+    session: null, siteVisit: null, writeup: null, reviews: [], proposal: null,
+  }));
+  render(<BriefingPage />);
+  expect(await screen.findByRole('heading', { name: 'Proposal review packet' })).toBeInTheDocument();
+  expect(screen.queryByText('Deliberation briefing')).not.toBeInTheDocument();
+  expect(document.querySelector('title')).toHaveTextContent(/^Proposal review packet$/);
 });
 
 test('B14/H2: shows the non-sensitive staff-acknowledged-newer-inputs notice when present', async () => {
@@ -147,7 +158,7 @@ test('links every member through the document route and only renders an https me
   }));
   render(<BriefingPage />);
   await screen.findByText('Ada Lovelace');
-  expect(screen.getByRole('heading', { name: 'Staff brief and notes' })).toBeInTheDocument();
+  expect(screen.getByRole('heading', { name: 'Proposal discussion brief' })).toBeInTheDocument();
   expect(screen.getByText('Staff Brief 1002379.docx').closest('a')).toHaveAttribute('href', '/api/external/briefing/tok/document?member=writeup-docx');
   expect(screen.queryByText(/PreSite_1002379/)).not.toBeInTheDocument();
   expect(screen.getByText('Open uploaded review').closest('a')).toHaveAttribute('href', '/api/external/briefing/tok/document?member=review%3Ar1');
@@ -202,7 +213,7 @@ test('research presentation materials list by label; oversize files show without
     ],
   }));
   render(<BriefingPage />);
-  expect(await screen.findByText('Research presentation materials')).toBeInTheDocument();
+  expect(await screen.findByText('Presentation materials')).toBeInTheDocument();
   const slides = await screen.findByRole('link', { name: 'Applicant Slides.pdf' });
   expect(slides).toHaveAttribute('href', '/api/external/briefing/tok/document?member=material%3A55555555-5555-4555-8555-555555555555');
   expect(slides).toHaveAttribute('target', '_blank');
@@ -338,5 +349,5 @@ test('approval lookup failure is distinct from no presentation materials', async
   global.fetch=jest.fn().mockResolvedValue(response({ok:true,title:'Example University',reviews:[],materials:[],presentationUnavailable:true}));
   render(<BriefingPage />);
   await screen.findByText('Presentation materials could not be checked. Refresh this page to try again.');
-  expect(screen.queryByText(/No research presentation materials yet/)).toBeNull();
+  expect(screen.queryByText(/No presentation materials yet/)).toBeNull();
 });
