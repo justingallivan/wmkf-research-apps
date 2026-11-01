@@ -92,7 +92,7 @@ function uploadFailureMessage(error) {
     return 'The exact file or upload-session outcome is uncertain. This upload is retained for reconciliation.';
   }
   if (code === 'post_presentation_site_visit_changed') {
-    return 'The active Site Visit changed after this upload began. Reload the page before resuming.';
+    return 'The active research presentation changed after this upload began. Reload the page before resuming.';
   }
   if (code === 'post_presentation_resume_fingerprint_mismatch') {
     return 'The selected file does not match this unfinished upload. Reselect the original recording.';
@@ -870,7 +870,7 @@ export default function PostPresentationMaterialsCard({ requestId }) {
   return (
     <section className="mt-8 rounded-xl border border-gray-200 bg-white p-6 shadow-sm" data-testid="post-presentation-materials-card">
       <h2 className="text-xl font-semibold text-gray-900">Post-presentation materials</h2>
-      <p className="mt-1 text-sm text-gray-600">Save a Zoom recording link, upload an MP4, or add a transcript for this Site Visit.</p>
+      <p className="mt-1 text-sm text-gray-600">Save a Zoom recording link, upload an MP4, or add a transcript for this research presentation.</p>
       {error && <div role="alert" className="mt-4 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-800">{error}</div>}
       {notice && <div role="status" className="mt-4 rounded-lg border border-blue-200 bg-blue-50 p-3 text-sm text-blue-800">{notice}</div>}
       {loading && <p className="mt-4 text-sm text-gray-500">Loading…</p>}

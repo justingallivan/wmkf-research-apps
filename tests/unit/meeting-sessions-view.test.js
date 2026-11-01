@@ -12,6 +12,7 @@ const detail = (id, title) => ({ session: { sessionId: id }, slots: [{ wmkf_deli
 test('same-day sessions remain distinct, status/location search is explicit, and opening retains context', async () => {
   global.fetch = jest.fn(async (url) => response(detail(url.split('/').pop(), 'Actual agenda title')));
   render(<Sessions sessions={sessions} cycleCode="D26" programId="research" />);
+  expect(screen.getByRole('region', { name: 'Proposal discussion sessions' })).toBeInTheDocument();
   expect(await screen.findByText('Actual agenda title')).toBeInTheDocument();
   expect(screen.getByRole('button', { name: /10:00 AM PST/ })).toHaveAttribute('aria-pressed', 'true');
   fireEvent.click(screen.getByRole('button', { name: /1:00 PM PST/ }));

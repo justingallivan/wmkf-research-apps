@@ -198,7 +198,13 @@ let writes = [],
         preferences: {
           _legacy_migration_complete: 'true'
         }
-      };else if (p === '/api/meeting-tracker/dashboard') body = dashboard;else if (p === '/api/meeting-tracker/sessions') body = {
+      };else if (p === '/api/meeting-tracker/program-briefing') body = url.searchParams.has('cycleCode') ? {
+        cycleCode: 'D26', cycleLabel: 'December 2026', loadedAt: '2026-10-31T18:00:00Z',
+        groups: [{ key: 'se', name: 'Science and Engineering', proposals: [{ ...proposals[0], proposalSummary: {status:'missing'}, discussionSummary: {status:'missing'}, discussion: {status:'none'} }] }]
+      } : { cycles: dashboard.cycles, defaultCycleCode: 'D26' };
+      else if (p === '/api/meeting-tracker/discussion-sentiment/candidates') body = {requestIds:[id], capped:false,statuses:{[id]:{state:'no_transcript'}}};
+      else if (p.startsWith('/api/meeting-tracker/visits/') && p.endsWith('/discussion-sentiment')) body = {state:'no_transcript',runCurrent:false,lastRunFailed:false,accepted:null,run:null};
+      else if (p === '/api/meeting-tracker/dashboard') body = dashboard;else if (p === '/api/meeting-tracker/sessions') body = {
         sessions: [session, {
           ...session,
           sessionId: sid2,
@@ -247,6 +253,8 @@ let writes = [],
       });
     });
     async function shot(name) {
+      // Let the shared controls finish their finite state transitions before contrast inspection.
+      await page.evaluate(() => Promise.all(document.getAnimations().filter(animation => animation.effect?.getComputedTiming().iterations !== Infinity).map(animation => animation.finished.catch(() => {}))));
       await page.addScriptTag({ url: 'http://localhost:3197/_meeting-ui-axe.js' });
       const accessibility = await page.evaluate(async () => (await axe.run(document.querySelector('main'), { runOnly: { type: 'tag', values: ['wcag2a','wcag2aa','wcag21aa'] } })).violations.map(v => ({ id:v.id, impact:v.impact, targets:v.nodes.map(n=>n.target) })));
       if (accessibility.length) throw Error(name + ' accessibility violations ' + JSON.stringify(accessibility));
@@ -328,7 +336,7 @@ let writes = [],
     await shot('sessions-desktop');
     await page.goto(`http://localhost:3197/meeting-tracker/visits/${id}?n=123456&cycleCode=D26&programId=research`);
     await page.getByRole('button', {
-      name: 'Edit visit details'
+      name: 'Edit research presentation details'
     }).waitFor();
     await page.getByText('Share status: Final', { exact: true }).waitFor();
     await shot('workspace-setup-desktop');
@@ -381,10 +389,26 @@ let writes = [],
       height: 844
     });
     await shot('session-workspace-narrow');
+    await page.setViewportSize({width:1440,height:1000});
+    await page.goto('http://localhost:3197/meeting-tracker/program-briefing');
+    await page.getByRole('heading', {name:'Discussion summaries',exact:true}).waitFor();
+    await page.getByRole('heading', {name:'December 2026 discussion summaries',exact:true}).waitFor();
+    await shot('discussion-summaries-desktop');
+    await page.setViewportSize({width:390,height:844});
+    await shot('discussion-summaries-narrow');
+    await page.getByRole('link', {name:'Post-presentation discussion sentiment',exact:true}).click();
+    await page.getByRole('heading', {name:'Post-presentation discussion sentiment',exact:true}).waitFor();
+    await page.getByRole('checkbox', {name:/Mapping how cells/}).waitFor();
+    await page.getByText('No post-presentation discussion transcript',{exact:true}).waitFor();
+    await shot('discussion-sentiment-narrow');
+    await page.setViewportSize({width:1440,height:1000});
+    await shot('discussion-sentiment-desktop');
+    await page.setViewportSize({width:390,height:844});
     readyTranscript = true;
     await page.goto(`http://localhost:3197/meeting-tracker/visits/${id}?n=123456&cycleCode=D26&programId=research#recording-and-transcript-card`);
     await page.getByRole('tab', {name:/Transcript preparation/}).waitFor();
     await page.getByLabel('Name for Speaker A').waitFor();
+    await page.waitForFunction(() => document.querySelector('[data-testid="card-refresh"]')?.disabled === false);
     await shot('workspace-transcript-review-narrow');
     await page.setViewportSize({width:1440,height:1000});
     await shot('workspace-transcript-review-desktop');
@@ -392,7 +416,7 @@ let writes = [],
     if (errors.length) throw Error(errors.join('\n'));
     fs.writeFileSync(out + '/evidence.json', JSON.stringify({
       screens: evidence,
-      checks: ['request search', 'materials select', 'both mobile actions', 'separate sessions preview', 'all visit task panels', 'invitation draft preservation', 'session workspace', 'URL-addressable sessions view and direct reload', 'preview focus and scroll', 'generated speaker review', 'WCAG A/AA automated scan', 'no horizontal overflow', 'no writes', 'no browser exceptions']
+      checks: ['request search', 'materials select', 'both mobile actions', 'separate sessions preview', 'all visit task panels', 'invitation draft preservation', 'session workspace', 'URL-addressable sessions view and direct reload', 'preview focus and scroll', 'generated speaker review', 'discussion summary and sentiment vocabulary', 'WCAG A/AA automated scan', 'no horizontal overflow', 'no writes', 'no browser exceptions']
     }, null, 2));
     console.log(JSON.stringify(evidence));
   } finally {

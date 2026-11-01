@@ -57,9 +57,11 @@ test('lists only proposals with a bound staff discussion transcript, from the sc
   handlers.candidates = async () => json({ requestIds: [A.toUpperCase()], capped: false });
   render(<DiscussionSentimentView />);
   expect(await screen.findByLabelText(/Alpha tissue repair/)).toBeInTheDocument();
+  expect(screen.getByRole('heading', { name: 'Post-presentation discussion sentiment' })).toBeInTheDocument();
+  expect(screen.getByRole('link', { name: 'Discussion summaries' })).toHaveAttribute('href', '/meeting-tracker/program-briefing');
   expect(screen.queryByLabelText(/Beta imaging/)).not.toBeInTheDocument();
   expect(screen.queryByText(/Gamma no visit/)).not.toBeInTheDocument();
-  expect(screen.getByText('Showing proposals with a staff discussion transcript.')).toBeInTheDocument();
+  expect(screen.getByText('Showing proposals with a post-presentation discussion transcript.')).toBeInTheDocument();
   expect(screen.queryByText(/may be incomplete/)).not.toBeInTheDocument();
   const urls = global.fetch.mock.calls.map(([u]) => String(u));
   expect(urls.filter((u) => u.includes('/dashboard')).every((u) => u.includes('projection=schedule') && u.includes('scope=all'))).toBe(true);
@@ -103,7 +105,7 @@ test('the program and cycle selects are populated from the first response and ke
 test('an empty candidate list shows no proposals rather than every proposal', async () => {
   handlers.candidates = async () => json({ requestIds: [], capped: false });
   render(<DiscussionSentimentView />);
-  expect(await screen.findByText(/No proposals with a staff discussion transcript match/)).toBeInTheDocument();
+  expect(await screen.findByText(/No proposals with a post-presentation discussion transcript match/)).toBeInTheDocument();
   expect(screen.queryByLabelText(/Alpha/)).not.toBeInTheDocument();
   expect(screen.queryByLabelText(/Beta/)).not.toBeInTheDocument();
 });
@@ -133,7 +135,7 @@ test('a slow candidates response for a previous cycle is ignored after the cycle
 
 test('choosing a proposal reads only that proposal, and shows each status label', async () => {
   const cases = [
-    [{ state: 'no_transcript', run: null, runCurrent: false }, 'No staff discussion transcript'],
+    [{ state: 'no_transcript', run: null, runCurrent: false }, 'No post-presentation discussion transcript'],
     [{ state: 'not_analyzed', run: null, runCurrent: false }, 'Not analyzed'],
     [{ state: 'analyzing', run: null, runCurrent: false, accepted: null }, 'Analyzing…'],
     [status(), 'Current'],
@@ -316,7 +318,7 @@ test('an accepted result can be withdrawn when the transcript is no longer bound
   handlers[`POST ${url(A, '/withdraw')}`] = async () => json({ run: {} });
   render(<DiscussionSentimentView />);
   await screen.findByLabelText(/Alpha/); tick('Alpha');
-  expect(await within(screen.getByRole('table')).findByText('No staff discussion transcript')).toBeInTheDocument();
+  expect(await within(screen.getByRole('table')).findByText('No post-presentation discussion transcript')).toBeInTheDocument();
   expect(screen.getByText(/Accepted by Alex Staff/)).toBeInTheDocument();
   expect(screen.queryByRole('button', { name: /Analyze/ })).not.toBeInTheDocument();
   fireEvent.click(screen.getByRole('button', { name: 'Withdraw' }));
@@ -339,7 +341,7 @@ test('a withdrawn result offers Re-analyze, not Accept, and says why (accept, wi
 test('the date filter narrows the picker by site visit date', async () => {
   render(<DiscussionSentimentView />);
   await screen.findByLabelText(/Alpha/);
-  fireEvent.change(screen.getByLabelText('Visit on or after'), { target: { value: '2026-09-15' } });
+  fireEvent.change(screen.getByLabelText('Research presentation starts on or after'), { target: { value: '2026-09-15' } });
   expect(screen.queryByLabelText(/Alpha/)).not.toBeInTheDocument();
   expect(screen.getByLabelText(/Beta/)).toBeInTheDocument();
 });

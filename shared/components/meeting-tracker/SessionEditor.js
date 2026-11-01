@@ -199,7 +199,7 @@ function SlotRow({ slot, proposal, sessions, sessionId, cycleCode, programId, bu
         <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1">
           {!slot.briefing?.url && requestId && <a href={`/workbench/${encodeURIComponent(requestId)}?tab=staff-deliberations${requestNumber ? `&n=${encodeURIComponent(requestNumber)}` : ''}`} className="text-xs font-semibold text-blue-800 underline">Check Staff Deliberations</a>}
           {proposal?.siteVisit?.activityId && proposal?.requestId && (
-            <a href={`/meeting-tracker/visits/${encodeURIComponent(proposal.requestId)}?${new URLSearchParams({ ...(cycleCode ? { cycleCode } : {}), ...(programId ? { programId } : {}), ...(proposal.requestNumber ? { n: proposal.requestNumber } : {}) })}#recording-and-transcript-card`} data-full-page-navigation="true" className="text-xs font-semibold text-blue-800 underline">Open visit · recording and transcript</a>
+            <a href={`/meeting-tracker/visits/${encodeURIComponent(proposal.requestId)}?${new URLSearchParams({ ...(cycleCode ? { cycleCode } : {}), ...(programId ? { programId } : {}), ...(proposal.requestNumber ? { n: proposal.requestNumber } : {}) })}#recording-and-transcript-card`} data-full-page-navigation="true" className="text-xs font-semibold text-blue-800 underline">Open research presentation · recording and transcript</a>
           )}
         </div>
       {!readOnly && panel === 'position' && (
@@ -580,7 +580,7 @@ export default function SessionEditor() {
         <div>
           <Link href={{ pathname: '/meeting-tracker', query: { ...(cycleCode ? { cycleCode } : {}), ...(programId ? { programId } : {}) } }} className="text-sm font-semibold text-gray-600 underline decoration-gray-300 underline-offset-4 hover:text-gray-900">Back to the cycle schedule</Link>
           <div className="mt-3 flex flex-wrap items-center gap-3">
-            <h1 className="text-2xl font-semibold text-gray-900">{isNew ? 'Create a proposal discussion session' : 'Meeting coordination'}</h1>
+            <h1 className="text-2xl font-semibold text-gray-900">{isNew ? 'Create a proposal discussion session' : 'Proposal discussion session'}</h1>
             {!isNew && session && SESSION_STATUS_LABEL[session.status] && (
               <span className={`inline-flex rounded-full px-2.5 py-0.5 text-xs font-semibold ${SESSION_STATUS_CLASS[session.status]}`}>{SESSION_STATUS_LABEL[session.status]}</span>
             )}

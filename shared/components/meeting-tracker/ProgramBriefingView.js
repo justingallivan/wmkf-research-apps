@@ -7,12 +7,12 @@ import { requestEnvelope } from '../../utils/api-request';
 
 const missing = {
   missing: 'No published summary yet.',
-  out_of_date: 'The saved summary is out of date. Review and publish an updated summary in the Site Visit.',
+  out_of_date: 'The saved summary is out of date. Review and publish an updated summary in the research presentation.',
   unavailable: 'This summary could not be verified or loaded. Refresh to try again.',
 };
 const sentimentMissing = {
-  none: 'No accepted, current analysis is available. Analyze and accept it in Discussion Sentiment.',
-  out_of_date: 'The accepted analysis is out of date. Review and accept an updated analysis in Discussion Sentiment.',
+  none: 'No accepted, current analysis is available. Analyze and accept it in Post-presentation discussion sentiment.',
+  out_of_date: 'The accepted analysis is out of date. Review and accept an updated analysis in Post-presentation discussion sentiment.',
   unavailable: 'The analysis could not be loaded. Refresh to try again.',
 };
 
@@ -55,7 +55,7 @@ function Proposal({ proposal }) {
     <p className="mt-1 text-base font-medium leading-6 text-gray-800">{proposal.title}</p>
     {proposal.projectLeader && <p className="mt-1 text-sm text-gray-600">Project leader: {proposal.projectLeader}</p>}
     <Summary title="Proposal overview" value={proposal.proposalSummary} requestId={proposal.requestId} />
-    <Summary title="Staff discussion" value={proposal.discussionSummary} requestId={proposal.requestId} />
+    <Summary title="Post-presentation discussion summary" value={proposal.discussionSummary} requestId={proposal.requestId} />
     {record ? <>
       <p className="briefing-block mt-5 text-sm leading-6 text-gray-800"><strong>Staff reception: {record.reception}; {record.enthusiasm} enthusiasm.</strong> {record.headline}</p>
       <div className="briefing-signals mt-5 grid gap-6 md:grid-cols-3">
@@ -70,8 +70,8 @@ function Proposal({ proposal }) {
       </div>
     </> : <p className="briefing-block mt-5 text-sm leading-6 text-gray-600"><strong>Positives, concerns, and unresolved questions: </strong>{sentimentMissing[proposal.discussion?.status] || sentimentMissing.unavailable}</p>}
     <p className="briefing-controls mt-5 flex flex-wrap gap-x-5 gap-y-2 text-sm font-semibold text-gray-700">
-      <Link href={`/meeting-tracker/visits/${proposal.requestId}`} className="rounded underline underline-offset-4 focus-visible:outline focus-visible:outline-2">Open Site Visit</Link>
-      <Link href="/meeting-tracker/discussion-sentiment" className="rounded underline underline-offset-4 focus-visible:outline focus-visible:outline-2">Review full sentiment analysis</Link>
+      <Link href={`/meeting-tracker/visits/${proposal.requestId}`} className="rounded underline underline-offset-4 focus-visible:outline focus-visible:outline-2">Open research presentation</Link>
+      <Link href="/meeting-tracker/discussion-sentiment" className="rounded underline underline-offset-4 focus-visible:outline focus-visible:outline-2">Review full post-presentation discussion sentiment</Link>
     </p>
   </article>;
 }
@@ -107,9 +107,9 @@ function Briefing({ profileId }) {
     let active = true;
     requestEnvelope(`/api/meeting-tracker/program-briefing?cycleCode=${encodeURIComponent(cycleCode)}`).then(({ ok, data: body }) => {
       if (!active) return;
-      if (!ok) throw new Error(body?.error || 'The briefing could not be loaded.');
+      if (!ok) throw new Error(body?.error || 'The discussion summaries could not be loaded.');
       setResource({ cycleCode, profileId, body }); setLoading(false);
-    }).catch((failure) => { if (active) { setError(failure.message || 'The briefing could not be loaded.'); setLoading(false); } });
+    }).catch((failure) => { if (active) { setError(failure.message || 'The discussion summaries could not be loaded.'); setLoading(false); } });
     return () => { active = false; };
   }, [cycleCode, profileId, reload]);
 
@@ -117,12 +117,12 @@ function Briefing({ profileId }) {
   const gaps = data?.groups?.flatMap((group) => group.proposals).filter((p) => p.proposalSummary.status !== 'current' || p.discussionSummary.status !== 'current' || p.discussion.status !== 'current').length || 0;
   const refresh = () => { setResource(null); setError(''); setLoading(true); if (cycleCode) setReload((value) => value + 1); else setCatalogReload((value) => value + 1); };
 
-  return <Layout title="Program briefing" maxWidth="6xl">
+  return <Layout title="Discussion summaries" maxWidth="6xl">
     <div className="program-briefing">
       <div className="briefing-controls mb-6 pt-8">
         <Link href="/meeting-tracker" className="rounded text-sm text-gray-600 underline underline-offset-4 focus-visible:outline focus-visible:outline-2">Meeting Tracker</Link>
-        <h1 className="mt-3 text-2xl font-semibold leading-8 text-gray-900">Program briefing</h1>
-        <p className="mt-2 text-sm leading-6 text-gray-600">The proposal and the staff discussion, together for each grant program.</p>
+        <h1 className="mt-3 text-2xl font-semibold leading-8 text-gray-900">Discussion summaries</h1>
+        <p className="mt-2 text-sm leading-6 text-gray-600">Proposal and post-presentation discussion summaries, together by grant program.</p>
       </div>
       <div className="briefing-controls mb-6 flex flex-wrap items-end justify-between gap-4">
         <div className="flex flex-wrap items-end gap-3">
@@ -130,15 +130,15 @@ function Briefing({ profileId }) {
             {!cycles.length && <option value="">{loading ? 'Loading cycles…' : 'No cycles available'}</option>}
             {cycles.map((cycle) => <option key={cycle.code} value={cycle.code}>{cycle.label}</option>)}
           </ToolbarSelect>
-          <Button type="button" variant="outline" className="min-h-12" onClick={refresh} disabled={loading}>Refresh briefing</Button>
+          <Button type="button" variant="outline" className="min-h-12" onClick={refresh} disabled={loading}>Refresh summaries</Button>
         </div>
         <Button type="button" className="min-h-12" disabled={loading || !data || !total} onClick={() => window.print()}>Print / save PDF</Button>
       </div>
       <div className="briefing-controls mb-6 flex flex-wrap gap-x-5 gap-y-2 text-sm text-gray-700">
-        <Link href="/meeting-tracker/discussion-sentiment" className="rounded underline underline-offset-4 focus-visible:outline focus-visible:outline-2">Discussion Sentiment</Link>
+        <Link href="/meeting-tracker/discussion-sentiment" className="rounded underline underline-offset-4 focus-visible:outline focus-visible:outline-2">Post-presentation discussion sentiment</Link>
       </div>
       {loading && <div role="status" className="space-y-8 bg-white p-8">
-        <span className="sr-only">Loading proposal summaries and staff discussion…</span>
+        <span className="sr-only">Loading proposal and post-presentation discussion summaries…</span>
         <div aria-hidden="true" className="space-y-4 motion-safe:animate-pulse">
           <div className="h-6 w-64 max-w-full rounded bg-gray-200" />
           <div className="h-4 max-w-2xl rounded bg-gray-200" />
@@ -147,13 +147,13 @@ function Briefing({ profileId }) {
         </div>
       </div>}
       {error && <div role="alert" className="py-8"><p className="text-gray-800">{error}</p><Button type="button" variant="outline" className="mt-4" onClick={refresh}>Try again</Button></div>}
-      {!loading && !error && !cycles.length && <p className="py-10 text-gray-600">No SE or MR proposals are available for a briefing.</p>}
+      {!loading && !error && !cycles.length && <p className="py-10 text-gray-600">No SE or MR proposals are available for discussion summaries.</p>}
       {data && <div className="briefing-document bg-white px-5 py-7 sm:px-8 sm:py-8">
-        <h1 className="text-2xl font-semibold leading-8 text-gray-900">{data.cycleLabel} program briefing</h1>
+        <h1 className="text-2xl font-semibold leading-8 text-gray-900">{data.cycleLabel} discussion summaries</h1>
         <p className="mt-2 text-sm leading-6 text-gray-600">Staff only · {total} proposal{total === 1 ? '' : 's'} · Loaded {new Date(data.loadedAt).toLocaleString('en-US', { dateStyle: 'medium', timeStyle: 'short' })}</p>
-        <p className="mt-3 max-w-prose text-sm leading-6 text-gray-600">Published summary excerpts and accepted, current sentiment. Quotes reflect staff discussion; they are not independent evaluations. Advancing and Phase II Pending research proposals are included; set-aside proposals are excluded.</p>
+        <p className="mt-3 max-w-prose text-sm leading-6 text-gray-600">Published summary excerpts and accepted, current sentiment. Quotes reflect post-presentation discussion; they are not independent evaluations. Advancing and Phase II Pending research proposals are included; set-aside proposals are excluded.</p>
         {gaps > 0 && <p className="mt-3 text-sm leading-6 text-gray-800">{gaps} proposal{gaps === 1 ? ' has' : 's have'} missing, out-of-date, or unavailable material. Gaps are marked below.</p>}
-        <nav aria-label="Briefing programs" className="briefing-controls mt-5 flex flex-wrap gap-5 text-sm font-semibold text-gray-800">{data.groups.map((group) => <a key={group.key} href={`#briefing-${group.key}`} className="rounded underline underline-offset-4 focus-visible:outline focus-visible:outline-2">{group.key.toUpperCase()} · {group.proposals.length} proposals</a>)}</nav>
+        <nav aria-label="Discussion summary programs" className="briefing-controls mt-5 flex flex-wrap gap-5 text-sm font-semibold text-gray-800">{data.groups.map((group) => <a key={group.key} href={`#briefing-${group.key}`} className="rounded underline underline-offset-4 focus-visible:outline focus-visible:outline-2">{group.key.toUpperCase()} · {group.proposals.length} proposals</a>)}</nav>
         {data.groups.map((group) => <section id={`briefing-${group.key}`} key={group.key} className="briefing-program mt-10 scroll-mt-6" aria-labelledby={`heading-${group.key}`}>
           <h2 id={`heading-${group.key}`} className="mb-5 text-xl font-semibold text-gray-900">{group.name} ({group.key.toUpperCase()})</h2>
           {group.proposals.length ? group.proposals.map((proposal) => <Proposal key={proposal.requestId} proposal={proposal} />) : <p className="text-sm leading-6 text-gray-600">No eligible proposals in this program for this cycle.</p>}

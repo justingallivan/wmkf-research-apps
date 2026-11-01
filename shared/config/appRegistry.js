@@ -61,7 +61,7 @@ export const APP_REGISTRY = [
     name: 'Meeting Tracker',
     href: '/meeting-tracker',
     icon: '🗓️',
-    description: 'Plan deliberation sessions, attendees, Zoom links, and ordered proposal discussions',
+    description: 'Plan proposal discussion sessions, attendees, Zoom links, and the order of proposals',
     categories: ['phase-ii'],
     features: ['Session Planning', 'Proposal Schedule', 'Attendee Directory', 'Zoom Links'],
   },
