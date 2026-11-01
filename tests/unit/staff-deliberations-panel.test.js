@@ -17,7 +17,7 @@ test('documentless requests are visible and the query preserves program cycle an
   expect(screen.getByRole('link', { name: 'Open request' })).toHaveAttribute('href', expect.stringMatching(/tab=staff-deliberations.*#deliberations-briefing$/));
   expect(screen.getAllByRole('link')).toHaveLength(1);
   expect(screen.queryByText(/Sharing history|No sharing recorded/)).not.toBeInTheDocument();
-  expect(screen.queryByText(/Deliberation session:/)).not.toBeInTheDocument();
+  expect(screen.queryByText(/Proposal discussion session:/)).not.toBeInTheDocument();
   expect(screen.queryByText(/Materials status/)).not.toBeInTheDocument();
 });
 
@@ -29,7 +29,7 @@ test('before the presentation the next step names the briefing, and the row has 
 });
 
 test.each([
-  ['upcoming', '2099-03-04T17:00:00Z', /^Check the proposal discussion brief in Word, then share it before the deliberation session on Mar 4, 9:00\sAM PST\.$/],
+  ['upcoming', '2099-03-04T17:00:00Z', /^Check the proposal discussion brief in Word, then share it before the proposal discussion session on Mar 4, 9:00\sAM PST\.$/],
   ['passed', '2020-03-04T17:00:00Z', /^Check the proposal discussion brief in Word, then share it for the research presentation\.$/],
 ])('a ready briefing with a %s deliberation session', async (_label, scheduledStartIso, expected) => {
   global.fetch.mockResolvedValue(response([row({

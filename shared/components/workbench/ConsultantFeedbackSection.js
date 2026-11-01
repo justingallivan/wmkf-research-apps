@@ -757,7 +757,7 @@ export default function ConsultantFeedbackSection({ requestId, previewReadOnly =
               checked={form.shared}
               onChange={(e) => setForm((f) => ({ ...f, shared: e.target.checked }))}
             />
-            Shared on briefing page
+            Shared on proposal review packet
           </label>
 
           {saveError && <p className="text-sm text-red-600">{saveError}</p>}

@@ -1041,7 +1041,7 @@ test('the composer shows the deliberation session slot read-only, and the previe
     />,
   );
   const slot = await screen.findByTestId('composer-session-slot');
-  expect(slot).toHaveTextContent(/Deliberation session: .*Sep 11, 2026.*11:45.*AM\./);
+  expect(slot).toHaveTextContent(/Proposal discussion session: .*Sep 11, 2026.*11:45.*AM\./);
   expect(slot).toHaveTextContent('Join link included.');
 
   fireEvent.change(screen.getByLabelText('To'), { target: { value: 'staff@example.org' } });
@@ -1059,7 +1059,7 @@ test('with no session the slot says not yet scheduled and names the PC', async (
     />,
   );
   const slot = await screen.findByTestId('composer-session-slot');
-  expect(slot).toHaveTextContent('Deliberation session: not yet scheduled.');
+  expect(slot).toHaveTextContent('Proposal discussion session: not yet scheduled.');
   expect(slot).toHaveTextContent('the PC schedules sessions in Meeting Tracker');
 });
 

@@ -194,7 +194,7 @@ export default function BriefingPage() {
           <ul className="mt-2 space-y-1 text-sm">
             {data.materials.map((material) => (
               <li key={material.member}>
-                <span className="font-medium text-gray-800">{material.label}:</span>{' '}
+                <span className="font-medium text-gray-800">{material.label === 'Transcript Summary' ? 'Presentation summary' : material.label}:</span>{' '}
                 {material.available ? (
                   <a className="text-blue-800 underline" href={material.media ? presentationHref(material.member) : documentHref(material.member)} {...((material.inline || material.media) ? { target: '_blank', rel: 'noreferrer noopener' } : {})}>
                     {material.filename}

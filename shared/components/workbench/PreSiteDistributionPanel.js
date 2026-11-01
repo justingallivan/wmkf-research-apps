@@ -107,7 +107,7 @@ function BriefingLinkCard({ link, onReissue, busy, error }) {
             </p>
           ) : (
             <p className="mt-1 text-sm text-gray-600">
-              Board members and consultants open the brief, every completed review, the proposal, and the site visit materials here without a login.
+              Board members and consultants open the brief, every completed review, the proposal, and the presentation materials here without a login.
               {expires ? ` Live until ${expires}.` : ''}
             </p>
           )}
@@ -221,7 +221,7 @@ function ComposerDialog({ onClose, busy, escapeDisabled = false, children }) {
           <div>
             <h3 id="share-composer-title" className="text-lg font-semibold text-gray-900">Share the proposal review packet</h3>
             <p className="mt-1 text-sm text-gray-600">
-              The email carries the proposal review packet link; the brief, every completed review, the proposal, and the site visit materials open there without a login.
+              The email carries the proposal review packet link; the brief, every completed review, the proposal, and the presentation materials open there without a login.
             </p>
           </div>
           <Button variant="outline" size="sm"
@@ -993,7 +993,7 @@ export default function PreSiteDistributionPanel({
             <dl className="mt-3 space-y-2 text-sm text-gray-700">
               <div><dt className="inline font-medium">Subject:</dt> <dd className="inline">{preview.subject}</dd></div>
               <div><dt className="inline font-medium">Snapshot source:</dt> <dd className="inline">Word version {preview.sourceVersionId}; later edits are not included</dd></div>
-              <div><dt className="inline font-medium">Proposal discussion session:</dt> <dd className="inline">{deliberationSessionLine(preview.session).replace('Deliberation session: ', '')}{preview.session?.meetingLink ? ' · Join link included' : ''}</dd></div>
+              <div><dt className="inline font-medium">Proposal discussion session:</dt> <dd className="inline">{deliberationSessionLine(preview.session).replace('Proposal discussion session: ', '')}{preview.session?.meetingLink ? ' · Join link included' : ''}</dd></div>
               <div>
                 <dt className="inline font-medium">Proposal review packet:</dt>{' '}
                 <dd className="inline">

@@ -1133,7 +1133,7 @@ test('M1: a shared brief without a current Word URL fails closed with an explana
   }));
   render(<StaffDeliberationsTab requestId={REQUEST_ID} />);
 
-  expect(await screen.findByRole('heading', { name: 'Pre-Research Presentation Brief is read-only' }))
+  expect(await screen.findByRole('heading', { name: 'Proposal discussion brief is read-only' }))
     .toBeInTheDocument();
   expect(screen.getByText(/No current Word link was returned/i)).toBeInTheDocument();
   expect(screen.queryByRole('button', { name: 'Share…' })).not.toBeInTheDocument();
@@ -1146,7 +1146,7 @@ test('M1: a shared Pre-Site writeup without a current Word URL fails closed with
   }));
   render(<StaffDeliberationsTab requestId={REQUEST_ID} />);
 
-  expect(await screen.findByRole('heading', { name: 'Pre-Site Visit Writeup is read-only' }))
+  expect(await screen.findByRole('heading', { name: 'Draft writeup is read-only' }))
     .toBeInTheDocument();
   expect(screen.getByText(/No current Word link was returned/i)).toBeInTheDocument();
   expect(screen.queryByRole('link', { name: /(?:Open|Edit) (?:brief|draft writeup) in Word/ })).not.toBeInTheDocument();
@@ -1797,7 +1797,7 @@ test('writeup and review come first; meeting details stay behind a compact discl
   queueRoute('briefGet', statusResponse({ currentArtifact: briefArtifact(REVIEW) }));
   queueRoute('presiteGet', statusResponse({ session: { scheduledStartIso: '2099-01-15T17:00:00Z', ianaTimeZone: 'America/Los_Angeles' } }));
   render(<StaffDeliberationsTab requestId={REQUEST_ID} />);
-  expect(await screen.findByText(/Nothing else is needed before the deliberation session/)).toBeInTheDocument();
+  expect(await screen.findByText(/Nothing else is needed before the proposal discussion session/)).toBeInTheDocument();
   const steps = Array.from(screen.getByRole('list', { name: 'Staff deliberations steps' }).querySelectorAll(':scope > li h3'))
     .map((heading) => heading.textContent.replace(/\s*\(.*\)$/, ''));
   expect(steps).toEqual(['Draft writeup', 'Group review', 'Proposal discussion brief', 'Presentation']);
@@ -1841,7 +1841,7 @@ describe('draft writeup hidden before group review', () => {
   expect(await screen.findByTestId('writeup-hidden-note')).toHaveTextContent('The lead Program Director is preparing the draft writeup.');
     expect(screen.getByText('Post-visit drafting')).toBeInTheDocument();
     expect(screen.queryByRole('link', { name: /(?:Edit|Open) writeup in Word/ })).not.toBeInTheDocument();
-    expect(screen.queryByRole('heading', { name: 'Pre-Site Visit Writeup is read-only' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: 'Draft writeup is read-only' })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Prepare draft writeup' })).not.toBeInTheDocument();
     expect(screen.queryByTestId('group-review-handoff-note')).not.toBeInTheDocument();
   });

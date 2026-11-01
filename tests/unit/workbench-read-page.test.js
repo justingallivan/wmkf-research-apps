@@ -37,7 +37,7 @@ test('a summary renders with its headings, AI-generated label and SharePoint lin
     links: { sharePoint: 'https://tenant.sharepoint.com/s.txt' },
   }));
   render(<ReadPage />);
-  expect(await screen.findByRole('heading', { level: 1, name: 'Staff Discussion Summary' })).toBeInTheDocument();
+  expect(await screen.findByRole('heading', { level: 1, name: 'Post-presentation discussion summary' })).toBeInTheDocument();
   expect(global.fetch.mock.calls[0][0]).toBe(`/api/workbench/site-visit/presentation-text?requestId=${REQUEST_ID}&documentId=${DOC}`);
   expect(screen.getAllByRole('heading', { level: 2 }).map((h) => h.textContent))
     .toEqual(['Main points raised', 'Questions and concerns', 'Follow-ups and decisions']);
@@ -100,4 +100,26 @@ test('either grant opens the page; neither shows the access message; the Workben
   render(<ReadPage />);
   await waitFor(() => expect(screen.queryByText('Words.')).not.toBeInTheDocument());
   expect(screen.getByText(/Access Not Available/i)).toBeInTheDocument();
+});
+
+// Labels are translated at the rendering boundary, without changing service metadata or content.
+test.each([
+  ['Transcript Summary', 'Presentation summary'],
+  ['Staff Discussion Transcript', 'Post-presentation discussion transcript'],
+  ['Custom saved label', 'Custom saved label'],
+  ['Post-presentation discussion summary', 'Post-presentation discussion summary'],
+])('renders %s without rewriting supplied content', async (legacy, expected) => {
+  const text = 'Original Staff Discussion Summary words remain.';
+  global.fetch.mockReturnValue(reply(200, { ok: true, item: { kind: 'transcript', label: legacy }, text, links: {} }));
+  render(<ReadPage />);
+  expect(await screen.findByRole('heading', { level: 1, name: expected })).toBeInTheDocument();
+  expect(screen.getByText(text)).toBeInTheDocument();
+});
+
+test.each([[415, 'unsupported_format'], [413, 'too_large'], [503, 'integrity_failed']])('keeps the known label and SharePoint fallback on %s refusal', async (status, reason) => {
+  global.fetch.mockReturnValue(reply(status, { ok: false, reason, item: { label: 'Staff Discussion Summary' }, links: { sharePoint: 'https://tenant.sharepoint.com/unchanged.txt' } }));
+  render(<ReadPage />);
+  expect(await screen.findByRole('heading', { level: 1, name: 'Post-presentation discussion summary' })).toBeInTheDocument();
+  expect(screen.getAllByRole('link', { name: /Open in SharePoint/ })[0]).toHaveAttribute('href', 'https://tenant.sharepoint.com/unchanged.txt');
+  expect(screen.queryByRole('button', { name: 'Retry' })).not.toBeInTheDocument();
 });

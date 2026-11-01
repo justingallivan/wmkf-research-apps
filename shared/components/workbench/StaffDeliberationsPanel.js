@@ -161,7 +161,7 @@ function nextStep(request, task, document) {
       ? dateTime(request.session.scheduledStartIso, request.session.ianaTimeZone)
       : null;
     return sessionWhen
-      ? `Check the proposal discussion brief in Word, then share it before the deliberation session on ${sessionWhen}.`
+      ? `Check the proposal discussion brief in Word, then share it before the proposal discussion session on ${sessionWhen}.`
       : 'Check the proposal discussion brief in Word, then share it for the research presentation.';
   }
   return 'Generate the proposal discussion brief.';

@@ -129,8 +129,10 @@ Runtime adoption is partial. PRs #577, #580, #581, #583, #590, #591 and #592
 merged the bounded Workbench, Meeting Tracker, Board-reader, email,
 applicant-materials, recording/transcript, and Admin/app-navigation display-copy
 slices. The current source/Git baseline is PR #592, merge `e08006db0`; this is
-not a deployment receipt. The scoped reader, saved-name/error-message, and
-generated-document residuals remain separately identified in the
+not a deployment receipt. A1–A3 are implemented on
+`codex/reader-helper-terminology`, which is not merged or live;
+PR #593 is the separate audit-only PR on `codex/terminology-completion-audit`.
+A4 and generated-document/saved-name/error-message findings remain separately identified in the
 [2026-11-01 terminology completion audit](audits/terminology-completion-audit-2026-11-01.md).
 That audit is source/caller evidence only; live prompt/settings/file inventories
 remain unknown. Keep the approved names while preserving routes, API/service and

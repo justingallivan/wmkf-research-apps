@@ -510,7 +510,7 @@ describe('status report for the page header chip (redesign §10)', () => {
     // The card's heading puts closed above an attention count; the report follows the same order.
     ['closed with an upload needing attention', { state: 'closed', attentionCount: 1 }, { key: 'closed', overdue: false }, 'Closed. The contributor link has expired.'],
     ['saving an upload', { processingCount: 1 }, { key: 'processing', overdue: false }, 'Upload received.'],
-    ['ready', { state: 'ready' }, { key: 'ready', overdue: false }, 'Ready. The files open on the briefing page.'],
+    ['ready', { state: 'ready' }, { key: 'ready', overdue: false }, 'Ready. The files open on the proposal review packet.'],
   ])('%s: the report uses the same state as the heading', async (_label, overrides, expected, heading) => {
     global.fetch = jest.fn(async () => response({ success: true, collection: collection(overrides) }));
     const onStatusChange = jest.fn();

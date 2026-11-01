@@ -589,7 +589,7 @@ export function RosterForm({ initialData, onChange, onSubmit, onCancel, saving, 
             onChange={(e) => updateField('preferred_email', e.target.value)}
             className={`${fieldClass} disabled:bg-gray-100 disabled:text-gray-500`}
             disabled={linked}
-            placeholder="Preferred Site Visit correspondence address"
+            placeholder="Preferred research presentation correspondence address"
           />
           {linked && <p className="mt-1 text-xs text-gray-500">Read-only while linked; email comes from the Dataverse contact.</p>}
         </div>

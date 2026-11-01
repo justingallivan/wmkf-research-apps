@@ -45,7 +45,7 @@ test('selecting a contact restores the initially stored manual email and makes i
     />,
   );
 
-  const email = screen.getByPlaceholderText('Preferred Site Visit correspondence address');
+  const email = screen.getByPlaceholderText('Preferred research presentation correspondence address');
   await userEvent.clear(email);
   await userEvent.type(email, 'unsaved@example.org');
   await userEvent.click(screen.getByRole('button', { name: 'Search' }));
