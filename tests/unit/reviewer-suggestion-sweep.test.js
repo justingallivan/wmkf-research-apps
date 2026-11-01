@@ -84,6 +84,9 @@ describe('sweepStaleInvites', () => {
     expect(updateSpy).toHaveBeenCalledWith('wmkf_appreviewersuggestions', SUGGESTION_ID, {
       wmkf_responsetype: RESPONSE_TYPE_MAP.no_response,
       wmkf_responsereceivedat: NOW.toISOString(),
+      // A lapse leaves Wave 35 Ended by / Ended at explicitly blank.
+      wmkf_endedby: null,
+      wmkf_endedat: null,
     }, { actingUserSystemId: 'staff-1', ifMatch: ETAG });
   });
 

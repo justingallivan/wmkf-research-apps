@@ -39,7 +39,8 @@ describe('withdrawPendingInvitation', () => {
         withdrawnSufficientAt: '2026-09-06T00:00:00.000Z',
         respondReminderSentAt: null,
       },
-      { actingUserSystemId: 'user-1', ifMatch: 'W/"etag-1"' },
+      // "No longer needed" is the Foundation ending the engagement.
+      { actingUserSystemId: 'user-1', ifMatch: 'W/"etag-1"', outcome: { endedBy: 'foundation', endedAt: '2026-09-06T00:00:00.000Z' } },
     );
   });
 
@@ -62,7 +63,8 @@ describe('withdrawPendingInvitation', () => {
         respondReminderSentAt: null,
         externalTokenRevoked: true,
       },
-      { actingUserSystemId: 'user-2', ifMatch: 'W/"etag-no-response"' },
+      // A lapse leaves Ended by / Ended at blank.
+      { actingUserSystemId: 'user-2', ifMatch: 'W/"etag-no-response"', outcome: { endedBy: null, endedAt: null } },
     );
     const patch = mockUpdateLifecycle.mock.calls[0][1];
     expect(patch).not.toHaveProperty('withdrawnSufficientAt');
@@ -110,7 +112,7 @@ describe('withdrawPendingInvitation', () => {
         withdrawnSufficientAt: '2026-09-06T00:00:00.000Z',
         respondReminderSentAt: null,
       },
-      { actingUserSystemId: null, ifMatch: undefined },
+      { actingUserSystemId: null, ifMatch: undefined, outcome: { endedBy: 'foundation', endedAt: '2026-09-06T00:00:00.000Z' } },
     );
   });
 });

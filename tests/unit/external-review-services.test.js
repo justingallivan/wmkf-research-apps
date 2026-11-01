@@ -451,6 +451,27 @@ describe('applyReviewerResponse', () => {
     expect(applyStage2aResponse).not.toHaveBeenCalled();
   });
 
+  it.each([
+    ['before accepting', false, 'reviewer_before_accepting'],
+    ['after accepting', true, 'reviewer_after_accepting'],
+  ])('a portal decline %s records Ended by from the same fresh row', async (_label, accepted, endedBy) => {
+    await applyReviewerResponse({
+      suggestion: baseSuggestion({ wmkf_accepted: accepted }), request, reviewer, body: { action: 'decline', decline: {} }, ifMatch: 'W/"1"',
+    });
+    expect(applyStage2aResponse).toHaveBeenCalledWith(
+      expect.any(String), expect.objectContaining({ action: 'decline', endedBy }), expect.objectContaining({ ifMatch: 'W/"1"' }),
+    );
+  });
+
+  it('a row whose response type is already Declined is an idempotent repeat, so its recorded Ended at is not overwritten', async () => {
+    const r = await applyReviewerResponse({
+      suggestion: baseSuggestion({ wmkf_declined: false, wmkf_responsetype: 100000001, wmkf_endedby: 100000000 }),
+      request, reviewer, body: { action: 'decline', decline: {} }, ifMatch: 'W/"1"',
+    });
+    expect(r).toMatchObject({ ok: true, idempotent: true });
+    expect(applyStage2aResponse).not.toHaveBeenCalled();
+  });
+
   it('repeat accept skips the PATCH but stages a queued job (tail retry)', async () => {
     const r = await applyReviewerResponse({
       suggestion: baseSuggestion({ wmkf_accepted: true }), request, reviewer, body: { action: 'accept' }, ifMatch: undefined,

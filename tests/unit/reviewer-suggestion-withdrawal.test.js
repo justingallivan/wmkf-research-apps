@@ -10,6 +10,7 @@ import { runChangeset } from '../../lib/dataverse/core/changeset.js';
 import { DynamicsService } from '../../lib/services/dynamics-service.js';
 import {
   applyStage2aResponse,
+  updateLifecycle,
   applyStaffReviewerWithdrawal,
   applyStaffReviewerRelease,
   applyStaffReviewerDidNotSubmit,
@@ -37,6 +38,7 @@ describe('reviewer withdrawal changeset', () => {
           reasonText: 'Schedule changed',
           referral: 'Dr. Alternate',
         },
+        endedBy: 'reviewer_after_accepting',
       },
       {
         ifMatch: 'W/"17"',
@@ -370,4 +372,45 @@ describe('already-Withdrawn honorarium stays bound', () => {
       });
     },
   );
+});
+
+describe('Wave 35 outcome fields on portal and lifecycle writes', () => {
+  const ACKS = { coiVersionId: '33333333-3333-4333-8333-333333333333', aiUseVersionId: '44444444-4444-4444-8444-444444444444' };
+
+  it('a portal re-accept clears Ended by and Ended at in the same write', async () => {
+    const update = jest.spyOn(DynamicsService, 'updateRecord').mockResolvedValue(undefined);
+    await applyStage2aResponse(SUGGESTION_ID, { action: 'accept', acks: ACKS }, { ifMatch: 'W/"1"' });
+    expect(update.mock.calls[0][2]).toMatchObject({ wmkf_accepted: true, wmkf_endedby: null, wmkf_endedat: null });
+    update.mockRestore();
+  });
+
+  it('a portal decline before accepting records Ended by and dates it with the response time', async () => {
+    const update = jest.spyOn(DynamicsService, 'updateRecord').mockResolvedValue(undefined);
+    await applyStage2aResponse(SUGGESTION_ID, {
+      action: 'decline', decline: {}, endedBy: 'reviewer_before_accepting', responseReceivedAt: '2026-10-31T10:00:00.000Z',
+    }, { ifMatch: 'W/"1"' });
+    expect(update.mock.calls[0][2]).toMatchObject({
+      wmkf_declined: true, wmkf_endedby: 100000000, wmkf_endedat: '2026-10-31T10:00:00.000Z',
+    });
+    update.mockRestore();
+  });
+
+  it('a portal decline without a caller-decided Ended by is refused before any write', async () => {
+    const update = jest.spyOn(DynamicsService, 'updateRecord').mockResolvedValue(undefined);
+    await expect(applyStage2aResponse(SUGGESTION_ID, { action: 'decline', decline: {} }, { ifMatch: 'W/"1"' }))
+      .rejects.toThrow('endedBy');
+    expect(update).not.toHaveBeenCalled();
+    update.mockRestore();
+  });
+
+  it('updateLifecycle ignores a client-supplied endedBy and only writes the server outcome option', async () => {
+    jest.spyOn(DynamicsService, 'getRecord').mockResolvedValue({ wmkf_reviewstatus: null });
+    const update = jest.spyOn(DynamicsService, 'updateRecord').mockResolvedValue(undefined);
+    await updateLifecycle(SUGGESTION_ID, { notes: 'x', endedBy: 'foundation', wmkf_endedby: 100000002 }, { ifMatch: 'W/"1"' });
+    expect(update.mock.calls[0][2]).toEqual({ wmkf_notes: 'x' });
+    await updateLifecycle(SUGGESTION_ID, { notes: 'y' }, { ifMatch: 'W/"1"', outcome: { endedBy: 'foundation', endedAt: '2026-10-31T10:00:00.000Z' } });
+    expect(update.mock.calls[1][2]).toEqual({ wmkf_notes: 'y', wmkf_endedby: 100000002, wmkf_endedat: '2026-10-31T10:00:00.000Z' });
+    await expect(updateLifecycle(SUGGESTION_ID, { notes: 'z' }, { outcome: { endedBy: 'someone', endedAt: null } })).rejects.toThrow('unknown endedBy');
+    jest.restoreAllMocks();
+  });
 });

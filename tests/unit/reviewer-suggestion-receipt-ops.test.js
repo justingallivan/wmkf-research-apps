@@ -113,16 +113,17 @@ describe('expireInvitationResponse', () => {
     expect(spy).toHaveBeenCalledWith(
       'wmkf_appreviewersuggestions',
       SUGGESTION_ID,
-      { wmkf_responsetype: RESPONSE_TYPE_MAP.no_response, wmkf_responsereceivedat: nowIso },
+      // Wave 35: a lapse leaves Ended by / Ended at explicitly blank.
+      { wmkf_responsetype: RESPONSE_TYPE_MAP.no_response, wmkf_responsereceivedat: nowIso, wmkf_endedby: null, wmkf_endedat: null },
       { ifMatch: 'W/"7"', actingUserSystemId: 'user-3' },
     );
   });
 
-  it('writes only the two response fields (no other field is ever included)', async () => {
+  it('writes only the two response fields plus the blank Wave 35 outcome fields', async () => {
     const spy = jest.spyOn(DynamicsService, 'updateRecord').mockResolvedValue({});
     await expireInvitationResponse(SUGGESTION_ID, '2026-09-05T12:00:00.000Z', { ifMatch: 'W/"7"' });
     const [, , payload] = spy.mock.calls[0];
-    expect(Object.keys(payload).sort()).toEqual(['wmkf_responsereceivedat', 'wmkf_responsetype']);
+    expect(Object.keys(payload).sort()).toEqual(['wmkf_endedat', 'wmkf_endedby', 'wmkf_responsereceivedat', 'wmkf_responsetype']);
   });
 
   it.each([

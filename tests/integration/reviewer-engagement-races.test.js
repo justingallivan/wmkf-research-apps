@@ -964,6 +964,9 @@ describe('F3 generic staff correction regressions', () => {
         wmkf_emailsentat: result.updated.emailSentAt,
         wmkf_responsetype: RESPONSE_TYPE_MAP.accepted,
         wmkf_responsereceivedat: result.updated.responseReceivedAt,
+        // A decline corrected to Accepted reopens the engagement (Wave 35).
+        wmkf_endedby: null,
+        wmkf_endedat: null,
       });
       expect(lifecycleWrite.headers['If-Match']).toBe(before.suggestion._etag);
       expect(lifecycleWrite.headers.MSCRMCallerID).toBe(ACTOR);
