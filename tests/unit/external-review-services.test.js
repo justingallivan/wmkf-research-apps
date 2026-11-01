@@ -451,6 +451,18 @@ describe('applyReviewerResponse', () => {
     expect(applyStage2aResponse).not.toHaveBeenCalled();
   });
 
+  it.each([
+    ['before accepting', false, 'reviewer_before_accepting'],
+    ['after accepting', true, 'reviewer_after_accepting'],
+  ])('a portal decline %s records Ended by from the same fresh row', async (_label, accepted, endedBy) => {
+    await applyReviewerResponse({
+      suggestion: baseSuggestion({ wmkf_accepted: accepted }), request, reviewer, body: { action: 'decline', decline: {} }, ifMatch: 'W/"1"',
+    });
+    expect(applyStage2aResponse).toHaveBeenCalledWith(
+      expect.any(String), expect.objectContaining({ action: 'decline', endedBy }), expect.objectContaining({ ifMatch: 'W/"1"' }),
+    );
+  });
+
   it('repeat accept skips the PATCH but stages a queued job (tail retry)', async () => {
     const r = await applyReviewerResponse({
       suggestion: baseSuggestion({ wmkf_accepted: true }), request, reviewer, body: { action: 'accept' }, ifMatch: undefined,

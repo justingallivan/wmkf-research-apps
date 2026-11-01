@@ -423,3 +423,12 @@ terminal or response value the predicate already reads, and making it a
 required guard field would fail closed on any select that lacks it. 3b-2:
 portal decline/re-accept, stale sweep, no-longer-needed release. 3b-3: COI /
 Other pre-answer writer and the staff withdrawal reason choice.
+
+**Slice 3b-2 (2026-10-31):** portal decline (before/after accepting, from
+the fresh ETag-bound row; Ended at = response time) and re-accept (clears);
+stale sweep and no-response release (explicit blank); no-longer-needed release
+(Foundation); staff corrections via `correctionOutcome` (clear on decline →
+Accepted; attribute a correction that ends an open engagement: decline →
+reviewer before/after accepting, no longer needed → Foundation, no response →
+blank). `updateLifecycle` accepts Ended by only through a server-side
+`outcome` option, so browser-supplied correction fields cannot set it.
