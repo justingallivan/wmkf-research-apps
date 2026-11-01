@@ -871,11 +871,15 @@ export default function InviteEmailModal({ requestId = null, candidates = [], se
                   aria-expanded={timelineOpen}
                   className="w-full text-left"
                 >
-                  <span className="flex items-center justify-between gap-3">
-                    <span className="text-xs font-medium text-gray-700">Reviewer campaign timeline</span>
-                    <span className="text-xs text-gray-500">{timelineOpen ? 'Collapse' : 'Edit'}</span>
+                  {/* Button is a centered inline-flex row; one full-width block
+                      child keeps the title row and the summary stacked. */}
+                  <span className="block w-full">
+                    <span className="flex items-center justify-between gap-3">
+                      <span className="text-xs font-medium text-gray-700">Reviewer campaign timeline</span>
+                      <span className="text-xs text-gray-500">{timelineOpen ? 'Collapse' : 'Edit'}</span>
+                    </span>
+                    <span className="mt-1 block text-xs text-gray-500">{timingSummary(timing)}</span>
                   </span>
-                  <span className="mt-1 block text-xs text-gray-500">{timingSummary(timing)}</span>
                 </Button>
                 {timelineOpen && (
                   <div className="mt-3">
