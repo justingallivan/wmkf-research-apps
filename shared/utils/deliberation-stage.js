@@ -157,13 +157,13 @@ export function projectDeliberationSession(schedule) {
 }
 
 /**
- * "Deliberation session: not yet scheduled." names the PC as the actor (a
+ * "Proposal discussion session: not yet scheduled." names the PC as the actor (a
  * normal state, not a warning); with a slot it reads the date and time in the
  * session's own time zone.
  */
 export function deliberationSessionLine(session) {
   const startMs = Date.parse(session?.scheduledStartIso || '');
-  if (!Number.isFinite(startMs)) return 'Deliberation session: not yet scheduled.';
+  if (!Number.isFinite(startMs)) return 'Proposal discussion session: not yet scheduled.';
   let when;
   try {
     when = new Intl.DateTimeFormat(undefined, {
@@ -174,7 +174,7 @@ export function deliberationSessionLine(session) {
   } catch {
     when = new Date(startMs).toLocaleString();
   }
-  return `Deliberation session: ${when}.`;
+  return `Proposal discussion session: ${when}.`;
 }
 
 export function deliberationVisitLine(visit) {

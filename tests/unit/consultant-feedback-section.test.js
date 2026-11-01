@@ -42,13 +42,13 @@ function mockFetchSequence({ items = [], consultants = [] } = {}) {
 
 afterEach(() => jest.restoreAllMocks());
 
-test('the "Shared on briefing page" checkbox defaults to checked on a new entry', async () => {
+test('the "Shared on proposal review packet" checkbox defaults to checked on a new entry', async () => {
   mockFetchSequence();
   render(<ConsultantFeedbackSection requestId={REQUEST_ID} />);
   await waitFor(() => expect(screen.getByText('No consultant feedback recorded yet.')).toBeInTheDocument());
 
   await userEvent.click(screen.getByRole('button', { name: 'Add feedback' }));
-  expect(screen.getByRole('checkbox', { name: /Shared on briefing page/ })).toBeChecked();
+  expect(screen.getByRole('checkbox', { name: /Shared on proposal review packet/ })).toBeChecked();
 });
 
 test('"Add person…" expands name/affiliation fields instead of the roster dropdown', async () => {

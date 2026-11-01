@@ -210,6 +210,7 @@ test('research presentation materials list by label; oversize files show without
       { member: 'material:55555555-5555-4555-8555-555555555555', label: 'Applicant Slides', filename: 'Applicant Slides.pdf', size: 2048, available: true, inline: true },
       { member: 'material:77777777-7777-4777-8777-777777777777', label: 'Applicant Slides', filename: 'Applicant Slides.pptx', size: 4096, available: true, inline: false },
       { member: 'material:66666666-6666-4666-8666-666666666666', label: 'Recording', filename: 'Visit.mp4', size: 900 * 1024 * 1024, available: false, inline: false },
+      { member: 'material:88888888-8888-4888-8888-888888888888', label: 'Transcript Summary', filename: '1001 Transcript Summary.txt', size: 1000, available: true, inline: false },
     ],
   }));
   render(<BriefingPage />);
@@ -222,6 +223,8 @@ test('research presentation materials list by label; oversize files show without
   expect(pptx).toHaveAttribute('href', '/api/external/briefing/tok/document?member=material%3A77777777-7777-4777-8777-777777777777');
   expect(pptx).not.toHaveAttribute('target');
   expect(screen.getAllByText('Applicant Slides:')).toHaveLength(2);
+  expect(screen.getByText('Presentation summary:')).toBeInTheDocument();
+  expect(screen.getByRole('link', { name: '1001 Transcript Summary.txt' })).toHaveAttribute('href', '/api/external/briefing/tok/document?member=material%3A88888888-8888-4888-8888-888888888888');
   expect(screen.queryByRole('link', { name: 'Visit.mp4' })).not.toBeInTheDocument();
   expect(screen.getByText(/Visit\.mp4/)).toBeInTheDocument();
   expect(screen.getByText(/too large to open here/)).toBeInTheDocument();

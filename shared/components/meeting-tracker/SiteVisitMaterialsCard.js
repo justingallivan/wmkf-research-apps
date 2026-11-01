@@ -33,7 +33,7 @@ const STATE_COPY = {
   processing: 'Upload received. We’re checking and saving the file.',
   needs_attention: 'An upload needs coordinator attention before it can be replaced.',
   received: 'Every required item is in. Confirm the files open, then the collection is ready.',
-  ready: 'Ready. The files open on the briefing page.',
+  ready: 'Ready. The files open on the proposal review packet.',
   closed: 'Closed. The contributor link has expired.',
 };
 
@@ -258,7 +258,7 @@ export default function SiteVisitMaterialsCard({ requestId, requestNumber, onSta
           <p className="mt-1 text-sm text-gray-600">
             {collection
               ? collectionStateCopy
-              : 'Ask the applicant for the presentation, its source file, and participant bios. They upload through one link; the files appear on the briefing page.'}
+              : 'Ask the applicant for the presentation, its source file, and participant bios. They upload through one link; the files appear on the proposal review packet.'}
           </p>
         </div>
         <div className="flex items-center gap-2">

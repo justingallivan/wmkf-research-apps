@@ -20,6 +20,13 @@ import {
   PRESENTATION_SUMMARY_LIST_HEADINGS,
 } from '../../shared/config/transcriptSummary';
 
+// Translate only known legacy display labels; supplied text and file identities stay unchanged.
+const READER_LABELS = new Map([
+  ['Transcript Summary', 'Presentation summary'],
+  ['Staff Discussion Summary', 'Post-presentation discussion summary'],
+  ['Staff Discussion Transcript', 'Post-presentation discussion transcript'],
+]);
+
 const SUMMARY_FORMAT = {
   presentation: { headings: PRESENTATION_SUMMARY_HEADINGS, listHeadings: PRESENTATION_SUMMARY_LIST_HEADINGS },
   discussion: { headings: DISCUSSION_SUMMARY_HEADINGS, listHeadings: DISCUSSION_SUMMARY_LIST_HEADINGS },
@@ -103,7 +110,7 @@ export function Reader({ Shell = Layout }) {
   const request = body.request || null;
   const item = body.item || {};
   const sharePoint = body.links?.sharePoint || null;
-  const label = item.label || (view.status === 'loading' ? 'Loading…' : 'Document');
+  const label = READER_LABELS.get(item.label) || item.label || (view.status === 'loading' ? 'Loading…' : 'Document');
   const published = formatDate(item.publishedAt);
   const identity = request?.number ? `Request ${request.number}` : 'Request';
   const problem = PROBLEM[body.reason] || 'This item could not be loaded.';
@@ -122,7 +129,7 @@ export function Reader({ Shell = Layout }) {
           ) : (
             <p className="text-sm text-gray-500">{identity}</p>
           )}
-          <div className="mt-2 flex items-start justify-between gap-4">
+          <div className="mt-2 flex flex-col items-start justify-between gap-4 sm:flex-row">
             <h1 className="text-2xl font-semibold text-gray-900 text-balance">{label}</h1>
             <SharePointLink href={sharePoint} />
           </div>

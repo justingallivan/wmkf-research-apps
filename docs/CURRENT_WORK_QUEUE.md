@@ -78,8 +78,11 @@ sequence.
   PRs #577, #580, #581, #583, #590, #591 and #592 merged bounded Workbench,
   Meeting Tracker, Board-reader, email, applicant-materials, recording/transcript,
   and Admin/app-navigation copy slices. PR #592 (`e08006db0`) is the current
-  source/Git baseline; no deployment is inferred. Remaining reader/helper,
-  generated-document, and saved-name/error copy findings are scoped in
+  merged source/Git baseline; no deployment is inferred. Audit findings A1-A3
+  are implemented on `codex/reader-helper-terminology`; that implementation
+  branch is not merged/live. PR #593 is audit-only on
+  `codex/terminology-completion-audit`.
+  A4 and generated-document/saved-name/error copy findings remain scoped in
   `docs/audits/terminology-completion-audit-2026-11-01.md`; live saved values,
   published prompts, and deployment state remain unknown. Preserve identifiers,
   routes, schemas, existing user content, and historical files; no data or

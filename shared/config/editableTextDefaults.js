@@ -511,7 +511,7 @@ export const EDITABLE_TEXT_DEFAULTS_BY_KEY = Object.freeze(
 export const EDITABLE_TEXT_GROUPS = [
   { id: 'reviewers', title: 'Reviewer emails', description: 'Default copy for reviewer email workflows (org defaults; some are per-PD editable).' },
   { id: 'grantees', title: 'Grantee emails', description: 'Default copy for grantee deliverables email workflows.' },
-  { id: 'applicants', title: 'Applicant emails', description: 'Default copy for applicant-facing email workflows before an award (site-visit materials).' },
+  { id: 'applicants', title: 'Applicant emails', description: 'Default copy for applicant-facing email workflows before an award (presentation materials).' },
   { id: 'internal', title: 'Internal emails', description: 'Default copy for internal staff-facing email workflows.' },
   { id: 'labels', title: 'Staff labels', description: 'Display labels shown in staff-facing UI, not email copy.' },
 ];

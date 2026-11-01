@@ -1400,11 +1400,11 @@ export default function StaffDeliberationsTab({
   // What to do now, for the steps whose stage sentence does not already say it.
   const nowLine = hasProblemNotice ? null
     : currentStep === 'briefing'
-      ? briefShared ? `Share the proposal discussion brief ${sessionUpcoming ? 'before the deliberation session' : 'for the research presentation'}.`
-        : briefDraftReady ? `Check the proposal discussion brief in Word, then share it ${sessionUpcoming ? 'before the deliberation session' : 'for the research presentation'}.`
+      ? briefShared ? `Share the proposal discussion brief ${sessionUpcoming ? 'before the proposal discussion session' : 'for the research presentation'}.`
+        : briefDraftReady ? `Check the proposal discussion brief in Word, then share it ${sessionUpcoming ? 'before the proposal discussion session' : 'for the research presentation'}.`
           : briefReadyFile ? null : 'Generate the proposal discussion brief.'
       : currentStep === 'session'
-        ? 'The brief is shared. Nothing else is needed before the deliberation session.'
+        ? 'The brief is shared. Nothing else is needed before the proposal discussion session.'
       : currentStep === 'presentation'
         ? 'Nothing is needed until the research presentation. You can prepare the draft writeup now if you like.'
         : null;
@@ -1529,7 +1529,7 @@ export default function StaffDeliberationsTab({
       </div>
       {briefShared && !briefReadyFile && (
         <div className="mt-4 rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-950">
-          <h4 className="font-semibold">Pre-Research Presentation Brief is read-only</h4>
+          <h4 className="font-semibold">Proposal discussion brief is read-only</h4>
           <p className="mt-1">
             No current Word link was returned for this record, so working controls are not
             available. Reload to retry, or contact an administrator if this persists.
@@ -1727,7 +1727,7 @@ export default function StaffDeliberationsTab({
       )}
       {(preSiteShared || preSiteFinal) && !readyFile && !writeupHidden && (
         <div className="mt-4 rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-950">
-          <h4 className="font-semibold">Pre-Site Visit Writeup is read-only</h4>
+          <h4 className="font-semibold">Draft writeup is read-only</h4>
           <p className="mt-1">
             No current Word link was returned for this record, so working controls are not
             available. Reload to retry, or contact an administrator if this persists.
@@ -1799,8 +1799,8 @@ export default function StaffDeliberationsTab({
           <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-950">
             <h3 className="font-semibold">Staff Deliberations is read-only</h3>
             <p className="mt-1">
-              The Pre-Research Presentation Brief has moved beyond the deliberation stages.
-              It cannot be downloaded or regenerated from this tab. The Site Visit writeup
+              The proposal discussion brief has moved beyond the deliberation stages.
+              It cannot be downloaded or regenerated from this tab. The draft writeup
               below keeps its own actions.
             </p>
           </div>

@@ -391,7 +391,7 @@ export default function SiteVisitEditor() {
           </p>
         )}
         {requestIdentity?.shareStatus && <p className="mt-1 text-sm text-gray-600">Share status: {requestIdentity.shareStatus}</p>}
-        {(!visit || editing) && <p className="mt-2 text-sm text-gray-600">The date here feeds the Staff Deliberations rail, the cycle view, the briefing page, and the Share email's calendar entry.</p>}
+        {(!visit || editing) && <p className="mt-2 text-sm text-gray-600">The date here feeds the Staff Deliberations rail, the cycle view, the proposal review packet, and the Share email's calendar entry.</p>}
       </div>
 
       {error && <div role="alert" className="mb-5 rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-800">{error}</div>}
