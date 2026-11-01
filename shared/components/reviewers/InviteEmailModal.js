@@ -118,6 +118,18 @@ function timingSummary(timing) {
 // Substitute the timing tokens with formatted dates. A line whose token has no
 // value is dropped entirely (so the bullet doesn't appear with a blank/leftover
 // token). The "Review timeline:" header is dropped when nothing is set at all.
+// The retired token can share a line with content applyTiming must not drop.
+// render-emails has already filled the link and server dates, so a line is
+// only removed automatically when, apart from a list marker, it holds no other
+// token, link or number (a date). Otherwise the PD edits the wording first.
+export function hasMixedLegacyReleaseLine(body) {
+  return String(body || '').split('\n').some((line) => {
+    if (!line.includes('{{proposalDelivery}}')) return false;
+    const rest = line.split('{{proposalDelivery}}').join('').replace(/^\s*(?:[-*•]|\d+[.)])\s*/, '');
+    return /\{\{|https?:\/\/|\d/.test(rest);
+  });
+}
+
 export function applyTiming(body, timing) {
   const values = timingTokenValues(timing);
   const anySet = Object.values(values).some(Boolean);
@@ -188,6 +200,8 @@ export function applySubjectTiming(subject, timing) {
 // renders are read-only server-side (no token minting), aborting here can
 // never strand a durable write.
 export const PREVIEW_RENDER_TIMEOUT_MS = 45000;
+
+export const LEGACY_RELEASE_BLOCK_MESSAGE = 'Your saved wording has the proposal release date on the same line as other details, so it can’t be removed automatically. Edit your default wording, or this email, to take out the release date before sending.';
 
 export default function InviteEmailModal({ requestId = null, candidates = [], settings = {}, allowResend = false, vipUnknown = false, onClose, onSent }) {
   const [step, setStep] = useState('preview'); // preview | sending | sent | error
@@ -426,6 +440,9 @@ export default function InviteEmailModal({ requestId = null, candidates = [], se
     body: edits[d.suggestionId]?.body ?? (d.skipped ? d.body : applyTiming(d.body, timing)),
   });
   const drafts = rawDrafts.map(draftView);
+  const legacyReleaseBlocked = rawDrafts.some((d) => !d.skipped
+    && edits[d.suggestionId]?.body == null
+    && hasMixedLegacyReleaseLine(d.body));
 
   // A draft renders as a FULL card when anything requires human eyes on it:
   // the person is VIP-flagged, the server skipped it (remediation UI), it
@@ -692,6 +709,7 @@ export default function InviteEmailModal({ requestId = null, candidates = [], se
   const handleSend = async () => {
     if (defaultWordingBusy) return;
     if (sendable.length === 0) { setError('No recipients with an email to send to.'); return; }
+    if (legacyReleaseBlocked) { setError(LEGACY_RELEASE_BLOCK_MESSAGE); return; }
     if (quickCheckSendable.length > 0 && !allQuickChecksConfirmed) {
       setError('Confirm each quick-check address before sending.');
       return;
@@ -864,7 +882,9 @@ export default function InviteEmailModal({ requestId = null, candidates = [], se
                 {timelineWarning ? (
                   <p role="status" className="text-xs text-amber-800 mt-2">{timelineWarning}</p>
                 ) : null}
-                {rawDrafts.some((d) => String(d?.body || '').includes('{{proposalDelivery}}')) ? (
+                {legacyReleaseBlocked ? (
+                  <p role="alert" className="text-xs text-red-700 mt-2">{LEGACY_RELEASE_BLOCK_MESSAGE}</p>
+                ) : rawDrafts.some((d) => String(d?.body || '').includes('{{proposalDelivery}}')) ? (
                   <p role="status" className="text-xs text-amber-800 mt-2">
                     Your saved wording still mentions a proposal release date. That line is left out, because
                     the proposal is now emailed when a reviewer accepts. Update your default wording to remove it.
@@ -1341,11 +1361,11 @@ export default function InviteEmailModal({ requestId = null, candidates = [], se
               <Button variant="primary" size="sm"
                 type="button"
                 onClick={handleSend}
-                disabled={defaultWordingBusy || (sendable.length === 0 || (quickCheckSendable.length > 0 && !allQuickChecksConfirmed))}
+                disabled={defaultWordingBusy || legacyReleaseBlocked || (sendable.length === 0 || (quickCheckSendable.length > 0 && !allQuickChecksConfirmed))}
                 className={`px-4 py-2 text-white text-sm font-medium rounded-lg disabled:opacity-40 disabled:cursor-not-allowed ${
                   quickCheckSendable.length > 0 ? 'bg-amber-600 hover:bg-amber-700' : 'bg-gray-900 hover:bg-gray-800'
                 }`}
-                title={(quickCheckSendable.length > 0
+                title={legacyReleaseBlocked ? LEGACY_RELEASE_BLOCK_MESSAGE : (quickCheckSendable.length > 0
                   ? `${quickCheckSendable.length} address(es) need a quick check before sending`
                   : undefined)}
               >

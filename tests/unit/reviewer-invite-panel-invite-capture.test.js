@@ -170,6 +170,29 @@ describe('ReviewerInvitePanel invitation capture rehearsal', () => {
     expect(JSON.parse(sendCall[1].body).drafts[0].body).toContain('https://reviews.wmkeck.org/external/review/token.value');
   });
 
+  test('blocks sending when the retired release date shares a line with the secure link', async () => {
+    const base = global.fetch.getMockImplementation();
+    global.fetch.mockImplementation(async (url, init) => {
+      if (url === '/api/review-manager/render-emails') {
+        return mockJson({ drafts: [{
+          ...draft,
+          body: 'Respond here: https://reviews.wmkeck.org/external/review/token.value — proposals around {{proposalDelivery}}.',
+          reviewDueDate: '2099-08-24',
+        }] });
+      }
+      return base(url, init);
+    });
+    render(
+      <ReviewerInvitePanel requestId="REQ-1" candidates={[candidate]} onRefresh={jest.fn()} settings={{ signature: 'Program Director' }} />,
+    );
+    fireEvent.click(screen.getByLabelText('Select Dr. Test Reviewer'));
+    fireEvent.click(screen.getByRole('button', { name: /send invitation \(1\)/i }));
+    await screen.findByDisplayValue('Invitation');
+    expect(await screen.findByText(/on the same line as other details/i)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /send 1 invitation/i })).toBeDisabled();
+    expect(global.fetch.mock.calls.some(([url]) => url === '/api/review-manager/send-emails')).toBe(false);
+  });
+
   test('keeps declined reviewers visible but excludes them from invitation selection and counts', () => {
     const declinedCandidate = {
       ...candidate,

@@ -6,6 +6,7 @@ import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import InviteEmailModal, {
   applySubjectTiming,
   applyTiming,
+  hasMixedLegacyReleaseLine,
   invitationTimelineWarning,
 } from '../../shared/components/reviewers/InviteEmailModal';
 import { readSseStream } from '../../shared/components/reviewers/sse';
@@ -81,6 +82,17 @@ describe('InviteEmailModal invitation timing contract', () => {
     expect(out).not.toMatch(/proposalDelivery|full proposal/);
     expect(out).toMatch(/^1\. You respond — by \S/);
     expect(out).toMatch(/3\. Your completed review is due — by \S/);
+  });
+
+  test('flags a legacy release date sharing a line with other details, not a standalone one', () => {
+    expect(hasMixedLegacyReleaseLine('2. We send the full proposal — around {{proposalDelivery}}')).toBe(false);
+    expect(hasMixedLegacyReleaseLine('Respond here {{externalLink}}; proposals around {{proposalDelivery}}.')).toBe(true);
+    expect(hasMixedLegacyReleaseLine('Proposals {{proposalDelivery}}, reviews due {{reviewDue}}.')).toBe(true);
+    expect(hasMixedLegacyReleaseLine('Respond by {{respondBy}}\n{{externalLink}}')).toBe(false);
+    expect(hasMixedLegacyReleaseLine('- Proposal delivered on {{proposalDelivery}}')).toBe(false);
+    // Server-filled link and dates arrive as plain text.
+    expect(hasMixedLegacyReleaseLine('Link: https://reviews.wmkeck.org/x — proposals {{proposalDelivery}}')).toBe(true);
+    expect(hasMixedLegacyReleaseLine('Proposals around {{proposalDelivery}}; reviews due March 10, 2027.')).toBe(true);
   });
 
   test('warns, without blocking, when reviews fall due on or before the response deadline', () => {
