@@ -1,42 +1,44 @@
 ---
 name: Proposal Context Extraction Plan
-description: Pre-extract structured context from proposals in the initial pass so downstream deep-dive calls use ~1.5K tokens of curated fields instead of the full ~7K-token proposal. Matters most in the single-phase cycle (2 cycles out) where deep-dive work happens on the same document the initial pass processed.
+description: Historical proposal for structured proposal-context extraction; fields, consumers, cycle assumptions, and implementation are not approved current architecture.
 type: project
 originSessionId: 295c55b4-a2bb-431a-984e-49c1e47ea565
 status: active
 scope: prompt
-last_verified: 2026-07-27 via current deferred plan and AI-field/writeback source; token estimates remain planning assumptions
+last_verified: 2026-10-31 source-only audit at f6376751d; no live probes; estimates and cycle assumptions are historical planning values
 ---
 
 ## Recall Rule
 
-Read this when: building deep-touch workflows (reviewer matching, virtual review panel, compliance screens, staff Q&A) for the single-phase grant cycle, or designing the `wmkf_ai_dataextract` capture.
+Read this only as historical context if a future owner-approved workflow raises a need for shared proposal-context extraction. It is not a current capture contract.
 
-Do:
-- Default downstream calls to read extracted Dynamics fields (~1.5K-token curated extracts), not the full ~7K-token proposal (~15K with images).
-- Capture structured extractions (central question, hypotheses, aims, methods, required expertise, key claims) in the initial pass that already reads the full proposal.
+Before any implementation, establish the current cycle and workflow, select its real inputs and consumers, and decide whether extraction is needed. Re-estimate token and cost assumptions for actual models and documents.
 
-Do not:
-- Build this yet — deferred until the single-phase cycle is imminent or a concrete deep-dive workflow first needs the extracted context.
+Do not assume downstream calls should consume extracted Dynamics fields. The successor Review Panel currently accepts a frozen proposal-narrative-only DTO; this plan's proposed fields are not its input contract.
 
-Ground truth: `docs/PROPOSAL_CONTEXT_EXTRACTION_PLAN.md` (field categories A/B/C, downstream economics, open design decisions); this is the capture shape for the deferred `wmkf_ai_dataextract`.
+Historical reference: `docs/PROPOSAL_CONTEXT_EXTRACTION_PLAN.md`. It records candidate field categories and open decisions, not a settled capture shape or approved `wmkf_ai_dataextract` contract.
 
-[VERIFIED 2026-07-27 as deferred design, not current data flow]:
-`lib/services/dynamics-service.js` contains the AI-run/write helpers, but no
-implemented shared extraction producer→persistence→consumer chain establishes
-this proposal-context surface. Token figures below are planning estimates.
+[VERIFIED 2026-10-31 via bounded source review at f6376751d; no live probe]:
+The existing `wmkf_ai_dataextract` field is included in Workbench proposal reads
+and in the cycle-dossier's captured `priorAiContext`; the Executor can persist
+prompt-declared outputs to that field. This is a narrower existing surface, not
+proof that the proposed A/B/C field set or all listed downstream consumers are
+implemented. The successor Review Panel explicitly selects a frozen proposal narrative
+with request identity, institution and title (`lib/services/review-panel-input.js`) and excludes
+`wmkf_ai_dataextract`. Token figures below are historical planning estimates,
+not measured current costs.
 
-Pre-extraction strategy for the single-phase grant cycle (2 cycles from 2026-04-17). In that cycle, proposals get one initial Claude pass; staff select some for deeper touch; deeper touch uses the SAME document with no new information from the submitter.
+Historical scenario considered in April 2026: a possible single-phase cycle where staff select proposals for deeper review using the same submitted document. The current cycle/workflow assumptions need owner confirmation before this scenario is reused.
 
 **Why:** The initial pass already reads the full 5-page proposal. If it also captures structured extractions (central question, hypotheses, specific aims, methods summary, required expertise, key claims, etc.) into Dynamics fields, every downstream call can reference curated ~1.5K-token extracts instead of the full ~7K-token proposal (or ~15K-token PDF with images on user-side paths).
 
-**How to apply:** When building deep-touch workflows (reviewer matching, virtual review panel, compliance screens, staff Q&A) for the single-phase cycle, default to reading extracted Dynamics fields rather than the full proposal. The extraction fields become the shared "context surface" for all downstream work.
+**How to apply:** Treat the design and its field list as candidates only. Each future consumer must choose and enforce its own input contract; do not make these fields a default context surface without an explicit current decision.
 
 **Key amplifiers of ROI:**
 - Expensive models (Opus, extended thinking): savings scale with per-token cost
 - Multi-LLM panels: savings multiply by provider count (Claude + GPT + Gemini + Perplexity)
 - Chain depth: 5–10 downstream calls per advancing proposal is common
 
-**This is the capture shape for the deferred `wmkf_ai_dataextract`** — see `docs/PROPOSAL_CONTEXT_EXTRACTION_PLAN.md` for the full field list (categories A/B/C), downstream economics, and open design decisions (JSON-in-Memo vs individual columns, multi-output vs focused-pass ingest, freshness policy).
+The field list and storage alternatives below are unresolved historical design questions for any expansion beyond the existing `wmkf_ai_dataextract` surface; they are not a settled capture shape. Keep this memory routed only as a reminder to seek a fresh owner-approved contract if a concrete workflow needs extraction.
 
-Not building yet — deferred until single-phase cycle is imminent or until a concrete deep-dive workflow first needs the extracted context.
+The historical proposal does not authorize a build. Revisit only after an owner approves a concrete workflow need, its inputs and consumers, and whether the existing `wmkf_ai_dataextract` field is sufficient or needs expansion.

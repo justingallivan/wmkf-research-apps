@@ -1,8 +1,8 @@
 ---
 agent_wiki: topic
 status: active
-last_verified: 2026-10-22
-verification_scope: "Inherited hub date; extraction integrity only, no claim or live-state recertification"
+last_verified: 2026-10-31
+verification_scope: "Materials-on-acceptance source/Git reconciliation only; other hub entries retain their dates, no fresh live-state recertification"
 stale_after_days: 90
 owner: reviewers
 source_files:
@@ -85,9 +85,9 @@ See [reviewer activity history](./reviewer-activity-history.md).
 See [reviewer invitation email](./reviewer-invitation-email.md).
 
 <!-- source-lines: 796-807 -->
-## Materials on acceptance and the shared release row (PR #562 branch, NOT merged)
+## Materials on acceptance and the shared release row (PR #562 merged)
 
-Automatic release on acceptance and the manual Release Materials send both claim one `reviewer_materials_releases` row per engagement before minting the reviewer link ([Atlas](../../atlas/postgres-reviewer-materials-releases.md); plan `docs/plans/REVIEWER_INVITATION_CALENDAR_BUILD_PLAN_2026-10-29.md` §3.3 build notes). Staff recovery lives in the Release Materials send result: "Send again" for a stopped or abandoned release, "Mark as delivered" (`/api/review-manager/materials-release-delivered`) for a sent but unrecorded one. A `failed` release is retaken by any normal send; the acceptance drain retries bookkeeping for `sent` rows. Treat all of this as branch-only until #562 merges and migration 091 is applied.
+Automatic release on acceptance and the manual Release Materials send both claim one `reviewer_materials_releases` row per engagement before minting the reviewer link ([Atlas](../../atlas/postgres-reviewer-materials-releases.md); plan `docs/plans/REVIEWER_INVITATION_CALENDAR_BUILD_PLAN_2026-10-29.md` §3.3 build notes). Staff recovery lives in the Release Materials send result: "Send again" for a stopped or abandoned release, "Mark as delivered" (`/api/review-manager/materials-release-delivered`) for a sent but unrecorded one. A `failed` release is retaken by any normal send; the acceptance drain retries bookkeeping for `sent` rows. [VERIFIED via source/Git, 2026-10-31] PR #562 merged as `fcad0ad53`; Session657 and DEVELOPMENT_LOG record migration 091 applied and the Production release. PR #568 (`166b808e2`) subsequently bound manual minting to the rechecked reviewer version. These dated receipts are not a fresh live probe or proof of the first natural J27 acceptance send. Invitation wording/date-field follow-ups remain in the build plan.
 
 ## Durable Memory
 

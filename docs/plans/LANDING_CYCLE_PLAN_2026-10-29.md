@@ -166,9 +166,7 @@ Deliberations, Initial Assessments, Awardees tab) take the shell's cycle.
   (not the UTC day the shared resolver uses); else the latest candidate; with
   no candidates, today's conventional rule. Codes alone would resolve by month
   and keep D26 through Dec 31.
-  **Amended by D47 (2026-10-29); built on branch `claude/board-setup-calendar`, PR #561, not merged:** the setup's `boardEnds` goes
-  away. Candidates become cycles with a Board setup row whose calendar Board
-  Meeting Date is set; the same order then compares that date.
+  **Amended by D47 (2026-10-29); implemented in merged PR #561 (`955613bdb`), Production-deployed 2026-10-31 per the dated release receipt:** the setup's `boardEnds` goes away. Candidates become cycles with a Board setup row whose calendar Board Meeting Date is set; the same order then compares that date. The release receipt says signed-in D26 Board-page rendering was not checked; this plan makes no fresh live-state claim.
 - Applies on first load only; an open page never switches.
 
 ### 3.4 Per-app behavior when the landing cycle is set to J27

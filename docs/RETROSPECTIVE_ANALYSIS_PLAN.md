@@ -3,7 +3,7 @@ title: "Retrospective Analysis — Long-Term Plan"
 domain: docs-governance
 kind: audit
 status: historical
-summary: "Created: 2026-04-22 (Session 106, from Connor + Justin conversation) Status: Planning — no code yet."
+summary: "Historical design: record export and file indexing exist; a joined document-selection, custom-prompt batch and structured-results workflow remains open."
 canonical: false
 cataloged: 2026-07-02
 owner: product-engineering
@@ -14,10 +14,20 @@ related:
   - docs/PROMPT_STORAGE_DESIGN.md
 ---
 
-# Retrospective Analysis — Long-Term Plan
+# Retrospective Analysis — Historical Plan and Current State
 
 **Created:** 2026-04-22 (Session 106, from Connor + Justin conversation)
-**Status:** Planning — no code yet
+**Status:** Historical design snapshot (2026-04-22). The statement “no code yet” described that date only and is superseded in part by the current-state record below.
+
+## Current state (verified from repository source, 2026-10-31)
+
+Two related building blocks now exist, but neither implements the full retrospective analysis workflow:
+
+- **Dataverse Bulk Export is shipped.** The `dataverse-bulk-export` app lets staff filter request records, preview the result set, confirm the run, and download an Excel workbook (`shared/config/appRegistry.js`; `pages/dataverse-bulk-export.js`; `pages/api/dataverse-export/preview.js`; `pages/api/dataverse-export/run.js`). It exports request data; it does not select and supply SharePoint documents to an AI analysis or export structured model results.
+- **The Research request-file metadata index is shipped and loaded.** The owner-run index covers Research requests from the 2018 meeting year, stores file metadata/classification, and has no staff UI or route consumer. Its approved build explicitly excludes text extraction and model calls (`docs/plans/RESEARCH_REQUEST_FILE_CORPUS_INDEX_BUILD_PLAN_2026-10-25.md`, especially “Scope” and “First Production load”).
+- **The requested end-to-end workflow remains open:** there is no verified staff workflow joining historical request selection, attached-document retrieval, a user-selected/custom prompt, multi-request analysis, and a structured analysis-results workbook. Existing batch summary pages use uploaded PDFs and fixed app prompts, with PDF/Markdown exports (`pages/batch-phase-i-summaries.js`, `pages/batch-proposal-summaries.js`).
+
+This is a repository-source assessment only; no live database, SharePoint, or deployment probe was run. It establishes the named components and their checked-in contracts, not external runtime availability.
 
 ## Purpose
 
@@ -38,49 +48,49 @@ PA and the existing web apps cover different regimes. Neither should grow to cov
 
 **Implication:** don't build a PA flow every time a staff member has a research question. Keep ad hoc workloads in the web apps and invest in making those apps better at the retrospective regime.
 
-## Gaps in the current web apps for retrospective work
+## Historical design gaps and their current status
 
-A retrospective analysis looks like: *"Pick 200 proposals from 3 historical cycles matching criterion X. Apply prompt P. Get structured results back as a spreadsheet."* Today, no single app supports this end to end. The four gaps:
+A retrospective analysis looks like: *"Pick 200 proposals from 3 historical cycles matching criterion X. Apply prompt P. Get structured results back as a spreadsheet."* The 2026-04-22 plan identified four gaps. Their status below distinguishes later partial building blocks from the still-missing end-to-end capability.
 
 ### 1. Historical-request picker
-No app today lets you select a *set* of requests by cycle / year / program area / status and auto-pull their SharePoint PDFs. Our batch summary apps require manual uploads. This is the biggest friction point — staff can't run any retrospective without exporting from Dynamics by hand first.
+**Still open for document analysis; partly superseded for record export.** Dataverse Bulk Export now provides a filtered, previewed request-record export, and the Research request-file corpus indexes metadata for Research request files from 2018 onward. Neither provides an analysis UI that selects a request cohort and automatically supplies its SharePoint PDFs to a model. The batch summary apps still require manual uploads. The earlier blanket claim that no historical request-set/export surface exists is stale; the narrower document-to-analysis gap remains.
 
-**Shape when built:** a reusable component: query Dynamics with staff-friendly filters, resolve each request's SharePoint bucket via `lib/utils/sharepoint-buckets.js`, stream PDFs into whichever analysis app is running.
+**Historical shape:** a reusable component that queries Dynamics, resolves SharePoint buckets, and supplies PDFs to an analysis app. The metadata index is a new source for file discovery, but no such staff-facing component is verified as built.
 
 ### 2. Bring-your-own-prompt batch app
-Today's batch apps (`batch-phase-i-summaries`, `batch-proposal-summaries`) are hardwired to specific prompts. A generic "apply this prompt template to this set of proposals, return structured results" surface does not exist. Most retrospective questions need exactly that.
+**Open.** Today's batch apps (`batch-phase-i-summaries`, `batch-proposal-summaries`) are hardwired to specific prompts. No generic historical-cohort runner with a prompt picker or custom prompt editor is verified in the checked-in UI/routes.
 
-**Shape when built:** staff picks a prompt (from `wmkf_ai_prompt` or an ad hoc editor), picks a request set (gap 1), kicks off a job, downloads results. The prompt's `wmkf_ai_promptoutputschema` (see `docs/WORKFLOW_CHAINING_DESIGN.md`) drives the result columns.
+**Historical shape:** staff picks a prompt (from `wmkf_ai_prompt` or an ad hoc editor), picks a request set, runs a job, and downloads results. No approval or input contract for this surface is established by this historical plan.
 
 ### 3. Batch API integration
-Existing batch apps call `/v1/messages` synchronously in a loop. For 100+ proposals that's fragile (timeouts, rate limits, partial-failure handling is crude) and full-price. Anthropic's Batch API (`/v1/messages/batches`) fixes both: async submit with a 24-hour SLA (often ~1 hour in practice), 50% off list, pattern-match JSONL results. Details captured in `docs/PDF_INPUT_FOR_BACKEND.md` under "Future batch-analysis regime."
+**Not verified as built for this workflow.** The historical plan proposed Anthropic Batch API integration for large proposal sets. The bounded source review found no Batch API submission/polling/reconciliation path connected to these batch apps. This statement is not a fresh provider-feature or pricing assessment.
 
-**Shape when built:** for jobs above a threshold (~50 proposals?), route to Batch API; smaller jobs stay synchronous for immediacy. Poll status from a scheduled cron or a "check status" button. Store the `batch_id` + `custom_id → source_request` mapping in Postgres so results can be reconciled.
+**Historical shape:** route larger jobs to an asynchronous provider batch, persist request-to-result mapping, and reconcile completions. Threshold, persistence, and polling design remain undecided; this plan does not approve them.
 
 ### 4. Structured-results export
-No current app exports a CSV of extracted fields across a batch. For retrospective analyses, that's the primary deliverable — staff pastes into Excel or Power BI for downstream analysis.
+**Open for model results.** Dataverse Bulk Export creates an Excel workbook of request records, but no checked-in app was found that exports structured model-extracted fields across an analysis batch.
 
-**Shape when built:** whichever job runner produces structured results (gap 2 + 3) drops an `.xlsx` into Vercel Blob, returns a signed URL.
+**Historical shape:** export structured model results from the eventual runner. The Bulk Export workbook is a separate request-data capability and does not close this gap.
 
-## Sequencing
+## Historical sequencing proposal (not current direction)
 
-Gaps depend on each other. Recommended order:
+The original plan proposed this order. It is preserved as historical context, not an approved implementation sequence:
 
 1. **Gap 1 — Historical-request picker.** Standalone UI, testable immediately against current Dynamics data, drops into any existing app. Unlocks every downstream step.
 2. **Gap 3 — Batch API integration.** Retrofit `batch-phase-i-summaries` and `batch-proposal-summaries` to optionally route to Batch API. Cost-saving win even before gap 2 ships. Also shakes out the async / polling / reconciliation infrastructure we'll need.
 3. **Gap 2 — Bring-your-own-prompt batch app.** Build once the picker and Batch API plumbing exist. This is also the first app that reads non-hardwired prompts from `wmkf_ai_prompt` on the user-facing side, so it validates the storage layer under real usage.
 4. **Gap 4 — Structured-results export.** Add alongside gap 2; they're the same UI surface.
 
-## Relationship to prompt storage
+## Historical relationship to prompt storage
 
-Retrospective prompts naturally live in `wmkf_ai_prompt` (see `docs/PROMPT_STORAGE_DESIGN.md`). Two subcategories to anticipate:
+The original proposal suggested `wmkf_ai_prompt` (see `docs/PROMPT_STORAGE_DESIGN.md`) for retrospective prompts. No product decision in this document establishes that storage choice. The two proposed subcategories were:
 
 - **Published retrospective prompts** — the analysis has been run once, validated, and the prompt is worth keeping for future repeats. Lives in the main table, discoverable in a prompt picker.
 - **Ad hoc / scratch prompts** — one-off experiments. Either don't persist, or persist with a `status: 'draft'` and an author scope, so the picker doesn't show them to everyone.
 
 The `wmkf_ai_promptoutputschema` field becomes especially important here — it's how the generic batch runner knows what columns to put in the exported spreadsheet.
 
-## Cost shape (informal)
+## Historical cost illustration (informal; not revalidated)
 
 Example: retrospective analysis across 300 historical Phase I proposals, ~1 stable prompt, Sonnet 4.6.
 

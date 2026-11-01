@@ -18,6 +18,12 @@ staff editing, and export capabilities should be retained and where they belong.
 The destination, scope, and timing are undecided. Do not assume that the future
 workflow must retain the standalone app or follow the older Power Automate plan.
 
+**Current implementation boundary (repository source, 2026-10-31):** the standalone
+app remains present and active. Its current flow supports request lookup, report
+extraction, proposal-versus-report goals assessment, staff editing, and Word export;
+the extracted content is not saved to an `akoya_request` field. This describes the
+existing app only and does not decide its successor or authorize migration/removal.
+
 ## Recall Rule
 
 Read when prioritizing Grant Reporting work or considering where its capabilities belong.
@@ -31,4 +37,7 @@ Earlier roadmap references in `project-app-roadmap-2026-04-25.md` describe past
 intent. This owner direction supersedes any assumption that Grant Reporting's
 standalone UI is the decided long-term home for these features.
 
-Ground truth: the owner's explicit direction on 2026-10-21, recorded above.
+Ground truth: the owner's explicit direction on 2026-10-21, recorded above; current
+source-backed implementation boundary is `pages/grant-reporting.js`,
+`pages/api/grant-reporting/lookup-grant.js`, and
+`lib/services/grant-reporting/extract-service.js`.

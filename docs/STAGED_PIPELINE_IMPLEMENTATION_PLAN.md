@@ -2,8 +2,8 @@
 title: "Staged Proposal Review Pipeline — App Implementation Plan"
 domain: prompt-executor
 kind: plan
-status: active
-summary: "1. Fit Screener — Standalone Stage 1 tool. Upload a proposal, get pass/flag/decline-recommend result. Single Haiku call, fast and cheap. Useful..."
+status: historical
+summary: "Historical staged-proposal pipeline design, not a current architecture or approved build sequence."
 canonical: false
 cataloged: 2026-07-02
 owner: product-engineering
@@ -14,15 +14,15 @@ related:
   - _archived/lib/services/panel-review-service.js
 ---
 
-# Staged Proposal Review Pipeline — App Implementation Plan
+# Staged Proposal Review Pipeline — Historical App Implementation Proposal
 
-> **Status (2026-05-08):** Not yet started. Plan is dormant pending cycle-redesign signal from Sarah/Connor. Don't start the V25 migration or build the Fit Screener until the redesigned cycle's shape (single-package vs. retained Phase I/II split, target volume) is locked — design assumptions below could shift.
+> **Historical proposal, not current authorization (checked against source on 2026-10-31).** The proposed `pipeline_proposals` persistence, Fit Screener, and Proposal Pipeline were not found in runtime code. This May 2026 design was dormant pending cycle redesign; the current cycle's intake and staff-triage architecture has not been approved by this document. Do not treat its migration, routes, apps, provider choices, Power Automate migration path, costs, or sequence below as current requirements. Any future work needs a fresh owner-approved scope and contract. The concept evaluator has a limited concept-PDF eligibility flag; the successor Review Panel is a separate narrative-only capability. Neither implements this staged proposal workflow.
 
 ## Context
 
 The grant cycle is being redesigned with higher proposal volume and potentially no concept/Phase I stages. The staged review pipeline (`docs/STAGED_REVIEW_PIPELINE.md`) defines a 3-stage automated triage: fit screening → intelligence brief → virtual panel review. 
 
-Strategy: build as interactive apps first (matching existing app patterns), test with real proposals this cycle, then migrate proven logic to PowerAutomate-triggered backend processes with Connor's help. The service layer is designed so the same methods work for both interactive and automated invocation.
+Historical strategy proposal only: interactive apps first, then consider Power Automate. No current service contract or migration decision follows from this text.
 
 ## Architecture: Two New Apps
 
@@ -30,7 +30,7 @@ Strategy: build as interactive apps first (matching existing app patterns), test
 
 2. **Proposal Pipeline** — Orchestration dashboard for all 3 stages. Tracks proposals through screening → intelligence → panel review, with staff decision points between stages. Stage 3 delegates to the existing `PanelReviewService` (links to `panel_reviews` table, doesn't duplicate).
 
-(Superseded 2026-10-04: the legacy Virtual Review Panel was retired and archived; a Stage 3 link would target the successor Review Panel.)
+(Superseded 2026-10-04: the legacy Virtual Review Panel was retired and archived. The successor Review Panel is a distinct narrative-only Workbench capability; it is not a Stage 3 implementation of this pipeline and is not connected to the proposed fit-screening or intelligence-brief stages.)
 
 ---
 

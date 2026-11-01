@@ -1,7 +1,8 @@
 ---
 agent_wiki: topic
 status: active
-last_verified: 2026-10-22
+last_verified: 2026-10-31
+verification_scope: "Bounded source/Git backlog reconciliation for materials acceptance and product follow-ups; other dated history retained, no live probes"
 stale_after_days: 90
 owner: product-strategy
 source_files:
@@ -62,10 +63,19 @@ document inventory, and individual implementation plans do not establish priorit
   release/smoke evidence. Queue item 5 is a completed release record, not a current
   recommendation to build filters. This pass verified source/merge ancestry, not current
   Production configuration.
-- **Reviewer materials on acceptance:** still planned for J27, not built. The D26
-  materials-release modal is manual; Stage 6B3 is not an automated acceptance-triggered
-  send. J27 proposals are expected in December 2026 and reviewer invitations in 2027.
-  Follow queue item 6 and `project-accepted-awaiting-materials-is-transient`.
+- **Reviewer materials on acceptance:** implemented on main via PR #562
+  (`fcad0ad53`). The acceptance drain and manual send share the durable release
+  row; fallback/recovery remain explicit. Dated Production release is recorded
+  in Session657, not freshly probed here. First natural J27 send observation and
+  separately scoped invitation wording/date-field work remain; do not queue
+  another automation build. Follow queue item 6 and the lifecycle hub.
+- **Unfinished product threads:** the [bounded backlog audit](../../audits/product-backlog-reconciliation-2026-10-31.md)
+  separates J27 intake/triage, corpus extraction/browsing, cycle readiness,
+  calendar-event agendas and Chairs-specific work from existing foundations.
+  Grant Reporting integration and Literature Analyzer disposition remain owner
+  decisions. Bulk Export and corpus indexing partly supersede the historical
+  retrospective plan; concept eligibility and the successor Review Panel do not
+  implement the old staged proposal pipeline. The canonical queue retains priority.
 - **S2AFF:** retained as a possible comparator after the prior skip recommendation was
   withdrawn, but it is not an active queue commitment or execution authorization. Owner
   decision and a pinned Python environment are prerequisites.
@@ -99,9 +109,9 @@ current sequencing or release authority.
 The entries below are historical implementation and release snapshots. Use
 `docs/CURRENT_WORK_QUEUE.md` for current priorities. Queue item 5 records the
 Final Writeup dashboard's implemented contract and dated 2026-09-06–07 release
-smokes; it does not call for another filter build. Queue item 6 remains plan-first
-and not built: the J27 automated materials-on-acceptance email. Its timing and
-manual-modal boundary are summarized above. The detailed reviewer lifecycle and
+smokes; it does not call for another filter build. Queue item 6 now records the
+implemented automated materials-on-acceptance email and its remaining observation
+and wording work. Its shared claim/manual-fallback boundary is summarized above. The detailed reviewer lifecycle and
 release evidence below is retained as history.
 
 Review-DOCX release complete 2026-09-03: the formatting work is Production-live
@@ -473,7 +483,7 @@ at `3101f067` in Ready deployment `dpl_AjT5FeDh5wkdeFSoZWJsVDM5oBqs`.
   `project-j27-doc-capture-evolution`.
 - Historical Group B writeup proposal: `docs/GROUP_B_WRITEUP_SPINE_DESIGN.md`. Its proposed
   URL fields and `writeup.*` prompt rows are not live, and its D26 pilot timing is obsolete.
-- Planned review/proposal work: `project-staged-review-pipeline`, `project-proposal-context-extraction`.
+- Historical staged-review design and deferred proposal-context decisions: `project-staged-review-pipeline`, `project-proposal-context-extraction`. Neither is a ready-to-execute architecture.
 - Planned automation/reports/post-award/AI: `project-backend-automation`, `project-interim-report-automation`, `project-awardee-onboarding`, `project-new-ai-capabilities`.
 - IRS verify-EIN: `project-irs-exempt-verification`.
 

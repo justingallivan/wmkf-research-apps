@@ -2,8 +2,8 @@
 title: Zoom participants in the transcript speaker picker
 domain: meeting-tracker
 kind: plan
-status: active
-summary: "Branch implementation: picker-only Zoom participant suggestions from verified transcript provenance, with request-contact/manual fallback and a five-second lookup budget. Not deployed."
+status: shipped
+summary: "SHIPPED in source on main via PR #511 (`bb7b5e04c`): picker-only Zoom participant suggestions from verified transcript provenance, with request-contact/manual fallback and a five-second lookup budget. This record does not establish a fresh Production or hosted staff acceptance check; the feature-specific residual is that bounded release verification."
 owner: product-engineering
 related:
   - docs/CURRENT_WORK_QUEUE.md
@@ -17,7 +17,9 @@ related:
 Owner scope: offer participants from the recorded Zoom occurrence ahead of
 request-associated people when correcting speaker names. Keep request contacts
 and manual entry for uploads or unavailable attendance. Presence is not proof
-of who spoke. Implementation is on `codex/zoom-speaker-picker`, not deployed.
+of who spoke. **Implementation status (2026-10-31): shipped in source on main
+via PR #511 (`bb7b5e04c`).** The merge establishes source ancestry only; it is
+not a fresh Production deployment or hosted staff-acceptance receipt.
 
 ## Invariants and contract
 
@@ -54,9 +56,11 @@ presentation-boundary regressions are included in the focused run.
 Validation passed: 303 tests across six focused suites. Relevant route/context/status/GUID gates and paired self-tests, type checking,
 changed-file ESLint, design detection and documentation drift checks passed for
 this change. Existing ESLint warnings outside edited lines remain unchanged.
-No live Zoom report, production mutation, hosted browser rehearsal or deployment
-was performed. Runtime behavior still needs hosted staff acceptance after an
-explicit release decision.
+At the pre-merge implementation review, no live Zoom report, production
+mutation, hosted browser rehearsal or deployment was performed. The feature was
+subsequently merged as PR #511. A fresh Production deployment check, live Zoom
+report and hosted staff acceptance are not evidenced by this plan; record those
+separately if release verification is required.
 
 
 ## Claude Opus review follow-up
@@ -70,4 +74,5 @@ predicate preserves the existing attendance validation contract. Three added
 regressions verify waiting-room collisions, long-name collisions and whitespace
 by feeding the selected label into attendance review and checking its speaker
 link. The six-suite rerun passed 303 tests; scoped ESLint and types passed.
-Deployment and live acceptance remain unverified.
+The PR #511 merge is verified through repository ancestry. Deployment and live
+acceptance remain unverified by this plan.

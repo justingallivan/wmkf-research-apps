@@ -1,52 +1,48 @@
 ---
 name: Staged Review Pipeline
-description: Three-stage automated proposal triage pipeline planned for the new grant cycle — fit screening, intelligence brief, virtual panel review
+description: Historical, unapproved three-stage proposal-triage design; current concept eligibility and successor Review Panel are separate capabilities
 type: project
-status: active
+status: stale
 scope: reviewer
-last_verified: unknown via memory-content (not re-probed 2026-06-04)
+last_verified: 2026-10-31 source-only audit at f6376751d; no live probes
 ---
 
 ## Recall Rule
 
-Read this when: planning or scoping automated proposal-triage / staged-review pipeline work for the new grant cycle.
+Read this only as historical context when someone asks about the old staged proposal pipeline design. It is not current scope or an implementation plan.
 
-Do:
-- Reference `docs/STAGED_REVIEW_PIPELINE.md` for stage definitions/schemas/routing and `docs/STAGED_PIPELINE_IMPLEMENTATION_PLAN.md` for the build plan.
-- Reuse what exists: Stage 0 intelligence pass → Stage 2 sub-tasks; Virtual Review Panel pipeline → Stage 3 core.
-- Design the service layer so it migrates directly to PowerAutomate triggers later.
+Current evidence (source-only, 2026-10-31): the proposed staged pipeline and its persistence/UI were not found. The concept evaluator has a limited concept-PDF eligibility flag. The successor Review Panel is a separate narrative-only Workbench capability with configured seats and a chair; it is not wired into the old pipeline. No current pipeline architecture or build is approved here.
 
-Do not:
-- Auto-decline any proposal without staff confirmation (Stage 1 is advisory, not decisional).
-- Average the Devil's Advocate output into the panel — label it separately in synthesis.
-- Assume this is scheduled; it is saved for a future session, not yet started.
+For current scope, get owner decisions and a fresh contract. Do not use the historical stage definitions, schemas, provider set, storage, or rollout sequence as requirements.
 
-Ground truth: `docs/STAGED_REVIEW_PIPELINE.md`, `docs/STAGED_PIPELINE_IMPLEMENTATION_PLAN.md`.
+Historical design constraint, not a current implementation contract: the old proposal required staff confirmation before decline. Any new screening work needs its own current decision and safety contract.
 
-Three-stage LLM-assisted proposal review pipeline for the new grant cycle (higher volume, full proposals instead of concepts + Phase I).
+Historical references only: `docs/STAGED_REVIEW_PIPELINE.md`, `docs/STAGED_PIPELINE_IMPLEMENTATION_PLAN.md`. Current source evidence is in `pages/api/evaluate-multi-perspective.js`, `lib/services/review-panel-input.js`, `lib/services/review-panel-worker.js`, and `docs/atlas/postgres-review-panel.md`.
+
+The following is the original 2026-05 proposal, retained as history. It does not establish current cycle architecture.
 
 **Why:** Grant cycle is being redesigned — concepts may be eliminated, Phase I may go away. Higher proposal volume requires automated triage to recover staff capacity. Current cycle's implementation provides lessons for the redesigned cycle after.
 
-**How to apply:** Full spec saved at `docs/STAGED_REVIEW_PIPELINE.md`. When planning implementation work, reference that doc for stage definitions, schemas, and routing logic.
+**How to apply:** Do not use the old spec as a build plan. Reconfirm owner intent, cycle shape, data contract, and safety requirements first.
 
-## Stage Summary
-1. **Fit Screening** (Haiku) — binary checklist against mission/eligibility criteria. No flags → auto-pass; flags → staff review. New work.
-2. **Intelligence Brief** (Perplexity + search APIs + Haiku) — novelty assessment, PI capability check, field landscape. Largely built as Stage 0 in Virtual Review Panel. Main new work: standalone output format for staff consumption, routing UI.
-3. **Virtual Panel Review** (Claude + GPT + Gemini + Perplexity) — existing pipeline plus Devil's Advocate pass (adversarial single-model review, rotated). Intelligence Brief injected as context.
+## Historical Stage Summary (Not Current State)
+1. **Fit Screening** (Haiku) — proposed binary checklist against mission/eligibility criteria. A limited concept-PDF eligibility flag exists, but it is not this full-proposal checklist or routing stage.
+2. **Intelligence Brief** (Perplexity + search APIs + Haiku) — proposed novelty, PI capability, and landscape brief. The described legacy panel intelligence work is archived; no shared stage output/routing surface was verified.
+3. **Virtual Panel Review** — the old four-provider integration and proposed Devil's Advocate pass were a proposal. The legacy panel is retired; its successor is not the old pipeline stage.
 
-## Key Design Decisions
+## Historical Proposed Decisions (Not Approved Current Decisions)
 - No proposal declined without staff confirmation (Stage 1 is advisory, not decisional)
 - Intelligence Brief travels with proposal through all stages
 - Devil's Advocate output labeled separately in synthesis, not averaged with panel
 - Per-proposal file storage model (`proposal_{id}/stage1_*.json`, etc.)
 - Staff dashboard with routing status, flag highlighting, override capability
 
-## What Already Exists
-- Stage 0 intelligence pass (claim extraction → parallel search → collation → Perplexity synthesis) = Stage 2 sub-tasks
-- Virtual Review Panel pipeline = Stage 3 core (legacy panel retired 2026-10-04; its pipeline is archived, so Stage 3 would build on the successor Review Panel)
-- PI disambiguation fix (institution + field in search queries) = Stage 2 Sub-task C concern addressed
+## Existing Similar Capabilities (Not Pipeline Stages)
+- The concept evaluator (`pages/api/evaluate-multi-perspective.js`) flags some concept PDFs as potentially outside funding scope and short-circuits that concept evaluation. This is not the proposed full-proposal checklist, persistent stage state, or staff routing.
+- The legacy Virtual Review Panel is retired and archived. The successor Review Panel is a separate narrative-only Workbench capability; it does not consume a Stage 2 intelligence brief or implement old Stage 3 routing.
+- No shared staged intelligence-brief pipeline has been established by this design.
 
-## What's New
+## Historical Proposed Work (Unbuilt; Not a Commitment)
 - Stage 1 fit screening (straightforward Haiku call)
 - Devil's Advocate pass in Stage 3
 - Proposal routing/dashboard UI
@@ -54,4 +50,4 @@ Three-stage LLM-assisted proposal review pipeline for the new grant cycle (highe
 - Batch processing across multiple proposals
 
 ## Implementation Plan
-Full implementation plan saved at `docs/STAGED_PIPELINE_IMPLEMENTATION_PLAN.md`. Two new apps (Fit Screener + Proposal Pipeline), 5 phases, designed so service layer migrates directly to PowerAutomate triggers later. Not yet scheduled for implementation — saved for a future session.
+The linked implementation plan preserves the old two-app/five-phase proposal. It is historical and not scheduled or approved. Any future work requires fresh scope; do not infer a Power Automate architecture from it.

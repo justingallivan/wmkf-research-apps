@@ -2,8 +2,8 @@
 title: Staged LLM-Assisted Proposal Review Pipeline
 domain: prompt-executor
 kind: history
-status: active
-summary: Proposals flow through stages sequentially. Staff review is required before any proposal is declined at Stage 1. Stages 2 and 3 produce inputs for...
+status: historical
+summary: "Historical staged screening design; concept eligibility and successor Review Panel exist separately, not as this pipeline."
 canonical: false
 cataloged: 2026-07-02
 owner: product-engineering
@@ -11,10 +11,10 @@ related:
   - docs/STAGED_PIPELINE_IMPLEMENTATION_PLAN.md
 ---
 
-# Staged LLM-Assisted Proposal Review Pipeline
+# Historical Design: Staged LLM-Assisted Proposal Review Pipeline
 ## W. M. Keck Foundation — New Cycle Design
 
-> **Status (2026-05-08):** Not yet built. No `pipeline_proposals` table, no Fit Screener app, no Pipeline app. Build plan is in `docs/STAGED_PIPELINE_IMPLEMENTATION_PLAN.md`. The Virtual Review Panel (Stage 3 dependency) is shipped and running. Cycle redesign is still in flight (concepts being eliminated, Phase I + II likely merging into one applicant package); the per-stage prompts and routing below are valid design once the redesigned cycle locks, but the volume assumption ("3x volume") may need to be revisited when the cycle shape stabilizes.
+> **Historical proposal, not current architecture (source checked 2026-10-31).** The staged workflow, its schemas, stages, routing, and provider sequence below were design proposals only; no `pipeline_proposals` table or Fit Screener/Proposal Pipeline implementation was found in runtime source. The concept evaluator does perform a limited eligibility flag on concept PDFs; it is not the full-proposal checklist or persistent staff-gated pipeline proposed here. The legacy Virtual Review Panel named below was retired and archived on 2026-10-04. Its successor Review Panel is a separate Workbench capability that takes a frozen proposal-narrative-only input and runs configured seats followed by a chair; it is not this Stage 3 integration. No current pipeline architecture or build scope is approved by this historical document. Re-scope with current owner decisions before adopting any part of it.
 
 This document describes a three-stage automated triage and review pipeline for evaluating a higher volume of full proposals. Each stage has a defined purpose, a set of inputs and outputs, and a clear handoff to the next stage or to staff. The pipeline is designed to complement staff judgment, not replace it — LLM outputs at every stage are advisory, not decisional.
 
@@ -173,7 +173,7 @@ A structured document for staff consumption. Should be readable in 5-10 minutes 
 
 ---
 
-## Stage 3: Virtual Panel Review
+## Stage 3: Legacy Virtual Panel Review (Retired; Historical Design)
 
 ### Purpose
 For proposals that staff has shortlisted, run a full multi-model virtual panel to approximate what peer reviewers would say. This stage is not a replacement for peer review — it is a structured pre-peer-review reality check that helps staff decide whether to commit external reviewer resources.

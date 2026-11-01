@@ -17,6 +17,12 @@ may already have moved into other parts of the app suite. Do not claim a
 specific migration, successor, or complete replacement without tracing the
 current consumers.
 
+**Current implementation boundary (repository source, 2026-10-31):** the standalone
+Literature Analyzer remains an active app. Its checked-in workflow accepts uploaded
+research-paper PDFs, extracts paper information, synthesizes across papers, and offers
+JSON/Markdown export. Prompt resolution now uses the shared tool-prompt resolver and
+composer; that plumbing change does not establish a successor or capability migration.
+
 Future follow-up: identify which capabilities are already served elsewhere,
 which remain useful, and whether the standalone app needs rework or another
 disposition. No destination or retirement decision has been made.
@@ -30,4 +36,7 @@ this standalone app until its continuing role and actual use are established.
 This note records product context only; it does not authorize removal of the
 app, access, routes, or data.
 
-Ground truth: the owner's statement on 2026-10-21, recorded above; capability reuse remains unverified.
+Ground truth: the owner's statement on 2026-10-21, recorded above; the app's continued
+presence and described upload workflow are source-backed in `shared/config/appRegistry.js`,
+`pages/literature-analyzer.js`, and `pages/api/analyze-literature.js`. Capability reuse,
+successor, and disposition remain unverified/open.

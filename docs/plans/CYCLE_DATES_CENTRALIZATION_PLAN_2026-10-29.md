@@ -2,8 +2,8 @@
 title: Cycle dates in one place — centralization plan
 domain: platform
 kind: plan
-status: proposed
-summary: "Owner ask 2026-10-29: cycle dates are entered once, on the cycle calendar (operations wmkf_grantcycle, D43), and nobody edits Vercel or any other screen when a cycle rolls over. Inventory of every per-cycle human touch today, what replaces each, the blank-date rule, missing columns to request from Connor, residual human steps, owner decisions and order by deadline. Builds on the rollover plan §3.2/§3.4; nothing built."
+status: active
+summary: "PARTIAL: the cycle calendar (PR #542), automatic landing cycle (PR #547/#550), calendar-driven review filing (PR #551), linked-cycle due-date reader (PR #552), and Board setup calendar read (PR #561) are merged and Production-deployed. Remaining plan work includes app-side dates and readiness, Staff Deliberations cohort/calendar checks, grantee-title retirement after verification, open per-request due-date handling, and remaining J27 decisions. Receipts are owner-recorded; this file does not claim a fresh live probe."
 canonical: false
 owner: product-engineering
 related:
@@ -15,6 +15,20 @@ related:
 ---
 
 # Cycle dates in one place
+
+## Current implementation state (2026-10-31)
+
+This plan remains active, but it is no longer an unbuilt design. The cycle
+calendar PR #542, landing-cycle PRs #547/#550, review filing PR #551, reviewer
+due-date/link work PR #552, and Board setup calendar read PR #561 are merged and
+Production-deployed. Owner-recorded release receipts are in `DEVELOPMENT_LOG.md`
+and the relevant plans. This audit did not make a fresh live probe.
+
+Remaining work is the app-side Feb 3 date and readiness behavior, Staff
+Deliberations calendar/cohort verification before April, verified retirement of
+the grantee-title job, and the open D26 per-request due-date handling decision.
+The reviewer invitation wording/date-field follow-up remains in
+`REVIEWER_INVITATION_CALENDAR_BUILD_PLAN_2026-10-29.md`.
 
 ## 1. Goal
 
@@ -86,7 +100,10 @@ dates; each is now in scope:
   Meeting Date is the ground truth; the landing cycle's Board-page rule, which
   reads the setup's `boardEnds`, moves to it too). Ask Connor whether request
   meeting dates follow a Board-date change; add a mismatch check to the
-  readiness notice. Board setup from the calendar: built on branch `claude/board-setup-calendar`, PR #561, not merged.
+  readiness notice. **Done:** Board setup now reads Board Meeting Date and
+  Board Mailing Date from the calendar; PR #561 (`955613bdb`) merged and
+  Production-deployed 2026-10-31. The owner-recorded release receipt says the
+  signed-in D26 Board-page rendering was not checked.
 - **`inviteStartDate` in Admin was never read.** Removed (PR #551, merge `caf318983`, Production-deployed 2026-10-29).
 
 ## 3. Blank dates
@@ -138,7 +155,7 @@ planned, reads their dates, so they get no field (corrected 2026-10-29).
 | Nov 15 | App-side dates on the calendar page |
 | Before Feb 3 | Staff recommendation deadline filled in (D40 warning reads it) |
 | Before Feb 24 | **One reviewer-invitation build (owner, 2026-10-29):** materials on acceptance (D46; work queue item 6) together with the review due date from the calendar — shared reader; invitation and stored due date from Reviews Due; per-send and browser-saved due dates removed; extensions based on the calendar date; Reviewer Finder record dates retired; review filing by Board date (replaces the Vercel switch; **done**, PR #551, merge `caf318983`, Production-deployed 2026-10-29). Build plan: `docs/plans/REVIEWER_INVITATION_CALENDAR_BUILD_PLAN_2026-10-29.md` |
-| Before Feb 24 | Board setup reads its dates from the calendar (D47), on the shared reader |
+| Done 2026-10-31 | Board setup reads its dates from the calendar (D47), PR #561; signed-in D26 Board-page rendering remains unchecked in the release receipt |
 | Before April | Confirm J27 research presentations trigger prep; prep by calendar after the cohort diff |
 | After Dec 10 | Retire the grantee-title job (T13, verify first) |
 

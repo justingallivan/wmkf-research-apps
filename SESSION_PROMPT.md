@@ -48,6 +48,19 @@ Main docs only:
 - `aa32a0c12` Monday archive and parked-task pointer.
 - This closeout: Session657 prompt and owner-reported delivery/no-Git-ZIP rule.
 
+## Concurrent Codex documentation audit — 2026-10-31
+
+[VERIFIED via source/Git at `f6376751d`; no live probes] A bounded audit of the
+eleven product threads and three stale shipped-feature to-dos is recorded in
+`docs/audits/product-backlog-reconciliation-2026-10-31.md`. Materials-on-acceptance,
+cycle-calendar and Zoom-picker build status are corrected across the queue,
+plans, memory and wiki; genuinely open products and owner decisions stay open.
+Grant Reporting audit logging is distinguished from request-field writeback;
+retrospective and staged-pipeline designs account for existing building blocks.
+This is documentation only on `codex/session-2026-10-31-start`; no runtime
+promotion or change to Claude's outcomes ownership is implied. Historical
+carryovers remain subject to verification and their original authorization.
+
 ## Next Items
 
 ### Parked — Monday, November 2
