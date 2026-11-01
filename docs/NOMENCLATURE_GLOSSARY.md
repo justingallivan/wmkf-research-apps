@@ -125,59 +125,19 @@ migrations.
 
 ### Current implementation boundary — 2026-11-01
 
-Runtime adoption is partial. The Workbench display-copy slice in
-`StaffDeliberationsTab`, `StaffDeliberationsPanel`, `FinalWriteupTab`, and
-`PreSiteDistributionPanel` merged through PR #577 as `e7cd37982` (Git/source
-evidence only; not a deployment receipt). As of 2026-10-31, the Meeting Tracker
-four-term display-copy slice is on branch `codex/meeting-tracker-terminology`:
-Site Visit → Research presentation; Deliberation session → Proposal discussion
-session; Program briefing → Discussion summaries; Discussion Sentiment →
-Post-presentation discussion sentiment. PR #580 merged this slice as
-`30bc81e77` in source/Git; no deployment is inferred. The Board-reader
-display-copy slice in `pages/external/briefing/[token].js` and
-`pages/external/presentation/[token].js` uses Proposal review packet, Proposal
-discussion brief, Proposal discussion session, Research presentation, and
-Presentation materials. It merged through PR #581 as `8c0859a6f` (Git/source
-evidence only; no deployment claim). That Board-reader slice excludes the
-applicant upload page, emails, generated documents, historic filenames,
-tokens/routes, and API payload changes. The two Meeting Tracker summary views
-use approved post-presentation discussion wording for the summary/transcript
-content they present; this is not a repo-wide Staff discussion rename. Other
-recorded staff-discussion labels and runtime surfaces remain pending separate
-scope. The email-copy slice merged through PR #583 as
-`3c4c6ee0b` (source/Git only; no deployment claim). It updates source defaults
-for packet sharing, agenda, and presentation-material invitation/reminder copy
-plus Admin metadata, preview labels, and the application-owned materials upload
-CTA. Existing stored Admin and personal settings, already-prepared email
-content, and generated documents were not changed; deployed setting values were
-not inspected and no backfill is included. The applicant-materials display-copy
-slice merged through PR #590 as `4f665c6a9` (source/Git only; no deployment
-claim): the upload-page title and support-email subject, plus the Staff
-Deliberations materials-card heading, use Presentation materials. PR #591 merged
-the recording/transcript display-copy slice as `3cf543f82` (source/Git only; no
-deployment claim). It uses **Recording and transcripts** and
-**Post-presentation discussion** in the scoped Recording and transcripts card,
-Preparation panel, Site Visit editor, and Research Presentation follow-up; the
-scheduled presentation-end label in Staff Deliberations is clarified
-separately. The scheduled event end is a calendar value; the presentation end
-in the recording is the transcript position marking the last presentation
-turn. This wording clarifies the two meanings without changing either timestamp
-or transcript processing. As of 2026-11-01, a separate Admin/app-navigation
-terminology slice is in progress on `codex/dossier-admin-terminology`:
-Scientific dossier replaces Cycle Dossier in the app, navigation, page, and
-Admin timeout labels; the Admin Site Visits group becomes Research
-presentations, with related recipient/material settings and default-attendee
-copy updated so new events are described as proposal discussion sessions. Admin
-prompt-catalog display titles, descriptions, and `usedBy` labels use Scientific
-dossier, Presentation summary, Post-presentation discussion, **Draft writeup
-proposal narrative sections**, and **Workbench → Draft writeup generation**;
-prompt keys, generation/input contracts, and prompt bodies are unchanged. This
-copy-only work adds no runtime behavior and preserves the `cycle-dossier` key and routes, the persisted
-audit reason `Stopped by the Cycle Dossier operator.`, settings keys, and user
-content. Check Git/PR and release receipts for current status; no deployment is
-inferred. Preserve routes, API/service and prompt identifiers, schema/storage
-values, artifact types, deep links, saved settings, and existing user-authored
-content.
+Runtime adoption is partial. PRs #577, #580, #581, #583, #590, #591 and #592
+merged the bounded Workbench, Meeting Tracker, Board-reader, email,
+applicant-materials, recording/transcript, and Admin/app-navigation display-copy
+slices. The current source/Git baseline is PR #592, merge `e08006db0`; this is
+not a deployment receipt. The scoped reader, saved-name/error-message, and
+generated-document residuals remain separately identified in the
+[2026-11-01 terminology completion audit](audits/terminology-completion-audit-2026-11-01.md).
+That audit is source/caller evidence only; live prompt/settings/file inventories
+remain unknown. Keep the approved names while preserving routes, API/service and
+prompt identifiers, schema/storage values, artifact types, deep links, saved
+settings, existing user-authored content, and historical files. No identifier,
+data, prompt-publication, or backfill migration is authorized by these copy
+slices.
 
 ### Historical source inventory — October 6–7, 2026
 
