@@ -22,8 +22,8 @@ const ACKNOWLEDGEMENT_SCHEMA_NOT_READY = 'final_writeup_acknowledgement_schema_n
 // the request has no current Site Visit document, which staff create with
 // Start Site Visit on Staff Deliberations, so say that instead of the
 // generic server sentence.
-const SITE_VISIT_PREREQUISITE_MESSAGE = 'Final Writeup needs a Site Visit working document first. '
-  + 'Check working-writeup preparation in Staff Deliberations. It becomes available after the scheduled presentation ends.';
+const SITE_VISIT_PREREQUISITE_MESSAGE = 'Final writeup needs a draft writeup first. '
+  + 'Check draft writeup preparation in Staff Deliberations. It becomes available after the scheduled research presentation ends.';
 
 function transitionErrorMessage(error) {
   return error?.code === 'final_writeup_source_missing'
@@ -42,7 +42,7 @@ const STAGE_PRESENTATION = Object.freeze({
   },
   'leadership-review': {
     chip: 'Leadership review',
-    heading: 'Final Writeup is with leadership',
+    heading: 'Final writeup is with leadership',
     chipClass: 'bg-indigo-100 text-indigo-900',
     panelClass: 'border-indigo-200 bg-indigo-50',
     dividerClass: 'border-indigo-200',
@@ -133,9 +133,9 @@ const SIGN_OFF_STATE_PRESENTATION = Object.freeze({
 // Why there is no Program Director count. Configured rosters render a count.
 const SIGN_OFF_ROSTER_NOTE = Object.freeze({
   [FINAL_WRITEUP_SIGN_OFF_ROSTER_STATUS.PROGRAM_NOT_CONFIGURED]:
-    'This grant program has no Program Director list in Final Writeup staffing, so reviews are not counted.',
+    'This grant program has no Program Director list in Final writeup staffing, so reviews are not counted.',
   [FINAL_WRITEUP_SIGN_OFF_ROSTER_STATUS.STAFFING_NOT_CONFIGURED]:
-    'Program Director assignments are not published in Final Writeup staffing, so reviews are not counted.',
+    'Program Director assignments are not published in Final writeup staffing, so reviews are not counted.',
   [FINAL_WRITEUP_SIGN_OFF_ROSTER_STATUS.UNAVAILABLE]:
     'The Program Director list could not be loaded. Reviews recorded so far are listed below.',
 });
@@ -323,7 +323,7 @@ export default function FinalWriteupTab({ requestId }) {
         .then((next) => {
           if (acknowledgementController.current !== controller) return;
           if (next.available !== false && next.finalArtifactId !== acknowledgementArtifactId) {
-            throw new Error('The current Final Writeup changed. Reload this tab before marking reviewed.');
+            throw new Error('The current Final writeup changed. Reload this tab before marking reviewed.');
           }
           setAcknowledgement(next);
         })
@@ -450,7 +450,7 @@ export default function FinalWriteupTab({ requestId }) {
       }
       if (activeController.current !== controller) return;
       if (body.artifact?.artifactId !== finalArtifactId) {
-        throw new Error('The current Final Writeup changed. Reload this tab before continuing.');
+        throw new Error('The current Final writeup changed. Reload this tab before continuing.');
       }
       setConfirming(null);
       setStatus((current) => ({
@@ -504,7 +504,7 @@ export default function FinalWriteupTab({ requestId }) {
       }
       if (acknowledgementController.current !== controller) return;
       if (body.finalArtifactId !== acknowledgementArtifactId) {
-        throw new Error('The current Final Writeup changed. Reload this tab before marking reviewed.');
+        throw new Error('The current Final writeup changed. Reload this tab before marking reviewed.');
       }
       setAcknowledgement(body);
     } catch (reviewError) {
@@ -574,9 +574,9 @@ export default function FinalWriteupTab({ requestId }) {
 
       <Card hover={false}>
         <div className="max-w-3xl">
-          <h2 className="text-xl font-semibold tracking-tight text-gray-900">Final Writeup</h2>
+          <h2 className="text-xl font-semibold tracking-tight text-gray-900">Final writeup</h2>
           <p className="mt-2 text-sm leading-6 text-gray-600">
-            This is the same editable working writeup. Starting a review records its current Word version.
+            The final writeup continues the same editable document prepared as the draft writeup. Starting a review records its current Word version.
           </p>
         </div>
 
@@ -586,7 +586,7 @@ export default function FinalWriteupTab({ requestId }) {
           </div>
         ) : status?.available === false ? (
           <div className="mt-6 rounded-xl border border-amber-200 bg-amber-50 p-5 text-amber-950">
-            <h3 className="font-semibold">Final Writeup setup is not active</h3>
+            <h3 className="font-semibold">Final writeup setup is not active</h3>
             <p className="mt-1 max-w-2xl text-sm leading-6">
               This stage is not available yet. Setup must be completed before staff can start group review.
             </p>
@@ -629,7 +629,7 @@ export default function FinalWriteupTab({ requestId }) {
                   rel="noopener noreferrer"
                   className="inline-flex min-h-11 items-center justify-center rounded-xl bg-gray-900 px-5 py-2.5 text-sm font-semibold text-white hover:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-gray-900 focus:ring-offset-2"
                 >
-                  Edit working writeup in Word
+                  Edit final writeup in Word
                 </a>
               </div>
             </div>

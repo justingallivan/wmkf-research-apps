@@ -82,7 +82,7 @@ function Step({ id, number, title, status, summary, actions, details = null, chi
   return (
     <li id={id} className="scroll-mt-6 px-5 py-4 sm:px-6">
       <div className="flex flex-wrap items-start justify-between gap-x-6 gap-y-3">
-        <div className="flex min-w-0 flex-1 gap-3">
+        <div className="flex min-w-0 flex-1 basis-full gap-3 md:basis-0">
           <StepMarker status={status} number={number} />
           <div className="min-w-0 flex-1">
             <h3 className={`text-base font-semibold ${status === 'upcoming' ? 'text-gray-600' : 'text-gray-900'}`}>
@@ -516,7 +516,7 @@ export default function StaffDeliberationsTab({
     }
     throw new Error(
       'The connection was interrupted and a newly completed draft could not be confirmed. '
-      + 'The current Word link, if shown, remains available; try Generate Word draft again.',
+      + 'The current Word link, if shown, remains available; retry preparation from the Draft writeup step.',
     );
   };
 
@@ -661,7 +661,7 @@ export default function StaffDeliberationsTab({
     }
     throw new Error(
       'The connection was interrupted and a newly completed brief could not be confirmed. '
-      + 'The current link, if shown, remains available; try Generate Brief again.',
+      + 'The current link, if shown, remains available; retry generation from the proposal discussion brief step.',
     );
   };
 
@@ -1217,13 +1217,13 @@ export default function StaffDeliberationsTab({
     : correctionDraft ? 'Corrections in progress'
       : ['blocked', 'unavailable'].includes(preparationState) || preparationReadError
         || ['unavailable', 'ambiguous'].includes(timing?.availability) ? 'Needs attention'
-        : due && editingReady ? 'Working writeup ready for post-visit editing'
-          : due && preparationState === 'disabled' ? (readyFile || writeupHidden ? 'Working draft available' : 'No working writeup yet')
+        : due && editingReady ? 'Draft writeup ready for editing'
+          : due && preparationState === 'disabled' ? (readyFile || writeupHidden ? 'Draft writeup available' : 'No draft writeup yet')
             : due && preparationState === 'due' ? 'Waiting for automatic preparation'
             : due && preparationState === 'pending' ? 'Queued for automatic preparation'
-              : due && (preparationState === 'running' || pendingArtifact?.operationStatus === REQUEST_DOCUMENT_OPERATION_STATUS.GENERATING) ? 'Preparing working writeup'
+              : due && (preparationState === 'running' || pendingArtifact?.operationStatus === REQUEST_DOCUMENT_OPERATION_STATUS.GENERATING) ? 'Preparing draft writeup'
                 : due && preparationState === 'prepared' ? 'Needs attention'
-                  : due ? 'Working writeup needed'
+                  : due ? 'Draft writeup needed'
             : timing?.endIso ? 'Before presentation' : 'Schedule needed';
   const materialsLine = siteVisitMaterialsLine(materials);
   const timingLabel = presentationEndLabel(timing);
@@ -1306,7 +1306,7 @@ export default function StaffDeliberationsTab({
     // brief (still recoverable before anyone outside staff has seen it) or a
     // plain Draft brief.
     briefReadyFile && !beyondDeliberations && (briefDraftReady || (briefShared && !everSent)) && {
-      key: 'regenerate', label: 'Regenerate Brief', onSelect: () => setConfirmDialog({ kind: 'brief' }), disabled: briefGenerating || briefUnchangedRetryBlocked,
+      key: 'regenerate', label: 'Regenerate brief', onSelect: () => setConfirmDialog({ kind: 'brief' }), disabled: briefGenerating || briefUnchangedRetryBlocked,
     },
     // Codex adversarial review (2026-09-17, round 4): suppressed while a
     // regeneration is pending (see briefRegenerationPending above) — a send
@@ -1330,7 +1330,7 @@ export default function StaffDeliberationsTab({
       key: 'download', label: 'Download', href: downloadUrl, download: readyFile.name || true, title: readyFile.name || undefined,
     },
       readyFile && ((preSiteDraftReady && canChangeWriteup) || writeupAccess?.canRegenerate === true) && {
-      key: 'regenerate', label: 'Regenerate Word Draft', onSelect: () => setConfirmDialog({
+      key: 'regenerate', label: 'Regenerate draft writeup', onSelect: () => setConfirmDialog({
         kind: 'presite',
         expectedArtifactId: artifact.artifactId,
         expectedFinalArtifactId: finalReview?.phase === 'group-review' ? finalReview.artifact?.artifactId : null,
@@ -1400,20 +1400,20 @@ export default function StaffDeliberationsTab({
   // What to do now, for the steps whose stage sentence does not already say it.
   const nowLine = hasProblemNotice ? null
     : currentStep === 'briefing'
-      ? briefShared ? `Share the briefing ${sessionUpcoming ? 'before the deliberation session' : 'for the presentation'}.`
-        : briefDraftReady ? `Check the briefing in Word, then share it ${sessionUpcoming ? 'before the deliberation session' : 'for the presentation'}.`
-          : briefReadyFile ? null : 'Generate the pre-site briefing.'
+      ? briefShared ? `Share the proposal discussion brief ${sessionUpcoming ? 'before the deliberation session' : 'for the research presentation'}.`
+        : briefDraftReady ? `Check the proposal discussion brief in Word, then share it ${sessionUpcoming ? 'before the deliberation session' : 'for the research presentation'}.`
+          : briefReadyFile ? null : 'Generate the proposal discussion brief.'
       : currentStep === 'session'
-        ? 'The briefing is shared. Nothing else is needed before the deliberation session.'
+        ? 'The brief is shared. Nothing else is needed before the deliberation session.'
       : currentStep === 'presentation'
-        ? 'Nothing is needed until the presentation. You can start the working writeup now if you like.'
+        ? 'Nothing is needed until the research presentation. You can prepare the draft writeup now if you like.'
         : null;
 
   const briefingStep = (
     <Step
       id="deliberations-briefing"
       number={3}
-      title="Pre-site briefing"
+      title="Proposal discussion brief"
       status={briefStatus}
       summary={(
         <>
@@ -1423,19 +1423,19 @@ export default function StaffDeliberationsTab({
       )}
       details={briefReadyFile ? (
         <div className="mt-2 text-sm text-gray-700">
-          <p className="text-gray-600">A concise summary to circulate before the presentation.</p>
+          <p className="text-gray-600">A concise proposal discussion brief to circulate before the research presentation.</p>
           <p className="mt-1">
-            {briefShared ? 'Working document:' : 'Latest draft:'}{' '}
+            {briefShared ? 'Shared brief:' : 'Latest draft:'}{' '}
             <span title={briefReadyFile.name || undefined}>
               {briefShared
-                ? 'Briefing in Word'
+                ? 'Brief in Word'
                 : briefReadyFile.lastModified
-                  ? `Briefing draft · generated ${new Date(briefReadyFile.lastModified).toLocaleDateString()}`
-                  : 'Briefing draft'}
+                  ? `Brief draft · generated ${new Date(briefReadyFile.lastModified).toLocaleDateString()}`
+                  : 'Brief draft'}
             </span>
           </p>
           <FileDetails file={briefReadyFile} />
-          <Warnings warnings={briefWarnings} label={briefShared ? 'Working document needs a quick edit check' : 'Draft needs a quick edit check'} />
+          <Warnings warnings={briefWarnings} label={briefShared ? 'Proposal discussion brief needs a quick edit check' : 'Brief draft needs a quick edit check'} />
         </div>
       ) : null}
       actions={(
@@ -1447,13 +1447,13 @@ export default function StaffDeliberationsTab({
               disabled={briefGenerating || !requestId || briefUnchangedRetryBlocked}
               className={primaryClass}
             >
-              {briefGenerating ? 'Generating…' : 'Generate Brief'}
+              {briefGenerating ? 'Generating…' : 'Generate proposal discussion brief'}
             </button>
           )}
           {briefReadyFile && briefDraftReady && (
             <>
               <a href={briefReadyFile.webUrl} target="_blank" rel="noopener noreferrer" className={primaryClass}>
-                Edit briefing in Word
+                Edit brief in Word
               </a>
               {/* Codex adversarial review (2026-09-17, round 4): suppressed
                   while a regeneration is pending — see briefRegenerationPending
@@ -1485,14 +1485,14 @@ export default function StaffDeliberationsTab({
                 </button>
               )}
               <a href={briefReadyFile.webUrl} target="_blank" rel="noopener noreferrer" className={secondaryClass}>
-                Open briefing in Word
+                Open brief in Word
               </a>
             </>
           )}
           {briefReadyFile && briefShared && everSent && (
             <>
               <a href={briefReadyFile.webUrl} target="_blank" rel="noopener noreferrer" className={secondaryClass}>
-                Open briefing in Word
+                Open brief in Word
               </a>
               {latestSendFailure && !briefRegenerationPending && (
                 <button type="button" onClick={openComposer} className={secondaryClass}>
@@ -1565,7 +1565,7 @@ export default function StaffDeliberationsTab({
     >
       {materialsLine && <p className="mt-0.5 text-sm text-gray-600" data-testid="deliberations-materials-line">{materialsLine}</p>}
       {/* Recording, transcripts and summary stay visible on the finished step:
-          they are the sources for the working writeup. Shown once anything is
+          they are the sources for the draft writeup. Shown once anything is
           published, or after the presentation to say where they will appear. */}
       {siteVisitContext?.presentationMaterialsStatus === 'loaded'
         && (due || (siteVisitContext.presentationMaterials || EMPTY_LIST).length > 0) && (
@@ -1585,12 +1585,12 @@ export default function StaffDeliberationsTab({
     <Step
       id="deliberations-writeup"
       number={1}
-      title="Post-presentation writeup"
+      title="Draft writeup"
       status={writeupStatus}
       summary={<p className={summaryClass}>{writeupSummary}</p>}
       details={readyFile ? (
         <div className="mt-2 text-sm text-gray-700">
-          <p className="text-gray-600">Findings from the presentation. All edits go into this one file.</p>
+          <p className="text-gray-600">Findings from the research presentation. All draft writeup edits go into this one file.</p>
           {!preSiteShared && !preSiteFinal && readyFile.lastModified && (
             <p className="mt-1">{`Draft generated ${new Date(readyFile.lastModified).toLocaleDateString()}`}</p>
           )}
@@ -1600,7 +1600,7 @@ export default function StaffDeliberationsTab({
             </p>
           )}
           <FileDetails file={readyFile} />
-          <Warnings warnings={draftWarnings} label={preSiteShared || preSiteFinal ? 'Writeup needs a quick edit check' : 'Draft needs a quick edit check'} />
+          <Warnings warnings={draftWarnings} label={preSiteShared || preSiteFinal ? 'Writeup needs a quick edit check' : 'Draft writeup needs a quick edit check'} />
           {previousVersions.length > 0 && (
             <section className="mt-3" aria-label="Previous writeup versions">
               <h4 className="font-medium text-gray-800">Previous versions</h4>
@@ -1627,16 +1627,16 @@ export default function StaffDeliberationsTab({
               disabled={generating || !requestId || unchangedRetryBlocked}
               className={due ? primaryClass : secondaryClass}
             >
-              {generating ? 'Preparing…' : 'Prepare working draft'}
+              {generating ? 'Preparing…' : 'Prepare draft writeup'}
             </button>
           )}
           {readyFile && preSiteDraftReady && (
             <>
               <a href={readyFile.webUrl} target="_blank" rel="noopener noreferrer" className={due || correctionDraft ? primaryClass : secondaryClass}>
-                Edit writeup in Word
+                Edit draft writeup in Word
               </a>
               {canChangeWriteup && !correctionDraft && due && timing?.availability === 'available' && preparationState === 'disabled' && <button type="button" onClick={startSiteVisitAction} disabled={startingSiteVisit || generating} className={secondaryClass}>
-                {startingSiteVisit ? 'Preparing…' : 'Prepare for post-visit editing'}
+                {startingSiteVisit ? 'Preparing…' : 'Prepare draft writeup for editing'}
               </button>}
               {canChangeWriteup && correctionDraft && <button type="button" onClick={startSiteVisitAction} disabled={startingSiteVisit || generating} className={secondaryClass}>
                 {startingSiteVisit ? 'Finishing…' : 'Finish corrections'}
@@ -1645,7 +1645,7 @@ export default function StaffDeliberationsTab({
           )}
           {readyFile && (preSiteShared || preSiteFinal) && (
             <a href={readyFile.webUrl} target="_blank" rel="noopener noreferrer" className={writeupStatus === 'current' ? primaryClass : secondaryClass}>
-              {preSiteFinal ? 'Open writeup in Word' : 'Edit writeup in Word'}
+              {preSiteFinal ? 'Open draft writeup in Word' : 'Edit draft writeup in Word'}
             </a>
           )}
           {canHandOff && (
@@ -1696,20 +1696,20 @@ export default function StaffDeliberationsTab({
             {preparationState === 'disabled'
               ? readyFile
                 ? preSiteDraftReady && !correctionDraft && timing?.availability === 'available'
-                  ? 'Automatic preparation is off. Prepare for post-visit editing keeps this Word file and records its current version; it does not start review or send email.'
+                  ? 'Automatic preparation is off. Prepare draft writeup for editing keeps this Word file and records its current version; it does not start review or send email.'
                   : 'Automatic preparation is off. Your existing Word file is unchanged.'
                 : unchangedRetryBlocked
                   ? 'Automatic preparation is off. Draft preparation needs attention; see the message above before trying again.'
-                  : 'Automatic preparation is off. Use Prepare working draft to create the writeup; this does not start review or send email.'
+              : 'Automatic preparation is off. Use Prepare draft writeup; this does not start review or send email.'
               : correctionDraft
-                ? 'Open for corrections. Choose Finish corrections when your edits are done; the working writeup then updates automatically.'
+              ? 'Open for corrections. Choose Finish corrections when your edits are done; the draft writeup then updates automatically.'
               : preparationState === 'due'
                 ? 'Waiting for automatic preparation. No preparation action is needed from you yet; group review starts only when you choose.'
               : preparationState === 'pending'
                 ? 'This request is queued for automatic preparation. Group review starts only when you choose.'
                 : preparationState === 'running' || pendingArtifact?.operationStatus === REQUEST_DOCUMENT_OPERATION_STATUS.GENERATING
-                  ? 'The working writeup is being prepared. Group review starts only when you choose.'
-                  : 'The scheduled presentation end has passed. The working writeup is not ready yet.'}
+                  ? 'The draft writeup is being prepared. Group review starts only when you choose.'
+                  : 'The scheduled research presentation end has passed. The draft writeup is not ready yet.'}
           </p>
         )}
       </div>
@@ -1717,7 +1717,7 @@ export default function StaffDeliberationsTab({
         <p className="mt-2 text-sm text-gray-700" data-testid="writeup-hidden-note">
           {writeupAccess?.identityLinked === false
             ? 'Your staff account isn’t linked to a Dynamics user, so the app can’t confirm you’re the lead Program Director. Contact an administrator.'
-            : 'The lead Program Director is drafting this writeup. You’ll see it when it’s ready for group review.'}
+            : 'The lead Program Director is preparing the draft writeup. You’ll see it when it’s ready for group review.'}
         </p>
       ) : handOffNote && (
         <p className="mt-2 text-sm text-gray-700" data-testid="group-review-handoff-note">{handOffNote}</p>
@@ -2066,11 +2066,11 @@ export default function StaffDeliberationsTab({
             className="w-full max-w-lg rounded-xl bg-white p-6 shadow-xl"
           >
             <h3 id="brief-reopen-title" className="text-lg font-semibold text-gray-900">
-              Regenerate a brief the Board already received?
+              Regenerate the proposal discussion brief the Board already received?
             </h3>
             <p className="mt-2 text-sm text-gray-700">
-              The Board already received this brief. A new Draft brief will replace it for staff.
-              The deliberation briefing page keeps serving the version already sent until you share again.
+              The Board already received this proposal discussion brief. A new draft of the proposal discussion brief will replace it for staff.
+              The proposal review packet keeps serving the version already sent until you share again.
             </p>
             {briefReopenError && (
               <div className="mt-4 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-800" role="alert">
@@ -2152,7 +2152,7 @@ export default function StaffDeliberationsTab({
                   disabled={!briefReopenFormValid || briefReopening}
                   className="rounded-lg bg-red-700 px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
                 >
-                  {briefReopening ? 'Regenerating…' : 'Regenerate Sent Brief'}
+                  {briefReopening ? 'Regenerating…' : 'Regenerate sent proposal discussion brief'}
                 </button>
               </div>
             </form>

@@ -59,7 +59,7 @@ function attentionReason(request) {
   if (request.timing?.availability === 'unavailable') return `The system couldn’t confirm the presentation time. ${RELOAD_THEN_ADMIN}`;
   if (request.preparation?.state === 'blocked') return 'Automatic writeup preparation stopped before it finished. Your existing document is preserved; open the request to retry.';
   if (request.preparation?.state === 'unavailable') return `The system couldn’t load the writeup preparation status. ${RELOAD_THEN_ADMIN}`;
-  for (const [key, name] of [['brief', 'briefing'], ['writeup', 'writeup']]) {
+  for (const [key, name] of [['brief', 'proposal discussion brief'], ['writeup', 'draft writeup']]) {
     const fact = request[key];
     if (fact?.operationStatus === REQUEST_DOCUMENT_OPERATION_STATUS.FAILED) return `The ${name} couldn’t be generated. Open the request to try again.`;
     if (fact?.availability === 'ambiguous') return `More than one ${name} is linked to this request. Contact an administrator.`;
@@ -84,12 +84,12 @@ function taskFor(request) {
     const ready = writeupReady(request);
     if (ready) return { label: 'Post-visit editing', bucket: 'post', tab: 'staff-deliberations' };
     if (request.preparation.state === 'disabled') {
-      return { label: request.writeup?.availability === 'available' ? 'Working draft available' : 'No working writeup yet', bucket: 'post', tab: 'staff-deliberations' };
+      return { label: request.writeup?.availability === 'available' ? 'Draft writeup available' : 'No draft writeup yet', bucket: 'post', tab: 'staff-deliberations' };
     }
-    if (request.preparation.state === 'running' || request.writeup?.operationStatus === REQUEST_DOCUMENT_OPERATION_STATUS.GENERATING) return { label: 'Preparing working writeup', bucket: 'post', tab: 'staff-deliberations' };
+    if (request.preparation.state === 'running' || request.writeup?.operationStatus === REQUEST_DOCUMENT_OPERATION_STATUS.GENERATING) return { label: 'Preparing draft writeup', bucket: 'post', tab: 'staff-deliberations' };
     if (request.preparation.state === 'due') return { label: 'Waiting for automatic preparation', bucket: 'post', tab: 'staff-deliberations' };
     if (request.preparation.state === 'pending') return { label: 'Queued for preparation', bucket: 'post', tab: 'staff-deliberations' };
-    return { label: 'Working writeup needed', bucket: 'post', tab: 'staff-deliberations' };
+    return { label: 'Draft writeup needed', bucket: 'post', tab: 'staff-deliberations' };
   }
   const notScheduled = request.timing?.availability === 'missing' || !request.timing?.endIso;
   return { label: notScheduled ? 'Schedule needed' : 'Before presentation', bucket: notScheduled ? 'attention' : 'before', tab: 'staff-deliberations' };
@@ -138,22 +138,22 @@ function presentationWhen(request) {
 }
 
 function nextStep(request, task, document) {
-  if (task.bucket === 'review') return 'Read the writeup and follow its review progress.';
+  if (task.bucket === 'review') return 'Read the final writeup and follow its review progress.';
   // Someone else's draft before group review: the lead PD drafts alone.
-  if (request.writeup?.fileHidden === true) return 'The lead Program Director is drafting this writeup.';
-  if (request.writeup?.correctionInProgress) return 'Make the requested corrections in the writeup, then choose Finish corrections.';
+  if (request.writeup?.fileHidden === true) return 'The lead Program Director is preparing the draft writeup.';
+  if (request.writeup?.correctionInProgress) return 'Make the requested corrections in the draft writeup, then choose Finish corrections.';
   if (task.label === 'Schedule needed') return 'Add the presentation schedule on the request page.';
   if (request.preparation?.state === 'running' || request.writeup?.operationStatus === REQUEST_DOCUMENT_OPERATION_STATUS.GENERATING) {
-    return 'Your writeup is being prepared. Check back shortly.';
+    return 'The draft writeup is being prepared. Check back shortly.';
   }
   if (request.preparation?.due && ['due', 'pending'].includes(request.preparation?.state)) {
     return 'Preparation will run automatically. No action is needed now.';
   }
-  if (task.label === 'Post-visit editing') return 'Add your presentation findings to the writeup, then open group review.';
+  if (task.label === 'Post-visit editing') return 'Add your research presentation findings to the draft writeup, then open group review.';
   if (task.bucket === 'post') return document
-    ? 'Prepare the writeup for post-visit editing.'
-    : 'Prepare your working writeup.';
-  if (request.brief?.operationStatus === REQUEST_DOCUMENT_OPERATION_STATUS.GENERATING) return 'The briefing is being prepared. Check back shortly.';
+    ? 'Prepare the draft writeup for editing.'
+    : 'Prepare your draft writeup.';
+  if (request.brief?.operationStatus === REQUEST_DOCUMENT_OPERATION_STATUS.GENERATING) return 'The proposal discussion brief is being prepared. Check back shortly.';
   if (document?.key === 'brief') {
     // Same rule as the request tab: name the session only while it is upcoming.
     const sessionStartMs = Date.parse(request.session?.scheduledStartIso || '');
@@ -161,10 +161,10 @@ function nextStep(request, task, document) {
       ? dateTime(request.session.scheduledStartIso, request.session.ianaTimeZone)
       : null;
     return sessionWhen
-      ? `Check the briefing in Word, then share it before the deliberation session on ${sessionWhen}.`
-      : 'Check the briefing in Word, then share it for the presentation.';
+      ? `Check the proposal discussion brief in Word, then share it before the deliberation session on ${sessionWhen}.`
+      : 'Check the proposal discussion brief in Word, then share it for the research presentation.';
   }
-  return 'Generate the pre-site briefing.';
+  return 'Generate the proposal discussion brief.';
 }
 
 function RequestRow({ request }) {

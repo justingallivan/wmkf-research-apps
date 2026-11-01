@@ -74,20 +74,18 @@ sequence.
   correction does not establish live delivery. Requirements and remaining follow-ups:
   `docs/plans/PERSONAL_EMAIL_DEFAULTS_TODO_2026-09-20.md`.
 
-- **Settle the deliberations vocabulary suite-wide (2026-10-06).** [OPEN —
-  owner group decision after the D26 cycle; do not rename panel by panel]
-  The PD's pre-deliberation document, the applicant event (site visit /
-  research presentation), the pre-visit meeting, the staff working document,
-  applicant slides/bios, recording/transcripts, and the two meanings of
-  "presentation end" each carry several names across the Workbench, Meeting
-  Tracker, Board-facing pages, Admin and email. The owner will settle one name
-  per concept with colleagues after D26; the change then lands across the suite
-  in one pass. Inventory, workflow order, code-identifier contracts and the
-  decision list: `docs/NOMENCLATURE_GLOSSARY.md` → "Deliberations workflow
-  vocabulary". Latest owner-edited colleague-review deck and proposed table:
+- **Deliberations display vocabulary — approved 2026-10-21; bounded UI-copy slice authorized 2026-10-31.**
+  The approved terminology table and glossary settle the names; Staff Deliberations
+  remains the Workbench request tab. The authorized branch-local slice is limited to
+  display copy in `StaffDeliberationsTab`, `StaffDeliberationsPanel`,
+  `FinalWriteupTab`, and `PreSiteDistributionPanel`. It does not authorize a
+  suite-wide rename or a technical migration: preserve routes, API/service names,
+  schema/storage values, artifact types, prompt identifiers, deep links, and saved
+  settings or content. This branch-local work is not merged or deployed. Runtime
+  wording on other surfaces remains partial/pending separate scope. Approved names,
+  dated historical inventory, and contracts: `docs/NOMENCLATURE_GLOSSARY.md` →
+  "Deliberations workflow vocabulary"; decision evidence:
   `docs/plans/review/PROPOSAL_WORKFLOW_VOCABULARY_2026-10-19.md`.
-  [OWNER DIRECTION 2026-10-19] Review with colleagues before app changes;
-  Staff Deliberations stays and the collection is proposed as Discussion summaries.
 
 - **Staff Deliberations: group-review handoff from the writeup step
   (2026-10-06).** [STAGE 1 LIVE — PR #452, merge `40b70a145`, Production 2026-10-06]
@@ -115,13 +113,6 @@ sequence.
   session is upcoming, matching the request tab's rule (`StaffDeliberationsPanel.js`);
   (b) the two writeup "check in Word" warnings no longer say "the Dataverse fill"
   (`lib/services/pre-site-visit/artifact-model.js`). Owner approved both wordings.
-
-- **Deliberations vocabulary: colleague review pending (owner, 2026-10-19).**
-  The owner has now reviewed the terminology and edited the presentation:
-  `docs/plans/review/PROPOSAL_WORKFLOW_VOCABULARY_2026-10-19.md` links the exact deck
-  and proposed names. The October 8 options sheet is an earlier historical proposal.
-  The earlier November 1 reminder does not block preparation already completed.
-  Await colleague feedback and explicit implementation scope before a suite-wide rename.
 
 - **Overlapping cycles with minimal configuration (2026-10-21).**
   [PARTIAL: CALENDAR, LANDING CYCLE AND NAMED DATE CONSUMERS SHIPPED; CONSOLIDATED READINESS VIEW/NOTICES STILL PLANNED]

@@ -118,9 +118,20 @@ legacy-live | deprecated | ambiguous | direct-url-test`. `migrationDecision` ∈
 [VERIFIED via owner decision, 2026-10-21] Colleague review approved the names in
 [the terminology table](plans/review/PROPOSAL_WORKFLOW_VOCABULARY_2026-10-19.md),
 with **Draft writeup** replacing the proposed **Post-presentation writeup**.
-The deck and mockups use these names. Runtime wording migration is pending and
-is not authorized by this artifact-editing task. Routes, storage names and
-identifiers remain unchanged.
+The deck and mockups use these names. Runtime adoption is partial; the bounded
+UI-copy authorization and current implementation boundary are recorded below.
+The Oct21 decision does not authorize route, storage, schema, or identifier
+migrations.
+
+### Current implementation boundary — 2026-10-31
+
+Runtime adoption is partial. A bounded UI-copy slice is authorized for
+`StaffDeliberationsTab`, `StaffDeliberationsPanel`, `FinalWriteupTab`, and
+`PreSiteDistributionPanel`. As of 2026-10-31, implementation is on branch
+`codex/draft-language`; check Git/PR state for current merge and release status.
+Other runtime surfaces remain pending separate scope. Preserve routes,
+API/service and prompt identifiers, schema/storage values, artifact types, deep
+links, saved settings, and existing user-authored content.
 
 ### Historical source inventory — October 6–7, 2026
 
@@ -156,7 +167,7 @@ not the approved design labels.
 | Applicant-supplied slides/bios | "Site visit materials" (magic-link page title), "Research presentation materials" (same page, body), "Research Presentation Materials" (Workbench card), "Materials" (list line) | `pages/external/materials/[token].js`; `ResearchPresentationMaterialsCard.js` |
 | Recording/transcripts after the event | "Post-presentation materials", "Research presentation follow-up" (old card title), "Recording and transcripts" (Workbench step), "Board presentation link" | `PostPresentationMaterialsCard.js`, `RecordingAndTranscriptCard.js`, `ResearchPresentationFollowUp.js` |
 | "Presentation end" | (a) the scheduled end of the site-visit event (Workbench "Presentation ends …"; triggers post-visit editing) vs (b) the point in the recording where the presentation stops and staff discussion begins (transcript split: "Presentation end not confirmed", "Choose the last turn of the presentation") | `StaffDeliberationsTab.js` vs `RecordingAndTranscriptCard.js` |
-| Staff's working document | "Post-presentation writeup" (Workbench step title), "Working writeup" (~19), "working draft" / "Prepare working draft", "Word Draft" ("Regenerate Word Draft"), "Pre-Site Visit Writeup" (read-only notice), "Site Visit working document" (Final Writeup prerequisite), "Pre-Site artifact" (Meeting Tracker) | `StaffDeliberationsTab.js`, `FinalWriteupTab.js`, `MeetingTrackerList.js` |
+| Staff's working document | Historical runtime variants included "Post-presentation writeup" (Workbench step title), "Working writeup" (~19), "working draft" / "Prepare working draft", "Word Draft" ("Regenerate Word Draft"), "Pre-Site Visit Writeup" (read-only notice), "Site Visit working document" (Final Writeup prerequisite), and "Pre-Site artifact" (Meeting Tracker). The approved display name is **Draft writeup**. | `StaffDeliberationsTab.js`, `FinalWriteupTab.js`, `MeetingTrackerList.js` |
 | The meeting | "Deliberation session" / "deliberation session" (~15), "PC deliberation session", "Meeting session" (browser tab title, `SessionEditor.js:526`), "session" | Meeting Tracker, `PreSiteDistributionPanel.js`, Workbench step |
 | The Workbench area | "Staff Deliberations" (request tab, ~19) vs "Staff deliberations" (list tab, ~9) — casing differs between the two tabs | `pages/workbench/[requestId].js`, Workbench list |
 
@@ -170,10 +181,10 @@ anchors `#deliberations-status|briefing|writeup`; SharePoint file names such as
 "… Site Visit Presentation.pdf". Treat these as LEAVE+DOCUMENT unless the group
 explicitly chooses a migration.
 
-- **status:** canonical (approved display vocabulary); runtime migration pending
+- **status:** canonical (approved display vocabulary); runtime adoption partial, bounded copy slice authorized 2026-10-31; implementation was on `codex/draft-language` as of that date (check current Git/PR state for release status)
 - **ownerAppKey:** `reviewers` (Workbench), `meeting-tracker`
-- **migrationDecision:** RENAME display copy when separately implemented; LEAVE+DOCUMENT internal identifiers.
-- **lastVerified:** 2026-10-21 via owner approval and terminology deck inspection
+- **migrationDecision:** Apply approved display copy within separately scoped UI work; LEAVE+DOCUMENT internal identifiers and existing persisted/user-authored values.
+- **lastVerified:** 2026-10-31 via owner-approved terminology and scoped implementation record
 
 ## Concept Evaluator
 
