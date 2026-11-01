@@ -101,6 +101,8 @@ describe('InviteEmailModal invitation timing contract', () => {
       '- Proposal delivered on {{proposalDelivery}}',
       'Proposals released to reviewers: {{proposalDelivery}}',
       'We will send you the full proposal by {{proposalDelivery}}.',
+      // Live default and a PD override in Production (read 2026-11-01).
+      'We expect to send the full proposal to you on {{proposalDelivery}}.',
     ]) expect(isMixedLegacyReleaseLine(line)).toBe(false);
     // Prose deadline with no digits, link or token: kept and blocked.
     expect(isMixedLegacyReleaseLine('Proposals {{proposalDelivery}}; please return your review by next Friday.')).toBe(true);
