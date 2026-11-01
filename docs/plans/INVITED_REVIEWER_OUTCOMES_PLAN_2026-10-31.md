@@ -444,6 +444,12 @@ route re-validates with `normalizeStaffWithdrawal` (400 on anything else, and
 on a `withdrawal` sent with another status), and `applyStaffReviewerWithdrawal`
 accepts only Reviewer after accepting or Foundation. A request without the
 payload keeps the pre-dialog values (reason Other, Reviewer after accepting).
+The open dialog is bound to the panel context it opened in and closes for good
+on a request, mode or permission change or when its row disappears. The
+reviewers DTO projects `declineReason` / `declineReasonText`, so activity
+history labels "Conflict of interest recorded by staff" (with who raised it)
+and "Foundation ended the engagement (recorded by staff)", and shows a
+reviewer-withdrawal reason and any staff note (stock notes hidden).
 Next, 3b-3b (owner decision Q2): "Record outcome…" in the Invite Reviewers row
 menu for unanswered reviewers (COI / Other, who ended it), a new pre-answer
 writer.

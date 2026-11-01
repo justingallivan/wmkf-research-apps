@@ -169,6 +169,44 @@ describe('buildActivityHistory', () => {
     expect(response.label).not.toBe('Reviewer declined invitation');
   });
 
+  describe('staff withdrawal dialog outcomes', () => {
+    const responseOf = (fields) => buildActivityHistory({
+      suggestionId: 's12',
+      responseReceivedAt: '2026-10-31T12:00:00Z',
+      responseType: 'declined',
+      reviewStatus: 'withdrew',
+      ...fields,
+    }).find(e => e.key === 'response_received');
+
+    it('names a conflict of interest and who raised it', () => {
+      const response = responseOf({ declineReason: 'conflict-of-interest', endedBy: 'foundation', declineReasonText: 'Co-author' });
+      expect(response.label).toBe('Conflict of interest recorded by staff');
+      expect(response.detail).toBe('Recorded as declined by a Program Director, not by the reviewer. Raised by the Foundation. Note: Co-author');
+    });
+
+    it('names a Foundation ending recorded as Other', () => {
+      const response = responseOf({ declineReason: 'other', endedBy: 'foundation', declineReasonText: 'Proposal withdrawn' });
+      expect(response.label).toBe('Foundation ended the engagement (recorded by staff)');
+      expect(response.detail).toMatch(/Note: Proposal withdrawn$/);
+    });
+
+    it('keeps the withdrawal label and adds the reason for a reviewer withdrawal', () => {
+      const response = responseOf({ declineReason: 'too-busy', endedBy: 'reviewer_after_accepting' });
+      expect(response.label).toBe('Withdrawal recorded by staff');
+      expect(response.detail).toBe('Recorded as declined by a Program Director, not by the reviewer. Reason: Too busy.');
+    });
+
+    it('hides the stock note on legacy and default withdrawals', () => {
+      const response = responseOf({
+        declineReason: 'other',
+        endedBy: 'reviewer_after_accepting',
+        declineReasonText: 'Program Director recorded that the reviewer could not complete the assignment.',
+      });
+      expect(response.label).toBe('Withdrawal recorded by staff');
+      expect(response.detail).toBe('Recorded as declined by a Program Director, not by the reviewer.');
+    });
+  });
+
   it('labels automated no-response close-out without asserting a reviewer response', () => {
     const events = buildActivityHistory({
       suggestionId: 's12',

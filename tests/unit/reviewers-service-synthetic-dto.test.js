@@ -28,6 +28,7 @@ jest.mock('../../lib/dataverse/adapters/reviewer-suggestion', () => ({
   findEndedAfterAcceptanceByRequest: async (...a) => (await findEndedAfterAcceptanceByRequest(...a)) || [],
   findAcceptedByPD: (...a) => findAcceptedByPD(...a),
   findAcceptedByCycle: (...a) => findAcceptedByCycle(...a),
+  DECLINE_REASON_BY_VALUE: {},
   RESPONSE_TYPE_BY_VALUE: {},
   HONORARIUM_ELIGIBILITY_BY_VALUE: {},
 }));

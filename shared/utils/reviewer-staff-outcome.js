@@ -30,7 +30,8 @@ export const STAFF_ENDED_BY_CHOICES = Object.freeze([
 
 export const STAFF_OUTCOME_NOTE_MAX = 2000;
 
-const DEFAULT_TEXT = Object.freeze({
+// Exported so activity history can hide these stock notes.
+export const STAFF_WITHDRAWAL_DEFAULT_TEXT = Object.freeze({
   withdrew: 'Program Director recorded that the reviewer could not complete the assignment.',
   coi: 'Program Director recorded a conflict of interest.',
 });
@@ -42,7 +43,7 @@ const DEFAULT_TEXT = Object.freeze({
  */
 export function normalizeStaffWithdrawal(input) {
   if (input === undefined || input === null) {
-    return { reasonPicklist: 'other', reasonText: DEFAULT_TEXT.withdrew, endedBy: 'reviewer_after_accepting' };
+    return { reasonPicklist: 'other', reasonText: STAFF_WITHDRAWAL_DEFAULT_TEXT.withdrew, endedBy: 'reviewer_after_accepting' };
   }
   if (typeof input !== 'object' || Array.isArray(input)) return { error: 'withdrawal must be an object' };
   const { kind } = input;
@@ -57,13 +58,13 @@ export function normalizeStaffWithdrawal(input) {
     if (!STAFF_WITHDRAWAL_REASONS.some((r) => r.value === input.reason)) {
       return { error: 'withdrawal.reason must be one of the listed reasons' };
     }
-    return { reasonPicklist: input.reason, reasonText: note || DEFAULT_TEXT.withdrew, endedBy: 'reviewer_after_accepting' };
+    return { reasonPicklist: input.reason, reasonText: note || STAFF_WITHDRAWAL_DEFAULT_TEXT.withdrew, endedBy: 'reviewer_after_accepting' };
   }
   if (!STAFF_ENDED_BY_CHOICES.some((c) => c.value === input.endedBy)) {
     return { error: 'withdrawal.endedBy must be reviewer_after_accepting or foundation' };
   }
   if (kind === 'coi') {
-    return { reasonPicklist: 'conflict-of-interest', reasonText: note || DEFAULT_TEXT.coi, endedBy: input.endedBy };
+    return { reasonPicklist: 'conflict-of-interest', reasonText: note || STAFF_WITHDRAWAL_DEFAULT_TEXT.coi, endedBy: input.endedBy };
   }
   if (!note) return { error: 'withdrawal.note is required for Other' };
   return { reasonPicklist: 'other', reasonText: note, endedBy: input.endedBy };

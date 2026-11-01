@@ -366,7 +366,11 @@ export default function ReviewerManagePanel({
   const [closeoutReviewerId, setCloseoutReviewerId] = useState(null); // suggestionId
   const [acceptedReleaseReviewerId, setAcceptedReleaseReviewerId] = useState(null);
   // Track Reviewers "Record reviewer withdrawal" dialog (outcomes slice 3b-3).
-  const [withdrawalReviewerId, setWithdrawalReviewerId] = useState(null);
+  // The open dialog is bound to the context it was opened in ({ suggestionId,
+  // epoch, valid }); the reconcile effect below closes it for good on a
+  // request/mode/permission change or row absence, like an attempt.
+  const [withdrawalDialog, setWithdrawalDialog] = useState(null);
+  const withdrawalDialogRef = useRef(null);
   // Stage 6B3: the one-use completion-cause the ReleaseMaterialsModal hands
   // back after a send finishes, so its own session effect can recognize the
   // selection-clear THIS attempt caused (and not reset the summary it just
@@ -439,6 +443,12 @@ export default function ReviewerManagePanel({
         attempt.valid = false;
       }
     }
+    const dialog = withdrawalDialogRef.current;
+    if (dialog && (dialog.epoch !== context.epoch || !context.reviewers.has(dialog.suggestionId))) {
+      dialog.valid = false;
+      withdrawalDialogRef.current = null;
+      setWithdrawalDialog(null);
+    }
   });
 
   // Capture stable requestId/suggestionId/kind/epoch and a unique attempt
@@ -506,8 +516,8 @@ export default function ReviewerManagePanel({
   const closeoutReviewer = closeoutReviewerId
     ? reviewers.find(r => r.suggestionId === closeoutReviewerId) || null
     : null;
-  const withdrawalReviewer = withdrawalReviewerId
-    ? reviewers.find(r => r.suggestionId === withdrawalReviewerId) || null
+  const withdrawalReviewer = withdrawalDialog?.valid
+    ? reviewers.find(r => r.suggestionId === withdrawalDialog.suggestionId) || null
     : null;
   const acceptedReleaseReviewer = acceptedReleaseReviewerId
     ? reviewers.find(r => r.suggestionId === acceptedReleaseReviewerId) || null
@@ -848,6 +858,12 @@ export default function ReviewerManagePanel({
     }
   };
 
+  const closeWithdrawalDialog = () => {
+    if (withdrawalDialogRef.current) withdrawalDialogRef.current.valid = false;
+    withdrawalDialogRef.current = null;
+    setWithdrawalDialog(null);
+  };
+
   const transitionTerminal = async (reviewer, terminalStatus, withdrawal) => {
     if (terminalStatus === 'released') {
       if (!canStartAction(reviewer.suggestionId)) return;
@@ -858,7 +874,9 @@ export default function ReviewerManagePanel({
     // with its choice, which replaces the confirm() below.
     if (terminalStatus === 'withdrew' && withdrawal === undefined) {
       if (!canStartAction(reviewer.suggestionId)) return;
-      setWithdrawalReviewerId(reviewer.suggestionId);
+      const dialog = { suggestionId: reviewer.suggestionId, epoch: statusContextRef.current.epoch, valid: true };
+      withdrawalDialogRef.current = dialog;
+      setWithdrawalDialog(dialog);
       return;
     }
     const outcome = {
@@ -1453,10 +1471,13 @@ export default function ReviewerManagePanel({
       {withdrawalReviewer && (
         <StaffWithdrawalModal
           reviewer={withdrawalReviewer}
-          onClose={() => setWithdrawalReviewerId(null)}
+          onClose={closeWithdrawalDialog}
           onConfirm={(payload) => {
-            setWithdrawalReviewerId(null);
-            transitionTerminal(withdrawalReviewer, 'withdrew', payload);
+            const dialog = withdrawalDialogRef.current;
+            // Consent belongs to the context the dialog opened in.
+            const current = Boolean(dialog?.valid) && dialog.epoch === statusContextRef.current.epoch;
+            closeWithdrawalDialog();
+            if (current) transitionTerminal(withdrawalReviewer, 'withdrew', payload);
           }}
         />
       )}

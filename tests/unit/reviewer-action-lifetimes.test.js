@@ -625,6 +625,18 @@ describe.each([false, true])('Stage 6B1 action lifetimes (StrictMode: %s)', (str
         expect(sentBodies()[0].withdrawal).toEqual({ kind: 'other', endedBy: 'reviewer_after_accepting', note: 'Moved abroad' });
       });
 
+      test.each(contextChanges.filter((change) => change !== 'unmount'))(
+        'an open dialog closes for good after %s and never dispatches',
+        (change) => {
+          const view = renderPanel();
+          withdraw();
+          expect(screen.getByRole('dialog')).toBeInTheDocument();
+          invalidate(view, change);
+          expect(screen.queryByRole('dialog')).toBeNull();
+          expect(terminalFetch).not.toHaveBeenCalled();
+        },
+      );
+
       test('preview read-only context refuses to open the dialog', () => {
         renderPanel({ previewReadOnly: true });
         withdraw();

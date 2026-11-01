@@ -32,6 +32,7 @@ jest.mock('../../lib/dataverse/adapters/reviewer-suggestion', () => ({
     100000001: 'not_eligible',
     100000002: 'not_applicable',
   },
+  DECLINE_REASON_BY_VALUE: { 100000001: 'conflict-of-interest', 100000004: 'other' },
 }));
 const getRequestById = jest.fn();
 // Grant Cycle link helpers: real strings and the real row reader, without the
@@ -501,7 +502,12 @@ describe('getReviewers', () => {
     });
     findEndedAfterAcceptanceByRequest.mockResolvedValueOnce([
       ended(IDS[0], 'person-1', TERMINAL_REVIEW_STATUS_VALUES.did_not_submit),
-      ended(IDS[2], 'person-3', TERMINAL_REVIEW_STATUS_VALUES.withdrew),
+      {
+        ...ended(IDS[2], 'person-3', TERMINAL_REVIEW_STATUS_VALUES.withdrew),
+        wmkf_endedby: 100000002,
+        wmkf_declinereasonpicklist: 100000001,
+        wmkf_declinereason: 'Co-author on the PI paper',
+      },
     ]);
 
     const out = await getReviewers({ proposalId: REQ, azureEmail: 'pd@wmkeck.org' });
@@ -513,6 +519,13 @@ describe('getReviewers', () => {
     expect(byId[IDS[2]]).toMatchObject({ reviewStatus: 'withdrew', lifecycleValid: true });
     expect(byId[IDS[0]]).toMatchObject({ endedBy: 'reviewer_after_accepting', endedAt: '2026-10-31T23:49:21Z' });
     expect(byId[IDS[1]]).toMatchObject({ endedBy: null, endedAt: null });
+    // A staff-recorded conflict of interest raised by the Foundation (slice 3b-3a).
+    expect(byId[IDS[2]]).toMatchObject({
+      endedBy: 'foundation',
+      declineReason: 'conflict-of-interest',
+      declineReasonText: 'Co-author on the PI paper',
+    });
+    expect(byId[IDS[1]]).toMatchObject({ declineReason: null, declineReasonText: null });
     // ReviewerManagePanel's "Release proposal to reviewers (N)" counts reviewStatus === 'accepted'.
     expect(rows.filter((r) => r.reviewStatus === 'accepted').map((r) => r.suggestionId)).toEqual([IDS[1]]);
     // Ended rows never join the synthesis readiness population.
