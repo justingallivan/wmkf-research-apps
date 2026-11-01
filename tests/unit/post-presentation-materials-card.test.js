@@ -493,7 +493,7 @@ test('an upload lock error keeps its specific message', async () => {
 
 test.each([
   ['post_presentation_upload_session_closed', 'Microsoft closed this upload session'],
-  ['post_presentation_site_visit_changed', 'The active Site Visit changed'],
+  ['post_presentation_site_visit_changed', 'The active research presentation changed'],
   ['post_presentation_resume_fingerprint_mismatch', 'does not match this unfinished upload'],
   ['post_presentation_finalize_in_progress', 'already being saved'],
   ['post_presentation_upload_changed', 'unfinished upload changed'],

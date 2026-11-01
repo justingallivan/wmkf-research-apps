@@ -25,7 +25,7 @@ export function classifySiteVisitMaterialsStatus(summary, { availability = 'unav
   if (summary === null) {
     return hasSiteVisit
       ? { key: MATERIALS_STATUS.NOT_REQUESTED, label: 'Not requested', tone: 'neutral' }
-      : { key: MATERIALS_STATUS.NO_VISIT, label: 'No visit', tone: 'neutral' };
+      : { key: MATERIALS_STATUS.NO_VISIT, label: 'No research presentation', tone: 'neutral' };
   }
   if (summary.state === 'needs_attention' || summary.attentionCount > 0) return { key: MATERIALS_STATUS.NEEDS_ATTENTION, label: 'Needs attention', tone: 'warning' };
   if (summary.state === 'processing' || summary.processingCount > 0) return { key: MATERIALS_STATUS.PROCESSING, label: 'Saving files', tone: 'info' };

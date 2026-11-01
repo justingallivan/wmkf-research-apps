@@ -81,3 +81,14 @@ test('a failed global session read does not hide the cycle schedule', async () =
   expect(await screen.findByRole('heading', {name:'#123456'})).toBeInTheDocument();
   expect(screen.queryByRole('alert')).not.toBeInTheDocument();
 });
+
+test('tracker navigation uses the approved discussion names while preserving route paths', async () => {
+  global.fetch = jest.fn((url) => String(url).includes('/sessions')
+    ? Promise.resolve({ ok: true, json: async () => ({ sessions: [] }) })
+    : Promise.resolve({ ok: true, json: async () => ({ proposals: [], programs: [], cycles: [{ code: 'D26' }] }) }));
+  render(<MeetingTrackerList />);
+  const summaries = await screen.findByRole('link', { name: 'Discussion summaries' });
+  const sentiment = screen.getByRole('link', { name: 'Post-presentation discussion sentiment' });
+  expect(summaries).toHaveAttribute('href', '/meeting-tracker/program-briefing');
+  expect(sentiment).toHaveAttribute('href', '/meeting-tracker/discussion-sentiment');
+});

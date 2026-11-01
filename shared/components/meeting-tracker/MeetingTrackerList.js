@@ -62,7 +62,7 @@ export function MeetingTrackerRequestRow({ proposal, cycleCode, programId }) {
         <h3 className="text-xs font-medium text-gray-500 lg:sr-only">Research presentation</h3>
         <p className="mt-1 text-sm text-gray-700 lg:mt-0">{proposal.siteVisit ? formatDate(proposal.siteVisit.scheduledStartIso) : 'Not scheduled'}</p>
         <a href={visitHref} data-full-page-navigation="true" className={actionClass}>{proposal.siteVisit ? 'Open research presentation' : 'Schedule research presentation'}<span aria-hidden="true" className="ml-1">→</span></a>
-        {proposal.siteVisitNeedsReconciliation && <p className="mt-1 text-xs text-amber-800">Multiple active visits; showing the earliest. Reconcile in the Workbench.</p>}
+        {proposal.siteVisitNeedsReconciliation && <p className="mt-1 text-xs text-amber-800">Multiple active research presentations; showing the earliest. Reconcile in the Workbench.</p>}
       </div>
       <div className="col-span-2 lg:col-span-1"><span className="mr-2 text-xs font-medium text-gray-500 lg:sr-only">Materials: </span><MaterialsStatusPill compact summary={proposal.materials} availability={proposal.materialsAvailability} hasSiteVisit={Boolean(proposal.siteVisit)} requestMaterialsHref={`${visitHref}#materials`} /></div>
     </article>
@@ -215,7 +215,7 @@ export default function MeetingTrackerList() {
   const optionalFilters = ['closed', 'no_visit', 'unavailable'].filter((key) => counts[key]);
   const filterOptions = [
     ...MATERIALS_STATUS_FILTERS,
-    ...optionalFilters.map((key) => ({ key, label: key === 'no_visit' ? 'No visit' : key === 'unavailable' ? 'Status unavailable' : 'Closed' })),
+    ...optionalFilters.map((key) => ({ key, label: key === 'no_visit' ? 'No research presentation' : key === 'unavailable' ? 'Status unavailable' : 'Closed' })),
   ];
 
   return (
@@ -223,8 +223,8 @@ export default function MeetingTrackerList() {
       <div className="mb-5 flex flex-wrap items-center justify-between gap-3 pt-6">
         <h1 className="text-2xl font-semibold text-gray-900">Meeting Tracker</h1>
         <div className="flex flex-wrap gap-5 text-sm font-semibold text-gray-600">
-          <Link href="/meeting-tracker/program-briefing" className="hover:text-gray-900 hover:underline">Program briefing</Link>
-          <Link href="/meeting-tracker/discussion-sentiment" className="hover:text-gray-900 hover:underline">Discussion sentiment</Link>
+          <Link href="/meeting-tracker/program-briefing" className="hover:text-gray-900 hover:underline">Discussion summaries</Link>
+          <Link href="/meeting-tracker/discussion-sentiment" className="hover:text-gray-900 hover:underline">Post-presentation discussion sentiment</Link>
         </div>
       </div>
       <nav aria-label="Meeting Tracker views" className="mb-5 flex gap-6 border-b border-gray-300">

@@ -22,7 +22,7 @@ const label = (value) => (value ? value.charAt(0).toUpperCase() + value.slice(1)
 
 const STATUS = {
   unavailable: { text: 'Status unavailable', tone: 'text-gray-600' },
-  no_transcript: { text: 'No staff discussion transcript', tone: 'text-gray-600' },
+  no_transcript: { text: 'No post-presentation discussion transcript', tone: 'text-gray-600' },
   not_analyzed: { text: 'Not analyzed', tone: 'text-gray-700' },
   analyzing: { text: 'Analyzing…', tone: 'text-blue-800' },
   current: { text: 'Current', tone: 'text-green-800' },
@@ -193,7 +193,7 @@ export default function DiscussionSentimentView() {
       if (programKey) query.set('programId', programKey);
       if (cycleKey) query.set('cycleCode', cycleKey);
       const envelope = await requestEnvelope(`/api/meeting-tracker/dashboard?${query}`, { tolerantBody: true });
-      if (!envelope.ok) throw new Error(envelope.data?.error || 'The site visits could not be loaded. Try again.');
+      if (!envelope.ok) throw new Error(envelope.data?.error || 'The research presentations could not be loaded. Try again.');
       return envelope.data;
     };
     try {
@@ -201,7 +201,7 @@ export default function DiscussionSentimentView() {
         const query = new URLSearchParams({ cycleCode: cycleKey });
         if (programKey) query.set('programId', programKey);
         const envelope = await requestEnvelope(`/api/meeting-tracker/discussion-sentiment/candidates?${query}`, { tolerantBody: true });
-        if (!envelope.ok) throw new Error(envelope.data?.error || 'The proposals with a staff discussion transcript could not be loaded. Try again.');
+        if (!envelope.ok) throw new Error(envelope.data?.error || 'The proposals with a post-presentation discussion transcript could not be loaded. Try again.');
         return envelope.data;
       };
       let body = await fetchDashboard(nextProgramId, nextCycleCode);
@@ -338,11 +338,11 @@ export default function DiscussionSentimentView() {
   const selectedRows = sortSentimentRows(order.map((id) => ({ ...rows[id], id, record: rows[id]?.data?.runCurrent ? rows[id].data.run?.record : null })));
 
   return (
-    <Layout title="Discussion Sentiment">
-      <PageHeader title="Discussion Sentiment" subtitle="Compare how staff received the proposals you choose, with quotes from the staff discussion." />
+    <Layout title="Post-presentation discussion sentiment">
+      <PageHeader title="Post-presentation discussion sentiment" subtitle="Compare how staff received the proposals you choose, with quotes from the post-presentation discussion." />
       <p className="mb-4 text-sm text-gray-600">
         <Link href="/meeting-tracker" className="font-semibold text-blue-700 underline underline-offset-4">Back to Meeting Tracker</Link>
-        <Link href="/meeting-tracker/program-briefing" className="ml-5 font-semibold text-blue-700 underline underline-offset-4">Program briefing</Link>
+        <Link href="/meeting-tracker/program-briefing" className="ml-5 font-semibold text-blue-700 underline underline-offset-4">Discussion summaries</Link>
       </p>
 
       <div className="mb-6 flex flex-wrap items-end gap-4">
@@ -365,10 +365,10 @@ export default function DiscussionSentimentView() {
           <option value="unavailable">Status unavailable</option>
         </ToolbarSelect>
         <button type="button" className={outlineButton} disabled={loading || !cycleCode} onClick={() => load(programId, cycleCode)}>Refresh statuses</button>
-        <label className="text-sm font-medium text-gray-700">Visit on or after
+        <label className="text-sm font-medium text-gray-700">Research presentation starts on or after
           <input type="date" value={from} onChange={(event) => setFrom(event.target.value)} className="mt-1 block h-12 rounded-xl border border-gray-300 px-3 text-base" />
         </label>
-        <label className="text-sm font-medium text-gray-700">Visit on or before
+        <label className="text-sm font-medium text-gray-700">Research presentation starts on or before
           <input type="date" value={to} onChange={(event) => setTo(event.target.value)} className="mt-1 block h-12 rounded-xl border border-gray-300 px-3 text-base" />
         </label>
       </div>
@@ -382,17 +382,17 @@ export default function DiscussionSentimentView() {
       <section aria-labelledby="sentiment-picker" className="mb-8">
         <h2 id="sentiment-picker" className="mb-2 text-lg font-semibold text-gray-900">Choose proposals</h2>
         {loading ? (
-          <div className="rounded-xl border border-gray-200 bg-white p-6 text-gray-500">Loading site visits…</div>
+          <div className="rounded-xl border border-gray-200 bg-white p-6 text-gray-500">Loading research presentations…</div>
         ) : visible.length ? (
           <ul className="divide-y divide-gray-200 rounded-xl border border-gray-200 bg-white">
             {visible.map((proposal) => (
-              <li key={proposal.requestId} className="flex items-center gap-3 px-4 py-3">
+              <li key={proposal.requestId} className="flex flex-wrap items-center gap-3 px-4 py-3">
                 <input id={`pick-${proposal.requestId}`} type="checkbox" className="h-5 w-5" checked={Boolean(rows[proposal.requestId])} disabled={Boolean(rows[proposal.requestId]?.busy)} onChange={() => toggle(proposal)} />
                 <label htmlFor={`pick-${proposal.requestId}`} className="min-w-0 flex-1 text-sm text-gray-900">
                   <span className="font-semibold">#{proposal.requestNumber}</span> {proposal.title || 'Untitled request'}
                   <span className="ml-2 text-gray-500">{fmt(DAY, proposal.siteVisit?.scheduledStartIso)}</span>
                 </label>
-                <div className="text-right text-xs" aria-live="polite">
+                <div className="w-full pl-8 text-left text-xs sm:w-auto sm:pl-0 sm:text-right" aria-live="polite">
                   <span className={`inline-block rounded-full bg-gray-100 px-2 py-1 font-semibold ${(STATUS[pickerStatus(proposal).state] || STATUS.unavailable).tone}`}>
                     {(STATUS[pickerStatus(proposal).state] || STATUS.unavailable).text}
                   </span>
@@ -403,9 +403,9 @@ export default function DiscussionSentimentView() {
             ))}
           </ul>
         ) : (
-          !error && <div className="rounded-xl border border-gray-200 bg-white p-6 text-sm text-gray-600">No proposals with a staff discussion transcript match. Try another cycle, date range, or analysis status filter.</div>
+          !error && <div className="rounded-xl border border-gray-200 bg-white p-6 text-sm text-gray-600">No proposals with a post-presentation discussion transcript match. Try another cycle, date range, or analysis status filter.</div>
         )}
-        {!loading && !error && <p className="mt-2 text-xs text-gray-500">Showing proposals with a staff discussion transcript.</p>}
+        {!loading && !error && <p className="mt-2 text-xs text-gray-500">Showing proposals with a post-presentation discussion transcript.</p>}
         {!loading && !error && capped && <p role="status" className="mt-1 text-sm text-amber-900">This list may be incomplete: the cycle has more documents than can be read at once. Ask an administrator if a proposal is missing.</p>}
       </section>
 

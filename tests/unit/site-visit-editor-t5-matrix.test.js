@@ -47,7 +47,7 @@ test('load axis (e): non-2xx unparseable body on the visit GET falls to its own 
       : Promise.resolve({ ok: true, status: 200, json: async () => ({ staff: [], board: [] }) })
   ));
   render(<SiteVisitEditor />);
-  expect(await screen.findByRole('alert')).toHaveTextContent('The site visit could not be loaded.');
+  expect(await screen.findByRole('alert')).toHaveTextContent('The research presentation could not be loaded.');
 });
 
 test('load axis (e): non-2xx unparseable body on the recipients GET falls to its own fallback, never silent', async () => {

@@ -17,6 +17,12 @@ beforeEach(() => {
 test('renders compact program groups, proposal/discussion summaries and staff signals; print opens browser print', async () => {
   render(<ProgramBriefingView />);
   expect(await screen.findByText('Imaging tissue')).toBeInTheDocument();
+  expect(screen.getByRole('heading', { level: 1, name: 'Discussion summaries' })).toBeInTheDocument();
+  expect(screen.getByRole('navigation', { name: 'Discussion summary programs' })).toBeInTheDocument();
+  expect(screen.getByRole('heading', { level: 1, name: 'December 2026 discussion summaries' })).toBeInTheDocument();
+  expect(screen.getByRole('heading', { name: 'Post-presentation discussion summary' })).toBeInTheDocument();
+  expect(screen.getByRole('link', { name: 'Open research presentation' })).toHaveAttribute('href', '/meeting-tracker/visits/req');
+  expect(screen.getByRole('link', { name: 'Review full post-presentation discussion sentiment' })).toHaveAttribute('href', '/meeting-tracker/discussion-sentiment');
   expect(screen.getByRole('heading', { name: 'Science and Engineering (SE)' })).toBeInTheDocument();
   expect(screen.getByRole('heading', { name: 'Medical Research (MR)' })).toBeInTheDocument();
   expect(screen.getByText('The method is promising.')).toBeInTheDocument(); expect(screen.getByText('Scaling remains difficult.')).toBeInTheDocument();
@@ -55,7 +61,7 @@ test('a late prior-cycle failure cannot replace the selected cycle', async () =>
 test('failure clears previous content, disables print and offers retry', async () => {
   render(<ProgramBriefingView />); await screen.findByText('Imaging tissue');
   read.mockResolvedValueOnce(json({ error: 'Try later.' }, false));
-  fireEvent.click(screen.getByRole('button', { name: 'Refresh briefing' }));
+  fireEvent.click(screen.getByRole('button', { name: 'Refresh summaries' }));
   expect(await screen.findByRole('alert')).toHaveTextContent('Try later.');
   expect(screen.queryByText('Imaging tissue')).not.toBeInTheDocument();
   expect(screen.getByRole('button', { name: 'Print / save PDF' })).toBeDisabled();

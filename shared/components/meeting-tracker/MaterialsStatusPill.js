@@ -17,7 +17,7 @@ export default function MaterialsStatusPill({ summary, availability, hasSiteVisi
   const countText = count && summary?.requiredCount === 0 ? 'No required items' : count ? `${count} received` : null;
   const detail = status.key === 'unavailable'
     ? 'Reload this page to refresh materials.'
-    : status.key === 'no_visit' ? 'Schedule a visit first.'
+    : status.key === 'no_visit' ? 'Schedule a research presentation first.'
       : status.key === 'not_requested' ? (summary ? 'Invitation not sent.' : 'Request materials.')
         : countText ? `${countText}${summary?.state === 'received' ? '; awaiting confirmation' : ''}${status.key === 'waiting' || status.key === 'late' ? dueText : ''}.` : '';
   const Icon = ICONS[status.key] || CircleHelp;

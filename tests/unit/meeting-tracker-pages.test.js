@@ -194,7 +194,7 @@ test('a saved site visit offers the recording workspace with request and cycle c
   const row = proposal({ siteVisit: { activityId: 'visit-1' } });
   const slot = { wmkf_deliberationslotid: FIRST_SLOT_ID, _wmkf_request_value: row.requestId, wmkf_minutes: 15, briefing: null };
   render(<ProposalOrderList slots={[slot]} proposalById={new Map([[row.requestId.toLowerCase(), row]])} sessions={[]} sessionId={SESSION_ID} cycleCode="D26" programId="p1" busy={false} savingSlotId={null} readOnly />);
-  expect(screen.getByRole('link', { name: 'Open visit · recording and transcript' })).toHaveAttribute('href',
+  expect(screen.getByRole('link', { name: 'Open research presentation · recording and transcript' })).toHaveAttribute('href',
     `/meeting-tracker/visits/${row.requestId}?cycleCode=D26&programId=p1&n=1002003#recording-and-transcript-card`);
   expect(screen.getByRole('link', { name: 'Check Staff Deliberations' })).toHaveAttribute('href', `/workbench/${row.requestId}?tab=staff-deliberations&n=1002003`);
 });
@@ -526,7 +526,7 @@ test('compact materials statuses preserve counts in the accessible description a
   expect(screen.getByRole('link', { name: /Check files.*Open materials/ })).toHaveAttribute('data-full-page-navigation', 'true');
   expect(screen.getByRole('link', { name: /Check files.*Open materials/ })).toHaveAccessibleName('Check files. 3/3 received; awaiting confirmation. Open materials');
   rerender(row({ siteVisit: null }));
-  expect(screen.getByTestId('materials-status')).toHaveTextContent('No visit');
+  expect(screen.getByTestId('materials-status')).toHaveTextContent('No research presentation');
   expect(screen.queryByRole('link', { name: /Open materials/ })).not.toBeInTheDocument();
 });
 

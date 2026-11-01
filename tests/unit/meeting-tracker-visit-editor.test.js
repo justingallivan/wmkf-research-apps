@@ -67,12 +67,12 @@ test('existing visit offers a missing applicant as one-click Add and includes th
   });
   render(<SiteVisitEditor />);
   expect(await screen.findByTestId('recording-transcript-in-editor')).toHaveTextContent(REQUEST_ID);
-  fireEvent.click(await screen.findByRole('button', { name: 'Edit visit details' }));
+  fireEvent.click(await screen.findByRole('button', { name: 'Edit research presentation details' }));
   fireEvent.click(await screen.findByRole('button', { name: 'Add Franklin Cat (franklin@example.edu)' }));
   expect(screen.getByText(/Franklin Cat · franklin@example.edu/)).toBeInTheDocument();
   expect(screen.getByText(/Justin · justin@example.edu/)).toBeInTheDocument();
   expect(global.fetch.mock.calls.some(([, options]) => options?.method === 'PATCH')).toBe(false);
-  fireEvent.click(screen.getByRole('button', { name: 'Save site visit' }));
+  fireEvent.click(screen.getByRole('button', { name: 'Save research presentation' }));
   const [, options] = await waitFor(() => global.fetch.mock.calls.find(([, value]) => value?.method === 'PATCH'));
   expect(JSON.parse(options.body).requiredAttendees).toEqual([
     { kind: 'manual', name: 'Justin', email: 'justin@example.edu' },
@@ -92,17 +92,17 @@ test('removing a saved applicant attendee and reopening shows Add without re-add
     return response({ success: true, siteVisit: visit, applicantAttendees: [{ kind: 'manual', name: 'Franklin Cat', email: 'franklin@example.edu' }] });
   });
   const first = render(<SiteVisitEditor />);
-  fireEvent.click(await screen.findByRole('button', { name: 'Edit visit details' }));
+  fireEvent.click(await screen.findByRole('button', { name: 'Edit research presentation details' }));
   fireEvent.click(await screen.findByRole('button', { name: /Franklin Cat · franklin@example.edu.*×/ }));
-  fireEvent.click(screen.getByRole('button', { name: 'Save site visit' }));
+  fireEvent.click(screen.getByRole('button', { name: 'Save research presentation' }));
   await waitFor(() => expect(visit.requiredAttendees).toEqual([]));
   first.unmount();
 
   render(<SiteVisitEditor />);
-  fireEvent.click(await screen.findByRole('button', { name: 'Edit visit details' }));
+  fireEvent.click(await screen.findByRole('button', { name: 'Edit research presentation details' }));
   expect(await screen.findByRole('button', { name: 'Add Franklin Cat (franklin@example.edu)' })).toBeInTheDocument();
   expect(screen.queryByRole('button', { name: /Franklin Cat · franklin@example.edu.*×/ })).not.toBeInTheDocument();
-  fireEvent.click(screen.getByRole('button', { name: 'Save site visit' }));
+  fireEvent.click(screen.getByRole('button', { name: 'Save research presentation' }));
   await waitFor(() => expect(global.fetch.mock.calls.filter(([, options]) => options?.method === 'PATCH')).toHaveLength(2));
   const patches = global.fetch.mock.calls.filter(([, options]) => options?.method === 'PATCH');
   expect(JSON.parse(patches[1][1].body).requiredAttendees).toEqual([]);
@@ -132,7 +132,7 @@ test('a new visit: the form posts the fields the logistics service expects, with
   expect(await screen.findByLabelText('Subject')).toHaveValue('Site Visit — #1003222');
   // Virtual by default (owner 2026-09-10).
   expect(screen.getByLabelText('Format')).toHaveValue('100000001');
-  const save = screen.getByRole('button', { name: 'Schedule site visit' });
+  const save = screen.getByRole('button', { name: 'Schedule research presentation' });
   expect(save).toBeDisabled();
 
   fireEvent.change(screen.getByLabelText('Starts'), { target: { value: '2026-10-01T09:00' } });
@@ -161,10 +161,10 @@ test('a new visit: the form posts the fields the logistics service expects, with
   });
   expect(payload).not.toHaveProperty('requestId');
   expect(payload).not.toHaveProperty('activityId');
-  expect(await screen.findAllByText('Site visit saved.')).not.toHaveLength(0);
+  expect(await screen.findAllByText('Research presentation saved.')).not.toHaveLength(0);
   // Once saved, the visit returns to its read-only summary.
-  expect(screen.getByRole('button', { name: 'Edit visit details' })).toBeInTheDocument();
-  expect(screen.queryByRole('button', { name: 'Save site visit' })).not.toBeInTheDocument();
+  expect(screen.getByRole('button', { name: 'Edit research presentation details' })).toBeInTheDocument();
+  expect(screen.queryByRole('button', { name: 'Save research presentation' })).not.toBeInTheDocument();
 });
 
 test('an existing visit: the form loads it, sends activityId + etag, and a write conflict reloads with an explanation', async () => {
@@ -181,11 +181,11 @@ test('an existing visit: the form loads it, sends activityId + etag, and a write
   });
   render(<SiteVisitEditor />);
 
-  expect(await screen.findByRole('heading', { name: /^Meeting coordination · #1003222/ })).toBeInTheDocument();
-  fireEvent.click(await screen.findByRole('button', { name: 'Edit visit details' }));
+  expect(await screen.findByRole('heading', { name: /^Research presentation · #1003222/ })).toBeInTheDocument();
+  fireEvent.click(await screen.findByRole('button', { name: 'Edit research presentation details' }));
   expect(screen.getByLabelText('Location or meeting link')).toHaveValue('https://zoom.example/v');
   expect(screen.getByLabelText('Format')).toHaveValue('100000001');
-  fireEvent.click(screen.getByRole('button', { name: 'Save site visit' }));
+  fireEvent.click(screen.getByRole('button', { name: 'Save research presentation' }));
 
   const [, options] = await waitFor(() => global.fetch.mock.calls.find(([, o]) => o?.method === 'PATCH'));
   expect(JSON.parse(options.body)).toMatchObject({ activityId: 'a1', etag: 'W/"1"', requiredAttendees: [{ kind: 'roster', rosterId: 3 }], optionalAttendees: [{ kind: 'staff', profileId: 8 }] });
@@ -204,7 +204,7 @@ test('a saved visit opens as a read-only summary: names not ids, a short meeting
   });
   render(<SiteVisitEditor />);
 
-  const summary = await screen.findByRole('region', { name: 'Visit details' });
+  const summary = await screen.findByRole('region', { name: 'Research presentation details' });
   expect(summary).toHaveTextContent('Thu, Oct 1, 2026 · 9:00 AM – 12:00 PM (America/Los_Angeles)');
   expect(summary).toHaveTextContent('Duncan Staff');
   expect(summary).toHaveTextContent('Board Member, Franklin Cat');
@@ -214,13 +214,13 @@ test('a saved visit opens as a read-only summary: names not ids, a short meeting
   expect(link).toHaveAttribute('href', 'https://zoom.example/j/123?pwd=secret');
   expect(summary).not.toHaveTextContent('pwd=secret');
   expect(screen.queryByLabelText('Location or meeting link')).not.toBeInTheDocument();
-  expect(screen.queryByRole('button', { name: 'Save site visit' })).not.toBeInTheDocument();
+  expect(screen.queryByRole('button', { name: 'Save research presentation' })).not.toBeInTheDocument();
 
-  fireEvent.click(screen.getByRole('button', { name: 'Edit visit details' }));
+  fireEvent.click(screen.getByRole('button', { name: 'Edit research presentation details' }));
   fireEvent.change(screen.getByLabelText('Location or meeting link'), { target: { value: 'Campus' } });
   fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
-  expect(screen.getByRole('region', { name: 'Visit details' })).toHaveTextContent('Open meeting link (zoom.example)');
-  fireEvent.click(screen.getByRole('button', { name: 'Edit visit details' }));
+  expect(screen.getByRole('region', { name: 'Research presentation details' })).toHaveTextContent('Open meeting link (zoom.example)');
+  fireEvent.click(screen.getByRole('button', { name: 'Edit research presentation details' }));
   expect(screen.getByLabelText('Location or meeting link')).toHaveValue('https://zoom.example/j/123?pwd=secret');
   expect(global.fetch.mock.calls.some(([, options]) => options?.method === 'PATCH')).toBe(false);
 });
@@ -240,7 +240,7 @@ describe('one attendee picker (Site Visit redesign §3.1)', () => {
   async function openEditor() {
     route();
     render(<SiteVisitEditor />);
-    fireEvent.click(await screen.findByRole('button', { name: 'Edit visit details' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Edit research presentation details' }));
   }
 
   test('each person appears once; the saved roles show; add, switch role and remove send the same ref shape', async () => {
@@ -254,7 +254,7 @@ describe('one attendee picker (Site Visit redesign §3.1)', () => {
     fireEvent.click(screen.getByRole('button', { name: /Add Chris Staff/ }));
     fireEvent.click(within(within(chosen).getByRole('group', { name: 'Chris Staff: attendance' })).getByRole('button', { name: 'Optional' }));
     fireEvent.click(screen.getByRole('button', { name: 'Remove Board Member' }));
-    fireEvent.click(screen.getByRole('button', { name: 'Save site visit' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Save research presentation' }));
     await waitFor(() => expect(global.fetch.mock.calls.some(([, o]) => o?.method === 'PATCH')).toBe(true));
     const payload = JSON.parse(global.fetch.mock.calls.find(([, o]) => o?.method === 'PATCH')[1].body);
     expect(payload.requiredAttendees).toEqual([]);
@@ -282,10 +282,10 @@ describe('one attendee picker (Site Visit redesign §3.1)', () => {
         return response({ success: true, siteVisit: full });
       });
       render(<SiteVisitEditor />);
-      fireEvent.click(await screen.findByRole('button', { name: 'Edit visit details' }));
+      fireEvent.click(await screen.findByRole('button', { name: 'Edit research presentation details' }));
     }
     const saved = async () => {
-      fireEvent.click(screen.getByRole('button', { name: 'Save site visit' }));
+      fireEvent.click(screen.getByRole('button', { name: 'Save research presentation' }));
       await waitFor(() => expect(global.fetch.mock.calls.some(([, o]) => o?.method === 'PATCH')).toBe(true));
       return JSON.parse(global.fetch.mock.calls.find(([, o]) => o?.method === 'PATCH')[1].body);
     };
@@ -322,7 +322,7 @@ describe('one attendee picker (Site Visit redesign §3.1)', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Change organizer' }));
     fireEvent.change(screen.getByLabelText('Organizer'), { target: { value: 'chris' } });
     fireEvent.click(screen.getByRole('button', { name: /Choose Chris Staff/ }));
-    fireEvent.click(screen.getByRole('button', { name: 'Save site visit' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Save research presentation' }));
     await waitFor(() => expect(global.fetch.mock.calls.some(([, o]) => o?.method === 'PATCH')).toBe(true));
     expect(JSON.parse(global.fetch.mock.calls.find(([, o]) => o?.method === 'PATCH')[1].body).organizer).toEqual({ kind: 'staff', profileId: 8 });
   });
@@ -342,11 +342,11 @@ test('the header shows the request identity from the visit read, and only the nu
   const view = render(<SiteVisitEditor />);
   expect(await screen.findByTestId('visit-request-identity')).toHaveTextContent('Example University — Quantum dots for imaging · Research Program · December 2026');
   expect(screen.getByText('Share status: Final')).toBeVisible();
-  expect(screen.getByRole('heading', { name: /^Meeting coordination · #1003222/ })).toBeInTheDocument();
+  expect(screen.getByRole('heading', { name: /^Research presentation · #1003222/ })).toBeInTheDocument();
   view.unmount();
   route(null);
   render(<SiteVisitEditor />);
-  expect(await screen.findByRole('heading', { name: /^Meeting coordination · #1003222/ })).toBeInTheDocument();
+  expect(await screen.findByRole('heading', { name: /^Research presentation · #1003222/ })).toBeInTheDocument();
   expect(screen.queryByTestId('visit-request-identity')).toBeNull();
   expect(screen.queryByText('Share status: Final')).not.toBeInTheDocument();
 });

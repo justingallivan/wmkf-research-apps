@@ -125,13 +125,22 @@ migrations.
 
 ### Current implementation boundary — 2026-10-31
 
-Runtime adoption is partial. A bounded UI-copy slice is authorized for
+Runtime adoption is partial. The Workbench display-copy slice in
 `StaffDeliberationsTab`, `StaffDeliberationsPanel`, `FinalWriteupTab`, and
-`PreSiteDistributionPanel`. As of 2026-10-31, implementation is on branch
-`codex/draft-language`; check Git/PR state for current merge and release status.
-Other runtime surfaces remain pending separate scope. Preserve routes,
-API/service and prompt identifiers, schema/storage values, artifact types, deep
-links, saved settings, and existing user-authored content.
+`PreSiteDistributionPanel` merged through PR #577 as `e7cd37982` (Git/source
+evidence only; not a deployment receipt). As of 2026-10-31, the Meeting Tracker
+four-term display-copy slice is on branch `codex/meeting-tracker-terminology`:
+Site Visit → Research presentation; Deliberation session → Proposal discussion
+session; Program briefing → Discussion summaries; Discussion Sentiment →
+Post-presentation discussion sentiment. Check Git/PR and release receipts for
+current status. The two summary views also use approved post-presentation
+discussion wording for the summary/transcript content they present; this is not
+a repo-wide Staff discussion rename. Other recorded staff-discussion labels and
+runtime surfaces remain pending separate full-migration scope. Saved subjects,
+emails, and generated documents retain their existing wording and are outside
+these UI-copy slices. Preserve routes, API/service and prompt identifiers,
+schema/storage values, artifact types, deep links, saved settings, and existing
+user-authored content.
 
 ### Historical source inventory — October 6–7, 2026
 
@@ -158,7 +167,7 @@ not the approved design labels.
    **Sends to leadership**. The Final writeups app's view names ("Needs my review",
    "Reviewed by me") still use review wording.
 
-### Terms in conflict
+### Runtime variants recorded in the historical inventory
 
 | Concept | Variants in use (examples) | Where |
 |---|---|---|
@@ -181,7 +190,7 @@ anchors `#deliberations-status|briefing|writeup`; SharePoint file names such as
 "… Site Visit Presentation.pdf". Treat these as LEAVE+DOCUMENT unless the group
 explicitly chooses a migration.
 
-- **status:** canonical (approved display vocabulary); runtime adoption partial, bounded copy slice authorized 2026-10-31; implementation was on `codex/draft-language` as of that date (check current Git/PR state for release status)
+- **status:** canonical (approved display vocabulary); runtime adoption partial; Workbench slice merged in PR #577; Meeting Tracker slice was on `codex/meeting-tracker-terminology` as of 2026-10-31 (check Git/PR and release receipts for current status)
 - **ownerAppKey:** `reviewers` (Workbench), `meeting-tracker`
 - **migrationDecision:** Apply approved display copy within separately scoped UI work; LEAVE+DOCUMENT internal identifiers and existing persisted/user-authored values.
 - **lastVerified:** 2026-10-31 via owner-approved terminology and scoped implementation record

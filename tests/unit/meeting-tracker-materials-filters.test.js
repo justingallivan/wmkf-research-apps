@@ -34,7 +34,7 @@ test('25 rows have exclusive stable counts; every normal filter retains source o
 test('diagnostic buckets count every row and zero-count filters are disabled and search has an explicit empty result',async()=>{
  rows=[{...fixtures()[0],siteVisit:null},{...fixtures()[1],materialsAvailability:'unavailable'},{...fixtures()[2],materials:summary('closed')}];
  render(<MeetingTrackerList/>);await screen.findByRole('option',{name:'Materials: All statuses (3)'});
- for(const label of ['No visit','Status unavailable','Closed'])expect(filter(`${label} (1)`)).toBeInTheDocument();
+ for(const label of ['No research presentation','Status unavailable','Closed'])expect(filter(`${label} (1)`)).toBeInTheDocument();
  expect(filter('Ready (0)')).toBeDisabled();
  fireEvent.change(screen.getByRole('searchbox',{name:'Find a request'}),{target:{value:'no matching request'}});expect(screen.getByText('No requests match these filters')).toBeInTheDocument();
  expect(screen.queryByRole('link',{name:'Edit visit'})).not.toBeInTheDocument();

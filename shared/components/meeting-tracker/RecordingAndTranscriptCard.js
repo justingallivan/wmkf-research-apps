@@ -105,7 +105,7 @@ function uploadFailureMessage(error) {
     return 'The exact file or upload-session outcome is uncertain. This upload is kept so it can be checked later.';
   }
   if (code === 'post_presentation_site_visit_changed') {
-    return 'The active Site Visit changed after this upload began. Reload the page before resuming.';
+    return 'The active research presentation changed after this upload began. Reload the page before resuming.';
   }
   if (code === 'post_presentation_resume_fingerprint_mismatch') {
     return 'The selected file does not match this unfinished upload. Reselect the original recording.';
@@ -988,7 +988,7 @@ const GENERATE_CONFLICT_COPY = {
   presentation_end_not_confirmed: 'Confirm where the presentation ends before generating the presentation transcript.',
   post_presentation_slot_busy: 'Another presentation transcript update is in progress. Try again in a moment.',
   meeting_transcript_current_changed: 'The published transcript changed. Refresh and try again.',
-  meeting_transcript_site_visit_changed: 'The Site Visit changed. Refresh and try again.',
+  meeting_transcript_site_visit_changed: 'The research presentation changed. Refresh and try again.',
 };
 function generateErrorMessage(error, fallback) {
   const code = error?.payload?.code;

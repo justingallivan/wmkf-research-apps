@@ -74,18 +74,26 @@ sequence.
   correction does not establish live delivery. Requirements and remaining follow-ups:
   `docs/plans/PERSONAL_EMAIL_DEFAULTS_TODO_2026-09-20.md`.
 
-- **Deliberations display vocabulary — approved 2026-10-21; bounded UI-copy slice authorized 2026-10-31.**
+- **Deliberations display vocabulary — approved 2026-10-21; bounded copy slices.**
   The approved terminology table and glossary settle the names; Staff Deliberations
-  remains the Workbench request tab. The authorized branch-local slice is limited to
-  display copy in `StaffDeliberationsTab`, `StaffDeliberationsPanel`,
-  `FinalWriteupTab`, and `PreSiteDistributionPanel`. It does not authorize a
-  suite-wide rename or a technical migration: preserve routes, API/service names,
-  schema/storage values, artifact types, prompt identifiers, deep links, and saved
-  settings or content. This branch-local work is not merged or deployed. Runtime
-  wording on other surfaces remains partial/pending separate scope. Approved names,
-  dated historical inventory, and contracts: `docs/NOMENCLATURE_GLOSSARY.md` →
-  "Deliberations workflow vocabulary"; decision evidence:
-  `docs/plans/review/PROPOSAL_WORKFLOW_VOCABULARY_2026-10-19.md`.
+  remains the Workbench request tab. The Workbench copy slice merged in PR #577 as
+  `e7cd37982` (Git/source evidence only; this does not establish deployment). As
+  of 2026-10-31, the Meeting Tracker four-term UI-copy slice is on branch
+  `codex/meeting-tracker-terminology`: Site Visit → Research presentation;
+  Deliberation session → Proposal discussion session; Program briefing →
+  Discussion summaries; Discussion Sentiment → Post-presentation discussion
+  sentiment. Check Git/PR and release receipts for current merge/deployment
+  status. The two summary views also use approved post-presentation discussion
+  wording for the discussion summary/transcript they present; this does not rename
+  recording labels or every existing Staff discussion label. Remaining recorded
+  staff-discussion labels await separate full-migration scope. Preserve routes,
+  API/service names, schema/storage values, artifact types, prompt identifiers,
+  deep links, and saved settings. Existing saved subjects, emails, and generated
+  documents retain their wording; changes to those require separate scope. No
+  suite-wide technical migration is authorized. Remaining runtime surfaces await
+  separate scope. Approved names, contracts, and dated historical inventory:
+  `docs/NOMENCLATURE_GLOSSARY.md` → "Deliberations workflow vocabulary"; decision
+  evidence: `docs/plans/review/PROPOSAL_WORKFLOW_VOCABULARY_2026-10-19.md`.
 
 - **Staff Deliberations: group-review handoff from the writeup step
   (2026-10-06).** [STAGE 1 LIVE — PR #452, merge `40b70a145`, Production 2026-10-06]

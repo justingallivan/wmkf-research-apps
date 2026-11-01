@@ -145,8 +145,8 @@ function VisitSummary({ visit, directory, onEdit }) {
   return (
     <section aria-labelledby="visit-details-heading" className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <h2 id="visit-details-heading" className="text-base font-semibold text-gray-900">Visit details</h2>
-        <Button type="button" variant="outline" size="sm" onClick={onEdit}>Edit visit details</Button>
+        <h2 id="visit-details-heading" className="text-base font-semibold text-gray-900">Research presentation details</h2>
+        <Button type="button" variant="outline" size="sm" onClick={onEdit}>Edit research presentation details</Button>
       </div>
       <dl className="mt-4 grid gap-x-8 gap-y-4 md:grid-cols-2">
         {row('When', visitWhen(visit))}
@@ -248,7 +248,7 @@ export default function SiteVisitEditor() {
       // Both GETs in flight together (as before the migration); the visit
       // result is settled first so its failure always wins the banner.
       const [visitSettled, recipientSettled] = await Promise.allSettled([
-        readJson(`/api/meeting-tracker/visits/${encodeURIComponent(requestId)}`, undefined, 'The site visit could not be loaded.'),
+        readJson(`/api/meeting-tracker/visits/${encodeURIComponent(requestId)}`, undefined, 'The research presentation could not be loaded.'),
         readJson('/api/meeting-tracker/recipients', undefined, 'The attendee directory could not be loaded.'),
       ]);
       if (!stillCurrent()) return;
@@ -343,16 +343,16 @@ export default function SiteVisitEditor() {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: payload,
-      }, 'The site visit could not be saved.');
+      }, 'The research presentation could not be saved.');
       setVisit(body.siteVisit);
       setForm(formFromVisit(body.siteVisit, requestNumber));
       setEditingFor(null);
-      setNotice('Site visit saved.');
+      setNotice('Research presentation saved.');
     } catch (saveError) {
       if (saveError.code === 'site_visit_write_conflict') {
         // Reload first (it clears the banner), then explain on top of fresh data.
         await load();
-        setError('The site visit changed since this page loaded. It has been reloaded; review and save again.');
+        setError('The research presentation changed since this page loaded. It has been reloaded; review and save again.');
       } else {
         setError(`${saveError.message} Please try again. If the problem continues, contact an administrator.`);
       }
@@ -375,11 +375,11 @@ export default function SiteVisitEditor() {
   const canSave = Boolean(form.organizer && form.startLocal && form.endLocal && form.timeZone.trim() && form.locationOrLink.trim() && form.subject.trim()) && !busy;
 
   return (
-    <Layout title={visit ? 'Site visit' : 'Schedule site visit'}>
+    <Layout title={visit ? 'Research presentation' : 'Schedule research presentation'}>
       <div className="pt-6 mb-6">
         {backLink}
         <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1">
-          <h1 className="text-2xl font-semibold text-gray-900">{visit ? 'Meeting coordination' : 'Schedule the research presentation'}{(requestIdentity?.requestNumber || requestNumber) ? ` · #${requestIdentity?.requestNumber || requestNumber}` : ''}</h1>
+          <h1 className="text-2xl font-semibold text-gray-900">{visit ? 'Research presentation' : 'Schedule the research presentation'}{(requestIdentity?.requestNumber || requestNumber) ? ` · #${requestIdentity?.requestNumber || requestNumber}` : ''}</h1>
           {visit && headerStatus && (
             <span data-testid="visit-header-status" className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-sm font-medium ${STATUS_TONES[headerStatus.tone] || STATUS_TONES.gray}`}>{headerStatus.label}</span>
           )}
@@ -407,7 +407,7 @@ export default function SiteVisitEditor() {
       <div className={`min-w-0 ${!loading && visit ? 'lg:col-start-2 lg:row-start-1' : ''}`} role="tabpanel" id={`${taskPrefix}-panel-setup`} aria-labelledby={visit ? `${taskPrefix}-task-setup` : undefined} hidden={task !== 'setup'}>
         <div className="mb-6"><h2 className="text-xl font-semibold text-gray-900">Meeting setup</h2><p className="mt-2 text-sm text-gray-600">Confirm the time, location and attendees before preparing invitations.</p></div>
       {loading ? (
-        <div className="rounded-xl border border-gray-200 bg-white p-8 text-center text-gray-500">Loading the site visit…</div>
+        <div className="rounded-xl border border-gray-200 bg-white p-8 text-center text-gray-500">Loading the research presentation…</div>
       ) : visit && !editing ? (
         <VisitSummary visit={visit} directory={recipients} onEdit={() => { setNotice(null); setEditingFor(requestId); }} />
       ) : (
@@ -418,13 +418,13 @@ export default function SiteVisitEditor() {
             <label className="text-sm font-medium text-gray-700">Time zone<input required value={form.timeZone} onChange={(event) => updateForm('timeZone', event.target.value)} placeholder={DEFAULT_TIME_ZONE} className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2" /></label>
             <label className="text-sm font-medium text-gray-700 md:col-span-2">Starts<input required type="datetime-local" value={form.startLocal} onChange={(event) => updateForm('startLocal', event.target.value)} className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2" /></label>
             <label className="text-sm font-medium text-gray-700 md:col-span-2">Ends<input required type="datetime-local" value={form.endLocal} onChange={(event) => updateForm('endLocal', event.target.value)} className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2" /></label>
-            <label className="text-sm font-medium text-gray-700 md:col-span-2 lg:col-span-4">Location or meeting link<input required value={form.locationOrLink} onChange={(event) => updateForm('locationOrLink', event.target.value)} placeholder="Campus address, or an https:// meeting link for a virtual visit" className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2" /></label>
+            <label className="text-sm font-medium text-gray-700 md:col-span-2 lg:col-span-4">Location or meeting link<input required value={form.locationOrLink} onChange={(event) => updateForm('locationOrLink', event.target.value)} placeholder="Campus address, or an https:// link for a remote research presentation" className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2" /></label>
             <label className="text-sm font-medium text-gray-700 md:col-span-2 lg:col-span-4">Notes<textarea rows="3" value={form.description} onChange={(event) => updateForm('description', event.target.value)} className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2" /></label>
           </div>
 
           <fieldset className="mt-6 border-t border-gray-100 pt-5">
             <legend className="text-base font-semibold text-gray-900">Organizer</legend>
-            <p className="mt-1 text-sm text-gray-600">The staff member who owns the visit and the calendar entry.</p>
+            <p className="mt-1 text-sm text-gray-600">The staff member who owns the research presentation and calendar entry.</p>
             <div className="mt-3">
               {recipients.staff.length === 0
                 ? <p className="text-sm text-gray-500">No staff found in the directory.</p>
@@ -450,7 +450,7 @@ export default function SiteVisitEditor() {
           <fieldset className="mt-6 border-t border-gray-100 pt-5">
             <legend className="text-base font-semibold text-gray-900">Applicant-side attendees</legend>
             <p className="mt-1 text-sm text-gray-600">People outside the foundation, such as the project leader. They receive the calendar entry.</p>
-            <p className="mt-1 text-xs text-gray-500">New visits prefill the Project Leader and primary contact from AkoyaGo when they have email addresses. For a saved visit, add any missing contacts below, then save to include them in the calendar entry.</p>
+            <p className="mt-1 text-xs text-gray-500">New research presentations prefill the Project Leader and primary contact from AkoyaGo when they have email addresses. For an existing presentation, add any missing contacts below, then save to include them in the calendar entry.</p>
             {applicantAttendeesUnavailable && <p role="status" className="mt-1 text-xs text-amber-800">Applicant contacts could not be loaded. Add attendees manually or reload the page.</p>}
             {missingApplicantAttendees.length > 0 && (
               <div className="mt-3 flex flex-wrap items-center gap-2">
@@ -486,7 +486,7 @@ export default function SiteVisitEditor() {
           <div className="mt-6 flex flex-wrap items-center justify-end gap-4 border-t border-gray-200 pt-5">
             {notice && <p role="status" className="text-sm font-medium text-blue-800">{notice}</p>}
             {visit && <Button type="button" variant="outline" disabled={busy} onClick={cancelEdit}>Cancel</Button>}
-            <Button type="submit" loading={busy} disabled={!canSave}>{visit ? 'Save site visit' : 'Schedule site visit'}</Button>
+            <Button type="submit" loading={busy} disabled={!canSave}>{visit ? 'Save research presentation' : 'Schedule research presentation'}</Button>
           </div>
         </form>
       )}
