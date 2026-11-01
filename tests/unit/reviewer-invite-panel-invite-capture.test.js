@@ -200,6 +200,27 @@ describe('ReviewerInvitePanel invitation capture rehearsal', () => {
     expect(global.fetch.mock.calls.some(([url]) => url === '/api/review-manager/send-emails')).toBe(false);
   });
 
+  test('blocks sending when the retired release date is in the subject', async () => {
+    const base = global.fetch.getMockImplementation();
+    global.fetch.mockImplementation(async (url, init) => {
+      if (url === '/api/review-manager/render-emails') {
+        return mockJson({ drafts: [{ ...draft, subject: 'Invitation — proposals {{proposalDelivery}}', reviewDueDate: '2099-08-24' }] });
+      }
+      return base(url, init);
+    });
+    render(
+      <ReviewerInvitePanel requestId="REQ-1" candidates={[candidate]} onRefresh={jest.fn()} settings={{ signature: 'Program Director' }} />,
+    );
+    fireEvent.click(screen.getByLabelText('Select Dr. Test Reviewer'));
+    fireEvent.click(screen.getByRole('button', { name: /send invitation \(1\)/i }));
+    const subjectBox = await screen.findByDisplayValue('Invitation — proposals {{proposalDelivery}}');
+    expect(await screen.findByText(/can’t be removed automatically/i)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /send 1 invitation/i })).toBeDisabled();
+    fireEvent.change(subjectBox, { target: { value: 'Invitation' } });
+    expect(screen.getByRole('button', { name: /send 1 invitation/i })).toBeEnabled();
+    expect(global.fetch.mock.calls.some(([url]) => url === '/api/review-manager/send-emails')).toBe(false);
+  });
+
   test('keeps declined reviewers visible but excludes them from invitation selection and counts', () => {
     const declinedCandidate = {
       ...candidate,

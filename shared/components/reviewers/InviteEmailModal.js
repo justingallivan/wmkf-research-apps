@@ -206,7 +206,7 @@ export function applySubjectTiming(subject, timing) {
 // never strand a durable write.
 export const PREVIEW_RENDER_TIMEOUT_MS = 45000;
 
-export const LEGACY_RELEASE_BLOCK_MESSAGE = 'Your saved wording mentions the proposal release date in a way that can’t be removed automatically. Edit your default wording, or this email, to take out {{proposalDelivery}} before sending.';
+export const LEGACY_RELEASE_BLOCK_MESSAGE = 'Your saved wording mentions the proposal release date in a way that can’t be removed automatically. Edit your default wording, or this email’s subject or message, to take out {{proposalDelivery}} before sending.';
 
 export default function InviteEmailModal({ requestId = null, candidates = [], settings = {}, allowResend = false, vipUnknown = false, onClose, onSent }) {
   const [step, setStep] = useState('preview'); // preview | sending | sent | error
@@ -445,8 +445,9 @@ export default function InviteEmailModal({ requestId = null, candidates = [], se
     body: edits[d.suggestionId]?.body ?? (d.skipped ? d.body : applyTiming(d.body, timing)),
   });
   const drafts = rawDrafts.map(draftView);
-  // Checks the body that would be sent, edited or not.
-  const legacyReleaseBlocked = drafts.some((d) => !d.skipped && String(d.body || '').includes('{{proposalDelivery}}'));
+  // Checks the subject and body that would be sent, edited or not.
+  const legacyReleaseBlocked = drafts.some((d) => !d.skipped
+    && `${d.subject || ''}\n${d.body || ''}`.includes('{{proposalDelivery}}'));
 
   // A draft renders as a FULL card when anything requires human eyes on it:
   // the person is VIP-flagged, the server skipped it (remediation UI), it
