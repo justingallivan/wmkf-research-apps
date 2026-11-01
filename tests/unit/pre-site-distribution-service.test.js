@@ -235,7 +235,7 @@ test('the email carries the request\'s deliberation session (tracker §5.6): bod
   const result = await preparePreSiteDistribution(prepareInput(), withSession.dependencies);
   expect(withSession.dependencies.getSession).toHaveBeenCalledWith(REQUEST_ID);
   const created = withSession.dependencies.createOrGetAttempt.mock.calls[0][0];
-  expect(created.bodyHtml).toContain('<strong>Pre-discussion:</strong>');
+  expect(created.bodyHtml).toContain('<strong>Proposal discussion session:</strong>');
   expect(created.bodyHtml).toContain('September 11, 2026');
   expect(created.bodyHtml).toContain('11:45');
   expect(created.bodyHtml).toContain('<a href="https://zoom.example/j/123">Join meeting</a>');
@@ -253,7 +253,7 @@ test('the email carries the request\'s deliberation session (tracker §5.6): bod
   without.dependencies.getSession = jest.fn(async () => null);
   const plain = await preparePreSiteDistribution(prepareInput(), without.dependencies);
   const plainCreated = without.dependencies.createOrGetAttempt.mock.calls[0][0];
-  expect(plainCreated.bodyHtml).toContain('<strong>Pre-discussion:</strong> not yet scheduled.');
+  expect(plainCreated.bodyHtml).toContain('<strong>Proposal discussion session:</strong> not yet scheduled.');
   expect(plainCreated.bodyHtml).not.toContain('Join meeting');
   expect(plainCreated.sessionSnapshot).toBeNull();
   // Discriminating: only the session differs between the two harnesses.
@@ -1185,7 +1185,7 @@ test('prepare refuses a material selection (retired) and binds one informational
   expect(persisted.toRecipients).toEqual(['staff@example.org', 'organizer@wmkeck.org']);
   expect(persisted.ccRecipients).toEqual(['consultant@example.org']);
   expect(persisted.bodyHtml).not.toContain('Applicant');
-  expect(persisted.bodyHtml).toContain('the research presentation materials, no login required');
+  expect(persisted.bodyHtml).toContain('the presentation materials, no login required');
   expect(persisted.calendar.content.toString('utf8')).toContain('METHOD:PUBLISH');
   expect(persisted.calendar.content.toString('utf8'))
     .toContain('ORGANIZER:mailto:organizer@wmkeck.org');
@@ -1663,7 +1663,7 @@ test('history returns configured Share defaults and preserves built-in fallbacks
   });
   expect(result.emailDefaults).toMatchObject({
     subjectTemplate: 'Discussion notes — {{requestNumber}}',
-    bodyTemplate: expect.stringContaining('deliberation briefing page'),
+    bodyTemplate: expect.stringContaining('proposal review packet'),
     briefingCopy: DELIBERATION_SHARE_SEED_BRIEFING_COPY,
     configured: false,
     unavailable: false,
@@ -1721,8 +1721,8 @@ test('history reports unavailable Share defaults while retaining built-in wordin
     getSettingStrict: jest.fn(async () => { throw new Error('Dataverse 503'); }),
   });
   expect(result.emailDefaults).toMatchObject({
-    subjectTemplate: 'Site Visit materials — {{requestNumber}}',
-    bodyTemplate: expect.stringContaining('deliberation briefing page'),
+    subjectTemplate: 'Proposal review packet — {{requestNumber}}',
+    bodyTemplate: expect.stringContaining('proposal review packet'),
     briefingCopy: DELIBERATION_SHARE_SEED_BRIEFING_COPY,
     configured: false,
     unavailable: true,
@@ -2878,10 +2878,10 @@ test('a missing persisted Dynamics activity fails closed without creating a repl
 
 test('body html carries the briefing section only when a link was minted', () => {
   const without = distributionBodyHtml('Hello', OPERATION_ID, []);
-  expect(without).not.toContain('Briefing page');
+  expect(without).not.toContain('Proposal review packet:');
   const link = { id: 'l', url: 'https://apps.test/external/briefing/abc<>', expiresAt: '2026-10-08T20:00:00Z' };
   const withLink = distributionBodyHtml('Hello', OPERATION_ID, [], link);
-  expect(withLink).toContain('<strong>Briefing page:</strong>');
+  expect(withLink).toContain('<strong>Proposal review packet:</strong>');
   // The stored body never carries the token: only the placeholder.
   expect(withLink).not.toContain('apps.test');
   expect(withLink).toContain(`href="${BRIEFING_LINK_PLACEHOLDER}"`);
@@ -2890,7 +2890,7 @@ test('body html carries the briefing section only when a link was minted', () =>
   expect(rendered).toContain('href="https://apps.test/external/briefing/abc&lt;&gt;"');
   expect(rendered).not.toContain(BRIEFING_LINK_PLACEHOLDER);
   expect(renderBriefingBody(withLink, null)).toBe(withLink);
-  expect(withLink.indexOf('Briefing page')).toBeLessThan(withLink.indexOf('wmkf-pre-site-distribution'));
+  expect(withLink.indexOf('Proposal review packet')).toBeLessThan(withLink.indexOf('wmkf-pre-site-distribution'));
 });
 
 test('body html carries the review-bundle placeholder alongside the briefing link; renderBriefingBody resolves both hrefs from the one token', () => {
@@ -3089,10 +3089,12 @@ test('an unbound preview (prepared before the link was mandatory) is refused at 
   expect(off.createEmailActivity).not.toHaveBeenCalled();
 });
 
-test('send renders the live link into the activity body only at creation, and a reissue after attachments stops transport', async () => {
+test('send preserves an old frozen email while rendering only its live link, and a reissue after attachments stops transport', async () => {
   const linkId = '99999999-9999-4999-8999-999999999999';
-  const bodyWithPlaceholder = distributionBodyHtml('Attached.', OPERATION_ID, [], { id: linkId, expiresAt: '2026-10-08T20:00:00Z' });
-  let row = attemptFixture({ briefing_link_id: linkId, body_html: bodyWithPlaceholder, attachment_mode: 'docx' });
+  const bodyWithPlaceholder = '<p>The deliberation briefing page is ready.</p><p><strong>Pre-discussion:</strong> Friday.</p>'
+    + `<p><strong>Briefing page:</strong> <a href="${BRIEFING_LINK_PLACEHOLDER}">Open the deliberation briefing</a></p>`
+    + '<h3>Site Visit materials</h3><!-- wmkf-pre-site-distribution:old-operation -->';
+  let row = attemptFixture({ briefing_link_id: linkId, body_html: bodyWithPlaceholder, subject: 'Site Visit materials — 1002379', attachment_mode: 'docx' });
   const url = 'https://apps.test/external/briefing/live-token';
   let liveId = linkId;
   const calls = [];
@@ -3105,7 +3107,7 @@ test('send renders the live link into the activity body only at creation, and a 
       return row;
     }),
     findEmailByCorrelation: jest.fn(async () => []),
-    createEmailActivity: jest.fn(async (activity) => { calls.push(activity.body); return '88888888-8888-4888-8888-888888888888'; }),
+    createEmailActivity: jest.fn(async (activity) => { calls.push(activity); return '88888888-8888-4888-8888-888888888888'; }),
     recordEmailActivity: jest.fn(async (attempt, emailId) => {
       row = { ...attempt, dynamics_email_id: emailId, state: 'activity_created' };
       return row;
@@ -3135,8 +3137,13 @@ test('send renders the live link into the activity body only at creation, and a 
     actingUserSystemId: ACTOR_ID,
   }, dependencies)).rejects.toMatchObject({ code: 'distribution_briefing_stale' });
   expect(calls).toHaveLength(1);
-  expect(calls[0]).toContain(`href="${url}"`);
-  expect(calls[0]).not.toContain(BRIEFING_LINK_PLACEHOLDER);
+  expect(calls[0].subject).toBe('Site Visit materials — 1002379');
+  expect(calls[0].body).toBe(bodyWithPlaceholder.replaceAll(BRIEFING_LINK_PLACEHOLDER, url));
+  expect(calls[0].body).toContain('<strong>Pre-discussion:</strong> Friday.');
+  expect(calls[0].body).toContain('<strong>Briefing page:</strong>');
+  expect(calls[0].body).toContain(`href="${url}"`);
+  expect(calls[0].body).not.toContain(BRIEFING_LINK_PLACEHOLDER);
+  expect(calls[0].body).not.toContain('Proposal discussion session:');
   expect(dependencies.sendEmail).not.toHaveBeenCalled();
   expect(dependencies.getLiveBriefingLink).toHaveBeenCalledTimes(2);
   // The failure happened before send intent, so the attempt is provably unsent

@@ -60,7 +60,7 @@ test('enforces renderer token grammar, shapes, kinds, and required per-kind toke
   expect(validatePartialMaterialsEmailTemplate(MATERIALS_EMAIL_KINDS.invitation, { body: '' }).valid).toBe(false);
   expect(validatePartialMaterialsEmailTemplate(MATERIALS_EMAIL_KINDS.invitation, { body: '{{unknown}}' }).valid).toBe(false);
   expect(validatePartialMaterialsEmailTemplate('unknown', { subject: 'x' }).valid).toBe(false);
-  expect(SITE_VISIT_MATERIALS_INVITE_SEED_SUBJECT).toBe('W.M. Keck Foundation Research Presentation Materials Request');
+  expect(SITE_VISIT_MATERIALS_INVITE_SEED_SUBJECT).toBe('W.M. Keck Foundation Presentation materials request');
   expect(SITE_VISIT_MATERIALS_REMINDER_SEED_SUBJECT).toBe(SITE_VISIT_MATERIALS_INVITE_SEED_SUBJECT);
   expect(validateMaterialsEmailTemplate('invitation', { subject: SITE_VISIT_MATERIALS_INVITE_SEED_SUBJECT, body: SITE_VISIT_MATERIALS_INVITE_SEED_BODY }).valid).toBe(true);
   expect(validateMaterialsEmailTemplate('reminder', { subject: SITE_VISIT_MATERIALS_REMINDER_SEED_SUBJECT, body: SITE_VISIT_MATERIALS_REMINDER_SEED_BODY }).valid).toBe(true);

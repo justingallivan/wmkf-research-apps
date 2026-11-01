@@ -6,7 +6,7 @@ const data = { configured: true, template: { subject: 'Saved', body: '' }, defau
 const response = (body, status = 200) => ({ ok: status < 400, status, json: async () => body });
 async function open(props = {}) {
   const view = render(<AgendaWordingDefault {...props} />);
-  const details = screen.getByText('Your default wording').closest('details'); details.open = true; fireEvent(details, new Event('toggle'));
+  const details = screen.getByText('Your discussion session agenda default wording').closest('details'); details.open = true; fireEvent(details, new Event('toggle'));
   await screen.findByLabelText('Default subject'); return view;
 }
 beforeEach(() => { global.fetch = jest.fn(async () => response(data)); });

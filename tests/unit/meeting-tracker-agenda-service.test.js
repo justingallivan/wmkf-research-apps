@@ -194,8 +194,12 @@ test('computeAgenda drops non-HTTPS links and rendered HTML escapes every propos
   const rendered = renderAgendaEmail('<Hello>', agenda);
   expect(rendered.bodyHtml).toContain('&lt;Hello&gt;');
   expect(rendered.bodyHtml).toContain('&lt;img src=x onerror=alert(1)&gt;');
+  expect(rendered.bodyHtml).toContain('<h3>Discussion session agenda</h3>');
+  expect(rendered.bodyHtml).toContain('Proposal discussion session:');
+  expect(rendered.bodyHtml).toContain('Open proposal review packet');
   expect(rendered.bodyHtml).not.toContain('javascript:');
-  expect(rendered.bodyText).toContain('briefing link to follow by email');
+  expect(rendered.bodyText).toContain('proposal review packet link to follow by email');
+  expect(rendered.bodyText).toContain('Discussion session agenda');
 });
 
 test('agenda items carry the applicant institution after the title when known and omit it otherwise', () => {
@@ -211,7 +215,7 @@ test('agenda items carry the applicant institution after the title when known an
 test('rendered agenda separates items with a blank line (text) and spacing (HTML)', () => {
   const agenda = computeAgenda(session(), slots());
   const rendered = renderAgendaEmail('Hello', agenda);
-  const agendaText = rendered.bodyText.split('\n\nAgenda\n\n')[1];
+  const agendaText = rendered.bodyText.split('\n\nDiscussion session agenda\n\n')[1];
   expect(agendaText.split('\n\n')).toHaveLength(2);
   expect(agendaText).not.toMatch(/[^\n]\n[^\n]/);
   expect(rendered.bodyHtml.match(/<li style="margin-bottom:12px">/g)).toHaveLength(2);
@@ -276,7 +280,7 @@ test('prepare freezes the normalized recipients, rendered body, and exact snapsh
     fromEmail: 'pc@example.org',
     actingUserSystemId: ACTOR_ID,
     agendaSnapshot: expect.objectContaining({ slots: expect.arrayContaining([expect.objectContaining({ requestId: REQUEST_ONE })]) }),
-    bodyHtml: expect.stringContaining('Open briefing'),
+    bodyHtml: expect.stringContaining('Open proposal review packet'),
   }));
   expect(result.agenda).toMatchObject({ operationId: OPERATION_ID, recipientCount: 2 });
 });
@@ -458,6 +462,25 @@ test('send persists each fence before transport and returns the accepted receipt
   }));
   expect(deps.createEmailActivity.mock.calls[0][0]).not.toHaveProperty('regardingId');
   expect(result.agenda.transportAccepted).toBe(true);
+});
+
+test('legacy prepared snapshot keeps schedule identity and sends its stored body verbatim', async () => {
+  const legacyBody = '<p>Old wording</p><p>Pre-discussion: Mon, September 14, 2026.</p><h3>Agenda</h3><ol><li>Open briefing</li></ol>';
+  const legacySnapshot = computeAgenda(session(), slots());
+  expect(legacySnapshot.sessionLine).toMatch(/^Pre-discussion:/);
+  expect(agendaScheduleChanged(session(), slots(), legacySnapshot)).toBe(false);
+
+  const legacy = row(legacySnapshot, {
+    subject: 'Deliberation session agenda',
+    body_text: 'Old wording\n\nPre-discussion: Mon, September 14, 2026.\n\nAgenda\n\nOpen briefing',
+    body_html: legacyBody,
+  });
+  const deps = sendDependencies(legacy);
+  await sendAgendaEmail(actorInput, deps);
+  expect(deps.createEmailActivity).toHaveBeenCalledWith(expect.objectContaining({
+    subject: legacy.subject,
+    body: legacyBody,
+  }));
 });
 
 test('a correlated activity is recovered and accepted without creating or sending again', async () => {
@@ -738,7 +761,7 @@ test('prepare resolves raw tokens from the same agenda snapshot and renders no e
   const deps = prepareDependencies();
   const result = await prepareAgendaEmail({ sessionId: SESSION_ID, operationId: OPERATION_ID, fromEmail: 'pc@example.org', actingUserSystemId: ACTOR_ID, to: 'staff@example.org', cc: '', subject: 'Agenda {{sessionDate}}', bodyText: '   ' }, deps);
   expect(result.agenda.subject).toBe('Agenda Monday, September 14');
-  expect(result.agenda.bodyText).toContain('Agenda');
+  expect(result.agenda.bodyText).toContain('Discussion session agenda');
   expect(deps.createOrGetAgenda.mock.calls[0][0].bodyHtml).not.toContain('<p></p>');
   expect(deps.getSession).toHaveBeenCalledTimes(1);
 });

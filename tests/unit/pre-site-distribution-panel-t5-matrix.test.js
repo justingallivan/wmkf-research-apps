@@ -64,7 +64,7 @@ let backingFetch = global.fetch;
 Object.defineProperty(global, 'fetch', { configurable: true, get: () => backingFetch, set: target => {
   backingFetch = new Proxy(target, { apply(fn, thisArg, args) {
     if (String(args[0]).includes('/email-preferences')) return Promise.resolve(response({ ok: true,
-      effective: preferencePair || { subject: 'Site Visit materials — {{requestNumber}}', body: 'The deliberation briefing page linked below has the Pre-Research Presentation Brief, every completed review, the proposal, and the research presentation materials.' },
+      effective: preferencePair || { subject: DELIBERATION_SHARE_SEED_SUBJECT, body: DELIBERATION_SHARE_SEED_BODY },
       ownStatus: 'absent', source: 'built_in', canSave: true, canClear: false }));
     return Reflect.apply(fn, thisArg, args);
   } });

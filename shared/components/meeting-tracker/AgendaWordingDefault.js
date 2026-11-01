@@ -46,9 +46,9 @@ export default function AgendaWordingDefault({ disabled, onBusyChange, onChanged
     finally { if (generation.current === current) { setBusy(false); callbacks.current.onBusyChange?.(false); } }
   };
   return <details className="mt-4 rounded-lg border border-gray-200" open={open} onToggle={(event) => { setOpen(event.currentTarget.open); if (event.currentTarget.open) void load(); }}>
-    <summary className="cursor-pointer px-3 py-2 text-sm font-medium text-gray-800">Your default wording</summary>
+    <summary className="cursor-pointer px-3 py-2 text-sm font-medium text-gray-800">Your discussion session agenda default wording</summary>
     <div className="space-y-3 border-t border-gray-200 p-3">
-      <p className="text-sm text-gray-600">Used for future agenda emails. Edits to the email above are not saved here. Optional placeholder: {'{{sessionDate}}'}.</p>
+      <p className="text-sm text-gray-600">Used for future discussion session agenda emails. Edits to the email above are not saved here. Optional placeholder: {'{{sessionDate}}'}.</p>
       {loading && <p role="status">Loading your default wording…</p>}
       {data && <>
         <label className="block text-sm">Default subject<input className="mt-1 w-full rounded-lg border border-gray-300 p-2" aria-describedby={validationText ? "agenda-default-validation" : undefined} value={template.subject} onChange={(e) => setTemplate({ ...template, subject: e.target.value })} disabled={busy || disabled} /></label>

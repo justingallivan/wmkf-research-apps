@@ -118,8 +118,8 @@ legacy-live | deprecated | ambiguous | direct-url-test`. `migrationDecision` ∈
 [VERIFIED via owner decision, 2026-10-21] Colleague review approved the names in
 [the terminology table](plans/review/PROPOSAL_WORKFLOW_VOCABULARY_2026-10-19.md),
 with **Draft writeup** replacing the proposed **Post-presentation writeup**.
-The deck and mockups use these names. Runtime adoption is partial; the bounded
-UI-copy authorization and current implementation boundary are recorded below.
+The deck and mockups use these names. Runtime adoption is partial; bounded
+implementation slices and their evidence are recorded below.
 The Oct21 decision does not authorize route, storage, schema, or identifier
 migrations.
 
@@ -133,21 +133,28 @@ four-term display-copy slice is on branch `codex/meeting-tracker-terminology`:
 Site Visit → Research presentation; Deliberation session → Proposal discussion
 session; Program briefing → Discussion summaries; Discussion Sentiment →
 Post-presentation discussion sentiment. PR #580 merged this slice as
-`30bc81e77` in source/Git; no deployment is inferred. As of 2026-11-01, a
-separate Board-reader display-copy slice is on branch
-`codex/board-page-terminology` in `pages/external/briefing/[token].js` and
-`pages/external/presentation/[token].js`, using Proposal review packet, Proposal
+`30bc81e77` in source/Git; no deployment is inferred. The Board-reader
+display-copy slice in `pages/external/briefing/[token].js` and
+`pages/external/presentation/[token].js` uses Proposal review packet, Proposal
 discussion brief, Proposal discussion session, Research presentation, and
-Presentation materials. This branch scope excludes the applicant upload page,
-emails, generated documents, historic filenames, tokens/routes, and API payload
-changes. Check Git/PR and release receipts for current status. The two Meeting
+Presentation materials. It merged through PR #581 as `8c0859a6f` (Git/source
+evidence only; no deployment claim). That Board-reader slice excludes the
+applicant upload page, emails, generated documents, historic filenames,
+tokens/routes, and API payload changes. The two Meeting
 Tracker summary views also use approved post-presentation discussion wording for
 the summary/transcript content they present; this is not a repo-wide Staff
 discussion rename. Other recorded staff-discussion labels and runtime surfaces
-remain pending separate scope. Saved subjects, emails, and generated documents
-retain their existing wording and are outside these UI-copy slices. Preserve
-routes, API/service and prompt identifiers, schema/storage values, artifact
-types, deep links, saved settings, and existing user-authored content.
+remain pending separate scope. As of 2026-11-01, a separate email-copy slice is
+being developed on branch `codex/email-template-terminology`; check Git/PR and
+release receipts for current status. It updates source defaults for packet
+sharing, agenda, and presentation-material invitation/reminder copy plus Admin
+metadata, preview labels, and the application-owned materials upload CTA.
+Existing stored Admin and personal settings,
+already-prepared email content, and generated documents are not changed by that
+source-copy slice; deployed setting values were not inspected and no backfill is
+included. Preserve routes, API/service and prompt identifiers, schema/storage
+values, artifact types, deep links, saved settings, and existing user-authored
+content.
 
 ### Historical source inventory — October 6–7, 2026
 
@@ -197,7 +204,7 @@ anchors `#deliberations-status|briefing|writeup`; SharePoint file names such as
 "… Site Visit Presentation.pdf". Treat these as LEAVE+DOCUMENT unless the group
 explicitly chooses a migration.
 
-- **status:** canonical (approved display vocabulary); runtime adoption partial; Workbench slice merged in PR #577 and Meeting Tracker slice merged in PR #580 (source/Git evidence only); Board-reader slice was on `codex/board-page-terminology` as of 2026-11-01 (check Git/PR and release receipts for current status)
+- **status:** canonical (approved display vocabulary); runtime adoption partial; Workbench slice merged in PR #577, Meeting Tracker slice merged in PR #580, and Board-reader slice merged in PR #581 (source/Git evidence only; no deployment claim); email source-copy slice on `codex/email-template-terminology` as of 2026-11-01 (check Git/PR and release receipts for current status)
 - **ownerAppKey:** `reviewers` (Workbench), `meeting-tracker`
 - **migrationDecision:** Apply approved display copy within separately scoped UI work; LEAVE+DOCUMENT internal identifiers and existing persisted/user-authored values.
 - **lastVerified:** 2026-11-01 via owner-approved terminology and scoped implementation records

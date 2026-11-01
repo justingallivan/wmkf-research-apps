@@ -303,7 +303,7 @@ test('overlong resolved subject preserves editable raw template with Save enable
   render(<PreSiteDistributionPanel {...props} requestNumber={'R'.repeat(25)} />);
   await waitFor(() => expect(screen.queryByText('Loading current defaults…')).toBeNull()); fireEvent.click(screen.getByText('Your default wording'));
   expect(screen.getByLabelText('Default subject')).toHaveValue(raw.subject); expect(screen.getByRole('button', { name: 'Save as my default' })).toBeEnabled();
-  expect(screen.getByLabelText('Subject')).toHaveValue(`Site Visit materials — ${'R'.repeat(25)}`); expect(within(screen.getByLabelText('Default subject').closest('details')).getByText(/resolved default subject is too long/)).toBeInTheDocument();
+  expect(screen.getByLabelText('Subject')).toHaveValue(`Proposal review packet — ${'R'.repeat(25)}`); expect(within(screen.getByLabelText('Default subject').closest('details')).getByText(/resolved default subject is too long/)).toBeInTheDocument();
 });
 test('duplicate repair notice and shared outage fallback notice are both visible', async () => {
   const fetcher = global.fetch;

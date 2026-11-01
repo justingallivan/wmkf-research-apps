@@ -33,6 +33,23 @@ test('personal pair survives shared outage; fallback never writes', async () => 
   expect(data).toMatchObject({ effective: template, source: 'personal', configured: true, sharedStatus: { subject: 'unavailable', body: 'unavailable' } });
   expect(deps.create).not.toHaveBeenCalled(); expect(deps.update).not.toHaveBeenCalled();
 });
+test('saved personal wording wins over updated shared defaults without rewriting either layer', async () => {
+  const saved = { subject: 'Site Visit materials — {{requestNumber}}', body: 'The deliberation briefing page is ready.' };
+  deps.listByOwnerAndKey.mockResolvedValue([row(saved)]);
+  deps.getSettingStrict.mockImplementation(async (key) => ({
+    found: true,
+    value: key.endsWith('.subject') ? 'Proposal review packet — {{requestNumber}}' : 'The proposal review packet is ready.',
+  }));
+  const data = await getDistributionPreferences(OWNER, deps);
+  expect(data).toMatchObject({
+    own: saved,
+    shared: { subject: 'Proposal review packet — {{requestNumber}}', body: 'The proposal review packet is ready.' },
+    effective: saved,
+    source: 'personal',
+  });
+  expect(deps.update).not.toHaveBeenCalled();
+  expect(deps.create).not.toHaveBeenCalled();
+});
 test('partial shared pair uses per-field built-in fallback and no briefing reads', async () => {
   deps.getSettingStrict.mockImplementation(async key => key.endsWith('.subject') ? { found: true, value: 'Shared' } : { found: true, value: '' });
   const data = await getDistributionPreferences(OWNER, deps);

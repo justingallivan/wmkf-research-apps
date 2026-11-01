@@ -212,14 +212,14 @@ function attemptPresentation(attempt) {
  */
 function ComposerDialog({ onClose, busy, escapeDisabled = false, children }) {
   return (
-    <EmailDialog label="Share for the deliberation session" busy={busy || escapeDisabled} onClose={onClose}>
+    <EmailDialog label="Share the proposal review packet" busy={busy || escapeDisabled} onClose={onClose}>
     <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/40 p-4" role="presentation">
       <div
         className="my-6 w-full max-w-3xl rounded-xl bg-white p-6 shadow-xl"
       >
         <div className="flex items-start justify-between gap-4">
           <div>
-            <h3 id="share-composer-title" className="text-lg font-semibold text-gray-900">Share for the deliberation session</h3>
+            <h3 id="share-composer-title" className="text-lg font-semibold text-gray-900">Share the proposal review packet</h3>
             <p className="mt-1 text-sm text-gray-600">
               The email carries the proposal review packet link; the brief, every completed review, the proposal, and the site visit materials open there without a login.
             </p>
@@ -993,7 +993,7 @@ export default function PreSiteDistributionPanel({
             <dl className="mt-3 space-y-2 text-sm text-gray-700">
               <div><dt className="inline font-medium">Subject:</dt> <dd className="inline">{preview.subject}</dd></div>
               <div><dt className="inline font-medium">Snapshot source:</dt> <dd className="inline">Word version {preview.sourceVersionId}; later edits are not included</dd></div>
-              <div><dt className="inline font-medium">Pre-discussion:</dt> <dd className="inline">{deliberationSessionLine(preview.session).replace('Deliberation session: ', '')}{preview.session?.meetingLink ? ' · Join link included' : ''}</dd></div>
+              <div><dt className="inline font-medium">Proposal discussion session:</dt> <dd className="inline">{deliberationSessionLine(preview.session).replace('Deliberation session: ', '')}{preview.session?.meetingLink ? ' · Join link included' : ''}</dd></div>
               <div>
                 <dt className="inline font-medium">Proposal review packet:</dt>{' '}
                 <dd className="inline">
@@ -1113,7 +1113,7 @@ export default function PreSiteDistributionPanel({
           </details>
         ) : (
           <>
-            <h3 className="text-base font-semibold text-gray-900">Send deliberation materials</h3>
+            <h3 className="text-base font-semibold text-gray-900">Send the proposal review packet</h3>
             <p className="mt-1 text-sm text-gray-600">
               Create a fixed preview, review the recipients and the proposal review packet link, then send through Dynamics.
             </p>
