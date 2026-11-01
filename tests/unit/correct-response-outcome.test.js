@@ -87,6 +87,16 @@ describe('through correctResponse', () => {
     expect(options.outcome).toMatchObject({ endedBy });
   });
 
+  test('a response-type-only decline is recorded as the complete decline', async () => {
+    findById.mockResolvedValue(row());
+    await run({ responseType: 'declined' });
+    expect(updateLifecycle).toHaveBeenCalledWith(
+      ID,
+      { responseType: 'declined', declined: true, accepted: false },
+      expect.objectContaining({ outcome: { endedBy: 'reviewer_before_accepting', endedAt: expect.any(String) } }),
+    );
+  });
+
   test('an unknown response type is refused before any write', async () => {
     findById.mockResolvedValue(row());
     await expect(run({ responseType: 'maybe' })).rejects.toMatchObject({ httpStatus: 400 });

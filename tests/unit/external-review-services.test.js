@@ -463,6 +463,15 @@ describe('applyReviewerResponse', () => {
     );
   });
 
+  it('a row whose response type is already Declined is an idempotent repeat, so its recorded Ended at is not overwritten', async () => {
+    const r = await applyReviewerResponse({
+      suggestion: baseSuggestion({ wmkf_declined: false, wmkf_responsetype: 100000001, wmkf_endedby: 100000000 }),
+      request, reviewer, body: { action: 'decline', decline: {} }, ifMatch: 'W/"1"',
+    });
+    expect(r).toMatchObject({ ok: true, idempotent: true });
+    expect(applyStage2aResponse).not.toHaveBeenCalled();
+  });
+
   it('repeat accept skips the PATCH but stages a queued job (tail retry)', async () => {
     const r = await applyReviewerResponse({
       suggestion: baseSuggestion({ wmkf_accepted: true }), request, reviewer, body: { action: 'accept' }, ifMatch: undefined,
