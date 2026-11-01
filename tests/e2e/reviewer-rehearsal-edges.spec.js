@@ -114,7 +114,6 @@ async function sendInvitation(page, reviewerName) {
   await expect(page.getByText('Invite reviewers (1)', { exact: true })).toBeVisible();
   await page.getByRole('button', { name: /reviewer campaign timeline/i }).click();
   await page.getByLabel('Days to respond').fill('7');
-  await page.getByLabel('Proposals released to reviewers').fill('2099-07-15');
   // D48: the review due date is the server's, shown read-only.
   await expect(page.getByText('From the cycle calendar', { exact: true })).toBeVisible();
   page.once('dialog', (dialog) => dialog.accept());
@@ -260,7 +259,6 @@ test.describe('private reviewer rehearsal edge fixtures', () => {
     await expect(page.getByText('Invite reviewers (1)', { exact: true })).toBeVisible();
     await page.getByRole('button', { name: /reviewer campaign timeline/i }).click();
     await page.getByLabel('Days to respond').fill('7');
-    await page.getByLabel('Proposals released to reviewers').fill('2099-07-15');
     page.once('dialog', (dialog) => dialog.dismiss());
     await page.getByRole('button', { name: 'Send 1 invitation' }).click();
     await expect(page.getByRole('button', { name: 'Send 1 invitation' })).toBeVisible();
