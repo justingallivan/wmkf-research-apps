@@ -28,6 +28,17 @@ export function getStatusInfo(status) {
   return STATUS_PIPELINE.find(s => s.key === status) || STATUS_PIPELINE[0];
 }
 
+// A staff-recorded conflict of interest or Foundation ending is stored as
+// Withdrew, but it is not the reviewer backing out (a conflict is not a
+// reliability mark), so the label follows the recorded reason.
+export function reviewStatusLabel(reviewer) {
+  if (reviewer?.reviewStatus === 'withdrew') {
+    if (reviewer.declineReason === 'conflict-of-interest') return 'Conflict of interest';
+    if (reviewer.endedBy === 'foundation') return 'Ended by Foundation';
+  }
+  return getStatusInfo(reviewer?.reviewStatus).label;
+}
+
 // Which reviewStatus values the Workbench tracking sub-tab surfaces. The
 // buckets must partition every STATUS_PIPELINE key (complete coverage, no
 // overlap).
