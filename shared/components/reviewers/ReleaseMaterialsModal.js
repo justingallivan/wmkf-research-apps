@@ -66,7 +66,6 @@ export default function ReleaseMaterialsModal({ isOpen, onClose, reviewers, prop
   const [error, setError] = useState(null);
   const [emailFields, setEmailFields] = useState({
     reviewDueDate: settings.reviewDueDate || '',
-    proposalSendDate: '',
     // honorarium removed S199 — now a Dataverse ground-truth read server-side.
   });
   // Attachments are per-template-type so switching templates (e.g. Materials
@@ -473,8 +472,9 @@ export default function ReleaseMaterialsModal({ isOpen, onClose, reviewers, prop
       const saved = localStorage.getItem(EMAIL_FIELDS_STORAGE_KEY);
       if (saved) {
         // A browser-saved review due date is ignored (D48): emails use the
-        // request's stored date, which this modal shows read-only.
-        const { reviewDueDate: _ignoredSavedDueDate, ...parsed } = JSON.parse(saved);
+        // request's stored date, which this modal shows read-only. The
+        // proposal send date field is retired (proposals go out on acceptance).
+        const { reviewDueDate: _ignoredSavedDueDate, proposalSendDate: _retiredSendDate, ...parsed } = JSON.parse(saved);
         setEmailFields(prev => ({ ...prev, ...parsed }));
       }
     } catch (e) { /* ignore */ }
@@ -600,11 +600,9 @@ export default function ReleaseMaterialsModal({ isOpen, onClose, reviewers, prop
     const snapshotTemplate = currentTemplate;
     const snapshotSettings = {
       signature: settings.signature || '',
-      customFields: {
-        proposalSendDate: emailFields.proposalSendDate || '',
-        // honorarium intentionally omitted — render-emails injects the
-        // Dataverse ground-truth amount server-side (S199).
-      },
+      // No client custom fields: the proposal send date is retired and
+      // render-emails injects the Dataverse honorarium amount server-side (S199).
+      customFields: {},
     };
 
     const run = renderTailRef.current.then(async () => {
@@ -953,15 +951,6 @@ export default function ReleaseMaterialsModal({ isOpen, onClose, reviewers, prop
                       {formatYmd(settings.reviewDueDate) || 'Not set'}
                     </p>
                   </div>
-                  <div>
-                    <label className="block text-xs text-gray-500 mb-0.5">Proposal Send Date</label>
-                    <input disabled={defaultWordingBusy}
-                      type="date"
-                      aria-label="Proposal send date" value={emailFields.proposalSendDate}
-                      onChange={e => setEmailFields(prev => ({ ...prev, proposalSendDate: e.target.value }))}
-                      className="w-full px-2 py-1 border border-gray-300 rounded text-sm focus:ring-1 focus:ring-gray-400 focus:outline-none"
-                    />
-                  </div>
                   {/* Honorarium amount removed from per-user input (S199): it is
                       now a single Dataverse ground-truth (honorarium.default_amount)
                       read server-side at email-render time. The
@@ -1124,8 +1113,7 @@ export default function ReleaseMaterialsModal({ isOpen, onClose, reviewers, prop
                     'proposalTitle', 'piName', 'piInstitution', 'externalLink',
                     'reviewDueDate', 'programName', 'signature',
                     'investigatorTeam', 'reviewerFormLink',
-                    'customField:proposalSendDate', 'customField:honorarium',
-                    'customField:proposalDueDate'].map(p => (
+                    'customField:honorarium'].map(p => (
                     <code key={p} className="text-xs bg-white px-1.5 py-0.5 rounded border border-gray-200 text-gray-600">
                       {`{{${p}}}`}
                     </code>
