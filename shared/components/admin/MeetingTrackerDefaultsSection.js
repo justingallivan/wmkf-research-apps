@@ -74,7 +74,7 @@ export default function MeetingTrackerDefaultsSection() {
   return (
     <div className="space-y-3">
       <p className="text-sm text-gray-600">
-        Every new deliberation session starts with these staff attendees. Board members are added per session in the Meeting Tracker.
+        Every new proposal discussion session starts with these staff attendees. Board members are added per session in the Meeting Tracker.
       </p>
       {notice && <p className="text-sm text-amber-800">{notice}</p>}
       {error && <p className="text-sm text-red-700" role="alert">{error}</p>}

@@ -10,16 +10,16 @@
 export const ADMIN_PROMPT_CATALOG = Object.freeze({
   "cycle-dossier.entry": {
     group: "meetings",
-    title: "Cycle Dossier briefing entry",
-    description: "Writes a private scientific briefing from a proposal, prior AI context, and retrieved literature evidence, with field background and references.",
-    usedBy: "Cycle Dossier → briefing entry generation",
+    title: "Scientific dossier entry",
+    description: "Writes a private scientific dossier entry from a proposal, prior AI context, and retrieved literature evidence, with field background and references.",
+    usedBy: "Scientific dossier → entry generation",
     usage: "application",
   },
   "cycle-dossier.research-plan": {
     group: "meetings",
-    title: "Cycle Dossier literature search plan",
+    title: "Scientific dossier literature search plan",
     description: "Creates up to three focused literature-search queries from the proposal for the app to run.",
-    usedBy: "Cycle Dossier → research stage before entry writing",
+    usedBy: "Scientific dossier → research stage before entry writing",
     usage: "application",
   },
   "executor.echo-parity": {
@@ -122,7 +122,7 @@ export const ADMIN_PROMPT_CATALOG = Object.freeze({
   },
   "meeting-transcript.presentation-summary": {
     group: "meetings",
-    title: "Site Visit presentation summary",
+    title: "Presentation summary",
     description: "Summarizes the applicants’ presentation and discussion with staff from the presentation transcript, with slide text when available. The caller holds a draft for staff review.",
     usedBy: "Meeting Tracker → presentation summary draft; meeting preparation worker",
     usage: "application",
@@ -136,16 +136,16 @@ export const ADMIN_PROMPT_CATALOG = Object.freeze({
   },
   "meeting-transcript.staff-discussion-sentiment": {
     group: "meetings",
-    title: "Staff discussion reception and uncertainty",
+    title: "Post-presentation discussion reception and uncertainty",
     description: "Records enthusiasm, reception, supporting and concerning points, disagreements, and uncertainties from staff-only discussion, backed by transcript quotations. It describes staff reactions rather than independently judging the proposal.",
-    usedBy: "Meeting Tracker → staff discussion sentiment analysis",
+    usedBy: "Meeting Tracker → post-presentation discussion sentiment analysis",
     usage: "application",
   },
   "meeting-transcript.staff-discussion-summary": {
     group: "meetings",
-    title: "Staff-only Site Visit discussion summary",
+    title: "Post-presentation discussion summary (staff only)",
     description: "Summarizes the internal staff discussion after applicants leave. Keeps that discussion separate from the applicants’ presentation summary.",
-    usedBy: "Meeting Tracker → staff discussion summary draft",
+    usedBy: "Meeting Tracker → post-presentation discussion summary draft",
     usage: "application",
   },
   "multi-perspective.initial-analysis": {
@@ -256,9 +256,9 @@ export const ADMIN_PROMPT_CATALOG = Object.freeze({
   },
   "pre-site-visit.proposal-core.generate": {
     group: "preflight",
-    title: "Pre-Site Visit proposal narrative sections",
+    title: "Draft writeup proposal narrative sections",
     description: "Drafts eight proposal-derived sections, from executive summary through methodology and personnel, using the narrative plus authoritative request context and personnel roster. Other writeup sections are populated elsewhere.",
-    usedBy: "Workbench → Pre-Site Visit writeup generation",
+    usedBy: "Workbench → Draft writeup generation",
     usage: "application",
   },
   "review-panel.chair": {

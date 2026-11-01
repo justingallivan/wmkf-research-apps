@@ -47,7 +47,7 @@ export function ExecutorBudgetEditor({ config, onPublished }) {
   const retryName = 'review-synthesis.generate';
   const timeoutNames = [
     ['field-primer.generate', 'Field primer timeout (milliseconds)'],
-    ['cycle-dossier.entry', 'Cycle Dossier entry timeout (milliseconds)'],
+    ['cycle-dossier.entry', 'Scientific dossier entry timeout (milliseconds)'],
   ];
   const [values, setValues] = useState(() => config?.budgets || {});
   const [baseBudgets, setBaseBudgets] = useState(() => config?.budgets || {});

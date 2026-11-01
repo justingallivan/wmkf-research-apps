@@ -167,7 +167,7 @@ const EXPECTED_HEADINGS = {
     'Consultants and Board',
     'Materials defaults',
     'Meeting Tracker default attendees',
-    'Site Visit recipient directory',
+    'Research presentation recipient directory',
     'Staff',
   ],
   'workflows:governance': [

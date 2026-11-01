@@ -114,7 +114,7 @@ describe('SiteVisitMaterialsDefaultsSection', () => {
 test('offset and upload cap save independently; blank and fractional offsets cannot be saved', async () => {
   global.fetch = jest.fn().mockResolvedValueOnce(jsonResponse(200, { maxMb: 500, dueBusinessDays: 2, source: 'default' }));
   render(<SiteVisitMaterialsDefaultsSection />);
-  const days = await screen.findByLabelText('Materials due (business days before the site visit)');
+  const days = await screen.findByLabelText('Materials due (business days before the research presentation)');
   const save = screen.getByRole('button', { name: 'Save due-date offset' });
   expect(days).toHaveValue(2);
   for (const value of ['', '1.5', '0', '31']) {
@@ -134,7 +134,7 @@ test('offset and upload cap save independently; blank and fractional offsets can
 test('an offset save failure keeps the edit retryable and never claims success', async () => {
   global.fetch = jest.fn().mockResolvedValueOnce(jsonResponse(200, { maxMb: 500, dueBusinessDays: 2 }));
   render(<SiteVisitMaterialsDefaultsSection />);
-  const days = await screen.findByLabelText('Materials due (business days before the site visit)');
+  const days = await screen.findByLabelText('Materials due (business days before the research presentation)');
   fireEvent.change(days, { target: { value: '5' } });
   global.fetch.mockResolvedValueOnce(jsonResponse(503, { error: 'Setting unavailable' }));
   fireEvent.click(screen.getByRole('button', { name: 'Save due-date offset' }));
@@ -148,7 +148,7 @@ test('an offset save failure keeps the edit retryable and never claims success',
 test.each([{}, { success: true }, { success: true, dueBusinessDays: 0 }])('incomplete offset save response %p does not claim success', async (response) => {
   global.fetch = jest.fn().mockResolvedValueOnce(jsonResponse(200, { maxMb: 500, dueBusinessDays: 2 }));
   render(<SiteVisitMaterialsDefaultsSection />);
-  const days = await screen.findByLabelText('Materials due (business days before the site visit)');
+  const days = await screen.findByLabelText('Materials due (business days before the research presentation)');
   fireEvent.change(days, { target: { value: '5' } });
   global.fetch.mockResolvedValueOnce(jsonResponse(200, response));
   fireEvent.click(screen.getByRole('button', { name: 'Save due-date offset' }));

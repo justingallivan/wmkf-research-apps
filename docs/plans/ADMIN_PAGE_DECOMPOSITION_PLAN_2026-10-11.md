@@ -372,3 +372,7 @@ before trying it (`admin-view-coverage` covers first render only).
   `/cycle-calendar` for staff). Coverage pins its single `/api/cycle-calendar` fetch and, with
   a minimal empty-calendar response, no headings. Intentional feature addition, not a
   relaxation of the decomposition's pure-move acceptance.
+- 2026-11-01: **Approved Admin display-copy update.** The page-coverage heading changes from
+  “Site Visit recipient directory” to “Research presentation recipient directory” to match
+  the approved Admin vocabulary. This changes the pinned heading only; fetch URLs, request
+  payloads, setting keys, and recipient behavior remain unchanged.

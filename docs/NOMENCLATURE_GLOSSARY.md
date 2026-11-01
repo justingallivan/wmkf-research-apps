@@ -153,17 +153,28 @@ content, and generated documents were not changed; deployed setting values were
 not inspected and no backfill is included. The applicant-materials display-copy
 slice merged through PR #590 as `4f665c6a9` (source/Git only; no deployment
 claim): the upload-page title and support-email subject, plus the Staff
-Deliberations materials-card heading, use Presentation materials. As of
-2026-11-01, a separate recording/transcript display-copy slice is in progress on
-`codex/recording-discussion-terminology`. It uses **Recording and transcripts**
-and **Post-presentation discussion** in the scoped Recording and transcripts
-card, Preparation panel, Site Visit editor, and Research Presentation follow-up;
-the scheduled presentation-end label in Staff Deliberations is clarified
+Deliberations materials-card heading, use Presentation materials. PR #591 merged
+the recording/transcript display-copy slice as `3cf543f82` (source/Git only; no
+deployment claim). It uses **Recording and transcripts** and
+**Post-presentation discussion** in the scoped Recording and transcripts card,
+Preparation panel, Site Visit editor, and Research Presentation follow-up; the
+scheduled presentation-end label in Staff Deliberations is clarified
 separately. The scheduled event end is a calendar value; the presentation end
-in the recording is the transcript position marking the last presentation turn.
-This wording clarifies the two meanings without changing either timestamp,
-transcript processing, upload behavior, settings, IDs, routes, tokens, or API
-contracts. Check Git/PR and release receipts for current status; no deployment is
+in the recording is the transcript position marking the last presentation
+turn. This wording clarifies the two meanings without changing either timestamp
+or transcript processing. As of 2026-11-01, a separate Admin/app-navigation
+terminology slice is in progress on `codex/dossier-admin-terminology`:
+Scientific dossier replaces Cycle Dossier in the app, navigation, page, and
+Admin timeout labels; the Admin Site Visits group becomes Research
+presentations, with related recipient/material settings and default-attendee
+copy updated so new events are described as proposal discussion sessions. Admin
+prompt-catalog display titles, descriptions, and `usedBy` labels use Scientific
+dossier, Presentation summary, Post-presentation discussion, **Draft writeup
+proposal narrative sections**, and **Workbench → Draft writeup generation**;
+prompt keys, generation/input contracts, and prompt bodies are unchanged. This
+copy-only work adds no runtime behavior and preserves the `cycle-dossier` key and routes, the persisted
+audit reason `Stopped by the Cycle Dossier operator.`, settings keys, and user
+content. Check Git/PR and release receipts for current status; no deployment is
 inferred. Preserve routes, API/service and prompt identifiers, schema/storage
 values, artifact types, deep links, saved settings, and existing user-authored
 content.

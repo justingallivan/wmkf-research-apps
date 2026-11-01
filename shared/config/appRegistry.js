@@ -43,7 +43,7 @@ export const APP_REGISTRY = [
     name: 'Review Panel',
     href: '/review-panel',
     icon: '⚖️',
-    description: 'Virtual Review Panel Phase A — narrative-only AI seat reviews (Claude + OpenAI) synthesized by a Claude chair, blind and separate from the D26 Cycle Dossier',
+    description: 'Virtual Review Panel Phase A — narrative-only AI seat reviews (Claude + OpenAI) synthesized by a Claude chair, blind and separate from the D26 Scientific dossier',
     categories: ['phase-ii'],
     features: ['Server-Scoped Roster', 'Blind Seat Reviews', 'Chair Synthesis', 'Private DOCX/PDF Editions'],
   },
@@ -186,7 +186,7 @@ export const DEFAULT_APP_GRANTS = ['dynamics-explorer'];
  */
 export const APP_LIFECYCLE_REGISTRY = {
   'cycle-dossier': {
-    name: 'Cycle Dossier',
+    name: 'Scientific dossier',
     status: 'direct-url-test',
     pagePath: '/cycle-dossier',
     notes: 'D26 superuser pilot. Explicit superuser-only navigation and page/API authorization; not grantable through the active app registry.',

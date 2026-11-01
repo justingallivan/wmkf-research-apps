@@ -71,7 +71,7 @@ export default function StaffingPanel({ includeFinalWriteups = false }) {
         <p className="mb-6 mt-1 text-gray-600">Assign staff responsibilities and program review audiences. This configuration is published separately by a system administrator.</p>
         <FinalWriteupMatrixAudiencesSection />
       </section>
-      <section aria-label="Related staffing settings"><h2 className="font-semibold">Related assignments</h2><ul className="mt-2 space-y-2"><li><Link className="underline" href="/admin?workspace=workflows&view=proposal-ranking">Proposal Ranking facilitators</Link></li><li><Link className="underline" href="/admin?workspace=workflows&view=site-visits">Meeting attendees and Site Visit recipients</Link></li></ul></section>
+      <section aria-label="Related staffing settings"><h2 className="font-semibold">Related assignments</h2><ul className="mt-2 space-y-2"><li><Link className="underline" href="/admin?workspace=workflows&view=proposal-ranking">Proposal Ranking facilitators</Link></li><li><Link className="underline" href="/admin?workspace=workflows&view=site-visits">Meeting attendees and research presentation recipients</Link></li></ul></section>
     </>}
   </div>;
 }

@@ -57,7 +57,7 @@ test('workspace and view navigation are URL-addressable and announce the active 
 
   rerender(<AdminViewNavigation workspace={workflows} activeView="final-writeups" />);
   expect(screen.getByRole('link', { name: 'Final Writeups' })).toHaveAttribute('aria-current', 'page');
-  expect(screen.getByRole('link', { name: 'Site Visits' })).toHaveAttribute(
+  expect(screen.getByRole('link', { name: 'Research presentations' })).toHaveAttribute(
     'href',
     adminHref('workflows', 'site-visits'),
   );
