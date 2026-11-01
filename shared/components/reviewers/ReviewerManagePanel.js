@@ -40,6 +40,7 @@ import { acceptedReviewerRemoveWarning } from './remove-reviewer-confirm';
 import { Card, Button } from '../Layout';
 import {
   getStatusInfo,
+  reviewStatusLabel,
   filterByMode,
   canTransitionToTerminal,
 } from './reviewer-modes';
@@ -71,8 +72,9 @@ export { PREVIEW_RENDER_TIMEOUT_MS } from './ReleaseMaterialsModal';
 
 // ─── Status Badge ───────────────────────────────────────────────────────────
 
-export function StatusBadge({ status, href, onClick, ariaLabel }) {
+export function StatusBadge({ status, label, href, onClick, ariaLabel }) {
   const info = getStatusInfo(status);
+  const text = label || info.label;
   const className = `inline-flex items-center whitespace-nowrap px-2.5 py-0.5 rounded-full text-xs font-medium ${info.color}`;
   if (href) {
     return (
@@ -81,7 +83,7 @@ export function StatusBadge({ status, href, onClick, ariaLabel }) {
         className={`${className} underline-offset-2 hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-green-600 focus-visible:ring-offset-1`}
         title="View submitted review"
       >
-        {info.label}
+        {text}
       </a>
     );
   }
@@ -94,11 +96,11 @@ export function StatusBadge({ status, href, onClick, ariaLabel }) {
         aria-label={ariaLabel}
         title="View activity history"
       >
-        {info.label}
+        {text}
       </button>
     );
   }
-  return <span className={className}>{info.label}</span>;
+  return <span className={className}>{text}</span>;
 }
 
 // Small honorarium-eligibility pill shown next to the status badge for
@@ -1241,6 +1243,7 @@ export default function ReviewerManagePanel({
                       <div className="flex flex-wrap items-center gap-1.5">
                         <StatusBadge
                           status={r.reviewStatus}
+                          label={reviewStatusLabel(r)}
                           href={['review_received', 'complete'].includes(r.reviewStatus)
                             ? `/workbench/${encodeURIComponent(proposal.proposalId)}?tab=reviews`
                             : undefined}

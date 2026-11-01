@@ -623,3 +623,18 @@ describe('Wave 35 Ended at', () => {
     expect(events.find((e) => e.key === 'ended')).toBeUndefined();
   });
 });
+
+describe('current status for a staff-recorded ending stored as Withdrew', () => {
+  it('names a conflict of interest instead of Withdrew', () => {
+    expect(currentTerminalStatus({ reviewStatus: 'withdrew', declineReason: 'conflict-of-interest', endedBy: 'foundation' }).label)
+      .toBe('Current status: Conflict of interest');
+  });
+  it('names a Foundation ending instead of Withdrew', () => {
+    expect(currentTerminalStatus({ reviewStatus: 'withdrew', declineReason: 'other', endedBy: 'foundation' }).label)
+      .toBe('Current status: Ended by Foundation');
+  });
+  it('keeps Withdrew for a reviewer withdrawal', () => {
+    expect(currentTerminalStatus({ reviewStatus: 'withdrew', declineReason: 'too-busy', endedBy: 'reviewer_after_accepting' }).label)
+      .toBe('Current status: Withdrew');
+  });
+});

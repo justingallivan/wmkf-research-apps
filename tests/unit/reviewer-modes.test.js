@@ -11,6 +11,7 @@
 const {
   STATUS_PIPELINE,
   getStatusInfo,
+  reviewStatusLabel,
   MODE_STATUSES,
   MODE_WORK_REMAINING,
   filterByMode,
@@ -40,6 +41,27 @@ describe('getStatusInfo', () => {
   it('falls back to the first stage for an unknown status', () => {
     expect(getStatusInfo('bogus')).toBe(STATUS_PIPELINE[0]);
     expect(getStatusInfo(undefined)).toBe(STATUS_PIPELINE[0]);
+  });
+});
+
+describe('reviewStatusLabel', () => {
+  it('labels a staff-recorded conflict of interest by its reason, whoever raised it', () => {
+    expect(reviewStatusLabel({ reviewStatus: 'withdrew', declineReason: 'conflict-of-interest', endedBy: 'foundation' }))
+      .toBe('Conflict of interest');
+    expect(reviewStatusLabel({ reviewStatus: 'withdrew', declineReason: 'conflict-of-interest', endedBy: 'reviewer_after_accepting' }))
+      .toBe('Conflict of interest');
+  });
+  it('labels a Foundation ending that is not a conflict', () => {
+    expect(reviewStatusLabel({ reviewStatus: 'withdrew', declineReason: 'other', endedBy: 'foundation' }))
+      .toBe('Ended by Foundation');
+  });
+  it('keeps Withdrew for a reviewer withdrawal and the pipeline label elsewhere', () => {
+    expect(reviewStatusLabel({ reviewStatus: 'withdrew', declineReason: 'too-busy', endedBy: 'reviewer_after_accepting' }))
+      .toBe('Withdrew');
+    expect(reviewStatusLabel({ reviewStatus: 'withdrew' })).toBe('Withdrew');
+    expect(reviewStatusLabel({ reviewStatus: 'did_not_submit', declineReason: 'conflict-of-interest', endedBy: 'foundation' }))
+      .toBe('Did not submit');
+    expect(reviewStatusLabel({ reviewStatus: 'accepted' })).toBe('Accepted');
   });
 });
 

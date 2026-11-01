@@ -62,6 +62,7 @@ import {
   STAFF_WITHDRAWAL_DEFAULT_TEXT,
   STAFF_WITHDRAWAL_REASONS,
 } from '../../utils/reviewer-staff-outcome';
+import { reviewStatusLabel } from './reviewer-modes';
 
 /**
  * Event descriptors in lifecycle order. `order` breaks ties when two stamps share a
@@ -393,8 +394,8 @@ export function reviewReceiptEvidence(reviewer) {
 }
 
 export function currentTerminalStatus(reviewer) {
-  const label = TERMINAL_STATUS_LABELS[reviewer?.reviewStatus];
-  if (!label) return null;
+  if (!TERMINAL_STATUS_LABELS[reviewer?.reviewStatus]) return null;
+  const label = reviewStatusLabel(reviewer);
 
   return {
     key: `terminal_${reviewer.reviewStatus}`,
