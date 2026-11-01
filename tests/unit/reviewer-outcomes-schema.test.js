@@ -25,6 +25,16 @@ test('the Ended By spec options are exactly the runtime values', () => {
   expect(ENDED_BY_BY_VALUE[ENDED_BY_VALUES.foundation]).toBe('foundation');
 });
 
+test('the Ended At spec is a nullable date-and-time lifecycle stamp on the same table', () => {
+  const endedAt = JSON.parse(fs.readFileSync(path.join(root,
+    'lib/dataverse/schema/wave35-reviewer-outcomes/02_wmkf_appreviewersuggestion_ended_at.json'), 'utf8'));
+  expect(endedAt.entityLogicalName).toBe(spec.entityLogicalName);
+  expect(endedAt.attributes).toEqual([expect.objectContaining({
+    type: 'DateTime', schemaName: 'wmkf_EndedAt', format: 'DateAndTime', behavior: 'UserLocal',
+  })]);
+  expect(endedAt.attributes[0]).not.toHaveProperty('requiredLevel');
+});
+
 test('Did not submit follows the earlier review statuses and is terminal', () => {
   const others = Object.values(REVIEW_STATUS_MAP).filter((v) => v !== DID_NOT_SUBMIT_REVIEW_STATUS_VALUE);
   expect(DID_NOT_SUBMIT_REVIEW_STATUS_VALUE).toBe(Math.max(...others) + 1);

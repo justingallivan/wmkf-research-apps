@@ -1,0 +1,16 @@
+{
+  "name": "wmkf_appreviewersuggestion-ended-at",
+  "kind": "extensions-on-existing",
+  "entityLogicalName": "wmkf_appreviewersuggestion",
+  "_comment": "When an invited reviewer's engagement was ended, written beside wmkf_endedby by the outcome writers (docs/plans/INVITED_REVIEWER_OUTCOMES_PLAN_2026-10-31.md; owner decision 2026-10-31 so activity history can date staff-recorded outcomes without overwriting the acceptance time in wmkf_responsereceivedat). Null for open engagements, lapsed invitations, and rows ended before this field existed. Same DateAndTime/UserLocal shape as the other lifecycle timestamps on this table. Run scripts/preflight-reviewer-outcomes-schema.mjs before the creation-only schema applier; an exact existing field is an expected no-op.",
+  "attributes": [
+    {
+      "type": "DateTime",
+      "schemaName": "wmkf_EndedAt",
+      "displayName": "Ended At",
+      "format": "DateAndTime",
+      "behavior": "UserLocal",
+      "description": "When this reviewer engagement was ended, recorded with Ended By. This is when the ending was recorded, not when the reviewer accepted. Empty when no one ended it, including a lapsed invitation, or when it ended before this field existed."
+    }
+  ]
+}
