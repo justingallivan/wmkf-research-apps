@@ -413,3 +413,13 @@ Production run unless `DATAVERSE_TARGET_INTERLOCK=on` and
 
 Rollback: deleting the new field or option is safe only while no row holds a
 value in it.
+
+**Slice 3b-1 (2026-10-31):** staff-ended writers set Ended by and Ended at
+(Withdrew and Did not submit: Reviewer after accepting; Release: Foundation);
+both fields join the shared suggestion select, the engagement reset set and
+the reviewers DTO; history dates Did not submit. Not added to
+`OUTCOME_GUARD_FIELDS`: every writer that sets Ended by also sets a declined,
+terminal or response value the predicate already reads, and making it a
+required guard field would fail closed on any select that lacks it. 3b-2:
+portal decline/re-accept, stale sweep, no-longer-needed release. 3b-3: COI /
+Other pre-answer writer and the staff withdrawal reason choice.

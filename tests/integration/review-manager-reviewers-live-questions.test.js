@@ -273,6 +273,8 @@ test('GET success returns the full proposal + reviewer envelope', async () => {
         respondReminderSentAt: null,
         responseReceivedAt: null,
         withdrawnSufficientAt: null,
+        endedBy: null,
+        endedAt: null,
         completedAt: null,
         materialsSentAt: '2026-06-20T00:00:00Z',
         daysSinceMaterialsSent: expect.any(Number),

@@ -531,3 +531,27 @@ describe('did not submit (outcomes slice 3a)', () => {
     expect(currentTerminalStatus(reviewer).label).toBe('Current status: Did not submit');
   });
 });
+
+describe('Wave 35 Ended at', () => {
+  it('dates a Did not submit outcome and makes it Last Action', () => {
+    const reviewer = {
+      suggestionId: 'dns-dated',
+      reviewStatus: 'did_not_submit',
+      responseType: 'declined',
+      responseReceivedAt: '2026-08-01T10:00:00Z',
+      reminderSentAt: '2026-08-20T10:00:00Z',
+      endedAt: '2026-10-31T23:49:21Z',
+    };
+    const ended = buildActivityHistory(reviewer).find((e) => e.key === 'ended');
+    expect(ended).toMatchObject({ label: 'Recorded by staff: review not submitted', at: '2026-10-31T23:49:21Z' });
+    expect(latestActivitySummary(reviewer)).toMatchObject({ key: 'ended', at: '2026-10-31T23:49:21Z' });
+  });
+
+  it.each([
+    ['withdrew', { responseReceivedAt: '2026-10-31T20:00:00Z' }],
+    ['released', { withdrawnSufficientAt: '2026-10-31T20:00:00Z' }],
+  ])('does not duplicate the existing dated %s event', (reviewStatus, stamps) => {
+    const events = buildActivityHistory({ suggestionId: 'x', reviewStatus, responseType: 'declined', endedAt: '2026-10-31T20:00:00Z', ...stamps });
+    expect(events.find((e) => e.key === 'ended')).toBeUndefined();
+  });
+});

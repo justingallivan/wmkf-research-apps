@@ -119,10 +119,12 @@ describe('reviewer withdrawal changeset', () => {
         wmkf_responsetype: RESPONSE_TYPE_MAP.declined,
         wmkf_responsereceivedat: '2026-07-24T20:00:00.000Z',
         wmkf_reviewstatus: REVIEW_STATUS_MAP.withdrew,
+        wmkf_endedby: 100000001, // Reviewer after accepting
         wmkf_externaltokenrevoked: true,
         wmkf_declinereferral: null,
       },
     });
+    expect(Date.parse(operations[0].body.wmkf_endedat)).not.toBeNaN();
     expect(operations[1]).toMatchObject({
       method: 'PATCH',
       entitySet: 'akoya_requests',
@@ -195,6 +197,8 @@ describe('reviewer withdrawal changeset', () => {
           wmkf_reviewstatus: REVIEW_STATUS_MAP.released,
           wmkf_externaltokenrevoked: true,
           wmkf_withdrawnsufficientat: '2026-09-16T17:00:00.000Z',
+          wmkf_endedby: 100000002, // Foundation
+          wmkf_endedat: '2026-09-16T17:00:00.000Z',
           wmkf_notes: 'Overdue after multiple reminders.',
         },
       }),
@@ -278,6 +282,7 @@ describe('staff-recorded did not submit', () => {
     wmkf_declinereferral: null,
     wmkf_reviewstatus: 100000007,
     wmkf_endedby: 100000001, // Reviewer after accepting
+    wmkf_endedat: expect.any(String),
     wmkf_externaltokenrevoked: true,
   };
 
