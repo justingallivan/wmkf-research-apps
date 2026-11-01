@@ -96,6 +96,8 @@ test('fills split-run Dataverse and AI placeholders while retaining the template
   expect(xml).not.toMatch(/\[\[(?:DV|AI):/);
   expect(xml).toContain('[[STAFF:GraphicalAbstractImage]]');
   expect(xml).toContain('[[STAFF:GraphicalAbstractCaption]]');
+  expect(xml).toContain('Research presentation:');
+  expect(xml).toContain('[[STAFF:ScientificPresentation]]');
   expect(xml).toContain('Institutional Funding History:Applicant University has received 8 awards totaling $9.15 million from WMKF.');
 });
 
@@ -123,11 +125,11 @@ test('produces byte-identical DOCX output for identical inputs', async () => {
   expect(second.equals(first)).toBe(true);
 });
 
-test('selects render-contract v9 over the v8 template bytes', () => {
+test('selects render-contract v10 over the heading-only v9 template bytes', () => {
   expect(PRE_SITE_VISIT_TEMPLATE).toEqual({
     id: 'phase-ii-pre-site-visit',
-    version: 9,
-    relativePath: 'shared/templates/pre-site-visit/phase-ii-pre-site-visit-v8.docx',
+    version: 10,
+    relativePath: 'shared/templates/pre-site-visit/phase-ii-pre-site-visit-v9.docx',
   });
   expect(PRE_SITE_VISIT_CONTRACT.templateId).toBe(PRE_SITE_VISIT_TEMPLATE.id);
   expect(PRE_SITE_VISIT_CONTRACT.templateVersion).toBe(String(PRE_SITE_VISIT_TEMPLATE.version));
@@ -578,4 +580,21 @@ test('retains the owner-added 12pt space after city/state', async () => {
   const body = await zip.file('word/document.xml').async('string');
   const paragraph = wordParagraphs(body).find((p) => p.includes('[[DV:CityState]]'));
   expect(paragraph).toContain('<w:spacing w:after="240"/>');
+});
+
+
+test('the new template changes only the visible heading and retains every other package part and token', async () => {
+  const old = await JSZip.loadAsync(await fs.readFile('shared/templates/pre-site-visit/phase-ii-pre-site-visit-v8.docx'));
+  const next = await JSZip.loadAsync(await fs.readFile(defaultPreSiteVisitTemplatePath()));
+  expect(Object.keys(next.files).sort()).toEqual(Object.keys(old.files).sort());
+  for (const name of Object.keys(old.files).filter(name => !old.files[name].dir)) {
+    const prior = await old.file(name).async('nodebuffer');
+    const current = await next.file(name).async('nodebuffer');
+    if (name === 'word/document.xml') {
+      const xml = prior.toString('utf8');
+      expect(xml.match(/<w:t>Scientific Presentation<\/w:t>/g)).toHaveLength(1);
+      expect(current.toString('utf8')).toBe(xml.replace('<w:t>Scientific Presentation</w:t>', '<w:t>Research presentation</w:t>'));
+      expect(current.toString('utf8').match(/\[\[STAFF:ScientificPresentation\]\]/g)).toHaveLength(1);
+    } else expect(current.equals(prior)).toBe(true);
+  }
 });

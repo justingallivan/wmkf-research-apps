@@ -864,7 +864,7 @@ test('an expired pre-model claim with no generated core fails closed and require
   expect(harness.dependencies.uploadFile).not.toHaveBeenCalled();
 });
 
-test('same operation resumes a verified uploaded file through post-visit activation without re-uploading', async () => {
+test.each([true, false])('old-template retry recovers uploaded bytes when present (%s) and otherwise refuses a mismatched rerender', async (hasUploadedFile) => {
   const oldArtifactId = '66666666-6666-4666-8666-666666666666';
   const clientOperationId = '77777777-7777-4777-8777-777777777777';
   const old = {
@@ -890,6 +890,9 @@ test('same operation resumes a verified uploaded file through post-visit activat
     wmkf_lifecyclestate: REQUEST_DOCUMENT_LIFECYCLE_STATE.DRAFT,
     wmkf_generationkey: generationKey, wmkf_claimtoken: CLAIM_ID,
     wmkf_producer: 'request-workbench-regenerate',
+    wmkf_templateversion: '9',
+    wmkf_presiteproposalcorejson: JSON.stringify({ schemaVersion: 4, proposalCore, diagnostics: [] }),
+    ...Object.fromEntries(Object.entries(SECTION_FIELDS).map(([key, field]) => [field, proposalCore[key]])),
     wmkf_contenthash: 'gdc1:governed-hash',
     wmkf_presiteinputsnapshotjson: JSON.stringify(buildPreSiteVisitInputSnapshot(inputFixture())),
     wmkf_sharepointfolderpath: 'Requests/1002379/Pre-Site Visit',
@@ -902,9 +905,23 @@ test('same operation resumes a verified uploaded file through post-visit activat
     webUrl: 'https://sharepoint.test/recovered.docx', versionId: '1.0',
     eTag: 'file-etag', size: 1234, lastModified: '2026-10-15T00:00:00Z',
   };
-  const harness = createHarness({ currentPointerRow: old, initialOperationRow: operation, initialUploadedFile: uploaded });
+  const harness = createHarness({ currentPointerRow: old, initialOperationRow: operation, initialUploadedFile: hasUploadedFile ? uploaded : null });
   harness.dependencies.loadInputs.mockRejectedValue(new Error('live narrative is unavailable'));
   harness.dependencies.getCurrentPrompt.mockRejectedValue(new Error('current prompt is unpublished'));
+  if (!hasUploadedFile) {
+    await expect(generatePreSiteVisitArtifact({
+      requestId: REQUEST_ID, actingUserSystemId: '88888888-8888-4888-8888-888888888888',
+      generationMode: 'regenerate',
+      regeneration: { expectedArtifactId: oldArtifactId, clientOperationId, expectedFinalArtifactId: null, isSuperuser: true },
+    }, harness.dependencies)).rejects.toMatchObject({ code: 'pre_site_visit_template_version_changed', httpStatus: 409 });
+    expect(harness.dependencies.renderDocx).not.toHaveBeenCalled();
+    expect(harness.dependencies.uploadFile).not.toHaveBeenCalled();
+    expect(harness.dependencies.runProposalCore).not.toHaveBeenCalled();
+    expect(harness.dependencies.commitChangeset).not.toHaveBeenCalled();
+    expect(harness.request._wmkf_currentpresitevisit_value).toBe(oldArtifactId);
+    expect(harness.row.wmkf_filename).toBe('1002379 regenerated.docx');
+    return;
+  }
   const result = await generatePreSiteVisitArtifact({
     requestId: REQUEST_ID, actingUserSystemId: '88888888-8888-4888-8888-888888888888',
     generationMode: 'regenerate',
@@ -915,6 +932,8 @@ test('same operation resumes a verified uploaded file through post-visit activat
     artifact: { artifactId: ARTIFACT_ID, operationStatus: REQUEST_DOCUMENT_OPERATION_STATUS.READY,
       lifecycleState: REQUEST_DOCUMENT_LIFECYCLE_STATE.REVIEW, file: { itemId: 'uploaded-item' } },
   });
+  expect(result.artifact.provenance.templateVersion).toBe('9');
+  expect(harness.dependencies.renderDocx).not.toHaveBeenCalled();
   expect(harness.dependencies.uploadFile).not.toHaveBeenCalled();
   expect(harness.dependencies.runProposalCore).not.toHaveBeenCalled();
   expect(harness.dependencies.loadInputs).not.toHaveBeenCalled();
@@ -1272,7 +1291,7 @@ test('read-only status projects current Ready plus milestone and newer pending r
     producer: 'request-workbench',
     inputFingerprint: 'input-fingerprint', renderInputFingerprint: 'render-fingerprint',
     promptName: PRE_SITE_VISIT_CONTRACT.promptName, promptVersion: 4, promptId: PROMPT_ID,
-    runId: RUN_ID, templateId: 'phase-ii-pre-site-visit', templateVersion: '9',
+    runId: RUN_ID, templateId: 'phase-ii-pre-site-visit', templateVersion: PRE_SITE_VISIT_CONTRACT.templateVersion,
     contentHash: 'gdc1:governed-hash',
   };
   const milestone = {
@@ -1435,7 +1454,7 @@ test.each([2, 3, 4])('matching persisted core and input snapshot schema v%s reta
         producer: 'request-workbench',
         inputFingerprint: 'input-fingerprint', renderInputFingerprint: 'render-fingerprint',
         promptName: PRE_SITE_VISIT_CONTRACT.promptName, promptVersion: 4, promptId: PROMPT_ID,
-        runId: RUN_ID, templateId: 'phase-ii-pre-site-visit', templateVersion: '9',
+        runId: RUN_ID, templateId: 'phase-ii-pre-site-visit', templateVersion: PRE_SITE_VISIT_CONTRACT.templateVersion,
         contentHash: 'gdc1:governed-hash',
       },
       milestone: null,
