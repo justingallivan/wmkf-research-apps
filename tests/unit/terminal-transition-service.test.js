@@ -284,6 +284,23 @@ test('eligible staff-recorded withdrawal corrects response state with the fresh 
   expect(updateLifecycle).not.toHaveBeenCalled();
 });
 
+test('the dialog choice is passed to the withdrawal writer', async () => {
+  await transitionReviewersTerminal(args({
+    withdrawal: { reasonPicklist: 'conflict-of-interest', reasonText: 'Co-author', endedBy: 'foundation' },
+  }));
+  expect(applyStaffReviewerWithdrawal).toHaveBeenCalledWith(
+    SUGGESTION,
+    {
+      actingUserSystemId: 'staff-1',
+      ifMatch: 'W/"7"',
+      cancelHonorarium: null,
+      reasonPicklist: 'conflict-of-interest',
+      reasonText: 'Co-author',
+      endedBy: 'foundation',
+    },
+  );
+});
+
 test('accepted row with a persisted null review status transitions', async () => {
   findById.mockResolvedValue(row({ wmkf_reviewstatus: null }));
 

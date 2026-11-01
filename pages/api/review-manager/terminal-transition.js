@@ -2,8 +2,9 @@
  * POST /api/review-manager/terminal-transition
  *   Preview accepted-reviewer release:
  *     { requestId, suggestionIds, terminalStatus: 'released', preview: true }
- *   Commit staff-recorded withdrawal:
- *     { requestId, suggestionIds, terminalStatus: 'withdrew' | 'did_not_submit' }
+ *   Commit staff-recorded withdrawal / did not submit:
+ *     { requestId, suggestionIds, terminalStatus: 'withdrew' | 'did_not_submit',
+ *       withdrawal? }  // withdrew only: { kind: withdrew|coi|other, reason?, note?, endedBy? }
  *   Commit accepted-reviewer release:
  *     { requestId, suggestionIds, terminalStatus: 'released',
  *       releaseReason: 'sufficient_reviews_received', sendEmail, overrides,
@@ -24,6 +25,7 @@ import {
   transitionReviewersTerminal,
 } from '../../../lib/services/review-manager/terminal-transition-service';
 import { isTerminalReviewStatus } from '../../../shared/config/reviewerStatus';
+import { normalizeStaffWithdrawal } from '../../../shared/utils/reviewer-staff-outcome';
 import { authorizeReviewerRequestMutation } from '../../../lib/services/reviewer-request-authorization';
 
 const MAX_BATCH = 100;
@@ -53,6 +55,13 @@ export default async function handler(req, res) {
   }
   if (!isTerminalReviewStatus(terminalStatus)) {
     return res.status(400).json({ error: 'terminalStatus must be withdrew, released or did_not_submit' });
+  }
+  let withdrawal;
+  if (terminalStatus === 'withdrew') {
+    withdrawal = normalizeStaffWithdrawal(req.body?.withdrawal);
+    if (withdrawal.error) return res.status(400).json({ error: withdrawal.error });
+  } else if (req.body?.withdrawal !== undefined) {
+    return res.status(400).json({ error: 'withdrawal is only supported for withdrew' });
   }
   if (preview && terminalStatus !== 'released') {
     return res.status(400).json({ error: 'preview is only supported for released' });
@@ -95,6 +104,7 @@ export default async function handler(req, res) {
         internalNotes: req.body?.internalNotes,
         sendEmail: req.body?.sendEmail,
         overrides: req.body?.overrides,
+        withdrawal,
       });
       return res.status(result.transitioned > 0 ? 200 : 409).json(result);
     } catch (error) {

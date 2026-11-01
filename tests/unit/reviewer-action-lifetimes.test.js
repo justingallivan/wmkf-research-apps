@@ -72,6 +72,10 @@ function withdraw(row = reviewer) {
   openMenu(row);
   clickItem('Record reviewer withdrawal');
 }
+function recordNotSubmitted(row = reviewer) {
+  openMenu(row);
+  clickItem('Record that the review was not submitted');
+}
 function release(row = reviewer) {
   openMenu(row);
   clickItem('Release from assignment');
@@ -172,10 +176,10 @@ const actionDefs = [
   },
   {
     kind: 'terminal',
-    trigger: withdraw,
+    trigger: recordNotSubmitted,
     needsConfirm: true,
     fetchMock: () => terminalFetch,
-    endpointBody: (row = reviewer) => JSON.stringify({ requestId: proposal.proposalId, suggestionIds: [row.suggestionId], terminalStatus: 'withdrew' }),
+    endpointBody: (row = reviewer) => JSON.stringify({ requestId: proposal.proposalId, suggestionIds: [row.suggestionId], terminalStatus: 'did_not_submit' }),
     successResponse: () => response({ transitioned: 1 }),
     failureResponse: () => response({ transitioned: 0, results: [{ status: 'write_failed' }] }, 409),
     failureAlertRe: /Could not end the engagement: write_failed\. Reload and try again\./,
@@ -556,15 +560,100 @@ describe.each([false, true])('Stage 6B1 action lifetimes (StrictMode: %s)', (str
   });
 
   describe('terminal transition specifics', () => {
+    describe('withdrawal dialog', () => {
+      function sentBodies() {
+        return terminalFetch.mock.calls.map(([, options]) => JSON.parse(options.body));
+      }
+
+      test('opens a dialog instead of confirm() and dispatches nothing until Record', () => {
+        renderPanel();
+        withdraw();
+        expect(screen.getByRole('dialog')).toBeInTheDocument();
+        expect(window.confirm).not.toHaveBeenCalled();
+        expect(terminalFetch).not.toHaveBeenCalled();
+      });
+
+      test('Cancel closes the dialog without a request', () => {
+        renderPanel();
+        withdraw();
+        fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
+        expect(screen.queryByRole('dialog')).toBeNull();
+        expect(terminalFetch).not.toHaveBeenCalled();
+      });
+
+      test('Reviewer withdrew sends the chosen reason', async () => {
+        terminalFetch.mockResolvedValue(response({ transitioned: 1 }));
+        renderPanel({ onRefresh: jest.fn() });
+        withdraw();
+        fireEvent.change(screen.getByLabelText('Reason'), { target: { value: 'outside-expertise' } });
+        fireEvent.click(screen.getByRole('button', { name: 'Record' }));
+        await act(async () => {});
+        expect(screen.queryByRole('dialog')).toBeNull();
+        expect(sentBodies()).toEqual([{
+          requestId: proposal.proposalId,
+          suggestionIds: [reviewer.suggestionId],
+          terminalStatus: 'withdrew',
+          withdrawal: { kind: 'withdrew', reason: 'outside-expertise' },
+        }]);
+      });
+
+      test('Conflict of interest sends who raised it and the note', async () => {
+        terminalFetch.mockResolvedValue(response({ transitioned: 1 }));
+        renderPanel({ onRefresh: jest.fn() });
+        withdraw();
+        fireEvent.click(screen.getByLabelText('Conflict of interest'));
+        fireEvent.click(screen.getByLabelText('Foundation'));
+        fireEvent.change(screen.getByLabelText(/^Note/), { target: { value: '  Co-author on the PI paper  ' } });
+        fireEvent.click(screen.getByRole('button', { name: 'Record' }));
+        await act(async () => {});
+        expect(sentBodies()[0].withdrawal).toEqual({ kind: 'coi', endedBy: 'foundation', note: 'Co-author on the PI paper' });
+      });
+
+      test('Other cannot be recorded without a note', async () => {
+        terminalFetch.mockResolvedValue(response({ transitioned: 1 }));
+        renderPanel({ onRefresh: jest.fn() });
+        withdraw();
+        fireEvent.click(screen.getByLabelText('Other'));
+        const record = screen.getByRole('button', { name: 'Record' });
+        expect(record).toBeDisabled();
+        fireEvent.change(screen.getByLabelText(/^Note/), { target: { value: '   ' } });
+        expect(record).toBeDisabled();
+        fireEvent.change(screen.getByLabelText(/^Note/), { target: { value: 'Moved abroad' } });
+        expect(record).not.toBeDisabled();
+        fireEvent.click(record);
+        await act(async () => {});
+        expect(sentBodies()[0].withdrawal).toEqual({ kind: 'other', endedBy: 'reviewer_after_accepting', note: 'Moved abroad' });
+      });
+
+      test.each(contextChanges.filter((change) => change !== 'unmount'))(
+        'an open dialog closes for good after %s and never dispatches',
+        (change) => {
+          const view = renderPanel();
+          withdraw();
+          expect(screen.getByRole('dialog')).toBeInTheDocument();
+          invalidate(view, change);
+          expect(screen.queryByRole('dialog')).toBeNull();
+          expect(terminalFetch).not.toHaveBeenCalled();
+        },
+      );
+
+      test('preview read-only context refuses to open the dialog', () => {
+        renderPanel({ previewReadOnly: true });
+        withdraw();
+        expect(screen.queryByRole('dialog')).toBeNull();
+        expect(terminalFetch).not.toHaveBeenCalled();
+      });
+    });
+
     test('Saving shows while a terminal write is in flight and only its own attempt clears it', async () => {
       const first = deferred();
       const second = deferred();
       terminalFetch.mockReturnValueOnce(first.promise).mockReturnValueOnce(second.promise);
       renderPanel({ onRefresh: jest.fn() });
       expect(screen.queryByText('Saving…')).toBeNull();
-      withdraw();
+      recordNotSubmitted();
       expect(screen.getByText('Saving…')).toBeInTheDocument();
-      withdraw();
+      recordNotSubmitted();
       // The superseded first attempt settling must not clear the newer attempt's indicator.
       await act(async () => first.resolve(response({ transitioned: 1 })));
       expect(screen.getByText('Saving…')).toBeInTheDocument();
@@ -575,13 +664,13 @@ describe.each([false, true])('Stage 6B1 action lifetimes (StrictMode: %s)', (str
     test('Saving clears after a failed terminal write', async () => {
       terminalFetch.mockResolvedValue(response({ transitioned: 0, results: [{ status: 'honorarium_paid' }] }, 409));
       renderPanel({ onRefresh: jest.fn() });
-      withdraw();
+      recordNotSubmitted();
       await act(async () => {});
       expect(window.alert.mock.calls.some(([m]) => /honorarium_paid/.test(m))).toBe(true);
       expect(screen.queryByText('Saving…')).toBeNull();
     });
 
-    test('opening the release preview does not supersede a pending withdrawal or dispatch the release mutation', async () => {
+    test('opening the release preview does not supersede a pending terminal write or dispatch the release mutation', async () => {
       const withdrawJob = deferred();
       terminalFetch.mockImplementation((_url, options) => {
         const body = JSON.parse(options.body);
@@ -604,7 +693,7 @@ describe.each([false, true])('Stage 6B1 action lifetimes (StrictMode: %s)', (str
       });
       const onRefresh = jest.fn();
       renderPanel({ onRefresh });
-      withdraw();
+      recordNotSubmitted();
       release();
       await act(async () => {});
       const requests = terminalFetch.mock.calls.map(([, options]) => JSON.parse(options.body));
@@ -664,7 +753,7 @@ describe.each([false, true])('Stage 6B1 action lifetimes (StrictMode: %s)', (str
       terminalFetch.mockReturnValue(job.promise);
       const onRefresh = jest.fn();
       const view = renderPanel({ onRefresh });
-      withdraw();
+      recordNotSubmitted();
       const sentBody = JSON.parse(terminalFetch.mock.calls[0][1].body);
       expect(sentBody.requestId).toBe(proposal.proposalId);
       // Switching the request after dispatch must not alter the in-flight
@@ -697,7 +786,7 @@ describe.each([false, true])('Stage 6B1 action lifetimes (StrictMode: %s)', (str
         });
         return true;
       });
-      withdraw();
+      recordNotSubmitted();
       expect(terminalFetch).toHaveBeenCalledTimes(1);
       const sentBody = JSON.parse(terminalFetch.mock.calls[0][1].body);
       expect(sentBody.requestId).toBe('switched-while-confirm-was-open');
@@ -708,7 +797,7 @@ describe.each([false, true])('Stage 6B1 action lifetimes (StrictMode: %s)', (str
       terminalFetch.mockResolvedValue(response({ transitioned: 0, results: [{ status: 'write_failed' }] }, 409));
       const onRefresh = jest.fn();
       renderPanel({ onRefresh });
-      withdraw();
+      recordNotSubmitted();
       await act(async () => {});
       expect(window.alert.mock.calls[0][0]).toMatch(/write_failed/);
       expect(onRefresh).not.toHaveBeenCalled();

@@ -106,6 +106,7 @@ jest.mock('../../lib/dataverse/adapters/reviewer-suggestion', () => ({
   bulkUpdateByRequest: jest.fn(async () => 0),
   dismissDeclineReferral: (...a) => dismissDeclineReferral(...a),
   APPLICANT_DISPOSITION_MAP: { recommended: 100000000, excluded: 100000001 },
+  DECLINE_REASON_BY_VALUE: {},
   RESPONSE_TYPE_BY_VALUE: {
     100000000: 'accepted',
     100000001: 'declined',

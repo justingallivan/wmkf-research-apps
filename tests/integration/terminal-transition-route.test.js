@@ -105,3 +105,43 @@ test('invalid terminal status fails before service work', async () => {
   expect(res.status).toHaveBeenCalledWith(400);
   expect(transitionReviewersTerminal).not.toHaveBeenCalled();
 });
+
+describe('staff withdrawal dialog payload', () => {
+  async function post(body) {
+    transitionReviewersTerminal.mockResolvedValue({ ok: true, transitioned: 1, results: [] });
+    const req = createMockReq({ method: 'POST', body: { requestId: REQUEST, suggestionIds: [SUGGESTION], ...body } });
+    const res = createMockRes();
+    await handler(req, res);
+    return res;
+  }
+
+  test('a conflict of interest raised by the Foundation reaches the service normalized', async () => {
+    const res = await post({ terminalStatus: 'withdrew', withdrawal: { kind: 'coi', endedBy: 'foundation', note: ' Co-author ' } });
+    expect(res.status).toHaveBeenCalledWith(200);
+    expect(transitionReviewersTerminal.mock.calls[0][0].withdrawal).toEqual({
+      reasonPicklist: 'conflict-of-interest',
+      reasonText: 'Co-author',
+      endedBy: 'foundation',
+    });
+  });
+
+  test('a withdrawal without a dialog payload keeps the pre-dialog defaults', async () => {
+    await post({ terminalStatus: 'withdrew' });
+    expect(transitionReviewersTerminal.mock.calls[0][0].withdrawal).toMatchObject({
+      reasonPicklist: 'other',
+      endedBy: 'reviewer_after_accepting',
+    });
+  });
+
+  test.each([
+    ['unknown kind', { terminalStatus: 'withdrew', withdrawal: { kind: 'fired' } }],
+    ['Other without a note', { terminalStatus: 'withdrew', withdrawal: { kind: 'other', endedBy: 'foundation', note: '  ' } }],
+    ['client-chosen ended-by outside the allowlist', { terminalStatus: 'withdrew', withdrawal: { kind: 'coi', endedBy: 'reviewer_before_accepting' } }],
+    ['withdrawal on did not submit', { terminalStatus: 'did_not_submit', withdrawal: { kind: 'withdrew', reason: 'too-busy' } }],
+    ['withdrawal on release', { terminalStatus: 'released', withdrawal: null }],
+  ])('%s is a 400 before service work', async (_name, body) => {
+    const res = await post(body);
+    expect(res.status).toHaveBeenCalledWith(400);
+    expect(transitionReviewersTerminal).not.toHaveBeenCalled();
+  });
+});

@@ -57,6 +57,8 @@
  * only a dated post-meeting stamp on a non-revoked row is an automated close.
  */
 
+import { STAFF_WITHDRAWAL_DEFAULT_TEXT, STAFF_WITHDRAWAL_REASONS } from '../../utils/reviewer-staff-outcome';
+
 /**
  * Event descriptors in lifecycle order. `order` breaks ties when two stamps share a
  * timestamp (bulk writes commonly do), so the display order stays stable and sensible
@@ -268,19 +270,48 @@ export function isSyntheticReceipt(reviewer) {
   return received !== null && received === completed;
 }
 
+// Staff withdrawal dialog (outcomes slice 3b-3a): a conflict of interest or a
+// Foundation ending is stored under the Withdrew status, so the label comes
+// from the decline reason and Ended by instead.
+function staffWithdrawalLabel(reviewer) {
+  if (reviewer?.declineReason === 'conflict-of-interest') {
+    return { label: 'Conflict of interest recorded by staff' };
+  }
+  if (reviewer?.endedBy === 'foundation') {
+    return { label: 'Foundation ended the engagement (recorded by staff)' };
+  }
+  return { label: 'Withdrawal recorded by staff' };
+}
+
+const STAFF_DEFAULT_NOTES = new Set(Object.values(STAFF_WITHDRAWAL_DEFAULT_TEXT));
+
+function staffWithdrawalDetail(reviewer) {
+  const parts = ['Recorded as declined by a Program Director, not by the reviewer.'];
+  if (reviewer?.declineReason === 'conflict-of-interest') {
+    if (reviewer.endedBy === 'foundation') parts.push('Raised by the Foundation.');
+    else if (reviewer.endedBy === 'reviewer_after_accepting') parts.push('Raised by the reviewer.');
+  } else {
+    const reason = STAFF_WITHDRAWAL_REASONS.find((r) => r.value === reviewer?.declineReason);
+    if (reason && reason.value !== 'other') parts.push(`Reason: ${reason.label}.`);
+  }
+  const note = reviewer?.declineReasonText;
+  if (note && !STAFF_DEFAULT_NOTES.has(note)) parts.push(`Note: ${note}`);
+  return parts.join(' ');
+}
+
 export function responseEventEvidence(reviewer) {
   const responseType = reviewer?.responseType || null;
   const reviewStatus = reviewer?.reviewStatus || null;
 
   if (responseType === 'declined' && reviewStatus === 'withdrew') {
     return {
-      label: 'Withdrawal recorded by staff',
+      ...staffWithdrawalLabel(reviewer),
       deliveryProven: true,
       // Not "Response: declined". The row's responseType IS `declined`, but that value
       // was written by applyStaffReviewerWithdrawal, not by the reviewer
       // (`reviewer-suggestion.js:1832-1842`). Echoing the raw enum under a
       // staff-recorded label re-introduces the ambiguity the label just removed.
-      detail: 'Recorded as declined by a Program Director, not by the reviewer.',
+      detail: staffWithdrawalDetail(reviewer),
     };
   }
 

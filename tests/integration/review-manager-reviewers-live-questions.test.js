@@ -34,6 +34,7 @@ jest.mock('../../lib/dataverse/adapters/reviewer-suggestion', () => {
   return {
     findByRequest: jest.fn(),
     findEndedAfterAcceptanceByRequest: jest.fn(async () => []),
+    DECLINE_REASON_BY_VALUE: {},
     RESPONSE_TYPE_BY_VALUE: Object.fromEntries(Object.entries(RESPONSE_TYPE_MAP).map(([k, v]) => [v, k])),
   };
 });
@@ -274,6 +275,8 @@ test('GET success returns the full proposal + reviewer envelope', async () => {
         responseReceivedAt: null,
         withdrawnSufficientAt: null,
         endedBy: null,
+        declineReason: null,
+        declineReasonText: null,
         endedAt: null,
         completedAt: null,
         materialsSentAt: '2026-06-20T00:00:00Z',
