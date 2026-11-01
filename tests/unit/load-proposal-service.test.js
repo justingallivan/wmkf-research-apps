@@ -73,8 +73,15 @@ function file(name, over = {}) {
   };
 }
 
+const ORIGINAL_BLOB_TOKEN = process.env.BLOB_READ_WRITE_TOKEN;
+afterAll(() => {
+  if (ORIGINAL_BLOB_TOKEN === undefined) delete process.env.BLOB_READ_WRITE_TOKEN;
+  else process.env.BLOB_READ_WRITE_TOKEN = ORIGINAL_BLOB_TOKEN;
+});
+
 beforeEach(() => {
   jest.clearAllMocks();
+  process.env.BLOB_READ_WRITE_TOKEN = 'shared-public-token';
   mockCreateSiteVisitFilter.mockReturnValue(mockSiteVisitFilter);
   mockSiteVisitFilter.mockImplementation(async (_library, _folder, files) => ({
     files,
@@ -247,7 +254,9 @@ test('golden path (cache miss) downloads, uploads at the deterministic hashed pa
       source: 'dynamics',
     })],
   });
-  expect(head).toHaveBeenCalledWith(expect.stringMatching(CACHE_PATH_RE));
+  // Both calls name the shared public store's token, so the SDK never falls
+  // back to OIDC + BLOB_STORE_ID (the private Factory store in Production).
+  expect(head).toHaveBeenCalledWith(expect.stringMatching(CACHE_PATH_RE), { token: 'shared-public-token' });
   expect(put).toHaveBeenCalledWith(
     expect.stringMatching(CACHE_PATH_RE),
     expect.any(Buffer),
@@ -256,6 +265,7 @@ test('golden path (cache miss) downloads, uploads at the deterministic hashed pa
       contentType: 'application/pdf',
       addRandomSuffix: false,
       allowOverwrite: true,
+      token: 'shared-public-token',
     },
   );
   // put must land at the exact path head() was checked against.
@@ -387,7 +397,7 @@ test('miss path: file changed between listing and download (size mismatch) uploa
   expect(put).toHaveBeenCalledWith(
     'reviewer-finder/1002836/Proposal_1002836.pdf',
     expect.any(Buffer),
-    { access: 'public', contentType: 'application/pdf', addRandomSuffix: true },
+    { access: 'public', contentType: 'application/pdf', addRandomSuffix: true, token: 'shared-public-token' },
   );
   // Never written under the version-keyed cache path.
   expect(put).not.toHaveBeenCalledWith(
