@@ -98,6 +98,10 @@ describe('InviteEmailModal invitation timing contract', () => {
   test('keeps a mixed legacy line intact, token visible, instead of dropping its deadline', () => {
     const out = applyTiming('Proposals around {{proposalDelivery}}; reviews due March 10, 2027.', { respondOffsetDays: 7 });
     expect(out).toBe('Proposals around {{proposalDelivery}}; reviews due March 10, 2027.');
+    // Another blank timing value must not drop the line either.
+    const blankOffset = applyTiming('Respond by {{respondBy}}; proposals {{proposalDelivery}}; reviews due March 10, 2027.\nhttps://reviews.wmkeck.org/x', { respondOffsetDays: '' });
+    expect(blankOffset).toContain('{{proposalDelivery}}; reviews due March 10, 2027.');
+    expect(blankOffset).toContain('https://reviews.wmkeck.org/x');
   });
 
   test('warns, without blocking, when reviews fall due on or before the response deadline', () => {

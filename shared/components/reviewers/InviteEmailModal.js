@@ -141,7 +141,9 @@ export function applyTiming(body, timing) {
     const keepLegacyToken = isMixedLegacyReleaseLine(line);
     for (const [token, value] of Object.entries(values)) {
       if (line.includes(token)) {
-        if (token === '{{proposalDelivery}}' && keepLegacyToken) continue;
+        // A kept mixed line is never dropped: blank tokens stay literal so
+        // Send remains blocked until the PD fixes it.
+        if (keepLegacyToken && !value) continue;
         if (!value) { drop = true; break; }
         next = next.split(token).join(value);
       }
