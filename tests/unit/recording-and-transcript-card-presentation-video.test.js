@@ -48,7 +48,7 @@ function route(handlers = {}) {
 const getCount = () => global.fetch.mock.calls.filter(([url, o]) => String(url).endsWith('/presentation-video-splits') && (o?.method || 'GET') === 'GET').length;
 async function renderLine(props = {}) {
   const view = render(<RecordingAndTranscriptCard requestId={REQUEST_ID} {...props} />);
-  await screen.findByText(/Presentation ends at/);
+  await screen.findByText(/Presentation ends in recording at/);
   return view;
 }
 const line = () => screen.findByTestId('presentation-video-line');
@@ -287,7 +287,7 @@ describe('polling', () => {
     route({ state: { splits: { available: true, splits: [split({ state: 'cutting' })] } } });
     render(<RecordingAndTranscriptCard requestId={REQUEST_ID} />);
     await advance(0);
-    await screen.findByText(/Presentation ends at/);
+    await screen.findByText(/Presentation ends in recording at/);
     const el = await line();
     const start = getCount();
     await advance(14_000);
@@ -305,7 +305,7 @@ describe('polling', () => {
     route({ state: { splits: { available: true, splits: [split({ state: 'registering' })] } } });
     const view = render(<RecordingAndTranscriptCard requestId={REQUEST_ID} />);
     await advance(0);
-    await screen.findByText(/Presentation ends at/);
+    await screen.findByText(/Presentation ends in recording at/);
     await line();
     const before = getCount();
     view.unmount();
@@ -342,7 +342,7 @@ describe('registering recovery and failed refreshes', () => {
     render(<RecordingAndTranscriptCard requestId={REQUEST_ID} />);
     const advance = (ms) => act(async () => { jest.advanceTimersByTime(ms); });
     await advance(0);
-    await screen.findByText(/Presentation ends at/);
+    await screen.findByText(/Presentation ends in recording at/);
     const el = await line();
     state.splits = () => { throw new Error('network down'); };
     fireEvent.click(within(el).getByRole('button', { name: 'Create presentation video' }));

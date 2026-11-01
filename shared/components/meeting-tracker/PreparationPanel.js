@@ -1,7 +1,7 @@
 import {useCallback,useEffect,useRef,useState} from 'react';
 import {requestJson} from '../../utils/api-request';
 import {Button} from '../Layout';
-const LABELS={source:'Save reviewed transcript',transcripts:'Presentation and staff transcripts',presentation_summary:'Presentation summary draft',discussion_summary:'Staff discussion summary draft',video:'Presentation video'};
+const LABELS={source:'Save reviewed transcript',transcripts:'Presentation and post-presentation discussion transcripts',presentation_summary:'Presentation summary draft',discussion_summary:'Post-presentation discussion summary draft',video:'Presentation video'};
 const STATES={pending:'Waiting',running:'Preparing…',succeeded:'Prepared',blocked:'Needs attention',unknown:'Outcome unknown'};
 /** Saved preparation progress is independent of this component's lifetime. */
 export default function PreparationPanel({requestId,source,blockedReason=null,onUpdated,beforeStart=null,onStarted=null,startLabel='Prepare saved materials'}){

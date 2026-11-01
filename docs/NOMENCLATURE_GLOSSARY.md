@@ -140,25 +140,33 @@ discussion brief, Proposal discussion session, Research presentation, and
 Presentation materials. It merged through PR #581 as `8c0859a6f` (Git/source
 evidence only; no deployment claim). That Board-reader slice excludes the
 applicant upload page, emails, generated documents, historic filenames,
-tokens/routes, and API payload changes. The two Meeting
-Tracker summary views also use approved post-presentation discussion wording for
-the summary/transcript content they present; this is not a repo-wide Staff
-discussion rename. Other recorded staff-discussion labels and runtime surfaces
-remain pending separate scope. The email-copy slice merged through PR #583 as
+tokens/routes, and API payload changes. The two Meeting Tracker summary views
+use approved post-presentation discussion wording for the summary/transcript
+content they present; this is not a repo-wide Staff discussion rename. Other
+recorded staff-discussion labels and runtime surfaces remain pending separate
+scope. The email-copy slice merged through PR #583 as
 `3c4c6ee0b` (source/Git only; no deployment claim). It updates source defaults
 for packet sharing, agenda, and presentation-material invitation/reminder copy
 plus Admin metadata, preview labels, and the application-owned materials upload
 CTA. Existing stored Admin and personal settings, already-prepared email
 content, and generated documents were not changed; deployed setting values were
-not inspected and no backfill is included. As of 2026-11-01, a separate
-applicant-materials display-copy slice is in progress on branch
-`codex/presentation-materials-terminology`: the upload page title and support
-email subject, plus the Staff Deliberations materials-card heading, use
-Presentation materials. This is display-only; upload behavior, settings, IDs,
-routes, tokens, and API contracts are unchanged. Check Git/PR and release
-receipts for current status; no deployment is inferred. Preserve routes,
-API/service and prompt identifiers, schema/storage values, artifact types, deep
-links, saved settings, and existing user-authored content.
+not inspected and no backfill is included. The applicant-materials display-copy
+slice merged through PR #590 as `4f665c6a9` (source/Git only; no deployment
+claim): the upload-page title and support-email subject, plus the Staff
+Deliberations materials-card heading, use Presentation materials. As of
+2026-11-01, a separate recording/transcript display-copy slice is in progress on
+`codex/recording-discussion-terminology`. It uses **Recording and transcripts**
+and **Post-presentation discussion** in the scoped Recording and transcripts
+card, Preparation panel, Site Visit editor, and Research Presentation follow-up;
+the scheduled presentation-end label in Staff Deliberations is clarified
+separately. The scheduled event end is a calendar value; the presentation end
+in the recording is the transcript position marking the last presentation turn.
+This wording clarifies the two meanings without changing either timestamp,
+transcript processing, upload behavior, settings, IDs, routes, tokens, or API
+contracts. Check Git/PR and release receipts for current status; no deployment is
+inferred. Preserve routes, API/service and prompt identifiers, schema/storage
+values, artifact types, deep links, saved settings, and existing user-authored
+content.
 
 ### Historical source inventory — October 6–7, 2026
 
@@ -208,7 +216,7 @@ anchors `#deliberations-status|briefing|writeup`; SharePoint file names such as
 "… Site Visit Presentation.pdf". Treat these as LEAVE+DOCUMENT unless the group
 explicitly chooses a migration.
 
-- **status:** canonical (approved display vocabulary); runtime adoption partial; Workbench slice merged in PR #577, Meeting Tracker slice merged in PR #580, Board-reader slice merged in PR #581, and email source-copy slice merged in PR #583 (source/Git evidence only; no deployment claim); applicant-materials display-copy slice on `codex/presentation-materials-terminology` as of 2026-11-01 (check Git/PR and release receipts for current status)
+- **status:** canonical (approved display vocabulary); runtime adoption partial; see the current implementation boundary above for the scoped slices and evidence limits
 - **ownerAppKey:** `reviewers` (Workbench), `meeting-tracker`
 - **migrationDecision:** Apply approved display copy within separately scoped UI work; LEAVE+DOCUMENT internal identifiers and existing persisted/user-authored values.
 - **lastVerified:** 2026-11-01 via owner-approved terminology and scoped implementation records

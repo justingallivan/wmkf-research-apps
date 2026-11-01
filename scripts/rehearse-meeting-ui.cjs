@@ -345,7 +345,7 @@ let writes = [],
       height: 844
     });
     await shot('workspace-setup-narrow');
-    for (const [tab, label] of [['invitations', 'Invitations'], ['materials', 'Materials collection'], ['recordings', 'Transcript preparation']]) {
+    for (const [tab, label] of [['invitations', 'Invitations'], ['materials', 'Materials collection'], ['recordings', 'Recording and transcripts']]) {
       await page.getByRole('tab', {
         name: new RegExp(label)
       }).click();
@@ -406,7 +406,7 @@ let writes = [],
     await page.setViewportSize({width:390,height:844});
     readyTranscript = true;
     await page.goto(`http://localhost:3197/meeting-tracker/visits/${id}?n=123456&cycleCode=D26&programId=research#recording-and-transcript-card`);
-    await page.getByRole('tab', {name:/Transcript preparation/}).waitFor();
+    await page.getByRole('tab', {name:/Recording and transcripts/}).waitFor();
     await page.getByLabel('Name for Speaker A').waitFor();
     await page.waitForFunction(() => document.querySelector('[data-testid="card-refresh"]')?.disabled === false);
     await shot('workspace-transcript-review-narrow');

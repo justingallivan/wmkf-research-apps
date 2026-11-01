@@ -91,26 +91,33 @@ sequence.
   Presentation materials. This Board slice does not include
   the applicant upload page, emails, generated documents, historic filenames,
   tokens/routes, or API payload changes. The two Meeting Tracker summary views
-  also use approved post-presentation discussion
-  wording for the discussion summary/transcript they present; this does not rename
-  recording labels or every existing Staff discussion label. Remaining recorded
-  staff-discussion labels await separate full-migration scope. Preserve routes,
-  API/service names, schema/storage values, artifact types, prompt identifiers,
-  deep links, and saved settings. The email-copy slice merged through PR #583
+  use approved post-presentation discussion wording for the discussion
+  summary/transcript they present. The applicant-materials display-copy slice
+  merged through PR #590 as `4f665c6a9` in source/Git (no deployment claim):
+  upload-page title/support-email subject and the Staff Deliberations materials-
+  card heading use Presentation materials. As of 2026-11-01, a separate
+  recording/transcript display-copy slice is in progress on
+  `codex/recording-discussion-terminology`, using Recording and transcripts and
+  Post-presentation discussion in the scoped Recording and transcripts card,
+  Preparation panel, Site Visit editor, and Research Presentation follow-up,
+  and clarifying the scheduled presentation end versus the selected last
+  presentation turn in the recording. This does not rename every existing
+  Staff discussion label. The email-copy slice merged through PR #583
   as `3c4c6ee0b` in source/Git (no deployment claim). It updates source defaults for packet-
   sharing, agenda, and presentation-material invitation/reminder emails, plus
   Admin metadata, preview labels, and the application-owned materials upload
-  CTA. Existing stored Admin/personal settings,
-  already-prepared email content, and generated documents remain unchanged;
-  deployed settings were not inspected and no backfill is included. No suite-wide
-  technical migration is authorized. Remaining runtime surfaces await
-  separate scope. As of 2026-11-01, a separate applicant-materials display-copy
-  slice is in progress on branch `codex/presentation-materials-terminology`:
-  upload-page title/support-email subject and Staff Deliberations materials-card
-  heading → Presentation materials. It changes visible copy only; upload
-  behavior, settings, IDs, routes, tokens, and API contracts are unchanged.
-  Check Git/PR and release receipts for current status; no deployment is
-  inferred. Approved names, contracts, and dated historical inventory:
+  CTA. No suite-wide technical migration is authorized. Remaining runtime
+  surfaces await separate scope. Preservation boundary: existing stored
+  Admin/personal settings, prepared email content, generated documents, and
+  user-authored content remain unchanged; deployed settings were not inspected
+  and no backfill is included. These copy
+  slices do not change routes, API/service or prompt identifiers, schema/storage
+  values, artifact types, deep links, settings, tokens, or IDs. The recording
+  boundary clarifies that the scheduled event end is a calendar value and the
+  selected last presentation turn is a recording position; timestamp values and
+  transcript processing remain unchanged. Check Git/PR and release receipts for
+  deployment status; none is inferred. Approved
+  names, contracts, and dated historical inventory:
   `docs/NOMENCLATURE_GLOSSARY.md` → "Deliberations workflow vocabulary"; decision
   evidence: `docs/plans/review/PROPOSAL_WORKFLOW_VOCABULARY_2026-10-19.md`.
 
