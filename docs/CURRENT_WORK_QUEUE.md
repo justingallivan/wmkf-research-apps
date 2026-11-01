@@ -74,65 +74,18 @@ sequence.
   correction does not establish live delivery. Requirements and remaining follow-ups:
   `docs/plans/PERSONAL_EMAIL_DEFAULTS_TODO_2026-09-20.md`.
 
-- **Deliberations display vocabulary — approved 2026-10-21; bounded copy slices.**
-  The approved terminology table and glossary settle the names; Staff Deliberations
-  remains the Workbench request tab. The Workbench copy slice merged in PR #577 as
-  `e7cd37982` (Git/source evidence only; this does not establish deployment). As
-  of 2026-10-31, the Meeting Tracker four-term UI-copy slice is on branch
-  `codex/meeting-tracker-terminology`: Site Visit → Research presentation;
-  Deliberation session → Proposal discussion session; Program briefing →
-  Discussion summaries; Discussion Sentiment → Post-presentation discussion
-  sentiment. PR #580 merged that Meeting Tracker slice as `30bc81e77` in
-  source/Git; this does not establish deployment. The Board-reader display-copy
-  slice merged through PR #581 as `8c0859a6f` in source/Git (no deployment claim).
-  It covers `pages/external/briefing/[token].js` and
-  `pages/external/presentation/[token].js`: Proposal review packet, Proposal
-  discussion brief, Proposal discussion session, Research presentation, and
-  Presentation materials. This Board slice does not include
-  the applicant upload page, emails, generated documents, historic filenames,
-  tokens/routes, or API payload changes. The two Meeting Tracker summary views
-  use approved post-presentation discussion wording for the discussion
-  summary/transcript they present. The applicant-materials display-copy slice
-  merged through PR #590 as `4f665c6a9` in source/Git (no deployment claim):
-  upload-page title/support-email subject and the Staff Deliberations materials-
-  card heading use Presentation materials. As of 2026-11-01, a separate
-  recording/transcript display-copy slice merged through PR #591 as
-  `3cf543f82` in source/Git (no deployment claim): Recording and transcripts /
-  Post-presentation discussion in the scoped Recording and transcripts card,
-  Preparation panel, Site Visit editor, and Research Presentation follow-up,
-  with the scheduled presentation end clarified versus the selected last
-  presentation turn in the recording. This does not rename every existing
-  Staff discussion label. As of 2026-11-01, a separate Admin/app-navigation
-  terminology slice is in progress on `codex/dossier-admin-terminology`:
-  Scientific dossier replaces Cycle Dossier in the app, navigation, page, and
-  Admin timeout labels; Admin Site Visits becomes Research presentations, with
-  related recipient/material settings and default-attendee copy now describe
-  proposal discussion sessions. Admin prompt-catalog display titles,
-  descriptions, and `usedBy` labels use Scientific dossier, Presentation
-  summary, Post-presentation discussion, **Draft writeup proposal narrative
-  sections**, and **Workbench → Draft writeup generation**; prompt keys,
-  generation/input contracts, and bodies are unchanged. This copy-only slice adds no runtime
-  behavior and preserves key `cycle-dossier`, routes, the persisted audit reason
-  `Stopped by the Cycle Dossier operator.`, settings keys, and user-authored
-  content. The
-  email-copy slice merged through PR #583
-  as `3c4c6ee0b` in source/Git (no deployment claim). It updates source defaults for packet-
-  sharing, agenda, and presentation-material invitation/reminder emails, plus
-  Admin metadata, preview labels, and the application-owned materials upload
-  CTA. No suite-wide technical migration is authorized. Remaining runtime
-  surfaces await separate scope. Preservation boundary: existing stored
-  Admin/personal settings, prepared email content, generated documents, and
-  user-authored content remain unchanged; deployed settings were not inspected
-  and no backfill is included. These copy
-  slices do not change routes, API/service or prompt identifiers, schema/storage
-  values, artifact types, deep links, settings, tokens, or IDs. The recording
-  boundary clarifies that the scheduled event end is a calendar value and the
-  selected last presentation turn is a recording position; timestamp values and
-  transcript processing remain unchanged. Check Git/PR and release receipts for
-  deployment status; none is inferred. Approved
-  names, contracts, and dated historical inventory:
-  `docs/NOMENCLATURE_GLOSSARY.md` → "Deliberations workflow vocabulary"; decision
-  evidence: `docs/plans/review/PROPOSAL_WORKFLOW_VOCABULARY_2026-10-19.md`.
+- **Deliberations display vocabulary — approved 2026-10-21; adoption partial.**
+  PRs #577, #580, #581, #583, #590, #591 and #592 merged bounded Workbench,
+  Meeting Tracker, Board-reader, email, applicant-materials, recording/transcript,
+  and Admin/app-navigation copy slices. PR #592 (`e08006db0`) is the current
+  source/Git baseline; no deployment is inferred. Remaining reader/helper,
+  generated-document, and saved-name/error copy findings are scoped in
+  `docs/audits/terminology-completion-audit-2026-11-01.md`; live saved values,
+  published prompts, and deployment state remain unknown. Preserve identifiers,
+  routes, schemas, existing user content, and historical files; no data or
+  prompt migration/backfill is authorized. Approved table and dated history:
+  `docs/plans/review/PROPOSAL_WORKFLOW_VOCABULARY_2026-10-19.md`; glossary:
+  `docs/NOMENCLATURE_GLOSSARY.md`.
 
 - **Staff Deliberations: group-review handoff from the writeup step
   (2026-10-06).** [STAGE 1 LIVE — PR #452, merge `40b70a145`, Production 2026-10-06]

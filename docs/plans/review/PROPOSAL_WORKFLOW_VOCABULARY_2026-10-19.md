@@ -3,7 +3,7 @@ title: Proposal Workflow Vocabulary — Approved Names
 domain: product
 kind: plan
 status: active
-summary: Owner-approved vocabulary following colleague review on 2026-10-21; deck and design mockups updated, runtime wording migration pending.
+summary: Owner-approved vocabulary following colleague review on 2026-10-21; deck and design mockups updated, bounded source-copy adoption is partial.
 canonical: false
 owner: product-engineering
 related:
@@ -13,7 +13,7 @@ related:
 
 # Proposal workflow vocabulary: approved names
 
-**Status:** [VERIFIED via owner decision, 2026-10-21] Colleague review is complete. All proposed names are approved, with **Draft writeup** replacing **Post-presentation writeup**. The owner authorized updating the deck and mockups; runtime application changes remain separately scoped. Staff Deliberations remains the Workbench request tab name.
+**Status:** [VERIFIED via owner decision, 2026-10-21] Colleague review is complete. All proposed names are approved, with **Draft writeup** replacing **Post-presentation writeup**. Staff Deliberations remains the Workbench request tab name. Bounded display-copy slices through PR #592 (`e08006db0`) are merged in source/Git; deployment is not inferred. The [2026-11-01 terminology completion audit](../../audits/terminology-completion-audit-2026-11-01.md) records remaining source work and evidence limits. Existing routes, identifiers, persisted user content and historical files remain outside these copy slices.
 
 [Approved terminology presentation](PROPOSAL_WORKFLOW_VOCABULARY_2026-10-19.pptx)
 
@@ -40,4 +40,4 @@ The owner's edited deck retains its layout and before/after examples. The approv
 
 The proposal discussion session covers multiple proposals and their reviews, gathers initial sentiments, and prepares questions for applicants before their research presentations. The proposal discussion brief is the authored document; the proposal review packet is the shared page containing the brief and supporting materials. Discussion summaries collect individual proposal and post-presentation discussion summaries, grouped by SE and MR.
 
-No route, storage, API, or internal identifier migration is specified here. Terminology is approved; runtime copy changes remain pending.
+No route, storage, API, or internal identifier migration is specified here. The approved names remain the target; runtime adoption is partial. Current source/Git status and remaining bounded slices are recorded in the linked 2026-11-01 audit. Live saved settings, prompts, deployment state, and generated-file inventory were not verified by that source-only audit.

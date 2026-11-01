@@ -89,7 +89,7 @@ related:
 
 | File | Kind | Status | Canonical | Summary | Cataloged |
 |---|---|---|---|---|---|
-| [CYCLE_DOSSIER_PILOT_DESIGN.md](CYCLE_DOSSIER_PILOT_DESIGN.md) | plan | active | yes | D26 private Cycle Dossier pilot design and branch-local implementation status. | 2026-09-07 |
+| [CYCLE_DOSSIER_PILOT_DESIGN.md](CYCLE_DOSSIER_PILOT_DESIGN.md) | plan | active | yes | D26 private scientific dossier pilot design and dated implementation status. | 2026-09-07 |
 
 ## data-layer
 
