@@ -3,7 +3,7 @@ title: Reviewer invitation build — materials on acceptance, calendar due date,
 domain: reviewers
 kind: plan
 status: in-progress
-summary: "PARTIAL / follow-ups remain. PR #551 review filing, PR #552 calendar due date and linked-cycle config, PR #561 Board setup calendar read, and PR #562 materials-on-acceptance implementation are merged and Production-deployed. PR #586 (2026-11-01) retires the invitation's proposal-release promise, the invite-dialog field and `{{proposalDelivery}}`; the live-text rebaseline and per-PD override check await owner OK, and Reviewer Finder cycle-record date retirement remains, as do the removed-candidate terminal-history decision, first-link due-date write gap, and first J27 acceptance observation. Release receipts are owner-recorded in DEVELOPMENT_LOG.md; no fresh live probe is claimed here."
+summary: "PARTIAL / follow-ups remain. PR #551 review filing, PR #552 calendar due date and linked-cycle config, PR #561 Board setup calendar read, and PR #562 materials-on-acceptance implementation are merged and Production-deployed. PR #586 and hotfix #587 (2026-11-01, Production-deployed) retire the invitation's proposal-release promise, the invite-dialog field and `{{proposalDelivery}}`; the live invitation body and the one PD override carrying the token were line-edited the same day (owner-approved). Reviewer Finder cycle-record date retirement remains, as do the removed-candidate terminal-history decision, first-link due-date write gap, and first J27 acceptance observation. Release receipts are owner-recorded in DEVELOPMENT_LOG.md; no fresh live probe is claimed here."
 canonical: false
 owner: product-engineering
 related:
@@ -28,12 +28,17 @@ Production probe was made for this update.
 
 Remaining work within this plan:
 
-- Invitation wording and `{{proposalDelivery}}`: PR #586 (2026-11-01) changes
-  the seed wording (owner-approved), removes the invite-dialog and admin
-  proposal-release date, and blanks the token so legacy wording drops its line.
-  Still owner-gated: a read-only Production check for per-PD overrides that
-  still carry the token, then the `--force-keys` rebaseline of
-  `email.reviewer_invitation.body`.
+- Invitation wording and `{{proposalDelivery}}`: **done 2026-11-01.** PR #586
+  (`f949a5cf`) changes the seed wording (owner-approved), removes the
+  invite-dialog and admin proposal-release date, and removes the token only on
+  recognized standalone release lines (any other line keeps it and blocks
+  Send). Hotfix #587 (`745ec4fb`) added the live default's sentence to that
+  set after it blocked Send. Owner-approved Production edits the same day: the
+  live `email.reviewer_invitation.body` (a custom 2026-07-25 wording, so not
+  force-rebaselined) had only its release sentence replaced, and Jean Kim's
+  saved invitation got the same one-line edit; a read-only check found no other
+  saved invitation carrying the token. The seed and live wording now differ by
+  design.
 - Retirement of the Reviewer Finder cycle-record date fields (§3.5) remains a
   separate PR.
 - Resolve the removed-candidate terminal-history question and the first-link
@@ -559,9 +564,8 @@ with the markers written only after confirmed delivery. Accepted.
    **Decided (D48).**
 5. Acceptance email wording: owner-approved and seeded as
    `email.reviewer_materials_acceptance.{subject,body}` before PR #562's merge.
-   Invitation wording: owner-approved 2026-11-01 and changed in the seed by
-   PR #586; the live text changes only on the owner-approved `--force-keys`
-   rebaseline.
+   Invitation wording: owner-approved 2026-11-01; changed in the seed by
+   PR #586 and, by a one-sentence edit, in the live setting the same day.
 
 ## 7. Build order and tests
 
