@@ -190,6 +190,13 @@ describe('ReviewerInvitePanel invitation capture rehearsal', () => {
     await screen.findByDisplayValue('Invitation');
     expect(await screen.findByText(/on the same line as other details/i)).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /send 1 invitation/i })).toBeDisabled();
+    // The line stays visible with its token; an unrelated edit does not lift the block.
+    const bodyBox = screen.getByDisplayValue(/proposals around \{\{proposalDelivery\}\}/i);
+    fireEvent.change(bodyBox, { target: { value: `Dear Dr. Test,\n${bodyBox.value}` } });
+    expect(screen.getByRole('button', { name: /send 1 invitation/i })).toBeDisabled();
+    // Removing the token clears it.
+    fireEvent.change(screen.getByDisplayValue(/Dear Dr\. Test/), { target: { value: 'Respond here: https://reviews.wmkeck.org/external/review/token.value' } });
+    expect(screen.getByRole('button', { name: /send 1 invitation/i })).toBeEnabled();
     expect(global.fetch.mock.calls.some(([url]) => url === '/api/review-manager/send-emails')).toBe(false);
   });
 

@@ -121,13 +121,12 @@ function timingSummary(timing) {
 // The retired token can share a line with content applyTiming must not drop.
 // render-emails has already filled the link and server dates, so a line is
 // only removed automatically when, apart from a list marker, it holds no other
-// token, link or number (a date). Otherwise the PD edits the wording first.
-export function hasMixedLegacyReleaseLine(body) {
-  return String(body || '').split('\n').some((line) => {
-    if (!line.includes('{{proposalDelivery}}')) return false;
-    const rest = line.split('{{proposalDelivery}}').join('').replace(/^\s*(?:[-*•]|\d+[.)])\s*/, '');
-    return /\{\{|https?:\/\/|\d/.test(rest);
-  });
+// token, link or number (a date). A mixed line is kept with the literal token
+// visible in the preview, and Send stays blocked until the PD removes it.
+export function isMixedLegacyReleaseLine(line) {
+  if (!String(line || '').includes('{{proposalDelivery}}')) return false;
+  const rest = line.split('{{proposalDelivery}}').join('').replace(/^\s*(?:[-*•]|\d+[.)])\s*/, '');
+  return /\{\{|https?:\/\/|\d/.test(rest);
 }
 
 export function applyTiming(body, timing) {
@@ -139,8 +138,10 @@ export function applyTiming(body, timing) {
     if (!anySet && /^\s*Review timeline:\s*$/.test(line)) continue;
     let drop = false;
     let next = line;
+    const keepLegacyToken = isMixedLegacyReleaseLine(line);
     for (const [token, value] of Object.entries(values)) {
       if (line.includes(token)) {
+        if (token === '{{proposalDelivery}}' && keepLegacyToken) continue;
         if (!value) { drop = true; break; }
         next = next.split(token).join(value);
       }
@@ -201,7 +202,7 @@ export function applySubjectTiming(subject, timing) {
 // never strand a durable write.
 export const PREVIEW_RENDER_TIMEOUT_MS = 45000;
 
-export const LEGACY_RELEASE_BLOCK_MESSAGE = 'Your saved wording has the proposal release date on the same line as other details, so it can’t be removed automatically. Edit your default wording, or this email, to take out the release date before sending.';
+export const LEGACY_RELEASE_BLOCK_MESSAGE = 'Your saved wording has the proposal release date on the same line as other details, so it can’t be removed automatically. Edit your default wording, or this email, to take out {{proposalDelivery}} before sending.';
 
 export default function InviteEmailModal({ requestId = null, candidates = [], settings = {}, allowResend = false, vipUnknown = false, onClose, onSent }) {
   const [step, setStep] = useState('preview'); // preview | sending | sent | error
@@ -440,9 +441,8 @@ export default function InviteEmailModal({ requestId = null, candidates = [], se
     body: edits[d.suggestionId]?.body ?? (d.skipped ? d.body : applyTiming(d.body, timing)),
   });
   const drafts = rawDrafts.map(draftView);
-  const legacyReleaseBlocked = rawDrafts.some((d) => !d.skipped
-    && edits[d.suggestionId]?.body == null
-    && hasMixedLegacyReleaseLine(d.body));
+  // Checks the body that would be sent, edited or not.
+  const legacyReleaseBlocked = drafts.some((d) => !d.skipped && String(d.body || '').includes('{{proposalDelivery}}'));
 
   // A draft renders as a FULL card when anything requires human eyes on it:
   // the person is VIP-flagged, the server skipped it (remediation UI), it
