@@ -36,6 +36,6 @@ release verification.
 - [Session chronology memory](../../.claude-memory/project-deliberation-session-precedes-site-visit.md)
 
 PR #581 (`8c0859a6f`) records the Board-reader terminology slice merged in
-source/Git only; it is separate from this email-copy work. As of 2026-11-01, the
-email terminology source changes are on `codex/email-template-terminology`.
-Check Git/PR and release receipts for subsequent merge or deployment status.
+source/Git only; it is separate from this email-copy work. The email terminology
+source changes merged through PR #583 as `3c4c6ee0b` (source/Git only; no
+deployment claim). Check release receipts for deployment status.

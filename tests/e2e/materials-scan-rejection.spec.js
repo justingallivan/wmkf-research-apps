@@ -112,7 +112,7 @@ async function installFailClosedRoutes(context, baseURL, {
 
 async function openPage(page, baseURL) {
   await page.goto(`${baseURL}/external/materials/${TOKEN}`);
-  await expect(page.getByRole('heading', { name: /Site visit materials/i })).toBeVisible();
+  await expect(page.getByRole('heading', { name: /Presentation materials/i })).toBeVisible();
 }
 
 test.describe('applicant materials scan rejection', () => {

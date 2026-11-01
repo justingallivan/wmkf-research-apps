@@ -575,9 +575,9 @@ brief**, **Proposal discussion session**, **Research presentation**, and
 **Presentation materials**. The briefing reader uses **Research presentation**
 and **Presentation materials**; institution/proposal metadata and historic
 filenames remain unchanged. The page rename does not change its routes, token,
-service, authentication, or payload contracts. As of 2026-10-31, this source
-copy is on branch `codex/board-page-terminology`; check Git/PR for current
-release status. This note makes no deployment claim.
+service, authentication, or payload contracts. The source-copy slice merged
+through PR #581 as `8c0859a6f` (Git/source evidence only); check release receipts
+for deployment status. This note makes no deployment claim.
 
 `pages/external/briefing/[token].js` + `/api/external/briefing/[token]/{context,document}`
 serve a read-only per-request page (the shared Pre-Research Presentation Brief snapshot — the Pre-Site writeup before Pre-RP Brief slice 4, **[PRESENT on `main` at `bfa65bc4d`; this source check does not establish current deployment/configuration]** — plus a date-only "staff acknowledged newer inputs" notice when the send carried a drift acknowledgement; every received review with

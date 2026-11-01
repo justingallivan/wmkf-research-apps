@@ -1,5 +1,5 @@
 /**
- * Research Presentation Materials — read-only card on the Staff
+ * Presentation materials — read-only card on the Staff
  * Deliberations tab (docs/APPLICANT_ADDITIONAL_MATERIALS_PLAN.md §16.13).
  *
  * Status comes from data the tab already holds: active logistics context, the
@@ -132,7 +132,7 @@ export default function ResearchPresentationMaterialsCard({ requestId, siteVisit
     <Card hover={false}>
       <section aria-labelledby="research-presentation-materials-title" data-testid="research-presentation-materials">
         <h3 id="research-presentation-materials-title" className="text-base font-semibold text-gray-900">
-          Research Presentation Materials
+          Presentation materials
         </h3>
         <p className={`mt-1 text-sm ${status ? TONE_CLASS[status.tone] : 'text-gray-600'}`} aria-live="polite">
           {status ? status.text : 'Checking the presentation schedule…'}

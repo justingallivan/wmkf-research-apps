@@ -604,8 +604,8 @@ export default function MaterialsContributorPage() {
     };
   }, [hasActiveUploadJobs, load, token]);
 
-  if (state.status === 'loading' || (state.status === 'ok' && state.token !== token)) return <Shell title="Site visit materials"><p className="mt-4 text-gray-600">Loading…</p></Shell>;
-  if (state.status === 'error') return <Shell title="Site visit materials"><p className="mt-4 text-gray-800">{REASON_MESSAGE[state.reason] || 'This link cannot be opened.'}</p></Shell>;
+  if (state.status === 'loading' || (state.status === 'ok' && state.token !== token)) return <Shell title="Presentation materials"><p className="mt-4 text-gray-600">Loading…</p></Shell>;
+  if (state.status === 'error') return <Shell title="Presentation materials"><p className="mt-4 text-gray-800">{REASON_MESSAGE[state.reason] || 'This link cannot be opened.'}</p></Shell>;
 
   const { data } = state;
   const refreshContext = async (acceptedJob = null) => {
@@ -627,7 +627,7 @@ export default function MaterialsContributorPage() {
     item.received && !jobs.some((job) => job.slot === item.key && BLOCKING_UPLOAD_STATUSES.has(job.status))
   ));
   return (
-    <Shell title={data.institution ? `Site visit materials · ${data.institution}` : 'Site visit materials'}>
+    <Shell title={data.institution ? `Presentation materials · ${data.institution}` : 'Presentation materials'}>
       {data.proposalTitle && <p className="mt-1 text-lg text-gray-700">{data.proposalTitle}</p>}
       <section className="mt-6 rounded-xl border border-gray-200 bg-white p-5 text-sm text-gray-800">
         {data.closed ? (
@@ -657,7 +657,7 @@ export default function MaterialsContributorPage() {
       )}
       {data.supportEmail && (
         <p className="mt-6 text-sm text-gray-600">
-          Need help? Email <a className="text-blue-800 underline" href={`mailto:${data.supportEmail}?subject=${encodeURIComponent(`Site visit materials — ${data.proposalTitle || data.institution || ''}`)}`}>{data.supportEmail}</a>.
+          Need help? Email <a className="text-blue-800 underline" href={`mailto:${data.supportEmail}?subject=${encodeURIComponent(`Presentation materials — ${data.proposalTitle || data.institution || ''}`)}`}>{data.supportEmail}</a>.
         </p>
       )}
     </Shell>
