@@ -188,7 +188,7 @@ describe('ReviewerInvitePanel invitation capture rehearsal', () => {
     fireEvent.click(screen.getByLabelText('Select Dr. Test Reviewer'));
     fireEvent.click(screen.getByRole('button', { name: /send invitation \(1\)/i }));
     await screen.findByDisplayValue('Invitation');
-    expect(await screen.findByText(/on the same line as other details/i)).toBeInTheDocument();
+    expect(await screen.findByText(/can’t be removed automatically/i)).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /send 1 invitation/i })).toBeDisabled();
     // The line stays visible with its token; an unrelated edit does not lift the block.
     const bodyBox = screen.getByDisplayValue(/proposals around \{\{proposalDelivery\}\}/i);

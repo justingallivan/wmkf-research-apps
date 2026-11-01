@@ -118,15 +118,17 @@ function timingSummary(timing) {
 // Substitute the timing tokens with formatted dates. A line whose token has no
 // value is dropped entirely (so the bullet doesn't appear with a blank/leftover
 // token). The "Review timeline:" header is dropped when nothing is set at all.
-// The retired token can share a line with content applyTiming must not drop.
-// render-emails has already filled the link and server dates, so a line is
-// only removed automatically when, apart from a list marker, it holds no other
-// token, link or number (a date). A mixed line is kept with the literal token
-// visible in the preview, and Send stays blocked until the PD removes it.
+// The retired token is removed automatically only on a recognized standalone
+// release line (the old seed's "We send the full proposal — around …", or
+// "Proposal(s) delivered/sent/released … on …"). Any other line carrying it is
+// kept with the literal token visible, and Send stays blocked until the PD
+// edits it, so custom wording never silently loses a link or deadline.
+const RETIRED_RELEASE_LINE = /^(?:we (?:will )?send (?:you )?the full proposal|proposals?(?: (?:will be )?(?:delivered|sent|released)(?: to (?:you|reviewers))?)?)\s*(?:[—–-]\s*)?(?:around|on|by)?\s*[.:]?\s*$/i;
+
 export function isMixedLegacyReleaseLine(line) {
   if (!String(line || '').includes('{{proposalDelivery}}')) return false;
-  const rest = line.split('{{proposalDelivery}}').join('').replace(/^\s*(?:[-*•]|\d+[.)])\s*/, '');
-  return /\{\{|https?:\/\/|\d/.test(rest);
+  const rest = line.split('{{proposalDelivery}}').join('').replace(/^\s*(?:[-*•]|\d+[.)])\s*/, '').trim();
+  return !RETIRED_RELEASE_LINE.test(rest);
 }
 
 export function applyTiming(body, timing) {
@@ -204,7 +206,7 @@ export function applySubjectTiming(subject, timing) {
 // never strand a durable write.
 export const PREVIEW_RENDER_TIMEOUT_MS = 45000;
 
-export const LEGACY_RELEASE_BLOCK_MESSAGE = 'Your saved wording has the proposal release date on the same line as other details, so it can’t be removed automatically. Edit your default wording, or this email, to take out {{proposalDelivery}} before sending.';
+export const LEGACY_RELEASE_BLOCK_MESSAGE = 'Your saved wording mentions the proposal release date in a way that can’t be removed automatically. Edit your default wording, or this email, to take out {{proposalDelivery}} before sending.';
 
 export default function InviteEmailModal({ requestId = null, candidates = [], settings = {}, allowResend = false, vipUnknown = false, onClose, onSent }) {
   const [step, setStep] = useState('preview'); // preview | sending | sent | error

@@ -95,6 +95,19 @@ describe('InviteEmailModal invitation timing contract', () => {
     expect(isMixedLegacyReleaseLine('Proposals around {{proposalDelivery}}; reviews due March 10, 2027.')).toBe(true);
   });
 
+  test('only recognized standalone release lines are removed automatically', () => {
+    for (const line of [
+      '2. We send the full proposal — around {{proposalDelivery}}',
+      '- Proposal delivered on {{proposalDelivery}}',
+      'Proposals released to reviewers: {{proposalDelivery}}',
+      'We will send you the full proposal by {{proposalDelivery}}.',
+    ]) expect(isMixedLegacyReleaseLine(line)).toBe(false);
+    // Prose deadline with no digits, link or token: kept and blocked.
+    expect(isMixedLegacyReleaseLine('Proposals {{proposalDelivery}}; please return your review by next Friday.')).toBe(true);
+    expect(applyTiming('Proposals {{proposalDelivery}}; please return your review by next Friday.\nhttps://reviews.wmkeck.org/x', { respondOffsetDays: 7 }))
+      .toContain('please return your review by next Friday.');
+  });
+
   test('keeps a mixed legacy line intact, token visible, instead of dropping its deadline', () => {
     const out = applyTiming('Proposals around {{proposalDelivery}}; reviews due March 10, 2027.', { respondOffsetDays: 7 });
     expect(out).toBe('Proposals around {{proposalDelivery}}; reviews due March 10, 2027.');
