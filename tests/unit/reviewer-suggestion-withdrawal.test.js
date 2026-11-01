@@ -137,6 +137,43 @@ describe('reviewer withdrawal changeset', () => {
     expect(operations.some((op) => op.method === 'DELETE')).toBe(false);
   });
 
+  it('records the staff dialog reason and who ended it', async () => {
+    await applyStaffReviewerWithdrawal(SUGGESTION_ID, {
+      ifMatch: 'W/"19"',
+      actingUserSystemId: 'staff-1',
+      cancelHonorarium: { id: HONORARIUM_ID, ifMatch: 'W/"4"' },
+      reasonPicklist: 'conflict-of-interest',
+      reasonText: 'Co-author on the PI paper',
+      endedBy: 'foundation',
+    });
+    const [[operation]] = runChangeset.mock.calls[0];
+    expect(operation.body).toMatchObject({
+      wmkf_declinereasonpicklist: 100000001, // Conflict of interest
+      wmkf_declinereason: 'Co-author on the PI paper',
+      wmkf_reviewstatus: REVIEW_STATUS_MAP.withdrew,
+      wmkf_endedby: 100000002, // Foundation
+    });
+  });
+
+  it('keeps the pre-dialog reason and ended-by by default', async () => {
+    await applyStaffReviewerWithdrawal(SUGGESTION_ID, {
+      ifMatch: 'W/"19"',
+      actingUserSystemId: 'staff-1',
+      cancelHonorarium: { id: HONORARIUM_ID, ifMatch: 'W/"4"' },
+    });
+    const [[operation]] = runChangeset.mock.calls[0];
+    expect(operation.body).toMatchObject({
+      wmkf_declinereasonpicklist: 100000004, // Other
+      wmkf_declinereason: 'Program Director recorded that the reviewer could not complete the assignment.',
+      wmkf_endedby: 100000001, // Reviewer after accepting
+    });
+  });
+
+  it.each(['reviewer_before_accepting', 'nobody'])('refuses ended-by %s before writing', async (endedBy) => {
+    await expect(applyStaffReviewerWithdrawal(SUGGESTION_ID, { ifMatch: 'W/"19"', endedBy })).rejects.toThrow(/endedBy/);
+    expect(runChangeset).not.toHaveBeenCalled();
+  });
+
   it.each(['applyStaffReviewerWithdrawal', 'applyStaffReviewerDidNotSubmit'])(
     '%s refuses the old delete instruction instead of silently ignoring it',
     async (fn) => {

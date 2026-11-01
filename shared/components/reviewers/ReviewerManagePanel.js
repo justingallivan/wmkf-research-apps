@@ -33,6 +33,7 @@ import ReviewerDueDateEditor from './ReviewerDueDateEditor';
 import ReviewerActivityDrawer from './ReviewerActivityDrawer';
 import ReviewerCloseoutModal from './ReviewerCloseoutModal';
 import AcceptedReviewerReleaseModal from './AcceptedReviewerReleaseModal';
+import StaffWithdrawalModal from './StaffWithdrawalModal';
 import { reviewerDocumentIsPending } from './reviewer-document-state';
 import { latestActivitySummary } from './reviewer-activity-history';
 import { acceptedReviewerRemoveWarning } from './remove-reviewer-confirm';
@@ -364,6 +365,8 @@ export default function ReviewerManagePanel({
   const [activityDrawerId, setActivityDrawerId] = useState(null); // suggestionId
   const [closeoutReviewerId, setCloseoutReviewerId] = useState(null); // suggestionId
   const [acceptedReleaseReviewerId, setAcceptedReleaseReviewerId] = useState(null);
+  // Track Reviewers "Record reviewer withdrawal" dialog (outcomes slice 3b-3).
+  const [withdrawalReviewerId, setWithdrawalReviewerId] = useState(null);
   // Stage 6B3: the one-use completion-cause the ReleaseMaterialsModal hands
   // back after a send finishes, so its own session effect can recognize the
   // selection-clear THIS attempt caused (and not reset the summary it just
@@ -502,6 +505,9 @@ export default function ReviewerManagePanel({
     : null;
   const closeoutReviewer = closeoutReviewerId
     ? reviewers.find(r => r.suggestionId === closeoutReviewerId) || null
+    : null;
+  const withdrawalReviewer = withdrawalReviewerId
+    ? reviewers.find(r => r.suggestionId === withdrawalReviewerId) || null
     : null;
   const acceptedReleaseReviewer = acceptedReleaseReviewerId
     ? reviewers.find(r => r.suggestionId === acceptedReleaseReviewerId) || null
@@ -842,14 +848,20 @@ export default function ReviewerManagePanel({
     }
   };
 
-  const transitionTerminal = async (reviewer, terminalStatus) => {
+  const transitionTerminal = async (reviewer, terminalStatus, withdrawal) => {
     if (terminalStatus === 'released') {
       if (!canStartAction(reviewer.suggestionId)) return;
       setAcceptedReleaseReviewerId(reviewer.suggestionId);
       return;
     }
+    // A withdrawal first collects why it is ending; the dialog calls back here
+    // with its choice, which replaces the confirm() below.
+    if (terminalStatus === 'withdrew' && withdrawal === undefined) {
+      if (!canStartAction(reviewer.suggestionId)) return;
+      setWithdrawalReviewerId(reviewer.suggestionId);
+      return;
+    }
     const outcome = {
-      withdrew: 'withdrew after accepting',
       did_not_submit: 'did not submit a review',
     }[terminalStatus] || 'was released by WMKF';
     const consequence = terminalStatus === 'withdrew' || terminalStatus === 'did_not_submit'
@@ -857,7 +869,8 @@ export default function ReviewerManagePanel({
         + 'Any linked honorarium request is kept and marked Withdrawn; a paid or payment-authorized honorarium stops this change.\n\n'
         + 'Saving can take up to half a minute.'
       : 'This ends the engagement and revokes their portal link.';
-    if (!confirm(`Confirm that ${reviewer.name || 'this reviewer'} ${outcome}?\n\n${consequence}`)) return;
+    if (terminalStatus !== 'withdrew'
+        && !confirm(`Confirm that ${reviewer.name || 'this reviewer'} ${outcome}?\n\n${consequence}`)) return;
     // Revalidate after confirm() and before dispatch (see handleRevokeToken).
     // Both terminal choices for a given row share one generation, since only
     // one of them can meaningfully be in flight for that row at a time.
@@ -877,6 +890,7 @@ export default function ReviewerManagePanel({
             requestId,
             suggestionIds: [reviewer.suggestionId],
             terminalStatus,
+            ...(withdrawal ? { withdrawal } : {}),
           },
           tolerantBody: true,
         });
@@ -1433,6 +1447,17 @@ export default function ReviewerManagePanel({
           previewReadOnly={previewReadOnly}
           onClose={() => setCloseoutReviewerId(null)}
           onSaved={() => (onRefresh ? onRefresh() : undefined)}
+        />
+      )}
+
+      {withdrawalReviewer && (
+        <StaffWithdrawalModal
+          reviewer={withdrawalReviewer}
+          onClose={() => setWithdrawalReviewerId(null)}
+          onConfirm={(payload) => {
+            setWithdrawalReviewerId(null);
+            transitionTerminal(withdrawalReviewer, 'withdrew', payload);
+          }}
         />
       )}
 

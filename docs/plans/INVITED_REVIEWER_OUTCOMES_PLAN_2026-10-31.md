@@ -432,3 +432,18 @@ Accepted; attribute a correction that ends an open engagement: decline →
 reviewer before/after accepting, no longer needed → Foundation, no response →
 blank). `updateLifecycle` accepts Ended by only through a server-side
 `outcome` option, so browser-supplied correction fields cannot set it.
+
+**Slice 3b-3a (2026-10-31, owner decision Q1):** Track Reviewers "Record
+reviewer withdrawal" opens one dialog (`StaffWithdrawalModal`) instead of a
+confirm: *Reviewer withdrew* with a reason (Too busy / Outside their expertise
+/ Bad timing / Other reason; Ended by = Reviewer after accepting), *Conflict of
+interest* with who raised it (Reviewer / Foundation), or *Other* with a
+required note and who ended it. Status stays Withdrew. Choices and validation
+live in `shared/utils/reviewer-staff-outcome.js`; the terminal-transition
+route re-validates with `normalizeStaffWithdrawal` (400 on anything else, and
+on a `withdrawal` sent with another status), and `applyStaffReviewerWithdrawal`
+accepts only Reviewer after accepting or Foundation. A request without the
+payload keeps the pre-dialog values (reason Other, Reviewer after accepting).
+Next, 3b-3b (owner decision Q2): "Record outcome…" in the Invite Reviewers row
+menu for unanswered reviewers (COI / Other, who ended it), a new pre-answer
+writer.
