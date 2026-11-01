@@ -450,6 +450,20 @@ reviewers DTO projects `declineReason` / `declineReasonText`, so activity
 history labels "Conflict of interest recorded by staff" (with who raised it)
 and "Foundation ended the engagement (recorded by staff)", and shows a
 reviewer-withdrawal reason and any staff note (stock notes hidden).
-Next, 3b-3b (owner decision Q2): "Record outcome…" in the Invite Reviewers row
-menu for unanswered reviewers (COI / Other, who ended it), a new pre-answer
-writer.
+
+**Record outcome before the reviewer answers (2026-10-31, owner decision
+Q2; was "3b-3b"):** the Invite Reviewers row menu gains "Record outcome…" for
+an invited reviewer who has not answered (same still-pending rule as the
+"no longer needed" release). The dialog (`StaffPendingOutcomeModal`) offers
+Conflict of interest (who raised it) or Other (required note, who ended it),
+Reviewer or Foundation. `POST /api/review-manager/pending-outcome`
+re-validates with `normalizeStaffPendingOutcome`, and
+`reviewer-engagement/record-pending-outcome.js` re-reads the row, checks
+request membership and still-pending state and writes
+`applyStaffPendingOutcome` bound to that read's ETag: Declined, out of the
+active pool, the reason and note, Ended by Reviewer before accepting or
+Foundation, Ended at, link revoked; review status unchanged. A reviewer who
+answers in between makes the write fail (412, reported as "changed"). Activity
+history labels a Foundation ending as recorded by staff; a reviewer-raised
+outcome is stored like a portal decline and reads as one, by design (who typed
+an outcome is not stored).

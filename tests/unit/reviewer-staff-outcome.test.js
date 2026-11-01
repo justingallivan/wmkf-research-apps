@@ -1,5 +1,6 @@
 import {
   STAFF_OUTCOME_NOTE_MAX,
+  normalizeStaffPendingOutcome,
   normalizeStaffWithdrawal,
 } from '../../shared/utils/reviewer-staff-outcome';
 
@@ -46,5 +47,32 @@ describe('normalizeStaffWithdrawal', () => {
     ['a pre-acceptance ended-by', { kind: 'coi', endedBy: 'reviewer_before_accepting' }],
   ])('rejects %s', (_name, input) => {
     expect(normalizeStaffWithdrawal(input).error).toBeTruthy();
+  });
+});
+
+describe('normalizeStaffPendingOutcome', () => {
+  test('conflict of interest records who raised it and a default note', () => {
+    expect(normalizeStaffPendingOutcome({ kind: 'coi', endedBy: 'foundation' })).toEqual({
+      reasonPicklist: 'conflict-of-interest',
+      reasonText: 'Program Director recorded a conflict of interest before the reviewer answered.',
+      endedBy: 'foundation',
+    });
+  });
+
+  test('Other requires a note', () => {
+    expect(normalizeStaffPendingOutcome({ kind: 'other', endedBy: 'reviewer_before_accepting', note: ' ' }).error).toMatch(/note is required/);
+    expect(normalizeStaffPendingOutcome({ kind: 'other', endedBy: 'reviewer_before_accepting', note: ' Retired ' }))
+      .toEqual({ reasonPicklist: 'other', reasonText: 'Retired', endedBy: 'reviewer_before_accepting' });
+  });
+
+  test.each([
+    ['a missing payload', undefined],
+    ['the withdrawal kind', { kind: 'withdrew', endedBy: 'foundation' }],
+    ['an after-accepting ended-by', { kind: 'coi', endedBy: 'reviewer_after_accepting' }],
+    ['no ended-by', { kind: 'coi' }],
+    ['a non-text note', { kind: 'coi', endedBy: 'foundation', note: 3 }],
+    ['an over-long note', { kind: 'coi', endedBy: 'foundation', note: 'x'.repeat(STAFF_OUTCOME_NOTE_MAX + 1) }],
+  ])('rejects %s', (_name, input) => {
+    expect(normalizeStaffPendingOutcome(input).error).toBeTruthy();
   });
 });
