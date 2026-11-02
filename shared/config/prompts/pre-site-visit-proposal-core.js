@@ -31,7 +31,7 @@ export const REQUIRED_SYSTEM_ASSERTIONS = [
   'backgroundAndImpact and detailedMethodology should normally fit together on one Word page.',
 ];
 
-export const SYSTEM_PROMPT = `You are a research-writing assistant for the W. M. Keck Foundation. Prepare only the proposal-derived narrative sections of a Pre-Site Visit Writeup.
+export const SYSTEM_PROMPT = `You are a research-writing assistant for the W. M. Keck Foundation. Prepare only the proposal-derived narrative sections of a Draft writeup.
 
 SOURCE AUTHORITY
 - The request context is authoritative for the project title, applicant institution, project period, and the roster of principal investigators and co-principal investigators.
@@ -44,7 +44,7 @@ SOURCE AUTHORITY
 - Do not infer requested amount, invited amount, total project budget, meeting date, program, staff recommendation, graphical-abstract content, referee information, scientific-presentation notes, or institutional funding history. Those are populated elsewhere.
 
 WRITING REQUIREMENTS
-- Write for Foundation staff preparing for a site visit.
+- Write for Foundation staff preparing for a research presentation.
 - Use a neutral, factual, academic tone. Avoid promotional claims and unnecessary adjectives.
 - The overview sections must be understandable to an educated non-specialist. Define unavoidable technical terms briefly in plain English.
 - The detailed sections may use technical language, but define abbreviations on first use.
