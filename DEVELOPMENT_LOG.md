@@ -10,6 +10,18 @@ The chronological archive after the `Legacy chronological session log` divider c
 
 ---
 
+## November 2026 — Integrity screening clarified; Retraction Watch managed monthly (Session 658, Codex)
+
+**Milestone:** Screening rejects conflicting names, reports identity uncertainty honestly, and uses a controlled, attributable Retraction Watch corpus; PubPeer becomes manual-only by owner decision.
+**Sessions:** Session 658; Fable source reviews/closures, owner-authorized migration, publication and monthly activation.
+**Ship state:**
+- PR #604 (`b95a6f04c`): matching/evidence fixes, migration 092, atomic corpus/metadata publication and two narrowly retained records with provenance.
+- First approved publication: 73,521 records, generation 1, completed audit 282049; scoped backup and local restore verified beforehand.
+- PR #605 (`c7f6b4370`): live monthly refresh on the 1st at 06:00 UTC; first scheduled execution remains future/unobserved.
+- PR #607 (`431a71888`): no automated PubPeer search/analysis; manual links throughout, policy-3 review coverage, historical decisions preserved. Final Fable READY TO MERGE and all CI passed; live screening 68 exercised the policy.
+**Why it matters:** Staff can distinguish name candidates from identity evidence and missing sources from clean checks; Integrity approval remains a staff record, not a downstream funding gate.
+**Pointers:** `docs/audits/integrity-production-release-2026-11-02.md`; `docs/audits/integrity-monthly-activation-2026-11-02.md`; `docs/audits/integrity-pubpeer-manual-2026-11-02.md`.
+
 ## November 2026 — Approved proposal-workflow terminology adopted (Session 657, Codex)
 
 **Milestone:** The apps adopt the approved names for proposal discussions, research presentations, shared packets and writeups, with bounded production verification.
