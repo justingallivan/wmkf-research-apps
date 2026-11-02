@@ -15,7 +15,8 @@ import { requestEnvelope } from '../../utils/api-request';
 import { ExecutorBudgetEditor } from './ExecutorBudgetEditor';
 import { TONE, fmtTs, fmtInt, ROW_DEFAULT_MAX_TOKENS } from './prompt-editor-utils';
 import PublishForm from './PromptPublishForm';
-import { ADMIN_PROMPT_GROUPS, resolveAdminPromptDescription } from '../../config/adminPromptCatalog';
+import PromptCatalogForm from './PromptCatalogForm';
+import { ADMIN_PROMPT_GROUPS, getAdminPromptDescription, resolveAdminPromptDescription } from '../../config/adminPromptCatalog';
 
 export { ExecutorBudgetEditor };
 
@@ -42,6 +43,10 @@ const STATUS_COPY = {
   idempotency_key_reuse: { tone: 'red',   text: 'This edit changed after publishing began. Retry the edited payload.' },
   audit_unavailable:     { tone: 'red',   text: 'Audit table unavailable; refused to publish.' },
   failed:                { tone: 'red',   text: 'Publish failed. Check server logs.' },
+  catalog_updated:       { tone: 'green', text: 'Details saved.' },
+  catalog_conflict:      { tone: 'amber', text: 'These details changed since you opened them. Reload and re-apply your edits.' },
+  catalog_superseded:    { tone: 'amber', text: 'Details saved, but a new version was published at the same time and does not have them. Reopen the details and save again.' },
+  invalid_catalog:       { tone: 'red',   text: 'Those details could not be saved.' },
 };
 export default function PromptTemplatesSection() {
   const [prompts, setPrompts] = useState(null);
@@ -192,6 +197,7 @@ export default function PromptTemplatesSection() {
 
 function PromptPanel({ prompt, modelCatalog, executorBudgetConfig, onPublished }) {
   const [expanded, setExpanded] = useState(false);
+  const [editingDetails, setEditingDetails] = useState(false);
   const [outcome, setOutcome] = useState(null);
   const dataverseFields = buildPromptDataverseFields(prompt);
   const description = resolveAdminPromptDescription(prompt);
@@ -229,16 +235,23 @@ function PromptPanel({ prompt, modelCatalog, executorBudgetConfig, onPublished }
         </div>
         <div className="flex shrink-0 items-center gap-2">
           <DataverseFieldInfoButton items={dataverseFields} />
+          <button
+            type="button"
+            onClick={() => { setEditingDetails((e) => !e); setExpanded(false); }}
+            className="px-3 py-1.5 text-sm border border-gray-300 text-gray-700 rounded hover:bg-gray-100"
+          >
+            {editingDetails ? 'Close details' : 'Edit details'}
+          </button>
           {prompt.hasCurrent ? (
             <button
-              onClick={() => setExpanded((e) => !e)}
+              onClick={() => { setExpanded((e) => !e); setEditingDetails(false); }}
               className="px-3 py-1.5 text-sm bg-gray-900 text-white rounded hover:bg-gray-800"
             >
               {expanded ? 'Cancel' : 'Edit & publish'}
             </button>
           ) : (
             <button
-              onClick={() => setExpanded((e) => !e)}
+              onClick={() => { setExpanded((e) => !e); setEditingDetails(false); }}
               className="px-3 py-1.5 text-sm border border-gray-300 text-gray-700 rounded hover:bg-gray-100"
               title="No published current version. View the body; publishing requires seeding a current version first."
             >
@@ -248,6 +261,15 @@ function PromptPanel({ prompt, modelCatalog, executorBudgetConfig, onPublished }
         </div>
       </div>
 
+      {editingDetails && (
+        <PromptCatalogForm
+          prompt={prompt}
+          fallback={getAdminPromptDescription(prompt.name)}
+          onSuccess={(o) => { setOutcome(o); onPublished(); setEditingDetails(false); }}
+          onOutcome={setOutcome}
+          onCancel={() => setEditingDetails(false)}
+        />
+      )}
       {expanded && (
         <PublishForm
           prompt={prompt}

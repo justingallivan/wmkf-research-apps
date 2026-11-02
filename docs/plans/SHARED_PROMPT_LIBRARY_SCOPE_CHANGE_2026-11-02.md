@@ -158,7 +158,16 @@ Justin's same-day approval (`DATAVERSE_PROD_WRITE_ACK`). Steps as run:
    records, per row, the name, row ID, ETags, before and after values,
    PATCH status and readback. It is needed because this write did not go
    through the Postgres `prompt_publish_audit`.
-7. **Next: Connor adds his prompts,** filling in the catalog fields as he
+7. **Editing in Admin** [OWNER DECISION 2026-11-02; BUILT on branch, not
+   deployed]
+   - Admin → AI → Prompts → **Edit details** saves the six fields in place,
+     with no new version.
+   - Group, section and usage are chosen from the existing lists.
+   - Each edit is audited in `prompt_publish_audit`, which needs migration
+     093 applied to Production Postgres before the code deploys.
+   - Clearing a field makes the page fall back to the built-in code catalog
+     text; it does not go blank.
+8. **Next: Connor adds his prompts,** filling in the catalog fields as he
    goes. He must not reuse an existing app prompt name. Publishing a brand-new
    name still needs the first-publish gap closed (see below).
 
