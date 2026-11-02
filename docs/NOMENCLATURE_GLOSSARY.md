@@ -125,20 +125,27 @@ migrations.
 
 ### Current implementation boundary — 2026-11-01
 
-Runtime adoption is partial. PRs #577, #580, #581, #583, #590, #591 and #592
-merged their bounded display-copy slices; PR #594 (`21c937783`) merged A1–A3
-reader/helper copy and PR #595 (`6cbed404c`) merged B1 generated-dossier copy
-to source/Git; PR #596 (`73ecc8445`) merged B2 template copy and the safe-recovery
-guard (source/Git only, not deployment evidence). A4 sentence-case copy and
-C1–C2 default/error copy are in progress on `codex/remaining-source-terminology`;
-check current Git/PR and release receipts before reporting their later status.
-Preserve approved names while keeping routes, API/service and
-prompt identifiers, schemas/storage values, artifact types, saved settings, user
-content, and historical files intact. No data, prompt-publication, or backfill
-migration is authorized.
+Runtime adoption remains partial across the full 16-name table. PRs #577, #580,
+#581, #583, #590, #591 and #592 merged their bounded display-copy slices; PR
+#594 (`21c937783`) merged A1–A3, #595 (`6cbed404c`) B1, #596 (`73ecc8445`) B2,
+and #597 (`3285d2ad3`) A4/C1/C2. PR #598 (`25cac4785`) merged the bounded
+prompt-source terminology slice. These are source/Git receipts, not deployment
+evidence. Separate operational receipts verify three scoped shared editable
+fields, clearing Duncan's invitation override, and publishing two scoped prompt
+families at v6/v3 with exact approved content preserved and audits completed.
+The signed-in Production walkthrough confirmed the main request 1003222
+Staff Deliberations/Final writeup headings and found 11 source-confirmed
+old-label strings across six files (two observed in the walkthrough, nine
+source-only). The remaining source-copy findings are being evaluated; do not
+call the migration complete. A fresh read-only inventory reports 46 email fields / 4 personal
+records and 60 prompt versions / 39 current; only the three scoped shared
+fields, cleared Duncan invitation override, and two published prompt families
+are verified as changed/read back. Preserve
+routes, API/service and prompt identifiers, schemas/storage values, artifact
+types, saved settings, user content, and historical files. No broad data
+migration, backfill, or unsafeguarded content rewrite is authorized. The
 [2026-11-01 terminology completion audit](audits/terminology-completion-audit-2026-11-01.md)
-records the exact scope and unknown live saved settings, prompts, files, and
-deployment state.
+holds the evidence matrix, remaining visible-label findings, and limits.
 
 ### Historical source inventory — October 6–7, 2026
 
