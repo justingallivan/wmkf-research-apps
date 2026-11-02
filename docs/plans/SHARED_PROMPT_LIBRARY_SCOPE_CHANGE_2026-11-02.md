@@ -78,14 +78,94 @@ From the branch plan's "Outcome and boundary" section:
 - **First publish of a brand-new prompt.** Publishing a name that has no
   current row returns `404 no_current_row` ("seed it before versioned
   publish"; `prompts-publish-service.js:123`).
-- **Organizing fields.** The group, section and title fields that the original
-  plan wanted do not exist.
-- **Connor's superuser access** is unconfirmed.
+- **Organizing fields.** The six catalog columns now exist (see
+  [Catalog columns](#catalog-columns)), but Admin neither shows them nor copies
+  them to a new version yet.
+- **Connor's superuser access:** [OWNER REPORTED 2026-11-02] Connor has it.
 
 **Owner-reported context, 2026-11-02.** Connor has no draft prompts in
 Dataverse yet. His current prompts are free text that Power Automate reads.
 He plans to add them to this same table, and he can sign in to Admin.
 Pointing his Power Automate flows at the table stays outside this work.
+
+## Catalog columns
+
+**[OWNER DECISION 2026-11-02]** Add all six catalog columns from the original
+plan, in Production and the sandbox.
+
+[VERIFIED via the `apply-dataverse-schema.js` run and a metadata readback,
+2026-11-02] All six exist on `wmkf_ai_prompt` in both environments. All are
+optional, and the types and lengths match
+`lib/dataverse/schema/wave36-prompt-catalog/`:
+
+| Column | Type | Length |
+|---|---|---|
+| `wmkf_ai_displaytitle` | String | 200 |
+| `wmkf_ai_description` | Memo | 4,000 |
+| `wmkf_ai_groupkey` | String | 80 |
+| `wmkf_ai_sectionkey` | String | 80 |
+| `wmkf_ai_usedby` | Memo | 4,000 |
+| `wmkf_ai_usagecategory` | String | 40 |
+
+- **Production:** created by the run, under Justin's same-day approval
+  (`DATAVERSE_PROD_WRITE_ACK`). The script binds new columns to solution
+  `wmkfResearchReviewAppSuite` (`scripts/apply-dataverse-schema.js:25-26`).
+  Solution membership was not read back separately.
+- **Sandbox:** the columns already existed before the run, which reported them
+  as present. [ASSUMED] They came from earlier PR553 test-schema work.
+- **Not changed:** no rows were written and no code reads these columns yet.
+  The draft-baseline column was not added, because Admin's existing `If-Match`
+  publish already catches concurrent edits.
+
+## Backfill plan for existing prompts
+
+[PLANNED — needs separate approvals at steps 3 and 5]
+
+1. **Copy the columns forward in Admin first.** Today a publish builds the new
+   version from an explicit field list
+   (`lib/services/admin/prompts-publish-service.js:263-277`), so it would drop
+   the catalog values.
+   - Make publish copy all six from the prior current row.
+   - Add them to the Admin row projection and the inventory list, so they are
+     visible.
+   - Until this ships, backfilled values would vanish on the next publish.
+2. **Draft the values from code; no Dataverse read is needed.** For each
+   prompt name defined under `shared/config/prompts/` or in a seed script,
+   propose all six values:
+   - Title and description, from the definition and its caller.
+   - Group and section, by app area.
+   - Used by: the calling app or service.
+   - Usage category: `application` for app-wired prompts, `unclassified`
+     otherwise.
+
+   Justin and Connor edit this table before anything is written.
+3. **Take a read-only Production inventory.** Collect every prompt name's
+   current row: ID, ETag, version, and whether any catalog value is already set.
+   - Flag names found in Dataverse but missing from the code table, such as
+     prompts Connor added; those need values from Connor.
+   - Flag any name with zero or several current rows.
+   - This is a Production read and needs Justin's approval.
+4. **Check that rewriting a row is safe for readers.** Before writing, confirm
+   on `main` that no reader refuses a prompt row because it was modified. The
+   known checks compare variables, output schema and body only. Look for
+   `modifiedon`, `versionnumber` or ETag dependence.
+5. **Write each row once, conditionally.** Write the six catalog columns only
+   to each name's current row, or to its latest row when no current row exists.
+   - Each write is a DAL update with `If-Match` on the inventoried ETag. A row
+     that changed since the inventory fails and is reported, not retried
+     blindly.
+   - Do it outside any publish activity.
+   - Production writes need a same-day `DATAVERSE_PROD_WRITE_ACK`.
+   - The sandbox goes first, as a rehearsal.
+6. **Keep a record.** Commit a before/after receipt per row under
+   `docs/plans/evidence/`: name, row ID, old and new values, and outcome. The
+   receipt is needed because this script does not write the Postgres
+   `prompt_publish_audit` that the publish route does.
+7. **Then Connor adds his prompts,** filling in the catalog fields as he goes.
+   He must not reuse an existing app prompt name.
+
+Historical versions are not backfilled. Catalog metadata describes the prompt
+as it is now; it is not a historical record.
 
 ## New shape (for Codex to plan)
 

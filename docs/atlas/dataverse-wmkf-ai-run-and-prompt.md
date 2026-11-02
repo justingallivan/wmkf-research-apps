@@ -76,13 +76,21 @@ Migration plans touching either entity must preserve these foreign keys.
 
 **Schema (verified 2026-05-07 via `fetchCurrentPrompt`, now in `lib/services/prompt-store.js` — moved out of `execute-prompt.js` in S222):** `wmkf_ai_promptid`, `wmkf_ai_promptname`, `wmkf_ai_systemprompt` (Memo), `wmkf_ai_promptbody` (Memo), `wmkf_ai_promptvariables` (Memo, JSON), `wmkf_ai_promptoutputschema` (Memo, JSON), `wmkf_ai_model` (String — per-prompt model override), `wmkf_ai_temperature` (Decimal), `wmkf_ai_maxtokens` (Integer), `wmkf_promptversion` (Integer — note: NO `_ai_` infix), `wmkf_ai_iscurrent` (Boolean — `fetchCurrentPrompt` filters on this), `wmkf_ai_promptstatus` (Picklist — seed scripts write `PROMPTSTATUS_PUBLISHED`). Full attr list deferrable; probe `EntityDefinitions(LogicalName='wmkf_ai_prompt')` if more fields surface.
 
-**Catalog columns (owner decision 2026-11-02; [PLANNED] — not yet created in any environment):**
-spec `lib/dataverse/schema/wave36-prompt-catalog/`. Six optional columns for
+**Catalog columns (owner decision 2026-11-02):**
+[VERIFIED via metadata readback 2026-11-02] These exist in Production
+(created by the wave36 run, same-day owner-approved write) and in the sandbox
+(already present before the run; [ASSUMED] created by earlier PR553
+test-schema work). Types, lengths and
+optional requirement match the spec in
+`lib/dataverse/schema/wave36-prompt-catalog/`. Six optional columns for
 organizing the shared prompt library: `wmkf_ai_displaytitle` (String 200),
 `wmkf_ai_description` (Memo 4000), `wmkf_ai_groupkey` (String 80),
 `wmkf_ai_sectionkey` (String 80), `wmkf_ai_usedby` (Memo 4000) and
 `wmkf_ai_usagecategory` (String 40). They are descriptive only: no reader
-selects them yet, and no prompt execution depends on them. See
+selects them yet, and no prompt execution depends on them. They are not yet
+populated. Admin publish does not yet copy them to a new version: it creates
+the new row from an explicit field list
+(`lib/services/admin/prompts-publish-service.js:263-277`). See
 `docs/plans/SHARED_PROMPT_LIBRARY_SCOPE_CHANGE_2026-11-02.md`.
 
 **Read paths (verified 2026-05-07; updated S222):**
