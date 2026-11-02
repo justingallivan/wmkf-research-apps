@@ -56,6 +56,10 @@
   },
   "crons": [
     {
+      "path": "/api/cron/refresh-retractions",
+      "schedule": "0 6 1 * *"
+    },
+    {
       "path": "/api/cron/drain-cycle-dossiers",
       "schedule": "*/5 * * * *"
     },

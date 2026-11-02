@@ -2,7 +2,7 @@
 
 Screen grant applicants for research integrity concerns using multiple data sources and AI analysis.
 
-**Source status (2026-11-02):** The accuracy changes below are deployed through PR #604. Migration 092 and production dry-run are verified; the manual worker is enabled but unscheduled. First corpus publication is verified: 73,521 records, generation 1, including two retained records with provenance. See [refresh operating guide](RETRACTION_WATCH_REFRESH.md).
+**Source status (2026-11-02):** The accuracy changes below are deployed through PR #604. Migration 092 and production dry-run are verified; the worker is enabled; owner-approved monthly scheduling is source-configured, pending deployment verification. First corpus publication is verified: 73,521 records, generation 1, including two retained records with provenance. See [refresh operating guide](RETRACTION_WATCH_REFRESH.md).
 
 ## Overview
 
@@ -73,5 +73,5 @@ application UI to retrieve earlier runs.
 - **Name ambiguity** — Common names may produce false positives. Always review matches carefully before drawing conclusions.
 - **Coverage gaps** — Not all retractions or concerns appear in these databases. A clean screening does not guarantee no issues exist.
 - **Context matters** — A retraction doesn't necessarily indicate misconduct. Papers can be retracted for honest errors, journal issues, or administrative reasons. Read the retraction notice.
-- **Timeliness** — Retraction Watch uses the locally imported dataset. The approved source was published on 2026-11-02 as generation 1; managed monthly scheduling remains off pending separate activation. Indexed PubPeer results and news can also have coverage gaps.
+- **Timeliness** — Retraction Watch uses the locally imported dataset. The approved source was published on 2026-11-02 as generation 1; monthly scheduling at 06:00 UTC on the 1st is owner-approved and source-configured, pending deployment verification. Indexed PubPeer results and news can also have coverage gaps.
 - **Use as a starting point** — Screening results should inform further investigation, not serve as a final determination.

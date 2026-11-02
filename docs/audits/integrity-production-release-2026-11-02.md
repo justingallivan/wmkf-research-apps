@@ -1,6 +1,6 @@
 # Integrity production release — 2026-11-02
 
-Owner authorized migration, merge and deployed production dry-run, then explicitly approved the first publication after reviewing its results. Publication is verified; the monthly schedule remains off. Source and retention policy passed OAuth-only Fable review/closure. This receipt tracks the live operation; earlier implementation/preflight receipts are historical checkpoints.
+Owner authorized migration, merge and deployed production dry-run, then explicitly approved the first publication after reviewing its results. Publication is verified; the monthly schedule remains off. Source and retention policy passed OAuth-only Fable review/closure. This receipt records migration, promotion and first publication. Subsequent monthly activation is tracked in [the activation receipt](integrity-monthly-activation-2026-11-02.md); schedule-off statements here describe the historical first-publication checkpoint.
 
 ## Historical migration checkpoint
 
@@ -43,7 +43,7 @@ Raw upstream SHA-256 `7a729a87837985954a34326202cb98c4bff4b2b142fda8695febb613cf
 
 Verification: PR Tests workflow 41515365066 concluded success (Jest and PostgreSQL-16 integration), as did every other PR check and Preview deployment. The corrected cron census passes all 18 tests and still pins 32 schedule definitions/31 unique scheduled routes. The operational credential-export correction passed syntax/lint and the actual authenticated deployed dry-run. The source screening/refresh/retention implementation retains the prior Fable READY FOR OWNER REVIEW receipt. Dirty unrelated main-checkout work was preserved.
 
-## Current result — owner-approved first publication verified
+## Verified first-publication checkpoint — before monthly activation
 
 [VERIFIED via production service and independent read-only database queries, 2026-11-02] After reviewing the dry-run results, Justin approved the first refresh. No monthly schedule or paid re-screen was authorized or invoked. Immediately before publication, the scoped backup archive checksum and restore proof were revalidated; the live full-row fingerprint still matched that backup. No active corpus writer/lock or running refresh audit was found. The exact Ready release remained b95a6f04c26440d4254a3c529d9fe4f16e93860c. A fresh production dry-run matched every approved count, upstream checksum and retained provenance entry. One subsequent authenticated request used dryRun=0.
 

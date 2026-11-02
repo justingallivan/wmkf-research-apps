@@ -3,7 +3,7 @@ title: Integrity screening accuracy and monthly Retraction Watch refresh
 domain: integrity-screener
 kind: plan
 status: active
-summary: "Reject conflicting author names, replace identity-confidence claims, validate PubPeer evidence, and safely refresh Retraction Watch monthly. Screening and controlled refresh code deployed through PR #604 after Fable review. Migration and production dry-run verified; first publication verified; monthly scheduling remains off."
+summary: "Reject conflicting author names, replace identity-confidence claims, validate PubPeer evidence, and safely refresh Retraction Watch monthly. Screening and controlled refresh code deployed through PR #604 after Fable review. Migration and production dry-run verified; first publication verified; monthly activation owner-approved, source-configured pending deployment."
 canonical: false
 cataloged: 2026-11-01
 owner: product-engineering
@@ -219,6 +219,10 @@ related:
 
 [VERIFIED via canonical migration runner, PR #604, Ready deployment and authenticated production dry-run] Migration 092 is applied; reviewed code is merged as b95a6f04c26440d4254a3c529d9fe4f16e93860c and deployed. Dry-run: 73,519 upstream + 2 retained = 73,521 candidate rows; 5,286 additions, 1,846 updates, 13 removals; checked maintenance receipt 281992. Actual corpus remains 68,248 with unchanged full hash and zero publication metadata rows. Production manual worker flag is on; no monthly schedule exists. First publication is not authorized and no non-dry-run call was made. The [release receipt](../audits/integrity-production-release-2026-11-02.md) is current execution authority; earlier numbered design/checkpoint material preserves its dated implementation context.
 
-## 13. Current publication checkpoint — 2026-11-02
+## 13. Historical first-publication checkpoint — 2026-11-02
 
 [VERIFIED via owner approval, fresh exact dry-run and independent production readback] The first managed publication is complete: 73,521 records (73,519 upstream + 2 retained), generation 1; 5,286 additions, 1,846 updates and 13 removals. Audit 282049 completed. Monthly scheduling remains off. See the current publication section of the [release receipt](../audits/integrity-production-release-2026-11-02.md). Earlier design and execution checkpoints are historical; no provider-backed re-screen has been run.
+
+## 14. Current monthly activation checkpoint
+
+[VERIFIED via owner instruction and source] Monthly activation is explicitly authorized after verified first publication. Separate schedule change adds 0 6 1 * *; deployment verification is pending. The [activation receipt](../audits/integrity-monthly-activation-2026-11-02.md) owns current scheduling status; prior schedule-off checkpoints are historical.
