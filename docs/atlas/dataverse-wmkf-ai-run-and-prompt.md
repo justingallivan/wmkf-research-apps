@@ -97,7 +97,10 @@ are not yet populated.
   `shared/config/adminPromptCatalog.js` prefers stored values field by field
   and falls back to the code catalog. Group/section and usage are validated.
 - **Write:** an Admin publish copies all six from the prior current row to the
-  new version. They are outside the publish fingerprint.
+  new version. They are outside the publish fingerprint. A `prompt-seed.js`
+  `--force` version copies them too: from the current row on republish, or
+  from the highest-version row on recover, and explicit seed `recordData`
+  wins. A first-time seed carries none.
 
 Every environment Admin reads must have these columns, or the Admin prompt
 reads return 400. See

@@ -123,7 +123,8 @@ optional, and the types and lengths match
 
 1. **Copy the columns forward in Admin first.** [BUILT on branch
    `claude/session-2026-11-02`; not yet deployed]
-   - A publish now copies all six from the prior current row.
+   - A publish now copies all six from the prior current row. So does a
+     `prompt-seed.js` `--force` recovery version.
    - The Admin projection and both Admin services return them as `catalog`.
    - The Admin prompts page prefers stored values and falls back to the code
      catalog.
