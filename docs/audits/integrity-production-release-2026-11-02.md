@@ -17,3 +17,5 @@ Live deployment/check receipts and actual dry-run diff will be recorded after ex
 ## CI fixture reconciliation
 
 The first PR database job found that the older Integrity-review fixture omitted the now-required dataset DTO. The fixture now explicitly uses unrecorded/unmanaged provenance, matching the engine contract; the production approval guard is unchanged. The refresh PG suite is added to the existing Postgres-16 CI job so future changes exercise it automatically. Both Integrity PG suites passed locally together: 19 tests including the full-source rehearsal. No runtime code was weakened or changed for the fixture correction.
+
+The full CI run passed 26,901 tests and identified one stale cron-census assertion. The census now records refresh-retractions as unscheduled operational reference-data work, with 34 route files. It still pins 32 scheduled entries / 31 unique scheduled paths, so this update cannot silently enable the new monthly schedule. Runtime code and vercel.json schedules are unchanged.
