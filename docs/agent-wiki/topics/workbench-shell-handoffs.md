@@ -1,8 +1,8 @@
 ---
 agent_wiki: topic
 status: active
-last_verified: 2026-11-01
-verification_scope: "Current terminology note cross-checked against bounded source/Git and production receipts; extracted lifecycle text remains dated historical guidance, not general runtime recertification"
+last_verified: 2026-11-02
+verification_scope: "Current terminology note records bounded production baseline and root-reported branch implementation; PR/release checks remain pending; extracted lifecycle text remains dated historical guidance"
 stale_after_days: 90
 owner: reviewers
 title: "Workbench Shell and Deliberation Handoffs"
@@ -41,15 +41,17 @@ extraction_segments:
 
 > The source page mixed current guidance with dated history and owner decisions; those distinctions are preserved in the extracts. The inherited `last_verified` date does not certify these claims anew. This pass verifies only extraction bounds and byte provenance, not runtime behavior, repository-wide drift, or live state.
 
-> **Current terminology status — 2026-11-01:** PRs #594–#598 merged the bounded
+> **Current terminology status — 2026-11-02:** PRs #594–#598 merged the bounded
 > reader/helper, generated-document, template/recovery, default/error, and
-> prompt-source slices in Git. Operational receipts verify only three shared
-> fields, one cleared invitation override, and two prompt families at v6/v3
-> with content preserved and audits complete. The signed-in Production walkthrough
-> confirmed the main Request 1003222 headings and found 11 source-confirmed old-label strings across six files; two were seen
-> and nine were source-only; their disposition is open. No full migration
-> or general deployment status is inferred. The 2026-10-31 wording in the
-> historical extract remains dated context. See the [current work queue](../../CURRENT_WORK_QUEUE.md)
+> prompt-source slices in Git. Operational receipts cover three shared fields,
+> one cleared invitation override, and two prompt families published at v6/v3
+> with content preserved and audits complete. The prior signed-in Production
+> walkthrough confirmed main Request 1003222 headings and found 11 baseline
+> old-label strings across six files (two observed, nine source-only). Root
+> reports corrections implemented on `codex/final-terminology-copy`; PR review
+> and Production verification remain pending. The separate stale-client
+> compatibility guard is out of scope. The 2026-10-31 wording in the historical
+> extract remains dated context. See the [current work queue](../../CURRENT_WORK_QUEUE.md)
 > and [terminology audit](../../audits/terminology-completion-audit-2026-11-01.md).
 
 <!-- source-lines: 2013-2098 -->
@@ -138,7 +140,7 @@ One Final Writeup row per request over the same stable SharePoint Word item; the
   and the request-locator suite (stateful router mock). Remaining panels and the Awardees
   cycle question: `docs/CURRENT_WORK_QUEUE.md` audit follow-ups.
 - **Automatic post-visit preparation is live (S579, 2026-10-06; PRs #449–#451).** `/api/cron/staff-deliberations-preparation` runs every 15 minutes and acts only with `STAFF_DELIBERATIONS_AUTO_PREPARE=on` plus the Production allowlists (Research, `D26`, `Phase II Pending`) and `_EXCLUDED_REQUEST_NUMBERS`; one predicate, `requestMatchesPreparationAllowlists` (`lib/services/pre-site-visit/preparation-config.js`), gates scan, claim, fence, retry and list/detail status. Hazards: the worker has no age bound (the cycle allowlist is the only backstop — see register J27-084 and `docs/plans/CYCLE_ROLLOVER_MINIMAL_CONFIGURATION_PLAN_2026-10-06.md`); SharePoint rewrites a file once on its first read (eTag +1, ~2.5 KB, version unchanged), absorbed as a transient `site_visit_sharepoint_version_changed` retry; the governed DOCX hash now covers reachable parts outside `word/` (staff-pasted `/media/…` images). Operator tools: `scripts/review-staff-deliberations-preparation-cohort.mjs`, `scripts/report-staff-deliberations-preparation-receipts.mjs`, `scripts/probe-staff-deliberations-handoff-file.mjs`. Group-review handoff from the writeup step ("Ready for group review") is live (PR #452, merge `40b70a145`, 2026-10-06); Stage 2 (draft hidden in the apps before group review except to the lead PD, PCs and superusers, via `lib/services/pre-site-visit/writeup-visibility.js`) is live (PR #453, merge `b47a70eae`, 2026-10-06; Dynamics Explorer is an owner-accepted gap); Stage 3 ("Sign off" replaces "Mark reviewed"; the lead PD and superusers see a names-only roster of expected Program Directors from `final_writeup.matrix_audiences` on the acknowledgement route, and Send to leadership names unsigned PDs) is live (PR #454, merge `b2bc23b95`, 2026-10-07); Stage 4 (handoff email to the other PDs, gated by fail-closed `FINAL_WRITEUP_HANDOFF_EMAIL_PROGRAM_IDS`, ledger `final_writeup_handoff_emails` keyed by the handed-off draft, staged before the transition only while the request has no Final, sent only after the transition is confirmed) is live for Research (PR #456, merge `8bc5b466b`, 2026-10-07; first real send not yet observed); Stage 5 is planned in `docs/plans/FINAL_WRITEUP_GROUP_REVIEW_HANDOFF_PLAN_2026-10-06.md`.
-- **Staff Deliberations redesign (S578, 2026-10-06, `feature/workbench-ux`; dated UI description).** The list is Reviewer-follow-up-style cards: `#number` + title, "Institution · PI · PD" (`projectLeader` from `cycle-list-service.js`), a stage chip with time, the next step naming the request-page action or the specific `attentionReason()`, and one "Open request"/"Open review" button deep-linking to `#deliberations-status|briefing|writeup`; no Word shortcut on the list (owner). The 2026-10-06 request-tab stepper labels (Pre-site briefing → Deliberation session → Presentation → Working writeup → Group review; step 4 then retitled "Post-presentation writeup") are historical labels, not unresolved naming choices. Recording/transcripts/summary sit in the Presentation step in this dated description. Deliberation sessions precede the site visit (memory `project-deliberation-session-precedes-site-visit`). Vocabulary was approved 2026-10-21; **Draft writeup** replaced proposed **Post-presentation writeup**. On 2026-10-31 a branch-local display-copy slice was authorized for `StaffDeliberationsTab`, `StaffDeliberationsPanel`, `FinalWriteupTab`, and `PreSiteDistributionPanel`; it is not merged or deployed. Other runtime wording remains pending separate scope; internal identifiers and persisted values remain unchanged. See `docs/NOMENCLATURE_GLOSSARY.md` and `docs/CURRENT_WORK_QUEUE.md`.
+- **Staff Deliberations redesign (S578, 2026-10-06, `feature/workbench-ux`; dated UI description).** The list is Reviewer-follow-up-style cards: `#number` + title, "Institution · PI · PD" (`projectLeader` from `cycle-list-service.js`), a stage chip with time, the next step naming the request-page action or the specific `attentionReason()`, and one "Open request"/"Open review" button deep-linking to `#deliberations-status|briefing|writeup`; no Word shortcut on the list (owner). The 2026-10-06 request-tab stepper labels (Pre-site briefing → Deliberation session → Presentation → Working writeup → Group review; step 4 then retitled "Post-presentation writeup") are historical labels, not unresolved naming choices. Recording/transcripts/summary sit in the Presentation step in this dated description. Deliberation sessions precede the site visit (memory `project-deliberation-session-precedes-site-visit`). Vocabulary was approved 2026-10-21; **Draft writeup** replaced proposed **Post-presentation writeup**. As recorded on 2026-10-31, a branch-local display-copy slice had been authorized for `StaffDeliberationsTab`, `StaffDeliberationsPanel`, `FinalWriteupTab`, and `PreSiteDistributionPanel`; that dated status is historical. Root now reports the 11-string correction on `codex/final-terminology-copy`, pending PR review and Production verification. Internal identifiers and persisted values remain unchanged. See `docs/NOMENCLATURE_GLOSSARY.md` and `docs/CURRENT_WORK_QUEUE.md`.
 <!-- end-source-lines: 2013-2098 -->
 <!-- source-lines: 2135-2153 -->
 - **Workbench UI polish (Codex PR #151, `3fc0a936`, production 2026-09-05).** UI-only; no

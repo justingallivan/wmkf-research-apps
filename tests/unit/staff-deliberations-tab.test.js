@@ -431,7 +431,7 @@ test('previous writeup versions render their preserved file links', async () => 
     }],
   }));
   render(<StaffDeliberationsTab requestId={REQUEST_ID} />);
-  expect(await screen.findByRole('link', { name: /Previous post-visit draft/ }))
+  expect(await screen.findByRole('link', { name: /Previous draft writeup/ }))
     .toHaveAttribute('href', 'https://sharepoint.test/old-version.docx');
 });
 
@@ -1522,7 +1522,7 @@ test('post-visit drafting: the lead PD marks the writeup ready for group review 
   queueRoute('presiteGet', statusResponse({ ...POST_VISIT_STATUS, finalReview: readyFinalReview() }));
   render(<StaffDeliberationsTab requestId={REQUEST_ID} onSelectTab={jest.fn()} />);
   const step = (await screen.findByRole('link', { name: 'Edit draft writeup in Word' })).closest('li');
-  expect(within(step).getByText('Post-visit drafting')).toBeInTheDocument();
+  expect(within(step).getByText('Draft writeup editing')).toBeInTheDocument();
   expect(within(step).queryByText('Locked for review')).not.toBeInTheDocument();
   fireEvent.click(within(step).getByRole('button', { name: 'Ready for group review' }));
   const dialog = screen.getByRole('dialog', { name: 'Ready for group review?' });
@@ -1839,7 +1839,7 @@ describe('draft writeup hidden before group review', () => {
     }));
     render(<StaffDeliberationsTab requestId={REQUEST_ID} />);
   expect(await screen.findByTestId('writeup-hidden-note')).toHaveTextContent('The lead Program Director is preparing the draft writeup.');
-    expect(screen.getByText('Post-visit drafting')).toBeInTheDocument();
+    expect(screen.getByText('Draft writeup editing')).toBeInTheDocument();
     expect(screen.queryByRole('link', { name: /(?:Edit|Open) writeup in Word/ })).not.toBeInTheDocument();
     expect(screen.queryByRole('heading', { name: 'Draft writeup is read-only' })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Prepare draft writeup' })).not.toBeInTheDocument();

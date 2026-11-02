@@ -1377,7 +1377,7 @@ export default function StaffDeliberationsTab({
   const leadershipReview = finalReview?.phase === 'leadership-review';
   const writeupSummary = reviewActive ? (leadershipReview ? 'Moved to review; now in leadership review' : 'Moved to group review')
     : preSiteFinal ? 'Locked for review'
-      : preSiteShared ? (finalReview?.phase === 'starting' ? 'Starting group review…' : 'Post-visit drafting')
+      : preSiteShared ? (finalReview?.phase === 'starting' ? 'Starting group review…' : 'Draft writeup editing')
       : correctionDraft ? 'Corrections in progress'
         : generating || pendingArtifact?.operationStatus === REQUEST_DOCUMENT_OPERATION_STATUS.GENERATING ? 'Preparing…'
           : (readyFile || writeupHidden) && preSiteDraftReady ? `Draft ready${draftWarnings.length ? ` · ${draftWarnings.length} ${draftWarnings.length === 1 ? 'thing' : 'things'} to check` : ''}`
@@ -1608,7 +1608,7 @@ export default function StaffDeliberationsTab({
                 {previousVersions.filter((version) => version.file?.webUrl).map((version, index) => (
                   <li key={`${version.createdAt || 'version'}-${index}`}>
                     <a href={version.file.webUrl} target="_blank" rel="noopener noreferrer" className="underline">
-                      {version.stage === 'group-review' ? 'Previous group-review writeup' : 'Previous post-visit draft'}
+                      {version.stage === 'group-review' ? 'Previous group-review writeup' : 'Previous draft writeup'}
                       {version.createdAt ? ` · ${new Date(version.createdAt).toLocaleDateString()}` : ''}
                     </a>
                   </li>

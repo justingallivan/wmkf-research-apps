@@ -107,7 +107,7 @@ test('reopened corrections remain a staff task even when an older preparation re
   expect(await screen.findByText('Make the requested corrections in the draft writeup, then choose Finish corrections.')).toBeInTheDocument();
   expect(screen.getByText('After presentation')).toBeInTheDocument();
   expect(screen.getByRole('link', { name: 'Open request' })).toHaveAttribute('href', expect.stringMatching(/staff-deliberations.*#deliberations-writeup$/));
-  expect(screen.queryByText('Post-visit editing')).not.toBeInTheDocument();
+  expect(screen.queryByText('Draft writeup editing')).not.toBeInTheDocument();
 });
 
 test('after presentation, a missing writeup never opens the pre-site briefing as a substitute', async () => {
@@ -251,4 +251,18 @@ test('corrections reopened before the presentation keep the Before stage', async
   expect(screen.getByText('Before presentation', { selector: 'span' })).toBeInTheDocument();
   expect(screen.queryByText('After presentation')).not.toBeInTheDocument();
   expect(screen.getByRole('link', { name: 'Open request' })).toHaveAttribute('href', expect.stringMatching(/#deliberations-writeup$/));
+});
+
+test('draft writeup wording retains editing guidance, the post filter, and the request destination', async () => {
+  global.fetch.mockResolvedValue(response([
+    row({ preparation: { due: true, state: 'prepared' }, writeup: { availability: 'available', lifecycleState: 100000001, milestoneComplete: true } }),
+    row({ requestId: 'r2', requestNumber: '1002904' }),
+  ]));
+  render(<StaffDeliberationsPanel {...props} />);
+  expect(await screen.findByText('Add your research presentation findings to the draft writeup, then open group review.')).toBeInTheDocument();
+  expect(screen.getByRole('option', { name: 'Draft writeup work' })).toHaveValue('post');
+  fireEvent.change(screen.getByLabelText('Task'), { target: { value: 'post' } });
+  expect(screen.queryByText(/#1002904/)).not.toBeInTheDocument();
+  expect(screen.getByText(/#1002903/)).toBeInTheDocument();
+  expect(screen.getByRole('link', { name: 'Open request' })).toHaveAttribute('href', expect.stringMatching(/tab=staff-deliberations.*#deliberations-writeup$/));
 });
