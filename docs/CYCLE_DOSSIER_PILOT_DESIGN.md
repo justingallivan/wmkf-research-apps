@@ -48,16 +48,26 @@ The six Postgres tables are documented in docs/atlas/postgres-cycle-dossiers.md.
 
 ## Current terminology status — 2026-11-01
 
-PR #593 merged the terminology audit as `d73cdc96e`; PR #594 merged its A1-A3
-reader/helper copy as `21c937783` (source/Git only; no deployment claim). The B1
-generated-document wording update is in progress on
-`codex/scientific-dossier-document-wording`. The scoped change is to update the individual dossier title and renderer-owned
-subtitle/PDF note and fallback wording to **Scientific dossier**; the explicit combined title `D26 Scientific Dossier` is already
-correct and stays. Scientific body text, citations, prompts, filenames, storage,
-and reuse behavior remain unchanged, as do existing files. Check current Git/PR
-and release receipts before reporting later status. No live prompts, settings,
-stored files, or deployment state were inspected. The historical implementation
-and rollout receipts below do not establish current deployment state.
+PR #593 merged the terminology audit as `d73cdc96e`; PR #594 merged A1-A3
+reader/helper copy as `21c937783` and PR #595 merged B1 generated-document
+wording as `6cbed404c` (source/Git only; no deployment claim). B1 changes the
+individual dossier title and renderer subtitle/PDF note and fallback wording
+to **Scientific dossier**; the explicit combined title `D26 Scientific
+Dossier` remains unchanged. Scientific body text, citations, prompts,
+filenames, storage, reuse behavior, and existing files remain unchanged. B2
+draft-writeup template-copy work is in progress on
+`codex/draft-writeup-presentation-heading`: clone physical template v8 to v9,
+change only the visible `Scientific Presentation:` heading to **Research
+presentation:**, and pair it with renderVersion 10. The
+`[[STAFF:ScientificPresentation]]` token is unchanged; old templates and stored
+documents remain intact, with the new version applying only to future renders.
+Generation first tries uploaded-file recovery; if an unresolved saved attempt
+has a different template version, the guard returns HTTP 409 and requires a
+new confirmed operation instead of rerendering under the new template identity.
+Check current Git/PR and release receipts before reporting later status. No live
+prompts, settings, stored files, or deployment state were inspected. The
+historical implementation and rollout receipts below do not establish current
+deployment state.
 
 **[VERIFIED 2026-09-07 via source, focused tests, and controlled setup]** The generation/document modules, guarded historical prompt support, prompt seed definitions, prompt seeder, six-table migration, setup-database fresh-install shape, API routes, worker/service/store, and UI are source-built on branch codex/cycle-dossier-pilot-build. Migration 045 is applied and verified; the private store `wmkf-cycle-dossier-private` (`store_W9WC1TLR7kpl9hty`) is connected under the custom `DOSSIER_BLOB` prefix in all environments, with the managed token authenticated in Development. Focused generation/document/Executor tests and targeted lint pass in the local checkout.
 

@@ -77,11 +77,15 @@ sequence.
 - **Deliberations display vocabulary — approved 2026-10-21; adoption partial.**
   PRs #577, #580, #581, #583, #590, #591 and #592 merged bounded display-copy
   slices. PR #593 merged the terminology audit as `d73cdc96e`; PR #594 merged
-  A1-A3 reader/helper copy as `21c937783` (source/Git only; no deployment
-  inferred). The B1 dossier-document wording update is in progress on
-  `codex/scientific-dossier-document-wording`; check current Git/PR and release
-  receipts before updating its status. A4, B2, and C1-C2 remain open. Evidence,
-  limits, and preservation boundaries: `docs/audits/terminology-completion-audit-2026-11-01.md`.
+  A1-A3 as `21c937783` and PR #595 merged B1 as `6cbed404c` (source/Git only;
+  no deployment inferred). B2 draft-writeup template copy is in progress on
+  `codex/draft-writeup-presentation-heading`; it versions a visible heading for
+  future renders while preserving the staff token, old template, and stored
+  documents. Recovery reuses an uploaded file when possible; an unresolved
+  saved attempt with a mismatched template version returns HTTP 409 and needs
+  a new confirmed operation. Check current Git/PR and release receipts before
+  updating its status. A4 and C1-C2 remain open. Evidence, limits, and preservation
+  boundaries: `docs/audits/terminology-completion-audit-2026-11-01.md`.
   Live saved values, prompts, files, and deployment state remain unknown. No data
   migration, prompt publication, or backfill is authorized. Approved table and
   dated history: `docs/plans/review/PROPOSAL_WORKFLOW_VOCABULARY_2026-10-19.md`;

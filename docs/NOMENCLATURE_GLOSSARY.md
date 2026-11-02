@@ -127,10 +127,14 @@ migrations.
 
 Runtime adoption is partial. PRs #577, #580, #581, #583, #590, #591 and #592
 merged their bounded display-copy slices; PR #594 (`21c937783`) merged A1–A3
-reader/helper copy to source/Git. These are not deployment receipts. B1 generated
-dossier wording is being updated on `codex/scientific-dossier-document-wording`;
-check current Git/PR and release receipts before reporting its later status. A4,
-B2, and C1–C2 remain open. The
+reader/helper copy and PR #595 (`6cbed404c`) merged B1 generated-dossier copy
+to source/Git. These are not deployment receipts. B2 draft-writeup template copy
+is in progress on `codex/draft-writeup-presentation-heading`; it changes only
+the future template's visible heading, preserving the staff token and older
+templates/stored files. Its recovery guard returns HTTP 409 rather than
+rerendering an unresolved saved operation under a mismatched template version,
+requiring a new confirmed operation. Check current Git/PR and release receipts before
+reporting later status. A4 and C1–C2 remain open. The
 [2026-11-01 terminology completion audit](audits/terminology-completion-audit-2026-11-01.md)
 records the exact scope and unknown live saved settings, prompts, files, and
 deployment state. Preserve approved names while keeping routes, API/service and
