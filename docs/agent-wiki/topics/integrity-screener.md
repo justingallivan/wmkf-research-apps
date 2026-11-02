@@ -48,7 +48,7 @@ applicant against several signals and surfaces a per-applicant `hasConcerns` fla
 - **Source 2 — PubPeer** — manual link only in policy version 3; not searched, summarized, cached or counted as evidence.
 - **Source 3 — News** — `google_news` **via SerpAPI** (`searchNews`).
 
-Only news uses `effectiveSerpKey` in policy version 3. `sources.pubpeer` carries mode=manual, searched=false, error=null, explanatory summary and a name-search link; it carries no concern count, raw results or completed-check assertion. Screens and exports retain this distinction. Source-built change is not yet deployed; [rollout receipt](../../audits/integrity-pubpeer-manual-2026-11-02.md).
+Only news uses `effectiveSerpKey` in policy version 3. `sources.pubpeer` carries mode=manual, searched=false, error=null, explanatory summary and a name-search link; it carries no concern count, raw results or completed-check assertion. Screens and exports retain this distinction. Change is deployed through PR #607; [rollout receipt](../../audits/integrity-pubpeer-manual-2026-11-02.md).
 
 ## Checked-out source and production boundary
 

@@ -4,7 +4,7 @@ Screen grant applicants for research integrity concerns using multiple data sour
 
 **Source status (2026-11-02):** The accuracy changes below are deployed through PR #604. Migration 092 and production dry-run are verified; the worker is enabled; owner-approved monthly scheduling is deployed and verified in the Production cron registry. First corpus publication is verified: 73,521 records, generation 1, including two retained records with provenance. See [refresh operating guide](RETRACTION_WATCH_REFRESH.md).
 
-**Source-built policy change (2026-11-02; not deployed yet):** automated PubPeer search and analysis are removed; both screens and exports show the manual-only source. See [review/rollout receipt](../audits/integrity-pubpeer-manual-2026-11-02.md).
+**Live policy change (PR #607, 2026-11-02):** automated PubPeer search and analysis are removed; both screens and exports show the manual-only source. See [review/rollout receipt](../audits/integrity-pubpeer-manual-2026-11-02.md).
 
 ## Overview
 

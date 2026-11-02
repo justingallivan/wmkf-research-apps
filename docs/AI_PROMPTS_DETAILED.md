@@ -812,7 +812,7 @@ This app runs five stages. The initial analysis is similar to the Concept Evalua
 <a name="integrity-pubpeer"></a>
 ### PubPeer — Manual Link Only
 
-Source policy 3 (not deployed yet) removes the PubPeer analysis prompt and automated search. Both screens and exports say Not checked automatically and provide a manual name-search link. Opening the link records no completed manual check. Historical screening evidence is preserved. News analysis remains below.
+Source policy 3 (live via PR #607, 2026-11-02) removes the PubPeer analysis prompt and automated search. Both screens and exports say Not checked automatically and provide a manual name-search link. Opening the link records no completed manual check. Historical screening evidence is preserved. News analysis remains below.
 
 ---
 

@@ -134,7 +134,7 @@ Takes multiple peer reviews for a proposal and produces:
 
 ## Integrity Screener
 
-Analyzes news for **research integrity concerns** about applicants; Retraction Watch is a database lookup. In source policy 3 (not deployed yet), PubPeer has a manual link only and no analysis prompt:
+Analyzes news for **research integrity concerns** about applicants; Retraction Watch is a database lookup. In source policy 3 (live via PR #607, 2026-11-02), PubPeer has a manual link only and no analysis prompt:
 
 - Data fabrication, image manipulation, plagiarism
 - Misconduct allegations, legal issues, ethical violations

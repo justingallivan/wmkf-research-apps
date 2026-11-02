@@ -234,7 +234,7 @@ the post-flip Workbench smoke emitted `mode=on` and no denial.
 | `ORCID_CLIENT_SECRET` | ORCID authentication | Created with client ID | Free |
 | `OPENALEX_API_KEY` | OpenAlex author/institution/work lookup authentication and rate-limit budget | [OpenAlex API key](https://openalex.org/settings/api) | Free daily budget |
 | `ROR_CLIENT_ID` | Optional, non-secret client identifier sent as `Client-Id` by the request-scoped ROR institution candidate adapter. The adapter remains operational when unset; configure it when ROR registration is available/policy requires identified traffic. | [ROR Client ID](https://ror.readme.io/docs/client-id) | Free |
-| `SERP_API_KEY` | Reviewer contact lookup + news (integrity); PubPeer is manual-only in source policy 3 (not deployed yet). NOT academic search — Scholar metrics/literature migrated to OpenAlex S251 | [SerpAPI](https://serpapi.com/) | ~$0.01/search |
+| `SERP_API_KEY` | Reviewer contact lookup + news (integrity); PubPeer is manual-only in source policy 3 (live via PR #607, 2026-11-02). NOT academic search — Scholar metrics/literature migrated to OpenAlex S251 | [SerpAPI](https://serpapi.com/) | ~$0.01/search |
 
 > **Load-bearing for the reviewer identity spine:** the OpenAlex+ORCID Track-A
 > verifier (`reviewer-identity-evidence.js`) uses `ORCID_CLIENT_ID`/`ORCID_CLIENT_SECRET`
