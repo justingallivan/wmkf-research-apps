@@ -41,6 +41,15 @@ extraction_segments:
 
 > The source page mixed current guidance with dated history and owner decisions; those distinctions are preserved in the extracts. The inherited `last_verified` date does not certify these claims anew. This pass verifies only extraction bounds and byte provenance, not runtime behavior, repository-wide drift, or live state.
 
+> **Current terminology status — 2026-11-01 (source/Git only):** PRs #594–#596
+> merged A1–A3, B1 and B2; no deployment is inferred. The 2026-10-31
+> branch-local wording in the historical excerpt below has since been
+> superseded. A4 sentence-case copy and C1–C2 future-default/error copy are in
+> progress on `codex/remaining-source-terminology`; check
+> current Git/PR and release receipts before reporting later status. No
+> deployment is inferred. See the [current work queue](../../CURRENT_WORK_QUEUE.md)
+> and [terminology audit](../../audits/terminology-completion-audit-2026-11-01.md).
+
 <!-- source-lines: 2013-2098 -->
 ## Final Writeup lifecycle (Slices 1–4)
 

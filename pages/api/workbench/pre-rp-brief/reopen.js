@@ -42,7 +42,7 @@ function sendError(res, error) {
   }
   console.error('workbench pre-rp-brief reopen error:', error);
   return res.status(500).json({
-    error: 'The Pre-RP Brief could not be regenerated.',
+    error: 'The Proposal discussion brief could not be regenerated.',
     details: process.env.NODE_ENV === 'development' ? error.message : undefined,
   });
 }

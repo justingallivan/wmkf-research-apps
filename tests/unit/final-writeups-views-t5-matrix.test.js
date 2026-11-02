@@ -77,13 +77,13 @@ test('dashboard load: network rejection is never silent', async () => {
 test('dashboard load axis (e): non-2xx unparseable body falls to the fallback text with status suffix, never silent', async () => {
   global.fetch = jest.fn().mockResolvedValue({ ok: false, status: 502, json: unparseable });
   render(<FinalWriteupsPanel cycleCode="D26" />);
-  expect(await screen.findByRole('alert')).toHaveTextContent('Failed to load Final Writeups (502)');
+  expect(await screen.findByRole('alert')).toHaveTextContent('Failed to load Final writeups (502)');
 });
 
 test('dashboard load: non-2xx empty body ({}) falls to the fallback text with status suffix (finding 1 parity)', async () => {
   global.fetch = jest.fn().mockResolvedValue({ ok: false, status: 500, json: async () => ({}) });
   render(<FinalWriteupsPanel cycleCode="D26" />);
-  expect(await screen.findByRole('alert')).toHaveTextContent('Failed to load Final Writeups (500)');
+  expect(await screen.findByRole('alert')).toHaveTextContent('Failed to load Final writeups (500)');
 });
 
 test('focused load: network rejection is never silent', async () => {
@@ -95,13 +95,13 @@ test('focused load: network rejection is never silent', async () => {
 test('focused load axis (e): non-2xx unparseable body falls to the fallback text with status suffix, never silent', async () => {
   global.fetch = jest.fn().mockResolvedValue({ ok: false, status: 502, json: unparseable });
   render(<FinalWriteupFocusedView requestId={REQUEST_ID} />);
-  expect(await screen.findByText('Failed to load Final Writeup (502)')).toBeInTheDocument();
+  expect(await screen.findByText('Failed to load Final writeup (502)')).toBeInTheDocument();
 });
 
 test('focused load: non-2xx empty body ({}) falls to the fallback text with status suffix (finding 1 parity)', async () => {
   global.fetch = jest.fn().mockResolvedValue({ ok: false, status: 500, json: async () => ({}) });
   render(<FinalWriteupFocusedView requestId={REQUEST_ID} />);
-  expect(await screen.findByText('Failed to load Final Writeup (500)')).toBeInTheDocument();
+  expect(await screen.findByText('Failed to load Final writeup (500)')).toBeInTheDocument();
 });
 
 test('acknowledge axis (e): non-2xx unparseable body falls to the fallback text with status suffix, never silent', async () => {

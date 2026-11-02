@@ -215,7 +215,7 @@ export default function AdminOverviewSection() {
         <div className="mt-3 divide-y divide-gray-200 overflow-hidden rounded-xl border border-gray-200 bg-white">
           {[
             ['Configure external review', 'Cycle timing, honorarium, reviewer discovery, and release behavior.', adminHref('workflows', 'external-review')],
-            ['Manage Final Writeup audiences', 'Set internal reviewers separately for each Grant Program.', adminHref('workflows', 'final-writeups')],
+            ['Manage Final writeup audiences', 'Set internal reviewers separately for each Grant Program.', adminHref('workflows', 'final-writeups')],
             ['Update staff access', 'Manage internal roles, applications, and identity linkage.', adminHref('people', 'app-access')],
             ['Review AI configuration', 'Inspect usage, model routing, prompts, and execution budgets.', adminHref('ai', 'models')],
           ].map(([title, description, href]) => (

@@ -1069,7 +1069,7 @@ describe('resolveCurrentPreRpBriefForDistribution', () => {
 describe('projectPreRpBriefArtifact', () => {
   it('rejects a row that is not a governed Pre-RP Brief document', () => {
     expect(() => projectPreRpBriefArtifact(briefRow({ wmkf_contenttype: 'application/pdf' })))
-      .toThrow(/not a governed Pre-RP Brief document/);
+      .toThrow(/not a governed Proposal discussion brief document/);
   });
 
   it('counts only received reviews from the stored input snapshot (H3a/B10 client mirror)', () => {

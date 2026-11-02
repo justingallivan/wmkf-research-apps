@@ -77,14 +77,15 @@ sequence.
 - **Deliberations display vocabulary — approved 2026-10-21; adoption partial.**
   PRs #577, #580, #581, #583, #590, #591 and #592 merged bounded display-copy
   slices. PR #593 merged the terminology audit as `d73cdc96e`; PR #594 merged
-  A1-A3 as `21c937783` and PR #595 merged B1 as `6cbed404c` (source/Git only;
-  no deployment inferred). B2 draft-writeup template copy is in progress on
-  `codex/draft-writeup-presentation-heading`; it versions a visible heading for
-  future renders while preserving the staff token, old template, and stored
-  documents. Recovery reuses an uploaded file when possible; an unresolved
-  saved attempt with a mismatched template version returns HTTP 409 and needs
-  a new confirmed operation. Check current Git/PR and release receipts before
-  updating its status. A4 and C1-C2 remain open. Evidence, limits, and preservation
+  A1-A3 as `21c937783`, PR #595 merged B1 as `6cbed404c`, and PR #596 merged
+  B2 as `73ecc8445` (source/Git only; no deployment inferred). The v8-to-v9
+  template change updates only the visible heading and renderVersion; the staff
+  token, old template, and stored documents are preserved. Recovery reuses an
+  uploaded file when possible; an unresolved saved attempt with a mismatched
+  template version returns HTTP 409 and requires a new confirmed operation.
+  A4 sentence-case copy and C1-C2 default/error copy are in progress on
+  `codex/remaining-source-terminology`; check current Git/PR and release
+  receipts before updating their status. Evidence, limits, and preservation
   boundaries: `docs/audits/terminology-completion-audit-2026-11-01.md`.
   Live saved values, prompts, files, and deployment state remain unknown. No data
   migration, prompt publication, or backfill is authorized. Approved table and

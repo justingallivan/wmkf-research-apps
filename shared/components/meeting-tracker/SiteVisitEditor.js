@@ -24,7 +24,7 @@ const DEFAULT_TIME_ZONE = 'America/Los_Angeles';
 
 function emptyForm(requestNumber) {
   return {
-    subject: requestNumber ? `Site Visit — #${requestNumber}` : 'Site Visit',
+    subject: requestNumber ? `Research presentation — #${requestNumber}` : 'Research presentation',
     description: '',
     startLocal: '',
     endLocal: '',

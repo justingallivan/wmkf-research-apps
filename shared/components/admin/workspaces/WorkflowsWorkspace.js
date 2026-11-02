@@ -137,7 +137,7 @@ export function WorkflowsWorkspace({ view }) {
         </AdminEditorPanel>
       );
     case 'final-writeups':
-      return <section><h2 className="text-lg font-semibold">Final Writeup staffing</h2><p className="mt-2 text-gray-600">Staff responsibilities and program review audiences are now managed in People &amp; Access.</p><Link className="mt-4 inline-flex min-h-11 items-center font-semibold underline" href="/admin?workspace=people&view=staffing">Open Staffing</Link></section>;
+      return <section><h2 className="text-lg font-semibold">Final writeup staffing</h2><p className="mt-2 text-gray-600">Staff responsibilities and program review audiences are now managed in People &amp; Access.</p><Link className="mt-4 inline-flex min-h-11 items-center font-semibold underline" href="/admin?workspace=people&view=staffing">Open Staffing</Link></section>;
     case 'site-visits':
       return (
         <div className="space-y-6">

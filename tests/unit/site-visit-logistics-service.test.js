@@ -405,7 +405,7 @@ test('the request identity shows no cycle label for a December meeting date with
 });
 
 test.each([
-  [null, 'No Pre-Site artifact'],
+  [null, 'No Draft writeup'],
   [{ lifecycleState: 999999999 }, 'Unknown'],
   [{ lifecycleState: REQUEST_DOCUMENT_LIFECYCLE_STATE.FINAL }, 'Final'],
 ])('detail share status labels missing and unrecognized artifacts without inventing readiness: %p', async (currentArtifact, expected) => {

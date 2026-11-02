@@ -85,7 +85,7 @@ test('publishes responsibilities and a Research audience through one v2 replacem
   expect(screen.getByRole('heading', { name: 'Research' })).toBeInTheDocument();
   fireEvent.click(screen.getByLabelText(/Anneli Stone/));
   fireEvent.click(screen.getByLabelText(/Saskia Pallais/));
-  fireEvent.click(screen.getByRole('button', { name: 'Publish Final Writeup staffing' }));
+  fireEvent.click(screen.getByRole('button', { name: 'Publish Final writeup staffing' }));
 
   await waitFor(() => expect(global.fetch).toHaveBeenNthCalledWith(
     2,
@@ -130,7 +130,7 @@ test('a v1 migration draft is publishable without changing the preserved program
   render(<FinalWriteupMatrixAudiencesSection />);
   expect(await screen.findByText(/still stored as version 1/i)).toBeInTheDocument();
   expect(screen.getByText('Unpublished changes')).toBeInTheDocument();
-  fireEvent.click(screen.getByRole('button', { name: 'Publish Final Writeup staffing' }));
+  fireEvent.click(screen.getByRole('button', { name: 'Publish Final writeup staffing' }));
 
   await waitFor(() => expect(JSON.parse(global.fetch.mock.calls[1][1].body)).toEqual({
     config: {
@@ -157,7 +157,7 @@ test('missing staff rows block publication until No persona lens is explicitly s
 
   render(<FinalWriteupMatrixAudiencesSection />);
   expect(await screen.findByText(/choose at least one responsibility/i)).toBeInTheDocument();
-  const publish = screen.getByRole('button', { name: 'Publish Final Writeup staffing' });
+  const publish = screen.getByRole('button', { name: 'Publish Final writeup staffing' });
   expect(publish).toBeDisabled();
 
   fireEvent.click(within(screen.getByRole('group', { name: /Responsibilities for Anneli Stone/ }))
@@ -187,7 +187,7 @@ test('stale conflict keeps the complete local draft retryable', async () => {
   render(<FinalWriteupMatrixAudiencesSection />);
   const ada = await screen.findByRole('group', { name: /Responsibilities for Ada Reviewer/ });
   fireEvent.click(within(ada).getByLabelText('Leadership'));
-  fireEvent.click(screen.getByRole('button', { name: 'Publish Final Writeup staffing' }));
+  fireEvent.click(screen.getByRole('button', { name: 'Publish Final writeup staffing' }));
 
   expect(await screen.findByRole('alert')).toHaveTextContent(/another administrator published/i);
   expect(within(ada).getByLabelText('Leadership')).toBeChecked();
@@ -210,14 +210,14 @@ test('(c) load: a network rejection surfaces the rejection\'s own message', asyn
 test('(d) load: a malformed 2xx body (tolerant) becomes {} -> fallback config, no error', async () => {
   global.fetch.mockResolvedValueOnce(unparseable(200));
   render(<FinalWriteupMatrixAudiencesSection />);
-  expect(await screen.findByRole('button', { name: 'Publish Final Writeup staffing' })).toBeInTheDocument();
+  expect(await screen.findByRole('button', { name: 'Publish Final writeup staffing' })).toBeInTheDocument();
   expect(screen.queryByRole('alert')).not.toBeInTheDocument();
 });
 
 test('(e) load: a non-2xx unparseable body (502) shows the fallback message, never silent', async () => {
   global.fetch.mockResolvedValueOnce(unparseable(502));
   render(<FinalWriteupMatrixAudiencesSection />);
-  expect(await screen.findByRole('alert')).toHaveTextContent('Final Writeup staffing could not be loaded.');
+  expect(await screen.findByRole('alert')).toHaveTextContent('Final writeup staffing could not be loaded.');
 });
 
 test('(c) save: a network rejection surfaces the rejection\'s own message', async () => {
@@ -231,7 +231,7 @@ test('(c) save: a network rejection surfaces the rejection\'s own message', asyn
   const ada = await screen.findByRole('group', { name: /Responsibilities for Ada Reviewer/ });
   fireEvent.click(within(ada).getByLabelText('Leadership'));
   global.fetch.mockRejectedValueOnce(new Error('network down'));
-  fireEvent.click(screen.getByRole('button', { name: 'Publish Final Writeup staffing' }));
+  fireEvent.click(screen.getByRole('button', { name: 'Publish Final writeup staffing' }));
   expect(await screen.findByRole('alert')).toHaveTextContent('network down');
 });
 
@@ -246,8 +246,8 @@ test('(e) save: a non-2xx unparseable body (502) shows the fallback message, nev
   const ada = await screen.findByRole('group', { name: /Responsibilities for Ada Reviewer/ });
   fireEvent.click(within(ada).getByLabelText('Leadership'));
   global.fetch.mockResolvedValueOnce(unparseable(502));
-  fireEvent.click(screen.getByRole('button', { name: 'Publish Final Writeup staffing' }));
-  expect(await screen.findByRole('alert')).toHaveTextContent('Final Writeup staffing could not be published.');
+  fireEvent.click(screen.getByRole('button', { name: 'Publish Final writeup staffing' }));
+  expect(await screen.findByRole('alert')).toHaveTextContent('Final writeup staffing could not be published.');
 });
 
 test('configured program with no reviewers remains visibly invalid and cannot publish', async () => {
@@ -264,5 +264,5 @@ test('configured program with no reviewers remains visibly invalid and cannot pu
   render(<FinalWriteupMatrixAudiencesSection />);
   fireEvent.click(await screen.findByLabelText(/Ada Reviewer/));
   expect(screen.getByText(/select at least one reviewer/i)).toBeInTheDocument();
-  expect(screen.getByRole('button', { name: 'Publish Final Writeup staffing' })).toBeDisabled();
+  expect(screen.getByRole('button', { name: 'Publish Final writeup staffing' })).toBeDisabled();
 });

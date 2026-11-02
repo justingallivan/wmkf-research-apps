@@ -161,8 +161,8 @@ const EXPECTED_HEADINGS = {
   'workflows:proposal-ranking': [
     'Proposal Ranking facilitators',
   ],
-  'workflows:final-writeups': ['Final Writeup staffing'],
-  'people:staffing': ['Final Writeup staffing', 'Program review audiences', 'Related assignments', 'Shared roles', 'Staff responsibilities'],
+  'workflows:final-writeups': ['Final writeup staffing'],
+  'people:staffing': ['Final writeup staffing', 'Program review audiences', 'Related assignments', 'Shared roles', 'Staff responsibilities'],
   'workflows:site-visits': [
     'Consultants and Board',
     'Materials defaults',

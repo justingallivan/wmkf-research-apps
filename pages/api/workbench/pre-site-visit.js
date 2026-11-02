@@ -49,7 +49,7 @@ function sendError(res, error) {
   }
   console.error('workbench pre-site-visit error:', error);
   return res.status(500).json({
-    error: 'Pre-Site Visit draft generation failed.',
+    error: 'Draft writeup generation failed.',
     details: process.env.NODE_ENV === 'development' ? error.message : undefined,
   });
 }
@@ -223,7 +223,7 @@ export default async function handler(req, res) {
           });
         }
         if (!isRequestDocumentExplicitActorSchemaReady()) {
-          throw new ServiceHttpError('Final Writeup is unavailable until its Dataverse schema is verified.', {
+          throw new ServiceHttpError('Final writeup is unavailable until its Dataverse schema is verified.', {
             httpStatus: 503, code: 'final_writeup_schema_not_ready',
           });
         }

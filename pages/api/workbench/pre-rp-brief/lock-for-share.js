@@ -23,7 +23,7 @@ function sendError(res, error) {
   }
   console.error('workbench pre-rp-brief lock-for-share error:', error);
   return res.status(500).json({
-    error: 'The Pre-RP Brief could not be locked for Share.',
+    error: 'The Proposal discussion brief could not be locked for Share.',
     details: process.env.NODE_ENV === 'development' ? error.message : undefined,
   });
 }

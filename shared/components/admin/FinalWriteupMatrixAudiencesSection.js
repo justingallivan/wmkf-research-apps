@@ -15,7 +15,7 @@ import useAdminUnsavedChangesGuard from './useAdminUnsavedChangesGuard';
 import { requestJson } from '../../utils/api-request';
 
 const VERSION = 2;
-const UNSAVED_WARNING = 'You have unsaved Final Writeup staffing changes. Leave without publishing?';
+const UNSAVED_WARNING = 'You have unsaved Final writeup staffing changes. Leave without publishing?';
 const RESPONSIBILITY_LABELS = Object.freeze({
   [FINAL_WRITEUP_PERSONA.PROGRAM_DIRECTOR]: 'Program Director',
   [FINAL_WRITEUP_PERSONA.PROGRAM_COORDINATOR]: 'Program Coordinator',
@@ -81,7 +81,7 @@ export default function FinalWriteupMatrixAudiencesSection() {
     try {
       const data = await requestJson('/api/admin/final-writeup-matrix-audiences', {
         tolerantBody: true,
-        fallbackMessage: 'Final Writeup staffing could not be loaded.',
+        fallbackMessage: 'Final writeup staffing could not be loaded.',
       });
       if (loadSequence.current === sequence) applyState(data);
     } catch (loadError) {
@@ -210,10 +210,10 @@ export default function FinalWriteupMatrixAudiencesSection() {
         method: 'PUT',
         body: { config: normalizedDraft, expectedRevision: revision },
         tolerantBody: true,
-        fallbackMessage: 'Final Writeup staffing could not be published.',
+        fallbackMessage: 'Final writeup staffing could not be published.',
       });
       applyState(data);
-      setNotice('Final Writeup staffing published. Responsibilities and program audiences now share this revision.');
+      setNotice('Final writeup staffing published. Responsibilities and program audiences now share this revision.');
     } catch (saveError) {
       setError(saveError.message);
     } finally {
@@ -221,7 +221,7 @@ export default function FinalWriteupMatrixAudiencesSection() {
     }
   };
 
-  if (loading) return <p className="text-sm text-gray-500">Loading Final Writeup staffing…</p>;
+  if (loading) return <p className="text-sm text-gray-500">Loading Final writeup staffing…</p>;
   if (error && !baseline) {
     return (
       <div className="space-y-3">
@@ -237,7 +237,7 @@ export default function FinalWriteupMatrixAudiencesSection() {
     <div className="space-y-8">
       <div className="max-w-3xl space-y-2 text-sm leading-6 text-gray-600">
         <p>
-          Assign each current Final Writeup reviewer-role member an operational responsibility,
+          Assign each current Final writeup reviewer-role member an operational responsibility,
           then choose the expected reviewers for each Dataverse Grant Program.
         </p>
         <p>
@@ -254,7 +254,7 @@ export default function FinalWriteupMatrixAudiencesSection() {
       )}
       {!configured && (
         <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-950" role="status">
-          <p className="font-semibold">Final Writeup staffing has not been published.</p>
+          <p className="font-semibold">Final writeup staffing has not been published.</p>
           <p className="mt-1">Complete every staff row and add at least one Grant Program audience before publishing.</p>
         </div>
       )}
@@ -415,7 +415,7 @@ export default function FinalWriteupMatrixAudiencesSection() {
           disabled={saving || !changed || hasEmptyAudience || unassignedReviewerIds.length > 0 || draftPrograms.length === 0}
           className="min-h-11 rounded-lg bg-gray-900 px-5 py-2.5 text-sm font-semibold text-white hover:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
         >
-          {saving ? 'Publishing…' : 'Publish Final Writeup staffing'}
+          {saving ? 'Publishing…' : 'Publish Final writeup staffing'}
         </button>
       </div>
     </div>

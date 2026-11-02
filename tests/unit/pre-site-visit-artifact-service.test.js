@@ -1362,7 +1362,7 @@ test.each([
     harness.dependencies.deleteFile,
   ].map((mock) => mock.mock.calls.length);
 
-  const expectedError = code ? { code } : { httpStatus: 500, message: 'The Pre-Site proposal core JSON is invalid.' };
+  const expectedError = code ? { code } : { httpStatus: 500, message: 'The Draft writeup proposal core JSON is invalid.' };
   await expect(getPreSiteVisitArtifactStatus({ requestId: REQUEST_ID }, harness.dependencies))
     .rejects.toMatchObject(expectedError);
   const after = [

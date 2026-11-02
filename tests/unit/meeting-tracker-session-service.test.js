@@ -49,6 +49,7 @@ test('session create stores default reference-only attendees and the explicit ac
 
   expect(deps.getDefaultAttendees).toHaveBeenCalledTimes(1);
   expect(deps.createSession).toHaveBeenCalledWith(expect.objectContaining({
+    wmkf_name: `Proposal discussion session · ${input.scheduledStartIso}`,
     wmkf_scheduledstart: input.scheduledStartIso,
     wmkf_scheduledend: input.scheduledEndIso,
     wmkf_meetinglink: input.meetingLink,
@@ -202,4 +203,22 @@ test('each slot carries its applicant institution from one bounded request read;
   consoleError.mockRestore();
   expect(result.slots.map((slot) => slot.institution)).toEqual([null, null]);
   expect(result.slots).toHaveLength(2);
+});
+
+
+test.each(['Deliberation session · 2026-09-15T16:00:00.000Z', 'Custom annual proposal conversation'])('session edits preserve saved name %s', async (name) => {
+  let row = storedRow({ wmkf_name: name });
+  const deps = dependencies({
+    getSession: jest.fn(async () => row),
+    updateSession: jest.fn(async (_id, _etag, patch) => { row = { ...row, ...patch }; }),
+  });
+  await updateDeliberationSession({
+    sessionId: SESSION_ID, etag: row._etag,
+    scheduledStartIso: '2026-09-15T16:30:00.000Z', notes: 'Updated notes',
+  }, { actingUserSystemId: ACTOR_ID }, deps);
+  const patch = deps.updateSession.mock.calls[0][2];
+  expect(patch).not.toHaveProperty('wmkf_name');
+  expect(patch.wmkf_scheduledstart).toBe('2026-09-15T16:30:00.000Z');
+  expect(patch.wmkf_notes).toBe('Updated notes');
+  expect(row.wmkf_name).toBe(name);
 });

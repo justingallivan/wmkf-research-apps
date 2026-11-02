@@ -34,7 +34,7 @@ function sendError(res, error) {
   }
   console.error('workbench pre-rp-brief error:', error);
   return res.status(500).json({
-    error: 'Pre-Research Presentation Brief generation failed.',
+    error: 'Proposal discussion brief generation failed.',
     details: process.env.NODE_ENV === 'development' ? error.message : undefined,
   });
 }

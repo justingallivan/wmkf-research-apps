@@ -55,7 +55,7 @@ async function fetchStatus(requestId, signal) {
     { signal, tolerantBody: true },
   );
   if (!ok) {
-    const failure = new Error(body.error || `Final Writeup status failed (${status})`);
+    const failure = new Error(body.error || `Final writeup status failed (${status})`);
     failure.code = body.code || null;
     throw failure;
   }
@@ -71,7 +71,7 @@ async function fetchAcknowledgementState(requestId, signal) {
     return { available: false };
   }
   if (!ok) {
-    throw new Error(body.error || `Final Writeup review status failed (${status})`);
+    throw new Error(body.error || `Final writeup review status failed (${status})`);
   }
   return body;
 }
@@ -399,7 +399,7 @@ export default function FinalWriteupTab({ requestId }) {
         tolerantBody: true,
       });
       if (!ok) {
-        const failure = new Error(body.error || `Final Writeup transition failed (${httpStatus})`);
+        const failure = new Error(body.error || `Final writeup transition failed (${httpStatus})`);
         failure.code = body.code || null;
         throw failure;
       }
@@ -500,7 +500,7 @@ export default function FinalWriteupTab({ requestId }) {
         return;
       }
       if (!ok) {
-        throw new Error(body.error || `Final Writeup review update failed (${httpStatus})`);
+        throw new Error(body.error || `Final writeup review update failed (${httpStatus})`);
       }
       if (acknowledgementController.current !== controller) return;
       if (body.finalArtifactId !== acknowledgementArtifactId) {
