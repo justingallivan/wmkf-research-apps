@@ -23,3 +23,9 @@ Seven audits: whole-flow and partial-success follow the same full-run save and p
 ## Controller verification before review closure
 
 [VERIFIED via local execution] 165 focused tests across 10 suites pass; 4 review tests pass against isolated loopback Postgres. Scoped lint has zero errors and the two preexisting IntegrityTab hook warnings. Prompt-injection, Atlas, API-route, docs catalog/currency/fact, symbol, wiki and secret gates and their self-tests pass. No production writes or provider calls were performed. Fable review is pending; merge remains gated on review closure and all release checks.
+
+## Initial Fable review and disposition
+
+[VERIFIED via host OAuth review] Model claude-fable-5-1, 47 turns, no permission denials; read-only tools only, no API/provider credentials or MCP servers. Initial verdict: one P2 help/app-card contradiction blocked merge. Core no-PubPeer-call, manual status, version-3 approval/history, auth/roster/fence/persistence and UI/export invariants were confirmed.
+
+The P2 is corrected in guideContent and appRegistry and covered by a real metadata regression test. P3 route-header, Markdown label, dead concern-count coupling and related credential/prompt/system documentation were also corrected. News analysis and historical data remain unchanged. A bounded Fable closure review is pending; merge is held until closure.

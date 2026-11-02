@@ -103,7 +103,7 @@ test('manual PubPeer link and all exports explicitly show no automated or record
     fireEvent.click(screen.getByRole('button', { name: 'Export Markdown' }));
     expect(captured[0]).toContain('Not checked automatically');
     expect(captured[0]).toContain('No manual check is recorded');
-    expect(captured[0]).toContain('https://pubpeer.com/search?q=Yuan%20He');
+    expect(captured[0]).toContain('[Open PubPeer manually](https://pubpeer.com/search?q=Yuan%20He)');
     expect(captured[0]).not.toContain('PubPeer: Incomplete source');
     fireEvent.click(screen.getByRole('button', { name: 'Export JSON' }));
     expect(JSON.parse(captured[1]).applicants[0].sources.pubpeer).toMatchObject({ mode: 'manual', searched: false });
@@ -112,4 +112,17 @@ test('manual PubPeer link and all exports explicitly show no automated or record
     expect(JSON.stringify(mockPdfCalls)).toContain('Open PubPeer manually: https://pubpeer.com/search?q=Yuan%20He');
     expect(mockPdfCalls).toContainEqual(['addBadge', 'Not checked automatically', 'default']);
   } finally { result.sources.pubpeer = oldSource; result.sourceCoverageVersion = oldVersion; }
+});
+
+
+test('staff help and app discovery describe manual-only PubPeer access', () => {
+  const { GUIDE_SECTIONS } = require('../../shared/config/guideContent');
+  const { APP_REGISTRY } = require('../../shared/config/appRegistry');
+  const guide = JSON.stringify(GUIDE_SECTIONS.find(section => section.key === 'integrity-screener'));
+  expect(guide).toContain('PubPeer is not checked automatically');
+  expect(guide).toContain('Opening the PubPeer link does not record a manual check');
+  expect(guide).not.toContain('PubPeer and news may include AI-written');
+  const app = APP_REGISTRY.find(app => app.key === 'integrity-screener');
+  expect(app.features).toContain('Manual PubPeer Link');
+  expect(app.features).not.toContain('PubPeer Search');
 });

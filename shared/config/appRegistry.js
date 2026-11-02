@@ -115,9 +115,9 @@ export const APP_REGISTRY = [
     name: 'Applicant Integrity Screener',
     href: '/integrity-screener',
     icon: '🔍',
-    description: 'Screen grant applicants for research integrity concerns using Retraction Watch, PubPeer, and news sources',
+    description: 'Screen grant applicants for research integrity concerns using automated Retraction Watch and news checks, with a manual PubPeer link',
     categories: ['phase-i', 'phase-ii'],
-    features: ['Retraction Watch DB', 'PubPeer Search', 'News Analysis', 'AI Summarization'],
+    features: ['Retraction Watch DB', 'Manual PubPeer Link', 'News Analysis', 'AI Summarization'],
   },
   {
     key: 'expertise-finder',

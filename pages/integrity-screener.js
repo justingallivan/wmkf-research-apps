@@ -658,7 +658,7 @@ function IntegrityScreenerPage() {
         }
         md += `\n${pubpeerResult.error || pubpeerResult.summary || 'Incomplete source'}\n\n`;
         if (pubpeerResult.searchUrl) {
-          md += `[View on PubPeer](${isManualPubPeerSource(pubpeerResult) ? manualPubPeerSource(result.name).searchUrl : pubpeerResult.searchUrl})\n\n`;
+          md += `[${isManualPubPeerSource(pubpeerResult) ? 'Open PubPeer manually' : 'View on PubPeer'}](${isManualPubPeerSource(pubpeerResult) ? manualPubPeerSource(result.name).searchUrl : pubpeerResult.searchUrl})\n\n`;
         }
       }
 

@@ -58,15 +58,15 @@ export const GUIDE_SECTIONS = [
     sections: [
       {
         heading: 'Overview',
-        content: `Screen grant applicants for research integrity concerns by searching the locally loaded Retraction Watch records, PubPeer (post-publication peer review), and Google News (media coverage of misconduct).`,
+        content: `Screen grant applicants for research integrity concerns using automated Retraction Watch and Google News checks. PubPeer is not checked automatically; use the manual link to review publications there.`,
       },
       {
         heading: 'Running a Screening',
-        content: `Enter applicant names (one per line), then click Screen Applicants. Results stream in as each source is checked. Each applicant gets a results card with match counts, confidence values, and source-specific details; PubPeer and news may include AI-written source summaries.`,
+        content: `Enter applicant names (one per line), then click Screen Applicants. Results stream in as each source is checked. Each applicant gets a results card with match counts, name evidence with identity unverified, and source-specific details. News may include an AI-written summary. Opening the PubPeer link does not record a manual check.`,
       },
       {
-        heading: 'Understanding Confidence Levels',
-        content: `High = exact or near-exact name match with corroborating evidence. Medium = partial match or common name with some supporting context. Low = weak match that may be a different person.`,
+        heading: 'Understanding Name Evidence',
+        content: `Exact name, initials, variant and possible-namesake labels describe name compatibility only; identity remains unverified. A matching name alone does not establish that the record concerns this applicant.`,
       },
       {
         heading: 'Dismissing False Positives',
@@ -74,7 +74,7 @@ export const GUIDE_SECTIONS = [
       },
       {
         heading: 'History & Export',
-        content: `The current page has no History tab, although authenticated history APIs exist. PDF, JSON, and Markdown exports cover the current run, including matches, confidence values, and available PubPeer/news summaries; they do not include dismissal records.`,
+        content: `The current page has no History tab, although authenticated history APIs exist. PDF, JSON, and Markdown exports cover the current run, including matches, name evidence, news summaries and the manual-only PubPeer status/link; they do not record a completed manual check or include dismissal records.`,
       },
       {
         heading: 'Important Caveats',

@@ -4,7 +4,7 @@
  * Main screening endpoint for Applicant Integrity Screener.
  * Accepts a list of applicants and screens them against:
  * - Retraction Watch database
- * - PubPeer (via SERP API)
+ * - PubPeer manual link only (never searched or analyzed automatically)
  * - News sources (via SERP API)
  *
  * Uses streaming SSE for real-time progress updates.

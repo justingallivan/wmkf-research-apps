@@ -48,7 +48,7 @@ Access is assigned by role and application. Some tools also appear within the Wo
 | **Multi-Perspective Evaluator** | Examines a concept from optimistic, skeptical, and neutral viewpoints. |
 | **Funding Analysis** | Examines federal funding evidence from NSF, NIH, and USAspending to inform funding-gap analysis. |
 | **Summarize Peer Reviews** | Draws out themes in reviewer feedback and helps prepare questions for the research presentation. |
-| **Applicant Integrity Screener** | Brings together potential concerns from retraction records, PubPeer, and news for staff assessment. |
+| **Applicant Integrity Screener** | Brings together retraction records and news for staff assessment. Source policy 3 adds a manual-only PubPeer link, with no automated PubPeer check (not deployed yet). |
 | **WMKF Expertise** | Helps match proposals to the expertise of staff, consultants, and Board members. |
 | **Grant Reporting** | Helps staff extract and review grantee reports, compare achievements with proposed goals, and prepare a Word report. |
 | **Dynamics Explorer** | Lets staff ask questions about grant-management records in plain language and export results. |
