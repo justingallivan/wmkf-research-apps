@@ -54,7 +54,7 @@ consume a `sources.pubpeer` shape (`hasConcerns`, `summary`, `resultCount`, `sea
 
 ## Checked-out source and production boundary
 
-[VERIFIED via source/tests, 2026-11-02] The accuracy increment is source-built on `codex/integrity-screening-discussion`, not deployed. The behavior below describes that branch; dated Production statements describe the earlier deployed baseline. The monthly reference refresh is source-built but disabled and unscheduled; no production migration/import occurred. See `docs/guides/RETRACTION_WATCH_REFRESH.md` and `docs/atlas/postgres-retraction-dataset.md`.
+[VERIFIED via source/tests, 2026-11-02] The accuracy increment is source-built on `codex/integrity-screening-discussion`, not deployed. The behavior below describes that branch; dated Production statements describe the earlier deployed baseline. The monthly reference refresh is source-built but disabled and unscheduled; migration 092 is now applied with unchanged corpus; promotion/manual dry-run are authorized and tracked in `docs/audits/integrity-production-release-2026-11-02.md`. No publication or cron activation occurred. See `docs/guides/RETRACTION_WATCH_REFRESH.md` and `docs/atlas/postgres-retraction-dataset.md`.
 
 ## Current UI boundaries
 
