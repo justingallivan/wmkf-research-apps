@@ -1,0 +1,50 @@
+{
+  "name": "wmkf_ai_prompt-catalog-fields",
+  "kind": "extensions-on-existing",
+  "entityLogicalName": "wmkf_ai_prompt",
+  "_comment": "Owner decision 2026-11-02 (Justin with Connor): six optional catalog columns for organizing the shared prompt library in Admin. They are descriptive only: no app reads them to run a prompt, and the technical key stays wmkf_ai_promptname. Logical names follow docs/plans/SHARED_PROMPT_LIBRARY_SCOPE_CHANGE_2026-11-02.md and the PR553 plan. All are nullable; additive only.",
+  "attributes": [
+    {
+      "type": "String",
+      "schemaName": "wmkf_ai_DisplayTitle",
+      "displayName": "Display Title",
+      "description": "Human-readable prompt title. The technical prompt name is unchanged.",
+      "maxLength": 200
+    },
+    {
+      "type": "Memo",
+      "schemaName": "wmkf_ai_Description",
+      "displayName": "Description",
+      "description": "What the prompt does.",
+      "maxLength": 4000
+    },
+    {
+      "type": "String",
+      "schemaName": "wmkf_ai_GroupKey",
+      "displayName": "Group",
+      "description": "Workflow group used to organize the prompt library, e.g. reviewer-workflow.",
+      "maxLength": 80
+    },
+    {
+      "type": "String",
+      "schemaName": "wmkf_ai_SectionKey",
+      "displayName": "Section",
+      "description": "Optional subsection within the group.",
+      "maxLength": 80
+    },
+    {
+      "type": "Memo",
+      "schemaName": "wmkf_ai_UsedBy",
+      "displayName": "Used By",
+      "description": "Apps or Power Automate flows that rely on this prompt. Declared by staff, not detected automatically.",
+      "maxLength": 4000
+    },
+    {
+      "type": "String",
+      "schemaName": "wmkf_ai_UsageCategory",
+      "displayName": "Usage Category",
+      "description": "Display classification of the prompt, such as application, reference or unclassified. Not an execution permission.",
+      "maxLength": 40
+    }
+  ]
+}

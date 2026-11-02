@@ -76,6 +76,15 @@ Migration plans touching either entity must preserve these foreign keys.
 
 **Schema (verified 2026-05-07 via `fetchCurrentPrompt`, now in `lib/services/prompt-store.js` — moved out of `execute-prompt.js` in S222):** `wmkf_ai_promptid`, `wmkf_ai_promptname`, `wmkf_ai_systemprompt` (Memo), `wmkf_ai_promptbody` (Memo), `wmkf_ai_promptvariables` (Memo, JSON), `wmkf_ai_promptoutputschema` (Memo, JSON), `wmkf_ai_model` (String — per-prompt model override), `wmkf_ai_temperature` (Decimal), `wmkf_ai_maxtokens` (Integer), `wmkf_promptversion` (Integer — note: NO `_ai_` infix), `wmkf_ai_iscurrent` (Boolean — `fetchCurrentPrompt` filters on this), `wmkf_ai_promptstatus` (Picklist — seed scripts write `PROMPTSTATUS_PUBLISHED`). Full attr list deferrable; probe `EntityDefinitions(LogicalName='wmkf_ai_prompt')` if more fields surface.
 
+**Catalog columns (owner decision 2026-11-02; [PLANNED] — not yet created in any environment):**
+spec `lib/dataverse/schema/wave36-prompt-catalog/`. Six optional columns for
+organizing the shared prompt library: `wmkf_ai_displaytitle` (String 200),
+`wmkf_ai_description` (Memo 4000), `wmkf_ai_groupkey` (String 80),
+`wmkf_ai_sectionkey` (String 80), `wmkf_ai_usedby` (Memo 4000) and
+`wmkf_ai_usagecategory` (String 40). They are descriptive only: no reader
+selects them yet, and no prompt execution depends on them. See
+`docs/plans/SHARED_PROMPT_LIBRARY_SCOPE_CHANGE_2026-11-02.md`.
+
 **Read paths (verified 2026-05-07; updated S222):**
 - `lib/services/prompt-store.js` `fetchCurrentPrompt` — the canonical fetch (a dependency-free leaf extracted from `execute-prompt.js` in S222 so the streaming reviewer routes can resolve bodies without importing the non-streaming Executor). Reads via direct `DynamicsService.queryRecords('wmkf_ai_prompts', { filter: \`wmkf_ai_promptname eq '...' and wmkf_ai_iscurrent eq true\`, top: 2 })`; throws typed `PROMPT_NOT_FOUND` / `PROMPT_DUPLICATE_CURRENT` on 0/≥2 current rows. **Does NOT go through `prompt-resolver.js`.**
 - `lib/services/execute-prompt.js` — imports `fetchCurrentPrompt` from `prompt-store.js` (Executor v3 path; behavior unchanged, covered by the Executor regression test).
