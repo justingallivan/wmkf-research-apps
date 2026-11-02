@@ -7,7 +7,8 @@
  * (no parent/child, no activeVersion pointer).
  *
  * GET  — current row (full editable metadata) + recent version history.
- * PUT  — publish a new version. Body:
+ * PUT  — publish a new version (or, for a draft-only name, the first version,
+ *        copied from the latest draft row). Body:
  *        { body, systemPrompt?, variables?, outputSchema?, model?, maxTokens?, expectedVersion?, requestId? }.
  * PATCH — edit catalog details in place (no new version). Body:
  *        { rowId, expected, catalog } — see lib/services/admin/prompts-catalog-service.js.

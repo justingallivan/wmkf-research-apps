@@ -59,7 +59,31 @@ test('keeps application use, stored reference and live publication state separat
   const draft = screen.getByRole('article', { name: 'Phase I application and budget checks' });
   expect(within(draft).getByText('No application caller')).toBeInTheDocument();
   expect(within(draft).getByText('draft — no published version')).toBeInTheDocument();
-  expect(within(draft).getByRole('button', { name: 'View' })).toBeEnabled();
+  expect(within(draft).getByRole('button', { name: 'Review & publish' })).toBeEnabled();
+});
+
+test('a draft with no version number offers Publish v1', async () => {
+  serve([{ ...prompt('connor.budget-check', false), version: null, model: null, maxTokens: null }]);
+  await renderOpenWorkflows();
+  const card = await screen.findByRole('article', { name: 'Description not cataloged' });
+  fireEvent.click(within(card).getByRole('button', { name: 'Review & publish' }));
+  expect(within(card).getByRole('button', { name: 'Publish v1' })).toBeEnabled();
+  expect(within(card).getByRole('button', { name: 'Reset' })).toBeDisabled();
+});
+
+test('a draft-only prompt can be published unchanged as its first version', async () => {
+  serve([prompt('phase-i.checkin', false)]);
+  await renderOpenWorkflows();
+  const draft = await screen.findByRole('article', { name: 'Phase I application and budget checks' });
+  fireEvent.click(within(draft).getByRole('button', { name: 'Review & publish' }));
+  expect(within(draft).getByText(/no published version yet/)).toBeInTheDocument();
+  const publish = within(draft).getByRole('button', { name: 'Publish v2' });
+  expect(publish).toBeEnabled();
+  fireEvent.click(publish);
+  await waitFor(() => expect(global.fetch).toHaveBeenCalledWith(
+    '/api/admin/prompts/phase-i.checkin',
+    expect.objectContaining({ method: 'PUT' }),
+  ));
 });
 
 test.each(['new.prompt', 'constructor', '__proto__'])('keeps an uncataloged name %s visible', async name => {

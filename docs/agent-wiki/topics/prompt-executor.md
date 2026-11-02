@@ -207,7 +207,9 @@ audit 2026-09-18: 8 current prompts, e.g. `cycle-dossier.research-plan` on Opus 
 - Prompt governance (Tier-1 rows, create-only seeds, versioned admin publish; routed here from the memory router 2026-10-05): `project-prompt-governance`.
 - Shared prompt library catalog (2026-11-02): no Dataverse plug-in. The six
   wave36 catalog columns are carried forward on publish, backfilled and
-  editable in Admin. First publish for new names is still open. See
+  editable in Admin. First publish for a draft-only name (copy the draft into
+  a new current row) is built on branch `claude/prompt-first-publish`, not
+  deployed. See
   `docs/plans/SHARED_PROMPT_LIBRARY_SCOPE_CHANGE_2026-11-02.md`.
 
 ## Standard Probe

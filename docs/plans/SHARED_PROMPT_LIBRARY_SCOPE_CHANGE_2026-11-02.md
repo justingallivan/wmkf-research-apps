@@ -75,12 +75,19 @@ From the branch plan's "Outcome and boundary" section:
 
 **Gaps.**
 
-- **First publish of a brand-new prompt.** Publishing a name that has no
-  current row returns `404 no_current_row` ("seed it before versioned
-  publish"; `prompts-publish-service.js:123`).
-- **Organizing fields.** The six catalog columns now exist (see
-  [Catalog columns](#catalog-columns)), but Admin neither shows them nor copies
-  them to a new version yet.
+- **First publish of a brand-new prompt.** [BUILT ON BRANCH
+  `claude/prompt-first-publish`, 2026-11-02; NOT DEPLOYED] Owner decision
+  2026-11-02 (option A): publishing a name that has no current row copies its
+  latest draft row, with any edits made in Admin, into a new current row at
+  max version + 1. The draft row is left unchanged, so later direct edits to it
+  do not reach the live prompt. The new row is stamped Published and its
+  pending/final audit names the draft as `prior_prompt_id`. Nothing is flipped,
+  so two simultaneous first publishes are caught only afterwards, as `partial`
+  with `invariant_violation_current_count_2` (accepted: superuser-only).
+  `404 no_current_row` now means no rows exist for the name. Before this, such a
+  publish returned `404 no_current_row` ("seed it before versioned publish").
+- **Organizing fields.** [DONE 2026-11-02] Admin shows, carries forward and
+  edits the six catalog columns; see [Catalog columns](#catalog-columns).
 - **Connor's superuser access:** [OWNER REPORTED 2026-11-02] Connor has it.
 
 **Owner-reported context, 2026-11-02.** Connor has no draft prompts in
@@ -187,7 +194,8 @@ Not backfilled:
   approves. Keep the existing `If-Match`, single-current, audit and idempotency
   behaviour.
 - **Show drafts written directly in Dataverse.** The inventory already lists
-  them. The gap is publishing one when the name has no current row.
+  them. Publishing one when the name has no current row is built on a branch;
+  see Gaps above.
 - **Expect states Admin did not create.** With no guards, Admin must detect and
   clearly report rows it did not produce, rather than guess: zero or several
   current versions for one key, versions out of sequence, edited published
