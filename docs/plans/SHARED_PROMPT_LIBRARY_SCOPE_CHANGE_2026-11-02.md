@@ -53,16 +53,50 @@ From the branch plan's "Outcome and boundary" section:
 - Versions are preserved, and a version goes live only through an explicit
   publish step.
 
+## What already exists on main
+
+[VERIFIED via source on `main` at `4e52d2018`] Much of Option B already exists:
+
+- **Versioned publish of an existing prompt.** Admin publishes a new version of
+  an existing prompt through `pages/api/admin/prompts/[name].js` and
+  `lib/services/admin/prompts-publish-service.js:1-20`. A publish creates
+  version v+1, switches the previous version off with `If-Match`, checks that
+  exactly one current version remains, and records an audit entry. It is
+  idempotent on replay.
+- **Inventory includes prompts no app uses.** The Admin list
+  (`lib/services/admin/prompts-list-service.js:8-12`) shows every prompt name.
+  A name that has only non-current rows appears as a draft.
+- **Superuser-only.** Both routes require a superuser
+  (`pages/api/admin/prompts/index.js:21`, `[name].js:29`).
+- **How apps select a prompt.** App readers pick a row by `wmkf_ai_promptname`
+  plus `wmkf_ai_iscurrent` (`lib/dataverse/adapters/ai-prompt.js:5,72-73`). A
+  new prompt under a name no app uses cannot be picked up by an app. Connor
+  must not reuse an existing app prompt name.
+
+**Gaps.**
+
+- **First publish of a brand-new prompt.** Publishing a name that has no
+  current row returns `404 no_current_row` ("seed it before versioned
+  publish"; `prompts-publish-service.js:123`).
+- **Organizing fields.** The group, section and title fields that the original
+  plan wanted do not exist.
+- **Connor's superuser access** is unconfirmed.
+
+**Owner-reported context, 2026-11-02.** Connor has no draft prompts in
+Dataverse yet. His current prompts are free text that Power Automate reads.
+He plans to add them to this same table, and he can sign in to Admin.
+Pointing his Power Automate flows at the table stays outside this work.
+
 ## New shape (for Codex to plan)
 
 [PLANNED — not designed or built]
 
-- **Publish in Admin's server.** Use ordinary Dataverse writes through the DAL
-  (`withDalContext`), made conditional on the row's ETag (`If-Match`). A
-  concurrent change then fails instead of being overwritten. Admin
-  auth/app-access remains the only publish permission.
-- **Show drafts written directly in Dataverse.** Admin must list and publish
-  drafts Connor creates outside Admin.
+- **Extend Admin's existing publish flow; don't build a new one.** Add a first
+  publish for a new prompt name, plus whatever organizing fields Justin
+  approves. Keep the existing `If-Match`, single-current, audit and idempotency
+  behaviour.
+- **Show drafts written directly in Dataverse.** The inventory already lists
+  them. The gap is publishing one when the name has no current row.
 - **Expect states Admin did not create.** With no guards, Admin must detect and
   clearly report rows it did not produce, rather than guess: zero or several
   current versions for one key, versions out of sequence, edited published
