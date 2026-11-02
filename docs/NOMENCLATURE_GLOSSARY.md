@@ -123,22 +123,30 @@ implementation slices and their evidence are recorded below.
 The Oct21 decision does not authorize route, storage, schema, or identifier
 migrations.
 
-### Current implementation boundary — 2026-11-01
+### Current implementation boundary — 2026-11-02
 
 Runtime adoption remains partial across the full 16-name table. PRs #577, #580,
 #581, #583, #590, #591 and #592 merged their bounded display-copy slices; PR
 #594 (`21c937783`) merged A1–A3, #595 (`6cbed404c`) B1, #596 (`73ecc8445`) B2,
 and #597 (`3285d2ad3`) A4/C1/C2. PR #598 (`25cac4785`) merged the bounded
-prompt-source terminology slice. These are source/Git receipts, not deployment
-evidence. Separate operational receipts verify three scoped shared editable
+prompt-source terminology slice, and PR #600 (`78c965b18`) merged the 11-string
+source correction. Root reports its focused 215-test / 7-suite run, six-file
+text-only AST review, and CI passing. These are source/Git and test receipts,
+not deployment evidence. Separate operational receipts verify three scoped shared editable
 fields, clearing Duncan's invitation override, and publishing two scoped prompt
 families at v6/v3 with exact approved content preserved and audits completed.
 The signed-in Production walkthrough confirmed the main Request 1003222
 Staff Deliberations/Final writeup headings and identified 11 baseline
-old-label strings across six files (two observed, nine source-only). Root reports
-all 11 corrections implemented on `codex/final-terminology-copy`; PR review and
-production verification remain pending. The separate stale-client compatibility
-guard is excluded; do not call the full terminology migration complete. A fresh read-only inventory reports 46 email fields / 4 personal
+old-label strings across six files (two observed, nine source-only). Those 11
+strings are corrected in merged PR #600 and deployed as Production deployment
+`7483066923`; a signed-in recheck confirmed three changed Workbench copy
+locations and the named Request 1003222 headings. The remaining error/history
+paths were not all triggered in the browser. Root has separately updated two
+legacy-client error messages on `codex/legacy-terminology-final-check`, with
+156 tests across 3 suites, scoped lint, text-only AST review, and independent
+review reported passing. Both HTTP 400 responses and machine codes are
+preserved; that change still needs a PR and Production deployment. Do not call
+the full terminology migration complete. A fresh read-only inventory reports 46 email fields / 4 personal
 records and 60 prompt versions / 39 current; only the three scoped shared
 fields, cleared Duncan invitation override, and two published prompt families
 are verified as changed/read back. Preserve
@@ -146,7 +154,8 @@ routes, API/service and prompt identifiers, schemas/storage values, artifact
 types, saved settings, user content, and historical files. No broad data
 migration, backfill, or unsafeguarded content rewrite is authorized. The
 [2026-11-01 terminology completion audit](audits/terminology-completion-audit-2026-11-01.md)
-holds the evidence matrix, branch-local correction status, and verification limits.
+holds the evidence matrix, merged correction status, pending error-copy update,
+and verification limits.
 
 ### Historical source inventory — October 6–7, 2026
 

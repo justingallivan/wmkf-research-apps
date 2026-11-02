@@ -46,7 +46,7 @@ renderDossierDocuments(manifest) renders Word and PDF directly from frozen paylo
 
 The six Postgres tables are documented in docs/atlas/postgres-cycle-dossiers.md. Entry revision numbers shown on cards, in the SharePoint and download filenames, and inside the documents are per request (`request_revision`, migration 046, 2026-09-12); the first pilot runs showed a table-wide counter ("Latest revision 6" on a request generated once), and files published before the migration keep the old number in their names. JSONB stores bounded previews, immutable entry revisions, one global run lease with independently checkpointed items, a durable operator stop, and private edition metadata. The dedicated private Blob store owns bytes and accepts only create-only exact pathnames with SHA-256/size verification. Retries create a new run budget while preserving prior charges. Published SharePoint copies are verified against the frozen bytes before the item is recorded: PDFs must match exactly; DOCX packages are compared by their decompressed `word/` parts, with relationship parts compared as order-independent attribute sets that ignore customXml links, because SharePoint Online rewrites `docProps/`, `customXml/`, package rels, and content types on upload, appends customXml relationships to `word/_rels/document.xml.rels`, and leaves `[trash]/NNNN.dat` packaging slots (document property promotion; observed on the first production smoke, 2026-09-12). A mismatch logs the differing part names. The item record keeps the frozen `sha256`/`size` and the observed `publishedSha256`/`publishedSize`. A failed item carries plain-language copy from `describeEntryFailure` (S509): the stage in flight (literature research, briefing, document rendering, SharePoint publishing) plus the cause when it is safe to state (transport timeout with its duration, deadline, refusal, truncation, provider HTTP status, or the dossier's own validation message); unknown errors stay generic so raw provider text never reaches the page. The tail says whether a charge is retained or saved work is kept, and that retry resumes from the checkpoint. Editions are dossier-level, not run-level: the page section is titled "Dossier editions", each card lists the request numbers it contains (`requestNumbers` in the projection), and the Progress aside says the latest edition may not come from the run shown. The roster has Include all / Exclude all. The edition PDF preview iframe needs `X-Frame-Options: SAMEORIGIN` on `/api/cycle-dossier/download` (a later `next.config.js` headers rule overriding the global DENY; found blank in production 2026-09-12).
 
-## Current terminology status — 2026-11-01
+## Current terminology status — 2026-11-02
 
 PR #593 merged the terminology audit as `d73cdc96e`; PR #594 merged A1-A3
 reader/helper copy as `21c937783`, PR #595 merged B1 generated-document
@@ -72,10 +72,15 @@ completed. The prior signed-in Production walkthrough confirmed the main Request
 Staff Deliberations/Final writeup headings and found 11 baseline old-label
 strings across six files (two observed, nine source-only); see the
 [terminology closeout audit](audits/terminology-completion-audit-2026-11-01.md).
-Root reports all 11 corrections implemented on `codex/final-terminology-copy`,
-pending PR review and Production verification. The separate stale-client
-guard is out of scope; this does not certify full terminology migration. Historical implementation and rollout
-receipts below retain their dated scope.
+All 11 corrections merged in PR #600 (`78c965b18`); root reports 215 focused
+tests across 7 suites, a six-file text-only AST review, and all CI passing.
+Production deployment `7483066923` succeeded, and a bounded signed-in recheck
+confirmed three changed Workbench copy locations. Editing/history states and
+service-error paths were not all exercised. A separate legacy-client error
+wording update is source/test/lint/review verified, preserving both HTTP
+400/code contracts; its PR and Production verification remain pending. This
+does not certify full terminology migration. Historical implementation and
+rollout receipts below retain their dated scope.
 
 **[VERIFIED 2026-09-07 via source, focused tests, and controlled setup]** The generation/document modules, guarded historical prompt support, prompt seed definitions, prompt seeder, six-table migration, setup-database fresh-install shape, API routes, worker/service/store, and UI are source-built on branch codex/cycle-dossier-pilot-build. Migration 045 is applied and verified; the private store `wmkf-cycle-dossier-private` (`store_W9WC1TLR7kpl9hty`) is connected under the custom `DOSSIER_BLOB` prefix in all environments, with the managed token authenticated in Development. Focused generation/document/Executor tests and targeted lint pass in the local checkout.
 

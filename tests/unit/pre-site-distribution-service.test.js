@@ -176,7 +176,13 @@ test.each(['zip', 'docx', 'pdf', 'both'])('prepare rejects attachment mode %s be
     bodyText: 'Attached.',
     fromEmail: 'sender@example.org',
     actingUserSystemId: ACTOR_ID,
-  }, {})).rejects.toMatchObject({ code: 'distribution_attachment_mode_invalid' });
+  }, {})).rejects.toMatchObject({
+    code: 'distribution_attachment_mode_invalid',
+    httpStatus: 400,
+    message: attachmentMode === 'zip'
+      ? 'The attachment mode is not recognized.'
+      : 'Attachments are no longer sent; use the proposal review packet. Reload and prepare the preview again.',
+  });
 });
 
 test('an absent or empty attachment mode means none: both snapshots are pinned, nothing is selected for attachment', async () => {
@@ -1165,7 +1171,7 @@ test('prepare refuses a material selection (retired) and binds one informational
     includeCalendar: true,
     siteVisitId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
     selectedMaterialIds: [materialId],
-  }), harness.dependencies)).rejects.toMatchObject({ code: 'distribution_material_links_retired', httpStatus: 400 });
+  }), harness.dependencies)).rejects.toMatchObject({ code: 'distribution_material_links_retired', httpStatus: 400, message: 'Material links are no longer sent by email; the proposal review packet contains the presentation materials. Reload and prepare the preview again.' });
   expect(harness.dependencies.createOrGetAttempt).not.toHaveBeenCalled();
 
   const result = await preparePreSiteDistribution(prepareInput({
