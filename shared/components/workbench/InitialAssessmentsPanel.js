@@ -67,7 +67,7 @@ export default function InitialAssessmentsPanel({ cycleCode, loadingCycles }) {
       {cycleCode === INITIAL_ASSESSMENTS_EXCLUDED_CYCLE ? (
         <Card hover={false}>
           <p className="font-medium text-gray-900">Initial assessments are not part of the D26 dual-phase workflow.</p>
-          <p className="mt-1 text-sm text-gray-500">This workspace becomes available for J27, where every complete single-submission proposal receives an Initial Assessment before advancement. Pre-site drafts for this cycle are under Staff deliberations.</p>
+          <p className="mt-1 text-sm text-gray-500">This workspace becomes available for J27, where every complete single-submission proposal receives an Initial Assessment before advancement. Draft writeups for this cycle are under Staff deliberations.</p>
         </Card>
       ) : loadingCycles || loading ? (
         <Card hover={false}><p className="text-gray-500">Loading artifacts…</p></Card>

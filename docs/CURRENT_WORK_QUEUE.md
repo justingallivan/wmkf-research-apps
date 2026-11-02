@@ -82,15 +82,18 @@ sequence.
   successfully to Production as deployment `7482300775`; Git merge status alone
   does not prove deployment. Signed-in Production walkthrough confirmed
   the main Request 1003222 Staff Deliberations/Final writeup headings and found
-  11 source-confirmed old-label strings across six files (two observed in the
-  walkthrough, nine source-only); disposition is pending and terminology migration is not complete. A fresh read-only
+  11 baseline old-label strings across six files (two observed, nine
+  source-only). Root reports corrections implemented on
+  `codex/final-terminology-copy`; PR review and Production verification remain
+  pending, so the migration is not release-complete. A fresh read-only
   inventory reported 46 email fields / 4 personal records and 60 prompt
   versions / 39 current. Only three scoped shared fields, Duncan's cleared
   invitation override, and two prompt families published at v6/v3 with exact
   approved content preserved and audits completed are verified changes.
   No raw content is stored here. No broad migration/backfill is authorized;
   existing saved names/content, historical files, identifiers and contracts
-  remain protected. Evidence, limits and exact residuals:
+  remain protected. The stale-client compatibility guard is explicitly outside
+  this 11-string PR. Evidence, limits and source locations:
   `docs/audits/terminology-completion-audit-2026-11-01.md`; approved table:
   `docs/plans/review/PROPOSAL_WORKFLOW_VOCABULARY_2026-10-19.md`; glossary:
   `docs/NOMENCLATURE_GLOSSARY.md`.

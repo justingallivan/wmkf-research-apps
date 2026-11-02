@@ -133,11 +133,12 @@ prompt-source terminology slice. These are source/Git receipts, not deployment
 evidence. Separate operational receipts verify three scoped shared editable
 fields, clearing Duncan's invitation override, and publishing two scoped prompt
 families at v6/v3 with exact approved content preserved and audits completed.
-The signed-in Production walkthrough confirmed the main request 1003222
-Staff Deliberations/Final writeup headings and found 11 source-confirmed
-old-label strings across six files (two observed in the walkthrough, nine
-source-only). The remaining source-copy findings are being evaluated; do not
-call the migration complete. A fresh read-only inventory reports 46 email fields / 4 personal
+The signed-in Production walkthrough confirmed the main Request 1003222
+Staff Deliberations/Final writeup headings and identified 11 baseline
+old-label strings across six files (two observed, nine source-only). Root reports
+all 11 corrections implemented on `codex/final-terminology-copy`; PR review and
+production verification remain pending. The separate stale-client compatibility
+guard is excluded; do not call the full terminology migration complete. A fresh read-only inventory reports 46 email fields / 4 personal
 records and 60 prompt versions / 39 current; only the three scoped shared
 fields, cleared Duncan invitation override, and two published prompt families
 are verified as changed/read back. Preserve
@@ -145,7 +146,7 @@ routes, API/service and prompt identifiers, schemas/storage values, artifact
 types, saved settings, user content, and historical files. No broad data
 migration, backfill, or unsafeguarded content rewrite is authorized. The
 [2026-11-01 terminology completion audit](audits/terminology-completion-audit-2026-11-01.md)
-holds the evidence matrix, remaining visible-label findings, and limits.
+holds the evidence matrix, branch-local correction status, and verification limits.
 
 ### Historical source inventory — October 6–7, 2026
 

@@ -24,7 +24,7 @@ export const VIEWS = {
   },
   'staff-deliberations': {
     label: 'Staff deliberations',
-    description: 'Review visit schedules, briefings, and post-visit preparation for the selected program and cycle.',
+    description: 'Review research presentation schedules, proposal discussion briefs, and draft writeups for the selected program and cycle.',
   },
   'initial-assessments': {
     label: 'Initial assessments',

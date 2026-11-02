@@ -68,11 +68,13 @@ rerendering under the new template identity. PR #597 implements the bounded A4/C
 prompt-source terminology. Bounded operational receipts verify three shared
 editable fields, Duncan's invitation override cleared, and two scoped prompt
 families current at v6/v3 with exact approved content preserved and audits
-completed. A signed-in Production walkthrough confirmed the main Request 1003222
-Staff Deliberations/Final writeup headings but found 11 source-confirmed old-label strings across six files; two were observed
-and nine were source-only; see the [terminology closeout audit](audits/terminology-completion-audit-2026-11-01.md).
-Those residuals are open; this note does not certify the full terminology
-migration or general deployment state. Historical implementation and rollout
+completed. The prior signed-in Production walkthrough confirmed the main Request 1003222
+Staff Deliberations/Final writeup headings and found 11 baseline old-label
+strings across six files (two observed, nine source-only); see the
+[terminology closeout audit](audits/terminology-completion-audit-2026-11-01.md).
+Root reports all 11 corrections implemented on `codex/final-terminology-copy`,
+pending PR review and Production verification. The separate stale-client
+guard is out of scope; this does not certify full terminology migration. Historical implementation and rollout
 receipts below retain their dated scope.
 
 **[VERIFIED 2026-09-07 via source, focused tests, and controlled setup]** The generation/document modules, guarded historical prompt support, prompt seed definitions, prompt seeder, six-table migration, setup-database fresh-install shape, API routes, worker/service/store, and UI are source-built on branch codex/cycle-dossier-pilot-build. Migration 045 is applied and verified; the private store `wmkf-cycle-dossier-private` (`store_W9WC1TLR7kpl9hty`) is connected under the custom `DOSSIER_BLOB` prefix in all environments, with the managed token authenticated in Development. Focused generation/document/Executor tests and targeted lint pass in the local checkout.

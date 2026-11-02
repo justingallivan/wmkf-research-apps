@@ -82,7 +82,7 @@ function taskFor(request) {
   if (attentionReason(request)) return { label: 'Needs attention', bucket: 'attention', tab: 'staff-deliberations' };
   if (request.preparation?.due) {
     const ready = writeupReady(request);
-    if (ready) return { label: 'Post-visit editing', bucket: 'post', tab: 'staff-deliberations' };
+    if (ready) return { label: 'Draft writeup editing', bucket: 'post', tab: 'staff-deliberations' };
     if (request.preparation.state === 'disabled') {
       return { label: request.writeup?.availability === 'available' ? 'Draft writeup available' : 'No draft writeup yet', bucket: 'post', tab: 'staff-deliberations' };
     }
@@ -149,7 +149,7 @@ function nextStep(request, task, document) {
   if (request.preparation?.due && ['due', 'pending'].includes(request.preparation?.state)) {
     return 'Preparation will run automatically. No action is needed now.';
   }
-  if (task.label === 'Post-visit editing') return 'Add your research presentation findings to the draft writeup, then open group review.';
+  if (task.label === 'Draft writeup editing') return 'Add your research presentation findings to the draft writeup, then open group review.';
   if (task.bucket === 'post') return document
     ? 'Prepare the draft writeup for editing.'
     : 'Prepare your draft writeup.';
@@ -303,7 +303,7 @@ export default function StaffDeliberationsPanel({
         <div className="flex flex-wrap items-end gap-3">
           <label className="flex flex-col gap-1.5 text-sm font-medium text-gray-700">Task
             <select value={filter} onChange={(event) => setFilter(event.target.value)} className="h-11 rounded-lg border border-gray-300 bg-white px-3 text-sm font-normal text-gray-900 focus:border-gray-500 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2">
-              <option value="all">All tasks</option><option value="before">Before presentation</option><option value="post">Post-visit work</option><option value="review">In review</option><option value="attention">Needs attention</option>
+              <option value="all">All tasks</option><option value="before">Before presentation</option><option value="post">Draft writeup work</option><option value="review">In review</option><option value="attention">Needs attention</option>
             </select>
           </label>
           <label className="flex flex-col gap-1.5 text-sm font-medium text-gray-700">Search
