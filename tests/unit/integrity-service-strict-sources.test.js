@@ -277,5 +277,6 @@ test('engine excludes the reported conflicting authors and keeps namesakes unver
     if (e.type === 'complete') complete = e;
   }
   expect(complete.results.map((r) => r.matchCount)).toEqual([0, 0, 1]);
+  expect(complete.results[2].sources.retraction_watch.matches[0]).not.toHaveProperty('confidenceLevel');
   expect(complete.results[2].sources.retraction_watch.matches[0]).toMatchObject({ matchedAuthor: 'He, Yuan', identityStatus: 'unverified', matchingVersion: 2 });
 });

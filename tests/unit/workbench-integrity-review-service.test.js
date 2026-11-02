@@ -343,6 +343,7 @@ test('legacy approved-v1 stays approved; an unapproved-v1 run cannot receive a n
   const deps = dependenciesFor(dataverseDependencies(), { runs: [oldRun], reviews: [approval] });
   const context = await getWorkbenchIntegrityContext({ requestId: REQUEST_ID, profileId: 42, actingUserSystemId: SYSTEM_ID }, deps);
   expect(context.review).toMatchObject({ status: 'approved', canApprove: false });
+  expect(context.review.reason).toContain('earlier rules');
   const unapproved = dependenciesFor(dataverseDependencies(), { runs: [oldRun] });
   const pending = await getWorkbenchIntegrityContext({ requestId: REQUEST_ID, profileId: 42, actingUserSystemId: SYSTEM_ID }, unapproved);
   expect(pending.review).toMatchObject({ status: 'needs_review', canApprove: false });

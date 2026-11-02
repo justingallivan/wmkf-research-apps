@@ -120,7 +120,7 @@ function AIResultCard({ source, result, onDismiss, screenedName }) {
                 Review Needed
               </span>
             ) : (
-              <span className="ml-2 inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800 border border-green-200">
+              <span className={`ml-2 inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium border ${result.error || result.searched !== true ? 'bg-amber-100 text-amber-800 border-amber-200' : 'bg-green-100 text-green-800 border-green-200'}`}>
                 {integritySourceLabel(result)}
               </span>
             )}
@@ -196,7 +196,7 @@ function ApplicantResultCard({ result, onDismiss }) {
                 {result.matchCount} item{result.matchCount !== 1 ? 's' : ''} for review
               </span>
             ) : (
-              <span className="inline-flex min-h-7 items-center px-3 py-1 rounded-full text-sm font-medium bg-green-100 text-green-800 border border-green-300">
+              <span className={`inline-flex min-h-7 items-center px-3 py-1 rounded-full text-sm font-medium border ${integrityIncomplete(result) ? 'bg-amber-100 text-amber-800 border-amber-300' : 'bg-green-100 text-green-800 border-green-300'}`}>
                 {integrityResultLabel(result)}
               </span>
             )}
@@ -236,7 +236,7 @@ function ApplicantResultCard({ result, onDismiss }) {
                   <div className="p-4 bg-gray-50 border-b border-gray-200">
                     <div className="flex items-center gap-2">
                       <span className="text-xs font-medium text-gray-500 uppercase">Retraction Watch</span>
-                      <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800 border border-green-200">
+                      <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium border ${result.sources.retraction_watch?.error ? 'bg-amber-100 text-amber-800 border-amber-200' : 'bg-green-100 text-green-800 border-green-200'}`}>
                         {integritySourceLabel(result.sources.retraction_watch)}
                       </span>
                     </div>

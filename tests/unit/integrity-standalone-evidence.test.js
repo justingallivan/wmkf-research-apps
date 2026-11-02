@@ -62,6 +62,7 @@ test('standalone UI and all three exports preserve uncertainty and expose source
   await run();
   expect(screen.getByText('Exact name match · identity unverified')).toBeInTheDocument();
   expect(screen.getByText('Incomplete source')).toBeInTheDocument();
+  expect(screen.getByText('Incomplete source').className).not.toContain('bg-green');
   expect(screen.queryByText(/100%/)).toBeNull();
   fireEvent.click(screen.getByRole('button', { name: 'Export Markdown' }));
   expect(captured[0]).toContain('Exact name match · identity unverified');

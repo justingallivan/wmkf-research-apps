@@ -12,7 +12,7 @@ const RESULT = {
   name: PEOPLE[0].name,
   institution: INSTITUTION,
   isCommonName: true,
-  sourceCoverageVersion: 1,
+  sourceCoverageVersion: 2, matchingVersion: 2,
   matchCount: 1,
   hasConcerns: true,
   sources: {
@@ -21,7 +21,7 @@ const RESULT = {
       retractionNature: 'Retraction', reasons: ['Data concern'], doi: '10.1000/example',
       urls: 'https://retraction.example/one; https://retraction.example/two',
     }], error: null },
-    pubpeer: { searched: true, summary: 'A source summary for human review.', resultCount: 1, hasConcerns: false, rawResults: [{ title: 'Public discussion', link: 'https://pubpeer.com/publication/example' }], error: null },
+    pubpeer: { searched: true, sourceValidationVersion: 2, summary: 'A source summary for human review.', resultCount: 1, hasConcerns: false, rawResults: [{ title: 'Public discussion', link: 'https://pubpeer.com/publication/example' }], error: null },
     news: { searched: true, summary: 'No relevant news found.', resultCount: 0, hasConcerns: false, error: null },
   },
 };
@@ -117,6 +117,7 @@ test('Integrity tab loads, confirms before spending, and renders saved findings 
   });
   await page.getByRole('button', { name: 'Run screen' }).click();
   await expect(page.getByText('Latest saved screen')).toBeVisible();
+  await expect(page.getByText(/Earlier matching rules/)).toHaveCount(0);
   await expect(page.getByText('1 item for human review')).toBeVisible();
   await expect(page.getByText('Incomplete screen')).toHaveCount(0);
   await expect(page.getByText('A retracted public study')).toBeVisible();

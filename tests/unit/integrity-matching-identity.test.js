@@ -36,3 +36,16 @@ test('unknown and legacy evidence is never a positive identity claim', () => {
   expect(integrityIdentityLabel({ matchingVersion: 2, identityStatus: 'verified', nameEvidence: 'exact_name' })).toBe('Identity unverified');
   expect(integrityIdentityLabel({ matchingVersion: 2, identityStatus: 'unverified', nameEvidence: 'toString' })).toBe('Identity unverified');
 });
+
+test.each([
+  ['Wei Li', 'LI Wei', true, 'ambiguous_name'],
+  ['Robert A Leung', 'RA Leung', true, 'compatible_initials'],
+  ['Anthony Leung', 'RA Leung', false, undefined],
+  ['John A Smith', 'John Paul A Smith', true, 'ambiguous_name'],
+  ['John A Smith', 'John B Smith', false, undefined],
+  ['A Leung', 'A Leung', true, 'compatible_initials'],
+])('Fable regression: %s / %s', (a, b, matches, nameEvidence) => {
+  const result = M.calculateNameMatch(a, b);
+  expect(result.matches).toBe(matches);
+  if (matches) expect(result.nameEvidence).toBe(nameEvidence);
+});
