@@ -10,6 +10,18 @@ The chronological archive after the `Legacy chronological session log` divider c
 
 ---
 
+## November 2026 — Shared prompt library catalog lives in Dataverse and is editable in Admin (Session 659, Claude)
+
+**Milestone:** Owner rescoped the shared prompt library away from a Dataverse plug-in. Prompt catalog metadata now lives on the prompt rows and is editable in Admin.
+**Sessions:** Session 659; owner-approved Production schema change, read-only inventory, ETag-bound backfill and owner-run migration 093.
+**Ship state:**
+- Six wave36 columns on `wmkf_ai_prompt` in Production (sandbox already had them).
+- PR #606 (`adb674d73`): Admin publish and seed `--force` carry them forward; the page prefers stored values.
+- 40 of 40 Production prompts backfilled from `ADMIN_PROMPT_CATALOG` and verified by readback.
+- PR #608 (`d108f21a1`): Admin "Edit details" edits them in place, audited in `prompt_publish_audit` (migration 093).
+**Why it matters:** Prompt descriptions and organization are shared Dataverse data that staff can maintain without a deploy. Connor can describe his own prompts. First publish for new prompt names is the remaining gap.
+**Pointers:** `docs/plans/SHARED_PROMPT_LIBRARY_SCOPE_CHANGE_2026-11-02.md`; `docs/plans/evidence/prompt-catalog-backfill-prod-2026-11-02.json`.
+
 ## November 2026 — Integrity screening clarified; Retraction Watch managed monthly (Session 658, Codex)
 
 **Milestone:** Screening rejects conflicting names, reports identity uncertainty honestly, and uses a controlled, attributable Retraction Watch corpus; PubPeer becomes manual-only by owner decision.

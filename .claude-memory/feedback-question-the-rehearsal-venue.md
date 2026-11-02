@@ -45,3 +45,11 @@ rehearsal or plan sandbox schema parity as a prerequisite. Each Production
 write still needs the owner's explicit OK. Worked example: the Wave 35 rollout
 (Ended by field + Did not submit status), steps 1-5 in
 `docs/plans/INVITED_REVIEWER_OUTCOMES_PLAN_2026-10-31.md`.
+
+**Repeat miss (Session 659, 2026-11-02):** for the prompt catalog backfill
+(display-only, reversible values copied from code), Claude still proposed a
+sandbox rehearsal plus a 40-row value review. The owner asked "Are you really
+concerned about a prod write?" Proportion the ceremony to the actual risk: name
+the one real hazard (here: readers that refuse a modified prompt row), check it
+in source, then do the guarded Production write. Receipt:
+`docs/plans/evidence/prompt-catalog-backfill-prod-2026-11-02.json`.

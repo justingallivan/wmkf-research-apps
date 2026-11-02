@@ -1,146 +1,149 @@
-# Session 659 Prompt: Integrity work complete; await next owner-selected task
+# Session 660 Prompt: Shared prompt library — first publish for new prompt names
 
-## Session 658 Summary — Codex, 2026-11-02 Pacific
+## Session 659 Summary — Claude, 2026-11-02 Pacific (concurrent with Codex Session 658)
 
-[VERIFIED via merged PRs and production receipts] Integrity screening accuracy,
-managed Retraction Watch refresh, monthly activation and the manual-only PubPeer
-policy are complete. Justin requested stop and disposal of this session's isolated
-worktree. Documentation lands on main through a docs-only closeout branch;
-no runtime promotion, provider call, database write or new backlog implementation
-is part of this closeout.
+Justin and Connor rescoped the shared prompt library. Claude then shipped catalog
+metadata end to end: columns, carry-forward, backfill and Admin editing. Runtime
+work went through PRs #606 and #608. Docs landed on `main` directly as Tier 0.
 
 ### What Was Completed
 
-1. **Screening accuracy — PR #604, merge b95a6f04c.** Conflicting given/middle
-   names are excluded; retained name candidates explicitly remain identity-unverified.
-   Matching, source reporting, history and exports were Fable-reviewed and tested.
-2. **Managed reference data — migration 092 and first publication.** Canonical
-   migration runner applied 092; scoped backup/local restore was verified before
-   publication. Owner-approved first refresh produced 73,521 rows: 73,519 upstream
-   plus two narrowly retained legacy records (13045/67801) with explicit notice,
-   backup and payload provenance. Initial generation 1; completed audit 282049.
-   Exact checksums and production readbacks are in the release receipt.
-3. **Monthly refresh — PR #605, merge c7f6b4370.** Production registry was verified
-   at 0 6 1 * * (the 1st at 06:00 UTC), with Production enablement on. The first
-   scheduled run is December 1, 2026 at 06:00 UTC / November 30 at 10 p.m. PST;
-   it has not yet been observed. No automatic applicant screening is scheduled.
-4. **Manual-only PubPeer — PR #607, merge 431a71888.** Owner declines paid access.
-   Automated Google PubPeer searches and Claude PubPeer analysis are removed.
-   Both screens, help, app card and PDF/Markdown/JSON show the manual link and
-   Not checked automatically; opening it records no check. Policy version 3
-   requires successful automated Retraction Watch/news plus existing roster and
-   reviewer authority checks. Old version-1/2 evidence/decisions retain their rules;
-   older unapproved runs need a new screen. No schema/history rewrite.
-5. **Live validation.** Owner approved Claude/SerpAPI credits to rerun request
-   1002852. Saved screening 68 verifies policy 3, recorded dataset generation 1,
-   successful automated sources and manual-only PubPeer. Owner subsequently
-   reported recording staff approval. This session did not record an approval,
-   hold or dismissal. No namesake match was converted into verified identity.
-6. **Workflow boundary.** Source/caller audit confirmed Integrity approval checks
-   apply to recording an Integrity disposition; no downstream progression/funding
-   gate consumes them. Monthly corpus refresh alone does not revoke a saved approval.
+1. **Scope change — no Dataverse plug-in.** [OWNER DECISION]
+   - Access to the prompt tables is already tightly limited, so there are no
+     write guards.
+   - Connor drafts in Dataverse and publishes from Admin. He cannot run Node
+     scripts and has superuser access.
+   - PR #553's plug-in/Windows-registration track is superseded. The Windows09
+     check was never run.
+   - Record: `docs/plans/SHARED_PROMPT_LIBRARY_SCOPE_CHANGE_2026-11-02.md`. The
+     former resume record `docs/plans/PR553_MONDAY_RESUME_2026-11-02.md` is now
+     historical.
+2. **Six catalog columns on `wmkf_ai_prompt`** (wave36; title, description,
+   group, section, used by, usage category).
+   - Created in Production under a same-day owner write ACK.
+   - The sandbox already had them.
+   - A metadata readback matched the spec in both environments. Spec:
+     `lib/dataverse/schema/wave36-prompt-catalog/`.
+3. **Carry-forward and display.** PR #606, merge `adb674d73`.
+   - Admin publish and `prompt-seed.js --force` copy the columns to each new
+     version.
+   - Admin prefers stored values and falls back to `ADMIN_PROMPT_CATALOG`.
+   - The preview was owner-checked through the stable alias with a
+     branch-scoped read-only `DATAVERSE_ALLOW_PROD_READS`. Both were rolled
+     back and verified afterwards.
+4. **Production backfill, 40 of 40 verified.**
+   - Read-only inventory first: 61 rows across 40 names, all in the code
+     catalog. The only exception was `phase-i.checkin`, which has no current
+     row; its v1 row was the target.
+   - Then one `If-Match` PATCH per row, using code-catalog values, with
+     readback.
+   - Evidence: `docs/plans/evidence/prompt-catalog-inventory-prod-2026-11-02.json`
+     and `docs/plans/evidence/prompt-catalog-backfill-prod-2026-11-02.json`.
+5. **Admin "Edit details".** PR #608, merge `d108f21a1`, deployed as
+   `dpl_8hJRjhFfKocTgjjHC4nMYebbLLpz`.
+   - Route and service: `PATCH /api/admin/prompts/[name]` →
+     `lib/services/admin/prompts-catalog-service.js`.
+   - Edits in place, with no new version. Stale-row/value checks return 409.
+   - Group, section and usage are allowlisted.
+   - A pending audit is written before the `If-Match` write, and the edit is
+     refused if that audit write fails.
+   - Returns `catalog_superseded` when a publish lands mid-edit.
+   - Migration 093 widened `prompt_publish_audit_status_check`. It was applied
+     owner-run, before the merge, and the constraint was read back.
+   - Writes run as the app principal; the audit row records the editor.
 
-### Commits and Evidence
-
-- PR #604 / b95a6f04c — accuracy, controlled refresh and retained provenance.
-- PR #605 / c7f6b4370; 6e00a10a7 — monthly activation and verified receipt.
-- PR #607 / 431a71888; 45814e16a — manual-only policy and deployed Fable closure.
-- Final Fable closure: READY TO MERGE after the P2 help/app-card correction;
-  OAuth-only read-only review, no API-key agent authentication or metered review.
-- Final manual-policy verification: 166 focused tests / 10 suites, 4 isolated
-  real-Postgres review tests, all PR checks green, Ready production deployment
-  dpl_EMb1sWckL9wCyvpL3gzw3ce571TX at the exact PR #607 merge SHA. Subsequent
-  docs-only reconciliation did not change the runtime. Production readback proved
-  the same 73,521-row hash/provenance and active monthly schedule.
+### Commits
+- `4e52d2018`, `1e50379e5` — scope change and existing Admin publish facts.
+- `6082a8116`, `2dac3ea90` — wave36 spec; columns live and backfill plan.
+- PR #606 `adb674d73` — catalog carry-forward/display (`a4af85911`, `a706af7bb`).
+- `997d395a4` — backfill receipt.
+- PR #608 `d108f21a1` — Admin catalog editing plus migration 093 (`728a75e52`).
+- `9db614417` — deployed markers and the next-session action item.
 
 ## Next Items
 
 ### Verified Open
 
-None required for this Integrity task. Do not start new work during closeout.
-The first future monthly execution remains unobserved; inspect its maintenance
-receipt if the owner asks about it, rather than claiming scheduled execution passed.
+1. **First publish for a brand-new prompt name in Admin.** [OWNER REQUEST
+   2026-11-02]
+   Evidence: `lib/services/admin/prompts-publish-service.js` returns
+   `404 no_current_row` ("seed it before versioned publish") for a name with
+   no current row. Connor's new prompts can't go live until this is fixed.
+   - Extend the existing publish flow.
+   - Keep `If-Match`, single-current verification, the pending/final audit and
+     payload idempotency.
+   - Owner decision needed first: create v1 from the draft row, or mark the
+     draft row itself current.
+2. **Owner smoke of Edit details (not yet done).** Justin edits one prompt's
+   details in Production, then restores the value. After that, read the two
+   `prompt_publish_audit` rows (`outcome_json.kind = 'catalog'`) to confirm the
+   profile and the before/after values.
 
-### Action item — next session (owner request, 2026-11-02, Claude)
+### Verify Before Acting
 
-**First publish for a brand-new prompt name in Admin.**
-[VERIFIED via `lib/services/admin/prompts-publish-service.js`] Admin publish
-refuses any name with no current row (`404 no_current_row`, "seed it before
-versioned publish"). Connor's new prompts, once added to `wmkf_ai_prompt`,
-cannot go live from Admin until this is fixed.
-
-- Scope: extend the existing publish flow; do not build a new one.
-- Keep `If-Match`, single-current verification, the pending/final audit and
-  payload idempotency.
-- Decide with Justin how the first version is created: v1 from the draft row,
-  or flip the draft row to current.
-- Resume from `docs/plans/SHARED_PROMPT_LIBRARY_SCOPE_CHANGE_2026-11-02.md`.
-
-Also: close PR #553 (superseded plug-in design). It must not merge; its
-Pre-Site output-schema change would break generation. Ask Justin or Codex
-before closing another agent's PR.
+1. **Close PR #553** (superseded plug-in design; owner asked 2026-11-02).
+   It must not merge: its Pre-Site output-schema change drops `maxLength`, and
+   `artifact-model.js` requires an exact live-row match, so merging would fail
+   every Pre-Site generation.
+   - The local branch `codex/shared-prompt-library-plan` (worktree
+     `/private/tmp/wmkf-pr553`) is 15 commits ahead of the remote and holds
+     local-only plug-in work.
+   - Closing the PR does not touch that branch.
+   - The signing key, Windows bundles and
+     `output/connor-windows09-offline-checks/` are local-only and must never
+     enter Git. Keep them until Justin decides.
 
 ### Parked — requires a new owner request
 
-- ORCID/publication/coauthor-grounded identity matching for common names.
-- Durable different-person dismissals. Existing standalone dismissal UI remains
-  a placeholder; do not claim reviewed namesakes are suppressed in future screens.
-Evidence: current matching/UI source and the manual-policy review receipt.
+- Integrity: ORCID/publication/coauthor identity matching; durable
+  different-person dismissals (the standalone UI is a placeholder).
+- Shared prompts: retiring `ADMIN_PROMPT_CATALOG` as the fallback;
+  `ExecutorBudgetEditor` still uses code titles.
 
 ### Do Not Reopen Without New Decision
 
-- No paid PubPeer subscription, undocumented endpoint or extension-key reuse.
-  June correspondence offered paid DOI/author APIs and limited trial access;
-  the old no-sanctioned-API claim is superseded. Owner chose manual-only.
-- No automatic re-screen, staff disposition, historical rewrite or new provider
-  spend. The completed request-specific credit approval is not blanket authority.
-- Do not add an Integrity funding/progression gate.
+- Shared prompts: no Dataverse plug-in, write guards or Windows registration.
+  Do not propose sandbox rehearsals for low-risk Production writes
+  (`feedback-question-the-rehearsal-venue`).
+- Integrity (Codex Session 658):
+  - No paid PubPeer, undocumented endpoint or extension-key reuse.
+  - No automatic re-screen, staff disposition, history rewrite or new provider
+    spend.
+  - No Integrity funding/progression gate.
 
 ## Concurrent Streams — preserve ownership, verify before acting
 
-The complete preceding Session 657/658 handoff is retrievable at
-`git show 997d395a4:SESSION_PROMPT.md` (verified during closeout). It preserves
-terminology acceptance limits, local-only colleague-brief artifacts, old queue
-pointers and other agents' boundaries. These are dated resume evidence, not a new
-worklist or transferable production-write authorization.
+Codex's complete Session 658 handoff, covering Integrity accuracy, the managed
+Retraction Watch refresh, monthly activation, manual-only PubPeer and its
+worktree disposal, is at `git show 9db614417:SESSION_PROMPT.md`.
 
 | Owner / stream | Current routing and preservation boundary |
 | --- | --- |
-| Claude / shared prompts | PR #606 is merged; 997d395a4 records the subsequent 40-row catalog backfill. PR #608 (Admin "Edit details" for the six catalog fields, audited in `prompt_publish_audit`) is merged and deployed as `d108f21a1`; migration 093 was applied to Production Postgres first (owner-run) and its constraint was verified. Next: first publish for new prompt names (see the action item above). Owning record: docs/plans/SHARED_PROMPT_LIBRARY_SCOPE_CHANGE_2026-11-02.md. Recheck source/live state with its owner; do not revive superseded plug-in/Windows-registration directions or treat the old PR #553 branch as current authority. |
-| Claude / reviewer outcomes and invitations | Existing owning plans: docs/plans/INVITED_REVIEWER_OUTCOMES_PLAN_2026-10-31.md and docs/plans/REVIEWER_INVITATION_CALENDAR_BUILD_PLAN_2026-10-29.md. Current open/closed items were not re-audited here. Coordinate before edits or sends. |
-| Codex / terminology | Merged slices and bounded verifier; preceding handoff and docs/audits/terminology-completion-audit-2026-11-01.md retain acceptance limits. Local colleague-brief output is not Git-backed; leave it untouched. |
-| Other streams | Preserve their worktrees, owning plans and queue decisions. No reprioritization or cleanup authority for another agent's artifacts. |
+| Codex / Integrity | Complete. First monthly refresh is scheduled for Dec 1, 2026 06:00 UTC and is unobserved; inspect its maintenance receipt rather than assuming it passed. The private backup at `/Users/gallivan/Code/WMKF_Apps/.integrity-backups/2026-11-02-pre-refresh/` must be preserved; no restore is authorized. Records: `docs/audits/integrity-*-2026-11-02.md`. |
+| Claude / shared prompts | See above. Owning record: `docs/plans/SHARED_PROMPT_LIBRARY_SCOPE_CHANGE_2026-11-02.md`. |
+| Claude / reviewer outcomes and invitations | `docs/plans/INVITED_REVIEWER_OUTCOMES_PLAN_2026-10-31.md`; `docs/plans/REVIEWER_INVITATION_CALENDAR_BUILD_PLAN_2026-10-29.md`. Not re-audited this session. |
+| Codex / terminology | `docs/audits/terminology-completion-audit-2026-11-01.md` keeps its acceptance limits. The local colleague brief is not Git-backed; leave it untouched. |
+| Other streams | Preserve their worktrees, owning plans and queue decisions. |
 
-## Key Files and Recovery
+## Key Files
 
 | Path | Purpose |
 | --- | --- |
-| docs/audits/integrity-production-release-2026-11-02.md | Migration, backup, dry-run and approved first publication receipts |
-| docs/audits/integrity-monthly-activation-2026-11-02.md | Fable/CI/deployment/live cron verification |
-| docs/audits/integrity-pubpeer-manual-2026-11-02.md | Policy contract, tests, Fable closure and deployed status |
-| docs/guides/RETRACTION_WATCH_REFRESH.md | Controlled refresh/uncertain-commit/recovery operating contract |
-| docs/agent-wiki/topics/integrity-screener.md | Current retrieval routing and PubPeer owner decision |
+| `docs/plans/SHARED_PROMPT_LIBRARY_SCOPE_CHANGE_2026-11-02.md` | Decision, catalog columns, backfill record, remaining work |
+| `lib/services/admin/prompts-catalog-service.js` | Catalog-details edit protocol |
+| `lib/services/admin/prompt-catalog-fields.js` | Column map and carry-forward helpers |
+| `shared/config/adminPromptCatalog.js` | Code catalog fallback, allowlists, `resolveAdminPromptDescription` |
+| `docs/atlas/dataverse-wmkf-ai-run-and-prompt.md` | Live read/write paths and audit statuses |
 
-The verified scoped backup remains outside the disposable worktree at
-`/Users/gallivan/Code/WMKF_Apps/.integrity-backups/2026-11-02-pre-refresh/`.
-It is private, ignored and not Git-synced. Preserve it; no production restore is
-authorized. Restoring must keep corpus and publication metadata coherent under
-the writer lock; never replay the raw dump into a running app.
+## Safety and Preservation
 
-## Stop and Worktree Preservation
-
-[VERIFIED before cleanup] Feature work is merged and pushed. The clean worktree
-`/private/tmp/wmkf-integrity-screening` has no local-only commits or unexplained
-untracked files. Inventoried ignored residuals are node_modules, .next, .swc,
-generated app/.well-known/workflow files, .agents/skills and the .env.local symlink
-back to the main checkout. These are disposable session setup/build artifacts;
-removing the symlink must not remove its target. The external backup, main output
-artifacts, other agents' worktrees and unrelated dirty main files remain untouched.
-Cleanup completion is recorded in the final chat after Git verifies removal.
-
-Milestone determination: required and added to DEVELOPMENT_LOG.md for managed
-Retraction Watch production cutover and retirement of automated PubPeer access.
-No CLAUDE.md or skill/instruction change is needed. Claim-evidence pilot report
-was attempted; local observation state could not be read, so no observation row
-or zero-advisory result was invented. Closeout documentation gates and push must
-pass before disposal; prior runtime checks are dated receipts, not rerun by stop.
+- Production approvals from this session (prod reads, write ACKs) are not
+  standing authority.
+- The unknown main-checkout WIP is owned by Justin or other sessions:
+  `.codex/hooks.json`, `.github/hooks/impeccable.json`,
+  `.impeccable/critique/…` and `output/`.
+- Claude's worktree `/Users/gallivan/Code/WMKF_Apps-claude-2026-11-02`
+  (branch `claude/session-2026-11-02`) is clean, and its commits are pushed to `main`. It holds
+  symlinked `node_modules` and a copied `.env.local`.
+- Milestone: a DEVELOPMENT_LOG entry was added for the shared prompt library
+  catalog in Admin.
