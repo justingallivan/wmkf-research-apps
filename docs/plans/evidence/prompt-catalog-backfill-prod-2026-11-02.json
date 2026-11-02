@@ -1,0 +1,1373 @@
+{
+ "kind": "prompt-catalog-backfill",
+ "mode": "execute",
+ "ranAt": "2026-11-02T22:05:23.117Z",
+ "host": "wmkf.crm.dynamics.com",
+ "inventoryReadAt": "2026-11-02T22:01:22.933Z",
+ "source": "shared/config/adminPromptCatalog.js ADMIN_PROMPT_CATALOG",
+ "summary": {
+  "written_verified": 40
+ },
+ "results": [
+  {
+   "name": "cycle-dossier.entry",
+   "rowId": "c525cac5-5ed6-f111-a05d-000d3a361c1f",
+   "version": 3,
+   "isCurrent": true,
+   "etagExpected": "W/\"106607089\"",
+   "etagBefore": "W/\"106607089\"",
+   "before": {
+    "wmkf_ai_displaytitle": null,
+    "wmkf_ai_description": null,
+    "wmkf_ai_groupkey": null,
+    "wmkf_ai_sectionkey": null,
+    "wmkf_ai_usedby": null,
+    "wmkf_ai_usagecategory": null
+   },
+   "after": {
+    "wmkf_ai_displaytitle": "Scientific dossier entry",
+    "wmkf_ai_description": "Writes a private scientific dossier entry from a proposal, prior AI context, and retrieved literature evidence, with field background and references.",
+    "wmkf_ai_groupkey": "meetings",
+    "wmkf_ai_sectionkey": null,
+    "wmkf_ai_usedby": "Scientific dossier → entry generation",
+    "wmkf_ai_usagecategory": "application"
+   },
+   "patchStatus": 204,
+   "readback": {
+    "wmkf_ai_displaytitle": "Scientific dossier entry",
+    "wmkf_ai_description": "Writes a private scientific dossier entry from a proposal, prior AI context, and retrieved literature evidence, with field background and references.",
+    "wmkf_ai_groupkey": "meetings",
+    "wmkf_ai_sectionkey": null,
+    "wmkf_ai_usedby": "Scientific dossier → entry generation",
+    "wmkf_ai_usagecategory": "application"
+   },
+   "outcome": "written_verified"
+  },
+  {
+   "name": "cycle-dossier.research-plan",
+   "rowId": "6f4c66f7-e4ae-f111-aaac-6045bd04539e",
+   "version": 2,
+   "isCurrent": true,
+   "etagExpected": "W/\"97802381\"",
+   "etagBefore": "W/\"97802381\"",
+   "before": {
+    "wmkf_ai_displaytitle": null,
+    "wmkf_ai_description": null,
+    "wmkf_ai_groupkey": null,
+    "wmkf_ai_sectionkey": null,
+    "wmkf_ai_usedby": null,
+    "wmkf_ai_usagecategory": null
+   },
+   "after": {
+    "wmkf_ai_displaytitle": "Scientific dossier literature search plan",
+    "wmkf_ai_description": "Creates up to three focused literature-search queries from the proposal for the app to run.",
+    "wmkf_ai_groupkey": "meetings",
+    "wmkf_ai_sectionkey": null,
+    "wmkf_ai_usedby": "Scientific dossier → research stage before entry writing",
+    "wmkf_ai_usagecategory": "application"
+   },
+   "patchStatus": 204,
+   "readback": {
+    "wmkf_ai_displaytitle": "Scientific dossier literature search plan",
+    "wmkf_ai_description": "Creates up to three focused literature-search queries from the proposal for the app to run.",
+    "wmkf_ai_groupkey": "meetings",
+    "wmkf_ai_sectionkey": null,
+    "wmkf_ai_usedby": "Scientific dossier → research stage before entry writing",
+    "wmkf_ai_usagecategory": "application"
+   },
+   "outcome": "written_verified"
+  },
+  {
+   "name": "executor.echo-parity",
+   "rowId": "63d789d5-649b-f111-b8db-6045bd008868",
+   "version": 2,
+   "isCurrent": true,
+   "etagExpected": "W/\"94905873\"",
+   "etagBefore": "W/\"94905873\"",
+   "before": {
+    "wmkf_ai_displaytitle": null,
+    "wmkf_ai_description": null,
+    "wmkf_ai_groupkey": null,
+    "wmkf_ai_sectionkey": null,
+    "wmkf_ai_usedby": null,
+    "wmkf_ai_usagecategory": null
+   },
+   "after": {
+    "wmkf_ai_displaytitle": "Executor echo and cache diagnostic",
+    "wmkf_ai_description": "Copies a request number and supplied test text into a small JSON response so a developer can compare repeated Executor output and observe cache use.",
+    "wmkf_ai_groupkey": "diagnostics",
+    "wmkf_ai_sectionkey": null,
+    "wmkf_ai_usedby": "Developer smoke tests.",
+    "wmkf_ai_usagecategory": "diagnostic"
+   },
+   "patchStatus": 204,
+   "readback": {
+    "wmkf_ai_displaytitle": "Executor echo and cache diagnostic",
+    "wmkf_ai_description": "Copies a request number and supplied test text into a small JSON response so a developer can compare repeated Executor output and observe cache use.",
+    "wmkf_ai_groupkey": "diagnostics",
+    "wmkf_ai_sectionkey": null,
+    "wmkf_ai_usedby": "Developer smoke tests.",
+    "wmkf_ai_usagecategory": "diagnostic"
+   },
+   "outcome": "written_verified"
+  },
+  {
+   "name": "expense-reporter.extract-document",
+   "rowId": "a97592ad-85c6-f111-aaad-6045bd0758b6",
+   "version": 1,
+   "isCurrent": true,
+   "etagExpected": "W/\"104202493\"",
+   "etagBefore": "W/\"104202493\"",
+   "before": {
+    "wmkf_ai_displaytitle": null,
+    "wmkf_ai_description": null,
+    "wmkf_ai_groupkey": null,
+    "wmkf_ai_sectionkey": null,
+    "wmkf_ai_usedby": null,
+    "wmkf_ai_usagecategory": null
+   },
+   "after": {
+    "wmkf_ai_displaytitle": "Extract expenses from receipt text",
+    "wmkf_ai_description": "Extracts expense information from the text of an uploaded receipt or invoice.",
+    "wmkf_ai_groupkey": "tools",
+    "wmkf_ai_sectionkey": null,
+    "wmkf_ai_usedby": "Expense Reporter → receipt and invoice documents",
+    "wmkf_ai_usagecategory": "application"
+   },
+   "patchStatus": 204,
+   "readback": {
+    "wmkf_ai_displaytitle": "Extract expenses from receipt text",
+    "wmkf_ai_description": "Extracts expense information from the text of an uploaded receipt or invoice.",
+    "wmkf_ai_groupkey": "tools",
+    "wmkf_ai_sectionkey": null,
+    "wmkf_ai_usedby": "Expense Reporter → receipt and invoice documents",
+    "wmkf_ai_usagecategory": "application"
+   },
+   "outcome": "written_verified"
+  },
+  {
+   "name": "expense-reporter.extract-image",
+   "rowId": "d283edae-85c6-f111-aaaf-70a8a5b11800",
+   "version": 1,
+   "isCurrent": true,
+   "etagExpected": "W/\"104202497\"",
+   "etagBefore": "W/\"104202497\"",
+   "before": {
+    "wmkf_ai_displaytitle": null,
+    "wmkf_ai_description": null,
+    "wmkf_ai_groupkey": null,
+    "wmkf_ai_sectionkey": null,
+    "wmkf_ai_usedby": null,
+    "wmkf_ai_usagecategory": null
+   },
+   "after": {
+    "wmkf_ai_displaytitle": "Extract expenses from a receipt image",
+    "wmkf_ai_description": "Reads a receipt or invoice image and extracts its expense information.",
+    "wmkf_ai_groupkey": "tools",
+    "wmkf_ai_sectionkey": null,
+    "wmkf_ai_usedby": "Expense Reporter → receipt and invoice images",
+    "wmkf_ai_usagecategory": "application"
+   },
+   "patchStatus": 204,
+   "readback": {
+    "wmkf_ai_displaytitle": "Extract expenses from a receipt image",
+    "wmkf_ai_description": "Reads a receipt or invoice image and extracts its expense information.",
+    "wmkf_ai_groupkey": "tools",
+    "wmkf_ai_sectionkey": null,
+    "wmkf_ai_usedby": "Expense Reporter → receipt and invoice images",
+    "wmkf_ai_usagecategory": "application"
+   },
+   "outcome": "written_verified"
+  },
+  {
+   "name": "expertise-finder.match",
+   "rowId": "a77592ad-85c6-f111-aaad-6045bd0758b6",
+   "version": 1,
+   "isCurrent": true,
+   "etagExpected": "W/\"104202478\"",
+   "etagBefore": "W/\"104202478\"",
+   "before": {
+    "wmkf_ai_displaytitle": null,
+    "wmkf_ai_description": null,
+    "wmkf_ai_groupkey": null,
+    "wmkf_ai_sectionkey": null,
+    "wmkf_ai_usedby": null,
+    "wmkf_ai_usagecategory": null
+   },
+   "after": {
+    "wmkf_ai_displaytitle": "Match a proposal to the internal expertise roster",
+    "wmkf_ai_description": "Compares a proposal with the supplied internal reviewer roster, explains suitable matches, and identifies expertise gaps.",
+    "wmkf_ai_groupkey": "reviewers",
+    "wmkf_ai_sectionkey": null,
+    "wmkf_ai_usedby": "Expertise Finder → single-proposal and batch matching",
+    "wmkf_ai_usagecategory": "application"
+   },
+   "patchStatus": 204,
+   "readback": {
+    "wmkf_ai_displaytitle": "Match a proposal to the internal expertise roster",
+    "wmkf_ai_description": "Compares a proposal with the supplied internal reviewer roster, explains suitable matches, and identifies expertise gaps.",
+    "wmkf_ai_groupkey": "reviewers",
+    "wmkf_ai_sectionkey": null,
+    "wmkf_ai_usedby": "Expertise Finder → single-proposal and batch matching",
+    "wmkf_ai_usagecategory": "application"
+   },
+   "outcome": "written_verified"
+  },
+  {
+   "name": "field-primer.generate",
+   "rowId": "16769ee1-649b-f111-b8db-6045bd008868",
+   "version": 2,
+   "isCurrent": true,
+   "etagExpected": "W/\"94905881\"",
+   "etagBefore": "W/\"94905881\"",
+   "before": {
+    "wmkf_ai_displaytitle": null,
+    "wmkf_ai_description": null,
+    "wmkf_ai_groupkey": null,
+    "wmkf_ai_sectionkey": null,
+    "wmkf_ai_usedby": null,
+    "wmkf_ai_usagecategory": null
+   },
+   "after": {
+    "wmkf_ai_displaytitle": "Research field primer",
+    "wmkf_ai_description": "Explains the proposal’s research field for a non-specialist: methods, subareas, frontiers, communities, venues, experts, and where the proposal fits. It does not evaluate the proposal or recommend reviewers.",
+    "wmkf_ai_groupkey": "preflight",
+    "wmkf_ai_sectionkey": null,
+    "wmkf_ai_usedby": "Workbench → Proposal → Field Primer; standalone generation",
+    "wmkf_ai_usagecategory": "application"
+   },
+   "patchStatus": 204,
+   "readback": {
+    "wmkf_ai_displaytitle": "Research field primer",
+    "wmkf_ai_description": "Explains the proposal’s research field for a non-specialist: methods, subareas, frontiers, communities, venues, experts, and where the proposal fits. It does not evaluate the proposal or recommend reviewers.",
+    "wmkf_ai_groupkey": "preflight",
+    "wmkf_ai_sectionkey": null,
+    "wmkf_ai_usedby": "Workbench → Proposal → Field Primer; standalone generation",
+    "wmkf_ai_usagecategory": "application"
+   },
+   "outcome": "written_verified"
+  },
+  {
+   "name": "funding-gap.analyze",
+   "rowId": "a87592ad-85c6-f111-aaad-6045bd0758b6",
+   "version": 1,
+   "isCurrent": true,
+   "etagExpected": "W/\"104202489\"",
+   "etagBefore": "W/\"104202489\"",
+   "before": {
+    "wmkf_ai_displaytitle": null,
+    "wmkf_ai_description": null,
+    "wmkf_ai_groupkey": null,
+    "wmkf_ai_sectionkey": null,
+    "wmkf_ai_usedby": null,
+    "wmkf_ai_usagecategory": null
+   },
+   "after": {
+    "wmkf_ai_displaytitle": "Federal funding landscape report",
+    "wmkf_ai_description": "Uses proposal details and funding records already retrieved by the app to write a report on funding patterns and potential gaps.",
+    "wmkf_ai_groupkey": "tools",
+    "wmkf_ai_sectionkey": null,
+    "wmkf_ai_usedby": "Funding Gap Analyzer → report stage",
+    "wmkf_ai_usagecategory": "application"
+   },
+   "patchStatus": 204,
+   "readback": {
+    "wmkf_ai_displaytitle": "Federal funding landscape report",
+    "wmkf_ai_description": "Uses proposal details and funding records already retrieved by the app to write a report on funding patterns and potential gaps.",
+    "wmkf_ai_groupkey": "tools",
+    "wmkf_ai_sectionkey": null,
+    "wmkf_ai_usedby": "Funding Gap Analyzer → report stage",
+    "wmkf_ai_usagecategory": "application"
+   },
+   "outcome": "written_verified"
+  },
+  {
+   "name": "funding-gap.extract",
+   "rowId": "a5af5fae-85c6-f111-aaaf-000d3a361c1f",
+   "version": 1,
+   "isCurrent": true,
+   "etagExpected": "W/\"104202484\"",
+   "etagBefore": "W/\"104202484\"",
+   "before": {
+    "wmkf_ai_displaytitle": null,
+    "wmkf_ai_description": null,
+    "wmkf_ai_groupkey": null,
+    "wmkf_ai_sectionkey": null,
+    "wmkf_ai_usedby": null,
+    "wmkf_ai_usagecategory": null
+   },
+   "after": {
+    "wmkf_ai_displaytitle": "Extract proposal details for funding searches",
+    "wmkf_ai_description": "Extracts the investigator, institution, research topics, and search terms needed for the app’s federal funding lookup.",
+    "wmkf_ai_groupkey": "tools",
+    "wmkf_ai_sectionkey": null,
+    "wmkf_ai_usedby": "Funding Gap Analyzer → initial extraction stage",
+    "wmkf_ai_usagecategory": "application"
+   },
+   "patchStatus": 204,
+   "readback": {
+    "wmkf_ai_displaytitle": "Extract proposal details for funding searches",
+    "wmkf_ai_description": "Extracts the investigator, institution, research topics, and search terms needed for the app’s federal funding lookup.",
+    "wmkf_ai_groupkey": "tools",
+    "wmkf_ai_sectionkey": null,
+    "wmkf_ai_usedby": "Funding Gap Analyzer → initial extraction stage",
+    "wmkf_ai_usagecategory": "application"
+   },
+   "outcome": "written_verified"
+  },
+  {
+   "name": "grantee-abstract.generate",
+   "rowId": "c766ce28-826e-f111-ab0d-000d3a306da2",
+   "version": 2,
+   "isCurrent": true,
+   "etagExpected": "W/\"86160737\"",
+   "etagBefore": "W/\"86160737\"",
+   "before": {
+    "wmkf_ai_displaytitle": null,
+    "wmkf_ai_description": null,
+    "wmkf_ai_groupkey": null,
+    "wmkf_ai_sectionkey": null,
+    "wmkf_ai_usedby": null,
+    "wmkf_ai_usagecategory": null
+   },
+   "after": {
+    "wmkf_ai_displaytitle": "Rewrite the grantee abstract in Foundation style",
+    "wmkf_ai_description": "Rewrites the applicant’s abstract in Foundation house style. The Awardee workflow saves the returned draft for staff review.",
+    "wmkf_ai_groupkey": "awardees",
+    "wmkf_ai_sectionkey": null,
+    "wmkf_ai_usedby": "Workbench → Awardee → generate abstract",
+    "wmkf_ai_usagecategory": "application"
+   },
+   "patchStatus": 204,
+   "readback": {
+    "wmkf_ai_displaytitle": "Rewrite the grantee abstract in Foundation style",
+    "wmkf_ai_description": "Rewrites the applicant’s abstract in Foundation house style. The Awardee workflow saves the returned draft for staff review.",
+    "wmkf_ai_groupkey": "awardees",
+    "wmkf_ai_sectionkey": null,
+    "wmkf_ai_usedby": "Workbench → Awardee → generate abstract",
+    "wmkf_ai_usagecategory": "application"
+   },
+   "outcome": "written_verified"
+  },
+  {
+   "name": "grantee-title.generate",
+   "rowId": "f3bb23bc-4f6c-f111-a826-000d3a306b0f",
+   "version": 1,
+   "isCurrent": true,
+   "etagExpected": "W/\"85986307\"",
+   "etagBefore": "W/\"85986307\"",
+   "before": {
+    "wmkf_ai_displaytitle": null,
+    "wmkf_ai_description": null,
+    "wmkf_ai_groupkey": null,
+    "wmkf_ai_sectionkey": null,
+    "wmkf_ai_usedby": null,
+    "wmkf_ai_usagecategory": null
+   },
+   "after": {
+    "wmkf_ai_displaytitle": "Board Summary project objective",
+    "wmkf_ai_description": "Turns the applicant’s title and abstract into one short, plain-language project-objective line for trustees.",
+    "wmkf_ai_groupkey": "awardees",
+    "wmkf_ai_sectionkey": null,
+    "wmkf_ai_usedby": "Scheduled grantee-title generation → missing edited project descriptions",
+    "wmkf_ai_usagecategory": "application"
+   },
+   "patchStatus": 204,
+   "readback": {
+    "wmkf_ai_displaytitle": "Board Summary project objective",
+    "wmkf_ai_description": "Turns the applicant’s title and abstract into one short, plain-language project-objective line for trustees.",
+    "wmkf_ai_groupkey": "awardees",
+    "wmkf_ai_sectionkey": null,
+    "wmkf_ai_usedby": "Scheduled grantee-title generation → missing edited project descriptions",
+    "wmkf_ai_usagecategory": "application"
+   },
+   "outcome": "written_verified"
+  },
+  {
+   "name": "initial-assessment.generate",
+   "rowId": "d829c1f3-649b-f111-b8db-6045bd008868",
+   "version": 2,
+   "isCurrent": true,
+   "etagExpected": "W/\"94905889\"",
+   "etagBefore": "W/\"94905889\"",
+   "before": {
+    "wmkf_ai_displaytitle": null,
+    "wmkf_ai_description": null,
+    "wmkf_ai_groupkey": null,
+    "wmkf_ai_sectionkey": null,
+    "wmkf_ai_usedby": null,
+    "wmkf_ai_usagecategory": null
+   },
+   "after": {
+    "wmkf_ai_displaytitle": "Initial Assessment narrative draft",
+    "wmkf_ai_description": "Drafts Summary, Significance and Impact, Research Plan, and Team Expertise from the proposal. Foundation Opportunity remains for staff judgment.",
+    "wmkf_ai_groupkey": "preflight",
+    "wmkf_ai_sectionkey": null,
+    "wmkf_ai_usedby": "Workbench → Initial Assessment generation",
+    "wmkf_ai_usagecategory": "application"
+   },
+   "patchStatus": 204,
+   "readback": {
+    "wmkf_ai_displaytitle": "Initial Assessment narrative draft",
+    "wmkf_ai_description": "Drafts Summary, Significance and Impact, Research Plan, and Team Expertise from the proposal. Foundation Opportunity remains for staff judgment.",
+    "wmkf_ai_groupkey": "preflight",
+    "wmkf_ai_sectionkey": null,
+    "wmkf_ai_usedby": "Workbench → Initial Assessment generation",
+    "wmkf_ai_usagecategory": "application"
+   },
+   "outcome": "written_verified"
+  },
+  {
+   "name": "literature-analyzer.compare",
+   "rowId": "182616b2-85c6-f111-aaad-6045bd027040",
+   "version": 1,
+   "isCurrent": true,
+   "etagExpected": "W/\"104202512\"",
+   "etagBefore": "W/\"104202512\"",
+   "before": {
+    "wmkf_ai_displaytitle": null,
+    "wmkf_ai_description": null,
+    "wmkf_ai_groupkey": null,
+    "wmkf_ai_sectionkey": null,
+    "wmkf_ai_usedby": null,
+    "wmkf_ai_usagecategory": null
+   },
+   "after": {
+    "wmkf_ai_displaytitle": "Compare research papers",
+    "wmkf_ai_description": "Compares the methods or findings across the supplied paper summaries.",
+    "wmkf_ai_groupkey": "tools",
+    "wmkf_ai_sectionkey": null,
+    "wmkf_ai_usedby": "Literature Analyzer → optional comparison stage",
+    "wmkf_ai_usagecategory": "application"
+   },
+   "patchStatus": 204,
+   "readback": {
+    "wmkf_ai_displaytitle": "Compare research papers",
+    "wmkf_ai_description": "Compares the methods or findings across the supplied paper summaries.",
+    "wmkf_ai_groupkey": "tools",
+    "wmkf_ai_sectionkey": null,
+    "wmkf_ai_usedby": "Literature Analyzer → optional comparison stage",
+    "wmkf_ai_usagecategory": "application"
+   },
+   "outcome": "written_verified"
+  },
+  {
+   "name": "literature-analyzer.extract-paper",
+   "rowId": "78423eb2-85c6-f111-aaaf-6045bd04539e",
+   "version": 1,
+   "isCurrent": true,
+   "etagExpected": "W/\"104202502\"",
+   "etagBefore": "W/\"104202502\"",
+   "before": {
+    "wmkf_ai_displaytitle": null,
+    "wmkf_ai_description": null,
+    "wmkf_ai_groupkey": null,
+    "wmkf_ai_sectionkey": null,
+    "wmkf_ai_usedby": null,
+    "wmkf_ai_usagecategory": null
+   },
+   "after": {
+    "wmkf_ai_displaytitle": "Extract information from one research paper",
+    "wmkf_ai_description": "Reads an attached research-paper PDF and extracts structured information for a literature review.",
+    "wmkf_ai_groupkey": "tools",
+    "wmkf_ai_sectionkey": null,
+    "wmkf_ai_usedby": "Literature Analyzer → per-paper extraction",
+    "wmkf_ai_usagecategory": "application"
+   },
+   "patchStatus": 204,
+   "readback": {
+    "wmkf_ai_displaytitle": "Extract information from one research paper",
+    "wmkf_ai_description": "Reads an attached research-paper PDF and extracts structured information for a literature review.",
+    "wmkf_ai_groupkey": "tools",
+    "wmkf_ai_sectionkey": null,
+    "wmkf_ai_usedby": "Literature Analyzer → per-paper extraction",
+    "wmkf_ai_usagecategory": "application"
+   },
+   "outcome": "written_verified"
+  },
+  {
+   "name": "literature-analyzer.synthesize",
+   "rowId": "38b33fb2-85c6-f111-aaaf-7ced8d3c3a59",
+   "version": 1,
+   "isCurrent": true,
+   "etagExpected": "W/\"104202507\"",
+   "etagBefore": "W/\"104202507\"",
+   "before": {
+    "wmkf_ai_displaytitle": null,
+    "wmkf_ai_description": null,
+    "wmkf_ai_groupkey": null,
+    "wmkf_ai_sectionkey": null,
+    "wmkf_ai_usedby": null,
+    "wmkf_ai_usagecategory": null
+   },
+   "after": {
+    "wmkf_ai_displaytitle": "Synthesize a literature review",
+    "wmkf_ai_description": "Combines extracted paper summaries into a review of shared themes, patterns, and relationships, optionally focused on a topic.",
+    "wmkf_ai_groupkey": "tools",
+    "wmkf_ai_sectionkey": null,
+    "wmkf_ai_usedby": "Literature Analyzer → synthesis stage",
+    "wmkf_ai_usagecategory": "application"
+   },
+   "patchStatus": 204,
+   "readback": {
+    "wmkf_ai_displaytitle": "Synthesize a literature review",
+    "wmkf_ai_description": "Combines extracted paper summaries into a review of shared themes, patterns, and relationships, optionally focused on a topic.",
+    "wmkf_ai_groupkey": "tools",
+    "wmkf_ai_sectionkey": null,
+    "wmkf_ai_usedby": "Literature Analyzer → synthesis stage",
+    "wmkf_ai_usagecategory": "application"
+   },
+   "outcome": "written_verified"
+  },
+  {
+   "name": "meeting-transcript.fragment-review",
+   "rowId": "a4f7c48f-21cb-f111-a05c-000d3a361c1f",
+   "version": 1,
+   "isCurrent": true,
+   "etagExpected": "W/\"104888226\"",
+   "etagBefore": "W/\"104888226\"",
+   "before": {
+    "wmkf_ai_displaytitle": null,
+    "wmkf_ai_description": null,
+    "wmkf_ai_groupkey": null,
+    "wmkf_ai_sectionkey": null,
+    "wmkf_ai_usedby": null,
+    "wmkf_ai_usagecategory": null
+   },
+   "after": {
+    "wmkf_ai_displaytitle": "Review possible speaker-split errors",
+    "wmkf_ai_description": "Classifies one-word interruptions as sentence fragments, interjections, or uncertain. Flags likely speaker-split errors for review; this pass does not rewrite the transcript or assign identities.",
+    "wmkf_ai_groupkey": "meetings",
+    "wmkf_ai_sectionkey": null,
+    "wmkf_ai_usedby": "Meeting transcription → speaker review",
+    "wmkf_ai_usagecategory": "application"
+   },
+   "patchStatus": 204,
+   "readback": {
+    "wmkf_ai_displaytitle": "Review possible speaker-split errors",
+    "wmkf_ai_description": "Classifies one-word interruptions as sentence fragments, interjections, or uncertain. Flags likely speaker-split errors for review; this pass does not rewrite the transcript or assign identities.",
+    "wmkf_ai_groupkey": "meetings",
+    "wmkf_ai_sectionkey": null,
+    "wmkf_ai_usedby": "Meeting transcription → speaker review",
+    "wmkf_ai_usagecategory": "application"
+   },
+   "outcome": "written_verified"
+  },
+  {
+   "name": "meeting-transcript.presentation-summary",
+   "rowId": "348ded13-f4c0-f111-aaad-6045bd04539e",
+   "version": 1,
+   "isCurrent": true,
+   "etagExpected": "W/\"102555110\"",
+   "etagBefore": "W/\"102555110\"",
+   "before": {
+    "wmkf_ai_displaytitle": null,
+    "wmkf_ai_description": null,
+    "wmkf_ai_groupkey": null,
+    "wmkf_ai_sectionkey": null,
+    "wmkf_ai_usedby": null,
+    "wmkf_ai_usagecategory": null
+   },
+   "after": {
+    "wmkf_ai_displaytitle": "Presentation summary",
+    "wmkf_ai_description": "Summarizes the applicants’ presentation and discussion with staff from the presentation transcript, with slide text when available. The caller holds a draft for staff review.",
+    "wmkf_ai_groupkey": "meetings",
+    "wmkf_ai_sectionkey": null,
+    "wmkf_ai_usedby": "Meeting Tracker → presentation summary draft; meeting preparation worker",
+    "wmkf_ai_usagecategory": "application"
+   },
+   "patchStatus": 204,
+   "readback": {
+    "wmkf_ai_displaytitle": "Presentation summary",
+    "wmkf_ai_description": "Summarizes the applicants’ presentation and discussion with staff from the presentation transcript, with slide text when available. The caller holds a draft for staff review.",
+    "wmkf_ai_groupkey": "meetings",
+    "wmkf_ai_sectionkey": null,
+    "wmkf_ai_usedby": "Meeting Tracker → presentation summary draft; meeting preparation worker",
+    "wmkf_ai_usagecategory": "application"
+   },
+   "outcome": "written_verified"
+  },
+  {
+   "name": "meeting-transcript.speaker-alignment",
+   "rowId": "ab4b1363-19c0-f111-aaaf-70a8a5b11800",
+   "version": 1,
+   "isCurrent": true,
+   "etagExpected": "W/\"102530690\"",
+   "etagBefore": "W/\"102530690\"",
+   "before": {
+    "wmkf_ai_displaytitle": null,
+    "wmkf_ai_description": null,
+    "wmkf_ai_groupkey": null,
+    "wmkf_ai_sectionkey": null,
+    "wmkf_ai_usedby": null,
+    "wmkf_ai_usagecategory": null
+   },
+   "after": {
+    "wmkf_ai_displaytitle": "Match transcript speakers to Zoom names",
+    "wmkf_ai_description": "Checks anonymous transcription speaker IDs against sampled speech and Zoom caption names, returning evidence-based identity suggestions that code verifies.",
+    "wmkf_ai_groupkey": "meetings",
+    "wmkf_ai_sectionkey": null,
+    "wmkf_ai_usedby": "Meeting transcription → Zoom speaker alignment",
+    "wmkf_ai_usagecategory": "application"
+   },
+   "patchStatus": 204,
+   "readback": {
+    "wmkf_ai_displaytitle": "Match transcript speakers to Zoom names",
+    "wmkf_ai_description": "Checks anonymous transcription speaker IDs against sampled speech and Zoom caption names, returning evidence-based identity suggestions that code verifies.",
+    "wmkf_ai_groupkey": "meetings",
+    "wmkf_ai_sectionkey": null,
+    "wmkf_ai_usedby": "Meeting transcription → Zoom speaker alignment",
+    "wmkf_ai_usagecategory": "application"
+   },
+   "outcome": "written_verified"
+  },
+  {
+   "name": "meeting-transcript.staff-discussion-sentiment",
+   "rowId": "25e1834a-25c7-f111-aaad-6045bd027040",
+   "version": 1,
+   "isCurrent": true,
+   "etagExpected": "W/\"104314439\"",
+   "etagBefore": "W/\"104314439\"",
+   "before": {
+    "wmkf_ai_displaytitle": null,
+    "wmkf_ai_description": null,
+    "wmkf_ai_groupkey": null,
+    "wmkf_ai_sectionkey": null,
+    "wmkf_ai_usedby": null,
+    "wmkf_ai_usagecategory": null
+   },
+   "after": {
+    "wmkf_ai_displaytitle": "Post-presentation discussion reception and uncertainty",
+    "wmkf_ai_description": "Records enthusiasm, reception, supporting and concerning points, disagreements, and uncertainties from staff-only discussion, backed by transcript quotations. It describes staff reactions rather than independently judging the proposal.",
+    "wmkf_ai_groupkey": "meetings",
+    "wmkf_ai_sectionkey": null,
+    "wmkf_ai_usedby": "Meeting Tracker → post-presentation discussion sentiment analysis",
+    "wmkf_ai_usagecategory": "application"
+   },
+   "patchStatus": 204,
+   "readback": {
+    "wmkf_ai_displaytitle": "Post-presentation discussion reception and uncertainty",
+    "wmkf_ai_description": "Records enthusiasm, reception, supporting and concerning points, disagreements, and uncertainties from staff-only discussion, backed by transcript quotations. It describes staff reactions rather than independently judging the proposal.",
+    "wmkf_ai_groupkey": "meetings",
+    "wmkf_ai_sectionkey": null,
+    "wmkf_ai_usedby": "Meeting Tracker → post-presentation discussion sentiment analysis",
+    "wmkf_ai_usagecategory": "application"
+   },
+   "outcome": "written_verified"
+  },
+  {
+   "name": "meeting-transcript.staff-discussion-summary",
+   "rowId": "9c9c2d0e-b2c6-f111-aaaf-000d3a361c1f",
+   "version": 2,
+   "isCurrent": true,
+   "etagExpected": "W/\"104227471\"",
+   "etagBefore": "W/\"104227471\"",
+   "before": {
+    "wmkf_ai_displaytitle": null,
+    "wmkf_ai_description": null,
+    "wmkf_ai_groupkey": null,
+    "wmkf_ai_sectionkey": null,
+    "wmkf_ai_usedby": null,
+    "wmkf_ai_usagecategory": null
+   },
+   "after": {
+    "wmkf_ai_displaytitle": "Post-presentation discussion summary (staff only)",
+    "wmkf_ai_description": "Summarizes the internal staff discussion after applicants leave. Keeps that discussion separate from the applicants’ presentation summary.",
+    "wmkf_ai_groupkey": "meetings",
+    "wmkf_ai_sectionkey": null,
+    "wmkf_ai_usedby": "Meeting Tracker → post-presentation discussion summary draft",
+    "wmkf_ai_usagecategory": "application"
+   },
+   "patchStatus": 204,
+   "readback": {
+    "wmkf_ai_displaytitle": "Post-presentation discussion summary (staff only)",
+    "wmkf_ai_description": "Summarizes the internal staff discussion after applicants leave. Keeps that discussion separate from the applicants’ presentation summary.",
+    "wmkf_ai_groupkey": "meetings",
+    "wmkf_ai_sectionkey": null,
+    "wmkf_ai_usedby": "Meeting Tracker → post-presentation discussion summary draft",
+    "wmkf_ai_usagecategory": "application"
+   },
+   "outcome": "written_verified"
+  },
+  {
+   "name": "multi-perspective.initial-analysis",
+   "rowId": "79423eb2-85c6-f111-aaaf-6045bd04539e",
+   "version": 1,
+   "isCurrent": true,
+   "etagExpected": "W/\"104202517\"",
+   "etagBefore": "W/\"104202517\"",
+   "before": {
+    "wmkf_ai_displaytitle": null,
+    "wmkf_ai_description": null,
+    "wmkf_ai_groupkey": null,
+    "wmkf_ai_sectionkey": null,
+    "wmkf_ai_usedby": null,
+    "wmkf_ai_usagecategory": null
+   },
+   "after": {
+    "wmkf_ai_displaytitle": "Extract and assess a research concept",
+    "wmkf_ai_description": "Reads the uploaded concept PDF and produces the initial concept analysis against the supplied Foundation funding guidelines.",
+    "wmkf_ai_groupkey": "reviews",
+    "wmkf_ai_sectionkey": "perspectives",
+    "wmkf_ai_usedby": "Multi-Perspective Evaluator → initial stage",
+    "wmkf_ai_usagecategory": "application"
+   },
+   "patchStatus": 204,
+   "readback": {
+    "wmkf_ai_displaytitle": "Extract and assess a research concept",
+    "wmkf_ai_description": "Reads the uploaded concept PDF and produces the initial concept analysis against the supplied Foundation funding guidelines.",
+    "wmkf_ai_groupkey": "reviews",
+    "wmkf_ai_sectionkey": "perspectives",
+    "wmkf_ai_usedby": "Multi-Perspective Evaluator → initial stage",
+    "wmkf_ai_usagecategory": "application"
+   },
+   "outcome": "written_verified"
+  },
+  {
+   "name": "multi-perspective.integrator",
+   "rowId": "ce7972b4-85c6-f111-aaaf-000d3a361c1f",
+   "version": 1,
+   "isCurrent": true,
+   "etagExpected": "W/\"104202539\"",
+   "etagBefore": "W/\"104202539\"",
+   "before": {
+    "wmkf_ai_displaytitle": null,
+    "wmkf_ai_description": null,
+    "wmkf_ai_groupkey": null,
+    "wmkf_ai_sectionkey": null,
+    "wmkf_ai_usedby": null,
+    "wmkf_ai_usagecategory": null
+   },
+   "after": {
+    "wmkf_ai_displaytitle": "Combine the three concept evaluations",
+    "wmkf_ai_description": "Combines the optimist, skeptic, and neutral assessments into an integrated recommendation, identifying agreement and resolving disagreements.",
+    "wmkf_ai_groupkey": "reviews",
+    "wmkf_ai_sectionkey": "perspectives",
+    "wmkf_ai_usedby": "Multi-Perspective Evaluator → integration stage",
+    "wmkf_ai_usagecategory": "application"
+   },
+   "patchStatus": 204,
+   "readback": {
+    "wmkf_ai_displaytitle": "Combine the three concept evaluations",
+    "wmkf_ai_description": "Combines the optimist, skeptic, and neutral assessments into an integrated recommendation, identifying agreement and resolving disagreements.",
+    "wmkf_ai_groupkey": "reviews",
+    "wmkf_ai_sectionkey": "perspectives",
+    "wmkf_ai_usedby": "Multi-Perspective Evaluator → integration stage",
+    "wmkf_ai_usagecategory": "application"
+   },
+   "outcome": "written_verified"
+  },
+  {
+   "name": "multi-perspective.neutral",
+   "rowId": "422616b2-85c6-f111-aaad-6045bd027040",
+   "version": 1,
+   "isCurrent": true,
+   "etagExpected": "W/\"104202535\"",
+   "etagBefore": "W/\"104202535\"",
+   "before": {
+    "wmkf_ai_displaytitle": null,
+    "wmkf_ai_description": null,
+    "wmkf_ai_groupkey": null,
+    "wmkf_ai_sectionkey": null,
+    "wmkf_ai_usedby": null,
+    "wmkf_ai_usagecategory": null
+   },
+   "after": {
+    "wmkf_ai_displaytitle": "Balanced research concept assessment",
+    "wmkf_ai_description": "Produces a realistic, probability-weighted assessment using the concept analysis, supplied literature, and evaluation framework.",
+    "wmkf_ai_groupkey": "reviews",
+    "wmkf_ai_sectionkey": "perspectives",
+    "wmkf_ai_usedby": "Multi-Perspective Evaluator → neutral perspective",
+    "wmkf_ai_usagecategory": "application"
+   },
+   "patchStatus": 204,
+   "readback": {
+    "wmkf_ai_displaytitle": "Balanced research concept assessment",
+    "wmkf_ai_description": "Produces a realistic, probability-weighted assessment using the concept analysis, supplied literature, and evaluation framework.",
+    "wmkf_ai_groupkey": "reviews",
+    "wmkf_ai_sectionkey": "perspectives",
+    "wmkf_ai_usedby": "Multi-Perspective Evaluator → neutral perspective",
+    "wmkf_ai_usagecategory": "application"
+   },
+   "outcome": "written_verified"
+  },
+  {
+   "name": "multi-perspective.optimist",
+   "rowId": "342616b2-85c6-f111-aaad-6045bd027040",
+   "version": 1,
+   "isCurrent": true,
+   "etagExpected": "W/\"104202526\"",
+   "etagBefore": "W/\"104202526\"",
+   "before": {
+    "wmkf_ai_displaytitle": null,
+    "wmkf_ai_description": null,
+    "wmkf_ai_groupkey": null,
+    "wmkf_ai_sectionkey": null,
+    "wmkf_ai_usedby": null,
+    "wmkf_ai_usagecategory": null
+   },
+   "after": {
+    "wmkf_ai_displaytitle": "Strongest case for a research concept",
+    "wmkf_ai_description": "Builds the strongest fair case in favor of the concept using the supplied analysis, literature, and framework.",
+    "wmkf_ai_groupkey": "reviews",
+    "wmkf_ai_sectionkey": "perspectives",
+    "wmkf_ai_usedby": "Multi-Perspective Evaluator → optimist perspective",
+    "wmkf_ai_usagecategory": "application"
+   },
+   "patchStatus": 204,
+   "readback": {
+    "wmkf_ai_displaytitle": "Strongest case for a research concept",
+    "wmkf_ai_description": "Builds the strongest fair case in favor of the concept using the supplied analysis, literature, and framework.",
+    "wmkf_ai_groupkey": "reviews",
+    "wmkf_ai_sectionkey": "perspectives",
+    "wmkf_ai_usedby": "Multi-Perspective Evaluator → optimist perspective",
+    "wmkf_ai_usagecategory": "application"
+   },
+   "outcome": "written_verified"
+  },
+  {
+   "name": "multi-perspective.proposal-summary",
+   "rowId": "f583edae-85c6-f111-aaaf-70a8a5b11800",
+   "version": 1,
+   "isCurrent": true,
+   "etagExpected": "W/\"104202521\"",
+   "etagBefore": "W/\"104202521\"",
+   "before": {
+    "wmkf_ai_displaytitle": null,
+    "wmkf_ai_description": null,
+    "wmkf_ai_groupkey": null,
+    "wmkf_ai_sectionkey": null,
+    "wmkf_ai_usedby": null,
+    "wmkf_ai_usagecategory": null
+   },
+   "after": {
+    "wmkf_ai_displaytitle": "Plain-language concept summary",
+    "wmkf_ai_description": "Explains what the researchers propose and the possible impact using the initial analysis and supplied literature.",
+    "wmkf_ai_groupkey": "reviews",
+    "wmkf_ai_sectionkey": "perspectives",
+    "wmkf_ai_usedby": "Multi-Perspective Evaluator → proposal summary stage",
+    "wmkf_ai_usagecategory": "application"
+   },
+   "patchStatus": 204,
+   "readback": {
+    "wmkf_ai_displaytitle": "Plain-language concept summary",
+    "wmkf_ai_description": "Explains what the researchers propose and the possible impact using the initial analysis and supplied literature.",
+    "wmkf_ai_groupkey": "reviews",
+    "wmkf_ai_sectionkey": "perspectives",
+    "wmkf_ai_usedby": "Multi-Perspective Evaluator → proposal summary stage",
+    "wmkf_ai_usagecategory": "application"
+   },
+   "outcome": "written_verified"
+  },
+  {
+   "name": "multi-perspective.skeptic",
+   "rowId": "67def2b4-85c6-f111-aaad-6045bd0758b6",
+   "version": 1,
+   "isCurrent": true,
+   "etagExpected": "W/\"104202530\"",
+   "etagBefore": "W/\"104202530\"",
+   "before": {
+    "wmkf_ai_displaytitle": null,
+    "wmkf_ai_description": null,
+    "wmkf_ai_groupkey": null,
+    "wmkf_ai_sectionkey": null,
+    "wmkf_ai_usedby": null,
+    "wmkf_ai_usagecategory": null
+   },
+   "after": {
+    "wmkf_ai_displaytitle": "Risks and weaknesses of a research concept",
+    "wmkf_ai_description": "Identifies weaknesses, missing evidence, and potential failure modes while assessing the concept fairly.",
+    "wmkf_ai_groupkey": "reviews",
+    "wmkf_ai_sectionkey": "perspectives",
+    "wmkf_ai_usedby": "Multi-Perspective Evaluator → skeptic perspective",
+    "wmkf_ai_usagecategory": "application"
+   },
+   "patchStatus": 204,
+   "readback": {
+    "wmkf_ai_displaytitle": "Risks and weaknesses of a research concept",
+    "wmkf_ai_description": "Identifies weaknesses, missing evidence, and potential failure modes while assessing the concept fairly.",
+    "wmkf_ai_groupkey": "reviews",
+    "wmkf_ai_sectionkey": "perspectives",
+    "wmkf_ai_usedby": "Multi-Perspective Evaluator → skeptic perspective",
+    "wmkf_ai_usagecategory": "application"
+   },
+   "outcome": "written_verified"
+  },
+  {
+   "name": "peer-review-summarizer.analyze",
+   "rowId": "c28c4dd8-e640-f111-88b5-000d3a306b0f",
+   "version": 1,
+   "isCurrent": true,
+   "etagExpected": "W/\"87884042\"",
+   "etagBefore": "W/\"87884042\"",
+   "before": {
+    "wmkf_ai_displaytitle": null,
+    "wmkf_ai_description": null,
+    "wmkf_ai_groupkey": null,
+    "wmkf_ai_sectionkey": null,
+    "wmkf_ai_usedby": null,
+    "wmkf_ai_usagecategory": null
+   },
+   "after": {
+    "wmkf_ai_displaytitle": "Summarize uploaded peer reviews",
+    "wmkf_ai_description": "Combines uploaded review documents into a narrative summary and a separate list of reviewers’ questions and concerns.",
+    "wmkf_ai_groupkey": "reviews",
+    "wmkf_ai_sectionkey": "human",
+    "wmkf_ai_usedby": "Peer Review Summarizer → main analysis",
+    "wmkf_ai_usagecategory": "application"
+   },
+   "patchStatus": 204,
+   "readback": {
+    "wmkf_ai_displaytitle": "Summarize uploaded peer reviews",
+    "wmkf_ai_description": "Combines uploaded review documents into a narrative summary and a separate list of reviewers’ questions and concerns.",
+    "wmkf_ai_groupkey": "reviews",
+    "wmkf_ai_sectionkey": "human",
+    "wmkf_ai_usedby": "Peer Review Summarizer → main analysis",
+    "wmkf_ai_usagecategory": "application"
+   },
+   "outcome": "written_verified"
+  },
+  {
+   "name": "peer-review-summarizer.questions",
+   "rowId": "1b1341dc-e640-f111-88b5-000d3a306d45",
+   "version": 1,
+   "isCurrent": true,
+   "etagExpected": "W/\"87884046\"",
+   "etagBefore": "W/\"87884046\"",
+   "before": {
+    "wmkf_ai_displaytitle": null,
+    "wmkf_ai_description": null,
+    "wmkf_ai_groupkey": null,
+    "wmkf_ai_sectionkey": null,
+    "wmkf_ai_usedby": null,
+    "wmkf_ai_usagecategory": null
+   },
+   "after": {
+    "wmkf_ai_displaytitle": "Recover questions from uploaded reviews",
+    "wmkf_ai_description": "Extracts reviewer questions and concerns when the main analysis produces no usable questions section or fewer than 50 characters of questions.",
+    "wmkf_ai_groupkey": "reviews",
+    "wmkf_ai_sectionkey": "human",
+    "wmkf_ai_usedby": "Peer Review Summarizer → conditional fallback pass",
+    "wmkf_ai_usagecategory": "application"
+   },
+   "patchStatus": 204,
+   "readback": {
+    "wmkf_ai_displaytitle": "Recover questions from uploaded reviews",
+    "wmkf_ai_description": "Extracts reviewer questions and concerns when the main analysis produces no usable questions section or fewer than 50 characters of questions.",
+    "wmkf_ai_groupkey": "reviews",
+    "wmkf_ai_sectionkey": "human",
+    "wmkf_ai_usedby": "Peer Review Summarizer → conditional fallback pass",
+    "wmkf_ai_usagecategory": "application"
+   },
+   "outcome": "written_verified"
+  },
+  {
+   "name": "phase-i.checkin",
+   "rowId": "ee2927ec-9741-f111-88b5-000d3a306b0f",
+   "version": 1,
+   "isCurrent": false,
+   "etagExpected": "W/\"78909348\"",
+   "etagBefore": "W/\"78909348\"",
+   "before": {
+    "wmkf_ai_displaytitle": null,
+    "wmkf_ai_description": null,
+    "wmkf_ai_groupkey": null,
+    "wmkf_ai_sectionkey": null,
+    "wmkf_ai_usedby": null,
+    "wmkf_ai_usagecategory": null
+   },
+   "after": {
+    "wmkf_ai_displaytitle": "Phase I application and budget checks",
+    "wmkf_ai_description": "Instructions for required-section checks, budget rules and arithmetic, keyword tags, a technical summary, and advisory funding-priority fit.",
+    "wmkf_ai_groupkey": "diagnostics",
+    "wmkf_ai_sectionkey": null,
+    "wmkf_ai_usedby": "No application currently connected.",
+    "wmkf_ai_usagecategory": "unconnected"
+   },
+   "patchStatus": 204,
+   "readback": {
+    "wmkf_ai_displaytitle": "Phase I application and budget checks",
+    "wmkf_ai_description": "Instructions for required-section checks, budget rules and arithmetic, keyword tags, a technical summary, and advisory funding-priority fit.",
+    "wmkf_ai_groupkey": "diagnostics",
+    "wmkf_ai_sectionkey": null,
+    "wmkf_ai_usedby": "No application currently connected.",
+    "wmkf_ai_usagecategory": "unconnected"
+   },
+   "outcome": "written_verified"
+  },
+  {
+   "name": "phase-i.summary",
+   "rowId": "d4201d8e-3840-f111-88b5-000d3a3065b8",
+   "version": 1,
+   "isCurrent": true,
+   "etagExpected": "W/\"83083057\"",
+   "etagBefore": "W/\"83083057\"",
+   "before": {
+    "wmkf_ai_displaytitle": null,
+    "wmkf_ai_description": null,
+    "wmkf_ai_groupkey": null,
+    "wmkf_ai_sectionkey": null,
+    "wmkf_ai_usedby": null,
+    "wmkf_ai_usagecategory": null
+   },
+   "after": {
+    "wmkf_ai_displaytitle": "Phase I proposal summary",
+    "wmkf_ai_description": "Writes a structured Phase I summary for the chosen length and audience; the Executor saves it to the request’s AI summary field.",
+    "wmkf_ai_groupkey": "preflight",
+    "wmkf_ai_sectionkey": null,
+    "wmkf_ai_usedby": "Phase I Dynamics → stored-prompt summarization option; developer tests",
+    "wmkf_ai_usagecategory": "application"
+   },
+   "patchStatus": 204,
+   "readback": {
+    "wmkf_ai_displaytitle": "Phase I proposal summary",
+    "wmkf_ai_description": "Writes a structured Phase I summary for the chosen length and audience; the Executor saves it to the request’s AI summary field.",
+    "wmkf_ai_groupkey": "preflight",
+    "wmkf_ai_sectionkey": null,
+    "wmkf_ai_usedby": "Phase I Dynamics → stored-prompt summarization option; developer tests",
+    "wmkf_ai_usagecategory": "application"
+   },
+   "outcome": "written_verified"
+  },
+  {
+   "name": "phase-ii.extract-structured",
+   "rowId": "65f67f40-9642-f111-88b4-6045bd019e44",
+   "version": 1,
+   "isCurrent": true,
+   "etagExpected": "W/\"83083184\"",
+   "etagBefore": "W/\"83083184\"",
+   "before": {
+    "wmkf_ai_displaytitle": null,
+    "wmkf_ai_description": null,
+    "wmkf_ai_groupkey": null,
+    "wmkf_ai_sectionkey": null,
+    "wmkf_ai_usedby": null,
+    "wmkf_ai_usagecategory": null
+   },
+   "after": {
+    "wmkf_ai_displaytitle": "Legacy Phase II proposal metadata extraction",
+    "wmkf_ai_description": "Stored instructions for extracting investigator, institution, funding, methods, and other proposal metadata. Current upload routes use code templates instead of this row.",
+    "wmkf_ai_groupkey": "reference",
+    "wmkf_ai_sectionkey": null,
+    "wmkf_ai_usedby": "No application reads this stored row. The corresponding Phase II tools use code templates.",
+    "wmkf_ai_usagecategory": "reference"
+   },
+   "patchStatus": 204,
+   "readback": {
+    "wmkf_ai_displaytitle": "Legacy Phase II proposal metadata extraction",
+    "wmkf_ai_description": "Stored instructions for extracting investigator, institution, funding, methods, and other proposal metadata. Current upload routes use code templates instead of this row.",
+    "wmkf_ai_groupkey": "reference",
+    "wmkf_ai_sectionkey": null,
+    "wmkf_ai_usedby": "No application reads this stored row. The corresponding Phase II tools use code templates.",
+    "wmkf_ai_usagecategory": "reference"
+   },
+   "outcome": "written_verified"
+  },
+  {
+   "name": "phase-ii.qa",
+   "rowId": "2040443d-9642-f111-88b4-000d3a306da2",
+   "version": 1,
+   "isCurrent": true,
+   "etagExpected": "W/\"83083186\"",
+   "etagBefore": "W/\"83083186\"",
+   "before": {
+    "wmkf_ai_displaytitle": null,
+    "wmkf_ai_description": null,
+    "wmkf_ai_groupkey": null,
+    "wmkf_ai_sectionkey": null,
+    "wmkf_ai_usedby": null,
+    "wmkf_ai_usagecategory": null
+   },
+   "after": {
+    "wmkf_ai_displaytitle": "Legacy Phase II proposal Q&A",
+    "wmkf_ai_description": "Stored context template for answering questions about a proposal and summary. The current Q&A route builds its system prompt from code instead.",
+    "wmkf_ai_groupkey": "reference",
+    "wmkf_ai_sectionkey": null,
+    "wmkf_ai_usedby": "No application reads this stored row. The corresponding Phase II tools use code templates.",
+    "wmkf_ai_usagecategory": "reference"
+   },
+   "patchStatus": 204,
+   "readback": {
+    "wmkf_ai_displaytitle": "Legacy Phase II proposal Q&A",
+    "wmkf_ai_description": "Stored context template for answering questions about a proposal and summary. The current Q&A route builds its system prompt from code instead.",
+    "wmkf_ai_groupkey": "reference",
+    "wmkf_ai_sectionkey": null,
+    "wmkf_ai_usedby": "No application reads this stored row. The corresponding Phase II tools use code templates.",
+    "wmkf_ai_usagecategory": "reference"
+   },
+   "outcome": "written_verified"
+  },
+  {
+   "name": "phase-ii.refine",
+   "rowId": "a6fff63d-9642-f111-88b5-000d3a306d45",
+   "version": 1,
+   "isCurrent": true,
+   "etagExpected": "W/\"83083187\"",
+   "etagBefore": "W/\"83083187\"",
+   "before": {
+    "wmkf_ai_displaytitle": null,
+    "wmkf_ai_description": null,
+    "wmkf_ai_groupkey": null,
+    "wmkf_ai_sectionkey": null,
+    "wmkf_ai_usedby": null,
+    "wmkf_ai_usagecategory": null
+   },
+   "after": {
+    "wmkf_ai_displaytitle": "Legacy Phase II writeup refinement",
+    "wmkf_ai_description": "Stored instructions for revising a writeup using staff feedback. The current refinement route uses its own inline template instead.",
+    "wmkf_ai_groupkey": "reference",
+    "wmkf_ai_sectionkey": null,
+    "wmkf_ai_usedby": "No application reads this stored row. The corresponding Phase II tools use code templates.",
+    "wmkf_ai_usagecategory": "reference"
+   },
+   "patchStatus": 204,
+   "readback": {
+    "wmkf_ai_displaytitle": "Legacy Phase II writeup refinement",
+    "wmkf_ai_description": "Stored instructions for revising a writeup using staff feedback. The current refinement route uses its own inline template instead.",
+    "wmkf_ai_groupkey": "reference",
+    "wmkf_ai_sectionkey": null,
+    "wmkf_ai_usedby": "No application reads this stored row. The corresponding Phase II tools use code templates.",
+    "wmkf_ai_usagecategory": "reference"
+   },
+   "outcome": "written_verified"
+  },
+  {
+   "name": "phase-ii.summarize",
+   "rowId": "5af67f40-9642-f111-88b4-6045bd019e44",
+   "version": 1,
+   "isCurrent": true,
+   "etagExpected": "W/\"83083182\"",
+   "etagBefore": "W/\"83083182\"",
+   "before": {
+    "wmkf_ai_displaytitle": null,
+    "wmkf_ai_description": null,
+    "wmkf_ai_groupkey": null,
+    "wmkf_ai_sectionkey": null,
+    "wmkf_ai_usedby": null,
+    "wmkf_ai_usagecategory": null
+   },
+   "after": {
+    "wmkf_ai_displaytitle": "Legacy Phase II two-part writeup",
+    "wmkf_ai_description": "Stored instructions for a short overview followed by a detailed proposal writeup. Current upload routes generate that prompt from code instead.",
+    "wmkf_ai_groupkey": "reference",
+    "wmkf_ai_sectionkey": null,
+    "wmkf_ai_usedby": "No application reads this stored row. The corresponding Phase II tools use code templates.",
+    "wmkf_ai_usagecategory": "reference"
+   },
+   "patchStatus": 204,
+   "readback": {
+    "wmkf_ai_displaytitle": "Legacy Phase II two-part writeup",
+    "wmkf_ai_description": "Stored instructions for a short overview followed by a detailed proposal writeup. Current upload routes generate that prompt from code instead.",
+    "wmkf_ai_groupkey": "reference",
+    "wmkf_ai_sectionkey": null,
+    "wmkf_ai_usedby": "No application reads this stored row. The corresponding Phase II tools use code templates.",
+    "wmkf_ai_usagecategory": "reference"
+   },
+   "outcome": "written_verified"
+  },
+  {
+   "name": "pre-site-visit.proposal-core.generate",
+   "rowId": "043246c7-5ed6-f111-a05d-70a8a5b11800",
+   "version": 6,
+   "isCurrent": true,
+   "etagExpected": "W/\"106607080\"",
+   "etagBefore": "W/\"106607080\"",
+   "before": {
+    "wmkf_ai_displaytitle": null,
+    "wmkf_ai_description": null,
+    "wmkf_ai_groupkey": null,
+    "wmkf_ai_sectionkey": null,
+    "wmkf_ai_usedby": null,
+    "wmkf_ai_usagecategory": null
+   },
+   "after": {
+    "wmkf_ai_displaytitle": "Draft writeup proposal narrative sections",
+    "wmkf_ai_description": "Drafts eight proposal-derived sections, from executive summary through methodology and personnel, using the narrative plus authoritative request context and personnel roster. Other writeup sections are populated elsewhere.",
+    "wmkf_ai_groupkey": "preflight",
+    "wmkf_ai_sectionkey": null,
+    "wmkf_ai_usedby": "Workbench → Draft writeup generation",
+    "wmkf_ai_usagecategory": "application"
+   },
+   "patchStatus": 204,
+   "readback": {
+    "wmkf_ai_displaytitle": "Draft writeup proposal narrative sections",
+    "wmkf_ai_description": "Drafts eight proposal-derived sections, from executive summary through methodology and personnel, using the narrative plus authoritative request context and personnel roster. Other writeup sections are populated elsewhere.",
+    "wmkf_ai_groupkey": "preflight",
+    "wmkf_ai_sectionkey": null,
+    "wmkf_ai_usedby": "Workbench → Draft writeup generation",
+    "wmkf_ai_usagecategory": "application"
+   },
+   "outcome": "written_verified"
+  },
+  {
+   "name": "review-panel.chair",
+   "rowId": "d74696d9-b6af-f111-aaac-000d3a361c1f",
+   "version": 3,
+   "isCurrent": true,
+   "etagExpected": "W/\"97820487\"",
+   "etagBefore": "W/\"97820487\"",
+   "before": {
+    "wmkf_ai_displaytitle": null,
+    "wmkf_ai_description": null,
+    "wmkf_ai_groupkey": null,
+    "wmkf_ai_sectionkey": null,
+    "wmkf_ai_usedby": null,
+    "wmkf_ai_usagecategory": null
+   },
+   "after": {
+    "wmkf_ai_displaytitle": "Synthesize AI panel reviews",
+    "wmkf_ai_description": "Combines the AI reviewers’ seat reports into a panel summary: ratings, consensus, disagreements, strengths, concerns, questions, and recommendation.",
+    "wmkf_ai_groupkey": "reviews",
+    "wmkf_ai_sectionkey": "panel",
+    "wmkf_ai_usedby": "Review Panel → chair stage; page and Workbench tab",
+    "wmkf_ai_usagecategory": "application"
+   },
+   "patchStatus": 204,
+   "readback": {
+    "wmkf_ai_displaytitle": "Synthesize AI panel reviews",
+    "wmkf_ai_description": "Combines the AI reviewers’ seat reports into a panel summary: ratings, consensus, disagreements, strengths, concerns, questions, and recommendation.",
+    "wmkf_ai_groupkey": "reviews",
+    "wmkf_ai_sectionkey": "panel",
+    "wmkf_ai_usedby": "Review Panel → chair stage; page and Workbench tab",
+    "wmkf_ai_usagecategory": "application"
+   },
+   "outcome": "written_verified"
+  },
+  {
+   "name": "review-panel.seat",
+   "rowId": "1938b8b0-b4af-f111-aaac-6045bd04539e",
+   "version": 2,
+   "isCurrent": true,
+   "etagExpected": "W/\"97820334\"",
+   "etagBefore": "W/\"97820334\"",
+   "before": {
+    "wmkf_ai_displaytitle": null,
+    "wmkf_ai_description": null,
+    "wmkf_ai_groupkey": null,
+    "wmkf_ai_sectionkey": null,
+    "wmkf_ai_usedby": null,
+    "wmkf_ai_usagecategory": null
+   },
+   "after": {
+    "wmkf_ai_displaytitle": "Independent AI reviewer report",
+    "wmkf_ai_description": "Uses the proposal narrative and configured review questions to produce one AI reviewer’s structured report. The worker runs it for each configured panel seat.",
+    "wmkf_ai_groupkey": "reviews",
+    "wmkf_ai_sectionkey": "panel",
+    "wmkf_ai_usedby": "Review Panel → reviewer-seat stage; page and Workbench tab",
+    "wmkf_ai_usagecategory": "application"
+   },
+   "patchStatus": 204,
+   "readback": {
+    "wmkf_ai_displaytitle": "Independent AI reviewer report",
+    "wmkf_ai_description": "Uses the proposal narrative and configured review questions to produce one AI reviewer’s structured report. The worker runs it for each configured panel seat.",
+    "wmkf_ai_groupkey": "reviews",
+    "wmkf_ai_sectionkey": "panel",
+    "wmkf_ai_usedby": "Review Panel → reviewer-seat stage; page and Workbench tab",
+    "wmkf_ai_usagecategory": "application"
+   },
+   "outcome": "written_verified"
+  },
+  {
+   "name": "review-synthesis.generate",
+   "rowId": "d8b80702-29b2-f111-aaac-002248086b29",
+   "version": 5,
+   "isCurrent": true,
+   "etagExpected": "W/\"98021939\"",
+   "etagBefore": "W/\"98021939\"",
+   "before": {
+    "wmkf_ai_displaytitle": null,
+    "wmkf_ai_description": null,
+    "wmkf_ai_groupkey": null,
+    "wmkf_ai_sectionkey": null,
+    "wmkf_ai_usedby": null,
+    "wmkf_ai_usagecategory": null
+   },
+   "after": {
+    "wmkf_ai_displaytitle": "Synthesize submitted human peer reviews",
+    "wmkf_ai_description": "Combines submitted reviewers’ ratings and written answers into a structured synthesis for staff and Program Directors. This is separate from the AI-generated Review Panel.",
+    "wmkf_ai_groupkey": "reviews",
+    "wmkf_ai_sectionkey": "human",
+    "wmkf_ai_usedby": "Workbench → Reviews; automatic review synthesis",
+    "wmkf_ai_usagecategory": "application"
+   },
+   "patchStatus": 204,
+   "readback": {
+    "wmkf_ai_displaytitle": "Synthesize submitted human peer reviews",
+    "wmkf_ai_description": "Combines submitted reviewers’ ratings and written answers into a structured synthesis for staff and Program Directors. This is separate from the AI-generated Review Panel.",
+    "wmkf_ai_groupkey": "reviews",
+    "wmkf_ai_sectionkey": "human",
+    "wmkf_ai_usedby": "Workbench → Reviews; automatic review synthesis",
+    "wmkf_ai_usagecategory": "application"
+   },
+   "outcome": "written_verified"
+  },
+  {
+   "name": "reviewer-finder.analyze",
+   "rowId": "07beab8a-887a-f111-ab0f-000d3a3065b8",
+   "version": 2,
+   "isCurrent": true,
+   "etagExpected": "W/\"87864450\"",
+   "etagBefore": "W/\"87864450\"",
+   "before": {
+    "wmkf_ai_displaytitle": null,
+    "wmkf_ai_description": null,
+    "wmkf_ai_groupkey": null,
+    "wmkf_ai_sectionkey": null,
+    "wmkf_ai_usedby": null,
+    "wmkf_ai_usagecategory": null
+   },
+   "after": {
+    "wmkf_ai_displaytitle": "Analyze a proposal for reviewer discovery",
+    "wmkf_ai_description": "Extracts scientific search context and proposes initial expert reviewers. Reviewer Finder uses both; Workbench enrichment reuses the scientific context and ignores the suggestions.",
+    "wmkf_ai_groupkey": "reviewers",
+    "wmkf_ai_sectionkey": null,
+    "wmkf_ai_usedby": "Reviewer Finder → proposal analysis; Workbench → enrich recommended reviewers",
+    "wmkf_ai_usagecategory": "application"
+   },
+   "patchStatus": 204,
+   "readback": {
+    "wmkf_ai_displaytitle": "Analyze a proposal for reviewer discovery",
+    "wmkf_ai_description": "Extracts scientific search context and proposes initial expert reviewers. Reviewer Finder uses both; Workbench enrichment reuses the scientific context and ignores the suggestions.",
+    "wmkf_ai_groupkey": "reviewers",
+    "wmkf_ai_sectionkey": null,
+    "wmkf_ai_usedby": "Reviewer Finder → proposal analysis; Workbench → enrich recommended reviewers",
+    "wmkf_ai_usagecategory": "application"
+   },
+   "outcome": "written_verified"
+  },
+  {
+   "name": "reviewer-finder.score-candidates",
+   "rowId": "02fb0aa0-e340-f111-88b5-000d3a306d45",
+   "version": 1,
+   "isCurrent": true,
+   "etagExpected": "W/\"84859099\"",
+   "etagBefore": "W/\"84859099\"",
+   "before": {
+    "wmkf_ai_displaytitle": null,
+    "wmkf_ai_description": null,
+    "wmkf_ai_groupkey": null,
+    "wmkf_ai_sectionkey": null,
+    "wmkf_ai_usedby": null,
+    "wmkf_ai_usagecategory": null
+   },
+   "after": {
+    "wmkf_ai_displaytitle": "Score discovered reviewer candidates",
+    "wmkf_ai_description": "Scores the relevance of already-discovered candidates to the proposal and explains their fit, in batches of ten. Candidates have already been found by the app’s database searches.",
+    "wmkf_ai_groupkey": "reviewers",
+    "wmkf_ai_sectionkey": null,
+    "wmkf_ai_usedby": "Reviewer Finder → discovered-candidate reasoning",
+    "wmkf_ai_usagecategory": "application"
+   },
+   "patchStatus": 204,
+   "readback": {
+    "wmkf_ai_displaytitle": "Score discovered reviewer candidates",
+    "wmkf_ai_description": "Scores the relevance of already-discovered candidates to the proposal and explains their fit, in batches of ten. Candidates have already been found by the app’s database searches.",
+    "wmkf_ai_groupkey": "reviewers",
+    "wmkf_ai_sectionkey": null,
+    "wmkf_ai_usedby": "Reviewer Finder → discovered-candidate reasoning",
+    "wmkf_ai_usagecategory": "application"
+   },
+   "outcome": "written_verified"
+  }
+ ]
+}

@@ -117,58 +117,57 @@ optional, and the types and lengths match
   The draft-baseline column was not added, because Admin's existing `If-Match`
   publish already catches concurrent edits.
 
-## Backfill plan for existing prompts
+## Backfill of existing prompts — done 2026-11-02
 
-[PLANNED — needs separate approvals at steps 3 and 5]
+[VERIFIED via per-row readback, 2026-11-02 22:05 UTC] All 40 Production
+prompt names now carry the six catalog values. Each was written once under
+Justin's same-day approval (`DATAVERSE_PROD_WRITE_ACK`). Steps as run:
 
-1. **Copy the columns forward in Admin first.** [BUILT on branch
-   `claude/session-2026-11-02`; not yet deployed]
-   - A publish now copies all six from the prior current row. So does a
-     `prompt-seed.js` `--force` recovery version.
-   - The Admin projection and both Admin services return them as `catalog`.
-   - The Admin prompts page prefers stored values and falls back to the code
-     catalog.
+1. **Admin copies the columns forward.** Merged in PR #606 (`adb674d73`) and
+   deployed to Production before the write. A publish copies all six from the
+   prior current row, and so does a `prompt-seed.js` `--force` recovery version.
+   The Admin prompts page prefers stored values and falls back to the code
+   catalog.
+2. **Values came from the code catalog.** Admin's existing
+   `ADMIN_PROMPT_CATALOG` in `shared/config/adminPromptCatalog.js` already held
+   title, description, group, section, used-by and usage for all 40 names. Each
+   maps one-to-one onto a column, so the Admin page shows the same text,
+   now read from Dataverse. Justin waived a separate value review for that
+   reason.
+3. **Read-only Production inventory** (owner-approved):
+   `docs/plans/evidence/prompt-catalog-inventory-prod-2026-11-02.json`.
+   - 61 rows across 40 names.
+   - Every name was in the code catalog, and every catalog entry was in
+     Dataverse.
+   - No duplicate-current rows, and no catalog values were already set.
+   - The one exception: `phase-i.checkin` has a single non-current v1 row. That
+     row was the target.
+4. **Readers are safe.** [VERIFIED via grep on `main`] No prompt-row reader
+   depends on a prompt row's `modifiedon`, `versionnumber` or ETag.
+   - The hits in `final-writeup/transition-model.js`,
+     `pre-site-visit/reopen-service.js`, `execute-prompt.js:489` and
+     `test-requests/run-runner.js` concern request, request-document or
+     suggestion rows.
+   - Prompt IDs and versions are unchanged.
+5. **Conditional write.** Each target row got one PATCH of the six columns,
+   with `If-Match` on the inventoried ETag, then a readback.
+   - The dry run showed no ETag drift, and all 40 were `written_verified`.
+   - Justin waived the sandbox rehearsal, because the values are
+     display-only and reversible.
+6. **Receipt:** `docs/plans/evidence/prompt-catalog-backfill-prod-2026-11-02.json`
+   records, per row, the name, row ID, ETags, before and after values,
+   PATCH status and readback. It is needed because this write did not go
+   through the Postgres `prompt_publish_audit`.
+7. **Next: Connor adds his prompts,** filling in the catalog fields as he
+   goes. He must not reuse an existing app prompt name. Publishing a brand-new
+   name still needs the first-publish gap closed (see below).
 
-   Until this deploys, backfilled values would vanish on the next publish.
-2. **Take the values from the existing code catalog.** No Dataverse read is
-   needed for this step.
-   [VERIFIED via `shared/config/adminPromptCatalog.js`] Admin already
-   describes prompts in `ADMIN_PROMPT_CATALOG`. It has title, description,
-   used by, usage, group and (where needed) section for 40 names. Those names
-   are pinned by `tests/unit/admin-prompt-catalog.test.js` to the audited
-   Production inventory in
-   `docs/audits/prompt-descriptions-and-callers-2026-10-29.md`.
-   - These map one-to-one onto the six columns.
-   - Generate the proposed table from it for Justin and Connor to confirm
-     before anything is written.
-   - After backfill the page shows the same text, now from Dataverse.
-3. **Take a read-only Production inventory.** Collect every prompt name's
-   current row: ID, ETag, version, and whether any catalog value is already set.
-   - Flag names found in Dataverse but missing from the code table, such as
-     prompts Connor added; those need values from Connor.
-   - Flag any name with zero or several current rows.
-   - This is a Production read and needs Justin's approval.
-4. **Check that rewriting a row is safe for readers.** Before writing, confirm
-   on `main` that no reader refuses a prompt row because it was modified. The
-   known checks compare variables, output schema and body only. Look for
-   `modifiedon`, `versionnumber` or ETag dependence.
-5. **Write each row once, conditionally.** Write the six catalog columns only
-   to each name's current row, or to its latest row when no current row exists.
-   - Each write is a DAL update with `If-Match` on the inventoried ETag. A row
-     that changed since the inventory fails and is reported, not retried
-     blindly.
-   - Do it outside any publish activity.
-   - Production writes need a same-day `DATAVERSE_PROD_WRITE_ACK`.
-   - The sandbox goes first, as a rehearsal.
-6. **Keep a record.** Commit a before/after receipt per row under
-   `docs/plans/evidence/`: name, row ID, old and new values, and outcome. The
-   receipt is needed because this script does not write the Postgres
-   `prompt_publish_audit` that the publish route does.
-7. **Then Connor adds his prompts,** filling in the catalog fields as he goes.
-   He must not reuse an existing app prompt name.
+Not backfilled:
 
-Historical versions are not backfilled. Catalog metadata describes the prompt
-as it is now; it is not a historical record.
+- Historical versions. Catalog metadata describes the prompt as it is now.
+- The sandbox prompt rows.
+- The code catalog itself. It remains the fallback until a decision is made to
+  retire it.
 
 ## New shape (for Codex to plan)
 

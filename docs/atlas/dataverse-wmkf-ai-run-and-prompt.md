@@ -87,8 +87,20 @@ organizing the shared prompt library: `wmkf_ai_displaytitle` (String 200),
 `wmkf_ai_description` (Memo 4000), `wmkf_ai_groupkey` (String 80),
 `wmkf_ai_sectionkey` (String 80), `wmkf_ai_usedby` (Memo 4000) and
 `wmkf_ai_usagecategory` (String 40). They are descriptive only, and no prompt
-execution depends on them (the Executor projection does not select them). They
-are not yet populated.
+execution depends on them (the Executor projection does not select them).
+
+[VERIFIED via per-row readback, 2026-11-02 22:05 UTC] They are populated in
+Production for all 40 prompt names. Values were copied from
+`ADMIN_PROMPT_CATALOG`, under a same-day owner-approved write:
+
+- Each name's current row was written, except `phase-i.checkin`, which has no
+  current row; its single v1 row was written.
+- Every write used `If-Match` on the inventoried ETag.
+
+Inventory and receipt:
+`docs/plans/evidence/prompt-catalog-inventory-prod-2026-11-02.json` and
+`docs/plans/evidence/prompt-catalog-backfill-prod-2026-11-02.json`. Historical
+versions and the sandbox were not backfilled.
 
 - **Read:** the Admin projection (`ADMIN_ROW_SELECT` in
   `lib/dataverse/adapters/ai-prompt.js`) selects them. Both Admin services return
