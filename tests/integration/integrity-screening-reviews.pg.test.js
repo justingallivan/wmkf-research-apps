@@ -44,7 +44,7 @@ const RESULT = {
   matchingVersion: 2,
   matchCount: 0,
   sources: {
-    retraction_watch: { searched: true, matches: [], error: null },
+    retraction_watch: { searched: true, matches: [], error: null, dataset: { status: 'unrecorded', state: 'unmanaged' } },
     pubpeer: { searched: true, sourceValidationVersion: 2, resultCount: 0, summary: 'No results', error: null },
     news: { searched: true, summary: 'No results', error: null },
   },
