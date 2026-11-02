@@ -4,7 +4,7 @@ import HelpButton from '../shared/components/HelpButton';
 import RequireAppAccess from '../shared/components/RequireAppAccess';
 import ErrorAlert from '../shared/components/ErrorAlert';
 
-import { integrityRetentionLabel, integrityIdentityLabel, integrityIncomplete, integritySourceLabel, integrityResultLabel, integrityDatasetLabel } from '../shared/utils/integrity-evidence';
+import { isManualPubPeerSource, manualPubPeerSource, integrityRetentionLabel, integrityIdentityLabel, integrityIncomplete, integritySourceLabel, integrityResultLabel, integrityDatasetLabel } from '../shared/utils/integrity-evidence';
 
 /**
  * Retraction match card
@@ -108,6 +108,7 @@ function AIResultCard({ source, result, onDismiss, screenedName }) {
     news: 'News Search',
   };
 
+  const manual = source === 'pubpeer' && isManualPubPeerSource(result);
   const hasConcerns = result.hasConcerns;
 
   return (
@@ -121,7 +122,7 @@ function AIResultCard({ source, result, onDismiss, screenedName }) {
                 Review Needed
               </span>
             ) : (
-              <span className={`ml-2 inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium border ${result.error || result.searched !== true ? 'bg-amber-100 text-amber-800 border-amber-200' : 'bg-green-100 text-green-800 border-green-200'}`}>
+              <span className={`ml-2 inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium border ${manual ? 'bg-gray-100 text-gray-700 border-gray-200' : result.error || result.searched !== true ? 'bg-amber-100 text-amber-800 border-amber-200' : 'bg-green-100 text-green-800 border-green-200'}`}>
                 {integritySourceLabel(result)}
               </span>
             )}
@@ -138,12 +139,12 @@ function AIResultCard({ source, result, onDismiss, screenedName }) {
         <div className="flex gap-2 pt-3 mt-3 border-t border-gray-100">
           {result.searchUrl && (
             <a
-              href={result.searchUrl}
+              href={manual ? manualPubPeerSource(screenedName).searchUrl : result.searchUrl}
               target="_blank"
               rel="noopener noreferrer"
               className="text-xs text-blue-600 hover:underline"
             >
-              View on PubPeer
+              {manual ? 'Open PubPeer manually' : 'View on PubPeer'}
             </a>
           )}
           {hasConcerns && (
@@ -472,7 +473,7 @@ function IntegrityScreenerPage() {
 
         for (const [key, label] of [['retraction_watch', 'Retraction Watch'], ['pubpeer', 'PubPeer'], ['news', 'News']]) {
           const source = result.sources[key];
-          if (!source?.searched) builder.addParagraph(`${label}: Incomplete source. ${source?.error || 'Not searched'}`);
+          if (!source?.searched && !isManualPubPeerSource(source)) builder.addParagraph(`${label}: Incomplete source. ${source?.error || 'Not searched'}`);
         }
 
         builder.addParagraph(integrityDatasetLabel(result.sources.retraction_watch?.dataset));
@@ -507,16 +508,17 @@ function IntegrityScreenerPage() {
 
         // PubPeer
         const pubpeerResult = result.sources.pubpeer || {};
-        if (pubpeerResult.searched) {
+        if (pubpeerResult.searched || isManualPubPeerSource(pubpeerResult)) {
           builder.addSection('PubPeer', 2);
           builder.addBadge(
             integritySourceLabel(pubpeerResult),
-            pubpeerResult.hasConcerns || pubpeerResult.error ? 'warning' : 'success'
+            isManualPubPeerSource(pubpeerResult) ? 'default' : pubpeerResult.hasConcerns || pubpeerResult.error ? 'warning' : 'success'
           );
           if (pubpeerResult.resultCount > 0) {
             builder.addKeyValue('Results Found', String(pubpeerResult.resultCount));
           }
           if (pubpeerResult.error) builder.addParagraph(`Error: ${pubpeerResult.error}`);
+          if (isManualPubPeerSource(pubpeerResult)) builder.addParagraph(`Open PubPeer manually: ${manualPubPeerSource(result.name).searchUrl}`);
           if (pubpeerResult.summary) {
             builder.addParagraph(pubpeerResult.summary);
           }
@@ -608,7 +610,7 @@ function IntegrityScreenerPage() {
 
       for (const [key, label] of [['retraction_watch', 'Retraction Watch'], ['pubpeer', 'PubPeer'], ['news', 'News']]) {
         const source = result.sources[key];
-        if (!source?.searched) md += `${label}: Incomplete source. ${source?.error || 'Not searched'}\n\n`;
+        if (!source?.searched && !isManualPubPeerSource(source)) md += `${label}: Incomplete source. ${source?.error || 'Not searched'}\n\n`;
       }
 
       md += `${integrityDatasetLabel(result.sources.retraction_watch?.dataset)}\n\n`;
@@ -648,7 +650,7 @@ function IntegrityScreenerPage() {
 
       // PubPeer results
       const pubpeerResult = result.sources.pubpeer || {};
-      if (pubpeerResult.searched) {
+      if (pubpeerResult.searched || isManualPubPeerSource(pubpeerResult)) {
         md += `### PubPeer\n\n`;
         md += `- **Status:** ${integritySourceLabel(pubpeerResult)}\n`;
         if (pubpeerResult.resultCount > 0) {
@@ -656,7 +658,7 @@ function IntegrityScreenerPage() {
         }
         md += `\n${pubpeerResult.error || pubpeerResult.summary || 'Incomplete source'}\n\n`;
         if (pubpeerResult.searchUrl) {
-          md += `[View on PubPeer](${pubpeerResult.searchUrl})\n\n`;
+          md += `[View on PubPeer](${isManualPubPeerSource(pubpeerResult) ? manualPubPeerSource(result.name).searchUrl : pubpeerResult.searchUrl})\n\n`;
         }
       }
 
@@ -794,7 +796,7 @@ function IntegrityScreenerPage() {
             </p>
             <p>
               <strong>PubPeer:</strong> Post-publication peer review platform.
-              Indexed PubPeer search results are checked for valid sources before AI analysis.
+              Not checked automatically. Use the manual link to review publications on PubPeer.
             </p>
             <p>
               <strong>News Search:</strong> Google News search for professionally

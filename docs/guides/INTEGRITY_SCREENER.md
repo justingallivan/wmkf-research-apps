@@ -4,6 +4,8 @@ Screen grant applicants for research integrity concerns using multiple data sour
 
 **Source status (2026-11-02):** The accuracy changes below are deployed through PR #604. Migration 092 and production dry-run are verified; the worker is enabled; owner-approved monthly scheduling is deployed and verified in the Production cron registry. First corpus publication is verified: 73,521 records, generation 1, including two retained records with provenance. See [refresh operating guide](RETRACTION_WATCH_REFRESH.md).
 
+**Source-built policy change (2026-11-02; not deployed yet):** automated PubPeer search and analysis are removed; both screens and exports show the manual-only source. See [review/rollout receipt](../audits/integrity-pubpeer-manual-2026-11-02.md).
+
 ## Overview
 
 The Integrity Screener searches for retractions, corrections, and integrity-related news for a list of applicant names. It combines database lookups with AI-powered analysis to surface potential concerns.
@@ -13,7 +15,7 @@ The Integrity Screener searches for retractions, corrections, and integrity-rela
 | Source | What It Searches | Coverage |
 |--------|-----------------|----------|
 | **Retraction Watch** | Locally loaded Retraction Watch records | Retraction records and reasons present in the current database |
-| **PubPeer** | Post-publication peer review comments | Community-flagged concerns about published papers |
+| **PubPeer** | Manual link only; no automated search or AI analysis | Not checked automatically; opening the link records no manual check |
 | **News Search** | Google News via SerpAPI | Media coverage of research misconduct |
 
 ## Running a Screening
@@ -34,9 +36,9 @@ The Integrity Screener searches for retractions, corrections, and integrity-rela
 
 Each applicant gets a results card showing:
 
-- **Match count** per source (Retraction Watch, PubPeer, News)
+- **Match count** from automated sources (Retraction Watch and News)
 - **Name evidence** — what matched, with identity explicitly unverified
-- **Source summaries** — PubPeer and news searches can include AI-written summaries for that source
+- **Source summaries** — news searches can include AI-written summaries; PubPeer has a manual link only
 - **Individual matches** — expandable details for each hit
 
 #### Understanding name evidence
@@ -46,7 +48,7 @@ Each applicant gets a results card showing:
 - Explicit conflicting given/middle names are excluded. An absent middle name or different current institution alone is not an exclusion.
 - Older runs say **Earlier matching rules · identity not established**; their saved results and decisions are unchanged.
 - Paper-wide affiliation is not proof of affiliation for the matched author. A correction or retraction alone does not establish misconduct.
-- PubPeer results must be HTTPS links on the accepted PubPeer hosts. Off-domain, mixed-domain, malformed, failed or unsearched sources are incomplete, never a clean search. A successful empty indexed search is not a direct search of PubPeer's complete database.
+- PubPeer is not checked automatically. The manual name-search link is a starting point for human review, not identity evidence or a recorded check. New policy version 3 requires complete automated Retraction Watch and news coverage for a new staff approval; it does not require a PubPeer result. Historical version-1/version-2 runs and approvals retain their original rules; an older unapproved run requires a new screen.
 
 ### 4. Record False Positives
 
@@ -73,5 +75,5 @@ application UI to retrieve earlier runs.
 - **Name ambiguity** — Common names may produce false positives. Always review matches carefully before drawing conclusions.
 - **Coverage gaps** — Not all retractions or concerns appear in these databases. A clean screening does not guarantee no issues exist.
 - **Context matters** — A retraction doesn't necessarily indicate misconduct. Papers can be retracted for honest errors, journal issues, or administrative reasons. Read the retraction notice.
-- **Timeliness** — Retraction Watch uses the locally imported dataset. The approved source was published on 2026-11-02 as generation 1; monthly scheduling at 06:00 UTC on the 1st is owner-approved and deployed and verified in the Production cron registry. Indexed PubPeer results and news can also have coverage gaps.
+- **Timeliness** — Retraction Watch uses the locally imported dataset. The approved source was published on 2026-11-02 as generation 1; monthly scheduling at 06:00 UTC on the 1st is owner-approved and deployed and verified in the Production cron registry. Manual PubPeer review and indexed news can also have coverage gaps.
 - **Use as a starting point** — Screening results should inform further investigation, not serve as a final determination.

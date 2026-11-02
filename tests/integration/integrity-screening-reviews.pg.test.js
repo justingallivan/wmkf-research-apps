@@ -40,12 +40,12 @@ const PERSON = { contactId: CONTACT_ID, name: 'Ada Example', institution: 'North
 const RESULT = {
   name: PERSON.name,
   institution: PERSON.institution,
-  sourceCoverageVersion: 2,
+  sourceCoverageVersion: 3,
   matchingVersion: 2,
   matchCount: 0,
   sources: {
     retraction_watch: { searched: true, matches: [], error: null, dataset: { status: 'unrecorded', state: 'unmanaged' } },
-    pubpeer: { searched: true, sourceValidationVersion: 2, resultCount: 0, summary: 'No results', error: null },
+    pubpeer: { mode: 'manual', searched: false, error: null, summary: 'Not checked automatically', searchUrl: 'https://pubpeer.com/search?q=Ada%20Example' },
     news: { searched: true, summary: 'No results', error: null },
   },
 };
@@ -120,7 +120,7 @@ describeIf('integrity screening reviews (live Postgres, migrations 056-057)', ()
 
   test('recorded v1 approval survives while a new v1 approval is refused', async () => {
     const id = await insertRun({ createdAt: '2099-01-01T00:00:00Z' });
-    const legacy = { ...RESULT, sourceCoverageVersion: 1, matchingVersion: undefined };
+    const legacy = { ...RESULT, sourceCoverageVersion: 1, matchingVersion: undefined, sources: { ...RESULT.sources, pubpeer: { searched: true, sourceValidationVersion: 2, resultCount: 0, summary: 'No results', error: null } } };
     await pg.client.query('UPDATE integrity_screenings SET results = $1 WHERE id = $2', [JSON.stringify([legacy]), id]);
     const args = { requestId: REQUEST_ID, screeningId: id, decision: 'approved', notes: '', profileId, actingUserSystemId: SYSTEM_ID };
     await expect(service.recordWorkbenchIntegrityReview(args, dataverseDependencies()))

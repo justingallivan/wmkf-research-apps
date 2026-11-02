@@ -11,12 +11,12 @@ const PERSON = { contactId: CONTACT_ID, name: 'Ada Example', institution: 'North
 const RESULT = {
   name: PERSON.name,
   institution: PERSON.institution,
-  sourceCoverageVersion: 2,
+  sourceCoverageVersion: 3,
   matchingVersion: 2,
   matchCount: 0,
   sources: {
     retraction_watch: { searched: true, matches: [], error: null, dataset: { status: 'unrecorded', state: 'unmanaged' } },
-    pubpeer: { searched: true, sourceValidationVersion: 2, resultCount: 0, summary: 'No results', error: null },
+    pubpeer: { mode: 'manual', searched: false, error: null, summary: 'Not checked automatically', searchUrl: 'https://pubpeer.com/search?q=Ada%20Example' },
     news: { searched: true, summary: 'No results', error: null },
   },
 };
@@ -338,8 +338,8 @@ test('migration 057 and fresh-install setup preserve append-only review rows and
 });
 
 test.each([
-  { ...RESULT, sourceCoverageVersion: 1, matchingVersion: undefined },
-  { ...RESULT, sources: { ...RESULT.sources, retraction_watch: { ...RESULT.sources.retraction_watch, dataset: undefined } } },
+  { ...RESULT, sourceCoverageVersion: 1, matchingVersion: undefined, sources: { ...RESULT.sources, pubpeer: { searched: true, sourceValidationVersion: 2, resultCount: 0, summary: 'No results', error: null } } },
+  { ...RESULT, sourceCoverageVersion: 2, sources: { ...RESULT.sources, pubpeer: { searched: true, sourceValidationVersion: 2, resultCount: 0, summary: 'No results', error: null }, retraction_watch: { ...RESULT.sources.retraction_watch, dataset: undefined } } },
 ])('legacy approval survives but cannot grant a new approval under current rules', async (legacyResult) => {
   const oldRun = { ...RUN, results: [legacyResult] };
   const approval = { id: 700, screening_id: RUN.id, decision: 'approved', created_at: RUN.created_at };
@@ -356,7 +356,7 @@ test.each([
 });
 
 test('a newer legacy hold wins over an earlier approval', async () => {
-  const oldRun = { ...RUN, results: [{ ...RESULT, sourceCoverageVersion: 1 }] };
+  const oldRun = { ...RUN, results: [{ ...RESULT, sourceCoverageVersion: 1, sources: { ...RESULT.sources, pubpeer: { searched: true, sourceValidationVersion: 2, resultCount: 0, summary: 'No results', error: null } } }] };
   const deps = dependenciesFor(dataverseDependencies(), { runs: [oldRun], reviews: [
     { id: 702, screening_id: RUN.id, decision: 'hold', notes: 'Recheck' },
     { id: 701, screening_id: RUN.id, decision: 'approved' },
@@ -370,10 +370,34 @@ test.each([
   { ...RESULT, sourceCoverageVersion: 99 },
   { ...RESULT, sources: { ...RESULT.sources, retraction_watch: { ...RESULT.sources.retraction_watch, dataset: undefined } } },
   { ...RESULT, matchingVersion: undefined },
-  { ...RESULT, sources: { ...RESULT.sources, pubpeer: { ...RESULT.sources.pubpeer, sourceValidationVersion: undefined } } },
+  { ...RESULT, sources: { ...RESULT.sources, pubpeer: { ...RESULT.sources.pubpeer, mode: undefined } } },
   { ...RESULT, sources: { ...RESULT.sources, retraction_watch: { searched: true, matches: [{ matchingVersion: 2, identityStatus: 'verified', nameEvidence: 'exact_name' }], error: null } } },
 ])('unknown or malformed current evidence fails closed for new approvals', async (badResult) => {
   const deps = dependenciesFor(dataverseDependencies(), { runs: [{ ...RUN, results: [badResult] }] });
   await expect(recordWorkbenchIntegrityReview(reviewArgs(), deps)).rejects.toMatchObject({ body: { code: 'integrity_screen_incomplete' } });
   expect(deps.state.inserts).toHaveLength(0);
+});
+
+
+test.each([
+  { ...RESULT.sources.pubpeer, mode: 'unknown' },
+  { ...RESULT.sources.pubpeer, searched: true },
+  { ...RESULT.sources.pubpeer, error: 'offline' },
+  { ...RESULT.sources.pubpeer, rawResults: [{ link: 'https://example.org' }] },
+  { ...RESULT.sources.pubpeer, hasConcerns: true },
+])('current policy rejects malformed manual-source evidence', async (pubpeer) => {
+  const deps = dependenciesFor(dataverseDependencies(), { runs: [{ ...RUN, results: [{ ...RESULT, sources: { ...RESULT.sources, pubpeer } }] }] });
+  await expect(recordWorkbenchIntegrityReview(reviewArgs(), deps)).rejects.toMatchObject({ body: { code: 'integrity_screen_incomplete' } });
+  expect(deps.state.inserts).toHaveLength(0);
+});
+
+test('a valid version-2 historical approval survives without allowing a new version-2 approval', async () => {
+  const oldResult = { ...RESULT, sourceCoverageVersion: 2, sources: { ...RESULT.sources,
+    pubpeer: { searched: true, sourceValidationVersion: 2, resultCount: 0, summary: 'No results', error: null } } };
+  const oldRun = { ...RUN, results: [oldResult] };
+  const deps = dependenciesFor(dataverseDependencies(), { runs: [oldRun], reviews: [{ id: 703, screening_id: RUN.id, decision: 'approved' }] });
+  const context = await getWorkbenchIntegrityContext({ requestId: REQUEST_ID, profileId: 42, actingUserSystemId: SYSTEM_ID }, deps);
+  expect(context.review).toMatchObject({ status: 'approved', canApprove: false });
+  const pending = dependenciesFor(dataverseDependencies(), { runs: [oldRun] });
+  await expect(recordWorkbenchIntegrityReview(reviewArgs(), pending)).rejects.toMatchObject({ body: { code: 'integrity_screen_incomplete' } });
 });

@@ -32,13 +32,13 @@ async function screen(options = strict) {
 
 test('strict source coverage is explicit and successful empty searches are complete', async () => {
   const result = await screen();
-  expect(result.sourceCoverageVersion).toBe(2);
+  expect(result.sourceCoverageVersion).toBe(3);
   expect(Object.keys(result.sources)).toHaveLength(3);
-  for (const source of Object.values(result.sources)) expect(source).toMatchObject({ searched: true, error: null });
-  expect(global.fetch).toHaveBeenCalledTimes(4);
+  for (const source of [result.sources.retraction_watch, result.sources.news]) expect(source).toMatchObject({ searched: true, error: null });
+  expect(global.fetch).toHaveBeenCalledTimes(2);
   expect(mockSql.mock.calls.filter(([parts]) => parts.join('?').includes('SELECT EXISTS'))).toHaveLength(1);
   expect(mockComplete).not.toHaveBeenCalled();
-  expect((await screen({})).sourceCoverageVersion).toBeUndefined();
+  expect((await screen({})).sourceCoverageVersion).toBe(3);
   expect(mockSql.mock.calls.filter(([parts]) => parts.join('?').includes('SELECT EXISTS'))).toHaveLength(1);
 });
 
@@ -52,7 +52,7 @@ test.each([
 ])('%s remains an exposed source failure in strict screening', async (_label, response) => {
   global.fetch.mockImplementation(response);
   const result = await screen();
-  expect(result.sources.pubpeer.error).toBeTruthy();
+  expect(result.sources.pubpeer).toMatchObject({ mode: 'manual', searched: false, error: null });
   expect(result.sources.news.error).toBeTruthy();
   expect(result.sources.retraction_watch.error).toBeNull();
 });
@@ -60,7 +60,7 @@ test.each([
 test('a failed narrow search is not masked by a successful broad search', async () => {
   global.fetch.mockImplementation(emptyResponse).mockImplementationOnce(emptyResponse)
     .mockImplementationOnce(() => ({ ok: false, status: 500 }));
-  expect((await screen()).sources.pubpeer.error).toBeTruthy();
+  expect((await screen()).sources.news.error).toBeTruthy();
 });
 
 test.each(['organic_results_state', 'news_results_state'])('documented successful empty %s is not an outage', async (field) => {
@@ -187,7 +187,7 @@ test('strict summary failure is exposed by the generator and cannot be approved 
   }) }));
   mockComplete.mockRejectedValue(new Error('provider unavailable'));
   const result = await screen();
-  expect(result.sources.pubpeer.error).toBe('Search result analysis failed');
+  expect(result.sources.pubpeer).toMatchObject({ mode: 'manual', searched: false, error: null });
   expect(result.sources.news.error).toBe('Search result analysis failed');
 });
 
@@ -236,40 +236,20 @@ test('strict mode keeps specific source-failure messages and names a timeout', a
     .rejects.toThrow('Invalid response from Claude API');
 });
 
-describe('PubPeer source identity validation (both callers)', () => {
-  const pubpeer = (link) => ({ title: 'Discussion', link, snippet: 'Image concern on a publication' });
-  const response = (items) => ({ ok: true, json: async () => ({ search_metadata: { status: 'Success' }, organic_results: items }) });
-  test.each([
-    'https://example.org/person', 'https://pubpeer.com.evil.org/publications/a',
-    'https://pubpeer.com@evil.org/a', 'https://user@pubpeer.com/publications/a',
-    'http://pubpeer.com/publications/a', 'https://pubpeer.com:8443/publications/a',
-  ])('rejects off-domain or unsafe URL before analysis: %s', async (link) => {
-    global.fetch.mockResolvedValue(response([pubpeer(link)]));
-    await expect(IntegrityService.searchPubPeer('Ada Example', '', 'fixture', 'fixture'))
-      .rejects.toMatchObject({ excludedResultCount: 1 });
-    expect(mockComplete).not.toHaveBeenCalled();
-  });
-  test('mixed results and an invalid narrow response cannot pass validation', async () => {
-    global.fetch.mockResolvedValueOnce(response([pubpeer('https://pubpeer.com/publications/a')]))
-      .mockResolvedValueOnce(response([pubpeer('https://example.org/a'), pubpeer('https://pubpeer.com/publications/a')]));
-    await expect(IntegrityService.searchPubPeer('Ada Example', 'Example University', 'fixture', 'fixture')).rejects.toThrow('unrelated sources');
-    expect(mockComplete).not.toHaveBeenCalled();
-  });
-  test('valid URLs are analyzed, deduplicated and versioned', async () => {
-    global.fetch.mockResolvedValue(response([pubpeer('https://pubpeer.com/publications/a')]));
-    const result = await IntegrityService.searchPubPeer('Ada Example', 'Example University', 'fixture', 'fixture');
-    expect(result).toMatchObject({ sourceValidationVersion: 2, resultCount: 1, hasConcerns: false });
-    expect(mockComplete).toHaveBeenCalledTimes(1);
-  });
-  test('standalone HTTP failure cannot become a successful empty search', async () => {
-    global.fetch.mockResolvedValue({ ok: false, status: 429 });
-    await expect(IntegrityService.searchPubPeer('Ada Example', '', 'fixture', 'fixture')).rejects.toThrow('Search provider request failed');
-  });
-  test('accepted empty responses use indexed-search wording', async () => {
-    const result = await IntegrityService.searchPubPeer('Ada Example', '', 'fixture', 'fixture');
-    expect(result).toMatchObject({ sourceValidationVersion: 2, resultCount: 0 });
-    expect(result.summary).toContain('not a direct search');
-  });
+test.each([strict, {}])('PubPeer never triggers search or analysis in either caller (%j)', async (options) => {
+  const r = await screen(options);
+  expect(r.sources.pubpeer).toMatchObject({ mode: 'manual', searched: false, error: null,
+    searchUrl: 'https://pubpeer.com/search?q=Ada%20Example' });
+  expect(r.sources.pubpeer.summary).toContain('No manual check is recorded');
+  expect(r.sources.pubpeer).not.toHaveProperty('hasConcerns');
+  expect(global.fetch).toHaveBeenCalledTimes(2);
+  for (const [url] of global.fetch.mock.calls) {
+    const params = new URL(url).searchParams;
+    expect(params.get('engine')).toBe('google_news');
+    expect(params.get('q')).not.toContain('site:pubpeer.com');
+  }
+  expect(mockComplete).not.toHaveBeenCalled();
+  expect(IntegrityService.searchPubPeer).toBeUndefined();
 });
 
 test('engine excludes the reported conflicting authors and keeps namesakes unverified', async () => {

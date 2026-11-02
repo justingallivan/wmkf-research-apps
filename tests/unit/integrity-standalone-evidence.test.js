@@ -85,3 +85,31 @@ test('standalone UI and all three exports preserve uncertainty and expose source
   expect(JSON.stringify(mockPdfCalls)).toContain('Dataset 7');
   expect(JSON.stringify(mockPdfCalls)).toContain('Retained from prior corpus');
 });
+
+
+test('manual PubPeer link and all exports explicitly show no automated or recorded manual check', async () => {
+  const oldSource = result.sources.pubpeer;
+  const oldVersion = result.sourceCoverageVersion;
+  result.sourceCoverageVersion = 3;
+  result.sources.pubpeer = require('../../shared/utils/integrity-evidence').manualPubPeerSource(result.name);
+  try {
+    await run();
+    const link = screen.getByRole('link', { name: 'Open PubPeer manually' });
+    expect(link).toHaveAttribute('href', 'https://pubpeer.com/search?q=Yuan%20He');
+    expect(link).toHaveAttribute('rel', 'noopener noreferrer');
+    expect(screen.getByText('Not checked automatically')).toBeInTheDocument();
+    expect(screen.getByText('Not checked automatically').className).not.toContain('bg-green');
+    expect(screen.queryByText('Incomplete source')).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'Export Markdown' }));
+    expect(captured[0]).toContain('Not checked automatically');
+    expect(captured[0]).toContain('No manual check is recorded');
+    expect(captured[0]).toContain('https://pubpeer.com/search?q=Yuan%20He');
+    expect(captured[0]).not.toContain('PubPeer: Incomplete source');
+    fireEvent.click(screen.getByRole('button', { name: 'Export JSON' }));
+    expect(JSON.parse(captured[1]).applicants[0].sources.pubpeer).toMatchObject({ mode: 'manual', searched: false });
+    fireEvent.click(screen.getByRole('button', { name: 'Export PDF' }));
+    await waitFor(() => expect(JSON.stringify(mockPdfCalls)).toContain('No manual check is recorded'));
+    expect(JSON.stringify(mockPdfCalls)).toContain('Open PubPeer manually: https://pubpeer.com/search?q=Yuan%20He');
+    expect(mockPdfCalls).toContainEqual(['addBadge', 'Not checked automatically', 'default']);
+  } finally { result.sources.pubpeer = oldSource; result.sourceCoverageVersion = oldVersion; }
+});
