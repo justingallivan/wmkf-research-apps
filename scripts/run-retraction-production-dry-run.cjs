@@ -23,6 +23,7 @@ async function main(){
  if(!/^[a-f0-9]{40}$/.test(expected||''))throw new Error('exact_release_sha_required');
  const project=api(`/v9/projects/${PROJECT}`);const deployment=project.targets?.production;
  if(project.id!==PROJECT||project.accountId!==TEAM||deployment?.readyState!=='READY'||deployment.meta?.githubCommitSha!==expected)throw new Error('production_release_not_ready_or_mismatched');
+ if(!Array.isArray(project.crons?.definitions))throw new Error('cron_registry_unverifiable');
  if(project.crons?.definitions?.some(job=>job.path.split('?')[0]==='/api/cron/refresh-retractions'))throw new Error('monthly_schedule_must_be_absent');
  const alias=JSON.parse(command(['inspect',DOMAIN,'--json','--scope',TEAM]));
  if(alias.id!==deployment.id||alias.target!=='production')throw new Error('production_domain_deployment_mismatch');
@@ -34,13 +35,18 @@ async function main(){
  try{
   const file=path.join(temp,'production.env');command(['env','pull',file,'--environment=production','--yes'],linked);fs.chmodSync(file,0o600);
   const env=dotenv.parse(fs.readFileSync(file));const dbUrl=new URL(env.POSTGRES_URL);
-  if(env.NEON_PROJECT_ID!=='falling-surf-05640504'||dbUrl.hostname!=='ep-frosty-credit-afovxswa-pooler.c-2.us-west-2.aws.neon.tech'||dbUrl.pathname!=='/neondb'||env.RETRACTION_REFRESH_ENABLED!=='on'||!env.CRON_SECRET)throw new Error('production_dryrun_configuration_mismatch');
+  // Vercel redacts Sensitive Production values in env pull. Use the existing
+  // local app cron credential only when that value is a redaction marker.
+  const isRedacted=value=>!value||/redacted|sensitive|hidden|encrypted/i.test(value);
+  const local=dotenv.parse(fs.readFileSync(path.join(ROOT,'.env.local')));
+  const cronSecret=isRedacted(env.CRON_SECRET)?local.CRON_SECRET:env.CRON_SECRET;
+  if(env.NEON_PROJECT_ID!=='falling-surf-05640504'||dbUrl.hostname!=='ep-frosty-credit-afovxswa-pooler.c-2.us-west-2.aws.neon.tech'||dbUrl.pathname!=='/neondb'||env.RETRACTION_REFRESH_ENABLED!=='on'||isRedacted(cronSecret))throw new Error('production_dryrun_configuration_mismatch');
   client=new Client({connectionString:withVerifyFullSslmode(env.POSTGRES_URL),application_name:'integrity-dryrun-readback',connectionTimeoutMillis:10000,query_timeout:30000});await client.connect();
   await client.query('BEGIN READ ONLY');
   const before=await fingerprint(client);const start=(await client.query('SELECT NOW()::text AS started')).rows[0].started;
   const prior=(await client.query('SELECT COUNT(*)::int AS count FROM retraction_dataset')).rows[0].count;
   await client.query('ROLLBACK');if(prior!==0)throw new Error('existing_publication_detected');
-  const response=await fetch(`https://${DOMAIN}/api/cron/refresh-retractions?dryRun=1`,{method:'GET',headers:{Authorization:`Bearer ${env.CRON_SECRET}`},redirect:'manual',signal:AbortSignal.timeout(270000)});
+  const response=await fetch(`https://${DOMAIN}/api/cron/refresh-retractions?dryRun=1`,{method:'GET',headers:{Authorization:`Bearer ${cronSecret}`},redirect:'manual',signal:AbortSignal.timeout(270000)});
   if(!response.headers.get('content-type')?.includes('application/json'))throw Object.assign(new Error('non_json_worker_response'),{status:response.status});
   const outcome=await response.json();
   if(!response.ok||outcome.success!==true||outcome.status!=='dry_run'||outcome.dryRun!==true||outcome.published!==false||outcome.auditRecorded!==true)throw Object.assign(new Error('worker_dryrun_not_successful'),{status:response.status,workerCode:/^[a-z_]+$/.test(outcome.error||'')?outcome.error:undefined});
@@ -49,6 +55,7 @@ async function main(){
   const audits=(await client.query("SELECT id,job_name,status,records_processed,records_deleted,started_at,completed_at,details FROM maintenance_runs WHERE job_name='retraction-refresh-dryrun' AND started_at>=$1::timestamptz ORDER BY id DESC LIMIT 3",[start])).rows;
   await client.query('ROLLBACK');
   const current=api(`/v9/projects/${PROJECT}`);
+  if(!Array.isArray(current.crons?.definitions))throw new Error('cron_registry_unverifiable');
   const scheduled=current.crons?.definitions?.some(job=>job.path.split('?')[0]==='/api/cron/refresh-retractions');
   if(before.rowsSha256!==after.rowsSha256||before.count!==after.count||published!==0||scheduled||!audits.some(a=>a.status==='completed'&&a.details?.checksum===outcome.checksum))throw new Error('dryrun_readback_mismatch');
   console.log(JSON.stringify({observedAt:new Date().toISOString(),deployment:{id:deployment.id,url:deployment.url,sha:expected},request:{domain:DOMAIN,path:'/api/cron/refresh-retractions?dryRun=1',method:'GET'},outcome,readback:{corpusCount:after.count,corpusRowsSha256:after.rowsSha256,corpusUnchanged:true,publicationMetadataRows:published,monthlySchedulePresent:false,audits}},null,2));

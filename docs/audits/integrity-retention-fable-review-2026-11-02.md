@@ -1,5 +1,7 @@
 # Narrow Retraction Watch retention — implementation and Fable review
 
+**Historical checkpoint:** subsequent migration, merge/deployment and production dry-run are complete in the [live release receipt](integrity-production-release-2026-11-02.md). First publication and monthly activation remain held.
+
 **SOURCE-BUILT, NOT DEPLOYED. Final Fable verdict READY FOR OWNER REVIEW; sole P2 closed, no blocking code findings.** Owner authorized retaining only legacy record IDs 13045 and 67801 with explicit provenance, implementing the smallest safe change and an ordinary OAuth-only Fable review. Migration, merge, flag activation, first production dry-run/publication and cron registration remain unexecuted and require release authorization.
 
 ## Invariants and whole-flow trace

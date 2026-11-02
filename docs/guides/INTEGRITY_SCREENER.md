@@ -2,7 +2,7 @@
 
 Screen grant applicants for research integrity concerns using multiple data sources and AI analysis.
 
-**Source status (2026-11-02):** The accuracy changes below are built on `codex/integrity-screening-discussion` and are not deployed. Managed monthly refresh is also source-built, disabled and unscheduled; no production dataset was updated. See [refresh operating guide](RETRACTION_WATCH_REFRESH.md).
+**Source status (2026-11-02):** The accuracy changes below are deployed through PR #604. Migration 092 and production dry-run are verified; the manual worker is enabled but unscheduled. First corpus publication is held for owner approval; the live dataset remains 68,248 unchanged records. See [refresh operating guide](RETRACTION_WATCH_REFRESH.md).
 
 ## Overview
 
@@ -73,5 +73,5 @@ application UI to retrieve earlier runs.
 - **Name ambiguity** — Common names may produce false positives. Always review matches carefully before drawing conclusions.
 - **Coverage gaps** — Not all retractions or concerns appear in these databases. A clean screening does not guarantee no issues exist.
 - **Context matters** — A retraction doesn't necessarily indicate misconduct. Papers can be retracted for honest errors, journal issues, or administrative reasons. Read the retraction notice.
-- **Timeliness** — Retraction Watch uses the locally imported dataset. Its current freshness is unverified; managed monthly refresh is source-built but remains disabled pending migration, initial publication approval and separate schedule activation. Indexed PubPeer results and news can also have coverage gaps.
+- **Timeliness** — Retraction Watch uses the locally imported dataset. The production dry-run validated a newer candidate dataset, but it has not been published; managed monthly scheduling remains off pending initial publication approval/readback and separate activation. Indexed PubPeer results and news can also have coverage gaps.
 - **Use as a starting point** — Screening results should inform further investigation, not serve as a final determination.

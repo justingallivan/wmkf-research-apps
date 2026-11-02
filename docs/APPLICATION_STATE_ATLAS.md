@@ -298,6 +298,6 @@ node scripts/audit-dataverse-state.js    # ~10s, free, hits live tenant
 
 Both scripts are read-only and idempotent.
 
-## Source-built Retraction Watch publication metadata
+## Retraction Watch publication metadata — live schema, first publication held
 
-**[SOURCE-BUILT, NOT DEPLOYED — 2026-11-02]** `retraction_dataset` is the proposed migration-092 singleton provenance record for managed Postgres reference-data publication. The refresh worker is disabled and unscheduled; migration 092 is applied and the 68,248-row legacy corpus is unchanged; promotion/deployed dry-run are authorized, with first publication held. See [retraction dataset metadata](atlas/postgres-retraction-dataset.md). The TEMP `retraction_refresh_stage` exists only during a refresh transaction and is not a new durable data store.
+**[LIVE SCHEMA/CODE — 2026-11-02]** `retraction_dataset` is the migration-092 singleton provenance record for managed Postgres reference-data publication. The manual refresh worker is enabled and unscheduled; migration 092 and PR #604 deployment are verified. Deployed dry-run succeeded; the 68,248-row legacy corpus remains unchanged and metadata empty, with first publication held. See [retraction dataset metadata](atlas/postgres-retraction-dataset.md). The TEMP `retraction_refresh_stage` exists only during a refresh transaction and is not a new durable data store.

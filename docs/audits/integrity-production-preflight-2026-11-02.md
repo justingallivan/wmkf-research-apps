@@ -1,5 +1,7 @@
 # Integrity rollout production preflight — 2026-11-02
 
+**Historical checkpoint:** subsequent migration, merge/deployment and production dry-run are complete in the [live release receipt](integrity-production-release-2026-11-02.md). First publication and monthly activation remain held.
+
 **Verdict: read-only checks passed; publication remains gated.** Justin authorized production preflight only. No migration, corpus write, environment change, backup/snapshot creation, merge, deployment, scheduled-job activation, restore or email was performed in this preflight.
 
 ## Evidence and scope
