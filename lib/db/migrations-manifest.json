@@ -90,6 +90,7 @@
     "089_manual_presentation_video_pairs.sql",
     "090_request_corpus_index.sql",
     "091_reviewer_materials_releases.sql",
-    "092_retraction_dataset.sql"
+    "092_retraction_dataset.sql",
+    "093_prompt_publish_audit_catalog_status.sql"
   ]
 }

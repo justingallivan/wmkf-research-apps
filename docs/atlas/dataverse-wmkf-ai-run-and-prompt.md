@@ -108,6 +108,18 @@ versions and the sandbox were not backfilled.
 - **Display:** `resolveAdminPromptDescription` in
   `shared/config/adminPromptCatalog.js` prefers stored values field by field
   and falls back to the code catalog. Group/section and usage are validated.
+- **Edit [BUILT on branch, 2026-11-02; not yet deployed]:**
+  `PATCH /api/admin/prompts/[name]` (superuser) edits the six columns in place
+  on the loaded current row (or the highest-version row when none is current).
+  It creates no new version.
+  - Stale row or stale values return 409.
+  - Group/section/usage are checked against `ADMIN_PROMPT_GROUPS` /
+    `ADMIN_PROMPT_USAGES`.
+  - A pending audit is written before the `If-Match` write; a failed audit
+    write aborts the edit.
+  - The adapter's `updateCatalog` refuses any other column.
+  - Writes run as the app principal, as publish does, so "last touched by"
+    shows the app. The audit row records the editor.
 - **Write:** an Admin publish copies all six from the prior current row to the
   new version. They are outside the publish fingerprint. A `prompt-seed.js`
   `--force` version copies them too: from the current row on republish, or
@@ -394,6 +406,23 @@ These are independent. Don't conflate them.
 **Schema:** migration `019_prompt_publish_audit.sql` (mirrored into `scripts/setup-database.js` V34). Columns: `request_id`, `prompt_name`, `target_version`, `new_prompt_id`, `prior_prompt_id`, `body_hash`, `profile_id` (→ `user_profiles`), `phase` (`pending`/`final`), `status` (incl. invariant statuses `no_current_row` / `duplicate_current_rows`), `outcome_json`, `warnings_json`, `created_at`. The legacy-named `body_hash` column now stores fingerprint version 2's canonical publish-payload hash; `outcome_json` records `fingerprintVersion`, `priorModel`, and `newModel`. No schema migration was required.
 
 **Write path:** `pages/api/admin/prompts/[name].js` (superuser) — the versioned-publish route. Prompt content is not stored here (it lives on the `wmkf_ai_prompt` row); only hashes and audit metadata.
+
+**Catalog-details edits [BUILT on branch, 2026-11-02; requires migration 093
+applied before deploy]:**
+
+- **Writer:** `PATCH /api/admin/prompts/[name]` via
+  `lib/services/admin/prompts-catalog-service.js`.
+- **Rows:** a pending row, then a final row, under a server-minted
+  `request_id`, so publish idempotency lookups never read them.
+- **Final statuses:** `catalog_updated`, `catalog_conflict`,
+  `catalog_superseded` or `failed`.
+- **Other columns:** `target_version` is the edited row's version, and
+  `new_prompt_id`/`prior_prompt_id` are that row's ID. `outcome_json` holds
+  `kind: 'catalog'` plus the before/after values.
+- **Constraint:** migration `093_prompt_publish_audit_catalog_status.sql`
+  widens `prompt_publish_audit_status_check`. The `scripts/setup-database.js`
+  V34 declaration is an unused historical fixture; fresh installs replay the
+  migrations.
 
 **Migration disposition:** stays Postgres. Parallels `policy_publish_audit`; no Dataverse counterpart.
 

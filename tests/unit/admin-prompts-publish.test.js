@@ -197,3 +197,41 @@ describe('PUT /api/admin/prompts/[name]', () => {
     expect(res.body.warnings.join(' ')).toMatch(/invariant_violation_current_count_2/);
   });
 });
+
+describe('PATCH /api/admin/prompts/[name] (catalog details)', () => {
+  const ROW = '33333333-3333-4333-8333-333333333333';
+  const LOADED = { title: 'Old', description: null, group: 'reviewers', section: null, usedBy: null, usage: 'application' };
+  const stored = { wmkf_ai_promptid: ROW, wmkf_ai_promptname: NAME, wmkf_promptversion: 3, wmkf_ai_iscurrent: true,
+    wmkf_ai_displaytitle: 'Old', wmkf_ai_groupkey: 'reviewers', wmkf_ai_usagecategory: 'application' };
+
+  it('400 for a non-GUID rowId, with no Dataverse call', async () => {
+    const res = mockRes();
+    await handler({ method: 'PATCH', query: { name: NAME }, body: { rowId: 'nope', expected: LOADED, catalog: LOADED } }, res);
+    expect(res.statusCode).toBe(400);
+    expect(res.body.status).toBe('invalid_catalog');
+    expect(DynamicsService.queryRecords).not.toHaveBeenCalled();
+  });
+
+  it('unauth PATCH short-circuits before any write', async () => {
+    const { requireSuperuser } = require('../../lib/utils/auth');
+    requireSuperuser.mockResolvedValueOnce(null);
+    const res = mockRes();
+    await handler({ method: 'PATCH', query: { name: NAME }, body: { rowId: ROW, expected: LOADED, catalog: LOADED } }, res);
+    expect(DynamicsService.updateRecord).not.toHaveBeenCalled();
+  });
+
+  it('200 catalog_updated: If-Match PATCH of the catalog columns only', async () => {
+    DynamicsService.queryRecords
+      .mockResolvedValueOnce({ records: [stored] })
+      .mockResolvedValueOnce({ records: [{ wmkf_ai_promptid: ROW, wmkf_promptversion: 3 }] });
+    const res = mockRes();
+    await handler({ method: 'PATCH', query: { name: NAME }, body: { rowId: ROW, expected: LOADED, catalog: { ...LOADED, title: 'New' } } }, res);
+    expect(res.statusCode).toBe(200);
+    expect(res.body).toMatchObject({ status: 'catalog_updated', rowId: ROW });
+    expect(DynamicsService.updateRecord).toHaveBeenCalledWith('wmkf_ai_prompts', ROW,
+      expect.objectContaining({ wmkf_ai_displaytitle: 'New', wmkf_ai_groupkey: 'reviewers' }), { ifMatch: 'W/"1"' });
+    const written = DynamicsService.updateRecord.mock.calls[0][2];
+    expect(Object.keys(written).every((key) => key.startsWith('wmkf_ai_') && !/promptbody|iscurrent|model/.test(key))).toBe(true);
+    expect(DynamicsService.createRecord).not.toHaveBeenCalled();
+  });
+});

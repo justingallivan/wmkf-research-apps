@@ -242,3 +242,20 @@ describe('aiPrompt entity set', () => {
     expect(aiPrompt.ENTITY_SET_NAME).toBe('wmkf_ai_prompts');
   });
 });
+
+describe('aiPrompt.updateCatalog', () => {
+  test('PATCHes only catalog columns with the required If-Match', async () => {
+    const u = jest.spyOn(DynamicsService, 'updateRecord').mockResolvedValue({});
+    await aiPrompt.updateCatalog(GUID_A, { wmkf_ai_displaytitle: 'T', wmkf_ai_sectionkey: null }, { ifMatch: 'W/"1"' });
+    expect(u).toHaveBeenCalledWith('wmkf_ai_prompts', GUID_A, { wmkf_ai_displaytitle: 'T', wmkf_ai_sectionkey: null }, { ifMatch: 'W/"1"' });
+    u.mockRestore();
+  });
+  test('refuses content columns, empty payloads and a missing If-Match', () => {
+    const u = jest.spyOn(DynamicsService, 'updateRecord').mockResolvedValue({});
+    expect(() => aiPrompt.updateCatalog(GUID_A, { wmkf_ai_promptbody: 'x' }, { ifMatch: 'W/"1"' })).toThrow(/only the six catalog columns/);
+    expect(() => aiPrompt.updateCatalog(GUID_A, {}, { ifMatch: 'W/"1"' })).toThrow(/only the six catalog columns/);
+    expect(() => aiPrompt.updateCatalog(GUID_A, { wmkf_ai_displaytitle: 'T' })).toThrow(/If-Match/);
+    expect(u).not.toHaveBeenCalled();
+    u.mockRestore();
+  });
+});
