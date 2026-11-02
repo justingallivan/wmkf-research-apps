@@ -79,19 +79,14 @@ work went through PRs #606 and #608. Docs landed on `main` directly as Tier 0.
    `prompt_publish_audit` rows (`outcome_json.kind = 'catalog'`) to confirm the
    profile and the before/after values.
 
-### Verify Before Acting
+### Done after closeout
 
-1. **Close PR #553** (superseded plug-in design; owner asked 2026-11-02).
-   It must not merge: its Pre-Site output-schema change drops `maxLength`, and
-   `artifact-model.js` requires an exact live-row match, so merging would fail
-   every Pre-Site generation.
-   - The local branch `codex/shared-prompt-library-plan` (worktree
-     `/private/tmp/wmkf-pr553`) is 15 commits ahead of the remote and holds
-     local-only plug-in work.
-   - Closing the PR does not touch that branch.
-   - The signing key, Windows bundles and
-     `output/connor-windows09-offline-checks/` are local-only and must never
-     enter Git. Keep them until Justin decides.
+1. **PR #553 closed** (owner request, 2026-11-02), with a comment explaining
+   the supersession and the Pre-Site schema hazard. Its branch
+   `codex/shared-prompt-library-plan` and worktree `/private/tmp/wmkf-pr553`
+   (15 local-only commits) were left untouched. The signing key, Windows
+   bundles and `output/connor-windows09-offline-checks/` remain local-only and
+   must never enter Git; disposal is Justin's decision.
 
 ### Parked — requires a new owner request
 
