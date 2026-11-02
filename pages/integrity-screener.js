@@ -4,30 +4,7 @@ import HelpButton from '../shared/components/HelpButton';
 import RequireAppAccess from '../shared/components/RequireAppAccess';
 import ErrorAlert from '../shared/components/ErrorAlert';
 
-/**
- * Confidence badge component
- */
-function ConfidenceBadge({ confidence }) {
-  let colorClass = 'bg-gray-100 text-gray-800 border-gray-200';
-  let label = 'Low';
-
-  if (confidence >= 90) {
-    colorClass = 'bg-red-100 text-red-800 border-red-200';
-    label = 'High';
-  } else if (confidence >= 70) {
-    colorClass = 'bg-yellow-100 text-yellow-800 border-yellow-200';
-    label = 'Medium';
-  } else if (confidence >= 50) {
-    colorClass = 'bg-orange-100 text-orange-800 border-orange-200';
-    label = 'Low';
-  }
-
-  return (
-    <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium border ${colorClass}`}>
-      {confidence}% ({label})
-    </span>
-  );
-}
+import { integrityIdentityLabel, integrityIncomplete, integritySourceLabel, integrityResultLabel } from '../shared/utils/integrity-evidence';
 
 /**
  * Retraction match card
@@ -42,7 +19,7 @@ function RetractionMatchCard({ match, onDismiss }) {
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2 mb-1">
               <span className="text-xs font-medium text-gray-500 uppercase">Retraction Watch</span>
-              <ConfidenceBadge confidence={match.confidence} />
+              <span className="text-xs text-gray-700">{integrityIdentityLabel(match)}</span>
             </div>
             <h4 className="text-sm font-medium text-gray-900 line-clamp-2">{match.title}</h4>
           </div>
@@ -56,6 +33,7 @@ function RetractionMatchCard({ match, onDismiss }) {
       </div>
 
       <div className="p-4 space-y-2">
+        <p className="text-xs text-gray-600">A correction or retraction alone does not establish misconduct.</p>
         {match.retractionNature && (
             <span className={`inline-flex min-h-6 items-center px-2 py-0.5 text-xs font-medium rounded-full ${
             match.retractionNature.toLowerCase().includes('retraction')
@@ -84,7 +62,7 @@ function RetractionMatchCard({ match, onDismiss }) {
           <div className="mt-3 pt-3 border-t border-gray-200 space-y-2 text-sm text-gray-600">
             {match.authors && <p><strong>Authors:</strong> {match.authors}</p>}
             {match.matchedAuthor && <p><strong>Matched Name:</strong> {match.matchedAuthor}</p>}
-            {match.institution && <p><strong>Institution:</strong> {match.institution}</p>}
+            {match.institution && <p><strong>Paper-wide affiliation:</strong> {match.institution}</p>}
             {match.doi && (
               <p>
                 <strong>DOI:</strong>{' '}
@@ -143,7 +121,7 @@ function AIResultCard({ source, result, onDismiss, screenedName }) {
               </span>
             ) : (
               <span className="ml-2 inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800 border border-green-200">
-                Clear
+                {integritySourceLabel(result)}
               </span>
             )}
           </div>
@@ -154,7 +132,7 @@ function AIResultCard({ source, result, onDismiss, screenedName }) {
       </div>
 
       <div className="p-4">
-        <p className="text-sm text-gray-700 whitespace-pre-wrap">{result.summary}</p>
+        <p className="text-sm text-gray-700 whitespace-pre-wrap">{result.error || result.summary || integritySourceLabel(result)}</p>
 
         <div className="flex gap-2 pt-3 mt-3 border-t border-gray-100">
           {result.searchUrl && (
@@ -185,7 +163,7 @@ function AIResultCard({ source, result, onDismiss, screenedName }) {
  * Applicant result card
  */
 function ApplicantResultCard({ result, onDismiss }) {
-  const [expanded, setExpanded] = useState(result.hasConcerns);
+  const [expanded, setExpanded] = useState(result.hasConcerns || integrityIncomplete(result));
   const detailsId = `integrity-result-${String(result.name || 'applicant').toLowerCase().replace(/[^a-z0-9]+/g, '-')}`;
 
   const retractionMatches = result.sources.retraction_watch?.matches || [];
@@ -200,6 +178,7 @@ function ApplicantResultCard({ result, onDismiss }) {
           <div className="flex-1">
             <div className="flex items-center gap-2 flex-wrap">
               <h3 className="text-lg font-semibold text-gray-900">{result.name}</h3>
+              {result.matchingVersion !== 2 && <span className="text-xs text-gray-600">Earlier matching rules · identity not established</span>}
               {result.isCommonName && (
                 <span className="inline-flex min-h-6 items-center px-2 py-0.5 rounded-full text-xs bg-blue-100 text-blue-700">
                   Common Name
@@ -218,7 +197,7 @@ function ApplicantResultCard({ result, onDismiss }) {
               </span>
             ) : (
               <span className="inline-flex min-h-7 items-center px-3 py-1 rounded-full text-sm font-medium bg-green-100 text-green-800 border border-green-300">
-                No concerns
+                {integrityResultLabel(result)}
               </span>
             )}
             <button
@@ -237,6 +216,7 @@ function ApplicantResultCard({ result, onDismiss }) {
       {/* Expanded content */}
       {expanded && (
         <div id={detailsId} className="p-4 space-y-4">
+          {integrityIncomplete(result) && <p className="text-sm text-amber-800">Incomplete screen. Review source errors and missing searches before drawing conclusions.</p>}
           {/* Retraction Watch results */}
           {result.sources.retraction_watch?.searched && (
             <div>
@@ -257,12 +237,12 @@ function ApplicantResultCard({ result, onDismiss }) {
                     <div className="flex items-center gap-2">
                       <span className="text-xs font-medium text-gray-500 uppercase">Retraction Watch</span>
                       <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800 border border-green-200">
-                        Clear
+                        {integritySourceLabel(result.sources.retraction_watch)}
                       </span>
                     </div>
                   </div>
                   <div className="p-4">
-                    <p className="text-sm text-gray-700">No retractions found in the database.</p>
+                    <p className="text-sm text-gray-700">{result.sources.retraction_watch?.error ? 'Retraction Watch search incomplete.' : 'No matching Retraction Watch records returned.'}</p>
                   </div>
                 </div>
               )}
@@ -273,7 +253,7 @@ function ApplicantResultCard({ result, onDismiss }) {
           )}
 
           {/* PubPeer results */}
-          {pubpeerResult.searched && (
+          {(
             <AIResultCard
               source="pubpeer"
               result={pubpeerResult}
@@ -283,7 +263,7 @@ function ApplicantResultCard({ result, onDismiss }) {
           )}
 
           {/* News results */}
-          {newsResult.searched && (
+          {(
             <AIResultCard
               source="news"
               result={newsResult}
@@ -467,8 +447,8 @@ function IntegrityScreenerPage() {
         .addTitle('Integrity Screening Report')
         .addMetadata('Date', dateStr)
         .addMetadata('Total Applicants', String(results.results.length))
-        .addMetadata('Applicants with Concerns', String(results.applicantsWithConcerns))
-        .addMetadata('Total Matches', String(results.totalMatches))
+        .addMetadata('Applicants with Review Items', String(results.applicantsWithConcerns))
+        .addMetadata('Total Review Items', String(results.totalMatches))
         .addDivider();
 
       results.results.forEach((result, index) => {
@@ -479,11 +459,18 @@ function IntegrityScreenerPage() {
           builder.addKeyValue('Institution', result.institution);
         }
         builder.addBadge(
-          result.hasConcerns ? 'Review Needed' : 'No Concerns',
-          result.hasConcerns ? 'warning' : 'success'
+          integrityResultLabel(result),
+          result.hasConcerns || integrityIncomplete(result) ? 'warning' : 'success'
         );
-        if (result.isCommonName) {
+        builder.addParagraph('Name matches do not establish identity. A correction or retraction alone does not establish misconduct.');
+        if (result.matchingVersion !== 2) builder.addParagraph('Earlier matching rules · identity not established');
+      if (result.isCommonName) {
           builder.addParagraph('Note: Common name (higher false positive risk)', { font: 'italic' });
+        }
+
+        for (const [key, label] of [['retraction_watch', 'Retraction Watch'], ['pubpeer', 'PubPeer'], ['news', 'News']]) {
+          const source = result.sources[key];
+          if (!source?.searched) builder.addParagraph(`${label}: Incomplete source. ${source?.error || 'Not searched'}`);
         }
 
         // Retraction Watch
@@ -495,18 +482,18 @@ function IntegrityScreenerPage() {
             retractionMatches.forEach((match) => {
               builder.addSpace(5);
               builder.addParagraph(match.title || 'Untitled', { font: 'bold' });
-              if (match.confidence) builder.addKeyValue('Confidence', `${match.confidence}%`);
+              builder.addKeyValue('Name evidence', integrityIdentityLabel(match));
               if (match.retractionNature) builder.addKeyValue('Action', match.retractionNature);
               if (match.journal) builder.addKeyValue('Journal', match.journal);
               if (match.retractionDate) builder.addKeyValue('Date', new Date(match.retractionDate).toLocaleDateString());
               if (match.reasons?.length > 0) builder.addKeyValue('Reasons', match.reasons.join(', '));
               if (match.authors) builder.addKeyValue('Authors', match.authors);
               if (match.matchedAuthor) builder.addKeyValue('Matched Name', match.matchedAuthor);
-              if (match.institution) builder.addKeyValue('Institution', match.institution);
+              if (match.institution) builder.addKeyValue('Paper-wide affiliation', match.institution);
               if (match.doi) builder.addKeyValue('DOI', match.doi);
             });
           } else {
-            builder.addParagraph('No retractions found in the database.');
+            builder.addParagraph(result.sources.retraction_watch.error ? 'Retraction Watch search incomplete.' : 'No matching Retraction Watch records returned.');
           }
           if (result.sources.retraction_watch?.error) {
             builder.addParagraph(`Error: ${result.sources.retraction_watch.error}`, { font: 'italic' });
@@ -518,12 +505,13 @@ function IntegrityScreenerPage() {
         if (pubpeerResult.searched) {
           builder.addSection('PubPeer', 2);
           builder.addBadge(
-            pubpeerResult.hasConcerns ? 'Review Needed' : 'Clear',
-            pubpeerResult.hasConcerns ? 'warning' : 'success'
+            integritySourceLabel(pubpeerResult),
+            pubpeerResult.hasConcerns || pubpeerResult.error ? 'warning' : 'success'
           );
           if (pubpeerResult.resultCount > 0) {
             builder.addKeyValue('Results Found', String(pubpeerResult.resultCount));
           }
+          if (pubpeerResult.error) builder.addParagraph(`Error: ${pubpeerResult.error}`);
           if (pubpeerResult.summary) {
             builder.addParagraph(pubpeerResult.summary);
           }
@@ -534,12 +522,13 @@ function IntegrityScreenerPage() {
         if (newsResult.searched) {
           builder.addSection('News Search', 2);
           builder.addBadge(
-            newsResult.hasConcerns ? 'Review Needed' : 'Clear',
-            newsResult.hasConcerns ? 'warning' : 'success'
+            integritySourceLabel(newsResult),
+            newsResult.hasConcerns || newsResult.error ? 'warning' : 'success'
           );
           if (newsResult.resultCount > 0) {
             builder.addKeyValue('Results Found', String(newsResult.resultCount));
           }
+          if (newsResult.error) builder.addParagraph(`Error: ${newsResult.error}`);
           if (newsResult.summary) {
             builder.addParagraph(newsResult.summary);
           }
@@ -561,6 +550,7 @@ function IntegrityScreenerPage() {
 
     const report = {
       screenedAt: new Date().toISOString(),
+      evidenceMeaning: 'All name matches have unverified identity. Numeric confidence is a heuristic name-similarity score, never a probability of identity. Review items combine potential records and source-level flags, not verified allegations.',
       applicants: results.results,
       summary: {
         totalApplicants: results.results.length,
@@ -592,10 +582,11 @@ function IntegrityScreenerPage() {
 
     let md = `# Integrity Screening Report\n\n`;
     md += `**Date:** ${dateStr}\n\n`;
+    md += `Name matches do not establish identity. A correction or retraction alone does not establish misconduct.\n\n`;
     md += `## Summary\n\n`;
     md += `- **Total Applicants Screened:** ${results.results.length}\n`;
-    md += `- **Applicants with Concerns:** ${results.applicantsWithConcerns}\n`;
-    md += `- **Total Matches Found:** ${results.totalMatches}\n\n`;
+    md += `- **Applicants with Review Items:** ${results.applicantsWithConcerns}\n`;
+    md += `- **Total Review Items:** ${results.totalMatches}\n\n`;
     md += `---\n\n`;
 
     results.results.forEach((result, index) => {
@@ -603,11 +594,17 @@ function IntegrityScreenerPage() {
       if (result.institution) {
         md += `- **Institution:** ${result.institution}\n`;
       }
-      md += `- **Status:** ${result.hasConcerns ? '⚠️ Review Needed' : '✓ No Concerns'}\n`;
+      md += `- **Status:** ${integrityResultLabel(result)}\n`;
+      if (result.matchingVersion !== 2) md += 'Earlier matching rules · identity not established\n\n';
       if (result.isCommonName) {
         md += `- **Note:** Common name (higher false positive risk)\n`;
       }
       md += `\n`;
+
+      for (const [key, label] of [['retraction_watch', 'Retraction Watch'], ['pubpeer', 'PubPeer'], ['news', 'News']]) {
+        const source = result.sources[key];
+        if (!source?.searched) md += `${label}: Incomplete source. ${source?.error || 'Not searched'}\n\n`;
+      }
 
       // Retraction Watch results
       const retractionMatches = result.sources.retraction_watch?.matches || [];
@@ -617,7 +614,7 @@ function IntegrityScreenerPage() {
           md += `**${retractionMatches.length} match${retractionMatches.length !== 1 ? 'es' : ''} found**\n\n`;
           retractionMatches.forEach((match, i) => {
             md += `#### Match ${i + 1}: ${match.title}\n\n`;
-            md += `- **Confidence:** ${match.confidence}%\n`;
+            md += `- **Name evidence:** ${integrityIdentityLabel(match)}\n`;
             if (match.retractionNature) md += `- **Action:** ${match.retractionNature}\n`;
             if (match.journal) md += `- **Journal:** ${match.journal}\n`;
             if (match.retractionDate) {
@@ -628,14 +625,13 @@ function IntegrityScreenerPage() {
             }
             if (match.authors) md += `- **Authors:** ${match.authors}\n`;
             if (match.matchedAuthor) md += `- **Matched Name:** ${match.matchedAuthor}\n`;
-            if (match.institution) md += `- **Institution:** ${match.institution}\n`;
+            if (match.institution) md += `- **Paper-wide affiliation:** ${match.institution}\n`;
             if (match.doi) md += `- **DOI:** [${match.doi}](https://doi.org/${match.doi})\n`;
             if (match.urls) md += `- **Source:** [View on Retraction Watch](${match.urls.split(';')[0].trim()})\n`;
             md += `\n`;
           });
         } else {
-          md += `- **Status:** ✓ Clear\n\n`;
-          md += `No retractions found in the database.\n\n`;
+          md += `${result.sources.retraction_watch.error ? 'Retraction Watch search incomplete.' : 'No matching Retraction Watch records returned.'}\n\n`;
         }
         if (result.sources.retraction_watch?.error) {
           md += `*Error: ${result.sources.retraction_watch.error}*\n\n`;
@@ -646,11 +642,11 @@ function IntegrityScreenerPage() {
       const pubpeerResult = result.sources.pubpeer || {};
       if (pubpeerResult.searched) {
         md += `### PubPeer\n\n`;
-        md += `- **Status:** ${pubpeerResult.hasConcerns ? '⚠️ Review Needed' : '✓ Clear'}\n`;
+        md += `- **Status:** ${integritySourceLabel(pubpeerResult)}\n`;
         if (pubpeerResult.resultCount > 0) {
           md += `- **Results Found:** ${pubpeerResult.resultCount}\n`;
         }
-        md += `\n${pubpeerResult.summary}\n\n`;
+        md += `\n${pubpeerResult.error || pubpeerResult.summary || 'Incomplete source'}\n\n`;
         if (pubpeerResult.searchUrl) {
           md += `[View on PubPeer](${pubpeerResult.searchUrl})\n\n`;
         }
@@ -660,11 +656,11 @@ function IntegrityScreenerPage() {
       const newsResult = result.sources.news || {};
       if (newsResult.searched) {
         md += `### News Search\n\n`;
-        md += `- **Status:** ${newsResult.hasConcerns ? '⚠️ Review Needed' : '✓ Clear'}\n`;
+        md += `- **Status:** ${integritySourceLabel(newsResult)}\n`;
         if (newsResult.resultCount > 0) {
           md += `- **Results Found:** ${newsResult.resultCount}\n`;
         }
-        md += `\n${newsResult.summary}\n\n`;
+        md += `\n${newsResult.error || newsResult.summary || 'Incomplete source'}\n\n`;
       }
 
 
@@ -750,8 +746,8 @@ function IntegrityScreenerPage() {
                 <div>
                   <h3 className="text-lg font-semibold text-gray-900">Screening Results</h3>
                   <p className="text-sm text-gray-600 mt-1">
-                    {results.applicantsWithConcerns} of {results.results.length} applicant{results.results.length !== 1 ? 's' : ''} with potential concerns
-                    {results.totalMatches > 0 && ` (${results.totalMatches} total matches)`}
+                    {results.applicantsWithConcerns} of {results.results.length} applicant{results.results.length !== 1 ? 's' : ''} with review items
+                    {results.totalMatches > 0 && ` (${results.totalMatches} total review items)`}
                   </p>
                 </div>
                 <div className="flex gap-2">
@@ -786,11 +782,11 @@ function IntegrityScreenerPage() {
           <div className="text-sm text-gray-600 space-y-2">
             <p>
               <strong>Retraction Watch Database:</strong> Comprehensive database of retracted papers
-              (~63,000+ entries). Updated periodically.
+              loaded reference data. The current dataset refresh is managed separately.
             </p>
             <p>
               <strong>PubPeer:</strong> Post-publication peer review platform.
-              AI analyzes comments for integrity concerns.
+              Indexed PubPeer search results are checked for valid sources before AI analysis.
             </p>
             <p>
               <strong>News Search:</strong> Google News search for professionally

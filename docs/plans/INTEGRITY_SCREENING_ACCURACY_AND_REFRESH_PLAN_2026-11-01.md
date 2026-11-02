@@ -3,7 +3,7 @@ title: Integrity screening accuracy and monthly Retraction Watch refresh
 domain: integrity-screener
 kind: plan
 status: planned
-summary: "Reject conflicting author names, replace identity-confidence claims, validate PubPeer evidence, and safely refresh Retraction Watch monthly. Implementation and live changes are not authorized by this plan."
+summary: "Reject conflicting author names, replace identity-confidence claims, validate PubPeer evidence, and safely refresh Retraction Watch monthly. Screening implementation authorized on the isolated branch; Fable review required before merge. Production changes remain unapproved."
 canonical: false
 cataloged: 2026-11-01
 owner: product-engineering
@@ -17,7 +17,7 @@ related:
 
 ## 1. Scope, authority, and status
 
-[PLANNED] Owner: Codex. Branch: `codex/integrity-screening-discussion`. Worktree: `/private/tmp/wmkf-integrity-screening`. This is a proposal for owner review before implementation; no runtime changes, migrations, imports, scheduled jobs, or production probes have been executed for this plan.
+[PLANNED] Owner: Codex. Branch: `codex/integrity-screening-discussion`. Worktree: `/private/tmp/wmkf-integrity-screening`. Justin authorized implementation on this isolated branch on 2026-11-02, starting with Increment A and requiring Fable review before merge or production work. Increment A is source-built with offline tests; its independent implementation review is pending. Increment B remains planned. No migrations, imports, scheduled jobs, or production probes have been executed for this plan.
 
 [VERIFIED via owner messages, 2026-11-01] Justin requested three initial fixes after inspecting request 1002852: reject conflicting names, use honest identity labels, and validate PubPeer sources. He additionally requested a Retraction Watch update and selected a **monthly** refresh. The proposed timing is **the 1st of every month at 06:00 UTC**, expression `0 6 1 * *`; only the monthly cadence was owner-selected, while the exact time is a planning default.
 
@@ -167,7 +167,7 @@ related:
 
 [PLANNED] B is acceptable when a full-dataset rehearsal meets resource budgets, failed imports leave corpus and metadata intact, readers either report one coherent generation or explicit incomplete coverage, unchanged files do not republish, provenance is truthful, and the initial authorized live refresh reads back correctly before cron enablement.
 
-[PLANNED] Work stays on the feature branch. Relevant red gates block the affected surface. No merge to `main` (which deploys), production migration/import, provider-credit-consuming re-screen, or cron activation is authorized by writing or reviewing this plan. Implementation begins only after Justin accepts the reviewed plan. Fable review is source-only; live state remains UNKNOWN unless separately probed.
+[PLANNED] Work stays on the feature branch. Relevant red gates block the affected surface. No merge to `main` (which deploys), production migration/import, provider-credit-consuming re-screen, or cron activation is authorized by writing or reviewing this plan. Justin accepted implementation on 2026-11-02; source work is authorized, while merge and production work remain unapproved. Fable review is source-only; live state remains UNKNOWN unless separately probed.
 
 ## 8. Independent review
 

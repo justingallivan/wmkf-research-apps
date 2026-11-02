@@ -17,7 +17,7 @@ const RESULT = {
   hasConcerns: true,
   sources: {
     retraction_watch: { searched: true, matches: [{
-      title: 'A retracted public study', matchedAuthor: PEOPLE[0].name, confidence: 92, confidenceLevel: 'high',
+      title: 'A retracted public study', matchedAuthor: PEOPLE[0].name, confidence: 92, matchingVersion: 2, identityStatus: 'unverified', nameEvidence: 'exact_name',
       retractionNature: 'Retraction', reasons: ['Data concern'], doi: '10.1000/example',
       urls: 'https://retraction.example/one; https://retraction.example/two',
     }], error: null },

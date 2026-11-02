@@ -16,6 +16,7 @@ const person = { contactId: 'contact-a', name: 'Ada Example', institution: 'Nort
 const completeResult = {
   name: person.name,
   institution: person.institution,
+  matchingVersion: 2,
   matchCount: 0,
   hasConcerns: false,
   sources: {
@@ -69,7 +70,8 @@ test('renders Retraction Watch persisted fields and safe semicolon-separated sou
   requestEnvelope.mockResolvedValue(ok({ ...loaded, latestRun: { ...savedRun, matchCount: 1, results: [result] } }));
   render(<IntegrityTab requestId={requestId} />);
   expect(await screen.findByText('A retracted study')).toBeInTheDocument();
-  expect(screen.getByText(/Match confidence: high \(92%\)/)).toBeInTheDocument();
+  expect(screen.getByText('Earlier matching rules · identity not established')).toBeInTheDocument();
+  expect(screen.queryByText(/92%/)).toBeNull();
   expect(screen.getByText('Matched author: Ada Example')).toBeInTheDocument();
   expect(screen.getByText('Action: Retraction')).toBeInTheDocument();
   expect(screen.getByText('Reasons: Data issues, Image concern')).toBeInTheDocument();

@@ -1,7 +1,7 @@
 ---
 agent_wiki: topic
 status: active
-last_verified: 2026-09-26
+last_verified: 2026-11-02
 stale_after_days: 90
 owner: integrity-screener
 source_files:
@@ -52,14 +52,18 @@ Sources 2 + 3 are both gated behind one `effectiveSerpKey` today (`integrity-ser
 consume a `sources.pubpeer` shape (`hasConcerns`, `summary`, `resultCount`, `searchUrl`, …) rendered in
 `pages/integrity-screener.js`.
 
+## Checked-out source and production boundary
+
+[VERIFIED via source/tests, 2026-11-02] The accuracy increment is source-built on `codex/integrity-screening-discussion`, not deployed. The behavior below describes that branch; dated Production statements describe the earlier deployed baseline. The monthly reference refresh is still planned.
+
 ## Current UI boundaries
 
 - The standalone `/integrity-screener` remains the manual-name screening page. The Workbench request page has a separate Integrity tab gated by the `integrity-screener` app grant.
 - In the Workbench flow, the server loads the request's Project Leader and PI/Co-PI junction contacts from Dataverse, deduplicates by contact, and supplies names and institutions to the existing screening engine. The route accepts the request GUID and does not use browser-supplied people or identities.
 - The tab shows the server-resolved people before a confirmation that screening uses Claude and SerpAPI credits per person. The request-scoped service refuses an empty list, missing names, or more than 10 people; the cap is a defensive spend bound.
-- The Workbench opts into the engine's version-1 strict source-coverage reporting. The standalone screen keeps its existing fail-soft default; this opt-in does not change that behavior.
+- New Workbench runs use strict coverage version 2 and name-evidence version 2. Explicit conflicting names are excluded; all retained name candidates remain identity-unverified. The standalone save contract remains fail-soft, but PubPeer retrieval/analysis failures are now explicit source errors in both callers. PubPeer off-domain or mixed results fail coverage before summarization; successful empty indexed searches are described as indexed coverage only.
 - Completed Workbench runs are saved with a nullable `integrity_screenings.request_id`. GET returns the latest run plus newest-first history pages of 20. `beforeRunId` is a request-scoped cursor. Migration 056 supplies the linkage column and latest-by-request index; migration 057 adds append-only review decisions.
-- The Workbench review endpoint allows the request's lead Program Director or a fresh-role superuser to record `approved` or `hold` on the latest run. Approval requires an unchanged current roster and complete version-1 coverage for Retraction Watch, PubPeer, and News; hold requires a note. The UI shows earlier decisions read-only. Approval means **Integrity review complete**; it records a human review after staff recommend funding and is not a funding decision or progression gate. Do not add automatic screening or an earlier gate.
+- The Workbench review endpoint allows the request's lead Program Director or a fresh-role superuser to record `approved` or `hold` on the latest run. New approval requires an unchanged current roster and complete version-2 coverage for Retraction Watch, PubPeer, and News, including validated PubPeer evidence. Previously recorded version-1 approvals remain historical approvals when roster and latest-decision precedence still allow it; unapproved older runs require a new screen; hold requires a note. The UI shows earlier decisions read-only. Approval means **Integrity review complete**; it records a human review after staff recommend funding and is not a funding decision or progression gate. Do not add automatic screening or an earlier gate.
 - The Workbench history/review surfaces are **live since 2026-09-30** (PR #366 merged as `fdaec0b1f`, deployed to Production; S552). Migrations 056 and 057 were applied and verified by a schema probe the same day, and a read-only production smoke passed. The standalone dismiss route is owner-scoped since PR #367 (`4d482d958`).
 - Standalone history and dismissal API primitives exist. The standalone page's Dismiss handler remains a placeholder: it logs and alerts but does not call the dismissal API. `screenApplicants` does not read prior dismissals, so future-screen suppression is not implemented.
 - Since PR #151 (2026-09-05) the source descriptions on the page no longer say
@@ -70,8 +74,7 @@ consume a `sources.pubpeer` shape (`hasConcerns`, `summary`, `resultCount`, `sea
   dismissals, so future-screen suppression is not implemented.
 - Strict (Workbench) SerpAPI empty-result rule (2026-10-01): a search counts as a complete empty result when `search_metadata.status` is `Success`, no results array is present, and **either** `search_information.{organic,news}_results_state === 'Fully empty'` **or** the known "hasn't returned any results" message is present. Anything else fails closed, including an error that arrives together with results. Live zero-result responses are recorded in `tests/fixtures/serpapi/zero-result-2026-10-01.json`. This closes PR #366 review finding 6.
 - Owner decision (2026-10-01): any user holding both `integrity-screener` and `reviewers` may start a new screen on an already-approved request, which returns it to needs-review. This is intended, not a gap.
-- PDF, JSON, and Markdown exports cover the current run and its source-specific
-  summaries; they do not contain durable dismissal records.
+- UI, PDF and Markdown show name evidence and unverified identity, not heuristic percentages. JSON retains numeric similarity only with an explicit non-probability explanation. Older evidence is labeled as earlier rules; saved histories/counts/decisions are not rewritten. Exports expose incomplete sources and do not contain durable dismissals.
 
 ## Durable Memory
 

@@ -353,7 +353,7 @@ If you're touching a service or utility, read its header before this catalog. If
 
 - **`integrity-service.js`** — Retraction Watch + PubPeer + News + Haiku summarization.
 - **`workbench/integrity-service.js`** — Request-scoped Workbench entry point: loads PI/Co-PI people from Dataverse inside the caller's trusted DAL context (a deleted or unreadable contact is left unnamed and refused as `person_identity_unavailable`), enforces a 10-person spend cap and a 240s run budget (503, nothing saved), returns 503 before any paid call when the Retraction Watch corpus is unavailable, saves completed runs to `integrity_screenings.request_id` (migration 056), pages 20 screening runs with their append-only recorded reviews, and authorizes the latest-screen lead-PD/superuser approval or hold (migration 057). Approval requires an exact current roster and complete strict-source coverage; it records integrity-review completion only, not a funding decision or progression gate. **[LIVE since 2026-09-30: PR #366 merged as `fdaec0b1f` and deployed to Production; migrations 056–057 applied and schema-verified the same day; production read-only smoke passed (S552)]**
-- **`integrity-matching-service.js`** — Multi-tier name matching + Retraction Watch optimization.
+- **`integrity-matching-service.js`** — Conservative name-candidate matching; rejects incompatible given/middle names and keeps every accepted identity unverified. Heuristic scores order candidates, not probabilities. **[Source-built on the Integrity branch, not deployed, 2026-11-02.]**
 
 ### Admin / monitoring
 
@@ -520,6 +520,8 @@ If you're touching a service or utility, read its header before this catalog. If
 ---
 
 ## `shared/utils/` — lifecycle policy (browser-safe)
+
+- **`shared/utils/integrity-evidence.js`** — Pure shared labels for identity evidence and incomplete sources/results in Workbench, standalone UI and exports; unknown/legacy metadata never implies verified identity. **[Source-built on the Integrity branch, not deployed, 2026-11-02.]**
 
 - **`shared/utils/reviewer-roster-projection.js`** — Canonical bounded reviewer candidate DTO for the durable Workbench Find roster; shared by client search and server roster/discovery writers. `reviewer-search-logic.js` re-exports it for client compatibility. The JSON DTO drops raw enrichment internals while preserving the identity and persistence-gate fields needed after reload.
 - **`shared/utils/graph-browser-upload.js`** — Shared browser-direct Microsoft Graph upload transport. Owns the 10 MiB default, strict sequential range validation, resettable upload-stall and response watchdogs, authorized status reconciliation for ambiguous PUT outcomes, bounded jitter/backoff and `Retry-After` handling, offline wait/manual Resume, same-browser Web Lock, and truthful Graph-confirmed versus in-flight progress. Mbps/ETA samples count only uniquely confirmed ranges attributable to this browser; status-reconciled cross-device progress advances the bar but not the local rate. File bytes travel only browser → preauthenticated Graph URL; application callbacks carry authorization/status metadata, never the full file.

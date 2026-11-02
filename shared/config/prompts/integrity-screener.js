@@ -30,7 +30,7 @@ Name: ${name}
 ${institutionContext}
 
 **YOUR TASK:**
-Analyze these PubPeer search results and identify any comments that indicate research integrity concerns.
+Analyze these validated PubPeer search results and identify substantive publication discussions that indicate research integrity concerns. Profile, search, help, and other navigation pages are not evidence of a concern. A matching name alone does not establish that a discussion concerns this applicant.
 
 **LOOK FOR:**
 - Data fabrication or manipulation

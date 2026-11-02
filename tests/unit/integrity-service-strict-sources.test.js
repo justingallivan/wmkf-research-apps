@@ -32,7 +32,7 @@ async function screen(options = strict) {
 
 test('strict source coverage is explicit and successful empty searches are complete', async () => {
   const result = await screen();
-  expect(result.sourceCoverageVersion).toBe(1);
+  expect(result.sourceCoverageVersion).toBe(2);
   expect(Object.keys(result.sources)).toHaveLength(3);
   for (const source of Object.values(result.sources)) expect(source).toMatchObject({ searched: true, error: null });
   expect(global.fetch).toHaveBeenCalledTimes(4);
@@ -178,7 +178,7 @@ test('legacy defaults retain fail-soft search and analysis behavior', async () =
 
 test('strict summary failure is exposed by the generator and cannot be approved as complete', async () => {
   global.fetch.mockImplementation((url) => ({ ok: true, json: async () => ({
-    search_metadata: { status: 'Success' }, [new URL(url).searchParams.get('engine') === 'google_news' ? 'news_results' : 'organic_results']: [{ title: 'Fixture', link: 'https://example.org' }],
+    search_metadata: { status: 'Success' }, [new URL(url).searchParams.get('engine') === 'google_news' ? 'news_results' : 'organic_results']: [{ title: 'Fixture', link: new URL(url).searchParams.get('engine') === 'google_news' ? 'https://example.org' : 'https://pubpeer.com/publications/fixture' }],
   }) }));
   mockComplete.mockRejectedValue(new Error('provider unavailable'));
   const result = await screen();
@@ -229,4 +229,53 @@ test('strict mode keeps specific source-failure messages and names a timeout', a
   mockComplete.mockResolvedValue({ text: '   ' });
   await expect(IntegrityService.analyzeWithHaiku([{ title: 'Fixture', link: 'https://example.org', snippet: '' }], 'Fixture', 'fixture', strict))
     .rejects.toThrow('Invalid response from Claude API');
+});
+
+describe('PubPeer source identity validation (both callers)', () => {
+  const pubpeer = (link) => ({ title: 'Discussion', link, snippet: 'Image concern on a publication' });
+  const response = (items) => ({ ok: true, json: async () => ({ search_metadata: { status: 'Success' }, organic_results: items }) });
+  test.each([
+    'https://example.org/person', 'https://pubpeer.com.evil.org/publications/a',
+    'https://pubpeer.com@evil.org/a', 'https://user@pubpeer.com/publications/a',
+    'http://pubpeer.com/publications/a', 'https://pubpeer.com:8443/publications/a',
+  ])('rejects off-domain or unsafe URL before analysis: %s', async (link) => {
+    global.fetch.mockResolvedValue(response([pubpeer(link)]));
+    await expect(IntegrityService.searchPubPeer('Ada Example', '', 'fixture', 'fixture'))
+      .rejects.toMatchObject({ excludedResultCount: 1 });
+    expect(mockComplete).not.toHaveBeenCalled();
+  });
+  test('mixed results and an invalid narrow response cannot pass validation', async () => {
+    global.fetch.mockResolvedValueOnce(response([pubpeer('https://pubpeer.com/publications/a')]))
+      .mockResolvedValueOnce(response([pubpeer('https://example.org/a'), pubpeer('https://pubpeer.com/publications/a')]));
+    await expect(IntegrityService.searchPubPeer('Ada Example', 'Example University', 'fixture', 'fixture')).rejects.toThrow('unrelated sources');
+    expect(mockComplete).not.toHaveBeenCalled();
+  });
+  test('valid URLs are analyzed, deduplicated and versioned', async () => {
+    global.fetch.mockResolvedValue(response([pubpeer('https://pubpeer.com/publications/a')]));
+    const result = await IntegrityService.searchPubPeer('Ada Example', 'Example University', 'fixture', 'fixture');
+    expect(result).toMatchObject({ sourceValidationVersion: 2, resultCount: 1, hasConcerns: false });
+    expect(mockComplete).toHaveBeenCalledTimes(1);
+  });
+  test('standalone HTTP failure cannot become a successful empty search', async () => {
+    global.fetch.mockResolvedValue({ ok: false, status: 429 });
+    await expect(IntegrityService.searchPubPeer('Ada Example', '', 'fixture', 'fixture')).rejects.toThrow('Search provider request failed');
+  });
+  test('accepted empty responses use indexed-search wording', async () => {
+    const result = await IntegrityService.searchPubPeer('Ada Example', '', 'fixture', 'fixture');
+    expect(result).toMatchObject({ sourceValidationVersion: 2, resultCount: 0 });
+    expect(result.summary).toContain('not a direct search');
+  });
+});
+
+test('engine excludes the reported conflicting authors and keeps namesakes unverified', async () => {
+  const rows = [{ record_id: 'fixture-1', authors: 'Robert A Leung', title: 'Unrelated paper' },
+    { record_id: 'fixture-2', authors: 'Aileen M Bailey', title: 'Another unrelated paper' },
+    { record_id: 'fixture-3', authors: 'He, Yuan', title: 'Possible namesake paper' }];
+  mockSql.mockImplementation((parts) => Promise.resolve({ rows: parts.join('?').includes('SELECT EXISTS') ? [{ available: true }] : rows }));
+  let complete;
+  for await (const e of IntegrityService.screenApplicants([{ name: 'Anthony Leung' }, { name: 'Scott Bailey' }, { name: 'Yuan He' }], 'fixture', 'fixture', null, strict)) {
+    if (e.type === 'complete') complete = e;
+  }
+  expect(complete.results.map((r) => r.matchCount)).toEqual([0, 0, 1]);
+  expect(complete.results[2].sources.retraction_watch.matches[0]).toMatchObject({ matchedAuthor: 'He, Yuan', identityStatus: 'unverified', matchingVersion: 2 });
 });
