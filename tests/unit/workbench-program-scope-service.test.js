@@ -13,7 +13,7 @@ const PD = '44444444-4444-4444-8444-444444444444';
 function deps(records, assigned = []) {
   return {
     listPrograms: jest.fn(async () => ({ records })),
-    queryAssignedRequests: jest.fn(async () => ({ records: assigned.map((id) => ({ _wmkf_grantprogram_value: id })) })),
+    queryAssignedRequests: jest.fn(async () => ({ records: assigned.map((id) => ({ _wmkf_grantprogram_value: id, wmkf_GrantCycle: { wmkf_cyclecode: 'D26' } })) })),
   };
 }
 
@@ -83,4 +83,18 @@ test('rejects a client selection outside the active live catalog', async () => {
 
 test('composes only the broad lookup predicate', () => {
   expect(buildProgramScopeFilter(SOCAL)).toBe(`_wmkf_grantprogram_value eq ${SOCAL}`);
+});
+
+test('unready J27 assignments do not displace the earlier-cycle program default', async () => {
+  const dependencies = deps([
+    { wmkf_grantprogramid: RESEARCH, wmkf_name: 'Research' },
+    { wmkf_grantprogramid: SOCAL, wmkf_name: 'Southern California' },
+  ]);
+  const later = { _wmkf_grantprogram_value: RESEARCH, wmkf_GrantCycle: { wmkf_cyclecode: 'J27' }, wmkf_readyforreview: false };
+  dependencies.queryAssignedRequests.mockResolvedValue({ records: [
+    { _wmkf_grantprogram_value: SOCAL, wmkf_GrantCycle: { wmkf_cyclecode: 'D26' } }, later,
+  ] });
+  expect((await resolveWorkbenchProgramScope({ callerSystemId: PD, dependencies })).defaultProgramId).toBe(SOCAL);
+  later.wmkf_readyforreview = true;
+  expect((await resolveWorkbenchProgramScope({ callerSystemId: PD, dependencies })).defaultProgramId).toBe(RESEARCH);
 });

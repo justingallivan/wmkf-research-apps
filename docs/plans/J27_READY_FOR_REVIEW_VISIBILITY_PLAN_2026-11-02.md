@@ -1,224 +1,166 @@
-# J27 ready-for-review visibility plan
+# J27 ready-for-review visibility gate
 
-Status: **PLANNED; no runtime change. Bounded Production read completed 2026-11-02; flow execution unverified.**
-Owner: Codex, branch `codex/session-660-start`; written 2026-11-02 Pacific.
-Scope: PD dashboard discovery for J27 and later; preserve earlier-cycle behavior.
+Status: **IMPLEMENTED ON FEATURE BRANCH; local verification passed, not deployed.**
+Owner: Codex, `codex/session-660-start`, 2026-11-02 Pacific.
+Scope: PD dashboard discovery for J27 and later; preserve earlier-cycle eligibility.
 
-## Owner decisions
+## Owner decisions and input contract
 
-[VERIFIED via Justin's 2026-11-02 messages, including Connor's relayed response]
-`akoya_request.wmkf_readyforreview` is the authoritative intake handoff marker.
-Power Automate sets it after backend work, including document assembly and AI
-analysis, has completed and proposals are ready for staff work. PDs must not
-see affected requests on their dashboards before this marker is ready.
-Justin explicitly chose **J27 and later; preserve earlier-cycle visibility**.
-The apps consume this marker; this feature does not set it or start the flows.
+[VERIFIED via Justin's 2026-11-02 messages and Connor's relayed response]
+Power Automate sets `akoya_request.wmkf_readyforreview` after backend processing,
+including document assembly and AI analysis, is complete and proposals are ready
+for staff work. PD dashboards must hide J27-and-later requests until ready.
+Earlier cycles keep their existing eligibility. The apps read the marker and
+never set it or start the flows as part of visibility filtering.
 
-This is an additional visibility prerequisite. It does not replace request
-lifecycle, staff state, PD/program scope, test isolation, authorization, or
-reviewer eligibility. In particular, ready does not mean invited for peer review.
+**Accepted operational risk (Justin, 2026-11-02):** PDs generally wait for Connor's
+release notice before logging in. Post-release reruns are expected to be rare
+and quick. Whether a rerun clears readiness, or a failure leaves a prior true
+value, is not an implementation blocker. Use the current Boolean on normal
+refresh; add no rerun safeguards, polling, app-owned completion state or extra
+producer prerequisites.
 
-## Contract surface and evidence
+[VERIFIED via owner-authorized Production GETs]
+`scripts/probe-j27-readiness-contract.cjs` confirmed Boolean Yes/true and No/false.
+Minimal receipt: `docs/plans/evidence/j27-readiness-production-2026-11-02.json`.
+Requests 1003391 and 1003384 both link to J27 and have readiness false, Request
+Status Phase I Pending, Phase I raw value 100000000, Phase II null, and test
+marker false. Neither is evidence of completed automation. No flow was executed
+or inspected; no Production data was written. The Atlas's former Picklist
+classification is corrected to Boolean using this evidence.
 
-Entry points: `/api/workbench/dashboard` (also Meeting Tracker's shared selection)
-and `/api/reviewer-finder/my-proposals`. Persistence: existing Dataverse Request
-field and linked operations Grant Cycle; no new table, column, or app-owned copy.
-Producer: external Power Automate, implementation not inspected here. Consumers:
-server-side discovery queries, cycle pickers, proposal lists and their totals,
-then the UI. Prior finding: current discovery is not gated on this marker.
+## Invariants
 
-[VERIFIED via source inspection at `fb8afa427`]
-
-| Surface | Evidence and current behavior | Planned treatment |
+| Invariant | Implementation surface | Verification |
 |---|---|---|
-| Workbench lifecycle visibility | `shared/config/workbenchVisibility.js`, `buildVisibilityFilter` and `isVisibleRequestRow`: Phase II Pending / Advancing / Set aside; no readiness check | Keep existing lifecycle semantics; compose a separate readiness rule for discovery |
-| Workbench dashboard and Meeting Tracker selection | `lib/services/workbench/dashboard-service.js`, `listCycles`, `selectProposalRecords`, `loadMeetingTrackerSelection`: cycle list and proposal list share the existing visibility filter | Gate both query paths before counts, default-cycle derivation and reviewer rollups |
-| Program default | `lib/services/workbench/program-scope-service.js`, `assignmentFilter`: derives caller's program from visible assignments | Apply readiness to assignment discovery too; preserve active program catalog and existing fallback |
-| Reviewer Finder My Proposals | `lib/services/reviewer-finder/my-proposals-service.js`, `listCycles`, `listProposalsInCycle`: separate filters; actionable additionally requires null Phase II Status | Gate both modes, including `status=all`; preserve reviewer eligibility separately |
-| Cycle source | `lib/dataverse/adapters/operations-grant-cycle.js`, `linkedCycleExpand`, `linkedCycleCode`, `linkedCycleFilter` | Derive era only from the Request's Grant Cycle link; no request meeting-date or created-date fallback |
-| Row-predicate regression coverage | `tests/unit/workbench-visibility-row-predicate.test.js` | Keep legacy truth table and add independent readiness / composition coverage |
-| Field schema | `docs/atlas/dataverse-akoya-request.md`, Custom Picklists: records `wmkf_readyforreview` as Picklist | STALE/CONFLICT: live probe confirms Boolean Yes/No; ready is exact `true` |
+| Linked cycles before J27 retain prior eligibility regardless of readiness | `shared/config/requestReadiness.js` | Pre-J27 truth table + existing D26 service tests |
+| Linked J27/D27 and all later cycles require exact `true` | Same policy + all services below | Null/false/missing/numeric/string negatives and ready-positive service fixtures |
+| No lifecycle, PD/program, authorization, test-isolation or action bypass | Readiness is composed after existing queries, before projection | Existing lifecycle/filter tests; test-marker/triage negative cases |
+| Counts/defaults and hydration use only eligible requests | Server service consumers | Hidden row IDs absent from rollup/document/sentiment calls; no stale count success |
+| Incomplete reads do not yield partial dashboard success | Existing bounded query contracts | Capped/hasMore tests; program-default fallback remains existing behavior |
+| No new persistence, writes, routes, polling or per-cycle allowlist | Read-only policy and service edits | Diff, gates, independent review |
 
-A repository search for `wmkf_readyforreview` in `lib`, `shared`, `pages`,
-`scripts` and `tests` found no runtime consumer. A contrary hit there would
-falsify the absence claim; the broader docs search found Atlas/evidence mentions.
-No claim about deployed behavior or Power Automate definitions is established by
-these source reads.
+## Rule and execution strategy
 
-[VERIFIED via `scripts/probe-j27-readiness-contract.cjs`, owner-authorized
-Production GETs, 2026-11-02] The field is Boolean: Yes/true and No/false.
-Receipt: `docs/plans/evidence/j27-readiness-production-2026-11-02.json`. Both
-1003391 and 1003384 link to J27, have readiness false, Request Status Phase I
-Pending, Phase I raw value 100000000, Phase II null, and test marker false.
-Phase I formatted labels were not returned; do not infer that label from this
-raw value alone. Neither example proves a completed automation handoff.
-The Atlas Picklist classification is STALE/CONFLICT; reconcile it with its
-other field groupings in the implementation documentation pass.
+[VERIFIED via source on this branch]
+`isRequestReadyForStaff` reads the expanded Grant Cycle code, matching the
+canonical `linkedCycleCode` grammar; it reuses `parseCycleCode`. J27 is the first
+cycle in 2027, so parsed years before 2027 are exempt. Every linked modern cycle
+in 2027 or later requires `wmkf_readyforreview === true`. This rolls forward
+without a cycle list or new environment setting. No lexical code comparison,
+request meeting date, creation date, status or test marker establishes an era.
+An absent/malformed cycle expansion cannot establish the pre-J27 exemption and
+is omitted from the normal operational discovery surfaces.
 
-## Visibility rule
+The smallest implementation uses **complete server-side request reads** and
+filters their records before counts, default selection, hydration or response
+projection. Existing `queryAllRequests` follows all Dataverse next links under
+its export bound (`lib/services/dynamics/read-ops.js`); services refuse capped
+or incomplete roster reads. Program-default assignment discovery retains its
+existing Research fallback on a capped scan, rather than deriving an assignment
+from incomplete data. The Final Writeups scoped reader retains its existing
+100-row cap/hasMore refusal before filtering. No client page is filtered after
+pagination, and no additional calendar inventory query is needed. This replaces
+the draft's proposed calendar-ID partition/query construction and requires no
+new Dataverse filter syntax or further live Production reads.
 
-[PLANNED]
+Every row reader selects `wmkf_readyforreview` and expands the existing
+`wmkf_GrantCycle` link under the current restriction/auth context. No raw count
+from the pre-filter read is returned as an eligible-request count.
 
-| Linked cycle | Readiness value | Result of new prerequisite |
+## Caller → persistence → consumer coverage
+
+[VERIFIED via inspected service source]
+
+| Discovery consumer | Read and filter point | Downstream effect |
 |---|---|---|
-| Earlier than J27 | Any, including missing | Preserve existing visibility exactly |
-| J27 or later | Exact verified ready value | Pass; existing surface eligibility still decides inclusion |
-| J27 or later | Null, missing, not-ready, or unknown value | Hide from dashboard discovery and its counts |
-| Missing / malformed / unreadable linked cycle | Any | Cannot prove legacy exemption: do not admit through dashboard discovery; report incomplete data through existing operational error handling |
+| Workbench dashboard | `lib/services/workbench/dashboard-service.js`, cycle and proposal modes | Cycles, counts, defaults, reviewer-rollup IDs, lists and totals |
+| Meeting Tracker schedule | Same service, `loadMeetingTrackerSelection` | Shared request roster; Discussion Sentiment's picker inherits this source |
+| Default Grant Program | `lib/services/workbench/program-scope-service.js` | Only ready/legacy assignments influence newest-cycle program default; catalog unchanged |
+| Reviewer Finder My Proposals | `lib/services/reviewer-finder/my-proposals-service.js`, both modes and status=all | Cycle counts and proposals before reviewer-suggestion hydration |
+| Program Briefing | `lib/services/meeting-tracker/program-briefing-service.js` | Cycle picker and printable groups before document/sentiment reads; existing membership validation retained |
+| Staff Deliberations | `lib/services/pre-site-visit/cycle-list-service.js` | Request-first list/counts before document/schedule/material reads |
+| Review Panel roster | `lib/services/review-panel-service.js` | Candidate roster before rollout/selection projection |
+| Final Writeups index | `lib/services/final-writeup/dashboard-service.js` | Cycles, default walkback, queues/counts and coordinator matrix before document reads |
 
-Compare parsed J/D cycle chronology (year, then June/December), never lexical
-code order. J27 is a one-time process cutover, not a list requiring a new entry
-for D27, J28, etc. Reuse existing cycle parsing. Readiness failure must sit
-outside all lifecycle OR branches, so Advancing, Set aside, `status=all`, scope
-`all`, or a test marker cannot bypass it. Do not truth-test the raw field:
-nonzero picklist values may represent not-ready.
+**Final Writeups historical/direct exceptions:** its existing `none` lens is an
+explicit archival workflow for current Finals without a modern linked cycle;
+that lens and its picker availability remain unchanged. The exemption is enforced
+by `!linkedCycleCode(request)`, and cannot admit a row linked to J27 or later.
+Focused `selectedRequestId` reads retain direct-access behavior, including the
+existing within-cycle navigation. The readiness gate applies to the unfocused
+index; this is discovery filtering, not an authorization or record-access gate.
+These preserve existing Final workflows rather than claiming an unlinked record
+has a known pre-J27 era.
 
-Use a small shared readiness policy with equivalent row and query behavior.
-Keep the dependency-free lifecycle module independent of DAL imports. Place
-linked-cycle query construction at the existing adapter/service boundary with
-restriction checks preserved. For known-cycle queries, classify that verified
-cycle and add the ready equality when required. For cross-cycle discovery,
-resolve and partition linked cycle IDs from the operations calendar, then build
-an equivalent server-side filter; page all required calendar rows, fail on an
-incomplete inventory, and respect URL bounds with bounded chunks if needed.
-Do not filter a paginated response only in the browser: that produces incorrect
-counts, empty pages and inconsistent cycle/default selection. Exact query shape
-must be checked against authorized Dataverse reads before implementation is
-accepted; no untested string-range OData comparison is assumed to work.
+The Cycle Dossier roster remains D26-only via `DOSSIER_CYCLE` and
+`buildDossierRosterFilter` (`lib/services/cycle-dossier-rollout.js`), so no readiness
+change is needed there. Existing action checks using `isVisibleRequestRow` in
+meeting invitations, transcription binding, Site Visit logistics and materials
+remain lifecycle-only. The lifecycle helper is unchanged. Workbench request
+search, direct resolution, Dynamics Explorer and administrator diagnostics
+remain outside the dashboard discovery gate.
 
-## Shared consumers and scope boundary
+## Adjacent J27 work, not part of this change
 
-[VERIFIED via import/call-site census] The lifecycle helper also feeds:
-`lib/services/pre-site-visit/cycle-list-service.js`,
-`lib/services/meeting-tracker/program-briefing-service.js`,
-`lib/services/review-panel-rollout.js`, and
-`lib/services/cycle-dossier-rollout.js`. Row checks also occur in
-`lib/services/meeting-tracker-transcription/binding.js`,
-`lib/services/meeting-coordination/invitation-service.js`,
-`lib/services/site-visit/logistics-service.js`, and
-`lib/services/site-visit-materials/collection-service.js`.
+[VERIFIED via existing source] An untriaged Phase I Pending row still fails the
+Workbench lifecycle predicate, even when ready. The J27 staff-intake-list work
+must add submitted-stage/staff-state eligibility separately. Reviewer Finder's
+actionable filter still requires null Phase II Status; Connor's advanced J27
+contract specifies Phase II Pending Committee Review. That compatibility change
+also remains separate. This gate does not promise those rows become visible
+where existing lifecycle rules exclude them.
 
-[VERIFIED via `lib/services/post-presentation-materials/discussion-sentiment-candidates.js`]
-Discussion Sentiment indirectly uses `loadMeetingTrackerSelection` for its
-candidate picker. Test the inherited discovery gate there as well; existing
-analysis records and direct analysis operations are outside this filter change.
+`docs/plans/J27_ALIGNMENT_LOG_2026-10-24.md` D25 describes an upstream files-ready
+trigger for AI. This downstream assembly-and-AI completion marker does not prove
+that upstream field was provisioned or replace staff-state/program-at-submission
+fields. No owning Factory/J27 flow plan is modified while Claude works in parallel.
 
-These are a consumer inventory, not proof that every path was audited end to
-end. Review each discovery/roster query before implementation and apply the new
-prerequisite to PD-facing dashboard rosters. Do not silently change an existing
-meeting, materials, invitation or transcription action's eligibility by adding
-readiness to the shared lifecycle helper. Those persistent workflows need their
-own semantics when readiness is cleared; changing them is outside this plan.
+## Verification and release
 
-[PLANNED; scope limit] This plan hides dashboard discovery, not record access.
-Workbench request search (`lib/services/workbench/request-search-service.js`),
-direct resolution (`lib/services/workbench/resolve-request-service.js`), Dynamics
-Explorer and administrator diagnostics remain separate. If the owner wants
-unready records unavailable through search/direct links too, define that as an
-explicit extension with server guards and matching UI behavior; dashboard
-filtering alone cannot provide it. Existing auth/restrictions stay enforced.
+Targeted mocked service tests cover actual hidden J27 rows, ready positives,
+legacy D26 rows without readiness, cycle/count/default behavior, downstream
+hydration IDs, empty selected cycles, strict Boolean semantics, and incomplete
+read refusal. Existing lifecycle truth-table, Meeting Tracker, Discussion
+Sentiment, Final Writeups archival/focused, and program-scope tests cover retained
+contracts. No new asynchronous client behavior is introduced; the current marker
+is re-read on each normal server fetch. Accepted rerun risk is not a new stale
+state protocol to implement.
 
-## Implementation sequence
+Run scoped tests and relevant gates, each gate/self-test sequentially: types,
+Atlas, DAL, OData, request-meeting-date reads, status parity, documentation and
+secret checks. Review the final diff independently before completion. Runtime
+work stays on the feature branch; promotion to main/Production is a deliberate
+release. Actual Power Automate completion visibility remains an operational
+observation, not a prerequisite to this owner-authorized implementation.
 
-1. **Verify the external input contract before writing runtime logic.** With
-   specific owner authorization for Production reads (or owner-run evidence),
-   inspect the field metadata, actual ready/not-ready values and representative
-   J27 records, including 1003391 and 1003384. Confirm with Connor that the flow
-   writes ready only after every required assembly/AI step succeeds. Confirm
-   whether reruns clear readiness, when it is cleared, and whether failures can
-   leave a previously ready value. Do not infer complete output from status or
-   filename. Record the producer contract and exact approved value mapping.
-2. **Implement the shared readiness policy and required discovery consumers**
-   on a runtime feature branch. Add required field projections and linked-cycle
-   expansion to row readers; OData-only filters need not select a field unless
-   a later row consumer reads it. Audit every relevant select/expand, including
-   cycle counts, program defaults and sibling dashboard rosters. No new route,
-   schema, env allowlist, background job, or client-supplied bypass is planned.
-3. **Verify before promotion.** Run the tests below and relevant gates,
-   sequentially with their self-tests: types, Atlas, API routes if routes change,
-   DAL, OData, request-meeting-date reads, status parity, and documentation gates.
-   Perform an authorized Preview read comparison. No automatic Production
-   backfill or readiness toggling is included. Existing D26 results must match;
-   unready J27 rows must be absent from every in-scope list/count.
-4. **Promote deliberately**, then observe an actual Power Automate completion:
-   the request appears on a fresh dashboard fetch without app-side flag writes.
-   Inspect source of readiness on failure; never weaken the equality to make
-   missing records appear. Record deployment and observation separately.
+## Contract reconciliation and bounded sweep
 
-## Acceptance and negative-space checks
+Implementation mode. Whole-flow: existing authenticated routes → server service
+→ Dataverse readiness/cycle read → filter → counts/hydration → existing DTO/UI.
+Partial success: no batch writes; capped rosters refused (program-default fallback
+retained). Async: no new client/state writes, background work, caching or polling.
+Helper: readiness prerequisite only, lifecycle/action helpers unchanged. Durable:
+no new schema/migration/route; Atlas corrected, this plan rewritten around accepted
+intent. Symbol fan-out: consumers listed above; direct/action exclusions explicit.
 
-[PLANNED; not executed]
+Bounded sweep mode A: readiness type/semantics and implementation status. Searches
+of source/tests/docs/wiki/memory found the Atlas type misclassification (corrected),
+the initial plan's unresolved rerun blocker (removed), and old saved-view evidence
+(historical, unchanged). D25 is a distinct upstream milestone. No claim that all
+J27 intake is implemented or that Power Automate has been live-tested follows
+from this change. Local verification (2026-11-02): 279 tests passed across 11 targeted suites;
+scoped ESLint passed; `npm run build` passed (seven dynamic filesystem/tracing
+warnings, no build errors); all 24 scoped gate/self-test commands named above
+passed, run sequentially. Independent read-only source review found and closed
+the initially omitted Final Writeups index path, then reported no further
+material findings. `git diff --check` passed. No additional live Production
+read, write, flow run or deploy was performed for implementation.
 
-- Independent table tests: D26/earlier with absent/not-ready/ready fields retain
-  prior lifecycle results; J27/D27/J28 with not-ready/null/missing/unknown values
-  are hidden; exact ready passes only when that surface's other rules pass.
-- Cross-product cases: unready + Phase II Pending, Advancing, Set aside enabled,
-  `status=all`, `scope=all`, superuser, test marker; none bypass readiness in the
-  dashboard. Ready does not bypass PD/program/auth restrictions.
-- Missing cycle, malformed cycle, missing projection and calendar-read failure
-  cannot masquerade as pre-J27. Verify row/query parity and pagination/count
-  behavior with mixed old/new cohorts, not merely filter-string assertions.
-- Service tests cover both cycle-list and request-list modes and program-default
-  discovery. Existing selected cycle remains a valid empty state after the last
-  visible request becomes unready. Failed reads must not return stale eligible
-  rows as a successful refreshed feed.
-- Verify readiness appears on the next normal refresh; no new polling assumed.
-  Inspect existing client generation/abort guards during implementation so an
-  earlier cycle/program response cannot overwrite the latest selection.
-- Factory integration is a separate write change: never copy a source's ready
-  marker or set it merely to make a clone visible. Any fixture that bypasses
-  Power Automate needs an explicit owner-defined artifact-completion contract.
-
-## Adjacent J27 dependencies
-
-[VERIFIED via source] Current Workbench eligibility does not include an untriaged
-`Phase I Pending` request. Therefore this gate alone will **not** make every
-ready newly submitted J27 proposal visible. The planned J27 staff-intake list
-must compose readiness with its own submitted-stage/staff-state eligibility,
-without broadening Reviewer Finder into Phase I reviewer assignment.
-
-[VERIFIED via `lib/services/reviewer-finder/my-proposals-service.js`,
-`listProposalsInCycle`] Reviewer Finder actionable mode requires null
-`wmkf_phaseiistatus`. Connor specifies non-null `Phase II Pending Committee
-Review` for advanced J27 requests. Consequently even a ready advanced J27 row
-can be excluded there. Resolve J27 actionable-status semantics in the relevant
-reviewer lifecycle work before claiming end-to-end visibility; this gate-only
-change must not silently remove that existing eligibility rule. Test both the
-newly submitted and advanced J27 examples against their intended surfaces.
-
-[PLANNED / unresolved] Keep this work aligned with
-`docs/plans/J27_ALIGNMENT_LOG_2026-10-24.md` (staff-intake list and staff-state
-work). Its D25 describes an upstream files-ready trigger for the AI pass; this
-handoff marker is downstream of assembly **and** AI completion. Do not collapse
-those two milestones or substitute readiness for the still-unconfirmed staff
-state / program-at-submission fields. This plan does not claim D25's upstream
-field was provisioned or decide its identity.
-
-## Contract-reconcile / bounded sweep record
-
-Review mode; seven audit dispositions:
-whole-flow PARTIAL (live schema verified; external writer uninspected); partial-success
-PLANNED (all required producer steps must succeed before ready); async PLANNED
-(refresh and generation guards to inspect); helper semantics PLANNED (new
-readiness rule, existing lifecycle helper preserved); durable surfaces PLANNED
-(no new persistence, update Atlas/runtime docs with implementation evidence);
-doc reconciliation PARTIAL; symbol fan-out inventoried above, not fully audited.
-
-Bounded sweep mode A, claim: owner-defined readiness is a post-automation PD
-visibility prerequisite, J27 onward. Authoritative intent: this conversation;
-implementation evidence: source at `fb8afa427`. Searches covered source, tests,
-scripts, docs, memory/wiki and root instructions/session prompt for the field,
-readiness and J27 visibility. Atlas field mentions are AGREE on existence but
-STALE on the Picklist classification, contradicted by the live Boolean metadata; old saved-view evidence is HISTORICAL; D25's
-files-ready AI trigger is a distinct upstream milestone, not a contradictory
-completion claim. The new plan is PLANNED. No owning J27/Factory documents were
-edited while Claude works in parallel. Broader reconciliation is AUDIT
-INCOMPLETE until the external contract and in-scope sibling consumers are
-verified; this is not a whole-repo readiness certification.
-
-Recommendation evidence: the policy composition is supported by the inspected
-query paths and owner intent, but query parity, end-to-end
-Power Automate handoff are NOT TESTED; live Boolean mapping is now verified. A ready J27 Phase I row still failing the
-legacy lifecycle predicate is the explicit disconfirming case for claiming this
-gate alone delivers staff intake. Verdict: **NEEDS PRODUCER COMPLETION/RERUN CONTRACT VERIFICATION
-BEFORE RUNTIME IMPLEMENTATION**, with scope decisions already recorded above.
+Bounded verdict: source implementation and local regressions VERIFIED; deployment
+and natural handoff observation remain unperformed. The operational rerun risk
+is accepted, not unresolved. Restatement classification within this scope:
+Atlas Boolean/input contract AGREE after correction; old initial plan blocker
+STALE and replaced; saved-view snapshots HISTORICAL; upstream D25 UNRELATED to
+completion semantics. No known stale readiness/type/blocker claim remains in the
+modified live plan/Atlas surfaces; this is not a whole-repo J27 certification.

@@ -150,3 +150,15 @@ describe('landing cycle (docs/plans/LANDING_CYCLE_PLAN_2026-10-29.md)', () => {
     expect(deps.getLandingCycle).not.toHaveBeenCalled();
   });
 });
+
+test('J27 briefing excludes unready rows before any artifact or sentiment reads', async () => {
+  const make = (n, ready) => ({ ...request(n), wmkf_GrantCycle: { wmkf_cyclecode: 'J27' }, wmkf_readyforreview: ready });
+  deps.queryRequests.mockResolvedValue({ records: [make(1, false), make(2, true)] });
+  const result = await load({ cycleCode: 'J27', profileId: 7 });
+  expect(result.groups.flatMap((g) => g.proposals).map((p) => p.requestId)).toEqual([id(2)]);
+  expect(deps.findDocuments).toHaveBeenCalledWith([id(2)]);
+  expect(deps.readSentiments).toHaveBeenCalledWith([id(2)], { profileId: 7 });
+  expect(deps.queryRequests.mock.calls[0][0].select).toContain('wmkf_readyforreview');
+  deps.queryRequests.mockResolvedValue({ records: [make(1, false)] });
+  expect(await load({ profileId: 7 })).toMatchObject({ cycles: [], defaultCycleCode: null });
+});

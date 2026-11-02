@@ -210,7 +210,8 @@ WMKF status / flags (the long tail):
   `akoya_requeststatus` changes only at the Board's final decision. Example: on 2026-10-26 staff marked 8 of
   the 23 D26 Advancing proposals `Not Recommended` (15 `Recommended`); all 23 stayed `Phase II Pending`
   [VERIFIED via `scripts/probe-d26-phase-statuses.js`, owner-run].
-- `wmkf_readyforreview`, `wmkf_galreadyforreview`, `wmkf_pcgoverifycomplete` (Picklist)
+- `wmkf_readyforreview` (**Boolean**, Yes/true and No/false; [VERIFIED 2026-11-02 via owner-authorized Production metadata GET, `scripts/probe-j27-readiness-contract.cjs`]). Power Automate owns the post-assembly/AI handoff marker. The apps read it for J27-and-later dashboard visibility; earlier linked cycles retain their prior eligibility. Runtime implementation is on `codex/session-660-start`, not yet promoted. Policy: `shared/config/requestReadiness.js`; scope and evidence: `docs/plans/J27_READY_FOR_REVIEW_VISIBILITY_PLAN_2026-11-02.md`.
+- `wmkf_galreadyforreview`, `wmkf_pcgoverifycomplete` (Picklist; unchanged historical classification)
 - `wmkf_vendorverified` (Picklist), `wmkf_rationalesummarycompleted`
 - `wmkf_groupexempt`, `wmkf_organizationisgovernmententity`, `wmkf_california`, `wmkf_caftb`, etc. — eligibility booleans
 
