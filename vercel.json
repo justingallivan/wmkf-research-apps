@@ -49,6 +49,9 @@
     },
     "pages/api/cron/drain-presentation-transcript-regenerations.js": {
       "maxDuration": 300
+    },
+    "pages/api/cron/refresh-retractions.js": {
+      "maxDuration": 300
     }
   },
   "crons": [

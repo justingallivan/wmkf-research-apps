@@ -54,7 +54,7 @@ consume a `sources.pubpeer` shape (`hasConcerns`, `summary`, `resultCount`, `sea
 
 ## Checked-out source and production boundary
 
-[VERIFIED via source/tests, 2026-11-02] The accuracy increment is source-built on `codex/integrity-screening-discussion`, not deployed. The behavior below describes that branch; dated Production statements describe the earlier deployed baseline. The monthly reference refresh is still planned.
+[VERIFIED via source/tests, 2026-11-02] The accuracy increment is source-built on `codex/integrity-screening-discussion`, not deployed. The behavior below describes that branch; dated Production statements describe the earlier deployed baseline. The monthly reference refresh is source-built but disabled and unscheduled; no production migration/import occurred. See `docs/guides/RETRACTION_WATCH_REFRESH.md` and `docs/atlas/postgres-retraction-dataset.md`.
 
 ## Current UI boundaries
 
@@ -75,6 +75,10 @@ consume a `sources.pubpeer` shape (`hasConcerns`, `summary`, `resultCount`, `sea
 - Strict (Workbench) SerpAPI empty-result rule (2026-10-01): a search counts as a complete empty result when `search_metadata.status` is `Success`, no results array is present, and **either** `search_information.{organic,news}_results_state === 'Fully empty'` **or** the known "hasn't returned any results" message is present. Anything else fails closed, including an error that arrives together with results. Live zero-result responses are recorded in `tests/fixtures/serpapi/zero-result-2026-10-01.json`. This closes PR #366 review finding 6.
 - Owner decision (2026-10-01): any user holding both `integrity-screener` and `reviewers` may start a new screen on an already-approved request, which returns it to needs-review. This is intended, not a gap.
 - UI, PDF and Markdown show name evidence and unverified identity, not heuristic percentages. JSON retains numeric similarity only with an explicit non-probability explanation. Older evidence is labeled as earlier rules; saved histories/counts/decisions are not rewritten. Exports expose incomplete sources and do not contain durable dismissals.
+
+## Corpus provenance (source-built, not deployed)
+
+Screens fence all people’s corpus queries with a monotonic publication generation and save recorded metadata under each `sources.retraction_watch.dataset`. Changed/unverified metadata makes final corpus evidence incomplete; old runs remain version-not-recorded. The worker requires strict bearer auth, production environment and literal enablement; it has no registered cron schedule. Migration 092 and first production publication need separate approval. The legacy importer refuses the managed schema, and cutover must also confirm no old/external writer is already running.
 
 ## Durable Memory
 

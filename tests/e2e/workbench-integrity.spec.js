@@ -16,7 +16,7 @@ const RESULT = {
   matchCount: 1,
   hasConcerns: true,
   sources: {
-    retraction_watch: { searched: true, matches: [{
+    retraction_watch: { searched: true, dataset: {status:'recorded',generation:'7',checksum:'a'.repeat(64),sourceUrl:'https://gitlab.com/crossref/retraction-watch-data/-/raw/main/retraction_watch.csv',rowCount:73519,publishedAt:'2026-11-01T00:00:00.000Z',lastCheckedAt:'2026-11-02T00:00:00.000Z'}, matches: [{
       title: 'A retracted public study', matchedAuthor: PEOPLE[0].name, confidence: 92, matchingVersion: 2, identityStatus: 'unverified', nameEvidence: 'exact_name',
       retractionNature: 'Retraction', reasons: ['Data concern'], doi: '10.1000/example',
       urls: 'https://retraction.example/one; https://retraction.example/two',
@@ -121,6 +121,7 @@ test('Integrity tab loads, confirms before spending, and renders saved findings 
   await expect(page.getByText('1 item for human review')).toBeVisible();
   await expect(page.getByText('Incomplete screen')).toHaveCount(0);
   await expect(page.getByText('A retracted public study')).toBeVisible();
+  await expect(page.getByText(/^Dataset 7 /)).toBeVisible();
   await expect(page.getByText('Common name — verify identity carefully')).toBeVisible();
   await expect(page.getByRole('link', { name: 'View Source' }).first()).toHaveAttribute('href', 'https://retraction.example/one');
   await expect(page.getByRole('link', { name: 'Public discussion' })).toHaveAttribute('href', 'https://pubpeer.com/publication/example');

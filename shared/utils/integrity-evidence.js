@@ -14,14 +14,23 @@ function integrityIdentityLabel(match) {
     ? `${labels[match.nameEvidence]} · identity unverified` : 'Identity unverified';
 }
 
+function integrityDatasetUnverified(dataset) {
+  if (dataset === undefined || dataset === null) return false; // legacy runs
+  if (dataset.status === 'unrecorded') return !['unmanaged', 'unpublished'].includes(dataset.state);
+  return dataset.status !== 'recorded' || !/^[1-9]\d*$/.test(dataset.generation)
+    || !/^[a-f0-9]{64}$/.test(dataset.checksum)
+    || !Number.isFinite(Date.parse(dataset.publishedAt)) || !Number.isFinite(Date.parse(dataset.lastCheckedAt));
+}
+
 function integrityIncomplete(result) {
+  if (integrityDatasetUnverified(result?.sources?.retraction_watch?.dataset)) return true;
   return ['retraction_watch', 'pubpeer', 'news'].some((key) => (
     result?.sources?.[key]?.searched !== true || Boolean(result.sources[key].error)
   ));
 }
 
 function integritySourceLabel(source) {
-  if (!source || source.searched !== true || source.error) return 'Incomplete source';
+  if (!source || source.searched !== true || source.error || integrityDatasetUnverified(source.dataset)) return 'Incomplete source';
   return source.hasConcerns ? 'Flagged for human review' : 'No concerns reported';
 }
 
@@ -30,4 +39,12 @@ function integrityResultLabel(result) {
   return result?.hasConcerns ? 'Items for human review' : 'No concerns reported';
 }
 
-module.exports = { integrityIdentityLabel, integrityIncomplete, integritySourceLabel, integrityResultLabel };
+function integrityDatasetLabel(dataset, now = Date.now()) {
+  if (integrityDatasetUnverified(dataset)) return 'Dataset version could not be verified.';
+  if (dataset?.status !== 'recorded' || !dataset.generation || !dataset.checksum
+    || !Number.isFinite(Date.parse(dataset.publishedAt)) || !Number.isFinite(Date.parse(dataset.lastCheckedAt))) return 'Dataset version not recorded.';
+  const stale = now - Date.parse(dataset.lastCheckedAt) > 45 * 24 * 60 * 60 * 1000;
+  return `Dataset ${dataset.generation} (${dataset.checksum.slice(0, 12)}) · published ${dataset.publishedAt.slice(0, 10)} · checked ${dataset.lastCheckedAt.slice(0, 10)}${stale ? ' · Freshness warning: last successful check is over 45 days old.' : ''}`;
+}
+
+module.exports = { integrityIdentityLabel, integrityIncomplete, integritySourceLabel, integrityResultLabel, integrityDatasetLabel, integrityDatasetUnverified };

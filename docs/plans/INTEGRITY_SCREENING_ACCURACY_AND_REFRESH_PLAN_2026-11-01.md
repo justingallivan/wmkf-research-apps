@@ -2,7 +2,7 @@
 title: Integrity screening accuracy and monthly Retraction Watch refresh
 domain: integrity-screener
 kind: plan
-status: planned
+status: active
 summary: "Reject conflicting author names, replace identity-confidence claims, validate PubPeer evidence, and safely refresh Retraction Watch monthly. Screening implementation authorized on the isolated branch; Fable review required before merge. Production changes remain unapproved."
 canonical: false
 cataloged: 2026-11-01
@@ -17,7 +17,7 @@ related:
 
 ## 1. Scope, authority, and status
 
-[PLANNED] Owner: Codex. Branch: `codex/integrity-screening-discussion`. Worktree: `/private/tmp/wmkf-integrity-screening`. Justin authorized implementation on this isolated branch on 2026-11-02, starting with Increment A and requiring Fable review before merge or production work. Increment A is source-built, tested, and Fable-reviewed as READY FOR OWNER REVIEW; it is not merged or deployed. Increment B remains planned. No migrations, imports, scheduled jobs, or production probes have been executed for this plan.
+[PLANNED] Owner: Codex. Branch: `codex/integrity-screening-discussion`. Worktree: `/private/tmp/wmkf-integrity-screening`. Justin authorized implementation on this isolated branch on 2026-11-02, starting with Increment A and requiring Fable review before merge or production work. Increment A is source-built, tested, and Fable-reviewed as READY FOR OWNER REVIEW; it is not merged or deployed. Increment B is now source-built with isolated tests and a full official-CSV rehearsal; its Fable review and release checks are in progress. Migration 092 was applied only in a disposable loopback database. No production migration, import, schedule, or production probe has been performed.
 
 [VERIFIED via owner messages, 2026-11-01] Justin requested three initial fixes after inspecting request 1002852: reject conflicting names, use honest identity labels, and validate PubPeer sources. He additionally requested a Retraction Watch update and selected a **monthly** refresh. The proposed timing is **the 1st of every month at 06:00 UTC**, expression `0 6 1 * *`; only the monthly cadence was owner-selected, while the exact time is a planning default.
 
@@ -44,7 +44,7 @@ related:
 
 [VERIFIED via source] The end-to-end entry points are the standalone `pages/integrity-screener.js` and its screen/history APIs, and `shared/components/workbench/IntegrityTab.js` through `pages/api/workbench/integrity/[requestId]/run.js`. The shared engine produces source results; standalone saving is historically fail-soft, while the Workbench service explicitly awaits its request-linked INSERT. Workbench history returns the saved JSON and append-only staff decisions. Standalone PDF, Markdown, and JSON exports are generated in the page. The new cron will be a separate reference-data writer, not a screening or staff-decision writer.
 
-## 3. Increment A: matching and source honesty
+## 3. Increment A implementation contract (source-built and reviewed, not deployed)
 
 ### A1. Reject definite name conflicts before permissive matching
 
@@ -97,7 +97,7 @@ related:
 
 [PLANNED] Preserve existing caller authentication, request-owned roster, per-request history, staff authority, and standalone versus Workbench save semantics. Retain existing generation/mounted/request guards across every new async result or failure update. No new funding decision or progression requirement is introduced.
 
-## 4. Increment B: monthly reference-data refresh
+## 4. Increment B implementation contract (source-built; review in progress, not deployed)
 
 ### B1. Execution preflight and schema
 
@@ -191,10 +191,18 @@ related:
 
 [VERIFIED via bounded source-led reconciliation] This revision updates the whole plan's affected contract, tables, acceptance criteria and async audit together; the initial review is explicitly historical. Runtime guidance remains current behavior because no runtime fact changed. Unknowns remain production schema/corpus freshness, actual provider responses, complete-source CSV compatibility, pooling configuration and measured resource fit. No whole-repository or live-state audit is claimed.
 
-## 9. Screening implementation checkpoint — 2026-11-02
+## 9. Historical screening checkpoint — before Increment B implementation, 2026-11-02
 
 [VERIFIED via source, local tests and OAuth-only Fable reviews] Increment A is implemented on this branch. The first implementation commit is `1ab370793`; `d3780341d` addresses the first review, and the final retrieval correction closes the remaining source-to-matcher recall gap. Both raw and expanded search terms are retained. The final independent verdict is **READY FOR OWNER REVIEW**; see the [complete implementation review and verification receipt](../audits/integrity-screening-implementation-fable-review-2026-11-02.md).
 
 [VERIFIED via local execution] Final source: 223 tests across 12 scoped Jest suites, 41 diagnostic assertions, canonical Next build, lint with zero errors, type check, and relevant gates/self-tests. Isolated Postgres integration (four tests) and mocked Chromium Workbench flow (one test) passed after the approval/UI corrections. No application-provider calls, production reads/writes, migrations, merges, or new cron schedules were performed. No historical screening JSON, count or staff decision was rewritten.
 
 [PLANNED] Increment B remains separate. Production corpus/schema/freshness preflight, reference-data service and metadata migration, isolated full-dataset rehearsal, controlled initial refresh, and later monthly schedule activation remain outstanding. Owner authorization to implement does not authorize merging or accessing production; those boundaries remain in force.
+
+## 10. Current managed-refresh checkpoint — 2026-11-02
+
+[VERIFIED via source and isolated execution] Justin authorized Increment B implementation. The managed refresh service, strict disabled worker, loopback-only rehearsal script, metadata reader/generation fence, UI/export provenance and migration 092 are source-built. No cron schedule is registered. Function duration configuration alone does not activate a schedule. Final source gates/build passed; Fable closure review returned READY FOR OWNER REVIEW with no P0/P1 findings. The two nonblocking final regression/reporting recommendations were implemented and tested; see the [refresh review receipt](../audits/retraction-refresh-fable-review-2026-11-02.md). Production activation remains unapproved.
+
+[VERIFIED via official CSV and local rehearsal] The official source download is 67,793,090 bytes / 73,519 records, SHA-256 `7a729a87837985954a34326202cb98c4bff4b2b142fda8695febb613cf45a7f4`. Publisher and subject reach 500 and 263 characters; migration 092 widens only those demonstrated VARCHAR(255) fields. The temporary Postgres rehearsal covered dry-run, full publication, unchanged checks, rollback, stable IDs, locking, protected deletions, audit-after-commit failure and actual A→B→A screening invalidation. A full-source indexed publication took about 12 seconds, and an actual service download took about 12.5 seconds. These are local evidence, not production row counts, schema verification or hosted performance guarantees.
+
+[PLANNED] Production target/schema/backup and legacy-writer quiet-window checks, migration approval/application, initial controlled dry-run and publication/readback, and a separate monthly `0 6 1 * *` activation commit remain outstanding. The source worker additionally requires literal `RETRACTION_REFRESH_ENABLED=on`; Preview/dev and unset/invalid flags fail closed. See [operating guide](../guides/RETRACTION_WATCH_REFRESH.md) and [metadata Atlas](../atlas/postgres-retraction-dataset.md).

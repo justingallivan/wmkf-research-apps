@@ -4,7 +4,7 @@ import HelpButton from '../shared/components/HelpButton';
 import RequireAppAccess from '../shared/components/RequireAppAccess';
 import ErrorAlert from '../shared/components/ErrorAlert';
 
-import { integrityIdentityLabel, integrityIncomplete, integritySourceLabel, integrityResultLabel } from '../shared/utils/integrity-evidence';
+import { integrityIdentityLabel, integrityIncomplete, integritySourceLabel, integrityResultLabel, integrityDatasetLabel } from '../shared/utils/integrity-evidence';
 
 /**
  * Retraction match card
@@ -217,6 +217,7 @@ function ApplicantResultCard({ result, onDismiss }) {
       {expanded && (
         <div id={detailsId} className="p-4 space-y-4">
           {integrityIncomplete(result) && <p className="text-sm text-amber-800">Incomplete screen. Review source errors and missing searches before drawing conclusions.</p>}
+          <p className="text-xs text-gray-600">{integrityDatasetLabel(result.sources.retraction_watch?.dataset)}</p>
           {/* Retraction Watch results */}
           {result.sources.retraction_watch?.searched && (
             <div>
@@ -473,6 +474,8 @@ function IntegrityScreenerPage() {
           if (!source?.searched) builder.addParagraph(`${label}: Incomplete source. ${source?.error || 'Not searched'}`);
         }
 
+        builder.addParagraph(integrityDatasetLabel(result.sources.retraction_watch?.dataset));
+
         // Retraction Watch
         const retractionMatches = result.sources.retraction_watch?.matches || [];
         if (result.sources.retraction_watch?.searched) {
@@ -605,6 +608,8 @@ function IntegrityScreenerPage() {
         const source = result.sources[key];
         if (!source?.searched) md += `${label}: Incomplete source. ${source?.error || 'Not searched'}\n\n`;
       }
+
+      md += `${integrityDatasetLabel(result.sources.retraction_watch?.dataset)}\n\n`;
 
       // Retraction Watch results
       const retractionMatches = result.sources.retraction_watch?.matches || [];

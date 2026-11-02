@@ -26,7 +26,7 @@ const matched = { title: 'A potential namesake paper', confidence: 100, matching
   identityStatus: 'unverified', nameEvidence: 'exact_name', matchedAuthor: 'Yuan He', retractionNature: 'Correction' };
 const result = { name: 'Yuan He', matchingVersion: 2, matchCount: 1, hasConcerns: true,
   sources: {
-    retraction_watch: { searched: true, matches: [matched], error: null },
+    retraction_watch: { searched: true, matches: [matched], error: null, dataset: {status:'recorded',generation:'7',checksum:'a'.repeat(64),publishedAt:'2026-11-01T00:00:00.000Z',lastCheckedAt:'2026-11-02T00:00:00.000Z'} },
     pubpeer: { searched: true, error: 'PubPeer search returned invalid or unrelated sources', hasConcerns: false },
     news: { searched: true, summary: 'No concerns found.', hasConcerns: false, error: null },
   },
@@ -65,6 +65,7 @@ test('standalone UI and all three exports preserve uncertainty and expose source
   expect(screen.getByText('Incomplete source').className).not.toContain('bg-green');
   expect(screen.queryByText(/100%/)).toBeNull();
   fireEvent.click(screen.getByRole('button', { name: 'Export Markdown' }));
+  expect(captured[0]).toContain('Dataset 7');
   expect(captured[0]).toContain('Exact name match · identity unverified');
   expect(captured[0]).toContain('Incomplete screen');
   expect(captured[0]).toContain('invalid or unrelated sources');
@@ -78,4 +79,5 @@ test('standalone UI and all three exports preserve uncertainty and expose source
   expect(mockPdfCalls.some((call) => call.includes('Incomplete screen'))).toBe(true);
   expect(JSON.stringify(mockPdfCalls)).toContain('invalid or unrelated sources');
   expect(JSON.stringify(mockPdfCalls)).not.toContain('100%');
+  expect(JSON.stringify(mockPdfCalls)).toContain('Dataset 7');
 });

@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { requestEnvelope } from '../../utils/api-request';
 import { Button, Card } from '../Layout';
-import { integrityIdentityLabel } from '../../utils/integrity-evidence';
+import { integrityIdentityLabel, integrityDatasetLabel, integrityIncomplete } from '../../utils/integrity-evidence';
 
 const SOURCES = [
   ['retraction_watch', 'Retraction Watch'],
@@ -17,10 +17,7 @@ function sourceState(source) {
 }
 
 function isIncomplete(result) {
-  return SOURCES.some(([key]) => {
-    const source = result?.sources?.[key];
-    return !source || source.searched !== true || Boolean(source.error);
-  });
+  return integrityIncomplete(result);
 }
 
 function formatDate(value) {
@@ -100,6 +97,7 @@ function SourceSummary({ sourceKey, label, source }) {
                 : <span className="text-gray-600">No concerns reported by this source</span>
         )}
       </div>
+      {sourceKey === 'retraction_watch' && <p className="mt-1 text-xs text-gray-600">{integrityDatasetLabel(source?.dataset)}</p>}
       {summary && <p className="mt-1 text-sm text-gray-700 whitespace-pre-wrap">{summary}</p>}
       {matches.map((match, index) => (
         <div key={`${match.sourceIdentifier || match.doi || match.title || 'match'}-${index}`} className="mt-1 text-sm text-gray-700">

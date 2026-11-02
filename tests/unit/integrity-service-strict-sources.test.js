@@ -15,7 +15,7 @@ beforeEach(() => {
   jest.spyOn(IntegrityMatchingService, 'buildTextSearchPatterns').mockReturnValue(['%example%']);
   mockSql.mockReset().mockImplementation((parts) => {
     const query = Array.isArray(parts) ? parts.join('?') : String(parts);
-    return Promise.resolve({ rows: query.includes('SELECT EXISTS') ? [{ available: true }] : [] });
+    return Promise.resolve({ rows: query.includes('SELECT EXISTS') ? [{ available: true }] : query.includes('to_regclass') ? [{ relation: null }] : [] });
   });
   mockComplete.mockReset().mockResolvedValue({ text: 'No concerns found.' });
   global.fetch = jest.fn().mockImplementation(emptyResponse);
@@ -159,9 +159,14 @@ test.each([
 });
 
 test.each([1, 2])('Retraction Watch query failure at query %i cannot become clean empty results', async (query) => {
-  mockSql.mockResolvedValueOnce({ rows: [{ available: true }] });
-  if (query === 2) mockSql.mockResolvedValueOnce({ rows: [] });
-  mockSql.mockRejectedValueOnce(new Error('database unavailable'));
+  let corpusQueries = 0;
+  mockSql.mockImplementation((parts) => {
+    const text = parts.join('?');
+    if (text.includes('SELECT EXISTS')) return Promise.resolve({ rows: [{ available: true }] });
+    if (text.includes('to_regclass')) return Promise.resolve({ rows: [{ relation: null }] });
+    if (++corpusQueries === query) return Promise.reject(new Error('database unavailable'));
+    return Promise.resolve({ rows: [] });
+  });
   const result = await screen();
   expect(result.sources.retraction_watch.error).toBe('Retraction Watch query failed');
 });
@@ -271,7 +276,7 @@ test('engine excludes the reported conflicting authors and keeps namesakes unver
   const rows = [{ record_id: 'fixture-1', authors: 'Robert A Leung', title: 'Unrelated paper' },
     { record_id: 'fixture-2', authors: 'Aileen M Bailey', title: 'Another unrelated paper' },
     { record_id: 'fixture-3', authors: 'He, Yuan', title: 'Possible namesake paper' }];
-  mockSql.mockImplementation((parts) => Promise.resolve({ rows: parts.join('?').includes('SELECT EXISTS') ? [{ available: true }] : rows }));
+  mockSql.mockImplementation((parts) => Promise.resolve({ rows: parts.join('?').includes('SELECT EXISTS') ? [{ available: true }] : parts.join('?').includes('to_regclass') ? [{ relation: null }] : rows }));
   let complete;
   for await (const e of IntegrityService.screenApplicants([{ name: 'Anthony Leung' }, { name: 'Scott Bailey' }, { name: 'Yuan He' }], 'fixture', 'fixture', null, strict)) {
     if (e.type === 'complete') complete = e;
@@ -293,4 +298,12 @@ test('actual retrieval terms fetch the raw all-caps surname before matching', as
   const matches = await IntegrityService.searchRetractionWatch('LI Wei', '', strict);
   expect(matches).toHaveLength(1);
   expect(matches[0]).toMatchObject({ matchedAuthor: 'Li Wei', identityStatus: 'unverified' });
+});
+
+describe('whole-run corpus generation fence',()=>{
+  const meta=(generation)=>({generation:String(generation),source_url:'https://gitlab.com/crossref/retraction-watch-data',source_checksum:'a'.repeat(64),published_at:'2026-11-01T00:00:00Z',last_checked_at:'2026-11-01T00:00:00Z',row_count:10,format_version:1});
+  function managed(before,after){let reads=0;mockSql.mockImplementation(parts=>{const q=parts.join('?');if(q.includes('SELECT EXISTS'))return Promise.resolve({rows:[{available:true}]});if(q.includes('to_regclass'))return Promise.resolve({rows:[{relation:'retraction_dataset'}]});if(q.includes('FROM retraction_dataset'))return Promise.resolve({rows:[meta(reads++===0?before:after)]});return Promise.resolve({rows:[{record_id:'fixture',authors:'Ada Example',title:'A candidate'}]});});}
+  test('unchanged generation records provenance',async()=>{managed(1,1);const r=await screen();expect(r.sources.retraction_watch.dataset).toMatchObject({status:'recorded',generation:'1'});expect(r.sources.retraction_watch.error).toBeNull();});
+  test('A→B→A still invalidates provisional matches because generation changed',async()=>{managed(1,3);const r=await screen();expect(r.sources.retraction_watch.error).toContain('dataset changed');expect(r.sources.retraction_watch.matches).toEqual([]);expect(r.sources.retraction_watch.dataset.status).toBe('unverified');expect(r.matchCount).toBe(0);expect(r.hasConcerns).toBe(false);});
+  test('metadata failure is incomplete, never a clean corpus',async()=>{managed(1,1);const impl=mockSql.getMockImplementation();mockSql.mockImplementation(parts=>parts.join('?').includes('to_regclass')?Promise.reject(new Error('offline')):impl(parts));const r=await screen();expect(r.sources.retraction_watch.error).toBeTruthy();});
 });

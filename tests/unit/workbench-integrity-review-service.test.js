@@ -15,7 +15,7 @@ const RESULT = {
   matchingVersion: 2,
   matchCount: 0,
   sources: {
-    retraction_watch: { searched: true, matches: [], error: null },
+    retraction_watch: { searched: true, matches: [], error: null, dataset: { status: 'unrecorded', state: 'unmanaged' } },
     pubpeer: { searched: true, sourceValidationVersion: 2, resultCount: 0, summary: 'No results', error: null },
     news: { searched: true, summary: 'No results', error: null },
   },
@@ -337,8 +337,11 @@ test('migration 057 and fresh-install setup preserve append-only review rows and
   expect(migration).not.toContain('ON DELETE CASCADE');
 });
 
-test('legacy approved-v1 stays approved; an unapproved-v1 run cannot receive a new approval', async () => {
-  const oldRun = { ...RUN, results: [{ ...RESULT, sourceCoverageVersion: 1, matchingVersion: undefined }] };
+test.each([
+  { ...RESULT, sourceCoverageVersion: 1, matchingVersion: undefined },
+  { ...RESULT, sources: { ...RESULT.sources, retraction_watch: { ...RESULT.sources.retraction_watch, dataset: undefined } } },
+])('legacy approval survives but cannot grant a new approval under current rules', async (legacyResult) => {
+  const oldRun = { ...RUN, results: [legacyResult] };
   const approval = { id: 700, screening_id: RUN.id, decision: 'approved', created_at: RUN.created_at };
   const deps = dependenciesFor(dataverseDependencies(), { runs: [oldRun], reviews: [approval] });
   const context = await getWorkbenchIntegrityContext({ requestId: REQUEST_ID, profileId: 42, actingUserSystemId: SYSTEM_ID }, deps);
@@ -363,7 +366,9 @@ test('a newer legacy hold wins over an earlier approval', async () => {
 });
 
 test.each([
+  { ...RESULT, sources: { ...RESULT.sources, retraction_watch: { ...RESULT.sources.retraction_watch, dataset: { status: 'unverified' } } } },
   { ...RESULT, sourceCoverageVersion: 99 },
+  { ...RESULT, sources: { ...RESULT.sources, retraction_watch: { ...RESULT.sources.retraction_watch, dataset: undefined } } },
   { ...RESULT, matchingVersion: undefined },
   { ...RESULT, sources: { ...RESULT.sources, pubpeer: { ...RESULT.sources.pubpeer, sourceValidationVersion: undefined } } },
   { ...RESULT, sources: { ...RESULT.sources, retraction_watch: { searched: true, matches: [{ matchingVersion: 2, identityStatus: 'verified', nameEvidence: 'exact_name' }], error: null } } },
