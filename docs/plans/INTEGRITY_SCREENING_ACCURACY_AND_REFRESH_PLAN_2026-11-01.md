@@ -3,7 +3,7 @@ title: Integrity screening accuracy and monthly Retraction Watch refresh
 domain: integrity-screener
 kind: plan
 status: active
-summary: "Reject conflicting author names, replace identity-confidence claims, validate PubPeer evidence, and safely refresh Retraction Watch monthly. Screening implementation authorized on the isolated branch; Fable review required before merge. Production changes remain unapproved."
+summary: "Reject conflicting author names, replace identity-confidence claims, validate PubPeer evidence, and safely refresh Retraction Watch monthly. Screening and controlled refresh code deployed through PR #604 after Fable review. Migration and production dry-run verified; first publication verified; monthly activation owner-approved, source-configured pending deployment."
 canonical: false
 cataloged: 2026-11-01
 owner: product-engineering
@@ -17,11 +17,11 @@ related:
 
 ## 1. Scope, authority, and status
 
-[VERIFIED via branch, reviews and authorized preflight] Owner: Codex. Branch: `codex/integrity-screening-discussion`. Worktree: `/private/tmp/wmkf-integrity-screening`. Justin authorized implementation on this isolated branch on 2026-11-02, starting with Increment A and requiring Fable review before merge or production work. Increment A is source-built, tested, and Fable-reviewed as READY FOR OWNER REVIEW; it is not merged or deployed. Increment B is source-built with isolated tests, full official-CSV rehearsal, passing release checks and Fable READY FOR OWNER REVIEW. Justin authorized read-only production preflight, which is recorded in the [preflight receipt](../audits/integrity-production-preflight-2026-11-02.md). Justin subsequently authorized migration/merge/deployed dry-run while holding first publication and monthly activation. Migration 092 is now applied in Production with unchanged corpus; the [live release receipt](../audits/integrity-production-release-2026-11-02.md) records promotion/dry-run progress.
+[VERIFIED via branch, reviews and authorized preflight] Owner: Codex. Branch: `codex/integrity-screening-discussion`. Worktree: `/private/tmp/wmkf-integrity-screening`. Justin authorized implementation on this isolated branch on 2026-11-02, starting with Increment A and requiring Fable review before merge or production work. Increment A is tested/Fable-reviewed and now deployed through PR #604. Increment B is source-built with isolated tests, full official-CSV rehearsal, passing release checks and Fable READY FOR OWNER REVIEW. Justin authorized read-only production preflight, which is recorded in the [preflight receipt](../audits/integrity-production-preflight-2026-11-02.md). Justin subsequently authorized migration/merge/deployed dry-run while holding first publication and monthly activation. Migration 092 is applied; the [live release receipt](../audits/integrity-production-release-2026-11-02.md) records completed promotion, successful deployed dry-run and the subsequently owner-approved first publication: 73,521 records, generation 1. Monthly scheduling remains off.
 
 [VERIFIED via owner messages, 2026-11-01] Justin requested three initial fixes after inspecting request 1002852: reject conflicting names, use honest identity labels, and validate PubPeer sources. He additionally requested a Retraction Watch update and selected a **monthly** refresh. The proposed timing is **the 1st of every month at 06:00 UTC**, expression `0 6 1 * *`; only the monthly cadence was owner-selected, while the exact time is a planning default.
 
-[PLANNED] Deliver two bounded increments: A, screening accuracy and source reporting; B, safe reference-data refresh and scheduling. Complete A independently of B where possible. Full ORCID/publication/coauthor-based identity resolution, dismissal persistence, a direct PubPeer API, general news-classifier redesign, automatic applicant screening, funding gates, and unrelated Reviewer Finder work are out of scope. No new paid provider calls are needed to test the implementation offline. Live re-screening is a separate explicitly approved application operation.
+[VERIFIED via implementation and release receipt] Delivered screening and controlled-refresh code in two bounded increments; publication and scheduling remain held. Original scope: A, screening accuracy and source reporting; B, safe reference-data refresh and scheduling. Complete A independently of B where possible. Full ORCID/publication/coauthor-based identity resolution, dismissal persistence, a direct PubPeer API, general news-classifier redesign, automatic applicant screening, funding gates, and unrelated Reviewer Finder work are out of scope. No new paid provider calls are needed to test the implementation offline. Live re-screening is a separate explicitly approved application operation.
 
 ## 2. Historical baseline evidence and uncertainty — before implementation
 
@@ -44,7 +44,7 @@ related:
 
 [VERIFIED via source] The end-to-end entry points are the standalone `pages/integrity-screener.js` and its screen/history APIs, and `shared/components/workbench/IntegrityTab.js` through `pages/api/workbench/integrity/[requestId]/run.js`. The shared engine produces source results; standalone saving is historically fail-soft, while the Workbench service explicitly awaits its request-linked INSERT. Workbench history returns the saved JSON and append-only staff decisions. Standalone PDF, Markdown, and JSON exports are generated in the page. The new cron will be a separate reference-data writer, not a screening or staff-decision writer.
 
-## 3. Increment A implementation contract (source-built and reviewed, not deployed)
+## 3. Historical accepted Increment A design (now implemented and deployed)
 
 ### A1. Reject definite name conflicts before permissive matching
 
@@ -97,7 +97,7 @@ related:
 
 [PLANNED] Preserve existing caller authentication, request-owned roster, per-request history, staff authority, and standalone versus Workbench save semantics. Retain existing generation/mounted/request guards across every new async result or failure update. No new funding decision or progression requirement is introduced.
 
-## 4. Increment B implementation contract (source-built; review in progress, not deployed)
+## 4. Historical accepted Increment B design (code deployed; first publication verified)
 
 ### B1. Execution preflight and schema
 
@@ -199,7 +199,7 @@ related:
 
 [PLANNED] Increment B remains separate. Production corpus/schema/freshness preflight, reference-data service and metadata migration, isolated full-dataset rehearsal, controlled initial refresh, and later monthly schedule activation remain outstanding. Owner authorization to implement does not authorize merging or accessing production; those boundaries remain in force.
 
-## 10. Current managed-refresh checkpoint — 2026-11-02
+## 10. Historical managed-refresh implementation checkpoint — 2026-11-02
 
 [VERIFIED via source and isolated execution] Justin authorized Increment B implementation. The managed refresh service, strict disabled worker, loopback-only rehearsal script, metadata reader/generation fence, UI/export provenance and migration 092 are source-built. No cron schedule is registered. Function duration configuration alone does not activate a schedule. Final source gates/build passed; Fable closure review returned READY FOR OWNER REVIEW with no P0/P1 findings. The two nonblocking final regression/reporting recommendations were implemented and tested; see the [refresh review receipt](../audits/retraction-refresh-fable-review-2026-11-02.md). Production activation remains unapproved.
 
@@ -208,8 +208,21 @@ related:
 [PARTIAL] Read-only production target/schema/corpus/scheduler preflight and seven-day PITR checks are complete; see the [preflight receipt](../audits/integrity-production-preflight-2026-11-02.md). Scoped backup/local restore is verified in the [removal review](../audits/integrity-backup-and-removals-2026-11-02.md); two omissions (13045 and 67801) led to owner-approved narrow retention; see the [retention implementation/review](../audits/integrity-retention-fable-review-2026-11-02.md), with final Fable READY FOR OWNER REVIEW and no blocking code findings. External-writer quiet-window confirmation, migration approval/application, initial controlled dry-run and publication/readback, and a separate monthly `0 6 1 * *` activation commit remain outstanding. The source worker additionally requires literal `RETRACTION_REFRESH_ENABLED=on`; Preview/dev and unset/invalid flags fail closed. See [operating guide](../guides/RETRACTION_WATCH_REFRESH.md) and [metadata Atlas](../atlas/postgres-retraction-dataset.md).
 
 
-## 11. Owner-approved narrow retention — source-built, not deployed
+## 11. Historical owner-approved retention implementation checkpoint
 
 [VERIFIED via owner instruction and isolated rehearsal] Retain only reviewed records 13045 and 67801 from the verified backup when their IDs are absent in the official feed. Keep raw CSV checksum/source count distinct from effective corpus count and the retained manifest. Publisher notice, review date, reason, backup SHA and per-record payload hash are durable provenance; final screened matches/UI/exports show the retained label. Returning upstream IDs win, manifest changes increment generation and other deletions continue. This is a fixed two-record policy, not a configurable override service. Migration 092 includes source_row_count, retained_records and count agreement and is now applied in Production with an empty metadata table; corpus publication is still held.
 
 [VERIFIED via restored production snapshot] Rehearsal produced 73,521 rows (73,519 upstream + 2 retained), 5,286 additions, 1,846 updates and 13 removals; both retained primary keys stayed stable; repeated unchanged check did not republish. No production write occurred. Fable delta review and closure returned READY FOR OWNER REVIEW, and source checks passed; the [retention receipt](../audits/integrity-retention-fable-review-2026-11-02.md) owns the current verdict and remaining operational gates.
+
+
+## 12. Historical pre-publication release checkpoint — 2026-11-02
+
+[VERIFIED via canonical migration runner, PR #604, Ready deployment and authenticated production dry-run] Migration 092 is applied; reviewed code is merged as b95a6f04c26440d4254a3c529d9fe4f16e93860c and deployed. Dry-run: 73,519 upstream + 2 retained = 73,521 candidate rows; 5,286 additions, 1,846 updates, 13 removals; checked maintenance receipt 281992. Actual corpus remains 68,248 with unchanged full hash and zero publication metadata rows. Production manual worker flag is on; no monthly schedule exists. First publication is not authorized and no non-dry-run call was made. The [release receipt](../audits/integrity-production-release-2026-11-02.md) is current execution authority; earlier numbered design/checkpoint material preserves its dated implementation context.
+
+## 13. Historical first-publication checkpoint — 2026-11-02
+
+[VERIFIED via owner approval, fresh exact dry-run and independent production readback] The first managed publication is complete: 73,521 records (73,519 upstream + 2 retained), generation 1; 5,286 additions, 1,846 updates and 13 removals. Audit 282049 completed. Monthly scheduling remains off. See the current publication section of the [release receipt](../audits/integrity-production-release-2026-11-02.md). Earlier design and execution checkpoints are historical; no provider-backed re-screen has been run.
+
+## 14. Current monthly activation checkpoint
+
+[VERIFIED via owner instruction and source] Monthly activation is explicitly authorized after verified first publication. Separate schedule change adds 0 6 1 * *; deployment verification is pending. The [activation receipt](../audits/integrity-monthly-activation-2026-11-02.md) owns current scheduling status; prior schedule-off checkpoints are historical.

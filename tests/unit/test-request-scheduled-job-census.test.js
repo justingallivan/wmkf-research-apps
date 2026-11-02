@@ -53,7 +53,7 @@ const RECORDED_CRONS = {
   'pricing-canary': { scheduled: true, class: 'operational' },
   'pricing-refresh': { scheduled: true, class: 'operational' },
   'reconcile-identities': { scheduled: true, class: 'operational' },
-  'refresh-retractions': { scheduled: false, class: 'operational', note: 'org-wide reference corpus only; no request selection, screening or email; monthly schedule intentionally absent during manual first-refresh approval' },
+  'refresh-retractions': { scheduled: true, class: 'operational', note: 'owner-approved monthly org-wide reference corpus refresh after verified first publication; no request selection, screening or email' },
   'refresh-irs-bmf': { scheduled: true, class: 'operational' },
   'reviewer-email-reconcile': { scheduled: true, class: 'guarded', guardFiles: ['lib/services/reviewer-email-reconciler.js'] },
   'reviewer-reminders': { scheduled: false, class: 'guarded', guardFiles: ['lib/services/reviewer-reminder-sweep.js'] },
@@ -78,14 +78,16 @@ test('every cron route is recorded', () => {
 
 test('the recorded schedule matches vercel.json', () => {
   const crons = JSON.parse(fs.readFileSync(path.join(ROOT, 'vercel.json'), 'utf8')).crons;
-  expect(crons).toHaveLength(32);
-  expect(new Set(crons.map(({ path: cronPath }) => cronPath.split('?')[0])).size).toBe(31);
+  expect(crons).toHaveLength(33);
+  expect(new Set(crons.map(({ path: cronPath }) => cronPath.split('?')[0])).size).toBe(32);
   const transcriptionCrons = crons.filter((cron) =>
     typeof cron.path === 'string' && cron.path.split('?')[0] === '/api/cron/drain-transcriptions'
   ).map(({ path: cronPath, schedule }) => ({ path: cronPath, schedule })).sort((a, b) => a.path.localeCompare(b.path));
   const expectedTranscriptionCrons = RECORDED_CRONS['drain-transcriptions'].scheduleEntries
     .slice().sort((a, b) => a.path.localeCompare(b.path));
   expect(transcriptionCrons).toEqual(expectedTranscriptionCrons);
+  expect(crons.filter(({ path: cronPath }) => cronPath === '/api/cron/refresh-retractions'))
+    .toEqual([{ path: '/api/cron/refresh-retractions', schedule: '0 6 1 * *' }]);
 
   const scheduled = crons
     .filter((cron) => !(typeof cron.path === 'string' && cron.path.split('?')[0] === '/api/cron/drain-transcriptions'))

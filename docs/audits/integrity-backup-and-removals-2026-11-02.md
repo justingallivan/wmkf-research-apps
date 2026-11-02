@@ -1,5 +1,7 @@
 # Retraction Watch backup, restore and removal review — 2026-11-02
 
+**Historical checkpoint:** subsequent migration, merge/deployment and production dry-run are complete in the [live release receipt](integrity-production-release-2026-11-02.md). First publication and monthly activation remain held.
+
 **Backup/restore VERIFIED. Historical removal-review verdict: the raw feed alone would lose two records.** The owner subsequently approved narrow retention; see the [current retention implementation/review](integrity-retention-fable-review-2026-11-02.md). Justin authorized the backup, isolated restore verification and removal review. Production was read-only; no migration, merge, refresh, env change or schedule activation occurred.
 
 ## Backup and restore proof
