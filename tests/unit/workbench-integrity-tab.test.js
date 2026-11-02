@@ -315,3 +315,9 @@ test('a deferred response cannot replace fresh state after A to B to A navigatio
   await waitFor(() => expect(screen.queryByText('Ari Stale')).toBeNull());
   expect(screen.getByText('Ari Fresh')).toBeInTheDocument();
 });
+
+test('retained matches visibly distinguish their prior-corpus provenance',async()=>{
+  const retained={...completeResult,sources:{...completeResult.sources,retraction_watch:{searched:true,error:null,matches:[{recordId:'13045',title:'Retained paper',retentionProvenance:{kind:'retained_legacy_record',reviewedAt:'2026-11-02',noticeUrl:'https://example.org/notice'}}]}}};
+  requestEnvelope.mockResolvedValue(ok({...loaded,latestRun:{...savedRun,results:[retained]}}));render(<IntegrityTab requestId={requestId}/>);
+  expect(await screen.findByText(/Retained from prior corpus/)).toBeInTheDocument();
+});

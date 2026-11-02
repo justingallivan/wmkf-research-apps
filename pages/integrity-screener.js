@@ -4,7 +4,7 @@ import HelpButton from '../shared/components/HelpButton';
 import RequireAppAccess from '../shared/components/RequireAppAccess';
 import ErrorAlert from '../shared/components/ErrorAlert';
 
-import { integrityIdentityLabel, integrityIncomplete, integritySourceLabel, integrityResultLabel, integrityDatasetLabel } from '../shared/utils/integrity-evidence';
+import { integrityRetentionLabel, integrityIdentityLabel, integrityIncomplete, integritySourceLabel, integrityResultLabel, integrityDatasetLabel } from '../shared/utils/integrity-evidence';
 
 /**
  * Retraction match card
@@ -21,6 +21,7 @@ function RetractionMatchCard({ match, onDismiss }) {
               <span className="text-xs font-medium text-gray-500 uppercase">Retraction Watch</span>
               <span className="text-xs text-gray-700">{integrityIdentityLabel(match)}</span>
             </div>
+            {match.retentionProvenance && <p className="text-xs text-amber-800">{integrityRetentionLabel(match)}</p>}
             <h4 className="text-sm font-medium text-gray-900 line-clamp-2">{match.title}</h4>
           </div>
           <button
@@ -486,6 +487,7 @@ function IntegrityScreenerPage() {
               builder.addSpace(5);
               builder.addParagraph(match.title || 'Untitled', { font: 'bold' });
               builder.addKeyValue('Name evidence', integrityIdentityLabel(match));
+              if (match.retentionProvenance) builder.addKeyValue('Record provenance', integrityRetentionLabel(match));
               if (match.retractionNature) builder.addKeyValue('Action', match.retractionNature);
               if (match.journal) builder.addKeyValue('Journal', match.journal);
               if (match.retractionDate) builder.addKeyValue('Date', new Date(match.retractionDate).toLocaleDateString());
@@ -620,6 +622,7 @@ function IntegrityScreenerPage() {
           retractionMatches.forEach((match, i) => {
             md += `#### Match ${i + 1}: ${match.title}\n\n`;
             md += `- **Name evidence:** ${integrityIdentityLabel(match)}\n`;
+            if (match.retentionProvenance) md += `- **Record provenance:** ${integrityRetentionLabel(match)}\n`;
             if (match.retractionNature) md += `- **Action:** ${match.retractionNature}\n`;
             if (match.journal) md += `- **Journal:** ${match.journal}\n`;
             if (match.retractionDate) {

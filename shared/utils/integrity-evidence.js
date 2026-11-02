@@ -39,12 +39,18 @@ function integrityResultLabel(result) {
   return result?.hasConcerns ? 'Items for human review' : 'No concerns reported';
 }
 
+function integrityRetentionLabel(match) {
+  const provenance = match?.retentionProvenance;
+  return provenance?.kind === 'retained_legacy_record'
+    ? `Retained from prior corpus (record ${provenance.recordId}) · ID absent from upstream feed · notice verified ${provenance.reviewedAt} · ${provenance.noticeUrl}` : '';
+}
+
 function integrityDatasetLabel(dataset, now = Date.now()) {
   if (integrityDatasetUnverified(dataset)) return 'Dataset version could not be verified.';
   if (dataset?.status !== 'recorded' || !dataset.generation || !dataset.checksum
     || !Number.isFinite(Date.parse(dataset.publishedAt)) || !Number.isFinite(Date.parse(dataset.lastCheckedAt))) return 'Dataset version not recorded.';
   const stale = now - Date.parse(dataset.lastCheckedAt) > 45 * 24 * 60 * 60 * 1000;
-  return `Dataset ${dataset.generation} (${dataset.checksum.slice(0, 12)}) · published ${dataset.publishedAt.slice(0, 10)} · checked ${dataset.lastCheckedAt.slice(0, 10)}${stale ? ' · Freshness warning: last successful check is over 45 days old.' : ''}`;
+  return `Dataset ${dataset.generation} (upstream ${dataset.checksum.slice(0, 12)}) · published ${dataset.publishedAt.slice(0, 10)} · checked ${dataset.lastCheckedAt.slice(0, 10)}${dataset.retainedRecords?.length ? ` · ${dataset.sourceRowCount} upstream + ${dataset.retainedRecords.length} retained legacy records` : ''}${stale ? ' · Freshness warning: last successful check is over 45 days old.' : ''}`;
 }
 
-module.exports = { integrityIdentityLabel, integrityIncomplete, integritySourceLabel, integrityResultLabel, integrityDatasetLabel, integrityDatasetUnverified };
+module.exports = { integrityIdentityLabel, integrityIncomplete, integritySourceLabel, integrityResultLabel, integrityDatasetLabel, integrityDatasetUnverified, integrityRetentionLabel };

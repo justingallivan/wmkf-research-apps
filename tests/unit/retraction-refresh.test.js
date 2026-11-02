@@ -51,3 +51,17 @@ test('metadata distinguishes absent/unpublished/unverified; checked time is not 
  expect(integrityDatasetLabel(snapshot,Date.parse('2027-01-01'))).toContain('Freshness warning');
  expect(integrityDatasetLabel(null)).toBe('Dataset version not recorded.');
 });
+
+test('retained provenance is shown separately from upstream checksum and counts',()=>{
+ const dataset={status:'recorded',generation:'1',checksum:'a'.repeat(64),publishedAt:'2026-11-02T00:00:00Z',lastCheckedAt:'2026-11-02T00:00:00Z',sourceRowCount:73519,retainedRecords:[{recordId:'13045'},{recordId:'67801'}]};
+ expect(integrityDatasetLabel(dataset)).toContain('73519 upstream + 2 retained legacy records');
+ expect(integrityDatasetLabel(dataset)).toContain('(upstream aaaaaaaaaaaa)');
+});
+
+test('recorded retained metadata validates counts and proof before labeling a screen',async()=>{
+ const retained=require('../../lib/services/retraction-retained-records.json').map(entry=>({...entry.provenance,recordSha256:'b'.repeat(64)}));
+ const row={generation:'1',source_url:'https://gitlab.com/crossref/retraction-watch-data',source_checksum:'a'.repeat(64),published_at:'2026-11-02T00:00:00Z',last_checked_at:'2026-11-02T00:00:00Z',row_count:12,source_row_count:10,retained_records:retained,format_version:1};
+ const read=data=>{let first=true;return readRetractionDataset(async()=>{if(first){first=false;return {rows:[{relation:'retraction_dataset'}]};}return {rows:[data]};});};
+ expect(await read(row)).toMatchObject({status:'recorded',sourceRowCount:10,rowCount:12,retainedRecords:retained});
+ for(const malformed of [{...row,source_row_count:9},{...row,retained_records:{}},{...row,retained_records:[{...retained[0],recordSha256:null},retained[1]]}])expect(await read(malformed)).toEqual({status:'unverified'});
+});

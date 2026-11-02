@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { requestEnvelope } from '../../utils/api-request';
 import { Button, Card } from '../Layout';
-import { integrityIdentityLabel, integrityDatasetLabel, integrityIncomplete } from '../../utils/integrity-evidence';
+import { integrityRetentionLabel, integrityIdentityLabel, integrityDatasetLabel, integrityIncomplete } from '../../utils/integrity-evidence';
 
 const SOURCES = [
   ['retraction_watch', 'Retraction Watch'],
@@ -103,6 +103,7 @@ function SourceSummary({ sourceKey, label, source }) {
         <div key={`${match.sourceIdentifier || match.doi || match.title || 'match'}-${index}`} className="mt-1 text-sm text-gray-700">
           <p className="font-medium text-gray-900">{match.title || 'Retraction Watch match'}</p>
           <p className="mt-0.5 text-xs text-gray-600">{integrityIdentityLabel(match)}</p>
+          {match.retentionProvenance && <p className="mt-0.5 text-xs text-amber-800">{integrityRetentionLabel(match)}</p>}
           {match.matchedAuthor && <p className="mt-0.5 text-sm">Matched author: {match.matchedAuthor}</p>}
           {match.institution && <p className="mt-0.5 text-sm">Paper-wide affiliation: {match.institution}</p>}
           {match.source && <span className="text-gray-500"> · {match.source}</span>}

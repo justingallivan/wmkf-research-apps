@@ -14,5 +14,8 @@ CREATE TABLE IF NOT EXISTS retraction_dataset (
  published_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
  last_checked_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
  row_count INTEGER NOT NULL CHECK (row_count > 0),
+ source_row_count INTEGER NOT NULL CHECK (source_row_count > 0),
+ retained_records JSONB NOT NULL DEFAULT '[]'::jsonb CHECK (jsonb_typeof(retained_records) = 'array'),
+ CHECK (row_count = source_row_count + jsonb_array_length(retained_records)),
  format_version INTEGER NOT NULL CHECK (format_version = 1)
 );

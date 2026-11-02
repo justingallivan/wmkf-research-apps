@@ -26,7 +26,7 @@ describeDb('managed reference refresh (real isolated Postgres)',()=>{
   let admin,pool,dir,alert;
   const schema='retraction_refresh_'+crypto.randomBytes(5).toString('hex');
   async function file(name,rows){const p=path.join(dir,name);await fs.writeFile(p,csv(rows));return p;}
-  const run=(csvFile,options={},deps={})=>refreshRetractions(options,{pool,csvFile,alert,...deps});
+  const run=(csvFile,options={},deps={})=>refreshRetractions(options,{pool,csvFile,alert,retainedRecords:[],...deps});
   const metadata=async()=> (await pool.query('SELECT * FROM retraction_dataset')).rows[0];
   beforeAll(async()=>{
     admin=new Pool({connectionString:URL_VALUE});await admin.query(`CREATE SCHEMA ${schema}`);
@@ -48,6 +48,40 @@ describeDb('managed reference refresh (real isolated Postgres)',()=>{
   });
   beforeEach(async()=>{alert=jest.fn();mockAfterMetadata=null;await pool.query('TRUNCATE retractions,retraction_dataset,maintenance_runs,system_alerts RESTART IDENTITY');});
   afterAll(async()=>{await pool?.end();await admin?.query(`DROP SCHEMA IF EXISTS ${schema} CASCADE`);await admin?.end();if(dir)await fs.rm(dir,{recursive:true,force:true});});
+  test('reviewed retention is atomic, repeat-safe, source-attributed and yields to returned upstream IDs',async()=>{
+    const retained=require('../../lib/services/retraction-retained-records.json');
+    const deps={retainedRecords:retained};
+    const a=await file('retained.csv',[makeRow(1),makeRow(2)]);
+    expect(await run(a,{dryRun:true},deps)).toMatchObject({count:4,sourceCount:2,retainedCount:2,removed:0});
+    expect(await metadata()).toBeUndefined();
+    const first=await run(a,{},deps);expect(first).toMatchObject({status:'published',count:4,retainedCount:2});
+    expect(await metadata()).toMatchObject({row_count:4,source_row_count:2});
+    expect((await metadata()).retained_records.map(r=>r.recordId)).toEqual(['13045','67801']);
+    let completed;for await(const event of IntegrityService.screenApplicants([{name:'Hong Wu'}],'fixture-only',null,null,{strictSourceErrors:true}))if(event.type==='complete')completed=event;
+    expect(completed.results[0].sources.retraction_watch.matches.find(m=>m.recordId==='13045').retentionProvenance).toMatchObject({kind:'retained_legacy_record',backupSha256:retained[0].provenance.backupSha256,noticeUrl:retained[0].provenance.noticeUrl});
+    expect((await run(a,{},deps)).status).toBe('unchanged');expect((await metadata()).generation).toBe('1');
+    const revised=retained.map(r=>({...r,provenance:{...r.provenance,reason:r.provenance.reason+' Reviewed again.'}}));
+    expect(await run(a,{}, {retainedRecords:revised})).toMatchObject({status:'published',sourceUnchanged:true,retentionChanged:true,generation:'2'});
+    const b=await file('returned.csv',[makeRow(1),makeRow(2),makeRow(13045,{Title:'Current upstream version',Author:'Hong Wu'})]);
+    expect(await run(b,{},deps)).toMatchObject({status:'published',count:4,sourceCount:3,retainedCount:1});
+    expect((await metadata()).retained_records.map(r=>r.recordId)).toEqual(['67801']);
+    expect((await pool.query("SELECT title FROM retractions WHERE record_id='13045'")).rows[0].title).toBe('Current upstream version');
+  });
+  test('retained author indexes are re-derived and a changed derivation changes publication provenance',async()=>{
+    const retained=require('../../lib/services/retraction-retained-records.json');const a=await file('retained-index.csv',[makeRow(1)]);await run(a,{}, {retainedRecords:retained});
+    const {IntegrityMatchingService}=require('../../lib/services/integrity-matching-service');const normalize=IntegrityMatchingService.normalizeName.bind(IntegrityMatchingService);
+    const spy=jest.spyOn(IntegrityMatchingService,'normalizeName').mockImplementation(name=>normalize(name).replace('almaqtari','al-maqtari'));
+    try {expect(await run(a,{}, {retainedRecords:retained})).toMatchObject({status:'published',sourceUnchanged:true,retentionChanged:true,generation:'2'});
+      expect((await pool.query("SELECT authors_normalized FROM retractions WHERE record_id='67801'")).rows[0].authors_normalized).toContain('qais ali al-maqtari');
+    } finally {spy.mockRestore();}
+  });
+  test('retention cannot bypass reviewed IDs and cannot leak rows or metadata through rollback',async()=>{
+    const retained=require('../../lib/services/retraction-retained-records.json');const a=await file('retention-fail.csv',[makeRow(1)]);
+    await expect(run(a,{}, {retainedRecords:[{...retained[0],data:{...retained[0].data,record_id:'999'}}]})).rejects.toMatchObject({code:'invalid_retained_retraction'});
+    expect(await metadata()).toBeUndefined();
+    await expect(run(a,{}, {retainedRecords:retained,beforeCommit:async()=>{throw new Error('injected');}})).rejects.toThrow();
+    expect((await pool.query('SELECT COUNT(*)::int AS count FROM retractions')).rows[0].count).toBe(0);expect(await metadata()).toBeUndefined();
+  });
   test('dry-run leaves corpus/metadata untouched; publish is complete, stable-id and repeat-safe',async()=>{
     const a=await file('a.csv',[makeRow(1,{Title:'Study, with\n"quotes"',Publisher:'p'.repeat(500),Subject:'s'.repeat(263)}),makeRow(2)]);
     const dry=await run(a,{dryRun:true});expect(dry).toMatchObject({status:'dry_run',published:false,count:2,inserted:2});expect(await metadata()).toBeUndefined();

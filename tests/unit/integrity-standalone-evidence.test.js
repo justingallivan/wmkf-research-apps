@@ -23,7 +23,7 @@ jest.mock('../../shared/utils/pdf-export', () => ({
 }));
 
 const matched = { title: 'A potential namesake paper', confidence: 100, matchingVersion: 2,
-  identityStatus: 'unverified', nameEvidence: 'exact_name', matchedAuthor: 'Yuan He', retractionNature: 'Correction' };
+  identityStatus: 'unverified', nameEvidence: 'exact_name', matchedAuthor: 'Yuan He', retractionNature: 'Correction', retentionProvenance: {kind:'retained_legacy_record',recordId:'13045',reviewedAt:'2026-11-02',noticeUrl:'https://example.org/retraction'} };
 const result = { name: 'Yuan He', matchingVersion: 2, matchCount: 1, hasConcerns: true,
   sources: {
     retraction_watch: { searched: true, matches: [matched], error: null, dataset: {status:'recorded',generation:'7',checksum:'a'.repeat(64),publishedAt:'2026-11-01T00:00:00.000Z',lastCheckedAt:'2026-11-02T00:00:00.000Z'} },
@@ -66,6 +66,8 @@ test('standalone UI and all three exports preserve uncertainty and expose source
   expect(screen.queryByText(/100%/)).toBeNull();
   fireEvent.click(screen.getByRole('button', { name: 'Export Markdown' }));
   expect(captured[0]).toContain('Dataset 7');
+  expect(screen.getByText(/Retained from prior corpus/)).toBeInTheDocument();
+  expect(captured[0]).toContain('Retained from prior corpus');
   expect(captured[0]).toContain('Exact name match · identity unverified');
   expect(captured[0]).toContain('Incomplete screen');
   expect(captured[0]).toContain('invalid or unrelated sources');
@@ -73,6 +75,7 @@ test('standalone UI and all three exports preserve uncertainty and expose source
   fireEvent.click(screen.getByRole('button', { name: 'Export JSON' }));
   const json = JSON.parse(captured[1]);
   expect(json.applicants[0].sources.retraction_watch.matches[0].identityStatus).toBe('unverified');
+  expect(json.applicants[0].sources.retraction_watch.matches[0].retentionProvenance.recordId).toBe('13045');
   expect(json.evidenceMeaning).toContain('never a probability');
   fireEvent.click(screen.getByRole('button', { name: 'Export PDF' }));
   await waitFor(() => expect(mockPdfCalls.some((call) => call.includes('Exact name match · identity unverified'))).toBe(true));
@@ -80,4 +83,5 @@ test('standalone UI and all three exports preserve uncertainty and expose source
   expect(JSON.stringify(mockPdfCalls)).toContain('invalid or unrelated sources');
   expect(JSON.stringify(mockPdfCalls)).not.toContain('100%');
   expect(JSON.stringify(mockPdfCalls)).toContain('Dataset 7');
+  expect(JSON.stringify(mockPdfCalls)).toContain('Retained from prior corpus');
 });
