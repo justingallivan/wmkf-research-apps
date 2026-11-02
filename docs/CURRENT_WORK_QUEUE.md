@@ -89,9 +89,11 @@ sequence.
   confirmed the updated Workbench intro, “Draft writeup work” option, and rare
   D26 deep-link explanation. Editing/history states and service-error paths were
   not all exercised. Root has separately updated two legacy-client error
-  messages on `codex/legacy-terminology-final-check`; tests, scoped lint, AST
-  review and independent review pass, with HTTP 400 and existing codes preserved.
-  That update's PR and Production verification remain pending. A fresh read-only
+  messages on `codex/legacy-terminology-final-check`; 135 tests across 3 suites
+  (including 22 verifier cases), scoped lint, AST review and independent review
+  pass, with HTTP 400 and existing codes preserved. PR #601 is merged; the
+  verifier confirms deployment metadata, expanded checkout/dependency match, and
+  nine synthetic cases. No live HTTP or browser error request was made. A fresh read-only
   inventory reported 46 email fields / 4 personal records and 60 prompt
   versions / 39 current. Only three scoped shared fields, Duncan's cleared
   invitation override, and two prompt families published at v6/v3 with exact

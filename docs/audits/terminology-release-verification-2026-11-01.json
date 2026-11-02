@@ -1,0 +1,64 @@
+{
+  "status": "passed",
+  "observedAt": "2026-11-02T03:36:24.486Z",
+  "repository": "justingallivan/wmkf-research-apps",
+  "deploymentEvidence": "latest GitHub-reported Production deployment",
+  "deployment": {
+    "id": 7483331184,
+    "sha": "73d270b935e136928502e28829e7522b41cc5cb9",
+    "state": "success",
+    "statusRecordedAt": "2026-11-02T03:11:01Z"
+  },
+  "runtimeSourceMatchesRevision": true,
+  "syntheticGuardChecks": [
+    {
+      "name": "retired material links",
+      "status": "passed",
+      "httpStatus": 400,
+      "code": "distribution_material_links_retired"
+    },
+    {
+      "name": "retired attachment mode: docx",
+      "status": "passed",
+      "httpStatus": 400,
+      "code": "distribution_attachment_mode_invalid"
+    },
+    {
+      "name": "retired attachment mode: pdf",
+      "status": "passed",
+      "httpStatus": 400,
+      "code": "distribution_attachment_mode_invalid"
+    },
+    {
+      "name": "retired attachment mode: both",
+      "status": "passed",
+      "httpStatus": 400,
+      "code": "distribution_attachment_mode_invalid"
+    },
+    {
+      "name": "unknown attachment mode",
+      "status": "passed",
+      "httpStatus": 400,
+      "code": "distribution_attachment_mode_invalid"
+    },
+    {
+      "name": "current client: omitted mode",
+      "status": "passed"
+    },
+    {
+      "name": "current client:  mode",
+      "status": "passed"
+    },
+    {
+      "name": "current client: none mode",
+      "status": "passed"
+    },
+    {
+      "name": "current calendar selection",
+      "status": "passed"
+    }
+  ],
+  "liveApplicationRequests": false,
+  "liveErrorResponsesTested": false,
+  "limitation": "No live HTTP/browser error requests were made; synthetic checks exercise the matching deployed source locally."
+}

@@ -77,8 +77,7 @@ tests across 7 suites, a six-file text-only AST review, and all CI passing.
 Production deployment `7483066923` succeeded, and a bounded signed-in recheck
 confirmed three changed Workbench copy locations. Editing/history states and
 service-error paths were not all exercised. A separate legacy-client error
-wording update is source/test/lint/review verified, preserving both HTTP
-400/code contracts; its PR and Production verification remain pending. This
+wording update is source/test/lint/review verified, preserving both HTTP 400/code contracts. PR #601 is merged; 135 tests across 3 suites (including 22 verifier cases) and scoped lint passed. The autonomous verifier confirmed Production deployment metadata, expanded local-runtime/source match, and nine synthetic checks. It made no live application request, so error responses remain untested. This
 does not certify full terminology migration. Historical implementation and
 rollout receipts below retain their dated scope.
 
