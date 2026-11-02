@@ -29,7 +29,9 @@ const ADMIN_ROW_SELECT =
   'wmkf_ai_promptstatus,wmkf_ai_systemprompt,wmkf_ai_promptbody,' +
   'wmkf_ai_promptvariables,wmkf_ai_promptoutputschema,wmkf_ai_model,' +
   'wmkf_ai_temperature,wmkf_ai_maxtokens,' +
-  'createdon,modifiedon,_modifiedby_value,wmkf_ai_publisheddatetime';
+  'createdon,modifiedon,_modifiedby_value,wmkf_ai_publisheddatetime,' +
+  'wmkf_ai_displaytitle,wmkf_ai_description,wmkf_ai_groupkey,' +
+  'wmkf_ai_sectionkey,wmkf_ai_usedby,wmkf_ai_usagecategory';
 const SEED_LIST_SELECT =
   'wmkf_ai_promptid,wmkf_ai_promptname,wmkf_promptversion,wmkf_ai_iscurrent';
 

@@ -86,11 +86,21 @@ optional requirement match the spec in
 organizing the shared prompt library: `wmkf_ai_displaytitle` (String 200),
 `wmkf_ai_description` (Memo 4000), `wmkf_ai_groupkey` (String 80),
 `wmkf_ai_sectionkey` (String 80), `wmkf_ai_usedby` (Memo 4000) and
-`wmkf_ai_usagecategory` (String 40). They are descriptive only: no reader
-selects them yet, and no prompt execution depends on them. They are not yet
-populated. Admin publish does not yet copy them to a new version: it creates
-the new row from an explicit field list
-(`lib/services/admin/prompts-publish-service.js:263-277`). See
+`wmkf_ai_usagecategory` (String 40). They are descriptive only, and no prompt
+execution depends on them (the Executor projection does not select them). They
+are not yet populated.
+
+- **Read:** the Admin projection (`ADMIN_ROW_SELECT` in
+  `lib/dataverse/adapters/ai-prompt.js`) selects them. Both Admin services return
+  them as `catalog` (`lib/services/admin/prompt-catalog-fields.js`).
+- **Display:** `resolveAdminPromptDescription` in
+  `shared/config/adminPromptCatalog.js` prefers stored values field by field
+  and falls back to the code catalog. Group/section and usage are validated.
+- **Write:** an Admin publish copies all six from the prior current row to the
+  new version. They are outside the publish fingerprint.
+
+Every environment Admin reads must have these columns, or the Admin prompt
+reads return 400. See
 `docs/plans/SHARED_PROMPT_LIBRARY_SCOPE_CHANGE_2026-11-02.md`.
 
 **Read paths (verified 2026-05-07; updated S222):**

@@ -143,6 +143,36 @@ describe('publishPrompt', () => {
     expect(aiPrompt.setIsCurrent).toHaveBeenCalledWith('prior', false, { ifMatch: 'W/"1"' });
   });
 
+  it('carries the catalog columns forward without changing the publish fingerprint', async () => {
+    const catalog = {
+      wmkf_ai_displaytitle: 'Analyze a proposal', wmkf_ai_description: 'Finds context.',
+      wmkf_ai_groupkey: 'reviewers', wmkf_ai_sectionkey: null,
+      wmkf_ai_usedby: 'Reviewer Finder', wmkf_ai_usagecategory: 'application',
+    };
+    const body = `${VALID_BODY}\nEDIT`;
+    aiPrompt.queryCurrentRows.mockResolvedValue({ records: [{ ...currentRow({ version: 9, id: 'n1', body }), ...catalog }] });
+    const bodyHash = publishHash({
+      body, systemPrompt: '', variables: ANALYZE_VARIABLES, outputSchema: null,
+      model: 'sonnet', temperature: null, maxTokens: null,
+    });
+    sql.mockResolvedValueOnce({ rows: [{ phase: 'final', status: 'completed', new_prompt_id: 'n1', target_version: 9, body_hash: bodyHash }] });
+    await expect(publishPrompt(args({ requestId: 'req-cat' }))).resolves.toMatchObject({ idempotentReplay: true });
+
+    aiPrompt.queryCurrentRows.mockResolvedValue({ records: [{ ...currentRow(), ...catalog }] });
+    aiPrompt.queryCurrentIdVersions.mockResolvedValue({ records: [{ wmkf_ai_promptid: 'new-row' }] });
+    await publishPrompt(args());
+    expect(aiPrompt.create).toHaveBeenCalledWith(expect.objectContaining(catalog));
+  });
+
+  it('writes null catalog columns when the prior row has none', async () => {
+    aiPrompt.queryCurrentRows.mockResolvedValue({ records: [currentRow()] });
+    aiPrompt.queryCurrentIdVersions.mockResolvedValue({ records: [{ wmkf_ai_promptid: 'new-row' }] });
+    await publishPrompt(args());
+    expect(aiPrompt.create).toHaveBeenCalledWith(expect.objectContaining({
+      wmkf_ai_displaytitle: null, wmkf_ai_usagecategory: null,
+    }));
+  });
+
   it('publishes a model-only edit as a new immutable version', async () => {
     aiPrompt.queryCurrentRows.mockResolvedValue({ records: [currentRow()] });
     aiPrompt.queryCurrentIdVersions.mockResolvedValue({ records: [{ wmkf_ai_promptid: 'new-row' }] });

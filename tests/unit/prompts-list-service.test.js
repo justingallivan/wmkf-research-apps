@@ -54,6 +54,7 @@ describe('listPrompts', () => {
       status: null, systemPrompt: '', body: 'b', variables: null, outputSchema: null,
       model: null, temperature: null, maxTokens: null,
       createdOn: null, publishedAt: null, modifiedOn: null, modifiedById: null, modifiedByName: null,
+      catalog: { title: null, description: null, group: null, section: null, usedBy: null, usage: null },
     });
   });
 
