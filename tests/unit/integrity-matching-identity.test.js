@@ -49,3 +49,12 @@ test.each([
   expect(result.matches).toBe(matches);
   if (matches) expect(result.nameEvidence).toBe(nameEvidence);
 });
+
+test('retrieval preserves raw all-caps surnames and expanded compact initials', () => {
+  expect(M.buildDatabaseSearchTerms('LI Wei')).toEqual(expect.arrayContaining(['li wei', 'wei li']));
+  expect(M.buildDatabaseSearchTerms('RA Leung')).toEqual(expect.arrayContaining(['ra leung', 'r a leung']));
+  expect(M.buildTextSearchPatterns('LI Wei')).toEqual(expect.arrayContaining(['%li%wei%', '%wei%li%']));
+  expect(M.buildTextSearchPatterns('RA Leung')).toEqual(expect.arrayContaining(['%ra%leung%', '%r%leung%']));
+  expect(M.calculateNameMatch('RA Leung', 'RA Leung').nameEvidence).toBe('ambiguous_name');
+  expect(M.calculateNameMatch('R.A. Leung', 'RA Leung').nameEvidence).toBe('ambiguous_name');
+});

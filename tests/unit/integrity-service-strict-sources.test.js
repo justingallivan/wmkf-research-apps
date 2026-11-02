@@ -280,3 +280,17 @@ test('engine excludes the reported conflicting authors and keeps namesakes unver
   expect(complete.results[2].sources.retraction_watch.matches[0]).not.toHaveProperty('confidenceLevel');
   expect(complete.results[2].sources.retraction_watch.matches[0]).toMatchObject({ matchedAuthor: 'He, Yuan', identityStatus: 'unverified', matchingVersion: 2 });
 });
+
+test('actual retrieval terms fetch the raw all-caps surname before matching', async () => {
+  // Unlike earlier engine fixtures, use the actual builders: a matcher-only
+  // test cannot catch a candidate that the indexed lookup never retrieved.
+  IntegrityMatchingService.buildDatabaseSearchTerms.mockRestore();
+  IntegrityMatchingService.buildTextSearchPatterns.mockRestore();
+  mockSql.mockImplementation((parts, term) => Promise.resolve({ rows:
+    parts.join('?').includes('authors_normalized') && term === 'li wei'
+      ? [{ record_id: 'raw-surname', authors: 'Li Wei', title: 'Retrieved by raw name term' }] : [],
+  }));
+  const matches = await IntegrityService.searchRetractionWatch('LI Wei', '', strict);
+  expect(matches).toHaveLength(1);
+  expect(matches[0]).toMatchObject({ matchedAuthor: 'Li Wei', identityStatus: 'unverified' });
+});

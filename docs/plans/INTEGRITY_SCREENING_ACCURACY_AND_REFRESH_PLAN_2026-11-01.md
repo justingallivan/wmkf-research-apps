@@ -17,7 +17,7 @@ related:
 
 ## 1. Scope, authority, and status
 
-[PLANNED] Owner: Codex. Branch: `codex/integrity-screening-discussion`. Worktree: `/private/tmp/wmkf-integrity-screening`. Justin authorized implementation on this isolated branch on 2026-11-02, starting with Increment A and requiring Fable review before merge or production work. Increment A is source-built with offline tests; its independent implementation review is pending. Increment B remains planned. No migrations, imports, scheduled jobs, or production probes have been executed for this plan.
+[PLANNED] Owner: Codex. Branch: `codex/integrity-screening-discussion`. Worktree: `/private/tmp/wmkf-integrity-screening`. Justin authorized implementation on this isolated branch on 2026-11-02, starting with Increment A and requiring Fable review before merge or production work. Increment A is source-built, tested, and Fable-reviewed as READY FOR OWNER REVIEW; it is not merged or deployed. Increment B remains planned. No migrations, imports, scheduled jobs, or production probes have been executed for this plan.
 
 [VERIFIED via owner messages, 2026-11-01] Justin requested three initial fixes after inspecting request 1002852: reject conflicting names, use honest identity labels, and validate PubPeer sources. He additionally requested a Retraction Watch update and selected a **monthly** refresh. The proposed timing is **the 1st of every month at 06:00 UTC**, expression `0 6 1 * *`; only the monthly cadence was owner-selected, while the exact time is a planning default.
 
@@ -190,3 +190,11 @@ related:
 [PLANNED] P2 dispositions: explicit standalone PubPeer failure handling; semicolon-aware author parsing and comma/suffix tests; news classifier limitations remain named out of scope; checked maintenance persistence and post-commit failure reporting; cron schedule in a separate activation commit; source header/width validation; diagnostic/UI/e2e fan-out tests. Retain the stable-ID/foreign-key preflight instead of trusting an absence claim without a fresh live schema check. Do not expand this task into a general identity resolver.
 
 [VERIFIED via bounded source-led reconciliation] This revision updates the whole plan's affected contract, tables, acceptance criteria and async audit together; the initial review is explicitly historical. Runtime guidance remains current behavior because no runtime fact changed. Unknowns remain production schema/corpus freshness, actual provider responses, complete-source CSV compatibility, pooling configuration and measured resource fit. No whole-repository or live-state audit is claimed.
+
+## 9. Screening implementation checkpoint — 2026-11-02
+
+[VERIFIED via source, local tests and OAuth-only Fable reviews] Increment A is implemented on this branch. The first implementation commit is `1ab370793`; `d3780341d` addresses the first review, and the final retrieval correction closes the remaining source-to-matcher recall gap. Both raw and expanded search terms are retained. The final independent verdict is **READY FOR OWNER REVIEW**; see the [complete implementation review and verification receipt](../audits/integrity-screening-implementation-fable-review-2026-11-02.md).
+
+[VERIFIED via local execution] Final source: 223 tests across 12 scoped Jest suites, 41 diagnostic assertions, canonical Next build, lint with zero errors, type check, and relevant gates/self-tests. Isolated Postgres integration (four tests) and mocked Chromium Workbench flow (one test) passed after the approval/UI corrections. No application-provider calls, production reads/writes, migrations, merges, or new cron schedules were performed. No historical screening JSON, count or staff decision was rewritten.
+
+[PLANNED] Increment B remains separate. Production corpus/schema/freshness preflight, reference-data service and metadata migration, isolated full-dataset rehearsal, controlled initial refresh, and later monthly schedule activation remain outstanding. Owner authorization to implement does not authorize merging or accessing production; those boundaries remain in force.
