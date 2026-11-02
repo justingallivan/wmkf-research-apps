@@ -21,7 +21,7 @@ function sendError(res, error) {
     return res.status(error.httpStatus).json(error.body ?? { error: error.message, code: error.code });
   }
   console.error('admin Final Writeup staffing error:', error);
-  return res.status(500).json({ error: 'The Final Writeup staffing operation failed.' });
+  return res.status(500).json({ error: 'The Final writeup staffing operation failed.' });
 }
 
 export default async function handler(req, res) {

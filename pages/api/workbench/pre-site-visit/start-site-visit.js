@@ -27,7 +27,7 @@ function sendError(res, error) {
   }
   console.error('workbench start-site-visit error:', error);
   return res.status(500).json({
-    error: 'The Site Visit stage could not be started.',
+    error: 'The Draft writeup could not be prepared for editing.',
     details: process.env.NODE_ENV === 'development' ? error.message : undefined,
   });
 }

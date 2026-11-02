@@ -896,11 +896,11 @@ export default function StaffDeliberationsTab({
         signal: controller.signal,
         tolerantBody: true,
       });
-      if (!ok) throw new Error(body.error || `The Site Visit could not be started (${status})`);
+      if (!ok) throw new Error(body.error || `The Draft writeup could not be prepared for editing (${status})`);
       if (generationSequence.current !== sequence || id !== requestId) {
-        throw new Error('The request changed while the Site Visit was being started.');
+        throw new Error('The request changed while the Draft writeup was being prepared for editing.');
       }
-      if (!body.artifact) throw new Error('Starting the Site Visit returned no artifact identity.');
+      if (!body.artifact) throw new Error('Preparing the Draft writeup for editing returned no artifact identity.');
       setArtifact(body.artifact);
       setPendingArtifact(null);
     } catch (startError) {
@@ -1863,7 +1863,7 @@ export default function StaffDeliberationsTab({
                     disabled={reopening || !requestNumber}
                     className="mt-3 rounded-lg border border-red-300 bg-white px-4 py-2 text-sm font-medium text-red-800 hover:bg-red-50 disabled:opacity-50"
                   >
-                    Reopen Pre-Site Draft
+                    Reopen Draft writeup
                   </button>
                 </div>
               )}

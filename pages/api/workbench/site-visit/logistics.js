@@ -50,7 +50,7 @@ function sendError(res, error) {
     });
   }
   console.error('workbench Site Visit logistics error:', error);
-  return res.status(500).json({ error: 'Site Visit logistics could not be processed.' });
+  return res.status(500).json({ error: 'Research presentation logistics could not be processed.' });
 }
 
 export default async function handler(req, res) {

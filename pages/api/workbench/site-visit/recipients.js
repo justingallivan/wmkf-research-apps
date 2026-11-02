@@ -21,7 +21,7 @@ export default async function handler(req, res) {
       });
     } catch (error) {
       console.error('workbench Site Visit recipient directory error:', error);
-      return res.status(500).json({ error: 'The Site Visit recipient directory could not be loaded.' });
+      return res.status(500).json({ error: 'The Research presentation recipient directory could not be loaded.' });
     }
   });
 }

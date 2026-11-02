@@ -1159,7 +1159,7 @@ test('only superusers can see the administration section and reopen control', as
   queueRoute('presiteGet', statusResponse({ currentArtifact: preSiteArtifact(REVIEW) }));
   render(<StaffDeliberationsTab requestId={REQUEST_ID} requestNumber="1002379" isSuperuser={false} />);
   await screen.findByRole('link', { name: /Edit draft writeup in Word/ });
-  expect(screen.queryByRole('button', { name: 'Reopen Pre-Site Draft' })).not.toBeInTheDocument();
+  expect(screen.queryByRole('button', { name: 'Reopen Draft writeup' })).not.toBeInTheDocument();
   expect(screen.queryByText(/Administration — guarded reopen/)).not.toBeInTheDocument();
 });
 
@@ -1184,7 +1184,7 @@ test('validates confirmation and submits one guarded reopen, returning the write
 
   await screen.findByRole('link', { name: /Edit draft writeup in Word/ });
   fireEvent.click(screen.getByText(/Administration — guarded reopen/));
-  fireEvent.click(screen.getByRole('button', { name: 'Reopen Pre-Site Draft' }));
+  fireEvent.click(screen.getByRole('button', { name: 'Reopen Draft writeup' }));
   const submit = screen.getByRole('button', { name: 'Create Draft Successor' });
   expect(submit).toBeDisabled();
   fireEvent.change(screen.getByLabelText('Reason'), { target: { value: PRE_SITE_REOPEN_REASON.ACCIDENTAL_HANDOFF } });
@@ -1213,7 +1213,7 @@ test('M2: a failed submit keeps one operation id and immutable audit inputs for 
 
   await screen.findByRole('link', { name: /Edit draft writeup in Word/ });
   fireEvent.click(screen.getByText(/Administration — guarded reopen/));
-  fireEvent.click(screen.getByRole('button', { name: 'Reopen Pre-Site Draft' }));
+  fireEvent.click(screen.getByRole('button', { name: 'Reopen Draft writeup' }));
   fireEvent.change(screen.getByLabelText('Reason'), { target: { value: PRE_SITE_REOPEN_REASON.ACCIDENTAL_HANDOFF } });
   fireEvent.change(screen.getByLabelText('Correction note'), { target: { value: 'The handoff was started too early.' } });
   fireEvent.change(screen.getByLabelText('Type request number 1002379 to confirm'), { target: { value: '1002379' } });
@@ -1417,7 +1417,7 @@ test('T2: submitReopen non-2xx (readStatus route bytes unaffected) posts exact h
 
   await screen.findByRole('link', { name: /Edit draft writeup in Word/ });
   fireEvent.click(screen.getByText(/Administration — guarded reopen/));
-  fireEvent.click(screen.getByRole('button', { name: 'Reopen Pre-Site Draft' }));
+  fireEvent.click(screen.getByRole('button', { name: 'Reopen Draft writeup' }));
   fireEvent.change(screen.getByLabelText('Reason'), { target: { value: PRE_SITE_REOPEN_REASON.ACCIDENTAL_HANDOFF } });
   fireEvent.change(screen.getByLabelText('Correction note'), { target: { value: 'The handoff was started too early.' } });
   fireEvent.change(screen.getByLabelText('Type request number 1002379 to confirm'), { target: { value: '1002379' } });

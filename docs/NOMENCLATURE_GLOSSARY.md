@@ -128,19 +128,17 @@ migrations.
 Runtime adoption is partial. PRs #577, #580, #581, #583, #590, #591 and #592
 merged their bounded display-copy slices; PR #594 (`21c937783`) merged A1–A3
 reader/helper copy and PR #595 (`6cbed404c`) merged B1 generated-dossier copy
-to source/Git. These are not deployment receipts. B2 draft-writeup template copy
-is in progress on `codex/draft-writeup-presentation-heading`; it changes only
-the future template's visible heading, preserving the staff token and older
-templates/stored files. Its recovery guard returns HTTP 409 rather than
-rerendering an unresolved saved operation under a mismatched template version,
-requiring a new confirmed operation. Check current Git/PR and release receipts before
-reporting later status. A4 and C1–C2 remain open. The
-[2026-11-01 terminology completion audit](audits/terminology-completion-audit-2026-11-01.md)
-records the exact scope and unknown live saved settings, prompts, files, and
-deployment state. Preserve approved names while keeping routes, API/service and
+to source/Git; PR #596 (`73ecc8445`) merged B2 template copy and the safe-recovery
+guard (source/Git only, not deployment evidence). A4 sentence-case copy and
+C1–C2 default/error copy are in progress on `codex/remaining-source-terminology`;
+check current Git/PR and release receipts before reporting their later status.
+Preserve approved names while keeping routes, API/service and
 prompt identifiers, schemas/storage values, artifact types, saved settings, user
 content, and historical files intact. No data, prompt-publication, or backfill
 migration is authorized.
+[2026-11-01 terminology completion audit](audits/terminology-completion-audit-2026-11-01.md)
+records the exact scope and unknown live saved settings, prompts, files, and
+deployment state.
 
 ### Historical source inventory — October 6–7, 2026
 

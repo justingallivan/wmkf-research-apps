@@ -276,7 +276,7 @@ function MatrixTable({ group, search, pd }) {
           <thead>
             <tr className="border-b border-gray-200 bg-gray-50">
               <th scope="col" className="sticky left-0 z-20 w-56 min-w-56 max-w-56 bg-gray-50 px-4 py-3 text-xs font-semibold uppercase tracking-wide text-gray-600 sm:w-72 sm:min-w-72 sm:max-w-72 sm:px-5">
-                Final Writeup
+                Final writeup
               </th>
               {(group.reviewers || []).map((reviewer) => (
                 <th key={reviewer.reviewerId} scope="col" className="min-w-36 px-3 py-3 text-sm font-semibold text-gray-900">
@@ -361,7 +361,7 @@ function CoordinatorMatrix({ matrix, search, pd }) {
         </div>
         {matrix.mode === 'role-default' && (
           <p className="mt-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900" role="status">
-            Program-specific audiences have not been published yet. This matrix is temporarily using every enabled member of the Final Writeup reviewer role.
+            Program-specific audiences have not been published yet. This matrix is temporarily using every enabled member of the Final writeup reviewer role.
           </p>
         )}
       </div>
@@ -374,7 +374,7 @@ function CoordinatorMatrix({ matrix, search, pd }) {
         <div className="rounded-xl border border-amber-300 bg-amber-50 p-4" role="status">
           <h3 className="font-semibold text-amber-950">Audience configuration needed</h3>
           <p className="mt-1 text-sm text-amber-900">
-            These Final Writeups are not placed in a matrix because their Grant Program has no saved audience.
+            These Final writeups are not placed in a matrix because their Grant Program has no saved audience.
           </p>
           <ul className="mt-3 space-y-2 text-sm text-amber-950">
             {unconfiguredRows.map((row) => (
@@ -396,7 +396,7 @@ function CoordinatorMatrix({ matrix, search, pd }) {
   );
 }
 
-function LoadingSurface({ message = 'Loading Final Writeups…' }) {
+function LoadingSurface({ message = 'Loading Final writeups…' }) {
   return (
     <div className="rounded-xl border border-gray-200 bg-white px-6 py-16 text-center shadow-sm" aria-live="polite">
       <div className="mx-auto mb-4 h-7 w-7 animate-spin rounded-full border-2 border-gray-200 border-t-gray-800" />
@@ -408,7 +408,7 @@ function LoadingSurface({ message = 'Loading Final Writeups…' }) {
 function ErrorSurface({ message, onRetry }) {
   return (
     <div className="rounded-xl border border-red-200 bg-red-50 px-6 py-8 text-red-900" role="alert">
-      <h2 className="font-semibold">Final Writeups could not be loaded</h2>
+      <h2 className="font-semibold">Final writeups could not be loaded</h2>
       <p className="mt-1 max-w-2xl text-sm">{message}</p>
       <button
         type="button"
@@ -594,7 +594,7 @@ function personaViewLabel(viewer) {
     leadership: 'Leadership',
   };
   const resolved = (viewer.personas || []).map((persona) => labels[persona]).filter(Boolean);
-  return resolved.length ? `${resolved.join(' + ')} view` : 'No Final Writeup view assigned';
+  return resolved.length ? `${resolved.join(' + ')} view` : 'No Final writeup view assigned';
 }
 
 function NeedsReviewEmptyState({ cycleLabel, pdName, counts, search, onChangeView }) {
@@ -671,7 +671,7 @@ export function FinalWriteupsPanel({
       });
       if (!resOk) {
         const responseError = body && typeof body === 'object' ? body.error : null;
-        throw new Error(responseError || `Failed to load Final Writeups (${resStatus})`);
+        throw new Error(responseError || `Failed to load Final writeups (${resStatus})`);
       }
       if (requestIdRef.current !== requestId) return;
       setData(body);
@@ -902,7 +902,7 @@ function FocusedDocument({ writeup }) {
         <div className="flex min-w-0 gap-4">
           <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-gray-100 text-gray-700"><DocumentIcon /></span>
           <div>
-            <h2 id="document-heading" className="text-lg font-semibold text-gray-900">Current Final Writeup</h2>
+            <h2 id="document-heading" className="text-lg font-semibold text-gray-900">Current Final writeup</h2>
             <p className="mt-1 text-sm text-gray-600">
               Opens in a separate Word window or browser tab.
             </p>
@@ -1041,7 +1041,7 @@ function FocusedNavigation({ navigation }) {
     </Link>
   ) : <span />;
   return (
-    <nav className="flex items-center justify-between gap-4 border-t border-gray-200 pt-5" aria-label="Final Writeup queue navigation">
+    <nav className="flex items-center justify-between gap-4 border-t border-gray-200 pt-5" aria-label="Final writeup queue navigation">
       {item('Previous', navigation.previous, 'left')}
       {item('Next', navigation.next, 'right')}
     </nav>
@@ -1067,7 +1067,7 @@ export function FinalWriteupFocusedView({ requestId }) {
       });
       if (!resOk) {
         const responseError = body && typeof body === 'object' ? body.error : null;
-        throw new Error(responseError || `Failed to load Final Writeup (${resStatus})`);
+        throw new Error(responseError || `Failed to load Final writeup (${resStatus})`);
       }
       if (requestIdRef.current !== loadId) return;
       setData(body);
@@ -1121,7 +1121,7 @@ export function FinalWriteupFocusedView({ requestId }) {
 
   const writeup = data?.selected || null;
   return (
-    <Layout title={writeup?.requestNumber ? `Final Writeup #${writeup.requestNumber}` : 'Final Writeup'} description="Focused Final Writeup review.">
+    <Layout title={writeup?.requestNumber ? `Final writeup #${writeup.requestNumber}` : 'Final writeup'} description="Focused Final writeup review.">
       <div className="pb-16 pt-6 sm:pt-8">
         <Link
           href={buildWorkbenchHref({
@@ -1131,7 +1131,7 @@ export function FinalWriteupFocusedView({ requestId }) {
           })}
           className="text-sm font-medium text-gray-500 underline-offset-4 hover:text-gray-900 hover:underline"
         >
-          ← Final Writeups
+          ← Final writeups
         </Link>
         <div className="mt-6">
           {loading ? <LoadingSurface message="Loading writeup…" /> : error ? (

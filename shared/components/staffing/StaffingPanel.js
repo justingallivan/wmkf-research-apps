@@ -67,7 +67,7 @@ export default function StaffingPanel({ includeFinalWriteups = false }) {
     <SharedRolesPanel />
     {includeFinalWriteups && isSuperuser && <>
       <section id="final-writeup-matrix-audiences" aria-labelledby="final-staffing-heading" className="rounded-xl border border-gray-200 bg-white p-6">
-        <h2 id="final-staffing-heading" className="text-lg font-semibold">Final Writeup staffing</h2>
+        <h2 id="final-staffing-heading" className="text-lg font-semibold">Final writeup staffing</h2>
         <p className="mb-6 mt-1 text-gray-600">Assign staff responsibilities and program review audiences. This configuration is published separately by a system administrator.</p>
         <FinalWriteupMatrixAudiencesSection />
       </section>

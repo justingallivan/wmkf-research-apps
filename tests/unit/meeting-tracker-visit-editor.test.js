@@ -54,8 +54,8 @@ test('applicant prefill deduplicates the PI and liaison and preserves existing s
   ]);
 });
 
-test('existing visit offers a missing applicant as one-click Add and includes them only after Save', async () => {
-  let visit = { activityId: 'a1', etag: 'W/"1"', subject: 'Site Visit', startLocal: '2026-10-01T09:00', endLocal: '2026-10-01T12:00', timeZone: 'America/Los_Angeles', format: 100000001, locationOrLink: 'Campus', organizer: { kind: 'staff', profileId: 7 }, requiredAttendees: [{ kind: 'manual', name: 'Justin', email: 'justin@example.edu' }], optionalAttendees: [] };
+test.each(['Site Visit', 'Custom applicant conversation'])('existing subject %s and description survive attendee edits', async (subject) => {
+  let visit = { activityId: 'a1', etag: 'W/"1"', subject, description: 'Saved custom logistics text', startLocal: '2026-10-01T09:00', endLocal: '2026-10-01T12:00', timeZone: 'America/Los_Angeles', format: 100000001, locationOrLink: 'Campus', organizer: { kind: 'staff', profileId: 7 }, requiredAttendees: [{ kind: 'manual', name: 'Justin', email: 'justin@example.edu' }], optionalAttendees: [] };
   global.fetch = jest.fn(async (url, options = {}) => {
     if (String(url).includes('/recipients')) return response(recipients);
     if (String(url).endsWith('/materials')) return response({ error: 'not enabled' }, 503);
@@ -74,6 +74,7 @@ test('existing visit offers a missing applicant as one-click Add and includes th
   expect(global.fetch.mock.calls.some(([, options]) => options?.method === 'PATCH')).toBe(false);
   fireEvent.click(screen.getByRole('button', { name: 'Save research presentation' }));
   const [, options] = await waitFor(() => global.fetch.mock.calls.find(([, value]) => value?.method === 'PATCH'));
+  expect(JSON.parse(options.body)).toMatchObject({ subject, description: 'Saved custom logistics text' });
   expect(JSON.parse(options.body).requiredAttendees).toEqual([
     { kind: 'manual', name: 'Justin', email: 'justin@example.edu' },
     { kind: 'manual', name: 'Franklin Cat', email: 'franklin@example.edu' },
@@ -129,7 +130,7 @@ test('a new visit: the form posts the fields the logistics service expects, with
   render(<SiteVisitEditor />);
 
   expect(await screen.findByRole('heading', { name: /Schedule the research presentation · #1003222/ })).toBeInTheDocument();
-  expect(await screen.findByLabelText('Subject')).toHaveValue('Site Visit — #1003222');
+  expect(await screen.findByLabelText('Subject')).toHaveValue('Research presentation — #1003222');
   // Virtual by default (owner 2026-09-10).
   expect(screen.getByLabelText('Format')).toHaveValue('100000001');
   const save = screen.getByRole('button', { name: 'Schedule research presentation' });
@@ -153,7 +154,7 @@ test('a new visit: the form posts the fields the logistics service expects, with
   expect(url).toBe(`/api/meeting-tracker/visits/${REQUEST_ID}`);
   const payload = JSON.parse(options.body);
   expect(payload).toEqual({
-    subject: 'Site Visit — #1003222', description: '', startLocal: '2026-10-01T09:00', endLocal: '2026-10-01T12:00',
+    subject: 'Research presentation — #1003222', description: '', startLocal: '2026-10-01T09:00', endLocal: '2026-10-01T12:00',
     timeZone: 'America/Los_Angeles', format: 100000001, locationOrLink: 'Campus',
     organizer: { kind: 'staff', profileId: 7 },
     requiredAttendees: [{ kind: 'manual', name: 'PI', email: 'pi@example.edu' }],

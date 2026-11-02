@@ -317,7 +317,7 @@ test('validator rejects unknown keys, duplicates, empty audiences, and unknown r
   expect(() => validateFinalWriteupMatrixAudienceConfig({
     ...v2Config(),
     personas: [{ reviewerId: ALLISON_ID, roles: ['executive'] }],
-  })).toThrow(/Unknown Final Writeup responsibility/);
+  })).toThrow(/Unknown Final writeup responsibility/);
   expect(() => validateFinalWriteupMatrixAudienceConfig({
     ...v2Config(),
     programs: [{ grantProgramId: RESEARCH_ID, reviewerIds: [] }],

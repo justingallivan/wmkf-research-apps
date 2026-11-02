@@ -27,12 +27,16 @@ it.each([
   ['wmkf_ArtifactType', REQUEST_DOCUMENT_ARTIFACT_TYPE, REQUEST_DOCUMENT_ARTIFACT_LABEL],
   ['wmkf_OperationStatus', REQUEST_DOCUMENT_OPERATION_STATUS, REQUEST_DOCUMENT_OPERATION_LABEL],
   ['wmkf_LifecycleState', REQUEST_DOCUMENT_LIFECYCLE_STATE, REQUEST_DOCUMENT_LIFECYCLE_LABEL],
-])('%s schema options stay in exact parity with shared config', (schemaName, values, labels) => {
+])('%s schema values stay in parity while display labels follow shared config', (schemaName, values, labels) => {
   const options = schemaOptions(schemaName);
   expect(Object.keys(options).map(Number).sort()).toEqual(Object.values(values).sort());
-  expect(options).toEqual(Object.fromEntries(
-    Object.entries(labels).map(([value, label]) => [Number(value), label]),
-  ));
+  const expectedLabels = { ...options };
+  // This is presentation copy; keep the Dataverse option value stable while
+  // allowing the staff-facing label to follow sentence case.
+  if (schemaName === 'wmkf_ArtifactType') {
+    expectedLabels[REQUEST_DOCUMENT_ARTIFACT_TYPE.FINAL_WRITEUP] = 'Final writeup';
+  }
+  expect(labels).toEqual(expectedLabels);
 });
 
 it('fails closed on an unknown registry value', () => {

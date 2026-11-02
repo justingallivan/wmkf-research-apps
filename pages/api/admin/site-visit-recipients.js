@@ -24,7 +24,7 @@ function sendError(res, error) {
     return res.status(error.httpStatus).json(error.body ?? { error: error.message, code: error.code });
   }
   console.error('admin Site Visit recipients error:', error);
-  return res.status(500).json({ error: 'The Site Visit recipient directory operation failed.' });
+  return res.status(500).json({ error: 'The Research presentation recipient directory operation failed.' });
 }
 
 export default async function handler(req, res) {

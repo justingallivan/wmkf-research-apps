@@ -29,7 +29,7 @@ function sendError(res, error) {
   }
   console.error('workbench final-writeup acknowledgement error:', error);
   return res.status(500).json({
-    error: 'Final Writeup review tracking failed.',
+    error: 'Final writeup review tracking failed.',
     details: process.env.NODE_ENV === 'development' ? error.message : undefined,
   });
 }

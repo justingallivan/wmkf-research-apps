@@ -38,7 +38,7 @@ function sendError(res, error) {
   }
   console.error('workbench pre-site reopen error:', error);
   return res.status(500).json({
-    error: 'The Pre-Site draft could not be reopened.',
+    error: 'The Draft writeup could not be reopened.',
     details: process.env.NODE_ENV === 'development' ? error.message : undefined,
   });
 }

@@ -56,7 +56,7 @@ const TABS = [
   { key: 'reviews', label: 'Reviews' },
   { key: 'review-panel', label: 'Review Panel', gate: 'review-panel' },
   { key: 'staff-deliberations', label: 'Staff Deliberations' },
-  { key: 'final-writeup', label: 'Final Writeup' },
+  { key: 'final-writeup', label: 'Final writeup' },
   { key: 'status', label: 'Status' },
   { key: 'awardee', label: 'Awardee' },
 ];
