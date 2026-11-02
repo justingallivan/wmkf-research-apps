@@ -71,6 +71,9 @@ it('golden: single-row full envelope pinned (every mapRow field)', async () => {
     modifiedon: '2026-01-03T00:00:00Z',
     _modifiedby_value: 'user-1',
     _modifiedby_value_formatted: 'Jane Doe',
+    wmkf_ai_displaytitle: 'Solo prompt',
+    wmkf_ai_groupkey: 'tools',
+    wmkf_ai_usagecategory: 'application',
   };
   DynamicsService.queryRecords.mockImplementation((entity, opts) =>
     Promise.resolve({ records: opts.filter.includes('eq true') ? [fullRow] : [] })
@@ -98,6 +101,10 @@ it('golden: single-row full envelope pinned (every mapRow field)', async () => {
       modifiedOn: '2026-01-03T00:00:00Z',
       modifiedById: 'user-1',
       modifiedByName: 'Jane Doe',
+      catalog: {
+        title: 'Solo prompt', description: null, group: 'tools',
+        section: null, usedBy: null, usage: 'application',
+      },
     }],
   });
 });

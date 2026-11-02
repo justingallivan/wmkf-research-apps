@@ -98,6 +98,7 @@ describe('/api/admin/prompts/[name] — envelope inventory gap fill (Stage 5 Pha
       systemPrompt: '', body: 'B4', variables: ANALYZE_VARIABLES, outputSchema: null,
       model: 'sonnet', temperature: null, maxTokens: null,
       createdOn: null, publishedAt: null, modifiedOn: null, modifiedById: null, modifiedByName: null,
+      catalog: { title: null, description: null, group: null, section: null, usedBy: null, usage: null },
     });
     expect(res.body.history.map((h) => h.version)).toEqual([4, 3]);
   });

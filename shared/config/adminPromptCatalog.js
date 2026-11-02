@@ -328,3 +328,38 @@ const UNCATALOGED_PROMPT = Object.freeze({
 export function getAdminPromptDescription(name) {
   return Object.hasOwn(ADMIN_PROMPT_CATALOG, name) ? ADMIN_PROMPT_CATALOG[name] : UNCATALOGED_PROMPT;
 }
+
+export const ADMIN_PROMPT_USAGES = ['application', 'reference', 'diagnostic', 'unconnected', 'uncataloged'];
+
+const text = (value) => (typeof value === 'string' && value.trim() ? value.trim() : null);
+
+function validPlacement(groupId, sectionId) {
+  const group = ADMIN_PROMPT_GROUPS.find(candidate => candidate.id === groupId);
+  if (!group) return false;
+  return group.sections ? group.sections.some(section => section.id === sectionId) : true;
+}
+
+/**
+ * Display metadata for a listed prompt. Stored catalog columns on the prompt row
+ * (`prompt.catalog`, wave36) win field by field; the code catalog above fills
+ * gaps. Group and section are taken as a pair and only when they name a known
+ * placement, and usage only when it is a known badge, so a stored typo falls
+ * back instead of hiding the prompt or breaking the page.
+ */
+export function resolveAdminPromptDescription(prompt) {
+  const fallback = getAdminPromptDescription(prompt?.name);
+  const stored = prompt?.catalog || {};
+  const group = text(stored.group);
+  const section = text(stored.section);
+  const placement = validPlacement(group, section)
+    ? { group, ...(section ? { section } : {}) }
+    : { group: fallback.group, ...(fallback.section ? { section: fallback.section } : {}) };
+  const usage = ADMIN_PROMPT_USAGES.includes(text(stored.usage)) ? text(stored.usage) : fallback.usage;
+  return {
+    title: text(stored.title) || fallback.title,
+    description: text(stored.description) || fallback.description,
+    usedBy: text(stored.usedBy) || fallback.usedBy,
+    usage,
+    ...placement,
+  };
+}

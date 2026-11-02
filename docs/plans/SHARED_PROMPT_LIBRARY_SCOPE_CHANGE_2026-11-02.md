@@ -121,24 +121,27 @@ optional, and the types and lengths match
 
 [PLANNED — needs separate approvals at steps 3 and 5]
 
-1. **Copy the columns forward in Admin first.** Today a publish builds the new
-   version from an explicit field list
-   (`lib/services/admin/prompts-publish-service.js:263-277`), so it would drop
-   the catalog values.
-   - Make publish copy all six from the prior current row.
-   - Add them to the Admin row projection and the inventory list, so they are
-     visible.
-   - Until this ships, backfilled values would vanish on the next publish.
-2. **Draft the values from code; no Dataverse read is needed.** For each
-   prompt name defined under `shared/config/prompts/` or in a seed script,
-   propose all six values:
-   - Title and description, from the definition and its caller.
-   - Group and section, by app area.
-   - Used by: the calling app or service.
-   - Usage category: `application` for app-wired prompts, `unclassified`
-     otherwise.
+1. **Copy the columns forward in Admin first.** [BUILT on branch
+   `claude/session-2026-11-02`; not yet deployed]
+   - A publish now copies all six from the prior current row. So does a
+     `prompt-seed.js` `--force` recovery version.
+   - The Admin projection and both Admin services return them as `catalog`.
+   - The Admin prompts page prefers stored values and falls back to the code
+     catalog.
 
-   Justin and Connor edit this table before anything is written.
+   Until this deploys, backfilled values would vanish on the next publish.
+2. **Take the values from the existing code catalog.** No Dataverse read is
+   needed for this step.
+   [VERIFIED via `shared/config/adminPromptCatalog.js`] Admin already
+   describes prompts in `ADMIN_PROMPT_CATALOG`. It has title, description,
+   used by, usage, group and (where needed) section for 40 names. Those names
+   are pinned by `tests/unit/admin-prompt-catalog.test.js` to the audited
+   Production inventory in
+   `docs/audits/prompt-descriptions-and-callers-2026-10-29.md`.
+   - These map one-to-one onto the six columns.
+   - Generate the proposed table from it for Justin and Connor to confirm
+     before anything is written.
+   - After backfill the page shows the same text, now from Dataverse.
 3. **Take a read-only Production inventory.** Collect every prompt name's
    current row: ID, ETag, version, and whether any catalog value is already set.
    - Flag names found in Dataverse but missing from the code table, such as

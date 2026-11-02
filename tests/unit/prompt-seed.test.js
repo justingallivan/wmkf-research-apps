@@ -90,6 +90,37 @@ test('recover (force, none current): creates v(max+1), no flip', async () => {
   expect(out).toMatchObject({ action: 'recover', version: 3 });
 });
 
+test('force versions carry catalog columns from the current row (republish) or latest row (recover)', async () => {
+  const cat = (title) => ({ wmkf_ai_displaytitle: title, wmkf_ai_groupkey: 'tools', wmkf_ai_usagecategory: 'application' });
+  DynamicsService.queryRecords
+    .mockResolvedValueOnce({ records: [{ ...row('v2', 2, true), ...cat('Current title') }, { ...row('v1', 1, false), ...cat('Old title') }] })
+    .mockResolvedValueOnce({ records: [row('new-id', 3, true)] });
+  await seedPromptRow({ promptName: NAME, recordData: RECORD, force: true, now: NOW });
+  expect(DynamicsService.createRecord).toHaveBeenLastCalledWith('wmkf_ai_prompts', expect.objectContaining({
+    wmkf_ai_displaytitle: 'Current title', wmkf_ai_groupkey: 'tools', wmkf_ai_description: null, wmkf_ai_systemprompt: 'sys',
+  }));
+
+  DynamicsService.queryRecords
+    .mockResolvedValueOnce({ records: [{ ...row('v1', 1, false), ...cat('Old title') }, { ...row('v2', 2, false), ...cat('Latest title') }] })
+    .mockResolvedValueOnce({ records: [row('new-id', 3, true)] });
+  await seedPromptRow({ promptName: NAME, recordData: RECORD, force: true, now: NOW });
+  expect(DynamicsService.createRecord).toHaveBeenLastCalledWith('wmkf_ai_prompts', expect.objectContaining({ wmkf_ai_displaytitle: 'Latest title' }));
+});
+
+test('first create carries no catalog columns; explicit seed values win over carried ones', async () => {
+  DynamicsService.queryRecords
+    .mockResolvedValueOnce({ records: [] })
+    .mockResolvedValueOnce({ records: [row('new-id', 1, true)] });
+  await seedPromptRow({ promptName: NAME, recordData: RECORD, now: NOW });
+  expect(DynamicsService.createRecord.mock.calls[0][1]).not.toHaveProperty('wmkf_ai_displaytitle');
+
+  DynamicsService.queryRecords
+    .mockResolvedValueOnce({ records: [{ ...row('v2', 2, true), wmkf_ai_displaytitle: 'Stored' }] })
+    .mockResolvedValueOnce({ records: [row('new-id', 3, true)] });
+  await seedPromptRow({ promptName: NAME, recordData: { ...RECORD, wmkf_ai_displaytitle: 'Seeded' }, force: true, now: NOW });
+  expect(DynamicsService.createRecord).toHaveBeenLastCalledWith('wmkf_ai_prompts', expect.objectContaining({ wmkf_ai_displaytitle: 'Seeded' }));
+});
+
 test('create-only refusal: existing row + no force → SeedRefused, no write', async () => {
   DynamicsService.queryRecords.mockResolvedValueOnce({ records: [row('a', 1, true)] });
   await expect(seedPromptRow({ promptName: NAME, recordData: RECORD })).rejects.toThrow(SeedRefused);

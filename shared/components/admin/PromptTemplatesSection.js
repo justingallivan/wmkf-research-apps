@@ -15,7 +15,7 @@ import { requestEnvelope } from '../../utils/api-request';
 import { ExecutorBudgetEditor } from './ExecutorBudgetEditor';
 import { TONE, fmtTs, fmtInt, ROW_DEFAULT_MAX_TOKENS } from './prompt-editor-utils';
 import PublishForm from './PromptPublishForm';
-import { ADMIN_PROMPT_GROUPS, getAdminPromptDescription } from '../../config/adminPromptCatalog';
+import { ADMIN_PROMPT_GROUPS, resolveAdminPromptDescription } from '../../config/adminPromptCatalog';
 
 export { ExecutorBudgetEditor };
 
@@ -103,11 +103,11 @@ export default function PromptTemplatesSection() {
   if (!prompts || prompts.length === 0) return <div className="text-gray-500 text-sm">No prompts found.</div>;
 
   const groups = ADMIN_PROMPT_GROUPS.map(group => ({
-    ...group, prompts: prompts.filter(prompt => getAdminPromptDescription(prompt.name).group === group.id),
+    ...group, prompts: prompts.filter(prompt => resolveAdminPromptDescription(prompt).group === group.id),
   })).filter(group => group.prompts.length > 0);
   const terms = search.toLowerCase().trim().split(/\s+/).filter(Boolean);
   const matchingNames = new Set(prompts.filter(prompt => {
-    const { title, description, usedBy, group: groupId, section: sectionId } = getAdminPromptDescription(prompt.name);
+    const { title, description, usedBy, group: groupId, section: sectionId } = resolveAdminPromptDescription(prompt);
     const group = ADMIN_PROMPT_GROUPS.find(candidate => candidate.id === groupId);
     const section = group?.sections?.find(candidate => candidate.id === sectionId);
     const text = [prompt.name, title, description, usedBy, group?.label, section?.label].join(' ').toLowerCase();
@@ -163,7 +163,7 @@ export default function PromptTemplatesSection() {
             <div className="space-y-6 p-4">
               {group.id === 'reference' && <p className="text-sm text-gray-600">These stored prompts are kept for reference. The current application routes use code templates instead.</p>}
               {group.sections ? group.sections.map(section => {
-                const sectionPrompts = group.prompts.filter(prompt => getAdminPromptDescription(prompt.name).section === section.id);
+                const sectionPrompts = group.prompts.filter(prompt => resolveAdminPromptDescription(prompt).section === section.id);
                 return (
                   <section key={section.id} aria-label={section.label} hidden={matchCount(sectionPrompts) === 0} className="space-y-4">
                     <h3 className="text-sm font-semibold text-gray-700">{section.label} ({matchCount(sectionPrompts)})</h3>
@@ -194,7 +194,7 @@ function PromptPanel({ prompt, modelCatalog, executorBudgetConfig, onPublished }
   const [expanded, setExpanded] = useState(false);
   const [outcome, setOutcome] = useState(null);
   const dataverseFields = buildPromptDataverseFields(prompt);
-  const description = getAdminPromptDescription(prompt.name);
+  const description = resolveAdminPromptDescription(prompt);
   const usage = USAGE_BADGES[description.usage];
   return (
     <article aria-label={description.title} className="border rounded-lg overflow-hidden">
